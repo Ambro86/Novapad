@@ -45,7 +45,7 @@ Novapad relies on several powerful Rust crates, including:
 
 ## License
 
-[Insert License Here - e.g., MIT, Apache 2.0]
+This project is licensed under the [Creative Commons License](https://creativecommons.org/licenses/by/4.0/).
 
 ## Author
 

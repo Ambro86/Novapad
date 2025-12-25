@@ -1,0 +1,55 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-windows:
+    name: Build & Package (Windows)
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install NSIS
+      run: choco install nsis
+
+    - name: Install cargo-packager
+      run: cargo install cargo-packager --locked
+
+    - name: Build (Release)
+      run: cargo build --verbose --release
+
+    - name: Package Application
+      run: cargo packager --release
+
+    - name: Prepare Portable Artifact
+      shell: powershell
+      run: |
+        New-Item -ItemType Directory -Force -Path "staging"
+        Copy-Item "target/release/novapad.exe" -Destination "staging/"
+        # Add any other required files if needed (e.g., config, assets)
+        # Since 'guida.txt' is embedded via include_str!, we just need the exe.
+
+    - name: Upload Portable (Exe)
+      uses: actions/upload-artifact@v4
+      with:
+        name: Novapad-Portable-Windows
+        path: staging/
+
+    - name: Upload Installers
+      uses: actions/upload-artifact@v4
+      with:
+        name: Novapad-Installers
+        path: target/release/packages/**/*

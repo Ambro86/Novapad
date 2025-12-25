@@ -1,3 +1,5 @@
+[Leggilo in Italiano 🇮🇹](README_IT.md)
+
 # Novapad
 
 **Novapad** is a modern, feature-rich Notepad alternative for Windows, built with Rust. It extends traditional text editing with support for various document formats, Text-to-Speech (TTS) capabilities, and more.

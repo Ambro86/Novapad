@@ -55,26 +55,20 @@ jobs:
       shell: powershell
       run: Get-ChildItem -Path target/release -Recurse
 
-    - name: Prepare Portable Artifact
-      shell: powershell
-      run: |
-        New-Item -ItemType Directory -Force -Path "staging"
-        Copy-Item "target/release/novapad.exe" -Destination "staging/"
-
     - name: Upload Portable (Exe)
       uses: actions/upload-artifact@v4
       with:
-        name: Novapad-Portable-Windows
-        path: staging/
+        name: Novapad-Portable
+        path: target/release/novapad.exe
 
-    - name: Upload Installers
+    - name: Upload Installer (Setup)
       uses: actions/upload-artifact@v4
       with:
-        name: Novapad-Installers
-        path: |
-          target/release/**/*.msi
-          target/release/**/*.exe
-          !target/release/novapad.exe
-          !target/release/deps/**
-          !target/release/build/**
-          !target/release/incremental/**
+        name: Novapad-Setup
+        path: target/release/*-setup.exe
+
+    - name: Upload Installer (MSI)
+      uses: actions/upload-artifact@v4
+      with:
+        name: Novapad-MSI
+        path: target/release/*.msi

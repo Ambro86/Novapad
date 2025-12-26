@@ -11,6 +11,10 @@ mod tts_engine;
 use tts_engine::*;
 mod file_handler;
 use file_handler::*;
+mod menu;
+use menu::*;
+mod search;
+use search::*;
 mod app_windows;
 
 use std::fmt::Display;
@@ -45,7 +49,7 @@ use windows::Win32::System::LibraryLoader::{GetModuleHandleW, LoadLibraryW};
 
 use windows::Win32::UI::Controls::RichEdit::{
 
-    MSFTEDIT_CLASS, EM_SETEVENTMASK, ENM_CHANGE, FINDTEXTEXW, CHARRANGE, EM_FINDTEXTEXW, EM_EXSETSEL, EM_EXGETSEL,
+    MSFTEDIT_CLASS, EM_SETEVENTMASK, ENM_CHANGE, CHARRANGE, EM_EXSETSEL, EM_EXGETSEL,
 
     TEXTRANGEW, EM_GETTEXTRANGE
 
@@ -65,9 +69,7 @@ use windows::Win32::UI::Controls::{
 
 use windows::Win32::UI::Controls::Dialogs::{
 
-    FindTextW, ReplaceTextW, FINDREPLACEW, FINDREPLACE_FLAGS, FR_DIALOGTERM, FR_DOWN, FR_FINDNEXT,
-
-    FR_MATCHCASE, FR_REPLACE, FR_REPLACEALL, FR_WHOLEWORD, GetOpenFileNameW, GetSaveFileNameW,
+    FINDREPLACEW, FINDREPLACE_FLAGS, GetOpenFileNameW, GetSaveFileNameW,
 
     OPENFILENAMEW, OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY, OFN_OVERWRITEPROMPT,
 
@@ -87,15 +89,15 @@ use windows::Win32::UI::Shell::{DragAcceptFiles, DragFinish, DragQueryFileW, HDR
 
 use windows::Win32::UI::WindowsAndMessaging::{
 
-    AppendMenuW, CreateAcceleratorTableW, CreateMenu, CreateWindowExW,
+    CreateAcceleratorTableW, CreateWindowExW,
 
-    DefWindowProcW, DeleteMenu, DestroyWindow, DispatchMessageW, DrawMenuBar, FindWindowW,
+    DefWindowProcW, DestroyWindow, DispatchMessageW, FindWindowW,
 
-    GetClientRect, GetMenuItemCount, GetMessageW, GetWindowLongPtrW, LoadCursorW, LoadIconW,
+    GetClientRect, GetMessageW, GetWindowLongPtrW, LoadCursorW, LoadIconW,
 
     MessageBoxW, MoveWindow, PostQuitMessage, RegisterClassW, SendMessageW,
 
-    SetMenu, RegisterWindowMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW,
+    RegisterWindowMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW,
 
     ShowWindow, PostMessageW, WM_APP,
 
@@ -103,11 +105,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
 
     EN_CHANGE, GWLP_USERDATA, CREATESTRUCTW,
 
-    HMENU, HCURSOR, HICON, IDC_ARROW, IDI_APPLICATION, IDYES, IDNO, MENU_ITEM_FLAGS,
+    HMENU, HCURSOR, HICON, IDC_ARROW, IDI_APPLICATION, IDYES, IDNO,
 
-    MB_ICONERROR, MB_ICONINFORMATION, MB_ICONWARNING, MB_OK, MB_YESNOCANCEL, MF_BYPOSITION,
+    MB_ICONERROR, MB_ICONINFORMATION, MB_ICONWARNING, MB_OK, MB_YESNOCANCEL,
 
-    MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MSG, SW_HIDE, SW_SHOW, WM_CLOSE,
+    MSG, SW_HIDE, SW_SHOW, WM_CLOSE,
 
     WM_COMMAND,
 
@@ -129,39 +131,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
 
 
 
-const IDM_FILE_NEW: usize = 1001;
-const IDM_FILE_OPEN: usize = 1002;
-const IDM_FILE_SAVE: usize = 1003;
-const IDM_FILE_SAVE_AS: usize = 1004;
-const IDM_FILE_SAVE_ALL: usize = 1005;
-const IDM_FILE_CLOSE: usize = 1006;
-const IDM_FILE_EXIT: usize = 1007;
-const IDM_FILE_READ_START: usize = 1008;
-const IDM_FILE_READ_PAUSE: usize = 1009;
-const IDM_FILE_READ_STOP: usize = 1010;
-const IDM_FILE_AUDIOBOOK: usize = 1011;
-const IDM_EDIT_UNDO: usize = 2001;
-const IDM_EDIT_CUT: usize = 2002;
-const IDM_EDIT_COPY: usize = 2003;
-const IDM_EDIT_PASTE: usize = 2004;
-const IDM_EDIT_SELECT_ALL: usize = 2005;
-const IDM_EDIT_FIND: usize = 2006;
-const IDM_EDIT_FIND_NEXT: usize = 2007;
-const IDM_EDIT_REPLACE: usize = 2008;
-const IDM_INSERT_BOOKMARK: usize = 2101;
-const IDM_MANAGE_BOOKMARKS: usize = 2102;
-const IDM_NEXT_TAB: usize = 3001;
-const IDM_FILE_RECENT_BASE: usize = 4000;
-const IDM_TOOLS_OPTIONS: usize = 5001;
-const IDM_HELP_GUIDE: usize = 7001;
-const IDM_HELP_ABOUT: usize = 7002;
-const MAX_RECENT: usize = 5;
 const WM_PDF_LOADED: u32 = WM_APP + 1;
 const WM_TTS_VOICES_LOADED: u32 = WM_APP + 2;
 const WM_TTS_AUDIOBOOK_DONE: u32 = WM_APP + 4;
 const WM_UPDATE_PROGRESS: u32 = WM_APP + 6;
-const FIND_DIALOG_ID: isize = 1;
-const REPLACE_DIALOG_ID: isize = 2;
 const COPYDATA_OPEN_FILE: usize = 1;
 
 struct PdfLoadResult {
@@ -768,17 +741,17 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 }
                 IDM_EDIT_FIND => {
                     log_debug("Menu: Find");
-                    open_find_dialog(hwnd);
+                    search::open_find_dialog(hwnd);
                     LRESULT(0)
                 }
                 IDM_EDIT_FIND_NEXT => {
                     log_debug("Menu: Find next");
-                    find_next_from_state(hwnd);
+                    search::find_next_from_state(hwnd);
                     LRESULT(0)
                 }
                 IDM_EDIT_REPLACE => {
                     log_debug("Menu: Replace");
-                    open_replace_dialog(hwnd);
+                    search::open_replace_dialog(hwnd);
                     LRESULT(0)
                 }
                 IDM_INSERT_BOOKMARK => {
@@ -850,169 +823,6 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
-
-unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
-    let hmenu = CreateMenu().unwrap_or(HMENU(0));
-    let file_menu = CreateMenu().unwrap_or(HMENU(0));
-    let recent_menu = CreateMenu().unwrap_or(HMENU(0));
-    let edit_menu = CreateMenu().unwrap_or(HMENU(0));
-    let insert_menu = CreateMenu().unwrap_or(HMENU(0));
-    let tools_menu = CreateMenu().unwrap_or(HMENU(0));
-    let help_menu = CreateMenu().unwrap_or(HMENU(0));
-
-    let labels = menu_labels(language);
-
-    let _ = append_menu_string(file_menu, MF_STRING, IDM_FILE_NEW, labels.file_new);
-    let _ = append_menu_string(file_menu, MF_STRING, IDM_FILE_OPEN, labels.file_open);
-    let _ = append_menu_string(file_menu, MF_STRING, IDM_FILE_SAVE, labels.file_save);
-    let _ = append_menu_string(file_menu, MF_STRING, IDM_FILE_SAVE_AS, labels.file_save_as);
-    let _ = append_menu_string(file_menu, MF_STRING, IDM_FILE_SAVE_ALL, labels.file_save_all);
-    let _ = append_menu_string(file_menu, MF_STRING, IDM_FILE_CLOSE, labels.file_close);
-    let _ = AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null());
-    let _ = append_menu_string(file_menu, MF_POPUP, recent_menu.0 as usize, labels.file_recent);
-    let _ = AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null());
-    let _ = append_menu_string(file_menu, MF_STRING, IDM_FILE_READ_START, labels.file_read_start);
-    let _ = append_menu_string(file_menu, MF_STRING, IDM_FILE_READ_PAUSE, labels.file_read_pause);
-    let _ = append_menu_string(file_menu, MF_STRING, IDM_FILE_READ_STOP, labels.file_read_stop);
-    let _ = AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null());
-    let _ = append_menu_string(file_menu, MF_STRING, IDM_FILE_AUDIOBOOK, labels.file_audiobook);
-    let _ = AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null());
-    let _ = append_menu_string(file_menu, MF_STRING, IDM_FILE_EXIT, labels.file_exit);
-    let _ = append_menu_string(hmenu, MF_POPUP, file_menu.0 as usize, labels.menu_file);
-
-    let _ = append_menu_string(edit_menu, MF_STRING, IDM_EDIT_UNDO, labels.edit_undo);
-    let _ = AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null());
-    let _ = append_menu_string(edit_menu, MF_STRING, IDM_EDIT_CUT, labels.edit_cut);
-    let _ = append_menu_string(edit_menu, MF_STRING, IDM_EDIT_COPY, labels.edit_copy);
-    let _ = append_menu_string(edit_menu, MF_STRING, IDM_EDIT_PASTE, labels.edit_paste);
-    let _ = append_menu_string(edit_menu, MF_STRING, IDM_EDIT_SELECT_ALL, labels.edit_select_all);
-    let _ = AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null());
-    let _ = append_menu_string(edit_menu, MF_STRING, IDM_EDIT_FIND, labels.edit_find);
-    let _ = append_menu_string(edit_menu, MF_STRING, IDM_EDIT_FIND_NEXT, labels.edit_find_next);
-    let _ = append_menu_string(edit_menu, MF_STRING, IDM_EDIT_REPLACE, labels.edit_replace);
-    let _ = append_menu_string(hmenu, MF_POPUP, edit_menu.0 as usize, labels.menu_edit);
-
-    let _ = append_menu_string(insert_menu, MF_STRING, IDM_INSERT_BOOKMARK, labels.insert_bookmark);
-    let _ = append_menu_string(insert_menu, MF_STRING, IDM_MANAGE_BOOKMARKS, labels.manage_bookmarks);
-    let _ = append_menu_string(hmenu, MF_POPUP, insert_menu.0 as usize, labels.menu_insert);
-
-    let _ = append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_OPTIONS, labels.menu_options);
-    let _ = append_menu_string(hmenu, MF_POPUP, tools_menu.0 as usize, labels.menu_tools);
-
-    let _ = append_menu_string(help_menu, MF_STRING, IDM_HELP_GUIDE, labels.help_guide);
-    let _ = append_menu_string(help_menu, MF_STRING, IDM_HELP_ABOUT, labels.help_about);
-    let _ = append_menu_string(hmenu, MF_POPUP, help_menu.0 as usize, labels.menu_help);
-
-    let _ = SetMenu(hwnd, hmenu);
-    (hmenu, recent_menu)
-}
-
-struct MenuLabels {
-    menu_file: &'static str,
-    menu_edit: &'static str,
-    menu_insert: &'static str,
-    menu_tools: &'static str,
-    menu_help: &'static str,
-    menu_options: &'static str,
-    file_new: &'static str,
-    file_open: &'static str,
-    file_save: &'static str,
-    file_save_as: &'static str,
-    file_save_all: &'static str,
-    file_close: &'static str,
-    file_recent: &'static str,
-    file_read_start: &'static str,
-    file_read_pause: &'static str,
-    file_read_stop: &'static str,
-    file_audiobook: &'static str,
-    file_exit: &'static str,
-    edit_undo: &'static str,
-    edit_cut: &'static str,
-    edit_copy: &'static str,
-    edit_paste: &'static str,
-    edit_select_all: &'static str,
-    edit_find: &'static str,
-    edit_find_next: &'static str,
-    edit_replace: &'static str,
-    insert_bookmark: &'static str,
-    manage_bookmarks: &'static str,
-    help_guide: &'static str,
-    help_about: &'static str,
-    recent_empty: &'static str,
-}
-
-fn menu_labels(language: Language) -> MenuLabels {
-    match language {
-        Language::Italian => MenuLabels {
-            menu_file: "&File",
-            menu_edit: "&Modifica",
-            menu_insert: "&Inserisci",
-            menu_tools: "S&trumenti",
-            menu_help: "&Aiuto",
-            menu_options: "&Opzioni...",
-            file_new: "&Nuovo\tCtrl+N",
-            file_open: "&Apri...\tCtrl+O",
-            file_save: "&Salva\tCtrl+S",
-            file_save_as: "Salva &come...",
-            file_save_all: "Salva &tutto\tCtrl+Shift+S",
-            file_close: "&Chiudi tab\tCtrl+W",
-            file_recent: "File &recenti",
-            file_read_start: "Avvia lettura\tF5",
-            file_read_pause: "Pausa lettura\tF4",
-            file_read_stop: "Stop lettura\tF6",
-            file_audiobook: "Registra audiolibro...\tCtrl+R",
-            file_exit: "&Esci",
-            edit_undo: "&Annulla\tCtrl+Z",
-            edit_cut: "&Taglia\tCtrl+X",
-            edit_copy: "&Copia\tCtrl+C",
-            edit_paste: "&Incolla\tCtrl+V",
-            edit_select_all: "Seleziona &tutto\tCtrl+A",
-            edit_find: "&Trova...\tCtrl+F",
-            edit_find_next: "Trova &successivo\tF3",
-            edit_replace: "&Sostituisci...\tCtrl+H",
-            insert_bookmark: "Inserisci &segnalibro\tCtrl+B",
-            manage_bookmarks: "&Gestisci segnalibri...",
-            help_guide: "&Guida",
-            help_about: "Informazioni &sul programma",
-            recent_empty: "Nessun file recente",
-        },
-        Language::English => MenuLabels {
-            menu_file: "&File",
-            menu_edit: "&Edit",
-            menu_insert: "&Insert",
-            menu_tools: "&Tools",
-            menu_help: "&Help",
-            menu_options: "&Options...",
-            file_new: "&New\tCtrl+N",
-            file_open: "&Open...\tCtrl+O",
-            file_save: "&Save\tCtrl+S",
-            file_save_as: "Save &As...",
-            file_save_all: "Save &All\tCtrl+Shift+S",
-            file_close: "&Close tab\tCtrl+W",
-            file_recent: "Recent &Files",
-            file_read_start: "Start reading\tF5",
-            file_read_pause: "Pause reading\tF4",
-            file_read_stop: "Stop reading\tF6",
-            file_audiobook: "Record audiobook...\tCtrl+R",
-            file_exit: "E&xit",
-            edit_undo: "&Undo\tCtrl+Z",
-            edit_cut: "Cu&t\tCtrl+X",
-            edit_copy: "&Copy\tCtrl+C",
-            edit_paste: "&Paste\tCtrl+V",
-            edit_select_all: "Select &All\tCtrl+A",
-            edit_find: "&Find...\tCtrl+F",
-            edit_find_next: "Find &Next\tF3",
-            edit_replace: "&Replace...\tCtrl+H",
-            insert_bookmark: "Insert &Bookmark\tCtrl+B",
-            manage_bookmarks: "&Manage Bookmarks...",
-            help_guide: "&Guide",
-            help_about: "&About the program",
-            recent_empty: "No recent files",
-        },
-    }
-}
-
-
 
 fn untitled_base(language: Language) -> &'static str {
     match language {
@@ -1130,29 +940,53 @@ fn pdf_loaded_message(language: Language) -> &'static str {
 
 
 
-fn text_not_found_message(language: Language) -> &'static str {
+pub(crate) fn text_not_found_message(language: Language) -> &'static str {
+
+
 
     match language {
 
+
+
         Language::Italian => "Testo non trovato.",
+
+
 
         Language::English => "Text not found.",
 
+
+
     }
+
+
 
 }
 
 
 
-fn find_title(language: Language) -> &'static str {
+
+
+
+
+pub(crate) fn find_title(language: Language) -> &'static str {
+
+
 
     match language {
 
+
+
         Language::Italian => "Trova",
+
+
 
         Language::English => "Find",
 
+
+
     }
+
+
 
 }
 
@@ -1186,10 +1020,7 @@ fn error_save_file_message(language: Language, err: impl Display) -> String {
 
 
 
-unsafe fn append_menu_string(menu: HMENU, flags: MENU_ITEM_FLAGS, id: usize, text: &str) {
-    let wide = to_wide(text);
-    let _ = AppendMenuW(menu, flags, id, PCWSTR(wide.as_ptr()));
-}
+
 
 unsafe fn create_accelerators() -> HACCEL {
     let virt = FCONTROL | FVIRTKEY;
@@ -1214,61 +1045,6 @@ unsafe fn create_accelerators() -> HACCEL {
     CreateAcceleratorTableW(&mut accels).unwrap_or(HACCEL(0))
 }
 
-unsafe fn open_find_dialog(hwnd: HWND) {
-    let has_dialog = with_state(hwnd, |state| state.find_dialog.0 != 0).unwrap_or(false);
-    if has_dialog {
-        let _ = with_state(hwnd, |state| {
-            SetFocus(state.find_dialog);
-        });
-        return;
-    }
-
-    let _ = with_state(hwnd, |state| {
-        let fr = FINDREPLACEW {
-            lStructSize: size_of::<FINDREPLACEW>() as u32,
-            hwndOwner: hwnd,
-            Flags: FR_DOWN,
-            lpstrFindWhat: PWSTR(state.find_text.as_mut_ptr()),
-            wFindWhatLen: state.find_text.len() as u16,
-            lCustData: LPARAM(FIND_DIALOG_ID),
-            ..Default::default()
-        };
-        state.find_replace = Some(fr);
-        if let Some(ref mut fr) = state.find_replace {
-            let dialog = FindTextW(fr);
-            state.find_dialog = dialog;
-        }
-    });
-}
-
-unsafe fn open_replace_dialog(hwnd: HWND) {
-    let has_dialog = with_state(hwnd, |state| state.replace_dialog.0 != 0).unwrap_or(false);
-    if has_dialog {
-        let _ = with_state(hwnd, |state| {
-            SetFocus(state.replace_dialog);
-        });
-        return;
-    }
-
-    let _ = with_state(hwnd, |state| {
-        let fr = FINDREPLACEW {
-            lStructSize: size_of::<FINDREPLACEW>() as u32,
-            hwndOwner: hwnd,
-            Flags: FR_DOWN,
-            lpstrFindWhat: PWSTR(state.find_text.as_mut_ptr()),
-            wFindWhatLen: state.find_text.len() as u16,
-            lpstrReplaceWith: PWSTR(state.replace_text.as_mut_ptr()),
-            wReplaceWithLen: state.replace_text.len() as u16,
-            lCustData: LPARAM(REPLACE_DIALOG_ID),
-            ..Default::default()
-        };
-        state.replace_replace = Some(fr);
-        if let Some(ref mut fr) = state.replace_replace {
-            let dialog = ReplaceTextW(fr);
-            state.replace_dialog = dialog;
-        }
-    });
-}
 
 
 
@@ -1297,270 +1073,20 @@ unsafe fn open_replace_dialog(hwnd: HWND) {
 
 
 
-unsafe fn handle_find_message(hwnd: HWND, lparam: LPARAM) {
-    let fr = &*(lparam.0 as *const FINDREPLACEW);
-    if (fr.Flags & FR_DIALOGTERM) != FINDREPLACE_FLAGS(0) {
-        let _ = with_state(hwnd, |state| {
-            if fr.lCustData.0 == FIND_DIALOG_ID {
-                state.find_dialog = HWND(0);
-                state.find_replace = None;
-            } else if fr.lCustData.0 == REPLACE_DIALOG_ID {
-                state.replace_dialog = HWND(0);
-                state.replace_replace = None;
-            }
-        });
-        return;
-    }
 
-    if (fr.Flags & (FR_FINDNEXT | FR_REPLACE | FR_REPLACEALL)) == FINDREPLACE_FLAGS(0) {
-        return;
-    }
 
-    let search = from_wide(fr.lpstrFindWhat.0);
-    if search.is_empty() {
-        return;
-    }
 
-    let Some(hwnd_edit) = get_active_edit(hwnd) else {
-        return;
-    };
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
 
-    let find_flags = extract_find_flags(fr.Flags);
-    let _ = with_state(hwnd, |state| {
-        state.last_find_flags = find_flags;
-    });
-
-    if (fr.Flags & FR_REPLACEALL) != FINDREPLACE_FLAGS(0) {
-        replace_all(hwnd, hwnd_edit, &search, &from_wide(fr.lpstrReplaceWith.0), find_flags);
-        return;
-    }
-
-    if (fr.Flags & FR_REPLACE) != FINDREPLACE_FLAGS(0) {
-        let replace = from_wide(fr.lpstrReplaceWith.0);
-        let replaced = replace_selection_if_match(hwnd_edit, &search, &replace, find_flags);
-        let found = find_next(hwnd_edit, &search, find_flags, true);
-        if !replaced && !found {
-            let message = to_wide(text_not_found_message(language));
-            let title = to_wide(find_title(language));
-            MessageBoxW(hwnd, PCWSTR(message.as_ptr()), PCWSTR(title.as_ptr()), MB_OK | MB_ICONWARNING);
-        }
-        return;
-    }
-
-    if find_next(hwnd_edit, &search, find_flags, true) {
-        return;
-    }
-    let message = to_wide(text_not_found_message(language));
-    let title = to_wide(find_title(language));
-    MessageBoxW(hwnd, PCWSTR(message.as_ptr()), PCWSTR(title.as_ptr()), MB_OK | MB_ICONWARNING);
-}
-
-unsafe fn find_next_from_state(hwnd: HWND) {
-    let (search, flags, language) = with_state(hwnd, |state| {
-        let search = from_wide(state.find_text.as_ptr());
-        (search, state.last_find_flags, state.settings.language)
-    })
-    .unwrap_or((String::new(), FINDREPLACE_FLAGS(0), Language::default()));
-    if search.is_empty() {
-        open_find_dialog(hwnd);
-        return;
-    }
-    let Some(hwnd_edit) = get_active_edit(hwnd) else {
-        return;
-    };
-    if !find_next(hwnd_edit, &search, flags, true) {
-        let message = to_wide(text_not_found_message(language));
-        let title = to_wide(find_title(language));
-        MessageBoxW(hwnd, PCWSTR(message.as_ptr()), PCWSTR(title.as_ptr()), MB_OK | MB_ICONWARNING);
-    }
-}
 
 pub(crate) unsafe fn get_active_edit(hwnd: HWND) -> Option<HWND> {
     with_state(hwnd, |state| state.docs.get(state.current).map(|doc| doc.hwnd_edit)).flatten()
 }
 
-fn extract_find_flags(flags: FINDREPLACE_FLAGS) -> FINDREPLACE_FLAGS {
-    let mut out = FINDREPLACE_FLAGS(0);
-    if (flags & FR_MATCHCASE) != FINDREPLACE_FLAGS(0) {
-        out |= FR_MATCHCASE;
-    }
-    if (flags & FR_WHOLEWORD) != FINDREPLACE_FLAGS(0) {
-        out |= FR_WHOLEWORD;
-    }
-    if (flags & FR_DOWN) != FINDREPLACE_FLAGS(0) {
-        out |= FR_DOWN;
-    }
-    out
-}
-
-unsafe fn find_next(
-    hwnd_edit: HWND,
-    search: &str,
-    flags: FINDREPLACE_FLAGS,
-    wrap: bool,
-) -> bool {
-    let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
-    SendMessageW(hwnd_edit, EM_EXGETSEL, WPARAM(0), LPARAM(&mut cr as *mut _ as isize));
-    
-    let down = (flags & FR_DOWN) != FINDREPLACE_FLAGS(0);
-    
-    let mut ft = FINDTEXTEXW {
-        chrg: CHARRANGE {
-            cpMin: if down { cr.cpMax } else { cr.cpMin },
-            cpMax: if down { -1 } else { 0 },
-        },
-        lpstrText: PCWSTR(to_wide(search).as_ptr()),
-        chrgText: CHARRANGE { cpMin: 0, cpMax: 0 },
-    };
-
-    let result = SendMessageW(hwnd_edit, EM_FINDTEXTEXW, WPARAM(flags.0 as usize), LPARAM(&mut ft as *mut _ as isize));
-    
-    if result.0 != -1 {
-        let mut sel = ft.chrgText;
-        // Swap to put caret at the beginning
-        std::mem::swap(&mut sel.cpMin, &mut sel.cpMax);
-        SendMessageW(hwnd_edit, EM_EXSETSEL, WPARAM(0), LPARAM(&mut sel as *mut _ as isize));
-        SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
-        SetFocus(hwnd_edit);
-        return true;
-    }
-
-    if wrap {
-        ft.chrg.cpMin = if down { 0 } else { -1 };
-        ft.chrg.cpMax = if down { -1 } else { 0 };
-        let result = SendMessageW(hwnd_edit, EM_FINDTEXTEXW, WPARAM(flags.0 as usize), LPARAM(&mut ft as *mut _ as isize));
-        if result.0 != -1 {
-            let mut sel = ft.chrgText;
-            std::mem::swap(&mut sel.cpMin, &mut sel.cpMax);
-            SendMessageW(hwnd_edit, EM_EXSETSEL, WPARAM(0), LPARAM(&mut sel as *mut _ as isize));
-            SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
-            SetFocus(hwnd_edit);
-            return true;
-        }
-    }
-    false
-}
 
 
 
-unsafe fn replace_selection_if_match(
-    hwnd_edit: HWND,
-    search: &str,
-    replace: &str,
-    flags: FINDREPLACE_FLAGS,
-) -> bool {
-    let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
-    SendMessageW(hwnd_edit, EM_EXGETSEL, WPARAM(0), LPARAM(&mut cr as *mut _ as isize));
-    
-    if cr.cpMin == cr.cpMax {
-        return false;
-    }
 
-    let wide_search = to_wide(search);
-    let mut ft = FINDTEXTEXW {
-        chrg: cr,
-        lpstrText: PCWSTR(wide_search.as_ptr()),
-        chrgText: CHARRANGE { cpMin: 0, cpMax: 0 },
-    };
-    
-    let res = SendMessageW(hwnd_edit, EM_FINDTEXTEXW, WPARAM(flags.0 as usize), LPARAM(&mut ft as *mut _ as isize));
-    
-    if res.0 == cr.cpMin as isize && ft.chrgText.cpMax == cr.cpMax {
-        let replace_wide = to_wide(replace);
-        SendMessageW(
-            hwnd_edit,
-            EM_REPLACESEL,
-            WPARAM(1),
-            LPARAM(replace_wide.as_ptr() as isize),
-        );
-        true
-    } else {
-        false
-    }
-}
 
-unsafe fn replace_all(
-    hwnd: HWND,
-    hwnd_edit: HWND,
-    search: &str,
-    replace: &str,
-    flags: FINDREPLACE_FLAGS,
-) {
-    if search.is_empty() {
-        return;
-    }
-    let mut start = 0i32;
-    let mut replaced_any = false;
-    let replace_wide = to_wide(replace);
-    
-    loop {
-        let mut ft = FINDTEXTEXW {
-            chrg: CHARRANGE {
-                cpMin: start,
-                cpMax: -1,
-            },
-            lpstrText: PCWSTR(to_wide(search).as_ptr()),
-            chrgText: CHARRANGE { cpMin: 0, cpMax: 0 },
-        };
-
-        let res = SendMessageW(hwnd_edit, EM_FINDTEXTEXW, WPARAM(flags.0 as usize), LPARAM(&mut ft as *mut _ as isize));
-        
-        if res.0 != -1 {
-            SendMessageW(hwnd_edit, EM_EXSETSEL, WPARAM(0), LPARAM(&mut ft.chrgText as *mut _ as isize));
-            SendMessageW(
-                hwnd_edit,
-                EM_REPLACESEL,
-                WPARAM(1),
-                LPARAM(replace_wide.as_ptr() as isize),
-            );
-            replaced_any = true;
-            
-            let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
-            SendMessageW(hwnd_edit, EM_EXGETSEL, WPARAM(0), LPARAM(&mut cr as *mut _ as isize));
-            start = cr.cpMax;
-        } else {
-            break;
-        }
-    }
-    
-    if !replaced_any {
-        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-        let message = to_wide(text_not_found_message(language));
-        let title = to_wide(find_title(language));
-        MessageBoxW(hwnd, PCWSTR(message.as_ptr()), PCWSTR(title.as_ptr()), MB_OK | MB_ICONWARNING);
-    }
-}
-
-unsafe fn update_recent_menu(hwnd: HWND, hmenu_recent: HMENU) {
-    let count = GetMenuItemCount(hmenu_recent);
-    if count > 0 {
-        for _ in 0..count {
-            let _ = DeleteMenu(hmenu_recent, 0, MF_BYPOSITION);
-        }
-    }
-
-    let (files, language) = with_state(hwnd, |state| {
-        (state.recent_files.clone(), state.settings.language)
-    })
-    .unwrap_or_default();
-    if files.is_empty() {
-        let labels = menu_labels(language);
-        let _ = append_menu_string(hmenu_recent, MF_STRING | MF_GRAYED, 0, labels.recent_empty);
-    } else {
-        for (i, path) in files.iter().enumerate() {
-            let label = format!("&{} {}", i + 1, abbreviate_recent_label(path));
-            let wide = to_wide(&label);
-            let _ = AppendMenuW(
-                hmenu_recent,
-                MF_STRING,
-                IDM_FILE_RECENT_BASE + i,
-                PCWSTR(wide.as_ptr()),
-            );
-        }
-    }
-    let _ = DrawMenuBar(hwnd);
-}
 
 unsafe fn insert_bookmark(hwnd: HWND) {
     let (hwnd_edit, path, format): (HWND, std::path::PathBuf, FileFormat) = match with_state(hwnd, |state| {
@@ -3024,17 +2550,4 @@ fn save_recent_files(files: &[PathBuf]) {
     if let Ok(json) = serde_json::to_string_pretty(&store) {
         let _ = std::fs::write(path, json);
     }
-}
-
-fn abbreviate_recent_label(path: &Path) -> String {
-    let filename = path.file_name().and_then(|s| s.to_str()).unwrap_or("File");
-    let parent = path.parent().and_then(|p| p.to_str()).unwrap_or("");
-    if parent.is_empty() {
-        return filename.to_string();
-    }
-    let mut suffix = parent.to_string();
-    if suffix.len() > 24 {
-        suffix = format!("...{}", &suffix[suffix.len().saturating_sub(24)..]);
-    }
-    format!("{filename} - {suffix}")
 }

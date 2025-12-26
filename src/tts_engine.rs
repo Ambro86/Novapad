@@ -20,7 +20,9 @@ use uuid::Uuid;
 use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::{PostMessageW, SendMessageW, WM_APP};
 use windows::Win32::System::Power::{SetThreadExecutionState, ES_CONTINUOUS, ES_SYSTEM_REQUIRED};
-use crate::{with_state, get_active_edit, get_edit_text, log_debug, show_error, save_audio_dialog};
+use crate::{with_state, get_active_edit, log_debug, show_error, save_audio_dialog};
+use crate::settings;
+use crate::editor_manager::get_edit_text;
 use crate::settings::{Language, AudiobookResult, TRUSTED_CLIENT_TOKEN};
 use crate::accessibility::{EM_GETSEL};
 
@@ -90,7 +92,7 @@ pub fn start_tts_from_caret(hwnd: HWND) {
     let text = unsafe { get_text_from_caret(hwnd_edit) };
     if text.trim().is_empty() {
         unsafe {
-            show_error(hwnd, language, crate::tts_no_text_message(language));
+            show_error(hwnd, language, settings::tts_no_text_message(language));
         }
         return;
     }
@@ -611,7 +613,7 @@ pub fn start_audiobook(hwnd: HWND) {
     let text = unsafe { get_edit_text(hwnd_edit) };
     if text.trim().is_empty() {
         unsafe {
-            show_error(hwnd, language, crate::tts_no_text_message(language));
+            show_error(hwnd, language, settings::tts_no_text_message(language));
         }
         return;
     }

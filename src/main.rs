@@ -4,6 +4,7 @@
 mod accessibility;
 use accessibility::*;
 mod settings;
+use editor_manager::{Document};
 use settings::*;
 mod bookmarks;
 use bookmarks::*;
@@ -17,11 +18,11 @@ mod search;
 use search::*;
 mod audio_player;
 use audio_player::*;
+mod editor_manager;
+use editor_manager::*;
 mod app_windows;
 
-use std::fmt::Display;
-
-use std::io::{Write};
+use std::io::Write;
 
 use std::mem::size_of;
 
@@ -37,9 +38,9 @@ use serde::{Deserialize, Serialize};
 
 use windows::core::{w, PCWSTR, PWSTR};
 
-use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM, BOOL};
+use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 
-use windows::Win32::Graphics::Gdi::{GetStockObject, HBRUSH, HFONT, COLOR_WINDOW, DEFAULT_GUI_FONT, InvalidateRect, UpdateWindow};
+use windows::Win32::Graphics::Gdi::{GetStockObject, HBRUSH, HFONT, COLOR_WINDOW, DEFAULT_GUI_FONT};
 
 use windows::Win32::System::DataExchange::COPYDATASTRUCT;
 
@@ -47,19 +48,15 @@ use windows::Win32::System::LibraryLoader::{GetModuleHandleW, LoadLibraryW};
 
 use windows::Win32::UI::Controls::RichEdit::{
 
-    MSFTEDIT_CLASS, EM_SETEVENTMASK, ENM_CHANGE, CHARRANGE, EM_EXSETSEL, EM_EXGETSEL,
-
-    TEXTRANGEW, EM_GETTEXTRANGE
+    CHARRANGE, EM_EXSETSEL, EM_EXGETSEL, TEXTRANGEW, EM_GETTEXTRANGE
 
 };
 
 use windows::Win32::UI::Controls::{
 
-    InitCommonControlsEx, ICC_TAB_CLASSES, INITCOMMONCONTROLSEX, NMHDR, TCITEMW, TCIF_TEXT,
+    InitCommonControlsEx, ICC_TAB_CLASSES, INITCOMMONCONTROLSEX, NMHDR, TCM_GETCURSEL,
 
-    TCM_ADJUSTRECT, TCM_DELETEITEM, TCM_GETCURSEL, TCM_INSERTITEMW, TCM_SETCURSEL, TCM_SETITEMW,
-
-    TCN_SELCHANGE, WC_TABCONTROLW, EM_GETMODIFY, EM_SETMODIFY, EM_SETREADONLY,
+    TCN_SELCHANGE, WC_TABCONTROLW,
 
 };
 
@@ -86,43 +83,22 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 use windows::Win32::UI::Shell::{DragAcceptFiles, DragFinish, DragQueryFileW, HDROP};
 
 use windows::Win32::UI::WindowsAndMessaging::{
-
     CreateAcceleratorTableW, CreateWindowExW,
-
     DefWindowProcW, DestroyWindow, DispatchMessageW, FindWindowW,
-
-    GetClientRect, GetMessageW, GetWindowLongPtrW, LoadCursorW, LoadIconW,
-
-    MessageBoxW, MoveWindow, PostQuitMessage, RegisterClassW, SendMessageW,
-
-    RegisterWindowMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW,
-
-    ShowWindow, PostMessageW, WM_APP,
-
+    GetMessageW, GetWindowLongPtrW, LoadCursorW, LoadIconW,
+    MessageBoxW, PostQuitMessage, RegisterClassW, SendMessageW,
+    RegisterWindowMessageW, SetForegroundWindow, SetWindowLongPtrW,
+    PostMessageW, WM_APP,
     TranslateAcceleratorW, TranslateMessage, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT,
-
-    EN_CHANGE, GWLP_USERDATA, CREATESTRUCTW,
-
-    HMENU, HCURSOR, HICON, IDC_ARROW, IDI_APPLICATION, IDYES, IDNO,
-
-    MB_ICONERROR, MB_ICONINFORMATION, MB_ICONWARNING, MB_OK, MB_YESNOCANCEL,
-
-    MSG, SW_HIDE, SW_SHOW, WM_CLOSE,
-
+    GWLP_USERDATA, CREATESTRUCTW, EN_CHANGE,
+    HMENU, HCURSOR, HICON, IDC_ARROW, IDI_APPLICATION,
+    MB_ICONERROR, MB_ICONINFORMATION, MB_OK,
+    MSG, WM_CLOSE,
     WM_COMMAND,
-
     WM_CREATE, WM_DESTROY, WM_DROPFILES, WM_KEYDOWN, WM_NOTIFY, WM_SIZE, WM_TIMER, WNDCLASSW, WS_CHILD,
-
-    WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_VISIBLE, ES_AUTOVSCROLL,
-
-    ES_AUTOHSCROLL, ES_MULTILINE, ES_WANTRETURN, WS_HSCROLL, WS_VSCROLL, ACCEL, FVIRTKEY,
-
-    FCONTROL, FSHIFT, WM_SETFOCUS, WM_NCDESTROY, HACCEL, WM_UNDO, WM_CUT, WM_COPY, WINDOW_STYLE,
-
-    WM_PASTE, WM_GETTEXT, WM_GETTEXTLENGTH, WM_COPYDATA, KillTimer, SetTimer,
-
-    WM_SETREDRAW,
-
+    WS_CLIPCHILDREN, WS_OVERLAPPEDWINDOW, WS_VISIBLE, ACCEL, FVIRTKEY,
+    FCONTROL, FSHIFT, WM_SETFOCUS, WM_NCDESTROY, HACCEL, WM_UNDO, WM_CUT, WM_COPY,
+    WM_PASTE, WM_COPYDATA, KillTimer, SetTimer,
 };
 
 
@@ -146,25 +122,6 @@ struct PdfLoadingState {
     timer_id: usize,
     frame: usize,
 }
-
-#[derive(Default)]
-struct Document {
-    title: String,
-    path: Option<PathBuf>,
-    hwnd_edit: HWND,
-    dirty: bool,
-    format: FileFormat,
-}
-
-
-
-
-
-
-
-
-
-
 
 fn log_path() -> Option<PathBuf> {
     let base = std::env::var_os("APPDATA")?;
@@ -476,17 +433,17 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             };
 
             if let Some(path_str) = file_to_open {
-                open_document(hwnd, Path::new(path_str));
+                editor_manager::open_document(hwnd, Path::new(path_str));
             } else {
-                new_document(hwnd);
+                editor_manager::new_document(hwnd);
             }
             
-            layout_children(hwnd);
+            editor_manager::layout_children(hwnd);
             DragAcceptFiles(hwnd, true);
             LRESULT(0)
         }
         WM_SIZE => {
-            layout_children(hwnd);
+            editor_manager::layout_children(hwnd);
             LRESULT(0)
         }
         WM_SETFOCUS => {
@@ -503,12 +460,12 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         }
         WM_NOTIFY => {
             let hdr = &*(lparam.0 as *const NMHDR);
-            if hdr.code == TCN_SELCHANGE && hdr.hwndFrom == get_tab(hwnd) {
+            if hdr.code == TCN_SELCHANGE && hdr.hwndFrom == editor_manager::get_tab(hwnd) {
                 attempt_switch_to_selected_tab(hwnd);
                 return LRESULT(0);
             }
             if hdr.code == EN_CHANGE as u32 {
-                mark_dirty_from_edit(hwnd, hdr.hwndFrom);
+                editor_manager::mark_dirty_from_edit(hwnd, hdr.hwndFrom);
                 return LRESULT(0);
             }
             DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -652,39 +609,39 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             match cmd_id {
                 IDM_FILE_NEW => {
                     log_debug("Menu: New document");
-                    new_document(hwnd);
+                    editor_manager::new_document(hwnd);
                     LRESULT(0)
                 }
                 IDM_FILE_OPEN => {
                     log_debug("Menu: Open document");
                     if let Some(path) = open_file_dialog(hwnd) {
-                        open_document(hwnd, &path);
+                        editor_manager::open_document(hwnd, &path);
                     }
                     LRESULT(0)
                 }
                 IDM_FILE_SAVE => {
                     log_debug("Menu: Save document");
-                    let _ = save_current_document(hwnd);
+                    let _ = editor_manager::save_current_document(hwnd);
                     LRESULT(0)
                 }
                 IDM_FILE_SAVE_AS => {
                     log_debug("Menu: Save document as");
-                    let _ = save_current_document_as(hwnd);
+                    let _ = editor_manager::save_current_document_as(hwnd);
                     LRESULT(0)
                 }
                 IDM_FILE_SAVE_ALL => {
                     log_debug("Menu: Save all documents");
-                    let _ = save_all_documents(hwnd);
+                    let _ = editor_manager::save_all_documents(hwnd);
                     LRESULT(0)
                 }
                 IDM_FILE_CLOSE => {
                     log_debug("Menu: Close document");
-                    close_current_document(hwnd);
+                    editor_manager::close_current_document(hwnd);
                     LRESULT(0)
                 }
                 IDM_FILE_EXIT => {
                     log_debug("Menu: Exit");
-                    let _ = try_close_app(hwnd);
+                    let _ = editor_manager::try_close_app(hwnd);
                     LRESULT(0)
                 }
                 IDM_FILE_READ_START => {
@@ -708,23 +665,28 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     LRESULT(0)
                 }
                 IDM_EDIT_UNDO => {
-                    send_to_active_edit(hwnd, WM_UNDO);
+                    log_debug("Menu: Undo");
+                    editor_manager::send_to_active_edit(hwnd, WM_UNDO);
                     LRESULT(0)
                 }
                 IDM_EDIT_CUT => {
-                    send_to_active_edit(hwnd, WM_CUT);
+                    log_debug("Menu: Cut");
+                    editor_manager::send_to_active_edit(hwnd, WM_CUT);
                     LRESULT(0)
                 }
                 IDM_EDIT_COPY => {
-                    send_to_active_edit(hwnd, WM_COPY);
+                    log_debug("Menu: Copy");
+                    editor_manager::send_to_active_edit(hwnd, WM_COPY);
                     LRESULT(0)
                 }
                 IDM_EDIT_PASTE => {
-                    send_to_active_edit(hwnd, WM_PASTE);
+                    log_debug("Menu: Paste");
+                    editor_manager::send_to_active_edit(hwnd, WM_PASTE);
                     LRESULT(0)
                 }
                 IDM_EDIT_SELECT_ALL => {
-                    select_all_active_edit(hwnd);
+                    log_debug("Menu: Select All");
+                    editor_manager::select_all_active_edit(hwnd);
                     LRESULT(0)
                 }
                 IDM_EDIT_FIND => {
@@ -812,199 +774,25 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
     }
 }
 
-fn untitled_base(language: Language) -> &'static str {
-    match language {
-        Language::Italian => "Senza titolo",
-        Language::English => "Untitled",
-    }
-}
 
-fn untitled_title(language: Language, count: usize) -> String {
-    format!("{} {}", untitled_base(language), count)
-}
 
-fn recent_missing_message(language: Language) -> &'static str {
-    match language {
-        Language::Italian => "Il file recente non esiste piu'.",
-        Language::English => "The recent file no longer exists.",
-    }
-}
 
-fn confirm_save_message(language: Language, title: &str) -> String {
 
-    match language {
 
-        Language::Italian => format!("Il documento \"{}\" e' modificato. Salvare?", title),
 
-        Language::English => format!("The document \"{}\" has been modified. Save?", title),
 
-    }
 
-}
 
 
 
-fn confirm_title(language: Language) -> &'static str {
 
-    match language {
 
-        Language::Italian => "Conferma",
 
-        Language::English => "Confirm",
 
-    }
 
-}
 
 
 
-fn error_title(language: Language) -> &'static str {
-
-    match language {
-
-        Language::Italian => "Errore",
-
-        Language::English => "Error",
-
-    }
-
-}
-
-
-
-pub(crate) fn tts_no_text_message(language: Language) -> &'static str {
-
-    match language {
-
-        Language::Italian => "Non c'e' testo da leggere.",
-
-        Language::English => "There is no text to read.",
-
-    }
-
-}
-
-
-
-fn audiobook_done_title(language: Language) -> &'static str {
-
-    match language {
-
-        Language::Italian => "Audiolibro",
-
-        Language::English => "Audiobook",
-
-    }
-
-}
-
-
-
-fn info_title(language: Language) -> &'static str {
-
-    match language {
-
-        Language::Italian => "Info",
-
-        Language::English => "Info",
-
-    }
-
-}
-
-
-
-fn pdf_loaded_message(language: Language) -> &'static str {
-
-    match language {
-
-        Language::Italian => "PDF caricato.",
-
-        Language::English => "PDF loaded.",
-
-    }
-
-}
-
-
-
-pub(crate) fn text_not_found_message(language: Language) -> &'static str {
-
-
-
-    match language {
-
-
-
-        Language::Italian => "Testo non trovato.",
-
-
-
-        Language::English => "Text not found.",
-
-
-
-    }
-
-
-
-}
-
-
-
-
-
-
-
-pub(crate) fn find_title(language: Language) -> &'static str {
-
-
-
-    match language {
-
-
-
-        Language::Italian => "Trova",
-
-
-
-        Language::English => "Find",
-
-
-
-    }
-
-
-
-}
-
-
-
-fn error_open_file_message(language: Language, err: impl Display) -> String {
-
-    match language {
-
-        Language::Italian => format!("Errore apertura file: {err}"),
-
-        Language::English => format!("Error opening file: {err}"),
-
-    }
-
-}
-
-
-
-fn error_save_file_message(language: Language, err: impl Display) -> String {
-
-    match language {
-
-        Language::Italian => format!("Errore salvataggio file: {err}"),
-
-        Language::English => format!("Error saving file: {err}"),
-
-    }
-
-}
 
 
 
@@ -1178,7 +966,7 @@ unsafe fn insert_bookmark(hwnd: HWND) {
     }
 }
 
-unsafe fn goto_first_bookmark(hwnd_edit: HWND, path: &Path, bookmarks: &BookmarkStore, format: FileFormat) {
+pub(crate) unsafe fn goto_first_bookmark(hwnd_edit: HWND, path: &Path, bookmarks: &BookmarkStore, format: FileFormat) {
     let path_str = path.to_string_lossy().to_string();
     if let Some(list) = bookmarks.files.get(&path_str) {
         if let Some(bm) = list.first() {
@@ -1217,7 +1005,7 @@ pub(crate) unsafe fn rebuild_menus(hwnd: HWND) {
     update_recent_menu(hwnd, recent_menu);
 }
 
-unsafe fn push_recent_file(hwnd: HWND, path: &Path) {
+pub(crate) unsafe fn push_recent_file(hwnd: HWND, path: &Path) {
     let (hmenu_recent, files) = match with_state(hwnd, |state| {
         state.recent_files.retain(|p| p != path);
         state.recent_files.insert(0, path.to_path_buf());
@@ -1251,170 +1039,11 @@ unsafe fn open_recent_by_index(hwnd: HWND, index: usize) {
     open_document(hwnd, &path);
 }
 
-unsafe fn sync_dirty_from_edit(hwnd: HWND, index: usize) -> bool {
-    let mut hwnd_edit = HWND(0);
-    let mut is_dirty = false;
-    let mut is_current = false;
-    let _ = with_state(hwnd, |state| {
-        if let Some(doc) = state.docs.get(index) {
-            hwnd_edit = doc.hwnd_edit;
-            is_dirty = doc.dirty;
-            is_current = state.current == index;
-        }
-    });
 
-    if hwnd_edit.0 == 0 {
-        return is_dirty;
-    }
 
-    let modified = SendMessageW(hwnd_edit, EM_GETMODIFY, WPARAM(0), LPARAM(0)).0 != 0;
-    if modified && !is_dirty {
-        let _ = with_state(hwnd, |state| {
-            if let Some(doc) = state.docs.get_mut(index) {
-                doc.dirty = true;
-                update_tab_title(state.hwnd_tab, index, &doc.title, true);
-            }
-        });
-        if is_current {
-            update_window_title(hwnd);
-        }
-    }
-    is_dirty || modified
-}
 
-unsafe fn confirm_save_if_dirty_entry(hwnd: HWND, index: usize, title: &str) -> bool {
-    if !sync_dirty_from_edit(hwnd, index) {
-        return true;
-    }
 
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    let message = confirm_save_message(language, title);
-    let wide = to_wide(&message);
-    let confirm = to_wide(confirm_title(language));
-    let result = MessageBoxW(
-        hwnd,
-        PCWSTR(wide.as_ptr()),
-        PCWSTR(confirm.as_ptr()),
-        MB_YESNOCANCEL | MB_ICONWARNING,
-    );
-    match result {
-        IDYES => save_document_at(hwnd, index, false),
-        IDNO => true,
-        _ => false,
-    }
-}
 
-unsafe fn close_current_document(hwnd: HWND) {
-    let index = match with_state(hwnd, |state| state.current) {
-        Some(index) => index,
-        None => return,
-    };
-    let _ = close_document_at(hwnd, index);
-}
-
-unsafe fn close_document_at(hwnd: HWND, index: usize) -> bool {
-    let (current, hwnd_tab, count, title) = match with_state(hwnd, |state| {
-        if index >= state.docs.len() {
-            return None;
-        }
-        Some((
-            state.current,
-            state.hwnd_tab,
-            state.docs.len(),
-            state.docs[index].title.clone(),
-        ))
-    }) {
-        Some(Some(values)) => values,
-        _ => return false,
-    };
-    if index >= count {
-        return false;
-    }
-    if !confirm_save_if_dirty_entry(hwnd, index, &title) {
-        return false;
-    }
-
-    let mut was_empty = false;
-    let mut new_hwnd_edit = None;
-    let mut update_title = false;
-    let mut closing_hwnd_edit = HWND(0);
-    let _ = with_state(hwnd, |state| {
-        let was_current = index == current;
-        let doc = state.docs.remove(index);
-        closing_hwnd_edit = doc.hwnd_edit;
-        SendMessageW(hwnd_tab, TCM_DELETEITEM, WPARAM(index), LPARAM(0));
-
-        if state.docs.is_empty() {
-            was_empty = true;
-            return;
-        }
-
-        if was_current {
-            let idx = if index >= state.docs.len() {
-                state.docs.len() - 1
-            } else {
-                index
-            };
-            state.current = idx;
-            SendMessageW(hwnd_tab, TCM_SETCURSEL, WPARAM(idx), LPARAM(0));
-            new_hwnd_edit = state.docs.get(idx).map(|doc| doc.hwnd_edit);
-            update_title = true;
-        } else if index < state.current {
-            state.current -= 1;
-            SendMessageW(hwnd_tab, TCM_SETCURSEL, WPARAM(state.current), LPARAM(0));
-        }
-    });
-
-    if closing_hwnd_edit.0 != 0 {
-        stop_pdf_loading_animation(hwnd, closing_hwnd_edit);
-        let _ = DestroyWindow(closing_hwnd_edit);
-    }
-
-    if was_empty {
-        new_document(hwnd);
-        return true;
-    }
-
-    if let Some(hwnd_edit) = new_hwnd_edit {
-        let is_audiobook = with_state(hwnd, |state| {
-            state.docs.get(state.current).map(|d| matches!(d.format, FileFormat::Audiobook)).unwrap_or(false)
-        }).unwrap_or(false);
-
-        if is_audiobook {
-            ShowWindow(hwnd_edit, SW_HIDE);
-            let hwnd_tab = with_state(hwnd, |state| state.hwnd_tab).unwrap_or(HWND(0));
-            if hwnd_tab.0 != 0 { SetFocus(hwnd_tab); }
-        } else {
-            ShowWindow(hwnd_edit, SW_SHOW);
-            SetFocus(hwnd_edit);
-        }
-        update_window_title(hwnd);
-        layout_children(hwnd);
-    } else if update_title {
-        update_window_title(hwnd);
-    }
-
-    true
-}
-
-unsafe fn try_close_app(hwnd: HWND) -> bool {
-    let entries = with_state(hwnd, |state| {
-        state
-            .docs
-            .iter()
-            .enumerate()
-            .map(|(i, doc)| (i, doc.title.clone()))
-            .collect::<Vec<_>>()
-    })
-    .unwrap_or_default();
-    for (index, title) in entries {
-        if !confirm_save_if_dirty_entry(hwnd, index, &title) {
-            return false;
-        }
-    }
-    let _ = DestroyWindow(hwnd);
-    true
-}
 
 pub(crate) unsafe fn with_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
@@ -1428,130 +1057,17 @@ where
     }
 }
 
-unsafe fn get_current_index(hwnd: HWND) -> usize {
-    with_state(hwnd, |state| state.current).unwrap_or(0)
-}
 
-unsafe fn get_tab(hwnd: HWND) -> HWND {
-    with_state(hwnd, |state| state.hwnd_tab).unwrap_or(HWND(0))
-}
 
-unsafe fn new_document(hwnd: HWND) {
-    let new_index = with_state(hwnd, |state| {
-        state.untitled_count += 1;
-        let title = untitled_title(state.settings.language, state.untitled_count);
-        let hwnd_edit = create_edit(hwnd, state.hfont, state.settings.word_wrap);
-        let doc = Document {
-            title: title.clone(),
-            path: None,
-            hwnd_edit,
-            dirty: false,
-            format: FileFormat::Text(TextEncoding::Utf8),
-        };
-        state.docs.push(doc);
-        insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);
-        state.docs.len() - 1
-    })
-    .unwrap_or(0);
-    select_tab(hwnd, new_index);
-}
 
-unsafe fn open_document(hwnd: HWND, path: &Path) {
-    log_debug(&format!("Open document: {}", path.display()));
 
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    if is_pdf_path(path) {
-        open_pdf_document_async(hwnd, path);
-        return;
-    }
-    let (content, format) = if is_docx_path(path) {
-        match read_docx_text(path, language) {
-            Ok(text) => (text, FileFormat::Docx),
-            Err(message) => {
-                show_error(hwnd, language, &message);
-                return;
-            }
-        }
-    } else if is_epub_path(path) {
-        match read_epub_text(path, language) {
-            Ok(text) => (text, FileFormat::Epub),
-            Err(message) => {
-                show_error(hwnd, language, &message);
-                return;
-            }
-        }
-    } else if is_mp3_path(path) {
-        (String::new(), FileFormat::Audiobook)
-    } else if is_doc_path(path) {
-        match read_doc_text(path, language) {
-            Ok(text) => (text, FileFormat::Doc),
-            Err(message) => {
-                show_error(hwnd, language, &message);
-                return;
-            }
-        }
-    } else if is_spreadsheet_path(path) {
-        match read_spreadsheet_text(path, language) {
-            Ok(text) => (text, FileFormat::Spreadsheet),
-            Err(message) => {
-                show_error(hwnd, language, &message);
-                return;
-            }
-        }
-    } else {
-        match std::fs::read(path) {
-            Ok(bytes) => match decode_text(&bytes, language) {
-                Ok((text, encoding)) => (text, FileFormat::Text(encoding)),
-                Err(message) => {
-                    show_error(hwnd, language, &message);
-                    return;
-                }
-            },
-            Err(err) => {
-                show_error(hwnd, language, &error_open_file_message(language, err));
-                return;
-            }
-        }
-    };
-
-    let new_index = with_state(hwnd, |state| {
-        let title = path.file_name().and_then(|s| s.to_str()).unwrap_or("File");
-        let hwnd_edit = create_edit(hwnd, state.hfont, state.settings.word_wrap);
-        set_edit_text(hwnd_edit, &content);
-
-        let doc = Document {
-            title: title.to_string(),
-            path: Some(path.to_path_buf()),
-            hwnd_edit,
-            dirty: false,
-            format,
-        };
-        if matches!(format, FileFormat::Audiobook) {
-            unsafe {
-                SendMessageW(hwnd_edit, EM_SETREADONLY, WPARAM(1), LPARAM(0));
-                ShowWindow(hwnd_edit, SW_HIDE);
-            }
-        }
-        state.docs.push(doc);
-        insert_tab(state.hwnd_tab, title, (state.docs.len() - 1) as i32);
-        goto_first_bookmark(hwnd_edit, path, &state.bookmarks, format);
-        state.docs.len() - 1
-    })
-    .unwrap_or(0);
-    select_tab(hwnd, new_index);
-    if matches!(format, FileFormat::Audiobook) {
-        unsafe { start_audiobook_playback(hwnd, path); }
-    }
-    push_recent_file(hwnd, path);
-}
-
-unsafe fn open_pdf_document_async(hwnd: HWND, path: &Path) {
+pub(crate) unsafe fn open_pdf_document_async(hwnd: HWND, path: &Path) {
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
     let path_buf = path.to_path_buf();
     let title = path.file_name().and_then(|s| s.to_str()).unwrap_or("File").to_string();
     let (hwnd_edit, new_index) = with_state(hwnd, |state| {
         let hwnd_edit = create_edit(hwnd, state.hfont, state.settings.word_wrap);
-        set_edit_text(hwnd_edit, &pdf_loading_placeholder(0));
+        editor_manager::set_edit_text(hwnd_edit, &pdf_loading_placeholder(0));
         let doc = Document {
             title: title.clone(),
             path: Some(path_buf.clone()),
@@ -1621,7 +1137,7 @@ unsafe fn handle_pdf_loaded(hwnd: HWND, payload: PdfLoadResult) {
 
     match result {
         Ok(text) => {
-            set_edit_text(hwnd_edit, &text);
+            editor_manager::set_edit_text(hwnd_edit, &text);
             let _ = with_state(hwnd, |state| {
                 goto_first_bookmark(hwnd_edit, &path, &state.bookmarks, FileFormat::Pdf);
             });
@@ -1699,11 +1215,11 @@ unsafe fn handle_pdf_loading_timer(hwnd: HWND, timer_id: usize) {
     });
 
     if let Some((hwnd_edit, frame)) = target {
-        set_edit_text(hwnd_edit, &pdf_loading_placeholder(frame));
+        editor_manager::set_edit_text(hwnd_edit, &pdf_loading_placeholder(frame));
     }
 }
 
-fn pdf_loading_placeholder(frame: usize) -> String {
+pub(crate) fn pdf_loading_placeholder(frame: usize) -> String {
     let spinner = ['|', '/', '-', '\\'][frame % 4];
     let bar_width = 24;
     let filled = frame % (bar_width + 1);
@@ -1734,102 +1250,7 @@ unsafe fn handle_drop_files(hwnd: HWND, hdrop: HDROP) {
     DragFinish(hdrop);
 }
 
-unsafe fn save_current_document(hwnd: HWND) -> bool {
-    save_document_at(hwnd, get_current_index(hwnd), false)
-}
 
-unsafe fn save_current_document_as(hwnd: HWND) -> bool {
-    save_document_at(hwnd, get_current_index(hwnd), true)
-}
-
-unsafe fn save_all_documents(hwnd: HWND) -> bool {
-    let dirty_indices = with_state(hwnd, |state| {
-        state
-            .docs
-            .iter()
-            .enumerate()
-            .filter_map(|(i, doc)| if doc.dirty { Some(i) } else { None })
-            .collect::<Vec<_>>()
-    })
-    .unwrap_or_default();
-    for index in dirty_indices {
-        if !save_document_at(hwnd, index, false) {
-            return false;
-        }
-    }
-    true
-}
-
-unsafe fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
-    let path = match with_state(hwnd, |state| {
-        if state.docs.is_empty() || index >= state.docs.len() {
-            return None;
-        }
-        let language = state.settings.language;
-        let text = get_edit_text(state.docs[index].hwnd_edit);
-        let suggested_name = suggested_filename_from_text(&text)
-            .filter(|name| !name.is_empty())
-            .unwrap_or_else(|| state.docs[index].title.clone());
-
-        let path = if !force_dialog {
-            state.docs[index].path.clone()
-        } else {
-            None
-        };
-        let path = match path {
-            Some(path) => path,
-            None => match save_file_dialog(hwnd, Some(&suggested_name)) {
-                Some(path) => path,
-                None => return None,
-            },
-        };
-
-        let is_docx = is_docx_path(&path);
-        let is_pdf = is_pdf_path(&path);
-        if is_docx {
-            if let Err(message) = write_docx_text(&path, &text, language) {
-                show_error(hwnd, language, &message);
-                return None;
-            }
-            state.docs[index].format = FileFormat::Docx;
-        } else if is_pdf {
-            let pdf_title = path.file_stem().and_then(|s| s.to_str()).unwrap_or("Documento");
-            if let Err(message) = write_pdf_text(&path, pdf_title, &text, language) {
-                show_error(hwnd, language, &message);
-                return None;
-            }
-            state.docs[index].format = FileFormat::Pdf;
-        } else {
-            let encoding = match state.docs[index].format {
-                FileFormat::Text(enc) => enc,
-                FileFormat::Docx | FileFormat::Doc | FileFormat::Pdf | FileFormat::Spreadsheet | FileFormat::Epub | FileFormat::Audiobook => TextEncoding::Utf8,
-            };
-            let bytes = encode_text(&text, encoding);
-            if let Err(err) = std::fs::write(&path, bytes) {
-                show_error(hwnd, language, &error_save_file_message(language, err));
-                return None;
-            }
-            state.docs[index].format = FileFormat::Text(encoding);
-        }
-
-        let hwnd_edit = state.docs[index].hwnd_edit;
-        state.docs[index].path = Some(path.clone());
-        state.docs[index].dirty = false;
-        SendMessageW(hwnd_edit, EM_SETMODIFY, WPARAM(0), LPARAM(0));
-        let title = path.file_name().and_then(|s| s.to_str()).unwrap_or("File");
-        state.docs[index].title = title.to_string();
-        update_tab_title(state.hwnd_tab, index, &state.docs[index].title, false);
-        if index == state.current {
-            update_window_title(hwnd);
-        }
-        Some(path)
-    }) {
-        Some(Some(path)) => path,
-        _ => return false,
-    };
-    push_recent_file(hwnd, &path);
-    true
-}
 
 unsafe fn next_tab_with_prompt(hwnd: HWND) {
     let (current, count) = match with_state(hwnd, |state| {
@@ -1875,255 +1296,8 @@ unsafe fn attempt_switch_to_selected_tab(hwnd: HWND) {
     select_tab(hwnd, sel);
 }
 
-unsafe fn select_tab(hwnd: HWND, index: usize) {
-    let result = with_state(hwnd, |state| {
-        if index >= state.docs.len() {
-            return None;
-        }
-        let prev = state.current;
-        let prev_edit = state.docs.get(prev).map(|doc| doc.hwnd_edit);
-        let new_doc = state.docs.get(index);
-        let new_edit = new_doc.map(|doc| doc.hwnd_edit);
-        let is_audiobook = new_doc.map(|doc| matches!(doc.format, FileFormat::Audiobook)).unwrap_or(false);
-        state.current = index;
-        Some((state.hwnd_tab, prev_edit, new_edit, is_audiobook))
-    })
-    .flatten();
-
-    let Some((hwnd_tab, prev_edit, new_edit, is_audiobook)) = result else {
-        return;
-    };
-
-    if let Some(hwnd_edit) = prev_edit {
-        ShowWindow(hwnd_edit, SW_HIDE);
-    }
-    SendMessageW(hwnd_tab, TCM_SETCURSEL, WPARAM(index), LPARAM(0));
-    if let Some(hwnd_edit) = new_edit {
-        if is_audiobook {
-            ShowWindow(hwnd_edit, SW_HIDE);
-            SetFocus(hwnd_tab);
-        } else {
-            ShowWindow(hwnd_edit, SW_SHOW);
-            SetFocus(hwnd_edit);
-        }
-    }
-    update_window_title(hwnd);
-    layout_children(hwnd);
-}
-
-unsafe fn insert_tab(hwnd_tab: HWND, title: &str, index: i32) {
-    let mut text = to_wide(title);
-    let mut item = TCITEMW {
-        mask: TCIF_TEXT,
-        pszText: PWSTR(text.as_mut_ptr()),
-        ..Default::default()
-    };
-    SendMessageW(hwnd_tab, TCM_INSERTITEMW, WPARAM(index as usize), LPARAM(&mut item as *mut _ as isize));
-}
-
-unsafe fn update_tab_title(hwnd_tab: HWND, index: usize, title: &str, dirty: bool) {
-    let label = if dirty {
-        format!("{title}*")
-    } else {
-        title.to_string()
-    };
-    let mut text = to_wide(&label);
-    let mut item = TCITEMW {
-        mask: TCIF_TEXT,
-        pszText: PWSTR(text.as_mut_ptr()),
-        ..Default::default()
-    };
-    SendMessageW(hwnd_tab, TCM_SETITEMW, WPARAM(index), LPARAM(&mut item as *mut _ as isize));
-}
-
-unsafe fn mark_dirty_from_edit(hwnd: HWND, hwnd_edit: HWND) {
-    let _ = with_state(hwnd, |state| {
-        for (i, doc) in state.docs.iter_mut().enumerate() {
-            if doc.hwnd_edit == hwnd_edit && !doc.dirty {
-                doc.dirty = true;
-                update_tab_title(state.hwnd_tab, i, &doc.title, true);
-                update_window_title(hwnd);
-                break;
-            }
-        }
-    });
-}
-
-unsafe fn update_window_title(hwnd: HWND) {
-    let _ = with_state(hwnd, |state| {
-        if let Some(doc) = state.docs.get(state.current) {
-            let suffix = if doc.dirty { "*" } else { "" };
-            let untitled = untitled_base(state.settings.language);
-            let display_title = if doc.title.starts_with(untitled) {
-                untitled
-            } else {
-                doc.title.as_str()
-            };
-            let title = format!("{display_title}{suffix} - Novapad");
-            let _ = SetWindowTextW(hwnd, PCWSTR(to_wide(&title).as_ptr()));
-        }
-    });
-}
-
-unsafe fn layout_children(hwnd: HWND) {
-    let state_data = with_state(hwnd, |state| {
-        (state.hwnd_tab, state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>())
-    });
-    let Some((hwnd_tab, edit_handles)) = state_data else {
-        return;
-    };
-    let mut rc = RECT::default();
-    if GetClientRect(hwnd, &mut rc).is_err() {
-        return;
-    }
-    let width = rc.right - rc.left;
-    let height = rc.bottom - rc.top;
-    let _ = MoveWindow(hwnd_tab, 0, 0, width, height, true);
-
-    let mut display = rc;
-    SendMessageW(
-        hwnd_tab,
-        TCM_ADJUSTRECT,
-        WPARAM(0),
-        LPARAM(&mut display as *mut _ as isize),
-    );
-    let edit_width = display.right - display.left;
-    let edit_height = display.bottom - display.top;
-    for hwnd_edit in edit_handles {
-        let _ = MoveWindow(
-            hwnd_edit,
-            display.left,
-            display.top,
-            edit_width,
-            edit_height,
-            true,
-        );
-    }
-}
-
-unsafe fn create_edit(parent: HWND, hfont: HFONT, word_wrap: bool) -> HWND {
-    let mut base_style = WS_CHILD.0 | WS_VSCROLL.0 | ES_MULTILINE as u32 | ES_AUTOVSCROLL as u32 | ES_WANTRETURN as u32;
-
-    if !word_wrap {
-        base_style |= WS_HSCROLL.0 | ES_AUTOHSCROLL as u32;
-    }
-
-    let style = WINDOW_STYLE(base_style);
-
-    let hwnd_edit = CreateWindowExW(
-        WS_EX_CLIENTEDGE,
-        MSFTEDIT_CLASS,
-        PCWSTR::null(),
-        style,
-        0,
-        0,
-        0,
-        0,
-        parent,
-        HMENU(0),
-        HINSTANCE(0),
-        None,
-    );
-    SendMessageW(hwnd_edit, EM_LIMITTEXT, WPARAM(0x7FFFFFFE), LPARAM(0));
-    SendMessageW(hwnd_edit, EM_SETEVENTMASK, WPARAM(0), LPARAM(ENM_CHANGE as isize));
-    SendMessageW(hwnd_edit, EM_SETREADONLY, WPARAM(0), LPARAM(0));
-    SendMessageW(hwnd_edit, EM_SETMODIFY, WPARAM(0), LPARAM(0));
-    SendMessageW(
-        hwnd_edit,
-        windows::Win32::UI::WindowsAndMessaging::WM_SETFONT,
-        WPARAM(hfont.0 as usize),
-        LPARAM(1),
-    );
-    ShowWindow(hwnd_edit, SW_HIDE);
-    hwnd_edit
-}
-
-pub(crate) unsafe fn apply_word_wrap_to_all_edits(hwnd: HWND, word_wrap: bool) {
-    let edits = with_state(hwnd, |state| state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>())
-        .unwrap_or_default();
-
-    for edit in edits {
-        apply_word_wrap_to_edit(edit, word_wrap);
-    }
-}
-
-unsafe fn apply_word_wrap_to_edit(hwnd_edit: HWND, word_wrap: bool) {
-    use windows::Win32::UI::WindowsAndMessaging::{
-        GetWindowLongPtrW, SetWindowLongPtrW, SetWindowPos, GWL_STYLE, SWP_FRAMECHANGED, SWP_NOMOVE,
-        SWP_NOSIZE, SWP_NOZORDER,
-    };
-
-    let _ = SendMessageW(hwnd_edit, WM_SETREDRAW, WPARAM(0), LPARAM(0));
-
-    let mut style = GetWindowLongPtrW(hwnd_edit, GWL_STYLE) as u32;
-
-    if word_wrap {
-        style &= !(WS_HSCROLL.0);
-        style &= !(ES_AUTOHSCROLL as u32);
-    } else {
-        style |= WS_HSCROLL.0;
-        style |= ES_AUTOHSCROLL as u32;
-    }
-
-    let _ = SetWindowLongPtrW(hwnd_edit, GWL_STYLE, style as isize);
-    let _ = SetWindowPos(
-        hwnd_edit,
-        HWND(0),
-        0,
-        0,
-        0,
-        0,
-        SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
-    );
-
-    let _ = SendMessageW(hwnd_edit, WM_SETREDRAW, WPARAM(1), LPARAM(0));
-    let _ = InvalidateRect(hwnd_edit, None, BOOL(1));
-    let _ = UpdateWindow(hwnd_edit);
-}
 
 
-unsafe fn send_to_active_edit(hwnd: HWND, msg: u32) {
-    let _ = with_state(hwnd, |state| {
-        if let Some(doc) = state.docs.get(state.current) {
-            SendMessageW(doc.hwnd_edit, msg, WPARAM(0), LPARAM(0));
-        }
-    });
-}
-
-unsafe fn select_all_active_edit(hwnd: HWND) {
-    let _ = with_state(hwnd, |state| {
-        if let Some(doc) = state.docs.get(state.current) {
-            SendMessageW(doc.hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(-1));
-        }
-    });
-}
-
-unsafe fn set_edit_text(hwnd_edit: HWND, text: &str) {
-    let wide = to_wide_normalized(text);
-    
-    SendMessageW(hwnd_edit, WM_SETREDRAW, WPARAM(0), LPARAM(0));
-    let _ = SetWindowTextW(hwnd_edit, PCWSTR(wide.as_ptr()));
-    SendMessageW(hwnd_edit, WM_SETREDRAW, WPARAM(1), LPARAM(0));
-    
-    let _ = InvalidateRect(hwnd_edit, None, BOOL(1));
-    let _ = UpdateWindow(hwnd_edit);
-    SendMessageW(hwnd_edit, EM_SETMODIFY, WPARAM(0), LPARAM(0));
-}
-
-pub(crate) unsafe fn get_edit_text(hwnd_edit: HWND) -> String {
-    let len = SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as usize;
-    if len == 0 {
-        return String::new();
-    }
-    let mut buffer = vec![0u16; len + 1];
-    SendMessageW(
-        hwnd_edit,
-        WM_GETTEXT,
-        WPARAM((len + 1) as usize),
-        LPARAM(buffer.as_mut_ptr() as isize),
-    );
-    String::from_utf16_lossy(&buffer[..len])
-}
 
 fn suggested_filename_from_text(text: &str) -> Option<String> {
     let first_line = text.lines().next().unwrap_or("").trim();

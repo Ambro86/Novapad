@@ -15,11 +15,9 @@ pub enum PlayerAction {
 }
 
 pub const EM_GETSEL: u32 = 0x00B0;
-pub const EM_SETSEL: u32 = 0x00B1;
 pub const EM_EXSETSEL: u32 = 0x0400 + 55;
 pub const EM_SCROLLCARET: u32 = 0x00B7;
 pub const EM_REPLACESEL: u32 = 0x00C2;
-pub const EM_LIMITTEXT: u32 = 0x00C5;
 
 pub const ES_CENTER: u32 = 0x0001;
 pub const ES_READONLY: u32 = 0x0800;

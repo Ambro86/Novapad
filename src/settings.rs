@@ -134,3 +134,98 @@ pub fn save_settings(settings: AppSettings) {
         let _ = std::fs::write(path, json);
     }
 }
+
+pub fn untitled_base(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "Senza titolo",
+        Language::English => "Untitled",
+    }
+}
+
+pub fn untitled_title(language: Language, count: usize) -> String {
+    format!("{} {}", untitled_base(language), count)
+}
+
+pub fn recent_missing_message(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "Il file recente non esiste piu'.",
+        Language::English => "The recent file no longer exists.",
+    }
+}
+
+pub fn confirm_save_message(language: Language, title: &str) -> String {
+    match language {
+        Language::Italian => format!("Il documento \"{}\" e' modificato. Salvare?", title),
+        Language::English => format!("The document \"{}\" has been modified. Save?", title),
+    }
+}
+
+pub fn confirm_title(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "Conferma",
+        Language::English => "Confirm",
+    }
+}
+
+pub fn error_title(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "Errore",
+        Language::English => "Error",
+    }
+}
+
+pub fn tts_no_text_message(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "Non c'e' testo da leggere.",
+        Language::English => "There is no text to read.",
+    }
+}
+
+pub fn audiobook_done_title(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "Audiolibro",
+        Language::English => "Audiobook",
+    }
+}
+
+pub fn info_title(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "Info",
+        Language::English => "Info",
+    }
+}
+
+pub fn pdf_loaded_message(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "PDF caricato.",
+        Language::English => "PDF loaded.",
+    }
+}
+
+pub fn text_not_found_message(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "Testo non trovato.",
+        Language::English => "Text not found.",
+    }
+}
+
+pub fn find_title(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "Trova",
+        Language::English => "Find",
+    }
+}
+
+pub fn error_open_file_message(language: Language, _err: impl std::fmt::Display) -> String {
+    match language {
+        Language::Italian => format!("Errore apertura file: {_err}"),
+        Language::English => format!("Error opening file: {_err}"),
+    }
+}
+
+pub fn error_save_file_message(language: Language, _err: impl std::fmt::Display) -> String {
+    match language {
+        Language::Italian => format!("Errore salvataggio file: {_err}"),
+        Language::English => format!("Error saving file: {_err}"),
+    }
+}

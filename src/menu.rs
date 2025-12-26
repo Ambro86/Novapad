@@ -207,7 +207,7 @@ pub unsafe fn update_recent_menu(hwnd: HWND, hmenu_recent: HMENU) {
         }
     }
 
-    let (files, language) = with_state(hwnd, |state| {
+    let (files, language): (Vec<std::path::PathBuf>, Language) = with_state(hwnd, |state| {
         (state.recent_files.clone(), state.settings.language)
     })
     .unwrap_or_default();

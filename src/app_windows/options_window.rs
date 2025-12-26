@@ -16,7 +16,8 @@ use windows::Win32::UI::Controls::{WC_BUTTON, WC_STATIC, WC_COMBOBOXW, BST_CHECK
 use windows::Win32::Graphics::Gdi::{HBRUSH, COLOR_WINDOW, HFONT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetFocus, SetFocus, VK_RETURN, VK_ESCAPE, EnableWindow};
-use crate::{with_state, rebuild_menus, apply_word_wrap_to_all_edits};
+use crate::{with_state, rebuild_menus};
+use crate::editor_manager::apply_word_wrap_to_all_edits;
 use crate::settings::{Language, OpenBehavior, VoiceInfo, save_settings, TRUSTED_CLIENT_TOKEN, VOICE_LIST_URL};
 use crate::accessibility::{to_wide, handle_accessibility};
 use std::thread;

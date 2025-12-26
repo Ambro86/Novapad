@@ -12,9 +12,9 @@ use windows::Win32::UI::Controls::Dialogs::{
     FR_MATCHCASE, FR_WHOLEWORD
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{SetFocus};
-use crate::settings::Language;
+use crate::settings::{Language, find_title, text_not_found_message};
 use crate::accessibility::{to_wide, from_wide, EM_SCROLLCARET, EM_REPLACESEL};
-use crate::{with_state, get_active_edit, text_not_found_message, find_title};
+use crate::{with_state, get_active_edit};
 
 pub const FIND_DIALOG_ID: isize = 1;
 pub const REPLACE_DIALOG_ID: isize = 2;
@@ -135,7 +135,7 @@ pub unsafe fn handle_find_message(hwnd: HWND, lparam: LPARAM) {
 }
 
 pub unsafe fn find_next_from_state(hwnd: HWND) {
-    let (search, flags, language) = with_state(hwnd, |state| {
+    let (search, flags, language): (String, FINDREPLACE_FLAGS, Language) = with_state(hwnd, |state| {
         let search = from_wide(state.find_text.as_ptr());
         (search, state.last_find_flags, state.settings.language)
     })

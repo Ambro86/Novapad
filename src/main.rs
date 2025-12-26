@@ -1,13 +1,22 @@
 #![allow(unsafe_op_in_unsafe_fn)]
 #![windows_subsystem = "windows"]
 
+mod accessibility;
+use accessibility::*;
+mod settings;
+use settings::*;
+mod bookmarks;
+use bookmarks::*;
+mod tts_engine;
+use tts_engine::*;
+mod app_windows;
+
 use std::fmt::Display;
 use std::io::{BufWriter, Read, Write};
 use std::mem::size_of;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool};
 use std::sync::Arc;
-use std::thread;
 use std::time::Duration;
 use chrono::Local;
 use docx_rs::{
@@ -17,22 +26,12 @@ use docx_rs::{
 use calamine::{open_workbook_auto, Reader, Data as CalamineData};
 use cfb::CompoundFile;
 use encoding_rs::{Encoding, WINDOWS_1252};
-use futures_util::{SinkExt, StreamExt};
+
 use pdf_extract::extract_text;
 use printpdf::{BuiltinFont, Mm, PdfDocument};
-use rand::Rng;
 use rodio::{Decoder, OutputStream, Sink, Source};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
-use tokio::sync::mpsc;
-use tokio_tungstenite::{
-    connect_async,
-    tungstenite::client::IntoClientRequest,
-    tungstenite::http::HeaderValue,
-    tungstenite::protocol::Message,
-};
-use url::Url;
-use uuid::Uuid;
+
 use windows::core::{w, PCWSTR, PWSTR};
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM, BOOL};
 use windows::Win32::Graphics::Gdi::{GetStockObject, HBRUSH, HFONT, COLOR_WINDOW, DEFAULT_GUI_FONT, InvalidateRect, UpdateWindow};
@@ -42,13 +41,10 @@ use windows::Win32::UI::Controls::RichEdit::{
     MSFTEDIT_CLASS, EM_SETEVENTMASK, ENM_CHANGE, FINDTEXTEXW, CHARRANGE, EM_FINDTEXTEXW, EM_EXSETSEL, EM_EXGETSEL,
     TEXTRANGEW, EM_GETTEXTRANGE
 };
-use windows::Win32::System::Power::{SetThreadExecutionState, ES_CONTINUOUS, ES_SYSTEM_REQUIRED};
 use windows::Win32::UI::Controls::{
     InitCommonControlsEx, ICC_TAB_CLASSES, INITCOMMONCONTROLSEX, NMHDR, TCITEMW, TCIF_TEXT,
     TCM_ADJUSTRECT, TCM_DELETEITEM, TCM_GETCURSEL, TCM_INSERTITEMW, TCM_SETCURSEL, TCM_SETITEMW,
-    TCN_SELCHANGE, WC_TABCONTROLW, EM_GETMODIFY, EM_SETMODIFY, EM_SETREADONLY, WC_BUTTON,
-    WC_COMBOBOXW, WC_STATIC, BST_CHECKED, PBM_SETRANGE, PBM_SETPOS,
-    WC_LISTBOXW,
+    TCN_SELCHANGE, WC_TABCONTROLW, EM_GETMODIFY, EM_SETMODIFY, EM_SETREADONLY,
 };
 
 use windows::Win32::UI::Controls::Dialogs::{
@@ -58,43 +54,30 @@ use windows::Win32::UI::Controls::Dialogs::{
     OFN_PATHMUSTEXIST,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    EnableWindow, GetFocus, GetKeyState, SetFocus, VK_CONTROL, VK_ESCAPE, VK_F3, VK_F4, VK_F5,
-    VK_F6, VK_RETURN, VK_TAB, VK_SPACE, VK_LEFT, VK_RIGHT, VK_UP, VK_DOWN, VK_HOME,
-    VK_END, VK_PRIOR, VK_NEXT
+    GetKeyState, SetFocus, VK_CONTROL, VK_F3, VK_F4, VK_F5,
+    VK_F6, VK_TAB
 };
 use windows::Win32::UI::Shell::{DragAcceptFiles, DragFinish, DragQueryFileW, HDROP};
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreateAcceleratorTableW, CreateMenu, CreateWindowExW,
     DefWindowProcW, DeleteMenu, DestroyWindow, DispatchMessageW, DrawMenuBar, FindWindowW,
     GetClientRect, GetMenuItemCount, GetMessageW, GetWindowLongPtrW, LoadCursorW, LoadIconW,
-    IsDialogMessageW, MessageBoxW, MoveWindow, PostQuitMessage, RegisterClassW, SendMessageW,
+    MessageBoxW, MoveWindow, PostQuitMessage, RegisterClassW, SendMessageW,
     SetMenu, RegisterWindowMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW,
-    ShowWindow, PostMessageW, WM_APP, GetParent, WS_POPUP,
+    ShowWindow, PostMessageW, WM_APP,
     TranslateAcceleratorW, TranslateMessage, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT,
     EN_CHANGE, GWLP_USERDATA, CREATESTRUCTW,
     HMENU, HCURSOR, HICON, IDC_ARROW, IDI_APPLICATION, IDYES, IDNO, MENU_ITEM_FLAGS,
-    MB_ICONERROR, MB_ICONINFORMATION, MB_ICONWARNING, MB_OK, MB_YESNOCANCEL, MB_YESNO, MF_BYPOSITION,
+    MB_ICONERROR, MB_ICONINFORMATION, MB_ICONWARNING, MB_OK, MB_YESNOCANCEL, MF_BYPOSITION,
     MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MSG, SW_HIDE, SW_SHOW, WM_CLOSE,
-    WM_COMMAND, WS_CAPTION, WS_SYSMENU, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_TABSTOP,
+    WM_COMMAND,
     WM_CREATE, WM_DESTROY, WM_DROPFILES, WM_KEYDOWN, WM_NOTIFY, WM_SIZE, WM_TIMER, WNDCLASSW, WS_CHILD,
     WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_VISIBLE, ES_AUTOVSCROLL,
     ES_AUTOHSCROLL, ES_MULTILINE, ES_WANTRETURN, WS_HSCROLL, WS_VSCROLL, ACCEL, FVIRTKEY,
     FCONTROL, FSHIFT, WM_SETFOCUS, WM_NCDESTROY, HACCEL, WM_UNDO, WM_CUT, WM_COPY, WINDOW_STYLE,
-    WM_PASTE, WM_GETTEXT, WM_GETTEXTLENGTH, WM_COPYDATA, KillTimer, SetTimer, WM_SETFONT,
-    BM_GETCHECK, BM_SETCHECK, CB_ADDSTRING, CB_GETCURSEL, CB_GETITEMDATA,
-    CB_RESETCONTENT, CB_SETCURSEL, CB_SETITEMDATA, CBS_DROPDOWNLIST, CB_GETDROPPEDSTATE,
-    BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, WM_SETREDRAW,
-    LB_ADDSTRING, LB_GETCURSEL, LBN_DBLCLK, LB_GETCOUNT, LB_RESETCONTENT, LB_SETCURSEL,
-    LBS_NOTIFY, LBS_HASSTRINGS,
+    WM_PASTE, WM_GETTEXT, WM_GETTEXTLENGTH, WM_COPYDATA, KillTimer, SetTimer,
+    WM_SETREDRAW,
 };
-
-use windows::Win32::UI::WindowsAndMessaging::{IDCANCEL};
-
-const EM_GETSEL: u32 = 0x00B0;
-const EM_SETSEL: u32 = 0x00B1;
-const EM_SCROLLCARET: u32 = 0x00B7;
-const EM_REPLACESEL: u32 = 0x00C2;
-const EM_LIMITTEXT: u32 = 0x00C5;
 
 const IDM_FILE_NEW: usize = 1001;
 const IDM_FILE_OPEN: usize = 1002;
@@ -125,45 +108,11 @@ const IDM_HELP_ABOUT: usize = 7002;
 const MAX_RECENT: usize = 5;
 const WM_PDF_LOADED: u32 = WM_APP + 1;
 const WM_TTS_VOICES_LOADED: u32 = WM_APP + 2;
-const WM_TTS_PLAYBACK_DONE: u32 = WM_APP + 3;
 const WM_TTS_AUDIOBOOK_DONE: u32 = WM_APP + 4;
-const WM_TTS_PLAYBACK_ERROR: u32 = WM_APP + 5;
 const WM_UPDATE_PROGRESS: u32 = WM_APP + 6;
-const WM_TTS_CHUNK_START: u32 = WM_APP + 7;
 const FIND_DIALOG_ID: isize = 1;
 const REPLACE_DIALOG_ID: isize = 2;
 const COPYDATA_OPEN_FILE: usize = 1;
-const ES_CENTER: u32 = 0x1;
-const ES_READONLY: u32 = 0x800;
-
-const TRUSTED_CLIENT_TOKEN: &str = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
-const WSS_URL_BASE: &str = "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1";
-const VOICE_LIST_URL: &str = "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list";
-const MAX_TTS_TEXT_LEN: usize = 3000;
-const MAX_TTS_TEXT_LEN_LONG: usize = 2000;
-const MAX_TTS_FIRST_CHUNK_LEN_LONG: usize = 800;
-const TTS_LONG_TEXT_THRESHOLD: usize = MAX_TTS_TEXT_LEN;
-
-const OPTIONS_CLASS_NAME: &str = "NovapadOptions";
-const OPTIONS_ID_LANG: usize = 6001;
-const OPTIONS_ID_OPEN: usize = 6002;
-const OPTIONS_ID_VOICE: usize = 6003;
-const OPTIONS_ID_MULTILINGUAL: usize = 6004;
-const OPTIONS_ID_SPLIT_ON_NEWLINE: usize = 6007;
-const OPTIONS_ID_WORD_WRAP: usize = 6008;
-const OPTIONS_ID_MOVE_CURSOR: usize = 6009;
-const OPTIONS_ID_AUDIO_SKIP: usize = 6010;
-const OPTIONS_ID_OK: usize = 6005;
-const OPTIONS_ID_CANCEL: usize = 6006;
-const HELP_ID_OK: usize = 7003;
-const HELP_CLASS_NAME: &str = "NovapadHelp";
-const PROGRESS_CLASS_NAME: &str = "NovapadProgress";
-const PROGRESS_ID_CANCEL: usize = 8001;
-const BOOKMARKS_CLASS_NAME: &str = "NovapadBookmarks";
-const BOOKMARKS_ID_LIST: usize = 9001;
-const BOOKMARKS_ID_DELETE: usize = 9002;
-const BOOKMARKS_ID_GOTO: usize = 9003;
-const BOOKMARKS_ID_OK: usize = 9004;
 
 struct PdfLoadResult {
     hwnd_edit: HWND,
@@ -186,44 +135,15 @@ struct Document {
     format: FileFormat,
 }
 
-#[derive(Clone)]
-struct VoiceInfo {
-    short_name: String,
-    locale: String,
-    is_multilingual: bool,
-}
 
-enum TtsCommand {
-    Pause,
-    Resume,
-    Stop,
-}
 
-struct TtsSession {
-    id: u64,
-    command_tx: mpsc::UnboundedSender<TtsCommand>,
-    cancel: Arc<AtomicBool>,
-    paused: bool,
-    initial_caret_pos: i32,
-}
 
-struct AudiobookResult {
-    success: bool,
-    message: String,
-}
 
-#[derive(Clone)]
-struct TtsChunk {
-    text_to_read: String,
-    original_len: usize,
-}
 
-struct ProgressDialogState {
-    hwnd_pb: HWND,
-    hwnd_text: HWND,
-    hwnd_cancel: HWND,
-    total: usize,
-}
+
+
+
+
 
 fn log_path() -> Option<PathBuf> {
     let base = std::env::var_os("APPDATA")?;
@@ -246,60 +166,10 @@ fn log_debug(message: &str) {
     }
 }
 
-fn prevent_sleep(enable: bool) {
-    unsafe {
-        if enable {
-            SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
-        } else {
-            SetThreadExecutionState(ES_CONTINUOUS);
-        }
-    }
-}
 
-fn post_tts_error(hwnd: HWND, session_id: u64, message: String) {
-    log_debug(&format!("TTS error: {message}"));
-    let payload = Box::new(message);
-    let _ = unsafe {
-        PostMessageW(
-            hwnd,
-            WM_TTS_PLAYBACK_ERROR,
-            WPARAM(session_id as usize),
-            LPARAM(Box::into_raw(payload) as isize),
-        )
-    };
-}
 
-struct OptionsDialogState {
-    parent: HWND,
-    combo_lang: HWND,
-    combo_open: HWND,
-    combo_voice: HWND,
-    combo_audio_skip: HWND,
-    checkbox_multilingual: HWND,
-    checkbox_split_on_newline: HWND,
-    checkbox_word_wrap: HWND,
-    checkbox_move_cursor: HWND,
-    ok_button: HWND,
-}
 
-struct HelpWindowState {
-    parent: HWND,
-    edit: HWND,
-    ok_button: HWND,
-}
 
-#[derive(Clone, Serialize, Deserialize)]
-struct Bookmark {
-    position: i32,
-    snippet: String,
-    timestamp: String,
-}
-
-#[derive(Default, Serialize, Deserialize)]
-struct BookmarkStore {
-    // Path string -> list of bookmarks
-    files: std::collections::HashMap<String, Vec<Bookmark>>,
-}
 
 struct AudiobookPlayer {
     path: PathBuf,
@@ -312,7 +182,7 @@ struct AudiobookPlayer {
 }
 
 #[derive(Default)]
-struct AppState {
+pub(crate) struct AppState {
     hwnd_tab: HWND,
     docs: Vec<Document>,
     current: usize,
@@ -346,94 +216,6 @@ struct AppState {
 #[derive(Default, Serialize, Deserialize)]
 struct RecentFileStore {
     files: Vec<String>,
-}
-
-#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-enum OpenBehavior {
-    #[serde(rename = "new_tab")]
-    NewTab,
-    #[serde(rename = "new_window")]
-    NewWindow,
-}
-
-impl Default for OpenBehavior {
-    fn default() -> Self {
-        OpenBehavior::NewTab
-    }
-}
-
-#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-enum Language {
-    #[serde(rename = "it")]
-    Italian,
-    #[serde(rename = "en")]
-    English,
-}
-
-impl Default for Language {
-    fn default() -> Self {
-        Language::Italian
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(default)]
-struct AppSettings {
-    open_behavior: OpenBehavior,
-    language: Language,
-    tts_voice: String,
-    tts_only_multilingual: bool,
-    split_on_newline: bool,
-    word_wrap: bool,
-    move_cursor_during_reading: bool,
-    audiobook_skip_seconds: u32,
-}
-
-impl Default for AppSettings {
-    fn default() -> Self {
-        AppSettings {
-            open_behavior: OpenBehavior::NewTab,
-            language: Language::Italian,
-            tts_voice: "it-IT-IsabellaNeural".to_string(),
-            tts_only_multilingual: false,
-            split_on_newline: true,
-            word_wrap: true,
-            move_cursor_during_reading: false,
-            audiobook_skip_seconds: 60,
-        }
-    }
-}
-
-
-#[derive(Clone, Copy)]
-enum TextEncoding {
-    Utf8,
-    Utf16Le,
-    Utf16Be,
-    Windows1252,
-}
-
-impl Default for TextEncoding {
-    fn default() -> Self {
-        TextEncoding::Utf8
-    }
-}
-
-#[derive(Clone, Copy)]
-enum FileFormat {
-    Text(TextEncoding),
-    Docx,
-    Doc,
-    Pdf,
-    Spreadsheet,
-    Epub,
-    Audiobook,
-}
-
-impl Default for FileFormat {
-    fn default() -> Self {
-        FileFormat::Text(TextEncoding::Utf8)
-    }
 }
 
 fn main() -> windows::core::Result<()> {
@@ -518,51 +300,37 @@ fn main() -> windows::core::Result<()> {
                     let secondary_open = state.bookmarks_window.0 != 0 || state.options_dialog.0 != 0 || state.help_window.0 != 0;
                     
                     if is_audiobook && !secondary_open {
-                        match msg.wParam.0 as u32 {
-                            vk if vk == VK_SPACE.0 as u32 => {
+                        match handle_player_keyboard(&msg, state.settings.audiobook_skip_seconds) {
+                            PlayerAction::TogglePause => {
                                 toggle_audiobook_pause(hwnd);
                                 handled = true;
                                 return;
                             }
-                            vk if vk == VK_LEFT.0 as u32 => {
-                                let skip = state.settings.audiobook_skip_seconds as i64;
-                                seek_audiobook(hwnd, -skip);
+                            PlayerAction::Seek(amount) => {
+                                seek_audiobook(hwnd, amount);
                                 handled = true;
                                 return;
                             }
-                            vk if vk == VK_RIGHT.0 as u32 => {
-                                let skip = state.settings.audiobook_skip_seconds as i64;
-                                seek_audiobook(hwnd, skip);
+                            PlayerAction::Volume(delta) => {
+                                change_audiobook_volume(hwnd, delta);
                                 handled = true;
                                 return;
                             }
-                            vk if vk == VK_UP.0 as u32 => {
-                                change_audiobook_volume(hwnd, 0.1);
+                            PlayerAction::BlockNavigation => {
                                 handled = true;
                                 return;
                             }
-                            vk if vk == VK_DOWN.0 as u32 => {
-                                change_audiobook_volume(hwnd, -0.1);
-                                handled = true;
-                                return;
-                            }
-                            // Block navigation to prevent screen reader noise
-                            vk if vk == VK_HOME.0 as u32 || vk == VK_END.0 as u32 ||
-                                  vk == VK_PRIOR.0 as u32 || vk == VK_NEXT.0 as u32 => {
-                                handled = true;
-                                return;
-                            }
-                            _ => {}
+                            PlayerAction::None => {}
                         }
                     }
                 }
 
-                if state.find_dialog.0 != 0 && IsDialogMessageW(state.find_dialog, &msg).as_bool() {
+                if state.find_dialog.0 != 0 && handle_accessibility(state.find_dialog, &msg) {
                     handled = true;
                     return;
                 }
                 if state.replace_dialog.0 != 0
-                    && IsDialogMessageW(state.replace_dialog, &msg).as_bool()
+                    && handle_accessibility(state.replace_dialog, &msg)
                 {
                     handled = true;
                     return;
@@ -571,78 +339,33 @@ fn main() -> windows::core::Result<()> {
                 if state.help_window.0 != 0 {
                     // Manual TAB handling for Help window
                     if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_TAB.0 as u32 {
-                        let _ = with_help_state(state.help_window, |h| {
-                            let focus = GetFocus();
-                            if focus == h.edit {
-                                SetFocus(h.ok_button);
-                            } else {
-                                SetFocus(h.edit);
-                            }
-                        });
+                        app_windows::help_window::handle_tab(state.help_window);
                         handled = true;
                         return;
                     }
 
-                    if IsDialogMessageW(state.help_window, &msg).as_bool() {
+                    if handle_accessibility(state.help_window, &msg) {
                         handled = true;
                         return;
                     }
                 }
 
                 if state.options_dialog.0 != 0 {
-                    // Special handling for Enter key in Options dialog to satisfy requirement:
-                    // "Enter activates OK" even in ComboBoxes (when closed).
-                    if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
-                        let focus = GetFocus();
-                        if GetParent(focus) == state.options_dialog {
-                            let dropped = SendMessageW(focus, CB_GETDROPPEDSTATE, WPARAM(0), LPARAM(0)).0 != 0;
-                            if !dropped {
-                                // If not a dropped-down combo, force OK.
-                                let _ = with_options_state(state.options_dialog, |opt_state| {
-                                    let _ = SendMessageW(
-                                        state.options_dialog,
-                                        WM_COMMAND,
-                                        WPARAM(OPTIONS_ID_OK | (0 << 16)),
-                                        LPARAM(opt_state.ok_button.0),
-                                    );
-                                });
-                                handled = true;
-                                return;
-                            }
-                        }
-                    }
-
-                    if IsDialogMessageW(state.options_dialog, &msg).as_bool() {
+                    if app_windows::options_window::handle_navigation(state.options_dialog, &msg) {
                         handled = true;
                         return;
                     }
                 }
 
                 if state.audiobook_progress.0 != 0 {
-                    if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
-                        if GetFocus() == with_progress_state(state.audiobook_progress, |s| s.hwnd_cancel).unwrap_or(HWND(0)) {
-                            request_cancel_audiobook(state.audiobook_progress);
-                            handled = true;
-                            return;
-                        }
-                    }
-                    if IsDialogMessageW(state.audiobook_progress, &msg).as_bool() {
+                    if app_windows::audiobook_window::handle_navigation(state.audiobook_progress, &msg) {
                         handled = true;
                         return;
                     }
                 }
 
                 if state.bookmarks_window.0 != 0 {
-                    if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
-                        let focus = GetFocus();
-                        let (list, btn) = with_bookmarks_state(state.bookmarks_window, |s| (s.hwnd_list, s.hwnd_goto)).unwrap_or((HWND(0), HWND(0)));
-                        if focus == list || focus == btn {
-                            goto_selected_bookmark(state.bookmarks_window);
-                            handled = true;
-                            return;
-                        }
-                    }
-                    if IsDialogMessageW(state.bookmarks_window, &msg).as_bool() {
+                    if app_windows::bookmarks_window::handle_navigation(state.bookmarks_window, &msg) {
                         handled = true;
                         return;
                     }
@@ -796,13 +519,13 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 return LRESULT(0);
             }
             let payload = Box::from_raw(lparam.0 as *mut Vec<VoiceInfo>);
-            let voices = *payload;
+            let voices: Vec<VoiceInfo> = *payload;
             let _ = with_state(hwnd, |state| {
                 state.voice_list = voices.clone();
             });
             if let Some(dialog) = with_state(hwnd, |state| state.options_dialog) {
                 if dialog.0 != 0 {
-                    refresh_options_voices(dialog);
+                    app_windows::options_window::refresh_voices(dialog);
                 }
             }
             LRESULT(0)
@@ -843,7 +566,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 return LRESULT(0);
             }
             let payload = Box::from_raw(lparam.0 as *mut String);
-            let message = *payload;
+            let message: String = *payload;
             let session_id = wparam.0 as u64;
             let mut should_show = false;
             let _ = with_state(hwnd, |state| {
@@ -955,22 +678,22 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 }
                 IDM_FILE_READ_START => {
                     log_debug("Menu: Start reading");
-                    start_tts_from_caret(hwnd);
+                    tts_engine::start_tts_from_caret(hwnd);
                     LRESULT(0)
                 }
                 IDM_FILE_READ_PAUSE => {
                     log_debug("Menu: Pause/resume reading");
-                    toggle_tts_pause(hwnd);
+                    tts_engine::toggle_tts_pause(hwnd);
                     LRESULT(0)
                 }
                 IDM_FILE_READ_STOP => {
                     log_debug("Menu: Stop reading");
-                    stop_tts_playback(hwnd);
+                    tts_engine::stop_tts_playback(hwnd);
                     LRESULT(0)
                 }
                 IDM_FILE_AUDIOBOOK => {
                     log_debug("Menu: Record audiobook");
-                    start_audiobook(hwnd);
+                    tts_engine::start_audiobook(hwnd);
                     LRESULT(0)
                 }
                 IDM_EDIT_UNDO => {
@@ -1015,7 +738,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 }
                 IDM_MANAGE_BOOKMARKS => {
                     log_debug("Menu: Manage Bookmarks");
-                    open_bookmarks_window(hwnd);
+                    app_windows::bookmarks_window::open(hwnd);
                     LRESULT(0)
                 }
                 IDM_NEXT_TAB => {
@@ -1024,17 +747,17 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 }
                 IDM_TOOLS_OPTIONS => {
                     log_debug("Menu: Options");
-                    open_options_dialog(hwnd);
+                    app_windows::options_window::open(hwnd);
                     LRESULT(0)
                 }
                 IDM_HELP_GUIDE => {
                     log_debug("Menu: Guide");
-                    open_help_window(hwnd);
+                    app_windows::help_window::open(hwnd);
                     LRESULT(0)
                 }
                 IDM_HELP_ABOUT => {
                     log_debug("Menu: About");
-                    show_about_dialog(hwnd);
+                    app_windows::about_window::show(hwnd);
                     LRESULT(0)
                 }
                 _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -1239,68 +962,7 @@ fn menu_labels(language: Language) -> MenuLabels {
     }
 }
 
-struct OptionsLabels {
-    title: &'static str,
-    label_language: &'static str,
-    label_open: &'static str,
-    label_voice: &'static str,
-    label_multilingual: &'static str,
-    label_split_on_newline: &'static str,
-    label_word_wrap: &'static str,
-    label_move_cursor: &'static str,
-    label_audio_skip: &'static str,
-    lang_it: &'static str,
-    lang_en: &'static str,
-    open_new_tab: &'static str,
-    open_new_window: &'static str,
-    ok: &'static str,
-    cancel: &'static str,
-    voices_loading: &'static str,
-    voices_empty: &'static str,
-}
 
-fn options_labels(language: Language) -> OptionsLabels {
-    match language {
-        Language::Italian => OptionsLabels {
-            title: "Opzioni",
-            label_language: "Lingua interfaccia:",
-            label_open: "Apertura file:",
-            label_voice: "Voce:",
-            label_multilingual: "Mostra solo voci multilingua",
-            label_split_on_newline: "Spezza la lettura quando si va a capo",
-            label_word_wrap: "A capo automatico nella finestra",
-            label_move_cursor: "Sposta il cursore durante la lettura",
-            label_audio_skip: "Spostamento MP3 (frecce):",
-            lang_it: "Italiano",
-            lang_en: "Inglese",
-            open_new_tab: "Apri file in nuovo tab",
-            open_new_window: "Apri file in nuova finestra",
-            ok: "OK",
-            cancel: "Annulla",
-            voices_loading: "Caricamento voci...",
-            voices_empty: "Nessuna voce disponibile",
-        },
-        Language::English => OptionsLabels {
-            title: "Options",
-            label_language: "Interface language:",
-            label_open: "Open behavior:",
-            label_voice: "Voice:",
-            label_multilingual: "Show only multilingual voices",
-            label_split_on_newline: "Split reading on new lines",
-            label_word_wrap: "Word wrap in editor",
-            label_move_cursor: "Move cursor during reading",
-            label_audio_skip: "MP3 skip interval:",
-            lang_it: "Italian",
-            lang_en: "English",
-            open_new_tab: "Open files in new tab",
-            open_new_window: "Open files in new window",
-            ok: "OK",
-            cancel: "Cancel",
-            voices_loading: "Loading voices...",
-            voices_empty: "No voices available",
-        },
-    }
-}
 
 fn untitled_base(language: Language) -> &'static str {
     match language {
@@ -1341,7 +1003,7 @@ fn error_title(language: Language) -> &'static str {
     }
 }
 
-fn tts_no_text_message(language: Language) -> &'static str {
+pub(crate) fn tts_no_text_message(language: Language) -> &'static str {
     match language {
         Language::Italian => "Non c'e' testo da leggere.",
         Language::English => "There is no text to read.",
@@ -1355,12 +1017,7 @@ fn audiobook_done_title(language: Language) -> &'static str {
     }
 }
 
-fn voices_load_error_message(language: Language, err: &str) -> String {
-    match language {
-        Language::Italian => format!("Errore nel caricamento delle voci: {err}"),
-        Language::English => format!("Failed to load voices: {err}"),
-    }
-}
+
 
 fn info_title(language: Language) -> &'static str {
     match language {
@@ -1369,26 +1026,9 @@ fn info_title(language: Language) -> &'static str {
     }
 }
 
-fn help_title(language: Language) -> &'static str {
-    match language {
-        Language::Italian => "Guida",
-        Language::English => "Guide",
-    }
-}
 
-fn about_title(language: Language) -> &'static str {
-    match language {
-        Language::Italian => "Informazioni sul programma",
-        Language::English => "About the program",
-    }
-}
 
-fn about_message(language: Language) -> &'static str {
-    match language {
-        Language::Italian => "Questo programma e un piccolo Notepad, creato da Ambrogio Riili, che permette di aprire i files piu comuni, tra cui anche pdf, e di creare degli audiolibri.",
-        Language::English => "This program is a small Notepad, created by Ambrogio Riili, that can open common files, including PDF, and can create audiobooks.",
-    }
-}
+
 
 fn pdf_loaded_message(language: Language) -> &'static str {
     match language {
@@ -1609,1881 +1249,32 @@ unsafe fn open_replace_dialog(hwnd: HWND) {
     });
 }
 
-unsafe fn open_options_dialog(hwnd: HWND) {
-    let existing = with_state(hwnd, |state| state.options_dialog).unwrap_or(HWND(0));
-    if existing.0 != 0 {
-        SetForegroundWindow(existing);
-        return;
-    }
 
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-    let class_name = to_wide(OPTIONS_CLASS_NAME);
-    let wc = WNDCLASSW {
-        hCursor: HCURSOR(LoadCursorW(None, IDC_ARROW).unwrap_or_default().0),
-        hInstance: hinstance,
-        lpszClassName: PCWSTR(class_name.as_ptr()),
-        lpfnWndProc: Some(options_wndproc),
-        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
-        ..Default::default()
-    };
-    RegisterClassW(&wc);
 
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    let labels = options_labels(language);
-    let title = to_wide(labels.title);
 
-    let dialog = CreateWindowExW(
-        WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
-        PCWSTR(class_name.as_ptr()),
-        PCWSTR(title.as_ptr()),
-        WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        520,
-        400,
-        hwnd,
-        None,
-        hinstance,
-        Some(hwnd.0 as *const std::ffi::c_void),
-    );
 
-    if dialog.0 != 0 {
-        let _ = with_state(hwnd, |state| {
-            state.options_dialog = dialog;
-        });
-        EnableWindow(hwnd, false);
-        SetForegroundWindow(dialog);
-        ensure_voice_list_loaded(hwnd, language);
-    }
-}
 
-unsafe fn open_help_window(hwnd: HWND) {
-    let existing = with_state(hwnd, |state| state.help_window).unwrap_or(HWND(0));
-    if existing.0 != 0 {
-        SetForegroundWindow(existing);
-        return;
-    }
 
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-    let class_name = to_wide(HELP_CLASS_NAME);
-    let wc = WNDCLASSW {
-        hCursor: HCURSOR(LoadCursorW(None, IDC_ARROW).unwrap_or_default().0),
-        hInstance: hinstance,
-        lpszClassName: PCWSTR(class_name.as_ptr()),
-        lpfnWndProc: Some(help_wndproc),
-        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
-        ..Default::default()
-    };
-    RegisterClassW(&wc);
 
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    let title = to_wide(help_title(language));
-    let window = CreateWindowExW(
-        WS_EX_CONTROLPARENT,
-        PCWSTR(class_name.as_ptr()),
-        PCWSTR(title.as_ptr()),
-        WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        640,
-        520,
-        hwnd,
-        None,
-        hinstance,
-        Some(hwnd.0 as *const std::ffi::c_void),
-    );
 
-    if window.0 != 0 {
-        let _ = with_state(hwnd, |state| {
-            state.help_window = window;
-        });
-        SetForegroundWindow(window);
-    }
-}
 
-unsafe extern "system" fn help_wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let create_struct = lparam.0 as *const CREATESTRUCTW;
-            let parent = HWND((*create_struct).lpCreateParams as isize);
-            let hfont = with_state(parent, |state| state.hfont).unwrap_or(HFONT(0));
 
-            let edit = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD
-                    | WS_VISIBLE
-                    | WS_VSCROLL
-                    | WINDOW_STYLE(ES_MULTILINE as u32)
-                    | WINDOW_STYLE(ES_AUTOVSCROLL as u32)
-                    | WINDOW_STYLE(ES_WANTRETURN as u32)
-                    | WS_TABSTOP,
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            SendMessageW(edit, EM_SETREADONLY, WPARAM(1), LPARAM(0));
-            if hfont.0 != 0 {
-                let _ = SendMessageW(edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-            }
 
-            let ok_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                w!("OK"),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(HELP_ID_OK as isize),
-                HINSTANCE(0),
-                None,
-            );
-            if hfont.0 != 0 && ok_button.0 != 0 {
-                let _ = SendMessageW(ok_button, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-            }
 
-            let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
-            let guide_content = match language {
-                Language::Italian => include_str!("../guida.txt"),
-                Language::English => include_str!("../guida_en.txt"),
-            };
-            let guide = normalize_to_crlf(guide_content);
-            let guide_wide = to_wide(&guide);
-            let _ = SetWindowTextW(edit, PCWSTR(guide_wide.as_ptr()));
-            SetFocus(edit);
 
-            let state = Box::new(HelpWindowState { parent, edit, ok_button });
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
-            LRESULT(0)
-        }
-        WM_SETFOCUS => {
-            let _ = with_help_state(hwnd, |state| {
-                SetFocus(state.edit);
-            });
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-            let cmd_id = (wparam.0 & 0xffff) as usize;
-            if cmd_id == HELP_ID_OK || cmd_id == IDCANCEL.0 as usize {
-                let _ = DestroyWindow(hwnd);
-                return LRESULT(0);
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_SIZE => {
-            let width = (lparam.0 & 0xffff) as i32;
-            let height = ((lparam.0 >> 16) & 0xffff) as i32;
-            let _ = with_help_state(hwnd, |state| {
-                let button_width = 90;
-                let button_height = 28;
-                let margin = 12;
-                let edit_height = (height - button_height - (margin * 2)).max(0);
-                let _ = MoveWindow(state.edit, 0, 0, width, edit_height, true);
-                let _ = MoveWindow(
-                    state.ok_button,
-                    width - button_width - margin,
-                    edit_height + margin,
-                    button_width,
-                    button_height,
-                    true,
-                );
-            });
-            LRESULT(0)
-        }
-        WM_DESTROY => {
-            let parent = with_help_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
-            if parent.0 != 0 {
-                let _ = with_state(parent, |state| {
-                    state.help_window = HWND(0);
-                });
-            }
-            LRESULT(0)
-        }
-        WM_NCDESTROY => {
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut HelpWindowState;
-            if !ptr.is_null() {
-                let _ = Box::from_raw(ptr);
-            }
-            LRESULT(0)
-        }
-        WM_CLOSE => {
-            let _ = DestroyWindow(hwnd);
-            LRESULT(0)
-        }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
-    }
-}
 
-unsafe fn with_help_state<F, R>(hwnd: HWND, f: F) -> Option<R>
-where
-    F: FnOnce(&mut HelpWindowState) -> R,
-{
-    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut HelpWindowState;
-    if ptr.is_null() {
-        None
-    } else {
-        Some(f(&mut *ptr))
-    }
-}
 
-unsafe extern "system" fn options_wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let create_struct = lparam.0 as *const CREATESTRUCTW;
-            let parent = HWND((*create_struct).lpCreateParams as isize);
-            let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
-            let labels = options_labels(language);
 
-            let hfont = with_state(parent, |state| state.hfont).unwrap_or(HFONT(0));
-            let label_lang = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(labels.label_language).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                20,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_lang = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                18,
-                300,
-                120,
-                hwnd,
-                HMENU(OPTIONS_ID_LANG as isize),
-                HINSTANCE(0),
-                None,
-            );
 
-            let label_open = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(labels.label_open).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                60,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_open = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                58,
-                300,
-                120,
-                hwnd,
-                HMENU(OPTIONS_ID_OPEN as isize),
-                HINSTANCE(0),
-                None,
-            );
 
-            let label_voice = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(labels.label_voice).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                100,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_voice = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                98,
-                300,
-                140,
-                hwnd,
-                HMENU(OPTIONS_ID_VOICE as isize),
-                HINSTANCE(0),
-                None,
-            );
 
-            let checkbox_multilingual = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(labels.label_multilingual).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                138,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_MULTILINGUAL as isize),
-                HINSTANCE(0),
-                None,
-            );
 
-            let label_audio_skip = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(labels.label_audio_skip).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                170,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_audio_skip = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                168,
-                300,
-                140,
-                hwnd,
-                HMENU(OPTIONS_ID_AUDIO_SKIP as isize),
-                HINSTANCE(0),
-                None,
-            );
 
-let checkbox_split_on_newline = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(labels.label_split_on_newline).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                202,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_SPLIT_ON_NEWLINE as isize),
-                HINSTANCE(0),
-                None,
-            );
 
-            let checkbox_word_wrap = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(labels.label_word_wrap).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                226,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_WORD_WRAP as isize),
-                HINSTANCE(0),
-                None,
-            );
 
-            let checkbox_move_cursor = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(labels.label_move_cursor).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                250,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_MOVE_CURSOR as isize),
-                HINSTANCE(0),
-                None,
-            );
 
-            let ok_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(labels.ok).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                280,
-                300,
-                90,
-                28,
-                hwnd,
-                HMENU(OPTIONS_ID_OK as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let cancel_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(labels.cancel).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                380,
-                300,
-                90,
-                28,
-                hwnd,
-                HMENU(OPTIONS_ID_CANCEL as isize),
-                HINSTANCE(0),
-                None,
-            );
 
-            for control in [
-                label_lang,
-                combo_lang,
-                label_open,
-                combo_open,
-                label_voice,
-                combo_voice,
-                label_audio_skip,
-                combo_audio_skip,
-                checkbox_multilingual,
-                checkbox_split_on_newline,
-                checkbox_word_wrap,
-                checkbox_move_cursor,
-                ok_button,
-                cancel_button,
-            ] {
-                if control.0 != 0 && hfont.0 != 0 {
-                    let _ = SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-                }
-            }
 
-            let dialog_state = Box::new(OptionsDialogState {
-                parent,
-                combo_lang,
-                combo_open,
-                combo_voice,
-                combo_audio_skip,
-                checkbox_multilingual,
-                checkbox_split_on_newline,
-                checkbox_word_wrap,
-                checkbox_move_cursor,
-                ok_button,
-            });
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(dialog_state) as isize);
-            initialize_options_dialog(hwnd);
-            SetFocus(combo_lang);
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-            let cmd_id = (wparam.0 & 0xffff) as usize;
-            let _notify = ((wparam.0 >> 16) & 0xffff) as u16;
-            match cmd_id {
-                OPTIONS_ID_OK => {
-                    apply_options_dialog(hwnd);
-                    LRESULT(0)
-                }
-                OPTIONS_ID_CANCEL | 2 => { // 2 is IDCANCEL
-                    let _ = DestroyWindow(hwnd);
-                    LRESULT(0)
-                }
-                OPTIONS_ID_MULTILINGUAL => {
-                    refresh_options_voices(hwnd);
-                    LRESULT(0)
-                }
-                OPTIONS_ID_VOICE => {
-                    DefWindowProcW(hwnd, msg, wparam, lparam)
-                }
-                _ => DefWindowProcW(hwnd, msg, wparam, lparam),
-            }
-        }
-        WM_KEYDOWN => {
-            if wparam.0 as u32 == VK_RETURN.0 as u32 {
-                let focus = GetFocus();
-                let is_voice = with_options_state(hwnd, |state| focus == state.combo_voice).unwrap_or(false);
-                if is_voice {
-                    apply_options_dialog(hwnd);
-                    return LRESULT(0);
-                }
-            } else if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                let _ = DestroyWindow(hwnd);
-                return LRESULT(0);
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_DESTROY => {
-            let parent = with_options_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
-            if parent.0 != 0 {
-                EnableWindow(parent, true);
-                SetForegroundWindow(parent);
-                let _ = with_state(parent, |state| {
-                    state.options_dialog = HWND(0);
-                });
-            }
-            LRESULT(0)
-        }
-        WM_NCDESTROY => {
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut OptionsDialogState;
-            if !ptr.is_null() {
-                let _ = Box::from_raw(ptr);
-            }
-            LRESULT(0)
-        }
-        WM_CLOSE => {
-            let _ = DestroyWindow(hwnd);
-            LRESULT(0)
-        }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
-    }
-}
-
-unsafe fn with_options_state<F, R>(hwnd: HWND, f: F) -> Option<R>
-where
-    F: FnOnce(&mut OptionsDialogState) -> R,
-{
-    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut OptionsDialogState;
-    if ptr.is_null() {
-        None
-    } else {
-        Some(f(&mut *ptr))
-    }
-}
-
-unsafe fn initialize_options_dialog(hwnd: HWND) {
-    let (parent, combo_lang, combo_open, _combo_voice, combo_audio_skip, checkbox_multilingual, checkbox_split_on_newline, checkbox_word_wrap, checkbox_move_cursor) = match with_options_state(hwnd, |state| {
-        (
-            state.parent,
-            state.combo_lang,
-            state.combo_open,
-            state.combo_voice,
-            state.combo_audio_skip,
-            state.checkbox_multilingual,
-            state.checkbox_split_on_newline,
-            state.checkbox_word_wrap,
-            state.checkbox_move_cursor,
-        )
-    }) {
-        Some(values) => values,
-        None => return,
-    };
-
-    let settings = with_state(parent, |state| state.settings.clone()).unwrap_or_default();
-    let labels = options_labels(settings.language);
-
-    let _ = SendMessageW(combo_lang, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    let _ = SendMessageW(combo_lang, CB_ADDSTRING, WPARAM(0), LPARAM(to_wide(labels.lang_it).as_ptr() as isize));
-    let _ = SendMessageW(combo_lang, CB_ADDSTRING, WPARAM(0), LPARAM(to_wide(labels.lang_en).as_ptr() as isize));
-    let lang_index = match settings.language {
-        Language::Italian => 0,
-        Language::English => 1,
-    };
-    let _ = SendMessageW(combo_lang, CB_SETCURSEL, WPARAM(lang_index), LPARAM(0));
-
-    let _ = SendMessageW(combo_open, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    let _ = SendMessageW(combo_open, CB_ADDSTRING, WPARAM(0), LPARAM(to_wide(labels.open_new_tab).as_ptr() as isize));
-    let _ = SendMessageW(combo_open, CB_ADDSTRING, WPARAM(0), LPARAM(to_wide(labels.open_new_window).as_ptr() as isize));
-    let open_index = match settings.open_behavior {
-        OpenBehavior::NewTab => 0,
-        OpenBehavior::NewWindow => 1,
-    };
-    let _ = SendMessageW(combo_open, CB_SETCURSEL, WPARAM(open_index), LPARAM(0));
-
-    if settings.tts_only_multilingual {
-        let _ = SendMessageW(
-            checkbox_multilingual,
-            BM_SETCHECK,
-            WPARAM(BST_CHECKED.0 as usize),
-            LPARAM(0),
-        );
-    }
-
-    if settings.split_on_newline {
-        let _ = SendMessageW(
-            checkbox_split_on_newline,
-            BM_SETCHECK,
-            WPARAM(BST_CHECKED.0 as usize),
-            LPARAM(0),
-        );
-    }
-
-    if settings.word_wrap {
-        let _ = SendMessageW(
-            checkbox_word_wrap,
-            BM_SETCHECK,
-            WPARAM(BST_CHECKED.0 as usize),
-            LPARAM(0),
-        );
-    }
-
-    if settings.move_cursor_during_reading {
-        let _ = SendMessageW(
-            checkbox_move_cursor,
-            BM_SETCHECK,
-            WPARAM(BST_CHECKED.0 as usize),
-            LPARAM(0),
-        );
-    }
-
-    // Populate skip interval combo
-    let _ = SendMessageW(combo_audio_skip, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    let skip_options = [
-        (10, "10 s"),
-        (30, "30 s"),
-        (60, "1 m"),
-        (120, "2 m"),
-        (300, "5 m"),
-    ];
-    let mut selected_idx = 2; // Default to 1m
-    for (secs, label) in skip_options.iter() {
-        let idx = SendMessageW(combo_audio_skip, CB_ADDSTRING, WPARAM(0), LPARAM(to_wide(label).as_ptr() as isize)).0 as usize;
-        let _ = SendMessageW(combo_audio_skip, CB_SETITEMDATA, WPARAM(idx), LPARAM(*secs as isize));
-        if *secs == settings.audiobook_skip_seconds {
-            selected_idx = idx;
-        }
-    }
-    let _ = SendMessageW(combo_audio_skip, CB_SETCURSEL, WPARAM(selected_idx), LPARAM(0));
-
-    refresh_options_voices(hwnd);
-}
-
-unsafe fn refresh_options_voices(hwnd: HWND) {
-    let (parent, combo_voice, checkbox) = match with_options_state(hwnd, |state| {
-        (state.parent, state.combo_voice, state.checkbox_multilingual)
-    }) {
-        Some(values) => values,
-        None => return,
-    };
-    let settings = with_state(parent, |state| state.settings.clone()).unwrap_or_default();
-    let voices = with_state(parent, |state| state.voice_list.clone()).unwrap_or_default();
-    let labels = options_labels(settings.language);
-    let only_multilingual = SendMessageW(checkbox, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
-        == BST_CHECKED.0;
-
-    populate_voice_combo(combo_voice, &voices, &settings.tts_voice, only_multilingual, &labels);
-}
-
-unsafe fn populate_voice_combo(
-    combo_voice: HWND,
-    voices: &[VoiceInfo],
-    selected: &str,
-    only_multilingual: bool,
-    labels: &OptionsLabels,
-) {
-    let _ = SendMessageW(combo_voice, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    let mut selected_index: Option<usize> = None;
-    let mut combo_index = 0usize;
-
-    for (voice_index, voice) in voices.iter().enumerate() {
-        if only_multilingual && !voice.is_multilingual {
-            continue;
-        }
-        let label = format!("{} ({})", voice.short_name, voice.locale);
-        let wide = to_wide(&label);
-        let idx = SendMessageW(combo_voice, CB_ADDSTRING, WPARAM(0), LPARAM(wide.as_ptr() as isize)).0;
-        if idx >= 0 {
-            let _ = SendMessageW(
-                combo_voice,
-                CB_SETITEMDATA,
-                WPARAM(idx as usize),
-                LPARAM(voice_index as isize),
-            );
-            if voice.short_name == selected {
-                selected_index = Some(combo_index);
-            }
-            combo_index += 1;
-        }
-    }
-
-    if combo_index == 0 {
-        let label = if voices.is_empty() {
-            labels.voices_loading
-        } else {
-            labels.voices_empty
-        };
-        let _ = SendMessageW(combo_voice, CB_ADDSTRING, WPARAM(0), LPARAM(to_wide(label).as_ptr() as isize));
-        let _ = SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
-        return;
-    }
-
-    let final_index = selected_index.unwrap_or(0);
-    let _ = SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(final_index), LPARAM(0));
-}
-
-unsafe fn apply_options_dialog(hwnd: HWND) {
-            let (
-                parent,
-                combo_lang,
-                combo_open,
-                combo_voice,
-                combo_audio_skip,
-                checkbox_multilingual,
-                checkbox_split_on_newline,
-                checkbox_word_wrap,
-                checkbox_move_cursor,
-            ) = match with_options_state(hwnd, |state| {
-                (
-                    state.parent,
-                    state.combo_lang,
-                    state.combo_open,
-                    state.combo_voice,
-                    state.combo_audio_skip,
-                    state.checkbox_multilingual,
-                    state.checkbox_split_on_newline,
-                    state.checkbox_word_wrap,
-                    state.checkbox_move_cursor,
-                )
-            }) {
-                        Some(values) => values,
-                        None => return,
-                    };
-            
-                    let mut settings = with_state(parent, |state| state.settings.clone()).unwrap_or_default();
-                    let old_language = settings.language;
-            
-                    let lang_sel = SendMessageW(combo_lang, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-                    settings.language = if lang_sel == 1 {
-                        Language::English
-                    } else {
-                        Language::Italian
-                    };
-            
-                    let open_sel = SendMessageW(combo_open, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-                    settings.open_behavior = if open_sel == 1 {
-                        OpenBehavior::NewWindow
-                    } else {
-                        OpenBehavior::NewTab
-                    };
-            
-                    let only_multilingual =
-                        SendMessageW(checkbox_multilingual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 == BST_CHECKED.0;
-                    settings.tts_only_multilingual = only_multilingual;
-            
-                    let split_on_newline =
-                        SendMessageW(checkbox_split_on_newline, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
-                            == BST_CHECKED.0;
-                    let word_wrap =
-                        SendMessageW(checkbox_word_wrap, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 == BST_CHECKED.0;
-                    let move_cursor =
-                        SendMessageW(checkbox_move_cursor, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 == BST_CHECKED.0;
-                    settings.split_on_newline = split_on_newline;
-                    let old_word_wrap = settings.word_wrap;
-                    settings.word_wrap = word_wrap;
-                    settings.move_cursor_during_reading = move_cursor;
-            let voices = with_state(parent, |state| state.voice_list.clone()).unwrap_or_default();
-            let voice_sel = SendMessageW(combo_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-            if voice_sel >= 0 {
-                let voice_index = SendMessageW(
-                    combo_voice,
-                    CB_GETITEMDATA,
-                    WPARAM(voice_sel as usize),
-                    LPARAM(0),
-                )
-                .0 as usize;
-                if voice_index < voices.len() {
-                    settings.tts_voice = voices[voice_index].short_name.clone();
-                }
-            }
-        
-            let skip_sel = SendMessageW(combo_audio_skip, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-            if skip_sel >= 0 {
-                let skip_secs = SendMessageW(combo_audio_skip, CB_GETITEMDATA, WPARAM(skip_sel as usize), LPARAM(0)).0;
-                settings.audiobook_skip_seconds = skip_secs as u32;
-            }
-        
-            let _ = with_state(parent, |state| {        state.settings = settings.clone();
-    });
-    let new_language = settings.language;
-    save_settings(settings.clone());
-
-    if old_language != new_language {
-        rebuild_menus(parent);
-    }
-
-    if old_word_wrap != settings.word_wrap {
-        apply_word_wrap_to_all_edits(parent, settings.word_wrap);
-    }
-
-    let _ = DestroyWindow(hwnd);
-}
-
-fn ensure_voice_list_loaded(hwnd: HWND, language: Language) {
-    let has_list = unsafe { with_state(hwnd, |state| !state.voice_list.is_empty()) }.unwrap_or(false);
-    if has_list {
-        return;
-    }
-    thread::spawn(move || {
-        match fetch_voice_list() {
-            Ok(list) => {
-                let payload = Box::new(list);
-                let _ = unsafe {
-                    PostMessageW(
-                        hwnd,
-                        WM_TTS_VOICES_LOADED,
-                        WPARAM(0),
-                        LPARAM(Box::into_raw(payload) as isize),
-                    )
-                };
-            }
-            Err(err) => unsafe {
-                let message = to_wide(&voices_load_error_message(language, &err));
-                let title = to_wide(error_title(language));
-                MessageBoxW(hwnd, PCWSTR(message.as_ptr()), PCWSTR(title.as_ptr()), MB_OK | MB_ICONERROR);
-            },
-        }
-    });
-}
-
-fn fetch_voice_list() -> Result<Vec<VoiceInfo>, String> {
-    let url = format!("{}?trustedclienttoken={}", VOICE_LIST_URL, TRUSTED_CLIENT_TOKEN);
-    let resp = reqwest::blocking::get(url).map_err(|err| err.to_string())?;
-    let value: serde_json::Value = resp.json().map_err(|err| err.to_string())?;
-    let Some(voices) = value.as_array() else {
-        return Err("Risposta non valida".to_string());
-    };
-
-    let mut results = Vec::new();
-    for voice in voices {
-        let short_name = voice["ShortName"].as_str().unwrap_or("").to_string();
-        if short_name.is_empty() {
-            continue;
-        }
-        let locale = voice["Locale"].as_str().unwrap_or("").to_string();
-        let is_multilingual = short_name.contains("Multilingual");
-        results.push(VoiceInfo {
-            short_name,
-            locale,
-            is_multilingual,
-        });
-    }
-    results.sort_by(|a, b| a.short_name.cmp(&b.short_name));
-    Ok(results)
-}
-
-fn start_tts_from_caret(hwnd: HWND) {
-    let Some(hwnd_edit) = (unsafe { get_active_edit(hwnd) }) else {
-        return;
-    };
-    let (language, split_on_newline) = unsafe {
-        with_state(hwnd, |state| {
-            (state.settings.language, state.settings.split_on_newline)
-        })
-    }
-    .unwrap_or_default();
-    let text = unsafe { get_text_from_caret(hwnd_edit) };
-    if text.trim().is_empty() {
-        unsafe {
-            show_error(hwnd, language, tts_no_text_message(language));
-        }
-        return;
-    }
-    let voice = unsafe {
-        with_state(hwnd, |state| state.settings.tts_voice.clone()).unwrap_or_else(|| {
-            "it-IT-IsabellaNeural".to_string()
-        })
-    };
-    let mut start: i32 = 0;
-    let mut end: i32 = 0;
-    unsafe { SendMessageW(hwnd_edit, EM_GETSEL, WPARAM(&mut start as *mut _ as usize), LPARAM(&mut end as *mut _ as isize)); }
-    let initial_caret_pos = start.min(end);
-
-    let chunks = split_into_tts_chunks(&text, split_on_newline);
-    start_tts_playback_with_chunks(hwnd, text, voice, chunks, initial_caret_pos);
-}
-
-fn toggle_tts_pause(hwnd: HWND) {
-    let _ = unsafe {
-        with_state(hwnd, |state| {
-            let Some(session) = &mut state.tts_session else {
-                return;
-            };
-            if session.paused {
-                prevent_sleep(true);
-                let _ = session.command_tx.send(TtsCommand::Resume);
-                session.paused = false;
-            } else {
-                prevent_sleep(false);
-                let _ = session.command_tx.send(TtsCommand::Pause);
-                session.paused = true;
-            }
-        })
-    };
-}
-
-fn stop_tts_playback(hwnd: HWND) {
-    prevent_sleep(false);
-    let _ = unsafe {
-        with_state(hwnd, |state| {
-            if let Some(session) = &state.tts_session {
-                session.cancel.store(true, Ordering::SeqCst);
-                let _ = session.command_tx.send(TtsCommand::Stop);
-            }
-            state.tts_session = None;
-        })
-    };
-}
-
-fn handle_tts_command(
-    cmd: TtsCommand,
-    sink: &Sink,
-    cancel_flag: &AtomicBool,
-    paused: &mut bool,
-) -> bool {
-    match cmd {
-        TtsCommand::Pause => {
-            sink.pause();
-            *paused = true;
-            false
-        }
-        TtsCommand::Resume => {
-            sink.play();
-            *paused = false;
-            false
-        }
-        TtsCommand::Stop => {
-            cancel_flag.store(true, Ordering::SeqCst);
-            sink.stop();
-            true
-        }
-    }
-}
-
-
-
-
-fn start_tts_playback_with_chunks(hwnd: HWND, cleaned: String, voice: String, chunks: Vec<TtsChunk>, initial_caret_pos: i32) {
-    stop_tts_playback(hwnd);
-    prevent_sleep(true);
-    if chunks.is_empty() {
-        return;
-    }
-
-    let (tx, mut rx) = mpsc::unbounded_channel::<TtsCommand>();
-    let cancel = Arc::new(AtomicBool::new(false));
-    let cancel_flag = cancel.clone();
-    let session_id = unsafe {
-        with_state(hwnd, |state| {
-            let id = state.tts_next_session_id;
-            state.tts_next_session_id = state.tts_next_session_id.saturating_add(1);
-            state.tts_session = Some(TtsSession {
-                id,
-                command_tx: tx.clone(),
-                cancel: cancel.clone(),
-                paused: false,
-                initial_caret_pos,
-            });
-            id
-        })
-        .unwrap_or(0)
-    };
-    let hwnd_copy = hwnd;
-    thread::spawn(move || {
-        log_debug(&format!(
-            "TTS start: voice={voice} chunks={} text_len={}",
-            chunks.len(),
-            cleaned.len()
-        ));
-        let (_stream, handle) = match OutputStream::try_default() {
-            Ok(values) => values,
-            Err(_) => {
-                post_tts_error(hwnd_copy, session_id, "Audio output device not available.".to_string());
-                return;
-            }
-        };
-        let sink = match Sink::try_new(&handle) {
-            Ok(sink) => sink,
-            Err(_) => {
-                post_tts_error(hwnd_copy, session_id, "Failed to create audio sink.".to_string());
-                return;
-            }
-        };
-        let rt = match tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-        {
-            Ok(rt) => rt,
-            Err(err) => {
-                post_tts_error(hwnd_copy, session_id, err.to_string());
-                return;
-            }
-        };
-
-        // Create a channel for buffered audio data (10 chunks buffer)
-        let (audio_tx, mut audio_rx) = mpsc::channel::<Result<(Vec<u8>, usize), String>>(10);
-        let cancel_downloader = cancel_flag.clone();
-        let chunks_downloader = chunks.clone();
-        let voice_downloader = voice.clone();
-
-        // Spawn background downloader task
-        rt.spawn(async move {
-            for chunk_obj in chunks_downloader {
-                if cancel_downloader.load(Ordering::SeqCst) { break; }
-                let request_id = Uuid::new_v4().simple().to_string();
-                match download_audio_chunk(&chunk_obj.text_to_read, &voice_downloader, &request_id).await {
-                    Ok(data) => {
-                        if audio_tx.send(Ok((data, chunk_obj.original_len))).await.is_err() { break; }
-                    }
-                    Err(e) => {
-                        let _ = audio_tx.send(Err(e)).await;
-                        break;
-                    }
-                }
-            }
-        });
-
-        let mut appended_any = false;
-        let mut paused = false;
-        let mut current_offset: usize = 0;
-
-        loop {
-            if cancel_flag.load(Ordering::SeqCst) { break; }
-
-            // Get next audio packet from buffer or handle commands while waiting
-            let packet = rt.block_on(async {
-                loop {
-                    if cancel_flag.load(Ordering::SeqCst) { return None; }
-                    
-                    // Priority to commands
-                    while let Ok(cmd) = rx.try_recv() {
-                        if handle_tts_command(cmd, &sink, cancel_flag.as_ref(), &mut paused) {
-                            return None;
-                        }
-                    }
-
-                    if paused {
-                        tokio::time::sleep(Duration::from_millis(100)).await;
-                        continue;
-                    }
-
-                    tokio::select! {
-                        res = audio_rx.recv() => return res,
-                        cmd_opt = rx.recv() => {
-                            if let Some(cmd) = cmd_opt {
-                                if handle_tts_command(cmd, &sink, cancel_flag.as_ref(), &mut paused) {
-                                    return None;
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-
-            let Some(res) = packet else { break; };
-            let (audio, orig_len) = match res {
-                Ok(data) => data,
-                Err(e) => {
-                    post_tts_error(hwnd_copy, session_id, e);
-                    break;
-                }
-            };
-
-            if audio.is_empty() { continue; }
-
-            let _ = unsafe {
-                PostMessageW(
-                    hwnd_copy,
-                    WM_TTS_CHUNK_START,
-                    WPARAM(session_id as usize),
-                    LPARAM(current_offset as isize),
-                )
-            };
-
-            let cursor = std::io::Cursor::new(audio);
-            let source = match Decoder::new(cursor) {
-                Ok(source) => source,
-                Err(_) => {
-                    post_tts_error(hwnd_copy, session_id, "Failed to decode audio.".to_string());
-                    break;
-                }
-            };
-
-            sink.append(source);
-            appended_any = true;
-            
-            // Loop while audio is playing to handle commands (Pause/Resume/Stop)
-            while !sink.empty() {
-                if cancel_flag.load(Ordering::SeqCst) {
-                    sink.stop();
-                    break;
-                }
-                while let Ok(cmd) = rx.try_recv() {
-                    if handle_tts_command(cmd, &sink, cancel_flag.as_ref(), &mut paused) {
-                        break;
-                    }
-                }
-                if cancel_flag.load(Ordering::SeqCst) {
-                    sink.stop();
-                    break;
-                }
-                std::thread::sleep(Duration::from_millis(50));
-            }
-            
-            if cancel_flag.load(Ordering::SeqCst) { break; }
-            current_offset += orig_len;
-        }
-
-        if appended_any {
-            let _ = unsafe {
-                PostMessageW(
-                    hwnd_copy,
-                    WM_TTS_PLAYBACK_DONE,
-                    WPARAM(session_id as usize),
-                    LPARAM(0),
-                )
-            };
-        }
-    });
-}
-
-
-unsafe fn create_progress_dialog(parent: HWND, total: usize) -> HWND {
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-    let class_name = to_wide(PROGRESS_CLASS_NAME);
-    
-    let wc = WNDCLASSW {
-        hCursor: HCURSOR(LoadCursorW(None, IDC_ARROW).unwrap_or_default().0),
-        hInstance: hinstance,
-        lpszClassName: PCWSTR(class_name.as_ptr()),
-        lpfnWndProc: Some(progress_wndproc),
-        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
-        ..Default::default()
-    };
-    RegisterClassW(&wc); 
-
-    let hwnd = CreateWindowExW(
-        WS_EX_DLGMODALFRAME,
-        PCWSTR(class_name.as_ptr()),
-        w!("Creazione Audiolibro"),
-        WS_POPUP | WS_CAPTION | WS_VISIBLE,
-        CW_USEDEFAULT, CW_USEDEFAULT,
-        300, 150,
-        parent,
-        HMENU(0),
-        hinstance,
-        Some(parent.0 as *const _),
-    );
-    
-    if hwnd.0 != 0 {
-         EnableWindow(parent, false);
-         let _ = with_progress_state(hwnd, |state| {
-             let _ = SendMessageW(state.hwnd_pb, PBM_SETRANGE, WPARAM(0), LPARAM((total as isize) << 16));
-             state.total = total;
-         });
-         
-         // Center window relative to parent
-         let mut rc_parent = RECT::default();
-         let mut rc_dlg = RECT::default();
-         let _ = windows::Win32::UI::WindowsAndMessaging::GetWindowRect(parent, &mut rc_parent);
-         let _ = windows::Win32::UI::WindowsAndMessaging::GetWindowRect(hwnd, &mut rc_dlg);
-         
-         let dlg_w = rc_dlg.right - rc_dlg.left;
-         let dlg_h = rc_dlg.bottom - rc_dlg.top;
-         let parent_w = rc_parent.right - rc_parent.left;
-         let parent_h = rc_parent.bottom - rc_parent.top;
-         
-         let x = rc_parent.left + (parent_w - dlg_w) / 2;
-         let y = rc_parent.top + (parent_h - dlg_h) / 2;
-         
-         let _ = MoveWindow(hwnd, x, y, dlg_w, dlg_h, true);
-    }
-    hwnd
-}
-
-unsafe fn with_progress_state<F, R>(hwnd: HWND, f: F) -> Option<R>
-where
-    F: FnOnce(&mut ProgressDialogState) -> R,
-{
-    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ProgressDialogState;
-    if ptr.is_null() {
-        None
-    } else {
-        Some(f(&mut *ptr))
-    }
-}
-
-unsafe fn request_cancel_audiobook(hwnd: HWND) {
-    let parent = GetParent(hwnd);
-    if parent.0 == 0 { return; }
-    
-    let already_cancelled = with_state(parent, |state| {
-        state.audiobook_cancel.as_ref().map(|c| c.load(Ordering::Relaxed)).unwrap_or(false)
-    }).unwrap_or(false);
-
-    if already_cancelled { return; }
-    
-    let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
-    let (msg, title) = match language {
-        Language::Italian => ("Sei sicuro di voler annullare la creazione dell'audiolibro?", "Conferma"),
-        Language::English => ("Are you sure you want to cancel the audiobook creation?", "Confirm"),
-    };
-    
-    let msg_w = to_wide(msg);
-    let title_w = to_wide(title);
-    
-    if MessageBoxW(hwnd, PCWSTR(msg_w.as_ptr()), PCWSTR(title_w.as_ptr()), MB_YESNO | MB_ICONWARNING) == IDYES {
-        let _ = with_state(parent, |state| {
-            if let Some(cancel) = &state.audiobook_cancel {
-                cancel.store(true, Ordering::Relaxed);
-            }
-        });
-    }
-}
-
-unsafe extern "system" fn progress_wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-             let create_struct = lparam.0 as *const CREATESTRUCTW;
-             let _parent = HWND((*create_struct).lpCreateParams as isize);
-             
-             let label = CreateWindowExW(
-                 Default::default(),
-                 w!("EDIT"),
-                 w!("Creazione audiolibro in corso. Avanzamento: 0%"),
-                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE((ES_CENTER | ES_READONLY) as u32),
-                 20, 20, 240, 20,
-                 hwnd, HMENU(0), HINSTANCE(0), None
-             );
-             
-             let pb = CreateWindowExW(
-                 Default::default(),
-                 w!("msctls_progress32"),
-                 PCWSTR::null(),
-                 WS_CHILD | WS_VISIBLE,
-                 20, 50, 240, 20,
-                 hwnd, HMENU(0), HINSTANCE(0), None
-             );
-
-             let hwnd_cancel = CreateWindowExW(
-                 Default::default(),
-                 WC_BUTTON,
-                 w!("Annulla"),
-                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                 95, 80, 90, 28,
-                 hwnd, HMENU(PROGRESS_ID_CANCEL as isize), HINSTANCE(0), None
-             );
-             
-             let state = Box::new(ProgressDialogState { hwnd_pb: pb, hwnd_text: label, hwnd_cancel, total: 0 }); 
-             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
-             
-             if label.0 != 0 {
-                 SetFocus(label);
-             }
-             LRESULT(0)
-        }
-        WM_SETFOCUS => {
-            let _ = with_progress_state(hwnd, |state| {
-                SetFocus(state.hwnd_text);
-            });
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-             let cmd_id = (wparam.0 & 0xffff) as usize;
-             if cmd_id == PROGRESS_ID_CANCEL || cmd_id == 2 { // 2 is IDCANCEL
-                 request_cancel_audiobook(hwnd);
-                 LRESULT(0)
-             } else {
-                 DefWindowProcW(hwnd, msg, wparam, lparam)
-             }
-        }
-        WM_UPDATE_PROGRESS => {
-             let current = wparam.0;
-             let _ = with_progress_state(hwnd, |state| {
-                 let _ = SendMessageW(state.hwnd_pb, PBM_SETPOS, WPARAM(current), LPARAM(0));
-                 if state.total > 0 {
-                     let pct = (current * 100) / state.total;
-                     let text = format!("Creazione audiolibro in corso. Avanzamento: {}%", pct);
-                     let wide = to_wide(&text);
-                     let _ = SetWindowTextW(state.hwnd_text, PCWSTR(wide.as_ptr()));
-                 }
-             });
-             LRESULT(0)
-        }
-        WM_CLOSE => {
-            request_cancel_audiobook(hwnd);
-            LRESULT(0)
-        }
-        WM_DESTROY => {
-            let parent = GetParent(hwnd);
-            if parent.0 != 0 {
-                EnableWindow(parent, true);
-                SetForegroundWindow(parent);
-            }
-            LRESULT(0)
-        }
-        WM_NCDESTROY => {
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ProgressDialogState;
-            if !ptr.is_null() {
-                let _ = Box::from_raw(ptr);
-            }
-            LRESULT(0)
-        }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
-    }
-}
-
-fn start_audiobook(hwnd: HWND) {
-    let Some(hwnd_edit) = (unsafe { get_active_edit(hwnd) }) else {
-        return;
-    };
-    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
-    let text = unsafe { get_edit_text(hwnd_edit) };
-    if text.trim().is_empty() {
-        unsafe {
-            show_error(hwnd, language, tts_no_text_message(language));
-        }
-        return;
-    }
-    let suggested_name = unsafe {
-        with_state(hwnd, |state| {
-            state.docs.get(state.current).map(|doc| {
-                let p = Path::new(&doc.title);
-                p.file_stem().and_then(|s| s.to_str()).unwrap_or(&doc.title).to_string()
-            })
-        })
-    }.flatten();
-
-    let Some(output) = (unsafe { save_audio_dialog(hwnd, suggested_name.as_deref()) }) else {
-        return;
-    };
-    let voice = unsafe {
-        with_state(hwnd, |state| state.settings.tts_voice.clone()).unwrap_or_else(|| {
-            "it-IT-IsabellaNeural".to_string()
-        })
-    };
-
-    let split_on_newline = unsafe { with_state(hwnd, |state| state.settings.split_on_newline) }
-        .unwrap_or(true);
-
-    let cleaned = strip_dashed_lines(&text);
-    let prepared = normalize_for_tts(&cleaned, split_on_newline);
-
-    let chunks = split_text(&prepared);
-    let chunks_len = chunks.len();
-    
-    let cancel_token = Arc::new(AtomicBool::new(false));
-    let progress_hwnd = unsafe {
-        let h = create_progress_dialog(hwnd, chunks_len);
-        let _ = with_state(hwnd, |state| {
-            state.audiobook_progress = h;
-            state.audiobook_cancel = Some(cancel_token.clone());
-        });
-        h
-    };
-
-    let cancel_clone = cancel_token.clone();
-    thread::spawn(move || {
-        let result = run_tts_audiobook(&chunks, &voice, &output, progress_hwnd, cancel_clone);
-        let success = result.is_ok();
-        let message = match result {
-            Ok(()) => match language {
-                Language::Italian => "Audiolibro salvato con successo.".to_string(),
-                Language::English => "Audiobook saved successfully.".to_string(),
-            },
-            Err(err) => err,
-        };
-        let payload = Box::new(AudiobookResult {
-            success,
-            message,
-        });
-        let _ = unsafe {
-            PostMessageW(
-                hwnd,
-                WM_TTS_AUDIOBOOK_DONE,
-                WPARAM(0),
-                LPARAM(Box::into_raw(payload) as isize),
-            )
-        };
-    });
-}
-
-fn run_tts_audiobook(
-    chunks: &[String],
-    voice: &str,
-    output: &Path,
-    progress_hwnd: HWND,
-    cancel: Arc<AtomicBool>,
-) -> Result<(), String> {
-    let file = std::fs::File::create(output).map_err(|err| err.to_string())?;
-    let mut writer = BufWriter::new(file);
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .map_err(|err| err.to_string())?;
-
-    rt.block_on(async {
-        let tasks = chunks.iter().enumerate().map(|(i, chunk)| {
-            let chunk = chunk.clone();
-            let voice = voice.to_string();
-            let cancel = cancel.clone();
-            async move {
-                let request_id = Uuid::new_v4().simple().to_string();
-                loop {
-                    if cancel.load(Ordering::Relaxed) {
-                        return Err("Cancelled".to_string());
-                    }
-                    match download_audio_chunk(&chunk, &voice, &request_id).await {
-                        Ok(data) => return Ok::<Vec<u8>, String>(data),
-                        Err(err) => {
-                            if cancel.load(Ordering::Relaxed) {
-                                return Err("Cancelled".to_string());
-                            }
-                            let msg = format!("Errore download chunk {}: {}. Riprovo tra 5 secondi...", i + 1, err);
-                            log_debug(&msg);
-                            
-                            // Use select! to allow instant cancellation during sleep
-                            tokio::select! {
-                                _ = tokio::time::sleep(Duration::from_secs(5)) => {},
-                                _ = async {
-                                    while !cancel.load(Ordering::Relaxed) {
-                                        tokio::time::sleep(Duration::from_millis(100)).await;
-                                    }
-                                } => {
-                                    return Err("Cancelled".to_string());
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-        let mut stream = futures_util::stream::iter(tasks).buffered(30);
-        let mut completed = 0;
-        while let Some(result) = stream.next().await {
-            if cancel.load(Ordering::Relaxed) {
-                return Err("Operazione annullata.".to_string());
-            }
-            let audio = match result {
-                Ok(data) => data,
-                Err(e) if e == "Cancelled" => return Err("Operazione annullata.".to_string()),
-                Err(e) => return Err(e),
-            };
-            
-            writer.write_all(&audio).map_err(|err| err.to_string())?;
-            completed += 1;
-            if progress_hwnd.0 != 0 {
-                if cancel.load(Ordering::Relaxed) { return Err("Operazione annullata.".to_string()); }
-                unsafe { let _ = PostMessageW(progress_hwnd, WM_UPDATE_PROGRESS, WPARAM(completed), LPARAM(0)); }
-            }
-        }
-        writer.flush().map_err(|err| err.to_string())?;
-        Ok(())
-    }).map_err(|e| {
-        if e == "Operazione annullata." {
-            // Try to delete file
-            let _ = std::fs::remove_file(output);
-        }
-        e
-    })
-}
-
-unsafe fn get_text_from_caret(hwnd_edit: HWND) -> String {
-    let mut start: i32 = 0;
-    let mut end: i32 = 0;
-    // Use EM_GETSEL to get the current cursor/selection position
-    SendMessageW(hwnd_edit, EM_GETSEL, WPARAM(&mut start as *mut _ as usize), LPARAM(&mut end as *mut _ as isize));
-    
-    // We want to start reading from the beginning of any selection, or from the cursor if no selection.
-    let caret_pos = start.min(end).max(0) as usize;
-
-    let full_text = get_edit_text(hwnd_edit);
-    if caret_pos == 0 {
-        return full_text;
-    }
-
-    // RichEdit's WM_GETTEXT (used by get_edit_text) usually returns text with \r\n.
-    // However, the indices from EM_GETSEL in RichEdit are based on its internal 
-    // representation (which uses a single \r for newlines).
-    // To fix this mismatch, we work with a version of the text that has single-character newlines.
-    let wide: Vec<u16> = full_text.replace("\r\n", "\n").encode_utf16().collect();
-    
-    if caret_pos >= wide.len() {
-        return String::new();
-    }
-    
-    String::from_utf16_lossy(&wide[caret_pos..])
-}
-
-fn generate_sec_ms_gec() -> String {
-    let win_epoch = 11644473600i64;
-    let now = Local::now().timestamp();
-    let ticks = now + win_epoch;
-    let ticks = ticks - (ticks % 300);
-    let ticks = (ticks as f64) * 1e7;
-
-    let str_to_hash = format!("{:.0}{}", ticks, TRUSTED_CLIENT_TOKEN);
-    let mut hasher = Sha256::new();
-    hasher.update(str_to_hash);
-    let result = hasher.finalize();
-    hex::encode(result).to_uppercase()
-}
-
-fn generate_muid() -> String {
-    let mut rng = rand::thread_rng();
-    let mut bytes = [0u8; 16];
-    rng.fill(&mut bytes);
-    hex::encode(bytes).to_uppercase()
-}
-
-fn get_date_string() -> String {
-    let now = Local::now();
-    now.format("%a %b %d %Y %H:%M:%S GMT+0000 (Coordinated Universal Time)").to_string()
-}
-
-fn voice_locale_from_short_name(voice: &str) -> String {
-    let mut parts: Vec<&str> = voice.split('-').collect();
-    if parts.len() >= 3 {
-        parts.pop();
-        return parts.join("-");
-    }
-    voice.to_string()
-}
-
-fn mkssml(text: &str, voice: &str) -> String {
-    let lang = voice_locale_from_short_name(voice);
-    let lang = if lang.is_empty() { "en-US".to_string() } else { lang };
-
-    format!(
-        "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='{}'>\n\
-        <voice name='{}'>\n\
-        <prosody pitch='+0Hz' rate='+0%' volume='+0%'>\n\
-        {}\n\
-        </prosody>\n\
-        </voice>\n\
-        </speak>",
-        lang, voice, text
-    )
-}
-
-fn remove_long_dash_runs(line: &str) -> String {
-    let mut out = String::with_capacity(line.len());
-    let mut dash_run = 0;
-
-    for ch in line.chars() {
-        if ch == '-' {
-            dash_run += 1;
-            continue;
-        }
-        if dash_run > 0 {
-            if dash_run < 3 {
-                out.extend(std::iter::repeat('-').take(dash_run));
-            }
-            dash_run = 0;
-        }
-        out.push(ch);
-    }
-
-    if dash_run > 0 && dash_run < 3 {
-        out.extend(std::iter::repeat('-').take(dash_run));
-    }
-
-    out
-}
-
-fn strip_dashed_lines(text: &str) -> String {
-    text.lines()
-        .filter_map(|line| {
-            let trimmed = line.trim();
-            if trimmed.is_empty() {
-                return Some(String::new());
-            }
-            let cleaned = remove_long_dash_runs(line);
-            if cleaned.trim().is_empty() {
-                return None;
-            }
-            Some(cleaned)
-        })
-        .collect::<Vec<String>>()
-        .join("\n")
-}
-
-fn split_text(text: &str) -> Vec<String> {
-    let mut chunks = Vec::new();
-    let char_indices: Vec<(usize, char)> = text.char_indices().collect();
-    let char_len = char_indices.len();
-    let mut current_char = 0;
-    let is_long = char_len > TTS_LONG_TEXT_THRESHOLD;
-    let max_len = if is_long { MAX_TTS_TEXT_LEN_LONG } else { MAX_TTS_TEXT_LEN };
-    let first_len = if is_long { MAX_TTS_FIRST_CHUNK_LEN_LONG } else { max_len };
-
-    let byte_index_at = |char_idx: usize| -> usize {
-        if char_idx >= char_len {
-            text.len()
-        } else {
-            char_indices[char_idx].0
-        }
-    };
-
-    while current_char < char_len {
-        let target_len = if chunks.is_empty() { first_len } else { max_len };
-        let mut split_char = current_char + target_len;
-
-        if split_char >= char_len {
-            let chunk = text[byte_index_at(current_char)..].trim().to_string();
-            if !chunk.is_empty() {
-                chunks.push(chunk);
-            }
-            break;
-        }
-
-        let search_end = split_char;
-        let search_start = current_char;
-
-        let mut split_found = None;
-        for idx in (search_start..search_end).rev() {
-            let c = char_indices[idx].1;
-            if c == '.' || c == '!' || c == '?' {
-                let next_idx = idx + 1;
-                if next_idx >= char_len {
-                    split_found = Some(next_idx);
-                } else if char_indices[next_idx].1.is_whitespace() {
-                    split_found = Some(next_idx);
-                }
-                if split_found.is_some() {
-                    break;
-                }
-            }
-        }
-
-        if split_found.is_none() {
-            for idx in (search_start..search_end).rev() {
-                let c = char_indices[idx].1;
-                if c == '\n' {
-                    if idx + 1 < char_len && char_indices[idx + 1].1 == '\n' {
-                        split_found = Some(idx + 2);
-                        break;
-                    }
-                } else if c == ';' || c == ':' {
-                    split_found = Some(idx + 1);
-                    break;
-                }
-            }
-        }
-
-        if split_found.is_none() {
-            for idx in (search_start..search_end).rev() {
-                if char_indices[idx].1 == ' ' {
-                    split_found = Some(idx + 1);
-                    break;
-                }
-            }
-        }
-
-        if let Some(split_at) = split_found {
-            split_char = split_at;
-        }
-
-        if split_char > current_char {
-            let chunk = text[byte_index_at(current_char)..byte_index_at(split_char)]
-                .trim()
-                .to_string();
-            if !chunk.is_empty() {
-                chunks.push(chunk);
-            }
-            current_char = split_char;
-        } else {
-            let hard_limit = std::cmp::min(current_char + target_len, char_len);
-            let chunk = text[byte_index_at(current_char)..byte_index_at(hard_limit)]
-                .trim()
-                .to_string();
-            if !chunk.is_empty() {
-                chunks.push(chunk);
-            }
-            current_char = hard_limit;
-        }
-    }
-    chunks
-}
-
-fn split_into_tts_chunks(text: &str, split_on_newline: bool) -> Vec<TtsChunk> {
-    let mut sentences = Vec::new();
-    let mut current_sentence = String::new();
-    let mut current_orig_len = 0usize;
-
-    for ch in text.chars() {
-        current_sentence.push(ch);
-        current_orig_len += 1;
-        
-        let is_terminal = matches!(ch, '.' | '!' | '?') || (split_on_newline && ch == '\n');
-        
-        if is_terminal {
-            let sentence_text = current_sentence.clone();
-            if !sentence_text.trim().is_empty() {
-                sentences.push((sentence_text, current_orig_len));
-            }
-            current_sentence.clear();
-            current_orig_len = 0;
-        }
-    }
-
-    if !current_sentence.trim().is_empty() {
-        sentences.push((current_sentence, current_orig_len));
-    }
-
-    let mut chunks = Vec::new();
-    let mut current_chunk_text = String::new();
-    let mut current_chunk_orig_len = 0usize;
-    let max_chars = 150; // Restored to 150
-
-    for (s_text, s_len) in sentences {
-        let potential_new_len = current_chunk_text.chars().count() + s_text.chars().count();
-        
-        if !current_chunk_text.is_empty() && potential_new_len > max_chars {
-            // Finish current chunk
-            let cleaned = strip_dashed_lines(&current_chunk_text);
-            let prepared = normalize_for_tts(&cleaned, split_on_newline);
-            chunks.push(TtsChunk {
-                text_to_read: prepared,
-                original_len: current_chunk_orig_len,
-            });
-            current_chunk_text.clear();
-            current_chunk_orig_len = 0;
-        }
-        
-        current_chunk_text.push_str(&s_text);
-        current_chunk_orig_len += s_len;
-    }
-
-    if !current_chunk_text.is_empty() {
-        let cleaned = strip_dashed_lines(&current_chunk_text);
-        let prepared = normalize_for_tts(&cleaned, split_on_newline);
-        chunks.push(TtsChunk {
-            text_to_read: prepared,
-            original_len: current_chunk_orig_len,
-        });
-    }
-
-    chunks
-}
-
-async fn download_audio_chunk(
-    text: &str,
-    voice: &str,
-    request_id: &str,
-) -> Result<Vec<u8>, String> {
-    let max_retries = 5;
-    let mut last_error = String::new();
-
-    for attempt in 1..=max_retries {
-        match download_audio_chunk_attempt(text, voice, request_id).await {
-            Ok(data) => return Ok(data),
-            Err(e) => {
-                last_error = e;
-                log_debug(&format!(
-                    "Errore download chunk (tentativo {}/{}): {}. Riprovo...",
-                    attempt, max_retries, last_error
-                ));
-                if attempt < max_retries {
-                    tokio::time::sleep(Duration::from_millis(500 * attempt as u64)).await;
-                }
-            }
-        }
-    }
-    Err(format!(
-        "Falliti {} tentativi. Ultimo errore: {}",
-        max_retries, last_error
-    ))
-}
-
-async fn download_audio_chunk_attempt(
-    text: &str,
-    voice: &str,
-    request_id: &str,
-) -> Result<Vec<u8>, String> {
-    let sec_ms_gec = generate_sec_ms_gec();
-    let sec_ms_gec_version = "1-130.0.2849.68";
-
-    let url_str = format!(
-        "{}?TrustedClientToken={}&ConnectionId={}&Sec-MS-GEC={}&Sec-MS-GEC-Version={}",
-        WSS_URL_BASE, TRUSTED_CLIENT_TOKEN, request_id, sec_ms_gec, sec_ms_gec_version
-    );
-    let url = Url::parse(&url_str).map_err(|err| err.to_string())?;
-
-    let mut request = url.into_client_request().map_err(|err| err.to_string())?;
-    let headers = request.headers_mut();
-    headers.insert("Pragma", HeaderValue::from_static("no-cache"));
-    headers.insert("Cache-Control", HeaderValue::from_static("no-cache"));
-    headers.insert(
-        "Origin",
-        HeaderValue::from_static("chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold"),
-    );
-    headers.insert(
-        "User-Agent",
-        HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0"),
-    );
-    headers.insert("Accept-Encoding", HeaderValue::from_static("gzip, deflate, br"));
-    headers.insert("Accept-Language", HeaderValue::from_static("en-US,en;q=0.9"));
-    let cookie = format!("muid={};", generate_muid());
-    headers.insert("Cookie", HeaderValue::from_str(&cookie).map_err(|err| err.to_string())?);
-
-    let (ws_stream, _) = connect_async(request).await.map_err(|err| err.to_string())?;
-    let (mut write, mut read) = ws_stream.split();
-
-    let config_msg = format!(
-        "X-Timestamp:{}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{{\"context\":{{\"synthesis\":{{\"audio\":{{\"metadataoptions\":{{\"sentenceBoundaryEnabled\":\"false\",\"wordBoundaryEnabled\":\"false\"}},\"outputFormat\":\"audio-24khz-48kbitrate-mono-mp3\"}}}}}}}}",
-        get_date_string()
-    );
-    write.send(Message::Text(config_msg)).await.map_err(|err| err.to_string())?;
-
-    let ssml = mkssml(text, voice);
-    let ssml_msg = format!(
-        "X-RequestId:{}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:{}Z\r\nPath:ssml\r\n\r\n{}",
-        request_id,
-        get_date_string(),
-        ssml
-    );
-    write.send(Message::Text(ssml_msg)).await.map_err(|err| err.to_string())?;
-
-    let mut audio_data = Vec::new();
-    while let Some(msg) = read.next().await {
-        let msg = msg.map_err(|err| err.to_string())?;
-        match msg {
-            Message::Text(text) => {
-                if text.contains("Path:turn.end") {
-                    break;
-                }
-            }
-            Message::Binary(data) => {
-                if data.len() < 2 {
-                    continue;
-                }
-                let be_len = u16::from_be_bytes([data[0], data[1]]) as usize;
-                let le_len = u16::from_le_bytes([data[0], data[1]]) as usize;
-                let mut parsed = false;
-                for header_len in [be_len, le_len] {
-                    if header_len == 0 || data.len() < header_len + 2 {
-                        continue;
-                    }
-                    let headers_bytes = &data[2..2 + header_len];
-                    let headers_str = String::from_utf8_lossy(headers_bytes);
-                    if headers_str.contains("Path:audio") {
-                        audio_data.extend_from_slice(&data[2 + header_len..]);
-                        parsed = true;
-                        break;
-                    }
-                }
-                if parsed {
-                    continue;
-                }
-            }
-            Message::Close(_) => break,
-            _ => {}
-        }
-    }
-
-    Ok(audio_data)
-}
 
 unsafe fn handle_find_message(hwnd: HWND, lparam: LPARAM) {
     let fr = &*(lparam.0 as *const FINDREPLACEW);
@@ -3564,7 +1355,7 @@ unsafe fn find_next_from_state(hwnd: HWND) {
     }
 }
 
-unsafe fn get_active_edit(hwnd: HWND) -> Option<HWND> {
+pub(crate) unsafe fn get_active_edit(hwnd: HWND) -> Option<HWND> {
     with_state(hwnd, |state| state.docs.get(state.current).map(|doc| doc.hwnd_edit)).flatten()
 }
 
@@ -3751,7 +1542,7 @@ unsafe fn update_recent_menu(hwnd: HWND, hmenu_recent: HMENU) {
 }
 
 unsafe fn insert_bookmark(hwnd: HWND) {
-    let (hwnd_edit, path, format) = match with_state(hwnd, |state| {
+    let (hwnd_edit, path, format): (HWND, std::path::PathBuf, FileFormat) = match with_state(hwnd, |state| {
         state.docs.get(state.current).and_then(|doc| {
             doc.path.clone().map(|p| (doc.hwnd_edit, p, doc.format))
         })
@@ -3791,7 +1582,7 @@ unsafe fn insert_bookmark(hwnd: HWND) {
         }).unwrap_or(HWND(0));
 
         if bookmarks_window.0 != 0 {
-            unsafe { refresh_bookmarks_list(bookmarks_window); }
+            unsafe { app_windows::bookmarks_window::refresh_bookmarks_list(bookmarks_window); }
         }
         return;
     }
@@ -3848,7 +1639,7 @@ unsafe fn insert_bookmark(hwnd: HWND) {
     }).unwrap_or(HWND(0));
 
     if bookmarks_window.0 != 0 {
-        unsafe { refresh_bookmarks_list(bookmarks_window); }
+        unsafe { app_windows::bookmarks_window::refresh_bookmarks_list(bookmarks_window); }
     }
 }
 
@@ -3867,268 +1658,20 @@ unsafe fn goto_first_bookmark(hwnd_edit: HWND, path: &Path, bookmarks: &Bookmark
     }
 }
 
-struct BookmarksWindowState {
-    parent: HWND,
-    hwnd_list: HWND,
-    hwnd_goto: HWND,
-}
 
-unsafe fn open_bookmarks_window(hwnd: HWND) {
-    let existing = with_state(hwnd, |state| state.bookmarks_window).unwrap_or(HWND(0));
-    if existing.0 != 0 {
-        SetForegroundWindow(existing);
-        return;
-    }
 
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-    let class_name = to_wide(BOOKMARKS_CLASS_NAME);
-    let wc = WNDCLASSW {
-        hCursor: HCURSOR(LoadCursorW(None, IDC_ARROW).unwrap_or_default().0),
-        hInstance: hinstance,
-        lpszClassName: PCWSTR(class_name.as_ptr()),
-        lpfnWndProc: Some(bookmarks_wndproc),
-        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
-        ..Default::default()
-    };
-    RegisterClassW(&wc);
 
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    let title = to_wide(if language == Language::Italian { "Gestisci segnalibri" } else { "Manage Bookmarks" });
 
-    let window = CreateWindowExW(
-        WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
-        PCWSTR(class_name.as_ptr()),
-        PCWSTR(title.as_ptr()),
-        WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        400,
-        450,
-        hwnd,
-        None,
-        hinstance,
-        Some(hwnd.0 as *const std::ffi::c_void),
-    );
 
-    if window.0 != 0 {
-        let _ = with_state(hwnd, |state| {
-            state.bookmarks_window = window;
-        });
-        EnableWindow(hwnd, false);
-        SetForegroundWindow(window);
-    }
-}
 
-unsafe extern "system" fn bookmarks_wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let create_struct = lparam.0 as *const CREATESTRUCTW;
-            let parent = HWND((*create_struct).lpCreateParams as isize);
-            let hfont = with_state(parent, |state| state.hfont).unwrap_or(HFONT(0));
-            let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
 
-            let hwnd_list = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_LISTBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_TABSTOP | WINDOW_STYLE((LBS_NOTIFY | LBS_HASSTRINGS) as u32),
-                10, 10, 360, 300,
-                hwnd, HMENU(BOOKMARKS_ID_LIST as isize), HINSTANCE(0), None
-            );
 
-            let btn_goto_text = if language == Language::Italian { "Vai a" } else { "Go to" };
-            let hwnd_goto = CreateWindowExW(
-                Default::default(), WC_BUTTON, PCWSTR(to_wide(btn_goto_text).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                10, 320, 110, 30,
-                hwnd, HMENU(BOOKMARKS_ID_GOTO as isize), HINSTANCE(0), None
-            );
 
-            let btn_del_text = if language == Language::Italian { "Elimina" } else { "Delete" };
-            let hwnd_delete = CreateWindowExW(
-                Default::default(), WC_BUTTON, PCWSTR(to_wide(btn_del_text).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                130, 320, 110, 30,
-                hwnd, HMENU(BOOKMARKS_ID_DELETE as isize), HINSTANCE(0), None
-            );
 
-            let hwnd_ok = CreateWindowExW(
-                Default::default(), WC_BUTTON, w!("OK"),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                250, 320, 110, 30,
-                hwnd, HMENU(BOOKMARKS_ID_OK as isize), HINSTANCE(0), None
-            );
 
-            for ctrl in [hwnd_list, hwnd_goto, hwnd_delete, hwnd_ok] {
-                if ctrl.0 != 0 && hfont.0 != 0 {
-                    let _ = SendMessageW(ctrl, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-                }
-            }
 
-            let state = Box::new(BookmarksWindowState { parent, hwnd_list, hwnd_goto });
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
-            
-            refresh_bookmarks_list(hwnd);
-            
-            if SendMessageW(hwnd_list, windows::Win32::UI::WindowsAndMessaging::LB_GETCOUNT as u32, WPARAM(0), LPARAM(0)).0 > 0 {
-                SendMessageW(hwnd_list, windows::Win32::UI::WindowsAndMessaging::LB_SETCURSEL as u32, WPARAM(0), LPARAM(0));
-            }
-            SetFocus(hwnd_list);
-            
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-            let cmd_id = (wparam.0 & 0xffff) as usize;
-            let notify = (wparam.0 >> 16) as u16;
-            match cmd_id {
-                BOOKMARKS_ID_GOTO => {
-                    goto_selected_bookmark(hwnd);
-                    LRESULT(0)
-                }
-                BOOKMARKS_ID_DELETE => {
-                    delete_selected_bookmark(hwnd);
-                    LRESULT(0)
-                }
-                BOOKMARKS_ID_OK => {
-                    let _ = DestroyWindow(hwnd);
-                    LRESULT(0)
-                }
-                BOOKMARKS_ID_LIST if notify == LBN_DBLCLK as u16 => {
-                    goto_selected_bookmark(hwnd);
-                    LRESULT(0)
-                }
-                cmd if cmd == IDCANCEL.0 as usize || cmd == 2 => {
-                    let _ = DestroyWindow(hwnd);
-                    LRESULT(0)
-                }
-                _ => DefWindowProcW(hwnd, msg, wparam, lparam),
-            }
-        }
-        WM_CLOSE => {
-            let _ = DestroyWindow(hwnd);
-            LRESULT(0)
-        }
-        WM_DESTROY => {
-            let parent = with_bookmarks_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-            if parent.0 != 0 {
-                EnableWindow(parent, true);
-                SetForegroundWindow(parent);
-                let _ = with_state(parent, |state| {
-                    state.bookmarks_window = HWND(0);
-                });
-            }
-            LRESULT(0)
-        }
-        WM_NCDESTROY => {
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut BookmarksWindowState;
-            if !ptr.is_null() {
-                let _ = Box::from_raw(ptr);
-            }
-            LRESULT(0)
-        }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
-    }
-}
 
-unsafe fn with_bookmarks_state<F, R>(hwnd: HWND, f: F) -> Option<R>
-where F: FnOnce(&mut BookmarksWindowState) -> R {
-    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut BookmarksWindowState;
-    if ptr.is_null() { None } else { Some(f(&mut *ptr)) }
-}
 
-unsafe fn refresh_bookmarks_list(hwnd: HWND) {
-    let (parent, hwnd_list) = match with_bookmarks_state(hwnd, |s| (s.parent, s.hwnd_list)) {
-        Some(v) => v,
-        None => return,
-    };
-
-    let path = with_state(parent, |state| {
-        state.docs.get(state.current).and_then(|d| d.path.clone())
-    }).flatten();
-
-    let Some(path) = path else { return; };
-    let path_str = path.to_string_lossy().to_string();
-
-    let _ = SendMessageW(hwnd_list, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
-
-    with_state(parent, |state| {
-        if let Some(list) = state.bookmarks.files.get(&path_str) {
-            for bm in list {
-                let text = format!("[{}] {}", bm.timestamp, bm.snippet);
-                let wide = to_wide(&text);
-                let _ = SendMessageW(hwnd_list, LB_ADDSTRING, WPARAM(0), LPARAM(wide.as_ptr() as isize));
-            }
-        }
-    });
-
-    let count = SendMessageW(hwnd_list, LB_GETCOUNT, WPARAM(0), LPARAM(0)).0 as i32;
-    if count > 0 {
-        if SendMessageW(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32 == -1 {
-            SendMessageW(hwnd_list, LB_SETCURSEL, WPARAM(0), LPARAM(0));
-        }
-    }
-}
-
-unsafe fn goto_selected_bookmark(hwnd: HWND) {
-    let (parent, hwnd_list) = match with_bookmarks_state(hwnd, |s| (s.parent, s.hwnd_list)) {
-        Some(v) => v,
-        None => return,
-    };
-
-    let sel = SendMessageW(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
-    if sel < 0 { return; }
-
-    let (path, hwnd_edit, format) = with_state(parent, |state| {
-        state.docs.get(state.current).and_then(|d| d.path.clone().map(|p| (p, d.hwnd_edit, d.format)))
-    }).flatten().unwrap();
-
-    let path_str = path.to_string_lossy().to_string();
-    
-    with_state(parent, |state| {
-        if let Some(list) = state.bookmarks.files.get(&path_str) {
-            if let Some(bm) = list.get(sel as usize) {
-                if matches!(format, FileFormat::Audiobook) {
-                    unsafe { start_audiobook_at(parent, &path, bm.position as u64); }
-                } else {
-                    let mut cr = CHARRANGE { cpMin: bm.position, cpMax: bm.position };
-                    unsafe {
-                        SendMessageW(hwnd_edit, EM_EXSETSEL, WPARAM(0), LPARAM(&mut cr as *mut _ as isize));
-                        SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
-                    }
-                }
-                unsafe { SetFocus(hwnd_edit); }
-            }
-        }
-    });
-    let _ = DestroyWindow(hwnd);
-}
-
-unsafe fn delete_selected_bookmark(hwnd: HWND) {
-    let (parent, hwnd_list) = match with_bookmarks_state(hwnd, |s| (s.parent, s.hwnd_list)) {
-        Some(v) => v,
-        None => return,
-    };
-
-    let sel = SendMessageW(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
-    if sel < 0 { return; }
-
-    let path = with_state(parent, |state| {
-        state.docs.get(state.current).and_then(|d| d.path.clone())
-    }).flatten();
-
-    let Some(path) = path else { return; };
-    let path_str = path.to_string_lossy().to_string();
-
-    with_state(parent, |state| {
-        if let Some(list) = state.bookmarks.files.get_mut(&path_str) {
-            if sel < list.len() as i32 {
-                list.remove(sel as usize);
-                save_bookmarks(&state.bookmarks);
-            }
-        }
-    });
-    refresh_bookmarks_list(hwnd);
-}
 
 unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
     let path_buf = path.to_path_buf();
@@ -4257,7 +1800,7 @@ unsafe fn stop_audiobook_playback(hwnd: HWND) {
     });
 }
 
-unsafe fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
+pub(crate) unsafe fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
     stop_audiobook_playback(hwnd);
     let path_buf = path.to_path_buf();
     let hwnd_main = hwnd;
@@ -4315,7 +1858,7 @@ unsafe fn change_audiobook_volume(hwnd: HWND, delta: f32) {
 }
 
 
-unsafe fn rebuild_menus(hwnd: HWND) {
+pub(crate) unsafe fn rebuild_menus(hwnd: HWND) {
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
     let (_, recent_menu) = create_menus(hwnd, language);
     let _ = with_state(hwnd, |state| {
@@ -4523,7 +2066,7 @@ unsafe fn try_close_app(hwnd: HWND) -> bool {
     true
 }
 
-unsafe fn with_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+pub(crate) unsafe fn with_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut AppState) -> R,
 {
@@ -5145,7 +2688,7 @@ unsafe fn create_edit(parent: HWND, hfont: HFONT, word_wrap: bool) -> HWND {
     hwnd_edit
 }
 
-unsafe fn apply_word_wrap_to_all_edits(hwnd: HWND, word_wrap: bool) {
+pub(crate) unsafe fn apply_word_wrap_to_all_edits(hwnd: HWND, word_wrap: bool) {
     let edits = with_state(hwnd, |state| state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>())
         .unwrap_or_default();
 
@@ -5217,7 +2760,7 @@ unsafe fn set_edit_text(hwnd_edit: HWND, text: &str) {
     SendMessageW(hwnd_edit, EM_SETMODIFY, WPARAM(0), LPARAM(0));
 }
 
-unsafe fn get_edit_text(hwnd_edit: HWND) -> String {
+pub(crate) unsafe fn get_edit_text(hwnd_edit: HWND) -> String {
     let len = SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as usize;
     if len == 0 {
         return String::new();
@@ -5404,7 +2947,7 @@ unsafe fn save_audio_dialog(hwnd: HWND, suggested_name: Option<&str>) -> Option<
     }
 }
 
-unsafe fn show_error(hwnd: HWND, language: Language, message: &str) {
+pub(crate) unsafe fn show_error(hwnd: HWND, language: Language, message: &str) {
     log_debug(&format!("Error shown: {message}"));
     let wide = to_wide(message);
     let title = to_wide(error_title(language));
@@ -5423,55 +2966,7 @@ unsafe fn show_info(hwnd: HWND, language: Language, message: &str) {
     );
 }
 
-unsafe fn show_about_dialog(hwnd: HWND) {
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    let message = to_wide(about_message(language));
-    let title = to_wide(about_title(language));
-    MessageBoxW(
-        hwnd,
-        PCWSTR(message.as_ptr()),
-        PCWSTR(title.as_ptr()),
-        MB_OK | MB_ICONINFORMATION,
-    );
-}
 
-fn to_wide(value: &str) -> Vec<u16> {
-    let mut out = Vec::with_capacity(value.len() + 1);
-    out.extend(value.encode_utf16());
-    out.push(0);
-    out
-}
-
-fn to_wide_normalized(text: &str) -> Vec<u16> {
-    let mut out = Vec::with_capacity(text.len() + 1);
-    let mut chars = text.chars().peekable();
-    while let Some(ch) = chars.next() {
-        match ch {
-            '\r' => {
-                out.push(0x000D); // \r
-                if chars.peek() == Some(&'\n') {
-                    chars.next();
-                }
-                out.push(0x000A); // \n
-            }
-            '\n' => {
-                out.push(0x000D); // \r
-                out.push(0x000A); // \n
-            }
-            _ => {
-                if (ch as u32) <= 0xFFFF {
-                    out.push(ch as u16);
-                } else {
-                    let mut b = [0u16; 2];
-                    ch.encode_utf16(&mut b);
-                    out.extend_from_slice(&b);
-                }
-            }
-        }
-    }
-    out.push(0);
-    out
-}
 
 
 unsafe fn send_open_file(hwnd: HWND, path: &str) -> bool {
@@ -5485,18 +2980,7 @@ unsafe fn send_open_file(hwnd: HWND, path: &str) -> bool {
     true
 }
 
-fn from_wide(ptr: *const u16) -> String {
-    if ptr.is_null() {
-        return String::new();
-    }
-    unsafe {
-        let mut len = 0;
-        while *ptr.add(len) != 0 {
-            len += 1;
-        }
-        String::from_utf16_lossy(std::slice::from_raw_parts(ptr, len))
-    }
-}
+
 
 fn is_docx_path(path: &Path) -> bool {
     path.extension()
@@ -6666,46 +4150,9 @@ fn average_pdf_line_len(text: &str) -> usize {
     }
 }
 
-fn normalize_to_crlf(text: &str) -> String {
-    if !text.contains('\r') && !text.contains('\n') {
-        return text.to_string();
-    }
-    
-    let mut out = String::with_capacity(text.len() + text.len() / 10);
-    let mut chars = text.chars().peekable();
-    while let Some(ch) = chars.next() {
-        match ch {
-            '\r' => {
-                out.push('\r');
-                if chars.peek() == Some(&'\n') {
-                    chars.next();
-                }
-                out.push('\n');
-            }
-            '\n' => {
-                out.push('\r');
-                out.push('\n');
-            }
-            _ => out.push(ch),
-        }
-    }
-    out
-}
 
-fn normalize_for_tts(text: &str, split_on_newline: bool) -> String {
-    if split_on_newline {
-        // Uniforma CRLF -> LF, ma mantiene i newline come separatori
-        text.replace("\r\n", "\n")
-    } else {
-        // I newline NON devono spezzare: diventano spazi
-        let t = text
-            .replace("\r\n", " ")
-            .replace('\n', " ")
-            .replace('\r', " ");
-        // Collassa spazi multipli
-        t.split_whitespace().collect::<Vec<_>>().join(" ")
-    }
-}
+
+
 
 
 fn wrap_words(text: &str, max_chars: usize) -> Vec<String> {
@@ -6843,64 +4290,15 @@ fn recent_store_path() -> Option<PathBuf> {
     Some(path)
 }
 
-fn settings_store_path() -> Option<PathBuf> {
-    let mut path = log_path()?.parent()?.to_path_buf();
-    path.push("settings.json");
-    Some(path)
-}
-
-fn bookmark_store_path() -> Option<PathBuf> {
-    let mut path = log_path()?.parent()?.to_path_buf();
-    path.push("bookmarks.json");
-    Some(path)
-}
-
-fn load_bookmarks() -> BookmarkStore {
-    let Some(path) = bookmark_store_path() else {
-        return BookmarkStore::default();
-    };
-    let data = std::fs::read_to_string(path).ok();
-    let Some(data) = data else {
-        return BookmarkStore::default();
-    };
-    serde_json::from_str(&data).unwrap_or_default()
-}
-
-fn save_bookmarks(bookmarks: &BookmarkStore) {
-    let Some(path) = bookmark_store_path() else {
-        return;
-    };
-    if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    if let Ok(json) = serde_json::to_string_pretty(bookmarks) {
-        let _ = std::fs::write(path, json);
-    }
-}
 
 
-fn load_settings() -> AppSettings {
-    let Some(path) = settings_store_path() else {
-        return AppSettings::default();
-    };
-    let data = std::fs::read_to_string(path).ok();
-    let Some(data) = data else {
-        return AppSettings::default();
-    };
-    serde_json::from_str(&data).unwrap_or_default()
-}
 
-fn save_settings(settings: AppSettings) {
-    let Some(path) = settings_store_path() else {
-        return;
-    };
-    if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    if let Ok(json) = serde_json::to_string_pretty(&settings) {
-        let _ = std::fs::write(path, json);
-    }
-}
+
+
+
+
+
+
 
 fn load_recent_files() -> Vec<PathBuf> {
     let Some(path) = recent_store_path() else {

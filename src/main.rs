@@ -9,75 +9,125 @@ mod bookmarks;
 use bookmarks::*;
 mod tts_engine;
 use tts_engine::*;
+mod file_handler;
+use file_handler::*;
 mod app_windows;
 
 use std::fmt::Display;
-use std::io::{BufWriter, Read, Write};
-use std::mem::size_of;
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool};
-use std::sync::Arc;
-use std::time::Duration;
-use chrono::Local;
-use docx_rs::{
-    read_docx, Docx, DocumentChild, Paragraph, ParagraphChild, Run, RunChild, Table,
-    TableChild, TableCellContent, TableRowChild,
-};
-use calamine::{open_workbook_auto, Reader, Data as CalamineData};
-use cfb::CompoundFile;
-use encoding_rs::{Encoding, WINDOWS_1252};
 
-use pdf_extract::extract_text;
-use printpdf::{BuiltinFont, Mm, PdfDocument};
-use rodio::{Decoder, OutputStream, Sink, Source};
+use std::io::{Write};
+
+use std::mem::size_of;
+
+use std::path::{Path, PathBuf};
+
+use std::sync::atomic::{AtomicBool};
+
+use std::sync::Arc;
+
+use std::time::Duration;
+
+use chrono::Local;
+
 use serde::{Deserialize, Serialize};
 
+use rodio::{Decoder, OutputStream, Sink, Source};
+
 use windows::core::{w, PCWSTR, PWSTR};
+
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM, BOOL};
+
 use windows::Win32::Graphics::Gdi::{GetStockObject, HBRUSH, HFONT, COLOR_WINDOW, DEFAULT_GUI_FONT, InvalidateRect, UpdateWindow};
+
 use windows::Win32::System::DataExchange::COPYDATASTRUCT;
+
 use windows::Win32::System::LibraryLoader::{GetModuleHandleW, LoadLibraryW};
+
 use windows::Win32::UI::Controls::RichEdit::{
+
     MSFTEDIT_CLASS, EM_SETEVENTMASK, ENM_CHANGE, FINDTEXTEXW, CHARRANGE, EM_FINDTEXTEXW, EM_EXSETSEL, EM_EXGETSEL,
+
     TEXTRANGEW, EM_GETTEXTRANGE
-};
-use windows::Win32::UI::Controls::{
-    InitCommonControlsEx, ICC_TAB_CLASSES, INITCOMMONCONTROLSEX, NMHDR, TCITEMW, TCIF_TEXT,
-    TCM_ADJUSTRECT, TCM_DELETEITEM, TCM_GETCURSEL, TCM_INSERTITEMW, TCM_SETCURSEL, TCM_SETITEMW,
-    TCN_SELCHANGE, WC_TABCONTROLW, EM_GETMODIFY, EM_SETMODIFY, EM_SETREADONLY,
+
 };
 
+use windows::Win32::UI::Controls::{
+
+    InitCommonControlsEx, ICC_TAB_CLASSES, INITCOMMONCONTROLSEX, NMHDR, TCITEMW, TCIF_TEXT,
+
+    TCM_ADJUSTRECT, TCM_DELETEITEM, TCM_GETCURSEL, TCM_INSERTITEMW, TCM_SETCURSEL, TCM_SETITEMW,
+
+    TCN_SELCHANGE, WC_TABCONTROLW, EM_GETMODIFY, EM_SETMODIFY, EM_SETREADONLY,
+
+};
+
+
+
 use windows::Win32::UI::Controls::Dialogs::{
+
     FindTextW, ReplaceTextW, FINDREPLACEW, FINDREPLACE_FLAGS, FR_DIALOGTERM, FR_DOWN, FR_FINDNEXT,
+
     FR_MATCHCASE, FR_REPLACE, FR_REPLACEALL, FR_WHOLEWORD, GetOpenFileNameW, GetSaveFileNameW,
+
     OPENFILENAMEW, OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY, OFN_OVERWRITEPROMPT,
+
     OFN_PATHMUSTEXIST,
+
 };
+
 use windows::Win32::UI::Input::KeyboardAndMouse::{
+
     GetKeyState, SetFocus, VK_CONTROL, VK_F3, VK_F4, VK_F5,
+
     VK_F6, VK_TAB
+
 };
+
 use windows::Win32::UI::Shell::{DragAcceptFiles, DragFinish, DragQueryFileW, HDROP};
+
 use windows::Win32::UI::WindowsAndMessaging::{
+
     AppendMenuW, CreateAcceleratorTableW, CreateMenu, CreateWindowExW,
+
     DefWindowProcW, DeleteMenu, DestroyWindow, DispatchMessageW, DrawMenuBar, FindWindowW,
+
     GetClientRect, GetMenuItemCount, GetMessageW, GetWindowLongPtrW, LoadCursorW, LoadIconW,
+
     MessageBoxW, MoveWindow, PostQuitMessage, RegisterClassW, SendMessageW,
+
     SetMenu, RegisterWindowMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW,
+
     ShowWindow, PostMessageW, WM_APP,
+
     TranslateAcceleratorW, TranslateMessage, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT,
+
     EN_CHANGE, GWLP_USERDATA, CREATESTRUCTW,
+
     HMENU, HCURSOR, HICON, IDC_ARROW, IDI_APPLICATION, IDYES, IDNO, MENU_ITEM_FLAGS,
+
     MB_ICONERROR, MB_ICONINFORMATION, MB_ICONWARNING, MB_OK, MB_YESNOCANCEL, MF_BYPOSITION,
+
     MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MSG, SW_HIDE, SW_SHOW, WM_CLOSE,
+
     WM_COMMAND,
+
     WM_CREATE, WM_DESTROY, WM_DROPFILES, WM_KEYDOWN, WM_NOTIFY, WM_SIZE, WM_TIMER, WNDCLASSW, WS_CHILD,
+
     WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_VISIBLE, ES_AUTOVSCROLL,
+
     ES_AUTOHSCROLL, ES_MULTILINE, ES_WANTRETURN, WS_HSCROLL, WS_VSCROLL, ACCEL, FVIRTKEY,
+
     FCONTROL, FSHIFT, WM_SETFOCUS, WM_NCDESTROY, HACCEL, WM_UNDO, WM_CUT, WM_COPY, WINDOW_STYLE,
+
     WM_PASTE, WM_GETTEXT, WM_GETTEXTLENGTH, WM_COPYDATA, KillTimer, SetTimer,
+
     WM_SETREDRAW,
+
 };
+
+
+
+
 
 const IDM_FILE_NEW: usize = 1001;
 const IDM_FILE_OPEN: usize = 1002;
@@ -983,187 +1033,158 @@ fn recent_missing_message(language: Language) -> &'static str {
 }
 
 fn confirm_save_message(language: Language, title: &str) -> String {
+
     match language {
+
         Language::Italian => format!("Il documento \"{}\" e' modificato. Salvare?", title),
+
         Language::English => format!("The document \"{}\" has been modified. Save?", title),
+
     }
+
 }
+
+
 
 fn confirm_title(language: Language) -> &'static str {
+
     match language {
+
         Language::Italian => "Conferma",
+
         Language::English => "Confirm",
+
     }
+
 }
+
+
 
 fn error_title(language: Language) -> &'static str {
+
     match language {
+
         Language::Italian => "Errore",
+
         Language::English => "Error",
+
     }
+
 }
+
+
 
 pub(crate) fn tts_no_text_message(language: Language) -> &'static str {
+
     match language {
+
         Language::Italian => "Non c'e' testo da leggere.",
+
         Language::English => "There is no text to read.",
+
     }
+
 }
 
+
+
 fn audiobook_done_title(language: Language) -> &'static str {
+
     match language {
+
         Language::Italian => "Audiolibro",
+
         Language::English => "Audiobook",
+
     }
+
 }
 
 
 
 fn info_title(language: Language) -> &'static str {
+
     match language {
+
         Language::Italian => "Info",
+
         Language::English => "Info",
+
     }
+
 }
-
-
 
 
 
 fn pdf_loaded_message(language: Language) -> &'static str {
+
     match language {
+
         Language::Italian => "PDF caricato.",
+
         Language::English => "PDF loaded.",
+
     }
+
 }
+
+
 
 fn text_not_found_message(language: Language) -> &'static str {
+
     match language {
+
         Language::Italian => "Testo non trovato.",
+
         Language::English => "Text not found.",
+
     }
+
 }
+
+
 
 fn find_title(language: Language) -> &'static str {
+
     match language {
+
         Language::Italian => "Trova",
+
         Language::English => "Find",
+
     }
+
 }
+
+
 
 fn error_open_file_message(language: Language, err: impl Display) -> String {
+
     match language {
+
         Language::Italian => format!("Errore apertura file: {err}"),
+
         Language::English => format!("Error opening file: {err}"),
+
     }
+
 }
 
-fn error_open_doc_message(language: Language, err: impl Display) -> String {
-    match language {
-        Language::Italian => format!("Errore apertura file DOC: {err}"),
-        Language::English => format!("Error opening DOC file: {err}"),
-    }
-}
 
-fn error_worddocument_missing_message(language: Language) -> &'static str {
-    match language {
-        Language::Italian => "Stream WordDocument non trovato.",
-        Language::English => "WordDocument stream not found.",
-    }
-}
-
-fn error_read_stream_message(language: Language, err: impl Display) -> String {
-    match language {
-        Language::Italian => format!("Errore lettura stream: {err}"),
-        Language::English => format!("Error reading stream: {err}"),
-    }
-}
-
-fn error_read_file_message(language: Language, err: impl Display) -> String {
-    match language {
-        Language::Italian => format!("Errore lettura file: {err}"),
-        Language::English => format!("Error reading file: {err}"),
-    }
-}
-
-fn error_unknown_format_message(language: Language) -> &'static str {
-    match language {
-        Language::Italian => {
-            "Impossibile leggere il file. Formato sconosciuto o magic number invalido."
-        }
-        Language::English => "Unable to read file. Unknown format or invalid magic number.",
-    }
-}
-
-fn error_read_docx_message(language: Language, err: impl Display) -> String {
-    match language {
-        Language::Italian => format!("Errore lettura DOCX: {err}"),
-        Language::English => format!("Error reading DOCX: {err}"),
-    }
-}
-
-fn error_read_pdf_message(language: Language, err: impl Display) -> String {
-    match language {
-        Language::Italian => format!("Errore lettura PDF: {err}"),
-        Language::English => format!("Error reading PDF: {err}"),
-    }
-}
-
-fn error_open_excel_message(language: Language, err: impl Display) -> String {
-    match language {
-        Language::Italian => format!("Errore apertura Excel: {err}"),
-        Language::English => format!("Error opening Excel: {err}"),
-    }
-}
-
-fn error_no_sheet_message(language: Language) -> &'static str {
-    match language {
-        Language::Italian => "Nessun foglio trovato o errore lettura foglio.",
-        Language::English => "No sheet found or error reading sheet.",
-    }
-}
 
 fn error_save_file_message(language: Language, err: impl Display) -> String {
+
     match language {
+
         Language::Italian => format!("Errore salvataggio file: {err}"),
+
         Language::English => format!("Error saving file: {err}"),
+
     }
+
 }
 
-fn error_save_docx_message(language: Language, err: impl Display) -> String {
-    match language {
-        Language::Italian => format!("Errore salvataggio DOCX: {err}"),
-        Language::English => format!("Error saving DOCX: {err}"),
-    }
-}
 
-fn error_pdf_font_message(language: Language, err: impl Display) -> String {
-    match language {
-        Language::Italian => format!("Errore font PDF: {err}"),
-        Language::English => format!("Error loading PDF font: {err}"),
-    }
-}
-
-fn error_save_pdf_message(language: Language, err: impl Display) -> String {
-    match language {
-        Language::Italian => format!("Errore salvataggio PDF: {err}"),
-        Language::English => format!("Error saving PDF: {err}"),
-    }
-}
-
-fn error_invalid_utf16le_message(language: Language) -> &'static str {
-    match language {
-        Language::Italian => "Il file UTF-16LE ha una lunghezza non valida.",
-        Language::English => "The UTF-16LE file has an invalid length.",
-    }
-}
-
-fn error_invalid_utf16be_message(language: Language) -> &'static str {
-    match language {
-        Language::Italian => "Il file UTF-16BE ha una lunghezza non valida.",
-        Language::English => "The UTF-16BE file has an invalid length.",
-    }
-}
 
 unsafe fn append_menu_string(menu: HMENU, flags: MENU_ITEM_FLAGS, id: usize, text: &str) {
     let wide = to_wide(text);
@@ -1689,7 +1710,7 @@ unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
             Ok(v) => v,
             Err(_) => return,
         };
-        let sink = match Sink::try_new(&handle) {
+        let sink: Arc<Sink> = match Sink::try_new(&handle) {
             Ok(s) => Arc::new(s),
             Err(_) => return,
         };
@@ -1699,7 +1720,7 @@ unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
             Err(_) => return,
         };
         
-        let source = match Decoder::new(std::io::BufReader::new(file)) {
+        let source: Decoder<_> = match Decoder::new(std::io::BufReader::new(file)) {
             Ok(s) => s,
             Err(_) => return,
         };
@@ -1768,9 +1789,9 @@ unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
     let hwnd_main = hwnd;
     std::thread::spawn(move || {
         let (_stream, handle) = OutputStream::try_default().unwrap();
-        let sink = Arc::new(Sink::try_new(&handle).unwrap());
+        let sink: Arc<Sink> = Arc::new(Sink::try_new(&handle).unwrap());
         let file = std::fs::File::open(&path).unwrap();
-        let source = Decoder::new(std::io::BufReader::new(file)).unwrap();
+        let source: Decoder<_> = Decoder::new(std::io::BufReader::new(file)).unwrap();
         
         use rodio::Source;
         let skipped = source.skip_duration(Duration::from_secs(current_pos as u64));
@@ -1810,7 +1831,7 @@ pub(crate) unsafe fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
             Ok(v) => v,
             Err(_) => return,
         };
-        let sink = match Sink::try_new(&handle) {
+        let sink: Arc<Sink> = match Sink::try_new(&handle) {
             Ok(s) => Arc::new(s),
             Err(_) => return,
         };
@@ -1820,7 +1841,7 @@ pub(crate) unsafe fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
             Err(_) => return,
         };
         
-        let source = match Decoder::new(std::io::BufReader::new(file)) {
+        let source: Decoder<_> = match Decoder::new(std::io::BufReader::new(file)) {
             Ok(s) => s,
             Err(_) => return,
         };
@@ -2912,39 +2933,32 @@ unsafe fn save_file_dialog(hwnd: HWND, suggested_name: Option<&str>) -> Option<P
     }
 }
 
-unsafe fn save_audio_dialog(hwnd: HWND, suggested_name: Option<&str>) -> Option<PathBuf> {
+pub(crate) unsafe fn save_audio_dialog(hwnd: HWND, suggested_name: Option<&str>) -> Option<PathBuf> {
     let mut file_buf = vec![0u16; 4096];
     if let Some(name) = suggested_name {
         let mut name_wide = to_wide(name);
-        // Remove trailing null if present from to_wide
-        if let Some(0) = name_wide.last() {
-            name_wide.pop();
-        }
+        if let Some(0) = name_wide.last() { name_wide.pop(); }
         let copy_len = name_wide.len().min(file_buf.len() - 1);
         file_buf[..copy_len].copy_from_slice(&name_wide[..copy_len]);
     }
-    let filter = "MP3 Files (*.mp3)\0*.mp3\0All Files (*.*)\0*.*\0\0";
-    let filter_wide = to_wide(filter);
+    let filter = to_wide("MP3 Files (*.mp3)\0*.mp3\0All Files (*.*)\0*.*\0\0");
     let title = to_wide("Audiobook");
     let mut ofn = OPENFILENAMEW {
-        lStructSize: size_of::<OPENFILENAMEW>() as u32,
+        lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
         hwndOwner: hwnd,
         lpstrFile: PWSTR(file_buf.as_mut_ptr()),
         nMaxFile: file_buf.len() as u32,
-        lpstrFilter: PCWSTR(filter_wide.as_ptr()),
+        lpstrFilter: PCWSTR(filter.as_ptr()),
         lpstrTitle: PCWSTR(title.as_ptr()),
         Flags: OFN_EXPLORER | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST,
         ..Default::default()
     };
     if GetSaveFileNameW(&mut ofn).as_bool() {
-        let mut path = PathBuf::from(from_wide(file_buf.as_ptr()));
-        if path.extension().is_none() {
-            path.set_extension("mp3");
-        }
+        let path = PathBuf::from(from_wide(file_buf.as_ptr()));
+        let mut path = path;
+        if path.extension().is_none() { path.set_extension("mp3"); }
         Some(path)
-    } else {
-        None
-    }
+    } else { None }
 }
 
 pub(crate) unsafe fn show_error(hwnd: HWND, language: Language, message: &str) {
@@ -2954,1351 +2968,31 @@ pub(crate) unsafe fn show_error(hwnd: HWND, language: Language, message: &str) {
     MessageBoxW(hwnd, PCWSTR(wide.as_ptr()), PCWSTR(title.as_ptr()), MB_OK | MB_ICONERROR);
 }
 
-unsafe fn show_info(hwnd: HWND, language: Language, message: &str) {
+pub(crate) unsafe fn show_info(hwnd: HWND, language: Language, message: &str) {
     log_debug(&format!("Info shown: {message}"));
     let wide = to_wide(message);
     let title = to_wide(info_title(language));
-    MessageBoxW(
-        hwnd,
-        PCWSTR(wide.as_ptr()),
-        PCWSTR(title.as_ptr()),
-        MB_OK | MB_ICONINFORMATION,
-    );
+    MessageBoxW(hwnd, PCWSTR(wide.as_ptr()), PCWSTR(title.as_ptr()), MB_OK | MB_ICONINFORMATION);
 }
 
-
-
-
-unsafe fn send_open_file(hwnd: HWND, path: &str) -> bool {
+pub(crate) unsafe fn send_open_file(hwnd: HWND, path: &str) -> bool {
     let wide = to_wide(path);
     let data = COPYDATASTRUCT {
         dwData: COPYDATA_OPEN_FILE,
-        cbData: (wide.len() * size_of::<u16>()) as u32,
+        cbData: (wide.len() * std::mem::size_of::<u16>()) as u32,
         lpData: wide.as_ptr() as *mut std::ffi::c_void,
     };
     SendMessageW(hwnd, WM_COPYDATA, WPARAM(0), LPARAM(&data as *const _ as isize));
     true
 }
 
-
-
-fn is_docx_path(path: &Path) -> bool {
-    path.extension()
-        .and_then(|s| s.to_str())
-        .map(|s| s.eq_ignore_ascii_case("docx"))
-        .unwrap_or(false)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::thread;
-    use std::time::Duration;
-
-    #[test]
-    #[ignore]
-    fn tts_smoke_downloads_audio() {
-        let phrases = [
-            "Ciao mondo.",
-            "Questo e un test di sintesi vocale.",
-            "Hello from Novapad.",
-        ];
-        let mut last_error = String::new();
-        for _ in 0..3 {
-            for phrase in phrases {
-                let request_id = Uuid::new_v4().simple().to_string();
-                let rt = tokio::runtime::Builder::new_multi_thread()
-                    .enable_all()
-                    .build()
-                    .expect("runtime build failed");
-                match rt.block_on(download_audio_chunk(
-                    phrase,
-                    "it-IT-IsabellaNeural",
-                    &request_id,
-                )) {
-                    Ok(audio) if audio.len() > 1024 => {
-                        return;
-                    }
-                    Ok(audio) => {
-                        last_error = format!("Audio too short: {} bytes", audio.len());
-                    }
-                    Err(err) => {
-                        last_error = err;
-                    }
-                }
-            }
-            thread::sleep(Duration::from_millis(300));
-        }
-        panic!("TTS smoke test failed: {last_error}");
-    }
-}
-
-fn is_doc_path(path: &Path) -> bool {
-    path.extension()
-        .and_then(|s| s.to_str())
-        .map(|s| s.eq_ignore_ascii_case("doc"))
-        .unwrap_or(false)
-}
-
-fn is_spreadsheet_path(path: &Path) -> bool {
-    path.extension()
-        .and_then(|s| s.to_str())
-        .map(|s| s.eq_ignore_ascii_case("xls") || s.eq_ignore_ascii_case("xlsx"))
-        .unwrap_or(false)
-}
-
-fn is_pdf_path(path: &Path) -> bool {
-    path.extension()
-        .and_then(|s| s.to_str())
-        .map(|s| s.eq_ignore_ascii_case("pdf"))
-        .unwrap_or(false)
-}
-
-fn is_epub_path(path: &Path) -> bool {
-    path.extension()
-        .and_then(|s| s.to_str())
-        .map(|s| s.eq_ignore_ascii_case("epub"))
-        .unwrap_or(false)
-}
-
-fn is_mp3_path(path: &Path) -> bool {
-    path.extension()
-        .and_then(|s| s.to_str())
-        .map(|s| s.eq_ignore_ascii_case("mp3"))
-        .unwrap_or(false)
-}
-
-fn read_epub_text(path: &Path, language: Language) -> Result<String, String> {
-    use epub::doc::EpubDoc;
-    let mut doc = EpubDoc::new(path).map_err(|e| error_read_file_message(language, e))?;
-    let mut full_text = String::new();
-
-    // Get the title if available
-    if let Some(title_item) = doc.mdata("title") {
-        full_text.push_str(&title_item.value);
-        full_text.push_str("\n\n");
-    }
-
-    // Iterate through chapters using the spine
-    let spine = doc.spine.clone();
-    for item in spine {
-        if let Some((content, mime)) = doc.get_resource(&item.idref) {
-            if mime.contains("xhtml") || mime.contains("html") || mime.contains("xml") {
-                let text = String::from_utf8(content.clone()).unwrap_or_else(|_| {
-                    String::from_utf8_lossy(&content).to_string()
-                });
-                
-                let cleaned = strip_html_tags(&text);
-                for line in cleaned.lines() {
-                    let trimmed = line.trim();
-                    // Skip technical strings like part0000, part0001, etc.
-                    if trimmed.is_empty() || (trimmed.starts_with("part") && trimmed.len() <= 12) {
-                        continue;
-                    }
-                    full_text.push_str(trimmed);
-                    full_text.push_str("\n");
-                }
-                full_text.push_str("\n");
-            }
-        }
-    }
-
-    if full_text.trim().is_empty() {
-        return Err("Il file EPUB sembra non contenere testo estraibile.".to_string());
-    }
-
-    Ok(full_text)
-}
-
-fn strip_html_tags(html: &str) -> String {
-    let mut out = String::new();
-    let mut inside = false;
-    for ch in html.chars() {
-        if ch == '<' {
-            inside = true;
-            continue;
-        }
-        if ch == '>' {
-            inside = false;
-            continue;
-        }
-        if !inside {
-            out.push(ch);
-        }
-    }
-    // Basic entity decoding
-    out.replace("&nbsp;", " ")
-       .replace("&lt;", "<")
-       .replace("&gt;", ">")
-       .replace("&amp;", "&")
-       .replace("&quot;", "\"")
-       .replace("&apos;", "'")
-}
-
-fn read_doc_text(path: &Path, language: Language) -> Result<String, String> {
-    log_debug("read_doc_text called");
-
-    let file = std::fs::File::open(path).map_err(|e| error_open_doc_message(language, e))?;
-    
-    // Try to determine if it is an OLE file (CFB)
-    match CompoundFile::open(&file) {
-        Ok(mut comp) => {
-            log_debug("OLE CompoundFile open success");
-            // Legacy DOC text is usually in "WordDocument" stream.
-            let buffer = {
-                let mut stream = match comp.open_stream("WordDocument") {
-                    Ok(stream) => stream,
-                    Err(_) => return Err(error_worddocument_missing_message(language).to_string()),
-                };
-                let mut buffer = Vec::new();
-                if let Err(e) = stream.read_to_end(&mut buffer) {
-                    return Err(error_read_stream_message(language, e));
-                }
-                buffer
-            };
-
-            let mut table_bytes = Vec::new();
-            if let Ok(mut table_stream) = comp.open_stream("1Table") {
-                let _ = table_stream.read_to_end(&mut table_bytes);
-            } else if let Ok(mut table_stream) = comp.open_stream("0Table") {
-                let _ = table_stream.read_to_end(&mut table_bytes);
-            }
-
-            if !table_bytes.is_empty() {
-                if let Some(text) = extract_doc_text_piece_table(&buffer, &table_bytes) {
-                    return Ok(clean_doc_text(text));
-                }
-            }
-            
-            let text_utf16 = extract_utf16_strings(&buffer);
-            let text_ascii = extract_ascii_strings(&buffer);
-
-            log_debug(&format!(
-                "DOC debug: UTF16 len={} ASCII len={}",
-                text_utf16.len(),
-                text_ascii.len()
-            ));
-            
-            // Try scanning for UTF-16LE text (Word 97+)
-            if text_utf16.len() > 100 {
-                return Ok(clean_doc_text(text_utf16));
-            }
-
-            // Fallback to ASCII/ANSI scanning (Word 6.0/95 or failed UTF-16)
-            if !text_ascii.is_empty() {
-                return Ok(clean_doc_text(text_ascii));
-            }
-            
-            Ok(clean_doc_text(text_utf16)) // Return whatever we found even if short
-        },
-        Err(err) => {
-            log_debug(&format!("OLE Open failed. Entering fallback. Err: {err}"));
-            let bytes = std::fs::read(path)
-                .map_err(|e| error_read_file_message(language, e))?;
-
-            if looks_like_rtf(&bytes) {
-                return Ok(extract_rtf_text(&bytes));
-            }
-
-            // Fallback 1: Try reading as DOCX (Zip/XML)
-            if let Ok(text) = read_docx_text(path, language) {
-                return Ok(clean_doc_text(text));
-            }
-            
-            // Fallback 2: Try extracting strings from raw bytes directly (treating as binary dump)
-            println!("Reading fallback bytes: {} bytes", bytes.len());
-            // Try UTF-16LE first (common in Word 97+)
-            let text_utf16 = extract_utf16_strings(&bytes);
-            println!("Extracted UTF16: {} chars", text_utf16.len());
-            if text_utf16.len() > 100 {
-                let cleaned = clean_doc_text(text_utf16);
-                println!("Cleaned UTF16: {} chars", cleaned.len());
-                return Ok(cleaned);
-            }
-            
-            // Try ASCII
-            let text_ascii = extract_ascii_strings(&bytes);
-            println!("Extracted ASCII: {} chars", text_ascii.len());
-            if text_ascii.len() > 0 {
-                let cleaned = clean_doc_text(text_ascii);
-                println!("Cleaned ASCII: {} chars", cleaned.len());
-                return Ok(cleaned);
-            }
-            
-            // If extraction found nothing but we have some utf16, return it
-            if !text_utf16.is_empty() {
-                return Ok(clean_doc_text(text_utf16));
-            }
-
-            Err(error_unknown_format_message(language).to_string())
-        }
-    }
-}
-
-fn looks_like_rtf(bytes: &[u8]) -> bool {
-    let mut start = 0usize;
-    if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
-        start = 3;
-    }
-    while start < bytes.len() && bytes[start].is_ascii_whitespace() {
-        start += 1;
-    }
-    bytes.get(start..start + 5).map(|s| s == b"{\\rtf").unwrap_or(false)
-}
-
-struct DocPiece {
-    offset: usize,
-    cp_len: usize,
-    compressed: bool,
-}
-
-fn extract_doc_text_piece_table(word: &[u8], table: &[u8]) -> Option<String> {
-    let pieces = find_piece_table(table)?;
-    let mut out = String::new();
-    for piece in pieces {
-        if piece.cp_len == 0 {
-            continue;
-        }
-        if piece.compressed {
-            let end = piece.offset.saturating_add(piece.cp_len);
-            if end > word.len() {
-                continue;
-            }
-            let slice = &word[piece.offset..end];
-            let (decoded, _, _) = WINDOWS_1252.decode(slice);
-            out.push_str(&decoded);
-        } else {
-            let byte_len = piece.cp_len.saturating_mul(2);
-            let end = piece.offset.saturating_add(byte_len);
-            if end > word.len() {
-                continue;
-            }
-            let mut utf16 = Vec::with_capacity(byte_len / 2);
-            for chunk in word[piece.offset..end].chunks_exact(2) {
-                utf16.push(u16::from_le_bytes([chunk[0], chunk[1]]));
-            }
-            out.push_str(&String::from_utf16_lossy(&utf16));
-        }
-    }
-    if out.is_empty() {
-        return None;
-    }
-    Some(out.replace('\r', "\n"))
-}
-
-fn find_piece_table(table: &[u8]) -> Option<Vec<DocPiece>> {
-    let mut best: Option<Vec<DocPiece>> = None;
-    let mut i = 0usize;
-    while i + 5 <= table.len() {
-        if table[i] != 0x02 {
-            i += 1;
-            continue;
-        }
-        let lcb = read_u32_le(table, i + 1)? as usize;
-        let start = i + 5;
-        let end = start.saturating_add(lcb);
-        if lcb < 4 || end > table.len() {
-            i += 1;
-            continue;
-        }
-        if let Some(pieces) = parse_plc_pcd(&table[start..end]) {
-            let should_replace = best
-                .as_ref()
-                .map(|b| pieces.len() > b.len())
-                .unwrap_or(true);
-            if should_replace {
-                best = Some(pieces);
-            }
-        }
-        i += 1;
-    }
-    best
-}
-
-fn parse_plc_pcd(data: &[u8]) -> Option<Vec<DocPiece>> {
-    if data.len() < 4 {
-        return None;
-    }
-    let remaining = data.len().saturating_sub(4);
-    if remaining % 12 != 0 {
-        return None;
-    }
-    let piece_count = remaining / 12;
-    if piece_count == 0 {
-        return None;
-    }
-    let cp_count = piece_count + 1;
-    let cp_bytes = cp_count * 4;
-    if cp_bytes > data.len() {
-        return None;
-    }
-    let mut cps = Vec::with_capacity(cp_count);
-    for idx in 0..cp_count {
-        cps.push(read_u32_le(data, idx * 4)?);
-    }
-    if cps.windows(2).any(|w| w[1] < w[0]) {
-        return None;
-    }
-    let mut pieces = Vec::with_capacity(piece_count);
-    let pcd_start = cp_bytes;
-    for idx in 0..piece_count {
-        let off = pcd_start + idx * 8;
-        if off + 8 > data.len() {
-            return None;
-        }
-        let fc_raw = read_u32_le(data, off + 2)?;
-        let compressed = (fc_raw & 1) == 1;
-        let fc = fc_raw & 0xFFFFFFFE;
-        let offset = if compressed {
-            (fc as usize) / 2
-        } else {
-            fc as usize
-        };
-        let cp_len = cps[idx + 1].saturating_sub(cps[idx]) as usize;
-        pieces.push(DocPiece {
-            offset,
-            cp_len,
-            compressed,
-        });
-    }
-    Some(pieces)
-}
-
-fn read_u32_le(data: &[u8], offset: usize) -> Option<u32> {
-    if offset + 4 > data.len() {
-        return None;
-    }
-    Some(u32::from_le_bytes([
-        data[offset],
-        data[offset + 1],
-        data[offset + 2],
-        data[offset + 3],
-    ]))
-}
-
-fn clean_doc_text(text: String) -> String {
-    let mut cleaned = String::new();
-    let mut log_file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log_path().unwrap_or_else(|| PathBuf::from("Novapad.log")))
-        .ok();
-
-    if let Some(ref mut f) = log_file {
-        use std::io::Write;
-        let _ = writeln!(f, "--- Start Cleaning ---");
-    }
-    
-    for line in text.lines() {
-        // Trim whitespace AND control characters immediately
-        let trimmed = line.trim_matches(|c: char| c.is_whitespace() || c.is_control());
-        
-        if trimmed.is_empty() {
-            continue;
-        }
-
-        if is_likely_garbage(trimmed) {
-            if let Some(ref mut f) = log_file {
-                use std::io::Write;
-                let _ = writeln!(f, "GARBAGE FILTERED: {}", trimmed.chars().take(50).collect::<String>());
-            }
-            continue;
-        }
-        
-        // Final safety net for the specific report - Check CONTAINS, not just starts_with
-        if trimmed.contains("11252") {
-             if let Some(ref mut f) = log_file {
-                use std::io::Write;
-                let _ = writeln!(f, "SIGNATURE FILTERED: {}", trimmed.chars().take(50).collect::<String>());
-             }
-             continue;
-        }
-
-        if let Some(ref mut f) = log_file {
-            use std::io::Write;
-            let _ = writeln!(f, "KEEPING: {}", trimmed.chars().take(50).collect::<String>());
-            // Log hex bytes of the first 20 chars to see hidden chars
-            let bytes: Vec<u8> = trimmed.chars().take(20).map(|c| c as u8).collect();
-            let _ = writeln!(f, "HEX START: {:?}", bytes);
-        }
-
-        cleaned.push_str(line);
-        cleaned.push('\n');
-    }
-    
-    cleaned
-}
-
-fn extract_utf16_strings(buffer: &[u8]) -> String {
-    let mut text = String::new();
-    let mut current_seq = Vec::new();
-    
-    for chunk in buffer.chunks_exact(2) {
-        let unit = u16::from_le_bytes([chunk[0], chunk[1]]);
-        let is_valid = (unit >= 32 && unit != 0xFFFF) || unit == 10 || unit == 13 || unit == 9;
-        
-        if is_valid {
-            current_seq.push(unit);
-            // Safety break for extremely long valid-looking sequences
-            if current_seq.len() > 10000 {
-                let s = String::from_utf16_lossy(&current_seq);
-                if !is_likely_garbage(&s) {
-                    text.push_str(&s);
-                    text.push('\n');
-                }
-                current_seq.clear();
-            }
-        } else {
-            if current_seq.len() > 5 {
-                let s = String::from_utf16_lossy(&current_seq);
-                if !is_likely_garbage(&s) {
-                    text.push_str(&s);
-                    text.push('\n');
-                }
-            }
-            current_seq.clear();
-        }
-    }
-    
-    if current_seq.len() > 5 {
-        let s = String::from_utf16_lossy(&current_seq);
-        if !is_likely_garbage(&s) {
-            text.push_str(&s);
-        }
-    }
-    
-    text
-}
-
-fn extract_ascii_strings(buffer: &[u8]) -> String {
-    let mut text = String::new();
-    let mut current_seq = Vec::new();
-    
-    for &byte in buffer {
-        if (byte >= 32 && byte <= 126) || byte == 10 || byte == 13 || byte == 9 {
-            current_seq.push(byte);
-            if current_seq.len() > 10000 {
-                if let Ok(s) = String::from_utf8(current_seq.clone()) {
-                     if !is_likely_garbage(&s) {
-                        text.push_str(&s);
-                        text.push('\n');
-                     }
-                }
-                current_seq.clear();
-            }
-        } else {
-            if current_seq.len() > 5 {
-                if let Ok(s) = String::from_utf8(current_seq.clone()) {
-                     if !is_likely_garbage(&s) {
-                        text.push_str(&s);
-                        text.push('\n');
-                     }
-                }
-            }
-            current_seq.clear();
-        }
-    }
-    text
-}
-
-fn is_likely_garbage(s: &str) -> bool {
-    // Trim whitespace AND control characters (including nulls)
-    let trimmed = s.trim_matches(|c: char| c.is_whitespace() || c.is_control());
-    
-    // 1. Check for specific garbage signatures found in the user's file
-    if s.contains("1125211") || s.contains("11252") || s.contains("Arial;") || s.contains("Times New Roman;") || s.contains("Courier New;") {
-        return true;
-    }
-    
-    // 2. Check for style definitions pattern (*numbers... Name)
-    if trimmed.starts_with('*') && trimmed.chars().nth(1).map_or(false, |c| c.is_ascii_digit()) {
-        return true;
-    }
-
-    // 3. Check for the pattern "numbers... Text|number" (e.g., 101000... Header or footer|2)
-    if s.contains("|") && trimmed.chars().take(5).all(|c| c.is_ascii_digit()) {
-        return true;
-    }
-
-    // 4. Check for '01', '02' patterns
-    if s.contains("'01") || s.contains("'02") || s.contains("'03") {
-        return true;
-    }
-
-    // 5. Ratio check: Real text usually has more letters than symbols/numbers
-    let letter_count = s.chars().filter(|c| c.is_alphabetic()).count();
-    let digit_count = s.chars().filter(|c| c.is_ascii_digit()).count();
-    let symbol_count = s.chars().filter(|c| !c.is_alphanumeric() && !c.is_whitespace()).count();
-    
-    if letter_count == 0 {
-        return true;
-    }
-
-    // If noise (digits + symbols) is greater than 40% of letters, discard it (stricter)
-    if (digit_count + symbol_count) * 2 > letter_count {
-        return true;
-    }
-
-    // 6. Check for long runs of digits
-    let mut max_digit_run = 0;
-    let mut current_digit_run = 0;
-    for c in s.chars() {
-        if c.is_ascii_digit() {
-            current_digit_run += 1;
-        } else {
-            max_digit_run = max_digit_run.max(current_digit_run);
-            current_digit_run = 0;
-        }
-    }
-    max_digit_run = max_digit_run.max(current_digit_run);
-    
-    if max_digit_run > 4 {
-        return true;
-    }
-
-    false
-}
-
-fn extract_rtf_text(bytes: &[u8]) -> String {
-    fn is_skip_destination(keyword: &str) -> bool {
-        matches!(
-            keyword,
-            "fonttbl"
-                | "colortbl"
-                | "stylesheet"
-                | "info"
-                | "pict"
-                | "object"
-                | "filetbl"
-                | "datastore"
-                | "themedata"
-                | "header"
-                | "headerl"
-                | "headerr"
-                | "headerf"
-                | "footer"
-                | "footerl"
-                | "footerr"
-                | "footerf"
-                | "generator"
-                | "xmlopen"
-                | "xmlattrname"
-                | "xmlattrvalue"
-        )
-    }
-
-    fn hex_val(b: u8) -> Option<u8> {
-        match b {
-            b'0'..=b'9' => Some(b - b'0'),
-            b'a'..=b'f' => Some(b - b'a' + 10),
-            b'A'..=b'F' => Some(b - b'A' + 10),
-            _ => None,
-        }
-    }
-
-    fn emit_char(out: &mut String, skip_output: &mut usize, in_skip: bool, ch: char) {
-        if *skip_output > 0 {
-            *skip_output -= 1;
-            return;
-        }
-        if in_skip {
-            return;
-        }
-        match ch {
-            '\r' | '\0' => {}
-            '\n' => out.push('\n'),
-            _ => out.push(ch),
-        }
-    }
-
-    fn emit_str(out: &mut String, skip_output: &mut usize, in_skip: bool, s: &str) {
-        for ch in s.chars() {
-            emit_char(out, skip_output, in_skip, ch);
-        }
-    }
-
-    fn encoding_from_codepage(codepage: i32) -> Option<&'static Encoding> {
-        let label = if codepage == 65001 {
-            "utf-8".to_string()
-        } else {
-            format!("windows-{}", codepage)
-        };
-        Encoding::for_label(label.as_bytes())
-    }
-
-    let mut out = String::new();
-    let mut i = 0usize;
-    let mut group_stack = vec![false];
-    let mut uc_skip = 1usize;
-    let mut skip_output = 0usize;
-    let mut encoding: &'static Encoding = WINDOWS_1252;
-
-    while i < bytes.len() {
-        match bytes[i] {
-            b'{' => {
-                let current = *group_stack.last().unwrap_or(&false);
-                group_stack.push(current);
-                i += 1;
-            }
-            b'}' => {
-                if group_stack.len() > 1 {
-                    group_stack.pop();
-                }
-                i += 1;
-            }
-            b'\\' => {
-                i += 1;
-                if i >= bytes.len() {
-                    break;
-                }
-                match bytes[i] {
-                    b'\\' | b'{' | b'}' => {
-                        emit_char(&mut out, &mut skip_output, *group_stack.last().unwrap(), bytes[i] as char);
-                        i += 1;
-                    }
-                    b'~' => {
-                        emit_char(&mut out, &mut skip_output, *group_stack.last().unwrap(), ' ');
-                        i += 1;
-                    }
-                    b'-' | b'_' => {
-                        emit_char(&mut out, &mut skip_output, *group_stack.last().unwrap(), '-');
-                        i += 1;
-                    }
-                    b'*' => {
-                        if let Some(last) = group_stack.last_mut() {
-                            *last = true;
-                        }
-                        i += 1;
-                    }
-                    b'\'' => {
-                        if i + 2 < bytes.len() {
-                            let h1 = bytes[i + 1];
-                            let h2 = bytes[i + 2];
-                            if let (Some(n1), Some(n2)) = (hex_val(h1), hex_val(h2)) {
-                                let byte = (n1 << 4) | n2;
-                                let buf = [byte];
-                                let (decoded, _, _) = encoding.decode(&buf);
-                                emit_str(&mut out, &mut skip_output, *group_stack.last().unwrap(), &decoded);
-                                i += 3;
-                            } else {
-                                i += 1;
-                            }
-                        } else {
-                            i += 1;
-                        }
-                    }
-                    b if b.is_ascii_alphabetic() => {
-                        let start = i;
-                        while i < bytes.len() && bytes[i].is_ascii_alphabetic() {
-                            i += 1;
-                        }
-                        let keyword = std::str::from_utf8(&bytes[start..i]).unwrap_or("");
-                        let mut sign = 1i32;
-                        if i < bytes.len() && bytes[i] == b'-' {
-                            sign = -1;
-                            i += 1;
-                        }
-                        let mut value = 0i32;
-                        let mut has_digit = false;
-                        while i < bytes.len() && bytes[i].is_ascii_digit() {
-                            has_digit = true;
-                            value = value * 10 + (bytes[i] - b'0') as i32;
-                            i += 1;
-                        }
-                        let num = if has_digit { Some(value * sign) } else { None };
-                        if i < bytes.len() && bytes[i] == b' ' {
-                            i += 1;
-                        }
-
-                        match keyword {
-                            "par" | "line" => emit_char(&mut out, &mut skip_output, *group_stack.last().unwrap(), '\n'),
-                            "tab" => emit_char(&mut out, &mut skip_output, *group_stack.last().unwrap(), '\t'),
-                            "emdash" => emit_str(&mut out, &mut skip_output, *group_stack.last().unwrap(), "--"),
-                            "endash" => emit_char(&mut out, &mut skip_output, *group_stack.last().unwrap(), '-'),
-                            "bullet" => emit_char(&mut out, &mut skip_output, *group_stack.last().unwrap(), '*'),
-                            "u" => {
-                                if let Some(n) = num {
-                                    let mut code = n;
-                                    if code < 0 {
-                                        code += 65536;
-                                    }
-                                    if let Some(ch) = char::from_u32(code as u32) {
-                                        emit_char(&mut out, &mut skip_output, *group_stack.last().unwrap(), ch);
-                                    }
-                                    skip_output = uc_skip;
-                                }
-                            }
-                            "uc" => {
-                                if let Some(n) = num {
-                                    if n >= 0 {
-                                        uc_skip = n as usize;
-                                    }
-                                }
-                            }
-                            "ansicpg" => {
-                                if let Some(n) = num {
-                                    if let Some(enc) = encoding_from_codepage(n) {
-                                        encoding = enc;
-                                    }
-                                }
-                            }
-                            _ => {
-                                if is_skip_destination(keyword) {
-                                    if let Some(last) = group_stack.last_mut() {
-                                        *last = true;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    _ => {
-                        i += 1;
-                    }
-                }
-            }
-            b'\r' | b'\n' => {
-                i += 1;
-            }
-            b => {
-                if b >= 0x80 {
-                    let buf = [b];
-                    let (decoded, _, _) = encoding.decode(&buf);
-                    emit_str(&mut out, &mut skip_output, *group_stack.last().unwrap(), &decoded);
-                } else {
-                    emit_char(&mut out, &mut skip_output, *group_stack.last().unwrap(), b as char);
-                }
-                i += 1;
-            }
-        }
-    }
-    out
-}
-
-fn read_spreadsheet_text(path: &Path, language: Language) -> Result<String, String> {
-    let mut workbook = open_workbook_auto(path)
-        .map_err(|err| error_open_excel_message(language, err))?;
-    
-    let mut out = String::new();
-    
-    if let Some(Ok(range)) = workbook.worksheet_range_at(0) {
-        for row in range.rows() {
-            let mut first = true;
-            for cell in row {
-                if !first {
-                    out.push('\t');
-                }
-                first = false;
-                match cell {
-                    CalamineData::Empty => {},
-                    CalamineData::String(s) => out.push_str(s),
-                    CalamineData::Float(f) => out.push_str(&f.to_string()),
-                    CalamineData::Int(i) => out.push_str(&i.to_string()),
-                    CalamineData::Bool(b) => out.push_str(&b.to_string()),
-                    CalamineData::Error(e) => out.push_str(&format!("{:?}", e)),
-                    CalamineData::DateTime(f) => out.push_str(&f.to_string()),
-                    CalamineData::DateTimeIso(s) | CalamineData::DurationIso(s) => out.push_str(s),
-                }
-            }
-            out.push('\n');
-        }
-    } else {
-        return Err(error_no_sheet_message(language).to_string());
-    }
-    
-    Ok(out)
-}
-
-fn read_docx_text(path: &Path, language: Language) -> Result<String, String> {
-    let bytes = std::fs::read(path).map_err(|err| error_open_file_message(language, err))?;
-    let docx = read_docx(&bytes).map_err(|err| error_read_docx_message(language, err))?;
-    Ok(extract_docx_text(&docx))
-}
-
-fn read_pdf_text(path: &Path, language: Language) -> Result<String, String> {
-    let text = extract_text(path).map_err(|err| error_read_pdf_message(language, err))?;
-    Ok(normalize_pdf_paragraphs(&text))
-}
-
-fn write_docx_text(path: &Path, text: &str, language: Language) -> Result<(), String> {
-    let file = std::fs::File::create(path).map_err(|err| error_save_file_message(language, err))?;
-    let mut docx = Docx::new();
-    for line in text.split('\n') {
-        let line = line.strip_suffix('\r').unwrap_or(line);
-        let paragraph = if line.is_empty() {
-            Paragraph::new()
-        } else {
-            Paragraph::new().add_run(Run::new().add_text(line))
-        };
-        docx = docx.add_paragraph(paragraph);
-    }
-    docx.build()
-        .pack(file)
-        .map_err(|err| error_save_docx_message(language, err))?;
-    Ok(())
-}
-
-fn write_pdf_text(path: &Path, title: &str, text: &str, language: Language) -> Result<(), String> {
-    let page_width = Mm(210.0);
-    let page_height = Mm(297.0);
-    let margin: f32 = 18.0;
-    let header_height: f32 = 18.0;
-    let footer_height: f32 = 12.0;
-    let body_font_size: f32 = 12.0;
-    let header_font_size: f32 = 14.0;
-    let line_height: f32 = 14.0;
-    let bullet_indent_mm: f32 = 6.0;
-    let bullet_indent_chars = 4usize;
-    let max_chars = estimate_max_chars(page_width.0, margin, body_font_size);
-
-    let title = if title.trim().is_empty() {
-        "Novapad"
-    } else {
-        title
-    };
-
-    let (doc, page1, layer1) = PdfDocument::new(title, page_width, page_height, "Layer 1");
-    let font = doc
-        .add_builtin_font(BuiltinFont::Helvetica)
-        .map_err(|err| error_pdf_font_message(language, err))?;
-    let font_bold = doc
-        .add_builtin_font(BuiltinFont::HelveticaBold)
-        .map_err(|err| error_pdf_font_message(language, err))?;
-
-    let lines = layout_pdf_lines(
-        text,
-        max_chars,
-        bullet_indent_chars,
-        body_font_size,
-        bullet_indent_mm,
-    );
-
-    let content_top = page_height.0 - margin - header_height;
-    let content_bottom = margin + footer_height;
-    let mut pages: Vec<Vec<PdfLine>> = Vec::new();
-    let mut current: Vec<PdfLine> = Vec::new();
-    let mut y = content_top;
-
-    for line in lines {
-        if y < content_bottom + line_height {
-            pages.push(current);
-            current = Vec::new();
-            y = content_top;
-        }
-        current.push(line);
-        y -= line_height;
-    }
-    if !current.is_empty() {
-        pages.push(current);
-    } else if pages.is_empty() {
-        pages.push(Vec::new());
-    }
-
-    for (page_index, page_lines) in pages.iter().enumerate() {
-        let (page, layer_id) = if page_index == 0 {
-            (page1, layer1)
-        } else {
-            doc.add_page(page_width, page_height, "Layer")
-        };
-        let layer = doc.get_page(page).get_layer(layer_id);
-
-        let header_y = page_height.0 - margin - 8.0;
-        layer.use_text(title, header_font_size, Mm(margin), Mm(header_y), &font_bold);
-
-        let page_label = format!("Pagina {} di {}", page_index + 1, pages.len());
-        layer.use_text(page_label, 9.0, Mm(margin), Mm(margin - 6.0), &font);
-
-        let mut y = content_top;
-        for line in page_lines {
-            if line.is_blank {
-                y -= line_height;
-                continue;
-            }
-            layer.use_text(
-                &line.text,
-                line.font_size,
-                Mm(margin + line.indent),
-                Mm(y),
-                &font,
-            );
-            y -= line_height;
-        }
-    }
-
-    let file = std::fs::File::create(path).map_err(|err| error_save_file_message(language, err))?;
-    doc.save(&mut BufWriter::new(file))
-        .map_err(|err| error_save_pdf_message(language, err))?;
-    Ok(())
-}
-
-struct PdfLine {
-    text: String,
-    indent: f32,
-    font_size: f32,
-    is_blank: bool,
-}
-
-fn estimate_max_chars(page_width: f32, margin: f32, font_size: f32) -> usize {
-    let usable_mm = page_width - (margin * 2.0);
-    let avg_char_mm = (font_size * 0.3528) * 0.5;
-    let estimate = (usable_mm / avg_char_mm) as usize;
-    estimate.min(110).max(60)
-}
-
-fn layout_pdf_lines(
-    text: &str,
-    max_chars: usize,
-    bullet_indent_chars: usize,
-    font_size: f32,
-    bullet_indent_mm: f32,
-) -> Vec<PdfLine> {
-    let mut lines = Vec::new();
-    for raw_line in text.lines() {
-        let line = raw_line.trim_end_matches('\r');
-        if line.trim().is_empty() {
-            lines.push(PdfLine {
-                text: String::new(),
-                indent: 0.0,
-                font_size,
-                is_blank: true,
-            });
-            continue;
-        }
-
-        if let Some((prefix, content)) = split_list_prefix(line) {
-            let first_max = max_chars.saturating_sub(prefix.len());
-            let next_max = max_chars.saturating_sub(bullet_indent_chars);
-            let mut wrapped = wrap_list_item(content, first_max, next_max);
-            if wrapped.is_empty() {
-                wrapped.push(String::new());
-            }
-            let first = format!("{}{}", prefix, wrapped[0]);
-            lines.push(PdfLine {
-                text: first,
-                indent: 0.0,
-                font_size,
-                is_blank: false,
-            });
-            for rest in wrapped.into_iter().skip(1) {
-                lines.push(PdfLine {
-                    text: rest,
-                    indent: bullet_indent_mm,
-                    font_size,
-                    is_blank: false,
-                });
-            }
-            continue;
-        }
-
-        for wrapped in wrap_words(line, max_chars) {
-            lines.push(PdfLine {
-                text: wrapped,
-                indent: 0.0,
-                font_size,
-                is_blank: false,
-            });
-        }
-    }
-    lines
-}
-
-fn split_list_prefix(line: &str) -> Option<(String, &str)> {
-    let trimmed = line.trim_start();
-    if let Some(rest) = trimmed.strip_prefix("- ") {
-        return Some(("- ".to_string(), rest));
-    }
-    if let Some(rest) = trimmed.strip_prefix("* ") {
-        return Some(("* ".to_string(), rest));
-    }
-    let bytes = trimmed.as_bytes();
-    let mut i = 0usize;
-    while i < bytes.len() && bytes[i].is_ascii_digit() {
-        i += 1;
-    }
-    if i > 0 && i + 1 < bytes.len() && bytes[i] == b'.' && bytes[i + 1] == b' ' {
-        let prefix = trimmed[..i + 2].to_string();
-        let rest = &trimmed[i + 2..];
-        return Some((prefix, rest));
-    }
-    None
-}
-
-fn extract_docx_text(docx: &Docx) -> String {
-    let mut out = String::new();
-    for child in &docx.document.children {
-        append_document_child_text(&mut out, child);
-    }
-    if out.ends_with('\n') {
-        out.pop();
-    }
-    out
-}
-
-fn normalize_pdf_paragraphs(text: &str) -> String {
-    let mut out = String::new();
-    let mut current = String::new();
-    let avg_len = average_pdf_line_len(text);
-    let mut last_line = String::new();
-    for raw_line in text.lines() {
-        let line = raw_line.trim();
-        if line.is_empty() {
-            flush_pdf_paragraph(&mut out, &mut current);
-            last_line.clear();
-            continue;
-        }
-
-        if current.is_empty() {
-            current.push_str(line);
-            last_line.clear();
-            last_line.push_str(line);
-            continue;
-        }
-
-        if looks_like_list_item(line) {
-            flush_pdf_paragraph(&mut out, &mut current);
-            current.push_str(line);
-            last_line.clear();
-            last_line.push_str(line);
-            continue;
-        }
-
-        if should_break_pdf_paragraph(&last_line, line, avg_len) {
-            flush_pdf_paragraph(&mut out, &mut current);
-            current.push_str(line);
-            last_line.clear();
-            last_line.push_str(line);
-            continue;
-        }
-
-        if last_line.ends_with('-') {
-            current.pop();
-            current.push_str(line);
-        } else {
-            current.push(' ');
-            current.push_str(line);
-        }
-        last_line.clear();
-        last_line.push_str(line);
-    }
-    flush_pdf_paragraph(&mut out, &mut current);
-    out
-}
-
-fn flush_pdf_paragraph(out: &mut String, current: &mut String) {
-    if current.is_empty() {
-        return;
-    }
-    if !out.is_empty() {
-        out.push_str("\n\n");
-    }
-    out.push_str(current.trim());
-    current.clear();
-}
-
-fn should_break_pdf_paragraph(prev: &str, next: &str, avg_len: usize) -> bool {
-    if prev.is_empty() || avg_len == 0 {
-        return false;
-    }
-    let prev_end = prev.chars().last().unwrap_or(' ');
-    let ends_sentence = matches!(prev_end, '.' | '!' | '?' | ':' | ';');
-    if !ends_sentence {
-        return false;
-    }
-    let next_start = next.chars().next().unwrap_or(' ');
-    let starts_new = next_start.is_ascii_uppercase() || matches!(next_start, '"' | '\'' | '(');
-    if !starts_new {
-        return false;
-    }
-    let threshold = avg_len.saturating_mul(7) / 10;
-    prev.len() <= threshold
-}
-
-fn looks_like_list_item(line: &str) -> bool {
-    let trimmed = line.trim_start();
-    if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
-        return true;
-    }
-    let mut chars = trimmed.chars();
-    let mut digits = 0usize;
-    while let Some(c) = chars.next() {
-        if c.is_ascii_digit() {
-            digits += 1;
-            continue;
-        }
-        if c == '.' && digits > 0 {
-            return chars.next().map(|c| c == ' ').unwrap_or(false);
-        }
-        break;
-    }
-    false
-}
-
-fn average_pdf_line_len(text: &str) -> usize {
-    let mut total = 0usize;
-    let mut count = 0usize;
-    for raw_line in text.lines() {
-        let line = raw_line.trim();
-        if line.is_empty() || looks_like_list_item(line) {
-            continue;
-        }
-        total = total.saturating_add(line.len());
-        count += 1;
-    }
-    if count == 0 {
-        0
-    } else {
-        total / count
-    }
-}
-
-
-
-
-
-
-fn wrap_words(text: &str, max_chars: usize) -> Vec<String> {
-    let mut lines = Vec::new();
-    let mut current = String::new();
-    for word in text.split_whitespace() {
-        if current.is_empty() {
-            current.push_str(word);
-            continue;
-        }
-        if current.len() + 1 + word.len() <= max_chars {
-            current.push(' ');
-            current.push_str(word);
-        } else {
-            lines.push(current);
-            current = word.to_string();
-        }
-    }
-    if !current.is_empty() {
-        lines.push(current);
-    }
-    lines
-}
-
-fn wrap_list_item(content: &str, first_max: usize, next_max: usize) -> Vec<String> {
-    let mut lines = Vec::new();
-    let mut current = String::new();
-    let mut limit = first_max.max(1);
-    for word in content.split_whitespace() {
-        if current.is_empty() {
-            current.push_str(word);
-            continue;
-        }
-        if current.len() + 1 + word.len() <= limit {
-            current.push(' ');
-            current.push_str(word);
-        } else {
-            lines.push(current);
-            current = word.to_string();
-            limit = next_max.max(1);
-        }
-    }
-    if !current.is_empty() {
-        lines.push(current);
-    }
-    lines
-}
-
-fn append_document_child_text(out: &mut String, child: &DocumentChild) {
-    match child {
-        DocumentChild::Paragraph(p) => {
-            append_paragraph_text(out, p);
-            out.push('\n');
-        }
-        DocumentChild::Table(t) => {
-            append_table_text(out, t);
-            out.push('\n');
-        }
-        _ => {}
-    }
-}
-
-fn append_paragraph_text(out: &mut String, paragraph: &Paragraph) {
-    for child in &paragraph.children {
-        append_paragraph_child_text(out, child);
-    }
-}
-
-fn append_paragraph_child_text(out: &mut String, child: &ParagraphChild) {
-    match child {
-        ParagraphChild::Run(run) => append_run_text(out, run),
-        ParagraphChild::Hyperlink(link) => {
-            for child in &link.children {
-                append_paragraph_child_text(out, child);
-            }
-        }
-        _ => {}
-    }
-}
-
-fn append_run_text(out: &mut String, run: &Run) {
-    for child in &run.children {
-        match child {
-            RunChild::Text(text) => out.push_str(&text.text),
-            RunChild::InstrTextString(text) => out.push_str(text),
-            RunChild::Tab(_) => out.push('\t'),
-            RunChild::Break(_) => out.push('\n'),
-            _ => {}
-        }
-    }
-}
-
-fn append_table_text(out: &mut String, table: &Table) {
-    for row in &table.rows {
-        let TableChild::TableRow(row) = row;
-        let mut first_cell = true;
-        for cell in &row.cells {
-            let TableRowChild::TableCell(cell) = cell;
-            if !first_cell {
-                out.push('\t');
-            }
-            first_cell = false;
-            let cell_text = extract_table_cell_text(cell);
-            out.push_str(&cell_text);
-        }
-        out.push('\n');
-    }
-}
-
-fn extract_table_cell_text(cell: &docx_rs::TableCell) -> String {
-    let mut out = String::new();
-    for content in &cell.children {
-        match content {
-            TableCellContent::Paragraph(p) => {
-                append_paragraph_text(&mut out, p);
-                out.push('\n');
-            }
-            TableCellContent::Table(t) => {
-                append_table_text(&mut out, t);
-            }
-            _ => {}
-        }
-    }
-    if out.ends_with('\n') {
-        out.pop();
-    }
-    out
-}
-
-fn recent_store_path() -> Option<PathBuf> {
+pub(crate) fn recent_store_path() -> Option<PathBuf> {
     let base = std::env::var_os("APPDATA")?;
     let mut path = PathBuf::from(base);
     path.push("Novapad");
     path.push("recent.json");
     Some(path)
 }
-
-
-
-
-
-
-
-
-
-
 
 fn load_recent_files() -> Vec<PathBuf> {
     let Some(path) = recent_store_path() else {
@@ -4343,66 +3037,4 @@ fn abbreviate_recent_label(path: &Path) -> String {
         suffix = format!("...{}", &suffix[suffix.len().saturating_sub(24)..]);
     }
     format!("{filename} - {suffix}")
-}
-
-fn decode_text(bytes: &[u8], language: Language) -> Result<(String, TextEncoding), String> {
-    if bytes.len() >= 2 {
-        if bytes[0] == 0xFF && bytes[1] == 0xFE {
-            if (bytes.len() - 2) % 2 != 0 {
-                return Err(error_invalid_utf16le_message(language).to_string());
-            }
-            let mut utf16 = Vec::with_capacity((bytes.len() - 2) / 2);
-            let mut i = 2;
-            while i + 1 < bytes.len() {
-                utf16.push(u16::from_le_bytes([bytes[i], bytes[i + 1]]));
-                i += 2;
-            }
-            return Ok((String::from_utf16_lossy(&utf16), TextEncoding::Utf16Le));
-        }
-        if bytes[0] == 0xFE && bytes[1] == 0xFF {
-            if (bytes.len() - 2) % 2 != 0 {
-                return Err(error_invalid_utf16be_message(language).to_string());
-            }
-            let mut utf16 = Vec::with_capacity((bytes.len() - 2) / 2);
-            let mut i = 2;
-            while i + 1 < bytes.len() {
-                utf16.push(u16::from_be_bytes([bytes[i], bytes[i + 1]]));
-                i += 2;
-            }
-            return Ok((String::from_utf16_lossy(&utf16), TextEncoding::Utf16Be));
-        }
-    }
-
-    if let Ok(text) = String::from_utf8(bytes.to_vec()) {
-        return Ok((text, TextEncoding::Utf8));
-    }
-
-    let (text, _, _) = WINDOWS_1252.decode(bytes);
-    Ok((text.into_owned(), TextEncoding::Windows1252))
-}
-
-fn encode_text(text: &str, encoding: TextEncoding) -> Vec<u8> {
-    match encoding {
-        TextEncoding::Utf8 => text.as_bytes().to_vec(),
-        TextEncoding::Utf16Le => {
-            let mut out = Vec::with_capacity(2 + text.len() * 2);
-            out.extend_from_slice(&[0xFF, 0xFE]);
-            for unit in text.encode_utf16() {
-                out.extend_from_slice(&unit.to_le_bytes());
-            }
-            out
-        }
-        TextEncoding::Utf16Be => {
-            let mut out = Vec::with_capacity(2 + text.len() * 2);
-            out.extend_from_slice(&[0xFE, 0xFF]);
-            for unit in text.encode_utf16() {
-                out.extend_from_slice(&unit.to_be_bytes());
-            }
-            out
-        }
-        TextEncoding::Windows1252 => {
-            let (encoded, _, _) = WINDOWS_1252.encode(text);
-            encoded.into_owned()
-        }
-    }
 }

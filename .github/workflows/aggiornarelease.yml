@@ -1,0 +1,119 @@
+name: Create Release (Windows)
+
+on:
+  workflow_dispatch:
+
+env:
+  RELEASE_VERSION: v0.5
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Get latest successful workflow run
+      id: get_run
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const runs = await github.rest.actions.listWorkflowRuns({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: 'ci.yml',
+            status: 'completed',
+            conclusion: 'success',
+            per_page: 1
+          });
+
+          if (runs.data.workflow_runs.length === 0) {
+            core.setFailed('Nessun workflow di build completato con successo trovato');
+            return;
+          }
+
+          const latestRun = runs.data.workflow_runs[0];
+          console.log(`Latest successful run: ${latestRun.id} from ${latestRun.created_at}`);
+
+          core.setOutput('run_id', latestRun.id);
+          core.setOutput('run_date', latestRun.created_at);
+          core.setOutput('run_sha', latestRun.head_sha.substring(0, 7));
+
+    - name: Download all artifacts from latest build
+      uses: actions/download-artifact@v4
+      with:
+        run-id: ${{ steps.get_run.outputs.run_id }}
+        path: ./artifacts
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract zip artifacts
+      run: |
+        echo "=== Estrazione zip ==="
+        find ./artifacts -type f -name "*.zip" -print -exec unzip -o "{}" -d "$(dirname "{}")" \;
+
+    - name: Collect release files
+      id: prepare_files
+      run: |
+        mkdir -p release_files
+
+        echo "=== Raccolta artifacts ==="
+        for artifact_dir in ./artifacts/*/; do
+          if [ -d "$artifact_dir" ]; then
+            echo "Processando artifact: $(basename "$artifact_dir")"
+            find "$artifact_dir" -maxdepth 2 -type f \( -name "*.exe" -o -name "*.msi" \) -print -exec cp "{}" release_files/ \;
+          fi
+        done
+
+        echo "=== File preparati per la release ==="
+        ls -la release_files/
+
+        file_count=$(find release_files -type f | wc -l)
+        echo "Numero totale di file: $file_count"
+
+        if [ $file_count -eq 0 ]; then
+          echo "ERRORE: Nessun file trovato per la release!"
+          exit 1
+        fi
+
+        echo "file_count=$file_count" >> $GITHUB_OUTPUT
+
+    - name: Create release
+      run: |
+        gh release create "${{ env.RELEASE_VERSION }}" \
+          --title "RustNotepad Release ${{ env.RELEASE_VERSION }}" \
+          --notes "Build: ${{ steps.get_run.outputs.run_id }} (${{ steps.get_run.outputs.run_sha }})"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload release assets
+      run: |
+        echo "Caricamento assets..."
+
+        for file in release_files/*; do
+          if [ -f "$file" ]; then
+            filename=$(basename "$file")
+            echo "Caricamento di $filename..."
+            gh release upload "${{ env.RELEASE_VERSION }}" "$file" --clobber
+          fi
+        done
+
+        echo "Tutti i file sono stati caricati!"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Summary
+      run: |
+        echo "Release creata con successo!"
+        echo "Tag: ${{ env.RELEASE_VERSION }}"
+        echo "Build ID: ${{ steps.get_run.outputs.run_id }}"
+        echo "Files caricati: ${{ steps.prepare_files.outputs.file_count }}"
+        echo ""
+        echo "Files nella release:"
+        ls -la release_files/ | sed 's/^/  /'
+        echo ""
+        echo "Link alla release: https://github.com/${{ github.repository }}/releases/tag/${{ env.RELEASE_VERSION }}"

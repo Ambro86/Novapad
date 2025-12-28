@@ -446,6 +446,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             }
             
             editor_manager::layout_children(hwnd);
+            editor_manager::apply_text_limit_to_all_edits(hwnd);
             DragAcceptFiles(hwnd, true);
             LRESULT(0)
         }

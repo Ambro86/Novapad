@@ -22,6 +22,26 @@ use crate::accessibility::{to_wide, from_wide, to_wide_normalized};
 use crate::{with_state, log_debug};
 use crate::file_handler::*;
 
+const EM_LIMITTEXT: u32 = 0x00C5;
+
+fn apply_text_limit(hwnd_edit: HWND) {
+    unsafe {
+        if hwnd_edit.0 != 0 {
+            SendMessageW(hwnd_edit, EM_LIMITTEXT, WPARAM(0x7FFFFFFE), LPARAM(0));
+        }
+    }
+}
+
+pub unsafe fn apply_text_limit_to_all_edits(hwnd: HWND) {
+    let edits = with_state(hwnd, |state| {
+        state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>()
+    }).unwrap_or_default();
+
+    for hwnd_edit in edits {
+        apply_text_limit(hwnd_edit);
+    }
+}
+
 pub struct Document {
     pub title: String,
     pub path: Option<PathBuf>,
@@ -80,6 +100,7 @@ pub unsafe fn apply_word_wrap_to_all_edits(hwnd: HWND, word_wrap: bool) {
     for hwnd_edit in edits {
         if hwnd_edit.0 == 0 { continue; }
         log_debug(&format!("Word wrap toggle for {:?}: {}", hwnd_edit, word_wrap));
+        apply_text_limit(hwnd_edit);
     }
 }
 
@@ -345,6 +366,8 @@ pub unsafe fn create_edit(parent: HWND, hfont: HFONT, word_wrap: bool) -> HWND {
             SendMessageW(hwnd_edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
         }
         SendMessageW(hwnd_edit, EM_SETEVENTMASK, WPARAM(0), LPARAM(ENM_CHANGE as isize));
+        // Allow large pastes (default edit limit is ~32K).
+        apply_text_limit(hwnd_edit);
     }
     hwnd_edit
 }

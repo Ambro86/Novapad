@@ -26,9 +26,9 @@ and the ability to **create audiobooks directly from text using Microsoft voices
   - Spreadsheets (Excel / ODS via `calamine`)
   - EPUB e-books
 - **Text-to-Speech (TTS) & Audiobook Creation**
-  - Read documents aloud using Microsoft voices (Edge Neural) and SAPI5
+  - Read documents aloud using Microsoft voices (Edge Neural) and SAPI5 (including OneCore)
   - Create MP3 audiobooks directly from text
-  - Supports both Microsoft voices and SAPI5 for playback and audiobook saving
+  - Supports both Microsoft voices and SAPI5/OneCore for playback and audiobook saving
 - **MP3 Audiobook Player**
   - Open and play MP3 files
   - Seek forward/backward using arrow keys

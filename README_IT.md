@@ -28,9 +28,9 @@ e la possibilit… di **creare audiolibri direttamente dal testo utilizzando le 
   - Fogli di calcolo (Excel / ODS tramite `calamine`)
   - E-book EPUB
 - **Text-to-Speech (TTS) e creazione di audiolibri**
-  - Lettura vocale dei documenti tramite le voci Microsoft (Edge Neural) e SAPI5
+  - Lettura vocale dei documenti tramite le voci Microsoft (Edge Neural) e SAPI5 (incluse OneCore)
   - Creazione di audiolibri in formato MP3 direttamente dal testo
-  - Supporto voci Microsoft e SAPI5 per lettura e salvataggio audiolibri
+  - Supporto voci Microsoft e SAPI5/OneCore per lettura e salvataggio audiolibri
 - **Player MP3 (audiolibri)**
   - Apertura e riproduzione di file MP3
   - Avanzamento e riavvolgimento con i tasti freccia

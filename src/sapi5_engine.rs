@@ -15,9 +15,12 @@ use windows::Win32::System::Com::{
 use crate::settings::{Language, VoiceInfo};
 use crate::accessibility::to_wide;
 use std::io::{Read, Seek, Write};
+use std::collections::HashSet;
 
 // SPDFID_WaveFormatEx: {C31ADBAE-527F-4ff5-A230-F62BB61FF70C}
 const SPDFID_WAVEFORMATEX: GUID = GUID::from_values(0xC31ADBAE, 0x527F, 0x4ff5, [0xA2, 0x30, 0xF6, 0x2B, 0xB6, 0x1F, 0xF7, 0x0C]);
+const SAPI_VOICES_PATH: PCWSTR = w!(r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices");
+const ONECORE_VOICES_PATH: PCWSTR = w!(r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech_OneCore\Voices");
 
 unsafe fn wcslen(ptr: *const u16) -> usize {
     let mut len = 0;
@@ -27,45 +30,86 @@ unsafe fn wcslen(ptr: *const u16) -> usize {
     len
 }
 
+unsafe fn collect_voice_descriptions(category_id: PCWSTR) -> Result<Vec<String>, String> {
+    let category: ISpObjectTokenCategory = CoCreateInstance(&SpObjectTokenCategory, None, CLSCTX_ALL)
+        .map_err(|e| format!("CoCreateInstance(Category) failed: {}", e))?;
+    category.SetId(category_id, false)
+         .map_err(|e| format!("SetId failed: {}", e))?;
+
+    let enum_tokens: IEnumSpObjectTokens = category.EnumTokens(None, None)
+        .map_err(|e| format!("EnumTokens failed: {}", e))?;
+
+    let mut count = 0;
+    enum_tokens.GetCount(&mut count).ok();
+
+    let mut voices = Vec::new();
+    for i in 0..count {
+        if let Ok(token) = enum_tokens.Item(i) {
+            if let Ok(desc_ptr) = token.GetStringValue(PCWSTR::null()) {
+                let description = if !desc_ptr.is_null() {
+                    let s = String::from_utf16_lossy(std::slice::from_raw_parts(desc_ptr.as_ptr(), wcslen(desc_ptr.as_ptr())));
+                    CoTaskMemFree(Some(desc_ptr.as_ptr() as *const _));
+                    s
+                } else {
+                    "Unknown Voice".to_string()
+                };
+                voices.push(description);
+            }
+        }
+    }
+    Ok(voices)
+}
+
+unsafe fn find_voice_token(voice_name: &str) -> Option<ISpObjectToken> {
+    for category_id in [SAPI_VOICES_PATH, ONECORE_VOICES_PATH] {
+        let category: windows::core::Result<ISpObjectTokenCategory> = CoCreateInstance(&SpObjectTokenCategory, None, CLSCTX_ALL);
+        if let Ok(cat) = category {
+            let _ = cat.SetId(category_id, false);
+            if let Ok(enum_tokens) = cat.EnumTokens(None, None) {
+                let mut count = 0;
+                if enum_tokens.GetCount(&mut count).is_ok() {
+                    for i in 0..count {
+                        if let Ok(tok) = enum_tokens.Item(i) {
+                            if let Ok(desc_ptr) = tok.GetStringValue(PCWSTR::null()) {
+                                if !desc_ptr.is_null() {
+                                    let description = String::from_utf16_lossy(std::slice::from_raw_parts(desc_ptr.as_ptr(), wcslen(desc_ptr.as_ptr())));
+                                    CoTaskMemFree(Some(desc_ptr.as_ptr() as *const _));
+                                    if description == voice_name {
+                                        return Some(tok);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 pub fn list_sapi_voices() -> Result<Vec<VoiceInfo>, String> {
     unsafe {
         // Use APARTMENTTHREADED for better compatibility with SAPI5
         let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
 
-        let category: ISpObjectTokenCategory = CoCreateInstance(&SpObjectTokenCategory, None, CLSCTX_ALL)
-            .map_err(|e| format!("CoCreateInstance(Category) failed: {}", e))?;
+        let mut names = Vec::new();
+        if let Ok(list) = collect_voice_descriptions(SAPI_VOICES_PATH) {
+            names.extend(list);
+        }
+        if let Ok(list) = collect_voice_descriptions(ONECORE_VOICES_PATH) {
+            names.extend(list);
+        }
 
-        // SAPI 5 Voices Category
-        let category_id = w!(r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices");
-        category.SetId(PCWSTR(category_id.as_ptr()), false)
-             .map_err(|e| format!("SetId failed: {}", e))?;
-
-        let enum_tokens: IEnumSpObjectTokens = category.EnumTokens(None, None)
-            .map_err(|e| format!("EnumTokens failed: {}", e))?;
-
-        let mut count = 0;
-        enum_tokens.GetCount(&mut count).ok();
-
+        let mut seen = HashSet::new();
         let mut voices = Vec::new();
-
-        for i in 0..count {
-            if let Ok(token) = enum_tokens.Item(i) {
-                 if let Ok(desc_ptr) = token.GetStringValue(PCWSTR::null()) {
-                     let description = if !desc_ptr.is_null() {
-                         let s = String::from_utf16_lossy(std::slice::from_raw_parts(desc_ptr.as_ptr(), wcslen(desc_ptr.as_ptr())));
-                         CoTaskMemFree(Some(desc_ptr.as_ptr() as *const _));
-                         s
-                     } else {
-                         "Unknown Voice".to_string()
-                     };
-                     
-                     // Use description as the short_name (ID) for display and selection
-                     voices.push(VoiceInfo {
-                         short_name: description.clone(), 
-                         locale: "SAPI5".to_string(), 
-                         is_multilingual: false,
-                     });
-                 }
+        for name in names {
+            if seen.insert(name.clone()) {
+                voices.push(VoiceInfo {
+                    short_name: name,
+                    locale: "SAPI5".to_string(),
+                    is_multilingual: false,
+                });
             }
         }
         Ok(voices)
@@ -94,30 +138,8 @@ pub fn play_sapi(
                 }
             };
 
-            // Setup voice
-            let category: windows::core::Result<ISpObjectTokenCategory> = CoCreateInstance(&SpObjectTokenCategory, None, CLSCTX_ALL);
-            if let Ok(cat) = category {
-                 let _ = cat.SetId(PCWSTR(w!(r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices").as_ptr()), false);
-                 if let Ok(enum_tokens) = cat.EnumTokens(None, None) {
-                     let mut count = 0;
-                     if enum_tokens.GetCount(&mut count).is_ok() {
-                         for i in 0..count {
-                             if let Ok(tok) = enum_tokens.Item(i) {
-                                 if let Ok(desc_ptr) = tok.GetStringValue(PCWSTR::null()) {
-                                     if !desc_ptr.is_null() {
-                                         let description = String::from_utf16_lossy(std::slice::from_raw_parts(desc_ptr.as_ptr(), wcslen(desc_ptr.as_ptr())));
-                                         CoTaskMemFree(Some(desc_ptr.as_ptr() as *const _));
-                                         
-                                         if description == voice_name {
-                                             let _ = voice.SetVoice(&tok);
-                                             break;
-                                         }
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 }
+            if let Some(token) = find_voice_token(&voice_name) {
+                let _ = voice.SetVoice(&token);
             }
 
             for chunk in chunks {
@@ -167,40 +189,9 @@ pub fn speak_sapi_to_file(
             let voice: ISpVoice = CoCreateInstance(&SpVoice, None, CLSCTX_ALL)
                 .map_err(|e| format!("Failed to create SpVoice: {}", e))?;
 
-            // Set the voice
-            let category: ISpObjectTokenCategory = CoCreateInstance(&SpObjectTokenCategory, None, CLSCTX_ALL)
-                .map_err(|e| format!("Failed to create Category: {}", e))?;
-            category.SetId(PCWSTR(w!(r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices").as_ptr()), false).ok();
-
-            let enum_tokens: IEnumSpObjectTokens = category.EnumTokens(None, None)
-                .map_err(|e| format!("Failed to enum tokens: {}", e))?;
-
-            let mut count = 0;
-            enum_tokens.GetCount(&mut count).ok();
-
-            let mut voice_token: Option<ISpObjectToken> = None;
-
-            // Find the token by Name
-            for i in 0..count {
-                if let Ok(tok) = enum_tokens.Item(i) {
-                    if let Ok(desc_ptr) = tok.GetStringValue(PCWSTR::null()) {
-                        if !desc_ptr.is_null() {
-                            let description = String::from_utf16_lossy(std::slice::from_raw_parts(desc_ptr.as_ptr(), wcslen(desc_ptr.as_ptr())));
-                            CoTaskMemFree(Some(desc_ptr.as_ptr() as *const _));
-                            if description == voice_name {
-                                voice_token = Some(tok);
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            if let Some(token) = voice_token {
-                voice.SetVoice(&token).map_err(|e| format!("SetVoice failed: {}", e))?;
-            } else {
-                return Err("Selected SAPI voice not found. Please select a voice in Options.".to_string());
-            }
+            let voice_token = find_voice_token(voice_name)
+                .ok_or_else(|| "Selected SAPI voice not found. Please select a voice in Options.".to_string())?;
+            voice.SetVoice(&voice_token).map_err(|e| format!("SetVoice failed: {}", e))?;
 
             let stream: ISpStream = CoCreateInstance(&SpFileStream, None, CLSCTX_ALL)
                 .map_err(|e| format!("Failed to create SpFileStream: {}", e))?;

@@ -76,11 +76,26 @@ impl Default for Language {
     }
 }
 
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum TtsEngine {
+    #[serde(rename = "edge")]
+    Edge,
+    #[serde(rename = "sapi5")]
+    Sapi5,
+}
+
+impl Default for TtsEngine {
+    fn default() -> Self {
+        TtsEngine::Edge
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AppSettings {
     pub open_behavior: OpenBehavior,
     pub language: Language,
+    pub tts_engine: TtsEngine,
     pub tts_voice: String,
     pub tts_only_multilingual: bool,
     pub split_on_newline: bool,
@@ -95,6 +110,7 @@ impl Default for AppSettings {
         AppSettings {
             open_behavior: OpenBehavior::NewTab,
             language: Language::Italian,
+            tts_engine: TtsEngine::Edge,
             tts_voice: "it-IT-IsabellaNeural".to_string(),
             tts_only_multilingual: false,
             split_on_newline: true,

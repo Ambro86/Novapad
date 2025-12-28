@@ -10,6 +10,8 @@ mod bookmarks;
 use bookmarks::*;
 mod tts_engine;
 use tts_engine::*;
+mod sapi5_engine;
+mod mf_encoder;
 mod file_handler;
 use file_handler::*;
 mod menu;
@@ -108,7 +110,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
 const WM_PDF_LOADED: u32 = WM_APP + 1;
 const WM_TTS_VOICES_LOADED: u32 = WM_APP + 2;
 const WM_TTS_AUDIOBOOK_DONE: u32 = WM_APP + 4;
+const WM_TTS_PLAYBACK_ERROR: u32 = WM_APP + 5;
 const WM_UPDATE_PROGRESS: u32 = WM_APP + 6;
+const WM_TTS_CHUNK_START: u32 = WM_APP + 7;
+const WM_TTS_SAPI_VOICES_LOADED: u32 = WM_APP + 8;
 const COPYDATA_OPEN_FILE: usize = 1;
 
 struct PdfLoadResult {
@@ -131,7 +136,7 @@ fn log_path() -> Option<PathBuf> {
     Some(path)
 }
 
-fn log_debug(message: &str) {
+pub(crate) fn log_debug(message: &str) {
     let Some(path) = log_path() else {
         return;
     };
@@ -175,7 +180,8 @@ pub(crate) struct AppState {
     next_timer_id: usize,
     tts_session: Option<TtsSession>,
     tts_next_session_id: u64,
-    voice_list: Vec<VoiceInfo>,
+    edge_voices: Vec<VoiceInfo>,
+    sapi_voices: Vec<VoiceInfo>,
     audiobook_progress: HWND,
     audiobook_cancel: Option<Arc<AtomicBool>>,
     active_audiobook: Option<AudiobookPlayer>,
@@ -415,7 +421,8 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 next_timer_id: 1,
                 tts_session: None,
                 tts_next_session_id: 1,
-                voice_list: Vec::new(),
+                edge_voices: Vec::new(),
+                sapi_voices: Vec::new(),
                 audiobook_progress: HWND(0),
                 audiobook_cancel: None,
                 active_audiobook: None,
@@ -489,7 +496,23 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             let payload = Box::from_raw(lparam.0 as *mut Vec<VoiceInfo>);
             let voices: Vec<VoiceInfo> = *payload;
             let _ = with_state(hwnd, |state| {
-                state.voice_list = voices.clone();
+                state.edge_voices = voices.clone();
+            });
+            if let Some(dialog) = with_state(hwnd, |state| state.options_dialog) {
+                if dialog.0 != 0 {
+                    app_windows::options_window::refresh_voices(dialog);
+                }
+            }
+            LRESULT(0)
+        }
+        WM_TTS_SAPI_VOICES_LOADED => {
+            if lparam.0 == 0 {
+                return LRESULT(0);
+            }
+            let payload = Box::from_raw(lparam.0 as *mut Vec<VoiceInfo>);
+            let voices: Vec<VoiceInfo> = *payload;
+            let _ = with_state(hwnd, |state| {
+                state.sapi_voices = voices.clone();
             });
             if let Some(dialog) = with_state(hwnd, |state| state.options_dialog) {
                 if dialog.0 != 0 {

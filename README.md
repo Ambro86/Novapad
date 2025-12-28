@@ -7,7 +7,7 @@ It extends traditional text editing with multi-format document support,
 advanced accessibility features, and Text-to-Speech (TTS) capabilities.
 
 It also includes an integrated **MP3 audiobook player**, a **bookmark system for both text and audio**,
-and the ability to **create audiobooks directly from text using system voices**.
+and the ability to **create audiobooks directly from text using system voices (Edge Neural and SAPI5)**.
 
 > ⚠️ **License Notice**
 > This project is **source-available but NOT open source**.
@@ -28,6 +28,7 @@ and the ability to **create audiobooks directly from text using system voices**.
 - **Text-to-Speech (TTS) & Audiobook Creation**
   - Read documents aloud using system voices
   - Create MP3 audiobooks directly from text
+  - Supports SAPI5 voices for playback and audiobook saving
 - **MP3 Audiobook Player**
   - Open and play MP3 files
   - Seek forward/backward using arrow keys

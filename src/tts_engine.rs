@@ -23,7 +23,7 @@ use windows::Win32::System::Power::{SetThreadExecutionState, ES_CONTINUOUS, ES_S
 use crate::{with_state, get_active_edit, log_debug, show_error, save_audio_dialog};
 use crate::settings;
 use crate::editor_manager::get_edit_text;
-use crate::settings::{Language, AudiobookResult, TRUSTED_CLIENT_TOKEN};
+use crate::settings::{Language, AudiobookResult, TRUSTED_CLIENT_TOKEN, TtsEngine};
 use crate::accessibility::{EM_GETSEL};
 
 pub const WSS_URL_BASE: &str = "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1";
@@ -83,12 +83,13 @@ pub fn start_tts_from_caret(hwnd: HWND) {
     let Some(hwnd_edit) = (unsafe { get_active_edit(hwnd) }) else {
         return;
     };
-    let (language, split_on_newline) = unsafe {
+    let (language, split_on_newline, tts_engine) = unsafe {
         with_state(hwnd, |state| {
-            (state.settings.language, state.settings.split_on_newline)
+            (state.settings.language, state.settings.split_on_newline, state.settings.tts_engine)
         })
     }
-    .unwrap_or_default();
+    .unwrap_or((Language::Italian, true, TtsEngine::Edge));
+    
     let text = unsafe { get_text_from_caret(hwnd_edit) };
     if text.trim().is_empty() {
         unsafe {
@@ -107,7 +108,30 @@ pub fn start_tts_from_caret(hwnd: HWND) {
     let initial_caret_pos = start.min(end);
 
     let chunks = split_into_tts_chunks(&text, split_on_newline);
-    start_tts_playback_with_chunks(hwnd, text, voice, chunks, initial_caret_pos);
+    
+    match tts_engine {
+        TtsEngine::Edge => start_tts_playback_with_chunks(hwnd, text, voice, chunks, initial_caret_pos),
+        TtsEngine::Sapi5 => {
+            // Stop any existing playback
+            stop_tts_playback(hwnd);
+            let cancel = Arc::new(AtomicBool::new(false));
+            let _ = unsafe {
+                with_state(hwnd, |state| {
+                    state.tts_session = Some(TtsSession {
+                        id: state.tts_next_session_id,
+                        command_tx: mpsc::unbounded_channel().0, // Dummy for SAPI currently
+                        cancel: cancel.clone(),
+                        paused: false,
+                        initial_caret_pos,
+                    });
+                    state.tts_next_session_id += 1;
+                })
+            };
+            
+            let chunk_strings: Vec<String> = chunks.into_iter().map(|c| c.text_to_read).collect();
+            let _ = crate::sapi5_engine::play_sapi(chunk_strings, voice, cancel);
+        }
+    }
 }
 
 pub fn toggle_tts_pause(hwnd: HWND) {
@@ -544,7 +568,7 @@ pub fn split_text(text: &str) -> Vec<String> {
         if split_found.is_none() {
             for idx in (search_start..search_end).rev() {
                 let c = char_indices[idx].1;
-                if c == '\n' { if idx + 1 < char_len && char_indices[idx + 1].1 == '\n' { split_found = Some(idx + 2); break; } }
+                if c == '\n' { if idx + 1 < char_len && char_indices[idx + 1].1 == '\n' { split_found = Some(idx + 2); break; } } 
                 else if c == ';' || c == ':' { split_found = Some(idx + 1); break; }
             }
         }
@@ -635,9 +659,9 @@ pub fn start_audiobook(hwnd: HWND) {
         })
     };
 
-    let (split_on_newline, audiobook_split) = unsafe { 
-        with_state(hwnd, |state| (state.settings.split_on_newline, state.settings.audiobook_split)) 
-    }.unwrap_or((true, 0));
+    let (split_on_newline, audiobook_split, tts_engine) = unsafe { 
+        with_state(hwnd, |state| (state.settings.split_on_newline, state.settings.audiobook_split, state.settings.tts_engine)) 
+    }.unwrap_or((true, 0, TtsEngine::Edge));
 
     let cleaned = strip_dashed_lines(&text);
     let prepared = normalize_for_tts(&cleaned, split_on_newline);
@@ -657,7 +681,10 @@ pub fn start_audiobook(hwnd: HWND) {
 
     let cancel_clone = cancel_token.clone();
     std::thread::spawn(move || {
-        let result = run_split_audiobook(&chunks, &voice, &output, audiobook_split, progress_hwnd, cancel_clone);
+        let result = match tts_engine {
+            TtsEngine::Edge => run_split_audiobook(&chunks, &voice, &output, audiobook_split, progress_hwnd, cancel_clone),
+            TtsEngine::Sapi5 => run_split_sapi_audiobook(&chunks, &voice, &output, audiobook_split, progress_hwnd, cancel_clone, language),
+        };
         let success = result.is_ok();
         let message = match result {
             Ok(()) => match language {
@@ -721,6 +748,61 @@ fn run_split_audiobook(
             cancel.clone(),
             &mut current_global_progress
         )?;
+    }
+    Ok(())
+}
+
+fn run_split_sapi_audiobook(
+    chunks: &[String],
+    voice: &str,
+    output: &Path,
+    split_parts: u32,
+    progress_hwnd: HWND,
+    cancel: Arc<AtomicBool>,
+    language: Language,
+) -> Result<(), String> {
+    let parts = if split_parts == 0 { 1 } else { split_parts as usize };
+    let total_chunks = chunks.len();
+    let parts = if total_chunks < parts { total_chunks } else { parts };
+    let chunks_per_part = (total_chunks + parts - 1) / parts; 
+    let mut current_global_progress = 0;
+
+    for part_idx in 0..parts {
+        let start_idx = part_idx * chunks_per_part;
+        let end_idx = std::cmp::min(start_idx + chunks_per_part, total_chunks);
+        if start_idx >= end_idx { break; }
+
+        let part_chunks = &chunks[start_idx..end_idx];
+        
+        let part_output = if parts > 1 {
+            let stem = output.file_stem().and_then(|s| s.to_str()).unwrap_or("audiobook");
+            let ext = output.extension().and_then(|s| s.to_str()).unwrap_or("mp3");
+            output.with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
+        } else {
+            output.to_path_buf()
+        };
+
+        let progress_hwnd_clone = progress_hwnd;
+        let cancel_clone = cancel.clone();
+        
+        crate::sapi5_engine::speak_sapi_to_file(
+            part_chunks,
+            voice,
+            &part_output,
+            language,
+            cancel_clone,
+            |_chunk_idx| { 
+                 current_global_progress += 1;
+                 if progress_hwnd_clone.0 != 0 {
+                     unsafe { 
+                         let _ = PostMessageW(progress_hwnd_clone, crate::WM_UPDATE_PROGRESS, WPARAM(current_global_progress), LPARAM(0)); 
+                     }
+                 }
+            }
+        ).map_err(|e| {
+             let _ = std::fs::remove_file(&part_output);
+             e
+        })?;
     }
     Ok(())
 }

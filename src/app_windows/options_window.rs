@@ -4,13 +4,13 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, GetWindowLongPtrW, RegisterClassW,
     SendMessageW, SetWindowLongPtrW, SetForegroundWindow,
     GWLP_USERDATA, WM_CREATE, WM_DESTROY, WM_NCDESTROY, WM_CLOSE, WM_COMMAND,
-    WM_KEYDOWN, WM_SETFONT, WM_APP, MessageBoxW,
+    WM_KEYDOWN, WM_SETFONT, WM_APP,
     WS_CAPTION, WS_SYSMENU, WS_VISIBLE, WS_CHILD, WS_TABSTOP, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME,
     CW_USEDEFAULT, HMENU, WNDCLASSW, WS_EX_CLIENTEDGE,
     BS_DEFPUSHBUTTON, BS_AUTOCHECKBOX, BM_SETCHECK, BM_GETCHECK,
     CB_ADDSTRING, CB_RESETCONTENT, CB_SETCURSEL, CB_GETCURSEL, CB_GETITEMDATA, CB_SETITEMDATA, CBS_DROPDOWNLIST,
-    MB_OK, MB_ICONERROR, CB_GETDROPPEDSTATE, GetParent, MSG,
-    CREATESTRUCTW, LoadCursorW, IDC_ARROW, WINDOW_STYLE
+    CB_GETDROPPEDSTATE, GetParent, MSG,
+    CREATESTRUCTW, LoadCursorW, IDC_ARROW, WINDOW_STYLE, CBN_SELCHANGE
 };
 use windows::Win32::UI::Controls::{WC_BUTTON, WC_STATIC, WC_COMBOBOXW, BST_CHECKED};
 use windows::Win32::Graphics::Gdi::{HBRUSH, COLOR_WINDOW, HFONT};
@@ -18,13 +18,14 @@ use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetFocus, SetFocus, VK_RETURN, VK_ESCAPE, EnableWindow};
 use crate::{with_state, rebuild_menus};
 use crate::editor_manager::apply_word_wrap_to_all_edits;
-use crate::settings::{Language, OpenBehavior, VoiceInfo, save_settings, TRUSTED_CLIENT_TOKEN, VOICE_LIST_URL};
+use crate::settings::{Language, OpenBehavior, VoiceInfo, TtsEngine, save_settings, TRUSTED_CLIENT_TOKEN, VOICE_LIST_URL};
 use crate::accessibility::{to_wide, handle_accessibility};
 use std::thread;
 
 const OPTIONS_CLASS_NAME: &str = "NovapadOptions";
 const OPTIONS_ID_LANG: usize = 6001;
 const OPTIONS_ID_OPEN: usize = 6002;
+const OPTIONS_ID_TTS_ENGINE: usize = 6012;
 const OPTIONS_ID_VOICE: usize = 6003;
 const OPTIONS_ID_MULTILINGUAL: usize = 6004;
 const OPTIONS_ID_SPLIT_ON_NEWLINE: usize = 6007;
@@ -36,6 +37,7 @@ const OPTIONS_ID_OK: usize = 6005;
 const OPTIONS_ID_CANCEL: usize = 6006;
 
 const WM_TTS_VOICES_LOADED: u32 = WM_APP + 2;
+const WM_TTS_SAPI_VOICES_LOADED: u32 = WM_APP + 8;
 
 pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
@@ -57,6 +59,7 @@ struct OptionsDialogState {
     parent: HWND,
     combo_lang: HWND,
     combo_open: HWND,
+    combo_tts_engine: HWND,
     combo_voice: HWND,
     combo_audio_skip: HWND,
     combo_audio_split: HWND,
@@ -71,6 +74,7 @@ struct OptionsLabels {
     title: &'static str,
     label_language: &'static str,
     label_open: &'static str,
+    label_tts_engine: &'static str,
     label_voice: &'static str,
     label_multilingual: &'static str,
     label_split_on_newline: &'static str,
@@ -82,11 +86,12 @@ struct OptionsLabels {
     lang_en: &'static str,
     open_new_tab: &'static str,
     open_new_window: &'static str,
+    engine_edge: &'static str,
+    engine_sapi5: &'static str,
     split_none: &'static str,
     split_parts: &'static str,
     ok: &'static str,
     cancel: &'static str,
-    voices_loading: &'static str,
     voices_empty: &'static str,
 }
 
@@ -96,6 +101,7 @@ fn options_labels(language: Language) -> OptionsLabels {
             title: "Opzioni",
             label_language: "Lingua interfaccia:",
             label_open: "Apertura file:",
+            label_tts_engine: "Sistema sintesi vocale:",
             label_voice: "Voce:",
             label_multilingual: "Mostra solo voci multilingua",
             label_split_on_newline: "Spezza la lettura quando si va a capo",
@@ -107,17 +113,19 @@ fn options_labels(language: Language) -> OptionsLabels {
             lang_en: "Inglese",
             open_new_tab: "Apri file in nuovo tab",
             open_new_window: "Apri file in nuova finestra",
+            engine_edge: "Voci Microsoft",
+            engine_sapi5: "SAPI5",
             split_none: "Nessuna divisione",
             split_parts: "parti",
             ok: "OK",
             cancel: "Annulla",
-            voices_loading: "Caricamento voci...",
             voices_empty: "Nessuna voce disponibile",
         },
         Language::English => OptionsLabels {
             title: "Options",
             label_language: "Interface language:",
             label_open: "Open behavior:",
+            label_tts_engine: "Text-to-Speech System:",
             label_voice: "Voice:",
             label_multilingual: "Show only multilingual voices",
             label_split_on_newline: "Split reading on new lines",
@@ -129,11 +137,12 @@ fn options_labels(language: Language) -> OptionsLabels {
             lang_en: "English",
             open_new_tab: "Open files in new tab",
             open_new_window: "Open files in new window",
+            engine_edge: "Microsoft Voices",
+            engine_sapi5: "SAPI5",
             split_none: "No split",
             split_parts: "parts",
             ok: "OK",
             cancel: "Cancel",
-            voices_loading: "Loading voices...",
             voices_empty: "No voices available",
         },
     }
@@ -170,7 +179,7 @@ pub unsafe fn open(parent: HWND) {
         CW_USEDEFAULT,
         CW_USEDEFAULT,
         520,
-        450,
+        500, // Increased height
         parent,
         None,
         hinstance,
@@ -183,24 +192,49 @@ pub unsafe fn open(parent: HWND) {
         });
         EnableWindow(parent, true);
         SetForegroundWindow(dialog);
-        ensure_voice_list_loaded(parent, language);
+        ensure_voice_lists_loaded(parent, language);
     }
 }
 
 pub unsafe fn refresh_voices(hwnd: HWND) {
-    let (parent, combo_voice, checkbox) = match with_options_state(hwnd, |state| {
-        (state.parent, state.combo_voice, state.checkbox_multilingual)
+    let (parent, combo_voice, combo_engine, checkbox) = match with_options_state(hwnd, |state| {
+        (state.parent, state.combo_voice, state.combo_tts_engine, state.checkbox_multilingual)
     }) {
         Some(values) => values,
         None => return,
     };
     let settings = with_state(parent, |state| state.settings.clone()).unwrap_or_default();
-    let voices = with_state(parent, |state| state.voice_list.clone()).unwrap_or_default();
+    
+    // Determine current engine from combo if possible, otherwise settings
+    let engine_sel = SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    let engine = if engine_sel >= 0 {
+        if engine_sel == 1 { TtsEngine::Sapi5 } else { TtsEngine::Edge }
+    } else {
+        settings.tts_engine
+    };
+
+    let voices = with_state(parent, |state| {
+        match engine {
+            TtsEngine::Edge => state.edge_voices.clone(),
+            TtsEngine::Sapi5 => state.sapi_voices.clone(),
+        }
+    }).unwrap_or_default();
+
     let labels = options_labels(settings.language);
     let only_multilingual = SendMessageW(checkbox, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
         == BST_CHECKED.0;
+    
+    // Multilingual checkbox only relevant for Edge voices?
+    // SAPI voices usually don't have "Multilingual" in name in the same way, but let's keep logic if applicable.
+    // Generally assume SAPI voices are local and we list all.
+    let filter_multilingual = if engine == TtsEngine::Edge { only_multilingual } else { false };
+    
+    // Disable multilingual checkbox for SAPI
+    EnableWindow(checkbox, engine == TtsEngine::Edge);
 
-    populate_voice_combo(combo_voice, &voices, &settings.tts_voice, only_multilingual, &labels);
+    // If switching engine, we might not have the correct "selected" voice in settings yet if we haven't saved.
+    // But we pass settings.tts_voice. If it's an ID from other engine, it won't match, so it selects default/first.
+    populate_voice_combo(combo_voice, &voices, &settings.tts_voice, filter_multilingual, &labels);
 }
 
 unsafe extern "system" fn options_wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -213,40 +247,54 @@ unsafe extern "system" fn options_wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, 
 
             let hfont = with_state(parent, |state| state.hfont).unwrap_or(HFONT(0));
             
-            let label_lang = CreateWindowExW(Default::default(), WC_STATIC, PCWSTR(to_wide(labels.label_language).as_ptr()), WS_CHILD | WS_VISIBLE, 20, 20, 140, 20, hwnd, HMENU(0), HINSTANCE(0), None);
-            let combo_lang = CreateWindowExW(WS_EX_CLIENTEDGE, WC_COMBOBOXW, PCWSTR::null(), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32), 170, 18, 300, 120, hwnd, HMENU(OPTIONS_ID_LANG as isize), HINSTANCE(0), None);
+            let mut y = 20;
+            let label_lang = CreateWindowExW(Default::default(), WC_STATIC, PCWSTR(to_wide(labels.label_language).as_ptr()), WS_CHILD | WS_VISIBLE, 20, y, 140, 20, hwnd, HMENU(0), HINSTANCE(0), None);
+            let combo_lang = CreateWindowExW(WS_EX_CLIENTEDGE, WC_COMBOBOXW, PCWSTR::null(), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32), 170, y - 2, 300, 120, hwnd, HMENU(OPTIONS_ID_LANG as isize), HINSTANCE(0), None);
+            y += 40;
 
-            let label_open = CreateWindowExW(Default::default(), WC_STATIC, PCWSTR(to_wide(labels.label_open).as_ptr()), WS_CHILD | WS_VISIBLE, 20, 60, 140, 20, hwnd, HMENU(0), HINSTANCE(0), None);
-            let combo_open = CreateWindowExW(WS_EX_CLIENTEDGE, WC_COMBOBOXW, PCWSTR::null(), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32), 170, 58, 300, 120, hwnd, HMENU(OPTIONS_ID_OPEN as isize), HINSTANCE(0), None);
+            let label_open = CreateWindowExW(Default::default(), WC_STATIC, PCWSTR(to_wide(labels.label_open).as_ptr()), WS_CHILD | WS_VISIBLE, 20, y, 140, 20, hwnd, HMENU(0), HINSTANCE(0), None);
+            let combo_open = CreateWindowExW(WS_EX_CLIENTEDGE, WC_COMBOBOXW, PCWSTR::null(), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32), 170, y - 2, 300, 120, hwnd, HMENU(OPTIONS_ID_OPEN as isize), HINSTANCE(0), None);
+            y += 40;
 
-            let label_voice = CreateWindowExW(Default::default(), WC_STATIC, PCWSTR(to_wide(labels.label_voice).as_ptr()), WS_CHILD | WS_VISIBLE, 20, 100, 140, 20, hwnd, HMENU(0), HINSTANCE(0), None);
-            let combo_voice = CreateWindowExW(WS_EX_CLIENTEDGE, WC_COMBOBOXW, PCWSTR::null(), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32), 170, 98, 300, 140, hwnd, HMENU(OPTIONS_ID_VOICE as isize), HINSTANCE(0), None);
+            let label_tts_engine = CreateWindowExW(Default::default(), WC_STATIC, PCWSTR(to_wide(labels.label_tts_engine).as_ptr()), WS_CHILD | WS_VISIBLE, 20, y, 140, 20, hwnd, HMENU(0), HINSTANCE(0), None);
+            let combo_tts_engine = CreateWindowExW(WS_EX_CLIENTEDGE, WC_COMBOBOXW, PCWSTR::null(), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32), 170, y - 2, 300, 120, hwnd, HMENU(OPTIONS_ID_TTS_ENGINE as isize), HINSTANCE(0), None);
+            y += 40;
 
-            let checkbox_multilingual = CreateWindowExW(Default::default(), WC_BUTTON, PCWSTR(to_wide(labels.label_multilingual).as_ptr()), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32), 170, 138, 300, 20, hwnd, HMENU(OPTIONS_ID_MULTILINGUAL as isize), HINSTANCE(0), None);
+            let label_voice = CreateWindowExW(Default::default(), WC_STATIC, PCWSTR(to_wide(labels.label_voice).as_ptr()), WS_CHILD | WS_VISIBLE, 20, y, 140, 20, hwnd, HMENU(0), HINSTANCE(0), None);
+            let combo_voice = CreateWindowExW(WS_EX_CLIENTEDGE, WC_COMBOBOXW, PCWSTR::null(), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32), 170, y - 2, 300, 140, hwnd, HMENU(OPTIONS_ID_VOICE as isize), HINSTANCE(0), None);
+            y += 40;
 
-            let label_audio_skip = CreateWindowExW(Default::default(), WC_STATIC, PCWSTR(to_wide(labels.label_audio_skip).as_ptr()), WS_CHILD | WS_VISIBLE, 20, 170, 140, 20, hwnd, HMENU(0), HINSTANCE(0), None);
-            let combo_audio_skip = CreateWindowExW(WS_EX_CLIENTEDGE, WC_COMBOBOXW, PCWSTR::null(), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32), 170, 168, 300, 140, hwnd, HMENU(OPTIONS_ID_AUDIO_SKIP as isize), HINSTANCE(0), None);
+            let checkbox_multilingual = CreateWindowExW(Default::default(), WC_BUTTON, PCWSTR(to_wide(labels.label_multilingual).as_ptr()), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32), 170, y, 300, 20, hwnd, HMENU(OPTIONS_ID_MULTILINGUAL as isize), HINSTANCE(0), None);
+            y += 32;
 
-            let label_audio_split = CreateWindowExW(Default::default(), WC_STATIC, PCWSTR(to_wide(labels.label_audio_split).as_ptr()), WS_CHILD | WS_VISIBLE, 20, 210, 140, 20, hwnd, HMENU(0), HINSTANCE(0), None);
-            let combo_audio_split = CreateWindowExW(WS_EX_CLIENTEDGE, WC_COMBOBOXW, PCWSTR::null(), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32), 170, 208, 300, 140, hwnd, HMENU(OPTIONS_ID_AUDIO_SPLIT as isize), HINSTANCE(0), None);
+            let label_audio_skip = CreateWindowExW(Default::default(), WC_STATIC, PCWSTR(to_wide(labels.label_audio_skip).as_ptr()), WS_CHILD | WS_VISIBLE, 20, y, 140, 20, hwnd, HMENU(0), HINSTANCE(0), None);
+            let combo_audio_skip = CreateWindowExW(WS_EX_CLIENTEDGE, WC_COMBOBOXW, PCWSTR::null(), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32), 170, y - 2, 300, 140, hwnd, HMENU(OPTIONS_ID_AUDIO_SKIP as isize), HINSTANCE(0), None);
+            y += 40;
 
-            let checkbox_split_on_newline = CreateWindowExW(Default::default(), WC_BUTTON, PCWSTR(to_wide(labels.label_split_on_newline).as_ptr()), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32), 170, 250, 300, 20, hwnd, HMENU(OPTIONS_ID_SPLIT_ON_NEWLINE as isize), HINSTANCE(0), None);
+            let label_audio_split = CreateWindowExW(Default::default(), WC_STATIC, PCWSTR(to_wide(labels.label_audio_split).as_ptr()), WS_CHILD | WS_VISIBLE, 20, y, 140, 20, hwnd, HMENU(0), HINSTANCE(0), None);
+            let combo_audio_split = CreateWindowExW(WS_EX_CLIENTEDGE, WC_COMBOBOXW, PCWSTR::null(), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32), 170, y - 2, 300, 140, hwnd, HMENU(OPTIONS_ID_AUDIO_SPLIT as isize), HINSTANCE(0), None);
+            y += 40;
 
-            let checkbox_word_wrap = CreateWindowExW(Default::default(), WC_BUTTON, PCWSTR(to_wide(labels.label_word_wrap).as_ptr()), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32), 170, 274, 300, 20, hwnd, HMENU(OPTIONS_ID_WORD_WRAP as isize), HINSTANCE(0), None);
+            let checkbox_split_on_newline = CreateWindowExW(Default::default(), WC_BUTTON, PCWSTR(to_wide(labels.label_split_on_newline).as_ptr()), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32), 170, y, 300, 20, hwnd, HMENU(OPTIONS_ID_SPLIT_ON_NEWLINE as isize), HINSTANCE(0), None);
+            y += 24;
 
-            let checkbox_move_cursor = CreateWindowExW(Default::default(), WC_BUTTON, PCWSTR(to_wide(labels.label_move_cursor).as_ptr()), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32), 170, 298, 300, 20, hwnd, HMENU(OPTIONS_ID_MOVE_CURSOR as isize), HINSTANCE(0), None);
+            let checkbox_word_wrap = CreateWindowExW(Default::default(), WC_BUTTON, PCWSTR(to_wide(labels.label_word_wrap).as_ptr()), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32), 170, y, 300, 20, hwnd, HMENU(OPTIONS_ID_WORD_WRAP as isize), HINSTANCE(0), None);
+            y += 24;
 
-            let ok_button = CreateWindowExW(Default::default(), WC_BUTTON, PCWSTR(to_wide(labels.ok).as_ptr()), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32), 280, 340, 90, 28, hwnd, HMENU(OPTIONS_ID_OK as isize), HINSTANCE(0), None);
-            let cancel_button = CreateWindowExW(Default::default(), WC_BUTTON, PCWSTR(to_wide(labels.cancel).as_ptr()), WS_CHILD | WS_VISIBLE | WS_TABSTOP, 380, 340, 90, 28, hwnd, HMENU(OPTIONS_ID_CANCEL as isize), HINSTANCE(0), None);
+            let checkbox_move_cursor = CreateWindowExW(Default::default(), WC_BUTTON, PCWSTR(to_wide(labels.label_move_cursor).as_ptr()), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32), 170, y, 300, 20, hwnd, HMENU(OPTIONS_ID_MOVE_CURSOR as isize), HINSTANCE(0), None);
+            y += 40;
 
-            for control in [label_lang, combo_lang, label_open, combo_open, label_voice, combo_voice, label_audio_skip, combo_audio_skip, label_audio_split, combo_audio_split, checkbox_multilingual, checkbox_split_on_newline, checkbox_word_wrap, checkbox_move_cursor, ok_button, cancel_button] {
+            let ok_button = CreateWindowExW(Default::default(), WC_BUTTON, PCWSTR(to_wide(labels.ok).as_ptr()), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32), 280, y, 90, 28, hwnd, HMENU(OPTIONS_ID_OK as isize), HINSTANCE(0), None);
+            let cancel_button = CreateWindowExW(Default::default(), WC_BUTTON, PCWSTR(to_wide(labels.cancel).as_ptr()), WS_CHILD | WS_VISIBLE | WS_TABSTOP, 380, y, 90, 28, hwnd, HMENU(OPTIONS_ID_CANCEL as isize), HINSTANCE(0), None);
+
+            for control in [label_lang, combo_lang, label_open, combo_open, label_tts_engine, combo_tts_engine, label_voice, combo_voice, label_audio_skip, combo_audio_skip, label_audio_split, combo_audio_split, checkbox_multilingual, checkbox_split_on_newline, checkbox_word_wrap, checkbox_move_cursor, ok_button, cancel_button] {
                 if control.0 != 0 && hfont.0 != 0 {
                     let _ = SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                 }
             }
 
             let dialog_state = Box::new(OptionsDialogState {
-                parent, combo_lang, combo_open, combo_voice, combo_audio_skip, combo_audio_split, checkbox_multilingual, checkbox_split_on_newline, checkbox_word_wrap, checkbox_move_cursor, ok_button
+                parent, combo_lang, combo_open, combo_tts_engine, combo_voice, combo_audio_skip, combo_audio_split, checkbox_multilingual, checkbox_split_on_newline, checkbox_word_wrap, checkbox_move_cursor, ok_button
             });
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(dialog_state) as isize);
             initialize_options_dialog(hwnd);
@@ -255,6 +303,7 @@ unsafe extern "system" fn options_wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, 
         }
         WM_COMMAND => {
             let cmd_id = (wparam.0 & 0xffff) as usize;
+            let code = (wparam.0 >> 16) as u32;
             match cmd_id {
                 OPTIONS_ID_OK => {
                     apply_options_dialog(hwnd);
@@ -266,6 +315,23 @@ unsafe extern "system" fn options_wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, 
                 }
                 OPTIONS_ID_MULTILINGUAL => {
                     refresh_voices(hwnd);
+                    LRESULT(0)
+                }
+                OPTIONS_ID_TTS_ENGINE => {
+                    if code == CBN_SELCHANGE {
+                        // When engine changes, verify if we need to load SAPI voices
+                        let combo = with_options_state(hwnd, |s| s.combo_tts_engine).unwrap_or(HWND(0));
+                        let sel = SendMessageW(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+                        if sel == 1 { // SAPI
+                            let parent = with_options_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                             let has_sapi = with_state(parent, |s| !s.sapi_voices.is_empty()).unwrap_or(false);
+                             if !has_sapi {
+                                 let lang = with_state(parent, |s| s.settings.language).unwrap_or_default();
+                                 ensure_sapi_voices_loaded(parent, lang);
+                             }
+                        }
+                        refresh_voices(hwnd);
+                    }
                     LRESULT(0)
                 }
                 _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -324,9 +390,9 @@ where
 }
 
 unsafe fn initialize_options_dialog(hwnd: HWND) {
-    let (parent, combo_lang, combo_open, _combo_voice, combo_audio_skip, combo_audio_split, checkbox_multilingual, checkbox_split_on_newline, checkbox_word_wrap, checkbox_move_cursor) = match with_options_state(hwnd, |state| {
+    let (parent, combo_lang, combo_open, combo_tts_engine, _combo_voice, combo_audio_skip, combo_audio_split, checkbox_multilingual, checkbox_split_on_newline, checkbox_word_wrap, checkbox_move_cursor) = match with_options_state(hwnd, |state| {
         (
-            state.parent, state.combo_lang, state.combo_open, state.combo_voice, state.combo_audio_skip, state.combo_audio_split,
+            state.parent, state.combo_lang, state.combo_open, state.combo_tts_engine, state.combo_voice, state.combo_audio_skip, state.combo_audio_split,
             state.checkbox_multilingual, state.checkbox_split_on_newline, state.checkbox_word_wrap, state.checkbox_move_cursor
         )
     }) {
@@ -354,6 +420,15 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         OpenBehavior::NewWindow => 1,
     };
     let _ = SendMessageW(combo_open, CB_SETCURSEL, WPARAM(open_index), LPARAM(0));
+
+    let _ = SendMessageW(combo_tts_engine, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    let _ = SendMessageW(combo_tts_engine, CB_ADDSTRING, WPARAM(0), LPARAM(to_wide(labels.engine_edge).as_ptr() as isize));
+    let _ = SendMessageW(combo_tts_engine, CB_ADDSTRING, WPARAM(0), LPARAM(to_wide(labels.engine_sapi5).as_ptr() as isize));
+    let engine_index = match settings.tts_engine {
+        TtsEngine::Edge => 0,
+        TtsEngine::Sapi5 => 1,
+    };
+    let _ = SendMessageW(combo_tts_engine, CB_SETCURSEL, WPARAM(engine_index), LPARAM(0));
 
     let _ = SendMessageW(checkbox_multilingual, BM_SETCHECK, WPARAM(if settings.tts_only_multilingual { BST_CHECKED.0 as usize } else { 0 }), LPARAM(0));
     let _ = SendMessageW(checkbox_split_on_newline, BM_SETCHECK, WPARAM(if settings.split_on_newline { BST_CHECKED.0 as usize } else { 0 }), LPARAM(0));
@@ -396,11 +471,10 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
 unsafe fn populate_voice_combo(combo_voice: HWND, voices: &[VoiceInfo], selected: &str, only_multilingual: bool, labels: &OptionsLabels) {
     let _ = SendMessageW(combo_voice, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
     if voices.is_empty() {
-        let label = if crate::with_state(windows::Win32::UI::WindowsAndMessaging::GetParent(combo_voice), |s| s.voice_list.is_empty()).unwrap_or(true) {
-            labels.voices_loading
-        } else {
-            labels.voices_empty
-        };
+        let label = labels.voices_empty; 
+        // We could also check if it's loading, but SAPI loads fast. 
+        // For Edge, it might be loading.
+        // We can check if "loading" logic is needed, but "voices_empty" is safe default.
         let _ = SendMessageW(combo_voice, CB_ADDSTRING, WPARAM(0), LPARAM(to_wide(label).as_ptr() as isize));
         let _ = SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
         return;
@@ -432,8 +506,8 @@ unsafe fn populate_voice_combo(combo_voice: HWND, voices: &[VoiceInfo], selected
 }
 
 unsafe fn apply_options_dialog(hwnd: HWND) {
-    let (parent, combo_lang, combo_open, combo_voice, combo_audio_skip, combo_audio_split, checkbox_multilingual, checkbox_split_on_newline, checkbox_word_wrap, checkbox_move_cursor) = match with_options_state(hwnd, |state| {
-        (state.parent, state.combo_lang, state.combo_open, state.combo_voice, state.combo_audio_skip, state.combo_audio_split, state.checkbox_multilingual, state.checkbox_split_on_newline, state.checkbox_word_wrap, state.checkbox_move_cursor)
+    let (parent, combo_lang, combo_open, combo_tts_engine, combo_voice, combo_audio_skip, combo_audio_split, checkbox_multilingual, checkbox_split_on_newline, checkbox_word_wrap, checkbox_move_cursor) = match with_options_state(hwnd, |state| {
+        (state.parent, state.combo_lang, state.combo_open, state.combo_tts_engine, state.combo_voice, state.combo_audio_skip, state.combo_audio_split, state.checkbox_multilingual, state.checkbox_split_on_newline, state.checkbox_word_wrap, state.checkbox_move_cursor)
     }) { Some(values) => values, None => return };
 
     let mut settings = with_state(parent, |state| state.settings.clone()).unwrap_or_default();
@@ -445,13 +519,22 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
 
     let open_sel = SendMessageW(combo_open, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     settings.open_behavior = if open_sel == 1 { OpenBehavior::NewWindow } else { OpenBehavior::NewTab };
+    
+    let engine_sel = SendMessageW(combo_tts_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    settings.tts_engine = if engine_sel == 1 { TtsEngine::Sapi5 } else { TtsEngine::Edge };
 
     settings.tts_only_multilingual = SendMessageW(checkbox_multilingual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 == BST_CHECKED.0;
     settings.split_on_newline = SendMessageW(checkbox_split_on_newline, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 == BST_CHECKED.0;
     settings.word_wrap = SendMessageW(checkbox_word_wrap, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 == BST_CHECKED.0;
     settings.move_cursor_during_reading = SendMessageW(checkbox_move_cursor, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 == BST_CHECKED.0;
 
-    let voices = with_state(parent, |state| state.voice_list.clone()).unwrap_or_default();
+    let voices = with_state(parent, |state| {
+        match settings.tts_engine {
+            TtsEngine::Edge => state.edge_voices.clone(),
+            TtsEngine::Sapi5 => state.sapi_voices.clone(),
+        }
+    }).unwrap_or_default();
+    
     let voice_sel = SendMessageW(combo_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     if voice_sel >= 0 {
         let voice_index = SendMessageW(combo_voice, CB_GETITEMDATA, WPARAM(voice_sel as usize), LPARAM(0)).0 as usize;
@@ -485,36 +568,55 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     let _ = DestroyWindow(hwnd);
 }
 
-fn ensure_voice_list_loaded(hwnd: HWND, language: Language) {
-    let has_list = unsafe { with_state(hwnd, |state| !state.voice_list.is_empty()) }.unwrap_or(false);
-    if has_list { return; }
+fn ensure_voice_lists_loaded(hwnd: HWND, language: Language) {
+    let (has_edge, has_sapi) = unsafe { with_state(hwnd, |state| (!state.edge_voices.is_empty(), !state.sapi_voices.is_empty())) }.unwrap_or((false, false));
     
-    thread::spawn(move || {
-        match fetch_voice_list() {
-            Ok(list) => {
-                let payload = Box::new(list);
-                let _ = unsafe {
-                    windows::Win32::UI::WindowsAndMessaging::PostMessageW(
-                        hwnd,
-                        WM_TTS_VOICES_LOADED,
-                        WPARAM(0),
-                        LPARAM(Box::into_raw(payload) as isize),
-                    )
-                };
+    if !has_edge {
+        thread::spawn(move || {
+            match fetch_voice_list() {
+                Ok(list) => {
+                    let payload = Box::new(list);
+                    let _ = unsafe {
+                        windows::Win32::UI::WindowsAndMessaging::PostMessageW(
+                            hwnd,
+                            WM_TTS_VOICES_LOADED,
+                            WPARAM(0),
+                            LPARAM(Box::into_raw(payload) as isize),
+                        )
+                    };
+                }
+                Err(err) => {
+                    // Log error but don't show message box for background load unless critical
+                    // For now keeping it to avoid spamming user if offline
+                    crate::log_debug(&format!("Failed to load Edge voices: {}", err));
+                },
             }
-            Err(err) => unsafe {
-                let msg_str = match language {
-                    Language::Italian => format!("Errore nel caricamento delle voci: {err}"),
-                    Language::English => format!("Failed to load voices: {err}"),
-                };
-                let title_str = match language {
-                    Language::Italian => "Errore",
-                    Language::English => "Error",
-                };
-                let message = to_wide(&msg_str);
-                let title = to_wide(title_str);
-                MessageBoxW(hwnd, PCWSTR(message.as_ptr()), PCWSTR(title.as_ptr()), MB_OK | MB_ICONERROR);
-            },
+        });
+    }
+
+    if !has_sapi {
+        ensure_sapi_voices_loaded(hwnd, language);
+    }
+}
+
+fn ensure_sapi_voices_loaded(hwnd: HWND, _language: Language) {
+    thread::spawn(move || {
+        match crate::sapi5_engine::list_sapi_voices() {
+            Ok(list) => {
+                 let payload = Box::new(list);
+                 let _ = unsafe {
+                     windows::Win32::UI::WindowsAndMessaging::PostMessageW(
+                         hwnd,
+                         WM_TTS_SAPI_VOICES_LOADED,
+                         WPARAM(0),
+                         LPARAM(Box::into_raw(payload) as isize),
+                     )
+                 };
+            }
+            Err(err) => {
+                crate::log_debug(&format!("Failed to load SAPI voices: {}", err));
+                // Optional: show error if user specifically selected SAPI?
+            }
         }
     });
 }

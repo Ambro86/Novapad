@@ -1,11 +1,12 @@
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use windows::core::{w, PCWSTR, GUID};
 use windows::Win32::Media::Speech::{
     SpVoice, ISpVoice, SpObjectTokenCategory, ISpObjectTokenCategory,
     ISpObjectToken, IEnumSpObjectTokens, SpFileStream, ISpStream,
-    SPFM_CREATE_ALWAYS,
+    SPFM_CREATE_ALWAYS, SPVOICESTATUS, SPRS_DONE, SPF_ASYNC, SPF_IS_NOT_XML, SPF_PURGEBEFORESPEAK,
 };
 use windows::Win32::Media::Audio::{WAVEFORMATEX, WAVE_FORMAT_PCM};
 use windows::Win32::System::Com::{
@@ -16,6 +17,9 @@ use crate::settings::{Language, VoiceInfo};
 use crate::accessibility::to_wide;
 use std::io::{Read, Seek, Write};
 use std::collections::HashSet;
+use std::collections::VecDeque;
+use tokio::sync::mpsc;
+use crate::tts_engine::TtsCommand;
 
 // SPDFID_WaveFormatEx: {C31ADBAE-527F-4ff5-A230-F62BB61FF70C}
 const SPDFID_WAVEFORMATEX: GUID = GUID::from_values(0xC31ADBAE, 0x527F, 0x4ff5, [0xA2, 0x30, 0xF6, 0x2B, 0xB6, 0x1F, 0xF7, 0x0C]);
@@ -120,6 +124,7 @@ pub fn play_sapi(
     chunks: Vec<String>,
     voice_name: String,
     cancel: Arc<AtomicBool>,
+    mut command_rx: mpsc::UnboundedReceiver<TtsCommand>,
 ) -> Result<(), String> {
     std::thread::spawn(move || {
         unsafe {
@@ -142,14 +147,94 @@ pub fn play_sapi(
                 let _ = voice.SetVoice(&token);
             }
 
-            for chunk in chunks {
+            let mut paused = false;
+            let mut pending: VecDeque<String> = VecDeque::from(chunks);
+
+            while let Some(chunk) = pending.pop_front() {
+                // Wait here if a pause was requested between chunks.
+                while paused {
+                    if cancel.load(Ordering::Relaxed) {
+                        let _ = voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None);
+                        return;
+                    }
+                    while let Ok(cmd) = command_rx.try_recv() {
+                        match cmd {
+                            TtsCommand::Resume => {
+                                paused = false;
+                            }
+                            TtsCommand::Stop => {
+                                cancel.store(true, Ordering::SeqCst);
+                                let _ = voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None);
+                                return;
+                            }
+                            TtsCommand::Pause => {}
+                        }
+                    }
+                    std::thread::sleep(Duration::from_millis(50));
+                }
+
                 if cancel.load(Ordering::Relaxed) {
                     break;
                 }
-                let chunk_wide = to_wide(&chunk);
-                // SPF_DEFAULT = 0, SPF_IS_NOT_XML = 16
-                // Passing 16 ensures plain text treatment
-                let _ = voice.Speak(PCWSTR(chunk_wide.as_ptr()), 16, None);
+
+                let current_chunk = chunk;
+                let chunk_wide = to_wide(&current_chunk);
+                let _ = voice.Speak(
+                    PCWSTR(chunk_wide.as_ptr()),
+                    (SPF_ASYNC.0 | SPF_IS_NOT_XML.0) as u32,
+                    None,
+                );
+
+                loop {
+                    if cancel.load(Ordering::Relaxed) {
+                        let _ = voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None);
+                        return;
+                    }
+                    while let Ok(cmd) = command_rx.try_recv() {
+                        match cmd {
+                            TtsCommand::Pause => {
+                                let mut status = SPVOICESTATUS::default();
+                                let mut remainder: Option<String> = None;
+                                if voice.GetStatus(&mut status, std::ptr::null_mut()).is_ok() {
+                                    let pos = status.ulInputWordPos as usize;
+                                    let wide: Vec<u16> = current_chunk.encode_utf16().collect();
+                                    let start = pos.min(wide.len());
+                                    if start < wide.len() {
+                                        let tail = String::from_utf16_lossy(&wide[start..]);
+                                        if !tail.trim().is_empty() {
+                                            remainder = Some(tail);
+                                        }
+                                    }
+                                }
+                                let _ = voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None);
+                                if let Some(rem) = remainder {
+                                    pending.push_front(rem);
+                                }
+                                paused = true;
+                                break;
+                            }
+                            TtsCommand::Resume => {
+                                paused = false;
+                            }
+                            TtsCommand::Stop => {
+                                cancel.store(true, Ordering::SeqCst);
+                                let _ = voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None);
+                                return;
+                            }
+                        }
+                    }
+                    if paused {
+                        break;
+                    }
+
+                    let mut status = SPVOICESTATUS::default();
+                    if voice.GetStatus(&mut status, std::ptr::null_mut()).is_ok() {
+                        if status.dwRunningState == SPRS_DONE.0 as u32 {
+                            break;
+                        }
+                    }
+                    let _ = voice.WaitUntilDone(50);
+                }
             }
         }
     });

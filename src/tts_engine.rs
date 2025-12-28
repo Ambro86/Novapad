@@ -115,11 +115,12 @@ pub fn start_tts_from_caret(hwnd: HWND) {
             // Stop any existing playback
             stop_tts_playback(hwnd);
             let cancel = Arc::new(AtomicBool::new(false));
+            let (command_tx, command_rx) = mpsc::unbounded_channel();
             let _ = unsafe {
                 with_state(hwnd, |state| {
                     state.tts_session = Some(TtsSession {
                         id: state.tts_next_session_id,
-                        command_tx: mpsc::unbounded_channel().0, // Dummy for SAPI currently
+                        command_tx,
                         cancel: cancel.clone(),
                         paused: false,
                         initial_caret_pos,
@@ -129,7 +130,7 @@ pub fn start_tts_from_caret(hwnd: HWND) {
             };
             
             let chunk_strings: Vec<String> = chunks.into_iter().map(|c| c.text_to_read).collect();
-            let _ = crate::sapi5_engine::play_sapi(chunk_strings, voice, cancel);
+            let _ = crate::sapi5_engine::play_sapi(chunk_strings, voice, cancel, command_rx);
         }
     }
 }

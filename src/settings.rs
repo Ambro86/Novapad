@@ -119,6 +119,8 @@ pub struct AppSettings {
     pub audiobook_split_text: String,
     pub favorite_voices: Vec<FavoriteVoice>,
     pub dictionary: Vec<DictionaryEntry>,
+    pub text_color: u32,
+    pub text_size: i32,
     pub show_voice_panel: bool,
     pub show_favorite_panel: bool,
 }
@@ -140,6 +142,8 @@ impl Default for AppSettings {
             audiobook_split_text: String::new(),
             favorite_voices: Vec::new(),
             dictionary: Vec::new(),
+            text_color: 0x000000,
+            text_size: 12,
             show_voice_panel: false,
             show_favorite_panel: false,
         }

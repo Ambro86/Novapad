@@ -36,6 +36,8 @@ Sostituisci: cerca e sostituisce il testo (Ctrl+H).
 Visualizza:
 Visualizza voci nell'editor: mostra i controlli per sistema di voci, elenco voci e filtro multilingua.
 Visualizza le voci preferite: mostra l'elenco delle voci preferite nell'editor.
+Colore testo: cambia il colore del testo (inclusi colori chiari e scuri).
+Dimensioni testo: cambia la dimensione del testo (piccola, normale, grande, molto grande, extra grande).
 Quando l'elenco di voci è visibile, Tab sposta il focus tra editor e controlli, Shift+Tab torna indietro.
 Per aggiungere o rimuovere una voce dai preferiti, spostati con tab sull'elenco di voci e aggiungila o rimuovila con il tasto applicazioni o col tasto destro del mouse. Dall'elenco di voci preferite, si può anche premere il tasto applicazioni per rimuovere le voci già inserite.
 Tasti rapidi: è possibile premere i tasti f1 ed f2, per cambiare voci durante la lettura tra quelle inserite nei preferiti.

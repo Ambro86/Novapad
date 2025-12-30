@@ -35,6 +35,8 @@ Replace: Find and replace text (Ctrl+H).
 View:
 Show voices in editor: Show voice system, voice list, and multilingual filter.
 Show favorite voices: Show the favorite voices list in the editor.
+Text color: Change the text color (including light and dark colors).
+Text size: Change the text size (small, normal, large, extra large, extra extra large).
 When the list of entries is visible, pressing Tab moves the focus between the editor and the controls, while Shift+Tab moves it backward.
 To add or remove an entry from favorites, use Tab to move to the list of entries and add or remove it using the Applications key or the right mouse button. From the list of favorite entries, you can also press the Applications key to remove entries that have already been added.
 Keyboard shortcuts: it is possible to press F1 and F2 to switch between entries during reading, cycling through those added to favorites.

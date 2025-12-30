@@ -979,6 +979,16 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     toggle_favorites_panel(hwnd);
                     LRESULT(0)
                 }
+                cmd_id if text_color_from_menu_id(cmd_id).is_some() => {
+                    let color = text_color_from_menu_id(cmd_id);
+                    update_text_preferences(hwnd, color, None);
+                    LRESULT(0)
+                }
+                cmd_id if text_size_from_menu_id(cmd_id).is_some() => {
+                    let size = text_size_from_menu_id(cmd_id);
+                    update_text_preferences(hwnd, None, size);
+                    LRESULT(0)
+                }
                 IDM_INSERT_BOOKMARK => {
                     log_debug("Menu: Insert Bookmark");
                     insert_bookmark(hwnd);
@@ -1143,11 +1153,106 @@ fn voice_panel_labels(language: Language) -> VoicePanelLabels {
     }
 }
 
+fn text_color_menu_id(text_color: u32) -> usize {
+    match text_color {
+        0x000000 => IDM_VIEW_TEXT_COLOR_BLACK,
+        0x800000 => IDM_VIEW_TEXT_COLOR_DARK_BLUE,
+        0x006400 => IDM_VIEW_TEXT_COLOR_DARK_GREEN,
+        0x002850 => IDM_VIEW_TEXT_COLOR_DARK_BROWN,
+        0x404040 => IDM_VIEW_TEXT_COLOR_DARK_GRAY,
+        0xFFCC99 => IDM_VIEW_TEXT_COLOR_LIGHT_BLUE,
+        0x99CC99 => IDM_VIEW_TEXT_COLOR_LIGHT_GREEN,
+        0x99B2CC => IDM_VIEW_TEXT_COLOR_LIGHT_BROWN,
+        0xC0C0C0 => IDM_VIEW_TEXT_COLOR_LIGHT_GRAY,
+        _ => IDM_VIEW_TEXT_COLOR_BLACK,
+    }
+}
+
+fn text_color_from_menu_id(cmd_id: usize) -> Option<u32> {
+    match cmd_id {
+        IDM_VIEW_TEXT_COLOR_BLACK => Some(0x000000),
+        IDM_VIEW_TEXT_COLOR_DARK_BLUE => Some(0x800000),
+        IDM_VIEW_TEXT_COLOR_DARK_GREEN => Some(0x006400),
+        IDM_VIEW_TEXT_COLOR_DARK_BROWN => Some(0x002850),
+        IDM_VIEW_TEXT_COLOR_DARK_GRAY => Some(0x404040),
+        IDM_VIEW_TEXT_COLOR_LIGHT_BLUE => Some(0xFFCC99),
+        IDM_VIEW_TEXT_COLOR_LIGHT_GREEN => Some(0x99CC99),
+        IDM_VIEW_TEXT_COLOR_LIGHT_BROWN => Some(0x99B2CC),
+        IDM_VIEW_TEXT_COLOR_LIGHT_GRAY => Some(0xC0C0C0),
+        _ => None,
+    }
+}
+
+fn text_size_menu_id(text_size: i32) -> usize {
+    match text_size {
+        10 => IDM_VIEW_TEXT_SIZE_SMALL,
+        12 => IDM_VIEW_TEXT_SIZE_NORMAL,
+        16 => IDM_VIEW_TEXT_SIZE_LARGE,
+        20 => IDM_VIEW_TEXT_SIZE_XLARGE,
+        24 => IDM_VIEW_TEXT_SIZE_XXLARGE,
+        _ => IDM_VIEW_TEXT_SIZE_NORMAL,
+    }
+}
+
+fn text_size_from_menu_id(cmd_id: usize) -> Option<i32> {
+    match cmd_id {
+        IDM_VIEW_TEXT_SIZE_SMALL => Some(10),
+        IDM_VIEW_TEXT_SIZE_NORMAL => Some(12),
+        IDM_VIEW_TEXT_SIZE_LARGE => Some(16),
+        IDM_VIEW_TEXT_SIZE_XLARGE => Some(20),
+        IDM_VIEW_TEXT_SIZE_XXLARGE => Some(24),
+        _ => None,
+    }
+}
+
+unsafe fn update_text_preferences(hwnd: HWND, text_color: Option<u32>, text_size: Option<i32>) {
+    let mut changed = false;
+    let mut next_color = None;
+    let mut next_size = None;
+    let _ = with_state(hwnd, |state| {
+        if let Some(color) = text_color {
+            if state.settings.text_color != color {
+                state.settings.text_color = color;
+                changed = true;
+            }
+            next_color = Some(state.settings.text_color);
+        } else {
+            next_color = Some(state.settings.text_color);
+        }
+        if let Some(size) = text_size {
+            if state.settings.text_size != size {
+                state.settings.text_size = size;
+                changed = true;
+            }
+            next_size = Some(state.settings.text_size);
+        } else {
+            next_size = Some(state.settings.text_size);
+        }
+    });
+
+    let (color, size) = match (next_color, next_size) {
+        (Some(c), Some(s)) => (c, s),
+        _ => return,
+    };
+    if changed {
+        if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
+            save_settings(settings);
+        }
+    }
+    editor_manager::apply_text_appearance_to_all_edits(hwnd, color, size);
+    update_voice_panel_menu_check(hwnd);
+}
+
 unsafe fn update_voice_panel_menu_check(hwnd: HWND) {
-    let (visible, favorites_visible) = with_state(hwnd, |state| {
-        (state.voice_panel_visible, state.voice_favorites_visible)
+    let (visible, favorites_visible, text_color, text_size) = with_state(hwnd, |state| {
+        (
+            state.voice_panel_visible,
+            state.voice_favorites_visible,
+            state.settings.text_color,
+            state.settings.text_size,
+        )
     })
-    .unwrap_or((false, false));
+    .unwrap_or((false, false, 0x000000, 12));
     let hmenu = GetMenu(hwnd);
     if hmenu.0 == 0 {
         return;
@@ -1156,6 +1261,36 @@ unsafe fn update_voice_panel_menu_check(hwnd: HWND) {
     let _ = CheckMenuItem(hmenu, IDM_VIEW_SHOW_VOICES as u32, (MF_BYCOMMAND | flags).0);
     let fav_flags = if favorites_visible { MF_CHECKED } else { MF_UNCHECKED };
     let _ = CheckMenuItem(hmenu, IDM_VIEW_SHOW_FAVORITES as u32, (MF_BYCOMMAND | fav_flags).0);
+
+    let color_items = [
+        IDM_VIEW_TEXT_COLOR_BLACK,
+        IDM_VIEW_TEXT_COLOR_DARK_BLUE,
+        IDM_VIEW_TEXT_COLOR_DARK_GREEN,
+        IDM_VIEW_TEXT_COLOR_DARK_BROWN,
+        IDM_VIEW_TEXT_COLOR_DARK_GRAY,
+        IDM_VIEW_TEXT_COLOR_LIGHT_BLUE,
+        IDM_VIEW_TEXT_COLOR_LIGHT_GREEN,
+        IDM_VIEW_TEXT_COLOR_LIGHT_BROWN,
+        IDM_VIEW_TEXT_COLOR_LIGHT_GRAY,
+    ];
+    let selected_color = text_color_menu_id(text_color);
+    for item in color_items {
+        let item_flags = if item == selected_color { MF_CHECKED } else { MF_UNCHECKED };
+        let _ = CheckMenuItem(hmenu, item as u32, (MF_BYCOMMAND | item_flags).0);
+    }
+
+    let size_items = [
+        IDM_VIEW_TEXT_SIZE_SMALL,
+        IDM_VIEW_TEXT_SIZE_NORMAL,
+        IDM_VIEW_TEXT_SIZE_LARGE,
+        IDM_VIEW_TEXT_SIZE_XLARGE,
+        IDM_VIEW_TEXT_SIZE_XXLARGE,
+    ];
+    let selected_size = text_size_menu_id(text_size);
+    for item in size_items {
+        let item_flags = if item == selected_size { MF_CHECKED } else { MF_UNCHECKED };
+        let _ = CheckMenuItem(hmenu, item as u32, (MF_BYCOMMAND | item_flags).0);
+    }
 }
 
 unsafe fn toggle_voice_panel(hwnd: HWND) {
@@ -2191,7 +2326,13 @@ pub(crate) unsafe fn open_pdf_document_async(hwnd: HWND, path: &Path) {
     let path_buf = path.to_path_buf();
     let title = path.file_name().and_then(|s| s.to_str()).unwrap_or("File").to_string();
     let (hwnd_edit, new_index) = with_state(hwnd, |state| {
-        let hwnd_edit = create_edit(hwnd, state.hfont, state.settings.word_wrap);
+        let hwnd_edit = create_edit(
+            hwnd,
+            state.hfont,
+            state.settings.word_wrap,
+            state.settings.text_color,
+            state.settings.text_size,
+        );
         editor_manager::set_edit_text(hwnd_edit, &pdf_loading_placeholder(0));
         let doc = Document {
             title: title.clone(),

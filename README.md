@@ -42,6 +42,8 @@ and the ability to **create audiobooks directly from text using Microsoft voices
   - Quickly jump to saved positions in documents or audio
 - **Accessibility-Focused**
   Designed to work correctly with screen readers such as NVDA and JAWS.
+- **Readable UI Options**
+  - Text color and text size controls for better readability, including light/dark colors and larger sizes
 - **Modern Tech Stack**
   Written in Rust for safety, performance, and reliability.
 

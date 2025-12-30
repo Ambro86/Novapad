@@ -13,7 +13,8 @@ use windows::Win32::UI::Controls::{
     EM_GETMODIFY, EM_SETMODIFY, EM_SETREADONLY
 };
 use windows::Win32::UI::Controls::RichEdit::{
-    MSFTEDIT_CLASS, EM_SETEVENTMASK, ENM_CHANGE, CHARRANGE, EM_EXSETSEL
+    CHARFORMAT2W, CFM_COLOR, CFM_SIZE, EM_SETCHARFORMAT, ENM_CHANGE, MSFTEDIT_CLASS, SCF_ALL,
+    CHARRANGE, EM_EXSETSEL, EM_SETEVENTMASK
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{SetFocus};
 use windows::Win32::Graphics::Gdi::{HFONT};
@@ -109,6 +110,30 @@ pub unsafe fn apply_word_wrap_to_all_edits(hwnd: HWND, word_wrap: bool) {
     }
 }
 
+pub unsafe fn apply_text_appearance_to_all_edits(hwnd: HWND, text_color: u32, text_size: i32) {
+    let edits = with_state(hwnd, |state| {
+        state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>()
+    }).unwrap_or_default();
+
+    for hwnd_edit in edits {
+        if hwnd_edit.0 == 0 { continue; }
+        apply_text_appearance(hwnd_edit, text_color, text_size);
+    }
+}
+
+fn apply_text_appearance(hwnd_edit: HWND, text_color: u32, text_size: i32) {
+    let mut format = CHARFORMAT2W::default();
+    format.Base.cbSize = std::mem::size_of::<CHARFORMAT2W>() as u32;
+    format.Base.dwMask = CFM_COLOR | CFM_SIZE;
+    format.Base.crTextColor = windows::Win32::Foundation::COLORREF(text_color);
+    if text_size > 0 {
+        format.Base.yHeight = text_size.saturating_mul(20);
+    }
+    unsafe {
+        SendMessageW(hwnd_edit, EM_SETCHARFORMAT, WPARAM(SCF_ALL as usize), LPARAM(&mut format as *mut _ as isize));
+    }
+}
+
 // --- Document Management ---
 
 pub unsafe fn new_document(hwnd: HWND) {
@@ -116,7 +141,13 @@ pub unsafe fn new_document(hwnd: HWND) {
         state.untitled_count += 1;
         let language = state.settings.language;
         let title = untitled_title(language, state.untitled_count);
-        let hwnd_edit = create_edit(hwnd, state.hfont, state.settings.word_wrap);
+        let hwnd_edit = create_edit(
+            hwnd,
+            state.hfont,
+            state.settings.word_wrap,
+            state.settings.text_color,
+            state.settings.text_size,
+        );
         let doc = Document {
             title: title.clone(),
             path: None,
@@ -192,7 +223,13 @@ pub unsafe fn open_document(hwnd: HWND, path: &Path) {
 
     let new_index = with_state(hwnd, |state| {
         let title = path.file_name().and_then(|s| s.to_str()).unwrap_or("File");
-        let hwnd_edit = create_edit(hwnd, state.hfont, state.settings.word_wrap);
+        let hwnd_edit = create_edit(
+            hwnd,
+            state.hfont,
+            state.settings.word_wrap,
+            state.settings.text_color,
+            state.settings.text_size,
+        );
         set_edit_text(hwnd_edit, &content);
 
         let doc = Document {
@@ -409,7 +446,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
     }
 }
 
-pub unsafe fn create_edit(parent: HWND, hfont: HFONT, word_wrap: bool) -> HWND {
+pub unsafe fn create_edit(parent: HWND, hfont: HFONT, word_wrap: bool, text_color: u32, text_size: i32) -> HWND {
     let mut style = WS_CHILD | WS_CLIPCHILDREN | WS_VSCROLL | WS_GROUP | windows::Win32::UI::WindowsAndMessaging::WINDOW_STYLE(ES_MULTILINE as u32) | windows::Win32::UI::WindowsAndMessaging::WINDOW_STYLE(ES_AUTOVSCROLL as u32) | windows::Win32::UI::WindowsAndMessaging::WINDOW_STYLE(ES_WANTRETURN as u32);
     if !word_wrap {
         style |= WS_HSCROLL | windows::Win32::UI::WindowsAndMessaging::WINDOW_STYLE(ES_AUTOHSCROLL as u32);
@@ -434,6 +471,7 @@ pub unsafe fn create_edit(parent: HWND, hfont: HFONT, word_wrap: bool) -> HWND {
         SendMessageW(hwnd_edit, EM_SETEVENTMASK, WPARAM(0), LPARAM(ENM_CHANGE as isize));
         // Allow large pastes (default edit limit is ~32K).
         apply_text_limit(hwnd_edit);
+        apply_text_appearance(hwnd_edit, text_color, text_size);
     }
     hwnd_edit
 }

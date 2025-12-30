@@ -45,6 +45,8 @@ e la possibilit… di **creare audiolibri direttamente dal testo utilizzando le 
 - **Accessibilità**
   Progettato per funzionare correttamente con screen reader
   come NVDA e JAWS.
+- **Opzioni di leggibilita'**
+  - Controlli per colore e dimensione del testo per una migliore lettura, con colori chiari/scuri e dimensioni grandi
 - **Tecnologia moderna**
   Scritto in Rust per garantire sicurezza, affidabilità e ottime prestazioni.
 

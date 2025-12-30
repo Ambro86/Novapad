@@ -34,6 +34,20 @@ pub const IDM_MANAGE_BOOKMARKS: usize = 2102;
 pub const IDM_NEXT_TAB: usize = 3001;
 pub const IDM_VIEW_SHOW_VOICES: usize = 6101;
 pub const IDM_VIEW_SHOW_FAVORITES: usize = 6102;
+pub const IDM_VIEW_TEXT_COLOR_BLACK: usize = 6201;
+pub const IDM_VIEW_TEXT_COLOR_DARK_BLUE: usize = 6202;
+pub const IDM_VIEW_TEXT_COLOR_DARK_GREEN: usize = 6203;
+pub const IDM_VIEW_TEXT_COLOR_DARK_BROWN: usize = 6204;
+pub const IDM_VIEW_TEXT_COLOR_DARK_GRAY: usize = 6205;
+pub const IDM_VIEW_TEXT_COLOR_LIGHT_BLUE: usize = 6206;
+pub const IDM_VIEW_TEXT_COLOR_LIGHT_GREEN: usize = 6207;
+pub const IDM_VIEW_TEXT_COLOR_LIGHT_BROWN: usize = 6208;
+pub const IDM_VIEW_TEXT_COLOR_LIGHT_GRAY: usize = 6209;
+pub const IDM_VIEW_TEXT_SIZE_SMALL: usize = 6301;
+pub const IDM_VIEW_TEXT_SIZE_NORMAL: usize = 6302;
+pub const IDM_VIEW_TEXT_SIZE_LARGE: usize = 6303;
+pub const IDM_VIEW_TEXT_SIZE_XLARGE: usize = 6304;
+pub const IDM_VIEW_TEXT_SIZE_XXLARGE: usize = 6305;
 pub const IDM_FILE_RECENT_BASE: usize = 4000;
 pub const IDM_TOOLS_OPTIONS: usize = 5001;
 pub const IDM_TOOLS_DICTIONARY: usize = 5002;
@@ -50,6 +64,22 @@ pub struct MenuLabels {
     pub menu_help: &'static str,
     pub menu_options: &'static str,
     pub menu_dictionary: &'static str,
+    pub view_text_color: &'static str,
+    pub view_text_size: &'static str,
+    pub view_text_color_black: &'static str,
+    pub view_text_color_dark_blue: &'static str,
+    pub view_text_color_dark_green: &'static str,
+    pub view_text_color_dark_brown: &'static str,
+    pub view_text_color_dark_gray: &'static str,
+    pub view_text_color_light_blue: &'static str,
+    pub view_text_color_light_green: &'static str,
+    pub view_text_color_light_brown: &'static str,
+    pub view_text_color_light_gray: &'static str,
+    pub view_text_size_small: &'static str,
+    pub view_text_size_normal: &'static str,
+    pub view_text_size_large: &'static str,
+    pub view_text_size_xlarge: &'static str,
+    pub view_text_size_xxlarge: &'static str,
     pub view_show_voices: &'static str,
     pub view_show_favorites: &'static str,
     pub file_new: &'static str,
@@ -90,6 +120,22 @@ pub fn menu_labels(language: Language) -> MenuLabels {
             menu_help: "&Aiuto",
             menu_options: "&Opzioni...",
             menu_dictionary: "&Dizionario",
+            view_text_color: "&Colore testo",
+            view_text_size: "&Dimensioni testo",
+            view_text_color_black: "&Nero",
+            view_text_color_dark_blue: "Blu &scuro",
+            view_text_color_dark_green: "Verde sc&uro",
+            view_text_color_dark_brown: "Marr&one scuro",
+            view_text_color_dark_gray: "Grigio scu&ro",
+            view_text_color_light_blue: "Blu c&hiaro",
+            view_text_color_light_green: "Verde ch&iaro",
+            view_text_color_light_brown: "Marrone chi&aro",
+            view_text_color_light_gray: "Grigio &chiaro",
+            view_text_size_small: "&Piccola",
+            view_text_size_normal: "&Normale",
+            view_text_size_large: "&Grande",
+            view_text_size_xlarge: "Molto gran&de",
+            view_text_size_xxlarge: "E&xtra grande",
             view_show_voices: "Visualizza &voci nell'editor",
             view_show_favorites: "Visualizza le voci &preferite",
             file_new: "&Nuovo\tCtrl+N",
@@ -127,6 +173,22 @@ pub fn menu_labels(language: Language) -> MenuLabels {
             menu_help: "&Help",
             menu_options: "&Options...",
             menu_dictionary: "&Dictionary",
+            view_text_color: "Text &color",
+            view_text_size: "Text &size",
+            view_text_color_black: "&Black",
+            view_text_color_dark_blue: "Dar&k blue",
+            view_text_color_dark_green: "Dark g&reen",
+            view_text_color_dark_brown: "Dark br&own",
+            view_text_color_dark_gray: "Dark gra&y",
+            view_text_color_light_blue: "&Light blue",
+            view_text_color_light_green: "Light gree&n",
+            view_text_color_light_brown: "Light bro&wn",
+            view_text_color_light_gray: "Light gr&ay",
+            view_text_size_small: "&Small",
+            view_text_size_normal: "&Normal",
+            view_text_size_large: "&Large",
+            view_text_size_xlarge: "E&xtra large",
+            view_text_size_xxlarge: "Ex&tra extra large",
             view_show_voices: "Show &voices in editor",
             view_show_favorites: "Show &favorite voices",
             file_new: "&New\tCtrl+N",
@@ -164,6 +226,8 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
     let recent_menu = CreateMenu().unwrap_or(HMENU(0));
     let edit_menu = CreateMenu().unwrap_or(HMENU(0));
     let view_menu = CreateMenu().unwrap_or(HMENU(0));
+    let view_color_menu = CreateMenu().unwrap_or(HMENU(0));
+    let view_size_menu = CreateMenu().unwrap_or(HMENU(0));
     let insert_menu = CreateMenu().unwrap_or(HMENU(0));
     let tools_menu = CreateMenu().unwrap_or(HMENU(0));
     let help_menu = CreateMenu().unwrap_or(HMENU(0));
@@ -202,6 +266,23 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
 
     let _ = append_menu_string(view_menu, MF_STRING, IDM_VIEW_SHOW_VOICES, labels.view_show_voices);
     let _ = append_menu_string(view_menu, MF_STRING, IDM_VIEW_SHOW_FAVORITES, labels.view_show_favorites);
+    let _ = AppendMenuW(view_menu, MF_SEPARATOR, 0, PCWSTR::null());
+    let _ = append_menu_string(view_color_menu, MF_STRING, IDM_VIEW_TEXT_COLOR_BLACK, labels.view_text_color_black);
+    let _ = append_menu_string(view_color_menu, MF_STRING, IDM_VIEW_TEXT_COLOR_DARK_BLUE, labels.view_text_color_dark_blue);
+    let _ = append_menu_string(view_color_menu, MF_STRING, IDM_VIEW_TEXT_COLOR_DARK_GREEN, labels.view_text_color_dark_green);
+    let _ = append_menu_string(view_color_menu, MF_STRING, IDM_VIEW_TEXT_COLOR_DARK_BROWN, labels.view_text_color_dark_brown);
+    let _ = append_menu_string(view_color_menu, MF_STRING, IDM_VIEW_TEXT_COLOR_DARK_GRAY, labels.view_text_color_dark_gray);
+    let _ = append_menu_string(view_color_menu, MF_STRING, IDM_VIEW_TEXT_COLOR_LIGHT_BLUE, labels.view_text_color_light_blue);
+    let _ = append_menu_string(view_color_menu, MF_STRING, IDM_VIEW_TEXT_COLOR_LIGHT_GREEN, labels.view_text_color_light_green);
+    let _ = append_menu_string(view_color_menu, MF_STRING, IDM_VIEW_TEXT_COLOR_LIGHT_BROWN, labels.view_text_color_light_brown);
+    let _ = append_menu_string(view_color_menu, MF_STRING, IDM_VIEW_TEXT_COLOR_LIGHT_GRAY, labels.view_text_color_light_gray);
+    let _ = append_menu_string(view_size_menu, MF_STRING, IDM_VIEW_TEXT_SIZE_SMALL, labels.view_text_size_small);
+    let _ = append_menu_string(view_size_menu, MF_STRING, IDM_VIEW_TEXT_SIZE_NORMAL, labels.view_text_size_normal);
+    let _ = append_menu_string(view_size_menu, MF_STRING, IDM_VIEW_TEXT_SIZE_LARGE, labels.view_text_size_large);
+    let _ = append_menu_string(view_size_menu, MF_STRING, IDM_VIEW_TEXT_SIZE_XLARGE, labels.view_text_size_xlarge);
+    let _ = append_menu_string(view_size_menu, MF_STRING, IDM_VIEW_TEXT_SIZE_XXLARGE, labels.view_text_size_xxlarge);
+    let _ = append_menu_string(view_menu, MF_POPUP, view_color_menu.0 as usize, labels.view_text_color);
+    let _ = append_menu_string(view_menu, MF_POPUP, view_size_menu.0 as usize, labels.view_text_size);
     let _ = append_menu_string(hmenu, MF_POPUP, view_menu.0 as usize, labels.menu_view);
 
     let _ = append_menu_string(insert_menu, MF_STRING, IDM_INSERT_BOOKMARK, labels.insert_bookmark);

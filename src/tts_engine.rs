@@ -90,7 +90,7 @@ pub fn start_tts_from_caret(hwnd: HWND) {
     }
     .unwrap_or((Language::Italian, true, TtsEngine::Edge));
     
-    let text = unsafe { get_text_from_caret(hwnd_edit) };
+    let (text, initial_caret_pos) = unsafe { get_text_from_caret(hwnd_edit) };
     if text.trim().is_empty() {
         unsafe {
             show_error(hwnd, language, settings::tts_no_text_message(language));
@@ -102,11 +102,6 @@ pub fn start_tts_from_caret(hwnd: HWND) {
             "it-IT-IsabellaNeural".to_string()
         })
     };
-    let mut start: i32 = 0;
-    let mut end: i32 = 0;
-    unsafe { SendMessageW(hwnd_edit, EM_GETSEL, WPARAM(&mut start as *mut _ as usize), LPARAM(&mut end as *mut _ as isize)); }
-    let initial_caret_pos = start.min(end);
-
     let chunks = split_into_tts_chunks(&text, split_on_newline);
     
     match tts_engine {
@@ -464,7 +459,7 @@ async fn download_audio_chunk_attempt(
     Ok(audio_data)
 }
 
-unsafe fn get_text_from_caret(hwnd_edit: HWND) -> String {
+unsafe fn get_text_from_caret(hwnd_edit: HWND) -> (String, i32) {
     let mut start: i32 = 0;
     let mut end: i32 = 0;
     SendMessageW(hwnd_edit, crate::accessibility::EM_GETSEL, WPARAM(&mut start as *mut _ as usize), LPARAM(&mut end as *mut _ as isize));
@@ -473,20 +468,74 @@ unsafe fn get_text_from_caret(hwnd_edit: HWND) -> String {
     
     // Se siamo all'inizio, o se siamo alla fine del testo, leggi tutto dall'inizio
     if caret_pos == 0 {
-        return full_text;
+        return (full_text, 0);
     }
     
-    let wide: Vec<u16> = full_text.replace("\r\n", "\n").encode_utf16().collect();
+    let normalized = full_text.replace("\r\n", "\n");
+    let wide: Vec<u16> = normalized.encode_utf16().collect();
     
-    // Se la posizione del cursore è oltre la lunghezza del testo (fine file), 
+    // Se la posizione del cursore Š oltre la lunghezza del testo (fine file), 
     // ricomincia a leggere dall'inizio come richiesto.
     if caret_pos >= wide.len() {
-        return full_text;
+        return (full_text, 0);
     }
     
-    String::from_utf16_lossy(&wide[caret_pos..])
+    let adjusted_pos = adjust_tts_caret_pos(&normalized, caret_pos as i32);
+    let adjusted_pos = adjusted_pos.max(0) as usize;
+    if adjusted_pos >= wide.len() {
+        return (full_text, 0);
+    }
+    (String::from_utf16_lossy(&wide[adjusted_pos..]), adjusted_pos as i32)
 }
 
+fn adjust_tts_caret_pos(text: &str, pos: i32) -> i32 {
+    if pos <= 0 {
+        return 0;
+    }
+    let mut items: Vec<(usize, usize, bool)> = Vec::new();
+    let mut offset = 0usize;
+    for ch in text.chars() {
+        let start = offset;
+        let len = ch.len_utf16();
+        let end = start + len;
+        let is_word = ch.is_alphanumeric() || ch == '_';
+        items.push((start, end, is_word));
+        offset = end;
+    }
+    if offset == 0 {
+        return pos;
+    }
+    let mut pos_usize = pos as usize;
+    if pos_usize > offset {
+        pos_usize = offset;
+    }
+
+    let mut prev: Option<usize> = None;
+    let mut next: Option<usize> = None;
+    for (idx, (start, end, _)) in items.iter().enumerate() {
+        if *end <= pos_usize {
+            prev = Some(idx);
+            continue;
+        }
+        if *start >= pos_usize {
+            next = Some(idx);
+            break;
+        }
+        next = Some(idx);
+        break;
+    }
+
+    let prev_is_word = prev.and_then(|idx| items.get(idx)).map(|v| v.2).unwrap_or(false);
+    let next_is_word = next.and_then(|idx| items.get(idx)).map(|v| v.2).unwrap_or(false);
+    if prev_is_word && next_is_word {
+        let mut idx = prev.unwrap();
+        while idx > 0 && items[idx - 1].2 {
+            idx -= 1;
+        }
+        return items[idx].0 as i32;
+    }
+    pos
+}
 fn generate_sec_ms_gec() -> String {
     let win_epoch = 11644473600i64;
     let ticks = Local::now().timestamp() + win_epoch;

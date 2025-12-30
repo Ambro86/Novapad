@@ -1300,6 +1300,49 @@ pub(crate) unsafe fn refresh_voice_panel(hwnd: HWND) {
     }
 }
 
+unsafe fn refresh_voice_panel_voice_list(hwnd: HWND) {
+    let (voice_visible, combo_voice, checkbox_multilingual) = match with_state(hwnd, |state| {
+        (
+            state.voice_panel_visible,
+            state.voice_combo_voice,
+            state.voice_checkbox_multilingual,
+        )
+    }) {
+        Some(values) => values,
+        None => return,
+    };
+    if !voice_visible || combo_voice.0 == 0 {
+        return;
+    }
+
+    let settings = with_state(hwnd, |state| state.settings.clone()).unwrap_or_default();
+    let labels = voice_panel_labels(settings.language);
+    let is_edge = matches!(settings.tts_engine, TtsEngine::Edge);
+    let _ = SendMessageW(
+        checkbox_multilingual,
+        BM_SETCHECK,
+        WPARAM(if settings.tts_only_multilingual { BST_CHECKED.0 as usize } else { 0 }),
+        LPARAM(0),
+    );
+    EnableWindow(checkbox_multilingual, is_edge);
+    let multi_show = if is_edge { SW_SHOW } else { SW_HIDE };
+    ShowWindow(checkbox_multilingual, multi_show);
+
+    let voices = with_state(hwnd, |state| {
+        match settings.tts_engine {
+            TtsEngine::Edge => state.edge_voices.clone(),
+            TtsEngine::Sapi5 => state.sapi_voices.clone(),
+        }
+    }).unwrap_or_default();
+    populate_voice_panel_combo(
+        combo_voice,
+        &voices,
+        &settings.tts_voice,
+        settings.tts_only_multilingual,
+        labels.voices_empty,
+    );
+}
+
 unsafe fn clear_voice_labels_if_hidden(hwnd: HWND) {
     let (voice_visible, favorites_visible, label_engine, label_voice, checkbox_multilingual, label_favorites) = match with_state(hwnd, |state| {
         (
@@ -1465,7 +1508,7 @@ unsafe fn handle_voice_panel_multilingual_toggle(hwnd: HWND) {
     if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
         save_settings(settings);
     }
-    refresh_voice_panel(hwnd);
+    refresh_voice_panel_voice_list(hwnd);
 }
 
 unsafe fn handle_voice_panel_favorite_change(hwnd: HWND) {
@@ -1536,7 +1579,7 @@ unsafe fn current_favorite_selection(hwnd: HWND) -> Option<FavoriteVoice> {
     favorites.get(fav_idx).cloned()
 }
 
-unsafe fn restart_tts_from_current_offset(hwnd: HWND) {
+pub(crate) unsafe fn restart_tts_from_current_offset(hwnd: HWND) {
     let mut restart = None;
     let _ = with_state(hwnd, |state| {
         if let Some(session) = &state.tts_session {
@@ -1551,9 +1594,64 @@ unsafe fn restart_tts_from_current_offset(hwnd: HWND) {
     });
     let Some((hwnd_edit, pos)) = restart else { return; };
     tts_engine::stop_tts_playback(hwnd);
+    let pos = adjust_tts_restart_pos(hwnd_edit, pos);
     let mut cr = CHARRANGE { cpMin: pos, cpMax: pos };
     SendMessageW(hwnd_edit, EM_EXSETSEL, WPARAM(0), LPARAM(&mut cr as *mut _ as isize));
     tts_engine::start_tts_from_caret(hwnd);
+}
+
+unsafe fn adjust_tts_restart_pos(hwnd_edit: HWND, pos: i32) -> i32 {
+    if pos <= 0 {
+        return 0;
+    }
+    let text = editor_manager::get_edit_text(hwnd_edit);
+    if text.is_empty() {
+        return pos;
+    }
+    let normalized = text.replace("\r\n", "\n");
+    let mut items: Vec<(usize, usize, bool)> = Vec::new();
+    let mut offset = 0usize;
+    for ch in normalized.chars() {
+        let start = offset;
+        let len = ch.len_utf16();
+        let end = start + len;
+        let is_word = ch.is_alphanumeric() || ch == '_';
+        items.push((start, end, is_word));
+        offset = end;
+    }
+    if offset == 0 {
+        return pos;
+    }
+    let mut pos_usize = pos as usize;
+    if pos_usize > offset {
+        pos_usize = offset;
+    }
+
+    let mut prev: Option<usize> = None;
+    let mut next: Option<usize> = None;
+    for (idx, (start, end, _)) in items.iter().enumerate() {
+        if *end <= pos_usize {
+            prev = Some(idx);
+            continue;
+        }
+        if *start >= pos_usize {
+            next = Some(idx);
+            break;
+        }
+        next = Some(idx);
+        break;
+    }
+
+    let prev_is_word = prev.and_then(|idx| items.get(idx)).map(|v| v.2).unwrap_or(false);
+    let next_is_word = next.and_then(|idx| items.get(idx)).map(|v| v.2).unwrap_or(false);
+    if prev_is_word && next_is_word {
+        let mut idx = prev.unwrap();
+        while idx > 0 && items[idx - 1].2 {
+            idx -= 1;
+        }
+        return items[idx].0 as i32;
+    }
+    pos
 }
 
 unsafe fn show_voice_context_menu(hwnd: HWND, target: HWND, lparam: LPARAM) {

@@ -541,6 +541,9 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     let mut settings = with_state(parent, |state| state.settings.clone()).unwrap_or_default();
     let old_language = settings.language;
     let old_word_wrap = settings.word_wrap;
+    let (old_engine, old_voice, was_tts_active) = with_state(parent, |state| {
+        (state.settings.tts_engine, state.settings.tts_voice.clone(), state.tts_session.is_some())
+    }).unwrap_or((settings.tts_engine, settings.tts_voice.clone(), false));
 
     let lang_sel = SendMessageW(combo_lang, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     settings.language = if lang_sel == 1 { Language::English } else { Language::Italian };
@@ -609,6 +612,9 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         apply_word_wrap_to_all_edits(parent, settings.word_wrap);
     }
     refresh_voice_panel(parent);
+    if was_tts_active && (old_engine != settings.tts_engine || old_voice != settings.tts_voice) {
+        crate::restart_tts_from_current_offset(parent);
+    }
     let _ = DestroyWindow(hwnd);
 }
 

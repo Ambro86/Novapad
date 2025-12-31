@@ -2,7 +2,7 @@
 
 [Read it in Italian 🇮🇹](README_IT.md)
 
-**Download the latest release:** https://github.com/Ambro86/Novapad/releases/latest
+**Download the latest release:**
 
 
 - [Portable (EXE)](https://github.com/Ambro86/Novapad/releases/latest/download/novapad.exe)

@@ -2,6 +2,8 @@
 
 [Leggilo in Inglese 🇬🇧](README.md)
 
+**Scarica l'ultima versione:** https://github.com/Ambro86/Novapad/releases/latest
+
 **Novapad** è un Notepad moderno e avanzato per Windows, sviluppato in Rust.
 Estende il classico editor di testo con il supporto a più formati di documento,
 funzionalità avanzate di accessibilità e capacità di Text-to-Speech (TTS).

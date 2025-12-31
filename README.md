@@ -5,9 +5,9 @@
 **Download the latest release:** https://github.com/Ambro86/Novapad/releases/latest
 
 
-- Portable (EXE): https://github.com/Ambro86/Novapad/releases/latest/download/novapad.exe
-- Installer (Setup): https://github.com/Ambro86/Novapad/releases/latest/download/novapad_x64-setup.exe
-- Installer (MSI): https://github.com/Ambro86/Novapad/releases/latest/download/novapad_x64_en-US.msi
+- [Portable (EXE)](https://github.com/Ambro86/Novapad/releases/latest/download/novapad.exe)
+- [Installer (Setup)](https://github.com/Ambro86/Novapad/releases/latest/download/novapad_x64-setup.exe)
+- [Installer (MSI)](https://github.com/Ambro86/Novapad/releases/latest/download/novapad_x64_en-US.msi)
 **Novapad** is a modern, feature-rich Notepad alternative for Windows, built with Rust.
 It extends traditional text editing with multi-format document support,
 advanced accessibility features, and Text-to-Speech (TTS) capabilities.

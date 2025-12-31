@@ -3,9 +3,6 @@ name: Create Release (Windows)
 on:
   workflow_dispatch:
 
-env:
-  RELEASE_VERSION: v0.5.0
-
 jobs:
   create-release:
     name: Create Release
@@ -17,6 +14,19 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+
+    - name: Read version from Cargo.toml
+      run: |
+        python - <<'PY'
+        import os
+        import pathlib
+        import tomllib
+
+        data = tomllib.loads(pathlib.Path("Cargo.toml").read_text(encoding="utf-8"))
+        version = data["package"]["version"]
+        with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
+            env.write(f"RELEASE_VERSION=v{version}\n")
+        PY
 
     - name: Get latest successful workflow run
       id: get_run
@@ -79,21 +89,6 @@ jobs:
           echo "ERRORE: Nessun file trovato per la release!"
           exit 1
         fi
-
-        echo "=== Rinomina file con versione release ==="
-        release_version="${RELEASE_VERSION#v}"
-        for file in release_files/*.{exe,msi}; do
-          if [ -f "$file" ]; then
-            filename=$(basename "$file")
-            newname=$(echo "$filename" | sed -E "s/[0-9]+(\.[0-9]+)+/${release_version}/")
-            if [ "$filename" != "$newname" ]; then
-              mv "$file" "release_files/$newname"
-              echo "Rinominato: $filename -> $newname"
-            else
-              echo "Nessuna rinomina per: $filename"
-            fi
-          fi
-        done
 
         echo "file_count=$file_count" >> $GITHUB_OUTPUT
 

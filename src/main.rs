@@ -306,6 +306,25 @@ fn main() -> windows::core::Result<()> {
             return Ok(());
         }
 
+        let current_version = env!("CARGO_PKG_VERSION");
+        let mut show_changelog = false;
+        let _ = with_state(hwnd, |state| {
+            let last_seen = state.settings.last_seen_changelog_version.clone();
+            if last_seen.is_empty() {
+                state.settings.last_seen_changelog_version = current_version.to_string();
+                save_settings(state.settings.clone());
+                return;
+            }
+            if last_seen != current_version {
+                state.settings.last_seen_changelog_version = current_version.to_string();
+                save_settings(state.settings.clone());
+                show_changelog = true;
+            }
+        });
+        if show_changelog {
+            app_windows::help_window::open_changelog(hwnd);
+        }
+
         let check_updates = with_state(hwnd, |state| state.settings.check_updates_on_startup)
             .unwrap_or(true);
         if check_updates {

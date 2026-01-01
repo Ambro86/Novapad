@@ -48,8 +48,15 @@ jobs:
     - name: Build (Release)
       run: cargo build --verbose --release
 
-    - name: Package Application
-      run: cargo packager --release
+    - name: Package Application (NSIS)
+      run: cargo packager --release --format nsis
+
+    - name: Generate WiX Artifacts
+      run: cargo packager --release --format wix || cmd /c "exit /b 0"
+
+    - name: Package Application (MSI)
+      shell: powershell
+      run: .\scripts\build_msi.ps1
 
     - name: List target directory (Debug)
       shell: powershell

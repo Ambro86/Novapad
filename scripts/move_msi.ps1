@@ -1,0 +1,1 @@
+Copy-Item -Path "C:\rustnotepad\rustnotepad\target\release\.cargo-packager\wix\x64\output.msi" -Destination "C:\rustnotepad\rustnotepad\target\release\novapad_0.5.1_x64_en-US.msi" -Force

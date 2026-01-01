@@ -52,6 +52,7 @@ Tab porta al pulsante "Aggiungi voci al dizionario", attivabile con Invio o Spaz
 Nella finestra di aggiunta/modifica: inserisci "Parola originale", poi Tab su "Parola in sostituzione", quindi OK o Annulla (Invio/Spazio). ESC annulla.
 Nell'elenco, Tab porta ai pulsanti "Modifica voce" e "Rimuovi voce selezionata".
 Le sostituzioni del dizionario sono applicate durante la lettura e la creazione dell'audiolibro e vengono salvate.
+Importa trascrizione da YouTube: incolla un URL, scegli la lingua e importa il testo nell'editor (Ctrl+Y). Opzione per includere i timestamp.
 
 Opzioni:
 Lingua: cambia la lingua dell'interfaccia.
@@ -65,4 +66,5 @@ Altre opzioni per dividere l'audiolibro: 2 parti, 4 parti, 6 parti, 8 parti.
 
 Aiuto:
 Guida: apre questa guida.
+Registro modifiche: mostra il changelog.
 Informazioni sul programma: mostra informazioni sul programma.

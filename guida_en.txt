@@ -51,6 +51,7 @@ Tab moves to the "Add entries to dictionary" button, activated with Enter or Spa
 In the add/edit window: enter "Original word", then Tab to "Replacement word", then OK or Cancel (Enter/Space). ESC cancels.
 In the list, Tab moves to "Edit entry" and "Remove selected entry".
 Dictionary replacements are applied during reading and audiobook creation and are saved.
+Import YouTube transcript: paste a URL, choose the language, and import the text into the editor (Ctrl+Y). Optional timestamps.
 
 Options:
 Language: Change interface language.
@@ -64,4 +65,5 @@ Other options to split the audiobook: 2 parts, 4 parts, 6 parts, 8 parts.
 
 Help:
 Guide: Open this guide.
+Changelog: Open the changelog window.
 About: Show program information.

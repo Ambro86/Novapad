@@ -9,7 +9,7 @@ use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM, WPARAM};
 use windows::Win32::System::Threading::{OpenProcess, WaitForSingleObject, PROCESS_SYNCHRONIZE};
 use windows::Win32::UI::WindowsAndMessaging::{
     MessageBoxW, PostMessageW, IDYES, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK,
-    MB_YESNO, WM_CLOSE,
+    MB_SETFOREGROUND, MB_YESNO, WM_CLOSE,
 };
 
 use crate::accessibility::to_wide;
@@ -325,7 +325,7 @@ fn show_permission_error(language: Language) {
             HWND(0),
             PCWSTR(text_w.as_ptr()),
             PCWSTR(title_w.as_ptr()),
-            MB_OK | MB_ICONERROR,
+            MB_OK | MB_ICONERROR | MB_SETFOREGROUND,
         );
     }
 }
@@ -383,7 +383,7 @@ fn show_update_error(language: Language, error: UpdateError) {
             HWND(0),
             PCWSTR(text_w.as_ptr()),
             PCWSTR(title_w.as_ptr()),
-            MB_OK | MB_ICONERROR,
+            MB_OK | MB_ICONERROR | MB_SETFOREGROUND,
         );
     }
 }
@@ -406,7 +406,7 @@ fn show_update_info(language: Language, info: UpdateInfo) {
             HWND(0),
             PCWSTR(text_w.as_ptr()),
             PCWSTR(title_w.as_ptr()),
-            MB_OK | MB_ICONINFORMATION,
+            MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND,
         );
     }
 }

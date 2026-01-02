@@ -153,6 +153,14 @@ pub fn play_sapi(
 ) -> Result<(), String> {
     std::thread::spawn(move || {
         unsafe {
+            crate::log_debug(&format!(
+                "SAPI playback: start voice='{}' chunks={} rate={} pitch={} volume={}",
+                voice_name,
+                chunks.len(),
+                tts_rate,
+                tts_pitch,
+                tts_volume
+            ));
             let hr = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
             if hr.is_err() {
                 crate::log_debug(&format!("SAPI playback: CoInitializeEx failed: {:?}", hr));
@@ -170,7 +178,19 @@ pub fn play_sapi(
             };
 
             if let Some(token) = find_voice_token(&voice_name) {
-                let _ = voice.SetVoice(&token);
+                if let Err(e) = voice.SetVoice(&token) {
+                    crate::log_debug(&format!("SAPI playback: SetVoice failed: {}", e));
+                } else {
+                    crate::log_debug(&format!(
+                        "SAPI playback: selected voice token '{}'",
+                        voice_name
+                    ));
+                }
+            } else {
+                crate::log_debug(&format!(
+                    "SAPI playback: voice token not found for '{}'; using default voice",
+                    voice_name
+                ));
             }
             let _ = voice.SetRate(map_sapi_rate(tts_rate));
             let _ = voice.SetVolume(map_sapi_volume(tts_volume));
@@ -179,6 +199,7 @@ pub fn play_sapi(
             let mut pending: VecDeque<String> = VecDeque::from(chunks);
 
             while let Some(chunk) = pending.pop_front() {
+                let mut logged_status_error = false;
                 // Wait here if a pause was requested between chunks.
                 while paused {
                     if cancel.load(Ordering::Relaxed) {
@@ -212,11 +233,13 @@ pub fn play_sapi(
                 let current_chunk = chunk;
                 let ssml = mk_sapi_ssml(&current_chunk, tts_rate, tts_pitch, tts_volume);
                 let chunk_wide = to_wide(&ssml);
-                let _ = voice.Speak(
+                if let Err(e) = voice.Speak(
                     PCWSTR(chunk_wide.as_ptr()),
                     (SPF_ASYNC.0 | SPF_IS_XML.0) as u32,
                     None,
-                );
+                ) {
+                    crate::log_debug(&format!("SAPI playback: Speak failed: {}", e));
+                }
 
                 loop {
                     if cancel.load(Ordering::Relaxed) {
@@ -269,12 +292,25 @@ pub fn play_sapi(
                     }
 
                     let mut status = SPVOICESTATUS::default();
-                    if voice.GetStatus(&mut status, std::ptr::null_mut()).is_ok() {
-                        if status.dwRunningState == SPRS_DONE.0 as u32 {
-                            break;
+                    match voice.GetStatus(&mut status, std::ptr::null_mut()) {
+                        Ok(()) => {
+                            if status.dwRunningState == SPRS_DONE.0 as u32 {
+                                break;
+                            }
+                        }
+                        Err(e) => {
+                            if !logged_status_error {
+                                crate::log_debug(&format!(
+                                    "SAPI playback: GetStatus failed: {}",
+                                    e
+                                ));
+                                logged_status_error = true;
+                            }
                         }
                     }
-                    let _ = voice.WaitUntilDone(50);
+                    if let Err(e) = voice.WaitUntilDone(50) {
+                        crate::log_debug(&format!("SAPI playback: WaitUntilDone failed: {}", e));
+                    }
                 }
             }
         }

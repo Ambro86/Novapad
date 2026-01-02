@@ -469,6 +469,14 @@ pub async fn download_audio_chunk(
     let mut last_error = String::new();
 
     for attempt in 1..=max_retries {
+        log_debug(&format!(
+            "Edge TTS: chunk start attempt={}/{} voice={} text_len={} request_id={}",
+            attempt,
+            max_retries,
+            voice,
+            text.chars().count(),
+            request_id
+        ));
         match download_audio_chunk_attempt(text, voice, request_id, tts_rate, tts_pitch, tts_volume)
             .await
         {
@@ -544,9 +552,26 @@ async fn download_audio_chunk_attempt(
         HeaderValue::from_str(&cookie).map_err(|err| err.to_string())?,
     );
 
-    let (ws_stream, _) = connect_async(request)
-        .await
-        .map_err(|err| err.to_string())?;
+    log_debug(&format!(
+        "Edge TTS: ws connect start voice={} request_id={}",
+        voice, request_id
+    ));
+    let connect_timeout = Duration::from_secs(3);
+    let (ws_stream, _) = match tokio::time::timeout(connect_timeout, connect_async(request)).await {
+        Ok(res) => res.map_err(|err| err.to_string())?,
+        Err(_) => {
+            log_debug(&format!(
+                "Edge TTS: ws connect timeout {}s request_id={}",
+                connect_timeout.as_secs(),
+                request_id
+            ));
+            return Err("WebSocket connect timeout".to_string());
+        }
+    };
+    log_debug(&format!(
+        "Edge TTS: ws connect ok voice={} request_id={}",
+        voice, request_id
+    ));
     let (mut write, mut read) = ws_stream.split();
 
     let config_msg = format!(
@@ -557,6 +582,10 @@ async fn download_audio_chunk_attempt(
         .send(Message::Text(config_msg))
         .await
         .map_err(|err| err.to_string())?;
+    log_debug(&format!(
+        "Edge TTS: ws config sent request_id={}",
+        request_id
+    ));
 
     let ssml = mkssml(text, voice, tts_rate, tts_pitch, tts_volume);
     let ssml_msg = format!(
@@ -569,13 +598,20 @@ async fn download_audio_chunk_attempt(
         .send(Message::Text(ssml_msg))
         .await
         .map_err(|err| err.to_string())?;
+    log_debug(&format!(
+        "Edge TTS: ws ssml sent request_id={}",
+        request_id
+    ));
 
     let mut audio_data = Vec::new();
+    let mut audio_frames = 0usize;
+    let mut saw_turn_end = false;
     while let Some(msg) = read.next().await {
         let msg = msg.map_err(|err| err.to_string())?;
         match msg {
             Message::Text(text) => {
                 if text.contains("Path:turn.end") {
+                    saw_turn_end = true;
                     break;
                 }
             }
@@ -594,6 +630,7 @@ async fn download_audio_chunk_attempt(
                     let headers_str = String::from_utf8_lossy(headers_bytes);
                     if headers_str.contains("Path:audio") {
                         audio_data.extend_from_slice(&data[2 + header_len..]);
+                        audio_frames += 1;
                         parsed = true;
                         break;
                     }
@@ -602,10 +639,25 @@ async fn download_audio_chunk_attempt(
                     continue;
                 }
             }
-            Message::Close(_) => break,
+            Message::Close(_) => {
+                log_debug(&format!(
+                    "Edge TTS: ws closed request_id={} audio_bytes={} audio_frames={}",
+                    request_id,
+                    audio_data.len(),
+                    audio_frames
+                ));
+                break;
+            }
             _ => {}
         }
     }
+    log_debug(&format!(
+        "Edge TTS: ws done request_id={} audio_bytes={} audio_frames={} turn_end={}",
+        request_id,
+        audio_data.len(),
+        audio_frames,
+        saw_turn_end
+    ));
     Ok(audio_data)
 }
 

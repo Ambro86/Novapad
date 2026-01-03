@@ -124,7 +124,7 @@
   "prompt.output": "Salida:",
   "prompt.autoscroll": "Auto-desplazamiento",
   "prompt.strip_ansi": "Eliminar ANSI",
-  "prompt.beep_on_idle": "Beep tras 2 s sin actividad",
+  "prompt.beep_on_idle": "Beep tras 1 s sin actividad",
   "prompt.prevent_sleep": "Evitar suspension durante el prompt",
   "prompt.clear_confirm": "¿Borrar la salida del prompt?",
   "dictionary.title": "Diccionario",

@@ -76,8 +76,8 @@ use windows::Win32::UI::Controls::Dialogs::{
 };
 
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    EnableWindow, GetFocus, GetKeyState, SetFocus, VK_CONTROL, VK_F1, VK_F2, VK_F3, VK_F4, VK_F5,
-    VK_F6, VK_RETURN, VK_SHIFT, VK_TAB,
+    EnableWindow, GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_CONTROL, VK_F1, VK_F2,
+    VK_F3, VK_F4, VK_F5, VK_F6, VK_RETURN, VK_SHIFT, VK_TAB,
 };
 
 use windows::Win32::UI::Shell::{DragAcceptFiles, DragFinish, DragQueryFileW, HDROP};
@@ -88,16 +88,17 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT,
     CheckMenuItem, CreateAcceleratorTableW, CreatePopupMenu, CreateWindowExW, DefWindowProcW,
     DestroyWindow, DispatchMessageW, EN_CHANGE, FALT, FCONTROL, FSHIFT, FVIRTKEY, FindWindowW,
-    GWLP_USERDATA, GetCursorPos, GetMenu, GetMessageW, GetWindowLongPtrW, HACCEL, HCURSOR, HICON,
-    HMENU, IDC_ARROW, IDI_APPLICATION, KillTimer, LoadCursorW, LoadIconW, MB_ICONERROR,
-    MB_ICONINFORMATION, MB_OK, MF_BYCOMMAND, MF_CHECKED, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW,
-    PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_SHOW,
-    SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
-    TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE, WM_APP,
-    WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY,
-    WM_DROPFILES, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE,
-    WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_TIMER, WM_UNDO, WNDCLASSW, WS_CHILD, WS_CLIPCHILDREN,
-    WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
+    GWLP_USERDATA, GetCursorPos, GetMenu, GetMessageW, GetParent, GetWindowLongPtrW, HACCEL,
+    HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, KillTimer, LoadCursorW, LoadIconW,
+    MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MF_BYCOMMAND, MF_CHECKED, MF_STRING, MF_UNCHECKED,
+    MSG, MessageBoxW, PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW,
+    SW_HIDE, SW_SHOW, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW,
+    SetWindowTextW, ShowWindow, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW,
+    TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY,
+    WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES, WM_KEYDOWN, WM_NCDESTROY,
+    WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_SYSKEYDOWN,
+    WM_TIMER, WM_UNDO, WNDCLASSW, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW,
+    WS_TABSTOP, WS_VISIBLE,
 };
 
 use crate::app_windows::find_in_files_window::FindInFilesCache;
@@ -123,6 +124,7 @@ const VOICE_MENU_ID_REMOVE_FAVORITE: u32 = 9002;
 fn focus_editor(hwnd: HWND) {
     unsafe {
         SetForegroundWindow(hwnd);
+        SetActiveWindow(hwnd);
         if let Some(hwnd_edit) = with_state(hwnd, |state| {
             state.docs.get(state.current).map(|doc| doc.hwnd_edit)
         })
@@ -332,6 +334,22 @@ fn main() -> windows::core::Result<()> {
                 if (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0 {
                     next_tab_with_prompt(hwnd);
                     continue;
+                }
+            }
+            if msg.message == WM_SYSKEYDOWN && msg.wParam.0 as u32 == u32::from(VK_F4.0) {
+                let (prompt_hwnd, prompt_open) = with_state(hwnd, |state| {
+                    (state.prompt_window, state.prompt_window.0 != 0)
+                })
+                .unwrap_or((HWND(0), false));
+                if prompt_open {
+                    let target = msg.hwnd;
+                    let target_parent = GetParent(target);
+                    let prompt_target = target == prompt_hwnd || target_parent == prompt_hwnd;
+                    let main_target = target == hwnd || target_parent == hwnd;
+                    if main_target && !prompt_target {
+                        editor_manager::close_current_document(hwnd);
+                        continue;
+                    }
                 }
             }
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == 'Z' as u32 {
@@ -1031,6 +1049,9 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     log_debug("Menu: Open document");
                     if let Some(path) = open_file_dialog(hwnd) {
                         editor_manager::open_document(hwnd, &path);
+                        if with_state(hwnd, |state| state.prompt_window.0 != 0).unwrap_or(false) {
+                            focus_editor(hwnd);
+                        }
                     }
                     LRESULT(0)
                 }
@@ -1271,10 +1292,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 let path = from_wide(cds.lpData as *const u16);
                 if !path.is_empty() {
                     open_document(hwnd, Path::new(&path));
-                    SetForegroundWindow(hwnd);
-                    if let Some(hwnd_edit) = get_active_edit(hwnd) {
-                        SetFocus(hwnd_edit);
-                    }
+                    let _ = PostMessageW(hwnd, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0));
                 }
                 return LRESULT(1);
             }

@@ -124,7 +124,7 @@
   "prompt.output": "Output:",
   "prompt.autoscroll": "Scorrimento automatico",
   "prompt.strip_ansi": "Rimuovi ANSI",
-  "prompt.beep_on_idle": "Avviso sonoro dopo 2s di inattivita",
+  "prompt.beep_on_idle": "Avviso sonoro dopo 1s di inattivita",
   "prompt.prevent_sleep": "Evita risparmio energetico durante il prompt",
   "prompt.clear_confirm": "Vuoi cancellare l'output del prompt?",
   "dictionary.title": "Dizionario",

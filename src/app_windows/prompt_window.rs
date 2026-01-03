@@ -2,6 +2,7 @@ use crate::accessibility::{EM_GETSEL, EM_REPLACESEL, EM_SCROLLCARET, to_wide};
 use crate::conpty::{ConPtySession, ConPtySpawn};
 use crate::settings::{Language, confirm_title, save_settings};
 use crate::{i18n, log_debug, show_error, with_state};
+use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -41,6 +42,8 @@ const PROMPT_ID_PREVENT_SLEEP: usize = 9306;
 const WM_PROMPT_OUTPUT: u32 = WM_APP + 60;
 const EM_SETSEL: u32 = 0x00B1;
 const EM_LIMITTEXT: u32 = 0x00C5;
+const PROMPT_OUTPUT_LIMIT: usize = 40_000;
+const PROMPT_OUTPUT_KEEP: usize = 10_000;
 
 struct PromptLabels {
     title: String,
@@ -74,6 +77,7 @@ struct PromptState {
     line_has_content: bool,
     blank_line_streak: u8,
     pending_ws: String,
+    program_is_codex: bool,
     beep_state: Arc<PromptBeepState>,
     session: Option<ConPtySession>,
     reader_cancel: Arc<AtomicBool>,
@@ -379,6 +383,10 @@ unsafe extern "system" fn prompt_wndproc(
             let strip_ansi = settings.prompt_strip_ansi;
             let beep_on_idle = settings.prompt_beep_on_idle;
             let prevent_sleep = settings.prompt_prevent_sleep;
+            let program_is_codex = settings
+                .prompt_program
+                .to_ascii_lowercase()
+                .contains("codex");
             let _ = SendMessageW(
                 checkbox_autoscroll,
                 BM_SETCHECK,
@@ -427,6 +435,7 @@ unsafe extern "system" fn prompt_wndproc(
                 line_has_content: false,
                 blank_line_streak: 0,
                 pending_ws: String::new(),
+                program_is_codex,
                 beep_state: beep_state.clone(),
                 session: None,
                 reader_cancel: reader_cancel.clone(),
@@ -692,7 +701,7 @@ fn start_output_reader(
             let last = beep_state_clone.last_output_ms.load(Ordering::Relaxed);
             if last != 0 {
                 let now = now_ms();
-                if now.saturating_sub(last) >= 2_000
+                if now.saturating_sub(last) >= 1_000
                     && beep_state_clone.enabled.load(Ordering::Relaxed)
                     && !beep_state_clone.beeped.swap(true, Ordering::Relaxed)
                 {
@@ -700,7 +709,7 @@ fn start_output_reader(
                         let _ = MessageBeep(MESSAGEBOX_STYLE(0));
                     }
                 }
-                if now.saturating_sub(last) >= 2_000
+                if now.saturating_sub(last) >= 1_000
                     && beep_state_clone.sleep_enabled.load(Ordering::Relaxed)
                     && beep_state_clone.sleep_active.load(Ordering::Relaxed)
                 {
@@ -780,8 +789,14 @@ unsafe fn send_input_to_pty(state: &mut PromptState) {
     let mut buffer = vec![0u16; (len + 1) as usize];
     let read = GetWindowTextW(state.input, &mut buffer);
     let text = String::from_utf16_lossy(&buffer[..read as usize]);
+    if state.program_is_codex && is_codex_approvals_command(&text) {
+        spawn_codex_approvals();
+        let _ = SetWindowTextW(state.input, PCWSTR::null());
+        return;
+    }
     if let Some(session) = state.session.as_ref() {
-        let payload = format!("{text}\r\n");
+        let newline = if state.program_is_codex { "\n" } else { "\r\n" };
+        let payload = format!("{text}{newline}");
         let _ = session.write_input(&payload);
     }
     let _ = SetWindowTextW(state.input, PCWSTR::null());
@@ -796,6 +811,41 @@ unsafe fn clear_output(state: &mut PromptState) {
     state.blank_line_streak = 0;
     state.pending_ws.clear();
     let _ = SetWindowTextW(state.output, PCWSTR::null());
+}
+
+unsafe fn trim_output_keep_last(state: &mut PromptState) {
+    if state.buffer_utf16_len <= PROMPT_OUTPUT_KEEP {
+        return;
+    }
+    let excess = state.buffer_utf16_len - PROMPT_OUTPUT_KEEP;
+    let mut units_removed = 0usize;
+    let mut cut_idx = 0usize;
+    for (byte_idx, ch) in state.buffer.char_indices() {
+        units_removed += ch.len_utf16();
+        cut_idx = byte_idx + ch.len_utf8();
+        if units_removed >= excess {
+            break;
+        }
+    }
+    if cut_idx == 0 {
+        return;
+    }
+    state.buffer.drain(..cut_idx);
+    state.buffer_utf16_len -= units_removed;
+    state.line_start_byte = state.buffer.len();
+    state.line_start_utf16 = state.buffer_utf16_len;
+    state.line_has_content = false;
+    state.blank_line_streak = 0;
+    state.pending_ws.clear();
+    let wide = to_wide(&state.buffer);
+    let _ = SetWindowTextW(state.output, PCWSTR(wide.as_ptr()));
+    let _ = SendMessageW(
+        state.output,
+        EM_SETSEL,
+        WPARAM(state.buffer_utf16_len),
+        LPARAM(state.buffer_utf16_len as isize),
+    );
+    let _ = SendMessageW(state.output, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
 }
 
 fn apply_prevent_sleep(enabled: bool) -> bool {
@@ -831,6 +881,12 @@ fn append_output(state: &mut PromptState, text: &str) {
         text.to_string()
     };
     let filtered = filter_context_left_lines(&filtered);
+    let filtered_units = filtered.encode_utf16().count();
+    if state.buffer_utf16_len + filtered_units > PROMPT_OUTPUT_LIMIT {
+        unsafe {
+            trim_output_keep_last(state);
+        }
+    }
 
     let prev_len = state.buffer_utf16_len;
     let prev_line_start_utf16 = state.line_start_utf16;
@@ -982,7 +1038,7 @@ fn strip_ansi_csi(input: &str) -> String {
         if ch == '\x1B' {
             if matches!(chars.peek(), Some(&'[')) {
                 let _ = chars.next();
-                while let Some(next) = chars.next() {
+                for next in chars.by_ref() {
                     if next.is_ascii_alphabetic() {
                         if matches!(next, 'm' | 'K' | 'G' | 'J') {
                             break;
@@ -1023,6 +1079,11 @@ fn filter_context_left_lines(input: &str) -> String {
                 i += 1;
             }
         }
+        let line = if is_whitespace_only_line(line) {
+            ""
+        } else {
+            line
+        };
         if !is_context_left_line(line) && !is_interrupt_hint_line(line) {
             out.push_str(line);
             out.push_str(line_end);
@@ -1031,10 +1092,31 @@ fn filter_context_left_lines(input: &str) -> String {
     out
 }
 
+fn is_codex_approvals_command(text: &str) -> bool {
+    text.trim().eq_ignore_ascii_case("/approvals")
+}
+
+fn spawn_codex_approvals() {
+    let spawn = Command::new("cmd")
+        .args(["/c", "start", "", "codex", "/approvals"])
+        .spawn();
+    if let Err(err) = spawn {
+        log_debug(&format!("Prompt approvals spawn failed: {err}"));
+    }
+}
+
+fn is_whitespace_only_line(line: &str) -> bool {
+    !line.is_empty() && line.chars().all(|ch| ch == ' ' || ch == '\t')
+}
+
 fn is_context_left_line(line: &str) -> bool {
     let trimmed = line.trim();
     if trimmed.is_empty() {
         return false;
+    }
+    let lower = trimmed.to_ascii_lowercase();
+    if lower.contains("context left") && lower.contains("shortcuts") {
+        return true;
     }
     let Some(before_suffix) = trimmed.strip_suffix("context left") else {
         return false;

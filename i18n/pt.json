@@ -124,7 +124,7 @@
   "prompt.output": "Saida:",
   "prompt.autoscroll": "Auto-rolagem",
   "prompt.strip_ansi": "Remover ANSI",
-  "prompt.beep_on_idle": "Beep apos 2 s sem atividade",
+  "prompt.beep_on_idle": "Beep apos 1 s sem atividade",
   "prompt.prevent_sleep": "Evitar suspensao durante o prompt",
   "prompt.clear_confirm": "Limpar a saida do prompt?",
   "dictionary.title": "Dicionario",

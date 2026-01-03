@@ -124,7 +124,7 @@
   "prompt.output": "Output:",
   "prompt.autoscroll": "Auto-scroll",
   "prompt.strip_ansi": "Strip ANSI",
-  "prompt.beep_on_idle": "Beep after 2s idle",
+  "prompt.beep_on_idle": "Beep after 1s idle",
   "prompt.prevent_sleep": "Prevent sleep during prompt",
   "prompt.clear_confirm": "Clear the prompt output?",
   "dictionary.title": "Dictionary",

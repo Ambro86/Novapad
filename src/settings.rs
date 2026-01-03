@@ -181,6 +181,8 @@ fn settings_store_path_current_dir() -> Option<PathBuf> {
     Some(path)
 }
 
+const PORTABLE_MODE: bool = cfg!(feature = "portable");
+
 fn system_language() -> Language {
     let mut buffer = [0u16; 85];
     let len = unsafe { GetUserDefaultLocaleName(&mut buffer) };
@@ -208,6 +210,28 @@ pub fn load_settings() -> AppSettings {
     };
     let appdata_path = settings_store_path_appdata();
     let current_path = settings_store_path_current_dir();
+
+    if PORTABLE_MODE {
+        if let Some(path) = current_path.as_ref().filter(|path| path.exists()) {
+            if let Ok(data) = std::fs::read_to_string(path) {
+                if let Ok(mut settings) = serde_json::from_str::<AppSettings>(&data) {
+                    settings.settings_in_current_dir = true;
+                    return settings;
+                }
+            }
+        }
+        if let Some(path) = appdata_path.as_ref().filter(|path| path.exists()) {
+            let mut settings = std::fs::read_to_string(path)
+                .ok()
+                .and_then(|data| serde_json::from_str(&data).ok())
+                .unwrap_or_else(|| default_settings.clone());
+            settings.settings_in_current_dir = true;
+            return settings;
+        }
+        let mut settings = default_settings;
+        settings.settings_in_current_dir = true;
+        return settings;
+    }
 
     if let Some(path) = appdata_path.as_ref().filter(|path| path.exists()) {
         let settings = std::fs::read_to_string(path)
@@ -241,7 +265,8 @@ pub fn load_settings() -> AppSettings {
 pub fn save_settings(settings: AppSettings) {
     let appdata_path = settings_store_path_appdata();
     let current_path = settings_store_path_current_dir();
-    let path = if settings.settings_in_current_dir {
+    let prefer_current_dir = settings.settings_in_current_dir || PORTABLE_MODE;
+    let path = if prefer_current_dir {
         current_path.clone()
     } else {
         appdata_path.clone()
@@ -261,7 +286,7 @@ pub fn save_settings(settings: AppSettings) {
     if wrote {
         if let (Some(appdata_path), Some(current_path)) = (appdata_path, current_path) {
             if appdata_path != current_path {
-                let stale_path = if settings.settings_in_current_dir {
+                let stale_path = if prefer_current_dir {
                     appdata_path
                 } else {
                     current_path

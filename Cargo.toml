@@ -78,6 +78,9 @@ uuid = { version = "1.6", features = ["v4"] }
 epub = "2.1"
 yt-transcript-rs = "0.1.8"
 
+[features]
+portable = []
+
 [profile.release]
 opt-level = 3          # MASSIME performance
 lto = true             # ottimizzazione cross-crate

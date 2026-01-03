@@ -37,6 +37,11 @@ jobs:
     - name: Tests
       run: cargo test --all
 
+    - name: Build (Release Portable)
+      run: cargo build --verbose --release --features portable
+      env:
+        CARGO_TARGET_DIR: target_portable
+
     - name: Install NSIS
       run: choco install nsis
 
@@ -78,7 +83,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: Novapad-Portable
-        path: target/release/novapad.exe
+        path: target_portable/release/novapad.exe
 
     - name: Upload Installer (Setup)
       uses: actions/upload-artifact@v4

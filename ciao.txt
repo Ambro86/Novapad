@@ -55,3 +55,4 @@ Deliverables:
 - Prompt window implementation with minimal output filtering.
 - Short manual test checklist (cmd.exe + codex interactive).
 - Run cargo test and cargo clippy --all and fix issues.
+Aggiunta logica per aprire i file in nuove finestre se le impostazioni lo chiedono e separazione del prompt accessibile; se qualcosa non funziona ricontrolla `src/main.rs` (nuova funzione `open_path_with_behavior`) e `src/app_windows/prompt_window.rs` (creazione senza parent).

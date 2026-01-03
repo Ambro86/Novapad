@@ -91,6 +91,7 @@
   "options.label.quote_prefix": "Quote prefix:",
   "options.label.move_cursor": "Move cursor during reading",
   "options.label.check_updates": "Check updates on startup",
+  "options.label.settings_current_dir": "Save settings in the current folder",
   "options.label.prompt_program": "Prompt program:",
   "options.label.prompt_autoscroll": "Prompt auto-scroll",
   "options.label.prompt_strip_ansi": "Prompt strip ANSI sequences",

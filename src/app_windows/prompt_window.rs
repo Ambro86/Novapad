@@ -129,7 +129,7 @@ pub unsafe fn open(parent: HWND) {
         140,
         720,
         520,
-        parent,
+        None,
         HMENU(0),
         hinstance,
         Some(parent.0 as *const std::ffi::c_void),

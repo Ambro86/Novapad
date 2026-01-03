@@ -51,6 +51,10 @@ e la possibilit… di **creare audiolibri direttamente dal testo utilizzando le 
 - **Accessibilità**
   Progettato per funzionare correttamente con screen reader
   come NVDA e JAWS.
+- **Prompt accessibile**
+  - Finestra prompt dedicata con output stabile per gli screen reader
+  - Scorciatoie: Ctrl+Shift+P, Alt+I (input), Alt+O (output)
+  - Opzioni: scorrimento automatico, rimuovi ANSI, beep dopo inattivita', evita sospensione; scelta tra cmd/PowerShell/Codex CLI
 - **Opzioni di leggibilita'**
   - Controlli per colore e dimensione del testo per una migliore lettura, con colori chiari/scuri e dimensioni grandi
 - **Strumenti di modifica**

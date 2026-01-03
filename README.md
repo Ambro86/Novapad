@@ -48,6 +48,10 @@ and the ability to **create audiobooks directly from text using Microsoft voices
   - Quickly jump to saved positions in documents or audio
 - **Accessibility-Focused**
   Designed to work correctly with screen readers such as NVDA and JAWS.
+- **Accessible Prompt**
+  - Dedicated prompt window with stable output for screen readers
+  - Shortcuts: Ctrl+Shift+P, Alt+I (input), Alt+O (output)
+  - Options: auto-scroll, strip ANSI, beep on idle, prevent sleep; choose cmd/PowerShell/Codex CLI
 - **Readable UI Options**
   - Text color and text size controls for better readability, including light/dark colors and larger sizes
 - **Editing tools**

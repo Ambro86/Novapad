@@ -63,6 +63,11 @@ En la ventana agregar/editar: ingresa "Palabra original", luego Tab a "Palabra d
 En la lista, Tab mueve a "Editar entrada" y "Eliminar entrada seleccionada".
 Los reemplazos del diccionario se aplican durante la lectura y la creacion de audiolibros y se guardan.
 Importar transcripcion de YouTube: pega una URL, elige el idioma e importa el texto al editor (Ctrl+Y). Opcional con marcas de tiempo.
+Prompt accesible: abre un prompt dedicado con salida estable para lectores de pantalla (Ctrl+Shift+P).
+Atajos: Alt+I enfoca la entrada, Alt+O enfoca la salida, Tab/Shift+Tab mueve entre entrada, salida y opciones.
+Enter envia la entrada. Ctrl+C copia la salida (o envia Ctrl+C al programa). Ctrl+L limpia la salida con confirmacion.
+Opciones del prompt: auto-desplazamiento, eliminar ANSI, beep tras 1 s sin actividad, evitar suspension.
+Programas: Simbolo del sistema (cmd.exe), PowerShell, Codex CLI (desde Opciones).
 
 Opciones:
 Idioma: Cambiar el idioma de la interfaz.

@@ -94,6 +94,7 @@ pub enum TtsEngine {
 pub struct AppSettings {
     pub open_behavior: OpenBehavior,
     pub language: Language,
+    pub settings_in_current_dir: bool,
     pub tts_engine: TtsEngine,
     pub tts_voice: String,
     pub tts_only_multilingual: bool,
@@ -131,6 +132,7 @@ impl Default for AppSettings {
         AppSettings {
             open_behavior: OpenBehavior::NewTab,
             language: Language::Italian,
+            settings_in_current_dir: false,
             tts_engine: TtsEngine::Edge,
             tts_voice: "it-IT-IsabellaNeural".to_string(),
             tts_only_multilingual: false,
@@ -165,10 +167,16 @@ impl Default for AppSettings {
     }
 }
 
-fn settings_store_path() -> Option<PathBuf> {
+fn settings_store_path_appdata() -> Option<PathBuf> {
     let base = std::env::var_os("APPDATA")?;
     let mut path = PathBuf::from(base);
     path.push("Novapad");
+    path.push("settings.json");
+    Some(path)
+}
+
+fn settings_store_path_current_dir() -> Option<PathBuf> {
+    let mut path = std::env::current_dir().ok()?;
     path.push("settings.json");
     Some(path)
 }
@@ -194,40 +202,75 @@ fn system_language() -> Language {
 }
 
 pub fn load_settings() -> AppSettings {
-    let Some(path) = settings_store_path() else {
-        return AppSettings::default();
+    let default_settings = AppSettings {
+        language: system_language(),
+        ..Default::default()
     };
-    if !path.exists() {
-        return AppSettings {
-            language: system_language(),
-            ..Default::default()
-        };
+    let appdata_path = settings_store_path_appdata();
+    let current_path = settings_store_path_current_dir();
+
+    if let Some(path) = appdata_path.as_ref().filter(|path| path.exists()) {
+        let settings = std::fs::read_to_string(path)
+            .ok()
+            .and_then(|data| serde_json::from_str(&data).ok())
+            .unwrap_or_else(|| default_settings.clone());
+
+        if settings.settings_in_current_dir {
+            if let Some(current) = current_path.as_ref().filter(|path| path.exists()) {
+                if let Ok(data) = std::fs::read_to_string(current) {
+                    if let Ok(portable) = serde_json::from_str(&data) {
+                        return portable;
+                    }
+                }
+            }
+        }
+        return settings;
     }
-    let data = std::fs::read_to_string(path).ok();
-    let Some(data) = data else {
-        return AppSettings {
-            language: system_language(),
-            ..Default::default()
-        };
-    };
-    match serde_json::from_str(&data) {
-        Ok(settings) => settings,
-        Err(_) => AppSettings {
-            language: system_language(),
-            ..Default::default()
-        },
+
+    if let Some(path) = current_path.as_ref().filter(|path| path.exists()) {
+        if let Ok(data) = std::fs::read_to_string(path) {
+            if let Ok(settings) = serde_json::from_str(&data) {
+                return settings;
+            }
+        }
     }
+
+    default_settings
 }
 
 pub fn save_settings(settings: AppSettings) {
-    let Some(path) = settings_store_path() else {
+    let appdata_path = settings_store_path_appdata();
+    let current_path = settings_store_path_current_dir();
+    let path = if settings.settings_in_current_dir {
+        current_path.clone()
+    } else {
+        appdata_path.clone()
+    };
+    let Some(path) = path else {
         return;
     };
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
+    let mut wrote = false;
     if let Ok(json) = serde_json::to_string_pretty(&settings) {
-        let _ = std::fs::write(path, json);
+        if std::fs::write(&path, json).is_ok() {
+            wrote = true;
+        }
+    }
+    if wrote {
+        if let (Some(appdata_path), Some(current_path)) = (appdata_path, current_path) {
+            if appdata_path != current_path {
+                let stale_path = if settings.settings_in_current_dir {
+                    appdata_path
+                } else {
+                    current_path
+                };
+                if stale_path.exists() {
+                    let _ = std::fs::remove_file(stale_path);
+                }
+            }
+        }
     }
 }
 

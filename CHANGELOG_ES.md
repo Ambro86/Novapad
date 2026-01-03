@@ -1,4 +1,11 @@
 # Changelog
+Version 0.5.5 – 2026-01-03
+Nuevas funciones
+• Aniadido un prompt accesible optimizado para mucho output y lectores de pantalla (Ctrl+Shift+P).
+• Aniadida la opcion de guardar la configuracion en la carpeta actual (modo portable).
+Correcciones
+• Mejorados los fragmentos de Buscar en archivos para que la vista previa quede alineada con la coincidencia.
+
 Version 0.5.4 – 2026-01-03
 Mejoras
 • Correccion de Normalizar espacios en blanco (Ctrl+Shift+Enter).

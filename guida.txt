@@ -64,6 +64,11 @@ Nella finestra di aggiunta/modifica: inserisci "Parola originale", poi Tab su "P
 Nell'elenco, Tab porta ai pulsanti "Modifica voce" e "Rimuovi voce selezionata".
 Le sostituzioni del dizionario sono applicate durante la lettura e la creazione dell'audiolibro e vengono salvate.
 Importa trascrizione da YouTube: incolla un URL, scegli la lingua e importa il testo nell'editor (Ctrl+Y). Opzione per includere i timestamp.
+Prompt accessibile: apre un prompt dedicato con output separato e stabile per gli screen reader (Ctrl+Shift+P).
+Scorciatoie: Alt+I focus input, Alt+O focus output, Tab/Shift+Tab per spostarsi tra input, output e opzioni.
+Invio invia il testo. Ctrl+C copia l'output (o invia Ctrl+C al programma). Ctrl+L pulisce l'output con conferma.
+Opzioni nel prompt: scorrimento automatico, rimuovi ANSI, avviso sonoro dopo 1s, evita risparmio energetico.
+Scelte programma: Prompt dei comandi (cmd.exe), PowerShell, Codex CLI (da Opzioni).
 
 Opzioni:
 Lingua: cambia la lingua dell'interfaccia.

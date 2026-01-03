@@ -63,6 +63,11 @@ In the add/edit window: enter "Original word", then Tab to "Replacement word", t
 In the list, Tab moves to "Edit entry" and "Remove selected entry".
 Dictionary replacements are applied during reading and audiobook creation and are saved.
 Import YouTube transcript: paste a URL, choose the language, and import the text into the editor (Ctrl+Y). Optional timestamps.
+Accessible Prompt: opens a dedicated prompt with stable output for screen readers (Ctrl+Shift+P).
+Shortcuts: Alt+I focuses input, Alt+O focuses output, Tab/Shift+Tab moves between input, output, and options.
+Enter sends the input. Ctrl+C copies the output (or sends Ctrl+C to the program). Ctrl+L clears the output with confirmation.
+Prompt options: auto-scroll, strip ANSI, beep after 1s idle, prevent sleep.
+Program choices: Command Prompt (cmd.exe), PowerShell, Codex CLI (from Options).
 
 Options:
 Language: Change interface language.

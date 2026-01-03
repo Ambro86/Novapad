@@ -52,6 +52,7 @@ const OPTIONS_ID_CHECK_UPDATES: usize = 6015;
 const OPTIONS_ID_PROMPT_PROGRAM: usize = 6019;
 const OPTIONS_ID_PROMPT_AUTOSCROLL: usize = 6020;
 const OPTIONS_ID_PROMPT_STRIP_ANSI: usize = 6021;
+const OPTIONS_ID_SETTINGS_CURRENT_DIR: usize = 6022;
 const OPTIONS_ID_OK: usize = 6005;
 const OPTIONS_ID_CANCEL: usize = 6006;
 const OPTIONS_FOCUS_LANG_MSG: u32 = WM_APP + 30;
@@ -104,6 +105,7 @@ struct OptionsDialogState {
     edit_quote_prefix: HWND,
     checkbox_move_cursor: HWND,
     checkbox_check_updates: HWND,
+    checkbox_settings_current_dir: HWND,
     label_prompt_program: HWND,
     combo_prompt_program: HWND,
     checkbox_prompt_autoscroll: HWND,
@@ -125,6 +127,7 @@ struct OptionsLabels {
     label_quote_prefix: String,
     label_move_cursor: String,
     label_check_updates: String,
+    label_settings_current_dir: String,
     label_prompt_program: String,
     label_prompt_autoscroll: String,
     label_prompt_strip_ansi: String,
@@ -166,6 +169,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_quote_prefix: i18n::tr(language, "options.label.quote_prefix"),
         label_move_cursor: i18n::tr(language, "options.label.move_cursor"),
         label_check_updates: i18n::tr(language, "options.label.check_updates"),
+        label_settings_current_dir: i18n::tr(language, "options.label.settings_current_dir"),
         label_prompt_program: i18n::tr(language, "options.label.prompt_program"),
         label_prompt_autoscroll: i18n::tr(language, "options.label.prompt_autoscroll"),
         label_prompt_strip_ansi: i18n::tr(language, "options.label.prompt_strip_ansi"),
@@ -229,7 +233,7 @@ pub unsafe fn open(parent: HWND) {
         CW_USEDEFAULT,
         CW_USEDEFAULT,
         520,
-        680,
+        710,
         parent,
         None,
         hinstance,
@@ -703,6 +707,22 @@ unsafe extern "system" fn options_wndproc(
             );
             y += 28;
 
+            let checkbox_settings_current_dir = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_settings_current_dir).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                170,
+                y,
+                300,
+                20,
+                hwnd,
+                HMENU(OPTIONS_ID_SETTINGS_CURRENT_DIR as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 24;
+
             let label_prompt_program = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -820,6 +840,7 @@ unsafe extern "system" fn options_wndproc(
                 edit_quote_prefix,
                 checkbox_move_cursor,
                 checkbox_check_updates,
+                checkbox_settings_current_dir,
                 label_prompt_program,
                 combo_prompt_program,
                 checkbox_prompt_autoscroll,
@@ -854,6 +875,7 @@ unsafe extern "system" fn options_wndproc(
                 edit_quote_prefix,
                 checkbox_move_cursor,
                 checkbox_check_updates,
+                checkbox_settings_current_dir,
                 label_prompt_program,
                 combo_prompt_program,
                 checkbox_prompt_autoscroll,
@@ -1028,6 +1050,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         edit_quote_prefix,
         checkbox_move_cursor,
         checkbox_check_updates,
+        checkbox_settings_current_dir,
         _label_prompt_program,
         combo_prompt_program,
         checkbox_prompt_autoscroll,
@@ -1054,6 +1077,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.edit_quote_prefix,
             state.checkbox_move_cursor,
             state.checkbox_check_updates,
+            state.checkbox_settings_current_dir,
             state.label_prompt_program,
             state.combo_prompt_program,
             state.checkbox_prompt_autoscroll,
@@ -1203,6 +1227,16 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         checkbox_check_updates,
         BM_SETCHECK,
         WPARAM(if settings.check_updates_on_startup {
+            BST_CHECKED.0 as usize
+        } else {
+            0
+        }),
+        LPARAM(0),
+    );
+    let _ = SendMessageW(
+        checkbox_settings_current_dir,
+        BM_SETCHECK,
+        WPARAM(if settings.settings_in_current_dir {
             BST_CHECKED.0 as usize
         } else {
             0
@@ -1415,6 +1449,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         edit_quote_prefix,
         checkbox_move_cursor,
         checkbox_check_updates,
+        checkbox_settings_current_dir,
         combo_prompt_program,
         checkbox_prompt_autoscroll,
         checkbox_prompt_strip_ansi,
@@ -1437,6 +1472,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.edit_quote_prefix,
             state.checkbox_move_cursor,
             state.checkbox_check_updates,
+            state.checkbox_settings_current_dir,
             state.combo_prompt_program,
             state.checkbox_prompt_autoscroll,
             state.checkbox_prompt_strip_ansi,
@@ -1521,6 +1557,9 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             == BST_CHECKED.0;
     settings.check_updates_on_startup =
         SendMessageW(checkbox_check_updates, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
+            == BST_CHECKED.0;
+    settings.settings_in_current_dir =
+        SendMessageW(checkbox_settings_current_dir, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
             == BST_CHECKED.0;
     settings.prompt_auto_scroll = SendMessageW(
         checkbox_prompt_autoscroll,

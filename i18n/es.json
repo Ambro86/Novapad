@@ -91,6 +91,7 @@
   "options.label.quote_prefix": "Prefijo de cita:",
   "options.label.move_cursor": "Mover cursor durante la lectura",
   "options.label.check_updates": "Buscar actualizaciones al iniciar",
+  "options.label.settings_current_dir": "Guardar la configuracion en la carpeta actual",
   "options.label.prompt_program": "Programa del prompt:",
   "options.label.prompt_autoscroll": "Auto-desplazamiento del prompt",
   "options.label.prompt_strip_ansi": "Eliminar secuencias ANSI del prompt",

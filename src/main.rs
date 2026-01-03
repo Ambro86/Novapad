@@ -1048,7 +1048,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 IDM_FILE_OPEN => {
                     log_debug("Menu: Open document");
                     if let Some(path) = open_file_dialog(hwnd) {
-                        editor_manager::open_document(hwnd, &path);
+                        open_path_with_behavior(hwnd, &path);
                         if with_state(hwnd, |state| state.prompt_window.0 != 0).unwrap_or(false) {
                             focus_editor(hwnd);
                         }
@@ -2811,6 +2811,24 @@ pub(crate) unsafe fn push_recent_file(hwnd: HWND, path: &Path) {
     save_recent_files(&files);
 }
 
+fn spawn_new_window_with_path(path: &Path) -> bool {
+    let Ok(exe) = std::env::current_exe() else {
+        return false;
+    };
+    std::process::Command::new(exe).arg(path).spawn().is_ok()
+}
+
+unsafe fn open_path_with_behavior(hwnd: HWND, path: &Path) {
+    let behavior = with_state(hwnd, |state| state.settings.open_behavior)
+        .unwrap_or(OpenBehavior::NewTab);
+    if behavior == OpenBehavior::NewWindow {
+        if spawn_new_window_with_path(path) {
+            return;
+        }
+    }
+    open_document(hwnd, path);
+}
+
 unsafe fn open_recent_by_index(hwnd: HWND, index: usize) {
     let path = with_state(hwnd, |state| state.recent_files.get(index).cloned()).unwrap_or(None);
     let Some(path) = path else {
@@ -2828,7 +2846,7 @@ unsafe fn open_recent_by_index(hwnd: HWND, index: usize) {
         save_recent_files(&files);
         return;
     }
-    open_document(hwnd, &path);
+    open_path_with_behavior(hwnd, &path);
 }
 
 pub(crate) unsafe fn with_state<F, R>(hwnd: HWND, f: F) -> Option<R>
@@ -3035,7 +3053,7 @@ unsafe fn handle_drop_files(hwnd: HWND, hdrop: HDROP) {
         if path.as_os_str().is_empty() {
             continue;
         }
-        open_document(hwnd, &path);
+        open_path_with_behavior(hwnd, &path);
     }
     DragFinish(hdrop);
 }

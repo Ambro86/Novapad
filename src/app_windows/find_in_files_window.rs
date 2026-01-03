@@ -11,11 +11,13 @@ use windows::Win32::UI::Controls::{
     NM_RETURN, NMHDR, NMTVKEYDOWN, PBM_SETPOS, PBM_SETRANGE, PROGRESS_CLASSW, TVN_KEYDOWN,
     WC_BUTTON, WC_EDIT, WC_STATIC,
 };
+use windows::Win32::UI::Controls::Dialogs::FR_MATCHCASE;
 use windows::Win32::UI::Controls::{
     TVGN_CARET, TVI_ROOT, TVIF_PARAM, TVIF_TEXT, TVINSERTSTRUCTW, TVINSERTSTRUCTW_0,
     TVITEMEXW_CHILDREN, TVITEMW, TVM_DELETEITEM, TVM_GETITEMW, TVM_GETNEXTITEM, TVM_INSERTITEMW,
     TVM_SELECTITEM, TVS_HASBUTTONS, TVS_HASLINES, TVS_LINESATROOT, TVS_SHOWSELALWAYS,
 };
+use windows::Win32::UI::Controls::RichEdit::{CHARRANGE, EM_EXSETSEL, EM_FINDTEXTEXW, FINDTEXTEXW};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, SetFocus, VK_ESCAPE, VK_RETURN,
 };
@@ -33,7 +35,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
-use crate::accessibility::{from_wide, normalize_to_crlf, to_wide};
+use crate::accessibility::{EM_SCROLLCARET, from_wide, normalize_to_crlf, to_wide};
 use crate::file_handler::{
     decode_text, is_doc_path, is_docx_path, is_epub_path, is_html_path, is_mp3_path, is_pdf_path,
     is_spreadsheet_path, read_doc_text, read_docx_text, read_epub_text, read_html_text,
@@ -51,6 +53,8 @@ const FIND_IN_FILES_ID_SEARCH: usize = 9204;
 const FIND_IN_FILES_ID_RESULTS: usize = 9205;
 const FIND_IN_FILES_ID_GO: usize = 9206;
 const FIND_IN_FILES_ID_PROGRESS: usize = 9207;
+
+const SNIPPET_MAX_CHARS: usize = 40;
 
 const WM_FIND_IN_FILES_PROGRESS: u32 = WM_APP + 40;
 const WM_FIND_IN_FILES_DONE: u32 = WM_APP + 41;
@@ -750,6 +754,7 @@ fn open_selected_result(state: &mut FindInFilesState) {
     let Some(result) = state.results.get(idx).cloned() else {
         return;
     };
+    let term = read_control_text(state.term_edit).trim().to_string();
     unsafe {
         crate::editor_manager::open_document_at_position(
             state.parent,
@@ -757,6 +762,10 @@ fn open_selected_result(state: &mut FindInFilesState) {
             result.start_utf16,
             result.len_utf16,
         );
+        if let Some(hwnd_edit) = crate::get_active_edit(state.parent) {
+            let term = normalize_to_crlf(&term);
+            select_term_at(hwnd_edit, &term, result.start_utf16, result.len_utf16);
+        }
         let _ = PostMessageW(state.parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0));
     }
 }
@@ -807,34 +816,34 @@ fn populate_results_tree(state: &mut FindInFilesState) {
         grouped.entry(result.path.clone()).or_default().push(idx);
     }
 
-    let mut first_child: Option<windows::Win32::UI::Controls::HTREEITEM> = None;
+    let mut first_parent: Option<windows::Win32::UI::Controls::HTREEITEM> = None;
     for (path, indices) in grouped {
         let parent_text = format!("{} ({})", path.display(), indices.len());
         let parent_item = insert_tree_item(state.results_tree, TVI_ROOT, &parent_text, -1);
+        if first_parent.is_none() {
+            first_parent = Some(parent_item);
+        }
 
         for idx in indices {
             let result = &state.results[idx];
-            let snippet = truncate_snippet(&result.snippet, 40);
             let line_prefix = i18n::tr_f(
                 state.language,
                 "find_in_files.line_prefix",
                 &[("line", &result.line.to_string())],
             );
-            let label = format!("{line_prefix} {snippet}");
+            let label = format!("{line_prefix} {}", result.snippet);
             let child = insert_tree_item(state.results_tree, parent_item, &label, idx as isize);
-            if first_child.is_none() {
-                first_child = Some(child);
-            }
+            let _ = child;
         }
     }
 
-    if let Some(child) = first_child {
+    if let Some(parent_item) = first_parent {
         unsafe {
             let _ = SendMessageW(
                 state.results_tree,
                 TVM_SELECTITEM,
                 WPARAM(TVGN_CARET as usize),
-                LPARAM(child.0 as isize),
+                LPARAM(parent_item.0 as isize),
             );
             let _ = SetFocus(state.results_tree);
         }
@@ -966,10 +975,12 @@ fn collect_matches(
     let mut start = 0usize;
     while let Some(found) = text[start..].find(term) {
         let byte_index = start + found;
-        let utf16_index = text[..byte_index].encode_utf16().count() as i32;
-        let line = text[..byte_index].bytes().filter(|b| *b == b'\n').count() + 1;
+        let utf16_index = byte_index_to_utf16(text, byte_index);
+        let line = count_line_number(text, byte_index);
         let (line_start, line_end) = line_bounds(text, byte_index);
-        let snippet = text[line_start..line_end].trim().to_string();
+        let line_text = text[line_start..line_end].trim_matches(['\r', '\n']);
+        let match_start = byte_index.saturating_sub(line_start);
+        let snippet = snippet_for_match(line_text, match_start, term.len(), SNIPPET_MAX_CHARS);
 
         out.push(SearchResult {
             path: path.to_path_buf(),
@@ -984,30 +995,213 @@ fn collect_matches(
 }
 
 fn line_bounds(text: &str, byte_index: usize) -> (usize, usize) {
-    let start = text[..byte_index]
-        .rfind('\n')
-        .map(|idx| idx + 1)
-        .unwrap_or(0);
-    let end = text[byte_index..]
-        .find('\n')
-        .map(|idx| byte_index + idx)
-        .unwrap_or_else(|| text.len());
+    let before = &text[..byte_index];
+    let last_lf = before.rfind('\n');
+    let last_cr = before.rfind('\r');
+    let start = match (last_lf, last_cr) {
+        (None, None) => 0,
+        (Some(idx), None) | (None, Some(idx)) => idx + 1,
+        (Some(lf), Some(cr)) => lf.max(cr) + 1,
+    };
+
+    let after = &text[byte_index..];
+    let next_lf = after.find('\n');
+    let next_cr = after.find('\r');
+    let end = match (next_lf, next_cr) {
+        (None, None) => text.len(),
+        (Some(idx), None) | (None, Some(idx)) => byte_index + idx,
+        (Some(lf), Some(cr)) => byte_index + lf.min(cr),
+    };
     (start, end)
 }
 
-fn truncate_snippet(text: &str, max_chars: usize) -> String {
-    if max_chars == 0 {
-        return String::new();
+fn count_line_number(text: &str, byte_index: usize) -> usize {
+    let mut line = 1usize;
+    let mut prev_cr = false;
+    for b in text[..byte_index].bytes() {
+        if b == b'\r' {
+            line += 1;
+            prev_cr = true;
+        } else if b == b'\n' {
+            if !prev_cr {
+                line += 1;
+            }
+            prev_cr = false;
+        } else {
+            prev_cr = false;
+        }
     }
-    let mut out = String::new();
-    for (idx, ch) in text.chars().enumerate() {
-        if idx >= max_chars {
-            out.push_str("...");
+    line
+}
+
+fn byte_index_to_utf16(text: &str, byte_idx: usize) -> i32 {
+    let mut utf16_count = 0usize;
+    for (idx, ch) in text.char_indices() {
+        if idx >= byte_idx {
             break;
         }
-        out.push(ch);
+        utf16_count += ch.len_utf16();
     }
-    out
+    utf16_count as i32
+}
+
+fn char_index_to_byte(text: &str, char_index: usize) -> usize {
+    if char_index == 0 {
+        return 0;
+    }
+    text.char_indices()
+        .nth(char_index)
+        .map(|(idx, _)| idx)
+        .unwrap_or(text.len())
+}
+
+fn is_word_char(ch: char) -> bool {
+    ch.is_alphanumeric() || ch == '_'
+}
+
+fn word_bounds(chars: &[char], match_start: usize, match_end: usize) -> (usize, usize) {
+    let mut start = match_start.min(chars.len());
+    while start > 0 && is_word_char(chars[start - 1]) {
+        start = start.saturating_sub(1);
+    }
+    let mut end = match_end.min(chars.len());
+    while end < chars.len() && is_word_char(chars[end]) {
+        end += 1;
+    }
+    (start, end)
+}
+
+fn snippet_for_match(line: &str, match_start: usize, match_len: usize, max_chars: usize) -> String {
+    if max_chars == 0 || line.is_empty() {
+        return String::new();
+    }
+
+    let match_end = match_start.saturating_add(match_len).min(line.len());
+    let match_start_char = line[..match_start].chars().count();
+    let match_end_char = line[..match_end].chars().count();
+    let chars: Vec<char> = line.chars().collect();
+    let total_chars = chars.len();
+    let (word_start_char, word_end_char) = word_bounds(&chars, match_start_char, match_end_char);
+
+    let mut slice_start_char = match_start_char.saturating_sub(max_chars / 2);
+    let mut slice_end_char = (slice_start_char + max_chars).min(total_chars);
+
+    if match_end_char > slice_end_char {
+        slice_end_char = match_end_char.min(total_chars);
+        slice_start_char = slice_end_char.saturating_sub(max_chars);
+    }
+
+    if slice_start_char > word_start_char {
+        slice_start_char = word_start_char;
+    }
+    if slice_end_char < word_end_char {
+        slice_end_char = word_end_char;
+    }
+
+    if slice_end_char.saturating_sub(slice_start_char) > max_chars {
+        let word_len = word_end_char.saturating_sub(word_start_char);
+        if word_len >= max_chars {
+            slice_start_char = word_start_char;
+            slice_end_char = (word_start_char + max_chars).min(total_chars);
+        } else {
+            let extra = max_chars - word_len;
+            let before = extra / 2;
+            let after = extra - before;
+            slice_start_char = word_start_char.saturating_sub(before);
+            slice_end_char = (word_end_char + after).min(total_chars);
+            let size = slice_end_char.saturating_sub(slice_start_char);
+            if size < max_chars {
+                let missing = max_chars - size;
+                slice_start_char = slice_start_char.saturating_sub(missing);
+            }
+        }
+    }
+
+    if slice_start_char > 0
+        && slice_start_char < word_start_char
+        && is_word_char(chars[slice_start_char])
+        && is_word_char(chars[slice_start_char - 1])
+    {
+        let mut adjust = slice_start_char;
+        while adjust < word_start_char && is_word_char(chars[adjust]) {
+            adjust += 1;
+        }
+        slice_start_char = adjust.min(word_start_char);
+    }
+
+    if slice_end_char < total_chars
+        && slice_end_char > word_end_char
+        && is_word_char(chars[slice_end_char - 1])
+        && is_word_char(chars[slice_end_char])
+    {
+        let mut adjust = slice_end_char;
+        while adjust > word_end_char && is_word_char(chars[adjust - 1]) {
+            adjust = adjust.saturating_sub(1);
+        }
+        slice_end_char = adjust.max(word_end_char);
+    }
+
+    let slice_start_byte = char_index_to_byte(line, slice_start_char);
+    let slice_end_byte = char_index_to_byte(line, slice_end_char);
+    let mut snippet = line[slice_start_byte..slice_end_byte].trim().to_string();
+
+    if slice_start_char > 0 {
+        snippet.insert_str(0, "...");
+    }
+    if slice_end_char < total_chars {
+        snippet.push_str("...");
+    }
+
+    snippet
+}
+
+unsafe fn select_term_at(hwnd_edit: HWND, term: &str, start: i32, len: i32) {
+    if term.is_empty() {
+        return;
+    }
+    let wide = to_wide(term);
+    let mut ft = FINDTEXTEXW {
+        chrg: CHARRANGE {
+            cpMin: start.max(0),
+            cpMax: -1,
+        },
+        lpstrText: PCWSTR(wide.as_ptr()),
+        chrgText: CHARRANGE { cpMin: 0, cpMax: 0 },
+    };
+    let found = SendMessageW(
+        hwnd_edit,
+        EM_FINDTEXTEXW,
+        WPARAM(FR_MATCHCASE.0 as usize),
+        LPARAM(&mut ft as *mut _ as isize),
+    )
+    .0
+        != -1;
+
+    if found {
+        let mut sel = ft.chrgText;
+        std::mem::swap(&mut sel.cpMin, &mut sel.cpMax);
+        SendMessageW(
+            hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut sel as *mut _ as isize),
+        );
+    } else {
+        let start = start.max(0);
+        let end = (start + len.max(0)).max(start);
+        let mut cr = CHARRANGE {
+            cpMin: start,
+            cpMax: end,
+        };
+        SendMessageW(
+            hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut cr as *mut _ as isize),
+        );
+    }
+    SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+    SetFocus(hwnd_edit);
 }
 
 fn browse_for_folder(owner: HWND, language: Language) -> Option<PathBuf> {

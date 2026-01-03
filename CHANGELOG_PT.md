@@ -1,4 +1,11 @@
 # Changelog
+Versao 0.5.5 – 2026-01-03
+Novas funcionalidades
+• Adicionado um prompt acessivel otimizado para muita saida e leitores de tela (Ctrl+Shift+P).
+• Adicionada a opcao de guardar as definicoes na pasta atual (modo portable).
+Correcoes
+• Melhorados os trechos de Procurar em arquivos para manter a previsualizacao alinhada com a ocorrencia.
+
 Versao 0.5.4 – 2026-01-03
 Melhorias
 • Correcao da funcao Normalizar espacos em branco (Ctrl+Shift+Enter).

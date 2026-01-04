@@ -27,7 +27,7 @@ use url::Url;
 use yt_transcript_rs::errors::CouldNotRetrieveTranscriptReason;
 use yt_transcript_rs::{Transcript, TranscriptList, YouTubeTranscriptApi};
 
-use crate::accessibility::{from_wide, to_wide, to_wide_normalized};
+use crate::accessibility::{EM_REPLACESEL, from_wide, to_wide, to_wide_normalized};
 use crate::editor_manager::get_edit_text;
 use crate::i18n;
 use crate::settings::{Language, save_settings};
@@ -154,7 +154,20 @@ pub fn import_youtube_transcript(parent: HWND) {
             format!("{text}\n\n{existing}")
         };
         let wide = to_wide_normalized(&combined);
-        let _ = SetWindowTextW(hwnd_edit, PCWSTR(wide.as_ptr()));
+        let _ = SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(-1));
+        let _ = SendMessageW(
+            hwnd_edit,
+            EM_REPLACESEL,
+            WPARAM(1),
+            LPARAM(wide.as_ptr() as isize),
+        );
+        let end = combined.len() as i32;
+        let _ = SendMessageW(
+            hwnd_edit,
+            EM_SETSEL,
+            WPARAM(end as usize),
+            LPARAM(end as isize),
+        );
         let cr = CHARRANGE { cpMin: 0, cpMax: 0 };
         let _ = SendMessageW(
             hwnd_edit,

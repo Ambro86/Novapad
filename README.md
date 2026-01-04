@@ -13,7 +13,8 @@ It extends traditional text editing with multi-format document support,
 advanced accessibility features, and Text-to-Speech (TTS) capabilities.
 
 It also includes an integrated **MP3 audiobook player**, a **bookmark system for both text and audio**,
-and the ability to **create audiobooks directly from text using Microsoft voices (Edge Neural) and SAPI5**.
+and the ability to **create audiobooks directly from text using Microsoft voices (Edge Neural) and SAPI5**,
+plus **podcast recording from microphone and system audio**.
 
 > ⚠️ **License Notice**
 > This project is **source-available but NOT open source**.
@@ -46,6 +47,8 @@ and the ability to **create audiobooks directly from text using Microsoft voices
 - **Bookmarks**
   - Create and manage bookmarks for both text files and MP3 playback
   - Quickly jump to saved positions in documents or audio
+- **Podcast Recording**
+  - Record from microphone and/or system audio (File menu, Ctrl+Shift+R)
 - **Accessibility-Focused**
   Designed to work correctly with screen readers such as NVDA and JAWS.
 - **Accessible Prompt**

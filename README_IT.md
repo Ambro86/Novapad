@@ -13,7 +13,8 @@ Estende il classico editor di testo con il supporto a più formati di documento,
 funzionalità avanzate di accessibilità e capacità di Text-to-Speech (TTS).
 
 Include inoltre un **player MP3 per audiolibri**, un **sistema di segnalibri per testo e audio**
-e la possibilit… di **creare audiolibri direttamente dal testo utilizzando le voci Microsoft (Edge Neural) e SAPI5**.
+e la possibilit… di **creare audiolibri direttamente dal testo utilizzando le voci Microsoft (Edge Neural) e SAPI5**,
+oltre alla **registrazione podcast da microfono e audio di sistema**.
 
 > ⚠️ **Avviso di licenza**
 > Questo progetto è **source-available ma NON open source**.
@@ -47,7 +48,9 @@ e la possibilit… di **creare audiolibri direttamente dal testo utilizzando le 
   - Volume su/giù con i tasti freccia
 - **Segnalibri**
   - Creazione e gestione di segnalibri sia per file di testo sia per la riproduzione MP3
-  - Salto rapido alle posizioni salvate nei documenti o nell’audio
+  - Salto rapido alle posizioni salvate nei documenti o nell'audio
+- **Registrazione podcast**
+  - Registra da microfono e/o audio di sistema (menu File, Ctrl+Shift+R)
 - **Accessibilità**
   Progettato per funzionare correttamente con screen reader
   come NVDA e JAWS.

@@ -22,6 +22,7 @@ pub const IDM_FILE_READ_START: usize = 1008;
 pub const IDM_FILE_READ_PAUSE: usize = 1009;
 pub const IDM_FILE_READ_STOP: usize = 1010;
 pub const IDM_FILE_AUDIOBOOK: usize = 1011;
+pub const IDM_FILE_PODCAST: usize = 1012;
 pub const IDM_EDIT_UNDO: usize = 2001;
 pub const IDM_EDIT_CUT: usize = 2002;
 pub const IDM_EDIT_COPY: usize = 2003;
@@ -111,6 +112,7 @@ pub struct MenuLabels {
     pub file_read_pause: String,
     pub file_read_stop: String,
     pub file_audiobook: String,
+    pub file_podcast: String,
     pub file_exit: String,
     pub edit_undo: String,
     pub edit_cut: String,
@@ -181,6 +183,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         file_read_pause: i18n::tr(language, "file.read_pause"),
         file_read_stop: i18n::tr(language, "file.read_stop"),
         file_audiobook: i18n::tr(language, "file.audiobook"),
+        file_podcast: i18n::tr(language, "file.podcast"),
         file_exit: i18n::tr(language, "file.exit"),
         edit_undo: i18n::tr(language, "edit.undo"),
         edit_cut: i18n::tr(language, "edit.cut"),
@@ -269,6 +272,7 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         IDM_FILE_AUDIOBOOK,
         &labels.file_audiobook,
     );
+    let _ = append_menu_string(file_menu, MF_STRING, IDM_FILE_PODCAST, &labels.file_podcast);
     let _ = AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null());
     let _ = append_menu_string(file_menu, MF_STRING, IDM_FILE_EXIT, &labels.file_exit);
     let _ = append_menu_string(hmenu, MF_POPUP, file_menu.0 as usize, &labels.menu_file);

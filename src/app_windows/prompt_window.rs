@@ -6,11 +6,15 @@ use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::Foundation::{HANDLE, HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{GetDC, GetTextMetricsW, ReleaseDC, TEXTMETRICW};
 use windows::Win32::Storage::FileSystem::ReadFile;
+use windows::Win32::System::DataExchange::{
+    CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
+};
 use windows::Win32::System::Diagnostics::Debug::MessageBeep;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::System::Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalUnlock};
 use windows::Win32::System::Power::{
     ES_CONTINUOUS, ES_SYSTEM_REQUIRED, EXECUTION_STATE, SetThreadExecutionState,
 };
@@ -24,10 +28,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, LoadCursorW,
     MB_ICONQUESTION, MB_OKCANCEL, MESSAGEBOX_STYLE, MSG, MessageBoxW, PostMessageW, RegisterClassW,
     SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP,
-    WM_CLOSE, WM_COMMAND, WM_COPY, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS,
-    WM_SETFONT, WM_SIZE, WM_SYSKEYDOWN, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
-    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SIZEBOX, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
-    WS_VSCROLL,
+    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT,
+    WM_SIZE, WM_SYSKEYDOWN, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    WS_EX_DLGMODALFRAME, WS_SIZEBOX, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::PCWSTR;
 
@@ -209,7 +212,7 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     if ctrl_down && msg.wParam.0 as u32 == 'C' as u32 {
         let _ = with_prompt_state(hwnd, |state| {
             if focus == state.output {
-                let _ = SendMessageW(state.output, WM_COPY, WPARAM(0), LPARAM(0));
+                copy_output_selection(state.output);
             } else if let Some(session) = state.session.as_ref() {
                 let _ = session.send_ctrl_c();
             }
@@ -569,7 +572,7 @@ unsafe extern "system" fn prompt_wndproc(
                 let _ = with_prompt_state(hwnd, |state| {
                     let focus = GetFocus();
                     if focus == state.output {
-                        let _ = SendMessageW(state.output, WM_COPY, WPARAM(0), LPARAM(0));
+                        copy_output_selection(state.output);
                     } else if let Some(session) = state.session.as_ref() {
                         let _ = session.send_ctrl_c();
                     }
@@ -666,6 +669,64 @@ where
         None
     } else {
         Some(f(&mut *ptr))
+    }
+}
+
+fn copy_output_selection(hwnd_output: HWND) {
+    unsafe {
+        const CF_UNICODETEXT: u32 = 13;
+        let mut start: u32 = 0;
+        let mut end: u32 = 0;
+        let _ = SendMessageW(
+            hwnd_output,
+            EM_GETSEL,
+            WPARAM(&mut start as *mut u32 as usize),
+            LPARAM(&mut end as *mut u32 as isize),
+        );
+        if end <= start {
+            return;
+        }
+        let len = GetWindowTextLengthW(hwnd_output);
+        if len <= 0 {
+            return;
+        }
+        let mut buf = vec![0u16; (len + 1) as usize];
+        let read = GetWindowTextW(hwnd_output, &mut buf) as usize;
+        if read == 0 {
+            return;
+        }
+        let start = (start as usize).min(read);
+        let end = (end as usize).min(read);
+        if end <= start {
+            return;
+        }
+        let mut selection = buf[start..end].to_vec();
+        selection.push(0);
+        if OpenClipboard(hwnd_output).is_err() {
+            return;
+        }
+        let _ = EmptyClipboard();
+        let size = selection.len() * std::mem::size_of::<u16>();
+        let handle = match GlobalAlloc(GMEM_MOVEABLE, size) {
+            Ok(handle) => handle,
+            Err(_) => {
+                let _ = CloseClipboard();
+                return;
+            }
+        };
+        if handle.0.is_null() {
+            let _ = CloseClipboard();
+            return;
+        }
+        let ptr = GlobalLock(handle) as *mut u16;
+        if ptr.is_null() {
+            let _ = CloseClipboard();
+            return;
+        }
+        std::ptr::copy_nonoverlapping(selection.as_ptr(), ptr, selection.len());
+        let _ = GlobalUnlock(handle);
+        let _ = SetClipboardData(CF_UNICODETEXT, HANDLE(handle.0 as isize));
+        let _ = CloseClipboard();
     }
 }
 

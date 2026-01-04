@@ -11,6 +11,7 @@ File recenti: apre un file recente.
 Lettura: F5 avvia la lettura, F4 pausa/riprendi, F6 ferma la lettura.
 Preferiti durante la lettura: F1 voce preferita precedente, F2 voce preferita successiva.
 Registra audiolibro: crea un file MP3 dal testo corrente (Ctrl+R).
+Crea podcast: crea un podcast da microfono e/o audio di sistema (Ctrl+Shift+R).
 
 Audiolibri MP3:
 Quando apri un file MP3, Novapad diventa un lettore audio.

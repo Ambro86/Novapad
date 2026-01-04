@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use windows::Win32::Foundation::HANDLE;
 use windows::Win32::Globalization::GetUserDefaultLocaleName;
+use windows::Win32::System::Com::CoTaskMemFree;
+use windows::Win32::UI::Shell::{FOLDERID_Documents, SHGetKnownFolderPath};
 
 pub const TRUSTED_CLIENT_TOKEN: &str = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
 pub const VOICE_LIST_URL: &str =
@@ -91,6 +94,17 @@ pub enum TtsEngine {
     Sapi5,
 }
 
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum PodcastFormat {
+    #[serde(rename = "mp3")]
+    #[default]
+    Mp3,
+    #[serde(rename = "wav")]
+    Wav,
+}
+
+pub const PODCAST_DEVICE_DEFAULT: &str = "default";
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AppSettings {
@@ -110,6 +124,13 @@ pub struct AppSettings {
     pub audiobook_split_by_text: bool,
     pub audiobook_split_text: String,
     pub audiobook_split_text_requires_newline: bool,
+    pub podcast_include_microphone: bool,
+    pub podcast_microphone_device_id: String,
+    pub podcast_include_system_audio: bool,
+    pub podcast_system_device_id: String,
+    pub podcast_output_format: PodcastFormat,
+    pub podcast_mp3_bitrate: u32,
+    pub podcast_save_folder: String,
     pub youtube_include_timestamps: bool,
     pub last_seen_changelog_version: String,
     pub favorite_voices: Vec<FavoriteVoice>,
@@ -148,6 +169,13 @@ impl Default for AppSettings {
             audiobook_split_by_text: false,
             audiobook_split_text: String::new(),
             audiobook_split_text_requires_newline: true,
+            podcast_include_microphone: true,
+            podcast_microphone_device_id: PODCAST_DEVICE_DEFAULT.to_string(),
+            podcast_include_system_audio: true,
+            podcast_system_device_id: PODCAST_DEVICE_DEFAULT.to_string(),
+            podcast_output_format: PodcastFormat::Mp3,
+            podcast_mp3_bitrate: 128,
+            podcast_save_folder: default_podcast_save_folder(),
             youtube_include_timestamps: true,
             last_seen_changelog_version: String::new(),
             favorite_voices: Vec::new(),
@@ -205,6 +233,38 @@ fn system_language() -> Language {
     Language::Italian
 }
 
+pub fn default_podcast_save_folder() -> String {
+    let mut base = known_folder_path(&FOLDERID_Documents).unwrap_or_else(|| {
+        std::env::var_os("USERPROFILE")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+            .join("Documents")
+    });
+    base.push("Novapad Recordings");
+    base.to_string_lossy().to_string()
+}
+
+fn known_folder_path(folder: &windows::core::GUID) -> Option<PathBuf> {
+    unsafe {
+        let raw = SHGetKnownFolderPath(
+            folder,
+            windows::Win32::UI::Shell::KNOWN_FOLDER_FLAG(0),
+            HANDLE(0),
+        )
+        .ok()?;
+        if raw.is_null() {
+            return None;
+        }
+        let path = crate::accessibility::from_wide(raw.0);
+        CoTaskMemFree(Some(raw.0 as *const _));
+        if path.is_empty() {
+            None
+        } else {
+            Some(PathBuf::from(path))
+        }
+    }
+}
+
 pub fn load_settings() -> AppSettings {
     let default_settings = AppSettings {
         language: system_language(),
@@ -217,35 +277,39 @@ pub fn load_settings() -> AppSettings {
 
     if PORTABLE_MODE {
         if appdata_exists {
-            return std::fs::read_to_string(appdata_path.as_ref().unwrap())
-                .ok()
-                .and_then(|data| serde_json::from_str(&data).ok())
-                .unwrap_or_else(|| default_settings.clone());
+            return normalize_settings(
+                std::fs::read_to_string(appdata_path.as_ref().unwrap())
+                    .ok()
+                    .and_then(|data| serde_json::from_str(&data).ok())
+                    .unwrap_or_else(|| default_settings.clone()),
+            );
         }
         if current_exists {
             if let Ok(data) = std::fs::read_to_string(current_path.as_ref().unwrap()) {
                 if let Ok(mut settings) = serde_json::from_str::<AppSettings>(&data) {
                     settings.settings_in_current_dir = true;
-                    return settings;
+                    return normalize_settings(settings);
                 }
             }
         }
         let mut settings = default_settings;
         settings.settings_in_current_dir = true;
-        return settings;
+        return normalize_settings(settings);
     }
 
     if let Some(path) = appdata_path.as_ref().filter(|path| path.exists()) {
-        let settings = std::fs::read_to_string(path)
-            .ok()
-            .and_then(|data| serde_json::from_str(&data).ok())
-            .unwrap_or_else(|| default_settings.clone());
+        let settings = normalize_settings(
+            std::fs::read_to_string(path)
+                .ok()
+                .and_then(|data| serde_json::from_str(&data).ok())
+                .unwrap_or_else(|| default_settings.clone()),
+        );
 
         if settings.settings_in_current_dir {
             if current_exists {
                 if let Ok(data) = std::fs::read_to_string(current_path.as_ref().unwrap()) {
                     if let Ok(portable) = serde_json::from_str(&data) {
-                        return portable;
+                        return normalize_settings(portable);
                     }
                 }
             }
@@ -256,12 +320,22 @@ pub fn load_settings() -> AppSettings {
     if let Some(path) = current_path.as_ref().filter(|path| path.exists()) {
         if let Ok(data) = std::fs::read_to_string(path) {
             if let Ok(settings) = serde_json::from_str(&data) {
-                return settings;
+                return normalize_settings(settings);
             }
         }
     }
 
-    default_settings
+    normalize_settings(default_settings)
+}
+
+fn normalize_settings(mut settings: AppSettings) -> AppSettings {
+    if settings.podcast_save_folder.trim().is_empty() {
+        settings.podcast_save_folder = default_podcast_save_folder();
+    }
+    if settings.podcast_mp3_bitrate == 0 {
+        settings.podcast_mp3_bitrate = 128;
+    }
+    settings
 }
 
 pub fn save_settings(settings: AppSettings) {
@@ -298,6 +372,21 @@ pub fn save_settings(settings: AppSettings) {
                     let _ = std::fs::remove_file(stale_path);
                 }
             }
+        }
+    }
+}
+
+pub fn save_settings_with_default_copy(settings: AppSettings, keep_default_copy: bool) {
+    save_settings(settings.clone());
+    if keep_default_copy && settings.settings_in_current_dir {
+        let Some(appdata_path) = settings_store_path_appdata() else {
+            return;
+        };
+        if let Some(parent) = appdata_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if let Ok(json) = serde_json::to_string_pretty(&settings) {
+            let _ = std::fs::write(appdata_path, json);
         }
     }
 }

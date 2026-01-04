@@ -5,6 +5,7 @@ Correcoes
 Melhorias
  Suporte a PPT/PPTX.
  Para formatos nao textuais, Salvar agora propoe sempre .txt para evitar corromper a formatacao (PDF/DOC/DOCX/EPUB/HTML/PPT/PPTX).
+ Gravacao de podcast do microfone e/ou audio do sistema (menu Arquivo, Ctrl+Shift+R).
 
 Versao 0.5.5 - 2026-01-03
 Novas funcionalidades

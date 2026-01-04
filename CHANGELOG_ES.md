@@ -5,6 +5,7 @@ Correcciones
 Mejoras
  Soporte PPT/PPTX.
  Para formatos no textuales, Guardar ahora propone siempre .txt para no romper el formato (PDF/DOC/DOCX/EPUB/HTML/PPT/PPTX).
+ Grabacion de podcast desde microfono y/o audio del sistema (menu Archivo, Ctrl+Shift+R).
 
 Version 0.5.5 - 2026-01-03
 Nuevas funciones

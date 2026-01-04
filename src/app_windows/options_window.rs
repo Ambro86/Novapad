@@ -7,7 +7,7 @@ use crate::accessibility::{handle_accessibility, to_wide};
 use crate::editor_manager::apply_word_wrap_to_all_edits;
 use crate::settings::{
     Language, OpenBehavior, TRUSTED_CLIENT_TOKEN, TtsEngine, VOICE_LIST_URL, VoiceInfo,
-    save_settings,
+    save_settings_with_default_copy,
 };
 use crate::{i18n, rebuild_menus, refresh_voice_panel, with_state};
 use std::thread;
@@ -23,12 +23,12 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CB_GETCURSEL, CB_GETDROPPEDSTATE, CB_GETITEMDATA, CB_RESETCONTENT, CB_SETCURSEL,
     CB_SETITEMDATA, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW,
     DefWindowProcW, DestroyWindow, ES_AUTOHSCROLL, GWLP_USERDATA, GetParent, GetWindowLongPtrW,
-    GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, KillTimer, LoadCursorW, MSG,
-    PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW, SendMessageW, SetForegroundWindow, SetTimer,
-    SetWindowLongPtrW, SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
-    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_SETFOCUS, WM_SETFONT,
-    WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
-    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, IDYES, KillTimer, LoadCursorW,
+    MB_ICONQUESTION, MB_YESNO, MSG, MessageBoxW, PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW,
+    SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
+    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY,
+    WM_NEXTDLGCTL, WM_SETFOCUS, WM_SETFONT, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD,
+    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, w};
 
@@ -1485,6 +1485,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     let mut settings = with_state(parent, |state| state.settings.clone()).unwrap_or_default();
     let old_language = settings.language;
     let old_word_wrap = settings.word_wrap;
+    let old_settings_current_dir = settings.settings_in_current_dir;
     let (old_engine, old_voice, was_tts_active) = with_state(parent, |state| {
         (
             state.settings.tts_engine,
@@ -1653,7 +1654,21 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         state.settings = settings.clone();
     });
     let new_language = settings.language;
-    save_settings(settings.clone());
+    let mut keep_default_copy = false;
+    if settings.settings_in_current_dir && !old_settings_current_dir {
+        let msg = i18n::tr(settings.language, "options.settings_copy_prompt");
+        let title = i18n::tr(settings.language, "app.confirm_title");
+        let msg_w = to_wide(&msg);
+        let title_w = to_wide(&title);
+        let result = MessageBoxW(
+            hwnd,
+            PCWSTR(msg_w.as_ptr()),
+            PCWSTR(title_w.as_ptr()),
+            MB_YESNO | MB_ICONQUESTION,
+        );
+        keep_default_copy = result == IDYES;
+    }
+    save_settings_with_default_copy(settings.clone(), keep_default_copy);
 
     if old_language != new_language {
         rebuild_menus(parent);

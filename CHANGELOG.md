@@ -5,6 +5,7 @@ Fixes
 Improvements
  Added PPT/PPTX support (open as text).
  Opening non-text formats now saves as .txt to avoid formatting corruption (PDF/DOC/DOCX/EPUB/HTML/PPT/PPTX).
+ Added podcast recording from microphone and system audio (File menu, Ctrl+Shift+R).
 
 Version 0.5.5 – 2026-01-03
 New features

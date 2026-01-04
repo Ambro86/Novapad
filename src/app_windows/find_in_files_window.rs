@@ -1425,7 +1425,7 @@ fn set_caret_position(hwnd_edit: HWND, pos: i32) {
     }
 }
 
-fn browse_for_folder(owner: HWND, language: Language) -> Option<PathBuf> {
+pub(crate) fn browse_for_folder(owner: HWND, language: Language) -> Option<PathBuf> {
     let labels = labels(language);
     let title = to_wide(&labels.folder_label);
     let mut bi = BROWSEINFOW {

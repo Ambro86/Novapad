@@ -6,6 +6,7 @@ Fix
 Miglioramenti
  Aggiunto supporto PPT/PPTX.
  Per i formati non testuali, Salva ora propone sempre .txt per evitare di rovinare la formattazione (PDF/DOC/DOCX/EPUB/HTML/PPT/PPTX).
+ Aggiunta registrazione podcast da microfono e audio di sistema (menu File, Ctrl+Shift+R).
 
 Versione 0.5.5 - 2026-01-03
 Nuove funzionalita

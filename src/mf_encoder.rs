@@ -32,26 +32,7 @@ fn read_wav_data_info(path: &Path) -> Result<(u64, u32, i16), String> {
 
         if chunk_id == b"data" {
             let data_offset = file.seek(SeekFrom::Current(0)).map_err(|e| e.to_string())?;
-            let mut remaining = chunk_size as usize;
-            let mut peak: i16 = 0;
-            let mut buf = vec![0u8; 4096];
-            while remaining > 0 {
-                let to_read = remaining.min(buf.len());
-                let bytes_read = file.read(&mut buf[..to_read]).map_err(|e| e.to_string())?;
-                if bytes_read == 0 {
-                    break;
-                }
-                let samples = bytes_read / 2;
-                for i in 0..samples {
-                    let s = i16::from_le_bytes([buf[i * 2], buf[i * 2 + 1]]);
-                    let abs = if s == i16::MIN { i16::MAX } else { s.abs() };
-                    if abs > peak {
-                        peak = abs;
-                    }
-                }
-                remaining = remaining.saturating_sub(bytes_read);
-            }
-            return Ok((data_offset, chunk_size, peak));
+            return Ok((data_offset, chunk_size, 0));
         } else {
             file.seek(SeekFrom::Current(chunk_size as i64))
                 .map_err(|e| e.to_string())?;
@@ -65,10 +46,36 @@ fn read_wav_data_info(path: &Path) -> Result<(u64, u32, i16), String> {
 }
 
 pub fn encode_wav_to_mp3(wav_path: &Path, mp3_path: &Path) -> Result<(), String> {
+    encode_wav_to_mp3_with_bitrate(wav_path, mp3_path, 128)
+}
+
+pub fn encode_wav_to_mp3_with_bitrate(
+    wav_path: &Path,
+    mp3_path: &Path,
+    bitrate_kbps: u32,
+) -> Result<(), String> {
+    encode_wav_to_mp3_with_bitrate_progress(wav_path, mp3_path, bitrate_kbps, |_| {}, None)
+}
+
+pub fn encode_wav_to_mp3_with_bitrate_progress<F>(
+    wav_path: &Path,
+    mp3_path: &Path,
+    bitrate_kbps: u32,
+    mut progress: F,
+    cancel: Option<&std::sync::atomic::AtomicBool>,
+) -> Result<(), String>
+where
+    F: FnMut(u32),
+{
     unsafe {
+        let bitrate_kbps = match bitrate_kbps {
+            192 => 192,
+            256 => 256,
+            _ => 128,
+        };
         crate::log_debug(&format!(
-            "MF: encode wav to mp3. wav={:?} mp3={:?}",
-            wav_path, mp3_path
+            "MF: encode wav to mp3. wav={:?} mp3={:?} bitrate_kbps={}",
+            wav_path, mp3_path, bitrate_kbps
         ));
         if let Err(e) = MFStartup(MF_VERSION, 0) {
             return Err(format!(
@@ -122,10 +129,12 @@ pub fn encode_wav_to_mp3(wav_path: &Path, mp3_path: &Path) -> Result<(), String>
             .GetCurrentMediaType(MF_SOURCE_READER_FIRST_AUDIO_STREAM.0 as u32)
             .map_err(|e| format!("GetCurrentMediaType failed: {}", e))?;
 
-        if let Ok((data_offset, data_size, peak)) = read_wav_data_info(wav_path) {
+        let mut data_size = 0u64;
+        if let Ok((data_offset, size, peak)) = read_wav_data_info(wav_path) {
+            data_size = size as u64;
             crate::log_debug(&format!(
                 "MF: wav data offset={} size={} peak={}",
-                data_offset, data_size, peak
+                data_offset, size, peak
             ));
         }
         let mut sample_rate = 0u32;
@@ -181,7 +190,7 @@ pub fn encode_wav_to_mp3(wav_path: &Path, mp3_path: &Path) -> Result<(), String>
         out_type
             .SetUINT32(&MF_MT_AUDIO_SAMPLES_PER_SECOND, requested_rate)
             .map_err(|e| format!("Set sample rate failed: {}", e))?;
-        let mp3_avg_bytes = 16000u32; // 128 kbps
+        let mp3_avg_bytes = (bitrate_kbps * 1000) / 8;
         out_type
             .SetUINT32(&MF_MT_AUDIO_AVG_BYTES_PER_SECOND, mp3_avg_bytes)
             .map_err(|e| format!("Set mp3 bitrate failed: {}", e))?;
@@ -206,7 +215,13 @@ pub fn encode_wav_to_mp3(wav_path: &Path, mp3_path: &Path) -> Result<(), String>
 
         let mut sample_count: u64 = 0;
         let mut total_bytes: u64 = 0;
+        let mut last_pct: u32 = 0;
         loop {
+            if let Some(cancel) = cancel {
+                if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+                    return Err("Saving canceled.".to_string());
+                }
+            }
             let mut read_stream = 0u32;
             let mut flags = 0u32;
             let mut _timestamp = 0i64;
@@ -233,9 +248,24 @@ pub fn encode_wav_to_mp3(wav_path: &Path, mp3_path: &Path) -> Result<(), String>
                 writer
                     .WriteSample(stream_index, &sample)
                     .map_err(|e| format!("WriteSample failed: {}", e))?;
+                if data_size > 0 {
+                    let pct = ((total_bytes.saturating_mul(100)) / data_size).min(100) as u32;
+                    if pct > last_pct {
+                        last_pct = pct;
+                        progress(pct);
+                    }
+                }
             }
         }
 
+        if let Some(cancel) = cancel {
+            if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+                return Err("Saving canceled.".to_string());
+            }
+        }
+        if last_pct < 100 {
+            progress(100);
+        }
         writer
             .Finalize()
             .map_err(|e| format!("SinkWriter Finalize failed: {}", e))?;

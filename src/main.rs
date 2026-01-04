@@ -33,6 +33,7 @@ mod editor_manager;
 use editor_manager::*;
 mod app_windows;
 mod i18n;
+mod podcast_recorder;
 mod updater;
 
 use std::io::Write;
@@ -76,8 +77,8 @@ use windows::Win32::UI::Controls::Dialogs::{
 };
 
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    EnableWindow, GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_CONTROL, VK_F1, VK_F2,
-    VK_F3, VK_F4, VK_F5, VK_F6, VK_RETURN, VK_SHIFT, VK_TAB,
+    EnableWindow, GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_CONTROL, VK_ESCAPE, VK_F1,
+    VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_RETURN, VK_SHIFT, VK_TAB,
 };
 
 use windows::Win32::UI::Shell::{DragAcceptFiles, DragFinish, DragQueryFileW, HDROP};
@@ -195,6 +196,8 @@ pub(crate) struct AppState {
     dictionary_entry_dialog: HWND,
     tts_tuning_dialog: HWND,
     prompt_window: HWND,
+    podcast_window: HWND,
+    podcast_save_window: HWND,
     find_msg: u32,
     find_text: Vec<u16>,
     replace_text: Vec<u16>,
@@ -336,6 +339,16 @@ fn main() -> windows::core::Result<()> {
                     continue;
                 }
             }
+            if msg.message == WM_KEYDOWN || msg.message == WM_SYSKEYDOWN {
+                if msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
+                    let save_hwnd =
+                        with_state(hwnd, |state| state.podcast_save_window).unwrap_or(HWND(0));
+                    if save_hwnd.0 != 0 {
+                        let _ = PostMessageW(save_hwnd, WM_COMMAND, WPARAM(2), LPARAM(0));
+                        continue;
+                    }
+                }
+            }
             if msg.message == WM_SYSKEYDOWN && msg.wParam.0 as u32 == u32::from(VK_F4.0) {
                 let (prompt_hwnd, prompt_open) = with_state(hwnd, |state| {
                     (state.prompt_window, state.prompt_window.0 != 0)
@@ -399,7 +412,8 @@ fn main() -> windows::core::Result<()> {
                         || state.options_dialog.0 != 0
                         || state.help_window.0 != 0
                         || state.changelog_window.0 != 0
-                        || state.dictionary_window.0 != 0;
+                        || state.dictionary_window.0 != 0
+                        || state.podcast_window.0 != 0;
                     let secondary_open = secondary_open
                         || state.dictionary_entry_dialog.0 != 0
                         || state.tts_tuning_dialog.0 != 0;
@@ -467,6 +481,23 @@ fn main() -> windows::core::Result<()> {
 
                 if state.options_dialog.0 != 0 {
                     if app_windows::options_window::handle_navigation(state.options_dialog, &msg) {
+                        handled = true;
+                        return;
+                    }
+                }
+
+                if state.podcast_window.0 != 0 {
+                    if app_windows::podcast_window::handle_navigation(state.podcast_window, &msg) {
+                        handled = true;
+                        return;
+                    }
+                }
+
+                if state.podcast_save_window.0 != 0 {
+                    if app_windows::podcast_save_window::handle_navigation(
+                        state.podcast_save_window,
+                        &msg,
+                    ) {
                         handled = true;
                         return;
                     }
@@ -712,6 +743,8 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 dictionary_entry_dialog: HWND(0),
                 tts_tuning_dialog: HWND(0),
                 prompt_window: HWND(0),
+                podcast_window: HWND(0),
+                podcast_save_window: HWND(0),
                 find_msg,
                 find_text: vec![0u16; 256],
                 replace_text: vec![0u16; 256],
@@ -1098,6 +1131,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 IDM_FILE_AUDIOBOOK => {
                     log_debug("Menu: Record audiobook");
                     tts_engine::start_audiobook(hwnd);
+                    LRESULT(0)
+                }
+                IDM_FILE_PODCAST => {
+                    log_debug("Menu: Record podcast");
+                    app_windows::podcast_window::open(hwnd);
                     LRESULT(0)
                 }
                 IDM_EDIT_UNDO => {
@@ -2587,6 +2625,11 @@ unsafe fn create_accelerators() -> HACCEL {
             fVirt: virt,
             key: 'R' as u16,
             cmd: IDM_FILE_AUDIOBOOK as u16,
+        },
+        ACCEL {
+            fVirt: virt_shift,
+            key: 'R' as u16,
+            cmd: IDM_FILE_PODCAST as u16,
         },
         ACCEL {
             fVirt: virt,

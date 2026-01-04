@@ -11,6 +11,7 @@ Recent Files: Open a recent file.
 Reading: F5 Start reading, F4 Pause/Resume, F6 Stop reading.
 Favorites during reading: F1 previous favorite voice, F2 next favorite voice.
 Record Audiobook: Create an MP3 file from the current text (Ctrl+R).
+Record Podcast: Record a podcast from microphone and/or system audio (Ctrl+Shift+R).
 
 MP3 Audiobooks:
 When you open an MP3 file, Novapad acts as an audio player.

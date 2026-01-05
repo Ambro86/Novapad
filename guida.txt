@@ -59,6 +59,11 @@ Inserisci segnalibro: salva la posizione attuale del cursore o il tempo dell'aud
 Gestisci segnalibri: visualizza, salta o elimina i segnalibri salvati. All'apertura di un file con segnalibri, il cursore o la riproduzione ripartiranno automaticamente dal primo disponibile.
 
 Strumenti:
+Audiolibri in sequenza: apre la finestra per convertire una lista di file (o intere cartelle) in audiolibri.
+- Aggiungi file/cartelle alla coda.
+- Scegli cartella di destinazione e formato (MP3 o WAV).
+- Opzioni per creare sottocartelle e evitare sovrascritture.
+- Premi Avvia per processare tutto in background.
 Dizionario: apre la finestra del dizionario. L'elenco si naviga con le frecce su/giu.
 Tab porta al pulsante "Aggiungi voci al dizionario", attivabile con Invio o Spazio.
 Nella finestra di aggiunta/modifica: inserisci "Parola originale", poi Tab su "Parola in sostituzione", quindi OK o Annulla (Invio/Spazio). ESC annulla.

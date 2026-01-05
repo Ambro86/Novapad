@@ -1,4 +1,16 @@
 # Changelog
+Version 0.5.7 - 2026-01-05
+Nuevas funciones
+• Aniadida opcion para grabar audiolibros en lote (conversion multiple de archivos y carpetas).
+• Aniadido soporte para archivos Markdown (.md).
+• Aniadida eleccion de codificacion al abrir archivos de texto.
+• Aniadida opcion en el terminal para anunciar nuevas lineas con NVDA.
+Mejoras
+• La grabacion de audiolibros se guarda ahora en MP3 nativo cuando se selecciona.
+• El usuario puede elegir donde colocar el asterisco * que indica cambios no guardados.
+• Mejorado el sistema de actualizacion para ser mas robusto en diferentes escenarios.
+• Aniadida en el menu Editar la funcion para eliminar guiones al final de linea (util para textos OCR).
+
 Version 0.5.6 - 2026-01-04
 Correcciones
  Mejorado Buscar en archivos: al pulsar Enter abre el archivo exactamente en el fragmento seleccionado.

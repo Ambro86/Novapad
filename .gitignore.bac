@@ -8,5 +8,4 @@
 *.log
 istruzioni_compilazione.txt
 filedocapertocometxt.txt
-# log.txt
-# service/
+log.txt

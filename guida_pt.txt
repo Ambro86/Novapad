@@ -58,6 +58,11 @@ Inserir marcador: salvar a posicao atual do cursor ou o tempo do audiolivro (Ctr
 Gerenciar marcadores: ver, ir ou excluir marcadores salvos. Ao abrir um arquivo com marcadores, o cursor ou a reproducao retomara automaticamente no primeiro disponivel.
 
 Ferramentas:
+Audiolivros em Lote: abre a janela para converter uma lista de arquivos (ou pastas inteiras) em audiolivros.
+- Adicione arquivos/pastas a fila.
+- Escolha a pasta de destino e formato (MP3 ou WAV).
+- Opcoes para criar subpastas e evitar sobrescrever.
+- Pressione Iniciar para processar tudo em segundo plano.
 Dicionario: abrir a janela do dicionario. A lista e navegada com as setas cima/baixo.
 Tab move para "Adicionar entradas ao dicionario", ativado com Enter ou Espaco.
 Na janela adicionar/editar: digite "Palavra original", depois Tab para "Palavra de substituicao", depois OK ou Cancelar (Enter/Espaco). ESC cancela.

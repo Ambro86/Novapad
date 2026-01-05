@@ -1,0 +1,403 @@
+2026-01-03T15:06:24.7189190Z Current runner version: '2.330.0'
+2026-01-03T15:06:24.7213546Z ##[group]Runner Image Provisioner
+2026-01-03T15:06:24.7214348Z Hosted Compute Agent
+2026-01-03T15:06:24.7214825Z Version: 20251211.462
+2026-01-03T15:06:24.7215383Z Commit: 6cbad8c2bb55d58165063d031ccabf57e2d2db61
+2026-01-03T15:06:24.7215996Z Build Date: 2025-12-11T16:28:49Z
+2026-01-03T15:06:24.7216614Z Worker ID: {ed869d17-59ba-4f17-8aa7-71092f129bd4}
+2026-01-03T15:06:24.7217193Z ##[endgroup]
+2026-01-03T15:06:24.7217691Z ##[group]Operating System
+2026-01-03T15:06:24.7218264Z Microsoft Windows Server 2025
+2026-01-03T15:06:24.7218749Z 10.0.26100
+2026-01-03T15:06:24.7219211Z Datacenter
+2026-01-03T15:06:24.7219602Z ##[endgroup]
+2026-01-03T15:06:24.7220035Z ##[group]Runner Image
+2026-01-03T15:06:24.7220500Z Image: windows-2025
+2026-01-03T15:06:24.7220959Z Version: 20251216.149.1
+2026-01-03T15:06:24.7222265Z Included Software: https://github.com/actions/runner-images/blob/win25/20251216.149/images/windows/Windows2025-Readme.md
+2026-01-03T15:06:24.7223641Z Image Release: https://github.com/actions/runner-images/releases/tag/win25%2F20251216.149
+2026-01-03T15:06:24.7224454Z ##[endgroup]
+2026-01-03T15:06:24.7225595Z ##[group]GITHUB_TOKEN Permissions
+2026-01-03T15:06:24.7227740Z Contents: read
+2026-01-03T15:06:24.7228277Z Metadata: read
+2026-01-03T15:06:24.7228701Z Packages: read
+2026-01-03T15:06:24.7229158Z ##[endgroup]
+2026-01-03T15:06:24.7231244Z Secret source: Actions
+2026-01-03T15:06:24.7231895Z Prepare workflow directory
+2026-01-03T15:06:24.7620803Z Prepare all required actions
+2026-01-03T15:06:24.7658141Z Getting action download info
+2026-01-03T15:06:25.1845679Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-01-03T15:06:25.3059340Z Download action repository 'dtolnay/rust-toolchain@stable' (SHA:4be9e76fd7c4901c61fb841f559994984270fce7)
+2026-01-03T15:06:25.7458753Z Download action repository 'swatinem/rust-cache@v2' (SHA:779680da715d629ac1d338a641029a2f4372abb5)
+2026-01-03T15:06:26.6927893Z Download action repository 'actions/cache@v4' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)
+2026-01-03T15:06:26.8294888Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-01-03T15:06:27.2078017Z Complete job name: Build & Package (Windows)
+2026-01-03T15:06:27.3272478Z ##[group]Run actions/checkout@v4
+2026-01-03T15:06:27.3273789Z with:
+2026-01-03T15:06:27.3274134Z   repository: Ambro86/Novapad
+2026-01-03T15:06:27.3274703Z   token: ***
+2026-01-03T15:06:27.3275045Z   ssh-strict: true
+2026-01-03T15:06:27.3275399Z   ssh-user: git
+2026-01-03T15:06:27.3275753Z   persist-credentials: true
+2026-01-03T15:06:27.3276131Z   clean: true
+2026-01-03T15:06:27.3276502Z   sparse-checkout-cone-mode: true
+2026-01-03T15:06:27.3276886Z   fetch-depth: 1
+2026-01-03T15:06:27.3277234Z   fetch-tags: false
+2026-01-03T15:06:27.3277550Z   show-progress: true
+2026-01-03T15:06:27.3277905Z   lfs: false
+2026-01-03T15:06:27.3278191Z   submodules: false
+2026-01-03T15:06:27.3278576Z   set-safe-directory: true
+2026-01-03T15:06:27.3279189Z env:
+2026-01-03T15:06:27.3279499Z   CARGO_TERM_COLOR: always
+2026-01-03T15:06:27.3279894Z ##[endgroup]
+2026-01-03T15:06:27.4976296Z Syncing repository: Ambro86/Novapad
+2026-01-03T15:06:27.4978009Z ##[group]Getting Git version info
+2026-01-03T15:06:27.4978556Z Working directory is 'D:\a\Novapad\Novapad'
+2026-01-03T15:06:27.5837046Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-01-03T15:06:27.8017194Z git version 2.52.0.windows.1
+2026-01-03T15:06:27.8020979Z ##[endgroup]
+2026-01-03T15:06:27.8027976Z Temporarily overriding HOME='D:\a\_temp\3c8d8b7a-000b-4497-8358-e3013bba0cf9' before making global git config changes
+2026-01-03T15:06:27.8029474Z Adding repository directory to the temporary git global config as a safe directory
+2026-01-03T15:06:27.8040898Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\Novapad\Novapad
+2026-01-03T15:06:27.8420963Z Deleting the contents of 'D:\a\Novapad\Novapad'
+2026-01-03T15:06:27.8428437Z ##[group]Initializing the repository
+2026-01-03T15:06:27.8443551Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\Novapad\Novapad
+2026-01-03T15:06:27.8952873Z Initialized empty Git repository in D:/a/Novapad/Novapad/.git/
+2026-01-03T15:06:27.8997448Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/Ambro86/Novapad
+2026-01-03T15:06:27.9329370Z ##[endgroup]
+2026-01-03T15:06:27.9329890Z ##[group]Disabling automatic garbage collection
+2026-01-03T15:06:27.9339292Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-01-03T15:06:27.9625825Z ##[endgroup]
+2026-01-03T15:06:27.9626293Z ##[group]Setting up auth
+2026-01-03T15:06:27.9644869Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-01-03T15:06:27.9934427Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-01-03T15:06:28.9272209Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-01-03T15:06:28.9661560Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-01-03T15:06:29.5258834Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-01-03T15:06:29.5553841Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-01-03T15:06:30.0776682Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-01-03T15:06:30.1073340Z ##[endgroup]
+2026-01-03T15:06:30.1074304Z ##[group]Fetching the repository
+2026-01-03T15:06:30.1088379Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +343e4dbacaca8bc4bcf0afbad863f22658a04379:refs/remotes/origin/master
+2026-01-03T15:06:31.3400887Z From https://github.com/Ambro86/Novapad
+2026-01-03T15:06:31.3401710Z  * [new ref]         343e4dbacaca8bc4bcf0afbad863f22658a04379 -> origin/master
+2026-01-03T15:06:31.3582957Z ##[endgroup]
+2026-01-03T15:06:31.3583301Z ##[group]Determining the checkout info
+2026-01-03T15:06:31.3586268Z ##[endgroup]
+2026-01-03T15:06:31.3601506Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-01-03T15:06:31.3939145Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-01-03T15:06:31.4222609Z ##[group]Checking out the ref
+2026-01-03T15:06:31.4232285Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force -B master refs/remotes/origin/master
+2026-01-03T15:06:31.5412551Z branch 'master' set up to track 'origin/master'.
+2026-01-03T15:06:31.5423200Z Reset branch 'master'
+2026-01-03T15:06:31.5464756Z ##[endgroup]
+2026-01-03T15:06:31.5783966Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-01-03T15:06:31.6045749Z 343e4dbacaca8bc4bcf0afbad863f22658a04379
+2026-01-03T15:06:31.6500743Z ##[group]Run dtolnay/rust-toolchain@stable
+2026-01-03T15:06:31.6501200Z with:
+2026-01-03T15:06:31.6501427Z   toolchain: stable
+2026-01-03T15:06:31.6501585Z env:
+2026-01-03T15:06:31.6501738Z   CARGO_TERM_COLOR: always
+2026-01-03T15:06:31.6501917Z ##[endgroup]
+2026-01-03T15:06:31.6707924Z ##[group]Run : parse toolchain version
+2026-01-03T15:06:31.6708272Z [36;1m: parse toolchain version[0m
+2026-01-03T15:06:31.6708519Z [36;1mif [[ -z $toolchain ]]; then[0m
+2026-01-03T15:06:31.6708967Z [36;1m  # GitHub does not enforce `required: true` inputs itself. https://github.com/actions/runner/issues/1070[0m
+2026-01-03T15:06:31.6710256Z [36;1m  echo "'toolchain' is a required input" >&2[0m
+2026-01-03T15:06:31.6710501Z [36;1m  exit 1[0m
+2026-01-03T15:06:31.6710767Z [36;1melif [[ $toolchain =~ ^stable' '[0-9]+' '(year|month|week|day)s?' 'ago$ ]]; then[0m
+2026-01-03T15:06:31.6711125Z [36;1m  if [[ Windows == macOS ]]; then[0m
+2026-01-03T15:06:31.6711578Z [36;1m    echo "toolchain=1.$((($(date -v-$(sed 's/stable \([0-9]*\) \(.\).*/\1\2/' <<< $toolchain) +%s)/60/60/24-16569)/7/6))" >> $GITHUB_OUTPUT[0m
+2026-01-03T15:06:31.6711981Z [36;1m  else[0m
+2026-01-03T15:06:31.6712307Z [36;1m    echo "toolchain=1.$((($(date --date "${toolchain#stable }" +%s)/60/60/24-16569)/7/6))" >> $GITHUB_OUTPUT[0m
+2026-01-03T15:06:31.6712672Z [36;1m  fi[0m
+2026-01-03T15:06:31.6712907Z [36;1melif [[ $toolchain =~ ^stable' 'minus' '[0-9]+' 'releases?$ ]]; then[0m
+2026-01-03T15:06:31.6713348Z [36;1m  echo "toolchain=1.$((($(date +%s)/60/60/24-16569)/7/6-${toolchain//[^0-9]/}))" >> $GITHUB_OUTPUT[0m
+2026-01-03T15:06:31.6713718Z [36;1melif [[ $toolchain =~ ^1\.[0-9]+$ ]]; then[0m
+2026-01-03T15:06:31.6714133Z [36;1m  echo "toolchain=1.$((i=${toolchain#1.}, c=($(date +%s)/60/60/24-16569)/7/6, i+9*i*(10*i<=c)+90*i*(100*i<=c)))" >> $GITHUB_OUTPUT[0m
+2026-01-03T15:06:31.6714519Z [36;1melse[0m
+2026-01-03T15:06:31.6714710Z [36;1m  echo "toolchain=$toolchain" >> $GITHUB_OUTPUT[0m
+2026-01-03T15:06:31.6714954Z [36;1mfi[0m
+2026-01-03T15:06:31.6732613Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-01-03T15:06:31.6732975Z env:
+2026-01-03T15:06:31.6733127Z   CARGO_TERM_COLOR: always
+2026-01-03T15:06:31.6733362Z   toolchain: stable
+2026-01-03T15:06:31.6733542Z ##[endgroup]
+2026-01-03T15:06:31.7411195Z ##[group]Run : construct rustup command line
+2026-01-03T15:06:31.7411502Z [36;1m: construct rustup command line[0m
+2026-01-03T15:06:31.7411887Z [36;1mecho "targets=$(for t in ${targets//,/ }; do echo -n ' --target' $t; done)" >> $GITHUB_OUTPUT[0m
+2026-01-03T15:06:31.7412403Z [36;1mecho "components=$(for c in ${components//,/ }; do echo -n ' --component' $c; done)" >> $GITHUB_OUTPUT[0m
+2026-01-03T15:06:31.7412816Z [36;1mecho "downgrade=" >> $GITHUB_OUTPUT[0m
+2026-01-03T15:06:31.7426516Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-01-03T15:06:31.7426866Z env:
+2026-01-03T15:06:31.7427037Z   CARGO_TERM_COLOR: always
+2026-01-03T15:06:31.7427217Z   targets: 
+2026-01-03T15:06:31.7427359Z   components: 
+2026-01-03T15:06:31.7427507Z ##[endgroup]
+2026-01-03T15:06:31.8142500Z ##[group]Run : set $CARGO_HOME
+2026-01-03T15:06:31.8142751Z [36;1m: set $CARGO_HOME[0m
+2026-01-03T15:06:31.8143037Z [36;1mecho CARGO_HOME=${CARGO_HOME:-"$USERPROFILE\.cargo"} >> $GITHUB_ENV[0m
+2026-01-03T15:06:31.8157174Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-01-03T15:06:31.8157519Z env:
+2026-01-03T15:06:31.8157676Z   CARGO_TERM_COLOR: always
+2026-01-03T15:06:31.8157862Z ##[endgroup]
+2026-01-03T15:06:31.8659915Z ##[group]Run : install rustup if needed on windows
+2026-01-03T15:06:31.8660268Z [36;1m: install rustup if needed on windows[0m
+2026-01-03T15:06:31.8660532Z [36;1mif ! command -v rustup &>/dev/null; then[0m
+2026-01-03T15:06:31.8662945Z [36;1m  curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused --location --silent --show-error --fail https://win.rustup.rs/x86_64 --output 'D:\a\_temp\rustup-init.exe'[0m
+2026-01-03T15:06:31.8663776Z [36;1m  'D:\a\_temp\rustup-init.exe' --default-toolchain none --no-modify-path -y[0m
+2026-01-03T15:06:31.8664147Z [36;1m  echo "$CARGO_HOME\bin" >> $GITHUB_PATH[0m
+2026-01-03T15:06:31.8664374Z [36;1mfi[0m
+2026-01-03T15:06:31.8677964Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-01-03T15:06:31.8678316Z env:
+2026-01-03T15:06:31.8678464Z   CARGO_TERM_COLOR: always
+2026-01-03T15:06:31.8678681Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-01-03T15:06:31.8678899Z ##[endgroup]
+2026-01-03T15:06:31.9259978Z ##[group]Run rustup toolchain install stable --profile minimal --no-self-update
+2026-01-03T15:06:31.9260637Z [36;1mrustup toolchain install stable --profile minimal --no-self-update[0m
+2026-01-03T15:06:31.9273730Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-01-03T15:06:31.9274074Z env:
+2026-01-03T15:06:31.9274236Z   CARGO_TERM_COLOR: always
+2026-01-03T15:06:31.9274445Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-01-03T15:06:31.9274674Z   RUSTUP_PERMIT_COPY_RENAME: 1
+2026-01-03T15:06:31.9274866Z ##[endgroup]
+2026-01-03T15:06:35.0400233Z info: syncing channel updates for 'stable-x86_64-pc-windows-msvc'
+2026-01-03T15:06:35.4266999Z 
+2026-01-03T15:06:35.4464020Z   stable-x86_64-pc-windows-msvc unchanged - rustc 1.92.0 (ded5c06cf 2025-12-08)
+2026-01-03T15:06:35.4464593Z 
+2026-01-03T15:06:35.4661088Z ##[group]Run rustup default stable
+2026-01-03T15:06:35.4661331Z [36;1mrustup default stable[0m
+2026-01-03T15:06:35.4674828Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-01-03T15:06:35.4675186Z env:
+2026-01-03T15:06:35.4675329Z   CARGO_TERM_COLOR: always
+2026-01-03T15:06:35.4675542Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-01-03T15:06:35.4675766Z ##[endgroup]
+2026-01-03T15:06:35.5415813Z info: using existing install for 'stable-x86_64-pc-windows-msvc'
+2026-01-03T15:06:35.5965514Z info: default toolchain set to 'stable-x86_64-pc-windows-msvc'
+2026-01-03T15:06:35.5966099Z 
+2026-01-03T15:06:35.6152039Z   stable-x86_64-pc-windows-msvc unchanged - rustc 1.92.0 (ded5c06cf 2025-12-08)
+2026-01-03T15:06:35.6152391Z 
+2026-01-03T15:06:35.6345056Z ##[group]Run : create cachekey
+2026-01-03T15:06:35.6345300Z [36;1m: create cachekey[0m
+2026-01-03T15:06:35.6345719Z [36;1mDATE=$(rustc +stable --version --verbose | sed -ne 's/^commit-date: \(20[0-9][0-9]\)-\([01][0-9]\)-\([0-3][0-9]\)$/\1\2\3/p')[0m
+2026-01-03T15:06:35.6346255Z [36;1mHASH=$(rustc +stable --version --verbose | sed -ne 's/^commit-hash: //p')[0m
+2026-01-03T15:06:35.6346707Z [36;1mecho "cachekey=$(echo $DATE$HASH | head -c12)" >> $GITHUB_OUTPUT[0m
+2026-01-03T15:06:35.6360649Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-01-03T15:06:35.6360986Z env:
+2026-01-03T15:06:35.6361141Z   CARGO_TERM_COLOR: always
+2026-01-03T15:06:35.6361349Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-01-03T15:06:35.6361576Z ##[endgroup]
+2026-01-03T15:06:36.4606988Z ##[group]Run : disable incremental compilation
+2026-01-03T15:06:36.4607287Z [36;1m: disable incremental compilation[0m
+2026-01-03T15:06:36.4607550Z [36;1mif [ -z "${CARGO_INCREMENTAL+set}" ]; then[0m
+2026-01-03T15:06:36.4607819Z [36;1m  echo CARGO_INCREMENTAL=0 >> $GITHUB_ENV[0m
+2026-01-03T15:06:36.4608041Z [36;1mfi[0m
+2026-01-03T15:06:36.4621079Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-01-03T15:06:36.4621416Z env:
+2026-01-03T15:06:36.4621567Z   CARGO_TERM_COLOR: always
+2026-01-03T15:06:36.4621781Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-01-03T15:06:36.4622020Z ##[endgroup]
+2026-01-03T15:06:36.5099536Z ##[group]Run : enable colors in Cargo output
+2026-01-03T15:06:36.5099822Z [36;1m: enable colors in Cargo output[0m
+2026-01-03T15:06:36.5100074Z [36;1mif [ -z "${CARGO_TERM_COLOR+set}" ]; then[0m
+2026-01-03T15:06:36.5101089Z [36;1m  echo CARGO_TERM_COLOR=always >> $GITHUB_ENV[0m
+2026-01-03T15:06:36.5101354Z [36;1mfi[0m
+2026-01-03T15:06:36.5114385Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-01-03T15:06:36.5114707Z env:
+2026-01-03T15:06:36.5114855Z   CARGO_TERM_COLOR: always
+2026-01-03T15:06:36.5115066Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-01-03T15:06:36.5115281Z   CARGO_INCREMENTAL: 0
+2026-01-03T15:06:36.5115446Z ##[endgroup]
+2026-01-03T15:06:36.5575327Z ##[group]Run : enable Cargo sparse registry
+2026-01-03T15:06:36.5575624Z [36;1m: enable Cargo sparse registry[0m
+2026-01-03T15:06:36.5575932Z [36;1m# implemented in 1.66, stabilized in 1.68, made default in 1.70[0m
+2026-01-03T15:06:36.5576649Z [36;1mif [ -z "${CARGO_REGISTRIES_CRATES_IO_PROTOCOL+set}" -o -f "D:\a\_temp"/.implicit_cargo_registries_crates_io_protocol ]; then[0m
+2026-01-03T15:06:36.5577201Z [36;1m  if rustc +stable --version --verbose | grep -q '^release: 1\.6[89]\.'; then[0m
+2026-01-03T15:06:36.5577633Z [36;1m    touch "D:\a\_temp"/.implicit_cargo_registries_crates_io_protocol || true[0m
+2026-01-03T15:06:36.5578029Z [36;1m    echo CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse >> $GITHUB_ENV[0m
+2026-01-03T15:06:36.5578452Z [36;1m  elif rustc +stable --version --verbose | grep -q '^release: 1\.6[67]\.'; then[0m
+2026-01-03T15:06:36.5578891Z [36;1m    touch "D:\a\_temp"/.implicit_cargo_registries_crates_io_protocol || true[0m
+2026-01-03T15:06:36.5579276Z [36;1m    echo CARGO_REGISTRIES_CRATES_IO_PROTOCOL=git >> $GITHUB_ENV[0m
+2026-01-03T15:06:36.5579558Z [36;1m  fi[0m
+2026-01-03T15:06:36.5579696Z [36;1mfi[0m
+2026-01-03T15:06:36.5592666Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-01-03T15:06:36.5592995Z env:
+2026-01-03T15:06:36.5593141Z   CARGO_TERM_COLOR: always
+2026-01-03T15:06:36.5593343Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-01-03T15:06:36.5593570Z   CARGO_INCREMENTAL: 0
+2026-01-03T15:06:36.5593738Z ##[endgroup]
+2026-01-03T15:06:36.7445578Z ##[group]Run : work around spurious network errors in curl 8.0
+2026-01-03T15:06:36.7445941Z [36;1m: work around spurious network errors in curl 8.0[0m
+2026-01-03T15:06:36.7446422Z [36;1m# https://rust-lang.zulipchat.com/#narrow/stream/246057-t-cargo/topic/timeout.20investigation[0m
+2026-01-03T15:06:36.7446954Z [36;1mif rustc +stable --version --verbose | grep -q '^release: 1\.7[01]\.'; then[0m
+2026-01-03T15:06:36.7447342Z [36;1m  echo CARGO_HTTP_MULTIPLEXING=false >> $GITHUB_ENV[0m
+2026-01-03T15:06:36.7447590Z [36;1mfi[0m
+2026-01-03T15:06:36.7461243Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-01-03T15:06:36.7461564Z env:
+2026-01-03T15:06:36.7461732Z   CARGO_TERM_COLOR: always
+2026-01-03T15:06:36.7461934Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-01-03T15:06:36.7462168Z   CARGO_INCREMENTAL: 0
+2026-01-03T15:06:36.7462330Z ##[endgroup]
+2026-01-03T15:06:36.8728374Z ##[group]Run rustc +stable --version --verbose
+2026-01-03T15:06:36.8728674Z [36;1mrustc +stable --version --verbose[0m
+2026-01-03T15:06:36.8741849Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-01-03T15:06:36.8742183Z env:
+2026-01-03T15:06:36.8742336Z   CARGO_TERM_COLOR: always
+2026-01-03T15:06:36.8742541Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-01-03T15:06:36.8742779Z   CARGO_INCREMENTAL: 0
+2026-01-03T15:06:36.8742941Z ##[endgroup]
+2026-01-03T15:06:36.9535760Z rustc 1.92.0 (ded5c06cf 2025-12-08)
+2026-01-03T15:06:36.9536262Z binary: rustc
+2026-01-03T15:06:36.9536632Z commit-hash: ded5c06cf21d2b93bffd5d884aa6e96934ee4234
+2026-01-03T15:06:36.9537111Z commit-date: 2025-12-08
+2026-01-03T15:06:36.9537444Z host: x86_64-pc-windows-msvc
+2026-01-03T15:06:36.9537811Z release: 1.92.0
+2026-01-03T15:06:36.9538164Z LLVM version: 21.1.3
+2026-01-03T15:06:36.9833378Z ##[group]Run swatinem/rust-cache@v2
+2026-01-03T15:06:36.9833658Z with:
+2026-01-03T15:06:36.9833822Z   prefix-key: v0-rust
+2026-01-03T15:06:36.9834011Z   add-job-id-key: true
+2026-01-03T15:06:36.9834212Z   add-rust-environment-hash-key: true
+2026-01-03T15:06:36.9834438Z   cache-targets: true
+2026-01-03T15:06:36.9834612Z   cache-all-crates: false
+2026-01-03T15:06:36.9834813Z   cache-workspace-crates: false
+2026-01-03T15:06:36.9835004Z   save-if: true
+2026-01-03T15:06:36.9835169Z   cache-provider: github
+2026-01-03T15:06:36.9835340Z   cache-bin: true
+2026-01-03T15:06:36.9835497Z   lookup-only: false
+2026-01-03T15:06:36.9835647Z env:
+2026-01-03T15:06:36.9835792Z   CARGO_TERM_COLOR: always
+2026-01-03T15:06:36.9835987Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-01-03T15:06:36.9836205Z   CARGO_INCREMENTAL: 0
+2026-01-03T15:06:36.9836372Z ##[endgroup]
+2026-01-03T15:06:39.4132665Z ##[group]Cache Configuration
+2026-01-03T15:06:39.4148485Z Cache Provider:
+2026-01-03T15:06:39.4149958Z     github
+2026-01-03T15:06:39.4151429Z Workspaces:
+2026-01-03T15:06:39.4152007Z     D:\a\Novapad\Novapad
+2026-01-03T15:06:39.4152330Z Cache Paths:
+2026-01-03T15:06:39.4152830Z     C:\Users\runneradmin\.cargo\bin
+2026-01-03T15:06:39.4153241Z     C:\Users\runneradmin\.cargo\.crates.toml
+2026-01-03T15:06:39.4155026Z     C:\Users\runneradmin\.cargo\.crates2.json
+2026-01-03T15:06:39.4155514Z     C:\Users\runneradmin\.cargo\registry
+2026-01-03T15:06:39.4155881Z     C:\Users\runneradmin\.cargo\git
+2026-01-03T15:06:39.4156221Z     D:\a\Novapad\Novapad\target
+2026-01-03T15:06:39.4156556Z Restore Key:
+2026-01-03T15:06:39.4156880Z     v0-rust-build-windows-Windows_NT-x64-7a6c70a5
+2026-01-03T15:06:39.4157276Z Cache Key:
+2026-01-03T15:06:39.4157595Z     v0-rust-build-windows-Windows_NT-x64-7a6c70a5-b6a2b03e
+2026-01-03T15:06:39.4158072Z .. Prefix:
+2026-01-03T15:06:39.4158398Z   - v0-rust-build-windows-Windows_NT-x64
+2026-01-03T15:06:39.4158777Z .. Environment considered:
+2026-01-03T15:06:39.4159313Z   - Rust Version: 1.92.0 x86_64-pc-windows-msvc (ded5c06cf21d2b93bffd5d884aa6e96934ee4234)
+2026-01-03T15:06:39.4159861Z   - CARGO_HOME
+2026-01-03T15:06:39.4160025Z   - CARGO_INCREMENTAL
+2026-01-03T15:06:39.4160192Z   - CARGO_TERM_COLOR
+2026-01-03T15:06:39.4160380Z .. Lockfiles considered:
+2026-01-03T15:06:39.4160720Z   - D:\a\Novapad\Novapad\Cargo.lock
+2026-01-03T15:06:39.4161069Z   - D:\a\Novapad\Novapad\Cargo.toml
+2026-01-03T15:06:39.4161465Z ##[endgroup]
+2026-01-03T15:06:39.4161557Z 
+2026-01-03T15:06:39.4161621Z ... Restoring cache ...
+2026-01-03T15:06:39.8471374Z Cache hit for: v0-rust-build-windows-Windows_NT-x64-7a6c70a5-b6a2b03e
+2026-01-03T15:06:41.0761997Z Received 29360128 of 1205410683 (2.4%), 28.0 MBs/sec
+2026-01-03T15:06:42.0771581Z Received 134217728 of 1205410683 (11.1%), 64.0 MBs/sec
+2026-01-03T15:06:43.0965907Z Received 268435456 of 1205410683 (22.3%), 84.8 MBs/sec
+2026-01-03T15:06:44.1503610Z Received 402653184 of 1205410683 (33.4%), 94.3 MBs/sec
+2026-01-03T15:06:45.1560380Z Received 536870912 of 1205410683 (44.5%), 100.8 MBs/sec
+2026-01-03T15:06:46.1686644Z Received 671088640 of 1205410683 (55.7%), 105.1 MBs/sec
+2026-01-03T15:06:47.2048187Z Received 805306368 of 1205410683 (66.8%), 107.8 MBs/sec
+2026-01-03T15:06:48.3510239Z Received 939524096 of 1205410683 (77.9%), 108.3 MBs/sec
+2026-01-03T15:06:49.3516045Z Received 1069547520 of 1205410683 (88.7%), 110.0 MBs/sec
+2026-01-03T15:06:50.3554489Z Received 1166016512 of 1205410683 (96.7%), 108.2 MBs/sec
+2026-01-03T15:06:50.7990956Z Received 1205410683 of 1205410683 (100.0%), 107.2 MBs/sec
+2026-01-03T15:06:50.7995190Z Cache Size: ~1150 MB (1205410683 B)
+2026-01-03T15:06:50.8037197Z [command]"C:\Program Files\Git\usr\bin\tar.exe" -xf D:/a/_temp/85f382b0-ccef-454d-908d-e1bbe1f11a0e/cache.tzst -P -C D:/a/Novapad/Novapad --force-local --use-compress-program "zstd -d"
+2026-01-03T15:07:08.7853836Z Cache restored successfully
+2026-01-03T15:07:08.7907100Z Restored from cache key "v0-rust-build-windows-Windows_NT-x64-7a6c70a5-b6a2b03e" full match: true.
+2026-01-03T15:07:08.8280067Z ##[group]Run cargo fmt --check
+2026-01-03T15:07:08.8280535Z [36;1mcargo fmt --check[0m
+2026-01-03T15:07:08.8480010Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-01-03T15:07:08.8480355Z env:
+2026-01-03T15:07:08.8480526Z   CARGO_TERM_COLOR: always
+2026-01-03T15:07:08.8480769Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-01-03T15:07:08.8481037Z   CARGO_INCREMENTAL: 0
+2026-01-03T15:07:08.8481244Z   CACHE_ON_FAILURE: false
+2026-01-03T15:07:08.8481446Z ##[endgroup]
+2026-01-03T15:07:15.9157236Z Diff in \\?\D:\a\Novapad\Novapad\src\app_windows\find_in_files_window.rs:7:
+2026-01-03T15:07:15.9162174Z  use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
+2026-01-03T15:07:15.9162600Z  use windows::Win32::System::Com::CoTaskMemFree;
+2026-01-03T15:07:15.9163146Z  use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+2026-01-03T15:07:15.9165270Z [32m+use windows::Win32::UI::Controls::Dialogs::FR_MATCHCASE;
+2026-01-03T15:07:15.9166478Z [0m[32m+use windows::Win32::UI::Controls::RichEdit::{CHARRANGE, EM_EXSETSEL, EM_FINDTEXTEXW, FINDTEXTEXW};
+2026-01-03T15:07:15.9167684Z [0m use windows::Win32::UI::Controls::{
+2026-01-03T15:07:15.9168323Z      NM_RETURN, NMHDR, NMTVKEYDOWN, PBM_SETPOS, PBM_SETRANGE, PROGRESS_CLASSW, TVN_KEYDOWN,
+2026-01-03T15:07:15.9168957Z      WC_BUTTON, WC_EDIT, WC_STATIC,
+2026-01-03T15:07:15.9169496Z Diff in \\?\D:\a\Novapad\Novapad\src\app_windows\find_in_files_window.rs:13:
+2026-01-03T15:07:15.9170027Z  };
+2026-01-03T15:07:15.9170560Z [31m-use windows::Win32::UI::Controls::Dialogs::FR_MATCHCASE;
+2026-01-03T15:07:15.9171210Z [0m use windows::Win32::UI::Controls::{
+2026-01-03T15:07:15.9171826Z      TVGN_CARET, TVI_ROOT, TVIF_PARAM, TVIF_TEXT, TVINSERTSTRUCTW, TVINSERTSTRUCTW_0,
+2026-01-03T15:07:15.9172772Z      TVITEMEXW_CHILDREN, TVITEMW, TVM_DELETEITEM, TVM_GETITEMW, TVM_GETNEXTITEM, TVM_INSERTITEMW,
+2026-01-03T15:07:15.9173682Z Diff in \\?\D:\a\Novapad\Novapad\src\app_windows\find_in_files_window.rs:18:
+2026-01-03T15:07:15.9174902Z      TVM_SELECTITEM, TVS_HASBUTTONS, TVS_HASLINES, TVS_LINESATROOT, TVS_SHOWSELALWAYS,
+2026-01-03T15:07:15.9175513Z  };
+2026-01-03T15:07:15.9176343Z [31m-use windows::Win32::UI::Controls::RichEdit::{CHARRANGE, EM_EXSETSEL, EM_FINDTEXTEXW, FINDTEXTEXW};
+2026-01-03T15:07:15.9177304Z [0m use windows::Win32::UI::Input::KeyboardAndMouse::{
+2026-01-03T15:07:15.9177859Z      EnableWindow, GetFocus, SetFocus, VK_ESCAPE, VK_RETURN,
+2026-01-03T15:07:15.9178349Z  };
+2026-01-03T15:07:15.9178782Z Diff in \\?\D:\a\Novapad\Novapad\src\app_windows\find_in_files_window.rs:1174:
+2026-01-03T15:07:15.9179370Z          WPARAM(FR_MATCHCASE.0 as usize),
+2026-01-03T15:07:15.9179798Z          LPARAM(&mut ft as *mut _ as isize),
+2026-01-03T15:07:15.9180177Z      )
+2026-01-03T15:07:15.9180472Z [31m-    .0
+2026-01-03T15:07:15.9180789Z [0m[31m-        != -1;
+2026-01-03T15:07:15.9181177Z [0m[32m+    .0 != -1;
+2026-01-03T15:07:15.9181498Z [0m 
+2026-01-03T15:07:15.9181734Z      if found {
+2026-01-03T15:07:15.9182024Z          let mut sel = ft.chrgText;
+2026-01-03T15:07:15.9387733Z Diff in \\?\D:\a\Novapad\Novapad\src\app_windows\options_window.rs:1558:
+2026-01-03T15:07:15.9388325Z      settings.check_updates_on_startup =
+2026-01-03T15:07:15.9388995Z          SendMessageW(checkbox_check_updates, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
+2026-01-03T15:07:15.9389610Z              == BST_CHECKED.0;
+2026-01-03T15:07:15.9390113Z [31m-    settings.settings_in_current_dir =
+2026-01-03T15:07:15.9390965Z [0m[31m-        SendMessageW(checkbox_settings_current_dir, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
+2026-01-03T15:07:15.9391441Z [0m[31m-            == BST_CHECKED.0;
+2026-01-03T15:07:15.9391785Z [0m[32m+    settings.settings_in_current_dir = SendMessageW(
+2026-01-03T15:07:15.9392135Z [0m[32m+        checkbox_settings_current_dir,
+2026-01-03T15:07:15.9392433Z [0m[32m+        BM_GETCHECK,
+2026-01-03T15:07:15.9392670Z [0m[32m+        WPARAM(0),
+2026-01-03T15:07:15.9394898Z [0m[32m+        LPARAM(0),
+2026-01-03T15:07:15.9395220Z [0m[32m+    )
+2026-01-03T15:07:15.9395428Z [0m[32m+    .0 as u32
+2026-01-03T15:07:15.9395664Z [0m[32m+        == BST_CHECKED.0;
+2026-01-03T15:07:15.9395973Z [0m     settings.prompt_auto_scroll = SendMessageW(
+2026-01-03T15:07:15.9396255Z          checkbox_prompt_autoscroll,
+2026-01-03T15:07:15.9396491Z          BM_GETCHECK,
+2026-01-03T15:07:16.0369501Z Diff in \\?\D:\a\Novapad\Novapad\src\main.rs:2819:
+2026-01-03T15:07:16.0369978Z  }
+2026-01-03T15:07:16.0370202Z  
+2026-01-03T15:07:16.0370559Z  unsafe fn open_path_with_behavior(hwnd: HWND, path: &Path) {
+2026-01-03T15:07:16.0371460Z [31m-    let behavior = with_state(hwnd, |state| state.settings.open_behavior)
+2026-01-03T15:07:16.0372280Z [0m[31m-        .unwrap_or(OpenBehavior::NewTab);
+2026-01-03T15:07:16.0372758Z [0m[32m+    let behavior =
+2026-01-03T15:07:16.0373932Z [0m[32m+        with_state(hwnd, |state| state.settings.open_behavior).unwrap_or(OpenBehavior::NewTab);
+2026-01-03T15:07:16.0374791Z [0m     if behavior == OpenBehavior::NewWindow {
+2026-01-03T15:07:16.0375261Z          if spawn_new_window_with_path(path) {
+2026-01-03T15:07:16.0375652Z              return;
+2026-01-03T15:07:16.7545202Z ##[error]Process completed with exit code 1.
+2026-01-03T15:07:16.7776970Z Post job cleanup.
+2026-01-03T15:07:17.0555811Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-01-03T15:07:17.1705721Z git version 2.52.0.windows.1
+2026-01-03T15:07:17.1781071Z Temporarily overriding HOME='D:\a\_temp\6d8428fe-3597-4f10-b0c5-261ab78847fa' before making global git config changes
+2026-01-03T15:07:17.1782070Z Adding repository directory to the temporary git global config as a safe directory
+2026-01-03T15:07:17.1792658Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\Novapad\Novapad
+2026-01-03T15:07:17.2143799Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-01-03T15:07:17.2437168Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-01-03T15:07:17.8800004Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-01-03T15:07:17.9054912Z http.https://github.com/.extraheader
+2026-01-03T15:07:17.9094862Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-01-03T15:07:17.9381815Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-01-03T15:07:18.4513628Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-01-03T15:07:18.4802935Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-01-03T15:07:18.9929579Z Cleaning up orphan processes

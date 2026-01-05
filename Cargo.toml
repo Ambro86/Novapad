@@ -1,6 +1,6 @@
 [package]
 name = "novapad"
-version = "0.5.6"
+version = "0.5.7"
 edition = "2024"
 authors = ["Ambrogio Riili"]
 description = "A modern Notepad with PDF, DOCX, XLS and EPUB support and TTS capabilities."

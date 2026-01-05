@@ -70,6 +70,114 @@ struct PromptLabels {
     clear_confirm: String,
 }
 
+struct AnsiStripper {
+    state: AnsiState,
+    chars_consumed: usize,
+}
+
+enum AnsiState {
+    Normal,
+    Esc,
+    Csi,
+    Osc,
+    OscEsc, // Met ESC while in OSC, waiting for backslash
+}
+
+impl AnsiStripper {
+    fn new() -> Self {
+        Self {
+            state: AnsiState::Normal,
+            chars_consumed: 0,
+        }
+    }
+
+    fn process(&mut self, input: &str) -> String {
+        let mut out = String::with_capacity(input.len());
+        for ch in input.chars() {
+            // Safety valve: prevent getting stuck in a state for too long
+            if !matches!(self.state, AnsiState::Normal) {
+                self.chars_consumed += 1;
+                if self.chars_consumed > 1000 {
+                    self.state = AnsiState::Normal;
+                    self.chars_consumed = 0;
+                }
+            }
+
+            match self.state {
+                AnsiState::Normal => {
+                    if ch == '\x1B' {
+                        self.state = AnsiState::Esc;
+                        self.chars_consumed = 0;
+                    } else {
+                        out.push(ch);
+                    }
+                }
+                AnsiState::Esc => {
+                    match ch {
+                        '[' => self.state = AnsiState::Csi,
+                        ']' => self.state = AnsiState::Osc,
+                        '(' | ')' | '>' | '=' | '7' | '8' | 'M' | 'E' | 'D' | 'H' | 'Z' => {
+                            // Simple sequences, just consume and return to normal
+                            self.state = AnsiState::Normal;
+                        }
+                        _ => {
+                            // Unknown sequence or simple ESC
+                            self.state = AnsiState::Normal;
+                            out.push(ch);
+                        }
+                    }
+                }
+                AnsiState::Csi => {
+                    // CSI sequences MUST be ASCII.
+                    // Parameter bytes: 0x30–0x3F (0-9:;<=>?)
+                    // Intermediate bytes: 0x20–0x2F (space !"#$%&'()*+,-./)
+                    // Final bytes: 0x40–0x7E (@A-Z[\]^_`a-z{|}~)
+                    if ch.is_ascii() {
+                        let b = ch as u8;
+                        if (0x40..=0x7E).contains(&b) {
+                            // Valid terminator
+                            self.state = AnsiState::Normal;
+                        } else if (0x20..=0x3F).contains(&b) {
+                            // Valid parameter/intermediate, consume
+                        } else {
+                            // Invalid ASCII char for CSI (e.g. control char < 0x20)
+                            // Abort sequence and output character
+                            self.state = AnsiState::Normal;
+                            out.push(ch);
+                        }
+                    } else {
+                        // Non-ASCII character (e.g. UTF-8 box drawing).
+                        // Definitely not part of a standard CSI sequence.
+                        // Abort sequence and output character.
+                        self.state = AnsiState::Normal;
+                        out.push(ch);
+                    }
+                }
+                AnsiState::Osc => {
+                    if ch == '\x07' {
+                        // BEL terminates OSC
+                        self.state = AnsiState::Normal;
+                    } else if ch == '\x1B' {
+                        // Check for ST (ESC \)
+                        self.state = AnsiState::OscEsc;
+                    }
+                    // Otherwise consume content of OSC
+                }
+                AnsiState::OscEsc => {
+                    if ch == '\\' {
+                        self.state = AnsiState::Normal;
+                    } else {
+                        // Not a backslash, so it wasn't an ST terminator.
+                        // We are still in OSC mode.
+                        self.state = AnsiState::Osc;
+                    }
+                }
+            }
+        }
+        out
+    }
+}
+
 struct PromptState {
     parent: HWND,
     label_input: HWND,
@@ -99,6 +207,7 @@ struct PromptState {
     beep_state: Arc<PromptBeepState>,
     session: Option<ConPtySession>,
     reader_cancel: Arc<AtomicBool>,
+    ansi_stripper: AnsiStripper,
 }
 
 fn prompt_labels(language: Language) -> PromptLabels {
@@ -514,10 +623,9 @@ unsafe extern "system" fn prompt_wndproc(
             let announce_lines = settings.prompt_announce_lines;
             let beep_on_idle = settings.prompt_beep_on_idle;
             let prevent_sleep = settings.prompt_prevent_sleep;
-            let program_is_codex = settings
-                .prompt_program
-                .to_ascii_lowercase()
-                .contains("codex");
+            let program_lower = settings.prompt_program.to_ascii_lowercase();
+            let program_is_codex =
+                program_lower.contains("codex") || program_lower.contains("claude");
             let _ = SendMessageW(
                 checkbox_autoscroll,
                 BM_SETCHECK,
@@ -580,6 +688,7 @@ unsafe extern "system" fn prompt_wndproc(
                 beep_state: beep_state.clone(),
                 session: None,
                 reader_cancel: reader_cancel.clone(),
+                ansi_stripper: AnsiStripper::new(),
             };
 
             layout_prompt(hwnd, &state);
@@ -1093,11 +1202,12 @@ fn confirm_clear_output(hwnd: HWND, parent: HWND) -> bool {
 
 fn append_output(state: &mut PromptState, text: &str) {
     let filtered = if state.strip_ansi {
-        strip_ansi_csi(text)
+        let stripped = state.ansi_stripper.process(text);
+        filter_context_left_lines(&stripped)
     } else {
         text.to_string()
     };
-    let filtered = filter_context_left_lines(&filtered);
+
     let filtered_units = filtered.encode_utf16().count();
     if state.buffer_utf16_len + filtered_units > PROMPT_OUTPUT_LIMIT {
         unsafe {
@@ -1207,8 +1317,9 @@ fn append_output(state: &mut PromptState, text: &str) {
     let replace_text = if had_cr {
         state.buffer[prev_line_start_byte..].to_string()
     } else {
-        delta
+        delta.clone() // Clone for debug log
     };
+
     let wide = to_wide(&replace_text);
     unsafe {
         let _ = SendMessageW(
@@ -1305,29 +1416,6 @@ fn looks_like_prompt(line: &str) -> bool {
     }
     let last = trimmed.chars().last().unwrap_or(' ');
     matches!(last, '>' | '$' | '#')
-}
-
-fn strip_ansi_csi(input: &str) -> String {
-    let mut out = String::new();
-    let mut chars = input.chars().peekable();
-    while let Some(ch) = chars.next() {
-        if ch == '\x1B' {
-            if matches!(chars.peek(), Some(&'[')) {
-                let _ = chars.next();
-                for next in chars.by_ref() {
-                    if next.is_ascii_alphabetic() {
-                        if matches!(next, 'm' | 'K' | 'G' | 'J') {
-                            break;
-                        }
-                        break;
-                    }
-                }
-                continue;
-            }
-        }
-        out.push(ch);
-    }
-    out
 }
 
 fn filter_context_left_lines(input: &str) -> String {

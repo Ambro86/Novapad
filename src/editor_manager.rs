@@ -2243,7 +2243,8 @@ pub unsafe fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> 
                 let initial_encoding = state.docs[index]
                     .current_save_text_encoding
                     .or(state.docs[index].opened_text_encoding)
-                    .unwrap_or(state.settings.default_text_encoding);
+                    .or(state.docs[index].opened_text_encoding)
+                    .unwrap_or_default();
                 match crate::save_file_dialog_with_encoding(
                     hwnd,
                     Some(&suggested_name),
@@ -2286,7 +2287,7 @@ pub unsafe fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> 
                 state.docs[index]
                     .current_save_text_encoding
                     .or(state.docs[index].opened_text_encoding)
-                    .unwrap_or(state.settings.default_text_encoding)
+                    .unwrap_or_default()
             };
             let bytes = encode_text(&text, encoding);
             if let Err(err) = std::fs::write(&path, bytes) {

@@ -58,6 +58,11 @@ Insert Bookmark: Save the current cursor position or audiobook time (Ctrl+B).
 Manage Bookmarks: View, jump to, or delete saved bookmarks. When opening a file with bookmarks, the cursor or playback will automatically resume from the first available one.
 
 Tools:
+Batch Audiobooks: opens a window to convert a list of files (or entire folders) into audiobooks.
+- Add files/folders to the queue.
+- Choose destination folder and format (MP3 or WAV).
+- Options to create subfolders and avoid overwrites.
+- Press Start to process everything in the background.
 Dictionary: Open the dictionary window. The list is navigated with Up/Down arrows.
 Tab moves to the "Add entries to dictionary" button, activated with Enter or Space.
 In the add/edit window: enter "Original word", then Tab to "Replacement word", then OK or Cancel (Enter/Space). ESC cancels.

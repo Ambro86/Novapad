@@ -1,4 +1,16 @@
 # Changelog
+Version 0.5.7 - 2026-01-05
+New features
+• Added Batch Audiobooks feature to convert multiple files/folders at once.
+• Added support for Markdown files (.md).
+• Added file encoding selection when opening text files.
+• Added option in the accessible terminal to announce new lines with NVDA.
+Improvements
+• Audiobook recording now saves natively to MP3 when selected.
+• User can now choose the position of the "unsaved changes" asterisk (*) in the window title.
+• Improved the update system robustness across different scenarios.
+• Added "Remove Hyphens" in Edit menu to fix OCR line-endings.
+
 Version 0.5.6 - 2026-01-04
 Fixes
  Improved Find in Files so pressing Enter opens the file exactly at the selected snippet.

@@ -1,5 +1,17 @@
 # Changelog
 
+Versione 0.5.7 - 2026-01-05
+Nuove funzionalita
+• Aggiunta l'opzione per registrare audiolibri in batch (conversione multipla di file e cartelle).
+• Aggiunto il supporto per i file Markdown (.md).
+• Aggiunta la scelta della codifica (encoding) all'apertura dei file di testo.
+• Aggiunta l'opzione nel terminale per annunciare con NVDA le nuove righe in arrivo.
+Miglioramenti
+• Il salvataggio delle registrazioni (audiolibri) avviene ora in MP3 nativo quando selezionato.
+• L'utente può scegliere dove inserire l'asterisco * che indica le modifiche non salvate (titolo finestra).
+• Migliorato il sistema di aggiornamento per renderlo più robusto in diversi scenari.
+• Aggiunta nel menu Modifica la funzione per rimuovere i trattini a fine riga (utile per testi OCR).
+
 Versione 0.5.6 - 2026-01-04
 Fix
  Migliorata Trova nei file: premendo Invio apre il file esattamente alla posizione dello snippet selezionato.

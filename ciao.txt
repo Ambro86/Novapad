@@ -1,0 +1,122 @@
+Implement an accessible “Registra podcast…” feature in Novapad (Windows / Win32), focused on screen-reader accessibility (NVDA) and reliable capture.
+
+Core requirements:
+
+* Must record audio from:
+
+  * Microphone (input capture)
+  * Computer/System audio (WASAPI loopback)
+  * Both mixed into a single track
+* Must allow disabling the microphone and recording ONLY system audio.
+* Must allow choosing output format WAV or MP3, default MP3.
+
+Menu integration:
+
+* Add a new command “Registra podcast…” in the File (File) menu.
+* Add a keyboard shortcut Ctrl+Shift+R to open or focus the recording window/dialog.
+
+UI (accessibility-first):
+
+* Create a modal dialog or dedicated window “Registra podcast”.
+* Controls must be fully keyboard accessible and screen-reader friendly with explicit labels.
+* Recommended control order (Tab order MUST follow this):
+
+  1. INPUT SOURCES group:
+
+     * Checkbox: “Include Microfono” (default ON)
+     * Dropdown: “Dispositivo microfono” (default = system default; disabled if mic unchecked)
+     * Checkbox: “Include Audio di sistema” (default ON if available; otherwise OFF + explanatory text)
+     * Dropdown: “Dispositivo audio di sistema” (default = system default render; optional)
+  2. OUTPUT group:
+
+     * Dropdown: “Formato” (MP3, WAV) default MP3
+     * If MP3 selected: dropdown “Bitrate” (128 kbps default; optional 192/256)
+     * Text field: “Percorso di salvataggio”
+     * Button: “Sfoglia…”
+     * Read-only text: shows the final filename preview “Podcast_YYYY-MM-DD_HH-mm-ss.mp3”
+  3. CONTROLS group:
+
+     * Button: Start
+     * Button: Pause
+     * Button: Resume
+     * Button: Stop & Save
+     * Button: Close
+  4. STATUS/LEVELS:
+
+     * Status text: Idle / Recording / Paused / Saving / Error
+     * Elapsed time label
+     * Level indicators for Mic and System (must be accessible; numeric peak value is sufficient)
+* Do not steal focus when status/levels update.
+
+Keyboard behavior / hotkeys:
+
+* Ctrl+S: Start
+* Ctrl+P: Pause / Resume (toggle)
+* Ctrl+T: Stop & Save
+* Esc: Close (if recording, confirm first)
+* Space activates focused buttons as standard.
+
+Audio capture (Windows):
+
+* Use WASAPI:
+
+  * Microphone: IAudioClient in capture mode for selected input device.
+  * System audio: WASAPI loopback capture on selected/default render device.
+* When both enabled:
+
+  * Mix to a single stream in real time.
+  * Prevent drift: resample to a common format if needed (handle different sample rates).
+  * Keep latency stable; use a ring buffer or similar.
+
+Encoding / file writing:
+
+* WAV:
+
+  * PCM 16-bit, 44.1 kHz (or 48 kHz if that’s your standard; be consistent).
+  * Write proper WAV headers and finalize on stop.
+* MP3 (default):
+
+  * Use existing encoder in Novapad if present; otherwise integrate a minimal MP3 encoder dependency.
+  * Default bitrate 128 kbps CBR.
+* Save defaults:
+
+  * Default folder: Documents\Novapad Recordings
+  * Default filename pattern: Podcast_YYYY-MM-DD_HH-mm-ss.(mp3|wav)
+* Ensure “Stop & Save” is atomic: don’t leave corrupt partial files; write temp then rename if needed.
+
+Error handling:
+
+* If loopback capture is unavailable/fails:
+
+  * Show a user-friendly message.
+  * Keep microphone recording functional.
+* If microphone device fails/unavailable:
+
+  * Allow system-audio-only recording if enabled.
+* If both sources are OFF, disable Start and show a clear hint.
+* Handle device changes:
+
+  * Lock devices for the session or show a warning; do not crash.
+
+Settings (persisted):
+
+* Include Microfono (default ON)
+* Selected microphone device (default “system default”)
+* Include Audio di sistema (default ON if supported)
+* Selected render device for loopback (default “system default”)
+* Output format (default MP3)
+* MP3 bitrate (default 128)
+* Default save folder
+
+Deliverables:
+
+* New audio capture module (WASAPI mic + loopback) and a simple mixer/resampler layer.
+* Recording UI integrated under File menu with shortcut.
+* Short manual test checklist:
+
+  * Mic-only, System-only, Both mixed
+  * MP3 default saves and plays correctly
+  * WAV saves and header correct
+  * Pause/Resume works
+  * NVDA reads controls and output path/levels without focus issues
+* Run cargo test and cargo clippy --all and fix issues.

@@ -1,4 +1,16 @@
 # Changelog
+Versao 0.5.7 - 2026-01-05
+Novas funcionalidades
+• Adicionada a opcao para gravar audiolivros em lote (conversao multipla de arquivos e pastas).
+• Adicionado suporte para arquivos Markdown (.md).
+• Adicionada a escolha da codificacao ao abrir arquivos de texto.
+• Adicionada opcao no terminal para anunciar novas linhas com NVDA.
+Melhorias
+• A gravacao de audiolivros agora e salva em MP3 nativo quando selecionado.
+• O usuario pode escolher onde inserir o asterisco * que indica modificacoes nao salvas.
+• Melhorado o sistema de atualizacao para ser mais robusto em diferentes cenarios.
+• Adicionada no menu Editar a funcao para remover hifens no final da linha (util para textos OCR).
+
 Versao 0.5.6 - 2026-01-04
 Correcoes
  Melhorado Procurar em arquivos: ao pressionar Enter abre o arquivo exatamente no trecho selecionado.

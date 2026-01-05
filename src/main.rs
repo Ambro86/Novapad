@@ -32,9 +32,13 @@ use audio_player::*;
 mod editor_manager;
 use editor_manager::*;
 mod app_windows;
+mod audio_capture;
+mod graphics_capture;
 mod i18n;
 mod podcast_recorder;
+mod screen_recorder;
 mod updater;
+mod video_recorder;
 
 use std::io::Write;
 use std::mem::size_of;
@@ -73,7 +77,7 @@ use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
 use windows::Win32::UI::Shell::{
     DragAcceptFiles, DragFinish, DragQueryFileW, FileSaveDialog, HDROP, IFileDialog,
     IFileDialogControlEvents, IFileDialogControlEvents_Impl, IFileDialogCustomize,
-    IFileDialogEvents, IFileDialogEvents_Impl, IFileSaveDialog, IShellItem,
+    IFileDialogEvents, IFileDialogEvents_Impl, IFileSaveDialog, IShellItem, SIGDN_FILESYSPATH,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     ACCEL, AppendMenuW, BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, CB_ADDSTRING, CB_GETCURSEL,
@@ -235,6 +239,12 @@ pub(crate) fn log_debug(message: &str) {
     }
 }
 
+struct ScreenRecordingSession {
+    recorder: screen_recorder::ScreenRecorder,
+    output_path: PathBuf,
+    start_time: Instant,
+}
+
 #[derive(Default)]
 pub(crate) struct AppState {
     hwnd_tab: HWND,
@@ -288,6 +298,7 @@ pub(crate) struct AppState {
     find_in_files_cache: Option<FindInFilesCache>,
     normalize_undo: Option<NormalizeUndo>,
     normalize_skip_change: bool,
+    screen_recorder: Option<ScreenRecordingSession>,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -856,6 +867,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 find_in_files_cache: None,
                 normalize_undo: None,
                 normalize_skip_change: false,
+                screen_recorder: None,
             });
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
 
@@ -1379,6 +1391,16 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 IDM_TOOLS_PROMPT => {
                     log_debug("Menu: Prompt");
                     app_windows::prompt_window::open(hwnd);
+                    LRESULT(0)
+                }
+                IDM_TOOLS_SCREEN_RECORD => {
+                    log_debug("Menu: Start screen recording");
+                    start_screen_recording(hwnd);
+                    LRESULT(0)
+                }
+                IDM_TOOLS_STOP_RECORD => {
+                    log_debug("Menu: Stop screen recording");
+                    stop_screen_recording(hwnd);
                     LRESULT(0)
                 }
                 IDM_HELP_GUIDE => {
@@ -3787,6 +3809,174 @@ pub(crate) unsafe fn save_file_dialog_with_encoding(
         Some((path, index_to_encoding(selected_encoding_idx)))
     } else {
         pfd.Unadvise(cookie).ok()?;
+        None
+    }
+}
+
+// Screen recording functions
+fn start_screen_recording(hwnd: HWND) {
+    unsafe {
+        // Check if already recording
+        let is_recording =
+            with_state(hwnd, |state| state.screen_recorder.is_some()).unwrap_or(false);
+        if is_recording {
+            let msg = "Already recording. Stop the current recording first.";
+            let title = "Screen Recording";
+            MessageBoxW(
+                hwnd,
+                PCWSTR(to_wide(msg).as_ptr()),
+                PCWSTR(to_wide(title).as_ptr()),
+                MB_OK | MB_ICONINFORMATION,
+            );
+            return;
+        }
+
+        // List available monitors
+        let monitors = match graphics_capture::list_monitors() {
+            Ok(m) if !m.is_empty() => m,
+            _ => {
+                let msg = "No monitors found.";
+                let title = "Screen Recording";
+                MessageBoxW(
+                    hwnd,
+                    PCWSTR(to_wide(msg).as_ptr()),
+                    PCWSTR(to_wide(title).as_ptr()),
+                    MB_OK | MB_ICONERROR,
+                );
+                return;
+            }
+        };
+
+        // For simplicity, use the first (primary) monitor
+        let monitor = &monitors[0];
+        log_debug(&format!("Starting recording on monitor: {}", monitor.name));
+
+        // Ask user where to save the video
+        let timestamp = Local::now().format("%Y%m%d_%H%M%S");
+        let suggested_name = format!("screen_recording_{}.mp4", timestamp);
+
+        let output_path = match save_file_dialog_mp4(hwnd, Some(&suggested_name)) {
+            Some(path) => path,
+            None => return, // User cancelled
+        };
+
+        // Start integrated screen recording (video + audio + encoding)
+        match screen_recorder::ScreenRecorder::start(monitor, output_path.clone()) {
+            Ok(recorder) => {
+                let session = ScreenRecordingSession {
+                    recorder,
+                    output_path: output_path.clone(),
+                    start_time: Instant::now(),
+                };
+
+                with_state(hwnd, |state| {
+                    state.screen_recorder = Some(session);
+                });
+
+                log_debug(&format!("Screen recording started: {:?}", output_path));
+                let msg = "Screen recording with audio started!\nRecording in progress...";
+                let title = "Screen Recording";
+                MessageBoxW(
+                    hwnd,
+                    PCWSTR(to_wide(msg).as_ptr()),
+                    PCWSTR(to_wide(title).as_ptr()),
+                    MB_OK | MB_ICONINFORMATION,
+                );
+            }
+            Err(e) => {
+                log_debug(&format!("Failed to start recording: {}", e));
+                let msg = format!("Failed to start recording:\n{}", e);
+                let title = "Screen Recording";
+                MessageBoxW(
+                    hwnd,
+                    PCWSTR(to_wide(&msg).as_ptr()),
+                    PCWSTR(to_wide(title).as_ptr()),
+                    MB_OK | MB_ICONERROR,
+                );
+            }
+        }
+    }
+}
+
+fn stop_screen_recording(hwnd: HWND) {
+    unsafe {
+        // Take the recording session
+        let session = with_state(hwnd, |state| state.screen_recorder.take()).flatten();
+
+        match session {
+            None => {
+                let msg = "Not currently recording.";
+                let title = "Screen Recording";
+                MessageBoxW(
+                    hwnd,
+                    PCWSTR(to_wide(msg).as_ptr()),
+                    PCWSTR(to_wide(title).as_ptr()),
+                    MB_OK | MB_ICONINFORMATION,
+                );
+            }
+            Some(session) => {
+                let duration = session.start_time.elapsed();
+                let output_path = session.output_path.clone();
+                let title = "Screen Recording";
+                log_debug(&format!("Stopping recording after {:?}", duration));
+
+                // Stop the recorder (this will finalize the MP4 file)
+                // Note: This may take a few seconds while encoding completes
+                match session.recorder.stop() {
+                    Ok(()) => {
+                        log_debug(&format!(
+                            "Recording stopped successfully: {:?}",
+                            output_path
+                        ));
+                        let msg = format!(
+                            "Recording saved successfully!\n\nFile: {}\nDuration: {:.1} seconds",
+                            output_path.display(),
+                            duration.as_secs_f32()
+                        );
+                        MessageBoxW(
+                            hwnd,
+                            PCWSTR(to_wide(&msg).as_ptr()),
+                            PCWSTR(to_wide(title).as_ptr()),
+                            MB_OK | MB_ICONINFORMATION,
+                        );
+                    }
+                    Err(e) => {
+                        log_debug(&format!("Error stopping recording: {}", e));
+                        let msg = format!("Error finalizing recording:\n{}", e);
+                        MessageBoxW(
+                            hwnd,
+                            PCWSTR(to_wide(&msg).as_ptr()),
+                            PCWSTR(to_wide(title).as_ptr()),
+                            MB_OK | MB_ICONERROR,
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+unsafe fn save_file_dialog_mp4(hwnd: HWND, suggested_name: Option<&str>) -> Option<PathBuf> {
+    let pfd: IFileSaveDialog = CoCreateInstance(&FileSaveDialog, None, CLSCTX_ALL).ok()?;
+
+    let filter_spec = [COMDLG_FILTERSPEC {
+        pszName: w!("MP4 Video"),
+        pszSpec: w!("*.mp4"),
+    }];
+    pfd.SetFileTypes(&filter_spec).ok()?;
+    pfd.SetFileTypeIndex(1).ok()?;
+    pfd.SetDefaultExtension(w!("mp4")).ok()?;
+
+    if let Some(name) = suggested_name {
+        pfd.SetFileName(PCWSTR(to_wide(name).as_ptr())).ok()?;
+    }
+
+    if pfd.Show(hwnd).is_ok() {
+        let item = pfd.GetResult().ok()?;
+        let name = item.GetDisplayName(SIGDN_FILESYSPATH).ok()?;
+        let path_str = name.to_string().ok()?;
+        Some(PathBuf::from(path_str))
+    } else {
         None
     }
 }

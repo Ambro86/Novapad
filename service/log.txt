@@ -1,56 +1,112 @@
+You are working on an existing Rust/Win32 application called “Novapad”.
 
-Microsoft Windows [Versione 10.0.26200.7462]
-(c) Microsoft Corporation. Tutti i diritti riservati.C:\rustnotepad\rustnotepad>cd \
+Context:
+- Novapad already has a fully working audio recording system (podcast / TTS / system audio).
+- Audio-only recording already supports formats like MP3 and WAV.
+- This existing audio pipeline MUST NOT be refactored or broken.
+- The app is accessibility-first and must work correctly with screen readers (NVDA).
 
-C:\>cd rustnotepad
+Goal:
+Add SCREEN VIDEO RECORDING on Windows, integrated with the existing audio recording flow.
 
-C:\rustnotepad>cd rustnotepad
+Core UX decision (IMPORTANT):
+- Add ONE checkbox labeled exactly:
+  “Record video (audio AAC)”
+- This label explicitly means:
+  - Video recording is enabled
+  - Audio format is automatically forced to AAC
+  - Output is a SINGLE MP4 file (H.264 video + AAC audio)
 
-C:\rustnotepad\rustnotepad>claude
+Behavior rules (must be followed strictly):
+1) If “Record video (audio AAC)” is OFF:
+   - Keep the current audio-only behavior EXACTLY as it is today.
+   - User-selected audio format (MP3/WAV/etc.) remains unchanged.
+   - No video is recorded.
 
-╭─── Claude Code v2.0.76 ───────────────────────────────────────────────────────────────────╮
-││ Tips for getting started│
-│Welcome back Ambrogio!│ Run /init to create a CLAUDE.md fil… │
-││ ──────────────────────────────────── │
-│* ▐▛███▜▌ *│ Recent activity│
-│* ▝▜█████▛▘ *│ No recent activity│
-│*  ▘▘ ▝▝  *││
-│││
-│   Sonnet 4.5 · Claude Pro · ambro86@gmail.com's    ││
-│   Organization││
-│C:\rustnotepad\rustnotepad││
-╰───────────────────────────────────────────────────────────────────────────────────────────╯
+2) If “Record video (audio AAC)” is ON:
+   - Enable screen (display) video capture.
+   - Force audio output format to AAC (ignore MP3 selection).
+   - Produce ONE final MP4 file containing:
+       - Video: H.264
+       - Audio: AAC
+   - Do NOT produce separate audio-only files.
+   - Do NOT keep MP3 in parallel.
+   - Do NOT ask additional confirmation dialogs.
 
-─────────────────────────────────────────────────────────────────────────────────────────────
-> Try "create a util logging.py that..."
-─────────────────────────────────────────────────────────────────────────────────────────────
-  ? for shortcuts
+Video capture requirements:
+- Capture the selected MONITOR (display capture), not a single window.
+- Must continue recording even when Novapad is not focused or minimized.
+- Intended use case includes full-screen or borderless games (e.g. Diablo IV).
+- Use Windows built-in APIs only:
+  - Prefer Windows Graphics Capture (WinRT).
+  - DXGI Desktop Duplication is acceptable if simpler for this codebase.
+  - DO NOT use GDI / BitBlt.
+  - DO NOT use ffmpeg or external binaries.
 
-─────────────────────────────────────────────────────────────────────────────────────────────
->
+Encoding / container:
+- Use Windows Media Foundation.
+- Video: H.264
+- Audio: AAC
+- Container: MP4
+- No third-party DLLs distributed with the app (system DLLs only).
 
-─────────────────────────────────────────────────────────────────────────────────────────────
-─────────────────────────────────────────────────────────────────────────────────────────────
->
+Architecture:
+- Create a new module, e.g. `video_recorder.rs`.
+- Introduce a `VideoRecorder` component:
+  - start(config) -> Result<()>
+  - stop() -> Result<()>
+- Video capture and encoding must run on a dedicated background thread.
+- UI thread must never block.
+- Proper COM / WinRT initialization must occur on the thread that uses it.
+- Use channels or atomics for clean stop signaling.
 
-─────────────────────────────────────────────────────────────────────────────────────────────
-ctrl+g to edit in Notepad  
+Integration with existing recording flow:
+- When recording starts:
+  - If video checkbox is OFF → start audio as today.
+  - If video checkbox is ON → start audio (AAC) + video together.
+- When recording stops:
+  - Finalize MP4 cleanly.
+  - Ensure no deadlocks between audio and video shutdown.
+- If video initialization fails:
+  - Show a clear error message.
+  - Abort video, but do NOT crash the app.
 
-─────────────────────────────────────────────────────────────────────────────────────────────
->
+Monitor selection:
+- If only one monitor exists, select it automatically.
+- If multiple monitors exist:
+  - Provide a dropdown (Display 1 / Display 2 / …).
+  - Persist selection in settings.
 
-─────────────────────────────────────────────────────────────────────────────────────────────
+Accessibility constraints:
+- Do NOT steal focus when recording starts or stops.
+- Do NOT interrupt screen reader speech.
+- Status updates must be non-intrusive.
+- Keyboard navigation and tab order must remain intact.
 
-─────────────────────────────────────────────────────────────────────────────────────────────
->
+File naming:
+- The final output file must be a single MP4.
+- Base name follows the existing audio naming logic.
+- Example:
+  - Audio-only: `example.mp3`
+  - Audio + video: `example.mp4`
 
-  ciao amico
+Edge cases to handle gracefully:
+- Protected content may appear black (expected behavior).
+- Windows “N” editions may lack Media Foundation codecs:
+  - Detect failure and show a clear explanation.
+- Fullscreen exclusive mode may be unstable:
+  - No hacks; document limitation.
 
-─────────────────────────────────────────────────────────────────────────────────────────────
+Deliverables:
+- Rust code implementing the above.
+- Minimal UI changes (checkbox + monitor selector).
+- Short internal documentation/comments explaining the audio override rule.
+- No refactoring of unrelated code.
 
-─────────────────────────────────────────────────────────────────────────────────────────────
->
+Do NOT:
+- Add webcam support.
+- Add window/app capture.
+- Add overlays, cursor effects, or streaming features.
+- Add new large dependencies.
 
-  ciao amico
-
-─────────────────────────────────────────────────────────────────────────────────────────────
+Focus on a clean, stable MVP implementation.

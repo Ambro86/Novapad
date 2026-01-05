@@ -22,6 +22,8 @@
   "menu.dictionary": "&Dicionario",
   "menu.import_youtube": "Importar transcricao do YouTube...\tCtrl+Y",
   "menu.prompt": "&Terminal acessivel...\tCtrl+Shift+P",
+  "menu.screen_record": "&Iniciar gravacao de tela...",
+  "menu.stop_record": "&Parar gravacao de tela",
   "view.text_color": "Cor do &texto",
   "view.text_size": "Tamanho do &texto",
   "view.text_color.black": "&Preto",

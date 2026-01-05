@@ -1,16 +1,22 @@
 #![allow(clippy::seek_from_current)]
 use crate::accessibility::to_wide;
+use crate::video_recorder::VideoFrame;
+use std::ffi::c_void;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
+use windows::Win32::Graphics::Direct3D11::{D3D11_MAP_READ, D3D11_MAPPED_SUBRESOURCE};
 use windows::Win32::Media::MediaFoundation::{
     IMFMediaBuffer, IMFMediaType, IMFSample, IMFSinkWriter, IMFSourceReader,
     MF_MT_AUDIO_AVG_BYTES_PER_SECOND, MF_MT_AUDIO_BITS_PER_SAMPLE, MF_MT_AUDIO_BLOCK_ALIGNMENT,
-    MF_MT_AUDIO_NUM_CHANNELS, MF_MT_AUDIO_SAMPLES_PER_SECOND, MF_MT_FIXED_SIZE_SAMPLES,
-    MF_MT_MAJOR_TYPE, MF_MT_SAMPLE_SIZE, MF_MT_SUBTYPE, MF_SOURCE_READER_FIRST_AUDIO_STREAM,
-    MF_SOURCE_READERF_ENDOFSTREAM, MF_VERSION, MFAudioFormat_MP3, MFAudioFormat_PCM,
-    MFCreateMediaType, MFCreateMemoryBuffer, MFCreateSample, MFCreateSinkWriterFromURL,
-    MFCreateSourceReaderFromURL, MFMediaType_Audio, MFShutdown, MFStartup,
+    MF_MT_AUDIO_NUM_CHANNELS, MF_MT_AUDIO_SAMPLES_PER_SECOND, MF_MT_AVG_BITRATE,
+    MF_MT_FIXED_SIZE_SAMPLES, MF_MT_FRAME_RATE, MF_MT_FRAME_SIZE, MF_MT_INTERLACE_MODE,
+    MF_MT_MAJOR_TYPE, MF_MT_PIXEL_ASPECT_RATIO, MF_MT_SAMPLE_SIZE, MF_MT_SUBTYPE,
+    MF_SOURCE_READER_FIRST_AUDIO_STREAM, MF_SOURCE_READERF_ENDOFSTREAM, MF_VERSION,
+    MFAudioFormat_AAC, MFAudioFormat_MP3, MFAudioFormat_PCM, MFCreateMediaType,
+    MFCreateMemoryBuffer, MFCreateSample, MFCreateSinkWriterFromURL, MFCreateSourceReaderFromURL,
+    MFMediaType_Audio, MFMediaType_Video, MFShutdown, MFStartup, MFVideoFormat_H264,
+    MFVideoFormat_RGB32,
 };
 use windows::core::PCWSTR;
 
@@ -456,5 +462,275 @@ where
             crate::log_debug("MF: encode completed.");
         }
         Ok(())
+    }
+}
+
+/// MP4 stream writer for video (H.264) + audio (AAC) recording
+pub struct Mp4StreamWriter {
+    _guard: MfGuard,
+    writer: IMFSinkWriter,
+    video_stream_index: u32,
+    audio_stream_index: u32,
+}
+
+// SAFETY: IMFSinkWriter is thread-safe for writing from a single thread
+unsafe impl Send for Mp4StreamWriter {}
+
+impl Mp4StreamWriter {
+    pub fn create(path: &Path, width: u32, height: u32) -> Result<Self, String> {
+        unsafe {
+            crate::log_debug(&format!(
+                "MF: creating MP4 writer. path={:?} size={}x{}",
+                path, width, height
+            ));
+
+            let guard = MfGuard::start()?;
+
+            let mp4_wide = to_wide(path.to_str().ok_or("Invalid MP4 path")?);
+            let writer: IMFSinkWriter =
+                MFCreateSinkWriterFromURL(PCWSTR(mp4_wide.as_ptr()), None, None)
+                    .map_err(|e| format!("MFCreateSinkWriterFromURL failed: {}", e))?;
+
+            // Configure video stream (H.264)
+            let video_out = MFCreateMediaType()
+                .map_err(|e| format!("MFCreateMediaType (video_out) failed: {}", e))?;
+            video_out
+                .SetGUID(&MF_MT_MAJOR_TYPE, &MFMediaType_Video)
+                .map_err(|e| format!("SetGUID video major type failed: {}", e))?;
+            video_out
+                .SetGUID(&MF_MT_SUBTYPE, &MFVideoFormat_H264)
+                .map_err(|e| format!("SetGUID H264 subtype failed: {}", e))?;
+            video_out
+                .SetUINT64(&MF_MT_FRAME_SIZE, ((width as u64) << 32) | (height as u64))
+                .map_err(|e| format!("SetUINT64 frame size failed: {}", e))?;
+            video_out
+                .SetUINT64(&MF_MT_FRAME_RATE, (30u64 << 32) | 1)
+                .map_err(|e| format!("SetUINT64 frame rate failed: {}", e))?; // 30 FPS
+            video_out
+                .SetUINT32(&MF_MT_AVG_BITRATE, 5_000_000)
+                .map_err(|e| format!("SetUINT32 avg bitrate failed: {}", e))?; // 5 Mbps
+            video_out
+                .SetUINT32(&MF_MT_INTERLACE_MODE, 2)
+                .map_err(|e| format!("SetUINT32 interlace mode failed: {}", e))?; // Progressive
+            video_out
+                .SetUINT64(&MF_MT_PIXEL_ASPECT_RATIO, (1u64 << 32) | 1)
+                .map_err(|e| format!("SetUINT64 pixel aspect ratio failed: {}", e))?; // 1:1
+
+            let video_in = MFCreateMediaType()
+                .map_err(|e| format!("MFCreateMediaType (video_in) failed: {}", e))?;
+            video_in
+                .SetGUID(&MF_MT_MAJOR_TYPE, &MFMediaType_Video)
+                .map_err(|e| format!("SetGUID video major type (in) failed: {}", e))?;
+            video_in
+                .SetGUID(&MF_MT_SUBTYPE, &MFVideoFormat_RGB32)
+                .map_err(|e| format!("SetGUID RGB32 subtype failed: {}", e))?; // BGRA from capture
+            video_in
+                .SetUINT64(&MF_MT_FRAME_SIZE, ((width as u64) << 32) | (height as u64))
+                .map_err(|e| format!("SetUINT64 frame size (in) failed: {}", e))?;
+            video_in
+                .SetUINT64(&MF_MT_FRAME_RATE, (30u64 << 32) | 1)
+                .map_err(|e| format!("SetUINT64 frame rate (in) failed: {}", e))?;
+
+            let video_stream_index = writer
+                .AddStream(&video_out)
+                .map_err(|e| format!("AddStream video failed: {}", e))?;
+            writer
+                .SetInputMediaType(video_stream_index, &video_in, None)
+                .map_err(|e| format!("SetInputMediaType video failed: {}", e))?;
+
+            // Configure audio stream (AAC)
+            let audio_out = MFCreateMediaType()
+                .map_err(|e| format!("MFCreateMediaType (audio_out) failed: {}", e))?;
+            audio_out
+                .SetGUID(&MF_MT_MAJOR_TYPE, &MFMediaType_Audio)
+                .map_err(|e| format!("SetGUID audio major type failed: {}", e))?;
+            audio_out
+                .SetGUID(&MF_MT_SUBTYPE, &MFAudioFormat_AAC)
+                .map_err(|e| format!("SetGUID AAC subtype failed: {}", e))?;
+            audio_out
+                .SetUINT32(&MF_MT_AUDIO_NUM_CHANNELS, 2)
+                .map_err(|e| format!("SetUINT32 audio channels failed: {}", e))?;
+            audio_out
+                .SetUINT32(&MF_MT_AUDIO_SAMPLES_PER_SECOND, 44100)
+                .map_err(|e| format!("SetUINT32 audio sample rate failed: {}", e))?;
+            audio_out
+                .SetUINT32(&MF_MT_AUDIO_AVG_BYTES_PER_SECOND, 24000)
+                .map_err(|e| format!("SetUINT32 audio avg bytes failed: {}", e))?; // 192 kbps
+
+            let audio_in = MFCreateMediaType()
+                .map_err(|e| format!("MFCreateMediaType (audio_in) failed: {}", e))?;
+            audio_in
+                .SetGUID(&MF_MT_MAJOR_TYPE, &MFMediaType_Audio)
+                .map_err(|e| format!("SetGUID audio major type (in) failed: {}", e))?;
+            audio_in
+                .SetGUID(&MF_MT_SUBTYPE, &MFAudioFormat_PCM)
+                .map_err(|e| format!("SetGUID PCM subtype failed: {}", e))?;
+            audio_in
+                .SetUINT32(&MF_MT_AUDIO_SAMPLES_PER_SECOND, 44100)
+                .map_err(|e| format!("SetUINT32 audio sample rate (in) failed: {}", e))?;
+            audio_in
+                .SetUINT32(&MF_MT_AUDIO_NUM_CHANNELS, 2)
+                .map_err(|e| format!("SetUINT32 audio channels (in) failed: {}", e))?;
+            audio_in
+                .SetUINT32(&MF_MT_AUDIO_BITS_PER_SAMPLE, 16)
+                .map_err(|e| format!("SetUINT32 audio bits per sample failed: {}", e))?;
+            audio_in
+                .SetUINT32(&MF_MT_AUDIO_BLOCK_ALIGNMENT, 4)
+                .map_err(|e| format!("SetUINT32 audio block alignment failed: {}", e))?;
+            audio_in
+                .SetUINT32(&MF_MT_AUDIO_AVG_BYTES_PER_SECOND, 176400)
+                .map_err(|e| format!("SetUINT32 audio avg bytes (in) failed: {}", e))?;
+
+            let audio_stream_index = writer
+                .AddStream(&audio_out)
+                .map_err(|e| format!("AddStream audio failed: {}", e))?;
+            writer
+                .SetInputMediaType(audio_stream_index, &audio_in, None)
+                .map_err(|e| format!("SetInputMediaType audio failed: {}", e))?;
+
+            writer
+                .BeginWriting()
+                .map_err(|e| format!("BeginWriting failed: {}", e))?;
+
+            crate::log_debug("MP4 writer initialized successfully");
+
+            Ok(Mp4StreamWriter {
+                _guard: guard,
+                writer,
+                video_stream_index,
+                audio_stream_index,
+            })
+        }
+    }
+
+    pub fn write_video_frame(&mut self, frame: &VideoFrame) -> Result<(), String> {
+        unsafe {
+            // Get D3D11 device context
+            let device = frame
+                .texture
+                .GetDevice()
+                .map_err(|e| format!("GetDevice failed: {}", e))?;
+
+            let context = device
+                .GetImmediateContext()
+                .map_err(|e| format!("GetImmediateContext failed: {}", e))?;
+
+            // Map texture to CPU memory
+            let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
+            context
+                .Map(&frame.texture, 0, D3D11_MAP_READ, 0, Some(&mut mapped))
+                .map_err(|e| format!("Map texture failed: {}", e))?;
+
+            // Calculate buffer size
+            let byte_count = (frame.width * frame.height * 4) as u32; // BGRA = 4 bytes per pixel
+
+            // Create Media Foundation buffer
+            let buffer = MFCreateMemoryBuffer(byte_count)
+                .map_err(|e| format!("MFCreateMemoryBuffer failed: {}", e))?;
+
+            let mut data_ptr: *mut c_void = std::ptr::null_mut();
+            buffer
+                .Lock(
+                    &mut data_ptr as *mut *mut c_void as *mut *mut u8,
+                    None,
+                    None,
+                )
+                .map_err(|e| format!("Buffer Lock failed: {}", e))?;
+
+            if !data_ptr.is_null() && !mapped.pData.is_null() {
+                std::ptr::copy_nonoverlapping(mapped.pData, data_ptr, byte_count as usize);
+            }
+
+            buffer
+                .Unlock()
+                .map_err(|e| format!("Buffer Unlock failed: {}", e))?;
+            buffer
+                .SetCurrentLength(byte_count)
+                .map_err(|e| format!("SetCurrentLength failed: {}", e))?;
+
+            context.Unmap(&frame.texture, 0);
+
+            // Create sample
+            let sample = MFCreateSample().map_err(|e| format!("MFCreateSample failed: {}", e))?;
+            sample
+                .AddBuffer(&buffer)
+                .map_err(|e| format!("AddBuffer failed: {}", e))?;
+            sample
+                .SetSampleTime(frame.timestamp)
+                .map_err(|e| format!("SetSampleTime failed: {}", e))?;
+            sample
+                .SetSampleDuration(333333)
+                .map_err(|e| format!("SetSampleDuration failed: {}", e))?; // ~33.33ms @ 30fps
+
+            self.writer
+                .WriteSample(self.video_stream_index, &sample)
+                .map_err(|e| format!("WriteSample failed: {}", e))?;
+
+            Ok(())
+        }
+    }
+
+    pub fn write_audio_samples(&mut self, samples: &[i16], timestamp: i64) -> Result<(), String> {
+        if samples.is_empty() {
+            return Ok(());
+        }
+
+        unsafe {
+            let byte_len = (samples.len() * 2) as u32;
+            let buffer = MFCreateMemoryBuffer(byte_len)
+                .map_err(|e| format!("MFCreateMemoryBuffer failed: {}", e))?;
+
+            let mut data_ptr = std::ptr::null_mut();
+            buffer
+                .Lock(&mut data_ptr, None, None)
+                .map_err(|e| format!("Buffer Lock failed: {}", e))?;
+
+            if !data_ptr.is_null() {
+                std::ptr::copy_nonoverlapping(
+                    samples.as_ptr() as *const u8,
+                    data_ptr,
+                    byte_len as usize,
+                );
+            }
+
+            buffer
+                .Unlock()
+                .map_err(|e| format!("Buffer Unlock failed: {}", e))?;
+            buffer
+                .SetCurrentLength(byte_len)
+                .map_err(|e| format!("SetCurrentLength failed: {}", e))?;
+
+            let sample = MFCreateSample().map_err(|e| format!("MFCreateSample failed: {}", e))?;
+            sample
+                .AddBuffer(&buffer)
+                .map_err(|e| format!("AddBuffer failed: {}", e))?;
+            sample
+                .SetSampleTime(timestamp)
+                .map_err(|e| format!("SetSampleTime failed: {}", e))?;
+
+            // Calculate duration
+            let frames = (samples.len() / 2) as i64; // Stereo: 2 channels
+            let duration = (frames * 10_000_000) / 44100;
+            sample
+                .SetSampleDuration(duration)
+                .map_err(|e| format!("SetSampleDuration failed: {}", e))?;
+
+            self.writer
+                .WriteSample(self.audio_stream_index, &sample)
+                .map_err(|e| format!("WriteSample failed: {}", e))?;
+
+            Ok(())
+        }
+    }
+
+    pub fn finalize(self) -> Result<(), String> {
+        unsafe {
+            crate::log_debug("Finalizing MP4 writer...");
+            self.writer
+                .Finalize()
+                .map_err(|e| format!("Finalize failed: {}", e))?;
+            crate::log_debug("MP4 writer finalized successfully");
+            Ok(())
+        }
     }
 }

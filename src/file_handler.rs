@@ -82,6 +82,66 @@ pub fn is_mp3_path(path: &Path) -> bool {
 
 // --- Text Encoding / Decoding ---
 
+pub fn decode_text_with_encoding(
+    bytes: &[u8],
+    encoding: TextEncoding,
+    language: Language,
+) -> Result<String, String> {
+    match encoding {
+        TextEncoding::Utf8 => {
+            String::from_utf8(bytes.to_vec()).map_err(|_| error_invalid_encoding_message(language))
+        }
+        TextEncoding::Utf8Bom => {
+            let start =
+                if bytes.len() >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF {
+                    3
+                } else {
+                    0
+                };
+            String::from_utf8(bytes[start..].to_vec())
+                .map_err(|_| error_invalid_encoding_message(language))
+        }
+        TextEncoding::Utf16Le => {
+            let start = if bytes.len() >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE {
+                2
+            } else {
+                0
+            };
+            if !(bytes.len() - start).is_multiple_of(2) {
+                return Err(error_invalid_utf16le_message(language));
+            }
+            let mut utf16 = Vec::with_capacity((bytes.len() - start) / 2);
+            let mut i = start;
+            while i + 1 < bytes.len() {
+                utf16.push(u16::from_le_bytes([bytes[i], bytes[i + 1]]));
+                i += 2;
+            }
+            Ok(String::from_utf16_lossy(&utf16))
+        }
+        TextEncoding::Utf16Be => {
+            let start = if bytes.len() >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF {
+                2
+            } else {
+                0
+            };
+            if !(bytes.len() - start).is_multiple_of(2) {
+                return Err(error_invalid_utf16be_message(language));
+            }
+            let mut utf16 = Vec::with_capacity((bytes.len() - start) / 2);
+            let mut i = start;
+            while i + 1 < bytes.len() {
+                utf16.push(u16::from_be_bytes([bytes[i], bytes[i + 1]]));
+                i += 2;
+            }
+            Ok(String::from_utf16_lossy(&utf16))
+        }
+        TextEncoding::Ansi => {
+            let (text, _, _) = WINDOWS_1252.decode(bytes);
+            Ok(text.into_owned())
+        }
+    }
+}
+
 pub fn decode_text(bytes: &[u8], language: Language) -> Result<(String, TextEncoding), String> {
     if bytes.len() >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF {
         if let Ok(text) = String::from_utf8(bytes[3..].to_vec()) {
@@ -1755,6 +1815,10 @@ fn wrap_list_item(content: &str, first_max: usize, next_max: usize) -> Vec<Strin
 }
 
 // Error message helpers (copied from main.rs)
+fn error_invalid_encoding_message(language: Language) -> String {
+    i18n::tr(language, "file_handler.invalid_encoding")
+}
+
 fn error_invalid_utf16le_message(language: Language) -> String {
     i18n::tr(language, "file_handler.utf16le_invalid_length")
 }

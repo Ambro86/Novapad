@@ -311,6 +311,7 @@
   "file_handler.pdf_save_error": "Erro ao salvar PDF: {err}",
   "file_handler.utf16le_invalid_length": "O arquivo UTF-16LE tem um comprimento invalido.",
   "file_handler.utf16be_invalid_length": "O arquivo UTF-16BE tem um comprimento invalido.",
+  "file_handler.invalid_encoding": "O arquivo não pode ser decodificado com a codificação selecionada.",
   "updater.prompt": "Atualizacao disponivel.\nVersao instalada: {current}\nNova versao: {latest}\n\nDeseja baixar e atualizar agora?",
   "updater.prompt.restart": "Atualizacao baixada.\nDeseja reiniciar o programa agora?",
   "updater.prompt.pending": "Ha uma atualizacao pendente.\nDeseja atualizar agora?",

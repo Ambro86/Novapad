@@ -1,5 +1,6 @@
 #![allow(clippy::if_same_then_else, clippy::collapsible_else_if)]
 use crate::accessibility::{EM_REPLACESEL, from_wide, to_wide, to_wide_normalized};
+use crate::file_handler::decode_text_with_encoding;
 use crate::file_handler::*;
 use crate::settings::{
     FileFormat, ModifiedMarkerPosition, TextEncoding, confirm_save_message, confirm_title,
@@ -1653,8 +1654,16 @@ pub unsafe fn new_document(hwnd: HWND) {
     select_tab(hwnd, new_index);
 }
 
-pub unsafe fn open_document(hwnd: HWND, path: &Path) {
-    log_debug(&format!("Open document: {}", path.display()));
+pub unsafe fn open_document_with_encoding(
+    hwnd: HWND,
+    path: &Path,
+    user_encoding: Option<TextEncoding>,
+) {
+    log_debug(&format!(
+        "Open document: {} (encoding: {:?})",
+        path.display(),
+        user_encoding
+    ));
 
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
     if is_pdf_path(path) {
@@ -1721,13 +1730,27 @@ pub unsafe fn open_document(hwnd: HWND, path: &Path) {
         }
     } else {
         match std::fs::read(path) {
-            Ok(bytes) => match decode_text(&bytes, language) {
-                Ok((text, encoding)) => (text, FileFormat::Text(encoding), Some(encoding)),
-                Err(message) => {
-                    crate::show_error(hwnd, language, &message);
-                    return;
+            Ok(bytes) => {
+                if let Some(encoding) = user_encoding {
+                    // User specified encoding
+                    match decode_text_with_encoding(&bytes, encoding, language) {
+                        Ok(text) => (text, FileFormat::Text(encoding), Some(encoding)),
+                        Err(message) => {
+                            crate::show_error(hwnd, language, &message);
+                            return;
+                        }
+                    }
+                } else {
+                    // Auto-detect encoding
+                    match decode_text(&bytes, language) {
+                        Ok((text, encoding)) => (text, FileFormat::Text(encoding), Some(encoding)),
+                        Err(message) => {
+                            crate::show_error(hwnd, language, &message);
+                            return;
+                        }
+                    }
                 }
-            },
+            }
             Err(err) => {
                 crate::show_error(
                     hwnd,
@@ -1778,6 +1801,10 @@ pub unsafe fn open_document(hwnd: HWND, path: &Path) {
         }
     }
     crate::push_recent_file(hwnd, path);
+}
+
+pub unsafe fn open_document(hwnd: HWND, path: &Path) {
+    open_document_with_encoding(hwnd, path, None);
 }
 
 pub unsafe fn select_tab(hwnd: HWND, index: usize) {

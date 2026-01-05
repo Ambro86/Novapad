@@ -1485,7 +1485,7 @@ fn run_batch(
                         i18n::tr(tts_settings.language, "batch_audiobooks.output_multiple")
                     } else {
                         outputs
-                            .get(0)
+                            .first()
                             .map(|p| p.to_string_lossy().to_string())
                             .unwrap_or_default()
                     };
@@ -1671,7 +1671,7 @@ fn split_chunks_by_count(chunks: &[String], split_parts: u32) -> Vec<Vec<String>
     } else {
         parts
     };
-    let chunks_per_part = (total_chunks + parts - 1) / parts;
+    let chunks_per_part = total_chunks.div_ceil(parts);
     let mut out = Vec::new();
     for part_idx in 0..parts {
         let start_idx = part_idx * chunks_per_part;

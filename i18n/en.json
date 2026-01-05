@@ -311,6 +311,7 @@
   "file_handler.pdf_save_error": "PDF save error: {err}",
   "file_handler.utf16le_invalid_length": "The UTF-16LE file has an invalid length.",
   "file_handler.utf16be_invalid_length": "The UTF-16BE file has an invalid length.",
+  "file_handler.invalid_encoding": "The file cannot be decoded with the selected encoding.",
   "updater.prompt": "Update available.\nInstalled version: {current}\nNew version: {latest}\n\nDo you want to download and update now?",
   "updater.prompt.restart": "Update downloaded.\nRestart the program now?",
   "updater.prompt.pending": "A pending update is available.\nUpdate now?",

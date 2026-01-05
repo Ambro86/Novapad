@@ -55,8 +55,8 @@ use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
 use windows::Win32::System::DataExchange::COPYDATASTRUCT;
 use windows::Win32::System::LibraryLoader::{GetModuleHandleW, LoadLibraryW};
 use windows::Win32::UI::Controls::Dialogs::{
-    FINDREPLACE_FLAGS, FINDREPLACEW, GetOpenFileNameW, GetSaveFileNameW, OFN_EXPLORER,
-    OFN_FILEMUSTEXIST, OFN_HIDEREADONLY, OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST, OPENFILENAMEW,
+    FINDREPLACE_FLAGS, FINDREPLACEW, GetSaveFileNameW, OFN_EXPLORER, OFN_OVERWRITEPROMPT,
+    OFN_PATHMUSTEXIST, OPENFILENAMEW,
 };
 use windows::Win32::UI::Controls::RichEdit::{
     CHARRANGE, EM_EXGETSEL, EM_EXSETSEL, EM_GETTEXTRANGE, TEXTRANGEW,
@@ -1162,8 +1162,8 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 }
                 IDM_FILE_OPEN => {
                     log_debug("Menu: Open document");
-                    if let Some(path) = open_file_dialog(hwnd) {
-                        open_path_with_behavior(hwnd, &path);
+                    if let Some((path, encoding)) = open_file_dialog_with_encoding(hwnd) {
+                        open_document_with_encoding(hwnd, &path, encoding);
                         if with_state(hwnd, |state| state.prompt_window.0 != 0).unwrap_or(false) {
                             focus_editor(hwnd);
                         }
@@ -2963,7 +2963,7 @@ fn spawn_new_window_with_path(path: &Path) -> bool {
     std::process::Command::new(exe).arg(path).spawn().is_ok()
 }
 
-unsafe fn open_path_with_behavior(hwnd: HWND, path: &Path) {
+unsafe fn open_document_with_encoding(hwnd: HWND, path: &Path, encoding: Option<TextEncoding>) {
     let behavior =
         with_state(hwnd, |state| state.settings.open_behavior).unwrap_or(OpenBehavior::NewTab);
     if behavior == OpenBehavior::NewWindow {
@@ -2971,7 +2971,11 @@ unsafe fn open_path_with_behavior(hwnd: HWND, path: &Path) {
             return;
         }
     }
-    open_document(hwnd, path);
+    editor_manager::open_document_with_encoding(hwnd, path, encoding);
+}
+
+unsafe fn open_path_with_behavior(hwnd: HWND, path: &Path) {
+    open_document_with_encoding(hwnd, path, None);
 }
 
 unsafe fn open_recent_by_index(hwnd: HWND, index: usize) {
@@ -3316,29 +3320,6 @@ fn is_reserved_filename(name: &str) -> bool {
     )
 }
 
-unsafe fn open_file_dialog(hwnd: HWND) -> Option<PathBuf> {
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    let filter_raw = i18n::tr(language, "dialog.open_filter");
-    let filter = to_wide(&filter_raw.replace("\\0", "\0"));
-    let mut file_buf = [0u16; 260];
-    let mut ofn = OPENFILENAMEW {
-        lStructSize: size_of::<OPENFILENAMEW>() as u32,
-        hwndOwner: hwnd,
-        lpstrFilter: PCWSTR(filter.as_ptr()),
-        lpstrFile: PWSTR(file_buf.as_mut_ptr()),
-        nMaxFile: file_buf.len() as u32,
-        nFilterIndex: 1,
-        Flags: OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY,
-        ..Default::default()
-    };
-    let ok = GetOpenFileNameW(&mut ofn);
-    if ok.as_bool() {
-        Some(PathBuf::from(from_wide(file_buf.as_ptr())))
-    } else {
-        None
-    }
-}
-
 pub(crate) unsafe fn save_audio_dialog(
     hwnd: HWND,
     suggested_name: Option<&str>,
@@ -3466,6 +3447,7 @@ struct CustomFileDialogEventHandler {
     _encoding_label: String,
     _encodings: Vec<String>,
     _initial_encoding: TextEncoding,
+    _is_save_dialog: bool,
 }
 
 impl IFileDialogEvents_Impl for CustomFileDialogEventHandler {
@@ -3496,21 +3478,27 @@ impl IFileDialogEvents_Impl for CustomFileDialogEventHandler {
         unsafe {
             let pfd = pfd.unwrap();
             let filter_index = pfd.GetFileTypeIndex()?;
+            crate::log_debug(&format!("OnTypeChange: filter_index = {}", filter_index));
             let pfdc: IFileDialogCustomize = pfd.cast()?;
-            // Show encoding only for TXT (index 1)
-            if filter_index == 1 {
-                pfdc.SetControlState(
-                    100,
-                    windows::Win32::UI::Shell::CDCS_VISIBLE
-                        | windows::Win32::UI::Shell::CDCS_ENABLED,
-                )?;
+            // Show encoding only for TXT:
+            // - Open dialog: TXT is index 2
+            // - Save dialog: TXT is index 1
+            let is_txt = if self._is_save_dialog {
+                filter_index == 1
+            } else {
+                filter_index == 2
+            };
+            if is_txt {
+                crate::log_debug("OnTypeChange: showing encoding combobox");
+                // Show the ComboBox (101)
                 pfdc.SetControlState(
                     101,
                     windows::Win32::UI::Shell::CDCS_VISIBLE
                         | windows::Win32::UI::Shell::CDCS_ENABLED,
                 )?;
             } else {
-                pfdc.SetControlState(100, windows::Win32::UI::Shell::CDCS_INACTIVE)?;
+                crate::log_debug("OnTypeChange: hiding encoding combobox");
+                // Hide the ComboBox (101)
                 pfdc.SetControlState(101, windows::Win32::UI::Shell::CDCS_INACTIVE)?;
             }
         }
@@ -3579,6 +3567,118 @@ fn index_to_encoding(index: u32) -> TextEncoding {
     }
 }
 
+pub(crate) unsafe fn open_file_dialog_with_encoding(
+    hwnd: HWND,
+) -> Option<(PathBuf, Option<TextEncoding>)> {
+    log_debug("open_file_dialog_with_encoding called");
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+
+    use windows::Win32::UI::Shell::FileOpenDialog;
+    use windows::Win32::UI::Shell::IFileOpenDialog;
+
+    let pfd: IFileOpenDialog = match CoCreateInstance(&FileOpenDialog, None, CLSCTX_ALL) {
+        Ok(dialog) => {
+            log_debug("FileOpenDialog created successfully");
+            dialog
+        }
+        Err(e) => {
+            log_debug(&format!("Failed to create FileOpenDialog: {:?}", e));
+            return None;
+        }
+    };
+
+    let filter_raw = i18n::tr(language, "dialog.open_filter");
+    let parts: Vec<&str> = filter_raw.split("\\0").collect();
+    let mut spec = Vec::new();
+    let mut pattern_wides = Vec::new();
+    let mut name_wides = Vec::new();
+    for i in (0..parts.len().saturating_sub(1)).step_by(2) {
+        if parts[i].is_empty() {
+            break;
+        }
+        name_wides.push(to_wide(parts[i]));
+        pattern_wides.push(to_wide(parts[i + 1]));
+    }
+    for i in 0..name_wides.len() {
+        spec.push(COMDLG_FILTERSPEC {
+            pszName: PCWSTR(name_wides[i].as_ptr()),
+            pszSpec: PCWSTR(pattern_wides[i].as_ptr()),
+        });
+    }
+    pfd.SetFileTypes(&spec).ok()?;
+    pfd.SetFileTypeIndex(1).ok()?; // Default to "All supported formats"
+
+    let pfdc: IFileDialogCustomize = pfd.cast().ok()?;
+    let encoding_label = i18n::tr(language, "dialog.encoding_label");
+    let encodings = vec![
+        i18n::tr(language, "encoding.ansi"),
+        i18n::tr(language, "encoding.utf8"),
+        i18n::tr(language, "encoding.utf8bom"),
+        i18n::tr(language, "encoding.utf16le"),
+        i18n::tr(language, "encoding.utf16be"),
+    ];
+
+    log_debug("Adding encoding controls to open dialog");
+
+    // Use ComboBox with "Codifica: " prefix in each item for NVDA
+    pfdc.AddComboBox(101).ok()?;
+
+    for (i, enc_name) in encodings.iter().enumerate() {
+        let item_text = format!("{} {}", encoding_label, enc_name);
+        pfdc.AddControlItem(101, i as u32, PCWSTR(to_wide(&item_text).as_ptr()))
+            .ok()?;
+    }
+    pfdc.SetSelectedControlItem(101, encoding_to_index(TextEncoding::Utf8))
+        .ok()?;
+
+    let handler: IFileDialogEvents = CustomFileDialogEventHandler {
+        _encoding_label: encoding_label,
+        _encodings: encodings,
+        _initial_encoding: TextEncoding::Utf8,
+        _is_save_dialog: false,
+    }
+    .into();
+    let cookie = pfd.Advise(&handler).ok()?;
+    log_debug(&format!(
+        "Event handler registered with cookie: {:?}",
+        cookie
+    ));
+
+    // Trigger OnTypeChange to set initial visibility
+    // Default index 1 = "All supported formats", encoding will be hidden
+    log_debug("Triggering initial OnTypeChange");
+    let _ = pfd.SetFileTypeIndex(1);
+
+    log_debug("Showing open dialog");
+    if pfd.Show(hwnd).is_ok() {
+        log_debug("Dialog closed with OK");
+        let item = pfd.GetResult().ok()?;
+        let path_ptr = item
+            .GetDisplayName(windows::Win32::UI::Shell::SIGDN_FILESYSPATH)
+            .ok()?;
+        let path_str = from_wide(path_ptr.0);
+        CoTaskMemFree(Some(path_ptr.0 as *const _));
+
+        let selected_encoding_idx = pfdc.GetSelectedControlItem(101).ok()?;
+        let filter_index = pfd.GetFileTypeIndex().ok()?;
+
+        let path = PathBuf::from(path_str);
+
+        // Only return encoding for text files (filter index 2 = TXT)
+        let encoding = if filter_index == 2 {
+            Some(index_to_encoding(selected_encoding_idx))
+        } else {
+            None
+        };
+
+        pfd.Unadvise(cookie).ok()?;
+        Some((path, encoding))
+    } else {
+        pfd.Unadvise(cookie).ok()?;
+        None
+    }
+}
+
 pub(crate) unsafe fn save_file_dialog_with_encoding(
     hwnd: HWND,
     suggested_name: Option<&str>,
@@ -3624,11 +3724,12 @@ pub(crate) unsafe fn save_file_dialog_with_encoding(
         i18n::tr(language, "encoding.utf16be"),
     ];
 
-    pfdc.AddText(100, PCWSTR(to_wide(&encoding_label).as_ptr()))
-        .ok()?;
+    // Use ComboBox with "Codifica: " prefix in each item for NVDA
     pfdc.AddComboBox(101).ok()?;
+
     for (i, enc_name) in encodings.iter().enumerate() {
-        pfdc.AddControlItem(101, i as u32, PCWSTR(to_wide(enc_name).as_ptr()))
+        let item_text = format!("{} {}", encoding_label, enc_name);
+        pfdc.AddControlItem(101, i as u32, PCWSTR(to_wide(&item_text).as_ptr()))
             .ok()?;
     }
     pfdc.SetSelectedControlItem(101, encoding_to_index(initial_encoding))
@@ -3638,9 +3739,13 @@ pub(crate) unsafe fn save_file_dialog_with_encoding(
         _encoding_label: encoding_label,
         _encodings: encodings,
         _initial_encoding: initial_encoding,
+        _is_save_dialog: true,
     }
     .into();
     let cookie = pfd.Advise(&handler).ok()?;
+
+    // Trigger OnTypeChange to set initial visibility (filter index 1 = TXT for save dialog)
+    let _ = pfd.SetFileTypeIndex(1);
 
     if pfd.Show(hwnd).is_ok() {
         let item = pfd.GetResult().ok()?;

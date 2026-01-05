@@ -311,6 +311,7 @@
   "file_handler.pdf_save_error": "Errore salvataggio PDF: {err}",
   "file_handler.utf16le_invalid_length": "Il file UTF-16LE ha una lunghezza non valida.",
   "file_handler.utf16be_invalid_length": "Il file UTF-16BE ha una lunghezza non valida.",
+  "file_handler.invalid_encoding": "Il file non può essere decodificato con la codifica selezionata.",
   "updater.prompt": "Aggiornamento disponibile.\nVersione installata: {current}\nNuova versione: {latest}\n\nVuoi scaricare e aggiornare ora?",
   "updater.prompt.restart": "Aggiornamento scaricato.\nVuoi riavviare il programma ora?",
   "updater.prompt.pending": "Hai un aggiornamento in sospeso.\nVuoi aggiornare ora?",

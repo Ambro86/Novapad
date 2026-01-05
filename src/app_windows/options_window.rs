@@ -34,6 +34,7 @@ use windows::core::{PCWSTR, w};
 
 const OPTIONS_CLASS_NAME: &str = "NovapadOptions";
 const OPTIONS_ID_LANG: usize = 6001;
+const OPTIONS_ID_DEFAULT_ENCODING: usize = 6024;
 const OPTIONS_ID_MODIFIED_MARKER_POSITION: usize = 6023;
 const OPTIONS_ID_OPEN: usize = 6002;
 const OPTIONS_ID_TTS_ENGINE: usize = 6012;
@@ -86,6 +87,8 @@ struct OptionsDialogState {
     parent: HWND,
     label_language: HWND,
     combo_lang: HWND,
+    _label_default_encoding: HWND,
+    combo_default_encoding: HWND,
     combo_modified_marker_position: HWND,
     combo_open: HWND,
     combo_tts_engine: HWND,
@@ -114,6 +117,7 @@ struct OptionsDialogState {
 struct OptionsLabels {
     title: String,
     label_language: String,
+    label_default_encoding: String,
     label_modified_marker_position: String,
     label_open: String,
     label_tts_engine: String,
@@ -136,6 +140,11 @@ struct OptionsLabels {
     lang_en: String,
     lang_es: String,
     lang_pt: String,
+    encoding_ansi: String,
+    encoding_utf8: String,
+    encoding_utf8bom: String,
+    encoding_utf16le: String,
+    encoding_utf16be: String,
     marker_position_end: String,
     marker_position_beginning: String,
     open_new_tab: String,
@@ -157,6 +166,7 @@ fn options_labels(language: Language) -> OptionsLabels {
     OptionsLabels {
         title: i18n::tr(language, "options.title"),
         label_language: i18n::tr(language, "options.label.language"),
+        label_default_encoding: i18n::tr(language, "dialog.encoding_label"),
         label_modified_marker_position: i18n::tr(
             language,
             "options.label.modified_marker_position",
@@ -185,6 +195,11 @@ fn options_labels(language: Language) -> OptionsLabels {
         lang_en: i18n::tr(language, "options.lang.en"),
         lang_es: i18n::tr(language, "options.lang.es"),
         lang_pt: i18n::tr(language, "options.lang.pt"),
+        encoding_ansi: i18n::tr(language, "encoding.ansi"),
+        encoding_utf8: i18n::tr(language, "encoding.utf8"),
+        encoding_utf8bom: i18n::tr(language, "encoding.utf8bom"),
+        encoding_utf16le: i18n::tr(language, "encoding.utf16le"),
+        encoding_utf16be: i18n::tr(language, "encoding.utf16be"),
         marker_position_end: i18n::tr(language, "options.modified_marker_position.end"),
         marker_position_beginning: i18n::tr(language, "options.modified_marker_position.beginning"),
         open_new_tab: i18n::tr(language, "options.open.new_tab"),
@@ -353,6 +368,36 @@ unsafe extern "system" fn options_wndproc(
                 120,
                 hwnd,
                 HMENU(OPTIONS_ID_LANG as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 40;
+
+            let label_default_encoding = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_default_encoding).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_default_encoding = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                120,
+                hwnd,
+                HMENU(OPTIONS_ID_DEFAULT_ENCODING as isize),
                 HINSTANCE(0),
                 None,
             );
@@ -818,6 +863,8 @@ unsafe extern "system" fn options_wndproc(
             for control in [
                 label_lang,
                 combo_lang,
+                label_default_encoding,
+                combo_default_encoding,
                 label_open,
                 combo_open,
                 label_tts_engine,
@@ -858,6 +905,8 @@ unsafe extern "system" fn options_wndproc(
                 parent,
                 label_language: label_lang,
                 combo_lang,
+                _label_default_encoding: label_default_encoding,
+                combo_default_encoding,
                 combo_modified_marker_position,
                 combo_open,
                 combo_tts_engine,
@@ -1032,6 +1081,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
     let (
         parent,
         combo_lang,
+        combo_default_encoding,
         combo_modified_marker_position,
         combo_open,
         combo_tts_engine,
@@ -1058,6 +1108,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         (
             state.parent,
             state.combo_lang,
+            state.combo_default_encoding,
             state.combo_modified_marker_position,
             state.combo_open,
             state.combo_tts_engine,
@@ -1121,6 +1172,56 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         Language::Portuguese => 3,
     };
     let _ = SendMessageW(combo_lang, CB_SETCURSEL, WPARAM(lang_index), LPARAM(0));
+
+    let _ = SendMessageW(
+        combo_default_encoding,
+        CB_RESETCONTENT,
+        WPARAM(0),
+        LPARAM(0),
+    );
+    let _ = SendMessageW(
+        combo_default_encoding,
+        CB_ADDSTRING,
+        WPARAM(0),
+        LPARAM(to_wide(&labels.encoding_ansi).as_ptr() as isize),
+    );
+    let _ = SendMessageW(
+        combo_default_encoding,
+        CB_ADDSTRING,
+        WPARAM(0),
+        LPARAM(to_wide(&labels.encoding_utf8).as_ptr() as isize),
+    );
+    let _ = SendMessageW(
+        combo_default_encoding,
+        CB_ADDSTRING,
+        WPARAM(0),
+        LPARAM(to_wide(&labels.encoding_utf8bom).as_ptr() as isize),
+    );
+    let _ = SendMessageW(
+        combo_default_encoding,
+        CB_ADDSTRING,
+        WPARAM(0),
+        LPARAM(to_wide(&labels.encoding_utf16le).as_ptr() as isize),
+    );
+    let _ = SendMessageW(
+        combo_default_encoding,
+        CB_ADDSTRING,
+        WPARAM(0),
+        LPARAM(to_wide(&labels.encoding_utf16be).as_ptr() as isize),
+    );
+    let enc_index = match settings.default_text_encoding {
+        crate::settings::TextEncoding::Ansi => 0,
+        crate::settings::TextEncoding::Utf8 => 1,
+        crate::settings::TextEncoding::Utf8Bom => 2,
+        crate::settings::TextEncoding::Utf16Le => 3,
+        crate::settings::TextEncoding::Utf16Be => 4,
+    };
+    let _ = SendMessageW(
+        combo_default_encoding,
+        CB_SETCURSEL,
+        WPARAM(enc_index),
+        LPARAM(0),
+    );
 
     let _ = SendMessageW(
         combo_modified_marker_position,
@@ -1440,6 +1541,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     let (
         parent,
         combo_lang,
+        combo_default_encoding,
         combo_modified_marker_position,
         combo_open,
         combo_tts_engine,
@@ -1462,6 +1564,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         (
             state.parent,
             state.combo_lang,
+            state.combo_default_encoding,
             state.combo_modified_marker_position,
             state.combo_open,
             state.combo_tts_engine,
@@ -1506,6 +1609,16 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         2 => Language::Spanish,
         3 => Language::Portuguese,
         _ => Language::Italian,
+    };
+
+    let enc_sel = SendMessageW(combo_default_encoding, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    settings.default_text_encoding = match enc_sel {
+        0 => crate::settings::TextEncoding::Ansi,
+        1 => crate::settings::TextEncoding::Utf8,
+        2 => crate::settings::TextEncoding::Utf8Bom,
+        3 => crate::settings::TextEncoding::Utf16Le,
+        4 => crate::settings::TextEncoding::Utf16Be,
+        _ => crate::settings::TextEncoding::Utf8,
     };
 
     let marker_sel = SendMessageW(

@@ -37,54 +37,44 @@ mod podcast_recorder;
 mod updater;
 
 use std::io::Write;
-
 use std::mem::size_of;
-
 use std::path::{Path, PathBuf};
-
+use std::sync::Arc;
 use std::sync::Once;
 use std::sync::atomic::AtomicBool;
 use std::time::{Duration, Instant};
 
-use std::sync::Arc;
-
 use chrono::Local;
-
 use serde::{Deserialize, Serialize};
 
-use windows::core::{PCWSTR, PWSTR, w};
-
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
-
 use windows::Win32::Graphics::Gdi::{
     COLOR_WINDOW, DEFAULT_GUI_FONT, GetStockObject, HBRUSH, HFONT,
 };
-
+use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
 use windows::Win32::System::DataExchange::COPYDATASTRUCT;
-
 use windows::Win32::System::LibraryLoader::{GetModuleHandleW, LoadLibraryW};
-
-use windows::Win32::UI::Controls::RichEdit::{
-    CHARRANGE, EM_EXGETSEL, EM_EXSETSEL, EM_GETTEXTRANGE, TEXTRANGEW,
-};
-
-use windows::Win32::UI::Controls::{
-    BST_CHECKED, ICC_TAB_CLASSES, INITCOMMONCONTROLSEX, InitCommonControlsEx, NMHDR, TCM_GETCURSEL,
-    TCN_SELCHANGE, WC_BUTTON, WC_COMBOBOXW, WC_STATIC, WC_TABCONTROLW,
-};
-
 use windows::Win32::UI::Controls::Dialogs::{
     FINDREPLACE_FLAGS, FINDREPLACEW, GetOpenFileNameW, GetSaveFileNameW, OFN_EXPLORER,
     OFN_FILEMUSTEXIST, OFN_HIDEREADONLY, OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST, OPENFILENAMEW,
 };
-
+use windows::Win32::UI::Controls::RichEdit::{
+    CHARRANGE, EM_EXGETSEL, EM_EXSETSEL, EM_GETTEXTRANGE, TEXTRANGEW,
+};
+use windows::Win32::UI::Controls::{
+    BST_CHECKED, ICC_TAB_CLASSES, INITCOMMONCONTROLSEX, InitCommonControlsEx, NMHDR, TCM_GETCURSEL,
+    TCN_SELCHANGE, WC_BUTTON, WC_COMBOBOXW, WC_STATIC, WC_TABCONTROLW,
+};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_CONTROL, VK_ESCAPE, VK_F1,
     VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_RETURN, VK_SHIFT, VK_TAB,
 };
-
-use windows::Win32::UI::Shell::{DragAcceptFiles, DragFinish, DragQueryFileW, HDROP};
-
+use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
+use windows::Win32::UI::Shell::{
+    DragAcceptFiles, DragFinish, DragQueryFileW, FileSaveDialog, HDROP, IFileDialog,
+    IFileDialogControlEvents, IFileDialogControlEvents_Impl, IFileDialogCustomize,
+    IFileDialogEvents, IFileDialogEvents_Impl, IFileSaveDialog, IShellItem,
+};
 use windows::Win32::UI::WindowsAndMessaging::{
     ACCEL, AppendMenuW, BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, CB_ADDSTRING, CB_GETCURSEL,
     CB_GETDROPPEDSTATE, CB_GETITEMDATA, CB_RESETCONTENT, CB_SETCURSEL, CB_SETITEMDATA,
@@ -103,6 +93,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_TIMER, WM_UNDO, WNDCLASSW, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW,
     WS_TABSTOP, WS_VISIBLE,
 };
+use windows::core::{Interface, PCWSTR, PWSTR, implement, w};
+
+const EM_SCROLLCARET: u32 = 0x00B7;
 
 use crate::app_windows::find_in_files_window::FindInFilesCache;
 
@@ -3036,6 +3029,8 @@ pub(crate) unsafe fn open_pdf_document_async(hwnd: HWND, path: &Path) {
             hwnd_edit,
             dirty: false,
             format: FileFormat::Pdf,
+            opened_text_encoding: None,
+            current_save_text_encoding: None,
         };
         state.docs.push(doc);
         insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);
@@ -3344,63 +3339,6 @@ unsafe fn open_file_dialog(hwnd: HWND) -> Option<PathBuf> {
     }
 }
 
-unsafe fn save_file_dialog(hwnd: HWND, suggested_name: Option<&str>) -> Option<PathBuf> {
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    let filter_raw = i18n::tr(language, "dialog.save_filter");
-    let filter = to_wide(&filter_raw.replace("\\0", "\0"));
-    let mut file_buf = [0u16; 260];
-    if let Some(name) = suggested_name {
-        let mut idx = 0usize;
-        for &ch in to_wide(name).iter() {
-            if ch == 0 || idx >= file_buf.len() - 1 {
-                break;
-            }
-            file_buf[idx] = ch;
-            idx += 1;
-        }
-        file_buf[idx] = 0;
-    }
-    let mut ofn = OPENFILENAMEW {
-        lStructSize: size_of::<OPENFILENAMEW>() as u32,
-        hwndOwner: hwnd,
-        lpstrFilter: PCWSTR(filter.as_ptr()),
-        lpstrFile: PWSTR(file_buf.as_mut_ptr()),
-        nMaxFile: file_buf.len() as u32,
-        Flags: OFN_EXPLORER | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST,
-        ..Default::default()
-    };
-    let ok = GetSaveFileNameW(&mut ofn);
-    if ok.as_bool() {
-        let mut path = PathBuf::from(from_wide(file_buf.as_ptr()));
-        if path.extension().is_none() {
-            match ofn.nFilterIndex {
-                1 => {
-                    path.set_extension("txt");
-                }
-                2 => {
-                    path.set_extension("pdf");
-                }
-                3 => {
-                    path.set_extension("docx");
-                }
-                4 => {
-                    path.set_extension("xlsx");
-                }
-                5 => {
-                    path.set_extension("rtf");
-                }
-                7 => {
-                    path.set_extension("html");
-                }
-                _ => {}
-            }
-        }
-        Some(path)
-    } else {
-        None
-    }
-}
-
 pub(crate) unsafe fn save_audio_dialog(
     hwnd: HWND,
     suggested_name: Option<&str>,
@@ -3520,5 +3458,230 @@ fn save_recent_files(files: &[PathBuf]) {
     };
     if let Ok(json) = serde_json::to_string_pretty(&store) {
         let _ = std::fs::write(path, json);
+    }
+}
+
+#[implement(IFileDialogEvents, IFileDialogControlEvents)]
+struct CustomFileDialogEventHandler {
+    _encoding_label: String,
+    _encodings: Vec<String>,
+    _initial_encoding: TextEncoding,
+}
+
+impl IFileDialogEvents_Impl for CustomFileDialogEventHandler {
+    fn OnFileOk(&self, _pfd: Option<&IFileDialog>) -> windows::core::Result<()> {
+        Ok(())
+    }
+    fn OnFolderChange(&self, _pfd: Option<&IFileDialog>) -> windows::core::Result<()> {
+        Ok(())
+    }
+    fn OnFolderChanging(
+        &self,
+        _pfd: Option<&IFileDialog>,
+        _psi: Option<&IShellItem>,
+    ) -> windows::core::Result<()> {
+        Ok(())
+    }
+    fn OnSelectionChange(&self, _pfd: Option<&IFileDialog>) -> windows::core::Result<()> {
+        Ok(())
+    }
+    fn OnShareViolation(
+        &self,
+        _pfd: Option<&IFileDialog>,
+        _psi: Option<&IShellItem>,
+    ) -> windows::core::Result<windows::Win32::UI::Shell::FDE_SHAREVIOLATION_RESPONSE> {
+        Ok(windows::Win32::UI::Shell::FDESVR_DEFAULT)
+    }
+    fn OnTypeChange(&self, pfd: Option<&IFileDialog>) -> windows::core::Result<()> {
+        unsafe {
+            let pfd = pfd.unwrap();
+            let filter_index = pfd.GetFileTypeIndex()?;
+            let pfdc: IFileDialogCustomize = pfd.cast()?;
+            // Show encoding only for TXT (index 1)
+            if filter_index == 1 {
+                pfdc.SetControlState(
+                    100,
+                    windows::Win32::UI::Shell::CDCS_VISIBLE
+                        | windows::Win32::UI::Shell::CDCS_ENABLED,
+                )?;
+                pfdc.SetControlState(
+                    101,
+                    windows::Win32::UI::Shell::CDCS_VISIBLE
+                        | windows::Win32::UI::Shell::CDCS_ENABLED,
+                )?;
+            } else {
+                pfdc.SetControlState(100, windows::Win32::UI::Shell::CDCS_INACTIVE)?;
+                pfdc.SetControlState(101, windows::Win32::UI::Shell::CDCS_INACTIVE)?;
+            }
+        }
+        Ok(())
+    }
+    fn OnOverwrite(
+        &self,
+        _pfd: Option<&IFileDialog>,
+        _psi: Option<&IShellItem>,
+    ) -> windows::core::Result<windows::Win32::UI::Shell::FDE_OVERWRITE_RESPONSE> {
+        Ok(windows::Win32::UI::Shell::FDEOR_DEFAULT)
+    }
+}
+
+impl IFileDialogControlEvents_Impl for CustomFileDialogEventHandler {
+    fn OnItemSelected(
+        &self,
+        _pfdc: Option<&IFileDialogCustomize>,
+        _dwidctl: u32,
+        _dwiditem: u32,
+    ) -> windows::core::Result<()> {
+        Ok(())
+    }
+    fn OnButtonClicked(
+        &self,
+        _pfdc: Option<&IFileDialogCustomize>,
+        _dwidctl: u32,
+    ) -> windows::core::Result<()> {
+        Ok(())
+    }
+    fn OnCheckButtonToggled(
+        &self,
+        _pfdc: Option<&IFileDialogCustomize>,
+        _dwidctl: u32,
+        _pbchecked: windows::Win32::Foundation::BOOL,
+    ) -> windows::core::Result<()> {
+        Ok(())
+    }
+    fn OnControlActivating(
+        &self,
+        _pfdc: Option<&IFileDialogCustomize>,
+        _dwidctl: u32,
+    ) -> windows::core::Result<()> {
+        Ok(())
+    }
+}
+
+fn encoding_to_index(enc: TextEncoding) -> u32 {
+    match enc {
+        TextEncoding::Ansi => 0,
+        TextEncoding::Utf8 => 1,
+        TextEncoding::Utf8Bom => 2,
+        TextEncoding::Utf16Le => 3,
+        TextEncoding::Utf16Be => 4,
+    }
+}
+
+fn index_to_encoding(index: u32) -> TextEncoding {
+    match index {
+        0 => TextEncoding::Ansi,
+        1 => TextEncoding::Utf8,
+        2 => TextEncoding::Utf8Bom,
+        3 => TextEncoding::Utf16Le,
+        4 => TextEncoding::Utf16Be,
+        _ => TextEncoding::Utf8,
+    }
+}
+
+pub(crate) unsafe fn save_file_dialog_with_encoding(
+    hwnd: HWND,
+    suggested_name: Option<&str>,
+    initial_encoding: TextEncoding,
+) -> Option<(PathBuf, TextEncoding)> {
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+
+    let pfd: IFileSaveDialog = CoCreateInstance(&FileSaveDialog, None, CLSCTX_ALL).ok()?;
+
+    let filter_raw = i18n::tr(language, "dialog.save_filter");
+    let parts: Vec<&str> = filter_raw.split("\\0").collect();
+    let mut spec = Vec::new();
+    let mut pattern_wides = Vec::new();
+    let mut name_wides = Vec::new();
+    for i in (0..parts.len().saturating_sub(1)).step_by(2) {
+        if parts[i].is_empty() {
+            break;
+        }
+        name_wides.push(to_wide(parts[i]));
+        pattern_wides.push(to_wide(parts[i + 1]));
+    }
+    for i in 0..name_wides.len() {
+        spec.push(COMDLG_FILTERSPEC {
+            pszName: PCWSTR(name_wides[i].as_ptr()),
+            pszSpec: PCWSTR(pattern_wides[i].as_ptr()),
+        });
+    }
+    pfd.SetFileTypes(&spec).ok()?;
+    pfd.SetFileTypeIndex(1).ok()?; // Default to TXT
+    pfd.SetDefaultExtension(w!("txt")).ok()?;
+
+    if let Some(name) = suggested_name {
+        pfd.SetFileName(PCWSTR(to_wide(name).as_ptr())).ok()?;
+    }
+
+    let pfdc: IFileDialogCustomize = pfd.cast().ok()?;
+    let encoding_label = i18n::tr(language, "dialog.encoding_label");
+    let encodings = vec![
+        i18n::tr(language, "encoding.ansi"),
+        i18n::tr(language, "encoding.utf8"),
+        i18n::tr(language, "encoding.utf8bom"),
+        i18n::tr(language, "encoding.utf16le"),
+        i18n::tr(language, "encoding.utf16be"),
+    ];
+
+    pfdc.AddText(100, PCWSTR(to_wide(&encoding_label).as_ptr()))
+        .ok()?;
+    pfdc.AddComboBox(101).ok()?;
+    for (i, enc_name) in encodings.iter().enumerate() {
+        pfdc.AddControlItem(101, i as u32, PCWSTR(to_wide(enc_name).as_ptr()))
+            .ok()?;
+    }
+    pfdc.SetSelectedControlItem(101, encoding_to_index(initial_encoding))
+        .ok()?;
+
+    let handler: IFileDialogEvents = CustomFileDialogEventHandler {
+        _encoding_label: encoding_label,
+        _encodings: encodings,
+        _initial_encoding: initial_encoding,
+    }
+    .into();
+    let cookie = pfd.Advise(&handler).ok()?;
+
+    if pfd.Show(hwnd).is_ok() {
+        let item = pfd.GetResult().ok()?;
+        let path_ptr = item
+            .GetDisplayName(windows::Win32::UI::Shell::SIGDN_FILESYSPATH)
+            .ok()?;
+        let path_str = from_wide(path_ptr.0);
+        CoTaskMemFree(Some(path_ptr.0 as *const _));
+
+        let selected_encoding_idx = pfdc.GetSelectedControlItem(101).ok()?;
+        let filter_index = pfd.GetFileTypeIndex().ok()?;
+
+        let mut path = PathBuf::from(path_str);
+        if path.extension().is_none() {
+            match filter_index {
+                1 => {
+                    path.set_extension("txt");
+                }
+                2 => {
+                    path.set_extension("pdf");
+                }
+                3 => {
+                    path.set_extension("docx");
+                }
+                4 => {
+                    path.set_extension("xlsx");
+                }
+                5 => {
+                    path.set_extension("rtf");
+                }
+                7 => {
+                    path.set_extension("html");
+                }
+                _ => {}
+            }
+        }
+
+        pfd.Unadvise(cookie).ok()?;
+        Some((path, index_to_encoding(selected_encoding_idx)))
+    } else {
+        pfd.Unadvise(cookie).ok()?;
+        None
     }
 }

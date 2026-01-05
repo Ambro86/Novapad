@@ -34,13 +34,19 @@ pub struct AudiobookResult {
     pub message: String,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default, Debug)]
 pub enum TextEncoding {
+    #[serde(rename = "ansi")]
+    Ansi,
+    #[serde(rename = "utf8")]
     #[default]
     Utf8,
+    #[serde(rename = "utf8bom")]
+    Utf8Bom,
+    #[serde(rename = "utf16le")]
     Utf16Le,
+    #[serde(rename = "utf16be")]
     Utf16Be,
-    Windows1252,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -121,6 +127,7 @@ pub const PODCAST_DEVICE_DEFAULT: &str = "default";
 pub struct AppSettings {
     pub open_behavior: OpenBehavior,
     pub language: Language,
+    pub default_text_encoding: TextEncoding,
     pub modified_marker_position: ModifiedMarkerPosition,
     pub settings_in_current_dir: bool,
     pub tts_engine: TtsEngine,
@@ -168,6 +175,7 @@ impl Default for AppSettings {
         AppSettings {
             open_behavior: OpenBehavior::NewTab,
             language: Language::Italian,
+            default_text_encoding: TextEncoding::Utf8,
             modified_marker_position: ModifiedMarkerPosition::End,
             settings_in_current_dir: false,
             tts_engine: TtsEngine::Edge,

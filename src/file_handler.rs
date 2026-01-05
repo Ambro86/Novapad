@@ -83,6 +83,12 @@ pub fn is_mp3_path(path: &Path) -> bool {
 // --- Text Encoding / Decoding ---
 
 pub fn decode_text(bytes: &[u8], language: Language) -> Result<(String, TextEncoding), String> {
+    if bytes.len() >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF {
+        if let Ok(text) = String::from_utf8(bytes[3..].to_vec()) {
+            return Ok((text, TextEncoding::Utf8Bom));
+        }
+    }
+
     if bytes.len() >= 2 {
         if bytes[0] == 0xFF && bytes[1] == 0xFE {
             if !(bytes.len() - 2).is_multiple_of(2) {
@@ -115,12 +121,18 @@ pub fn decode_text(bytes: &[u8], language: Language) -> Result<(String, TextEnco
     }
 
     let (text, _, _) = WINDOWS_1252.decode(bytes);
-    Ok((text.into_owned(), TextEncoding::Windows1252))
+    Ok((text.into_owned(), TextEncoding::Ansi))
 }
 
 pub fn encode_text(text: &str, encoding: TextEncoding) -> Vec<u8> {
     match encoding {
         TextEncoding::Utf8 => text.as_bytes().to_vec(),
+        TextEncoding::Utf8Bom => {
+            let mut out = Vec::with_capacity(3 + text.len());
+            out.extend_from_slice(&[0xEF, 0xBB, 0xBF]);
+            out.extend_from_slice(text.as_bytes());
+            out
+        }
         TextEncoding::Utf16Le => {
             let mut out = Vec::with_capacity(2 + text.len() * 2);
             out.extend_from_slice(&[0xFF, 0xFE]);
@@ -137,7 +149,7 @@ pub fn encode_text(text: &str, encoding: TextEncoding) -> Vec<u8> {
             }
             out
         }
-        TextEncoding::Windows1252 => {
+        TextEncoding::Ansi => {
             let (encoded, _, _) = WINDOWS_1252.encode(text);
             encoded.into_owned()
         }

@@ -68,6 +68,8 @@ pub struct Document {
     pub hwnd_edit: HWND,
     pub dirty: bool,
     pub format: FileFormat,
+    pub opened_text_encoding: Option<TextEncoding>,
+    pub current_save_text_encoding: Option<TextEncoding>,
 }
 
 #[derive(Clone)]
@@ -87,6 +89,8 @@ impl Default for Document {
             hwnd_edit: HWND(0),
             dirty: false,
             format: FileFormat::Text(TextEncoding::Utf8),
+            opened_text_encoding: None,
+            current_save_text_encoding: None,
         }
     }
 }
@@ -1638,6 +1642,8 @@ pub unsafe fn new_document(hwnd: HWND) {
             hwnd_edit,
             dirty: false,
             format: FileFormat::Text(TextEncoding::Utf8),
+            opened_text_encoding: None,
+            current_save_text_encoding: None,
         };
         state.docs.push(doc);
         insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);
@@ -1655,9 +1661,9 @@ pub unsafe fn open_document(hwnd: HWND, path: &Path) {
         crate::open_pdf_document_async(hwnd, path);
         return;
     }
-    let (content, format) = if is_docx_path(path) {
+    let (content, format, opened_text_encoding) = if is_docx_path(path) {
         match read_docx_text(path, language) {
-            Ok(text) => (text, FileFormat::Docx),
+            Ok(text) => (text, FileFormat::Docx, None),
             Err(message) => {
                 crate::show_error(hwnd, language, &message);
                 return;
@@ -1665,7 +1671,7 @@ pub unsafe fn open_document(hwnd: HWND, path: &Path) {
         }
     } else if is_pptx_path(path) {
         match read_ppt_text(path, language) {
-            Ok(text) => (text, FileFormat::Pptx),
+            Ok(text) => (text, FileFormat::Pptx, None),
             Err(message) => {
                 crate::show_error(hwnd, language, &message);
                 return;
@@ -1673,7 +1679,7 @@ pub unsafe fn open_document(hwnd: HWND, path: &Path) {
         }
     } else if is_ppt_path(path) {
         match read_ppt_text(path, language) {
-            Ok(text) => (text, FileFormat::Ppt),
+            Ok(text) => (text, FileFormat::Ppt, None),
             Err(message) => {
                 crate::show_error(hwnd, language, &message);
                 return;
@@ -1681,7 +1687,7 @@ pub unsafe fn open_document(hwnd: HWND, path: &Path) {
         }
     } else if is_epub_path(path) {
         match read_epub_text(path, language) {
-            Ok(text) => (text, FileFormat::Epub),
+            Ok(text) => (text, FileFormat::Epub, None),
             Err(message) => {
                 crate::show_error(hwnd, language, &message);
                 return;
@@ -1689,17 +1695,17 @@ pub unsafe fn open_document(hwnd: HWND, path: &Path) {
         }
     } else if is_html_path(path) {
         match read_html_text(path, language) {
-            Ok((text, _encoding)) => (text, FileFormat::Html),
+            Ok((text, _encoding)) => (text, FileFormat::Html, None),
             Err(message) => {
                 crate::show_error(hwnd, language, &message);
                 return;
             }
         }
     } else if is_mp3_path(path) {
-        (String::new(), FileFormat::Audiobook)
+        (String::new(), FileFormat::Audiobook, None)
     } else if is_doc_path(path) {
         match read_doc_text(path, language) {
-            Ok(text) => (text, FileFormat::Doc),
+            Ok(text) => (text, FileFormat::Doc, None),
             Err(message) => {
                 crate::show_error(hwnd, language, &message);
                 return;
@@ -1707,7 +1713,7 @@ pub unsafe fn open_document(hwnd: HWND, path: &Path) {
         }
     } else if is_spreadsheet_path(path) {
         match read_spreadsheet_text(path, language) {
-            Ok(text) => (text, FileFormat::Spreadsheet),
+            Ok(text) => (text, FileFormat::Spreadsheet, None),
             Err(message) => {
                 crate::show_error(hwnd, language, &message);
                 return;
@@ -1716,7 +1722,7 @@ pub unsafe fn open_document(hwnd: HWND, path: &Path) {
     } else {
         match std::fs::read(path) {
             Ok(bytes) => match decode_text(&bytes, language) {
-                Ok((text, encoding)) => (text, FileFormat::Text(encoding)),
+                Ok((text, encoding)) => (text, FileFormat::Text(encoding), Some(encoding)),
                 Err(message) => {
                     crate::show_error(hwnd, language, &message);
                     return;
@@ -1750,6 +1756,8 @@ pub unsafe fn open_document(hwnd: HWND, path: &Path) {
             hwnd_edit,
             dirty: false,
             format,
+            opened_text_encoding,
+            current_save_text_encoding: None,
         };
         if matches!(format, FileFormat::Audiobook) {
             unsafe {
@@ -2196,18 +2204,30 @@ pub unsafe fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> 
                 .to_string();
         }
 
-        let path = if !force_dialog && !is_lossy_doc {
-            state.docs[index].path.clone()
+        let path_info = if !force_dialog && !is_lossy_doc {
+            state.docs[index].path.clone().map(|p| (p, None))
         } else {
             None
         };
-        let path = match path {
-            Some(path) => path,
-            None => match crate::save_file_dialog(hwnd, Some(&suggested_name)) {
-                Some(path) => path,
-                None => return None,
-            },
+
+        let (path, user_selected_encoding) = match path_info {
+            Some((path, enc)) => (path, enc),
+            None => {
+                let initial_encoding = state.docs[index]
+                    .current_save_text_encoding
+                    .or(state.docs[index].opened_text_encoding)
+                    .unwrap_or(state.settings.default_text_encoding);
+                match crate::save_file_dialog_with_encoding(
+                    hwnd,
+                    Some(&suggested_name),
+                    initial_encoding,
+                ) {
+                    Some((path, enc)) => (path, Some(enc)),
+                    None => return None,
+                }
+            }
         };
+
         let mut path = path;
         if is_lossy_doc {
             path.set_extension("txt");
@@ -2232,17 +2252,14 @@ pub unsafe fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> 
             }
             state.docs[index].format = FileFormat::Pdf;
         } else {
-            let encoding = match state.docs[index].format {
-                FileFormat::Text(enc) => enc,
-                FileFormat::Docx
-                | FileFormat::Doc
-                | FileFormat::Pdf
-                | FileFormat::Spreadsheet
-                | FileFormat::Epub
-                | FileFormat::Html
-                | FileFormat::Ppt
-                | FileFormat::Pptx
-                | FileFormat::Audiobook => TextEncoding::Utf8,
+            let encoding = if let Some(enc) = user_selected_encoding {
+                state.docs[index].current_save_text_encoding = Some(enc);
+                enc
+            } else {
+                state.docs[index]
+                    .current_save_text_encoding
+                    .or(state.docs[index].opened_text_encoding)
+                    .unwrap_or(state.settings.default_text_encoding)
             };
             let bytes = encode_text(&text, encoding);
             if let Err(err) = std::fs::write(&path, bytes) {

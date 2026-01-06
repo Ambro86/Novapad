@@ -14,11 +14,10 @@ use windows::Win32::System::Com::{
     CLSCTX_ALL, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx, CoUninitialize,
 };
 
-/// Audio sample with timestamp
+/// Audio sample without timestamp (will be calculated by encoder)
 #[derive(Clone)]
 pub struct AudioSample {
     pub data: Vec<i16>, // 16-bit PCM stereo samples
-    pub timestamp: i64, // 100-nanosecond units
     pub sample_rate: u32,
     pub channels: u16,
 }
@@ -44,6 +43,10 @@ impl AudioQueue {
 
         if queue.len() >= self.max_samples {
             queue.remove(0); // Drop oldest
+            crate::log_debug(&format!(
+                "WARNING: Audio queue overflow! Dropped oldest sample. Queue size: {}",
+                self.max_samples
+            ));
         }
 
         queue.push(sample);
@@ -79,9 +82,17 @@ pub struct AudioRecorderHandle {
     stop: Arc<AtomicBool>,
     thread: Option<JoinHandle<Result<(), String>>>,
     pub audio_queue: Arc<AudioQueue>,
+    pub sample_rate: u32,
+    pub channels: u16,
 }
 
 impl AudioRecorderHandle {
+    /// Signal audio recording to stop (without waiting)
+    pub fn signal_stop(&self) {
+        self.stop.store(true, Ordering::SeqCst);
+    }
+
+    /// Stop audio recording and wait for thread to finish
     pub fn stop(mut self) -> Result<(), String> {
         self.stop.store(true, Ordering::SeqCst);
 
@@ -93,12 +104,29 @@ impl AudioRecorderHandle {
 
         Ok(())
     }
+
+    /// Wait for thread to finish (call after signal_stop)
+    pub fn join(mut self) -> Result<(), String> {
+        if let Some(thread) = self.thread.take() {
+            thread
+                .join()
+                .map_err(|_| "Audio capture thread panicked".to_string())??;
+        }
+        Ok(())
+    }
 }
 
 /// Start audio recording using WASAPI loopback
 pub fn start_audio_recording() -> Result<AudioRecorderHandle, String> {
-    let audio_queue = Arc::new(AudioQueue::new(200)); // ~4-5 seconds buffer at 44.1kHz
+    let audio_queue = Arc::new(AudioQueue::new(3000)); // Large buffer to prevent overflow
     let stop = Arc::new(AtomicBool::new(false));
+
+    // Get audio format info before starting thread
+    let (sample_rate, channels) = get_audio_format()?;
+    crate::log_debug(&format!(
+        "Audio capture will use: {} Hz, {} channels",
+        sample_rate, channels
+    ));
 
     let audio_queue_clone = Arc::clone(&audio_queue);
     let stop_clone = Arc::clone(&stop);
@@ -109,7 +137,42 @@ pub fn start_audio_recording() -> Result<AudioRecorderHandle, String> {
         stop,
         thread: Some(thread),
         audio_queue,
+        sample_rate,
+        channels,
     })
+}
+
+/// Get the audio format that will be used for capture
+fn get_audio_format() -> Result<(u32, u16), String> {
+    unsafe {
+        CoInitializeEx(None, COINIT_APARTMENTTHREADED)
+            .ok()
+            .map_err(|e| format!("CoInitializeEx failed: {:?}", e))?;
+
+        let enumerator: IMMDeviceEnumerator =
+            CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
+                .map_err(|e| format!("Failed to create device enumerator: {}", e))?;
+
+        let device: IMMDevice = enumerator
+            .GetDefaultAudioEndpoint(eRender, eConsole)
+            .map_err(|e| format!("Failed to get default audio endpoint: {}", e))?;
+
+        let audio_client: IAudioClient = device
+            .Activate(CLSCTX_ALL, None)
+            .map_err(|e| format!("Failed to activate audio client: {}", e))?;
+
+        let format_ptr = audio_client
+            .GetMixFormat()
+            .map_err(|e| format!("GetMixFormat failed: {}", e))?;
+        let format = &*format_ptr;
+
+        let sample_rate = format.nSamplesPerSec;
+        let channels = format.nChannels;
+
+        CoUninitialize();
+
+        Ok((sample_rate, channels))
+    }
 }
 
 fn audio_capture_loop(audio_queue: Arc<AudioQueue>, stop: Arc<AtomicBool>) -> Result<(), String> {
@@ -196,7 +259,8 @@ unsafe fn audio_capture_loop_impl(
 
     // Capture loop
     while !stop.load(Ordering::SeqCst) {
-        thread::sleep(Duration::from_millis(10));
+        // Reduced sleep for faster audio capture - was 10ms, now 5ms
+        thread::sleep(Duration::from_millis(5));
 
         let packet_length = match capture_client.GetNextPacketSize() {
             Ok(len) => len,
@@ -217,12 +281,6 @@ unsafe fn audio_capture_loop_impl(
             }
 
             if num_frames > 0 && !buffer_ptr.is_null() {
-                // Calculate timestamp
-                let mut current_qpc = 0i64;
-                let _ =
-                    windows::Win32::System::Performance::QueryPerformanceCounter(&mut current_qpc);
-                let timestamp = ((current_qpc - start_qpc) * 10_000_000) / qpc_freq;
-
                 // Convert to 16-bit PCM stereo
                 let frame_size = (channels as usize) * bytes_per_sample;
                 let total_bytes = (num_frames as usize) * frame_size;
@@ -258,7 +316,6 @@ unsafe fn audio_capture_loop_impl(
 
                 let audio_sample = AudioSample {
                     data: samples,
-                    timestamp,
                     sample_rate,
                     channels: 2, // Always output stereo
                 };

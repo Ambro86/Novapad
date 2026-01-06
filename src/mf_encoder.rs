@@ -5,7 +5,9 @@ use std::ffi::c_void;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
-use windows::Win32::Graphics::Direct3D11::{D3D11_MAP_READ, D3D11_MAPPED_SUBRESOURCE};
+use windows::Win32::Graphics::Direct3D11::{
+    D3D11_MAP_READ, D3D11_MAPPED_SUBRESOURCE, ID3D11Texture2D,
+};
 use windows::Win32::Media::MediaFoundation::{
     IMFMediaBuffer, IMFMediaType, IMFSample, IMFSinkWriter, IMFSourceReader,
     MF_MT_AUDIO_AVG_BYTES_PER_SECOND, MF_MT_AUDIO_BITS_PER_SAMPLE, MF_MT_AUDIO_BLOCK_ALIGNMENT,
@@ -471,17 +473,27 @@ pub struct Mp4StreamWriter {
     writer: IMFSinkWriter,
     video_stream_index: u32,
     audio_stream_index: u32,
+    audio_sample_rate: u32,
+    audio_timestamp: i64, // Current audio timestamp in 100-nanosecond units
+    staging_texture: Option<ID3D11Texture2D>, // Reusable staging texture for video frames
+    staging_width: u32,
+    staging_height: u32,
 }
 
 // SAFETY: IMFSinkWriter is thread-safe for writing from a single thread
 unsafe impl Send for Mp4StreamWriter {}
 
 impl Mp4StreamWriter {
-    pub fn create(path: &Path, width: u32, height: u32) -> Result<Self, String> {
+    pub fn create(
+        path: &Path,
+        width: u32,
+        height: u32,
+        audio_sample_rate: u32,
+    ) -> Result<Self, String> {
         unsafe {
             crate::log_debug(&format!(
-                "MF: creating MP4 writer. path={:?} size={}x{}",
-                path, width, height
+                "MF: creating MP4 writer. path={:?} size={}x{} audio={}Hz",
+                path, width, height, audio_sample_rate
             ));
 
             let guard = MfGuard::start()?;
@@ -507,8 +519,8 @@ impl Mp4StreamWriter {
                 .SetUINT64(&MF_MT_FRAME_RATE, (30u64 << 32) | 1)
                 .map_err(|e| format!("SetUINT64 frame rate failed: {}", e))?; // 30 FPS
             video_out
-                .SetUINT32(&MF_MT_AVG_BITRATE, 5_000_000)
-                .map_err(|e| format!("SetUINT32 avg bitrate failed: {}", e))?; // 5 Mbps
+                .SetUINT32(&MF_MT_AVG_BITRATE, 2_000_000)
+                .map_err(|e| format!("SetUINT32 avg bitrate failed: {}", e))?; // 2 Mbps (reduced for faster encoding)
             video_out
                 .SetUINT32(&MF_MT_INTERLACE_MODE, 2)
                 .map_err(|e| format!("SetUINT32 interlace mode failed: {}", e))?; // Progressive
@@ -551,7 +563,7 @@ impl Mp4StreamWriter {
                 .SetUINT32(&MF_MT_AUDIO_NUM_CHANNELS, 2)
                 .map_err(|e| format!("SetUINT32 audio channels failed: {}", e))?;
             audio_out
-                .SetUINT32(&MF_MT_AUDIO_SAMPLES_PER_SECOND, 44100)
+                .SetUINT32(&MF_MT_AUDIO_SAMPLES_PER_SECOND, audio_sample_rate)
                 .map_err(|e| format!("SetUINT32 audio sample rate failed: {}", e))?;
             audio_out
                 .SetUINT32(&MF_MT_AUDIO_AVG_BYTES_PER_SECOND, 24000)
@@ -566,7 +578,7 @@ impl Mp4StreamWriter {
                 .SetGUID(&MF_MT_SUBTYPE, &MFAudioFormat_PCM)
                 .map_err(|e| format!("SetGUID PCM subtype failed: {}", e))?;
             audio_in
-                .SetUINT32(&MF_MT_AUDIO_SAMPLES_PER_SECOND, 44100)
+                .SetUINT32(&MF_MT_AUDIO_SAMPLES_PER_SECOND, audio_sample_rate)
                 .map_err(|e| format!("SetUINT32 audio sample rate (in) failed: {}", e))?;
             audio_in
                 .SetUINT32(&MF_MT_AUDIO_NUM_CHANNELS, 2)
@@ -577,8 +589,10 @@ impl Mp4StreamWriter {
             audio_in
                 .SetUINT32(&MF_MT_AUDIO_BLOCK_ALIGNMENT, 4)
                 .map_err(|e| format!("SetUINT32 audio block alignment failed: {}", e))?;
+
+            let audio_avg_bytes_in = audio_sample_rate * 4; // 16-bit stereo = 4 bytes per frame
             audio_in
-                .SetUINT32(&MF_MT_AUDIO_AVG_BYTES_PER_SECOND, 176400)
+                .SetUINT32(&MF_MT_AUDIO_AVG_BYTES_PER_SECOND, audio_avg_bytes_in)
                 .map_err(|e| format!("SetUINT32 audio avg bytes (in) failed: {}", e))?;
 
             let audio_stream_index = writer
@@ -599,13 +613,22 @@ impl Mp4StreamWriter {
                 writer,
                 video_stream_index,
                 audio_stream_index,
+                audio_sample_rate,
+                audio_timestamp: 0,
+                staging_texture: None,
+                staging_width: 0,
+                staging_height: 0,
             })
         }
     }
 
     pub fn write_video_frame(&mut self, frame: &VideoFrame) -> Result<(), String> {
         unsafe {
-            // Get D3D11 device context
+            use windows::Win32::Graphics::Direct3D11::{
+                D3D11_CPU_ACCESS_READ, D3D11_TEXTURE2D_DESC, D3D11_USAGE_STAGING, ID3D11Texture2D,
+            };
+
+            // Get D3D11 device and context
             let device = frame
                 .texture
                 .GetDevice()
@@ -615,11 +638,58 @@ impl Mp4StreamWriter {
                 .GetImmediateContext()
                 .map_err(|e| format!("GetImmediateContext failed: {}", e))?;
 
-            // Map texture to CPU memory
+            // Check if we need to create/recreate staging texture
+            let need_new_staging = self.staging_texture.is_none()
+                || self.staging_width != frame.width
+                || self.staging_height != frame.height;
+
+            if need_new_staging {
+                // Get source texture description
+                let mut src_desc = D3D11_TEXTURE2D_DESC::default();
+                frame.texture.GetDesc(&mut src_desc);
+
+                // Create staging texture for CPU access
+                let staging_desc = D3D11_TEXTURE2D_DESC {
+                    Width: src_desc.Width,
+                    Height: src_desc.Height,
+                    MipLevels: 1,
+                    ArraySize: 1,
+                    Format: src_desc.Format,
+                    SampleDesc: windows::Win32::Graphics::Dxgi::Common::DXGI_SAMPLE_DESC {
+                        Count: 1,
+                        Quality: 0,
+                    },
+                    Usage: D3D11_USAGE_STAGING,
+                    BindFlags: 0,
+                    CPUAccessFlags: D3D11_CPU_ACCESS_READ.0 as u32,
+                    MiscFlags: Default::default(),
+                };
+
+                let mut staging_texture: Option<ID3D11Texture2D> = None;
+                device
+                    .CreateTexture2D(&staging_desc, None, Some(&mut staging_texture))
+                    .map_err(|e| format!("CreateTexture2D (staging) failed: {}", e))?;
+
+                self.staging_texture = staging_texture;
+                self.staging_width = frame.width;
+                self.staging_height = frame.height;
+
+                crate::log_debug(&format!(
+                    "Created reusable staging texture: {}x{}",
+                    frame.width, frame.height
+                ));
+            }
+
+            let staging_texture = self.staging_texture.as_ref().unwrap();
+
+            // Copy from GPU texture to staging texture
+            context.CopyResource(staging_texture, &frame.texture);
+
+            // Map staging texture to CPU memory
             let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
             context
-                .Map(&frame.texture, 0, D3D11_MAP_READ, 0, Some(&mut mapped))
-                .map_err(|e| format!("Map texture failed: {}", e))?;
+                .Map(staging_texture, 0, D3D11_MAP_READ, 0, Some(&mut mapped))
+                .map_err(|e| format!("Map staging texture failed: {}", e))?;
 
             // Calculate buffer size
             let byte_count = (frame.width * frame.height * 4) as u32; // BGRA = 4 bytes per pixel
@@ -638,7 +708,25 @@ impl Mp4StreamWriter {
                 .map_err(|e| format!("Buffer Lock failed: {}", e))?;
 
             if !data_ptr.is_null() && !mapped.pData.is_null() {
-                std::ptr::copy_nonoverlapping(mapped.pData, data_ptr, byte_count as usize);
+                // Handle row pitch - mapped data might have padding
+                let src_pitch = mapped.RowPitch as usize;
+                let dst_pitch = (frame.width * 4) as usize;
+
+                if src_pitch == dst_pitch {
+                    // No padding, direct copy
+                    std::ptr::copy_nonoverlapping(mapped.pData, data_ptr, byte_count as usize);
+                } else {
+                    // Copy row by row to handle padding
+                    for row in 0..frame.height {
+                        let src_offset = row as usize * src_pitch;
+                        let dst_offset = row as usize * dst_pitch;
+                        std::ptr::copy_nonoverlapping(
+                            (mapped.pData as *const u8).add(src_offset),
+                            (data_ptr as *mut u8).add(dst_offset),
+                            dst_pitch,
+                        );
+                    }
+                }
             }
 
             buffer
@@ -648,7 +736,7 @@ impl Mp4StreamWriter {
                 .SetCurrentLength(byte_count)
                 .map_err(|e| format!("SetCurrentLength failed: {}", e))?;
 
-            context.Unmap(&frame.texture, 0);
+            context.Unmap(staging_texture, 0);
 
             // Create sample
             let sample = MFCreateSample().map_err(|e| format!("MFCreateSample failed: {}", e))?;
@@ -670,7 +758,17 @@ impl Mp4StreamWriter {
         }
     }
 
-    pub fn write_audio_samples(&mut self, samples: &[i16], timestamp: i64) -> Result<(), String> {
+    /// Get current audio duration in seconds
+    pub fn get_audio_duration_seconds(&self) -> f64 {
+        (self.audio_timestamp as f64) / 10_000_000.0
+    }
+
+    /// Get current audio timestamp in 100-nanosecond units
+    pub fn get_audio_timestamp(&self) -> i64 {
+        self.audio_timestamp
+    }
+
+    pub fn write_audio_samples(&mut self, samples: &[i16]) -> Result<(), String> {
         if samples.is_empty() {
             return Ok(());
         }
@@ -704,13 +802,15 @@ impl Mp4StreamWriter {
             sample
                 .AddBuffer(&buffer)
                 .map_err(|e| format!("AddBuffer failed: {}", e))?;
+
+            // Use incrementing timestamp based on samples written
             sample
-                .SetSampleTime(timestamp)
+                .SetSampleTime(self.audio_timestamp)
                 .map_err(|e| format!("SetSampleTime failed: {}", e))?;
 
-            // Calculate duration
+            // Calculate duration based on actual sample rate
             let frames = (samples.len() / 2) as i64; // Stereo: 2 channels
-            let duration = (frames * 10_000_000) / 44100;
+            let duration = (frames * 10_000_000) / self.audio_sample_rate as i64;
             sample
                 .SetSampleDuration(duration)
                 .map_err(|e| format!("SetSampleDuration failed: {}", e))?;
@@ -718,6 +818,9 @@ impl Mp4StreamWriter {
             self.writer
                 .WriteSample(self.audio_stream_index, &sample)
                 .map_err(|e| format!("WriteSample failed: {}", e))?;
+
+            // Increment timestamp for next sample
+            self.audio_timestamp += duration;
 
             Ok(())
         }

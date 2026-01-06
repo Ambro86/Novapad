@@ -86,6 +86,11 @@ pub struct VideoRecorderHandle {
 }
 
 impl VideoRecorderHandle {
+    /// Signal video recording to stop (without waiting)
+    pub fn signal_stop(&self) {
+        self.stop.store(true, Ordering::SeqCst);
+    }
+
     /// Stop video recording and wait for threads to finish
     pub fn stop(self) -> Result<(), String> {
         self.stop.store(true, Ordering::SeqCst);
@@ -98,11 +103,21 @@ impl VideoRecorderHandle {
 
         Ok(())
     }
+
+    /// Wait for threads to finish (call after signal_stop)
+    pub fn join(self) -> Result<(), String> {
+        for thread in self.threads {
+            thread
+                .join()
+                .map_err(|_| "Video capture thread panicked".to_string())??;
+        }
+        Ok(())
+    }
 }
 
 /// Start video recording for the specified monitor
 pub fn start_video_recording(monitor_info: &MonitorInfo) -> Result<VideoRecorderHandle, String> {
-    let frame_queue = Arc::new(FrameQueue::new(60)); // Max 2 seconds at 30 FPS
+    let frame_queue = Arc::new(FrameQueue::new(300)); // Max 10 seconds at 30 FPS (increased buffer)
     let stop = Arc::new(AtomicBool::new(false));
 
     // Create capture session

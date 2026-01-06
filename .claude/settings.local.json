@@ -9,5 +9,6 @@
       "Bash(git commit:*)",
       "Bash(cargo fmt:*)"
     ]
-  }
+  },
+  "spinnerTipsEnabled": true
 }

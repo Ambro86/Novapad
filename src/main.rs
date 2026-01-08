@@ -300,6 +300,7 @@ struct RecentFileStore {
 }
 
 fn main() -> windows::core::Result<()> {
+    accessibility::ensure_nvda_controller_client();
     log_debug("Application started.");
 
     let args: Vec<String> = std::env::args().collect();

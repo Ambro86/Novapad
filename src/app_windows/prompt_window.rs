@@ -18,13 +18,7 @@ use windows::Win32::System::Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalLock, Glo
 use windows::Win32::System::Power::{
     ES_CONTINUOUS, ES_SYSTEM_REQUIRED, EXECUTION_STATE, SetThreadExecutionState,
 };
-use windows::Win32::UI::Accessibility::{
-    Assertive, IRawElementProviderSimple, IRawElementProviderSimple_Impl, ProviderOptions,
-    ProviderOptions_ServerSideProvider, UIA_ControlTypePropertyId, UIA_IsContentElementPropertyId,
-    UIA_IsControlElementPropertyId, UIA_LiveRegionChangedEventId, UIA_LiveSettingPropertyId,
-    UIA_NamePropertyId, UIA_PATTERN_ID, UIA_PROPERTY_ID, UIA_TextControlTypeId,
-    UiaHostProviderFromHwnd, UiaRaiseAutomationEvent, UiaReturnRawElementProvider, UiaRootObjectId,
-};
+
 use windows::Win32::UI::Controls::{WC_BUTTON, WC_EDIT, WC_STATIC};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetFocus, GetKeyState, SetFocus, VK_CONTROL, VK_ESCAPE, VK_RETURN, VK_SHIFT, VK_TAB,
@@ -35,15 +29,14 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, LoadCursorW,
     MB_ICONQUESTION, MB_OKCANCEL, MESSAGEBOX_STYLE, MSG, MessageBoxW, PostMessageW, RegisterClassW,
     SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP,
-    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_GETOBJECT, WM_KEYDOWN, WM_NCDESTROY,
-    WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_SYSKEYDOWN, WNDCLASSW, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SIZEBOX, WS_SYSMENU, WS_TABSTOP,
-    WS_VISIBLE, WS_VSCROLL,
+    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT,
+    WM_SIZE, WM_SYSKEYDOWN, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    WS_EX_DLGMODALFRAME, WS_SIZEBOX, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
-use windows::core::{BSTR, Interface, PCWSTR, VARIANT, implement};
+use windows::core::PCWSTR;
 
 const PROMPT_CLASS_NAME: &str = "NovapadPrompt";
-const LIVE_REGION_CLASS_NAME: &str = "NovapadPromptLiveRegion";
+
 const PROMPT_ID_INPUT: usize = 9301;
 const PROMPT_ID_OUTPUT: usize = 9302;
 const PROMPT_ID_AUTOSCROLL: usize = 9303;
@@ -185,7 +178,7 @@ struct PromptState {
     input: HWND,
     label_output: HWND,
     output: HWND,
-    live_region: HWND,
+
     checkbox_autoscroll: HWND,
     checkbox_strip_ansi: HWND,
     checkbox_announce_lines: HWND,
@@ -244,14 +237,6 @@ pub unsafe fn open(parent: HWND) {
         ..Default::default()
     };
     RegisterClassW(&wc);
-    let live_class_name = to_wide(LIVE_REGION_CLASS_NAME);
-    let live_wc = WNDCLASSW {
-        hInstance: hinstance,
-        lpszClassName: PCWSTR(live_class_name.as_ptr()),
-        lpfnWndProc: Some(live_region_wndproc),
-        ..Default::default()
-    };
-    RegisterClassW(&live_wc);
 
     let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
     let labels = prompt_labels(language);
@@ -366,77 +351,6 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     false
 }
 
-#[implement(IRawElementProviderSimple)]
-struct LiveRegionProvider {
-    hwnd: HWND,
-}
-
-impl LiveRegionProvider {
-    fn new(hwnd: HWND) -> Self {
-        Self { hwnd }
-    }
-
-    fn read_text(&self) -> String {
-        unsafe {
-            let len = GetWindowTextLengthW(self.hwnd);
-            if len <= 0 {
-                return String::new();
-            }
-            let mut buffer = vec![0u16; (len + 1) as usize];
-            let read = GetWindowTextW(self.hwnd, &mut buffer);
-            String::from_utf16_lossy(&buffer[..read as usize])
-        }
-    }
-}
-
-impl IRawElementProviderSimple_Impl for LiveRegionProvider {
-    fn ProviderOptions(&self) -> windows::core::Result<ProviderOptions> {
-        Ok(ProviderOptions_ServerSideProvider)
-    }
-
-    fn GetPatternProvider(
-        &self,
-        _patternid: UIA_PATTERN_ID,
-    ) -> windows::core::Result<windows::core::IUnknown> {
-        unsafe { Ok(windows::core::IUnknown::from_raw(std::ptr::null_mut())) }
-    }
-
-    fn GetPropertyValue(&self, propertyid: UIA_PROPERTY_ID) -> windows::core::Result<VARIANT> {
-        if propertyid == UIA_NamePropertyId {
-            return Ok(VARIANT::from(BSTR::from(self.read_text())));
-        }
-        if propertyid == UIA_LiveSettingPropertyId {
-            return Ok(VARIANT::from(Assertive.0));
-        }
-        if propertyid == UIA_ControlTypePropertyId {
-            return Ok(VARIANT::from(UIA_TextControlTypeId.0));
-        }
-        if propertyid == UIA_IsControlElementPropertyId
-            || propertyid == UIA_IsContentElementPropertyId
-        {
-            return Ok(VARIANT::from(true));
-        }
-        Ok(VARIANT::default())
-    }
-
-    fn HostRawElementProvider(&self) -> windows::core::Result<IRawElementProviderSimple> {
-        unsafe { UiaHostProviderFromHwnd(self.hwnd) }
-    }
-}
-
-unsafe extern "system" fn live_region_wndproc(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    if msg == WM_GETOBJECT && lparam.0 as i32 == UiaRootObjectId {
-        let provider: IRawElementProviderSimple = LiveRegionProvider::new(hwnd).into();
-        return UiaReturnRawElementProvider(hwnd, wparam, lparam, &provider);
-    }
-    DefWindowProcW(hwnd, msg, wparam, lparam)
-}
-
 unsafe extern "system" fn prompt_wndproc(
     hwnd: HWND,
     msg: u32,
@@ -515,21 +429,6 @@ unsafe extern "system" fn prompt_wndproc(
                 None,
             );
             let _ = SendMessageW(output, EM_LIMITTEXT, WPARAM(0x7FFFFFFE), LPARAM(0));
-            let live_region_class = to_wide(LIVE_REGION_CLASS_NAME);
-            let live_region = CreateWindowExW(
-                Default::default(),
-                PCWSTR(live_region_class.as_ptr()),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE,
-                0,
-                0,
-                1,
-                1,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
 
             let checkbox_autoscroll = CreateWindowExW(
                 Default::default(),
@@ -607,7 +506,6 @@ unsafe extern "system" fn prompt_wndproc(
                 input,
                 label_output,
                 output,
-                live_region,
                 checkbox_autoscroll,
                 checkbox_strip_ansi,
                 checkbox_announce_lines,
@@ -666,7 +564,7 @@ unsafe extern "system" fn prompt_wndproc(
                 input,
                 label_output,
                 output,
-                live_region,
+
                 checkbox_autoscroll,
                 checkbox_strip_ansi,
                 checkbox_announce_lines,
@@ -1375,7 +1273,7 @@ fn append_output(state: &mut PromptState, text: &str) {
     }
     if state.announce_lines && newline_appended {
         for line in lines_to_announce {
-            announce_line(state.live_region, &line);
+            announce_line(&line);
             state.last_announced_line = line;
         }
     }
@@ -1385,7 +1283,7 @@ fn append_output(state: &mut PromptState, text: &str) {
             && current_line != state.last_announced_line
             && looks_like_prompt(&current_line)
         {
-            announce_line(state.live_region, &current_line);
+            announce_line(&current_line);
             state.last_announced_line = current_line;
         }
     }
@@ -1435,16 +1333,11 @@ fn append_newline(
     *newline_appended = true;
 }
 
-fn announce_line(live_region: HWND, line: &str) {
+fn announce_line(line: &str) {
     if line.is_empty() {
         return;
     }
-    unsafe {
-        let wide = to_wide(line);
-        let _ = SetWindowTextW(live_region, PCWSTR(wide.as_ptr()));
-        let provider: IRawElementProviderSimple = LiveRegionProvider::new(live_region).into();
-        let _ = UiaRaiseAutomationEvent(&provider, UIA_LiveRegionChangedEventId);
-    }
+    crate::accessibility::nvda_speak(line);
 }
 
 fn looks_like_prompt(line: &str) -> bool {
@@ -1671,14 +1564,6 @@ fn layout_prompt(hwnd: HWND, state: &PromptState) {
             checkbox_y3,
             320,
             checkbox_height,
-            true,
-        );
-        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            state.live_region,
-            0,
-            0,
-            1,
-            1,
             true,
         );
     }

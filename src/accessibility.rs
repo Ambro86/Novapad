@@ -88,3 +88,79 @@ pub fn handle_player_keyboard(msg: &MSG, skip_seconds: u32) -> PlayerAction {
         PlayerAction::None
     }
 }
+
+static mut NVDA_HANDLE: isize = 0;
+static mut NVDA_SPEAK_ADDR: usize = 0;
+
+/// Attempts to speak text using the NVDA Controller Client DLL.
+/// Returns true if the DLL was loaded and the function called, false otherwise.
+pub fn nvda_speak(text: &str) -> bool {
+    use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
+    use windows::core::{PCSTR, PCWSTR};
+
+    unsafe {
+        if NVDA_HANDLE == 0 {
+            let dll_name = if cfg!(target_arch = "x86_64") {
+                to_wide("nvdaControllerClient64.dll")
+            } else {
+                to_wide("nvdaControllerClient32.dll")
+            };
+
+            if let Ok(h) = LoadLibraryW(PCWSTR(dll_name.as_ptr())) {
+                NVDA_HANDLE = h.0;
+                let proc_name = std::ffi::CString::new("nvdaController_speakText").unwrap();
+                if let Some(addr) = GetProcAddress(
+                    windows::Win32::Foundation::HMODULE(NVDA_HANDLE),
+                    PCSTR(proc_name.as_ptr() as *const u8),
+                ) {
+                    NVDA_SPEAK_ADDR = addr as usize;
+                }
+            }
+        }
+
+        if NVDA_SPEAK_ADDR != 0 {
+            let func: unsafe extern "system" fn(*const u16) -> i32 =
+                std::mem::transmute(NVDA_SPEAK_ADDR);
+            let wide = to_wide(text);
+            let _ = func(wide.as_ptr());
+            return true;
+        }
+    }
+    false
+}
+
+pub fn ensure_nvda_controller_client() {
+    let dll_name = if cfg!(target_arch = "x86_64") {
+        "nvdaControllerClient64.dll"
+    } else {
+        "nvdaControllerClient32.dll"
+    };
+
+    let exe_path = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let exe_dir = exe_path
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."));
+    let dll_path = exe_dir.join(dll_name);
+
+    if dll_path.exists() {
+        return;
+    }
+
+    let url = format!(
+        "https://raw.githubusercontent.com/Ambro86/Novapad/main/dll/{}",
+        dll_name
+    );
+
+    // Simple blocking download
+    // We print to stdout/stderr in case something goes wrong, but we don't crash
+    if let Ok(response) = reqwest::blocking::get(&url) {
+        if response.status().is_success() {
+            if let Ok(bytes) = response.bytes() {
+                if let Ok(mut file) = std::fs::File::create(&dll_path) {
+                    use std::io::Write;
+                    let _ = file.write_all(&bytes);
+                }
+            }
+        }
+    }
+}

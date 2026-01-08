@@ -77,6 +77,8 @@
   "edit.text_stats": "Estadisticas de texto\tAlt+Y",
   "edit.join_lines": "Unir lineas\tCtrl+Shift+J",
   "edit.clean_eol_hyphens": "Eliminar guiones de final de linea",
+  "edit.remove_duplicate_lines": "Eliminar duplicados",
+  "edit.remove_duplicate_consecutive_lines": "Eliminar duplicados consecutivos",
   "insert.bookmark": "Insertar &marcador\tCtrl+B",
   "insert.manage_bookmarks": "&Gestionar marcadores...",
   "help.guide": "&Guia",

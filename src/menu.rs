@@ -44,6 +44,8 @@ pub const IDM_EDIT_UNQUOTE_LINES: usize = 2017;
 pub const IDM_EDIT_TEXT_STATS: usize = 2018;
 pub const IDM_EDIT_JOIN_LINES: usize = 2019;
 pub const IDM_EDIT_CLEAN_EOL_HYPHENS: usize = 2020;
+pub const IDM_EDIT_REMOVE_DUPLICATE_LINES: usize = 2021;
+pub const IDM_EDIT_REMOVE_DUPLICATE_CONSECUTIVE_LINES: usize = 2022;
 pub const IDM_INSERT_BOOKMARK: usize = 2101;
 pub const IDM_MANAGE_BOOKMARKS: usize = 2102;
 pub const IDM_NEXT_TAB: usize = 3001;
@@ -138,6 +140,8 @@ pub struct MenuLabels {
     pub edit_text_stats: String,
     pub edit_join_lines: String,
     pub edit_clean_eol_hyphens: String,
+    pub edit_remove_duplicate_lines: String,
+    pub edit_remove_duplicate_consecutive_lines: String,
     pub insert_bookmark: String,
     pub manage_bookmarks: String,
     pub help_guide: String,
@@ -212,6 +216,11 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         edit_text_stats: i18n::tr(language, "edit.text_stats"),
         edit_join_lines: i18n::tr(language, "edit.join_lines"),
         edit_clean_eol_hyphens: i18n::tr(language, "edit.clean_eol_hyphens"),
+        edit_remove_duplicate_lines: i18n::tr(language, "edit.remove_duplicate_lines"),
+        edit_remove_duplicate_consecutive_lines: i18n::tr(
+            language,
+            "edit.remove_duplicate_consecutive_lines",
+        ),
         insert_bookmark: i18n::tr(language, "insert.bookmark"),
         manage_bookmarks: i18n::tr(language, "insert.manage_bookmarks"),
         help_guide: i18n::tr(language, "help.guide"),
@@ -377,6 +386,18 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         MF_STRING,
         IDM_EDIT_CLEAN_EOL_HYPHENS,
         &labels.edit_clean_eol_hyphens,
+    );
+    let _ = append_menu_string(
+        edit_menu,
+        MF_STRING,
+        IDM_EDIT_REMOVE_DUPLICATE_LINES,
+        &labels.edit_remove_duplicate_lines,
+    );
+    let _ = append_menu_string(
+        edit_menu,
+        MF_STRING,
+        IDM_EDIT_REMOVE_DUPLICATE_CONSECUTIVE_LINES,
+        &labels.edit_remove_duplicate_consecutive_lines,
     );
     let _ = append_menu_string(
         edit_menu,

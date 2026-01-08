@@ -77,6 +77,8 @@
   "edit.text_stats": "Text &Statistics\tAlt+Y",
   "edit.join_lines": "&Join Lines\tCtrl+Shift+J",
   "edit.clean_eol_hyphens": "Remove end-of-line hyphens",
+  "edit.remove_duplicate_lines": "Remove Duplicate Lines",
+  "edit.remove_duplicate_consecutive_lines": "Remove Duplicate Consecutive Lines",
   "insert.bookmark": "Insert &Bookmark\tCtrl+B",
   "insert.manage_bookmarks": "&Manage Bookmarks...",
   "help.guide": "&Guide",

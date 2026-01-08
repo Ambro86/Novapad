@@ -36,6 +36,7 @@ mod app_windows;
 mod audio_capture;
 mod i18n;
 mod podcast_recorder;
+mod text_ops;
 mod updater;
 
 use std::io::Write;
@@ -1332,6 +1333,16 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 IDM_EDIT_CLEAN_EOL_HYPHENS => {
                     log_debug("Menu: Clean EOL hyphens");
                     editor_manager::clean_end_of_line_hyphens_active_edit(hwnd);
+                    LRESULT(0)
+                }
+                IDM_EDIT_REMOVE_DUPLICATE_LINES => {
+                    log_debug("Menu: Remove duplicate lines");
+                    editor_manager::remove_duplicate_lines_active_edit(hwnd);
+                    LRESULT(0)
+                }
+                IDM_EDIT_REMOVE_DUPLICATE_CONSECUTIVE_LINES => {
+                    log_debug("Menu: Remove duplicate consecutive lines");
+                    editor_manager::remove_duplicate_consecutive_lines_active_edit(hwnd);
                     LRESULT(0)
                 }
                 IDM_VIEW_SHOW_VOICES => {

@@ -77,6 +77,8 @@
   "edit.text_stats": "Statistiche testo\tAlt+Y",
   "edit.join_lines": "Unisci righe\tCtrl+Shift+J",
   "edit.clean_eol_hyphens": "Ripulisci trattini a fine riga",
+  "edit.remove_duplicate_lines": "Rimuovi linee duplicate",
+  "edit.remove_duplicate_consecutive_lines": "Rimuovi linee duplicate consecutive",
   "insert.bookmark": "Inserisci &segnalibro\tCtrl+B",
   "insert.manage_bookmarks": "&Gestisci segnalibri...",
   "help.guide": "&Guida",

@@ -147,6 +147,97 @@ pub unsafe fn select_all_active_edit(hwnd: HWND) {
     }
 }
 
+pub unsafe fn remove_duplicate_lines_active_edit(hwnd: HWND) {
+    apply_text_op_active_edit(hwnd, crate::text_ops::remove_duplicate_lines);
+}
+
+pub unsafe fn remove_duplicate_consecutive_lines_active_edit(hwnd: HWND) {
+    apply_text_op_active_edit(hwnd, crate::text_ops::remove_duplicate_consecutive_lines);
+}
+
+unsafe fn apply_text_op_active_edit<F>(hwnd: HWND, op: F)
+where
+    F: Fn(&str) -> String,
+{
+    let Some(hwnd_edit) = crate::get_active_edit(hwnd) else {
+        return;
+    };
+    let text = get_edit_text(hwnd_edit);
+    if text.is_empty() {
+        return;
+    }
+
+    let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
+    SendMessageW(
+        hwnd_edit,
+        EM_EXGETSEL,
+        WPARAM(0),
+        LPARAM(&mut selection as *mut _ as isize),
+    );
+
+    let (affected_start, affected_end) = if selection.cpMin != selection.cpMax {
+        // Operates strictly on the selection.
+        // However, we must ensure we get the bytes correct.
+        let start_byte = utf16_index_to_byte(&text, selection.cpMin);
+        let end_byte = utf16_index_to_byte(&text, selection.cpMax);
+        (start_byte, end_byte)
+    } else {
+        // Whole document
+        (0, text.len())
+    };
+
+    let affected = &text[affected_start..affected_end];
+    let processed = op(affected);
+
+    if processed == affected {
+        return;
+    }
+
+    let mut replace_range = CHARRANGE {
+        cpMin: byte_index_to_utf16(&text, affected_start),
+        cpMax: byte_index_to_utf16(&text, affected_end),
+    };
+
+    // Select the range to be replaced
+    SendMessageW(
+        hwnd_edit,
+        EM_EXSETSEL,
+        WPARAM(0),
+        LPARAM(&mut replace_range as *mut _ as isize),
+    );
+
+    // Single-undo guarantee.
+    begin_single_undo_action(hwnd_edit);
+    let replace_wide = to_wide(&processed);
+    SendMessageW(
+        hwnd_edit,
+        EM_REPLACESEL,
+        WPARAM(1),
+        LPARAM(replace_wide.as_ptr() as isize),
+    );
+
+    // According to specs:
+    // "If operating on selection: replace the selection and re-select the replaced block (same start, new end)."
+    // EM_REPLACESEL with 1 (fCanUndo) often handles caret, but let's ensure selection is set to the new block.
+    // The previous selection started at `replace_range.cpMin`.
+    // The new end is `replace_range.cpMin + processed_utf16_len`.
+    let new_len_utf16 = processed.chars().map(|c| c.len_utf16() as i32).sum::<i32>();
+    let mut new_selection = CHARRANGE {
+        cpMin: replace_range.cpMin,
+        cpMax: replace_range.cpMin + new_len_utf16,
+    };
+    SendMessageW(
+        hwnd_edit,
+        EM_EXSETSEL,
+        WPARAM(0),
+        LPARAM(&mut new_selection as *mut _ as isize),
+    );
+
+    end_single_undo_action(hwnd_edit);
+    mark_dirty_from_edit(hwnd, hwnd_edit);
+    SetFocus(hwnd_edit);
+}
+
 pub unsafe fn apply_word_wrap_to_all_edits(hwnd: HWND, word_wrap: bool) {
     let edits = with_state(hwnd, |state| {
         state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>()

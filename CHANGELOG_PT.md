@@ -1,4 +1,17 @@
 # Changelog
+Versao 0.5.8 - 2026-01-09
+Novas funcionalidades
+• Adicionado controle de volume para o microfone e o audio do sistema ao gravar podcasts.
+• Adicionadas as funcoes de edicao mencionadas acima.
+• Adicionada uma nova funcao para importar artigos de sites ou feeds RSS, incluindo os feeds mais importantes para cada idioma.
+• Adicionada uma funcao para remover todos os marcadores do arquivo atual.
+• Adicionada a funcao para remover linhas duplicadas e linhas duplicadas consecutivas.
+• Adicionada a funcao para fechar todas as abas ou janelas exceto a atual.
+• Adicionada a entrada Doacoes no menu Ajuda para todos os idiomas.
+Melhorias
+• Melhorado o terminal acessivel para evitar alguns crashes.
+• Removida a opcao para mover as definicoes para a pasta atual; agora o programa faz isso automaticamente (se a pasta do exe se chama "novapad portable" ou o exe esta em unidade removivel, salva na pasta do exe em `config`, senao em `%APPDATA%\\Novapad`, com fallback para `config` se a pasta preferida nao for gravavel).
+
 Versao 0.5.7 - 2026-01-05
 Novas funcionalidades
 • Adicionada a opcao para gravar audiolivros em lote (conversao multipla de arquivos e pastas).

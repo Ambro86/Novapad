@@ -1,0 +1,12 @@
+Donations
+Novapad is a program created at first to meet personal needs, but over time it has grown more and more. Developing it requires constant work to improve features, fix bugs, search for new ideas, and carefully test all functions.
+If you find this program useful and want to support its development, you can make a donation.
+PayPal
+You can donate via PayPal using this link:
+https://www.paypal.me/ambrogio86
+Please, if possible, add “Novapad” as the payment note.
+Bank transfer
+You can also donate via bank transfer to the bank account in the name of Ambrogio Riili.
+IBAN: IT77W0306901020100000064149
+Please, if possible, use a clear payment reason, for example “Novapad”.
+Anyone who supports the project will be mentioned in the program and on the GitHub repository, unless they prefer to stay anonymous or use a nickname.

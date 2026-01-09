@@ -48,7 +48,7 @@ pub fn remove_duplicate_lines(scope: &str) -> String {
     // If scope is "a\n\n", content is "a\n", split is ["a", ""].
 
     // We work on `content`.
-    let mut lines = split_lines_keep_empty(content);
+    let lines = split_lines_keep_empty(content);
 
     // Special case: if the original string ended with a newline, `split_trailing_newline` removed it.
     // If `content` was empty (e.g. scope was just "\n"), then lines is [""] which is correct for a blank line?
@@ -82,7 +82,7 @@ pub fn remove_duplicate_consecutive_lines(scope: &str) -> String {
     let eol = detect_eol(scope);
     let (content, trailing) = split_trailing_newline(scope);
 
-    let mut lines = split_lines_keep_empty(content);
+    let lines = split_lines_keep_empty(content);
     let mut out_lines = Vec::new();
 
     let mut last_line: Option<&str> = None;

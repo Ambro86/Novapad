@@ -1,121 +1,52 @@
-Microsoft Windows [Versione 10.0.26200.7462]
-(c) Microsoft Corporation. Tutti i diritti riservati.
-
-C:\rustnotepad\rustnotepad>cargo build --release
-   Compiling novapad v0.5.7 (C:\rustnotepad\rustnotepad)
-warning: constant `PORTABLE_MODE` is never used
-   --> src\settings.rs:315:7
-    |
-315 | const PORTABLE_MODE: bool = cfg!(feature = "portable");
-    |       ^^^^^^^^^^^^^
-    |
-    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
-
-warning: struct `AudioSample` is never constructed
-  --> src\audio_capture.rs:19:12
-   |
-19 | pub struct AudioSample {
-   |            ^^^^^^^^^^^
-
-warning: struct `AudioQueue` is never constructed
-  --> src\audio_capture.rs:26:12
-   |
-26 | pub struct AudioQueue {
-   |            ^^^^^^^^^^
-
-warning: associated items `new`, `push`, `pop`, `len`, and `is_empty` are never used
-  --> src\audio_capture.rs:33:12
-   |
-32 | impl AudioQueue {
-   | --------------- associated items in this implementation
-33 |     pub fn new(max_samples: usize) -> Self {
-   |            ^^^
-...
-41 |     pub fn push(&self, sample: AudioSample) {
-   |            ^^^^
-...
-56 |     pub fn pop(&self, timeout: Duration) -> Option<AudioSample> {
-   |            ^^^
-...
-71 |     pub fn len(&self) -> usize {
-   |            ^^^
-...
-75 |     pub fn is_empty(&self) -> bool {
-   |            ^^^^^^^^
-
-warning: struct `AudioRecorderHandle` is never constructed
-  --> src\audio_capture.rs:81:12
-   |
-81 | pub struct AudioRecorderHandle {
-   |            ^^^^^^^^^^^^^^^^^^^
-
-warning: methods `signal_stop`, `stop`, and `join` are never used
-   --> src\audio_capture.rs:91:12
-    |
- 89 | impl AudioRecorderHandle {
-    | ------------------------ methods in this implementation
- 90 |     /// Signal audio recording to stop (without waiting)
- 91 |     pub fn signal_stop(&self) {
-    |            ^^^^^^^^^^^
-...
- 96 |     pub fn stop(mut self) -> Result<(), String> {
-    |            ^^^^
-...
-109 |     pub fn join(mut self) -> Result<(), String> {
-    |            ^^^^
-
-warning: function `create_audio_recorder_handle` is never used
-   --> src\audio_capture.rs:120:8
-    |
-120 | pub fn create_audio_recorder_handle(
-    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: function `start_audio_recording` is never used
-   --> src\audio_capture.rs:137:8
-    |
-137 | pub fn start_audio_recording() -> Result<AudioRecorderHandle, String> {
-    |        ^^^^^^^^^^^^^^^^^^^^^
-
-warning: function `get_audio_format` is never used
-   --> src\audio_capture.rs:163:4
-    |
-163 | fn get_audio_format() -> Result<(u32, u16), String> {
-    |    ^^^^^^^^^^^^^^^^
-
-warning: function `audio_capture_loop` is never used
-   --> src\audio_capture.rs:195:4
-    |
-195 | fn audio_capture_loop(audio_queue: Arc<AudioQueue>, stop: Arc<AtomicBool>) -> Result<(), String> {
-    |    ^^^^^^^^^^^^^^^^^^
-
-warning: function `audio_capture_loop_impl` is never used
-   --> src\audio_capture.rs:209:11
-    |
-209 | unsafe fn audio_capture_loop_impl(
-    |           ^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: function `start_mic_audio_recording` is never used
-   --> src\podcast_recorder.rs:426:4
-    |
-426 | fn start_mic_audio_recording(device_id: &str) -> Result<AudioRecorder, String> {
-    |    ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: function `mic_capture_loop` is never used
-   --> src\podcast_recorder.rs:473:4
-    |
-473 | fn mic_capture_loop(
-    |    ^^^^^^^^^^^^^^^^
-
-warning: methods `pop_chunk` and `is_empty` are never used
-   --> src\podcast_recorder.rs:782:8
-    |
-762 | impl MixBuffer {
-    | -------------- methods in this implementation
-...
-782 |     fn pop_chunk(&self, timeout: Duration) -> Option<Vec<i16>> {
-    |        ^^^^^^^^^
-...
-817 |     fn is_empty(&self) -> bool {
-    |        ^^^^^^^^
-
-    Building [=======================> ] 393/394: novapad(bin)
+🇮🇹 Italiano – Donazioni
+Novapad è un programma creato inizialmente per soddisfare esigenze personali, ma nel tempo è cresciuto sempre di più. Il suo sviluppo richiede un lavoro costante per migliorare le funzionalità, correggere bug, ricercare nuove idee e testare a fondo ogni parte del programma.
+Se ritieni utile questo programma e desideri supportarne lo sviluppo, puoi effettuare una donazione.
+PayPal
+Puoi donare tramite PayPal al seguente link:
+https://www.paypal.me/ambrogio86
+Se possibile, indica come causale “Novapad”.
+Bonifico bancario
+È possibile contribuire anche tramite bonifico bancario sul conto intestato a Ambrogio Riili.
+IBAN: IT77W0306901020100000064149
+Se possibile, indica una causale chiara, ad esempio “Novapad”.
+Chiunque decida di supportare il progetto verrà ringraziato nel programma e sul repository GitHub, nella sezione sostenitori, salvo richiesta di anonimato o utilizzo di un nickname.
+ 
+🇬🇧 English (A2) – Donations
+Novapad is a program created at first to meet personal needs, but over time it has grown more and more. Developing it requires constant work to improve features, fix bugs, search for new ideas, and carefully test all functions.
+If you find this program useful and want to support its development, you can make a donation.
+PayPal
+You can donate via PayPal using this link:
+https://www.paypal.me/ambrogio86
+Please, if possible, add “Novapad” as the payment note.
+Bank transfer
+You can also donate via bank transfer to the bank account in the name of Ambrogio Riili.
+IBAN: IT77W0306901020100000064149
+Please, if possible, use a clear payment reason, for example “Novapad”.
+Anyone who supports the project will be mentioned in the program and on the GitHub repository, unless they prefer to stay anonymous or use a nickname.
+ 
+🇪🇸 Español – Donaciones
+Novapad es un programa creado inicialmente para cubrir necesidades personales, pero con el tiempo ha crecido cada vez más. Su desarrollo requiere un trabajo constante para mejorar las funciones, corregir errores, buscar nuevas ideas y probar cuidadosamente todas las funciones.
+Si consideras útil este programa y deseas apoyar su desarrollo, puedes hacer una donación.
+PayPal
+Puedes donar a través de PayPal usando este enlace:
+https://www.paypal.me/ambrogio86
+Si es posible, indica “Novapad” como concepto del pago.
+Transferencia bancaria
+También puedes contribuir mediante transferencia bancaria a la cuenta a nombre de Ambrogio Riili.
+IBAN: IT77W0306901020100000064149
+Si es posible, utiliza un concepto claro, por ejemplo “Novapad”.
+Las personas que apoyen el proyecto serán mencionadas en el programa y en el repositorio de GitHub, salvo que prefieran permanecer en el anonimato o usar un apodo.
+ 
+🇵🇹 Português – Doações
+Novapad é um programa criado inicialmente para atender necessidades pessoais, mas com o tempo cresceu cada vez mais. O seu desenvolvimento exige um trabalho constante para melhorar funcionalidades, corrigir erros, buscar novas ideias e testar cuidadosamente todas as funções.
+Se você considera este programa útil e deseja apoiar o seu desenvolvimento, pode fazer uma doação.
+PayPal
+Você pode doar via PayPal usando este link:
+https://www.paypal.me/ambrogio86
+Se possível, adicione “Novapad” como descrição do pagamento.
+Transferência bancária
+Também é possível contribuir por transferência bancária para a conta em nome de Ambrogio Riili.
+IBAN: IT77W0306901020100000064149
+Se possível, utilize uma descrição clara, por exemplo “Novapad”.
+Quem apoiar o projeto será mencionado no programa e no repositório do GitHub, a menos que prefira permanecer anônimo ou usar um apelido.
+ 

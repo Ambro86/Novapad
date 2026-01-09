@@ -2421,6 +2421,22 @@ pub unsafe fn close_current_document(hwnd: HWND) {
     let _ = close_document_at(hwnd, index);
 }
 
+pub unsafe fn close_other_documents(hwnd: HWND) -> bool {
+    loop {
+        let (current, total) = match with_state(hwnd, |state| (state.current, state.docs.len())) {
+            Some(values) => values,
+            None => return true,
+        };
+        if total <= 1 {
+            return true;
+        }
+        let idx = if current == 0 { 1 } else { 0 };
+        if !close_document_at(hwnd, idx) {
+            return false;
+        }
+    }
+}
+
 pub unsafe fn close_document_at(hwnd: HWND, index: usize) -> bool {
     let result = with_state(hwnd, |state| {
         if index >= state.docs.len() {
@@ -2448,11 +2464,13 @@ pub unsafe fn close_document_at(hwnd: HWND, index: usize) -> bool {
     let mut was_current = false;
     let mut was_empty = false;
     let mut update_title = false;
+    let mut was_audiobook = false;
 
     let _ = with_state(hwnd, |state| {
         was_current = state.current == index;
         let doc = state.docs.remove(index);
         closing_hwnd_edit = doc.hwnd_edit;
+        was_audiobook = matches!(doc.format, FileFormat::Audiobook);
         let _ = SendMessageW(
             hwnd_tab,
             windows::Win32::UI::Controls::TCM_DELETEITEM,
@@ -2484,6 +2502,9 @@ pub unsafe fn close_document_at(hwnd: HWND, index: usize) -> bool {
 
     if closing_hwnd_edit.0 != 0 {
         let _ = DestroyWindow(closing_hwnd_edit);
+    }
+    if was_audiobook {
+        crate::audio_player::stop_audiobook_playback(hwnd);
     }
 
     if was_empty {
@@ -2533,6 +2554,7 @@ pub unsafe fn try_close_app(hwnd: HWND) -> bool {
             }
         }
     }
+    crate::audio_player::stop_audiobook_playback(hwnd);
     let _ = DestroyWindow(hwnd);
     true
 }

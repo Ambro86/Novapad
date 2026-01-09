@@ -1,0 +1,38 @@
+BBC News | https://feeds.bbci.co.uk/news/rss.xml
+CNN Top Stories | http://rss.cnn.com/rss/cnn_topstories.rss
+NYT > Top Stories | http://feeds.nytimes.com/nyt/rss/HomePage
+World news The Guardian | https://www.theguardian.com/world/rss
+Al Jazeera – Breaking News | https://www.aljazeera.com/xml/rss/all.xml
+Sky News – Home | https://feeds.skynews.com/feeds/rss/home.xml
+Financial Times – Home | https://www.ft.com/rss/home
+NPR – News | https://feeds.npr.org/1001/rss.xml
+Reddit – World News | https://www.reddit.com/r/worldnews/.rss
+CNBC – Top News | https://www.cnbc.com/id/100003114/device/rss/rss.html
+Wall Street Journal – World News | https://www.wsj.com/xml/rss/3_7085.xml
+Dow Jones – World News | https://feeds.a.dj.com/rss/RSSWorldNews.xml
+Investing.com – News | https://www.investing.com/rss/news.rss
+Seeking Alpha – Market News | https://seekingalpha.com/feed.xml
+Forbes – Innovation | https://www.forbes.com/innovation/feed2/
+New York Times – World News | https://rss.nytimes.com/services/xml/rss/nyt/World.xml
+Los Angeles Times – World News | https://www.latimes.com/world/rss2.0.xml
+TIME – Latest Stories | https://time.com/feed/
+The Atlantic – All Articles | https://www.theatlantic.com/feed/all/
+Vox – Latest Stories | https://www.vox.com/rss/index.xml
+Wired – Latest | https://www.wired.com/feed/rss
+TechCrunch – Startups & Tech | https://techcrunch.com/feed/
+The Verge – All Stories | https://www.theverge.com/rss/index.xml
+Ars Technica – All Content | http://feeds.arstechnica.com/arstechnica/index
+Engadget – Latest | https://www.engadget.com/rss.xml
+MIT Technology Review – Latest | https://www.technologyreview.com/feed/
+ZDNet – News | https://www.zdnet.com/news/rss.xml
+CNET – News | https://www.cnet.com/rss/news/
+MacRumors – All Stories | https://www.macrumors.com/macrumors.xml
+Lifehacker – Tips & Guides | https://lifehacker.com/rss
+Hacker News – Front Page | https://hnrss.org/frontpage
+Product Hunt – Daily Feed | https://www.producthunt.com/feed
+Stack Overflow Blog | https://stackoverflow.blog/feed/
+GitHub Blog | https://github.blog/feed/
+NASA – Breaking News | https://www.nasa.gov/rss/dyn/breaking_news.rss
+Nature – Science News | https://www.nature.com/subjects/science/rss
+Science Magazine – Current News | https://www.science.org/rss/news_current.xml
+New Scientist – Home Feed | https://www.newscientist.com/feed/home/

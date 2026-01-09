@@ -1,0 +1,29 @@
+   Compiling novapad v0.5.7 (C:\rustnotepad\rustnotepad)
+error[E0432]: unresolved import `windows::Win32::Foundation::HMENU`
+ --> src\app_windows\rss_window.rs:5:76
+  |
+5 | use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM, HMENU};
+  |                                                                            ^^^^^ no `HMENU` in `Win32::Foundation`
+  |
+  = help: consider importing this struct through its public re-export instead:
+          crate::HMENU
+
+warning: unused imports: `NM_TREEVIEW_ACTION`, `TVGN_ROOT`, `TVM_GETITEMW`, `TVM_SELECTITEM`, `TVM_SETITEMW`, and `WC_TREEVIEW`
+  --> src\app_windows\rss_window.rs:10:16
+   |
+10 |     WC_BUTTON, WC_TREEVIEW, TVITEMW, TVI_ROOT, TVI_LAST, TVM_INSERTITEMW, TVM_DELETEITEM,
+   |                ^^^^^^^^^^^
+11 |     TVIF_TEXT, TVIF_PARAM, TVINSERTSTRUCTW, TVM_GETNEXTITEM, TVGN_ROOT, TVGN_CHILD, 
+   |                                                              ^^^^^^^^^
+12 |     TVM_GETITEMW, TVM_SELECTITEM, TVGN_CARET, NMTREEVIEWW, TVN_ITEMEXPANDINGW, NMHDR,
+   |     ^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+13 |     TVN_KEYDOWN, TVM_EXPAND, TVE_EXPAND, TVM_SETITEMW, NMTVKEYDOWN, TVITEMEXW_CHILDREN,
+   |                                          ^^^^^^^^^^^^
+14 |     TVINSERTSTRUCTW_0, NM_TREEVIEW_ACTION,
+   |                        ^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0432`.
+warning: `novapad` (bin "novapad") generated 1 warning
+error: could not compile `novapad` (bin "novapad") due to 1 previous error; 1 warning emitted

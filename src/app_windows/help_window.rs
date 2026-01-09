@@ -23,11 +23,16 @@ use windows::core::{PCWSTR, w};
 
 const HELP_CLASS_NAME: &str = "NovapadHelp";
 const HELP_ID_OK: usize = 7003;
+const DONATIONS_IT: &str = include_str!("../../donations_it.txt");
+const DONATIONS_EN: &str = include_str!("../../donations_en.txt");
+const DONATIONS_ES: &str = include_str!("../../donations_es.txt");
+const DONATIONS_PT: &str = include_str!("../../donations_pt.txt");
 
 #[derive(Clone, Copy)]
 enum HelpWindowKind {
     Guide,
     Changelog,
+    Donations,
 }
 
 struct HelpWindowInit {
@@ -51,10 +56,15 @@ pub unsafe fn open_changelog(parent: HWND) {
     open_window(parent, HelpWindowKind::Changelog);
 }
 
+pub unsafe fn open_donations(parent: HWND) {
+    open_window(parent, HelpWindowKind::Donations);
+}
+
 unsafe fn open_window(parent: HWND, kind: HelpWindowKind) {
     let existing = with_state(parent, |state| match kind {
         HelpWindowKind::Guide => state.help_window,
         HelpWindowKind::Changelog => state.changelog_window,
+        HelpWindowKind::Donations => state.donations_window,
     })
     .unwrap_or(HWND(0));
     if existing.0 != 0 {
@@ -103,6 +113,7 @@ unsafe fn open_window(parent: HWND, kind: HelpWindowKind) {
         let _ = with_state(parent, |state| match kind {
             HelpWindowKind::Guide => state.help_window = window,
             HelpWindowKind::Changelog => state.changelog_window = window,
+            HelpWindowKind::Donations => state.donations_window = window,
         });
         SetForegroundWindow(window);
     } else if !init_ptr.is_null() {
@@ -198,19 +209,20 @@ unsafe extern "system" fn help_wndproc(
 
             let content = match init.kind {
                 HelpWindowKind::Guide => match init.language {
-                    Language::Italian => include_str!("../../guida.txt"),
-                    Language::English => include_str!("../../guida_en.txt"),
-                    Language::Spanish => include_str!("../../guida_es.txt"),
-                    Language::Portuguese => include_str!("../../guida_pt.txt"),
+                    Language::Italian => include_str!("../../guida.txt").to_string(),
+                    Language::English => include_str!("../../guida_en.txt").to_string(),
+                    Language::Spanish => include_str!("../../guida_es.txt").to_string(),
+                    Language::Portuguese => include_str!("../../guida_pt.txt").to_string(),
                 },
                 HelpWindowKind::Changelog => match init.language {
-                    Language::Italian => include_str!("../../CHANGELOG_IT.md"),
-                    Language::English => include_str!("../../CHANGELOG.md"),
-                    Language::Spanish => include_str!("../../CHANGELOG_ES.md"),
-                    Language::Portuguese => include_str!("../../CHANGELOG_PT.md"),
+                    Language::Italian => include_str!("../../CHANGELOG_IT.md").to_string(),
+                    Language::English => include_str!("../../CHANGELOG.md").to_string(),
+                    Language::Spanish => include_str!("../../CHANGELOG_ES.md").to_string(),
+                    Language::Portuguese => include_str!("../../CHANGELOG_PT.md").to_string(),
                 },
+                HelpWindowKind::Donations => donations_content(init.language),
             };
-            let content = normalize_to_crlf(content);
+            let content = normalize_to_crlf(&content);
             let content_wide = to_wide(&content);
             let _ = SetWindowTextW(edit, PCWSTR(content_wide.as_ptr()));
             SetFocus(edit);
@@ -265,6 +277,7 @@ unsafe extern "system" fn help_wndproc(
                 let _ = with_state(parent, |state| match kind {
                     HelpWindowKind::Guide => state.help_window = HWND(0),
                     HelpWindowKind::Changelog => state.changelog_window = HWND(0),
+                    HelpWindowKind::Donations => state.donations_window = HWND(0),
                 });
             }
             LRESULT(0)
@@ -311,5 +324,15 @@ fn help_title(language: Language, kind: HelpWindowKind) -> String {
     match kind {
         HelpWindowKind::Guide => i18n::tr(language, "help.window.guide"),
         HelpWindowKind::Changelog => i18n::tr(language, "help.window.changelog"),
+        HelpWindowKind::Donations => i18n::tr(language, "help.window.donations"),
+    }
+}
+
+fn donations_content(language: Language) -> String {
+    match language {
+        Language::Italian => DONATIONS_IT.to_string(),
+        Language::English => DONATIONS_EN.to_string(),
+        Language::Spanish => DONATIONS_ES.to_string(),
+        Language::Portuguese => DONATIONS_PT.to_string(),
     }
 }

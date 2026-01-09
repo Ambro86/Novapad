@@ -37,6 +37,7 @@ mod audio_capture;
 mod i18n;
 mod podcast_recorder;
 mod text_ops;
+mod tools;
 mod updater;
 
 use std::io::Write;
@@ -50,7 +51,7 @@ use std::time::{Duration, Instant};
 use chrono::Local;
 use serde::{Deserialize, Serialize};
 
-use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::Foundation::{BOOL, HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
     COLOR_WINDOW, DEFAULT_GUI_FONT, GetStockObject, HBRUSH, HFONT,
 };
@@ -83,18 +84,18 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CB_GETDROPPEDSTATE, CB_GETITEMDATA, CB_RESETCONTENT, CB_SETCURSEL, CB_SETITEMDATA,
     CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT,
     CheckMenuItem, CreateAcceleratorTableW, CreatePopupMenu, CreateWindowExW, DefWindowProcW,
-    DestroyWindow, DispatchMessageW, EN_CHANGE, FALT, FCONTROL, FSHIFT, FVIRTKEY, FindWindowW,
-    GWLP_USERDATA, GetCursorPos, GetMenu, GetMessageW, GetParent, GetWindowLongPtrW, HACCEL,
-    HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, KillTimer, LoadCursorW, LoadIconW,
-    MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MF_BYCOMMAND, MF_CHECKED, MF_STRING, MF_UNCHECKED,
-    MSG, MessageBoxW, PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW,
-    SW_HIDE, SW_SHOW, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW,
-    SetWindowTextW, ShowWindow, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW,
-    TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY,
-    WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES, WM_KEYDOWN, WM_NCDESTROY,
-    WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_SYSKEYDOWN,
-    WM_TIMER, WM_UNDO, WNDCLASSW, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW,
-    WS_TABSTOP, WS_VISIBLE,
+    DestroyWindow, DispatchMessageW, EN_CHANGE, EnumWindows, FALT, FCONTROL, FSHIFT, FVIRTKEY,
+    FindWindowW, GWLP_USERDATA, GetClassNameW, GetCursorPos, GetMenu, GetMessageW, GetParent,
+    GetWindowLongPtrW, HACCEL, HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, KillTimer,
+    LoadCursorW, LoadIconW, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MF_BYCOMMAND, MF_CHECKED,
+    MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, PostMessageW, PostQuitMessage, RegisterClassW,
+    RegisterWindowMessageW, SW_HIDE, SW_SHOW, SendMessageW, SetForegroundWindow, SetTimer,
+    SetWindowLongPtrW, SetWindowTextW, ShowWindow, TPM_RIGHTBUTTON, TrackPopupMenu,
+    TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
+    WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES, WM_KEYDOWN,
+    WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SIZE,
+    WM_SYSKEYDOWN, WM_TIMER, WM_UNDO, WNDCLASSW, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE,
+    WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{Interface, PCWSTR, PWSTR, implement, w};
 
@@ -255,6 +256,7 @@ pub(crate) struct AppState {
     options_dialog: HWND,
     help_window: HWND,
     changelog_window: HWND,
+    donations_window: HWND,
     bookmarks_window: HWND,
     dictionary_window: HWND,
     dictionary_entry_dialog: HWND,
@@ -263,6 +265,8 @@ pub(crate) struct AppState {
     podcast_window: HWND,
     podcast_save_window: HWND,
     batch_audiobooks_window: HWND,
+    rss_window: HWND,
+    rss_add_dialog: HWND, // Input dialog for RSS
     find_msg: u32,
     find_text: Vec<u16>,
     replace_text: Vec<u16>,
@@ -486,6 +490,7 @@ fn main() -> windows::core::Result<()> {
                         || state.options_dialog.0 != 0
                         || state.help_window.0 != 0
                         || state.changelog_window.0 != 0
+                        || state.donations_window.0 != 0
                         || state.dictionary_window.0 != 0
                         || state.podcast_window.0 != 0;
                     let secondary_open = secondary_open
@@ -548,6 +553,18 @@ fn main() -> windows::core::Result<()> {
                     }
 
                     if handle_accessibility(state.changelog_window, &msg) {
+                        handled = true;
+                        return;
+                    }
+                }
+                if state.donations_window.0 != 0 {
+                    if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_TAB.0 as u32 {
+                        app_windows::help_window::handle_tab(state.donations_window);
+                        handled = true;
+                        return;
+                    }
+
+                    if handle_accessibility(state.donations_window, &msg) {
                         handled = true;
                         return;
                     }
@@ -639,6 +656,20 @@ fn main() -> windows::core::Result<()> {
 
                 if state.prompt_window.0 != 0 {
                     if app_windows::prompt_window::handle_navigation(state.prompt_window, &msg) {
+                        handled = true;
+                        return;
+                    }
+                }
+
+                if state.rss_window.0 != 0 {
+                    if handle_accessibility(state.rss_window, &msg) {
+                        handled = true;
+                        return;
+                    }
+                }
+
+                if state.rss_add_dialog.0 != 0 {
+                    if handle_accessibility(state.rss_add_dialog, &msg) {
                         handled = true;
                         return;
                     }
@@ -825,14 +856,18 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 options_dialog: HWND(0),
                 help_window: HWND(0),
                 changelog_window: HWND(0),
+                donations_window: HWND(0),
                 bookmarks_window: HWND(0),
                 dictionary_window: HWND(0),
                 dictionary_entry_dialog: HWND(0),
                 tts_tuning_dialog: HWND(0),
                 prompt_window: HWND(0),
                 podcast_window: HWND(0),
+                rss_window: HWND(0),
+                rss_add_dialog: HWND(0),
                 podcast_save_window: HWND(0),
                 batch_audiobooks_window: HWND(0),
+
                 find_msg,
                 find_text: vec![0u16; 256],
                 replace_text: vec![0u16; 256],
@@ -1198,6 +1233,13 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     editor_manager::close_current_document(hwnd);
                     LRESULT(0)
                 }
+                IDM_FILE_CLOSE_OTHERS => {
+                    log_debug("Menu: Close other files");
+                    if editor_manager::close_other_documents(hwnd) {
+                        close_other_windows(hwnd);
+                    }
+                    LRESULT(0)
+                }
                 IDM_FILE_EXIT => {
                     log_debug("Menu: Exit");
                     let _ = editor_manager::try_close_app(hwnd);
@@ -1370,6 +1412,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     insert_bookmark(hwnd);
                     LRESULT(0)
                 }
+                IDM_INSERT_CLEAR_BOOKMARKS => {
+                    log_debug("Menu: Clear Current Bookmarks");
+                    clear_current_bookmarks(hwnd);
+                    LRESULT(0)
+                }
                 IDM_MANAGE_BOOKMARKS => {
                     log_debug("Menu: Manage Bookmarks");
                     app_windows::bookmarks_window::open(hwnd);
@@ -1399,6 +1446,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     app_windows::prompt_window::open(hwnd);
                     LRESULT(0)
                 }
+                IDM_TOOLS_RSS => {
+                    log_debug("Menu: RSS");
+                    app_windows::rss_window::open(hwnd);
+                    LRESULT(0)
+                }
                 IDM_HELP_GUIDE => {
                     log_debug("Menu: Guide");
                     app_windows::help_window::open(hwnd);
@@ -1407,6 +1459,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 IDM_HELP_CHANGELOG => {
                     log_debug("Menu: Changelog");
                     app_windows::help_window::open_changelog(hwnd);
+                    LRESULT(0)
+                }
+                IDM_HELP_DONATIONS => {
+                    log_debug("Menu: Donations");
+                    app_windows::help_window::open_donations(hwnd);
                     LRESULT(0)
                 }
                 IDM_HELP_CHECK_UPDATES => {
@@ -2645,6 +2702,11 @@ unsafe fn create_accelerators() -> HACCEL {
             cmd: IDM_FILE_CLOSE as u16,
         },
         ACCEL {
+            fVirt: virt_shift,
+            key: 'W' as u16,
+            cmd: IDM_FILE_CLOSE_OTHERS as u16,
+        },
+        ACCEL {
             fVirt: virt,
             key: 'F' as u16,
             cmd: IDM_EDIT_FIND as u16,
@@ -2771,6 +2833,27 @@ unsafe fn create_accelerators() -> HACCEL {
         },
     ];
     CreateAcceleratorTableW(&mut accels).unwrap_or(HACCEL(0))
+}
+
+unsafe extern "system" fn enum_close_other_windows(hwnd: HWND, lparam: LPARAM) -> BOOL {
+    let current = HWND(lparam.0);
+    if hwnd == current {
+        return BOOL(1);
+    }
+    let mut buf = [0u16; 64];
+    let len = GetClassNameW(hwnd, &mut buf);
+    if len == 0 {
+        return BOOL(1);
+    }
+    let name = String::from_utf16_lossy(&buf[..len as usize]);
+    if name == "NovapadWin32" {
+        let _ = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
+    }
+    BOOL(1)
+}
+
+unsafe fn close_other_windows(hwnd: HWND) {
+    let _ = EnumWindows(Some(enum_close_other_windows), LPARAM(hwnd.0));
 }
 
 pub(crate) unsafe fn get_active_edit(hwnd: HWND) -> Option<HWND> {
@@ -2920,6 +3003,31 @@ unsafe fn insert_bookmark(hwnd: HWND) {
         unsafe {
             app_windows::bookmarks_window::refresh_bookmarks_list(bookmarks_window);
         }
+    }
+}
+
+unsafe fn clear_current_bookmarks(hwnd: HWND) {
+    let path: std::path::PathBuf = match with_state(hwnd, |state| {
+        state
+            .docs
+            .get(state.current)
+            .and_then(|doc| doc.path.clone())
+    }) {
+        Some(Some(path)) => path,
+        _ => return,
+    };
+
+    let path_str = path.to_string_lossy().to_string();
+    let bookmarks_window = with_state(hwnd, |state| {
+        if state.bookmarks.files.remove(&path_str).is_some() {
+            save_bookmarks(&state.bookmarks);
+        }
+        state.bookmarks_window
+    })
+    .unwrap_or(HWND(0));
+
+    if bookmarks_window.0 != 0 {
+        app_windows::bookmarks_window::refresh_bookmarks_list(bookmarks_window);
     }
 }
 

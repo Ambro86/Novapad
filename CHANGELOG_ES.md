@@ -1,4 +1,17 @@
 # Changelog
+Version 0.5.8 - 2026-01-09
+Nuevas funciones
+• Aniadido control de volumen para microfono y audio del sistema al grabar podcasts.
+• Aniadidas las funciones de edicion mencionadas arriba.
+• Aniadida una nueva funcion para importar articulos desde sitios web o feeds RSS, incluyendo los feeds mas importantes para cada idioma.
+• Aniadida una funcion para eliminar todos los marcadores del archivo actual.
+• Aniadida la funcion para eliminar lineas duplicadas y lineas duplicadas consecutivas.
+• Aniadida la funcion para cerrar todas las pestanas o ventanas excepto la actual.
+• Aniadida la entrada Donaciones en el menu Ayuda para todos los idiomas.
+Mejoras
+• Mejorado el terminal accesible para evitar algunos bloqueos.
+• Eliminada la casilla para mover la configuracion a la carpeta actual; ahora el programa lo gestiona automaticamente (si la carpeta del exe se llama "novapad portable" o el exe esta en una unidad extraible, guarda en la carpeta del exe en `config`, si no en `%APPDATA%\\Novapad`, con fallback a `config` si la carpeta preferida no es escribible).
+
 Version 0.5.7 - 2026-01-05
 Nuevas funciones
 • Aniadida opcion para grabar audiolibros en lote (conversion multiple de archivos y carpetas).

@@ -134,6 +134,8 @@ uuid = { version = "1.6", features = ["v4"] }
 epub = "2.1"
 yt-transcript-rs = "0.1.8"
 zip = "0.6"
+feed-rs = "1.3"
+scraper = "0.19"
 
 [features]
 portable = []

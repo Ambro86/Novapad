@@ -2,6 +2,7 @@ use crate::accessibility::{EM_GETSEL, EM_REPLACESEL, EM_SCROLLCARET, to_wide};
 use crate::conpty::{ConPtySession, ConPtySpawn};
 use crate::settings::{Language, confirm_title, save_settings};
 use crate::{i18n, log_debug, show_error, with_state};
+use std::collections::VecDeque;
 use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -26,12 +27,13 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 use windows::Win32::UI::WindowsAndMessaging::{
     BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, CreateWindowExW, DefWindowProcW, DestroyWindow,
     ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_READONLY, GetClientRect, GetParent,
-    GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, LoadCursorW,
-    MB_ICONQUESTION, MB_OKCANCEL, MESSAGEBOX_STYLE, MSG, MessageBoxW, PostMessageW, RegisterClassW,
-    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP,
-    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT,
-    WM_SIZE, WM_SYSKEYDOWN, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
-    WS_EX_DLGMODALFRAME, WS_SIZEBOX, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, KillTimer,
+    LoadCursorW, MB_ICONQUESTION, MB_OKCANCEL, MESSAGEBOX_STYLE, MSG, MessageBoxW, PostMessageW,
+    RegisterClassW, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW,
+    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY,
+    WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD,
+    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SIZEBOX, WS_SYSMENU, WS_TABSTOP,
+    WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::PCWSTR;
 
@@ -51,6 +53,8 @@ const EM_LIMITTEXT: u32 = 0x00C5;
 const EM_SETREADONLY: u32 = 0x00CF;
 const PROMPT_OUTPUT_LIMIT: usize = 40_000;
 const PROMPT_OUTPUT_KEEP: usize = 10_000;
+const PROMPT_OUTPUT_TIMER_ID: usize = 3;
+const PROMPT_OUTPUT_FLUSH_CHARS: usize = 2048;
 
 struct PromptLabels {
     title: String,
@@ -202,6 +206,8 @@ struct PromptState {
     session: Option<ConPtySession>,
     reader_cancel: Arc<AtomicBool>,
     ansi_stripper: AnsiStripper,
+    output_queue: VecDeque<String>,
+    output_flush_active: bool,
 }
 
 fn prompt_labels(language: Language) -> PromptLabels {
@@ -588,6 +594,8 @@ unsafe extern "system" fn prompt_wndproc(
                 session: None,
                 reader_cancel: reader_cancel.clone(),
                 ansi_stripper: AnsiStripper::new(),
+                output_queue: VecDeque::new(),
+                output_flush_active: false,
             };
 
             layout_prompt(hwnd, &state);
@@ -780,13 +788,40 @@ unsafe extern "system" fn prompt_wndproc(
             }
             let payload = unsafe { Box::from_raw(lparam.0 as *mut String) };
             let _ = with_prompt_state(hwnd, |state| {
-                append_output(state, &payload);
+                state.output_queue.push_back(*payload);
+                if !state.output_flush_active {
+                    state.output_flush_active = true;
+                    let _ = SetTimer(hwnd, PROMPT_OUTPUT_TIMER_ID, 20, None);
+                }
             });
             LRESULT(0)
+        }
+        WM_TIMER => {
+            if wparam.0 as usize == PROMPT_OUTPUT_TIMER_ID {
+                let _ = with_prompt_state(hwnd, |state| {
+                    let mut budget = PROMPT_OUTPUT_FLUSH_CHARS;
+                    while budget > 0 {
+                        let Some(chunk) = state.output_queue.pop_front() else {
+                            break;
+                        };
+                        budget = budget.saturating_sub(chunk.len());
+                        append_output(state, &chunk);
+                    }
+                    if state.output_queue.is_empty() {
+                        state.output_flush_active = false;
+                        let _ = KillTimer(hwnd, PROMPT_OUTPUT_TIMER_ID);
+                    }
+                });
+                return LRESULT(0);
+            }
+            DefWindowProcW(hwnd, msg, wparam, lparam)
         }
         WM_DESTROY => {
             let _ = with_prompt_state(hwnd, |state| {
                 state.reader_cancel.store(true, Ordering::Relaxed);
+                state.output_queue.clear();
+                state.output_flush_active = false;
+                let _ = KillTimer(hwnd, PROMPT_OUTPUT_TIMER_ID);
                 if state.beep_state.sleep_active.load(Ordering::Relaxed) {
                     let _ = apply_prevent_sleep(false);
                     state

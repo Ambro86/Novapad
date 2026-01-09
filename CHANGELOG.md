@@ -1,4 +1,17 @@
 # Changelog
+Version 0.5.8 - 2026-01-09
+New features
+• Added volume control for the microphone and system audio when recording podcasts.
+• Added the editing functions mentioned above.
+• Added a new feature to import articles from websites or RSS feeds, including the most important feeds for each language.
+• Added a function to remove all bookmarks for the current file.
+• Added a function to remove duplicate lines and duplicate consecutive lines.
+• Added a function to close all tabs or windows except the current one.
+• Added a Donations entry in the Help menu for all languages.
+Improvements
+• Improved the accessible terminal to prevent some crashes.
+• Removed the setting to move settings to the current folder; the app now handles this automatically based on location (if the exe folder is named "novapad portable" or the exe is on a removable drive, settings go to the exe folder in `config`, otherwise `%APPDATA%\\Novapad`, with fallback to the exe `config` if the preferred folder is not writable).
+
 Version 0.5.7 - 2026-01-05
 New features
 • Added Batch Audiobooks feature to convert multiple files/folders at once.

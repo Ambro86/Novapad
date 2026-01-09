@@ -1,3 +1,4 @@
+use crate::tools::rss::RssSource;
 use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
 use std::os::windows::prelude::*;
@@ -176,6 +177,24 @@ pub struct AppSettings {
     pub prompt_beep_on_idle: bool,
     pub prompt_prevent_sleep: bool,
     pub prompt_announce_lines: bool,
+    #[serde(default)]
+    pub rss_sources: Vec<RssSource>,
+    #[serde(default)]
+    pub rss_removed_default_en: Vec<String>,
+    #[serde(default)]
+    pub rss_default_en_keys: Vec<String>,
+    #[serde(default)]
+    pub rss_removed_default_it: Vec<String>,
+    #[serde(default)]
+    pub rss_default_it_keys: Vec<String>,
+    #[serde(default)]
+    pub rss_removed_default_es: Vec<String>,
+    #[serde(default)]
+    pub rss_default_es_keys: Vec<String>,
+    #[serde(default)]
+    pub rss_removed_default_pt: Vec<String>,
+    #[serde(default)]
+    pub rss_default_pt_keys: Vec<String>,
 }
 
 impl Default for AppSettings {
@@ -226,6 +245,15 @@ impl Default for AppSettings {
             prompt_beep_on_idle: true,
             prompt_prevent_sleep: true,
             prompt_announce_lines: true,
+            rss_sources: Vec::new(),
+            rss_removed_default_en: Vec::new(),
+            rss_default_en_keys: Vec::new(),
+            rss_removed_default_it: Vec::new(),
+            rss_default_it_keys: Vec::new(),
+            rss_removed_default_es: Vec::new(),
+            rss_default_es_keys: Vec::new(),
+            rss_removed_default_pt: Vec::new(),
+            rss_default_pt_keys: Vec::new(),
         }
     }
 }

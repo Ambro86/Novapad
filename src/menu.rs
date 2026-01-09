@@ -24,6 +24,7 @@ pub const IDM_FILE_READ_STOP: usize = 1010;
 pub const IDM_FILE_AUDIOBOOK: usize = 1011;
 pub const IDM_FILE_PODCAST: usize = 1012;
 pub const IDM_FILE_BATCH_AUDIOBOOK: usize = 1013;
+pub const IDM_FILE_CLOSE_OTHERS: usize = 1014;
 pub const IDM_EDIT_UNDO: usize = 2001;
 pub const IDM_EDIT_CUT: usize = 2002;
 pub const IDM_EDIT_COPY: usize = 2003;
@@ -48,6 +49,7 @@ pub const IDM_EDIT_REMOVE_DUPLICATE_LINES: usize = 2021;
 pub const IDM_EDIT_REMOVE_DUPLICATE_CONSECUTIVE_LINES: usize = 2022;
 pub const IDM_INSERT_BOOKMARK: usize = 2101;
 pub const IDM_MANAGE_BOOKMARKS: usize = 2102;
+pub const IDM_INSERT_CLEAR_BOOKMARKS: usize = 2103;
 pub const IDM_NEXT_TAB: usize = 3001;
 pub const IDM_VIEW_SHOW_VOICES: usize = 6101;
 pub const IDM_VIEW_SHOW_FAVORITES: usize = 6102;
@@ -70,11 +72,13 @@ pub const IDM_TOOLS_OPTIONS: usize = 5001;
 pub const IDM_TOOLS_DICTIONARY: usize = 5002;
 pub const IDM_TOOLS_IMPORT_YOUTUBE: usize = 5003;
 pub const IDM_TOOLS_PROMPT: usize = 5004;
+pub const IDM_TOOLS_RSS: usize = 5005;
 pub const IDM_HELP_GUIDE: usize = 7001;
 pub const IDM_HELP_ABOUT: usize = 7002;
 pub const IDM_HELP_CHECK_UPDATES: usize = 7003;
 pub const IDM_HELP_CHANGELOG: usize = 7004;
 pub const IDM_HELP_PENDING_UPDATE: usize = 7005;
+pub const IDM_HELP_DONATIONS: usize = 7006;
 pub const MAX_RECENT: usize = 5;
 
 pub struct MenuLabels {
@@ -88,6 +92,7 @@ pub struct MenuLabels {
     pub menu_dictionary: String,
     pub menu_import_youtube: String,
     pub menu_prompt: String,
+    pub menu_rss: String,
     pub view_text_color: String,
     pub view_text_size: String,
     pub view_text_color_black: String,
@@ -112,6 +117,7 @@ pub struct MenuLabels {
     pub file_save_as: String,
     pub file_save_all: String,
     pub file_close: String,
+    pub file_close_others: String,
     pub file_recent: String,
     pub file_read_start: String,
     pub file_read_pause: String,
@@ -143,9 +149,11 @@ pub struct MenuLabels {
     pub edit_remove_duplicate_lines: String,
     pub edit_remove_duplicate_consecutive_lines: String,
     pub insert_bookmark: String,
+    pub insert_clear_bookmarks: String,
     pub manage_bookmarks: String,
     pub help_guide: String,
     pub help_changelog: String,
+    pub help_donations: String,
     pub help_check_updates: String,
     pub help_pending_update: String,
     pub help_about: String,
@@ -164,6 +172,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         menu_dictionary: i18n::tr(language, "menu.dictionary"),
         menu_import_youtube: i18n::tr(language, "menu.import_youtube"),
         menu_prompt: i18n::tr(language, "menu.prompt"),
+        menu_rss: i18n::tr(language, "menu.rss"),
         view_text_color: i18n::tr(language, "view.text_color"),
         view_text_size: i18n::tr(language, "view.text_size"),
         view_text_color_black: i18n::tr(language, "view.text_color.black"),
@@ -188,6 +197,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         file_save_as: i18n::tr(language, "file.save_as"),
         file_save_all: i18n::tr(language, "file.save_all"),
         file_close: i18n::tr(language, "file.close"),
+        file_close_others: i18n::tr(language, "file.close_others"),
         file_recent: i18n::tr(language, "file.recent"),
         file_read_start: i18n::tr(language, "file.read_start"),
         file_read_pause: i18n::tr(language, "file.read_pause"),
@@ -222,9 +232,11 @@ pub fn menu_labels(language: Language) -> MenuLabels {
             "edit.remove_duplicate_consecutive_lines",
         ),
         insert_bookmark: i18n::tr(language, "insert.bookmark"),
+        insert_clear_bookmarks: i18n::tr(language, "insert.clear_bookmarks"),
         manage_bookmarks: i18n::tr(language, "insert.manage_bookmarks"),
         help_guide: i18n::tr(language, "help.guide"),
         help_changelog: i18n::tr(language, "help.changelog"),
+        help_donations: i18n::tr(language, "help.donations"),
         help_check_updates: i18n::tr(language, "help.check_updates"),
         help_pending_update: i18n::tr(language, "help.pending_update"),
         help_about: i18n::tr(language, "help.about"),
@@ -257,6 +269,18 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         &labels.file_save_all,
     );
     let _ = append_menu_string(file_menu, MF_STRING, IDM_FILE_CLOSE, &labels.file_close);
+    let _ = append_menu_string(
+        file_menu,
+        MF_STRING,
+        IDM_FILE_CLOSE_OTHERS,
+        &labels.file_close_others,
+    );
+    let _ = append_menu_string(
+        file_menu,
+        MF_STRING,
+        IDM_FILE_CLOSE_OTHERS,
+        &labels.file_close_others,
+    );
     let _ = AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null());
     let _ = append_menu_string(
         file_menu,
@@ -527,12 +551,19 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
     let _ = append_menu_string(
         insert_menu,
         MF_STRING,
+        IDM_INSERT_CLEAR_BOOKMARKS,
+        &labels.insert_clear_bookmarks,
+    );
+    let _ = append_menu_string(
+        insert_menu,
+        MF_STRING,
         IDM_MANAGE_BOOKMARKS,
         &labels.manage_bookmarks,
     );
     let _ = append_menu_string(hmenu, MF_POPUP, insert_menu.0 as usize, &labels.menu_insert);
 
     let _ = append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_PROMPT, &labels.menu_prompt);
+    let _ = append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_RSS, &labels.menu_rss);
     let _ = append_menu_string(
         tools_menu,
         MF_STRING,
@@ -559,6 +590,12 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         MF_STRING,
         IDM_HELP_CHANGELOG,
         &labels.help_changelog,
+    );
+    let _ = append_menu_string(
+        help_menu,
+        MF_STRING,
+        IDM_HELP_DONATIONS,
+        &labels.help_donations,
     );
     let _ = append_menu_string(
         help_menu,

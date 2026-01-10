@@ -1,5 +1,5 @@
 # Changelog
-Version 0.5.8 - 2026-01-09
+Version 0.5.8 - 2026-01-10
 New features
 • Added volume control for the microphone and system audio when recording podcasts.
 • Added a new feature to import articles from websites or RSS feeds, including the most important feeds for each language.

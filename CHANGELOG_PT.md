@@ -1,5 +1,5 @@
 # Changelog
-Versao 0.5.8 - 2026-01-09
+Versao 0.5.8 - 2026-01-10
 Novas funcionalidades
 • Adicionado controle de volume para o microfone e o audio do sistema ao gravar podcasts.
 • Adicionada uma nova funcao para importar artigos de sites ou feeds RSS, incluindo os feeds mais importantes para cada idioma.

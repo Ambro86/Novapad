@@ -1,5 +1,5 @@
 # Changelog
-Version 0.5.8 - 2026-01-09
+Version 0.5.8 - 2026-01-10
 Nuevas funciones
 • Aniadido control de volumen para microfono y audio del sistema al grabar podcasts.
 • Aniadida una nueva funcion para importar articulos desde sitios web o feeds RSS, incluyendo los feeds mas importantes para cada idioma.

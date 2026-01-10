@@ -709,6 +709,25 @@ fn verify_download_integrity(
     Ok(())
 }
 
+fn is_same_executable(a: &Path, b: &Path) -> bool {
+    let Ok(a_meta) = a.metadata() else {
+        return false;
+    };
+    let Ok(b_meta) = b.metadata() else {
+        return false;
+    };
+    if a_meta.len() != b_meta.len() {
+        return false;
+    }
+    let Ok(a_hash) = compute_sha256(a) else {
+        return false;
+    };
+    let Ok(b_hash) = compute_sha256(b) else {
+        return false;
+    };
+    a_hash.eq_ignore_ascii_case(&b_hash)
+}
+
 fn paths_equal(a: &Path, b: &Path) -> bool {
     let ca = std::fs::canonicalize(a).unwrap_or_else(|_| a.to_path_buf());
     let cb = std::fs::canonicalize(b).unwrap_or_else(|_| b.to_path_buf());
@@ -755,41 +774,80 @@ fn quote_arg(arg: &str) -> String {
 
 fn launch_self_updater(current_exe: &Path, new_exe: &Path) -> io::Result<()> {
     let pid = std::process::id();
-    let updater_exe = runner_updater_path(current_exe)?;
-    if let Some(parent) = updater_exe.parent() {
-        std::fs::create_dir_all(parent)?;
+    let mut last_err: Option<io::Error> = None;
+    for updater_exe in runner_updater_candidates(current_exe) {
+        if !ensure_dir_writable_for_runner(&updater_exe) {
+            continue;
+        }
+        match std::fs::copy(current_exe, &updater_exe) {
+            Ok(_) => {
+                log_debug(&format!(
+                    "Update launch: runner={} current={} new={}",
+                    updater_exe.display(),
+                    current_exe.display(),
+                    new_exe.display()
+                ));
+                std::process::Command::new(updater_exe)
+                    .arg("--self-update")
+                    .arg("--pid")
+                    .arg(pid.to_string())
+                    .arg("--current")
+                    .arg(current_exe)
+                    .arg("--new")
+                    .arg(new_exe)
+                    .arg("--restart")
+                    .spawn()?;
+                return Ok(());
+            }
+            Err(err) => {
+                log_win32_error("Update launch: runner copy failed", &err);
+                last_err = Some(err);
+            }
+        }
     }
-    std::fs::copy(current_exe, &updater_exe)?;
-    log_debug(&format!(
-        "Update launch: runner={} current={} new={}",
-        updater_exe.display(),
-        current_exe.display(),
-        new_exe.display()
-    ));
-    std::process::Command::new(updater_exe)
-        .arg("--self-update")
-        .arg("--pid")
-        .arg(pid.to_string())
-        .arg("--current")
-        .arg(current_exe)
-        .arg("--new")
-        .arg(new_exe)
-        .arg("--restart")
-        .spawn()?;
-    Ok(())
+    Err(last_err.unwrap_or_else(|| {
+        io::Error::new(io::ErrorKind::PermissionDenied, "Runner path not writable")
+    }))
 }
 
-fn runner_updater_path(current_exe: &Path) -> io::Result<PathBuf> {
+fn runner_updater_candidates(current_exe: &Path) -> Vec<PathBuf> {
     let file_name = current_exe
         .file_name()
         .and_then(|name| name.to_str())
-        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Invalid executable name"))?;
-    let base = std::env::var_os("LOCALAPPDATA")
-        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Missing LOCALAPPDATA"))?;
-    let mut path = PathBuf::from(base);
-    path.push(UPDATER_DIR_NAME);
-    path.push(format!("{file_name}.Updater.exe"));
-    Ok(path)
+        .unwrap_or("novapad.exe");
+    let mut candidates = Vec::new();
+    if let Some(base) = std::env::var_os("LOCALAPPDATA") {
+        let mut path = PathBuf::from(base);
+        path.push(UPDATER_DIR_NAME);
+        path.push(format!("{file_name}.Updater.exe"));
+        candidates.push(path);
+    }
+    let mut temp_path = std::env::temp_dir();
+    temp_path.push(format!("{file_name}.Updater.exe"));
+    candidates.push(temp_path);
+    candidates
+}
+
+fn ensure_dir_writable_for_runner(path: &Path) -> bool {
+    let Some(parent) = path.parent() else {
+        return false;
+    };
+    if std::fs::create_dir_all(parent).is_err() {
+        return false;
+    }
+    let probe_name = format!("novapad_updater_probe_{}.tmp", std::process::id());
+    let probe_path = parent.join(probe_name);
+    match OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&probe_path)
+    {
+        Ok(_) => {
+            let _ = std::fs::remove_file(&probe_path);
+            true
+        }
+        Err(_) => false,
+    }
 }
 
 pub(crate) fn run_self_update(args: &[String]) -> Result<i32, String> {
@@ -834,20 +892,25 @@ pub(crate) fn run_self_update(args: &[String]) -> Result<i32, String> {
 
     let self_exe = std::env::current_exe().map_err(|err| err.to_string())?;
     if paths_equal(&self_exe, &current) {
-        let runner = runner_updater_path(&current).map_err(|err| err.to_string())?;
-        if let Some(parent) = runner.parent() {
-            let _ = std::fs::create_dir_all(parent);
+        for runner in runner_updater_candidates(&current) {
+            if !ensure_dir_writable_for_runner(&runner) {
+                continue;
+            }
+            if std::fs::copy(&self_exe, &runner).is_err() {
+                continue;
+            }
+            log_debug(&format!(
+                "Self-update launched from target. Relaunching runner: {}",
+                runner.display()
+            ));
+            let mut cmd = std::process::Command::new(runner);
+            for arg in args {
+                cmd.arg(arg);
+            }
+            let _ = cmd.spawn();
+            return Ok(EXIT_OK);
         }
-        let _ = std::fs::copy(&self_exe, &runner);
-        log_debug(&format!(
-            "Self-update launched from target. Relaunching runner: {}",
-            runner.display()
-        ));
-        let mut cmd = std::process::Command::new(runner);
-        for arg in args {
-            cmd.arg(arg);
-        }
-        let _ = cmd.spawn();
+        log_debug("Self-update launched from target. Runner copy failed.");
         return Ok(EXIT_OK);
     }
 
@@ -973,6 +1036,8 @@ pub(crate) fn run_self_update(args: &[String]) -> Result<i32, String> {
             return Ok(EXIT_REPLACE_FAILED);
         }
     }
+    let _ = std::fs::remove_file(&new);
+    let _ = std::fs::remove_file(temp_update_meta_path(&new));
 
     let language = load_settings().language;
     if restart {
@@ -1208,32 +1273,62 @@ impl Drop for UpdateLock {
 }
 
 fn acquire_update_lock(current_exe: &Path) -> Result<UpdateLock, UpdateLockError> {
-    let path =
-        update_lock_path(current_exe).map_err(|err| UpdateLockError::Other(err.to_string()))?;
-    if path.exists() {
-        if let Some(pid) = read_lock_pid(&path) {
-            if is_process_running(pid) {
+    let paths =
+        update_lock_paths(current_exe).map_err(|err| UpdateLockError::Other(err.to_string()))?;
+    let mut last_err: Option<io::Error> = None;
+    for path in paths {
+        if path.exists() {
+            if let Some(pid) = read_lock_pid(&path) {
+                if is_process_running(pid) {
+                    return Err(UpdateLockError::InProgress);
+                }
+            }
+            let _ = std::fs::remove_file(&path);
+        }
+        let mut file = match OpenOptions::new().write(true).create_new(true).open(&path) {
+            Ok(file) => file,
+            Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
                 return Err(UpdateLockError::InProgress);
             }
-        }
-        let _ = std::fs::remove_file(&path);
+            Err(err) => {
+                if is_access_denied(&err) {
+                    last_err = Some(err);
+                    continue;
+                }
+                return Err(UpdateLockError::Other(err.to_string()));
+            }
+        };
+        let _ = writeln!(file, "{}", std::process::id());
+        return Ok(UpdateLock { path, keep: false });
     }
-    let mut file = match OpenOptions::new().write(true).create_new(true).open(&path) {
-        Ok(file) => file,
-        Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
-            return Err(UpdateLockError::InProgress);
-        }
-        Err(err) => return Err(UpdateLockError::Other(err.to_string())),
-    };
-    let _ = writeln!(file, "{}", std::process::id());
-    Ok(UpdateLock { path, keep: false })
+    Err(UpdateLockError::Other(
+        last_err
+            .unwrap_or_else(|| io::Error::new(io::ErrorKind::Other, "Lock unavailable"))
+            .to_string(),
+    ))
 }
 
-fn update_lock_path(current_exe: &Path) -> Result<PathBuf, io::Error> {
+fn update_lock_path_primary(current_exe: &Path) -> Result<PathBuf, io::Error> {
     let dir = current_exe
         .parent()
         .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Missing executable directory"))?;
     Ok(dir.join(UPDATE_LOCK_NAME))
+}
+
+fn update_lock_path_temp(current_exe: &Path) -> PathBuf {
+    let file_name = current_exe
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("novapad.exe");
+    let mut path = std::env::temp_dir();
+    path.push(format!("{UPDATE_LOCK_NAME}.{file_name}"));
+    path
+}
+
+fn update_lock_paths(current_exe: &Path) -> Result<Vec<PathBuf>, io::Error> {
+    let primary = update_lock_path_primary(current_exe)?;
+    let temp = update_lock_path_temp(current_exe);
+    Ok(vec![primary, temp])
 }
 
 fn read_lock_pid(path: &Path) -> Option<u32> {
@@ -1252,9 +1347,11 @@ fn is_process_running(pid: u32) -> bool {
 }
 
 fn remove_update_lock(current_exe: &Path) -> io::Result<()> {
-    let path = update_lock_path(current_exe)?;
-    if path.exists() {
-        std::fs::remove_file(path)?;
+    let paths = update_lock_paths(current_exe)?;
+    for path in paths {
+        if path.exists() {
+            let _ = std::fs::remove_file(path);
+        }
     }
     Ok(())
 }
@@ -1379,15 +1476,17 @@ pub(crate) fn cleanup_update_lock_on_start() {
     let Ok(current_exe) = std::env::current_exe() else {
         return;
     };
-    let Ok(lock_path) = update_lock_path(&current_exe) else {
+    let Ok(lock_paths) = update_lock_paths(&current_exe) else {
         return;
     };
-    if !lock_path.exists() {
-        return;
-    }
-    let pid = read_lock_pid(&lock_path);
-    if pid.is_none_or(|pid| !is_process_running(pid)) {
-        let _ = std::fs::remove_file(lock_path);
+    for lock_path in lock_paths {
+        if !lock_path.exists() {
+            continue;
+        }
+        let pid = read_lock_pid(&lock_path);
+        if pid.is_none_or(|pid| !is_process_running(pid)) {
+            let _ = std::fs::remove_file(lock_path);
+        }
     }
 }
 
@@ -1454,6 +1553,15 @@ pub(crate) fn check_pending_update(hwnd: HWND, force: bool) {
             return;
         }
     };
+    if is_same_executable(&pending, &current_exe) {
+        log_debug("Pending update matches current exe. Clearing pending update.");
+        let _ = std::fs::remove_file(&pending);
+        let _ = std::fs::remove_file(temp_update_meta_path(&pending));
+        if force {
+            show_update_info(language, UpdateInfo::NoPending);
+        }
+        return;
+    }
     let mut update_lock = match acquire_update_lock(&current_exe) {
         Ok(lock) => lock,
         Err(UpdateLockError::InProgress) => {

@@ -1,94 +1,15 @@
-use std::{
-    ffi::OsStr,
-    fs::OpenOptions,
-    io,
-    os::windows::prelude::*,
-    path::{Component, Path, PathBuf, Prefix},
-};
+Looks good, thanks.
 
-use windows::Win32::Storage::FileSystem::{GetDriveTypeW, DRIVE_REMOVABLE};
+- The separate timeouts (connect 4s, total 15s) are perfect for my use case, please keep them as-is.
+- Good job adding the canonicalization test. Please make sure the canonicalization covers:
+  - remove fragments (#...)
+  - remove trailing slash (but keep "/" for the root)
+  - remove tracking params: utm_*, fbclid, gclid
+  - do NOT remove functional params like id/p/article/etc.
 
-fn wide(s: &str) -> Vec<u16> {
-    OsStr::new(s).encode_wide().chain(Some(0)).collect()
-}
+Next, please run a quick manual check:
+1) Refresh a feed twice and confirm 304 does NOT clear the list.
+2) Scroll the RSS list without pressing Enter and confirm no article/site fetch happens.
+3) Press Enter on 3 items from the same host and confirm rate limiting/backoff shows in logs when needed.
 
-// Portable forzato se la cartella che contiene l'exe si chiama "novapad portable" (case-insensitive)
-fn is_portable_folder(exe_dir: &Path) -> bool {
-    exe_dir
-        .file_name()
-        .and_then(|n| n.to_str())
-        .map(|n| n.eq_ignore_ascii_case("novapad portable"))
-        .unwrap_or(false)
-}
-
-// DRIVE_* solo per path con lettera (C:\, D:\, ecc.). UNC / altri -> None
-fn exe_drive_type(exe: &Path) -> Option<u32> {
-    match exe.components().next()? {
-        Component::Prefix(p) => match p.kind() {
-            Prefix::Disk(letter) | Prefix::VerbatimDisk(letter) => {
-                let root = format!("{}:\\", letter as char);
-                Some(unsafe { GetDriveTypeW(wide(&root).as_ptr()) })
-            }
-            _ => None,
-        },
-        _ => None,
-    }
-}
-
-// Test reale di scrittura (create_dir_all può riuscire ma scrivere file no)
-fn dir_is_writable(dir: &Path) -> bool {
-    if std::fs::create_dir_all(dir).is_err() {
-        return false;
-    }
-    let probe = dir.join(format!(".probe_{}", std::process::id()));
-    match OpenOptions::new().write(true).create_new(true).open(&probe) {
-        Ok(_) => {
-            let _ = std::fs::remove_file(&probe);
-            true
-        }
-        Err(_) => false,
-    }
-}
-
-// ---- decisione percorso impostazioni ----
-
-let exe_path = std::env::current_exe()
-    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-
-let exe_dir = exe_path
-    .parent()
-    .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "no exe dir"))?
-    .to_path_buf();
-
-// Portable: <exe_dir>\config\settings.json
-let portable_dir = exe_dir.join("config");
-
-// Non-portable: %APPDATA%\Novapad\settings.json  (nessun "config" qui)
-let appdata_dir = std::env::var_os("APPDATA")
-    .map(PathBuf::from)
-    .map(|p| p.join("Novapad"))
-    .unwrap_or_else(|| portable_dir.clone());
-
-// 1) "novapad portable" -> portable forzato
-let preferred_dir = if is_portable_folder(&exe_dir) {
-    portable_dir.clone()
-}
-// 2) drive removibile -> portable
-else if matches!(exe_drive_type(&exe_path), Some(t) if t == DRIVE_REMOVABLE) {
-    portable_dir.clone()
-}
-// 3) default -> AppData\Novapad
-else {
-    appdata_dir
-};
-
-// fallback garantito: se preferred non è scrivibile, usa portable_dir
-let settings_dir = if dir_is_writable(&preferred_dir) {
-    preferred_dir
-} else {
-    let _ = std::fs::create_dir_all(&portable_dir);
-    portable_dir
-};
-
-// File finale:
-let settings_path = settings_dir.join("settings.json");
+If all good, we can consider this merged.

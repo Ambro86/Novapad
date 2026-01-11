@@ -91,6 +91,29 @@ fn normalize_rss_url_key(url: &str) -> String {
     s.to_ascii_lowercase()
 }
 
+unsafe fn rss_page_sizes(parent: HWND) -> (usize, usize) {
+    with_state(parent, |s| {
+        (
+            s.settings.rss_initial_page_size,
+            s.settings.rss_next_page_size,
+        )
+    })
+    .unwrap_or((INITIAL_LOAD_COUNT, LOAD_MORE_COUNT))
+}
+
+unsafe fn ensure_rss_http(parent: HWND) {
+    let config = with_state(parent, |s| rss::config_from_settings(&s.settings))
+        .unwrap_or_else(|| rss::RssHttpConfig::default());
+    if let Err(err) = rss::init_http(config) {
+        eprintln!("rss_http_init_error: {}", err);
+    }
+}
+
+unsafe fn rss_fetch_config(parent: HWND) -> rss::RssFetchConfig {
+    with_state(parent, |s| rss::fetch_config_from_settings(&s.settings))
+        .unwrap_or_else(|| rss::RssFetchConfig::default())
+}
+
 fn default_feed_path(language: crate::settings::Language) -> Option<PathBuf> {
     let file_name = match language {
         crate::settings::Language::English => "feed_en.txt",
@@ -283,6 +306,7 @@ fn apply_default_sources(
             url: url.clone(),
             kind: RssSourceType::Feed,
             user_title: title.trim() != url.trim(),
+            cache: rss::RssFeedCache::default(),
         });
         existing.insert(key.clone());
         changed = true;
@@ -679,6 +703,7 @@ unsafe extern "system" fn rss_wndproc(
                             src.title = title.clone();
                             src.url = url.clone();
                             src.user_title = title.trim() != url.trim();
+                            src.cache = rss::RssFeedCache::default();
                         }
                         crate::settings::save_settings(state.settings.clone());
                     });
@@ -690,6 +715,7 @@ unsafe extern "system" fn rss_wndproc(
                             url: url.clone(),
                             kind: RssSourceType::Site,
                             user_title: title.trim() != url.trim(),
+                            cache: rss::RssFeedCache::default(),
                         });
                         crate::settings::save_settings(state.settings.clone());
                     });
@@ -1140,12 +1166,17 @@ unsafe fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEIT
                 ps.settings
                     .rss_sources
                     .get(*idx)
-                    .map(|src| (src.url.clone(), true))
+                    .map(|src| (src.url.clone(), src.kind.clone(), src.cache.clone(), true))
             })
             .flatten()
         } else if let Some(NodeData::Item(item)) = s.node_data.get(&(hitem.0)) {
             if item.is_folder {
-                Some((item.link.clone(), false))
+                Some((
+                    item.link.clone(),
+                    RssSourceType::Site,
+                    rss::RssFeedCache::default(),
+                    false,
+                ))
             } else {
                 None
             }
@@ -1154,7 +1185,7 @@ unsafe fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEIT
         }
     });
 
-    let (url, _is_source) = if let Some(info) = item_info_opt.flatten() {
+    let (url, source_kind, cache, _is_source) = if let Some(info) = item_info_opt.flatten() {
         info
     } else {
         return;
@@ -1212,12 +1243,28 @@ unsafe fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEIT
         let _ = SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(hitem.0));
     }
 
+    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    let fetch_config = if parent.0 != 0 {
+        rss_fetch_config(parent)
+    } else {
+        rss::RssFetchConfig::default()
+    };
+    if parent.0 != 0 {
+        ensure_rss_http(parent);
+    }
+
+    // UI: "Refresh feeds" should trigger this fetch for the selected source.
     std::thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .unwrap();
-        let res = rt.block_on(rss::fetch_and_parse(&url_clone));
+        let res = rt.block_on(rss::fetch_and_parse(
+            &url_clone,
+            source_kind,
+            cache,
+            fetch_config,
+        ));
         let msg = Box::new(FetchResult {
             hitem: hitem.0,
             result: res,
@@ -1233,7 +1280,7 @@ unsafe fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEIT
 
 struct FetchResult {
     hitem: isize,
-    result: Result<(RssSourceType, String, Vec<RssItem>), String>,
+    result: Result<rss::RssFetchOutcome, String>,
 }
 
 unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
@@ -1293,24 +1340,8 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
         }
     }
 
-    loop {
-        let child = SendMessageW(
-            hwnd_tree,
-            TVM_GETNEXTITEM,
-            WPARAM(TVGN_CHILD as usize),
-            LPARAM(hitem.0),
-        );
-        if child.0 == 0 {
-            break;
-        }
-        SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
-    }
-    with_rss_state(hwnd, |s| {
-        s.source_items.remove(&hitem.0);
-    });
-
     match res.result {
-        Ok((_kind, title, items)) => {
+        Ok(outcome) => {
             // Update source title if applicable
             let is_source_node = with_rss_state(hwnd, |s| {
                 s.node_data.contains_key(&hitem.0)
@@ -1328,7 +1359,7 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                 .flatten();
                 if let Some(i) = idx {
                     let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-                    let mut final_title = title.clone();
+                    let mut final_title = outcome.title.clone();
                     with_state(parent, |ps| {
                         let lang = ps.settings.language;
                         let (_key, keep_default_title) = ps
@@ -1346,11 +1377,15 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                             if !src.user_title
                                 && !keep_default_title
                                 && looks_auto
-                                && !title.is_empty()
+                                && !outcome.title.is_empty()
                             {
-                                src.title = title.clone();
+                                src.title = outcome.title.clone();
                             }
                             final_title = src.title.clone();
+                            if src.kind != outcome.kind {
+                                src.kind = outcome.kind;
+                            }
+                            src.cache = outcome.cache.clone();
                         }
                         crate::settings::save_settings(ps.settings.clone());
                     });
@@ -1371,11 +1406,38 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                 }
             }
 
+            if outcome.not_modified {
+                return;
+            }
+
+            loop {
+                let child = SendMessageW(
+                    hwnd_tree,
+                    TVM_GETNEXTITEM,
+                    WPARAM(TVGN_CHILD as usize),
+                    LPARAM(hitem.0),
+                );
+                if child.0 == 0 {
+                    break;
+                }
+                SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
+            }
             with_rss_state(hwnd, |s| {
-                s.source_items
-                    .insert(hitem.0, SourceItemsState { items, loaded: 0 });
+                s.source_items.remove(&hitem.0);
             });
-            let inserted = load_more_items(hwnd, hitem, INITIAL_LOAD_COUNT);
+
+            with_rss_state(hwnd, |s| {
+                s.source_items.insert(
+                    hitem.0,
+                    SourceItemsState {
+                        items: outcome.items,
+                        loaded: 0,
+                    },
+                );
+            });
+            let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+            let (initial_count, _next_count) = rss_page_sizes(parent);
+            let inserted = load_more_items(hwnd, hitem, initial_count);
 
             // Force expansion/visibility now that children are populated.
             // This prevents cases where the node appears to expand only after moving selection.
@@ -1431,6 +1493,21 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
             }
         }
         Err(e) => {
+            loop {
+                let child = SendMessageW(
+                    hwnd_tree,
+                    TVM_GETNEXTITEM,
+                    WPARAM(TVGN_CHILD as usize),
+                    LPARAM(hitem.0),
+                );
+                if child.0 == 0 {
+                    break;
+                }
+                SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
+            }
+            with_rss_state(hwnd, |s| {
+                s.source_items.remove(&hitem.0);
+            });
             if e.to_ascii_lowercase().contains("resource limit") {
                 return;
             }
@@ -1516,7 +1593,9 @@ unsafe fn handle_selection_changed(hwnd: HWND, hitem: windows::Win32::UI::Contro
         last = next;
     }
     if hitem == last {
-        let _ = load_more_items(hwnd, parent, LOAD_MORE_COUNT);
+        let parent_hwnd = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+        let (_initial_count, next_count) = rss_page_sizes(parent_hwnd);
+        let _ = load_more_items(hwnd, parent, next_count);
     }
 }
 
@@ -1525,6 +1604,7 @@ unsafe fn load_more_items(
     hitem: windows::Win32::UI::Controls::HTREEITEM,
     batch: usize,
 ) -> usize {
+    // UI: "Load more titles" can call this to append the next page locally.
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     if hwnd_tree.0 == 0 {
         return 0;
@@ -1578,6 +1658,7 @@ unsafe fn load_more_items(
 }
 
 unsafe fn handle_enter(hwnd: HWND) {
+    // UI: On Enter, fetch article content and import into the editor.
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     let hitem = windows::Win32::UI::Controls::HTREEITEM(
         SendMessageW(
@@ -1811,38 +1892,30 @@ unsafe fn force_focus_editor_on_parent(parent: HWND) {
 unsafe fn import_item(hwnd: HWND, item: RssItem) {
     let url = item.link.clone();
 
+    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    if parent.0 != 0 {
+        ensure_rss_http(parent);
+    }
+
     std::thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .unwrap();
-        let content_res = rt.block_on(async {
-            let resp = reqwest::get(&url).await.map_err(|e| e.to_string())?;
-            let html = resp.text().await.map_err(|e| e.to_string())?;
-            Ok::<String, String>(html)
-        });
+        let content_res = rt.block_on(rss::fetch_article_text(
+            &url,
+            &item.title,
+            &item.description,
+        ));
 
-        match content_res {
-            Ok(html) => {
-                let article = crate::tools::reader::reader_mode_extract(&html).unwrap_or(
-                    crate::tools::reader::ArticleContent {
-                        title: item.title.clone(),
-                        content: item.description.clone(),
-                        excerpt: String::new(),
-                    },
-                );
-
-                let msg = Box::new(ImportResult {
-                    text: format!("{}\n\n{}", article.title, article.content),
-                });
-                let _ = PostMessageW(
-                    hwnd,
-                    WM_RSS_IMPORT_COMPLETE,
-                    WPARAM(0),
-                    LPARAM(Box::into_raw(msg) as isize),
-                );
-            }
-            Err(_) => {}
+        if let Ok(text) = content_res {
+            let msg = Box::new(ImportResult { text });
+            let _ = PostMessageW(
+                hwnd,
+                WM_RSS_IMPORT_COMPLETE,
+                WPARAM(0),
+                LPARAM(Box::into_raw(msg) as isize),
+            );
         }
     });
 }

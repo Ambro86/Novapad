@@ -1,0 +1,109 @@
+Differenze tra le tre funzioni (in modo semplice)
+
+1) Keep unique items
+   - Codice: keep_unique_items_active_edit -> keep_unique_lines_block (src/editor_manager.rs).
+   - Tiene solo la prima occorrenza di ogni riga NON vuota (univoca "globalmente").
+   - Confronto case-insensitive: "Ciao" e "ciao" sono considerati uguali.
+   - Le righe vuote o di soli spazi NON vengono deduplicate: restano tutte come sono.
+   - Ordine delle righe preservato (resta la prima vista).
+
+2) Remove duplicate lines
+   - Codice: remove_duplicate_lines (src/text_ops.rs).
+   - Rimuove tutti i duplicati globali: resta solo la prima occorrenza di ogni riga.
+   - Confronto case-sensitive: "Ciao" e "ciao" sono diversi.
+   - Le righe vuote vengono deduplicate: due righe vuote consecutive diventano una sola.
+   - Ordine delle righe preservato (resta la prima vista).
+
+3) Remove duplicate consecutive lines
+   - Codice: remove_duplicate_consecutive_lines (src/text_ops.rs).
+   - Rimuove SOLO i duplicati adiacenti; se una riga si ripete piu' avanti, resta.
+   - Confronto case-sensitive (come sopra).
+   - Le righe vuote consecutive vengono ridotte a una sola; se sono separate, restano.
+
+In breve:
+- "Keep unique items" = dedup globale, ma solo righe non vuote e senza distinguere maiuscole/minuscole.
+- "Remove duplicate lines" = dedup globale, include righe vuote, distingue maiuscole/minuscole.
+- "Remove duplicate consecutive lines" = dedup solo di ripetizioni consecutive, distingue maiuscole/minuscole.
+
+Esempi completi
+
+Esempio A
+Input:
+a
+b
+a
+
+Output "Keep unique items":
+a
+b
+
+Output "Remove duplicate lines":
+a
+b
+
+Output "Remove duplicate consecutive lines":
+a
+b
+a
+
+Esempio B
+Input:
+Ciao
+ciao
+CIAO
+
+Output "Keep unique items":
+Ciao
+
+Output "Remove duplicate lines":
+Ciao
+ciao
+CIAO
+
+Output "Remove duplicate consecutive lines":
+Ciao
+ciao
+CIAO
+
+Esempio C
+Input:
+a
+
+
+a
+
+
+Output "Keep unique items":
+a
+
+
+
+Output "Remove duplicate lines":
+a
+
+Output "Remove duplicate consecutive lines":
+a
+
+a
+
+Esempio D (spazi finali e tab)
+Input:
+ciao␠
+ciao\t
+ciao
+CIAO␠
+
+Output "Keep unique items":
+ciao␠
+
+Output "Remove duplicate lines":
+ciao␠
+ciao\t
+ciao
+CIAO␠
+
+Output "Remove duplicate consecutive lines":
+ciao␠
+ciao\t
+ciao
+CIAO␠

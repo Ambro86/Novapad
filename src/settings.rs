@@ -195,6 +195,26 @@ pub struct AppSettings {
     pub rss_removed_default_pt: Vec<String>,
     #[serde(default)]
     pub rss_default_pt_keys: Vec<String>,
+    #[serde(default)]
+    pub rss_global_max_concurrency: usize,
+    #[serde(default)]
+    pub rss_per_host_max_concurrency: usize,
+    #[serde(default)]
+    pub rss_per_host_rps: u32,
+    #[serde(default)]
+    pub rss_per_host_burst: u32,
+    #[serde(default)]
+    pub rss_max_retries: usize,
+    #[serde(default)]
+    pub rss_backoff_max_secs: u64,
+    #[serde(default)]
+    pub rss_initial_page_size: usize,
+    #[serde(default)]
+    pub rss_next_page_size: usize,
+    #[serde(default)]
+    pub rss_max_items_per_feed: usize,
+    #[serde(default)]
+    pub rss_max_excerpt_chars: usize,
 }
 
 impl Default for AppSettings {
@@ -254,6 +274,16 @@ impl Default for AppSettings {
             rss_default_es_keys: Vec::new(),
             rss_removed_default_pt: Vec::new(),
             rss_default_pt_keys: Vec::new(),
+            rss_global_max_concurrency: 8,
+            rss_per_host_max_concurrency: 2,
+            rss_per_host_rps: 1,
+            rss_per_host_burst: 2,
+            rss_max_retries: 4,
+            rss_backoff_max_secs: 120,
+            rss_initial_page_size: 100,
+            rss_next_page_size: 100,
+            rss_max_items_per_feed: 5000,
+            rss_max_excerpt_chars: 512,
         }
     }
 }
@@ -430,6 +460,36 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     }
     if settings.modified_marker_position == ModifiedMarkerPosition::Unknown {
         settings.modified_marker_position = ModifiedMarkerPosition::End;
+    }
+    if settings.rss_global_max_concurrency == 0 {
+        settings.rss_global_max_concurrency = 8;
+    }
+    if settings.rss_per_host_max_concurrency == 0 {
+        settings.rss_per_host_max_concurrency = 2;
+    }
+    if settings.rss_per_host_rps == 0 {
+        settings.rss_per_host_rps = 1;
+    }
+    if settings.rss_per_host_burst == 0 {
+        settings.rss_per_host_burst = 2;
+    }
+    if settings.rss_max_retries == 0 {
+        settings.rss_max_retries = 4;
+    }
+    if settings.rss_backoff_max_secs == 0 {
+        settings.rss_backoff_max_secs = 120;
+    }
+    if settings.rss_initial_page_size == 0 {
+        settings.rss_initial_page_size = 100;
+    }
+    if settings.rss_next_page_size == 0 {
+        settings.rss_next_page_size = 100;
+    }
+    if settings.rss_max_items_per_feed == 0 {
+        settings.rss_max_items_per_feed = 5000;
+    }
+    if settings.rss_max_excerpt_chars == 0 {
+        settings.rss_max_excerpt_chars = 512;
     }
     settings
 }

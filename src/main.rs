@@ -72,7 +72,7 @@ use windows::Win32::UI::Controls::{
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_APPS, VK_CONTROL, VK_ESCAPE,
-    VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F10, VK_RETURN, VK_SHIFT, VK_TAB,
+    VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F10, VK_MENU, VK_RETURN, VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
 use windows::Win32::UI::Shell::{
@@ -690,7 +690,8 @@ fn main() -> windows::core::Result<()> {
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == 'Z' as u32 {
                 let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
                 let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
-                if ctrl_down && !shift_down {
+                let alt_down = (GetKeyState(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
+                if ctrl_down && !shift_down && !alt_down {
                     if let Some(hwnd_edit) = get_active_edit(hwnd) {
                         if GetFocus() == hwnd_edit {
                             if !editor_manager::try_normalize_undo(hwnd) {

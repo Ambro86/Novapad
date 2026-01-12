@@ -1,0 +1,93 @@
+Hướng dẫn chương trình
+
+Tệp:
+Mới: Tạo tài liệu mới (Ctrl+N).
+Mở: Mở các tệp văn bản, PDF, EPUB, MP3 và các định dạng được hỗ trợ khác (Ctrl+O).
+Lưu: Lưu tài liệu (Ctrl+S).
+Lưu mới thành: Lưu với tên mới.
+Lưu tất cả: Lưu tất cả tài liệu (Ctrl+Shift+S).
+Đóng tab: Đóng tài liệu hiện tại (Ctrl+W).
+Tệp gần đây: Mở một tệp gần đây.
+Đọc: F5 Bắt đầu đọc, F4 Tạm dừng/Tiếp tục, F6 Dừng đọc.
+Yêu thích khi đọc: F1 giọng yêu thích trước, F2 giọng yêu thích tiếp theo.
+Ghi sách nói: Tạo tệp MP3 từ văn bản hiện tại (Ctrl+R).
+Ghi podcast: Ghi podcast từ micro và/hoặc âm thanh hệ thống (Ctrl+Shift+R).
+
+Sách nói MP3:
+Khi bạn mở một tệp MP3, Novapad sẽ hoạt động như một trình phát âm thanh.
+Điều khiển bằng bàn phím:
+
+- DẤU CÁCH: Phát / Tạm dừng.
+- MŨI TÊN PHẢI: Tua nhanh 1 phút.
+- MŨI TÊN TRÁI: Tua lùi 1 phút.
+- MŨI TÊN LÊN: Tăng âm lượng.
+- MŨI TÊN XUỐNG: Giảm âm lượng.
+- CTRL+B: Chèn dấu trang tại thời điểm chính xác.
+
+Chỉnh sửa:
+Hoàn tác: Hoàn tác thao tác cuối cùng (Ctrl+Z).
+Cắt: Xóa văn bản đã chọn và sao chép vào bộ nhớ tạm (Ctrl+X).
+Sao chép: Sao chép văn bản đã chọn vào bộ nhớ tạm (Ctrl+C).
+Dán: Dán nội dung từ bộ nhớ tạm vào tài liệu (Ctrl+V).
+Chọn tất cả: Chọn toàn bộ văn bản (Ctrl+A).
+Tìm: Tìm kiếm văn bản trong tài liệu (Ctrl+F).
+Tìm trong tệp: Tìm kiếm văn bản trên nhiều tệp (Ctrl+Shift+F).
+Tìm tiếp: Tìm lần xuất hiện tiếp theo (F3).
+Thay thế: Tìm và thay thế văn bản (Ctrl+H).
+Chuẩn hóa khoảng trắng: Cắt gọn lề dòng và giảm các khoảng trống thừa (Ctrl+Shift+Enter).
+Nối dòng: Ghép các dòng trong đoạn văn hoặc vùng chọn (Ctrl+Shift+J).
+Ngắt dòng cứng: Dàn lại đoạn văn hoặc vùng chọn (Ctrl+Shift+H).
+Xóa thẻ Markdown: Loại bỏ các thẻ Markdown (Ctrl+Shift+M).
+Sắp xếp mục: Sắp xếp các dòng trong đoạn văn hoặc vùng chọn (Alt+Shift+O).
+Giữ mục duy nhất: Xóa các dòng trùng lặp trong đoạn văn hoặc vùng chọn (Alt+Shift+K).
+Đảo ngược mục: Đảo ngược thứ tự các dòng trong đoạn văn hoặc vùng chọn (Alt+Shift+Z).
+Trích dẫn dòng: Thêm tiền tố vào các dòng trong đoạn văn hoặc vùng chọn (Ctrl+Q).
+Bỏ trích dẫn dòng: Xóa tiền tố khỏi các dòng trong đoạn văn hoặc vùng chọn (Ctrl+Shift+Q).
+Thống kê văn bản: Hiển thị số ký tự, số từ và số dòng của vùng chọn hoặc toàn bộ tài liệu (Alt+Y).
+
+Hiển thị:
+Hiển thị giọng nói trong trình soạn thảo: Hiển thị hệ thống giọng nói, danh sách giọng nói và bộ lọc đa ngôn ngữ.
+Hiển thị giọng yêu thích: Hiển thị danh sách giọng nói yêu thích trong trình soạn thảo.
+Màu chữ: Thay đổi màu văn bản (bao gồm màu sáng và màu tối).
+Cỡ chữ: Thay đổi kích thước văn bản (nhỏ, bình thường, lớn, rất lớn, cực lớn).
+Khi danh sách mục đang hiển thị, nhấn Tab để chuyển tiêu điểm giữa trình soạn thảo và các điều khiển, Shift+Tab để chuyển ngược lại.
+Để thêm hoặc xóa một mục khỏi danh sách yêu thích, dùng Tab để chuyển đến danh sách mục và thêm hoặc xóa bằng phím Applications hoặc chuột phải. Trong danh sách mục yêu thích, bạn cũng có thể nhấn phím Applications để xóa các mục đã được thêm.
+Phím tắt: có thể nhấn F1 và F2 để chuyển đổi giữa các mục trong khi đọc, lần lượt duyệt qua các mục đã được thêm vào danh sách yêu thích.
+
+Chèn:
+Chèn dấu trang: Lưu vị trí con trỏ hiện tại hoặc thời điểm của sách nói (Ctrl+B).
+Quản lý dấu trang: Xem, nhảy tới hoặc xóa các dấu trang đã lưu. Khi mở tệp có dấu trang, con trỏ hoặc quá trình phát sẽ tự động tiếp tục từ dấu trang khả dụng đầu tiên.
+
+Công cụ:
+Sách nói hàng loạt: mở cửa sổ để chuyển đổi danh sách tệp (hoặc toàn bộ thư mục) thành sách nói.
+
+- Thêm tệp/thư mục vào hàng đợi.
+- Chọn thư mục đích và định dạng (MP3 hoặc WAV).
+- Tùy chọn tạo thư mục con và tránh ghi đè.
+- Nhấn Start để xử lý tất cả ở chế độ nền.
+  Từ điển: Mở cửa sổ từ điển. Danh sách được điều hướng bằng phím mũi tên Lên/Xuống.
+  Phím Tab di chuyển đến nút "Thêm mục vào từ điển", kích hoạt bằng Enter hoặc Space.
+  Trong cửa sổ thêm/sửa: nhập "Từ gốc", sau đó Tab đến "Từ thay thế", rồi chọn OK hoặc Cancel (Enter/Space). ESC để hủy.
+  Trong danh sách, Tab di chuyển đến "Sửa mục" và "Xóa mục đã chọn".
+  Các thay thế từ điển được áp dụng khi đọc và khi tạo sách nói, và sẽ được lưu lại.
+  Nhập bản chép lời YouTube: dán URL, chọn ngôn ngữ và nhập văn bản vào trình soạn thảo (Ctrl+Y). Có thể chọn kèm mốc thời gian.
+  Terminal hỗ trợ tiếp cận: mở một terminal chuyên dụng với đầu ra ổn định cho trình đọc màn hình (Ctrl+Shift+P).
+  Phím tắt: Alt+I đưa tiêu điểm vào input, Alt+O đưa tiêu điểm vào output, Tab/Shift+Tab di chuyển giữa input, output và các tùy chọn.
+  Enter gửi input. Ctrl+C sao chép output (hoặc gửi Ctrl+C tới chương trình). Ctrl+L xóa output sau khi xác nhận.
+  Tùy chọn terminal: tự động cuộn, loại bỏ ANSI, thông báo dòng mới, phát âm báo sau 1 giây không hoạt động, ngăn chế độ ngủ.
+  Lựa chọn chương trình: Command Prompt (cmd.exe), PowerShell, Codex CLI (trong Tùy chọn).
+
+Tùy chọn:
+Ngôn ngữ: Thay đổi ngôn ngữ giao diện.
+Cách mở: Mở tệp trong thẻ mới hoặc cửa sổ mới.
+Giọng nói: Chọn giọng để đọc.
+Giọng đa ngôn ngữ: Lọc danh sách giọng nói.
+Chọn cao độ, tốc độ và âm lượng: Thiết lập cao độ, tốc độ và âm lượng cho giọng nói (cả Microsoft và SAPI5). Áp dụng cho đọc và sách nói.
+Di chuyển con trỏ khi đọc: Theo dõi trực quan văn bản khi đang được đọc.
+Chia sách nói theo văn bản: Chia khi dấu mốc xuất hiện ở đầu dòng (phân biệt chữ hoa chữ thường: "Chapter" và "chapter" là khác nhau). Ví dụ: với "Chapter", chương trình sẽ tạo một phần cho mỗi chương, bao gồm tác giả và phần giới thiệu trong phần đầu tiên cho đến Chapter đầu tiên. Nếu không tìm thấy, sẽ không chia.
+Các tùy chọn khác để chia sách nói: 2 phần, 4 phần, 6 phần, 8 phần.
+
+Trợ giúp:
+Hướng dẫn: Mở hướng dẫn này.
+Nhật ký thay đổi: Mở cửa sổ nhật ký thay đổi.
+Giới thiệu: Hiển thị thông tin chương trình.

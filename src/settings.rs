@@ -96,6 +96,8 @@ pub enum Language {
     Spanish,
     #[serde(rename = "pt")]
     Portuguese,
+    #[serde(rename = "vi")]
+    Vietnamese,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -407,6 +409,9 @@ fn system_language() -> Language {
         }
         if lower.starts_with("pt") {
             return Language::Portuguese;
+        }
+        if lower.starts_with("vi") {
+            return Language::Vietnamese;
         }
         return Language::English;
     }

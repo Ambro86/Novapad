@@ -213,12 +213,14 @@ unsafe extern "system" fn help_wndproc(
                     Language::English => include_str!("../../guida_en.txt").to_string(),
                     Language::Spanish => include_str!("../../guida_es.txt").to_string(),
                     Language::Portuguese => include_str!("../../guida_pt.txt").to_string(),
+                    Language::Vietnamese => include_str!("../../guida_vi.txt").to_string(),
                 },
                 HelpWindowKind::Changelog => match init.language {
                     Language::Italian => include_str!("../../CHANGELOG_IT.md").to_string(),
                     Language::English => include_str!("../../CHANGELOG.md").to_string(),
                     Language::Spanish => include_str!("../../CHANGELOG_ES.md").to_string(),
                     Language::Portuguese => include_str!("../../CHANGELOG_PT.md").to_string(),
+                    Language::Vietnamese => include_str!("../../CHANGELOG_VI.md").to_string(),
                 },
                 HelpWindowKind::Donations => donations_content(init.language),
             };
@@ -334,5 +336,6 @@ fn donations_content(language: Language) -> String {
         Language::English => DONATIONS_EN.to_string(),
         Language::Spanish => DONATIONS_ES.to_string(),
         Language::Portuguese => DONATIONS_PT.to_string(),
+        Language::Vietnamese => DONATIONS_EN.to_string(),
     }
 }

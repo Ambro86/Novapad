@@ -13,5 +13,4 @@ pub mod podcast_window;
 pub mod podcasts_window;
 pub mod prompt_window;
 pub mod rss_window;
-pub mod tts_tuning_window;
 pub mod youtube_transcript_window;

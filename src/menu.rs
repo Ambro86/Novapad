@@ -147,6 +147,7 @@ pub struct MenuLabels {
     pub edit_find_next: String,
     pub edit_replace: String,
     pub edit_find_in_files: String,
+    pub edit_text_menu: String,
     pub edit_strip_markdown: String,
     pub edit_normalize_whitespace: String,
     pub edit_hard_line_break: String,
@@ -228,6 +229,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         edit_find_next: i18n::tr(language, "edit.find_next"),
         edit_replace: i18n::tr(language, "edit.replace"),
         edit_find_in_files: i18n::tr(language, "edit.find_in_files"),
+        edit_text_menu: i18n::tr(language, "edit.text_menu"),
         edit_strip_markdown: i18n::tr(language, "edit.strip_markdown"),
         edit_normalize_whitespace: i18n::tr(language, "edit.normalize_whitespace"),
         edit_hard_line_break: i18n::tr(language, "edit.hard_line_break"),
@@ -446,78 +448,87 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         &labels.edit_find_next,
     );
     let _ = append_menu_string(edit_menu, MF_STRING, IDM_EDIT_REPLACE, &labels.edit_replace);
+    let _ = AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null());
+    let text_menu = CreateMenu().unwrap_or(HMENU(0));
     let _ = append_menu_string(
-        edit_menu,
+        text_menu,
         MF_STRING,
         IDM_EDIT_STRIP_MARKDOWN,
         &labels.edit_strip_markdown,
     );
     let _ = append_menu_string(
-        edit_menu,
+        text_menu,
         MF_STRING,
         IDM_EDIT_NORMALIZE_WHITESPACE,
         &labels.edit_normalize_whitespace,
     );
     let _ = append_menu_string(
-        edit_menu,
+        text_menu,
         MF_STRING,
         IDM_EDIT_HARD_LINE_BREAK,
         &labels.edit_hard_line_break,
     );
     let _ = append_menu_string(
-        edit_menu,
-        MF_STRING,
-        IDM_EDIT_ORDER_ITEMS,
-        &labels.edit_order_items,
-    );
-    let _ = append_menu_string(
-        edit_menu,
-        MF_STRING,
-        IDM_EDIT_KEEP_UNIQUE_ITEMS,
-        &labels.edit_keep_unique_items,
-    );
-    let _ = append_menu_string(
-        edit_menu,
-        MF_STRING,
-        IDM_EDIT_REVERSE_ITEMS,
-        &labels.edit_reverse_items,
-    );
-    let _ = append_menu_string(
-        edit_menu,
-        MF_STRING,
-        IDM_EDIT_QUOTE_LINES,
-        &labels.edit_quote_lines,
-    );
-    let _ = append_menu_string(
-        edit_menu,
-        MF_STRING,
-        IDM_EDIT_UNQUOTE_LINES,
-        &labels.edit_unquote_lines,
-    );
-    let _ = append_menu_string(
-        edit_menu,
+        text_menu,
         MF_STRING,
         IDM_EDIT_JOIN_LINES,
         &labels.edit_join_lines,
     );
     let _ = append_menu_string(
-        edit_menu,
+        text_menu,
         MF_STRING,
         IDM_EDIT_CLEAN_EOL_HYPHENS,
         &labels.edit_clean_eol_hyphens,
     );
     let _ = append_menu_string(
-        edit_menu,
+        text_menu,
+        MF_STRING,
+        IDM_EDIT_ORDER_ITEMS,
+        &labels.edit_order_items,
+    );
+    let _ = append_menu_string(
+        text_menu,
+        MF_STRING,
+        IDM_EDIT_KEEP_UNIQUE_ITEMS,
+        &labels.edit_keep_unique_items,
+    );
+    let _ = append_menu_string(
+        text_menu,
+        MF_STRING,
+        IDM_EDIT_REVERSE_ITEMS,
+        &labels.edit_reverse_items,
+    );
+    let _ = append_menu_string(
+        text_menu,
+        MF_STRING,
+        IDM_EDIT_QUOTE_LINES,
+        &labels.edit_quote_lines,
+    );
+    let _ = append_menu_string(
+        text_menu,
+        MF_STRING,
+        IDM_EDIT_UNQUOTE_LINES,
+        &labels.edit_unquote_lines,
+    );
+    let _ = append_menu_string(
+        text_menu,
         MF_STRING,
         IDM_EDIT_REMOVE_DUPLICATE_LINES,
         &labels.edit_remove_duplicate_lines,
     );
     let _ = append_menu_string(
-        edit_menu,
+        text_menu,
         MF_STRING,
         IDM_EDIT_REMOVE_DUPLICATE_CONSECUTIVE_LINES,
         &labels.edit_remove_duplicate_consecutive_lines,
     );
+    let _ = append_menu_string(
+        edit_menu,
+        MF_POPUP,
+        text_menu.0 as usize,
+        &labels.edit_text_menu,
+    );
+    let _ = AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null());
     let _ = append_menu_string(
         edit_menu,
         MF_STRING,

@@ -270,6 +270,7 @@ fn default_feed_path(language: crate::settings::Language) -> Option<PathBuf> {
         crate::settings::Language::Italian => "feed_it.txt",
         crate::settings::Language::Spanish => "feed_es.txt",
         crate::settings::Language::Portuguese => "feed_pt.txt",
+        crate::settings::Language::Vietnamese => "feed_en.txt",
     };
     let exe_dir = std::env::current_exe()
         .ok()
@@ -295,6 +296,7 @@ fn embedded_default_feeds(language: crate::settings::Language) -> &'static str {
         crate::settings::Language::Italian => FEED_IT_DATA,
         crate::settings::Language::Spanish => FEED_ES_DATA,
         crate::settings::Language::Portuguese => FEED_PT_DATA,
+        crate::settings::Language::Vietnamese => FEED_EN_DATA,
     }
 }
 
@@ -340,6 +342,10 @@ fn is_default_key(
             .any(|k| normalize_rss_url_key(k) == key),
         crate::settings::Language::Portuguese => settings
             .rss_default_pt_keys
+            .iter()
+            .any(|k| normalize_rss_url_key(k) == key),
+        crate::settings::Language::Vietnamese => settings
+            .rss_default_en_keys
             .iter()
             .any(|k| normalize_rss_url_key(k) == key),
     }
@@ -503,6 +509,12 @@ unsafe fn ensure_default_sources(parent: HWND) {
                 &mut s.settings.rss_sources,
                 &mut s.settings.rss_removed_default_pt,
                 &mut s.settings.rss_default_pt_keys,
+                &defaults,
+            ),
+            crate::settings::Language::Vietnamese => apply_default_sources(
+                &mut s.settings.rss_sources,
+                &mut s.settings.rss_removed_default_en,
+                &mut s.settings.rss_default_en_keys,
                 &defaults,
             ),
         };
@@ -2323,6 +2335,7 @@ unsafe fn handle_delete(hwnd: HWND) {
                         | crate::settings::Language::Italian
                         | crate::settings::Language::Spanish
                         | crate::settings::Language::Portuguese
+                        | crate::settings::Language::Vietnamese
                 ) {
                     let defaults = load_default_feeds(language);
                     if !defaults.is_empty() {
@@ -2347,6 +2360,9 @@ unsafe fn handle_delete(hwnd: HWND) {
                                 }
                                 crate::settings::Language::Portuguese => {
                                     &mut ps.settings.rss_removed_default_pt
+                                }
+                                crate::settings::Language::Vietnamese => {
+                                    &mut ps.settings.rss_removed_default_en
                                 }
                             };
                             let already =

@@ -389,7 +389,6 @@ pub(crate) struct AppState {
     bookmarks_window: HWND,
     dictionary_window: HWND,
     dictionary_entry_dialog: HWND,
-    tts_tuning_dialog: HWND,
     prompt_window: HWND,
     podcast_window: HWND,
     podcast_save_window: HWND,
@@ -550,6 +549,24 @@ fn main() -> windows::core::Result<()> {
             // Priority 1: Global navigation keys (Ctrl+Tab)
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_TAB.0 as u32 {
                 if (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0 {
+                    let options_hwnd =
+                        with_state(hwnd, |state| state.options_dialog).unwrap_or(HWND(0));
+                    if options_hwnd.0 != 0 {
+                        let mut cur = msg.hwnd;
+                        let mut options_target = false;
+                        while cur.0 != 0 {
+                            if cur == options_hwnd {
+                                options_target = true;
+                                break;
+                            }
+                            cur = GetParent(cur);
+                        }
+                        if options_target {
+                            let _ =
+                                app_windows::options_window::handle_navigation(options_hwnd, &msg);
+                            continue;
+                        }
+                    }
                     next_tab_with_prompt(hwnd);
                     continue;
                 }
@@ -722,7 +739,6 @@ fn main() -> windows::core::Result<()> {
                         || state.podcast_window.0 != 0;
                     let secondary_open = secondary_open
                         || state.dictionary_entry_dialog.0 != 0
-                        || state.tts_tuning_dialog.0 != 0
                         || state.go_to_time_dialog.0 != 0;
 
                     if is_audiobook && !secondary_open {
@@ -874,16 +890,6 @@ fn main() -> windows::core::Result<()> {
                         return;
                     }
                     if handle_accessibility(state.batch_audiobooks_window, &msg) {
-                        handled = true;
-                        return;
-                    }
-                }
-
-                if state.tts_tuning_dialog.0 != 0 {
-                    if app_windows::tts_tuning_window::handle_navigation(
-                        state.tts_tuning_dialog,
-                        &msg,
-                    ) {
                         handled = true;
                         return;
                     }
@@ -1130,7 +1136,6 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 bookmarks_window: HWND(0),
                 dictionary_window: HWND(0),
                 dictionary_entry_dialog: HWND(0),
-                tts_tuning_dialog: HWND(0),
                 prompt_window: HWND(0),
                 podcast_window: HWND(0),
                 rss_window: HWND(0),
@@ -3257,7 +3262,7 @@ unsafe fn create_accelerators() -> HACCEL {
         },
         ACCEL {
             fVirt: virt_shift,
-            key: 'P' as u16,
+            key: 'O' as u16,
             cmd: IDM_TOOLS_OPTIONS as u16,
         },
         ACCEL {
@@ -3272,7 +3277,7 @@ unsafe fn create_accelerators() -> HACCEL {
         },
         ACCEL {
             fVirt: virt_shift,
-            key: 'O' as u16,
+            key: 'P' as u16,
             cmd: IDM_TOOLS_PODCASTS as u16,
         },
         ACCEL {

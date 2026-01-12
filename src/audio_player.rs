@@ -1,10 +1,15 @@
-use crate::settings::FileFormat;
+use crate::accessibility::to_wide;
+use crate::settings::{FileFormat, settings_dir};
 use crate::with_state;
 use rodio::{Decoder, OutputStream, Sink, Source};
+use std::ffi::c_void;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::OnceLock;
 use std::time::Duration;
 use windows::Win32::Foundation::HWND;
+use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
+use windows::core::{PCSTR, PCWSTR};
 
 pub struct AudiobookPlayer {
     pub path: PathBuf,
@@ -16,6 +21,242 @@ pub struct AudiobookPlayer {
     pub volume: f32,
     pub muted: bool,
     pub prev_volume: f32,
+    pub speed: f32,
+}
+
+type SoundTouchHandle = *mut c_void;
+type SoundTouchCreate = unsafe extern "C" fn() -> SoundTouchHandle;
+type SoundTouchDestroy = unsafe extern "C" fn(SoundTouchHandle);
+type SoundTouchSetSampleRate = unsafe extern "C" fn(SoundTouchHandle, u32);
+type SoundTouchSetChannels = unsafe extern "C" fn(SoundTouchHandle, u32);
+type SoundTouchSetTempo = unsafe extern "C" fn(SoundTouchHandle, f32);
+type SoundTouchPutSamples = unsafe extern "C" fn(SoundTouchHandle, *const f32, u32);
+type SoundTouchReceiveSamples = unsafe extern "C" fn(SoundTouchHandle, *mut f32, u32) -> u32;
+type SoundTouchFlush = unsafe extern "C" fn(SoundTouchHandle);
+type SoundTouchClear = unsafe extern "C" fn(SoundTouchHandle);
+
+struct SoundTouchApi {
+    _handle: windows::Win32::Foundation::HMODULE,
+    create: SoundTouchCreate,
+    destroy: SoundTouchDestroy,
+    set_sample_rate: SoundTouchSetSampleRate,
+    set_channels: SoundTouchSetChannels,
+    set_tempo: SoundTouchSetTempo,
+    put_samples: SoundTouchPutSamples,
+    receive_samples: SoundTouchReceiveSamples,
+    flush: SoundTouchFlush,
+    clear: SoundTouchClear,
+}
+
+fn load_soundtouch_api() -> Option<&'static SoundTouchApi> {
+    static SOUND_TOUCH: OnceLock<Option<SoundTouchApi>> = OnceLock::new();
+    SOUND_TOUCH
+        .get_or_init(|| unsafe {
+            let dll_name = if cfg!(target_arch = "x86_64") {
+                "SoundTouch-6766862dc3e61fe695b186dfb40dc6b5.dll"
+            } else {
+                "SoundTouch-6766862dc3e61fe695b186dfb40dc6b5.dll"
+            };
+            let dll_path = settings_dir().join(dll_name);
+            let dll_path_wide = to_wide(&dll_path.to_string_lossy());
+            let h = LoadLibraryW(PCWSTR(dll_path_wide.as_ptr())).ok()?;
+            let proc = |name: &str| {
+                let cstr = std::ffi::CString::new(name).ok()?;
+                let addr = GetProcAddress(h, PCSTR(cstr.as_ptr() as *const u8))?;
+                Some(addr)
+            };
+            Some(SoundTouchApi {
+                _handle: h,
+                create: std::mem::transmute(proc("soundtouch_createInstance")?),
+                destroy: std::mem::transmute(proc("soundtouch_destroyInstance")?),
+                set_sample_rate: std::mem::transmute(proc("soundtouch_setSampleRate")?),
+                set_channels: std::mem::transmute(proc("soundtouch_setChannels")?),
+                set_tempo: std::mem::transmute(proc("soundtouch_setTempo")?),
+                put_samples: std::mem::transmute(proc("soundtouch_putSamples")?),
+                receive_samples: std::mem::transmute(proc("soundtouch_receiveSamples")?),
+                flush: std::mem::transmute(proc("soundtouch_flush")?),
+                clear: std::mem::transmute(proc("soundtouch_clear")?),
+            })
+        })
+        .as_ref()
+}
+
+struct SoundTouch {
+    api: SoundTouchApi,
+    handle: SoundTouchHandle,
+    channels: u16,
+}
+
+unsafe impl Send for SoundTouch {}
+
+impl SoundTouch {
+    fn new(sample_rate: u32, channels: u16, tempo: f32) -> Option<Self> {
+        let api = load_soundtouch_api()?;
+        unsafe {
+            let handle = (api.create)();
+            if handle.is_null() {
+                return None;
+            }
+            (api.set_sample_rate)(handle, sample_rate);
+            (api.set_channels)(handle, channels as u32);
+            (api.set_tempo)(handle, tempo);
+            Some(Self {
+                api: SoundTouchApi {
+                    _handle: api._handle,
+                    create: api.create,
+                    destroy: api.destroy,
+                    set_sample_rate: api.set_sample_rate,
+                    set_channels: api.set_channels,
+                    set_tempo: api.set_tempo,
+                    put_samples: api.put_samples,
+                    receive_samples: api.receive_samples,
+                    flush: api.flush,
+                    clear: api.clear,
+                },
+                handle,
+                channels,
+            })
+        }
+    }
+
+    fn put_samples(&self, samples: &[f32], frames: u32) {
+        unsafe {
+            (self.api.put_samples)(self.handle, samples.as_ptr(), frames);
+        }
+    }
+
+    fn receive_samples(&self, out: &mut [f32], max_frames: u32) -> u32 {
+        unsafe { (self.api.receive_samples)(self.handle, out.as_mut_ptr(), max_frames) }
+    }
+
+    fn flush(&self) {
+        unsafe {
+            (self.api.flush)(self.handle);
+        }
+    }
+}
+
+impl Drop for SoundTouch {
+    fn drop(&mut self) {
+        unsafe {
+            (self.api.clear)(self.handle);
+            (self.api.destroy)(self.handle);
+        }
+    }
+}
+
+struct SoundTouchSource<S>
+where
+    S: Source<Item = f32>,
+{
+    input: S,
+    st: SoundTouch,
+    buffer: Vec<f32>,
+    index: usize,
+    finished: bool,
+}
+
+unsafe impl<S> Send for SoundTouchSource<S> where S: Source<Item = f32> + Send {}
+
+impl<S> SoundTouchSource<S>
+where
+    S: Source<Item = f32>,
+{
+    fn try_new(input: S, tempo: f32) -> Result<Self, S> {
+        let channels = input.channels();
+        let sample_rate = input.sample_rate();
+        let st = match SoundTouch::new(sample_rate, channels, tempo) {
+            Some(st) => st,
+            None => return Err(input),
+        };
+        Ok(Self {
+            input,
+            st,
+            buffer: Vec::new(),
+            index: 0,
+            finished: false,
+        })
+    }
+
+    fn refill(&mut self) -> bool {
+        const INPUT_FRAMES: usize = 2048;
+        const OUTPUT_FRAMES: usize = 4096;
+        let channels = self.st.channels as usize;
+
+        self.buffer.clear();
+        self.index = 0;
+
+        if !self.finished {
+            let mut input_samples = Vec::with_capacity(INPUT_FRAMES * channels);
+            while input_samples.len() < INPUT_FRAMES * channels {
+                if let Some(sample) = self.input.next() {
+                    input_samples.push(sample);
+                } else {
+                    break;
+                }
+            }
+            let frames = input_samples.len() / channels;
+            if frames > 0 {
+                self.st.put_samples(&input_samples, frames as u32);
+            } else {
+                self.st.flush();
+                self.finished = true;
+            }
+        } else {
+            self.st.flush();
+        }
+
+        let mut out = vec![0.0f32; OUTPUT_FRAMES * channels];
+        loop {
+            let received = self.st.receive_samples(&mut out, OUTPUT_FRAMES as u32);
+            if received == 0 {
+                break;
+            }
+            let count = received as usize * channels;
+            self.buffer.extend_from_slice(&out[..count]);
+        }
+
+        !self.buffer.is_empty()
+    }
+}
+
+impl<S> Iterator for SoundTouchSource<S>
+where
+    S: Source<Item = f32>,
+{
+    type Item = f32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index >= self.buffer.len() {
+            if !self.refill() {
+                return None;
+            }
+        }
+        let sample = self.buffer[self.index];
+        self.index += 1;
+        Some(sample)
+    }
+}
+
+impl<S> Source for SoundTouchSource<S>
+where
+    S: Source<Item = f32>,
+{
+    fn current_frame_len(&self) -> Option<usize> {
+        None
+    }
+
+    fn channels(&self) -> u16 {
+        self.st.channels
+    }
+
+    fn sample_rate(&self) -> u32 {
+        self.input.sample_rate()
+    }
+
+    fn total_duration(&self) -> Option<Duration> {
+        None
+    }
 }
 
 pub fn parse_time_input(input: &str) -> Result<u64, String> {
@@ -80,51 +321,16 @@ pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
     })
     .unwrap_or(0);
 
-    let hwnd_main = hwnd;
-    std::thread::spawn(move || {
-        let (_stream, handle) = match OutputStream::try_default() {
-            Ok(v) => v,
-            Err(_) => return,
-        };
-        let sink: Arc<Sink> = match Sink::try_new(&handle) {
-            Ok(s) => Arc::new(s),
-            Err(_) => return,
-        };
-
-        let file = match std::fs::File::open(&path_buf) {
-            Ok(f) => f,
-            Err(_) => return,
-        };
-
-        let source: Decoder<_> = match Decoder::new(std::io::BufReader::new(file)) {
-            Ok(s) => s,
-            Err(_) => return,
-        };
-
-        // Salta alla posizione del segnalibro se presente
-        if bookmark_pos > 0 {
-            let skipped = source.skip_duration(std::time::Duration::from_secs(bookmark_pos as u64));
-            sink.append(skipped);
-        } else {
-            sink.append(source);
-        }
-
-        let player = AudiobookPlayer {
-            path: path_buf.clone(),
-            sink: sink.clone(),
-            _stream,
-            is_paused: false,
-            start_instant: std::time::Instant::now(),
-            accumulated_seconds: bookmark_pos as u64,
-            volume: 1.0,
-            muted: false,
-            prev_volume: 1.0,
-        };
-
-        let _ = with_state(hwnd_main, |state| {
-            state.active_audiobook = Some(player);
-        });
-    });
+    start_audiobook_at_with_speed(
+        hwnd,
+        path_buf,
+        bookmark_pos as u64,
+        1.0,
+        false,
+        1.0,
+        false,
+        1.0,
+    );
 }
 
 pub unsafe fn toggle_audiobook_pause(hwnd: HWND) {
@@ -177,46 +383,37 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
             }
             let new_pos = (player.accumulated_seconds as i64 + seconds).max(0);
             player.accumulated_seconds = new_pos as u64;
-            Some((player.path.clone(), new_pos))
+            Some((
+                player.path.clone(),
+                new_pos as u64,
+                player.speed,
+                player.is_paused,
+                player.volume,
+                player.muted,
+                player.prev_volume,
+            ))
         } else {
             None
         }
     })
     .flatten();
 
-    let (path, current_pos) = match result {
+    let (path, current_pos, speed, paused, volume, muted, prev_volume) = match result {
         Some(v) => v,
         None => return,
     };
 
     stop_audiobook_playback(hwnd);
-
-    let hwnd_main = hwnd;
-    std::thread::spawn(move || {
-        let (_stream, handle) = OutputStream::try_default().unwrap();
-        let sink: Arc<Sink> = Arc::new(Sink::try_new(&handle).unwrap());
-        let file = std::fs::File::open(&path).unwrap();
-        let source: Decoder<_> = Decoder::new(std::io::BufReader::new(file)).unwrap();
-
-        let skipped = source.skip_duration(Duration::from_secs(current_pos as u64));
-        sink.append(skipped);
-
-        let player = AudiobookPlayer {
-            path,
-            sink: sink.clone(),
-            _stream,
-            is_paused: false,
-            start_instant: std::time::Instant::now(),
-            accumulated_seconds: current_pos as u64,
-            volume: 1.0,
-            muted: false,
-            prev_volume: 1.0,
-        };
-
-        let _ = with_state(hwnd_main, |state| {
-            state.active_audiobook = Some(player);
-        });
-    });
+    start_audiobook_at_with_speed(
+        hwnd,
+        path,
+        current_pos,
+        speed,
+        paused,
+        volume,
+        muted,
+        prev_volume,
+    );
 }
 
 pub unsafe fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> {
@@ -245,8 +442,25 @@ pub unsafe fn stop_audiobook_playback(hwnd: HWND) {
 pub unsafe fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
     stop_audiobook_playback(hwnd);
     let path_buf = path.to_path_buf();
-    let hwnd_main = hwnd;
+    start_audiobook_at_with_speed(hwnd, path_buf, seconds, 1.0, false, 1.0, false, 1.0);
+}
 
+fn start_audiobook_at_with_speed(
+    hwnd: HWND,
+    path: PathBuf,
+    seconds: u64,
+    speed: f32,
+    paused: bool,
+    volume: f32,
+    muted: bool,
+    prev_volume: f32,
+) {
+    let effective_speed = if (speed - 1.0).abs() > f32::EPSILON && load_soundtouch_api().is_some() {
+        speed
+    } else {
+        1.0
+    };
+    let hwnd_main = hwnd;
     std::thread::spawn(move || {
         let (_stream, handle) = match OutputStream::try_default() {
             Ok(v) => v,
@@ -257,38 +471,61 @@ pub unsafe fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
             Err(_) => return,
         };
 
-        let file = match std::fs::File::open(&path_buf) {
+        let file = match std::fs::File::open(&path) {
             Ok(f) => f,
             Err(_) => return,
         };
 
-        let source: Decoder<_> = match Decoder::new(std::io::BufReader::new(file)) {
+        let base: Decoder<_> = match Decoder::new(std::io::BufReader::new(file)) {
             Ok(s) => s,
             Err(_) => return,
         };
 
-        if seconds > 0 {
-            let skipped = source.skip_duration(std::time::Duration::from_secs(seconds));
-            sink.append(skipped);
+        let source: Box<dyn Source<Item = f32> + Send> = if seconds > 0 {
+            Box::new(
+                base.skip_duration(std::time::Duration::from_secs(seconds))
+                    .convert_samples(),
+            )
+        } else {
+            Box::new(base.convert_samples())
+        };
+
+        if (effective_speed - 1.0).abs() > f32::EPSILON {
+            match SoundTouchSource::try_new(source, effective_speed) {
+                Ok(st_source) => sink.append(st_source),
+                Err(source) => sink.append(source),
+            }
         } else {
             sink.append(source);
         }
 
+        if muted {
+            sink.set_volume(0.0);
+        } else {
+            sink.set_volume(volume);
+        }
+        if paused {
+            sink.pause();
+        }
+
         let player = AudiobookPlayer {
-            path: path_buf.clone(),
+            path,
             sink: sink.clone(),
             _stream,
-            is_paused: false,
+            is_paused: paused,
             start_instant: std::time::Instant::now(),
             accumulated_seconds: seconds,
-            volume: 1.0,
-            muted: false,
-            prev_volume: 1.0,
+            volume,
+            muted,
+            prev_volume,
+            speed: effective_speed,
         };
 
-        let _ = with_state(hwnd_main, |state| {
-            state.active_audiobook = Some(player);
-        });
+        let _ = unsafe {
+            with_state(hwnd_main, |state| {
+                state.active_audiobook = Some(player);
+            })
+        };
     });
 }
 
@@ -303,6 +540,58 @@ pub unsafe fn change_audiobook_volume(hwnd: HWND, delta: f32) {
             player.sink.set_volume(player.volume);
         }
     });
+}
+
+pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) {
+    if load_soundtouch_api().is_none() {
+        return;
+    }
+    let result = with_state(hwnd, |state| {
+        if let Some(player) = state.active_audiobook.take() {
+            let current = if player.is_paused {
+                player.accumulated_seconds
+            } else {
+                player.accumulated_seconds + player.start_instant.elapsed().as_secs()
+            };
+            let new_speed = (player.speed + delta).clamp(0.5, 3.0);
+            player.sink.stop();
+            Some((
+                player.path,
+                current,
+                new_speed,
+                player.is_paused,
+                player.volume,
+                player.muted,
+                player.prev_volume,
+            ))
+        } else {
+            None
+        }
+    })
+    .flatten();
+
+    let (path, current, speed, paused, volume, muted, prev_volume) = match result {
+        Some(v) => v,
+        None => return,
+    };
+
+    start_audiobook_at_with_speed(
+        hwnd,
+        path,
+        current,
+        speed,
+        paused,
+        volume,
+        muted,
+        prev_volume,
+    );
+}
+
+pub unsafe fn audiobook_speed_level(hwnd: HWND) -> Option<f32> {
+    with_state(hwnd, |state| {
+        state.active_audiobook.as_ref().map(|player| player.speed)
+    })
+    .flatten()
 }
 
 pub unsafe fn audiobook_volume_level(hwnd: HWND) -> Option<f32> {

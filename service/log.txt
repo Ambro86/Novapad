@@ -1,36 +1,40 @@
-[2026-01-10 01:18:00] Application started.
-[2026-01-10 01:18:00] MAIN WM_SETFOCUS
-[2026-01-10 01:18:04] Menu: RSS
-[2026-01-10 01:18:05] MAIN WM_SETFOCUS
-[2026-01-10 01:18:05] RSS ESC focus: begin
-[2026-01-10 01:18:05] MAIN WM_SETFOCUS
-[2026-01-10 01:18:05] RSS ESC focus: edit hwnd=HWND(61869450)
-[2026-01-10 01:18:05] MAIN WM_SETFOCUS
-[2026-01-10 01:18:05] RSS ESC focus: final focus=HWND(61869450)
-[2026-01-10 01:18:05] RSS ESC focus: begin
-[2026-01-10 01:18:05] MAIN WM_SETFOCUS
-[2026-01-10 01:18:05] RSS ESC focus: edit hwnd=HWND(61869450)
-[2026-01-10 01:18:05] MAIN WM_SETFOCUS
-[2026-01-10 01:18:05] RSS ESC focus: final focus=HWND(61869450)
-[2026-01-10 01:18:05] FOCUS_EDITOR: begin focus=HWND(61869450)
-[2026-01-10 01:18:05] FOCUS_EDITOR: edit hwnd=HWND(61869450)
-[2026-01-10 01:18:05] FOCUS_EDITOR: end focus=HWND(61869450)
-[2026-01-10 01:18:05] FOCUS_EDITOR: begin focus=HWND(61869450)
-[2026-01-10 01:18:05] FOCUS_EDITOR: edit hwnd=HWND(61869450)
-[2026-01-10 01:18:05] FOCUS_EDITOR: end focus=HWND(61869450)
-[2026-01-10 01:18:05] MAIN WM_TIMER focus retry id=1
-[2026-01-10 01:18:05] FOCUS_EDITOR: begin focus=HWND(61869450)
-[2026-01-10 01:18:05] FOCUS_EDITOR: edit hwnd=HWND(61869450)
-[2026-01-10 01:18:05] FOCUS_EDITOR: end focus=HWND(61869450)
-[2026-01-10 01:18:05] MAIN WM_TIMER focus retry id=2
-[2026-01-10 01:18:05] FOCUS_EDITOR: begin focus=HWND(61869450)
-[2026-01-10 01:18:05] FOCUS_EDITOR: edit hwnd=HWND(61869450)
-[2026-01-10 01:18:05] FOCUS_EDITOR: end focus=HWND(61869450)
-[2026-01-10 01:18:05] MAIN WM_TIMER focus retry id=3
-[2026-01-10 01:18:05] FOCUS_EDITOR: begin focus=HWND(61869450)
-[2026-01-10 01:18:05] FOCUS_EDITOR: edit hwnd=HWND(61869450)
-[2026-01-10 01:18:05] FOCUS_EDITOR: end focus=HWND(61869450)
-[2026-01-10 01:18:06] MAIN WM_TIMER focus retry id=4
-[2026-01-10 01:18:06] FOCUS_EDITOR: begin focus=HWND(61869450)
-[2026-01-10 01:18:06] FOCUS_EDITOR: edit hwnd=HWND(61869450)
-[2026-01-10 01:18:06] FOCUS_EDITOR: end focus=HWND(61869450)
+[2026-01-12 20:13:26] Application started.
+[2026-01-12 20:13:27] Menu: RSS
+[2026-01-12 20:13:41] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-12 20:13:41] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-12 20:13:41] rss_ui_batch start source=2423856829952 append_count=100 loaded_before=0 total_before=0
+[2026-01-12 20:13:41] rss_ui_batch append source=2423856829952 inserted=100 loaded=101 total=141
+[2026-01-12 20:13:41] rss_ui_batch end source=2423856829952 appended=100
+[2026-01-12 20:13:42] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-12 20:13:43] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-12 20:13:44] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-12 20:13:45] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-12 20:13:46] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-12 20:13:47] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
+[2026-01-12 20:13:47] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-12 20:13:47] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
+[2026-01-12 20:13:48] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
+[2026-01-12 20:13:48] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-12 20:13:49] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-12 20:13:49] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
+[2026-01-12 20:13:50] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
+[2026-01-12 20:13:50] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-12 20:13:51] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-12 20:13:51] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
+[2026-01-12 20:13:52] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
+[2026-01-12 20:13:52] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-12 20:13:53] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
+[2026-01-12 20:13:53] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-12 20:13:54] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
+[2026-01-12 20:13:54] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-12 20:13:55] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-12 20:13:55] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
+[2026-01-12 20:13:55] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
+[2026-01-12 20:13:57] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
+[2026-01-12 20:13:58] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
+[2026-01-12 20:13:59] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
+[2026-01-12 20:14:00] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
+[2026-01-12 20:14:01] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
+[2026-01-12 20:14:06] Application started.
+[2026-01-12 20:14:14] rss_action kind=feed action=retry_now override=true host="tributetohe.blogspot.com"
+[2026-01-12 20:14:14] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""

@@ -3,14 +3,19 @@ use std::ffi::OsString;
 use std::os::windows::ffi::OsStringExt;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    VK_DOWN, VK_END, VK_HOME, VK_LEFT, VK_NEXT, VK_PRIOR, VK_RIGHT, VK_SPACE, VK_UP,
+    GetKeyState, VK_CONTROL, VK_DOWN, VK_END, VK_ESCAPE, VK_HOME, VK_LEFT, VK_NEXT, VK_OEM_PERIOD,
+    VK_PRIOR, VK_RIGHT, VK_SPACE, VK_UP,
 };
 use windows::Win32::UI::WindowsAndMessaging::{IsDialogMessageW, MSG, WM_KEYDOWN};
 
-pub enum PlayerAction {
+pub enum PlayerCommand {
     TogglePause,
+    Stop,
     Seek(i64),
     Volume(f32),
+    MuteToggle,
+    GoToTime,
+    AnnounceTime,
     BlockNavigation,
     None,
 }
@@ -66,27 +71,33 @@ pub unsafe fn handle_accessibility(hwnd: HWND, msg: &MSG) -> bool {
 }
 
 /// Handles keyboard accessibility for the player window (Audiobook).
-/// Returns a PlayerAction indicating what the application should do.
-pub fn handle_player_keyboard(msg: &MSG, skip_seconds: u32) -> PlayerAction {
+/// Returns a PlayerCommand indicating what the application should do.
+pub fn handle_player_keyboard(msg: &MSG, skip_seconds: u32) -> PlayerCommand {
     if msg.message == WM_KEYDOWN {
+        let ctrl_down = unsafe { (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0 };
         match msg.wParam.0 as u32 {
-            vk if vk == VK_SPACE.0 as u32 => PlayerAction::TogglePause,
-            vk if vk == VK_LEFT.0 as u32 => PlayerAction::Seek(-(skip_seconds as i64)),
-            vk if vk == VK_RIGHT.0 as u32 => PlayerAction::Seek(skip_seconds as i64),
-            vk if vk == VK_UP.0 as u32 => PlayerAction::Volume(0.1),
-            vk if vk == VK_DOWN.0 as u32 => PlayerAction::Volume(-0.1),
+            vk if ctrl_down && vk == 'T' as u32 => PlayerCommand::GoToTime,
+            vk if ctrl_down && vk == 'I' as u32 => PlayerCommand::AnnounceTime,
+            vk if vk == VK_SPACE.0 as u32 => PlayerCommand::TogglePause,
+            vk if vk == VK_LEFT.0 as u32 => PlayerCommand::Seek(-(skip_seconds as i64)),
+            vk if vk == VK_RIGHT.0 as u32 => PlayerCommand::Seek(skip_seconds as i64),
+            vk if vk == VK_UP.0 as u32 => PlayerCommand::Volume(0.1),
+            vk if vk == VK_DOWN.0 as u32 => PlayerCommand::Volume(-0.1),
+            vk if vk == VK_OEM_PERIOD.0 as u32 => PlayerCommand::Stop,
+            vk if vk == VK_ESCAPE.0 as u32 => PlayerCommand::Stop,
+            vk if vk == 'M' as u32 => PlayerCommand::MuteToggle,
             // Block navigation to prevent screen reader noise
             vk if vk == VK_HOME.0 as u32
                 || vk == VK_END.0 as u32
                 || vk == VK_PRIOR.0 as u32
                 || vk == VK_NEXT.0 as u32 =>
             {
-                PlayerAction::BlockNavigation
+                PlayerCommand::BlockNavigation
             }
-            _ => PlayerAction::None,
+            _ => PlayerCommand::None,
         }
     } else {
-        PlayerAction::None
+        PlayerCommand::None
     }
 }
 

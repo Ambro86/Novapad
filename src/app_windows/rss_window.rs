@@ -1,37 +1,43 @@
-use crate::accessibility::{from_wide, to_wide};
+use crate::accessibility::{from_wide, nvda_speak, to_wide};
 
+use crate::editor_manager;
 use crate::i18n;
+use crate::log_debug;
 use crate::tools::rss::{self, RssItem, RssSource, RssSourceType};
 use crate::with_state;
 use std::collections::{HashMap, HashSet};
 use std::mem;
 use std::path::PathBuf;
+use url::Url;
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::System::DataExchange::COPYDATASTRUCT;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::{
-    NM_RCLICK, NMHDR, NMTREEVIEWW, NMTVKEYDOWN, TVE_EXPAND, TVGN_CARET, TVGN_CHILD, TVHITTESTINFO,
-    TVI_LAST, TVI_ROOT, TVIF_PARAM, TVIF_TEXT, TVINSERTSTRUCTW, TVINSERTSTRUCTW_0,
-    TVITEMEXW_CHILDREN, TVITEMW, TVM_DELETEITEM, TVM_ENSUREVISIBLE, TVM_EXPAND, TVM_GETNEXTITEM,
-    TVM_HITTEST, TVM_INSERTITEMW, TVM_SELECTITEM, TVM_SETITEMW, TVN_ITEMEXPANDINGW, TVN_KEYDOWN,
-    TVN_SELCHANGEDW, WC_BUTTON,
+    NM_RCLICK, NMHDR, NMTREEVIEWW, NMTVKEYDOWN, TVE_EXPAND, TVGN_CARET, TVGN_CHILD, TVGN_NEXT,
+    TVGN_ROOT, TVHITTESTINFO, TVI_LAST, TVI_ROOT, TVIF_PARAM, TVIF_TEXT, TVINSERTSTRUCTW,
+    TVINSERTSTRUCTW_0, TVITEMEXW_CHILDREN, TVITEMW, TVM_DELETEITEM, TVM_ENSUREVISIBLE, TVM_EXPAND,
+    TVM_GETITEMW, TVM_GETNEXTITEM, TVM_HITTEST, TVM_INSERTITEMW, TVM_SELECTITEM, TVM_SETITEMW,
+    TVM_SORTCHILDRENCB, TVN_ITEMEXPANDINGW, TVN_KEYDOWN, TVN_SELCHANGEDW, TVSORTCB, WC_BUTTON,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_APPS, VK_ESCAPE, VK_F10, VK_SHIFT,
+    GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_APPS, VK_ESCAPE, VK_F10, VK_RETURN,
+    VK_SHIFT, VK_TAB,
 };
+use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, BS_DEFPUSHBUTTON, CHILDID_SELF, CREATESTRUCTW, CW_USEDEFAULT, CallWindowProcW,
     CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, DestroyWindow,
-    EVENT_OBJECT_FOCUS, GWLP_USERDATA, GWLP_WNDPROC, GetCursorPos, GetDlgItem, GetParent,
-    GetWindowLongPtrW, GetWindowRect, HMENU, IDYES, KillTimer, MB_ICONQUESTION, MB_YESNO,
-    MF_STRING, MessageBoxW, OBJID_CLIENT, PostMessageW, RegisterClassW, SendMessageW,
-    SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, TrackPopupMenu, WINDOW_STYLE, WM_CLOSE,
-    WM_COMMAND, WM_CONTEXTMENU, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL,
-    WM_NOTIFY, WM_NULL, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SYSKEYDOWN, WM_TIMER, WM_USER,
-    WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_POPUP,
-    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    EVENT_OBJECT_FOCUS, GWLP_USERDATA, GWLP_WNDPROC, GetCursorPos, GetDlgCtrlID, GetDlgItem,
+    GetParent, GetWindowLongPtrW, GetWindowRect, HMENU, IDYES, KillTimer, MB_ICONQUESTION,
+    MB_YESNO, MF_GRAYED, MF_POPUP, MF_STRING, MessageBoxW, OBJID_CLIENT, PostMessageW,
+    RegisterClassW, SW_SHOW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW,
+    TrackPopupMenu, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CREATE, WM_DESTROY,
+    WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_SETFOCUS, WM_SETFONT,
+    WM_SETREDRAW, WM_SYSKEYDOWN, WM_TIMER, WM_USER, WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD,
+    WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -41,6 +47,16 @@ const ID_BTN_ADD: usize = 1002;
 const ID_BTN_CLOSE: usize = 1003;
 const ID_CTX_EDIT: usize = 1101;
 const ID_CTX_DELETE: usize = 1102;
+const ID_CTX_RETRY: usize = 1103;
+const ID_CTX_REORDER_UP: usize = 1301;
+const ID_CTX_REORDER_DOWN: usize = 1302;
+const ID_CTX_REORDER_TOP: usize = 1303;
+const ID_CTX_REORDER_BOTTOM: usize = 1304;
+const ID_CTX_REORDER_POSITION: usize = 1305;
+const ID_CTX_OPEN_BROWSER: usize = 1201;
+const ID_CTX_SHARE_FACEBOOK: usize = 1202;
+const ID_CTX_SHARE_TWITTER: usize = 1203;
+const ID_CTX_SHARE_WHATSAPP: usize = 1204;
 
 const WM_RSS_FETCH_COMPLETE: u32 = WM_USER + 200;
 const WM_RSS_IMPORT_COMPLETE: u32 = WM_USER + 201;
@@ -50,6 +66,9 @@ const WM_CLEAR_ADD_GUARD: u32 = WM_USER + 204;
 pub(crate) const WM_RSS_SHOW_CONTEXT: u32 = WM_USER + 205;
 const ADD_GUARD_TIMER_ID: usize = 1;
 const EM_REPLACESEL: u32 = 0x00C2;
+const REORDER_EDIT_ID: usize = 1401;
+const REORDER_OK_ID: usize = 1402;
+const REORDER_CANCEL_ID: usize = 1403;
 
 const FEED_EN_DATA: &str = include_str!("../../i18n/feed_en.txt");
 const FEED_IT_DATA: &str = include_str!("../../i18n/feed_it.txt");
@@ -91,6 +110,137 @@ fn normalize_rss_url_key(url: &str) -> String {
     s.to_ascii_lowercase()
 }
 
+fn percent_encode(input: &str) -> String {
+    url::form_urlencoded::byte_serialize(input.as_bytes()).collect()
+}
+
+fn is_valid_article_url(url: &str) -> bool {
+    let Ok(parsed) = Url::parse(url) else {
+        return false;
+    };
+    matches!(parsed.scheme(), "http" | "https")
+}
+
+fn open_url_in_browser(url: &str) -> Result<(), String> {
+    let url_wide = to_wide(url);
+    let verb = to_wide("open");
+    unsafe {
+        let result = ShellExecuteW(
+            HWND(0),
+            PCWSTR(verb.as_ptr()),
+            PCWSTR(url_wide.as_ptr()),
+            PCWSTR::null(),
+            PCWSTR::null(),
+            SW_SHOW,
+        );
+        if result.0 as isize <= 32 {
+            return Err(format!("ShellExecute failed ({})", result.0 as isize));
+        }
+    }
+    Ok(())
+}
+
+fn move_vec_to_index<T>(items: &mut Vec<T>, from: usize, to: usize) -> bool {
+    if from >= items.len() {
+        return false;
+    }
+    let target = to.min(items.len().saturating_sub(1));
+    if from == target {
+        return false;
+    }
+    let item = items.remove(from);
+    items.insert(target, item);
+    true
+}
+
+fn rss_item_key(item: &RssItem) -> String {
+    if !item.guid.trim().is_empty() {
+        return item.guid.trim().to_string();
+    }
+    if !item.link.trim().is_empty() {
+        return item.link.trim().to_string();
+    }
+    item.title.trim().to_string()
+}
+
+unsafe extern "system" fn rss_tree_compare(
+    lparam1: LPARAM,
+    lparam2: LPARAM,
+    _lparam_sort: LPARAM,
+) -> i32 {
+    let a = lparam1.0;
+    let b = lparam2.0;
+    a.cmp(&b) as i32
+}
+
+unsafe fn collect_root_items(hwnd_tree: HWND) -> Vec<windows::Win32::UI::Controls::HTREEITEM> {
+    let mut items = Vec::new();
+    let mut current = windows::Win32::UI::Controls::HTREEITEM(
+        SendMessageW(
+            hwnd_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_ROOT as usize),
+            LPARAM(0),
+        )
+        .0,
+    );
+    while current.0 != 0 {
+        items.push(current);
+        current = windows::Win32::UI::Controls::HTREEITEM(
+            SendMessageW(
+                hwnd_tree,
+                TVM_GETNEXTITEM,
+                WPARAM(TVGN_NEXT as usize),
+                LPARAM(current.0),
+            )
+            .0,
+        );
+    }
+    items
+}
+
+unsafe fn apply_root_order(
+    hwnd: HWND,
+    hwnd_tree: HWND,
+    ordered_items: &[windows::Win32::UI::Controls::HTREEITEM],
+) {
+    for (i, hitem) in ordered_items.iter().enumerate() {
+        let mut item = TVITEMW {
+            mask: TVIF_PARAM,
+            lParam: LPARAM(i as isize),
+            ..Default::default()
+        };
+        item.hItem = *hitem;
+        let _ = SendMessageW(
+            hwnd_tree,
+            TVM_SETITEMW,
+            WPARAM(0),
+            LPARAM(&mut item as *mut _ as isize),
+        );
+    }
+    with_rss_state(hwnd, |s| {
+        for (i, hitem) in ordered_items.iter().enumerate() {
+            s.node_data.insert(hitem.0, NodeData::Source(i));
+        }
+    });
+    let mut sort_cb = TVSORTCB {
+        hParent: TVI_ROOT,
+        lpfnCompare: Some(rss_tree_compare),
+        lParam: LPARAM(0),
+    };
+    let _ = SendMessageW(
+        hwnd_tree,
+        TVM_SORTCHILDRENCB,
+        WPARAM(0),
+        LPARAM(&mut sort_cb as *mut _ as isize),
+    );
+}
+
+unsafe fn announce_rss_status(message: &str) {
+    log_debug(&format!("rss_status {}", message));
+    let _ = nvda_speak(message);
+}
+
 unsafe fn rss_page_sizes(parent: HWND) -> (usize, usize) {
     with_state(parent, |s| {
         (
@@ -105,7 +255,7 @@ unsafe fn ensure_rss_http(parent: HWND) {
     let config = with_state(parent, |s| rss::config_from_settings(&s.settings))
         .unwrap_or_else(|| rss::RssHttpConfig::default());
     if let Err(err) = rss::init_http(config) {
-        eprintln!("rss_http_init_error: {}", err);
+        log_debug(&format!("rss_http_init_error: {}", err));
     }
 }
 
@@ -370,6 +520,7 @@ struct RssWindowState {
     source_items: HashMap<isize, SourceItemsState>,
     enter_guard: bool,
     add_guard: bool,
+    reorder_dialog: HWND,
     pending_edit: Option<usize>,
     tree_proc: WNDPROC,
     last_selected: isize,
@@ -450,6 +601,17 @@ pub unsafe fn show_context_menu_from_keyboard(hwnd: HWND) {
     show_rss_context_menu(hwnd, pt.x, pt.y, false);
 }
 
+pub unsafe fn focus_library(hwnd: HWND) {
+    if hwnd.0 == 0 {
+        return;
+    }
+    SetForegroundWindow(hwnd);
+    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+    if hwnd_tree.0 != 0 {
+        SetFocus(hwnd_tree);
+    }
+}
+
 unsafe fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     if hwnd_tree.0 == 0 {
@@ -510,11 +672,14 @@ unsafe fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) 
         return;
     }
 
-    let is_source = with_rss_state(hwnd, |s| {
-        matches!(s.node_data.get(&hitem.0), Some(NodeData::Source(_)))
-    })
-    .unwrap_or(false);
-    if !is_source {
+    let (is_source, source_index, article_item) =
+        with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
+            Some(NodeData::Source(idx)) => (true, Some(*idx), None),
+            Some(NodeData::Item(item)) => (false, None, Some(item.clone())),
+            None => (false, None, None),
+        })
+        .unwrap_or((false, None, None));
+    if !is_source && article_item.is_none() {
         return;
     }
 
@@ -524,21 +689,131 @@ unsafe fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) 
     .unwrap_or_default();
     let edit_label = i18n::tr(language, "rss.context.edit");
     let delete_label = i18n::tr(language, "rss.context.delete");
+    let retry_label = i18n::tr(language, "rss.context.retry_now");
+    let reorder_label = i18n::tr(language, "rss.context.reorder");
+    let reorder_up = i18n::tr(language, "rss.reorder.move_up");
+    let reorder_down = i18n::tr(language, "rss.reorder.move_down");
+    let reorder_top = i18n::tr(language, "rss.reorder.move_top");
+    let reorder_bottom = i18n::tr(language, "rss.reorder.move_bottom");
+    let reorder_position = i18n::tr(language, "rss.reorder.move_to_position");
+    let open_label = i18n::tr(language, "rss.context.open_browser");
+    let facebook_label = i18n::tr(language, "rss.context.share_facebook");
+    let twitter_label = i18n::tr(language, "rss.context.share_twitter");
+    let whatsapp_label = i18n::tr(language, "rss.context.share_whatsapp");
 
     if let Ok(menu) = CreatePopupMenu() {
         if menu.0 != 0 {
-            let _ = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_EDIT,
-                PCWSTR(to_wide(&edit_label).as_ptr()),
-            );
-            let _ = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_DELETE,
-                PCWSTR(to_wide(&delete_label).as_ptr()),
-            );
+            if is_source {
+                let _ = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_EDIT,
+                    PCWSTR(to_wide(&edit_label).as_ptr()),
+                );
+                let _ = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_DELETE,
+                    PCWSTR(to_wide(&delete_label).as_ptr()),
+                );
+                let _ = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_RETRY,
+                    PCWSTR(to_wide(&retry_label).as_ptr()),
+                );
+                if let Some(idx) = source_index {
+                    let total = with_rss_state(hwnd, |s| {
+                        with_state(s.parent, |ps| ps.settings.rss_sources.len())
+                    })
+                    .flatten()
+                    .unwrap_or(0);
+                    let at_top = idx == 0;
+                    let at_bottom = total == 0 || idx + 1 >= total;
+                    if let Ok(submenu) = CreatePopupMenu() {
+                        if submenu.0 != 0 {
+                            let up_flags = if at_top {
+                                MF_STRING | MF_GRAYED
+                            } else {
+                                MF_STRING
+                            };
+                            let down_flags = if at_bottom {
+                                MF_STRING | MF_GRAYED
+                            } else {
+                                MF_STRING
+                            };
+                            let _ = AppendMenuW(
+                                submenu,
+                                up_flags,
+                                ID_CTX_REORDER_UP,
+                                PCWSTR(to_wide(&reorder_up).as_ptr()),
+                            );
+                            let _ = AppendMenuW(
+                                submenu,
+                                down_flags,
+                                ID_CTX_REORDER_DOWN,
+                                PCWSTR(to_wide(&reorder_down).as_ptr()),
+                            );
+                            let _ = AppendMenuW(
+                                submenu,
+                                up_flags,
+                                ID_CTX_REORDER_TOP,
+                                PCWSTR(to_wide(&reorder_top).as_ptr()),
+                            );
+                            let _ = AppendMenuW(
+                                submenu,
+                                down_flags,
+                                ID_CTX_REORDER_BOTTOM,
+                                PCWSTR(to_wide(&reorder_bottom).as_ptr()),
+                            );
+                            let _ = AppendMenuW(
+                                submenu,
+                                MF_STRING,
+                                ID_CTX_REORDER_POSITION,
+                                PCWSTR(to_wide(&reorder_position).as_ptr()),
+                            );
+                            let _ = AppendMenuW(
+                                menu,
+                                MF_POPUP,
+                                submenu.0 as usize,
+                                PCWSTR(to_wide(&reorder_label).as_ptr()),
+                            );
+                        }
+                    }
+                }
+            } else if let Some(item) = article_item {
+                let url = item.link.trim();
+                let valid_url = !url.is_empty() && is_valid_article_url(url);
+                let flags = if valid_url {
+                    MF_STRING
+                } else {
+                    MF_STRING | MF_GRAYED
+                };
+                let _ = AppendMenuW(
+                    menu,
+                    flags,
+                    ID_CTX_OPEN_BROWSER,
+                    PCWSTR(to_wide(&open_label).as_ptr()),
+                );
+                let _ = AppendMenuW(
+                    menu,
+                    flags,
+                    ID_CTX_SHARE_FACEBOOK,
+                    PCWSTR(to_wide(&facebook_label).as_ptr()),
+                );
+                let _ = AppendMenuW(
+                    menu,
+                    flags,
+                    ID_CTX_SHARE_TWITTER,
+                    PCWSTR(to_wide(&twitter_label).as_ptr()),
+                );
+                let _ = AppendMenuW(
+                    menu,
+                    flags,
+                    ID_CTX_SHARE_WHATSAPP,
+                    PCWSTR(to_wide(&whatsapp_label).as_ptr()),
+                );
+            }
             SetForegroundWindow(hwnd);
             let _ = TrackPopupMenu(
                 menu,
@@ -574,6 +849,7 @@ unsafe extern "system" fn rss_wndproc(
                 source_items: HashMap::new(),
                 enter_guard: false,
                 add_guard: false,
+                reorder_dialog: HWND(0),
                 pending_edit: None,
                 tree_proc: None,
                 last_selected: 0,
@@ -667,6 +943,46 @@ unsafe extern "system" fn rss_wndproc(
                 }
                 ID_CTX_DELETE => {
                     handle_delete(hwnd);
+                    LRESULT(0)
+                }
+                ID_CTX_RETRY => {
+                    handle_retry_now(hwnd);
+                    LRESULT(0)
+                }
+                ID_CTX_REORDER_UP => {
+                    handle_reorder_action(hwnd, ReorderAction::Up);
+                    LRESULT(0)
+                }
+                ID_CTX_REORDER_DOWN => {
+                    handle_reorder_action(hwnd, ReorderAction::Down);
+                    LRESULT(0)
+                }
+                ID_CTX_REORDER_TOP => {
+                    handle_reorder_action(hwnd, ReorderAction::Top);
+                    LRESULT(0)
+                }
+                ID_CTX_REORDER_BOTTOM => {
+                    handle_reorder_action(hwnd, ReorderAction::Bottom);
+                    LRESULT(0)
+                }
+                ID_CTX_REORDER_POSITION => {
+                    handle_reorder_action(hwnd, ReorderAction::Position);
+                    LRESULT(0)
+                }
+                ID_CTX_OPEN_BROWSER => {
+                    handle_article_action(hwnd, ArticleAction::OpenInBrowser);
+                    LRESULT(0)
+                }
+                ID_CTX_SHARE_FACEBOOK => {
+                    handle_article_action(hwnd, ArticleAction::ShareFacebook);
+                    LRESULT(0)
+                }
+                ID_CTX_SHARE_TWITTER => {
+                    handle_article_action(hwnd, ArticleAction::ShareTwitter);
+                    LRESULT(0)
+                }
+                ID_CTX_SHARE_WHATSAPP => {
+                    handle_article_action(hwnd, ArticleAction::ShareWhatsApp);
                     LRESULT(0)
                 }
                 _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -946,6 +1262,9 @@ unsafe extern "system" fn rss_wndproc(
                 SendMessageW(h_edit, EM_SETSEL, WPARAM(0), LPARAM(0));
 
                 SetFocus(h_edit);
+                if parent.0 != 0 {
+                    editor_manager::mark_current_document_from_rss(parent, true);
+                }
             }
             LRESULT(0)
         }
@@ -979,6 +1298,201 @@ unsafe extern "system" fn rss_wndproc(
                     );
                     let _ = SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(last));
                 }
+            }
+            LRESULT(0)
+        }
+        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+    }
+}
+
+unsafe extern "system" fn reorder_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    match msg {
+        WM_CREATE => {
+            let cs = lparam.0 as *const CREATESTRUCTW;
+            let init_ptr = (*cs).lpCreateParams as *mut ReorderDialogInit;
+            if init_ptr.is_null() {
+                return LRESULT(0);
+            }
+            SetWindowLongPtrW(hwnd, GWLP_USERDATA, init_ptr as isize);
+            let init = &*init_ptr;
+
+            let language = with_rss_state(init.parent, |s| {
+                with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
+            })
+            .unwrap_or_default();
+            let position_template = i18n::tr(language, "rss.reorder.position_of");
+            let position_text = position_template
+                .replace("{x}", &(init.source_index + 1).to_string())
+                .replace("{n}", &init.total.to_string());
+            let move_label = i18n::tr(language, "rss.reorder.move_to_position");
+            let ok_label = i18n::tr(language, "rss.dialog.ok");
+            let cancel_label = i18n::tr(language, "rss.dialog.cancel");
+
+            let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+            CreateWindowExW(
+                Default::default(),
+                w!("STATIC"),
+                PCWSTR(to_wide(&position_text).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                10,
+                10,
+                330,
+                16,
+                hwnd,
+                HMENU(1),
+                hinstance,
+                None,
+            );
+            CreateWindowExW(
+                Default::default(),
+                w!("STATIC"),
+                PCWSTR(to_wide(&move_label).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                10,
+                36,
+                330,
+                16,
+                hwnd,
+                HMENU(2),
+                hinstance,
+                None,
+            );
+            let edit = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                10,
+                54,
+                120,
+                24,
+                hwnd,
+                HMENU(REORDER_EDIT_ID as isize),
+                hinstance,
+                None,
+            );
+            let _ = SendMessageW(edit, EM_LIMITTEXT, WPARAM(6), LPARAM(0));
+            let ok = CreateWindowExW(
+                Default::default(),
+                w!("BUTTON"),
+                PCWSTR(to_wide(&ok_label).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                170,
+                96,
+                80,
+                24,
+                hwnd,
+                HMENU(REORDER_OK_ID as isize),
+                hinstance,
+                None,
+            );
+            let cancel = CreateWindowExW(
+                Default::default(),
+                w!("BUTTON"),
+                PCWSTR(to_wide(&cancel_label).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                260,
+                96,
+                80,
+                24,
+                hwnd,
+                HMENU(REORDER_CANCEL_ID as isize),
+                hinstance,
+                None,
+            );
+            for control in [edit, ok, cancel] {
+                let prev = SetWindowLongPtrW(
+                    control,
+                    GWLP_WNDPROC,
+                    reorder_control_subclass_proc as isize,
+                );
+                let _ = SetWindowLongPtrW(control, GWLP_USERDATA, prev);
+            }
+            SetFocus(edit);
+            LRESULT(0)
+        }
+        WM_COMMAND => {
+            let id = (wparam.0 & 0xffff) as usize;
+            match id {
+                1 => {
+                    SendMessageW(hwnd, WM_COMMAND, WPARAM(REORDER_OK_ID), LPARAM(0));
+                    LRESULT(0)
+                }
+                REORDER_OK_ID => {
+                    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ReorderDialogInit;
+                    if ptr.is_null() {
+                        return LRESULT(0);
+                    }
+                    let init = &*ptr;
+                    let edit = GetDlgItem(hwnd, REORDER_EDIT_ID as i32);
+                    let len = SendMessageW(
+                        edit,
+                        windows::Win32::UI::WindowsAndMessaging::WM_GETTEXTLENGTH,
+                        WPARAM(0),
+                        LPARAM(0),
+                    )
+                    .0;
+                    let mut buf = vec![0u16; len as usize + 1];
+                    SendMessageW(
+                        edit,
+                        windows::Win32::UI::WindowsAndMessaging::WM_GETTEXT,
+                        WPARAM(buf.len()),
+                        LPARAM(buf.as_mut_ptr() as isize),
+                    );
+                    let text = from_wide(buf.as_ptr());
+                    let language = with_rss_state(init.parent, |s| {
+                        with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
+                    })
+                    .unwrap_or_default();
+                    let pos = match text.trim().parse::<usize>() {
+                        Ok(v) if v > 0 => v,
+                        _ => {
+                            let message = i18n::tr(language, "rss.reorder.invalid_position");
+                            announce_rss_status(&message);
+                            SetFocus(edit);
+                            return LRESULT(0);
+                        }
+                    };
+                    let target = pos.clamp(1, init.total) - 1;
+                    if let Some(new_index) = apply_reorder_action(
+                        init.parent,
+                        init.source_index,
+                        ReorderAction::Position,
+                        target,
+                    ) {
+                        if new_index != init.source_index {
+                            let template = i18n::tr(language, "rss.reorder.moved_position");
+                            let message = template.replace("{x}", &(new_index + 1).to_string());
+                            announce_rss_status(&message);
+                        }
+                    }
+                    let _ = DestroyWindow(hwnd);
+                    LRESULT(0)
+                }
+                REORDER_CANCEL_ID | 2 => {
+                    let _ = DestroyWindow(hwnd);
+                    LRESULT(0)
+                }
+                _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+            }
+        }
+        WM_KEYDOWN => {
+            if wparam.0 as u16 == VK_ESCAPE.0 {
+                SendMessageW(hwnd, WM_COMMAND, WPARAM(REORDER_CANCEL_ID), LPARAM(0));
+                return LRESULT(0);
+            }
+            DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
+        WM_NCDESTROY => {
+            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ReorderDialogInit;
+            if !ptr.is_null() {
+                let init = Box::from_raw(ptr);
+                with_rss_state(init.parent, |s| s.reorder_dialog = HWND(0));
             }
             LRESULT(0)
         }
@@ -1185,11 +1699,22 @@ unsafe fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEIT
         }
     });
 
-    let (url, source_kind, cache, _is_source) = if let Some(info) = item_info_opt.flatten() {
+    let (url, source_kind, mut cache, _is_source) = if let Some(info) = item_info_opt.flatten() {
         info
     } else {
         return;
     };
+    let empty_items = with_rss_state(hwnd, |s| {
+        s.source_items
+            .get(&hitem.0)
+            .map(|state| state.items.is_empty())
+            .unwrap_or(true)
+    })
+    .unwrap_or(true);
+    if empty_items {
+        cache.etag = None;
+        cache.last_modified = None;
+    }
 
     with_rss_state(hwnd, |s| {
         s.pending_fetches.insert(url.clone(), hitem.0);
@@ -1264,6 +1789,7 @@ unsafe fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEIT
             source_kind,
             cache,
             fetch_config,
+            false,
         ));
         let msg = Box::new(FetchResult {
             hitem: hitem.0,
@@ -1280,15 +1806,14 @@ unsafe fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEIT
 
 struct FetchResult {
     hitem: isize,
-    result: Result<rss::RssFetchOutcome, String>,
+    result: Result<rss::RssFetchOutcome, rss::FeedFetchError>,
 }
 
 unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
     let hitem = windows::Win32::UI::Controls::HTREEITEM(res.hitem);
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
 
-    // Preserve selection if it is a child of this item
-    let selected = windows::Win32::UI::Controls::HTREEITEM(
+    let caret = windows::Win32::UI::Controls::HTREEITEM(
         SendMessageW(
             hwnd_tree,
             TVM_GETNEXTITEM,
@@ -1297,48 +1822,6 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
         )
         .0,
     );
-    let mut selected_idx = None;
-    if selected.0 != 0 {
-        // Check if selected is child of hitem
-        let parent_of_selected = windows::Win32::UI::Controls::HTREEITEM(
-            SendMessageW(
-                hwnd_tree,
-                TVM_GETNEXTITEM,
-                WPARAM(windows::Win32::UI::Controls::TVGN_PARENT as usize),
-                LPARAM(selected.0),
-            )
-            .0,
-        );
-        if parent_of_selected == hitem {
-            // It is a child. Find its index.
-            let mut idx = 0;
-            let mut child = windows::Win32::UI::Controls::HTREEITEM(
-                SendMessageW(
-                    hwnd_tree,
-                    TVM_GETNEXTITEM,
-                    WPARAM(TVGN_CHILD as usize),
-                    LPARAM(hitem.0),
-                )
-                .0,
-            );
-            while child.0 != 0 {
-                if child == selected {
-                    selected_idx = Some(idx);
-                    break;
-                }
-                child = windows::Win32::UI::Controls::HTREEITEM(
-                    SendMessageW(
-                        hwnd_tree,
-                        TVM_GETNEXTITEM,
-                        WPARAM(windows::Win32::UI::Controls::TVGN_NEXT as usize),
-                        LPARAM(child.0),
-                    )
-                    .0,
-                );
-                idx += 1;
-            }
-        }
-    }
 
     match res.result {
         Ok(outcome) => {
@@ -1360,6 +1843,7 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                 if let Some(i) = idx {
                     let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
                     let mut final_title = outcome.title.clone();
+                    let allow_title_update = caret != hitem;
                     with_state(parent, |ps| {
                         let lang = ps.settings.language;
                         let (_key, keep_default_title) = ps
@@ -1390,109 +1874,196 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                         crate::settings::save_settings(ps.settings.clone());
                     });
 
-                    let title_wide = to_wide(&final_title);
-                    let mut tvi = TVITEMW {
-                        mask: TVIF_TEXT,
-                        hItem: hitem,
-                        pszText: windows::core::PWSTR(title_wide.as_ptr() as *mut _),
-                        ..Default::default()
-                    };
-                    SendMessageW(
-                        hwnd_tree,
-                        TVM_SETITEMW,
-                        WPARAM(0),
-                        LPARAM(&mut tvi as *mut _ as isize),
-                    );
+                    if allow_title_update {
+                        let title_wide = to_wide(&final_title);
+                        let mut tvi = TVITEMW {
+                            mask: TVIF_TEXT,
+                            hItem: hitem,
+                            pszText: windows::core::PWSTR(title_wide.as_ptr() as *mut _),
+                            ..Default::default()
+                        };
+                        SendMessageW(
+                            hwnd_tree,
+                            TVM_SETITEMW,
+                            WPARAM(0),
+                            LPARAM(&mut tvi as *mut _ as isize),
+                        );
+                    }
                 }
             }
 
             if outcome.not_modified {
-                return;
-            }
-
-            loop {
-                let child = SendMessageW(
-                    hwnd_tree,
-                    TVM_GETNEXTITEM,
-                    WPARAM(TVGN_CHILD as usize),
-                    LPARAM(hitem.0),
-                );
-                if child.0 == 0 {
-                    break;
-                }
-                SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
-            }
-            with_rss_state(hwnd, |s| {
-                s.source_items.remove(&hitem.0);
-            });
-
-            with_rss_state(hwnd, |s| {
-                s.source_items.insert(
-                    hitem.0,
-                    SourceItemsState {
-                        items: outcome.items,
-                        loaded: 0,
-                    },
-                );
-            });
-            let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-            let (initial_count, _next_count) = rss_page_sizes(parent);
-            let inserted = load_more_items(hwnd, hitem, initial_count);
-
-            // Force expansion/visibility now that children are populated.
-            // This prevents cases where the node appears to expand only after moving selection.
-            SendMessageW(
-                hwnd_tree,
-                TVM_EXPAND,
-                WPARAM(TVE_EXPAND.0 as usize),
-                LPARAM(hitem.0),
-            );
-            SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(hitem.0));
-
-            // Restore selection only if focus stays on this tree item.
-            if let Some(idx) = selected_idx {
-                let focused = GetFocus();
-                let caret = windows::Win32::UI::Controls::HTREEITEM(
-                    SendMessageW(
-                        hwnd_tree,
-                        TVM_GETNEXTITEM,
-                        WPARAM(TVGN_CARET as usize),
-                        LPARAM(0),
-                    )
-                    .0,
-                );
-                if focused == hwnd_tree && caret == hitem && idx < inserted {
-                    // specific restoration might be hard because handlers changed.
-                    // We can try to find the Nth child.
-                    let mut child = SendMessageW(
+                let has_items = with_rss_state(hwnd, |s| {
+                    s.source_items
+                        .get(&hitem.0)
+                        .map(|state| !state.items.is_empty())
+                        .unwrap_or(false)
+                })
+                .unwrap_or(false);
+                if !has_items {
+                    let child = SendMessageW(
                         hwnd_tree,
                         TVM_GETNEXTITEM,
                         WPARAM(TVGN_CHILD as usize),
                         LPARAM(hitem.0),
                     );
-                    for _ in 0..idx {
-                        if child.0 == 0 {
-                            break;
-                        }
-                        child = SendMessageW(
-                            hwnd_tree,
-                            TVM_GETNEXTITEM,
-                            WPARAM(windows::Win32::UI::Controls::TVGN_NEXT as usize),
-                            LPARAM(child.0),
-                        );
-                    }
                     if child.0 != 0 {
-                        SendMessageW(
+                        let mut item = TVITEMW {
+                            mask: TVIF_TEXT,
+                            hItem: windows::Win32::UI::Controls::HTREEITEM(child.0),
+                            pszText: windows::core::PWSTR::null(),
+                            cchTextMax: 0,
+                            ..Default::default()
+                        };
+                        let _ = SendMessageW(
                             hwnd_tree,
-                            TVM_SELECTITEM,
-                            WPARAM(TVGN_CARET as usize),
-                            LPARAM(child.0),
+                            TVM_GETITEMW,
+                            WPARAM(0),
+                            LPARAM(&mut item as *mut _ as isize),
                         );
+                        let mut buf = vec![0u16; 64];
+                        item.pszText = windows::core::PWSTR(buf.as_mut_ptr());
+                        item.cchTextMax = buf.len() as i32;
+                        if SendMessageW(
+                            hwnd_tree,
+                            TVM_GETITEMW,
+                            WPARAM(0),
+                            LPARAM(&mut item as *mut _ as isize),
+                        )
+                        .0 != 0
+                        {
+                            let text = from_wide(buf.as_ptr());
+                            if text.trim() == "Loading..." {
+                                let _ = SendMessageW(
+                                    hwnd_tree,
+                                    TVM_DELETEITEM,
+                                    WPARAM(0),
+                                    LPARAM(child.0),
+                                );
+                            }
+                        }
                     }
                 }
+                return;
+            }
+
+            let mut appended = 0usize;
+            let mut loaded_before = 0usize;
+            let mut total_before = 0usize;
+            let existing =
+                with_rss_state(hwnd, |s| s.source_items.get(&hitem.0).is_some()).unwrap_or(false);
+            if existing {
+                with_rss_state(hwnd, |s| {
+                    let Some(state) = s.source_items.get_mut(&hitem.0) else {
+                        return;
+                    };
+                    loaded_before = state.loaded;
+                    total_before = state.items.len();
+                    let mut seen: HashSet<String> = state.items.iter().map(rss_item_key).collect();
+                    for item in outcome.items {
+                        let key = rss_item_key(&item);
+                        if seen.insert(key) {
+                            state.items.push(item);
+                            appended += 1;
+                        }
+                    }
+                });
+                if appended > 0 {
+                    log_debug(&format!(
+                        "rss_ui_batch start source={} append_count={} loaded_before={} total_before={}",
+                        hitem.0, appended, loaded_before, total_before
+                    ));
+                    if loaded_before >= total_before {
+                        let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                        let (_initial_count, next_count) = rss_page_sizes(parent);
+                        let _ = load_more_items(hwnd, hitem, next_count);
+                    }
+                    log_debug(&format!(
+                        "rss_ui_batch end source={} appended={}",
+                        hitem.0, appended
+                    ));
+                }
+            } else {
+                loop {
+                    let child = SendMessageW(
+                        hwnd_tree,
+                        TVM_GETNEXTITEM,
+                        WPARAM(TVGN_CHILD as usize),
+                        LPARAM(hitem.0),
+                    );
+                    if child.0 == 0 {
+                        break;
+                    }
+                    SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
+                }
+                with_rss_state(hwnd, |s| {
+                    s.source_items.insert(
+                        hitem.0,
+                        SourceItemsState {
+                            items: outcome.items,
+                            loaded: 0,
+                        },
+                    );
+                });
+                let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                let (initial_count, _next_count) = rss_page_sizes(parent);
+                log_debug(&format!(
+                    "rss_ui_batch start source={} append_count={} loaded_before=0 total_before=0",
+                    hitem.0, initial_count
+                ));
+                let inserted = load_more_items(hwnd, hitem, initial_count);
+                log_debug(&format!(
+                    "rss_ui_batch end source={} appended={}",
+                    hitem.0, inserted
+                ));
             }
         }
         Err(e) => {
+            let (message, cache) = match e {
+                rss::FeedFetchError::InCooldown { kind, cache, .. } => (
+                    format!("Feed temporarily blocked/cooldown ({kind}). Try again later."),
+                    Some(cache),
+                ),
+                rss::FeedFetchError::HttpStatus {
+                    status,
+                    kind,
+                    cache,
+                } => (format!("Feed error {status} ({kind})."), Some(cache)),
+                rss::FeedFetchError::Network { message, cache } => {
+                    (format!("Error: {message}"), Some(cache))
+                }
+            };
+
+            let is_source_node = with_rss_state(hwnd, |s| {
+                s.node_data.contains_key(&hitem.0)
+                    && matches!(s.node_data[&hitem.0], NodeData::Source(_))
+            })
+            .unwrap_or(false);
+            if is_source_node {
+                let idx = with_rss_state(hwnd, |s| {
+                    if let NodeData::Source(i) = s.node_data[&hitem.0] {
+                        Some(i)
+                    } else {
+                        None
+                    }
+                })
+                .flatten();
+                if let (Some(i), Some(cache)) = (idx, cache) {
+                    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                    with_state(parent, |ps| {
+                        if let Some(src) = ps.settings.rss_sources.get_mut(i) {
+                            src.cache = cache;
+                        }
+                        crate::settings::save_settings(ps.settings.clone());
+                    });
+                }
+            }
+
+            let has_items =
+                with_rss_state(hwnd, |s| s.source_items.get(&hitem.0).is_some()).unwrap_or(false);
+            if has_items {
+                return;
+            }
             loop {
                 let child = SendMessageW(
                     hwnd_tree,
@@ -1508,10 +2079,7 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
             with_rss_state(hwnd, |s| {
                 s.source_items.remove(&hitem.0);
             });
-            if e.to_ascii_lowercase().contains("resource limit") {
-                return;
-            }
-            let text = to_wide(&format!("Error: {}", e));
+            let text = to_wide(&message);
             let mut tvis = TVINSERTSTRUCTW {
                 hParent: hitem,
                 hInsertAfter: TVI_LAST,
@@ -1610,12 +2178,12 @@ unsafe fn load_more_items(
         return 0;
     }
     let _ = SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(0), LPARAM(0));
-    let inserted = with_rss_state(hwnd, |s| {
+    let (inserted, loaded_after, total_after) = with_rss_state(hwnd, |s| {
         let Some(state) = s.source_items.get_mut(&hitem.0) else {
-            return 0;
+            return (0usize, 0usize, 0usize);
         };
         if state.loaded >= state.items.len() {
-            return 0;
+            return (0usize, state.loaded, state.items.len());
         }
         let mut inserted = 0usize;
         let mut idx = state.loaded;
@@ -1650,10 +2218,16 @@ unsafe fn load_more_items(
             inserted += 1;
         }
         state.loaded = idx;
-        inserted
+        (inserted, state.loaded, state.items.len())
     })
-    .unwrap_or(0);
+    .unwrap_or((0usize, 0usize, 0usize));
     let _ = SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(1), LPARAM(0));
+    if inserted > 0 {
+        log_debug(&format!(
+            "rss_ui_batch append source={} inserted={} loaded={} total={}",
+            hitem.0, inserted, loaded_after, total_after
+        ));
+    }
     inserted
 }
 
@@ -1847,6 +2421,300 @@ unsafe fn handle_edit_source(hwnd: HWND) {
     show_add_dialog_with_prefill(hwnd, title, url);
 }
 
+unsafe fn handle_retry_now(hwnd: HWND) {
+    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+    let hitem = windows::Win32::UI::Controls::HTREEITEM(
+        SendMessageW(
+            hwnd_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_CARET as usize),
+            LPARAM(0),
+        )
+        .0,
+    );
+    if hitem.0 == 0 {
+        return;
+    }
+
+    let source_info = with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
+        Some(NodeData::Source(idx)) => with_state(s.parent, |ps| {
+            ps.settings
+                .rss_sources
+                .get(*idx)
+                .map(|src| (src.url.clone(), src.kind.clone(), src.cache.clone()))
+        })
+        .flatten(),
+        _ => None,
+    })
+    .flatten();
+
+    let Some((url, source_kind, cache)) = source_info else {
+        return;
+    };
+    if url.trim().is_empty() {
+        return;
+    }
+
+    let host = Url::parse(&url)
+        .ok()
+        .and_then(|u| u.host_str().map(|h| h.to_string()))
+        .unwrap_or_default();
+    log_debug(&format!(
+        "rss_action kind=feed action=retry_now override=true host=\"{}\"",
+        host
+    ));
+
+    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    let fetch_config = if parent.0 != 0 {
+        rss_fetch_config(parent)
+    } else {
+        rss::RssFetchConfig::default()
+    };
+    if parent.0 != 0 {
+        ensure_rss_http(parent);
+    }
+
+    let url_clone = url.clone();
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let res = rt.block_on(rss::fetch_and_parse(
+            &url_clone,
+            source_kind,
+            cache,
+            fetch_config,
+            true,
+        ));
+        let msg = Box::new(FetchResult {
+            hitem: hitem.0,
+            result: res,
+        });
+        let _ = PostMessageW(
+            hwnd,
+            WM_RSS_FETCH_COMPLETE,
+            WPARAM(0),
+            LPARAM(Box::into_raw(msg) as isize),
+        );
+    });
+}
+
+#[derive(Clone, Copy)]
+enum ReorderAction {
+    Up,
+    Down,
+    Top,
+    Bottom,
+    Position,
+}
+
+#[derive(Clone, Copy)]
+struct ReorderDialogInit {
+    parent: HWND,
+    source_index: usize,
+    total: usize,
+}
+
+unsafe fn selected_source_index(hwnd: HWND) -> Option<usize> {
+    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+    if hwnd_tree.0 == 0 {
+        return None;
+    }
+    let hitem = windows::Win32::UI::Controls::HTREEITEM(
+        SendMessageW(
+            hwnd_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_CARET as usize),
+            LPARAM(0),
+        )
+        .0,
+    );
+    if hitem.0 == 0 {
+        return None;
+    }
+    with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
+        Some(NodeData::Source(idx)) => Some(*idx),
+        _ => None,
+    })
+    .flatten()
+}
+
+unsafe fn apply_reorder_action(
+    hwnd: HWND,
+    source_index: usize,
+    action: ReorderAction,
+    target_index: usize,
+) -> Option<usize> {
+    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    if hwnd_tree.0 == 0 || parent.0 == 0 {
+        return None;
+    }
+    let mut root_items = collect_root_items(hwnd_tree);
+    if source_index >= root_items.len() {
+        return None;
+    }
+    let new_index = with_state(parent, |ps| {
+        let moved = match action {
+            ReorderAction::Up => crate::settings::move_rss_feed_up(&mut ps.settings, source_index),
+            ReorderAction::Down => {
+                crate::settings::move_rss_feed_down(&mut ps.settings, source_index)
+            }
+            ReorderAction::Top => {
+                crate::settings::move_rss_feed_to_top(&mut ps.settings, source_index)
+            }
+            ReorderAction::Bottom => {
+                crate::settings::move_rss_feed_to_bottom(&mut ps.settings, source_index)
+            }
+            ReorderAction::Position => crate::settings::move_rss_feed_to_index(
+                &mut ps.settings,
+                source_index,
+                target_index,
+            ),
+        };
+        if moved.is_some() {
+            crate::settings::save_settings(ps.settings.clone());
+        }
+        moved
+    })
+    .flatten();
+    let Some(new_index) = new_index else {
+        return None;
+    };
+    if move_vec_to_index(&mut root_items, source_index, new_index) {
+        apply_root_order(hwnd, hwnd_tree, &root_items);
+    }
+    Some(new_index)
+}
+
+unsafe fn handle_reorder_action(hwnd: HWND, action: ReorderAction) {
+    let Some(source_index) = selected_source_index(hwnd) else {
+        return;
+    };
+    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
+    let total = with_state(parent, |ps| ps.settings.rss_sources.len()).unwrap_or(0);
+    if total == 0 {
+        return;
+    }
+    if matches!(action, ReorderAction::Position) {
+        show_reorder_dialog(hwnd, source_index, total);
+        return;
+    }
+    let new_index = match action {
+        ReorderAction::Up => apply_reorder_action(hwnd, source_index, action, 0),
+        ReorderAction::Down => apply_reorder_action(hwnd, source_index, action, 0),
+        ReorderAction::Top => apply_reorder_action(hwnd, source_index, action, 0),
+        ReorderAction::Bottom => apply_reorder_action(hwnd, source_index, action, 0),
+        ReorderAction::Position => None,
+    };
+    if let Some(new_index) = new_index {
+        if new_index != source_index {
+            let template = i18n::tr(language, "rss.reorder.moved_position");
+            let message = template.replace("{x}", &(new_index + 1).to_string());
+            announce_rss_status(&message);
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum ArticleAction {
+    OpenInBrowser,
+    ShareFacebook,
+    ShareTwitter,
+    ShareWhatsApp,
+}
+
+unsafe fn selected_article_item(hwnd: HWND) -> Option<RssItem> {
+    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+    if hwnd_tree.0 == 0 {
+        return None;
+    }
+    let hitem = windows::Win32::UI::Controls::HTREEITEM(
+        SendMessageW(
+            hwnd_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_CARET as usize),
+            LPARAM(0),
+        )
+        .0,
+    );
+    if hitem.0 == 0 {
+        return None;
+    }
+    with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
+        Some(NodeData::Item(item)) => Some(item.clone()),
+        _ => None,
+    })
+    .flatten()
+}
+
+unsafe fn handle_article_action(hwnd: HWND, action: ArticleAction) {
+    let Some(item) = selected_article_item(hwnd) else {
+        log_debug("rss_action kind=article action=unavailable reason=no_article");
+        return;
+    };
+    let url = item.link.trim().to_string();
+    if !is_valid_article_url(&url) {
+        log_debug("rss_action kind=article action=unavailable reason=invalid_url");
+        return;
+    }
+    let title = item.title.trim().to_string();
+    let share_url = match action {
+        ArticleAction::OpenInBrowser => {
+            log_debug(&format!(
+                "rss_action kind=article action=open_in_browser url=\"{}\"",
+                url
+            ));
+            url.clone()
+        }
+        ArticleAction::ShareFacebook => {
+            log_debug(&format!(
+                "rss_action kind=article action=share_facebook url=\"{}\"",
+                url
+            ));
+            format!(
+                "https://www.facebook.com/sharer/sharer.php?u={}",
+                percent_encode(&url)
+            )
+        }
+        ArticleAction::ShareTwitter => {
+            log_debug(&format!(
+                "rss_action kind=article action=share_twitter url=\"{}\"",
+                url
+            ));
+            let mut share = format!(
+                "https://twitter.com/intent/tweet?url={}",
+                percent_encode(&url)
+            );
+            if !title.is_empty() {
+                share.push_str("&text=");
+                share.push_str(&percent_encode(&title));
+            }
+            share
+        }
+        ArticleAction::ShareWhatsApp => {
+            log_debug(&format!(
+                "rss_action kind=article action=share_whatsapp url=\"{}\"",
+                url
+            ));
+            let text = if title.is_empty() {
+                url.clone()
+            } else {
+                format!("{}\n{}", title, url)
+            };
+            format!("https://wa.me/?text={}", percent_encode(&text))
+        }
+    };
+    if let Err(err) = open_url_in_browser(&share_url) {
+        log_debug(&format!(
+            "rss_action kind=article action=browser_error error=\"{}\"",
+            err
+        ));
+    }
+}
+
 unsafe fn force_focus_editor_on_parent(parent: HWND) {
     if parent.0 == 0 {
         return;
@@ -1949,6 +2817,120 @@ fn collapse_blank_lines(input: &str) -> String {
     // If the input ended without a newline, `lines()` won't tell us that.
     // Keep behavior stable by not forcing an extra newline when the output is empty.
     if out.is_empty() { String::new() } else { out }
+}
+
+unsafe fn show_reorder_dialog(parent_hwnd: HWND, source_index: usize, total: usize) {
+    let existing = with_rss_state(parent_hwnd, |s| s.reorder_dialog).unwrap_or(HWND(0));
+    if existing.0 != 0 {
+        SetForegroundWindow(existing);
+        return;
+    }
+    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+    let class_name = to_wide("NovapadRssReorder");
+    let wc = WNDCLASSW {
+        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+            windows::Win32::UI::WindowsAndMessaging::LoadCursorW(
+                None,
+                windows::Win32::UI::WindowsAndMessaging::IDC_ARROW,
+            )
+            .unwrap_or_default()
+            .0,
+        ),
+        hInstance: hinstance,
+        lpszClassName: PCWSTR(class_name.as_ptr()),
+        lpfnWndProc: Some(reorder_wndproc),
+        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+        ..Default::default()
+    };
+    RegisterClassW(&wc);
+
+    let language = with_rss_state(parent_hwnd, |s| {
+        with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
+    })
+    .unwrap_or_default();
+    let title = i18n::tr(language, "rss.context.reorder");
+    let init_ptr = Box::into_raw(Box::new(ReorderDialogInit {
+        parent: parent_hwnd,
+        source_index,
+        total,
+    }));
+    let hwnd = CreateWindowExW(
+        WS_EX_DLGMODALFRAME,
+        PCWSTR(class_name.as_ptr()),
+        PCWSTR(to_wide(&title).as_ptr()),
+        WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_POPUP,
+        CW_USEDEFAULT,
+        CW_USEDEFAULT,
+        360,
+        160,
+        parent_hwnd,
+        None,
+        hinstance,
+        Some(init_ptr as *const _),
+    );
+    if hwnd.0 == 0 {
+        let _ = Box::from_raw(init_ptr);
+        return;
+    }
+    with_rss_state(parent_hwnd, |s| s.reorder_dialog = hwnd);
+}
+
+unsafe extern "system" fn reorder_control_subclass_proc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    if msg == windows::Win32::UI::WindowsAndMessaging::WM_CHAR {
+        if wparam.0 as u16 == VK_TAB.0 {
+            return LRESULT(0);
+        }
+    }
+    if msg == WM_KEYDOWN {
+        let id = GetDlgCtrlID(hwnd) as usize;
+        let parent = GetParent(hwnd);
+        let edit = GetDlgItem(parent, REORDER_EDIT_ID as i32);
+        let ok = GetDlgItem(parent, REORDER_OK_ID as i32);
+        let cancel = GetDlgItem(parent, REORDER_CANCEL_ID as i32);
+        if wparam.0 as u16 == VK_TAB.0 {
+            let shift = (GetKeyState(VK_SHIFT.0 as i32) & 0x8000u16 as i16) != 0;
+            let next = if shift {
+                if id == REORDER_EDIT_ID {
+                    cancel
+                } else if id == REORDER_CANCEL_ID {
+                    ok
+                } else {
+                    edit
+                }
+            } else if id == REORDER_EDIT_ID {
+                ok
+            } else if id == REORDER_OK_ID {
+                cancel
+            } else {
+                edit
+            };
+            SetFocus(next);
+            return LRESULT(0);
+        }
+        if wparam.0 as u16 == VK_RETURN.0 {
+            let target = if id == REORDER_CANCEL_ID {
+                REORDER_CANCEL_ID
+            } else {
+                REORDER_OK_ID
+            };
+            SendMessageW(parent, WM_COMMAND, WPARAM(target), LPARAM(0));
+            return LRESULT(0);
+        }
+        if wparam.0 as u16 == VK_ESCAPE.0 {
+            SendMessageW(parent, WM_COMMAND, WPARAM(REORDER_CANCEL_ID), LPARAM(0));
+            return LRESULT(0);
+        }
+    }
+    let prev = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+    if prev == 0 {
+        return DefWindowProcW(hwnd, msg, wparam, lparam);
+    }
+    CallWindowProcW(Some(std::mem::transmute(prev)), hwnd, msg, wparam, lparam)
 }
 
 unsafe fn show_add_dialog(parent_hwnd: HWND) {

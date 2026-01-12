@@ -6,8 +6,9 @@ use crate::with_state;
 use std::path::Path;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::{
-    AppendMenuW, CreateMenu, DeleteMenu, DrawMenuBar, GetMenuItemCount, HMENU, MENU_ITEM_FLAGS,
-    MF_BYPOSITION, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, SetMenu,
+    AppendMenuW, CreateMenu, DeleteMenu, DestroyMenu, DrawMenuBar, GetMenu, GetMenuItemCount,
+    HMENU, InsertMenuW, MENU_ITEM_FLAGS, MF_BYCOMMAND, MF_BYPOSITION, MF_GRAYED, MF_POPUP,
+    MF_SEPARATOR, MF_STRING, SetMenu,
 };
 use windows::core::PCWSTR;
 
@@ -47,6 +48,15 @@ pub const IDM_EDIT_JOIN_LINES: usize = 2019;
 pub const IDM_EDIT_CLEAN_EOL_HYPHENS: usize = 2020;
 pub const IDM_EDIT_REMOVE_DUPLICATE_LINES: usize = 2021;
 pub const IDM_EDIT_REMOVE_DUPLICATE_CONSECUTIVE_LINES: usize = 2022;
+pub const IDM_PLAYBACK_PLAY_PAUSE: usize = 8001;
+pub const IDM_PLAYBACK_STOP: usize = 8002;
+pub const IDM_PLAYBACK_SEEK_FORWARD: usize = 8003;
+pub const IDM_PLAYBACK_SEEK_BACKWARD: usize = 8004;
+pub const IDM_PLAYBACK_GO_TO_TIME: usize = 8005;
+pub const IDM_PLAYBACK_ANNOUNCE_TIME: usize = 8006;
+pub const IDM_PLAYBACK_VOLUME_UP: usize = 8007;
+pub const IDM_PLAYBACK_VOLUME_DOWN: usize = 8008;
+pub const IDM_PLAYBACK_MUTE_TOGGLE: usize = 8009;
 pub const IDM_INSERT_BOOKMARK: usize = 2101;
 pub const IDM_MANAGE_BOOKMARKS: usize = 2102;
 pub const IDM_INSERT_CLEAR_BOOKMARKS: usize = 2103;
@@ -73,6 +83,7 @@ pub const IDM_TOOLS_DICTIONARY: usize = 5002;
 pub const IDM_TOOLS_IMPORT_YOUTUBE: usize = 5003;
 pub const IDM_TOOLS_PROMPT: usize = 5004;
 pub const IDM_TOOLS_RSS: usize = 5005;
+pub const IDM_TOOLS_PODCASTS: usize = 5006;
 pub const IDM_HELP_GUIDE: usize = 7001;
 pub const IDM_HELP_ABOUT: usize = 7002;
 pub const IDM_HELP_CHECK_UPDATES: usize = 7003;
@@ -93,6 +104,7 @@ pub struct MenuLabels {
     pub menu_import_youtube: String,
     pub menu_prompt: String,
     pub menu_rss: String,
+    pub menu_podcasts: String,
     pub view_text_color: String,
     pub view_text_size: String,
     pub view_text_color_black: String,
@@ -173,6 +185,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         menu_import_youtube: i18n::tr(language, "menu.import_youtube"),
         menu_prompt: i18n::tr(language, "menu.prompt"),
         menu_rss: i18n::tr(language, "menu.rss"),
+        menu_podcasts: i18n::tr(language, "menu.podcasts"),
         view_text_color: i18n::tr(language, "view.text_color"),
         view_text_size: i18n::tr(language, "view.text_size"),
         view_text_color_black: i18n::tr(language, "view.text_color.black"),
@@ -241,6 +254,94 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         help_pending_update: i18n::tr(language, "help.pending_update"),
         help_about: i18n::tr(language, "help.about"),
         recent_empty: i18n::tr(language, "recent.empty"),
+    }
+}
+
+pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
+    let hmenu = GetMenu(hwnd);
+    if hmenu.0 == 0 {
+        return;
+    }
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let existing = with_state(hwnd, |state| state.playback_menu).unwrap_or(HMENU(0));
+    if show {
+        if existing.0 != 0 {
+            return;
+        }
+        let playback_menu = CreateMenu().unwrap_or(HMENU(0));
+        if playback_menu.0 == 0 {
+            return;
+        }
+        let title = i18n::tr(language, "menu.playback");
+        let play_pause = i18n::tr(language, "playback.play_pause");
+        let stop = i18n::tr(language, "playback.stop");
+        let seek_forward = i18n::tr(language, "playback.seek_forward");
+        let seek_backward = i18n::tr(language, "playback.seek_backward");
+        let go_to_time = i18n::tr(language, "playback.go_to_time");
+        let announce_time = i18n::tr(language, "playback.announce_time");
+        let volume_up = i18n::tr(language, "playback.volume_up");
+        let volume_down = i18n::tr(language, "playback.volume_down");
+        let mute_toggle = i18n::tr(language, "playback.mute_toggle");
+
+        let _ = append_menu_string(
+            playback_menu,
+            MF_STRING,
+            IDM_PLAYBACK_PLAY_PAUSE,
+            &play_pause,
+        );
+        let _ = append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_STOP, &stop);
+        let _ = append_menu_string(
+            playback_menu,
+            MF_STRING,
+            IDM_PLAYBACK_SEEK_FORWARD,
+            &seek_forward,
+        );
+        let _ = append_menu_string(
+            playback_menu,
+            MF_STRING,
+            IDM_PLAYBACK_SEEK_BACKWARD,
+            &seek_backward,
+        );
+        let _ = append_menu_string(
+            playback_menu,
+            MF_STRING,
+            IDM_PLAYBACK_GO_TO_TIME,
+            &go_to_time,
+        );
+        let _ = append_menu_string(
+            playback_menu,
+            MF_STRING,
+            IDM_PLAYBACK_ANNOUNCE_TIME,
+            &announce_time,
+        );
+        let _ = append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_VOLUME_UP, &volume_up);
+        let _ = append_menu_string(
+            playback_menu,
+            MF_STRING,
+            IDM_PLAYBACK_VOLUME_DOWN,
+            &volume_down,
+        );
+        let _ = append_menu_string(
+            playback_menu,
+            MF_STRING,
+            IDM_PLAYBACK_MUTE_TOGGLE,
+            &mute_toggle,
+        );
+        let wide = to_wide(&title);
+        let _ = InsertMenuW(
+            hmenu,
+            0,
+            MF_BYPOSITION | MF_POPUP,
+            playback_menu.0 as usize,
+            PCWSTR(wide.as_ptr()),
+        );
+        let _ = with_state(hwnd, |state| state.playback_menu = playback_menu);
+        let _ = DrawMenuBar(hwnd);
+    } else if existing.0 != 0 {
+        let _ = DeleteMenu(hmenu, existing.0 as u32, MF_BYCOMMAND);
+        let _ = DestroyMenu(existing);
+        let _ = with_state(hwnd, |state| state.playback_menu = HMENU(0));
+        let _ = DrawMenuBar(hwnd);
     }
 }
 
@@ -558,6 +659,12 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
 
     let _ = append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_PROMPT, &labels.menu_prompt);
     let _ = append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_RSS, &labels.menu_rss);
+    let _ = append_menu_string(
+        tools_menu,
+        MF_STRING,
+        IDM_TOOLS_PODCASTS,
+        &labels.menu_podcasts,
+    );
     let _ = append_menu_string(
         tools_menu,
         MF_STRING,

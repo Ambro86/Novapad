@@ -1,3 +1,4 @@
+use crate::log_debug;
 use crate::tools::reader;
 use feed_rs::parser;
 use rand::Rng;
@@ -33,6 +34,12 @@ pub struct RssFeedCache {
     pub last_fetch: Option<i64>,
     #[serde(default)]
     pub last_status: Option<u16>,
+    #[serde(default)]
+    pub consecutive_failures: u32,
+    #[serde(default)]
+    pub blocked_until_epoch_secs: Option<i64>,
+    #[serde(default)]
+    pub last_error_kind: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,10 +65,26 @@ pub struct RssItem {
     pub published: Option<i64>,
 }
 
+#[derive(Debug, Clone)]
+pub struct PodcastEpisode {
+    pub title: String,
+    pub link: String,
+    #[allow(dead_code)]
+    pub description: String,
+    pub guid: String,
+    pub published: Option<i64>,
+    pub enclosure_url: Option<String>,
+    #[allow(dead_code)]
+    pub enclosure_type: Option<String>,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct RssFetchConfig {
     pub max_items_per_feed: usize,
     pub max_excerpt_chars: usize,
+    pub cooldown_blocked_secs: u64,
+    pub cooldown_not_found_secs: u64,
+    pub cooldown_rate_limited_secs: u64,
 }
 
 impl Default for RssFetchConfig {
@@ -69,6 +92,51 @@ impl Default for RssFetchConfig {
         Self {
             max_items_per_feed: 5000,
             max_excerpt_chars: 512,
+            cooldown_blocked_secs: 3600,
+            cooldown_not_found_secs: 86400,
+            cooldown_rate_limited_secs: 300,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum FeedFetchError {
+    InCooldown {
+        until: i64,
+        kind: String,
+        cache: RssFeedCache,
+    },
+    HttpStatus {
+        status: u16,
+        kind: String,
+        cache: RssFeedCache,
+    },
+    Network {
+        message: String,
+        cache: RssFeedCache,
+    },
+}
+
+impl std::fmt::Display for FeedFetchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FeedFetchError::InCooldown { until, kind, .. } => {
+                write!(f, "Feed in cooldown ({kind}) until {until}")
+            }
+            FeedFetchError::HttpStatus { status, kind, .. } => {
+                write!(f, "HTTP {status} ({kind})")
+            }
+            FeedFetchError::Network { message, .. } => write!(f, "{message}"),
+        }
+    }
+}
+
+impl FeedFetchError {
+    fn cache_clone(&self) -> RssFeedCache {
+        match self {
+            FeedFetchError::InCooldown { cache, .. } => cache.clone(),
+            FeedFetchError::HttpStatus { cache, .. } => cache.clone(),
+            FeedFetchError::Network { cache, .. } => cache.clone(),
         }
     }
 }
@@ -102,6 +170,16 @@ pub struct RssFetchOutcome {
     pub title: String,
     pub items: Vec<RssItem>,
     pub cache: RssFeedCache,
+    pub not_modified: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct PodcastFetchOutcome {
+    #[allow(dead_code)]
+    pub title: String,
+    pub items: Vec<PodcastEpisode>,
+    pub cache: RssFeedCache,
+    #[allow(dead_code)]
     pub not_modified: bool,
 }
 
@@ -185,7 +263,7 @@ fn shared_http() -> Result<&'static RssHttp, String> {
     res.as_ref().map_err(|e| e.clone())
 }
 
-fn normalize_url(input: &str) -> String {
+pub fn normalize_url(input: &str) -> String {
     let s = input.trim();
     if s.is_empty() {
         return String::new();
@@ -219,8 +297,12 @@ fn canonicalize_url(u: &str) -> String {
                 .collect();
 
             url.query_pairs_mut().clear();
-            for (k, v) in pairs {
-                url.query_pairs_mut().append_pair(&k, &v);
+            if pairs.is_empty() {
+                url.set_query(None);
+            } else {
+                for (k, v) in pairs {
+                    url.query_pairs_mut().append_pair(&k, &v);
+                }
             }
         }
 
@@ -334,10 +416,31 @@ fn log_request_attempt(
     let status_code = status.map(|s| s.as_u16()).unwrap_or(0);
     let backoff_ms = backoff.map(|d| d.as_millis()).unwrap_or(0);
     let err_msg = err.unwrap_or("");
-    eprintln!(
+    log_debug(&format!(
         "rss_request kind=\"{}\" url=\"{}\" host=\"{}\" attempt={} status={} not_modified={} backoff_ms={} error=\"{}\"",
         fetch_kind, url, host, attempt, status_code, not_modified, backoff_ms, err_msg
-    );
+    ));
+}
+
+fn log_feed_cooldown(
+    url: &str,
+    host: &str,
+    status: u16,
+    until: i64,
+    kind: &str,
+    cooldown_secs: u64,
+) {
+    log_debug(&format!(
+        "rss_cooldown kind=\"feed\" url=\"{}\" host=\"{}\" status={} cooldown_secs={} until_epoch={} reason=\"{}\"",
+        url, host, status, cooldown_secs, until, kind
+    ));
+}
+
+fn log_feed_cooldown_skip(url: &str, host: &str, until: i64, kind: &str) {
+    log_debug(&format!(
+        "rss_cooldown_skip kind=\"feed\" url=\"{}\" host=\"{}\" status=cooldown until_epoch={} reason=\"{}\"",
+        url, host, until, kind
+    ));
 }
 
 fn parse_feed_bytes(
@@ -357,13 +460,10 @@ fn parse_feed_bytes(
         .map(|entry| {
             let title = entry
                 .title
-                .map(|t| t.content)
+                .as_ref()
+                .map(|t| t.content.clone())
                 .unwrap_or_else(|| "No Title".to_string());
-            let link = entry
-                .links
-                .first()
-                .map(|l| l.href.clone())
-                .unwrap_or_default();
+            let link = select_entry_link(&entry);
             let guid = if !entry.id.trim().is_empty() {
                 entry.id.clone()
             } else if !link.trim().is_empty() {
@@ -372,7 +472,11 @@ fn parse_feed_bytes(
                 title.clone()
             };
             let published = entry.published.or(entry.updated).map(|d| d.timestamp());
-            let description = entry.summary.map(|s| s.content).unwrap_or_default();
+            let description = entry
+                .summary
+                .as_ref()
+                .map(|s| s.content.clone())
+                .unwrap_or_default();
             let description = truncate_excerpt(&description, max_excerpt_chars);
             RssItem {
                 title,
@@ -387,7 +491,168 @@ fn parse_feed_bytes(
     Some((title, items))
 }
 
+fn select_entry_enclosure(entry: &feed_rs::model::Entry) -> (Option<String>, Option<String>) {
+    let mut candidate_audio: Option<(String, Option<String>)> = None;
+    for media in &entry.media {
+        for content in &media.content {
+            let Some(url) = content.url.as_ref().map(|u| u.as_str()) else {
+                continue;
+            };
+            let url = url.trim();
+            if url.is_empty() {
+                continue;
+            }
+            let media_type = content.content_type.as_ref().map(|m| m.to_string());
+            let is_audio = media_type
+                .as_deref()
+                .map(|m| m.starts_with("audio/"))
+                .unwrap_or(false);
+            if is_audio {
+                return (Some(url.to_string()), media_type);
+            }
+            if candidate_audio.is_none() && is_audio_extension(url) {
+                candidate_audio = Some((url.to_string(), media_type));
+            }
+        }
+    }
+    if let Some(content) = entry.content.as_ref().and_then(|c| c.src.as_ref()) {
+        let href = content.href.trim();
+        if !href.is_empty() {
+            let media_type = content.media_type.as_ref().map(|m| m.to_string());
+            let is_audio = media_type
+                .as_deref()
+                .map(|m| m.starts_with("audio/"))
+                .unwrap_or(false);
+            if is_audio || candidate_audio.is_none() && is_audio_extension(href) {
+                return (Some(href.to_string()), media_type);
+            }
+        }
+    }
+    for link in &entry.links {
+        let href = link.href.trim();
+        if href.is_empty() {
+            continue;
+        }
+        let rel = link.rel.as_deref().unwrap_or("");
+        let media_type = link.media_type.as_ref().map(|m| m.to_string());
+        let is_audio = media_type
+            .as_deref()
+            .map(|m| m.starts_with("audio/"))
+            .unwrap_or(false);
+        if rel.eq_ignore_ascii_case("enclosure") || is_audio {
+            return (Some(href.to_string()), media_type);
+        }
+        if candidate_audio.is_none() && is_audio_extension(href) {
+            candidate_audio = Some((href.to_string(), media_type));
+        }
+    }
+    if let Some((href, media_type)) = candidate_audio {
+        return (Some(href), media_type);
+    }
+    (None, None)
+}
+
+fn is_audio_extension(url: &str) -> bool {
+    let lower = url.to_ascii_lowercase();
+    lower.ends_with(".mp3")
+        || lower.ends_with(".m4a")
+        || lower.ends_with(".aac")
+        || lower.ends_with(".ogg")
+        || lower.ends_with(".opus")
+        || lower.ends_with(".wav")
+        || lower.ends_with(".flac")
+}
+
+fn parse_podcast_feed_bytes(
+    bytes: Vec<u8>,
+    fallback_title: &str,
+    max_excerpt_chars: usize,
+) -> Option<(String, Vec<PodcastEpisode>)> {
+    let cursor = Cursor::new(bytes);
+    let feed = parser::parse(cursor).ok()?;
+    let title = feed
+        .title
+        .map(|t| t.content)
+        .unwrap_or_else(|| fallback_title.to_string());
+    let items = feed
+        .entries
+        .into_iter()
+        .map(|entry| {
+            let title = entry
+                .title
+                .as_ref()
+                .map(|t| t.content.clone())
+                .unwrap_or_else(|| "No Title".to_string());
+            let link = select_entry_link(&entry);
+            let guid = if !entry.id.trim().is_empty() {
+                entry.id.clone()
+            } else if !link.trim().is_empty() {
+                link.clone()
+            } else {
+                title.clone()
+            };
+            let published = entry.published.or(entry.updated).map(|d| d.timestamp());
+            let description = entry
+                .summary
+                .as_ref()
+                .map(|s| s.content.clone())
+                .unwrap_or_default();
+            let description = truncate_excerpt(&description, max_excerpt_chars);
+            let (enclosure_url, enclosure_type) = select_entry_enclosure(&entry);
+            PodcastEpisode {
+                title,
+                link,
+                description,
+                guid,
+                published,
+                enclosure_url,
+                enclosure_type,
+            }
+        })
+        .collect();
+    Some((title, items))
+}
+
+fn select_entry_link(entry: &feed_rs::model::Entry) -> String {
+    for link in &entry.links {
+        let href = link.href.trim();
+        if href.is_empty() {
+            continue;
+        }
+        let rel = link.rel.as_deref().unwrap_or("");
+        if rel.is_empty() || rel.eq_ignore_ascii_case("alternate") {
+            return href.to_string();
+        }
+    }
+    if let Some(link) = entry.links.iter().find(|l| !l.href.trim().is_empty()) {
+        return link.href.clone();
+    }
+    let id = entry.id.trim();
+    if id.starts_with("http://") || id.starts_with("https://") {
+        return id.to_string();
+    }
+    String::new()
+}
+
 fn item_dedup_key(item: &RssItem) -> String {
+    if !item.guid.trim().is_empty() {
+        return format!("guid:{}", item.guid.trim());
+    }
+    if !item.link.trim().is_empty() {
+        return format!("link:{}", canonicalize_url(&item.link));
+    }
+    let mut hasher = Sha256::new();
+    hasher.update(item.title.as_bytes());
+    hasher.update(b"|");
+    hasher.update(item.link.as_bytes());
+    hasher.update(b"|");
+    if let Some(ts) = item.published {
+        hasher.update(ts.to_string().as_bytes());
+    }
+    format!("hash:{}", hex::encode(hasher.finalize()))
+}
+
+fn podcast_item_dedup_key(item: &PodcastEpisode) -> String {
     if !item.guid.trim().is_empty() {
         return format!("guid:{}", item.guid.trim());
     }
@@ -425,6 +690,24 @@ fn dedup_items(items: Vec<RssItem>, max_items: usize) -> Vec<RssItem> {
     let mut out = Vec::new();
     for item in items {
         let key = item_dedup_key(&item);
+        if seen.insert(key) {
+            out.push(item);
+            if out.len() >= max_items {
+                break;
+            }
+        }
+    }
+    out
+}
+
+fn dedup_podcast_items(items: Vec<PodcastEpisode>, max_items: usize) -> Vec<PodcastEpisode> {
+    if max_items == 0 {
+        return Vec::new();
+    }
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut out = Vec::with_capacity(items.len().min(max_items));
+    for item in items {
+        let key = podcast_item_dedup_key(&item);
         if seen.insert(key) {
             out.push(item);
             if out.len() >= max_items {
@@ -492,20 +775,81 @@ struct FetchBytesOutcome {
     not_modified: bool,
 }
 
+fn apply_feed_cooldown(
+    cache: &mut RssFeedCache,
+    status: u16,
+    retry_after: Option<Duration>,
+    config: &RssFetchConfig,
+    now: i64,
+) -> (i64, String, u64) {
+    let (kind, cooldown_secs) = match status {
+        401 => ("blocked_401".to_string(), config.cooldown_blocked_secs),
+        403 => ("blocked_403".to_string(), config.cooldown_blocked_secs),
+        404 => ("not_found_404".to_string(), config.cooldown_not_found_secs),
+        429 => {
+            let retry_secs = retry_after.map(|d| d.as_secs()).unwrap_or(0);
+            let secs = if retry_secs > 0 {
+                retry_secs
+            } else {
+                config.cooldown_rate_limited_secs
+            };
+            ("rate_limited_429".to_string(), secs)
+        }
+        _ => ("unknown".to_string(), config.cooldown_blocked_secs),
+    };
+    let until = now.saturating_add(cooldown_secs as i64);
+    cache.last_status = Some(status);
+    cache.consecutive_failures = cache.consecutive_failures.saturating_add(1);
+    cache.blocked_until_epoch_secs = Some(until);
+    cache.last_error_kind = Some(kind.clone());
+    (until, kind, cooldown_secs)
+}
+
 async fn fetch_bytes_with_retries(
     http: &RssHttp,
     url: &str,
     is_feed: bool,
     fetch_kind: &str,
+    override_cooldown: bool,
+    fetch_config: &RssFetchConfig,
     mut cache: Option<&mut RssFeedCache>,
-) -> Result<FetchBytesOutcome, String> {
+) -> Result<FetchBytesOutcome, FeedFetchError> {
     let host = host_from_url(url).unwrap_or_else(|| "unknown".to_string());
     let max_attempts = http.config.max_retries + 1;
+
+    if is_feed && !override_cooldown {
+        if let Some(cache) = cache.as_deref() {
+            if let Some(until) = cache.blocked_until_epoch_secs {
+                let now = now_unix();
+                if now < until {
+                    let kind = cache
+                        .last_error_kind
+                        .clone()
+                        .unwrap_or_else(|| "cooldown".to_string());
+                    log_feed_cooldown_skip(url, &host, until, &kind);
+                    return Err(FeedFetchError::InCooldown {
+                        until,
+                        kind,
+                        cache: cache.clone(),
+                    });
+                }
+            }
+        }
+    }
 
     for attempt in 1..=max_attempts {
         wait_for_rate_limit(http, &host).await;
         let response = {
-            let _permits = http.acquire_permits(&host).await?;
+            let _permits = match http.acquire_permits(&host).await {
+                Ok(permits) => permits,
+                Err(e) => {
+                    let cache = cache
+                        .as_deref()
+                        .cloned()
+                        .unwrap_or_else(RssFeedCache::default);
+                    return Err(FeedFetchError::Network { message: e, cache });
+                }
+            };
             let mut req = http
                 .client
                 .get(url)
@@ -540,8 +884,29 @@ async fn fetch_bytes_with_retries(
                     cache.last_status = Some(status.as_u16());
                 }
 
+                if is_feed {
+                    let now = now_unix();
+                    let code = status.as_u16();
+                    if matches!(code, 401 | 403 | 404 | 429) {
+                        if let Some(cache) = cache.as_deref_mut() {
+                            let retry_after = parse_retry_after(&headers);
+                            let (until, kind, cooldown_secs) =
+                                apply_feed_cooldown(cache, code, retry_after, fetch_config, now);
+                            log_feed_cooldown(url, &host, code, until, &kind, cooldown_secs);
+                            return Err(FeedFetchError::HttpStatus {
+                                status: code,
+                                kind,
+                                cache: cache.clone(),
+                            });
+                        }
+                    }
+                }
+
                 if status == StatusCode::NOT_MODIFIED && is_feed {
                     if let Some(cache) = cache.as_deref_mut() {
+                        cache.consecutive_failures = 0;
+                        cache.blocked_until_epoch_secs = None;
+                        cache.last_error_kind = None;
                         cache.feed_url = Some(url.to_string());
                         if let Some(etag) = headers.get(ETAG).and_then(|v| v.to_str().ok()) {
                             cache.etag = Some(etag.to_string());
@@ -570,6 +935,13 @@ async fn fetch_bytes_with_retries(
 
                 if !status.is_success() {
                     let retry_after = parse_retry_after(resp.headers());
+                    if is_feed {
+                        if let Some(cache) = cache.as_deref_mut() {
+                            cache.last_status = Some(status.as_u16());
+                            cache.consecutive_failures =
+                                cache.consecutive_failures.saturating_add(1);
+                        }
+                    }
                     if should_retry_status(status) && attempt < max_attempts {
                         let base = compute_backoff(attempt - 1, http.config.backoff_max_secs);
                         let jitter_ms = rand::thread_rng().gen_range(0..=300);
@@ -602,10 +974,30 @@ async fn fetch_bytes_with_retries(
                         None,
                         Some("non-retriable status"),
                     );
-                    return Err(format!("HTTP {status}"));
+                    let cache = cache
+                        .as_deref()
+                        .cloned()
+                        .unwrap_or_else(RssFeedCache::default);
+                    return Err(FeedFetchError::HttpStatus {
+                        status: status.as_u16(),
+                        kind: "http_error".to_string(),
+                        cache,
+                    });
                 }
 
-                let bytes = resp.bytes().await.map_err(|e| e.to_string())?.to_vec();
+                let bytes = match resp.bytes().await {
+                    Ok(b) => b.to_vec(),
+                    Err(err) => {
+                        let cache = cache
+                            .as_deref()
+                            .cloned()
+                            .unwrap_or_else(RssFeedCache::default);
+                        return Err(FeedFetchError::Network {
+                            message: err.to_string(),
+                            cache,
+                        });
+                    }
+                };
                 if is_resource_limit_body(&bytes) && attempt < max_attempts {
                     let delay = compute_backoff(attempt - 1, http.config.backoff_max_secs)
                         + Duration::from_millis(rand::thread_rng().gen_range(0..=300));
@@ -624,6 +1016,9 @@ async fn fetch_bytes_with_retries(
                 }
 
                 if let Some(cache) = cache.as_deref_mut() {
+                    cache.consecutive_failures = 0;
+                    cache.blocked_until_epoch_secs = None;
+                    cache.last_error_kind = None;
                     cache.feed_url = Some(url.to_string());
                     if let Some(etag) = headers.get(ETAG).and_then(|v| v.to_str().ok()) {
                         cache.etag = Some(etag.to_string());
@@ -667,6 +1062,12 @@ async fn fetch_bytes_with_retries(
                     sleep(delay).await;
                     continue;
                 }
+                if is_feed {
+                    if let Some(cache) = cache.as_deref_mut() {
+                        cache.consecutive_failures = cache.consecutive_failures.saturating_add(1);
+                        cache.last_status = err.status().map(|s| s.as_u16());
+                    }
+                }
                 log_request_attempt(
                     url,
                     &host,
@@ -677,17 +1078,32 @@ async fn fetch_bytes_with_retries(
                     None,
                     Some(&err_msg),
                 );
-                return Err(err_msg);
+                let cache = cache
+                    .as_deref()
+                    .cloned()
+                    .unwrap_or_else(RssFeedCache::default);
+                return Err(FeedFetchError::Network {
+                    message: err_msg,
+                    cache,
+                });
             }
         }
     }
 
-    Err("Request retries exhausted".to_string())
+    let cache = cache
+        .as_deref()
+        .cloned()
+        .unwrap_or_else(RssFeedCache::default);
+    Err(FeedFetchError::Network {
+        message: "Request retries exhausted".to_string(),
+        cache,
+    })
 }
 
 async fn fetch_site_extra_bytes(
     http: &RssHttp,
     url: &str,
+    fetch_config: &RssFetchConfig,
     extra_requests: &mut usize,
     burst_requests: &mut usize,
 ) -> Option<Vec<u8>> {
@@ -700,7 +1116,7 @@ async fn fetch_site_extra_bytes(
     }
     *extra_requests += 1;
     *burst_requests += 1;
-    fetch_bytes_with_retries(http, url, false, "site", None)
+    fetch_bytes_with_retries(http, url, false, "site", false, fetch_config, None)
         .await
         .ok()
         .map(|out| out.bytes)
@@ -785,42 +1201,75 @@ pub async fn fetch_and_parse(
     source_kind: RssSourceType,
     cache: RssFeedCache,
     fetch_config: RssFetchConfig,
-) -> Result<RssFetchOutcome, String> {
+    override_cooldown: bool,
+) -> Result<RssFetchOutcome, FeedFetchError> {
     let url = normalize_url(url);
     if url.is_empty() {
-        return Err("Empty URL".to_string());
+        return Err(FeedFetchError::Network {
+            message: "Empty URL".to_string(),
+            cache,
+        });
     }
 
-    let http = shared_http()?;
+    if matches!(source_kind, RssSourceType::Feed) && !override_cooldown {
+        if let Some(until) = cache.blocked_until_epoch_secs {
+            let now = now_unix();
+            if now < until {
+                let kind = cache
+                    .last_error_kind
+                    .clone()
+                    .unwrap_or_else(|| "cooldown".to_string());
+                if let Some(host) = host_from_url(&url) {
+                    log_feed_cooldown_skip(&url, &host, until, &kind);
+                }
+                return Err(FeedFetchError::InCooldown { until, kind, cache });
+            }
+        }
+    }
+
+    let http = shared_http().map_err(|e| FeedFetchError::Network {
+        message: e,
+        cache: cache.clone(),
+    })?;
     let mut cache = cache;
 
     if let Some(feed_url) = cache.feed_url.clone() {
         let feed_url = normalize_url(&feed_url);
         if !feed_url.is_empty() {
-            if let Ok(out) =
-                fetch_bytes_with_retries(http, &feed_url, true, "feed", Some(&mut cache)).await
+            let out = fetch_bytes_with_retries(
+                http,
+                &feed_url,
+                true,
+                "feed",
+                override_cooldown,
+                &fetch_config,
+                Some(&mut cache),
+            )
+            .await;
+            let out = match out {
+                Ok(out) => out,
+                Err(err) => return Err(err),
+            };
+            if out.not_modified {
+                return Ok(RssFetchOutcome {
+                    kind: RssSourceType::Feed,
+                    title: String::new(),
+                    items: Vec::new(),
+                    cache,
+                    not_modified: true,
+                });
+            }
+            if let Some((title, items)) =
+                parse_feed_bytes(out.bytes, &feed_url, fetch_config.max_excerpt_chars)
             {
-                if out.not_modified {
-                    return Ok(RssFetchOutcome {
-                        kind: RssSourceType::Feed,
-                        title: String::new(),
-                        items: Vec::new(),
-                        cache,
-                        not_modified: true,
-                    });
-                }
-                if let Some((title, items)) =
-                    parse_feed_bytes(out.bytes, &feed_url, fetch_config.max_excerpt_chars)
-                {
-                    let items = dedup_items(items, fetch_config.max_items_per_feed);
-                    return Ok(RssFetchOutcome {
-                        kind: RssSourceType::Feed,
-                        title,
-                        items,
-                        cache,
-                        not_modified: false,
-                    });
-                }
+                let items = dedup_items(items, fetch_config.max_items_per_feed);
+                return Ok(RssFetchOutcome {
+                    kind: RssSourceType::Feed,
+                    title,
+                    items,
+                    cache,
+                    not_modified: false,
+                });
             }
         }
     }
@@ -832,6 +1281,8 @@ pub async fn fetch_and_parse(
         &url,
         primary_as_feed,
         fetch_kind_main,
+        override_cooldown,
+        &fetch_config,
         if primary_as_feed {
             Some(&mut cache)
         } else {
@@ -844,19 +1295,30 @@ pub async fn fetch_and_parse(
         Err(e1) => {
             if url.starts_with("https://") {
                 let http_url = url.replacen("https://", "http://", 1);
-                fetch_bytes_with_retries(
+                let out = fetch_bytes_with_retries(
                     http,
                     &http_url,
                     primary_as_feed,
                     fetch_kind_main,
+                    override_cooldown,
+                    &fetch_config,
                     if primary_as_feed {
                         Some(&mut cache)
                     } else {
                         None
                     },
                 )
-                .await
-                .map_err(|e2| format!("{e1} | fallback-http failed: {e2}"))?
+                .await;
+                match out {
+                    Ok(out) => out,
+                    Err(e2) => {
+                        let cache = e2.cache_clone();
+                        return Err(FeedFetchError::Network {
+                            message: format!("{e1} | fallback-http failed: {e2}"),
+                            cache,
+                        });
+                    }
+                }
             } else {
                 return Err(e1);
             }
@@ -892,8 +1354,16 @@ pub async fn fetch_and_parse(
     if feed_url.is_none() {
         let feed_links = reader::extract_feed_links_from_html(&url, &html);
         for candidate in feed_links {
-            let out =
-                fetch_bytes_with_retries(http, &candidate, true, "feed", Some(&mut cache)).await;
+            let out = fetch_bytes_with_retries(
+                http,
+                &candidate,
+                true,
+                "feed",
+                override_cooldown,
+                &fetch_config,
+                Some(&mut cache),
+            )
+            .await;
             let Ok(out) = out else {
                 continue;
             };
@@ -973,8 +1443,14 @@ pub async fn fetch_and_parse(
             }
 
             // Fetch hub page itself.
-            if let Some(hub_bytes) =
-                fetch_site_extra_bytes(http, &hub, &mut extra_requests, &mut burst_requests).await
+            if let Some(hub_bytes) = fetch_site_extra_bytes(
+                http,
+                &hub,
+                &fetch_config,
+                &mut extra_requests,
+                &mut burst_requests,
+            )
+            .await
             {
                 let hub_html = String::from_utf8_lossy(&hub_bytes).to_string();
                 let mut got = reader::extract_article_links_from_html(&hub, &hub_html, target_max);
@@ -989,6 +1465,7 @@ pub async fn fetch_and_parse(
                         let sub_bytes = fetch_site_extra_bytes(
                             http,
                             &sub,
+                            &fetch_config,
                             &mut extra_requests,
                             &mut burst_requests,
                         )
@@ -1018,9 +1495,14 @@ pub async fn fetch_and_parse(
                 if extra.len() >= target_max {
                     break;
                 }
-                let p_bytes =
-                    fetch_site_extra_bytes(http, &purl, &mut extra_requests, &mut burst_requests)
-                        .await;
+                let p_bytes = fetch_site_extra_bytes(
+                    http,
+                    &purl,
+                    &fetch_config,
+                    &mut extra_requests,
+                    &mut burst_requests,
+                )
+                .await;
                 if let Some(p_bytes) = p_bytes {
                     let p_html = String::from_utf8_lossy(&p_bytes).to_string();
                     let mut got =
@@ -1134,6 +1616,114 @@ pub async fn fetch_and_parse(
     })
 }
 
+pub async fn fetch_podcast_feed(
+    url: &str,
+    cache: RssFeedCache,
+    fetch_config: RssFetchConfig,
+    override_cooldown: bool,
+) -> Result<PodcastFetchOutcome, FeedFetchError> {
+    let url = normalize_url(url);
+    if url.is_empty() {
+        return Err(FeedFetchError::Network {
+            message: "Empty URL".to_string(),
+            cache,
+        });
+    }
+
+    if !override_cooldown {
+        if let Some(until) = cache.blocked_until_epoch_secs {
+            let now = now_unix();
+            if now < until {
+                let kind = cache
+                    .last_error_kind
+                    .clone()
+                    .unwrap_or_else(|| "cooldown".to_string());
+                if let Some(host) = host_from_url(&url) {
+                    log_feed_cooldown_skip(&url, &host, until, &kind);
+                }
+                return Err(FeedFetchError::InCooldown { until, kind, cache });
+            }
+        }
+    }
+
+    let http = shared_http().map_err(|e| FeedFetchError::Network {
+        message: e,
+        cache: cache.clone(),
+    })?;
+    let mut cache = cache;
+
+    let out = fetch_bytes_with_retries(
+        http,
+        &url,
+        true,
+        "feed",
+        override_cooldown,
+        &fetch_config,
+        Some(&mut cache),
+    )
+    .await?;
+
+    if out.not_modified {
+        return Ok(PodcastFetchOutcome {
+            title: String::new(),
+            items: Vec::new(),
+            cache,
+            not_modified: true,
+        });
+    }
+
+    if let Some((title, items)) =
+        parse_podcast_feed_bytes(out.bytes, &url, fetch_config.max_excerpt_chars)
+    {
+        let items = dedup_podcast_items(items, fetch_config.max_items_per_feed);
+        return Ok(PodcastFetchOutcome {
+            title,
+            items,
+            cache,
+            not_modified: false,
+        });
+    }
+
+    Err(FeedFetchError::Network {
+        message: "Unable to parse podcast feed".to_string(),
+        cache,
+    })
+}
+
+#[allow(dead_code)]
+pub async fn fetch_itunes_search(
+    url: &str,
+    fetch_config: RssFetchConfig,
+) -> Result<Vec<u8>, FeedFetchError> {
+    let http = shared_http().map_err(|e| FeedFetchError::Network {
+        message: e,
+        cache: RssFeedCache::default(),
+    })?;
+    let out =
+        fetch_bytes_with_retries(http, url, false, "itunes", false, &fetch_config, None).await?;
+    Ok(out.bytes)
+}
+
+pub async fn fetch_url_bytes(
+    url: &str,
+    fetch_config: RssFetchConfig,
+) -> Result<Vec<u8>, FeedFetchError> {
+    let url = normalize_url(url);
+    if url.is_empty() {
+        return Err(FeedFetchError::Network {
+            message: "Empty URL".to_string(),
+            cache: RssFeedCache::default(),
+        });
+    }
+    let http = shared_http().map_err(|e| FeedFetchError::Network {
+        message: e,
+        cache: RssFeedCache::default(),
+    })?;
+    let out =
+        fetch_bytes_with_retries(http, &url, false, "generic", false, &fetch_config, None).await?;
+    Ok(out.bytes)
+}
+
 pub async fn fetch_article_text(
     url: &str,
     fallback_title: &str,
@@ -1144,7 +1734,10 @@ pub async fn fetch_article_text(
         return Err("Empty URL".to_string());
     }
     let http = shared_http()?;
-    let out = fetch_bytes_with_retries(http, &url, false, "article", None).await?;
+    let fetch_config = RssFetchConfig::default();
+    let out = fetch_bytes_with_retries(http, &url, false, "article", false, &fetch_config, None)
+        .await
+        .map_err(|e| e.to_string())?;
     let html = String::from_utf8_lossy(&out.bytes).to_string();
     let article = reader::reader_mode_extract(&html).unwrap_or(reader::ArticleContent {
         title: fallback_title.to_string(),
@@ -1169,6 +1762,9 @@ pub fn fetch_config_from_settings(settings: &crate::settings::AppSettings) -> Rs
     RssFetchConfig {
         max_items_per_feed: settings.rss_max_items_per_feed,
         max_excerpt_chars: settings.rss_max_excerpt_chars,
+        cooldown_blocked_secs: settings.rss_cooldown_blocked_secs,
+        cooldown_not_found_secs: settings.rss_cooldown_not_found_secs,
+        cooldown_rate_limited_secs: settings.rss_cooldown_rate_limited_secs,
     }
 }
 
@@ -1233,5 +1829,69 @@ mod tests {
             canonicalize_url(url),
             "example.com/article?id=123&article=abc"
         );
+    }
+
+    #[tokio::test]
+    async fn test_feed_cooldown_short_circuit() {
+        let now = now_unix();
+        let mut cache = RssFeedCache::default();
+        cache.blocked_until_epoch_secs = Some(now + 60);
+        cache.last_error_kind = Some("blocked_403".to_string());
+        let err = fetch_and_parse(
+            "https://example.com/feed",
+            RssSourceType::Feed,
+            cache,
+            RssFetchConfig::default(),
+            false,
+        )
+        .await
+        .unwrap_err();
+        match err {
+            FeedFetchError::InCooldown { kind, .. } => {
+                assert_eq!(kind, "blocked_403");
+            }
+            _ => panic!("expected cooldown error"),
+        }
+    }
+
+    #[test]
+    fn test_feed_cooldown_403() {
+        let mut cache = RssFeedCache::default();
+        let config = RssFetchConfig::default();
+        let now = 1000;
+        let (until, kind, cooldown_secs) = apply_feed_cooldown(&mut cache, 403, None, &config, now);
+        assert_eq!(kind, "blocked_403");
+        assert_eq!(cooldown_secs, config.cooldown_blocked_secs);
+        assert_eq!(until, now + config.cooldown_blocked_secs as i64);
+        assert_eq!(cache.blocked_until_epoch_secs, Some(until));
+        assert_eq!(cache.last_error_kind, Some("blocked_403".to_string()));
+    }
+
+    #[test]
+    fn test_feed_cooldown_429_retry_after() {
+        let mut cache = RssFeedCache::default();
+        let config = RssFetchConfig::default();
+        let now = 1000;
+        let (until, kind, cooldown_secs) = apply_feed_cooldown(
+            &mut cache,
+            429,
+            Some(Duration::from_secs(120)),
+            &config,
+            now,
+        );
+        assert_eq!(kind, "rate_limited_429");
+        assert_eq!(cooldown_secs, 120);
+        assert_eq!(until, now + 120);
+    }
+
+    #[test]
+    fn test_feed_cooldown_429_default() {
+        let mut cache = RssFeedCache::default();
+        let config = RssFetchConfig::default();
+        let now = 1000;
+        let (until, kind, cooldown_secs) = apply_feed_cooldown(&mut cache, 429, None, &config, now);
+        assert_eq!(kind, "rate_limited_429");
+        assert_eq!(cooldown_secs, config.cooldown_rate_limited_secs);
+        assert_eq!(until, now + config.cooldown_rate_limited_secs as i64);
     }
 }

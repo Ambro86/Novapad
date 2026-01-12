@@ -274,6 +274,101 @@ fn confirm_menu_action(hwnd: HWND, key: &str) {
     }
 }
 
+fn format_time_hms(seconds: u64) -> String {
+    let hours = seconds / 3600;
+    let minutes = (seconds % 3600) / 60;
+    let secs = seconds % 60;
+    if hours > 0 {
+        format!("{:02}:{:02}:{:02}", hours, minutes, secs)
+    } else {
+        format!("{:02}:{:02}", minutes, secs)
+    }
+}
+
+unsafe fn announce_player_time(hwnd: HWND) {
+    let (current, path, language) = with_state(hwnd, |state| {
+        let current = state.active_audiobook.as_ref().map(|player| {
+            if player.is_paused {
+                player.accumulated_seconds
+            } else {
+                player.accumulated_seconds + player.start_instant.elapsed().as_secs()
+            }
+        });
+        let path = state
+            .active_audiobook
+            .as_ref()
+            .map(|player| player.path.clone());
+        (current, path, state.settings.language)
+    })
+    .unwrap_or((None, None, Language::default()));
+    let Some(current) = current else {
+        return;
+    };
+    let current_str = format_time_hms(current);
+    let total = path.and_then(|p| audiobook_duration_secs(&p));
+    let message = if let Some(total) = total {
+        let total_str = format_time_hms(total);
+        i18n::tr_f(
+            language,
+            "player.time_announce",
+            &[("current", &current_str), ("total", &total_str)],
+        )
+    } else {
+        i18n::tr_f(
+            language,
+            "player.time_announce_no_total",
+            &[("current", &current_str)],
+        )
+    };
+    let _ = nvda_speak(&message);
+}
+
+unsafe fn announce_player_volume(hwnd: HWND) {
+    let (volume, language) = with_state(hwnd, |state| {
+        let volume = crate::audio_player::audiobook_volume_level(hwnd);
+        (volume, state.settings.language)
+    })
+    .unwrap_or((None, Language::default()));
+    let Some(volume) = volume else {
+        return;
+    };
+    let percent = (volume * 100.0).round().clamp(0.0, 300.0) as u32;
+    let message = i18n::tr_f(
+        language,
+        "player.volume_announce",
+        &[("pct", &percent.to_string())],
+    );
+    let _ = nvda_speak(&message);
+}
+
+unsafe fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
+    match command {
+        PlayerCommand::TogglePause => {
+            toggle_audiobook_pause(hwnd);
+        }
+        PlayerCommand::Stop => {
+            stop_audiobook_playback(hwnd);
+        }
+        PlayerCommand::Seek(amount) => {
+            seek_audiobook(hwnd, amount);
+        }
+        PlayerCommand::Volume(delta) => {
+            change_audiobook_volume(hwnd, delta);
+            announce_player_volume(hwnd);
+        }
+        PlayerCommand::MuteToggle => {
+            toggle_audiobook_mute(hwnd);
+        }
+        PlayerCommand::GoToTime => {
+            app_windows::go_to_time_window::open(hwnd);
+        }
+        PlayerCommand::AnnounceTime => {
+            announce_player_time(hwnd);
+        }
+        PlayerCommand::BlockNavigation | PlayerCommand::None => {}
+    }
+}
+
 #[derive(Default)]
 pub(crate) struct AppState {
     hwnd_tab: HWND,
@@ -299,8 +394,12 @@ pub(crate) struct AppState {
     podcast_window: HWND,
     podcast_save_window: HWND,
     batch_audiobooks_window: HWND,
+    podcasts_window: HWND,
+    podcasts_add_dialog: HWND,
     rss_window: HWND,
     rss_add_dialog: HWND, // Input dialog for RSS
+    go_to_time_dialog: HWND,
+    playback_menu: HMENU,
     find_msg: u32,
     find_text: Vec<u16>,
     replace_text: Vec<u16>,
@@ -318,6 +417,7 @@ pub(crate) struct AppState {
     audiobook_progress: HWND,
     audiobook_cancel: Option<Arc<AtomicBool>>,
     active_audiobook: Option<AudiobookPlayer>,
+    last_stopped_audiobook: Option<std::path::PathBuf>,
     voice_panel_visible: bool,
     voice_label_engine: HWND,
     voice_combo_engine: HWND,
@@ -471,6 +571,25 @@ fn main() -> windows::core::Result<()> {
                         continue;
                     }
                 }
+                let podcasts_hwnd =
+                    with_state(hwnd, |state| state.podcasts_window).unwrap_or(HWND(0));
+                if podcasts_hwnd.0 != 0 {
+                    let mut cur = msg.hwnd;
+                    let mut podcasts_target = false;
+                    while cur.0 != 0 {
+                        if cur == podcasts_hwnd {
+                            app_windows::podcasts_window::show_context_menu_from_keyboard(
+                                podcasts_hwnd,
+                            );
+                            podcasts_target = true;
+                            break;
+                        }
+                        cur = GetParent(cur);
+                    }
+                    if podcasts_target {
+                        continue;
+                    }
+                }
             }
             if msg.message == WM_KEYDOWN || msg.message == WM_SYSKEYDOWN {
                 let key = msg.wParam.0 as u32;
@@ -493,10 +612,40 @@ fn main() -> windows::core::Result<()> {
                             continue;
                         }
                     }
+                    let podcasts_hwnd =
+                        with_state(hwnd, |state| state.podcasts_window).unwrap_or(HWND(0));
+                    if podcasts_hwnd.0 != 0 {
+                        let mut cur = msg.hwnd;
+                        let mut podcasts_target = false;
+                        while cur.0 != 0 {
+                            if cur == podcasts_hwnd {
+                                app_windows::podcasts_window::show_context_menu_from_keyboard(
+                                    podcasts_hwnd,
+                                );
+                                podcasts_target = true;
+                                break;
+                            }
+                            cur = GetParent(cur);
+                        }
+                        if podcasts_target {
+                            continue;
+                        }
+                    }
                 }
             }
             if msg.message == WM_KEYDOWN || msg.message == WM_SYSKEYDOWN {
                 if msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
+                    let rss_hwnd = with_state(hwnd, |state| state.rss_window).unwrap_or(HWND(0));
+                    if rss_hwnd.0 != 0 {
+                        if let Some(hwnd_edit) = get_active_edit(hwnd) {
+                            if GetFocus() == hwnd_edit
+                                && editor_manager::current_document_is_from_rss(hwnd)
+                            {
+                                app_windows::rss_window::focus_library(rss_hwnd);
+                                continue;
+                            }
+                        }
+                    }
                     let save_hwnd =
                         with_state(hwnd, |state| state.podcast_save_window).unwrap_or(HWND(0));
                     if save_hwnd.0 != 0 {
@@ -573,30 +722,29 @@ fn main() -> windows::core::Result<()> {
                         || state.podcast_window.0 != 0;
                     let secondary_open = secondary_open
                         || state.dictionary_entry_dialog.0 != 0
-                        || state.tts_tuning_dialog.0 != 0;
+                        || state.tts_tuning_dialog.0 != 0
+                        || state.go_to_time_dialog.0 != 0;
 
                     if is_audiobook && !secondary_open {
-                        match handle_player_keyboard(&msg, state.settings.audiobook_skip_seconds) {
-                            PlayerAction::TogglePause => {
-                                toggle_audiobook_pause(hwnd);
+                        let command =
+                            handle_player_keyboard(&msg, state.settings.audiobook_skip_seconds);
+                        if !matches!(command, PlayerCommand::None) {
+                            if matches!(command, PlayerCommand::BlockNavigation) {
                                 handled = true;
                                 return;
                             }
-                            PlayerAction::Seek(amount) => {
-                                seek_audiobook(hwnd, amount);
-                                handled = true;
-                                return;
+                            let is_stop = matches!(command, PlayerCommand::Stop);
+                            let podcasts_window = state.podcasts_window;
+                            handle_player_command(hwnd, command);
+                            if is_stop {
+                                editor_manager::close_current_document(hwnd);
+                                if podcasts_window.0 != 0 {
+                                    SetForegroundWindow(podcasts_window);
+                                    app_windows::podcasts_window::focus_library(podcasts_window);
+                                }
                             }
-                            PlayerAction::Volume(delta) => {
-                                change_audiobook_volume(hwnd, delta);
-                                handled = true;
-                                return;
-                            }
-                            PlayerAction::BlockNavigation => {
-                                handled = true;
-                                return;
-                            }
-                            PlayerAction::None => {}
+                            handled = true;
+                            return;
                         }
                     }
                 }
@@ -606,6 +754,15 @@ fn main() -> windows::core::Result<()> {
                     return;
                 }
                 if state.replace_dialog.0 != 0 && handle_accessibility(state.replace_dialog, &msg) {
+                    handled = true;
+                    return;
+                }
+                if state.go_to_time_dialog.0 != 0
+                    && app_windows::go_to_time_window::handle_navigation(
+                        state.go_to_time_dialog,
+                        &msg,
+                    )
+                {
                     handled = true;
                     return;
                 }
@@ -748,6 +905,21 @@ fn main() -> windows::core::Result<()> {
 
                 if state.rss_add_dialog.0 != 0 {
                     if handle_accessibility(state.rss_add_dialog, &msg) {
+                        handled = true;
+                        return;
+                    }
+                }
+                if state.podcasts_window.0 != 0 {
+                    if handle_accessibility(state.podcasts_window, &msg) {
+                        handled = true;
+                        return;
+                    }
+                }
+                if state.podcasts_add_dialog.0 != 0 {
+                    if app_windows::podcasts_window::handle_navigation(
+                        state.podcasts_add_dialog,
+                        &msg,
+                    ) {
                         handled = true;
                         return;
                     }
@@ -962,7 +1134,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 prompt_window: HWND(0),
                 podcast_window: HWND(0),
                 rss_window: HWND(0),
+                podcasts_window: HWND(0),
+                podcasts_add_dialog: HWND(0),
                 rss_add_dialog: HWND(0),
+                go_to_time_dialog: HWND(0),
+                playback_menu: HMENU(0),
                 podcast_save_window: HWND(0),
                 batch_audiobooks_window: HWND(0),
 
@@ -983,6 +1159,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 audiobook_progress: HWND(0),
                 audiobook_cancel: None,
                 active_audiobook: None,
+                last_stopped_audiobook: None,
                 voice_panel_visible: false,
                 voice_label_engine: label_engine,
                 voice_combo_engine: combo_engine,
@@ -1518,6 +1695,48 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     }
                     LRESULT(0)
                 }
+                IDM_PLAYBACK_PLAY_PAUSE => {
+                    handle_player_command(hwnd, PlayerCommand::TogglePause);
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_STOP => {
+                    handle_player_command(hwnd, PlayerCommand::Stop);
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_SEEK_FORWARD => {
+                    let skip_seconds =
+                        with_state(hwnd, |state| state.settings.audiobook_skip_seconds)
+                            .unwrap_or(0);
+                    handle_player_command(hwnd, PlayerCommand::Seek(skip_seconds as i64));
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_SEEK_BACKWARD => {
+                    let skip_seconds =
+                        with_state(hwnd, |state| state.settings.audiobook_skip_seconds)
+                            .unwrap_or(0);
+                    handle_player_command(hwnd, PlayerCommand::Seek(-(skip_seconds as i64)));
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_GO_TO_TIME => {
+                    handle_player_command(hwnd, PlayerCommand::GoToTime);
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_ANNOUNCE_TIME => {
+                    handle_player_command(hwnd, PlayerCommand::AnnounceTime);
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_VOLUME_UP => {
+                    handle_player_command(hwnd, PlayerCommand::Volume(0.1));
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_VOLUME_DOWN => {
+                    handle_player_command(hwnd, PlayerCommand::Volume(-0.1));
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_MUTE_TOGGLE => {
+                    handle_player_command(hwnd, PlayerCommand::MuteToggle);
+                    LRESULT(0)
+                }
                 IDM_VIEW_SHOW_VOICES => {
                     log_debug("Menu: Toggle voice panel");
                     toggle_voice_panel(hwnd);
@@ -1582,6 +1801,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 IDM_TOOLS_RSS => {
                     log_debug("Menu: RSS");
                     app_windows::rss_window::open(hwnd);
+                    LRESULT(0)
+                }
+                IDM_TOOLS_PODCASTS => {
+                    log_debug("Menu: Podcasts");
+                    app_windows::podcasts_window::open(hwnd);
                     LRESULT(0)
                 }
                 IDM_HELP_GUIDE => {
@@ -2973,6 +3197,21 @@ unsafe fn create_accelerators() -> HACCEL {
         },
         ACCEL {
             fVirt: virt,
+            key: 'D' as u16,
+            cmd: IDM_EDIT_REMOVE_DUPLICATE_LINES as u16,
+        },
+        ACCEL {
+            fVirt: virt_shift,
+            key: 'C' as u16,
+            cmd: IDM_EDIT_REMOVE_DUPLICATE_CONSECUTIVE_LINES as u16,
+        },
+        ACCEL {
+            fVirt: virt_alt_shift,
+            key: 'H' as u16,
+            cmd: IDM_EDIT_CLEAN_EOL_HYPHENS as u16,
+        },
+        ACCEL {
+            fVirt: virt,
             key: VK_TAB.0 as u16,
             cmd: IDM_NEXT_TAB as u16,
         },
@@ -3030,6 +3269,11 @@ unsafe fn create_accelerators() -> HACCEL {
             fVirt: virt_shift,
             key: 'U' as u16,
             cmd: IDM_TOOLS_RSS as u16,
+        },
+        ACCEL {
+            fVirt: virt_shift,
+            key: 'O' as u16,
+            cmd: IDM_TOOLS_PODCASTS as u16,
         },
         ACCEL {
             fVirt: virt_shift,
@@ -3381,6 +3625,7 @@ pub(crate) unsafe fn open_pdf_document_async(hwnd: HWND, path: &Path) {
             format: FileFormat::Pdf,
             opened_text_encoding: None,
             current_save_text_encoding: None,
+            from_rss: false,
         };
         state.docs.push(doc);
         insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);

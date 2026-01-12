@@ -1,4 +1,4 @@
-Corriere della Sera | https://www.corriere.it/rss/homepage.xml
+Corriere della Sera | https://xml2.corriereobjects.it/feed-hp/homepage.xml
 La Repubblica | https://www.repubblica.it/rss/homepage/rss2.0.xml
 ANSA | https://www.ansa.it/sito/ansait_rss.xml
 Il Sole 24 Ore | http://www.ilsole24ore.com/rss/primapagina.xml

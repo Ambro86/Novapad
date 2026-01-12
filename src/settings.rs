@@ -180,6 +180,8 @@ pub struct AppSettings {
     #[serde(default)]
     pub rss_sources: Vec<RssSource>,
     #[serde(default)]
+    pub podcast_sources: Vec<RssSource>,
+    #[serde(default)]
     pub rss_removed_default_en: Vec<String>,
     #[serde(default)]
     pub rss_default_en_keys: Vec<String>,
@@ -215,6 +217,12 @@ pub struct AppSettings {
     pub rss_max_items_per_feed: usize,
     #[serde(default)]
     pub rss_max_excerpt_chars: usize,
+    #[serde(default)]
+    pub rss_cooldown_blocked_secs: u64,
+    #[serde(default)]
+    pub rss_cooldown_not_found_secs: u64,
+    #[serde(default)]
+    pub rss_cooldown_rate_limited_secs: u64,
 }
 
 impl Default for AppSettings {
@@ -274,6 +282,7 @@ impl Default for AppSettings {
             rss_default_es_keys: Vec::new(),
             rss_removed_default_pt: Vec::new(),
             rss_default_pt_keys: Vec::new(),
+            podcast_sources: Vec::new(),
             rss_global_max_concurrency: 8,
             rss_per_host_max_concurrency: 2,
             rss_per_host_rps: 1,
@@ -284,6 +293,9 @@ impl Default for AppSettings {
             rss_next_page_size: 100,
             rss_max_items_per_feed: 5000,
             rss_max_excerpt_chars: 512,
+            rss_cooldown_blocked_secs: 3600,
+            rss_cooldown_not_found_secs: 86400,
+            rss_cooldown_rate_limited_secs: 300,
         }
     }
 }
@@ -491,6 +503,10 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     if settings.rss_max_excerpt_chars == 0 {
         settings.rss_max_excerpt_chars = 512;
     }
+    settings.rss_cooldown_blocked_secs = settings.rss_cooldown_blocked_secs.clamp(60, 86_400);
+    settings.rss_cooldown_not_found_secs = settings.rss_cooldown_not_found_secs.clamp(300, 604_800);
+    settings.rss_cooldown_rate_limited_secs =
+        settings.rss_cooldown_rate_limited_secs.clamp(30, 3_600);
     settings
 }
 
@@ -518,6 +534,98 @@ pub fn error_title(language: Language) -> String {
 
 pub fn tts_no_text_message(language: Language) -> String {
     crate::i18n::tr(language, "app.tts_no_text")
+}
+
+pub fn move_rss_feed_up(settings: &mut AppSettings, index: usize) -> Option<usize> {
+    if index == 0 || index >= settings.rss_sources.len() {
+        return None;
+    }
+    settings.rss_sources.swap(index, index - 1);
+    Some(index - 1)
+}
+
+pub fn move_rss_feed_down(settings: &mut AppSettings, index: usize) -> Option<usize> {
+    if index + 1 >= settings.rss_sources.len() {
+        return None;
+    }
+    settings.rss_sources.swap(index, index + 1);
+    Some(index + 1)
+}
+
+pub fn move_rss_feed_to_top(settings: &mut AppSettings, index: usize) -> Option<usize> {
+    move_rss_feed_to_index(settings, index, 0)
+}
+
+pub fn move_rss_feed_to_bottom(settings: &mut AppSettings, index: usize) -> Option<usize> {
+    let len = settings.rss_sources.len();
+    if len == 0 {
+        return None;
+    }
+    move_rss_feed_to_index(settings, index, len - 1)
+}
+
+pub fn move_rss_feed_to_index(
+    settings: &mut AppSettings,
+    index: usize,
+    target_index: usize,
+) -> Option<usize> {
+    let len = settings.rss_sources.len();
+    if index >= len {
+        return None;
+    }
+    let target = target_index.min(len.saturating_sub(1));
+    if target == index {
+        return Some(index);
+    }
+    let item = settings.rss_sources.remove(index);
+    settings.rss_sources.insert(target, item);
+    Some(target)
+}
+
+pub fn move_podcast_feed_up(settings: &mut AppSettings, index: usize) -> Option<usize> {
+    if index == 0 || index >= settings.podcast_sources.len() {
+        return None;
+    }
+    settings.podcast_sources.swap(index, index - 1);
+    Some(index - 1)
+}
+
+pub fn move_podcast_feed_down(settings: &mut AppSettings, index: usize) -> Option<usize> {
+    if index + 1 >= settings.podcast_sources.len() {
+        return None;
+    }
+    settings.podcast_sources.swap(index, index + 1);
+    Some(index + 1)
+}
+
+pub fn move_podcast_feed_to_top(settings: &mut AppSettings, index: usize) -> Option<usize> {
+    move_podcast_feed_to_index(settings, index, 0)
+}
+
+pub fn move_podcast_feed_to_bottom(settings: &mut AppSettings, index: usize) -> Option<usize> {
+    let len = settings.podcast_sources.len();
+    if len == 0 {
+        return None;
+    }
+    move_podcast_feed_to_index(settings, index, len - 1)
+}
+
+pub fn move_podcast_feed_to_index(
+    settings: &mut AppSettings,
+    index: usize,
+    target_index: usize,
+) -> Option<usize> {
+    let len = settings.podcast_sources.len();
+    if index >= len {
+        return None;
+    }
+    let target = target_index.min(len.saturating_sub(1));
+    if target == index {
+        return Some(index);
+    }
+    let item = settings.podcast_sources.remove(index);
+    settings.podcast_sources.insert(target, item);
+    Some(target)
 }
 
 pub fn audiobook_done_title(language: Language) -> String {

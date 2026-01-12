@@ -71,6 +71,7 @@ pub struct Document {
     pub format: FileFormat,
     pub opened_text_encoding: Option<TextEncoding>,
     pub current_save_text_encoding: Option<TextEncoding>,
+    pub from_rss: bool,
 }
 
 #[derive(Clone)]
@@ -92,6 +93,7 @@ impl Default for Document {
             format: FileFormat::Text(TextEncoding::Utf8),
             opened_text_encoding: None,
             current_save_text_encoding: None,
+            from_rss: false,
         }
     }
 }
@@ -1647,11 +1649,6 @@ fn strip_markdown_text(text: &str) -> String {
         }
         if trimmed.starts_with("- ") || trimmed.starts_with("* ") || trimmed.starts_with("+ ") {
             trimmed = trimmed[2..].trim_start();
-        } else if let Some(rest) = trimmed.strip_prefix(|c: char| c.is_ascii_digit()) {
-            let rest = rest.trim_start();
-            if let Some(rest) = rest.strip_prefix('.') {
-                trimmed = rest.trim_start();
-            }
         }
         let mut cleaned = strip_markdown_inline(trimmed);
         cleaned.push_str(line_end);
@@ -1747,6 +1744,7 @@ pub unsafe fn new_document(hwnd: HWND) {
             format: FileFormat::Text(TextEncoding::Utf8),
             opened_text_encoding: None,
             current_save_text_encoding: None,
+            from_rss: false,
         };
         state.docs.push(doc);
         insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);
@@ -1883,6 +1881,7 @@ pub unsafe fn open_document_with_encoding(
             format,
             opened_text_encoding,
             current_save_text_encoding: None,
+            from_rss: false,
         };
         if matches!(format, FileFormat::Audiobook) {
             unsafe {
@@ -1907,6 +1906,25 @@ pub unsafe fn open_document_with_encoding(
 
 pub unsafe fn open_document(hwnd: HWND, path: &Path) {
     open_document_with_encoding(hwnd, path, None);
+}
+
+pub unsafe fn mark_current_document_from_rss(hwnd: HWND, from_rss: bool) {
+    let _ = with_state(hwnd, |state| {
+        if let Some(doc) = state.docs.get_mut(state.current) {
+            doc.from_rss = from_rss;
+        }
+    });
+}
+
+pub unsafe fn current_document_is_from_rss(hwnd: HWND) -> bool {
+    with_state(hwnd, |state| {
+        state
+            .docs
+            .get(state.current)
+            .map(|doc| doc.from_rss)
+            .unwrap_or(false)
+    })
+    .unwrap_or(false)
 }
 
 pub unsafe fn select_tab(hwnd: HWND, index: usize) {
@@ -1944,6 +1962,7 @@ pub unsafe fn select_tab(hwnd: HWND, index: usize) {
         }
     }
     update_window_title(hwnd);
+    crate::menu::update_playback_menu(hwnd, is_audiobook);
     layout_children(hwnd);
 }
 
@@ -2545,6 +2564,15 @@ pub unsafe fn close_document_at(hwnd: HWND, index: usize) -> bool {
         }
     }
     layout_children(hwnd);
+    let is_audiobook = with_state(hwnd, |state| {
+        state
+            .docs
+            .get(state.current)
+            .map(|d| matches!(d.format, FileFormat::Audiobook))
+            .unwrap_or(false)
+    })
+    .unwrap_or(false);
+    crate::menu::update_playback_menu(hwnd, is_audiobook);
     true
 }
 

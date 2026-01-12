@@ -341,6 +341,25 @@ unsafe fn announce_player_volume(hwnd: HWND) {
     let _ = nvda_speak(&message);
 }
 
+unsafe fn announce_player_speed(hwnd: HWND) {
+    let (speed, language) = with_state(hwnd, |state| {
+        let speed = crate::audio_player::audiobook_speed_level(hwnd);
+        (speed, state.settings.language)
+    })
+    .unwrap_or((None, Language::Italian));
+    let Some(speed) = speed else {
+        return;
+    };
+    let scaled = (speed * 10.0).round() / 10.0;
+    let speed_text = if (scaled.fract() - 0.0).abs() < f32::EPSILON {
+        format!("{:.0}", scaled)
+    } else {
+        format!("{:.1}", scaled)
+    };
+    let message = i18n::tr_f(language, "player.speed_announce", &[("speed", &speed_text)]);
+    let _ = nvda_speak(&message);
+}
+
 unsafe fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
     match command {
         PlayerCommand::TogglePause => {
@@ -355,6 +374,10 @@ unsafe fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
         PlayerCommand::Volume(delta) => {
             change_audiobook_volume(hwnd, delta);
             announce_player_volume(hwnd);
+        }
+        PlayerCommand::Speed(delta) => {
+            change_audiobook_speed(hwnd, delta);
+            announce_player_speed(hwnd);
         }
         PlayerCommand::MuteToggle => {
             toggle_audiobook_mute(hwnd);
@@ -441,6 +464,7 @@ struct RecentFileStore {
 
 fn main() -> windows::core::Result<()> {
     accessibility::ensure_nvda_controller_client();
+    accessibility::ensure_soundtouch_dll();
     log_debug("Application started.");
 
     let args: Vec<String> = std::env::args().collect();

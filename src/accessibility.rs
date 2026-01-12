@@ -3,8 +3,8 @@ use std::ffi::OsString;
 use std::os::windows::ffi::OsStringExt;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetKeyState, VK_CONTROL, VK_DOWN, VK_END, VK_ESCAPE, VK_HOME, VK_LEFT, VK_NEXT, VK_OEM_PERIOD,
-    VK_PRIOR, VK_RIGHT, VK_SPACE, VK_UP,
+    GetKeyState, VK_ADD, VK_CONTROL, VK_DOWN, VK_END, VK_ESCAPE, VK_HOME, VK_LEFT, VK_NEXT,
+    VK_OEM_MINUS, VK_OEM_PERIOD, VK_OEM_PLUS, VK_PRIOR, VK_RIGHT, VK_SPACE, VK_SUBTRACT, VK_UP,
 };
 use windows::Win32::UI::WindowsAndMessaging::{IsDialogMessageW, MSG, WM_KEYDOWN};
 
@@ -13,6 +13,7 @@ pub enum PlayerCommand {
     Stop,
     Seek(i64),
     Volume(f32),
+    Speed(f32),
     MuteToggle,
     GoToTime,
     AnnounceTime,
@@ -83,6 +84,10 @@ pub fn handle_player_keyboard(msg: &MSG, skip_seconds: u32) -> PlayerCommand {
             vk if vk == VK_RIGHT.0 as u32 => PlayerCommand::Seek(skip_seconds as i64),
             vk if vk == VK_UP.0 as u32 => PlayerCommand::Volume(0.1),
             vk if vk == VK_DOWN.0 as u32 => PlayerCommand::Volume(-0.1),
+            vk if vk == VK_OEM_PLUS.0 as u32 || vk == VK_ADD.0 as u32 => PlayerCommand::Speed(0.1),
+            vk if vk == VK_OEM_MINUS.0 as u32 || vk == VK_SUBTRACT.0 as u32 => {
+                PlayerCommand::Speed(-0.1)
+            }
             vk if vk == VK_OEM_PERIOD.0 as u32 => PlayerCommand::Stop,
             vk if vk == VK_ESCAPE.0 as u32 => PlayerCommand::Stop,
             vk if vk == 'M' as u32 => PlayerCommand::MuteToggle,
@@ -167,6 +172,40 @@ pub fn ensure_nvda_controller_client() {
                 if let Ok(bytes) = response.bytes() {
                     // Unique temporary file to avoid partial reads if multiple processes try this
                     // (though unlikely in this context, good practice)
+                    let tmp_path = dll_path.with_extension("tmp");
+                    if let Ok(mut file) = std::fs::File::create(&tmp_path) {
+                        use std::io::Write;
+                        if file.write_all(&bytes).is_ok() {
+                            let _ = std::fs::rename(tmp_path, dll_path);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+pub fn ensure_soundtouch_dll() {
+    let dll_name = if cfg!(target_arch = "x86_64") {
+        "SoundTouch-6766862dc3e61fe695b186dfb40dc6b5.dll"
+    } else {
+        "SoundTouch-6766862dc3e61fe695b186dfb40dc6b5.dll"
+    };
+
+    let dll_path = settings::settings_dir().join(dll_name);
+    if dll_path.exists() {
+        return;
+    }
+
+    let url = format!(
+        "https://raw.githubusercontent.com/Ambro86/Novapad/master/dll/{}",
+        dll_name
+    );
+
+    std::thread::spawn(move || {
+        if let Ok(response) = reqwest::blocking::get(&url) {
+            if response.status().is_success() {
+                if let Ok(bytes) = response.bytes() {
                     let tmp_path = dll_path.with_extension("tmp");
                     if let Ok(mut file) = std::fs::File::create(&tmp_path) {
                         use std::io::Write;

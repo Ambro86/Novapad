@@ -11,8 +11,10 @@ use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::io::Cursor;
+use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use tokio::process::Command;
 use tokio::sync::{Mutex, OwnedSemaphorePermit, Semaphore};
 use tokio::time::sleep;
 use url::Url;
@@ -319,6 +321,8 @@ struct HostRateState {
 }
 
 static RSS_HTTP: OnceLock<Result<RssHttp, String>> = OnceLock::new();
+const CURL_IMPERSONATE_URL: &str =
+    "https://raw.githubusercontent.com/Ambro86/Novapad/master/dll/curl.exe";
 
 pub fn init_http(config: RssHttpConfig) -> Result<(), String> {
     let res = RSS_HTTP.get_or_init(|| RssHttp::new(config));
@@ -1797,6 +1801,101 @@ pub async fn fetch_url_bytes(
     Ok(out.bytes)
 }
 
+fn curl_exe_path() -> PathBuf {
+    crate::settings::settings_dir().join("curl.exe")
+}
+
+async fn ensure_curl_exe() -> Result<PathBuf, String> {
+    let exe_path = curl_exe_path();
+    if exe_path.exists() {
+        return Ok(exe_path);
+    }
+    let _ = std::fs::create_dir_all(
+        exe_path
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new(".")),
+    );
+    let response = reqwest::get(CURL_IMPERSONATE_URL)
+        .await
+        .map_err(|e| e.to_string())?;
+    if !response.status().is_success() {
+        return Err(format!(
+            "curl download failed: {}",
+            response.status().as_u16()
+        ));
+    }
+    let bytes = response.bytes().await.map_err(|e| e.to_string())?;
+    let tmp_path = exe_path.with_extension("tmp");
+    std::fs::write(&tmp_path, &bytes).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp_path, &exe_path).map_err(|e| e.to_string())?;
+    Ok(exe_path)
+}
+
+fn is_probably_blocked_html(html: &str) -> bool {
+    let lower = html.to_ascii_lowercase();
+    lower.contains("just a moment")
+        || lower.contains("cf-browser-verification")
+        || lower.contains("cf-chl")
+        || lower.contains("attention required")
+}
+
+fn curl_impersonate_args(url: &str) -> Vec<String> {
+    vec![
+        "--ciphers".to_string(),
+        "TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384,TLS_CHACHA20_POLY1305_SHA256,ECDHE-ECDSA-AES128-GCM-SHA256,ECDHE-RSA-AES128-GCM-SHA256,ECDHE-ECDSA-AES256-GCM-SHA384,ECDHE-RSA-AES256-GCM-SHA384,ECDHE-ECDSA-CHACHA20-POLY1305,ECDHE-RSA-CHACHA20-POLY1305,ECDHE-RSA-AES128-SHA,ECDHE-RSA-AES256-SHA,AES128-GCM-SHA256,AES256-GCM-SHA384,AES128-SHA,AES256-SHA".to_string(),
+        "-H".to_string(),
+        "sec-ch-ua: \"Chromium\";v=\"116\", \"Not)A;Brand\";v=\"24\", \"Google Chrome\";v=\"116\"".to_string(),
+        "-H".to_string(),
+        "sec-ch-ua-mobile: ?0".to_string(),
+        "-H".to_string(),
+        "sec-ch-ua-platform: \"Windows\"".to_string(),
+        "-H".to_string(),
+        "Upgrade-Insecure-Requests: 1".to_string(),
+        "-H".to_string(),
+        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36".to_string(),
+        "-H".to_string(),
+        "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7".to_string(),
+        "-H".to_string(),
+        "Sec-Fetch-Site: none".to_string(),
+        "-H".to_string(),
+        "Sec-Fetch-Mode: navigate".to_string(),
+        "-H".to_string(),
+        "Sec-Fetch-User: ?1".to_string(),
+        "-H".to_string(),
+        "Sec-Fetch-Dest: document".to_string(),
+        "-H".to_string(),
+        "Accept-Encoding: gzip, deflate, br".to_string(),
+        "-H".to_string(),
+        "Accept-Language: en-US,en;q=0.9".to_string(),
+        "--http2".to_string(),
+        "--compressed".to_string(),
+        "--tlsv1.2".to_string(),
+        "--alps".to_string(),
+        "--cert-compression".to_string(),
+        "brotli".to_string(),
+        "--location".to_string(),
+        "--max-time".to_string(),
+        "20".to_string(),
+        "-sS".to_string(),
+        url.to_string(),
+    ]
+}
+
+async fn fetch_article_html_with_curl(url: &str) -> Result<String, String> {
+    let exe_path = ensure_curl_exe().await?;
+    let args = curl_impersonate_args(url);
+    let output = Command::new(&exe_path)
+        .args(&args)
+        .output()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("curl failed: {}", stderr.trim()));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
 pub async fn fetch_article_text(
     url: &str,
     fallback_title: &str,
@@ -1808,10 +1907,27 @@ pub async fn fetch_article_text(
     }
     let http = shared_http()?;
     let fetch_config = RssFetchConfig::default();
-    let out = fetch_bytes_with_retries(http, &url, false, "article", false, &fetch_config, None)
-        .await
-        .map_err(|e| e.to_string())?;
-    let html = String::from_utf8_lossy(&out.bytes).to_string();
+    let out =
+        fetch_bytes_with_retries(http, &url, false, "article", false, &fetch_config, None).await;
+    let html = match out {
+        Ok(out) => String::from_utf8_lossy(&out.bytes).to_string(),
+        Err(err) => {
+            log_debug(&format!(
+                "rss_article_fetch reqwest_failed url=\"{}\" error=\"{}\"",
+                url, err
+            ));
+            fetch_article_html_with_curl(&url).await?
+        }
+    };
+    let html = if is_probably_blocked_html(&html) {
+        log_debug(&format!(
+            "rss_article_fetch reqwest_blocked url=\"{}\"",
+            url
+        ));
+        fetch_article_html_with_curl(&url).await?
+    } else {
+        html
+    };
     let article = reader::reader_mode_extract(&html).unwrap_or(reader::ArticleContent {
         title: fallback_title.to_string(),
         content: fallback_description.to_string(),

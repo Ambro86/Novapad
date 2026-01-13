@@ -3018,7 +3018,7 @@ unsafe fn import_item(hwnd: HWND, item: RssItem) {
                     "rss_import_fallback url=\"{}\" error=\"{}\"",
                     url, err
                 ));
-                format!("{}\n\n{}\n\n{}", item.title, item.description, url)
+                format!("{}\n\n{}", item.title, url)
             }
         };
         let msg = Box::new(ImportResult { text });

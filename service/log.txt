@@ -1,17 +1,6 @@
-[2026-01-13 00:25:55] Application started.
-[2026-01-13 00:25:58] Menu: Find
-[2026-01-13 00:28:51] Menu: New document
-[2026-01-13 00:28:53] Menu: Find
-[2026-01-13 00:53:12] Application started.
-[2026-01-13 00:53:14] Menu: Open document
-[2026-01-13 00:53:14] open_file_dialog_with_encoding called
-[2026-01-13 00:53:14] FileOpenDialog created successfully
-[2026-01-13 00:53:14] Adding encoding controls to open dialog
-[2026-01-13 00:53:14] Event handler registered with cookie: 4
-[2026-01-13 00:53:14] Triggering initial OnTypeChange
-[2026-01-13 00:53:14] Showing open dialog
-[2026-01-13 00:53:14] OnTypeChange: filter_index = 1
-[2026-01-13 00:53:14] OnTypeChange: hiding encoding combobox
-[2026-01-13 00:53:18] Dialog closed with OK
-[2026-01-13 00:53:18] Open document: C:\Users\ambro\Downloads\Braveheart.mp3 (encoding: None)
-[2026-01-13 00:53:23] SoundTouch exports: bpm_putSamples, bpm_putSamples_i16, soundtouch_clear, soundtouch_createInstance, soundtouch_destroyInstance, soundtouch_flush, soundtouch_getSetting, soundtouch_getVersionId, soundtouch_getVersionString, soundtouch_getVersionString2, soundtouch_isEmpty, soundtouch_numSamples, soundtouch_numUnprocessedSamples, soundtouch_putSamples, soundtouch_putSamples_i16, soundtouch_receiveSamples, soundtouch_receiveSamples_i16, soundtouch_setChannels, soundtouch_setPitch, soundtouch_setPitchOctaves, soundtouch_setPitchSemiTones, soundtouch_setRate, soundtouch_setRateChange, soundtouch_setSampleRate, soundtouch_setSetting, soundtouch_setTempo, soundtouch_setTempoChange
+So here is a bit of a strange bug.
+When Novapad is first launched and you use quotes, they’re normal straight quotes. Sometimes, though, they turn into smart quotes when you try to write something with quotes.
+I have no idea why it does this. Maybe there needs to be a setting that lets you turn smart quotes on and off?
+"This is a test."
+As you can see, this time they came out as normal straight quotes. When I tried it earlier, they were smart quotes.
+It's not something that happens regularly, so good luck trying to resolve this one lol.

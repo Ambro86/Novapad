@@ -1,14 +1,20 @@
+use crate::accessibility::to_wide;
 use crate::tools::rss::RssSource;
 use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
 use std::os::windows::prelude::*;
 use std::path::PathBuf;
 use std::path::{Component, Prefix};
-use windows::Win32::Foundation::HANDLE;
+use windows::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS, HANDLE};
 use windows::Win32::Globalization::GetUserDefaultLocaleName;
 use windows::Win32::Storage::FileSystem::GetDriveTypeW;
 use windows::Win32::System::Com::CoTaskMemFree;
+use windows::Win32::System::Registry::{
+    HKEY_CURRENT_USER, KEY_SET_VALUE, REG_OPTION_NON_VOLATILE, REG_SZ, RegCloseKey,
+    RegCreateKeyExW, RegDeleteTreeW, RegSetValueExW,
+};
 use windows::Win32::UI::Shell::{FOLDERID_Documents, SHGetKnownFolderPath};
+use windows::core::PCWSTR;
 
 pub const DRIVE_REMOVABLE: u32 = 2;
 
@@ -143,6 +149,7 @@ pub struct AppSettings {
     pub split_on_newline: bool,
     pub word_wrap: bool,
     pub wrap_width: u32,
+    pub smart_quotes: bool,
     pub quote_prefix: String,
     pub move_cursor_during_reading: bool,
     pub audiobook_skip_seconds: u32,
@@ -179,6 +186,7 @@ pub struct AppSettings {
     pub prompt_beep_on_idle: bool,
     pub prompt_prevent_sleep: bool,
     pub prompt_announce_lines: bool,
+    pub context_menu_open_with: bool,
     #[serde(default)]
     pub rss_sources: Vec<RssSource>,
     #[serde(default)]
@@ -239,6 +247,7 @@ impl Default for AppSettings {
             split_on_newline: false,
             word_wrap: true,
             wrap_width: 80,
+            smart_quotes: false,
             quote_prefix: "> ".to_string(),
             move_cursor_during_reading: false,
             audiobook_skip_seconds: 60,
@@ -275,6 +284,7 @@ impl Default for AppSettings {
             prompt_beep_on_idle: true,
             prompt_prevent_sleep: true,
             prompt_announce_lines: true,
+            context_menu_open_with: false,
             rss_sources: Vec::new(),
             rss_removed_default_en: Vec::new(),
             rss_default_en_keys: Vec::new(),
@@ -527,6 +537,121 @@ pub fn save_settings(settings: AppSettings) {
 
 pub fn save_settings_with_default_copy(settings: AppSettings, _keep_default_copy: bool) {
     save_settings(settings);
+}
+
+const CONTEXT_MENU_EXTENSIONS: &[&str] = &[
+    "txt", "md", "pdf", "epub", "mp3", "doc", "docx", "xls", "xlsx", "rtf", "htm", "html", "ppt",
+    "pptx",
+];
+
+pub fn sync_context_menu(settings: &AppSettings) {
+    let label = crate::i18n::tr(settings.language, "context_menu.open_with");
+    let exe_path = match std::env::current_exe() {
+        Ok(path) => path,
+        Err(err) => {
+            crate::log_debug(&format!("Context menu: failed to get exe path: {err}"));
+            return;
+        }
+    };
+    let exe_path_str = exe_path.to_string_lossy();
+    let command = format!("\"{}\" \"%1\"", exe_path_str);
+    let icon = format!("\"{}\",0", exe_path_str);
+
+    for ext in CONTEXT_MENU_EXTENSIONS {
+        let base_key = format!(
+            "Software\\Classes\\SystemFileAssociations\\.{}\\shell\\OpenWithNovapad",
+            ext
+        );
+        if settings.context_menu_open_with {
+            create_context_menu_entry(&base_key, &label, &command, &icon);
+        } else {
+            delete_context_menu_entry(&base_key);
+        }
+    }
+}
+
+fn create_context_menu_entry(base_key: &str, label: &str, command: &str, icon: &str) {
+    if let Some(key) = create_registry_key(base_key) {
+        let _ = set_registry_string_value(key, None, label);
+        unsafe {
+            RegCloseKey(key);
+        }
+    }
+
+    let icon_key = format!("{base_key}\\DefaultIcon");
+    if let Some(key) = create_registry_key(&icon_key) {
+        let _ = set_registry_string_value(key, None, icon);
+        unsafe {
+            RegCloseKey(key);
+        }
+    }
+
+    let command_key = format!("{base_key}\\command");
+    if let Some(key) = create_registry_key(&command_key) {
+        let _ = set_registry_string_value(key, None, command);
+        unsafe {
+            RegCloseKey(key);
+        }
+    }
+}
+
+fn delete_context_menu_entry(base_key: &str) {
+    let base_key_wide = to_wide(base_key);
+    let status = unsafe { RegDeleteTreeW(HKEY_CURRENT_USER, PCWSTR(base_key_wide.as_ptr())) };
+    if status != ERROR_SUCCESS && status != ERROR_FILE_NOT_FOUND {
+        crate::log_debug(&format!(
+            "Context menu: failed to delete key {base_key}: {status:?}"
+        ));
+    }
+}
+
+fn create_registry_key(path: &str) -> Option<windows::Win32::System::Registry::HKEY> {
+    let path_wide = to_wide(path);
+    let mut key = windows::Win32::System::Registry::HKEY::default();
+    let status = unsafe {
+        RegCreateKeyExW(
+            HKEY_CURRENT_USER,
+            PCWSTR(path_wide.as_ptr()),
+            0,
+            PCWSTR::null(),
+            REG_OPTION_NON_VOLATILE,
+            KEY_SET_VALUE,
+            None,
+            &mut key,
+            None,
+        )
+    };
+    if status == ERROR_SUCCESS {
+        Some(key)
+    } else {
+        crate::log_debug(&format!(
+            "Context menu: failed to create key {path}: {status:?}"
+        ));
+        None
+    }
+}
+
+fn set_registry_string_value(
+    key: windows::Win32::System::Registry::HKEY,
+    value_name: Option<&str>,
+    value: &str,
+) -> bool {
+    let value_wide = to_wide(value);
+    let name_wide;
+    let name_ptr = if let Some(name) = value_name {
+        name_wide = to_wide(name);
+        PCWSTR(name_wide.as_ptr())
+    } else {
+        PCWSTR::null()
+    };
+    let value_bytes = unsafe {
+        std::slice::from_raw_parts(value_wide.as_ptr() as *const u8, value_wide.len() * 2)
+    };
+    let status = unsafe { RegSetValueExW(key, name_ptr, 0, REG_SZ, Some(value_bytes)) };
+    if status != ERROR_SUCCESS {
+        crate::log_debug(&format!("Context menu: failed to set value: {status:?}"));
+    }
+    status == ERROR_SUCCESS
 }
 
 pub fn confirm_title(language: Language) -> String {

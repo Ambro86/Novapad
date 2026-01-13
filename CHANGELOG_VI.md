@@ -1,5 +1,32 @@
 Nhật kí thay đổi
 
+Phien ban 0.5.9 - 2025-01-13
+Tinh nang moi
+• Them kha nang sap xep RSS tu menu ngu canh (len/xuong/den vi tri), co kiem tra vi tri khong hop le.
+• Them menu ngu canh cho bai viet: mo trang goc va chia se qua WhatsApp, Facebook va X.
+• Them phim tat Esc de quay lai danh sach RSS tu bai viet da nhap.
+• Them che do podcast: tim kiem, dang ky va nghe; sap xep dang ky; Esc dung phat va quay lai danh sach; Enter tren tap phat bat dau phat.
+• Them dieu chinh toc do phat cho podcast va file MP3.
+• Them Ctrl+T de di den thoi gian cu the.
+• Them nut nghe thu giong doc sau hop chon am luong.
+• Them chuc nang regex cho Tim va Thay the, phong cach Notepad++.
+• Them nhap RSS tu file OPML va TXT.
+• Them tuy chon trong Cai dat de bat "Mo voi Novapad" trong File Explorer, ke ca ban portable.
+Cai tien
+• Cai thien lua chon toc do, cao do va am luong giong doc, ton trong gioi han toi da cua TTS.
+• Nhieu cai tien cho RSS de tai du cac bai viet ma khong di chuyen focus NVDA khi cap nhat.
+• Cai thien phat am thanh voi menu rieng, thong bao thoi gian bang Ctrl+I va am luong toi 300%.
+• Them cac phim tat con thieu cho mot so chuc nang.
+• Sap xep lai menu Chinh sua voi submenu cho cac chuc nang lam sach van ban.
+• Sap xep lai Tuy chon thanh cac the, co Ctrl+Tab va Ctrl+Shift+Tab de chuyen the.
+• Khac phuc loi doc bai viet: trinh doc RSS gio doc du bai viet nhu tren trinh duyet.
+Sua loi
+• Sua loi lam sach Markdown loai bo so o dau dong.
+• Sua AltGr+Z kich hoat Undo.
+• Sua loi khi ghi sach noi khong the dung nhanh.
+Ban dia hoa
+• Them dich tieng Viet (cam on Anh Duc Nguyen).
+
 Phiên bản 0.5.7 - 2026-01-05
 Tính năng mới
 • Thêm tính năng Sách nói hàng loạt để chuyển đổi nhiều tệp/thư mục cùng lúc.

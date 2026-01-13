@@ -1,4 +1,32 @@
 # Changelog
+
+Version 0.5.9 - 2025-01-13
+Nuevas funciones
+• Aniadida la posibilidad de reordenar RSS desde el menu contextual (arriba/abajo/a posicion) con controles para posiciones no validas.
+• Aniadido un menu contextual para los articulos con abrir sitio original y compartir por WhatsApp, Facebook y X.
+• Aniadido el atajo Esc para volver desde articulos importados a la lista RSS.
+• Aniadido el modo podcast: buscar, suscribirse y escuchar; reordenar suscripciones; Esc detiene la reproduccion y vuelve a la lista; Enter en un episodio inicia la reproduccion.
+• Aniadido el control de velocidad de reproduccion para podcasts y archivos MP3.
+• Aniadido Ctrl+T para ir a un tiempo especifico.
+• Aniadido un boton de vista previa de voz despues del combo de volumen.
+• Aniadida la funcion de regex para Buscar y Reemplazar, estilo Notepad++.
+• Aniadida la importacion de RSS desde archivos OPML y TXT.
+• Aniadida la casilla en Opciones para habilitar "Abrir con Novapad" en el Explorador de archivos, tambien en version portable.
+Mejoras
+• Mejorada la seleccion de velocidad, tono y volumen de las voces, respetando los limites maximos del TTS.
+• Varias mejoras de RSS para descargar todos los articulos sin mover el foco de NVDA durante las actualizaciones.
+• Mejorada la reproduccion de audio con un menu dedicado, anuncio del tiempo con Ctrl+I y volumen hasta el 300%.
+• Aniadidos atajos faltantes para algunas funciones.
+• Reorganizado el menu Editar con un submenu para las funciones de limpieza de texto.
+• Reorganizadas las Opciones en pestanas, con Ctrl+Tab y Ctrl+Shift+Tab para moverse entre ellas.
+• Resueltos los problemas de lectura de articulos: el lector RSS ahora muestra los articulos completos como en el navegador.
+Correcciones
+• Corregido un problema por el que la limpieza de Markdown eliminaba numeros al inicio de linea.
+• Corregido AltGr+Z que activaba Undo.
+• Corregido un problema por el que al grabar un audiolibro no se podia detener rapidamente.
+Localizacion
+• Aniadida la traduccion vietnamita (gracias a Anh Duc Nguyen).
+
 Version 0.5.8 - 2026-01-10
 Nuevas funciones
 • Aniadido control de volumen para microfono y audio del sistema al grabar podcasts.

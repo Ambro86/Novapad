@@ -1,4 +1,32 @@
 # Changelog
+
+Version 0.5.9 - 2025-01-13
+New features
+• Added RSS reordering from the context menu (up/down/to position) with invalid-position checks.
+• Added an article context menu with open original site and share via WhatsApp, Facebook, and X.
+• Added Esc shortcut to return from imported articles to the RSS list.
+• Added podcast mode: search, subscribe, listen; reorder subscriptions; Esc stops playback and returns to the list; Enter on an episode starts playback.
+• Added playback speed control for podcasts and MP3 files.
+• Added Ctrl+T to jump to a specific time.
+• Added a voice preview button after the volume combo.
+• Added regex find and replace (Notepad++ style).
+• Added RSS import from OPML and TXT files.
+• Added an option to enable "Open with Novapad" in File Explorer, including portable builds.
+Improvements
+• Improved voice speed/pitch/volume selection, respecting TTS max limits.
+• Various RSS improvements to download all articles without moving NVDA focus during updates.
+• Improved audio playback with a dedicated menu, Ctrl+I time announce, and volume up to 300%.
+• Added missing shortcuts for some functions.
+• Reorganized the Edit menu with a text cleanup submenu.
+• Reorganized Options into tabs, with Ctrl+Tab and Ctrl+Shift+Tab navigation.
+• RSS reader now downloads full article content, matching the browser view.
+Fixes
+• Fixed Markdown cleanup removing numbers at the start of lines.
+• Fixed AltGr+Z triggering undo.
+• Fixed audiobook recording cancellation so it stops quickly.
+Localization
+• Added Vietnamese translation (thanks to Anh Đức Nguyễn).
+
 Version 0.5.8 - 2026-01-10
 New features
 • Added volume control for the microphone and system audio when recording podcasts.

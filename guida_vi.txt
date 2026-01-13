@@ -22,6 +22,10 @@ Khi bạn mở một tệp MP3, Novapad sẽ hoạt động như một trình ph
 - MŨI TÊN TRÁI: Tua lùi 1 phút.
 - MŨI TÊN LÊN: Tăng âm lượng.
 - MŨI TÊN XUỐNG: Giảm âm lượng.
+- +: Tăng tốc độ phát.
+- -: Giảm tốc độ phát.
+- CTRL+I: Thông báo thời gian phát.
+- CTRL+T: Đi tới thời gian cụ thể.
 - CTRL+B: Chèn dấu trang tại thời điểm chính xác.
 
 Chỉnh sửa:
@@ -76,6 +80,13 @@ Sách nói hàng loạt: mở cửa sổ để chuyển đổi danh sách tệp 
   Enter gửi input. Ctrl+C sao chép output (hoặc gửi Ctrl+C tới chương trình). Ctrl+L xóa output sau khi xác nhận.
   Tùy chọn terminal: tự động cuộn, loại bỏ ANSI, thông báo dòng mới, phát âm báo sau 1 giây không hoạt động, ngăn chế độ ngủ.
   Lựa chọn chương trình: Command Prompt (cmd.exe), PowerShell, Codex CLI (trong Tùy chọn).
+  RSS / Bài viết: mở cửa sổ RSS/Bài viết, thêm nguồn, mở rộng một feed và nhấn Enter để nhập bài viết vào trình soạn thảo.
+  Trong cửa sổ RSS, chọn một feed hoặc site và nhấn Delete để xóa khỏi thư viện.
+  Trong menu ngữ cảnh của feed hoặc site bạn có thể chỉnh sửa hoặc xóa RSS/site.
+  Sau khi nhập một bài viết RSS, nhấn Esc để quay lại danh sách RSS.
+  Podcast: mở cửa sổ Podcast để tìm kiếm và quản lý đăng ký.
+  Trong danh sách tập, nhấn Enter để phát tập.
+  Khi đang phát, nhấn Esc để dừng podcast và quay lại thư viện.
 
 Tùy chọn:
 Ngôn ngữ: Thay đổi ngôn ngữ giao diện.

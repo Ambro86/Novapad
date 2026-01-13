@@ -7,7 +7,7 @@ use crate::accessibility::{handle_accessibility, to_wide};
 use crate::editor_manager::{apply_word_wrap_to_all_edits, update_window_title};
 use crate::settings::{
     Language, ModifiedMarkerPosition, OpenBehavior, TRUSTED_CLIENT_TOKEN, TtsEngine,
-    VOICE_LIST_URL, VoiceInfo, save_settings_with_default_copy,
+    VOICE_LIST_URL, VoiceInfo, save_settings_with_default_copy, sync_context_menu,
 };
 use crate::{i18n, rebuild_menus, refresh_voice_panel, tts_engine, with_state};
 use std::sync::Arc;
@@ -48,6 +48,8 @@ const OPTIONS_ID_VOICE: usize = 6003;
 const OPTIONS_ID_MULTILINGUAL: usize = 6004;
 const OPTIONS_ID_SPLIT_ON_NEWLINE: usize = 6007;
 const OPTIONS_ID_WORD_WRAP: usize = 6008;
+const OPTIONS_ID_SMART_QUOTES: usize = 6025;
+const OPTIONS_ID_CONTEXT_MENU: usize = 6026;
 const OPTIONS_ID_MOVE_CURSOR: usize = 6009;
 const OPTIONS_ID_TTS_SPEED: usize = 6014;
 const OPTIONS_ID_TTS_PITCH: usize = 6020;
@@ -147,12 +149,14 @@ struct OptionsDialogState {
     checkbox_multilingual: HWND,
     checkbox_split_on_newline: HWND,
     checkbox_word_wrap: HWND,
+    checkbox_smart_quotes: HWND,
     label_wrap_width: HWND,
     edit_wrap_width: HWND,
     label_quote_prefix: HWND,
     edit_quote_prefix: HWND,
     checkbox_move_cursor: HWND,
     checkbox_check_updates: HWND,
+    checkbox_context_menu: HWND,
     label_prompt_program: HWND,
     combo_prompt_program: HWND,
     ok_button: HWND,
@@ -176,10 +180,12 @@ struct OptionsLabels {
     label_tts_preview: String,
     label_split_on_newline: String,
     label_word_wrap: String,
+    label_smart_quotes: String,
     label_wrap_width: String,
     label_quote_prefix: String,
     label_move_cursor: String,
     label_check_updates: String,
+    label_context_menu: String,
     label_prompt_program: String,
     label_audio_skip: String,
     label_audio_split: String,
@@ -230,10 +236,12 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_tts_preview: i18n::tr(language, "options.label.voice_preview"),
         label_split_on_newline: i18n::tr(language, "options.label.split_on_newline"),
         label_word_wrap: i18n::tr(language, "options.label.word_wrap"),
+        label_smart_quotes: i18n::tr(language, "options.label.smart_quotes"),
         label_wrap_width: i18n::tr(language, "options.label.wrap_width"),
         label_quote_prefix: i18n::tr(language, "options.label.quote_prefix"),
         label_move_cursor: i18n::tr(language, "options.label.move_cursor"),
         label_check_updates: i18n::tr(language, "options.label.check_updates"),
+        label_context_menu: i18n::tr(language, "options.label.context_menu"),
         label_prompt_program: i18n::tr(language, "options.label.prompt_program"),
         label_audio_skip: i18n::tr(language, "options.label.audio_skip"),
         label_audio_split: i18n::tr(language, "options.label.audio_split"),
@@ -835,6 +843,22 @@ unsafe extern "system" fn options_wndproc(
                 HINSTANCE(0),
                 None,
             );
+            y += 24;
+
+            let checkbox_smart_quotes = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_smart_quotes).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                170,
+                y,
+                300,
+                20,
+                hwnd,
+                HMENU(OPTIONS_ID_SMART_QUOTES as isize),
+                HINSTANCE(0),
+                None,
+            );
             y += 26;
 
             let label_wrap_width = CreateWindowExW(
@@ -924,6 +948,22 @@ unsafe extern "system" fn options_wndproc(
                 20,
                 hwnd,
                 HMENU(OPTIONS_ID_CHECK_UPDATES as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 24;
+
+            let checkbox_context_menu = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_context_menu).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                170,
+                y,
+                300,
+                20,
+                hwnd,
+                HMENU(OPTIONS_ID_CONTEXT_MENU as isize),
                 HINSTANCE(0),
                 None,
             );
@@ -1017,12 +1057,14 @@ unsafe extern "system" fn options_wndproc(
                 checkbox_multilingual,
                 checkbox_split_on_newline,
                 checkbox_word_wrap,
+                checkbox_smart_quotes,
                 label_wrap_width,
                 edit_wrap_width,
                 label_quote_prefix,
                 edit_quote_prefix,
                 checkbox_move_cursor,
                 checkbox_check_updates,
+                checkbox_context_menu,
                 label_prompt_program,
                 combo_prompt_program,
                 ok_button,
@@ -1063,12 +1105,14 @@ unsafe extern "system" fn options_wndproc(
                 checkbox_multilingual,
                 checkbox_split_on_newline,
                 checkbox_word_wrap,
+                checkbox_smart_quotes,
                 label_wrap_width,
                 edit_wrap_width,
                 label_quote_prefix,
                 edit_quote_prefix,
                 checkbox_move_cursor,
                 checkbox_check_updates,
+                checkbox_context_menu,
                 label_prompt_program,
                 combo_prompt_program,
                 ok_button,
@@ -1243,12 +1287,14 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         checkbox_multilingual,
         checkbox_split_on_newline,
         checkbox_word_wrap,
+        checkbox_smart_quotes,
         _label_wrap_width,
         edit_wrap_width,
         _label_quote_prefix,
         edit_quote_prefix,
         checkbox_move_cursor,
         checkbox_check_updates,
+        checkbox_context_menu,
         _label_prompt_program,
         combo_prompt_program,
     ) = match with_options_state(hwnd, |state| {
@@ -1270,12 +1316,14 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.checkbox_multilingual,
             state.checkbox_split_on_newline,
             state.checkbox_word_wrap,
+            state.checkbox_smart_quotes,
             state.label_wrap_width,
             state.edit_wrap_width,
             state.label_quote_prefix,
             state.edit_quote_prefix,
             state.checkbox_move_cursor,
             state.checkbox_check_updates,
+            state.checkbox_context_menu,
             state.label_prompt_program,
             state.combo_prompt_program,
         )
@@ -1564,6 +1612,16 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         }),
         LPARAM(0),
     );
+    let _ = SendMessageW(
+        checkbox_smart_quotes,
+        BM_SETCHECK,
+        WPARAM(if settings.smart_quotes {
+            BST_CHECKED.0 as usize
+        } else {
+            0
+        }),
+        LPARAM(0),
+    );
     let wrap_text = settings.wrap_width.to_string();
     let _ = SetWindowTextW(edit_wrap_width, PCWSTR(to_wide(&wrap_text).as_ptr()));
     let _ = SetWindowTextW(
@@ -1584,6 +1642,16 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         checkbox_check_updates,
         BM_SETCHECK,
         WPARAM(if settings.check_updates_on_startup {
+            BST_CHECKED.0 as usize
+        } else {
+            0
+        }),
+        LPARAM(0),
+    );
+    let _ = SendMessageW(
+        checkbox_context_menu,
+        BM_SETCHECK,
+        WPARAM(if settings.context_menu_open_with {
             BST_CHECKED.0 as usize
         } else {
             0
@@ -1917,10 +1985,12 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         checkbox_multilingual,
         checkbox_split_on_newline,
         checkbox_word_wrap,
+        checkbox_smart_quotes,
         edit_wrap_width,
         edit_quote_prefix,
         checkbox_move_cursor,
         checkbox_check_updates,
+        checkbox_context_menu,
         combo_prompt_program,
     ) = match with_options_state(hwnd, |state| {
         (
@@ -1940,10 +2010,12 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.checkbox_multilingual,
             state.checkbox_split_on_newline,
             state.checkbox_word_wrap,
+            state.checkbox_smart_quotes,
             state.edit_wrap_width,
             state.edit_quote_prefix,
             state.checkbox_move_cursor,
             state.checkbox_check_updates,
+            state.checkbox_context_menu,
             state.combo_prompt_program,
         )
     }) {
@@ -1955,6 +2027,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     let old_language = settings.language;
     let old_marker_position = settings.modified_marker_position;
     let old_word_wrap = settings.word_wrap;
+    let old_context_menu = settings.context_menu_open_with;
     let (old_engine, old_voice, old_rate, old_pitch, old_volume, was_tts_active) =
         with_state(parent, |state| {
             (
@@ -2032,6 +2105,9 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     settings.word_wrap = SendMessageW(checkbox_word_wrap, BM_GETCHECK, WPARAM(0), LPARAM(0)).0
         as u32
         == BST_CHECKED.0;
+    settings.smart_quotes = SendMessageW(checkbox_smart_quotes, BM_GETCHECK, WPARAM(0), LPARAM(0)).0
+        as u32
+        == BST_CHECKED.0;
 
     let width_len = GetWindowTextLengthW(edit_wrap_width);
     if width_len >= 0 {
@@ -2056,6 +2132,9 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             == BST_CHECKED.0;
     settings.check_updates_on_startup =
         SendMessageW(checkbox_check_updates, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
+            == BST_CHECKED.0;
+    settings.context_menu_open_with =
+        SendMessageW(checkbox_context_menu, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
             == BST_CHECKED.0;
 
     let prompt_sel = SendMessageW(combo_prompt_program, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
@@ -2131,6 +2210,11 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     let keep_default_copy = false;
 
     save_settings_with_default_copy(settings.clone(), keep_default_copy);
+    if settings.context_menu_open_with != old_context_menu
+        || (settings.context_menu_open_with && old_language != new_language)
+    {
+        sync_context_menu(&settings);
+    }
 
     if old_language != new_language {
         rebuild_menus(parent);
@@ -2214,6 +2298,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.label_prompt_program,
             state.combo_prompt_program,
             state.checkbox_check_updates,
+            state.checkbox_context_menu,
         ] {
             ShowWindow(control, if show_general { SW_SHOW } else { SW_HIDE });
         }
@@ -2238,6 +2323,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
 
         for control in [
             state.checkbox_word_wrap,
+            state.checkbox_smart_quotes,
             state.label_wrap_width,
             state.edit_wrap_width,
             state.label_quote_prefix,

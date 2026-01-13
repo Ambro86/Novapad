@@ -18,7 +18,8 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{SetActiveWindow, SetFocus};
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::{
     FindWindowW, IDYES, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK, MB_SETFOREGROUND,
-    MB_YESNO, MessageBoxW, PostMessageW, SW_SHOW, SetForegroundWindow, ShowWindow, WM_CLOSE,
+    MB_YESNO, MESSAGEBOX_STYLE, MessageBoxW, PostMessageW, SW_SHOW, SetForegroundWindow,
+    ShowWindow, WM_CLOSE,
 };
 use windows::core::PCWSTR;
 
@@ -243,48 +244,21 @@ fn prompt_update(hwnd: HWND, language: Language, current: &str, latest: &str) ->
         &[("current", current), ("latest", latest)],
     );
     let title = i18n::tr(language, "updater.title");
-    let text_w = to_wide(&text);
-    let title_w = to_wide(&title);
-    let result = unsafe {
-        MessageBoxW(
-            hwnd,
-            PCWSTR(text_w.as_ptr()),
-            PCWSTR(title_w.as_ptr()),
-            MB_YESNO | MB_ICONQUESTION,
-        )
-    };
+    let result = show_update_message(hwnd, &text, &title, MB_YESNO | MB_ICONQUESTION);
     result == IDYES
 }
 
 fn prompt_restart_after_download(hwnd: HWND, language: Language) -> bool {
     let text = i18n::tr(language, "updater.prompt.restart");
     let title = i18n::tr(language, "updater.title");
-    let text_w = to_wide(&text);
-    let title_w = to_wide(&title);
-    let result = unsafe {
-        MessageBoxW(
-            hwnd,
-            PCWSTR(text_w.as_ptr()),
-            PCWSTR(title_w.as_ptr()),
-            MB_YESNO | MB_ICONQUESTION,
-        )
-    };
+    let result = show_update_message(hwnd, &text, &title, MB_YESNO | MB_ICONQUESTION);
     result == IDYES
 }
 
 fn prompt_pending_update(hwnd: HWND, language: Language) -> bool {
     let text = i18n::tr(language, "updater.prompt.pending");
     let title = i18n::tr(language, "updater.title");
-    let text_w = to_wide(&text);
-    let title_w = to_wide(&title);
-    let result = unsafe {
-        MessageBoxW(
-            hwnd,
-            PCWSTR(text_w.as_ptr()),
-            PCWSTR(title_w.as_ptr()),
-            MB_YESNO | MB_ICONQUESTION,
-        )
-    };
+    let result = show_update_message(hwnd, &text, &title, MB_YESNO | MB_ICONQUESTION);
     result == IDYES
 }
 
@@ -1371,16 +1345,13 @@ fn restore_backup(current: &Path) -> io::Result<()> {
 fn show_permission_error(language: Language) {
     let text = i18n::tr(language, "updater.permission_error");
     let title = i18n::tr(language, "updater.title");
-    let text_w = to_wide(&text);
-    let title_w = to_wide(&title);
-    unsafe {
-        MessageBoxW(
-            HWND(0),
-            PCWSTR(text_w.as_ptr()),
-            PCWSTR(title_w.as_ptr()),
-            MB_OK | MB_ICONERROR | MB_SETFOREGROUND,
-        );
-    }
+    let owner = find_main_window();
+    let _ = show_update_message(
+        owner,
+        &text,
+        &title,
+        MB_OK | MB_ICONERROR | MB_SETFOREGROUND,
+    );
 }
 
 enum UpdateError {
@@ -1417,46 +1388,37 @@ fn show_update_error(language: Language, error: UpdateError) {
     };
     let text = i18n::tr(language, text_key);
     let title = i18n::tr(language, "updater.title");
-    let text_w = to_wide(&text);
-    let title_w = to_wide(&title);
-    unsafe {
-        MessageBoxW(
-            HWND(0),
-            PCWSTR(text_w.as_ptr()),
-            PCWSTR(title_w.as_ptr()),
-            MB_OK | MB_ICONERROR | MB_SETFOREGROUND,
-        );
-    }
+    let owner = find_main_window();
+    let _ = show_update_message(
+        owner,
+        &text,
+        &title,
+        MB_OK | MB_ICONERROR | MB_SETFOREGROUND,
+    );
 }
 
 fn show_update_error_with_url(language: Language, key: &str, url: &str) {
     let text = i18n::tr_f(language, key, &[("url", url)]);
     let title = i18n::tr(language, "updater.title");
-    let text_w = to_wide(&text);
-    let title_w = to_wide(&title);
-    unsafe {
-        MessageBoxW(
-            HWND(0),
-            PCWSTR(text_w.as_ptr()),
-            PCWSTR(title_w.as_ptr()),
-            MB_OK | MB_ICONERROR | MB_SETFOREGROUND,
-        );
-    }
+    let owner = find_main_window();
+    let _ = show_update_message(
+        owner,
+        &text,
+        &title,
+        MB_OK | MB_ICONERROR | MB_SETFOREGROUND,
+    );
 }
 
 fn show_update_error_args(language: Language, key: &str, args: &[(&str, &str)]) {
     let text = i18n::tr_f(language, key, args);
     let title = i18n::tr(language, "updater.title");
-    let text_w = to_wide(&text);
-    let title_w = to_wide(&title);
-    unsafe {
-        MessageBoxW(
-            HWND(0),
-            PCWSTR(text_w.as_ptr()),
-            PCWSTR(title_w.as_ptr()),
-            MB_OK | MB_ICONERROR | MB_SETFOREGROUND,
-        );
-    }
+    let owner = find_main_window();
+    let _ = show_update_message(
+        owner,
+        &text,
+        &title,
+        MB_OK | MB_ICONERROR | MB_SETFOREGROUND,
+    );
 }
 
 pub(crate) fn cleanup_backup_on_start() {
@@ -1632,30 +1594,54 @@ fn show_update_info(language: Language, info: UpdateInfo) {
     };
     let text = i18n::tr(language, text_key);
     let title = i18n::tr(language, "updater.title");
-    let text_w = to_wide(&text);
-    let title_w = to_wide(&title);
-    unsafe {
-        MessageBoxW(
-            HWND(0),
-            PCWSTR(text_w.as_ptr()),
-            PCWSTR(title_w.as_ptr()),
-            MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND,
-        );
-    }
-    if info == UpdateInfo::Completed {
-        focus_main_window();
-    }
+    let owner = find_main_window();
+    let _ = show_update_message(
+        owner,
+        &text,
+        &title,
+        MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND,
+    );
 }
 
 fn focus_main_window() {
-    let class_name = to_wide("NovapadWin32");
+    let hwnd = find_main_window();
+    if hwnd.0 == 0 {
+        return;
+    }
     unsafe {
-        let hwnd = FindWindowW(PCWSTR(class_name.as_ptr()), PCWSTR::null());
-        if hwnd.0 != 0 {
-            let _ = ShowWindow(hwnd, SW_SHOW);
-            let _ = SetForegroundWindow(hwnd);
-            let _ = SetActiveWindow(hwnd);
-            let _ = SetFocus(hwnd);
+        let _ = ShowWindow(hwnd, SW_SHOW);
+        let _ = SetForegroundWindow(hwnd);
+        let _ = SetActiveWindow(hwnd);
+        let _ = SetFocus(hwnd);
+    }
+}
+
+fn find_main_window() -> HWND {
+    let class_name = to_wide("NovapadWin32");
+    unsafe { FindWindowW(PCWSTR(class_name.as_ptr()), PCWSTR::null()) }
+}
+
+fn show_update_message(
+    owner: HWND,
+    text: &str,
+    title: &str,
+    flags: MESSAGEBOX_STYLE,
+) -> windows::Win32::UI::WindowsAndMessaging::MESSAGEBOX_RESULT {
+    let text_w = to_wide(text);
+    let title_w = to_wide(title);
+    let result = unsafe {
+        MessageBoxW(
+            owner,
+            PCWSTR(text_w.as_ptr()),
+            PCWSTR(title_w.as_ptr()),
+            flags,
+        )
+    };
+    focus_main_window();
+    if owner.0 != 0 {
+        unsafe {
+            let _ = PostMessageW(owner, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0));
         }
     }
+    result
 }

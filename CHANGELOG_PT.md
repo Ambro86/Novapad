@@ -1,4 +1,32 @@
 # Changelog
+
+Versao 0.5.9 - 2025-01-13
+Novas funcionalidades
+• Adicionada a possibilidade de reordenar RSS pelo menu contextual (cima/baixo/posicao), com validacao de posicoes invalidas.
+• Adicionado menu contextual para artigos com abrir site original e compartilhar via WhatsApp, Facebook e X.
+• Adicionado atalho Esc para voltar de artigos importados para a lista de RSS.
+• Adicionada a modalidade podcast: buscar, inscrever e ouvir; reordenar assinaturas; Esc para parar a reproducao e voltar a lista; Enter em um episodio inicia a reproducao.
+• Adicionado controle de velocidade de reproducao para podcasts e arquivos MP3.
+• Adicionado Ctrl+T para ir a um tempo especifico.
+• Adicionado um botao de previa de voz apos o combo de volume.
+• Adicionada a funcao regex para Localizar e Substituir, estilo Notepad++.
+• Adicionada a importacao de RSS a partir de arquivos OPML e TXT.
+• Adicionada nas Opcoes a caixa para habilitar "Abrir com Novapad" no Explorador de arquivos, inclusive na versao portable.
+Melhorias
+• Melhorada a selecao de velocidade, tom e volume das vozes, respeitando os limites maximos do TTS.
+• Varias melhorias no RSS para baixar todos os artigos sem mover o foco do NVDA durante atualizacoes.
+• Melhorada a reproducao de audio com um menu dedicado, anuncio de tempo com Ctrl+I e volume ate 300%.
+• Adicionados atalhos faltantes para algumas funcoes.
+• Reorganizado o menu Editar com um submenu para as funcoes de limpeza de texto.
+• Reorganizadas as Opcoes em abas, com Ctrl+Tab e Ctrl+Shift+Tab para navegar.
+• Resolvidos os problemas de leitura de artigos: o leitor RSS agora mostra os artigos completos como no navegador.
+Correcoes
+• Corrigido um problema em que a limpeza de Markdown removia numeros no inicio da linha.
+• Corrigido AltGr+Z que acionava Undo.
+• Corrigido um problema em que ao gravar um audiolivro nao era possivel interromper rapidamente.
+Localizacao
+• Adicionada a traducao vietnamita (graças a Anh Duc Nguyen).
+
 Versao 0.5.8 - 2026-01-10
 Novas funcionalidades
 • Adicionado controle de volume para o microfone e o audio do sistema ao gravar podcasts.

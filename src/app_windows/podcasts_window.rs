@@ -15,10 +15,11 @@ use windows::Win32::System::DataExchange::{
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::{
-    HTREEITEM, TVGN_CARET, TVGN_CHILD, TVGN_NEXT, TVGN_PARENT, TVGN_ROOT, TVIF_CHILDREN,
-    TVIF_PARAM, TVIF_TEXT, TVINSERTSTRUCTW, TVITEMEXW_CHILDREN, TVITEMW, TVM_DELETEITEM,
-    TVM_ENSUREVISIBLE, TVM_EXPAND, TVM_GETITEMW, TVM_GETNEXTITEM, TVM_INSERTITEMW, TVM_SELECTITEM,
-    TVM_SETITEMW, TVM_SORTCHILDRENCB, TVN_ITEMEXPANDINGW, TVN_SELCHANGEDW, TVSORTCB,
+    HTREEITEM, NM_RETURN, NMTVKEYDOWN, TVGN_CARET, TVGN_CHILD, TVGN_NEXT, TVGN_PARENT, TVGN_ROOT,
+    TVIF_CHILDREN, TVIF_PARAM, TVIF_TEXT, TVINSERTSTRUCTW, TVITEMEXW_CHILDREN, TVITEMW,
+    TVM_DELETEITEM, TVM_ENSUREVISIBLE, TVM_EXPAND, TVM_GETITEMW, TVM_GETNEXTITEM, TVM_INSERTITEMW,
+    TVM_SELECTITEM, TVM_SETITEMW, TVM_SORTCHILDRENCB, TVN_ITEMEXPANDINGW, TVN_KEYDOWN,
+    TVN_SELCHANGEDW, TVSORTCB,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetFocus, GetKeyState, SetFocus, VK_APPS, VK_DELETE, VK_ESCAPE, VK_F10, VK_LEFT, VK_RETURN,
@@ -62,6 +63,7 @@ const ADD_CANCEL_ID: usize = 12203;
 const WM_PODCAST_FETCH_COMPLETE: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 310;
 const WM_PODCAST_SEARCH_COMPLETE: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 311;
 const WM_PODCAST_PLAY_READY: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 312;
+const WM_PODCAST_PLAY_FAILED: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 313;
 
 const EM_SETSEL: u32 = 0x00B1;
 const EM_SCROLLCARET: u32 = 0x00B7;
@@ -111,6 +113,7 @@ struct PodcastWindowState {
     search_proc: WNDPROC,
     reorder_dialog: HWND,
     last_selected: isize,
+    pending_play: Option<String>,
 }
 
 #[derive(Clone)]
@@ -163,6 +166,16 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
         if key == VK_ESCAPE.0 as u32 {
             let _ = SendMessageW(hwnd, WM_COMMAND, WPARAM(2), LPARAM(0));
             return true;
+        }
+        if key == VK_RETURN.0 as u32 {
+            let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+            if hwnd_tree.0 != 0 && GetFocus() == hwnd_tree {
+                if let Some(item) = selected_episode(hwnd) {
+                    let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                    open_episode_in_player(hwnd, parent, &item);
+                    return true;
+                }
+            }
         }
     }
     handle_accessibility(hwnd, msg)
@@ -698,6 +711,18 @@ unsafe fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpis
         announce_status(&i18n::tr(language, "podcasts.no_audio_url"));
         return;
     };
+    let play_key = episode_key(episode);
+    let should_start = with_podcast_state(hwnd, |s| {
+        if s.pending_play.as_deref() == Some(play_key.as_str()) {
+            return false;
+        }
+        s.pending_play = Some(play_key);
+        true
+    })
+    .unwrap_or(true);
+    if !should_start {
+        return;
+    }
     if parent.0 != 0 {
         ensure_rss_http(parent);
     }
@@ -716,6 +741,7 @@ unsafe fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpis
             Ok(b) => b,
             Err(err) => {
                 log_debug(&format!("podcasts_download_error {}", err));
+                let _ = PostMessageW(hwnd_copy, WM_PODCAST_PLAY_FAILED, WPARAM(0), LPARAM(0));
                 return;
             }
         };
@@ -731,6 +757,8 @@ unsafe fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpis
                 WPARAM(0),
                 LPARAM(Box::into_raw(msg) as isize),
             );
+        } else {
+            let _ = PostMessageW(hwnd_copy, WM_PODCAST_PLAY_FAILED, WPARAM(0), LPARAM(0));
         }
     });
 }
@@ -2076,8 +2104,21 @@ unsafe extern "system" fn podcast_tree_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    if msg == WM_KEYDOWN || msg == windows::Win32::UI::WindowsAndMessaging::WM_SYSKEYDOWN {
+    if msg == WM_KEYDOWN
+        || msg == windows::Win32::UI::WindowsAndMessaging::WM_SYSKEYDOWN
+        || msg == WM_CHAR
+    {
         let key = wparam.0 as u32;
+        if msg == WM_CHAR && key == VK_RETURN.0 as u32 {
+            let parent = GetParent(hwnd);
+            if parent.0 != 0 {
+                if let Some(item) = selected_episode(parent) {
+                    let main_hwnd = with_podcast_state(parent, |s| s.parent).unwrap_or(HWND(0));
+                    open_episode_in_player(parent, main_hwnd, &item);
+                    return LRESULT(0);
+                }
+            }
+        }
         if key == VK_DELETE.0 as u32 {
             let parent = GetParent(hwnd);
             if parent.0 != 0 {
@@ -2135,6 +2176,23 @@ unsafe extern "system" fn podcast_tree_wndproc(
                         );
                         return LRESULT(0);
                     }
+                }
+            }
+        }
+        if key == VK_RETURN.0 as u32 {
+            let parent = GetParent(hwnd);
+            if parent.0 != 0 {
+                if let Some(item) = selected_episode(parent) {
+                    let main_hwnd = with_podcast_state(parent, |s| s.parent).unwrap_or(HWND(0));
+                    open_episode_in_player(parent, main_hwnd, &item);
+                    return LRESULT(0);
+                }
+                if let Some(idx) = selected_source_index(parent) {
+                    let hitem = selected_tree_item(parent);
+                    if hitem.0 != 0 {
+                        load_episode_children(parent, hitem, idx, false);
+                    }
+                    return LRESULT(0);
                 }
             }
         }
@@ -2619,6 +2677,7 @@ unsafe extern "system" fn podcast_wndproc(
                 search_proc: None,
                 reorder_dialog: HWND(0),
                 last_selected: 0,
+                pending_play: None,
             });
             SetWindowLongPtrW(
                 hwnd,
@@ -2640,6 +2699,25 @@ unsafe extern "system" fn podcast_wndproc(
         WM_NOTIFY => {
             let nmhdr = &*(lparam.0 as *const windows::Win32::UI::Controls::NMHDR);
             if nmhdr.idFrom as usize == ID_TREE {
+                if nmhdr.code == NM_RETURN {
+                    let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                    if let Some(item) = selected_episode(hwnd) {
+                        open_episode_in_player(hwnd, parent, &item);
+                        return LRESULT(0);
+                    }
+                }
+                if nmhdr.code == TVN_KEYDOWN {
+                    let key = (lparam.0 as *const NMTVKEYDOWN).as_ref();
+                    if let Some(key) = key
+                        && key.wVKey == VK_RETURN.0 as u16
+                    {
+                        let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                        if let Some(item) = selected_episode(hwnd) {
+                            open_episode_in_player(hwnd, parent, &item);
+                            return LRESULT(0);
+                        }
+                    }
+                }
                 if nmhdr.code == TVN_ITEMEXPANDINGW {
                     let info = &*(lparam.0 as *const windows::Win32::UI::Controls::NMTREEVIEWW);
                     let hitem = info.itemNew.hItem;
@@ -2853,6 +2931,7 @@ unsafe extern "system" fn podcast_wndproc(
                 return LRESULT(0);
             }
             let msg = Box::from_raw(ptr);
+            with_podcast_state(hwnd, |s| s.pending_play = None);
             let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
             editor_manager::open_document(parent, &msg.path);
             if parent.0 != 0 {
@@ -2863,6 +2942,10 @@ unsafe extern "system" fn podcast_wndproc(
                     }
                 }
             }
+            LRESULT(0)
+        }
+        WM_PODCAST_PLAY_FAILED => {
+            with_podcast_state(hwnd, |s| s.pending_play = None);
             LRESULT(0)
         }
         WM_DESTROY => {

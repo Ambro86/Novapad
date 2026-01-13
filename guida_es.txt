@@ -21,6 +21,10 @@ Controles de teclado:
 - FLECHA IZQUIERDA: Retroceder 1 minuto.
 - FLECHA ARRIBA: Subir volumen.
 - FLECHA ABAJO: Bajar volumen.
+- +: Aumentar la velocidad de reproduccion.
+- -: Disminuir la velocidad de reproduccion.
+- CTRL+I: Anunciar el tiempo de reproduccion.
+- CTRL+T: Ir a un tiempo especifico.
 - CTRL+B: Insertar un marcador en el tiempo exacto.
 
 Edicion:
@@ -78,6 +82,10 @@ Programas: Simbolo del sistema (cmd.exe), PowerShell, Codex CLI (desde Opciones)
 RSS / Articulos: abre la ventana RSS/Articulos, agrega fuentes, expande un feed y pulsa Enter para importar un articulo al editor.
 En la ventana RSS, selecciona un feed o sitio y pulsa Supr para eliminarlo de la biblioteca.
 En el menu contextual de un feed o sitio puedes modificar o eliminar un RSS o sitio.
+Despues de importar un articulo RSS, pulsa Esc para volver a la lista RSS.
+Podcast: abre la ventana Podcasts para buscar y gestionar suscripciones.
+En la lista de episodios, pulsa Enter para reproducir el episodio.
+Durante la reproduccion, Esc detiene el podcast y vuelve a la biblioteca.
 
 Opciones:
 Idioma: Cambiar el idioma de la interfaz.

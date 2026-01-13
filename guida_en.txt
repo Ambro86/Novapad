@@ -21,6 +21,10 @@ Keyboard controls:
 - LEFT ARROW: Rewind 1 minute.
 - UP ARROW: Increase volume.
 - DOWN ARROW: Decrease volume.
+- +: Increase playback speed.
+- -: Decrease playback speed.
+- CTRL+I: Announce playback time.
+- CTRL+T: Go to a specific time.
 - CTRL+B: Insert a bookmark at the exact time.
 
 Edit:
@@ -78,6 +82,10 @@ Program choices: Command Prompt (cmd.exe), PowerShell, Codex CLI (from Options).
 RSS / Articles: opens the RSS/Articles window, add sources, expand a feed, and press Enter to import an article into the editor.
 In the RSS window, select a feed or site and press Delete to remove it from the library.
 From the context menu on a feed or site you can edit or delete an RSS or site.
+After importing an RSS article, press Esc to return to the RSS list.
+Podcasts: opens the Podcasts window to search and manage subscriptions.
+In the episode list, press Enter to play the episode.
+During playback, Esc stops the podcast and returns to the library.
 
 Options:
 Language: Change interface language.

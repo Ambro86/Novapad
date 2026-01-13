@@ -5,15 +5,21 @@ use crate::i18n;
 use crate::log_debug;
 use crate::tools::rss::{self, RssItem, RssSource, RssSourceType};
 use crate::with_state;
+use quick_xml::Reader;
+use quick_xml::events::Event;
 use std::collections::{HashMap, HashSet};
 use std::mem;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use url::Url;
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::System::DataExchange::COPYDATASTRUCT;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
+use windows::Win32::UI::Controls::Dialogs::{
+    GetOpenFileNameW, OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY, OFN_PATHMUSTEXIST,
+    OPENFILENAMEW,
+};
 use windows::Win32::UI::Controls::{
     NM_RCLICK, NMHDR, NMTREEVIEWW, NMTVKEYDOWN, TVE_EXPAND, TVGN_CARET, TVGN_CHILD, TVGN_NEXT,
     TVGN_ROOT, TVHITTESTINFO, TVI_LAST, TVI_ROOT, TVIF_PARAM, TVIF_TEXT, TVINSERTSTRUCTW,
@@ -39,12 +45,13 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
     WS_VSCROLL,
 };
-use windows::core::{PCWSTR, w};
+use windows::core::{PCWSTR, PWSTR, w};
 
 const RSS_WINDOW_CLASS: &str = "NovapadRssWindow";
 const ID_TREE: usize = 1001;
 const ID_BTN_ADD: usize = 1002;
 const ID_BTN_CLOSE: usize = 1003;
+const ID_BTN_IMPORT: usize = 1004;
 const ID_CTX_EDIT: usize = 1101;
 const ID_CTX_DELETE: usize = 1102;
 const ID_CTX_RETRY: usize = 1103;
@@ -112,6 +119,175 @@ fn normalize_rss_url_key(url: &str) -> String {
 
 fn percent_encode(input: &str) -> String {
     url::form_urlencoded::byte_serialize(input.as_bytes()).collect()
+}
+
+fn parse_single_path(buffer: &[u16]) -> Option<PathBuf> {
+    let end = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
+    if end == 0 {
+        return None;
+    }
+    Some(PathBuf::from(String::from_utf16_lossy(&buffer[..end])))
+}
+
+fn parse_opml_sources(text: &str) -> Vec<(String, String)> {
+    let mut reader = Reader::from_str(text);
+    reader.trim_text(true);
+    let mut buf = Vec::new();
+    let mut out = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+                if !e.name().as_ref().eq_ignore_ascii_case(b"outline") {
+                    buf.clear();
+                    continue;
+                }
+                let mut url = String::new();
+                let mut title = String::new();
+                for attr in e.attributes().flatten() {
+                    let key = attr.key.as_ref();
+                    let value = attr
+                        .decode_and_unescape_value(&reader)
+                        .unwrap_or_default()
+                        .to_string();
+                    if key.eq_ignore_ascii_case(b"xmlUrl") {
+                        url = value;
+                    } else if key.eq_ignore_ascii_case(b"title")
+                        || key.eq_ignore_ascii_case(b"text")
+                    {
+                        if title.is_empty() {
+                            title = value;
+                        }
+                    }
+                }
+                if !url.trim().is_empty() {
+                    out.push((title, url));
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(_) => break,
+            _ => {}
+        }
+        buf.clear();
+    }
+    out
+}
+
+fn open_import_txt_dialog(hwnd: HWND, language: crate::settings::Language) -> Option<PathBuf> {
+    let filter_raw = i18n::tr(language, "rss.import_filter");
+    let filter = to_wide(&filter_raw.replace("\\0", "\0"));
+    let mut buffer = vec![0u16; 4096];
+    let mut ofn = OPENFILENAMEW {
+        lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
+        hwndOwner: hwnd,
+        lpstrFilter: PCWSTR(filter.as_ptr()),
+        lpstrFile: PWSTR(buffer.as_mut_ptr()),
+        nMaxFile: buffer.len() as u32,
+        Flags: OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY,
+        ..Default::default()
+    };
+    if !unsafe { GetOpenFileNameW(&mut ofn).as_bool() } {
+        return None;
+    }
+    parse_single_path(&buffer)
+}
+
+unsafe fn import_sources_from_file(hwnd: HWND, path: &Path) {
+    let bytes = match std::fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            log_debug(&format!(
+                "rss_import_file_error path=\"{}\" error=\"{}\"",
+                path.to_string_lossy(),
+                err
+            ));
+            return;
+        }
+    };
+    let text = String::from_utf8_lossy(&bytes);
+    let is_opml = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.eq_ignore_ascii_case("opml"))
+        .unwrap_or(false)
+        || text.to_ascii_lowercase().contains("<opml");
+    let opml_sources = if is_opml {
+        parse_opml_sources(&text)
+    } else {
+        Vec::new()
+    };
+    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    if parent.0 == 0 {
+        return;
+    }
+    let mut added = 0usize;
+    with_state(parent, |state| {
+        let mut existing: HashSet<String> = state
+            .settings
+            .rss_sources
+            .iter()
+            .map(|src| normalize_rss_url_key(&src.url))
+            .filter(|k| !k.is_empty())
+            .collect();
+        if !opml_sources.is_empty() {
+            for (mut title, url_raw) in opml_sources {
+                let url = rss::normalize_url(&url_raw);
+                if url.is_empty() {
+                    continue;
+                }
+                let key = normalize_rss_url_key(&url);
+                if key.is_empty() || existing.contains(&key) {
+                    continue;
+                }
+                if title.trim().is_empty() {
+                    title = url.clone();
+                }
+                state.settings.rss_sources.push(RssSource {
+                    title: title.clone(),
+                    url: url.clone(),
+                    kind: RssSourceType::Feed,
+                    user_title: title.trim() != url.trim(),
+                    cache: rss::RssFeedCache::default(),
+                });
+                existing.insert(key);
+                added += 1;
+            }
+        } else {
+            for line in text.lines() {
+                let url_raw = line.trim();
+                if url_raw.is_empty() {
+                    continue;
+                }
+                let url = rss::normalize_url(url_raw);
+                if url.is_empty() {
+                    continue;
+                }
+                let key = normalize_rss_url_key(&url);
+                if key.is_empty() || existing.contains(&key) {
+                    continue;
+                }
+                state.settings.rss_sources.push(RssSource {
+                    title: url.clone(),
+                    url: url.clone(),
+                    kind: RssSourceType::Feed,
+                    user_title: false,
+                    cache: rss::RssFeedCache::default(),
+                });
+                existing.insert(key);
+                added += 1;
+            }
+        }
+        if added > 0 {
+            crate::settings::save_settings(state.settings.clone());
+        }
+    });
+    if added > 0 {
+        log_debug(&format!(
+            "rss_import_file_added path=\"{}\" count={}",
+            path.to_string_lossy(),
+            added
+        ));
+        reload_tree(hwnd);
+    }
 }
 
 fn is_valid_article_url(url: &str) -> bool {
@@ -527,6 +703,7 @@ unsafe fn ensure_default_sources(parent: HWND) {
 struct RssWindowState {
     parent: HWND,
     hwnd_tree: HWND,
+    hwnd_import: HWND,
     node_data: HashMap<isize, NodeData>,
     pending_fetches: HashMap<String, isize>, // URL -> hItem
     source_items: HashMap<isize, SourceItemsState>,
@@ -856,6 +1033,7 @@ unsafe extern "system" fn rss_wndproc(
             let state = Box::new(RssWindowState {
                 parent,
                 hwnd_tree: HWND(0),
+                hwnd_import: HWND(0),
                 node_data: HashMap::new(),
                 pending_fetches: HashMap::new(),
                 source_items: HashMap::new(),
@@ -922,10 +1100,21 @@ unsafe extern "system" fn rss_wndproc(
                     }
                     LRESULT(0)
                 }
+                ID_BTN_IMPORT => {
+                    let language = with_rss_state(hwnd, |s| {
+                        with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
+                    })
+                    .unwrap_or_default();
+                    if let Some(path) = open_import_txt_dialog(hwnd, language) {
+                        import_sources_from_file(hwnd, &path);
+                    }
+                    LRESULT(0)
+                }
                 1 => {
                     // IDOK (Enter key often triggers this generic command)
                     let focus = GetFocus();
                     let btn_add = GetDlgItem(hwnd, ID_BTN_ADD as i32);
+                    let btn_import = GetDlgItem(hwnd, ID_BTN_IMPORT as i32);
                     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
 
                     if focus == btn_add {
@@ -933,6 +1122,17 @@ unsafe extern "system" fn rss_wndproc(
                         if !already {
                             with_rss_state(hwnd, |s| s.add_guard = true);
                             let _ = PostMessageW(hwnd, WM_SHOW_ADD_DIALOG, WPARAM(0), LPARAM(0));
+                        }
+                        return LRESULT(0);
+                    }
+
+                    if focus == btn_import {
+                        let language = with_rss_state(hwnd, |s| {
+                            with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
+                        })
+                        .unwrap_or_default();
+                        if let Some(path) = open_import_txt_dialog(hwnd, language) {
+                            import_sources_from_file(hwnd, &path);
                         }
                         return LRESULT(0);
                     }
@@ -1601,10 +1801,25 @@ unsafe fn create_controls(hwnd: HWND) {
         WS_CHILD | WS_VISIBLE | WS_TABSTOP,
         10,
         520,
-        100,
+        120,
         30,
         hwnd,
         HMENU(ID_BTN_ADD as isize),
+        hinstance,
+        None,
+    );
+
+    let hwnd_import = CreateWindowExW(
+        Default::default(),
+        WC_BUTTON,
+        PCWSTR(to_wide(&i18n::tr(language, "rss.tree.import_txt")).as_ptr()),
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+        140,
+        520,
+        160,
+        30,
+        hwnd,
+        HMENU(ID_BTN_IMPORT as isize),
         hinstance,
         None,
     );
@@ -1614,9 +1829,9 @@ unsafe fn create_controls(hwnd: HWND) {
         WC_BUTTON,
         PCWSTR(to_wide(&i18n::tr(language, "rss.tree.close")).as_ptr()),
         WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-        370,
+        320,
         520,
-        100,
+        120,
         30,
         hwnd,
         HMENU(ID_BTN_CLOSE as isize),
@@ -1624,7 +1839,10 @@ unsafe fn create_controls(hwnd: HWND) {
         None,
     );
 
-    with_rss_state(hwnd, |s| s.hwnd_tree = hwnd_tree);
+    with_rss_state(hwnd, |s| {
+        s.hwnd_tree = hwnd_tree;
+        s.hwnd_import = hwnd_import;
+    });
 
     let hfont = with_rss_state(hwnd, |s| {
         with_state(s.parent, |ps| ps.hfont).unwrap_or(HFONT(0))
@@ -1633,6 +1851,7 @@ unsafe fn create_controls(hwnd: HWND) {
     if hfont.0 != 0 {
         SendMessageW(hwnd_tree, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
         SendMessageW(hwnd_add, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+        SendMessageW(hwnd_import, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
         SendMessageW(hwnd_close, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
     }
 
@@ -2792,15 +3011,23 @@ unsafe fn import_item(hwnd: HWND, item: RssItem) {
             &item.description,
         ));
 
-        if let Ok(text) = content_res {
-            let msg = Box::new(ImportResult { text });
-            let _ = PostMessageW(
-                hwnd,
-                WM_RSS_IMPORT_COMPLETE,
-                WPARAM(0),
-                LPARAM(Box::into_raw(msg) as isize),
-            );
-        }
+        let text = match content_res {
+            Ok(text) => text,
+            Err(err) => {
+                log_debug(&format!(
+                    "rss_import_fallback url=\"{}\" error=\"{}\"",
+                    url, err
+                ));
+                format!("{}\n\n{}\n\n{}", item.title, item.description, url)
+            }
+        };
+        let msg = Box::new(ImportResult { text });
+        let _ = PostMessageW(
+            hwnd,
+            WM_RSS_IMPORT_COMPLETE,
+            WPARAM(0),
+            LPARAM(Box::into_raw(msg) as isize),
+        );
     });
 }
 

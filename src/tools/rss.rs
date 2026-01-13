@@ -1805,6 +1805,29 @@ fn curl_exe_path() -> PathBuf {
     crate::settings::settings_dir().join("curl.exe")
 }
 
+pub fn ensure_curl_exe_download() {
+    let exe_path = curl_exe_path();
+    if exe_path.exists() {
+        return;
+    }
+    let url = CURL_IMPERSONATE_URL.to_string();
+    std::thread::spawn(move || {
+        if let Ok(response) = reqwest::blocking::get(&url) {
+            if response.status().is_success() {
+                if let Ok(bytes) = response.bytes() {
+                    let tmp_path = exe_path.with_extension("tmp");
+                    if let Ok(mut file) = std::fs::File::create(&tmp_path) {
+                        use std::io::Write;
+                        if file.write_all(&bytes).is_ok() {
+                            let _ = std::fs::rename(tmp_path, exe_path);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
 async fn ensure_curl_exe() -> Result<PathBuf, String> {
     let exe_path = curl_exe_path();
     if exe_path.exists() {

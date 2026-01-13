@@ -77,6 +77,8 @@
   "edit.text_stats": "Thống kê &văn bản\tAlt+Y",
   "edit.join_lines": "&Nối các dòng\tCtrl+Shift+J",
   "edit.clean_eol_hyphens": "Xóa dấu gạch nối cuối dòng",
+  "playback.speed_up": "Tang toc do\t+",
+  "playback.speed_down": "Giam toc do\t-",
   "insert.bookmark": "Chèn &dấu trang\tCtrl+B",
   "insert.manage_bookmarks": "&Quản lý dấu trang...",
   "help.guide": "&Hướng dẫn",

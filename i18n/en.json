@@ -93,6 +93,8 @@
   "playback.announce_time": "A&nnounce time\tCtrl+I",
   "playback.volume_up": "Volume &up\tUp",
   "playback.volume_down": "Volume &down\tDown",
+  "playback.speed_up": "Speed &up\t+",
+  "playback.speed_down": "Speed &down\t-",
   "playback.mute_toggle": "&Mute / Unmute\tM",
   "insert.bookmark": "Insert &Bookmark\tCtrl+B",
   "insert.clear_bookmarks": "Remove Bookmarks for Current &File\tCtrl+Shift+L",

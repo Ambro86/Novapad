@@ -57,6 +57,8 @@ pub const IDM_PLAYBACK_ANNOUNCE_TIME: usize = 8006;
 pub const IDM_PLAYBACK_VOLUME_UP: usize = 8007;
 pub const IDM_PLAYBACK_VOLUME_DOWN: usize = 8008;
 pub const IDM_PLAYBACK_MUTE_TOGGLE: usize = 8009;
+pub const IDM_PLAYBACK_SPEED_UP: usize = 8010;
+pub const IDM_PLAYBACK_SPEED_DOWN: usize = 8011;
 pub const IDM_INSERT_BOOKMARK: usize = 2101;
 pub const IDM_MANAGE_BOOKMARKS: usize = 2102;
 pub const IDM_INSERT_CLEAR_BOOKMARKS: usize = 2103;
@@ -283,6 +285,8 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
         let announce_time = i18n::tr(language, "playback.announce_time");
         let volume_up = i18n::tr(language, "playback.volume_up");
         let volume_down = i18n::tr(language, "playback.volume_down");
+        let speed_up = i18n::tr(language, "playback.speed_up");
+        let speed_down = i18n::tr(language, "playback.speed_down");
         let mute_toggle = i18n::tr(language, "playback.mute_toggle");
 
         let _ = append_menu_string(
@@ -322,6 +326,13 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
             MF_STRING,
             IDM_PLAYBACK_VOLUME_DOWN,
             &volume_down,
+        );
+        let _ = append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_SPEED_UP, &speed_up);
+        let _ = append_menu_string(
+            playback_menu,
+            MF_STRING,
+            IDM_PLAYBACK_SPEED_DOWN,
+            &speed_down,
         );
         let _ = append_menu_string(
             playback_menu,

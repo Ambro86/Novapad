@@ -1,40 +1,17 @@
-[2026-01-12 20:13:26] Application started.
-[2026-01-12 20:13:27] Menu: RSS
-[2026-01-12 20:13:41] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-12 20:13:41] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-12 20:13:41] rss_ui_batch start source=2423856829952 append_count=100 loaded_before=0 total_before=0
-[2026-01-12 20:13:41] rss_ui_batch append source=2423856829952 inserted=100 loaded=101 total=141
-[2026-01-12 20:13:41] rss_ui_batch end source=2423856829952 appended=100
-[2026-01-12 20:13:42] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-12 20:13:43] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-12 20:13:44] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-12 20:13:45] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-12 20:13:46] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-12 20:13:47] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
-[2026-01-12 20:13:47] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-12 20:13:47] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
-[2026-01-12 20:13:48] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
-[2026-01-12 20:13:48] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-12 20:13:49] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-12 20:13:49] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
-[2026-01-12 20:13:50] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
-[2026-01-12 20:13:50] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-12 20:13:51] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-12 20:13:51] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
-[2026-01-12 20:13:52] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
-[2026-01-12 20:13:52] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-12 20:13:53] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
-[2026-01-12 20:13:53] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-12 20:13:54] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
-[2026-01-12 20:13:54] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-12 20:13:55] rss_request kind="feed" url="https://xml2.corriereobjects.it/feed-hp/homepage.xml" host="xml2.corriereobjects.it" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-12 20:13:55] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
-[2026-01-12 20:13:55] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
-[2026-01-12 20:13:57] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
-[2026-01-12 20:13:58] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
-[2026-01-12 20:13:59] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
-[2026-01-12 20:14:00] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
-[2026-01-12 20:14:01] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
-[2026-01-12 20:14:06] Application started.
-[2026-01-12 20:14:14] rss_action kind=feed action=retry_now override=true host="tributetohe.blogspot.com"
-[2026-01-12 20:14:14] rss_request kind="feed" url="https://tributetohe.blogspot.com/feeds/posts/default" host="tributetohe.blogspot.com" attempt=1 status=304 not_modified=true backoff_ms=0 error=""
+[2026-01-13 00:25:55] Application started.
+[2026-01-13 00:25:58] Menu: Find
+[2026-01-13 00:28:51] Menu: New document
+[2026-01-13 00:28:53] Menu: Find
+[2026-01-13 00:53:12] Application started.
+[2026-01-13 00:53:14] Menu: Open document
+[2026-01-13 00:53:14] open_file_dialog_with_encoding called
+[2026-01-13 00:53:14] FileOpenDialog created successfully
+[2026-01-13 00:53:14] Adding encoding controls to open dialog
+[2026-01-13 00:53:14] Event handler registered with cookie: 4
+[2026-01-13 00:53:14] Triggering initial OnTypeChange
+[2026-01-13 00:53:14] Showing open dialog
+[2026-01-13 00:53:14] OnTypeChange: filter_index = 1
+[2026-01-13 00:53:14] OnTypeChange: hiding encoding combobox
+[2026-01-13 00:53:18] Dialog closed with OK
+[2026-01-13 00:53:18] Open document: C:\Users\ambro\Downloads\Braveheart.mp3 (encoding: None)
+[2026-01-13 00:53:23] SoundTouch exports: bpm_putSamples, bpm_putSamples_i16, soundtouch_clear, soundtouch_createInstance, soundtouch_destroyInstance, soundtouch_flush, soundtouch_getSetting, soundtouch_getVersionId, soundtouch_getVersionString, soundtouch_getVersionString2, soundtouch_isEmpty, soundtouch_numSamples, soundtouch_numUnprocessedSamples, soundtouch_putSamples, soundtouch_putSamples_i16, soundtouch_receiveSamples, soundtouch_receiveSamples_i16, soundtouch_setChannels, soundtouch_setPitch, soundtouch_setPitchOctaves, soundtouch_setPitchSemiTones, soundtouch_setRate, soundtouch_setRateChange, soundtouch_setSampleRate, soundtouch_setSetting, soundtouch_setTempo, soundtouch_setTempoChange

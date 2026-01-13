@@ -341,15 +341,7 @@ unsafe fn announce_player_volume(hwnd: HWND) {
     let _ = nvda_speak(&message);
 }
 
-unsafe fn announce_player_speed(hwnd: HWND) {
-    let (speed, language) = with_state(hwnd, |state| {
-        let speed = crate::audio_player::audiobook_speed_level(hwnd);
-        (speed, state.settings.language)
-    })
-    .unwrap_or((None, Language::Italian));
-    let Some(speed) = speed else {
-        return;
-    };
+unsafe fn announce_player_speed(language: Language, speed: f32) {
     let scaled = (speed * 10.0).round() / 10.0;
     let speed_text = if (scaled.fract() - 0.0).abs() < f32::EPSILON {
         format!("{:.0}", scaled)
@@ -376,8 +368,11 @@ unsafe fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
             announce_player_volume(hwnd);
         }
         PlayerCommand::Speed(delta) => {
-            change_audiobook_speed(hwnd, delta);
-            announce_player_speed(hwnd);
+            let language =
+                with_state(hwnd, |state| state.settings.language).unwrap_or(Language::default());
+            if let Some(speed) = change_audiobook_speed(hwnd, delta) {
+                announce_player_speed(language, speed);
+            }
         }
         PlayerCommand::MuteToggle => {
             toggle_audiobook_mute(hwnd);
@@ -1761,6 +1756,14 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 }
                 IDM_PLAYBACK_VOLUME_DOWN => {
                     handle_player_command(hwnd, PlayerCommand::Volume(-0.1));
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_SPEED_UP => {
+                    handle_player_command(hwnd, PlayerCommand::Speed(0.1));
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_SPEED_DOWN => {
+                    handle_player_command(hwnd, PlayerCommand::Speed(-0.1));
                     LRESULT(0)
                 }
                 IDM_PLAYBACK_MUTE_TOGGLE => {

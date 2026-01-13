@@ -93,6 +93,8 @@
   "playback.announce_time": "A&nnuncia tempo\tCtrl+I",
   "playback.volume_up": "Volume &su\tSu",
   "playback.volume_down": "Volume &giu\tGiu",
+  "playback.speed_up": "Velocita &su\t+",
+  "playback.speed_down": "Velocita &giu\t-",
   "playback.mute_toggle": "&Muto / Audio\tM",
   "insert.bookmark": "Inserisci &segnalibro\tCtrl+B",
   "insert.clear_bookmarks": "Rimuovi segnalibri del &file corrente\tCtrl+Shift+L",

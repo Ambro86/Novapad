@@ -187,9 +187,9 @@ pub fn ensure_nvda_controller_client() {
 
 pub fn ensure_soundtouch_dll() {
     let dll_name = if cfg!(target_arch = "x86_64") {
-        "SoundTouch-6766862dc3e61fe695b186dfb40dc6b5.dll"
+        "SoundTouch64.dll"
     } else {
-        "SoundTouch-6766862dc3e61fe695b186dfb40dc6b5.dll"
+        "SoundTouch64.dll"
     };
 
     let dll_path = settings::settings_dir().join(dll_name);

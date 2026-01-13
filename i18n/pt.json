@@ -93,6 +93,8 @@
   "playback.announce_time": "A&nunciar tempo\tCtrl+I",
   "playback.volume_up": "Volume &aumentar\tCima",
   "playback.volume_down": "Volume &diminuir\tBaixo",
+  "playback.speed_up": "Velocidade &aumentar\t+",
+  "playback.speed_down": "Velocidade &diminuir\t-",
   "playback.mute_toggle": "&Mudo / Som\tM",
   "insert.bookmark": "Inserir &marcador\tCtrl+B",
   "insert.clear_bookmarks": "Remover marcadores do &arquivo atual\tCtrl+Shift+L",

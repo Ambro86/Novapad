@@ -272,7 +272,9 @@ pub unsafe fn request_cancel(hwnd: HWND) {
             if let Some(cancel) = &state.audiobook_cancel {
                 cancel.store(true, Ordering::Relaxed);
             }
+            state.audiobook_progress = HWND(0);
         });
+        let _ = windows::Win32::UI::WindowsAndMessaging::DestroyWindow(hwnd);
     }
 }
 

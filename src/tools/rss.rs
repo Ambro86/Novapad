@@ -3,7 +3,9 @@ use crate::tools::reader;
 use feed_rs::parser;
 use rand::Rng;
 use reqwest::StatusCode;
-use reqwest::header::{ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED, RETRY_AFTER};
+use reqwest::header::{
+    ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED, REFERER, RETRY_AFTER,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
@@ -193,10 +195,75 @@ struct RssHttp {
 
 impl RssHttp {
     fn new(config: RssHttpConfig) -> Result<Self, String> {
-        let user_agent = format!("Novapad/{} (RSS reader)", env!("CARGO_PKG_VERSION"));
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert(
+            reqwest::header::USER_AGENT,
+            reqwest::header::HeaderValue::from_static(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            ),
+        );
+        headers.insert(
+            reqwest::header::ACCEPT_LANGUAGE,
+            reqwest::header::HeaderValue::from_static("en-US,en;q=0.9"),
+        );
+        headers.insert(
+            reqwest::header::ACCEPT,
+            reqwest::header::HeaderValue::from_static(
+                "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            ),
+        );
+        headers.insert(
+            reqwest::header::ACCEPT_ENCODING,
+            reqwest::header::HeaderValue::from_static("gzip, deflate, br"),
+        );
+        headers.insert(
+            reqwest::header::CACHE_CONTROL,
+            reqwest::header::HeaderValue::from_static("max-age=0"),
+        );
+        headers.insert(
+            reqwest::header::UPGRADE_INSECURE_REQUESTS,
+            reqwest::header::HeaderValue::from_static("1"),
+        );
+        headers.insert(
+            "sec-ch-ua",
+            reqwest::header::HeaderValue::from_static(
+                "\"Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\"",
+            ),
+        );
+        headers.insert(
+            "sec-ch-ua-mobile",
+            reqwest::header::HeaderValue::from_static("?0"),
+        );
+        headers.insert(
+            "sec-ch-ua-platform",
+            reqwest::header::HeaderValue::from_static("\"Windows\""),
+        );
+        headers.insert(
+            "sec-fetch-dest",
+            reqwest::header::HeaderValue::from_static("document"),
+        );
+        headers.insert(
+            "sec-fetch-mode",
+            reqwest::header::HeaderValue::from_static("navigate"),
+        );
+        headers.insert(
+            "sec-fetch-site",
+            reqwest::header::HeaderValue::from_static("none"),
+        );
+        headers.insert(
+            "sec-fetch-user",
+            reqwest::header::HeaderValue::from_static("?1"),
+        );
+        headers.insert(
+            REFERER,
+            reqwest::header::HeaderValue::from_static("https://news.google.com/"),
+        );
         let client = reqwest::Client::builder()
-            .user_agent(user_agent)
+            .default_headers(headers)
+            .cookie_store(true)
             .redirect(reqwest::redirect::Policy::limited(10))
+            .gzip(true)
+            .brotli(true)
             .connect_timeout(Duration::from_secs(4))
             .timeout(Duration::from_secs(15))
             .pool_max_idle_per_host(8)
@@ -974,6 +1041,12 @@ async fn fetch_bytes_with_retries(
                         None,
                         Some("non-retriable status"),
                     );
+                    if status.as_u16() == 403 {
+                        log_debug(&format!(
+                            "rss_request blocked_403 kind=\"{}\" url=\"{}\" host=\"{}\"",
+                            fetch_kind, url, host
+                        ));
+                    }
                     let cache = cache
                         .as_deref()
                         .cloned()

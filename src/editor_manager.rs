@@ -9,11 +9,11 @@ use crate::settings::{
 use crate::{log_debug, with_state};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, RECT, WPARAM};
+use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::HFONT;
 use windows::Win32::UI::Controls::RichEdit::{
-    CFM_COLOR, CFM_SIZE, CHARFORMAT2W, CHARRANGE, EM_EXGETSEL, EM_EXSETSEL, EM_SETCHARFORMAT,
-    EM_SETEVENTMASK, ENM_CHANGE, MSFTEDIT_CLASS, SCF_ALL,
+    CFM_COLOR, CFM_SIZE, CHARFORMAT2W, CHARRANGE, EM_EXGETSEL, EM_EXSETSEL, EM_GETTEXTRANGE,
+    EM_SETCHARFORMAT, EM_SETEVENTMASK, ENM_CHANGE, MSFTEDIT_CLASS, SCF_ALL, TEXTRANGEW,
 };
 use windows::Win32::UI::Controls::{
     EM_GETMODIFY, EM_SETMODIFY, EM_SETREADONLY, TCIF_TEXT, TCITEMW, TCM_ADJUSTRECT,
@@ -21,10 +21,12 @@ use windows::Win32::UI::Controls::{
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use windows::Win32::UI::WindowsAndMessaging::{
-    DestroyWindow, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_WANTRETURN, GetClientRect,
+    CallWindowProcW, DefWindowProcW, DestroyWindow, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE,
+    ES_WANTRETURN, GWLP_USERDATA, GWLP_WNDPROC, GetClientRect, GetParent, GetWindowLongPtrW,
     GetWindowTextLengthW, GetWindowTextW, HMENU, IDNO, IDYES, MB_ICONWARNING, MB_YESNOCANCEL,
-    MessageBoxW, MoveWindow, SW_HIDE, SW_SHOW, SendMessageW, SetWindowTextW, ShowWindow,
-    WM_SETFONT, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_GROUP, WS_HSCROLL, WS_VSCROLL,
+    MessageBoxW, MoveWindow, SW_HIDE, SW_SHOW, SendMessageW, SetWindowLongPtrW, SetWindowTextW,
+    ShowWindow, WM_CHAR, WM_SETFONT, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_GROUP,
+    WS_HSCROLL, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR};
 
@@ -43,6 +45,95 @@ const VOICE_PANEL_ROW_HEIGHT: i32 = 22;
 const VOICE_PANEL_SPACING: i32 = 6;
 const VOICE_PANEL_LABEL_WIDTH: i32 = 140;
 const VOICE_PANEL_COMBO_HEIGHT: i32 = 140;
+
+unsafe fn should_use_opening_quote(hwnd_edit: HWND) -> bool {
+    let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
+    SendMessageW(
+        hwnd_edit,
+        EM_EXGETSEL,
+        WPARAM(0),
+        LPARAM(&mut selection as *mut _ as isize),
+    );
+    if selection.cpMin <= 0 {
+        return true;
+    }
+
+    let prev_index = selection.cpMin - 1;
+    let mut buf = [0u16; 2];
+    let mut range = TEXTRANGEW {
+        chrg: CHARRANGE {
+            cpMin: prev_index,
+            cpMax: selection.cpMin,
+        },
+        lpstrText: PWSTR(buf.as_mut_ptr()),
+    };
+    SendMessageW(
+        hwnd_edit,
+        EM_GETTEXTRANGE,
+        WPARAM(0),
+        LPARAM(&mut range as *mut _ as isize),
+    );
+    let prev_char = char::from_u32(buf[0] as u32).unwrap_or('\0');
+    matches!(
+        prev_char,
+        '\0' | ' '
+            | '\n'
+            | '\r'
+            | '\t'
+            | '('
+            | '['
+            | '{'
+            | '<'
+            | '—'
+            | '–'
+            | '«'
+            | '“'
+            | '‘'
+            | '/'
+            | '\\'
+            | '‒'
+            | '―'
+    )
+}
+
+unsafe extern "system" fn edit_subclass_proc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    if msg == WM_CHAR {
+        let ch = wparam.0 as u32;
+        if ch == '\'' as u32 || ch == '\"' as u32 {
+            let parent = GetParent(hwnd);
+            let enabled = with_state(parent, |state| state.settings.smart_quotes).unwrap_or(false);
+            if enabled {
+                let opening = should_use_opening_quote(hwnd);
+                let replacement = match (ch, opening) {
+                    (34, true) => "“",
+                    (34, false) => "”",
+                    (_, true) => "‘",
+                    _ => "’",
+                };
+                let wide = to_wide(replacement);
+                let _ = SendMessageW(
+                    hwnd,
+                    EM_REPLACESEL,
+                    WPARAM(1),
+                    LPARAM(wide.as_ptr() as isize),
+                );
+                return LRESULT(0);
+            }
+        }
+    }
+
+    let prev = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+    if prev != 0 {
+        CallWindowProcW(Some(std::mem::transmute(prev)), hwnd, msg, wparam, lparam)
+    } else {
+        DefWindowProcW(hwnd, msg, wparam, lparam)
+    }
+}
 
 fn apply_text_limit(hwnd_edit: HWND) {
     unsafe {
@@ -115,6 +206,8 @@ pub unsafe fn set_edit_text(hwnd_edit: HWND, text: &str) {
             WPARAM(0),
             LPARAM(ENM_CHANGE as isize),
         );
+        let prev = SetWindowLongPtrW(hwnd_edit, GWLP_WNDPROC, edit_subclass_proc as isize);
+        let _ = SetWindowLongPtrW(hwnd_edit, GWLP_USERDATA, prev);
     }
 }
 

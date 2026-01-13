@@ -496,6 +496,65 @@ pub async fn download_audio_chunk(
     ))
 }
 
+async fn wait_or_cancel(duration: Duration, cancel: &AtomicBool) -> bool {
+    tokio::select! {
+        _ = tokio::time::sleep(duration) => false,
+        _ = async {
+            while !cancel.load(Ordering::Relaxed) {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        } => true,
+    }
+}
+
+pub async fn download_audio_chunk_cancel(
+    text: &str,
+    voice: &str,
+    request_id: &str,
+    tts_rate: i32,
+    tts_pitch: i32,
+    tts_volume: i32,
+    language: Language,
+    cancel: &AtomicBool,
+) -> Result<Vec<u8>, String> {
+    let max_retries = 40;
+    let mut last_error = String::new();
+
+    for attempt in 1..=max_retries {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(cancelled_message(language));
+        }
+        match download_audio_chunk_attempt(text, voice, request_id, tts_rate, tts_pitch, tts_volume)
+            .await
+        {
+            Ok(data) => return Ok(data),
+            Err(e) => {
+                last_error = e;
+                let msg = i18n::tr_f(
+                    language,
+                    "tts.chunk_download_retry",
+                    &[
+                        ("attempt", &attempt.to_string()),
+                        ("max", &max_retries.to_string()),
+                        ("err", &last_error),
+                    ],
+                );
+                log_debug(&msg);
+                if attempt < max_retries {
+                    if wait_or_cancel(Duration::from_millis(500 * attempt as u64), cancel).await {
+                        return Err(cancelled_message(language));
+                    }
+                }
+            }
+        }
+    }
+    Err(i18n::tr_f(
+        language,
+        "tts.chunk_download_error",
+        &[("err", &last_error)],
+    ))
+}
+
 async fn download_audio_chunk_attempt(
     text: &str,
     voice: &str,
@@ -1599,7 +1658,7 @@ pub(crate) fn run_tts_audiobook_part(
                     if cancel.load(Ordering::Relaxed) {
                         return Err("Cancelled".to_string());
                     }
-                    match download_audio_chunk(
+                    match download_audio_chunk_cancel(
                         &chunk,
                         &voice,
                         &request_id,
@@ -1607,6 +1666,7 @@ pub(crate) fn run_tts_audiobook_part(
                         tts_pitch,
                         tts_volume,
                         language,
+                        cancel.as_ref(),
                     )
                     .await
                     {

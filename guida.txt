@@ -21,6 +21,10 @@ Comandi da tastiera:
 - FRECCIA SINISTRA: Indietro di 1 minuto.
 - FRECCIA SU: Aumenta il volume.
 - FRECCIA GIU: Diminuisce il volume.
+- +: Aumenta la velocita di riproduzione.
+- -: Diminuisce la velocita di riproduzione.
+- CTRL+I: Annuncia il tempo di riproduzione.
+- CTRL+T: Vai a un tempo specifico.
 - CTRL+B: Inserisce un segnalibro nel minuto esatto.
 
 
@@ -79,6 +83,10 @@ Scelte programma: Prompt dei comandi (cmd.exe), PowerShell, Codex CLI (da Opzion
 RSS / Articoli: apre la finestra RSS/Articoli, aggiungi fonti, espandi un feed e premi Invio per importare un articolo nell'editor.
 Nella finestra RSS, seleziona un feed o sito e premi Canc per rimuoverlo dalla libreria.
 Nel menu contestuale dei feed o siti puoi modificare o eliminare un RSS o sito.
+Dopo aver importato una notizia, premi Esc per tornare all'elenco RSS.
+Podcast: apre la finestra Podcast per cercare e gestire le sottoscrizioni.
+Nell'elenco episodi, premi Invio per riprodurre l'episodio.
+Durante la riproduzione, Esc ferma il podcast e torna alla libreria.
 
 Opzioni:
 Lingua: cambia la lingua dell'interfaccia.

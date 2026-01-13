@@ -21,6 +21,10 @@ Controles de teclado:
 - SETA ESQUERDA: Voltar 1 minuto.
 - SETA PARA CIMA: Aumentar volume.
 - SETA PARA BAIXO: Diminuir volume.
+- +: Aumentar a velocidade de reproducao.
+- -: Diminuir a velocidade de reproducao.
+- CTRL+I: Anunciar o tempo de reproducao.
+- CTRL+T: Ir para um tempo especifico.
 - CTRL+B: Inserir um marcador no tempo exato.
 
 Editar:
@@ -73,6 +77,10 @@ Terminal acessivel: abre um terminal dedicado com saida estavel para leitores de
 RSS / Artigos: abre a janela RSS/Artigos, adicione fontes, expanda um feed e pressione Enter para importar um artigo para o editor.
 Na janela RSS, selecione um feed ou site e pressione Delete para remove-lo da biblioteca.
 No menu contextual de um feed ou site voce pode modificar ou eliminar um RSS ou site.
+Apos importar um artigo RSS, pressione Esc para voltar a lista RSS.
+Podcast: abre a janela Podcasts para buscar e gerenciar assinaturas.
+Na lista de episodios, pressione Enter para reproduzir o episodio.
+Durante a reproducao, Esc para o podcast e volta a biblioteca.
 
 Opcoes:
 Idioma: alterar o idioma da interface.

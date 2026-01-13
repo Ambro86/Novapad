@@ -423,6 +423,11 @@ pub(crate) struct AppState {
     find_replace: Option<FINDREPLACEW>,
     replace_replace: Option<FINDREPLACEW>,
     last_find_flags: FINDREPLACE_FLAGS,
+    find_use_regex: bool,
+    find_dot_matches_newline: bool,
+    find_wrap_around: bool,
+    find_replace_in_selection: bool,
+    find_replace_in_all_docs: bool,
     pdf_loading: Vec<PdfLoadingState>,
     next_timer_id: usize,
     tts_session: Option<TtsSession>,
@@ -936,7 +941,8 @@ fn main() -> windows::core::Result<()> {
                     }
                 }
                 if state.podcasts_window.0 != 0 {
-                    if handle_accessibility(state.podcasts_window, &msg) {
+                    if app_windows::podcasts_window::handle_navigation(state.podcasts_window, &msg)
+                    {
                         handled = true;
                         return;
                     }
@@ -1173,6 +1179,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 find_replace: None,
                 replace_replace: None,
                 last_find_flags: FINDREPLACE_FLAGS(0),
+                find_use_regex: false,
+                find_dot_matches_newline: false,
+                find_wrap_around: true,
+                find_replace_in_selection: false,
+                find_replace_in_all_docs: false,
                 pdf_loading: Vec::new(),
                 next_timer_id: 1,
                 tts_session: None,

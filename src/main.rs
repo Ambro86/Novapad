@@ -96,8 +96,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
     WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES, WM_KEYDOWN,
     WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SIZE,
-    WM_SYSKEYDOWN, WM_TIMER, WM_UNDO, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN,
-    WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
+    WM_SYSKEYDOWN, WM_TIMER, WM_UNDO, WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD, WS_CLIPCHILDREN,
+    WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_OVERLAPPEDWINDOW, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{Interface, PCWSTR, PWSTR, implement, w};
 
@@ -113,6 +113,8 @@ const WM_TTS_PLAYBACK_ERROR: u32 = WM_APP + 5;
 const WM_UPDATE_PROGRESS: u32 = WM_APP + 6;
 const WM_TTS_CHUNK_START: u32 = WM_APP + 7;
 const WM_TTS_SAPI_VOICES_LOADED: u32 = WM_APP + 8;
+const WM_CURL_PREFETCH_START: u32 = WM_APP + 90;
+const WM_CURL_PREFETCH_DONE: u32 = WM_APP + 91;
 
 pub const WM_FOCUS_EDITOR: u32 = WM_APP + 30;
 const FOCUS_EDITOR_TIMER_ID: usize = 1;
@@ -415,6 +417,7 @@ pub(crate) struct AppState {
     podcasts_add_dialog: HWND,
     rss_window: HWND,
     rss_add_dialog: HWND, // Input dialog for RSS
+    curl_download_dialog: HWND,
     go_to_time_dialog: HWND,
     playback_menu: HMENU,
     find_msg: u32,
@@ -465,7 +468,6 @@ struct RecentFileStore {
 fn main() -> windows::core::Result<()> {
     accessibility::ensure_nvda_controller_client();
     accessibility::ensure_soundtouch_dll();
-    crate::tools::rss::ensure_curl_exe_download();
     log_debug("Application started.");
 
     let args: Vec<String> = std::env::args().collect();
@@ -541,6 +543,11 @@ fn main() -> windows::core::Result<()> {
         if hwnd.0 == 0 {
             return Ok(());
         }
+        std::thread::spawn(move || {
+            let _ = PostMessageW(hwnd, WM_CURL_PREFETCH_START, WPARAM(0), LPARAM(0));
+            crate::tools::rss::ensure_curl_exe_download();
+            let _ = PostMessageW(hwnd, WM_CURL_PREFETCH_DONE, WPARAM(0), LPARAM(0));
+        });
         updater::check_pending_update(hwnd, false);
 
         let current_version = env!("CARGO_PKG_VERSION");
@@ -981,6 +988,58 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
     }
 
     match msg {
+        WM_CURL_PREFETCH_START => {
+            let language =
+                with_state(hwnd, |state| state.settings.language).unwrap_or(Language::default());
+            let title = to_wide(&i18n::tr(language, "rss.window.title"));
+            let text = to_wide("Sto scaricando un file aggiuntivo...");
+            let dialog = CreateWindowExW(
+                WS_EX_DLGMODALFRAME,
+                w!("#32770"),
+                PCWSTR(title.as_ptr()),
+                WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+                CW_USEDEFAULT,
+                CW_USEDEFAULT,
+                360,
+                120,
+                hwnd,
+                None,
+                HINSTANCE(0),
+                None,
+            );
+            if dialog.0 != 0 {
+                let _ = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(text.as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    28,
+                    320,
+                    40,
+                    dialog,
+                    None,
+                    HINSTANCE(0),
+                    None,
+                );
+                let _ = with_state(hwnd, |state| state.curl_download_dialog = dialog);
+            }
+            return LRESULT(0);
+        }
+        WM_CURL_PREFETCH_DONE => {
+            let dialog = with_state(hwnd, |state| state.curl_download_dialog).unwrap_or(HWND(0));
+            if dialog.0 != 0 {
+                let _ = DestroyWindow(dialog);
+                let _ = with_state(hwnd, |state| state.curl_download_dialog = HWND(0));
+            }
+            MessageBoxW(
+                hwnd,
+                w!("File scaricato OK"),
+                w!("Novapad"),
+                MB_OK | MB_ICONINFORMATION,
+            );
+            return LRESULT(0);
+        }
         WM_CREATE => {
             let mut icc = INITCOMMONCONTROLSEX {
                 dwSize: size_of::<INITCOMMONCONTROLSEX>() as u32,
@@ -1169,6 +1228,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 podcasts_window: HWND(0),
                 podcasts_add_dialog: HWND(0),
                 rss_add_dialog: HWND(0),
+                curl_download_dialog: HWND(0),
                 go_to_time_dialog: HWND(0),
                 playback_menu: HMENU(0),
                 podcast_save_window: HWND(0),

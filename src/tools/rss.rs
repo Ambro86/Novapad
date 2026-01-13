@@ -322,7 +322,7 @@ struct HostRateState {
 
 static RSS_HTTP: OnceLock<Result<RssHttp, String>> = OnceLock::new();
 const CURL_IMPERSONATE_URL: &str =
-    "https://raw.githubusercontent.com/Ambro86/Novapad/master/dll/curl.exe";
+    "https://raw.githubusercontent.com/Ambro86/Novapad/master/dll/curl.7z";
 
 pub fn init_http(config: RssHttpConfig) -> Result<(), String> {
     let res = RSS_HTTP.get_or_init(|| RssHttp::new(config));
@@ -1805,27 +1805,73 @@ fn curl_exe_path() -> PathBuf {
     crate::settings::settings_dir().join("curl.exe")
 }
 
+fn curl_archive_path() -> PathBuf {
+    crate::settings::settings_dir().join("curl.7z")
+}
+
+fn find_curl_exe_recursive(dir: &std::path::Path, depth: usize) -> Option<PathBuf> {
+    if depth == 0 {
+        return None;
+    }
+    let entries = std::fs::read_dir(dir).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            if let Some(found) = find_curl_exe_recursive(&path, depth - 1) {
+                return Some(found);
+            }
+            continue;
+        }
+        if path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.eq_ignore_ascii_case("curl.exe"))
+        {
+            return Some(path);
+        }
+    }
+    None
+}
+
+fn extract_curl_archive(archive_path: &std::path::Path) -> Result<PathBuf, String> {
+    let target_dir = crate::settings::settings_dir();
+    sevenz_rust::decompress_file(archive_path, &target_dir).map_err(|e| e.to_string())?;
+    let exe_path = curl_exe_path();
+    if exe_path.exists() {
+        return Ok(exe_path);
+    }
+    if let Some(found) = find_curl_exe_recursive(&target_dir, 3) {
+        if found != exe_path {
+            let _ = std::fs::rename(&found, &exe_path);
+        }
+        if exe_path.exists() {
+            return Ok(exe_path);
+        }
+    }
+    Err("curl.exe not found after extract".to_string())
+}
+
 pub fn ensure_curl_exe_download() {
     let exe_path = curl_exe_path();
     if exe_path.exists() {
         return;
     }
     let url = CURL_IMPERSONATE_URL.to_string();
-    std::thread::spawn(move || {
-        if let Ok(response) = reqwest::blocking::get(&url) {
-            if response.status().is_success() {
-                if let Ok(bytes) = response.bytes() {
-                    let tmp_path = exe_path.with_extension("tmp");
-                    if let Ok(mut file) = std::fs::File::create(&tmp_path) {
-                        use std::io::Write;
-                        if file.write_all(&bytes).is_ok() {
-                            let _ = std::fs::rename(tmp_path, exe_path);
-                        }
+    if let Ok(response) = reqwest::blocking::get(&url) {
+        if response.status().is_success() {
+            if let Ok(bytes) = response.bytes() {
+                let archive_path = curl_archive_path();
+                let tmp_path = archive_path.with_extension("tmp");
+                if let Ok(mut file) = std::fs::File::create(&tmp_path) {
+                    use std::io::Write;
+                    if file.write_all(&bytes).is_ok() {
+                        let _ = std::fs::rename(tmp_path, &archive_path);
+                        let _ = extract_curl_archive(&archive_path);
                     }
                 }
             }
         }
-    });
+    }
 }
 
 async fn ensure_curl_exe() -> Result<PathBuf, String> {
@@ -1848,10 +1894,11 @@ async fn ensure_curl_exe() -> Result<PathBuf, String> {
         ));
     }
     let bytes = response.bytes().await.map_err(|e| e.to_string())?;
-    let tmp_path = exe_path.with_extension("tmp");
+    let archive_path = curl_archive_path();
+    let tmp_path = archive_path.with_extension("tmp");
     std::fs::write(&tmp_path, &bytes).map_err(|e| e.to_string())?;
-    std::fs::rename(&tmp_path, &exe_path).map_err(|e| e.to_string())?;
-    Ok(exe_path)
+    std::fs::rename(&tmp_path, &archive_path).map_err(|e| e.to_string())?;
+    extract_curl_archive(&archive_path)
 }
 
 fn is_probably_blocked_html(html: &str) -> bool {

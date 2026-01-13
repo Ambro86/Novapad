@@ -139,6 +139,7 @@ scraper = "0.19"
 httpdate = "1.0"
 mp3-duration = "0.1"
 fancy-regex = "0.13"
+sevenz-rust = "0.6"
 
 [features]
 portable = []

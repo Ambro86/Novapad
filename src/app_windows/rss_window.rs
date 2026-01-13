@@ -778,6 +778,9 @@ pub unsafe fn open(parent: HWND) {
 
     if hwnd.0 != 0 {
         let _ = with_state(parent, |s| s.rss_window = hwnd);
+        std::thread::spawn(|| {
+            crate::tools::rss::ensure_curl_exe_download();
+        });
         // IMPORTANT: do NOT disable the parent window.
         // If the parent is disabled, Windows (and NVDA) treat the editor as unavailable,
         // and SetFocus/SetForegroundWindow will not behave reliably.

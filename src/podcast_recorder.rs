@@ -1004,15 +1004,8 @@ fn capture_source(
     stop: Arc<AtomicBool>,
     paused: Arc<AtomicBool>,
 ) -> Result<(), String> {
-    let kind_name = match kind {
-        SourceKind::Microphone => "Microphone",
-        SourceKind::System => "System",
-    };
-    crate::log_debug(&format!("{} capture_source started", kind_name));
-
     let _com = ComInit::new()?;
     let device = resolve_device(device_id, loopback)?;
-    crate::log_debug(&format!("{} device resolved", kind_name));
     let client: IAudioClient = unsafe {
         device
             .Activate(CLSCTX_ALL, None)
@@ -1120,22 +1113,27 @@ fn capture_source(
 }
 
 fn resolve_device(device_id: &str, loopback: bool) -> Result<IMMDevice, String> {
-    let enumerator = DeviceEnumerator::new()?;
+    // Note: COM must already be initialized by the caller and kept alive
+    // for the lifetime of the returned device.
+    let enumerator: IMMDeviceEnumerator = unsafe {
+        CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
+            .map_err(|e| format!("MMDeviceEnumerator failed: {e}"))?
+    };
+
     if device_id.is_empty() || device_id == PODCAST_DEVICE_DEFAULT {
         let flow = if loopback { eRender } else { eCapture };
         return unsafe {
             enumerator
-                .inner
                 .GetDefaultAudioEndpoint(flow, eConsole)
                 .map_err(|e| format!("GetDefaultAudioEndpoint failed: {e}"))
         };
     }
+
     let wide = crate::accessibility::to_wide(device_id);
     unsafe {
         enumerator
-            .inner
             .GetDevice(PCWSTR(wide.as_ptr()))
-            .map_err(|e| format!("GetDevice failed: {e}"))
+            .map_err(|e| format!("GetDevice({}) failed: {e}", device_id))
     }
 }
 

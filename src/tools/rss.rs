@@ -12,10 +12,8 @@ use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::io::Cursor;
-use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use tokio::process::Command;
 use tokio::sync::{Mutex, OwnedSemaphorePermit, Semaphore};
 use tokio::time::sleep;
 use url::Url;
@@ -322,9 +320,6 @@ struct HostRateState {
 }
 
 static RSS_HTTP: OnceLock<Result<RssHttp, String>> = OnceLock::new();
-const CURL_IMPERSONATE_URL: &str =
-    "https://raw.githubusercontent.com/Ambro86/Novapad/master/dll/curl.7z";
-const CURL_CA_BUNDLE_URL: &str = "https://curl.se/ca/cacert.pem";
 
 pub fn init_http(config: RssHttpConfig) -> Result<(), String> {
     let res = RSS_HTTP.get_or_init(|| RssHttp::new(config));
@@ -1875,167 +1870,6 @@ pub async fn fetch_url_bytes(
     Ok(out.bytes)
 }
 
-fn curl_exe_path() -> PathBuf {
-    crate::settings::settings_dir().join("curl.exe")
-}
-
-fn curl_archive_path() -> PathBuf {
-    crate::settings::settings_dir().join("curl.7z")
-}
-
-fn curl_ca_bundle_path() -> PathBuf {
-    crate::settings::settings_dir().join("cacert.pem")
-}
-
-fn find_curl_exe_recursive(dir: &std::path::Path, depth: usize) -> Option<PathBuf> {
-    if depth == 0 {
-        return None;
-    }
-    let entries = std::fs::read_dir(dir).ok()?;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            if let Some(found) = find_curl_exe_recursive(&path, depth - 1) {
-                return Some(found);
-            }
-            continue;
-        }
-        if path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .is_some_and(|name| name.eq_ignore_ascii_case("curl.exe"))
-        {
-            return Some(path);
-        }
-    }
-    None
-}
-
-fn extract_curl_archive(archive_path: &std::path::Path) -> Result<PathBuf, String> {
-    let target_dir = crate::settings::settings_dir();
-    let temp_dir = target_dir.join(format!(
-        "curl_tmp_{}_{}",
-        std::process::id(),
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_millis())
-            .unwrap_or(0)
-    ));
-    let _ = std::fs::create_dir_all(&temp_dir);
-    sevenz_rust::decompress_file(archive_path, &temp_dir).map_err(|e| e.to_string())?;
-    let exe_path = curl_exe_path();
-    if let Some(found) = find_curl_exe_recursive(&temp_dir, 4) {
-        if found != exe_path {
-            let _ = std::fs::remove_file(&exe_path);
-            let _ = std::fs::rename(&found, &exe_path);
-        }
-    }
-    let _ = std::fs::remove_file(archive_path);
-    let _ = std::fs::remove_dir_all(&temp_dir);
-    if exe_path.exists() {
-        return Ok(exe_path);
-    }
-    Err("curl.exe not found after extract".to_string())
-}
-
-pub fn ensure_curl_exe_download() -> bool {
-    let exe_path = curl_exe_path();
-    if exe_path.exists() {
-        let _ = ensure_curl_ca_bundle_download();
-        return true;
-    }
-    let url = CURL_IMPERSONATE_URL.to_string();
-    if let Ok(response) = reqwest::blocking::get(&url) {
-        if response.status().is_success() {
-            if let Ok(bytes) = response.bytes() {
-                let archive_path = curl_archive_path();
-                let tmp_path = archive_path.with_extension("tmp");
-                if let Ok(mut file) = std::fs::File::create(&tmp_path) {
-                    use std::io::Write;
-                    if file.write_all(&bytes).is_ok() {
-                        let _ = std::fs::rename(tmp_path, &archive_path);
-                        let _ = extract_curl_archive(&archive_path);
-                        let _ = ensure_curl_ca_bundle_download();
-                        return exe_path.exists();
-                    }
-                }
-            }
-        }
-    }
-    false
-}
-
-fn ensure_curl_ca_bundle_download() -> bool {
-    let ca_path = curl_ca_bundle_path();
-    if ca_path.exists() {
-        return true;
-    }
-    let url = CURL_CA_BUNDLE_URL.to_string();
-    if let Ok(response) = reqwest::blocking::get(&url) {
-        if response.status().is_success() {
-            if let Ok(bytes) = response.bytes() {
-                let tmp_path = ca_path.with_extension("tmp");
-                if let Ok(mut file) = std::fs::File::create(&tmp_path) {
-                    use std::io::Write;
-                    if file.write_all(&bytes).is_ok() {
-                        let _ = std::fs::rename(tmp_path, &ca_path);
-                        return ca_path.exists();
-                    }
-                }
-            }
-        }
-    }
-    false
-}
-
-async fn ensure_curl_exe() -> Result<PathBuf, String> {
-    let exe_path = curl_exe_path();
-    if exe_path.exists() {
-        return Ok(exe_path);
-    }
-    let _ = std::fs::create_dir_all(
-        exe_path
-            .parent()
-            .unwrap_or_else(|| std::path::Path::new(".")),
-    );
-    let response = reqwest::get(CURL_IMPERSONATE_URL)
-        .await
-        .map_err(|e| e.to_string())?;
-    if !response.status().is_success() {
-        return Err(format!(
-            "curl download failed: {}",
-            response.status().as_u16()
-        ));
-    }
-    let bytes = response.bytes().await.map_err(|e| e.to_string())?;
-    let archive_path = curl_archive_path();
-    let tmp_path = archive_path.with_extension("tmp");
-    std::fs::write(&tmp_path, &bytes).map_err(|e| e.to_string())?;
-    std::fs::rename(&tmp_path, &archive_path).map_err(|e| e.to_string())?;
-    extract_curl_archive(&archive_path)
-}
-
-async fn ensure_curl_ca_bundle() -> Result<PathBuf, String> {
-    let ca_path = curl_ca_bundle_path();
-    if ca_path.exists() {
-        return Ok(ca_path);
-    }
-    let response = reqwest::get(CURL_CA_BUNDLE_URL)
-        .await
-        .map_err(|e| e.to_string())?;
-    if !response.status().is_success() {
-        return Err(format!(
-            "cacert download failed: {}",
-            response.status().as_u16()
-        ));
-    }
-    let bytes = response.bytes().await.map_err(|e| e.to_string())?;
-    let tmp_path = ca_path.with_extension("tmp");
-    std::fs::write(&tmp_path, &bytes).map_err(|e| e.to_string())?;
-    std::fs::rename(&tmp_path, &ca_path).map_err(|e| e.to_string())?;
-    Ok(ca_path)
-}
-
 fn is_probably_blocked_html(html: &str) -> bool {
     let lower = html.to_ascii_lowercase();
     lower.contains("just a moment")
@@ -2044,83 +1878,6 @@ fn is_probably_blocked_html(html: &str) -> bool {
         || lower.contains("attention required")
         || lower.contains("you have a preview of this article while we are checking your access")
         || lower.contains("when we have confirmed access, the full article content will load")
-}
-
-fn curl_impersonate_args(url: &str, cacert_path: Option<&std::path::Path>) -> Vec<String> {
-    let mut args = vec![
-        "--ciphers".to_string(),
-        "TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384,TLS_CHACHA20_POLY1305_SHA256,ECDHE-ECDSA-AES128-GCM-SHA256,ECDHE-RSA-AES128-GCM-SHA256,ECDHE-ECDSA-AES256-GCM-SHA384,ECDHE-RSA-AES256-GCM-SHA384,ECDHE-ECDSA-CHACHA20-POLY1305,ECDHE-RSA-CHACHA20-POLY1305,ECDHE-RSA-AES128-SHA,ECDHE-RSA-AES256-SHA,AES128-GCM-SHA256,AES256-GCM-SHA384,AES128-SHA,AES256-SHA".to_string(),
-        "-H".to_string(),
-        "sec-ch-ua: \"Chromium\";v=\"116\", \"Not)A;Brand\";v=\"24\", \"Google Chrome\";v=\"116\"".to_string(),
-        "-H".to_string(),
-        "sec-ch-ua-mobile: ?0".to_string(),
-        "-H".to_string(),
-        "sec-ch-ua-platform: \"Windows\"".to_string(),
-        "-H".to_string(),
-        "Upgrade-Insecure-Requests: 1".to_string(),
-        "-H".to_string(),
-        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36".to_string(),
-        "-H".to_string(),
-        "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7".to_string(),
-        "-H".to_string(),
-        "Sec-Fetch-Site: none".to_string(),
-        "-H".to_string(),
-        "Sec-Fetch-Mode: navigate".to_string(),
-        "-H".to_string(),
-        "Sec-Fetch-User: ?1".to_string(),
-        "-H".to_string(),
-        "Sec-Fetch-Dest: document".to_string(),
-        "-H".to_string(),
-        "Accept-Encoding: gzip, deflate, br".to_string(),
-        "-H".to_string(),
-        "Accept-Language: en-US,en;q=0.9".to_string(),
-        "--http2".to_string(),
-        "--compressed".to_string(),
-        "--tlsv1.2".to_string(),
-        "--alps".to_string(),
-        "--cert-compression".to_string(),
-        "brotli".to_string(),
-        "--location".to_string(),
-        "--connect-timeout".to_string(),
-        "5".to_string(),
-        "--max-time".to_string(),
-        "8".to_string(),
-        "-sS".to_string(),
-        url.to_string(),
-    ];
-    if let Some(path) = cacert_path {
-        args.push("--cacert".to_string());
-        args.push(path.to_string_lossy().to_string());
-    }
-    args
-}
-
-async fn fetch_article_html_with_curl(url: &str) -> Result<String, String> {
-    let exe_path = ensure_curl_exe().await?;
-    let ca_path = ensure_curl_ca_bundle().await.ok();
-    let args = curl_impersonate_args(url, ca_path.as_deref());
-    let start = Instant::now();
-    let mut cmd = Command::new(&exe_path);
-    cmd.args(&args);
-    #[cfg(target_os = "windows")]
-    {
-        cmd.creation_flags(0x08000000);
-    }
-    let output = cmd.output().await.map_err(|e| e.to_string())?;
-    let elapsed_ms = start.elapsed().as_millis();
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        log_debug(&format!(
-            "rss_curl_done ms={} status=fail url=\"{}\"",
-            elapsed_ms, url
-        ));
-        return Err(format!("curl failed: {}", stderr.trim()));
-    }
-    log_debug(&format!(
-        "rss_curl_done ms={} status=ok url=\"{}\"",
-        elapsed_ms, url
-    ));
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
 pub async fn fetch_article_text(
@@ -2135,7 +1892,7 @@ pub async fn fetch_article_text(
     }
     let http = shared_http()?;
     let fetch_config = RssFetchConfig::default();
-    let mut html = {
+    let html = {
         let out =
             fetch_bytes_with_retries(http, &url, false, "article", false, &fetch_config, None)
                 .await;
@@ -2161,25 +1918,6 @@ pub async fn fetch_article_text(
             }
         }
     };
-    if html.is_none() {
-        html = match fetch_article_html_with_curl(&url).await {
-            Ok(html) => {
-                if is_probably_blocked_html(&html) {
-                    log_debug(&format!("rss_article_fetch curl_blocked url=\"{}\"", url));
-                    None
-                } else {
-                    Some(html)
-                }
-            }
-            Err(err) => {
-                log_debug(&format!(
-                    "rss_article_fetch curl_failed url=\"{}\" error=\"{}\"",
-                    url, err
-                ));
-                None
-            }
-        };
-    }
     let html = html.unwrap_or_default();
     let article = reader::reader_mode_extract(&html).unwrap_or(reader::ArticleContent {
         title: fallback_title.to_string(),

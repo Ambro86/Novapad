@@ -1,14 +1,23 @@
-[2026-01-14 14:30:41] Application started.
-[2026-01-14 14:30:42] Menu: RSS
-[2026-01-14 14:30:44] rss_request kind="feed" url="https://www.newscientist.com/feed/home/" host="www.newscientist.com" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-14 14:30:44] rss_request kind="feed" url="https://www.newscientist.com/feed/home/" host="www.newscientist.com" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-14 14:30:44] rss_ui_batch start source=2948405030816 append_count=100 loaded_before=0 total_before=0
-[2026-01-14 14:30:44] rss_ui_batch append source=2948405030816 inserted=100 loaded=100 total=100
-[2026-01-14 14:30:44] rss_ui_batch end source=2948405030816 appended=100
-[2026-01-14 14:30:45] rss_request kind="feed" url="https://www.newscientist.com/feed/home/" host="www.newscientist.com" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-14 14:30:46] rss_request kind="feed" url="https://www.newscientist.com/feed/home/" host="www.newscientist.com" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-14 14:30:47] rss_request kind="article" url="https://www.newscientist.com/article/2511350-we-must-completely-change-the-way-we-build-homes-to-stay-below-2c/?utm_campaign=RSS%7CNSNS&utm_source=NSNS&utm_medium=RSS&utm_content=home" host="www.newscientist.com" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-14 14:30:47] rss_article_fetch_done ms=2171 url="https://www.newscientist.com/article/2511350-we-must-completely-change-the-way-we-build-homes-to-stay-below-2c/?utm_campaign=RSS%7CNSNS&utm_source=NSNS&utm_medium=RSS&utm_content=home"
-[2026-01-14 14:30:48] rss_request kind="feed" url="https://www.newscientist.com/feed/home/" host="www.newscientist.com" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-14 14:30:49] rss_request kind="feed" url="https://www.newscientist.com/feed/home/" host="www.newscientist.com" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
-[2026-01-14 14:30:50] rss_request kind="feed" url="https://www.newscientist.com/feed/home/" host="www.newscientist.com" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-14 22:08:07] Application started.
+[2026-01-14 22:08:08] Menu: Record podcast
+[2026-01-14 22:08:18] probe_device: testing device_id={0.0.1.00000000}.{801c6696-da01-4a2c-b1ee-42ba4b53891c}, loopback=false
+[2026-01-14 22:08:18] resolve_device: looking up specific device_id={0.0.1.00000000}.{801c6696-da01-4a2c-b1ee-42ba4b53891c}
+[2026-01-14 22:08:18] probe_device: resolved to device name='Cuffia auricolare (EarPods)', id='{0.0.1.00000000}.{801c6696-da01-4a2c-b1ee-42ba4b53891c}'
+[2026-01-14 22:08:18] probe_device: testing device_id=default, loopback=true
+[2026-01-14 22:08:18] resolve_device: using default device (loopback=true)
+[2026-01-14 22:08:18] probe_device: resolved to device name='Cuffia auricolare (EarPods)', id='{0.0.0.00000000}.{50f112bb-cbe7-4bca-b5c9-67dded8e20d1}'
+[2026-01-14 22:08:18] Starting microphone capture thread
+[2026-01-14 22:08:18] Starting system audio capture thread
+[2026-01-14 22:08:18] Microphone capture thread started
+[2026-01-14 22:08:18] System audio capture thread started
+[2026-01-14 22:08:18[] Microphone capture_source started (device_id={0.0.1.00000000}.{801c6696-da01-4a2c-b1ee-42ba4b53891c})2026-01-14 22:08:18
+] MF: streaming mp3 writer. mp3="C:\\Users\\ambro\\Documents\\Novapad Recordings\\Podcast_2026-01-14_22-08-18_tmp.mp3" bitrate_kbps=128 rate=44100 ch=2
+[2026-01-14 22:08:18] System capture_source started (device_id=default)
+[2026-01-14 22:08:18] resolve_device: looking up specific device_id={0.0.1.00000000}.{801c6696-da01-4a2c-b1ee-42ba4b53891c}
+[2026-01-14 22:08:18] resolve_device: using default device (loopback=true)
+[2026-01-14 22:08:18] System CAPTURING FROM: name='Cuffia auricolare (EarPods)', id='{0.0.0.00000000}.{50f112bb-cbe7-4bca-b5c9-67dded8e20d1}'
+[2026-01-14 22:08:27] Stopping podcast recording
+[2026-01-14 22:08:27] Signaled encoder to stop
+[2026-01-14 22:08:27] System audio capture thread stopped normally
+[2026-01-14 22:08:27] Microphone capture thread stopped normally
+[2026-01-14 22:08:48] All threads stopped

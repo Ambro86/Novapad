@@ -63,6 +63,7 @@ const PODCAST_ID_LEVEL_MIC: usize = 11017;
 const PODCAST_ID_LEVEL_SYSTEM: usize = 11018;
 const PODCAST_ID_HINT: usize = 11019;
 const PODCAST_ID_SYSTEM_UNAVAILABLE: usize = 11020;
+const PODCAST_ID_SOURCE: usize = 11025;
 const WM_PODCAST_SAVE_RESULT: u32 = windows::Win32::UI::WindowsAndMessaging::WM_APP + 74;
 
 struct PodcastSaveResult {
@@ -117,6 +118,7 @@ struct PodcastState {
     resume_button: HWND,
     stop_button: HWND,
     status_text: HWND,
+    source_text: HWND,
     elapsed_text: HWND,
     level_mic_text: HWND,
     level_system_text: HWND,
@@ -741,6 +743,21 @@ unsafe extern "system" fn podcast_wndproc(
                 None,
             );
 
+            let source_text = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.hint_select_source).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                595,
+                560,
+                18,
+                hwnd,
+                HMENU(PODCAST_ID_SOURCE as isize),
+                None,
+                None,
+            );
+
             let elapsed_label = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -923,6 +940,7 @@ unsafe extern "system" fn podcast_wndproc(
                 resume_button,
                 stop_button,
                 status_text,
+                source_text,
                 elapsed_text,
                 level_mic_text,
                 level_system_text,
@@ -1262,20 +1280,8 @@ fn populate_combos(
 
         let _ = SendMessageW(mic_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
         let _ = SendMessageW(system_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-
-        let default_text = to_wide(&labels(language).default_device);
-        let _ = SendMessageW(
-            mic_combo,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(default_text.as_ptr() as isize),
-        );
-        let _ = SendMessageW(
-            system_combo,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(default_text.as_ptr() as isize),
-        );
+        // Note: devices are added later in apply_settings_to_ui from mic_devices/system_devices
+        // which already include "Default" as the first entry
     }
 }
 
@@ -1487,6 +1493,30 @@ fn update_status_text(state: &PodcastState, status: RecorderStatus) {
     }
 }
 
+fn update_source_info_text(
+    state: &PodcastState,
+    mic_name: Option<String>,
+    system_name: Option<String>,
+) {
+    let labels = labels(state.language);
+    let mut parts = Vec::new();
+    if let Some(mic) = mic_name {
+        parts.push(format!("{}: {}", labels.mic_device, mic));
+    }
+    if let Some(system) = system_name {
+        parts.push(format!("{}: {}", labels.system_device, system));
+    }
+    let text = if parts.is_empty() {
+        labels.hint_select_source
+    } else {
+        parts.join("  ")
+    };
+    let wide = to_wide(&text);
+    unsafe {
+        let _ = SetWindowTextW(state.source_text, PCWSTR(wide.as_ptr()));
+    }
+}
+
 fn update_status_from_recorder(state: &mut PodcastState) {
     if let Some(recorder) = state.recorder.as_ref() {
         let status = recorder.status();
@@ -1597,6 +1627,7 @@ fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
         return;
     }
 
+    let default_device_label = labels.default_device.clone();
     let config = RecorderConfig {
         include_mic,
         mic_device_id: selected_device_id(state, true),
@@ -1611,6 +1642,22 @@ fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
     match start_recording(config) {
         Ok(recorder) => {
             state.recorder = Some(recorder);
+            let mic_name =
+                device_display_name(&state.mic_devices, &mic_device_id, &default_device_label);
+            let system_name = device_display_name(
+                &state.system_devices,
+                &system_device_id,
+                &default_device_label,
+            );
+            update_source_info_text(
+                state,
+                Some(mic_name),
+                if include_system {
+                    Some(system_name)
+                } else {
+                    None
+                },
+            );
             update_recording_controls(state);
             update_status_text(state, RecorderStatus::Recording);
             unsafe {
@@ -1728,6 +1775,7 @@ fn persist_settings(state: &PodcastState) {
             save_settings(app.settings.clone());
         });
     }
+    update_source_info_text(state, None, None);
 }
 
 // VIDEO REMOVED: selected_monitor_id function removed
@@ -1812,6 +1860,14 @@ fn selected_device_id(state: &PodcastState, mic: bool) -> String {
     list.get(index)
         .map(|d| d.id.clone())
         .unwrap_or_else(|| PODCAST_DEVICE_DEFAULT.to_string())
+}
+
+fn device_display_name(devices: &[AudioDevice], device_id: &str, fallback: &str) -> String {
+    devices
+        .iter()
+        .find(|d| d.id == device_id)
+        .map(|d| d.name.clone())
+        .unwrap_or_else(|| fallback.to_string())
 }
 
 fn selected_save_folder(state: &PodcastState) -> PathBuf {

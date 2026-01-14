@@ -87,9 +87,9 @@
   "playback.speed_down": "Giam toc do\t-",
   "insert.bookmark": "Chèn &dấu trang\tCtrl+B",
   "insert.manage_bookmarks": "&Quản lý dấu trang...",
-  "help.guide": "&Hướng dẫn",
+  "help.guide": "&Hướng dẫn\tF1",
   "help.changelog": "&Nhật ký thay đổi",
-  "help.check_updates": "Kiểm tra bản &cập nhật",
+  "help.check_updates": "Kiểm tra bản &cập nhật\tF2",
   "help.pending_update": "Bản cập nhật đang chờ",
   "help.about": "&Giới thiệu phần mềm",
   "recent.empty": "Không có tệp nào gần đây",
@@ -412,5 +412,14 @@
   "rss.tree.add_source": "Them nguon",
   "rss.tree.import_txt": "Nhap tu tep",
   "rss.tree.close": "Dong",
-  "rss.import_filter": "Tep TXT/OPML (*.txt;*.opml)\\0*.txt;*.opml\\0Tep van ban (*.txt)\\0*.txt\\0OPML (*.opml)\\0*.opml\\0Tat ca tep (*.*)\\0*.*\\0\\0"
+  "rss.import_filter": "Tep TXT/OPML (*.txt;*.opml)\\0*.txt;*.opml\\0Tep van ban (*.txt)\\0*.txt\\0OPML (*.opml)\\0*.opml\\0Tat ca tep (*.*)\\0*.*\\0\\0",
+  "podcasts.import_button": "Nhập podcast từ OPML...",
+  "podcasts.export_button": "Xuất podcast ra OPML...",
+  "podcasts.imported": "Đã nhập podcast",
+  "podcasts.exported": "Đã xuất podcast",
+  "podcasts.import_failed": "Không thể nhập podcast",
+  "podcasts.export_failed": "Không thể xuất podcast",
+  "podcasts.subscribed_title": "Đăng ký hoàn tất",
+  "podcasts.subscribed_message": "Bạn đã đăng ký podcast thành công.",
+  "podcasts.status.selected": "Podcast được chọn: {title}"
 }

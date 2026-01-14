@@ -4,8 +4,11 @@ use crate::i18n;
 use crate::settings::{self, Language, confirm_title};
 use crate::tools::rss::{self, PodcastEpisode, RssSource, RssSourceType};
 use crate::{log_debug, with_state};
+use quick_xml::{Reader, events::Event};
 use sha2::Digest;
 use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
@@ -14,6 +17,10 @@ use windows::Win32::System::DataExchange::{
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
+use windows::Win32::UI::Controls::Dialogs::{
+    GetOpenFileNameW, GetSaveFileNameW, OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY,
+    OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST, OPENFILENAMEW,
+};
 use windows::Win32::UI::Controls::{
     HTREEITEM, NM_RETURN, NMTVKEYDOWN, TVGN_CARET, TVGN_CHILD, TVGN_NEXT, TVGN_PARENT, TVGN_ROOT,
     TVIF_CHILDREN, TVIF_PARAM, TVIF_TEXT, TVINSERTSTRUCTW, TVITEMEXW_CHILDREN, TVITEMW,
@@ -22,23 +29,23 @@ use windows::Win32::UI::Controls::{
     TVN_SELCHANGEDW, TVSORTCB,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetFocus, GetKeyState, SetFocus, VK_APPS, VK_DELETE, VK_ESCAPE, VK_F10, VK_LEFT, VK_RETURN,
-    VK_RIGHT, VK_SHIFT, VK_TAB,
+    EnableWindow, GetFocus, GetKeyState, SetFocus, VK_APPS, VK_DELETE, VK_ESCAPE, VK_F10, VK_LEFT,
+    VK_RETURN, VK_RIGHT, VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CHILDID_SELF, CallWindowProcW, CreateMenu, CreatePopupMenu, CreateWindowExW,
     DefWindowProcW, DestroyMenu, DestroyWindow, EVENT_OBJECT_FOCUS, GetClientRect, GetDlgCtrlID,
     GetDlgItem, GetParent, GetWindowLongPtrW, GetWindowRect, HMENU, IDC_ARROW, IDYES, LB_ADDSTRING,
-    LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK, LBS_NOTIFY, MB_YESNO, MF_GRAYED,
-    MF_POPUP, MF_SEPARATOR, MF_STRING, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW,
-    RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW,
-    TrackPopupMenu, WINDOW_STYLE, WM_CHAR, WM_COMMAND, WM_CONTEXTMENU, WM_COPYDATA, WM_CREATE,
-    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_SETFOCUS, WM_SETFONT,
-    WM_SIZE, WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
-    WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK, LBS_NOTIFY, MB_ICONINFORMATION, MB_OK,
+    MB_YESNO, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MSG, MessageBoxW, OBJID_CLIENT,
+    PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
+    SetWindowTextW, TrackPopupMenu, WINDOW_STYLE, WM_CHAR, WM_COMMAND, WM_CONTEXTMENU, WM_COPYDATA,
+    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_SETFOCUS,
+    WM_SETFONT, WM_SIZE, WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
-use windows::core::{PCWSTR, w};
+use windows::core::{PCWSTR, PWSTR, w};
 
 const PODCASTS_WINDOW_CLASS: &str = "NovapadPodcasts";
 const PODCASTS_REORDER_CLASS: &str = "NovapadPodcastsReorder";
@@ -50,6 +57,9 @@ const ID_SEARCH_EDIT: usize = 12002;
 const ID_SEARCH_BUTTON: usize = 12006;
 const ID_RESULTS: usize = 12003;
 const ID_ADD_BUTTON: usize = 12004;
+const ID_IMPORT_BUTTON: usize = 12009;
+const ID_EXPORT_BUTTON: usize = 12010;
+const ID_DELETE_BUTTON: usize = 12008;
 const ID_CLOSE_BUTTON: usize = 12007;
 
 const REORDER_EDIT_ID: usize = 12101;
@@ -104,6 +114,9 @@ struct PodcastWindowState {
     hwnd_search_button: HWND,
     hwnd_results: HWND,
     hwnd_add: HWND,
+    hwnd_import: HWND,
+    hwnd_export: HWND,
+    hwnd_delete: HWND,
     hwnd_close: HWND,
     node_data: HashMap<isize, NodeData>,
     source_items: HashMap<isize, SourceItemsState>,
@@ -124,6 +137,241 @@ enum NodeData {
 
 struct SourceItemsState {
     items: Vec<PodcastEpisode>,
+}
+
+fn parse_opml_sources(text: &str) -> Vec<(String, String)> {
+    let mut reader = Reader::from_str(text);
+    reader.trim_text(true);
+    let mut buf = Vec::new();
+    let mut out = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+                if !e.name().as_ref().eq_ignore_ascii_case(b"outline") {
+                    buf.clear();
+                    continue;
+                }
+                let mut url = String::new();
+                let mut title = String::new();
+                for attr in e.attributes().flatten() {
+                    let key = attr.key.as_ref();
+                    let value = attr
+                        .decode_and_unescape_value(&reader)
+                        .unwrap_or_default()
+                        .to_string();
+                    if key.eq_ignore_ascii_case(b"xmlUrl") {
+                        url = value;
+                    } else if key.eq_ignore_ascii_case(b"title")
+                        || key.eq_ignore_ascii_case(b"text")
+                    {
+                        if title.is_empty() {
+                            title = value;
+                        }
+                    }
+                }
+                if !url.trim().is_empty() {
+                    out.push((title, url));
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(_) => break,
+            _ => {}
+        }
+        buf.clear();
+    }
+    out
+}
+
+fn parse_single_path(buffer: &[u16]) -> Option<PathBuf> {
+    let end = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
+    if end == 0 {
+        return None;
+    }
+    Some(PathBuf::from(String::from_utf16_lossy(&buffer[..end])))
+}
+
+fn open_opml_file_dialog(hwnd: HWND, language: Language, for_import: bool) -> Option<PathBuf> {
+    let raw_filter = i18n::tr(language, "rss.import_filter");
+    let filter = to_wide(&raw_filter.replace("\\0", "\0"));
+    let mut buffer = vec![0u16; 4096];
+    let mut ofn = OPENFILENAMEW {
+        lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
+        hwndOwner: hwnd,
+        lpstrFilter: PCWSTR(filter.as_ptr()),
+        lpstrFile: PWSTR(buffer.as_mut_ptr()),
+        nMaxFile: buffer.len() as u32,
+        Flags: OFN_EXPLORER
+            | OFN_HIDEREADONLY
+            | OFN_PATHMUSTEXIST
+            | if for_import {
+                OFN_FILEMUSTEXIST
+            } else {
+                OFN_OVERWRITEPROMPT
+            },
+        ..Default::default()
+    };
+    let success = if for_import {
+        unsafe { GetOpenFileNameW(&mut ofn).as_bool() }
+    } else {
+        unsafe { GetSaveFileNameW(&mut ofn).as_bool() }
+    };
+    if !success {
+        return None;
+    }
+    parse_single_path(&buffer)
+}
+
+fn normalize_podcast_key(url: &str) -> String {
+    rss::normalize_url(url).to_ascii_lowercase()
+}
+
+fn import_podcast_sources_from_file(hwnd: HWND, path: &Path) -> Option<usize> {
+    let bytes = std::fs::read(path).ok()?;
+    let text = String::from_utf8_lossy(&bytes);
+    let is_opml = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.eq_ignore_ascii_case("opml"))
+        .unwrap_or(false)
+        || text.to_ascii_lowercase().contains("<opml");
+    let sources = if is_opml {
+        parse_opml_sources(&text)
+    } else {
+        Vec::new()
+    };
+    let parent = unsafe { with_podcast_state(hwnd, |s| s.parent) }.unwrap_or(HWND(0));
+    if parent.0 == 0 {
+        return None;
+    }
+    let mut added = 0usize;
+    unsafe {
+        with_state(parent, |state| {
+            let mut existing: HashSet<String> = state
+                .settings
+                .podcast_sources
+                .iter()
+                .map(|src| normalize_podcast_key(&src.url))
+                .filter(|k| !k.is_empty())
+                .collect();
+            for (mut title, url_raw) in sources {
+                let url = rss::normalize_url(&url_raw);
+                if url.is_empty() {
+                    continue;
+                }
+                let key = normalize_podcast_key(&url);
+                if key.is_empty() || existing.contains(&key) {
+                    continue;
+                }
+                if title.trim().is_empty() {
+                    title = url.clone();
+                }
+                state.settings.podcast_sources.push(rss::RssSource {
+                    title: title.clone(),
+                    url: url.clone(),
+                    kind: rss::RssSourceType::Feed,
+                    user_title: title.trim() != url.trim(),
+                    cache: rss::RssFeedCache::default(),
+                });
+                existing.insert(key);
+                added += 1;
+            }
+            if added > 0 {
+                crate::settings::save_settings(state.settings.clone());
+            }
+        });
+    }
+    if added > 0 {
+        unsafe {
+            reload_tree(hwnd);
+        }
+    }
+    Some(added)
+}
+
+fn escape_opml_attr(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
+fn export_podcast_sources_to_file(hwnd: HWND, path: &Path) -> Result<usize, String> {
+    let parent = unsafe { with_podcast_state(hwnd, |s| s.parent) }.unwrap_or(HWND(0));
+    if parent.0 == 0 {
+        return Err("missing parent".to_string());
+    }
+    let sources = unsafe { with_state(parent, |state| state.settings.podcast_sources.clone()) }
+        .unwrap_or_default();
+    if sources.is_empty() {
+        return Ok(0);
+    }
+    let mut file = File::create(path).map_err(|e| e.to_string())?;
+    writeln!(
+        file,
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<opml version=\"1.0\">\n<head>\n<title>Novapad Podcasts</title>\n</head>\n<body>"
+    )
+    .map_err(|e| e.to_string())?;
+    for src in sources.iter() {
+        let title = if src.title.trim().is_empty() {
+            src.url.clone()
+        } else {
+            src.title.clone()
+        };
+        writeln!(
+            file,
+            "  <outline text=\"{}\" title=\"{}\" xmlUrl=\"{}\" />",
+            escape_opml_attr(&title),
+            escape_opml_attr(&title),
+            escape_opml_attr(&src.url)
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    writeln!(file, "</body>\n</opml>").map_err(|e| e.to_string())?;
+    Ok(sources.len())
+}
+
+unsafe fn handle_import_opml(hwnd: HWND) {
+    let language = with_podcast_state(hwnd, |s| s.language).unwrap_or_default();
+    if let Some(path) = open_opml_file_dialog(hwnd, language, true) {
+        if let Some(count) = import_podcast_sources_from_file(hwnd, &path) {
+            if count > 0 {
+                announce_status(&i18n::tr(language, "podcasts.imported"));
+            }
+        } else {
+            let title = i18n::tr(language, "podcasts.window.title");
+            let message = i18n::tr(language, "podcasts.import_failed");
+            let _ = MessageBoxW(
+                hwnd,
+                PCWSTR(to_wide(&message).as_ptr()),
+                PCWSTR(to_wide(&title).as_ptr()),
+                MB_OK | MB_ICONINFORMATION,
+            );
+        }
+    }
+}
+
+unsafe fn handle_export_opml(hwnd: HWND) {
+    let language = with_podcast_state(hwnd, |s| s.language).unwrap_or_default();
+    if let Some(path) = open_opml_file_dialog(hwnd, language, false) {
+        match export_podcast_sources_to_file(hwnd, &path) {
+            Ok(count) => {
+                if count > 0 {
+                    announce_status(&i18n::tr(language, "podcasts.exported"));
+                }
+            }
+            Err(err) => {
+                let title = i18n::tr(language, "podcasts.window.title");
+                let message = format!("{}: {}", i18n::tr(language, "podcasts.export_failed"), err);
+                let _ = MessageBoxW(
+                    hwnd,
+                    PCWSTR(to_wide(&message).as_ptr()),
+                    PCWSTR(to_wide(&title).as_ptr()),
+                    MB_OK | MB_ICONINFORMATION,
+                );
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -168,8 +416,19 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
             return true;
         }
         if key == VK_RETURN.0 as u32 {
-            let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-            if hwnd_tree.0 != 0 && GetFocus() == hwnd_tree {
+            let (hwnd_tree, hwnd_results) =
+                with_podcast_state(hwnd, |s| (s.hwnd_tree, s.hwnd_results))
+                    .unwrap_or((HWND(0), HWND(0)));
+            let focus = GetFocus();
+
+            // Handle Enter on search results list
+            if hwnd_results.0 != 0 && focus == hwnd_results {
+                subscribe_selected_result(hwnd);
+                return true;
+            }
+
+            // Handle Enter on tree view
+            if hwnd_tree.0 != 0 && focus == hwnd_tree {
                 if let Some(item) = selected_episode(hwnd) {
                     let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
                     open_episode_in_player(hwnd, parent, &item);
@@ -360,6 +619,35 @@ unsafe fn selected_source_index(hwnd: HWND) -> Option<usize> {
         _ => None,
     })
     .flatten()
+}
+
+unsafe fn selected_source_name(hwnd: HWND) -> Option<String> {
+    let index = selected_source_index(hwnd)?;
+    let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    if parent.0 == 0 {
+        return None;
+    }
+    with_state(parent, |ps| {
+        ps.settings.podcast_sources.get(index).map(|src| {
+            if src.title.trim().is_empty() {
+                src.url.clone()
+            } else {
+                src.title.clone()
+            }
+        })
+    })
+    .unwrap_or(None)
+}
+
+fn update_delete_button_state(hwnd: HWND) {
+    let enabled = unsafe { selected_source_name(hwnd).is_some() };
+    unsafe {
+        with_podcast_state(hwnd, |state| {
+            if state.hwnd_delete.0 != 0 {
+                EnableWindow(state.hwnd_delete, enabled);
+            }
+        });
+    }
 }
 
 unsafe fn selected_episode(hwnd: HWND) -> Option<PodcastEpisode> {
@@ -723,6 +1011,11 @@ unsafe fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpis
     if !should_start {
         return;
     }
+
+    // Show loading message immediately so user knows action was triggered
+    let language = with_state(parent, |s| s.settings.language).unwrap_or_default();
+    announce_status(&i18n::tr(language, "podcasts.loading"));
+
     if parent.0 != 0 {
         ensure_rss_http(parent);
     }
@@ -936,6 +1229,17 @@ unsafe fn subscribe_selected_result(hwnd: HWND) {
     if let Some(index) = new_index {
         let language = with_state(parent, |s| s.settings.language).unwrap_or_default();
         announce_status(&i18n::tr(language, "podcasts.added"));
+
+        // Show confirmation dialog
+        let title = i18n::tr(language, "podcasts.subscribed_title");
+        let message = i18n::tr(language, "podcasts.subscribed_message");
+        let _ = MessageBoxW(
+            hwnd,
+            PCWSTR(to_wide(&message).as_ptr()),
+            PCWSTR(to_wide(&title).as_ptr()),
+            MB_OK | MB_ICONINFORMATION,
+        );
+
         let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
         if hwnd_tree.0 != 0 {
             let title = if result.title.trim().is_empty() {
@@ -1582,6 +1886,11 @@ unsafe fn handle_source_action(hwnd: HWND, verb: SourceAction) {
                 true
             };
             if !confirm {
+                let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+                if hwnd_tree.0 != 0 {
+                    SetFocus(hwnd_tree);
+                }
+                update_delete_button_state(hwnd);
                 return;
             }
             let removed = with_state(parent, |ps| {
@@ -1598,6 +1907,7 @@ unsafe fn handle_source_action(hwnd: HWND, verb: SourceAction) {
                 let language = with_state(parent, |s| s.settings.language).unwrap_or_default();
                 announce_status(&i18n::tr(language, "podcasts.removed"));
                 reload_tree(hwnd);
+                update_delete_button_state(hwnd);
                 let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
                 if hwnd_tree.0 != 0 {
                     SetFocus(hwnd_tree);
@@ -1619,6 +1929,13 @@ unsafe fn handle_source_action(hwnd: HWND, verb: SourceAction) {
                         );
                     }
                 }
+            }
+            {
+                let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+                if hwnd_tree.0 != 0 {
+                    SetFocus(hwnd_tree);
+                }
+                update_delete_button_state(hwnd);
             }
         }
         SourceAction::CopyUrl => {
@@ -2231,17 +2548,34 @@ unsafe extern "system" fn podcast_search_wndproc(
         if key == VK_TAB.0 as u32 {
             let parent = GetParent(hwnd);
             if parent.0 != 0 {
-                let (hwnd_tree, hwnd_search_button, hwnd_results, hwnd_add, hwnd_close) =
-                    with_podcast_state(parent, |s| {
-                        (
-                            s.hwnd_tree,
-                            s.hwnd_search_button,
-                            s.hwnd_results,
-                            s.hwnd_add,
-                            s.hwnd_close,
-                        )
-                    })
-                    .unwrap_or((HWND(0), HWND(0), HWND(0), HWND(0), HWND(0)));
+                let (
+                    hwnd_tree,
+                    hwnd_search_button,
+                    hwnd_results,
+                    hwnd_add,
+                    hwnd_import,
+                    hwnd_export,
+                    hwnd_close,
+                ) = with_podcast_state(parent, |s| {
+                    (
+                        s.hwnd_tree,
+                        s.hwnd_search_button,
+                        s.hwnd_results,
+                        s.hwnd_add,
+                        s.hwnd_import,
+                        s.hwnd_export,
+                        s.hwnd_close,
+                    )
+                })
+                .unwrap_or((
+                    HWND(0),
+                    HWND(0),
+                    HWND(0),
+                    HWND(0),
+                    HWND(0),
+                    HWND(0),
+                    HWND(0),
+                ));
                 let prev = GetKeyState(VK_SHIFT.0 as i32) < 0;
                 let target = if prev {
                     hwnd_tree
@@ -2251,6 +2585,10 @@ unsafe extern "system" fn podcast_search_wndproc(
                     hwnd_results
                 } else if hwnd_add.0 != 0 {
                     hwnd_add
+                } else if hwnd_import.0 != 0 {
+                    hwnd_import
+                } else if hwnd_export.0 != 0 {
+                    hwnd_export
                 } else {
                     hwnd_close
                 };
@@ -2341,6 +2679,27 @@ unsafe fn create_controls(hwnd: HWND) {
             s.tree_proc = std::mem::transmute::<isize, WNDPROC>(old)
         });
     }
+
+    let hwnd_delete = CreateWindowExW(
+        Default::default(),
+        w!("BUTTON"),
+        PCWSTR(
+            to_wide(&i18n::tr(
+                with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
+                "podcasts.delete_button",
+            ))
+            .as_ptr(),
+        ),
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+        220,
+        300,
+        200,
+        26,
+        hwnd,
+        HMENU(ID_DELETE_BUTTON as isize),
+        hinstance,
+        None,
+    );
 
     let hwnd_search_label = CreateWindowExW(
         Default::default(),
@@ -2445,6 +2804,48 @@ unsafe fn create_controls(hwnd: HWND) {
         None,
     );
 
+    let hwnd_import = CreateWindowExW(
+        Default::default(),
+        w!("BUTTON"),
+        PCWSTR(
+            to_wide(&i18n::tr(
+                with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
+                "podcasts.import_button",
+            ))
+            .as_ptr(),
+        ),
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+        10,
+        526,
+        200,
+        26,
+        hwnd,
+        HMENU(ID_IMPORT_BUTTON as isize),
+        hinstance,
+        None,
+    );
+
+    let hwnd_export = CreateWindowExW(
+        Default::default(),
+        w!("BUTTON"),
+        PCWSTR(
+            to_wide(&i18n::tr(
+                with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
+                "podcasts.export_button",
+            ))
+            .as_ptr(),
+        ),
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+        10,
+        562,
+        200,
+        26,
+        hwnd,
+        HMENU(ID_EXPORT_BUTTON as isize),
+        hinstance,
+        None,
+    );
+
     let hwnd_close = CreateWindowExW(
         Default::default(),
         w!("BUTTON"),
@@ -2456,7 +2857,7 @@ unsafe fn create_controls(hwnd: HWND) {
             .as_ptr(),
         ),
         WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-        270,
+        430,
         490,
         200,
         26,
@@ -2473,6 +2874,9 @@ unsafe fn create_controls(hwnd: HWND) {
         s.hwnd_search_button = hwnd_search_button;
         s.hwnd_results = hwnd_results;
         s.hwnd_add = hwnd_add;
+        s.hwnd_import = hwnd_import;
+        s.hwnd_export = hwnd_export;
+        s.hwnd_delete = hwnd_delete;
         s.hwnd_close = hwnd_close;
     });
 
@@ -2489,6 +2893,8 @@ unsafe fn create_controls(hwnd: HWND) {
         hwnd_search_button,
         hwnd_results,
         hwnd_add,
+        hwnd_import,
+        hwnd_export,
         hwnd_close,
     ] {
         if ctrl.0 != 0 {
@@ -2511,14 +2917,15 @@ unsafe fn resize_controls(hwnd: HWND) {
     let search_button_h = 26;
     let results_h = 140;
     let button_h = 26;
+    let button_rows = 3;
     let tree_h = (height
         - margin * 2
-        - spacing * 5
+        - spacing * 7
         - label_h
         - search_h
         - search_button_h
         - results_h
-        - button_h)
+        - button_h * button_rows)
         .max(120);
     let controls = with_podcast_state(hwnd, |s| {
         (
@@ -2528,10 +2935,14 @@ unsafe fn resize_controls(hwnd: HWND) {
             s.hwnd_search_button,
             s.hwnd_results,
             s.hwnd_add,
+            s.hwnd_import,
+            s.hwnd_export,
             s.hwnd_close,
         )
     })
     .unwrap_or((
+        HWND(0),
+        HWND(0),
         HWND(0),
         HWND(0),
         HWND(0),
@@ -2590,12 +3001,20 @@ unsafe fn resize_controls(hwnd: HWND) {
             controls.5, margin, y, 200, button_h, true,
         );
         let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            controls.6,
+            controls.8,
             (width - margin - 200).max(margin),
             y,
             200,
             button_h,
             true,
+        );
+        y += button_h + spacing;
+        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+            controls.6, margin, y, 200, button_h, true,
+        );
+        y += button_h + spacing;
+        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+            controls.7, margin, y, 200, button_h, true,
         );
     }
 }
@@ -2668,6 +3087,9 @@ unsafe extern "system" fn podcast_wndproc(
                 hwnd_search_button: HWND(0),
                 hwnd_results: HWND(0),
                 hwnd_add: HWND(0),
+                hwnd_import: HWND(0),
+                hwnd_export: HWND(0),
+                hwnd_delete: HWND(0),
                 hwnd_close: HWND(0),
                 node_data: HashMap::new(),
                 source_items: HashMap::new(),
@@ -2686,6 +3108,7 @@ unsafe extern "system" fn podcast_wndproc(
             );
             create_controls(hwnd);
             reload_tree(hwnd);
+            update_delete_button_state(hwnd);
             let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
             if hwnd_tree.0 != 0 {
                 SetFocus(hwnd_tree);
@@ -2730,6 +3153,7 @@ unsafe extern "system" fn podcast_wndproc(
                 if nmhdr.code == TVN_SELCHANGEDW {
                     let info = &*(lparam.0 as *const windows::Win32::UI::Controls::NMTREEVIEWW);
                     with_podcast_state(hwnd, |s| s.last_selected = info.itemNew.hItem.0);
+                    update_delete_button_state(hwnd);
                 }
             }
             LRESULT(0)
@@ -2748,6 +3172,14 @@ unsafe extern "system" fn podcast_wndproc(
                     show_add_dialog(hwnd);
                     LRESULT(0)
                 }
+                ID_IMPORT_BUTTON => {
+                    handle_import_opml(hwnd);
+                    LRESULT(0)
+                }
+                ID_EXPORT_BUTTON => {
+                    handle_export_opml(hwnd);
+                    LRESULT(0)
+                }
                 ID_CLOSE_BUTTON | 2 => {
                     let _ = DestroyWindow(hwnd);
                     LRESULT(0)
@@ -2764,6 +3196,10 @@ unsafe extern "system" fn podcast_wndproc(
                         subscribe_selected_result(hwnd);
                         return LRESULT(0);
                     }
+                    LRESULT(0)
+                }
+                ID_DELETE_BUTTON => {
+                    handle_source_action(hwnd, SourceAction::Remove);
                     LRESULT(0)
                 }
                 _ => DefWindowProcW(hwnd, msg, wparam, lparam),

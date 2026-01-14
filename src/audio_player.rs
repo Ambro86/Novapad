@@ -517,26 +517,31 @@ pub fn audiobook_duration_secs(path: &Path) -> Option<u64> {
 pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
     let path_buf = path.to_path_buf();
 
-    let bookmark_pos = with_state(hwnd, |state| {
-        state
+    let (bookmark_pos, speed, volume) = with_state(hwnd, |state| {
+        let pos = state
             .bookmarks
             .files
             .get(&path_buf.to_string_lossy().to_string())
             .and_then(|list| list.last()) // Usa l'ultimo segnalibro per l'audio
             .map(|bm| bm.position)
-            .unwrap_or(0)
+            .unwrap_or(0);
+        (
+            pos,
+            state.settings.audiobook_playback_speed,
+            state.settings.audiobook_playback_volume,
+        )
     })
-    .unwrap_or(0);
+    .unwrap_or((0, 1.0, 1.0));
 
     start_audiobook_at_with_speed(
         hwnd,
         path_buf,
         bookmark_pos as u64,
-        1.0,
+        speed,
         false,
-        1.0,
+        volume,
         false,
-        1.0,
+        volume,
     );
 }
 
@@ -647,9 +652,33 @@ pub unsafe fn stop_audiobook_playback(hwnd: HWND) {
 }
 
 pub unsafe fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
+    // Preserve current speed and volume settings
+    let (speed, volume, muted, prev_volume) = with_state(hwnd, |state| {
+        if let Some(player) = &state.active_audiobook {
+            (
+                player.speed,
+                player.volume,
+                player.muted,
+                player.prev_volume,
+            )
+        } else {
+            (1.0, 1.0, false, 1.0)
+        }
+    })
+    .unwrap_or((1.0, 1.0, false, 1.0));
+
     stop_audiobook_playback(hwnd);
     let path_buf = path.to_path_buf();
-    start_audiobook_at_with_speed(hwnd, path_buf, seconds, 1.0, false, 1.0, false, 1.0);
+    start_audiobook_at_with_speed(
+        hwnd,
+        path_buf,
+        seconds,
+        speed,
+        false,
+        volume,
+        muted,
+        prev_volume,
+    );
 }
 
 fn start_audiobook_at_with_speed(
@@ -737,16 +766,28 @@ fn start_audiobook_at_with_speed(
 }
 
 pub unsafe fn change_audiobook_volume(hwnd: HWND, delta: f32) {
-    let _ = with_state(hwnd, |state| {
+    let new_volume = with_state(hwnd, |state| {
         if let Some(player) = &mut state.active_audiobook {
             if player.muted {
                 player.prev_volume = (player.prev_volume + delta).clamp(0.0, 3.0);
-                return;
+                return None;
             }
             player.volume = (player.volume + delta).clamp(0.0, 3.0);
             player.sink.set_volume(player.volume);
+            Some(player.volume)
+        } else {
+            None
         }
-    });
+    })
+    .flatten();
+
+    // Save volume to settings
+    if let Some(volume) = new_volume {
+        with_state(hwnd, |state| {
+            state.settings.audiobook_playback_volume = volume;
+            crate::settings::save_settings(state.settings.clone());
+        });
+    }
 }
 
 pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
@@ -792,6 +833,13 @@ pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
         muted,
         prev_volume,
     );
+
+    // Save speed to settings
+    with_state(hwnd, |state| {
+        state.settings.audiobook_playback_speed = speed;
+        crate::settings::save_settings(state.settings.clone());
+    });
+
     Some(speed)
 }
 

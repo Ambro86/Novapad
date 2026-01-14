@@ -206,8 +206,6 @@ pub unsafe fn set_edit_text(hwnd_edit: HWND, text: &str) {
             WPARAM(0),
             LPARAM(ENM_CHANGE as isize),
         );
-        let prev = SetWindowLongPtrW(hwnd_edit, GWLP_WNDPROC, edit_subclass_proc as isize);
-        let _ = SetWindowLongPtrW(hwnd_edit, GWLP_USERDATA, prev);
     }
 }
 
@@ -2384,6 +2382,9 @@ pub unsafe fn create_edit(
             WPARAM(0),
             LPARAM(ENM_CHANGE as isize),
         );
+        // Install subclass for smart quotes
+        let prev = SetWindowLongPtrW(hwnd_edit, GWLP_WNDPROC, edit_subclass_proc as isize);
+        let _ = SetWindowLongPtrW(hwnd_edit, GWLP_USERDATA, prev);
     }
     hwnd_edit
 }
@@ -2417,6 +2418,10 @@ pub unsafe fn save_all_documents(hwnd: HWND) -> bool {
 pub unsafe fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
     let result = with_state(hwnd, |state| {
         if state.docs.is_empty() || index >= state.docs.len() {
+            return None;
+        }
+        // Prevent saving audio files (MP3, etc.) which would corrupt them
+        if matches!(state.docs[index].format, FileFormat::Audiobook) {
             return None;
         }
         let language = state.settings.language;

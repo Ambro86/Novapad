@@ -72,7 +72,8 @@ use windows::Win32::UI::Controls::{
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_APPS, VK_CONTROL, VK_ESCAPE,
-    VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F10, VK_MENU, VK_RETURN, VK_SHIFT, VK_TAB,
+    VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F10, VK_MENU, VK_RETURN, VK_SHIFT,
+    VK_TAB,
 };
 use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
 use windows::Win32::UI::Shell::{
@@ -727,12 +728,20 @@ fn main() -> windows::core::Result<()> {
                 }
             }
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == u32::from(VK_F1.0) {
+                app_windows::help_window::open(hwnd);
+                continue;
+            }
+            if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == u32::from(VK_F2.0) {
+                updater::check_for_update(hwnd, true);
+                continue;
+            }
+            if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == u32::from(VK_F7.0) {
                 if is_tts_active(hwnd) {
                     cycle_favorite_voice(hwnd, -1);
                     continue;
                 }
             }
-            if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == u32::from(VK_F2.0) {
+            if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == u32::from(VK_F8.0) {
                 if is_tts_active(hwnd) {
                     cycle_favorite_voice(hwnd, 1);
                     continue;
@@ -1449,11 +1458,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             LRESULT(0)
         }
         WM_KEYDOWN => {
-            if wparam.0 as u32 == u32::from(VK_F1.0) {
+            if wparam.0 as u32 == u32::from(VK_F7.0) {
                 cycle_favorite_voice(hwnd, -1);
                 return LRESULT(0);
             }
-            if wparam.0 as u32 == u32::from(VK_F2.0) {
+            if wparam.0 as u32 == u32::from(VK_F8.0) {
                 cycle_favorite_voice(hwnd, 1);
                 return LRESULT(0);
             }
@@ -1870,11 +1879,6 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 IDM_HELP_CHECK_UPDATES => {
                     log_debug("Menu: Check updates");
                     updater::check_for_update(hwnd, true);
-                    LRESULT(0)
-                }
-                IDM_HELP_PENDING_UPDATE => {
-                    log_debug("Menu: Pending update");
-                    updater::check_pending_update(hwnd, true);
                     LRESULT(0)
                 }
                 IDM_HELP_ABOUT => {

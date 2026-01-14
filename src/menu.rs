@@ -90,7 +90,6 @@ pub const IDM_HELP_GUIDE: usize = 7001;
 pub const IDM_HELP_ABOUT: usize = 7002;
 pub const IDM_HELP_CHECK_UPDATES: usize = 7003;
 pub const IDM_HELP_CHANGELOG: usize = 7004;
-pub const IDM_HELP_PENDING_UPDATE: usize = 7005;
 pub const IDM_HELP_DONATIONS: usize = 7006;
 pub const MAX_RECENT: usize = 5;
 
@@ -170,7 +169,6 @@ pub struct MenuLabels {
     pub help_changelog: String,
     pub help_donations: String,
     pub help_check_updates: String,
-    pub help_pending_update: String,
     pub help_about: String,
     pub recent_empty: String,
 }
@@ -255,7 +253,6 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         help_changelog: i18n::tr(language, "help.changelog"),
         help_donations: i18n::tr(language, "help.donations"),
         help_check_updates: i18n::tr(language, "help.check_updates"),
-        help_pending_update: i18n::tr(language, "help.pending_update"),
         help_about: i18n::tr(language, "help.about"),
         recent_empty: i18n::tr(language, "recent.empty"),
     }
@@ -725,12 +722,6 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         MF_STRING,
         IDM_HELP_CHECK_UPDATES,
         &labels.help_check_updates,
-    );
-    let _ = append_menu_string(
-        help_menu,
-        MF_STRING,
-        IDM_HELP_PENDING_UPDATE,
-        &labels.help_pending_update,
     );
     let _ = append_menu_string(help_menu, MF_STRING, IDM_HELP_ABOUT, &labels.help_about);
     let _ = append_menu_string(hmenu, MF_POPUP, help_menu.0 as usize, &labels.menu_help);

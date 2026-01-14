@@ -543,11 +543,19 @@ fn main() -> windows::core::Result<()> {
         if hwnd.0 == 0 {
             return Ok(());
         }
-        std::thread::spawn(move || {
-            let _ = PostMessageW(hwnd, WM_CURL_PREFETCH_START, WPARAM(0), LPARAM(0));
-            crate::tools::rss::ensure_curl_exe_download();
-            let _ = PostMessageW(hwnd, WM_CURL_PREFETCH_DONE, WPARAM(0), LPARAM(0));
-        });
+        let curl_path = settings::settings_dir().join("curl.exe");
+        if !curl_path.exists() {
+            std::thread::spawn(move || {
+                let _ = PostMessageW(hwnd, WM_CURL_PREFETCH_START, WPARAM(0), LPARAM(0));
+                let ok = crate::tools::rss::ensure_curl_exe_download();
+                let _ = PostMessageW(
+                    hwnd,
+                    WM_CURL_PREFETCH_DONE,
+                    WPARAM(if ok { 1 } else { 0 }),
+                    LPARAM(0),
+                );
+            });
+        }
         updater::check_pending_update(hwnd, false);
 
         let current_version = env!("CARGO_PKG_VERSION");
@@ -1032,12 +1040,14 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 let _ = DestroyWindow(dialog);
                 let _ = with_state(hwnd, |state| state.curl_download_dialog = HWND(0));
             }
-            MessageBoxW(
-                hwnd,
-                w!("File scaricato OK"),
-                w!("Novapad"),
-                MB_OK | MB_ICONINFORMATION,
-            );
+            if wparam.0 != 0 {
+                MessageBoxW(
+                    hwnd,
+                    w!("File scaricato OK"),
+                    w!("Novapad"),
+                    MB_OK | MB_ICONINFORMATION,
+                );
+            }
             return LRESULT(0);
         }
         WM_CREATE => {

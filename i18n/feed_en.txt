@@ -33,6 +33,5 @@ Product Hunt – Daily Feed | https://www.producthunt.com/feed
 Stack Overflow Blog | https://stackoverflow.blog/feed/
 GitHub Blog | https://github.blog/feed/
 NASA – Breaking News | https://www.nasa.gov/rss/dyn/breaking_news.rss
-Nature – Science News | https://www.nature.com/subjects/science/rss
 Science Magazine – Current News | https://www.science.org/rss/news_current.xml
 New Scientist – Home Feed | https://www.newscientist.com/feed/home/

@@ -1,6 +1,14 @@
-So here is a bit of a strange bug.
-When Novapad is first launched and you use quotes, they’re normal straight quotes. Sometimes, though, they turn into smart quotes when you try to write something with quotes.
-I have no idea why it does this. Maybe there needs to be a setting that lets you turn smart quotes on and off?
-"This is a test."
-As you can see, this time they came out as normal straight quotes. When I tried it earlier, they were smart quotes.
-It's not something that happens regularly, so good luck trying to resolve this one lol.
+[2026-01-14 14:30:41] Application started.
+[2026-01-14 14:30:42] Menu: RSS
+[2026-01-14 14:30:44] rss_request kind="feed" url="https://www.newscientist.com/feed/home/" host="www.newscientist.com" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-14 14:30:44] rss_request kind="feed" url="https://www.newscientist.com/feed/home/" host="www.newscientist.com" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-14 14:30:44] rss_ui_batch start source=2948405030816 append_count=100 loaded_before=0 total_before=0
+[2026-01-14 14:30:44] rss_ui_batch append source=2948405030816 inserted=100 loaded=100 total=100
+[2026-01-14 14:30:44] rss_ui_batch end source=2948405030816 appended=100
+[2026-01-14 14:30:45] rss_request kind="feed" url="https://www.newscientist.com/feed/home/" host="www.newscientist.com" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-14 14:30:46] rss_request kind="feed" url="https://www.newscientist.com/feed/home/" host="www.newscientist.com" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-14 14:30:47] rss_request kind="article" url="https://www.newscientist.com/article/2511350-we-must-completely-change-the-way-we-build-homes-to-stay-below-2c/?utm_campaign=RSS%7CNSNS&utm_source=NSNS&utm_medium=RSS&utm_content=home" host="www.newscientist.com" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-14 14:30:47] rss_article_fetch_done ms=2171 url="https://www.newscientist.com/article/2511350-we-must-completely-change-the-way-we-build-homes-to-stay-below-2c/?utm_campaign=RSS%7CNSNS&utm_source=NSNS&utm_medium=RSS&utm_content=home"
+[2026-01-14 14:30:48] rss_request kind="feed" url="https://www.newscientist.com/feed/home/" host="www.newscientist.com" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-14 14:30:49] rss_request kind="feed" url="https://www.newscientist.com/feed/home/" host="www.newscientist.com" attempt=1 status=200 not_modified=false backoff_ms=0 error=""
+[2026-01-14 14:30:50] rss_request kind="feed" url="https://www.newscientist.com/feed/home/" host="www.newscientist.com" attempt=1 status=200 not_modified=false backoff_ms=0 error=""

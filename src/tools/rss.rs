@@ -4,7 +4,8 @@ use feed_rs::parser;
 use rand::Rng;
 use reqwest::StatusCode;
 use reqwest::header::{
-    ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED, REFERER, RETRY_AFTER,
+    ACCEPT, ACCEPT_LANGUAGE, CONNECTION, ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED,
+    REFERER, RETRY_AFTER, SET_COOKIE, UPGRADE_INSECURE_REQUESTS,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -323,6 +324,7 @@ struct HostRateState {
 static RSS_HTTP: OnceLock<Result<RssHttp, String>> = OnceLock::new();
 const CURL_IMPERSONATE_URL: &str =
     "https://raw.githubusercontent.com/Ambro86/Novapad/master/dll/curl.7z";
+const CURL_CA_BUNDLE_URL: &str = "https://curl.se/ca/cacert.pem";
 
 pub fn init_http(config: RssHttpConfig) -> Result<(), String> {
     let res = RSS_HTTP.get_or_init(|| RssHttp::new(config));
@@ -430,6 +432,11 @@ fn host_from_url(url: &str) -> Option<String> {
     Url::parse(url)
         .ok()
         .and_then(|u| u.host_str().map(|h| h.to_string()))
+}
+
+fn article_referer(url: &str) -> Option<String> {
+    let _ = url;
+    Some("https://news.google.com/".to_string())
 }
 
 fn now_unix() -> i64 {
@@ -921,14 +928,33 @@ async fn fetch_bytes_with_retries(
                     return Err(FeedFetchError::Network { message: e, cache });
                 }
             };
-            let mut req = http
-                .client
-                .get(url)
-                .header(
-                    "Accept",
-                    "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                )
-                .header("Accept-Language", "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7");
+            let mut req = http.client.get(url);
+            if fetch_kind == "article" {
+                req = req
+                    .timeout(Duration::from_secs(30))
+                    .header(
+                        ACCEPT,
+                        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                    )
+                    .header(ACCEPT_LANGUAGE, "en-US,en;q=0.9")
+                    .header("DNT", "1")
+                    .header(CONNECTION, "keep-alive")
+                    .header(UPGRADE_INSECURE_REQUESTS, "1")
+                    .header("Sec-Fetch-Dest", "document")
+                    .header("Sec-Fetch-Mode", "navigate")
+                    .header("Sec-Fetch-Site", "none")
+                    .header("Sec-Fetch-User", "?1");
+                if let Some(referer) = article_referer(url) {
+                    req = req.header(REFERER, referer);
+                }
+            } else {
+                req = req
+                    .header(
+                        ACCEPT,
+                        "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    )
+                    .header(ACCEPT_LANGUAGE, "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7");
+            }
 
             if is_feed {
                 if let Some(cache) = cache.as_ref() {
@@ -1006,6 +1032,34 @@ async fn fetch_bytes_with_retries(
 
                 if !status.is_success() {
                     let retry_after = parse_retry_after(resp.headers());
+                    if fetch_kind == "article"
+                        && status == StatusCode::FORBIDDEN
+                        && attempt < max_attempts
+                    {
+                        let has_cf_challenge = headers
+                            .get("cf-mitigated")
+                            .and_then(|v| v.to_str().ok())
+                            .is_some();
+                        let has_cf_cookie = headers
+                            .get(SET_COOKIE)
+                            .and_then(|v| v.to_str().ok())
+                            .is_some_and(|v| v.contains("__cf_bm="));
+                        if has_cf_challenge || has_cf_cookie {
+                            let delay = Duration::from_secs(1);
+                            log_request_attempt(
+                                url,
+                                &host,
+                                fetch_kind,
+                                attempt,
+                                Some(status),
+                                false,
+                                Some(delay),
+                                Some("cf_challenge_retry"),
+                            );
+                            sleep(delay).await;
+                            continue;
+                        }
+                    }
                     if is_feed {
                         if let Some(cache) = cache.as_deref_mut() {
                             cache.last_status = Some(status.as_u16());
@@ -1123,6 +1177,26 @@ async fn fetch_bytes_with_retries(
             }
             Err(err) => {
                 let err_msg = format_error_chain(&err);
+                if fetch_kind == "article" && err.is_timeout() {
+                    let cache = cache
+                        .as_deref()
+                        .cloned()
+                        .unwrap_or_else(RssFeedCache::default);
+                    log_request_attempt(
+                        url,
+                        &host,
+                        fetch_kind,
+                        attempt,
+                        err.status(),
+                        false,
+                        None,
+                        Some(&err_msg),
+                    );
+                    return Err(FeedFetchError::Network {
+                        message: err_msg,
+                        cache,
+                    });
+                }
                 if should_retry_error(&err) && attempt < max_attempts {
                     let base = compute_backoff(attempt - 1, http.config.backoff_max_secs);
                     let delay = base + Duration::from_millis(rand::thread_rng().gen_range(0..=300));
@@ -1809,6 +1883,10 @@ fn curl_archive_path() -> PathBuf {
     crate::settings::settings_dir().join("curl.7z")
 }
 
+fn curl_ca_bundle_path() -> PathBuf {
+    crate::settings::settings_dir().join("cacert.pem")
+}
+
 fn find_curl_exe_recursive(dir: &std::path::Path, depth: usize) -> Option<PathBuf> {
     if depth == 0 {
         return None;
@@ -1835,26 +1913,36 @@ fn find_curl_exe_recursive(dir: &std::path::Path, depth: usize) -> Option<PathBu
 
 fn extract_curl_archive(archive_path: &std::path::Path) -> Result<PathBuf, String> {
     let target_dir = crate::settings::settings_dir();
-    sevenz_rust::decompress_file(archive_path, &target_dir).map_err(|e| e.to_string())?;
+    let temp_dir = target_dir.join(format!(
+        "curl_tmp_{}_{}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0)
+    ));
+    let _ = std::fs::create_dir_all(&temp_dir);
+    sevenz_rust::decompress_file(archive_path, &temp_dir).map_err(|e| e.to_string())?;
     let exe_path = curl_exe_path();
-    if exe_path.exists() {
-        return Ok(exe_path);
-    }
-    if let Some(found) = find_curl_exe_recursive(&target_dir, 3) {
+    if let Some(found) = find_curl_exe_recursive(&temp_dir, 4) {
         if found != exe_path {
+            let _ = std::fs::remove_file(&exe_path);
             let _ = std::fs::rename(&found, &exe_path);
         }
-        if exe_path.exists() {
-            return Ok(exe_path);
-        }
+    }
+    let _ = std::fs::remove_file(archive_path);
+    let _ = std::fs::remove_dir_all(&temp_dir);
+    if exe_path.exists() {
+        return Ok(exe_path);
     }
     Err("curl.exe not found after extract".to_string())
 }
 
-pub fn ensure_curl_exe_download() {
+pub fn ensure_curl_exe_download() -> bool {
     let exe_path = curl_exe_path();
     if exe_path.exists() {
-        return;
+        let _ = ensure_curl_ca_bundle_download();
+        return true;
     }
     let url = CURL_IMPERSONATE_URL.to_string();
     if let Ok(response) = reqwest::blocking::get(&url) {
@@ -1867,11 +1955,37 @@ pub fn ensure_curl_exe_download() {
                     if file.write_all(&bytes).is_ok() {
                         let _ = std::fs::rename(tmp_path, &archive_path);
                         let _ = extract_curl_archive(&archive_path);
+                        let _ = ensure_curl_ca_bundle_download();
+                        return exe_path.exists();
                     }
                 }
             }
         }
     }
+    false
+}
+
+fn ensure_curl_ca_bundle_download() -> bool {
+    let ca_path = curl_ca_bundle_path();
+    if ca_path.exists() {
+        return true;
+    }
+    let url = CURL_CA_BUNDLE_URL.to_string();
+    if let Ok(response) = reqwest::blocking::get(&url) {
+        if response.status().is_success() {
+            if let Ok(bytes) = response.bytes() {
+                let tmp_path = ca_path.with_extension("tmp");
+                if let Ok(mut file) = std::fs::File::create(&tmp_path) {
+                    use std::io::Write;
+                    if file.write_all(&bytes).is_ok() {
+                        let _ = std::fs::rename(tmp_path, &ca_path);
+                        return ca_path.exists();
+                    }
+                }
+            }
+        }
+    }
+    false
 }
 
 async fn ensure_curl_exe() -> Result<PathBuf, String> {
@@ -1901,16 +2015,39 @@ async fn ensure_curl_exe() -> Result<PathBuf, String> {
     extract_curl_archive(&archive_path)
 }
 
+async fn ensure_curl_ca_bundle() -> Result<PathBuf, String> {
+    let ca_path = curl_ca_bundle_path();
+    if ca_path.exists() {
+        return Ok(ca_path);
+    }
+    let response = reqwest::get(CURL_CA_BUNDLE_URL)
+        .await
+        .map_err(|e| e.to_string())?;
+    if !response.status().is_success() {
+        return Err(format!(
+            "cacert download failed: {}",
+            response.status().as_u16()
+        ));
+    }
+    let bytes = response.bytes().await.map_err(|e| e.to_string())?;
+    let tmp_path = ca_path.with_extension("tmp");
+    std::fs::write(&tmp_path, &bytes).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp_path, &ca_path).map_err(|e| e.to_string())?;
+    Ok(ca_path)
+}
+
 fn is_probably_blocked_html(html: &str) -> bool {
     let lower = html.to_ascii_lowercase();
     lower.contains("just a moment")
         || lower.contains("cf-browser-verification")
         || lower.contains("cf-chl")
         || lower.contains("attention required")
+        || lower.contains("you have a preview of this article while we are checking your access")
+        || lower.contains("when we have confirmed access, the full article content will load")
 }
 
-fn curl_impersonate_args(url: &str) -> Vec<String> {
-    vec![
+fn curl_impersonate_args(url: &str, cacert_path: Option<&std::path::Path>) -> Vec<String> {
+    let mut args = vec![
         "--ciphers".to_string(),
         "TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384,TLS_CHACHA20_POLY1305_SHA256,ECDHE-ECDSA-AES128-GCM-SHA256,ECDHE-RSA-AES128-GCM-SHA256,ECDHE-ECDSA-AES256-GCM-SHA384,ECDHE-RSA-AES256-GCM-SHA384,ECDHE-ECDSA-CHACHA20-POLY1305,ECDHE-RSA-CHACHA20-POLY1305,ECDHE-RSA-AES128-SHA,ECDHE-RSA-AES256-SHA,AES128-GCM-SHA256,AES256-GCM-SHA384,AES128-SHA,AES256-SHA".to_string(),
         "-H".to_string(),
@@ -1944,25 +2081,45 @@ fn curl_impersonate_args(url: &str) -> Vec<String> {
         "--cert-compression".to_string(),
         "brotli".to_string(),
         "--location".to_string(),
+        "--connect-timeout".to_string(),
+        "5".to_string(),
         "--max-time".to_string(),
-        "20".to_string(),
+        "8".to_string(),
         "-sS".to_string(),
         url.to_string(),
-    ]
+    ];
+    if let Some(path) = cacert_path {
+        args.push("--cacert".to_string());
+        args.push(path.to_string_lossy().to_string());
+    }
+    args
 }
 
 async fn fetch_article_html_with_curl(url: &str) -> Result<String, String> {
     let exe_path = ensure_curl_exe().await?;
-    let args = curl_impersonate_args(url);
-    let output = Command::new(&exe_path)
-        .args(&args)
-        .output()
-        .await
-        .map_err(|e| e.to_string())?;
+    let ca_path = ensure_curl_ca_bundle().await.ok();
+    let args = curl_impersonate_args(url, ca_path.as_deref());
+    let start = Instant::now();
+    let mut cmd = Command::new(&exe_path);
+    cmd.args(&args);
+    #[cfg(target_os = "windows")]
+    {
+        cmd.creation_flags(0x08000000);
+    }
+    let output = cmd.output().await.map_err(|e| e.to_string())?;
+    let elapsed_ms = start.elapsed().as_millis();
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
+        log_debug(&format!(
+            "rss_curl_done ms={} status=fail url=\"{}\"",
+            elapsed_ms, url
+        ));
         return Err(format!("curl failed: {}", stderr.trim()));
     }
+    log_debug(&format!(
+        "rss_curl_done ms={} status=ok url=\"{}\"",
+        elapsed_ms, url
+    ));
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
@@ -1971,38 +2128,69 @@ pub async fn fetch_article_text(
     fallback_title: &str,
     fallback_description: &str,
 ) -> Result<String, String> {
+    let start_total = Instant::now();
     let url = normalize_url(url);
     if url.is_empty() {
         return Err("Empty URL".to_string());
     }
     let http = shared_http()?;
     let fetch_config = RssFetchConfig::default();
-    let out =
-        fetch_bytes_with_retries(http, &url, false, "article", false, &fetch_config, None).await;
-    let html = match out {
-        Ok(out) => String::from_utf8_lossy(&out.bytes).to_string(),
-        Err(err) => {
-            log_debug(&format!(
-                "rss_article_fetch reqwest_failed url=\"{}\" error=\"{}\"",
-                url, err
-            ));
-            fetch_article_html_with_curl(&url).await?
+    let mut html = {
+        let out =
+            fetch_bytes_with_retries(http, &url, false, "article", false, &fetch_config, None)
+                .await;
+        match out {
+            Ok(out) => {
+                let html = String::from_utf8_lossy(&out.bytes).to_string();
+                if is_probably_blocked_html(&html) {
+                    log_debug(&format!(
+                        "rss_article_fetch reqwest_blocked url=\"{}\"",
+                        url
+                    ));
+                    None
+                } else {
+                    Some(html)
+                }
+            }
+            Err(err) => {
+                log_debug(&format!(
+                    "rss_article_fetch reqwest_failed url=\"{}\" error=\"{}\"",
+                    url, err
+                ));
+                None
+            }
         }
     };
-    let html = if is_probably_blocked_html(&html) {
-        log_debug(&format!(
-            "rss_article_fetch reqwest_blocked url=\"{}\"",
-            url
-        ));
-        fetch_article_html_with_curl(&url).await?
-    } else {
-        html
-    };
+    if html.is_none() {
+        html = match fetch_article_html_with_curl(&url).await {
+            Ok(html) => {
+                if is_probably_blocked_html(&html) {
+                    log_debug(&format!("rss_article_fetch curl_blocked url=\"{}\"", url));
+                    None
+                } else {
+                    Some(html)
+                }
+            }
+            Err(err) => {
+                log_debug(&format!(
+                    "rss_article_fetch curl_failed url=\"{}\" error=\"{}\"",
+                    url, err
+                ));
+                None
+            }
+        };
+    }
+    let html = html.unwrap_or_default();
     let article = reader::reader_mode_extract(&html).unwrap_or(reader::ArticleContent {
         title: fallback_title.to_string(),
         content: fallback_description.to_string(),
         excerpt: String::new(),
     });
+    log_debug(&format!(
+        "rss_article_fetch_done ms={} url=\"{}\"",
+        start_total.elapsed().as_millis(),
+        url
+    ));
     Ok(format!("{}\n\n{}", article.title, article.content))
 }
 
@@ -2152,5 +2340,76 @@ mod tests {
         assert_eq!(kind, "rate_limited_429");
         assert_eq!(cooldown_secs, config.cooldown_rate_limited_secs);
         assert_eq!(until, now + config.cooldown_rate_limited_secs as i64);
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_article_fetch_profiles_probe() {
+        let feeds = std::fs::read_to_string("i18n/feed_en.txt")
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|line| {
+                let mut parts = line.split('|').map(str::trim);
+                let title = parts.next()?;
+                let url = parts.next()?;
+                Some((title.to_string(), url.to_string()))
+            })
+            .filter(|(title, _)| {
+                title.contains("NYT")
+                    || title.contains("New Scientist")
+                    || title.contains("CNN")
+                    || title.contains("NPR")
+            })
+            .collect::<Vec<_>>();
+        assert!(!feeds.is_empty(), "no test feeds found");
+
+        for (title, url) in feeds {
+            let outcome = fetch_and_parse(
+                &url,
+                RssSourceType::Feed,
+                RssFeedCache::default(),
+                RssFetchConfig::default(),
+                true,
+            )
+            .await
+            .unwrap();
+            let item = outcome
+                .items
+                .into_iter()
+                .find(|item| !item.link.trim().is_empty())
+                .expect("feed missing article links");
+            let text = fetch_article_text(&item.link, &item.title, &item.description)
+                .await
+                .unwrap_or_default();
+            let lower = text.to_ascii_lowercase();
+            if title.contains("NYT") {
+                assert!(
+                    !lower.contains("preview of our"),
+                    "nytimes preview detected: {} ({})",
+                    item.title,
+                    item.link
+                );
+            }
+            assert!(
+                text.len() > 200,
+                "short article for {}: {} ({})",
+                title,
+                item.title,
+                item.link
+            );
+        }
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_article_fetch_nytimes_specific_url() {
+        let url = "https://www.nytimes.com/2026/01/13/business/china-trade-surplus-exports.html";
+        let text = fetch_article_text(url, "", "").await.unwrap_or_default();
+        let lower = text.to_ascii_lowercase();
+        assert!(
+            !lower.contains("preview of this article while we are checking your access"),
+            "nytimes preview detected for specific url"
+        );
+        assert!(text.len() > 200, "nytimes article too short");
     }
 }

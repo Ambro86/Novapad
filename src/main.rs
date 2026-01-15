@@ -159,7 +159,7 @@ pub(crate) fn focus_editor(hwnd: HWND) {
             let _ = SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
             let _ = SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
             let _ = PostMessageW(hwnd, WM_NEXTDLGCTL, WPARAM(hwnd_edit.0 as usize), LPARAM(1));
-            let _ = NotifyWinEvent(
+            NotifyWinEvent(
                 EVENT_OBJECT_FOCUS,
                 hwnd_edit,
                 OBJID_CLIENT.0,
@@ -671,7 +671,7 @@ pub(crate) fn prefetch_podcast_chapters(hwnd: HWND, key: String, url: String) {
         with_state(hwnd, |state| {
             crate::tools::rss::config_from_settings(&state.settings)
         })
-        .unwrap_or_else(|| crate::tools::rss::RssHttpConfig::default())
+        .unwrap_or_else(crate::tools::rss::RssHttpConfig::default)
     };
     if let Err(err) = crate::tools::rss::init_http(config) {
         log_debug(&format!("rss_http_init_error: {}", err));
@@ -680,7 +680,7 @@ pub(crate) fn prefetch_podcast_chapters(hwnd: HWND, key: String, url: String) {
         with_state(hwnd, |state| {
             crate::tools::rss::fetch_config_from_settings(&state.settings)
         })
-        .unwrap_or_else(|| crate::tools::rss::RssFetchConfig::default())
+        .unwrap_or_else(crate::tools::rss::RssFetchConfig::default)
     };
     let fallback_url = extract_embedded_chapters_url(&url);
     let hwnd_copy = hwnd;
@@ -733,9 +733,7 @@ fn fetch_chapters_with_fallback(
             log_debug(&format!("podcast_chapters_fetch_error {}", err));
         }
     }
-    let Some(fallback_url) = fallback_url.as_ref() else {
-        return None;
-    };
+    let fallback_url = fallback_url.as_ref()?;
     match rt.block_on(crate::tools::rss::fetch_url_bytes(
         fallback_url,
         fetch_config,
@@ -2801,7 +2799,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     SetForegroundWindow(hwnd);
                     focus_editor(hwnd);
                     if let Some(hwnd_edit) = get_active_edit(hwnd) {
-                        let _ = NotifyWinEvent(
+                        NotifyWinEvent(
                             EVENT_OBJECT_FOCUS,
                             hwnd_edit,
                             OBJID_CLIENT.0,

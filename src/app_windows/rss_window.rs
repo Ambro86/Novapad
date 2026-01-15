@@ -460,7 +460,7 @@ fn rss_page_sizes(parent: HWND) -> (usize, usize) {
 fn ensure_rss_http(parent: HWND) {
     let config = unsafe {
         with_state(parent, |s| rss::config_from_settings(&s.settings))
-            .unwrap_or_else(|| rss::RssHttpConfig::default())
+            .unwrap_or_else(rss::RssHttpConfig::default)
     };
     if let Err(err) = rss::init_http(config) {
         log_debug(&format!("rss_http_init_error: {}", err));
@@ -470,7 +470,7 @@ fn ensure_rss_http(parent: HWND) {
 fn rss_fetch_config(parent: HWND) -> rss::RssFetchConfig {
     unsafe {
         with_state(parent, |s| rss::fetch_config_from_settings(&s.settings))
-            .unwrap_or_else(|| rss::RssFetchConfig::default())
+            .unwrap_or_else(rss::RssFetchConfig::default)
     }
 }
 
@@ -492,12 +492,7 @@ fn default_feed_path(language: crate::settings::Language) -> Option<PathBuf> {
     if let Ok(dir) = std::env::current_dir() {
         candidates.push(dir.join("i18n").join(file_name));
     }
-    for path in candidates {
-        if path.exists() {
-            return Some(path);
-        }
-    }
-    None
+    candidates.into_iter().find(|path| path.exists())
 }
 
 fn embedded_default_feeds(language: crate::settings::Language) -> &'static str {
@@ -3345,7 +3340,7 @@ fn collapse_blank_lines(input: &str) -> String {
                 continue;
             }
             prev_blank = true;
-            out.push_str("\n");
+            out.push('\n');
         } else {
             prev_blank = false;
             out.push_str(line);

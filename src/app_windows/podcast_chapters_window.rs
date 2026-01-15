@@ -104,7 +104,7 @@ pub fn select_chapter(parent: HWND, chapters: &[Chapter], language: Language) ->
 
     let mut msg = MSG::default();
     loop {
-        if unsafe { IsWindow(hwnd).as_bool() } == false {
+        if !unsafe { IsWindow(hwnd).as_bool() } {
             break;
         }
         let res = unsafe { GetMessageW(&mut msg, HWND(0), 0, 0) };
@@ -162,7 +162,7 @@ pub fn select_chapter(parent: HWND, chapters: &[Chapter], language: Language) ->
         SetForegroundWindow(parent);
     }
 
-    result.lock().unwrap().clone()
+    *result.lock().unwrap()
 }
 
 unsafe extern "system" fn chapter_list_wndproc(

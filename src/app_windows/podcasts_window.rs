@@ -143,7 +143,7 @@ struct PodcastWindowState {
 #[derive(Clone)]
 enum NodeData {
     Source(usize),
-    Episode(PodcastEpisode),
+    Episode(Box<PodcastEpisode>),
 }
 
 struct SourceItemsState {
@@ -465,7 +465,7 @@ unsafe fn announce_status(message: &str) {
 
 unsafe fn ensure_rss_http(parent: HWND) {
     let config = with_state(parent, |s| rss::config_from_settings(&s.settings))
-        .unwrap_or_else(|| rss::RssHttpConfig::default());
+        .unwrap_or_else(rss::RssHttpConfig::default);
     if let Err(err) = rss::init_http(config) {
         log_debug(&format!("rss_http_init_error: {}", err));
     }
@@ -473,7 +473,7 @@ unsafe fn ensure_rss_http(parent: HWND) {
 
 unsafe fn rss_fetch_config(parent: HWND) -> rss::RssFetchConfig {
     with_state(parent, |s| rss::fetch_config_from_settings(&s.settings))
-        .unwrap_or_else(|| rss::RssFetchConfig::default())
+        .unwrap_or_else(rss::RssFetchConfig::default)
 }
 
 unsafe fn open_url_in_browser(url: &str) -> Result<(), String> {
@@ -674,7 +674,7 @@ unsafe fn selected_episode(hwnd: HWND) -> Option<PodcastEpisode> {
         return None;
     }
     with_podcast_state(hwnd, |s| match s.node_data.get(&hitem.0) {
-        Some(NodeData::Episode(item)) => Some(item.clone()),
+        Some(NodeData::Episode(item)) => Some((**item).clone()),
         _ => None,
     })
     .flatten()
@@ -958,7 +958,7 @@ unsafe fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<Podcast
         if inserted.0 != 0 {
             with_podcast_state(hwnd, |s| {
                 s.node_data
-                    .insert(inserted.0, NodeData::Episode(item.clone()));
+                    .insert(inserted.0, NodeData::Episode(Box::new(item.clone())));
             });
         }
     }
@@ -1844,7 +1844,7 @@ unsafe fn force_focus_editor_on_parent(parent: HWND) {
         let _ = SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(0));
         let _ = SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
         let _ = SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
-        let _ = NotifyWinEvent(
+        NotifyWinEvent(
             EVENT_OBJECT_FOCUS,
             hwnd_edit,
             OBJID_CLIENT.0,

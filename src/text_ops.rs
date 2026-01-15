@@ -9,11 +9,11 @@ fn detect_eol(s: &str) -> &str {
 /// Helper to split text into content and optional trailing newline.
 /// Returns (content_without_trailing, has_trailing_newline)
 fn split_trailing_newline(text: &str) -> (&str, bool) {
-    if text.ends_with("\r\n") {
-        return (&text[..text.len() - 2], true);
+    if let Some(stripped) = text.strip_suffix("\r\n") {
+        return (stripped, true);
     }
-    if text.ends_with('\n') {
-        return (&text[..text.len() - 1], true);
+    if let Some(stripped) = text.strip_suffix('\n') {
+        return (stripped, true);
     }
     (text, false)
 }

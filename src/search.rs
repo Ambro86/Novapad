@@ -808,11 +808,8 @@ unsafe fn find_next_regex(
 
 fn regex_find_forward(regex: &Regex, text: &str, start: usize) -> Option<(usize, usize)> {
     let slice = &text[start..];
-    let mut iter = regex.find_iter(slice);
-    while let Some(res) = iter.next() {
-        if let Ok(found) = res {
-            return Some((start + found.start(), start + found.end()));
-        }
+    if let Some(found) = regex.find_iter(slice).flatten().next() {
+        return Some((start + found.start(), start + found.end()));
     }
     None
 }
@@ -820,11 +817,8 @@ fn regex_find_forward(regex: &Regex, text: &str, start: usize) -> Option<(usize,
 fn regex_find_backward(regex: &Regex, text: &str, end: usize) -> Option<(usize, usize)> {
     let slice = &text[..end];
     let mut last = None;
-    let mut iter = regex.find_iter(slice);
-    while let Some(res) = iter.next() {
-        if let Ok(found) = res {
-            last = Some((found.start(), found.end()));
-        }
+    for found in regex.find_iter(slice).flatten() {
+        last = Some((found.start(), found.end()));
     }
     last
 }

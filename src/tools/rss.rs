@@ -777,9 +777,7 @@ fn parse_podcast_chapters_map(bytes: &[u8]) -> HashMap<String, (Option<String>, 
                 if is_item_start(&name) {
                     current = Some(ChaptersItem::default());
                 } else if let Some(item) = current.as_mut() {
-                    if eq_ignore_ascii(&name, b"guid") {
-                        current_field = Some(ChaptersField::Guid);
-                    } else if eq_ignore_ascii(&name, b"id") {
+                    if eq_ignore_ascii(&name, b"guid") || eq_ignore_ascii(&name, b"id") {
                         current_field = Some(ChaptersField::Guid);
                     } else if eq_ignore_ascii(&name, b"title") {
                         current_field = Some(ChaptersField::Title);
@@ -913,7 +911,7 @@ fn eq_ignore_ascii(input: &[u8], expected: &[u8]) -> bool {
         && input
             .iter()
             .zip(expected)
-            .all(|(a, b)| a.to_ascii_lowercase() == b.to_ascii_lowercase())
+            .all(|(a, b)| a.eq_ignore_ascii_case(b))
 }
 
 fn attr_value<R: std::io::BufRead>(
@@ -946,9 +944,7 @@ fn parse_podlove_chapters_map(bytes: &[u8]) -> HashMap<String, Vec<Chapter>> {
                 if is_item_start(&name) {
                     current = Some(PodloveItem::default());
                 } else if let Some(item) = current.as_mut() {
-                    if eq_ignore_ascii(&name, b"guid") {
-                        current_field = Some(ChaptersField::Guid);
-                    } else if eq_ignore_ascii(&name, b"id") {
+                    if eq_ignore_ascii(&name, b"guid") || eq_ignore_ascii(&name, b"id") {
                         current_field = Some(ChaptersField::Guid);
                     } else if eq_ignore_ascii(&name, b"title") {
                         current_field = Some(ChaptersField::Title);

@@ -402,11 +402,10 @@ fn resolve_settings_dir() -> PathBuf {
         .unwrap_or_else(|| portable_dir.clone());
 
     // 1) "novapad portable" -> portable forzato
-    let preferred_dir = if is_portable_folder(&exe_dir) {
-        portable_dir.clone()
-    }
     // 2) drive removibile -> portable
-    else if matches!(exe_drive_type(&exe_path), Some(t) if t == DRIVE_REMOVABLE) {
+    let preferred_dir = if is_portable_folder(&exe_dir)
+        || matches!(exe_drive_type(&exe_path), Some(t) if t == DRIVE_REMOVABLE)
+    {
         portable_dir.clone()
     }
     // 3) default -> AppData\Novapad
@@ -414,14 +413,12 @@ fn resolve_settings_dir() -> PathBuf {
         appdata_dir
     };
 
-    let settings_dir = if dir_is_writable(&preferred_dir) {
+    if dir_is_writable(&preferred_dir) {
         preferred_dir
     } else {
         let _ = std::fs::create_dir_all(&portable_dir);
         portable_dir
-    };
-
-    settings_dir
+    }
 }
 
 pub fn settings_dir() -> PathBuf {

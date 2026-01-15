@@ -161,11 +161,7 @@ fn load_soundtouch_api() -> Option<&'static SoundTouchApi> {
     static SOUND_TOUCH: OnceLock<Option<SoundTouchApi>> = OnceLock::new();
     SOUND_TOUCH
         .get_or_init(|| unsafe {
-            let dll_name = if cfg!(target_arch = "x86_64") {
-                "SoundTouch64.dll"
-            } else {
-                "SoundTouch64.dll"
-            };
+            let dll_name = "SoundTouch64.dll";
             let mut candidates = Vec::new();
             candidates.push(settings_dir().join(dll_name));
             if let Ok(appdata) = std::env::var("APPDATA") {
@@ -792,9 +788,7 @@ pub unsafe fn change_audiobook_volume(hwnd: HWND, delta: f32) {
 }
 
 pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
-    if load_soundtouch_api().is_none() {
-        return None;
-    }
+    load_soundtouch_api()?;
     let result = with_state(hwnd, |state| {
         if let Some(player) = state.active_audiobook.take() {
             let current = if player.is_paused {
@@ -819,10 +813,7 @@ pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
     })
     .flatten();
 
-    let (path, current, speed, paused, volume, muted, prev_volume) = match result {
-        Some(v) => v,
-        None => return None,
-    };
+    let (path, current, speed, paused, volume, muted, prev_volume) = result?;
 
     start_audiobook_at_with_speed(
         hwnd,

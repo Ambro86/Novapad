@@ -1,8 +1,3 @@
-#![allow(
-    clippy::identity_op,
-    clippy::if_same_then_else,
-    clippy::bind_instead_of_map
-)]
 use crate::accessibility::{handle_accessibility, to_wide};
 use crate::editor_manager::{apply_word_wrap_to_all_edits, update_window_title};
 use crate::settings::{
@@ -121,7 +116,7 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
                     let _ = SendMessageW(
                         hwnd,
                         WM_COMMAND,
-                        WPARAM(OPTIONS_ID_OK | (0 << 16)),
+                        WPARAM(OPTIONS_ID_OK),
                         LPARAM(state.ok_button.0),
                     );
                 });
@@ -2163,9 +2158,9 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             WPARAM(idx),
             LPARAM(*parts as isize),
         );
-        if settings.audiobook_split_by_text && *parts == AUDIOBOOK_SPLIT_BY_TEXT {
-            selected_split_idx = idx;
-        } else if !settings.audiobook_split_by_text && *parts == settings.audiobook_split {
+        if (settings.audiobook_split_by_text && *parts == AUDIOBOOK_SPLIT_BY_TEXT)
+            || (!settings.audiobook_split_by_text && *parts == settings.audiobook_split)
+        {
             selected_split_idx = idx;
         }
     }

@@ -1,4 +1,3 @@
-#![allow(clippy::bool_comparison)]
 use std::sync::{Arc, Mutex};
 
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
@@ -250,7 +249,7 @@ fn show_import_dialog(
 
     let mut msg = MSG::default();
     loop {
-        if unsafe { IsWindow(hwnd).as_bool() } == false {
+        if !unsafe { IsWindow(hwnd).as_bool() } {
             break;
         }
         let res = unsafe { GetMessageW(&mut msg, HWND(0), 0, 0) };

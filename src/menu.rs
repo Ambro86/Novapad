@@ -1,4 +1,3 @@
-#![allow(clippy::let_unit_value)]
 use crate::accessibility::to_wide;
 use crate::i18n;
 use crate::settings::Language;
@@ -316,39 +315,39 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
         let has_chapters =
             with_state(hwnd, |state| !state.active_podcast_chapters.is_empty()).unwrap_or(false);
 
-        let _ = append_menu_string(
+        append_menu_string(
             playback_menu,
             MF_STRING,
             IDM_PLAYBACK_PLAY_PAUSE,
             &play_pause,
         );
-        let _ = append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_STOP, &stop);
-        let _ = append_menu_string(
+        append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_STOP, &stop);
+        append_menu_string(
             playback_menu,
             MF_STRING,
             IDM_PLAYBACK_SEEK_FORWARD,
             &seek_forward,
         );
-        let _ = append_menu_string(
+        append_menu_string(
             playback_menu,
             MF_STRING,
             IDM_PLAYBACK_SEEK_BACKWARD,
             &seek_backward,
         );
         if has_chapters {
-            let _ = append_menu_string(
+            append_menu_string(
                 playback_menu,
                 MF_STRING,
                 IDM_PLAYBACK_CHAPTER_PREV,
                 &chapter_prev,
             );
-            let _ = append_menu_string(
+            append_menu_string(
                 playback_menu,
                 MF_STRING,
                 IDM_PLAYBACK_CHAPTER_NEXT,
                 &chapter_next,
             );
-            let _ = append_menu_string(
+            append_menu_string(
                 playback_menu,
                 MF_STRING,
                 IDM_PLAYBACK_CHAPTER_LIST,
@@ -356,40 +355,40 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
             );
         }
         if show_download {
-            let _ = append_menu_string(
+            append_menu_string(
                 playback_menu,
                 MF_STRING,
                 IDM_PLAYBACK_DOWNLOAD_EPISODE,
                 &download_episode,
             );
         }
-        let _ = append_menu_string(
+        append_menu_string(
             playback_menu,
             MF_STRING,
             IDM_PLAYBACK_GO_TO_TIME,
             &go_to_time,
         );
-        let _ = append_menu_string(
+        append_menu_string(
             playback_menu,
             MF_STRING,
             IDM_PLAYBACK_ANNOUNCE_TIME,
             &announce_time,
         );
-        let _ = append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_VOLUME_UP, &volume_up);
-        let _ = append_menu_string(
+        append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_VOLUME_UP, &volume_up);
+        append_menu_string(
             playback_menu,
             MF_STRING,
             IDM_PLAYBACK_VOLUME_DOWN,
             &volume_down,
         );
-        let _ = append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_SPEED_UP, &speed_up);
-        let _ = append_menu_string(
+        append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_SPEED_UP, &speed_up);
+        append_menu_string(
             playback_menu,
             MF_STRING,
             IDM_PLAYBACK_SPEED_DOWN,
             &speed_down,
         );
-        let _ = append_menu_string(
+        append_menu_string(
             playback_menu,
             MF_STRING,
             IDM_PLAYBACK_MUTE_TOGGLE,
@@ -427,101 +426,101 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
 
     let labels = menu_labels(language);
 
-    let _ = append_menu_string(file_menu, MF_STRING, IDM_FILE_NEW, &labels.file_new);
-    let _ = append_menu_string(file_menu, MF_STRING, IDM_FILE_OPEN, &labels.file_open);
-    let _ = append_menu_string(file_menu, MF_STRING, IDM_FILE_SAVE, &labels.file_save);
-    let _ = append_menu_string(file_menu, MF_STRING, IDM_FILE_SAVE_AS, &labels.file_save_as);
-    let _ = append_menu_string(
+    append_menu_string(file_menu, MF_STRING, IDM_FILE_NEW, &labels.file_new);
+    append_menu_string(file_menu, MF_STRING, IDM_FILE_OPEN, &labels.file_open);
+    append_menu_string(file_menu, MF_STRING, IDM_FILE_SAVE, &labels.file_save);
+    append_menu_string(file_menu, MF_STRING, IDM_FILE_SAVE_AS, &labels.file_save_as);
+    append_menu_string(
         file_menu,
         MF_STRING,
         IDM_FILE_SAVE_ALL,
         &labels.file_save_all,
     );
-    let _ = append_menu_string(file_menu, MF_STRING, IDM_FILE_CLOSE, &labels.file_close);
-    let _ = append_menu_string(
+    append_menu_string(file_menu, MF_STRING, IDM_FILE_CLOSE, &labels.file_close);
+    append_menu_string(
         file_menu,
         MF_STRING,
         IDM_FILE_CLOSE_OTHERS,
         &labels.file_close_others,
     );
     let _ = AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null());
-    let _ = append_menu_string(
+    append_menu_string(
         file_menu,
         MF_POPUP,
         recent_menu.0 as usize,
         &labels.file_recent,
     );
     let _ = AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null());
-    let _ = append_menu_string(
+    append_menu_string(
         file_menu,
         MF_STRING,
         IDM_FILE_READ_START,
         &labels.file_read_start,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         file_menu,
         MF_STRING,
         IDM_FILE_READ_PAUSE,
         &labels.file_read_pause,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         file_menu,
         MF_STRING,
         IDM_FILE_READ_STOP,
         &labels.file_read_stop,
     );
     let _ = AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null());
-    let _ = append_menu_string(
+    append_menu_string(
         file_menu,
         MF_STRING,
         IDM_FILE_AUDIOBOOK,
         &labels.file_audiobook,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         file_menu,
         MF_STRING,
         IDM_FILE_BATCH_AUDIOBOOK,
         &labels.file_batch_audiobooks,
     );
-    let _ = append_menu_string(file_menu, MF_STRING, IDM_FILE_PODCAST, &labels.file_podcast);
+    append_menu_string(file_menu, MF_STRING, IDM_FILE_PODCAST, &labels.file_podcast);
     let _ = AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null());
-    let _ = append_menu_string(file_menu, MF_STRING, IDM_FILE_EXIT, &labels.file_exit);
-    let _ = append_menu_string(hmenu, MF_POPUP, file_menu.0 as usize, &labels.menu_file);
+    append_menu_string(file_menu, MF_STRING, IDM_FILE_EXIT, &labels.file_exit);
+    append_menu_string(hmenu, MF_POPUP, file_menu.0 as usize, &labels.menu_file);
 
-    let _ = append_menu_string(edit_menu, MF_STRING, IDM_EDIT_UNDO, &labels.edit_undo);
+    append_menu_string(edit_menu, MF_STRING, IDM_EDIT_UNDO, &labels.edit_undo);
     let _ = AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null());
-    let _ = append_menu_string(edit_menu, MF_STRING, IDM_EDIT_CUT, &labels.edit_cut);
-    let _ = append_menu_string(edit_menu, MF_STRING, IDM_EDIT_COPY, &labels.edit_copy);
-    let _ = append_menu_string(edit_menu, MF_STRING, IDM_EDIT_PASTE, &labels.edit_paste);
-    let _ = append_menu_string(
+    append_menu_string(edit_menu, MF_STRING, IDM_EDIT_CUT, &labels.edit_cut);
+    append_menu_string(edit_menu, MF_STRING, IDM_EDIT_COPY, &labels.edit_copy);
+    append_menu_string(edit_menu, MF_STRING, IDM_EDIT_PASTE, &labels.edit_paste);
+    append_menu_string(
         edit_menu,
         MF_STRING,
         IDM_EDIT_SELECT_ALL,
         &labels.edit_select_all,
     );
     let _ = AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null());
-    let _ = append_menu_string(edit_menu, MF_STRING, IDM_EDIT_FIND, &labels.edit_find);
-    let _ = append_menu_string(
+    append_menu_string(edit_menu, MF_STRING, IDM_EDIT_FIND, &labels.edit_find);
+    append_menu_string(
         edit_menu,
         MF_STRING,
         IDM_EDIT_FIND_IN_FILES,
         &labels.edit_find_in_files,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         edit_menu,
         MF_STRING,
         IDM_EDIT_FIND_NEXT,
         &labels.edit_find_next,
     );
-    let _ = append_menu_string(edit_menu, MF_STRING, IDM_EDIT_REPLACE, &labels.edit_replace);
+    append_menu_string(edit_menu, MF_STRING, IDM_EDIT_REPLACE, &labels.edit_replace);
     let _ = AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null());
-    let _ = append_menu_string(
+    append_menu_string(
         edit_menu,
         MF_STRING,
         IDM_EDIT_PREV_SPELLING_ERROR,
         &labels.edit_prev_spelling_error,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         edit_menu,
         MF_STRING,
         IDM_EDIT_NEXT_SPELLING_ERROR,
@@ -529,273 +528,273 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
     );
     let _ = AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null());
     let text_menu = CreateMenu().unwrap_or(HMENU(0));
-    let _ = append_menu_string(
+    append_menu_string(
         text_menu,
         MF_STRING,
         IDM_EDIT_STRIP_MARKDOWN,
         &labels.edit_strip_markdown,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         text_menu,
         MF_STRING,
         IDM_EDIT_NORMALIZE_WHITESPACE,
         &labels.edit_normalize_whitespace,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         text_menu,
         MF_STRING,
         IDM_EDIT_HARD_LINE_BREAK,
         &labels.edit_hard_line_break,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         text_menu,
         MF_STRING,
         IDM_EDIT_JOIN_LINES,
         &labels.edit_join_lines,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         text_menu,
         MF_STRING,
         IDM_EDIT_CLEAN_EOL_HYPHENS,
         &labels.edit_clean_eol_hyphens,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         text_menu,
         MF_STRING,
         IDM_EDIT_ORDER_ITEMS,
         &labels.edit_order_items,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         text_menu,
         MF_STRING,
         IDM_EDIT_KEEP_UNIQUE_ITEMS,
         &labels.edit_keep_unique_items,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         text_menu,
         MF_STRING,
         IDM_EDIT_REVERSE_ITEMS,
         &labels.edit_reverse_items,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         text_menu,
         MF_STRING,
         IDM_EDIT_QUOTE_LINES,
         &labels.edit_quote_lines,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         text_menu,
         MF_STRING,
         IDM_EDIT_UNQUOTE_LINES,
         &labels.edit_unquote_lines,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         text_menu,
         MF_STRING,
         IDM_EDIT_REMOVE_DUPLICATE_LINES,
         &labels.edit_remove_duplicate_lines,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         text_menu,
         MF_STRING,
         IDM_EDIT_REMOVE_DUPLICATE_CONSECUTIVE_LINES,
         &labels.edit_remove_duplicate_consecutive_lines,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         edit_menu,
         MF_POPUP,
         text_menu.0 as usize,
         &labels.edit_text_menu,
     );
     let _ = AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null());
-    let _ = append_menu_string(
+    append_menu_string(
         edit_menu,
         MF_STRING,
         IDM_EDIT_TEXT_STATS,
         &labels.edit_text_stats,
     );
-    let _ = append_menu_string(hmenu, MF_POPUP, edit_menu.0 as usize, &labels.menu_edit);
+    append_menu_string(hmenu, MF_POPUP, edit_menu.0 as usize, &labels.menu_edit);
 
-    let _ = append_menu_string(
+    append_menu_string(
         view_menu,
         MF_STRING,
         IDM_VIEW_SHOW_VOICES,
         &labels.view_show_voices,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         view_menu,
         MF_STRING,
         IDM_VIEW_SHOW_FAVORITES,
         &labels.view_show_favorites,
     );
     let _ = AppendMenuW(view_menu, MF_SEPARATOR, 0, PCWSTR::null());
-    let _ = append_menu_string(
+    append_menu_string(
         view_color_menu,
         MF_STRING,
         IDM_VIEW_TEXT_COLOR_BLACK,
         &labels.view_text_color_black,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         view_color_menu,
         MF_STRING,
         IDM_VIEW_TEXT_COLOR_DARK_BLUE,
         &labels.view_text_color_dark_blue,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         view_color_menu,
         MF_STRING,
         IDM_VIEW_TEXT_COLOR_DARK_GREEN,
         &labels.view_text_color_dark_green,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         view_color_menu,
         MF_STRING,
         IDM_VIEW_TEXT_COLOR_DARK_BROWN,
         &labels.view_text_color_dark_brown,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         view_color_menu,
         MF_STRING,
         IDM_VIEW_TEXT_COLOR_DARK_GRAY,
         &labels.view_text_color_dark_gray,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         view_color_menu,
         MF_STRING,
         IDM_VIEW_TEXT_COLOR_LIGHT_BLUE,
         &labels.view_text_color_light_blue,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         view_color_menu,
         MF_STRING,
         IDM_VIEW_TEXT_COLOR_LIGHT_GREEN,
         &labels.view_text_color_light_green,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         view_color_menu,
         MF_STRING,
         IDM_VIEW_TEXT_COLOR_LIGHT_BROWN,
         &labels.view_text_color_light_brown,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         view_color_menu,
         MF_STRING,
         IDM_VIEW_TEXT_COLOR_LIGHT_GRAY,
         &labels.view_text_color_light_gray,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         view_size_menu,
         MF_STRING,
         IDM_VIEW_TEXT_SIZE_SMALL,
         &labels.view_text_size_small,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         view_size_menu,
         MF_STRING,
         IDM_VIEW_TEXT_SIZE_NORMAL,
         &labels.view_text_size_normal,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         view_size_menu,
         MF_STRING,
         IDM_VIEW_TEXT_SIZE_LARGE,
         &labels.view_text_size_large,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         view_size_menu,
         MF_STRING,
         IDM_VIEW_TEXT_SIZE_XLARGE,
         &labels.view_text_size_xlarge,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         view_size_menu,
         MF_STRING,
         IDM_VIEW_TEXT_SIZE_XXLARGE,
         &labels.view_text_size_xxlarge,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         view_menu,
         MF_POPUP,
         view_color_menu.0 as usize,
         &labels.view_text_color,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         view_menu,
         MF_POPUP,
         view_size_menu.0 as usize,
         &labels.view_text_size,
     );
-    let _ = append_menu_string(hmenu, MF_POPUP, view_menu.0 as usize, &labels.menu_view);
+    append_menu_string(hmenu, MF_POPUP, view_menu.0 as usize, &labels.menu_view);
 
-    let _ = append_menu_string(
+    append_menu_string(
         insert_menu,
         MF_STRING,
         IDM_INSERT_BOOKMARK,
         &labels.insert_bookmark,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         insert_menu,
         MF_STRING,
         IDM_INSERT_CLEAR_BOOKMARKS,
         &labels.insert_clear_bookmarks,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         insert_menu,
         MF_STRING,
         IDM_MANAGE_BOOKMARKS,
         &labels.manage_bookmarks,
     );
-    let _ = append_menu_string(hmenu, MF_POPUP, insert_menu.0 as usize, &labels.menu_insert);
+    append_menu_string(hmenu, MF_POPUP, insert_menu.0 as usize, &labels.menu_insert);
 
-    let _ = append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_PROMPT, &labels.menu_prompt);
-    let _ = append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_RSS, &labels.menu_rss);
-    let _ = append_menu_string(
+    append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_PROMPT, &labels.menu_prompt);
+    append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_RSS, &labels.menu_rss);
+    append_menu_string(
         tools_menu,
         MF_STRING,
         IDM_TOOLS_PODCASTS,
         &labels.menu_podcasts,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         tools_menu,
         MF_STRING,
         IDM_TOOLS_OPTIONS,
         &labels.menu_options,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         tools_menu,
         MF_STRING,
         IDM_TOOLS_DICTIONARY,
         &labels.menu_dictionary,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         tools_menu,
         MF_STRING,
         IDM_TOOLS_IMPORT_YOUTUBE,
         &labels.menu_import_youtube,
     );
-    let _ = append_menu_string(hmenu, MF_POPUP, tools_menu.0 as usize, &labels.menu_tools);
+    append_menu_string(hmenu, MF_POPUP, tools_menu.0 as usize, &labels.menu_tools);
 
-    let _ = append_menu_string(help_menu, MF_STRING, IDM_HELP_GUIDE, &labels.help_guide);
-    let _ = append_menu_string(
+    append_menu_string(help_menu, MF_STRING, IDM_HELP_GUIDE, &labels.help_guide);
+    append_menu_string(
         help_menu,
         MF_STRING,
         IDM_HELP_CHANGELOG,
         &labels.help_changelog,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         help_menu,
         MF_STRING,
         IDM_HELP_DONATIONS,
         &labels.help_donations,
     );
-    let _ = append_menu_string(
+    append_menu_string(
         help_menu,
         MF_STRING,
         IDM_HELP_CHECK_UPDATES,
         &labels.help_check_updates,
     );
-    let _ = append_menu_string(help_menu, MF_STRING, IDM_HELP_ABOUT, &labels.help_about);
-    let _ = append_menu_string(hmenu, MF_POPUP, help_menu.0 as usize, &labels.menu_help);
+    append_menu_string(help_menu, MF_STRING, IDM_HELP_ABOUT, &labels.help_about);
+    append_menu_string(hmenu, MF_POPUP, help_menu.0 as usize, &labels.menu_help);
 
     let _ = SetMenu(hwnd, hmenu);
     (hmenu, recent_menu)
@@ -815,7 +814,7 @@ pub unsafe fn update_recent_menu(hwnd: HWND, hmenu_recent: HMENU) {
     .unwrap_or_default();
     if files.is_empty() {
         let labels = menu_labels(language);
-        let _ = append_menu_string(hmenu_recent, MF_STRING | MF_GRAYED, 0, &labels.recent_empty);
+        append_menu_string(hmenu_recent, MF_STRING | MF_GRAYED, 0, &labels.recent_empty);
     } else {
         for (i, path) in files.iter().enumerate() {
             let label = format!("&{} {}", i + 1, abbreviate_recent_label(path));

@@ -1,4 +1,3 @@
-#![allow(clippy::if_same_then_else, clippy::collapsible_else_if)]
 use crate::accessibility::{normalize_to_crlf, to_wide};
 use crate::i18n;
 use crate::settings::Language;
@@ -7,9 +6,7 @@ use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::WC_BUTTON;
-use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetFocus, GetKeyState, SetFocus, VK_RETURN, VK_SHIFT,
-};
+use windows::Win32::UI::Input::KeyboardAndMouse::{GetFocus, SetFocus, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow,
     ES_AUTOVSCROLL, ES_MULTILINE, ES_WANTRETURN, GWLP_USERDATA, GetWindowLongPtrW, HMENU,
@@ -124,20 +121,11 @@ unsafe fn open_window(parent: HWND, kind: HelpWindowKind) {
 pub unsafe fn handle_tab(hwnd: HWND) {
     let _ = with_help_state(hwnd, |state| {
         let focus = GetFocus();
-        let shift_down = (GetKeyState(VK_SHIFT.0 as i32) as u16) & 0x8000 != 0;
 
-        if shift_down {
-            if focus == state.edit {
-                SetFocus(state.ok_button);
-            } else {
-                SetFocus(state.edit);
-            }
+        if focus == state.edit {
+            SetFocus(state.ok_button);
         } else {
-            if focus == state.edit {
-                SetFocus(state.ok_button);
-            } else {
-                SetFocus(state.edit);
-            }
+            SetFocus(state.edit);
         }
     });
 }

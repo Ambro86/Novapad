@@ -363,33 +363,37 @@ unsafe extern "system" fn rss_tree_compare(
     a.cmp(&b) as i32
 }
 
-unsafe fn collect_root_items(hwnd_tree: HWND) -> Vec<windows::Win32::UI::Controls::HTREEITEM> {
+fn collect_root_items(hwnd_tree: HWND) -> Vec<windows::Win32::UI::Controls::HTREEITEM> {
     let mut items = Vec::new();
     let mut current = windows::Win32::UI::Controls::HTREEITEM(
-        SendMessageW(
-            hwnd_tree,
-            TVM_GETNEXTITEM,
-            WPARAM(TVGN_ROOT as usize),
-            LPARAM(0),
-        )
+        unsafe {
+            SendMessageW(
+                hwnd_tree,
+                TVM_GETNEXTITEM,
+                WPARAM(TVGN_ROOT as usize),
+                LPARAM(0),
+            )
+        }
         .0,
     );
     while current.0 != 0 {
         items.push(current);
         current = windows::Win32::UI::Controls::HTREEITEM(
-            SendMessageW(
-                hwnd_tree,
-                TVM_GETNEXTITEM,
-                WPARAM(TVGN_NEXT as usize),
-                LPARAM(current.0),
-            )
+            unsafe {
+                SendMessageW(
+                    hwnd_tree,
+                    TVM_GETNEXTITEM,
+                    WPARAM(TVGN_NEXT as usize),
+                    LPARAM(current.0),
+                )
+            }
             .0,
         );
     }
     items
 }
 
-unsafe fn apply_root_order(
+fn apply_root_order(
     hwnd: HWND,
     hwnd_tree: HWND,
     ordered_items: &[windows::Win32::UI::Controls::HTREEITEM],
@@ -401,57 +405,69 @@ unsafe fn apply_root_order(
             ..Default::default()
         };
         item.hItem = *hitem;
-        let _ = SendMessageW(
-            hwnd_tree,
-            TVM_SETITEMW,
-            WPARAM(0),
-            LPARAM(&mut item as *mut _ as isize),
-        );
+        let _ = unsafe {
+            SendMessageW(
+                hwnd_tree,
+                TVM_SETITEMW,
+                WPARAM(0),
+                LPARAM(&mut item as *mut _ as isize),
+            )
+        };
     }
-    with_rss_state(hwnd, |s| {
-        for (i, hitem) in ordered_items.iter().enumerate() {
-            s.node_data.insert(hitem.0, NodeData::Source(i));
-        }
-    });
+    unsafe {
+        with_rss_state(hwnd, |s| {
+            for (i, hitem) in ordered_items.iter().enumerate() {
+                s.node_data.insert(hitem.0, NodeData::Source(i));
+            }
+        });
+    }
     let mut sort_cb = TVSORTCB {
         hParent: TVI_ROOT,
         lpfnCompare: Some(rss_tree_compare),
         lParam: LPARAM(0),
     };
-    let _ = SendMessageW(
-        hwnd_tree,
-        TVM_SORTCHILDRENCB,
-        WPARAM(0),
-        LPARAM(&mut sort_cb as *mut _ as isize),
-    );
+    let _ = unsafe {
+        SendMessageW(
+            hwnd_tree,
+            TVM_SORTCHILDRENCB,
+            WPARAM(0),
+            LPARAM(&mut sort_cb as *mut _ as isize),
+        )
+    };
 }
 
-unsafe fn announce_rss_status(message: &str) {
+fn announce_rss_status(message: &str) {
     log_debug(&format!("rss_status {}", message));
     let _ = nvda_speak(message);
 }
 
-unsafe fn rss_page_sizes(parent: HWND) -> (usize, usize) {
-    with_state(parent, |s| {
-        (
-            s.settings.rss_initial_page_size,
-            s.settings.rss_next_page_size,
-        )
-    })
-    .unwrap_or((INITIAL_LOAD_COUNT, LOAD_MORE_COUNT))
+fn rss_page_sizes(parent: HWND) -> (usize, usize) {
+    unsafe {
+        with_state(parent, |s| {
+            (
+                s.settings.rss_initial_page_size,
+                s.settings.rss_next_page_size,
+            )
+        })
+        .unwrap_or((INITIAL_LOAD_COUNT, LOAD_MORE_COUNT))
+    }
 }
 
-unsafe fn ensure_rss_http(parent: HWND) {
-    let config = with_state(parent, |s| rss::config_from_settings(&s.settings))
-        .unwrap_or_else(|| rss::RssHttpConfig::default());
+fn ensure_rss_http(parent: HWND) {
+    let config = unsafe {
+        with_state(parent, |s| rss::config_from_settings(&s.settings))
+            .unwrap_or_else(|| rss::RssHttpConfig::default())
+    };
     if let Err(err) = rss::init_http(config) {
         log_debug(&format!("rss_http_init_error: {}", err));
     }
 }
 
-unsafe fn rss_fetch_config(parent: HWND) -> rss::RssFetchConfig {
-    with_state(parent, |s| rss::fetch_config_from_settings(&s.settings))
-        .unwrap_or_else(|| rss::RssFetchConfig::default())
+fn rss_fetch_config(parent: HWND) -> rss::RssFetchConfig {
+    unsafe {
+        with_state(parent, |s| rss::fetch_config_from_settings(&s.settings))
+            .unwrap_or_else(|| rss::RssFetchConfig::default())
+    }
 }
 
 fn default_feed_path(language: crate::settings::Language) -> Option<PathBuf> {
@@ -2550,12 +2566,14 @@ unsafe fn handle_enter(hwnd: HWND) {
     // UI: On Enter, fetch article content and import into the editor.
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     let hitem = windows::Win32::UI::Controls::HTREEITEM(
-        SendMessageW(
-            hwnd_tree,
-            TVM_GETNEXTITEM,
-            WPARAM(TVGN_CARET as usize),
-            LPARAM(0),
-        )
+        unsafe {
+            SendMessageW(
+                hwnd_tree,
+                TVM_GETNEXTITEM,
+                WPARAM(TVGN_CARET as usize),
+                LPARAM(0),
+            )
+        }
         .0,
     );
     if hitem.0 == 0 {
@@ -2583,12 +2601,14 @@ unsafe fn handle_enter(hwnd: HWND) {
 unsafe fn handle_delete(hwnd: HWND) {
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     let hitem = windows::Win32::UI::Controls::HTREEITEM(
-        SendMessageW(
-            hwnd_tree,
-            TVM_GETNEXTITEM,
-            WPARAM(TVGN_CARET as usize),
-            LPARAM(0),
-        )
+        unsafe {
+            SendMessageW(
+                hwnd_tree,
+                TVM_GETNEXTITEM,
+                WPARAM(TVGN_CARET as usize),
+                LPARAM(0),
+            )
+        }
         .0,
     );
     if hitem.0 == 0 {
@@ -2692,12 +2712,14 @@ unsafe fn handle_delete(hwnd: HWND) {
 unsafe fn handle_edit_source(hwnd: HWND) {
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     let hitem = windows::Win32::UI::Controls::HTREEITEM(
-        SendMessageW(
-            hwnd_tree,
-            TVM_GETNEXTITEM,
-            WPARAM(TVGN_CARET as usize),
-            LPARAM(0),
-        )
+        unsafe {
+            SendMessageW(
+                hwnd_tree,
+                TVM_GETNEXTITEM,
+                WPARAM(TVGN_CARET as usize),
+                LPARAM(0),
+            )
+        }
         .0,
     );
     if hitem.0 == 0 {
@@ -2743,12 +2765,14 @@ unsafe fn handle_edit_source(hwnd: HWND) {
 unsafe fn handle_retry_now(hwnd: HWND) {
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     let hitem = windows::Win32::UI::Controls::HTREEITEM(
-        SendMessageW(
-            hwnd_tree,
-            TVM_GETNEXTITEM,
-            WPARAM(TVGN_CARET as usize),
-            LPARAM(0),
-        )
+        unsafe {
+            SendMessageW(
+                hwnd_tree,
+                TVM_GETNEXTITEM,
+                WPARAM(TVGN_CARET as usize),
+                LPARAM(0),
+            )
+        }
         .0,
     );
     if hitem.0 == 0 {
@@ -2835,38 +2859,42 @@ struct ReorderDialogInit {
     total: usize,
 }
 
-unsafe fn selected_source_index(hwnd: HWND) -> Option<usize> {
-    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+fn selected_source_index(hwnd: HWND) -> Option<usize> {
+    let hwnd_tree = unsafe { with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0)) };
     if hwnd_tree.0 == 0 {
         return None;
     }
     let hitem = windows::Win32::UI::Controls::HTREEITEM(
-        SendMessageW(
-            hwnd_tree,
-            TVM_GETNEXTITEM,
-            WPARAM(TVGN_CARET as usize),
-            LPARAM(0),
-        )
+        unsafe {
+            SendMessageW(
+                hwnd_tree,
+                TVM_GETNEXTITEM,
+                WPARAM(TVGN_CARET as usize),
+                LPARAM(0),
+            )
+        }
         .0,
     );
     if hitem.0 == 0 {
         return None;
     }
-    with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
-        Some(NodeData::Source(idx)) => Some(*idx),
-        _ => None,
-    })
-    .flatten()
+    unsafe {
+        with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
+            Some(NodeData::Source(idx)) => Some(*idx),
+            _ => None,
+        })
+        .flatten()
+    }
 }
 
-unsafe fn apply_reorder_action(
+fn apply_reorder_action(
     hwnd: HWND,
     source_index: usize,
     action: ReorderAction,
     target_index: usize,
 ) -> Option<usize> {
-    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    let hwnd_tree = unsafe { with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0)) };
+    let parent = unsafe { with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0)) };
     if hwnd_tree.0 == 0 || parent.0 == 0 {
         return None;
     }
@@ -2874,30 +2902,34 @@ unsafe fn apply_reorder_action(
     if source_index >= root_items.len() {
         return None;
     }
-    let new_index = with_state(parent, |ps| {
-        let moved = match action {
-            ReorderAction::Up => crate::settings::move_rss_feed_up(&mut ps.settings, source_index),
-            ReorderAction::Down => {
-                crate::settings::move_rss_feed_down(&mut ps.settings, source_index)
+    let new_index = unsafe {
+        with_state(parent, |ps| {
+            let moved = match action {
+                ReorderAction::Up => {
+                    crate::settings::move_rss_feed_up(&mut ps.settings, source_index)
+                }
+                ReorderAction::Down => {
+                    crate::settings::move_rss_feed_down(&mut ps.settings, source_index)
+                }
+                ReorderAction::Top => {
+                    crate::settings::move_rss_feed_to_top(&mut ps.settings, source_index)
+                }
+                ReorderAction::Bottom => {
+                    crate::settings::move_rss_feed_to_bottom(&mut ps.settings, source_index)
+                }
+                ReorderAction::Position => crate::settings::move_rss_feed_to_index(
+                    &mut ps.settings,
+                    source_index,
+                    target_index,
+                ),
+            };
+            if moved.is_some() {
+                crate::settings::save_settings(ps.settings.clone());
             }
-            ReorderAction::Top => {
-                crate::settings::move_rss_feed_to_top(&mut ps.settings, source_index)
-            }
-            ReorderAction::Bottom => {
-                crate::settings::move_rss_feed_to_bottom(&mut ps.settings, source_index)
-            }
-            ReorderAction::Position => crate::settings::move_rss_feed_to_index(
-                &mut ps.settings,
-                source_index,
-                target_index,
-            ),
-        };
-        if moved.is_some() {
-            crate::settings::save_settings(ps.settings.clone());
-        }
-        moved
-    })
-    .flatten();
+            moved
+        })
+        .flatten()
+    };
     let Some(new_index) = new_index else {
         return None;
     };

@@ -5,11 +5,12 @@ use crate::settings::{self, Language, confirm_title};
 use crate::tools::rss::{self, PodcastEpisode, RssSource, RssSourceType};
 use crate::{log_debug, with_state};
 use quick_xml::{Reader, events::Event};
-use sha2::Digest;
+use sha1::{Digest as Sha1Digest, Sha1};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::System::DataExchange::{
@@ -34,16 +35,17 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::{
-    AppendMenuW, CHILDID_SELF, CallWindowProcW, CreateMenu, CreatePopupMenu, CreateWindowExW,
-    DefWindowProcW, DestroyMenu, DestroyWindow, EVENT_OBJECT_FOCUS, GetClientRect, GetDlgCtrlID,
-    GetDlgItem, GetParent, GetWindowLongPtrW, GetWindowRect, HMENU, IDC_ARROW, IDYES, LB_ADDSTRING,
-    LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK, LBS_NOTIFY, MB_ICONINFORMATION, MB_OK,
-    MB_YESNO, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MSG, MessageBoxW, OBJID_CLIENT,
-    PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
-    SetWindowTextW, TrackPopupMenu, WINDOW_STYLE, WM_CHAR, WM_COMMAND, WM_CONTEXTMENU, WM_COPYDATA,
-    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_SETFOCUS,
-    WM_SETFONT, WM_SIZE, WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
-    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    AppendMenuW, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, CBS_DROPDOWNLIST, CHILDID_SELF,
+    CallWindowProcW, CreateMenu, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu,
+    DestroyWindow, EVENT_OBJECT_FOCUS, GetClientRect, GetDlgCtrlID, GetDlgItem, GetParent,
+    GetWindowLongPtrW, GetWindowRect, HMENU, IDC_ARROW, IDYES, LB_ADDSTRING, LB_GETCURSEL,
+    LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK, LBS_NOTIFY, MB_ICONINFORMATION, MB_OK, MB_YESNO,
+    MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW,
+    RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW,
+    TrackPopupMenu, WINDOW_STYLE, WM_CHAR, WM_COMMAND, WM_CONTEXTMENU, WM_COPYDATA, WM_CREATE,
+    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_SETFOCUS, WM_SETFONT,
+    WM_SIZE, WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -54,6 +56,7 @@ const PODCASTS_ADD_CLASS: &str = "NovapadPodcastsAdd";
 const ID_TREE: usize = 12001;
 const ID_SEARCH_LABEL: usize = 12005;
 const ID_SEARCH_EDIT: usize = 12002;
+const ID_SEARCH_PROVIDER: usize = 12011;
 const ID_SEARCH_BUTTON: usize = 12006;
 const ID_RESULTS: usize = 12003;
 const ID_ADD_BUTTON: usize = 12004;
@@ -106,12 +109,19 @@ struct PodcastSearchResult {
     feed_url: String,
 }
 
+#[derive(Clone, Copy)]
+enum SearchProvider {
+    Itunes,
+    PodcastIndex,
+}
+
 struct PodcastWindowState {
     parent: HWND,
     language: Language,
     hwnd_tree: HWND,
     hwnd_search_label: HWND,
     hwnd_search: HWND,
+    hwnd_search_provider: HWND,
     hwnd_search_button: HWND,
     hwnd_results: HWND,
     hwnd_add: HWND,
@@ -812,6 +822,48 @@ unsafe fn update_source_cache(parent: HWND, source_index: usize, cache: rss::Rss
     });
 }
 
+unsafe fn update_source_title(hwnd: HWND, hitem: HTREEITEM, source_index: usize, feed_title: &str) {
+    let title = feed_title.trim();
+    if title.is_empty() {
+        return;
+    }
+    let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    if parent.0 == 0 {
+        return;
+    }
+    let mut updated = None;
+    let _ = with_state(parent, |ps| {
+        if let Some(src) = ps.settings.podcast_sources.get_mut(source_index) {
+            let looks_auto = src.title.trim().is_empty() || src.title == src.url;
+            if !src.user_title && looks_auto {
+                src.title = title.to_string();
+                updated = Some(src.title.clone());
+                settings::save_settings(ps.settings.clone());
+            }
+        }
+    });
+    let Some(updated) = updated else {
+        return;
+    };
+    let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+    if hwnd_tree.0 == 0 {
+        return;
+    }
+    let title_wide = to_wide(&updated);
+    let mut tvi = TVITEMW {
+        mask: TVIF_TEXT,
+        hItem: hitem,
+        pszText: windows::core::PWSTR(title_wide.as_ptr() as *mut _),
+        ..Default::default()
+    };
+    let _ = SendMessageW(
+        hwnd_tree,
+        TVM_SETITEMW,
+        WPARAM(0),
+        LPARAM(&mut tvi as *mut _ as isize),
+    );
+}
+
 unsafe fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<PodcastEpisode>) {
     let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     if hwnd_tree.0 == 0 {
@@ -1187,6 +1239,19 @@ unsafe fn update_search_results(hwnd: HWND, results: Vec<PodcastSearchResult>) {
     SetFocus(hwnd_results);
 }
 
+unsafe fn selected_search_provider(hwnd: HWND) -> SearchProvider {
+    let combo = with_podcast_state(hwnd, |s| s.hwnd_search_provider).unwrap_or(HWND(0));
+    if combo.0 == 0 {
+        return SearchProvider::Itunes;
+    }
+    let sel = SendMessageW(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    if sel == 1 {
+        SearchProvider::PodcastIndex
+    } else {
+        SearchProvider::Itunes
+    }
+}
+
 unsafe fn perform_search(hwnd: HWND, query: &str) {
     let trimmed = query.trim();
     if trimmed.is_empty() {
@@ -1212,30 +1277,85 @@ unsafe fn perform_search(hwnd: HWND, query: &str) {
     if parent.0 != 0 {
         ensure_rss_http(parent);
     }
+    let provider = selected_search_provider(hwnd);
     let query = percent_encode(trimmed);
-    let url = format!(
-        "https://itunes.apple.com/search?media=podcast&term={}&limit=20",
-        query
-    );
     let hwnd_copy = hwnd;
     std::thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .unwrap();
-        let fetch_config = rss_fetch_config(parent);
-        let bytes = rt.block_on(rss::fetch_url_bytes(&url, fetch_config));
         let mut results = Vec::new();
-        if let Ok(bytes) = bytes {
-            if let Ok(parsed) = serde_json::from_slice::<ItunesSearchResponse>(&bytes) {
-                for item in parsed.results {
-                    if let Some(feed_url) = item.feed_url {
-                        results.push(PodcastSearchResult {
-                            title: item.collection_name.unwrap_or_default(),
-                            artist: item.artist_name.unwrap_or_default(),
-                            feed_url,
-                        });
+        match provider {
+            SearchProvider::Itunes => {
+                let url = format!(
+                    "https://itunes.apple.com/search?media=podcast&term={}&limit=20",
+                    query
+                );
+                let fetch_config = rss_fetch_config(parent);
+                let bytes = rt.block_on(rss::fetch_url_bytes(&url, fetch_config));
+                if let Ok(bytes) = bytes {
+                    if let Ok(parsed) = serde_json::from_slice::<ItunesSearchResponse>(&bytes) {
+                        for item in parsed.results {
+                            if let Some(feed_url) = item.feed_url {
+                                results.push(PodcastSearchResult {
+                                    title: item.collection_name.unwrap_or_default(),
+                                    artist: item.artist_name.unwrap_or_default(),
+                                    feed_url,
+                                });
+                            }
+                        }
                     }
+                }
+            }
+            SearchProvider::PodcastIndex => {
+                let key = std::env::var("PODCASTINDEX_API_KEY").ok();
+                let secret = std::env::var("PODCASTINDEX_API_SECRET").ok();
+                if let (Some(key), Some(secret)) = (key, secret) {
+                    let auth_date = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs()
+                        .to_string();
+                    let mut hasher = Sha1::new();
+                    hasher.update(format!("{key}{secret}{auth_date}").as_bytes());
+                    let hash = format!("{:x}", hasher.finalize());
+                    let url = format!(
+                        "https://api.podcastindex.org/api/1.0/search/byterm?q={}&max=20",
+                        query
+                    );
+                    if let Ok(resp) = reqwest::blocking::Client::new()
+                        .get(url)
+                        .header("User-Agent", "Novapad")
+                        .header("X-Auth-Date", auth_date)
+                        .header("X-Auth-Key", key)
+                        .header("Authorization", hash)
+                        .send()
+                    {
+                        if let Ok(bytes) = resp.bytes() {
+                            if let Ok(parsed) =
+                                serde_json::from_slice::<PodcastIndexSearchResponse>(&bytes)
+                            {
+                                if let Some(feeds) = parsed.feeds {
+                                    for feed in feeds {
+                                        let feed_url = feed.feed_url.or(feed.url);
+                                        if let Some(feed_url) = feed_url {
+                                            results.push(PodcastSearchResult {
+                                                title: feed.title.unwrap_or_default(),
+                                                artist: feed
+                                                    .author
+                                                    .or(feed.owner_name)
+                                                    .unwrap_or_default(),
+                                                feed_url,
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    log_debug("PodcastIndex search skipped: missing API keys");
                 }
             }
         }
@@ -1501,6 +1621,22 @@ struct ItunesSearchItem {
     collection_name: Option<String>,
     #[serde(rename = "artistName")]
     artist_name: Option<String>,
+    #[serde(rename = "feedUrl")]
+    feed_url: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct PodcastIndexSearchResponse {
+    feeds: Option<Vec<PodcastIndexFeed>>,
+}
+
+#[derive(serde::Deserialize)]
+struct PodcastIndexFeed {
+    title: Option<String>,
+    author: Option<String>,
+    #[serde(rename = "ownerName")]
+    owner_name: Option<String>,
+    url: Option<String>,
     #[serde(rename = "feedUrl")]
     feed_url: Option<String>,
 }
@@ -2803,6 +2939,46 @@ unsafe fn create_controls(hwnd: HWND) {
         });
     }
 
+    let provider_itunes = i18n::tr(
+        with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
+        "podcasts.search.provider.itunes",
+    );
+    let provider_podcastindex = i18n::tr(
+        with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
+        "podcasts.search.provider.podcastindex",
+    );
+    let hwnd_search_provider = CreateWindowExW(
+        WS_EX_CLIENTEDGE,
+        w!("COMBOBOX"),
+        PCWSTR::null(),
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+        10,
+        364,
+        220,
+        200,
+        hwnd,
+        HMENU(ID_SEARCH_PROVIDER as isize),
+        hinstance,
+        None,
+    );
+    if hwnd_search_provider.0 != 0 {
+        let itunes_wide = to_wide(&provider_itunes);
+        let podcastindex_wide = to_wide(&provider_podcastindex);
+        let _ = SendMessageW(
+            hwnd_search_provider,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(itunes_wide.as_ptr() as isize),
+        );
+        let _ = SendMessageW(
+            hwnd_search_provider,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(podcastindex_wide.as_ptr() as isize),
+        );
+        let _ = SendMessageW(hwnd_search_provider, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+    }
+
     let hwnd_search_button = CreateWindowExW(
         Default::default(),
         w!("BUTTON"),
@@ -2815,7 +2991,7 @@ unsafe fn create_controls(hwnd: HWND) {
         ),
         WS_CHILD | WS_VISIBLE | WS_TABSTOP,
         10,
-        364,
+        396,
         140,
         26,
         hwnd,
@@ -2830,7 +3006,7 @@ unsafe fn create_controls(hwnd: HWND) {
         PCWSTR::null(),
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(LBS_NOTIFY as u32),
         10,
-        398,
+        430,
         460,
         140,
         hwnd,
@@ -2927,6 +3103,7 @@ unsafe fn create_controls(hwnd: HWND) {
         s.hwnd_tree = hwnd_tree;
         s.hwnd_search_label = hwnd_search_label;
         s.hwnd_search = hwnd_search;
+        s.hwnd_search_provider = hwnd_search_provider;
         s.hwnd_search_button = hwnd_search_button;
         s.hwnd_results = hwnd_results;
         s.hwnd_add = hwnd_add;
@@ -2946,6 +3123,7 @@ unsafe fn create_controls(hwnd: HWND) {
         hwnd_tree,
         hwnd_search_label,
         hwnd_search,
+        hwnd_search_provider,
         hwnd_search_button,
         hwnd_results,
         hwnd_add,
@@ -2976,8 +3154,9 @@ unsafe fn resize_controls(hwnd: HWND) {
     let button_rows = 3;
     let tree_h = (height
         - margin * 2
-        - spacing * 7
+        - spacing * 8
         - label_h
+        - search_h
         - search_h
         - search_button_h
         - results_h
@@ -2988,6 +3167,7 @@ unsafe fn resize_controls(hwnd: HWND) {
             s.hwnd_tree,
             s.hwnd_search_label,
             s.hwnd_search,
+            s.hwnd_search_provider,
             s.hwnd_search_button,
             s.hwnd_results,
             s.hwnd_add,
@@ -2997,6 +3177,7 @@ unsafe fn resize_controls(hwnd: HWND) {
         )
     })
     .unwrap_or((
+        HWND(0),
         HWND(0),
         HWND(0),
         HWND(0),
@@ -3039,13 +3220,22 @@ unsafe fn resize_controls(hwnd: HWND) {
             controls.3,
             margin,
             y,
+            width - margin * 2,
+            search_h,
+            true,
+        );
+        y += search_h + spacing;
+        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+            controls.4,
+            margin,
+            y,
             200,
             search_button_h,
             true,
         );
         y += search_button_h + spacing;
         let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            controls.4,
+            controls.5,
             margin,
             y,
             width - margin * 2,
@@ -3054,10 +3244,10 @@ unsafe fn resize_controls(hwnd: HWND) {
         );
         y += results_h + spacing;
         let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            controls.5, margin, y, 200, button_h, true,
+            controls.6, margin, y, 200, button_h, true,
         );
         let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            controls.8,
+            controls.9,
             (width - margin - 200).max(margin),
             y,
             200,
@@ -3066,11 +3256,11 @@ unsafe fn resize_controls(hwnd: HWND) {
         );
         y += button_h + spacing;
         let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            controls.6, margin, y, 200, button_h, true,
+            controls.7, margin, y, 200, button_h, true,
         );
         y += button_h + spacing;
         let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            controls.7, margin, y, 200, button_h, true,
+            controls.8, margin, y, 200, button_h, true,
         );
     }
 }
@@ -3140,6 +3330,7 @@ unsafe extern "system" fn podcast_wndproc(
                 hwnd_tree: HWND(0),
                 hwnd_search_label: HWND(0),
                 hwnd_search: HWND(0),
+                hwnd_search_provider: HWND(0),
                 hwnd_search_button: HWND(0),
                 hwnd_results: HWND(0),
                 hwnd_add: HWND(0),
@@ -3263,18 +3454,20 @@ unsafe extern "system" fn podcast_wndproc(
         }
         WM_KEYDOWN => {
             let focus = GetFocus();
-            let (hwnd_tree, hwnd_search, hwnd_results, hwnd_search_button) =
+            let (hwnd_tree, hwnd_search, hwnd_search_provider, hwnd_results, hwnd_search_button) =
                 with_podcast_state(hwnd, |s| {
                     (
                         s.hwnd_tree,
                         s.hwnd_search,
+                        s.hwnd_search_provider,
                         s.hwnd_results,
                         s.hwnd_search_button,
                     )
                 })
-                .unwrap_or((HWND(0), HWND(0), HWND(0), HWND(0)));
+                .unwrap_or((HWND(0), HWND(0), HWND(0), HWND(0), HWND(0)));
             let key = wparam.0 as u32;
-            if focus == hwnd_search && key == VK_RETURN.0 as u32 {
+            if (focus == hwnd_search || focus == hwnd_search_provider) && key == VK_RETURN.0 as u32
+            {
                 if hwnd_search_button.0 != 0 {
                     let _ = SendMessageW(
                         hwnd_search_button,
@@ -3395,6 +3588,14 @@ unsafe extern "system" fn podcast_wndproc(
             match msg.result {
                 Ok(outcome) => {
                     let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                    if !outcome.title.trim().is_empty() {
+                        update_source_title(
+                            hwnd,
+                            HTREEITEM(msg.hitem),
+                            msg.source_index,
+                            &outcome.title,
+                        );
+                    }
                     update_source_cache(parent, msg.source_index, outcome.cache);
                     if outcome.not_modified {
                         apply_episode_results(hwnd, HTREEITEM(msg.hitem), Vec::new());

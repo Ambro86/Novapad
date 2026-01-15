@@ -500,6 +500,8 @@
   "podcasts.no_audio_url": "No audio URL for this episode",
   "podcasts.search.no_results": "No results",
   "podcasts.search.label": "Search podcasts:",
+  "podcasts.search.provider.itunes": "iTunes",
+  "podcasts.search.provider.podcastindex": "Podcast Index",
   "podcasts.download_filter": "Audio files\\0*.mp3;*.m4a;*.aac;*.ogg;*.opus;*.wav;*.flac\\0All files\\0*.*\\0\\0",
   "podcasts.download_started": "Download started",
   "podcasts.download_completed": "Download completed",

@@ -71,14 +71,14 @@ struct PodcastSaveResult {
     message: String,
 }
 
-pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
+pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message == WM_KEYDOWN {
-        let ctrl = (GetKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0;
-        let shift = (GetKeyState(VK_SHIFT.0 as i32) as u16 & 0x8000) != 0;
+        let ctrl = unsafe { (GetKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0 };
+        let shift = unsafe { (GetKeyState(VK_SHIFT.0 as i32) as u16 & 0x8000) != 0 };
         let key = msg.wParam.0 as u32;
 
         if key == VK_ESCAPE.0 as u32 {
-            let _ = SendMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
+            let _ = unsafe { SendMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) };
             return true;
         }
         if ctrl && !shift {
@@ -96,7 +96,7 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
             }
         }
     }
-    handle_accessibility(hwnd, msg)
+    unsafe { handle_accessibility(hwnd, msg) }
 }
 
 struct PodcastState {
@@ -215,51 +215,60 @@ fn labels(language: Language) -> PodcastLabels {
     }
 }
 
-pub unsafe fn open(parent: HWND) {
-    let existing = with_state(parent, |state| state.podcast_window).unwrap_or(HWND(0));
+pub fn open(parent: HWND) {
+    let existing = unsafe { with_state(parent, |state| state.podcast_window) }.unwrap_or(HWND(0));
     if existing.0 != 0 {
-        SetForegroundWindow(existing);
+        unsafe {
+            SetForegroundWindow(existing);
+        }
         return;
     }
 
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+    let hinstance = HINSTANCE(unsafe { GetModuleHandleW(None).unwrap_or_default().0 });
     let class_name = to_wide(PODCAST_CLASS_NAME);
     let wc = WNDCLASSW {
-        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
-            LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
-        ),
+        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(unsafe {
+            LoadCursorW(None, IDC_ARROW).unwrap_or_default().0
+        }),
         hInstance: hinstance,
         lpszClassName: PCWSTR(class_name.as_ptr()),
         lpfnWndProc: Some(podcast_wndproc),
         hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
         ..Default::default()
     };
-    RegisterClassW(&wc);
+    unsafe {
+        RegisterClassW(&wc);
+    }
 
-    let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
+    let language =
+        unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
     let title = to_wide(&labels(language).title);
 
-    let window = CreateWindowExW(
-        WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
-        PCWSTR(class_name.as_ptr()),
-        PCWSTR(title.as_ptr()),
-        WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        640,
-        620,
-        parent,
-        None,
-        hinstance,
-        Some(parent.0 as *const std::ffi::c_void),
-    );
+    let window = unsafe {
+        CreateWindowExW(
+            WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            640,
+            620,
+            parent,
+            None,
+            hinstance,
+            Some(parent.0 as *const std::ffi::c_void),
+        )
+    };
 
     if window.0 != 0 {
-        let _ = with_state(parent, |state| {
-            state.podcast_window = window;
-        });
-        EnableWindow(parent, false);
-        SetForegroundWindow(window);
+        unsafe {
+            let _ = with_state(parent, |state| {
+                state.podcast_window = window;
+            });
+            EnableWindow(parent, false);
+            SetForegroundWindow(window);
+        }
     }
 }
 unsafe extern "system" fn podcast_wndproc(

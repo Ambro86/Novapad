@@ -1959,6 +1959,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sevenz-rust",
+ "sha1",
  "sha2",
  "tokio",
  "tokio-tungstenite",

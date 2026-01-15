@@ -503,6 +503,8 @@
   "podcasts.no_audio_url": "Nessun URL audio per questo episodio",
   "podcasts.search.no_results": "Nessun risultato",
   "podcasts.search.label": "Cerca podcast:",
+  "podcasts.search.provider.itunes": "iTunes",
+  "podcasts.search.provider.podcastindex": "Podcast Index",
   "podcasts.download_filter": "File audio\\0*.mp3;*.m4a;*.aac;*.ogg;*.opus;*.wav;*.flac\\0Tutti i file\\0*.*\\0\\0",
   "podcasts.download_started": "Download avviato",
   "podcasts.download_completed": "Download completato",

@@ -45,6 +45,10 @@ const EXIT_UAC_CANCELLED: i32 = 5;
 const EXIT_REPLACE_FAILED: i32 = 6;
 const EXIT_REBOOT_REQUIRED: i32 = 10;
 
+fn app_language(hwnd: HWND) -> Language {
+    unsafe { with_state(hwnd, |state| state.settings.language).unwrap_or_default() }
+}
+
 #[derive(Deserialize)]
 struct ReleaseAsset {
     name: String,
@@ -59,7 +63,7 @@ struct ReleaseInfo {
 }
 
 pub(crate) fn check_for_update(hwnd: HWND, interactive: bool) {
-    let language = unsafe { with_state(hwnd, |state| state.settings.language).unwrap_or_default() };
+    let language = app_language(hwnd);
     thread::spawn(move || {
         let current_version = env!("CARGO_PKG_VERSION");
         let latest = match fetch_latest_release() {
@@ -1459,24 +1463,21 @@ pub(crate) fn check_pending_update(hwnd: HWND, force: bool) {
     }
     let Some(pending) = pending_update_path() else {
         if force {
-            let language =
-                unsafe { with_state(hwnd, |state| state.settings.language).unwrap_or_default() };
+            let language = app_language(hwnd);
             show_update_info(language, UpdateInfo::NoPending);
         }
         return;
     };
     if !pending.exists() {
         if force {
-            let language =
-                unsafe { with_state(hwnd, |state| state.settings.language).unwrap_or_default() };
+            let language = app_language(hwnd);
             show_update_info(language, UpdateInfo::NoPending);
         }
         return;
     }
     let Ok(meta) = pending.metadata() else {
         if force {
-            let language =
-                unsafe { with_state(hwnd, |state| state.settings.language).unwrap_or_default() };
+            let language = app_language(hwnd);
             show_update_info(language, UpdateInfo::NoPending);
         }
         return;
@@ -1485,14 +1486,13 @@ pub(crate) fn check_pending_update(hwnd: HWND, force: bool) {
         let _ = std::fs::remove_file(&pending);
         let _ = std::fs::remove_file(temp_update_meta_path(&pending));
         if force {
-            let language =
-                unsafe { with_state(hwnd, |state| state.settings.language).unwrap_or_default() };
+            let language = app_language(hwnd);
             show_update_info(language, UpdateInfo::NoPending);
         }
         return;
     }
 
-    let language = unsafe { with_state(hwnd, |state| state.settings.language).unwrap_or_default() };
+    let language = app_language(hwnd);
     let (meta_size, meta_hash) = read_update_metadata(&pending);
     if let Err(err) = stabilize_download(&pending) {
         log_debug(&format!("Pending update: staged file unstable: {err}"));

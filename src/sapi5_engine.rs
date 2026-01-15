@@ -38,43 +38,42 @@ const SAPI_VOICES_PATH: PCWSTR = w!(r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Spee
 const ONECORE_VOICES_PATH: PCWSTR =
     w!(r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech_OneCore\Voices");
 
-unsafe fn wcslen(ptr: *const u16) -> usize {
-    let mut len = 0;
-    while *ptr.add(len) != 0 {
-        len += 1;
+fn utf16_ptr_to_string(ptr: *const u16) -> Option<String> {
+    if ptr.is_null() {
+        return None;
     }
-    len
+    unsafe {
+        let mut len = 0;
+        while *ptr.add(len) != 0 {
+            len += 1;
+        }
+        let slice = std::slice::from_raw_parts(ptr, len);
+        Some(String::from_utf16_lossy(slice))
+    }
 }
 
-unsafe fn collect_voice_descriptions(category_id: PCWSTR) -> Result<Vec<String>, String> {
-    let category: ISpObjectTokenCategory =
+fn collect_voice_descriptions(category_id: PCWSTR) -> Result<Vec<String>, String> {
+    let category: ISpObjectTokenCategory = unsafe {
         CoCreateInstance(&SpObjectTokenCategory, None, CLSCTX_ALL)
-            .map_err(|e| format!("CoCreateInstance(Category) failed: {}", e))?;
-    category
-        .SetId(category_id, false)
-        .map_err(|e| format!("SetId failed: {}", e))?;
+            .map_err(|e| format!("CoCreateInstance(Category) failed: {}", e))?
+    };
+    unsafe { category.SetId(category_id, false) }.map_err(|e| format!("SetId failed: {}", e))?;
 
-    let enum_tokens: IEnumSpObjectTokens = category
-        .EnumTokens(None, None)
+    let enum_tokens: IEnumSpObjectTokens = unsafe { category.EnumTokens(None, None) }
         .map_err(|e| format!("EnumTokens failed: {}", e))?;
 
     let mut count = 0;
-    enum_tokens.GetCount(&mut count).ok();
+    unsafe { enum_tokens.GetCount(&mut count) }.ok();
 
     let mut voices = Vec::new();
     for i in 0..count {
-        if let Ok(token) = enum_tokens.Item(i) {
-            if let Ok(desc_ptr) = token.GetStringValue(PCWSTR::null()) {
-                let description = if !desc_ptr.is_null() {
-                    let s = String::from_utf16_lossy(std::slice::from_raw_parts(
-                        desc_ptr.as_ptr(),
-                        wcslen(desc_ptr.as_ptr()),
-                    ));
+        if let Ok(token) = unsafe { enum_tokens.Item(i) } {
+            if let Ok(desc_ptr) = unsafe { token.GetStringValue(PCWSTR::null()) } {
+                let description = utf16_ptr_to_string(desc_ptr.as_ptr())
+                    .unwrap_or_else(|| "Unknown Voice".to_string());
+                unsafe {
                     CoTaskMemFree(Some(desc_ptr.as_ptr() as *const _));
-                    s
-                } else {
-                    "Unknown Voice".to_string()
-                };
+                }
                 voices.push(description);
             }
         }
@@ -82,28 +81,24 @@ unsafe fn collect_voice_descriptions(category_id: PCWSTR) -> Result<Vec<String>,
     Ok(voices)
 }
 
-unsafe fn find_voice_token(voice_name: &str) -> Option<ISpObjectToken> {
+fn find_voice_token(voice_name: &str) -> Option<ISpObjectToken> {
     for category_id in [SAPI_VOICES_PATH, ONECORE_VOICES_PATH] {
         let category: windows::core::Result<ISpObjectTokenCategory> =
-            CoCreateInstance(&SpObjectTokenCategory, None, CLSCTX_ALL);
+            unsafe { CoCreateInstance(&SpObjectTokenCategory, None, CLSCTX_ALL) };
         if let Ok(cat) = category {
-            let _ = cat.SetId(category_id, false);
-            if let Ok(enum_tokens) = cat.EnumTokens(None, None) {
+            let _ = unsafe { cat.SetId(category_id, false) };
+            if let Ok(enum_tokens) = unsafe { cat.EnumTokens(None, None) } {
                 let mut count = 0;
-                if enum_tokens.GetCount(&mut count).is_ok() {
+                if unsafe { enum_tokens.GetCount(&mut count) }.is_ok() {
                     for i in 0..count {
-                        if let Ok(tok) = enum_tokens.Item(i) {
-                            if let Ok(desc_ptr) = tok.GetStringValue(PCWSTR::null()) {
-                                if !desc_ptr.is_null() {
-                                    let description =
-                                        String::from_utf16_lossy(std::slice::from_raw_parts(
-                                            desc_ptr.as_ptr(),
-                                            wcslen(desc_ptr.as_ptr()),
-                                        ));
+                        if let Ok(tok) = unsafe { enum_tokens.Item(i) } {
+                            if let Ok(desc_ptr) = unsafe { tok.GetStringValue(PCWSTR::null()) } {
+                                let description = utf16_ptr_to_string(desc_ptr.as_ptr());
+                                unsafe {
                                     CoTaskMemFree(Some(desc_ptr.as_ptr() as *const _));
-                                    if description == voice_name {
-                                        return Some(tok);
-                                    }
+                                }
+                                if description.as_deref() == Some(voice_name) {
+                                    return Some(tok);
                                 }
                             }
                         }

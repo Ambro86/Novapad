@@ -343,7 +343,7 @@ unsafe fn update_chapter_announcement(hwnd: HWND) {
     }
 }
 
-unsafe fn announce_current_chapter_on_start(
+fn announce_current_chapter_on_start(
     hwnd: HWND,
     chapters: &[Chapter],
     current_pos_ms: Option<u64>,
@@ -355,9 +355,11 @@ unsafe fn announce_current_chapter_on_start(
     let current_idx = current_pos_ms
         .and_then(|pos| crate::podcast::chapters::current_chapter_index(pos, chapters))
         .or(Some(0));
-    let _ = with_state(hwnd, |state| {
-        state.last_announced_chapter_index = current_idx
-    });
+    let _ = unsafe {
+        with_state(hwnd, |state| {
+            state.last_announced_chapter_index = current_idx
+        })
+    };
     let Some(idx) = current_idx else {
         return;
     };
@@ -755,21 +757,23 @@ fn extract_embedded_chapters_url(url: &str) -> Option<String> {
     }
 }
 
-unsafe fn announce_player_time(hwnd: HWND) {
-    let (current, path, language) = with_state(hwnd, |state| {
-        let current = state.active_audiobook.as_ref().map(|player| {
-            if player.is_paused {
-                player.accumulated_seconds
-            } else {
-                player.accumulated_seconds + player.start_instant.elapsed().as_secs()
-            }
-        });
-        let path = state
-            .active_audiobook
-            .as_ref()
-            .map(|player| player.path.clone());
-        (current, path, state.settings.language)
-    })
+fn announce_player_time(hwnd: HWND) {
+    let (current, path, language) = unsafe {
+        with_state(hwnd, |state| {
+            let current = state.active_audiobook.as_ref().map(|player| {
+                if player.is_paused {
+                    player.accumulated_seconds
+                } else {
+                    player.accumulated_seconds + player.start_instant.elapsed().as_secs()
+                }
+            });
+            let path = state
+                .active_audiobook
+                .as_ref()
+                .map(|player| player.path.clone());
+            (current, path, state.settings.language)
+        })
+    }
     .unwrap_or((None, None, Language::default()));
     let Some(current) = current else {
         return;
@@ -793,12 +797,9 @@ unsafe fn announce_player_time(hwnd: HWND) {
     let _ = nvda_speak(&message);
 }
 
-unsafe fn announce_player_volume(hwnd: HWND) {
-    let (volume, language) = with_state(hwnd, |state| {
-        let volume = crate::audio_player::audiobook_volume_level(hwnd);
-        (volume, state.settings.language)
-    })
-    .unwrap_or((None, Language::default()));
+fn announce_player_volume(hwnd: HWND) {
+    let volume = unsafe { crate::audio_player::audiobook_volume_level(hwnd) };
+    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     let Some(volume) = volume else {
         return;
     };
@@ -811,7 +812,7 @@ unsafe fn announce_player_volume(hwnd: HWND) {
     let _ = nvda_speak(&message);
 }
 
-unsafe fn announce_player_speed(language: Language, speed: f32) {
+fn announce_player_speed(language: Language, speed: f32) {
     let scaled = (speed * 10.0).round() / 10.0;
     let speed_text = if (scaled.fract() - 0.0).abs() < f32::EPSILON {
         format!("{:.0}", scaled)
@@ -822,12 +823,12 @@ unsafe fn announce_player_speed(language: Language, speed: f32) {
     let _ = nvda_speak(&message);
 }
 
-unsafe fn announce_chapters_unavailable(language: Language) {
+fn announce_chapters_unavailable(language: Language) {
     let message = i18n::tr(language, "playback.chapters_unavailable");
     let _ = nvda_speak(&message);
 }
 
-unsafe fn seek_to_chapter_index(hwnd: HWND, chapters: &[Chapter], index: usize) {
+fn seek_to_chapter_index(hwnd: HWND, chapters: &[Chapter], index: usize) {
     let Some(chapter) = chapters.get(index) else {
         return;
     };
@@ -835,18 +836,22 @@ unsafe fn seek_to_chapter_index(hwnd: HWND, chapters: &[Chapter], index: usize) 
         "podcast_chapter_seek index={} start_ms={} title={}",
         index, chapter.start_ms, chapter.title
     ));
-    let _ = seek_audiobook_to(hwnd, chapter.start_ms / 1000);
-    update_chapter_announcement(hwnd);
+    unsafe {
+        let _ = seek_audiobook_to(hwnd, chapter.start_ms / 1000);
+        update_chapter_announcement(hwnd);
+    }
 }
 
-unsafe fn handle_chapter_navigation(hwnd: HWND, direction: i32) {
-    let (chapters, language, current_pos_ms) = with_state(hwnd, |state| {
-        (
-            state.active_podcast_chapters.clone(),
-            state.settings.language,
-            audiobook_position_ms_from_state(state),
-        )
-    })
+fn handle_chapter_navigation(hwnd: HWND, direction: i32) {
+    let (chapters, language, current_pos_ms) = unsafe {
+        with_state(hwnd, |state| {
+            (
+                state.active_podcast_chapters.clone(),
+                state.settings.language,
+                audiobook_position_ms_from_state(state),
+            )
+        })
+    }
     .unwrap_or((Vec::new(), Language::default(), None));
     if chapters.is_empty() {
         announce_chapters_unavailable(language);
@@ -871,13 +876,15 @@ unsafe fn handle_chapter_navigation(hwnd: HWND, direction: i32) {
     }
 }
 
-unsafe fn handle_chapter_list(hwnd: HWND) {
-    let (chapters, language) = with_state(hwnd, |state| {
-        (
-            state.active_podcast_chapters.clone(),
-            state.settings.language,
-        )
-    })
+fn handle_chapter_list(hwnd: HWND) {
+    let (chapters, language) = unsafe {
+        with_state(hwnd, |state| {
+            (
+                state.active_podcast_chapters.clone(),
+                state.settings.language,
+            )
+        })
+    }
     .unwrap_or((Vec::new(), Language::default()));
     if chapters.is_empty() {
         announce_chapters_unavailable(language);
@@ -890,34 +897,37 @@ unsafe fn handle_chapter_list(hwnd: HWND) {
     }
 }
 
-unsafe fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
+fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
     match command {
-        PlayerCommand::TogglePause => {
+        PlayerCommand::TogglePause => unsafe {
             toggle_audiobook_pause(hwnd);
-        }
-        PlayerCommand::Stop => {
+        },
+        PlayerCommand::Stop => unsafe {
             stop_audiobook_playback(hwnd);
-        }
-        PlayerCommand::Seek(amount) => {
+        },
+        PlayerCommand::Seek(amount) => unsafe {
             seek_audiobook(hwnd, amount);
-        }
+        },
         PlayerCommand::Volume(delta) => {
-            change_audiobook_volume(hwnd, delta);
+            unsafe {
+                change_audiobook_volume(hwnd, delta);
+            }
             announce_player_volume(hwnd);
         }
         PlayerCommand::Speed(delta) => {
             let language =
-                with_state(hwnd, |state| state.settings.language).unwrap_or(Language::default());
-            if let Some(speed) = change_audiobook_speed(hwnd, delta) {
+                unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+            let speed = unsafe { change_audiobook_speed(hwnd, delta) };
+            if let Some(speed) = speed {
                 announce_player_speed(language, speed);
             }
         }
-        PlayerCommand::MuteToggle => {
+        PlayerCommand::MuteToggle => unsafe {
             toggle_audiobook_mute(hwnd);
-        }
-        PlayerCommand::GoToTime => {
+        },
+        PlayerCommand::GoToTime => unsafe {
             app_windows::go_to_time_window::open(hwnd);
-        }
+        },
         PlayerCommand::AnnounceTime => {
             announce_player_time(hwnd);
         }

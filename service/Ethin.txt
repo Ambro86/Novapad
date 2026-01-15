@@ -1,0 +1,19 @@
+Ethin
+Yesterday 05:20:03 (edited by Ethin Yesterday 05:34:45)
+9th Duke
+Offline
+Registered: 2010-04-21
+Posts: 9,237
+User Karma: 1,241
+I read through most of this topic and I get some pretty bad impressions honestly. Specifically, I get the strong vibe that you don't actually know what this program should be. Is it a notepad mimic? Is it a more complex text editor? Is it a book reader? Is it an RSS feed reader? You should probably take a step back and consider this before you go developing even more stuff on top of it. This is known as feature creep in software engineering, and 99 percent of the time it is rarely ever a good thing.
+Edit: okay, yeah, Rorry101 was right on the mark. I'm looking at the code and the decisions made are just... Utterly nonsensical. You reimplement wcslen, instead of using either a Rust dependency that already exists, or using Rusts UTF-8 support that already exists. You use unsafe way more than you should. You don't use the OneCore API even though that's how you should be accessing OneCore voices unless you have a really really good reason not to. Like, why do you not just use Windows.Media.SpeechSynthesis.SpeechSynthesizer for speech synthesis and Windows.Media.Playback.MediaPlayer for playing the samples returned by SynthesizeTextToStreamAsync or SynthesizeSsmlToStreamAsync? As for SAPI, is there a reason you wrap all of that in unsafe (such as find_voice_token) instead of doing the obvious thing and wrapping *only* what is unsafe? Why do you manually implement audio file parsing instead of using existing audio parser libraries? Same question for generating audio files: you are for some strange reason implementing a ton of things which crates already exist to do. Why are you manually implementing audio playback and capture when that is literally the point of the Cpal crate?
+"On two occasions I have been asked [by members of Parliament!]: 'Pray, Mr. Babbage, if you put into the machine wrong figures, will the right answers come out ?' I am not able rightly to apprehend the kind of confusion of ideas that could provoke such a question."    — Charles Babbage.
+Ethin
+Yesterday 07:56:21
+9th Duke
+Offline
+Registered: 2010-04-21
+Posts: 9,237
+User Karma: 1,241
+@152, no. It uses so much Windows specific stuff (and I don't know if the OP even wrote a single line of the code or had AI do all the work) that I doubt porting to the mac would be possible without an incredibly massive rewrite of the codebase.
+"On two occasions I have been asked [by members of Parliament!]: 'Pray, Mr. Babbage, if you put into the machine wrong figures, will the right answers come out ?' I am not able rightly to apprehend the kind of confusion of ideas that could provoke such a question."    — Charles Babbage.

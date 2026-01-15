@@ -92,6 +92,7 @@ const ID_CTX_PLAY: usize = 13101;
 const ID_CTX_OPEN_EPISODE: usize = 13102;
 const ID_CTX_COPY_AUDIO: usize = 13103;
 const ID_CTX_COPY_TITLE: usize = 13104;
+const ID_CTX_DOWNLOAD_EPISODE: usize = 13105;
 
 const ID_CTX_SUBSCRIBE: usize = 13201;
 const ID_CTX_SEARCH_INFO: usize = 13202;
@@ -270,6 +271,7 @@ fn import_podcast_sources_from_file(hwnd: HWND, path: &Path) -> Option<usize> {
                     url: url.clone(),
                     kind: rss::RssSourceType::Feed,
                     user_title: title.trim() != url.trim(),
+                    unread: false,
                     cache: rss::RssFeedCache::default(),
                 });
                 existing.insert(key);
@@ -406,9 +408,14 @@ struct SearchResultMsg {
 
 struct PlayReadyMsg {
     path: PathBuf,
+    enclosure_url: String,
+    title: String,
 }
 
 pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
+    if msg.message == WM_CHAR {
+        return false;
+    }
     if msg.message == WM_KEYDOWN {
         let key = msg.wParam.0 as u32;
         if key == VK_ESCAPE.0 as u32 {
@@ -1004,12 +1011,34 @@ unsafe fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpis
         if s.pending_play.as_deref() == Some(play_key.as_str()) {
             return false;
         }
-        s.pending_play = Some(play_key);
+        s.pending_play = Some(play_key.clone());
         true
     })
     .unwrap_or(true);
     if !should_start {
         return;
+    }
+    if parent.0 != 0 {
+        crate::set_pending_podcast_chapters_key(parent, Some(play_key.clone()));
+        if !episode.podlove_chapters.is_empty() {
+            crate::cache_podcast_chapters(
+                parent,
+                play_key.clone(),
+                episode.podlove_chapters.clone(),
+            );
+        } else if let Some(chapters_url) = episode.chapters_url.clone() {
+            let chapters_type = episode.chapters_type.clone();
+            let should_fetch = match chapters_type
+                .as_deref()
+                .map(|t| t.trim().to_ascii_lowercase())
+            {
+                None => true,
+                Some(kind) => kind == "application/json" || kind == "application/json+chapters",
+            };
+            if should_fetch {
+                crate::prefetch_podcast_chapters(parent, play_key.clone(), chapters_url);
+            }
+        }
     }
 
     // Show loading message immediately so user knows action was triggered
@@ -1020,6 +1049,7 @@ unsafe fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpis
         ensure_rss_http(parent);
     }
     let url = url.clone();
+    let episode_title = episode.title.clone();
     let enclosure_type = episode.enclosure_type.clone();
     let parent_hwnd = parent;
     let hwnd_copy = hwnd;
@@ -1043,7 +1073,11 @@ unsafe fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpis
             let _ = std::fs::create_dir_all(parent_dir);
         }
         if std::fs::write(&file_path, bytes).is_ok() {
-            let msg = Box::new(PlayReadyMsg { path: file_path });
+            let msg = Box::new(PlayReadyMsg {
+                path: file_path,
+                enclosure_url: url.clone(),
+                title: episode_title.clone(),
+            });
             let _ = PostMessageW(
                 hwnd_copy,
                 WM_PODCAST_PLAY_READY,
@@ -1103,6 +1137,7 @@ unsafe fn add_podcast_source(parent: HWND, feed_url: &str, title: &str) -> Optio
             url: normalized,
             kind: RssSourceType::Feed,
             user_title: !title.trim().is_empty(),
+            unread: false,
             cache: rss::RssFeedCache::default(),
         });
         settings::save_settings(ps.settings.clone());
@@ -1782,6 +1817,7 @@ unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool)
             let open_label = i18n::tr(language, "podcasts.context.open_episode");
             let copy_audio = i18n::tr(language, "podcasts.context.copy_audio");
             let copy_title = i18n::tr(language, "podcasts.context.copy_title");
+            let download_label = i18n::tr(language, "podcasts.context.download_episode");
             let _ = AppendMenuW(
                 menu,
                 MF_STRING,
@@ -1805,6 +1841,12 @@ unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool)
                 MF_STRING,
                 ID_CTX_COPY_TITLE,
                 PCWSTR(to_wide(&copy_title).as_ptr()),
+            );
+            let _ = AppendMenuW(
+                menu,
+                MF_STRING,
+                ID_CTX_DOWNLOAD_EPISODE,
+                PCWSTR(to_wide(&download_label).as_ptr()),
             );
         }
         None => {}
@@ -1842,6 +1884,7 @@ unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool)
         ID_CTX_OPEN_EPISODE => handle_episode_action(hwnd, EpisodeAction::OpenEpisode),
         ID_CTX_COPY_AUDIO => handle_episode_action(hwnd, EpisodeAction::CopyAudio),
         ID_CTX_COPY_TITLE => handle_episode_action(hwnd, EpisodeAction::CopyTitle),
+        ID_CTX_DOWNLOAD_EPISODE => handle_episode_action(hwnd, EpisodeAction::Download),
         ID_CTX_SUBSCRIBE => subscribe_selected_result(hwnd),
         _ => {}
     }
@@ -1973,6 +2016,7 @@ enum EpisodeAction {
     OpenEpisode,
     CopyAudio,
     CopyTitle,
+    Download,
 }
 
 unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
@@ -1993,6 +2037,18 @@ unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
             }
         }
         EpisodeAction::CopyTitle => copy_text_to_clipboard(hwnd, &item.title),
+        EpisodeAction::Download => {
+            if parent.0 == 0 {
+                return;
+            }
+            crate::download_podcast_episode(
+                parent,
+                item.enclosure_url.clone(),
+                Some(item.title.clone()),
+                None,
+                with_state(parent, |s| s.settings.language).unwrap_or_default(),
+            );
+        }
     }
 }
 
@@ -3371,6 +3427,17 @@ unsafe extern "system" fn podcast_wndproc(
             let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
             editor_manager::open_document(parent, &msg.path);
             if parent.0 != 0 {
+                editor_manager::mark_current_document_from_rss(parent, true);
+                crate::set_active_podcast_episode_info(
+                    parent,
+                    Some(msg.enclosure_url.clone()),
+                    Some(msg.title.clone()),
+                    Some(msg.path.clone()),
+                );
+                crate::menu::update_playback_menu(parent, true);
+                crate::activate_pending_podcast_chapters(parent);
+            }
+            if parent.0 != 0 {
                 SetForegroundWindow(parent);
                 if let Some(hwnd_tab) = with_state(parent, |s| s.hwnd_tab) {
                     if hwnd_tab.0 != 0 {
@@ -3382,6 +3449,10 @@ unsafe extern "system" fn podcast_wndproc(
         }
         WM_PODCAST_PLAY_FAILED => {
             with_podcast_state(hwnd, |s| s.pending_play = None);
+            let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+            if parent.0 != 0 {
+                crate::set_pending_podcast_chapters_key(parent, None);
+            }
             LRESULT(0)
         }
         WM_DESTROY => {

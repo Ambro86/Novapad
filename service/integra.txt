@@ -1,10 +1,53 @@
-1. Importa REFERER in cima al file:
-  use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT, REFERER, /* altri... */};
+You are working inside the Novapad codebase (Rust, Windows). The project already has a Podcast player and NVDA integration via NVDA Controller Client. Implement “Podcast Chapters” support with accessible announcements and navigation commands.
 
-  2. Aggiungi l'header nella funzione che crea il client, DOPO tutti gli altri headers ma PRIMA di .build():
-  headers.insert(
-      REFERER,
-      HeaderValue::from_static("https://news.google.com/")
-  );
+GOALS
+1) Chapters parsing + model:
+   - Support Podcasting 2.0 chapters first:
+     - Parse <podcast:chapters ...> in the episode RSS item (namespace: https://podcastindex.org/namespace/1.0).
+     - The tag provides a URL and a type. Support type "application/json+chapters" (JSON Chapters spec).
+     - Fetch the chapters JSON over HTTP using the project’s existing HTTP client (do NOT add bypass techniques; normal fetching only).
+   - Represent chapters as: Vec<Chapter> where Chapter = { start_ms: u64, title: String, url: Option<String>, image: Option<String> }.
+   - Sort chapters by start_ms ascending, drop invalid entries (missing startTime or title, negative times, duplicates can be kept but stable).
 
-  Il file "C:\msys64\home\ambro\curl-impersonate\rust_rss_nytimes\src\main.rs" già ha tutto implementato e funzionante! Puoi copiarlo direttamente o usarlo come riferimento. 🚀
+2) Player integration:
+   - The audio player already tracks current playback position in ms (or can query it). Add a “current chapter index” function:
+     - Given current_pos_ms and chapters, return the index i of the last chapter whose start_ms <= current_pos_ms (or None if before first).
+   - Add “seek_to_chapter(index)” that seeks player to chapters[index].start_ms.
+
+3) NVDA announcement behavior (important):
+   - When playback advances into a new chapter, NVDA must announce: "Chapter: {title}" exactly once per chapter transition.
+   - Do NOT repeat the same chapter announcement continuously (e.g., on timer ticks). Implement debouncing:
+     - Keep last_announced_chapter_index: Option<usize> in the playback/session state.
+     - On position updates, compute current_chapter_index; if it differs from last_announced_chapter_index, announce and update last_announced_chapter_index.
+   - Use the existing NVDA Controller Client wrapper (already in the repo). Use the same pattern used for other spoken status messages. Do not change already-working NVDA code; only extend it.
+
+4) UI / Commands (menu “Riproduci”):
+   Add three commands in the “Riproduci” menu and bind them consistently with existing command system:
+   A) “Capitolo successivo”:
+      - If there is a next chapter after current_chapter_index, seek to it.
+      - If currently before the first chapter, go to chapter 0.
+      - If already at last chapter, optionally announce “Ultimo capitolo” (or do nothing) – follow existing UX conventions in the codebase.
+   B) “Capitolo precedente”:
+      - If there is a previous chapter, seek to it.
+      - If in first chapter, seek to 0:00 or the first chapter start based on existing behavior (choose consistent behavior).
+   C) “Lista capitoli…”:
+      - Opens a list UI consistent with other lists in Novapad (e.g., list of episodes, RSS items).
+      - Populate rows with "mm:ss  Title" (or hh:mm:ss if long).
+      - On Enter on a row: seek to that chapter start and close the list, then NVDA announces the chapter (either immediately or via chapter-change detection; ensure it’s announced once).
+
+5) Caching & performance:
+   - Cache chapters per episode GUID/URL in memory for the session to avoid refetching on every play.
+   - If chapters fetch fails, playback still works; show/announce a non-blocking message like “Capitoli non disponibili”.
+
+6) Files & structure:
+   - Create or extend modules in a clean way:
+     - e.g., podcast/chapters.rs for parsing + fetching + model
+     - integrate into podcast/player.rs (or equivalent)
+     - integrate commands/menu in the UI command registry.
+   - Add minimal unit tests for:
+     - JSON parsing of chapters with various startTime formats (number seconds, "HH:MM:SS" if spec allows; handle the formats you choose and document it).
+     - current chapter index calculation edge cases (before first, exactly at boundary, after last).
+
+DELIVERABLES
+- Implement code changes with compile-clean result.
+- Provide a short summary of what you changed and where.

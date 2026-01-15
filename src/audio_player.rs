@@ -515,6 +515,7 @@ pub fn audiobook_duration_secs(path: &Path) -> Option<u64> {
 }
 
 pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
+    crate::reset_active_podcast_chapters_for_playback(hwnd);
     let path_buf = path.to_path_buf();
 
     let (bookmark_pos, speed, volume) = with_state(hwnd, |state| {

@@ -1,6 +1,9 @@
 use crate::log_debug;
+use crate::podcast::chapters::Chapter;
 use crate::tools::reader;
 use feed_rs::parser;
+use quick_xml::Reader;
+use quick_xml::events::Event;
 use rand::Rng;
 use reqwest::StatusCode;
 use reqwest::header::{
@@ -53,6 +56,8 @@ pub struct RssSource {
     #[serde(default)]
     pub user_title: bool,
     #[serde(default)]
+    pub unread: bool,
+    #[serde(default)]
     pub cache: RssFeedCache,
 }
 
@@ -79,6 +84,9 @@ pub struct PodcastEpisode {
     pub enclosure_url: Option<String>,
     #[allow(dead_code)]
     pub enclosure_type: Option<String>,
+    pub chapters_url: Option<String>,
+    pub chapters_type: Option<String>,
+    pub podlove_chapters: Vec<Chapter>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -641,6 +649,8 @@ fn parse_podcast_feed_bytes(
     fallback_title: &str,
     max_excerpt_chars: usize,
 ) -> Option<(String, Vec<PodcastEpisode>)> {
+    let chapters_map = parse_podcast_chapters_map(&bytes);
+    let podlove_map = parse_podlove_chapters_map(&bytes);
     let cursor = Cursor::new(bytes);
     let feed = parser::parse(cursor).ok()?;
     let title = feed
@@ -672,6 +682,40 @@ fn parse_podcast_feed_bytes(
                 .unwrap_or_default();
             let description = truncate_excerpt(&description, max_excerpt_chars);
             let (enclosure_url, enclosure_type) = select_entry_enclosure(&entry);
+            let chapters_key = podcast_chapters_guid_key(&guid);
+            let chapters_link_key = podcast_chapters_link_key(&link);
+            let chapters_title_key = podcast_chapters_title_key(&title);
+            let chapters_entry = chapters_key
+                .as_ref()
+                .and_then(|key| chapters_map.get(key))
+                .or_else(|| {
+                    chapters_link_key
+                        .as_ref()
+                        .and_then(|key| chapters_map.get(key))
+                })
+                .or_else(|| {
+                    chapters_title_key
+                        .as_ref()
+                        .and_then(|key| chapters_map.get(key))
+                })
+                .cloned()
+                .unwrap_or((None, None));
+            let (chapters_url, chapters_type) = chapters_entry;
+            let podlove_entry = chapters_key
+                .as_ref()
+                .and_then(|key| podlove_map.get(key))
+                .or_else(|| {
+                    chapters_link_key
+                        .as_ref()
+                        .and_then(|key| podlove_map.get(key))
+                })
+                .or_else(|| {
+                    chapters_title_key
+                        .as_ref()
+                        .and_then(|key| podlove_map.get(key))
+                })
+                .cloned()
+                .unwrap_or_default();
             PodcastEpisode {
                 title,
                 link,
@@ -680,10 +724,383 @@ fn parse_podcast_feed_bytes(
                 published,
                 enclosure_url,
                 enclosure_type,
+                chapters_url,
+                chapters_type,
+                podlove_chapters: podlove_entry,
             }
         })
         .collect();
     Some((title, items))
+}
+
+fn podcast_chapters_guid_key(guid: &str) -> Option<String> {
+    let trimmed = guid.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(format!("guid:{trimmed}"))
+    }
+}
+
+fn podcast_chapters_link_key(link: &str) -> Option<String> {
+    let trimmed = link.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(format!("link:{}", canonicalize_url(trimmed)))
+    }
+}
+
+fn podcast_chapters_title_key(title: &str) -> Option<String> {
+    let trimmed = title.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(format!("title:{trimmed}"))
+    }
+}
+
+fn parse_podcast_chapters_map(bytes: &[u8]) -> HashMap<String, (Option<String>, Option<String>)> {
+    let mut out = HashMap::new();
+    let mut reader = Reader::from_reader(Cursor::new(bytes));
+    reader.trim_text(true);
+    let mut buf = Vec::new();
+    let mut current = None;
+    let mut current_field: Option<ChaptersField> = None;
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                let name = e.name().as_ref().to_vec();
+                if is_item_start(&name) {
+                    current = Some(ChaptersItem::default());
+                } else if let Some(item) = current.as_mut() {
+                    if eq_ignore_ascii(&name, b"guid") {
+                        current_field = Some(ChaptersField::Guid);
+                    } else if eq_ignore_ascii(&name, b"id") {
+                        current_field = Some(ChaptersField::Guid);
+                    } else if eq_ignore_ascii(&name, b"title") {
+                        current_field = Some(ChaptersField::Title);
+                    } else if eq_ignore_ascii(&name, b"link") {
+                        current_field = Some(ChaptersField::Link);
+                        if let Some(href) = attr_value(&reader, &e, b"href") {
+                            if item.link.is_empty() {
+                                item.link = href;
+                            }
+                        }
+                    } else if is_podcast_chapters_tag(&name) {
+                        if let Some(url) = attr_value(&reader, &e, b"url") {
+                            item.chapters_url = Some(url);
+                        }
+                        if let Some(kind) = attr_value(&reader, &e, b"type") {
+                            item.chapters_type = Some(kind);
+                        }
+                    }
+                }
+            }
+            Ok(Event::Empty(e)) => {
+                let name = e.name().as_ref().to_vec();
+                if let Some(item) = current.as_mut() {
+                    if eq_ignore_ascii(&name, b"link") {
+                        if let Some(href) = attr_value(&reader, &e, b"href") {
+                            if item.link.is_empty() {
+                                item.link = href;
+                            }
+                        }
+                    } else if is_podcast_chapters_tag(&name) {
+                        if let Some(url) = attr_value(&reader, &e, b"url") {
+                            item.chapters_url = Some(url);
+                        }
+                        if let Some(kind) = attr_value(&reader, &e, b"type") {
+                            item.chapters_type = Some(kind);
+                        }
+                    }
+                }
+            }
+            Ok(Event::Text(e)) => {
+                if let (Some(item), Some(field)) = (current.as_mut(), current_field) {
+                    let text = e.unescape().unwrap_or_default().to_string();
+                    match field {
+                        ChaptersField::Guid => {
+                            if item.guid.is_empty() {
+                                item.guid = text;
+                            }
+                        }
+                        ChaptersField::Link => {
+                            if item.link.is_empty() {
+                                item.link = text;
+                            }
+                        }
+                        ChaptersField::Title => {
+                            if item.title.is_empty() {
+                                item.title = text;
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(Event::End(e)) => {
+                let name = e.name().as_ref().to_vec();
+                if is_item_end(&name) {
+                    if let Some(item) = current.take() {
+                        if item
+                            .chapters_url
+                            .as_ref()
+                            .map(|u| !u.trim().is_empty())
+                            .unwrap_or(false)
+                        {
+                            let entry = (item.chapters_url, item.chapters_type);
+                            if let Some(key) = podcast_chapters_guid_key(&item.guid) {
+                                out.entry(key).or_insert_with(|| entry.clone());
+                            }
+                            if let Some(key) = podcast_chapters_link_key(&item.link) {
+                                out.entry(key).or_insert_with(|| entry.clone());
+                            }
+                            if let Some(key) = podcast_chapters_title_key(&item.title) {
+                                out.entry(key).or_insert(entry);
+                            }
+                        }
+                    }
+                } else if eq_ignore_ascii(&name, b"guid")
+                    || eq_ignore_ascii(&name, b"id")
+                    || eq_ignore_ascii(&name, b"title")
+                    || eq_ignore_ascii(&name, b"link")
+                {
+                    current_field = None;
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(_) => break,
+            _ => {}
+        }
+        buf.clear();
+    }
+    out
+}
+
+#[derive(Default)]
+struct ChaptersItem {
+    guid: String,
+    link: String,
+    title: String,
+    chapters_url: Option<String>,
+    chapters_type: Option<String>,
+}
+
+#[derive(Clone, Copy)]
+enum ChaptersField {
+    Guid,
+    Link,
+    Title,
+}
+
+fn is_item_start(name: &[u8]) -> bool {
+    eq_ignore_ascii(name, b"item") || eq_ignore_ascii(name, b"entry")
+}
+
+fn is_item_end(name: &[u8]) -> bool {
+    eq_ignore_ascii(name, b"item") || eq_ignore_ascii(name, b"entry")
+}
+
+fn is_podcast_chapters_tag(name: &[u8]) -> bool {
+    eq_ignore_ascii(name, b"podcast:chapters")
+}
+
+fn eq_ignore_ascii(input: &[u8], expected: &[u8]) -> bool {
+    input.len() == expected.len()
+        && input
+            .iter()
+            .zip(expected)
+            .all(|(a, b)| a.to_ascii_lowercase() == b.to_ascii_lowercase())
+}
+
+fn attr_value<R: std::io::BufRead>(
+    reader: &Reader<R>,
+    e: &quick_xml::events::BytesStart,
+    key: &[u8],
+) -> Option<String> {
+    for attr in e.attributes().flatten() {
+        if eq_ignore_ascii(attr.key.as_ref(), key) {
+            return attr
+                .decode_and_unescape_value(reader)
+                .ok()
+                .map(|v| v.to_string());
+        }
+    }
+    None
+}
+
+fn parse_podlove_chapters_map(bytes: &[u8]) -> HashMap<String, Vec<Chapter>> {
+    let mut out = HashMap::new();
+    let mut reader = Reader::from_reader(Cursor::new(bytes));
+    reader.trim_text(true);
+    let mut buf = Vec::new();
+    let mut current = None;
+    let mut current_field: Option<ChaptersField> = None;
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                let name = e.name().as_ref().to_vec();
+                if is_item_start(&name) {
+                    current = Some(PodloveItem::default());
+                } else if let Some(item) = current.as_mut() {
+                    if eq_ignore_ascii(&name, b"guid") {
+                        current_field = Some(ChaptersField::Guid);
+                    } else if eq_ignore_ascii(&name, b"id") {
+                        current_field = Some(ChaptersField::Guid);
+                    } else if eq_ignore_ascii(&name, b"title") {
+                        current_field = Some(ChaptersField::Title);
+                    } else if eq_ignore_ascii(&name, b"link") {
+                        current_field = Some(ChaptersField::Link);
+                        if let Some(href) = attr_value(&reader, &e, b"href") {
+                            if item.link.is_empty() {
+                                item.link = href;
+                            }
+                        }
+                    } else if eq_ignore_ascii(&name, b"psc:chapters") {
+                        item.in_chapters = true;
+                    } else if eq_ignore_ascii(&name, b"psc:chapter") && item.in_chapters {
+                        if let Some(chapter) = parse_podlove_chapter(&reader, &e) {
+                            item.chapters.push(chapter);
+                        }
+                    }
+                }
+            }
+            Ok(Event::Empty(e)) => {
+                let name = e.name().as_ref().to_vec();
+                if let Some(item) = current.as_mut() {
+                    if eq_ignore_ascii(&name, b"psc:chapter") && item.in_chapters {
+                        if let Some(chapter) = parse_podlove_chapter(&reader, &e) {
+                            item.chapters.push(chapter);
+                        }
+                    }
+                }
+            }
+            Ok(Event::Text(e)) => {
+                if let (Some(item), Some(field)) = (current.as_mut(), current_field) {
+                    let text = e.unescape().unwrap_or_default().to_string();
+                    match field {
+                        ChaptersField::Guid => {
+                            if item.guid.is_empty() {
+                                item.guid = text;
+                            }
+                        }
+                        ChaptersField::Link => {
+                            if item.link.is_empty() {
+                                item.link = text;
+                            }
+                        }
+                        ChaptersField::Title => {
+                            if item.title.is_empty() {
+                                item.title = text;
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(Event::End(e)) => {
+                let name = e.name().as_ref().to_vec();
+                if is_item_end(&name) {
+                    if let Some(item) = current.take() {
+                        if !item.chapters.is_empty() {
+                            let entry = item.chapters;
+                            if let Some(key) = podcast_chapters_guid_key(&item.guid) {
+                                out.entry(key).or_insert_with(|| entry.clone());
+                            }
+                            if let Some(key) = podcast_chapters_link_key(&item.link) {
+                                out.entry(key).or_insert_with(|| entry.clone());
+                            }
+                            if let Some(key) = podcast_chapters_title_key(&item.title) {
+                                out.entry(key).or_insert(entry);
+                            }
+                        }
+                    }
+                } else if eq_ignore_ascii(&name, b"psc:chapters") {
+                    if let Some(item) = current.as_mut() {
+                        item.in_chapters = false;
+                    }
+                } else if eq_ignore_ascii(&name, b"guid")
+                    || eq_ignore_ascii(&name, b"id")
+                    || eq_ignore_ascii(&name, b"title")
+                    || eq_ignore_ascii(&name, b"link")
+                {
+                    current_field = None;
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(_) => break,
+            _ => {}
+        }
+        buf.clear();
+    }
+    out
+}
+
+#[derive(Default)]
+struct PodloveItem {
+    guid: String,
+    link: String,
+    title: String,
+    in_chapters: bool,
+    chapters: Vec<Chapter>,
+}
+
+fn parse_podlove_chapter<R: std::io::BufRead>(
+    reader: &Reader<R>,
+    e: &quick_xml::events::BytesStart,
+) -> Option<Chapter> {
+    let mut start = None;
+    let mut title = None;
+    for attr in e.attributes().flatten() {
+        let key = attr.key.as_ref();
+        let value = attr
+            .decode_and_unescape_value(reader)
+            .unwrap_or_default()
+            .to_string();
+        if eq_ignore_ascii(key, b"start") {
+            start = Some(value);
+        } else if eq_ignore_ascii(key, b"title") {
+            title = Some(value);
+        }
+    }
+    let start = start?;
+    let title = title?.trim().to_string();
+    if title.is_empty() {
+        return None;
+    }
+    let start_ms = parse_podlove_time_ms(&start)?;
+    Some(Chapter {
+        start_ms,
+        title,
+        url: None,
+        image: None,
+    })
+}
+
+fn parse_podlove_time_ms(input: &str) -> Option<u64> {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let parts: Vec<&str> = trimmed.split(':').collect();
+    let seconds = match parts.len() {
+        1 => parts[0].parse::<f64>().ok()?,
+        2 => {
+            let minutes = parts[0].parse::<f64>().ok()?;
+            let secs = parts[1].parse::<f64>().ok()?;
+            minutes * 60.0 + secs
+        }
+        3 => {
+            let hours = parts[0].parse::<f64>().ok()?;
+            let minutes = parts[1].parse::<f64>().ok()?;
+            let secs = parts[2].parse::<f64>().ok()?;
+            hours * 3600.0 + minutes * 60.0 + secs
+        }
+        _ => return None,
+    };
+    if seconds < 0.0 {
+        return None;
+    }
+    Some((seconds * 1000.0).floor() as u64)
 }
 
 fn select_entry_link(entry: &feed_rs::model::Entry) -> String {

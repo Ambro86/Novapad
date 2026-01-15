@@ -2633,6 +2633,7 @@ pub unsafe fn close_document_at(hwnd: HWND, index: usize) -> bool {
     }
     if was_audiobook {
         crate::audio_player::stop_audiobook_playback(hwnd);
+        crate::clear_active_podcast_chapters(hwnd);
     }
 
     if was_empty {
@@ -2692,6 +2693,7 @@ pub unsafe fn try_close_app(hwnd: HWND) -> bool {
         }
     }
     crate::audio_player::stop_audiobook_playback(hwnd);
+    crate::clear_active_podcast_chapters(hwnd);
     let _ = DestroyWindow(hwnd);
     true
 }

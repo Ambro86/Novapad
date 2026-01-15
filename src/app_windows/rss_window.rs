@@ -117,6 +117,18 @@ fn normalize_rss_url_key(url: &str) -> String {
     s.to_ascii_lowercase()
 }
 
+fn rss_source_display_title(source: &RssSource, language: crate::settings::Language) -> String {
+    let mut title = if source.title.trim().is_empty() {
+        source.url.clone()
+    } else {
+        source.title.clone()
+    };
+    if source.unread {
+        title.push_str(&i18n::tr(language, "rss.unread_suffix"));
+    }
+    title
+}
+
 fn percent_encode(input: &str) -> String {
     url::form_urlencoded::byte_serialize(input.as_bytes()).collect()
 }
@@ -246,6 +258,7 @@ unsafe fn import_sources_from_file(hwnd: HWND, path: &Path) {
                     url: url.clone(),
                     kind: RssSourceType::Feed,
                     user_title: title.trim() != url.trim(),
+                    unread: false,
                     cache: rss::RssFeedCache::default(),
                 });
                 existing.insert(key);
@@ -270,6 +283,7 @@ unsafe fn import_sources_from_file(hwnd: HWND, path: &Path) {
                     url: url.clone(),
                     kind: RssSourceType::Feed,
                     user_title: false,
+                    unread: false,
                     cache: rss::RssFeedCache::default(),
                 });
                 existing.insert(key);
@@ -638,6 +652,7 @@ fn apply_default_sources(
             url: url.clone(),
             kind: RssSourceType::Feed,
             user_title: title.trim() != url.trim(),
+            unread: false,
             cache: rss::RssFeedCache::default(),
         });
         existing.insert(key.clone());
@@ -1243,6 +1258,7 @@ unsafe extern "system" fn rss_wndproc(
                             url: url.clone(),
                             kind: RssSourceType::Site,
                             user_title: title.trim() != url.trim(),
+                            unread: false,
                             cache: rss::RssFeedCache::default(),
                         });
                         crate::settings::save_settings(state.settings.clone());
@@ -1859,13 +1875,14 @@ unsafe fn create_controls(hwnd: HWND) {
 }
 
 unsafe fn reload_tree(hwnd: HWND) {
-    let (hwnd_tree, sources) = match with_rss_state(hwnd, |s| {
+    let (hwnd_tree, sources, language) = match with_rss_state(hwnd, |s| {
         (
             s.hwnd_tree,
             with_state(s.parent, |ps| ps.settings.rss_sources.clone()),
+            with_state(s.parent, |ps| ps.settings.language),
         )
     }) {
-        Some((t, Some(src))) => (t, src),
+        Some((t, Some(src), Some(language))) => (t, src, language),
         _ => return,
     };
 
@@ -1877,7 +1894,7 @@ unsafe fn reload_tree(hwnd: HWND) {
     });
 
     for (i, source) in sources.into_iter().enumerate() {
-        let title = to_wide(&source.title);
+        let title = to_wide(&rss_source_display_title(&source, language));
         let mut tvis = TVINSERTSTRUCTW {
             hParent: TVI_ROOT,
             hInsertAfter: TVI_LAST,
@@ -1904,7 +1921,73 @@ unsafe fn reload_tree(hwnd: HWND) {
     }
 }
 
+unsafe fn update_source_tree_title(
+    hwnd_tree: HWND,
+    hitem: windows::Win32::UI::Controls::HTREEITEM,
+    title: &str,
+) {
+    if hwnd_tree.0 == 0 || hitem.0 == 0 {
+        return;
+    }
+    let title_wide = to_wide(title);
+    let mut tvi = TVITEMW {
+        mask: TVIF_TEXT,
+        hItem: hitem,
+        pszText: windows::core::PWSTR(title_wide.as_ptr() as *mut _),
+        ..Default::default()
+    };
+    SendMessageW(
+        hwnd_tree,
+        TVM_SETITEMW,
+        WPARAM(0),
+        LPARAM(&mut tvi as *mut _ as isize),
+    );
+}
+
+unsafe fn set_source_unread(
+    hwnd: HWND,
+    hitem: windows::Win32::UI::Controls::HTREEITEM,
+    unread: bool,
+) {
+    let (hwnd_tree, title_opt) = with_rss_state(hwnd, |s| {
+        let hwnd_tree = s.hwnd_tree;
+        let parent = s.parent;
+        let source_idx = s.node_data.get(&hitem.0).and_then(|node| match node {
+            NodeData::Source(idx) => Some(*idx),
+            _ => None,
+        });
+        let Some(idx) = source_idx else {
+            return (hwnd_tree, None);
+        };
+        let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
+        let title_opt = with_state(parent, |ps| {
+            if let Some(src) = ps.settings.rss_sources.get_mut(idx) {
+                if src.unread != unread {
+                    src.unread = unread;
+                    let title = rss_source_display_title(src, language);
+                    crate::settings::save_settings(ps.settings.clone());
+                    return Some(title);
+                }
+            }
+            None
+        })
+        .flatten();
+        (hwnd_tree, title_opt)
+    })
+    .unwrap_or((HWND(0), None));
+    if let Some(title) = title_opt {
+        update_source_tree_title(hwnd_tree, hitem, &title);
+    }
+}
+
 unsafe fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM) {
+    if with_rss_state(hwnd, |s| {
+        matches!(s.node_data.get(&(hitem.0)), Some(NodeData::Source(_)))
+    })
+    .unwrap_or(false)
+    {
+        set_source_unread(hwnd, hitem, false);
+    }
     let item_info_opt = with_rss_state(hwnd, |s| {
         if let Some(NodeData::Source(idx)) = s.node_data.get(&(hitem.0)) {
             with_state(s.parent, |ps| {
@@ -2096,7 +2179,7 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                             {
                                 src.title = outcome.title.clone();
                             }
-                            final_title = src.title.clone();
+                            final_title = rss_source_display_title(src, lang);
                             if src.kind != outcome.kind {
                                 src.kind = outcome.kind;
                             }
@@ -2213,6 +2296,7 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                         "rss_ui_batch end source={} appended={}",
                         hitem.0, appended
                     ));
+                    set_source_unread(hwnd, hitem, true);
                 }
             } else {
                 loop {

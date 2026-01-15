@@ -59,6 +59,10 @@ pub const IDM_PLAYBACK_VOLUME_DOWN: usize = 8008;
 pub const IDM_PLAYBACK_MUTE_TOGGLE: usize = 8009;
 pub const IDM_PLAYBACK_SPEED_UP: usize = 8010;
 pub const IDM_PLAYBACK_SPEED_DOWN: usize = 8011;
+pub const IDM_PLAYBACK_CHAPTER_PREV: usize = 8012;
+pub const IDM_PLAYBACK_CHAPTER_NEXT: usize = 8013;
+pub const IDM_PLAYBACK_CHAPTER_LIST: usize = 8014;
+pub const IDM_PLAYBACK_DOWNLOAD_EPISODE: usize = 8015;
 pub const IDM_INSERT_BOOKMARK: usize = 2101;
 pub const IDM_MANAGE_BOOKMARKS: usize = 2102;
 pub const IDM_INSERT_CLEAR_BOOKMARKS: usize = 2103;
@@ -265,9 +269,19 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
     }
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
     let existing = with_state(hwnd, |state| state.playback_menu).unwrap_or(HMENU(0));
+    let show_download = with_state(hwnd, |state| {
+        state
+            .docs
+            .get(state.current)
+            .map(|doc| doc.from_rss)
+            .unwrap_or(false)
+    })
+    .unwrap_or(false);
     if show {
         if existing.0 != 0 {
-            return;
+            let _ = DeleteMenu(hmenu, existing.0 as u32, MF_BYCOMMAND);
+            let _ = DestroyMenu(existing);
+            let _ = with_state(hwnd, |state| state.playback_menu = HMENU(0));
         }
         let playback_menu = CreateMenu().unwrap_or(HMENU(0));
         if playback_menu.0 == 0 {
@@ -285,6 +299,12 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
         let speed_up = i18n::tr(language, "playback.speed_up");
         let speed_down = i18n::tr(language, "playback.speed_down");
         let mute_toggle = i18n::tr(language, "playback.mute_toggle");
+        let chapter_prev = i18n::tr(language, "playback.chapter_prev");
+        let chapter_next = i18n::tr(language, "playback.chapter_next");
+        let chapter_list = i18n::tr(language, "playback.chapter_list");
+        let download_episode = i18n::tr(language, "playback.download_episode");
+        let has_chapters =
+            with_state(hwnd, |state| !state.active_podcast_chapters.is_empty()).unwrap_or(false);
 
         let _ = append_menu_string(
             playback_menu,
@@ -305,6 +325,34 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
             IDM_PLAYBACK_SEEK_BACKWARD,
             &seek_backward,
         );
+        if has_chapters {
+            let _ = append_menu_string(
+                playback_menu,
+                MF_STRING,
+                IDM_PLAYBACK_CHAPTER_PREV,
+                &chapter_prev,
+            );
+            let _ = append_menu_string(
+                playback_menu,
+                MF_STRING,
+                IDM_PLAYBACK_CHAPTER_NEXT,
+                &chapter_next,
+            );
+            let _ = append_menu_string(
+                playback_menu,
+                MF_STRING,
+                IDM_PLAYBACK_CHAPTER_LIST,
+                &chapter_list,
+            );
+        }
+        if show_download {
+            let _ = append_menu_string(
+                playback_menu,
+                MF_STRING,
+                IDM_PLAYBACK_DOWNLOAD_EPISODE,
+                &download_episode,
+            );
+        }
         let _ = append_menu_string(
             playback_menu,
             MF_STRING,

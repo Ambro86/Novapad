@@ -5,8 +5,11 @@ use std::ffi::OsStr;
 use std::os::windows::prelude::*;
 use std::path::PathBuf;
 use std::path::{Component, Prefix};
-use windows::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS, HANDLE};
+use windows::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS, HANDLE, HLOCAL, LocalFree};
 use windows::Win32::Globalization::GetUserDefaultLocaleName;
+use windows::Win32::Security::Cryptography::{
+    CRYPT_INTEGER_BLOB, CRYPTPROTECT_UI_FORBIDDEN, CryptProtectData, CryptUnprotectData,
+};
 use windows::Win32::Storage::FileSystem::GetDriveTypeW;
 use windows::Win32::System::Com::CoTaskMemFree;
 use windows::Win32::System::Registry::{
@@ -155,6 +158,7 @@ pub struct AppSettings {
     pub tts_engine: TtsEngine,
     pub tts_voice: String,
     pub tts_only_multilingual: bool,
+    pub tts_manual_tuning: bool,
     pub split_on_newline: bool,
     pub word_wrap: bool,
     pub wrap_width: u32,
@@ -179,6 +183,9 @@ pub struct AppSettings {
     pub podcast_save_folder: String,
     pub podcast_include_video: bool,
     pub podcast_monitor_id: String,
+    pub podcast_cache_limit_mb: u32,
+    pub podcast_index_api_key: String,
+    pub podcast_index_api_secret: String,
     pub youtube_include_timestamps: bool,
     pub last_seen_changelog_version: String,
     pub favorite_voices: Vec<FavoriteVoice>,
@@ -258,6 +265,7 @@ impl Default for AppSettings {
             tts_engine: TtsEngine::Edge,
             tts_voice: "it-IT-IsabellaNeural".to_string(),
             tts_only_multilingual: false,
+            tts_manual_tuning: false,
             split_on_newline: false,
             word_wrap: true,
             wrap_width: 80,
@@ -282,6 +290,9 @@ impl Default for AppSettings {
             podcast_save_folder: default_podcast_save_folder(),
             podcast_include_video: false,
             podcast_monitor_id: String::new(),
+            podcast_cache_limit_mb: 500,
+            podcast_index_api_key: String::new(),
+            podcast_index_api_secret: String::new(),
             youtube_include_timestamps: true,
             last_seen_changelog_version: String::new(),
             favorite_voices: Vec::new(),
@@ -537,6 +548,7 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     if settings.rss_max_excerpt_chars == 0 {
         settings.rss_max_excerpt_chars = 512;
     }
+    settings.podcast_cache_limit_mb = settings.podcast_cache_limit_mb.clamp(100, 2048);
     if settings.spellcheck_fixed_language.trim().is_empty() {
         settings.spellcheck_fixed_language = "en-US".to_string();
     }
@@ -545,6 +557,76 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     settings.rss_cooldown_rate_limited_secs =
         settings.rss_cooldown_rate_limited_secs.clamp(30, 3_600);
     settings
+}
+
+fn dpapi_protect(data: &[u8]) -> Option<Vec<u8>> {
+    unsafe {
+        let in_blob = CRYPT_INTEGER_BLOB {
+            cbData: data.len() as u32,
+            pbData: data.as_ptr() as *mut u8,
+        };
+        let mut out_blob = CRYPT_INTEGER_BLOB::default();
+        let ok = CryptProtectData(
+            &in_blob,
+            None,
+            None,
+            None,
+            None,
+            CRYPTPROTECT_UI_FORBIDDEN,
+            &mut out_blob,
+        )
+        .is_ok();
+        if !ok || out_blob.pbData.is_null() {
+            return None;
+        }
+        let out = std::slice::from_raw_parts(out_blob.pbData, out_blob.cbData as usize).to_vec();
+        let _ = LocalFree(HLOCAL(out_blob.pbData as *mut std::ffi::c_void));
+        Some(out)
+    }
+}
+
+fn dpapi_unprotect(data: &[u8]) -> Option<Vec<u8>> {
+    unsafe {
+        let in_blob = CRYPT_INTEGER_BLOB {
+            cbData: data.len() as u32,
+            pbData: data.as_ptr() as *mut u8,
+        };
+        let mut out_blob = CRYPT_INTEGER_BLOB::default();
+        let ok = CryptUnprotectData(
+            &in_blob,
+            None,
+            None,
+            None,
+            None,
+            CRYPTPROTECT_UI_FORBIDDEN,
+            &mut out_blob,
+        )
+        .is_ok();
+        if !ok || out_blob.pbData.is_null() {
+            return None;
+        }
+        let out = std::slice::from_raw_parts(out_blob.pbData, out_blob.cbData as usize).to_vec();
+        let _ = LocalFree(HLOCAL(out_blob.pbData as *mut std::ffi::c_void));
+        Some(out)
+    }
+}
+
+pub fn encrypt_podcast_index_secret(secret: &str) -> String {
+    if secret.trim().is_empty() {
+        return String::new();
+    }
+    dpapi_protect(secret.as_bytes())
+        .map(hex::encode)
+        .unwrap_or_default()
+}
+
+pub fn decrypt_podcast_index_secret(secret: &str) -> Option<String> {
+    if secret.trim().is_empty() {
+        return None;
+    }
+    let decoded = hex::decode(secret).ok()?;
+    let bytes = dpapi_unprotect(&decoded)?;
+    String::from_utf8(bytes).ok()
 }
 
 pub fn save_settings(settings: AppSettings) {

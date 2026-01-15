@@ -59,6 +59,9 @@ pub struct RssSource {
     pub unread: bool,
     #[serde(default)]
     pub cache: RssFeedCache,
+    /// GUID of the most recent article the user has seen (for cross-session unread tracking)
+    #[serde(default)]
+    pub last_seen_guid: Option<String>,
 }
 
 #[derive(Debug, Clone)]

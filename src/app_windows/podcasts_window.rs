@@ -283,6 +283,7 @@ fn import_podcast_sources_from_file(hwnd: HWND, path: &Path) -> Option<usize> {
                     user_title: title.trim() != url.trim(),
                     unread: false,
                     cache: rss::RssFeedCache::default(),
+                    last_seen_guid: None,
                 });
                 existing.insert(key);
                 added += 1;
@@ -1103,8 +1104,29 @@ unsafe fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpis
     let url = url.clone();
     let episode_title = episode.title.clone();
     let enclosure_type = episode.enclosure_type.clone();
+    let cached_path = podcast_cache_path(&url, enclosure_type.as_deref());
+    let cached_ok = cached_path
+        .metadata()
+        .map(|m| m.is_file() && m.len() > 0)
+        .unwrap_or(false);
+    if cached_ok {
+        let msg = Box::new(PlayReadyMsg {
+            path: cached_path,
+            enclosure_url: url.clone(),
+            title: episode_title.clone(),
+        });
+        let _ = PostMessageW(
+            hwnd,
+            WM_PODCAST_PLAY_READY,
+            WPARAM(0),
+            LPARAM(Box::into_raw(msg) as isize),
+        );
+        return;
+    }
     let parent_hwnd = parent;
     let hwnd_copy = hwnd;
+    let cache_limit_mb = with_state(parent, |s| s.settings.podcast_cache_limit_mb).unwrap_or(500);
+    let cache_dir = podcast_cache_dir();
     std::thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -1125,6 +1147,8 @@ unsafe fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpis
             let _ = std::fs::create_dir_all(parent_dir);
         }
         if std::fs::write(&file_path, bytes).is_ok() {
+            let limit_bytes = cache_limit_mb as u64 * 1024 * 1024;
+            enforce_podcast_cache_limit(&cache_dir, limit_bytes, Some(&file_path));
             let msg = Box::new(PlayReadyMsg {
                 path: file_path,
                 enclosure_url: url.clone(),
@@ -1162,7 +1186,110 @@ fn podcast_cache_path(url: &str, mime: Option<&str>) -> PathBuf {
         }
     };
     let filename = format!("podcast_{}.{}", &hash[..16], ext);
-    settings::settings_dir().join("podcasts").join(filename)
+    podcast_cache_dir().join(filename)
+}
+
+fn podcast_cache_dir() -> PathBuf {
+    settings::settings_dir().join("podcast cache")
+}
+
+fn podcast_cache_marker_path(path: &Path) -> PathBuf {
+    let mut marker = path.to_path_buf();
+    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+        marker.set_extension(format!("{}.played", ext));
+    } else {
+        marker.set_extension("played");
+    }
+    marker
+}
+
+fn system_time_secs(time: SystemTime) -> u64 {
+    time.duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
+fn enforce_podcast_cache_limit(cache_dir: &Path, limit_bytes: u64, protected: Option<&Path>) {
+    if limit_bytes == 0 {
+        return;
+    }
+    let entries = match std::fs::read_dir(cache_dir) {
+        Ok(entries) => entries,
+        Err(_) => return,
+    };
+    let mut markers: HashMap<PathBuf, u64> = HashMap::new();
+    let mut files: Vec<(PathBuf, u64, u64)> = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let metadata = match entry.metadata() {
+            Ok(metadata) => metadata,
+            Err(_) => continue,
+        };
+        if !metadata.is_file() {
+            continue;
+        }
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext.eq_ignore_ascii_case("played") {
+            let base = path.with_extension("");
+            let modified = metadata.modified().map(system_time_secs).unwrap_or(0);
+            markers.insert(base, modified);
+            continue;
+        }
+        let modified = metadata.modified().map(system_time_secs).unwrap_or(0);
+        files.push((path, metadata.len(), modified));
+    }
+
+    let mut total: u64 = files.iter().map(|(_, size, _)| *size).sum();
+    if total <= limit_bytes {
+        return;
+    }
+
+    let protected = protected.map(|path| path.to_path_buf());
+    let mut played_entries: Vec<(PathBuf, u64, u64)> = Vec::new();
+    let mut unplayed_entries: Vec<(PathBuf, u64, u64)> = Vec::new();
+    for (path, size, modified) in files {
+        if let Some(marked) = markers.get(&path).copied() {
+            played_entries.push((path, size, marked));
+        } else {
+            unplayed_entries.push((path, size, modified));
+        }
+    }
+    played_entries.sort_by_key(|entry| entry.2);
+    unplayed_entries.sort_by_key(|entry| entry.2);
+
+    for (path, size, _) in played_entries {
+        if total <= limit_bytes {
+            break;
+        }
+        remove_cache_entry(&path, size, &protected, &mut total);
+    }
+    for (path, size, _) in unplayed_entries {
+        if total <= limit_bytes {
+            break;
+        }
+        remove_cache_entry(&path, size, &protected, &mut total);
+    }
+}
+
+fn remove_cache_entry(path: &Path, size: u64, protected: &Option<PathBuf>, total: &mut u64) {
+    if protected.as_ref().map(|p| p == path).unwrap_or(false) {
+        return;
+    }
+    if std::fs::remove_file(path).is_ok() {
+        let marker = podcast_cache_marker_path(path);
+        let _ = std::fs::remove_file(marker);
+        *total = total.saturating_sub(size);
+    } else {
+        log_debug(&format!(
+            "podcast_cache_delete_failed {}",
+            path.to_string_lossy()
+        ));
+    }
+}
+
+fn mark_podcast_episode_played(path: &Path) {
+    let marker = podcast_cache_marker_path(path);
+    let _ = std::fs::write(marker, b"");
 }
 
 unsafe fn add_podcast_source(parent: HWND, feed_url: &str, title: &str) -> Option<usize> {
@@ -1191,6 +1318,7 @@ unsafe fn add_podcast_source(parent: HWND, feed_url: &str, title: &str) -> Optio
             user_title: !title.trim().is_empty(),
             unread: false,
             cache: rss::RssFeedCache::default(),
+            last_seen_guid: None,
         });
         settings::save_settings(ps.settings.clone());
         Some(ps.settings.podcast_sources.len() - 1)
@@ -1278,6 +1406,39 @@ unsafe fn perform_search(hwnd: HWND, query: &str) {
         ensure_rss_http(parent);
     }
     let provider = selected_search_provider(hwnd);
+    let (podcastindex_key, podcastindex_secret) =
+        if matches!(provider, SearchProvider::PodcastIndex) {
+            let (key, secret) = with_state(parent, |ps| {
+                (
+                    ps.settings.podcast_index_api_key.clone(),
+                    settings::decrypt_podcast_index_secret(&ps.settings.podcast_index_api_secret),
+                )
+            })
+            .unwrap_or((String::new(), None));
+            let missing = key.trim().is_empty()
+                || secret
+                    .as_deref()
+                    .map(|s| s.trim().is_empty())
+                    .unwrap_or(true);
+            if missing {
+                let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
+                let title = i18n::tr(language, "podcasts.podcastindex.missing_title");
+                let body = i18n::tr(language, "podcasts.podcastindex.missing_body");
+                let response = MessageBoxW(
+                    hwnd,
+                    PCWSTR(to_wide(&body).as_ptr()),
+                    PCWSTR(to_wide(&title).as_ptr()),
+                    MB_YESNO | MB_ICONINFORMATION,
+                );
+                if response == IDYES {
+                    let _ = open_url_in_browser("https://api.podcastindex.org/signup");
+                }
+                return;
+            }
+            (key, secret.unwrap_or_default())
+        } else {
+            (String::new(), String::new())
+        };
     let query = percent_encode(trimmed);
     let hwnd_copy = hwnd;
     std::thread::spawn(move || {
@@ -1309,9 +1470,9 @@ unsafe fn perform_search(hwnd: HWND, query: &str) {
                 }
             }
             SearchProvider::PodcastIndex => {
-                let key = std::env::var("PODCASTINDEX_API_KEY").ok();
-                let secret = std::env::var("PODCASTINDEX_API_SECRET").ok();
-                if let (Some(key), Some(secret)) = (key, secret) {
+                let key = podcastindex_key.trim().to_string();
+                let secret = podcastindex_secret;
+                if !key.is_empty() && !secret.trim().is_empty() {
                     let auth_date = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .unwrap_or_default()
@@ -2177,11 +2338,15 @@ unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
             if parent.0 == 0 {
                 return;
             }
+            let Some(url) = item.enclosure_url.clone() else {
+                return;
+            };
+            let cache_path = podcast_cache_path(&url, item.enclosure_type.as_deref());
             crate::download_podcast_episode(
                 parent,
-                item.enclosure_url.clone(),
+                Some(url),
                 Some(item.title.clone()),
-                None,
+                Some(cache_path),
                 with_state(parent, |s| s.settings.language).unwrap_or_default(),
             );
         }
@@ -3626,6 +3791,7 @@ unsafe extern "system" fn podcast_wndproc(
             let msg = Box::from_raw(ptr);
             with_podcast_state(hwnd, |s| s.pending_play = None);
             let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+            mark_podcast_episode_played(&msg.path);
             editor_manager::open_document(parent, &msg.path);
             if parent.0 != 0 {
                 editor_manager::mark_current_document_from_rss(parent, true);

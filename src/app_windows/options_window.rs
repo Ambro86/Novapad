@@ -25,17 +25,18 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, GetKeyState, SetFocus, VK_CONTROL, VK_ESCAPE, VK_RETURN, VK_SHIFT,
     VK_TAB,
 };
+use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::{
-    BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL,
-    CB_GETDROPPEDSTATE, CB_GETITEMDATA, CB_RESETCONTENT, CB_SETCURSEL, CB_SETITEMDATA,
-    CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
-    DestroyWindow, ES_AUTOHSCROLL, GWLP_USERDATA, GetParent, GetWindowLongPtrW,
-    GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, LoadCursorW, MSG, PostMessageW,
-    RegisterClassW, SW_HIDE, SW_SHOW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
-    SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY,
-    WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_SETFONT, WNDCLASSW, WS_CAPTION,
-    WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP,
-    WS_VISIBLE,
+    BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCOUNT,
+    CB_GETCURSEL, CB_GETDROPPEDSTATE, CB_GETITEMDATA, CB_RESETCONTENT, CB_SETCURSEL,
+    CB_SETITEMDATA, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW,
+    DefWindowProcW, DestroyWindow, ES_AUTOHSCROLL, ES_PASSWORD, GWLP_USERDATA, GetParent,
+    GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, LoadCursorW, MSG,
+    PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW, SW_SHOWNORMAL, SendMessageW,
+    SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_APP,
+    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL,
+    WM_NOTIFY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -51,17 +52,24 @@ const OPTIONS_ID_WORD_WRAP: usize = 6008;
 const OPTIONS_ID_SMART_QUOTES: usize = 6025;
 const OPTIONS_ID_CONTEXT_MENU: usize = 6026;
 const OPTIONS_ID_SPELLCHECK_ENABLED: usize = 6027;
-const OPTIONS_ID_SPELLCHECK_LANGUAGE_MODE: usize = 6028;
-const OPTIONS_ID_SPELLCHECK_FIXED_LANGUAGE: usize = 6029;
+const OPTIONS_ID_SPELLCHECK_LANGUAGE: usize = 6028;
 const OPTIONS_ID_MOVE_CURSOR: usize = 6009;
 const OPTIONS_ID_TTS_SPEED: usize = 6014;
 const OPTIONS_ID_TTS_PITCH: usize = 6020;
 const OPTIONS_ID_TTS_VOLUME: usize = 6021;
 const OPTIONS_ID_TTS_PREVIEW: usize = 6022;
+const OPTIONS_ID_TTS_MANUAL_TUNING: usize = 6031;
+const OPTIONS_ID_TTS_SPEED_EDIT: usize = 6032;
+const OPTIONS_ID_TTS_PITCH_EDIT: usize = 6033;
+const OPTIONS_ID_TTS_VOLUME_EDIT: usize = 6034;
 const OPTIONS_ID_AUDIO_SKIP: usize = 6010;
 const OPTIONS_ID_AUDIO_SPLIT: usize = 6011;
 const OPTIONS_ID_AUDIO_SPLIT_TEXT: usize = 6013;
 const OPTIONS_ID_AUDIO_SPLIT_REQUIRE_NEWLINE: usize = 6016;
+const OPTIONS_ID_PODCAST_CACHE_LIMIT: usize = 6030;
+const OPTIONS_ID_PODCASTINDEX_KEY: usize = 6035;
+const OPTIONS_ID_PODCASTINDEX_SECRET: usize = 6036;
+const OPTIONS_ID_PODCASTINDEX_SIGNUP: usize = 6037;
 const OPTIONS_ID_WRAP_WIDTH: usize = 6017;
 const OPTIONS_ID_QUOTE_PREFIX: usize = 6018;
 const OPTIONS_ID_CHECK_UPDATES: usize = 6015;
@@ -97,6 +105,8 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
                     }
                     let _ = SendMessageW(tabs, TCM_SETCURSEL, WPARAM(next as usize), LPARAM(0));
                     set_active_tab(hwnd, next);
+                    SetFocus(tabs);
+                    let _ = PostMessageW(hwnd, WM_NEXTDLGCTL, WPARAM(tabs.0 as usize), LPARAM(1));
                     return true;
                 }
             }
@@ -125,6 +135,7 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
 struct OptionsDialogState {
     parent: HWND,
     hwnd_tabs: HWND,
+    focus_initialized: bool,
     label_language: HWND,
     label_modified_marker_position: HWND,
     label_open: HWND,
@@ -142,6 +153,10 @@ struct OptionsDialogState {
     combo_tts_speed: HWND,
     combo_tts_pitch: HWND,
     combo_tts_volume: HWND,
+    edit_tts_speed: HWND,
+    edit_tts_pitch: HWND,
+    edit_tts_volume: HWND,
+    checkbox_tts_manual: HWND,
     label_audio_skip: HWND,
     combo_audio_skip: HWND,
     label_audio_split: HWND,
@@ -149,15 +164,20 @@ struct OptionsDialogState {
     label_audio_split_text: HWND,
     edit_audio_split_text: HWND,
     checkbox_audio_split_requires_newline: HWND,
+    label_podcast_cache_limit: HWND,
+    edit_podcast_cache_limit: HWND,
+    label_podcastindex_key: HWND,
+    edit_podcastindex_key: HWND,
+    label_podcastindex_secret: HWND,
+    edit_podcastindex_secret: HWND,
+    button_podcastindex_signup: HWND,
     checkbox_multilingual: HWND,
     checkbox_split_on_newline: HWND,
     checkbox_word_wrap: HWND,
     checkbox_smart_quotes: HWND,
     checkbox_spellcheck: HWND,
-    label_spellcheck_language_mode: HWND,
-    combo_spellcheck_language_mode: HWND,
-    label_spellcheck_fixed_language: HWND,
-    edit_spellcheck_fixed_language: HWND,
+    label_spellcheck_language: HWND,
+    combo_spellcheck_language: HWND,
     label_wrap_width: HWND,
     edit_wrap_width: HWND,
     label_quote_prefix: HWND,
@@ -186,12 +206,12 @@ struct OptionsLabels {
     label_tts_pitch: String,
     label_tts_volume: String,
     label_tts_preview: String,
+    label_tts_manual_tuning: String,
     label_split_on_newline: String,
     label_word_wrap: String,
     label_smart_quotes: String,
     label_spellcheck: String,
-    label_spellcheck_language_mode: String,
-    label_spellcheck_fixed_language: String,
+    label_spellcheck_language: String,
     label_wrap_width: String,
     label_quote_prefix: String,
     label_move_cursor: String,
@@ -202,6 +222,10 @@ struct OptionsLabels {
     label_audio_split: String,
     label_audio_split_text: String,
     label_audio_split_requires_newline: String,
+    label_podcast_cache_limit: String,
+    label_podcastindex_key: String,
+    label_podcastindex_secret: String,
+    label_podcastindex_signup: String,
     lang_it: String,
     lang_en: String,
     lang_es: String,
@@ -217,8 +241,14 @@ struct OptionsLabels {
     split_none: String,
     split_by_text: String,
     split_parts: String,
-    spellcheck_mode_follow: String,
-    spellcheck_mode_fixed: String,
+    spellcheck_lang_follow: String,
+    spellcheck_lang_en_us: String,
+    spellcheck_lang_en_gb: String,
+    spellcheck_lang_it: String,
+    spellcheck_lang_es: String,
+    spellcheck_lang_pt_br: String,
+    spellcheck_lang_fr: String,
+    spellcheck_lang_de: String,
     prompt_cmd: String,
     prompt_powershell: String,
     prompt_codex: String,
@@ -247,18 +277,12 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_tts_pitch: i18n::tr(language, "tts_tuning.label_pitch"),
         label_tts_volume: i18n::tr(language, "tts_tuning.label_volume"),
         label_tts_preview: i18n::tr(language, "options.label.voice_preview"),
+        label_tts_manual_tuning: i18n::tr(language, "options.label.tts_manual_tuning"),
         label_split_on_newline: i18n::tr(language, "options.label.split_on_newline"),
         label_word_wrap: i18n::tr(language, "options.label.word_wrap"),
         label_smart_quotes: i18n::tr(language, "options.label.smart_quotes"),
         label_spellcheck: i18n::tr(language, "options.label.spellcheck"),
-        label_spellcheck_language_mode: i18n::tr(
-            language,
-            "options.label.spellcheck_language_mode",
-        ),
-        label_spellcheck_fixed_language: i18n::tr(
-            language,
-            "options.label.spellcheck_fixed_language",
-        ),
+        label_spellcheck_language: i18n::tr(language, "options.label.spellcheck_language"),
         label_wrap_width: i18n::tr(language, "options.label.wrap_width"),
         label_quote_prefix: i18n::tr(language, "options.label.quote_prefix"),
         label_move_cursor: i18n::tr(language, "options.label.move_cursor"),
@@ -272,6 +296,10 @@ fn options_labels(language: Language) -> OptionsLabels {
             language,
             "options.label.audio_split_requires_newline",
         ),
+        label_podcast_cache_limit: i18n::tr(language, "options.label.podcast_cache_limit"),
+        label_podcastindex_key: i18n::tr(language, "options.label.podcastindex_key"),
+        label_podcastindex_secret: i18n::tr(language, "options.label.podcastindex_secret"),
+        label_podcastindex_signup: i18n::tr(language, "options.button.podcastindex_signup"),
         lang_it: i18n::tr(language, "options.lang.it"),
         lang_en: i18n::tr(language, "options.lang.en"),
         lang_es: i18n::tr(language, "options.lang.es"),
@@ -287,8 +315,14 @@ fn options_labels(language: Language) -> OptionsLabels {
         split_none: i18n::tr(language, "options.split.none"),
         split_by_text: i18n::tr(language, "options.split.by_text"),
         split_parts: i18n::tr(language, "options.split.parts"),
-        spellcheck_mode_follow: i18n::tr(language, "options.spellcheck.language_mode.follow"),
-        spellcheck_mode_fixed: i18n::tr(language, "options.spellcheck.language_mode.fixed"),
+        spellcheck_lang_follow: i18n::tr(language, "options.spellcheck.lang.follow"),
+        spellcheck_lang_en_us: i18n::tr(language, "options.spellcheck.lang.en_us"),
+        spellcheck_lang_en_gb: i18n::tr(language, "options.spellcheck.lang.en_gb"),
+        spellcheck_lang_it: i18n::tr(language, "options.spellcheck.lang.it"),
+        spellcheck_lang_es: i18n::tr(language, "options.spellcheck.lang.es"),
+        spellcheck_lang_pt_br: i18n::tr(language, "options.spellcheck.lang.pt_br"),
+        spellcheck_lang_fr: i18n::tr(language, "options.spellcheck.lang.fr"),
+        spellcheck_lang_de: i18n::tr(language, "options.spellcheck.lang.de"),
         prompt_cmd: i18n::tr(language, "options.prompt.cmd"),
         prompt_powershell: i18n::tr(language, "options.prompt.powershell"),
         prompt_codex: i18n::tr(language, "options.prompt.codex"),
@@ -653,6 +687,20 @@ unsafe extern "system" fn options_wndproc(
                 HINSTANCE(0),
                 None,
             );
+            let edit_tts_speed = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                170,
+                y - 2,
+                300,
+                22,
+                hwnd,
+                HMENU(OPTIONS_ID_TTS_SPEED_EDIT as isize),
+                HINSTANCE(0),
+                None,
+            );
             y += 40;
 
             let label_tts_pitch = CreateWindowExW(
@@ -683,6 +731,20 @@ unsafe extern "system" fn options_wndproc(
                 HINSTANCE(0),
                 None,
             );
+            let edit_tts_pitch = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                170,
+                y - 2,
+                300,
+                22,
+                hwnd,
+                HMENU(OPTIONS_ID_TTS_PITCH_EDIT as isize),
+                HINSTANCE(0),
+                None,
+            );
             y += 40;
 
             let label_tts_volume = CreateWindowExW(
@@ -710,6 +772,20 @@ unsafe extern "system" fn options_wndproc(
                 140,
                 hwnd,
                 HMENU(OPTIONS_ID_TTS_VOLUME as isize),
+                HINSTANCE(0),
+                None,
+            );
+            let edit_tts_volume = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                170,
+                y - 2,
+                300,
+                22,
+                hwnd,
+                HMENU(OPTIONS_ID_TTS_VOLUME_EDIT as isize),
                 HINSTANCE(0),
                 None,
             );
@@ -837,6 +913,131 @@ unsafe extern "system" fn options_wndproc(
             );
             y += 24;
 
+            let label_podcast_cache_limit = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_podcast_cache_limit).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let edit_podcast_cache_limit = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                170,
+                y - 2,
+                80,
+                22,
+                hwnd,
+                HMENU(OPTIONS_ID_PODCAST_CACHE_LIMIT as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
+            let label_podcastindex_key = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_podcastindex_key).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let edit_podcastindex_key = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                170,
+                y - 2,
+                300,
+                22,
+                hwnd,
+                HMENU(OPTIONS_ID_PODCASTINDEX_KEY as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
+            let label_podcastindex_secret = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_podcastindex_secret).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let edit_podcastindex_secret = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD
+                    | WS_VISIBLE
+                    | WS_TABSTOP
+                    | WINDOW_STYLE((ES_AUTOHSCROLL | ES_PASSWORD) as u32),
+                170,
+                y - 2,
+                300,
+                22,
+                hwnd,
+                HMENU(OPTIONS_ID_PODCASTINDEX_SECRET as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
+            let button_podcastindex_signup = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_podcastindex_signup).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                170,
+                y,
+                300,
+                26,
+                hwnd,
+                HMENU(OPTIONS_ID_PODCASTINDEX_SIGNUP as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 34;
+
+            let checkbox_tts_manual = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_tts_manual_tuning).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                170,
+                y,
+                300,
+                20,
+                hwnd,
+                HMENU(OPTIONS_ID_TTS_MANUAL_TUNING as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 24;
+
             let checkbox_split_on_newline = CreateWindowExW(
                 Default::default(),
                 WC_BUTTON,
@@ -901,10 +1102,10 @@ unsafe extern "system" fn options_wndproc(
             );
             y += 26;
 
-            let label_spellcheck_language_mode = CreateWindowExW(
+            let label_spellcheck_language = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
-                PCWSTR(to_wide(&labels.label_spellcheck_language_mode).as_ptr()),
+                PCWSTR(to_wide(&labels.label_spellcheck_language).as_ptr()),
                 WS_CHILD | WS_VISIBLE,
                 20,
                 y,
@@ -915,7 +1116,7 @@ unsafe extern "system" fn options_wndproc(
                 HINSTANCE(0),
                 None,
             );
-            let combo_spellcheck_language_mode = CreateWindowExW(
+            let combo_spellcheck_language = CreateWindowExW(
                 WS_EX_CLIENTEDGE,
                 WC_COMBOBOXW,
                 PCWSTR::null(),
@@ -923,39 +1124,9 @@ unsafe extern "system" fn options_wndproc(
                 170,
                 y - 2,
                 300,
-                140,
+                200,
                 hwnd,
-                HMENU(OPTIONS_ID_SPELLCHECK_LANGUAGE_MODE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_spellcheck_fixed_language = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_spellcheck_fixed_language).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_spellcheck_fixed_language = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                120,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_SPELLCHECK_FIXED_LANGUAGE as isize),
+                HMENU(OPTIONS_ID_SPELLCHECK_LANGUAGE as isize),
                 HINSTANCE(0),
                 None,
             );
@@ -1146,6 +1317,9 @@ unsafe extern "system" fn options_wndproc(
                 combo_tts_pitch,
                 label_tts_volume,
                 combo_tts_volume,
+                edit_tts_speed,
+                edit_tts_pitch,
+                edit_tts_volume,
                 button_tts_preview,
                 label_audio_skip,
                 combo_audio_skip,
@@ -1154,15 +1328,21 @@ unsafe extern "system" fn options_wndproc(
                 label_audio_split_text,
                 edit_audio_split_text,
                 checkbox_audio_split_requires_newline,
+                label_podcast_cache_limit,
+                edit_podcast_cache_limit,
+                label_podcastindex_key,
+                edit_podcastindex_key,
+                label_podcastindex_secret,
+                edit_podcastindex_secret,
+                button_podcastindex_signup,
+                checkbox_tts_manual,
                 checkbox_multilingual,
                 checkbox_split_on_newline,
                 checkbox_word_wrap,
                 checkbox_smart_quotes,
                 checkbox_spellcheck,
-                label_spellcheck_language_mode,
-                combo_spellcheck_language_mode,
-                label_spellcheck_fixed_language,
-                edit_spellcheck_fixed_language,
+                label_spellcheck_language,
+                combo_spellcheck_language,
                 label_wrap_width,
                 edit_wrap_width,
                 label_quote_prefix,
@@ -1183,6 +1363,7 @@ unsafe extern "system" fn options_wndproc(
             let dialog_state = Box::new(OptionsDialogState {
                 parent,
                 hwnd_tabs,
+                focus_initialized: false,
                 label_language: label_lang,
                 label_modified_marker_position,
                 label_open,
@@ -1200,6 +1381,10 @@ unsafe extern "system" fn options_wndproc(
                 combo_tts_speed,
                 combo_tts_pitch,
                 combo_tts_volume,
+                edit_tts_speed,
+                edit_tts_pitch,
+                edit_tts_volume,
+                checkbox_tts_manual,
                 label_audio_skip,
                 combo_audio_skip,
                 label_audio_split,
@@ -1207,15 +1392,20 @@ unsafe extern "system" fn options_wndproc(
                 label_audio_split_text,
                 edit_audio_split_text,
                 checkbox_audio_split_requires_newline,
+                label_podcast_cache_limit,
+                edit_podcast_cache_limit,
+                label_podcastindex_key,
+                edit_podcastindex_key,
+                label_podcastindex_secret,
+                edit_podcastindex_secret,
+                button_podcastindex_signup,
                 checkbox_multilingual,
                 checkbox_split_on_newline,
                 checkbox_word_wrap,
                 checkbox_smart_quotes,
                 checkbox_spellcheck,
-                label_spellcheck_language_mode,
-                combo_spellcheck_language_mode,
-                label_spellcheck_fixed_language,
-                edit_spellcheck_fixed_language,
+                label_spellcheck_language,
+                combo_spellcheck_language,
                 label_wrap_width,
                 edit_wrap_width,
                 label_quote_prefix,
@@ -1292,14 +1482,16 @@ unsafe extern "system" fn options_wndproc(
                     }
                     LRESULT(0)
                 }
-                OPTIONS_ID_SPELLCHECK_LANGUAGE_MODE => {
-                    if code == CBN_SELCHANGE {
-                        update_spellcheck_language_mode_visibility(hwnd);
-                    }
+                OPTIONS_ID_SPELLCHECK_ENABLED => {
+                    update_spellcheck_language_visibility(hwnd);
                     LRESULT(0)
                 }
-                OPTIONS_ID_SPELLCHECK_ENABLED => {
-                    update_spellcheck_language_mode_visibility(hwnd);
+                OPTIONS_ID_TTS_MANUAL_TUNING => {
+                    update_tts_manual_visibility(hwnd);
+                    LRESULT(0)
+                }
+                OPTIONS_ID_PODCASTINDEX_SIGNUP => {
+                    open_podcastindex_signup();
                     LRESULT(0)
                 }
                 _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -1333,6 +1525,9 @@ unsafe extern "system" fn options_wndproc(
                         || focus == state.combo_tts_speed
                         || focus == state.combo_tts_pitch
                         || focus == state.combo_tts_volume
+                        || focus == state.edit_tts_speed
+                        || focus == state.edit_tts_pitch
+                        || focus == state.edit_tts_volume
                 })
                 .unwrap_or(false);
                 if is_tts_combo {
@@ -1399,18 +1594,28 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         combo_tts_speed,
         combo_tts_pitch,
         combo_tts_volume,
+        edit_tts_speed,
+        edit_tts_pitch,
+        edit_tts_volume,
         combo_audio_skip,
         combo_audio_split,
         _label_audio_split_text,
         edit_audio_split_text,
         checkbox_audio_split_requires_newline,
+        _label_podcast_cache_limit,
+        edit_podcast_cache_limit,
+        _label_podcastindex_key,
+        edit_podcastindex_key,
+        _label_podcastindex_secret,
+        edit_podcastindex_secret,
+        _button_podcastindex_signup,
+        checkbox_tts_manual,
         checkbox_multilingual,
         checkbox_split_on_newline,
         checkbox_word_wrap,
         checkbox_smart_quotes,
         checkbox_spellcheck,
-        combo_spellcheck_language_mode,
-        edit_spellcheck_fixed_language,
+        combo_spellcheck_language,
         _label_wrap_width,
         edit_wrap_width,
         _label_quote_prefix,
@@ -1431,18 +1636,28 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.combo_tts_speed,
             state.combo_tts_pitch,
             state.combo_tts_volume,
+            state.edit_tts_speed,
+            state.edit_tts_pitch,
+            state.edit_tts_volume,
             state.combo_audio_skip,
             state.combo_audio_split,
             state.label_audio_split_text,
             state.edit_audio_split_text,
             state.checkbox_audio_split_requires_newline,
+            state.label_podcast_cache_limit,
+            state.edit_podcast_cache_limit,
+            state.label_podcastindex_key,
+            state.edit_podcastindex_key,
+            state.label_podcastindex_secret,
+            state.edit_podcastindex_secret,
+            state.button_podcastindex_signup,
+            state.checkbox_tts_manual,
             state.checkbox_multilingual,
             state.checkbox_split_on_newline,
             state.checkbox_word_wrap,
             state.checkbox_smart_quotes,
             state.checkbox_spellcheck,
-            state.combo_spellcheck_language_mode,
-            state.edit_spellcheck_fixed_language,
+            state.combo_spellcheck_language,
             state.label_wrap_width,
             state.edit_wrap_width,
             state.label_quote_prefix,
@@ -1697,6 +1912,29 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
     select_combo_value(combo_tts_speed, settings.tts_rate);
     select_combo_value(combo_tts_pitch, settings.tts_pitch);
     select_combo_value(combo_tts_volume, settings.tts_volume);
+    let _ = SetWindowTextW(
+        edit_tts_speed,
+        PCWSTR(to_wide(&settings.tts_rate.to_string()).as_ptr()),
+    );
+    let _ = SetWindowTextW(
+        edit_tts_pitch,
+        PCWSTR(to_wide(&settings.tts_pitch.to_string()).as_ptr()),
+    );
+    let _ = SetWindowTextW(
+        edit_tts_volume,
+        PCWSTR(to_wide(&settings.tts_volume.to_string()).as_ptr()),
+    );
+    let _ = SendMessageW(
+        checkbox_tts_manual,
+        BM_SETCHECK,
+        WPARAM(if settings.tts_manual_tuning {
+            BST_CHECKED.0 as usize
+        } else {
+            0
+        }),
+        LPARAM(0),
+    );
+    update_tts_manual_visibility(hwnd);
 
     let _ = SendMessageW(
         checkbox_multilingual,
@@ -1759,38 +1997,48 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         LPARAM(0),
     );
     let _ = SendMessageW(
-        combo_spellcheck_language_mode,
+        combo_spellcheck_language,
         CB_RESETCONTENT,
         WPARAM(0),
         LPARAM(0),
     );
-    let _ = SendMessageW(
-        combo_spellcheck_language_mode,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.spellcheck_mode_follow).as_ptr() as isize),
-    );
-    let _ = SendMessageW(
-        combo_spellcheck_language_mode,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.spellcheck_mode_fixed).as_ptr() as isize),
-    );
-    let mode_index = match settings.spellcheck_language_mode {
-        crate::settings::SpellcheckLanguageMode::FixedLanguage => 1,
-        crate::settings::SpellcheckLanguageMode::FollowEditorLanguage => 0,
+    let spellcheck_options = [
+        (labels.spellcheck_lang_follow.clone(), "follow"),
+        (labels.spellcheck_lang_en_us.clone(), "en-US"),
+        (labels.spellcheck_lang_en_gb.clone(), "en-GB"),
+        (labels.spellcheck_lang_it.clone(), "it-IT"),
+        (labels.spellcheck_lang_es.clone(), "es-ES"),
+        (labels.spellcheck_lang_pt_br.clone(), "pt-BR"),
+        (labels.spellcheck_lang_fr.clone(), "fr-FR"),
+        (labels.spellcheck_lang_de.clone(), "de-DE"),
+    ];
+    let mut selected_idx = 0;
+    let current_val = if settings.spellcheck_language_mode
+        == crate::settings::SpellcheckLanguageMode::FollowEditorLanguage
+    {
+        "follow"
+    } else {
+        &settings.spellcheck_fixed_language
     };
+
+    for (i, (label, val)) in spellcheck_options.iter().enumerate() {
+        let _ = SendMessageW(
+            combo_spellcheck_language,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(label).as_ptr() as isize),
+        );
+        if *val == current_val {
+            selected_idx = i;
+        }
+    }
     let _ = SendMessageW(
-        combo_spellcheck_language_mode,
+        combo_spellcheck_language,
         CB_SETCURSEL,
-        WPARAM(mode_index),
+        WPARAM(selected_idx),
         LPARAM(0),
     );
-    let _ = SetWindowTextW(
-        edit_spellcheck_fixed_language,
-        PCWSTR(to_wide(&settings.spellcheck_fixed_language).as_ptr()),
-    );
-    update_spellcheck_language_mode_visibility(hwnd);
+    update_spellcheck_language_visibility(hwnd);
     let wrap_text = settings.wrap_width.to_string();
     let _ = SetWindowTextW(edit_wrap_width, PCWSTR(to_wide(&wrap_text).as_ptr()));
     let _ = SetWindowTextW(
@@ -1932,6 +2180,19 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
     let _ = SetWindowTextW(edit_audio_split_text, PCWSTR(split_text_wide.as_ptr()));
     update_audio_split_text_visibility(hwnd);
 
+    let cache_limit_text = settings.podcast_cache_limit_mb.to_string();
+    let _ = SetWindowTextW(
+        edit_podcast_cache_limit,
+        PCWSTR(to_wide(&cache_limit_text).as_ptr()),
+    );
+    let _ = SetWindowTextW(
+        edit_podcastindex_key,
+        PCWSTR(to_wide(&settings.podcast_index_api_key).as_ptr()),
+    );
+    let secret = crate::settings::decrypt_podcast_index_secret(&settings.podcast_index_api_secret)
+        .unwrap_or_default();
+    let _ = SetWindowTextW(edit_podcastindex_secret, PCWSTR(to_wide(&secret).as_ptr()));
+
     refresh_voices(hwnd);
 }
 
@@ -2039,21 +2300,140 @@ fn combo_value(hwnd: HWND) -> i32 {
     }
 }
 
-unsafe fn preview_voice(hwnd: HWND) {
-    let (parent, combo_tts_engine, combo_voice, combo_tts_speed, combo_tts_pitch, combo_tts_volume) =
+const TTS_RATE_MIN: i32 = -100;
+const TTS_RATE_MAX: i32 = 100;
+const TTS_PITCH_MIN: i32 = -12;
+const TTS_PITCH_MAX: i32 = 12;
+const TTS_VOLUME_MIN: i32 = 25;
+const TTS_VOLUME_MAX: i32 = 200;
+
+fn read_tts_edit_value(edit: HWND, fallback: i32, min: i32, max: i32) -> i32 {
+    unsafe {
+        let len = GetWindowTextLengthW(edit);
+        if len <= 0 {
+            return fallback;
+        }
+        let mut buf = vec![0u16; (len + 1) as usize];
+        let read = GetWindowTextW(edit, &mut buf);
+        let text = String::from_utf16_lossy(&buf[..read as usize]);
+        if let Ok(parsed) = text.trim().parse::<i32>() {
+            parsed.clamp(min, max)
+        } else {
+            fallback
+        }
+    }
+}
+
+fn select_combo_nearest_value(hwnd: HWND, value: i32) {
+    unsafe {
+        let count = SendMessageW(hwnd, CB_GETCOUNT, WPARAM(0), LPARAM(0)).0;
+        if count <= 0 {
+            return;
+        }
+        let mut best_idx = 0;
+        let mut best_diff = i32::MAX;
+        for i in 0..count {
+            let data = SendMessageW(hwnd, CB_GETITEMDATA, WPARAM(i as usize), LPARAM(0)).0 as i32;
+            let diff = (data - value).abs();
+            if diff < best_diff {
+                best_diff = diff;
+                best_idx = i;
+            }
+        }
+        let _ = SendMessageW(hwnd, CB_SETCURSEL, WPARAM(best_idx as usize), LPARAM(0));
+    }
+}
+
+unsafe fn update_tts_manual_visibility(hwnd: HWND) {
+    let (checkbox, combo_speed, combo_pitch, combo_volume, edit_speed, edit_pitch, edit_volume) =
         match with_options_state(hwnd, |state| {
             (
-                state.parent,
-                state.combo_tts_engine,
-                state.combo_voice,
+                state.checkbox_tts_manual,
                 state.combo_tts_speed,
                 state.combo_tts_pitch,
                 state.combo_tts_volume,
+                state.edit_tts_speed,
+                state.edit_tts_pitch,
+                state.edit_tts_volume,
             )
         }) {
             Some(values) => values,
             None => return,
         };
+    let manual =
+        SendMessageW(checkbox, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 == BST_CHECKED.0;
+    if manual {
+        let rate = combo_value(combo_speed);
+        let pitch = combo_value(combo_pitch);
+        let volume = combo_value(combo_volume);
+        let _ = SetWindowTextW(edit_speed, PCWSTR(to_wide(&rate.to_string()).as_ptr()));
+        let _ = SetWindowTextW(edit_pitch, PCWSTR(to_wide(&pitch.to_string()).as_ptr()));
+        let _ = SetWindowTextW(edit_volume, PCWSTR(to_wide(&volume.to_string()).as_ptr()));
+    } else {
+        let rate = read_tts_edit_value(edit_speed, 0, TTS_RATE_MIN, TTS_RATE_MAX);
+        let pitch = read_tts_edit_value(edit_pitch, 0, TTS_PITCH_MIN, TTS_PITCH_MAX);
+        let volume = read_tts_edit_value(edit_volume, 100, TTS_VOLUME_MIN, TTS_VOLUME_MAX);
+        select_combo_nearest_value(combo_speed, rate);
+        select_combo_nearest_value(combo_pitch, pitch);
+        select_combo_nearest_value(combo_volume, volume);
+    }
+    ShowWindow(combo_speed, if manual { SW_HIDE } else { SW_SHOW });
+    ShowWindow(combo_pitch, if manual { SW_HIDE } else { SW_SHOW });
+    ShowWindow(combo_volume, if manual { SW_HIDE } else { SW_SHOW });
+    ShowWindow(edit_speed, if manual { SW_SHOW } else { SW_HIDE });
+    ShowWindow(edit_pitch, if manual { SW_SHOW } else { SW_HIDE });
+    ShowWindow(edit_volume, if manual { SW_SHOW } else { SW_HIDE });
+    EnableWindow(combo_speed, !manual);
+    EnableWindow(combo_pitch, !manual);
+    EnableWindow(combo_volume, !manual);
+    EnableWindow(edit_speed, manual);
+    EnableWindow(edit_pitch, manual);
+    EnableWindow(edit_volume, manual);
+}
+
+fn open_podcastindex_signup() {
+    unsafe {
+        let url = to_wide("https://api.podcastindex.org/signup");
+        let _ = ShellExecuteW(
+            HWND(0),
+            w!("open"),
+            PCWSTR(url.as_ptr()),
+            PCWSTR::null(),
+            PCWSTR::null(),
+            SW_SHOWNORMAL,
+        );
+    }
+}
+
+unsafe fn preview_voice(hwnd: HWND) {
+    let (
+        parent,
+        combo_tts_engine,
+        combo_voice,
+        combo_tts_speed,
+        combo_tts_pitch,
+        combo_tts_volume,
+        edit_tts_speed,
+        edit_tts_pitch,
+        edit_tts_volume,
+        checkbox_tts_manual,
+    ) = match with_options_state(hwnd, |state| {
+        (
+            state.parent,
+            state.combo_tts_engine,
+            state.combo_voice,
+            state.combo_tts_speed,
+            state.combo_tts_pitch,
+            state.combo_tts_volume,
+            state.edit_tts_speed,
+            state.edit_tts_pitch,
+            state.edit_tts_volume,
+            state.checkbox_tts_manual,
+        )
+    }) {
+        Some(values) => values,
+        None => return,
+    };
 
     let (language, split_on_newline, dictionary) = with_state(parent, |state| {
         (
@@ -2097,9 +2477,23 @@ unsafe fn preview_voice(hwnd: HWND) {
     }
     let voice = voices[voice_index].short_name.clone();
 
-    let rate = combo_value(combo_tts_speed);
-    let pitch = combo_value(combo_tts_pitch);
-    let volume = combo_value(combo_tts_volume);
+    let manual = SendMessageW(checkbox_tts_manual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
+        == BST_CHECKED.0;
+    let rate = if manual {
+        read_tts_edit_value(edit_tts_speed, 0, TTS_RATE_MIN, TTS_RATE_MAX)
+    } else {
+        combo_value(combo_tts_speed)
+    };
+    let pitch = if manual {
+        read_tts_edit_value(edit_tts_pitch, 0, TTS_PITCH_MIN, TTS_PITCH_MAX)
+    } else {
+        combo_value(combo_tts_pitch)
+    };
+    let volume = if manual {
+        read_tts_edit_value(edit_tts_volume, 100, TTS_VOLUME_MIN, TTS_VOLUME_MAX)
+    } else {
+        combo_value(combo_tts_volume)
+    };
     let chunks = tts_engine::split_into_tts_chunks(&text, split_on_newline, &dictionary);
 
     match engine {
@@ -2147,17 +2541,23 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         combo_tts_speed,
         combo_tts_pitch,
         combo_tts_volume,
+        edit_tts_speed,
+        edit_tts_pitch,
+        edit_tts_volume,
         combo_audio_skip,
         combo_audio_split,
         edit_audio_split_text,
         checkbox_audio_split_requires_newline,
+        edit_podcast_cache_limit,
+        edit_podcastindex_key,
+        edit_podcastindex_secret,
+        checkbox_tts_manual,
         checkbox_multilingual,
         checkbox_split_on_newline,
         checkbox_word_wrap,
         checkbox_smart_quotes,
         checkbox_spellcheck,
-        combo_spellcheck_language_mode,
-        edit_spellcheck_fixed_language,
+        combo_spellcheck_language,
         edit_wrap_width,
         edit_quote_prefix,
         checkbox_move_cursor,
@@ -2175,17 +2575,23 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.combo_tts_speed,
             state.combo_tts_pitch,
             state.combo_tts_volume,
+            state.edit_tts_speed,
+            state.edit_tts_pitch,
+            state.edit_tts_volume,
             state.combo_audio_skip,
             state.combo_audio_split,
             state.edit_audio_split_text,
             state.checkbox_audio_split_requires_newline,
+            state.edit_podcast_cache_limit,
+            state.edit_podcastindex_key,
+            state.edit_podcastindex_secret,
+            state.checkbox_tts_manual,
             state.checkbox_multilingual,
             state.checkbox_split_on_newline,
             state.checkbox_word_wrap,
             state.checkbox_smart_quotes,
             state.checkbox_spellcheck,
-            state.combo_spellcheck_language_mode,
-            state.edit_spellcheck_fixed_language,
+            state.combo_spellcheck_language,
             state.edit_wrap_width,
             state.edit_quote_prefix,
             state.checkbox_move_cursor,
@@ -2262,9 +2668,33 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         _ => TtsEngine::Edge,
     };
 
-    settings.tts_rate = combo_value(combo_tts_speed);
-    settings.tts_pitch = combo_value(combo_tts_pitch);
-    settings.tts_volume = combo_value(combo_tts_volume);
+    settings.tts_manual_tuning =
+        SendMessageW(checkbox_tts_manual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
+            == BST_CHECKED.0;
+    if settings.tts_manual_tuning {
+        settings.tts_rate = read_tts_edit_value(
+            edit_tts_speed,
+            settings.tts_rate,
+            TTS_RATE_MIN,
+            TTS_RATE_MAX,
+        );
+        settings.tts_pitch = read_tts_edit_value(
+            edit_tts_pitch,
+            settings.tts_pitch,
+            TTS_PITCH_MIN,
+            TTS_PITCH_MAX,
+        );
+        settings.tts_volume = read_tts_edit_value(
+            edit_tts_volume,
+            settings.tts_volume,
+            TTS_VOLUME_MIN,
+            TTS_VOLUME_MAX,
+        );
+    } else {
+        settings.tts_rate = combo_value(combo_tts_speed);
+        settings.tts_pitch = combo_value(combo_tts_pitch);
+        settings.tts_volume = combo_value(combo_tts_volume);
+    }
 
     settings.tts_only_multilingual =
         SendMessageW(checkbox_multilingual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
@@ -2289,27 +2719,29 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     settings.spellcheck_enabled =
         SendMessageW(checkbox_spellcheck, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
             == BST_CHECKED.0;
-    let spellcheck_mode_sel = SendMessageW(
-        combo_spellcheck_language_mode,
+    let spellcheck_sel = SendMessageW(
+        combo_spellcheck_language,
         CB_GETCURSEL,
         WPARAM(0),
         LPARAM(0),
     )
     .0;
-    settings.spellcheck_language_mode = if spellcheck_mode_sel == 1 {
-        crate::settings::SpellcheckLanguageMode::FixedLanguage
+    if spellcheck_sel == 0 {
+        settings.spellcheck_language_mode =
+            crate::settings::SpellcheckLanguageMode::FollowEditorLanguage;
     } else {
-        crate::settings::SpellcheckLanguageMode::FollowEditorLanguage
-    };
-    let spellcheck_lang_len = GetWindowTextLengthW(edit_spellcheck_fixed_language);
-    if spellcheck_lang_len >= 0 {
-        let mut buf = vec![0u16; (spellcheck_lang_len + 1) as usize];
-        let read = GetWindowTextW(edit_spellcheck_fixed_language, &mut buf);
-        let text = String::from_utf16_lossy(&buf[..read as usize]);
-        let trimmed = text.trim();
-        if !trimmed.is_empty() {
-            settings.spellcheck_fixed_language = trimmed.to_string();
-        }
+        settings.spellcheck_language_mode = crate::settings::SpellcheckLanguageMode::FixedLanguage;
+        let val = match spellcheck_sel {
+            1 => "en-US",
+            2 => "en-GB",
+            3 => "it-IT",
+            4 => "es-ES",
+            5 => "pt-BR",
+            6 => "fr-FR",
+            7 => "de-DE",
+            _ => "en-US",
+        };
+        settings.spellcheck_fixed_language = val.to_string();
     }
 
     let width_len = GetWindowTextLengthW(edit_wrap_width);
@@ -2406,6 +2838,36 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         settings.audiobook_split_text = text;
     }
 
+    let cache_len = GetWindowTextLengthW(edit_podcast_cache_limit);
+    if cache_len >= 0 {
+        let mut buf = vec![0u16; (cache_len + 1) as usize];
+        let read = GetWindowTextW(edit_podcast_cache_limit, &mut buf);
+        let text = String::from_utf16_lossy(&buf[..read as usize]);
+        if let Ok(parsed) = text.trim().parse::<u32>() {
+            settings.podcast_cache_limit_mb = parsed.clamp(100, 2048);
+        }
+    }
+    let key_len = GetWindowTextLengthW(edit_podcastindex_key);
+    if key_len >= 0 {
+        let mut buf = vec![0u16; (key_len + 1) as usize];
+        let read = GetWindowTextW(edit_podcastindex_key, &mut buf);
+        let text = String::from_utf16_lossy(&buf[..read as usize]);
+        settings.podcast_index_api_key = text.trim().to_string();
+    }
+    let secret_len = GetWindowTextLengthW(edit_podcastindex_secret);
+    if secret_len >= 0 {
+        let mut buf = vec![0u16; (secret_len + 1) as usize];
+        let read = GetWindowTextW(edit_podcastindex_secret, &mut buf);
+        let text = String::from_utf16_lossy(&buf[..read as usize]);
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            settings.podcast_index_api_secret.clear();
+        } else {
+            settings.podcast_index_api_secret =
+                crate::settings::encrypt_podcast_index_secret(trimmed);
+        }
+    }
+
     let _ = with_state(parent, |state| {
         state.settings = settings.clone();
     });
@@ -2490,14 +2952,13 @@ unsafe fn update_audio_split_text_visibility(hwnd: HWND) {
     EnableWindow(checkbox_audio_split_requires_newline, selected);
 }
 
-unsafe fn update_spellcheck_language_mode_visibility(hwnd: HWND) {
-    let (checkbox_spellcheck, combo_spellcheck_language_mode, label_fixed, edit_fixed) =
+unsafe fn update_spellcheck_language_visibility(hwnd: HWND) {
+    let (checkbox_spellcheck, label_spellcheck_language, combo_spellcheck_language) =
         match with_options_state(hwnd, |state| {
             (
                 state.checkbox_spellcheck,
-                state.combo_spellcheck_language_mode,
-                state.label_spellcheck_fixed_language,
-                state.edit_spellcheck_fixed_language,
+                state.label_spellcheck_language,
+                state.combo_spellcheck_language,
             )
         }) {
             Some(values) => values,
@@ -2506,20 +2967,20 @@ unsafe fn update_spellcheck_language_mode_visibility(hwnd: HWND) {
     let spellcheck_enabled = SendMessageW(checkbox_spellcheck, BM_GETCHECK, WPARAM(0), LPARAM(0)).0
         as u32
         == BST_CHECKED.0;
-    let mode_sel = SendMessageW(
-        combo_spellcheck_language_mode,
-        CB_GETCURSEL,
-        WPARAM(0),
-        LPARAM(0),
-    )
-    .0;
-    let fixed = spellcheck_enabled && mode_sel == 1;
-    EnableWindow(combo_spellcheck_language_mode, spellcheck_enabled);
-    EnableWindow(label_fixed, fixed);
-    EnableWindow(edit_fixed, fixed);
+    EnableWindow(label_spellcheck_language, spellcheck_enabled);
+    EnableWindow(combo_spellcheck_language, spellcheck_enabled);
 }
 
 unsafe fn set_active_tab(hwnd: HWND, index: i32) {
+    let focus_first = with_options_state(hwnd, |state| {
+        if state.focus_initialized {
+            false
+        } else {
+            state.focus_initialized = true;
+            true
+        }
+    })
+    .unwrap_or(false);
     let _ = with_options_state(hwnd, |state| {
         let show_general = index == OPTIONS_TAB_GENERAL;
         let show_voice = index == OPTIONS_TAB_VOICE;
@@ -2552,8 +3013,12 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.combo_tts_pitch,
             state.label_tts_volume,
             state.combo_tts_volume,
+            state.edit_tts_speed,
+            state.edit_tts_pitch,
+            state.edit_tts_volume,
             state.button_tts_preview,
             state.checkbox_multilingual,
+            state.checkbox_tts_manual,
             state.checkbox_split_on_newline,
         ] {
             ShowWindow(control, if show_voice { SW_SHOW } else { SW_HIDE });
@@ -2563,10 +3028,8 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.checkbox_word_wrap,
             state.checkbox_smart_quotes,
             state.checkbox_spellcheck,
-            state.label_spellcheck_language_mode,
-            state.combo_spellcheck_language_mode,
-            state.label_spellcheck_fixed_language,
-            state.edit_spellcheck_fixed_language,
+            state.label_spellcheck_language,
+            state.combo_spellcheck_language,
             state.label_wrap_width,
             state.edit_wrap_width,
             state.label_quote_prefix,
@@ -2584,6 +3047,13 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.label_audio_split_text,
             state.edit_audio_split_text,
             state.checkbox_audio_split_requires_newline,
+            state.label_podcast_cache_limit,
+            state.edit_podcast_cache_limit,
+            state.label_podcastindex_key,
+            state.edit_podcastindex_key,
+            state.label_podcastindex_secret,
+            state.edit_podcastindex_secret,
+            state.button_podcastindex_signup,
         ] {
             ShowWindow(control, if show_audio { SW_SHOW } else { SW_HIDE });
         }
@@ -2591,6 +3061,8 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
 
     if index == OPTIONS_TAB_AUDIO {
         update_audio_split_text_visibility(hwnd);
+    } else if index == OPTIONS_TAB_VOICE {
+        update_tts_manual_visibility(hwnd);
     } else if let Some((label, edit, checkbox)) = with_options_state(hwnd, |state| {
         (
             state.label_audio_split_text,
@@ -2605,7 +3077,9 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
         EnableWindow(checkbox, false);
     }
 
-    focus_tab_first(hwnd, index);
+    if focus_first {
+        focus_tab_first(hwnd, index);
+    }
 }
 
 unsafe fn focus_tab_first(hwnd: HWND, index: i32) {

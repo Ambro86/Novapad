@@ -74,7 +74,7 @@ pub fn select_chapter(parent: HWND, chapters: &[Chapter], language: Language) ->
         language,
         result: result.clone(),
     });
-    let title = to_wide(&i18n::tr(language, "playback.chapter_list"));
+    let title = to_wide(&i18n::tr(language, "podcasts.chapters.title"));
 
     let hwnd = unsafe {
         CreateWindowExW(

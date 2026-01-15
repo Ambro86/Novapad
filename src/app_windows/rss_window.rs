@@ -71,6 +71,7 @@ const WM_SHOW_ADD_DIALOG: u32 = WM_USER + 202;
 const WM_CLEAR_ENTER_GUARD: u32 = WM_USER + 203;
 const WM_CLEAR_ADD_GUARD: u32 = WM_USER + 204;
 pub(crate) const WM_RSS_SHOW_CONTEXT: u32 = WM_USER + 205;
+const WM_RSS_BACKGROUND_CHECK_COMPLETE: u32 = WM_USER + 206;
 const ADD_GUARD_TIMER_ID: usize = 1;
 const EM_REPLACESEL: u32 = 0x00C2;
 const REORDER_EDIT_ID: usize = 1401;
@@ -118,15 +119,16 @@ fn normalize_rss_url_key(url: &str) -> String {
 }
 
 fn rss_source_display_title(source: &RssSource, language: crate::settings::Language) -> String {
-    let mut title = if source.title.trim().is_empty() {
+    let base_title = if source.title.trim().is_empty() {
         source.url.clone()
     } else {
         source.title.clone()
     };
     if source.unread {
-        title.push_str(&i18n::tr(language, "rss.unread_suffix"));
+        format!("{}{}", i18n::tr(language, "rss.unread_prefix"), base_title)
+    } else {
+        base_title
     }
-    title
 }
 
 fn percent_encode(input: &str) -> String {
@@ -260,6 +262,7 @@ unsafe fn import_sources_from_file(hwnd: HWND, path: &Path) {
                     user_title: title.trim() != url.trim(),
                     unread: false,
                     cache: rss::RssFeedCache::default(),
+                    last_seen_guid: None,
                 });
                 existing.insert(key);
                 added += 1;
@@ -285,6 +288,7 @@ unsafe fn import_sources_from_file(hwnd: HWND, path: &Path) {
                     user_title: false,
                     unread: false,
                     cache: rss::RssFeedCache::default(),
+                    last_seen_guid: None,
                 });
                 existing.insert(key);
                 added += 1;
@@ -670,6 +674,7 @@ fn apply_default_sources(
             user_title: title.trim() != url.trim(),
             unread: false,
             cache: rss::RssFeedCache::default(),
+            last_seen_guid: None,
         });
         existing.insert(key.clone());
         changed = true;
@@ -1081,6 +1086,9 @@ unsafe extern "system" fn rss_wndproc(
             ensure_default_sources(parent);
             reload_tree(hwnd);
 
+            // Start background check for new articles on all feeds
+            start_background_unread_check(hwnd);
+
             LRESULT(0)
         }
         WM_DESTROY => {
@@ -1276,6 +1284,7 @@ unsafe extern "system" fn rss_wndproc(
                             user_title: title.trim() != url.trim(),
                             unread: false,
                             cache: rss::RssFeedCache::default(),
+                            last_seen_guid: None,
                         });
                         crate::settings::save_settings(state.settings.clone());
                     });
@@ -1320,13 +1329,10 @@ unsafe extern "system" fn rss_wndproc(
                 match (*nmhdr).code {
                     TVN_ITEMEXPANDINGW => {
                         let pnmtv = lparam.0 as *const NMTREEVIEWW;
-                        // Handle expansion
-                        // TVE_EXPAND is u32 or constant?
-                        // action is NM_TREEVIEW_ACTION.
-                        // We need to check if it equals TVE_EXPAND.
-                        // But wait, TVE_EXPAND is action flag?
-                        // Assuming action == TVE_EXPAND
-                        if (*pnmtv).action == TVE_EXPAND {
+                        // action contains TVE_EXPAND (2) when expanding
+                        // Use bitwise AND to check for the expand flag
+                        let action_val = (*pnmtv).action.0 as u32;
+                        if (action_val & TVE_EXPAND.0) != 0 {
                             let hitem = (*pnmtv).itemNew.hItem;
                             handle_expand(hwnd, hitem);
                         }
@@ -1442,6 +1448,12 @@ unsafe extern "system" fn rss_wndproc(
             let ptr = lparam.0 as *mut FetchResult;
             let res = *Box::from_raw(ptr);
             process_fetch_result(hwnd, res);
+            LRESULT(0)
+        }
+        WM_RSS_BACKGROUND_CHECK_COMPLETE => {
+            let ptr = lparam.0 as *mut BackgroundCheckResult;
+            let res = *Box::from_raw(ptr);
+            process_background_check_result(hwnd, res);
             LRESULT(0)
         }
         WM_CLEAR_ENTER_GUARD => {
@@ -1965,6 +1977,18 @@ unsafe fn set_source_unread(
     hitem: windows::Win32::UI::Controls::HTREEITEM,
     unread: bool,
 ) {
+    // When marking as read (!unread), also update last_seen_guid from the first item
+    let first_item_key: Option<String> = if !unread {
+        with_rss_state(hwnd, |s| {
+            s.source_items
+                .get(&hitem.0)
+                .and_then(|state| state.items.first().map(rss_item_key))
+        })
+        .flatten()
+    } else {
+        None
+    };
+
     let (hwnd_tree, title_opt) = with_rss_state(hwnd, |s| {
         let hwnd_tree = s.hwnd_tree;
         let parent = s.parent;
@@ -1978,8 +2002,19 @@ unsafe fn set_source_unread(
         let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
         let title_opt = with_state(parent, |ps| {
             if let Some(src) = ps.settings.rss_sources.get_mut(idx) {
+                let mut changed = false;
                 if src.unread != unread {
                     src.unread = unread;
+                    changed = true;
+                }
+                // Update last_seen_guid when marking as read
+                if let Some(ref key) = first_item_key {
+                    if src.last_seen_guid.as_ref() != Some(key) {
+                        src.last_seen_guid = Some(key.clone());
+                        changed = true;
+                    }
+                }
+                if changed {
                     let title = rss_source_display_title(src, language);
                     crate::settings::save_settings(ps.settings.clone());
                     return Some(title);
@@ -1997,13 +2032,24 @@ unsafe fn set_source_unread(
 }
 
 unsafe fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM) {
-    if with_rss_state(hwnd, |s| {
-        matches!(s.node_data.get(&(hitem.0)), Some(NodeData::Source(_)))
+    // Check if items are already loaded - if so, mark as read immediately
+    let has_loaded_items = with_rss_state(hwnd, |s| {
+        if !matches!(s.node_data.get(&(hitem.0)), Some(NodeData::Source(_))) {
+            return false;
+        }
+        s.source_items
+            .get(&hitem.0)
+            .map(|state| !state.items.is_empty())
+            .unwrap_or(false)
     })
-    .unwrap_or(false)
-    {
+    .unwrap_or(false);
+
+    if has_loaded_items {
+        // Items already loaded, mark as read now
         set_source_unread(hwnd, hitem, false);
     }
+    // If items not loaded yet, they will be fetched and mark_as_read will happen
+    // in process_fetch_result after items are loaded
     let item_info_opt = with_rss_state(hwnd, |s| {
         if let Some(NodeData::Source(idx)) = s.node_data.get(&(hitem.0)) {
             with_state(s.parent, |ps| {
@@ -2137,6 +2183,134 @@ unsafe fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEIT
 struct FetchResult {
     hitem: isize,
     result: Result<rss::RssFetchOutcome, rss::FeedFetchError>,
+}
+
+/// Result of a background check for new articles (lightweight, no UI update needed)
+struct BackgroundCheckResult {
+    source_idx: usize,
+    newest_item_key: Option<String>,
+}
+
+/// Launch background check for all feeds to detect new articles without blocking UI
+unsafe fn start_background_unread_check(hwnd: HWND) {
+    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    if parent.0 == 0 {
+        return;
+    }
+
+    let sources: Vec<(usize, String, rss::RssSourceType, rss::RssFeedCache)> =
+        with_state(parent, |ps| {
+            ps.settings
+                .rss_sources
+                .iter()
+                .enumerate()
+                .map(|(i, src)| (i, src.url.clone(), src.kind.clone(), src.cache.clone()))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    if sources.is_empty() {
+        return;
+    }
+
+    let fetch_config = rss_fetch_config(parent);
+    ensure_rss_http(parent);
+
+    let hwnd_raw = hwnd.0;
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        rt.block_on(async {
+            // Process feeds concurrently but not all at once (limit concurrency)
+            let semaphore = std::sync::Arc::new(tokio::sync::Semaphore::new(4));
+            let mut handles = Vec::new();
+
+            for (idx, url, kind, cache) in sources {
+                let sem = semaphore.clone();
+                let cfg = fetch_config.clone();
+                let hwnd_val = hwnd_raw;
+
+                let handle = tokio::spawn(async move {
+                    let _permit = sem.acquire().await.ok()?;
+                    let result = rss::fetch_and_parse(&url, kind, cache, cfg, false).await;
+                    if let Ok(outcome) = result {
+                        let newest_key = outcome.items.first().map(|item| {
+                            if !item.guid.trim().is_empty() {
+                                item.guid.trim().to_string()
+                            } else if !item.link.trim().is_empty() {
+                                item.link.trim().to_string()
+                            } else {
+                                item.title.trim().to_string()
+                            }
+                        });
+                        let msg = Box::new(BackgroundCheckResult {
+                            source_idx: idx,
+                            newest_item_key: newest_key,
+                        });
+                        let _ = PostMessageW(
+                            HWND(hwnd_val),
+                            WM_RSS_BACKGROUND_CHECK_COMPLETE,
+                            WPARAM(0),
+                            LPARAM(Box::into_raw(msg) as isize),
+                        );
+                    }
+                    Some(())
+                });
+                handles.push(handle);
+            }
+
+            for h in handles {
+                let _ = h.await;
+            }
+        });
+    });
+}
+
+/// Process background check result - update unread state if new articles detected
+unsafe fn process_background_check_result(hwnd: HWND, res: BackgroundCheckResult) {
+    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    if parent.0 == 0 {
+        return;
+    }
+
+    let Some(newest_key) = res.newest_item_key else {
+        return;
+    };
+
+    // Check if this is a new article compared to last_seen_guid
+    let should_mark_unread = with_state(parent, |ps| {
+        ps.settings
+            .rss_sources
+            .get(res.source_idx)
+            .map(|src| match &src.last_seen_guid {
+                Some(last_seen) => last_seen != &newest_key,
+                None => true, // Never seen before
+            })
+            .unwrap_or(false)
+    })
+    .unwrap_or(false);
+
+    if should_mark_unread {
+        // Find the tree item for this source and mark it unread
+        let hitem_opt = with_rss_state(hwnd, |s| {
+            for (&h, node) in &s.node_data {
+                if let NodeData::Source(idx) = node {
+                    if *idx == res.source_idx {
+                        return Some(windows::Win32::UI::Controls::HTREEITEM(h));
+                    }
+                }
+            }
+            None
+        })
+        .flatten();
+
+        if let Some(hitem) = hitem_opt {
+            set_source_unread(hwnd, hitem, true);
+        }
+    }
 }
 
 unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
@@ -2282,6 +2456,7 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
             let mut total_before = 0usize;
             let existing =
                 with_rss_state(hwnd, |s| s.source_items.get(&hitem.0).is_some()).unwrap_or(false);
+
             if existing {
                 with_rss_state(hwnd, |s| {
                     let Some(state) = s.source_items.get_mut(&hitem.0) else {
@@ -2327,6 +2502,7 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                     }
                     SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
                 }
+
                 with_rss_state(hwnd, |s| {
                     s.source_items.insert(
                         hitem.0,
@@ -2347,6 +2523,10 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                     "rss_ui_batch end source={} appended={}",
                     hitem.0, inserted
                 ));
+
+                // User expanded the feed and items are now loaded - mark as read
+                // This updates last_seen_guid to the newest item
+                set_source_unread(hwnd, hitem, false);
             }
         }
         Err(e) => {

@@ -2,7 +2,7 @@ use crate::accessibility::{EM_REPLACESEL, EM_SCROLLCARET, from_wide, to_wide};
 use crate::editor_manager::get_edit_text;
 use crate::i18n;
 use crate::settings::{Language, find_title, text_not_found_message};
-use crate::{get_active_edit, show_error, with_state};
+use crate::{get_active_edit, show_error, show_info, with_state};
 use fancy_regex::Regex;
 use windows::Win32::Foundation::HINSTANCE;
 use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
@@ -390,7 +390,7 @@ pub unsafe fn replace_all(
         return;
     }
     let mut start = 0i32;
-    let mut replaced_any = false;
+    let mut count = 0usize;
     let replace_wide = to_wide(replace);
 
     loop {
@@ -423,7 +423,7 @@ pub unsafe fn replace_all(
                 WPARAM(1),
                 LPARAM(replace_wide.as_ptr() as isize),
             );
-            replaced_any = true;
+            count += 1;
 
             let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
             SendMessageW(
@@ -438,8 +438,8 @@ pub unsafe fn replace_all(
         }
     }
 
-    if !replaced_any {
-        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    if count == 0 {
         let message = to_wide(&text_not_found_message(language));
         let title = to_wide(&find_title(language));
         MessageBoxW(
@@ -448,6 +448,13 @@ pub unsafe fn replace_all(
             PCWSTR(title.as_ptr()),
             MB_OK | MB_ICONWARNING,
         );
+    } else {
+        let message = i18n::tr_f(
+            language,
+            "find.replaced_count",
+            &[("count", &count.to_string())],
+        );
+        show_info(hwnd, language, &message);
     }
 }
 
@@ -893,7 +900,7 @@ unsafe fn replace_all_regex(
         }
     };
     let normalized = normalize_regex_replacement(replace);
-    let mut replaced_any = false;
+    let mut total_count = 0usize;
 
     if options.replace_in_all_docs {
         let edits = with_state(hwnd, |state| {
@@ -909,11 +916,11 @@ unsafe fn replace_all_regex(
             if text.is_empty() {
                 continue;
             }
-            let matches = regex.is_match(&text).unwrap_or(false);
-            if !matches {
+            let count = regex.find_iter(&text).count();
+            if count == 0 {
                 continue;
             }
-            replaced_any = true;
+            total_count += count;
             let replaced = regex.replace_all(&text, normalized.as_str()).to_string();
             replace_range_text(hwnd_doc, 0, -1, &replaced);
         }
@@ -932,23 +939,23 @@ unsafe fn replace_all_regex(
         let start = utf16_index_to_byte(&text, cr.cpMin);
         let end = utf16_index_to_byte(&text, cr.cpMax);
         let selected = &text[start..end];
-        let matches = regex.is_match(selected).unwrap_or(false);
-        if matches {
-            replaced_any = true;
+        let count = regex.find_iter(selected).count();
+        if count > 0 {
+            total_count = count;
             let replaced = regex.replace_all(selected, normalized.as_str()).to_string();
             replace_range_text(hwnd_edit, cr.cpMin, cr.cpMax, &replaced);
         }
     } else {
         let text = get_edit_text(hwnd_edit);
-        let matches = regex.is_match(&text).unwrap_or(false);
-        if matches {
-            replaced_any = true;
+        let count = regex.find_iter(&text).count();
+        if count > 0 {
+            total_count = count;
             let replaced = regex.replace_all(&text, normalized.as_str()).to_string();
             replace_range_text(hwnd_edit, 0, -1, &replaced);
         }
     }
 
-    if !replaced_any {
+    if total_count == 0 {
         let message = to_wide(&text_not_found_message(language));
         let title = to_wide(&find_title(language));
         MessageBoxW(
@@ -957,6 +964,13 @@ unsafe fn replace_all_regex(
             PCWSTR(title.as_ptr()),
             MB_OK | MB_ICONWARNING,
         );
+    } else {
+        let message = i18n::tr_f(
+            language,
+            "find.replaced_count",
+            &[("count", &total_count.to_string())],
+        );
+        show_info(hwnd, language, &message);
     }
 }
 
@@ -974,12 +988,12 @@ unsafe fn replace_all_in_all_docs(
             .collect::<Vec<_>>()
     })
     .unwrap_or_default();
-    let mut replaced_any = false;
+    let mut total_count = 0usize;
     for hwnd_doc in edits {
-        replaced_any |= replace_all_in_range(hwnd_doc, search, replace, flags, 0, -1);
+        total_count += replace_all_in_range(hwnd_doc, search, replace, flags, 0, -1);
     }
-    if !replaced_any {
-        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    if total_count == 0 {
         let message = to_wide(&text_not_found_message(language));
         let title = to_wide(&find_title(language));
         MessageBoxW(
@@ -988,6 +1002,13 @@ unsafe fn replace_all_in_all_docs(
             PCWSTR(title.as_ptr()),
             MB_OK | MB_ICONWARNING,
         );
+    } else {
+        let message = i18n::tr_f(
+            language,
+            "find.replaced_count",
+            &[("count", &total_count.to_string())],
+        );
+        show_info(hwnd, language, &message);
     }
 }
 
@@ -1008,8 +1029,9 @@ unsafe fn replace_all_in_selection(
     if cr.cpMin == cr.cpMax {
         return;
     }
-    if !replace_all_in_range(hwnd_edit, search, replace, flags, cr.cpMin, cr.cpMax) {
-        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let count = replace_all_in_range(hwnd_edit, search, replace, flags, cr.cpMin, cr.cpMax);
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    if count == 0 {
         let message = to_wide(&text_not_found_message(language));
         let title = to_wide(&find_title(language));
         MessageBoxW(
@@ -1018,6 +1040,13 @@ unsafe fn replace_all_in_selection(
             PCWSTR(title.as_ptr()),
             MB_OK | MB_ICONWARNING,
         );
+    } else {
+        let message = i18n::tr_f(
+            language,
+            "find.replaced_count",
+            &[("count", &count.to_string())],
+        );
+        show_info(hwnd, language, &message);
     }
 }
 
@@ -1028,13 +1057,13 @@ unsafe fn replace_all_in_range(
     flags: FINDREPLACE_FLAGS,
     start_utf16: i32,
     end_utf16: i32,
-) -> bool {
+) -> usize {
     if search.is_empty() {
-        return false;
+        return 0;
     }
     let mut start = start_utf16;
     let mut end = end_utf16;
-    let mut replaced_any = false;
+    let mut count = 0usize;
     let replace_wide = to_wide(replace);
     let replace_len = replace.chars().map(|c| c.len_utf16() as i32).sum::<i32>();
 
@@ -1068,7 +1097,7 @@ unsafe fn replace_all_in_range(
             WPARAM(1),
             LPARAM(replace_wide.as_ptr() as isize),
         );
-        replaced_any = true;
+        count += 1;
         let match_len = ft.chrgText.cpMax - ft.chrgText.cpMin;
         let delta = replace_len - match_len;
         let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
@@ -1083,7 +1112,7 @@ unsafe fn replace_all_in_range(
             end += delta;
         }
     }
-    replaced_any
+    count
 }
 
 unsafe fn replace_range_text(hwnd_edit: HWND, start_utf16: i32, end_utf16: i32, text: &str) {

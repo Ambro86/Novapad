@@ -48,6 +48,8 @@ pub const IDM_EDIT_JOIN_LINES: usize = 2019;
 pub const IDM_EDIT_CLEAN_EOL_HYPHENS: usize = 2020;
 pub const IDM_EDIT_REMOVE_DUPLICATE_LINES: usize = 2021;
 pub const IDM_EDIT_REMOVE_DUPLICATE_CONSECUTIVE_LINES: usize = 2022;
+pub const IDM_EDIT_PREV_SPELLING_ERROR: usize = 2023;
+pub const IDM_EDIT_NEXT_SPELLING_ERROR: usize = 2024;
 pub const IDM_SPELLCHECK_SUGGESTION_BASE: usize = 12000;
 pub const IDM_SPELLCHECK_SUGGESTION_MAX: usize = 10;
 pub const IDM_SPELLCHECK_ADD_TO_DICTIONARY: usize = 12100;
@@ -156,6 +158,8 @@ pub struct MenuLabels {
     pub edit_find_next: String,
     pub edit_replace: String,
     pub edit_find_in_files: String,
+    pub edit_prev_spelling_error: String,
+    pub edit_next_spelling_error: String,
     pub edit_text_menu: String,
     pub edit_strip_markdown: String,
     pub edit_normalize_whitespace: String,
@@ -237,6 +241,8 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         edit_find_next: i18n::tr(language, "edit.find_next"),
         edit_replace: i18n::tr(language, "edit.replace"),
         edit_find_in_files: i18n::tr(language, "edit.find_in_files"),
+        edit_prev_spelling_error: i18n::tr(language, "edit.prev_spelling_error"),
+        edit_next_spelling_error: i18n::tr(language, "edit.next_spelling_error"),
         edit_text_menu: i18n::tr(language, "edit.text_menu"),
         edit_strip_markdown: i18n::tr(language, "edit.strip_markdown"),
         edit_normalize_whitespace: i18n::tr(language, "edit.normalize_whitespace"),
@@ -508,6 +514,19 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         &labels.edit_find_next,
     );
     let _ = append_menu_string(edit_menu, MF_STRING, IDM_EDIT_REPLACE, &labels.edit_replace);
+    let _ = AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null());
+    let _ = append_menu_string(
+        edit_menu,
+        MF_STRING,
+        IDM_EDIT_PREV_SPELLING_ERROR,
+        &labels.edit_prev_spelling_error,
+    );
+    let _ = append_menu_string(
+        edit_menu,
+        MF_STRING,
+        IDM_EDIT_NEXT_SPELLING_ERROR,
+        &labels.edit_next_spelling_error,
+    );
     let _ = AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null());
     let text_menu = CreateMenu().unwrap_or(HMENU(0));
     let _ = append_menu_string(

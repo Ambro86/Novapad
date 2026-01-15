@@ -75,8 +75,8 @@ use windows::Win32::UI::Controls::{
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_APPS, VK_CONTROL, VK_ESCAPE,
-    VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F10, VK_MENU, VK_RETURN, VK_SHIFT,
-    VK_TAB,
+    VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_F10, VK_MENU, VK_RETURN,
+    VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
 use windows::Win32::UI::Shell::{
@@ -85,16 +85,17 @@ use windows::Win32::UI::Shell::{
     IFileDialogEvents, IFileDialogEvents_Impl, IFileSaveDialog, IShellItem, SIGDN_FILESYSPATH,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    ACCEL, AppendMenuW, BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, CB_ADDSTRING, CB_GETCURSEL,
-    CB_GETDROPPEDSTATE, CB_GETITEMDATA, CB_RESETCONTENT, CB_SETCURSEL, CB_SETITEMDATA,
-    CBN_SELCHANGE, CBS_DROPDOWNLIST, CHILDID_SELF, CREATESTRUCTW, CS_HREDRAW, CS_VREDRAW,
-    CW_USEDEFAULT, CallWindowProcW, CheckMenuItem, CreateAcceleratorTableW, CreatePopupMenu,
-    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, EN_CHANGE,
-    EVENT_OBJECT_FOCUS, EnumWindows, FALT, FCONTROL, FSHIFT, FVIRTKEY, FindWindowW, GWLP_USERDATA,
-    GWLP_WNDPROC, GetClassNameW, GetCursorPos, GetMenu, GetMessageW, GetParent, GetWindowLongPtrW,
-    HACCEL, HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, IsChild, KillTimer, LoadCursorW,
-    LoadIconW, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MF_BYCOMMAND, MF_CHECKED, MF_GRAYED,
-    MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW,
+    ACCEL, AppendMenuW, BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, CB_ADDSTRING, CB_GETCOUNT,
+    CB_GETCURSEL, CB_GETDROPPEDSTATE, CB_GETITEMDATA, CB_RESETCONTENT, CB_SETCURSEL,
+    CB_SETITEMDATA, CBN_SELCHANGE, CBS_DROPDOWNLIST, CHILDID_SELF, CREATESTRUCTW, CS_HREDRAW,
+    CS_VREDRAW, CW_USEDEFAULT, CallWindowProcW, CheckMenuItem, CreateAcceleratorTableW,
+    CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, EN_CHANGE,
+    EN_KILLFOCUS, ES_AUTOHSCROLL, EVENT_OBJECT_FOCUS, EnumWindows, FALT, FCONTROL, FSHIFT,
+    FVIRTKEY, FindWindowW, GWLP_USERDATA, GWLP_WNDPROC, GetClassNameW, GetCursorPos, GetMenu,
+    GetMessageW, GetParent, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HACCEL,
+    HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, IsChild, KillTimer, LoadCursorW, LoadIconW,
+    MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MF_BYCOMMAND, MF_CHECKED, MF_GRAYED, MF_POPUP,
+    MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW,
     PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_SHOW, SW_SHOWMAXIMIZED,
     SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
     TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE, WM_APP,
@@ -135,6 +136,12 @@ const VOICE_PANEL_ID_ENGINE: usize = 8001;
 const VOICE_PANEL_ID_VOICE: usize = 8002;
 const VOICE_PANEL_ID_MULTILINGUAL: usize = 8003;
 const VOICE_PANEL_ID_FAVORITES: usize = 8004;
+const VOICE_PANEL_ID_SPEED: usize = 8005;
+const VOICE_PANEL_ID_PITCH: usize = 8006;
+const VOICE_PANEL_ID_VOLUME: usize = 8007;
+const VOICE_PANEL_ID_SPEED_EDIT: usize = 8008;
+const VOICE_PANEL_ID_PITCH_EDIT: usize = 8009;
+const VOICE_PANEL_ID_VOLUME_EDIT: usize = 8010;
 const VOICE_MENU_ID_ADD_FAVORITE: u32 = 9001;
 const VOICE_MENU_ID_REMOVE_FAVORITE: u32 = 9002;
 
@@ -316,7 +323,16 @@ fn clean_menu_label(label: &str) -> String {
             cleaned.push(ch);
         }
     }
-    cleaned.trim().to_string()
+    // Remove accelerator patterns like "(&X)" or "(X)" at the end
+    let trimmed = cleaned.trim();
+    if let Some(pos) = trimmed.rfind(" (") {
+        let suffix = &trimmed[pos..];
+        // Check if it matches pattern " (&X)" or " (X)" where X is a single char
+        if suffix.len() <= 5 && suffix.ends_with(')') {
+            return trimmed[..pos].trim().to_string();
+        }
+    }
+    trimmed.to_string()
 }
 
 fn confirm_menu_action(hwnd: HWND, key: &str) {
@@ -558,10 +574,6 @@ pub(crate) fn download_podcast_episode(
     cache_path: Option<PathBuf>,
     language: Language,
 ) {
-    let started_message = i18n::tr(language, "podcasts.download_started");
-    let completed_message = i18n::tr(language, "podcasts.download_completed");
-    let failed_message = i18n::tr(language, "podcasts.download_failed");
-    let _ = nvda_speak(&started_message);
     let suggested_name = title
         .as_deref()
         .and_then(suggested_filename_from_text)
@@ -584,72 +596,29 @@ pub(crate) fn download_podcast_episode(
     let Some(target) = target else {
         return;
     };
-    let url = url.clone();
     let cache_path = cache_path.clone();
-    let fetch_config = unsafe {
-        with_state(hwnd, |state| {
-            crate::tools::rss::fetch_config_from_settings(&state.settings)
-        })
-        .unwrap_or_else(|| crate::tools::rss::RssFetchConfig::default())
-    };
-    let http_config = unsafe {
-        with_state(hwnd, |state| {
-            crate::tools::rss::config_from_settings(&state.settings)
-        })
-        .unwrap_or_else(|| crate::tools::rss::RssHttpConfig::default())
-    };
     std::thread::spawn(move || {
-        let completed_message = completed_message;
-        let failed_message = failed_message;
-        let _ = crate::tools::rss::init_http(http_config);
-        if let Some(cache_path) = cache_path.as_ref() {
-            if cache_path.exists() {
-                if std::fs::copy(cache_path, &target).is_ok() {
-                    log_debug(&format!(
-                        "podcast_episode_downloaded src=cache dst={}",
-                        target.to_string_lossy()
-                    ));
-                    let _ = nvda_speak(&completed_message);
-                    return;
-                } else {
-                    log_debug(&format!(
-                        "podcast_episode_download_failed copy dst={}",
-                        target.to_string_lossy()
-                    ));
-                    let _ = nvda_speak(&failed_message);
-                    return;
-                }
-            }
-        }
-        let Some(url) = url.as_deref() else {
-            log_debug("podcast_episode_download_failed no_url");
-            let _ = nvda_speak(&failed_message);
+        let Some(cache_path) = cache_path.as_ref() else {
+            log_debug("podcast_episode_save_failed no_cache");
             return;
         };
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap();
-        match rt.block_on(crate::tools::rss::fetch_url_bytes(url, fetch_config)) {
-            Ok(bytes) => {
-                if std::fs::write(&target, bytes).is_ok() {
-                    log_debug(&format!(
-                        "podcast_episode_downloaded src=url dst={}",
-                        target.to_string_lossy()
-                    ));
-                    let _ = nvda_speak(&completed_message);
-                } else {
-                    log_debug(&format!(
-                        "podcast_episode_download_failed write dst={}",
-                        target.to_string_lossy()
-                    ));
-                    let _ = nvda_speak(&failed_message);
-                }
-            }
-            Err(err) => {
-                log_debug(&format!("podcast_episode_download_failed {}", err));
-                let _ = nvda_speak(&failed_message);
-            }
+        if !cache_path.exists() {
+            log_debug(&format!(
+                "podcast_episode_save_failed missing_cache {}",
+                cache_path.to_string_lossy()
+            ));
+            return;
+        }
+        if std::fs::copy(cache_path, &target).is_ok() {
+            log_debug(&format!(
+                "podcast_episode_saved src=cache dst={}",
+                target.to_string_lossy()
+            ));
+        } else {
+            log_debug(&format!(
+                "podcast_episode_save_failed copy dst={}",
+                target.to_string_lossy()
+            ));
         }
     });
 }
@@ -1056,6 +1025,15 @@ pub(crate) struct AppState {
     voice_combo_engine: HWND,
     voice_label_voice: HWND,
     voice_combo_voice: HWND,
+    voice_label_speed: HWND,
+    voice_combo_speed: HWND,
+    voice_edit_speed: HWND,
+    voice_label_pitch: HWND,
+    voice_combo_pitch: HWND,
+    voice_edit_pitch: HWND,
+    voice_label_volume: HWND,
+    voice_combo_volume: HWND,
+    voice_edit_volume: HWND,
     voice_checkbox_multilingual: HWND,
     voice_favorites_visible: bool,
     voice_label_favorites: HWND,
@@ -1349,17 +1327,27 @@ fn main() -> windows::core::Result<()> {
                 updater::check_for_update(hwnd, true);
                 continue;
             }
-            if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == u32::from(VK_F7.0) {
+            if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == u32::from(VK_F9.0) {
                 if is_tts_active(hwnd) {
                     cycle_favorite_voice(hwnd, -1);
                     continue;
                 }
             }
-            if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == u32::from(VK_F8.0) {
+            if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == u32::from(VK_F10.0) {
+                // F10 is normally used for menu, so only use it for voice cycling during TTS
                 if is_tts_active(hwnd) {
                     cycle_favorite_voice(hwnd, 1);
                     continue;
                 }
+            }
+            // F7/F8 for spelling navigation
+            if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == u32::from(VK_F7.0) {
+                go_to_spelling_error(hwnd, false);
+                continue;
+            }
+            if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == u32::from(VK_F8.0) {
+                go_to_spelling_error(hwnd, true);
+                continue;
             }
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_TAB.0 as u32 {
                 if (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) == 0 {
@@ -1692,6 +1680,132 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 HINSTANCE(0),
                 None,
             );
+            let label_speed = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(empty_label.as_ptr()),
+                WS_CHILD,
+                0,
+                0,
+                0,
+                0,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_speed = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                0,
+                0,
+                0,
+                140,
+                hwnd,
+                HMENU(VOICE_PANEL_ID_SPEED as isize),
+                HINSTANCE(0),
+                None,
+            );
+            let edit_speed = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                0,
+                0,
+                0,
+                0,
+                hwnd,
+                HMENU(VOICE_PANEL_ID_SPEED_EDIT as isize),
+                HINSTANCE(0),
+                None,
+            );
+            let label_pitch = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(empty_label.as_ptr()),
+                WS_CHILD,
+                0,
+                0,
+                0,
+                0,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_pitch = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                0,
+                0,
+                0,
+                140,
+                hwnd,
+                HMENU(VOICE_PANEL_ID_PITCH as isize),
+                HINSTANCE(0),
+                None,
+            );
+            let edit_pitch = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                0,
+                0,
+                0,
+                0,
+                hwnd,
+                HMENU(VOICE_PANEL_ID_PITCH_EDIT as isize),
+                HINSTANCE(0),
+                None,
+            );
+            let label_volume = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(empty_label.as_ptr()),
+                WS_CHILD,
+                0,
+                0,
+                0,
+                0,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_volume = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                0,
+                0,
+                0,
+                140,
+                hwnd,
+                HMENU(VOICE_PANEL_ID_VOLUME as isize),
+                HINSTANCE(0),
+                None,
+            );
+            let edit_volume = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                0,
+                0,
+                0,
+                0,
+                hwnd,
+                HMENU(VOICE_PANEL_ID_VOLUME_EDIT as isize),
+                HINSTANCE(0),
+                None,
+            );
             let checkbox_multilingual = CreateWindowExW(
                 Default::default(),
                 WC_BUTTON,
@@ -1759,6 +1873,15 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 combo_engine,
                 label_voice,
                 combo_voice,
+                label_speed,
+                combo_speed,
+                edit_speed,
+                label_pitch,
+                combo_pitch,
+                edit_pitch,
+                label_volume,
+                combo_volume,
+                edit_volume,
                 checkbox_multilingual,
                 label_favorites,
                 combo_favorites,
@@ -1834,6 +1957,15 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 voice_combo_engine: combo_engine,
                 voice_label_voice: label_voice,
                 voice_combo_voice: combo_voice,
+                voice_label_speed: label_speed,
+                voice_combo_speed: combo_speed,
+                voice_edit_speed: edit_speed,
+                voice_label_pitch: label_pitch,
+                voice_combo_pitch: combo_pitch,
+                voice_edit_pitch: edit_pitch,
+                voice_label_volume: label_volume,
+                voice_combo_volume: combo_volume,
+                voice_edit_volume: edit_volume,
                 voice_checkbox_multilingual: checkbox_multilingual,
                 voice_favorites_visible: false,
                 voice_label_favorites: label_favorites,
@@ -2157,11 +2289,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             LRESULT(0)
         }
         WM_KEYDOWN => {
-            if wparam.0 as u32 == u32::from(VK_F7.0) {
+            if wparam.0 as u32 == u32::from(VK_F9.0) {
                 cycle_favorite_voice(hwnd, -1);
                 return LRESULT(0);
             }
-            if wparam.0 as u32 == u32::from(VK_F8.0) {
+            if wparam.0 as u32 == u32::from(VK_F10.0) {
                 cycle_favorite_voice(hwnd, 1);
                 return LRESULT(0);
             }
@@ -2191,6 +2323,9 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             let cmd_id = (wparam.0 & 0xffff) as usize;
             let notification = (wparam.0 >> 16) as u16;
             if u32::from(notification) == EN_CHANGE {
+                if is_voice_panel_tuning_edit(hwnd, HWND(lparam.0)) {
+                    return LRESULT(0);
+                }
                 editor_manager::handle_normalize_edit_change(hwnd, HWND(lparam.0));
                 mark_dirty_from_edit(hwnd, HWND(lparam.0));
                 return LRESULT(0);
@@ -2209,6 +2344,22 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             }
             if cmd_id == VOICE_PANEL_ID_MULTILINGUAL {
                 handle_voice_panel_multilingual_toggle(hwnd);
+                return LRESULT(0);
+            }
+            if (cmd_id == VOICE_PANEL_ID_SPEED
+                || cmd_id == VOICE_PANEL_ID_PITCH
+                || cmd_id == VOICE_PANEL_ID_VOLUME)
+                && u32::from(notification) == CBN_SELCHANGE
+            {
+                handle_voice_panel_tuning_combo_change(hwnd);
+                return LRESULT(0);
+            }
+            if (cmd_id == VOICE_PANEL_ID_SPEED_EDIT
+                || cmd_id == VOICE_PANEL_ID_PITCH_EDIT
+                || cmd_id == VOICE_PANEL_ID_VOLUME_EDIT)
+                && u32::from(notification) == EN_KILLFOCUS
+            {
+                handle_voice_panel_tuning_edit_change(hwnd);
                 return LRESULT(0);
             }
             if cmd_id == VOICE_MENU_ID_ADD_FAVORITE as usize {
@@ -2362,6 +2513,16 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 IDM_EDIT_REPLACE => {
                     log_debug("Menu: Replace");
                     search::open_replace_dialog(hwnd);
+                    LRESULT(0)
+                }
+                IDM_EDIT_PREV_SPELLING_ERROR => {
+                    log_debug("Menu: Previous spelling error");
+                    go_to_spelling_error(hwnd, false);
+                    LRESULT(0)
+                }
+                IDM_EDIT_NEXT_SPELLING_ERROR => {
+                    log_debug("Menu: Next spelling error");
+                    go_to_spelling_error(hwnd, true);
                     LRESULT(0)
                 }
                 IDM_EDIT_STRIP_MARKDOWN => {
@@ -2720,6 +2881,9 @@ unsafe fn is_tts_active(hwnd: HWND) -> bool {
 struct VoicePanelLabels {
     label_engine: String,
     label_voice: String,
+    label_speed: String,
+    label_pitch: String,
+    label_volume: String,
     label_favorites: String,
     label_multilingual: String,
     engine_edge: String,
@@ -2736,6 +2900,9 @@ fn voice_panel_labels(language: Language) -> VoicePanelLabels {
     VoicePanelLabels {
         label_engine: i18n::tr(language, "voice_panel.label_engine"),
         label_voice: i18n::tr(language, "voice_panel.label_voice"),
+        label_speed: i18n::tr(language, "tts_tuning.label_speed"),
+        label_pitch: i18n::tr(language, "tts_tuning.label_pitch"),
+        label_volume: i18n::tr(language, "tts_tuning.label_volume"),
         label_favorites: i18n::tr(language, "voice_panel.label_favorites"),
         label_multilingual: i18n::tr(language, "voice_panel.label_multilingual"),
         engine_edge: i18n::tr(language, "voice_panel.engine_edge"),
@@ -2745,6 +2912,76 @@ fn voice_panel_labels(language: Language) -> VoicePanelLabels {
         favorites_empty: i18n::tr(language, "voice_panel.favorites_empty"),
         add_favorite: i18n::tr(language, "voice_panel.add_favorite"),
         remove_favorite: i18n::tr(language, "voice_panel.remove_favorite"),
+    }
+}
+
+const TTS_RATE_MIN: i32 = -100;
+const TTS_RATE_MAX: i32 = 100;
+const TTS_PITCH_MIN: i32 = -12;
+const TTS_PITCH_MAX: i32 = 12;
+const TTS_VOLUME_MIN: i32 = 25;
+const TTS_VOLUME_MAX: i32 = 200;
+
+fn init_tts_panel_combo(hwnd: HWND, items: &[(String, i32)]) {
+    unsafe {
+        let _ = SendMessageW(hwnd, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        for (label, value) in items {
+            let idx = SendMessageW(
+                hwnd,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(label).as_ptr() as isize),
+            )
+            .0 as usize;
+            let _ = SendMessageW(hwnd, CB_SETITEMDATA, WPARAM(idx), LPARAM(*value as isize));
+        }
+    }
+}
+
+fn combo_value(hwnd: HWND) -> i32 {
+    unsafe {
+        let sel = SendMessageW(hwnd, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+        if sel < 0 {
+            return 0;
+        }
+        SendMessageW(hwnd, CB_GETITEMDATA, WPARAM(sel as usize), LPARAM(0)).0 as i32
+    }
+}
+
+fn select_combo_nearest_value(hwnd: HWND, value: i32) {
+    unsafe {
+        let count = SendMessageW(hwnd, CB_GETCOUNT, WPARAM(0), LPARAM(0)).0;
+        if count <= 0 {
+            return;
+        }
+        let mut best_idx = 0;
+        let mut best_diff = i32::MAX;
+        for i in 0..count {
+            let data = SendMessageW(hwnd, CB_GETITEMDATA, WPARAM(i as usize), LPARAM(0)).0 as i32;
+            let diff = (data - value).abs();
+            if diff < best_diff {
+                best_diff = diff;
+                best_idx = i;
+            }
+        }
+        let _ = SendMessageW(hwnd, CB_SETCURSEL, WPARAM(best_idx as usize), LPARAM(0));
+    }
+}
+
+fn read_tts_edit_value(edit: HWND, fallback: i32, min: i32, max: i32) -> i32 {
+    unsafe {
+        let len = GetWindowTextLengthW(edit);
+        if len <= 0 {
+            return fallback;
+        }
+        let mut buf = vec![0u16; (len + 1) as usize];
+        let read = GetWindowTextW(edit, &mut buf);
+        let text = String::from_utf16_lossy(&buf[..read as usize]);
+        if let Ok(parsed) = text.trim().parse::<i32>() {
+            parsed.clamp(min, max)
+        } else {
+            fallback
+        }
     }
 }
 
@@ -2914,23 +3151,47 @@ unsafe fn set_voice_panel_visible(hwnd: HWND, visible: bool) {
 }
 
 unsafe fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: bool) {
-    let (label_engine, combo_engine, label_voice, combo_voice, checkbox_multilingual, changed) =
-        match with_state(hwnd, |state| {
-            let changed = state.settings.show_voice_panel != visible;
-            state.voice_panel_visible = visible;
-            state.settings.show_voice_panel = visible;
-            (
-                state.voice_label_engine,
-                state.voice_combo_engine,
-                state.voice_label_voice,
-                state.voice_combo_voice,
-                state.voice_checkbox_multilingual,
-                changed,
-            )
-        }) {
-            Some(values) => values,
-            None => return,
-        };
+    let (
+        label_engine,
+        combo_engine,
+        label_voice,
+        combo_voice,
+        label_speed,
+        combo_speed,
+        edit_speed,
+        label_pitch,
+        combo_pitch,
+        edit_pitch,
+        label_volume,
+        combo_volume,
+        edit_volume,
+        checkbox_multilingual,
+        changed,
+    ) = match with_state(hwnd, |state| {
+        let changed = state.settings.show_voice_panel != visible;
+        state.voice_panel_visible = visible;
+        state.settings.show_voice_panel = visible;
+        (
+            state.voice_label_engine,
+            state.voice_combo_engine,
+            state.voice_label_voice,
+            state.voice_combo_voice,
+            state.voice_label_speed,
+            state.voice_combo_speed,
+            state.voice_edit_speed,
+            state.voice_label_pitch,
+            state.voice_combo_pitch,
+            state.voice_edit_pitch,
+            state.voice_label_volume,
+            state.voice_combo_volume,
+            state.voice_edit_volume,
+            state.voice_checkbox_multilingual,
+            changed,
+        )
+    }) {
+        Some(values) => values,
+        None => return,
+    };
 
     let show = if visible { SW_SHOW } else { SW_HIDE };
     for control in [
@@ -2938,6 +3199,15 @@ unsafe fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: b
         combo_engine,
         label_voice,
         combo_voice,
+        label_speed,
+        combo_speed,
+        edit_speed,
+        label_pitch,
+        combo_pitch,
+        edit_pitch,
+        label_volume,
+        combo_volume,
+        edit_volume,
         checkbox_multilingual,
     ] {
         if control.0 != 0 {
@@ -3010,6 +3280,15 @@ pub(crate) unsafe fn refresh_voice_panel(hwnd: HWND) {
         combo_engine,
         label_voice,
         combo_voice,
+        label_speed,
+        combo_speed,
+        edit_speed,
+        label_pitch,
+        combo_pitch,
+        edit_pitch,
+        label_volume,
+        combo_volume,
+        edit_volume,
         checkbox_multilingual,
         favorites_visible,
         label_favorites,
@@ -3021,6 +3300,15 @@ pub(crate) unsafe fn refresh_voice_panel(hwnd: HWND) {
             state.voice_combo_engine,
             state.voice_label_voice,
             state.voice_combo_voice,
+            state.voice_label_speed,
+            state.voice_combo_speed,
+            state.voice_edit_speed,
+            state.voice_label_pitch,
+            state.voice_combo_pitch,
+            state.voice_edit_pitch,
+            state.voice_label_volume,
+            state.voice_combo_volume,
+            state.voice_edit_volume,
             state.voice_checkbox_multilingual,
             state.voice_favorites_visible,
             state.voice_label_favorites,
@@ -3039,8 +3327,14 @@ pub(crate) unsafe fn refresh_voice_panel(hwnd: HWND) {
     if voice_visible {
         let label_engine_wide = to_wide(&labels.label_engine);
         let label_voice_wide = to_wide(&labels.label_voice);
+        let label_speed_wide = to_wide(&labels.label_speed);
+        let label_pitch_wide = to_wide(&labels.label_pitch);
+        let label_volume_wide = to_wide(&labels.label_volume);
         let _ = SetWindowTextW(label_engine, PCWSTR(label_engine_wide.as_ptr()));
         let _ = SetWindowTextW(label_voice, PCWSTR(label_voice_wide.as_ptr()));
+        let _ = SetWindowTextW(label_speed, PCWSTR(label_speed_wide.as_ptr()));
+        let _ = SetWindowTextW(label_pitch, PCWSTR(label_pitch_wide.as_ptr()));
+        let _ = SetWindowTextW(label_volume, PCWSTR(label_volume_wide.as_ptr()));
         let label_multi_wide = to_wide(&labels.label_multilingual);
         let _ = SetWindowTextW(checkbox_multilingual, PCWSTR(label_multi_wide.as_ptr()));
     }
@@ -3085,6 +3379,152 @@ pub(crate) unsafe fn refresh_voice_panel(hwnd: HWND) {
     }
 
     if voice_visible {
+        let speed_items = [
+            (
+                i18n::tr(settings.language, "tts_tuning.speed.extremely_slow"),
+                -100,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.speed.very_slow"),
+                -60,
+            ),
+            (i18n::tr(settings.language, "tts_tuning.speed.slow"), -35),
+            (
+                i18n::tr(settings.language, "tts_tuning.speed.a_bit_slow"),
+                -20,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.speed.slightly_slow"),
+                -10,
+            ),
+            (i18n::tr(settings.language, "tts_tuning.speed.normal"), 0),
+            (
+                i18n::tr(settings.language, "tts_tuning.speed.slightly_fast"),
+                10,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.speed.a_bit_fast"),
+                20,
+            ),
+            (i18n::tr(settings.language, "tts_tuning.speed.fast"), 35),
+            (
+                i18n::tr(settings.language, "tts_tuning.speed.very_fast"),
+                50,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.speed.super_fast"),
+                100,
+            ),
+        ];
+        let pitch_items = [
+            (
+                i18n::tr(settings.language, "tts_tuning.pitch.very_low"),
+                -12,
+            ),
+            (i18n::tr(settings.language, "tts_tuning.pitch.low"), -10),
+            (
+                i18n::tr(settings.language, "tts_tuning.pitch.a_bit_low"),
+                -7,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.pitch.slightly_low"),
+                -5,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.pitch.a_little_lower"),
+                -2,
+            ),
+            (i18n::tr(settings.language, "tts_tuning.pitch.normal"), 0),
+            (
+                i18n::tr(settings.language, "tts_tuning.pitch.a_little_higher"),
+                2,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.pitch.slightly_high"),
+                5,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.pitch.a_bit_high"),
+                7,
+            ),
+            (i18n::tr(settings.language, "tts_tuning.pitch.high"), 9),
+            (
+                i18n::tr(settings.language, "tts_tuning.pitch.very_high"),
+                12,
+            ),
+        ];
+        let volume_items = [
+            (
+                i18n::tr(settings.language, "tts_tuning.volume.very_low"),
+                25,
+            ),
+            (i18n::tr(settings.language, "tts_tuning.volume.low"), 40),
+            (
+                i18n::tr(settings.language, "tts_tuning.volume.a_bit_low"),
+                55,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.volume.medium_low"),
+                70,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.volume.slightly_low"),
+                85,
+            ),
+            (i18n::tr(settings.language, "tts_tuning.volume.normal"), 100),
+            (
+                i18n::tr(settings.language, "tts_tuning.volume.slightly_high"),
+                115,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.volume.medium_high"),
+                130,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.volume.a_bit_high"),
+                145,
+            ),
+            (i18n::tr(settings.language, "tts_tuning.volume.high"), 160),
+            (
+                i18n::tr(settings.language, "tts_tuning.volume.very_high"),
+                180,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.volume.maximum"),
+                200,
+            ),
+        ];
+        init_tts_panel_combo(combo_speed, &speed_items);
+        init_tts_panel_combo(combo_pitch, &pitch_items);
+        init_tts_panel_combo(combo_volume, &volume_items);
+        select_combo_nearest_value(combo_speed, settings.tts_rate);
+        select_combo_nearest_value(combo_pitch, settings.tts_pitch);
+        select_combo_nearest_value(combo_volume, settings.tts_volume);
+        let _ = SetWindowTextW(
+            edit_speed,
+            PCWSTR(to_wide(&settings.tts_rate.to_string()).as_ptr()),
+        );
+        let _ = SetWindowTextW(
+            edit_pitch,
+            PCWSTR(to_wide(&settings.tts_pitch.to_string()).as_ptr()),
+        );
+        let _ = SetWindowTextW(
+            edit_volume,
+            PCWSTR(to_wide(&settings.tts_volume.to_string()).as_ptr()),
+        );
+        let manual = settings.tts_manual_tuning;
+        ShowWindow(combo_speed, if manual { SW_HIDE } else { SW_SHOW });
+        ShowWindow(combo_pitch, if manual { SW_HIDE } else { SW_SHOW });
+        ShowWindow(combo_volume, if manual { SW_HIDE } else { SW_SHOW });
+        ShowWindow(edit_speed, if manual { SW_SHOW } else { SW_HIDE });
+        ShowWindow(edit_pitch, if manual { SW_SHOW } else { SW_HIDE });
+        ShowWindow(edit_volume, if manual { SW_SHOW } else { SW_HIDE });
+        EnableWindow(combo_speed, !manual);
+        EnableWindow(combo_pitch, !manual);
+        EnableWindow(combo_volume, !manual);
+        EnableWindow(edit_speed, manual);
+        EnableWindow(edit_pitch, manual);
+        EnableWindow(edit_volume, manual);
         let voices = with_state(hwnd, |state| match settings.tts_engine {
             TtsEngine::Edge => state.edge_voices.clone(),
             TtsEngine::Sapi5 => state.sapi_voices.clone(),
@@ -3161,6 +3601,9 @@ unsafe fn clear_voice_labels_if_hidden(hwnd: HWND) {
         favorites_visible,
         label_engine,
         label_voice,
+        label_speed,
+        label_pitch,
+        label_volume,
         checkbox_multilingual,
         label_favorites,
     ) = match with_state(hwnd, |state| {
@@ -3169,6 +3612,9 @@ unsafe fn clear_voice_labels_if_hidden(hwnd: HWND) {
             state.voice_favorites_visible,
             state.voice_label_engine,
             state.voice_label_voice,
+            state.voice_label_speed,
+            state.voice_label_pitch,
+            state.voice_label_volume,
             state.voice_checkbox_multilingual,
             state.voice_label_favorites,
         )
@@ -3182,6 +3628,9 @@ unsafe fn clear_voice_labels_if_hidden(hwnd: HWND) {
     let empty = to_wide("");
     let _ = SetWindowTextW(label_engine, PCWSTR(empty.as_ptr()));
     let _ = SetWindowTextW(label_voice, PCWSTR(empty.as_ptr()));
+    let _ = SetWindowTextW(label_speed, PCWSTR(empty.as_ptr()));
+    let _ = SetWindowTextW(label_pitch, PCWSTR(empty.as_ptr()));
+    let _ = SetWindowTextW(label_volume, PCWSTR(empty.as_ptr()));
     let _ = SetWindowTextW(checkbox_multilingual, PCWSTR(empty.as_ptr()));
     let _ = SetWindowTextW(label_favorites, PCWSTR(empty.as_ptr()));
 }
@@ -3369,6 +3818,106 @@ unsafe fn handle_voice_panel_multilingual_toggle(hwnd: HWND) {
         save_settings(settings);
     }
     refresh_voice_panel_voice_list(hwnd);
+}
+
+unsafe fn is_voice_panel_tuning_edit(hwnd: HWND, target: HWND) -> bool {
+    if target.0 == 0 {
+        return false;
+    }
+    with_state(hwnd, |state| {
+        target == state.voice_edit_speed
+            || target == state.voice_edit_pitch
+            || target == state.voice_edit_volume
+    })
+    .unwrap_or(false)
+}
+
+unsafe fn handle_voice_panel_tuning_combo_change(hwnd: HWND) {
+    let (combo_speed, combo_pitch, combo_volume, was_active, old_rate, old_pitch, old_volume) =
+        with_state(hwnd, |state| {
+            (
+                state.voice_combo_speed,
+                state.voice_combo_pitch,
+                state.voice_combo_volume,
+                state.tts_session.is_some(),
+                state.settings.tts_rate,
+                state.settings.tts_pitch,
+                state.settings.tts_volume,
+            )
+        })
+        .unwrap_or((HWND(0), HWND(0), HWND(0), false, 0, 0, 100));
+    if combo_speed.0 == 0 || combo_pitch.0 == 0 || combo_volume.0 == 0 {
+        return;
+    }
+    let rate = combo_value(combo_speed);
+    let pitch = combo_value(combo_pitch);
+    let volume = combo_value(combo_volume);
+    let changed = with_state(hwnd, |state| {
+        if state.settings.tts_rate != rate
+            || state.settings.tts_pitch != pitch
+            || state.settings.tts_volume != volume
+        {
+            state.settings.tts_rate = rate;
+            state.settings.tts_pitch = pitch;
+            state.settings.tts_volume = volume;
+            true
+        } else {
+            false
+        }
+    })
+    .unwrap_or(false);
+    if changed {
+        if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
+            save_settings(settings);
+        }
+        if was_active && (old_rate != rate || old_pitch != pitch || old_volume != volume) {
+            restart_tts_from_current_offset(hwnd);
+        }
+    }
+}
+
+unsafe fn handle_voice_panel_tuning_edit_change(hwnd: HWND) {
+    let (edit_speed, edit_pitch, edit_volume, was_active, old_rate, old_pitch, old_volume) =
+        with_state(hwnd, |state| {
+            (
+                state.voice_edit_speed,
+                state.voice_edit_pitch,
+                state.voice_edit_volume,
+                state.tts_session.is_some(),
+                state.settings.tts_rate,
+                state.settings.tts_pitch,
+                state.settings.tts_volume,
+            )
+        })
+        .unwrap_or((HWND(0), HWND(0), HWND(0), false, 0, 0, 100));
+    if edit_speed.0 == 0 || edit_pitch.0 == 0 || edit_volume.0 == 0 {
+        return;
+    }
+    let rate = read_tts_edit_value(edit_speed, old_rate, TTS_RATE_MIN, TTS_RATE_MAX);
+    let pitch = read_tts_edit_value(edit_pitch, old_pitch, TTS_PITCH_MIN, TTS_PITCH_MAX);
+    let volume = read_tts_edit_value(edit_volume, old_volume, TTS_VOLUME_MIN, TTS_VOLUME_MAX);
+    let changed = with_state(hwnd, |state| {
+        if state.settings.tts_rate != rate
+            || state.settings.tts_pitch != pitch
+            || state.settings.tts_volume != volume
+        {
+            state.settings.tts_rate = rate;
+            state.settings.tts_pitch = pitch;
+            state.settings.tts_volume = volume;
+            true
+        } else {
+            false
+        }
+    })
+    .unwrap_or(false);
+    if changed {
+        if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
+            save_settings(settings);
+        }
+        if was_active && (old_rate != rate || old_pitch != pitch || old_volume != volume) {
+            restart_tts_from_current_offset(hwnd);
+        }
+    }
 }
 
 unsafe fn handle_voice_panel_favorite_change(hwnd: HWND) {
@@ -4175,6 +4724,119 @@ unsafe fn handle_spellcheck_ignore_once(hwnd: HWND) {
     });
 }
 
+/// Navigate to next (forward=true) or previous (forward=false) spelling error
+unsafe fn go_to_spelling_error(hwnd: HWND, forward: bool) {
+    use windows::Win32::UI::Controls::RichEdit::{CHARRANGE, EM_EXGETSEL, EM_EXSETSEL};
+
+    let Some(hwnd_edit) = get_active_edit(hwnd) else {
+        return;
+    };
+
+    // Get spellcheck language
+    let resolution = with_state(hwnd, |state| {
+        state.spellcheck_manager.resolve_language(&state.settings)
+    })
+    .flatten();
+    let Some(resolution) = resolution else {
+        // Spellcheck disabled or no language available
+        return;
+    };
+
+    // Get current cursor position
+    let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
+    SendMessageW(
+        hwnd_edit,
+        EM_EXGETSEL,
+        WPARAM(0),
+        LPARAM(&mut cr as *mut _ as isize),
+    );
+    let current_pos = if forward { cr.cpMax } else { cr.cpMin };
+
+    // Get document info
+    let doc_id = with_state(hwnd, |state| {
+        state
+            .docs
+            .iter()
+            .find(|d| d.hwnd_edit == hwnd_edit)
+            .map(|d| d.hwnd_edit.0)
+    })
+    .flatten()
+    .unwrap_or(0);
+
+    let text = editor_manager::get_edit_text(hwnd_edit);
+    if text.is_empty() {
+        return;
+    }
+
+    // Collect all misspellings from all lines
+    let mut all_errors: Vec<(i32, i32)> = Vec::new(); // (start_utf16, end_utf16)
+
+    let mut line_start_utf16 = 0i32;
+    for (line_idx, line) in text.lines().enumerate() {
+        let misspellings = with_state(hwnd, |state| {
+            state.spellcheck_manager.check_line(
+                doc_id,
+                line_idx as i32,
+                line,
+                &resolution.effective,
+            )
+        })
+        .unwrap_or_default();
+
+        for m in misspellings {
+            // Convert byte offsets to UTF-16 offsets
+            let start_byte = m.start;
+            let end_byte = m.end;
+            let prefix = &line[..start_byte.min(line.len())];
+            let word_part = &line[start_byte.min(line.len())..end_byte.min(line.len())];
+            let start_utf16_in_line: i32 = prefix.encode_utf16().count() as i32;
+            let word_utf16_len: i32 = word_part.encode_utf16().count() as i32;
+
+            let abs_start = line_start_utf16 + start_utf16_in_line;
+            let abs_end = abs_start + word_utf16_len;
+            all_errors.push((abs_start, abs_end));
+        }
+
+        // Account for line ending (could be \r\n or \n)
+        let line_utf16_len: i32 = line.encode_utf16().count() as i32;
+        line_start_utf16 += line_utf16_len + 1; // +1 for \n (simplified)
+    }
+
+    if all_errors.is_empty() {
+        return;
+    }
+
+    // Find the next/previous error relative to current position (no wrap-around)
+    let target = if forward {
+        // Find first error after current position
+        all_errors.iter().find(|(start, _)| *start > current_pos)
+    } else {
+        // Find last error before current position
+        all_errors.iter().rev().find(|(_, end)| *end < current_pos)
+    };
+
+    if let Some(&(start, end)) = target {
+        // Select the misspelled word
+        let mut new_range = CHARRANGE {
+            cpMin: start,
+            cpMax: end,
+        };
+        SendMessageW(
+            hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut new_range as *mut _ as isize),
+        );
+        // Scroll to make visible
+        SendMessageW(
+            hwnd_edit,
+            crate::accessibility::EM_SCROLLCARET,
+            WPARAM(0),
+            LPARAM(0),
+        );
+    }
+}
+
 unsafe fn handle_voice_context_favorite(hwnd: HWND, add: bool) {
     let ctx = with_state(hwnd, |state| state.voice_context_voice.clone()).unwrap_or(None);
     let Some(fav) = ctx else {
@@ -4229,20 +4891,34 @@ unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
         visible,
         combo_engine,
         combo_voice,
+        combo_speed,
+        combo_pitch,
+        combo_volume,
+        edit_speed,
+        edit_pitch,
+        edit_volume,
         checkbox_multilingual,
         combo_favorites,
         favorites_visible,
         is_edge,
+        manual_tuning,
         hwnd_tab,
     ) = match with_state(hwnd, |state| {
         (
             state.voice_panel_visible,
             state.voice_combo_engine,
             state.voice_combo_voice,
+            state.voice_combo_speed,
+            state.voice_combo_pitch,
+            state.voice_combo_volume,
+            state.voice_edit_speed,
+            state.voice_edit_pitch,
+            state.voice_edit_volume,
             state.voice_checkbox_multilingual,
             state.voice_combo_favorites,
             state.voice_favorites_visible,
             matches!(state.settings.tts_engine, TtsEngine::Edge),
+            state.settings.tts_manual_tuning,
             state.hwnd_tab,
         )
     }) {
@@ -4258,7 +4934,9 @@ unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
     }
     let is_combo_focus = focus == combo_engine
         || focus == combo_voice
-        || (is_edge && focus == checkbox_multilingual)
+        || (!manual_tuning && focus == combo_speed)
+        || (!manual_tuning && focus == combo_pitch)
+        || (!manual_tuning && focus == combo_volume)
         || (favorites_visible && focus == combo_favorites);
     if is_combo_focus {
         let dropped = SendMessageW(focus, CB_GETDROPPEDSTATE, WPARAM(0), LPARAM(0)).0 != 0;
@@ -4278,9 +4956,27 @@ unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
     if is_audiobook {
         hwnd_edit = hwnd_tab;
     }
+    let speed_control = if manual_tuning {
+        edit_speed
+    } else {
+        combo_speed
+    };
+    let pitch_control = if manual_tuning {
+        edit_pitch
+    } else {
+        combo_pitch
+    };
+    let volume_control = if manual_tuning {
+        edit_volume
+    } else {
+        combo_volume
+    };
     if focus != hwnd_edit
         && focus != combo_engine
         && focus != combo_voice
+        && focus != speed_control
+        && focus != pitch_control
+        && focus != volume_control
         && focus != hwnd_tab
         && !(is_edge && focus == checkbox_multilingual)
         && !(favorites_visible && focus == combo_favorites)
@@ -4301,59 +4997,45 @@ unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
     } else {
         hwnd_tab
     };
-    if focus == combo_engine {
-        let target = if shift_down {
-            fallback_edit
-        } else {
-            combo_voice
-        };
-        if target.0 != 0 {
-            SetFocus(target);
-            return true;
+    let mut order = Vec::new();
+    if visible {
+        order.push(combo_engine);
+        order.push(combo_voice);
+        order.push(speed_control);
+        order.push(pitch_control);
+        order.push(volume_control);
+        if is_edge {
+            order.push(checkbox_multilingual);
         }
     }
-    if focus == combo_voice {
-        let target = if shift_down {
-            combo_engine
-        } else if is_edge {
-            checkbox_multilingual
-        } else if favorites_visible {
-            combo_favorites
-        } else {
-            fallback_edit
-        };
-        if target.0 != 0 {
-            SetFocus(target);
-            return true;
-        }
+    if favorites_visible {
+        order.push(combo_favorites);
     }
-    if is_edge && focus == checkbox_multilingual {
-        let target = if shift_down {
-            combo_voice
-        } else if favorites_visible {
-            combo_favorites
-        } else {
-            fallback_edit
-        };
-        if target.0 != 0 {
-            SetFocus(target);
-            return true;
-        }
-    }
-    if favorites_visible && focus == combo_favorites {
-        let target = if shift_down {
-            if visible {
-                if is_edge {
-                    checkbox_multilingual
-                } else {
-                    combo_voice
-                }
-            } else {
-                fallback_edit
+    let Some(idx) = order.iter().position(|item| *item == focus) else {
+        return false;
+    };
+    if shift_down {
+        if idx == 0 {
+            if fallback_edit.0 != 0 {
+                SetFocus(fallback_edit);
+                return true;
             }
-        } else {
-            fallback_edit
-        };
+            return false;
+        }
+        let target = order[idx - 1];
+        if target.0 != 0 {
+            SetFocus(target);
+            return true;
+        }
+    } else {
+        if idx + 1 >= order.len() {
+            if fallback_edit.0 != 0 {
+                SetFocus(fallback_edit);
+                return true;
+            }
+            return false;
+        }
+        let target = order[idx + 1];
         if target.0 != 0 {
             SetFocus(target);
             return true;

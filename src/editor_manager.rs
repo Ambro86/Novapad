@@ -2167,6 +2167,15 @@ pub unsafe fn layout_children(hwnd: HWND) {
             state.voice_combo_engine,
             state.voice_label_voice,
             state.voice_combo_voice,
+            state.voice_label_speed,
+            state.voice_combo_speed,
+            state.voice_edit_speed,
+            state.voice_label_pitch,
+            state.voice_combo_pitch,
+            state.voice_edit_pitch,
+            state.voice_label_volume,
+            state.voice_combo_volume,
+            state.voice_edit_volume,
             state.voice_checkbox_multilingual,
             state.voice_label_favorites,
             state.voice_combo_favorites,
@@ -2183,6 +2192,15 @@ pub unsafe fn layout_children(hwnd: HWND) {
         combo_engine,
         label_voice,
         combo_voice,
+        label_speed,
+        combo_speed,
+        edit_speed,
+        label_pitch,
+        combo_pitch,
+        edit_pitch,
+        label_volume,
+        combo_volume,
+        edit_volume,
         checkbox_multilingual,
         label_favorites,
         combo_favorites,
@@ -2216,7 +2234,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
             voice_panel_visible && matches!(tts_engine, crate::settings::TtsEngine::Edge);
         let mut rows = 0;
         if voice_panel_visible {
-            rows += 2;
+            rows += 5;
             if show_multilingual {
                 rows += 1;
             }
@@ -2235,6 +2253,9 @@ pub unsafe fn layout_children(hwnd: HWND) {
         let row2_top = row1_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
         let row3_top = row2_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
         let row4_top = row3_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
+        let row5_top = row4_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
+        let row6_top = row5_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
+        let row7_top = row6_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
 
         if voice_panel_visible {
             let _ = MoveWindow(
@@ -2269,11 +2290,83 @@ pub unsafe fn layout_children(hwnd: HWND) {
                 VOICE_PANEL_COMBO_HEIGHT,
                 true,
             );
+            let _ = MoveWindow(
+                label_speed,
+                label_x,
+                row3_top,
+                VOICE_PANEL_LABEL_WIDTH,
+                VOICE_PANEL_ROW_HEIGHT,
+                true,
+            );
+            let _ = MoveWindow(
+                combo_speed,
+                combo_x,
+                row3_top - 2,
+                combo_width,
+                VOICE_PANEL_COMBO_HEIGHT,
+                true,
+            );
+            let _ = MoveWindow(
+                edit_speed,
+                combo_x,
+                row3_top - 2,
+                combo_width,
+                VOICE_PANEL_COMBO_HEIGHT,
+                true,
+            );
+            let _ = MoveWindow(
+                label_pitch,
+                label_x,
+                row4_top,
+                VOICE_PANEL_LABEL_WIDTH,
+                VOICE_PANEL_ROW_HEIGHT,
+                true,
+            );
+            let _ = MoveWindow(
+                combo_pitch,
+                combo_x,
+                row4_top - 2,
+                combo_width,
+                VOICE_PANEL_COMBO_HEIGHT,
+                true,
+            );
+            let _ = MoveWindow(
+                edit_pitch,
+                combo_x,
+                row4_top - 2,
+                combo_width,
+                VOICE_PANEL_COMBO_HEIGHT,
+                true,
+            );
+            let _ = MoveWindow(
+                label_volume,
+                label_x,
+                row5_top,
+                VOICE_PANEL_LABEL_WIDTH,
+                VOICE_PANEL_ROW_HEIGHT,
+                true,
+            );
+            let _ = MoveWindow(
+                combo_volume,
+                combo_x,
+                row5_top - 2,
+                combo_width,
+                VOICE_PANEL_COMBO_HEIGHT,
+                true,
+            );
+            let _ = MoveWindow(
+                edit_volume,
+                combo_x,
+                row5_top - 2,
+                combo_width,
+                VOICE_PANEL_COMBO_HEIGHT,
+                true,
+            );
             if show_multilingual {
                 let _ = MoveWindow(
                     checkbox_multilingual,
                     label_x,
-                    row3_top,
+                    row6_top,
                     combo_width + VOICE_PANEL_LABEL_WIDTH + VOICE_PANEL_PADDING,
                     VOICE_PANEL_ROW_HEIGHT,
                     true,
@@ -2282,7 +2375,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
                     let _ = MoveWindow(
                         label_favorites,
                         label_x,
-                        row4_top,
+                        row7_top,
                         VOICE_PANEL_LABEL_WIDTH,
                         VOICE_PANEL_ROW_HEIGHT,
                         true,
@@ -2290,7 +2383,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
                     let _ = MoveWindow(
                         combo_favorites,
                         combo_x,
-                        row4_top - 2,
+                        row7_top - 2,
                         combo_width,
                         VOICE_PANEL_COMBO_HEIGHT,
                         true,
@@ -2300,7 +2393,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
                 let _ = MoveWindow(
                     label_favorites,
                     label_x,
-                    row3_top,
+                    row6_top,
                     VOICE_PANEL_LABEL_WIDTH,
                     VOICE_PANEL_ROW_HEIGHT,
                     true,
@@ -2308,7 +2401,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
                 let _ = MoveWindow(
                     combo_favorites,
                     combo_x,
-                    row3_top - 2,
+                    row6_top - 2,
                     combo_width,
                     VOICE_PANEL_COMBO_HEIGHT,
                     true,

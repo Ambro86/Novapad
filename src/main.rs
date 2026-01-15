@@ -37,6 +37,7 @@ mod audio_capture;
 mod i18n;
 mod podcast;
 mod podcast_recorder;
+mod spellcheck;
 mod text_ops;
 mod tools;
 mod updater;
@@ -53,9 +54,9 @@ use std::time::{Duration, Instant};
 use chrono::Local;
 use serde::{Deserialize, Serialize};
 
-use windows::Win32::Foundation::{BOOL, HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::Foundation::{BOOL, HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
-    COLOR_WINDOW, DEFAULT_GUI_FONT, GetStockObject, HBRUSH, HFONT,
+    COLOR_WINDOW, DEFAULT_GUI_FONT, GetStockObject, HBRUSH, HFONT, ScreenToClient,
 };
 use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
 use windows::Win32::System::DataExchange::COPYDATASTRUCT;
@@ -66,7 +67,7 @@ use windows::Win32::UI::Controls::Dialogs::{
     OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST, OPENFILENAMEW,
 };
 use windows::Win32::UI::Controls::RichEdit::{
-    CHARRANGE, EM_EXGETSEL, EM_EXSETSEL, EM_GETTEXTRANGE, TEXTRANGEW,
+    CHARRANGE, EM_EXGETSEL, EM_EXSETSEL, EM_GETTEXTRANGE, EN_SELCHANGE, TEXTRANGEW,
 };
 use windows::Win32::UI::Controls::{
     BST_CHECKED, ICC_TAB_CLASSES, INITCOMMONCONTROLSEX, InitCommonControlsEx, NMHDR, TCM_GETCURSEL,
@@ -92,20 +93,24 @@ use windows::Win32::UI::WindowsAndMessaging::{
     EVENT_OBJECT_FOCUS, EnumWindows, FALT, FCONTROL, FSHIFT, FVIRTKEY, FindWindowW, GWLP_USERDATA,
     GWLP_WNDPROC, GetClassNameW, GetCursorPos, GetMenu, GetMessageW, GetParent, GetWindowLongPtrW,
     HACCEL, HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, IsChild, KillTimer, LoadCursorW,
-    LoadIconW, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MF_BYCOMMAND, MF_CHECKED, MF_STRING,
-    MF_UNCHECKED, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW,
-    RegisterWindowMessageW, SW_HIDE, SW_SHOW, SW_SHOWMAXIMIZED, SendMessageW, SetForegroundWindow,
-    SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow, TPM_RIGHTBUTTON, TrackPopupMenu,
-    TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
-    WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES, WM_KEYDOWN,
-    WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SIZE,
-    WM_SYSKEYDOWN, WM_TIMER, WM_UNDO, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN,
-    WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
+    LoadIconW, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MF_BYCOMMAND, MF_CHECKED, MF_GRAYED,
+    MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW,
+    PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_SHOW, SW_SHOWMAXIMIZED,
+    SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
+    TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE, WM_APP,
+    WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY,
+    WM_DROPFILES, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE,
+    WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WM_UNDO, WNDCLASSW, WNDPROC,
+    WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{Interface, PCWSTR, PWSTR, implement, w};
 
 const EM_SCROLLCARET: u32 = 0x00B7;
 const EM_SETSEL: u32 = 0x00B1;
+const EM_CHARFROMPOS: u32 = 0x00D7;
+const EM_LINEFROMCHAR: u32 = 0x00C9;
+const EM_LINEINDEX: u32 = 0x00BB;
+const EM_LINELENGTH: u32 = 0x00C1;
 
 use crate::app_windows::find_in_files_window::FindInFilesCache;
 use crate::podcast::chapters::Chapter;
@@ -157,6 +162,16 @@ pub(crate) fn focus_editor(hwnd: HWND) {
     }
 }
 
+pub(crate) fn reset_spellcheck_state(hwnd: HWND) {
+    unsafe {
+        let _ = with_state(hwnd, |state| {
+            state.spellcheck_manager.clear_cache();
+            state.spellcheck_last_announce = None;
+            state.spellcheck_context = None;
+        });
+    }
+}
+
 struct PdfLoadResult {
     hwnd_edit: HWND,
     path: PathBuf,
@@ -172,6 +187,37 @@ struct PdfLoadingState {
 struct PodcastChaptersReady {
     key: String,
     chapters: Option<Vec<Chapter>>,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct SpellcheckAnnounceKey {
+    doc_id: isize,
+    line_index: i32,
+    start_utf8: usize,
+    end_utf8: usize,
+    line_hash: u64,
+    language: String,
+}
+
+#[derive(Clone)]
+struct SpellcheckContextMenuState {
+    hwnd_edit: HWND,
+    line_start: i32,
+    language: String,
+    word_range: (usize, usize),
+    word: String,
+    line_text: String,
+    suggestions: Vec<String>,
+}
+
+struct SpellcheckWordContext {
+    doc_id: isize,
+    line_index: i32,
+    line_start: i32,
+    line_text: String,
+    line_hash: u64,
+    word_range: (usize, usize),
+    word: String,
 }
 
 fn log_path() -> Option<PathBuf> {
@@ -1020,6 +1066,10 @@ pub(crate) struct AppState {
     find_in_files_cache: Option<FindInFilesCache>,
     normalize_undo: Option<NormalizeUndo>,
     normalize_skip_change: bool,
+    spellcheck_manager: spellcheck::SpellcheckManager,
+    spellcheck_last_announce: Option<SpellcheckAnnounceKey>,
+    spellcheck_context: Option<SpellcheckContextMenuState>,
+    spellcheck_space_trigger: Option<HWND>,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -1794,6 +1844,10 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 find_in_files_cache: None,
                 normalize_undo: None,
                 normalize_skip_change: false,
+                spellcheck_manager: spellcheck::SpellcheckManager::default(),
+                spellcheck_last_announce: None,
+                spellcheck_context: None,
+                spellcheck_space_trigger: None,
             });
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
 
@@ -1854,6 +1908,10 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             }
             if hdr.code == EN_CHANGE as u32 {
                 editor_manager::mark_dirty_from_edit(hwnd, hdr.hwndFrom);
+                return LRESULT(0);
+            }
+            if hdr.code == EN_SELCHANGE as u32 {
+                handle_spellcheck_selection_change(hwnd, hdr.hwndFrom);
                 return LRESULT(0);
             }
             DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -2159,6 +2217,20 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             }
             if cmd_id == VOICE_MENU_ID_REMOVE_FAVORITE as usize {
                 handle_voice_context_favorite(hwnd, false);
+                return LRESULT(0);
+            }
+            if cmd_id >= IDM_SPELLCHECK_SUGGESTION_BASE
+                && cmd_id < IDM_SPELLCHECK_SUGGESTION_BASE + IDM_SPELLCHECK_SUGGESTION_MAX
+            {
+                handle_spellcheck_suggestion(hwnd, cmd_id - IDM_SPELLCHECK_SUGGESTION_BASE);
+                return LRESULT(0);
+            }
+            if cmd_id == IDM_SPELLCHECK_ADD_TO_DICTIONARY {
+                handle_spellcheck_add_to_dictionary(hwnd);
+                return LRESULT(0);
+            }
+            if cmd_id == IDM_SPELLCHECK_IGNORE_ONCE {
+                handle_spellcheck_ignore_once(hwnd);
                 return LRESULT(0);
             }
 
@@ -3525,6 +3597,421 @@ unsafe fn adjust_tts_restart_pos(hwnd_edit: HWND, pos: i32) -> i32 {
     pos
 }
 
+unsafe fn spellcheck_caret_char_index(hwnd_edit: HWND) -> Option<i32> {
+    let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
+    SendMessageW(
+        hwnd_edit,
+        EM_EXGETSEL,
+        WPARAM(0),
+        LPARAM(&mut selection as *mut _ as isize),
+    );
+    if selection.cpMin < 0 {
+        None
+    } else {
+        Some(selection.cpMin)
+    }
+}
+
+unsafe fn spellcheck_char_index_from_lparam(hwnd_edit: HWND, lparam: LPARAM) -> Option<i32> {
+    if lparam.0 == -1 {
+        return spellcheck_caret_char_index(hwnd_edit);
+    }
+    let x = (lparam.0 & 0xffff) as i32;
+    let y = ((lparam.0 >> 16) & 0xffff) as i32;
+    if x == -1 && y == -1 {
+        return spellcheck_caret_char_index(hwnd_edit);
+    }
+    let mut pt = POINT { x, y };
+    let _ = ScreenToClient(hwnd_edit, &mut pt);
+    let res = SendMessageW(
+        hwnd_edit,
+        EM_CHARFROMPOS,
+        WPARAM(0),
+        LPARAM(&pt as *const _ as isize),
+    )
+    .0 as i32;
+    if res < 0 { None } else { Some(res) }
+}
+
+unsafe fn spellcheck_line_info(hwnd_edit: HWND, char_index: i32) -> Option<(i32, i32, String)> {
+    if char_index < 0 {
+        return None;
+    }
+    let line_index = SendMessageW(
+        hwnd_edit,
+        EM_LINEFROMCHAR,
+        WPARAM(char_index as usize),
+        LPARAM(0),
+    )
+    .0 as i32;
+    if line_index < 0 {
+        return None;
+    }
+    let line_start = SendMessageW(
+        hwnd_edit,
+        EM_LINEINDEX,
+        WPARAM(line_index as usize),
+        LPARAM(0),
+    )
+    .0 as i32;
+    if line_start < 0 {
+        return None;
+    }
+    let line_len = SendMessageW(
+        hwnd_edit,
+        EM_LINELENGTH,
+        WPARAM(line_start as usize),
+        LPARAM(0),
+    )
+    .0 as i32;
+    if line_len <= 0 {
+        return Some((line_index, line_start, String::new()));
+    }
+    let mut buf = vec![0u16; (line_len + 1) as usize];
+    let mut range = TEXTRANGEW {
+        chrg: CHARRANGE {
+            cpMin: line_start,
+            cpMax: line_start + line_len,
+        },
+        lpstrText: PWSTR(buf.as_mut_ptr()),
+    };
+    SendMessageW(
+        hwnd_edit,
+        EM_GETTEXTRANGE,
+        WPARAM(0),
+        LPARAM(&mut range as *mut _ as isize),
+    );
+    let line_text = from_wide(buf.as_ptr());
+    Some((line_index, line_start, line_text))
+}
+
+unsafe fn spellcheck_word_context_from_char_index(
+    hwnd_edit: HWND,
+    char_index: i32,
+) -> Option<SpellcheckWordContext> {
+    let (line_index, line_start, line_text) = spellcheck_line_info(hwnd_edit, char_index)?;
+    if line_text.is_empty() {
+        return None;
+    }
+    let offset_utf16 = (char_index - line_start).max(0) as u32;
+    let caret_byte = spellcheck::utf16_offset_to_utf8_byte_offset(&line_text, offset_utf16);
+    let word_range = spellcheck::word_range_at(&line_text, caret_byte)?;
+    let word = line_text
+        .get(word_range.0..word_range.1)
+        .unwrap_or("")
+        .to_string();
+    if word.is_empty() {
+        return None;
+    }
+    let line_hash = spellcheck::hash_line(&line_text);
+    Some(SpellcheckWordContext {
+        doc_id: hwnd_edit.0,
+        line_index,
+        line_start,
+        line_text,
+        line_hash,
+        word_range,
+        word,
+    })
+}
+
+unsafe fn spellcheck_word_context_from_lparam(
+    hwnd_edit: HWND,
+    lparam: LPARAM,
+) -> Option<SpellcheckWordContext> {
+    let char_index = spellcheck_char_index_from_lparam(hwnd_edit, lparam)?;
+    spellcheck_word_context_from_char_index(hwnd_edit, char_index)
+}
+
+unsafe fn handle_spellcheck_selection_change(hwnd: HWND, hwnd_edit: HWND) {
+    let should_check = with_state(hwnd, |state| {
+        state.spellcheck_space_trigger == Some(hwnd_edit)
+    })
+    .unwrap_or(false);
+    if !should_check {
+        return;
+    }
+    let _ = with_state(hwnd, |state| {
+        state.spellcheck_space_trigger = None;
+    });
+    let Some(caret_index) = spellcheck_caret_char_index(hwnd_edit) else {
+        let _ = with_state(hwnd, |state| state.spellcheck_last_announce = None);
+        return;
+    };
+    let Some(word_ctx) = spellcheck_word_context_from_char_index(hwnd_edit, caret_index) else {
+        let _ = with_state(hwnd, |state| state.spellcheck_last_announce = None);
+        return;
+    };
+
+    let (announce_msg, fallback_msg) = with_state(hwnd, |state| {
+        let settings = &state.settings;
+        let Some(resolution) = state.spellcheck_manager.resolve_language(settings) else {
+            state.spellcheck_last_announce = None;
+            return (None, None);
+        };
+        let language_ui = settings.language;
+        let fallback_msg = if resolution.announce_fallback {
+            Some(i18n::tr_f(
+                language_ui,
+                "spellcheck.language_fallback",
+                &[
+                    ("requested", &resolution.requested),
+                    ("language", &resolution.effective),
+                ],
+            ))
+        } else {
+            None
+        };
+
+        let miss = state.spellcheck_manager.is_word_misspelled(
+            word_ctx.doc_id,
+            word_ctx.line_index,
+            &word_ctx.line_text,
+            word_ctx.word_range,
+            &resolution.effective,
+        );
+        if let Some(miss) = miss {
+            let key = SpellcheckAnnounceKey {
+                doc_id: word_ctx.doc_id,
+                line_index: word_ctx.line_index,
+                start_utf8: miss.start,
+                end_utf8: miss.end,
+                line_hash: word_ctx.line_hash,
+                language: resolution.effective.clone(),
+            };
+            if state.spellcheck_last_announce.as_ref() != Some(&key) {
+                state.spellcheck_last_announce = Some(key);
+                let msg = i18n::tr_f(
+                    language_ui,
+                    "spellcheck.announce_misspelled",
+                    &[("word", &word_ctx.word)],
+                );
+                return (Some(msg), fallback_msg);
+            }
+            return (None, fallback_msg);
+        }
+        state.spellcheck_last_announce = None;
+        (None, fallback_msg)
+    })
+    .unwrap_or((None, None));
+
+    if let Some(message) = fallback_msg {
+        log_debug(&format!("Spellcheck: {message}"));
+        let _ = nvda_speak(&message);
+    }
+    if let Some(message) = announce_msg {
+        let _ = nvda_speak(&message);
+    }
+}
+
+pub(crate) unsafe fn show_editor_context_menu(hwnd: HWND, hwnd_edit: HWND, lparam: LPARAM) {
+    let language_ui = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let labels = menu_labels(language_ui);
+
+    let mut spell_status = None;
+    let mut spell_context = None;
+    let mut fallback_msg = None;
+
+    if let Some(word_ctx) = spellcheck_word_context_from_lparam(hwnd_edit, lparam) {
+        let (status, suggestions, language, fallback) = with_state(hwnd, |state| {
+            let settings = &state.settings;
+            let Some(resolution) = state.spellcheck_manager.resolve_language(settings) else {
+                return (None, Vec::new(), None, None);
+            };
+            let fallback_msg = if resolution.announce_fallback {
+                Some(i18n::tr_f(
+                    settings.language,
+                    "spellcheck.language_fallback",
+                    &[
+                        ("requested", &resolution.requested),
+                        ("language", &resolution.effective),
+                    ],
+                ))
+            } else {
+                None
+            };
+            let miss = state.spellcheck_manager.is_word_misspelled(
+                word_ctx.doc_id,
+                word_ctx.line_index,
+                &word_ctx.line_text,
+                word_ctx.word_range,
+                &resolution.effective,
+            );
+            if miss.is_some() {
+                let suggestions = state
+                    .spellcheck_manager
+                    .suggestions(&word_ctx.word, &resolution.effective);
+                (
+                    Some(true),
+                    suggestions,
+                    Some(resolution.effective.clone()),
+                    fallback_msg,
+                )
+            } else {
+                (
+                    Some(false),
+                    Vec::new(),
+                    Some(resolution.effective.clone()),
+                    fallback_msg,
+                )
+            }
+        })
+        .unwrap_or((None, Vec::new(), None, None));
+
+        spell_status = status;
+        fallback_msg = fallback;
+        if status == Some(true) {
+            let suggestions = suggestions
+                .into_iter()
+                .take(menu::IDM_SPELLCHECK_SUGGESTION_MAX)
+                .collect::<Vec<_>>();
+            if let Some(language) = language {
+                spell_context = Some(SpellcheckContextMenuState {
+                    hwnd_edit,
+                    line_start: word_ctx.line_start,
+                    language,
+                    word_range: word_ctx.word_range,
+                    word: word_ctx.word,
+                    line_text: word_ctx.line_text,
+                    suggestions,
+                });
+            }
+        }
+    }
+
+    let _ = with_state(hwnd, |state| {
+        state.spellcheck_context = spell_context.clone();
+    });
+
+    if let Some(message) = fallback_msg {
+        log_debug(&format!("Spellcheck: {message}"));
+        let _ = nvda_speak(&message);
+    }
+
+    let menu = CreatePopupMenu().unwrap_or(HMENU(0));
+    if menu.0 == 0 {
+        return;
+    }
+
+    if let Some(status) = spell_status {
+        if status {
+            let label = i18n::tr(language_ui, "context_menu.spelling_misspelled");
+            let _ = AppendMenuW(
+                menu,
+                MF_STRING | MF_GRAYED,
+                0,
+                PCWSTR(to_wide(&label).as_ptr()),
+            );
+            if let Ok(submenu) = CreatePopupMenu() {
+                if submenu.0 != 0 {
+                    let suggestions = spell_context
+                        .as_ref()
+                        .map(|ctx| ctx.suggestions.as_slice())
+                        .unwrap_or(&[]);
+                    if suggestions.is_empty() {
+                        let none_label =
+                            i18n::tr(language_ui, "context_menu.spelling_no_suggestions");
+                        let _ = AppendMenuW(
+                            submenu,
+                            MF_STRING | MF_GRAYED,
+                            0,
+                            PCWSTR(to_wide(&none_label).as_ptr()),
+                        );
+                    } else {
+                        for (idx, suggestion) in suggestions.iter().enumerate() {
+                            let id = menu::IDM_SPELLCHECK_SUGGESTION_BASE + idx;
+                            let _ = AppendMenuW(
+                                submenu,
+                                MF_STRING,
+                                id,
+                                PCWSTR(to_wide(suggestion).as_ptr()),
+                            );
+                        }
+                    }
+                    let _ = AppendMenuW(submenu, MF_SEPARATOR, 0, PCWSTR::null());
+                    let add_label =
+                        i18n::tr(language_ui, "context_menu.spelling_add_to_dictionary");
+                    let ignore_label = i18n::tr(language_ui, "context_menu.spelling_ignore_once");
+                    let _ = AppendMenuW(
+                        submenu,
+                        MF_STRING,
+                        menu::IDM_SPELLCHECK_ADD_TO_DICTIONARY,
+                        PCWSTR(to_wide(&add_label).as_ptr()),
+                    );
+                    let _ = AppendMenuW(
+                        submenu,
+                        MF_STRING,
+                        menu::IDM_SPELLCHECK_IGNORE_ONCE,
+                        PCWSTR(to_wide(&ignore_label).as_ptr()),
+                    );
+                    let suggestions_label =
+                        i18n::tr(language_ui, "context_menu.spelling_suggestions");
+                    let _ = AppendMenuW(
+                        menu,
+                        MF_POPUP,
+                        submenu.0 as usize,
+                        PCWSTR(to_wide(&suggestions_label).as_ptr()),
+                    );
+                }
+            }
+        } else {
+            let label = i18n::tr(language_ui, "context_menu.spelling_ok");
+            let _ = AppendMenuW(
+                menu,
+                MF_STRING | MF_GRAYED,
+                0,
+                PCWSTR(to_wide(&label).as_ptr()),
+            );
+        }
+        let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
+    }
+
+    let _ = AppendMenuW(
+        menu,
+        MF_STRING,
+        IDM_EDIT_UNDO,
+        PCWSTR(to_wide(&labels.edit_undo).as_ptr()),
+    );
+    let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
+    let _ = AppendMenuW(
+        menu,
+        MF_STRING,
+        IDM_EDIT_CUT,
+        PCWSTR(to_wide(&labels.edit_cut).as_ptr()),
+    );
+    let _ = AppendMenuW(
+        menu,
+        MF_STRING,
+        IDM_EDIT_COPY,
+        PCWSTR(to_wide(&labels.edit_copy).as_ptr()),
+    );
+    let _ = AppendMenuW(
+        menu,
+        MF_STRING,
+        IDM_EDIT_PASTE,
+        PCWSTR(to_wide(&labels.edit_paste).as_ptr()),
+    );
+    let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
+    let _ = AppendMenuW(
+        menu,
+        MF_STRING,
+        IDM_EDIT_SELECT_ALL,
+        PCWSTR(to_wide(&labels.edit_select_all).as_ptr()),
+    );
+
+    let mut x = (lparam.0 & 0xffff) as i32;
+    let mut y = ((lparam.0 >> 16) & 0xffff) as i32;
+    if x == -1 && y == -1 {
+        let mut pt = POINT::default();
+        let _ = GetCursorPos(&mut pt);
+        x = pt.x;
+        y = pt.y;
+    }
+    SetForegroundWindow(hwnd);
+    let _ = TrackPopupMenu(menu, TPM_RIGHTBUTTON, x, y, 0, hwnd, None);
+    let _ = PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0));
+}
+
 unsafe fn show_voice_context_menu(hwnd: HWND, target: HWND, lparam: LPARAM) {
     let (combo_voice, combo_favorites, engine, language) = with_state(hwnd, |state| {
         (
@@ -3600,6 +4087,92 @@ unsafe fn show_voice_context_menu(hwnd: HWND, target: HWND, lparam: LPARAM) {
     SetForegroundWindow(hwnd);
     let _ = TrackPopupMenu(menu, TPM_RIGHTBUTTON, x, y, 0, hwnd, None);
     let _ = PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0));
+}
+
+unsafe fn replace_spellcheck_word(
+    hwnd_edit: HWND,
+    ctx: &SpellcheckContextMenuState,
+    replacement: &str,
+) {
+    let start_utf16 = ctx.line_start
+        + spellcheck::utf8_byte_offset_to_utf16_units(&ctx.line_text, ctx.word_range.0);
+    let end_utf16 = ctx.line_start
+        + spellcheck::utf8_byte_offset_to_utf16_units(&ctx.line_text, ctx.word_range.1);
+    let mut range = CHARRANGE {
+        cpMin: start_utf16,
+        cpMax: end_utf16,
+    };
+    SendMessageW(
+        hwnd_edit,
+        EM_EXSETSEL,
+        WPARAM(0),
+        LPARAM(&mut range as *mut _ as isize),
+    );
+    let wide = to_wide(replacement);
+    let _ = SendMessageW(
+        hwnd_edit,
+        EM_REPLACESEL,
+        WPARAM(1),
+        LPARAM(wide.as_ptr() as isize),
+    );
+    let new_end =
+        start_utf16 + spellcheck::utf8_byte_offset_to_utf16_units(replacement, replacement.len());
+    let mut new_sel = CHARRANGE {
+        cpMin: new_end,
+        cpMax: new_end,
+    };
+    let _ = SendMessageW(
+        hwnd_edit,
+        EM_EXSETSEL,
+        WPARAM(0),
+        LPARAM(&mut new_sel as *mut _ as isize),
+    );
+}
+
+unsafe fn handle_spellcheck_suggestion(hwnd: HWND, index: usize) {
+    let ctx = with_state(hwnd, |state| state.spellcheck_context.clone()).unwrap_or(None);
+    let Some(ctx) = ctx else {
+        return;
+    };
+    let Some(replacement) = ctx.suggestions.get(index).cloned() else {
+        return;
+    };
+    if ctx.hwnd_edit.0 != 0 {
+        replace_spellcheck_word(ctx.hwnd_edit, &ctx, &replacement);
+    }
+    let _ = with_state(hwnd, |state| {
+        state.spellcheck_manager.clear_cache();
+        state.spellcheck_last_announce = None;
+        state.spellcheck_context = None;
+    });
+}
+
+unsafe fn handle_spellcheck_add_to_dictionary(hwnd: HWND) {
+    let ctx = with_state(hwnd, |state| state.spellcheck_context.clone()).unwrap_or(None);
+    let Some(ctx) = ctx else {
+        return;
+    };
+    let _ = with_state(hwnd, |state| {
+        state
+            .spellcheck_manager
+            .add_to_dictionary(&ctx.word, &ctx.language);
+        state.spellcheck_last_announce = None;
+        state.spellcheck_context = None;
+    });
+}
+
+unsafe fn handle_spellcheck_ignore_once(hwnd: HWND) {
+    let ctx = with_state(hwnd, |state| state.spellcheck_context.clone()).unwrap_or(None);
+    let Some(ctx) = ctx else {
+        return;
+    };
+    let _ = with_state(hwnd, |state| {
+        state
+            .spellcheck_manager
+            .ignore_once(&ctx.word, &ctx.language);
+        state.spellcheck_last_announce = None;
+        state.spellcheck_context = None;
+    });
 }
 
 unsafe fn handle_voice_context_favorite(hwnd: HWND, add: bool) {

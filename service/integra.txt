@@ -1,53 +1,89 @@
-You are working inside the Novapad codebase (Rust, Windows). The project already has a Podcast player and NVDA integration via NVDA Controller Client. Implement “Podcast Chapters” support with accessible announcements and navigation commands.
+You are working inside the existing Novapad Rust codebase (Windows-only). Implement spellcheck using Windows Spell Checking API (COM): ISpellCheckerFactory / ISpellChecker. Integrate with editor language, context menu, and NVDA announcements.
 
-GOALS
-1) Chapters parsing + model:
-   - Support Podcasting 2.0 chapters first:
-     - Parse <podcast:chapters ...> in the episode RSS item (namespace: https://podcastindex.org/namespace/1.0).
-     - The tag provides a URL and a type. Support type "application/json+chapters" (JSON Chapters spec).
-     - Fetch the chapters JSON over HTTP using the project’s existing HTTP client (do NOT add bypass techniques; normal fetching only).
-   - Represent chapters as: Vec<Chapter> where Chapter = { start_ms: u64, title: String, url: Option<String>, image: Option<String> }.
-   - Sort chapters by start_ms ascending, drop invalid entries (missing startTime or title, negative times, duplicates can be kept but stable).
+KEY USER REQUIREMENTS
+1) Language:
+   - Novapad already has a user-selected language (likely used by the app/editor).
+   - Prefer reusing that language for spellcheck IF it is a BCP-47 tag (e.g., "it-IT", "en-US").
+   - Implement a spellcheck language mode:
+       a) FollowEditorLanguage (default)
+       b) FixedLanguage(lang_tag)
+   - If current editor language is not a valid BCP-47 / not supported by Windows spellcheck, fall back gracefully to system UI language or "en-US" and show status message.
 
-2) Player integration:
-   - The audio player already tracks current playback position in ms (or can query it). Add a “current chapter index” function:
-     - Given current_pos_ms and chapters, return the index i of the last chapter whose start_ms <= current_pos_ms (or None if before first).
-   - Add “seek_to_chapter(index)” that seeks player to chapters[index].start_ms.
+2) Context menu on word:
+   - When the user opens the context menu while focused on a word, the menu must indicate spelling status:
+       - If correct: disabled item "Spelling: OK"
+       - If incorrect: "Spelling: Misspelled" plus submenu:
+            - Suggestions (list; Enter replaces the word)
+            - Add to dictionary
+            - Ignore once
+   - The status and suggestions must be computed for the word under caret (or under mouse if that exists). Prefer using cached line results to avoid slow calls.
 
-3) NVDA announcement behavior (important):
-   - When playback advances into a new chapter, NVDA must announce: "Chapter: {title}" exactly once per chapter transition.
-   - Do NOT repeat the same chapter announcement continuously (e.g., on timer ticks). Implement debouncing:
-     - Keep last_announced_chapter_index: Option<usize> in the playback/session state.
-     - On position updates, compute current_chapter_index; if it differs from last_announced_chapter_index, announce and update last_announced_chapter_index.
-   - Use the existing NVDA Controller Client wrapper (already in the repo). Use the same pattern used for other spoken status messages. Do not change already-working NVDA code; only extend it.
+3) NVDA announcement:
+   - When caret lands on a misspelled word, NVDA must announce:
+       "Errore ortografico: <word>"
+     (Italian string is fine; if Novapad is localized, route through existing i18n.)
+   - Announce only once per word occurrence while the caret stays on it. Do not repeat on every arrow move inside the same word.
+   - Use NVDA Controller Client already used in Novapad.
 
-4) UI / Commands (menu “Riproduci”):
-   Add three commands in the “Riproduci” menu and bind them consistently with existing command system:
-   A) “Capitolo successivo”:
-      - If there is a next chapter after current_chapter_index, seek to it.
-      - If currently before the first chapter, go to chapter 0.
-      - If already at last chapter, optionally announce “Ultimo capitolo” (or do nothing) – follow existing UX conventions in the codebase.
-   B) “Capitolo precedente”:
-      - If there is a previous chapter, seek to it.
-      - If in first chapter, seek to 0:00 or the first chapter start based on existing behavior (choose consistent behavior).
-   C) “Lista capitoli…”:
-      - Opens a list UI consistent with other lists in Novapad (e.g., list of episodes, RSS items).
-      - Populate rows with "mm:ss  Title" (or hh:mm:ss if long).
-      - On Enter on a row: seek to that chapter start and close the list, then NVDA announces the chapter (either immediately or via chapter-change detection; ensure it’s announced once).
+CONSTRAINTS
+- Use Windows Spell Checking API only (no Hunspell).
+- Use `windows` crate (preferred) or `windows-sys` if already used.
+- Keep changes minimal, consistent with Novapad command/menu architecture.
+- Handle UTF-16 offsets from COM and convert to UTF-8 byte offsets correctly.
 
-5) Caching & performance:
-   - Cache chapters per episode GUID/URL in memory for the session to avoid refetching on every play.
-   - If chapters fetch fails, playback still works; show/announce a non-blocking message like “Capitoli non disponibili”.
+DELIVERABLES / FILES
+A) Spellcheck backend
+   - Add module: src/spellcheck/windows_spellcheck.rs
+   - Implement WindowsSpellChecker with:
+       - supported_languages() -> Vec<String>
+       - set_language(lang: &str)
+       - check_text(text: &str) -> Vec<Misspelling> where Misspelling includes UTF-8 byte ranges
+       - suggestions(word: &str) -> Vec<String>
+       - add_to_dictionary(word: &str)
+       - ignore_once(word: &str) or local ignore-once set if no API support
 
-6) Files & structure:
-   - Create or extend modules in a clean way:
-     - e.g., podcast/chapters.rs for parsing + fetching + model
-     - integrate into podcast/player.rs (or equivalent)
-     - integrate commands/menu in the UI command registry.
-   - Add minimal unit tests for:
-     - JSON parsing of chapters with various startTime formats (number seconds, "HH:MM:SS" if spec allows; handle the formats you choose and document it).
-     - current chapter index calculation edge cases (before first, exactly at boundary, after last).
+B) Spellcheck manager (editor-facing)
+   - Add a small manager that:
+       - resolves effective language based on FollowEditorLanguage vs FixedLanguage
+       - caches results per line: (doc_id, line_index, line_text_hash, language) -> Vec<Misspelling>
+       - provides quick query: is_word_misspelled(line_text, word_range) -> Option<Misspelling>
 
-DELIVERABLES
-- Implement code changes with compile-clean result.
-- Provide a short summary of what you changed and where.
+C) Editor integration
+   - Hook on caret movement events (arrow keys, word navigation, click) to detect current word.
+   - If current word is misspelled and not yet announced for that occurrence, call NVDA to speak:
+       "Errore ortografico: {word}"
+   - Maintain a dedup key:
+       (doc_id, line_index, start_utf8, end_utf8, line_text_hash, language)
+     Store last_announced_key; only announce when it changes.
+
+D) Context menu integration
+   - On context menu open:
+       - compute current word range + word text
+       - check spelling status using cached line data (populate cache if missing)
+       - add menu items described above
+       - suggestions list: selecting replaces the word and preserves caret
+
+E) Offset conversion correctness
+   - COM returns offsets in UTF-16 code units (StartIndex, Length).
+   - Implement helper:
+       utf16_offset_to_utf8_byte_offset(text: &str, utf16_units: u32) -> usize
+   - Add unit tests: ASCII, accents ("città"), emoji ("😀").
+   - Ensure surrogate pairs handled correctly.
+
+F) COM/threading
+   - Ensure CoInitializeEx is called in the thread doing COM calls.
+   - If using background worker for spellcheck, initialize COM there too. Otherwise keep calls on UI thread and rely on caching.
+
+CONFIG
+- Add settings:
+   spellcheck.enabled (bool, default true or false per existing conventions)
+   spellcheck.language_mode ("follow" | "fixed")
+   spellcheck.fixed_language (string, default "en-US")
+- If editor already has language config, wire FollowEditorLanguage to that value.
+
+OUTPUT REQUIREMENTS
+- Provide a concise summary of changes and list of files modified/added.
+- Include code with clear comments around COM, caching, and NVDA announce dedup.
+- Ensure build passes and style is clippy-friendly.
+
+Proceed to implement now in the repo.

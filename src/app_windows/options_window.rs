@@ -50,6 +50,9 @@ const OPTIONS_ID_SPLIT_ON_NEWLINE: usize = 6007;
 const OPTIONS_ID_WORD_WRAP: usize = 6008;
 const OPTIONS_ID_SMART_QUOTES: usize = 6025;
 const OPTIONS_ID_CONTEXT_MENU: usize = 6026;
+const OPTIONS_ID_SPELLCHECK_ENABLED: usize = 6027;
+const OPTIONS_ID_SPELLCHECK_LANGUAGE_MODE: usize = 6028;
+const OPTIONS_ID_SPELLCHECK_FIXED_LANGUAGE: usize = 6029;
 const OPTIONS_ID_MOVE_CURSOR: usize = 6009;
 const OPTIONS_ID_TTS_SPEED: usize = 6014;
 const OPTIONS_ID_TTS_PITCH: usize = 6020;
@@ -150,6 +153,11 @@ struct OptionsDialogState {
     checkbox_split_on_newline: HWND,
     checkbox_word_wrap: HWND,
     checkbox_smart_quotes: HWND,
+    checkbox_spellcheck: HWND,
+    label_spellcheck_language_mode: HWND,
+    combo_spellcheck_language_mode: HWND,
+    label_spellcheck_fixed_language: HWND,
+    edit_spellcheck_fixed_language: HWND,
     label_wrap_width: HWND,
     edit_wrap_width: HWND,
     label_quote_prefix: HWND,
@@ -181,6 +189,9 @@ struct OptionsLabels {
     label_split_on_newline: String,
     label_word_wrap: String,
     label_smart_quotes: String,
+    label_spellcheck: String,
+    label_spellcheck_language_mode: String,
+    label_spellcheck_fixed_language: String,
     label_wrap_width: String,
     label_quote_prefix: String,
     label_move_cursor: String,
@@ -206,6 +217,8 @@ struct OptionsLabels {
     split_none: String,
     split_by_text: String,
     split_parts: String,
+    spellcheck_mode_follow: String,
+    spellcheck_mode_fixed: String,
     prompt_cmd: String,
     prompt_powershell: String,
     prompt_codex: String,
@@ -237,6 +250,15 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_split_on_newline: i18n::tr(language, "options.label.split_on_newline"),
         label_word_wrap: i18n::tr(language, "options.label.word_wrap"),
         label_smart_quotes: i18n::tr(language, "options.label.smart_quotes"),
+        label_spellcheck: i18n::tr(language, "options.label.spellcheck"),
+        label_spellcheck_language_mode: i18n::tr(
+            language,
+            "options.label.spellcheck_language_mode",
+        ),
+        label_spellcheck_fixed_language: i18n::tr(
+            language,
+            "options.label.spellcheck_fixed_language",
+        ),
         label_wrap_width: i18n::tr(language, "options.label.wrap_width"),
         label_quote_prefix: i18n::tr(language, "options.label.quote_prefix"),
         label_move_cursor: i18n::tr(language, "options.label.move_cursor"),
@@ -265,6 +287,8 @@ fn options_labels(language: Language) -> OptionsLabels {
         split_none: i18n::tr(language, "options.split.none"),
         split_by_text: i18n::tr(language, "options.split.by_text"),
         split_parts: i18n::tr(language, "options.split.parts"),
+        spellcheck_mode_follow: i18n::tr(language, "options.spellcheck.language_mode.follow"),
+        spellcheck_mode_fixed: i18n::tr(language, "options.spellcheck.language_mode.fixed"),
         prompt_cmd: i18n::tr(language, "options.prompt.cmd"),
         prompt_powershell: i18n::tr(language, "options.prompt.powershell"),
         prompt_codex: i18n::tr(language, "options.prompt.codex"),
@@ -861,6 +885,82 @@ unsafe extern "system" fn options_wndproc(
             );
             y += 26;
 
+            let checkbox_spellcheck = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_spellcheck).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                170,
+                y,
+                300,
+                20,
+                hwnd,
+                HMENU(OPTIONS_ID_SPELLCHECK_ENABLED as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 26;
+
+            let label_spellcheck_language_mode = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_spellcheck_language_mode).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_spellcheck_language_mode = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                140,
+                hwnd,
+                HMENU(OPTIONS_ID_SPELLCHECK_LANGUAGE_MODE as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
+            let label_spellcheck_fixed_language = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_spellcheck_fixed_language).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let edit_spellcheck_fixed_language = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                170,
+                y - 2,
+                120,
+                22,
+                hwnd,
+                HMENU(OPTIONS_ID_SPELLCHECK_FIXED_LANGUAGE as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
             let label_wrap_width = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -1058,6 +1158,11 @@ unsafe extern "system" fn options_wndproc(
                 checkbox_split_on_newline,
                 checkbox_word_wrap,
                 checkbox_smart_quotes,
+                checkbox_spellcheck,
+                label_spellcheck_language_mode,
+                combo_spellcheck_language_mode,
+                label_spellcheck_fixed_language,
+                edit_spellcheck_fixed_language,
                 label_wrap_width,
                 edit_wrap_width,
                 label_quote_prefix,
@@ -1106,6 +1211,11 @@ unsafe extern "system" fn options_wndproc(
                 checkbox_split_on_newline,
                 checkbox_word_wrap,
                 checkbox_smart_quotes,
+                checkbox_spellcheck,
+                label_spellcheck_language_mode,
+                combo_spellcheck_language_mode,
+                label_spellcheck_fixed_language,
+                edit_spellcheck_fixed_language,
                 label_wrap_width,
                 edit_wrap_width,
                 label_quote_prefix,
@@ -1180,6 +1290,16 @@ unsafe extern "system" fn options_wndproc(
                     if code == CBN_SELCHANGE {
                         update_audio_split_text_visibility(hwnd);
                     }
+                    LRESULT(0)
+                }
+                OPTIONS_ID_SPELLCHECK_LANGUAGE_MODE => {
+                    if code == CBN_SELCHANGE {
+                        update_spellcheck_language_mode_visibility(hwnd);
+                    }
+                    LRESULT(0)
+                }
+                OPTIONS_ID_SPELLCHECK_ENABLED => {
+                    update_spellcheck_language_mode_visibility(hwnd);
                     LRESULT(0)
                 }
                 _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -1288,6 +1408,9 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         checkbox_split_on_newline,
         checkbox_word_wrap,
         checkbox_smart_quotes,
+        checkbox_spellcheck,
+        combo_spellcheck_language_mode,
+        edit_spellcheck_fixed_language,
         _label_wrap_width,
         edit_wrap_width,
         _label_quote_prefix,
@@ -1317,6 +1440,9 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.checkbox_split_on_newline,
             state.checkbox_word_wrap,
             state.checkbox_smart_quotes,
+            state.checkbox_spellcheck,
+            state.combo_spellcheck_language_mode,
+            state.edit_spellcheck_fixed_language,
             state.label_wrap_width,
             state.edit_wrap_width,
             state.label_quote_prefix,
@@ -1622,6 +1748,49 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         }),
         LPARAM(0),
     );
+    let _ = SendMessageW(
+        checkbox_spellcheck,
+        BM_SETCHECK,
+        WPARAM(if settings.spellcheck_enabled {
+            BST_CHECKED.0 as usize
+        } else {
+            0
+        }),
+        LPARAM(0),
+    );
+    let _ = SendMessageW(
+        combo_spellcheck_language_mode,
+        CB_RESETCONTENT,
+        WPARAM(0),
+        LPARAM(0),
+    );
+    let _ = SendMessageW(
+        combo_spellcheck_language_mode,
+        CB_ADDSTRING,
+        WPARAM(0),
+        LPARAM(to_wide(&labels.spellcheck_mode_follow).as_ptr() as isize),
+    );
+    let _ = SendMessageW(
+        combo_spellcheck_language_mode,
+        CB_ADDSTRING,
+        WPARAM(0),
+        LPARAM(to_wide(&labels.spellcheck_mode_fixed).as_ptr() as isize),
+    );
+    let mode_index = match settings.spellcheck_language_mode {
+        crate::settings::SpellcheckLanguageMode::FixedLanguage => 1,
+        crate::settings::SpellcheckLanguageMode::FollowEditorLanguage => 0,
+    };
+    let _ = SendMessageW(
+        combo_spellcheck_language_mode,
+        CB_SETCURSEL,
+        WPARAM(mode_index),
+        LPARAM(0),
+    );
+    let _ = SetWindowTextW(
+        edit_spellcheck_fixed_language,
+        PCWSTR(to_wide(&settings.spellcheck_fixed_language).as_ptr()),
+    );
+    update_spellcheck_language_mode_visibility(hwnd);
     let wrap_text = settings.wrap_width.to_string();
     let _ = SetWindowTextW(edit_wrap_width, PCWSTR(to_wide(&wrap_text).as_ptr()));
     let _ = SetWindowTextW(
@@ -1986,6 +2155,9 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         checkbox_split_on_newline,
         checkbox_word_wrap,
         checkbox_smart_quotes,
+        checkbox_spellcheck,
+        combo_spellcheck_language_mode,
+        edit_spellcheck_fixed_language,
         edit_wrap_width,
         edit_quote_prefix,
         checkbox_move_cursor,
@@ -2011,6 +2183,9 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.checkbox_split_on_newline,
             state.checkbox_word_wrap,
             state.checkbox_smart_quotes,
+            state.checkbox_spellcheck,
+            state.combo_spellcheck_language_mode,
+            state.edit_spellcheck_fixed_language,
             state.edit_wrap_width,
             state.edit_quote_prefix,
             state.checkbox_move_cursor,
@@ -2028,6 +2203,9 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     let old_marker_position = settings.modified_marker_position;
     let old_word_wrap = settings.word_wrap;
     let old_context_menu = settings.context_menu_open_with;
+    let old_spellcheck_enabled = settings.spellcheck_enabled;
+    let old_spellcheck_mode = settings.spellcheck_language_mode;
+    let old_spellcheck_fixed_language = settings.spellcheck_fixed_language.clone();
     let (old_engine, old_voice, old_rate, old_pitch, old_volume, was_tts_active) =
         with_state(parent, |state| {
             (
@@ -2108,6 +2286,31 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     settings.smart_quotes = SendMessageW(checkbox_smart_quotes, BM_GETCHECK, WPARAM(0), LPARAM(0)).0
         as u32
         == BST_CHECKED.0;
+    settings.spellcheck_enabled =
+        SendMessageW(checkbox_spellcheck, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
+            == BST_CHECKED.0;
+    let spellcheck_mode_sel = SendMessageW(
+        combo_spellcheck_language_mode,
+        CB_GETCURSEL,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0;
+    settings.spellcheck_language_mode = if spellcheck_mode_sel == 1 {
+        crate::settings::SpellcheckLanguageMode::FixedLanguage
+    } else {
+        crate::settings::SpellcheckLanguageMode::FollowEditorLanguage
+    };
+    let spellcheck_lang_len = GetWindowTextLengthW(edit_spellcheck_fixed_language);
+    if spellcheck_lang_len >= 0 {
+        let mut buf = vec![0u16; (spellcheck_lang_len + 1) as usize];
+        let read = GetWindowTextW(edit_spellcheck_fixed_language, &mut buf);
+        let text = String::from_utf16_lossy(&buf[..read as usize]);
+        let trimmed = text.trim();
+        if !trimmed.is_empty() {
+            settings.spellcheck_fixed_language = trimmed.to_string();
+        }
+    }
 
     let width_len = GetWindowTextLengthW(edit_wrap_width);
     if width_len >= 0 {
@@ -2210,6 +2413,12 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     let keep_default_copy = false;
 
     save_settings_with_default_copy(settings.clone(), keep_default_copy);
+    if settings.spellcheck_enabled != old_spellcheck_enabled
+        || settings.spellcheck_language_mode != old_spellcheck_mode
+        || settings.spellcheck_fixed_language != old_spellcheck_fixed_language
+    {
+        crate::reset_spellcheck_state(parent);
+    }
     if settings.context_menu_open_with != old_context_menu
         || (settings.context_menu_open_with && old_language != new_language)
     {
@@ -2281,6 +2490,35 @@ unsafe fn update_audio_split_text_visibility(hwnd: HWND) {
     EnableWindow(checkbox_audio_split_requires_newline, selected);
 }
 
+unsafe fn update_spellcheck_language_mode_visibility(hwnd: HWND) {
+    let (checkbox_spellcheck, combo_spellcheck_language_mode, label_fixed, edit_fixed) =
+        match with_options_state(hwnd, |state| {
+            (
+                state.checkbox_spellcheck,
+                state.combo_spellcheck_language_mode,
+                state.label_spellcheck_fixed_language,
+                state.edit_spellcheck_fixed_language,
+            )
+        }) {
+            Some(values) => values,
+            None => return,
+        };
+    let spellcheck_enabled = SendMessageW(checkbox_spellcheck, BM_GETCHECK, WPARAM(0), LPARAM(0)).0
+        as u32
+        == BST_CHECKED.0;
+    let mode_sel = SendMessageW(
+        combo_spellcheck_language_mode,
+        CB_GETCURSEL,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0;
+    let fixed = spellcheck_enabled && mode_sel == 1;
+    EnableWindow(combo_spellcheck_language_mode, spellcheck_enabled);
+    EnableWindow(label_fixed, fixed);
+    EnableWindow(edit_fixed, fixed);
+}
+
 unsafe fn set_active_tab(hwnd: HWND, index: i32) {
     let _ = with_options_state(hwnd, |state| {
         let show_general = index == OPTIONS_TAB_GENERAL;
@@ -2324,6 +2562,11 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
         for control in [
             state.checkbox_word_wrap,
             state.checkbox_smart_quotes,
+            state.checkbox_spellcheck,
+            state.label_spellcheck_language_mode,
+            state.combo_spellcheck_language_mode,
+            state.label_spellcheck_fixed_language,
+            state.edit_spellcheck_fixed_language,
             state.label_wrap_width,
             state.edit_wrap_width,
             state.label_quote_prefix,

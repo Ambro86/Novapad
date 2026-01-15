@@ -127,6 +127,15 @@ pub enum TtsEngine {
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum SpellcheckLanguageMode {
+    #[serde(rename = "follow")]
+    #[default]
+    FollowEditorLanguage,
+    #[serde(rename = "fixed")]
+    FixedLanguage,
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum PodcastFormat {
     #[serde(rename = "mp3")]
     #[default]
@@ -189,6 +198,9 @@ pub struct AppSettings {
     pub prompt_prevent_sleep: bool,
     pub prompt_announce_lines: bool,
     pub context_menu_open_with: bool,
+    pub spellcheck_enabled: bool,
+    pub spellcheck_language_mode: SpellcheckLanguageMode,
+    pub spellcheck_fixed_language: String,
     #[serde(default)]
     pub rss_sources: Vec<RssSource>,
     #[serde(default)]
@@ -289,6 +301,9 @@ impl Default for AppSettings {
             prompt_prevent_sleep: true,
             prompt_announce_lines: true,
             context_menu_open_with: false,
+            spellcheck_enabled: false,
+            spellcheck_language_mode: SpellcheckLanguageMode::FollowEditorLanguage,
+            spellcheck_fixed_language: "en-US".to_string(),
             rss_sources: Vec::new(),
             rss_removed_default_en: Vec::new(),
             rss_default_en_keys: Vec::new(),
@@ -521,6 +536,9 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     }
     if settings.rss_max_excerpt_chars == 0 {
         settings.rss_max_excerpt_chars = 512;
+    }
+    if settings.spellcheck_fixed_language.trim().is_empty() {
+        settings.spellcheck_fixed_language = "en-US".to_string();
     }
     settings.rss_cooldown_blocked_secs = settings.rss_cooldown_blocked_secs.clamp(60, 86_400);
     settings.rss_cooldown_not_found_secs = settings.rss_cooldown_not_found_secs.clamp(300, 604_800);

@@ -13,7 +13,8 @@ use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM}
 use windows::Win32::Graphics::Gdi::HFONT;
 use windows::Win32::UI::Controls::RichEdit::{
     CFM_COLOR, CFM_SIZE, CHARFORMAT2W, CHARRANGE, EM_EXGETSEL, EM_EXSETSEL, EM_GETTEXTRANGE,
-    EM_SETCHARFORMAT, EM_SETEVENTMASK, ENM_CHANGE, MSFTEDIT_CLASS, SCF_ALL, TEXTRANGEW,
+    EM_SETCHARFORMAT, EM_SETEVENTMASK, ENM_CHANGE, ENM_SELCHANGE, MSFTEDIT_CLASS, SCF_ALL,
+    TEXTRANGEW,
 };
 use windows::Win32::UI::Controls::{
     EM_GETMODIFY, EM_SETMODIFY, EM_SETREADONLY, TCIF_TEXT, TCITEMW, TCM_ADJUSTRECT,
@@ -25,8 +26,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     ES_WANTRETURN, GWLP_USERDATA, GWLP_WNDPROC, GetClientRect, GetParent, GetWindowLongPtrW,
     GetWindowTextLengthW, GetWindowTextW, HMENU, IDNO, IDYES, MB_ICONWARNING, MB_YESNOCANCEL,
     MessageBoxW, MoveWindow, SW_HIDE, SW_SHOW, SendMessageW, SetWindowLongPtrW, SetWindowTextW,
-    ShowWindow, WM_CHAR, WM_SETFONT, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_GROUP,
-    WS_HSCROLL, WS_VSCROLL,
+    ShowWindow, WM_CHAR, WM_CONTEXTMENU, WM_SETFONT, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE,
+    WS_GROUP, WS_HSCROLL, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR};
 
@@ -104,6 +105,15 @@ unsafe extern "system" fn edit_subclass_proc(
 ) -> LRESULT {
     if msg == WM_CHAR {
         let ch = wparam.0 as u32;
+        if matches!(
+            ch,
+            9 | 13 | 32 | 44 | 46 | 58 | 59 | 33 | 63 | 41 | 93 | 125
+        ) {
+            let parent = GetParent(hwnd);
+            let _ = with_state(parent, |state| {
+                state.spellcheck_space_trigger = Some(hwnd);
+            });
+        }
         if ch == '\'' as u32 || ch == '\"' as u32 {
             let parent = GetParent(hwnd);
             let enabled = with_state(parent, |state| state.settings.smart_quotes).unwrap_or(false);
@@ -125,6 +135,11 @@ unsafe extern "system" fn edit_subclass_proc(
                 return LRESULT(0);
             }
         }
+    }
+    if msg == WM_CONTEXTMENU {
+        let parent = GetParent(hwnd);
+        crate::show_editor_context_menu(parent, hwnd, lparam);
+        return LRESULT(0);
     }
 
     let prev = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
@@ -204,7 +219,7 @@ pub unsafe fn set_edit_text(hwnd_edit: HWND, text: &str) {
             hwnd_edit,
             EM_SETEVENTMASK,
             WPARAM(0),
-            LPARAM(ENM_CHANGE as isize),
+            LPARAM((ENM_CHANGE | ENM_SELCHANGE) as isize),
         );
     }
 }
@@ -2380,7 +2395,7 @@ pub unsafe fn create_edit(
             hwnd_edit,
             EM_SETEVENTMASK,
             WPARAM(0),
-            LPARAM(ENM_CHANGE as isize),
+            LPARAM((ENM_CHANGE | ENM_SELCHANGE) as isize),
         );
         // Install subclass for smart quotes
         let prev = SetWindowLongPtrW(hwnd_edit, GWLP_WNDPROC, edit_subclass_proc as isize);

@@ -2388,9 +2388,7 @@ unsafe fn apply_reorder_action(
         moved
     })
     .flatten();
-    let Some(new_index) = new_index else {
-        return None;
-    };
+    let new_index = new_index?;
     if move_vec_to_index(&mut root_items, source_index, new_index) {
         apply_root_order(hwnd, hwnd_tree, &root_items);
     }

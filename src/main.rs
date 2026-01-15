@@ -35,11 +35,13 @@ use editor_manager::*;
 mod app_windows;
 mod audio_capture;
 mod i18n;
+mod podcast;
 mod podcast_recorder;
 mod text_ops;
 mod tools;
 mod updater;
 
+use std::collections::HashMap;
 use std::io::Write;
 use std::mem::size_of;
 use std::path::{Path, PathBuf};
@@ -60,8 +62,8 @@ use windows::Win32::System::DataExchange::COPYDATASTRUCT;
 use windows::Win32::System::LibraryLoader::{GetModuleHandleW, LoadLibraryW};
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::Dialogs::{
-    FINDREPLACE_FLAGS, FINDREPLACEW, GetSaveFileNameW, OFN_EXPLORER, OFN_OVERWRITEPROMPT,
-    OFN_PATHMUSTEXIST, OPENFILENAMEW,
+    FINDREPLACE_FLAGS, FINDREPLACEW, GetSaveFileNameW, OFN_EXPLORER, OFN_HIDEREADONLY,
+    OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST, OPENFILENAMEW,
 };
 use windows::Win32::UI::Controls::RichEdit::{
     CHARRANGE, EM_EXGETSEL, EM_EXSETSEL, EM_GETTEXTRANGE, TEXTRANGEW,
@@ -89,11 +91,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, EN_CHANGE,
     EVENT_OBJECT_FOCUS, EnumWindows, FALT, FCONTROL, FSHIFT, FVIRTKEY, FindWindowW, GWLP_USERDATA,
     GWLP_WNDPROC, GetClassNameW, GetCursorPos, GetMenu, GetMessageW, GetParent, GetWindowLongPtrW,
-    HACCEL, HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, KillTimer, LoadCursorW, LoadIconW,
-    MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MF_BYCOMMAND, MF_CHECKED, MF_STRING, MF_UNCHECKED,
-    MSG, MessageBoxW, OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW,
-    RegisterWindowMessageW, SW_HIDE, SW_SHOW, SendMessageW, SetForegroundWindow, SetTimer,
-    SetWindowLongPtrW, SetWindowTextW, ShowWindow, TPM_RIGHTBUTTON, TrackPopupMenu,
+    HACCEL, HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, IsChild, KillTimer, LoadCursorW,
+    LoadIconW, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MF_BYCOMMAND, MF_CHECKED, MF_STRING,
+    MF_UNCHECKED, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW,
+    RegisterWindowMessageW, SW_HIDE, SW_SHOW, SW_SHOWMAXIMIZED, SendMessageW, SetForegroundWindow,
+    SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow, TPM_RIGHTBUTTON, TrackPopupMenu,
     TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
     WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES, WM_KEYDOWN,
     WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SIZE,
@@ -106,6 +108,7 @@ const EM_SCROLLCARET: u32 = 0x00B7;
 const EM_SETSEL: u32 = 0x00B1;
 
 use crate::app_windows::find_in_files_window::FindInFilesCache;
+use crate::podcast::chapters::Chapter;
 
 const WM_PDF_LOADED: u32 = WM_APP + 1;
 const WM_TTS_VOICES_LOADED: u32 = WM_APP + 2;
@@ -116,10 +119,12 @@ const WM_TTS_CHUNK_START: u32 = WM_APP + 7;
 const WM_TTS_SAPI_VOICES_LOADED: u32 = WM_APP + 8;
 
 pub const WM_FOCUS_EDITOR: u32 = WM_APP + 30;
+const WM_PODCAST_CHAPTERS_READY: u32 = WM_APP + 31;
 const FOCUS_EDITOR_TIMER_ID: usize = 1;
 const FOCUS_EDITOR_TIMER_ID2: usize = 2;
 const FOCUS_EDITOR_TIMER_ID3: usize = 3;
 const FOCUS_EDITOR_TIMER_ID4: usize = 4;
+const CHAPTER_ANNOUNCE_TIMER_ID: usize = 5;
 const COPYDATA_OPEN_FILE: usize = 1;
 const VOICE_PANEL_ID_ENGINE: usize = 8001;
 const VOICE_PANEL_ID_VOICE: usize = 8002;
@@ -162,6 +167,11 @@ struct PdfLoadingState {
     hwnd_edit: HWND,
     timer_id: usize,
     frame: usize,
+}
+
+struct PodcastChaptersReady {
+    key: String,
+    chapters: Option<Vec<Chapter>>,
 }
 
 fn log_path() -> Option<PathBuf> {
@@ -286,6 +296,465 @@ fn format_time_hms(seconds: u64) -> String {
     }
 }
 
+fn audiobook_position_ms_from_state(state: &AppState) -> Option<u64> {
+    let player = state.active_audiobook.as_ref()?;
+    let accumulated_ms = player.accumulated_seconds.saturating_mul(1000);
+    if player.is_paused {
+        return Some(accumulated_ms);
+    }
+    let elapsed_ms = player.start_instant.elapsed().as_millis() as u64;
+    Some(accumulated_ms.saturating_add(elapsed_ms))
+}
+
+unsafe fn update_chapter_announcement(hwnd: HWND) {
+    let (current_pos_ms, chapters, last_idx, language) = with_state(hwnd, |state| {
+        (
+            audiobook_position_ms_from_state(state),
+            state.active_podcast_chapters.clone(),
+            state.last_announced_chapter_index,
+            state.settings.language,
+        )
+    })
+    .unwrap_or((None, Vec::new(), None, Language::default()));
+    let Some(current_pos_ms) = current_pos_ms else {
+        return;
+    };
+    if chapters.is_empty() {
+        let _ = with_state(hwnd, |state| state.last_announced_chapter_index = None);
+        return;
+    }
+    let current_idx = crate::podcast::chapters::current_chapter_index(current_pos_ms, &chapters);
+    if current_idx == last_idx {
+        return;
+    }
+    let _ = with_state(hwnd, |state| {
+        state.last_announced_chapter_index = current_idx
+    });
+    let Some(idx) = current_idx else {
+        return;
+    };
+    if let Some(chapter) = chapters.get(idx) {
+        let message = i18n::tr_f(
+            language,
+            "playback.chapter_announce",
+            &[("title", &chapter.title)],
+        );
+        let _ = nvda_speak(&message);
+    }
+}
+
+unsafe fn announce_current_chapter_on_start(
+    hwnd: HWND,
+    chapters: &[Chapter],
+    current_pos_ms: Option<u64>,
+    language: Language,
+) {
+    if chapters.is_empty() {
+        return;
+    }
+    let current_idx = current_pos_ms
+        .and_then(|pos| crate::podcast::chapters::current_chapter_index(pos, chapters))
+        .or(Some(0));
+    let _ = with_state(hwnd, |state| {
+        state.last_announced_chapter_index = current_idx
+    });
+    let Some(idx) = current_idx else {
+        return;
+    };
+    if let Some(chapter) = chapters.get(idx) {
+        let message = i18n::tr_f(
+            language,
+            "playback.chapter_announce",
+            &[("title", &chapter.title)],
+        );
+        let _ = nvda_speak(&message);
+    }
+}
+
+pub(crate) fn clear_active_podcast_chapters(hwnd: HWND) {
+    unsafe {
+        let _ = with_state(hwnd, |state| {
+            state.active_podcast_chapters_key = None;
+            state.active_podcast_chapters.clear();
+            state.last_announced_chapter_index = None;
+            state.active_podcast_episode_url = None;
+            state.active_podcast_episode_title = None;
+            state.active_podcast_episode_cache = None;
+        });
+        let _ = KillTimer(hwnd, CHAPTER_ANNOUNCE_TIMER_ID);
+    }
+}
+
+pub(crate) fn reset_active_podcast_chapters_for_playback(hwnd: HWND) {
+    let (has_pending, has_active) = unsafe {
+        with_state(hwnd, |state| {
+            (
+                state.pending_podcast_chapters_key.is_some(),
+                state.active_podcast_chapters_key.is_some(),
+            )
+        })
+        .unwrap_or((false, false))
+    };
+    if has_pending {
+        unsafe {
+            let _ = with_state(hwnd, |state| {
+                state.active_podcast_chapters_key = None;
+                state.active_podcast_chapters.clear();
+                state.last_announced_chapter_index = None;
+                state.active_podcast_episode_url = None;
+                state.active_podcast_episode_title = None;
+                state.active_podcast_episode_cache = None;
+            });
+            let _ = KillTimer(hwnd, CHAPTER_ANNOUNCE_TIMER_ID);
+        }
+        return;
+    }
+    if !has_active {
+        clear_active_podcast_chapters(hwnd);
+    }
+}
+
+pub(crate) fn set_pending_podcast_chapters_key(hwnd: HWND, key: Option<String>) {
+    let _ = unsafe { with_state(hwnd, |state| state.pending_podcast_chapters_key = key) };
+}
+
+pub(crate) fn activate_pending_podcast_chapters(hwnd: HWND) {
+    let (chapters, language, should_announce_unavailable, current_pos_ms) = unsafe {
+        with_state(hwnd, |state| {
+            let key = state.pending_podcast_chapters_key.take();
+            state.active_podcast_chapters_key = key.clone();
+            state.last_announced_chapter_index = None;
+            if let Some(key) = key.as_ref() {
+                if let Some(cached) = state.podcast_chapters_cache.get(key) {
+                    match cached {
+                        Some(list) => {
+                            state.active_podcast_chapters = list.clone();
+                            return (
+                                list.clone(),
+                                state.settings.language,
+                                false,
+                                audiobook_position_ms_from_state(state),
+                            );
+                        }
+                        None => {
+                            state.active_podcast_chapters.clear();
+                            return (
+                                Vec::new(),
+                                state.settings.language,
+                                true,
+                                audiobook_position_ms_from_state(state),
+                            );
+                        }
+                    }
+                }
+            }
+            state.active_podcast_chapters.clear();
+            (
+                Vec::new(),
+                state.settings.language,
+                false,
+                audiobook_position_ms_from_state(state),
+            )
+        })
+        .unwrap_or((Vec::new(), Language::default(), false, None))
+    };
+    unsafe {
+        if !chapters.is_empty() {
+            let _ = SetTimer(hwnd, CHAPTER_ANNOUNCE_TIMER_ID, 500, None);
+            announce_current_chapter_on_start(hwnd, &chapters, current_pos_ms, language);
+        } else {
+            let _ = KillTimer(hwnd, CHAPTER_ANNOUNCE_TIMER_ID);
+        }
+        if should_announce_unavailable {
+            let message = i18n::tr(language, "playback.chapters_unavailable");
+            let _ = nvda_speak(&message);
+        }
+        crate::menu::update_playback_menu(hwnd, true);
+    }
+}
+
+pub(crate) fn set_active_podcast_episode_info(
+    hwnd: HWND,
+    url: Option<String>,
+    title: Option<String>,
+    cache_path: Option<PathBuf>,
+) {
+    let _ = unsafe {
+        with_state(hwnd, |state| {
+            state.active_podcast_episode_url = url;
+            state.active_podcast_episode_title = title;
+            state.active_podcast_episode_cache = cache_path;
+        })
+    };
+}
+
+pub(crate) fn download_active_podcast_episode(hwnd: HWND) {
+    let (url, title, cache_path, language) = unsafe {
+        with_state(hwnd, |state| {
+            (
+                state.active_podcast_episode_url.clone(),
+                state.active_podcast_episode_title.clone(),
+                state.active_podcast_episode_cache.clone(),
+                state.settings.language,
+            )
+        })
+        .unwrap_or((None, None, None, Language::default()))
+    };
+    download_podcast_episode(hwnd, url, title, cache_path, language);
+}
+
+pub(crate) fn download_podcast_episode(
+    hwnd: HWND,
+    url: Option<String>,
+    title: Option<String>,
+    cache_path: Option<PathBuf>,
+    language: Language,
+) {
+    let started_message = i18n::tr(language, "podcasts.download_started");
+    let completed_message = i18n::tr(language, "podcasts.download_completed");
+    let failed_message = i18n::tr(language, "podcasts.download_failed");
+    let _ = nvda_speak(&started_message);
+    let suggested_name = title
+        .as_deref()
+        .and_then(suggested_filename_from_text)
+        .unwrap_or_else(|| "podcast_episode".to_string());
+    let mut ext = cache_path
+        .as_ref()
+        .and_then(|p| p.extension().and_then(|e| e.to_str()))
+        .map(|e| e.to_string());
+    if ext.is_none() {
+        if let Some(url) = url.as_deref() {
+            ext = Path::new(url)
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(|e| e.to_string());
+        }
+    }
+    let ext = ext.unwrap_or_else(|| "mp3".to_string());
+    let suggested_full = format!("{}.{}", suggested_name, ext);
+    let target = unsafe { save_podcast_episode_dialog(hwnd, language, &suggested_full) };
+    let Some(target) = target else {
+        return;
+    };
+    let url = url.clone();
+    let cache_path = cache_path.clone();
+    let fetch_config = unsafe {
+        with_state(hwnd, |state| {
+            crate::tools::rss::fetch_config_from_settings(&state.settings)
+        })
+        .unwrap_or_else(|| crate::tools::rss::RssFetchConfig::default())
+    };
+    let http_config = unsafe {
+        with_state(hwnd, |state| {
+            crate::tools::rss::config_from_settings(&state.settings)
+        })
+        .unwrap_or_else(|| crate::tools::rss::RssHttpConfig::default())
+    };
+    std::thread::spawn(move || {
+        let completed_message = completed_message;
+        let failed_message = failed_message;
+        let _ = crate::tools::rss::init_http(http_config);
+        if let Some(cache_path) = cache_path.as_ref() {
+            if cache_path.exists() {
+                if std::fs::copy(cache_path, &target).is_ok() {
+                    log_debug(&format!(
+                        "podcast_episode_downloaded src=cache dst={}",
+                        target.to_string_lossy()
+                    ));
+                    let _ = nvda_speak(&completed_message);
+                    return;
+                } else {
+                    log_debug(&format!(
+                        "podcast_episode_download_failed copy dst={}",
+                        target.to_string_lossy()
+                    ));
+                    let _ = nvda_speak(&failed_message);
+                    return;
+                }
+            }
+        }
+        let Some(url) = url.as_deref() else {
+            log_debug("podcast_episode_download_failed no_url");
+            let _ = nvda_speak(&failed_message);
+            return;
+        };
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        match rt.block_on(crate::tools::rss::fetch_url_bytes(url, fetch_config)) {
+            Ok(bytes) => {
+                if std::fs::write(&target, bytes).is_ok() {
+                    log_debug(&format!(
+                        "podcast_episode_downloaded src=url dst={}",
+                        target.to_string_lossy()
+                    ));
+                    let _ = nvda_speak(&completed_message);
+                } else {
+                    log_debug(&format!(
+                        "podcast_episode_download_failed write dst={}",
+                        target.to_string_lossy()
+                    ));
+                    let _ = nvda_speak(&failed_message);
+                }
+            }
+            Err(err) => {
+                log_debug(&format!("podcast_episode_download_failed {}", err));
+                let _ = nvda_speak(&failed_message);
+            }
+        }
+    });
+}
+
+unsafe fn save_podcast_episode_dialog(
+    hwnd: HWND,
+    language: Language,
+    suggested_name: &str,
+) -> Option<PathBuf> {
+    let raw_filter = i18n::tr(language, "podcasts.download_filter");
+    let filter = to_wide(&raw_filter.replace("\\0", "\0"));
+    let mut buffer = vec![0u16; 4096];
+    let wide_name = to_wide(suggested_name);
+    for (i, ch) in wide_name
+        .iter()
+        .enumerate()
+        .take(buffer.len().saturating_sub(1))
+    {
+        buffer[i] = *ch;
+    }
+    let mut ofn = OPENFILENAMEW {
+        lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
+        hwndOwner: hwnd,
+        lpstrFilter: PCWSTR(filter.as_ptr()),
+        lpstrFile: PWSTR(buffer.as_mut_ptr()),
+        nMaxFile: buffer.len() as u32,
+        Flags: OFN_EXPLORER | OFN_HIDEREADONLY | OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT,
+        ..Default::default()
+    };
+    if !GetSaveFileNameW(&mut ofn).as_bool() {
+        return None;
+    }
+    let end = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
+    if end == 0 {
+        return None;
+    }
+    Some(PathBuf::from(String::from_utf16_lossy(&buffer[..end])))
+}
+pub(crate) fn prefetch_podcast_chapters(hwnd: HWND, key: String, url: String) {
+    let should_fetch = unsafe {
+        with_state(hwnd, |state| {
+            !state.podcast_chapters_cache.contains_key(&key)
+        })
+        .unwrap_or(false)
+    };
+    if !should_fetch {
+        return;
+    }
+    let config = unsafe {
+        with_state(hwnd, |state| {
+            crate::tools::rss::config_from_settings(&state.settings)
+        })
+        .unwrap_or_else(|| crate::tools::rss::RssHttpConfig::default())
+    };
+    if let Err(err) = crate::tools::rss::init_http(config) {
+        log_debug(&format!("rss_http_init_error: {}", err));
+    }
+    let fetch_config = unsafe {
+        with_state(hwnd, |state| {
+            crate::tools::rss::fetch_config_from_settings(&state.settings)
+        })
+        .unwrap_or_else(|| crate::tools::rss::RssFetchConfig::default())
+    };
+    let fallback_url = extract_embedded_chapters_url(&url);
+    let hwnd_copy = hwnd;
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let chapters = fetch_chapters_with_fallback(&rt, &url, &fallback_url, fetch_config);
+        let msg = Box::new(PodcastChaptersReady { key, chapters });
+        let _ = unsafe {
+            PostMessageW(
+                hwnd_copy,
+                WM_PODCAST_CHAPTERS_READY,
+                WPARAM(0),
+                LPARAM(Box::into_raw(msg) as isize),
+            )
+        };
+    });
+}
+
+pub(crate) fn cache_podcast_chapters(hwnd: HWND, key: String, chapters: Vec<Chapter>) {
+    let _ = unsafe {
+        with_state(hwnd, |state| {
+            state.podcast_chapters_cache.insert(key, Some(chapters));
+        })
+    };
+}
+
+fn fetch_chapters_with_fallback(
+    rt: &tokio::runtime::Runtime,
+    url: &str,
+    fallback_url: &Option<String>,
+    fetch_config: crate::tools::rss::RssFetchConfig,
+) -> Option<Vec<Chapter>> {
+    match rt.block_on(crate::tools::rss::fetch_url_bytes(url, fetch_config)) {
+        Ok(bytes) => {
+            let parsed = crate::podcast::chapters::parse_chapters_json(&bytes);
+            if !parsed.is_empty() {
+                log_debug(&format!(
+                    "podcast_chapters_ok url={} count={}",
+                    url,
+                    parsed.len()
+                ));
+                return Some(parsed);
+            }
+            log_debug(&format!("podcast_chapters_empty url={}", url));
+        }
+        Err(err) => {
+            log_debug(&format!("podcast_chapters_fetch_error {}", err));
+        }
+    }
+    let Some(fallback_url) = fallback_url.as_ref() else {
+        return None;
+    };
+    match rt.block_on(crate::tools::rss::fetch_url_bytes(
+        fallback_url,
+        fetch_config,
+    )) {
+        Ok(bytes) => {
+            let parsed = crate::podcast::chapters::parse_chapters_json(&bytes);
+            if parsed.is_empty() {
+                log_debug(&format!("podcast_chapters_empty url={}", fallback_url));
+                None
+            } else {
+                log_debug(&format!(
+                    "podcast_chapters_ok url={} count={}",
+                    fallback_url,
+                    parsed.len()
+                ));
+                Some(parsed)
+            }
+        }
+        Err(err) => {
+            log_debug(&format!("podcast_chapters_fetch_error {}", err));
+            None
+        }
+    }
+}
+
+fn extract_embedded_chapters_url(url: &str) -> Option<String> {
+    let marker = "/chapters/";
+    let idx = url.rfind(marker)?;
+    let tail = &url[idx + marker.len()..];
+    if tail.starts_with("http://") || tail.starts_with("https://") {
+        Some(tail.to_string())
+    } else {
+        None
+    }
+}
+
 unsafe fn announce_player_time(hwnd: HWND) {
     let (current, path, language) = with_state(hwnd, |state| {
         let current = state.active_audiobook.as_ref().map(|player| {
@@ -353,6 +822,74 @@ unsafe fn announce_player_speed(language: Language, speed: f32) {
     let _ = nvda_speak(&message);
 }
 
+unsafe fn announce_chapters_unavailable(language: Language) {
+    let message = i18n::tr(language, "playback.chapters_unavailable");
+    let _ = nvda_speak(&message);
+}
+
+unsafe fn seek_to_chapter_index(hwnd: HWND, chapters: &[Chapter], index: usize) {
+    let Some(chapter) = chapters.get(index) else {
+        return;
+    };
+    log_debug(&format!(
+        "podcast_chapter_seek index={} start_ms={} title={}",
+        index, chapter.start_ms, chapter.title
+    ));
+    let _ = seek_audiobook_to(hwnd, chapter.start_ms / 1000);
+    update_chapter_announcement(hwnd);
+}
+
+unsafe fn handle_chapter_navigation(hwnd: HWND, direction: i32) {
+    let (chapters, language, current_pos_ms) = with_state(hwnd, |state| {
+        (
+            state.active_podcast_chapters.clone(),
+            state.settings.language,
+            audiobook_position_ms_from_state(state),
+        )
+    })
+    .unwrap_or((Vec::new(), Language::default(), None));
+    if chapters.is_empty() {
+        announce_chapters_unavailable(language);
+        return;
+    }
+    let current_idx = current_pos_ms
+        .and_then(|pos| crate::podcast::chapters::current_chapter_index(pos, &chapters));
+    let target = if direction > 0 {
+        match current_idx {
+            Some(idx) if idx + 1 < chapters.len() => Some(idx + 1),
+            None => Some(0),
+            _ => None,
+        }
+    } else {
+        match current_idx {
+            Some(idx) if idx > 0 => Some(idx - 1),
+            _ => Some(0),
+        }
+    };
+    if let Some(index) = target {
+        seek_to_chapter_index(hwnd, &chapters, index);
+    }
+}
+
+unsafe fn handle_chapter_list(hwnd: HWND) {
+    let (chapters, language) = with_state(hwnd, |state| {
+        (
+            state.active_podcast_chapters.clone(),
+            state.settings.language,
+        )
+    })
+    .unwrap_or((Vec::new(), Language::default()));
+    if chapters.is_empty() {
+        announce_chapters_unavailable(language);
+        return;
+    }
+    if let Some(index) =
+        app_windows::podcast_chapters_window::select_chapter(hwnd, &chapters, language)
+    {
+        seek_to_chapter_index(hwnd, &chapters, index);
+    }
+}
+
 unsafe fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
     match command {
         PlayerCommand::TogglePause => {
@@ -383,6 +920,15 @@ unsafe fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
         }
         PlayerCommand::AnnounceTime => {
             announce_player_time(hwnd);
+        }
+        PlayerCommand::ChapterPrev => {
+            handle_chapter_navigation(hwnd, -1);
+        }
+        PlayerCommand::ChapterNext => {
+            handle_chapter_navigation(hwnd, 1);
+        }
+        PlayerCommand::ChapterList => {
+            handle_chapter_list(hwnd);
         }
         PlayerCommand::BlockNavigation | PlayerCommand::None => {}
     }
@@ -441,6 +987,14 @@ pub(crate) struct AppState {
     audiobook_cancel: Option<Arc<AtomicBool>>,
     active_audiobook: Option<AudiobookPlayer>,
     last_stopped_audiobook: Option<std::path::PathBuf>,
+    active_podcast_episode_url: Option<String>,
+    active_podcast_episode_title: Option<String>,
+    active_podcast_episode_cache: Option<PathBuf>,
+    podcast_chapters_cache: HashMap<String, Option<Vec<Chapter>>>,
+    pending_podcast_chapters_key: Option<String>,
+    active_podcast_chapters_key: Option<String>,
+    active_podcast_chapters: Vec<Chapter>,
+    last_announced_chapter_index: Option<usize>,
     voice_panel_visible: bool,
     voice_label_engine: HWND,
     voice_combo_engine: HWND,
@@ -773,9 +1327,11 @@ fn main() -> windows::core::Result<()> {
                         || state.podcast_window.0 != 0;
                     let secondary_open = secondary_open
                         || state.dictionary_entry_dialog.0 != 0
-                        || state.go_to_time_dialog.0 != 0;
+                        || state.go_to_time_dialog.0 != 0
+                        || state.podcasts_add_dialog.0 != 0;
 
-                    if is_audiobook && !secondary_open {
+                    let is_main_target = msg.hwnd == hwnd || IsChild(hwnd, msg.hwnd).as_bool();
+                    if is_audiobook && !secondary_open && is_main_target {
                         let command =
                             handle_player_keyboard(&msg, state.settings.audiobook_skip_seconds);
                         if !matches!(command, PlayerCommand::None) {
@@ -1205,6 +1761,14 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 audiobook_cancel: None,
                 active_audiobook: None,
                 last_stopped_audiobook: None,
+                active_podcast_episode_url: None,
+                active_podcast_episode_title: None,
+                active_podcast_episode_cache: None,
+                podcast_chapters_cache: HashMap::new(),
+                pending_podcast_chapters_key: None,
+                active_podcast_chapters_key: None,
+                active_podcast_chapters: Vec::new(),
+                last_announced_chapter_index: None,
                 voice_panel_visible: false,
                 voice_label_engine: label_engine,
                 voice_combo_engine: combo_engine,
@@ -1241,6 +1805,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
 
             if let Some(path_str) = file_to_open {
                 editor_manager::open_document(hwnd, Path::new(path_str));
+                let _ = ShowWindow(hwnd, SW_SHOWMAXIMIZED);
                 let _ = PostMessageW(hwnd, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0));
             } else {
                 editor_manager::new_document(hwnd);
@@ -1293,7 +1858,73 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 focus_editor(hwnd);
                 return LRESULT(0);
             }
+            if wparam.0 == CHAPTER_ANNOUNCE_TIMER_ID {
+                update_chapter_announcement(hwnd);
+                return LRESULT(0);
+            }
             handle_pdf_loading_timer(hwnd, wparam.0 as usize);
+            LRESULT(0)
+        }
+        WM_PODCAST_CHAPTERS_READY => {
+            let ptr = lparam.0 as *mut PodcastChaptersReady;
+            if ptr.is_null() {
+                return LRESULT(0);
+            }
+            let msg = Box::from_raw(ptr);
+            let (apply_now, chapters, language, announce_unavailable, current_pos_ms) =
+                with_state(hwnd, |state| {
+                    let chapters = msg.chapters.clone();
+                    state
+                        .podcast_chapters_cache
+                        .insert(msg.key.clone(), chapters.clone());
+                    let apply_now = state
+                        .active_podcast_chapters_key
+                        .as_deref()
+                        .map(|k| k == msg.key.as_str())
+                        .unwrap_or(false);
+                    if apply_now {
+                        state.last_announced_chapter_index = None;
+                        if let Some(list) = chapters.clone() {
+                            state.active_podcast_chapters = list.clone();
+                            return (
+                                true,
+                                list,
+                                state.settings.language,
+                                false,
+                                audiobook_position_ms_from_state(state),
+                            );
+                        }
+                        state.active_podcast_chapters.clear();
+                        return (
+                            true,
+                            Vec::new(),
+                            state.settings.language,
+                            true,
+                            audiobook_position_ms_from_state(state),
+                        );
+                    }
+                    (
+                        false,
+                        Vec::new(),
+                        state.settings.language,
+                        false,
+                        audiobook_position_ms_from_state(state),
+                    )
+                })
+                .unwrap_or((false, Vec::new(), Language::default(), false, None));
+            if apply_now {
+                if !chapters.is_empty() {
+                    let _ = SetTimer(hwnd, CHAPTER_ANNOUNCE_TIMER_ID, 500, None);
+                    announce_current_chapter_on_start(hwnd, &chapters, current_pos_ms, language);
+                } else {
+                    let _ = KillTimer(hwnd, CHAPTER_ANNOUNCE_TIMER_ID);
+                }
+                if announce_unavailable {
+                    let message = i18n::tr(language, "playback.chapters_unavailable");
+                    let _ = nvda_speak(&message);
+                }
+                crate::menu::update_playback_menu(hwnd, true);
+            }
             LRESULT(0)
         }
         WM_PDF_LOADED => {
@@ -1762,6 +2393,22 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     handle_player_command(hwnd, PlayerCommand::Seek(-(skip_seconds as i64)));
                     LRESULT(0)
                 }
+                IDM_PLAYBACK_CHAPTER_PREV => {
+                    handle_chapter_navigation(hwnd, -1);
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_CHAPTER_NEXT => {
+                    handle_chapter_navigation(hwnd, 1);
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_CHAPTER_LIST => {
+                    handle_chapter_list(hwnd);
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_DOWNLOAD_EPISODE => {
+                    download_active_podcast_episode(hwnd);
+                    LRESULT(0)
+                }
                 IDM_PLAYBACK_GO_TO_TIME => {
                     handle_player_command(hwnd, PlayerCommand::GoToTime);
                     LRESULT(0)
@@ -1907,7 +2554,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 let path = from_wide(cds.lpData as *const u16);
                 if !path.is_empty() {
                     open_document(hwnd, Path::new(&path));
-                    let _ = ShowWindow(hwnd, SW_SHOW);
+                    let _ = ShowWindow(hwnd, SW_SHOWMAXIMIZED);
                     SetForegroundWindow(hwnd);
                     focus_editor(hwnd);
                     if let Some(hwnd_edit) = get_active_edit(hwnd) {

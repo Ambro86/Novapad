@@ -85,6 +85,12 @@
   "edit.clean_eol_hyphens": "Xóa dấu gạch nối cuối dòng",
   "playback.speed_up": "Tang toc do\t+",
   "playback.speed_down": "Giam toc do\t-",
+  "playback.chapter_prev": "Chuong &truoc\tAlt+Shift+P",
+  "playback.chapter_next": "Chuong &tiep theo\tAlt+Shift+N",
+  "playback.chapter_list": "Danh sach chuo&ng...\tAlt+Shift+L",
+  "playback.download_episode": "Tai xuong tap...",
+  "playback.chapter_announce": "Chapter: {title}",
+  "playback.chapters_unavailable": "Khong co chuong",
   "insert.bookmark": "Chèn &dấu trang\tCtrl+B",
   "insert.manage_bookmarks": "&Quản lý dấu trang...",
   "help.guide": "&Hướng dẫn\tF1",
@@ -413,6 +419,7 @@
   "rss.tree.import_txt": "Nhap tu tep",
   "rss.tree.close": "Dong",
   "rss.import_filter": "Tep TXT/OPML (*.txt;*.opml)\\0*.txt;*.opml\\0Tep van ban (*.txt)\\0*.txt\\0OPML (*.opml)\\0*.opml\\0Tat ca tep (*.*)\\0*.*\\0\\0",
+  "rss.unread_suffix": " (chua doc)",
   "podcasts.import_button": "Nhập podcast từ OPML...",
   "podcasts.export_button": "Xuất podcast ra OPML...",
   "podcasts.imported": "Đã nhập podcast",
@@ -421,5 +428,10 @@
   "podcasts.export_failed": "Không thể xuất podcast",
   "podcasts.subscribed_title": "Đăng ký hoàn tất",
   "podcasts.subscribed_message": "Bạn đã đăng ký podcast thành công.",
-  "podcasts.status.selected": "Podcast được chọn: {title}"
+  "podcasts.status.selected": "Podcast được chọn: {title}",
+  "podcasts.download_filter": "Tep am thanh\\0*.mp3;*.m4a;*.aac;*.ogg;*.opus;*.wav;*.flac\\0Tat ca tep\\0*.*\\0\\0",
+  "podcasts.download_started": "Tai xuong bat dau",
+  "podcasts.download_completed": "Tai xuong hoan tat",
+  "podcasts.download_failed": "Tai xuong that bai",
+  "podcasts.context.download_episode": "Tai xuong tap..."
 }

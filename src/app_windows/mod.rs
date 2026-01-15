@@ -8,6 +8,7 @@ pub mod go_to_time_window;
 pub mod help_window;
 pub mod marker_select_window;
 pub mod options_window;
+pub mod podcast_chapters_window;
 pub mod podcast_save_window;
 pub mod podcast_window;
 pub mod podcasts_window;

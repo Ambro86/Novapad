@@ -3,8 +3,9 @@ use std::ffi::OsString;
 use std::os::windows::ffi::OsStringExt;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetKeyState, VK_ADD, VK_CONTROL, VK_DOWN, VK_END, VK_ESCAPE, VK_HOME, VK_LEFT, VK_NEXT,
-    VK_OEM_MINUS, VK_OEM_PERIOD, VK_OEM_PLUS, VK_PRIOR, VK_RIGHT, VK_SPACE, VK_SUBTRACT, VK_UP,
+    GetKeyState, VK_ADD, VK_CONTROL, VK_DOWN, VK_END, VK_ESCAPE, VK_HOME, VK_LEFT, VK_MENU,
+    VK_NEXT, VK_OEM_MINUS, VK_OEM_PERIOD, VK_OEM_PLUS, VK_PRIOR, VK_RIGHT, VK_SHIFT, VK_SPACE,
+    VK_SUBTRACT, VK_UP,
 };
 use windows::Win32::UI::WindowsAndMessaging::{IsDialogMessageW, MSG, WM_KEYDOWN};
 
@@ -17,6 +18,9 @@ pub enum PlayerCommand {
     MuteToggle,
     GoToTime,
     AnnounceTime,
+    ChapterPrev,
+    ChapterNext,
+    ChapterList,
     BlockNavigation,
     None,
 }
@@ -76,7 +80,12 @@ pub unsafe fn handle_accessibility(hwnd: HWND, msg: &MSG) -> bool {
 pub fn handle_player_keyboard(msg: &MSG, skip_seconds: u32) -> PlayerCommand {
     if msg.message == WM_KEYDOWN {
         let ctrl_down = unsafe { (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0 };
+        let alt_down = unsafe { (GetKeyState(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0 };
+        let shift_down = unsafe { (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0 };
         match msg.wParam.0 as u32 {
+            vk if alt_down && shift_down && vk == 'P' as u32 => PlayerCommand::ChapterPrev,
+            vk if alt_down && shift_down && vk == 'N' as u32 => PlayerCommand::ChapterNext,
+            vk if alt_down && shift_down && vk == 'L' as u32 => PlayerCommand::ChapterList,
             vk if ctrl_down && vk == 'T' as u32 => PlayerCommand::GoToTime,
             vk if ctrl_down && vk == 'I' as u32 => PlayerCommand::AnnounceTime,
             vk if vk == VK_SPACE.0 as u32 => PlayerCommand::TogglePause,

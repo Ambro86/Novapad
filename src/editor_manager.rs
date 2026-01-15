@@ -1,10 +1,9 @@
-#![allow(clippy::if_same_then_else, clippy::collapsible_else_if)]
 use crate::accessibility::{EM_REPLACESEL, from_wide, to_wide, to_wide_normalized};
 use crate::file_handler::decode_text_with_encoding;
 use crate::file_handler::*;
 use crate::settings::{
     FileFormat, ModifiedMarkerPosition, TextEncoding, confirm_save_message, confirm_title,
-    untitled_base, untitled_title,
+    untitled_title,
 };
 use crate::{log_debug, with_state};
 use std::collections::HashSet;
@@ -2123,12 +2122,7 @@ pub unsafe fn mark_dirty_from_edit(hwnd: HWND, hwnd_edit: HWND) {
 pub unsafe fn update_window_title(hwnd: HWND) {
     let _ = with_state(hwnd, |state| {
         if let Some(doc) = state.docs.get(state.current) {
-            let untitled = untitled_base(state.settings.language);
-            let display_title = if doc.title.starts_with(&untitled) {
-                &doc.title
-            } else {
-                &doc.title
-            };
+            let display_title = &doc.title;
             let base_title = if display_title.trim().is_empty() {
                 "Novapad".to_string()
             } else {
@@ -2718,21 +2712,19 @@ pub unsafe fn close_document_at(hwnd: HWND, index: usize) -> bool {
             state.untitled_count = 0;
             state.current = 0;
             was_empty = true;
-        } else {
-            if was_current {
-                let idx = if index >= state.docs.len() {
-                    state.docs.len() - 1
-                } else {
-                    index
-                };
-                state.current = idx;
-                SendMessageW(hwnd_tab, TCM_SETCURSEL, WPARAM(idx), LPARAM(0));
-                new_hwnd_edit = state.docs.get(idx).map(|doc| doc.hwnd_edit);
-                update_title = true;
-            } else if index < state.current {
-                state.current -= 1;
-                SendMessageW(hwnd_tab, TCM_SETCURSEL, WPARAM(state.current), LPARAM(0));
-            }
+        } else if was_current {
+            let idx = if index >= state.docs.len() {
+                state.docs.len() - 1
+            } else {
+                index
+            };
+            state.current = idx;
+            SendMessageW(hwnd_tab, TCM_SETCURSEL, WPARAM(idx), LPARAM(0));
+            new_hwnd_edit = state.docs.get(idx).map(|doc| doc.hwnd_edit);
+            update_title = true;
+        } else if index < state.current {
+            state.current -= 1;
+            SendMessageW(hwnd_tab, TCM_SETCURSEL, WPARAM(state.current), LPARAM(0));
         }
     });
 

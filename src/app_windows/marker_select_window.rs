@@ -1,4 +1,3 @@
-#![allow(clippy::let_and_return, clippy::bool_comparison)]
 use std::sync::{Arc, Mutex};
 
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
@@ -125,7 +124,7 @@ pub fn select_marker_entries(
 
     let mut msg = MSG::default();
     loop {
-        if unsafe { IsWindow(hwnd).as_bool() } == false {
+        if !unsafe { IsWindow(hwnd).as_bool() } {
             break;
         }
         let res = unsafe { GetMessageW(&mut msg, HWND(0), 0, 0) };
@@ -163,8 +162,7 @@ pub fn select_marker_entries(
         SetForegroundWindow(parent);
     }
 
-    let selected = result.lock().unwrap().clone();
-    selected
+    result.lock().unwrap().clone()
 }
 
 unsafe extern "system" fn marker_select_wndproc(

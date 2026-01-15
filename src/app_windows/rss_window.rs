@@ -3272,7 +3272,7 @@ unsafe fn force_focus_editor_on_parent(parent: HWND) {
         let _ = SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(0));
         let _ = SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
         let _ = SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
-        let _ = NotifyWinEvent(
+        NotifyWinEvent(
             EVENT_OBJECT_FOCUS,
             hwnd_edit,
             OBJID_CLIENT.0,

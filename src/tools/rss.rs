@@ -1294,6 +1294,40 @@ fn apply_feed_cooldown(
     (until, kind, cooldown_secs)
 }
 
+use std::os::windows::process::CommandExt;
+use std::process::Command;
+
+fn fetch_via_external_curl(url: &str) -> Option<Vec<u8>> {
+    let settings_dir = crate::settings::settings_dir();
+    let curl_path = settings_dir.join("curl.exe");
+
+    if !curl_path.exists() {
+        return None;
+    }
+
+    // CREATE_NO_WINDOW = 0x08000000
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+    let output = Command::new(curl_path)
+        .arg("-L") // Follow redirects
+        .arg("--compressed") // Handle gzip/brotli
+        .arg("-s") // Silent mode
+        .arg("--max-time")
+        .arg("20")
+        .arg("--impersonate")
+        .arg("chrome")
+        .arg(url)
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .ok()?;
+
+    if output.status.success() {
+        Some(output.stdout)
+    } else {
+        None
+    }
+}
+
 async fn fetch_bytes_with_retries(
     http: &RssHttp,
     url: &str,
@@ -1304,6 +1338,25 @@ async fn fetch_bytes_with_retries(
     mut cache: Option<&mut RssFeedCache>,
 ) -> Result<FetchBytesOutcome, FeedFetchError> {
     let host = host_from_url(url).unwrap_or_else(|| "unknown".to_string());
+
+    // Try external curl first if available (bypasses some TLS blocks)
+    if let Some(bytes) = fetch_via_external_curl(url) {
+        log_debug(&format!(
+            "rss_request curl_external success url=\"{}\"",
+            url
+        ));
+        if let Some(cache) = cache.as_deref_mut() {
+            cache.last_fetch = Some(now_unix());
+            cache.last_status = Some(200);
+            cache.consecutive_failures = 0;
+            // Curl doesn't give us headers easily for ETag handling in this simple mode
+        }
+        return Ok(FetchBytesOutcome {
+            bytes,
+            not_modified: false,
+        });
+    }
+
     let max_attempts = http.config.max_retries + 1;
 
     if is_feed && !override_cooldown {

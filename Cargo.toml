@@ -142,9 +142,11 @@ httpdate = "1.0"
 mp3-duration = "0.1"
 fancy-regex = "0.13"
 sevenz-rust = "0.6"
+rquest = { version = "0.21", optional = true, default-features = false, features = ["websocket", "hickory-dns"] }
 
 [features]
 portable = []
+impersonate = ["dep:rquest"]
 
 [profile.release]
 opt-level = 3          # MASSIME performance

@@ -1,3 +1,24 @@
+================================================================================
+RISPOSTA ALLE CRITICHE E AZIONI INTRAPRESE (Ultimo aggiornamento: Oggi)
+================================================================================
+
+1. "You reimplement wcslen... You use unsafe way more than you should":
+   - FATTO: Rifattorizzato `src/sapi5_engine.rs`. Rimossa la funzione manuale `utf16_ptr_to_string` (che usava logica unsafe per contare la lunghezza) sostituendola con metodi sicuri della libreria `windows`.
+   - FATTO: Ridotto drasticamente lo scope dei blocchi `unsafe` in tutto il modulo SAPI5, isolando le chiamate COM in funzioni helper e strutture RAII (`ComRuntime`).
+
+2. "Why do you manually implement audio file parsing...?":
+   - FATTO: Rifattorizzato la gestione dei file WAV in `src/sapi5_engine.rs`. Sostituiti i calcoli manuali di puntatori e byte sparsi con un approccio basato su `std::io` idiomatico e sicuro, rendendo il codice più leggibile e meno propenso a errori.
+
+3. "Why do you not just use Windows.Media.SpeechSynthesis...?":
+   - ANALIZZATO E RIMANDATO: È stato tentato lo sviluppo di un motore parallelo basato sulle API WinRT moderne. Tuttavia, la versione corrente della libreria `windows` (0.54) utilizzata nel progetto presenta complessità nella proiezione dei metodi statici (es. `SpeechSynthesizer::AllVoices`) che richiederebbero un aggiornamento massivo e rischioso delle dipendenze.
+   - DECISIONE: Si è scelto di dare priorità alla sicurezza e stabilità del motore SAPI5 esistente (vedi punto 1), rimandando l'adozione di WinRT a quando sarà possibile aggiornare lo stack tecnologico.
+
+4. "Feature creep / Identity crisis":
+   - IN CORSO: Avviata una profonda pulizia del codice (rimozione dead code, risoluzione warnings di Clippy) per consolidare le funzionalità core e migliorare la manutenibilità prima di espandere ulteriormente il software.
+
+================================================================================
+TESTO ORIGINALE:
+================================================================================
 Ethin
 Yesterday 05:20:03 (edited by Ethin Yesterday 05:34:45)
 9th Duke

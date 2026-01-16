@@ -1,3 +1,5 @@
+#![allow(clippy::fn_to_numeric_cast)]
+
 use crate::accessibility::{EM_REPLACESEL, from_wide, to_wide, to_wide_normalized};
 use crate::file_handler::decode_text_with_encoding;
 use crate::file_handler::*;

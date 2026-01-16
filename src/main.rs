@@ -1,6 +1,7 @@
 #![allow(unsafe_op_in_unsafe_fn)]
 #![allow(
     clippy::collapsible_if,
+    clippy::fn_to_numeric_cast,
     clippy::manual_pattern_char_comparison,
     clippy::manual_range_contains,
     clippy::needless_return,

@@ -1,3 +1,5 @@
+#![allow(clippy::fn_to_numeric_cast)]
+
 use crate::accessibility::{from_wide, nvda_speak, to_wide};
 
 use crate::editor_manager;
@@ -558,7 +560,7 @@ fn is_default_key(
 
 fn apply_default_sources(
     rss_sources: &mut Vec<RssSource>,
-    removed_list: &mut Vec<String>,
+    removed_list: &[String],
     keys_list: &mut Vec<String>,
     defaults: &[(String, String)],
 ) -> bool {

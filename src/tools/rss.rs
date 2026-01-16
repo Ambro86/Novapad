@@ -198,7 +198,10 @@ pub struct PodcastFetchOutcome {
 }
 
 struct RssHttp {
+    #[cfg(not(feature = "impersonate"))]
     client: reqwest::Client,
+    #[cfg(feature = "impersonate")]
+    client: rquest::Client,
     global_sem: Arc<Semaphore>,
     per_host_sem: Mutex<HashMap<String, Arc<Semaphore>>>,
     rate_state: Mutex<HashMap<String, HostRateState>>,
@@ -207,75 +210,105 @@ struct RssHttp {
 
 impl RssHttp {
     fn new(config: RssHttpConfig) -> Result<Self, String> {
+        #[cfg(not(feature = "impersonate"))]
         let mut headers = reqwest::header::HeaderMap::new();
-        headers.insert(
-            reqwest::header::USER_AGENT,
-            reqwest::header::HeaderValue::from_static(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            ),
-        );
-        headers.insert(
-            reqwest::header::ACCEPT_LANGUAGE,
-            reqwest::header::HeaderValue::from_static("en-US,en;q=0.9"),
-        );
-        headers.insert(
-            reqwest::header::ACCEPT,
-            reqwest::header::HeaderValue::from_static(
-                "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-            ),
-        );
-        headers.insert(
-            reqwest::header::ACCEPT_ENCODING,
-            reqwest::header::HeaderValue::from_static("gzip, deflate, br"),
-        );
-        headers.insert(
-            reqwest::header::CACHE_CONTROL,
-            reqwest::header::HeaderValue::from_static("max-age=0"),
-        );
-        headers.insert(
-            reqwest::header::UPGRADE_INSECURE_REQUESTS,
-            reqwest::header::HeaderValue::from_static("1"),
-        );
-        headers.insert(
-            "sec-ch-ua",
-            reqwest::header::HeaderValue::from_static(
-                "\"Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\"",
-            ),
-        );
-        headers.insert(
-            "sec-ch-ua-mobile",
-            reqwest::header::HeaderValue::from_static("?0"),
-        );
-        headers.insert(
-            "sec-ch-ua-platform",
-            reqwest::header::HeaderValue::from_static("\"Windows\""),
-        );
-        headers.insert(
-            "sec-fetch-dest",
-            reqwest::header::HeaderValue::from_static("document"),
-        );
-        headers.insert(
-            "sec-fetch-mode",
-            reqwest::header::HeaderValue::from_static("navigate"),
-        );
-        headers.insert(
-            "sec-fetch-site",
-            reqwest::header::HeaderValue::from_static("none"),
-        );
-        headers.insert(
-            "sec-fetch-user",
-            reqwest::header::HeaderValue::from_static("?1"),
-        );
-        headers.insert(
-            REFERER,
-            reqwest::header::HeaderValue::from_static("https://news.google.com/"),
-        );
+        #[cfg(feature = "impersonate")]
+        let mut headers = rquest::header::HeaderMap::new();
+
+        #[cfg(not(feature = "impersonate"))]
+        {
+            headers.insert(
+                reqwest::header::USER_AGENT,
+                reqwest::header::HeaderValue::from_static(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                ),
+            );
+            headers.insert(
+                reqwest::header::ACCEPT_LANGUAGE,
+                reqwest::header::HeaderValue::from_static("en-US,en;q=0.9"),
+            );
+            headers.insert(
+                reqwest::header::ACCEPT,
+                reqwest::header::HeaderValue::from_static(
+                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                ),
+            );
+            headers.insert(
+                reqwest::header::ACCEPT_ENCODING,
+                reqwest::header::HeaderValue::from_static("gzip, deflate, br"),
+            );
+            headers.insert(
+                reqwest::header::CACHE_CONTROL,
+                reqwest::header::HeaderValue::from_static("max-age=0"),
+            );
+            headers.insert(
+                reqwest::header::UPGRADE_INSECURE_REQUESTS,
+                reqwest::header::HeaderValue::from_static("1"),
+            );
+            headers.insert(
+                "sec-ch-ua",
+                reqwest::header::HeaderValue::from_static(
+                    "\"Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\"",
+                ),
+            );
+            headers.insert(
+                "sec-ch-ua-mobile",
+                reqwest::header::HeaderValue::from_static("?0"),
+            );
+            headers.insert(
+                "sec-ch-ua-platform",
+                reqwest::header::HeaderValue::from_static("\"Windows\""),
+            );
+            headers.insert(
+                "sec-fetch-dest",
+                reqwest::header::HeaderValue::from_static("document"),
+            );
+            headers.insert(
+                "sec-fetch-mode",
+                reqwest::header::HeaderValue::from_static("navigate"),
+            );
+            headers.insert(
+                "sec-fetch-site",
+                reqwest::header::HeaderValue::from_static("none"),
+            );
+            headers.insert(
+                "sec-fetch-user",
+                reqwest::header::HeaderValue::from_static("?1"),
+            );
+            headers.insert(
+                REFERER,
+                reqwest::header::HeaderValue::from_static("https://news.google.com/"),
+            );
+        }
+
+        #[cfg(feature = "impersonate")]
+        {
+            // rquest handles most headers automatically via impersonate
+            headers.insert(
+                REFERER,
+                rquest::header::HeaderValue::from_static("https://news.google.com/"),
+            );
+        }
+
+        #[cfg(not(feature = "impersonate"))]
         let client = reqwest::Client::builder()
             .default_headers(headers)
             .cookie_store(true)
             .redirect(reqwest::redirect::Policy::limited(10))
             .gzip(true)
             .brotli(true)
+            .connect_timeout(Duration::from_secs(4))
+            .timeout(Duration::from_secs(15))
+            .pool_max_idle_per_host(8)
+            .build()
+            .map_err(|e| e.to_string())?;
+
+        #[cfg(feature = "impersonate")]
+        let client = rquest::Client::builder()
+            .impersonate(rquest::Impersonate::Chrome120)
+            .default_headers(headers)
+            .cookie_store(true)
+            .redirect(rquest::redirect::Policy::limited(10))
             .connect_timeout(Duration::from_secs(4))
             .timeout(Duration::from_secs(15))
             .pool_max_idle_per_host(8)
@@ -1340,6 +1373,8 @@ async fn fetch_bytes_with_retries(
     let host = host_from_url(url).unwrap_or_else(|| "unknown".to_string());
 
     // Try external curl first if available (bypasses some TLS blocks)
+    // BUT only if we are NOT using the builtin impersonate feature
+    #[cfg(not(feature = "impersonate"))]
     if let Some(bytes) = fetch_via_external_curl(url) {
         log_debug(&format!(
             "rss_request curl_external success url=\"{}\"",

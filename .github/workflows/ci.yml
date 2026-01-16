@@ -40,6 +40,9 @@ jobs:
     - name: Install WiX Toolset
       run: choco install wixtoolset
 
+    - name: Install NASM (for rquest/boring)
+      run: choco install nasm
+
     - name: Cache cargo-packager
       id: cache-cargo-packager
       uses: actions/cache@v4
@@ -55,7 +58,7 @@ jobs:
       run: cargo install cargo-packager --locked
 
     - name: Build (Release)
-      run: cargo build --verbose --release
+      run: cargo build --verbose --release --features impersonate
 
     - name: Package Application (NSIS)
       run: cargo packager --release --formats nsis

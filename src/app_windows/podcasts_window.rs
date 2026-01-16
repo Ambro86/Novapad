@@ -1,3 +1,5 @@
+#![allow(clippy::fn_to_numeric_cast)]
+
 use crate::accessibility::{from_wide, handle_accessibility, nvda_speak, to_wide};
 use crate::editor_manager;
 use crate::i18n;

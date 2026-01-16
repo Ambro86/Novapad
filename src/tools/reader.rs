@@ -1,6 +1,7 @@
 use scraper::{Html, Selector};
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ArticleContent {
     pub title: String,
     pub content: String,
@@ -32,6 +33,58 @@ fn decode_unicode(input: &str) -> String {
         }
     }
     result
+}
+
+/// Estrae una stringa JSON gestendo correttamente gli escape (\" \\ \n ecc.)
+/// Ritorna la stringa decodificata e la posizione dopo la virgoletta di chiusura
+fn extract_json_string(s: &str) -> Option<(String, usize)> {
+    let mut result = String::new();
+    let mut chars = s.char_indices().peekable();
+
+    while let Some((i, c)) = chars.next() {
+        if c == '\\' {
+            // Carattere escaped
+            if let Some((_, next_c)) = chars.next() {
+                match next_c {
+                    '"' => result.push('"'),
+                    '\\' => result.push('\\'),
+                    'n' => result.push('\n'),
+                    'r' => result.push('\r'),
+                    't' => result.push('\t'),
+                    'u' => {
+                        // Unicode escape \uXXXX
+                        let mut hex = String::new();
+                        for _ in 0..4 {
+                            if let Some((_, h)) = chars.next() {
+                                hex.push(h);
+                            }
+                        }
+                        if let Ok(code) = u32::from_str_radix(&hex, 16) {
+                            if let Some(decoded_char) = std::char::from_u32(code) {
+                                result.push(decoded_char);
+                            }
+                        }
+                    }
+                    _ => {
+                        result.push('\\');
+                        result.push(next_c);
+                    }
+                }
+            }
+        } else if c == '"' {
+            // Fine della stringa
+            return Some((result, i + 1));
+        } else {
+            result.push(c);
+        }
+    }
+
+    // Stringa non chiusa
+    if !result.is_empty() {
+        Some((result, s.len()))
+    } else {
+        None
+    }
 }
 
 pub fn clean_text(input: &str) -> String {
@@ -92,14 +145,18 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
             if author_info.is_empty() {
                 if let Some(a_idx) = json.find("\"name\":\"") {
                     let part = &json[a_idx + 8..];
-                    if let Some(end) = part.find("\"") {
-                        author_info.push_str(&part[..end]);
+                    if let Some((name, _)) = extract_json_string(part) {
+                        author_info.push_str(&name);
                     }
                 }
                 if let Some(d_idx) = json.find("\"datePublished\":\"") {
                     let part = &json[d_idx + 17..];
-                    if let Some(end) = part.find("\"") {
-                        let date = &part[..10]; // Prendi solo YYYY-MM-DD
+                    if let Some((date_str, _)) = extract_json_string(part) {
+                        let date = if date_str.len() >= 10 {
+                            &date_str[..10]
+                        } else {
+                            &date_str
+                        };
                         author_info.push_str(&format!(" ({})", date));
                     }
                 }
@@ -111,14 +168,22 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
                 "\"articleBody\":\"",
                 "\"subtitle\":\"",
             ] {
-                for part in json.split(key) {
-                    if let Some(end) = part.find("\"") {
-                        let val = &part[..end];
-                        if val.len() > 40 && !val.contains("http") && !body_acc.contains(val) {
-                            body_acc.push_str(val);
-                            body_acc.push_str("\n\n");
-                            found_anything = true;
+                let mut search_pos = 0;
+                while let Some(key_pos) = json[search_pos..].find(key) {
+                    let abs_start = search_pos + key_pos + key.len();
+                    if abs_start < json.len() {
+                        if let Some((val, end_pos)) = extract_json_string(&json[abs_start..]) {
+                            if val.len() > 40 && !val.contains("http") && !body_acc.contains(&val) {
+                                body_acc.push_str(&val);
+                                body_acc.push_str("\n\n");
+                                found_anything = true;
+                            }
+                            search_pos = abs_start + end_pos;
+                        } else {
+                            break;
                         }
+                    } else {
+                        break;
                     }
                 }
             }
@@ -130,13 +195,63 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
         if let Ok(next_selector) = Selector::parse("script#__NEXT_DATA__") {
             if let Some(element) = document.select(&next_selector).next() {
                 let json_text = element.text().collect::<Vec<_>>().join("");
-                for part in json_text.split("\"text\":\"") {
-                    if let Some(end_idx) = part.find("\"") {
-                        let val = &part[..end_idx];
-                        if val.len() > 30 && !val.contains("http") && !val.contains("{") {
-                            body_acc.push_str(val);
+
+                // WSJ: estrai testi dai blocchi "content":[...] dei paragrafi
+                let mut seen_paragraphs = std::collections::HashSet::new();
+                for content_block in json_text.split("\"type\":\"paragraph\"") {
+                    if let Some(content_start) = content_block.find("\"content\":[") {
+                        let after_content = &content_block[content_start..];
+                        // Estrai tutti i "text":"..." dal blocco content usando extract_json_string
+                        let mut para_text = String::new();
+                        let mut search_pos = 0;
+                        while let Some(text_start) = after_content[search_pos..].find("\"text\":\"")
+                        {
+                            let abs_start = search_pos + text_start + 8; // dopo "text":"
+                            if abs_start < after_content.len() {
+                                if let Some((val, end_pos)) =
+                                    extract_json_string(&after_content[abs_start..])
+                                {
+                                    if !val.is_empty() && !val.starts_with('{') {
+                                        para_text.push_str(&val);
+                                    }
+                                    search_pos = abs_start + end_pos;
+                                } else {
+                                    break;
+                                }
+                            } else {
+                                break;
+                            }
+                        }
+                        // Evita duplicati
+                        if para_text.len() > 20 && !seen_paragraphs.contains(&para_text) {
+                            seen_paragraphs.insert(para_text.clone());
+                            body_acc.push_str(&para_text);
                             body_acc.push_str("\n\n");
                             found_anything = true;
+                        }
+                    }
+                }
+
+                // Fallback: vecchio metodo per altri siti (con extract_json_string)
+                if !found_anything {
+                    let mut search_pos = 0;
+                    while let Some(text_start) = json_text[search_pos..].find("\"text\":\"") {
+                        let abs_start = search_pos + text_start + 8;
+                        if abs_start < json_text.len() {
+                            if let Some((val, end_pos)) =
+                                extract_json_string(&json_text[abs_start..])
+                            {
+                                if val.len() > 30 && !val.contains("http") && !val.contains("{") {
+                                    body_acc.push_str(&val);
+                                    body_acc.push_str("\n\n");
+                                    found_anything = true;
+                                }
+                                search_pos = abs_start + end_pos;
+                            } else {
+                                break;
+                            }
+                        } else {
+                            break;
                         }
                     }
                 }
@@ -147,6 +262,7 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
     // 3. FALLBACK CSS
     if !found_anything || body_acc.len() < 300 {
         let content_selectors = [
+            "p[data-type='paragraph']", // WSJ modern
             ".wsj-article-body p",
             "article p",
             ".atext",
@@ -167,7 +283,6 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
                 }
                 if sel_acc.len() > 200 {
                     body_acc.push_str(&sel_acc);
-                    found_anything = true;
                     break;
                 }
             }
@@ -230,15 +345,19 @@ pub fn collapse_blank_lines(s: &str) -> String {
     out.trim_end_matches('\n').to_string()
 }
 
+#[allow(dead_code)]
 pub fn extract_article_links_from_html(_: &str, _: &str, _: usize) -> Vec<(String, String)> {
     Vec::new()
 }
+#[allow(dead_code)]
 pub fn extract_hub_links_from_html(_: &str, _: &str, _: usize) -> Vec<String> {
     Vec::new()
 }
+#[allow(dead_code)]
 pub fn extract_feed_links_from_html(_: &str, _: &str) -> Vec<String> {
     Vec::new()
 }
+#[allow(dead_code)]
 pub fn extract_page_title(html: &str, _: &str) -> String {
     pick_title(&Html::parse_document(html))
 }

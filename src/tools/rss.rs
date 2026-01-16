@@ -2,17 +2,10 @@ use crate::log_debug;
 use crate::podcast::chapters::Chapter;
 use crate::tools::reader;
 use feed_rs::parser;
-use quick_xml::Reader;
-use quick_xml::events::Event;
-use rand::Rng;
 use reqwest::{self, StatusCode, header};
 
-use header::{
-    ACCEPT, ACCEPT_LANGUAGE, CONNECTION, ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED,
-    REFERER, RETRY_AFTER, SET_COOKIE, UPGRADE_INSECURE_REQUESTS,
-};
+use header::{ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED, REFERER};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::io::Cursor;
@@ -68,6 +61,7 @@ pub struct RssSource {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct RssItem {
     pub title: String,
     pub link: String,
@@ -78,6 +72,7 @@ pub struct RssItem {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct PodcastEpisode {
     pub title: String,
     pub link: String,
@@ -92,6 +87,7 @@ pub struct PodcastEpisode {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub struct RssFetchConfig {
     pub max_items_per_feed: usize,
     pub max_excerpt_chars: usize,
@@ -113,6 +109,7 @@ impl Default for RssFetchConfig {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum FeedFetchError {
     InCooldown {
         until: i64,
@@ -144,6 +141,7 @@ impl std::fmt::Display for FeedFetchError {
     }
 }
 
+#[allow(dead_code)]
 impl FeedFetchError {
     fn cache_clone(&self) -> RssFeedCache {
         match self {
@@ -155,6 +153,7 @@ impl FeedFetchError {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub struct RssHttpConfig {
     pub global_max_concurrency: usize,
     pub per_host_max_concurrency: usize,
@@ -194,6 +193,7 @@ pub struct PodcastFetchOutcome {
     pub not_modified: bool,
 }
 
+#[allow(dead_code)]
 struct RssHttp {
     client: HttpClient,
     global_sem: Arc<Semaphore>,
@@ -270,6 +270,7 @@ struct RequestPermits {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct HostRateState {
     tokens: f64,
     last: Instant,
@@ -391,6 +392,7 @@ fn compute_backoff(attempt: usize, max_secs: u64) -> Duration {
     Duration::from_secs(secs)
 }
 
+#[allow(dead_code)]
 fn log_request_attempt(
     url: &str,
     host: &str,
@@ -508,9 +510,9 @@ async fn fetch_bytes_with_retries(
     http: &RssHttp,
     url: &str,
     is_feed: bool,
-    fetch_kind: &str,
-    override_cooldown: bool,
-    fetch_config: &RssFetchConfig,
+    _fetch_kind: &str,
+    _override_cooldown: bool,
+    _fetch_config: &RssFetchConfig,
     mut cache: Option<&mut RssFeedCache>,
 ) -> Result<FetchBytesOutcome, FeedFetchError> {
     let host = host_from_url(url).unwrap_or_else(|| "unknown".to_string());
@@ -614,7 +616,7 @@ struct FetchBytesOutcome {
 
 pub async fn fetch_and_parse(
     url: &str,
-    source_kind: RssSourceType,
+    _source_kind: RssSourceType,
     cache: RssFeedCache,
     fetch_config: RssFetchConfig,
     override_cooldown: bool,

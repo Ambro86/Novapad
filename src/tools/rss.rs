@@ -5,8 +5,27 @@ use feed_rs::parser;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use rand::Rng;
-use reqwest::StatusCode;
-use reqwest::header::{
+#[cfg(not(feature = "impersonate"))]
+use reqwest;
+#[cfg(feature = "impersonate")]
+use rquest;
+
+#[cfg(not(feature = "impersonate"))]
+type HttpClient = reqwest::Client;
+#[cfg(feature = "impersonate")]
+type HttpClient = rquest::Client;
+
+#[cfg(not(feature = "impersonate"))]
+type HttpError = reqwest::Error;
+#[cfg(feature = "impersonate")]
+type HttpError = rquest::Error;
+
+#[cfg(not(feature = "impersonate"))]
+use reqwest::{StatusCode, header};
+#[cfg(feature = "impersonate")]
+use rquest::{StatusCode, header};
+
+use header::{
     ACCEPT, ACCEPT_LANGUAGE, CONNECTION, ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED,
     REFERER, RETRY_AFTER, SET_COOKIE, UPGRADE_INSECURE_REQUESTS,
 };
@@ -198,10 +217,7 @@ pub struct PodcastFetchOutcome {
 }
 
 struct RssHttp {
-    #[cfg(not(feature = "impersonate"))]
-    client: reqwest::Client,
-    #[cfg(feature = "impersonate")]
-    client: rquest::Client,
+    client: HttpClient,
     global_sem: Arc<Semaphore>,
     per_host_sem: Mutex<HashMap<String, Arc<Semaphore>>>,
     rate_state: Mutex<HashMap<String, HostRateState>>,
@@ -210,74 +226,62 @@ struct RssHttp {
 
 impl RssHttp {
     fn new(config: RssHttpConfig) -> Result<Self, String> {
-        #[cfg(not(feature = "impersonate"))]
-        let mut headers = reqwest::header::HeaderMap::new();
-        #[cfg(feature = "impersonate")]
-        let mut headers = rquest::header::HeaderMap::new();
+        let mut headers = header::HeaderMap::new();
 
         #[cfg(not(feature = "impersonate"))]
         {
             headers.insert(
-                reqwest::header::USER_AGENT,
-                reqwest::header::HeaderValue::from_static(
+                header::USER_AGENT,
+                header::HeaderValue::from_static(
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 ),
             );
             headers.insert(
-                reqwest::header::ACCEPT_LANGUAGE,
-                reqwest::header::HeaderValue::from_static("en-US,en;q=0.9"),
+                header::ACCEPT_LANGUAGE,
+                header::HeaderValue::from_static("en-US,en;q=0.9"),
             );
             headers.insert(
-                reqwest::header::ACCEPT,
-                reqwest::header::HeaderValue::from_static(
+                header::ACCEPT,
+                header::HeaderValue::from_static(
                     "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
                 ),
             );
             headers.insert(
-                reqwest::header::ACCEPT_ENCODING,
-                reqwest::header::HeaderValue::from_static("gzip, deflate, br"),
+                header::ACCEPT_ENCODING,
+                header::HeaderValue::from_static("gzip, deflate, br"),
             );
             headers.insert(
-                reqwest::header::CACHE_CONTROL,
-                reqwest::header::HeaderValue::from_static("max-age=0"),
+                header::CACHE_CONTROL,
+                header::HeaderValue::from_static("max-age=0"),
             );
             headers.insert(
-                reqwest::header::UPGRADE_INSECURE_REQUESTS,
-                reqwest::header::HeaderValue::from_static("1"),
+                header::UPGRADE_INSECURE_REQUESTS,
+                header::HeaderValue::from_static("1"),
             );
             headers.insert(
                 "sec-ch-ua",
-                reqwest::header::HeaderValue::from_static(
+                header::HeaderValue::from_static(
                     "\"Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\"",
                 ),
             );
-            headers.insert(
-                "sec-ch-ua-mobile",
-                reqwest::header::HeaderValue::from_static("?0"),
-            );
+            headers.insert("sec-ch-ua-mobile", header::HeaderValue::from_static("?0"));
             headers.insert(
                 "sec-ch-ua-platform",
-                reqwest::header::HeaderValue::from_static("\"Windows\""),
+                header::HeaderValue::from_static("\"Windows\""),
             );
             headers.insert(
                 "sec-fetch-dest",
-                reqwest::header::HeaderValue::from_static("document"),
+                header::HeaderValue::from_static("document"),
             );
             headers.insert(
                 "sec-fetch-mode",
-                reqwest::header::HeaderValue::from_static("navigate"),
+                header::HeaderValue::from_static("navigate"),
             );
-            headers.insert(
-                "sec-fetch-site",
-                reqwest::header::HeaderValue::from_static("none"),
-            );
-            headers.insert(
-                "sec-fetch-user",
-                reqwest::header::HeaderValue::from_static("?1"),
-            );
+            headers.insert("sec-fetch-site", header::HeaderValue::from_static("none"));
+            headers.insert("sec-fetch-user", header::HeaderValue::from_static("?1"));
             headers.insert(
                 REFERER,
-                reqwest::header::HeaderValue::from_static("https://news.google.com/"),
+                header::HeaderValue::from_static("https://news.google.com/"),
             );
         }
 
@@ -286,7 +290,7 @@ impl RssHttp {
             // rquest handles most headers automatically via impersonate
             headers.insert(
                 REFERER,
-                rquest::header::HeaderValue::from_static("https://news.google.com/"),
+                header::HeaderValue::from_static("https://news.google.com/"),
             );
         }
 
@@ -313,7 +317,7 @@ impl RssHttp {
             .timeout(Duration::from_secs(15))
             .pool_max_idle_per_host(8)
             .build()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e: HttpError| e.to_string())?;
 
         Ok(Self {
             client,
@@ -456,7 +460,7 @@ fn canonicalize_url(u: &str) -> String {
     s
 }
 
-fn format_error_chain(e: &reqwest::Error) -> String {
+fn format_error_chain(e: &HttpError) -> String {
     let mut msg = e.to_string();
     let mut cur: Option<&(dyn Error + 'static)> = e.source();
     while let Some(err) = cur {
@@ -489,7 +493,7 @@ fn should_retry_status(status: StatusCode) -> bool {
     matches!(status.as_u16(), 429 | 502 | 503 | 504 | 508)
 }
 
-fn should_retry_error(err: &reqwest::Error) -> bool {
+fn should_retry_error(err: &HttpError) -> bool {
     if err.is_timeout() || err.is_connect() {
         return true;
     }
@@ -499,7 +503,7 @@ fn should_retry_error(err: &reqwest::Error) -> bool {
     err.is_request()
 }
 
-fn parse_retry_after(headers: &reqwest::header::HeaderMap) -> Option<Duration> {
+fn parse_retry_after(headers: &header::HeaderMap) -> Option<Duration> {
     let value = headers.get(RETRY_AFTER)?.to_str().ok()?;
     if let Ok(seconds) = value.trim().parse::<u64>() {
         return Some(Duration::from_secs(seconds));

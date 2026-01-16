@@ -484,6 +484,13 @@ fn article_referer(url: &str) -> Option<String> {
     Some("https://news.google.com/".to_string())
 }
 
+/// Check if URL belongs to NYTimes (requires special handling)
+fn is_nytimes_url(url: &str) -> bool {
+    host_from_url(url)
+        .map(|h| h.contains("nytimes.com") || h.contains("nyt.com"))
+        .unwrap_or(false)
+}
+
 fn now_unix() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -1452,6 +1459,23 @@ async fn fetch_bytes_with_retries(
                 if let Some(referer) = article_referer(url) {
                     req = req.header(REFERER, referer);
                 }
+            } else if is_nytimes_url(url) {
+                // NYTimes needs special handling: RSS-first Accept, longer timeout, and specific headers
+                req = req
+                    .timeout(Duration::from_secs(30))
+                    .header(
+                        ACCEPT,
+                        "application/rss+xml,application/xml,application/atom+xml,text/xml;q=0.9,*/*;q=0.8",
+                    )
+                    .header(ACCEPT_LANGUAGE, "en-US,en;q=0.9")
+                    .header("DNT", "1")
+                    .header(CONNECTION, "keep-alive")
+                    .header(UPGRADE_INSECURE_REQUESTS, "1")
+                    .header("Sec-Fetch-Dest", "document")
+                    .header("Sec-Fetch-Mode", "navigate")
+                    .header("Sec-Fetch-Site", "cross-site")
+                    .header("Sec-Fetch-User", "?1")
+                    .header(REFERER, "https://news.google.com/");
             } else {
                 req = req
                     .header(

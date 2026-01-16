@@ -38,41 +38,57 @@ const SAPI_VOICES_PATH: PCWSTR = w!(r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Spee
 const ONECORE_VOICES_PATH: PCWSTR =
     w!(r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech_OneCore\Voices");
 
-fn utf16_ptr_to_string(ptr: *const u16) -> Option<String> {
+fn pwstr_to_string(ptr: PCWSTR) -> String {
     if ptr.is_null() {
-        return None;
+        return "Unknown Voice".to_string();
     }
     unsafe {
-        let mut len = 0;
-        while *ptr.add(len) != 0 {
-            len += 1;
-        }
-        let slice = std::slice::from_raw_parts(ptr, len);
-        Some(String::from_utf16_lossy(slice))
+        ptr.to_string()
+            .unwrap_or_else(|_| "Unknown Voice".to_string())
+    }
+}
+
+struct ComRuntime;
+
+impl ComRuntime {
+    fn new() -> Result<Self, windows::core::Error> {
+        unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) }.ok()?;
+        Ok(Self)
+    }
+}
+
+impl Drop for ComRuntime {
+    fn drop(&mut self) {
+        unsafe { CoUninitialize() };
     }
 }
 
 fn collect_voice_descriptions(category_id: PCWSTR) -> Result<Vec<String>, String> {
+    let _com = ComRuntime::new().map_err(|e| format!("CoInitializeEx failed: {}", e))?;
+
     let category: ISpObjectTokenCategory = unsafe {
         CoCreateInstance(&SpObjectTokenCategory, None, CLSCTX_ALL)
             .map_err(|e| format!("CoCreateInstance(Category) failed: {}", e))?
     };
+
     unsafe { category.SetId(category_id, false) }.map_err(|e| format!("SetId failed: {}", e))?;
 
     let enum_tokens: IEnumSpObjectTokens = unsafe { category.EnumTokens(None, None) }
         .map_err(|e| format!("EnumTokens failed: {}", e))?;
 
     let mut count = 0;
-    unsafe { enum_tokens.GetCount(&mut count) }.ok();
+    if unsafe { enum_tokens.GetCount(&mut count) }.is_err() {
+        return Ok(Vec::new());
+    }
 
     let mut voices = Vec::new();
     for i in 0..count {
+        // Safe wrapper around token operations
         if let Ok(token) = unsafe { enum_tokens.Item(i) } {
             if let Ok(desc_ptr) = unsafe { token.GetStringValue(PCWSTR::null()) } {
-                let description = utf16_ptr_to_string(desc_ptr.as_ptr())
-                    .unwrap_or_else(|| "Unknown Voice".to_string());
+                let description = pwstr_to_string(PCWSTR(desc_ptr.0));
                 unsafe {
-                    CoTaskMemFree(Some(desc_ptr.as_ptr() as *const _));
+                    CoTaskMemFree(Some(desc_ptr.0 as *const _));
                 }
                 voices.push(description);
             }
@@ -93,11 +109,11 @@ fn find_voice_token(voice_name: &str) -> Option<ISpObjectToken> {
                     for i in 0..count {
                         if let Ok(tok) = unsafe { enum_tokens.Item(i) } {
                             if let Ok(desc_ptr) = unsafe { tok.GetStringValue(PCWSTR::null()) } {
-                                let description = utf16_ptr_to_string(desc_ptr.as_ptr());
+                                let description = pwstr_to_string(PCWSTR(desc_ptr.0));
                                 unsafe {
-                                    CoTaskMemFree(Some(desc_ptr.as_ptr() as *const _));
+                                    CoTaskMemFree(Some(desc_ptr.0 as *const _));
                                 }
-                                if description.as_deref() == Some(voice_name) {
+                                if description == voice_name {
                                     return Some(tok);
                                 }
                             }
@@ -111,31 +127,28 @@ fn find_voice_token(voice_name: &str) -> Option<ISpObjectToken> {
 }
 
 pub fn list_sapi_voices() -> Result<Vec<VoiceInfo>, String> {
-    unsafe {
-        // Use APARTMENTTHREADED for better compatibility with SAPI5
-        let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+    let _com = ComRuntime::new().map_err(|e| format!("CoInitializeEx failed: {}", e))?;
 
-        let mut names = Vec::new();
-        if let Ok(list) = collect_voice_descriptions(SAPI_VOICES_PATH) {
-            names.extend(list);
-        }
-        if let Ok(list) = collect_voice_descriptions(ONECORE_VOICES_PATH) {
-            names.extend(list);
-        }
-
-        let mut seen = HashSet::new();
-        let mut voices = Vec::new();
-        for name in names {
-            if seen.insert(name.clone()) {
-                voices.push(VoiceInfo {
-                    short_name: name,
-                    locale: "SAPI5".to_string(),
-                    is_multilingual: false,
-                });
-            }
-        }
-        Ok(voices)
+    let mut names = Vec::new();
+    if let Ok(list) = collect_voice_descriptions(SAPI_VOICES_PATH) {
+        names.extend(list);
     }
+    if let Ok(list) = collect_voice_descriptions(ONECORE_VOICES_PATH) {
+        names.extend(list);
+    }
+
+    let mut seen = HashSet::new();
+    let mut voices = Vec::new();
+    for name in names {
+        if seen.insert(name.clone()) {
+            voices.push(VoiceInfo {
+                short_name: name,
+                locale: "SAPI5".to_string(),
+                is_multilingual: false,
+            });
+        }
+    }
+    Ok(voices)
 }
 
 pub fn play_sapi(

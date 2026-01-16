@@ -1,3 +1,0 @@
-[2026-01-14 22:52:52] Application started.
-[2026-01-14 22:52:53] Menu: Options
-[2026-01-14 22:53:22] Menu: Options

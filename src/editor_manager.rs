@@ -143,7 +143,16 @@ unsafe extern "system" fn edit_subclass_proc(
 
     let prev = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
     if prev != 0 {
-        CallWindowProcW(Some(std::mem::transmute(prev)), hwnd, msg, wparam, lparam)
+        CallWindowProcW(
+            Some(std::mem::transmute::<
+                isize,
+                unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
+            >(prev)),
+            hwnd,
+            msg,
+            wparam,
+            lparam,
+        )
     } else {
         DefWindowProcW(hwnd, msg, wparam, lparam)
     }

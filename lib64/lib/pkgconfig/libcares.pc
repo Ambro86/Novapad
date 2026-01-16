@@ -1,0 +1,22 @@
+#***************************************************************************
+# Project        ___       __ _ _ __ ___  ___ 
+#               / __|____ / _` | '__/ _ \/ __|
+#              | (_|_____| (_| | | |  __/\__ \
+#               \___|     \__,_|_|  \___||___/
+#
+# Copyright (C) The c-ares project and its contributors
+# SPDX-License-Identifier: MIT
+prefix=D:/a/curl-impersonate/curl-impersonate/packages
+exec_prefix=D:/a/curl-impersonate/curl-impersonate/packages/bin
+libdir=D:/a/curl-impersonate/curl-impersonate/packages/lib
+includedir=D:/a/curl-impersonate/curl-impersonate/packages/include
+
+Name: c-ares
+URL: https://c-ares.org/
+Description: asynchronous DNS lookup library
+Version: 1.30.0
+Requires: 
+Requires.private: 
+Cflags: -I${includedir}
+Libs: -L${libdir} -lcares
+Libs.private:  -lws2_32 -ladvapi32 -liphlpapi

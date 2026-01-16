@@ -10,6 +10,7 @@
 #![windows_subsystem = "windows"]
 
 mod accessibility;
+mod curl_client;
 use accessibility::*;
 mod conpty;
 mod settings;

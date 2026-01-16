@@ -1,0 +1,13 @@
+prefix=D:/a/curl-impersonate/curl-impersonate/packages
+exec_prefix=D:/a/curl-impersonate/curl-impersonate/packages
+libdir=D:/a/curl-impersonate/curl-impersonate/packages/lib
+sharedlibdir=D:/a/curl-impersonate/curl-impersonate/packages/lib
+includedir=D:/a/curl-impersonate/curl-impersonate/packages/include
+
+Name: zlib
+Description: zlib compression library
+Version: 1.3
+
+Requires:
+Libs: -L${libdir} -L${sharedlibdir} -lz
+Cflags: -I${includedir}

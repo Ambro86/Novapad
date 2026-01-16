@@ -311,7 +311,7 @@ impl RssHttp {
 
         #[cfg(feature = "impersonate")]
         let client = rquest::Client::builder()
-            .emulation(Emulation::Chrome131)
+            .emulation(Emulation::Chrome133)
             .default_headers(headers)
             .cookie_store(true)
             .redirect(rquest::redirect::Policy::limited(10))

@@ -586,6 +586,8 @@ dependencies = [
  "compression-core",
  "flate2",
  "memchr",
+ "zstd 0.13.3",
+ "zstd-safe 7.2.4",
 ]
 
 [[package]]
@@ -609,6 +611,24 @@ dependencies = [
  "percent-encoding",
  "time",
  "version_check",
+]
+
+[[package]]
+name = "cookie_store"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2eac901828f88a5241ee0600950ab981148a18f2f756900ffba1b125ca6a3ef9"
+dependencies = [
+ "cookie",
+ "document-features",
+ "idna",
+ "log",
+ "publicsuffix",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "time",
+ "url",
 ]
 
 [[package]]
@@ -2233,6 +2253,7 @@ dependencies = [
  "reqwest",
  "rodio",
  "rquest",
+ "rquest-util",
  "scraper 0.19.1",
  "serde",
  "serde_json",
@@ -2854,7 +2875,7 @@ dependencies = [
  "base64",
  "bytes",
  "cookie",
- "cookie_store",
+ "cookie_store 0.22.0",
  "encoding_rs",
  "futures-channel",
  "futures-core",
@@ -2931,9 +2952,13 @@ checksum = "821ab2b3866cc43b553364566edf7387aea98b28b87213d8a889fc2504b3b8b0"
 dependencies = [
  "antidote",
  "arc-swap",
+ "async-compression",
  "base64",
  "boring2",
  "bytes",
+ "cookie",
+ "cookie_store 0.21.1",
+ "encoding_rs",
  "futures-util",
  "hickory-resolver",
  "http",
@@ -2951,14 +2976,27 @@ dependencies = [
  "serde_urlencoded",
  "socket2 0.5.10",
  "sync_wrapper",
+ "system-configuration",
  "tokio",
  "tokio-boring2",
  "tokio-tungstenite 0.26.2",
+ "tokio-util",
  "tower",
  "tower-service",
  "typed-builder",
  "url",
+ "webpki-root-certs 0.26.11",
  "windows-registry 0.5.3",
+]
+
+[[package]]
+name = "rquest-util"
+version = "2.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3e3762f6e3e0d1674a6e74ebcbcb3b8d56c895757fc2cc2aa0d5e62ccfcb21e"
+dependencies = [
+ "rquest",
+ "typed-builder",
 ]
 
 [[package]]
@@ -4140,6 +4178,24 @@ dependencies = [
  "phf_codegen 0.11.3",
  "string_cache",
  "string_cache_codegen",
+]
+
+[[package]]
+name = "webpki-root-certs"
+version = "0.26.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75c7f0ef91146ebfb530314f5f1d24528d7f0767efbfd31dce919275413e393e"
+dependencies = [
+ "webpki-root-certs 1.0.5",
+]
+
+[[package]]
+name = "webpki-root-certs"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36a29fc0408b113f68cf32637857ab740edfafdf460c326cd2afaa2d84cc05dc"
+dependencies = [
+ "rustls-pki-types",
 ]
 
 [[package]]

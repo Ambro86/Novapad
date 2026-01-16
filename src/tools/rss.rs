@@ -9,6 +9,8 @@ use rand::Rng;
 use reqwest;
 #[cfg(feature = "impersonate")]
 use rquest;
+#[cfg(feature = "impersonate")]
+use rquest_util::Emulation;
 
 #[cfg(not(feature = "impersonate"))]
 type HttpClient = reqwest::Client;
@@ -309,7 +311,7 @@ impl RssHttp {
 
         #[cfg(feature = "impersonate")]
         let client = rquest::Client::builder()
-            .impersonate(rquest::Impersonate::Chrome120)
+            .emulation(Emulation::Chrome120)
             .default_headers(headers)
             .cookie_store(true)
             .redirect(rquest::redirect::Policy::limited(10))

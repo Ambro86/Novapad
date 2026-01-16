@@ -698,13 +698,22 @@ pub async fn fetch_article_text(
     ));
     let url_for_curl = url_str.clone();
     let bytes_res = tokio::task::spawn_blocking(move || {
-        crate::curl_client::fetch_url_impersonated(&url_for_curl).map_err(|e| e.to_string())
+        crate::curl_client::CurlClient::fetch_url_impersonated(&url_for_curl)
+            .map_err(|e| e.to_string())
     })
     .await
     .map_err(|e| e.to_string())?;
 
     let html = match bytes_res {
-        Ok(bytes) => String::from_utf8_lossy(&bytes).to_string(),
+        Ok(bytes) => {
+            let s = String::from_utf8_lossy(&bytes).to_string();
+            // DEBUG: Salva l'HTML grezzo in un file vicino all'exe
+            if let Ok(mut exe_path) = std::env::current_exe() {
+                exe_path.set_file_name("debug_last_fetch.txt");
+                let _ = std::fs::write(exe_path, &s);
+            }
+            s
+        }
         Err(err) => {
             log_debug(&format!(
                 "rss_article_fetch curl_failed url=\"{url_str}\" error=\"{err}\""
@@ -724,7 +733,6 @@ pub async fn fetch_article_text(
     ));
     Ok(format!("{}\n\n{}", article.title, article.content))
 }
-
 pub fn config_from_settings(settings: &crate::settings::AppSettings) -> RssHttpConfig {
     RssHttpConfig {
         global_max_concurrency: settings.rss_global_max_concurrency,

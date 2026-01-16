@@ -1,5 +1,4 @@
 use scraper::{Html, Selector};
-use url::Url;
 
 #[derive(Debug, Clone)]
 pub struct ArticleContent {
@@ -8,42 +7,59 @@ pub struct ArticleContent {
     pub excerpt: String,
 }
 
-/// Funzione per pulire il testo da entità HTML, rimasugli JSON e spazi strani
-pub fn clean_text(input: &str) -> String {
-    let mut text = input.to_string();
+fn decode_unicode(input: &str) -> String {
+    let mut result = String::new();
+    let mut chars = input.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\\' && chars.peek() == Some(&'u') {
+            chars.next();
+            let mut hex = String::new();
+            for _ in 0..4 {
+                if let Some(h) = chars.next() {
+                    hex.push(h);
+                }
+            }
+            if let Ok(code) = u32::from_str_radix(&hex, 16) {
+                if let Some(decoded_char) = std::char::from_u32(code) {
+                    result.push(decoded_char);
+                    continue;
+                }
+            }
+            result.push_str("\\u");
+            result.push_str(&hex);
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
 
-    // 1. Rimpiazza entità HTML comuni
+pub fn clean_text(input: &str) -> String {
+    let decoded = decode_unicode(input);
+    // Pulizia encoding Mediaset/TGCOM24
+    let mut text = decoded
+        .replace("Ã¨", "è")
+        .replace("Ã ", "à")
+        .replace("Ã¹", "ù")
+        .replace("Ã²", "ò")
+        .replace("Ã¬", "ì")
+        .replace("Â ", " ")
+        .replace("Ã©", "é")
+        .replace("Â", "");
+
     text = text
         .replace("&nbsp;", " ")
         .replace("&#160;", " ")
-        .replace("\u{00a0}", " ") // Carattere Unicode non-breaking space
-        .replace("&amp;", "&")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&apos;", "'")
-        .replace("&#39;", "'")
-        .replace("&#039;", "'")
-        .replace("&#x27;", "'")
-        .replace("&ndash;", "–")
-        .replace("&mdash;", "—")
-        .replace("&laquo;", "«")
-        .replace("&raquo;", "»")
-        .replace("&lsquo;", "‘")
-        .replace("&rsquo;", "’")
-        .replace("&ldquo;", "“")
-        .replace("&rdquo;", "”");
-
-    // 2. Rimpiazza sequenze di escape JSON (per estrazione da JSON-LD)
+        .replace("\u{00a0}", " ");
     text = text
-        .replace("\\n", "\n")
+        .replace("&amp;", "&")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'");
+    text = text
         .replace("\\\"", "\"")
-        .replace("\\u003c", "<")
-        .replace("\\u003e", ">")
-        .replace("\\u0026", "&")
-        .replace("\\u0027", "'");
+        .replace("\\n", "\n")
+        .replace("\\/", "/");
 
-    // 3. Rimuove tag HTML rimasti (es. <br>, <b>)
     let mut cleaned = String::new();
     let mut in_tag = false;
     for c in text.chars() {
@@ -56,99 +72,127 @@ pub fn clean_text(input: &str) -> String {
             cleaned.push(c);
         }
     }
-
     cleaned
 }
 
 pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
     let document = Html::parse_document(html_content);
-    let raw_title = pick_title(&document);
-    let title = clean_text(&raw_title);
+    let title = pick_title(&document);
 
-    let mut combined_content = String::new();
+    let mut body_acc = String::new();
+    let mut author_info = String::new();
     let mut found_anything = false;
 
-    // 1. ESTRAZIONE DA JSON-LD (Schema.org) - La più pulita
-    if let Ok(json_selector) = Selector::parse("script[type='application/ld+json']") {
-        for element in document.select(&json_selector) {
-            let json_text = element.text().collect::<Vec<_>>().join("");
-            if let Some(start_idx) = json_text.find("\"articleBody\":\"") {
-                let body_part = &json_text[start_idx + 15..];
-                // Cerchiamo la fine del campo, facendo attenzione alle virgolette chiuse
-                if let Some(end_idx) = body_part.find("\",\"") {
-                    let body = &body_part[..end_idx];
-                    if body.len() > 300 {
-                        combined_content = body.to_string();
-                        found_anything = true;
-                        break;
+    // 1. ESTRAZIONE DA JSON-LD (Schema.org) - MOLTO RICCO SU TGCOM24
+    if let Ok(s) = Selector::parse("script[type='application/ld+json']") {
+        for element in document.select(&s) {
+            let json = element.text().collect::<Vec<_>>().join("");
+
+            // Cerchiamo Autore e Data
+            if author_info.is_empty() {
+                if let Some(a_idx) = json.find("\"name\":\"") {
+                    let part = &json[a_idx + 8..];
+                    if let Some(end) = part.find("\"") {
+                        author_info.push_str(&part[..end]);
+                    }
+                }
+                if let Some(d_idx) = json.find("\"datePublished\":\"") {
+                    let part = &json[d_idx + 17..];
+                    if let Some(end) = part.find("\"") {
+                        let date = &part[..10]; // Prendi solo YYYY-MM-DD
+                        author_info.push_str(&format!(" ({})", date));
                     }
                 }
             }
-        }
-    }
 
-    // 2. ESTRAZIONE DA SELETTORI CSS (per Corriere, Adnkronos, ecc.)
-    if !found_anything {
-        let content_selectors = [
-            ".atext",         // Il Sole 24 Ore
-            ".art-text",      // Adnkronos
-            ".story-content", // Corriere della Sera
-            ".item-text",     // Corriere
-            "article p",      // Standard
-            ".article-body p",
-            ".entry-content p",
-            ".post-content p",
-        ];
-
-        for sel_str in content_selectors {
-            if let Ok(selector) = Selector::parse(sel_str) {
-                let matches: Vec<_> = document.select(&selector).collect();
-                if !matches.is_empty() {
-                    for element in matches {
-                        let text = element.text().collect::<Vec<_>>().join(" ");
-                        let trimmed = text.trim();
-                        if !trimmed.is_empty() {
-                            combined_content.push_str(trimmed);
-                            combined_content.push_str("\n\n");
+            // Cerchiamo description e articleBody
+            for key in [
+                "\"description\":\"",
+                "\"articleBody\":\"",
+                "\"subtitle\":\"",
+            ] {
+                for part in json.split(key) {
+                    if let Some(end) = part.find("\"") {
+                        let val = &part[..end];
+                        if val.len() > 40 && !val.contains("http") && !body_acc.contains(val) {
+                            body_acc.push_str(val);
+                            body_acc.push_str("\n\n");
                             found_anything = true;
                         }
                     }
-                    if found_anything && (sel_str.starts_with('.') || sel_str.starts_with('[')) {
-                        break;
+                }
+            }
+        }
+    }
+
+    // 2. ESTRAZIONE DA NEXT_DATA (WSJ / Altri)
+    if !found_anything {
+        if let Ok(next_selector) = Selector::parse("script#__NEXT_DATA__") {
+            if let Some(element) = document.select(&next_selector).next() {
+                let json_text = element.text().collect::<Vec<_>>().join("");
+                for part in json_text.split("\"text\":\"") {
+                    if let Some(end_idx) = part.find("\"") {
+                        let val = &part[..end_idx];
+                        if val.len() > 30 && !val.contains("http") && !val.contains("{") {
+                            body_acc.push_str(val);
+                            body_acc.push_str("\n\n");
+                            found_anything = true;
+                        }
                     }
                 }
             }
         }
     }
 
-    // 3. FALLBACK: Body
-    if !found_anything {
-        if let Ok(s) = Selector::parse("body") {
-            if let Some(node) = document.select(&s).next() {
-                combined_content = extract_text_cleanly(node);
+    // 3. FALLBACK CSS
+    if !found_anything || body_acc.len() < 300 {
+        let content_selectors = [
+            ".wsj-article-body p",
+            "article p",
+            ".atext",
+            ".art-text",
+            ".story-content p",
+            ".article-body p",
+        ];
+        for sel_str in content_selectors {
+            if let Ok(selector) = Selector::parse(sel_str) {
+                let mut sel_acc = String::new();
+                for element in document.select(&selector) {
+                    let text = element.text().collect::<Vec<_>>().join(" ");
+                    if text.to_lowercase().contains("enable js") {
+                        continue;
+                    }
+                    sel_acc.push_str(&text);
+                    sel_acc.push_str("\n\n");
+                }
+                if sel_acc.len() > 200 {
+                    body_acc.push_str(&sel_acc);
+                    found_anything = true;
+                    break;
+                }
             }
         }
     }
 
-    // PULIZIA FINALE
-    let content = clean_text(&combined_content);
-    let content = collapse_blank_lines(&content);
-    let excerpt = content.chars().take(300).collect::<String>();
+    let mut final_text = String::new();
+    if !author_info.is_empty() {
+        final_text.push_str(&format!("Di {}\n\n", author_info));
+    }
+    final_text.push_str(&body_acc);
+
+    let content = clean_text(&final_text);
+    let final_content = collapse_blank_lines(&content);
+    let excerpt = final_content.chars().take(300).collect::<String>();
 
     Some(ArticleContent {
         title: title.trim().to_string(),
-        content,
+        content: final_content,
         excerpt,
     })
 }
 
 fn pick_title(document: &Html) -> String {
-    let title_selectors = [
-        "h1",
-        "title",
-        "meta[property='og:title']",
-        "meta[name='twitter:title']",
-    ];
+    let title_selectors = ["meta[property='og:title']", "h1", "title"];
     for sel in title_selectors {
         if let Ok(s) = Selector::parse(sel) {
             if let Some(el) = document.select(&s).next() {
@@ -157,62 +201,14 @@ fn pick_title(document: &Html) -> String {
                 } else {
                     el.text().collect::<Vec<_>>().join(" ")
                 };
-                if !t.trim().is_empty() {
-                    return t;
+                let clean_t = t.trim();
+                if clean_t.len() > 5 && !clean_t.to_lowercase().ends_with(".com") {
+                    return decode_unicode(clean_t);
                 }
             }
         }
     }
     "No Title".to_string()
-}
-
-fn extract_text_cleanly(element: scraper::ElementRef) -> String {
-    let mut out = String::new();
-    let ignore = [
-        "script", "style", "noscript", "nav", "footer", "header", "aside", "iframe",
-    ];
-    recursive_text_extract(element, &mut out, &ignore);
-    out
-}
-
-fn recursive_text_extract(element: scraper::ElementRef, out: &mut String, ignore: &[&str]) {
-    for child in element.children() {
-        if let Some(el) = child.value().as_element() {
-            let name = el.name();
-            if ignore.contains(&name) {
-                continue;
-            }
-            if is_block_element(name) {
-                out.push('\n');
-            }
-            if let Some(child_ref) = scraper::ElementRef::wrap(child) {
-                recursive_text_extract(child_ref, out, ignore);
-            }
-            if is_block_element(name) {
-                out.push('\n');
-            }
-        } else if let Some(txt) = child.value().as_text() {
-            out.push_str(txt.trim());
-            out.push(' ');
-        }
-    }
-}
-
-fn is_block_element(name: &str) -> bool {
-    matches!(
-        name,
-        "p" | "div"
-            | "h1"
-            | "h2"
-            | "h3"
-            | "h4"
-            | "h5"
-            | "h6"
-            | "li"
-            | "blockquote"
-            | "section"
-            | "article"
-    )
 }
 
 pub fn collapse_blank_lines(s: &str) -> String {

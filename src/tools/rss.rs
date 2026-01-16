@@ -12,6 +12,10 @@ use rquest;
 #[cfg(feature = "impersonate")]
 use rquest_util::Emulation;
 
+// Always import reqwest for fallback client (NYTimes workaround)
+#[cfg(feature = "impersonate")]
+use reqwest as reqwest_fallback;
+
 #[cfg(not(feature = "impersonate"))]
 type HttpClient = reqwest::Client;
 #[cfg(feature = "impersonate")]
@@ -484,11 +488,73 @@ fn article_referer(url: &str) -> Option<String> {
     Some("https://news.google.com/".to_string())
 }
 
-/// Check if URL belongs to NYTimes (requires special handling)
-fn is_nytimes_url(url: &str) -> bool {
-    host_from_url(url)
-        .map(|h| h.contains("nytimes.com") || h.contains("nyt.com"))
-        .unwrap_or(false)
+/// Fallback fetch using plain reqwest (without TLS impersonation)
+/// Some sites paradoxically block TLS fingerprinting but allow plain requests
+#[cfg(feature = "impersonate")]
+async fn fetch_article_plain_reqwest(url: &str) -> Result<Vec<u8>, String> {
+    use reqwest_fallback::header::{
+        ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, CACHE_CONTROL, HeaderMap, HeaderValue, REFERER,
+        UPGRADE_INSECURE_REQUESTS, USER_AGENT,
+    };
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        USER_AGENT,
+        HeaderValue::from_static(
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        ),
+    );
+    headers.insert(
+        ACCEPT,
+        HeaderValue::from_static(
+            "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        ),
+    );
+    headers.insert(
+        ACCEPT_ENCODING,
+        HeaderValue::from_static("gzip, deflate, br"),
+    );
+    headers.insert(ACCEPT_LANGUAGE, HeaderValue::from_static("en-US,en;q=0.9"));
+    headers.insert(CACHE_CONTROL, HeaderValue::from_static("max-age=0"));
+    headers.insert(UPGRADE_INSECURE_REQUESTS, HeaderValue::from_static("1"));
+    headers.insert(
+        "sec-ch-ua",
+        HeaderValue::from_static(
+            "\"Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\"",
+        ),
+    );
+    headers.insert("sec-ch-ua-mobile", HeaderValue::from_static("?0"));
+    headers.insert(
+        "sec-ch-ua-platform",
+        HeaderValue::from_static("\"Windows\""),
+    );
+    headers.insert("sec-fetch-dest", HeaderValue::from_static("document"));
+    headers.insert("sec-fetch-mode", HeaderValue::from_static("navigate"));
+    headers.insert("sec-fetch-site", HeaderValue::from_static("none"));
+    headers.insert("sec-fetch-user", HeaderValue::from_static("?1"));
+    headers.insert(
+        REFERER,
+        HeaderValue::from_static("https://news.google.com/"),
+    );
+
+    let client = reqwest_fallback::Client::builder()
+        .default_headers(headers)
+        .gzip(true)
+        .brotli(true)
+        .timeout(Duration::from_secs(30))
+        .redirect(reqwest_fallback::redirect::Policy::limited(10))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let response = client.get(url).send().await.map_err(|e| e.to_string())?;
+
+    let status = response.status();
+    if !status.is_success() {
+        return Err(format!("HTTP {}", status.as_u16()));
+    }
+
+    let bytes = response.bytes().await.map_err(|e| e.to_string())?;
+    Ok(bytes.to_vec())
 }
 
 fn now_unix() -> i64 {
@@ -1459,23 +1525,6 @@ async fn fetch_bytes_with_retries(
                 if let Some(referer) = article_referer(url) {
                     req = req.header(REFERER, referer);
                 }
-            } else if is_nytimes_url(url) {
-                // NYTimes needs special handling: RSS-first Accept, longer timeout, and specific headers
-                req = req
-                    .timeout(Duration::from_secs(30))
-                    .header(
-                        ACCEPT,
-                        "application/rss+xml,application/xml,application/atom+xml,text/xml;q=0.9,*/*;q=0.8",
-                    )
-                    .header(ACCEPT_LANGUAGE, "en-US,en;q=0.9")
-                    .header("DNT", "1")
-                    .header(CONNECTION, "keep-alive")
-                    .header(UPGRADE_INSECURE_REQUESTS, "1")
-                    .header("Sec-Fetch-Dest", "document")
-                    .header("Sec-Fetch-Mode", "navigate")
-                    .header("Sec-Fetch-Site", "cross-site")
-                    .header("Sec-Fetch-User", "?1")
-                    .header(REFERER, "https://news.google.com/");
             } else {
                 req = req
                     .header(
@@ -2426,6 +2475,71 @@ pub async fn fetch_article_text(
     }
     let http = shared_http()?;
     let fetch_config = RssFetchConfig::default();
+
+    // Adaptive fetch: try rquest first, if blocked (403) fallback to plain reqwest
+    #[cfg(feature = "impersonate")]
+    let html = {
+        // First try with rquest (TLS fingerprinting)
+        let primary_result =
+            fetch_bytes_with_retries(http, &url, false, "article", false, &fetch_config, None)
+                .await;
+
+        match primary_result {
+            Ok(out) => {
+                let html = String::from_utf8_lossy(&out.bytes).to_string();
+                if is_probably_blocked_html(&html) {
+                    log_debug(&format!("rss_article_fetch rquest_blocked url=\"{}\"", url));
+                    None
+                } else {
+                    Some(html)
+                }
+            }
+            Err(ref err) => {
+                // If 403 Forbidden, try fallback with plain reqwest (no TLS fingerprinting)
+                let is_403 = matches!(err, FeedFetchError::HttpStatus { status: 403, .. });
+                if is_403 {
+                    log_debug(&format!(
+                        "rss_article_fetch rquest_403_fallback url=\"{}\"",
+                        url
+                    ));
+                    match fetch_article_plain_reqwest(&url).await {
+                        Ok(bytes) => {
+                            let html = String::from_utf8_lossy(&bytes).to_string();
+                            if is_probably_blocked_html(&html) {
+                                log_debug(&format!(
+                                    "rss_article_fetch fallback_blocked url=\"{}\"",
+                                    url
+                                ));
+                                None
+                            } else {
+                                log_debug(&format!(
+                                    "rss_article_fetch fallback_success url=\"{}\" bytes={}",
+                                    url,
+                                    bytes.len()
+                                ));
+                                Some(html)
+                            }
+                        }
+                        Err(fallback_err) => {
+                            log_debug(&format!(
+                                "rss_article_fetch fallback_failed url=\"{}\" error=\"{}\"",
+                                url, fallback_err
+                            ));
+                            None
+                        }
+                    }
+                } else {
+                    log_debug(&format!(
+                        "rss_article_fetch rquest_failed url=\"{}\" error=\"{}\"",
+                        url, err
+                    ));
+                    None
+                }
+            }
+        }
+    };
+
+    #[cfg(not(feature = "impersonate"))]
     let html = {
         let out =
             fetch_bytes_with_retries(http, &url, false, "article", false, &fetch_config, None)

@@ -34,6 +34,7 @@ mod editor_manager;
 use editor_manager::*;
 mod app_windows;
 mod audio_capture;
+mod audio_utils;
 mod i18n;
 mod podcast;
 mod podcast_recorder;

@@ -228,47 +228,74 @@ fn load_soundtouch_api() -> Option<&'static SoundTouchApi> {
             };
             Some(SoundTouchApi {
                 _handle: h,
-                create: std::mem::transmute(proc(&[
+                create: std::mem::transmute::<
+                    unsafe extern "system" fn() -> isize,
+                    unsafe extern "C" fn() -> *mut std::ffi::c_void,
+                >(proc(&[
                     "soundtouch_createInstance",
                     "_soundtouch_createInstance",
                     "soundtouch_createInstance@0",
                 ])?),
-                destroy: std::mem::transmute(proc(&[
+                destroy: std::mem::transmute::<
+                    unsafe extern "system" fn() -> isize,
+                    unsafe extern "C" fn(*mut std::ffi::c_void),
+                >(proc(&[
                     "soundtouch_destroyInstance",
                     "_soundtouch_destroyInstance",
                     "soundtouch_destroyInstance@4",
                 ])?),
-                set_sample_rate: std::mem::transmute(proc(&[
+                set_sample_rate: std::mem::transmute::<
+                    unsafe extern "system" fn() -> isize,
+                    unsafe extern "C" fn(*mut std::ffi::c_void, u32),
+                >(proc(&[
                     "soundtouch_setSampleRate",
                     "_soundtouch_setSampleRate",
                     "soundtouch_setSampleRate@8",
                 ])?),
-                set_channels: std::mem::transmute(proc(&[
+                set_channels: std::mem::transmute::<
+                    unsafe extern "system" fn() -> isize,
+                    unsafe extern "C" fn(*mut std::ffi::c_void, u32),
+                >(proc(&[
                     "soundtouch_setChannels",
                     "_soundtouch_setChannels",
                     "soundtouch_setChannels@8",
                 ])?),
-                set_tempo: std::mem::transmute(proc(&[
+                set_tempo: std::mem::transmute::<
+                    unsafe extern "system" fn() -> isize,
+                    unsafe extern "C" fn(*mut std::ffi::c_void, f32),
+                >(proc(&[
                     "soundtouch_setTempo",
                     "_soundtouch_setTempo",
                     "soundtouch_setTempo@8",
                 ])?),
-                put_samples: std::mem::transmute(proc(&[
+                put_samples: std::mem::transmute::<
+                    unsafe extern "system" fn() -> isize,
+                    unsafe extern "C" fn(*mut std::ffi::c_void, *const f32, u32),
+                >(proc(&[
                     "soundtouch_putSamples",
                     "_soundtouch_putSamples",
                     "soundtouch_putSamples@12",
                 ])?),
-                receive_samples: std::mem::transmute(proc(&[
+                receive_samples: std::mem::transmute::<
+                    unsafe extern "system" fn() -> isize,
+                    unsafe extern "C" fn(*mut std::ffi::c_void, *mut f32, u32) -> u32,
+                >(proc(&[
                     "soundtouch_receiveSamples",
                     "_soundtouch_receiveSamples",
                     "soundtouch_receiveSamples@12",
                 ])?),
-                flush: std::mem::transmute(proc(&[
+                flush: std::mem::transmute::<
+                    unsafe extern "system" fn() -> isize,
+                    unsafe extern "C" fn(*mut std::ffi::c_void),
+                >(proc(&[
                     "soundtouch_flush",
                     "_soundtouch_flush",
                     "soundtouch_flush@4",
                 ])?),
-                clear: std::mem::transmute(proc(&[
+                clear: std::mem::transmute::<
+                    unsafe extern "system" fn() -> isize,
+                    unsafe extern "C" fn(*mut std::ffi::c_void),
+                >(proc(&[
                     "soundtouch_clear",
                     "_soundtouch_clear",
                     "soundtouch_clear@4",

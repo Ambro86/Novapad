@@ -2530,7 +2530,16 @@ unsafe extern "system" fn reorder_control_subclass_proc(
     if prev == 0 {
         return DefWindowProcW(hwnd, msg, wparam, lparam);
     }
-    CallWindowProcW(Some(std::mem::transmute(prev)), hwnd, msg, wparam, lparam)
+    CallWindowProcW(
+        Some(std::mem::transmute::<
+            isize,
+            unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
+        >(prev)),
+        hwnd,
+        msg,
+        wparam,
+        lparam,
+    )
 }
 
 unsafe extern "system" fn reorder_wndproc(

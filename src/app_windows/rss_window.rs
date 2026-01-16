@@ -2450,7 +2450,7 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
             let mut loaded_before = 0usize;
             let mut total_before = 0usize;
             let existing =
-                with_rss_state(hwnd, |s| s.source_items.get(&hitem.0).is_some()).unwrap_or(false);
+                with_rss_state(hwnd, |s| s.source_items.contains_key(&hitem.0)).unwrap_or(false);
 
             if existing {
                 with_rss_state(hwnd, |s| {
@@ -2566,7 +2566,7 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
             }
 
             let has_items =
-                with_rss_state(hwnd, |s| s.source_items.get(&hitem.0).is_some()).unwrap_or(false);
+                with_rss_state(hwnd, |s| s.source_items.contains_key(&hitem.0)).unwrap_or(false);
             if has_items {
                 return;
             }
@@ -3462,7 +3462,16 @@ unsafe extern "system" fn reorder_control_subclass_proc(
     if prev == 0 {
         return DefWindowProcW(hwnd, msg, wparam, lparam);
     }
-    CallWindowProcW(Some(std::mem::transmute(prev)), hwnd, msg, wparam, lparam)
+    CallWindowProcW(
+        Some(std::mem::transmute::<
+            isize,
+            unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
+        >(prev)),
+        hwnd,
+        msg,
+        wparam,
+        lparam,
+    )
 }
 
 unsafe fn show_add_dialog(parent_hwnd: HWND) {

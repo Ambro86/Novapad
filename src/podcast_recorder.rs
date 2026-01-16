@@ -1,12 +1,11 @@
 use crate::accessibility::from_wide;
 use crate::audio_capture::{self, AudioRecorderHandle as AudioRecorder};
+use crate::audio_utils;
 use crate::mf_encoder;
 use crate::settings;
 use crate::settings::{PODCAST_DEVICE_DEFAULT, PodcastFormat};
 use chrono::Local;
 use std::collections::VecDeque;
-use std::fs::{File, OpenOptions};
-use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
@@ -848,7 +847,10 @@ fn write_mixed_audio_wav(
     stop: Arc<AtomicBool>,
     paused: Arc<AtomicBool>,
 ) -> Result<(), String> {
-    let mut writer = WavWriter::create(&path)?;
+    let mut writer =
+        audio_utils::WavWriter::create(&path, TARGET_SAMPLE_RATE, TARGET_CHANNELS, TARGET_BITS)
+            .map_err(|e| e.to_string())?;
+
     let mut last_write = Instant::now();
     loop {
         if stop.load(Ordering::SeqCst) {
@@ -900,7 +902,9 @@ fn write_mixed_audio_wav(
         }
         drop(inner);
 
-        writer.write_f32(&mixed)?;
+        writer
+            .write_samples_f32(&mixed)
+            .map_err(|e| e.to_string())?;
 
         let elapsed = last_write.elapsed();
         if elapsed < Duration::from_millis(10) {
@@ -908,7 +912,7 @@ fn write_mixed_audio_wav(
         }
         last_write = Instant::now();
     }
-    writer.finalize()?;
+    writer.finalize().map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -1259,92 +1263,6 @@ impl LinearResampler {
             self.pos -= drop_frames as f64;
         }
         out
-    }
-}
-
-struct WavWriter {
-    file: File,
-    data_size: u32,
-}
-
-impl WavWriter {
-    fn create(path: &Path) -> Result<Self, String> {
-        let file = OpenOptions::new()
-            .create(true)
-            .truncate(true)
-            .write(true)
-            .open(path)
-            .map_err(|e| e.to_string())?;
-        let mut writer = WavWriter { file, data_size: 0 };
-        writer.write_header_placeholder()?;
-        Ok(writer)
-    }
-
-    fn write_header_placeholder(&mut self) -> Result<(), String> {
-        self.file.write_all(b"RIFF").map_err(|e| e.to_string())?;
-        self.file
-            .write_all(&0u32.to_le_bytes())
-            .map_err(|e| e.to_string())?;
-        self.file.write_all(b"WAVE").map_err(|e| e.to_string())?;
-        self.file.write_all(b"fmt ").map_err(|e| e.to_string())?;
-        self.file
-            .write_all(&16u32.to_le_bytes())
-            .map_err(|e| e.to_string())?;
-        self.file
-            .write_all(&1u16.to_le_bytes())
-            .map_err(|e| e.to_string())?;
-        self.file
-            .write_all(&TARGET_CHANNELS.to_le_bytes())
-            .map_err(|e| e.to_string())?;
-        self.file
-            .write_all(&TARGET_SAMPLE_RATE.to_le_bytes())
-            .map_err(|e| e.to_string())?;
-        let byte_rate = TARGET_SAMPLE_RATE * TARGET_CHANNELS as u32 * (TARGET_BITS as u32 / 8);
-        let block_align = TARGET_CHANNELS * (TARGET_BITS / 8);
-        self.file
-            .write_all(&byte_rate.to_le_bytes())
-            .map_err(|e| e.to_string())?;
-        self.file
-            .write_all(&block_align.to_le_bytes())
-            .map_err(|e| e.to_string())?;
-        self.file
-            .write_all(&TARGET_BITS.to_le_bytes())
-            .map_err(|e| e.to_string())?;
-        self.file.write_all(b"data").map_err(|e| e.to_string())?;
-        self.file
-            .write_all(&0u32.to_le_bytes())
-            .map_err(|e| e.to_string())?;
-        Ok(())
-    }
-
-    fn write_f32(&mut self, samples: &[f32]) -> Result<(), String> {
-        let mut buf = Vec::with_capacity(samples.len() * 2);
-        for sample in samples {
-            let clamped = sample.clamp(-1.0, 1.0);
-            let v = (clamped * i16::MAX as f32) as i16;
-            buf.extend_from_slice(&v.to_le_bytes());
-        }
-        self.file.write_all(&buf).map_err(|e| e.to_string())?;
-        self.data_size = self.data_size.saturating_add(buf.len() as u32);
-        Ok(())
-    }
-
-    fn finalize(&mut self) -> Result<(), String> {
-        let riff_size = 36u32.saturating_add(self.data_size);
-        self.file
-            .seek(SeekFrom::Start(4))
-            .map_err(|e| e.to_string())?;
-        self.file
-            .write_all(&riff_size.to_le_bytes())
-            .map_err(|e| e.to_string())?;
-        self.file
-            .seek(SeekFrom::Start(40))
-            .map_err(|e| e.to_string())?;
-        self.file
-            .write_all(&self.data_size.to_le_bytes())
-            .map_err(|e| e.to_string())?;
-        self.file.flush().map_err(|e| e.to_string())?;
-        Ok(())
     }
 }
 

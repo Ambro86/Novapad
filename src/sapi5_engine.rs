@@ -9,7 +9,6 @@ use crate::settings::{Language, VoiceInfo};
 use crate::tts_engine::TtsCommand;
 use std::collections::HashSet;
 use std::collections::VecDeque;
-use std::io::{Read, Seek, Write};
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -392,13 +391,13 @@ pub fn speak_sapi_to_file(
         }
 
         if is_mp3 {
-            if let Ok(data_size) = wav_data_size(&wav_path) {
+            if let Ok(data_size) = crate::audio_utils::get_wav_data_size(&wav_path) {
                 if data_size == 0 {
                     let sample_rate = 44100u32;
                     let channels = 1u16;
                     let bits_per_sample = 16u16;
                     let duration_ms = 500u32;
-                    let _ = write_silence_wav(
+                    let _ = crate::audio_utils::write_silence_file(
                         &wav_path,
                         sample_rate,
                         channels,
@@ -485,89 +484,4 @@ fn mk_sapi_ssml(text: &str, rate: i32, pitch: i32, volume: i32) -> String {
         format_volume(volume),
         escaped
     )
-}
-
-fn wav_data_size(path: &Path) -> Result<u32, String> {
-    let mut file = std::fs::File::open(path).map_err(|e| e.to_string())?;
-    let mut header = [0u8; 12];
-    file.read_exact(&mut header).map_err(|e| e.to_string())?;
-
-    if &header[0..4] != b"RIFF" || &header[8..12] != b"WAVE" {
-        return Err("Invalid WAV header".to_string());
-    }
-
-    let mut buffer = [0u8; 8];
-    while file.read_exact(&mut buffer).is_ok() {
-        let chunk_id = &buffer[0..4];
-        let chunk_size = u32::from_le_bytes([buffer[4], buffer[5], buffer[6], buffer[7]]);
-
-        if chunk_id == b"data" {
-            return Ok(chunk_size);
-        }
-
-        // Skip chunk (must be even-aligned in WAV)
-        let skip = if chunk_size % 2 == 1 {
-            chunk_size + 1
-        } else {
-            chunk_size
-        };
-        file.seek(std::io::SeekFrom::Current(skip as i64))
-            .map_err(|e| e.to_string())?;
-    }
-    Err("WAV data chunk not found".to_string())
-}
-
-fn write_silence_wav(
-    path: &Path,
-    sample_rate: u32,
-    channels: u16,
-    bits_per_sample: u16,
-    duration_ms: u32,
-) -> Result<(), String> {
-    let bytes_per_sample = (bits_per_sample / 8) as u32;
-    let samples = sample_rate.saturating_mul(duration_ms) / 1000;
-    let data_size = samples
-        .saturating_mul(channels as u32)
-        .saturating_mul(bytes_per_sample);
-    let riff_size = 36u32.saturating_add(data_size);
-    let byte_rate = sample_rate
-        .saturating_mul(channels as u32)
-        .saturating_mul(bytes_per_sample);
-    let block_align = (channels as u32 * bytes_per_sample) as u16;
-
-    let mut file = std::fs::File::create(path).map_err(|e| e.to_string())?;
-
-    // Write RIFF header
-    file.write_all(b"RIFF").map_err(|e| e.to_string())?;
-    file.write_all(&riff_size.to_le_bytes())
-        .map_err(|e| e.to_string())?;
-    file.write_all(b"WAVE").map_err(|e| e.to_string())?;
-
-    // Write fmt chunk
-    file.write_all(b"fmt ").map_err(|e| e.to_string())?;
-    file.write_all(&16u32.to_le_bytes())
-        .map_err(|e| e.to_string())?;
-    file.write_all(&1u16.to_le_bytes())
-        .map_err(|e| e.to_string())?; // PCM
-    file.write_all(&channels.to_le_bytes())
-        .map_err(|e| e.to_string())?;
-    file.write_all(&sample_rate.to_le_bytes())
-        .map_err(|e| e.to_string())?;
-    file.write_all(&byte_rate.to_le_bytes())
-        .map_err(|e| e.to_string())?;
-    file.write_all(&block_align.to_le_bytes())
-        .map_err(|e| e.to_string())?;
-    file.write_all(&bits_per_sample.to_le_bytes())
-        .map_err(|e| e.to_string())?;
-
-    // Write data chunk
-    file.write_all(b"data").map_err(|e| e.to_string())?;
-    file.write_all(&data_size.to_le_bytes())
-        .map_err(|e| e.to_string())?;
-
-    // Fill with silence (zeros)
-    let silence = vec![0u8; data_size as usize];
-    file.write_all(&silence).map_err(|e| e.to_string())?;
-
-    Ok(())
 }

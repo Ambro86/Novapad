@@ -1806,6 +1806,7 @@ fn export_parts(
                     tts.tts_volume,
                 )?;
             }
+            TtsEngine::Sapi4 => {}
             TtsEngine::Sapi5 => {
                 crate::sapi5_engine::speak_sapi_to_file(
                     part_chunks,

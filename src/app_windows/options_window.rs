@@ -232,6 +232,7 @@ struct OptionsLabels {
     open_new_window: String,
     engine_edge: String,
     engine_sapi5: String,
+    engine_sapi4: String,
 
     split_none: String,
     split_by_text: String,
@@ -306,6 +307,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         open_new_window: i18n::tr(language, "options.open.new_window"),
         engine_edge: i18n::tr(language, "options.engine.edge"),
         engine_sapi5: i18n::tr(language, "options.engine.sapi5"),
+        engine_sapi4: "SAPI 4".to_string(),
 
         split_none: i18n::tr(language, "options.split.none"),
         split_by_text: i18n::tr(language, "options.split.by_text"),
@@ -396,6 +398,7 @@ pub unsafe fn refresh_voices(hwnd: HWND) {
     let engine = if engine_sel >= 0 {
         match engine_sel {
             1 => TtsEngine::Sapi5,
+            2 => TtsEngine::Sapi4,
 
             _ => TtsEngine::Edge,
         }
@@ -406,6 +409,7 @@ pub unsafe fn refresh_voices(hwnd: HWND) {
     let voices = with_state(parent, |state| match engine {
         TtsEngine::Edge => state.edge_voices.clone(),
         TtsEngine::Sapi5 => state.sapi_voices.clone(),
+        TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
     })
     .unwrap_or_default();
 
@@ -1774,10 +1778,17 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         WPARAM(0),
         LPARAM(to_wide(&labels.engine_sapi5).as_ptr() as isize),
     );
+    let _ = SendMessageW(
+        combo_tts_engine,
+        CB_ADDSTRING,
+        WPARAM(0),
+        LPARAM(to_wide(&labels.engine_sapi4).as_ptr() as isize),
+    );
 
     let engine_index = match settings.tts_engine {
         TtsEngine::Edge => 0,
         TtsEngine::Sapi5 => 1,
+        TtsEngine::Sapi4 => 2,
     };
     let _ = SendMessageW(
         combo_tts_engine,
@@ -2453,6 +2464,7 @@ unsafe fn preview_voice(hwnd: HWND) {
     let voices = with_state(parent, |state| match engine {
         TtsEngine::Edge => state.edge_voices.clone(),
         TtsEngine::Sapi5 => state.sapi_voices.clone(),
+        TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
     })
     .unwrap_or_default();
 
@@ -2497,6 +2509,7 @@ unsafe fn preview_voice(hwnd: HWND) {
                 parent, text, voice, chunks, 0, rate, pitch, volume,
             );
         }
+        TtsEngine::Sapi4 => {}
         TtsEngine::Sapi5 => {
             tts_engine::stop_tts_playback(parent);
             let cancel = Arc::new(AtomicBool::new(false));
@@ -2659,6 +2672,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     let engine_sel = SendMessageW(combo_tts_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     settings.tts_engine = match engine_sel {
         1 => TtsEngine::Sapi5,
+        2 => TtsEngine::Sapi4,
 
         _ => TtsEngine::Edge,
     };
@@ -2777,6 +2791,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     let voices = with_state(parent, |state| match settings.tts_engine {
         TtsEngine::Edge => state.edge_voices.clone(),
         TtsEngine::Sapi5 => state.sapi_voices.clone(),
+        TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
     })
     .unwrap_or_default();
 

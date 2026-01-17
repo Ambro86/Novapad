@@ -2011,6 +2011,7 @@ dependencies = [
  "hex",
  "httpdate",
  "mp3-duration",
+ "once_cell",
  "pdf-extract",
  "printpdf",
  "quick-xml 0.31.0",

@@ -127,6 +127,8 @@ pub enum TtsEngine {
     Edge,
     #[serde(rename = "sapi5")]
     Sapi5,
+    #[serde(rename = "sapi4")]
+    Sapi4,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]

@@ -26,7 +26,9 @@ use tts_engine::*;
 mod file_handler;
 mod mf_encoder;
 
+mod sapi4_engine;
 mod sapi5_engine;
+
 use file_handler::*;
 mod menu;
 use menu::*;
@@ -3365,6 +3367,7 @@ pub(crate) unsafe fn refresh_voice_panel(hwnd: HWND) {
         let engine_index = match settings.tts_engine {
             TtsEngine::Edge => 0,
             TtsEngine::Sapi5 => 1,
+            TtsEngine::Sapi4 => 2,
         };
         let _ = SendMessageW(combo_engine, CB_SETCURSEL, WPARAM(engine_index), LPARAM(0));
         let is_edge = matches!(settings.tts_engine, TtsEngine::Edge);
@@ -3530,11 +3533,13 @@ pub(crate) unsafe fn refresh_voice_panel(hwnd: HWND) {
         EnableWindow(edit_speed, manual);
         EnableWindow(edit_pitch, manual);
         EnableWindow(edit_volume, manual);
-        let voices = with_state(hwnd, |state| match settings.tts_engine {
-            TtsEngine::Edge => state.edge_voices.clone(),
-            TtsEngine::Sapi5 => state.sapi_voices.clone(),
-        })
-        .unwrap_or_default();
+        let voices: Vec<crate::settings::VoiceInfo> =
+            with_state(hwnd, |state| match settings.tts_engine {
+                TtsEngine::Edge => state.edge_voices.clone(),
+                TtsEngine::Sapi5 => state.sapi_voices.clone(),
+                TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
+            })
+            .unwrap_or_default();
         populate_voice_panel_combo(
             combo_voice,
             &voices,
@@ -3586,11 +3591,13 @@ unsafe fn refresh_voice_panel_voice_list(hwnd: HWND) {
     let multi_show = if is_edge { SW_SHOW } else { SW_HIDE };
     ShowWindow(checkbox_multilingual, multi_show);
 
-    let voices = with_state(hwnd, |state| match settings.tts_engine {
-        TtsEngine::Edge => state.edge_voices.clone(),
-        TtsEngine::Sapi5 => state.sapi_voices.clone(),
-    })
-    .unwrap_or_default();
+    let voices: Vec<crate::settings::VoiceInfo> =
+        with_state(hwnd, |state| match settings.tts_engine {
+            TtsEngine::Edge => state.edge_voices.clone(),
+            TtsEngine::Sapi5 => state.sapi_voices.clone(),
+            TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
+        })
+        .unwrap_or_default();
     populate_voice_panel_combo(
         combo_voice,
         &voices,
@@ -3717,6 +3724,7 @@ unsafe fn populate_favorites_combo(
         let engine_label = match fav.engine {
             TtsEngine::Edge => &labels.engine_edge,
             TtsEngine::Sapi5 => &labels.engine_sapi,
+            TtsEngine::Sapi4 => &labels.engine_sapi,
         };
         let label = format!("{} ({})", fav.short_name, engine_label);
         let cb_idx = SendMessageW(
@@ -3975,6 +3983,7 @@ unsafe fn current_voice_selection(hwnd: HWND, engine: TtsEngine) -> Option<Strin
         let list = match engine {
             TtsEngine::Edge => state.edge_voices.clone(),
             TtsEngine::Sapi5 => state.sapi_voices.clone(),
+            TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
         };
         (state.voice_combo_voice, list)
     })?;

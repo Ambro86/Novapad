@@ -144,6 +144,35 @@ pub fn start_tts_from_caret(hwnd: HWND) {
             tts_pitch,
             tts_volume,
         ),
+        TtsEngine::Sapi4 => {
+            stop_tts_playback(hwnd);
+            let voice_idx = if let Some(hash_pos) = voice.find("#") {
+                let rest = &voice[hash_pos + 1..];
+                if let Some(pipe_pos) = rest.find("|") {
+                    rest[..pipe_pos].parse::<i32>().unwrap_or(1)
+                } else {
+                    rest.parse::<i32>().unwrap_or(1)
+                }
+            } else {
+                1
+            };
+            let cancel = Arc::new(AtomicBool::new(false));
+            let (command_tx, command_rx) = mpsc::unbounded_channel();
+            let _ = unsafe {
+                with_state(hwnd, |state| {
+                    state.tts_session = Some(TtsSession {
+                        id: state.tts_next_session_id,
+                        command_tx,
+                        cancel: cancel.clone(),
+                        paused: false,
+                        initial_caret_pos,
+                    });
+                    state.tts_next_session_id += 1;
+                })
+            };
+            crate::sapi4_engine::play_sapi4(voice_idx, text, cancel, command_rx);
+            return;
+        }
         TtsEngine::Sapi5 => {
             // Stop any existing playback
             stop_tts_playback(hwnd);
@@ -1329,6 +1358,29 @@ pub fn start_audiobook(hwnd: HWND) {
                     )
                 }
             }
+            TtsEngine::Sapi4 => {
+                let voice_idx = parse_sapi4_voice_index(&voice);
+                if let Some(parts) = marker_parts {
+                    run_marker_split_sapi4_audiobook(
+                        &parts,
+                        voice_idx,
+                        &output,
+                        progress_hwnd,
+                        cancel_clone,
+                        language,
+                    )
+                } else {
+                    run_split_sapi4_audiobook(
+                        &chunks,
+                        voice_idx,
+                        &output,
+                        split_parts,
+                        progress_hwnd,
+                        cancel_clone,
+                        language,
+                    )
+                }
+            }
             TtsEngine::Sapi5 => {
                 if let Some(parts) = marker_parts {
                     run_marker_split_sapi_audiobook(
@@ -1373,6 +1425,19 @@ pub fn start_audiobook(hwnd: HWND) {
             )
         };
     });
+}
+
+fn parse_sapi4_voice_index(voice: &str) -> i32 {
+    if let Some(hash_pos) = voice.find('#') {
+        let rest = &voice[hash_pos + 1..];
+        if let Some(pipe_pos) = rest.find('|') {
+            rest[..pipe_pos].parse::<i32>().unwrap_or(1)
+        } else {
+            rest.parse::<i32>().unwrap_or(1)
+        }
+    } else {
+        1
+    }
 }
 
 fn run_split_audiobook(
@@ -1481,6 +1546,142 @@ fn run_marker_split_audiobook(
             tts_pitch,
             tts_volume,
         )?;
+    }
+    Ok(())
+}
+
+fn run_split_sapi4_audiobook(
+    chunks: &[String],
+    voice_idx: i32,
+    output: &Path,
+    split_parts: u32,
+    progress_hwnd: HWND,
+    cancel: Arc<AtomicBool>,
+    language: Language,
+) -> Result<(), String> {
+    let parts = if split_parts == 0 {
+        1
+    } else {
+        split_parts as usize
+    };
+    let total_chunks = chunks.len();
+    let parts = if total_chunks < parts {
+        total_chunks
+    } else {
+        parts
+    };
+    let chunks_per_part = (total_chunks + parts - 1) / parts;
+    let mut current_global_progress = 0;
+
+    for part_idx in 0..parts {
+        let start_idx = part_idx * chunks_per_part;
+        let end_idx = std::cmp::min(start_idx + chunks_per_part, total_chunks);
+        if start_idx >= end_idx {
+            break;
+        }
+
+        let part_chunks = &chunks[start_idx..end_idx];
+        let part_output = if parts > 1 {
+            let stem = output
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("audiobook");
+            let ext = output.extension().and_then(|s| s.to_str()).unwrap_or("mp3");
+            output.with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
+        } else {
+            output.to_path_buf()
+        };
+
+        let progress_hwnd_clone = progress_hwnd;
+        let cancel_clone = cancel.clone();
+
+        crate::sapi4_engine::speak_sapi4_to_file(
+            part_chunks,
+            voice_idx,
+            &part_output,
+            cancel_clone,
+            |_chunk_idx| {
+                current_global_progress += 1;
+                if progress_hwnd_clone.0 != 0 {
+                    unsafe {
+                        let _ = PostMessageW(
+                            progress_hwnd_clone,
+                            crate::WM_UPDATE_PROGRESS,
+                            WPARAM(current_global_progress),
+                            LPARAM(0),
+                        );
+                    }
+                }
+            },
+        )
+        .map_err(|e| {
+            let _ = std::fs::remove_file(&part_output);
+            if e == "Cancelled" {
+                cancelled_message(language)
+            } else {
+                e
+            }
+        })?;
+    }
+    Ok(())
+}
+
+fn run_marker_split_sapi4_audiobook(
+    parts: &[Vec<String>],
+    voice_idx: i32,
+    output: &Path,
+    progress_hwnd: HWND,
+    cancel: Arc<AtomicBool>,
+    language: Language,
+) -> Result<(), String> {
+    let parts_len = parts.len();
+    let mut current_global_progress = 0;
+
+    for (part_idx, part_chunks) in parts.iter().enumerate() {
+        if part_chunks.is_empty() {
+            continue;
+        }
+        let part_output = if parts_len > 1 {
+            let stem = output
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("audiobook");
+            let ext = output.extension().and_then(|s| s.to_str()).unwrap_or("mp3");
+            output.with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
+        } else {
+            output.to_path_buf()
+        };
+
+        let progress_hwnd_clone = progress_hwnd;
+        let cancel_clone = cancel.clone();
+
+        crate::sapi4_engine::speak_sapi4_to_file(
+            part_chunks,
+            voice_idx,
+            &part_output,
+            cancel_clone,
+            |_chunk_idx| {
+                current_global_progress += 1;
+                if progress_hwnd_clone.0 != 0 {
+                    unsafe {
+                        let _ = PostMessageW(
+                            progress_hwnd_clone,
+                            crate::WM_UPDATE_PROGRESS,
+                            WPARAM(current_global_progress),
+                            LPARAM(0),
+                        );
+                    }
+                }
+            },
+        )
+        .map_err(|e| {
+            let _ = std::fs::remove_file(&part_output);
+            if e == "Cancelled" {
+                cancelled_message(language)
+            } else {
+                e
+            }
+        })?;
     }
     Ok(())
 }

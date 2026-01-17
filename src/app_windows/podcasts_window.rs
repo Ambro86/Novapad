@@ -1418,7 +1418,6 @@ unsafe fn perform_search(hwnd: HWND, query: &str) {
             })
             .unwrap_or((String::new(), None));
 
-            // Usa le chiavi dell'utente se impostate, altrimenti usa quelle embedded di default
             let (key, secret) = if !user_key.trim().is_empty()
                 && user_secret
                     .as_deref()
@@ -1427,12 +1426,6 @@ unsafe fn perform_search(hwnd: HWND, query: &str) {
             {
                 // Chiavi utente
                 (user_key, user_secret.unwrap_or_default())
-            } else if crate::embedded_secrets::has_default_podcast_index_keys() {
-                // Chiavi embedded di default
-                (
-                    crate::embedded_secrets::default_podcast_index_api_key().to_string(),
-                    crate::embedded_secrets::default_podcast_index_api_secret().to_string(),
-                )
             } else {
                 // Nessuna chiave disponibile
                 (String::new(), String::new())

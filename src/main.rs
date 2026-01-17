@@ -13,7 +13,6 @@
 mod accessibility;
 mod curl_client;
 mod embedded_deps;
-mod embedded_secrets;
 use accessibility::*;
 mod conpty;
 mod settings;
@@ -5688,8 +5687,26 @@ unsafe fn handle_pdf_loaded(hwnd: HWND, payload: PdfLoadResult) {
             push_recent_file(hwnd, &path);
         }
         Err(message) => {
+            // Instead of closing the document, show error message as placeholder text
+            // This keeps the tab open so users can see what file failed and retry
+            let error_placeholder = format!(
+                "{}\n\n{}",
+                message,
+                i18n::tr(language, "app.pdf_error_hint")
+            );
+            editor_manager::set_edit_text(hwnd_edit, &error_placeholder);
             show_error(hwnd, language, &message);
-            let _ = close_document_at(hwnd, index);
+            let mut update_title = false;
+            let _ = with_state(hwnd, |state| {
+                if let Some(doc) = state.docs.get_mut(index) {
+                    doc.dirty = false;
+                    update_tab_title(state.hwnd_tab, index, &doc.title, false);
+                    update_title = state.current == index;
+                }
+            });
+            if update_title {
+                update_window_title(hwnd);
+            }
         }
     }
 }

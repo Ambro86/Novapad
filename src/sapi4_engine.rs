@@ -13,49 +13,6 @@ use tokio::sync::mpsc;
 
 static VOICE_CACHE: Lazy<Mutex<Vec<VoiceInfo>>> = Lazy::new(|| Mutex::new(Vec::new()));
 
-pub fn speak(voice_index: i32, text: &str) {
-    if let Ok(mut exe_path) = std::env::current_exe() {
-        exe_path.set_file_name("sapi4_bridge.exe");
-        if let Ok(mut child) = Command::new(exe_path)
-            .arg("--voice")
-            .arg(voice_index.to_string())
-            .stdin(Stdio::piped())
-            .creation_flags(0x08000000)
-            .spawn()
-        {
-            if let Some(mut stdin) = child.stdin.take() {
-                let _ = stdin.write_all(text.as_bytes());
-            }
-        }
-    }
-}
-
-pub fn stop() {
-    let _ = Command::new("taskkill")
-        .args(&["/F", "/IM", "sapi4_bridge.exe", "/T"])
-        .creation_flags(0x08000000)
-        .status();
-}
-
-fn spawn_sapi4_process(voice_index: i32, text: &str) -> Result<(), String> {
-    let mut exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
-    exe_path.set_file_name("sapi4_bridge.exe");
-    let mut child = Command::new(exe_path)
-        .arg("--voice")
-        .arg(voice_index.to_string())
-        .stdin(Stdio::piped())
-        .creation_flags(0x08000000)
-        .spawn()
-        .map_err(|e| e.to_string())?;
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin
-            .write_all(text.as_bytes())
-            .map_err(|e| e.to_string())?;
-    }
-    let _ = child.wait();
-    Ok(())
-}
-
 pub fn speak_sapi4_to_file(
     chunks: &[String],
     voice_index: i32,
@@ -80,9 +37,7 @@ pub fn speak_sapi4_to_file(
     } else {
         output.to_path_buf()
     };
-
-    let mut exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
-    exe_path.set_file_name("sapi4_bridge.exe");
+    let exe_path = select_sapi4_bridge_for_file()?;
     let mut child = Command::new(exe_path)
         .arg("--voice")
         .arg(voice_index.to_string())
@@ -93,7 +48,7 @@ pub fn speak_sapi4_to_file(
         .arg("--volume")
         .arg(tts_volume.to_string())
         .arg("--output")
-        .arg(&wav_path)
+        .arg(output)
         .stdin(Stdio::piped())
         .creation_flags(0x08000000)
         .spawn()
@@ -103,10 +58,21 @@ pub fn speak_sapi4_to_file(
             .write_all(text.as_bytes())
             .map_err(|e| e.to_string())?;
     }
+    let mut reported = 0usize;
+    let max_report = chunks.len().saturating_sub(1);
+    let mut last_size = 0u64;
     loop {
         if cancel.load(Ordering::SeqCst) {
             let _ = child.kill();
             return Err("Cancelled".to_string());
+        }
+        let size = std::fs::metadata(&wav_path).map(|m| m.len()).unwrap_or(0);
+        if size > last_size {
+            last_size = size;
+            if reported < max_report {
+                reported += 1;
+                on_progress(0);
+            }
         }
         match child.try_wait() {
             Ok(Some(_)) => break,
@@ -115,24 +81,33 @@ pub fn speak_sapi4_to_file(
         }
     }
 
-    for idx in 0..chunks.len() {
-        on_progress(idx);
-    }
-
-    if is_mp3 {
-        if let Ok(data_size) = crate::audio_utils::get_wav_data_size(&wav_path) {
-            if data_size == 0 {
-                let _ = crate::audio_utils::write_silence_file(&wav_path, 44100, 2, 16, 500);
-            }
-        }
-        if let Err(e) = crate::mf_encoder::encode_wav_to_mp3(&wav_path, output) {
-            let dest_wav = output.with_extension("wav");
-            let _ = std::fs::rename(&wav_path, &dest_wav);
-            return Err(e);
-        }
+    for _ in reported..chunks.len() {
+        on_progress(0);
     }
 
     Ok(())
+}
+
+fn select_sapi4_bridge_for_file() -> Result<PathBuf, String> {
+    let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
+    let dir = exe_path.parent().ok_or("Missing exe dir")?;
+    let settings_dir = crate::settings::settings_dir();
+    let candidates = [
+        settings_dir.join("sapi4_bridge_32.exe"),
+        settings_dir.join("sapi4_bridge_x86.exe"),
+        settings_dir.join("sapi4_bridge.exe"),
+        dir.join("sapi4_bridge_32.exe"),
+        dir.join("sapi4_bridge_x86.exe"),
+        dir.join("sapi4_bridge.exe"),
+    ];
+    for path in candidates {
+        if path.exists() {
+            return Ok(path);
+        }
+    }
+    let mut fallback = exe_path;
+    fallback.set_file_name("sapi4_bridge.exe");
+    Ok(fallback)
 }
 
 fn send_line(stdin: &mut ChildStdin, line: &str) -> std::io::Result<()> {

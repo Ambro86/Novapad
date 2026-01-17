@@ -67,6 +67,7 @@ pub fn extract_all() -> std::io::Result<PathBuf> {
         ("cacert.pem", CACERT_PEM),
         ("SoundTouch64.dll", SOUNDTOUCH_DLL),
         ("nvdaControllerClient64.dll", NVDA_CLIENT_DLL),
+        ("sapi4_bridge_32.exe", SAPI4_BRIDGE_32_EXE),
     ];
 
     for (name, data) in deps {
@@ -116,3 +117,5 @@ pub fn soundtouch_path() -> PathBuf {
 pub fn nvda_client_path() -> PathBuf {
     get_dep_path("nvdaControllerClient64.dll")
 }
+// SAPI4 bridge: helper 32-bit per salvataggio su file.
+const SAPI4_BRIDGE_32_EXE: &[u8] = include_bytes!("../dll/sapi4_bridge_32.exe");

@@ -56,9 +56,6 @@ jobs:
 
     - name: Build (Release)
       run: cargo build --verbose --release
-      env:
-        PODCAST_INDEX_API_KEY: ${{ secrets.PODCAST_INDEX_API_KEY }}
-        PODCAST_INDEX_API_SECRET: ${{ secrets.PODCAST_INDEX_API_SECRET }}
 
     - name: Package Application (NSIS)
       run: cargo packager --release --formats nsis

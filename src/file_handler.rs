@@ -1439,13 +1439,33 @@ pub fn write_docx_text(path: &Path, text: &str, language: Language) -> Result<()
 // --- PDF Parsing & Writing ---
 
 pub fn read_pdf_text(path: &Path, language: Language) -> Result<String, String> {
-    let text = extract_text(path).map_err(|err| {
-        i18n::tr_f(
-            language,
-            "file_handler.pdf_read_error",
-            &[("err", &err.to_string())],
-        )
-    })?;
+    // Use catch_unwind to handle potential panics in pdf_extract library
+    let extraction_result =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| extract_text(path)));
+
+    let text = match extraction_result {
+        Ok(Ok(text)) => text,
+        Ok(Err(err)) => {
+            return Err(i18n::tr_f(
+                language,
+                "file_handler.pdf_read_error",
+                &[("err", &err.to_string())],
+            ));
+        }
+        Err(_panic) => {
+            return Err(i18n::tr_f(
+                language,
+                "file_handler.pdf_read_error",
+                &[("err", "PDF extraction crashed unexpectedly")],
+            ));
+        }
+    };
+
+    // Handle empty or whitespace-only PDFs
+    if text.trim().is_empty() {
+        return Ok(i18n::tr(language, "file_handler.pdf_no_text"));
+    }
+
     Ok(normalize_pdf_paragraphs(&text))
 }
 

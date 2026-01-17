@@ -1410,18 +1410,35 @@ unsafe fn perform_search(hwnd: HWND, query: &str) {
     let provider = selected_search_provider(hwnd);
     let (podcastindex_key, podcastindex_secret) =
         if matches!(provider, SearchProvider::PodcastIndex) {
-            let (key, secret) = with_state(parent, |ps| {
+            let (user_key, user_secret) = with_state(parent, |ps| {
                 (
                     ps.settings.podcast_index_api_key.clone(),
                     settings::decrypt_podcast_index_secret(&ps.settings.podcast_index_api_secret),
                 )
             })
             .unwrap_or((String::new(), None));
-            let missing = key.trim().is_empty()
-                || secret
+
+            // Usa le chiavi dell'utente se impostate, altrimenti usa quelle embedded di default
+            let (key, secret) = if !user_key.trim().is_empty()
+                && user_secret
                     .as_deref()
-                    .map(|s| s.trim().is_empty())
-                    .unwrap_or(true);
+                    .map(|s| !s.trim().is_empty())
+                    .unwrap_or(false)
+            {
+                // Chiavi utente
+                (user_key, user_secret.unwrap_or_default())
+            } else if crate::embedded_secrets::has_default_podcast_index_keys() {
+                // Chiavi embedded di default
+                (
+                    crate::embedded_secrets::default_podcast_index_api_key().to_string(),
+                    crate::embedded_secrets::default_podcast_index_api_secret().to_string(),
+                )
+            } else {
+                // Nessuna chiave disponibile
+                (String::new(), String::new())
+            };
+
+            let missing = key.trim().is_empty() || secret.trim().is_empty();
             if missing {
                 let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
                 let title = i18n::tr(language, "podcasts.podcastindex.missing_title");
@@ -1437,7 +1454,7 @@ unsafe fn perform_search(hwnd: HWND, query: &str) {
                 }
                 return;
             }
-            (key, secret.unwrap_or_default())
+            (key, secret)
         } else {
             (String::new(), String::new())
         };

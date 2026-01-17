@@ -13,6 +13,7 @@
 mod accessibility;
 mod curl_client;
 mod embedded_deps;
+mod embedded_secrets;
 use accessibility::*;
 mod conpty;
 mod settings;

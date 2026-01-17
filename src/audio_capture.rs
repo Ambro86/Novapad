@@ -2,6 +2,7 @@
 //!
 //! This module provides audio capture functionality for screen recording
 
+use crate::com_guard::ComGuard;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle};
@@ -10,9 +11,7 @@ use windows::Win32::Media::Audio::{
     AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK, IAudioCaptureClient, IAudioClient,
     IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator, eConsole, eRender,
 };
-use windows::Win32::System::Com::{
-    CLSCTX_ALL, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx, CoUninitialize,
-};
+use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance};
 
 /// Audio sample without timestamp (will be calculated by encoder)
 #[derive(Clone)]
@@ -169,11 +168,9 @@ pub fn start_audio_recording() -> Result<AudioRecorderHandle, String> {
 /// Get the audio format that will be used for capture
 #[allow(dead_code)]
 fn get_audio_format() -> Result<(u32, u16), String> {
-    unsafe {
-        CoInitializeEx(None, COINIT_APARTMENTTHREADED)
-            .ok()
-            .map_err(|e| format!("CoInitializeEx failed: {:?}", e))?;
+    let _com = ComGuard::new_sta().map_err(|e| format!("CoInitializeEx failed: {:?}", e))?;
 
+    unsafe {
         let enumerator: IMMDeviceEnumerator =
             CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
                 .map_err(|e| format!("Failed to create device enumerator: {}", e))?;
@@ -194,25 +191,16 @@ fn get_audio_format() -> Result<(u32, u16), String> {
         let sample_rate = format.nSamplesPerSec;
         let channels = format.nChannels;
 
-        CoUninitialize();
-
         Ok((sample_rate, channels))
     }
 }
 
 #[allow(dead_code)]
 fn audio_capture_loop(audio_queue: Arc<AudioQueue>, stop: Arc<AtomicBool>) -> Result<(), String> {
-    unsafe {
-        // Initialize COM for this thread
-        CoInitializeEx(None, COINIT_APARTMENTTHREADED)
-            .ok()
-            .map_err(|e| format!("CoInitializeEx failed: {:?}", e))?;
+    // Initialize COM for this thread - will be cleaned up when _com goes out of scope
+    let _com = ComGuard::new_sta().map_err(|e| format!("CoInitializeEx failed: {:?}", e))?;
 
-        let result = audio_capture_loop_impl(audio_queue, stop);
-
-        CoUninitialize();
-        result
-    }
+    unsafe { audio_capture_loop_impl(audio_queue, stop) }
 }
 
 #[allow(dead_code)]

@@ -1,6 +1,7 @@
 use crate::accessibility::from_wide;
 use crate::audio_capture::{self, AudioRecorderHandle as AudioRecorder};
 use crate::audio_utils;
+use crate::com_guard::ComGuard;
 use crate::mf_encoder;
 use crate::settings;
 use crate::settings::{PODCAST_DEVICE_DEFAULT, PodcastFormat};
@@ -12,7 +13,6 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
-use windows::Win32::Foundation::RPC_E_CHANGED_MODE;
 use windows::Win32::Media::Audio::{
     AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
     DEVICE_STATE_ACTIVE, EDataFlow, IAudioCaptureClient, IAudioClient, IMMDevice,
@@ -22,10 +22,7 @@ use windows::Win32::Media::Audio::{
 use windows::Win32::Media::KernelStreaming::WAVE_FORMAT_EXTENSIBLE;
 use windows::Win32::Media::Multimedia::{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT};
 use windows::Win32::System::Com::StructuredStorage::PropVariantToStringAlloc;
-use windows::Win32::System::Com::{
-    CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoTaskMemFree,
-    CoUninitialize, STGM_READ,
-};
+use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree, STGM_READ};
 use windows::Win32::System::Power::{ES_CONTINUOUS, ES_SYSTEM_REQUIRED, SetThreadExecutionState};
 use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
 use windows::core::PCWSTR;
@@ -48,51 +45,18 @@ enum SampleFormat {
 }
 
 struct DeviceEnumerator {
-    _init: ComInit,
+    _init: ComGuard,
     inner: IMMDeviceEnumerator,
 }
 
 impl DeviceEnumerator {
     fn new() -> Result<Self, String> {
-        let init = ComInit::new()?;
+        let init = ComGuard::new_mta().map_err(|e| format!("CoInitializeEx failed: {e}"))?;
         let inner: IMMDeviceEnumerator = unsafe {
             CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
                 .map_err(|e| format!("MMDeviceEnumerator failed: {e}"))?
         };
         Ok(Self { _init: init, inner })
-    }
-}
-
-struct ComInit {
-    should_uninit: bool,
-}
-
-impl ComInit {
-    fn new() -> Result<Self, String> {
-        unsafe {
-            let result = CoInitializeEx(None, COINIT_MULTITHREADED);
-            if let Err(err) = result.ok() {
-                if err.code() == RPC_E_CHANGED_MODE {
-                    return Ok(Self {
-                        should_uninit: false,
-                    });
-                }
-                return Err(format!("CoInitializeEx failed: {err}"));
-            }
-        }
-        Ok(Self {
-            should_uninit: true,
-        })
-    }
-}
-
-impl Drop for ComInit {
-    fn drop(&mut self) {
-        if self.should_uninit {
-            unsafe {
-                CoUninitialize();
-            }
-        }
     }
 }
 
@@ -105,7 +69,7 @@ pub fn list_output_devices() -> Result<Vec<AudioDevice>, String> {
 }
 
 pub fn probe_device(device_id: &str, loopback: bool) -> Result<(), String> {
-    let _com = ComInit::new()?;
+    let _com = ComGuard::new_mta().map_err(|e| format!("CoInitializeEx failed: {e}"))?;
     let device = resolve_device(device_id, loopback)?;
     let client: IAudioClient = unsafe {
         device
@@ -430,7 +394,7 @@ fn start_mic_audio_recording(device_id: &str) -> Result<AudioRecorder, String> {
     let stop = Arc::new(AtomicBool::new(false));
 
     // Get mic format
-    let _com = ComInit::new()?;
+    let _com = ComGuard::new_mta().map_err(|e| format!("CoInitializeEx failed: {e}"))?;
     let device = resolve_device(device_id, false)?; // false = not loopback
 
     let client: IAudioClient = unsafe {
@@ -478,7 +442,7 @@ fn mic_capture_loop(
 ) -> Result<(), String> {
     use crate::audio_capture::AudioSample;
 
-    let _com = ComInit::new()?;
+    let _com = ComGuard::new_mta().map_err(|e| format!("CoInitializeEx failed: {e}"))?;
     let device = resolve_device(device_id, false)?; // false = not loopback
 
     let client: IAudioClient = unsafe {
@@ -1008,7 +972,7 @@ fn capture_source(
     stop: Arc<AtomicBool>,
     paused: Arc<AtomicBool>,
 ) -> Result<(), String> {
-    let _com = ComInit::new()?;
+    let _com = ComGuard::new_mta().map_err(|e| format!("CoInitializeEx failed: {e}"))?;
     let device = resolve_device(device_id, loopback)?;
     let client: IAudioClient = unsafe {
         device

@@ -11,6 +11,7 @@
 #![windows_subsystem = "windows"]
 
 mod accessibility;
+mod com_guard;
 mod curl_client;
 mod embedded_deps;
 use accessibility::*;

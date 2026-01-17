@@ -4,6 +4,7 @@
     clippy::too_many_arguments
 )]
 use crate::accessibility::to_wide;
+use crate::com_guard::ComGuard;
 use crate::i18n;
 use crate::settings::{Language, VoiceInfo};
 use crate::tts_engine::TtsCommand;
@@ -20,10 +21,7 @@ use windows::Win32::Media::Speech::{
     SPF_IS_XML, SPF_PURGEBEFORESPEAK, SPFM_CREATE_ALWAYS, SPRS_DONE, SPVOICESTATUS, SpFileStream,
     SpObjectTokenCategory, SpVoice,
 };
-use windows::Win32::System::Com::{
-    CLSCTX_ALL, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx, CoTaskMemFree,
-    CoUninitialize,
-};
+use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
 use windows::core::{GUID, PCWSTR, w};
 
 // SPDFID_WaveFormatEx: {C31ADBAE-527F-4ff5-A230-F62BB61FF70C}
@@ -47,23 +45,8 @@ fn pwstr_to_string(ptr: PCWSTR) -> String {
     }
 }
 
-struct ComRuntime;
-
-impl ComRuntime {
-    fn new() -> Result<Self, windows::core::Error> {
-        unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) }.ok()?;
-        Ok(Self)
-    }
-}
-
-impl Drop for ComRuntime {
-    fn drop(&mut self) {
-        unsafe { CoUninitialize() };
-    }
-}
-
 fn collect_voice_descriptions(category_id: PCWSTR) -> Result<Vec<String>, String> {
-    let _com = ComRuntime::new().map_err(|e| format!("CoInitializeEx failed: {}", e))?;
+    let _com = ComGuard::new_sta().map_err(|e| format!("CoInitializeEx failed: {}", e))?;
 
     let category: ISpObjectTokenCategory = unsafe {
         CoCreateInstance(&SpObjectTokenCategory, None, CLSCTX_ALL)
@@ -126,7 +109,7 @@ fn find_voice_token(voice_name: &str) -> Option<ISpObjectToken> {
 }
 
 pub fn list_sapi_voices() -> Result<Vec<VoiceInfo>, String> {
-    let _com = ComRuntime::new().map_err(|e| format!("CoInitializeEx failed: {}", e))?;
+    let _com = ComGuard::new_sta().map_err(|e| format!("CoInitializeEx failed: {}", e))?;
 
     let mut names = Vec::new();
     if let Ok(list) = collect_voice_descriptions(SAPI_VOICES_PATH) {
@@ -160,13 +143,15 @@ pub fn play_sapi(
     mut command_rx: mpsc::UnboundedReceiver<TtsCommand>,
 ) -> Result<(), String> {
     std::thread::spawn(move || {
-        unsafe {
-            let hr = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
-            if hr.is_err() {
-                crate::log_debug(&format!("SAPI playback: CoInitializeEx failed: {:?}", hr));
+        let _com = match ComGuard::new_sta() {
+            Ok(g) => g,
+            Err(e) => {
+                crate::log_debug(&format!("SAPI playback: CoInitializeEx failed: {:?}", e));
                 return;
             }
+        };
 
+        unsafe {
             let voice_res: windows::core::Result<ISpVoice> =
                 CoCreateInstance(&SpVoice, None, CLSCTX_ALL);
             let voice = match voice_res {
@@ -301,20 +286,9 @@ pub fn speak_sapi_to_file(
     cancel: Arc<AtomicBool>,
     mut progress_callback: impl FnMut(usize),
 ) -> Result<(), String> {
-    unsafe {
-        let com_initialized = CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok();
-        struct ComGuard(bool);
-        impl Drop for ComGuard {
-            fn drop(&mut self) {
-                if self.0 {
-                    unsafe {
-                        CoUninitialize();
-                    }
-                }
-            }
-        }
-        let _com_guard = ComGuard(com_initialized);
+    let _com = ComGuard::new_sta().map_err(|e| format!("CoInitializeEx failed: {}", e))?;
 
+    unsafe {
         let is_mp3 = output_path
             .extension()
             .map_or(false, |e| e.eq_ignore_ascii_case("mp3"));

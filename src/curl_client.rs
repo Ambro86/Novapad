@@ -1,6 +1,5 @@
 use curl::easy::{Easy, List};
 use std::ffi::CString;
-use std::path::Path;
 use std::time::Duration;
 
 fn log_profile(profile: &str, url: &str, status: &str) {
@@ -84,9 +83,10 @@ impl CurlClient {
         easy.pipewait(true)?;
         easy.cookie_file("")?;
 
-        // Verifica certificati CA (stessa logica di Chrome Advanced)
-        if Path::new("cacert.pem").exists() {
-            easy.cainfo("cacert.pem")?;
+        // Verifica certificati CA da APPDATA (estratti da embedded_deps)
+        let cacert_path = crate::embedded_deps::cacert_path();
+        if cacert_path.exists() {
+            easy.cainfo(cacert_path.to_string_lossy().as_ref())?;
         } else {
             easy.ssl_verify_peer(false)?;
             easy.ssl_verify_host(false)?;
@@ -132,9 +132,10 @@ fn fetch_url_chrome_advanced(url: &str) -> anyhow::Result<Vec<u8>> {
     easy.connect_timeout(std::time::Duration::from_secs(10))?;
     easy.timeout(std::time::Duration::from_secs(30))?;
 
-    // Verifica certificati CA
-    if Path::new("cacert.pem").exists() {
-        easy.cainfo("cacert.pem")?;
+    // Verifica certificati CA da APPDATA (estratti da embedded_deps)
+    let cacert_path = crate::embedded_deps::cacert_path();
+    if cacert_path.exists() {
+        easy.cainfo(cacert_path.to_string_lossy().as_ref())?;
     } else {
         easy.ssl_verify_peer(false)?;
         easy.ssl_verify_host(false)?;

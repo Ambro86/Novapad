@@ -122,10 +122,10 @@ quick-xml = "0.31"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 anyhow = "1.0"
-chrono = "0.4"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 futures-util = "0.3"
 hex = "0.4"
-rand = "0.8"
+rand = { version = "0.8", default-features = false, features = ["std", "std_rng"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "cookies", "gzip", "brotli", "blocking", "json"] }
 curl = "0.4.46"
 curl-sys = "0.4.72"
@@ -155,3 +155,4 @@ lto = true
 codegen-units = 1
 panic = "abort"
 debug = 0
+strip = true

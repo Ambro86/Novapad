@@ -12,6 +12,7 @@
 
 mod accessibility;
 mod curl_client;
+mod embedded_deps;
 use accessibility::*;
 mod conpty;
 mod settings;
@@ -1057,8 +1058,10 @@ struct RecentFileStore {
 }
 
 fn main() -> windows::core::Result<()> {
-    accessibility::ensure_nvda_controller_client();
-    accessibility::ensure_soundtouch_dll();
+    // Estrai le dipendenze embedded (DLL, certificati, ecc.)
+    if let Err(e) = embedded_deps::extract_all() {
+        log_debug(&format!("Warning: Failed to extract embedded deps: {}", e));
+    }
     log_debug("Application started.");
 
     let args: Vec<String> = std::env::args().collect();

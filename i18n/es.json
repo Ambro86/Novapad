@@ -288,6 +288,7 @@
   "voice_panel.label_multilingual": "Mostrar solo voces multilingues",
   "voice_panel.engine_edge": "Voces Microsoft",
   "voice_panel.engine_sapi": "SAPI5",
+  "voice_panel.engine_sapi4": "SAPI4",
   "voice_panel.voices_empty": "No hay voces disponibles",
   "voice_panel.favorites_empty": "No hay voces favoritas",
   "voice_panel.add_favorite": "Agregar a favoritos",

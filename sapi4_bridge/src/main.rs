@@ -26,6 +26,13 @@ const IID_IAUDIOFILE: GUID = GUID { Data1: 0xFD7C2320, Data2: 0x3D6D, Data3: 0x1
 const IID_ITTSNOTIFYSINKW: GUID = GUID { Data1: 0xC0FA8F40, Data2: 0x4A46, Data3: 0x101B, Data4: [0x93, 0x1A, 0x00, 0xAA, 0x00, 0x47, 0xBA, 0x4F] };
 const IID_IAUDIOFILENOTIFYSINK: GUID = GUID { Data1: 0x492FE490, Data2: 0x51E7, Data3: 0x11B9, Data4: [0xC0, 0x00, 0xFE, 0xD6, 0xCB, 0xA3, 0xB1, 0xA9] };
 const TTSDATAFLAG_TAGGED: DWORD = 1;
+const IID_ITTSATTRIBUTESW: GUID = GUID { Data1: 0x1287A280, Data2: 0x4A47, Data3: 0x101B, Data4: [0x93, 0x1A, 0x00, 0xAA, 0x00, 0x47, 0xBA, 0x4F] };
+const TTSATTR_MINSPEED: DWORD = 0;
+const TTSATTR_MAXSPEED: DWORD = 0xFFFF_FFFF;
+const TTSATTR_MINPITCH: WORD = 0;
+const TTSATTR_MAXPITCH: WORD = 0xFFFF;
+const TTSATTR_MINVOLUME: DWORD = 0;
+const TTSATTR_MAXVOLUME: DWORD = 0xFFFF_FFFF;
 
 // ITTSEnum vtable
 #[repr(C)]
@@ -119,6 +126,27 @@ struct ITTSNotifySinkVtbl {
 struct ITTSNotifySink {
     lpVtbl: *const ITTSNotifySinkVtbl,
     done: *const AtomicBool,
+}
+
+// ITTSAttributes vtable
+#[repr(C)]
+struct ITTSAttributesVtbl {
+    query_interface: unsafe extern "system" fn(*mut ITTSAttributes, REFIID, *mut *mut std::ffi::c_void) -> i32,
+    add_ref: unsafe extern "system" fn(*mut ITTSAttributes) -> u32,
+    release: unsafe extern "system" fn(*mut ITTSAttributes) -> u32,
+    pitch_get: unsafe extern "system" fn(*mut ITTSAttributes, *mut WORD) -> i32,
+    pitch_set: unsafe extern "system" fn(*mut ITTSAttributes, WORD) -> i32,
+    real_time_get: unsafe extern "system" fn(*mut ITTSAttributes, *mut DWORD) -> i32,
+    real_time_set: unsafe extern "system" fn(*mut ITTSAttributes, DWORD) -> i32,
+    speed_get: unsafe extern "system" fn(*mut ITTSAttributes, *mut DWORD) -> i32,
+    speed_set: unsafe extern "system" fn(*mut ITTSAttributes, DWORD) -> i32,
+    volume_get: unsafe extern "system" fn(*mut ITTSAttributes, *mut DWORD) -> i32,
+    volume_set: unsafe extern "system" fn(*mut ITTSAttributes, DWORD) -> i32,
+}
+
+#[repr(C)]
+struct ITTSAttributes {
+    lpVtbl: *const ITTSAttributesVtbl,
 }
 
 // IAudioFileNotifySink vtable
@@ -344,21 +372,31 @@ fn main() {
         .and_then(|s| s.parse::<u32>().ok())
         .unwrap_or(1);
 
+    let rate = args.iter().position(|a| a == "--rate")
+        .and_then(|i| args.get(i + 1))
+        .and_then(|s| s.parse::<i32>().ok());
+    let pitch = args.iter().position(|a| a == "--pitch")
+        .and_then(|i| args.get(i + 1))
+        .and_then(|s| s.parse::<i32>().ok());
+    let volume = args.iter().position(|a| a == "--volume")
+        .and_then(|i| args.get(i + 1))
+        .and_then(|s| s.parse::<i32>().ok());
+
     let output_path = args.iter().position(|a| a == "--output")
         .and_then(|i| args.get(i + 1))
         .map(|s| s.to_string());
 
     if let Some(path) = output_path {
-        speak_to_file(target_idx, &path);
+        speak_to_file(target_idx, &path, rate, pitch, volume);
         return;
     }
 
     if args.iter().any(|a| a == "--server") {
-        run_server(target_idx);
+        run_server(target_idx, rate, pitch, volume);
         return;
     }
 
-    speak_with_voice(target_idx);
+    speak_with_voice(target_idx, rate, pitch, volume);
 }
 
 fn get_mode_name(info: &TTSMODEINFO) -> String {
@@ -573,7 +611,7 @@ unsafe fn speak_text(central_ptr: *mut ITTSCentral, text: &str) -> i32 {
     speak_text_with_flags(central_ptr, text, 0)
 }
 
-fn run_server(target_idx: u32) {
+fn run_server(target_idx: u32, rate: Option<i32>, pitch: Option<i32>, volume: Option<i32>) {
     unsafe {
         let Some((enum_ptr, central_ptr)) = init_central(target_idx) else {
             return;
@@ -583,6 +621,7 @@ fn run_server(target_idx: u32) {
         let tts_central = &*central_ptr;
         let central_vtbl = &*tts_central.lpVtbl;
 
+        apply_tts_attributes(central_ptr, rate, pitch, volume);
         let rx = spawn_command_reader();
         let mut running = true;
 
@@ -619,7 +658,7 @@ fn run_server(target_idx: u32) {
     }
 }
 
-fn speak_to_file(target_idx: u32, output_path: &str) {
+fn speak_to_file(target_idx: u32, output_path: &str, rate: Option<i32>, pitch: Option<i32>, volume: Option<i32>) {
     unsafe {
         CoInitializeEx(ptr::null_mut(), 0x2);
 
@@ -686,6 +725,8 @@ fn speak_to_file(target_idx: u32, output_path: &str) {
             &mut reg_key,
         );
 
+        apply_tts_attributes(central_ptr, rate, pitch, volume);
+
         let mut text = String::new();
         let _ = io::stdin().read_to_string(&mut text);
         if text.is_empty() {
@@ -726,7 +767,7 @@ fn speak_to_file(target_idx: u32, output_path: &str) {
     }
 }
 
-fn speak_with_voice(target_idx: u32) {
+fn speak_with_voice(target_idx: u32, rate: Option<i32>, pitch: Option<i32>, volume: Option<i32>) {
     unsafe {
         let Some((enum_ptr, central_ptr)) = init_central(target_idx) else {
             return;
@@ -735,6 +776,8 @@ fn speak_with_voice(target_idx: u32) {
         let vtbl = &*tts_enum.lpVtbl;
         let tts_central = &*central_ptr;
         let central_vtbl = &*tts_central.lpVtbl;
+
+        apply_tts_attributes(central_ptr, rate, pitch, volume);
 
         // Read text from stdin
         let mut text = String::new();
@@ -765,4 +808,124 @@ fn speak_with_voice(target_idx: u32) {
         (central_vtbl.release)(central_ptr);
         (vtbl.release)(enum_ptr);
     }
+}
+
+unsafe fn apply_tts_attributes(
+    central_ptr: *mut ITTSCentral,
+    rate: Option<i32>,
+    pitch: Option<i32>,
+    volume: Option<i32>,
+) {
+    if rate.is_none() && pitch.is_none() && volume.is_none() {
+        return;
+    }
+    let tts_central = &*central_ptr;
+    let central_vtbl = &*tts_central.lpVtbl;
+    let mut attr_ptr: *mut ITTSAttributes = ptr::null_mut();
+    let hr = (central_vtbl.query_interface)(
+        central_ptr,
+        &IID_ITTSATTRIBUTESW,
+        &mut attr_ptr as *mut _ as *mut _,
+    );
+    if hr != S_OK || attr_ptr.is_null() {
+        return;
+    }
+    let attr = &*attr_ptr;
+    let attr_vtbl = &*attr.lpVtbl;
+
+    let mut speed_percent: Option<f64> = None;
+    let mut pitch_percent: Option<f64> = None;
+    let mut volume_percent: Option<f64> = None;
+
+    if let Some(rate) = rate {
+        let rate = rate.clamp(-100, 100);
+        speed_percent = Some(((rate as f64 + 100.0) / 2.0).clamp(0.0, 100.0));
+    }
+
+    if let Some(pitch) = pitch {
+        let pitch = pitch.clamp(-12, 12);
+        pitch_percent = Some(((pitch as f64 + 12.0) / 24.0 * 100.0).clamp(0.0, 100.0));
+    }
+
+    if let Some(volume) = volume {
+        let volume = volume.clamp(0, 100);
+        volume_percent = Some(volume as f64);
+    }
+
+    let scale_with_default = |percent: f64, min: f64, max: f64, default: f64| -> f64 {
+        let percent = percent.clamp(0.0, 100.0);
+        if percent <= 50.0 {
+            let span = (default - min).max(0.0);
+            min + span * (percent / 50.0)
+        } else {
+            let span = (max - default).max(0.0);
+            default + span * ((percent - 50.0) / 50.0)
+        }
+    };
+
+    if let Some(percent) = speed_percent {
+        let mut old_val: DWORD = 0;
+        let _ = (attr_vtbl.speed_get)(attr_ptr, &mut old_val);
+        let _ = (attr_vtbl.speed_set)(attr_ptr, TTSATTR_MINSPEED);
+        let mut min_val: DWORD = 0;
+        let _ = (attr_vtbl.speed_get)(attr_ptr, &mut min_val);
+        let _ = (attr_vtbl.speed_set)(attr_ptr, TTSATTR_MAXSPEED);
+        let mut max_val: DWORD = 0;
+        let _ = (attr_vtbl.speed_get)(attr_ptr, &mut max_val);
+        let max_val = max_val.saturating_sub(1);
+        if max_val > min_val {
+            let default_val = old_val.clamp(min_val, max_val);
+            let scaled = scale_with_default(
+                percent,
+                min_val as f64,
+                max_val as f64,
+                default_val as f64,
+            );
+            let _ = (attr_vtbl.speed_set)(attr_ptr, scaled as u32);
+        } else {
+            let _ = (attr_vtbl.speed_set)(attr_ptr, old_val);
+        }
+    }
+
+    if let Some(percent) = pitch_percent {
+        let mut old_val: WORD = 0;
+        let _ = (attr_vtbl.pitch_get)(attr_ptr, &mut old_val);
+        let _ = (attr_vtbl.pitch_set)(attr_ptr, TTSATTR_MINPITCH);
+        let mut min_val: WORD = 0;
+        let _ = (attr_vtbl.pitch_get)(attr_ptr, &mut min_val);
+        let _ = (attr_vtbl.pitch_set)(attr_ptr, TTSATTR_MAXPITCH);
+        let mut max_val: WORD = 0;
+        let _ = (attr_vtbl.pitch_get)(attr_ptr, &mut max_val);
+        if max_val > min_val {
+            let default_val = old_val.clamp(min_val, max_val);
+            let scaled = scale_with_default(
+                percent,
+                min_val as f64,
+                max_val as f64,
+                default_val as f64,
+            );
+            let _ = (attr_vtbl.pitch_set)(attr_ptr, scaled as u16);
+        } else {
+            let _ = (attr_vtbl.pitch_set)(attr_ptr, old_val);
+        }
+    }
+
+    if let Some(percent) = volume_percent {
+        let _ = (attr_vtbl.volume_set)(attr_ptr, TTSATTR_MINVOLUME);
+        let mut min_val: DWORD = 0;
+        let _ = (attr_vtbl.volume_get)(attr_ptr, &mut min_val);
+        let min_val = min_val & 0xFFFF;
+        let _ = (attr_vtbl.volume_set)(attr_ptr, TTSATTR_MAXVOLUME);
+        let mut max_val: DWORD = 0;
+        let _ = (attr_vtbl.volume_get)(attr_ptr, &mut max_val);
+        let max_val = max_val & 0xFFFF;
+        if max_val > min_val {
+            let scaled = min_val as f64 + (max_val - min_val) as f64 * (percent / 100.0);
+            let val = scaled as u32;
+            let val = (val & 0xFFFF) | (val << 16);
+            let _ = (attr_vtbl.volume_set)(attr_ptr, val);
+        }
+    }
+
+    let _ = (attr_vtbl.release)(attr_ptr);
 }

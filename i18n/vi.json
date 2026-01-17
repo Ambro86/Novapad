@@ -270,6 +270,7 @@
   "voice_panel.label_multilingual": "Chỉ hiện giọng đọc đa ngôn ngữ",
   "voice_panel.engine_edge": "Microsoft Voices",
   "voice_panel.engine_sapi": "SAPI5",
+  "voice_panel.engine_sapi4": "SAPI4",
   "voice_panel.voices_empty": "Không có giọng đọc nào khả dụng",
   "voice_panel.favorites_empty": "Chưa có giọng đọc yêu thích nào",
   "voice_panel.add_favorite": "Thêm vào danh sách yêu thích",

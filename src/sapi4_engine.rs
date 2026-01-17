@@ -60,6 +60,9 @@ pub fn speak_sapi4_to_file(
     chunks: &[String],
     voice_index: i32,
     output: &Path,
+    tts_rate: i32,
+    tts_pitch: i32,
+    tts_volume: i32,
     cancel: Arc<AtomicBool>,
     mut on_progress: impl FnMut(usize),
 ) -> Result<(), String> {
@@ -83,6 +86,12 @@ pub fn speak_sapi4_to_file(
     let mut child = Command::new(exe_path)
         .arg("--voice")
         .arg(voice_index.to_string())
+        .arg("--rate")
+        .arg(tts_rate.to_string())
+        .arg("--pitch")
+        .arg(tts_pitch.to_string())
+        .arg("--volume")
+        .arg(tts_volume.to_string())
         .arg("--output")
         .arg(&wav_path)
         .stdin(Stdio::piped())
@@ -142,6 +151,9 @@ fn send_speak(stdin: &mut ChildStdin, text: &str) -> std::io::Result<()> {
 pub fn play_sapi4(
     voice_index: i32,
     text: String,
+    tts_rate: i32,
+    tts_pitch: i32,
+    tts_volume: i32,
     cancel: Arc<AtomicBool>,
     mut command_rx: mpsc::UnboundedReceiver<TtsCommand>,
 ) {
@@ -154,6 +166,12 @@ pub fn play_sapi4(
         let mut child = match Command::new(exe_path)
             .arg("--voice")
             .arg(voice_index.to_string())
+            .arg("--rate")
+            .arg(tts_rate.to_string())
+            .arg("--pitch")
+            .arg(tts_pitch.to_string())
+            .arg("--volume")
+            .arg(tts_volume.to_string())
             .arg("--server")
             .stdin(Stdio::piped())
             .creation_flags(0x08000000)

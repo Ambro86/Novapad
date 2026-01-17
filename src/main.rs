@@ -3364,6 +3364,12 @@ pub(crate) unsafe fn refresh_voice_panel(hwnd: HWND) {
             WPARAM(0),
             LPARAM(to_wide(&labels.engine_sapi).as_ptr() as isize),
         );
+        let _ = SendMessageW(
+            combo_engine,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.engine_sapi4).as_ptr() as isize),
+        );
         let engine_index = match settings.tts_engine {
             TtsEngine::Edge => 0,
             TtsEngine::Sapi5 => 1,
@@ -3761,10 +3767,10 @@ unsafe fn handle_voice_panel_engine_change(hwnd: HWND) {
         None => return,
     };
     let sel = SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-    let new_engine = if sel == 1 {
-        TtsEngine::Sapi5
-    } else {
-        TtsEngine::Edge
+    let new_engine = match sel {
+        1 => TtsEngine::Sapi5,
+        2 => TtsEngine::Sapi4,
+        _ => TtsEngine::Edge,
     };
     let (old_engine, old_voice) = with_state(hwnd, |state| {
         (state.settings.tts_engine, state.settings.tts_voice.clone())

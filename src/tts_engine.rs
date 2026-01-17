@@ -170,7 +170,9 @@ pub fn start_tts_from_caret(hwnd: HWND) {
                     state.tts_next_session_id += 1;
                 })
             };
-            crate::sapi4_engine::play_sapi4(voice_idx, text, cancel, command_rx);
+            crate::sapi4_engine::play_sapi4(
+                voice_idx, text, tts_rate, tts_pitch, tts_volume, cancel, command_rx,
+            );
             return;
         }
         TtsEngine::Sapi5 => {
@@ -1368,6 +1370,9 @@ pub fn start_audiobook(hwnd: HWND) {
                         progress_hwnd,
                         cancel_clone,
                         language,
+                        tts_rate,
+                        tts_pitch,
+                        tts_volume,
                     )
                 } else {
                     run_split_sapi4_audiobook(
@@ -1378,6 +1383,9 @@ pub fn start_audiobook(hwnd: HWND) {
                         progress_hwnd,
                         cancel_clone,
                         language,
+                        tts_rate,
+                        tts_pitch,
+                        tts_volume,
                     )
                 }
             }
@@ -1558,6 +1566,9 @@ fn run_split_sapi4_audiobook(
     progress_hwnd: HWND,
     cancel: Arc<AtomicBool>,
     language: Language,
+    tts_rate: i32,
+    tts_pitch: i32,
+    tts_volume: i32,
 ) -> Result<(), String> {
     let parts = if split_parts == 0 {
         1
@@ -1599,6 +1610,9 @@ fn run_split_sapi4_audiobook(
             part_chunks,
             voice_idx,
             &part_output,
+            tts_rate,
+            tts_pitch,
+            tts_volume,
             cancel_clone,
             |_chunk_idx| {
                 current_global_progress += 1;
@@ -1633,6 +1647,9 @@ fn run_marker_split_sapi4_audiobook(
     progress_hwnd: HWND,
     cancel: Arc<AtomicBool>,
     language: Language,
+    tts_rate: i32,
+    tts_pitch: i32,
+    tts_volume: i32,
 ) -> Result<(), String> {
     let parts_len = parts.len();
     let mut current_global_progress = 0;
@@ -1659,6 +1676,9 @@ fn run_marker_split_sapi4_audiobook(
             part_chunks,
             voice_idx,
             &part_output,
+            tts_rate,
+            tts_pitch,
+            tts_volume,
             cancel_clone,
             |_chunk_idx| {
                 current_global_progress += 1;

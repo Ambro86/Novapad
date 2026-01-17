@@ -2456,10 +2456,10 @@ unsafe fn preview_voice(hwnd: HWND) {
     }
 
     let engine_sel = SendMessageW(combo_tts_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-    let engine = if engine_sel == 1 {
-        TtsEngine::Sapi5
-    } else {
-        TtsEngine::Edge
+    let engine = match engine_sel {
+        1 => TtsEngine::Sapi5,
+        2 => TtsEngine::Sapi4,
+        _ => TtsEngine::Edge,
     };
     let voices = with_state(parent, |state| match engine {
         TtsEngine::Edge => state.edge_voices.clone(),
@@ -2509,7 +2509,34 @@ unsafe fn preview_voice(hwnd: HWND) {
                 parent, text, voice, chunks, 0, rate, pitch, volume,
             );
         }
-        TtsEngine::Sapi4 => {}
+        TtsEngine::Sapi4 => {
+            tts_engine::stop_tts_playback(parent);
+            let voice_idx = if let Some(hash_pos) = voice.find('#') {
+                let rest = &voice[hash_pos + 1..];
+                if let Some(pipe_pos) = rest.find('|') {
+                    rest[..pipe_pos].parse::<i32>().unwrap_or(1)
+                } else {
+                    rest.parse::<i32>().unwrap_or(1)
+                }
+            } else {
+                1
+            };
+            let cancel = Arc::new(AtomicBool::new(false));
+            let (command_tx, command_rx) = mpsc::unbounded_channel();
+            let _ = with_state(parent, |state| {
+                state.tts_session = Some(tts_engine::TtsSession {
+                    id: state.tts_next_session_id,
+                    command_tx,
+                    cancel: cancel.clone(),
+                    paused: false,
+                    initial_caret_pos: 0,
+                });
+                state.tts_next_session_id += 1;
+            });
+            crate::sapi4_engine::play_sapi4(
+                voice_idx, text, rate, pitch, volume, cancel, command_rx,
+            );
+        }
         TtsEngine::Sapi5 => {
             tts_engine::stop_tts_playback(parent);
             let cancel = Arc::new(AtomicBool::new(false));

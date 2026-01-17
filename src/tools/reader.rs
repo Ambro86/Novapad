@@ -91,14 +91,14 @@ pub fn clean_text(input: &str) -> String {
     let decoded = decode_unicode(input);
     // Pulizia encoding Mediaset/TGCOM24
     let mut text = decoded
-        .replace("Ã¨", "è")
-        .replace("Ã ", "à")
-        .replace("Ã¹", "ù")
-        .replace("Ã²", "ò")
-        .replace("Ã¬", "ì")
-        .replace("Â ", " ")
-        .replace("Ã©", "é")
-        .replace("Â", "");
+        .replace("ÃƒÂ¨", "Ã¨")
+        .replace("ÃƒÂ ", "Ã ")
+        .replace("ÃƒÂ¹", "Ã¹")
+        .replace("ÃƒÂ²", "Ã²")
+        .replace("ÃƒÂ¬", "Ã¬")
+        .replace("Ã‚Â ", " ")
+        .replace("ÃƒÂ©", "Ã©")
+        .replace("Ã‚", "");
 
     text = text
         .replace("&nbsp;", " ")
@@ -269,6 +269,7 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
             ".art-text",
             ".story-content p",
             ".article-body p",
+            "#col-sx-interna p",
         ];
         for sel_str in content_selectors {
             if let Ok(selector) = Selector::parse(sel_str) {

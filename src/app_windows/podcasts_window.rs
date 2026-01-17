@@ -3790,7 +3790,7 @@ unsafe extern "system" fn podcast_wndproc(
                     update_source_cache(parent, msg.source_index, outcome.cache);
                     if outcome.not_modified {
                         apply_episode_results(hwnd, HTREEITEM(msg.hitem), Vec::new());
-                    } else if !outcome.items.is_empty() {
+                    } else {
                         apply_episode_results(hwnd, HTREEITEM(msg.hitem), outcome.items);
                     }
                 }

@@ -2010,6 +2010,7 @@ dependencies = [
  "futures-util",
  "hex",
  "httpdate",
+ "libloading",
  "mp3-duration",
  "once_cell",
  "pdf-extract",

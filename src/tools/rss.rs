@@ -459,6 +459,113 @@ fn parse_feed_bytes(
     Some((title, items))
 }
 
+fn parse_podcast_feed_bytes(
+    bytes: Vec<u8>,
+    fallback_title: &str,
+    max_excerpt_chars: usize,
+) -> Option<(String, Vec<PodcastEpisode>)> {
+    let cursor = Cursor::new(bytes);
+    let feed = parser::parse(cursor).ok()?;
+    let title = feed
+        .title
+        .map(|t| t.content)
+        .unwrap_or_else(|| fallback_title.to_string());
+    let items = feed
+        .entries
+        .into_iter()
+        .map(|entry| {
+            let title = entry
+                .title
+                .as_ref()
+                .map(|t| t.content.clone())
+                .unwrap_or_else(|| "No Title".to_string());
+            let link = select_entry_link(&entry);
+            let guid = if !entry.id.trim().is_empty() {
+                entry.id.clone()
+            } else if !link.trim().is_empty() {
+                link.clone()
+            } else {
+                title.clone()
+            };
+            let published = entry.published.or(entry.updated).map(|d| d.timestamp());
+            let description = entry
+                .summary
+                .as_ref()
+                .map(|s| s.content.clone())
+                .or_else(|| entry.content.as_ref().and_then(|c| c.body.clone()))
+                .unwrap_or_default();
+            let description = truncate_excerpt(&description, max_excerpt_chars);
+            let (enclosure_url, enclosure_type) = select_podcast_enclosure(&entry);
+            let (chapters_url, chapters_type) = select_podcast_chapters_link(&entry);
+            PodcastEpisode {
+                title,
+                link,
+                description,
+                guid,
+                published,
+                enclosure_url,
+                enclosure_type,
+                chapters_url,
+                chapters_type,
+                podlove_chapters: Vec::new(),
+            }
+        })
+        .collect();
+    Some((title, items))
+}
+
+fn select_podcast_enclosure(entry: &feed_rs::model::Entry) -> (Option<String>, Option<String>) {
+    if let Some(content) = entry.content.as_ref() {
+        if let Some(src) = content.src.as_ref() {
+            return (
+                Some(src.href.clone()),
+                Some(content.content_type.to_string()),
+            );
+        }
+    }
+    for link in &entry.links {
+        if let Some(rel) = link.rel.as_deref() {
+            if rel.eq_ignore_ascii_case("enclosure") {
+                return (Some(link.href.clone()), link.media_type.clone());
+            }
+        }
+    }
+    for link in &entry.links {
+        if let Some(media_type) = link.media_type.as_deref() {
+            if media_type.starts_with("audio/") || media_type.starts_with("video/") {
+                return (Some(link.href.clone()), link.media_type.clone());
+            }
+        }
+    }
+    for media in &entry.media {
+        for content in &media.content {
+            if let Some(url) = content.url.as_ref() {
+                let media_type = content.content_type.as_ref().map(|m| m.to_string());
+                return (Some(url.to_string()), media_type);
+            }
+        }
+    }
+    (None, None)
+}
+
+fn select_podcast_chapters_link(entry: &feed_rs::model::Entry) -> (Option<String>, Option<String>) {
+    for link in &entry.links {
+        let rel = link.rel.as_deref().unwrap_or("").to_lowercase();
+        let href = link.href.to_lowercase();
+        if rel.contains("chapters") || href.contains("/chapters/") {
+            return (Some(link.href.clone()), link.media_type.clone());
+        }
+        if let Some(media_type) = link.media_type.as_deref() {
+            if media_type.eq_ignore_ascii_case("application/json")
+                && (rel.contains("podcast") || href.contains("chapters"))
+            {
+                return (Some(link.href.clone()), link.media_type.clone());
+            }
+        }
+    }
+    (None, None)
+}
+
 fn select_entry_link(entry: &feed_rs::model::Entry) -> String {
     for link in &entry.links {
         let href = link.href.trim();
@@ -488,6 +595,25 @@ fn truncate_excerpt(input: &str, max_chars: usize) -> String {
 }
 
 fn dedup_items(items: Vec<RssItem>, max_items: usize) -> Vec<RssItem> {
+    let mut seen = HashSet::new();
+    let mut out = Vec::new();
+    for item in items {
+        let key = if !item.guid.trim().is_empty() {
+            format!("guid:{}", item.guid.trim())
+        } else {
+            format!("link:{}", canonicalize_url(&item.link))
+        };
+        if seen.insert(key) {
+            out.push(item);
+            if out.len() >= max_items {
+                break;
+            }
+        }
+    }
+    out
+}
+
+fn dedup_podcast_items(items: Vec<PodcastEpisode>, max_items: usize) -> Vec<PodcastEpisode> {
     let mut seen = HashSet::new();
     let mut out = Vec::new();
     for item in items {
@@ -761,13 +887,43 @@ pub async fn fetch_podcast_feed(
     url: &str,
     cache: RssFeedCache,
     cfg: RssFetchConfig,
-    _: bool,
+    override_cooldown: bool,
 ) -> Result<PodcastFetchOutcome, FeedFetchError> {
-    let res = fetch_and_parse(url, RssSourceType::Feed, cache, cfg, true).await?;
-    Ok(PodcastFetchOutcome {
-        title: res.title,
-        items: Vec::new(),
-        cache: res.cache,
-        not_modified: res.not_modified,
+    let url = normalize_url(url);
+    let http = shared_http().map_err(|e| FeedFetchError::Network {
+        message: e,
+        cache: cache.clone(),
+    })?;
+    let mut cache = cache;
+
+    let out = fetch_bytes_with_retries(
+        http,
+        &url,
+        true,
+        "podcast",
+        override_cooldown,
+        &cfg,
+        Some(&mut cache),
+    )
+    .await?;
+    if out.not_modified {
+        return Ok(PodcastFetchOutcome {
+            title: String::new(),
+            items: Vec::new(),
+            cache,
+            not_modified: true,
+        });
+    }
+    if let Some((title, items)) = parse_podcast_feed_bytes(out.bytes, &url, cfg.max_excerpt_chars) {
+        return Ok(PodcastFetchOutcome {
+            title,
+            items: dedup_podcast_items(items, cfg.max_items_per_feed),
+            cache,
+            not_modified: false,
+        });
+    }
+    Err(FeedFetchError::Network {
+        message: "Parsing failed".to_string(),
+        cache,
     })
 }

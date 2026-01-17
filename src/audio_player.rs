@@ -1,7 +1,7 @@
-use crate::accessibility::to_wide;
 use crate::log_debug;
 use crate::settings::{FileFormat, settings_dir};
 use crate::with_state;
+use libloading::Library;
 use rodio::{Decoder, OutputStream, Sink, Source};
 use std::ffi::c_void;
 use std::path::{Path, PathBuf};
@@ -9,116 +9,6 @@ use std::sync::Arc;
 use std::sync::OnceLock;
 use std::time::Duration;
 use windows::Win32::Foundation::HWND;
-use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
-use windows::core::{PCSTR, PCWSTR};
-
-fn read_u16_le(buf: &[u8], offset: usize) -> Option<u16> {
-    let bytes = buf.get(offset..offset + 2)?;
-    Some(u16::from_le_bytes([bytes[0], bytes[1]]))
-}
-
-fn read_u32_le(buf: &[u8], offset: usize) -> Option<u32> {
-    let bytes = buf.get(offset..offset + 4)?;
-    Some(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
-}
-
-fn rva_to_offset(sections: &[(u32, u32, u32)], rva: u32) -> Option<usize> {
-    for (virt_addr, virt_size, raw_ptr) in sections {
-        if rva >= *virt_addr && rva < (*virt_addr).saturating_add(*virt_size) {
-            let offset = rva - *virt_addr;
-            return Some((*raw_ptr).saturating_add(offset) as usize);
-        }
-    }
-    None
-}
-
-fn read_export_names(path: &Path) -> Vec<String> {
-    let Ok(buf) = std::fs::read(path) else {
-        return Vec::new();
-    };
-    if buf.len() < 0x40 || &buf[0..2] != b"MZ" {
-        return Vec::new();
-    }
-    let e_lfanew = match read_u32_le(&buf, 0x3c) {
-        Some(v) => v as usize,
-        None => return Vec::new(),
-    };
-    if buf.len() < e_lfanew + 24 || &buf[e_lfanew..e_lfanew + 4] != b"PE\0\0" {
-        return Vec::new();
-    }
-    let file_header_offset = e_lfanew + 4;
-    let number_of_sections = match read_u16_le(&buf, file_header_offset + 2) {
-        Some(v) => v as usize,
-        None => return Vec::new(),
-    };
-    let size_of_optional_header = match read_u16_le(&buf, file_header_offset + 16) {
-        Some(v) => v as usize,
-        None => return Vec::new(),
-    };
-    let optional_offset = file_header_offset + 20;
-    if buf.len() < optional_offset + size_of_optional_header {
-        return Vec::new();
-    }
-    let magic = read_u16_le(&buf, optional_offset).unwrap_or(0);
-    let data_dir_offset = match magic {
-        0x10b => optional_offset + 0x60,
-        0x20b => optional_offset + 0x70,
-        _ => return Vec::new(),
-    };
-    let export_rva = read_u32_le(&buf, data_dir_offset).unwrap_or(0);
-    let export_size = read_u32_le(&buf, data_dir_offset + 4).unwrap_or(0);
-    if export_rva == 0 || export_size == 0 {
-        return Vec::new();
-    }
-    let section_offset = optional_offset + size_of_optional_header;
-    let mut sections = Vec::new();
-    for i in 0..number_of_sections {
-        let base = section_offset + i * 40;
-        if buf.len() < base + 40 {
-            break;
-        }
-        let virtual_size = read_u32_le(&buf, base + 8).unwrap_or(0);
-        let virtual_address = read_u32_le(&buf, base + 12).unwrap_or(0);
-        let raw_size = read_u32_le(&buf, base + 16).unwrap_or(0);
-        let raw_ptr = read_u32_le(&buf, base + 20).unwrap_or(0);
-        let size = std::cmp::max(virtual_size, raw_size);
-        sections.push((virtual_address, size, raw_ptr));
-    }
-    let export_offset = match rva_to_offset(&sections, export_rva) {
-        Some(v) => v,
-        None => return Vec::new(),
-    };
-    if buf.len() < export_offset + 40 {
-        return Vec::new();
-    }
-    let number_of_names = read_u32_le(&buf, export_offset + 24).unwrap_or(0) as usize;
-    let address_of_names = read_u32_le(&buf, export_offset + 32).unwrap_or(0);
-    let names_offset = match rva_to_offset(&sections, address_of_names) {
-        Some(v) => v,
-        None => return Vec::new(),
-    };
-    let mut names = Vec::new();
-    for i in 0..number_of_names {
-        let name_rva = match read_u32_le(&buf, names_offset + i * 4) {
-            Some(v) => v,
-            None => break,
-        };
-        let name_offset = match rva_to_offset(&sections, name_rva) {
-            Some(v) => v,
-            None => continue,
-        };
-        let mut end = name_offset;
-        while end < buf.len() && buf[end] != 0 {
-            end += 1;
-        }
-        if end > name_offset && end <= buf.len() {
-            if let Ok(s) = std::str::from_utf8(&buf[name_offset..end]) {
-                names.push(s.to_string());
-            }
-        }
-    }
-    names
-}
 
 pub struct AudiobookPlayer {
     pub path: PathBuf,
@@ -145,7 +35,7 @@ type SoundTouchFlush = unsafe extern "C" fn(SoundTouchHandle);
 type SoundTouchClear = unsafe extern "C" fn(SoundTouchHandle);
 
 struct SoundTouchApi {
-    _handle: windows::Win32::Foundation::HMODULE,
+    _lib: Library,
     create: SoundTouchCreate,
     destroy: SoundTouchDestroy,
     set_sample_rate: SoundTouchSetSampleRate,
@@ -157,10 +47,27 @@ struct SoundTouchApi {
     clear: SoundTouchClear,
 }
 
+fn load_symbol<T: Copy>(lib: &Library, names: &[&str]) -> Option<T> {
+    for name in names {
+        let mut symbol_name = Vec::with_capacity(name.len() + 1);
+        symbol_name.extend_from_slice(name.as_bytes());
+        symbol_name.push(0);
+        if let Ok(symbol) = unsafe { lib.get::<T>(&symbol_name) } {
+            return Some(*symbol);
+        }
+    }
+    log_debug(&format!("SoundTouch symbol missing: {:?}", names));
+    None
+}
+
 fn load_soundtouch_api() -> Option<&'static SoundTouchApi> {
     static SOUND_TOUCH: OnceLock<Option<SoundTouchApi>> = OnceLock::new();
     SOUND_TOUCH
-        .get_or_init(|| unsafe {
+        .get_or_init(|| {
+            if !cfg!(target_arch = "x86_64") {
+                log_debug("SoundTouch DLL not available for this architecture.");
+                return None;
+            }
             let dll_name = "SoundTouch64.dll";
             let mut candidates = Vec::new();
             candidates.push(settings_dir().join(dll_name));
@@ -178,135 +85,113 @@ fn load_soundtouch_api() -> Option<&'static SoundTouchApi> {
                 candidates.push(dir.join(dll_name));
             }
 
-            let mut h = None;
-            let mut loaded_path = None;
+            let mut lib = None;
             for path in candidates {
-                let dll_path_wide = to_wide(&path.to_string_lossy());
-                if let Ok(handle) = LoadLibraryW(PCWSTR(dll_path_wide.as_ptr())) {
-                    h = Some(handle);
-                    loaded_path = Some(path);
-                    break;
-                } else {
-                    log_debug(&format!(
-                        "SoundTouch load failed: {}",
-                        path.to_string_lossy()
-                    ));
-                }
-            }
-            let h = h?;
-            if let Some(path) = loaded_path {
-                let exports = read_export_names(&path);
-                let mut filtered: Vec<String> = exports
-                    .into_iter()
-                    .filter(|name| {
-                        let lower = name.to_lowercase();
-                        lower.contains("soundtouch")
-                            || lower.contains("tempo")
-                            || lower.contains("sample")
-                    })
-                    .collect();
-                filtered.sort();
-                if !filtered.is_empty() {
-                    let preview = if filtered.len() > 40 {
-                        filtered[..40].join(", ")
-                    } else {
-                        filtered.join(", ")
-                    };
-                    log_debug(&format!("SoundTouch exports: {}", preview));
-                }
-            }
-            let proc = |names: &[&str]| {
-                for name in names {
-                    if let Ok(cstr) = std::ffi::CString::new(*name) {
-                        if let Some(addr) = GetProcAddress(h, PCSTR(cstr.as_ptr() as *const u8)) {
-                            return Some(addr);
-                        }
+                match unsafe { Library::new(&path) } {
+                    Ok(loaded) => {
+                        lib = Some(loaded);
+                        log_debug(&format!("SoundTouch loaded: {}", path.to_string_lossy()));
+                        break;
+                    }
+                    Err(_) => {
+                        log_debug(&format!(
+                            "SoundTouch load failed: {}",
+                            path.to_string_lossy()
+                        ));
                     }
                 }
-                log_debug(&format!("SoundTouch symbol missing: {:?}", names));
-                None
-            };
-            Some(SoundTouchApi {
-                _handle: h,
-                create: std::mem::transmute::<
-                    unsafe extern "system" fn() -> isize,
-                    unsafe extern "C" fn() -> *mut std::ffi::c_void,
-                >(proc(&[
+            }
+            let lib = lib?;
+            let create = load_symbol::<SoundTouchCreate>(
+                &lib,
+                &[
                     "soundtouch_createInstance",
                     "_soundtouch_createInstance",
                     "soundtouch_createInstance@0",
-                ])?),
-                destroy: std::mem::transmute::<
-                    unsafe extern "system" fn() -> isize,
-                    unsafe extern "C" fn(*mut std::ffi::c_void),
-                >(proc(&[
+                ],
+            )?;
+            let destroy = load_symbol::<SoundTouchDestroy>(
+                &lib,
+                &[
                     "soundtouch_destroyInstance",
                     "_soundtouch_destroyInstance",
                     "soundtouch_destroyInstance@4",
-                ])?),
-                set_sample_rate: std::mem::transmute::<
-                    unsafe extern "system" fn() -> isize,
-                    unsafe extern "C" fn(*mut std::ffi::c_void, u32),
-                >(proc(&[
+                ],
+            )?;
+            let set_sample_rate = load_symbol::<SoundTouchSetSampleRate>(
+                &lib,
+                &[
                     "soundtouch_setSampleRate",
                     "_soundtouch_setSampleRate",
                     "soundtouch_setSampleRate@8",
-                ])?),
-                set_channels: std::mem::transmute::<
-                    unsafe extern "system" fn() -> isize,
-                    unsafe extern "C" fn(*mut std::ffi::c_void, u32),
-                >(proc(&[
+                ],
+            )?;
+            let set_channels = load_symbol::<SoundTouchSetChannels>(
+                &lib,
+                &[
                     "soundtouch_setChannels",
                     "_soundtouch_setChannels",
                     "soundtouch_setChannels@8",
-                ])?),
-                set_tempo: std::mem::transmute::<
-                    unsafe extern "system" fn() -> isize,
-                    unsafe extern "C" fn(*mut std::ffi::c_void, f32),
-                >(proc(&[
+                ],
+            )?;
+            let set_tempo = load_symbol::<SoundTouchSetTempo>(
+                &lib,
+                &[
                     "soundtouch_setTempo",
                     "_soundtouch_setTempo",
                     "soundtouch_setTempo@8",
-                ])?),
-                put_samples: std::mem::transmute::<
-                    unsafe extern "system" fn() -> isize,
-                    unsafe extern "C" fn(*mut std::ffi::c_void, *const f32, u32),
-                >(proc(&[
+                ],
+            )?;
+            let put_samples = load_symbol::<SoundTouchPutSamples>(
+                &lib,
+                &[
                     "soundtouch_putSamples",
                     "_soundtouch_putSamples",
                     "soundtouch_putSamples@12",
-                ])?),
-                receive_samples: std::mem::transmute::<
-                    unsafe extern "system" fn() -> isize,
-                    unsafe extern "C" fn(*mut std::ffi::c_void, *mut f32, u32) -> u32,
-                >(proc(&[
+                ],
+            )?;
+            let receive_samples = load_symbol::<SoundTouchReceiveSamples>(
+                &lib,
+                &[
                     "soundtouch_receiveSamples",
                     "_soundtouch_receiveSamples",
                     "soundtouch_receiveSamples@12",
-                ])?),
-                flush: std::mem::transmute::<
-                    unsafe extern "system" fn() -> isize,
-                    unsafe extern "C" fn(*mut std::ffi::c_void),
-                >(proc(&[
+                ],
+            )?;
+            let flush = load_symbol::<SoundTouchFlush>(
+                &lib,
+                &[
                     "soundtouch_flush",
                     "_soundtouch_flush",
                     "soundtouch_flush@4",
-                ])?),
-                clear: std::mem::transmute::<
-                    unsafe extern "system" fn() -> isize,
-                    unsafe extern "C" fn(*mut std::ffi::c_void),
-                >(proc(&[
+                ],
+            )?;
+            let clear = load_symbol::<SoundTouchClear>(
+                &lib,
+                &[
                     "soundtouch_clear",
                     "_soundtouch_clear",
                     "soundtouch_clear@4",
-                ])?),
+                ],
+            )?;
+            Some(SoundTouchApi {
+                _lib: lib,
+                create,
+                destroy,
+                set_sample_rate,
+                set_channels,
+                set_tempo,
+                put_samples,
+                receive_samples,
+                flush,
+                clear,
             })
         })
         .as_ref()
 }
 
 struct SoundTouch {
-    api: SoundTouchApi,
+    api: &'static SoundTouchApi,
     handle: SoundTouchHandle,
     channels: u16,
 }
@@ -325,18 +210,7 @@ impl SoundTouch {
             (api.set_channels)(handle, channels as u32);
             (api.set_tempo)(handle, tempo);
             Some(Self {
-                api: SoundTouchApi {
-                    _handle: api._handle,
-                    create: api.create,
-                    destroy: api.destroy,
-                    set_sample_rate: api.set_sample_rate,
-                    set_channels: api.set_channels,
-                    set_tempo: api.set_tempo,
-                    put_samples: api.put_samples,
-                    receive_samples: api.receive_samples,
-                    flush: api.flush,
-                    clear: api.clear,
-                },
+                api,
                 handle,
                 channels,
             })

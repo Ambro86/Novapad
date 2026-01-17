@@ -7,10 +7,15 @@ use std::io::Write;
 use std::path::PathBuf;
 
 // Embed delle DLL direttamente nell'exe
+// libcurl: runtime portatile senza dipendenze di sistema.
 const LIBCURL_DLL: &[u8] = include_bytes!("../dll/libcurl.dll");
+// zlib: dipendenza runtime di libcurl.
 const ZLIB_DLL: &[u8] = include_bytes!("../dll/zlib.dll");
+// cacert: bundle CA per la verifica TLS con libcurl embedded.
 const CACERT_PEM: &[u8] = include_bytes!("../dll/cacert.pem");
+// SoundTouch: time-stretching audio senza installazioni esterne.
 const SOUNDTOUCH_DLL: &[u8] = include_bytes!("../dll/SoundTouch64.dll");
+// NVDA: integrazione con screen reader tramite controller client.
 const NVDA_CLIENT_DLL: &[u8] = include_bytes!("../dll/nvdaControllerClient64.dll");
 
 /// Calcola un hash semplice per verificare se il file è cambiato

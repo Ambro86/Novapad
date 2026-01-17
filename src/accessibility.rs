@@ -1,6 +1,7 @@
 use crate::settings;
 use std::ffi::OsString;
 use std::os::windows::ffi::OsStringExt;
+use std::sync::OnceLock;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetKeyState, VK_ADD, VK_CONTROL, VK_DOWN, VK_END, VK_ESCAPE, VK_HOME, VK_LEFT, VK_MENU,
@@ -115,45 +116,39 @@ pub fn handle_player_keyboard(msg: &MSG, skip_seconds: u32) -> PlayerCommand {
     }
 }
 
-static mut NVDA_HANDLE: isize = 0;
-static mut NVDA_SPEAK_ADDR: usize = 0;
+static NVDA_LIB: OnceLock<libloading::Library> = OnceLock::new();
+static NVDA_SPEAK: OnceLock<Option<unsafe extern "C" fn(*const u16) -> i32>> = OnceLock::new();
 
 /// Attempts to speak text using the NVDA Controller Client DLL.
 /// Returns true if the DLL was loaded and the function called, false otherwise.
 pub fn nvda_speak(text: &str) -> bool {
-    use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
-    use windows::core::{PCSTR, PCWSTR};
+    let speak = match NVDA_SPEAK.get_or_init(|| {
+        let dll_name = if cfg!(target_arch = "x86_64") {
+            "nvdaControllerClient64.dll"
+        } else {
+            "nvdaControllerClient32.dll"
+        };
+        let dll_path = settings::settings_dir().join(dll_name);
+        let lib = unsafe { libloading::Library::new(&dll_path).ok()? };
+        let func = unsafe {
+            let symbol: libloading::Symbol<unsafe extern "C" fn(*const u16) -> i32> =
+                lib.get(b"nvdaController_speakText\0").ok()?;
+            *symbol
+        };
+        if NVDA_LIB.set(lib).is_err() {
+            return None;
+        }
+        Some(func)
+    }) {
+        Some(func) => *func,
+        None => return false,
+    };
 
+    let wide = to_wide(text);
     unsafe {
-        if NVDA_HANDLE == 0 {
-            let dll_name = if cfg!(target_arch = "x86_64") {
-                "nvdaControllerClient64.dll"
-            } else {
-                "nvdaControllerClient32.dll"
-            };
-            let dll_path = settings::settings_dir().join(dll_name);
-            let dll_path_wide = to_wide(&dll_path.to_string_lossy());
-            if let Ok(h) = LoadLibraryW(PCWSTR(dll_path_wide.as_ptr())) {
-                NVDA_HANDLE = h.0;
-                let proc_name = std::ffi::CString::new("nvdaController_speakText").unwrap();
-                if let Some(addr) = GetProcAddress(
-                    windows::Win32::Foundation::HMODULE(NVDA_HANDLE),
-                    PCSTR(proc_name.as_ptr() as *const u8),
-                ) {
-                    NVDA_SPEAK_ADDR = addr as usize;
-                }
-            }
-        }
-
-        if NVDA_SPEAK_ADDR != 0 {
-            let func: unsafe extern "system" fn(*const u16) -> i32 =
-                std::mem::transmute(NVDA_SPEAK_ADDR);
-            let wide = to_wide(text);
-            let _ = func(wide.as_ptr());
-            return true;
-        }
+        let _ = speak(wide.as_ptr());
     }
-    false
+    true
 }
 
 // Le DLL nvdaControllerClient64.dll e SoundTouch64.dll sono ora embedded

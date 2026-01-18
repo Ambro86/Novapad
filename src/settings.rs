@@ -498,12 +498,11 @@ pub fn load_settings() -> AppSettings {
     };
 
     let path = get_settings_path();
-    if path.exists() {
-        if let Ok(data) = std::fs::read_to_string(&path) {
-            if let Ok(settings) = serde_json::from_str(&data) {
-                return normalize_settings(settings);
-            }
-        }
+    if path.exists()
+        && let Ok(data) = std::fs::read_to_string(&path)
+        && let Ok(settings) = serde_json::from_str(&data)
+    {
+        return normalize_settings(settings);
     }
 
     normalize_settings(default_settings)
@@ -635,11 +634,24 @@ pub fn decrypt_podcast_index_secret(secret: &str) -> Option<String> {
 
 pub fn save_settings(settings: AppSettings) {
     let path = get_settings_path();
-    if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
+    if let Some(parent) = path.parent()
+        && let Err(e) = std::fs::create_dir_all(parent)
+    {
+        crate::log_debug(&format!("Failed to create settings directory: {}", e));
     }
-    if let Ok(json) = serde_json::to_string_pretty(&settings) {
-        let _ = std::fs::write(path, json);
+    match serde_json::to_string_pretty(&settings) {
+        Ok(json) => {
+            if let Err(e) = std::fs::write(&path, json) {
+                crate::log_debug(&format!(
+                    "Failed to save settings to {}: {}",
+                    path.display(),
+                    e
+                ));
+            }
+        }
+        Err(e) => {
+            crate::log_debug(&format!("Failed to serialize settings: {}", e));
+        }
     }
 }
 
@@ -919,6 +931,7 @@ pub fn untitled_title(language: Language, number: usize) -> String {
     }
 }
 
+#[allow(dead_code)]
 pub fn recent_missing_message(language: Language) -> String {
     crate::i18n::tr(language, "app.recent_missing")
 }

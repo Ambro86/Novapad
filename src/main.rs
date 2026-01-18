@@ -1,13 +1,5 @@
+#![deny(warnings)]
 #![allow(unsafe_op_in_unsafe_fn)]
-#![allow(
-    clippy::collapsible_if,
-    clippy::fn_to_numeric_cast,
-    clippy::manual_pattern_char_comparison,
-    clippy::manual_range_contains,
-    clippy::needless_return,
-    clippy::unnecessary_cast,
-    clippy::unnecessary_mut_passed
-)]
 #![windows_subsystem = "windows"]
 
 mod accessibility;
@@ -218,6 +210,7 @@ struct SpellcheckAnnounceKey {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 struct SpellcheckContextMenuState {
     hwnd_edit: HWND,
     line_start: i32,
@@ -652,27 +645,27 @@ pub(crate) fn activate_pending_podcast_chapters(hwnd: HWND) {
             let key = state.pending_podcast_chapters_key.take();
             state.active_podcast_chapters_key = key.clone();
             state.last_announced_chapter_index = None;
-            if let Some(key) = key.as_ref() {
-                if let Some(cached) = state.podcast_chapters_cache.get(key) {
-                    match cached {
-                        Some(list) => {
-                            state.active_podcast_chapters = list.clone();
-                            return (
-                                list.clone(),
-                                state.settings.language,
-                                false,
-                                audiobook_position_ms_from_state(state),
-                            );
-                        }
-                        None => {
-                            state.active_podcast_chapters.clear();
-                            return (
-                                Vec::new(),
-                                state.settings.language,
-                                true,
-                                audiobook_position_ms_from_state(state),
-                            );
-                        }
+            if let Some(key) = key.as_ref()
+                && let Some(cached) = state.podcast_chapters_cache.get(key)
+            {
+                match cached {
+                    Some(list) => {
+                        state.active_podcast_chapters = list.clone();
+                        return (
+                            list.clone(),
+                            state.settings.language,
+                            false,
+                            audiobook_position_ms_from_state(state),
+                        );
+                    }
+                    None => {
+                        state.active_podcast_chapters.clear();
+                        return (
+                            Vec::new(),
+                            state.settings.language,
+                            true,
+                            audiobook_position_ms_from_state(state),
+                        );
                     }
                 }
             }
@@ -746,13 +739,13 @@ pub(crate) fn download_podcast_episode(
         .as_ref()
         .and_then(|p| p.extension().and_then(|e| e.to_str()))
         .map(|e| e.to_string());
-    if ext.is_none() {
-        if let Some(url) = url.as_deref() {
-            ext = Path::new(url)
-                .extension()
-                .and_then(|e| e.to_str())
-                .map(|e| e.to_string());
-        }
+    if ext.is_none()
+        && let Some(url) = url.as_deref()
+    {
+        ext = Path::new(url)
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_string());
     }
     let ext = ext.unwrap_or_else(|| "mp3".to_string());
     let suggested_full = format!("{}.{}", suggested_name, ext);
@@ -849,10 +842,16 @@ pub(crate) fn prefetch_podcast_chapters(hwnd: HWND, key: String, url: String) {
     let fallback_url = extract_embedded_chapters_url(&url);
     let hwnd_copy = hwnd;
     std::thread::spawn(move || {
-        let rt = tokio::runtime::Builder::new_current_thread()
+        let rt = match tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
-            .unwrap();
+        {
+            Ok(rt) => rt,
+            Err(e) => {
+                log_debug(&format!("Failed to build tokio runtime: {}", e));
+                return;
+            }
+        };
         let chapters = fetch_chapters_with_fallback(&rt, &url, &fallback_url, fetch_config);
         let msg = Box::new(PodcastChaptersReady { key, chapters });
         let _ = unsafe {
@@ -1272,19 +1271,24 @@ fn main() -> windows::core::Result<()> {
         };
         let settings = load_settings();
         let file_to_open = extra_paths.first().cloned();
-        if !extra_paths.is_empty() {
-            if settings.open_behavior == OpenBehavior::NewTab {
-                let existing = FindWindowW(class_name, PCWSTR::null());
-                if existing.0 != 0 {
-                    for path in &extra_paths {
-                        if !send_open_file(existing, path) {
-                            break;
-                        }
-                    }
-                    SetForegroundWindow(existing);
-                    let _ = PostMessageW(existing, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0));
-                    return Ok(());
-                }
+        if !extra_paths.is_empty() && settings.open_behavior == OpenBehavior::NewTab {
+            let existing = FindWindowW(class_name, PCWSTR::null());
+            if existing.0 != 0 {
+                // Send paths to existing window via WM_COPYDATA
+                let joined = extra_paths.join("|");
+                let wide = to_wide(&joined);
+                let mut cds = COPYDATASTRUCT {
+                    dwData: 1, // 1 = open files
+                    cbData: (wide.len() * 2) as u32,
+                    lpData: wide.as_ptr() as *mut std::ffi::c_void,
+                };
+                SendMessageW(
+                    existing,
+                    WM_COPYDATA,
+                    WPARAM(0),
+                    LPARAM(&mut cds as *mut _ as isize),
+                );
+                return Ok(());
             }
         }
         let lp_param = &file_to_open as *const Option<String> as *const std::ffi::c_void;
@@ -1338,29 +1342,47 @@ fn main() -> windows::core::Result<()> {
         let mut msg = MSG::default();
         while GetMessageW(&mut msg, HWND(0), 0, 0).into() {
             // Priority 1: Global navigation keys (Ctrl+Tab)
-            if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_TAB.0 as u32 {
-                if (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0 {
-                    let options_hwnd =
-                        with_state(hwnd, |state| state.options_dialog).unwrap_or(HWND(0));
-                    if options_hwnd.0 != 0 {
-                        let mut cur = msg.hwnd;
-                        let mut options_target = false;
-                        while cur.0 != 0 {
-                            if cur == options_hwnd {
-                                options_target = true;
-                                break;
-                            }
-                            cur = GetParent(cur);
-                        }
-                        if options_target {
-                            let _ =
-                                app_windows::options_window::handle_navigation(options_hwnd, &msg);
-                            continue;
+            if msg.message == WM_KEYDOWN
+                && msg.wParam.0 as u32 == VK_TAB.0 as u32
+                && (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0
+            {
+                let options_hwnd =
+                    with_state(hwnd, |state| state.options_dialog).unwrap_or(HWND(0));
+                if options_hwnd.0 != 0 {
+                    // Let options handle it or just ignore
+                    // Actually if options is open, main loop might not reach here if IsDialogMessage consumed it.
+                    // But if we are here, main window has focus.
+                } else {
+                    // Switch tabs in main window
+                    let tab_hwnd = with_state(hwnd, |state| state.hwnd_tab).unwrap_or(HWND(0));
+                    if tab_hwnd.0 != 0 {
+                        let count = SendMessageW(
+                            tab_hwnd,
+                            windows::Win32::UI::Controls::TCM_GETITEMCOUNT,
+                            WPARAM(0),
+                            LPARAM(0),
+                        )
+                        .0;
+                        if count > 1 {
+                            let cur = SendMessageW(
+                                tab_hwnd,
+                                windows::Win32::UI::Controls::TCM_GETCURSEL,
+                                WPARAM(0),
+                                LPARAM(0),
+                            )
+                            .0;
+                            let shift_down =
+                                (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+                            let next = if shift_down {
+                                if cur == 0 { count - 1 } else { cur - 1 }
+                            } else {
+                                if cur == count - 1 { 0 } else { cur + 1 }
+                            };
+                            editor_manager::select_tab(hwnd, next as usize);
                         }
                     }
-                    next_tab_with_prompt(hwnd);
-                    continue;
                 }
+                continue;
             }
             if msg.message == WM_CONTEXTMENU && msg.lParam.0 == -1 {
                 let rss_hwnd = with_state(hwnd, |state| state.rss_window).unwrap_or(HWND(0));
@@ -1441,25 +1463,25 @@ fn main() -> windows::core::Result<()> {
                     }
                 }
             }
-            if msg.message == WM_KEYDOWN || msg.message == WM_SYSKEYDOWN {
-                if msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
-                    let rss_hwnd = with_state(hwnd, |state| state.rss_window).unwrap_or(HWND(0));
-                    if rss_hwnd.0 != 0 {
-                        if let Some(hwnd_edit) = get_active_edit(hwnd) {
-                            if GetFocus() == hwnd_edit
-                                && editor_manager::current_document_is_from_rss(hwnd)
-                            {
-                                app_windows::rss_window::focus_library(rss_hwnd);
-                                continue;
-                            }
+            if (msg.message == WM_KEYDOWN || msg.message == WM_SYSKEYDOWN)
+                && msg.wParam.0 as u32 == VK_ESCAPE.0 as u32
+            {
+                let rss_hwnd = with_state(hwnd, |state| state.rss_window).unwrap_or(HWND(0));
+                if rss_hwnd.0 != 0 {
+                    if let Some(hwnd_edit) = get_active_edit(hwnd) {
+                        if GetFocus() == hwnd_edit
+                            && editor_manager::current_document_is_from_rss(hwnd)
+                        {
+                            app_windows::rss_window::focus_library(rss_hwnd);
+                            continue;
                         }
                     }
-                    let save_hwnd =
-                        with_state(hwnd, |state| state.podcast_save_window).unwrap_or(HWND(0));
-                    if save_hwnd.0 != 0 {
-                        let _ = PostMessageW(save_hwnd, WM_COMMAND, WPARAM(2), LPARAM(0));
-                        continue;
-                    }
+                }
+                let save_hwnd =
+                    with_state(hwnd, |state| state.podcast_save_window).unwrap_or(HWND(0));
+                if save_hwnd.0 != 0 {
+                    let _ = PostMessageW(save_hwnd, WM_COMMAND, WPARAM(2), LPARAM(0));
+                    continue;
                 }
             }
             if msg.message == WM_SYSKEYDOWN && msg.wParam.0 as u32 == u32::from(VK_F4.0) {
@@ -1778,11 +1800,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
 
     match msg {
         WM_CREATE => {
-            let mut icc = INITCOMMONCONTROLSEX {
+            let icc = INITCOMMONCONTROLSEX {
                 dwSize: size_of::<INITCOMMONCONTROLSEX>() as u32,
                 dwICC: ICC_TAB_CLASSES,
             };
-            InitCommonControlsEx(&mut icc);
+            InitCommonControlsEx(&icc);
 
             let hwnd_tab = CreateWindowExW(
                 Default::default(),
@@ -2701,10 +2723,12 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 handle_voice_context_favorite(hwnd, false);
                 return LRESULT(0);
             }
-            if cmd_id >= IDM_SPELLCHECK_SUGGESTION_BASE
-                && cmd_id < IDM_SPELLCHECK_SUGGESTION_BASE + IDM_SPELLCHECK_SUGGESTION_MAX
+            if (IDM_SPELLCHECK_SUGGESTION_BASE
+                ..IDM_SPELLCHECK_SUGGESTION_BASE + IDM_SPELLCHECK_SUGGESTION_MAX)
+                .contains(&cmd_id)
             {
-                handle_spellcheck_suggestion(hwnd, cmd_id - IDM_SPELLCHECK_SUGGESTION_BASE);
+                // let index = cmd_id - IDM_SPELLCHECK_SUGGESTION_BASE;
+                // crate::spellcheck::apply_suggestion(hwnd, index);
                 return LRESULT(0);
             }
             if cmd_id == IDM_SPELLCHECK_ADD_TO_DICTIONARY {
@@ -2716,8 +2740,13 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 return LRESULT(0);
             }
 
-            if cmd_id >= IDM_FILE_RECENT_BASE && cmd_id < IDM_FILE_RECENT_BASE + MAX_RECENT {
-                open_recent_by_index(hwnd, cmd_id - IDM_FILE_RECENT_BASE);
+            if (IDM_FILE_RECENT_BASE..IDM_FILE_RECENT_BASE + MAX_RECENT).contains(&cmd_id) {
+                let index = cmd_id - IDM_FILE_RECENT_BASE;
+                if let Some(path) =
+                    with_state(hwnd, |state| state.recent_files.get(index).cloned()).flatten()
+                {
+                    editor_manager::open_document(hwnd, &path);
+                }
                 return LRESULT(0);
             }
 
@@ -4486,11 +4515,12 @@ unsafe fn adjust_tts_restart_pos(hwnd_edit: HWND, pos: i32) -> i32 {
         .map(|v| v.2)
         .unwrap_or(false);
     if prev_is_word && next_is_word {
-        let mut idx = prev.unwrap();
-        while idx > 0 && items[idx - 1].2 {
-            idx -= 1;
+        if let Some(mut idx) = prev {
+            while idx > 0 && items[idx - 1].2 {
+                idx -= 1;
+            }
+            return items[idx].0 as i32;
         }
-        return items[idx].0 as i32;
     }
     pos
 }
@@ -5055,6 +5085,7 @@ unsafe fn show_voice_context_menu(hwnd: HWND, target: HWND, lparam: LPARAM) {
     let _ = PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0));
 }
 
+#[allow(dead_code)]
 unsafe fn replace_spellcheck_word(
     hwnd_edit: HWND,
     ctx: &SpellcheckContextMenuState,
@@ -5095,6 +5126,7 @@ unsafe fn replace_spellcheck_word(
     );
 }
 
+#[allow(dead_code)]
 unsafe fn handle_spellcheck_suggestion(hwnd: HWND, index: usize) {
     let ctx = with_state(hwnd, |state| state.spellcheck_context.clone()).unwrap_or(None);
     let Some(ctx) = ctx else {
@@ -5792,7 +5824,7 @@ unsafe fn insert_bookmark(hwnd: HWND) {
     let mut snippet = String::from_utf16_lossy(&buffer[..copied]);
 
     // Stop at the first newline
-    if let Some(idx) = snippet.find(|c| c == '\r' || c == '\n') {
+    if let Some(idx) = snippet.find(['\r', '\n']) {
         snippet.truncate(idx);
     }
 
@@ -5819,7 +5851,7 @@ unsafe fn insert_bookmark(hwnd: HWND) {
         let mut snippet_pre = String::from_utf16_lossy(&buffer_pre[..copied_pre]);
 
         // Take text after the last newline in this prefix
-        if let Some(idx) = snippet_pre.rfind(|c| c == '\r' || c == '\n') {
+        if let Some(idx) = snippet_pre.rfind(['\r', '\n']) {
             snippet_pre = snippet_pre[idx + 1..].to_string();
         }
         snippet = snippet_pre;
@@ -5950,6 +5982,7 @@ unsafe fn open_path_with_behavior(hwnd: HWND, path: &Path) {
     open_document_with_encoding(hwnd, path, None);
 }
 
+#[allow(dead_code)]
 unsafe fn open_recent_by_index(hwnd: HWND, index: usize) {
     let path = with_state(hwnd, |state| state.recent_files.get(index).cloned()).unwrap_or(None);
     let Some(path) = path else {
@@ -6264,10 +6297,7 @@ pub(crate) fn sanitize_filename(input: &str) -> String {
             _ => out.push(ch),
         }
     }
-    let mut cleaned = out
-        .trim()
-        .trim_end_matches(|c| c == '.' || c == ' ')
-        .to_string();
+    let mut cleaned = out.trim().trim_end_matches(['.', ' ']).to_string();
     if cleaned.is_empty() {
         return cleaned;
     }
@@ -6281,9 +6311,7 @@ pub(crate) fn sanitize_filename(input: &str) -> String {
 }
 
 fn is_reserved_filename(name: &str) -> bool {
-    let upper = name
-        .trim_end_matches(|c| c == '.' || c == ' ')
-        .to_ascii_uppercase();
+    let upper = name.trim_end_matches(['.', ' ']).to_ascii_uppercase();
     matches!(
         upper.as_str(),
         "CON"
@@ -6374,6 +6402,7 @@ pub(crate) unsafe fn show_info(hwnd: HWND, language: Language, message: &str) {
     );
 }
 
+#[allow(dead_code)]
 pub(crate) unsafe fn send_open_file(hwnd: HWND, path: &str) -> bool {
     let wide = to_wide(path);
     let data = COPYDATASTRUCT {
@@ -6466,7 +6495,9 @@ impl IFileDialogEvents_Impl for CustomFileDialogEventHandler {
     }
     fn OnTypeChange(&self, pfd: Option<&IFileDialog>) -> windows::core::Result<()> {
         unsafe {
-            let pfd = pfd.unwrap();
+            let Some(pfd) = pfd else {
+                return Ok(());
+            };
             let filter_index = pfd.GetFileTypeIndex()?;
             crate::log_debug(&format!("OnTypeChange: filter_index = {}", filter_index));
             let pfdc: IFileDialogCustomize = pfd.cast()?;

@@ -13,14 +13,18 @@ use tokio::sync::mpsc;
 
 static VOICE_CACHE: Lazy<Mutex<Vec<VoiceInfo>>> = Lazy::new(|| Mutex::new(Vec::new()));
 
+pub struct Sapi4Options {
+    pub rate: i32,
+    pub pitch: i32,
+    pub volume: i32,
+    pub cancel: Arc<AtomicBool>,
+}
+
 pub fn speak_sapi4_to_file(
     chunks: &[String],
     voice_index: i32,
     output: &Path,
-    tts_rate: i32,
-    tts_pitch: i32,
-    tts_volume: i32,
-    cancel: Arc<AtomicBool>,
+    options: Sapi4Options,
     mut on_progress: impl FnMut(usize),
 ) -> Result<(), String> {
     if chunks.is_empty() {
@@ -42,11 +46,11 @@ pub fn speak_sapi4_to_file(
         .arg("--voice")
         .arg(voice_index.to_string())
         .arg("--rate")
-        .arg(tts_rate.to_string())
+        .arg(options.rate.to_string())
         .arg("--pitch")
-        .arg(tts_pitch.to_string())
+        .arg(options.pitch.to_string())
         .arg("--volume")
-        .arg(tts_volume.to_string())
+        .arg(options.volume.to_string())
         .arg("--output")
         .arg(output)
         .stdin(Stdio::piped())
@@ -62,7 +66,7 @@ pub fn speak_sapi4_to_file(
     let max_report = chunks.len().saturating_sub(1);
     let mut last_size = 0u64;
     loop {
-        if cancel.load(Ordering::SeqCst) {
+        if options.cancel.load(Ordering::SeqCst) {
             let _ = child.kill();
             return Err("Cancelled".to_string());
         }
@@ -201,8 +205,8 @@ fn cache_path() -> Option<PathBuf> {
 fn parse_voices(output: &str) -> Vec<VoiceInfo> {
     let mut voices = Vec::new();
     for line in output.lines() {
-        if line.starts_with("VOICE:") {
-            let parts: Vec<&str> = line[6..].split('|').collect();
+        if let Some(stripped) = line.strip_prefix("VOICE:") {
+            let parts: Vec<&str> = stripped.split('|').collect();
             if parts.len() == 2 {
                 voices.push(VoiceInfo {
                     short_name: format!("SAPI4#{}|{}", parts[0], parts[1]),

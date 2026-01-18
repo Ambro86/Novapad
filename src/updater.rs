@@ -1,4 +1,3 @@
-#![allow(clippy::io_other_error)]
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};

@@ -143,10 +143,13 @@ pub fn decode_text_with_encoding(
 }
 
 pub fn decode_text(bytes: &[u8], language: Language) -> Result<(String, TextEncoding), String> {
-    if bytes.len() >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF {
-        if let Ok(text) = String::from_utf8(bytes[3..].to_vec()) {
-            return Ok((text, TextEncoding::Utf8Bom));
-        }
+    if bytes.len() >= 3
+        && bytes[0] == 0xEF
+        && bytes[1] == 0xBB
+        && bytes[2] == 0xBF
+        && let Ok(text) = String::from_utf8(bytes[3..].to_vec())
+    {
+        return Ok((text, TextEncoding::Utf8Bom));
     }
 
     if bytes.len() >= 2 {
@@ -481,10 +484,8 @@ fn extract_pptx_slide_text(xml: &str) -> String {
                 }
             }
             Ok(Event::End(e)) => {
-                if e.name().as_ref() == b"a:p" && paragraph_has_text {
-                    if !out.ends_with('\n') {
-                        out.push('\n');
-                    }
+                if e.name().as_ref() == b"a:p" && paragraph_has_text && !out.ends_with('\n') {
+                    out.push('\n');
                 }
             }
             Ok(Event::Empty(e)) => {
@@ -499,11 +500,11 @@ fn extract_pptx_slide_text(xml: &str) -> String {
                 }
             }
             Ok(Event::Text(e)) => {
-                if let Ok(text) = e.unescape() {
-                    if !text.is_empty() {
-                        out.push_str(&text);
-                        paragraph_has_text = true;
-                    }
+                if let Ok(text) = e.unescape()
+                    && !text.is_empty()
+                {
+                    out.push_str(&text);
+                    paragraph_has_text = true;
                 }
             }
             Ok(Event::CData(e)) => {
@@ -612,11 +613,11 @@ fn html_to_text(html: &str) -> String {
                         | "h4"
                         | "h5"
                         | "h6"
-                ) {
-                    if !last_newline && !out.is_empty() {
-                        out.push('\n');
-                        last_newline = true;
-                    }
+                ) && !last_newline
+                    && !out.is_empty()
+                {
+                    out.push('\n');
+                    last_newline = true;
                 }
                 tag.clear();
             } else {
@@ -1082,7 +1083,7 @@ pub fn extract_rtf_text(bytes: &[u8]) -> String {
                         emit_char(
                             &mut out,
                             &mut skip_output,
-                            *group_stack.last().unwrap(),
+                            *group_stack.last().unwrap_or(&false),
                             bytes[i] as char,
                         );
                         i += 1;
@@ -1091,7 +1092,7 @@ pub fn extract_rtf_text(bytes: &[u8]) -> String {
                         emit_char(
                             &mut out,
                             &mut skip_output,
-                            *group_stack.last().unwrap(),
+                            *group_stack.last().unwrap_or(&false),
                             ' ',
                         );
                         i += 1;
@@ -1100,7 +1101,7 @@ pub fn extract_rtf_text(bytes: &[u8]) -> String {
                         emit_char(
                             &mut out,
                             &mut skip_output,
-                            *group_stack.last().unwrap(),
+                            *group_stack.last().unwrap_or(&false),
                             '-',
                         );
                         i += 1;
@@ -1122,7 +1123,7 @@ pub fn extract_rtf_text(bytes: &[u8]) -> String {
                                 emit_str(
                                     &mut out,
                                     &mut skip_output,
-                                    *group_stack.last().unwrap(),
+                                    *group_stack.last().unwrap_or(&false),
                                     &decoded,
                                 );
                                 i += 3;
@@ -1159,31 +1160,31 @@ pub fn extract_rtf_text(bytes: &[u8]) -> String {
                             "par" | "line" => emit_char(
                                 &mut out,
                                 &mut skip_output,
-                                *group_stack.last().unwrap(),
+                                *group_stack.last().unwrap_or(&false),
                                 '\n',
                             ),
                             "tab" => emit_char(
                                 &mut out,
                                 &mut skip_output,
-                                *group_stack.last().unwrap(),
+                                *group_stack.last().unwrap_or(&false),
                                 '\t',
                             ),
                             "emdash" => emit_str(
                                 &mut out,
                                 &mut skip_output,
-                                *group_stack.last().unwrap(),
+                                *group_stack.last().unwrap_or(&false),
                                 "--",
                             ),
                             "endash" => emit_char(
                                 &mut out,
                                 &mut skip_output,
-                                *group_stack.last().unwrap(),
+                                *group_stack.last().unwrap_or(&false),
                                 '-',
                             ),
                             "bullet" => emit_char(
                                 &mut out,
                                 &mut skip_output,
-                                *group_stack.last().unwrap(),
+                                *group_stack.last().unwrap_or(&false),
                                 '*',
                             ),
                             "u" => {
@@ -1196,7 +1197,7 @@ pub fn extract_rtf_text(bytes: &[u8]) -> String {
                                         emit_char(
                                             &mut out,
                                             &mut skip_output,
-                                            *group_stack.last().unwrap(),
+                                            *group_stack.last().unwrap_or(&false),
                                             ch,
                                         );
                                     }
@@ -1241,14 +1242,14 @@ pub fn extract_rtf_text(bytes: &[u8]) -> String {
                     emit_str(
                         &mut out,
                         &mut skip_output,
-                        *group_stack.last().unwrap(),
+                        *group_stack.last().unwrap_or(&false),
                         &decoded,
                     );
                 } else {
                     emit_char(
                         &mut out,
                         &mut skip_output,
-                        *group_stack.last().unwrap(),
+                        *group_stack.last().unwrap_or(&false),
                         b as char,
                     );
                 }

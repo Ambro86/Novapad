@@ -32,11 +32,11 @@ fn simple_hash(data: &[u8]) -> u64 {
 fn write_if_changed(path: &PathBuf, data: &[u8]) -> std::io::Result<bool> {
     if path.exists() {
         // Controlla dimensione come quick check
-        if let Ok(metadata) = fs::metadata(path) {
-            if metadata.len() == data.len() as u64 {
-                // Stessa dimensione, probabilmente uguale - skip
-                return Ok(false);
-            }
+        if let Ok(metadata) = fs::metadata(path)
+            && metadata.len() == data.len() as u64
+        {
+            // Stessa dimensione, probabilmente uguale - skip
+            return Ok(false);
         }
     }
 

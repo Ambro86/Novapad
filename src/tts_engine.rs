@@ -1,11 +1,3 @@
-#![allow(
-    clippy::collapsible_if,
-    clippy::manual_div_ceil,
-    clippy::manual_inspect,
-    clippy::manual_repeat_n,
-    clippy::collapsible_str_replace,
-    clippy::too_many_arguments
-)]
 use crate::editor_manager::get_edit_text;
 use crate::i18n;
 use crate::settings;
@@ -63,6 +55,39 @@ pub struct TtsSession {
 pub struct TtsChunk {
     pub text_to_read: String,
     pub original_len: usize,
+}
+
+pub struct TtsPlaybackOptions {
+    pub hwnd: HWND,
+    pub cleaned: String,
+    pub voice: String,
+    pub chunks: Vec<TtsChunk>,
+    pub initial_caret_pos: i32,
+    pub rate: i32,
+    pub pitch: i32,
+    pub volume: i32,
+}
+
+pub struct AudiobookCommonOptions<'a> {
+    pub voice: &'a str,
+    pub output: &'a Path,
+    pub progress_hwnd: HWND,
+    pub cancel: Arc<AtomicBool>,
+    pub language: Language,
+    pub rate: i32,
+    pub pitch: i32,
+    pub volume: i32,
+}
+
+pub struct DownloadChunkOptions<'a> {
+    pub text: &'a str,
+    pub voice: &'a str,
+    pub request_id: &'a str,
+    pub rate: i32,
+    pub pitch: i32,
+    pub volume: i32,
+    pub language: Language,
+    pub cancel: &'a AtomicBool,
 }
 
 fn cancelled_message(language: Language) -> String {
@@ -134,16 +159,16 @@ pub fn start_tts_from_caret(hwnd: HWND) {
     let chunks = split_into_tts_chunks(&text, split_on_newline, &dictionary);
 
     match tts_engine {
-        TtsEngine::Edge => start_tts_playback_with_chunks(
+        TtsEngine::Edge => start_tts_playback_with_chunks(TtsPlaybackOptions {
             hwnd,
-            text,
+            cleaned: text,
             voice,
             chunks,
             initial_caret_pos,
-            tts_rate,
-            tts_pitch,
-            tts_volume,
-        ),
+            rate: tts_rate,
+            pitch: tts_pitch,
+            volume: tts_volume,
+        }),
         TtsEngine::Sapi4 => {
             stop_tts_playback(hwnd);
             let voice_idx = if let Some(hash_pos) = voice.find("#") {
@@ -264,28 +289,20 @@ fn handle_tts_command(
     }
 }
 
-pub fn start_tts_playback_with_chunks(
-    hwnd: HWND,
-    cleaned: String,
-    voice: String,
-    chunks: Vec<TtsChunk>,
-    initial_caret_pos: i32,
-    tts_rate: i32,
-    tts_pitch: i32,
-    tts_volume: i32,
-) {
-    stop_tts_playback(hwnd);
+pub fn start_tts_playback_with_chunks(options: TtsPlaybackOptions) {
+    stop_tts_playback(options.hwnd);
     prevent_sleep(true);
-    if chunks.is_empty() {
+    if options.chunks.is_empty() {
         return;
     }
 
-    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+    let language =
+        unsafe { with_state(options.hwnd, |state| state.settings.language) }.unwrap_or_default();
     let (tx, mut rx) = mpsc::unbounded_channel::<TtsCommand>();
     let cancel = Arc::new(AtomicBool::new(false));
     let cancel_flag = cancel.clone();
     let session_id = unsafe {
-        with_state(hwnd, |state| {
+        with_state(options.hwnd, |state| {
             let id = state.tts_next_session_id;
             state.tts_next_session_id = state.tts_next_session_id.saturating_add(1);
             state.tts_session = Some(TtsSession {
@@ -293,13 +310,20 @@ pub fn start_tts_playback_with_chunks(
                 command_tx: tx.clone(),
                 cancel: cancel.clone(),
                 paused: false,
-                initial_caret_pos,
+                initial_caret_pos: options.initial_caret_pos,
             });
             id
         })
         .unwrap_or(0)
     };
-    let hwnd_copy = hwnd;
+    let hwnd_copy = options.hwnd;
+    let chunks = options.chunks;
+    let cleaned = options.cleaned;
+    let voice = options.voice;
+    let tts_rate = options.rate;
+    let tts_pitch = options.pitch;
+    let tts_volume = options.volume;
+
     std::thread::spawn(move || {
         log_debug(&format!(
             "TTS start: voice={voice} chunks={} text_len={}",
@@ -539,30 +563,30 @@ async fn wait_or_cancel(duration: Duration, cancel: &AtomicBool) -> bool {
 }
 
 pub async fn download_audio_chunk_cancel(
-    text: &str,
-    voice: &str,
-    request_id: &str,
-    tts_rate: i32,
-    tts_pitch: i32,
-    tts_volume: i32,
-    language: Language,
-    cancel: &AtomicBool,
+    options: DownloadChunkOptions<'_>,
 ) -> Result<Vec<u8>, String> {
     let max_retries = 40;
     let mut last_error = String::new();
 
     for attempt in 1..=max_retries {
-        if cancel.load(Ordering::Relaxed) {
-            return Err(cancelled_message(language));
+        if options.cancel.load(Ordering::Relaxed) {
+            return Err(cancelled_message(options.language));
         }
-        match download_audio_chunk_attempt(text, voice, request_id, tts_rate, tts_pitch, tts_volume)
-            .await
+        match download_audio_chunk_attempt(
+            options.text,
+            options.voice,
+            options.request_id,
+            options.rate,
+            options.pitch,
+            options.volume,
+        )
+        .await
         {
             Ok(data) => return Ok(data),
             Err(e) => {
                 last_error = e;
                 let msg = i18n::tr_f(
-                    language,
+                    options.language,
                     "tts.chunk_download_retry",
                     &[
                         ("attempt", &attempt.to_string()),
@@ -572,15 +596,17 @@ pub async fn download_audio_chunk_cancel(
                 );
                 log_debug(&msg);
                 if attempt < max_retries {
-                    if wait_or_cancel(Duration::from_millis(500 * attempt as u64), cancel).await {
-                        return Err(cancelled_message(language));
+                    if wait_or_cancel(Duration::from_millis(500 * attempt as u64), options.cancel)
+                        .await
+                    {
+                        return Err(cancelled_message(options.language));
                     }
                 }
             }
         }
     }
     Err(i18n::tr_f(
-        language,
+        options.language,
         "tts.chunk_download_error",
         &[("err", &last_error)],
     ))
@@ -1331,90 +1357,38 @@ pub fn start_audiobook(hwnd: HWND) {
 
     let cancel_clone = cancel_token.clone();
     std::thread::spawn(move || {
+        let options = AudiobookCommonOptions {
+            voice: &voice,
+            output: &output,
+            progress_hwnd,
+            cancel: cancel_clone,
+            language,
+            rate: tts_rate,
+            pitch: tts_pitch,
+            volume: tts_volume,
+        };
+
         let result = match tts_engine {
             TtsEngine::Edge => {
                 if let Some(parts) = marker_parts {
-                    run_marker_split_audiobook(
-                        &parts,
-                        &voice,
-                        &output,
-                        progress_hwnd,
-                        cancel_clone,
-                        language,
-                        tts_rate,
-                        tts_pitch,
-                        tts_volume,
-                    )
+                    run_marker_split_audiobook(&parts, options)
                 } else {
-                    run_split_audiobook(
-                        &chunks,
-                        &voice,
-                        &output,
-                        split_parts,
-                        progress_hwnd,
-                        cancel_clone,
-                        language,
-                        tts_rate,
-                        tts_pitch,
-                        tts_volume,
-                    )
+                    run_split_audiobook(&chunks, split_parts, options)
                 }
             }
             TtsEngine::Sapi4 => {
                 let voice_idx = parse_sapi4_voice_index(&voice);
                 if let Some(parts) = marker_parts {
-                    run_marker_split_sapi4_audiobook(
-                        &parts,
-                        voice_idx,
-                        &output,
-                        progress_hwnd,
-                        cancel_clone,
-                        language,
-                        tts_rate,
-                        tts_pitch,
-                        tts_volume,
-                    )
+                    run_marker_split_sapi4_audiobook(&parts, voice_idx, options)
                 } else {
-                    run_split_sapi4_audiobook(
-                        &chunks,
-                        voice_idx,
-                        &output,
-                        split_parts,
-                        progress_hwnd,
-                        cancel_clone,
-                        language,
-                        tts_rate,
-                        tts_pitch,
-                        tts_volume,
-                    )
+                    run_split_sapi4_audiobook(&chunks, voice_idx, split_parts, options)
                 }
             }
             TtsEngine::Sapi5 => {
                 if let Some(parts) = marker_parts {
-                    run_marker_split_sapi_audiobook(
-                        &parts,
-                        &voice,
-                        &output,
-                        progress_hwnd,
-                        cancel_clone,
-                        language,
-                        tts_rate,
-                        tts_pitch,
-                        tts_volume,
-                    )
+                    run_marker_split_sapi_audiobook(&parts, options)
                 } else {
-                    run_split_sapi_audiobook(
-                        &chunks,
-                        &voice,
-                        &output,
-                        split_parts,
-                        progress_hwnd,
-                        cancel_clone,
-                        language,
-                        tts_rate,
-                        tts_pitch,
-                        tts_volume,
-                    )
+                    run_split_sapi_audiobook(&chunks, split_parts, options)
                 }
             }
         };
@@ -1450,15 +1424,8 @@ fn parse_sapi4_voice_index(voice: &str) -> i32 {
 
 fn run_split_audiobook(
     chunks: &[String],
-    voice: &str,
-    output: &Path,
     split_parts: u32,
-    progress_hwnd: HWND,
-    cancel: Arc<AtomicBool>,
-    language: Language,
-    tts_rate: i32,
-    tts_pitch: i32,
-    tts_volume: i32,
+    options: AudiobookCommonOptions,
 ) -> Result<(), String> {
     let parts = if split_parts == 0 {
         1
@@ -1473,7 +1440,7 @@ fn run_split_audiobook(
     } else {
         parts
     };
-    let chunks_per_part = (total_chunks + parts - 1) / parts; // Ceiling division
+    let chunks_per_part = total_chunks.div_ceil(parts);
 
     let mut current_global_progress = 0;
 
@@ -1487,42 +1454,43 @@ fn run_split_audiobook(
         let part_chunks = &chunks[start_idx..end_idx];
 
         let part_output = if parts > 1 {
-            let stem = output
+            let stem = options
+                .output
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("audiobook");
-            let ext = output.extension().and_then(|s| s.to_str()).unwrap_or("mp3");
-            output.with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
+            let ext = options
+                .output
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or("mp3");
+            options
+                .output
+                .with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
         } else {
-            output.to_path_buf()
+            options.output.to_path_buf()
         };
 
-        run_tts_audiobook_part(
-            part_chunks,
-            voice,
-            &part_output,
-            progress_hwnd,
-            cancel.clone(),
-            &mut current_global_progress,
-            language,
-            tts_rate,
-            tts_pitch,
-            tts_volume,
-        )?;
+        // Create a temporary options struct with the correct output path for this part
+        let part_options = AudiobookCommonOptions {
+            voice: options.voice,
+            output: &part_output,
+            progress_hwnd: options.progress_hwnd,
+            cancel: options.cancel.clone(),
+            language: options.language,
+            rate: options.rate,
+            pitch: options.pitch,
+            volume: options.volume,
+        };
+
+        run_tts_audiobook_part(part_chunks, &mut current_global_progress, &part_options)?;
     }
     Ok(())
 }
 
 fn run_marker_split_audiobook(
     parts: &[Vec<String>],
-    voice: &str,
-    output: &Path,
-    progress_hwnd: HWND,
-    cancel: Arc<AtomicBool>,
-    language: Language,
-    tts_rate: i32,
-    tts_pitch: i32,
-    tts_volume: i32,
+    options: AudiobookCommonOptions,
 ) -> Result<(), String> {
     let parts_len = parts.len();
     let mut current_global_progress = 0;
@@ -1532,28 +1500,35 @@ fn run_marker_split_audiobook(
             continue;
         }
         let part_output = if parts_len > 1 {
-            let stem = output
+            let stem = options
+                .output
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("audiobook");
-            let ext = output.extension().and_then(|s| s.to_str()).unwrap_or("mp3");
-            output.with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
+            let ext = options
+                .output
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or("mp3");
+            options
+                .output
+                .with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
         } else {
-            output.to_path_buf()
+            options.output.to_path_buf()
         };
 
-        run_tts_audiobook_part(
-            part_chunks,
-            voice,
-            &part_output,
-            progress_hwnd,
-            cancel.clone(),
-            &mut current_global_progress,
-            language,
-            tts_rate,
-            tts_pitch,
-            tts_volume,
-        )?;
+        let part_options = AudiobookCommonOptions {
+            voice: options.voice,
+            output: &part_output,
+            progress_hwnd: options.progress_hwnd,
+            cancel: options.cancel.clone(),
+            language: options.language,
+            rate: options.rate,
+            pitch: options.pitch,
+            volume: options.volume,
+        };
+
+        run_tts_audiobook_part(part_chunks, &mut current_global_progress, &part_options)?;
     }
     Ok(())
 }
@@ -1561,14 +1536,8 @@ fn run_marker_split_audiobook(
 fn run_split_sapi4_audiobook(
     chunks: &[String],
     voice_idx: i32,
-    output: &Path,
     split_parts: u32,
-    progress_hwnd: HWND,
-    cancel: Arc<AtomicBool>,
-    language: Language,
-    tts_rate: i32,
-    tts_pitch: i32,
-    tts_volume: i32,
+    options: AudiobookCommonOptions,
 ) -> Result<(), String> {
     let parts = if split_parts == 0 {
         1
@@ -1581,7 +1550,7 @@ fn run_split_sapi4_audiobook(
     } else {
         parts
     };
-    let chunks_per_part = (total_chunks + parts - 1) / parts;
+    let chunks_per_part = total_chunks.div_ceil(parts);
     let mut current_global_progress = 0;
 
     for part_idx in 0..parts {
@@ -1593,27 +1562,36 @@ fn run_split_sapi4_audiobook(
 
         let part_chunks = &chunks[start_idx..end_idx];
         let part_output = if parts > 1 {
-            let stem = output
+            let stem = options
+                .output
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("audiobook");
-            let ext = output.extension().and_then(|s| s.to_str()).unwrap_or("mp3");
-            output.with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
+            let ext = options
+                .output
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or("mp3");
+            options
+                .output
+                .with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
         } else {
-            output.to_path_buf()
+            options.output.to_path_buf()
         };
 
-        let progress_hwnd_clone = progress_hwnd;
-        let cancel_clone = cancel.clone();
+        let progress_hwnd_clone = options.progress_hwnd;
+        let cancel_clone = options.cancel.clone();
 
         crate::sapi4_engine::speak_sapi4_to_file(
             part_chunks,
             voice_idx,
             &part_output,
-            tts_rate,
-            tts_pitch,
-            tts_volume,
-            cancel_clone,
+            crate::sapi4_engine::Sapi4Options {
+                rate: options.rate,
+                pitch: options.pitch,
+                volume: options.volume,
+                cancel: cancel_clone,
+            },
             |_chunk_idx| {
                 current_global_progress += 1;
                 if progress_hwnd_clone.0 != 0 {
@@ -1631,7 +1609,7 @@ fn run_split_sapi4_audiobook(
         .map_err(|e| {
             let _ = std::fs::remove_file(&part_output);
             if e == "Cancelled" {
-                cancelled_message(language)
+                cancelled_message(options.language)
             } else {
                 e
             }
@@ -1643,13 +1621,7 @@ fn run_split_sapi4_audiobook(
 fn run_marker_split_sapi4_audiobook(
     parts: &[Vec<String>],
     voice_idx: i32,
-    output: &Path,
-    progress_hwnd: HWND,
-    cancel: Arc<AtomicBool>,
-    language: Language,
-    tts_rate: i32,
-    tts_pitch: i32,
-    tts_volume: i32,
+    options: AudiobookCommonOptions,
 ) -> Result<(), String> {
     let parts_len = parts.len();
     let mut current_global_progress = 0;
@@ -1659,27 +1631,36 @@ fn run_marker_split_sapi4_audiobook(
             continue;
         }
         let part_output = if parts_len > 1 {
-            let stem = output
+            let stem = options
+                .output
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("audiobook");
-            let ext = output.extension().and_then(|s| s.to_str()).unwrap_or("mp3");
-            output.with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
+            let ext = options
+                .output
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or("mp3");
+            options
+                .output
+                .with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
         } else {
-            output.to_path_buf()
+            options.output.to_path_buf()
         };
 
-        let progress_hwnd_clone = progress_hwnd;
-        let cancel_clone = cancel.clone();
+        let progress_hwnd_clone = options.progress_hwnd;
+        let cancel_clone = options.cancel.clone();
 
         crate::sapi4_engine::speak_sapi4_to_file(
             part_chunks,
             voice_idx,
             &part_output,
-            tts_rate,
-            tts_pitch,
-            tts_volume,
-            cancel_clone,
+            crate::sapi4_engine::Sapi4Options {
+                rate: options.rate,
+                pitch: options.pitch,
+                volume: options.volume,
+                cancel: cancel_clone,
+            },
             |_chunk_idx| {
                 current_global_progress += 1;
                 if progress_hwnd_clone.0 != 0 {
@@ -1697,7 +1678,7 @@ fn run_marker_split_sapi4_audiobook(
         .map_err(|e| {
             let _ = std::fs::remove_file(&part_output);
             if e == "Cancelled" {
-                cancelled_message(language)
+                cancelled_message(options.language)
             } else {
                 e
             }
@@ -1708,15 +1689,8 @@ fn run_marker_split_sapi4_audiobook(
 
 fn run_split_sapi_audiobook(
     chunks: &[String],
-    voice: &str,
-    output: &Path,
     split_parts: u32,
-    progress_hwnd: HWND,
-    cancel: Arc<AtomicBool>,
-    language: Language,
-    tts_rate: i32,
-    tts_pitch: i32,
-    tts_volume: i32,
+    options: AudiobookCommonOptions,
 ) -> Result<(), String> {
     let parts = if split_parts == 0 {
         1
@@ -1729,7 +1703,7 @@ fn run_split_sapi_audiobook(
     } else {
         parts
     };
-    let chunks_per_part = (total_chunks + parts - 1) / parts;
+    let chunks_per_part = total_chunks.div_ceil(parts);
     let mut current_global_progress = 0;
 
     for part_idx in 0..parts {
@@ -1742,28 +1716,37 @@ fn run_split_sapi_audiobook(
         let part_chunks = &chunks[start_idx..end_idx];
 
         let part_output = if parts > 1 {
-            let stem = output
+            let stem = options
+                .output
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("audiobook");
-            let ext = output.extension().and_then(|s| s.to_str()).unwrap_or("mp3");
-            output.with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
+            let ext = options
+                .output
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or("mp3");
+            options
+                .output
+                .with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
         } else {
-            output.to_path_buf()
+            options.output.to_path_buf()
         };
 
-        let progress_hwnd_clone = progress_hwnd;
-        let cancel_clone = cancel.clone();
+        let progress_hwnd_clone = options.progress_hwnd;
+        let cancel_clone = options.cancel.clone();
 
         crate::sapi5_engine::speak_sapi_to_file(
-            part_chunks,
-            voice,
-            &part_output,
-            language,
-            tts_rate,
-            tts_pitch,
-            tts_volume,
-            cancel_clone,
+            crate::sapi5_engine::SapiExportOptions {
+                chunks: part_chunks,
+                voice_name: options.voice,
+                output_path: &part_output,
+                language: options.language,
+                rate: options.rate,
+                pitch: options.pitch,
+                volume: options.volume,
+                cancel: cancel_clone,
+            },
             |_chunk_idx| {
                 current_global_progress += 1;
                 if progress_hwnd_clone.0 != 0 {
@@ -1788,14 +1771,7 @@ fn run_split_sapi_audiobook(
 
 fn run_marker_split_sapi_audiobook(
     parts: &[Vec<String>],
-    voice: &str,
-    output: &Path,
-    progress_hwnd: HWND,
-    cancel: Arc<AtomicBool>,
-    language: Language,
-    tts_rate: i32,
-    tts_pitch: i32,
-    tts_volume: i32,
+    options: AudiobookCommonOptions,
 ) -> Result<(), String> {
     let parts_len = parts.len();
     let mut current_global_progress = 0;
@@ -1805,28 +1781,37 @@ fn run_marker_split_sapi_audiobook(
             continue;
         }
         let part_output = if parts_len > 1 {
-            let stem = output
+            let stem = options
+                .output
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("audiobook");
-            let ext = output.extension().and_then(|s| s.to_str()).unwrap_or("mp3");
-            output.with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
+            let ext = options
+                .output
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or("mp3");
+            options
+                .output
+                .with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
         } else {
-            output.to_path_buf()
+            options.output.to_path_buf()
         };
 
-        let progress_hwnd_clone = progress_hwnd;
-        let cancel_clone = cancel.clone();
+        let progress_hwnd_clone = options.progress_hwnd;
+        let cancel_clone = options.cancel.clone();
 
         crate::sapi5_engine::speak_sapi_to_file(
-            part_chunks,
-            voice,
-            &part_output,
-            language,
-            tts_rate,
-            tts_pitch,
-            tts_volume,
-            cancel_clone,
+            crate::sapi5_engine::SapiExportOptions {
+                chunks: part_chunks,
+                voice_name: options.voice,
+                output_path: &part_output,
+                language: options.language,
+                rate: options.rate,
+                pitch: options.pitch,
+                volume: options.volume,
+                cancel: cancel_clone,
+            },
             |_chunk_idx| {
                 current_global_progress += 1;
                 if progress_hwnd_clone.0 != 0 {
@@ -1851,17 +1836,10 @@ fn run_marker_split_sapi_audiobook(
 
 pub(crate) fn run_tts_audiobook_part(
     chunks: &[String],
-    voice: &str,
-    output: &Path,
-    progress_hwnd: HWND,
-    cancel: Arc<AtomicBool>,
     current_global_progress: &mut usize,
-    language: Language,
-    tts_rate: i32,
-    tts_pitch: i32,
-    tts_volume: i32,
+    options: &AudiobookCommonOptions,
 ) -> Result<(), String> {
-    let file = std::fs::File::create(output).map_err(|err| err.to_string())?;
+    let file = std::fs::File::create(options.output).map_err(|err| err.to_string())?;
     let mut writer = BufWriter::new(file);
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -1871,24 +1849,28 @@ pub(crate) fn run_tts_audiobook_part(
     rt.block_on(async {
         let tasks = chunks.iter().enumerate().map(|(i, chunk)| {
             let chunk = chunk.clone();
-            let voice = voice.to_string();
-            let cancel = cancel.clone();
+            let voice = options.voice.to_string();
+            let cancel = options.cancel.clone();
+            let lang = options.language;
+            let rate = options.rate;
+            let pitch = options.pitch;
+            let volume = options.volume;
             async move {
                 let request_id = Uuid::new_v4().simple().to_string();
                 loop {
                     if cancel.load(Ordering::Relaxed) {
                         return Err("Cancelled".to_string());
                     }
-                    match download_audio_chunk_cancel(
-                        &chunk,
-                        &voice,
-                        &request_id,
-                        tts_rate,
-                        tts_pitch,
-                        tts_volume,
-                        language,
-                        cancel.as_ref(),
-                    )
+                    match download_audio_chunk_cancel(DownloadChunkOptions {
+                        text: &chunk,
+                        voice: &voice,
+                        request_id: &request_id,
+                        rate,
+                        pitch,
+                        volume,
+                        language: lang,
+                        cancel: cancel.as_ref(),
+                    })
                     .await
                     {
                         Ok(data) => return Ok::<Vec<u8>, String>(data),
@@ -1897,7 +1879,7 @@ pub(crate) fn run_tts_audiobook_part(
                                 return Err("Cancelled".to_string());
                             }
                             let msg = i18n::tr_f(
-                                language,
+                                lang,
                                 "tts.chunk_download_retry_wait",
                                 &[("index", &(i + 1).to_string()), ("err", &err)],
                             );
@@ -1922,24 +1904,24 @@ pub(crate) fn run_tts_audiobook_part(
         let mut stream = futures_util::stream::iter(tasks).buffered(30);
 
         while let Some(result) = stream.next().await {
-            if cancel.load(Ordering::Relaxed) {
-                return Err(cancelled_message(language));
+            if options.cancel.load(Ordering::Relaxed) {
+                return Err(cancelled_message(options.language));
             }
             let audio = match result {
                 Ok(data) => data,
-                Err(e) if e == "Cancelled" => return Err(cancelled_message(language)),
+                Err(e) if e == "Cancelled" => return Err(cancelled_message(options.language)),
                 Err(e) => return Err(e),
             };
 
             writer.write_all(&audio).map_err(|err| err.to_string())?;
             *current_global_progress += 1;
-            if progress_hwnd.0 != 0 {
-                if cancel.load(Ordering::Relaxed) {
-                    return Err(cancelled_message(language));
+            if options.progress_hwnd.0 != 0 {
+                if options.cancel.load(Ordering::Relaxed) {
+                    return Err(cancelled_message(options.language));
                 }
                 unsafe {
                     let _ = PostMessageW(
-                        progress_hwnd,
+                        options.progress_hwnd,
                         crate::WM_UPDATE_PROGRESS,
                         WPARAM(*current_global_progress),
                         LPARAM(0),
@@ -1950,10 +1932,9 @@ pub(crate) fn run_tts_audiobook_part(
         writer.flush().map_err(|err| err.to_string())?;
         Ok(())
     })
-    .map_err(|e| {
-        if e == cancelled_message(language) {
-            let _ = std::fs::remove_file(output);
+    .inspect_err(|e| {
+        if e == &cancelled_message(options.language) {
+            let _ = std::fs::remove_file(options.output);
         }
-        e
     })
 }

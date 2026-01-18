@@ -411,6 +411,95 @@ pub fn audiobook_duration_secs(path: &Path) -> Option<u64> {
     mp3_duration::from_path(path).ok().map(|d| d.as_secs())
 }
 
+struct AudiobookPlaybackOptions {
+    speed: f32,
+    paused: bool,
+    volume: f32,
+    muted: bool,
+    prev_volume: f32,
+}
+
+fn start_audiobook_at_with_options(
+    hwnd: HWND,
+    path: PathBuf,
+    seconds: u64,
+    options: AudiobookPlaybackOptions,
+) {
+    let effective_speed =
+        if (options.speed - 1.0).abs() > f32::EPSILON && load_soundtouch_api().is_some() {
+            options.speed
+        } else {
+            1.0
+        };
+    let hwnd_main = hwnd;
+    std::thread::spawn(move || {
+        let (_stream, handle) = match OutputStream::try_default() {
+            Ok(v) => v,
+            Err(_) => return,
+        };
+        let sink: Arc<Sink> = match Sink::try_new(&handle) {
+            Ok(s) => Arc::new(s),
+            Err(_) => return,
+        };
+
+        let file = match std::fs::File::open(&path) {
+            Ok(f) => f,
+            Err(_) => return,
+        };
+
+        let base: Decoder<_> = match Decoder::new(std::io::BufReader::new(file)) {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+
+        let source: Box<dyn Source<Item = f32> + Send> = if seconds > 0 {
+            Box::new(
+                base.skip_duration(std::time::Duration::from_secs(seconds))
+                    .convert_samples(),
+            )
+        } else {
+            Box::new(base.convert_samples())
+        };
+
+        if (effective_speed - 1.0).abs() > f32::EPSILON {
+            match SoundTouchSource::try_new(source, effective_speed) {
+                Ok(st_source) => sink.append(st_source),
+                Err(source) => sink.append(source),
+            }
+        } else {
+            sink.append(source);
+        }
+
+        if options.muted {
+            sink.set_volume(0.0);
+        } else {
+            sink.set_volume(options.volume);
+        }
+        if options.paused {
+            sink.pause();
+        }
+
+        let player = AudiobookPlayer {
+            path,
+            sink: sink.clone(),
+            _stream,
+            is_paused: options.paused,
+            start_instant: std::time::Instant::now(),
+            accumulated_seconds: seconds,
+            volume: options.volume,
+            muted: options.muted,
+            prev_volume: options.prev_volume,
+            speed: effective_speed,
+        };
+
+        let _ = unsafe {
+            with_state(hwnd_main, |state| {
+                state.active_audiobook = Some(player);
+            })
+        };
+    });
+}
+
 pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
     crate::reset_active_podcast_chapters_for_playback(hwnd);
     let path_buf = path.to_path_buf();
@@ -420,7 +509,7 @@ pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
             .bookmarks
             .files
             .get(&path_buf.to_string_lossy().to_string())
-            .and_then(|list| list.last()) // Usa l'ultimo segnalibro per l'audio
+            .and_then(|list| list.last())
             .map(|bm| bm.position)
             .unwrap_or(0);
         (
@@ -431,15 +520,17 @@ pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
     })
     .unwrap_or((0, 1.0, 1.0));
 
-    start_audiobook_at_with_speed(
+    start_audiobook_at_with_options(
         hwnd,
         path_buf,
         bookmark_pos as u64,
-        speed,
-        false,
-        volume,
-        false,
-        volume,
+        AudiobookPlaybackOptions {
+            speed,
+            paused: false,
+            volume,
+            muted: false,
+            prev_volume: volume,
+        },
     );
 }
 
@@ -514,15 +605,17 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
     };
 
     stop_audiobook_playback(hwnd);
-    start_audiobook_at_with_speed(
+    start_audiobook_at_with_options(
         hwnd,
         path,
         current_pos,
-        speed,
-        paused,
-        volume,
-        muted,
-        prev_volume,
+        AudiobookPlaybackOptions {
+            speed,
+            paused,
+            volume,
+            muted,
+            prev_volume,
+        },
     );
 }
 
@@ -550,7 +643,6 @@ pub unsafe fn stop_audiobook_playback(hwnd: HWND) {
 }
 
 pub unsafe fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
-    // Preserve current speed and volume settings
     let (speed, volume, muted, prev_volume) = with_state(hwnd, |state| {
         if let Some(player) = &state.active_audiobook {
             (
@@ -567,100 +659,18 @@ pub unsafe fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
 
     stop_audiobook_playback(hwnd);
     let path_buf = path.to_path_buf();
-    start_audiobook_at_with_speed(
+    start_audiobook_at_with_options(
         hwnd,
         path_buf,
         seconds,
-        speed,
-        false,
-        volume,
-        muted,
-        prev_volume,
-    );
-}
-
-fn start_audiobook_at_with_speed(
-    hwnd: HWND,
-    path: PathBuf,
-    seconds: u64,
-    speed: f32,
-    paused: bool,
-    volume: f32,
-    muted: bool,
-    prev_volume: f32,
-) {
-    let effective_speed = if (speed - 1.0).abs() > f32::EPSILON && load_soundtouch_api().is_some() {
-        speed
-    } else {
-        1.0
-    };
-    let hwnd_main = hwnd;
-    std::thread::spawn(move || {
-        let (_stream, handle) = match OutputStream::try_default() {
-            Ok(v) => v,
-            Err(_) => return,
-        };
-        let sink: Arc<Sink> = match Sink::try_new(&handle) {
-            Ok(s) => Arc::new(s),
-            Err(_) => return,
-        };
-
-        let file = match std::fs::File::open(&path) {
-            Ok(f) => f,
-            Err(_) => return,
-        };
-
-        let base: Decoder<_> = match Decoder::new(std::io::BufReader::new(file)) {
-            Ok(s) => s,
-            Err(_) => return,
-        };
-
-        let source: Box<dyn Source<Item = f32> + Send> = if seconds > 0 {
-            Box::new(
-                base.skip_duration(std::time::Duration::from_secs(seconds))
-                    .convert_samples(),
-            )
-        } else {
-            Box::new(base.convert_samples())
-        };
-
-        if (effective_speed - 1.0).abs() > f32::EPSILON {
-            match SoundTouchSource::try_new(source, effective_speed) {
-                Ok(st_source) => sink.append(st_source),
-                Err(source) => sink.append(source),
-            }
-        } else {
-            sink.append(source);
-        }
-
-        if muted {
-            sink.set_volume(0.0);
-        } else {
-            sink.set_volume(volume);
-        }
-        if paused {
-            sink.pause();
-        }
-
-        let player = AudiobookPlayer {
-            path,
-            sink: sink.clone(),
-            _stream,
-            is_paused: paused,
-            start_instant: std::time::Instant::now(),
-            accumulated_seconds: seconds,
+        AudiobookPlaybackOptions {
+            speed,
+            paused: false,
             volume,
             muted,
             prev_volume,
-            speed: effective_speed,
-        };
-
-        let _ = unsafe {
-            with_state(hwnd_main, |state| {
-                state.active_audiobook = Some(player);
-            })
-        };
-    });
+        },
+    );
 }
 
 pub unsafe fn change_audiobook_volume(hwnd: HWND, delta: f32) {
@@ -679,7 +689,6 @@ pub unsafe fn change_audiobook_volume(hwnd: HWND, delta: f32) {
     })
     .flatten();
 
-    // Save volume to settings
     if let Some(volume) = new_volume {
         with_state(hwnd, |state| {
             state.settings.audiobook_playback_volume = volume;
@@ -716,15 +725,17 @@ pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
 
     let (path, current, speed, paused, volume, muted, prev_volume) = result?;
 
-    start_audiobook_at_with_speed(
+    start_audiobook_at_with_options(
         hwnd,
         path,
         current,
-        speed,
-        paused,
-        volume,
-        muted,
-        prev_volume,
+        AudiobookPlaybackOptions {
+            speed,
+            paused,
+            volume,
+            muted,
+            prev_volume,
+        },
     );
 
     // Save speed to settings

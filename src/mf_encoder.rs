@@ -1,4 +1,3 @@
-#![allow(clippy::seek_from_current)]
 use crate::accessibility::to_wide;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
@@ -222,7 +221,7 @@ fn read_wav_data_info(path: &Path) -> Result<(u64, u32, i16), String> {
         let chunk_size = u32::from_le_bytes(chunk_header[4..8].try_into().unwrap());
 
         if chunk_id == b"data" {
-            let data_offset = file.seek(SeekFrom::Current(0)).map_err(|e| e.to_string())?;
+            let data_offset = file.stream_position().map_err(|e| e.to_string())?;
             return Ok((data_offset, chunk_size, 0));
         } else {
             file.seek(SeekFrom::Current(chunk_size as i64))
@@ -394,10 +393,10 @@ where
         let mut total_bytes: u64 = 0;
         let mut last_pct: u32 = 0;
         loop {
-            if let Some(cancel) = cancel {
-                if cancel.load(std::sync::atomic::Ordering::Relaxed) {
-                    return Err("Saving canceled.".to_string());
-                }
+            if let Some(cancel) = cancel
+                && cancel.load(std::sync::atomic::Ordering::Relaxed)
+            {
+                return Err("Saving canceled.".to_string());
             }
             let mut read_stream = 0u32;
             let mut flags = 0u32;
@@ -435,10 +434,10 @@ where
             }
         }
 
-        if let Some(cancel) = cancel {
-            if cancel.load(std::sync::atomic::Ordering::Relaxed) {
-                return Err("Saving canceled.".to_string());
-            }
+        if let Some(cancel) = cancel
+            && cancel.load(std::sync::atomic::Ordering::Relaxed)
+        {
+            return Err("Saving canceled.".to_string());
         }
         if last_pct < 100 {
             progress(100);

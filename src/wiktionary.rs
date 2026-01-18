@@ -128,7 +128,7 @@ fn strip_links(mut s: String) -> String {
             break;
         };
         let inner = &s[start + 2..end];
-        let replacement = inner.split('|').last().unwrap_or(inner).to_string();
+        let replacement = inner.split('|').next_back().unwrap_or(inner).to_string();
         s.replace_range(start..end + 2, &replacement);
     }
     s
@@ -157,12 +157,11 @@ fn strip_external_links(mut s: String) -> String {
             || inner.starts_with("https://")
             || inner.starts_with("www.");
         let replacement = if is_url {
-            let label = inner
+            inner
                 .split_whitespace()
                 .skip(1)
                 .collect::<Vec<_>>()
-                .join(" ");
-            label
+                .join(" ")
         } else {
             inner.to_string()
         };
@@ -328,7 +327,7 @@ impl WiktionaryService {
 
         let parsed: MwInfoResponse =
             serde_json::from_value(v).map_err(|err| LookupError::Other(err.to_string()))?;
-        let page = parsed.query.pages.get(0).ok_or_else(|| {
+        let page = parsed.query.pages.first().ok_or_else(|| {
             LookupError::Other("Wiktionary response missing page info".to_string())
         })?;
         if page.missing.unwrap_or(false) || page.pageid == Some(-1) {

@@ -1,8 +1,3 @@
-#![allow(
-    clippy::collapsible_if,
-    clippy::unnecessary_map_or,
-    clippy::too_many_arguments
-)]
 use crate::accessibility::to_wide;
 use crate::com_guard::ComGuard;
 use crate::i18n;
@@ -66,14 +61,14 @@ fn collect_voice_descriptions(category_id: PCWSTR) -> Result<Vec<String>, String
     let mut voices = Vec::new();
     for i in 0..count {
         // Safe wrapper around token operations
-        if let Ok(token) = unsafe { enum_tokens.Item(i) } {
-            if let Ok(desc_ptr) = unsafe { token.GetStringValue(PCWSTR::null()) } {
-                let description = pwstr_to_string(PCWSTR(desc_ptr.0));
-                unsafe {
-                    CoTaskMemFree(Some(desc_ptr.0 as *const _));
-                }
-                voices.push(description);
+        if let Ok(token) = unsafe { enum_tokens.Item(i) }
+            && let Ok(desc_ptr) = unsafe { token.GetStringValue(PCWSTR::null()) }
+        {
+            let description = pwstr_to_string(PCWSTR(desc_ptr.0));
+            unsafe {
+                CoTaskMemFree(Some(desc_ptr.0 as *const _));
             }
+            voices.push(description);
         }
     }
     Ok(voices)
@@ -89,15 +84,15 @@ fn find_voice_token(voice_name: &str) -> Option<ISpObjectToken> {
                 let mut count = 0;
                 if unsafe { enum_tokens.GetCount(&mut count) }.is_ok() {
                     for i in 0..count {
-                        if let Ok(tok) = unsafe { enum_tokens.Item(i) } {
-                            if let Ok(desc_ptr) = unsafe { tok.GetStringValue(PCWSTR::null()) } {
-                                let description = pwstr_to_string(PCWSTR(desc_ptr.0));
-                                unsafe {
-                                    CoTaskMemFree(Some(desc_ptr.0 as *const _));
-                                }
-                                if description == voice_name {
-                                    return Some(tok);
-                                }
+                        if let Ok(tok) = unsafe { enum_tokens.Item(i) }
+                            && let Ok(desc_ptr) = unsafe { tok.GetStringValue(PCWSTR::null()) }
+                        {
+                            let description = pwstr_to_string(PCWSTR(desc_ptr.0));
+                            unsafe {
+                                CoTaskMemFree(Some(desc_ptr.0 as *const _));
+                            }
+                            if description == voice_name {
+                                return Some(tok);
                             }
                         }
                     }
@@ -262,10 +257,10 @@ pub fn play_sapi(
                     }
 
                     let mut status = SPVOICESTATUS::default();
-                    if voice.GetStatus(&mut status, std::ptr::null_mut()).is_ok() {
-                        if status.dwRunningState == SPRS_DONE.0 as u32 {
-                            break;
-                        }
+                    if voice.GetStatus(&mut status, std::ptr::null_mut()).is_ok()
+                        && status.dwRunningState == SPRS_DONE.0 as u32
+                    {
+                        break;
                     }
                     let _ = voice.WaitUntilDone(50);
                 }
@@ -275,31 +270,36 @@ pub fn play_sapi(
     Ok(())
 }
 
+pub struct SapiExportOptions<'a> {
+    pub chunks: &'a [String],
+    pub voice_name: &'a str,
+    pub output_path: &'a Path,
+    pub language: Language,
+    pub rate: i32,
+    pub pitch: i32,
+    pub volume: i32,
+    pub cancel: Arc<AtomicBool>,
+}
+
 pub fn speak_sapi_to_file(
-    chunks: &[String],
-    voice_name: &str,
-    output_path: &Path,
-    language: Language,
-    tts_rate: i32,
-    tts_pitch: i32,
-    tts_volume: i32,
-    cancel: Arc<AtomicBool>,
+    options: SapiExportOptions,
     mut progress_callback: impl FnMut(usize),
 ) -> Result<(), String> {
     let _com = ComGuard::new_sta().map_err(|e| format!("CoInitializeEx failed: {}", e))?;
 
     unsafe {
-        let is_mp3 = output_path
+        let is_mp3 = options
+            .output_path
             .extension()
-            .map_or(false, |e| e.eq_ignore_ascii_case("mp3"));
+            .is_some_and(|e| e.eq_ignore_ascii_case("mp3"));
         crate::log_debug(&format!(
             "SAPI: is_mp3={}, output_path={:?}",
-            is_mp3, output_path
+            is_mp3, options.output_path
         ));
         let wav_path = if is_mp3 {
-            output_path.with_extension("wav.tmp")
+            options.output_path.with_extension("wav.tmp")
         } else {
-            output_path.to_path_buf()
+            options.output_path.to_path_buf()
         };
         crate::log_debug(&format!("SAPI: Target wav_path={:?}", wav_path));
 
@@ -307,14 +307,14 @@ pub fn speak_sapi_to_file(
             let voice: ISpVoice = CoCreateInstance(&SpVoice, None, CLSCTX_ALL)
                 .map_err(|e| format!("Failed to create SpVoice: {}", e))?;
 
-            let voice_token = find_voice_token(voice_name).ok_or_else(|| {
+            let voice_token = find_voice_token(options.voice_name).ok_or_else(|| {
                 "Selected SAPI voice not found. Please select a voice in Options.".to_string()
             })?;
             voice
                 .SetVoice(&voice_token)
                 .map_err(|e| format!("SetVoice failed: {}", e))?;
-            let _ = voice.SetRate(map_sapi_rate(tts_rate));
-            let _ = voice.SetVolume(map_sapi_volume(tts_volume));
+            let _ = voice.SetRate(map_sapi_rate(options.rate));
+            let _ = voice.SetVolume(map_sapi_volume(options.volume));
 
             let stream: ISpStream = CoCreateInstance(&SpFileStream, None, CLSCTX_ALL)
                 .map_err(|e| format!("Failed to create SpFileStream: {}", e))?;
@@ -344,13 +344,13 @@ pub fn speak_sapi_to_file(
                 .SetOutput(&stream, true)
                 .map_err(|e| format!("SetOutput failed: {}", e))?;
 
-            for (i, chunk) in chunks.iter().enumerate() {
-                if cancel.load(Ordering::Relaxed) {
+            for (i, chunk) in options.chunks.iter().enumerate() {
+                if options.cancel.load(Ordering::Relaxed) {
                     let _ = stream.Close();
                     let _ = std::fs::remove_file(&wav_path);
                     return Err("Cancelled".to_string());
                 }
-                let ssml = mk_sapi_ssml(chunk, tts_rate, tts_pitch, tts_volume);
+                let ssml = mk_sapi_ssml(chunk, options.rate, options.pitch, options.volume);
                 let chunk_wide = to_wide(&ssml);
                 voice
                     .Speak(PCWSTR(chunk_wide.as_ptr()), SPF_IS_XML.0 as u32, None)
@@ -365,35 +365,31 @@ pub fn speak_sapi_to_file(
         }
 
         if is_mp3 {
-            if let Ok(data_size) = crate::audio_utils::get_wav_data_size(&wav_path) {
-                if data_size == 0 {
-                    let sample_rate = 44100u32;
-                    let channels = 1u16;
-                    let bits_per_sample = 16u16;
-                    let duration_ms = 500u32;
-                    let _ = crate::audio_utils::write_silence_file(
-                        &wav_path,
-                        sample_rate,
-                        channels,
-                        bits_per_sample,
-                        duration_ms,
-                    );
-                    crate::log_debug(
-                        "SAPI: WAV had no data; wrote 500ms silence for MP3 encoding.",
-                    );
-                }
+            if let Ok(data_size) = crate::audio_utils::get_wav_data_size(&wav_path)
+                && data_size == 0
+            {
+                let sample_rate = 44100u32;
+                let channels = 1u16;
+                let bits_per_sample = 16u16;
+                let _ = crate::audio_utils::write_silence_file(
+                    &wav_path,
+                    sample_rate,
+                    channels,
+                    bits_per_sample,
+                    500,
+                );
             }
-            match crate::mf_encoder::encode_wav_to_mp3(&wav_path, output_path) {
+            match crate::mf_encoder::encode_wav_to_mp3(&wav_path, options.output_path) {
                 Ok(()) => {
                     let _ = std::fs::remove_file(&wav_path);
                 }
                 Err(e) => {
-                    let dest_wav = output_path.with_extension("wav");
+                    let dest_wav = options.output_path.with_extension("wav");
                     let _ = std::fs::rename(&wav_path, &dest_wav);
                     let msg = if e.contains("Media Foundation not available") {
-                        mf_not_available_message(language)
+                        mf_not_available_message(options.language)
                     } else {
-                        mf_error_message(language, &e)
+                        mf_error_message(options.language, &e)
                     };
                     return Err(msg);
                 }

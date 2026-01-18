@@ -120,7 +120,7 @@ impl ConPtySession {
                 flags,
                 None,
                 None,
-                &mut si_ex.StartupInfo,
+                &si_ex.StartupInfo,
                 &mut proc_info,
             )
         } {

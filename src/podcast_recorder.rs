@@ -257,8 +257,8 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
 
     // Audio-only path
     let shared = Arc::new(SharedState::new(config.include_mic, config.include_system));
-    *shared.status.lock().unwrap() = RecorderStatus::Recording;
-    *shared.started_at.lock().unwrap() = Some(Instant::now());
+    *shared.status.lock().unwrap_or_else(|e| e.into_inner()) = RecorderStatus::Recording;
+    *shared.started_at.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
 
     let stop = Arc::new(AtomicBool::new(false));
     let paused = Arc::new(AtomicBool::new(false));
@@ -276,16 +276,16 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
         let mic_gain = config.mic_gain;
         threads.push(thread::spawn(move || {
             crate::log_debug("Microphone capture thread started");
-            let result = capture_source(
-                SourceKind::Microphone,
-                &device_id,
-                false,
-                mic_gain,
+            let result = capture_source(CaptureOptions {
+                kind: SourceKind::Microphone,
+                device_id,
+                loopback: false,
+                gain: mic_gain,
                 buffer,
-                shared_state.clone(),
-                stop_flag.clone(),
-                paused_flag,
-            );
+                shared: shared_state.clone(),
+                stop: stop_flag.clone(),
+                paused: paused_flag,
+            });
             if let Err(err) = &result {
                 crate::log_debug(&format!("Microphone capture error: {}", err));
                 if let Ok(mut error) = shared_state.last_error.lock() {
@@ -312,16 +312,16 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
         let system_gain = config.system_gain;
         threads.push(thread::spawn(move || {
             crate::log_debug("System audio capture thread started");
-            let result = capture_source(
-                SourceKind::System,
-                &device_id,
-                true,
-                system_gain,
+            let result = capture_source(CaptureOptions {
+                kind: SourceKind::System,
+                device_id,
+                loopback: true,
+                gain: system_gain,
                 buffer,
-                shared_state.clone(),
-                stop_flag.clone(),
-                paused_flag,
-            );
+                shared: shared_state.clone(),
+                stop: stop_flag.clone(),
+                paused: paused_flag,
+            });
             if let Err(err) = &result {
                 crate::log_debug(&format!("System audio capture error: {}", err));
                 if let Ok(mut error) = shared_state.last_error.lock() {
@@ -750,7 +750,10 @@ impl MixBuffer {
 
         // Wait for data if queues are empty
         if inner.mic.is_empty() && inner.system.is_empty() {
-            let result = self.condvar.wait_timeout(inner, timeout).unwrap();
+            let result = self
+                .condvar
+                .wait_timeout(inner, timeout)
+                .unwrap_or_else(|e| e.into_inner());
             inner = result.0;
         }
 
@@ -962,18 +965,20 @@ fn write_mixed_audio_mp3(
     Ok(())
 }
 
-fn capture_source(
+struct CaptureOptions {
     kind: SourceKind,
-    device_id: &str,
+    device_id: String,
     loopback: bool,
     gain: f32,
     buffer: Arc<MixBuffer>,
     shared: Arc<SharedState>,
     stop: Arc<AtomicBool>,
     paused: Arc<AtomicBool>,
-) -> Result<(), String> {
+}
+
+fn capture_source(options: CaptureOptions) -> Result<(), String> {
     let _com = ComGuard::new_mta().map_err(|e| format!("CoInitializeEx failed: {e}"))?;
-    let device = resolve_device(device_id, loopback)?;
+    let device = resolve_device(&options.device_id, options.loopback)?;
     let client: IAudioClient = unsafe {
         device
             .Activate(CLSCTX_ALL, None)
@@ -988,7 +993,7 @@ fn capture_source(
     let (input_rate, input_channels, input_format) = parse_format(unsafe { &*mix_format });
 
     let mut stream_flags = 0;
-    if loopback {
+    if options.loopback {
         stream_flags |= AUDCLNT_STREAMFLAGS_LOOPBACK;
     }
     unsafe {
@@ -1020,10 +1025,10 @@ fn capture_source(
         LinearResampler::new(input_rate, TARGET_SAMPLE_RATE, input_channels as usize);
 
     loop {
-        if stop.load(Ordering::SeqCst) {
+        if options.stop.load(Ordering::SeqCst) {
             break;
         }
-        if paused.load(Ordering::SeqCst) {
+        if options.paused.load(Ordering::SeqCst) {
             thread::sleep(Duration::from_millis(15));
             continue;
         }
@@ -1053,18 +1058,18 @@ fn capture_source(
                     .map_err(|e| format!("ReleaseBuffer failed: {e}"))?;
             }
 
-            update_peak(&shared, &kind, &samples);
+            update_peak(&options.shared, &options.kind, &samples);
             let resampled = resampler.push(&samples);
             let mut stereo = to_stereo(&resampled, input_channels as usize);
 
             // Apply gain
-            if gain != 1.0 {
+            if options.gain != 1.0 {
                 for sample in stereo.iter_mut() {
-                    *sample = (*sample * gain).clamp(-1.0, 1.0);
+                    *sample = (*sample * options.gain).clamp(-1.0, 1.0);
                 }
             }
 
-            buffer.push(kind, stereo);
+            options.buffer.push(options.kind, stereo);
             packet_len = unsafe {
                 capture
                     .GetNextPacketSize()

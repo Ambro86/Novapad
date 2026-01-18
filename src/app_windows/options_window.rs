@@ -90,21 +90,21 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
         let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
         if ctrl_down {
             let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
-            if let Some(tabs) = with_options_state(hwnd, |state| state.hwnd_tabs) {
-                if tabs.0 != 0 {
-                    let current = SendMessageW(tabs, TCM_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
-                    let mut next = if shift_down { current - 1 } else { current + 1 };
-                    if next < 0 {
-                        next = OPTIONS_TAB_COUNT - 1;
-                    } else if next >= OPTIONS_TAB_COUNT {
-                        next = 0;
-                    }
-                    let _ = SendMessageW(tabs, TCM_SETCURSEL, WPARAM(next as usize), LPARAM(0));
-                    set_active_tab(hwnd, next);
-                    SetFocus(tabs);
-                    let _ = PostMessageW(hwnd, WM_NEXTDLGCTL, WPARAM(tabs.0 as usize), LPARAM(1));
-                    return true;
+            if let Some(tabs) = with_options_state(hwnd, |state| state.hwnd_tabs)
+                && tabs.0 != 0
+            {
+                let current = SendMessageW(tabs, TCM_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
+                let mut next = if shift_down { current - 1 } else { current + 1 };
+                if next < 0 {
+                    next = OPTIONS_TAB_COUNT - 1;
+                } else if next >= OPTIONS_TAB_COUNT {
+                    next = 0;
                 }
+                let _ = SendMessageW(tabs, TCM_SETCURSEL, WPARAM(next as usize), LPARAM(0));
+                set_active_tab(hwnd, next);
+                SetFocus(tabs);
+                let _ = PostMessageW(hwnd, WM_NEXTDLGCTL, WPARAM(tabs.0 as usize), LPARAM(1));
+                return true;
             }
         }
     }
@@ -1466,7 +1466,7 @@ unsafe extern "system" fn options_wndproc(
         }
         WM_NOTIFY => {
             let hdr = &*(lparam.0 as *const NMHDR);
-            if hdr.idFrom == OPTIONS_ID_TABS as usize && hdr.code == TCN_SELCHANGE as u32 {
+            if hdr.idFrom == OPTIONS_ID_TABS as usize && hdr.code == TCN_SELCHANGE {
                 let tabs = with_options_state(hwnd, |state| state.hwnd_tabs).unwrap_or(HWND(0));
                 if tabs.0 != 0 {
                     let index = SendMessageW(tabs, TCM_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
@@ -2591,9 +2591,17 @@ unsafe fn preview_voice(hwnd: HWND) {
 
     match engine {
         TtsEngine::Edge => {
-            tts_engine::start_tts_playback_with_chunks(
-                parent, text, voice, chunks, 0, rate, pitch, volume,
-            );
+            let options = tts_engine::TtsPlaybackOptions {
+                hwnd: parent,
+                cleaned: text,
+                voice,
+                chunks,
+                initial_caret_pos: 0,
+                rate,
+                pitch,
+                volume,
+            };
+            tts_engine::start_tts_playback_with_chunks(options);
         }
         TtsEngine::Sapi4 => {
             tts_engine::stop_tts_playback(parent);
@@ -2890,10 +2898,10 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         let mut buf = vec![0u16; (width_len + 1) as usize];
         let read = GetWindowTextW(edit_wrap_width, &mut buf);
         let text = String::from_utf16_lossy(&buf[..read as usize]);
-        if let Ok(parsed) = text.trim().parse::<u32>() {
-            if parsed > 0 {
-                settings.wrap_width = parsed;
-            }
+        if let Ok(parsed) = text.trim().parse::<u32>()
+            && parsed > 0
+        {
+            settings.wrap_width = parsed;
         }
     }
     let prefix_len = GetWindowTextLengthW(edit_quote_prefix);

@@ -1793,30 +1793,34 @@ fn export_parts(
         let output = &outputs[part_idx];
         match tts.tts_engine {
             TtsEngine::Edge => {
-                run_tts_audiobook_part(
-                    part_chunks,
-                    &tts.voice,
+                let options = crate::tts_engine::AudiobookCommonOptions {
+                    voice: &tts.voice,
                     output,
-                    HWND(0),
-                    cancel.clone(),
-                    &mut progress,
-                    tts.language,
-                    tts.tts_rate,
-                    tts.tts_pitch,
-                    tts.tts_volume,
-                )?;
+                    progress_hwnd: HWND(0),
+                    cancel: cancel.clone(),
+                    language: tts.language,
+                    rate: tts.tts_rate,
+                    pitch: tts.tts_pitch,
+                    volume: tts.tts_volume,
+                };
+                run_tts_audiobook_part(part_chunks, &mut progress, &options)?;
             }
-            TtsEngine::Sapi4 => {}
+            TtsEngine::Sapi4 => {
+                // SAPI4 not implemented for batch yet in this context, or maybe it was empty before too?
+                // The original code had empty block for Sapi4.
+            }
             TtsEngine::Sapi5 => {
                 crate::sapi5_engine::speak_sapi_to_file(
-                    part_chunks,
-                    &tts.voice,
-                    output,
-                    tts.language,
-                    tts.tts_rate,
-                    tts.tts_pitch,
-                    tts.tts_volume,
-                    cancel.clone(),
+                    crate::sapi5_engine::SapiExportOptions {
+                        chunks: part_chunks,
+                        voice_name: &tts.voice,
+                        output_path: output,
+                        language: tts.language,
+                        rate: tts.tts_rate,
+                        pitch: tts.tts_pitch,
+                        volume: tts.tts_volume,
+                        cancel: cancel.clone(),
+                    },
                     |_chunk_idx| {
                         progress += 1;
                     },

@@ -46,12 +46,12 @@ impl ComGuard {
 
         // RPC_E_CHANGED_MODE = COM already initialized with different model
         // We can still use COM, but shouldn't call CoUninitialize
-        if let Err(ref e) = result.ok() {
-            if e.code() == RPC_E_CHANGED_MODE {
-                return Ok(Self {
-                    should_uninit: false,
-                });
-            }
+        if let Err(ref e) = result.ok()
+            && e.code() == RPC_E_CHANGED_MODE
+        {
+            return Ok(Self {
+                should_uninit: false,
+            });
         }
 
         // Other errors - propagate

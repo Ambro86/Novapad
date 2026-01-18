@@ -392,22 +392,31 @@ fn compute_backoff(attempt: usize, max_secs: u64) -> Duration {
     Duration::from_secs(secs)
 }
 
-#[allow(dead_code)]
-fn log_request_attempt(
-    url: &str,
-    host: &str,
-    fetch_kind: &str,
+struct RequestLogInfo<'a> {
+    url: &'a str,
+    host: &'a str,
+    fetch_kind: &'a str,
     attempt: usize,
     status: Option<StatusCode>,
     not_modified: bool,
     backoff: Option<Duration>,
-    err: Option<&str>,
-) {
-    let status_code = status.map(|s| s.as_u16()).unwrap_or(0);
-    let backoff_ms = backoff.map(|d| d.as_millis()).unwrap_or(0);
+    err: Option<&'a str>,
+}
+
+#[allow(dead_code)]
+fn log_request_attempt(info: RequestLogInfo) {
+    let status_code = info.status.map(|s| s.as_u16()).unwrap_or(0);
+    let backoff_ms = info.backoff.map(|d| d.as_millis()).unwrap_or(0);
     log_debug(&format!(
-        "rss_request kind=\"{fetch_kind}\" url=\"{url}\" host=\"{host}\" attempt={attempt} status={status_code} not_modified={not_modified} backoff_ms={backoff_ms} error=\"{}\"",
-        err.unwrap_or("")
+        "rss_request kind=\"{}\" url=\"{}\" host=\"{}\" attempt={} status={} not_modified={} backoff_ms={} error=\"{}\"",
+        info.fetch_kind,
+        info.url,
+        info.host,
+        info.attempt,
+        status_code,
+        info.not_modified,
+        backoff_ms,
+        info.err.unwrap_or("")
     ));
 }
 

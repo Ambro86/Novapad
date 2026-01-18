@@ -1176,9 +1176,10 @@ unsafe extern "system" fn rss_wndproc(
                     if focus == hwnd_tree {
                         let already = with_rss_state(hwnd, |s| s.enter_guard).unwrap_or(false);
                         if !already {
+                            let shift_down = GetKeyState(VK_SHIFT.0 as i32) & 0x8000u16 as i16 != 0;
                             with_rss_state(hwnd, |s| s.enter_guard = true);
                             let _ = PostMessageW(hwnd, WM_CLEAR_ENTER_GUARD, WPARAM(0), LPARAM(0));
-                            handle_enter(hwnd);
+                            handle_enter_action(hwnd, shift_down);
                         }
                         return LRESULT(0);
                     }
@@ -1346,9 +1347,10 @@ unsafe extern "system" fn rss_wndproc(
                         if (*ptvkd).wVKey
                             == windows::Win32::UI::Input::KeyboardAndMouse::VK_RETURN.0
                         {
+                            let shift_down = GetKeyState(VK_SHIFT.0 as i32) & 0x8000u16 as i16 != 0;
                             with_rss_state(hwnd, |s| s.enter_guard = true);
                             let _ = PostMessageW(hwnd, WM_CLEAR_ENTER_GUARD, WPARAM(0), LPARAM(0));
-                            handle_enter(hwnd);
+                            handle_enter_action(hwnd, shift_down);
                             LRESULT(1)
                         } else if (*ptvkd).wVKey
                             == windows::Win32::UI::Input::KeyboardAndMouse::VK_DELETE.0
@@ -2739,8 +2741,8 @@ unsafe fn load_more_items(
     inserted
 }
 
-unsafe fn handle_enter(hwnd: HWND) {
-    // UI: On Enter, fetch article content and import into the editor.
+unsafe fn handle_enter_action(hwnd: HWND, open_in_browser: bool) {
+    // UI: Enter imports the article, Shift+Enter opens it in the browser.
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     let hitem = windows::Win32::UI::Controls::HTREEITEM(
         unsafe {
@@ -2764,7 +2766,11 @@ unsafe fn handle_enter(hwnd: HWND) {
     .flatten();
 
     if let Some(item) = item_opt {
-        import_item(hwnd, item);
+        if open_in_browser {
+            handle_article_action(hwnd, ArticleAction::OpenInBrowser);
+        } else {
+            import_item(hwnd, item);
+        }
     } else {
         SendMessageW(
             hwnd_tree,

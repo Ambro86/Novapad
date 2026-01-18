@@ -65,6 +65,7 @@ const OPTIONS_ID_PODCAST_CACHE_LIMIT: usize = 6030;
 const OPTIONS_ID_PODCASTINDEX_KEY: usize = 6035;
 const OPTIONS_ID_PODCASTINDEX_SECRET: usize = 6036;
 const OPTIONS_ID_PODCASTINDEX_SIGNUP: usize = 6037;
+const OPTIONS_ID_DICTIONARY_TRANSLATION: usize = 6038;
 const OPTIONS_ID_WRAP_WIDTH: usize = 6017;
 const OPTIONS_ID_QUOTE_PREFIX: usize = 6018;
 const OPTIONS_ID_CHECK_UPDATES: usize = 6015;
@@ -173,6 +174,8 @@ struct OptionsDialogState {
     checkbox_spellcheck: HWND,
     label_spellcheck_language: HWND,
     combo_spellcheck_language: HWND,
+    label_dictionary_translation: HWND,
+    combo_dictionary_translation: HWND,
     label_wrap_width: HWND,
     edit_wrap_width: HWND,
     label_quote_prefix: HWND,
@@ -207,6 +210,7 @@ struct OptionsLabels {
     label_smart_quotes: String,
     label_spellcheck: String,
     label_spellcheck_language: String,
+    label_dictionary_translation: String,
     label_wrap_width: String,
     label_quote_prefix: String,
     label_move_cursor: String,
@@ -245,6 +249,8 @@ struct OptionsLabels {
     spellcheck_lang_pt_br: String,
     spellcheck_lang_fr: String,
     spellcheck_lang_de: String,
+    dictionary_translation_auto: String,
+    dictionary_translation_none: String,
     prompt_cmd: String,
     prompt_powershell: String,
     prompt_codex: String,
@@ -279,6 +285,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_smart_quotes: i18n::tr(language, "options.label.smart_quotes"),
         label_spellcheck: i18n::tr(language, "options.label.spellcheck"),
         label_spellcheck_language: i18n::tr(language, "options.label.spellcheck_language"),
+        label_dictionary_translation: i18n::tr(language, "options.label.dictionary_translation"),
         label_wrap_width: i18n::tr(language, "options.label.wrap_width"),
         label_quote_prefix: i18n::tr(language, "options.label.quote_prefix"),
         label_move_cursor: i18n::tr(language, "options.label.move_cursor"),
@@ -320,6 +327,8 @@ fn options_labels(language: Language) -> OptionsLabels {
         spellcheck_lang_pt_br: i18n::tr(language, "options.spellcheck.lang.pt_br"),
         spellcheck_lang_fr: i18n::tr(language, "options.spellcheck.lang.fr"),
         spellcheck_lang_de: i18n::tr(language, "options.spellcheck.lang.de"),
+        dictionary_translation_auto: i18n::tr(language, "options.dictionary_translation.auto"),
+        dictionary_translation_none: i18n::tr(language, "options.dictionary_translation.none"),
         prompt_cmd: i18n::tr(language, "options.prompt.cmd"),
         prompt_powershell: i18n::tr(language, "options.prompt.powershell"),
         prompt_codex: i18n::tr(language, "options.prompt.codex"),
@@ -1131,6 +1140,36 @@ unsafe extern "system" fn options_wndproc(
             );
             y += 30;
 
+            let label_dictionary_translation = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_dictionary_translation).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_dictionary_translation = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                200,
+                hwnd,
+                HMENU(OPTIONS_ID_DICTIONARY_TRANSLATION as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
             let label_wrap_width = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -1342,6 +1381,8 @@ unsafe extern "system" fn options_wndproc(
                 checkbox_spellcheck,
                 label_spellcheck_language,
                 combo_spellcheck_language,
+                label_dictionary_translation,
+                combo_dictionary_translation,
                 label_wrap_width,
                 edit_wrap_width,
                 label_quote_prefix,
@@ -1405,6 +1446,8 @@ unsafe extern "system" fn options_wndproc(
                 checkbox_spellcheck,
                 label_spellcheck_language,
                 combo_spellcheck_language,
+                label_dictionary_translation,
+                combo_dictionary_translation,
                 label_wrap_width,
                 edit_wrap_width,
                 label_quote_prefix,
@@ -1615,6 +1658,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         checkbox_smart_quotes,
         checkbox_spellcheck,
         combo_spellcheck_language,
+        _label_dictionary_translation,
+        combo_dictionary_translation,
         _label_wrap_width,
         edit_wrap_width,
         _label_quote_prefix,
@@ -1657,6 +1702,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.checkbox_smart_quotes,
             state.checkbox_spellcheck,
             state.combo_spellcheck_language,
+            state.label_dictionary_translation,
+            state.combo_dictionary_translation,
             state.label_wrap_width,
             state.edit_wrap_width,
             state.label_quote_prefix,
@@ -2045,6 +2092,45 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         LPARAM(0),
     );
     update_spellcheck_language_visibility(hwnd);
+
+    let _ = SendMessageW(
+        combo_dictionary_translation,
+        CB_RESETCONTENT,
+        WPARAM(0),
+        LPARAM(0),
+    );
+    let dictionary_translation_options = [
+        (labels.dictionary_translation_auto.clone(), "auto"),
+        (labels.dictionary_translation_none.clone(), "none"),
+        (labels.lang_it.clone(), "it"),
+        (labels.lang_en.clone(), "en"),
+        (labels.lang_es.clone(), "es"),
+        (labels.lang_pt.clone(), "pt"),
+        (labels.lang_vi.clone(), "vi"),
+    ];
+    let current_dict_lang = settings
+        .dictionary_translation_language
+        .trim()
+        .to_ascii_lowercase();
+    let mut dict_selected_idx = 0;
+    for (i, (label, val)) in dictionary_translation_options.iter().enumerate() {
+        let _ = SendMessageW(
+            combo_dictionary_translation,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(label).as_ptr() as isize),
+        );
+        if *val == current_dict_lang {
+            dict_selected_idx = i;
+        }
+    }
+    let _ = SendMessageW(
+        combo_dictionary_translation,
+        CB_SETCURSEL,
+        WPARAM(dict_selected_idx),
+        LPARAM(0),
+    );
+
     let wrap_text = settings.wrap_width.to_string();
     let _ = SetWindowTextW(edit_wrap_width, PCWSTR(to_wide(&wrap_text).as_ptr()));
     let _ = SetWindowTextW(
@@ -2593,6 +2679,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         checkbox_smart_quotes,
         checkbox_spellcheck,
         combo_spellcheck_language,
+        combo_dictionary_translation,
         edit_wrap_width,
         edit_quote_prefix,
         checkbox_move_cursor,
@@ -2627,6 +2714,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.checkbox_smart_quotes,
             state.checkbox_spellcheck,
             state.combo_spellcheck_language,
+            state.combo_dictionary_translation,
             state.edit_wrap_width,
             state.edit_quote_prefix,
             state.checkbox_move_cursor,
@@ -2779,6 +2867,23 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         };
         settings.spellcheck_fixed_language = val.to_string();
     }
+
+    let dict_sel = SendMessageW(
+        combo_dictionary_translation,
+        CB_GETCURSEL,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0;
+    let dict_values = ["auto", "none", "it", "en", "es", "pt", "vi"];
+    settings.dictionary_translation_language = if dict_sel >= 0 {
+        dict_values
+            .get(dict_sel as usize)
+            .unwrap_or(&"auto")
+            .to_string()
+    } else {
+        "auto".to_string()
+    };
 
     let width_len = GetWindowTextLengthW(edit_wrap_width);
     if width_len >= 0 {
@@ -3067,6 +3172,8 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.checkbox_spellcheck,
             state.label_spellcheck_language,
             state.combo_spellcheck_language,
+            state.label_dictionary_translation,
+            state.combo_dictionary_translation,
             state.label_wrap_width,
             state.edit_wrap_width,
             state.label_quote_prefix,

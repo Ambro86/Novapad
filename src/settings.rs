@@ -192,6 +192,7 @@ pub struct AppSettings {
     pub last_seen_changelog_version: String,
     pub favorite_voices: Vec<FavoriteVoice>,
     pub dictionary: Vec<DictionaryEntry>,
+    pub dictionary_translation_language: String,
     pub text_color: u32,
     pub text_size: i32,
     pub tts_rate: i32,
@@ -299,6 +300,7 @@ impl Default for AppSettings {
             last_seen_changelog_version: String::new(),
             favorite_voices: Vec::new(),
             dictionary: Vec::new(),
+            dictionary_translation_language: "auto".to_string(),
             text_color: 0x000000,
             text_size: 12,
             tts_rate: 0,
@@ -550,6 +552,9 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     settings.podcast_cache_limit_mb = settings.podcast_cache_limit_mb.clamp(100, 2048);
     if settings.spellcheck_fixed_language.trim().is_empty() {
         settings.spellcheck_fixed_language = "en-US".to_string();
+    }
+    if settings.dictionary_translation_language.trim().is_empty() {
+        settings.dictionary_translation_language = "auto".to_string();
     }
     settings.rss_cooldown_blocked_secs = settings.rss_cooldown_blocked_secs.clamp(60, 86_400);
     settings.rss_cooldown_not_found_secs = settings.rss_cooldown_not_found_secs.clamp(300, 604_800);

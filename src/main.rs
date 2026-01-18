@@ -48,6 +48,7 @@ mod spellcheck;
 mod text_ops;
 mod tools;
 mod updater;
+mod wiktionary;
 
 use std::collections::HashMap;
 use std::io::Write;
@@ -96,20 +97,22 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CB_GETCURSEL, CB_GETDROPPEDSTATE, CB_GETITEMDATA, CB_RESETCONTENT, CB_SETCURSEL,
     CB_SETITEMDATA, CBN_SELCHANGE, CBS_DROPDOWNLIST, CHILDID_SELF, CREATESTRUCTW, CS_HREDRAW,
     CS_VREDRAW, CW_USEDEFAULT, CallWindowProcW, CheckMenuItem, CreateAcceleratorTableW,
-    CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, EN_CHANGE,
-    EN_KILLFOCUS, ES_AUTOHSCROLL, EVENT_OBJECT_FOCUS, EnumWindows, FALT, FCONTROL, FSHIFT,
-    FVIRTKEY, FindWindowW, GWLP_USERDATA, GWLP_WNDPROC, GetClassNameW, GetCursorPos, GetMenu,
-    GetMessageW, GetParent, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HACCEL,
-    HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, IsChild, KillTimer, LoadCursorW, LoadIconW,
-    MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MF_BYCOMMAND, MF_CHECKED, MF_GRAYED, MF_POPUP,
+    CreatePopupMenu, CreateWindowExW, DefWindowProcW, DeleteMenu, DestroyWindow, DispatchMessageW,
+    DrawMenuBar, EN_CHANGE, EN_KILLFOCUS, ES_AUTOHSCROLL, EVENT_OBJECT_FOCUS, EnumWindows, FALT,
+    FCONTROL, FSHIFT, FVIRTKEY, FindWindowW, GWLP_USERDATA, GWLP_WNDPROC, GetClassNameW,
+    GetCursorPos, GetMenu, GetMenuItemCount, GetMessageW, GetParent, GetWindowLongPtrW,
+    GetWindowTextLengthW, GetWindowTextW, HACCEL, HCURSOR, HICON, HMENU, IDC_ARROW,
+    IDI_APPLICATION, IsChild, IsWindow, KillTimer, LoadCursorW, LoadIconW, MB_ICONERROR,
+    MB_ICONINFORMATION, MB_OK, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_GRAYED, MF_POPUP,
     MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW,
     PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_SHOW, SW_SHOWMAXIMIZED,
     SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
     TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE, WM_APP,
     WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY,
-    WM_DROPFILES, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE,
-    WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WM_UNDO, WNDCLASSW, WNDPROC,
-    WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
+    WM_DROPFILES, WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL,
+    WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WM_UNDO, WNDCLASSW,
+    WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP,
+    WS_VISIBLE,
 };
 use windows::core::{Interface, PCWSTR, PWSTR, implement, w};
 
@@ -133,6 +136,7 @@ const WM_TTS_SAPI_VOICES_LOADED: u32 = WM_APP + 8;
 
 pub const WM_FOCUS_EDITOR: u32 = WM_APP + 30;
 const WM_PODCAST_CHAPTERS_READY: u32 = WM_APP + 31;
+const WM_DICTIONARY_LOADED: u32 = WM_APP + 32;
 const FOCUS_EDITOR_TIMER_ID: usize = 1;
 const FOCUS_EDITOR_TIMER_ID2: usize = 2;
 const FOCUS_EDITOR_TIMER_ID3: usize = 3;
@@ -351,6 +355,159 @@ fn confirm_menu_action(hwnd: HWND, key: &str) {
         unsafe {
             show_info(hwnd, language, &message);
         }
+    }
+}
+
+fn dictionary_cache_key(language: Language, pref: &str, word: &str) -> String {
+    let lang = match language {
+        Language::Italian => "it",
+        Language::English => "en",
+        Language::Spanish => "es",
+        Language::Portuguese => "pt",
+        Language::Vietnamese => "vi",
+    };
+    format!(
+        "{}|{}|{}",
+        lang,
+        pref.trim().to_ascii_lowercase(),
+        word.trim().to_ascii_lowercase()
+    )
+}
+
+fn dictionary_cache_path() -> std::path::PathBuf {
+    settings::settings_dir().join("dictionary_cache.json")
+}
+
+fn load_dictionary_cache() -> HashMap<String, Vec<String>> {
+    let path = dictionary_cache_path();
+    if !path.exists() {
+        return HashMap::new();
+    }
+    match std::fs::read_to_string(&path) {
+        Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
+        Err(_) => HashMap::new(),
+    }
+}
+
+fn save_dictionary_cache(cache: &HashMap<String, Vec<String>>) {
+    let path = dictionary_cache_path();
+    if let Ok(content) = serde_json::to_string(cache) {
+        let _ = std::fs::write(path, content);
+    }
+}
+
+pub(crate) fn update_dictionary_cache(hwnd: HWND, key: String, lines: Vec<String>) {
+    unsafe {
+        let _ = with_state(hwnd, |state| {
+            state.dictionary_cache.insert(key, lines);
+            save_dictionary_cache(&state.dictionary_cache);
+        });
+    }
+}
+
+struct DictionaryLookupResult {
+    key: String,
+    lines: Vec<String>,
+    generation: usize,
+}
+
+fn start_dictionary_lookup(
+    hwnd_val: isize,
+    word: String,
+    language: Language,
+    pref: String,
+    key: String,
+    generation: usize,
+) {
+    std::thread::spawn(move || {
+        let lines = match wiktionary::lookup_for_language(&word, language, &pref) {
+            Ok(entry) => wiktionary::format_menu_lines(language, &entry),
+            Err(wiktionary::LookupError::NotFound { .. }) => {
+                vec![i18n::tr(language, "dictionary.not_found")]
+            }
+            Err(err) => {
+                log_debug(&format!("Dictionary lookup failed: {err}"));
+                vec![i18n::tr(language, "dictionary.not_found")]
+            }
+        };
+        let result = Box::new(DictionaryLookupResult {
+            key,
+            lines,
+            generation,
+        });
+        let hwnd = HWND(hwnd_val);
+        unsafe {
+            if IsWindow(hwnd).as_bool() {
+                let _ = PostMessageW(
+                    hwnd,
+                    WM_DICTIONARY_LOADED,
+                    WPARAM(0),
+                    LPARAM(Box::into_raw(result) as isize),
+                );
+            } else {
+                drop(result);
+            }
+        }
+    });
+}
+
+unsafe fn prefetch_dictionary_for_selection(hwnd: HWND, hwnd_edit: HWND) {
+    let mut range = CHARRANGE::default();
+    SendMessageW(
+        hwnd_edit,
+        EM_EXGETSEL,
+        WPARAM(0),
+        LPARAM(&mut range as *mut _ as isize),
+    );
+    let start = range.cpMin;
+    let end = range.cpMax;
+    if start >= end || (end - start) > 50 {
+        return;
+    }
+    let len = (end - start) as usize;
+    let mut buf = vec![0u16; len + 1];
+    let mut tr = TEXTRANGEW {
+        chrg: CHARRANGE {
+            cpMin: start,
+            cpMax: end,
+        },
+        lpstrText: windows::core::PWSTR(buf.as_mut_ptr()),
+    };
+    let copied = SendMessageW(
+        hwnd_edit,
+        EM_GETTEXTRANGE,
+        WPARAM(0),
+        LPARAM(&mut tr as *mut _ as isize),
+    )
+    .0 as usize;
+    if copied == 0 {
+        return;
+    }
+    let selected = from_wide(buf.as_ptr());
+    let trimmed = selected.trim();
+    if trimmed.is_empty() || trimmed.contains(char::is_whitespace) {
+        return;
+    }
+    let word = trimmed.to_string();
+
+    let prefetch_info = with_state(hwnd, |state| {
+        let language = state.settings.language;
+        let pref = state.settings.dictionary_translation_language.clone();
+        let key = dictionary_cache_key(language, &pref, &word);
+        if state.dictionary_cache.contains_key(&key) {
+            return None;
+        }
+        if state.dictionary_pending_lookup.as_ref() == Some(&key) {
+            return None;
+        }
+        state.dictionary_pending_lookup = Some(key.clone());
+        let generation = state.dictionary_prefetch_generation;
+        Some((word.clone(), language, pref, key, generation))
+    })
+    .flatten();
+
+    if let Some((word, language, pref, key, generation)) = prefetch_info {
+        start_dictionary_lookup(hwnd.0, word, language, pref, key, generation);
     }
 }
 
@@ -984,6 +1141,7 @@ pub(crate) struct AppState {
     bookmarks_window: HWND,
     dictionary_window: HWND,
     dictionary_entry_dialog: HWND,
+    wiktionary_window: HWND,
     prompt_window: HWND,
     podcast_window: HWND,
     podcast_save_window: HWND,
@@ -1053,6 +1211,15 @@ pub(crate) struct AppState {
     spellcheck_last_announce: Option<SpellcheckAnnounceKey>,
     spellcheck_context: Option<SpellcheckContextMenuState>,
     spellcheck_space_trigger: Option<HWND>,
+    dictionary_context_menu: HMENU,
+    dictionary_context_word: String,
+    dictionary_context_language: Language,
+    dictionary_context_pref: String,
+    dictionary_context_loaded: bool,
+    dictionary_context_expanded: bool,
+    dictionary_cache: HashMap<String, Vec<String>>,
+    dictionary_pending_lookup: Option<String>,
+    dictionary_prefetch_generation: usize,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -1520,6 +1687,16 @@ fn main() -> windows::core::Result<()> {
                     }
                 }
 
+                if state.wiktionary_window.0 != 0 {
+                    if app_windows::wiktionary_window::handle_navigation(
+                        state.wiktionary_window,
+                        &msg,
+                    ) {
+                        handled = true;
+                        return;
+                    }
+                }
+
                 if state.dictionary_entry_dialog.0 != 0 {
                     if handle_accessibility(state.dictionary_entry_dialog, &msg) {
                         handled = true;
@@ -1917,6 +2094,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 bookmarks_window: HWND(0),
                 dictionary_window: HWND(0),
                 dictionary_entry_dialog: HWND(0),
+                wiktionary_window: HWND(0),
                 prompt_window: HWND(0),
                 podcast_window: HWND(0),
                 rss_window: HWND(0),
@@ -1987,6 +2165,15 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 spellcheck_last_announce: None,
                 spellcheck_context: None,
                 spellcheck_space_trigger: None,
+                dictionary_context_menu: HMENU(0),
+                dictionary_context_word: String::new(),
+                dictionary_context_language: Language::default(),
+                dictionary_context_pref: String::new(),
+                dictionary_context_loaded: false,
+                dictionary_context_expanded: false,
+                dictionary_cache: load_dictionary_cache(),
+                dictionary_pending_lookup: None,
+                dictionary_prefetch_generation: 0,
             });
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
 
@@ -2051,6 +2238,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             }
             if hdr.code == EN_SELCHANGE as u32 {
                 handle_spellcheck_selection_change(hwnd, hdr.hwndFrom);
+                prefetch_dictionary_for_selection(hwnd, hdr.hwndFrom);
                 return LRESULT(0);
             }
             DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -2131,6 +2319,73 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     let _ = nvda_speak(&message);
                 }
                 crate::menu::update_playback_menu(hwnd, true);
+            }
+            LRESULT(0)
+        }
+        WM_DICTIONARY_LOADED => {
+            if lparam.0 == 0 {
+                return LRESULT(0);
+            }
+            let result = Box::from_raw(lparam.0 as *mut DictionaryLookupResult);
+            let updated = with_state(hwnd, |state| {
+                let current_gen = state.dictionary_prefetch_generation;
+                if result.generation != current_gen {
+                    return false;
+                }
+                state
+                    .dictionary_cache
+                    .insert(result.key.clone(), result.lines.clone());
+                state.dictionary_pending_lookup = None;
+                save_dictionary_cache(&state.dictionary_cache);
+
+                if state.dictionary_context_menu.0 != 0 && !state.dictionary_context_loaded {
+                    let key = dictionary_cache_key(
+                        state.dictionary_context_language,
+                        &state.dictionary_context_pref,
+                        &state.dictionary_context_word,
+                    );
+                    if key == result.key {
+                        let hmenu = state.dictionary_context_menu;
+                        let count = GetMenuItemCount(hmenu);
+                        if count > 0 {
+                            for _ in 0..count {
+                                let _ = DeleteMenu(hmenu, 0, MF_BYPOSITION);
+                            }
+                        }
+                        for line in &result.lines {
+                            let display = format!(" {}", line);
+                            let _ = AppendMenuW(
+                                hmenu,
+                                MF_STRING | MF_GRAYED,
+                                0,
+                                PCWSTR(to_wide(&display).as_ptr()),
+                            );
+                        }
+                        state.dictionary_context_loaded = true;
+                        return true;
+                    }
+                }
+                false
+            })
+            .unwrap_or(false);
+            if updated {
+                let (hmenu, expanded) = with_state(hwnd, |state| {
+                    (
+                        state.dictionary_context_menu,
+                        state.dictionary_context_expanded,
+                    )
+                })
+                .unwrap_or((HMENU(0), false));
+                if hmenu.0 != 0 && expanded {
+                    let _ = DrawMenuBar(hwnd);
+                    use windows::Win32::UI::Input::KeyboardAndMouse::{
+                        KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, VK_LEFT, VK_RIGHT, keybd_event,
+                    };
+                    keybd_event(VK_LEFT.0 as u8, 0, KEYBD_EVENT_FLAGS(0), 0);
+                    keybd_event(VK_LEFT.0 as u8, 0, KEYEVENTF_KEYUP, 0);
+                    keybd_event(VK_RIGHT.0 as u8, 0, KEYBD_EVENT_FLAGS(0), 0);
+                    keybd_event(VK_RIGHT.0 as u8, 0, KEYEVENTF_KEYUP, 0);
+                }
             }
             LRESULT(0)
         }
@@ -2311,6 +2566,75 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 return LRESULT(0);
             }
             DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
+        WM_INITMENUPOPUP => {
+            let hmenu = HMENU(wparam.0 as isize);
+            let ctx = with_state(hwnd, |state| {
+                if state.dictionary_context_menu != hmenu || state.dictionary_context_loaded {
+                    return None;
+                }
+                state.dictionary_context_expanded = true;
+                let key = dictionary_cache_key(
+                    state.dictionary_context_language,
+                    &state.dictionary_context_pref,
+                    &state.dictionary_context_word,
+                );
+                let cached = state.dictionary_cache.get(&key).cloned();
+                let pending = state.dictionary_pending_lookup.as_ref() == Some(&key);
+                Some((
+                    state.dictionary_context_word.clone(),
+                    state.dictionary_context_language,
+                    state.dictionary_context_pref.clone(),
+                    key,
+                    cached,
+                    pending,
+                    state.dictionary_prefetch_generation,
+                ))
+            })
+            .flatten();
+            let Some((word, language, pref, key, cached, pending, generation)) = ctx else {
+                return DefWindowProcW(hwnd, msg, wparam, lparam);
+            };
+
+            let count = GetMenuItemCount(hmenu);
+            if count > 0 {
+                for _ in 0..count {
+                    let _ = DeleteMenu(hmenu, 0, MF_BYPOSITION);
+                }
+            }
+
+            match cached {
+                Some(lines) => {
+                    for line in lines {
+                        let display = line.replace('&', "");
+                        let _ = AppendMenuW(
+                            hmenu,
+                            MF_STRING | MF_GRAYED,
+                            0,
+                            PCWSTR(to_wide(&display).as_ptr()),
+                        );
+                    }
+                    let _ = with_state(hwnd, |state| {
+                        state.dictionary_context_loaded = true;
+                    });
+                }
+                None => {
+                    let loading_msg = i18n::tr(language, "dictionary.loading");
+                    let _ = AppendMenuW(
+                        hmenu,
+                        MF_STRING | MF_GRAYED,
+                        0,
+                        PCWSTR(to_wide(&loading_msg).as_ptr()),
+                    );
+                    if !pending {
+                        let _ = with_state(hwnd, |state| {
+                            state.dictionary_pending_lookup = Some(key.clone());
+                        });
+                        start_dictionary_lookup(hwnd.0, word, language, pref, key, generation);
+                    }
+                }
+            }
+            LRESULT(0)
         }
         WM_CONTEXTMENU => {
             let target = HWND(wparam.0 as isize);
@@ -2736,6 +3060,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 IDM_TOOLS_DICTIONARY => {
                     log_debug("Menu: Dictionary");
                     app_windows::dictionary_window::open(hwnd);
+                    LRESULT(0)
+                }
+                IDM_TOOLS_DICTIONARY_LOOKUP => {
+                    log_debug("Menu: Dictionary lookup");
+                    open_dictionary_lookup(hwnd);
                     LRESULT(0)
                 }
                 IDM_TOOLS_IMPORT_YOUTUBE => {
@@ -4376,6 +4705,10 @@ unsafe fn handle_spellcheck_selection_change(hwnd: HWND, hwnd_edit: HWND) {
 pub(crate) unsafe fn show_editor_context_menu(hwnd: HWND, hwnd_edit: HWND, lparam: LPARAM) {
     let language_ui = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
     let labels = menu_labels(language_ui);
+    let dictionary_pref = with_state(hwnd, |state| {
+        state.settings.dictionary_translation_language.clone()
+    })
+    .unwrap_or_else(|| "auto".to_string());
 
     let mut spell_status = None;
     let mut spell_context = None;
@@ -4460,6 +4793,59 @@ pub(crate) unsafe fn show_editor_context_menu(hwnd: HWND, hwnd_edit: HWND, lpara
     let menu = CreatePopupMenu().unwrap_or(HMENU(0));
     if menu.0 == 0 {
         return;
+    }
+
+    if let Some(word_ctx) = spellcheck_word_context_from_lparam(hwnd_edit, lparam) {
+        if let Ok(submenu) = CreatePopupMenu() {
+            if submenu.0 != 0 {
+                let placeholder = format!(" {}", i18n::tr(language_ui, "dictionary.menu_expand"));
+                let _ = AppendMenuW(
+                    submenu,
+                    MF_STRING | MF_GRAYED,
+                    0,
+                    PCWSTR(to_wide(&placeholder).as_ptr()),
+                );
+                let label = i18n::tr(language_ui, "context_menu.dictionary");
+                let _ = AppendMenuW(
+                    menu,
+                    MF_POPUP,
+                    submenu.0 as usize,
+                    PCWSTR(to_wide(&label).as_ptr()),
+                );
+                let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
+                let prefetch_info = with_state(hwnd, |state| {
+                    state.dictionary_context_menu = submenu;
+                    state.dictionary_context_word = word_ctx.word.clone();
+                    state.dictionary_context_language = language_ui;
+                    state.dictionary_context_pref = dictionary_pref.clone();
+                    state.dictionary_context_loaded = false;
+                    state.dictionary_prefetch_generation =
+                        state.dictionary_prefetch_generation.wrapping_add(1);
+                    let generation = state.dictionary_prefetch_generation;
+
+                    let key = dictionary_cache_key(language_ui, &dictionary_pref, &word_ctx.word);
+                    if state.dictionary_cache.contains_key(&key) {
+                        return None;
+                    }
+                    if state.dictionary_pending_lookup.as_ref() == Some(&key) {
+                        return None;
+                    }
+                    state.dictionary_pending_lookup = Some(key.clone());
+                    Some((word_ctx.word.clone(), key, generation))
+                })
+                .flatten();
+                if let Some((word, key, generation)) = prefetch_info {
+                    start_dictionary_lookup(
+                        hwnd.0,
+                        word,
+                        language_ui,
+                        dictionary_pref.clone(),
+                        key,
+                        generation,
+                    );
+                }
+            }
+        }
     }
 
     if let Some(status) = spell_status {
@@ -4579,6 +4965,17 @@ pub(crate) unsafe fn show_editor_context_menu(hwnd: HWND, hwnd_edit: HWND, lpara
     SetForegroundWindow(hwnd);
     let _ = TrackPopupMenu(menu, TPM_RIGHTBUTTON, x, y, 0, hwnd, None);
     let _ = PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0));
+    let _ = with_state(hwnd, |state| {
+        state.dictionary_context_menu = HMENU(0);
+        state.dictionary_context_word.clear();
+        state.dictionary_context_pref.clear();
+        state.dictionary_context_loaded = false;
+        state.dictionary_context_expanded = false;
+    });
+}
+
+unsafe fn open_dictionary_lookup(hwnd: HWND) {
+    app_windows::wiktionary_window::open(hwnd);
 }
 
 unsafe fn show_voice_context_menu(hwnd: HWND, target: HWND, lparam: LPARAM) {
@@ -5189,6 +5586,11 @@ unsafe fn create_accelerators() -> HACCEL {
             fVirt: virt_alt_shift,
             key: 'H' as u16,
             cmd: IDM_EDIT_CLEAN_EOL_HYPHENS as u16,
+        },
+        ACCEL {
+            fVirt: virt_alt_shift,
+            key: 'D' as u16,
+            cmd: IDM_TOOLS_DICTIONARY_LOOKUP as u16,
         },
         ACCEL {
             fVirt: virt,

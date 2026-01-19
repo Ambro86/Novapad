@@ -144,6 +144,7 @@
   "options.label.split_on_newline": "Split reading on new lines",
   "options.label.word_wrap": "Word wrap in editor",
   "options.label.smart_quotes": "Smart quotes",
+  "options.label.strip_markdown_keep_bullets": "Keep bullet points when stripping Markdown",
   "options.label.spellcheck": "Spellcheck",
   "options.label.spellcheck_language": "Spellcheck language:",
   "options.label.dictionary_translation": "Dictionary translation language:",

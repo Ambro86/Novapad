@@ -2542,10 +2542,6 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
         }
         Err(e) => {
             let (message, cache) = match e {
-                rss::FeedFetchError::InCooldown { kind, cache, .. } => (
-                    format!("Feed temporarily blocked/cooldown ({kind}). Try again later."),
-                    Some(cache),
-                ),
                 rss::FeedFetchError::HttpStatus {
                     status,
                     kind,

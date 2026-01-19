@@ -144,6 +144,7 @@
   "options.label.split_on_newline": "Spezza la lettura quando si va a capo",
   "options.label.word_wrap": "A capo automatico nella finestra",
   "options.label.smart_quotes": "Virgolette tipografiche",
+  "options.label.strip_markdown_keep_bullets": "Mantieni elenchi puntati quando rimuovi Markdown",
   "options.label.spellcheck": "Correttore ortografico",
   "options.label.spellcheck_language": "Lingua correttore:",
   "options.label.dictionary_translation": "Lingua traduzione dizionario:",

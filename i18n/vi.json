@@ -125,6 +125,7 @@
   "options.label.split_on_newline": "Ngắt quãng khi đọc ở dòng mới",
   "options.label.word_wrap": "Tự động xuống dòng trong trình soạn thảo",
   "options.label.smart_quotes": "Dấu ngoặc kép thông minh",
+  "options.label.strip_markdown_keep_bullets": "Giữ lại dấu đầu dòng khi loại bỏ Markdown",
   "options.label.spellcheck": "Kiểm tra chính tả",
   "options.label.spellcheck_language": "Ngôn ngữ kiểm tra:",
   "options.label.dictionary_translation": "Ngôn ngữ dịch từ điển:",

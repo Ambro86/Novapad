@@ -257,7 +257,6 @@ pub fn word_range_at(text: &str, byte_pos: usize) -> Option<(usize, usize)> {
     }
 }
 
-#[allow(dead_code)]
 pub fn utf8_byte_offset_to_utf16_units(text: &str, byte_idx: usize) -> i32 {
     let mut utf16_count = 0usize;
     for (idx, ch) in text.char_indices() {

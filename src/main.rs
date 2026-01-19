@@ -32,7 +32,6 @@ use audio_player::*;
 mod editor_manager;
 use editor_manager::*;
 mod app_windows;
-mod audio_capture;
 mod audio_utils;
 mod i18n;
 mod podcast;
@@ -83,7 +82,7 @@ use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
 use windows::Win32::UI::Shell::{
     DragAcceptFiles, DragFinish, DragQueryFileW, FileSaveDialog, HDROP, IFileDialog,
     IFileDialogControlEvents, IFileDialogControlEvents_Impl, IFileDialogCustomize,
-    IFileDialogEvents, IFileDialogEvents_Impl, IFileSaveDialog, IShellItem, SIGDN_FILESYSPATH,
+    IFileDialogEvents, IFileDialogEvents_Impl, IFileSaveDialog, IShellItem,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     ACCEL, AppendMenuW, BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, CB_ADDSTRING, CB_GETCOUNT,
@@ -220,7 +219,6 @@ struct SpellcheckAnnounceKey {
 }
 
 #[derive(Clone)]
-#[allow(dead_code)]
 struct SpellcheckContextMenuState {
     hwnd_edit: HWND,
     line_start: i32,
@@ -2776,8 +2774,8 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 ..IDM_SPELLCHECK_SUGGESTION_BASE + IDM_SPELLCHECK_SUGGESTION_MAX)
                 .contains(&cmd_id)
             {
-                // let index = cmd_id - IDM_SPELLCHECK_SUGGESTION_BASE;
-                // crate::spellcheck::apply_suggestion(hwnd, index);
+                let index = cmd_id - IDM_SPELLCHECK_SUGGESTION_BASE;
+                handle_spellcheck_suggestion(hwnd, index);
                 return LRESULT(0);
             }
             if cmd_id == IDM_SPELLCHECK_ADD_TO_DICTIONARY {
@@ -3309,7 +3307,6 @@ struct VoicePanelLabels {
     label_multilingual: String,
     engine_edge: String,
     engine_sapi: String,
-    #[allow(dead_code)]
     engine_sapi4: String,
     voices_empty: String,
     favorites_empty: String,
@@ -5175,7 +5172,6 @@ unsafe fn show_voice_context_menu(hwnd: HWND, target: HWND, lparam: LPARAM) {
     crate::log_if_err!(PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0)));
 }
 
-#[allow(dead_code)]
 unsafe fn replace_spellcheck_word(
     hwnd_edit: HWND,
     ctx: &SpellcheckContextMenuState,
@@ -5216,7 +5212,6 @@ unsafe fn replace_spellcheck_word(
     );
 }
 
-#[allow(dead_code)]
 unsafe fn handle_spellcheck_suggestion(hwnd: HWND, index: usize) {
     let ctx = with_state(hwnd, |state| state.spellcheck_context.clone()).unwrap_or(None);
     let Some(ctx) = ctx else {
@@ -6070,27 +6065,6 @@ unsafe fn open_path_with_behavior(hwnd: HWND, path: &Path) {
     open_document_with_encoding(hwnd, path, None);
 }
 
-#[allow(dead_code)]
-unsafe fn open_recent_by_index(hwnd: HWND, index: usize) {
-    let path = with_state(hwnd, |state| state.recent_files.get(index).cloned()).unwrap_or(None);
-    let Some(path) = path else {
-        return;
-    };
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    if !path.exists() {
-        show_error(hwnd, language, &recent_missing_message(language));
-        let files = with_state(hwnd, |state| {
-            state.recent_files.retain(|p| p != &path);
-            update_recent_menu(hwnd, state.hmenu_recent);
-            state.recent_files.clone()
-        })
-        .unwrap_or_default();
-        save_recent_files(&files);
-        return;
-    }
-    open_path_with_behavior(hwnd, &path);
-}
-
 pub(crate) unsafe fn with_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut AppState) -> R,
@@ -6494,24 +6468,6 @@ pub(crate) unsafe fn show_info(hwnd: HWND, language: Language, message: &str) {
     );
 }
 
-#[allow(dead_code)]
-pub(crate) unsafe fn send_open_file(hwnd: HWND, path: &str) -> bool {
-    let wide = to_wide(path);
-    let data = COPYDATASTRUCT {
-        dwData: COPYDATA_OPEN_FILE,
-        cbData: (wide.len() * std::mem::size_of::<u16>()) as u32,
-        lpData: wide.as_ptr() as *mut std::ffi::c_void,
-    };
-    SendMessageW(
-        hwnd,
-        WM_COPYDATA,
-        WPARAM(0),
-        LPARAM(&data as *const _ as isize),
-    );
-    crate::log_if_err!(PostMessageW(hwnd, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)));
-    true
-}
-
 pub(crate) fn recent_store_path() -> Option<PathBuf> {
     let mut path = settings::settings_dir();
     path.push("recent.json");
@@ -6900,32 +6856,6 @@ pub(crate) unsafe fn save_file_dialog_with_encoding(
         Some((path, index_to_encoding(selected_encoding_idx)))
     } else {
         pfd.Unadvise(cookie).ok()?;
-        None
-    }
-}
-
-#[allow(dead_code)]
-unsafe fn save_file_dialog_mp4(hwnd: HWND, suggested_name: Option<&str>) -> Option<PathBuf> {
-    let pfd: IFileSaveDialog = CoCreateInstance(&FileSaveDialog, None, CLSCTX_ALL).ok()?;
-
-    let filter_spec = [COMDLG_FILTERSPEC {
-        pszName: w!("MP4 Video"),
-        pszSpec: w!("*.mp4"),
-    }];
-    pfd.SetFileTypes(&filter_spec).ok()?;
-    pfd.SetFileTypeIndex(1).ok()?;
-    pfd.SetDefaultExtension(w!("mp4")).ok()?;
-
-    if let Some(name) = suggested_name {
-        pfd.SetFileName(PCWSTR(to_wide(name).as_ptr())).ok()?;
-    }
-
-    if pfd.Show(hwnd).is_ok() {
-        let item = pfd.GetResult().ok()?;
-        let name = item.GetDisplayName(SIGDN_FILESYSPATH).ok()?;
-        let path_str = name.to_string().ok()?;
-        Some(PathBuf::from(path_str))
-    } else {
         None
     }
 }

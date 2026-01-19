@@ -45,6 +45,7 @@ const OPTIONS_ID_MULTILINGUAL: usize = 6004;
 const OPTIONS_ID_SPLIT_ON_NEWLINE: usize = 6007;
 const OPTIONS_ID_WORD_WRAP: usize = 6008;
 const OPTIONS_ID_SMART_QUOTES: usize = 6025;
+const OPTIONS_ID_STRIP_MARKDOWN_KEEP_BULLETS: usize = 6039;
 const OPTIONS_ID_CONTEXT_MENU: usize = 6026;
 const OPTIONS_ID_SPELLCHECK_ENABLED: usize = 6027;
 const OPTIONS_ID_SPELLCHECK_LANGUAGE: usize = 6028;
@@ -179,6 +180,7 @@ struct OptionsDialogState {
     checkbox_split_on_newline: HWND,
     checkbox_word_wrap: HWND,
     checkbox_smart_quotes: HWND,
+    checkbox_strip_markdown_keep_bullets: HWND,
     checkbox_spellcheck: HWND,
     label_spellcheck_language: HWND,
     combo_spellcheck_language: HWND,
@@ -216,6 +218,7 @@ struct OptionsLabels {
     label_split_on_newline: String,
     label_word_wrap: String,
     label_smart_quotes: String,
+    label_strip_markdown_keep_bullets: String,
     label_spellcheck: String,
     label_spellcheck_language: String,
     label_dictionary_translation: String,
@@ -291,6 +294,10 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_split_on_newline: i18n::tr(language, "options.label.split_on_newline"),
         label_word_wrap: i18n::tr(language, "options.label.word_wrap"),
         label_smart_quotes: i18n::tr(language, "options.label.smart_quotes"),
+        label_strip_markdown_keep_bullets: i18n::tr(
+            language,
+            "options.label.strip_markdown_keep_bullets",
+        ),
         label_spellcheck: i18n::tr(language, "options.label.spellcheck"),
         label_spellcheck_language: i18n::tr(language, "options.label.spellcheck_language"),
         label_dictionary_translation: i18n::tr(language, "options.label.dictionary_translation"),
@@ -1106,6 +1113,22 @@ unsafe extern "system" fn options_wndproc(
             );
             y += 26;
 
+            let checkbox_strip_markdown_keep_bullets = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_strip_markdown_keep_bullets).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                170,
+                y,
+                300,
+                20,
+                hwnd,
+                HMENU(OPTIONS_ID_STRIP_MARKDOWN_KEEP_BULLETS as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 26;
+
             let checkbox_spellcheck = CreateWindowExW(
                 Default::default(),
                 WC_BUTTON,
@@ -1390,6 +1413,7 @@ unsafe extern "system" fn options_wndproc(
                 checkbox_split_on_newline,
                 checkbox_word_wrap,
                 checkbox_smart_quotes,
+                checkbox_strip_markdown_keep_bullets,
                 checkbox_spellcheck,
                 label_spellcheck_language,
                 combo_spellcheck_language,
@@ -1455,6 +1479,7 @@ unsafe extern "system" fn options_wndproc(
                 checkbox_split_on_newline,
                 checkbox_word_wrap,
                 checkbox_smart_quotes,
+                checkbox_strip_markdown_keep_bullets,
                 checkbox_spellcheck,
                 label_spellcheck_language,
                 combo_spellcheck_language,
@@ -1675,6 +1700,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         checkbox_split_on_newline,
         checkbox_word_wrap,
         checkbox_smart_quotes,
+        checkbox_strip_markdown_keep_bullets,
         checkbox_spellcheck,
         combo_spellcheck_language,
         _label_dictionary_translation,
@@ -1719,6 +1745,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.checkbox_split_on_newline,
             state.checkbox_word_wrap,
             state.checkbox_smart_quotes,
+            state.checkbox_strip_markdown_keep_bullets,
             state.checkbox_spellcheck,
             state.combo_spellcheck_language,
             state.label_dictionary_translation,
@@ -2058,6 +2085,16 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         checkbox_smart_quotes,
         BM_SETCHECK,
         WPARAM(if settings.smart_quotes {
+            BST_CHECKED.0 as usize
+        } else {
+            0
+        }),
+        LPARAM(0),
+    );
+    SendMessageW(
+        checkbox_strip_markdown_keep_bullets,
+        BM_SETCHECK,
+        WPARAM(if settings.strip_markdown_keep_bullets {
             BST_CHECKED.0 as usize
         } else {
             0
@@ -2732,6 +2769,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         checkbox_split_on_newline,
         checkbox_word_wrap,
         checkbox_smart_quotes,
+        checkbox_strip_markdown_keep_bullets,
         checkbox_spellcheck,
         combo_spellcheck_language,
         combo_dictionary_translation,
@@ -2767,6 +2805,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.checkbox_split_on_newline,
             state.checkbox_word_wrap,
             state.checkbox_smart_quotes,
+            state.checkbox_strip_markdown_keep_bullets,
             state.checkbox_spellcheck,
             state.combo_spellcheck_language,
             state.combo_dictionary_translation,
@@ -2893,6 +2932,14 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         == BST_CHECKED.0;
     settings.smart_quotes = SendMessageW(checkbox_smart_quotes, BM_GETCHECK, WPARAM(0), LPARAM(0)).0
         as u32
+        == BST_CHECKED.0;
+    settings.strip_markdown_keep_bullets = SendMessageW(
+        checkbox_strip_markdown_keep_bullets,
+        BM_GETCHECK,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0 as u32
         == BST_CHECKED.0;
     settings.spellcheck_enabled =
         SendMessageW(checkbox_spellcheck, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
@@ -3229,6 +3276,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
         for control in [
             state.checkbox_word_wrap,
             state.checkbox_smart_quotes,
+            state.checkbox_strip_markdown_keep_bullets,
             state.checkbox_spellcheck,
             state.label_spellcheck_language,
             state.combo_spellcheck_language,

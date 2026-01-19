@@ -165,6 +165,8 @@ pub struct AppSettings {
     pub word_wrap: bool,
     pub wrap_width: u32,
     pub smart_quotes: bool,
+    #[serde(default)]
+    pub strip_markdown_keep_bullets: bool,
     pub quote_prefix: String,
     pub move_cursor_during_reading: bool,
     pub audiobook_skip_seconds: u32,
@@ -273,6 +275,7 @@ impl Default for AppSettings {
             word_wrap: true,
             wrap_width: 80,
             smart_quotes: false,
+            strip_markdown_keep_bullets: false,
             quote_prefix: "> ".to_string(),
             move_cursor_during_reading: false,
             audiobook_skip_seconds: 60,
@@ -432,9 +435,6 @@ pub fn settings_dir() -> PathBuf {
 fn get_settings_path() -> PathBuf {
     resolve_settings_dir().join("settings.json")
 }
-
-#[allow(dead_code)]
-const PORTABLE_MODE: bool = cfg!(feature = "portable");
 
 fn system_language() -> Language {
     let mut buffer = [0u16; 85];
@@ -929,9 +929,4 @@ pub fn untitled_title(language: Language, number: usize) -> String {
     } else {
         format!("{} {}", base, number)
     }
-}
-
-#[allow(dead_code)]
-pub fn recent_missing_message(language: Language) -> String {
-    crate::i18n::tr(language, "app.recent_missing")
 }

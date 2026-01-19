@@ -359,15 +359,27 @@ fn is_ppt_placeholder_levels(lower: &str) -> bool {
 fn parse_ppt_records(data: &[u8], out: &mut Vec<String>) {
     let mut pos = 0usize;
     while pos + 8 <= data.len() {
-        let ver_inst = match read_u16_le(data, pos) {
+        let ver_inst = match data
+            .get(pos..pos + 2)
+            .and_then(|slice| slice.try_into().ok())
+            .map(u16::from_le_bytes)
+        {
             Some(v) => v,
             None => break,
         };
-        let rec_type = match read_u16_le(data, pos + 2) {
+        let rec_type = match data
+            .get(pos + 2..pos + 4)
+            .and_then(|slice| slice.try_into().ok())
+            .map(u16::from_le_bytes)
+        {
             Some(v) => v,
             None => break,
         };
-        let rec_len = match read_u32_le(data, pos + 4) {
+        let rec_len = match data
+            .get(pos + 4..pos + 8)
+            .and_then(|slice| slice.try_into().ok())
+            .map(u32::from_le_bytes)
+        {
             Some(v) => v as usize,
             None => break,
         };
@@ -783,7 +795,10 @@ fn find_piece_table(table: &[u8]) -> Option<Vec<DocPiece>> {
             i += 1;
             continue;
         }
-        let lcb = read_u32_le(table, i + 1)? as usize;
+        let lcb = table
+            .get(i + 1..i + 5)
+            .and_then(|slice| slice.try_into().ok())
+            .map(u32::from_le_bytes)? as usize;
         let start = i + 5;
         let end = start.saturating_add(lcb);
         if lcb < 4 || end > table.len() {
@@ -818,7 +833,11 @@ fn parse_plc_pcd(data: &[u8]) -> Option<Vec<DocPiece>> {
     let cp_count = piece_count + 1;
     let mut cps = Vec::with_capacity(cp_count);
     for idx in 0..cp_count {
-        cps.push(read_u32_le(data, idx * 4)?);
+        let value = data
+            .get(idx * 4..idx * 4 + 4)
+            .and_then(|slice| slice.try_into().ok())
+            .map(u32::from_le_bytes)?;
+        cps.push(value);
     }
     if cps.windows(2).any(|w| w[1] < w[0]) {
         return None;
@@ -830,7 +849,10 @@ fn parse_plc_pcd(data: &[u8]) -> Option<Vec<DocPiece>> {
         if off + 8 > data.len() {
             return None;
         }
-        let fc_raw = read_u32_le(data, off + 2)?;
+        let fc_raw = data
+            .get(off + 2..off + 6)
+            .and_then(|slice| slice.try_into().ok())
+            .map(u32::from_le_bytes)?;
         let compressed = (fc_raw & 1) == 1;
         let fc = fc_raw & 0xFFFFFFFE;
         let offset = if compressed {
@@ -845,25 +867,6 @@ fn parse_plc_pcd(data: &[u8]) -> Option<Vec<DocPiece>> {
         });
     }
     Some(pieces)
-}
-
-fn read_u32_le(data: &[u8], offset: usize) -> Option<u32> {
-    if offset + 4 > data.len() {
-        return None;
-    }
-    Some(u32::from_le_bytes([
-        data[offset],
-        data[offset + 1],
-        data[offset + 2],
-        data[offset + 3],
-    ]))
-}
-
-fn read_u16_le(data: &[u8], offset: usize) -> Option<u16> {
-    if offset + 2 > data.len() {
-        return None;
-    }
-    Some(u16::from_le_bytes([data[offset], data[offset + 1]]))
 }
 
 fn clean_doc_text(text: String) -> String {

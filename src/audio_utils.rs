@@ -84,17 +84,6 @@ impl WavWriter {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    pub fn write_samples_i16(&mut self, samples: &[i16]) -> Result<(), AudioError> {
-        let mut buf = Vec::with_capacity(samples.len() * 2);
-        for sample in samples {
-            buf.extend_from_slice(&sample.to_le_bytes());
-        }
-        self.file.write_all(&buf)?;
-        self.data_size = self.data_size.saturating_add(buf.len() as u32);
-        Ok(())
-    }
-
     pub fn write_samples_f32(&mut self, samples: &[f32]) -> Result<(), AudioError> {
         // Convert f32 samples (-1.0 to 1.0) to i16
         let mut buf = Vec::with_capacity(samples.len() * 2);

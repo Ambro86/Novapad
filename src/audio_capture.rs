@@ -15,7 +15,6 @@ use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance};
 
 /// Audio sample without timestamp (will be calculated by encoder)
 #[derive(Clone)]
-#[allow(dead_code)]
 pub struct AudioSample {
     pub data: Vec<i16>, // 16-bit PCM stereo samples
     pub sample_rate: u32,
@@ -23,14 +22,12 @@ pub struct AudioSample {
 }
 
 /// Thread-safe queue for audio samples
-#[allow(dead_code)]
 pub struct AudioQueue {
     inner: Mutex<Vec<AudioSample>>,
     condvar: Condvar,
     max_samples: usize,
 }
 
-#[allow(dead_code)]
 impl AudioQueue {
     pub fn new(max_samples: usize) -> Self {
         AudioQueue {
@@ -80,7 +77,6 @@ impl AudioQueue {
 }
 
 /// Handle to control audio recording
-#[allow(dead_code)]
 pub struct AudioRecorderHandle {
     stop: Arc<AtomicBool>,
     thread: Option<JoinHandle<Result<(), String>>>,
@@ -89,7 +85,6 @@ pub struct AudioRecorderHandle {
     pub channels: u16,
 }
 
-#[allow(dead_code)]
 impl AudioRecorderHandle {
     /// Signal audio recording to stop (without waiting)
     pub fn signal_stop(&self) {
@@ -121,7 +116,6 @@ impl AudioRecorderHandle {
 }
 
 /// Create an AudioRecorderHandle from components (for internal use)
-#[allow(dead_code)]
 pub fn create_audio_recorder_handle(
     stop: Arc<AtomicBool>,
     thread: JoinHandle<Result<(), String>>,
@@ -139,7 +133,6 @@ pub fn create_audio_recorder_handle(
 }
 
 /// Start audio recording using WASAPI loopback
-#[allow(dead_code)]
 pub fn start_audio_recording() -> Result<AudioRecorderHandle, String> {
     let audio_queue = Arc::new(AudioQueue::new(3000)); // Large buffer to prevent overflow
     let stop = Arc::new(AtomicBool::new(false));
@@ -166,7 +159,6 @@ pub fn start_audio_recording() -> Result<AudioRecorderHandle, String> {
 }
 
 /// Get the audio format that will be used for capture
-#[allow(dead_code)]
 fn get_audio_format() -> Result<(u32, u16), String> {
     let _com = ComGuard::new_sta().map_err(|e| format!("CoInitializeEx failed: {:?}", e))?;
 
@@ -195,7 +187,6 @@ fn get_audio_format() -> Result<(u32, u16), String> {
     }
 }
 
-#[allow(dead_code)]
 fn audio_capture_loop(audio_queue: Arc<AudioQueue>, stop: Arc<AtomicBool>) -> Result<(), String> {
     // Initialize COM for this thread - will be cleaned up when _com goes out of scope
     let _com = ComGuard::new_sta().map_err(|e| format!("CoInitializeEx failed: {:?}", e))?;
@@ -203,7 +194,6 @@ fn audio_capture_loop(audio_queue: Arc<AudioQueue>, stop: Arc<AtomicBool>) -> Re
     unsafe { audio_capture_loop_impl(audio_queue, stop) }
 }
 
-#[allow(dead_code)]
 unsafe fn audio_capture_loop_impl(
     audio_queue: Arc<AudioQueue>,
     stop: Arc<AtomicBool>,

@@ -1,11 +1,9 @@
 use scraper::{Html, Selector};
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct ArticleContent {
     pub title: String,
     pub content: String,
-    pub excerpt: String,
 }
 
 fn decode_unicode(input: &str) -> String {
@@ -294,12 +292,9 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
 
     let content = clean_text(&final_text);
     let final_content = collapse_blank_lines(&content);
-    let excerpt = final_content.chars().take(300).collect::<String>();
-
     Some(ArticleContent {
         title: title.trim().to_string(),
         content: final_content,
-        excerpt,
     })
 }
 
@@ -340,21 +335,4 @@ pub fn collapse_blank_lines(s: &str) -> String {
         }
     }
     out.trim_end_matches('\n').to_string()
-}
-
-#[allow(dead_code)]
-pub fn extract_article_links_from_html(_: &str, _: &str, _: usize) -> Vec<(String, String)> {
-    Vec::new()
-}
-#[allow(dead_code)]
-pub fn extract_hub_links_from_html(_: &str, _: &str, _: usize) -> Vec<String> {
-    Vec::new()
-}
-#[allow(dead_code)]
-pub fn extract_feed_links_from_html(_: &str, _: &str) -> Vec<String> {
-    Vec::new()
-}
-#[allow(dead_code)]
-pub fn extract_page_title(html: &str, _: &str) -> String {
-    pick_title(&Html::parse_document(html))
 }

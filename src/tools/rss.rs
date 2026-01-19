@@ -61,24 +61,19 @@ pub struct RssSource {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct RssItem {
     pub title: String,
     pub link: String,
     pub description: String,
     pub is_folder: bool,
     pub guid: String,
-    pub published: Option<i64>,
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct PodcastEpisode {
     pub title: String,
     pub link: String,
-    pub description: String,
     pub guid: String,
-    pub published: Option<i64>,
     pub enclosure_url: Option<String>,
     pub enclosure_type: Option<String>,
     pub chapters_url: Option<String>,
@@ -87,13 +82,9 @@ pub struct PodcastEpisode {
 }
 
 #[derive(Debug, Clone, Copy)]
-#[allow(dead_code)]
 pub struct RssFetchConfig {
     pub max_items_per_feed: usize,
     pub max_excerpt_chars: usize,
-    pub cooldown_blocked_secs: u64,
-    pub cooldown_not_found_secs: u64,
-    pub cooldown_rate_limited_secs: u64,
 }
 
 impl Default for RssFetchConfig {
@@ -101,21 +92,12 @@ impl Default for RssFetchConfig {
         Self {
             max_items_per_feed: 5000,
             max_excerpt_chars: 512,
-            cooldown_blocked_secs: 3600,
-            cooldown_not_found_secs: 86400,
-            cooldown_rate_limited_secs: 300,
         }
     }
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub enum FeedFetchError {
-    InCooldown {
-        until: i64,
-        kind: String,
-        cache: RssFeedCache,
-    },
     HttpStatus {
         status: u16,
         kind: String,
@@ -130,9 +112,6 @@ pub enum FeedFetchError {
 impl std::fmt::Display for FeedFetchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FeedFetchError::InCooldown { until, kind, .. } => {
-                write!(f, "Feed in cooldown ({kind}) until {until}")
-            }
             FeedFetchError::HttpStatus { status, kind, .. } => {
                 write!(f, "HTTP {status} ({kind})")
             }
@@ -141,24 +120,10 @@ impl std::fmt::Display for FeedFetchError {
     }
 }
 
-#[allow(dead_code)]
-impl FeedFetchError {
-    fn cache_clone(&self) -> RssFeedCache {
-        match self {
-            FeedFetchError::InCooldown { cache, .. } => cache.clone(),
-            FeedFetchError::HttpStatus { cache, .. } => cache.clone(),
-            FeedFetchError::Network { cache, .. } => cache.clone(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
-#[allow(dead_code)]
 pub struct RssHttpConfig {
     pub global_max_concurrency: usize,
     pub per_host_max_concurrency: usize,
-    pub per_host_rps: u32,
-    pub per_host_burst: u32,
     pub max_retries: usize,
     pub backoff_max_secs: u64,
 }
@@ -168,8 +133,6 @@ impl Default for RssHttpConfig {
         Self {
             global_max_concurrency: 8,
             per_host_max_concurrency: 2,
-            per_host_rps: 1,
-            per_host_burst: 2,
             max_retries: 4,
             backoff_max_secs: 120,
         }
@@ -193,12 +156,10 @@ pub struct PodcastFetchOutcome {
     pub not_modified: bool,
 }
 
-#[allow(dead_code)]
 struct RssHttp {
     client: HttpClient,
     global_sem: Arc<Semaphore>,
     per_host_sem: Mutex<HashMap<String, Arc<Semaphore>>>,
-    rate_state: Mutex<HashMap<String, HostRateState>>,
     config: RssHttpConfig,
 }
 
@@ -231,7 +192,6 @@ impl RssHttp {
             client,
             global_sem: Arc::new(Semaphore::new(config.global_max_concurrency.max(1))),
             per_host_sem: Mutex::new(HashMap::new()),
-            rate_state: Mutex::new(HashMap::new()),
             config,
         })
     }
@@ -267,13 +227,6 @@ impl RssHttp {
 struct RequestPermits {
     _global: OwnedSemaphorePermit,
     _host: OwnedSemaphorePermit,
-}
-
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-struct HostRateState {
-    tokens: f64,
-    last: Instant,
 }
 
 static RSS_HTTP: OnceLock<Result<RssHttp, String>> = OnceLock::new();
@@ -392,34 +345,6 @@ fn compute_backoff(attempt: usize, max_secs: u64) -> Duration {
     Duration::from_secs(secs)
 }
 
-struct RequestLogInfo<'a> {
-    url: &'a str,
-    host: &'a str,
-    fetch_kind: &'a str,
-    attempt: usize,
-    status: Option<StatusCode>,
-    not_modified: bool,
-    backoff: Option<Duration>,
-    err: Option<&'a str>,
-}
-
-#[allow(dead_code)]
-fn log_request_attempt(info: RequestLogInfo) {
-    let status_code = info.status.map(|s| s.as_u16()).unwrap_or(0);
-    let backoff_ms = info.backoff.map(|d| d.as_millis()).unwrap_or(0);
-    log_debug(&format!(
-        "rss_request kind=\"{}\" url=\"{}\" host=\"{}\" attempt={} status={} not_modified={} backoff_ms={} error=\"{}\"",
-        info.fetch_kind,
-        info.url,
-        info.host,
-        info.attempt,
-        status_code,
-        info.not_modified,
-        backoff_ms,
-        info.err.unwrap_or("")
-    ));
-}
-
 fn parse_feed_bytes(
     bytes: Vec<u8>,
     fallback_title: &str,
@@ -448,7 +373,6 @@ fn parse_feed_bytes(
             } else {
                 title.clone()
             };
-            let published = entry.published.or(entry.updated).map(|d| d.timestamp());
             let description = entry
                 .summary
                 .as_ref()
@@ -461,7 +385,6 @@ fn parse_feed_bytes(
                 description,
                 is_folder: false,
                 guid,
-                published,
             }
         })
         .collect();
@@ -471,7 +394,6 @@ fn parse_feed_bytes(
 fn parse_podcast_feed_bytes(
     bytes: Vec<u8>,
     fallback_title: &str,
-    max_excerpt_chars: usize,
 ) -> Option<(String, Vec<PodcastEpisode>)> {
     let cursor = Cursor::new(bytes);
     let feed = parser::parse(cursor).ok()?;
@@ -496,22 +418,12 @@ fn parse_podcast_feed_bytes(
             } else {
                 title.clone()
             };
-            let published = entry.published.or(entry.updated).map(|d| d.timestamp());
-            let description = entry
-                .summary
-                .as_ref()
-                .map(|s| s.content.clone())
-                .or_else(|| entry.content.as_ref().and_then(|c| c.body.clone()))
-                .unwrap_or_default();
-            let description = truncate_excerpt(&description, max_excerpt_chars);
             let (enclosure_url, enclosure_type) = select_podcast_enclosure(&entry);
             let (chapters_url, chapters_type) = select_podcast_chapters_link(&entry);
             PodcastEpisode {
                 title,
                 link,
-                description,
                 guid,
-                published,
                 enclosure_url,
                 enclosure_type,
                 chapters_url,
@@ -859,7 +771,6 @@ pub async fn fetch_article_text(
     let article = reader::reader_mode_extract(&html).unwrap_or(reader::ArticleContent {
         title: fallback_title.to_string(),
         content: fallback_description.to_string(),
-        excerpt: String::new(),
     });
     log_debug(&format!(
         "rss_article_fetch_done ms={} url=\"{url_str}\"",
@@ -871,8 +782,6 @@ pub fn config_from_settings(settings: &crate::settings::AppSettings) -> RssHttpC
     RssHttpConfig {
         global_max_concurrency: settings.rss_global_max_concurrency,
         per_host_max_concurrency: settings.rss_per_host_max_concurrency,
-        per_host_rps: settings.rss_per_host_rps,
-        per_host_burst: settings.rss_per_host_burst,
         max_retries: settings.rss_max_retries,
         backoff_max_secs: settings.rss_backoff_max_secs,
     }
@@ -882,9 +791,6 @@ pub fn fetch_config_from_settings(settings: &crate::settings::AppSettings) -> Rs
     RssFetchConfig {
         max_items_per_feed: settings.rss_max_items_per_feed,
         max_excerpt_chars: settings.rss_max_excerpt_chars,
-        cooldown_blocked_secs: settings.rss_cooldown_blocked_secs,
-        cooldown_not_found_secs: settings.rss_cooldown_not_found_secs,
-        cooldown_rate_limited_secs: settings.rss_cooldown_rate_limited_secs,
     }
 }
 
@@ -920,7 +826,7 @@ pub async fn fetch_podcast_feed(
             not_modified: true,
         });
     }
-    if let Some((title, items)) = parse_podcast_feed_bytes(out.bytes, &url, cfg.max_excerpt_chars) {
+    if let Some((title, items)) = parse_podcast_feed_bytes(out.bytes, &url) {
         return Ok(PodcastFetchOutcome {
             title,
             items: dedup_podcast_items(items, cfg.max_items_per_feed),

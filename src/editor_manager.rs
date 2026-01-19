@@ -284,10 +284,6 @@ where
     let Some(hwnd_edit) = crate::get_active_edit(hwnd) else {
         return false;
     };
-    let text = get_edit_text(hwnd_edit);
-    if text.is_empty() {
-        return false;
-    }
 
     let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
     SendMessageW(
@@ -297,28 +293,35 @@ where
         LPARAM(&mut selection as *mut _ as isize),
     );
 
-    let (affected_start, affected_end) = if selection.cpMin != selection.cpMax {
-        // Operates strictly on the selection.
-        // However, we must ensure we get the bytes correct.
-        let start_byte = utf16_index_to_byte(&text, selection.cpMin);
-        let end_byte = utf16_index_to_byte(&text, selection.cpMax);
-        (start_byte, end_byte)
+    if selection.cpMin > selection.cpMax {
+        std::mem::swap(&mut selection.cpMin, &mut selection.cpMax);
+    }
+
+    let (affected, replace_range) = if selection.cpMin != selection.cpMax {
+        let affected = get_text_range(hwnd_edit, selection);
+        if affected.is_empty() {
+            return false;
+        }
+        (affected, selection)
     } else {
-        // Whole document
-        (0, text.len())
+        let text = get_edit_text(hwnd_edit);
+        if text.is_empty() {
+            return false;
+        }
+        let replace_range = CHARRANGE {
+            cpMin: 0,
+            cpMax: byte_index_to_utf16(&text, text.len()),
+        };
+        (text, replace_range)
     };
 
-    let affected = &text[affected_start..affected_end];
-    let processed = op(affected);
+    let processed = op(&affected);
 
     if processed == affected {
         return false;
     }
 
-    let mut replace_range = CHARRANGE {
-        cpMin: byte_index_to_utf16(&text, affected_start),
-        cpMax: byte_index_to_utf16(&text, affected_end),
-    };
+    let mut replace_range = replace_range;
 
     // Select the range to be replaced
     SendMessageW(
@@ -343,7 +346,7 @@ where
     // EM_REPLACESEL with 1 (fCanUndo) often handles caret, but let's ensure selection is set to the new block.
     // The previous selection started at `replace_range.cpMin`.
     // The new end is `replace_range.cpMin + processed_utf16_len`.
-    let new_len_utf16 = processed.chars().map(|c| c.len_utf16() as i32).sum::<i32>();
+    let new_len_utf16 = processed.encode_utf16().count() as i32;
     let mut new_selection = CHARRANGE {
         cpMin: replace_range.cpMin,
         cpMax: replace_range.cpMin + new_len_utf16,
@@ -359,6 +362,29 @@ where
     mark_dirty_from_edit(hwnd, hwnd_edit);
     SetFocus(hwnd_edit);
     true
+}
+
+fn get_text_range(hwnd_edit: HWND, range: CHARRANGE) -> String {
+    let len = (range.cpMax - range.cpMin).max(0) as usize;
+    if len == 0 {
+        return String::new();
+    }
+    let mut buf = vec![0u16; len + 1];
+    let mut text_range = TEXTRANGEW {
+        chrg: range,
+        lpstrText: PWSTR(buf.as_mut_ptr()),
+    };
+    let copied = unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_GETTEXTRANGE,
+            WPARAM(0),
+            LPARAM(&mut text_range as *mut _ as isize),
+        )
+    }
+    .0 as usize;
+    let used = copied.min(len);
+    String::from_utf16_lossy(&buf[..used])
 }
 
 pub unsafe fn apply_word_wrap_to_all_edits(hwnd: HWND, word_wrap: bool) {
@@ -509,7 +535,9 @@ pub unsafe fn strip_markdown_active_edit(hwnd: HWND) -> bool {
     if text.is_empty() {
         return false;
     }
-    let cleaned = strip_markdown_text(&text);
+    let keep_bullets =
+        with_state(hwnd, |state| state.settings.strip_markdown_keep_bullets).unwrap_or(false);
+    let cleaned = strip_markdown_text(&text, keep_bullets);
     if cleaned == text {
         return false;
     }
@@ -1764,7 +1792,7 @@ fn byte_index_to_utf16(text: &str, byte_idx: usize) -> i32 {
     utf16_count as i32
 }
 
-fn strip_markdown_text(text: &str) -> String {
+fn strip_markdown_text(text: &str, keep_bullets: bool) -> String {
     let mut out = String::with_capacity(text.len());
     for line in text.split_inclusive('\n') {
         let (content, line_end) = if let Some(pos) = line.find('\n') {
@@ -1773,6 +1801,9 @@ fn strip_markdown_text(text: &str) -> String {
             (line, "")
         };
         let mut trimmed = content.trim_start();
+        if is_markdown_horizontal_rule(trimmed) {
+            continue;
+        }
         if trimmed.starts_with("```") {
             trimmed = trimmed.trim_start_matches('`').trim_start();
         }
@@ -1782,14 +1813,43 @@ fn strip_markdown_text(text: &str) -> String {
         if trimmed.starts_with('>') {
             trimmed = trimmed.trim_start_matches('>').trim_start();
         }
+        let mut line: std::borrow::Cow<'_, str> = std::borrow::Cow::Borrowed(trimmed);
         if trimmed.starts_with("- ") || trimmed.starts_with("* ") || trimmed.starts_with("+ ") {
-            trimmed = trimmed[2..].trim_start();
+            if keep_bullets {
+                let bullet = trimmed.chars().next().unwrap_or('-');
+                let rest = trimmed[1..].trim_start();
+                line = std::borrow::Cow::Owned(format!("{bullet} {rest}"));
+            } else {
+                line = std::borrow::Cow::Borrowed(trimmed[2..].trim_start());
+            }
         }
-        let mut cleaned = strip_markdown_inline(trimmed);
+        let mut cleaned = strip_markdown_inline(line.as_ref());
         cleaned.push_str(line_end);
         out.push_str(&cleaned);
     }
     out
+}
+
+fn is_markdown_horizontal_rule(text: &str) -> bool {
+    let mut marker = None;
+    let mut count = 0usize;
+    for ch in text.chars() {
+        if ch == ' ' || ch == '\t' {
+            continue;
+        }
+        if ch != '-' && ch != '*' && ch != '_' {
+            return false;
+        }
+        if let Some(prev) = marker {
+            if prev != ch {
+                return false;
+            }
+        } else {
+            marker = Some(ch);
+        }
+        count += 1;
+    }
+    count >= 3
 }
 
 fn strip_markdown_inline(text: &str) -> String {

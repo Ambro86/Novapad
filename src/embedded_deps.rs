@@ -18,16 +18,6 @@ const SOUNDTOUCH_DLL: &[u8] = include_bytes!("../dll/SoundTouch64.dll");
 // NVDA: integrazione con screen reader tramite controller client.
 const NVDA_CLIENT_DLL: &[u8] = include_bytes!("../dll/nvdaControllerClient64.dll");
 
-/// Calcola un hash semplice per verificare se il file è cambiato
-#[allow(dead_code)]
-fn simple_hash(data: &[u8]) -> u64 {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-    let mut hasher = DefaultHasher::new();
-    data.hash(&mut hasher);
-    hasher.finish()
-}
-
 /// Scrive un file solo se non esiste o se l'hash è diverso
 fn write_if_changed(path: &PathBuf, data: &[u8]) -> std::io::Result<bool> {
     if path.exists() {
@@ -95,27 +85,10 @@ pub fn get_dep_path(name: &str) -> PathBuf {
     crate::settings::settings_dir().join(name)
 }
 
-/// Ritorna il path di libcurl.dll
-#[allow(dead_code)]
-pub fn libcurl_path() -> PathBuf {
-    get_dep_path("libcurl.dll")
-}
-
 /// Ritorna il path di cacert.pem
 pub fn cacert_path() -> PathBuf {
     get_dep_path("cacert.pem")
 }
 
-/// Ritorna il path di SoundTouch64.dll
-#[allow(dead_code)]
-pub fn soundtouch_path() -> PathBuf {
-    get_dep_path("SoundTouch64.dll")
-}
-
-/// Ritorna il path di nvdaControllerClient64.dll
-#[allow(dead_code)]
-pub fn nvda_client_path() -> PathBuf {
-    get_dep_path("nvdaControllerClient64.dll")
-}
 // SAPI4 bridge: helper 32-bit per salvataggio su file.
 const SAPI4_BRIDGE_32_EXE: &[u8] = include_bytes!("../dll/sapi4_bridge_32.exe");

@@ -144,6 +144,7 @@
   "options.label.split_on_newline": "Separar leitura em novas linhas",
   "options.label.word_wrap": "Quebra automatica no editor",
   "options.label.smart_quotes": "Aspas inteligentes",
+  "options.label.strip_markdown_keep_bullets": "Manter marcadores ao remover Markdown",
   "options.label.spellcheck": "Corretor ortográfico",
   "options.label.spellcheck_language": "Idioma do corretor:",
   "options.label.dictionary_translation": "Idioma da traducao do dicionario:",

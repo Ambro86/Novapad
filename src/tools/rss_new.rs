@@ -27,7 +27,6 @@
     let article = reader::reader_mode_extract(&html).unwrap_or(reader::ArticleContent {
         title: fallback_title.to_string(),
         content: fallback_description.to_string(),
-        excerpt: String::new(),
     });
     log_debug(&format!(
         "rss_article_fetch_done ms={} url=\"{}\"",

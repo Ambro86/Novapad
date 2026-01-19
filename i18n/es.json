@@ -144,6 +144,7 @@
   "options.label.split_on_newline": "Separar lectura en saltos de linea",
   "options.label.word_wrap": "Ajuste de linea en el editor",
   "options.label.smart_quotes": "Comillas tipograficas",
+  "options.label.strip_markdown_keep_bullets": "Mantener viñetas al quitar Markdown",
   "options.label.spellcheck": "Corrector ortográfico",
   "options.label.spellcheck_language": "Idioma del corrector:",
   "options.label.dictionary_translation": "Idioma de traduccion del diccionario:",

@@ -534,10 +534,10 @@ fn get_mode_name(info: &TTSMODEINFO) -> String {
 }
 
 fn list_voices() {
+    let mut enum_ptr: *mut ITTSEnum = ptr::null_mut();
+    
     unsafe {
         CoInitializeEx(ptr::null_mut(), 0x2);
-
-        let mut enum_ptr: *mut ITTSEnum = ptr::null_mut();
         let hr = CoCreateInstance(
             &CLSID_TTSENUMERATOR,
             ptr::null_mut(),
@@ -545,34 +545,39 @@ fn list_voices() {
             &IID_ITTSENUM,
             &mut enum_ptr as *mut _ as *mut _
         );
-
         if hr != S_OK || enum_ptr.is_null() {
             eprintln!("Failed to create TTSEnumerator, hr={:#x}", hr);
             return;
         }
+    }
 
+    let vtbl = unsafe {
         let tts_enum = &*enum_ptr;
-        let vtbl = &*tts_enum.lpVtbl;
+        &(*tts_enum.lpVtbl)
+    };
 
+    unsafe {
         (vtbl.reset)(enum_ptr);
+    }
 
-        eprintln!("sizeof TTSMODEINFO = {}", std::mem::size_of::<TTSMODEINFO>());
+    eprintln!("sizeof TTSMODEINFO = {}", std::mem::size_of::<TTSMODEINFO>());
 
-        let mut idx = 1u32;
-        loop {
-            let mut mode_info: TTSMODEINFO = std::mem::zeroed();
-            let mut fetched: u32 = 0;
+    let mut idx = 1u32;
+    loop {
+        let mut mode_info: TTSMODEINFO = unsafe { std::mem::zeroed() };
+        let mut fetched: u32 = 0;
 
-            let hr = (vtbl.next)(enum_ptr, 1, &mut mode_info, &mut fetched);
-            if hr != S_OK || fetched == 0 {
-                break;
-            }
-
-            let name = get_mode_name(&mode_info);
-            println!("VOICE:{}|{}", idx, name);
-            idx += 1;
+        let hr = unsafe { (vtbl.next)(enum_ptr, 1, &mut mode_info, &mut fetched) };
+        if hr != S_OK || fetched == 0 {
+            break;
         }
 
+        let name = get_mode_name(&mode_info);
+        println!("VOICE:{}|{}", idx, name);
+        idx += 1;
+    }
+
+    unsafe {
         (vtbl.release)(enum_ptr);
     }
 }
@@ -742,56 +747,63 @@ unsafe fn speak_text(central_ptr: *mut ITTSCentral, text: &str) -> i32 {
 }
 
 fn run_server(target_idx: u32, rate: Option<i32>, pitch: Option<i32>, volume: Option<i32>) {
+    let (enum_ptr, central_ptr) = unsafe {
+        match init_central(target_idx) {
+            Some(res) => res,
+            None => return,
+        }
+    };
+
+    let central_vtbl = unsafe { &*(*central_ptr).lpVtbl };
+    let enum_vtbl = unsafe { &*(*enum_ptr).lpVtbl };
+
     unsafe {
-        let Some((enum_ptr, central_ptr)) = init_central(target_idx) else {
-            return;
-        };
-        let tts_enum = &*enum_ptr;
-        let vtbl = &*tts_enum.lpVtbl;
-        let tts_central = &*central_ptr;
-        let central_vtbl = &*tts_central.lpVtbl;
-
         apply_tts_attributes(central_ptr, rate, pitch, volume);
-        let rx = spawn_command_reader();
-        let mut running = true;
+    }
 
-        while running {
-            let mut msg: MSG = std::mem::zeroed();
+    let rx = spawn_command_reader();
+    let mut running = true;
+
+    while running {
+        let mut msg: MSG = unsafe { std::mem::zeroed() };
+        unsafe {
             while PeekMessageW(&mut msg, ptr::null_mut(), 0, 0, PM_REMOVE) != 0 {
                 TranslateMessage(&msg);
                 DispatchMessageW(&msg);
             }
-
-            match rx.try_recv() {
-                Ok(ServerCommand::Speak(text)) => {
-                    let hr = speak_text(central_ptr, &text);
-                    if hr != S_OK {
-                        eprintln!("TextData failed, hr={:#x}", hr);
-                    }
-                }
-                Ok(ServerCommand::Pause) => {
-                    let hr = (central_vtbl.audio_pause)(central_ptr);
-                    if hr != S_OK { eprintln!("AudioPause failed: {:#x}", hr); }
-                }
-                Ok(ServerCommand::Resume) => {
-                    let hr = (central_vtbl.audio_resume)(central_ptr);
-                    if hr != S_OK { eprintln!("AudioResume failed: {:#x}", hr); }
-                }
-                Ok(ServerCommand::Stop) => {
-                    let hr = (central_vtbl.audio_reset)(central_ptr);
-                    if hr != S_OK { eprintln!("AudioReset failed: {:#x}", hr); }
-                    running = false;
-                }
-                Ok(ServerCommand::Quit) => { running = false; }
-                Err(mpsc::TryRecvError::Disconnected) => { running = false; }
-                Err(mpsc::TryRecvError::Empty) => {}
-            }
-
-            std::thread::sleep(std::time::Duration::from_millis(10));
         }
 
+        match rx.try_recv() {
+            Ok(ServerCommand::Speak(text)) => {
+                let hr = unsafe { speak_text(central_ptr, &text) };
+                if hr != S_OK {
+                    eprintln!("TextData failed, hr={:#x}", hr);
+                }
+            }
+            Ok(ServerCommand::Pause) => {
+                let hr = unsafe { (central_vtbl.audio_pause)(central_ptr) };
+                if hr != S_OK { eprintln!("AudioPause failed: {:#x}", hr); }
+            }
+            Ok(ServerCommand::Resume) => {
+                let hr = unsafe { (central_vtbl.audio_resume)(central_ptr) };
+                if hr != S_OK { eprintln!("AudioResume failed: {:#x}", hr); }
+            }
+            Ok(ServerCommand::Stop) => {
+                let hr = unsafe { (central_vtbl.audio_reset)(central_ptr) };
+                if hr != S_OK { eprintln!("AudioReset failed: {:#x}", hr); }
+                running = false;
+            }
+            Ok(ServerCommand::Quit) => { running = false; }
+            Err(mpsc::TryRecvError::Disconnected) => { running = false; }
+            Err(mpsc::TryRecvError::Empty) => {}
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+
+    unsafe {
         (central_vtbl.release)(central_ptr);
-        (vtbl.release)(enum_ptr);
+        (enum_vtbl.release)(enum_ptr);
     }
 }
 
@@ -939,47 +951,53 @@ fn speak_to_file(target_idx: u32, output_path: &str, rate: Option<i32>, pitch: O
 }
 
 fn speak_with_voice(target_idx: u32, rate: Option<i32>, pitch: Option<i32>, volume: Option<i32>) {
+    let (enum_ptr, central_ptr) = unsafe {
+        match init_central(target_idx) {
+            Some(res) => res,
+            None => return,
+        }
+    };
+
+    let central_vtbl = unsafe { &*(*central_ptr).lpVtbl };
+    let enum_vtbl = unsafe { &*(*enum_ptr).lpVtbl };
+
     unsafe {
-        let Some((enum_ptr, central_ptr)) = init_central(target_idx) else {
-            return;
-        };
-        let tts_enum = &*enum_ptr;
-        let vtbl = &*tts_enum.lpVtbl;
-        let tts_central = &*central_ptr;
-        let central_vtbl = &*tts_central.lpVtbl;
-
         apply_tts_attributes(central_ptr, rate, pitch, volume);
+    }
 
-        // Read text from stdin
-        let mut text = String::new();
-        if io::stdin().read_to_string(&mut text).is_err() {
-            eprintln!("Failed to read text from stdin");
-        }
-        if text.is_empty() {
-            text = "Test di sintesi vocale. Questa è la voce italiana.".to_string();
-        }
+    // Read text from stdin
+    let mut text = String::new();
+    if io::stdin().read_to_string(&mut text).is_err() {
+        eprintln!("Failed to read text from stdin");
+    }
+    if text.is_empty() {
+        text = "Test di sintesi vocale. Questa è la voce italiana.".to_string();
+    }
 
-        let hr = speak_text(central_ptr, &text);
+    let hr = unsafe { speak_text(central_ptr, &text) };
 
-        if hr != S_OK {
-            eprintln!("TextData failed, hr={:#x}", hr);
-        } else {
-            eprintln!("TextData succeeded!");
-        }
+    if hr != S_OK {
+        eprintln!("TextData failed, hr={:#x}", hr);
+    } else {
+        eprintln!("TextData succeeded!");
+    }
 
-        // Message loop
-        let mut msg: MSG = std::mem::zeroed();
-        let start = std::time::Instant::now();
-        while start.elapsed().as_secs() < 30 {
+    // Message loop
+    let mut msg: MSG = unsafe { std::mem::zeroed() };
+    let start = std::time::Instant::now();
+    while start.elapsed().as_secs() < 30 {
+        unsafe {
             while PeekMessageW(&mut msg, ptr::null_mut(), 0, 0, PM_REMOVE) != 0 {
                 TranslateMessage(&msg);
                 DispatchMessageW(&msg);
             }
-            std::thread::sleep(std::time::Duration::from_millis(10));
         }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
 
+    unsafe {
         (central_vtbl.release)(central_ptr);
-        (vtbl.release)(enum_ptr);
+        (enum_vtbl.release)(enum_ptr);
     }
 }
 

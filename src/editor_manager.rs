@@ -1,4 +1,4 @@
-use crate::accessibility::{EM_REPLACESEL, from_wide, to_wide, to_wide_normalized};
+use crate::accessibility::{EM_REPLACESEL, to_wide, to_wide_normalized};
 use crate::file_handler::decode_text_with_encoding;
 use crate::file_handler::*;
 use crate::settings::{
@@ -245,7 +245,7 @@ pub unsafe fn get_edit_text(hwnd_edit: HWND) -> String {
     }
     let mut buf = vec![0u16; (len + 1) as usize];
     GetWindowTextW(hwnd_edit, &mut buf);
-    from_wide(buf.as_ptr())
+    String::from_utf16_lossy(&buf[..len as usize])
 }
 
 pub unsafe fn send_to_active_edit(hwnd: HWND, msg: u32) {

@@ -1,4 +1,4 @@
-use crate::accessibility::{from_wide, handle_accessibility, nvda_speak, to_wide};
+use crate::accessibility::{handle_accessibility, nvda_speak, to_wide};
 use crate::editor_manager;
 use crate::i18n;
 use crate::settings::{self, Language, confirm_title};
@@ -951,7 +951,8 @@ unsafe fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<Podcast
         )
         .0 != 0
         {
-            let text = from_wide(buf.as_ptr());
+            let len = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+            let text = String::from_utf16_lossy(&buf[..len]);
             if text.trim()
                 == i18n::tr(
                     with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
@@ -1793,7 +1794,7 @@ unsafe extern "system" fn add_wndproc(
                         WPARAM(buf.len()),
                         LPARAM(buf.as_mut_ptr() as isize),
                     );
-                    let url = from_wide(buf.as_ptr());
+                    let url = String::from_utf16_lossy(&buf[..len as usize]);
                     let parent = GetParent(hwnd);
                     if !url.trim().is_empty() {
                         let payload = url.trim().to_string();
@@ -1966,7 +1967,7 @@ unsafe fn trigger_search_from_edit(hwnd: HWND) {
         WPARAM(buf.len()),
         LPARAM(buf.as_mut_ptr() as isize),
     );
-    let query = from_wide(buf.as_ptr());
+    let query = String::from_utf16_lossy(&buf[..len as usize]);
     perform_search(hwnd, &query);
     if hwnd_results.0 != 0 {
         SetFocus(hwnd_results);
@@ -2781,7 +2782,7 @@ unsafe extern "system" fn reorder_wndproc(
                         WPARAM(buf.len()),
                         LPARAM(buf.as_mut_ptr() as isize),
                     );
-                    let text = from_wide(buf.as_ptr());
+                    let text = String::from_utf16_lossy(&buf[..len as usize]);
                     let language =
                         with_podcast_state(init.parent, |s| s.language).unwrap_or_default();
                     let pos = match text.trim().parse::<usize>() {
@@ -3801,7 +3802,14 @@ unsafe extern "system" fn podcast_wndproc(
         WM_COPYDATA => {
             let cds = &*(lparam.0 as *const COPYDATASTRUCT);
             if cds.dwData == PODCAST_ADD_COPYDATA {
-                let url = from_wide(cds.lpData as *const u16);
+                let len_u16 = (cds.cbData as usize) / 2;
+                let slice = std::slice::from_raw_parts(cds.lpData as *const u16, len_u16);
+                let len = if len_u16 > 0 && slice[len_u16 - 1] == 0 {
+                    len_u16 - 1
+                } else {
+                    len_u16
+                };
+                let url = String::from_utf16_lossy(&slice[..len]);
                 let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
                 if let Some(index) = add_podcast_source(parent, &url, "") {
                     let language = with_state(parent, |s| s.settings.language).unwrap_or_default();

@@ -31,7 +31,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
-use crate::accessibility::{EM_REPLACESEL, ES_READONLY, from_wide, to_wide};
+use crate::accessibility::{EM_REPLACESEL, ES_READONLY, to_wide};
 use crate::app_windows::find_in_files_window::browse_for_folder;
 use crate::file_handler::{
     decode_text, is_doc_path, is_docx_path, is_epub_path, is_html_path, is_mp3_path, is_pdf_path,
@@ -1446,7 +1446,7 @@ fn read_control_text(hwnd: HWND) -> String {
     unsafe {
         GetWindowTextW(hwnd, &mut buffer);
     }
-    unsafe { from_wide(buffer.as_ptr()) }
+    String::from_utf16_lossy(&buffer[..len])
 }
 
 fn load_tts_settings(parent: HWND, voice: String, language: Language) -> TtsSettings {

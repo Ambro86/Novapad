@@ -1,4 +1,3 @@
-use crate::accessibility::from_wide;
 use crate::audio_capture::{self, AudioRecorderHandle as AudioRecorder};
 use crate::audio_utils;
 use crate::com_guard::ComGuard;
@@ -134,7 +133,7 @@ fn device_id(device: &IMMDevice) -> Option<String> {
         if id.is_null() {
             return None;
         }
-        let value = from_wide(id.0);
+        let value = id.to_string().unwrap_or_default();
         CoTaskMemFree(Some(id.0 as *const _));
         if value.is_empty() { None } else { Some(value) }
     }
@@ -154,7 +153,7 @@ fn device_friendly_name(device: &IMMDevice) -> Option<String> {
         if name_ptr.is_null() {
             return None;
         }
-        let name = from_wide(name_ptr.0);
+        let name = name_ptr.to_string().unwrap_or_default();
         CoTaskMemFree(Some(name_ptr.0 as *const _));
         if name.is_empty() { None } else { Some(name) }
     }

@@ -1,4 +1,4 @@
-use crate::accessibility::{from_wide, handle_accessibility, to_wide};
+use crate::accessibility::{handle_accessibility, to_wide};
 use crate::i18n;
 use crate::log_debug;
 use crate::settings::Language;
@@ -535,7 +535,7 @@ unsafe fn run_lookup(hwnd: HWND) {
     }
     let mut buf = vec![0u16; (len + 1) as usize];
     let _read = GetWindowTextW(input, &mut buf);
-    let word = from_wide(buf.as_ptr());
+    let word = String::from_utf16_lossy(&buf[..len as usize]);
     let trimmed = word.trim().to_string();
     if trimmed.is_empty() {
         let msg = i18n::tr(language, "dictionary.no_word");

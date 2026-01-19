@@ -1,4 +1,4 @@
-use crate::accessibility::{from_wide, nvda_speak, to_wide};
+use crate::accessibility::{nvda_speak, to_wide};
 
 use crate::editor_manager;
 use crate::i18n;
@@ -1692,7 +1692,7 @@ unsafe extern "system" fn reorder_wndproc(
                         WPARAM(buf.len()),
                         LPARAM(buf.as_mut_ptr() as isize),
                     );
-                    let text = from_wide(buf.as_ptr());
+                    let text = String::from_utf16_lossy(&buf[..len as usize]);
                     let language = with_rss_state(init.parent, |s| {
                         with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
                     })
@@ -2451,7 +2451,8 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                         )
                         .0 != 0
                         {
-                            let text = from_wide(buf.as_ptr());
+                            let len = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+                            let text = String::from_utf16_lossy(&buf[..len]);
                             if text.trim() == "Loading..." {
                                 SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
                             }
@@ -3719,7 +3720,7 @@ unsafe extern "system" fn input_wndproc(
                         WPARAM(buf.len()),
                         LPARAM(buf.as_mut_ptr() as isize),
                     );
-                    let url = from_wide(buf.as_ptr());
+                    let url = String::from_utf16_lossy(&buf[..len as usize]);
 
                     let h_edit_title = GetDlgItem(hwnd, 104);
                     let tlen = SendMessageW(
@@ -3736,7 +3737,7 @@ unsafe extern "system" fn input_wndproc(
                         WPARAM(tbuf.len()),
                         LPARAM(tbuf.as_mut_ptr() as isize),
                     );
-                    let title = from_wide(tbuf.as_ptr());
+                    let title = String::from_utf16_lossy(&tbuf[..tlen as usize]);
 
                     if !url.trim().is_empty() {
                         let parent = windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd);

@@ -1,6 +1,4 @@
 use crate::settings;
-use std::ffi::OsString;
-use std::os::windows::ffi::OsStringExt;
 use std::sync::OnceLock;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
@@ -49,16 +47,6 @@ pub fn to_wide_normalized(text: &str) -> Vec<u16> {
 
 pub fn normalize_to_crlf(text: &str) -> String {
     text.replace("\r\n", "\n").replace('\n', "\r\n")
-}
-
-/// Converts a wide string pointer (UTF-16) to a Rust String.
-pub unsafe fn from_wide(ptr: *const u16) -> String {
-    let mut len = 0;
-    while *ptr.add(len) != 0 {
-        len += 1;
-    }
-    let slice = std::slice::from_raw_parts(ptr, len);
-    OsString::from_wide(slice).to_string_lossy().into_owned()
 }
 
 /// The "Golden Rule" accessibility handler.

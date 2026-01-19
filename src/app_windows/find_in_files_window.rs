@@ -34,7 +34,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
-use crate::accessibility::{EM_SCROLLCARET, from_wide, normalize_to_crlf, to_wide};
+use crate::accessibility::{EM_SCROLLCARET, normalize_to_crlf, to_wide};
 use crate::file_handler::{
     decode_text, is_doc_path, is_docx_path, is_epub_path, is_html_path, is_mp3_path, is_pdf_path,
     is_ppt_path, is_pptx_path, is_spreadsheet_path, read_doc_text, read_docx_text, read_epub_text,
@@ -718,7 +718,7 @@ fn read_control_text(hwnd: HWND) -> String {
         }
         let mut buf = vec![0u16; (len + 1) as usize];
         GetWindowTextW(hwnd, &mut buf);
-        from_wide(buf.as_ptr())
+        String::from_utf16_lossy(&buf[..len as usize])
     }
 }
 
@@ -1522,7 +1522,8 @@ pub(crate) fn browse_for_folder(owner: HWND, language: Language) -> Option<PathB
     if !ok {
         return None;
     }
-    let path = unsafe { from_wide(buffer.as_ptr()) };
+    let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
+    let path = String::from_utf16_lossy(&buffer[..len]);
     if path.is_empty() {
         None
     } else {

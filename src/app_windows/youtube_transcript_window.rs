@@ -27,7 +27,7 @@ use url::Url;
 use yt_transcript_rs::errors::CouldNotRetrieveTranscriptReason;
 use yt_transcript_rs::{Transcript, TranscriptList, YouTubeTranscriptApi};
 
-use crate::accessibility::{EM_REPLACESEL, from_wide, to_wide, to_wide_normalized};
+use crate::accessibility::{EM_REPLACESEL, to_wide, to_wide_normalized};
 use crate::editor_manager::get_edit_text;
 use crate::i18n;
 use crate::settings::{Language, save_settings};
@@ -817,7 +817,7 @@ fn read_edit_text(hwnd: HWND) -> String {
     unsafe {
         windows::Win32::UI::WindowsAndMessaging::GetWindowTextW(hwnd, &mut buf);
     }
-    unsafe { from_wide(buf.as_ptr()) }
+    String::from_utf16_lossy(&buf[..len as usize])
 }
 
 fn extract_video_id(input: &str) -> Option<String> {

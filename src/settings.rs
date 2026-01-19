@@ -481,7 +481,7 @@ fn known_folder_path(folder: &windows::core::GUID) -> Option<PathBuf> {
         if raw.is_null() {
             return None;
         }
-        let path = crate::accessibility::from_wide(raw.0);
+        let path = raw.to_string().unwrap_or_default();
         CoTaskMemFree(Some(raw.0 as *const _));
         if path.is_empty() {
             None

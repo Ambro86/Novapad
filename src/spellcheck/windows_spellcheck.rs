@@ -1,4 +1,4 @@
-use crate::accessibility::{from_wide, to_wide};
+use crate::accessibility::to_wide;
 use crate::log_debug;
 use windows::Win32::Foundation::S_FALSE;
 use windows::Win32::Globalization::{
@@ -191,7 +191,7 @@ fn enum_string_to_vec(enum_string: IEnumString) -> Vec<String> {
         }
         let ptr = values[0];
         if !ptr.is_null() {
-            let text = unsafe { from_wide(ptr.0) };
+            let text = unsafe { ptr.to_string().unwrap_or_default() };
             if !text.is_empty() {
                 out.push(text);
             }

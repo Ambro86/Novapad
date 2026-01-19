@@ -2,7 +2,6 @@ mod windows_spellcheck;
 
 pub use windows_spellcheck::{Misspelling, WindowsSpellChecker, utf16_offset_to_utf8_byte_offset};
 
-use crate::accessibility::from_wide;
 use crate::settings::{AppSettings, Language, SpellcheckLanguageMode};
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
@@ -284,7 +283,8 @@ fn system_language_tag() -> Option<String> {
     if len == 0 {
         return None;
     }
-    let locale = unsafe { from_wide(buffer.as_ptr()) };
+    let len = len.saturating_sub(1) as usize;
+    let locale = String::from_utf16_lossy(&buffer[..len]);
     if locale.is_empty() {
         None
     } else {

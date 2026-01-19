@@ -1,4 +1,4 @@
-use crate::accessibility::{EM_REPLACESEL, EM_SCROLLCARET, from_wide, to_wide};
+use crate::accessibility::{EM_REPLACESEL, EM_SCROLLCARET, to_wide};
 use crate::editor_manager::get_edit_text;
 use crate::i18n;
 use crate::settings::{Language, find_title, text_not_found_message};
@@ -117,7 +117,16 @@ pub unsafe fn handle_find_message(hwnd: HWND, lparam: LPARAM) {
         return;
     }
 
-    let search = from_wide(fr.lpstrFindWhat.0);
+    let search = {
+        let len = fr.wFindWhatLen as usize;
+        let slice = std::slice::from_raw_parts(fr.lpstrFindWhat.0, len);
+        let len = if len > 0 && slice[len - 1] == 0 {
+            len - 1
+        } else {
+            len
+        };
+        String::from_utf16_lossy(&slice[..len])
+    };
     if search.is_empty() {
         return;
     }
@@ -138,7 +147,16 @@ pub unsafe fn handle_find_message(hwnd: HWND, lparam: LPARAM) {
             hwnd,
             hwnd_edit,
             &search,
-            &from_wide(fr.lpstrReplaceWith.0),
+            &{
+                let len = fr.wReplaceWithLen as usize;
+                let slice = std::slice::from_raw_parts(fr.lpstrReplaceWith.0, len);
+                let len = if len > 0 && slice[len - 1] == 0 {
+                    len - 1
+                } else {
+                    len
+                };
+                String::from_utf16_lossy(&slice[..len])
+            },
             find_flags,
             &options,
         );
@@ -146,7 +164,16 @@ pub unsafe fn handle_find_message(hwnd: HWND, lparam: LPARAM) {
     }
 
     if (fr.Flags & FR_REPLACE) != FINDREPLACE_FLAGS(0) {
-        let replace = from_wide(fr.lpstrReplaceWith.0);
+        let replace = {
+            let len = fr.wReplaceWithLen as usize;
+            let slice = std::slice::from_raw_parts(fr.lpstrReplaceWith.0, len);
+            let len = if len > 0 && slice[len - 1] == 0 {
+                len - 1
+            } else {
+                len
+            };
+            String::from_utf16_lossy(&slice[..len])
+        };
         let replaced =
             replace_selection_if_match(hwnd, hwnd_edit, &search, &replace, find_flags, &options);
         let found = find_next(
@@ -193,7 +220,13 @@ pub unsafe fn handle_find_message(hwnd: HWND, lparam: LPARAM) {
 pub unsafe fn find_next_from_state(hwnd: HWND) {
     let (search, flags, language): (String, FINDREPLACE_FLAGS, Language) =
         with_state(hwnd, |state| {
-            let search = from_wide(state.find_text.as_ptr());
+            let len = state.find_text.len();
+            let len = if len > 0 && state.find_text[len - 1] == 0 {
+                len - 1
+            } else {
+                len
+            };
+            let search = String::from_utf16_lossy(&state.find_text[..len]);
             (search, state.last_find_flags, state.settings.language)
         })
         .unwrap_or((String::new(), FINDREPLACE_FLAGS(0), Language::default()));

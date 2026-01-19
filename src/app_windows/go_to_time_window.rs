@@ -1,4 +1,4 @@
-use crate::accessibility::{from_wide, handle_accessibility, nvda_speak, to_wide};
+use crate::accessibility::{handle_accessibility, nvda_speak, to_wide};
 use crate::audio_player::{audiobook_duration_secs, parse_time_input, seek_audiobook_to};
 use crate::i18n;
 use crate::with_state;
@@ -235,7 +235,7 @@ unsafe extern "system" fn go_to_time_wndproc(
                     WPARAM(buf.len()),
                     LPARAM(buf.as_mut_ptr() as isize),
                 );
-                let text = from_wide(buf.as_ptr());
+                let text = String::from_utf16_lossy(&buf[..len as usize]);
                 let target = match parse_time_input(&text) {
                     Ok(v) => v,
                     Err(_) => {

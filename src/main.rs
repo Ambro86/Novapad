@@ -500,7 +500,7 @@ unsafe fn prefetch_dictionary_for_selection(hwnd: HWND, hwnd_edit: HWND) {
     if copied == 0 {
         return;
     }
-    let selected = from_wide(buf.as_ptr());
+    let selected = String::from_utf16_lossy(&buf[..copied]);
     let trimmed = selected.trim();
     if trimmed.is_empty() || trimmed.contains(char::is_whitespace) {
         return;
@@ -3208,7 +3208,14 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         WM_COPYDATA => {
             let cds = &*(lparam.0 as *const COPYDATASTRUCT);
             if cds.dwData == COPYDATA_OPEN_FILE && !cds.lpData.is_null() {
-                let path = from_wide(cds.lpData as *const u16);
+                let len_u16 = (cds.cbData as usize) / 2;
+                let slice = std::slice::from_raw_parts(cds.lpData as *const u16, len_u16);
+                let len = if len_u16 > 0 && slice[len_u16 - 1] == 0 {
+                    len_u16 - 1
+                } else {
+                    len_u16
+                };
+                let path = String::from_utf16_lossy(&slice[..len]);
                 if !path.is_empty() {
                     open_document(hwnd, Path::new(&path));
                     ShowWindow(hwnd, SW_SHOWMAXIMIZED);
@@ -4691,7 +4698,8 @@ unsafe fn spellcheck_line_info(hwnd_edit: HWND, char_index: i32) -> Option<(i32,
         WPARAM(0),
         LPARAM(&mut range as *mut _ as isize),
     );
-    let line_text = from_wide(buf.as_ptr());
+    let line_len = line_len.max(0) as usize;
+    let line_text = String::from_utf16_lossy(&buf[..line_len]);
     Some((line_index, line_start, line_text))
 }
 
@@ -6304,7 +6312,7 @@ unsafe fn handle_drop_files(hwnd: HWND, hdrop: HDROP) {
         if len == 0 {
             continue;
         }
-        let path = PathBuf::from(from_wide(buffer.as_ptr()));
+        let path = PathBuf::from(String::from_utf16_lossy(&buffer[..len as usize]));
         if path.as_os_str().is_empty() {
             continue;
         }
@@ -6447,7 +6455,11 @@ pub(crate) unsafe fn save_audio_dialog(
         ..Default::default()
     };
     if GetSaveFileNameW(&mut ofn).as_bool() {
-        let path = PathBuf::from(from_wide(file_buf.as_ptr()));
+        let len = file_buf
+            .iter()
+            .position(|&c| c == 0)
+            .unwrap_or(file_buf.len());
+        let path = PathBuf::from(String::from_utf16_lossy(&file_buf[..len]));
         let mut path = path;
         if path.extension().is_none() {
             path.set_extension("mp3");
@@ -6757,7 +6769,7 @@ pub(crate) unsafe fn open_file_dialog_with_encoding(
         let path_ptr = item
             .GetDisplayName(windows::Win32::UI::Shell::SIGDN_FILESYSPATH)
             .ok()?;
-        let path_str = from_wide(path_ptr.0);
+        let path_str = path_ptr.to_string().unwrap_or_default();
         CoTaskMemFree(Some(path_ptr.0 as *const _));
 
         let selected_encoding_idx = pfdc.GetSelectedControlItem(101).ok()?;
@@ -6853,7 +6865,7 @@ pub(crate) unsafe fn save_file_dialog_with_encoding(
         let path_ptr = item
             .GetDisplayName(windows::Win32::UI::Shell::SIGDN_FILESYSPATH)
             .ok()?;
-        let path_str = from_wide(path_ptr.0);
+        let path_str = path_ptr.to_string().unwrap_or_default();
         CoTaskMemFree(Some(path_ptr.0 as *const _));
 
         let selected_encoding_idx = pfdc.GetSelectedControlItem(101).ok()?;

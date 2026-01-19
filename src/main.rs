@@ -40,6 +40,7 @@ mod spellcheck;
 mod text_ops;
 mod tools;
 mod updater;
+mod wikipedia;
 mod wiktionary;
 
 use std::collections::HashMap;
@@ -61,6 +62,7 @@ use windows::Win32::Graphics::Gdi::{
 use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
 use windows::Win32::System::DataExchange::COPYDATASTRUCT;
 use windows::Win32::System::LibraryLoader::{GetModuleHandleW, LoadLibraryW};
+use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::Dialogs::{
     FINDREPLACE_FLAGS, FINDREPLACEW, GetSaveFileNameW, OFN_EXPLORER, OFN_HIDEREADONLY,
@@ -85,31 +87,30 @@ use windows::Win32::UI::Shell::{
     IFileDialogEvents, IFileDialogEvents_Impl, IFileSaveDialog, IShellItem,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    ACCEL, AppendMenuW, BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, CB_ADDSTRING, CB_GETCOUNT,
-    CB_GETCURSEL, CB_GETDROPPEDSTATE, CB_GETITEMDATA, CB_RESETCONTENT, CB_SETCURSEL,
-    CB_SETITEMDATA, CBN_SELCHANGE, CBS_DROPDOWNLIST, CHILDID_SELF, CREATESTRUCTW, CS_HREDRAW,
-    CS_VREDRAW, CW_USEDEFAULT, CallWindowProcW, CheckMenuItem, CreateAcceleratorTableW,
+    ACCEL, AllowSetForegroundWindow, AppendMenuW, BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX,
+    CB_ADDSTRING, CB_GETCOUNT, CB_GETCURSEL, CB_GETDROPPEDSTATE, CB_GETITEMDATA, CB_RESETCONTENT,
+    CB_SETCURSEL, CB_SETITEMDATA, CBN_SELCHANGE, CBS_DROPDOWNLIST, CHILDID_SELF, CREATESTRUCTW,
+    CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, CallWindowProcW, CheckMenuItem, CreateAcceleratorTableW,
     CreatePopupMenu, CreateWindowExW, DefWindowProcW, DeleteMenu, DestroyWindow, DispatchMessageW,
     DrawMenuBar, EN_CHANGE, EN_KILLFOCUS, ES_AUTOHSCROLL, EVENT_OBJECT_FOCUS, EnumWindows, FALT,
     FCONTROL, FSHIFT, FVIRTKEY, FindWindowW, GWLP_USERDATA, GWLP_WNDPROC, GetClassNameW,
-    GetCursorPos, GetMenu, GetMenuItemCount, GetMessageW, GetParent, GetWindowLongPtrW,
-    GetWindowTextLengthW, GetWindowTextW, HACCEL, HCURSOR, HICON, HMENU, IDC_ARROW,
-    IDI_APPLICATION, IsChild, IsWindow, KillTimer, LoadCursorW, LoadIconW, MB_ICONERROR,
-    MB_ICONINFORMATION, MB_OK, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_GRAYED, MF_POPUP,
-    MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW,
-    PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_SHOW, SW_SHOWMAXIMIZED,
-    SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
-    TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE, WM_APP,
-    WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY,
-    WM_DROPFILES, WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL,
-    WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WM_UNDO, WNDCLASSW,
-    WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP,
-    WS_VISIBLE,
+    GetCursorPos, GetForegroundWindow, GetMenu, GetMenuItemCount, GetMessageW, GetParent,
+    GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, HACCEL,
+    HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, IsChild, IsIconic, IsWindow, KillTimer,
+    LoadCursorW, LoadIconW, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MF_BYCOMMAND, MF_BYPOSITION,
+    MF_CHECKED, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW,
+    OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE,
+    SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED, SendMessageW, SetForegroundWindow, SetTimer,
+    SetWindowLongPtrW, SetWindowTextW, ShowWindow, TPM_RIGHTBUTTON, TrackPopupMenu,
+    TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
+    WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES,
+    WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE,
+    WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WM_UNDO, WNDCLASSW, WNDPROC,
+    WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{Interface, PCWSTR, PWSTR, implement, w};
 
 const EM_SCROLLCARET: u32 = 0x00B7;
-const EM_SETSEL: u32 = 0x00B1;
 const EM_CHARFROMPOS: u32 = 0x00D7;
 const EM_LINEFROMCHAR: u32 = 0x00C9;
 const EM_LINEINDEX: u32 = 0x00BB;
@@ -148,17 +149,49 @@ const VOICE_PANEL_ID_VOLUME_EDIT: usize = 8010;
 const VOICE_MENU_ID_ADD_FAVORITE: u32 = 9001;
 const VOICE_MENU_ID_REMOVE_FAVORITE: u32 = 9002;
 
-pub(crate) fn focus_editor(hwnd: HWND) {
+fn bring_window_to_foreground(hwnd: HWND) {
     unsafe {
-        SetForegroundWindow(hwnd);
+        let foreground = GetForegroundWindow();
+        let current_thread = GetCurrentThreadId();
+        let mut attached_thread = None;
+        if foreground.0 != 0 {
+            let foreground_thread = GetWindowThreadProcessId(foreground, None);
+            if foreground_thread != 0 && foreground_thread != current_thread {
+                if AttachThreadInput(foreground_thread, current_thread, true).as_bool() {
+                    attached_thread = Some(foreground_thread);
+                } else {
+                    log_debug("AttachThreadInput (attach) failed");
+                }
+            }
+        }
+
+        if IsIconic(hwnd).as_bool() {
+            ShowWindow(hwnd, SW_RESTORE);
+        } else {
+            ShowWindow(hwnd, SW_SHOW);
+        }
+        if !SetForegroundWindow(hwnd).as_bool() {
+            log_debug("SetForegroundWindow failed");
+        }
         SetActiveWindow(hwnd);
+
+        if let Some(foreground_thread) = attached_thread
+            && !AttachThreadInput(foreground_thread, current_thread, false).as_bool()
+        {
+            log_debug("AttachThreadInput (detach) failed");
+        }
+    }
+}
+
+pub(crate) fn focus_editor(hwnd: HWND) {
+    bring_window_to_foreground(hwnd);
+    unsafe {
         let hwnd_edit = with_state(hwnd, |state| {
             state.docs.get(state.current).map(|doc| doc.hwnd_edit)
         })
         .flatten();
         if let Some(hwnd_edit) = hwnd_edit {
             SetFocus(hwnd_edit);
-            SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(0));
             SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
             SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
             crate::log_if_err!(PostMessageW(
@@ -1185,6 +1218,7 @@ pub(crate) struct AppState {
     dictionary_window: HWND,
     dictionary_entry_dialog: HWND,
     wiktionary_window: HWND,
+    wikipedia_window: HWND,
     prompt_window: HWND,
     podcast_window: HWND,
     podcast_save_window: HWND,
@@ -1326,6 +1360,13 @@ fn main() -> windows::core::Result<()> {
                     cbData: (wide.len() * 2) as u32,
                     lpData: wide.as_ptr() as *mut std::ffi::c_void,
                 };
+                let mut existing_pid = 0u32;
+                let existing_thread = GetWindowThreadProcessId(existing, Some(&mut existing_pid));
+                if existing_thread == 0 {
+                    log_debug("GetWindowThreadProcessId failed for existing window");
+                } else if existing_pid != 0 {
+                    crate::log_if_err!(AllowSetForegroundWindow(existing_pid));
+                }
                 SendMessageW(
                     existing,
                     WM_COPYDATA,
@@ -1764,6 +1805,15 @@ fn main() -> windows::core::Result<()> {
                     handled = true;
                     return;
                 }
+                if state.wikipedia_window.0 != 0
+                    && app_windows::wikipedia_window::handle_navigation(
+                        state.wikipedia_window,
+                        &msg,
+                    )
+                {
+                    handled = true;
+                    return;
+                }
 
                 if state.dictionary_entry_dialog.0 != 0
                     && handle_accessibility(state.dictionary_entry_dialog, &msg)
@@ -2154,6 +2204,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 dictionary_window: HWND(0),
                 dictionary_entry_dialog: HWND(0),
                 wiktionary_window: HWND(0),
+                wikipedia_window: HWND(0),
                 prompt_window: HWND(0),
                 podcast_window: HWND(0),
                 rss_window: HWND(0),
@@ -2255,9 +2306,19 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             if let Some(path_str) = file_to_open {
                 editor_manager::open_document(hwnd, Path::new(path_str));
                 ShowWindow(hwnd, SW_SHOWMAXIMIZED);
+                bring_window_to_foreground(hwnd);
+                if let Some(hwnd_edit) = get_active_edit(hwnd) {
+                    NotifyWinEvent(
+                        EVENT_OBJECT_FOCUS,
+                        hwnd_edit,
+                        OBJID_CLIENT.0,
+                        CHILDID_SELF as i32,
+                    );
+                }
                 crate::log_if_err!(PostMessageW(hwnd, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)));
             } else {
                 editor_manager::new_document(hwnd);
+                crate::log_if_err!(PostMessageW(hwnd, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)));
             }
 
             editor_manager::layout_children(hwnd);
@@ -3143,6 +3204,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     open_dictionary_lookup(hwnd);
                     LRESULT(0)
                 }
+                IDM_TOOLS_WIKIPEDIA_IMPORT => {
+                    log_debug("Menu: Wikipedia import");
+                    app_windows::wikipedia_window::open(hwnd);
+                    LRESULT(0)
+                }
                 IDM_TOOLS_IMPORT_YOUTUBE => {
                     log_debug("Menu: Import YouTube transcript");
                     app_windows::youtube_transcript_window::import_youtube_transcript(hwnd);
@@ -3217,7 +3283,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 if !path.is_empty() {
                     open_document(hwnd, Path::new(&path));
                     ShowWindow(hwnd, SW_SHOWMAXIMIZED);
-                    SetForegroundWindow(hwnd);
+                    bring_window_to_foreground(hwnd);
                     focus_editor(hwnd);
                     if let Some(hwnd_edit) = get_active_edit(hwnd) {
                         NotifyWinEvent(
@@ -5708,6 +5774,11 @@ unsafe fn create_accelerators() -> HACCEL {
             fVirt: virt_alt_shift,
             key: 'D' as u16,
             cmd: IDM_TOOLS_DICTIONARY_LOOKUP as u16,
+        },
+        ACCEL {
+            fVirt: virt_alt_shift,
+            key: 'W' as u16,
+            cmd: IDM_TOOLS_WIKIPEDIA_IMPORT as u16,
         },
         ACCEL {
             fVirt: virt,

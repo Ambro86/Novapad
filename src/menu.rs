@@ -96,6 +96,7 @@ pub const IDM_TOOLS_PROMPT: usize = 5004;
 pub const IDM_TOOLS_RSS: usize = 5005;
 pub const IDM_TOOLS_PODCASTS: usize = 5006;
 pub const IDM_TOOLS_DICTIONARY_LOOKUP: usize = 5007;
+pub const IDM_TOOLS_WIKIPEDIA_IMPORT: usize = 5008;
 pub const IDM_HELP_GUIDE: usize = 7001;
 pub const IDM_HELP_ABOUT: usize = 7002;
 pub const IDM_HELP_CHECK_UPDATES: usize = 7003;
@@ -113,6 +114,7 @@ pub struct MenuLabels {
     pub menu_options: String,
     pub menu_dictionary: String,
     pub menu_dictionary_lookup: String,
+    pub menu_wikipedia_import: String,
     pub menu_import_youtube: String,
     pub menu_prompt: String,
     pub menu_rss: String,
@@ -197,6 +199,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         menu_options: i18n::tr(language, "menu.options"),
         menu_dictionary: i18n::tr(language, "menu.dictionary"),
         menu_dictionary_lookup: i18n::tr(language, "menu.dictionary_lookup"),
+        menu_wikipedia_import: i18n::tr(language, "menu.wikipedia_import"),
         menu_import_youtube: i18n::tr(language, "menu.import_youtube"),
         menu_prompt: i18n::tr(language, "menu.prompt"),
         menu_rss: i18n::tr(language, "menu.rss"),
@@ -774,6 +777,12 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         MF_STRING,
         IDM_TOOLS_DICTIONARY_LOOKUP,
         &labels.menu_dictionary_lookup,
+    );
+    append_menu_string(
+        tools_menu,
+        MF_STRING,
+        IDM_TOOLS_WIKIPEDIA_IMPORT,
+        &labels.menu_wikipedia_import,
     );
     append_menu_string(
         tools_menu,

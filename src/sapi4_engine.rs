@@ -137,11 +137,13 @@ pub fn play_sapi4(
     mut command_rx: mpsc::UnboundedReceiver<TtsCommand>,
 ) {
     std::thread::spawn(move || {
-        let mut exe_path = match std::env::current_exe() {
+        let exe_path = match select_sapi4_bridge_for_file() {
             Ok(path) => path,
-            Err(_) => return,
+            Err(err) => {
+                crate::log_debug(&format!("SAPI4 bridge not found: {}", err));
+                return;
+            }
         };
-        exe_path.set_file_name("sapi4_bridge.exe");
         let mut child = match Command::new(exe_path)
             .arg("--voice")
             .arg(voice_index.to_string())
@@ -240,22 +242,26 @@ pub fn get_voices() -> Vec<VoiceInfo> {
         }
     }
 
-    if let Ok(mut exe_path) = std::env::current_exe() {
-        exe_path.set_file_name("sapi4_bridge.exe");
-        if let Ok(out) = Command::new(exe_path)
-            .arg("--list")
-            .creation_flags(0x08000000)
-            .output()
-        {
-            let stdout = String::from_utf8_lossy(&out.stdout);
-            let voices = parse_voices(&stdout);
-            if !voices.is_empty() {
-                if let Some(path) = cache_path() {
-                    crate::log_if_err!(std::fs::write(path, stdout.as_bytes()));
-                }
-                *cache = voices.clone();
-                return voices;
+    let exe_path = match select_sapi4_bridge_for_file() {
+        Ok(path) => path,
+        Err(err) => {
+            crate::log_debug(&format!("SAPI4 bridge not found: {}", err));
+            return Vec::new();
+        }
+    };
+    if let Ok(out) = Command::new(exe_path)
+        .arg("--list")
+        .creation_flags(0x08000000)
+        .output()
+    {
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        let voices = parse_voices(&stdout);
+        if !voices.is_empty() {
+            if let Some(path) = cache_path() {
+                crate::log_if_err!(std::fs::write(path, stdout.as_bytes()));
             }
+            *cache = voices.clone();
+            return voices;
         }
     }
     Vec::new()

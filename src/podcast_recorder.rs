@@ -343,17 +343,19 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
     let writer_shared = shared.clone();
     let writer_stop = stop.clone();
     let writer_paused = paused.clone();
-    let writer_path = match config.output_format {
-        PodcastFormat::Mp3 => temp_mp3.clone(),
-        PodcastFormat::Wav => temp_wav.clone(),
+    let (writer_path, writer_format) = match config.output_format {
+        PodcastFormat::Mp3 => (temp_mp3.clone(), PodcastFormat::Mp3),
+        PodcastFormat::Wav => (temp_wav.clone(), PodcastFormat::Wav),
     };
-    let writer_format = config.output_format;
     let writer_bitrate = config.mp3_bitrate;
+    let writer_config = WriterConfig {
+        path: writer_path,
+        format: writer_format,
+        mp3_bitrate: writer_bitrate,
+    };
     threads.push(thread::spawn(move || {
         let result = write_mixed_audio(
-            writer_path,
-            writer_format,
-            writer_bitrate,
+            writer_config,
             writer_buffer,
             writer_shared.clone(),
             writer_stop.clone(),
@@ -461,8 +463,16 @@ impl RecorderHandle {
         }
 
         if self.format == PodcastFormat::Mp3 {
+            if let Some(cancel) = cancel.as_ref()
+                && cancel.load(Ordering::Relaxed)
+            {
+                crate::log_if_err!(std::fs::remove_file(&self.temp_wav));
+                crate::log_if_err!(std::fs::remove_file(&self.temp_mp3));
+                return Err("Saving canceled.".to_string());
+            }
             progress(100);
             if let Err(err) = rename_atomic(&self.temp_mp3, &self.output_path) {
+                crate::log_debug(&format!("MP3 final rename failed: {}", err));
                 self.set_error(&err);
                 return Err(err);
             }
@@ -590,20 +600,29 @@ impl MixBuffer {
     }
 }
 
-fn write_mixed_audio(
+struct WriterConfig {
     path: PathBuf,
     format: PodcastFormat,
     mp3_bitrate: u32,
+}
+
+fn write_mixed_audio(
+    config: WriterConfig,
     buffer: Arc<MixBuffer>,
     shared: Arc<SharedState>,
     stop: Arc<AtomicBool>,
     paused: Arc<AtomicBool>,
 ) -> Result<(), String> {
-    match format {
-        PodcastFormat::Mp3 => {
-            write_mixed_audio_mp3(path, mp3_bitrate, buffer, shared, stop, paused)
-        }
-        PodcastFormat::Wav => write_mixed_audio_wav(path, buffer, shared, stop, paused),
+    match config.format {
+        PodcastFormat::Mp3 => write_mixed_audio_mp3(
+            config.path,
+            config.mp3_bitrate,
+            buffer,
+            shared,
+            stop,
+            paused,
+        ),
+        PodcastFormat::Wav => write_mixed_audio_wav(config.path, buffer, shared, stop, paused),
     }
 }
 

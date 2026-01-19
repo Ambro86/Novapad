@@ -240,7 +240,7 @@ fn read_ppt_binary_text(path: &Path, language: Language) -> Result<String, Strin
         && let Ok(mut comp) = CompoundFile::open(&file)
         && let Ok(mut stream) = comp.open_stream("PowerPoint Document")
     {
-        let _ = stream.read_to_end(&mut buffer);
+        crate::log_if_err!(stream.read_to_end(&mut buffer));
     }
     let source = if buffer.is_empty() { &bytes } else { &buffer };
     let record_text = extract_ppt_record_text(source);
@@ -670,9 +670,9 @@ pub fn read_doc_text(path: &Path, language: Language) -> Result<String, String> 
 
             let mut table_bytes = Vec::new();
             if let Ok(mut table_stream) = comp.open_stream("1Table") {
-                let _ = table_stream.read_to_end(&mut table_bytes);
+                crate::log_if_err!(table_stream.read_to_end(&mut table_bytes));
             } else if let Ok(mut table_stream) = comp.open_stream("0Table") {
-                let _ = table_stream.read_to_end(&mut table_bytes);
+                crate::log_if_err!(table_stream.read_to_end(&mut table_bytes));
             }
 
             if !table_bytes.is_empty()

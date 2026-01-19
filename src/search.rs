@@ -43,13 +43,13 @@ pub struct FindOptions {
 pub unsafe fn open_find_dialog(hwnd: HWND) {
     let has_dialog = with_state(hwnd, |state| state.find_dialog.0 != 0).unwrap_or(false);
     if has_dialog {
-        let _ = with_state(hwnd, |state| {
+        with_state(hwnd, |state| {
             SetFocus(state.find_dialog);
         });
         return;
     }
 
-    let _ = with_state(hwnd, |state| {
+    with_state(hwnd, |state| {
         state.find_replace = Some(FINDREPLACEW {
             lStructSize: std::mem::size_of::<FINDREPLACEW>() as u32,
             hwndOwner: hwnd,
@@ -71,13 +71,13 @@ pub unsafe fn open_find_dialog(hwnd: HWND) {
 pub unsafe fn open_replace_dialog(hwnd: HWND) {
     let has_dialog = with_state(hwnd, |state| state.replace_dialog.0 != 0).unwrap_or(false);
     if has_dialog {
-        let _ = with_state(hwnd, |state| {
+        with_state(hwnd, |state| {
             SetFocus(state.replace_dialog);
         });
         return;
     }
 
-    let _ = with_state(hwnd, |state| {
+    with_state(hwnd, |state| {
         state.replace_replace = Some(FINDREPLACEW {
             lStructSize: std::mem::size_of::<FINDREPLACEW>() as u32,
             hwndOwner: hwnd,
@@ -101,7 +101,7 @@ pub unsafe fn open_replace_dialog(hwnd: HWND) {
 pub unsafe fn handle_find_message(hwnd: HWND, lparam: LPARAM) {
     let fr = &*(lparam.0 as *const FINDREPLACEW);
     if (fr.Flags & FR_DIALOGTERM) != FINDREPLACE_FLAGS(0) {
-        let _ = with_state(hwnd, |state| {
+        with_state(hwnd, |state| {
             if fr.lCustData.0 == FIND_DIALOG_ID {
                 state.find_dialog = HWND(0);
                 state.find_replace = None;
@@ -129,7 +129,7 @@ pub unsafe fn handle_find_message(hwnd: HWND, lparam: LPARAM) {
 
     let find_flags = extract_find_flags(fr.Flags);
     let options = get_find_options(hwnd);
-    let _ = with_state(hwnd, |state| {
+    with_state(hwnd, |state| {
         state.last_find_flags = find_flags;
     });
 
@@ -506,7 +506,7 @@ unsafe extern "system" fn find_replace_hook_proc(
                 added += 2;
             }
             let extra = (added * (line_h + gap)) + 10;
-            let _ = SetWindowPos(
+            crate::log_if_err!(SetWindowPos(
                 hdlg,
                 HWND(0),
                 0,
@@ -514,7 +514,7 @@ unsafe extern "system" fn find_replace_hook_proc(
                 width,
                 height + extra,
                 SWP_NOMOVE | SWP_NOZORDER,
-            );
+            ));
 
             let x = 12;
             let checkbox_width = width.saturating_sub(x + 16);
@@ -573,12 +573,7 @@ unsafe extern "system" fn find_replace_hook_proc(
                     let hwnd_child =
                         windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hdlg, id as i32);
                     if hwnd_child.0 != 0 {
-                        let _ = SendMessageW(
-                            hwnd_child,
-                            WM_SETFONT,
-                            WPARAM(font.0 as usize),
-                            LPARAM(1),
-                        );
+                        SendMessageW(hwnd_child, WM_SETFONT, WPARAM(font.0 as usize), LPARAM(1));
                     }
                 }
             }
@@ -593,25 +588,25 @@ unsafe extern "system" fn find_replace_hook_proc(
             match cmd_id {
                 FIND_ID_REGEX => {
                     let checked = is_checkbox_checked(hdlg, FIND_ID_REGEX);
-                    let _ = with_state(parent, |state| {
+                    with_state(parent, |state| {
                         state.find_use_regex = checked;
                     });
                 }
                 FIND_ID_DOT_MATCHES_NEWLINE => {
                     let checked = is_checkbox_checked(hdlg, FIND_ID_DOT_MATCHES_NEWLINE);
-                    let _ = with_state(parent, |state| {
+                    with_state(parent, |state| {
                         state.find_dot_matches_newline = checked;
                     });
                 }
                 FIND_ID_WRAP_AROUND => {
                     let checked = is_checkbox_checked(hdlg, FIND_ID_WRAP_AROUND);
-                    let _ = with_state(parent, |state| {
+                    with_state(parent, |state| {
                         state.find_wrap_around = checked;
                     });
                 }
                 REPLACE_ID_IN_SELECTION => {
                     let checked = is_checkbox_checked(hdlg, REPLACE_ID_IN_SELECTION);
-                    let _ = with_state(parent, |state| {
+                    with_state(parent, |state| {
                         state.find_replace_in_selection = checked;
                         if checked {
                             state.find_replace_in_all_docs = false;
@@ -623,7 +618,7 @@ unsafe extern "system" fn find_replace_hook_proc(
                 }
                 REPLACE_ID_IN_ALL_DOCS => {
                     let checked = is_checkbox_checked(hdlg, REPLACE_ID_IN_ALL_DOCS);
-                    let _ = with_state(parent, |state| {
+                    with_state(parent, |state| {
                         state.find_replace_in_all_docs = checked;
                         if checked {
                             state.find_replace_in_selection = false;
@@ -645,8 +640,8 @@ fn dialog_metrics(hwnd: HWND) -> (i32, i32, i32) {
     unsafe {
         let mut rc_client = windows::Win32::Foundation::RECT::default();
         let mut rc_window = windows::Win32::Foundation::RECT::default();
-        let _ = GetClientRect(hwnd, &mut rc_client);
-        let _ = GetWindowRect(hwnd, &mut rc_window);
+        crate::log_if_err!(GetClientRect(hwnd, &mut rc_client));
+        crate::log_if_err!(GetWindowRect(hwnd, &mut rc_window));
         let width = rc_window.right - rc_window.left;
         let height = rc_window.bottom - rc_window.top;
         (width, height, rc_client.bottom)
@@ -692,7 +687,7 @@ unsafe fn set_checkbox_checked(hwnd: HWND, checked: bool) {
     } else {
         Default::default()
     };
-    let _ = SendMessageW(hwnd, BM_SETCHECK, WPARAM(value.0 as usize), LPARAM(0));
+    SendMessageW(hwnd, BM_SETCHECK, WPARAM(value.0 as usize), LPARAM(0));
 }
 
 unsafe fn set_checkbox_checked_by_id(hwnd: HWND, id: isize, checked: bool) {
@@ -704,15 +699,14 @@ fn normalize_regex_replacement(replace: &str) -> String {
     let mut out = String::with_capacity(replace.len());
     let mut chars = replace.chars().peekable();
     while let Some(ch) = chars.next() {
-        if ch == '\\' {
-            if let Some(next) = chars.peek() {
-                if next.is_ascii_digit() {
-                    out.push('$');
-                    out.push(*next);
-                    chars.next();
-                    continue;
-                }
-            }
+        if ch == '\\'
+            && let Some(next) = chars.peek()
+            && next.is_ascii_digit()
+        {
+            out.push('$');
+            out.push(*next);
+            chars.next();
+            continue;
         }
         out.push(ch);
     }

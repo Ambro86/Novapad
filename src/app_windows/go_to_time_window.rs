@@ -79,7 +79,7 @@ pub unsafe fn open(parent: HWND) {
         Some(state_ptr as *const _),
     );
     if hwnd.0 == 0 {
-        let _ = Box::from_raw(state_ptr);
+        drop(Box::from_raw(state_ptr));
         return;
     }
     EnableWindow(parent, false);
@@ -205,15 +205,15 @@ unsafe extern "system" fn go_to_time_wndproc(
         }
         WM_KEYDOWN => {
             if wparam.0 as u32 == windows::Win32::UI::Input::KeyboardAndMouse::VK_ESCAPE.0 as u32 {
-                let _ = DestroyWindow(hwnd);
+                crate::log_if_err!(DestroyWindow(hwnd));
                 return LRESULT(0);
             }
             DefWindowProcW(hwnd, msg, wparam, lparam)
         }
         WM_COMMAND => {
-            let id = (wparam.0 & 0xffff) as usize;
+            let id = wparam.0 & 0xffff;
             if id == GO_TO_TIME_CANCEL_ID || id == 2 {
-                let _ = DestroyWindow(hwnd);
+                crate::log_if_err!(DestroyWindow(hwnd));
                 return LRESULT(0);
             }
             if id == GO_TO_TIME_OK_ID || id == 1 {
@@ -242,8 +242,8 @@ unsafe extern "system" fn go_to_time_wndproc(
                         let msg = i18n::tr(language, "go_to_time.invalid_time");
                         let status = GetDlgItem(hwnd, GO_TO_TIME_STATUS_ID as i32);
                         let wide = to_wide(&msg);
-                        let _ = SetWindowTextW(status, PCWSTR(wide.as_ptr()));
-                        let _ = nvda_speak(&msg);
+                        crate::log_if_err!(SetWindowTextW(status, PCWSTR(wide.as_ptr())));
+                        nvda_speak(&msg);
                         SetFocus(input);
                         return LRESULT(0);
                     }
@@ -257,22 +257,22 @@ unsafe extern "system" fn go_to_time_wndproc(
                 .unwrap_or(None)
                 .unwrap_or((std::path::PathBuf::new(), None));
                 if path.as_os_str().is_empty() {
-                    let _ = DestroyWindow(hwnd);
+                    crate::log_if_err!(DestroyWindow(hwnd));
                     return LRESULT(0);
                 }
                 let mut seek_target = target as u64;
-                if let Some(max_secs) = duration {
-                    if seek_target > max_secs {
-                        seek_target = max_secs;
-                        let msg = i18n::tr(language, "go_to_time.clamped");
-                        let status = GetDlgItem(hwnd, GO_TO_TIME_STATUS_ID as i32);
-                        let wide = to_wide(&msg);
-                        let _ = SetWindowTextW(status, PCWSTR(wide.as_ptr()));
-                        let _ = nvda_speak(&msg);
-                    }
+                if let Some(max_secs) = duration
+                    && seek_target > max_secs
+                {
+                    seek_target = max_secs;
+                    let msg = i18n::tr(language, "go_to_time.clamped");
+                    let status = GetDlgItem(hwnd, GO_TO_TIME_STATUS_ID as i32);
+                    let wide = to_wide(&msg);
+                    crate::log_if_err!(SetWindowTextW(status, PCWSTR(wide.as_ptr())));
+                    nvda_speak(&msg);
                 }
-                let _ = seek_audiobook_to(parent, seek_target);
-                let _ = DestroyWindow(hwnd);
+                crate::log_if_err!(seek_audiobook_to(parent, seek_target));
+                crate::log_if_err!(DestroyWindow(hwnd));
                 return LRESULT(0);
             }
             DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -293,10 +293,8 @@ unsafe extern "system" fn go_to_time_wndproc(
                 let state = Box::from_raw(ptr);
                 let parent = state.parent;
                 with_state(parent, |s| s.go_to_time_dialog = HWND(0));
-                if parent.0 != 0 {
-                    if state.prev_focus.0 != 0 {
-                        SetFocus(state.prev_focus);
-                    }
+                if parent.0 != 0 && state.prev_focus.0 != 0 {
+                    SetFocus(state.prev_focus);
                 }
             }
             LRESULT(0)

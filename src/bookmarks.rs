@@ -36,9 +36,9 @@ pub fn save_bookmarks(store: &BookmarkStore) {
         return;
     };
     if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
+        crate::log_if_err!(std::fs::create_dir_all(parent));
     }
     if let Ok(json) = serde_json::to_string_pretty(store) {
-        let _ = std::fs::write(path, json);
+        crate::log_if_err!(std::fs::write(path, json));
     }
 }

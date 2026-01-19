@@ -129,9 +129,13 @@ pub unsafe fn open(parent: HWND) {
     );
 
     if window.0 != 0 {
-        let _ = with_state(parent, |state| {
+        if with_state(parent, |state| {
             state.dictionary_window = window;
-        });
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access dictionary state");
+        }
         EnableWindow(parent, false);
         SetForegroundWindow(window);
     }
@@ -232,7 +236,7 @@ unsafe extern "system" fn dictionary_wndproc(
 
             for ctrl in [hwnd_list, hwnd_add, hwnd_edit, hwnd_remove, hwnd_close] {
                 if ctrl.0 != 0 && hfont.0 != 0 {
-                    let _ = SendMessageW(ctrl, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    SendMessageW(ctrl, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                 }
             }
 
@@ -250,7 +254,7 @@ unsafe extern "system" fn dictionary_wndproc(
             LRESULT(0)
         }
         WM_COMMAND => {
-            let cmd_id = (wparam.0 & 0xffff) as usize;
+            let cmd_id = wparam.0 & 0xffff;
             let notify = (wparam.0 >> 16) as u16;
             match cmd_id {
                 DICT_ID_ADD => {
@@ -268,7 +272,7 @@ unsafe extern "system" fn dictionary_wndproc(
                     LRESULT(0)
                 }
                 DICT_ID_CLOSE => {
-                    let _ = DestroyWindow(hwnd);
+                    crate::log_if_err!(DestroyWindow(hwnd));
                     LRESULT(0)
                 }
                 DICT_ID_LIST if notify == LBN_SELCHANGE as u16 => {
@@ -276,7 +280,7 @@ unsafe extern "system" fn dictionary_wndproc(
                     LRESULT(0)
                 }
                 cmd if cmd == IDCANCEL.0 as usize || cmd == 2 => {
-                    let _ = DestroyWindow(hwnd);
+                    crate::log_if_err!(DestroyWindow(hwnd));
                     LRESULT(0)
                 }
                 _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -292,13 +296,13 @@ unsafe extern "system" fn dictionary_wndproc(
         }
         WM_KEYDOWN => {
             if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                let _ = DestroyWindow(hwnd);
+                crate::log_if_err!(DestroyWindow(hwnd));
                 return LRESULT(0);
             }
             DefWindowProcW(hwnd, msg, wparam, lparam)
         }
         WM_CLOSE => {
-            let _ = DestroyWindow(hwnd);
+            crate::log_if_err!(DestroyWindow(hwnd));
             LRESULT(0)
         }
         WM_DESTROY => {
@@ -310,16 +314,20 @@ unsafe extern "system" fn dictionary_wndproc(
                 if let Some(edit) = crate::get_active_edit(parent) {
                     SetFocus(edit);
                 }
-                let _ = with_state(parent, |state| {
+                if with_state(parent, |state| {
                     state.dictionary_window = HWND(0);
-                });
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access dictionary state");
+                }
             }
             LRESULT(0)
         }
         WM_NCDESTROY => {
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut DictionaryWindowState;
             if !ptr.is_null() {
-                let _ = Box::from_raw(ptr);
+                drop(Box::from_raw(ptr));
             }
             LRESULT(0)
         }
@@ -360,7 +368,7 @@ pub unsafe fn refresh_dictionary_list(hwnd: HWND) {
     };
 
     let selected = SendMessageW(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-    let _ = SendMessageW(hwnd_list, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    SendMessageW(hwnd_list, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
 
     let entries = with_state(parent, |state| state.settings.dictionary.clone()).unwrap_or_default();
     for (idx, entry) in entries.iter().enumerate() {
@@ -373,7 +381,7 @@ pub unsafe fn refresh_dictionary_list(hwnd: HWND) {
         )
         .0;
         if lb_idx >= 0 {
-            let _ = SendMessageW(
+            SendMessageW(
                 hwnd_list,
                 LB_SETITEMDATA,
                 WPARAM(lb_idx as usize),
@@ -389,7 +397,7 @@ pub unsafe fn refresh_dictionary_list(hwnd: HWND) {
         } else {
             0
         };
-        let _ = SendMessageW(hwnd_list, LB_SETCURSEL, WPARAM(target as usize), LPARAM(0));
+        SendMessageW(hwnd_list, LB_SETCURSEL, WPARAM(target as usize), LPARAM(0));
     }
     update_button_states(hwnd);
 }
@@ -418,14 +426,20 @@ unsafe fn remove_selected_entry(hwnd: HWND) {
     let Some(index) = selected_dictionary_index(hwnd) else {
         return;
     };
-    let _ = with_state(parent, |state| {
+    if with_state(parent, |state| {
         if index < state.settings.dictionary.len() {
             state.settings.dictionary.remove(index);
         }
         save_settings(state.settings.clone());
-    });
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access dictionary state");
+    }
     refresh_dictionary_list(hwnd);
-    let _ = PostMessageW(hwnd, DICT_FOCUS_LIST_MSG, WPARAM(0), LPARAM(0));
+    if let Err(_e) = PostMessageW(hwnd, DICT_FOCUS_LIST_MSG, WPARAM(0), LPARAM(0)) {
+        crate::log_debug(&format!("Error: {:?}", _e));
+    }
 }
 
 unsafe fn open_entry_dialog(owner: HWND, index: Option<usize>) {
@@ -481,9 +495,13 @@ unsafe fn open_entry_dialog(owner: HWND, index: Option<usize>) {
     );
 
     if dialog.0 != 0 {
-        let _ = with_state(parent, |state| {
+        if with_state(parent, |state| {
             state.dictionary_entry_dialog = dialog;
-        });
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access dictionary state");
+        }
         EnableWindow(owner, false);
         SetForegroundWindow(dialog);
     }
@@ -603,21 +621,25 @@ unsafe extern "system" fn dictionary_entry_wndproc(
                 cancel_button,
             ] {
                 if ctrl.0 != 0 && hfont.0 != 0 {
-                    let _ = SendMessageW(ctrl, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    SendMessageW(ctrl, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                 }
             }
 
-            if let Some(index) = state.index {
-                if let Some(entry) =
+            if let Some(index) = state.index
+                && let Some(entry) =
                     with_state(state.parent, |s| s.settings.dictionary.get(index).cloned())
                         .unwrap_or(None)
+            {
+                if let Err(_e) =
+                    SetWindowTextW(edit_original, PCWSTR(to_wide(&entry.original).as_ptr()))
                 {
-                    let _ =
-                        SetWindowTextW(edit_original, PCWSTR(to_wide(&entry.original).as_ptr()));
-                    let _ = SetWindowTextW(
-                        edit_replacement,
-                        PCWSTR(to_wide(&entry.replacement).as_ptr()),
-                    );
+                    crate::log_debug(&format!("Failed to set edit_original text: {:?}", _e));
+                }
+                if let Err(_e) = SetWindowTextW(
+                    edit_replacement,
+                    PCWSTR(to_wide(&entry.replacement).as_ptr()),
+                ) {
+                    crate::log_debug(&format!("Failed to set edit_replacement text: {:?}", _e));
                 }
             }
 
@@ -630,7 +652,7 @@ unsafe extern "system" fn dictionary_entry_wndproc(
             LRESULT(0)
         }
         WM_COMMAND => {
-            let cmd_id = (wparam.0 & 0xffff) as usize;
+            let cmd_id = wparam.0 & 0xffff;
             match cmd_id {
                 DICT_ENTRY_ID_OK => {
                     apply_entry_dialog(hwnd);
@@ -641,7 +663,7 @@ unsafe extern "system" fn dictionary_entry_wndproc(
                     LRESULT(0)
                 }
                 DICT_ENTRY_ID_CANCEL | 2 => {
-                    let _ = DestroyWindow(hwnd);
+                    crate::log_if_err!(DestroyWindow(hwnd));
                     LRESULT(0)
                 }
                 _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -649,13 +671,13 @@ unsafe extern "system" fn dictionary_entry_wndproc(
         }
         WM_KEYDOWN => {
             if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                let _ = DestroyWindow(hwnd);
+                crate::log_if_err!(DestroyWindow(hwnd));
                 return LRESULT(0);
             }
             DefWindowProcW(hwnd, msg, wparam, lparam)
         }
         WM_CLOSE => {
-            let _ = DestroyWindow(hwnd);
+            crate::log_if_err!(DestroyWindow(hwnd));
             LRESULT(0)
         }
         WM_DESTROY => {
@@ -664,19 +686,24 @@ unsafe extern "system" fn dictionary_entry_wndproc(
             if owner.0 != 0 {
                 EnableWindow(owner, true);
                 SetForegroundWindow(owner);
-                let _ = PostMessageW(owner, DICT_FOCUS_LIST_MSG, WPARAM(0), LPARAM(0));
+                if let Err(_e) = PostMessageW(owner, DICT_FOCUS_LIST_MSG, WPARAM(0), LPARAM(0)) {
+                    crate::log_debug(&format!("Error: {:?}", _e));
+                }
             }
-            if parent.0 != 0 {
-                let _ = with_state(parent, |state| {
+            if parent.0 != 0
+                && with_state(parent, |state| {
                     state.dictionary_entry_dialog = HWND(0);
-                });
+                })
+                .is_none()
+            {
+                crate::log_debug("Failed to access dictionary state");
             }
             LRESULT(0)
         }
         WM_NCDESTROY => {
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut DictionaryEntryState;
             if !ptr.is_null() {
-                let _ = Box::from_raw(ptr);
+                drop(Box::from_raw(ptr));
             }
             LRESULT(0)
         }
@@ -717,7 +744,7 @@ unsafe fn apply_entry_dialog(hwnd: HWND) {
         return;
     }
 
-    let _ = with_state(parent, |state| {
+    if with_state(parent, |state| {
         match index {
             Some(idx) => {
                 if idx < state.settings.dictionary.len() {
@@ -735,11 +762,17 @@ unsafe fn apply_entry_dialog(hwnd: HWND) {
             }
         }
         save_settings(state.settings.clone());
-    });
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access dictionary state");
+    }
 
     refresh_dictionary_list(owner);
-    let _ = PostMessageW(owner, DICT_FOCUS_LIST_MSG, WPARAM(0), LPARAM(0));
-    let _ = DestroyWindow(hwnd);
+    if let Err(_e) = PostMessageW(owner, DICT_FOCUS_LIST_MSG, WPARAM(0), LPARAM(0)) {
+        crate::log_debug(&format!("Error: {:?}", _e));
+    }
+    crate::log_if_err!(DestroyWindow(hwnd));
 }
 
 unsafe fn get_window_text(hwnd: HWND) -> String {

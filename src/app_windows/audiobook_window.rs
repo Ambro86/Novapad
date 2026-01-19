@@ -81,21 +81,31 @@ pub unsafe fn open(parent: HWND, total: usize) -> HWND {
 
     if hwnd.0 != 0 {
         EnableWindow(parent, false);
-        let _ = with_progress_state(hwnd, |state| {
-            let _ = SendMessageW(
+        if with_progress_state(hwnd, |state| {
+            SendMessageW(
                 state.hwnd_pb,
                 PBM_SETRANGE,
                 WPARAM(0),
                 LPARAM((total as isize) << 16),
             );
             state.total = total;
-        });
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access audiobook state");
+        }
 
         // Center window relative to parent
         let mut rc_parent = RECT::default();
         let mut rc_dlg = RECT::default();
-        let _ = windows::Win32::UI::WindowsAndMessaging::GetWindowRect(parent, &mut rc_parent);
-        let _ = windows::Win32::UI::WindowsAndMessaging::GetWindowRect(hwnd, &mut rc_dlg);
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::GetWindowRect(
+            parent,
+            &mut rc_parent
+        ));
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::GetWindowRect(
+            hwnd,
+            &mut rc_dlg
+        ));
 
         let dlg_w = rc_dlg.right - rc_dlg.left;
         let dlg_h = rc_dlg.bottom - rc_dlg.top;
@@ -105,7 +115,7 @@ pub unsafe fn open(parent: HWND, total: usize) -> HWND {
         let x = rc_parent.left + (parent_w - dlg_w) / 2;
         let y = rc_parent.top + (parent_h - dlg_h) / 2;
 
-        let _ = MoveWindow(hwnd, x, y, dlg_w, dlg_h, true);
+        crate::log_if_err!(MoveWindow(hwnd, x, y, dlg_w, dlg_h, true));
     }
     hwnd
 }
@@ -128,7 +138,7 @@ unsafe extern "system" fn progress_wndproc(
                 Default::default(),
                 w!("EDIT"),
                 PCWSTR(to_wide(&label_text).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE((ES_CENTER | ES_READONLY) as u32),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_CENTER | ES_READONLY),
                 20,
                 20,
                 240,
@@ -184,13 +194,17 @@ unsafe extern "system" fn progress_wndproc(
             LRESULT(0)
         }
         WM_SETFOCUS => {
-            let _ = with_progress_state(hwnd, |state| {
+            if with_progress_state(hwnd, |state| {
                 SetFocus(state.hwnd_text);
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access audiobook state");
+            }
             LRESULT(0)
         }
         WM_COMMAND => {
-            let cmd_id = (wparam.0 & 0xffff) as usize;
+            let cmd_id = wparam.0 & 0xffff;
             if cmd_id == PROGRESS_ID_CANCEL || cmd_id == 2 {
                 // 2 is IDCANCEL
                 request_cancel(hwnd);
@@ -201,15 +215,21 @@ unsafe extern "system" fn progress_wndproc(
         }
         WM_UPDATE_PROGRESS => {
             let current = wparam.0;
-            let _ = with_progress_state(hwnd, |state| {
-                let _ = SendMessageW(state.hwnd_pb, PBM_SETPOS, WPARAM(current), LPARAM(0));
+            if with_progress_state(hwnd, |state| {
+                SendMessageW(state.hwnd_pb, PBM_SETPOS, WPARAM(current), LPARAM(0));
                 if state.total > 0 {
                     let pct = (current * 100) / state.total;
                     let text = progress_text(state.language, pct);
                     let wide = to_wide(&text);
-                    let _ = SetWindowTextW(state.hwnd_text, PCWSTR(wide.as_ptr()));
+                    if let Err(e) = SetWindowTextW(state.hwnd_text, PCWSTR(wide.as_ptr())) {
+                        crate::log_debug(&format!("Failed to set status text: {}", e));
+                    }
                 }
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access audiobook state");
+            }
             LRESULT(0)
         }
         WM_CLOSE => {
@@ -227,7 +247,7 @@ unsafe extern "system" fn progress_wndproc(
         WM_NCDESTROY => {
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ProgressDialogState;
             if !ptr.is_null() {
-                let _ = Box::from_raw(ptr);
+                drop(Box::from_raw(ptr));
             }
             LRESULT(0)
         }
@@ -268,13 +288,17 @@ pub unsafe fn request_cancel(hwnd: HWND) {
         MB_YESNO | MB_ICONWARNING,
     ) == IDYES
     {
-        let _ = with_state(parent, |state| {
+        if with_state(parent, |state| {
             if let Some(cancel) = &state.audiobook_cancel {
                 cancel.store(true, Ordering::Relaxed);
             }
             state.audiobook_progress = HWND(0);
-        });
-        let _ = windows::Win32::UI::WindowsAndMessaging::DestroyWindow(hwnd);
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access audiobook state");
+        }
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::DestroyWindow(hwnd));
     }
 }
 

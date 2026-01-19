@@ -48,7 +48,7 @@ fn write_if_changed(path: &PathBuf, data: &[u8]) -> std::io::Result<bool> {
     drop(file);
 
     // Rimuovi vecchio file se esiste
-    let _ = fs::remove_file(path);
+    crate::log_if_err!(fs::remove_file(path));
     fs::rename(&tmp_path, path)?;
 
     Ok(true)

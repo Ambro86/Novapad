@@ -100,10 +100,14 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
                 } else if next >= OPTIONS_TAB_COUNT {
                     next = 0;
                 }
-                let _ = SendMessageW(tabs, TCM_SETCURSEL, WPARAM(next as usize), LPARAM(0));
+                SendMessageW(tabs, TCM_SETCURSEL, WPARAM(next as usize), LPARAM(0));
                 set_active_tab(hwnd, next);
                 SetFocus(tabs);
-                let _ = PostMessageW(hwnd, WM_NEXTDLGCTL, WPARAM(tabs.0 as usize), LPARAM(1));
+                if let Err(_e) =
+                    PostMessageW(hwnd, WM_NEXTDLGCTL, WPARAM(tabs.0 as usize), LPARAM(1))
+                {
+                    crate::log_debug(&format!("Error: {:?}", _e));
+                }
                 return true;
             }
         }
@@ -113,14 +117,18 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
         if GetParent(focus) == hwnd {
             let dropped = SendMessageW(focus, CB_GETDROPPEDSTATE, WPARAM(0), LPARAM(0)).0 != 0;
             if !dropped {
-                let _ = with_options_state(hwnd, |state| {
-                    let _ = SendMessageW(
+                if with_options_state(hwnd, |state| {
+                    SendMessageW(
                         hwnd,
                         WM_COMMAND,
                         WPARAM(OPTIONS_ID_OK),
                         LPARAM(state.ok_button.0),
                     );
-                });
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access state in options_window");
+                }
                 return true;
             }
         }
@@ -379,9 +387,13 @@ pub unsafe fn open(parent: HWND) {
     );
 
     if dialog.0 != 0 {
-        let _ = with_state(parent, |state| {
+        if with_state(parent, |state| {
             state.options_dialog = dialog;
-        });
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access state in options_window");
+        }
         EnableWindow(parent, true);
         SetForegroundWindow(dialog);
         ensure_voice_lists_loaded(parent, language);
@@ -491,14 +503,14 @@ unsafe extern "system" fn options_wndproc(
                     pszText: PWSTR(text.as_mut_ptr()),
                     ..Default::default()
                 };
-                let _ = SendMessageW(
+                SendMessageW(
                     hwnd_tabs,
                     TCM_INSERTITEMW,
                     WPARAM(index),
                     LPARAM(&mut item as *mut _ as isize),
                 );
             }
-            let _ = SendMessageW(hwnd_tabs, TCM_SETCURSEL, WPARAM(0), LPARAM(0));
+            SendMessageW(hwnd_tabs, TCM_SETCURSEL, WPARAM(0), LPARAM(0));
 
             let mut y = 50;
             let label_lang = CreateWindowExW(
@@ -1396,7 +1408,7 @@ unsafe extern "system" fn options_wndproc(
                 cancel_button,
             ] {
                 if control.0 != 0 && hfont.0 != 0 {
-                    let _ = SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                 }
             }
 
@@ -1466,7 +1478,7 @@ unsafe extern "system" fn options_wndproc(
         }
         WM_NOTIFY => {
             let hdr = &*(lparam.0 as *const NMHDR);
-            if hdr.idFrom == OPTIONS_ID_TABS as usize && hdr.code == TCN_SELCHANGE {
+            if hdr.idFrom == OPTIONS_ID_TABS && hdr.code == TCN_SELCHANGE {
                 let tabs = with_options_state(hwnd, |state| state.hwnd_tabs).unwrap_or(HWND(0));
                 if tabs.0 != 0 {
                     let index = SendMessageW(tabs, TCM_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
@@ -1477,7 +1489,7 @@ unsafe extern "system" fn options_wndproc(
             DefWindowProcW(hwnd, msg, wparam, lparam)
         }
         WM_COMMAND => {
-            let cmd_id = (wparam.0 & 0xffff) as usize;
+            let cmd_id = wparam.0 & 0xffff;
             let code = (wparam.0 >> 16) as u32;
             match cmd_id {
                 OPTIONS_ID_OK => {
@@ -1485,7 +1497,7 @@ unsafe extern "system" fn options_wndproc(
                     LRESULT(0)
                 }
                 OPTIONS_ID_CANCEL | 2 => {
-                    let _ = DestroyWindow(hwnd);
+                    crate::log_if_err!(DestroyWindow(hwnd));
                     LRESULT(0)
                 }
                 OPTIONS_ID_MULTILINGUAL => {
@@ -1554,7 +1566,7 @@ unsafe extern "system" fn options_wndproc(
                         } else if next >= OPTIONS_TAB_COUNT {
                             next = 0;
                         }
-                        let _ = SendMessageW(tabs, TCM_SETCURSEL, WPARAM(next as usize), LPARAM(0));
+                        SendMessageW(tabs, TCM_SETCURSEL, WPARAM(next as usize), LPARAM(0));
                         set_active_tab(hwnd, next);
                         return LRESULT(0);
                     }
@@ -1577,7 +1589,7 @@ unsafe extern "system" fn options_wndproc(
                     return LRESULT(0);
                 }
             } else if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                let _ = DestroyWindow(hwnd);
+                crate::log_if_err!(DestroyWindow(hwnd));
                 return LRESULT(0);
             }
             DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -1591,22 +1603,29 @@ unsafe extern "system" fn options_wndproc(
                 if let Some(edit) = crate::get_active_edit(parent) {
                     SetFocus(edit);
                 }
-                let _ = PostMessageW(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0));
-                let _ = with_state(parent, |state| {
+                if let Err(_e) = PostMessageW(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0))
+                {
+                    crate::log_debug(&format!("Error: {:?}", _e));
+                }
+                if with_state(parent, |state| {
                     state.options_dialog = HWND(0);
-                });
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access state in options_window");
+                }
             }
             LRESULT(0)
         }
         WM_NCDESTROY => {
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut OptionsDialogState;
             if !ptr.is_null() {
-                let _ = Box::from_raw(ptr);
+                drop(Box::from_raw(ptr));
             }
             LRESULT(0)
         }
         WM_CLOSE => {
-            let _ = DestroyWindow(hwnd);
+            crate::log_if_err!(DestroyWindow(hwnd));
             LRESULT(0)
         }
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -1722,32 +1741,32 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
     let settings = with_state(parent, |state| state.settings.clone()).unwrap_or_default();
     let labels = options_labels(settings.language);
 
-    let _ = SendMessageW(combo_lang, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    let _ = SendMessageW(
+    SendMessageW(combo_lang, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    SendMessageW(
         combo_lang,
         CB_ADDSTRING,
         WPARAM(0),
         LPARAM(to_wide(&labels.lang_it).as_ptr() as isize),
     );
-    let _ = SendMessageW(
+    SendMessageW(
         combo_lang,
         CB_ADDSTRING,
         WPARAM(0),
         LPARAM(to_wide(&labels.lang_en).as_ptr() as isize),
     );
-    let _ = SendMessageW(
+    SendMessageW(
         combo_lang,
         CB_ADDSTRING,
         WPARAM(0),
         LPARAM(to_wide(&labels.lang_es).as_ptr() as isize),
     );
-    let _ = SendMessageW(
+    SendMessageW(
         combo_lang,
         CB_ADDSTRING,
         WPARAM(0),
         LPARAM(to_wide(&labels.lang_pt).as_ptr() as isize),
     );
-    let _ = SendMessageW(
+    SendMessageW(
         combo_lang,
         CB_ADDSTRING,
         WPARAM(0),
@@ -1760,23 +1779,23 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         Language::Portuguese => 3,
         Language::Vietnamese => 4,
     };
-    let _ = SendMessageW(combo_lang, CB_SETCURSEL, WPARAM(lang_index), LPARAM(0));
+    SendMessageW(combo_lang, CB_SETCURSEL, WPARAM(lang_index), LPARAM(0));
 
-    let _ = SendMessageW(combo_lang, CB_SETCURSEL, WPARAM(lang_index), LPARAM(0));
+    SendMessageW(combo_lang, CB_SETCURSEL, WPARAM(lang_index), LPARAM(0));
 
-    let _ = SendMessageW(
+    SendMessageW(
         combo_modified_marker_position,
         CB_RESETCONTENT,
         WPARAM(0),
         LPARAM(0),
     );
-    let _ = SendMessageW(
+    SendMessageW(
         combo_modified_marker_position,
         CB_ADDSTRING,
         WPARAM(0),
         LPARAM(to_wide(&labels.marker_position_end).as_ptr() as isize),
     );
-    let _ = SendMessageW(
+    SendMessageW(
         combo_modified_marker_position,
         CB_ADDSTRING,
         WPARAM(0),
@@ -1786,21 +1805,21 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         ModifiedMarkerPosition::Beginning => 1,
         _ => 0,
     };
-    let _ = SendMessageW(
+    SendMessageW(
         combo_modified_marker_position,
         CB_SETCURSEL,
         WPARAM(position_index),
         LPARAM(0),
     );
 
-    let _ = SendMessageW(combo_open, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    let _ = SendMessageW(
+    SendMessageW(combo_open, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    SendMessageW(
         combo_open,
         CB_ADDSTRING,
         WPARAM(0),
         LPARAM(to_wide(&labels.open_new_tab).as_ptr() as isize),
     );
-    let _ = SendMessageW(
+    SendMessageW(
         combo_open,
         CB_ADDSTRING,
         WPARAM(0),
@@ -1810,22 +1829,22 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         OpenBehavior::NewTab => 0,
         OpenBehavior::NewWindow => 1,
     };
-    let _ = SendMessageW(combo_open, CB_SETCURSEL, WPARAM(open_index), LPARAM(0));
+    SendMessageW(combo_open, CB_SETCURSEL, WPARAM(open_index), LPARAM(0));
 
-    let _ = SendMessageW(combo_tts_engine, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    let _ = SendMessageW(
+    SendMessageW(combo_tts_engine, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    SendMessageW(
         combo_tts_engine,
         CB_ADDSTRING,
         WPARAM(0),
         LPARAM(to_wide(&labels.engine_edge).as_ptr() as isize),
     );
-    let _ = SendMessageW(
+    SendMessageW(
         combo_tts_engine,
         CB_ADDSTRING,
         WPARAM(0),
         LPARAM(to_wide(&labels.engine_sapi5).as_ptr() as isize),
     );
-    let _ = SendMessageW(
+    SendMessageW(
         combo_tts_engine,
         CB_ADDSTRING,
         WPARAM(0),
@@ -1837,7 +1856,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         TtsEngine::Sapi5 => 1,
         TtsEngine::Sapi4 => 2,
     };
-    let _ = SendMessageW(
+    SendMessageW(
         combo_tts_engine,
         CB_SETCURSEL,
         WPARAM(engine_index),
@@ -1965,19 +1984,25 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
     select_combo_value(combo_tts_speed, settings.tts_rate);
     select_combo_value(combo_tts_pitch, settings.tts_pitch);
     select_combo_value(combo_tts_volume, settings.tts_volume);
-    let _ = SetWindowTextW(
+    if let Err(_e) = SetWindowTextW(
         edit_tts_speed,
         PCWSTR(to_wide(&settings.tts_rate.to_string()).as_ptr()),
-    );
-    let _ = SetWindowTextW(
+    ) {
+        crate::log_debug(&format!("Failed to set speed text: {:?}", _e));
+    }
+    if let Err(_e) = SetWindowTextW(
         edit_tts_pitch,
         PCWSTR(to_wide(&settings.tts_pitch.to_string()).as_ptr()),
-    );
-    let _ = SetWindowTextW(
+    ) {
+        crate::log_debug(&format!("Failed to set pitch text: {:?}", _e));
+    }
+    if let Err(_e) = SetWindowTextW(
         edit_tts_volume,
         PCWSTR(to_wide(&settings.tts_volume.to_string()).as_ptr()),
-    );
-    let _ = SendMessageW(
+    ) {
+        crate::log_debug(&format!("Failed to set volume text: {:?}", _e));
+    }
+    SendMessageW(
         checkbox_tts_manual,
         BM_SETCHECK,
         WPARAM(if settings.tts_manual_tuning {
@@ -1989,7 +2014,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
     );
     update_tts_manual_visibility(hwnd);
 
-    let _ = SendMessageW(
+    SendMessageW(
         checkbox_multilingual,
         BM_SETCHECK,
         WPARAM(if settings.tts_only_multilingual {
@@ -1999,7 +2024,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         }),
         LPARAM(0),
     );
-    let _ = SendMessageW(
+    SendMessageW(
         checkbox_audio_split_requires_newline,
         BM_SETCHECK,
         WPARAM(if settings.audiobook_split_text_requires_newline {
@@ -2009,7 +2034,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         }),
         LPARAM(0),
     );
-    let _ = SendMessageW(
+    SendMessageW(
         checkbox_split_on_newline,
         BM_SETCHECK,
         WPARAM(if settings.split_on_newline {
@@ -2019,7 +2044,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         }),
         LPARAM(0),
     );
-    let _ = SendMessageW(
+    SendMessageW(
         checkbox_word_wrap,
         BM_SETCHECK,
         WPARAM(if settings.word_wrap {
@@ -2029,7 +2054,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         }),
         LPARAM(0),
     );
-    let _ = SendMessageW(
+    SendMessageW(
         checkbox_smart_quotes,
         BM_SETCHECK,
         WPARAM(if settings.smart_quotes {
@@ -2039,7 +2064,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         }),
         LPARAM(0),
     );
-    let _ = SendMessageW(
+    SendMessageW(
         checkbox_spellcheck,
         BM_SETCHECK,
         WPARAM(if settings.spellcheck_enabled {
@@ -2049,7 +2074,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         }),
         LPARAM(0),
     );
-    let _ = SendMessageW(
+    SendMessageW(
         combo_spellcheck_language,
         CB_RESETCONTENT,
         WPARAM(0),
@@ -2075,7 +2100,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
     };
 
     for (i, (label, val)) in spellcheck_options.iter().enumerate() {
-        let _ = SendMessageW(
+        SendMessageW(
             combo_spellcheck_language,
             CB_ADDSTRING,
             WPARAM(0),
@@ -2085,7 +2110,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             selected_idx = i;
         }
     }
-    let _ = SendMessageW(
+    SendMessageW(
         combo_spellcheck_language,
         CB_SETCURSEL,
         WPARAM(selected_idx),
@@ -2093,7 +2118,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
     );
     update_spellcheck_language_visibility(hwnd);
 
-    let _ = SendMessageW(
+    SendMessageW(
         combo_dictionary_translation,
         CB_RESETCONTENT,
         WPARAM(0),
@@ -2114,7 +2139,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         .to_ascii_lowercase();
     let mut dict_selected_idx = 0;
     for (i, (label, val)) in dictionary_translation_options.iter().enumerate() {
-        let _ = SendMessageW(
+        SendMessageW(
             combo_dictionary_translation,
             CB_ADDSTRING,
             WPARAM(0),
@@ -2124,7 +2149,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             dict_selected_idx = i;
         }
     }
-    let _ = SendMessageW(
+    SendMessageW(
         combo_dictionary_translation,
         CB_SETCURSEL,
         WPARAM(dict_selected_idx),
@@ -2132,12 +2157,14 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
     );
 
     let wrap_text = settings.wrap_width.to_string();
-    let _ = SetWindowTextW(edit_wrap_width, PCWSTR(to_wide(&wrap_text).as_ptr()));
-    let _ = SetWindowTextW(
+    if let Err(_e) = SetWindowTextW(edit_wrap_width, PCWSTR(to_wide(&wrap_text).as_ptr())) {
+        crate::log_debug(&format!("Error: {:?}", _e));
+    }
+    if let Err(_e) = SetWindowTextW(
         edit_quote_prefix,
         PCWSTR(to_wide(&settings.quote_prefix).as_ptr()),
-    );
-    let _ = SendMessageW(
+    ) {}
+    SendMessageW(
         checkbox_move_cursor,
         BM_SETCHECK,
         WPARAM(if settings.move_cursor_during_reading {
@@ -2147,7 +2174,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         }),
         LPARAM(0),
     );
-    let _ = SendMessageW(
+    SendMessageW(
         checkbox_check_updates,
         BM_SETCHECK,
         WPARAM(if settings.check_updates_on_startup {
@@ -2157,7 +2184,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         }),
         LPARAM(0),
     );
-    let _ = SendMessageW(
+    SendMessageW(
         checkbox_context_menu,
         BM_SETCHECK,
         WPARAM(if settings.context_menu_open_with {
@@ -2168,14 +2195,14 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         LPARAM(0),
     );
 
-    let _ = SendMessageW(combo_prompt_program, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    SendMessageW(combo_prompt_program, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
     let prompt_options = [
         labels.prompt_cmd.clone(),
         labels.prompt_powershell.clone(),
         labels.prompt_codex.clone(),
     ];
     for label in prompt_options.iter() {
-        let _ = SendMessageW(
+        SendMessageW(
             combo_prompt_program,
             CB_ADDSTRING,
             WPARAM(0),
@@ -2190,14 +2217,14 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
     } else {
         0
     };
-    let _ = SendMessageW(
+    SendMessageW(
         combo_prompt_program,
         CB_SETCURSEL,
         WPARAM(program_idx),
         LPARAM(0),
     );
 
-    let _ = SendMessageW(combo_audio_skip, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    SendMessageW(combo_audio_skip, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
     let skip_options = [
         (10, "10 s"),
         (30, "30 s"),
@@ -2214,7 +2241,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             LPARAM(to_wide(label).as_ptr() as isize),
         )
         .0 as usize;
-        let _ = SendMessageW(
+        SendMessageW(
             combo_audio_skip,
             CB_SETITEMDATA,
             WPARAM(idx),
@@ -2224,14 +2251,14 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             selected_idx = idx;
         }
     }
-    let _ = SendMessageW(
+    SendMessageW(
         combo_audio_skip,
         CB_SETCURSEL,
         WPARAM(selected_idx),
         LPARAM(0),
     );
 
-    let _ = SendMessageW(combo_audio_split, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    SendMessageW(combo_audio_split, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
     let split_options = [
         (0, labels.split_none.clone()),
         (AUDIOBOOK_SPLIT_BY_TEXT, labels.split_by_text.clone()),
@@ -2249,7 +2276,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             LPARAM(to_wide(label).as_ptr() as isize),
         )
         .0 as usize;
-        let _ = SendMessageW(
+        SendMessageW(
             combo_audio_split,
             CB_SETITEMDATA,
             WPARAM(idx),
@@ -2261,7 +2288,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             selected_split_idx = idx;
         }
     }
-    let _ = SendMessageW(
+    SendMessageW(
         combo_audio_split,
         CB_SETCURSEL,
         WPARAM(selected_split_idx),
@@ -2269,21 +2296,25 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
     );
 
     let split_text_wide = to_wide(&settings.audiobook_split_text);
-    let _ = SetWindowTextW(edit_audio_split_text, PCWSTR(split_text_wide.as_ptr()));
+    if let Err(_e) = SetWindowTextW(edit_audio_split_text, PCWSTR(split_text_wide.as_ptr())) {
+        crate::log_debug(&format!("Error: {:?}", _e));
+    }
     update_audio_split_text_visibility(hwnd);
 
     let cache_limit_text = settings.podcast_cache_limit_mb.to_string();
-    let _ = SetWindowTextW(
+    if let Err(_e) = SetWindowTextW(
         edit_podcast_cache_limit,
         PCWSTR(to_wide(&cache_limit_text).as_ptr()),
-    );
-    let _ = SetWindowTextW(
+    ) {}
+    if let Err(_e) = SetWindowTextW(
         edit_podcastindex_key,
         PCWSTR(to_wide(&settings.podcast_index_api_key).as_ptr()),
-    );
+    ) {}
     let secret = crate::settings::decrypt_podcast_index_secret(&settings.podcast_index_api_secret)
         .unwrap_or_default();
-    let _ = SetWindowTextW(edit_podcastindex_secret, PCWSTR(to_wide(&secret).as_ptr()));
+    if let Err(_e) = SetWindowTextW(edit_podcastindex_secret, PCWSTR(to_wide(&secret).as_ptr())) {
+        crate::log_debug(&format!("Error: {:?}", _e));
+    }
 
     refresh_voices(hwnd);
 }
@@ -2295,19 +2326,19 @@ unsafe fn populate_voice_combo(
     only_multilingual: bool,
     labels: &OptionsLabels,
 ) {
-    let _ = SendMessageW(combo_voice, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    SendMessageW(combo_voice, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
     if voices.is_empty() {
         let label = &labels.voices_empty;
         // We could also check if it's loading, but SAPI loads fast.
         // For Edge, it might be loading.
         // We can check if "loading" logic is needed, but "voices_empty" is safe default.
-        let _ = SendMessageW(
+        SendMessageW(
             combo_voice,
             CB_ADDSTRING,
             WPARAM(0),
             LPARAM(to_wide(label).as_ptr() as isize),
         );
-        let _ = SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+        SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
         return;
     }
     let mut selected_index: Option<usize> = None;
@@ -2327,7 +2358,7 @@ unsafe fn populate_voice_combo(
         )
         .0;
         if idx >= 0 {
-            let _ = SendMessageW(
+            SendMessageW(
                 combo_voice,
                 CB_SETITEMDATA,
                 WPARAM(idx as usize),
@@ -2341,15 +2372,15 @@ unsafe fn populate_voice_combo(
     }
 
     if let Some(idx) = selected_index {
-        let _ = SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(idx), LPARAM(0));
+        SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(idx), LPARAM(0));
     } else if combo_index > 0 {
-        let _ = SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+        SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
     }
 }
 
 fn init_tts_combo(hwnd: HWND, items: &[(String, i32)]) {
     unsafe {
-        let _ = SendMessageW(hwnd, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        SendMessageW(hwnd, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
         for (label, value) in items {
             let idx = SendMessageW(
                 hwnd,
@@ -2358,7 +2389,7 @@ fn init_tts_combo(hwnd: HWND, items: &[(String, i32)]) {
                 LPARAM(to_wide(label).as_ptr() as isize),
             )
             .0 as usize;
-            let _ = SendMessageW(hwnd, CB_SETITEMDATA, WPARAM(idx), LPARAM(*value as isize));
+            SendMessageW(hwnd, CB_SETITEMDATA, WPARAM(idx), LPARAM(*value as isize));
         }
     }
 }
@@ -2375,7 +2406,7 @@ fn select_combo_value(hwnd: HWND, value: i32) {
         for i in 0..count {
             let data = SendMessageW(hwnd, CB_GETITEMDATA, WPARAM(i as usize), LPARAM(0)).0 as i32;
             if data == value {
-                let _ = SendMessageW(hwnd, CB_SETCURSEL, WPARAM(i as usize), LPARAM(0));
+                SendMessageW(hwnd, CB_SETCURSEL, WPARAM(i as usize), LPARAM(0));
                 break;
             }
         }
@@ -2432,7 +2463,7 @@ fn select_combo_nearest_value(hwnd: HWND, value: i32) {
                 best_idx = i;
             }
         }
-        let _ = SendMessageW(hwnd, CB_SETCURSEL, WPARAM(best_idx as usize), LPARAM(0));
+        SendMessageW(hwnd, CB_SETCURSEL, WPARAM(best_idx as usize), LPARAM(0));
     }
 }
 
@@ -2458,9 +2489,16 @@ unsafe fn update_tts_manual_visibility(hwnd: HWND) {
         let rate = combo_value(combo_speed);
         let pitch = combo_value(combo_pitch);
         let volume = combo_value(combo_volume);
-        let _ = SetWindowTextW(edit_speed, PCWSTR(to_wide(&rate.to_string()).as_ptr()));
-        let _ = SetWindowTextW(edit_pitch, PCWSTR(to_wide(&pitch.to_string()).as_ptr()));
-        let _ = SetWindowTextW(edit_volume, PCWSTR(to_wide(&volume.to_string()).as_ptr()));
+        if let Err(_e) = SetWindowTextW(edit_speed, PCWSTR(to_wide(&rate.to_string()).as_ptr())) {
+            crate::log_debug(&format!("Error: {:?}", _e));
+        }
+        if let Err(_e) = SetWindowTextW(edit_pitch, PCWSTR(to_wide(&pitch.to_string()).as_ptr())) {
+            crate::log_debug(&format!("Error: {:?}", _e));
+        }
+        if let Err(_e) = SetWindowTextW(edit_volume, PCWSTR(to_wide(&volume.to_string()).as_ptr()))
+        {
+            crate::log_debug(&format!("Error: {:?}", _e));
+        }
     } else {
         let rate = read_tts_edit_value(edit_speed, 0, TTS_RATE_MIN, TTS_RATE_MAX);
         let pitch = read_tts_edit_value(edit_pitch, 0, TTS_PITCH_MIN, TTS_PITCH_MAX);
@@ -2486,7 +2524,7 @@ unsafe fn update_tts_manual_visibility(hwnd: HWND) {
 fn open_podcastindex_signup() {
     unsafe {
         let url = to_wide("https://api.podcastindex.org/signup");
-        let _ = ShellExecuteW(
+        ShellExecuteW(
             HWND(0),
             w!("open"),
             PCWSTR(url.as_ptr()),
@@ -2617,7 +2655,7 @@ unsafe fn preview_voice(hwnd: HWND) {
             };
             let cancel = Arc::new(AtomicBool::new(false));
             let (command_tx, command_rx) = mpsc::unbounded_channel();
-            let _ = with_state(parent, |state| {
+            if with_state(parent, |state| {
                 state.tts_session = Some(tts_engine::TtsSession {
                     id: state.tts_next_session_id,
                     command_tx,
@@ -2626,7 +2664,11 @@ unsafe fn preview_voice(hwnd: HWND) {
                     initial_caret_pos: 0,
                 });
                 state.tts_next_session_id += 1;
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access state in options_window");
+            }
             crate::sapi4_engine::play_sapi4(
                 voice_idx, text, rate, pitch, volume, cancel, command_rx,
             );
@@ -2635,7 +2677,7 @@ unsafe fn preview_voice(hwnd: HWND) {
             tts_engine::stop_tts_playback(parent);
             let cancel = Arc::new(AtomicBool::new(false));
             let (command_tx, command_rx) = mpsc::unbounded_channel();
-            let _ = with_state(parent, |state| {
+            if with_state(parent, |state| {
                 state.tts_session = Some(tts_engine::TtsSession {
                     id: state.tts_next_session_id,
                     command_tx,
@@ -2644,17 +2686,22 @@ unsafe fn preview_voice(hwnd: HWND) {
                     initial_caret_pos: 0,
                 });
                 state.tts_next_session_id += 1;
-            });
-            let chunk_strings: Vec<String> = chunks.into_iter().map(|c| c.text_to_read).collect();
-            let _ = crate::sapi5_engine::play_sapi(
-                chunk_strings,
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access state in options_window");
+            }
+            if let Err(e) = crate::sapi5_engine::play_sapi(
+                vec![text],
                 voice,
                 rate,
                 pitch,
                 volume,
                 cancel,
                 command_rx,
-            );
+            ) {
+                crate::log_debug(&format!("SAPI5 test playback failed: {}", e));
+            }
         }
     }
 }
@@ -2743,25 +2790,24 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     let old_spellcheck_enabled = settings.spellcheck_enabled;
     let old_spellcheck_mode = settings.spellcheck_language_mode;
     let old_spellcheck_fixed_language = settings.spellcheck_fixed_language.clone();
-    let (old_engine, old_voice, old_rate, old_pitch, old_volume, was_tts_active) =
-        with_state(parent, |state| {
-            (
-                state.settings.tts_engine,
-                state.settings.tts_voice.clone(),
-                state.settings.tts_rate,
-                state.settings.tts_pitch,
-                state.settings.tts_volume,
-                state.tts_session.is_some(),
-            )
-        })
-        .unwrap_or((
-            settings.tts_engine,
-            settings.tts_voice.clone(),
-            settings.tts_rate,
-            settings.tts_pitch,
-            settings.tts_volume,
-            false,
-        ));
+    let res = with_state(parent, |state| {
+        (
+            state.settings.tts_engine,
+            state.settings.tts_voice.clone(),
+            state.settings.tts_rate,
+            state.settings.tts_pitch,
+            state.settings.tts_volume,
+            state.tts_session.is_some(),
+        )
+    });
+    let (old_engine, old_voice, old_rate, old_pitch, old_volume, was_tts_active) = res.unwrap_or((
+        settings.tts_engine,
+        settings.tts_voice.clone(),
+        settings.tts_rate,
+        settings.tts_pitch,
+        settings.tts_volume,
+        false,
+    ));
 
     let lang_sel = SendMessageW(combo_lang, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     settings.language = match lang_sel {
@@ -3018,9 +3064,13 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         }
     }
 
-    let _ = with_state(parent, |state| {
+    if with_state(parent, |state| {
         state.settings = settings.clone();
-    });
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access state in options_window");
+    }
     let new_language = settings.language;
     let keep_default_copy = false;
 
@@ -3056,10 +3106,12 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     {
         crate::restart_tts_from_current_offset(parent);
     }
-    if parent.0 != 0 {
-        let _ = PostMessageW(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0));
+    if parent.0 != 0
+        && let Err(_e) = PostMessageW(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0))
+    {
+        crate::log_debug(&format!("Error: {:?}", _e));
     }
-    let _ = DestroyWindow(hwnd);
+    crate::log_if_err!(DestroyWindow(hwnd));
 }
 
 unsafe fn update_audio_split_text_visibility(hwnd: HWND) {
@@ -3131,7 +3183,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
         }
     })
     .unwrap_or(false);
-    let _ = with_options_state(hwnd, |state| {
+    if with_options_state(hwnd, |state| {
         let show_general = index == OPTIONS_TAB_GENERAL;
         let show_voice = index == OPTIONS_TAB_VOICE;
         let show_editor = index == OPTIONS_TAB_EDITOR;
@@ -3209,7 +3261,11 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
         ] {
             ShowWindow(control, if show_audio { SW_SHOW } else { SW_HIDE });
         }
-    });
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access state in options_window");
+    }
 
     if index == OPTIONS_TAB_AUDIO {
         update_audio_split_text_visibility(hwnd);
@@ -3246,7 +3302,9 @@ unsafe fn focus_tab_first(hwnd: HWND, index: i32) {
 
     if target.0 != 0 {
         SetFocus(target);
-        let _ = PostMessageW(hwnd, WM_NEXTDLGCTL, WPARAM(target.0 as usize), LPARAM(1));
+        if let Err(_e) = PostMessageW(hwnd, WM_NEXTDLGCTL, WPARAM(target.0 as usize), LPARAM(1)) {
+            crate::log_debug(&format!("Error: {:?}", _e));
+        }
     }
 }
 
@@ -3255,21 +3313,26 @@ pub(crate) fn ensure_voice_lists_loaded(hwnd: HWND, language: Language) {
         with_state(hwnd, |state| {
             (!state.edge_voices.is_empty(), !state.sapi_voices.is_empty())
         })
-    }
-    .unwrap_or((false, false));
+        .unwrap_or((false, false))
+    };
 
     if !has_edge {
         thread::spawn(move || {
             match fetch_voice_list() {
                 Ok(list) => {
                     let payload = Box::new(list);
-                    let _ = unsafe {
-                        windows::Win32::UI::WindowsAndMessaging::PostMessageW(
+                    unsafe {
+                        if let Err(e) = windows::Win32::UI::WindowsAndMessaging::PostMessageW(
                             hwnd,
                             WM_TTS_VOICES_LOADED,
                             WPARAM(0),
                             LPARAM(Box::into_raw(payload) as isize),
-                        )
+                        ) {
+                            crate::log_debug(&format!(
+                                "Failed to post WM_TTS_VOICES_LOADED: {}",
+                                e
+                            ));
+                        }
                     };
                 }
                 Err(err) => {
@@ -3290,13 +3353,15 @@ fn ensure_sapi_voices_loaded(hwnd: HWND, _language: Language) {
     thread::spawn(move || match crate::sapi5_engine::list_sapi_voices() {
         Ok(list) => {
             let payload = Box::new(list);
-            let _ = unsafe {
-                windows::Win32::UI::WindowsAndMessaging::PostMessageW(
+            unsafe {
+                if let Err(e) = windows::Win32::UI::WindowsAndMessaging::PostMessageW(
                     hwnd,
                     WM_TTS_SAPI_VOICES_LOADED,
                     WPARAM(0),
                     LPARAM(Box::into_raw(payload) as isize),
-                )
+                ) {
+                    crate::log_debug(&format!("Failed to post WM_TTS_SAPI_VOICES_LOADED: {}", e));
+                }
             };
         }
         Err(err) => {

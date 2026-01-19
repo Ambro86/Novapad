@@ -205,7 +205,7 @@ pub unsafe fn open(parent: HWND) {
         Some(state_ptr as *const _),
     );
     if hwnd.0 == 0 {
-        let _ = Box::from_raw(state_ptr);
+        drop(Box::from_raw(state_ptr));
         return;
     }
     with_state(parent, |state| state.wiktionary_window = hwnd);
@@ -326,20 +326,21 @@ unsafe extern "system" fn wiktionary_wndproc(
             (*init_ptr).output = output;
             (*init_ptr).search = search;
             (*init_ptr).close = close;
+            let proc_ptr = tab_subclass_proc as usize;
             for control in [input, search, output, close] {
                 let prev = SetWindowLongPtrW(
                     control,
                     windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
-                    tab_subclass_proc as isize,
+                    proc_ptr as isize,
                 );
-                let _ = SetWindowLongPtrW(control, GWLP_USERDATA, prev);
+                SetWindowLongPtrW(control, GWLP_USERDATA, prev);
             }
             SetFocus(input);
             LRESULT(0)
         }
         WM_KEYDOWN => {
             if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                let _ = DestroyWindow(hwnd);
+                crate::log_if_err!(DestroyWindow(hwnd));
                 return LRESULT(0);
             }
             if wparam.0 as u32 == VK_RETURN.0 as u32 {
@@ -350,7 +351,7 @@ unsafe extern "system" fn wiktionary_wndproc(
                     return DefWindowProcW(hwnd, msg, wparam, lparam);
                 };
                 if focus == close {
-                    let _ = DestroyWindow(hwnd);
+                    crate::log_if_err!(DestroyWindow(hwnd));
                     return LRESULT(0);
                 }
                 if focus == search {
@@ -361,9 +362,9 @@ unsafe extern "system" fn wiktionary_wndproc(
             DefWindowProcW(hwnd, msg, wparam, lparam)
         }
         WM_COMMAND => {
-            let id = (wparam.0 & 0xffff) as usize;
+            let id = wparam.0 & 0xffff;
             if id == WIKTIONARY_CLOSE_ID || id == 2 {
-                let _ = DestroyWindow(hwnd);
+                crate::log_if_err!(DestroyWindow(hwnd));
                 return LRESULT(0);
             }
             if id == WIKTIONARY_SEARCH_ID || id == 1 {
@@ -381,8 +382,10 @@ unsafe extern "system" fn wiktionary_wndproc(
             let result_ptr = lparam.0 as *mut String;
             if !result_ptr.is_null() {
                 let text = Box::from_raw(result_ptr);
-                if let Some(output) = with_window_state(hwnd, |state| state.output) {
-                    let _ = SetWindowTextW(output, PCWSTR(to_wide(&text).as_ptr()));
+                if let Some(output) = with_window_state(hwnd, |state| state.output)
+                    && let Err(_e) = SetWindowTextW(output, PCWSTR(to_wide(&text).as_ptr()))
+                {
+                    crate::log_debug(&format!("Error: {:?}", _e));
                 }
             }
             LRESULT(0)
@@ -407,7 +410,7 @@ unsafe fn handle_enter_key(hwnd: HWND) -> bool {
     }
     let id = GetDlgCtrlID(hwnd) as usize;
     if id == WIKTIONARY_CLOSE_ID {
-        let _ = DestroyWindow(parent);
+        crate::log_if_err!(DestroyWindow(parent));
         return true;
     }
     if id == WIKTIONARY_SEARCH_ID {
@@ -436,16 +439,16 @@ unsafe extern "system" fn tab_subclass_proc(
                 return LRESULT(0);
             }
         }
-        if key == windows::Win32::UI::Input::KeyboardAndMouse::VK_RETURN.0 {
-            if handle_enter_key(hwnd) {
-                return LRESULT(0);
-            }
-        }
-    }
-    if msg == windows::Win32::UI::WindowsAndMessaging::WM_CHAR && wparam.0 == 13 {
-        if handle_enter_key(hwnd) {
+        if key == windows::Win32::UI::Input::KeyboardAndMouse::VK_RETURN.0 && handle_enter_key(hwnd)
+        {
             return LRESULT(0);
         }
+    }
+    if msg == windows::Win32::UI::WindowsAndMessaging::WM_CHAR
+        && wparam.0 == 13
+        && handle_enter_key(hwnd)
+    {
+        return LRESULT(0);
     }
     if msg == windows::Win32::UI::WindowsAndMessaging::WM_GETDLGCODE {
         let id = GetDlgCtrlID(hwnd) as usize;
@@ -523,7 +526,11 @@ unsafe fn run_lookup(hwnd: HWND) {
     let len = GetWindowTextLengthW(input);
     if len <= 0 {
         let msg = i18n::tr(language, "dictionary.no_word");
-        let _ = SetWindowTextW(output, PCWSTR(to_wide(&to_windows_newlines(&msg)).as_ptr()));
+        if let Err(_e) =
+            SetWindowTextW(output, PCWSTR(to_wide(&to_windows_newlines(&msg)).as_ptr()))
+        {
+            crate::log_debug(&format!("Error: {:?}", _e));
+        }
         return;
     }
     let mut buf = vec![0u16; (len + 1) as usize];
@@ -532,7 +539,11 @@ unsafe fn run_lookup(hwnd: HWND) {
     let trimmed = word.trim().to_string();
     if trimmed.is_empty() {
         let msg = i18n::tr(language, "dictionary.no_word");
-        let _ = SetWindowTextW(output, PCWSTR(to_wide(&to_windows_newlines(&msg)).as_ptr()));
+        if let Err(_e) =
+            SetWindowTextW(output, PCWSTR(to_wide(&to_windows_newlines(&msg)).as_ptr()))
+        {
+            crate::log_debug(&format!("Error: {:?}", _e));
+        }
         return;
     }
 
@@ -541,10 +552,10 @@ unsafe fn run_lookup(hwnd: HWND) {
         with_state(parent, |state| state.dictionary_cache.get(&key).cloned()).unwrap_or(None);
     if let Some(lines) = cached_lines {
         let text = format_cached_output(language, &lines);
-        let _ = SetWindowTextW(
+        if let Err(_e) = SetWindowTextW(
             output,
             PCWSTR(to_wide(&to_windows_newlines(&text)).as_ptr()),
-        );
+        ) {}
         return;
     }
 
@@ -554,10 +565,10 @@ unsafe fn run_lookup(hwnd: HWND) {
     LOOKUP_GENERATION.store(generation, Ordering::SeqCst);
 
     let loading_msg = i18n::tr(language, "dictionary.loading");
-    let _ = SetWindowTextW(
+    if let Err(_e) = SetWindowTextW(
         output,
         PCWSTR(to_wide(&to_windows_newlines(&loading_msg)).as_ptr()),
-    );
+    ) {}
 
     let hwnd_val = hwnd.0;
     let parent_hwnd = parent;
@@ -584,14 +595,16 @@ unsafe fn run_lookup(hwnd: HWND) {
         let hwnd = HWND(hwnd_val);
         unsafe {
             if IsWindow(hwnd).as_bool() {
-                let _ = PostMessageW(
+                if let Err(e) = PostMessageW(
                     hwnd,
                     WM_LOOKUP_DONE,
                     WPARAM(generation),
                     LPARAM(text_ptr as isize),
-                );
+                ) {
+                    crate::log_debug(&format!("Failed to post WM_LOOKUP_DONE: {}", e));
+                }
             } else {
-                let _ = Box::from_raw(text_ptr);
+                drop(Box::from_raw(text_ptr));
             }
         }
     });

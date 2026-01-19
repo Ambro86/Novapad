@@ -79,7 +79,9 @@ fn find_voice_token(voice_name: &str) -> Option<ISpObjectToken> {
         let category: windows::core::Result<ISpObjectTokenCategory> =
             unsafe { CoCreateInstance(&SpObjectTokenCategory, None, CLSCTX_ALL) };
         if let Ok(cat) = category {
-            let _ = unsafe { cat.SetId(category_id, false) };
+            if let Err(_e) = unsafe { cat.SetId(category_id, false) } {
+                crate::log_debug(&format!("Failed to set SAPI5 category: {:?}", _e));
+            }
             if let Ok(enum_tokens) = unsafe { cat.EnumTokens(None, None) } {
                 let mut count = 0;
                 if unsafe { enum_tokens.GetCount(&mut count) }.is_ok() {
@@ -157,11 +159,17 @@ pub fn play_sapi(
                 }
             };
 
-            if let Some(token) = find_voice_token(&voice_name) {
-                let _ = voice.SetVoice(&token);
+            if let Some(token) = find_voice_token(&voice_name)
+                && let Err(e) = voice.SetVoice(&token)
+            {
+                crate::log_debug(&format!("Failed to set SAPI5 voice: {}", e));
             }
-            let _ = voice.SetRate(map_sapi_rate(tts_rate));
-            let _ = voice.SetVolume(map_sapi_volume(tts_volume));
+            if let Err(e) = voice.SetRate(map_sapi_rate(tts_rate)) {
+                crate::log_debug(&format!("Failed to set SAPI5 rate: {}", e));
+            }
+            if let Err(e) = voice.SetVolume(map_sapi_volume(tts_volume)) {
+                crate::log_debug(&format!("Failed to set SAPI5 volume: {}", e));
+            }
 
             let mut paused = false;
             let mut pending: VecDeque<String> = VecDeque::from(chunks);
@@ -170,7 +178,11 @@ pub fn play_sapi(
                 // Wait here if a pause was requested between chunks.
                 while paused {
                     if cancel.load(Ordering::Relaxed) {
-                        let _ = voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None);
+                        if let Err(e) =
+                            voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None)
+                        {
+                            crate::log_debug(&format!("SAPI5 Speak failed: {}", e));
+                        }
                         return;
                     }
                     while let Ok(cmd) = command_rx.try_recv() {
@@ -180,11 +192,10 @@ pub fn play_sapi(
                             }
                             TtsCommand::Stop => {
                                 cancel.store(true, Ordering::SeqCst);
-                                let _ = voice.Speak(
-                                    PCWSTR::null(),
-                                    SPF_PURGEBEFORESPEAK.0 as u32,
-                                    None,
-                                );
+                                if let Err(_e) =
+                                    voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None)
+                                {
+                                }
                                 return;
                             }
                             TtsCommand::Pause => {}
@@ -200,15 +211,21 @@ pub fn play_sapi(
                 let current_chunk = chunk;
                 let ssml = mk_sapi_ssml(&current_chunk, tts_rate, tts_pitch, tts_volume);
                 let chunk_wide = to_wide(&ssml);
-                let _ = voice.Speak(
+                if let Err(e) = voice.Speak(
                     PCWSTR(chunk_wide.as_ptr()),
                     (SPF_ASYNC.0 | SPF_IS_XML.0) as u32,
                     None,
-                );
+                ) {
+                    crate::log_debug(&format!("SAPI5 chunk Speak failed: {}", e));
+                }
 
                 loop {
                     if cancel.load(Ordering::Relaxed) {
-                        let _ = voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None);
+                        if let Err(e) =
+                            voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None)
+                        {
+                            crate::log_debug(&format!("SAPI5 Speak failed: {}", e));
+                        }
                         return;
                     }
                     while let Ok(cmd) = command_rx.try_recv() {
@@ -227,11 +244,10 @@ pub fn play_sapi(
                                         }
                                     }
                                 }
-                                let _ = voice.Speak(
-                                    PCWSTR::null(),
-                                    SPF_PURGEBEFORESPEAK.0 as u32,
-                                    None,
-                                );
+                                if let Err(_e) =
+                                    voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None)
+                                {
+                                }
                                 if let Some(rem) = remainder {
                                     pending.push_front(rem);
                                 }
@@ -243,11 +259,10 @@ pub fn play_sapi(
                             }
                             TtsCommand::Stop => {
                                 cancel.store(true, Ordering::SeqCst);
-                                let _ = voice.Speak(
-                                    PCWSTR::null(),
-                                    SPF_PURGEBEFORESPEAK.0 as u32,
-                                    None,
-                                );
+                                if let Err(_e) =
+                                    voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None)
+                                {
+                                }
                                 return;
                             }
                         }
@@ -262,7 +277,9 @@ pub fn play_sapi(
                     {
                         break;
                     }
-                    let _ = voice.WaitUntilDone(50);
+                    if let Err(e) = voice.WaitUntilDone(50) {
+                        crate::log_debug(&format!("Failed to wait for SAPI5: {}", e));
+                    }
                 }
             }
         }
@@ -313,8 +330,12 @@ pub fn speak_sapi_to_file(
             voice
                 .SetVoice(&voice_token)
                 .map_err(|e| format!("SetVoice failed: {}", e))?;
-            let _ = voice.SetRate(map_sapi_rate(options.rate));
-            let _ = voice.SetVolume(map_sapi_volume(options.volume));
+            if let Err(e) = voice.SetRate(map_sapi_rate(options.rate)) {
+                crate::log_debug(&format!("Failed to set SAPI5 rate: {}", e));
+            }
+            if let Err(e) = voice.SetVolume(map_sapi_volume(options.volume)) {
+                crate::log_debug(&format!("Failed to set SAPI5 volume: {}", e));
+            }
 
             let stream: ISpStream = CoCreateInstance(&SpFileStream, None, CLSCTX_ALL)
                 .map_err(|e| format!("Failed to create SpFileStream: {}", e))?;
@@ -346,8 +367,12 @@ pub fn speak_sapi_to_file(
 
             for (i, chunk) in options.chunks.iter().enumerate() {
                 if options.cancel.load(Ordering::Relaxed) {
-                    let _ = stream.Close();
-                    let _ = std::fs::remove_file(&wav_path);
+                    if let Err(e) = stream.Close() {
+                        crate::log_debug(&format!("Failed to close SAPI5 stream: {}", e));
+                    }
+                    if let Err(e) = std::fs::remove_file(&wav_path) {
+                        crate::log_debug(&format!("Failed to remove SAPI5 temp WAV: {}", e));
+                    }
                     return Err("Cancelled".to_string());
                 }
                 let ssml = mk_sapi_ssml(chunk, options.rate, options.pitch, options.volume);
@@ -359,9 +384,15 @@ pub fn speak_sapi_to_file(
                 progress_callback(i + 1);
             }
 
-            let _ = voice.WaitUntilDone(u32::MAX);
-            let _ = voice.SetOutput(None, false);
-            let _ = stream.Close();
+            if let Err(e) = voice.WaitUntilDone(u32::MAX) {
+                crate::log_debug(&format!("Failed to wait for SAPI5: {}", e));
+            }
+            if let Err(e) = voice.SetOutput(None, false) {
+                crate::log_debug(&format!("Failed to reset SAPI5 output: {}", e));
+            }
+            if let Err(e) = stream.Close() {
+                crate::log_debug(&format!("Failed to close SAPI5 stream: {}", e));
+            }
         }
 
         if is_mp3 {
@@ -371,21 +402,27 @@ pub fn speak_sapi_to_file(
                 let sample_rate = 44100u32;
                 let channels = 1u16;
                 let bits_per_sample = 16u16;
-                let _ = crate::audio_utils::write_silence_file(
+                if let Err(e) = crate::audio_utils::write_silence_file(
                     &wav_path,
                     sample_rate,
                     channels,
                     bits_per_sample,
-                    500,
-                );
+                    50,
+                ) {
+                    crate::log_debug(&format!("Failed to write silence file: {}", e));
+                }
             }
             match crate::mf_encoder::encode_wav_to_mp3(&wav_path, options.output_path) {
                 Ok(()) => {
-                    let _ = std::fs::remove_file(&wav_path);
+                    if let Err(e) = std::fs::remove_file(&wav_path) {
+                        crate::log_debug(&format!("Failed to remove SAPI5 temp WAV: {}", e));
+                    }
                 }
                 Err(e) => {
                     let dest_wav = options.output_path.with_extension("wav");
-                    let _ = std::fs::rename(&wav_path, &dest_wav);
+                    if let Err(e) = std::fs::rename(&wav_path, &dest_wav) {
+                        crate::log_debug(&format!("Failed to rename SAPI5 output: {}", e));
+                    }
                     let msg = if e.contains("Media Foundation not available") {
                         mf_not_available_message(options.language)
                     } else {

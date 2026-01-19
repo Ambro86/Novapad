@@ -113,12 +113,12 @@ pub fn select_chapter(parent: HWND, chapters: &[Chapter], language: Language) ->
         }
         unsafe {
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
-                let _ = PostMessageW(
+                crate::log_if_err!(PostMessageW(
                     hwnd,
                     WM_COMMAND,
-                    WPARAM(CHAPTER_LIST_ID_CANCEL as usize),
+                    WPARAM(CHAPTER_LIST_ID_CANCEL),
                     LPARAM(0),
-                );
+                ));
                 continue;
             }
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
@@ -126,12 +126,12 @@ pub fn select_chapter(parent: HWND, chapters: &[Chapter], language: Language) ->
                     .unwrap_or((HWND(0), HWND(0)));
                 let focus = GetFocus();
                 if focus == list || focus == ok {
-                    let _ = PostMessageW(
+                    crate::log_if_err!(PostMessageW(
                         hwnd,
                         WM_COMMAND,
-                        WPARAM(CHAPTER_LIST_ID_OK as usize),
+                        WPARAM(CHAPTER_LIST_ID_OK),
                         LPARAM(0),
-                    );
+                    ));
                     continue;
                 }
             }
@@ -140,16 +140,16 @@ pub fn select_chapter(parent: HWND, chapters: &[Chapter], language: Language) ->
                     .unwrap_or((HWND(0), HWND(0)));
                 let focus = GetFocus();
                 if focus == list || focus == ok {
-                    let _ = PostMessageW(
+                    crate::log_if_err!(PostMessageW(
                         hwnd,
                         WM_COMMAND,
-                        WPARAM(CHAPTER_LIST_ID_OK as usize),
+                        WPARAM(CHAPTER_LIST_ID_OK),
                         LPARAM(0),
-                    );
+                    ));
                     continue;
                 }
             }
-            if IsDialogMessageW(hwnd, &mut msg).as_bool() {
+            if IsDialogMessageW(hwnd, &msg).as_bool() {
                 continue;
             }
             TranslateMessage(&msg);
@@ -200,17 +200,17 @@ unsafe extern "system" fn chapter_list_wndproc(
                 None,
             );
 
-            let _ = SendMessageW(list, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+            SendMessageW(list, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
             for item in init.items.iter() {
-                let _ = SendMessageW(
+                SendMessageW(
                     list,
                     LB_ADDSTRING,
                     WPARAM(0),
                     LPARAM(to_wide(item).as_ptr() as isize),
                 );
             }
-            let _ = SendMessageW(list, LB_SETCURSEL, WPARAM(0), LPARAM(0));
-            let _ = SetFocus(list);
+            SendMessageW(list, LB_SETCURSEL, WPARAM(0), LPARAM(0));
+            SetFocus(list);
 
             let ok = CreateWindowExW(
                 Default::default(),
@@ -244,7 +244,7 @@ unsafe extern "system" fn chapter_list_wndproc(
 
             for control in [list, ok, cancel] {
                 if control.0 != 0 && hfont.0 != 0 {
-                    let _ = SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                 }
             }
 
@@ -258,7 +258,7 @@ unsafe extern "system" fn chapter_list_wndproc(
             LRESULT(0)
         }
         WM_COMMAND => {
-            let cmd_id = (wparam.0 & 0xffff) as usize;
+            let cmd_id = wparam.0 & 0xffff;
             match cmd_id {
                 CHAPTER_LIST_ID_OK => {
                     let (list, result) =
@@ -266,22 +266,22 @@ unsafe extern "system" fn chapter_list_wndproc(
                             .unwrap_or((HWND(0), Arc::new(Mutex::new(None))));
                     if list.0 != 0 {
                         let sel = SendMessageW(list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
-                        if sel >= 0 {
-                            let _ = result.lock().map(|mut r| *r = Some(sel as usize));
+                        if sel >= 0 && result.lock().map(|mut r| *r = Some(sel as usize)).is_err() {
+                            crate::log_debug("Failed to update podcast chapter selection");
                         }
                     }
-                    let _ = DestroyWindow(hwnd);
+                    crate::log_if_err!(DestroyWindow(hwnd));
                     LRESULT(0)
                 }
                 CHAPTER_LIST_ID_CANCEL => {
-                    let _ = DestroyWindow(hwnd);
+                    crate::log_if_err!(DestroyWindow(hwnd));
                     LRESULT(0)
                 }
                 _ => DefWindowProcW(hwnd, msg, wparam, lparam),
             }
         }
         WM_CLOSE => {
-            let _ = DestroyWindow(hwnd);
+            crate::log_if_err!(DestroyWindow(hwnd));
             LRESULT(0)
         }
         WM_DESTROY => {
@@ -291,7 +291,7 @@ unsafe extern "system" fn chapter_list_wndproc(
             }
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ChapterListState;
             if !ptr.is_null() {
-                let _ = Box::from_raw(ptr);
+                drop(Box::from_raw(ptr));
             }
             LRESULT(0)
         }

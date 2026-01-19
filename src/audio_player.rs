@@ -74,11 +74,11 @@ fn load_soundtouch_api() -> Option<&'static SoundTouchApi> {
             if let Ok(appdata) = std::env::var("APPDATA") {
                 candidates.push(PathBuf::from(appdata).join("Novapad").join(dll_name));
             }
-            if let Ok(exe) = std::env::current_exe() {
-                if let Some(dir) = exe.parent() {
-                    candidates.push(dir.join("dll").join(dll_name));
-                    candidates.push(dir.join(dll_name));
-                }
+            if let Ok(exe) = std::env::current_exe()
+                && let Some(dir) = exe.parent()
+            {
+                candidates.push(dir.join("dll").join(dll_name));
+                candidates.push(dir.join(dll_name));
             }
             if let Ok(dir) = std::env::current_dir() {
                 candidates.push(dir.join("dll").join(dll_name));
@@ -331,10 +331,8 @@ where
     type Item = f32;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.index >= self.buffer.len() {
-            if !self.refill() {
-                return None;
-            }
+        if self.index >= self.buffer.len() && !self.refill() {
+            return None;
         }
         let sample = self.buffer[self.index];
         self.index += 1;
@@ -492,11 +490,15 @@ fn start_audiobook_at_with_options(
             speed: effective_speed,
         };
 
-        let _ = unsafe {
-            with_state(hwnd_main, |state| {
+        unsafe {
+            if with_state(hwnd_main, |state| {
                 state.active_audiobook = Some(player);
             })
-        };
+            .is_none()
+            {
+                crate::log_debug("Failed to access audio player state");
+            }
+        }
     });
 }
 
@@ -634,12 +636,16 @@ pub unsafe fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> 
 }
 
 pub unsafe fn stop_audiobook_playback(hwnd: HWND) {
-    let _ = with_state(hwnd, |state| {
+    if with_state(hwnd, |state| {
         if let Some(player) = state.active_audiobook.take() {
             state.last_stopped_audiobook = Some(player.path.clone());
             player.sink.stop();
         }
-    });
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access audio player state");
+    }
 }
 
 pub unsafe fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
@@ -689,11 +695,14 @@ pub unsafe fn change_audiobook_volume(hwnd: HWND, delta: f32) {
     })
     .flatten();
 
-    if let Some(volume) = new_volume {
-        with_state(hwnd, |state| {
+    if let Some(volume) = new_volume
+        && with_state(hwnd, |state| {
             state.settings.audiobook_playback_volume = volume;
             crate::settings::save_settings(state.settings.clone());
-        });
+        })
+        .is_none()
+    {
+        crate::log_debug("Failed to access audio player state");
     }
 }
 
@@ -739,10 +748,14 @@ pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
     );
 
     // Save speed to settings
-    with_state(hwnd, |state| {
+    if with_state(hwnd, |state| {
         state.settings.audiobook_playback_speed = speed;
         crate::settings::save_settings(state.settings.clone());
-    });
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access audio player state");
+    }
 
     Some(speed)
 }
@@ -758,7 +771,7 @@ pub unsafe fn audiobook_volume_level(hwnd: HWND) -> Option<f32> {
 }
 
 pub unsafe fn toggle_audiobook_mute(hwnd: HWND) {
-    let _ = with_state(hwnd, |state| {
+    if with_state(hwnd, |state| {
         if let Some(player) = &mut state.active_audiobook {
             if player.muted {
                 let restored = if player.prev_volume > 0.0 {
@@ -778,7 +791,11 @@ pub unsafe fn toggle_audiobook_mute(hwnd: HWND) {
                 player.sink.set_volume(0.0);
             }
         }
-    });
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access audio player state");
+    }
 }
 
 #[cfg(test)]

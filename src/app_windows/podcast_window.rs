@@ -78,7 +78,7 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
         let key = msg.wParam.0 as u32;
 
         if key == VK_ESCAPE.0 as u32 {
-            let _ = unsafe { SendMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) };
+            unsafe { SendMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) };
             return true;
         }
         if ctrl && !shift {
@@ -263,9 +263,13 @@ pub fn open(parent: HWND) {
 
     if window.0 != 0 {
         unsafe {
-            let _ = with_state(parent, |state| {
+            if with_state(parent, |state| {
                 state.podcast_window = window;
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access podcast state");
+            }
             EnableWindow(parent, false);
             SetForegroundWindow(window);
         }
@@ -914,7 +918,7 @@ unsafe extern "system" fn podcast_wndproc(
                 hint_text,
             ];
             for control in controls {
-                let _ = SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
             }
 
             populate_combos(
@@ -976,15 +980,17 @@ unsafe extern "system" fn podcast_wndproc(
             let boxed = Box::new(state);
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(boxed) as isize);
 
-            let _ = SetTimer(hwnd, PODCAST_TIMER_ID, 500, None);
+            if SetTimer(hwnd, PODCAST_TIMER_ID, 500, None) == 0 {
+                crate::log_debug("Failed to set PODCAST_TIMER");
+            }
             SetFocus(include_mic);
             LRESULT(0)
         }
         WM_COMMAND => {
-            let id = (wparam.0 & 0xffff) as usize;
+            let id = wparam.0 & 0xffff;
             let code = (wparam.0 >> 16) as u16;
             let mut handled = false;
-            with_podcast_state(hwnd, |state| match id {
+            if with_podcast_state(hwnd, |state| match id {
                 PODCAST_ID_INCLUDE_MIC | PODCAST_ID_INCLUDE_SYSTEM | PODCAST_ID_INCLUDE_VIDEO => {
                     update_source_controls(state);
                     update_recording_controls(state);
@@ -1026,7 +1032,9 @@ unsafe extern "system" fn podcast_wndproc(
                     if let Some(folder) = browse_for_folder(hwnd, state.language) {
                         let path = folder.to_string_lossy().to_string();
                         let wide = to_wide(&path);
-                        let _ = SetWindowTextW(state.save_path, PCWSTR(wide.as_ptr()));
+                        if let Err(_e) = SetWindowTextW(state.save_path, PCWSTR(wide.as_ptr())) {
+                            crate::log_debug(&format!("Error: {:?}", _e));
+                        }
                         update_filename_preview(state);
                         persist_settings(state);
                     }
@@ -1063,11 +1071,15 @@ unsafe extern "system" fn podcast_wndproc(
                     stop_recording_action(state, hwnd);
                 }
                 PODCAST_ID_CLOSE => {
-                    let _ = SendMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
+                    SendMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
                     handled = true;
                 }
                 _ => {}
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access podcast state");
+            }
             if handled {
                 return LRESULT(0);
             }
@@ -1075,32 +1087,48 @@ unsafe extern "system" fn podcast_wndproc(
         }
         WM_TIMER => {
             if wparam.0 == PODCAST_TIMER_ID {
-                with_podcast_state(hwnd, |state| {
+                if with_podcast_state(hwnd, |state| {
                     update_status_from_recorder(state);
-                });
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access podcast state");
+                }
                 return LRESULT(0);
             }
             DefWindowProcW(hwnd, msg, wparam, lparam)
         }
         podcast_save_window::WM_PODCAST_SAVE_CLOSED => {
-            with_podcast_state(hwnd, |state| {
+            if with_podcast_state(hwnd, |state| {
                 state.saving_dialog = HWND(0);
                 state.save_cancel = None;
-                let _ = with_state(state.parent, |app| {
+                if with_state(state.parent, |app| {
                     app.podcast_save_window = HWND(0);
-                });
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access podcast state");
+                }
                 if state.start_button.0 != 0 {
                     SetFocus(state.start_button);
                 }
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access podcast state");
+            }
             LRESULT(0)
         }
         podcast_save_window::WM_PODCAST_SAVE_CANCEL => {
-            with_podcast_state(hwnd, |state| {
+            if with_podcast_state(hwnd, |state| {
                 if let Some(cancel) = state.save_cancel.as_ref() {
                     cancel.store(true, Ordering::Relaxed);
                 }
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access podcast state");
+            }
             LRESULT(0)
         }
         WM_PODCAST_SAVE_RESULT => {
@@ -1108,7 +1136,7 @@ unsafe extern "system" fn podcast_wndproc(
                 return LRESULT(0);
             }
             let result = unsafe { Box::from_raw(lparam.0 as *mut PodcastSaveResult) };
-            with_podcast_state(hwnd, |state| {
+            if with_podcast_state(hwnd, |state| {
                 let title = if result.success {
                     i18n::tr(state.language, "podcast.done_title")
                 } else {
@@ -1130,71 +1158,95 @@ unsafe extern "system" fn podcast_wndproc(
                     );
                     SetFocus(state.start_button);
                 }
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access podcast state");
+            }
             LRESULT(0)
         }
         WM_CLOSE => {
             let mut should_close = true;
-            with_podcast_state(hwnd, |state| {
-                if let Some(recorder) = state.recorder.as_ref() {
-                    if matches!(
+            if with_podcast_state(hwnd, |state| {
+                if let Some(recorder) = state.recorder.as_ref()
+                    && matches!(
                         recorder.status(),
                         RecorderStatus::Recording | RecorderStatus::Paused
-                    ) {
-                        let labels = labels(state.language);
-                        let text = to_wide(&labels.confirm_close_recording);
-                        let title = to_wide(&confirm_title(state.language));
-                        let result = windows::Win32::UI::WindowsAndMessaging::MessageBoxW(
-                            hwnd,
-                            PCWSTR(text.as_ptr()),
-                            PCWSTR(title.as_ptr()),
-                            MB_OKCANCEL | MB_ICONWARNING,
-                        );
-                        if result == IDOK {
-                            stop_recording_action(state, hwnd);
-                        } else {
-                            should_close = false;
-                        }
+                    )
+                {
+                    let labels = labels(state.language);
+                    let text = to_wide(&labels.confirm_close_recording);
+                    let title = to_wide(&confirm_title(state.language));
+                    let result = windows::Win32::UI::WindowsAndMessaging::MessageBoxW(
+                        hwnd,
+                        PCWSTR(text.as_ptr()),
+                        PCWSTR(title.as_ptr()),
+                        MB_OKCANCEL | MB_ICONWARNING,
+                    );
+                    if result == IDOK {
+                        stop_recording_action(state, hwnd);
+                    } else {
+                        should_close = false;
                     }
                 }
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access podcast state");
+            }
             if should_close {
-                let _ = DestroyWindow(hwnd);
+                crate::log_if_err!(DestroyWindow(hwnd));
             }
             LRESULT(0)
         }
         WM_DESTROY => {
-            with_podcast_state(hwnd, |state| {
-                if let Some(recorder) = state.recorder.take() {
-                    let _ = recorder.stop();
+            if with_podcast_state(hwnd, |state| {
+                if let Some(recorder) = state.recorder.take()
+                    && let Err(e) = recorder.stop()
+                {
+                    crate::log_debug(&format!("Failed to stop recorder: {}", e));
                 }
                 if state.saving_dialog.0 != 0 {
-                    let _ = DestroyWindow(state.saving_dialog);
+                    crate::log_if_err!(DestroyWindow(state.saving_dialog));
                     state.saving_dialog = HWND(0);
                     state.save_cancel = None;
-                    let _ = with_state(state.parent, |app| {
+                    if with_state(state.parent, |app| {
                         app.podcast_save_window = HWND(0);
-                    });
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access podcast state");
+                    }
                 }
                 EnableWindow(state.parent, true);
                 unsafe {
-                    let _ =
-                        PostMessageW(state.parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0));
+                    if let Err(e) =
+                        PostMessageW(state.parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0))
+                    {
+                        crate::log_debug(&format!("Failed to post WM_FOCUS_EDITOR: {}", e));
+                    }
                 }
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access podcast state");
+            }
             LRESULT(0)
         }
         WM_NCDESTROY => {
             let parent = with_podcast_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
-            if parent.0 != 0 {
-                let _ = with_state(parent, |state| {
+            if parent.0 != 0
+                && with_state(parent, |state| {
                     state.podcast_window = HWND(0);
-                });
+                })
+                .is_none()
+            {
+                crate::log_debug("Failed to access podcast state");
             }
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
             if ptr != 0 {
                 unsafe {
-                    let _ = Box::from_raw(ptr as *mut PodcastState);
+                    drop(Box::from_raw(ptr as *mut PodcastState));
                 }
             }
             LRESULT(0)
@@ -1225,26 +1277,26 @@ fn populate_combos(
     language: Language,
 ) {
     unsafe {
-        let _ = SendMessageW(format_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        SendMessageW(format_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
         let mp3 = to_wide("MP3");
         let wav = to_wide("WAV");
-        let _ = SendMessageW(
+        SendMessageW(
             format_combo,
             CB_ADDSTRING,
             WPARAM(0),
             LPARAM(mp3.as_ptr() as isize),
         );
-        let _ = SendMessageW(
+        SendMessageW(
             format_combo,
             CB_ADDSTRING,
             WPARAM(0),
             LPARAM(wav.as_ptr() as isize),
         );
 
-        let _ = SendMessageW(bitrate_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        SendMessageW(bitrate_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
         for bitrate in ["128 kbps", "192 kbps", "256 kbps"] {
             let text = to_wide(bitrate);
-            let _ = SendMessageW(
+            SendMessageW(
                 bitrate_combo,
                 CB_ADDSTRING,
                 WPARAM(0),
@@ -1253,7 +1305,7 @@ fn populate_combos(
         }
 
         // Populate microphone gain combo with Italian text
-        let _ = SendMessageW(mic_gain_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        SendMessageW(mic_gain_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
         let gain_options = [
             "podcast.gain.quarter",
             "podcast.gain.third",
@@ -1267,7 +1319,7 @@ fn populate_combos(
         ];
         for key in gain_options {
             let text = to_wide(&i18n::tr(language, key));
-            let _ = SendMessageW(
+            SendMessageW(
                 mic_gain_combo,
                 CB_ADDSTRING,
                 WPARAM(0),
@@ -1276,10 +1328,10 @@ fn populate_combos(
         }
 
         // Populate system gain combo with Italian text
-        let _ = SendMessageW(system_gain_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        SendMessageW(system_gain_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
         for key in gain_options {
             let text = to_wide(&i18n::tr(language, key));
-            let _ = SendMessageW(
+            SendMessageW(
                 system_gain_combo,
                 CB_ADDSTRING,
                 WPARAM(0),
@@ -1287,8 +1339,8 @@ fn populate_combos(
             );
         }
 
-        let _ = SendMessageW(mic_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-        let _ = SendMessageW(system_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        SendMessageW(mic_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        SendMessageW(system_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
         // Note: devices are added later in apply_settings_to_ui from mic_devices/system_devices
         // which already include "Default" as the first entry
     }
@@ -1318,7 +1370,7 @@ fn load_devices(language: Language) -> (Vec<AudioDevice>, Vec<AudioDevice>, bool
 
 fn apply_settings_to_ui(state: &mut PodcastState, settings: &AppSettings) {
     unsafe {
-        let _ = SendMessageW(
+        SendMessageW(
             state.include_mic,
             BM_SETCHECK,
             WPARAM(if settings.podcast_include_microphone {
@@ -1328,7 +1380,7 @@ fn apply_settings_to_ui(state: &mut PodcastState, settings: &AppSettings) {
             }),
             LPARAM(0),
         );
-        let _ = SendMessageW(
+        SendMessageW(
             state.include_system,
             BM_SETCHECK,
             WPARAM(if settings.podcast_include_system_audio {
@@ -1341,23 +1393,23 @@ fn apply_settings_to_ui(state: &mut PodcastState, settings: &AppSettings) {
 
         for (index, device) in state.mic_devices.iter().enumerate() {
             let name = to_wide(&device.name);
-            let _ = SendMessageW(
+            SendMessageW(
                 state.mic_device,
                 CB_ADDSTRING,
                 WPARAM(0),
                 LPARAM(name.as_ptr() as isize),
             );
             if device.id == settings.podcast_microphone_device_id {
-                let _ = SendMessageW(state.mic_device, CB_SETCURSEL, WPARAM(index), LPARAM(0));
+                SendMessageW(state.mic_device, CB_SETCURSEL, WPARAM(index), LPARAM(0));
             }
         }
         if SendMessageW(state.mic_device, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 == -1 {
-            let _ = SendMessageW(state.mic_device, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+            SendMessageW(state.mic_device, CB_SETCURSEL, WPARAM(0), LPARAM(0));
         }
 
         // Set mic gain
         let mic_gain_index = gain_to_index(settings.podcast_microphone_gain);
-        let _ = SendMessageW(
+        SendMessageW(
             state.mic_gain,
             CB_SETCURSEL,
             WPARAM(mic_gain_index),
@@ -1368,23 +1420,23 @@ fn apply_settings_to_ui(state: &mut PodcastState, settings: &AppSettings) {
 
         for (index, device) in state.system_devices.iter().enumerate() {
             let name = to_wide(&device.name);
-            let _ = SendMessageW(
+            SendMessageW(
                 state.system_device,
                 CB_ADDSTRING,
                 WPARAM(0),
                 LPARAM(name.as_ptr() as isize),
             );
             if device.id == settings.podcast_system_device_id {
-                let _ = SendMessageW(state.system_device, CB_SETCURSEL, WPARAM(index), LPARAM(0));
+                SendMessageW(state.system_device, CB_SETCURSEL, WPARAM(index), LPARAM(0));
             }
         }
         if SendMessageW(state.system_device, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 == -1 {
-            let _ = SendMessageW(state.system_device, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+            SendMessageW(state.system_device, CB_SETCURSEL, WPARAM(0), LPARAM(0));
         }
 
         // Set system gain
         let system_gain_index = gain_to_index(settings.podcast_system_gain);
-        let _ = SendMessageW(
+        SendMessageW(
             state.system_gain,
             CB_SETCURSEL,
             WPARAM(system_gain_index),
@@ -1395,7 +1447,7 @@ fn apply_settings_to_ui(state: &mut PodcastState, settings: &AppSettings) {
             PodcastFormat::Mp3 => 0,
             PodcastFormat::Wav => 1,
         };
-        let _ = SendMessageW(
+        SendMessageW(
             state.format_combo,
             CB_SETCURSEL,
             WPARAM(format_index),
@@ -1407,7 +1459,7 @@ fn apply_settings_to_ui(state: &mut PodcastState, settings: &AppSettings) {
             256 => 2,
             _ => 0,
         };
-        let _ = SendMessageW(
+        SendMessageW(
             state.bitrate_combo,
             CB_SETCURSEL,
             WPARAM(bitrate_index),
@@ -1420,7 +1472,9 @@ fn apply_settings_to_ui(state: &mut PodcastState, settings: &AppSettings) {
             settings.podcast_save_folder.clone()
         };
         let path_w = to_wide(&path);
-        let _ = SetWindowTextW(state.save_path, PCWSTR(path_w.as_ptr()));
+        if let Err(_e) = SetWindowTextW(state.save_path, PCWSTR(path_w.as_ptr())) {
+            crate::log_debug(&format!("Error: {:?}", _e));
+        }
     }
 }
 
@@ -1498,7 +1552,9 @@ fn update_status_text(state: &PodcastState, status: RecorderStatus) {
     };
     let wide = to_wide(&text);
     unsafe {
-        let _ = SetWindowTextW(state.status_text, PCWSTR(wide.as_ptr()));
+        if let Err(_e) = SetWindowTextW(state.status_text, PCWSTR(wide.as_ptr())) {
+            crate::log_debug(&format!("Error: {:?}", _e));
+        }
     }
 }
 
@@ -1522,7 +1578,9 @@ fn update_source_info_text(
     };
     let wide = to_wide(&text);
     unsafe {
-        let _ = SetWindowTextW(state.source_text, PCWSTR(wide.as_ptr()));
+        if let Err(_e) = SetWindowTextW(state.source_text, PCWSTR(wide.as_ptr())) {
+            crate::log_debug(&format!("Error: {:?}", _e));
+        }
     }
 }
 
@@ -1538,7 +1596,9 @@ fn update_status_from_recorder(state: &mut PodcastState) {
         let time_text = format!("{:02}:{:02}:{:02}", hours, mins, secs);
         let time_w = to_wide(&time_text);
         unsafe {
-            let _ = SetWindowTextW(state.elapsed_text, PCWSTR(time_w.as_ptr()));
+            if let Err(_e) = SetWindowTextW(state.elapsed_text, PCWSTR(time_w.as_ptr())) {
+                crate::log_debug(&format!("Error: {:?}", _e));
+            }
         }
         let levels = recorder.levels();
         let mic_text = levels.mic_peak.to_string();
@@ -1546,8 +1606,12 @@ fn update_status_from_recorder(state: &mut PodcastState) {
         unsafe {
             let mic_w = to_wide(&mic_text);
             let sys_w = to_wide(&sys_text);
-            let _ = SetWindowTextW(state.level_mic_text, PCWSTR(mic_w.as_ptr()));
-            let _ = SetWindowTextW(state.level_system_text, PCWSTR(sys_w.as_ptr()));
+            if let Err(_e) = SetWindowTextW(state.level_mic_text, PCWSTR(mic_w.as_ptr())) {
+                crate::log_debug(&format!("Error: {:?}", _e));
+            }
+            if let Err(_e) = SetWindowTextW(state.level_system_text, PCWSTR(sys_w.as_ptr())) {
+                crate::log_debug(&format!("Error: {:?}", _e));
+            }
         }
         if let Some(err) = recorder.take_error() {
             unsafe {
@@ -1569,7 +1633,9 @@ fn update_filename_preview(state: &PodcastState) {
     let name = format!("Podcast_{timestamp}.{ext}");
     let wide = to_wide(&name);
     unsafe {
-        let _ = SetWindowTextW(state.filename_preview, PCWSTR(wide.as_ptr()));
+        if let Err(_e) = SetWindowTextW(state.filename_preview, PCWSTR(wide.as_ptr())) {
+            crate::log_debug(&format!("Error: {:?}", _e));
+        }
     }
 }
 fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
@@ -1585,45 +1651,41 @@ fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
 
     let mic_device_id = selected_device_id(state, true);
     let system_device_id = selected_device_id(state, false);
-    if include_mic {
-        if let Err(err) = probe_device(&mic_device_id, false) {
+    if include_mic && let Err(err) = probe_device(&mic_device_id, false) {
+        unsafe {
+            show_error(
+                state.parent,
+                state.language,
+                &format!("{} {}", labels.error_microphone, err),
+            );
+        }
+        if include_system {
             unsafe {
-                show_error(
-                    state.parent,
-                    state.language,
-                    &format!("{} {}", labels.error_microphone, err),
+                SendMessageW(
+                    state.include_mic,
+                    BM_SETCHECK,
+                    WPARAM(BST_UNCHECKED.0 as usize),
+                    LPARAM(0),
                 );
-            }
-            if include_system {
-                unsafe {
-                    let _ = SendMessageW(
-                        state.include_mic,
-                        BM_SETCHECK,
-                        WPARAM(BST_UNCHECKED.0 as usize),
-                        LPARAM(0),
-                    );
-                }
             }
         }
     }
-    if include_system {
-        if let Err(err) = probe_device(&system_device_id, true) {
+    if include_system && let Err(err) = probe_device(&system_device_id, true) {
+        unsafe {
+            show_error(
+                state.parent,
+                state.language,
+                &format!("{} {}", labels.error_system_audio, err),
+            );
+        }
+        if include_mic {
             unsafe {
-                show_error(
-                    state.parent,
-                    state.language,
-                    &format!("{} {}", labels.error_system_audio, err),
+                SendMessageW(
+                    state.include_system,
+                    BM_SETCHECK,
+                    WPARAM(BST_UNCHECKED.0 as usize),
+                    LPARAM(0),
                 );
-            }
-            if include_mic {
-                unsafe {
-                    let _ = SendMessageW(
-                        state.include_system,
-                        BM_SETCHECK,
-                        WPARAM(BST_UNCHECKED.0 as usize),
-                        LPARAM(0),
-                    );
-                }
             }
         }
     }
@@ -1691,9 +1753,13 @@ fn stop_recording_action(state: &mut PodcastState, hwnd: HWND) {
         if dialog.0 != 0 {
             state.saving_dialog = dialog;
             unsafe {
-                let _ = with_state(state.parent, |app| {
+                if with_state(state.parent, |app| {
                     app.podcast_save_window = dialog;
-                });
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access podcast state");
+                }
             }
         }
     }
@@ -1709,12 +1775,12 @@ fn stop_recording_action(state: &mut PodcastState, hwnd: HWND) {
                 |pct| {
                     if dialog.0 != 0 {
                         unsafe {
-                            let _ = PostMessageW(
+                            if let Err(_e) = PostMessageW(
                                 dialog,
                                 podcast_save_window::WM_PODCAST_SAVE_PROGRESS,
                                 WPARAM(pct as usize),
                                 LPARAM(0),
-                            );
+                            ) {}
                         }
                     }
                 },
@@ -1737,22 +1803,26 @@ fn stop_recording_action(state: &mut PodcastState, hwnd: HWND) {
             }
             if dialog.0 != 0 {
                 unsafe {
-                    let _ = PostMessageW(
+                    if let Err(_e) = PostMessageW(
                         dialog,
                         podcast_save_window::WM_PODCAST_SAVE_DONE,
                         WPARAM(0),
                         LPARAM(0),
-                    );
+                    ) {
+                        crate::log_debug(&format!("Error: {:?}", _e));
+                    }
                 }
             }
             if let Some(payload) = notify {
-                let _ = unsafe {
-                    PostMessageW(
+                unsafe {
+                    if let Err(e) = PostMessageW(
                         hwnd,
                         WM_PODCAST_SAVE_RESULT,
                         WPARAM(0),
                         LPARAM(Box::into_raw(Box::new(payload)) as isize),
-                    )
+                    ) {
+                        crate::log_debug(&format!("Failed to post WM_PODCAST_SAVE_RESULT: {}", e));
+                    }
                 };
             }
         });
@@ -1771,7 +1841,7 @@ fn persist_settings(state: &PodcastState) {
     let bitrate = selected_bitrate(state);
     let save_folder = selected_save_folder(state).to_string_lossy().to_string();
     unsafe {
-        let _ = with_state(state.parent, |app| {
+        if with_state(state.parent, |app| {
             app.settings.podcast_include_microphone = include_mic;
             app.settings.podcast_microphone_device_id = mic_device_id;
             app.settings.podcast_microphone_gain = mic_gain;
@@ -1782,7 +1852,11 @@ fn persist_settings(state: &PodcastState) {
             app.settings.podcast_mp3_bitrate = bitrate;
             app.settings.podcast_save_folder = save_folder;
             save_settings(app.settings.clone());
-        });
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access podcast state");
+        }
     }
     update_source_info_text(state, None, None);
 }
@@ -1901,7 +1975,7 @@ fn click_button(hwnd: HWND, id: usize) {
     unsafe {
         let button = GetDlgItem(hwnd, id as i32);
         if button.0 != 0 {
-            let _ = SendMessageW(button, BM_CLICK, WPARAM(0), LPARAM(0));
+            SendMessageW(button, BM_CLICK, WPARAM(0), LPARAM(0));
         }
     }
 }

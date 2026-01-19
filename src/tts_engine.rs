@@ -107,14 +107,16 @@ pub fn prevent_sleep(enable: bool) {
 pub fn post_tts_error(hwnd: HWND, session_id: u64, message: String) {
     log_debug(&format!("TTS error: {message}"));
     let payload = Box::new(message);
-    let _ = unsafe {
-        PostMessageW(
+    unsafe {
+        if let Err(e) = PostMessageW(
             hwnd,
             WM_TTS_PLAYBACK_ERROR,
             WPARAM(session_id as usize),
             LPARAM(Box::into_raw(payload) as isize),
-        )
-    };
+        ) {
+            crate::log_debug(&format!("Failed to post WM_TTS_PLAYBACK_ERROR: {}", e));
+        }
+    }
 }
 
 pub fn start_tts_from_caret(hwnd: HWND) {
@@ -183,7 +185,7 @@ pub fn start_tts_from_caret(hwnd: HWND) {
             };
             let cancel = Arc::new(AtomicBool::new(false));
             let (command_tx, command_rx) = mpsc::unbounded_channel();
-            let _ = unsafe {
+            if unsafe {
                 with_state(hwnd, |state| {
                     state.tts_session = Some(TtsSession {
                         id: state.tts_next_session_id,
@@ -194,18 +196,21 @@ pub fn start_tts_from_caret(hwnd: HWND) {
                     });
                     state.tts_next_session_id += 1;
                 })
-            };
+            }
+            .is_none()
+            {
+                crate::log_debug("Failed to update TTS session state");
+            }
             crate::sapi4_engine::play_sapi4(
                 voice_idx, text, tts_rate, tts_pitch, tts_volume, cancel, command_rx,
             );
-            return;
         }
         TtsEngine::Sapi5 => {
             // Stop any existing playback
             stop_tts_playback(hwnd);
             let cancel = Arc::new(AtomicBool::new(false));
             let (command_tx, command_rx) = mpsc::unbounded_channel();
-            let _ = unsafe {
+            if unsafe {
                 with_state(hwnd, |state| {
                     state.tts_session = Some(TtsSession {
                         id: state.tts_next_session_id,
@@ -216,10 +221,14 @@ pub fn start_tts_from_caret(hwnd: HWND) {
                     });
                     state.tts_next_session_id += 1;
                 })
-            };
+            }
+            .is_none()
+            {
+                crate::log_debug("Failed to update TTS session state");
+            }
 
             let chunk_strings: Vec<String> = chunks.into_iter().map(|c| c.text_to_read).collect();
-            let _ = crate::sapi5_engine::play_sapi(
+            if let Err(e) = crate::sapi5_engine::play_sapi(
                 chunk_strings,
                 voice,
                 tts_rate,
@@ -227,41 +236,57 @@ pub fn start_tts_from_caret(hwnd: HWND) {
                 tts_volume,
                 cancel,
                 command_rx,
-            );
+            ) {
+                crate::log_debug(&format!("SAPI5 playback error: {}", e));
+            }
         }
     }
 }
 
 pub fn toggle_tts_pause(hwnd: HWND) {
-    let _ = unsafe {
+    if unsafe {
         with_state(hwnd, |state| {
             let Some(session) = &mut state.tts_session else {
                 return;
             };
             if session.paused {
                 prevent_sleep(true);
-                let _ = session.command_tx.send(TtsCommand::Resume);
+                if let Err(e) = session.command_tx.send(TtsCommand::Resume) {
+                    crate::log_debug(&format!("Failed to send Resume command: {}", e));
+                }
                 session.paused = false;
             } else {
                 prevent_sleep(false);
-                let _ = session.command_tx.send(TtsCommand::Pause);
+                if let Err(e) = session.command_tx.send(TtsCommand::Pause) {
+                    crate::log_debug(&format!("Failed to send Pause command: {}", e));
+                }
                 session.paused = true;
             }
         })
-    };
+    }
+    .is_none()
+    {
+        crate::log_debug("Failed to access TTS session state for pause/resume");
+    }
 }
 
 pub fn stop_tts_playback(hwnd: HWND) {
     prevent_sleep(false);
-    let _ = unsafe {
+    if unsafe {
         with_state(hwnd, |state| {
             if let Some(session) = &state.tts_session {
                 session.cancel.store(true, Ordering::SeqCst);
-                let _ = session.command_tx.send(TtsCommand::Stop);
+                if let Err(e) = session.command_tx.send(TtsCommand::Stop) {
+                    crate::log_debug(&format!("Failed to send Stop command: {}", e));
+                }
             }
             state.tts_session = None;
         })
-    };
+    }
+    .is_none()
+    {
+        crate::log_debug("Failed to access TTS session state for stop");
+    }
 }
 
 fn handle_tts_command(
@@ -398,7 +423,9 @@ pub fn start_tts_playback_with_chunks(options: TtsPlaybackOptions) {
                         }
                     }
                     Err(e) => {
-                        let _ = audio_tx.send(Err(e)).await;
+                        if let Err(err) = audio_tx.send(Err(e)).await {
+                            crate::log_debug(&format!("Failed to send audio error: {:?}", err));
+                        }
                         break;
                     }
                 }
@@ -416,7 +443,9 @@ pub fn start_tts_playback_with_chunks(options: TtsPlaybackOptions) {
 
             let packet = rt.block_on(async {
                 loop {
-                    if cancel_flag.load(Ordering::SeqCst) { return None; }
+                    if cancel_flag.load(Ordering::SeqCst) {
+                        return None;
+                    }
                     while let Ok(cmd) = rx.try_recv() {
                         if handle_tts_command(cmd, &sink, cancel_flag.as_ref(), &mut paused) {
                             return None;
@@ -429,10 +458,10 @@ pub fn start_tts_playback_with_chunks(options: TtsPlaybackOptions) {
                     tokio::select! {
                         res = audio_rx.recv() => return res,
                         cmd_opt = rx.recv() => {
-                            if let Some(cmd) = cmd_opt {
-                                if handle_tts_command(cmd, &sink, cancel_flag.as_ref(), &mut paused) {
-                                    return None;
-                                }
+                            if let Some(cmd) = cmd_opt
+                                && handle_tts_command(cmd, &sink, cancel_flag.as_ref(), &mut paused)
+                            {
+                                return None;
                             }
                         }
                     }
@@ -454,14 +483,16 @@ pub fn start_tts_playback_with_chunks(options: TtsPlaybackOptions) {
                 continue;
             }
 
-            let _ = unsafe {
-                PostMessageW(
+            unsafe {
+                if let Err(e) = PostMessageW(
                     hwnd_copy,
                     WM_TTS_CHUNK_START,
                     WPARAM(session_id as usize),
                     LPARAM(current_offset as isize),
-                )
-            };
+                ) {
+                    crate::log_debug(&format!("Failed to post WM_TTS_CHUNK_START: {}", e));
+                }
+            }
 
             let cursor = std::io::Cursor::new(audio);
             let source = match Decoder::new(cursor) {
@@ -497,14 +528,16 @@ pub fn start_tts_playback_with_chunks(options: TtsPlaybackOptions) {
         }
 
         if appended_any {
-            let _ = unsafe {
-                PostMessageW(
+            unsafe {
+                if let Err(e) = PostMessageW(
                     hwnd_copy,
                     WM_TTS_PLAYBACK_DONE,
                     WPARAM(session_id as usize),
                     LPARAM(0),
-                )
-            };
+                ) {
+                    crate::log_debug(&format!("Failed to post WM_TTS_PLAYBACK_DONE: {}", e));
+                }
+            }
         }
     });
 }
@@ -595,12 +628,11 @@ pub async fn download_audio_chunk_cancel(
                     ],
                 );
                 log_debug(&msg);
-                if attempt < max_retries {
-                    if wait_or_cancel(Duration::from_millis(500 * attempt as u64), options.cancel)
+                if attempt < max_retries
+                    && wait_or_cancel(Duration::from_millis(500 * attempt as u64), options.cancel)
                         .await
-                    {
-                        return Err(cancelled_message(options.language));
-                    }
+                {
+                    return Err(cancelled_message(options.language));
                 }
             }
         }
@@ -803,8 +835,10 @@ fn adjust_tts_caret_pos(text: &str, pos: i32) -> i32 {
         .and_then(|idx| items.get(idx))
         .map(|v| v.2)
         .unwrap_or(false);
-    if prev_is_word && next_is_word {
-        let mut idx = prev.unwrap();
+    if prev_is_word
+        && next_is_word
+        && let Some(mut idx) = prev
+    {
         while idx > 0 && items[idx - 1].2 {
             idx -= 1;
         }
@@ -876,14 +910,14 @@ pub fn remove_long_dash_runs(line: &str) -> String {
         }
         if dash_run > 0 {
             if dash_run < 3 {
-                out.extend(std::iter::repeat('-').take(dash_run));
+                out.extend(std::iter::repeat_n('-', dash_run));
             }
             dash_run = 0;
         }
         out.push(ch);
     }
     if dash_run > 0 && dash_run < 3 {
-        out.extend(std::iter::repeat('-').take(dash_run));
+        out.extend(std::iter::repeat_n('-', dash_run));
     }
     out
 }
@@ -912,7 +946,7 @@ pub fn normalize_for_tts(text: &str, split_on_newline: bool) -> String {
     } else {
         text.replace('\n', " ").replace('\r', "")
     };
-    normalized.replace('«', "").replace('»', "")
+    normalized.replace(['«', '»'], "")
 }
 
 fn apply_dictionary(text: &str, dictionary: &[DictionaryEntry]) -> String {
@@ -973,10 +1007,8 @@ pub(crate) fn collect_marker_entries(
 
     let mut entries = Vec::new();
     for (idx, _) in normalized.match_indices(marker) {
-        if require_newline {
-            if idx != 0 && !normalized[..idx].ends_with('\n') {
-                continue;
-            }
+        if require_newline && idx != 0 && !normalized[..idx].ends_with('\n') {
+            continue;
         }
         let label = marker_label_for_position(&normalized, idx, marker);
         entries.push(MarkerEntry { pos: idx, label });
@@ -1348,10 +1380,14 @@ pub fn start_audiobook(hwnd: HWND) {
     let cancel_token = Arc::new(AtomicBool::new(false));
     let progress_hwnd = unsafe {
         let h = crate::app_windows::audiobook_window::open(hwnd, chunks_len);
-        let _ = with_state(hwnd, |state| {
+        if with_state(hwnd, |state| {
             state.audiobook_progress = h;
             state.audiobook_cancel = Some(cancel_token.clone());
-        });
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to update audiobook progress state");
+        }
         h
     };
 
@@ -1398,14 +1434,16 @@ pub fn start_audiobook(hwnd: HWND) {
             Err(err) => err,
         };
         let payload = Box::new(AudiobookResult { success, message });
-        let _ = unsafe {
-            PostMessageW(
+        unsafe {
+            if let Err(e) = PostMessageW(
                 hwnd,
                 crate::WM_TTS_AUDIOBOOK_DONE,
                 WPARAM(0),
                 LPARAM(Box::into_raw(payload) as isize),
-            )
-        };
+            ) {
+                crate::log_debug(&format!("Failed to post WM_TTS_AUDIOBOOK_DONE: {}", e));
+            }
+        }
     });
 }
 
@@ -1596,18 +1634,25 @@ fn run_split_sapi4_audiobook(
                 current_global_progress += 1;
                 if progress_hwnd_clone.0 != 0 {
                     unsafe {
-                        let _ = PostMessageW(
+                        if let Err(e) = PostMessageW(
                             progress_hwnd_clone,
                             crate::WM_UPDATE_PROGRESS,
                             WPARAM(current_global_progress),
                             LPARAM(0),
-                        );
+                        ) {
+                            crate::log_debug(&format!("Failed to post WM_UPDATE_PROGRESS: {}", e));
+                        }
                     }
                 }
             },
         )
         .map_err(|e| {
-            let _ = std::fs::remove_file(&part_output);
+            if let Err(rem_err) = std::fs::remove_file(&part_output) {
+                crate::log_debug(&format!(
+                    "Failed to remove part output after error {}: {}",
+                    e, rem_err
+                ));
+            }
             if e == "Cancelled" {
                 cancelled_message(options.language)
             } else {
@@ -1665,18 +1710,25 @@ fn run_marker_split_sapi4_audiobook(
                 current_global_progress += 1;
                 if progress_hwnd_clone.0 != 0 {
                     unsafe {
-                        let _ = PostMessageW(
+                        if let Err(e) = PostMessageW(
                             progress_hwnd_clone,
                             crate::WM_UPDATE_PROGRESS,
                             WPARAM(current_global_progress),
                             LPARAM(0),
-                        );
+                        ) {
+                            crate::log_debug(&format!("Failed to post WM_UPDATE_PROGRESS: {}", e));
+                        }
                     }
                 }
             },
         )
         .map_err(|e| {
-            let _ = std::fs::remove_file(&part_output);
+            if let Err(rem_err) = std::fs::remove_file(&part_output) {
+                crate::log_debug(&format!(
+                    "Failed to remove part output after error {}: {}",
+                    e, rem_err
+                ));
+            }
             if e == "Cancelled" {
                 cancelled_message(options.language)
             } else {
@@ -1751,18 +1803,25 @@ fn run_split_sapi_audiobook(
                 current_global_progress += 1;
                 if progress_hwnd_clone.0 != 0 {
                     unsafe {
-                        let _ = PostMessageW(
+                        if let Err(e) = PostMessageW(
                             progress_hwnd_clone,
                             crate::WM_UPDATE_PROGRESS,
                             WPARAM(current_global_progress),
                             LPARAM(0),
-                        );
+                        ) {
+                            crate::log_debug(&format!("Failed to post WM_UPDATE_PROGRESS: {}", e));
+                        }
                     }
                 }
             },
         )
         .map_err(|e| {
-            let _ = std::fs::remove_file(&part_output);
+            if let Err(rem_err) = std::fs::remove_file(&part_output) {
+                crate::log_debug(&format!(
+                    "Failed to remove part output after error {}: {}",
+                    e, rem_err
+                ));
+            }
             e
         })?;
     }
@@ -1816,18 +1875,25 @@ fn run_marker_split_sapi_audiobook(
                 current_global_progress += 1;
                 if progress_hwnd_clone.0 != 0 {
                     unsafe {
-                        let _ = PostMessageW(
+                        if let Err(e) = PostMessageW(
                             progress_hwnd_clone,
                             crate::WM_UPDATE_PROGRESS,
                             WPARAM(current_global_progress),
                             LPARAM(0),
-                        );
+                        ) {
+                            crate::log_debug(&format!("Failed to post WM_UPDATE_PROGRESS: {}", e));
+                        }
                     }
                 }
             },
         )
         .map_err(|e| {
-            let _ = std::fs::remove_file(&part_output);
+            if let Err(rem_err) = std::fs::remove_file(&part_output) {
+                crate::log_debug(&format!(
+                    "Failed to remove part output after error {}: {}",
+                    e, rem_err
+                ));
+            }
             e
         })?;
     }
@@ -1920,21 +1986,27 @@ pub(crate) fn run_tts_audiobook_part(
                     return Err(cancelled_message(options.language));
                 }
                 unsafe {
-                    let _ = PostMessageW(
+                    if let Err(e) = PostMessageW(
                         options.progress_hwnd,
                         crate::WM_UPDATE_PROGRESS,
                         WPARAM(*current_global_progress),
                         LPARAM(0),
-                    );
+                    ) {
+                        crate::log_debug(&format!("Failed to post WM_UPDATE_PROGRESS: {}", e));
+                    }
                 }
             }
         }
         writer.flush().map_err(|err| err.to_string())?;
         Ok(())
     })
-    .inspect_err(|e| {
-        if e == &cancelled_message(options.language) {
-            let _ = std::fs::remove_file(options.output);
+    .map_err(|e| {
+        if let Err(rem_err) = std::fs::remove_file(options.output) {
+            crate::log_debug(&format!(
+                "Failed to remove part output after error {}: {}",
+                e, rem_err
+            ));
         }
+        e
     })
 }

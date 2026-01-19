@@ -291,9 +291,9 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
     .unwrap_or(false);
     if show {
         if existing.0 != 0 {
-            let _ = DeleteMenu(hmenu, existing.0 as u32, MF_BYCOMMAND);
-            let _ = DestroyMenu(existing);
-            let _ = with_state(hwnd, |state| state.playback_menu = HMENU(0));
+            crate::log_if_err!(DeleteMenu(hmenu, existing.0 as u32, MF_BYCOMMAND));
+            crate::log_if_err!(DestroyMenu(existing));
+            with_state(hwnd, |state| state.playback_menu = HMENU(0));
         }
         let playback_menu = CreateMenu().unwrap_or(HMENU(0));
         if playback_menu.0 == 0 {
@@ -398,20 +398,20 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
             &mute_toggle,
         );
         let wide = to_wide(&title);
-        let _ = InsertMenuW(
+        crate::log_if_err!(InsertMenuW(
             hmenu,
             0,
             MF_BYPOSITION | MF_POPUP,
             playback_menu.0 as usize,
             PCWSTR(wide.as_ptr()),
-        );
-        let _ = with_state(hwnd, |state| state.playback_menu = playback_menu);
-        let _ = DrawMenuBar(hwnd);
+        ));
+        with_state(hwnd, |state| state.playback_menu = playback_menu);
+        crate::log_if_err!(DrawMenuBar(hwnd));
     } else if existing.0 != 0 {
-        let _ = DeleteMenu(hmenu, existing.0 as u32, MF_BYCOMMAND);
-        let _ = DestroyMenu(existing);
-        let _ = with_state(hwnd, |state| state.playback_menu = HMENU(0));
-        let _ = DrawMenuBar(hwnd);
+        crate::log_if_err!(DeleteMenu(hmenu, existing.0 as u32, MF_BYCOMMAND));
+        crate::log_if_err!(DestroyMenu(existing));
+        with_state(hwnd, |state| state.playback_menu = HMENU(0));
+        crate::log_if_err!(DrawMenuBar(hwnd));
     }
 }
 
@@ -446,14 +446,14 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         IDM_FILE_CLOSE_OTHERS,
         &labels.file_close_others,
     );
-    let _ = AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null());
+    crate::log_if_err!(AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null()));
     append_menu_string(
         file_menu,
         MF_POPUP,
         recent_menu.0 as usize,
         &labels.file_recent,
     );
-    let _ = AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null());
+    crate::log_if_err!(AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null()));
     append_menu_string(
         file_menu,
         MF_STRING,
@@ -472,7 +472,7 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         IDM_FILE_READ_STOP,
         &labels.file_read_stop,
     );
-    let _ = AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null());
+    crate::log_if_err!(AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null()));
     append_menu_string(
         file_menu,
         MF_STRING,
@@ -486,12 +486,12 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         &labels.file_batch_audiobooks,
     );
     append_menu_string(file_menu, MF_STRING, IDM_FILE_PODCAST, &labels.file_podcast);
-    let _ = AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null());
+    crate::log_if_err!(AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null()));
     append_menu_string(file_menu, MF_STRING, IDM_FILE_EXIT, &labels.file_exit);
     append_menu_string(hmenu, MF_POPUP, file_menu.0 as usize, &labels.menu_file);
 
     append_menu_string(edit_menu, MF_STRING, IDM_EDIT_UNDO, &labels.edit_undo);
-    let _ = AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null());
+    crate::log_if_err!(AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null()));
     append_menu_string(edit_menu, MF_STRING, IDM_EDIT_CUT, &labels.edit_cut);
     append_menu_string(edit_menu, MF_STRING, IDM_EDIT_COPY, &labels.edit_copy);
     append_menu_string(edit_menu, MF_STRING, IDM_EDIT_PASTE, &labels.edit_paste);
@@ -501,7 +501,7 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         IDM_EDIT_SELECT_ALL,
         &labels.edit_select_all,
     );
-    let _ = AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null());
+    crate::log_if_err!(AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null()));
     append_menu_string(edit_menu, MF_STRING, IDM_EDIT_FIND, &labels.edit_find);
     append_menu_string(
         edit_menu,
@@ -516,7 +516,7 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         &labels.edit_find_next,
     );
     append_menu_string(edit_menu, MF_STRING, IDM_EDIT_REPLACE, &labels.edit_replace);
-    let _ = AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null());
+    crate::log_if_err!(AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null()));
     append_menu_string(
         edit_menu,
         MF_STRING,
@@ -529,7 +529,7 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         IDM_EDIT_NEXT_SPELLING_ERROR,
         &labels.edit_next_spelling_error,
     );
-    let _ = AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null());
+    crate::log_if_err!(AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null()));
     let text_menu = CreateMenu().unwrap_or(HMENU(0));
     append_menu_string(
         text_menu,
@@ -609,7 +609,7 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         text_menu.0 as usize,
         &labels.edit_text_menu,
     );
-    let _ = AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null());
+    crate::log_if_err!(AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null()));
     append_menu_string(
         edit_menu,
         MF_STRING,
@@ -630,7 +630,7 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         IDM_VIEW_SHOW_FAVORITES,
         &labels.view_show_favorites,
     );
-    let _ = AppendMenuW(view_menu, MF_SEPARATOR, 0, PCWSTR::null());
+    crate::log_if_err!(AppendMenuW(view_menu, MF_SEPARATOR, 0, PCWSTR::null()));
     append_menu_string(
         view_color_menu,
         MF_STRING,
@@ -805,7 +805,7 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
     append_menu_string(help_menu, MF_STRING, IDM_HELP_ABOUT, &labels.help_about);
     append_menu_string(hmenu, MF_POPUP, help_menu.0 as usize, &labels.menu_help);
 
-    let _ = SetMenu(hwnd, hmenu);
+    crate::log_if_err!(SetMenu(hwnd, hmenu));
     (hmenu, recent_menu)
 }
 
@@ -813,7 +813,7 @@ pub unsafe fn update_recent_menu(hwnd: HWND, hmenu_recent: HMENU) {
     let count = GetMenuItemCount(hmenu_recent);
     if count > 0 {
         for _ in 0..count {
-            let _ = DeleteMenu(hmenu_recent, 0, MF_BYPOSITION);
+            crate::log_if_err!(DeleteMenu(hmenu_recent, 0, MF_BYPOSITION));
         }
     }
 
@@ -828,15 +828,15 @@ pub unsafe fn update_recent_menu(hwnd: HWND, hmenu_recent: HMENU) {
         for (i, path) in files.iter().enumerate() {
             let label = format!("&{} {}", i + 1, abbreviate_recent_label(path));
             let wide = to_wide(&label);
-            let _ = AppendMenuW(
+            crate::log_if_err!(AppendMenuW(
                 hmenu_recent,
                 MF_STRING,
                 IDM_FILE_RECENT_BASE + i,
                 PCWSTR(wide.as_ptr()),
-            );
+            ));
         }
     }
-    let _ = DrawMenuBar(hwnd);
+    crate::log_if_err!(DrawMenuBar(hwnd));
 }
 
 pub fn abbreviate_recent_label(path: &Path) -> String {
@@ -854,5 +854,5 @@ pub fn abbreviate_recent_label(path: &Path) -> String {
 
 pub unsafe fn append_menu_string(menu: HMENU, flags: MENU_ITEM_FLAGS, id: usize, text: &str) {
     let wide = to_wide(text);
-    let _ = AppendMenuW(menu, flags, id, PCWSTR(wide.as_ptr()));
+    crate::log_if_err!(AppendMenuW(menu, flags, id, PCWSTR(wide.as_ptr())));
 }

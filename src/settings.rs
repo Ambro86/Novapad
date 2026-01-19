@@ -382,7 +382,7 @@ fn dir_is_writable(dir: &std::path::Path) -> bool {
         .open(&probe)
     {
         Ok(_) => {
-            let _ = std::fs::remove_file(&probe);
+            crate::log_if_err!(std::fs::remove_file(&probe));
             true
         }
         Err(_) => false,
@@ -420,7 +420,7 @@ fn resolve_settings_dir() -> PathBuf {
     if dir_is_writable(&preferred_dir) {
         preferred_dir
     } else {
-        let _ = std::fs::create_dir_all(&portable_dir);
+        crate::log_if_err!(std::fs::create_dir_all(&portable_dir));
         portable_dir
     }
 }
@@ -583,7 +583,7 @@ fn dpapi_protect(data: &[u8]) -> Option<Vec<u8>> {
             return None;
         }
         let out = std::slice::from_raw_parts(out_blob.pbData, out_blob.cbData as usize).to_vec();
-        let _ = LocalFree(HLOCAL(out_blob.pbData as *mut std::ffi::c_void));
+        LocalFree(HLOCAL(out_blob.pbData as *mut std::ffi::c_void));
         Some(out)
     }
 }
@@ -609,7 +609,7 @@ fn dpapi_unprotect(data: &[u8]) -> Option<Vec<u8>> {
             return None;
         }
         let out = std::slice::from_raw_parts(out_blob.pbData, out_blob.cbData as usize).to_vec();
-        let _ = LocalFree(HLOCAL(out_blob.pbData as *mut std::ffi::c_void));
+        LocalFree(HLOCAL(out_blob.pbData as *mut std::ffi::c_void));
         Some(out)
     }
 }
@@ -692,7 +692,7 @@ pub fn sync_context_menu(settings: &AppSettings) {
 
 fn create_context_menu_entry(base_key: &str, label: &str, command: &str, icon: &str) {
     if let Some(key) = create_registry_key(base_key) {
-        let _ = set_registry_string_value(key, None, label);
+        set_registry_string_value(key, None, label);
         unsafe {
             RegCloseKey(key);
         }
@@ -700,7 +700,7 @@ fn create_context_menu_entry(base_key: &str, label: &str, command: &str, icon: &
 
     let icon_key = format!("{base_key}\\DefaultIcon");
     if let Some(key) = create_registry_key(&icon_key) {
-        let _ = set_registry_string_value(key, None, icon);
+        set_registry_string_value(key, None, icon);
         unsafe {
             RegCloseKey(key);
         }
@@ -708,7 +708,7 @@ fn create_context_menu_entry(base_key: &str, label: &str, command: &str, icon: &
 
     let command_key = format!("{base_key}\\command");
     if let Some(key) = create_registry_key(&command_key) {
-        let _ = set_registry_string_value(key, None, command);
+        set_registry_string_value(key, None, command);
         unsafe {
             RegCloseKey(key);
         }

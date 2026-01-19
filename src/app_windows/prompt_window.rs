@@ -267,9 +267,13 @@ pub unsafe fn open(parent: HWND) {
         return;
     }
 
-    let _ = with_state(parent, |state| {
+    if with_state(parent, |state| {
         state.prompt_window = hwnd;
-    });
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access prompt state");
+    }
 }
 
 pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
@@ -284,15 +288,23 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
 
     if msg.message == WM_SYSKEYDOWN {
         if msg.wParam.0 as u32 == 'I' as u32 {
-            let _ = with_prompt_state(hwnd, |state| {
+            if with_prompt_state(hwnd, |state| {
                 SetFocus(state.input);
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access prompt state");
+            }
             return true;
         }
         if msg.wParam.0 as u32 == 'O' as u32 {
-            let _ = with_prompt_state(hwnd, |state| {
+            if with_prompt_state(hwnd, |state| {
                 SetFocus(state.output);
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access prompt state");
+            }
             return true;
         }
         return false;
@@ -304,7 +316,7 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
 
     if msg.wParam.0 as u32 == VK_TAB.0 as u32 {
         let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
-        let _ = with_prompt_state(hwnd, |state| {
+        if with_prompt_state(hwnd, |state| {
             let order = [
                 state.input,
                 state.output,
@@ -321,36 +333,54 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
                 idx = (idx + 1) % order.len();
             }
             SetFocus(order[idx]);
-        });
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access prompt state");
+        }
         return true;
     }
 
     if msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
-        let _ = with_prompt_state(hwnd, |state| {
+        if with_prompt_state(hwnd, |state| {
             if focus == state.input {
                 send_input_to_pty(state);
             }
-        });
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access prompt state");
+        }
         return true;
     }
 
     let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
     if ctrl_down && msg.wParam.0 as u32 == 'C' as u32 {
-        let _ = with_prompt_state(hwnd, |state| {
+        if with_prompt_state(hwnd, |state| {
             if focus == state.output {
                 copy_output_selection(state.output);
-            } else if let Some(session) = state.session.as_ref() {
-                let _ = session.send_ctrl_c();
+            } else if let Some(session) = state.session.as_ref()
+                && !session.send_ctrl_c()
+            {
+                crate::log_debug("Failed to send Ctrl+C");
             }
-        });
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access prompt state");
+        }
         return true;
     }
     if ctrl_down && msg.wParam.0 as u32 == 'L' as u32 {
-        let _ = with_prompt_state(hwnd, |state| {
+        if with_prompt_state(hwnd, |state| {
             if confirm_clear_output(hwnd, state.parent) {
                 clear_output(state);
             }
-        });
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access prompt state");
+        }
         return true;
     }
 
@@ -434,7 +464,7 @@ unsafe extern "system" fn prompt_wndproc(
                 HINSTANCE(0),
                 None,
             );
-            let _ = SendMessageW(output, EM_LIMITTEXT, WPARAM(0x7FFFFFFE), LPARAM(0));
+            SendMessageW(output, EM_LIMITTEXT, WPARAM(0x7FFFFFFE), LPARAM(0));
 
             let checkbox_autoscroll = CreateWindowExW(
                 Default::default(),
@@ -519,7 +549,7 @@ unsafe extern "system" fn prompt_wndproc(
                 checkbox_prevent_sleep,
             ] {
                 if control.0 != 0 && hfont.0 != 0 {
-                    let _ = SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                 }
             }
 
@@ -531,31 +561,31 @@ unsafe extern "system" fn prompt_wndproc(
             let program_lower = settings.prompt_program.to_ascii_lowercase();
             let program_is_codex =
                 program_lower.contains("codex") || program_lower.contains("claude");
-            let _ = SendMessageW(
+            SendMessageW(
                 checkbox_autoscroll,
                 BM_SETCHECK,
                 WPARAM(if auto_scroll { 1 } else { 0 }),
                 LPARAM(0),
             );
-            let _ = SendMessageW(
+            SendMessageW(
                 checkbox_strip_ansi,
                 BM_SETCHECK,
                 WPARAM(if strip_ansi { 1 } else { 0 }),
                 LPARAM(0),
             );
-            let _ = SendMessageW(
+            SendMessageW(
                 checkbox_announce_lines,
                 BM_SETCHECK,
                 WPARAM(if announce_lines { 1 } else { 0 }),
                 LPARAM(0),
             );
-            let _ = SendMessageW(
+            SendMessageW(
                 checkbox_beep_on_idle,
                 BM_SETCHECK,
                 WPARAM(if beep_on_idle { 1 } else { 0 }),
                 LPARAM(0),
             );
-            let _ = SendMessageW(
+            SendMessageW(
                 checkbox_prevent_sleep,
                 BM_SETCHECK,
                 WPARAM(if prevent_sleep { 1 } else { 0 }),
@@ -614,21 +644,26 @@ unsafe extern "system" fn prompt_wndproc(
             LRESULT(0)
         }
         WM_SIZE => {
-            let _ = with_prompt_state(hwnd, |state| {
+            if with_prompt_state(hwnd, |state| {
                 layout_prompt(hwnd, state);
-                if let Some(session) = state.session.as_ref() {
-                    if let Some((cols, rows)) = output_cells(state.output) {
-                        let _ = session.resize(cols, rows);
-                    }
+                if let Some(session) = state.session.as_ref()
+                    && let Some((cols, rows)) = output_cells(state.output)
+                    && !session.resize(cols, rows)
+                {
+                    crate::log_debug("Failed to resize session");
                 }
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access prompt state");
+            }
             LRESULT(0)
         }
         WM_COMMAND => {
-            let cmd_id = (wparam.0 & 0xffff) as usize;
+            let cmd_id = wparam.0 & 0xffff;
             match cmd_id {
                 PROMPT_ID_AUTOSCROLL => {
-                    let _ = with_prompt_state(hwnd, |state| {
+                    if with_prompt_state(hwnd, |state| {
                         let checked = SendMessageW(
                             state.checkbox_autoscroll,
                             BM_GETCHECK,
@@ -640,11 +675,15 @@ unsafe extern "system" fn prompt_wndproc(
                         update_prompt_settings(state.parent, |settings| {
                             settings.prompt_auto_scroll = checked;
                         });
-                    });
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access prompt state");
+                    }
                     LRESULT(0)
                 }
                 PROMPT_ID_STRIP_ANSI => {
-                    let _ = with_prompt_state(hwnd, |state| {
+                    if with_prompt_state(hwnd, |state| {
                         let checked = SendMessageW(
                             state.checkbox_strip_ansi,
                             BM_GETCHECK,
@@ -656,11 +695,15 @@ unsafe extern "system" fn prompt_wndproc(
                         update_prompt_settings(state.parent, |settings| {
                             settings.prompt_strip_ansi = checked;
                         });
-                    });
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access prompt state");
+                    }
                     LRESULT(0)
                 }
                 PROMPT_ID_ANNOUNCE_LINES => {
-                    let _ = with_prompt_state(hwnd, |state| {
+                    if with_prompt_state(hwnd, |state| {
                         let checked = SendMessageW(
                             state.checkbox_announce_lines,
                             BM_GETCHECK,
@@ -672,11 +715,15 @@ unsafe extern "system" fn prompt_wndproc(
                         update_prompt_settings(state.parent, |settings| {
                             settings.prompt_announce_lines = checked;
                         });
-                    });
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access prompt state");
+                    }
                     LRESULT(0)
                 }
                 PROMPT_ID_BEEP_ON_IDLE => {
-                    let _ = with_prompt_state(hwnd, |state| {
+                    if with_prompt_state(hwnd, |state| {
                         let checked = SendMessageW(
                             state.checkbox_beep_on_idle,
                             BM_GETCHECK,
@@ -689,11 +736,15 @@ unsafe extern "system" fn prompt_wndproc(
                         update_prompt_settings(state.parent, |settings| {
                             settings.prompt_beep_on_idle = checked;
                         });
-                    });
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access prompt state");
+                    }
                     LRESULT(0)
                 }
                 PROMPT_ID_PREVENT_SLEEP => {
-                    let _ = with_prompt_state(hwnd, |state| {
+                    if with_prompt_state(hwnd, |state| {
                         let checked = SendMessageW(
                             state.checkbox_prevent_sleep,
                             BM_GETCHECK,
@@ -707,7 +758,7 @@ unsafe extern "system" fn prompt_wndproc(
                             .sleep_enabled
                             .store(checked, Ordering::Relaxed);
                         if !checked && state.beep_state.sleep_active.load(Ordering::Relaxed) {
-                            let _ = apply_prevent_sleep(false);
+                            apply_prevent_sleep(false);
                             state
                                 .beep_state
                                 .sleep_active
@@ -716,7 +767,11 @@ unsafe extern "system" fn prompt_wndproc(
                         update_prompt_settings(state.parent, |settings| {
                             settings.prompt_prevent_sleep = checked;
                         });
-                    });
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access prompt state");
+                    }
                     LRESULT(0)
                 }
                 _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -725,61 +780,86 @@ unsafe extern "system" fn prompt_wndproc(
         WM_KEYDOWN => {
             if wparam.0 as u32 == VK_RETURN.0 as u32 {
                 let focus = GetFocus();
-                let _ = with_prompt_state(hwnd, |state| {
+                if with_prompt_state(hwnd, |state| {
                     if focus == state.input {
                         send_input_to_pty(state);
-                        return;
                     }
-                });
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access prompt state");
+                }
                 return LRESULT(0);
             }
             if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                let _ = DestroyWindow(hwnd);
+                crate::log_if_err!(DestroyWindow(hwnd));
                 return LRESULT(0);
             }
             let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
             if ctrl_down && wparam.0 as u32 == 'C' as u32 {
-                let _ = with_prompt_state(hwnd, |state| {
+                if with_prompt_state(hwnd, |state| {
                     let focus = GetFocus();
                     if focus == state.output {
                         copy_output_selection(state.output);
-                    } else if let Some(session) = state.session.as_ref() {
-                        let _ = session.send_ctrl_c();
+                    } else if let Some(session) = state.session.as_ref()
+                        && !session.send_ctrl_c()
+                    {
+                        crate::log_debug("Failed to send Ctrl+C");
                     }
-                });
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access prompt state");
+                }
                 return LRESULT(0);
             }
             if ctrl_down && wparam.0 as u32 == 'L' as u32 {
-                let _ = with_prompt_state(hwnd, |state| {
+                if with_prompt_state(hwnd, |state| {
                     if confirm_clear_output(hwnd, state.parent) {
                         clear_output(state);
                     }
-                });
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access prompt state");
+                }
                 return LRESULT(0);
             }
             DefWindowProcW(hwnd, msg, wparam, lparam)
         }
         WM_SYSKEYDOWN => {
             if wparam.0 as u32 == 'I' as u32 {
-                let _ = with_prompt_state(hwnd, |state| {
+                if with_prompt_state(hwnd, |state| {
                     SetFocus(state.input);
-                });
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access prompt state");
+                }
                 return LRESULT(0);
             }
             if wparam.0 as u32 == 'O' as u32 {
-                let _ = with_prompt_state(hwnd, |state| {
+                if with_prompt_state(hwnd, |state| {
                     SetFocus(state.output);
-                });
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access prompt state");
+                }
                 return LRESULT(0);
             }
             DefWindowProcW(hwnd, msg, wparam, lparam)
         }
         WM_SETFOCUS => {
-            let _ = with_prompt_state(hwnd, |state| {
+            if with_prompt_state(hwnd, |state| {
                 if state.input.0 != 0 {
                     SetFocus(state.input);
                 }
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access prompt state");
+            }
             LRESULT(0)
         }
         WM_PROMPT_OUTPUT => {
@@ -787,18 +867,24 @@ unsafe extern "system" fn prompt_wndproc(
                 return LRESULT(0);
             }
             let payload = unsafe { Box::from_raw(lparam.0 as *mut String) };
-            let _ = with_prompt_state(hwnd, |state| {
+            if with_prompt_state(hwnd, |state| {
                 state.output_queue.push_back(*payload);
                 if !state.output_flush_active {
                     state.output_flush_active = true;
-                    let _ = SetTimer(hwnd, PROMPT_OUTPUT_TIMER_ID, 20, None);
+                    if SetTimer(hwnd, PROMPT_OUTPUT_TIMER_ID, 20, None) == 0 {
+                        crate::log_debug("Failed to set PROMPT_OUTPUT_TIMER");
+                    }
                 }
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access prompt state");
+            }
             LRESULT(0)
         }
         WM_TIMER => {
-            if wparam.0 as usize == PROMPT_OUTPUT_TIMER_ID {
-                let _ = with_prompt_state(hwnd, |state| {
+            if wparam.0 == PROMPT_OUTPUT_TIMER_ID {
+                if with_prompt_state(hwnd, |state| {
                     let mut budget = PROMPT_OUTPUT_FLUSH_CHARS;
                     while budget > 0 {
                         let Some(chunk) = state.output_queue.pop_front() else {
@@ -809,21 +895,29 @@ unsafe extern "system" fn prompt_wndproc(
                     }
                     if state.output_queue.is_empty() {
                         state.output_flush_active = false;
-                        let _ = KillTimer(hwnd, PROMPT_OUTPUT_TIMER_ID);
+                        if let Err(e) = KillTimer(hwnd, PROMPT_OUTPUT_TIMER_ID) {
+                            crate::log_debug(&format!("Failed to kill PROMPT_OUTPUT_TIMER: {}", e));
+                        }
                     }
-                });
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access prompt state");
+                }
                 return LRESULT(0);
             }
             DefWindowProcW(hwnd, msg, wparam, lparam)
         }
         WM_DESTROY => {
-            let _ = with_prompt_state(hwnd, |state| {
+            if with_prompt_state(hwnd, |state| {
                 state.reader_cancel.store(true, Ordering::Relaxed);
                 state.output_queue.clear();
                 state.output_flush_active = false;
-                let _ = KillTimer(hwnd, PROMPT_OUTPUT_TIMER_ID);
+                if let Err(e) = KillTimer(hwnd, PROMPT_OUTPUT_TIMER_ID) {
+                    crate::log_debug(&format!("Failed to kill PROMPT_OUTPUT_TIMER: {}", e));
+                }
                 if state.beep_state.sleep_active.load(Ordering::Relaxed) {
-                    let _ = apply_prevent_sleep(false);
+                    apply_prevent_sleep(false);
                     state
                         .beep_state
                         .sleep_active
@@ -832,11 +926,19 @@ unsafe extern "system" fn prompt_wndproc(
                 if let Some(mut session) = state.session.take() {
                     session.close();
                 }
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access prompt state");
+            }
             let parent = with_prompt_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
-            let _ = with_state(parent, |state| {
+            if with_state(parent, |state| {
                 state.prompt_window = HWND(0);
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access prompt state");
+            }
             LRESULT(0)
         }
         WM_NCDESTROY => {
@@ -844,12 +946,12 @@ unsafe extern "system" fn prompt_wndproc(
                 GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
                     as *mut PromptState;
             if !ptr.is_null() {
-                let _ = Box::from_raw(ptr);
+                drop(Box::from_raw(ptr));
             }
             LRESULT(0)
         }
         WM_CLOSE => {
-            let _ = DestroyWindow(hwnd);
+            crate::log_if_err!(DestroyWindow(hwnd));
             LRESULT(0)
         }
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -874,7 +976,7 @@ fn copy_output_selection(hwnd_output: HWND) {
         const CF_UNICODETEXT: u32 = 13;
         let mut start: u32 = 0;
         let mut end: u32 = 0;
-        let _ = SendMessageW(
+        SendMessageW(
             hwnd_output,
             EM_GETSEL,
             WPARAM(&mut start as *mut u32 as usize),
@@ -902,28 +1004,42 @@ fn copy_output_selection(hwnd_output: HWND) {
         if OpenClipboard(hwnd_output).is_err() {
             return;
         }
-        let _ = EmptyClipboard();
+        if let Err(e) = EmptyClipboard() {
+            crate::log_debug(&format!("EmptyClipboard failed: {}", e));
+        }
         let size = selection.len() * std::mem::size_of::<u16>();
         let handle = match GlobalAlloc(GMEM_MOVEABLE, size) {
             Ok(handle) => handle,
             Err(_) => {
-                let _ = CloseClipboard();
+                if let Err(e) = CloseClipboard() {
+                    crate::log_debug(&format!("CloseClipboard failed: {}", e));
+                }
                 return;
             }
         };
         if handle.0.is_null() {
-            let _ = CloseClipboard();
+            if let Err(e) = CloseClipboard() {
+                crate::log_debug(&format!("CloseClipboard failed: {}", e));
+            }
             return;
         }
         let ptr = GlobalLock(handle) as *mut u16;
         if ptr.is_null() {
-            let _ = CloseClipboard();
+            if let Err(e) = CloseClipboard() {
+                crate::log_debug(&format!("CloseClipboard failed: {}", e));
+            }
             return;
         }
         std::ptr::copy_nonoverlapping(selection.as_ptr(), ptr, selection.len());
-        let _ = GlobalUnlock(handle);
-        let _ = SetClipboardData(CF_UNICODETEXT, HANDLE(handle.0 as isize));
-        let _ = CloseClipboard();
+        if let Err(e) = GlobalUnlock(handle) {
+            crate::log_debug(&format!("GlobalUnlock failed: {}", e));
+        }
+        if let Err(e) = SetClipboardData(CF_UNICODETEXT, HANDLE(handle.0 as isize)) {
+            crate::log_debug(&format!("SetClipboardData failed: {}", e));
+        }
+        if let Err(e) = CloseClipboard() {
+            crate::log_debug(&format!("CloseClipboard failed: {}", e));
+        }
     }
 }
 
@@ -964,14 +1080,16 @@ fn start_output_reader(
                     && !beep_state_clone.beeped.swap(true, Ordering::Relaxed)
                 {
                     unsafe {
-                        let _ = MessageBeep(MESSAGEBOX_STYLE(0));
+                        if let Err(e) = MessageBeep(MESSAGEBOX_STYLE(0)) {
+                            crate::log_debug(&format!("MessageBeep failed: {}", e));
+                        }
                     }
                 }
                 if now.saturating_sub(last) >= 1_000
                     && beep_state_clone.sleep_enabled.load(Ordering::Relaxed)
                     && beep_state_clone.sleep_active.load(Ordering::Relaxed)
                 {
-                    let _ = apply_prevent_sleep(false);
+                    apply_prevent_sleep(false);
                     beep_state_clone
                         .sleep_active
                         .store(false, Ordering::Relaxed);
@@ -1016,7 +1134,7 @@ fn start_output_reader(
             if beep_state.sleep_enabled.load(Ordering::Relaxed)
                 && !beep_state.sleep_active.swap(true, Ordering::Relaxed)
             {
-                let _ = apply_prevent_sleep(true);
+                apply_prevent_sleep(true);
             }
             let chunk = String::from_utf8_lossy(&buffer[..read as usize]).to_string();
             let payload = Box::new(chunk);
@@ -1030,13 +1148,15 @@ fn start_output_reader(
                 )
                 .is_err()
                 {
-                    let _ = Box::from_raw(payload_ptr);
+                    drop(Box::from_raw(payload_ptr));
                     break;
                 }
             }
         }
         unsafe {
-            let _ = windows::Win32::Foundation::CloseHandle(output_read);
+            if let Err(e) = windows::Win32::Foundation::CloseHandle(output_read) {
+                crate::log_debug(&format!("Failed to close output_read: {}", e));
+            }
         }
     });
 }
@@ -1068,15 +1188,21 @@ unsafe fn send_input_to_pty(state: &mut PromptState) {
     let text = String::from_utf16_lossy(&buffer[..read as usize]);
     if state.program_is_codex && is_codex_approvals_command(&text) {
         spawn_codex_approvals();
-        let _ = SetWindowTextW(state.input, PCWSTR::null());
+        if let Err(_e) = SetWindowTextW(state.input, PCWSTR::null()) {
+            crate::log_debug(&format!("Error: {:?}", _e));
+        }
         return;
     }
     if let Some(session) = state.session.as_ref() {
         let newline = if state.program_is_codex { "\n" } else { "\r\n" };
         let payload = format!("{text}{newline}");
-        let _ = session.write_input(&payload);
+        if !session.write_input(&payload) {
+            crate::log_debug("Failed to write input");
+        }
     }
-    let _ = SetWindowTextW(state.input, PCWSTR::null());
+    if let Err(_e) = SetWindowTextW(state.input, PCWSTR::null()) {
+        crate::log_debug(&format!("Error: {:?}", _e));
+    }
 }
 
 unsafe fn clear_output(state: &mut PromptState) {
@@ -1088,7 +1214,9 @@ unsafe fn clear_output(state: &mut PromptState) {
     state.blank_line_streak = 0;
     state.pending_ws.clear();
     state.last_announced_line.clear();
-    let _ = SetWindowTextW(state.output, PCWSTR::null());
+    if let Err(_e) = SetWindowTextW(state.output, PCWSTR::null()) {
+        crate::log_debug(&format!("Error: {:?}", _e));
+    }
 }
 
 unsafe fn trim_output_keep_last(state: &mut PromptState) {
@@ -1117,16 +1245,18 @@ unsafe fn trim_output_keep_last(state: &mut PromptState) {
     state.pending_ws.clear();
     state.last_announced_line.clear();
     let wide = to_wide(&state.buffer);
-    let _ = SendMessageW(state.output, EM_SETREADONLY, WPARAM(0), LPARAM(0));
-    let _ = SetWindowTextW(state.output, PCWSTR(wide.as_ptr()));
-    let _ = SendMessageW(state.output, EM_SETREADONLY, WPARAM(1), LPARAM(0));
-    let _ = SendMessageW(
+    SendMessageW(state.output, EM_SETREADONLY, WPARAM(0), LPARAM(0));
+    if let Err(_e) = SetWindowTextW(state.output, PCWSTR(wide.as_ptr())) {
+        crate::log_debug(&format!("Error: {:?}", _e));
+    }
+    SendMessageW(state.output, EM_SETREADONLY, WPARAM(1), LPARAM(0));
+    SendMessageW(
         state.output,
         EM_SETSEL,
         WPARAM(state.buffer_utf16_len),
         LPARAM(state.buffer_utf16_len as isize),
     );
-    let _ = SendMessageW(state.output, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+    SendMessageW(state.output, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
 }
 
 fn apply_prevent_sleep(enabled: bool) -> bool {
@@ -1181,7 +1311,7 @@ fn append_output(state: &mut PromptState, text: &str) {
     while let Some(ch) = chars.next() {
         if ch == '\r' {
             if matches!(chars.peek(), Some(&'\n')) {
-                let _ = chars.next();
+                chars.next();
                 if !state.line_has_content {
                     if state.blank_line_streak >= 1 {
                         continue;
@@ -1253,7 +1383,7 @@ fn append_output(state: &mut PromptState, text: &str) {
     let mut sel_end = 0u32;
     if focus == output {
         unsafe {
-            let _ = SendMessageW(
+            SendMessageW(
                 output,
                 EM_GETSEL,
                 WPARAM(&mut sel_start as *mut _ as usize),
@@ -1281,25 +1411,25 @@ fn append_output(state: &mut PromptState, text: &str) {
         replace_text.trim()
     ));
     unsafe {
-        let _ = SendMessageW(
+        SendMessageW(
             output,
             EM_SETREADONLY,
             WPARAM(0), // False
             LPARAM(0),
         );
-        let _ = SendMessageW(
+        SendMessageW(
             output,
             EM_SETSEL,
             WPARAM(replace_start),
             LPARAM(replace_end as isize),
         );
-        let _ = SendMessageW(
+        SendMessageW(
             output,
             EM_REPLACESEL,
             WPARAM(1),
             LPARAM(wide.as_ptr() as isize),
         );
-        let _ = SendMessageW(
+        SendMessageW(
             output,
             EM_SETREADONLY,
             WPARAM(1), // True
@@ -1325,20 +1455,20 @@ fn append_output(state: &mut PromptState, text: &str) {
 
     if should_scroll {
         unsafe {
-            let _ = SendMessageW(
+            SendMessageW(
                 output,
                 EM_SETSEL,
                 WPARAM(state.buffer_utf16_len),
                 LPARAM(state.buffer_utf16_len as isize),
             );
-            let _ = SendMessageW(output, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+            SendMessageW(output, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
         }
     } else if focus == output {
         let max = state.buffer_utf16_len as u32;
         let restore_start = sel_start.min(max);
         let restore_end = sel_end.min(max);
         unsafe {
-            let _ = SendMessageW(
+            SendMessageW(
                 output,
                 EM_SETSEL,
                 WPARAM(restore_start as usize),
@@ -1485,7 +1615,7 @@ fn text_metrics(hwnd: HWND) -> Option<(i32, i32)> {
         }
         let mut tm = TEXTMETRICW::default();
         let ok = GetTextMetricsW(hdc, &mut tm).as_bool();
-        let _ = ReleaseDC(hwnd, hdc);
+        ReleaseDC(hwnd, hdc);
         if ok {
             Some((tm.tmAveCharWidth.max(1), tm.tmHeight.max(1)))
         } else {
@@ -1517,90 +1647,90 @@ fn layout_prompt(hwnd: HWND, state: &PromptState) {
 
     let mut y = margin;
     unsafe {
-        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
             state.label_input,
             margin,
             y,
             label_width,
             label_height,
             true,
-        );
-        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+        ));
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
             state.input,
             margin + label_width + spacing,
             y - 2,
             (width - margin * 2 - label_width - spacing).max(120),
             input_height,
             true,
-        );
+        ));
     }
     y += input_height + spacing;
 
     let output_height =
         (height - y - label_height - checkbox_height * 3 - spacing * 2 - margin).max(120);
     unsafe {
-        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
             state.label_output,
             margin,
             y,
             label_width,
             label_height,
             true,
-        );
-        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+        ));
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
             state.output,
             margin,
             y + label_height,
             (width - margin * 2).max(120),
             output_height,
             true,
-        );
+        ));
     }
     let output_bottom = y + label_height + output_height;
     let checkbox_y = output_bottom + spacing;
     let checkbox_y2 = checkbox_y + checkbox_height + spacing;
     let checkbox_y3 = checkbox_y2 + checkbox_height + spacing;
     unsafe {
-        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
             state.checkbox_autoscroll,
             margin,
             checkbox_y,
             200,
             checkbox_height,
             true,
-        );
-        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+        ));
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
             state.checkbox_strip_ansi,
             margin + 210,
             checkbox_y,
             220,
             checkbox_height,
             true,
-        );
-        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+        ));
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
             state.checkbox_announce_lines,
             margin,
             checkbox_y2,
             260,
             checkbox_height,
             true,
-        );
-        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+        ));
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
             state.checkbox_beep_on_idle,
             margin + 270,
             checkbox_y2,
             240,
             checkbox_height,
             true,
-        );
-        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+        ));
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
             state.checkbox_prevent_sleep,
             margin,
             checkbox_y3,
             320,
             checkbox_height,
             true,
-        );
+        ));
     }
 }
 struct PromptBeepState {

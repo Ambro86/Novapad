@@ -81,7 +81,9 @@ enum BatchStatusCode {
 
 pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
-        let _ = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
+        if let Err(e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
+            crate::log_debug(&format!("Failed to post WM_CLOSE: {}", e));
+        }
         return true;
     }
     false
@@ -261,11 +263,14 @@ pub fn open(parent: HWND) {
         unsafe { with_state(parent, |state| state.batch_audiobooks_window).unwrap_or(HWND(0)) };
     if existing.0 != 0 {
         if unsafe { !IsWindow(existing).as_bool() } {
-            let _ = unsafe {
+            let result = unsafe {
                 with_state(parent, |state| {
                     state.batch_audiobooks_window = HWND(0);
                 })
             };
+            if result.is_none() {
+                crate::log_debug("Failed to access batch window state at L264");
+            }
         } else {
             unsafe {
                 SetForegroundWindow(existing);
@@ -313,11 +318,15 @@ pub fn open(parent: HWND) {
         return;
     }
 
-    let _ = unsafe {
+    if unsafe {
         with_state(parent, |state| {
             state.batch_audiobooks_window = hwnd;
         })
-    };
+    }
+    .is_none()
+    {
+        crate::log_debug("Failed to access batch window state at L316");
+    }
 }
 
 unsafe extern "system" fn batch_wndproc(
@@ -338,10 +347,7 @@ unsafe extern "system" fn batch_wndproc(
                 WS_EX_CLIENTEDGE,
                 w!("SysListView32"),
                 PCWSTR::null(),
-                WS_CHILD
-                    | WS_VISIBLE
-                    | WS_TABSTOP
-                    | WINDOW_STYLE((LVS_REPORT | LVS_SHOWSELALWAYS) as u32),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(LVS_REPORT | LVS_SHOWSELALWAYS),
                 16,
                 16,
                 720,
@@ -351,7 +357,7 @@ unsafe extern "system" fn batch_wndproc(
                 HINSTANCE(0),
                 None,
             );
-            let _ = SendMessageW(
+            SendMessageW(
                 list,
                 LVM_SETEXTENDEDLISTVIEWSTYLE,
                 WPARAM(0),
@@ -490,19 +496,19 @@ unsafe extern "system" fn batch_wndproc(
                 HINSTANCE(0),
                 None,
             );
-            let _ = SendMessageW(
+            SendMessageW(
                 format_combo,
                 CB_ADDSTRING,
                 WPARAM(0),
                 LPARAM(to_wide(&labels.format_mp3).as_ptr() as isize),
             );
-            let _ = SendMessageW(
+            SendMessageW(
                 format_combo,
                 CB_ADDSTRING,
                 WPARAM(0),
                 LPARAM(to_wide(&labels.format_wav).as_ptr() as isize),
             );
-            let _ = SendMessageW(format_combo, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+            SendMessageW(format_combo, CB_SETCURSEL, WPARAM(0), LPARAM(0));
 
             let checkbox_subfolder = CreateWindowExW(
                 Default::default(),
@@ -532,7 +538,7 @@ unsafe extern "system" fn batch_wndproc(
                 HINSTANCE(0),
                 None,
             );
-            let _ = SendMessageW(
+            SendMessageW(
                 checkbox_avoid_overwrite,
                 windows::Win32::UI::WindowsAndMessaging::BM_SETCHECK,
                 WPARAM(BST_CHECKED.0 as usize),
@@ -567,7 +573,7 @@ unsafe extern "system" fn batch_wndproc(
                 HINSTANCE(0),
                 None,
             );
-            let _ = SendMessageW(
+            SendMessageW(
                 progress_bar,
                 PBM_SETRANGE,
                 WPARAM(0),
@@ -616,7 +622,7 @@ unsafe extern "system" fn batch_wndproc(
                 HINSTANCE(0),
                 None,
             );
-            let _ = EnableWindow(cancel_button, false);
+            EnableWindow(cancel_button, false);
 
             let log_label = CreateWindowExW(
                 Default::default(),
@@ -669,7 +675,7 @@ unsafe extern "system" fn batch_wndproc(
                 log_edit,
             ] {
                 if control.0 != 0 && hfont.0 != 0 {
-                    let _ = SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                 }
             }
 
@@ -677,8 +683,10 @@ unsafe extern "system" fn batch_wndproc(
                 .unwrap_or_else(|_| PathBuf::from("."))
                 .to_string_lossy()
                 .to_string();
-            let _ = SetWindowTextW(output_edit, PCWSTR(to_wide(&initial_folder).as_ptr()));
-            let _ = SetFocus(list);
+            if let Err(e) = SetWindowTextW(output_edit, PCWSTR(to_wide(&initial_folder).as_ptr())) {
+                crate::log_debug(&format!("Failed to set initial output folder: {}", e));
+            }
+            SetFocus(list);
 
             let message_queue = Arc::new(Mutex::new(VecDeque::new()));
 
@@ -712,60 +720,98 @@ unsafe extern "system" fn batch_wndproc(
                 windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
                 Box::into_raw(state) as isize,
             );
-            let _ = SetTimer(hwnd, BATCH_TIMER_ID, 200, None);
+            if SetTimer(hwnd, BATCH_TIMER_ID, 200, None) == 0 {
+                crate::log_debug("Failed to set BATCH_TIMER");
+            }
 
             LRESULT(0)
         }
         WM_COMMAND => {
-            let cmd_id = (wparam.0 & 0xffff) as usize;
+            let cmd_id = wparam.0 & 0xffff;
             match cmd_id {
                 BATCH_ID_ADD_FILES => {
-                    let _ = with_batch_state(hwnd, |state| {
+                    if with_batch_state(hwnd, |state| {
                         add_files_to_queue(state);
-                    });
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access batch state");
+                    }
                     LRESULT(0)
                 }
                 BATCH_ID_ADD_FOLDER => {
-                    let _ = with_batch_state(hwnd, |state| {
+                    if with_batch_state(hwnd, |state| {
                         add_folder_to_queue(state);
-                    });
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access batch state");
+                    }
                     LRESULT(0)
                 }
                 BATCH_ID_REMOVE => {
-                    let _ = with_batch_state(hwnd, |state| {
+                    if with_batch_state(hwnd, |state| {
                         remove_selected_items(state);
-                    });
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access batch state");
+                    }
                     LRESULT(0)
                 }
                 BATCH_ID_CLEAR => {
-                    let _ = with_batch_state(hwnd, |state| {
+                    if with_batch_state(hwnd, |state| {
                         clear_items(state);
-                    });
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access batch state");
+                    }
                     LRESULT(0)
                 }
                 BATCH_ID_OUTPUT_BROWSE => {
-                    let _ = with_batch_state(hwnd, |state| {
+                    if with_batch_state(hwnd, |state| {
                         if let Some(folder) = browse_for_folder(hwnd, state.language) {
                             let wide = to_wide(folder.to_string_lossy().as_ref());
-                            let _ = SetWindowTextW(state.output_edit, PCWSTR(wide.as_ptr()));
+                            if let Err(e) = SetWindowTextW(state.output_edit, PCWSTR(wide.as_ptr()))
+                            {
+                                crate::log_debug(&format!("Failed to set output folder: {}", e));
+                            }
                         }
-                    });
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access batch state");
+                    }
                     LRESULT(0)
                 }
                 BATCH_ID_START => {
-                    let _ = with_batch_state(hwnd, |state| {
+                    if with_batch_state(hwnd, |state| {
                         start_batch(state);
-                    });
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access batch state");
+                    }
                     LRESULT(0)
                 }
                 BATCH_ID_CANCEL => {
-                    let _ = with_batch_state(hwnd, |state| {
+                    if with_batch_state(hwnd, |state| {
                         request_cancel(state);
-                    });
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access batch state");
+                    }
                     LRESULT(0)
                 }
                 BATCH_ID_CLOSE => {
-                    let _ = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
+                    if let Err(e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
+                        crate::log_debug(&format!(
+                            "Failed to post WM_CLOSE on cancellation: {}",
+                            e
+                        ));
+                    }
                     LRESULT(0)
                 }
                 _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -783,7 +829,7 @@ unsafe extern "system" fn batch_wndproc(
             .unwrap_or(true);
             if allow_close {
                 unsafe {
-                    let _ = DestroyWindow(hwnd);
+                    crate::log_if_err!(DestroyWindow(hwnd));
                 }
             }
             LRESULT(0)
@@ -793,7 +839,7 @@ unsafe extern "system" fn batch_wndproc(
             LRESULT(0)
         }
         WM_TIMER => {
-            if wparam.0 as usize == BATCH_TIMER_ID {
+            if wparam.0 == BATCH_TIMER_ID {
                 handle_batch_messages(hwnd);
                 return LRESULT(0);
             }
@@ -801,19 +847,29 @@ unsafe extern "system" fn batch_wndproc(
         }
         WM_DESTROY => {
             log_debug("Batch WM_DESTROY");
-            let _ = KillTimer(hwnd, BATCH_TIMER_ID);
-            let _ = with_batch_state(hwnd, |state| {
+            if let Err(e) = KillTimer(hwnd, BATCH_TIMER_ID) {
+                crate::log_debug(&format!("Failed to kill BATCH_TIMER: {}", e));
+            }
+            if with_batch_state(hwnd, |state| {
                 state.running = false;
                 state.cancel_flag = None;
-            });
-            let _ = unsafe {
-                with_state(
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access batch state");
+            }
+            unsafe {
+                if with_state(
                     windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd),
                     |state| {
                         state.batch_audiobooks_window = HWND(0);
                     },
                 )
-            };
+                .is_none()
+                {
+                    crate::log_debug("Failed to access parent state in WM_DESTROY");
+                }
+            }
             let parent = windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd);
             crate::focus_editor(parent);
             LRESULT(0)
@@ -826,7 +882,7 @@ unsafe extern "system" fn batch_wndproc(
             };
             if !ptr.is_null() {
                 unsafe {
-                    let _ = SetWindowLongPtrW(
+                    SetWindowLongPtrW(
                         hwnd,
                         windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
                         0,
@@ -872,7 +928,7 @@ fn insert_column(list: HWND, index: i32, text: &str, width: i32) {
         ..Default::default()
     };
     unsafe {
-        let _ = SendMessageW(
+        SendMessageW(
             list,
             LVM_INSERTCOLUMNW,
             WPARAM(index as usize),
@@ -891,7 +947,7 @@ fn insert_list_item(list: HWND, index: i32, input: &str, status: &str, output: &
         ..Default::default()
     };
     unsafe {
-        let _ = SendMessageW(
+        SendMessageW(
             list,
             LVM_INSERTITEMW,
             WPARAM(0),
@@ -910,7 +966,7 @@ fn set_list_subitem(list: HWND, index: i32, subitem: i32, text: &str) {
         ..Default::default()
     };
     unsafe {
-        let _ = SendMessageW(
+        SendMessageW(
             list,
             LVM_SETITEMTEXTW,
             WPARAM(index as usize),
@@ -993,7 +1049,7 @@ fn remove_selected_items(state: &mut BatchState) {
         if idx < state.items.len() {
             state.items.remove(idx);
             unsafe {
-                let _ = SendMessageW(state.list, LVM_DELETEITEM, WPARAM(idx), LPARAM(0));
+                SendMessageW(state.list, LVM_DELETEITEM, WPARAM(idx), LPARAM(0));
             }
         }
     }
@@ -1006,7 +1062,7 @@ fn clear_items(state: &mut BatchState) {
     }
     state.items.clear();
     unsafe {
-        let _ = SendMessageW(state.list, LVM_DELETEALLITEMS, WPARAM(0), LPARAM(0));
+        SendMessageW(state.list, LVM_DELETEALLITEMS, WPARAM(0), LPARAM(0));
     }
     update_progress(state, 0, 0);
 }
@@ -1030,17 +1086,17 @@ fn start_batch(state: &mut BatchState) {
         return;
     }
     let output_folder = PathBuf::from(output_folder.trim());
-    if !output_folder.exists() {
-        if let Err(err) = std::fs::create_dir_all(&output_folder) {
-            unsafe {
-                show_error(
-                    state.hwnd,
-                    state.language,
-                    &format!("{}: {}", labels.invalid_output_folder, err),
-                );
-            }
-            return;
+    if !output_folder.exists()
+        && let Err(err) = std::fs::create_dir_all(&output_folder)
+    {
+        unsafe {
+            show_error(
+                state.hwnd,
+                state.language,
+                &format!("{}: {}", labels.invalid_output_folder, err),
+            );
         }
+        return;
     }
     let format_sel =
         unsafe { SendMessageW(state.format_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)) }.0 as i32;
@@ -1076,7 +1132,7 @@ fn start_batch(state: &mut BatchState) {
     set_running(state, true);
     append_log(state, &labels.log_start);
     unsafe {
-        let _ = SetFocus(state.log_edit);
+        SetFocus(state.log_edit);
     }
 
     let items = state.items.iter().map(|item| item.input.clone()).collect();
@@ -1107,7 +1163,7 @@ fn request_cancel(state: &mut BatchState) {
     let labels = labels(state.language);
     append_log(state, &labels.log_cancel_requested);
     unsafe {
-        let _ = EnableWindow(state.cancel_button, false);
+        EnableWindow(state.cancel_button, false);
     }
 }
 
@@ -1160,13 +1216,17 @@ fn handle_batch_messages(hwnd: HWND) {
     let mut messages: Vec<BatchMessage> = Vec::new();
     let mut done_dialog: Option<(HWND, Language, HWND)> = None;
     let mut done_report: Option<PathBuf> = None;
-    let _ = with_batch_state(hwnd, |state| {
+    if with_batch_state(hwnd, |state| {
         if let Ok(mut queue) = state.message_queue.lock() {
             while let Some(msg) = queue.pop_front() {
                 messages.push(msg);
             }
         }
-    });
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access batch state");
+    }
     if messages.is_empty() {
         return;
     }
@@ -1190,7 +1250,7 @@ fn handle_batch_messages(hwnd: HWND) {
             break;
         }
     }
-    let _ = with_batch_state(hwnd, |state| {
+    if with_batch_state(hwnd, |state| {
         if done_report.is_some() {
             log_debug("Batch WM_BATCH_EVENT: done-only handling.");
             done_dialog = Some(finish_batch(state, done_report.as_ref()));
@@ -1211,7 +1271,11 @@ fn handle_batch_messages(hwnd: HWND) {
                 }
             }
         }
-    });
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access batch state");
+    }
     if let Some((parent, language, list)) = done_dialog {
         log_debug("Batch finished. Showing completion dialog.");
         unsafe {
@@ -1223,7 +1287,7 @@ fn handle_batch_messages(hwnd: HWND) {
         }
         if unsafe { IsWindow(list).as_bool() } {
             unsafe {
-                let _ = SetFocus(list);
+                SetFocus(list);
             }
         }
         log_debug("Batch completion dialog closed.");
@@ -1238,7 +1302,7 @@ fn update_progress(state: &mut BatchState, completed: usize, total: usize) {
     };
     if unsafe { IsWindow(state.progress_bar).as_bool() } {
         unsafe {
-            let _ = SendMessageW(
+            SendMessageW(
                 state.progress_bar,
                 PBM_SETPOS,
                 WPARAM(percent as usize),
@@ -1257,7 +1321,9 @@ fn update_progress(state: &mut BatchState, completed: usize, total: usize) {
     if unsafe { IsWindow(state.progress_label).as_bool() } {
         let wide = to_wide(&label);
         unsafe {
-            let _ = SetWindowTextW(state.progress_label, PCWSTR(wide.as_ptr()));
+            if let Err(e) = SetWindowTextW(state.progress_label, PCWSTR(wide.as_ptr())) {
+                crate::log_debug(&format!("Failed to set progress label: {}", e));
+            }
         }
     }
 }
@@ -1272,15 +1338,15 @@ fn append_log(state: &mut BatchState, line: &str) {
     }
     let wide = to_wide(&text);
     unsafe {
-        let len = GetWindowTextLengthW(state.log_edit) as i32;
+        let len = GetWindowTextLengthW(state.log_edit);
         let len = if len < 0 { 0 } else { len };
-        let _ = SendMessageW(
+        SendMessageW(
             state.log_edit,
             EM_SETSEL,
             WPARAM(len as usize),
             LPARAM(len as isize),
         );
-        let _ = SendMessageW(
+        SendMessageW(
             state.log_edit,
             EM_REPLACESEL,
             WPARAM(1),
@@ -1378,7 +1444,7 @@ fn read_control_text(hwnd: HWND) -> String {
     }
     let mut buffer = vec![0u16; len + 1];
     unsafe {
-        let _ = GetWindowTextW(hwnd, &mut buffer);
+        GetWindowTextW(hwnd, &mut buffer);
     }
     unsafe { from_wide(buffer.as_ptr()) }
 }
@@ -1649,7 +1715,9 @@ fn export_single_audiobook(
         Err(err) => {
             if !cancel.load(Ordering::SeqCst) {
                 for path in &output_paths {
-                    let _ = std::fs::remove_file(path);
+                    if let Err(e) = std::fs::remove_file(path) {
+                        crate::log_debug(&format!("Failed to remove temp batch file: {}", e));
+                    }
                 }
             }
             Err(err)

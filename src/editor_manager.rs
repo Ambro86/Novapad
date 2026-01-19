@@ -109,9 +109,13 @@ unsafe extern "system" fn edit_subclass_proc(
             9 | 13 | 32 | 44 | 46 | 58 | 59 | 33 | 63 | 41 | 93 | 125
         ) {
             let parent = GetParent(hwnd);
-            let _ = with_state(parent, |state| {
+            if with_state(parent, |state| {
                 state.spellcheck_space_trigger = Some(hwnd);
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access editor state");
+            }
         }
         if ch == '\'' as u32 || ch == '\"' as u32 {
             let parent = GetParent(hwnd);
@@ -125,7 +129,7 @@ unsafe extern "system" fn edit_subclass_proc(
                     _ => "’",
                 };
                 let wide = to_wide(replacement);
-                let _ = SendMessageW(
+                SendMessageW(
                     hwnd,
                     EM_REPLACESEL,
                     WPARAM(1),
@@ -220,7 +224,9 @@ pub unsafe fn set_edit_text(hwnd_edit: HWND, text: &str) {
         // Prevent programmatic loads from marking the document as modified.
         SendMessageW(hwnd_edit, EM_SETEVENTMASK, WPARAM(0), LPARAM(0));
     }
-    let _ = SetWindowTextW(hwnd_edit, PCWSTR(wide.as_ptr()));
+    if let Err(e) = SetWindowTextW(hwnd_edit, PCWSTR(wide.as_ptr())) {
+        crate::log_debug(&format!("Failed to set editor text: {}", e));
+    }
     if hwnd_edit.0 != 0 {
         SendMessageW(hwnd_edit, EM_SETMODIFY, WPARAM(0), LPARAM(0));
         SendMessageW(
@@ -432,10 +438,14 @@ fn end_single_undo_action(hwnd_edit: HWND) {
 
 pub unsafe fn try_normalize_undo(hwnd: HWND) -> bool {
     let mut undo = None;
-    let _ = with_state(hwnd, |state| {
+    if with_state(hwnd, |state| {
         undo = state.normalize_undo.clone();
         state.normalize_undo = None;
-    });
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access editor state");
+    }
     let Some(undo) = undo else {
         return false;
     };
@@ -453,7 +463,7 @@ pub unsafe fn try_normalize_undo(hwnd: HWND) -> bool {
         WPARAM(0),
         LPARAM(&mut cr as *mut _ as isize),
     );
-    let _ = with_state(hwnd, |state| {
+    if with_state(hwnd, |state| {
         for (idx, doc) in state.docs.iter_mut().enumerate() {
             if doc.hwnd_edit == undo.hwnd_edit {
                 doc.dirty = undo.was_dirty;
@@ -464,23 +474,31 @@ pub unsafe fn try_normalize_undo(hwnd: HWND) -> bool {
                 break;
             }
         }
-    });
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access editor state");
+    }
     SetFocus(undo.hwnd_edit);
     true
 }
 
 pub unsafe fn handle_normalize_edit_change(hwnd: HWND, hwnd_edit: HWND) {
-    let _ = with_state(hwnd, |state| {
+    if with_state(hwnd, |state| {
         if state.normalize_skip_change {
             state.normalize_skip_change = false;
             return;
         }
-        if let Some(pending) = &state.normalize_undo {
-            if pending.hwnd_edit == hwnd_edit {
-                state.normalize_undo = None;
-            }
+        if let Some(pending) = &state.normalize_undo
+            && pending.hwnd_edit == hwnd_edit
+        {
+            state.normalize_undo = None;
         }
-    });
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access editor state");
+    }
 }
 
 pub unsafe fn strip_markdown_active_edit(hwnd: HWND) -> bool {
@@ -629,7 +647,7 @@ pub unsafe fn normalize_whitespace_active_edit(hwnd: HWND) -> bool {
     );
     // Single-undo guarantee.
     SendMessageW(hwnd_edit, EM_STOPGROUPTYPING, WPARAM(0), LPARAM(0));
-    let _ = with_state(hwnd, |state| {
+    let result = with_state(hwnd, |state| {
         state.normalize_undo = Some(NormalizeUndo {
             hwnd_edit,
             text: text.clone(),
@@ -639,6 +657,9 @@ pub unsafe fn normalize_whitespace_active_edit(hwnd: HWND) -> bool {
         });
         state.normalize_skip_change = true;
     });
+    if result.is_none() {
+        crate::log_debug("Failed to access editor state");
+    }
     let mut set_text = SetTextEx {
         flags: ST_KEEPUNDO | ST_SELECTION,
         codepage: CP_UNICODE,
@@ -1775,32 +1796,30 @@ fn strip_markdown_inline(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut chars = text.chars().peekable();
     while let Some(&ch) = chars.peek() {
-        let _ = chars.next();
+        chars.next();
         if ch == '`' {
             continue;
         }
-        if ch == '*' || ch == '_' {
-            if let Some(next) = chars.peek() {
-                if *next == ch {
-                    let _ = chars.next();
-                    continue;
-                }
-            }
+        if (ch == '*' || ch == '_')
+            && let Some(next) = chars.peek()
+            && *next == ch
+        {
+            chars.next();
+            continue;
         }
-        if ch == '~' {
-            if let Some(next) = chars.peek() {
-                if *next == '~' {
-                    let _ = chars.next();
-                    continue;
-                }
-            }
+        if ch == '~'
+            && let Some(next) = chars.peek()
+            && *next == '~'
+        {
+            chars.next();
+            continue;
         }
         if ch == '!' && chars.peek() == Some(&'[') {
-            let _ = chars.next();
+            chars.next();
             let alt = collect_bracket_text(&mut chars, ']');
             if chars.peek() == Some(&'(') {
-                let _ = chars.next();
-                let _ = collect_bracket_text(&mut chars, ')');
+                chars.next();
+                collect_bracket_text(&mut chars, ')');
             }
             out.push_str(&alt);
             continue;
@@ -1808,8 +1827,8 @@ fn strip_markdown_inline(text: &str) -> String {
         if ch == '[' {
             let label = collect_bracket_text(&mut chars, ']');
             if chars.peek() == Some(&'(') {
-                let _ = chars.next();
-                let _ = collect_bracket_text(&mut chars, ')');
+                chars.next();
+                collect_bracket_text(&mut chars, ')');
                 out.push_str(&label);
                 continue;
             }
@@ -2023,11 +2042,14 @@ pub unsafe fn open_document(hwnd: HWND, path: &Path) {
 }
 
 pub unsafe fn mark_current_document_from_rss(hwnd: HWND, from_rss: bool) {
-    let _ = with_state(hwnd, |state| {
+    let result = with_state(hwnd, |state| {
         if let Some(doc) = state.docs.get_mut(state.current) {
             doc.from_rss = from_rss;
         }
     });
+    if result.is_none() {
+        crate::log_debug("Failed to access editor state");
+    }
 }
 
 pub unsafe fn current_document_is_from_rss(hwnd: HWND) -> bool {
@@ -2116,7 +2138,7 @@ pub unsafe fn update_tab_title(hwnd_tab: HWND, index: usize, title: &str, dirty:
 }
 
 pub unsafe fn mark_dirty_from_edit(hwnd: HWND, hwnd_edit: HWND) {
-    let _ = with_state(hwnd, |state| {
+    if with_state(hwnd, |state| {
         for (i, doc) in state.docs.iter_mut().enumerate() {
             if doc.hwnd_edit == hwnd_edit && !doc.dirty {
                 doc.dirty = true;
@@ -2125,11 +2147,15 @@ pub unsafe fn mark_dirty_from_edit(hwnd: HWND, hwnd_edit: HWND) {
                 break;
             }
         }
-    });
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access editor state");
+    }
 }
 
 pub unsafe fn update_window_title(hwnd: HWND) {
-    let _ = with_state(hwnd, |state| {
+    if with_state(hwnd, |state| {
         if let Some(doc) = state.docs.get(state.current) {
             let display_title = &doc.title;
             let base_title = if display_title.trim().is_empty() {
@@ -2143,9 +2169,15 @@ pub unsafe fn update_window_title(hwnd: HWND) {
                 state.settings.modified_marker_position,
             );
             let wide = to_wide(&full_title);
-            let _ = SetWindowTextW(hwnd, PCWSTR(wide.as_ptr()));
+            if let Err(e) = SetWindowTextW(hwnd, PCWSTR(wide.as_ptr())) {
+                crate::log_debug(&format!("Failed to set window title: {}", e));
+            }
         }
-    });
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access editor state");
+    }
 }
 
 fn apply_modified_marker(title: &str, dirty: bool, position: ModifiedMarkerPosition) -> String {
@@ -2184,6 +2216,10 @@ pub unsafe fn layout_children(hwnd: HWND) {
             state.voice_combo_favorites,
         )
     });
+    if state_data.is_none() {
+        crate::log_debug("Failed to access editor state");
+        return;
+    }
 
     let Some((
         hwnd_tab,
@@ -2220,7 +2256,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
     let width = rc.right - rc.left;
     let height = rc.bottom - rc.top;
 
-    let _ = MoveWindow(hwnd_tab, 0, 0, width, height, true);
+    crate::log_if_err!(MoveWindow(hwnd_tab, 0, 0, width, height, true));
 
     let mut tab_rc = rc;
     SendMessageW(
@@ -2261,186 +2297,186 @@ pub unsafe fn layout_children(hwnd: HWND) {
         let row7_top = row6_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
 
         if voice_panel_visible {
-            let _ = MoveWindow(
+            crate::log_if_err!(MoveWindow(
                 label_engine,
                 label_x,
                 row1_top,
                 VOICE_PANEL_LABEL_WIDTH,
                 VOICE_PANEL_ROW_HEIGHT,
                 true,
-            );
-            let _ = MoveWindow(
+            ));
+            crate::log_if_err!(MoveWindow(
                 combo_engine,
                 combo_x,
                 row1_top - 2,
                 combo_width,
                 VOICE_PANEL_COMBO_HEIGHT,
                 true,
-            );
-            let _ = MoveWindow(
+            ));
+            crate::log_if_err!(MoveWindow(
                 label_voice,
                 label_x,
                 row2_top,
                 VOICE_PANEL_LABEL_WIDTH,
                 VOICE_PANEL_ROW_HEIGHT,
                 true,
-            );
-            let _ = MoveWindow(
+            ));
+            crate::log_if_err!(MoveWindow(
                 combo_voice,
                 combo_x,
                 row2_top - 2,
                 combo_width,
                 VOICE_PANEL_COMBO_HEIGHT,
                 true,
-            );
-            let _ = MoveWindow(
+            ));
+            crate::log_if_err!(MoveWindow(
                 label_speed,
                 label_x,
                 row3_top,
                 VOICE_PANEL_LABEL_WIDTH,
                 VOICE_PANEL_ROW_HEIGHT,
                 true,
-            );
-            let _ = MoveWindow(
+            ));
+            crate::log_if_err!(MoveWindow(
                 combo_speed,
                 combo_x,
                 row3_top - 2,
                 combo_width,
                 VOICE_PANEL_COMBO_HEIGHT,
                 true,
-            );
-            let _ = MoveWindow(
+            ));
+            crate::log_if_err!(MoveWindow(
                 edit_speed,
                 combo_x,
                 row3_top - 2,
                 combo_width,
                 VOICE_PANEL_COMBO_HEIGHT,
                 true,
-            );
-            let _ = MoveWindow(
+            ));
+            crate::log_if_err!(MoveWindow(
                 label_pitch,
                 label_x,
                 row4_top,
                 VOICE_PANEL_LABEL_WIDTH,
                 VOICE_PANEL_ROW_HEIGHT,
                 true,
-            );
-            let _ = MoveWindow(
+            ));
+            crate::log_if_err!(MoveWindow(
                 combo_pitch,
                 combo_x,
                 row4_top - 2,
                 combo_width,
                 VOICE_PANEL_COMBO_HEIGHT,
                 true,
-            );
-            let _ = MoveWindow(
+            ));
+            crate::log_if_err!(MoveWindow(
                 edit_pitch,
                 combo_x,
                 row4_top - 2,
                 combo_width,
                 VOICE_PANEL_COMBO_HEIGHT,
                 true,
-            );
-            let _ = MoveWindow(
+            ));
+            crate::log_if_err!(MoveWindow(
                 label_volume,
                 label_x,
                 row5_top,
                 VOICE_PANEL_LABEL_WIDTH,
                 VOICE_PANEL_ROW_HEIGHT,
                 true,
-            );
-            let _ = MoveWindow(
+            ));
+            crate::log_if_err!(MoveWindow(
                 combo_volume,
                 combo_x,
                 row5_top - 2,
                 combo_width,
                 VOICE_PANEL_COMBO_HEIGHT,
                 true,
-            );
-            let _ = MoveWindow(
+            ));
+            crate::log_if_err!(MoveWindow(
                 edit_volume,
                 combo_x,
                 row5_top - 2,
                 combo_width,
                 VOICE_PANEL_COMBO_HEIGHT,
                 true,
-            );
+            ));
             if show_multilingual {
-                let _ = MoveWindow(
+                crate::log_if_err!(MoveWindow(
                     checkbox_multilingual,
                     label_x,
                     row6_top,
                     combo_width + VOICE_PANEL_LABEL_WIDTH + VOICE_PANEL_PADDING,
                     VOICE_PANEL_ROW_HEIGHT,
                     true,
-                );
+                ));
                 if favorites_visible {
-                    let _ = MoveWindow(
+                    crate::log_if_err!(MoveWindow(
                         label_favorites,
                         label_x,
                         row7_top,
                         VOICE_PANEL_LABEL_WIDTH,
                         VOICE_PANEL_ROW_HEIGHT,
                         true,
-                    );
-                    let _ = MoveWindow(
+                    ));
+                    crate::log_if_err!(MoveWindow(
                         combo_favorites,
                         combo_x,
                         row7_top - 2,
                         combo_width,
                         VOICE_PANEL_COMBO_HEIGHT,
                         true,
-                    );
+                    ));
                 }
             } else if favorites_visible {
-                let _ = MoveWindow(
+                crate::log_if_err!(MoveWindow(
                     label_favorites,
                     label_x,
                     row6_top,
                     VOICE_PANEL_LABEL_WIDTH,
                     VOICE_PANEL_ROW_HEIGHT,
                     true,
-                );
-                let _ = MoveWindow(
+                ));
+                crate::log_if_err!(MoveWindow(
                     combo_favorites,
                     combo_x,
                     row6_top - 2,
                     combo_width,
                     VOICE_PANEL_COMBO_HEIGHT,
                     true,
-                );
+                ));
             }
         } else if favorites_visible {
-            let _ = MoveWindow(
+            crate::log_if_err!(MoveWindow(
                 label_favorites,
                 label_x,
                 row1_top,
                 VOICE_PANEL_LABEL_WIDTH,
                 VOICE_PANEL_ROW_HEIGHT,
                 true,
-            );
-            let _ = MoveWindow(
+            ));
+            crate::log_if_err!(MoveWindow(
                 combo_favorites,
                 combo_x,
                 row1_top - 2,
                 combo_width,
                 VOICE_PANEL_COMBO_HEIGHT,
                 true,
-            );
+            ));
         }
     }
 
     let panel_offset = panel_height;
     for hwnd_edit in edit_handles {
         if hwnd_edit.0 != 0 {
-            let _ = MoveWindow(
+            crate::log_if_err!(MoveWindow(
                 hwnd_edit,
                 tab_rc.left,
                 tab_rc.top + panel_offset,
                 tab_rc.right - tab_rc.left,
                 tab_rc.bottom - tab_rc.top - panel_offset,
                 true,
-            );
+            ));
         }
     }
 }
@@ -2494,8 +2530,9 @@ pub unsafe fn create_edit(
             LPARAM((ENM_CHANGE | ENM_SELCHANGE) as isize),
         );
         // Install subclass for smart quotes
-        let prev = SetWindowLongPtrW(hwnd_edit, GWLP_WNDPROC, edit_subclass_proc as isize);
-        let _ = SetWindowLongPtrW(hwnd_edit, GWLP_USERDATA, prev);
+        let proc_ptr = edit_subclass_proc as usize;
+        let prev = SetWindowLongPtrW(hwnd_edit, GWLP_WNDPROC, proc_ptr as isize);
+        SetWindowLongPtrW(hwnd_edit, GWLP_USERDATA, prev);
     }
     hwnd_edit
 }
@@ -2643,6 +2680,9 @@ pub unsafe fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> 
         }
         Some(path)
     });
+    if result.is_none() {
+        crate::log_debug("Failed to access editor state");
+    }
 
     if let Some(Some(path)) = result {
         crate::push_recent_file(hwnd, &path);
@@ -2657,7 +2697,9 @@ pub unsafe fn close_current_document(hwnd: HWND) {
         Some(i) => i,
         None => return,
     };
-    let _ = close_document_at(hwnd, index);
+    if !close_document_at(hwnd, index) {
+        crate::log_debug("Failed to close document");
+    }
 }
 
 pub unsafe fn close_other_documents(hwnd: HWND) -> bool {
@@ -2688,6 +2730,9 @@ pub unsafe fn close_document_at(hwnd: HWND, index: usize) -> bool {
             state.docs[index].title.clone(),
         ))
     });
+    if result.is_none() {
+        crate::log_debug("Failed to access editor state");
+    }
 
     let (_current, hwnd_tab, _count, title) = match result {
         Some(Some(values)) => values,
@@ -2705,12 +2750,12 @@ pub unsafe fn close_document_at(hwnd: HWND, index: usize) -> bool {
     let mut update_title = false;
     let mut was_audiobook = false;
 
-    let _ = with_state(hwnd, |state| {
+    if with_state(hwnd, |state| {
         was_current = state.current == index;
         let doc = state.docs.remove(index);
         closing_hwnd_edit = doc.hwnd_edit;
         was_audiobook = matches!(doc.format, FileFormat::Audiobook);
-        let _ = SendMessageW(
+        SendMessageW(
             hwnd_tab,
             windows::Win32::UI::Controls::TCM_DELETEITEM,
             WPARAM(index),
@@ -2735,10 +2780,14 @@ pub unsafe fn close_document_at(hwnd: HWND, index: usize) -> bool {
             state.current -= 1;
             SendMessageW(hwnd_tab, TCM_SETCURSEL, WPARAM(state.current), LPARAM(0));
         }
-    });
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access editor state");
+    }
 
     if closing_hwnd_edit.0 != 0 {
-        let _ = DestroyWindow(closing_hwnd_edit);
+        crate::log_if_err!(DestroyWindow(closing_hwnd_edit));
     }
     if was_audiobook {
         crate::audio_player::stop_audiobook_playback(hwnd);
@@ -2793,6 +2842,9 @@ pub unsafe fn try_close_app(hwnd: HWND) -> bool {
             .map(|(i, d)| (i, d.title.clone()))
             .collect::<Vec<_>>()
     });
+    if result.is_none() {
+        crate::log_debug("Failed to access editor state");
+    }
 
     if let Some(entries) = result {
         for (index, title) in entries {
@@ -2803,7 +2855,7 @@ pub unsafe fn try_close_app(hwnd: HWND) -> bool {
     }
     crate::audio_player::stop_audiobook_playback(hwnd);
     crate::clear_active_podcast_chapters(hwnd);
-    let _ = DestroyWindow(hwnd);
+    crate::log_if_err!(DestroyWindow(hwnd));
     true
 }
 
@@ -2811,13 +2863,17 @@ pub unsafe fn sync_dirty_from_edit(hwnd: HWND, index: usize) -> bool {
     let mut hwnd_edit = HWND(0);
     let mut is_dirty = false;
     let mut is_current = false;
-    let _ = with_state(hwnd, |state| {
+    if with_state(hwnd, |state| {
         if let Some(doc) = state.docs.get(index) {
             hwnd_edit = doc.hwnd_edit;
             is_dirty = doc.dirty;
             is_current = state.current == index;
         }
-    });
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access editor state");
+    }
 
     if hwnd_edit.0 == 0 {
         return is_dirty;
@@ -2825,7 +2881,7 @@ pub unsafe fn sync_dirty_from_edit(hwnd: HWND, index: usize) -> bool {
 
     let modified = SendMessageW(hwnd_edit, EM_GETMODIFY, WPARAM(0), LPARAM(0)).0 != 0;
     if modified && !is_dirty {
-        let _ = with_state(hwnd, |state| {
+        if with_state(hwnd, |state| {
             if let Some(doc) = state.docs.get_mut(index) {
                 doc.dirty = true;
                 update_tab_title(state.hwnd_tab, index, &doc.title, true);
@@ -2833,7 +2889,11 @@ pub unsafe fn sync_dirty_from_edit(hwnd: HWND, index: usize) -> bool {
                     update_window_title(hwnd);
                 }
             }
-        });
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access editor state");
+        }
         return true;
     }
     is_dirty

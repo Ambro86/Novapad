@@ -193,12 +193,10 @@ fn strip_templates(s: String) -> String {
             i += 2;
             continue;
         }
-        if s[i..].starts_with("}}") {
-            if depth > 0 {
-                depth -= 1;
-                i += 2;
-                continue;
-            }
+        if s[i..].starts_with("}}") && depth > 0 {
+            depth -= 1;
+            i += 2;
+            continue;
         }
         let ch = s[i..].chars().next().unwrap_or('\0');
         if depth == 0 && ch != '\0' {

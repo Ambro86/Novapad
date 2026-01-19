@@ -199,11 +199,13 @@ pub fn open_find_in_files_dialog(parent: HWND) {
         }
         unsafe {
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
-                let _ = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
+                if let Err(_e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
+                    crate::log_debug(&format!("Error: {:?}", _e));
+                }
                 continue;
             }
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
-                let _ = with_find_state(hwnd, |state| {
+                if with_find_state(hwnd, |state| {
                     let focus = GetFocus();
                     let cmd = if focus == state.results_tree {
                         FIND_IN_FILES_ID_GO
@@ -214,11 +216,17 @@ pub fn open_find_in_files_dialog(parent: HWND) {
                     } else {
                         FIND_IN_FILES_ID_SEARCH
                     };
-                    let _ = PostMessageW(hwnd, WM_COMMAND, WPARAM(cmd), LPARAM(0));
-                });
+                    if let Err(_e) = PostMessageW(hwnd, WM_COMMAND, WPARAM(cmd), LPARAM(0)) {
+                        crate::log_debug(&format!("Error: {:?}", _e));
+                    }
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access find state");
+                }
                 continue;
             }
-            if IsDialogMessageW(hwnd, &mut msg).as_bool() {
+            if IsDialogMessageW(hwnd, &msg).as_bool() {
                 continue;
             }
             TranslateMessage(&msg);
@@ -366,7 +374,7 @@ unsafe extern "system" fn find_in_files_wndproc(
                 HINSTANCE(0),
                 None,
             );
-            let _ = SendMessageW(
+            SendMessageW(
                 progress_bar,
                 PBM_SETRANGE,
                 WPARAM(0),
@@ -396,8 +404,7 @@ unsafe extern "system" fn find_in_files_wndproc(
                     | WS_TABSTOP
                     | WS_VSCROLL
                     | WINDOW_STYLE(
-                        (TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | TVS_SHOWSELALWAYS)
-                            as u32,
+                        TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | TVS_SHOWSELALWAYS,
                     ),
                 16,
                 198,
@@ -438,11 +445,11 @@ unsafe extern "system" fn find_in_files_wndproc(
                 go_button,
             ] {
                 if control.0 != 0 && hfont.0 != 0 {
-                    let _ = SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                 }
             }
 
-            let _ = SetFocus(term_edit);
+            SetFocus(term_edit);
 
             let state = Box::new(FindInFilesState {
                 hwnd,
@@ -468,33 +475,53 @@ unsafe extern "system" fn find_in_files_wndproc(
                 Box::into_raw(state) as isize,
             );
 
-            let _ = with_find_state(hwnd, |state| {
+            if with_find_state(hwnd, |state| {
                 apply_cache(state);
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access find state");
+            }
 
             LRESULT(0)
         }
         WM_COMMAND => {
-            let cmd_id = (wparam.0 & 0xffff) as usize;
+            let cmd_id = wparam.0 & 0xffff;
             if cmd_id == FIND_IN_FILES_ID_BROWSE {
-                let _ = with_find_state(hwnd, |state| {
+                if with_find_state(hwnd, |state| {
                     if let Some(folder) = browse_for_folder(hwnd, state.language) {
                         let wide = to_wide(folder.to_string_lossy().as_ref());
-                        let _ = SetWindowTextW(state.folder_edit, PCWSTR(wide.as_ptr()));
-                        let _ = SetFocus(state.term_edit);
+                        if let Err(_e) = SetWindowTextW(state.folder_edit, PCWSTR(wide.as_ptr())) {
+                            crate::log_debug(&format!("Error: {:?}", _e));
+                        }
+                        SetFocus(state.term_edit);
                     }
-                });
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access find state");
+                }
                 LRESULT(0)
             } else if cmd_id == FIND_IN_FILES_ID_SEARCH {
-                let _ = with_find_state(hwnd, |state| {
+                if with_find_state(hwnd, |state| {
                     start_search(state);
-                });
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access find state");
+                }
                 LRESULT(0)
             } else if cmd_id == FIND_IN_FILES_ID_GO {
-                let _ = with_find_state(hwnd, |state| {
+                if with_find_state(hwnd, |state| {
                     open_selected_result(state);
-                });
-                let _ = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access find state");
+                }
+                if let Err(_e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
+                    crate::log_debug(&format!("Error: {:?}", _e));
+                }
                 LRESULT(0)
             } else {
                 DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -502,18 +529,24 @@ unsafe extern "system" fn find_in_files_wndproc(
         }
         WM_KEYDOWN => {
             if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                let _ = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
+                if let Err(_e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
+                    crate::log_debug(&format!("Error: {:?}", _e));
+                }
                 return LRESULT(0);
             }
             if wparam.0 as u32 == VK_RETURN.0 as u32 {
-                let _ = with_find_state(hwnd, |state| {
+                if with_find_state(hwnd, |state| {
                     let focus = GetFocus();
                     if focus == state.results_tree {
                         open_selected_result(state);
                     } else {
                         start_search(state);
                     }
-                });
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access find state");
+                }
                 return LRESULT(0);
             }
             DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -522,48 +555,58 @@ unsafe extern "system" fn find_in_files_wndproc(
             let hdr = lparam.0 as *const NMHDR;
             if !hdr.is_null() {
                 unsafe {
-                    if (*hdr).code == NM_RETURN
-                        && (*hdr).idFrom as usize == FIND_IN_FILES_ID_RESULTS
-                    {
-                        let _ = with_find_state(hwnd, |state| {
+                    if (*hdr).code == NM_RETURN && (*hdr).idFrom == FIND_IN_FILES_ID_RESULTS {
+                        if with_find_state(hwnd, |state| {
                             open_selected_result(state);
-                        });
-                        let _ = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
+                        })
+                        .is_none()
+                        {
+                            crate::log_debug("Failed to access find state");
+                        }
+                        if let Err(_e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
+                            crate::log_debug(&format!("Error: {:?}", _e));
+                        }
                         return LRESULT(0);
                     }
-                    if (*hdr).code == TVN_KEYDOWN
-                        && (*hdr).idFrom as usize == FIND_IN_FILES_ID_RESULTS
-                    {
+                    if (*hdr).code == TVN_KEYDOWN && (*hdr).idFrom == FIND_IN_FILES_ID_RESULTS {
                         let key = (lparam.0 as *const NMTVKEYDOWN).as_ref();
                         if let Some(key) = key
-                            && key.wVKey == VK_RETURN.0 as u16
+                            && key.wVKey == VK_RETURN.0
                         {
-                            let _ = with_find_state(hwnd, |state| {
+                            if with_find_state(hwnd, |state| {
                                 open_selected_result(state);
-                            });
-                            let _ = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
+                            })
+                            .is_none()
+                            {
+                                crate::log_debug("Failed to access find state");
+                            }
+                            if let Err(_e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
+                                crate::log_debug(&format!("Error: {:?}", _e));
+                            }
                             return LRESULT(0);
                         }
                     }
                     if (*hdr).code == TVN_ITEMEXPANDINGW
-                        && (*hdr).idFrom as usize == FIND_IN_FILES_ID_RESULTS
+                        && (*hdr).idFrom == FIND_IN_FILES_ID_RESULTS
                     {
                         let info = (lparam.0 as *const NMTREEVIEWW).as_ref();
                         if let Some(info) = info
                             && info.action == TVE_EXPAND
                         {
-                            let _ = with_find_state(hwnd, |state| {
+                            if with_find_state(hwnd, |state| {
                                 ensure_children_loaded(state, info.itemNew.hItem);
-                            });
+                            })
+                            .is_none()
+                            {
+                                crate::log_debug("Failed to access find state");
+                            }
                             return LRESULT(0);
                         }
                     }
-                    if (*hdr).code == TVN_SELCHANGEDW
-                        && (*hdr).idFrom as usize == FIND_IN_FILES_ID_RESULTS
-                    {
+                    if (*hdr).code == TVN_SELCHANGEDW && (*hdr).idFrom == FIND_IN_FILES_ID_RESULTS {
                         let info = (lparam.0 as *const NMTREEVIEWW).as_ref();
                         if let Some(info) = info {
-                            let _ = with_find_state(hwnd, |state| {
+                            let failed = with_find_state(hwnd, |state| {
                                 let idx = tree_item_param(state.results_tree, info.itemNew.hItem);
                                 state.selected_result = idx.and_then(|value| {
                                     if value < 0 {
@@ -572,7 +615,12 @@ unsafe extern "system" fn find_in_files_wndproc(
                                         Some(value as usize)
                                     }
                                 });
-                            });
+                            })
+                            .is_none();
+                            if failed {
+                                crate::log_debug("Failed to access find state");
+                            }
+                            return LRESULT(0);
                         }
                         return LRESULT(0);
                     }
@@ -582,16 +630,20 @@ unsafe extern "system" fn find_in_files_wndproc(
         }
         WM_FIND_IN_FILES_PROGRESS => {
             let percent = wparam.0 as u32;
-            let _ = with_find_state(hwnd, |state| {
+            if with_find_state(hwnd, |state| {
                 set_progress(state, percent);
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access find state");
+            }
             LRESULT(0)
         }
         WM_FIND_IN_FILES_DONE => {
             let results_ptr = lparam.0 as *mut Vec<SearchResult>;
             if !results_ptr.is_null() {
                 let results = unsafe { Box::from_raw(results_ptr) };
-                let _ = with_find_state(hwnd, |state| {
+                if with_find_state(hwnd, |state| {
                     state.results = *results;
                     state.searching = false;
                     state.cancel_flag = None;
@@ -599,25 +651,37 @@ unsafe extern "system" fn find_in_files_wndproc(
                     set_progress(state, 100);
                     populate_results_tree(state);
                     store_cache(state);
-                });
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access find state");
+                }
             }
             LRESULT(0)
         }
         WM_CLOSE => {
-            let _ = with_find_state(hwnd, |state| {
+            if with_find_state(hwnd, |state| {
                 if let Some(flag) = &state.cancel_flag {
                     flag.store(true, Ordering::SeqCst);
                 }
                 store_cache(state);
-            });
-            let _ = DestroyWindow(hwnd);
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access find state");
+            }
+            crate::log_if_err!(DestroyWindow(hwnd));
             LRESULT(0)
         }
         WM_DESTROY => {
-            let _ = with_find_state(hwnd, |state| {
+            if with_find_state(hwnd, |state| {
                 EnableWindow(state.parent, true);
                 SetForegroundWindow(state.parent);
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access find state");
+            }
             LRESULT(0)
         }
         WM_NCDESTROY => {
@@ -625,7 +689,7 @@ unsafe extern "system" fn find_in_files_wndproc(
                 GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
                     as *mut FindInFilesState;
             if !ptr.is_null() {
-                let _ = Box::from_raw(ptr);
+                drop(Box::from_raw(ptr));
             }
             LRESULT(0)
         }
@@ -663,11 +727,15 @@ fn load_cache(parent: HWND) -> Option<FindInFilesCache> {
 }
 
 fn save_cache(parent: HWND, cache: FindInFilesCache) {
-    let _ = unsafe {
-        with_state(parent, |state| {
+    unsafe {
+        if with_state(parent, |state| {
             state.find_in_files_cache = Some(cache);
         })
-    };
+        .is_none()
+        {
+            crate::log_debug("Failed to update find_in_files_cache state");
+        }
+    }
 }
 
 fn apply_cache(state: &mut FindInFilesState) {
@@ -677,13 +745,17 @@ fn apply_cache(state: &mut FindInFilesState) {
     if !cache.term.is_empty() {
         let wide = to_wide(&cache.term);
         unsafe {
-            let _ = SetWindowTextW(state.term_edit, PCWSTR(wide.as_ptr()));
+            if let Err(e) = SetWindowTextW(state.term_edit, PCWSTR(wide.as_ptr())) {
+                crate::log_debug(&format!("Failed to set term_edit text: {}", e));
+            }
         }
     }
     if !cache.folder.is_empty() {
         let wide = to_wide(&cache.folder);
         unsafe {
-            let _ = SetWindowTextW(state.folder_edit, PCWSTR(wide.as_ptr()));
+            if let Err(e) = SetWindowTextW(state.folder_edit, PCWSTR(wide.as_ptr())) {
+                crate::log_debug(&format!("Failed to set folder_edit text: {}", e));
+            }
         }
     }
     if !cache.results.is_empty() {
@@ -774,13 +846,15 @@ fn start_search(state: &mut FindInFilesState) {
                 }
             }
             let percent = ((idx + 1) * 100 / total) as u32;
-            let _ = unsafe {
-                PostMessageW(
+            unsafe {
+                if let Err(e) = PostMessageW(
                     hwnd,
                     WM_FIND_IN_FILES_PROGRESS,
                     WPARAM(percent as usize),
                     LPARAM(0),
-                )
+                ) {
+                    crate::log_debug(&format!("Failed to post WM_FIND_IN_FILES_PROGRESS: {}", e));
+                }
             };
         }
 
@@ -788,13 +862,15 @@ fn start_search(state: &mut FindInFilesState) {
             return;
         }
         let boxed = Box::new(results);
-        let _ = unsafe {
-            PostMessageW(
+        unsafe {
+            if let Err(e) = PostMessageW(
                 hwnd,
                 WM_FIND_IN_FILES_DONE,
                 WPARAM(0),
                 LPARAM(Box::into_raw(boxed) as isize),
-            )
+            ) {
+                crate::log_debug(&format!("Failed to post WM_FIND_IN_FILES_DONE: {}", e));
+            }
         };
     });
 }
@@ -812,15 +888,17 @@ fn open_selected_result(state: &mut FindInFilesState) {
     let term = read_control_text(state.term_edit).trim().to_string();
     unsafe {
         crate::editor_manager::open_document(state.parent, &result.path);
-        if let Some(hwnd_edit) = crate::get_active_edit(state.parent) {
-            if !select_snippet_exact(hwnd_edit, &result.snippet) {
-                let term = normalize_to_crlf(&term);
-                if result.snippet.trim().is_empty() {
-                    select_term_at(hwnd_edit, &term, result.start_utf16, result.len_utf16);
-                }
+        if let Some(hwnd_edit) = crate::get_active_edit(state.parent)
+            && !select_snippet_exact(hwnd_edit, &result.snippet)
+        {
+            let term = normalize_to_crlf(&term);
+            if result.snippet.trim().is_empty() {
+                select_term_at(hwnd_edit, &term, result.start_utf16, result.len_utf16);
             }
         }
-        let _ = PostMessageW(state.parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0));
+        if let Err(e) = PostMessageW(state.parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) {
+            crate::log_debug(&format!("Failed to post WM_FOCUS_EDITOR: {}", e));
+        }
     }
 }
 
@@ -838,7 +916,7 @@ fn set_search_enabled(state: &mut FindInFilesState, enabled: bool) {
 fn set_progress(state: &mut FindInFilesState, percent: u32) {
     let percent = percent.min(100);
     unsafe {
-        let _ = SendMessageW(
+        SendMessageW(
             state.progress_bar,
             PBM_SETPOS,
             WPARAM(percent as usize),
@@ -846,19 +924,21 @@ fn set_progress(state: &mut FindInFilesState, percent: u32) {
         );
         let label = format!("{} {}%", labels(state.language).progress, percent);
         let wide = to_wide(&label);
-        let _ = SetWindowTextW(state.progress_text, PCWSTR(wide.as_ptr()));
+        if let Err(e) = SetWindowTextW(state.progress_text, PCWSTR(wide.as_ptr())) {
+            crate::log_debug(&format!("Failed to set progress text: {}", e));
+        }
     }
 }
 
 fn clear_results_tree(tree: HWND) {
     unsafe {
-        let _ = SendMessageW(tree, TVM_DELETEITEM, WPARAM(0), LPARAM(TVI_ROOT.0 as isize));
+        SendMessageW(tree, TVM_DELETEITEM, WPARAM(0), LPARAM(TVI_ROOT.0));
     }
 }
 
 fn set_results_redraw(tree: HWND, enabled: bool) {
     unsafe {
-        let _ = SendMessageW(tree, WM_SETREDRAW, WPARAM(enabled as usize), LPARAM(0));
+        SendMessageW(tree, WM_SETREDRAW, WPARAM(enabled as usize), LPARAM(0));
     }
 }
 
@@ -867,7 +947,7 @@ fn populate_results_tree(state: &mut FindInFilesState) {
     clear_results_tree(state.results_tree);
     if state.results.is_empty() {
         unsafe {
-            let _ = SetFocus(state.results_tree);
+            SetFocus(state.results_tree);
         }
         set_results_redraw(state.results_tree, true);
         return;
@@ -900,13 +980,13 @@ fn populate_results_tree(state: &mut FindInFilesState) {
 
     if let Some(parent_item) = first_parent {
         unsafe {
-            let _ = SendMessageW(
+            SendMessageW(
                 state.results_tree,
                 TVM_SELECTITEM,
                 WPARAM(TVGN_CARET as usize),
-                LPARAM(parent_item.0 as isize),
+                LPARAM(parent_item.0),
             );
-            let _ = SetFocus(state.results_tree);
+            SetFocus(state.results_tree);
         }
     }
     set_results_redraw(state.results_tree, true);
@@ -965,7 +1045,7 @@ fn ensure_children_loaded(
             state.results_tree,
             TVM_GETNEXTITEM,
             WPARAM(TVGN_CHILD as usize),
-            LPARAM(parent.0 as isize),
+            LPARAM(parent.0),
         )
     };
     if has_child.0 != 0 {
@@ -1002,8 +1082,7 @@ fn ensure_children_loaded(
             &[("line", &result.line.to_string())],
         );
         let label = format!("{line_prefix} {}", result.snippet);
-        let child = insert_tree_item(state.results_tree, parent, &label, *idx as isize, false);
-        let _ = child;
+        insert_tree_item(state.results_tree, parent, &label, *idx as isize, false);
     }
 }
 
@@ -1316,7 +1395,7 @@ fn snippet_for_match(line: &str, match_start: usize, match_len: usize, max_chars
     snippet
 }
 
-unsafe fn select_term_at(hwnd_edit: HWND, term: &str, start: i32, len: i32) {
+unsafe fn select_term_at(hwnd_edit: HWND, term: &str, start: i32, _len: i32) {
     if term.is_empty() {
         return;
     }
@@ -1342,8 +1421,6 @@ unsafe fn select_term_at(hwnd_edit: HWND, term: &str, start: i32, len: i32) {
         set_caret_position(hwnd_edit, start);
     } else {
         let start = start.max(0);
-        let end = (start + len.max(0)).max(start);
-        let _ = end;
         set_caret_position(hwnd_edit, start);
     }
 }
@@ -1428,14 +1505,14 @@ fn set_caret_position(hwnd_edit: HWND, pos: i32) {
 pub(crate) fn browse_for_folder(owner: HWND, language: Language) -> Option<PathBuf> {
     let labels = labels(language);
     let title = to_wide(&labels.folder_label);
-    let mut bi = BROWSEINFOW {
+    let bi = BROWSEINFOW {
         hwndOwner: owner,
         lpszTitle: PCWSTR(title.as_ptr()),
         ulFlags: BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE,
         ..Default::default()
     };
 
-    let pidl = unsafe { SHBrowseForFolderW(&mut bi) };
+    let pidl = unsafe { SHBrowseForFolderW(&bi) };
     if pidl.is_null() {
         return None;
     }

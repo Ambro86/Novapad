@@ -67,7 +67,7 @@ pub fn speak_sapi4_to_file(
     let mut last_size = 0u64;
     loop {
         if options.cancel.load(Ordering::SeqCst) {
-            let _ = child.kill();
+            crate::log_if_err!(child.kill());
             return Err("Cancelled".to_string());
         }
         let size = std::fs::metadata(&wav_path).map(|m| m.len()).unwrap_or(0);
@@ -164,35 +164,35 @@ pub fn play_sapi4(
             None => return,
         };
         if send_speak(&mut stdin, &text).is_err() {
-            let _ = child.wait();
+            crate::log_if_err!(child.wait());
             return;
         }
 
         loop {
             if cancel.load(Ordering::Relaxed) {
-                let _ = send_line(&mut stdin, "STOP");
+                crate::log_if_err!(send_line(&mut stdin, "STOP"));
                 break;
             }
 
             match command_rx.blocking_recv() {
                 Some(TtsCommand::Pause) => {
-                    let _ = send_line(&mut stdin, "PAUSE");
+                    crate::log_if_err!(send_line(&mut stdin, "PAUSE"));
                 }
                 Some(TtsCommand::Resume) => {
-                    let _ = send_line(&mut stdin, "RESUME");
+                    crate::log_if_err!(send_line(&mut stdin, "RESUME"));
                 }
                 Some(TtsCommand::Stop) => {
-                    let _ = send_line(&mut stdin, "STOP");
+                    crate::log_if_err!(send_line(&mut stdin, "STOP"));
                     break;
                 }
                 None => {
-                    let _ = send_line(&mut stdin, "STOP");
+                    crate::log_if_err!(send_line(&mut stdin, "STOP"));
                     break;
                 }
             }
         }
 
-        let _ = child.wait();
+        crate::log_if_err!(child.wait());
     });
 }
 
@@ -230,13 +230,13 @@ pub fn get_voices() -> Vec<VoiceInfo> {
         return cache.clone();
     }
 
-    if let Some(path) = cache_path() {
-        if let Ok(cached) = std::fs::read_to_string(&path) {
-            let voices = parse_voices(&cached);
-            if !voices.is_empty() {
-                *cache = voices.clone();
-                return voices;
-            }
+    if let Some(path) = cache_path()
+        && let Ok(cached) = std::fs::read_to_string(&path)
+    {
+        let voices = parse_voices(&cached);
+        if !voices.is_empty() {
+            *cache = voices.clone();
+            return voices;
         }
     }
 
@@ -251,7 +251,7 @@ pub fn get_voices() -> Vec<VoiceInfo> {
             let voices = parse_voices(&stdout);
             if !voices.is_empty() {
                 if let Some(path) = cache_path() {
-                    let _ = std::fs::write(path, stdout.as_bytes());
+                    crate::log_if_err!(std::fs::write(path, stdout.as_bytes()));
                 }
                 *cache = voices.clone();
                 return voices;

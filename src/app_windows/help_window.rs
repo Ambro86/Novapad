@@ -107,19 +107,23 @@ unsafe fn open_window(parent: HWND, kind: HelpWindowKind) {
     );
 
     if window.0 != 0 {
-        let _ = with_state(parent, |state| match kind {
+        if with_state(parent, |state| match kind {
             HelpWindowKind::Guide => state.help_window = window,
             HelpWindowKind::Changelog => state.changelog_window = window,
             HelpWindowKind::Donations => state.donations_window = window,
-        });
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access help state");
+        }
         SetForegroundWindow(window);
     } else if !init_ptr.is_null() {
-        let _ = Box::from_raw(init_ptr);
+        drop(Box::from_raw(init_ptr));
     }
 }
 
 pub unsafe fn handle_tab(hwnd: HWND) {
-    let _ = with_help_state(hwnd, |state| {
+    if with_help_state(hwnd, |state| {
         let focus = GetFocus();
 
         if focus == state.edit {
@@ -127,7 +131,11 @@ pub unsafe fn handle_tab(hwnd: HWND) {
         } else {
             SetFocus(state.edit);
         }
-    });
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access help state");
+    }
 }
 
 unsafe extern "system" fn help_wndproc(
@@ -174,7 +182,7 @@ unsafe extern "system" fn help_wndproc(
                 LPARAM(0),
             );
             if hfont.0 != 0 {
-                let _ = SendMessageW(edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                SendMessageW(edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
             }
 
             let ok_button = CreateWindowExW(
@@ -192,7 +200,7 @@ unsafe extern "system" fn help_wndproc(
                 None,
             );
             if hfont.0 != 0 && ok_button.0 != 0 {
-                let _ = SendMessageW(ok_button, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                SendMessageW(ok_button, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
             }
 
             let content = match init.kind {
@@ -214,7 +222,9 @@ unsafe extern "system" fn help_wndproc(
             };
             let content = normalize_to_crlf(&content);
             let content_wide = to_wide(&content);
-            let _ = SetWindowTextW(edit, PCWSTR(content_wide.as_ptr()));
+            if let Err(e) = SetWindowTextW(edit, PCWSTR(content_wide.as_ptr())) {
+                crate::log_debug(&format!("Failed to set help content: {}", e));
+            }
             SetFocus(edit);
 
             let state = Box::new(HelpWindowState {
@@ -227,15 +237,19 @@ unsafe extern "system" fn help_wndproc(
             LRESULT(0)
         }
         WM_SETFOCUS => {
-            let _ = with_help_state(hwnd, |state| {
+            if with_help_state(hwnd, |state| {
                 SetFocus(state.edit);
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access help state");
+            }
             LRESULT(0)
         }
         WM_COMMAND => {
-            let cmd_id = (wparam.0 & 0xffff) as usize;
+            let cmd_id = wparam.0 & 0xffff;
             if cmd_id == HELP_ID_OK || cmd_id == IDCANCEL.0 as usize {
-                let _ = DestroyWindow(hwnd);
+                crate::log_if_err!(DestroyWindow(hwnd));
                 return LRESULT(0);
             }
             DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -243,53 +257,64 @@ unsafe extern "system" fn help_wndproc(
         WM_SIZE => {
             let width = (lparam.0 & 0xffff) as i32;
             let height = ((lparam.0 >> 16) & 0xffff) as i32;
-            let _ = with_help_state(hwnd, |state| {
+            if with_help_state(hwnd, |state| {
                 let button_width = 90;
                 let button_height = 28;
                 let margin = 12;
                 let edit_height = (height - button_height - (margin * 2)).max(0);
-                let _ = MoveWindow(state.edit, 0, 0, width, edit_height, true);
-                let _ = MoveWindow(
+                crate::log_if_err!(MoveWindow(state.edit, 0, 0, width, edit_height, true));
+                crate::log_if_err!(MoveWindow(
                     state.ok_button,
                     width - button_width - margin,
                     edit_height + margin,
                     button_width,
                     button_height,
                     true,
-                );
-            });
+                ));
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access help state");
+            }
             LRESULT(0)
         }
         WM_DESTROY => {
             let (parent, kind) = with_help_state(hwnd, |state| (state.parent, state.kind))
                 .unwrap_or((HWND(0), HelpWindowKind::Guide));
-            if parent.0 != 0 {
-                let _ = with_state(parent, |state| match kind {
+            if parent.0 != 0
+                && with_state(parent, |state| match kind {
                     HelpWindowKind::Guide => state.help_window = HWND(0),
                     HelpWindowKind::Changelog => state.changelog_window = HWND(0),
                     HelpWindowKind::Donations => state.donations_window = HWND(0),
-                });
+                })
+                .is_none()
+            {
+                crate::log_debug("Failed to access help state");
             }
             LRESULT(0)
         }
         WM_NCDESTROY => {
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut HelpWindowState;
             if !ptr.is_null() {
-                let _ = Box::from_raw(ptr);
+                drop(Box::from_raw(ptr));
             }
             LRESULT(0)
         }
         WM_CLOSE => {
-            let _ = DestroyWindow(hwnd);
+            crate::log_if_err!(DestroyWindow(hwnd));
             LRESULT(0)
         }
         WM_KEYDOWN => {
             if wparam.0 as u32 == VK_RETURN.0 as u32 {
-                let _ = with_help_state(hwnd, |state| {
+                if with_help_state(hwnd, |state| {
                     if GetFocus() == state.ok_button {
-                        let _ = DestroyWindow(hwnd);
+                        crate::log_if_err!(DestroyWindow(hwnd));
                     }
-                });
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access help state");
+                }
                 return LRESULT(0);
             }
             DefWindowProcW(hwnd, msg, wparam, lparam)

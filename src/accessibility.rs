@@ -146,7 +146,7 @@ pub fn nvda_speak(text: &str) -> bool {
 
     let wide = to_wide(text);
     unsafe {
-        let _ = speak(wide.as_ptr());
+        speak(wide.as_ptr());
     }
     true
 }

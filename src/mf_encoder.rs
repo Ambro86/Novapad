@@ -32,7 +32,7 @@ impl MfGuard {
 impl Drop for MfGuard {
     fn drop(&mut self) {
         unsafe {
-            let _ = MFShutdown();
+            crate::log_if_err!(MFShutdown());
         }
     }
 }
@@ -97,8 +97,12 @@ impl Mp3StreamWriter {
             pcm_type
                 .SetUINT32(&MF_MT_AUDIO_AVG_BYTES_PER_SECOND, avg_bytes)
                 .map_err(|e| format!("Set avg bytes failed: {}", e))?;
-            let _ = pcm_type.SetUINT32(&MF_MT_FIXED_SIZE_SAMPLES, 1);
-            let _ = pcm_type.SetUINT32(&MF_MT_SAMPLE_SIZE, block_align);
+            if let Err(e) = pcm_type.SetUINT32(&MF_MT_FIXED_SIZE_SAMPLES, 1) {
+                crate::log_debug(&format!("Failed to set fixed size samples: {}", e));
+            }
+            if let Err(_e) = pcm_type.SetUINT32(&MF_MT_SAMPLE_SIZE, block_align) {
+                crate::log_debug(&format!("Error: {:?}", _e));
+            }
 
             let out_type: IMFMediaType = MFCreateMediaType()
                 .map_err(|e| format!("MFCreateMediaType (mp3) failed: {}", e))?;
@@ -218,8 +222,7 @@ fn read_wav_data_info(path: &Path) -> Result<(u64, u32, i16), String> {
             break;
         }
         let chunk_id = &chunk_header[0..4];
-        let chunk_size = u32::from_le_bytes(chunk_header[4..8].try_into().unwrap());
-
+        let chunk_size = u32::from_le_bytes(chunk_header[4..8].try_into().unwrap_or([0, 0, 0, 0]));
         if chunk_id == b"data" {
             let data_offset = file.stream_position().map_err(|e| e.to_string())?;
             return Ok((data_offset, chunk_size, 0));
@@ -288,11 +291,22 @@ where
         let requested_bits = 16u32;
         let requested_block_align = requested_channels * (requested_bits / 8);
         let requested_avg_bytes = requested_rate * requested_block_align;
-        let _ = pcm_type.SetUINT32(&MF_MT_AUDIO_SAMPLES_PER_SECOND, requested_rate);
-        let _ = pcm_type.SetUINT32(&MF_MT_AUDIO_NUM_CHANNELS, requested_channels);
-        let _ = pcm_type.SetUINT32(&MF_MT_AUDIO_BITS_PER_SAMPLE, requested_bits);
-        let _ = pcm_type.SetUINT32(&MF_MT_AUDIO_BLOCK_ALIGNMENT, requested_block_align);
-        let _ = pcm_type.SetUINT32(&MF_MT_AUDIO_AVG_BYTES_PER_SECOND, requested_avg_bytes);
+        if let Err(e) = pcm_type.SetUINT32(&MF_MT_AUDIO_SAMPLES_PER_SECOND, requested_rate) {
+            crate::log_debug(&format!("Failed to set audio samples per second: {}", e));
+        }
+        if let Err(_e) = pcm_type.SetUINT32(&MF_MT_AUDIO_NUM_CHANNELS, requested_channels) {
+            crate::log_debug(&format!("Error: {:?}", _e));
+        }
+        if let Err(_e) = pcm_type.SetUINT32(&MF_MT_AUDIO_BITS_PER_SAMPLE, requested_bits) {
+            crate::log_debug(&format!("Error: {:?}", _e));
+        }
+        if let Err(_e) = pcm_type.SetUINT32(&MF_MT_AUDIO_BLOCK_ALIGNMENT, requested_block_align) {
+            crate::log_debug(&format!("Error: {:?}", _e));
+        }
+        if let Err(_e) = pcm_type.SetUINT32(&MF_MT_AUDIO_AVG_BYTES_PER_SECOND, requested_avg_bytes)
+        {
+            crate::log_debug(&format!("Error: {:?}", _e));
+        }
         reader
             .SetCurrentMediaType(
                 MF_SOURCE_READER_FIRST_AUDIO_STREAM.0 as u32,
@@ -347,9 +361,13 @@ where
         }
 
         let input_type = in_type;
-        let _ = input_type.SetUINT32(&MF_MT_FIXED_SIZE_SAMPLES, 1);
-        if block_align != 0 {
-            let _ = input_type.SetUINT32(&MF_MT_SAMPLE_SIZE, block_align);
+        if let Err(_e) = input_type.SetUINT32(&MF_MT_FIXED_SIZE_SAMPLES, 1) {
+            crate::log_debug(&format!("Error: {:?}", _e));
+        }
+        if block_align != 0
+            && let Err(_e) = input_type.SetUINT32(&MF_MT_SAMPLE_SIZE, block_align)
+        {
+            crate::log_debug(&format!("Error: {:?}", _e));
         }
 
         let out_type: IMFMediaType =

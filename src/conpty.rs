@@ -46,8 +46,8 @@ impl ConPtySession {
         let output_pipe = unsafe { CreatePipe(&mut output_read, &mut output_write, None, 0) };
         if let Err(err) = output_pipe {
             unsafe {
-                let _ = CloseHandle(input_read);
-                let _ = CloseHandle(input_write);
+                crate::log_if_err!(CloseHandle(input_read));
+                crate::log_if_err!(CloseHandle(input_write));
             }
             return Err(err);
         }
@@ -57,18 +57,18 @@ impl ConPtySession {
         };
 
         unsafe {
-            let _ = CloseHandle(input_read);
-            let _ = CloseHandle(output_write);
+            crate::log_if_err!(CloseHandle(input_read));
+            crate::log_if_err!(CloseHandle(output_write));
         }
 
         let mut attr_list_size: usize = 0;
         unsafe {
-            let _ = InitializeProcThreadAttributeList(
+            crate::log_if_err!(InitializeProcThreadAttributeList(
                 LPPROC_THREAD_ATTRIBUTE_LIST(std::ptr::null_mut()),
                 1,
                 0,
                 &mut attr_list_size,
-            );
+            ));
         }
         let mut attr_list_buf = vec![0u8; attr_list_size];
         let attr_list = LPPROC_THREAD_ATTRIBUTE_LIST(attr_list_buf.as_mut_ptr() as *mut _);
@@ -77,8 +77,8 @@ impl ConPtySession {
         {
             unsafe {
                 ClosePseudoConsole(hpc);
-                let _ = CloseHandle(input_write);
-                let _ = CloseHandle(output_read);
+                crate::log_if_err!(CloseHandle(input_write));
+                crate::log_if_err!(CloseHandle(output_read));
             }
             return Err(err);
         }
@@ -97,8 +97,8 @@ impl ConPtySession {
             unsafe {
                 DeleteProcThreadAttributeList(attr_list);
                 ClosePseudoConsole(hpc);
-                let _ = CloseHandle(input_write);
-                let _ = CloseHandle(output_read);
+                crate::log_if_err!(CloseHandle(input_write));
+                crate::log_if_err!(CloseHandle(output_read));
             }
             return Err(err);
         }
@@ -127,8 +127,8 @@ impl ConPtySession {
             unsafe {
                 DeleteProcThreadAttributeList(attr_list);
                 ClosePseudoConsole(hpc);
-                let _ = CloseHandle(input_write);
-                let _ = CloseHandle(output_read);
+                crate::log_if_err!(CloseHandle(input_write));
+                crate::log_if_err!(CloseHandle(output_read));
             }
             return Err(err);
         }
@@ -138,7 +138,7 @@ impl ConPtySession {
         }
 
         unsafe {
-            let _ = CloseHandle(proc_info.hThread);
+            crate::log_if_err!(CloseHandle(proc_info.hThread));
         }
 
         Ok(ConPtySpawn {
@@ -172,11 +172,11 @@ impl ConPtySession {
     pub fn close(&mut self) {
         unsafe {
             if self.input_write.0 != 0 {
-                let _ = CloseHandle(self.input_write);
+                crate::log_if_err!(CloseHandle(self.input_write));
                 self.input_write = HANDLE(0);
             }
             if self.process_handle.0 != 0 {
-                let _ = CloseHandle(self.process_handle);
+                crate::log_if_err!(CloseHandle(self.process_handle));
                 self.process_handle = HANDLE(0);
             }
             if self.hpc.0 != 0 {

@@ -338,7 +338,7 @@ unsafe fn audio_capture_loop_impl(
                 audio_queue.push(audio_sample);
             }
 
-            let _ = capture_client.ReleaseBuffer(num_frames);
+            crate::log_if_err!(capture_client.ReleaseBuffer(num_frames));
 
             current_packet_length = match capture_client.GetNextPacketSize() {
                 Ok(len) => len,

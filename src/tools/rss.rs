@@ -326,7 +326,7 @@ fn canonicalize_url(u: &str) -> String {
                 }
             }
         }
-        let _ = url.set_port(None);
+        crate::log_if_err!(url.set_port(None));
         let mut s = url.to_string();
         if let Some(rest) = s.strip_prefix("https://") {
             s = rest.to_string();
@@ -524,26 +524,26 @@ fn parse_podcast_feed_bytes(
 }
 
 fn select_podcast_enclosure(entry: &feed_rs::model::Entry) -> (Option<String>, Option<String>) {
-    if let Some(content) = entry.content.as_ref() {
-        if let Some(src) = content.src.as_ref() {
-            return (
-                Some(src.href.clone()),
-                Some(content.content_type.to_string()),
-            );
+    if let Some(content) = entry.content.as_ref()
+        && let Some(src) = content.src.as_ref()
+    {
+        return (
+            Some(src.href.clone()),
+            Some(content.content_type.to_string()),
+        );
+    }
+    for link in &entry.links {
+        if let Some(rel) = link.rel.as_deref()
+            && rel.eq_ignore_ascii_case("enclosure")
+        {
+            return (Some(link.href.clone()), link.media_type.clone());
         }
     }
     for link in &entry.links {
-        if let Some(rel) = link.rel.as_deref() {
-            if rel.eq_ignore_ascii_case("enclosure") {
-                return (Some(link.href.clone()), link.media_type.clone());
-            }
-        }
-    }
-    for link in &entry.links {
-        if let Some(media_type) = link.media_type.as_deref() {
-            if media_type.starts_with("audio/") || media_type.starts_with("video/") {
-                return (Some(link.href.clone()), link.media_type.clone());
-            }
+        if let Some(media_type) = link.media_type.as_deref()
+            && (media_type.starts_with("audio/") || media_type.starts_with("video/"))
+        {
+            return (Some(link.href.clone()), link.media_type.clone());
         }
     }
     for media in &entry.media {
@@ -564,12 +564,11 @@ fn select_podcast_chapters_link(entry: &feed_rs::model::Entry) -> (Option<String
         if rel.contains("chapters") || href.contains("/chapters/") {
             return (Some(link.href.clone()), link.media_type.clone());
         }
-        if let Some(media_type) = link.media_type.as_deref() {
-            if media_type.eq_ignore_ascii_case("application/json")
-                && (rel.contains("podcast") || href.contains("chapters"))
-            {
-                return (Some(link.href.clone()), link.media_type.clone());
-            }
+        if let Some(media_type) = link.media_type.as_deref()
+            && media_type.eq_ignore_ascii_case("application/json")
+            && (rel.contains("podcast") || href.contains("chapters"))
+        {
+            return (Some(link.href.clone()), link.media_type.clone());
         }
     }
     (None, None)
@@ -660,14 +659,12 @@ async fn fetch_bytes_with_retries(
                 FeedFetchError::Network { message: e, cache }
             })?;
             let mut req = http.client.get(url);
-            if is_feed {
-                if let Some(c) = cache.as_ref() {
-                    if let Some(etag) = c.etag.as_deref() {
-                        req = req.header(IF_NONE_MATCH, etag);
-                    }
-                    if let Some(m) = c.last_modified.as_deref() {
-                        req = req.header(IF_MODIFIED_SINCE, m);
-                    }
+            if is_feed && let Some(c) = cache.as_ref() {
+                if let Some(etag) = c.etag.as_deref() {
+                    req = req.header(IF_NONE_MATCH, etag);
+                }
+                if let Some(m) = c.last_modified.as_deref() {
+                    req = req.header(IF_MODIFIED_SINCE, m);
                 }
             }
             req.send().await
@@ -847,7 +844,7 @@ pub async fn fetch_article_text(
             // DEBUG: Salva l'HTML grezzo in un file vicino all'exe
             if let Ok(mut exe_path) = std::env::current_exe() {
                 exe_path.set_file_name("debug_last_fetch.txt");
-                let _ = std::fs::write(exe_path, &s);
+                crate::log_if_err!(std::fs::write(exe_path, &s));
             }
             s
         }

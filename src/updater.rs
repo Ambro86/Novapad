@@ -311,7 +311,7 @@ fn download_and_update(
         verify_download_integrity(&temp_path, Some(expected_size), expected_hash.as_deref())
     {
         log_debug(&format!("Download integrity failed: {err}"));
-        let _ = std::fs::remove_file(&temp_path);
+        crate::log_if_err!(std::fs::remove_file(&temp_path));
         return Err(err);
     }
     log_debug("Download integrity ok.");
@@ -325,7 +325,7 @@ fn download_and_update(
     launch_self_updater(&current_exe, &temp_path).map_err(|err| err.to_string())?;
 
     unsafe {
-        let _ = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
+        crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
     }
     Ok(UpdateAction::Started)
 }
@@ -348,15 +348,15 @@ fn pending_update_path() -> Option<PathBuf> {
 fn probe_dir_writable(current_exe: &Path) -> Result<(), io::Error> {
     let dir = current_exe
         .parent()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Missing executable directory"))?;
+        .ok_or_else(|| io::Error::other("Missing executable directory"))?;
     let probe_name = format!("novapad_write_probe_{}.tmp", std::process::id());
     let probe_path = dir.join(probe_name);
     let mut file = std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(&probe_path)?;
-    let _ = file.write_all(b"ok");
-    let _ = std::fs::remove_file(&probe_path);
+    crate::log_if_err!(file.write_all(b"ok"));
+    crate::log_if_err!(std::fs::remove_file(&probe_path));
     Ok(())
 }
 
@@ -375,7 +375,7 @@ fn can_open_exe_for_update(current_exe: &Path) -> Result<(), io::Error> {
             Ok(handle) => handle,
             Err(_) => return Err(io::Error::last_os_error()),
         };
-        let _ = CloseHandle(handle);
+        crate::log_if_err!(CloseHandle(handle));
     }
     Ok(())
 }
@@ -481,8 +481,8 @@ fn flush_file_on_disk(path: &Path) -> Result<(), io::Error> {
             FILE_ATTRIBUTE_NORMAL,
             None,
         )?;
-        let _ = FlushFileBuffers(handle);
-        let _ = CloseHandle(handle);
+        crate::log_if_err!(FlushFileBuffers(handle));
+        crate::log_if_err!(CloseHandle(handle));
     }
     Ok(())
 }
@@ -490,15 +490,15 @@ fn flush_file_on_disk(path: &Path) -> Result<(), io::Error> {
 fn copy_to_target_dir(new_exe: &Path, current_exe: &Path) -> Result<PathBuf, io::Error> {
     let dir = current_exe
         .parent()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Missing executable directory"))?;
+        .ok_or_else(|| io::Error::other("Missing executable directory"))?;
     let file_name = current_exe
         .file_name()
         .and_then(|name| name.to_str())
-        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Invalid executable name"))?;
+        .ok_or_else(|| io::Error::other("Invalid executable name"))?;
     let temp_name = format!("{file_name}.tmp.{}", std::process::id());
     let temp_path = dir.join(temp_name);
     std::fs::copy(new_exe, &temp_path)?;
-    let _ = flush_file_on_disk(&temp_path);
+    crate::log_if_err!(flush_file_on_disk(&temp_path));
     Ok(temp_path)
 }
 
@@ -513,7 +513,7 @@ fn write_update_metadata(update_path: &Path, expected_size: u64, sha256: Option<
     if let Some(hash) = sha256 {
         lines.push(format!("sha256={hash}"));
     }
-    let _ = std::fs::write(meta_path, lines.join("\r\n"));
+    crate::log_if_err!(std::fs::write(meta_path, lines.join("\r\n")));
 }
 
 fn read_update_metadata(update_path: &Path) -> (Option<u64>, Option<String>) {
@@ -549,11 +549,11 @@ fn download_file(url: &str, target: &Path) -> Result<(), String> {
     let mut file = File::create(target).map_err(|err| err.to_string())?;
     let written = io::copy(&mut resp, &mut file).map_err(|err| err.to_string())?;
     file.flush().map_err(|err| err.to_string())?;
-    if let Some(expected) = expected_len {
-        if written != expected {
-            let _ = std::fs::remove_file(target);
-            return Err("Download incomplete".to_string());
-        }
+    if let Some(expected) = expected_len
+        && written != expected
+    {
+        crate::log_if_err!(std::fs::remove_file(target));
+        return Err("Download incomplete".to_string());
     }
     Ok(())
 }
@@ -600,12 +600,12 @@ fn download_sha256_optional(url: &str, target_name: &str) -> Option<String> {
     match download_file(url, &temp) {
         Ok(()) => {
             let content = std::fs::read_to_string(&temp).ok();
-            let _ = std::fs::remove_file(&temp);
+            crate::log_if_err!(std::fs::remove_file(&temp));
             content.and_then(|text| parse_sha256_file(&text, target_name))
         }
         Err(err) => {
             log_debug(&format!("Sha256 download failed: {err}"));
-            let _ = std::fs::remove_file(&temp);
+            crate::log_if_err!(std::fs::remove_file(&temp));
             None
         }
     }
@@ -622,7 +622,7 @@ fn stabilize_download(path: &Path) -> Result<(), String> {
         match std::fs::File::open(path) {
             Ok(mut file) => {
                 let mut buf = [0u8; 512];
-                let _ = file.read(&mut buf);
+                crate::log_if_err!(file.read(&mut buf));
                 if let Ok(meta) = file.metadata() {
                     let len = meta.len();
                     let write_time = meta.modified().ok();
@@ -668,12 +668,12 @@ fn verify_download_integrity(
 ) -> Result<(), String> {
     let meta = std::fs::metadata(path).map_err(|err| err.to_string())?;
     let size = meta.len();
-    if let Some(expected) = expected_size {
-        if size != expected {
-            return Err(format!(
-                "Integrity failed: size mismatch expected={expected} actual={size}"
-            ));
-        }
+    if let Some(expected) = expected_size
+        && size != expected
+    {
+        return Err(format!(
+            "Integrity failed: size mismatch expected={expected} actual={size}"
+        ));
     }
     if let Some(expected_hash) = expected_sha256 {
         let actual = compute_sha256(path)?;
@@ -820,7 +820,7 @@ fn ensure_dir_writable_for_runner(path: &Path) -> bool {
         .open(&probe_path)
     {
         Ok(_) => {
-            let _ = std::fs::remove_file(&probe_path);
+            crate::log_if_err!(std::fs::remove_file(&probe_path));
             true
         }
         Err(_) => false,
@@ -884,7 +884,7 @@ pub(crate) fn run_self_update(args: &[String]) -> Result<i32, String> {
             for arg in args {
                 cmd.arg(arg);
             }
-            let _ = cmd.spawn();
+            crate::log_if_err!(cmd.spawn());
             return Ok(EXIT_OK);
         }
         log_debug("Self-update launched from target. Runner copy failed.");
@@ -912,13 +912,13 @@ pub(crate) fn run_self_update(args: &[String]) -> Result<i32, String> {
     }
     if let Err(err) = verify_download_integrity(&new, meta_size, meta_hash.as_deref()) {
         log_debug(&format!("Self-update: integrity failed: {err}"));
-        let _ = std::fs::remove_file(&new);
-        let _ = std::fs::remove_file(temp_update_meta_path(&new));
+        crate::log_if_err!(std::fs::remove_file(&new));
+        crate::log_if_err!(std::fs::remove_file(temp_update_meta_path(&new)));
         return Ok(EXIT_INTEGRITY_FAILED);
     }
 
     wait_for_process_exit(pid);
-    let _ = recover_backup_if_needed(&current);
+    crate::log_if_err!(recover_backup_if_needed(&current));
 
     let dir = current
         .parent()
@@ -961,7 +961,7 @@ pub(crate) fn run_self_update(args: &[String]) -> Result<i32, String> {
             if schedule_retry && elevated {
                 log_debug("Schedule retry (elevated) succeeded.");
             }
-            let _ = remove_update_lock(&current);
+            crate::log_if_err!(remove_update_lock(&current));
             let language = load_settings().language;
             show_update_info(language, UpdateInfo::RebootRequired);
             return Ok(EXIT_REBOOT_REQUIRED);
@@ -1013,8 +1013,8 @@ pub(crate) fn run_self_update(args: &[String]) -> Result<i32, String> {
             return Ok(EXIT_REPLACE_FAILED);
         }
     }
-    let _ = std::fs::remove_file(&new);
-    let _ = std::fs::remove_file(temp_update_meta_path(&new));
+    crate::log_if_err!(std::fs::remove_file(&new));
+    crate::log_if_err!(std::fs::remove_file(temp_update_meta_path(&new)));
 
     let language = load_settings().language;
     if restart {
@@ -1024,8 +1024,8 @@ pub(crate) fn run_self_update(args: &[String]) -> Result<i32, String> {
         {
             Ok(_) => show_update_info(language, UpdateInfo::Completed),
             Err(err) => {
-                let _ = restore_backup(&current);
-                let _ = remove_update_lock(&current);
+                crate::log_if_err!(restore_backup(&current));
+                crate::log_if_err!(remove_update_lock(&current));
                 log_debug(&format!("Self-update: restart failed: {err}"));
                 show_update_error(language, UpdateError::RestartFailed);
                 return Ok(EXIT_REPLACE_FAILED);
@@ -1034,7 +1034,7 @@ pub(crate) fn run_self_update(args: &[String]) -> Result<i32, String> {
     } else {
         show_update_info(language, UpdateInfo::Completed);
     }
-    let _ = remove_update_lock(&current);
+    crate::log_if_err!(remove_update_lock(&current));
     Ok(EXIT_OK)
 }
 
@@ -1045,7 +1045,7 @@ fn wait_for_process_exit(pid: u32) {
             log_debug(&format!(
                 "Self-update: waited for pid={pid} result={result:?}"
             ));
-            let _ = CloseHandle(handle);
+            crate::log_if_err!(CloseHandle(handle));
         } else {
             log_debug(&format!("Self-update: failed to open pid={pid}"));
         }
@@ -1074,7 +1074,7 @@ fn replace_executable(current: &Path, new: &Path) -> ReplaceResult {
     let mut attempt: u32 = 0;
     loop {
         attempt += 1;
-        let _ = recover_backup_if_needed(current);
+        crate::log_if_err!(recover_backup_if_needed(current));
         match replace_with_win32(current, new, &backup) {
             Ok(()) => return ReplaceResult::Replaced,
             Err(err) => {
@@ -1089,36 +1089,31 @@ fn replace_executable(current: &Path, new: &Path) -> ReplaceResult {
         if elapsed > std::time::Duration::from_secs(20) {
             break;
         }
-        if let Some(code) = last_err.as_ref().and_then(|e| e.raw_os_error()) {
-            if is_transient_win32_code(code) {
-                std::thread::sleep(retry_delay(attempt));
-                continue;
-            }
+        if let Some(code) = last_err.as_ref().and_then(|e| e.raw_os_error())
+            && is_transient_win32_code(code)
+        {
+            std::thread::sleep(retry_delay(attempt));
+            continue;
         }
         break;
     }
-    if let Some(err) = last_err.as_ref() {
-        if err.raw_os_error().is_some_and(is_transient_win32_code) {
-            return match schedule_replace_on_reboot(new, current) {
-                Ok(()) => ReplaceResult::ScheduledReboot,
-                Err(err) => ReplaceResult::ScheduleFailed { err },
-            };
-        }
+    if let Some(err) = last_err.as_ref()
+        && err.raw_os_error().is_some_and(is_transient_win32_code)
+    {
+        return match schedule_replace_on_reboot(new, current) {
+            Ok(()) => ReplaceResult::ScheduledReboot,
+            Err(err) => ReplaceResult::ScheduleFailed { err },
+        };
     }
     ReplaceResult::Failed {
         restored: current.exists(),
-        err: last_err.unwrap_or_else(|| {
-            io::Error::new(io::ErrorKind::Other, "Failed to replace executable")
-        }),
+        err: last_err.unwrap_or_else(|| io::Error::other("Failed to replace executable")),
     }
 }
 
 fn replace_with_win32(target: &Path, source: &Path, backup: &Path) -> io::Result<()> {
     if target.parent() != source.parent() {
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
-            "Source must be in target directory",
-        ));
+        return Err(io::Error::other("Source must be in target directory"));
     }
     let target_w = to_wide(&target.to_string_lossy());
     let source_w = to_wide(&source.to_string_lossy());
@@ -1158,11 +1153,11 @@ fn replace_with_win32(target: &Path, source: &Path, backup: &Path) -> io::Result
         .is_err()
         {
             let move_err = io::Error::last_os_error();
-            let _ = MoveFileExW(
+            crate::log_if_err!(MoveFileExW(
                 PCWSTR(backup_w.as_ptr()),
                 PCWSTR(target_w.as_ptr()),
                 MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
-            );
+            ));
             return Err(move_err);
         }
     }
@@ -1176,10 +1171,7 @@ fn schedule_replace_on_reboot(source: &Path, target: &Path) -> io::Result<()> {
             source.display(),
             target.display()
         ));
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
-            "Source must be in target directory",
-        ));
+        return Err(io::Error::other("Source must be in target directory"));
     }
     let source_w = to_wide(&source.to_string_lossy());
     let target_w = to_wide(&target.to_string_lossy());
@@ -1221,7 +1213,7 @@ fn backup_executable_path(current: &Path) -> Result<PathBuf, io::Error> {
     let file_name = current
         .file_name()
         .and_then(|name| name.to_str())
-        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Invalid executable name"))?;
+        .ok_or_else(|| io::Error::other("Invalid executable name"))?;
     Ok(current.with_file_name(format!("{file_name}.old")))
 }
 
@@ -1244,7 +1236,7 @@ impl UpdateLock {
 impl Drop for UpdateLock {
     fn drop(&mut self) {
         if !self.keep {
-            let _ = std::fs::remove_file(&self.path);
+            crate::log_if_err!(std::fs::remove_file(&self.path));
         }
     }
 }
@@ -1255,12 +1247,12 @@ fn acquire_update_lock(current_exe: &Path) -> Result<UpdateLock, UpdateLockError
     let mut last_err: Option<io::Error> = None;
     for path in paths {
         if path.exists() {
-            if let Some(pid) = read_lock_pid(&path) {
-                if is_process_running(pid) {
-                    return Err(UpdateLockError::InProgress);
-                }
+            if let Some(pid) = read_lock_pid(&path)
+                && is_process_running(pid)
+            {
+                return Err(UpdateLockError::InProgress);
             }
-            let _ = std::fs::remove_file(&path);
+            crate::log_if_err!(std::fs::remove_file(&path));
         }
         let mut file = match OpenOptions::new().write(true).create_new(true).open(&path) {
             Ok(file) => file,
@@ -1275,12 +1267,12 @@ fn acquire_update_lock(current_exe: &Path) -> Result<UpdateLock, UpdateLockError
                 return Err(UpdateLockError::Other(err.to_string()));
             }
         };
-        let _ = writeln!(file, "{}", std::process::id());
+        crate::log_if_err!(writeln!(file, "{}", std::process::id()));
         return Ok(UpdateLock { path, keep: false });
     }
     Err(UpdateLockError::Other(
         last_err
-            .unwrap_or_else(|| io::Error::new(io::ErrorKind::Other, "Lock unavailable"))
+            .unwrap_or_else(|| io::Error::other("Lock unavailable"))
             .to_string(),
     ))
 }
@@ -1288,7 +1280,7 @@ fn acquire_update_lock(current_exe: &Path) -> Result<UpdateLock, UpdateLockError
 fn update_lock_path_primary(current_exe: &Path) -> Result<PathBuf, io::Error> {
     let dir = current_exe
         .parent()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Missing executable directory"))?;
+        .ok_or_else(|| io::Error::other("Missing executable directory"))?;
     Ok(dir.join(UPDATE_LOCK_NAME))
 }
 
@@ -1316,7 +1308,7 @@ fn read_lock_pid(path: &Path) -> Option<u32> {
 fn is_process_running(pid: u32) -> bool {
     unsafe {
         if let Ok(handle) = OpenProcess(PROCESS_SYNCHRONIZE, false, pid) {
-            let _ = CloseHandle(handle);
+            crate::log_if_err!(CloseHandle(handle));
             return true;
         }
     }
@@ -1327,7 +1319,7 @@ fn remove_update_lock(current_exe: &Path) -> io::Result<()> {
     let paths = update_lock_paths(current_exe)?;
     for path in paths {
         if path.exists() {
-            let _ = std::fs::remove_file(path);
+            crate::log_if_err!(std::fs::remove_file(path));
         }
     }
     Ok(())
@@ -1339,9 +1331,9 @@ fn restore_backup(current: &Path) -> io::Result<()> {
         return Ok(());
     }
     let failed = current.with_extension("failed");
-    let _ = std::fs::rename(current, &failed);
+    crate::log_if_err!(std::fs::rename(current, &failed));
     std::fs::rename(&backup, current)?;
-    let _ = std::fs::remove_file(failed);
+    crate::log_if_err!(std::fs::remove_file(failed));
     Ok(())
 }
 
@@ -1349,7 +1341,7 @@ fn show_permission_error(language: Language) {
     let text = i18n::tr(language, "updater.permission_error");
     let title = i18n::tr(language, "updater.title");
     let owner = find_main_window();
-    let _ = show_update_message(
+    show_update_message(
         owner,
         &text,
         &title,
@@ -1392,7 +1384,7 @@ fn show_update_error(language: Language, error: UpdateError) {
     let text = i18n::tr(language, text_key);
     let title = i18n::tr(language, "updater.title");
     let owner = find_main_window();
-    let _ = show_update_message(
+    show_update_message(
         owner,
         &text,
         &title,
@@ -1404,7 +1396,7 @@ fn show_update_error_with_url(language: Language, key: &str, url: &str) {
     let text = i18n::tr_f(language, key, &[("url", url)]);
     let title = i18n::tr(language, "updater.title");
     let owner = find_main_window();
-    let _ = show_update_message(
+    show_update_message(
         owner,
         &text,
         &title,
@@ -1416,7 +1408,7 @@ fn show_update_error_args(language: Language, key: &str, args: &[(&str, &str)]) 
     let text = i18n::tr_f(language, key, args);
     let title = i18n::tr(language, "updater.title");
     let owner = find_main_window();
-    let _ = show_update_message(
+    show_update_message(
         owner,
         &text,
         &title,
@@ -1428,12 +1420,12 @@ pub(crate) fn cleanup_backup_on_start() {
     let Ok(current_exe) = std::env::current_exe() else {
         return;
     };
-    let _ = recover_backup_if_needed(&current_exe);
+    crate::log_if_err!(recover_backup_if_needed(&current_exe));
     let Ok(backup) = backup_executable_path(&current_exe) else {
         return;
     };
     if current_exe.exists() && backup.exists() {
-        let _ = std::fs::remove_file(backup);
+        crate::log_if_err!(std::fs::remove_file(backup));
     }
 }
 
@@ -1450,7 +1442,7 @@ pub(crate) fn cleanup_update_lock_on_start() {
         }
         let pid = read_lock_pid(&lock_path);
         if pid.is_none_or(|pid| !is_process_running(pid)) {
-            let _ = std::fs::remove_file(lock_path);
+            crate::log_if_err!(std::fs::remove_file(lock_path));
         }
     }
 }
@@ -1482,8 +1474,8 @@ pub(crate) fn check_pending_update(hwnd: HWND, force: bool) {
         return;
     };
     if meta.len() == 0 {
-        let _ = std::fs::remove_file(&pending);
-        let _ = std::fs::remove_file(temp_update_meta_path(&pending));
+        crate::log_if_err!(std::fs::remove_file(&pending));
+        crate::log_if_err!(std::fs::remove_file(temp_update_meta_path(&pending)));
         if force {
             let language = app_language(hwnd);
             show_update_info(language, UpdateInfo::NoPending);
@@ -1495,15 +1487,15 @@ pub(crate) fn check_pending_update(hwnd: HWND, force: bool) {
     let (meta_size, meta_hash) = read_update_metadata(&pending);
     if let Err(err) = stabilize_download(&pending) {
         log_debug(&format!("Pending update: staged file unstable: {err}"));
-        let _ = std::fs::remove_file(&pending);
-        let _ = std::fs::remove_file(temp_update_meta_path(&pending));
+        crate::log_if_err!(std::fs::remove_file(&pending));
+        crate::log_if_err!(std::fs::remove_file(temp_update_meta_path(&pending)));
         show_update_error(language, UpdateError::Download);
         return;
     }
     if let Err(err) = verify_download_integrity(&pending, meta_size, meta_hash.as_deref()) {
         log_debug(&format!("Pending update: integrity failed: {err}"));
-        let _ = std::fs::remove_file(&pending);
-        let _ = std::fs::remove_file(temp_update_meta_path(&pending));
+        crate::log_if_err!(std::fs::remove_file(&pending));
+        crate::log_if_err!(std::fs::remove_file(temp_update_meta_path(&pending)));
         show_update_error(language, UpdateError::Download);
         return;
     }
@@ -1516,8 +1508,8 @@ pub(crate) fn check_pending_update(hwnd: HWND, force: bool) {
     };
     if is_same_executable(&pending, &current_exe) {
         log_debug("Pending update matches current exe. Clearing pending update.");
-        let _ = std::fs::remove_file(&pending);
-        let _ = std::fs::remove_file(temp_update_meta_path(&pending));
+        crate::log_if_err!(std::fs::remove_file(&pending));
+        crate::log_if_err!(std::fs::remove_file(temp_update_meta_path(&pending)));
         if force {
             show_update_info(language, UpdateInfo::NoPending);
         }
@@ -1547,7 +1539,7 @@ pub(crate) fn check_pending_update(hwnd: HWND, force: bool) {
     }
     update_lock.keep();
     unsafe {
-        let _ = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
+        crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
     }
 }
 
@@ -1572,14 +1564,13 @@ pub(crate) fn cleanup_update_temp_on_start() {
         };
         if (name.starts_with(&updater_prefix) && name.ends_with(".exe")) || name == update_meta_name
         {
-            let _ = std::fs::remove_file(path);
-        } else if name == update_name {
-            if let Ok(meta) = path.metadata() {
-                if meta.len() == 0 {
-                    let _ = std::fs::remove_file(&path);
-                    let _ = std::fs::remove_file(temp_update_meta_path(&path));
-                }
-            }
+            crate::log_if_err!(std::fs::remove_file(path));
+        } else if name == update_name
+            && let Ok(meta) = path.metadata()
+            && meta.len() == 0
+        {
+            crate::log_if_err!(std::fs::remove_file(&path));
+            crate::log_if_err!(std::fs::remove_file(temp_update_meta_path(&path)));
         }
     }
 }
@@ -1594,7 +1585,7 @@ fn show_update_info(language: Language, info: UpdateInfo) {
     let text = i18n::tr(language, text_key);
     let title = i18n::tr(language, "updater.title");
     let owner = find_main_window();
-    let _ = show_update_message(
+    show_update_message(
         owner,
         &text,
         &title,
@@ -1608,10 +1599,10 @@ fn focus_main_window() {
         return;
     }
     unsafe {
-        let _ = ShowWindow(hwnd, SW_SHOW);
-        let _ = SetForegroundWindow(hwnd);
-        let _ = SetActiveWindow(hwnd);
-        let _ = SetFocus(hwnd);
+        ShowWindow(hwnd, SW_SHOW);
+        SetForegroundWindow(hwnd);
+        SetActiveWindow(hwnd);
+        SetFocus(hwnd);
     }
 }
 
@@ -1639,7 +1630,12 @@ fn show_update_message(
     focus_main_window();
     if owner.0 != 0 {
         unsafe {
-            let _ = PostMessageW(owner, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0));
+            crate::log_if_err!(PostMessageW(
+                owner,
+                crate::WM_FOCUS_EDITOR,
+                WPARAM(0),
+                LPARAM(0)
+            ));
         }
     }
     result

@@ -11,7 +11,7 @@ fn log_profile(profile: &str, url: &str, status: &str) {
             .append(true)
             .open(&exe_path)
         {
-            let _ = writeln!(file, "[{}] {} - {}", profile, status, url);
+            crate::log_if_err!(writeln!(file, "[{}] {} - {}", profile, status, url));
         }
     }
 }

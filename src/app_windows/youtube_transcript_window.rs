@@ -122,23 +122,31 @@ pub fn import_youtube_transcript(parent: HWND) {
     };
     let Some(result) = show_import_dialog(parent, language, include_timestamps) else {
         unsafe {
-            let _ = PostMessageW(parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0));
+            if let Err(e) = PostMessageW(parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) {
+                crate::log_debug(&format!("Failed to post WM_FOCUS_EDITOR: {}", e));
+            }
         }
         return;
     };
-    let _ = unsafe {
-        with_state(parent, |state| {
+    unsafe {
+        if with_state(parent, |state| {
             state.settings.youtube_include_timestamps = result.include_timestamps;
             save_settings(state.settings.clone());
         })
-    };
+        .is_none()
+        {
+            crate::log_debug("Failed to update YouTube settings state");
+        }
+    }
 
     let text = match fetch_transcript_text(&result.transcript, result.include_timestamps) {
         Ok(text) => text,
         Err(err) => {
             unsafe {
                 show_error(parent, language, &error_message(language, &err));
-                let _ = PostMessageW(parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0));
+                if let Err(e) = PostMessageW(parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) {
+                    crate::log_debug(&format!("Failed to post WM_FOCUS_EDITOR: {}", e));
+                }
             }
             return;
         }
@@ -147,10 +155,12 @@ pub fn import_youtube_transcript(parent: HWND) {
     unsafe {
         let Some(hwnd_edit) = get_active_edit(parent) else {
             show_error(parent, language, &labels(language).no_document);
-            let _ = PostMessageW(parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0));
+            if let Err(e) = PostMessageW(parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) {
+                crate::log_debug(&format!("Failed to post WM_FOCUS_EDITOR: {}", e));
+            }
             return;
         };
-        let _ = SetFocus(hwnd_edit);
+        SetFocus(hwnd_edit);
         let existing = get_edit_text(hwnd_edit);
         let combined = if existing.is_empty() {
             text
@@ -158,29 +168,29 @@ pub fn import_youtube_transcript(parent: HWND) {
             format!("{text}\n\n{existing}")
         };
         let wide = to_wide_normalized(&combined);
-        let _ = SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(-1));
-        let _ = SendMessageW(
+        SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(-1));
+        SendMessageW(
             hwnd_edit,
             EM_REPLACESEL,
             WPARAM(1),
             LPARAM(wide.as_ptr() as isize),
         );
         let end = combined.len() as i32;
-        let _ = SendMessageW(
+        SendMessageW(
             hwnd_edit,
             EM_SETSEL,
             WPARAM(end as usize),
             LPARAM(end as isize),
         );
         let cr = CHARRANGE { cpMin: 0, cpMax: 0 };
-        let _ = SendMessageW(
+        SendMessageW(
             hwnd_edit,
             EM_EXSETSEL,
             WPARAM(0),
             LPARAM(&cr as *const _ as isize),
         );
-        let _ = SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(0));
-        let _ = SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+        SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(0));
+        SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
         NotifyWinEvent(
             EVENT_OBJECT_VALUECHANGE,
             hwnd_edit,
@@ -188,7 +198,9 @@ pub fn import_youtube_transcript(parent: HWND) {
             CHILDID_SELF,
         );
         NotifyWinEvent(EVENT_OBJECT_FOCUS, hwnd_edit, OBJID_CLIENT, CHILDID_SELF);
-        let _ = PostMessageW(parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0));
+        if let Err(e) = PostMessageW(parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) {
+            crate::log_debug(&format!("Error: {:?}", e));
+        }
     }
 }
 
@@ -258,17 +270,21 @@ fn show_import_dialog(
         }
         unsafe {
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
-                let _ = PostMessageW(hwnd, WM_COMMAND, WPARAM(YT_ID_CANCEL as usize), LPARAM(0));
+                if let Err(_e) = PostMessageW(hwnd, WM_COMMAND, WPARAM(YT_ID_CANCEL), LPARAM(0)) {
+                    crate::log_debug(&format!("Error: {:?}", _e));
+                }
                 continue;
             }
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
                 let ok = with_import_state(hwnd, |state| state.ok_button).unwrap_or(HWND(0));
                 if GetFocus() == ok {
-                    let _ = PostMessageW(hwnd, WM_COMMAND, WPARAM(YT_ID_OK as usize), LPARAM(0));
+                    if let Err(_e) = PostMessageW(hwnd, WM_COMMAND, WPARAM(YT_ID_OK), LPARAM(0)) {
+                        crate::log_debug(&format!("Error: {:?}", _e));
+                    }
                     continue;
                 }
             }
-            if IsDialogMessageW(hwnd, &mut msg).as_bool() {
+            if IsDialogMessageW(hwnd, &msg).as_bool() {
                 continue;
             }
             TranslateMessage(&msg);
@@ -281,7 +297,7 @@ fn show_import_dialog(
         SetForegroundWindow(parent);
     }
 
-    result.lock().unwrap().clone()
+    result.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
 unsafe extern "system" fn import_wndproc(
@@ -448,7 +464,7 @@ unsafe extern "system" fn import_wndproc(
                 cancel_button,
             ] {
                 if control.0 != 0 && hfont.0 != 0 {
-                    let _ = SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                 }
             }
 
@@ -472,29 +488,31 @@ unsafe extern "system" fn import_wndproc(
             } else {
                 0
             };
-            let _ = SendMessageW(
+            SendMessageW(
                 timestamp_check,
                 BM_SETCHECK,
                 WPARAM(initial_check as usize),
                 LPARAM(0),
             );
-            let _ = SetFocus(url_edit);
+            SetFocus(url_edit);
             LRESULT(0)
         }
         WM_COMMAND => {
-            let cmd_id = (wparam.0 & 0xffff) as usize;
+            let cmd_id = wparam.0 & 0xffff;
             let notification = ((wparam.0 >> 16) & 0xffff) as u16;
             if cmd_id == YT_ID_LOAD {
                 start_load_languages(hwnd);
                 LRESULT(0)
             } else if cmd_id == YT_ID_OK {
                 let mut should_close = false;
-                let _ = with_import_state(hwnd, |state| {
+                if with_import_state(hwnd, |state| {
                     if state.loading {
                         return;
                     }
                     if state.transcripts.is_empty() {
-                        let _ = start_load_languages(hwnd);
+                        if !start_load_languages(hwnd) {
+                            crate::log_debug("Failed to start load languages");
+                        }
                         return;
                     }
                     let idx = SendMessageW(state.lang_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
@@ -505,30 +523,45 @@ unsafe extern "system" fn import_wndproc(
                         SendMessageW(state.timestamp_check, BM_GETCHECK, WPARAM(0), LPARAM(0)).0
                             == BST_CHECKED.0 as isize;
                     let transcript = state.transcripts[idx as usize].clone();
-                    *state.result.lock().unwrap() = Some(ImportResult {
+                    *state.result.lock().unwrap_or_else(|e| e.into_inner()) = Some(ImportResult {
                         transcript,
                         include_timestamps,
                     });
                     should_close = true;
-                });
-                if should_close {
-                    let _ = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access import state");
+                }
+                if should_close && let Err(_e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0))
+                {
+                    crate::log_debug(&format!("Error: {:?}", _e));
                 }
                 LRESULT(0)
             } else if cmd_id == YT_ID_CANCEL {
-                let _ = with_import_state(hwnd, |state| {
-                    *state.result.lock().unwrap() = None;
-                });
-                let _ = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
+                if with_import_state(hwnd, |state| {
+                    *state.result.lock().unwrap_or_else(|e| e.into_inner()) = None;
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access import state");
+                }
+                if let Err(_e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
+                    crate::log_debug(&format!("Error: {:?}", _e));
+                }
                 LRESULT(0)
             } else if cmd_id == YT_ID_URL && notification as u32 == EN_CHANGE {
-                let _ = with_import_state(hwnd, |state| {
+                if with_import_state(hwnd, |state| {
                     if state.loading {
                         return;
                     }
                     state.transcripts.clear();
-                    let _ = SendMessageW(state.lang_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-                });
+                    SendMessageW(state.lang_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access import state");
+                }
                 LRESULT(0)
             } else {
                 DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -541,38 +574,50 @@ unsafe extern "system" fn import_wndproc(
         }
         WM_KEYDOWN => {
             if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                let _ = PostMessageW(hwnd, WM_COMMAND, WPARAM(YT_ID_CANCEL as usize), LPARAM(0));
+                if let Err(_e) = PostMessageW(hwnd, WM_COMMAND, WPARAM(YT_ID_CANCEL), LPARAM(0)) {
+                    crate::log_debug(&format!("Error: {:?}", _e));
+                }
                 return LRESULT(0);
             }
             if wparam.0 as u32 == VK_RETURN.0 as u32 {
                 let focus = GetFocus();
                 let url_edit = with_import_state(hwnd, |state| state.url_edit).unwrap_or(HWND(0));
                 if focus == url_edit {
-                    let _ = PostMessageW(hwnd, WM_COMMAND, WPARAM(YT_ID_LOAD as usize), LPARAM(0));
+                    if let Err(_e) = PostMessageW(hwnd, WM_COMMAND, WPARAM(YT_ID_LOAD), LPARAM(0)) {
+                        crate::log_debug(&format!("Error: {:?}", _e));
+                    }
                     return LRESULT(0);
                 }
             }
             DefWindowProcW(hwnd, msg, wparam, lparam)
         }
         WM_CLOSE => {
-            let _ = DestroyWindow(hwnd);
+            crate::log_if_err!(DestroyWindow(hwnd));
             LRESULT(0)
         }
         WM_DESTROY => {
-            let _ = with_import_state(hwnd, |state| {
+            if with_import_state(hwnd, |state| {
                 EnableWindow(state.parent, true);
                 SetForegroundWindow(state.parent);
-                let _ = PostMessageW(state.parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0));
+                if let Err(e) =
+                    PostMessageW(state.parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0))
+                {
+                    crate::log_debug(&format!("Failed to post WM_FOCUS_EDITOR: {}", e));
+                }
                 if let Some(hwnd_edit) = get_active_edit(state.parent) {
                     NotifyWinEvent(EVENT_OBJECT_FOCUS, hwnd_edit, OBJID_CLIENT, CHILDID_SELF);
                 }
-            });
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access import state");
+            }
             LRESULT(0)
         }
         WM_NCDESTROY => {
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ImportState;
             if !ptr.is_null() {
-                let _ = Box::from_raw(ptr);
+                drop(Box::from_raw(ptr));
             }
             LRESULT(0)
         }
@@ -608,35 +653,38 @@ fn start_load_languages(hwnd: HWND) -> bool {
     let mut status = HWND(0);
     let mut already_loading = false;
 
-    let _ = unsafe {
+    if unsafe {
         with_import_state(hwnd, |state| {
-            already_loading = state.loading;
-            if already_loading {
-                return;
-            }
-            language = state.language;
-            url = read_edit_text(state.url_edit);
             edit = state.url_edit;
             ok_button = state.ok_button;
             load_button = state.load_button;
             combo = state.lang_combo;
             timestamp = state.timestamp_check;
             status = state.status_label;
+            language = state.language;
+            url = read_edit_text(state.url_edit);
+            already_loading = state.loading;
             state.loading = true;
         })
-    };
+    }
+    .is_none()
+    {
+        crate::log_debug("Failed to access import state at L641");
+    }
     if already_loading {
         return false;
     }
 
     let labels_data = labels(language);
     unsafe {
-        let _ = SetWindowTextW(status, PCWSTR(to_wide(&labels_data.loading).as_ptr()));
-        let _ = EnableWindow(edit, false);
-        let _ = EnableWindow(load_button, false);
-        let _ = EnableWindow(combo, false);
-        let _ = EnableWindow(timestamp, false);
-        let _ = EnableWindow(ok_button, false);
+        if let Err(e) = SetWindowTextW(status, PCWSTR(to_wide(&labels_data.loading).as_ptr())) {
+            crate::log_debug(&format!("Failed to set status text: {}", e));
+        }
+        EnableWindow(edit, false);
+        EnableWindow(load_button, false);
+        EnableWindow(combo, false);
+        EnableWindow(timestamp, false);
+        EnableWindow(ok_button, false);
     }
 
     std::thread::spawn(move || {
@@ -668,12 +716,14 @@ fn start_load_languages(hwnd: HWND) -> bool {
             }
         };
         unsafe {
-            let _ = PostMessageW(
+            if let Err(e) = PostMessageW(
                 hwnd,
                 WM_YT_LOAD_COMPLETE,
                 WPARAM(0),
                 LPARAM(Box::into_raw(Box::new(result)) as isize),
-            );
+            ) {
+                crate::log_debug(&format!("Failed to post WM_YT_LOAD_COMPLETE: {}", e));
+            }
         }
     });
     true
@@ -688,61 +738,71 @@ fn finish_load_languages(hwnd: HWND, result: LoadResult) {
     let mut timestamp = HWND(0);
     let mut status = HWND(0);
 
-    let _ = unsafe {
+    if unsafe {
         with_import_state(hwnd, |state| {
-            language = state.language;
             edit = state.url_edit;
             ok_button = state.ok_button;
             load_button = state.load_button;
             combo = state.lang_combo;
             timestamp = state.timestamp_check;
             status = state.status_label;
+            language = state.language;
             state.loading = false;
         })
-    };
+    }
+    .is_none()
+    {
+        crate::log_debug("Failed to access import state at L731");
+    }
 
     let labels_data = labels(language);
     unsafe {
-        let _ = SetWindowTextW(status, PCWSTR(to_wide("").as_ptr()));
-        let _ = EnableWindow(edit, true);
-        let _ = EnableWindow(load_button, true);
-        let _ = EnableWindow(combo, true);
-        let _ = EnableWindow(timestamp, true);
-        let _ = EnableWindow(ok_button, true);
+        if let Err(_e) = SetWindowTextW(status, PCWSTR(to_wide("").as_ptr())) {
+            crate::log_debug(&format!("Failed to set status text: {:?}", _e));
+        }
+        EnableWindow(edit, true);
+        EnableWindow(load_button, true);
+        EnableWindow(combo, true);
+        EnableWindow(timestamp, true);
+        EnableWindow(ok_button, true);
     }
 
     if let Some(err) = result.error {
         unsafe {
             show_error(hwnd, language, &error_message(language, &err));
-            let _ = SetFocus(edit);
+            SetFocus(edit);
         }
         return;
     }
 
     unsafe {
-        let _ = SendMessageW(combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        SendMessageW(combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
         for transcript in result.transcripts.iter() {
             let mut label = format!("{} ({})", transcript.language(), transcript.language_code());
             if transcript.is_generated() {
                 label.push_str(&format!(" - {}", labels_data.auto));
             }
             let wide = to_wide(&label);
-            let _ = SendMessageW(
+            SendMessageW(
                 combo,
                 CB_ADDSTRING,
                 WPARAM(0),
                 LPARAM(wide.as_ptr() as isize),
             );
         }
-        let _ = SendMessageW(combo, CB_SETCURSEL, WPARAM(0), LPARAM(0));
-        let _ = SetFocus(combo);
+        SendMessageW(combo, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+        SetFocus(combo);
     }
 
-    let _ = unsafe {
+    if unsafe {
         with_import_state(hwnd, |state| {
             state.transcripts = result.transcripts;
         })
-    };
+    }
+    .is_none()
+    {
+        crate::log_debug("Failed to access import state at L786");
+    }
 }
 
 fn read_edit_text(hwnd: HWND) -> String {
@@ -755,7 +815,7 @@ fn read_edit_text(hwnd: HWND) -> String {
     }
     let mut buf = vec![0u16; (len + 1) as usize];
     unsafe {
-        let _ = windows::Win32::UI::WindowsAndMessaging::GetWindowTextW(hwnd, &mut buf);
+        windows::Win32::UI::WindowsAndMessaging::GetWindowTextW(hwnd, &mut buf);
     }
     unsafe { from_wide(buf.as_ptr()) }
 }

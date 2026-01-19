@@ -172,12 +172,10 @@ fn parse_opml_sources(text: &str) -> Vec<(String, String)> {
                         .to_string();
                     if key.eq_ignore_ascii_case(b"xmlUrl") {
                         url = value;
-                    } else if key.eq_ignore_ascii_case(b"title")
-                        || key.eq_ignore_ascii_case(b"text")
+                    } else if title.is_empty()
+                        && (key.eq_ignore_ascii_case(b"title") || key.eq_ignore_ascii_case(b"text"))
                     {
-                        if title.is_empty() {
-                            title = value;
-                        }
+                        title = value;
                     }
                 }
                 if !url.trim().is_empty() {
@@ -256,7 +254,7 @@ fn import_podcast_sources_from_file(hwnd: HWND, path: &Path) -> Option<usize> {
     }
     let mut added = 0usize;
     unsafe {
-        with_state(parent, |state| {
+        if with_state(parent, |state| {
             let mut existing: HashSet<String> = state
                 .settings
                 .podcast_sources
@@ -291,7 +289,11 @@ fn import_podcast_sources_from_file(hwnd: HWND, path: &Path) -> Option<usize> {
             if added > 0 {
                 crate::settings::save_settings(state.settings.clone());
             }
-        });
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access state in import_opml");
+        }
     }
     if added > 0 {
         unsafe {
@@ -354,7 +356,7 @@ unsafe fn handle_import_opml(hwnd: HWND) {
         } else {
             let title = i18n::tr(language, "podcasts.window.title");
             let message = i18n::tr(language, "podcasts.import_failed");
-            let _ = MessageBoxW(
+            MessageBoxW(
                 hwnd,
                 PCWSTR(to_wide(&message).as_ptr()),
                 PCWSTR(to_wide(&title).as_ptr()),
@@ -376,7 +378,7 @@ unsafe fn handle_export_opml(hwnd: HWND) {
             Err(err) => {
                 let title = i18n::tr(language, "podcasts.window.title");
                 let message = format!("{}: {}", i18n::tr(language, "podcasts.export_failed"), err);
-                let _ = MessageBoxW(
+                MessageBoxW(
                     hwnd,
                     PCWSTR(to_wide(&message).as_ptr()),
                     PCWSTR(to_wide(&title).as_ptr()),
@@ -430,7 +432,7 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message == WM_KEYDOWN {
         let key = msg.wParam.0 as u32;
         if key == VK_ESCAPE.0 as u32 {
-            let _ = SendMessageW(hwnd, WM_COMMAND, WPARAM(2), LPARAM(0));
+            SendMessageW(hwnd, WM_COMMAND, WPARAM(2), LPARAM(0));
             return true;
         }
         if key == VK_RETURN.0 as u32 {
@@ -446,12 +448,13 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
             }
 
             // Handle Enter on tree view
-            if hwnd_tree.0 != 0 && focus == hwnd_tree {
-                if let Some(item) = selected_episode(hwnd) {
-                    let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-                    open_episode_in_player(hwnd, parent, &item);
-                    return true;
-                }
+            if hwnd_tree.0 != 0
+                && focus == hwnd_tree
+                && let Some(item) = selected_episode(hwnd)
+            {
+                let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                open_episode_in_player(hwnd, parent, &item);
+                return true;
             }
         }
     }
@@ -460,7 +463,9 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
 
 unsafe fn announce_status(message: &str) {
     log_debug(&format!("podcasts_status {}", message));
-    let _ = nvda_speak(message);
+    if !nvda_speak(message) {
+        crate::log_debug("NVDA speak failed");
+    }
 }
 
 unsafe fn ensure_rss_http(parent: HWND) {
@@ -505,28 +510,40 @@ unsafe fn copy_text_to_clipboard(hwnd: HWND, text: &str) {
     if OpenClipboard(hwnd).is_err() {
         return;
     }
-    let _ = EmptyClipboard();
+    if let Err(e) = EmptyClipboard() {
+        crate::log_debug(&format!("EmptyClipboard failed: {}", e));
+    }
     let size = content.len() * std::mem::size_of::<u16>();
     let handle = match GlobalAlloc(GMEM_MOVEABLE, size) {
         Ok(handle) => handle,
         Err(_) => {
-            let _ = CloseClipboard();
+            if let Err(e) = CloseClipboard() {
+                crate::log_debug(&format!("CloseClipboard failed: {}", e));
+            }
             return;
         }
     };
     if handle.0.is_null() {
-        let _ = CloseClipboard();
+        if let Err(e) = CloseClipboard() {
+            crate::log_debug(&format!("CloseClipboard failed: {}", e));
+        }
         return;
     }
     let ptr = GlobalLock(handle) as *mut u16;
     if ptr.is_null() {
-        let _ = CloseClipboard();
+        if let Err(e) = CloseClipboard() {
+            crate::log_debug(&format!("CloseClipboard failed: {}", e));
+        }
         return;
     }
     std::ptr::copy_nonoverlapping(content.as_ptr(), ptr, content.len());
-    let _ = GlobalUnlock(handle);
-    let _ = SetClipboardData(CF_UNICODETEXT, HANDLE(handle.0 as isize));
-    let _ = CloseClipboard();
+    crate::log_if_err!(GlobalUnlock(handle));
+    if let Err(e) = SetClipboardData(CF_UNICODETEXT, HANDLE(handle.0 as isize)) {
+        crate::log_debug(&format!("SetClipboardData failed: {}", e));
+    }
+    if let Err(e) = CloseClipboard() {
+        crate::log_debug(&format!("CloseClipboard failed: {}", e));
+    }
 }
 
 fn move_vec_to_index<T>(items: &mut Vec<T>, from: usize, to: usize) -> bool {
@@ -586,7 +603,7 @@ unsafe fn apply_root_order(hwnd: HWND, hwnd_tree: HWND, ordered_items: &[HTREEIT
             ..Default::default()
         };
         item.hItem = *hitem;
-        let _ = SendMessageW(
+        SendMessageW(
             hwnd_tree,
             TVM_SETITEMW,
             WPARAM(0),
@@ -603,7 +620,7 @@ unsafe fn apply_root_order(hwnd: HWND, hwnd_tree: HWND, ordered_items: &[HTREEIT
         lpfnCompare: Some(podcast_tree_compare),
         lParam: LPARAM(0),
     };
-    let _ = SendMessageW(
+    SendMessageW(
         hwnd_tree,
         TVM_SORTCHILDRENCB,
         WPARAM(0),
@@ -772,7 +789,7 @@ unsafe fn load_episode_children(hwnd: HWND, hitem: HTREEITEM, source_index: usiz
                 },
             },
         };
-        let _ = SendMessageW(
+        SendMessageW(
             hwnd_tree,
             TVM_INSERTITEMW,
             WPARAM(0),
@@ -780,21 +797,27 @@ unsafe fn load_episode_children(hwnd: HWND, hitem: HTREEITEM, source_index: usiz
         );
     }
 
-    let _ = SendMessageW(
+    SendMessageW(
         hwnd_tree,
         TVM_EXPAND,
         WPARAM(windows::Win32::UI::Controls::TVE_EXPAND.0 as usize),
         LPARAM(hitem.0),
     );
-    let _ = SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(hitem.0));
+    SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(hitem.0));
 
     let hwnd_copy = hwnd;
     std::thread::spawn(move || {
-        let rt = tokio::runtime::Builder::new_current_thread()
+        let rt = match tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
-            .unwrap();
-        let res = rt.block_on(rss::fetch_podcast_feed(
+        {
+            Ok(rt) => rt,
+            Err(e) => {
+                crate::log_debug(&format!("Failed to build tokio runtime: {}", e));
+                return;
+            }
+        };
+        let res = rt.block_on(crate::tools::rss::fetch_podcast_feed(
             &url,
             cache,
             rss_fetch_config(parent),
@@ -805,22 +828,26 @@ unsafe fn load_episode_children(hwnd: HWND, hitem: HTREEITEM, source_index: usiz
             source_index,
             result: res,
         });
-        let _ = PostMessageW(
+        if let Err(_e) = PostMessageW(
             hwnd_copy,
             WM_PODCAST_FETCH_COMPLETE,
             WPARAM(0),
             LPARAM(Box::into_raw(msg) as isize),
-        );
+        ) {}
     });
 }
 
 unsafe fn update_source_cache(parent: HWND, source_index: usize, cache: rss::RssFeedCache) {
-    let _ = with_state(parent, |ps| {
+    if with_state(parent, |ps| {
         if let Some(src) = ps.settings.podcast_sources.get_mut(source_index) {
             src.cache = cache;
             settings::save_settings(ps.settings.clone());
         }
-    });
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to update source cache state");
+    }
 }
 
 unsafe fn update_source_title(hwnd: HWND, hitem: HTREEITEM, source_index: usize, feed_title: &str) {
@@ -833,7 +860,7 @@ unsafe fn update_source_title(hwnd: HWND, hitem: HTREEITEM, source_index: usize,
         return;
     }
     let mut updated = None;
-    let _ = with_state(parent, |ps| {
+    if with_state(parent, |ps| {
         if let Some(src) = ps.settings.podcast_sources.get_mut(source_index) {
             let looks_auto = src.title.trim().is_empty() || src.title == src.url;
             if !src.user_title && looks_auto {
@@ -842,7 +869,11 @@ unsafe fn update_source_title(hwnd: HWND, hitem: HTREEITEM, source_index: usize,
                 settings::save_settings(ps.settings.clone());
             }
         }
-    });
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to update source title state");
+    }
     let Some(updated) = updated else {
         return;
     };
@@ -857,7 +888,7 @@ unsafe fn update_source_title(hwnd: HWND, hitem: HTREEITEM, source_index: usize,
         pszText: windows::core::PWSTR(title_wide.as_ptr() as *mut _),
         ..Default::default()
     };
-    let _ = SendMessageW(
+    SendMessageW(
         hwnd_tree,
         TVM_SETITEMW,
         WPARAM(0),
@@ -903,7 +934,7 @@ unsafe fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<Podcast
             cchTextMax: 0,
             ..Default::default()
         };
-        let _ = SendMessageW(
+        SendMessageW(
             hwnd_tree,
             TVM_GETITEMW,
             WPARAM(0),
@@ -927,7 +958,7 @@ unsafe fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<Podcast
                     "podcasts.loading",
                 )
             {
-                let _ = SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
+                SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
             }
         }
     }
@@ -1009,7 +1040,7 @@ unsafe fn reload_tree(hwnd: HWND) {
     if hwnd_tree.0 == 0 {
         return;
     }
-    let _ = SendMessageW(
+    SendMessageW(
         hwnd_tree,
         TVM_DELETEITEM,
         WPARAM(0),
@@ -1044,7 +1075,7 @@ unsafe fn reload_tree(hwnd: HWND) {
         .0,
     );
     if first.0 != 0 {
-        let _ = SendMessageW(
+        SendMessageW(
             hwnd_tree,
             TVM_SELECTITEM,
             WPARAM(TVGN_CARET as usize),
@@ -1115,12 +1146,12 @@ unsafe fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpis
             enclosure_url: url.clone(),
             title: episode_title.clone(),
         });
-        let _ = PostMessageW(
+        if let Err(_e) = PostMessageW(
             hwnd,
             WM_PODCAST_PLAY_READY,
             WPARAM(0),
             LPARAM(Box::into_raw(msg) as isize),
-        );
+        ) {}
         return;
     }
     let parent_hwnd = parent;
@@ -1128,23 +1159,35 @@ unsafe fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpis
     let cache_limit_mb = with_state(parent, |s| s.settings.podcast_cache_limit_mb).unwrap_or(500);
     let cache_dir = podcast_cache_dir();
     std::thread::spawn(move || {
-        let rt = tokio::runtime::Builder::new_current_thread()
+        let rt = match tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
-            .unwrap();
+        {
+            Ok(rt) => rt,
+            Err(e) => {
+                crate::log_debug(&format!("Failed to build tokio runtime: {}", e));
+                return;
+            }
+        };
         let fetch_config = rss_fetch_config(parent_hwnd);
         let bytes = rt.block_on(rss::fetch_url_bytes(&url, fetch_config));
         let bytes = match bytes {
             Ok(b) => b,
             Err(err) => {
                 log_debug(&format!("podcasts_download_error {}", err));
-                let _ = PostMessageW(hwnd_copy, WM_PODCAST_PLAY_FAILED, WPARAM(0), LPARAM(0));
+                if let Err(_e) =
+                    PostMessageW(hwnd_copy, WM_PODCAST_PLAY_FAILED, WPARAM(0), LPARAM(0))
+                {
+                    crate::log_debug(&format!("Error: {:?}", _e));
+                }
                 return;
             }
         };
         let file_path = podcast_cache_path(&url, enclosure_type.as_deref());
-        if let Some(parent_dir) = file_path.parent() {
-            let _ = std::fs::create_dir_all(parent_dir);
+        if let Some(parent_dir) = file_path.parent()
+            && let Err(e) = std::fs::create_dir_all(parent_dir)
+        {
+            crate::log_debug(&format!("Failed to create podcast directory: {}", e));
         }
         if std::fs::write(&file_path, bytes).is_ok() {
             let limit_bytes = cache_limit_mb as u64 * 1024 * 1024;
@@ -1154,14 +1197,16 @@ unsafe fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpis
                 enclosure_url: url.clone(),
                 title: episode_title.clone(),
             });
-            let _ = PostMessageW(
+            if let Err(_e) = PostMessageW(
                 hwnd_copy,
                 WM_PODCAST_PLAY_READY,
                 WPARAM(0),
                 LPARAM(Box::into_raw(msg) as isize),
-            );
-        } else {
-            let _ = PostMessageW(hwnd_copy, WM_PODCAST_PLAY_FAILED, WPARAM(0), LPARAM(0));
+            ) {}
+        } else if let Err(_e) =
+            PostMessageW(hwnd_copy, WM_PODCAST_PLAY_FAILED, WPARAM(0), LPARAM(0))
+        {
+            crate::log_debug(&format!("Error: {:?}", _e));
         }
     });
 }
@@ -1277,7 +1322,9 @@ fn remove_cache_entry(path: &Path, size: u64, protected: &Option<PathBuf>, total
     }
     if std::fs::remove_file(path).is_ok() {
         let marker = podcast_cache_marker_path(path);
-        let _ = std::fs::remove_file(marker);
+        if let Err(e) = std::fs::remove_file(marker) {
+            crate::log_debug(&format!("Failed to remove marker file: {}", e));
+        }
         *total = total.saturating_sub(size);
     } else {
         log_debug(&format!(
@@ -1289,7 +1336,9 @@ fn remove_cache_entry(path: &Path, size: u64, protected: &Option<PathBuf>, total
 
 fn mark_podcast_episode_played(path: &Path) {
     let marker = podcast_cache_marker_path(path);
-    let _ = std::fs::write(marker, b"");
+    if let Err(e) = std::fs::write(marker, b"") {
+        crate::log_debug(&format!("Failed to write marker file: {}", e));
+    }
 }
 
 unsafe fn add_podcast_source(parent: HWND, feed_url: &str, title: &str) -> Option<usize> {
@@ -1331,20 +1380,20 @@ unsafe fn update_search_results(hwnd: HWND, results: Vec<PodcastSearchResult>) {
     if hwnd_results.0 == 0 {
         return;
     }
-    let _ = SendMessageW(hwnd_results, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    SendMessageW(hwnd_results, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
     if results.is_empty() {
         let text = to_wide(&i18n::tr(
             with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
             "podcasts.search.no_results",
         ));
-        let _ = SendMessageW(
+        SendMessageW(
             hwnd_results,
             LB_ADDSTRING,
             WPARAM(0),
             LPARAM(text.as_ptr() as isize),
         );
         with_podcast_state(hwnd, |s| s.search_results = Vec::new());
-        let _ = SendMessageW(hwnd_results, LB_SETCURSEL, WPARAM(0), LPARAM(0));
+        SendMessageW(hwnd_results, LB_SETCURSEL, WPARAM(0), LPARAM(0));
         SetFocus(hwnd_results);
         return;
     }
@@ -1355,7 +1404,7 @@ unsafe fn update_search_results(hwnd: HWND, results: Vec<PodcastSearchResult>) {
             format!("{} - {}", item.title, item.artist)
         };
         let wide = to_wide(&label);
-        let _ = SendMessageW(
+        SendMessageW(
             hwnd_results,
             LB_ADDSTRING,
             WPARAM(0),
@@ -1363,7 +1412,7 @@ unsafe fn update_search_results(hwnd: HWND, results: Vec<PodcastSearchResult>) {
         );
     }
     with_podcast_state(hwnd, |s| s.search_results = results);
-    let _ = SendMessageW(hwnd_results, LB_SETCURSEL, WPARAM(0), LPARAM(0));
+    SendMessageW(hwnd_results, LB_SETCURSEL, WPARAM(0), LPARAM(0));
     SetFocus(hwnd_results);
 }
 
@@ -1387,18 +1436,18 @@ unsafe fn perform_search(hwnd: HWND, query: &str) {
     }
     let hwnd_results = with_podcast_state(hwnd, |s| s.hwnd_results).unwrap_or(HWND(0));
     if hwnd_results.0 != 0 {
-        let _ = SendMessageW(hwnd_results, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        SendMessageW(hwnd_results, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
         let text = to_wide(&i18n::tr(
             with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
             "podcasts.loading",
         ));
-        let _ = SendMessageW(
+        SendMessageW(
             hwnd_results,
             LB_ADDSTRING,
             WPARAM(0),
             LPARAM(text.as_ptr() as isize),
         );
-        let _ = SendMessageW(hwnd_results, LB_SETCURSEL, WPARAM(0), LPARAM(0));
+        SendMessageW(hwnd_results, LB_SETCURSEL, WPARAM(0), LPARAM(0));
         SetFocus(hwnd_results);
     }
     let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
@@ -1440,8 +1489,10 @@ unsafe fn perform_search(hwnd: HWND, query: &str) {
                     PCWSTR(to_wide(&title).as_ptr()),
                     MB_YESNO | MB_ICONINFORMATION,
                 );
-                if response == IDYES {
-                    let _ = open_url_in_browser("https://api.podcastindex.org/signup");
+                if response == IDYES
+                    && let Err(_e) = open_url_in_browser("https://api.podcastindex.org/signup")
+                {
+                    crate::log_debug(&format!("Error: {:?}", _e));
                 }
                 return;
             }
@@ -1452,10 +1503,16 @@ unsafe fn perform_search(hwnd: HWND, query: &str) {
     let query = percent_encode(trimmed);
     let hwnd_copy = hwnd;
     std::thread::spawn(move || {
-        let rt = tokio::runtime::Builder::new_current_thread()
+        let rt = match tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
-            .unwrap();
+        {
+            Ok(rt) => rt,
+            Err(e) => {
+                crate::log_debug(&format!("Failed to build tokio runtime: {}", e));
+                return;
+            }
+        };
         let mut results = Vec::new();
         match provider {
             SearchProvider::Itunes => {
@@ -1465,16 +1522,16 @@ unsafe fn perform_search(hwnd: HWND, query: &str) {
                 );
                 let fetch_config = rss_fetch_config(parent);
                 let bytes = rt.block_on(rss::fetch_url_bytes(&url, fetch_config));
-                if let Ok(bytes) = bytes {
-                    if let Ok(parsed) = serde_json::from_slice::<ItunesSearchResponse>(&bytes) {
-                        for item in parsed.results {
-                            if let Some(feed_url) = item.feed_url {
-                                results.push(PodcastSearchResult {
-                                    title: item.collection_name.unwrap_or_default(),
-                                    artist: item.artist_name.unwrap_or_default(),
-                                    feed_url,
-                                });
-                            }
+                if let Ok(bytes) = bytes
+                    && let Ok(parsed) = serde_json::from_slice::<ItunesSearchResponse>(&bytes)
+                {
+                    for item in parsed.results {
+                        if let Some(feed_url) = item.feed_url {
+                            results.push(PodcastSearchResult {
+                                title: item.collection_name.unwrap_or_default(),
+                                artist: item.artist_name.unwrap_or_default(),
+                                feed_url,
+                            });
                         }
                     }
                 }
@@ -1502,26 +1559,19 @@ unsafe fn perform_search(hwnd: HWND, query: &str) {
                         .header("X-Auth-Key", key)
                         .header("Authorization", hash)
                         .send()
+                        && let Ok(bytes) = resp.bytes()
+                        && let Ok(parsed) =
+                            serde_json::from_slice::<PodcastIndexSearchResponse>(&bytes)
+                        && let Some(feeds) = parsed.feeds
                     {
-                        if let Ok(bytes) = resp.bytes() {
-                            if let Ok(parsed) =
-                                serde_json::from_slice::<PodcastIndexSearchResponse>(&bytes)
-                            {
-                                if let Some(feeds) = parsed.feeds {
-                                    for feed in feeds {
-                                        let feed_url = feed.feed_url.or(feed.url);
-                                        if let Some(feed_url) = feed_url {
-                                            results.push(PodcastSearchResult {
-                                                title: feed.title.unwrap_or_default(),
-                                                artist: feed
-                                                    .author
-                                                    .or(feed.owner_name)
-                                                    .unwrap_or_default(),
-                                                feed_url,
-                                            });
-                                        }
-                                    }
-                                }
+                        for feed in feeds {
+                            let feed_url = feed.feed_url.or(feed.url);
+                            if let Some(feed_url) = feed_url {
+                                results.push(PodcastSearchResult {
+                                    title: feed.title.unwrap_or_default(),
+                                    artist: feed.author.or(feed.owner_name).unwrap_or_default(),
+                                    feed_url,
+                                });
                             }
                         }
                     }
@@ -1531,12 +1581,12 @@ unsafe fn perform_search(hwnd: HWND, query: &str) {
             }
         }
         let msg = Box::new(SearchResultMsg { results });
-        let _ = PostMessageW(
+        if let Err(_e) = PostMessageW(
             hwnd_copy,
             WM_PODCAST_SEARCH_COMPLETE,
             WPARAM(0),
             LPARAM(Box::into_raw(msg) as isize),
-        );
+        ) {}
     });
 }
 
@@ -1559,7 +1609,7 @@ unsafe fn subscribe_selected_result(hwnd: HWND) {
         // Show confirmation dialog
         let title = i18n::tr(language, "podcasts.subscribed_title");
         let message = i18n::tr(language, "podcasts.subscribed_message");
-        let _ = MessageBoxW(
+        MessageBoxW(
             hwnd,
             PCWSTR(to_wide(&message).as_ptr()),
             PCWSTR(to_wide(&title).as_ptr()),
@@ -1578,7 +1628,7 @@ unsafe fn subscribe_selected_result(hwnd: HWND) {
                 with_podcast_state(hwnd, |s| {
                     s.node_data.insert(hitem.0, NodeData::Source(index));
                 });
-                let _ = SendMessageW(
+                SendMessageW(
                     hwnd_tree,
                     TVM_SELECTITEM,
                     WPARAM(TVGN_CARET as usize),
@@ -1632,7 +1682,7 @@ unsafe fn show_add_dialog(parent_hwnd: HWND) {
         Some(init_ptr as *const _),
     );
     if hwnd.0 == 0 {
-        let _ = Box::from_raw(init_ptr);
+        drop(Box::from_raw(init_ptr));
         return;
     }
     with_state(main_hwnd, |s| s.podcasts_add_dialog = hwnd);
@@ -1721,7 +1771,7 @@ unsafe extern "system" fn add_wndproc(
             LRESULT(0)
         }
         WM_COMMAND => {
-            let id = (wparam.0 & 0xffff) as usize;
+            let id = wparam.0 & 0xffff;
             match id {
                 1 => {
                     SendMessageW(hwnd, WM_COMMAND, WPARAM(ADD_OK_ID), LPARAM(0));
@@ -1760,11 +1810,11 @@ unsafe extern "system" fn add_wndproc(
                             LPARAM(&cds as *const _ as isize),
                         );
                     }
-                    let _ = DestroyWindow(hwnd);
+                    crate::log_if_err!(DestroyWindow(hwnd));
                     LRESULT(0)
                 }
                 ADD_CANCEL_ID | 2 => {
-                    let _ = DestroyWindow(hwnd);
+                    crate::log_if_err!(DestroyWindow(hwnd));
                     LRESULT(0)
                 }
                 _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -1814,7 +1864,9 @@ struct PodcastIndexFeed {
 
 pub unsafe fn show_context_menu_from_keyboard(hwnd: HWND) {
     let mut pt = windows::Win32::Foundation::POINT::default();
-    let _ = windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut pt);
+    crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::GetCursorPos(
+        &mut pt
+    ));
     show_context_menu(hwnd, pt.x, pt.y, false);
 }
 
@@ -1830,9 +1882,9 @@ unsafe fn force_focus_editor_on_parent(parent: HWND) {
         return;
     }
     SetForegroundWindow(parent);
-    let _ = SendMessageW(parent, WM_SETFOCUS, WPARAM(0), LPARAM(0));
+    SendMessageW(parent, WM_SETFOCUS, WPARAM(0), LPARAM(0));
     if crate::get_active_edit(parent).is_none() {
-        let _ = SendMessageW(
+        SendMessageW(
             parent,
             WM_COMMAND,
             WPARAM(crate::menu::IDM_FILE_NEW),
@@ -1841,19 +1893,19 @@ unsafe fn force_focus_editor_on_parent(parent: HWND) {
     }
     if let Some(hwnd_edit) = crate::get_active_edit(parent) {
         SetFocus(hwnd_edit);
-        let _ = SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(0));
-        let _ = SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
-        let _ = SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
-        let _ = SendMessageW(
+        SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(0));
+        SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+        SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
+        SendMessageW(
             parent,
             WM_NEXTDLGCTL,
             WPARAM(hwnd_edit.0 as usize),
             LPARAM(1),
         );
         SetFocus(hwnd_edit);
-        let _ = SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(0));
-        let _ = SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
-        let _ = SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
+        SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(0));
+        SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+        SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
         NotifyWinEvent(
             EVENT_OBJECT_FOCUS,
             hwnd_edit,
@@ -1861,8 +1913,10 @@ unsafe fn force_focus_editor_on_parent(parent: HWND) {
             CHILDID_SELF as i32,
         );
     }
-    let _ = SendMessageW(parent, WM_SETFOCUS, WPARAM(0), LPARAM(0));
-    let _ = PostMessageW(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0));
+    SendMessageW(parent, WM_SETFOCUS, WPARAM(0), LPARAM(0));
+    if let Err(_e) = PostMessageW(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) {
+        crate::log_debug(&format!("Error: {:?}", _e));
+    }
 }
 
 unsafe fn show_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
@@ -1935,7 +1989,7 @@ unsafe fn show_search_result_info(hwnd: HWND) {
             ("feed", &result.feed_url),
         ],
     );
-    let _ = MessageBoxW(
+    MessageBoxW(
         hwnd,
         PCWSTR(to_wide(&body).as_ptr()),
         PCWSTR(to_wide(&title).as_ptr()),
@@ -1949,36 +2003,35 @@ unsafe fn show_search_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: boo
         return;
     }
     let mut rect = windows::Win32::Foundation::RECT::default();
-    if use_hit_test {
-        if GetWindowRect(hwnd_results, &mut rect).is_ok() {
-            if x < rect.left || x > rect.right || y < rect.top || y > rect.bottom {
-                return;
-            }
-        }
+    if use_hit_test
+        && GetWindowRect(hwnd_results, &mut rect).is_ok()
+        && (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom)
+    {
+        return;
     }
     let language = with_podcast_state(hwnd, |s| s.language).unwrap_or_default();
     let label = i18n::tr(language, "podcasts.context.subscribe");
     let info_label = i18n::tr(language, "podcasts.context.info");
     let copy_label = i18n::tr(language, "podcasts.context.copy_url");
     let menu = CreateMenu().unwrap_or(HMENU(0));
-    let _ = AppendMenuW(
+    if let Err(_e) = AppendMenuW(
         menu,
         MF_STRING,
         ID_CTX_SUBSCRIBE,
         PCWSTR(to_wide(&label).as_ptr()),
-    );
-    let _ = AppendMenuW(
+    ) {}
+    if let Err(_e) = AppendMenuW(
         menu,
         MF_STRING,
         ID_CTX_SEARCH_INFO,
         PCWSTR(to_wide(&info_label).as_ptr()),
-    );
-    let _ = AppendMenuW(
+    ) {}
+    if let Err(_e) = AppendMenuW(
         menu,
         MF_STRING,
         ID_CTX_SEARCH_COPY_URL,
         PCWSTR(to_wide(&copy_label).as_ptr()),
-    );
+    ) {}
     let cmd = TrackPopupMenu(
         menu,
         windows::Win32::UI::WindowsAndMessaging::TPM_RETURNCMD,
@@ -1999,7 +2052,7 @@ unsafe fn show_search_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: boo
         }
         _ => {}
     }
-    let _ = DestroyMenu(menu);
+    crate::log_if_err!(DestroyMenu(menu));
 }
 
 unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
@@ -2008,12 +2061,11 @@ unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool)
         return;
     }
     let mut rect = windows::Win32::Foundation::RECT::default();
-    if use_hit_test {
-        if GetWindowRect(hwnd_tree, &mut rect).is_ok() {
-            if x < rect.left || x > rect.right || y < rect.top || y > rect.bottom {
-                return;
-            }
-        }
+    if use_hit_test
+        && GetWindowRect(hwnd_tree, &mut rect).is_ok()
+        && (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom)
+    {
+        return;
     }
     let hitem = selected_tree_item(hwnd);
     if hitem.0 == 0 {
@@ -2037,87 +2089,89 @@ unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool)
             let reorder_position = i18n::tr(language, "rss.reorder.move_to_position");
             let copy_url = i18n::tr(language, "podcasts.context.copy_url");
             let open_feed = i18n::tr(language, "podcasts.context.open_feed");
-            let _ = AppendMenuW(
+            if let Err(_e) = AppendMenuW(
                 menu,
                 MF_STRING,
                 ID_CTX_UPDATE,
                 PCWSTR(to_wide(&update_label).as_ptr()),
-            );
-            let _ = AppendMenuW(
+            ) {}
+            if let Err(_e) = AppendMenuW(
                 menu,
                 MF_STRING,
                 ID_CTX_REMOVE,
                 PCWSTR(to_wide(&remove_label).as_ptr()),
-            );
+            ) {}
             let total = with_podcast_state(hwnd, |s| {
                 with_state(s.parent, |ps| ps.settings.podcast_sources.len()).unwrap_or(0)
             })
             .unwrap_or(0);
             let at_top = idx == 0;
             let at_bottom = total == 0 || idx + 1 >= total;
-            if let Ok(submenu) = CreatePopupMenu() {
-                if submenu.0 != 0 {
-                    let up_flags = if at_top {
-                        MF_STRING | MF_GRAYED
-                    } else {
-                        MF_STRING
-                    };
-                    let down_flags = if at_bottom {
-                        MF_STRING | MF_GRAYED
-                    } else {
-                        MF_STRING
-                    };
-                    let _ = AppendMenuW(
-                        submenu,
-                        up_flags,
-                        ID_CTX_REORDER_UP,
-                        PCWSTR(to_wide(&reorder_up).as_ptr()),
-                    );
-                    let _ = AppendMenuW(
-                        submenu,
-                        down_flags,
-                        ID_CTX_REORDER_DOWN,
-                        PCWSTR(to_wide(&reorder_down).as_ptr()),
-                    );
-                    let _ = AppendMenuW(
-                        submenu,
-                        up_flags,
-                        ID_CTX_REORDER_TOP,
-                        PCWSTR(to_wide(&reorder_top).as_ptr()),
-                    );
-                    let _ = AppendMenuW(
-                        submenu,
-                        down_flags,
-                        ID_CTX_REORDER_BOTTOM,
-                        PCWSTR(to_wide(&reorder_bottom).as_ptr()),
-                    );
-                    let _ = AppendMenuW(
-                        submenu,
-                        MF_STRING,
-                        ID_CTX_REORDER_POSITION,
-                        PCWSTR(to_wide(&reorder_position).as_ptr()),
-                    );
-                    let _ = AppendMenuW(
-                        menu,
-                        MF_POPUP,
-                        submenu.0 as usize,
-                        PCWSTR(to_wide(&reorder_label).as_ptr()),
-                    );
-                }
+            if let Ok(submenu) = CreatePopupMenu()
+                && submenu.0 != 0
+            {
+                let up_flags = if at_top {
+                    MF_STRING | MF_GRAYED
+                } else {
+                    MF_STRING
+                };
+                let down_flags = if at_bottom {
+                    MF_STRING | MF_GRAYED
+                } else {
+                    MF_STRING
+                };
+                if let Err(_e) = AppendMenuW(
+                    submenu,
+                    up_flags,
+                    ID_CTX_REORDER_UP,
+                    PCWSTR(to_wide(&reorder_up).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    submenu,
+                    down_flags,
+                    ID_CTX_REORDER_DOWN,
+                    PCWSTR(to_wide(&reorder_down).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    submenu,
+                    up_flags,
+                    ID_CTX_REORDER_TOP,
+                    PCWSTR(to_wide(&reorder_top).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    submenu,
+                    down_flags,
+                    ID_CTX_REORDER_BOTTOM,
+                    PCWSTR(to_wide(&reorder_bottom).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    submenu,
+                    MF_STRING,
+                    ID_CTX_REORDER_POSITION,
+                    PCWSTR(to_wide(&reorder_position).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_POPUP,
+                    submenu.0 as usize,
+                    PCWSTR(to_wide(&reorder_label).as_ptr()),
+                ) {}
             }
-            let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
-            let _ = AppendMenuW(
+            if let Err(_e) = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()) {
+                crate::log_debug(&format!("Error: {:?}", _e));
+            }
+            if let Err(_e) = AppendMenuW(
                 menu,
                 MF_STRING,
                 ID_CTX_COPY_URL,
                 PCWSTR(to_wide(&copy_url).as_ptr()),
-            );
-            let _ = AppendMenuW(
+            ) {}
+            if let Err(_e) = AppendMenuW(
                 menu,
                 MF_STRING,
                 ID_CTX_OPEN_FEED,
                 PCWSTR(to_wide(&open_feed).as_ptr()),
-            );
+            ) {}
         }
         Some(NodeData::Episode(_)) => {
             let play_label = i18n::tr(language, "podcasts.context.play");
@@ -2125,36 +2179,36 @@ unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool)
             let copy_audio = i18n::tr(language, "podcasts.context.copy_audio");
             let copy_title = i18n::tr(language, "podcasts.context.copy_title");
             let download_label = i18n::tr(language, "podcasts.context.download_episode");
-            let _ = AppendMenuW(
+            if let Err(_e) = AppendMenuW(
                 menu,
                 MF_STRING,
                 ID_CTX_PLAY,
                 PCWSTR(to_wide(&play_label).as_ptr()),
-            );
-            let _ = AppendMenuW(
+            ) {}
+            if let Err(_e) = AppendMenuW(
                 menu,
                 MF_STRING,
                 ID_CTX_OPEN_EPISODE,
                 PCWSTR(to_wide(&open_label).as_ptr()),
-            );
-            let _ = AppendMenuW(
+            ) {}
+            if let Err(_e) = AppendMenuW(
                 menu,
                 MF_STRING,
                 ID_CTX_COPY_AUDIO,
                 PCWSTR(to_wide(&copy_audio).as_ptr()),
-            );
-            let _ = AppendMenuW(
+            ) {}
+            if let Err(_e) = AppendMenuW(
                 menu,
                 MF_STRING,
                 ID_CTX_COPY_TITLE,
                 PCWSTR(to_wide(&copy_title).as_ptr()),
-            );
-            let _ = AppendMenuW(
+            ) {}
+            if let Err(_e) = AppendMenuW(
                 menu,
                 MF_STRING,
                 ID_CTX_DOWNLOAD_EPISODE,
                 PCWSTR(to_wide(&download_label).as_ptr()),
-            );
+            ) {}
         }
         None => {}
     }
@@ -2170,13 +2224,13 @@ unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool)
         None,
     )
     .0 as usize;
-    let _ = PostMessageW(
+    if let Err(_e) = PostMessageW(
         hwnd,
         windows::Win32::UI::WindowsAndMessaging::WM_NULL,
         WPARAM(0),
         LPARAM(0),
-    );
-    let _ = DestroyMenu(menu);
+    ) {}
+    crate::log_if_err!(DestroyMenu(menu));
     match cmd {
         ID_CTX_UPDATE => handle_source_action(hwnd, SourceAction::Update),
         ID_CTX_REMOVE => handle_source_action(hwnd, SourceAction::Remove),
@@ -2271,7 +2325,7 @@ unsafe fn handle_source_action(hwnd: HWND, verb: SourceAction) {
                         .0,
                     );
                     if first.0 != 0 {
-                        let _ = SendMessageW(
+                        SendMessageW(
                             hwnd_tree,
                             TVM_SELECTITEM,
                             WPARAM(TVGN_CARET as usize),
@@ -2310,8 +2364,10 @@ unsafe fn handle_source_action(hwnd: HWND, verb: SourceAction) {
             })
             .unwrap_or(None)
             .unwrap_or_default();
-            if !url.is_empty() {
-                let _ = open_url_in_browser(&url);
+            if !url.is_empty()
+                && let Err(_e) = open_url_in_browser(&url)
+            {
+                crate::log_debug(&format!("Error: {:?}", _e));
             }
         }
     }
@@ -2334,8 +2390,10 @@ unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
     match action {
         EpisodeAction::Play => open_episode_in_player(hwnd, parent, &item),
         EpisodeAction::OpenEpisode => {
-            if !item.link.trim().is_empty() {
-                let _ = open_url_in_browser(&item.link);
+            if !item.link.trim().is_empty()
+                && let Err(_e) = open_url_in_browser(&item.link)
+            {
+                crate::log_debug(&format!("Error: {:?}", _e));
             }
         }
         EpisodeAction::CopyAudio => {
@@ -2426,12 +2484,12 @@ unsafe fn handle_reorder_action(hwnd: HWND, action: ReorderAction) {
         ReorderAction::Bottom => apply_reorder_action(hwnd, source_index, action, 0),
         ReorderAction::Position => None,
     };
-    if let Some(new_index) = new_index {
-        if new_index != source_index {
-            let template = i18n::tr(language, "rss.reorder.moved_position");
-            let message = template.replace("{x}", &(new_index + 1).to_string());
-            announce_status(&message);
-        }
+    if let Some(new_index) = new_index
+        && new_index != source_index
+    {
+        let template = i18n::tr(language, "rss.reorder.moved_position");
+        let message = template.replace("{x}", &(new_index + 1).to_string());
+        announce_status(&message);
     }
 }
 
@@ -2479,7 +2537,7 @@ unsafe fn show_reorder_dialog(parent_hwnd: HWND, source_index: usize, total: usi
         Some(init_ptr as *const _),
     );
     if hwnd.0 == 0 {
-        let _ = Box::from_raw(init_ptr);
+        drop(Box::from_raw(init_ptr));
         return;
     }
     with_podcast_state(parent_hwnd, |s| s.reorder_dialog = hwnd);
@@ -2491,10 +2549,8 @@ unsafe extern "system" fn reorder_control_subclass_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    if msg == WM_CHAR {
-        if wparam.0 as u16 == VK_TAB.0 {
-            return LRESULT(0);
-        }
+    if msg == WM_CHAR && wparam.0 as u16 == VK_TAB.0 {
+        return LRESULT(0);
     }
     if msg == WM_KEYDOWN {
         let id = GetDlgCtrlID(hwnd) as usize;
@@ -2658,30 +2714,33 @@ unsafe extern "system" fn reorder_wndproc(
                 hinstance,
                 None,
             );
+            let proc_ptr = reorder_control_subclass_proc as usize;
             let prev = SetWindowLongPtrW(
                 edit,
                 windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
-                reorder_control_subclass_proc as isize,
+                proc_ptr as isize,
             );
             SetWindowLongPtrW(
                 edit,
                 windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
                 prev,
             );
+            let proc_ptr = reorder_control_subclass_proc as usize;
             let prev_ok = SetWindowLongPtrW(
                 ok,
                 windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
-                reorder_control_subclass_proc as isize,
+                proc_ptr as isize,
             );
             SetWindowLongPtrW(
                 ok,
                 windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
                 prev_ok,
             );
+            let proc_ptr = reorder_control_subclass_proc as usize;
             let prev_cancel = SetWindowLongPtrW(
                 cancel,
                 windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
-                reorder_control_subclass_proc as isize,
+                proc_ptr as isize,
             );
             SetWindowLongPtrW(
                 cancel,
@@ -2689,12 +2748,14 @@ unsafe extern "system" fn reorder_wndproc(
                 prev_cancel,
             );
             let text = format!("{}", source_index + 1);
-            let _ = SetWindowTextW(edit, PCWSTR(to_wide(&text).as_ptr()));
+            if let Err(_e) = SetWindowTextW(edit, PCWSTR(to_wide(&text).as_ptr())) {
+                crate::log_debug(&format!("Error: {:?}", _e));
+            }
             SetFocus(edit);
             LRESULT(0)
         }
         WM_COMMAND => {
-            let id = (wparam.0 & 0xffff) as usize;
+            let id = wparam.0 & 0xffff;
             match id {
                 REORDER_OK_ID | 1 => {
                     let ptr = GetWindowLongPtrW(
@@ -2738,14 +2799,13 @@ unsafe extern "system" fn reorder_wndproc(
                         init.source_index,
                         ReorderAction::Position,
                         target,
-                    ) {
-                        if new_index != init.source_index {
-                            let template = i18n::tr(language, "rss.reorder.moved_position");
-                            let message = template.replace("{x}", &(new_index + 1).to_string());
-                            announce_status(&message);
-                        }
+                    ) && new_index != init.source_index
+                    {
+                        let template = i18n::tr(language, "rss.reorder.moved_position");
+                        let message = template.replace("{x}", &(new_index + 1).to_string());
+                        announce_status(&message);
                     }
-                    let _ = DestroyWindow(hwnd);
+                    crate::log_if_err!(DestroyWindow(hwnd));
                     focus_library(init.parent);
                     LRESULT(0)
                 }
@@ -2759,7 +2819,7 @@ unsafe extern "system" fn reorder_wndproc(
                     } else {
                         (*ptr).parent
                     };
-                    let _ = DestroyWindow(hwnd);
+                    crate::log_if_err!(DestroyWindow(hwnd));
                     if parent.0 != 0 {
                         focus_library(parent);
                     }
@@ -2802,12 +2862,12 @@ unsafe extern "system" fn podcast_tree_wndproc(
         let key = wparam.0 as u32;
         if msg == WM_CHAR && key == VK_RETURN.0 as u32 {
             let parent = GetParent(hwnd);
-            if parent.0 != 0 {
-                if let Some(item) = selected_episode(parent) {
-                    let main_hwnd = with_podcast_state(parent, |s| s.parent).unwrap_or(HWND(0));
-                    open_episode_in_player(parent, main_hwnd, &item);
-                    return LRESULT(0);
-                }
+            if parent.0 != 0
+                && let Some(item) = selected_episode(parent)
+            {
+                let main_hwnd = with_podcast_state(parent, |s| s.parent).unwrap_or(HWND(0));
+                open_episode_in_player(parent, main_hwnd, &item);
+                return LRESULT(0);
             }
         }
         if key == VK_DELETE.0 as u32 {
@@ -2819,19 +2879,19 @@ unsafe extern "system" fn podcast_tree_wndproc(
         }
         if key == VK_RIGHT.0 as u32 {
             let parent = GetParent(hwnd);
-            if parent.0 != 0 {
-                if let Some(idx) = selected_source_index(parent) {
-                    let hitem = selected_tree_item(parent);
-                    if hitem.0 != 0 {
-                        load_episode_children(parent, hitem, idx, false);
-                        let _ = SendMessageW(
-                            hwnd,
-                            TVM_EXPAND,
-                            WPARAM(windows::Win32::UI::Controls::TVE_EXPAND.0 as usize),
-                            LPARAM(hitem.0),
-                        );
-                        return LRESULT(0);
-                    }
+            if parent.0 != 0
+                && let Some(idx) = selected_source_index(parent)
+            {
+                let hitem = selected_tree_item(parent);
+                if hitem.0 != 0 {
+                    load_episode_children(parent, hitem, idx, false);
+                    SendMessageW(
+                        hwnd,
+                        TVM_EXPAND,
+                        WPARAM(windows::Win32::UI::Controls::TVE_EXPAND.0 as usize),
+                        LPARAM(hitem.0),
+                    );
+                    return LRESULT(0);
                 }
             }
         }
@@ -2850,7 +2910,7 @@ unsafe extern "system" fn podcast_tree_wndproc(
                         .0,
                     );
                     if parent_item.0 != 0 {
-                        let _ = SendMessageW(
+                        SendMessageW(
                             hwnd,
                             TVM_SELECTITEM,
                             WPARAM(TVGN_CARET as usize),
@@ -2859,7 +2919,7 @@ unsafe extern "system" fn podcast_tree_wndproc(
                         return LRESULT(0);
                     }
                     if selected_source_index(parent).is_some() {
-                        let _ = SendMessageW(
+                        SendMessageW(
                             hwnd,
                             TVM_EXPAND,
                             WPARAM(windows::Win32::UI::Controls::TVE_COLLAPSE.0 as usize),
@@ -2892,7 +2952,11 @@ unsafe extern "system" fn podcast_tree_wndproc(
         {
             let parent = GetParent(hwnd);
             if parent.0 != 0 {
-                let _ = PostMessageW(parent, WM_CONTEXTMENU, WPARAM(hwnd.0 as usize), LPARAM(-1));
+                if let Err(_e) =
+                    PostMessageW(parent, WM_CONTEXTMENU, WPARAM(hwnd.0 as usize), LPARAM(-1))
+                {
+                    crate::log_debug(&format!("Error: {:?}", _e));
+                }
                 return LRESULT(0);
             }
         }
@@ -3029,10 +3093,10 @@ unsafe fn create_controls(hwnd: HWND) {
             | WS_VISIBLE
             | WS_TABSTOP
             | WINDOW_STYLE(
-                (windows::Win32::UI::Controls::TVS_HASLINES
+                windows::Win32::UI::Controls::TVS_HASLINES
                     | windows::Win32::UI::Controls::TVS_HASBUTTONS
                     | windows::Win32::UI::Controls::TVS_LINESATROOT
-                    | windows::Win32::UI::Controls::TVS_SHOWSELALWAYS) as u32,
+                    | windows::Win32::UI::Controls::TVS_SHOWSELALWAYS,
             ),
         10,
         10,
@@ -3044,10 +3108,11 @@ unsafe fn create_controls(hwnd: HWND) {
         None,
     );
     if hwnd_tree.0 != 0 {
+        let proc_ptr = podcast_tree_wndproc as usize;
         let old = SetWindowLongPtrW(
             hwnd_tree,
             windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
-            podcast_tree_wndproc as isize,
+            proc_ptr as isize,
         );
         with_podcast_state(hwnd, |s| {
             s.tree_proc = std::mem::transmute::<isize, WNDPROC>(old)
@@ -3111,10 +3176,11 @@ unsafe fn create_controls(hwnd: HWND) {
         None,
     );
     if hwnd_search.0 != 0 {
+        let proc_ptr = podcast_search_wndproc as usize;
         let old = SetWindowLongPtrW(
             hwnd_search,
             windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
-            podcast_search_wndproc as isize,
+            proc_ptr as isize,
         );
         with_podcast_state(hwnd, |s| {
             s.search_proc = std::mem::transmute::<isize, WNDPROC>(old)
@@ -3146,19 +3212,19 @@ unsafe fn create_controls(hwnd: HWND) {
     if hwnd_search_provider.0 != 0 {
         let itunes_wide = to_wide(&provider_itunes);
         let podcastindex_wide = to_wide(&provider_podcastindex);
-        let _ = SendMessageW(
+        SendMessageW(
             hwnd_search_provider,
             CB_ADDSTRING,
             WPARAM(0),
             LPARAM(itunes_wide.as_ptr() as isize),
         );
-        let _ = SendMessageW(
+        SendMessageW(
             hwnd_search_provider,
             CB_ADDSTRING,
             WPARAM(0),
             LPARAM(podcastindex_wide.as_ptr() as isize),
         );
-        let _ = SendMessageW(hwnd_search_provider, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+        SendMessageW(hwnd_search_provider, CB_SETCURSEL, WPARAM(0), LPARAM(0));
     }
 
     let hwnd_search_button = CreateWindowExW(
@@ -3314,7 +3380,7 @@ unsafe fn create_controls(hwnd: HWND) {
         hwnd_close,
     ] {
         if ctrl.0 != 0 {
-            let _ = SendMessageW(ctrl, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+            SendMessageW(ctrl, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
         }
     }
 }
@@ -3371,79 +3437,79 @@ unsafe fn resize_controls(hwnd: HWND) {
         HWND(0),
     ));
     if controls.0 != HWND(0) {
-        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
             controls.0,
             margin,
             margin,
             width - margin * 2,
             tree_h,
             true,
-        );
+        ));
         let mut y = margin + tree_h + spacing;
-        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
             controls.1,
             margin,
             y,
             width - margin * 2,
             label_h,
             true,
-        );
+        ));
         y += label_h + spacing;
-        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
             controls.2,
             margin,
             y,
             width - margin * 2,
             search_h,
             true,
-        );
+        ));
         y += search_h + spacing;
-        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
             controls.3,
             margin,
             y,
             width - margin * 2,
             search_h,
             true,
-        );
+        ));
         y += search_h + spacing;
-        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
             controls.4,
             margin,
             y,
             200,
             search_button_h,
             true,
-        );
+        ));
         y += search_button_h + spacing;
-        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
             controls.5,
             margin,
             y,
             width - margin * 2,
             results_h,
             true,
-        );
+        ));
         y += results_h + spacing;
-        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
             controls.6, margin, y, 200, button_h, true,
-        );
-        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+        ));
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
             controls.9,
             (width - margin - 200).max(margin),
             y,
             200,
             button_h,
             true,
-        );
+        ));
         y += button_h + spacing;
-        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
             controls.7, margin, y, 200, button_h, true,
-        );
+        ));
         y += button_h + spacing;
-        let _ = windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
             controls.8, margin, y, 200, button_h, true,
-        );
+        ));
     }
 }
 
@@ -3490,7 +3556,9 @@ pub unsafe fn open(parent: HWND) {
     );
 
     if hwnd.0 != 0 {
-        let _ = with_state(parent, |s| s.podcasts_window = hwnd);
+        if with_state(parent, |s| s.podcasts_window = hwnd).is_none() {
+            crate::log_debug("Failed to set podcasts_window state");
+        }
         SetForegroundWindow(hwnd);
     }
 }
@@ -3550,7 +3618,7 @@ unsafe extern "system" fn podcast_wndproc(
         }
         WM_NOTIFY => {
             let nmhdr = &*(lparam.0 as *const windows::Win32::UI::Controls::NMHDR);
-            if nmhdr.idFrom as usize == ID_TREE {
+            if nmhdr.idFrom == ID_TREE {
                 if nmhdr.code == NM_RETURN {
                     let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
                     if let Some(item) = selected_episode(hwnd) {
@@ -3561,7 +3629,7 @@ unsafe extern "system" fn podcast_wndproc(
                 if nmhdr.code == TVN_KEYDOWN {
                     let key = (lparam.0 as *const NMTVKEYDOWN).as_ref();
                     if let Some(key) = key
-                        && key.wVKey == VK_RETURN.0 as u16
+                        && key.wVKey == VK_RETURN.0
                     {
                         let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
                         if let Some(item) = selected_episode(hwnd) {
@@ -3594,7 +3662,7 @@ unsafe extern "system" fn podcast_wndproc(
             LRESULT(0)
         }
         WM_COMMAND => {
-            let id = (wparam.0 & 0xffff) as usize;
+            let id = wparam.0 & 0xffff;
             let code = ((wparam.0 >> 16) & 0xffff) as u16;
             match id {
                 ID_ADD_BUTTON => {
@@ -3610,7 +3678,7 @@ unsafe extern "system" fn podcast_wndproc(
                     LRESULT(0)
                 }
                 ID_CLOSE_BUTTON | 2 => {
-                    let _ = DestroyWindow(hwnd);
+                    crate::log_if_err!(DestroyWindow(hwnd));
                     LRESULT(0)
                 }
                 ID_SEARCH_BUTTON => {
@@ -3651,7 +3719,7 @@ unsafe extern "system" fn podcast_wndproc(
             if (focus == hwnd_search || focus == hwnd_search_provider) && key == VK_RETURN.0 as u32
             {
                 if hwnd_search_button.0 != 0 {
-                    let _ = SendMessageW(
+                    SendMessageW(
                         hwnd_search_button,
                         windows::Win32::UI::WindowsAndMessaging::BM_CLICK,
                         WPARAM(0),
@@ -3680,20 +3748,21 @@ unsafe extern "system" fn podcast_wndproc(
                     return LRESULT(0);
                 }
             }
-            if focus == hwnd_tree && key == VK_RIGHT.0 as u32 {
-                if let Some(idx) = selected_source_index(hwnd) {
-                    let hitem = selected_tree_item(hwnd);
-                    if hitem.0 != 0 {
-                        load_episode_children(hwnd, hitem, idx, false);
-                        let _ = SendMessageW(
-                            hwnd_tree,
-                            TVM_EXPAND,
-                            WPARAM(windows::Win32::UI::Controls::TVE_EXPAND.0 as usize),
-                            LPARAM(hitem.0),
-                        );
-                    }
-                    return LRESULT(0);
+            if focus == hwnd_tree
+                && key == VK_RIGHT.0 as u32
+                && let Some(idx) = selected_source_index(hwnd)
+            {
+                let hitem = selected_tree_item(hwnd);
+                if hitem.0 != 0 {
+                    load_episode_children(hwnd, hitem, idx, false);
+                    SendMessageW(
+                        hwnd_tree,
+                        TVM_EXPAND,
+                        WPARAM(windows::Win32::UI::Controls::TVE_EXPAND.0 as usize),
+                        LPARAM(hitem.0),
+                    );
                 }
+                return LRESULT(0);
             }
             if focus == hwnd_tree && key == VK_LEFT.0 as u32 {
                 let hitem = selected_tree_item(hwnd);
@@ -3708,7 +3777,7 @@ unsafe extern "system" fn podcast_wndproc(
                         .0,
                     );
                     if parent_item.0 != 0 {
-                        let _ = SendMessageW(
+                        SendMessageW(
                             hwnd_tree,
                             TVM_SELECTITEM,
                             WPARAM(TVGN_CARET as usize),
@@ -3717,7 +3786,7 @@ unsafe extern "system" fn podcast_wndproc(
                         return LRESULT(0);
                     }
                     if selected_source_index(hwnd).is_some() {
-                        let _ = SendMessageW(
+                        SendMessageW(
                             hwnd_tree,
                             TVM_EXPAND,
                             WPARAM(windows::Win32::UI::Controls::TVE_COLLAPSE.0 as usize),
@@ -3744,7 +3813,7 @@ unsafe extern "system" fn podcast_wndproc(
                             with_podcast_state(hwnd, |s| {
                                 s.node_data.insert(hitem.0, NodeData::Source(index));
                             });
-                            let _ = SendMessageW(
+                            SendMessageW(
                                 hwnd_tree,
                                 TVM_SELECTITEM,
                                 WPARAM(TVGN_CARET as usize),
@@ -3823,10 +3892,10 @@ unsafe extern "system" fn podcast_wndproc(
             }
             if parent.0 != 0 {
                 SetForegroundWindow(parent);
-                if let Some(hwnd_tab) = with_state(parent, |s| s.hwnd_tab) {
-                    if hwnd_tab.0 != 0 {
-                        SetFocus(hwnd_tab);
-                    }
+                if let Some(hwnd_tab) = with_state(parent, |s| s.hwnd_tab)
+                    && hwnd_tab.0 != 0
+                {
+                    SetFocus(hwnd_tab);
                 }
             }
             LRESULT(0)
@@ -3842,14 +3911,16 @@ unsafe extern "system" fn podcast_wndproc(
         WM_DESTROY => {
             let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
             if parent.0 != 0 {
-                let _ = with_state(parent, |s| s.podcasts_window = HWND(0));
+                if with_state(parent, |s| s.podcasts_window = HWND(0)).is_none() {
+                    crate::log_debug("Failed to reset podcasts_window state");
+                }
                 force_focus_editor_on_parent(parent);
             }
             let ptr =
                 GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
                     as *mut PodcastWindowState;
             if !ptr.is_null() {
-                let _ = Box::from_raw(ptr);
+                drop(Box::from_raw(ptr));
             }
             LRESULT(0)
         }

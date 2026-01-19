@@ -237,9 +237,9 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
         config.save_folder.clone()
     };
     if let Some(parent) = output_folder.parent() {
-        let _ = std::fs::create_dir_all(parent);
+        crate::log_if_err!(std::fs::create_dir_all(parent));
     }
-    let _ = std::fs::create_dir_all(&output_folder);
+    crate::log_if_err!(std::fs::create_dir_all(&output_folder));
 
     let timestamp = Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
     let base_name = format!("Podcast_{timestamp}");
@@ -552,12 +552,11 @@ impl RecorderHandle {
     pub fn resume(&self) {
         if self.paused.swap(false, Ordering::SeqCst) {
             let now = Instant::now();
-            if let Ok(mut paused_at) = self.shared.paused_at.lock() {
-                if let Some(start) = paused_at.take() {
-                    if let Ok(mut total) = self.shared.paused_total.lock() {
-                        *total += now.saturating_duration_since(start);
-                    }
-                }
+            if let Ok(mut paused_at) = self.shared.paused_at.lock()
+                && let Some(start) = paused_at.take()
+                && let Ok(mut total) = self.shared.paused_total.lock()
+            {
+                *total += now.saturating_duration_since(start);
             }
             if let Ok(mut status) = self.shared.status.lock() {
                 *status = RecorderStatus::Recording;
@@ -607,12 +606,12 @@ impl RecorderHandle {
         }
         crate::log_debug("All threads stopped");
 
-        if let Some(cancel) = cancel.as_ref() {
-            if cancel.load(Ordering::Relaxed) {
-                let _ = std::fs::remove_file(&self.temp_wav);
-                let _ = std::fs::remove_file(&self.temp_mp3);
-                return Err("Saving canceled.".to_string());
-            }
+        if let Some(cancel) = cancel.as_ref()
+            && cancel.load(Ordering::Relaxed)
+        {
+            crate::log_if_err!(std::fs::remove_file(&self.temp_wav));
+            crate::log_if_err!(std::fs::remove_file(&self.temp_mp3));
+            return Err("Saving canceled.".to_string());
         }
 
         if self.format == PodcastFormat::Mp3 {
@@ -687,23 +686,23 @@ impl RecorderHandle {
 
 fn rename_atomic(src: &Path, dest: &Path) -> Result<(), String> {
     if dest.exists() {
-        let _ = std::fs::remove_file(dest);
+        crate::log_if_err!(std::fs::remove_file(dest));
     }
     std::fs::rename(src, dest).map_err(|e| e.to_string())
 }
 
 fn keep_awake_loop(stop: Arc<AtomicBool>) -> Result<(), String> {
     unsafe {
-        let _ = SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
+        SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
     }
     while !stop.load(Ordering::SeqCst) {
         thread::sleep(Duration::from_secs(30));
         unsafe {
-            let _ = SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
+            SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
         }
     }
     unsafe {
-        let _ = SetThreadExecutionState(ES_CONTINUOUS);
+        SetThreadExecutionState(ES_CONTINUOUS);
     }
     Ok(())
 }
@@ -841,9 +840,11 @@ fn write_mixed_audio_wav(
         };
 
         if !can_mix {
-            let _ = buffer
-                .condvar
-                .wait_timeout(inner, Duration::from_millis(40));
+            crate::log_if_err!(
+                buffer
+                    .condvar
+                    .wait_timeout(inner, Duration::from_millis(40))
+            );
             continue;
         }
 
@@ -920,9 +921,11 @@ fn write_mixed_audio_mp3(
         };
 
         if !can_mix {
-            let _ = buffer
-                .condvar
-                .wait_timeout(inner, Duration::from_millis(40));
+            crate::log_if_err!(
+                buffer
+                    .condvar
+                    .wait_timeout(inner, Duration::from_millis(40))
+            );
             continue;
         }
 
@@ -1080,7 +1083,7 @@ fn capture_source(options: CaptureOptions) -> Result<(), String> {
     }
 
     unsafe {
-        let _ = client.Stop();
+        crate::log_if_err!(client.Stop());
     }
     Ok(())
 }

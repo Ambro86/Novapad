@@ -20,11 +20,11 @@ fn decode_unicode(input: &str) -> String {
                     hex.push(h);
                 }
             }
-            if let Ok(code) = u32::from_str_radix(&hex, 16) {
-                if let Some(decoded_char) = std::char::from_u32(code) {
-                    result.push(decoded_char);
-                    continue;
-                }
+            if let Ok(code) = u32::from_str_radix(&hex, 16)
+                && let Some(decoded_char) = std::char::from_u32(code)
+            {
+                result.push(decoded_char);
+                continue;
             }
             result.push_str("\\u");
             result.push_str(&hex);
@@ -59,10 +59,10 @@ fn extract_json_string(s: &str) -> Option<(String, usize)> {
                                 hex.push(h);
                             }
                         }
-                        if let Ok(code) = u32::from_str_radix(&hex, 16) {
-                            if let Some(decoded_char) = std::char::from_u32(code) {
-                                result.push(decoded_char);
-                            }
+                        if let Ok(code) = u32::from_str_radix(&hex, 16)
+                            && let Some(decoded_char) = std::char::from_u32(code)
+                        {
+                            result.push(decoded_char);
                         }
                     }
                     _ => {
@@ -191,69 +191,65 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
     }
 
     // 2. ESTRAZIONE DA NEXT_DATA (WSJ / Altri)
-    if !found_anything {
-        if let Ok(next_selector) = Selector::parse("script#__NEXT_DATA__") {
-            if let Some(element) = document.select(&next_selector).next() {
-                let json_text = element.text().collect::<Vec<_>>().join("");
+    if !found_anything
+        && let Ok(next_selector) = Selector::parse("script#__NEXT_DATA__")
+        && let Some(element) = document.select(&next_selector).next()
+    {
+        let json_text = element.text().collect::<Vec<_>>().join("");
 
-                // WSJ: estrai testi dai blocchi "content":[...] dei paragrafi
-                let mut seen_paragraphs = std::collections::HashSet::new();
-                for content_block in json_text.split("\"type\":\"paragraph\"") {
-                    if let Some(content_start) = content_block.find("\"content\":[") {
-                        let after_content = &content_block[content_start..];
-                        // Estrai tutti i "text":"..." dal blocco content usando extract_json_string
-                        let mut para_text = String::new();
-                        let mut search_pos = 0;
-                        while let Some(text_start) = after_content[search_pos..].find("\"text\":\"")
+        // WSJ: estrai testi dai blocchi "content":[...] dei paragrafi
+        let mut seen_paragraphs = std::collections::HashSet::new();
+        for content_block in json_text.split("\"type\":\"paragraph\"") {
+            if let Some(content_start) = content_block.find("\"content\":[") {
+                let after_content = &content_block[content_start..];
+                // Estrai tutti i "text":"..." dal blocco content usando extract_json_string
+                let mut para_text = String::new();
+                let mut search_pos = 0;
+                while let Some(text_start) = after_content[search_pos..].find("\"text\":\"") {
+                    let abs_start = search_pos + text_start + 8; // dopo "text":"
+                    if abs_start < after_content.len() {
+                        if let Some((val, end_pos)) =
+                            extract_json_string(&after_content[abs_start..])
                         {
-                            let abs_start = search_pos + text_start + 8; // dopo "text":"
-                            if abs_start < after_content.len() {
-                                if let Some((val, end_pos)) =
-                                    extract_json_string(&after_content[abs_start..])
-                                {
-                                    if !val.is_empty() && !val.starts_with('{') {
-                                        para_text.push_str(&val);
-                                    }
-                                    search_pos = abs_start + end_pos;
-                                } else {
-                                    break;
-                                }
-                            } else {
-                                break;
+                            if !val.is_empty() && !val.starts_with('{') {
+                                para_text.push_str(&val);
                             }
-                        }
-                        // Evita duplicati
-                        if para_text.len() > 20 && !seen_paragraphs.contains(&para_text) {
-                            seen_paragraphs.insert(para_text.clone());
-                            body_acc.push_str(&para_text);
-                            body_acc.push_str("\n\n");
-                            found_anything = true;
-                        }
-                    }
-                }
-
-                // Fallback: vecchio metodo per altri siti (con extract_json_string)
-                if !found_anything {
-                    let mut search_pos = 0;
-                    while let Some(text_start) = json_text[search_pos..].find("\"text\":\"") {
-                        let abs_start = search_pos + text_start + 8;
-                        if abs_start < json_text.len() {
-                            if let Some((val, end_pos)) =
-                                extract_json_string(&json_text[abs_start..])
-                            {
-                                if val.len() > 30 && !val.contains("http") && !val.contains("{") {
-                                    body_acc.push_str(&val);
-                                    body_acc.push_str("\n\n");
-                                    found_anything = true;
-                                }
-                                search_pos = abs_start + end_pos;
-                            } else {
-                                break;
-                            }
+                            search_pos = abs_start + end_pos;
                         } else {
                             break;
                         }
+                    } else {
+                        break;
                     }
+                }
+                // Evita duplicati
+                if para_text.len() > 20 && !seen_paragraphs.contains(&para_text) {
+                    seen_paragraphs.insert(para_text.clone());
+                    body_acc.push_str(&para_text);
+                    body_acc.push_str("\n\n");
+                    found_anything = true;
+                }
+            }
+        }
+
+        // Fallback: vecchio metodo per altri siti (con extract_json_string)
+        if !found_anything {
+            let mut search_pos = 0;
+            while let Some(text_start) = json_text[search_pos..].find("\"text\":\"") {
+                let abs_start = search_pos + text_start + 8;
+                if abs_start < json_text.len() {
+                    if let Some((val, end_pos)) = extract_json_string(&json_text[abs_start..]) {
+                        if val.len() > 30 && !val.contains("http") && !val.contains("{") {
+                            body_acc.push_str(&val);
+                            body_acc.push_str("\n\n");
+                            found_anything = true;
+                        }
+                        search_pos = abs_start + end_pos;
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
                 }
             }
         }
@@ -310,17 +306,17 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
 fn pick_title(document: &Html) -> String {
     let title_selectors = ["meta[property='og:title']", "h1", "title"];
     for sel in title_selectors {
-        if let Ok(s) = Selector::parse(sel) {
-            if let Some(el) = document.select(&s).next() {
-                let t = if sel.contains("meta") {
-                    el.value().attr("content").unwrap_or("").to_string()
-                } else {
-                    el.text().collect::<Vec<_>>().join(" ")
-                };
-                let clean_t = t.trim();
-                if clean_t.len() > 5 && !clean_t.to_lowercase().ends_with(".com") {
-                    return decode_unicode(clean_t);
-                }
+        if let Ok(s) = Selector::parse(sel)
+            && let Some(el) = document.select(&s).next()
+        {
+            let t = if sel.contains("meta") {
+                el.value().attr("content").unwrap_or("").to_string()
+            } else {
+                el.text().collect::<Vec<_>>().join(" ")
+            };
+            let clean_t = t.trim();
+            if clean_t.len() > 5 && !clean_t.to_lowercase().ends_with(".com") {
+                return decode_unicode(clean_t);
             }
         }
     }

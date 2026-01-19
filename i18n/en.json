@@ -8,6 +8,8 @@
   "app.tts_no_text": "There is no text to read.",
   "app.audiobook_done_title": "Audiobook",
   "app.info_title": "Info",
+  "dialog.pdf_no_text_ocr": "No extractable text. Do you want to run OCR to recognize the text?",
+  "dialog.ocr_title": "PDF OCR",
   "app.pdf_loaded": "PDF loaded.",
   "app.pdf_error_hint": "The PDF could not be read. Try reopening or use a different PDF viewer.",
   "app.text_not_found": "Text not found.",

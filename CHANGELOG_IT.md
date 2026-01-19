@@ -12,6 +12,7 @@ Nuove funzionalita
 • Aggiunta la funzione regex per Trova e Sostituisci, stile Notepad++.
 • Aggiunta l'importazione RSS da file OPML e TXT.
 • Aggiunta nelle Opzioni la casella per abilitare "Apri con Novapad" in Esplora risorse, anche in versione portable.
+• Aggiunto supporto OCR per PDF scansionati (richiede Windows 10/11): se un PDF non contiene testo, viene proposto il riconoscimento automatico.
 Miglioramenti
 • Migliorata la selezione di velocita, tono e volume delle voci, rispettando i limiti massimi del TTS.
 • Vari miglioramenti alla modalita RSS per scaricare tutti gli articoli senza spostare il focus di NVDA durante gli aggiornamenti.

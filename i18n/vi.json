@@ -8,6 +8,8 @@
   "app.tts_no_text": "Không có văn bản để đọc.",
   "app.audiobook_done_title": "Sách nói",
   "app.info_title": "Thông tin",
+  "dialog.pdf_no_text_ocr": "Không có văn bản nào có thể trích xuất. Bạn có muốn chạy OCR để nhận dạng văn bản không?",
+  "dialog.ocr_title": "PDF OCR",
   "app.pdf_loaded": "Đã tải xong PDF.",
   "app.pdf_error_hint": "Không thể đọc PDF. Hãy thử mở lại hoặc sử dụng trình xem PDF khác.",
   "app.text_not_found": "Không tìm thấy văn bản.",

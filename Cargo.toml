@@ -62,9 +62,15 @@ template = "packager/wix/main.wxs"
 [dependencies]
 windows = { version = "0.54", features = [
   "implement",
+  "Globalization",
   "Graphics_Capture",
   "Graphics_DirectX",
   "Graphics_DirectX_Direct3D11",
+  "Graphics_Imaging",
+  "Data_Pdf",
+  "Media_Ocr",
+  "Storage",
+  "Storage_Streams",
   "Win32_Devices_FunctionDiscovery",
   "Win32_Foundation",
   "Win32_Globalization",

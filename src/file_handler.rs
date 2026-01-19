@@ -1442,7 +1442,12 @@ pub fn write_docx_text(path: &Path, text: &str, language: Language) -> Result<()
 
 // --- PDF Parsing & Writing ---
 
-pub fn read_pdf_text(path: &Path, language: Language) -> Result<String, String> {
+pub enum PdfTextResult {
+    Text(String),
+    NoText,
+}
+
+pub fn read_pdf_text_with_status(path: &Path, language: Language) -> Result<PdfTextResult, String> {
     // Use catch_unwind to handle potential panics in pdf_extract library
     let extraction_result =
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| extract_text(path)));
@@ -1467,10 +1472,17 @@ pub fn read_pdf_text(path: &Path, language: Language) -> Result<String, String> 
 
     // Handle empty or whitespace-only PDFs
     if text.trim().is_empty() {
-        return Ok(i18n::tr(language, "file_handler.pdf_no_text"));
+        return Ok(PdfTextResult::NoText);
     }
 
-    Ok(normalize_pdf_paragraphs(&text))
+    Ok(PdfTextResult::Text(normalize_pdf_paragraphs(&text)))
+}
+
+pub fn read_pdf_text(path: &Path, language: Language) -> Result<String, String> {
+    match read_pdf_text_with_status(path, language)? {
+        PdfTextResult::Text(text) => Ok(text),
+        PdfTextResult::NoText => Ok(i18n::tr(language, "file_handler.pdf_no_text")),
+    }
 }
 
 fn normalize_pdf_paragraphs(text: &str) -> String {

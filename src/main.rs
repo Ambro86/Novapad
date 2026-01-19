@@ -42,6 +42,7 @@ mod tools;
 mod updater;
 mod wikipedia;
 mod wiktionary;
+mod win_ocr;
 
 use std::collections::HashMap;
 use std::io::Write;
@@ -96,19 +97,20 @@ use windows::Win32::UI::WindowsAndMessaging::{
     FCONTROL, FSHIFT, FVIRTKEY, FindWindowW, GWLP_USERDATA, GWLP_WNDPROC, GetClassNameW,
     GetCursorPos, GetForegroundWindow, GetMenu, GetMenuItemCount, GetMessageW, GetParent,
     GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, HACCEL,
-    HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, IsChild, IsIconic, IsWindow, KillTimer,
-    LoadCursorW, LoadIconW, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MF_BYCOMMAND, MF_BYPOSITION,
-    MF_CHECKED, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW,
-    OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE,
-    SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED, SendMessageW, SetForegroundWindow, SetTimer,
-    SetWindowLongPtrW, SetWindowTextW, ShowWindow, TPM_RIGHTBUTTON, TrackPopupMenu,
-    TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
-    WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES,
-    WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE,
-    WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WM_UNDO, WNDCLASSW, WNDPROC,
-    WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
+    HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, IDYES, IsChild, IsIconic, IsWindow,
+    KillTimer, LoadCursorW, LoadIconW, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK,
+    MB_YESNO, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_GRAYED, MF_POPUP, MF_SEPARATOR,
+    MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW, PostQuitMessage,
+    RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED,
+    SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
+    TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE, WM_APP,
+    WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY,
+    WM_DROPFILES, WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL,
+    WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WM_UNDO, WNDCLASSW,
+    WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP,
+    WS_VISIBLE,
 };
-use windows::core::{Interface, PCWSTR, PWSTR, implement, w};
+use windows::core::{HSTRING, Interface, PCWSTR, PWSTR, implement, w};
 
 const EM_SCROLLCARET: u32 = 0x00B7;
 const EM_CHARFROMPOS: u32 = 0x00D7;
@@ -227,7 +229,7 @@ pub(crate) fn reset_spellcheck_state(hwnd: HWND) {
 struct PdfLoadResult {
     hwnd_edit: HWND,
     path: PathBuf,
-    result: Result<String, String>,
+    result: Result<PdfTextResult, String>,
 }
 
 struct PdfLoadingState {
@@ -6190,7 +6192,7 @@ pub(crate) unsafe fn open_pdf_document_async(hwnd: HWND, path: &Path) {
 
     let hwnd_main = hwnd;
     std::thread::spawn(move || {
-        let result = read_pdf_text(&path_buf, language);
+        let result = read_pdf_text_with_status(&path_buf, language);
         let payload = Box::new(PdfLoadResult {
             hwnd_edit,
             path: path_buf,
@@ -6236,7 +6238,7 @@ unsafe fn handle_pdf_loaded(hwnd: HWND, payload: PdfLoadResult) {
     };
 
     match result {
-        Ok(text) => {
+        Ok(PdfTextResult::Text(text)) => {
             editor_manager::set_edit_text(hwnd_edit, &text);
             with_state(hwnd, |state| {
                 goto_first_bookmark(hwnd_edit, &path, &state.bookmarks, FileFormat::Pdf);
@@ -6255,9 +6257,66 @@ unsafe fn handle_pdf_loaded(hwnd: HWND, payload: PdfLoadResult) {
             }
             push_recent_file(hwnd, &path);
         }
+        Ok(PdfTextResult::NoText) => {
+            let msg = i18n::tr(language, "dialog.pdf_no_text_ocr");
+            let title = i18n::tr(language, "dialog.ocr_title");
+            let response = MessageBoxW(
+                hwnd,
+                &HSTRING::from(&msg),
+                &HSTRING::from(&title),
+                MB_YESNO | MB_ICONQUESTION,
+            );
+
+            if response == IDYES {
+                start_pdf_loading_animation(hwnd, hwnd_edit);
+                let hwnd_main = hwnd;
+                let path_clone = path.clone();
+                std::thread::spawn(move || {
+                    let ocr_result = win_ocr::recognize_text_from_pdf(&path_clone, language);
+                    let final_result = match ocr_result {
+                        Ok(text) => Ok(PdfTextResult::Text(text)),
+                        Err(e) => Err(e),
+                    };
+                    let payload = Box::new(PdfLoadResult {
+                        hwnd_edit,
+                        path: path_clone,
+                        result: final_result,
+                    });
+                    unsafe {
+                        let payload_ptr = Box::into_raw(payload);
+                        if let Err(e) = PostMessageW(
+                            hwnd_main,
+                            WM_PDF_LOADED,
+                            WPARAM(0),
+                            LPARAM(payload_ptr as isize),
+                        ) {
+                            crate::log_debug(&format!("Failed to post WM_PDF_LOADED: {}", e));
+                        }
+                    }
+                });
+            } else {
+                let text = i18n::tr(language, "file_handler.pdf_no_text");
+                editor_manager::set_edit_text(hwnd_edit, &text);
+                with_state(hwnd, |state| {
+                    goto_first_bookmark(hwnd_edit, &path, &state.bookmarks, FileFormat::Pdf);
+                });
+                show_info(hwnd, language, &pdf_loaded_message(language));
+                let mut update_title = false;
+                with_state(hwnd, |state| {
+                    if let Some(doc) = state.docs.get_mut(index) {
+                        doc.dirty = false;
+                        update_tab_title(state.hwnd_tab, index, &doc.title, false);
+                        update_title = state.current == index;
+                    }
+                });
+                if update_title {
+                    update_window_title(hwnd);
+                }
+                push_recent_file(hwnd, &path);
+            }
+        }
         Err(message) => {
             // Instead of closing the document, show error message as placeholder text
-            // This keeps the tab open so users can see what file failed and retry
             let error_placeholder = format!(
                 "{}\n\n{}",
                 message,

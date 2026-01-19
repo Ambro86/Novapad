@@ -9,7 +9,7 @@ Lưu tất cả: Lưu tất cả tài liệu (Ctrl+Shift+S).
 Đóng tab: Đóng tài liệu hiện tại (Ctrl+W).
 Tệp gần đây: Mở một tệp gần đây.
 Đọc: F5 Bắt đầu đọc, F4 Tạm dừng/Tiếp tục, F6 Dừng đọc.
-Yêu thích khi đọc: F1 giọng yêu thích trước, F2 giọng yêu thích tiếp theo.
+Yêu thích khi đọc: F9 giọng yêu thích trước, F10 giọng yêu thích tiếp theo.
 Ghi sách nói: Tạo tệp MP3 từ văn bản hiện tại (Ctrl+R).
 Ghi podcast: Ghi podcast từ micro và/hoặc âm thanh hệ thống (Ctrl+Shift+R).
 
@@ -48,6 +48,7 @@ Giữ mục duy nhất: Xóa các dòng trùng lặp trong đoạn văn hoặc v
 Trích dẫn dòng: Thêm tiền tố vào các dòng trong đoạn văn hoặc vùng chọn (Ctrl+Q).
 Bỏ trích dẫn dòng: Xóa tiền tố khỏi các dòng trong đoạn văn hoặc vùng chọn (Ctrl+Shift+Q).
 Thống kê văn bản: Hiển thị số ký tự, số từ và số dòng của vùng chọn hoặc toàn bộ tài liệu (Alt+Y).
+Điều hướng lỗi chính tả: F7 lỗi trước, F8 lỗi tiếp theo.
 
 Hiển thị:
 Hiển thị giọng nói trong trình soạn thảo: Hiển thị hệ thống giọng nói, danh sách giọng nói và bộ lọc đa ngôn ngữ.
@@ -56,7 +57,7 @@ Màu chữ: Thay đổi màu văn bản (bao gồm màu sáng và màu tối).
 Cỡ chữ: Thay đổi kích thước văn bản (nhỏ, bình thường, lớn, rất lớn, cực lớn).
 Khi danh sách mục đang hiển thị, nhấn Tab để chuyển tiêu điểm giữa trình soạn thảo và các điều khiển, Shift+Tab để chuyển ngược lại.
 Để thêm hoặc xóa một mục khỏi danh sách yêu thích, dùng Tab để chuyển đến danh sách mục và thêm hoặc xóa bằng phím Applications hoặc chuột phải. Trong danh sách mục yêu thích, bạn cũng có thể nhấn phím Applications để xóa các mục đã được thêm.
-Phím tắt: có thể nhấn F1 và F2 để chuyển đổi giữa các mục trong khi đọc, lần lượt duyệt qua các mục đã được thêm vào danh sách yêu thích.
+Phím tắt: có thể nhấn F9 và F10 để chuyển đổi giữa các mục trong khi đọc, lần lượt duyệt qua các mục đã được thêm vào danh sách yêu thích.
 
 Chèn:
 Chèn dấu trang: Lưu vị trí con trỏ hiện tại hoặc thời điểm của sách nói (Ctrl+B).
@@ -75,6 +76,8 @@ Sách nói hàng loạt: mở cửa sổ để chuyển đổi danh sách tệp 
   Trong danh sách, Tab di chuyển đến "Sửa mục" và "Xóa mục đã chọn".
   Các thay thế từ điển được áp dụng khi đọc và khi tạo sách nói, và sẽ được lưu lại.
   Nhập bản chép lời YouTube: dán URL, chọn ngôn ngữ và nhập văn bản vào trình soạn thảo (Ctrl+Y). Có thể chọn kèm mốc thời gian.
+  Tìm và nhập từ Wikipedia: tìm kiếm bài viết trên Wikipedia và nhập văn bản vào trình soạn thảo (Alt+Shift+W).
+  Từ điển trực tuyến: tra cứu định nghĩa và bản dịch trên Wiktionary trực tuyến (Alt+Shift+D).
   Terminal hỗ trợ tiếp cận: mở một terminal chuyên dụng với đầu ra ổn định cho trình đọc màn hình (Ctrl+Shift+P).
   Phím tắt: Alt+I đưa tiêu điểm vào input, Alt+O đưa tiêu điểm vào output, Tab/Shift+Tab di chuyển giữa input, output và các tùy chọn.
   Enter gửi input. Ctrl+C sao chép output (hoặc gửi Ctrl+C tới chương trình). Ctrl+L xóa output sau khi xác nhận.
@@ -99,6 +102,7 @@ Chia sách nói theo văn bản: Chia khi dấu mốc xuất hiện ở đầu d
 Các tùy chọn khác để chia sách nói: 2 phần, 4 phần, 6 phần, 8 phần.
 
 Trợ giúp:
-Hướng dẫn: Mở hướng dẫn này.
+Hướng dẫn: Mở hướng dẫn này (F1).
+Kiểm tra cập nhật: Kiểm tra xem có bản cập nhật không (F2).
 Nhật ký thay đổi: Mở cửa sổ nhật ký thay đổi.
 Giới thiệu: Hiển thị thông tin chương trình.

@@ -9,7 +9,7 @@ Guardar todo: Guardar todos los documentos (Ctrl+Shift+S).
 Cerrar pestaña: Cerrar el documento actual (Ctrl+W).
 Archivos recientes: Abrir un archivo reciente.
 Lectura: F5 iniciar lectura, F4 pausar/reanudar, F6 detener lectura.
-Favoritos durante lectura: F1 voz favorita anterior, F2 voz favorita siguiente.
+Favoritos durante lectura: F9 voz favorita anterior, F10 voz favorita siguiente.
 Grabar audiolibro: Crear un archivo MP3 desde el texto actual (Ctrl+R).
 Grabar podcast: Grabar un podcast desde microfono y/o audio del sistema (Ctrl+Shift+R).
 
@@ -47,6 +47,7 @@ Invertir lineas: Invierte el orden de las lineas en el parrafo o la seleccion (A
 Comentar lineas: Agrega un prefijo a las lineas del parrafo o la seleccion (Ctrl+Q).
 Descomentar lineas: Quita el prefijo de las lineas del parrafo o la seleccion (Ctrl+Shift+Q).
 Estadisticas de texto: Muestra caracteres, palabras y lineas en seleccion o documento (Alt+Y).
+Navegacion de ortografia: F7 error anterior, F8 error siguiente.
 
 Vista:
 Mostrar voces en el editor: Mostrar sistema de voces, lista de voces y filtro multilingue.
@@ -55,7 +56,7 @@ Color del texto: Cambiar el color del texto (incluye colores claros y oscuros).
 Tamano del texto: Cambiar el tamano del texto (pequeno, normal, grande, extra grande, extra extra grande).
 Cuando la lista de entradas esta visible, al pulsar Tab se mueve el foco entre el editor y los controles, mientras que Shift+Tab lo mueve hacia atras.
 Para agregar o quitar una entrada de favoritos, usa Tab para ir a la lista y agregala o quitala con la tecla Aplicaciones o el boton derecho del mouse. En la lista de favoritos tambien puedes usar la tecla Aplicaciones para quitar entradas ya agregadas.
-Atajos de teclado: es posible pulsar F1 y F2 para cambiar entre entradas durante la lectura, recorriendo las agregadas a favoritos.
+Atajos de teclado: es posible pulsar F9 y F10 para cambiar entre entradas durante la lectura, recorriendo las agregadas a favoritos.
 
 Insertar:
 Insertar marcador: Guardar la posicion actual del cursor o el tiempo del audiolibro (Ctrl+B).
@@ -73,6 +74,8 @@ En la ventana agregar/editar: ingresa "Palabra original", luego Tab a "Palabra d
 En la lista, Tab mueve a "Editar entrada" y "Eliminar entrada seleccionada".
 Los reemplazos del diccionario se aplican durante la lectura y la creacion de audiolibros y se guardan.
 Importar transcripcion de YouTube: pega una URL, elige el idioma e importa el texto al editor (Ctrl+Y). Opcional con marcas de tiempo.
+Buscar e importar desde Wikipedia: busca un articulo en Wikipedia e importa su texto al editor (Alt+Shift+W).
+Diccionario en linea: busca definiciones y traducciones en el Wikcionario en linea (Alt+Shift+D).
 Terminal accesible: abre un terminal dedicado con salida estable para lectores de pantalla (Ctrl+Shift+T).
 Atajos: Alt+I enfoca la entrada, Alt+O enfoca la salida, Tab/Shift+Tab mueve entre entrada, salida y opciones.
 Enter envia la entrada. Ctrl+C copia la salida (o envia Ctrl+C al programa). Ctrl+L limpia la salida con confirmacion.
@@ -98,6 +101,7 @@ Division de audiolibro por texto: Divide cuando el marcador aparece al inicio de
 Otras opciones para dividir el audiolibro: 2 partes, 4 partes, 6 partes, 8 partes.
 
 Ayuda:
-Guia: Abrir esta guia.
+Guia: Abrir esta guia (F1).
+Buscar actualizaciones: Comprobar si hay actualizaciones (F2).
 Changelog: Abrir la ventana de cambios.
 Acerca de: Mostrar la informacion del programa.

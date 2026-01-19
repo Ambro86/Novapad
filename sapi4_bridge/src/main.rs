@@ -371,7 +371,9 @@ impl MfGuard {
 impl Drop for MfGuard {
     fn drop(&mut self) {
         unsafe {
-            let _ = MFShutdown();
+            if let Err(e) = MFShutdown() {
+                eprintln!("MFShutdown failed: {}", e);
+            }
         }
     }
 }
@@ -401,11 +403,16 @@ fn encode_wav_to_mp3(wav_path: &Path, mp3_path: &Path) -> Result<(), String> {
         let bits_per_sample = 16u32;
         let block_align = channels * (bits_per_sample / 8);
         let avg_bytes = sample_rate * block_align;
-        let _ = pcm_type.SetUINT32(&MF_MT_AUDIO_SAMPLES_PER_SECOND, sample_rate);
-        let _ = pcm_type.SetUINT32(&MF_MT_AUDIO_NUM_CHANNELS, channels);
-        let _ = pcm_type.SetUINT32(&MF_MT_AUDIO_BITS_PER_SAMPLE, bits_per_sample);
-        let _ = pcm_type.SetUINT32(&MF_MT_AUDIO_BLOCK_ALIGNMENT, block_align);
-        let _ = pcm_type.SetUINT32(&MF_MT_AUDIO_AVG_BYTES_PER_SECOND, avg_bytes);
+        pcm_type.SetUINT32(&MF_MT_AUDIO_SAMPLES_PER_SECOND, sample_rate)
+            .map_err(|e| format!("Set sample rate failed: {}", e))?;
+        pcm_type.SetUINT32(&MF_MT_AUDIO_NUM_CHANNELS, channels)
+            .map_err(|e| format!("Set channels failed: {}", e))?;
+        pcm_type.SetUINT32(&MF_MT_AUDIO_BITS_PER_SAMPLE, bits_per_sample)
+            .map_err(|e| format!("Set bits per sample failed: {}", e))?;
+        pcm_type.SetUINT32(&MF_MT_AUDIO_BLOCK_ALIGNMENT, block_align)
+            .map_err(|e| format!("Set block alignment failed: {}", e))?;
+        pcm_type.SetUINT32(&MF_MT_AUDIO_AVG_BYTES_PER_SECOND, avg_bytes)
+            .map_err(|e| format!("Set avg bytes failed: {}", e))?;
         reader
             .SetCurrentMediaType(
                 MF_SOURCE_READER_FIRST_AUDIO_STREAM.0 as u32,
@@ -579,7 +586,7 @@ fn spawn_command_reader() -> mpsc::Receiver<ServerCommand> {
             let mut line = String::new();
             match reader.read_line(&mut line) {
                 Ok(0) => {
-                    let _ = tx.send(ServerCommand::Quit);
+                    if let Err(e) = tx.send(ServerCommand::Quit) { eprintln!("Send Quit failed: {}", e); }
                     break;
                 }
                 Ok(_) => {
@@ -590,26 +597,26 @@ fn spawn_command_reader() -> mpsc::Receiver<ServerCommand> {
                             let mut buf = vec![0u8; len];
                             if reader.read_exact(&mut buf).is_ok() {
                                 let text = String::from_utf8_lossy(&buf).to_string();
-                                let _ = tx.send(ServerCommand::Speak(text));
+                                if let Err(e) = tx.send(ServerCommand::Speak(text)) { eprintln!("Send Speak failed: {}", e); }
                                 continue;
                             }
                         }
-                        let _ = tx.send(ServerCommand::Quit);
+                        if let Err(e) = tx.send(ServerCommand::Quit) { eprintln!("Send Quit failed: {}", e); }
                         break;
                     }
                     match cmd {
-                        "PAUSE" => { let _ = tx.send(ServerCommand::Pause); }
-                        "RESUME" => { let _ = tx.send(ServerCommand::Resume); }
-                        "STOP" => { let _ = tx.send(ServerCommand::Stop); }
+                        "PAUSE" => { if let Err(e) = tx.send(ServerCommand::Pause) { eprintln!("Send Pause failed: {}", e); } }
+                        "RESUME" => { if let Err(e) = tx.send(ServerCommand::Resume) { eprintln!("Send Resume failed: {}", e); } }
+                        "STOP" => { if let Err(e) = tx.send(ServerCommand::Stop) { eprintln!("Send Stop failed: {}", e); } }
                         "QUIT" => {
-                            let _ = tx.send(ServerCommand::Quit);
+                            if let Err(e) = tx.send(ServerCommand::Quit) { eprintln!("Send Quit failed: {}", e); }
                             break;
                         }
                         _ => {}
                     }
                 }
                 Err(_) => {
-                    let _ = tx.send(ServerCommand::Quit);
+                    if let Err(e) = tx.send(ServerCommand::Quit) { eprintln!("Send Quit failed: {}", e); }
                     break;
                 }
             }
@@ -762,10 +769,17 @@ fn run_server(target_idx: u32, rate: Option<i32>, pitch: Option<i32>, volume: Op
                         eprintln!("TextData failed, hr={:#x}", hr);
                     }
                 }
-                Ok(ServerCommand::Pause) => { let _ = (central_vtbl.audio_pause)(central_ptr); }
-                Ok(ServerCommand::Resume) => { let _ = (central_vtbl.audio_resume)(central_ptr); }
+                Ok(ServerCommand::Pause) => {
+                    let hr = (central_vtbl.audio_pause)(central_ptr);
+                    if hr != S_OK { eprintln!("AudioPause failed: {:#x}", hr); }
+                }
+                Ok(ServerCommand::Resume) => {
+                    let hr = (central_vtbl.audio_resume)(central_ptr);
+                    if hr != S_OK { eprintln!("AudioResume failed: {:#x}", hr); }
+                }
                 Ok(ServerCommand::Stop) => {
-                    let _ = (central_vtbl.audio_reset)(central_ptr);
+                    let hr = (central_vtbl.audio_reset)(central_ptr);
+                    if hr != S_OK { eprintln!("AudioReset failed: {:#x}", hr); }
                     running = false;
                 }
                 Ok(ServerCommand::Quit) => { running = false; }
@@ -834,7 +848,8 @@ fn speak_to_file(target_idx: u32, output_path: &str, rate: Option<i32>, pitch: O
             return;
         }
 
-        let _ = (audio_vtbl.real_time_set)(audio_file_ptr, 0x100);
+        let hr = (audio_vtbl.real_time_set)(audio_file_ptr, 0x100);
+        if hr != S_OK { eprintln!("AudioFile RealTimeSet failed: {:#x}", hr); }
 
         let audio_unknown = audio_file_ptr as *mut IUnknown;
         let Some((enum_ptr, central_ptr)) = init_central_with_audio(target_idx, audio_unknown) else {
@@ -856,22 +871,26 @@ fn speak_to_file(target_idx: u32, output_path: &str, rate: Option<i32>, pitch: O
             lpVtbl: &AUDIO_FILE_NOTIFY_VTBL,
             done: &done,
         };
-        let _ = (audio_vtbl.register)(
+        let hr = (audio_vtbl.register)(
             audio_file_ptr,
             &audio_notify as *const _ as *mut std::ffi::c_void,
         );
+        if hr != S_OK { eprintln!("AudioFile Register failed: {:#x}", hr); }
         let mut reg_key: DWORD = 0;
-        let _ = (central_vtbl.register)(
+        let hr = (central_vtbl.register)(
             central_ptr,
             &notify as *const _ as *mut std::ffi::c_void,
             IID_ITTSNOTIFYSINKW,
             &mut reg_key,
         );
+        if hr != S_OK { eprintln!("ITTSCentral Register failed: {:#x}", hr); }
 
         apply_tts_attributes(central_ptr, rate, pitch, volume);
 
         let mut text = String::new();
-        let _ = io::stdin().read_to_string(&mut text);
+        if io::stdin().read_to_string(&mut text).is_err() {
+            eprintln!("Failed to read text from stdin");
+        }
         if text.is_empty() {
             (central_vtbl.release)(central_ptr);
             (enum_vtbl.release)(enum_ptr);
@@ -903,7 +922,8 @@ fn speak_to_file(target_idx: u32, output_path: &str, rate: Option<i32>, pitch: O
             }
         }
 
-        let _ = (audio_vtbl.flush)(audio_file_ptr);
+        let hr = (audio_vtbl.flush)(audio_file_ptr);
+        if hr != S_OK { eprintln!("AudioFile Flush failed: {:#x}", hr); }
         (central_vtbl.release)(central_ptr);
         (enum_vtbl.release)(enum_ptr);
         (audio_vtbl.release)(audio_file_ptr);
@@ -911,8 +931,8 @@ fn speak_to_file(target_idx: u32, output_path: &str, rate: Option<i32>, pitch: O
         if is_mp3 {
             if let Err(err) = encode_wav_to_mp3(&wav_path, output_path) {
                 eprintln!("WAV->MP3 failed: {}", err);
-            } else {
-                let _ = std::fs::remove_file(&wav_path);
+            } else if let Err(e) = std::fs::remove_file(&wav_path) {
+                eprintln!("Failed to remove temp wav: {}", e);
             }
         }
     }
@@ -932,7 +952,9 @@ fn speak_with_voice(target_idx: u32, rate: Option<i32>, pitch: Option<i32>, volu
 
         // Read text from stdin
         let mut text = String::new();
-        let _ = io::stdin().read_to_string(&mut text);
+        if io::stdin().read_to_string(&mut text).is_err() {
+            eprintln!("Failed to read text from stdin");
+        }
         if text.is_empty() {
             text = "Test di sintesi vocale. Questa è la voce italiana.".to_string();
         }
@@ -1016,67 +1038,81 @@ unsafe fn apply_tts_attributes(
 
     if let Some(percent) = speed_percent {
         let mut old_val: DWORD = 0;
-        let _ = (attr_vtbl.speed_get)(attr_ptr, &mut old_val);
-        let _ = (attr_vtbl.speed_set)(attr_ptr, TTSATTR_MINSPEED);
-        let mut min_val: DWORD = 0;
-        let _ = (attr_vtbl.speed_get)(attr_ptr, &mut min_val);
-        let _ = (attr_vtbl.speed_set)(attr_ptr, TTSATTR_MAXSPEED);
-        let mut max_val: DWORD = 0;
-        let _ = (attr_vtbl.speed_get)(attr_ptr, &mut max_val);
-        let max_val = max_val.saturating_sub(1);
-        if max_val > min_val {
-            let default_val = old_val.clamp(min_val, max_val);
-            let scaled = scale_with_default(
-                percent,
-                min_val as f64,
-                max_val as f64,
-                default_val as f64,
-            );
-            let _ = (attr_vtbl.speed_set)(attr_ptr, scaled as u32);
-        } else {
-            let _ = (attr_vtbl.speed_set)(attr_ptr, old_val);
+        if (attr_vtbl.speed_get)(attr_ptr, &mut old_val) == S_OK {
+            if (attr_vtbl.speed_set)(attr_ptr, TTSATTR_MINSPEED) != S_OK { eprintln!("Failed to set min speed"); }
+            let mut min_val: DWORD = 0;
+            if (attr_vtbl.speed_get)(attr_ptr, &mut min_val) == S_OK {
+                if (attr_vtbl.speed_set)(attr_ptr, TTSATTR_MAXSPEED) != S_OK { eprintln!("Failed to set max speed"); }
+                let mut max_val: DWORD = 0;
+                if (attr_vtbl.speed_get)(attr_ptr, &mut max_val) == S_OK {
+                    let max_val = max_val.saturating_sub(1);
+                    if max_val > min_val {
+                        let default_val = old_val.clamp(min_val, max_val);
+                        let scaled = scale_with_default(
+                            percent,
+                            min_val as f64,
+                            max_val as f64,
+                            default_val as f64,
+                        );
+                        if (attr_vtbl.speed_set)(attr_ptr, scaled as u32) != S_OK {
+                            eprintln!("Failed to set speed");
+                        }
+                    } else if (attr_vtbl.speed_set)(attr_ptr, old_val) != S_OK {
+                        eprintln!("Failed to restore speed");
+                    }
+                }
+            }
         }
     }
 
     if let Some(percent) = pitch_percent {
         let mut old_val: WORD = 0;
-        let _ = (attr_vtbl.pitch_get)(attr_ptr, &mut old_val);
-        let _ = (attr_vtbl.pitch_set)(attr_ptr, TTSATTR_MINPITCH);
-        let mut min_val: WORD = 0;
-        let _ = (attr_vtbl.pitch_get)(attr_ptr, &mut min_val);
-        let _ = (attr_vtbl.pitch_set)(attr_ptr, TTSATTR_MAXPITCH);
-        let mut max_val: WORD = 0;
-        let _ = (attr_vtbl.pitch_get)(attr_ptr, &mut max_val);
-        if max_val > min_val {
-            let default_val = old_val.clamp(min_val, max_val);
-            let scaled = scale_with_default(
-                percent,
-                min_val as f64,
-                max_val as f64,
-                default_val as f64,
-            );
-            let _ = (attr_vtbl.pitch_set)(attr_ptr, scaled as u16);
-        } else {
-            let _ = (attr_vtbl.pitch_set)(attr_ptr, old_val);
+        if (attr_vtbl.pitch_get)(attr_ptr, &mut old_val) == S_OK {
+            if (attr_vtbl.pitch_set)(attr_ptr, TTSATTR_MINPITCH) != S_OK { eprintln!("Failed to set min pitch"); }
+            let mut min_val: WORD = 0;
+            if (attr_vtbl.pitch_get)(attr_ptr, &mut min_val) == S_OK {
+                if (attr_vtbl.pitch_set)(attr_ptr, TTSATTR_MAXPITCH) != S_OK { eprintln!("Failed to set max pitch"); }
+                let mut max_val: WORD = 0;
+                if (attr_vtbl.pitch_get)(attr_ptr, &mut max_val) == S_OK {
+                    if max_val > min_val {
+                        let default_val = old_val.clamp(min_val, max_val);
+                        let scaled = scale_with_default(
+                            percent,
+                            min_val as f64,
+                            max_val as f64,
+                            default_val as f64,
+                        );
+                        if (attr_vtbl.pitch_set)(attr_ptr, scaled as u16) != S_OK {
+                            eprintln!("Failed to set pitch");
+                        }
+                    } else if (attr_vtbl.pitch_set)(attr_ptr, old_val) != S_OK {
+                        eprintln!("Failed to restore pitch");
+                    }
+                }
+            }
         }
     }
 
     if let Some(percent) = volume_percent {
-        let _ = (attr_vtbl.volume_set)(attr_ptr, TTSATTR_MINVOLUME);
+        if (attr_vtbl.volume_set)(attr_ptr, TTSATTR_MINVOLUME) != S_OK { eprintln!("Failed to set min volume"); }
         let mut min_val: DWORD = 0;
-        let _ = (attr_vtbl.volume_get)(attr_ptr, &mut min_val);
-        let min_val = min_val & 0xFFFF;
-        let _ = (attr_vtbl.volume_set)(attr_ptr, TTSATTR_MAXVOLUME);
-        let mut max_val: DWORD = 0;
-        let _ = (attr_vtbl.volume_get)(attr_ptr, &mut max_val);
-        let max_val = max_val & 0xFFFF;
-        if max_val > min_val {
-            let scaled = min_val as f64 + (max_val - min_val) as f64 * (percent / 100.0);
-            let val = scaled as u32;
-            let val = (val & 0xFFFF) | (val << 16);
-            let _ = (attr_vtbl.volume_set)(attr_ptr, val);
+        if (attr_vtbl.volume_get)(attr_ptr, &mut min_val) == S_OK {
+            let min_val = min_val & 0xFFFF;
+            if (attr_vtbl.volume_set)(attr_ptr, TTSATTR_MAXVOLUME) != S_OK { eprintln!("Failed to set max volume"); }
+            let mut max_val: DWORD = 0;
+            if (attr_vtbl.volume_get)(attr_ptr, &mut max_val) == S_OK {
+                let max_val = max_val & 0xFFFF;
+                if max_val > min_val {
+                    let scaled = min_val as f64 + (max_val - min_val) as f64 * (percent / 100.0);
+                    let val = scaled as u32;
+                    let val = (val & 0xFFFF) | (val << 16);
+                    if (attr_vtbl.volume_set)(attr_ptr, val) != S_OK {
+                        eprintln!("Failed to set volume");
+                    }
+                }
+            }
         }
     }
 
-    let _ = (attr_vtbl.release)(attr_ptr);
+    (attr_vtbl.release)(attr_ptr);
 }

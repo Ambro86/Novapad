@@ -9,7 +9,7 @@ Save All: Save all documents (Ctrl+Shift+S).
 Close Tab: Close the current document (Ctrl+W).
 Recent Files: Open a recent file.
 Reading: F5 Start reading, F4 Pause/Resume, F6 Stop reading.
-Favorites during reading: F1 previous favorite voice, F2 next favorite voice.
+Favorites during reading: F9 previous favorite voice, F10 next favorite voice.
 Record Audiobook: Create an MP3 file from the current text (Ctrl+R).
 Record Podcast: Record a podcast from microphone and/or system audio (Ctrl+Shift+R).
 
@@ -47,6 +47,7 @@ Reverse Items: Reverse the lines in the paragraph or selection (Alt+Shift+Z).
 Quote Lines: Add a prefix to lines in the paragraph or selection (Ctrl+Q).
 Unquote Lines: Remove the prefix from lines in the paragraph or selection (Ctrl+Shift+Q).
 Text Statistics: Shows characters, words, and lines for selection or document (Alt+Y).
+Spellcheck navigation: F7 previous error, F8 next error.
 
 View:
 Show voices in editor: Show voice system, voice list, and multilingual filter.
@@ -55,7 +56,7 @@ Text color: Change the text color (including light and dark colors).
 Text size: Change the text size (small, normal, large, extra large, extra extra large).
 When the list of entries is visible, pressing Tab moves the focus between the editor and the controls, while Shift+Tab moves it backward.
 To add or remove an entry from favorites, use Tab to move to the list of entries and add or remove it using the Applications key or the right mouse button. From the list of favorite entries, you can also press the Applications key to remove entries that have already been added.
-Keyboard shortcuts: it is possible to press F1 and F2 to switch between entries during reading, cycling through those added to favorites.
+Keyboard shortcuts: it is possible to press F9 and F10 to switch between entries during reading, cycling through those added to favorites.
 
 Insert:
 Insert Bookmark: Save the current cursor position or audiobook time (Ctrl+B).
@@ -73,6 +74,8 @@ In the add/edit window: enter "Original word", then Tab to "Replacement word", t
 In the list, Tab moves to "Edit entry" and "Remove selected entry".
 Dictionary replacements are applied during reading and audiobook creation and are saved.
 Import YouTube transcript: paste a URL, choose the language, and import the text into the editor (Ctrl+Y). Optional timestamps.
+Search and import from Wikipedia: search for an article on Wikipedia and import its text into the editor (Alt+Shift+W).
+Online dictionary: search for definitions and translations in the online Wiktionary (Alt+Shift+D).
 Accessible Terminal: opens a dedicated terminal with stable output for screen readers (Ctrl+Shift+T).
 Shortcuts: Alt+I focuses input, Alt+O focuses output, Tab/Shift+Tab moves between input, output, and options.
 Enter sends the input. Ctrl+C copies the output (or sends Ctrl+C to the program). Ctrl+L clears the output with confirmation.
@@ -98,6 +101,7 @@ Audiobook split by text: Split when the marker appears at the start of a line (c
 Other options to split the audiobook: 2 parts, 4 parts, 6 parts, 8 parts.
 
 Help:
-Guide: Open this guide.
+Guide: Open this guide (F1).
+Check for updates: Check if updates are available (F2).
 Changelog: Open the changelog window.
 About: Show program information.

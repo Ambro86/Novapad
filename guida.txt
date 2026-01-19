@@ -9,7 +9,7 @@ Salva tutto: salva tutti i documenti (Ctrl+Shift+S).
 Chiudi tab: chiude il documento corrente (Ctrl+W).
 File recenti: apre un file recente.
 Lettura: F5 avvia la lettura, F4 pausa/riprendi, F6 ferma la lettura.
-Preferiti durante la lettura: F1 voce preferita precedente, F2 voce preferita successiva.
+Preferiti durante la lettura: F9 voce preferita precedente, F10 voce preferita successiva.
 Registra audiolibro: crea un file MP3 dal testo corrente (Ctrl+R).
 Crea podcast: crea un podcast da microfono e/o audio di sistema (Ctrl+Shift+R).
 
@@ -48,6 +48,7 @@ Inverti righe: inverte l'ordine delle righe nel paragrafo o nella selezione (Alt
 Commenta righe: aggiunge un prefisso alle righe del paragrafo o della selezione (Ctrl+Q).
 Decommenta righe: rimuove il prefisso dalle righe del paragrafo o della selezione (Ctrl+Shift+Q).
 Statistiche testo: mostra caratteri, parole e righe su selezione o documento (Alt+Y).
+Navigazione errori ortografici: F7 errore precedente, F8 errore successivo.
 
 Visualizza:
 Visualizza voci nell'editor: mostra i controlli per sistema di voci, elenco voci e filtro multilingua.
@@ -56,7 +57,7 @@ Colore testo: cambia il colore del testo (inclusi colori chiari e scuri).
 Dimensioni testo: cambia la dimensione del testo (piccola, normale, grande, molto grande, extra grande).
 Quando l'elenco di voci è visibile, Tab sposta il focus tra editor e controlli, Shift+Tab torna indietro.
 Per aggiungere o rimuovere una voce dai preferiti, spostati con tab sull'elenco di voci e aggiungila o rimuovila con il tasto applicazioni o col tasto destro del mouse. Dall'elenco di voci preferite, si può anche premere il tasto applicazioni per rimuovere le voci già inserite.
-Tasti rapidi: è possibile premere i tasti f1 ed f2, per cambiare voci durante la lettura tra quelle inserite nei preferiti.
+Tasti rapidi: è possibile premere i tasti F9 ed F10, per cambiare voci durante la lettura tra quelle inserite nei preferiti.
 
 Inserisci:
 Inserisci segnalibro: salva la posizione attuale del cursore o il tempo dell'audiolibro (Ctrl+B).
@@ -74,6 +75,8 @@ Nella finestra di aggiunta/modifica: inserisci "Parola originale", poi Tab su "P
 Nell'elenco, Tab porta ai pulsanti "Modifica voce" e "Rimuovi voce selezionata".
 Le sostituzioni del dizionario sono applicate durante la lettura e la creazione dell'audiolibro e vengono salvate.
 Importa trascrizione da YouTube: incolla un URL, scegli la lingua e importa il testo nell'editor (Ctrl+Y). Opzione per includere i timestamp.
+Cerca e importa da Wikipedia: cerca un articolo su Wikipedia e ne importa il testo nell'editor (Alt+Shift+W).
+Dizionario online: cerca definizioni e traduzioni nel Wiktionary online (Alt+Shift+D).
 Terminale accessibile: apre un terminale dedicato con output separato e stabile per gli screen reader (Ctrl+Shift+T).
 Scorciatoie: Alt+I focus input, Alt+O focus output, Tab/Shift+Tab per spostarsi tra input, output e opzioni.
 Invio invia il testo. Ctrl+C copia l'output (o invia Ctrl+C al programma). Ctrl+L pulisce l'output con conferma.
@@ -99,6 +102,7 @@ Divisione audiolibro per testo: divide l'audiolibro quando il testo indicato com
 Altre opzioni per dividere l'audiolibro: 2 parti, 4 parti, 6 parti, 8 parti.
 
 Aiuto:
-Guida: apre questa guida.
+Guida: apre questa guida (F1).
+Controllo aggiornamenti: controlla se ci sono aggiornamenti (F2).
 Registro modifiche: mostra il changelog.
 Informazioni sul programma: mostra informazioni sul programma.

@@ -1223,6 +1223,8 @@ fn podcast_cache_path(url: &str, mime: Option<&str>) -> PathBuf {
         .unwrap_or("");
     let ext = match mime.map(|m| m.to_ascii_lowercase()) {
         Some(mime) if mime.contains("mpeg") || mime.contains("mp3") => "mp3",
+        Some(mime) if mime.contains("mp4") || mime.contains("m4a") || mime.contains("aac") => "m4a",
+        Some(mime) if mime.contains("ogg") || mime.contains("vorbis") => "ogg",
         _ => {
             if url_ext.is_empty() {
                 "mp3"

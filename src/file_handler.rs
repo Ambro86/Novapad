@@ -76,7 +76,7 @@ pub fn is_html_path(path: &Path) -> bool {
 pub fn is_mp3_path(path: &Path) -> bool {
     path.extension()
         .and_then(|s| s.to_str())
-        .map(|s| s.eq_ignore_ascii_case("mp3"))
+        .map(|s| s.eq_ignore_ascii_case("mp3") || s.eq_ignore_ascii_case("m4a"))
         .unwrap_or(false)
 }
 

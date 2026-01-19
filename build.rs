@@ -33,11 +33,15 @@ fn main() {
         .join("../../../")
         .join(profile);
 
+    if !target_dir.exists() {
+        std::fs::create_dir_all(&target_dir).expect("Failed to create target directory");
+    }
+
     for dll in &["libcurl.dll", "zlib.dll"] {
         let src = lib_dir.join(dll);
         let dst = target_dir.join(dll);
         if src.exists() {
-            let _ = std::fs::copy(&src, &dst);
+            std::fs::copy(&src, &dst).expect("Failed to copy DLL");
         }
     }
 
@@ -45,6 +49,6 @@ fn main() {
     let cacert_src = std::path::Path::new(&root).join("cacert.pem");
     let cacert_dst = target_dir.join("cacert.pem");
     if cacert_src.exists() {
-        let _ = std::fs::copy(&cacert_src, &cacert_dst);
+        std::fs::copy(&cacert_src, &cacert_dst).expect("Failed to copy cacert.pem");
     }
 }

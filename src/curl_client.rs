@@ -3,6 +3,7 @@ use std::ffi::CString;
 use std::time::Duration;
 
 fn log_profile(profile: &str, url: &str, status: &str) {
+    #[cfg(debug_assertions)]
     if let Ok(mut exe_path) = std::env::current_exe() {
         exe_path.set_file_name("debug_curl_profile.log");
         use std::io::Write;

@@ -769,6 +769,7 @@ pub async fn fetch_article_text(
         Ok(bytes) => {
             let s = String::from_utf8_lossy(&bytes).to_string();
             // DEBUG: Salva l'HTML grezzo in un file vicino all'exe
+            #[cfg(debug_assertions)]
             if let Ok(mut exe_path) = std::env::current_exe() {
                 exe_path.set_file_name("debug_last_fetch.txt");
                 crate::log_if_err!(std::fs::write(exe_path, &s));

@@ -396,7 +396,13 @@ fn parse_podcast_feed_bytes(
     fallback_title: &str,
 ) -> Option<(String, Vec<PodcastEpisode>)> {
     let cursor = Cursor::new(bytes);
-    let feed = parser::parse(cursor).ok()?;
+    let feed = match parser::parse(cursor) {
+        Ok(f) => f,
+        Err(e) => {
+            crate::log_debug(&format!("DEBUG: parser::parse failed: {:?}", e));
+            return None;
+        }
+    };
     let title = feed
         .title
         .map(|t| t.content)
@@ -824,7 +830,7 @@ pub async fn fetch_podcast_feed(
     })?;
     let mut cache = cache;
 
-    let out = fetch_bytes_with_retries(
+    let out_result = fetch_bytes_with_retries(
         http,
         &url,
         true,
@@ -833,7 +839,48 @@ pub async fn fetch_podcast_feed(
         &cfg,
         Some(&mut cache),
     )
-    .await?;
+    .await;
+
+    let out = match out_result {
+        Ok(o) => o,
+        Err(e) => {
+            let (returned_cache, msg) = match e {
+                FeedFetchError::HttpStatus { cache, status, .. } => {
+                    (cache, format!("HTTP {}", status))
+                }
+                FeedFetchError::Network { cache, message } => (cache, message),
+            };
+            cache = returned_cache;
+            crate::log_debug(&format!(
+                "Standard fetch failed for {}, trying CurlClient. Error: {}",
+                url, msg
+            ));
+            match fetch_url_bytes(&url, cfg).await {
+                Ok(bytes) => {
+                    cache.etag = None;
+                    cache.last_modified = None;
+                    cache.last_fetch = Some(now_unix());
+                    cache.last_status = Some(200);
+                    cache.consecutive_failures = 0;
+                    FetchBytesOutcome {
+                        bytes,
+                        not_modified: false,
+                    }
+                }
+                Err(curl_err) => {
+                    let msg = match curl_err {
+                        FeedFetchError::HttpStatus { status, .. } => format!("HTTP {}", status),
+                        FeedFetchError::Network { message, .. } => message,
+                    };
+                    return Err(FeedFetchError::Network {
+                        message: msg,
+                        cache,
+                    });
+                }
+            }
+        }
+    };
+
     if out.not_modified {
         return Ok(PodcastFetchOutcome {
             title: String::new(),

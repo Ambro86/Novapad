@@ -14,6 +14,8 @@ Tính năng mới
 
 • Đã thêm hỗ trợ giọng nói SAPI4, cho cả việc đọc thời gian thực và tạo sách nói.
 
+• Đã thêm cơ chế OCR dự phòng tự động cho các PDF không truy cập được: khi không tìm thấy văn bản có thể trích xuất, tài liệu sẽ được nhận dạng bằng OCR.
+
 • Đã thêm hỗ trợ từ điển thông qua Wiktionary. Khi nhấn phím Applications, các định nghĩa sẽ được hiển thị và, khi có sẵn, cả từ đồng nghĩa và bản dịch sang ngôn ngữ khác.
 
 • Đã thêm chức năng nhập bài viết từ Wikipedia với tìm kiếm, chọn kết quả và nhập trực tiếp vào trình soạn thảo.
@@ -80,7 +82,7 @@ Cải tiến dành cho nhà phát triển
 
 Những thay đổi này giúp giảm việc sử dụng unsafe không cần thiết, loại bỏ các hành vi không xác định tiềm ẩn và làm cho mã nguồn trở nên chuẩn mực hơn, ổn định hơn và dễ bảo trì hơn.
 
-&nbsp;
+ 
 
 
 

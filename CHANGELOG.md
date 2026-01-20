@@ -6,6 +6,7 @@ New features
 • Added podcast import and export via OPML files.
 • Added Podcast Index search support in addition to iTunes. Users can enter their free API key and secret (generated using only an email address).
 • Added support for SAPI4 voices, both for real-time reading and audiobook creation.
+• Added automatic OCR fallback for non-accessible PDFs: when no extractable text is found, the document is recognized via OCR.
 • Added dictionary support using Wiktionary. Pressing the Applications key shows definitions, and when available, synonyms and translations into other languages.
 • Added Wikipedia article import with search, result selection, and direct import into the editor.
 • Added Shift+Enter shortcut in the RSS module to open an article directly in the original website.

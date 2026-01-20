@@ -13,6 +13,7 @@ use quick_xml::Reader as XmlReader;
 use quick_xml::events::Event;
 use std::io::{BufWriter, Read};
 use std::path::Path;
+use windows::Win32::Globalization::{CP_ACP, WideCharToMultiByte};
 use zip::ZipArchive;
 
 // --- Path identification ---
@@ -213,6 +214,21 @@ pub fn encode_text(text: &str, encoding: TextEncoding) -> Vec<u8> {
             out
         }
         TextEncoding::Ansi => {
+            let wide: Vec<u16> = text.encode_utf16().collect();
+            if wide.is_empty() {
+                return Vec::new();
+            }
+            unsafe {
+                let len = WideCharToMultiByte(CP_ACP, 0, &wide, None, None, None);
+                if len > 0 {
+                    let mut buf = vec![0u8; len as usize];
+                    let len2 = WideCharToMultiByte(CP_ACP, 0, &wide, Some(&mut buf), None, None);
+                    if len2 > 0 {
+                        buf.truncate(len2 as usize);
+                        return buf;
+                    }
+                }
+            }
             let (encoded, _, _) = WINDOWS_1252.encode(text);
             encoded.into_owned()
         }

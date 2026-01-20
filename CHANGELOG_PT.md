@@ -5,7 +5,8 @@ Novas funcionalidades
 • Adicionado o corretor ortográfico. A partir do menu contextual, é possível verificar se a palavra atual está correta e, caso não esteja, obter sugestões.
 • Adicionada a importação e exportação de podcasts por meio de arquivos OPML.
 • Adicionado suporte à pesquisa no Podcast Index além do iTunes. O utilizador pode introduzir a sua API key e API secret gratuitos (gerados apenas com o seu endereço de e-mail).
-• Adicionado suporte às vozes SAPI4, tanto para leitura em tempo real como para a criação de audiolivros.
+• Adicionado suporte às vozes SAPI4, tanto para leitura em tempo real como para a criação de audiolivros
+• Adicionado um fallback automático de OCR para PDFs não acessíveis: quando não é encontrado texto extraível, o documento é reconhecido através de OCR..
 • Adicionado suporte de dicionário através do Wiktionary. Ao pressionar a tecla Aplicações, são apresentadas as definições e, quando disponíveis, também sinónimos e traduções para outros idiomas.
 • Adicionada a importação de artigos da Wikipedia com pesquisa, seleção de resultados e importação direta para o editor.
 • Adicionado o atalho Shift+Enter no módulo RSS para abrir um artigo diretamente no site original.

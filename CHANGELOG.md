@@ -1,5 +1,16 @@
 # Changelog
 
+Version 0.6.1 – 2026-01-20
+Fixes
+• Fixed a bug where enabling “Show voices in the editor” caused podcast playback to stop.
+• Fixed an issue where some podcasts could not be added via URL because the URL was being truncated.
+• Fixed a bug where normal URLs could no longer be added in the RSS feed feature.
+• Fixed an issue where the Wikipedia language option was shown multiple times across different settings tabs.
+• Removed the creation of debug files that were incorrectly generated even in release mode.
+Improvements
+• Improved support for Microsoft voices, which now use a dedicated playback method with a different user agent.
+• Added support for MP4 files.
+
 Version 0.6.0 – 2025-01-20
 New features
 • Added spell checker. From the context menu, users can check whether the current word is correct and, if not, get spelling suggestions.

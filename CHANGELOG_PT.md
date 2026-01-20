@@ -1,5 +1,22 @@
 # Changelog
 
+Versão 0.6.1 – 2026-01-20
+Correções
+• Corrigido um erro em que, ao ativar “Mostrar vozes no editor” e reproduzir um podcast, a reprodução era interrompida.
+• Corrigido um problema em que alguns podcasts não podiam ser adicionados por URL porque o endereço era truncado.
+• Corrigido um erro que impedia a adição de URLs normais na funcionalidade de feeds RSS.
+• Corrigido um problema em que o idioma da Wikipedia era mostrado em várias abas das opções.
+• Removida a criação de alguns ficheiros de depuração que eram gerados mesmo em modo release.
+Melhorias
+• Melhorado o suporte para vozes Microsoft, que agora são reproduzidas utilizando um método dedicado com um user agent diferente.
+• Adicionado suporte para ficheiros MP4.
+
+
+Versão 0.6.0 – 2025-01-XX
+Melhorias
+• Melhorado o suporte para vozes Microsoft, que agora são reproduzidas utilizando um método dedicado com um user agent diferente.
+
+
 Versão 0.6.0 – 2025-01-20
 Novas funcionalidades
 • Adicionado o corretor ortográfico. A partir do menu contextual, é possível verificar se a palavra atual está correta e, caso não esteja, obter sugestões.

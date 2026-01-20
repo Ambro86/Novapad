@@ -12,15 +12,16 @@ use windows::Win32::Storage::FileSystem::{
     MOVEFILE_DELAY_UNTIL_REBOOT, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, MoveFileExW,
     OPEN_EXISTING, REPLACEFILE_WRITE_THROUGH, ReplaceFileW,
 };
-use windows::Win32::System::Threading::{OpenProcess, PROCESS_SYNCHRONIZE, WaitForSingleObject};
-use windows::Win32::UI::Input::KeyboardAndMouse::{SetActiveWindow, SetFocus};
+use windows::Win32::System::Threading::{
+    GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SYNCHRONIZE,
+    WaitForSingleObject,
+};
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::{
     FindWindowW, IDYES, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK, MB_SETFOREGROUND,
-    MB_YESNO, MESSAGEBOX_STYLE, MessageBoxW, PostMessageW, SW_SHOW, SetForegroundWindow,
-    ShowWindow, WM_CLOSE,
+    MB_YESNO, MESSAGEBOX_STYLE, MessageBoxW, PostMessageW, SW_SHOW, WM_CLOSE,
 };
-use windows::core::PCWSTR;
+use windows::core::{HSTRING, PCWSTR};
 
 use crate::accessibility::to_wide;
 use crate::i18n;
@@ -63,8 +64,12 @@ struct ReleaseInfo {
 
 pub(crate) fn check_for_update(hwnd: HWND, interactive: bool) {
     let language = app_language(hwnd);
+    log_debug(&format!(
+        "Update check triggered: interactive={interactive}"
+    ));
     thread::spawn(move || {
         let current_version = env!("CARGO_PKG_VERSION");
+        log_debug("Update check: fetching latest release...");
         let latest = match fetch_latest_release() {
             Ok(info) => info,
             Err(err) => {
@@ -77,13 +82,19 @@ pub(crate) fn check_for_update(hwnd: HWND, interactive: bool) {
         };
 
         let latest_version = normalize_version(&latest.tag_name);
+        log_debug(&format!(
+            "Update check: current={} latest={}",
+            current_version, latest_version
+        ));
         if !is_newer_version(&latest_version, current_version) {
+            log_debug("Update check: no newer version available.");
             if interactive {
                 show_update_info(language, UpdateInfo::NoUpdate);
             }
             return;
         }
 
+        log_debug("Update check: newer version found. Selecting asset...");
         let Some(asset) = select_portable_asset(&latest.assets) else {
             log_debug("Update check: no portable asset found.");
             if interactive {
@@ -119,9 +130,16 @@ pub(crate) fn check_for_update(hwnd: HWND, interactive: bool) {
                 classify_io_error(&err)
             ));
         }
+        log_debug("Update check: acquiring lock...");
         let mut update_lock = match acquire_update_lock(&current_exe) {
-            Ok(lock) => lock,
+            Ok(lock) => {
+                log_debug("Update check: lock acquired.");
+                lock
+            }
             Err(UpdateLockError::InProgress) => {
+                log_debug(
+                    "Update check: lock already held by another thread/process. Skipping silent check.",
+                );
                 if interactive {
                     show_update_error(language, UpdateError::Concurrent);
                 }
@@ -144,6 +162,10 @@ pub(crate) fn check_for_update(hwnd: HWND, interactive: bool) {
             match available_disk_bytes(&current_exe) {
                 Ok(available) => {
                     if available < required {
+                        log_debug(&format!(
+                            "Update check: insufficient disk space. needed={} avail={}",
+                            required, available
+                        ));
                         if interactive {
                             let needed = format_mb(required);
                             let available = format_mb(available);
@@ -162,10 +184,13 @@ pub(crate) fn check_for_update(hwnd: HWND, interactive: bool) {
             }
         }
 
+        log_debug("Update check: prompting user...");
         if !prompt_update(hwnd, language, current_version, &latest_version) {
+            log_debug("Update check: user declined update.");
             return;
         }
 
+        log_debug("Update check: starting download...");
         match download_and_update(
             hwnd,
             language,
@@ -175,9 +200,12 @@ pub(crate) fn check_for_update(hwnd: HWND, interactive: bool) {
             &asset.name,
         ) {
             Ok(UpdateAction::Started) => {
+                log_debug("Update check: update process started successfully.");
                 update_lock.keep();
             }
-            Ok(UpdateAction::Deferred) => {}
+            Ok(UpdateAction::Deferred) => {
+                log_debug("Update check: update downloaded but deferred by user.");
+            }
             Err(err) => {
                 log_debug(&format!("Update failed: {err}"));
                 if interactive {
@@ -192,6 +220,7 @@ fn fetch_latest_release() -> Result<ReleaseInfo, String> {
     let url = format!("https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases/latest");
     let client = reqwest::blocking::Client::builder()
         .user_agent(USER_AGENT)
+        .timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|err| err.to_string())?;
     let resp = client
@@ -247,21 +276,36 @@ fn prompt_update(hwnd: HWND, language: Language, current: &str, latest: &str) ->
         &[("current", current), ("latest", latest)],
     );
     let title = i18n::tr(language, "updater.title");
-    let result = show_update_message(hwnd, &text, &title, MB_YESNO | MB_ICONQUESTION);
+    let result = show_update_message(
+        hwnd,
+        &text,
+        &title,
+        MB_YESNO | MB_ICONQUESTION | MB_SETFOREGROUND,
+    );
     result == IDYES
 }
 
 fn prompt_restart_after_download(hwnd: HWND, language: Language) -> bool {
     let text = i18n::tr(language, "updater.prompt.restart");
     let title = i18n::tr(language, "updater.title");
-    let result = show_update_message(hwnd, &text, &title, MB_YESNO | MB_ICONQUESTION);
+    let result = show_update_message(
+        hwnd,
+        &text,
+        &title,
+        MB_YESNO | MB_ICONQUESTION | MB_SETFOREGROUND,
+    );
     result == IDYES
 }
 
 fn prompt_pending_update(hwnd: HWND, language: Language) -> bool {
     let text = i18n::tr(language, "updater.prompt.pending");
     let title = i18n::tr(language, "updater.title");
-    let result = show_update_message(hwnd, &text, &title, MB_YESNO | MB_ICONQUESTION);
+    let result = show_update_message(
+        hwnd,
+        &text,
+        &title,
+        MB_YESNO | MB_ICONQUESTION | MB_SETFOREGROUND,
+    );
     result == IDYES
 }
 
@@ -540,6 +584,7 @@ fn read_update_metadata(update_path: &Path) -> (Option<u64>, Option<String>) {
 fn download_file(url: &str, target: &Path) -> Result<(), String> {
     let client = reqwest::blocking::Client::builder()
         .user_agent(USER_AGENT)
+        .timeout(std::time::Duration::from_secs(300))
         .build()
         .map_err(|err| err.to_string())?;
     let mut resp = client.get(url).send().map_err(|err| err.to_string())?;
@@ -1244,15 +1289,24 @@ impl Drop for UpdateLock {
 fn acquire_update_lock(current_exe: &Path) -> Result<UpdateLock, UpdateLockError> {
     let paths =
         update_lock_paths(current_exe).map_err(|err| UpdateLockError::Other(err.to_string()))?;
+    let my_pid = std::process::id();
     let mut last_err: Option<io::Error> = None;
     for path in paths {
         if path.exists() {
-            if let Some(pid) = read_lock_pid(&path)
-                && is_process_running(pid)
-            {
-                return Err(UpdateLockError::InProgress);
+            if let Some(pid) = read_lock_pid(&path) {
+                log_debug(&format!("Update lock: found PID {pid} in {:?}", path));
+                if pid == my_pid {
+                    log_debug("Update lock: current process already holds the lock. Proceeding.");
+                    return Ok(UpdateLock { path, keep: false });
+                }
+                if is_process_running(pid) {
+                    log_debug(&format!("Update lock: process {pid} is still running."));
+                    return Err(UpdateLockError::InProgress);
+                }
+                log_debug(&format!("Update lock: process {pid} is NOT running."));
             }
-            crate::log_if_err!(std::fs::remove_file(&path));
+            crate::log_debug(&format!("Removing stale update lock at {:?}", path));
+            let _ = std::fs::remove_file(&path);
         }
         let mut file = match OpenOptions::new().write(true).create_new(true).open(&path) {
             Ok(file) => file,
@@ -1307,9 +1361,11 @@ fn read_lock_pid(path: &Path) -> Option<u32> {
 
 fn is_process_running(pid: u32) -> bool {
     unsafe {
-        if let Ok(handle) = OpenProcess(PROCESS_SYNCHRONIZE, false, pid) {
+        if let Ok(handle) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) {
+            let mut exit_code = 0u32;
+            let ok = GetExitCodeProcess(handle, &mut exit_code).is_ok();
             crate::log_if_err!(CloseHandle(handle));
-            return true;
+            return ok && exit_code == 259; // 259 = STILL_ACTIVE
         }
     }
     false
@@ -1340,9 +1396,8 @@ fn restore_backup(current: &Path) -> io::Result<()> {
 fn show_permission_error(language: Language) {
     let text = i18n::tr(language, "updater.permission_error");
     let title = i18n::tr(language, "updater.title");
-    let owner = find_main_window();
     show_update_message(
-        owner,
+        HWND(0),
         &text,
         &title,
         MB_OK | MB_ICONERROR | MB_SETFOREGROUND,
@@ -1383,9 +1438,8 @@ fn show_update_error(language: Language, error: UpdateError) {
     };
     let text = i18n::tr(language, text_key);
     let title = i18n::tr(language, "updater.title");
-    let owner = find_main_window();
     show_update_message(
-        owner,
+        HWND(0),
         &text,
         &title,
         MB_OK | MB_ICONERROR | MB_SETFOREGROUND,
@@ -1395,9 +1449,8 @@ fn show_update_error(language: Language, error: UpdateError) {
 fn show_update_error_with_url(language: Language, key: &str, url: &str) {
     let text = i18n::tr_f(language, key, &[("url", url)]);
     let title = i18n::tr(language, "updater.title");
-    let owner = find_main_window();
     show_update_message(
-        owner,
+        HWND(0),
         &text,
         &title,
         MB_OK | MB_ICONERROR | MB_SETFOREGROUND,
@@ -1407,9 +1460,8 @@ fn show_update_error_with_url(language: Language, key: &str, url: &str) {
 fn show_update_error_args(language: Language, key: &str, args: &[(&str, &str)]) {
     let text = i18n::tr_f(language, key, args);
     let title = i18n::tr(language, "updater.title");
-    let owner = find_main_window();
     show_update_message(
-        owner,
+        HWND(0),
         &text,
         &title,
         MB_OK | MB_ICONERROR | MB_SETFOREGROUND,
@@ -1584,31 +1636,12 @@ fn show_update_info(language: Language, info: UpdateInfo) {
     };
     let text = i18n::tr(language, text_key);
     let title = i18n::tr(language, "updater.title");
-    let owner = find_main_window();
     show_update_message(
-        owner,
+        HWND(0),
         &text,
         &title,
         MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND,
     );
-}
-
-fn focus_main_window() {
-    let hwnd = find_main_window();
-    if hwnd.0 == 0 {
-        return;
-    }
-    unsafe {
-        ShowWindow(hwnd, SW_SHOW);
-        SetForegroundWindow(hwnd);
-        SetActiveWindow(hwnd);
-        SetFocus(hwnd);
-    }
-}
-
-fn find_main_window() -> HWND {
-    let class_name = to_wide("NovapadWin32");
-    unsafe { FindWindowW(PCWSTR(class_name.as_ptr()), PCWSTR::null()) }
 }
 
 fn show_update_message(
@@ -1617,26 +1650,47 @@ fn show_update_message(
     title: &str,
     flags: MESSAGEBOX_STYLE,
 ) -> windows::Win32::UI::WindowsAndMessaging::MESSAGEBOX_RESULT {
-    let text_w = to_wide(text);
-    let title_w = to_wide(title);
-    let result = unsafe {
-        MessageBoxW(
-            owner,
-            PCWSTR(text_w.as_ptr()),
-            PCWSTR(title_w.as_ptr()),
-            flags,
-        )
-    };
-    focus_main_window();
-    if owner.0 != 0 {
-        unsafe {
-            crate::log_if_err!(PostMessageW(
-                owner,
-                crate::WM_FOCUS_EDITOR,
-                WPARAM(0),
-                LPARAM(0)
-            ));
+    let mut target = owner;
+    if target.0 == 0 {
+        let class_name = to_wide("NovapadWin32");
+        target = unsafe { FindWindowW(PCWSTR(class_name.as_ptr()), PCWSTR::null()) };
+    }
+
+    if target.0 == 0 {
+        let msg = HSTRING::from(text);
+        let tit = HSTRING::from(title);
+        return unsafe { MessageBoxW(None, &msg, &tit, flags) };
+    }
+
+    let (tx, rx) = std::sync::mpsc::channel();
+    let req = Box::new(crate::UpdateDialogRequest {
+        text: text.to_string(),
+        title: title.to_string(),
+        flags,
+        response_tx: tx,
+    });
+    let ptr = Box::into_raw(req);
+    unsafe {
+        log_debug(&format!(
+            "Updater: Posting WM_UPDATE_DIALOG to {:?}",
+            target
+        ));
+        if let Err(e) = PostMessageW(
+            target,
+            crate::WM_UPDATE_DIALOG,
+            WPARAM(0),
+            LPARAM(ptr as isize),
+        ) {
+            log_debug(&format!("Updater: PostMessageW failed: {}", e));
+            drop(Box::from_raw(ptr));
+            return windows::Win32::UI::WindowsAndMessaging::MESSAGEBOX_RESULT(0);
         }
     }
-    result
+
+    log_debug("Updater: Waiting for response channel...");
+    let response = rx
+        .recv_timeout(std::time::Duration::from_secs(60))
+        .unwrap_or(0);
+    log_debug(&format!("Updater: Received response: {}", response));
+    windows::Win32::UI::WindowsAndMessaging::MESSAGEBOX_RESULT(response)
 }

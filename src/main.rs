@@ -48,9 +48,9 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::mem::size_of;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::sync::Once;
 use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, mpsc};
 use std::time::{Duration, Instant};
 
 use chrono::Local;
@@ -100,10 +100,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, HACCEL,
     HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, IDYES, IsChild, IsIconic, IsWindow,
     KillTimer, LoadCursorW, LoadIconW, MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION,
-    MB_ICONQUESTION, MB_OK, MB_YESNO, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_GRAYED, MF_POPUP,
-    MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW,
-    PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW,
-    SW_SHOWMAXIMIZED, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW,
+    MB_ICONQUESTION, MB_OK, MB_YESNO, MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED,
+    MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, OBJID_CLIENT,
+    PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_RESTORE,
+    SW_SHOW, SW_SHOWMAXIMIZED, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW,
     SetWindowTextW, ShowWindow, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW,
     TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY,
     WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES, WM_INITMENUPOPUP, WM_KEYDOWN,
@@ -131,6 +131,9 @@ const WM_TTS_CHUNK_START: u32 = WM_APP + 7;
 const WM_TTS_SAPI_VOICES_LOADED: u32 = WM_APP + 8;
 
 pub const WM_FOCUS_EDITOR: u32 = WM_APP + 30;
+pub const WM_UPDATE_DIALOG: u32 = WM_APP + 80;
+const WM_AUTO_UPDATE_CHECK: u32 = WM_APP + 81;
+const WM_CHECK_PENDING_UPDATE: u32 = WM_APP + 82;
 const WM_PODCAST_CHAPTERS_READY: u32 = WM_APP + 31;
 const WM_DICTIONARY_LOADED: u32 = WM_APP + 32;
 const FOCUS_EDITOR_TIMER_ID: usize = 1;
@@ -231,6 +234,13 @@ struct PdfLoadResult {
     hwnd_edit: HWND,
     path: PathBuf,
     result: Result<PdfTextResult, String>,
+}
+
+pub struct UpdateDialogRequest {
+    pub text: String,
+    pub title: String,
+    pub flags: MESSAGEBOX_STYLE,
+    pub response_tx: mpsc::Sender<i32>,
 }
 
 struct PdfLoadingState {
@@ -1400,7 +1410,13 @@ fn main() -> windows::core::Result<()> {
         if hwnd.0 == 0 {
             return Ok(());
         }
-        updater::check_pending_update(hwnd, false);
+        refresh_voice_panel(hwnd);
+        crate::log_if_err!(PostMessageW(
+            hwnd,
+            WM_CHECK_PENDING_UPDATE,
+            WPARAM(0),
+            LPARAM(0)
+        ));
 
         let current_version = env!("CARGO_PKG_VERSION");
         let mut show_changelog = false;
@@ -1424,7 +1440,15 @@ fn main() -> windows::core::Result<()> {
         let check_updates =
             with_state(hwnd, |state| state.settings.check_updates_on_startup).unwrap_or(true);
         if check_updates {
-            updater::check_for_update(hwnd, false);
+            let hwnd_val = hwnd.0;
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                if let Err(e) =
+                    PostMessageW(HWND(hwnd_val), WM_AUTO_UPDATE_CHECK, WPARAM(0), LPARAM(0))
+                {
+                    crate::log_debug(&format!("Failed to post startup update check: {}", e));
+                }
+            });
         }
 
         let accel = create_accelerators();
@@ -2513,6 +2537,36 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     keybd_event(VK_RIGHT.0 as u8, 0, KEYEVENTF_KEYUP, 0);
                 }
             }
+            LRESULT(0)
+        }
+        WM_UPDATE_DIALOG => {
+            if lparam.0 == 0 {
+                return LRESULT(0);
+            }
+            crate::log_debug("UI: Received WM_UPDATE_DIALOG");
+            let req = unsafe { Box::from_raw(lparam.0 as *mut UpdateDialogRequest) };
+            let result = unsafe {
+                MessageBoxW(
+                    hwnd,
+                    &HSTRING::from(&req.text),
+                    &HSTRING::from(&req.title),
+                    req.flags,
+                )
+            };
+            crate::log_debug(&format!("UI: Update dialog result: {:?}", result));
+            if let Err(e) = req.response_tx.send(result.0) {
+                crate::log_debug(&format!("UI: Failed to send response to channel: {}", e));
+            } else {
+                crate::log_debug("UI: Response sent to channel successfully");
+            }
+            LRESULT(0)
+        }
+        WM_AUTO_UPDATE_CHECK => {
+            updater::check_for_update(hwnd, false);
+            LRESULT(0)
+        }
+        WM_CHECK_PENDING_UPDATE => {
+            updater::check_pending_update(hwnd, false);
             LRESULT(0)
         }
         WM_PDF_LOADED => {

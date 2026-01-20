@@ -1,3 +1,4 @@
+nul
 /target
 **/*.rs.bac
 **/*.rs.segnalibri.bac
@@ -8,4 +9,5 @@
 *.log
 istruzioni_compilazione.txt
 filedocapertocometxt.txt
-log.txt
+# log.txt
+service/

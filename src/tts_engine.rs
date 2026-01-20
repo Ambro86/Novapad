@@ -653,7 +653,7 @@ async fn download_audio_chunk_attempt(
     tts_volume: i32,
 ) -> Result<Vec<u8>, String> {
     let sec_ms_gec = generate_sec_ms_gec();
-    let sec_ms_gec_version = "1-130.0.2849.68";
+    let sec_ms_gec_version = "1-132.0.2917.39";
 
     let url_str = format!(
         "{}?TrustedClientToken={}&ConnectionId={}&Sec-MS-GEC={}&Sec-MS-GEC-Version={}",
@@ -669,7 +669,7 @@ async fn download_audio_chunk_attempt(
         "Origin",
         HeaderValue::from_static("chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold"),
     );
-    headers.insert("User-Agent", HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0"));
+    headers.insert("User-Agent", HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0"));
     headers.insert(
         "Accept-Encoding",
         HeaderValue::from_static("gzip, deflate, br"),
@@ -849,8 +849,8 @@ fn adjust_tts_caret_pos(text: &str, pos: i32) -> i32 {
 fn generate_sec_ms_gec() -> String {
     let win_epoch = 11644473600i64;
     let ticks = Local::now().timestamp() + win_epoch;
-    let ticks = (ticks - (ticks % 300)) as f64 * 1e7;
-    let str_to_hash = format!("{:.0}{}", ticks, TRUSTED_CLIENT_TOKEN);
+    let ticks = (ticks - (ticks % 300)) * 10_000_000;
+    let str_to_hash = format!("{}{}", ticks, TRUSTED_CLIENT_TOKEN);
     let mut hasher = Sha256::new();
     hasher.update(str_to_hash);
     hex::encode(hasher.finalize()).to_uppercase()

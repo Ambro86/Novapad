@@ -37,15 +37,15 @@ use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, CBS_DROPDOWNLIST, CHILDID_SELF,
     CallWindowProcW, CreateMenu, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu,
-    DestroyWindow, EVENT_OBJECT_FOCUS, GetClientRect, GetDlgCtrlID, GetDlgItem, GetParent,
-    GetWindowLongPtrW, GetWindowRect, HMENU, IDC_ARROW, IDYES, LB_ADDSTRING, LB_GETCURSEL,
-    LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK, LBS_NOTIFY, MB_ICONINFORMATION, MB_OK, MB_YESNO,
-    MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW,
-    RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW,
-    TrackPopupMenu, WINDOW_STYLE, WM_CHAR, WM_COMMAND, WM_CONTEXTMENU, WM_COPYDATA, WM_CREATE,
-    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_SETFOCUS, WM_SETFONT,
-    WM_SIZE, WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
-    WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    DestroyWindow, ES_AUTOHSCROLL, EVENT_OBJECT_FOCUS, GetClientRect, GetDlgCtrlID, GetDlgItem,
+    GetParent, GetWindowLongPtrW, GetWindowRect, HMENU, IDC_ARROW, IDYES, LB_ADDSTRING,
+    LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK, LBS_NOTIFY, MB_ICONINFORMATION, MB_OK,
+    MB_YESNO, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MSG, MessageBoxW, OBJID_CLIENT,
+    PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
+    SetWindowTextW, TrackPopupMenu, WINDOW_STYLE, WM_CHAR, WM_COMMAND, WM_CONTEXTMENU, WM_COPYDATA,
+    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_SETFOCUS,
+    WM_SETFONT, WM_SIZE, WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -1800,7 +1800,7 @@ unsafe extern "system" fn add_wndproc(
                 WS_EX_CLIENTEDGE,
                 w!("EDIT"),
                 PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
                 10,
                 28,
                 320,
@@ -3903,6 +3903,41 @@ unsafe extern "system" fn podcast_wndproc(
                                 LPARAM(hitem.0),
                             );
                             load_episode_children(hwnd, hitem, index, false);
+                        }
+                    }
+                } else {
+                    let normalized = crate::tools::rss::normalize_url(&url);
+                    let existing_idx = with_state(parent, |s| {
+                        s.settings.podcast_sources.iter().position(|src| {
+                            crate::tools::rss::normalize_url(&src.url) == normalized
+                        })
+                    })
+                    .flatten();
+
+                    if let Some(idx) = existing_idx {
+                        let hitem = with_podcast_state(hwnd, |s| {
+                            s.node_data.iter().find_map(|(h, data)| {
+                                if let NodeData::Source(i) = data {
+                                    if *i == idx { Some(*h) } else { None }
+                                } else {
+                                    None
+                                }
+                            })
+                        })
+                        .flatten();
+
+                        if let Some(hitem) = hitem {
+                            let hwnd_tree =
+                                with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+                            if hwnd_tree.0 != 0 {
+                                SendMessageW(
+                                    hwnd_tree,
+                                    TVM_SELECTITEM,
+                                    WPARAM(TVGN_CARET as usize),
+                                    LPARAM(hitem),
+                                );
+                                load_episode_children(hwnd, HTREEITEM(hitem), idx, true);
+                            }
                         }
                     }
                 }

@@ -3,6 +3,7 @@ use crate::settings::{FileFormat, settings_dir};
 use crate::with_state;
 use libloading::Library;
 use rodio::{Decoder, OutputStream, Sink, Source};
+use sha2::Digest;
 use std::ffi::c_void;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -401,12 +402,47 @@ pub fn parse_time_input(input: &str) -> Result<u64, String> {
 }
 
 pub fn audiobook_duration_secs(path: &Path) -> Option<u64> {
+    let extension = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    if extension == "mp3"
+        && let Ok(d) = mp3_duration::from_path(path)
+    {
+        return Some(d.as_secs());
+    }
+
+    // Use alias if needed for MF
+    let mut final_path = path.to_path_buf();
+    if (extension == "mp4" || extension == "aac" || extension == "mp3")
+        && !path.to_string_lossy().contains("podcast cache")
+    {
+        let cache_dir = settings_dir().join("podcast cache");
+        let mut hasher = sha2::Sha256::new();
+        use sha2::Digest;
+        hasher.update(path.to_string_lossy().as_bytes());
+        let hash = hex::encode(hasher.finalize());
+        let linked_path = cache_dir.join(format!("link_{}.m4a", &hash[..16]));
+        if linked_path.exists() {
+            final_path = linked_path;
+        }
+    }
+
+    if let Ok(dur) = crate::mf_encoder::get_audio_duration_mf(&final_path) {
+        return Some(dur);
+    }
     let file = std::fs::File::open(path).ok()?;
     let source: Decoder<_> = Decoder::new(std::io::BufReader::new(file)).ok()?;
     if let Some(dur) = source.total_duration() {
         return Some(dur.as_secs());
     }
-    mp3_duration::from_path(path).ok().map(|d| d.as_secs())
+    if extension != "mp3" {
+        // Already tried for mp3
+        mp3_duration::from_path(path).ok().map(|d| d.as_secs())
+    } else {
+        None
+    }
 }
 
 struct AudiobookPlaybackOptions {
@@ -431,40 +467,226 @@ fn start_audiobook_at_with_options(
         };
     let hwnd_main = hwnd;
     std::thread::spawn(move || {
+        log_debug(&format!(
+            "Audio player: Thread started for {}",
+            path.display()
+        ));
         let (_stream, handle) = match OutputStream::try_default() {
             Ok(v) => v,
-            Err(_) => return,
+            Err(e) => {
+                log_debug(&format!(
+                    "Audio player: Failed to get default output stream: {}",
+                    e
+                ));
+                return;
+            }
         };
         let sink: Arc<Sink> = match Sink::try_new(&handle) {
             Ok(s) => Arc::new(s),
-            Err(_) => return,
+            Err(e) => {
+                log_debug(&format!("Audio player: Failed to create sink: {}", e));
+                return;
+            }
         };
 
-        let file = match std::fs::File::open(&path) {
-            Ok(f) => f,
-            Err(_) => return,
-        };
+        log_debug(&format!("Audio player: Opening file {}", path.display()));
+        let file_size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+        let extension = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
 
-        let base: Decoder<_> = match Decoder::new(std::io::BufReader::new(file)) {
-            Ok(s) => s,
-            Err(_) => return,
-        };
+        // Force M4A extension for Media Foundation to avoid indexing hangs on .mp4 video files
+        // and to speed up .mp3/.aac opening.
+        let mut final_path = path.clone();
+        if (extension == "mp4" || extension == "aac" || extension == "mp3")
+            && !path.to_string_lossy().contains("podcast cache")
+        {
+            let cache_dir = settings_dir().join("podcast cache");
+            let _ = std::fs::create_dir_all(&cache_dir);
+            let mut hasher = sha2::Sha256::new();
+            hasher.update(path.to_string_lossy().as_bytes());
+            let hash = hex::encode(hasher.finalize());
+            let linked_path = cache_dir.join(format!("link_{}.m4a", &hash[..16]));
 
-        let source: Box<dyn Source<Item = f32> + Send> = if seconds > 0 {
-            Box::new(
-                base.skip_duration(std::time::Duration::from_secs(seconds))
-                    .convert_samples(),
-            )
+            if !linked_path.exists() {
+                log_debug(&format!(
+                    "Audio player: Creating M4A alias for extension {}: {}",
+                    extension,
+                    linked_path.display()
+                ));
+                // Try hard link first (instant, no space)
+                if std::fs::hard_link(&path, &linked_path).is_err() {
+                    // Fallback to copy if on different volume (slow, but only once)
+                    let _ = std::fs::copy(&path, &linked_path);
+                }
+            }
+            if linked_path.exists() {
+                final_path = linked_path;
+            }
+        }
+
+        let extension = final_path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+        let is_mf_favored =
+            extension == "m4a" || extension == "mp4" || extension == "aac" || extension == "mp3";
+
+        log_debug("Audio player: Creating decoder...");
+        let source: Box<dyn Source<Item = f32> + Send> = if is_mf_favored {
+            log_debug(&format!(
+                "Audio player: Using Media Foundation for {}",
+                extension
+            ));
+            match crate::mf_source::MfSource::try_new(&final_path) {
+                Ok(mut mfs) => {
+                    if seconds > 0 {
+                        log_debug(&format!("Audio player: Efficient seek to {}s", seconds));
+                        if let Err(e) = mfs.seek(std::time::Duration::from_secs(seconds)) {
+                            log_debug(&format!("Audio player: MfSource seek failed: {}", e));
+                        }
+                    }
+                    Box::new(mfs)
+                }
+                Err(e) => {
+                    log_debug(&format!(
+                        "Audio player: MfSource failed, falling back to rodio: {}",
+                        e
+                    ));
+                    // Fallback to rodio decoder
+                    if file_size > 100 * 1024 * 1024 {
+                        let reader = std::io::BufReader::with_capacity(
+                            8 * 1024 * 1024,
+                            std::fs::File::open(&path).unwrap(),
+                        );
+                        match Decoder::new(reader) {
+                            Ok(d) => Box::new(
+                                d.convert_samples()
+                                    .skip_duration(std::time::Duration::from_secs(seconds)),
+                            ),
+                            Err(e) => {
+                                log_debug(&format!("Audio player: Decoder failed: {}", e));
+                                return;
+                            }
+                        }
+                    } else {
+                        match std::fs::read(&path) {
+                            Ok(bytes) => match Decoder::new(std::io::Cursor::new(bytes)) {
+                                Ok(d) => Box::new(
+                                    d.convert_samples()
+                                        .skip_duration(std::time::Duration::from_secs(seconds)),
+                                ),
+                                Err(e) => {
+                                    log_debug(&format!(
+                                        "Audio player: Memory decoder failed: {}",
+                                        e
+                                    ));
+                                    return;
+                                }
+                            },
+                            Err(e) => {
+                                log_debug(&format!("Audio player: Failed to read file: {}", e));
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+        } else if file_size > 100 * 1024 * 1024 {
+            log_debug(
+                "Audio player: Large file detected (>100MB). Indexing may take a few seconds...",
+            );
+            let file = std::fs::File::open(&path).unwrap();
+            let reader = std::io::BufReader::with_capacity(8 * 1024 * 1024, file);
+            match Decoder::new(reader) {
+                Ok(d) => {
+                    let src = d.convert_samples();
+                    if seconds > 0 {
+                        log_debug(&format!("Audio player: Skipping to {} seconds", seconds));
+                        Box::new(src.skip_duration(std::time::Duration::from_secs(seconds)))
+                    } else {
+                        Box::new(src)
+                    }
+                }
+                Err(e) => {
+                    log_debug(&format!("Audio player: Failed to create decoder: {}", e));
+                    return;
+                }
+            }
         } else {
-            Box::new(base.convert_samples())
+            match std::fs::read(&path) {
+                Ok(bytes) => {
+                    log_debug(&format!(
+                        "Audio player: Read {} bytes into memory",
+                        bytes.len()
+                    ));
+                    match Decoder::new(std::io::Cursor::new(bytes)) {
+                        Ok(d) => {
+                            let src = d.convert_samples();
+                            if seconds > 0 {
+                                log_debug(&format!(
+                                    "Audio player: Skipping to {} seconds",
+                                    seconds
+                                ));
+                                Box::new(src.skip_duration(std::time::Duration::from_secs(seconds)))
+                            } else {
+                                Box::new(src)
+                            }
+                        }
+                        Err(e) => {
+                            log_debug(&format!(
+                                "Audio player: Failed to create memory decoder: {}",
+                                e
+                            ));
+                            return;
+                        }
+                    }
+                }
+                Err(e) => {
+                    log_debug(&format!(
+                        "Audio player: Failed to read file into memory: {}",
+                        e
+                    ));
+                    let file = std::fs::File::open(&path).unwrap();
+                    match Decoder::new(std::io::BufReader::new(file)) {
+                        Ok(d) => {
+                            let src = d.convert_samples();
+                            if seconds > 0 {
+                                log_debug(&format!(
+                                    "Audio player: Skipping to {} seconds",
+                                    seconds
+                                ));
+                                Box::new(src.skip_duration(std::time::Duration::from_secs(seconds)))
+                            } else {
+                                Box::new(src)
+                            }
+                        }
+                        err => {
+                            log_debug(&format!(
+                                "Audio player: Final decoder attempt failed: {:?}",
+                                err.is_err()
+                            ));
+                            return;
+                        }
+                    }
+                }
+            }
         };
 
         if (effective_speed - 1.0).abs() > f32::EPSILON {
+            log_debug(&format!(
+                "Audio player: Applying speed factor {}",
+                effective_speed
+            ));
             match SoundTouchSource::try_new(source, effective_speed) {
                 Ok(st_source) => sink.append(st_source),
                 Err(source) => sink.append(source),
             }
         } else {
+            log_debug("Audio player: Appending source to sink");
             sink.append(source);
         }
 
@@ -476,6 +698,7 @@ fn start_audiobook_at_with_options(
         if options.paused {
             sink.pause();
         }
+        log_debug("Audio player: Playback started");
 
         let player = AudiobookPlayer {
             path,

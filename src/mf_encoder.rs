@@ -2,38 +2,66 @@ use crate::accessibility::to_wide;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
+use std::sync::Once;
 use windows::Win32::Media::MediaFoundation::{
     IMFMediaBuffer, IMFMediaType, IMFSample, IMFSinkWriter, IMFSourceReader,
     MF_MT_AUDIO_AVG_BYTES_PER_SECOND, MF_MT_AUDIO_BITS_PER_SAMPLE, MF_MT_AUDIO_BLOCK_ALIGNMENT,
     MF_MT_AUDIO_NUM_CHANNELS, MF_MT_AUDIO_SAMPLES_PER_SECOND, MF_MT_FIXED_SIZE_SAMPLES,
-    MF_MT_MAJOR_TYPE, MF_MT_SAMPLE_SIZE, MF_MT_SUBTYPE, MF_SOURCE_READER_FIRST_AUDIO_STREAM,
-    MF_SOURCE_READERF_ENDOFSTREAM, MF_VERSION, MFAudioFormat_MP3, MFAudioFormat_PCM,
-    MFCreateMediaType, MFCreateMemoryBuffer, MFCreateSample, MFCreateSinkWriterFromURL,
-    MFCreateSourceReaderFromURL, MFMediaType_Audio, MFShutdown, MFStartup,
+    MF_MT_MAJOR_TYPE, MF_MT_SAMPLE_SIZE, MF_MT_SUBTYPE, MF_PD_DURATION,
+    MF_SOURCE_READER_FIRST_AUDIO_STREAM, MF_SOURCE_READERF_ENDOFSTREAM, MF_VERSION,
+    MFAudioFormat_MP3, MFAudioFormat_PCM, MFCreateMediaType, MFCreateMemoryBuffer, MFCreateSample,
+    MFCreateSinkWriterFromURL, MFCreateSourceReaderFromURL, MFMediaType_Audio, MFStartup,
 };
 use windows::core::PCWSTR;
 
-struct MfGuard;
+static MF_STARTUP: Once = Once::new();
+
+pub struct MfGuard;
 
 impl MfGuard {
-    fn start() -> Result<Self, String> {
-        unsafe {
-            if let Err(e) = MFStartup(MF_VERSION, 0) {
-                return Err(format!(
-                    "Media Foundation not available. Install Media Feature Pack on Windows N/KN. ({})",
-                    e
-                ));
-            }
-        }
-        Ok(MfGuard)
+    pub fn start() -> Result<Self, String> {
+        let mut res = Ok(());
+        MF_STARTUP.call_once(|| {
+                unsafe {
+                    if let Err(e) = MFStartup(MF_VERSION, 0) {
+                        res = Err(format!(
+                            "Media Foundation not available. Install Media Feature Pack on Windows N/KN. ({})",
+                            e
+                        ));
+                    }
+                }
+            });
+        res.map(|_| MfGuard)
     }
 }
 
 impl Drop for MfGuard {
     fn drop(&mut self) {
-        unsafe {
-            crate::log_if_err!(MFShutdown());
-        }
+        // We keep MF running once started to avoid overhead of continuous startup/shutdown
+    }
+}
+
+pub fn get_audio_duration_mf(path: &std::path::Path) -> Result<u64, String> {
+    unsafe {
+        let _guard = MfGuard::start()?;
+
+        let path_wide = crate::accessibility::to_wide(path.to_str().ok_or("Invalid path")?);
+
+        let reader: IMFSourceReader = MFCreateSourceReaderFromURL(PCWSTR(path_wide.as_ptr()), None)
+            .map_err(|e| format!("MFCreateSourceReaderFromURL failed: {}", e))?;
+
+        // Use MF_SOURCE_READER_MEDIASOURCE (0xFFFFFFFF) for presentation-wide attributes like duration
+
+        let var = reader
+            .GetPresentationAttribute(0xffffffff, &MF_PD_DURATION)
+            .map_err(|e| format!("GetPresentationAttribute failed: {}", e))?;
+
+        // MF_PD_DURATION is a VT_I8 (long long) representing duration in 100-nanosecond units.
+
+        let hns = windows::Win32::System::Com::StructuredStorage::PropVariantToInt64(&var)
+            .map_err(|e| format!("PropVariantToInt64 failed: {}", e))?;
+        let secs = (hns / 10_000_000) as u64;
+        Ok(secs)
     }
 }
 

@@ -29,18 +29,27 @@ pub struct CurlClient;
 
 impl CurlClient {
     pub fn fetch_url_impersonated(url: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-        // WSJ e Dow Jones: vai diretto con iPhone
-        let is_wsj_or_dowjones =
-            url.contains("wsj.com") || url.contains("dowjones.com") || url.contains("barrons.com");
+        Self::fetch_url_impersonated_with_progress(url, |_| {})
+    }
 
-        if is_wsj_or_dowjones {
-            log_profile("IPHONE_SAFARI", url, "direct (WSJ/DowJones)");
-            return Self::fetch_iphone(url);
+    pub fn fetch_url_impersonated_with_progress<F: FnMut(u32)>(
+        url: &str,
+        mut progress_cb: F,
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        // WSJ, Dow Jones e Podbean: vai diretto con iPhone
+        let use_iphone_direct = url.contains("wsj.com")
+            || url.contains("dowjones.com")
+            || url.contains("barrons.com")
+            || url.contains("podbean.com");
+
+        if use_iphone_direct {
+            log_profile("IPHONE_SAFARI", url, "direct (Known Host)");
+            return Self::fetch_iphone(url, progress_cb);
         }
 
         // PRIMA: proviamo con il profilo Chrome dettagliato (TLS fingerprinting avanzato)
         log_profile("CHROME_ADVANCED", url, "attempting");
-        match fetch_url_chrome_advanced(url) {
+        match fetch_url_chrome_advanced(url, &mut progress_cb) {
             Ok(bytes) => {
                 let check = String::from_utf8_lossy(&bytes).to_lowercase();
                 // Se non è bloccato, ritorna il risultato
@@ -66,7 +75,7 @@ impl CurlClient {
 
         // FALLBACK: iPhone Safari
         log_profile("IPHONE_SAFARI", url, "attempting fallback");
-        let result = Self::fetch_iphone(url);
+        let result = Self::fetch_iphone(url, progress_cb);
         match &result {
             Ok(bytes) => log_profile("IPHONE_SAFARI", url, &format!("done (len={})", bytes.len())),
             Err(e) => log_profile("IPHONE_SAFARI", url, &format!("error: {}", e)),
@@ -74,14 +83,20 @@ impl CurlClient {
         result
     }
 
-    fn fetch_iphone(url: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    fn fetch_iphone<F: FnMut(u32)>(
+        url: &str,
+        mut progress_cb: F,
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        crate::log_debug(&format!("Curl: fetch_iphone starting for {}", url));
         let mut easy = Easy::new();
         easy.url(url)?;
         easy.follow_location(true)?;
-        easy.timeout(Duration::from_secs(25))?;
+        easy.timeout(Duration::from_secs(600))?; // Aumentato a 10m per file grandi
+        easy.connect_timeout(Duration::from_secs(15))?;
         easy.accept_encoding("gzip, deflate, br")?;
         easy.pipewait(true)?;
         easy.cookie_file("")?;
+        easy.progress(true)?;
 
         // Verifica certificati CA da APPDATA (estratti da embedded_deps)
         let cacert_path = crate::embedded_deps::cacert_path();
@@ -105,21 +120,46 @@ impl CurlClient {
         easy.http_headers(list)?;
 
         let mut data = Vec::new();
+        crate::log_debug("Curl: starting perform...");
+        let mut last_log_mb = 0;
+        let mut last_pct = 0u32;
         {
             let mut transfer = easy.transfer();
             transfer.write_function(|new_data| {
                 data.extend_from_slice(new_data);
+                let current_mb = data.len() / (1024 * 1024);
+                if current_mb > last_log_mb && current_mb % 5 == 0 {
+                    crate::log_debug(&format!("Curl: downloaded {} MB...", current_mb));
+                    last_log_mb = current_mb;
+                }
                 Ok(new_data.len())
+            })?;
+            transfer.progress_function(|dltotal, dlnow, _, _| {
+                if dltotal > 0.0 {
+                    let pct = (dlnow / dltotal * 100.0) as u32;
+                    if pct > last_pct {
+                        last_pct = pct;
+                        progress_cb(pct);
+                    }
+                }
+                true
             })?;
             transfer.perform()?;
         }
+        crate::log_debug(&format!(
+            "Curl: perform finished, downloaded {} bytes",
+            data.len()
+        ));
         Ok(data)
     }
 }
 
 /// Vecchio profilo Chrome dettagliato con TLS fingerprinting avanzato
 /// (dal commit c5e5842)
-fn fetch_url_chrome_advanced(url: &str) -> anyhow::Result<Vec<u8>> {
+fn fetch_url_chrome_advanced<F: FnMut(u32)>(
+    url: &str,
+    mut progress_cb: F,
+) -> anyhow::Result<Vec<u8>> {
     let mut easy = Easy::new();
     easy.url(url)?;
 
@@ -130,7 +170,8 @@ fn fetch_url_chrome_advanced(url: &str) -> anyhow::Result<Vec<u8>> {
     easy.follow_location(true)?;
     easy.max_redirections(10)?;
     easy.connect_timeout(std::time::Duration::from_secs(10))?;
-    easy.timeout(std::time::Duration::from_secs(30))?;
+    easy.timeout(std::time::Duration::from_secs(600))?; // 10m per file grandi
+    easy.progress(true)?;
 
     // Verifica certificati CA da APPDATA (estratti da embedded_deps)
     let cacert_path = crate::embedded_deps::cacert_path();
@@ -189,11 +230,22 @@ fn fetch_url_chrome_advanced(url: &str) -> anyhow::Result<Vec<u8>> {
     easy.http_headers(list)?;
 
     let mut data = Vec::new();
+    let mut last_pct = 0u32;
     {
         let mut transfer = easy.transfer();
         transfer.write_function(|new_data| {
             data.extend_from_slice(new_data);
             Ok(new_data.len())
+        })?;
+        transfer.progress_function(|dltotal, dlnow, _, _| {
+            if dltotal > 0.0 {
+                let pct = (dlnow / dltotal * 100.0) as u32;
+                if pct > last_pct {
+                    last_pct = pct;
+                    progress_cb(pct);
+                }
+            }
+            true
         })?;
         transfer.perform()?;
     }

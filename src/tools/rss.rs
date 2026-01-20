@@ -709,23 +709,38 @@ pub async fn fetch_and_parse(
 
 pub async fn fetch_url_bytes(
     url: &str,
-    fetch_config: RssFetchConfig,
+    _fetch_config: RssFetchConfig,
 ) -> Result<Vec<u8>, FeedFetchError> {
-    let http = shared_http().map_err(|e| FeedFetchError::Network {
-        message: e,
-        cache: RssFeedCache::default(),
-    })?;
-    let out = fetch_bytes_with_retries(
-        http,
-        &normalize_url(url),
-        false,
-        "generic",
-        false,
-        &fetch_config,
-        None,
-    )
-    .await?;
-    Ok(out.bytes)
+    let url_str = normalize_url(url);
+    let bytes_res = tokio::task::spawn_blocking(move || {
+        crate::curl_client::CurlClient::fetch_url_impersonated(&url_str).map_err(|e| e.to_string())
+    })
+    .await;
+
+    match bytes_res {
+        Ok(Ok(bytes)) => Ok(bytes),
+        Ok(Err(err)) => Err(FeedFetchError::Network {
+            message: err,
+            cache: RssFeedCache::default(),
+        }),
+        Err(err) => Err(FeedFetchError::Network {
+            message: err.to_string(),
+            cache: RssFeedCache::default(),
+        }),
+    }
+}
+
+pub fn fetch_url_bytes_with_progress<F: FnMut(u32)>(
+    url: &str,
+    progress_cb: F,
+) -> Result<Vec<u8>, String> {
+    let url_str = normalize_url(url);
+    log_debug(&format!(
+        "fetch_url_bytes_with_progress: calling impersonated for {}",
+        url_str
+    ));
+    crate::curl_client::CurlClient::fetch_url_impersonated_with_progress(&url_str, progress_cb)
+        .map_err(|e| e.to_string())
 }
 
 pub async fn fetch_article_text(

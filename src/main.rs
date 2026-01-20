@@ -18,6 +18,7 @@ mod tts_engine;
 use tts_engine::*;
 mod file_handler;
 mod mf_encoder;
+mod mf_source;
 
 mod sapi4_engine;
 mod sapi5_engine;

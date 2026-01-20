@@ -34,7 +34,7 @@ use windows::core::{PCWSTR, PWSTR, w};
 use crate::accessibility::{EM_REPLACESEL, ES_READONLY, to_wide};
 use crate::app_windows::find_in_files_window::browse_for_folder;
 use crate::file_handler::{
-    decode_text, is_doc_path, is_docx_path, is_epub_path, is_html_path, is_mp3_path, is_pdf_path,
+    decode_text, is_audio_path, is_doc_path, is_docx_path, is_epub_path, is_html_path, is_pdf_path,
     is_ppt_path, is_pptx_path, is_spreadsheet_path, read_doc_text, read_docx_text, read_epub_text,
     read_html_text, read_pdf_text, read_ppt_text, read_spreadsheet_text,
 };
@@ -1416,7 +1416,7 @@ fn collect_folder_files(folder: &Path) -> Vec<PathBuf> {
                 stack.push(path);
                 continue;
             }
-            if is_mp3_path(&path) {
+            if is_audio_path(&path) {
                 continue;
             }
             files.push(path);

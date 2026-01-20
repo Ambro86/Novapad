@@ -2003,7 +2003,7 @@ pub unsafe fn open_document_with_encoding(
                 return;
             }
         }
-    } else if is_mp3_path(path) {
+    } else if is_audio_path(path) {
         (String::new(), FileFormat::Audiobook, None)
     } else if is_doc_path(path) {
         match read_doc_text(path, language) {

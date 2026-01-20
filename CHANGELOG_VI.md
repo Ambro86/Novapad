@@ -1,117 +1,89 @@
-Nhật kí thay đổi
-
-
+# Nhật ký thay đổi
 
 Phiên bản 0.6.0 – 2025-01-20
-
 Tính năng mới
-
-• Đã thêm chức năng kiểm tra chính tả. Từ menu ngữ cảnh, người dùng có thể kiểm tra xem từ hiện tại có đúng hay không và nhận gợi ý nếu sai.
-
-• Đã thêm chức năng nhập và xuất podcast thông qua tệp OPML.
-
-• Đã thêm hỗ trợ tìm kiếm Podcast Index bên cạnh iTunes. Người dùng có thể nhập API key và API secret miễn phí (được tạo chỉ bằng địa chỉ email).
-
-• Đã thêm hỗ trợ giọng nói SAPI4, cho cả việc đọc thời gian thực và tạo sách nói.
-
-• Đã thêm cơ chế OCR dự phòng tự động cho các PDF không truy cập được: khi không tìm thấy văn bản có thể trích xuất, tài liệu sẽ được nhận dạng bằng OCR.
-
-• Đã thêm hỗ trợ từ điển thông qua Wiktionary. Khi nhấn phím Applications, các định nghĩa sẽ được hiển thị và, khi có sẵn, cả từ đồng nghĩa và bản dịch sang ngôn ngữ khác.
-
-• Đã thêm chức năng nhập bài viết từ Wikipedia với tìm kiếm, chọn kết quả và nhập trực tiếp vào trình soạn thảo.
-
-• Đã thêm phím tắt Shift+Enter trong mô-đun RSS để mở bài viết trực tiếp trên trang web gốc.
-
+• Thêm trình kiểm tra chính tả. Từ menu chuột phải, người dùng có thể kiểm tra xem từ hiện tại có đúng không và nếu không, sẽ nhận được các gợi ý sửa lỗi.
+• Thêm tính năng nhập và xuất podcast thông qua tệp OPML.
+• Thêm hỗ trợ tìm kiếm trên Podcast Index cùng với iTunes. Người dùng có thể nhập API key và secret miễn phí (tạo chỉ bằng địa chỉ email).
+• Thêm hỗ trợ cho các giọng đọc SAPI4, áp dụng cho cả việc đọc thời gian thực và tạo sách nói.
+• Thêm tính năng tự động chuyển sang OCR cho các tệp PDF không hỗ trợ tiếp cận: khi không tìm thấy văn bản có thể trích xuất, tài liệu sẽ được nhận dạng qua OCR.
+• Thêm hỗ trợ từ điển bằng Wiktionary. Nhấn phím Applications sẽ hiển thị các định nghĩa, và khi có sẵn, sẽ hiện cả từ đồng nghĩa cùng bản dịch sang các ngôn ngữ khác.
+• Thêm tính năng nhập bài viết Wikipedia với khả năng tìm kiếm, chọn kết quả và nhập trực tiếp vào trình soạn thảo.
+• Thêm phím tắt Shift+Enter trong mô-đun RSS để mở trực tiếp bài viết trên trang web gốc.
 Cải tiến
-
-• Việc chọn micro hiện luôn được ứng dụng tôn trọng.
-
-• Trong cửa sổ podcast, khi nhấn Enter trên một tập, NVDA sẽ thông báo ngay “đang tải”, giúp người dùng biết rõ thao tác đã được thực hiện.
-
-• Trong kết quả tìm kiếm podcast, nhấn Enter sẽ đăng ký podcast đã chọn.
-
-• Đã sửa và cải thiện nhãn cho các phím tắt Ctrl+Shift+O và Podcast Ctrl+Shift+P.
-
-• Tốc độ phát và âm lượng hiện được lưu trong cài đặt và áp dụng cho tất cả các tệp âm thanh.
-
-• Đã thêm thư mục bộ nhớ đệm riêng cho các tập podcast. Người dùng có thể giữ tập podcast thông qua mục “Giữ podcast” trong menu Phát. Bộ nhớ đệm sẽ tự động được dọn dẹp khi vượt quá dung lượng do người dùng thiết lập (Tùy chọn → Âm thanh).
-
-• Đã cải thiện đáng kể việc tải bài viết RSS bằng cách sử dụng libcurl với giả lập Chrome và iPhone, đảm bảo khả năng tương thích với khoảng 99% trang web.
-
-• Đã thêm trạng thái đã đọc / chưa đọc cho các bài viết RSS, với hiển thị rõ ràng trong danh sách RSS.
-
-• Chức năng Thay thế tất cả hiện hiển thị số lượng thay thế đã thực hiện.
-
-• Đã thêm nút Xóa podcast khi duyệt thư viện podcast bằng phím Tab.
-
+• Việc lựa chọn Micro giờ đây luôn được ứng dụng tuân thủ chính xác.
+• Trong cửa sổ podcast, nhấn Enter vào một tập tin giờ đây sẽ thông báo ngay lập tức "đang tải" qua NVDA để xác nhận thao tác.
+• Trong kết quả tìm kiếm podcast, nhấn Enter giờ đây sẽ đăng ký theo dõi podcast đã chọn.
+• Sửa và cải thiện các nhãn cho phím tắt Ctrl+Shift+O và Podcast Ctrl+Shift+P.
+• Tốc độ phát và âm lượng giờ đây được lưu trong cài đặt và duy trì cho tất cả các tệp âm thanh.
+• Thêm một thư mục bộ nhớ đệm (cache) riêng cho các tập podcast. Người dùng có thể giữ lại các tập phim qua mục "Giữ podcast" trong menu Phát lại. Bộ nhớ đệm sẽ tự động được dọn dẹp khi vượt quá kích thước do người dùng thiết lập (Tùy chọn → Âm thanh).
+• Cải thiện đáng kể việc tải bài viết RSS bằng cách sử dụng giả lập libcurl với cấu hình Chrome và iPhone, đảm bảo tương thích với khoảng 99% các trang web.
+• Thêm trạng thái đã đọc / chưa đọc cho các bài viết RSS, với chỉ báo rõ ràng trong danh sách RSS.
+• Tính năng Thay thế tất cả giờ đây sẽ báo cáo số lượng thay thế đã thực hiện.
+• Thêm nút Xóa Podcast khi điều hướng thư viện podcast bằng phím Tab.
 Sửa lỗi
-
-• Đã loại bỏ mục “pending update” dư thừa trong menu Trợ giúp (việc cập nhật đã được xử lý tự động).
-
-• Đã sửa lỗi khi mở tệp MP3 và nhấn Ctrl+S khiến tệp bị lưu và dẫn đến hỏng tệp.
-
-• Đã sửa lỗi giao diện khi “Batch Audiobooks” hiển thị là “(B)… Ctrl+Shift+B” (đã loại bỏ nhãn dư thừa).
-
-• Đã sửa lỗi dấu ngoặc kép thông minh: khi được bật, dấu ngoặc kép thông thường giờ đây được thay thế chính xác bằng dấu ngoặc kép kiểu chữ.
-
-• Đã sửa lỗi khi sử dụng “Đi tới dấu trang” làm tốc độ phát bị đặt lại về 1.0.
-
-• Đã sửa lỗi khi phát podcast đã tải xuống nhưng hệ thống vẫn tải lại thay vì sử dụng phiên bản trong bộ nhớ đệm.
-
+• Loại bỏ mục "bản cập nhật đang chờ" thừa trong menu Trợ giúp (việc cập nhật đã được xử lý tự động).
+• Sửa lỗi nhấn Ctrl+S trên tệp MP đang mở gây lưu đè và làm hỏng tệp.
+• Sửa lỗi giao diện khiến "Sách nói hàng loạt" hiển thị thành "(B)… Ctrl+Shift+B" (loại bỏ nhãn thừa).
+• Sửa lỗi ngoặc kép thông minh: khi được bật, các dấu ngoặc kép thông thường giờ đây sẽ được thay thế chính xác bằng ngoặc kép thông minh.
+• Sửa lỗi sử dụng "Đi tới dấu trang" làm đặt lại tốc độ phát về 1.0.
+• Sửa lỗi các tập podcast đã tải về lại bị tải lại thay vì sử dụng bản lưu trong bộ nhớ đệm.
 Phím tắt
+• F1 giờ đây mở hướng dẫn Trợ giúp.
+• F2 giờ đây kiểm tra các bản cập nhật.
+• F7 / F8 giờ đây nhảy đến lỗi chính tả trước đó hoặc tiếp theo.
+• F9 / F10 giờ đây chuyển đổi nhanh giữa các giọng đọc yêu thích.
+Cải tiến cho nhà phát triển
+• Các lỗi không còn bị bỏ qua một cách im lặng: tất cả các mẫu `let _ =` đã bị loại bỏ, và các lỗi hiện được xử lý rõ ràng (truyền đi, ghi nhật ký hoặc xử lý bằng các phương án dự phòng phù hợp).
+• Dự án giờ đây sẽ không thể biên dịch nếu có cảnh báo (warnings): cả `cargo check` và `cargo clippy` phải vượt qua một cách sạch sẽ.
+• Các triển khai tùy chỉnh như strlen / wcslen đã bị loại bỏ. Độ dài chuỗi và bộ đệm UTF-16 giờ đây được lấy trực tiếp từ dữ liệu do Rust quản lý thay vì quét bộ nhớ.
+• Việc xử lý DLL đã được làm sạch và hợp nhất xung quanh `libloading`, tránh các logic trình nạp tùy chỉnh và phân tích cú pháp PE.
+• Các trình hỗ trợ phân tích cú pháp byte tự viết đã bị loại bỏ; tất cả việc phân tích byte hiện sử dụng `from_le_bytes` / `from_be_bytes` tiêu chuẩn trên các lát cắt (slices) đã được kiểm tra.
+Những thay đổi này giúp giảm việc sử dụng mã không an toàn (unsafe) không cần thiết, loại bỏ các hành vi không xác định tiềm ẩn và làm cho mã nguồn trở nên chuẩn mực, mạnh mẽ và dễ bảo trì hơn.
 
-• F1 hiện mở hướng dẫn.
+Phiên bản 0.5.9 - 2025-01-13
+Tính năng mới
+• Thêm tính năng sắp xếp lại RSS từ menu chuột phải (lên/xuống/đến vị trí) với kiểm tra vị trí hợp lệ.
+• Thêm menu ngữ cảnh cho bài viết với các tùy chọn mở trang web gốc và chia sẻ qua WhatsApp, Facebook và X.
+• Thêm phím tắt Esc để quay lại danh sách RSS từ các bài viết đã nhập.
+• Thêm chế độ podcast: tìm kiếm, đăng ký, lắng nghe; sắp xếp lại các đăng ký; phím Esc dừng phát và quay lại danh sách; phím Enter trên một tập phim để bắt đầu phát.
+• Thêm điều khiển tốc độ phát cho podcast và tệp MP3.
+• Thêm Ctrl+T để đi tới một mốc thời gian cụ thể.
+• Thêm nút nghe thử giọng đọc sau hộp chọn âm lượng.
+• Thêm tính năng tìm kiếm và thay thế bằng biểu thức chính quy (Regex) theo phong cách Notepad++.
+• Thêm tính năng nhập RSS từ tệp OPML và TXT.
+• Thêm tùy chọn để bật "Mở bằng Novapad" trong File Explorer, bao gồm cả các bản portable.
+Cải tiến
+• Cải thiện việc chọn tốc độ/cao độ/âm lượng giọng đọc, tuân thủ các giới hạn tối đa của TTS.
+• Nhiều cải tiến RSS để tải xuống tất cả bài viết mà không làm di chuyển tiêu điểm NVDA trong quá trình cập nhật.
+• Cải thiện việc phát âm thanh với menu chuyên dụng, thông báo thời gian bằng Ctrl+I và âm lượng lên tới 300%.
+• Thêm các phím tắt còn thiếu cho một số chức năng.
+• Tổ chức lại menu Chỉnh sửa với menu con dọn dẹp văn bản.
+• Tổ chức lại Tùy chọn thành các tab, với điều hướng bằng Ctrl+Tab và Ctrl+Shift+Tab.
+• Trình đọc RSS hiện tải toàn bộ nội dung bài viết, khớp với chế độ xem trên trình duyệt.
+Sửa lỗi
+• Sửa lỗi dọn dẹp Markdown làm xóa mất các số ở đầu dòng.
+• Sửa lỗi AltGr+Z kích hoạt lệnh hoàn tác.
+• Sửa lỗi hủy ghi âm sách nói để quá trình dừng lại nhanh chóng.
+Bản địa hóa
+• Thêm bản dịch tiếng Việt (cảm ơn Anh Đức Nguyễn).
 
-• F2 hiện kiểm tra cập nhật.
-
-• F7 / F8 hiện cho phép chuyển đến lỗi chính tả trước đó hoặc tiếp theo.
-
-• F9 / F10 hiện cho phép chuyển nhanh giữa các giọng nói đã lưu trong mục yêu thích.
-
-Cải tiến dành cho nhà phát triển
-
-• Lỗi không còn bị bỏ qua một cách im lặng: tất cả các mẫu let \_ = đã được loại bỏ và lỗi hiện được xử lý rõ ràng (truyền tiếp, ghi log hoặc xử lý bằng cơ chế dự phòng phù hợp).
-
-• Dự án hiện sẽ không biên dịch nếu còn cảnh báo: cả cargo check và cargo clippy đều phải chạy sạch, với các lint chặt chẽ hơn và loại bỏ allow khi có thể.
-
-• Đã loại bỏ các triển khai tùy chỉnh kiểu strlen / wcslen. Độ dài chuỗi và bộ đệm UTF-16 hiện được lấy trực tiếp từ dữ liệu do Rust quản lý, thay vì quét bộ nhớ thủ công.
-
-• Việc xử lý DLL đã được làm gọn và thống nhất xoay quanh libloading, tránh logic tải tùy chỉnh và phân tích PE.
-
-• Đã loại bỏ các helper tự viết cho việc phân tích byte; toàn bộ việc phân tích byte hiện sử dụng from\_le\_bytes / from\_be\_bytes trên các slice đã được kiểm tra.
-
-Những thay đổi này giúp giảm việc sử dụng unsafe không cần thiết, loại bỏ các hành vi không xác định tiềm ẩn và làm cho mã nguồn trở nên chuẩn mực hơn, ổn định hơn và dễ bảo trì hơn.
-
- 
-
-
-
-Phien ban 0.5.9 - 2025-01-13
-Tinh nang moi
-• Them kha nang sap xep RSS tu menu ngu canh (len/xuong/den vi tri), co kiem tra vi tri khong hop le.
-• Them menu ngu canh cho bai viet: mo trang goc va chia se qua WhatsApp, Facebook va X.
-• Them phim tat Esc de quay lai danh sach RSS tu bai viet da nhap.
-• Them che do podcast: tim kiem, dang ky va nghe; sap xep dang ky; Esc dung phat va quay lai danh sach; Enter tren tap phat bat dau phat.
-• Them dieu chinh toc do phat cho podcast va file MP3.
-• Them Ctrl+T de di den thoi gian cu the.
-• Them nut nghe thu giong doc sau hop chon am luong.
-• Them chuc nang regex cho Tim va Thay the, phong cach Notepad++.
-• Them nhap RSS tu file OPML va TXT.
-• Them tuy chon trong Cai dat de bat "Mo voi Novapad" trong File Explorer, ke ca ban portable.
-Cai tien
-• Cai thien lua chon toc do, cao do va am luong giong doc, ton trong gioi han toi da cua TTS.
-• Nhieu cai tien cho RSS de tai du cac bai viet ma khong di chuyen focus NVDA khi cap nhat.
-• Cai thien phat am thanh voi menu rieng, thong bao thoi gian bang Ctrl+I va am luong toi 300%.
-• Them cac phim tat con thieu cho mot so chuc nang.
-• Sap xep lai menu Chinh sua voi submenu cho cac chuc nang lam sach van ban.
-• Sap xep lai Tuy chon thanh cac the, co Ctrl+Tab va Ctrl+Shift+Tab de chuyen the.
-• Khac phuc loi doc bai viet: trinh doc RSS gio doc du bai viet nhu tren trinh duyet.
-Sua loi
-• Sua loi lam sach Markdown loai bo so o dau dong.
-• Sua AltGr+Z kich hoat Undo.
-• Sua loi khi ghi sach noi khong the dung nhanh.
-Ban dia hoa
-• Them dich tieng Viet (cam on Anh Duc Nguyen).
+Phiên bản 0.5.8 - 2026-01-10
+Tính năng mới
+• Thêm điều khiển âm lượng cho micro và âm thanh hệ thống khi ghi âm podcast.
+• Thêm tính năng mới để nhập bài viết từ các trang web hoặc nguồn cấp dữ liệu RSS, bao gồm các nguồn quan trọng nhất cho mỗi ngôn ngữ.
+• Thêm chức năng xóa tất cả dấu trang cho tệp hiện tại.
+• Thêm chức năng xóa các dòng trùng lặp và các dòng trùng lặp liên tiếp.
+• Thêm chức năng đóng tất cả các tab hoặc cửa sổ ngoại trừ cái hiện tại.
+• Thêm mục Quyên góp trong menu Trợ giúp cho tất cả các ngôn ngữ.
+Cải tiến
+• Cải thiện terminal hỗ trợ tiếp cận để ngăn chặn một số lỗi treo máy.
+• Cải thiện và sửa lỗi các phím truy cập và phím tắt trong toàn bộ ứng dụng.
+• Sửa lỗi đóng cửa sổ phát âm thanh nhưng âm thanh không dừng.
+• Thêm hộp thoại xác nhận cho các hành động quan trọng (ví dụ: xóa dòng trùng lặp, xóa dấu gạch nối cuối dòng, xóa tất cả dấu trang). Không có hộp thoại nào hiển thị khi hành động đó không thể thực hiện.
+• Thêm khả năng xóa các nguồn RSS/trang web khỏi thư viện bằng cách chọn chúng và nhấn phím Delete.
+• Thêm menu chuột phải trong cửa sổ RSS để chỉnh sửa hoặc xóa các nguồn RSS/trang web.
+• Loại bỏ cài đặt di chuyển cài đặt sang thư mục hiện tại; ứng dụng hiện tự động xử lý việc này dựa trên vị trí (nếu thư mục chứa file exe tên là "novapad portable" hoặc nằm trên ổ đĩa di động, cài đặt sẽ vào thư mục `config` của exe, nếu không sẽ vào `%APPDATA%\Novapad`).
 
 Phiên bản 0.5.7 - 2026-01-05
 Tính năng mới
@@ -120,25 +92,25 @@ Tính năng mới
 • Thêm lựa chọn bảng mã khi mở các tệp văn bản.
 • Thêm tùy chọn trong terminal hỗ trợ tiếp cận để thông báo khi có dòng mới bằng NVDA.
 Cải tiến
-• Quá trình ghi âm sách nói giờ đây sẽ lưu trực tiếp sang định dạng MP3 khi được chọn.
-• Người dùng có thể chọn vị trí của dấu sao (\*) báo hiệu "chưa lưu" trên tiêu đề cửa sổ.
-• Cải thiện độ ổn định của hệ thống cập nhật trong nhiều tình huống khác nhau.
-• Thêm mục "Xóa dấu gạch nối" trong menu Chỉnh sửa để sửa lỗi ngắt dòng sau khi quét OCR.
+• Ghi âm sách nói giờ đây lưu trực tiếp sang MP3 khi được chọn.
+• Người dùng giờ đây có thể chọn vị trí dấu sao (*) báo hiệu chưa lưu trên tiêu đề cửa sổ.
+• Cải thiện độ ổn định của hệ thống cập nhật.
+• Thêm mục "Xóa dấu gạch nối" trong menu Chỉnh sửa để sửa lỗi ngắt dòng OCR.
 
 Phiên bản 0.5.6 - 2026-01-04
 Sửa lỗi
-Cải thiện Tìm trong các tệp để khi nhấn Enter sẽ mở tệp chính xác tại vị trí đoạn văn bản được chọn.
+  Cải thiện Tìm trong các tệp để nhấn Enter sẽ mở tệp chính xác tại đoạn văn bản đã chọn.
 Cải tiến
-Thêm hỗ trợ định dạng PPT/PPTX (mở dưới dạng văn bản).
-Khi mở các định dạng không phải văn bản thuần túy, phần mềm sẽ lưu thành tệp .txt để tránh lỗi định dạng (PDF/DOC/DOCX/EPUB/HTML/PPT/PPTX).
-Thêm ghi âm podcast từ micro và âm thanh hệ thống (Menu Tệp, Ctrl+Shift+R).
+  Thêm hỗ trợ PPT/PPTX (mở dưới dạng văn bản).
+  Mở các định dạng không phải văn bản giờ đây sẽ lưu thành .txt để tránh lỗi định dạng (PDF/DOC/DOCX/EPUB/HTML/PPT/PPTX).
+  Thêm ghi âm podcast từ micro và âm thanh hệ thống (Menu Tệp, Ctrl+Shift+R).
 
 Phiên bản 0.5.5 – 2026-01-03
 Tính năng mới
-• Thêm Terminal hỗ trợ tiếp cận được tối ưu hóa cho nội dung đầu ra lớn và trình đọc màn hình (Ctrl+Shift+P).
-• Thêm cài đặt để lưu tùy chỉnh người dùng vào thư mục hiện tại (chế độ portable).
+• Thêm terminal hỗ trợ tiếp cận được tối ưu hóa cho đầu ra lớn và trình đọc màn hình (Ctrl+Shift+P).
+• Thêm cài đặt để lưu cài đặt người dùng trong thư mục hiện tại (chế độ portable).
 Sửa lỗi
-• Cải thiện đoạn trích dẫn trong Tìm trong các tệp để phần xem trước luôn khớp với kết quả tìm thấy.
+• Cải thiện đoạn trích dẫn Tìm trong các tệp để phần xem trước luôn khớp với kết quả tìm thấy.
 
 Phiên bản 0.5.4 – 2026-01-03
 Cải tiến
@@ -148,7 +120,7 @@ Cải tiến
 Phiên bản 0.5.3 – 2026-01-02
 Tính năng mới
 • Thêm tính năng Tìm trong các tệp.
-• Thêm các công cụ văn bản mới: Chuẩn hóa khoảng trắng, Ngắt dòng cứng và Loại bỏ thẻ Markdown.
+• Thêm các công cụ văn bản mới: Chuẩn hóa khoảng trắng, Ngắt dòng cứng và Loại bỏ Markdown.
 • Thêm Thống kê văn bản (Alt+Y).
 • Thêm các lệnh danh sách mới trong menu Chỉnh sửa:
 • Sắp xếp các mục (Alt+Shift+O)
@@ -156,38 +128,33 @@ Tính năng mới
 • Đảo ngược các mục (Alt+Shift+Z)
 • Thêm Trích dẫn / Bỏ trích dẫn các dòng (Ctrl+Q / Ctrl+Shift+Q).
 Bản địa hóa
-• Thêm ngôn ngữ tiếng Tây Ban Nha.
-• Thêm ngôn ngữ tiếng Bồ Đào Nha.
+• Thêm bản dịch tiếng Tây Ban Nha.
+• Thêm bản dịch tiếng Bồ Đào Nha.
 Cải tiến
-• Khi đang mở tệp EPUB, lệnh Lưu sẽ tự động chuyển thành Lưu mới thành và xuất nội dung dưới dạng tệp .txt để tránh làm hỏng tệp EPUB.
+• Khi mở tệp EPUB, lệnh Lưu giờ đây tự động chuyển thành Lưu mới thành và xuất nội dung dưới dạng tệp .txt để tránh làm hỏng EPUB.
 
 ## 0.5.2 - 2026-01-01
-
-* Thêm Nhật ký thay đổi.
-* Thêm tùy chọn "Mở với Novapad" và liên kết tệp trong quá trình cài đặt.
-* Cải thiện ngôn ngữ cho các thông báo (lỗi, hộp thoại, xuất sách nói).
-* Thêm lựa chọn phần khi dùng "Chia nhỏ sách nói dựa trên văn bản", với tùy chọn "Bắt buộc dấu đánh dấu ở đầu dòng".
-* Thêm tính năng nhập bản phụ đề YouTube với lựa chọn ngôn ngữ, mốc thời gian và cải thiện xử lý tiêu điểm.
+- Thêm nhật ký thay đổi.
+- Thêm các tùy chọn mở bằng Novapad và liên kết tệp trong khi cài đặt.
+- Cải thiện bản địa hóa thông báo (lỗi, hộp thoại, xuất sách nói).
+- Thêm lựa chọn phần khi dùng "Chia nhỏ sách nói dựa trên văn bản", với tùy chọn "Bắt buộc dấu đánh dấu ở đầu dòng".
+- Thêm tính năng nhập phụ đề YouTube với lựa chọn ngôn ngữ, mốc thời gian và cải thiện xử lý tiêu điểm.
 
 ## 0.5.1 - 2025-12-31
-
-* Cập nhật tự động có xác nhận, cải thiện thông báo và xử lý lỗi.
-* Cải tiến xuất sách nói (chia nhỏ theo văn bản, SAPI5/Media Foundation, điều khiển nâng cao).
-* Cải tiến TTS (tạm dừng/tiếp tục, từ điển thay thế, danh sách yêu thích).
-* Thêm menu Hiển thị và các bảng giọng đọc/yêu thích, chỉnh màu và cỡ chữ.
-* Tự động chọn ngôn ngữ theo hệ thống và cải thiện bản địa hóa.
-* Thiết lập quy trình đóng gói cho Windows (MSI/NSIS).
+- Cập nhật tự động có xác nhận, cải thiện thông báo và xử lý lỗi.
+- Cải tiến xuất sách nói (chia nhỏ theo văn bản, SAPI5/Media Foundation, điều khiển nâng cao).
+- Cải tiến TTS (tạm dừng/tiếp tục, từ điển thay thế, danh sách yêu thích).
+- Menu Hiển thị và các bảng giọng đọc/yêu thích, màu chữ và cỡ chữ.
+- Ngôn ngữ mặc định theo hệ thống và cải thiện bản địa hóa.
+- Đóng gói cho Windows (MSI/NSIS).
 
 ## 0.5.0 - 2025-12-27
-
-* Tái cấu trúc theo mô-đun (trình soạn thảo, xử lý tệp, menu, tìm kiếm).
-* Cập nhật quy trình đóng gói trên Windows và tệp README/giấy phép.
-* Sửa lỗi điều hướng phím TAB trong cửa sổ Trợ giúp.
+- Tái cấu trúc theo mô-đun (trình soạn thảo, xử lý tệp, menu, tìm kiếm).
+- Quy trình đóng gói trên Windows và cập nhật README/giấy phép.
+- Sửa lỗi điều hướng phím TAB trong cửa sổ Trợ giúp.
 
 ## 0.5 - 2025-12-27
-
-* Nâng cấp phiên bản sơ bộ.
+- Nâng cấp phiên bản sơ bộ.
 
 ## 0.1.0 - 2025-12-25
-
-* Phiên bản phát hành đầu tiên: Cấu trúc dự án và tệp README.
+- Phiên bản phát hành đầu tiên: Cấu trúc dự án và tệp README.

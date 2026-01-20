@@ -2,7 +2,7 @@ use curl::easy::{Easy, List};
 use std::ffi::CString;
 use std::time::Duration;
 
-fn log_profile(profile: &str, url: &str, status: &str) {
+fn log_profile(_profile: &str, _url: &str, _status: &str) {
     #[cfg(debug_assertions)]
     if let Ok(mut exe_path) = std::env::current_exe() {
         exe_path.set_file_name("debug_curl_profile.log");
@@ -12,7 +12,7 @@ fn log_profile(profile: &str, url: &str, status: &str) {
             .append(true)
             .open(&exe_path)
         {
-            crate::log_if_err!(writeln!(file, "[{}] {} - {}", profile, status, url));
+            crate::log_if_err!(writeln!(file, "[{}] {} - {}", _profile, _status, _url));
         }
     }
 }

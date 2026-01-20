@@ -2,6 +2,28 @@ Nhật kí thay đổi
 
 
 
+Phiên bản 0.6.1 – 2026-01-20
+
+Sửa lỗi
+
+• Đã sửa lỗi khi bật “Hiển thị giọng nói trong trình soạn thảo” và phát podcast thì quá trình phát bị dừng.
+
+• Đã sửa lỗi khiến một số podcast không thể thêm bằng URL do địa chỉ bị cắt ngắn.
+
+• Đã sửa lỗi không thể thêm các URL thông thường trong chức năng RSS feed.
+
+• Đã sửa lỗi khiến ngôn ngữ Wikipedia hiển thị ở nhiều tab cài đặt khác nhau.
+
+• Đã loại bỏ việc tạo một số tệp debug vốn vẫn được tạo ngay cả ở chế độ release.
+
+Cải tiến
+
+• Cải thiện hỗ trợ cho giọng nói Microsoft, hiện được phát bằng phương thức chuyên biệt với user agent khác.
+
+• Đã thêm hỗ trợ cho tệp MP4.
+
+
+
 Phiên bản 0.6.0 – 2025-01-20
 
 Tính năng mới

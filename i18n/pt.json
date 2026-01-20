@@ -35,7 +35,7 @@
   "menu.tools": "&Ferramentas",
   "menu.help": "&Ajuda",
   "menu.options": "&Opcoes...\tCtrl+Shift+O",
-  "menu.dictionary": "&Dicionario\tCtrl+Shift+D",
+  "menu.dictionary": "Dicionário &vocal\tCtrl+Shift+D",
   "menu.dictionary_lookup": "Dicionario online...\tAlt+Shift+D",
   "menu.wikipedia_import": "Pesquisar e importar do Wikipedia...\tAlt+Shift+W",
   "menu.import_youtube": "Importar transcricao do &YouTube...\tCtrl+Y",

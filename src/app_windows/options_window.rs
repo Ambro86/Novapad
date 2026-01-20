@@ -3374,6 +3374,8 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.combo_spellcheck_language,
             state.label_dictionary_translation,
             state.combo_dictionary_translation,
+            state.label_wikipedia_language,
+            state.combo_wikipedia_language,
             state.label_wrap_width,
             state.edit_wrap_width,
             state.label_quote_prefix,

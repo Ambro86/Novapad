@@ -1689,8 +1689,21 @@ fn main() -> windows::core::Result<()> {
                         || state.go_to_time_dialog.0 != 0
                         || state.podcasts_add_dialog.0 != 0;
 
+                    // Exclude voice panel controls from player keyboard handling
+                    let is_voice_panel_control = msg.hwnd == state.voice_combo_engine
+                        || msg.hwnd == state.voice_combo_voice
+                        || msg.hwnd == state.voice_combo_speed
+                        || msg.hwnd == state.voice_combo_pitch
+                        || msg.hwnd == state.voice_combo_volume
+                        || msg.hwnd == state.voice_edit_speed
+                        || msg.hwnd == state.voice_edit_pitch
+                        || msg.hwnd == state.voice_edit_volume
+                        || msg.hwnd == state.voice_checkbox_multilingual
+                        || msg.hwnd == state.voice_combo_favorites;
+
                     let is_main_target = msg.hwnd == hwnd || IsChild(hwnd, msg.hwnd).as_bool();
-                    if is_audiobook && !secondary_open && is_main_target {
+                    if is_audiobook && !secondary_open && is_main_target && !is_voice_panel_control
+                    {
                         let command =
                             handle_player_keyboard(&msg, state.settings.audiobook_skip_seconds);
                         if !matches!(command, PlayerCommand::None) {

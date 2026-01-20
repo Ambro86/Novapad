@@ -6,7 +6,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     VK_NEXT, VK_OEM_MINUS, VK_OEM_PERIOD, VK_OEM_PLUS, VK_PRIOR, VK_RIGHT, VK_SHIFT, VK_SPACE,
     VK_SUBTRACT, VK_UP,
 };
-use windows::Win32::UI::WindowsAndMessaging::{IsDialogMessageW, MSG, WM_KEYDOWN};
+use windows::Win32::UI::WindowsAndMessaging::{IsChild, IsDialogMessageW, MSG, WM_KEYDOWN};
 
 pub enum PlayerCommand {
     TogglePause,
@@ -55,6 +55,13 @@ pub fn normalize_to_crlf(text: &str) -> String {
 ///
 /// Returns `true` if the message was handled and should be skipped by the main loop.
 pub unsafe fn handle_accessibility(hwnd: HWND, msg: &MSG) -> bool {
+    // Only process messages that belong to this window or its children.
+    // This prevents IsDialogMessageW from interfering with messages destined
+    // for other windows (e.g., the main editor while a secondary window is open).
+    if msg.hwnd != hwnd && !IsChild(hwnd, msg.hwnd).as_bool() {
+        return false;
+    }
+
     // 1. Standard Dialog Navigation (TAB, Arrows, Enter, Space on controls)
     // IsDialogMessageW handles the vast majority of accessibility rules automatically.
     if IsDialogMessageW(hwnd, msg).as_bool() {

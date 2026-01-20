@@ -77,6 +77,7 @@ const WM_PODCAST_FETCH_COMPLETE: u32 = windows::Win32::UI::WindowsAndMessaging::
 const WM_PODCAST_SEARCH_COMPLETE: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 311;
 const WM_PODCAST_PLAY_READY: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 312;
 const WM_PODCAST_PLAY_FAILED: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 313;
+const WM_PODCAST_DOWNLOAD_PROGRESS: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 314;
 
 const EM_SETSEL: u32 = 0x00B1;
 const EM_SCROLLCARET: u32 = 0x00B7;
@@ -1147,67 +1148,118 @@ unsafe fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpis
             enclosure_url: url.clone(),
             title: episode_title.clone(),
         });
-        if let Err(_e) = PostMessageW(
-            hwnd,
-            WM_PODCAST_PLAY_READY,
-            WPARAM(0),
-            LPARAM(Box::into_raw(msg) as isize),
-        ) {}
+        if let Err(e) = unsafe {
+            PostMessageW(
+                hwnd,
+                WM_PODCAST_PLAY_READY,
+                WPARAM(0),
+                LPARAM(Box::into_raw(msg) as isize),
+            )
+        } {
+            log_debug(&format!(
+                "Failed to post WM_PODCAST_PLAY_READY from cache: {}",
+                e
+            ));
+        }
         return;
     }
-    let parent_hwnd = parent;
+
     let hwnd_copy = hwnd;
     let cache_limit_mb = with_state(parent, |s| s.settings.podcast_cache_limit_mb).unwrap_or(500);
     let cache_dir = podcast_cache_dir();
+
     std::thread::spawn(move || {
-        let rt = match tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-        {
-            Ok(rt) => rt,
-            Err(e) => {
-                crate::log_debug(&format!("Failed to build tokio runtime: {}", e));
-                return;
+        log_debug(&format!("Podcast thread: starting download for {}", url));
+        let mut last_reported_pct = 0u32;
+        let bytes = rss::fetch_url_bytes_with_progress(&url, |pct| {
+            if pct >= last_reported_pct + 10 || (pct == 100 && last_reported_pct < 100) {
+                last_reported_pct = (pct / 10) * 10;
+                unsafe {
+                    if windows::Win32::UI::WindowsAndMessaging::IsWindow(hwnd_copy).as_bool() {
+                        let _ = PostMessageW(
+                            hwnd_copy,
+                            WM_PODCAST_DOWNLOAD_PROGRESS,
+                            WPARAM(last_reported_pct as usize),
+                            LPARAM(0),
+                        );
+                    }
+                }
             }
-        };
-        let fetch_config = rss_fetch_config(parent_hwnd);
-        let bytes = rt.block_on(rss::fetch_url_bytes(&url, fetch_config));
+        });
         let bytes = match bytes {
-            Ok(b) => b,
+            Ok(b) => {
+                log_debug(&format!("podcasts_download_ok len={} url={}", b.len(), url));
+                b
+            }
             Err(err) => {
-                log_debug(&format!("podcasts_download_error {}", err));
-                if let Err(_e) =
-                    PostMessageW(hwnd_copy, WM_PODCAST_PLAY_FAILED, WPARAM(0), LPARAM(0))
-                {
-                    crate::log_debug(&format!("Error: {:?}", _e));
+                log_debug(&format!("podcasts_download_error {}: {}", url, err));
+                unsafe {
+                    if windows::Win32::UI::WindowsAndMessaging::IsWindow(hwnd_copy).as_bool()
+                        && let Err(e) =
+                            PostMessageW(hwnd_copy, WM_PODCAST_PLAY_FAILED, WPARAM(0), LPARAM(0))
+                    {
+                        log_debug(&format!("Failed to post WM_PODCAST_PLAY_FAILED: {}", e));
+                    }
                 }
                 return;
             }
         };
         let file_path = podcast_cache_path(&url, enclosure_type.as_deref());
+        log_debug(&format!("podcasts_cache_path: {}", file_path.display()));
         if let Some(parent_dir) = file_path.parent()
             && let Err(e) = std::fs::create_dir_all(parent_dir)
         {
-            crate::log_debug(&format!("Failed to create podcast directory: {}", e));
+            crate::log_debug(&format!(
+                "Failed to create podcast directory {}: {}",
+                parent_dir.display(),
+                e
+            ));
         }
-        if std::fs::write(&file_path, bytes).is_ok() {
-            let limit_bytes = cache_limit_mb as u64 * 1024 * 1024;
-            enforce_podcast_cache_limit(&cache_dir, limit_bytes, Some(&file_path));
-            let msg = Box::new(PlayReadyMsg {
-                path: file_path,
-                enclosure_url: url.clone(),
-                title: episode_title.clone(),
-            });
-            if let Err(_e) = PostMessageW(
-                hwnd_copy,
-                WM_PODCAST_PLAY_READY,
-                WPARAM(0),
-                LPARAM(Box::into_raw(msg) as isize),
-            ) {}
-        } else if let Err(_e) =
-            PostMessageW(hwnd_copy, WM_PODCAST_PLAY_FAILED, WPARAM(0), LPARAM(0))
-        {
-            crate::log_debug(&format!("Error: {:?}", _e));
+        match std::fs::write(&file_path, bytes) {
+            Ok(_) => {
+                log_debug(&format!("podcasts_write_ok: {}", file_path.display()));
+                let limit_bytes = cache_limit_mb as u64 * 1024 * 1024;
+                enforce_podcast_cache_limit(&cache_dir, limit_bytes, Some(&file_path));
+                let msg = Box::new(PlayReadyMsg {
+                    path: file_path,
+                    enclosure_url: url.clone(),
+                    title: episode_title.clone(),
+                });
+                unsafe {
+                    if windows::Win32::UI::WindowsAndMessaging::IsWindow(hwnd_copy).as_bool() {
+                        log_debug(&format!(
+                            "Posting WM_PODCAST_PLAY_READY to HWND({:?})",
+                            hwnd_copy.0
+                        ));
+                        if let Err(e) = PostMessageW(
+                            hwnd_copy,
+                            WM_PODCAST_PLAY_READY,
+                            WPARAM(0),
+                            LPARAM(Box::into_raw(msg) as isize),
+                        ) {
+                            log_debug(&format!("Failed to post WM_PODCAST_PLAY_READY: {}", e));
+                        }
+                    }
+                }
+            }
+            Err(err) => {
+                log_debug(&format!(
+                    "Failed to write podcast cache file {}: {}",
+                    file_path.display(),
+                    err
+                ));
+                unsafe {
+                    if windows::Win32::UI::WindowsAndMessaging::IsWindow(hwnd_copy).as_bool()
+                        && let Err(e) =
+                            PostMessageW(hwnd_copy, WM_PODCAST_PLAY_FAILED, WPARAM(0), LPARAM(0))
+                    {
+                        log_debug(&format!(
+                            "Failed to post WM_PODCAST_PLAY_FAILED after write error: {}",
+                            e
+                        ));
+                    }
+                }
+            }
         }
     });
 }
@@ -1216,23 +1268,44 @@ fn podcast_cache_path(url: &str, mime: Option<&str>) -> PathBuf {
     let mut hasher = sha2::Sha256::new();
     hasher.update(url.as_bytes());
     let hash = hex::encode(hasher.finalize());
-    let url_ext = url
-        .split('?')
-        .next()
-        .and_then(|s| Path::new(s).extension().and_then(|e| e.to_str()))
-        .unwrap_or("");
-    let ext = match mime.map(|m| m.to_ascii_lowercase()) {
-        Some(mime) if mime.contains("mpeg") || mime.contains("mp3") => "mp3",
-        Some(mime) if mime.contains("mp4") || mime.contains("m4a") || mime.contains("aac") => "m4a",
-        Some(mime) if mime.contains("ogg") || mime.contains("vorbis") => "ogg",
-        _ => {
-            if url_ext.is_empty() {
-                "mp3"
-            } else {
-                url_ext
-            }
-        }
+
+    let mut ext = match mime.map(|m| m.to_ascii_lowercase()) {
+        Some(m) if m.contains("mpeg") || m.contains("mp3") => "mp3",
+        Some(m) if m.contains("mp4") || m.contains("m4a") || m.contains("aac") => "m4a",
+        Some(m) if m.contains("ogg") || m.contains("vorbis") => "ogg",
+        Some(m) if m.contains("opus") => "opus",
+        Some(m) if m.contains("wav") => "wav",
+        Some(m) if m.contains("flac") => "flac",
+        _ => "",
     };
+
+    let url_ext_owned;
+    if ext.is_empty() {
+        let url_ext = url
+            .split('?')
+            .next()
+            .unwrap_or(url)
+            .split('/')
+            .next_back()
+            .unwrap_or("")
+            .split('.')
+            .next_back()
+            .unwrap_or("mp3")
+            .to_ascii_lowercase();
+
+        if url_ext == "mp4" {
+            ext = "m4a";
+        } else {
+            url_ext_owned = url_ext;
+            ext = &url_ext_owned;
+        }
+    }
+
+    // Limit extension length to avoid issues with weird URLs
+    if ext.len() > 5 || ext.is_empty() {
+        ext = "mp3";
+    }
+
     let filename = format!("podcast_{}.{}", &hash[..16], ext);
     podcast_cache_dir().join(filename)
 }
@@ -3916,6 +3989,17 @@ unsafe extern "system" fn podcast_wndproc(
             if parent.0 != 0 {
                 crate::set_pending_podcast_chapters_key(parent, None);
             }
+            LRESULT(0)
+        }
+        WM_PODCAST_DOWNLOAD_PROGRESS => {
+            let pct = wparam.0 as u32;
+            let language = with_podcast_state(hwnd, |s| s.language).unwrap_or_default();
+            let message = crate::i18n::tr_f(
+                language,
+                "podcasts.download_progress",
+                &[("pct", &pct.to_string())],
+            );
+            crate::accessibility::nvda_speak(&message);
             LRESULT(0)
         }
         WM_DESTROY => {

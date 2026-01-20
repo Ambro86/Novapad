@@ -1,6 +1,6 @@
 [package]
 name = "novapad"
-version = "0.5.9"
+version = "0.6.0"
 edition = "2024"
 authors = ["Ambrogio Riili"]
 description = "A modern Notepad with PDF, DOCX, XLS and EPUB support and TTS capabilities."
@@ -156,6 +156,21 @@ libloading = "0.8"
 
 [features]
 portable = []
+
+[profile.dev.package.symphonia]
+opt-level = 3
+
+[profile.dev.package.symphonia-core]
+opt-level = 3
+
+[profile.dev.package.symphonia-format-isomp4]
+opt-level = 3
+
+[profile.dev.package.symphonia-codec-aac]
+opt-level = 3
+
+[profile.dev.package.rodio]
+opt-level = 3
 
 [profile.release]
 opt-level = 3

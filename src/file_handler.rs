@@ -74,10 +74,19 @@ pub fn is_html_path(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-pub fn is_mp3_path(path: &Path) -> bool {
+pub fn is_audio_path(path: &Path) -> bool {
     path.extension()
         .and_then(|s| s.to_str())
-        .map(|s| s.eq_ignore_ascii_case("mp3") || s.eq_ignore_ascii_case("m4a"))
+        .map(|s| {
+            s.eq_ignore_ascii_case("mp3")
+                || s.eq_ignore_ascii_case("m4a")
+                || s.eq_ignore_ascii_case("mp4")
+                || s.eq_ignore_ascii_case("aac")
+                || s.eq_ignore_ascii_case("ogg")
+                || s.eq_ignore_ascii_case("opus")
+                || s.eq_ignore_ascii_case("wav")
+                || s.eq_ignore_ascii_case("flac")
+        })
         .unwrap_or(false)
 }
 

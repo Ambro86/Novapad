@@ -3,6 +3,7 @@ use crate::podcast::chapters::Chapter;
 use crate::tools::reader;
 use feed_rs::parser;
 use reqwest::{self, StatusCode, header};
+use scraper::{Html, Selector};
 
 use header::{ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED, REFERER};
 use serde::{Deserialize, Serialize};
@@ -659,6 +660,30 @@ async fn fetch_bytes_with_retries(
     })
 }
 
+fn extract_feed_links(html: &str, base_url: &str) -> Vec<String> {
+    let mut links = Vec::new();
+    let document = Html::parse_document(html);
+    if let Ok(selector) = Selector::parse("link[rel~='alternate'][href]") {
+        for element in document.select(&selector) {
+            if let Some(type_attr) = element.value().attr("type") {
+                let t = type_attr.to_lowercase();
+                if (t.contains("rss") || t.contains("atom") || t.contains("xml"))
+                    && let Some(href) = element.value().attr("href")
+                {
+                    if let Ok(u) = Url::parse(base_url)
+                        && let Ok(joined) = u.join(href)
+                    {
+                        links.push(joined.to_string());
+                    } else if href.starts_with("http") {
+                        links.push(href.to_string());
+                    }
+                }
+            }
+        }
+    }
+    links
+}
+
 struct FetchBytesOutcome {
     bytes: Vec<u8>,
     not_modified: bool,
@@ -678,7 +703,7 @@ pub async fn fetch_and_parse(
     })?;
     let mut cache = cache;
 
-    let out = fetch_bytes_with_retries(
+    let out_result = fetch_bytes_with_retries(
         http,
         &url,
         true,
@@ -687,7 +712,48 @@ pub async fn fetch_and_parse(
         &fetch_config,
         Some(&mut cache),
     )
-    .await?;
+    .await;
+
+    let out = match out_result {
+        Ok(o) => o,
+        Err(e) => {
+            let (returned_cache, msg) = match e {
+                FeedFetchError::HttpStatus { cache, status, .. } => {
+                    (cache, format!("HTTP {}", status))
+                }
+                FeedFetchError::Network { cache, message } => (cache, message),
+            };
+            cache = returned_cache;
+            crate::log_debug(&format!(
+                "Standard fetch failed for {}, trying CurlClient. Error: {}",
+                url, msg
+            ));
+            match fetch_url_bytes(&url, fetch_config).await {
+                Ok(bytes) => {
+                    cache.etag = None;
+                    cache.last_modified = None;
+                    cache.last_fetch = Some(now_unix());
+                    cache.last_status = Some(200);
+                    cache.consecutive_failures = 0;
+                    FetchBytesOutcome {
+                        bytes,
+                        not_modified: false,
+                    }
+                }
+                Err(curl_err) => {
+                    let msg = match curl_err {
+                        FeedFetchError::HttpStatus { status, .. } => format!("HTTP {}", status),
+                        FeedFetchError::Network { message, .. } => message,
+                    };
+                    return Err(FeedFetchError::Network {
+                        message: msg,
+                        cache,
+                    });
+                }
+            }
+        }
+    };
+
     if out.not_modified {
         return Ok(RssFetchOutcome {
             kind: RssSourceType::Feed,
@@ -697,7 +763,9 @@ pub async fn fetch_and_parse(
             not_modified: true,
         });
     }
-    if let Some((title, items)) = parse_feed_bytes(out.bytes, &url, fetch_config.max_excerpt_chars)
+
+    if let Some((title, items)) =
+        parse_feed_bytes(out.bytes.clone(), &url, fetch_config.max_excerpt_chars)
     {
         return Ok(RssFetchOutcome {
             kind: RssSourceType::Feed,
@@ -707,6 +775,45 @@ pub async fn fetch_and_parse(
             not_modified: false,
         });
     }
+
+    // HTML Discovery
+    let html = String::from_utf8_lossy(&out.bytes);
+    let feed_links = extract_feed_links(&html, &url);
+    for feed_link in feed_links {
+        crate::log_debug(&format!("Discovering feed at: {}", feed_link));
+        let sub_out_result = fetch_bytes_with_retries(
+            http,
+            &feed_link,
+            true,
+            "feed",
+            override_cooldown,
+            &fetch_config,
+            None,
+        )
+        .await;
+
+        let sub_bytes = match sub_out_result {
+            Ok(o) => o.bytes,
+            Err(_) => match fetch_url_bytes(&feed_link, fetch_config).await {
+                Ok(b) => b,
+                Err(_) => continue,
+            },
+        };
+
+        if let Some((title, items)) =
+            parse_feed_bytes(sub_bytes, &feed_link, fetch_config.max_excerpt_chars)
+        {
+            cache.feed_url = Some(feed_link);
+            return Ok(RssFetchOutcome {
+                kind: RssSourceType::Feed,
+                title,
+                items: dedup_items(items, fetch_config.max_items_per_feed),
+                cache,
+                not_modified: false,
+            });
+        }
+    }
+
     Err(FeedFetchError::Network {
         message: "Parsing failed".to_string(),
         cache,

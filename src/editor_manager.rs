@@ -1814,7 +1814,7 @@ fn strip_markdown_text(text: &str, keep_bullets: bool) -> String {
             trimmed = trimmed.trim_start_matches('>').trim_start();
         }
         let mut line: std::borrow::Cow<'_, str> = std::borrow::Cow::Borrowed(trimmed);
-        if trimmed.starts_with("- ") || trimmed.starts_with("* ") || trimmed.starts_with("+ ") {
+        if trimmed.starts_with("- ") || trimmed.starts_with("+ ") {
             if keep_bullets {
                 let bullet = trimmed.chars().next().unwrap_or('-');
                 let rest = trimmed[1..].trim_start();

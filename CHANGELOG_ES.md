@@ -1,5 +1,45 @@
 # Changelog
 
+Versión 0.6.0 – 2025-01-20
+Nuevas funciones
+• Añadido el corrector ortográfico. Desde el menú contextual es posible comprobar si la palabra actual es correcta y, en caso contrario, obtener sugerencias.
+• Añadida la importación y exportación de podcasts mediante archivos OPML.
+• Añadido soporte para la búsqueda en Podcast Index además de iTunes. El usuario puede introducir su API key y API secret gratuitos (generados usando solo su correo electrónico).
+• Añadido soporte para voces SAPI4, tanto para la lectura en tiempo real como para la creación de audiolibros.
+• Añadido soporte de diccionario mediante Wiktionary. Al pulsar la tecla Aplicaciones se muestran las definiciones y, cuando están disponibles, también sinónimos y traducciones a otros idiomas.
+• Añadida la importación de artículos desde Wikipedia con búsqueda, selección de resultados e importación directa en el editor.
+• Añadido el atajo Shift+Enter en el módulo RSS para abrir un artículo directamente en el sitio web original.
+Mejoras
+• La selección del micrófono ahora siempre es respetada por la aplicación.
+• En la ventana de podcasts, al pulsar Enter sobre un episodio, NVDA anuncia inmediatamente “cargando”, proporcionando confirmación inmediata de la acción.
+• En los resultados de búsqueda de podcasts, al pulsar Enter ahora se realiza la suscripción al podcast seleccionado.
+• Corregidas y mejoradas las etiquetas de los atajos Ctrl+Shift+O y Podcast Ctrl+Shift+P.
+• La velocidad de reproducción y el volumen ahora se guardan en la configuración y se mantienen para todos los archivos de audio.
+• Añadida una carpeta de caché dedicada para los episodios de podcasts. El usuario puede conservar los episodios mediante “Conservar podcast” en el menú Reproducir. La caché se limpia automáticamente cuando supera el tamaño configurado por el usuario (Opciones → Audio).
+• Mejorada de forma significativa la obtención de artículos RSS utilizando libcurl con impersonación de Chrome e iPhone, garantizando compatibilidad con aproximadamente el 99 % de los sitios.
+• Añadido el estado leído / no leído para los artículos RSS, con indicación clara en la lista RSS.
+• La función Reemplazar todo ahora muestra también el número de reemplazos realizados.
+• Añadido el botón Eliminar podcast al navegar por la biblioteca de podcasts mediante Tab.
+Correcciones
+• Eliminada la entrada redundante “pending update” del menú Ayuda (las actualizaciones ya se gestionan automáticamente).
+• Corregido un error por el cual, al abrir un archivo MP3 y pulsar Ctrl+S, el archivo se guardaba y quedaba corrupto.
+• Corregido un problema de interfaz donde “Batch Audiobooks” se mostraba como “(B)… Ctrl+Shift+B” (se eliminó la etiqueta redundante).
+• Corregido el funcionamiento de las comillas inteligentes: cuando están habilitadas, las comillas normales ahora se sustituyen correctamente por comillas tipográficas.
+• Corregido un error por el cual, al usar “Ir al marcador”, la velocidad de reproducción se restablecía a 1.0.
+• Corregido un problema por el cual los episodios de podcasts ya descargados se volvían a descargar en lugar de usar la versión en caché.
+Atajos de teclado
+• F1 ahora abre la guía.
+• F2 ahora comprueba si hay actualizaciones.
+• F7 / F8 ahora permiten desplazarse al error ortográfico anterior o siguiente.
+• F9 / F10 ahora permiten cambiar rápidamente entre las voces guardadas en favoritos.
+Mejoras para desarrolladores
+• Los errores ya no se ignoran silenciosamente: se han eliminado todos los patrones let _ = y los errores ahora se gestionan explícitamente (propagados, registrados o tratados con mecanismos de respaldo adecuados).
+• El proyecto ahora no compila si hay advertencias: tanto cargo check como cargo clippy deben completarse sin avisos, con lints más estrictos y eliminación de allow donde sea posible.
+• Eliminadas las implementaciones personalizadas de tipo strlen / wcslen. Las longitudes de cadenas y buffers UTF-16 ahora se derivan de datos gestionados por Rust, sin escanear memoria manualmente.
+• La gestión de DLL se ha limpiado y centralizado en torno a libloading, evitando lógica de carga personalizada y análisis PE.
+• Eliminados los helpers manuales para el parsing de bytes: ahora todo el parsing utiliza from_le_bytes / from_be_bytes sobre slices verificadas.
+Estos cambios reducen el uso innecesario de unsafe, eliminan posibles comportamientos indefinidos y hacen que el código sea más idiomático, robusto y mantenible.
+
 Version 0.5.9 - 2025-01-13
 Nuevas funciones
 • Aniadida la posibilidad de reordenar RSS desde el menu contextual (arriba/abajo/a posicion) con controles para posiciones no validas.

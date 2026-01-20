@@ -82,8 +82,14 @@ fn dictionary_labels(language: Language) -> DictionaryLabels {
 }
 
 pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
-    if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
-        return handle_accessibility(hwnd, msg);
+    if msg.message == WM_KEYDOWN {
+        if msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
+            crate::log_if_err!(DestroyWindow(hwnd));
+            return true;
+        }
+        if msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
+            return handle_accessibility(hwnd, msg);
+        }
     }
     handle_accessibility(hwnd, msg)
 }

@@ -62,6 +62,7 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
 use windows::Win32::System::DataExchange::COPYDATASTRUCT;
+use windows::Win32::System::Diagnostics::Debug::MessageBeep;
 use windows::Win32::System::LibraryLoader::{GetModuleHandleW, LoadLibraryW};
 use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
@@ -98,17 +99,17 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetCursorPos, GetForegroundWindow, GetMenu, GetMenuItemCount, GetMessageW, GetParent,
     GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, HACCEL,
     HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, IDYES, IsChild, IsIconic, IsWindow,
-    KillTimer, LoadCursorW, LoadIconW, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK,
-    MB_YESNO, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_GRAYED, MF_POPUP, MF_SEPARATOR,
-    MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW, PostQuitMessage,
-    RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED,
-    SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
-    TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE, WM_APP,
-    WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY,
-    WM_DROPFILES, WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL,
-    WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WM_UNDO, WNDCLASSW,
-    WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP,
-    WS_VISIBLE,
+    KillTimer, LoadCursorW, LoadIconW, MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION,
+    MB_ICONQUESTION, MB_OK, MB_YESNO, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_GRAYED, MF_POPUP,
+    MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW,
+    PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW,
+    SW_SHOWMAXIMIZED, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW,
+    SetWindowTextW, ShowWindow, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW,
+    TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY,
+    WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES, WM_INITMENUPOPUP, WM_KEYDOWN,
+    WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SIZE,
+    WM_SYSKEYDOWN, WM_TIMER, WM_UNDO, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN,
+    WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{HSTRING, Interface, PCWSTR, PWSTR, implement, w};
 
@@ -236,6 +237,7 @@ struct PdfLoadingState {
     hwnd_edit: HWND,
     timer_id: usize,
     frame: usize,
+    start_time: Instant,
 }
 
 struct PodcastChaptersReady {
@@ -6243,7 +6245,10 @@ unsafe fn handle_pdf_loaded(hwnd: HWND, payload: PdfLoadResult) {
             with_state(hwnd, |state| {
                 goto_first_bookmark(hwnd_edit, &path, &state.bookmarks, FileFormat::Pdf);
             });
-            show_info(hwnd, language, &pdf_loaded_message(language));
+            let msg = pdf_loaded_message(language);
+            crate::log_debug(&format!("Info (speech): {msg}"));
+            crate::accessibility::nvda_speak(&msg);
+            let _ = unsafe { MessageBeep(MB_ICONASTERISK) };
             let mut update_title = false;
             with_state(hwnd, |state| {
                 if let Some(doc) = state.docs.get_mut(index) {
@@ -6347,6 +6352,7 @@ unsafe fn start_pdf_loading_animation(hwnd: HWND, hwnd_edit: HWND) {
             hwnd_edit,
             timer_id,
             frame: 0,
+            start_time: Instant::now(),
         });
         timer_id
     })
@@ -6380,6 +6386,7 @@ unsafe fn stop_pdf_loading_animation(hwnd: HWND, hwnd_edit: HWND) {
 
 unsafe fn handle_pdf_loading_timer(hwnd: HWND, timer_id: usize) {
     let mut target = None;
+    let mut should_timeout = false;
     with_state(hwnd, |state| {
         if let Some(entry) = state
             .pdf_loading
@@ -6387,9 +6394,72 @@ unsafe fn handle_pdf_loading_timer(hwnd: HWND, timer_id: usize) {
             .find(|entry| entry.timer_id == timer_id)
         {
             entry.frame = entry.frame.wrapping_add(1);
+            if entry.start_time.elapsed().as_secs() >= 15 {
+                should_timeout = true;
+            }
             target = Some((entry.hwnd_edit, entry.frame));
         }
     });
+
+    if should_timeout && let Some((hwnd_edit, _)) = target {
+        stop_pdf_loading_animation(hwnd, hwnd_edit);
+        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+        let msg = format!(
+            "{}\n\n{}",
+            i18n::tr(language, "app.pdf_error_hint"),
+            i18n::tr(language, "dialog.pdf_no_text_ocr")
+        );
+        let title = i18n::tr(language, "dialog.ocr_title");
+        let response = MessageBoxW(
+            hwnd,
+            PCWSTR(to_wide(&msg).as_ptr()),
+            PCWSTR(to_wide(&title).as_ptr()),
+            MB_YESNO | MB_ICONQUESTION,
+        );
+
+        if response == IDYES {
+            let path = with_state(hwnd, |state| {
+                state
+                    .docs
+                    .iter()
+                    .find(|d| d.hwnd_edit == hwnd_edit)
+                    .and_then(|d| d.path.clone())
+            })
+            .flatten();
+
+            if let Some(path) = path {
+                start_pdf_loading_animation(hwnd, hwnd_edit);
+                let hwnd_main = hwnd;
+                std::thread::spawn(move || {
+                    let ocr_result = win_ocr::recognize_text_from_pdf(&path, language);
+                    let final_result = match ocr_result {
+                        Ok(text) => Ok(PdfTextResult::Text(text)),
+                        Err(e) => Err(e),
+                    };
+                    let payload = Box::new(PdfLoadResult {
+                        hwnd_edit,
+                        path,
+                        result: final_result,
+                    });
+                    unsafe {
+                        let payload_ptr = Box::into_raw(payload);
+                        if let Err(e) = PostMessageW(
+                            hwnd_main,
+                            WM_PDF_LOADED,
+                            WPARAM(0),
+                            LPARAM(payload_ptr as isize),
+                        ) {
+                            crate::log_debug(&format!("Failed to post WM_PDF_LOADED: {}", e));
+                        }
+                    }
+                });
+            }
+        } else {
+            let err = i18n::tr(language, "app.pdf_error_hint");
+            editor_manager::set_edit_text(hwnd_edit, &err);
+        }
+        return;
+    }
 
     if let Some((hwnd_edit, frame)) = target {
         editor_manager::set_edit_text(hwnd_edit, &pdf_loading_placeholder(frame));

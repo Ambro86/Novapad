@@ -417,6 +417,10 @@ unsafe fn handle_enter_key(hwnd: HWND) -> bool {
         run_lookup(parent);
         return true;
     }
+    if id == WIKTIONARY_INPUT_ID {
+        run_lookup(parent);
+        return true;
+    }
     false
 }
 
@@ -546,6 +550,8 @@ unsafe fn run_lookup(hwnd: HWND) {
         }
         return;
     }
+
+    SetFocus(output);
 
     let key = dictionary_cache_key(language, &pref, &trimmed);
     let cached_lines =

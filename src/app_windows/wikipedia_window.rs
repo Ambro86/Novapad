@@ -87,24 +87,28 @@ fn labels(language: Language) -> WikipediaLabels {
 }
 
 pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
-    if msg.message == windows::Win32::UI::WindowsAndMessaging::WM_KEYDOWN
-        && msg.wParam.0 as u32 == VK_RETURN.0 as u32
-    {
-        let focus = GetFocus();
-        if let Some((input, search, results, close)) = with_window_state(hwnd, |state| {
-            (state.input, state.search, state.results, state.close)
-        }) {
-            if focus == close {
-                crate::log_if_err!(DestroyWindow(hwnd));
-                return true;
-            }
-            if focus == input || focus == search {
-                run_search(hwnd);
-                return true;
-            }
-            if focus == results {
-                start_import(hwnd);
-                return true;
+    if msg.message == windows::Win32::UI::WindowsAndMessaging::WM_KEYDOWN {
+        if msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
+            crate::log_if_err!(DestroyWindow(hwnd));
+            return true;
+        }
+        if msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
+            let focus = GetFocus();
+            if let Some((input, search, results, close)) = with_window_state(hwnd, |state| {
+                (state.input, state.search, state.results, state.close)
+            }) {
+                if focus == close {
+                    crate::log_if_err!(DestroyWindow(hwnd));
+                    return true;
+                }
+                if focus == input || focus == search {
+                    run_search(hwnd);
+                    return true;
+                }
+                if focus == results {
+                    start_import(hwnd);
+                    return true;
+                }
             }
         }
     }

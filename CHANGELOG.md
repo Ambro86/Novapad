@@ -1,5 +1,45 @@
 # Changelog
 
+Version 0.6.0 – 2025-01-20
+New features
+• Added spell checker. From the context menu, users can check whether the current word is correct and, if not, get spelling suggestions.
+• Added podcast import and export via OPML files.
+• Added Podcast Index search support in addition to iTunes. Users can enter their free API key and secret (generated using only an email address).
+• Added support for SAPI4 voices, both for real-time reading and audiobook creation.
+• Added dictionary support using Wiktionary. Pressing the Applications key shows definitions, and when available, synonyms and translations into other languages.
+• Added Wikipedia article import with search, result selection, and direct import into the editor.
+• Added Shift+Enter shortcut in the RSS module to open an article directly in the original website.
+Improvements
+• Microphone selection is now always respected by the application.
+• In the podcast window, pressing Enter on an episode now immediately announces “loading” via NVDA to confirm the action.
+• In podcast search results, pressing Enter now subscribes to the selected podcast.
+• Fixed and improved labels for Ctrl+Shift+O and Podcast Ctrl+Shift+P shortcuts.
+• Playback speed and volume are now saved in settings and persist across all audio files.
+• Added a dedicated cache folder for podcast episodes. Users can keep episodes via “Keep podcast” in the Playback menu. The cache is automatically cleaned when exceeding the user-defined size (Options → Audio).
+• Improved RSS article fetching significantly using libcurl impersonation with Chrome and iPhone profiles, ensuring compatibility with ~99% of sites.
+• Added read / unread state for RSS articles, with clear indication in the RSS list.
+• Replace All now reports the number of replacements performed.
+• Added a Delete Podcast button when navigating the podcast library using Tab.
+Fixes
+• Removed the redundant “pending update” entry from the Help menu (updates are already handled automatically).
+• Fixed a bug where pressing Ctrl+S on an opened MP3 file would save and corrupt the file.
+• Fixed a UI issue where “Batch Audiobooks” was shown as “(B)… Ctrl+Shift+B” (removed redundant label).
+• Fixed smart quotes: when enabled, normal quotes are now correctly replaced with smart quotes.
+• Fixed a bug where using “Go to bookmark” reset the playback speed to 1.0.
+• Fixed an issue where already-downloaded podcast episodes were re-downloaded instead of using the cached version.
+Keyboard shortcuts
+• F1 now opens the Help guide.
+• F2 now checks for updates.
+• F7 / F8 now jump to the previous or next spelling error.
+• F9 / F10 now quickly switch between favorite voices.
+Developer improvements
+• Errors are no longer silently dropped: all let _ = patterns have been removed, and errors are now explicitly handled (propagated, logged, or handled with fallbacks as appropriate).
+• The project now fails to compile if there are warnings: both cargo check and cargo clippy must pass cleanly, with lints tightened and allow removed where possible.
+• Custom implementations such as strlen / wcslen-style helpers have been removed. String and UTF-16 buffer lengths are now derived from Rust-owned data instead of scanning memory.
+• DLL handling has been cleaned up and consolidated around libloading, avoiding custom loader logic and PE parsing.
+• Hand-rolled byte parsing helpers were removed; all byte parsing now uses standard from_le_bytes / from_be_bytes on checked slices.
+These changes reduce unnecessary unsafe usage, eliminate potential undefined behavior, and make the codebase more idiomatic, robust, and maintainable.
+
 Version 0.5.9 - 2025-01-13
 New features
 • Added RSS reordering from the context menu (up/down/to position) with invalid-position checks.

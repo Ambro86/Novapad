@@ -1,5 +1,89 @@
 Nhật kí thay đổi
 
+
+
+Phiên bản 0.6.0 – 2025-01-20
+
+Tính năng mới
+
+• Đã thêm chức năng kiểm tra chính tả. Từ menu ngữ cảnh, người dùng có thể kiểm tra xem từ hiện tại có đúng hay không và nhận gợi ý nếu sai.
+
+• Đã thêm chức năng nhập và xuất podcast thông qua tệp OPML.
+
+• Đã thêm hỗ trợ tìm kiếm Podcast Index bên cạnh iTunes. Người dùng có thể nhập API key và API secret miễn phí (được tạo chỉ bằng địa chỉ email).
+
+• Đã thêm hỗ trợ giọng nói SAPI4, cho cả việc đọc thời gian thực và tạo sách nói.
+
+• Đã thêm hỗ trợ từ điển thông qua Wiktionary. Khi nhấn phím Applications, các định nghĩa sẽ được hiển thị và, khi có sẵn, cả từ đồng nghĩa và bản dịch sang ngôn ngữ khác.
+
+• Đã thêm chức năng nhập bài viết từ Wikipedia với tìm kiếm, chọn kết quả và nhập trực tiếp vào trình soạn thảo.
+
+• Đã thêm phím tắt Shift+Enter trong mô-đun RSS để mở bài viết trực tiếp trên trang web gốc.
+
+Cải tiến
+
+• Việc chọn micro hiện luôn được ứng dụng tôn trọng.
+
+• Trong cửa sổ podcast, khi nhấn Enter trên một tập, NVDA sẽ thông báo ngay “đang tải”, giúp người dùng biết rõ thao tác đã được thực hiện.
+
+• Trong kết quả tìm kiếm podcast, nhấn Enter sẽ đăng ký podcast đã chọn.
+
+• Đã sửa và cải thiện nhãn cho các phím tắt Ctrl+Shift+O và Podcast Ctrl+Shift+P.
+
+• Tốc độ phát và âm lượng hiện được lưu trong cài đặt và áp dụng cho tất cả các tệp âm thanh.
+
+• Đã thêm thư mục bộ nhớ đệm riêng cho các tập podcast. Người dùng có thể giữ tập podcast thông qua mục “Giữ podcast” trong menu Phát. Bộ nhớ đệm sẽ tự động được dọn dẹp khi vượt quá dung lượng do người dùng thiết lập (Tùy chọn → Âm thanh).
+
+• Đã cải thiện đáng kể việc tải bài viết RSS bằng cách sử dụng libcurl với giả lập Chrome và iPhone, đảm bảo khả năng tương thích với khoảng 99% trang web.
+
+• Đã thêm trạng thái đã đọc / chưa đọc cho các bài viết RSS, với hiển thị rõ ràng trong danh sách RSS.
+
+• Chức năng Thay thế tất cả hiện hiển thị số lượng thay thế đã thực hiện.
+
+• Đã thêm nút Xóa podcast khi duyệt thư viện podcast bằng phím Tab.
+
+Sửa lỗi
+
+• Đã loại bỏ mục “pending update” dư thừa trong menu Trợ giúp (việc cập nhật đã được xử lý tự động).
+
+• Đã sửa lỗi khi mở tệp MP3 và nhấn Ctrl+S khiến tệp bị lưu và dẫn đến hỏng tệp.
+
+• Đã sửa lỗi giao diện khi “Batch Audiobooks” hiển thị là “(B)… Ctrl+Shift+B” (đã loại bỏ nhãn dư thừa).
+
+• Đã sửa lỗi dấu ngoặc kép thông minh: khi được bật, dấu ngoặc kép thông thường giờ đây được thay thế chính xác bằng dấu ngoặc kép kiểu chữ.
+
+• Đã sửa lỗi khi sử dụng “Đi tới dấu trang” làm tốc độ phát bị đặt lại về 1.0.
+
+• Đã sửa lỗi khi phát podcast đã tải xuống nhưng hệ thống vẫn tải lại thay vì sử dụng phiên bản trong bộ nhớ đệm.
+
+Phím tắt
+
+• F1 hiện mở hướng dẫn.
+
+• F2 hiện kiểm tra cập nhật.
+
+• F7 / F8 hiện cho phép chuyển đến lỗi chính tả trước đó hoặc tiếp theo.
+
+• F9 / F10 hiện cho phép chuyển nhanh giữa các giọng nói đã lưu trong mục yêu thích.
+
+Cải tiến dành cho nhà phát triển
+
+• Lỗi không còn bị bỏ qua một cách im lặng: tất cả các mẫu let \_ = đã được loại bỏ và lỗi hiện được xử lý rõ ràng (truyền tiếp, ghi log hoặc xử lý bằng cơ chế dự phòng phù hợp).
+
+• Dự án hiện sẽ không biên dịch nếu còn cảnh báo: cả cargo check và cargo clippy đều phải chạy sạch, với các lint chặt chẽ hơn và loại bỏ allow khi có thể.
+
+• Đã loại bỏ các triển khai tùy chỉnh kiểu strlen / wcslen. Độ dài chuỗi và bộ đệm UTF-16 hiện được lấy trực tiếp từ dữ liệu do Rust quản lý, thay vì quét bộ nhớ thủ công.
+
+• Việc xử lý DLL đã được làm gọn và thống nhất xoay quanh libloading, tránh logic tải tùy chỉnh và phân tích PE.
+
+• Đã loại bỏ các helper tự viết cho việc phân tích byte; toàn bộ việc phân tích byte hiện sử dụng from\_le\_bytes / from\_be\_bytes trên các slice đã được kiểm tra.
+
+Những thay đổi này giúp giảm việc sử dụng unsafe không cần thiết, loại bỏ các hành vi không xác định tiềm ẩn và làm cho mã nguồn trở nên chuẩn mực hơn, ổn định hơn và dễ bảo trì hơn.
+
+&nbsp;
+
+
+
 Phien ban 0.5.9 - 2025-01-13
 Tinh nang moi
 • Them kha nang sap xep RSS tu menu ngu canh (len/xuong/den vi tri), co kiem tra vi tri khong hop le.

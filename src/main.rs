@@ -143,16 +143,16 @@ const FOCUS_EDITOR_TIMER_ID3: usize = 3;
 const FOCUS_EDITOR_TIMER_ID4: usize = 4;
 const CHAPTER_ANNOUNCE_TIMER_ID: usize = 5;
 const COPYDATA_OPEN_FILE: usize = 1;
-const VOICE_PANEL_ID_ENGINE: usize = 8001;
-const VOICE_PANEL_ID_VOICE: usize = 8002;
-const VOICE_PANEL_ID_MULTILINGUAL: usize = 8003;
-const VOICE_PANEL_ID_FAVORITES: usize = 8004;
-const VOICE_PANEL_ID_SPEED: usize = 8005;
-const VOICE_PANEL_ID_PITCH: usize = 8006;
-const VOICE_PANEL_ID_VOLUME: usize = 8007;
-const VOICE_PANEL_ID_SPEED_EDIT: usize = 8008;
-const VOICE_PANEL_ID_PITCH_EDIT: usize = 8009;
-const VOICE_PANEL_ID_VOLUME_EDIT: usize = 8010;
+const VOICE_PANEL_ID_ENGINE: usize = 21001;
+const VOICE_PANEL_ID_VOICE: usize = 21002;
+const VOICE_PANEL_ID_MULTILINGUAL: usize = 21003;
+const VOICE_PANEL_ID_FAVORITES: usize = 21004;
+const VOICE_PANEL_ID_SPEED: usize = 21005;
+const VOICE_PANEL_ID_PITCH: usize = 21006;
+const VOICE_PANEL_ID_VOLUME: usize = 21007;
+const VOICE_PANEL_ID_SPEED_EDIT: usize = 21008;
+const VOICE_PANEL_ID_PITCH_EDIT: usize = 21009;
+const VOICE_PANEL_ID_VOLUME_EDIT: usize = 21010;
 const VOICE_MENU_ID_ADD_FAVORITE: u32 = 9001;
 const VOICE_MENU_ID_REMOVE_FAVORITE: u32 = 9002;
 
@@ -1691,16 +1691,7 @@ fn main() -> windows::core::Result<()> {
                         || state.podcasts_add_dialog.0 != 0;
 
                     // Exclude voice panel controls from player keyboard handling
-                    let is_voice_panel_control = msg.hwnd == state.voice_combo_engine
-                        || msg.hwnd == state.voice_combo_voice
-                        || msg.hwnd == state.voice_combo_speed
-                        || msg.hwnd == state.voice_combo_pitch
-                        || msg.hwnd == state.voice_combo_volume
-                        || msg.hwnd == state.voice_edit_speed
-                        || msg.hwnd == state.voice_edit_pitch
-                        || msg.hwnd == state.voice_edit_volume
-                        || msg.hwnd == state.voice_checkbox_multilingual
-                        || msg.hwnd == state.voice_combo_favorites;
+                    let is_voice_panel_control = is_focus_in_voice_panel(hwnd);
 
                     let is_main_target = msg.hwnd == hwnd || IsChild(hwnd, msg.hwnd).as_bool();
                     if is_audiobook && !secondary_open && is_main_target && !is_voice_panel_control
@@ -5558,6 +5549,39 @@ unsafe fn remove_favorite_voice(hwnd: HWND, engine: TtsEngine, voice_name: &str)
     refresh_voice_panel(hwnd);
 }
 
+unsafe fn is_focus_in_voice_panel(hwnd: HWND) -> bool {
+    let focus = GetFocus();
+    if focus.0 == 0 {
+        return false;
+    }
+
+    let mut class_buf = [0u16; 64];
+    let len = GetClassNameW(focus, &mut class_buf);
+    let class_name = String::from_utf16_lossy(&class_buf[..len as usize]);
+    if class_name == "ComboLBox" {
+        return true;
+    }
+
+    with_state(hwnd, |state| {
+        if !state.voice_panel_visible && !state.voice_favorites_visible {
+            return false;
+        }
+        let is_match =
+            |ctrl: HWND| ctrl.0 != 0 && (focus == ctrl || IsChild(ctrl, focus).as_bool());
+        is_match(state.voice_combo_engine)
+            || is_match(state.voice_combo_voice)
+            || is_match(state.voice_combo_speed)
+            || is_match(state.voice_combo_pitch)
+            || is_match(state.voice_combo_volume)
+            || is_match(state.voice_edit_speed)
+            || is_match(state.voice_edit_pitch)
+            || is_match(state.voice_edit_volume)
+            || is_match(state.voice_checkbox_multilingual)
+            || is_match(state.voice_combo_favorites)
+    })
+    .unwrap_or(false)
+}
+
 unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
     let (
         visible,
@@ -5600,10 +5624,25 @@ unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
     if !visible && !favorites_visible {
         return false;
     }
-    let focus = GetFocus();
-    if focus.0 == 0 {
+    let raw_focus = GetFocus();
+    if raw_focus.0 == 0 {
         return false;
     }
+    let focus = if raw_focus == combo_engine || IsChild(combo_engine, raw_focus).as_bool() {
+        combo_engine
+    } else if raw_focus == combo_voice || IsChild(combo_voice, raw_focus).as_bool() {
+        combo_voice
+    } else if raw_focus == combo_speed || IsChild(combo_speed, raw_focus).as_bool() {
+        combo_speed
+    } else if raw_focus == combo_pitch || IsChild(combo_pitch, raw_focus).as_bool() {
+        combo_pitch
+    } else if raw_focus == combo_volume || IsChild(combo_volume, raw_focus).as_bool() {
+        combo_volume
+    } else if raw_focus == combo_favorites || IsChild(combo_favorites, raw_focus).as_bool() {
+        combo_favorites
+    } else {
+        raw_focus
+    };
     let is_combo_focus = focus == combo_engine
         || focus == combo_voice
         || (!manual_tuning && focus == combo_speed)

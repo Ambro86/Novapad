@@ -2124,6 +2124,7 @@ pub unsafe fn current_document_is_from_rss(hwnd: HWND) -> bool {
 }
 
 pub unsafe fn select_tab(hwnd: HWND, index: usize) {
+    crate::log_debug(&format!("Editor: select_tab called for index {}", index));
     let result = with_state(hwnd, |state| {
         if index >= state.docs.len() {
             return None;
@@ -2135,6 +2136,10 @@ pub unsafe fn select_tab(hwnd: HWND, index: usize) {
         let is_audiobook = new_doc
             .map(|doc| matches!(doc.format, FileFormat::Audiobook))
             .unwrap_or(false);
+        crate::log_debug(&format!(
+            "Editor: Switching from index {} to {}. Is audiobook: {}",
+            prev, index, is_audiobook
+        ));
         state.current = index;
         Some((state.hwnd_tab, prev_edit, new_edit, is_audiobook))
     })

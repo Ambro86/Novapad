@@ -726,6 +726,10 @@ fn start_audiobook_at_with_options(
 }
 
 pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
+    crate::log_debug(&format!(
+        "Audio player: start_audiobook_playback called for {}",
+        path.display()
+    ));
     crate::reset_active_podcast_chapters_for_playback(hwnd);
     let path_buf = path.to_path_buf();
 
@@ -760,13 +764,16 @@ pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
 }
 
 pub unsafe fn toggle_audiobook_pause(hwnd: HWND) {
+    crate::log_debug("Audio player: toggle_audiobook_pause triggered");
     let start_action = with_state(hwnd, |state| {
         if let Some(player) = &mut state.active_audiobook {
             if player.is_paused {
+                crate::log_debug("Audio player: Resuming playback");
                 player.sink.play();
                 player.is_paused = false;
                 player.start_instant = std::time::Instant::now();
             } else {
+                crate::log_debug("Audio player: Pausing playback");
                 player.sink.pause();
                 player.is_paused = true;
                 player.accumulated_seconds += player.start_instant.elapsed().as_secs();
@@ -859,8 +866,13 @@ pub unsafe fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> 
 }
 
 pub unsafe fn stop_audiobook_playback(hwnd: HWND) {
+    crate::log_debug("Audio player: stop_audiobook_playback called");
     if with_state(hwnd, |state| {
         if let Some(player) = state.active_audiobook.take() {
+            crate::log_debug(&format!(
+                "Audio player: Stopping and removing player for {}",
+                player.path.display()
+            ));
             state.last_stopped_audiobook = Some(player.path.clone());
             player.sink.stop();
         }
@@ -872,6 +884,11 @@ pub unsafe fn stop_audiobook_playback(hwnd: HWND) {
 }
 
 pub unsafe fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
+    crate::log_debug(&format!(
+        "Audio player: start_audiobook_at called for {} at {}s",
+        path.display(),
+        seconds
+    ));
     let (speed, volume, muted, prev_volume) = with_state(hwnd, |state| {
         if let Some(player) = &state.active_audiobook {
             (

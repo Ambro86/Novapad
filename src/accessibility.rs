@@ -8,22 +8,6 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{IsChild, IsDialogMessageW, MSG, WM_KEYDOWN};
 
-pub enum PlayerCommand {
-    TogglePause,
-    Stop,
-    Seek(i64),
-    Volume(f32),
-    Speed(f32),
-    MuteToggle,
-    GoToTime,
-    AnnounceTime,
-    ChapterPrev,
-    ChapterNext,
-    ChapterList,
-    BlockNavigation,
-    None,
-}
-
 pub const EM_GETSEL: u32 = 0x00B0;
 pub const EM_EXSETSEL: u32 = 0x0400 + 55;
 pub const EM_SCROLLCARET: u32 = 0x00B7;
@@ -78,7 +62,9 @@ pub fn handle_player_keyboard(msg: &MSG, skip_seconds: u32) -> PlayerCommand {
         let ctrl_down = unsafe { (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0 };
         let alt_down = unsafe { (GetKeyState(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0 };
         let shift_down = unsafe { (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0 };
-        match msg.wParam.0 as u32 {
+        let vk = msg.wParam.0 as u32;
+
+        let cmd = match vk {
             vk if alt_down && shift_down && vk == 'P' as u32 => PlayerCommand::ChapterPrev,
             vk if alt_down && shift_down && vk == 'N' as u32 => PlayerCommand::ChapterNext,
             vk if alt_down && shift_down && vk == 'L' as u32 => PlayerCommand::ChapterList,
@@ -105,10 +91,35 @@ pub fn handle_player_keyboard(msg: &MSG, skip_seconds: u32) -> PlayerCommand {
                 PlayerCommand::BlockNavigation
             }
             _ => PlayerCommand::None,
+        };
+
+        if !matches!(cmd, PlayerCommand::None) {
+            crate::log_debug(&format!(
+                "Keyboard: VK 0x{:X} triggered PlayerCommand::{:?}",
+                vk, cmd
+            ));
         }
+        cmd
     } else {
         PlayerCommand::None
     }
+}
+
+#[derive(Debug)]
+pub enum PlayerCommand {
+    TogglePause,
+    Stop,
+    Seek(i64),
+    Volume(f32),
+    Speed(f32),
+    MuteToggle,
+    GoToTime,
+    AnnounceTime,
+    ChapterPrev,
+    ChapterNext,
+    ChapterList,
+    BlockNavigation,
+    None,
 }
 
 static NVDA_LIB: OnceLock<libloading::Library> = OnceLock::new();

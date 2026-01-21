@@ -92,6 +92,7 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
         let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
         if ctrl_down {
             let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+
             if let Some(tabs) = with_options_state(hwnd, |state| state.hwnd_tabs)
                 && tabs.0 != 0
             {
@@ -105,10 +106,12 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
                 SendMessageW(tabs, TCM_SETCURSEL, WPARAM(next as usize), LPARAM(0));
                 set_active_tab(hwnd, next);
                 SetFocus(tabs);
+
+                // Force update focus for screen readers
                 if let Err(_e) =
                     PostMessageW(hwnd, WM_NEXTDLGCTL, WPARAM(tabs.0 as usize), LPARAM(1))
                 {
-                    crate::log_debug(&format!("Error: {:?}", _e));
+                    crate::log_debug(&format!("Error posting WM_NEXTDLGCTL: {:?}", _e));
                 }
                 return true;
             }
@@ -1634,6 +1637,7 @@ unsafe extern "system" fn options_wndproc(
                         }
                         SendMessageW(tabs, TCM_SETCURSEL, WPARAM(next as usize), LPARAM(0));
                         set_active_tab(hwnd, next);
+                        SetFocus(tabs);
                         return LRESULT(0);
                     }
                 }

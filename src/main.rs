@@ -449,6 +449,7 @@ fn dictionary_cache_key(language: Language, pref: &str, word: &str) -> String {
         Language::Portuguese => "pt",
         Language::Swedish => "sv",
         Language::Vietnamese => "vi",
+        Language::Czech => "cs",
     };
     format!(
         "{}|{}|{}",
@@ -1211,6 +1212,14 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
             let language =
                 unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
             let speed = unsafe { change_audiobook_speed(hwnd, delta) };
+            if let Some(speed) = speed {
+                announce_player_speed(language, speed);
+            }
+        }
+        PlayerCommand::SpeedReset => {
+            let language =
+                unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+            let speed = unsafe { reset_audiobook_speed(hwnd) };
             if let Some(speed) = speed {
                 announce_player_speed(language, speed);
             }
@@ -3345,6 +3354,10 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 }
                 IDM_PLAYBACK_SPEED_DOWN => {
                     handle_player_command(hwnd, PlayerCommand::Speed(-0.1));
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_SPEED_RESET => {
+                    handle_player_command(hwnd, PlayerCommand::SpeedReset);
                     LRESULT(0)
                 }
                 IDM_PLAYBACK_MUTE_TOGGLE => {

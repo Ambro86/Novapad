@@ -198,12 +198,6 @@ pub fn play_sapi4(
     });
 }
 
-fn cache_path() -> Option<PathBuf> {
-    let mut path = std::env::current_exe().ok()?;
-    path.set_file_name("sapi4_voices.cache");
-    Some(path)
-}
-
 fn parse_voices(output: &str) -> Vec<VoiceInfo> {
     let mut voices = Vec::new();
     for line in output.lines() {
@@ -232,16 +226,6 @@ pub fn get_voices() -> Vec<VoiceInfo> {
         return cache.clone();
     }
 
-    if let Some(path) = cache_path()
-        && let Ok(cached) = std::fs::read_to_string(&path)
-    {
-        let voices = parse_voices(&cached);
-        if !voices.is_empty() {
-            *cache = voices.clone();
-            return voices;
-        }
-    }
-
     let exe_path = match select_sapi4_bridge_for_file() {
         Ok(path) => path,
         Err(err) => {
@@ -257,9 +241,6 @@ pub fn get_voices() -> Vec<VoiceInfo> {
         let stdout = String::from_utf8_lossy(&out.stdout);
         let voices = parse_voices(&stdout);
         if !voices.is_empty() {
-            if let Some(path) = cache_path() {
-                crate::log_if_err!(std::fs::write(path, stdout.as_bytes()));
-            }
             *cache = voices.clone();
             return voices;
         }

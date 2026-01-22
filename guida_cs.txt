@@ -1,0 +1,122 @@
+Příručka programu
+
+Soubor:
+
+ Nový: Vytvořit nový dokument (Ctrl+N).
+ Otevřít: Otevřít textové soubory, PDF, EPUB, MP3 a další podporované formáty (Ctrl+O).
+ Uložit: Uložit dokument (Ctrl+S).
+ Uložit jako: Uložit s novým názvem.
+ Uložit vše: Uložit všechny dokumenty (Ctrl+Shift+S).
+ Zavřít kartu: Zavřít aktuální dokument (Ctrl+W).
+ Nedávné soubory: Otevřít nedávný soubor.
+ Čtení: F5 Spustit čtení, F4 Pozastavit/Pokračovat, F6 Zastavit čtení.
+ Oblíbené během čtení: F9 předchozí oblíbený hlas, F10 další oblíbený hlas.
+ Nahrát audioknihu: Vytvořit soubor MP3 z aktuálního textu (Ctrl+R).
+ Nahrát podcast: Nahrát podcast z mikrofonu a/nebo systémového zvuku (Ctrl+Shift+R).
+
+MP3 Audioknihy:
+Když otevřete soubor MP3, Novapad funguje jako audio přehrávač.
+Ovládání klávesnicí:
+
+ MEZERNÍK: Přehrát / Pozastavit.
+ ŠIPKA VPRAVO: Rychlý posun vpřed o 1 minutu.
+ ŠIPKA VLEVO: Přetočit zpět o 1 minutu.
+ ŠIPKA NAHORU: Zvýšit hlasitost.
+ ŠIPKA DOLŮ: Snížit hlasitost.
+ +: Zvýšit rychlost přehrávání.
+ -: Snížit rychlost přehrávání.
+ CTRL+I: Ohlásit čas přehrávání.
+ CTRL+T: Přejít na konkrétní čas.
+ CTRL+B: Vložit záložku v přesný čas.
+
+Úpravy:
+
+ Zpět: Vrátit zpět poslední operaci (Ctrl+Z).
+ Vyjmout: Odstranit vybraný text a zkopírovat jej do schránky (Ctrl+X).
+ Kopírovat: Zkopírovat vybraný text do schránky (Ctrl+C).
+ Vložit: Vložit obsah schránky do dokumentu (Ctrl+V).
+ Vybrat vše: Vybrat veškerý text (Ctrl+A).
+ Najít: Hledat text v dokumentu (Ctrl+F).
+ Najít v souborech: Hledat text ve více souborech (Ctrl+Shift+F).
+ Najít další: Najít další výskyt (F3).
+ Nahradit: Najít a nahradit text (Ctrl+H).
+ Normalizovat bílé znaky: Oříznout okraje řádků a zredukovat mezery (Ctrl+Shift+Enter).
+ Spojit řádky: Spojit řádky v odstavci nebo výběru (Ctrl+Shift+J).
+ Tvrdý konec řádku: Přeformátovat odstavec nebo výběr (Ctrl+Shift+H).
+ Odstranit značky Markdown: Odstranit značky Markdown (Ctrl+Shift+M).
+ Seřadit položky: Seřadit řádky odstavce nebo výběru (Alt+Shift+O).
+ Ponechat jedinečné položky: Odstranit duplicitní řádky v odstavci nebo výběru (Alt+Shift+K).
+ Obrátit položky: Obrátit pořadí řádků v odstavci nebo výběru (Alt+Shift+Z).
+ Citovat řádky: Přidat předponu k řádkům v odstavci nebo výběru (Ctrl+Q).
+ Zrušit citaci řádků: Odstranit předponu z řádků v odstavci nebo výběru (Ctrl+Shift+Q).
+ Statistiky textu: Zobrazí znaky, slova a řádky pro výběr nebo dokument (Alt+Y).
+ Navigace kontroly pravopisu: F7 předchozí chyba, F8 další chyba.
+
+Zobrazit:
+
+ Zobrazit hlasy v editoru: Zobrazit hlasový systém, seznam hlasů a vícejazyčný filtr.
+ Zobrazit oblíbené hlasy: Zobrazit seznam oblíbených hlasů v editoru.
+ Barva textu: Změnit barvu textu (včetně světlých a tmavých barev).
+ Velikost textu: Změnit velikost textu (malá, normální, velká, extra velká, extra extra velká).
+ Když je seznam položek viditelný, stisknutí klávesy Tab přesouvá zaměření mezi editorem a ovládacími prvky, zatímco Shift+Tab jej přesouvá zpět.
+ Chcete-li přidat nebo odebrat položku z oblíbených, použijte Tab pro přechod na seznam položek a přidejte nebo odeberte ji pomocí klávesy Aplikace nebo pravého tlačítka myši. Ze seznamu oblíbených položek můžete také stisknout klávesu Aplikace pro odstranění již přidaných položek.
+ Klávesové zkratky: během čtení je možné stisknout F9 a F10 pro přepínání mezi položkami, procházením těch přidaných do oblíbených.
+
+Vložit:
+
+ Vložit záložku: Uložit aktuální pozici kurzoru nebo čas audioknihy (Ctrl+B).
+ Spravovat záložky: Zobrazit, přejít na nebo odstranit uložené záložky. Při otevření souboru se záložkami bude kurzor nebo přehrávání automaticky pokračovat od první dostupné.
+
+Nástroje:
+
+ Hromadné audioknihy: otevře okno pro převod seznamu souborů (nebo celých složek) na audioknihy.
+ Přidat soubory/složky do fronty.
+ Zvolit cílovou složku a formát (MP3 nebo WAV).
+ Možnosti vytvořit podsložky a zabránit přepsání.
+ Stisknout Spustit pro zpracování všeho na pozadí.
+
+
+ Slovník: Otevřít okno slovníku. V seznamu se naviguje šipkami Nahoru/Dolů.
+ Tab přesouvá na tlačítko "Přidat položky do slovníku", aktivované klávesou Enter nebo Mezerník.
+ V okně přidání/úpravy: zadejte "Původní slovo", poté Tab na "Náhradní slovo", poté OK nebo Zrušit (Enter/Mezerník). ESC zruší.
+ V seznamu se Tab přesouvá na "Upravit položku" a "Odstranit vybranou položku".
+ Nahrazení ve slovníku se aplikují během čtení a vytváření audioknih a jsou ukládána.
+
+
+ Importovat přepis z YouTube: vložte URL, zvolte jazyk a importujte text do editoru (Ctrl+Y). Volitelná časová razítka.
+ Hledat a importovat z Wikipedie: hledat článek na Wikipedii a importovat jeho text do editoru (Alt+Shift+W).
+ Online slovník: hledat definice a překlady v online Wikislovníku (Alt+Shift+D).
+ Přístupný terminál: otevře vyhrazený terminál se stabilním výstupem pro čtečky obrazovky (Ctrl+Shift+T).
+ Zkratky: Alt+I zaměří vstup, Alt+O zaměří výstup, Tab/Shift+Tab přesouvá mezi vstupem, výstupem a možnostmi.
+ Enter odešle vstup. Ctrl+C zkopíruje výstup (nebo odešle Ctrl+C do programu). Ctrl+L vymaže výstup s potvrzením.
+ Možnosti terminálu: automatické posouvání, odstranit ANSI, oznamovat nové řádky, pípnutí po 1s nečinnosti, zabránit spánku.
+ Volby programu: Příkazový řádek (cmd.exe), PowerShell, Codex CLI (z Možností).
+
+
+
+RSS / Články: otevře okno RSS/Články, přidat zdroje, rozbalit kanál a stisknout Enter pro import článku do editoru.
+
+ V okně RSS vyberte kanál nebo stránku a stiskněte Delete pro odstranění z knihovny.
+ Z kontextového menu na kanálu nebo stránce můžete upravit nebo smazat RSS nebo stránku.
+ Po importu RSS článku stiskněte Esc pro návrat do seznamu RSS.
+ Podcasty: otevře okno Podcasty pro vyhledávání a správu odběrů.
+ V seznamu epizod stiskněte Enter pro přehrání epizody.
+ Během přehrávání Esc zastaví podcast a vrátí se do knihovny.
+
+Možnosti:
+
+ Jazyk: Změnit jazyk rozhraní.
+ Chování při otevírání: Otevírat soubory na nové kartě nebo v novém okně.
+ Hlas: Zvolit hlas pro čtení.
+ Vícejazyčné hlasy: Filtrovat seznam hlasů.
+ Zvolit výšku, rychlost a hlasitost: Nastavit výšku, rychlost a hlasitost pro hlasy (Microsoft i SAPI5). Platí pro čtení a audioknihy.
+ Posouvat kurzor během čtení: Vizuálně sledovat text, jak je čten.
+ Rozdělení audioknihy podle textu: Rozdělit, když se značka objeví na začátku řádku (rozlišují se velká a malá písmena: "Kapitola" a "kapitola" jsou odlišné). Příklad: s "Kapitola" vytvoří jednu část na kapitolu, včetně autora a úvodu v první části až po první Kapitolu. Pokud nenalezeno, bez rozdělení.
+ Další možnosti rozdělení audioknihy: 2 části, 4 části, 6 částí, 8 částí.
+
+Nápověda:
+
+Příručka: Otevřít tuto příručku (F1).
+Zkontrolovat aktualizace: Zkontrolovat, zda jsou k dispozici aktualizace (F2).
+Seznam změn: Otevřít okno se seznamem změn.
+O programu: Zobrazit informace o programu.

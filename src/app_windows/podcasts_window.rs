@@ -33,7 +33,6 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, GetKeyState, SetFocus, VK_APPS, VK_CONTROL, VK_DELETE, VK_ESCAPE,
     VK_F10, VK_LEFT, VK_RETURN, VK_RIGHT, VK_SHIFT, VK_TAB,
 };
-use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, CBS_DROPDOWNLIST, CHILDID_SELF,
     CallWindowProcW, CreateMenu, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu,
@@ -489,22 +488,6 @@ unsafe fn ensure_rss_http(parent: HWND) {
 unsafe fn rss_fetch_config(parent: HWND) -> rss::RssFetchConfig {
     with_state(parent, |s| rss::fetch_config_from_settings(&s.settings))
         .unwrap_or_else(rss::RssFetchConfig::default)
-}
-
-unsafe fn open_url_in_browser(url: &str) -> Result<(), String> {
-    let wide = to_wide(url);
-    let result = ShellExecuteW(
-        HWND(0),
-        w!("open"),
-        PCWSTR(wide.as_ptr()),
-        PCWSTR::null(),
-        PCWSTR::null(),
-        windows::Win32::UI::WindowsAndMessaging::SW_SHOW,
-    );
-    if result.0 as isize <= 32 {
-        return Err(format!("ShellExecute failed: {}", result.0));
-    }
-    Ok(())
 }
 
 unsafe fn copy_text_to_clipboard(hwnd: HWND, text: &str) {
@@ -1584,7 +1567,9 @@ unsafe fn perform_search(hwnd: HWND, query: &str) {
                     MB_YESNO | MB_ICONINFORMATION,
                 );
                 if response == IDYES
-                    && let Err(_e) = open_url_in_browser("https://api.podcastindex.org/signup")
+                    && let Err(_e) = crate::audio_utils::open_url_in_browser(
+                        "https://api.podcastindex.org/signup",
+                    )
                 {
                     crate::log_debug(&format!("Error: {:?}", _e));
                 }
@@ -2500,7 +2485,7 @@ unsafe fn handle_source_action(hwnd: HWND, verb: SourceAction) {
             .unwrap_or(None)
             .unwrap_or_default();
             if !url.is_empty()
-                && let Err(_e) = open_url_in_browser(&url)
+                && let Err(_e) = crate::audio_utils::open_url_in_browser(&url)
             {
                 crate::log_debug(&format!("Error: {:?}", _e));
             }
@@ -2527,7 +2512,7 @@ unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
         EpisodeAction::Play => open_episode_in_player(hwnd, parent, &item),
         EpisodeAction::OpenEpisode => {
             if !item.link.trim().is_empty()
-                && let Err(_e) = open_url_in_browser(&item.link)
+                && let Err(_e) = crate::audio_utils::open_url_in_browser(&item.link)
             {
                 crate::log_debug(&format!("Error: {:?}", _e));
             }

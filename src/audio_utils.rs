@@ -1,6 +1,10 @@
+use crate::accessibility::to_wide;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
+use windows::Win32::Foundation::HWND;
+use windows::Win32::UI::Shell::ShellExecuteW;
+use windows::core::{PCWSTR, w};
 
 /// Errors that can occur during audio operations
 #[derive(Debug)]
@@ -173,5 +177,23 @@ pub fn write_silence_file(
     let mut writer = WavWriter::create(path, sample_rate, channels, bits_per_sample)?;
     writer.write_silence_ms(duration_ms)?;
     writer.finalize()?;
+    Ok(())
+}
+
+pub fn open_url_in_browser(url: &str) -> Result<(), String> {
+    let wide = to_wide(url);
+    unsafe {
+        let result = ShellExecuteW(
+            HWND(0),
+            w!("open"),
+            PCWSTR(wide.as_ptr()),
+            PCWSTR::null(),
+            PCWSTR::null(),
+            windows::Win32::UI::WindowsAndMessaging::SW_SHOW,
+        );
+        if result.0 as isize <= 32 {
+            return Err(format!("ShellExecute failed: {}", result.0));
+        }
+    }
     Ok(())
 }

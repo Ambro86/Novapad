@@ -80,6 +80,7 @@ const OPTIONS_ID_INTERPRETER_SEARCH: usize = 6043;
 const OPTIONS_ID_WRAP_WIDTH: usize = 6017;
 const OPTIONS_ID_QUOTE_PREFIX: usize = 6018;
 const OPTIONS_ID_CHECK_UPDATES: usize = 6015;
+const OPTIONS_ID_MANAGE_ASSOCIATIONS: usize = 6044;
 const OPTIONS_ID_PROMPT_PROGRAM: usize = 6019;
 const OPTIONS_ID_TABS: usize = 6024;
 
@@ -212,6 +213,8 @@ struct OptionsDialogState {
     checkbox_move_cursor: HWND,
     checkbox_check_updates: HWND,
     checkbox_context_menu: HWND,
+    label_file_associations: HWND,
+    button_manage_associations: HWND,
     label_prompt_program: HWND,
     combo_prompt_program: HWND,
     ok_button: HWND,
@@ -250,6 +253,8 @@ struct OptionsLabels {
     label_move_cursor: String,
     label_check_updates: String,
     label_context_menu: String,
+    label_file_associations: String,
+    label_manage_associations: String,
     label_prompt_program: String,
     label_audio_skip: String,
     label_audio_split: String,
@@ -265,6 +270,7 @@ struct OptionsLabels {
     lang_pt: String,
     lang_sv: String,
     lang_vi: String,
+    lang_cs: String,
     marker_position_end: String,
     marker_position_beginning: String,
     open_new_tab: String,
@@ -335,6 +341,8 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_move_cursor: i18n::tr(language, "options.label.move_cursor"),
         label_check_updates: i18n::tr(language, "options.label.check_updates"),
         label_context_menu: i18n::tr(language, "options.label.context_menu"),
+        label_file_associations: i18n::tr(language, "options.label.file_associations"),
+        label_manage_associations: i18n::tr(language, "options.button.manage_associations"),
         label_prompt_program: i18n::tr(language, "options.label.prompt_program"),
         label_audio_skip: i18n::tr(language, "options.label.audio_skip"),
         label_audio_split: i18n::tr(language, "options.label.audio_split"),
@@ -353,6 +361,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         lang_pt: i18n::tr(language, "options.lang.pt"),
         lang_sv: i18n::tr(language, "options.lang.sv"),
         lang_vi: i18n::tr(language, "options.lang.vi"),
+        lang_cs: i18n::tr(language, "options.lang.cs"),
         marker_position_end: i18n::tr(language, "options.modified_marker_position.end"),
         marker_position_beginning: i18n::tr(language, "options.modified_marker_position.beginning"),
         open_new_tab: i18n::tr(language, "options.open.new_tab"),
@@ -1432,6 +1441,36 @@ unsafe extern "system" fn options_wndproc(
             );
             y += 28;
 
+            let label_file_associations = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_file_associations).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let button_manage_associations = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_manage_associations).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                170,
+                y - 2,
+                300,
+                26,
+                hwnd,
+                HMENU(OPTIONS_ID_MANAGE_ASSOCIATIONS as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 34;
+
             let label_prompt_program = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -1550,6 +1589,8 @@ unsafe extern "system" fn options_wndproc(
                 checkbox_move_cursor,
                 checkbox_check_updates,
                 checkbox_context_menu,
+                label_file_associations,
+                button_manage_associations,
                 label_prompt_program,
                 combo_prompt_program,
                 ok_button,
@@ -1622,6 +1663,8 @@ unsafe extern "system" fn options_wndproc(
                 checkbox_move_cursor,
                 checkbox_check_updates,
                 checkbox_context_menu,
+                label_file_associations,
+                button_manage_associations,
                 label_prompt_program,
                 combo_prompt_program,
                 ok_button,
@@ -1709,6 +1752,21 @@ unsafe extern "system" fn options_wndproc(
                 }
                 OPTIONS_ID_INTERPRETER_SEARCH => {
                     search_for_interpreter(hwnd);
+                    LRESULT(0)
+                }
+                OPTIONS_ID_MANAGE_ASSOCIATIONS => {
+                    unsafe {
+                        crate::settings::register_application_capabilities();
+                        let url = to_wide("ms-settings:defaultapps?registeredApp=Novapad");
+                        ShellExecuteW(
+                            HWND(0),
+                            w!("open"),
+                            PCWSTR(url.as_ptr()),
+                            PCWSTR::null(),
+                            PCWSTR::null(),
+                            SW_SHOWNORMAL,
+                        );
+                    }
                     LRESULT(0)
                 }
                 _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -1954,6 +2012,13 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         WPARAM(0),
         LPARAM(to_wide(&labels.lang_vi).as_ptr() as isize),
     );
+    SendMessageW(
+        combo_lang,
+        CB_ADDSTRING,
+        WPARAM(0),
+        LPARAM(to_wide(&labels.lang_cs).as_ptr() as isize),
+    );
+
     let lang_index = match settings.language {
         Language::Italian => 0,
         Language::English => 1,
@@ -1961,6 +2026,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         Language::Portuguese => 3,
         Language::Swedish => 4,
         Language::Vietnamese => 5,
+        Language::Czech => 6,
     };
     SendMessageW(combo_lang, CB_SETCURSEL, WPARAM(lang_index), LPARAM(0));
 
@@ -2326,6 +2392,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         (labels.lang_pt.clone(), "pt"),
         (labels.lang_sv.clone(), "sv"),
         (labels.lang_vi.clone(), "vi"),
+        (labels.lang_cs.clone(), "cs"),
     ];
     let current_dict_lang = settings
         .dictionary_translation_language
@@ -2364,6 +2431,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         (labels.lang_pt.clone(), "pt"),
         (labels.lang_sv.clone(), "sv"),
         (labels.lang_vi.clone(), "vi"),
+        (labels.lang_cs.clone(), "cs"),
     ];
     let current_wikipedia_lang = settings.wikipedia_language.trim().to_ascii_lowercase();
     let mut wiki_selected_idx = 0;
@@ -3059,6 +3127,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         3 => Language::Portuguese,
         4 => Language::Swedish,
         5 => Language::Vietnamese,
+        6 => Language::Czech,
         _ => Language::Italian,
     };
 
@@ -3470,6 +3539,8 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.combo_prompt_program,
             state.checkbox_check_updates,
             state.checkbox_context_menu,
+            state.label_file_associations,
+            state.button_manage_associations,
         ] {
             ShowWindow(control, if show_general { SW_SHOW } else { SW_HIDE });
         }

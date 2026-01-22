@@ -65,6 +65,7 @@ pub const IDM_PLAYBACK_VOLUME_DOWN: usize = 8008;
 pub const IDM_PLAYBACK_MUTE_TOGGLE: usize = 8009;
 pub const IDM_PLAYBACK_SPEED_UP: usize = 8010;
 pub const IDM_PLAYBACK_SPEED_DOWN: usize = 8011;
+pub const IDM_PLAYBACK_SPEED_RESET: usize = 8016;
 pub const IDM_PLAYBACK_CHAPTER_PREV: usize = 8012;
 pub const IDM_PLAYBACK_CHAPTER_NEXT: usize = 8013;
 pub const IDM_PLAYBACK_CHAPTER_LIST: usize = 8014;
@@ -316,6 +317,7 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
         let volume_down = i18n::tr(language, "playback.volume_down");
         let speed_up = i18n::tr(language, "playback.speed_up");
         let speed_down = i18n::tr(language, "playback.speed_down");
+        let speed_reset = i18n::tr(language, "playback.speed_reset");
         let mute_toggle = i18n::tr(language, "playback.mute_toggle");
         let chapter_prev = i18n::tr(language, "playback.chapter_prev");
         let chapter_next = i18n::tr(language, "playback.chapter_next");
@@ -396,6 +398,12 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
             MF_STRING,
             IDM_PLAYBACK_SPEED_DOWN,
             &speed_down,
+        );
+        append_menu_string(
+            playback_menu,
+            MF_STRING,
+            IDM_PLAYBACK_SPEED_RESET,
+            &speed_reset,
         );
         append_menu_string(
             playback_menu,

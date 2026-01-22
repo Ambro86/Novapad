@@ -1000,6 +1000,60 @@ pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
     Some(speed)
 }
 
+pub unsafe fn reset_audiobook_speed(hwnd: HWND) -> Option<f32> {
+    load_soundtouch_api()?;
+    let result = with_state(hwnd, |state| {
+        if let Some(player) = state.active_audiobook.take() {
+            let current = if player.is_paused {
+                player.accumulated_seconds
+            } else {
+                player.accumulated_seconds + player.start_instant.elapsed().as_secs()
+            };
+            let new_speed = 1.0;
+            player.sink.stop();
+            Some((
+                player.path,
+                current,
+                new_speed,
+                player.is_paused,
+                player.volume,
+                player.muted,
+                player.prev_volume,
+            ))
+        } else {
+            None
+        }
+    })
+    .flatten();
+
+    let (path, current, speed, paused, volume, muted, prev_volume) = result?;
+
+    start_audiobook_at_with_options(
+        hwnd,
+        path,
+        current,
+        AudiobookPlaybackOptions {
+            speed,
+            paused,
+            volume,
+            muted,
+            prev_volume,
+        },
+    );
+
+    // Save speed to settings
+    if with_state(hwnd, |state| {
+        state.settings.audiobook_playback_speed = speed;
+        crate::settings::save_settings(state.settings.clone());
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access audio player state");
+    }
+
+    Some(speed)
+}
+
 pub unsafe fn audiobook_volume_level(hwnd: HWND) -> Option<f32> {
     with_state(hwnd, |state| {
         state

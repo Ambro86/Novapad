@@ -31,14 +31,13 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_APPS, VK_ESCAPE, VK_F10, VK_RETURN,
     VK_SHIFT, VK_TAB,
 };
-use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, BS_DEFPUSHBUTTON, CHILDID_SELF, CREATESTRUCTW, CW_USEDEFAULT, CallWindowProcW,
     CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, DestroyWindow,
     EVENT_OBJECT_FOCUS, GWLP_USERDATA, GWLP_WNDPROC, GetCursorPos, GetDlgCtrlID, GetDlgItem,
     GetParent, GetWindowLongPtrW, GetWindowRect, HMENU, IDYES, KillTimer, MB_ICONQUESTION,
     MB_YESNO, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MessageBoxW, OBJID_CLIENT,
-    PostMessageW, RegisterClassW, SW_SHOW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
+    PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
     SetWindowTextW, TrackPopupMenu, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CREATE,
     WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_SETFOCUS,
     WM_SETFONT, WM_SETREDRAW, WM_SYSKEYDOWN, WM_TIMER, WM_USER, WNDCLASSW, WNDPROC, WS_CAPTION,
@@ -289,25 +288,6 @@ fn is_valid_article_url(url: &str) -> bool {
     matches!(parsed.scheme(), "http" | "https")
 }
 
-fn open_url_in_browser(url: &str) -> Result<(), String> {
-    let url_wide = to_wide(url);
-    let verb = to_wide("open");
-    unsafe {
-        let result = ShellExecuteW(
-            HWND(0),
-            PCWSTR(verb.as_ptr()),
-            PCWSTR(url_wide.as_ptr()),
-            PCWSTR::null(),
-            PCWSTR::null(),
-            SW_SHOW,
-        );
-        if result.0 as isize <= 32 {
-            return Err(format!("ShellExecute failed ({})", result.0 as isize));
-        }
-    }
-    Ok(())
-}
-
 fn move_vec_to_index<T>(items: &mut Vec<T>, from: usize, to: usize) -> bool {
     if from >= items.len() {
         return false;
@@ -458,6 +438,7 @@ fn default_feed_path(language: crate::settings::Language) -> Option<PathBuf> {
         crate::settings::Language::Portuguese => "feed_pt.txt",
         crate::settings::Language::Swedish => "feed_en.txt",
         crate::settings::Language::Vietnamese => "feed_vi.txt",
+        crate::settings::Language::Czech => "feed_en.txt",
     };
     let exe_dir = std::env::current_exe()
         .ok()
@@ -480,6 +461,7 @@ fn embedded_default_feeds(language: crate::settings::Language) -> &'static str {
         crate::settings::Language::Portuguese => FEED_PT_DATA,
         crate::settings::Language::Swedish => FEED_EN_DATA,
         crate::settings::Language::Vietnamese => FEED_VI_DATA,
+        crate::settings::Language::Czech => FEED_EN_DATA,
     }
 }
 
@@ -533,6 +515,10 @@ fn is_default_key(
             .any(|k| normalize_rss_url_key(k) == key),
         crate::settings::Language::Vietnamese => settings
             .rss_default_vi_keys
+            .iter()
+            .any(|k| normalize_rss_url_key(k) == key),
+        crate::settings::Language::Czech => settings
+            .rss_default_en_keys
             .iter()
             .any(|k| normalize_rss_url_key(k) == key),
     }
@@ -711,6 +697,12 @@ unsafe fn ensure_default_sources(parent: HWND) {
                 &mut s.settings.rss_sources,
                 &s.settings.rss_removed_default_vi,
                 &mut s.settings.rss_default_vi_keys,
+                &defaults,
+            ),
+            crate::settings::Language::Czech => apply_default_sources(
+                &mut s.settings.rss_sources,
+                &s.settings.rss_removed_default_en,
+                &mut s.settings.rss_default_en_keys,
                 &defaults,
             ),
         };
@@ -2920,6 +2912,7 @@ unsafe fn handle_delete(hwnd: HWND) {
                         | crate::settings::Language::Spanish
                         | crate::settings::Language::Portuguese
                         | crate::settings::Language::Vietnamese
+                        | crate::settings::Language::Czech
                 ) {
                     let defaults = load_default_feeds(language);
                     if !defaults.is_empty() {
@@ -2949,6 +2942,9 @@ unsafe fn handle_delete(hwnd: HWND) {
                                     &mut ps.settings.rss_removed_default_pt
                                 }
                                 crate::settings::Language::Vietnamese => {
+                                    &mut ps.settings.rss_removed_default_vi
+                                }
+                                crate::settings::Language::Czech => {
                                     &mut ps.settings.rss_removed_default_en
                                 }
                             };
@@ -3335,7 +3331,7 @@ unsafe fn handle_article_action(hwnd: HWND, action: ArticleAction) {
             format!("https://wa.me/?text={}", percent_encode(&text))
         }
     };
-    if let Err(err) = open_url_in_browser(&share_url) {
+    if let Err(err) = crate::audio_utils::open_url_in_browser(&share_url) {
         log_debug(&format!(
             "rss_action kind=article action=browser_error error=\"{}\"",
             err

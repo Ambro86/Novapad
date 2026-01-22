@@ -25,6 +25,7 @@ const DONATIONS_EN: &str = include_str!("../../donations_en.txt");
 const DONATIONS_ES: &str = include_str!("../../donations_es.txt");
 const DONATIONS_PT: &str = include_str!("../../donations_pt.txt");
 const DONATIONS_SV: &str = include_str!("../../donations_sv.txt");
+const DONATIONS_CS: &str = include_str!("../../donations_cs.txt");
 
 fn read_override_text(file_name: &str) -> Option<String> {
     let exe_path = match std::env::current_exe() {
@@ -240,6 +241,8 @@ unsafe extern "system" fn help_wndproc(
                     Language::Swedish => read_override_text("guida_sv.txt")
                         .unwrap_or_else(|| include_str!("../../guida_sv.txt").to_string()),
                     Language::Vietnamese => include_str!("../../guida_vi.txt").to_string(),
+                    Language::Czech => read_override_text("guida_cs.txt")
+                        .unwrap_or_else(|| include_str!("../../guida_cs.txt").to_string()),
                 },
                 HelpWindowKind::Changelog => match init.language {
                     Language::Italian => include_str!("../../CHANGELOG_IT.md").to_string(),
@@ -248,6 +251,7 @@ unsafe extern "system" fn help_wndproc(
                     Language::Portuguese => include_str!("../../CHANGELOG_PT.md").to_string(),
                     Language::Swedish => include_str!("../../CHANGELOG.md").to_string(),
                     Language::Vietnamese => include_str!("../../CHANGELOG_VI.md").to_string(),
+                    Language::Czech => include_str!("../../CHANGELOG.md").to_string(),
                 },
                 HelpWindowKind::Donations => donations_content(init.language),
             };
@@ -384,5 +388,8 @@ fn donations_content(language: Language) -> String {
             read_override_text("donations_sv.txt").unwrap_or_else(|| DONATIONS_SV.to_string())
         }
         Language::Vietnamese => DONATIONS_EN.to_string(),
+        Language::Czech => {
+            read_override_text("donations_cs.txt").unwrap_or_else(|| DONATIONS_CS.to_string())
+        }
     }
 }

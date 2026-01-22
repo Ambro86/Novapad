@@ -30,15 +30,15 @@ use windows::Win32::UI::Controls::{
     TVN_SELCHANGEDW, TVSORTCB,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    EnableWindow, GetFocus, GetKeyState, SetFocus, VK_APPS, VK_DELETE, VK_ESCAPE, VK_F10, VK_LEFT,
-    VK_RETURN, VK_RIGHT, VK_SHIFT, VK_TAB,
+    EnableWindow, GetFocus, GetKeyState, SetFocus, VK_APPS, VK_CONTROL, VK_DELETE, VK_ESCAPE,
+    VK_F10, VK_LEFT, VK_RETURN, VK_RIGHT, VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, CBS_DROPDOWNLIST, CHILDID_SELF,
     CallWindowProcW, CreateMenu, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu,
     DestroyWindow, ES_AUTOHSCROLL, EVENT_OBJECT_FOCUS, GetClientRect, GetDlgCtrlID, GetDlgItem,
-    GetParent, GetWindowLongPtrW, GetWindowRect, HMENU, IDC_ARROW, IDYES, LB_ADDSTRING,
+    GetParent, GetWindowLongPtrW, GetWindowRect, HMENU, IDC_ARROW, IDYES, IsChild, LB_ADDSTRING,
     LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK, LBS_NOTIFY, MB_ICONINFORMATION, MB_OK,
     MB_YESNO, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MSG, MessageBoxW, OBJID_CLIENT,
     PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
@@ -101,6 +101,7 @@ const ID_CTX_OPEN_EPISODE: usize = 13102;
 const ID_CTX_COPY_AUDIO: usize = 13103;
 const ID_CTX_COPY_TITLE: usize = 13104;
 const ID_CTX_DOWNLOAD_EPISODE: usize = 13105;
+const ID_CTX_VIEW_DESCRIPTION: usize = 13106;
 
 const ID_CTX_SUBSCRIBE: usize = 13201;
 const ID_CTX_SEARCH_INFO: usize = 13202;
@@ -432,6 +433,9 @@ struct PlayReadyMsg {
 }
 
 pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
+    if msg.hwnd != hwnd && !IsChild(hwnd, msg.hwnd).as_bool() {
+        return false;
+    }
     if msg.message == WM_CHAR {
         return false;
     }
@@ -2298,11 +2302,18 @@ unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool)
             let copy_audio = i18n::tr(language, "podcasts.context.copy_audio");
             let copy_title = i18n::tr(language, "podcasts.context.copy_title");
             let download_label = i18n::tr(language, "podcasts.context.download_episode");
+            let view_description = i18n::tr(language, "podcasts.context.view_description");
             if let Err(_e) = AppendMenuW(
                 menu,
                 MF_STRING,
                 ID_CTX_PLAY,
                 PCWSTR(to_wide(&play_label).as_ptr()),
+            ) {}
+            if let Err(_e) = AppendMenuW(
+                menu,
+                MF_STRING,
+                ID_CTX_VIEW_DESCRIPTION,
+                PCWSTR(to_wide(&view_description).as_ptr()),
             ) {}
             if let Err(_e) = AppendMenuW(
                 menu,
@@ -2369,6 +2380,7 @@ unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool)
         ID_CTX_COPY_AUDIO => handle_episode_action(hwnd, EpisodeAction::CopyAudio),
         ID_CTX_COPY_TITLE => handle_episode_action(hwnd, EpisodeAction::CopyTitle),
         ID_CTX_DOWNLOAD_EPISODE => handle_episode_action(hwnd, EpisodeAction::Download),
+        ID_CTX_VIEW_DESCRIPTION => handle_episode_action(hwnd, EpisodeAction::ViewDescription),
         ID_CTX_SUBSCRIBE => subscribe_selected_result(hwnd),
         _ => {}
     }
@@ -2503,6 +2515,7 @@ enum EpisodeAction {
     CopyAudio,
     CopyTitle,
     Download,
+    ViewDescription,
 }
 
 unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
@@ -2541,6 +2554,313 @@ unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
                 with_state(parent, |s| s.settings.language).unwrap_or_default(),
             );
         }
+        EpisodeAction::ViewDescription => {
+            let content = crate::tools::reader::clean_text(&item.description);
+            let final_content = crate::tools::reader::collapse_blank_lines(&content);
+            show_description_dialog(hwnd, &item.title, &final_content);
+        }
+    }
+}
+
+struct DescriptionDialogInit {
+    title: String,
+    content: String,
+}
+
+const DESCRIPTION_DIALOG_CLASS: &str = "NovapadPodcastDescription";
+const ID_DESCRIPTION_EDIT: usize = 14001;
+const ID_DESCRIPTION_OK: usize = 14002;
+
+unsafe fn show_description_dialog(parent: HWND, title: &str, content: &str) {
+    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+    let class_name = to_wide(DESCRIPTION_DIALOG_CLASS);
+
+    let wc = WNDCLASSW {
+        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+            windows::Win32::UI::WindowsAndMessaging::LoadCursorW(None, IDC_ARROW)
+                .unwrap_or_default()
+                .0,
+        ),
+        hInstance: hinstance,
+        lpszClassName: PCWSTR(class_name.as_ptr()),
+        lpfnWndProc: Some(description_wndproc),
+        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+        ..Default::default()
+    };
+    let _ = RegisterClassW(&wc);
+
+    let window_title = i18n::tr(
+        with_podcast_state(parent, |s| s.language).unwrap_or_default(),
+        "podcasts.description_title",
+    );
+
+    let init_ptr = Box::into_raw(Box::new(DescriptionDialogInit {
+        title: title.to_string(),
+        content: content.to_string(),
+    }));
+
+    let hwnd = CreateWindowExW(
+        WS_EX_DLGMODALFRAME,
+        PCWSTR(class_name.as_ptr()),
+        PCWSTR(to_wide(&window_title).as_ptr()),
+        WS_CAPTION
+            | WS_SYSMENU
+            | WS_VISIBLE
+            | WS_POPUP
+            | windows::Win32::UI::WindowsAndMessaging::WS_THICKFRAME
+            | windows::Win32::UI::WindowsAndMessaging::WS_MAXIMIZEBOX,
+        windows::Win32::UI::WindowsAndMessaging::CW_USEDEFAULT,
+        windows::Win32::UI::WindowsAndMessaging::CW_USEDEFAULT,
+        600,
+        450,
+        parent,
+        None,
+        hinstance,
+        Some(init_ptr as *const _),
+    );
+
+    if hwnd.0 != 0 {
+        let main_hwnd = with_podcast_state(parent, |s| s.parent).unwrap_or(HWND(0));
+        if main_hwnd.0 != 0 {
+            with_state(main_hwnd, |s| s.podcasts_description_dialog = hwnd);
+        }
+    } else {
+        unsafe {
+            drop(Box::from_raw(init_ptr));
+        }
+    }
+}
+
+unsafe extern "system" fn description_control_subclass_proc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    if msg == WM_CHAR && wparam.0 as u16 == VK_TAB.0 {
+        return LRESULT(0);
+    }
+    if msg == WM_KEYDOWN {
+        let id = GetDlgCtrlID(hwnd) as usize;
+        let parent = GetParent(hwnd);
+        let edit = GetDlgItem(parent, ID_DESCRIPTION_EDIT as i32);
+        let ok = GetDlgItem(parent, ID_DESCRIPTION_OK as i32);
+
+        if wparam.0 as u16 == VK_TAB.0 {
+            let next = if id == ID_DESCRIPTION_EDIT { ok } else { edit };
+            if next.0 != 0 {
+                SetFocus(next);
+            }
+            return LRESULT(0);
+        }
+        if wparam.0 as u16 == VK_RETURN.0 && id == ID_DESCRIPTION_OK {
+            crate::log_if_err!(DestroyWindow(parent));
+            return LRESULT(0);
+        }
+        if wparam.0 as u16 == VK_ESCAPE.0 {
+            crate::log_if_err!(DestroyWindow(parent));
+            return LRESULT(0);
+        }
+        // Allow Ctrl+A in edit
+        if id == ID_DESCRIPTION_EDIT
+            && wparam.0 as u16 == 'A' as u16
+            && GetKeyState(VK_CONTROL.0 as i32) < 0
+        {
+            SendMessageW(edit, EM_SETSEL, WPARAM(0), LPARAM(-1));
+            return LRESULT(0);
+        }
+    }
+    let prev = GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA);
+    if prev == 0 {
+        return DefWindowProcW(hwnd, msg, wparam, lparam);
+    }
+    CallWindowProcW(
+        Some(std::mem::transmute::<
+            isize,
+            unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
+        >(prev)),
+        hwnd,
+        msg,
+        wparam,
+        lparam,
+    )
+}
+
+unsafe extern "system" fn description_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    match msg {
+        WM_CREATE => {
+            let cs = lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
+            let init_ptr = (*cs).lpCreateParams as *mut DescriptionDialogInit;
+            if !init_ptr.is_null() {
+                let init = Box::from_raw(init_ptr);
+                let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+
+                let full_text = format!("{}\r\n\r\n{}", init.title, init.content);
+
+                let edit = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | windows::Win32::UI::WindowsAndMessaging::WS_VSCROLL
+                        | WS_TABSTOP
+                        | WINDOW_STYLE(
+                            (windows::Win32::UI::WindowsAndMessaging::ES_MULTILINE
+                                | windows::Win32::UI::WindowsAndMessaging::ES_READONLY
+                                | windows::Win32::UI::WindowsAndMessaging::ES_AUTOVSCROLL)
+                                as u32,
+                        ),
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(ID_DESCRIPTION_EDIT as isize),
+                    hinstance,
+                    None,
+                );
+
+                let hfont = HFONT(
+                    windows::Win32::Graphics::Gdi::GetStockObject(
+                        windows::Win32::Graphics::Gdi::DEFAULT_GUI_FONT,
+                    )
+                    .0,
+                );
+                SendMessageW(edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+
+                let wide_text = to_wide(&full_text);
+                SendMessageW(
+                    edit,
+                    windows::Win32::UI::WindowsAndMessaging::WM_SETTEXT,
+                    WPARAM(0),
+                    LPARAM(wide_text.as_ptr() as isize),
+                );
+
+                let ok_button = CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    w!("OK"),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WINDOW_STYLE(
+                            windows::Win32::UI::WindowsAndMessaging::BS_DEFPUSHBUTTON as u32,
+                        ),
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(ID_DESCRIPTION_OK as isize),
+                    hinstance,
+                    None,
+                );
+                SendMessageW(ok_button, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+
+                // Subclass controls for Tab navigation
+                let proc_ptr = description_control_subclass_proc as usize;
+
+                let prev_edit = SetWindowLongPtrW(
+                    edit,
+                    windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
+                    proc_ptr as isize,
+                );
+                SetWindowLongPtrW(
+                    edit,
+                    windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+                    prev_edit,
+                );
+
+                let prev_ok = SetWindowLongPtrW(
+                    ok_button,
+                    windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
+                    proc_ptr as isize,
+                );
+                SetWindowLongPtrW(
+                    ok_button,
+                    windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+                    prev_ok,
+                );
+
+                SetFocus(edit);
+            }
+            LRESULT(0)
+        }
+        WM_SIZE => {
+            let mut rect = windows::Win32::Foundation::RECT::default();
+            crate::log_if_err!(GetClientRect(hwnd, &mut rect));
+            let width = rect.right;
+            let height = rect.bottom;
+            let button_height = 30;
+            let margin = 10;
+
+            let edit_height = if height > (button_height + 2 * margin) {
+                height - button_height - 2 * margin
+            } else {
+                height
+            };
+
+            let edit = GetDlgItem(hwnd, ID_DESCRIPTION_EDIT as i32);
+            if edit.0 != 0 {
+                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                    edit,
+                    0,
+                    0,
+                    width,
+                    edit_height,
+                    true
+                ));
+            }
+
+            let ok_button = GetDlgItem(hwnd, ID_DESCRIPTION_OK as i32);
+            if ok_button.0 != 0 {
+                let btn_width = 80;
+                let btn_x = (width - btn_width) / 2;
+                let btn_y = edit_height + margin;
+                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                    ok_button,
+                    btn_x,
+                    btn_y,
+                    btn_width,
+                    button_height,
+                    true
+                ));
+            }
+            LRESULT(0)
+        }
+        WM_COMMAND => {
+            let id = wparam.0 & 0xffff;
+            if id == ID_DESCRIPTION_OK || id == 2 {
+                crate::log_if_err!(DestroyWindow(hwnd));
+                return LRESULT(0);
+            }
+            DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
+        WM_KEYDOWN => {
+            if wparam.0 as u16 == VK_ESCAPE.0 {
+                crate::log_if_err!(DestroyWindow(hwnd));
+                return LRESULT(0);
+            }
+            DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
+        WM_DESTROY => {
+            let parent = GetParent(hwnd);
+            if parent.0 != 0 {
+                let main_hwnd = with_podcast_state(parent, |s| s.parent).unwrap_or(HWND(0));
+                if main_hwnd.0 != 0 {
+                    with_state(main_hwnd, |s| s.podcasts_description_dialog = HWND(0));
+                }
+                focus_library(parent);
+            }
+            LRESULT(0)
+        }
+        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 

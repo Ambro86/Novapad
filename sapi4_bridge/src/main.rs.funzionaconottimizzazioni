@@ -1484,103 +1484,6 @@ fn speak_with_voice(
 // speak_to_file: optional mp3
 // =========================
 
-fn split_text_for_recording(text: &str, max_chars: usize) -> Vec<String> {
-    if text.len() <= max_chars {
-        return vec![text.to_string()];
-    }
-
-    let bytes = text.as_bytes();
-    let mut out = Vec::new();
-    let mut start = 0usize;
-
-    while start < text.len() {
-        let mut end = (start + max_chars).min(text.len());
-
-        // Taglio preferenziale: newline -> fine frase -> spazio
-        let mut cut: Option<usize> = None;
-
-        // newline
-        let mut i = end;
-        while i > start {
-            if bytes[i - 1] == b'\n' {
-                cut = Some(i);
-                break;
-            }
-            i -= 1;
-        }
-
-        // punteggiatura
-        if cut.is_none() {
-            let mut j = end;
-            while j > start {
-                match bytes[j - 1] {
-                    b'.' | b'!' | b'?' | b';' => {
-                        cut = Some(j);
-                        break;
-                    }
-                    _ => {}
-                }
-                j -= 1;
-            }
-        }
-
-        // spazio
-        if cut.is_none() {
-            let mut k = end;
-            while k > start {
-                if bytes[k - 1] == b' ' {
-                    cut = Some(k);
-                    break;
-                }
-                k -= 1;
-            }
-        }
-
-        if let Some(c) = cut {
-            end = c;
-        }
-
-        let chunk = text[start..end].to_string();
-        out.push(chunk);
-
-        start = end;
-        while start < text.len() && bytes[start] == b' ' {
-            start += 1;
-        }
-    }
-
-    out
-}
-
-unsafe fn try_start_next_recording_chunk(
-    central_ptr: *mut ITTSCentral,
-    state: &Arc<SpeakState>,
-    flags: DWORD,
-) {
-    if !state.done.load(Ordering::Acquire) {
-        return;
-    }
-
-    let next = match pop_next_text(state) {
-        Some(t) => t,
-        None => return,
-    };
-
-    state.mark_running();
-    set_current_text(state, next);
-
-    let hr = speak_from_state_with_flags(central_ptr, state, flags);
-    if !hr_ok(hr) {
-        eprintln!("TextData failed, hr={:#x}", hr);
-        state.mark_done();
-        let mut guard = match state.current_text.lock() {
-            Ok(g) => g,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        *guard = None;
-    }
-}
-
 fn speak_to_file(
     target_idx: u32,
     output_path: &str,
@@ -1621,45 +1524,35 @@ fn speak_to_file(
         };
 
         let wav_str = wav_path.to_str().ok_or_else(|| "Invalid output path".to_string())?;
-        let out_wide = U16CString::from_str(wav_str)
-            .map_err(|_| "Invalid output path (interior NUL?)".to_string())?;
+        let out_wide =
+            U16CString::from_str(wav_str).map_err(|_| "Invalid output path (interior NUL?)".to_string())?;
 
         let hr_set = (audio_vtbl.set)(audio_file_ptr.as_ptr(), out_wide.as_ptr(), 1);
         if !hr_ok(hr_set) {
             return Err(format!("AudioFile::Set failed, hr={:#x}", hr_set));
         }
 
-        // =========================
-        // OTTIMIZZAZIONE: prova non-real-time SOLO in registrazione
-        // (non cambia la velocità del parlato, cambia il modo di output/buffering)
-        // =========================
-        let hr_rt0 = (audio_vtbl.real_time_set)(audio_file_ptr.as_ptr(), 0);
-        if !hr_ok(hr_rt0) {
-            // fallback al comportamento precedente
-            let hr_rt = (audio_vtbl.real_time_set)(audio_file_ptr.as_ptr(), 0x100);
-            if !hr_ok(hr_rt) {
-                eprintln!("AudioFile RealTimeSet failed: {:#x} / fallback {:#x}", hr_rt0, hr_rt);
-            }
+        let hr_rt = (audio_vtbl.real_time_set)(audio_file_ptr.as_ptr(), 0x100);
+        if !hr_ok(hr_rt) {
+            eprintln!("AudioFile RealTimeSet failed: {:#x}", hr_rt);
         }
 
         let audio_unknown = audio_file_ptr.as_ptr() as *mut IUnknown;
         let (_enum_ptr, central_ptr) = init_central_with_audio(target_idx, audio_unknown)?;
         let central_vtbl = &*(*central_ptr.as_ptr()).lpVtbl;
 
-        // NON cambiamo “velocità parlato” oltre ai parametri utente
         apply_tts_attributes(central_ptr.as_ptr(), rate, pitch, volume);
 
         let state = Arc::new(SpeakState::new());
 
-        // --- TTS notify sink ---
         let tts_sink_box = Box::new(ITTSNotifySink {
             lpVtbl: &NOTIFY_VTBL,
             refcnt: AtomicU32::new(1),
             state: state.clone(),
         });
         let tts_sink_raw = Box::into_raw(tts_sink_box);
-        let tts_handle = SinkHandle::new(tts_sink_raw)
-            .ok_or_else(|| "Failed to create TTS notify sink".to_string())?;
+        let tts_handle =
+            SinkHandle::new(tts_sink_raw).ok_or_else(|| "Failed to create TTS notify sink".to_string())?;
         tts_handle.add_ref();
 
         let mut reg_key: DWORD = 0;
@@ -1674,15 +1567,14 @@ fn speak_to_file(
             eprintln!("ITTSCentral Register failed: {:#x}", hr_reg_tts);
         }
 
-        // --- AudioFile notify sink ---
         let af_sink_box = Box::new(IAudioFileNotifySink {
             lpVtbl: &AUDIO_FILE_NOTIFY_VTBL,
             refcnt: AtomicU32::new(1),
             state: state.clone(),
         });
         let af_sink_raw = Box::into_raw(af_sink_box);
-        let af_handle = SinkHandle::new(af_sink_raw)
-            .ok_or_else(|| "Failed to create audiofile notify sink".to_string())?;
+        let af_handle =
+            SinkHandle::new(af_sink_raw).ok_or_else(|| "Failed to create audiofile notify sink".to_string())?;
         af_handle.add_ref();
 
         let hr_reg_af = (audio_vtbl.register)(audio_file_ptr.as_ptr(), af_handle.as_void_ptr());
@@ -1690,9 +1582,6 @@ fn speak_to_file(
             eprintln!("AudioFile Register failed: {:#x}", hr_reg_af);
         }
 
-        // =========================
-        // READ TEXT
-        // =========================
         let mut text = String::new();
         match io::stdin().read_to_string(&mut text) {
             Ok(_) => {}
@@ -1713,79 +1602,27 @@ fn speak_to_file(
             return Ok(());
         }
 
-        // =========================
-        // OTTIMIZZAZIONE: CHUNKING
-        // =========================
-        // Nota: non accelera oltre realtime se la voce è realtime,
-        // ma riduce overhead e “buchi” tra blocchi.
         let cleaned = sanitize_text_for_u16c(&text);
+        let u16c = U16CString::from_str(&cleaned).map_err(|_| "Input contains interior NUL".to_string())?;
+        state.mark_running();
+        set_current_text(&state, u16c);
 
-        // 3500 è un buon compromesso; puoi provare 2000..8000
-        let chunks = split_text_for_recording(&cleaned, 3500);
-
-        // Metti tutto in coda come U16CString (così la memoria resta viva finché serve)
-        for ch in chunks {
-            match U16CString::from_str(&ch) {
-                Ok(u16c) => enqueue_text(&state, u16c),
-                Err(_) => eprintln!("Skipped a chunk due to interior NUL"),
-            }
+        let hr_speak = speak_from_state_with_flags(central_ptr.as_ptr(), &state, TTSDATAFLAG_TAGGED);
+        if !hr_ok(hr_speak) {
+            eprintln!("TextData failed, hr={:#x}", hr_speak);
+            state.mark_done();
         }
 
-        // avvia il primo chunk
-        state.mark_done(); // per permettere try_start_next...
-        try_start_next_recording_chunk(
-            central_ptr.as_ptr(),
-            &state,
-            TTSDATAFLAG_TAGGED,
-        );
-
-        // Pump finché la coda è vuota e siamo done
         let mut msg: MSG = std::mem::zeroed();
         let start_wait = std::time::Instant::now();
-        let timeout = std::time::Duration::from_secs(60 * 60); // 1h (audiolibri lunghi)
+        let timeout = std::time::Duration::from_secs(300);
 
-        loop {
+        while !state.done.load(Ordering::Acquire) && start_wait.elapsed() < timeout {
             while PeekMessageW(&mut msg, ptr::null_mut(), 0, 0, PM_REMOVE) != 0 {
                 TranslateMessage(&msg);
                 DispatchMessageW(&msg);
             }
-
-            // se finito un chunk, parte il prossimo
-            try_start_next_recording_chunk(
-                central_ptr.as_ptr(),
-                &state,
-                TTSDATAFLAG_TAGGED,
-            );
-
-            // condizione uscita: done e queue vuota e nessun current_text
-            let done = state.done.load(Ordering::Acquire);
-
-            let queue_empty = {
-                let q = match state.queue.lock() {
-                    Ok(g) => g,
-                    Err(poisoned) => poisoned.into_inner(),
-                };
-                q.is_empty()
-            };
-
-            let no_current = {
-                let cur = match state.current_text.lock() {
-                    Ok(g) => g,
-                    Err(poisoned) => poisoned.into_inner(),
-                };
-                cur.is_none()
-            };
-
-            if done && queue_empty && no_current {
-                break;
-            }
-
-            if start_wait.elapsed() >= timeout {
-                eprintln!("Recording timeout reached");
-                break;
-            }
-
-            std::thread::sleep(std::time::Duration::from_millis(2));
+            std::thread::sleep(std::time::Duration::from_millis(10));
         }
 
         let hr_flush = (audio_vtbl.flush)(audio_file_ptr.as_ptr());
@@ -1800,7 +1637,6 @@ fn speak_to_file(
             }
         }
 
-        // release handles (2 refs come prima)
         tts_handle.release();
         af_handle.release();
         tts_handle.release();

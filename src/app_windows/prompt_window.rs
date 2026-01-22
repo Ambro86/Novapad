@@ -29,8 +29,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, CreateWindowExW, DefWindowProcW, DestroyWindow,
     DispatchMessageW, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_READONLY, GWLP_USERDATA,
     GetClientRect, GetMessageW, GetParent, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW,
-    HMENU, IDC_ARROW, IsWindow, KillTimer, LoadCursorW, MB_ICONQUESTION, MB_OKCANCEL,
-    MESSAGEBOX_STYLE, MSG, MessageBoxW, PostMessageW, RegisterClassW, SendMessageW,
+    HMENU, IDC_ARROW, IsDialogMessageW, IsWindow, KillTimer, LoadCursorW, MB_ICONQUESTION,
+    MB_OKCANCEL, MESSAGEBOX_STYLE, MSG, MessageBoxW, PostMessageW, RegisterClassW, SendMessageW,
     SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, TranslateMessage,
     WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY,
     WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD,
@@ -285,8 +285,10 @@ pub unsafe fn prompt_user(
 
     let mut msg = MSG::default();
     while IsWindow(hwnd).as_bool() && GetMessageW(&mut msg, HWND(0), 0, 0).into() {
-        TranslateMessage(&msg);
-        DispatchMessageW(&msg);
+        if unsafe { !IsDialogMessageW(hwnd, &msg).as_bool() } {
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
     }
 
     windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow(parent, true);

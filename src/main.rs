@@ -73,11 +73,14 @@ use windows::Win32::UI::Controls::Dialogs::{
     OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST, OPENFILENAMEW,
 };
 use windows::Win32::UI::Controls::RichEdit::{
-    CHARRANGE, EM_EXGETSEL, EM_EXSETSEL, EM_GETTEXTRANGE, EN_SELCHANGE, TEXTRANGEW,
+    CFE_AUTOBACKCOLOR, CFM_BACKCOLOR, CHARFORMAT2W, CHARRANGE, EM_EXGETSEL, EM_EXSETSEL,
+    EM_GETTEXTRANGE, EM_SETCHARFORMAT, EM_SETEVENTMASK, EN_SELCHANGE, ENM_CHANGE, ENM_SELCHANGE,
+    SCF_SELECTION, TEXTRANGEW,
 };
 use windows::Win32::UI::Controls::{
-    BST_CHECKED, ICC_TAB_CLASSES, INITCOMMONCONTROLSEX, InitCommonControlsEx, NMHDR, TCM_GETCURSEL,
-    TCN_SELCHANGE, WC_BUTTON, WC_COMBOBOXW, WC_STATIC, WC_TABCONTROLW,
+    BST_CHECKED, EM_GETMODIFY, EM_SETMODIFY, ICC_TAB_CLASSES, INITCOMMONCONTROLSEX,
+    InitCommonControlsEx, NMHDR, TCM_GETCURSEL, TCN_SELCHANGE, WC_BUTTON, WC_COMBOBOXW, WC_STATIC,
+    WC_TABCONTROLW,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_APPS, VK_CONTROL, VK_ESCAPE,
@@ -109,9 +112,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     ShowWindow, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage,
     WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE,
     WM_CUT, WM_DESTROY, WM_DROPFILES, WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL,
-    WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER,
-    WM_UNDO, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW,
-    WS_TABSTOP, WS_VISIBLE,
+    WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSKEYDOWN,
+    WM_TIMER, WM_UNDO, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE,
+    WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{HSTRING, Interface, PCWSTR, PWSTR, implement, w};
 
@@ -144,6 +147,8 @@ const FOCUS_EDITOR_TIMER_ID2: usize = 2;
 const FOCUS_EDITOR_TIMER_ID3: usize = 3;
 const FOCUS_EDITOR_TIMER_ID4: usize = 4;
 const CHAPTER_ANNOUNCE_TIMER_ID: usize = 5;
+const SPELLCHECK_HIGHLIGHT_TIMER_ID: usize = 6;
+const SPELLCHECK_HIGHLIGHT_DEBOUNCE_MS: u32 = 100;
 const PDF_OCR_PROMPT_TIMEOUT_COPYDATA_SECS: u64 = 30;
 const COPYDATA_OPEN_FILE: usize = 1;
 const VOICE_PANEL_ID_ENGINE: usize = 21001;
@@ -1257,6 +1262,7 @@ pub(crate) struct AppState {
     batch_audiobooks_window: HWND,
     podcasts_window: HWND,
     podcasts_add_dialog: HWND,
+    podcasts_description_dialog: HWND,
     rss_window: HWND,
     rss_add_dialog: HWND, // Input dialog for RSS
     go_to_time_dialog: HWND,
@@ -1320,6 +1326,8 @@ pub(crate) struct AppState {
     spellcheck_last_announce: Option<SpellcheckAnnounceKey>,
     spellcheck_context: Option<SpellcheckContextMenuState>,
     spellcheck_space_trigger: Option<HWND>,
+    spellcheck_highlight_pending: Option<HWND>,
+    spellcheck_last_highlighted_line: Option<(isize, i32)>, // (doc_id, line_index)
     dictionary_context_menu: HMENU,
     dictionary_context_word: String,
     dictionary_context_language: Language,
@@ -1713,7 +1721,8 @@ fn main() -> windows::core::Result<()> {
                     let secondary_open = secondary_open
                         || state.dictionary_entry_dialog.0 != 0
                         || state.go_to_time_dialog.0 != 0
-                        || state.podcasts_add_dialog.0 != 0;
+                        || state.podcasts_add_dialog.0 != 0
+                        || state.podcasts_description_dialog.0 != 0;
 
                     // Exclude voice panel controls from player keyboard handling
                     let is_voice_panel_control = is_focus_in_voice_panel(hwnd);
@@ -1912,8 +1921,11 @@ fn main() -> windows::core::Result<()> {
                     handled = true;
                     return;
                 }
-                if state.podcasts_window.0 != 0
-                    && app_windows::podcasts_window::handle_navigation(state.podcasts_window, &msg)
+                if state.podcasts_description_dialog.0 != 0
+                    && app_windows::podcasts_window::handle_navigation(
+                        state.podcasts_description_dialog,
+                        &msg,
+                    )
                 {
                     handled = true;
                     return;
@@ -1923,6 +1935,12 @@ fn main() -> windows::core::Result<()> {
                         state.podcasts_add_dialog,
                         &msg,
                     )
+                {
+                    handled = true;
+                    return;
+                }
+                if state.podcasts_window.0 != 0
+                    && app_windows::podcasts_window::handle_navigation(state.podcasts_window, &msg)
                 {
                     handled = true;
                 }
@@ -2268,6 +2286,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 rss_window: HWND(0),
                 podcasts_window: HWND(0),
                 podcasts_add_dialog: HWND(0),
+                podcasts_description_dialog: HWND(0),
                 rss_add_dialog: HWND(0),
                 go_to_time_dialog: HWND(0),
                 playback_menu: HMENU(0),
@@ -2333,6 +2352,8 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 spellcheck_last_announce: None,
                 spellcheck_context: None,
                 spellcheck_space_trigger: None,
+                spellcheck_highlight_pending: None,
+                spellcheck_last_highlighted_line: None,
                 dictionary_context_menu: HMENU(0),
                 dictionary_context_word: String::new(),
                 dictionary_context_language: Language::default(),
@@ -2429,6 +2450,12 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         WM_NOTIFY => {
             let hdr = &*(lparam.0 as *const NMHDR);
             if hdr.code == TCN_SELCHANGE && hdr.hwndFrom == editor_manager::get_tab(hwnd) {
+                // Cancel pending spellcheck highlight when switching tabs
+                crate::log_if_err!(KillTimer(hwnd, SPELLCHECK_HIGHLIGHT_TIMER_ID));
+                with_state(hwnd, |state| {
+                    state.spellcheck_highlight_pending = None;
+                    state.spellcheck_last_highlighted_line = None;
+                });
                 attempt_switch_to_selected_tab(hwnd);
                 return LRESULT(0);
             }
@@ -2437,8 +2464,12 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 return LRESULT(0);
             }
             if hdr.code == EN_SELCHANGE {
-                handle_spellcheck_selection_change(hwnd, hdr.hwndFrom);
-                prefetch_dictionary_for_selection(hwnd, hdr.hwndFrom);
+                // Only process if editor has focus to avoid focus issues during file open etc.
+                if GetFocus() == hdr.hwndFrom {
+                    handle_spellcheck_selection_change(hwnd, hdr.hwndFrom);
+                    prefetch_dictionary_for_selection(hwnd, hdr.hwndFrom);
+                    trigger_spellcheck_highlight(hwnd, hdr.hwndFrom);
+                }
                 return LRESULT(0);
             }
             DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -2455,6 +2486,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             }
             if wparam.0 == CHAPTER_ANNOUNCE_TIMER_ID {
                 update_chapter_announcement(hwnd);
+                return LRESULT(0);
+            }
+            if wparam.0 == SPELLCHECK_HIGHLIGHT_TIMER_ID {
+                crate::log_if_err!(KillTimer(hwnd, SPELLCHECK_HIGHLIGHT_TIMER_ID));
+                handle_spellcheck_highlight_timer(hwnd);
                 return LRESULT(0);
             }
             handle_pdf_loading_timer(hwnd, wparam.0);
@@ -2980,6 +3016,12 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 }
                 IDM_FILE_OPEN => {
                     log_debug("Menu: Open document");
+                    // Cancel spellcheck highlight to avoid focus issues
+                    crate::log_if_err!(KillTimer(hwnd, SPELLCHECK_HIGHLIGHT_TIMER_ID));
+                    with_state(hwnd, |state| {
+                        state.spellcheck_highlight_pending = None;
+                        state.spellcheck_last_highlighted_line = None;
+                    });
                     if let Some((path, encoding)) = open_file_dialog_with_encoding(hwnd) {
                         open_document_with_encoding(hwnd, &path, encoding);
                         if with_state(hwnd, |state| state.prompt_window.0 != 0).unwrap_or(false) {
@@ -4929,6 +4971,8 @@ unsafe fn handle_spellcheck_selection_change(hwnd: HWND, hwnd_edit: HWND) {
     }
     with_state(hwnd, |state| {
         state.spellcheck_space_trigger = None;
+        // Force re-highlight of current line when space/punctuation is pressed
+        state.spellcheck_last_highlighted_line = None;
     });
     let Some(caret_index) = spellcheck_caret_char_index(hwnd_edit) else {
         with_state(hwnd, |state| state.spellcheck_last_announce = None);
@@ -4998,6 +5042,262 @@ unsafe fn handle_spellcheck_selection_change(hwnd: HWND, hwnd_edit: HWND) {
     if let Some(message) = announce_msg {
         nvda_speak(&message);
     }
+}
+
+/// Triggers the debounced spellcheck highlight timer
+unsafe fn trigger_spellcheck_highlight(hwnd: HWND, hwnd_edit: HWND) {
+    let should_start_timer = with_state(hwnd, |state| {
+        if !state.settings.spellcheck_enabled {
+            return false;
+        }
+        state.spellcheck_highlight_pending = Some(hwnd_edit);
+        true
+    })
+    .unwrap_or(false);
+
+    if should_start_timer {
+        // Reset/start the debounce timer only if spellcheck is enabled
+        SetTimer(
+            hwnd,
+            SPELLCHECK_HIGHLIGHT_TIMER_ID,
+            SPELLCHECK_HIGHLIGHT_DEBOUNCE_MS,
+            None,
+        );
+    }
+}
+
+/// Called when the debounce timer fires - highlights misspellings on current line
+unsafe fn handle_spellcheck_highlight_timer(hwnd: HWND) {
+    let Some(hwnd_edit) =
+        with_state(hwnd, |state| state.spellcheck_highlight_pending.take()).flatten()
+    else {
+        return;
+    };
+
+    // Don't do anything if editor doesn't have focus
+    if GetFocus() != hwnd_edit {
+        return;
+    }
+
+    let Some(caret_index) = spellcheck_caret_char_index(hwnd_edit) else {
+        return;
+    };
+
+    let Some((line_index, line_start, line_text)) = spellcheck_line_info(hwnd_edit, caret_index)
+    else {
+        return;
+    };
+
+    let doc_id = hwnd_edit.0;
+
+    // Check if we're on the same line as before - no need to re-highlight
+    let should_highlight = with_state(hwnd, |state| {
+        let last = state.spellcheck_last_highlighted_line;
+        if last == Some((doc_id, line_index)) {
+            return false;
+        }
+        state.spellcheck_last_highlighted_line = Some((doc_id, line_index));
+        true
+    })
+    .unwrap_or(false);
+
+    if !should_highlight {
+        return;
+    }
+
+    // Get misspellings for this line
+    let misspellings = with_state(hwnd, |state| {
+        let settings = &state.settings;
+        let resolution = state.spellcheck_manager.resolve_language(settings)?;
+        let misses = state.spellcheck_manager.check_line(
+            doc_id,
+            line_index,
+            &line_text,
+            &resolution.effective,
+        );
+        Some((misses, settings.text_color))
+    })
+    .flatten();
+
+    let Some((misspellings, text_color)) = misspellings else {
+        return;
+    };
+
+    // First, reset the entire line to normal formatting
+    reset_line_formatting(hwnd_edit, line_start, line_text.len(), text_color);
+
+    // Then highlight each misspelled word with red background
+    for miss in misspellings {
+        let start_utf16 = spellcheck::utf8_byte_offset_to_utf16_units(&line_text, miss.start);
+        let end_utf16 = spellcheck::utf8_byte_offset_to_utf16_units(&line_text, miss.end);
+        let abs_start = line_start + start_utf16;
+        let abs_end = line_start + end_utf16;
+        highlight_misspelled_word(hwnd_edit, abs_start, abs_end);
+    }
+}
+
+/// Resets line formatting to normal (removes red background)
+unsafe fn reset_line_formatting(
+    hwnd_edit: HWND,
+    line_start: i32,
+    line_len: usize,
+    _text_color: u32,
+) {
+    if line_len == 0 {
+        return;
+    }
+
+    // Check if this editor still has focus - don't mess with selection if not
+    if GetFocus() != hwnd_edit {
+        return;
+    }
+
+    // Save modified state - formatting changes should not mark document as dirty
+    let was_modified = SendMessageW(hwnd_edit, EM_GETMODIFY, WPARAM(0), LPARAM(0)).0 != 0;
+
+    // Disable change notifications during formatting
+    SendMessageW(hwnd_edit, EM_SETEVENTMASK, WPARAM(0), LPARAM(0));
+
+    // Lock the control to prevent redraws/scrolling
+    SendMessageW(hwnd_edit, WM_SETREDRAW, WPARAM(0), LPARAM(0));
+
+    // Save current selection
+    let mut old_sel = CHARRANGE { cpMin: 0, cpMax: 0 };
+    SendMessageW(
+        hwnd_edit,
+        EM_EXGETSEL,
+        WPARAM(0),
+        LPARAM(&mut old_sel as *mut _ as isize),
+    );
+
+    // Select the line
+    let line_end = line_start + line_len as i32;
+    let mut sel = CHARRANGE {
+        cpMin: line_start,
+        cpMax: line_end,
+    };
+    SendMessageW(
+        hwnd_edit,
+        EM_EXSETSEL,
+        WPARAM(0),
+        LPARAM(&mut sel as *mut _ as isize),
+    );
+
+    // Apply normal formatting (remove background color)
+    let mut format = CHARFORMAT2W::default();
+    format.Base.cbSize = std::mem::size_of::<CHARFORMAT2W>() as u32;
+    format.Base.dwMask = CFM_BACKCOLOR;
+    format.Base.dwEffects = CFE_AUTOBACKCOLOR; // Use default background
+    SendMessageW(
+        hwnd_edit,
+        EM_SETCHARFORMAT,
+        WPARAM(SCF_SELECTION as usize),
+        LPARAM(&mut format as *mut _ as isize),
+    );
+
+    // Restore selection
+    SendMessageW(
+        hwnd_edit,
+        EM_EXSETSEL,
+        WPARAM(0),
+        LPARAM(&mut old_sel as *mut _ as isize),
+    );
+
+    // Unlock redraw
+    SendMessageW(hwnd_edit, WM_SETREDRAW, WPARAM(1), LPARAM(0));
+
+    // Re-enable change notifications
+    SendMessageW(
+        hwnd_edit,
+        EM_SETEVENTMASK,
+        WPARAM(0),
+        LPARAM((ENM_CHANGE | ENM_SELCHANGE) as isize),
+    );
+
+    // Restore modified state
+    SendMessageW(
+        hwnd_edit,
+        EM_SETMODIFY,
+        WPARAM(if was_modified { 1 } else { 0 }),
+        LPARAM(0),
+    );
+}
+
+/// Highlights a misspelled word with red background
+unsafe fn highlight_misspelled_word(hwnd_edit: HWND, start: i32, end: i32) {
+    // Check if this editor still has focus - don't mess with selection if not
+    if GetFocus() != hwnd_edit {
+        return;
+    }
+
+    // Save modified state - formatting changes should not mark document as dirty
+    let was_modified = SendMessageW(hwnd_edit, EM_GETMODIFY, WPARAM(0), LPARAM(0)).0 != 0;
+
+    // Disable change notifications during formatting
+    SendMessageW(hwnd_edit, EM_SETEVENTMASK, WPARAM(0), LPARAM(0));
+
+    // Lock the control to prevent redraws/scrolling
+    SendMessageW(hwnd_edit, WM_SETREDRAW, WPARAM(0), LPARAM(0));
+
+    // Save current selection
+    let mut old_sel = CHARRANGE { cpMin: 0, cpMax: 0 };
+    SendMessageW(
+        hwnd_edit,
+        EM_EXGETSEL,
+        WPARAM(0),
+        LPARAM(&mut old_sel as *mut _ as isize),
+    );
+
+    // Select the misspelled word
+    let mut sel = CHARRANGE {
+        cpMin: start,
+        cpMax: end,
+    };
+    SendMessageW(
+        hwnd_edit,
+        EM_EXSETSEL,
+        WPARAM(0),
+        LPARAM(&mut sel as *mut _ as isize),
+    );
+
+    // Apply red background color
+    let mut format = CHARFORMAT2W::default();
+    format.Base.cbSize = std::mem::size_of::<CHARFORMAT2W>() as u32;
+    format.Base.dwMask = CFM_BACKCOLOR;
+    format.crBackColor = windows::Win32::Foundation::COLORREF(0x0000FF); // Red in BGR format
+    SendMessageW(
+        hwnd_edit,
+        EM_SETCHARFORMAT,
+        WPARAM(SCF_SELECTION as usize),
+        LPARAM(&mut format as *mut _ as isize),
+    );
+
+    // Restore selection
+    SendMessageW(
+        hwnd_edit,
+        EM_EXSETSEL,
+        WPARAM(0),
+        LPARAM(&mut old_sel as *mut _ as isize),
+    );
+
+    // Unlock redraw
+    SendMessageW(hwnd_edit, WM_SETREDRAW, WPARAM(1), LPARAM(0));
+
+    // Re-enable change notifications
+    SendMessageW(
+        hwnd_edit,
+        EM_SETEVENTMASK,
+        WPARAM(0),
+        LPARAM((ENM_CHANGE | ENM_SELCHANGE) as isize),
+    );
+
+    // Restore modified state
+    SendMessageW(
+        hwnd_edit,
+        EM_SETMODIFY,
+        WPARAM(if was_modified { 1 } else { 0 }),
+        LPARAM(0),
+    );
 }
 
 pub(crate) unsafe fn show_editor_context_menu(hwnd: HWND, hwnd_edit: HWND, lparam: LPARAM) {

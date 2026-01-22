@@ -77,6 +77,7 @@ pub struct RssItem {
 pub struct PodcastEpisode {
     pub title: String,
     pub link: String,
+    pub description: String,
     pub guid: String,
     pub enclosure_url: Option<String>,
     pub enclosure_type: Option<String>,
@@ -431,12 +432,20 @@ fn parse_podcast_feed_bytes(
             } else {
                 title.clone()
             };
+            let description = entry
+                .summary
+                .as_ref()
+                .map(|s| s.content.clone())
+                .or_else(|| entry.content.as_ref().and_then(|c| c.body.clone()))
+                .unwrap_or_default();
+
             let (enclosure_url, enclosure_type) = select_podcast_enclosure(&entry);
             let (chapters_url, chapters_type) = select_podcast_chapters_link(&entry);
             let pub_date = entry.published.or(entry.updated).map(|d| d.timestamp());
             PodcastEpisode {
                 title,
                 link,
+                description,
                 guid,
                 enclosure_url,
                 enclosure_type,

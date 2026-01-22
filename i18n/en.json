@@ -609,6 +609,8 @@
   "podcasts.context.copy_audio": "Copy audio URL",
   "podcasts.context.copy_title": "Copy episode title",
   "podcasts.context.download_episode": "Save episode...",
+  "podcasts.context.view_description": "View Description",
+  "podcasts.description_title": "Episode Description",
   "podcasts.context.subscribe": "Subscribe",
   "podcasts.context.info": "Info",
   "podcasts.subscribed_title": "Subscription complete",

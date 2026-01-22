@@ -9,7 +9,8 @@ use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
 use windows::Win32::Graphics::Gdi::{DEFAULT_GUI_FONT, GetStockObject};
 use windows::Win32::UI::Controls::Dialogs::{
     FINDREPLACE_FLAGS, FINDREPLACEW, FR_DIALOGTERM, FR_DOWN, FR_ENABLEHOOK, FR_FINDNEXT,
-    FR_MATCHCASE, FR_REPLACE, FR_REPLACEALL, FR_WHOLEWORD, FindTextW, ReplaceTextW,
+    FR_HIDEMATCHCASE, FR_HIDEWHOLEWORD, FR_MATCHCASE, FR_REPLACE, FR_REPLACEALL, FR_WHOLEWORD,
+    FindTextW, ReplaceTextW,
 };
 use windows::Win32::UI::Controls::RichEdit::{
     CHARRANGE, EM_EXGETSEL, EM_EXSETSEL, EM_FINDTEXTEXW, FINDTEXTEXW,
@@ -29,6 +30,8 @@ pub const REPLACE_DIALOG_ID: isize = 2;
 const FIND_ID_REGEX: isize = 5101;
 const FIND_ID_DOT_MATCHES_NEWLINE: isize = 5102;
 const FIND_ID_WRAP_AROUND: isize = 5103;
+const FIND_ID_MATCH_CASE: isize = 5106;
+const FIND_ID_WHOLE_WORD: isize = 5107;
 const REPLACE_ID_IN_SELECTION: isize = 5104;
 const REPLACE_ID_IN_ALL_DOCS: isize = 5105;
 
@@ -37,6 +40,8 @@ pub struct FindOptions {
     pub use_regex: bool,
     pub dot_matches_newline: bool,
     pub wrap_around: bool,
+    pub match_case: bool,
+    pub whole_word: bool,
     pub replace_in_selection: bool,
     pub replace_in_all_docs: bool,
 }
@@ -54,7 +59,7 @@ pub unsafe fn open_find_dialog(hwnd: HWND) {
         state.find_replace = Some(FINDREPLACEW {
             lStructSize: std::mem::size_of::<FINDREPLACEW>() as u32,
             hwndOwner: hwnd,
-            Flags: FR_DOWN | FR_ENABLEHOOK,
+            Flags: FR_DOWN | FR_ENABLEHOOK | FR_HIDEMATCHCASE | FR_HIDEWHOLEWORD,
             lpstrFindWhat: PWSTR(state.find_text.as_mut_ptr()),
             wFindWhatLen: state.find_text.len() as u16,
             lCustData: LPARAM(FIND_DIALOG_ID),
@@ -82,7 +87,7 @@ pub unsafe fn open_replace_dialog(hwnd: HWND) {
         state.replace_replace = Some(FINDREPLACEW {
             lStructSize: std::mem::size_of::<FINDREPLACEW>() as u32,
             hwndOwner: hwnd,
-            Flags: FR_DOWN | FR_ENABLEHOOK,
+            Flags: FR_DOWN | FR_ENABLEHOOK | FR_HIDEMATCHCASE | FR_HIDEWHOLEWORD,
             lpstrFindWhat: PWSTR(state.find_text.as_mut_ptr()),
             wFindWhatLen: state.find_text.len() as u16,
             lpstrReplaceWith: PWSTR(state.replace_text.as_mut_ptr()),
@@ -137,8 +142,8 @@ pub unsafe fn handle_find_message(hwnd: HWND, lparam: LPARAM) {
     };
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
 
-    let find_flags = extract_find_flags(fr.Flags);
     let options = get_find_options(hwnd);
+    let find_flags = extract_find_flags(fr.Flags, &options);
     with_state(hwnd, |state| {
         state.last_find_flags = find_flags;
     });
@@ -258,12 +263,12 @@ pub unsafe fn find_next_from_state(hwnd: HWND) {
     }
 }
 
-fn extract_find_flags(flags: FINDREPLACE_FLAGS) -> FINDREPLACE_FLAGS {
+fn extract_find_flags(flags: FINDREPLACE_FLAGS, options: &FindOptions) -> FINDREPLACE_FLAGS {
     let mut out = FINDREPLACE_FLAGS(0);
-    if (flags & FR_MATCHCASE) != FINDREPLACE_FLAGS(0) {
+    if options.match_case {
         out |= FR_MATCHCASE;
     }
-    if (flags & FR_WHOLEWORD) != FINDREPLACE_FLAGS(0) {
+    if options.whole_word {
         out |= FR_WHOLEWORD;
     }
     if (flags & FR_DOWN) != FINDREPLACE_FLAGS(0) {
@@ -500,6 +505,8 @@ unsafe fn get_find_options(hwnd: HWND) -> FindOptions {
         use_regex: state.find_use_regex,
         dot_matches_newline: state.find_dot_matches_newline,
         wrap_around: state.find_wrap_around,
+        match_case: state.find_match_case,
+        whole_word: state.find_whole_word,
         replace_in_selection: state.find_replace_in_selection,
         replace_in_all_docs: state.find_replace_in_all_docs,
     })
@@ -507,6 +514,8 @@ unsafe fn get_find_options(hwnd: HWND) -> FindOptions {
         use_regex: false,
         dot_matches_newline: false,
         wrap_around: true,
+        match_case: false,
+        whole_word: false,
         replace_in_selection: false,
         replace_in_all_docs: false,
     })
@@ -526,10 +535,20 @@ unsafe extern "system" fn find_replace_hook_proc(
             let is_replace = fr.lCustData.0 == REPLACE_DIALOG_ID;
             let (width, height, client_bottom) = dialog_metrics(hdlg);
 
-            let (regex_text, dot_text, wrap_text, selection_text, all_docs_text) = (
+            let (
+                regex_text,
+                dot_text,
+                wrap_text,
+                case_text,
+                word_text,
+                selection_text,
+                all_docs_text,
+            ) = (
                 i18n::tr(language, "find.regex"),
                 i18n::tr(language, "find.dot_matches_newline"),
                 i18n::tr(language, "find.wrap_around"),
+                i18n::tr(language, "find.match_case"),
+                i18n::tr(language, "find.whole_word"),
                 i18n::tr(language, "find.replace_in_selection"),
                 i18n::tr(language, "find.replace_in_all_docs"),
             );
@@ -538,9 +557,9 @@ unsafe extern "system" fn find_replace_hook_proc(
             let mut y = client_bottom + 8;
             let line_h = 18;
             let gap = 4;
-            let mut added = 3;
+            let mut added = 5; // Regex, Dot, Wrap, Case, Word
             if is_replace {
-                added += 2;
+                added += 2; // In selection, All docs
             }
             let extra = (added * (line_h + gap)) + 10;
             crate::log_if_err!(SetWindowPos(
@@ -576,6 +595,16 @@ unsafe extern "system" fn find_replace_hook_proc(
             set_checkbox_checked(wrap, options.wrap_around);
             y += line_h + gap;
 
+            let case_cb =
+                create_checkbox(hdlg, FIND_ID_MATCH_CASE, &case_text, x, y, checkbox_width);
+            set_checkbox_checked(case_cb, options.match_case);
+            y += line_h + gap;
+
+            let word_cb =
+                create_checkbox(hdlg, FIND_ID_WHOLE_WORD, &word_text, x, y, checkbox_width);
+            set_checkbox_checked(word_cb, options.whole_word);
+            y += line_h + gap;
+
             if is_replace {
                 let sel = create_checkbox(
                     hdlg,
@@ -604,6 +633,8 @@ unsafe extern "system" fn find_replace_hook_proc(
                     FIND_ID_REGEX,
                     FIND_ID_DOT_MATCHES_NEWLINE,
                     FIND_ID_WRAP_AROUND,
+                    FIND_ID_MATCH_CASE,
+                    FIND_ID_WHOLE_WORD,
                     REPLACE_ID_IN_SELECTION,
                     REPLACE_ID_IN_ALL_DOCS,
                 ] {
@@ -639,6 +670,18 @@ unsafe extern "system" fn find_replace_hook_proc(
                     let checked = is_checkbox_checked(hdlg, FIND_ID_WRAP_AROUND);
                     with_state(parent, |state| {
                         state.find_wrap_around = checked;
+                    });
+                }
+                FIND_ID_MATCH_CASE => {
+                    let checked = is_checkbox_checked(hdlg, FIND_ID_MATCH_CASE);
+                    with_state(parent, |state| {
+                        state.find_match_case = checked;
+                    });
+                }
+                FIND_ID_WHOLE_WORD => {
+                    let checked = is_checkbox_checked(hdlg, FIND_ID_WHOLE_WORD);
+                    with_state(parent, |state| {
+                        state.find_whole_word = checked;
                     });
                 }
                 REPLACE_ID_IN_SELECTION => {

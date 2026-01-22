@@ -19,6 +19,8 @@
   "find.regex": "Espressione regolare",
   "find.dot_matches_newline": "Il punto corrisponde a nuova riga",
   "find.wrap_around": "Ricerca circolare",
+  "find.match_case": "Distingui maiuscole/minuscole",
+  "find.whole_word": "Parola intera",
   "find.replace_in_selection": "Sostituisci nella selezione",
   "find.replace_in_all_docs": "Sostituisci in tutti i documenti aperti",
   "find.replaced_count": "{count} sostituzione/i effettuata/e.",

@@ -1718,6 +1718,13 @@ fn run_sapi4_parallel_part(
         return Ok(());
     }
 
+    let is_mp3 = options
+        .output
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.eq_ignore_ascii_case("mp3"))
+        .unwrap_or(false);
+
     // Parallel processing for chunks within this part
     let temp_dir = options
         .output
@@ -1777,6 +1784,7 @@ fn run_sapi4_parallel_part(
                     break;
                 };
                 if cancel_token.load(Ordering::Relaxed) {
+                    let _ = tx.send(Err("Cancelled".to_string()));
                     break;
                 }
 
@@ -1810,7 +1818,21 @@ fn run_sapi4_parallel_part(
                     let _ = tx.send(Err(e));
                     break;
                 } else {
-                    let _ = tx.send(Ok(sub_output));
+                    // If we want MP3, convert this chunk immediately in parallel
+                    if is_mp3 {
+                        let mp3_sub = sub_output.with_extension("mp3");
+                        let _com_guard = crate::com_guard::ComGuard::new_mta();
+                        if let Err(e) = crate::mf_encoder::encode_wav_to_mp3(&sub_output, &mp3_sub)
+                        {
+                            let _ = std::fs::remove_file(&sub_output);
+                            let _ = tx.send(Err(format!("Parallel MP3 encode failed: {}", e)));
+                            break;
+                        }
+                        let _ = std::fs::remove_file(&sub_output);
+                        let _ = tx.send(Ok(mp3_sub));
+                    } else {
+                        let _ = tx.send(Ok(sub_output));
+                    }
                 }
             }
         });
@@ -1834,27 +1856,55 @@ fn run_sapi4_parallel_part(
         let _ = h.join();
     }
 
-    if let Some(e) = error {
+    if error.is_some() || options.cancel.load(Ordering::Relaxed) {
         let _ = std::fs::remove_dir_all(&temp_dir);
-        return Err(if e == "Cancelled" {
+        let msg = if let Some(e) = error {
+            e
+        } else {
+            "Cancelled".to_string()
+        };
+        return Err(if msg == "Cancelled" {
             cancelled_message(options.language)
         } else {
-            e
+            msg
         });
     }
 
     produced_files.sort_by_key(|p: &PathBuf| {
-        p.file_stem()
-            .and_then(|s| s.to_str())
-            .and_then(|s| s.strip_prefix("sub_"))
+        let name = p.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+        name.strip_prefix("sub_")
             .and_then(|s| s.parse::<usize>().ok())
             .unwrap_or(0)
     });
 
-    let result = merge_and_finalize_sapi4_audio(&produced_files, options.output, options.language);
+    let result = if is_mp3 {
+        // Fast MP3 join
+        merge_and_finalize_sapi4_mp3(&produced_files, options.output, options.language)
+    } else {
+        // Standard WAV join
+        merge_and_finalize_sapi4_audio(&produced_files, options.output, options.language)
+    };
+
     let _ = std::fs::remove_dir_all(&temp_dir);
     *global_progress = progress_counter.load(Ordering::SeqCst);
     result
+}
+
+fn merge_and_finalize_sapi4_mp3(
+    mp3_files: &[PathBuf],
+    output: &Path,
+    _language: Language,
+) -> Result<(), String> {
+    if mp3_files.is_empty() {
+        return Ok(());
+    }
+
+    let mut out_file = std::fs::File::create(output).map_err(|e| e.to_string())?;
+    for path in mp3_files {
+        let mut in_file = std::fs::File::open(path).map_err(|e| e.to_string())?;
+        std::io::copy(&mut in_file, &mut out_file).map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 fn merge_and_finalize_sapi4_audio(

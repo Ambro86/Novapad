@@ -6,8 +6,8 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 use windows::Win32::Media::Audio::{
     AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, IAudioCaptureClient, IAudioClient,
-    IAudioRenderClient, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator, WAVEFORMATEX,
-    WAVEFORMATEXTENSIBLE, eCapture, eConsole, eRender,
+    IAudioRenderClient, IMMDevice, IMMDeviceEnumerator, ISimpleAudioVolume, MMDeviceEnumerator,
+    WAVEFORMATEX, WAVEFORMATEXTENSIBLE, eCapture, eMultimedia, eRender,
 };
 use windows::Win32::Media::KernelStreaming::WAVE_FORMAT_EXTENSIBLE;
 use windows::Win32::Media::Multimedia::{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT};
@@ -61,7 +61,7 @@ fn monitor_loop(device_id: String, stop: Arc<AtomicBool>) -> Result<(), String> 
 
     let render_device: IMMDevice = unsafe {
         enumerator
-            .GetDefaultAudioEndpoint(eRender, eConsole)
+            .GetDefaultAudioEndpoint(eRender, eMultimedia)
             .map_err(|e| format!("GetDefaultAudioEndpoint failed: {e}"))?
     };
 
@@ -97,6 +97,43 @@ fn monitor_loop(device_id: String, stop: Arc<AtomicBool>) -> Result<(), String> 
             .GetService()
             .map_err(|e| format!("Render GetService failed: {e}"))?
     };
+
+    let volume_control: ISimpleAudioVolume = unsafe {
+        render_client
+            .GetService()
+            .map_err(|e| format!("Render GetService Volume failed: {e}"))?
+    };
+    unsafe {
+        volume_control
+            .SetMasterVolume(1.0, std::ptr::null())
+            .map_err(|e| format!("SetMasterVolume failed: {e}"))?;
+        volume_control
+            .SetMute(false, std::ptr::null())
+            .map_err(|e| format!("SetMute failed: {e}"))?;
+    }
+
+    // Pre-roll silence
+    let buffer_size = unsafe {
+        render_client
+            .GetBufferSize()
+            .map_err(|e| format!("GetBufferSize failed: {e}"))?
+    };
+    let pre_roll = buffer_size / 2;
+    unsafe {
+        let buffer_ptr = render_service
+            .GetBuffer(pre_roll)
+            .map_err(|e| format!("Pre-roll GetBuffer failed: {e}"))?;
+        let frame_size = (out_channels as u32)
+            * if matches!(out_fmt, SampleFormat::F32) {
+                4
+            } else {
+                2
+            };
+        std::ptr::write_bytes(buffer_ptr, 0, (pre_roll * frame_size) as usize);
+        render_service
+            .ReleaseBuffer(pre_roll, AUDCLNT_BUFFERFLAGS_SILENT.0 as u32)
+            .map_err(|e| format!("Pre-roll ReleaseBuffer failed: {e}"))?;
+    }
 
     // 2. Setup Capture (Input)
     let capture_device = resolve_device(&enumerator, &device_id)?;
@@ -150,6 +187,7 @@ fn monitor_loop(device_id: String, stop: Arc<AtomicBool>) -> Result<(), String> 
 
     let mut resampler = LinearResampler::new(in_rate, out_rate, in_channels as usize);
     let mut first_packet = true;
+    let mut debug_counter = 0;
 
     // Main loop
     while !stop.load(Ordering::Relaxed) {
@@ -200,6 +238,10 @@ fn monitor_loop(device_id: String, stop: Arc<AtomicBool>) -> Result<(), String> 
             // Write to Render
             let frames_to_write = output_samples.len() / out_channels as usize;
             if frames_to_write > 0 {
+                debug_counter += 1;
+                if debug_counter % 500 == 0 {
+                    crate::log_debug(&format!("Monitor: Writing {} frames", frames_to_write));
+                }
                 unsafe {
                     // Check padding
                     let padding = render_client.GetCurrentPadding().unwrap_or(0);
@@ -249,7 +291,7 @@ fn resolve_device(enumerator: &IMMDeviceEnumerator, device_id: &str) -> Result<I
     if device_id.is_empty() || device_id == PODCAST_DEVICE_DEFAULT {
         unsafe {
             enumerator
-                .GetDefaultAudioEndpoint(eCapture, eConsole)
+                .GetDefaultAudioEndpoint(eCapture, eMultimedia)
                 .map_err(|e| format!("GetDefaultAudioEndpoint failed: {e}"))
         }
     } else {

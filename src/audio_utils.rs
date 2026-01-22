@@ -180,6 +180,103 @@ pub fn write_silence_file(
     Ok(())
 }
 
+/// Joins multiple WAV files into a single one
+pub fn join_wav_files(inputs: &[std::path::PathBuf], output: &Path) -> Result<(), AudioError> {
+    if inputs.is_empty() {
+        return Ok(());
+    }
+
+    // 1. Read the first file to get audio format details (sample rate, channels, etc.)
+    let mut fmt_chunk = [0u8; 16];
+    let mut sample_rate = 0u32;
+    let mut channels = 0u16;
+    let mut bits_per_sample = 0u16;
+
+    {
+        let mut first_file = File::open(&inputs[0])?;
+        let mut header = [0u8; 12];
+        first_file.read_exact(&mut header)?;
+        if &header[0..4] != b"RIFF" || &header[8..12] != b"WAVE" {
+            return Err(AudioError::InvalidFormat(
+                "Not a valid RIFF/WAVE file".to_string(),
+            ));
+        }
+
+        let mut found_fmt = false;
+        let mut buffer = [0u8; 8];
+        while first_file.read_exact(&mut buffer).is_ok() {
+            let chunk_id = &buffer[0..4];
+            let chunk_size = u32::from_le_bytes([buffer[4], buffer[5], buffer[6], buffer[7]]);
+            if chunk_id == b"fmt " {
+                let to_read = chunk_size.min(16) as usize;
+                first_file.read_exact(&mut fmt_chunk[..to_read])?;
+                if chunk_size > 16 {
+                    first_file.seek(SeekFrom::Current((chunk_size - 16) as i64))?;
+                }
+                channels = u16::from_le_bytes([fmt_chunk[2], fmt_chunk[3]]);
+                sample_rate =
+                    u32::from_le_bytes([fmt_chunk[4], fmt_chunk[5], fmt_chunk[6], fmt_chunk[7]]);
+                bits_per_sample = u16::from_le_bytes([fmt_chunk[14], fmt_chunk[15]]);
+                found_fmt = true;
+                break;
+            } else {
+                let skip = if chunk_size % 2 == 1 {
+                    chunk_size + 1
+                } else {
+                    chunk_size
+                };
+                first_file.seek(SeekFrom::Current(skip as i64))?;
+            }
+        }
+        if !found_fmt {
+            return Err(AudioError::InvalidFormat("fmt chunk not found".to_string()));
+        }
+    }
+
+    // 2. Create the output file with a standard 44-byte header
+    let mut writer = WavWriter::create(output, sample_rate, channels, bits_per_sample)?;
+    let mut total_data_size = 0u32;
+
+    // 3. Append data from each file
+    for input_path in inputs {
+        let mut file = File::open(input_path)?;
+        let mut header = [0u8; 12];
+        file.read_exact(&mut header)?;
+
+        let mut buffer = [0u8; 8];
+        while file.read_exact(&mut buffer).is_ok() {
+            let chunk_id = &buffer[0..4];
+            let chunk_size = u32::from_le_bytes([buffer[4], buffer[5], buffer[6], buffer[7]]);
+
+            if chunk_id == b"data" {
+                let mut data_buf = vec![0u8; 1024 * 64];
+                let mut remaining = chunk_size as usize;
+                while remaining > 0 {
+                    let to_read = remaining.min(data_buf.len());
+                    file.read_exact(&mut data_buf[..to_read])?;
+                    writer.file.write_all(&data_buf[..to_read])?;
+                    remaining -= to_read;
+                }
+                total_data_size = total_data_size.saturating_add(chunk_size);
+                break;
+            } else {
+                let skip = if chunk_size % 2 == 1 {
+                    chunk_size + 1
+                } else {
+                    chunk_size
+                };
+                file.seek(SeekFrom::Current(skip as i64))?;
+            }
+        }
+    }
+
+    // 4. Finalize the output header with the correct total size
+    writer.data_size = total_data_size;
+    writer.finalize()?;
+
+    Ok(())
+}
+
 pub fn open_url_in_browser(url: &str) -> Result<(), String> {
     let wide = to_wide(url);
     unsafe {

@@ -11,9 +11,9 @@ use rand::Rng;
 use rodio::{Decoder, OutputStream, Sink};
 use sha2::{Digest, Sha256};
 use std::io::{BufWriter, Write};
-use std::path::Path;
-use std::sync::Arc;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio_tungstenite::{
@@ -77,6 +77,7 @@ pub struct AudiobookCommonOptions<'a> {
     pub rate: i32,
     pub pitch: i32,
     pub volume: i32,
+    pub sapi4_threads: Option<u32>,
 }
 
 pub struct DownloadChunkOptions<'a> {
@@ -1324,6 +1325,19 @@ pub fn start_audiobook(hwnd: HWND) {
     let cleaned = strip_dashed_lines(&text);
     let mut split_parts = audiobook_split;
     let mut marker_parts: Option<Vec<Vec<String>>> = None;
+    let mut sapi4_threads: Option<u32> = None;
+
+    if tts_engine == TtsEngine::Sapi4 {
+        let title = i18n::tr(language, "audiobook.sapi4_threads_title");
+        let body = i18n::tr(language, "audiobook.sapi4_threads_body");
+        if let Some(val_str) = unsafe {
+            crate::app_windows::prompt_window::prompt_user(hwnd, &title, &body, "30", language)
+        } && let Ok(val) = val_str.parse::<u32>()
+        {
+            sapi4_threads = Some(val.clamp(1, 100));
+        }
+    }
+
     if audiobook_split_by_text {
         let (normalized, entries) = collect_marker_entries(
             &cleaned,
@@ -1402,6 +1416,7 @@ pub fn start_audiobook(hwnd: HWND) {
             rate: tts_rate,
             pitch: tts_pitch,
             volume: tts_volume,
+            sapi4_threads,
         };
 
         let result = match tts_engine {
@@ -1519,6 +1534,7 @@ fn run_split_audiobook(
             rate: options.rate,
             pitch: options.pitch,
             volume: options.volume,
+            sapi4_threads: options.sapi4_threads,
         };
 
         run_tts_audiobook_part(part_chunks, &mut current_global_progress, &part_options)?;
@@ -1564,6 +1580,7 @@ fn run_marker_split_audiobook(
             rate: options.rate,
             pitch: options.pitch,
             volume: options.volume,
+            sapi4_threads: options.sapi4_threads,
         };
 
         run_tts_audiobook_part(part_chunks, &mut current_global_progress, &part_options)?;
@@ -1577,21 +1594,22 @@ fn run_split_sapi4_audiobook(
     split_parts: u32,
     options: AudiobookCommonOptions,
 ) -> Result<(), String> {
-    let parts = if split_parts == 0 {
+    let parts_count = if split_parts == 0 {
         1
     } else {
         split_parts as usize
     };
     let total_chunks = chunks.len();
-    let parts = if total_chunks < parts {
+    let parts_count = if total_chunks < parts_count {
         total_chunks
     } else {
-        parts
+        parts_count
     };
-    let chunks_per_part = total_chunks.div_ceil(parts);
+
+    let chunks_per_part = total_chunks.div_ceil(parts_count);
     let mut current_global_progress = 0;
 
-    for part_idx in 0..parts {
+    for part_idx in 0..parts_count {
         let start_idx = part_idx * chunks_per_part;
         let end_idx = std::cmp::min(start_idx + chunks_per_part, total_chunks);
         if start_idx >= end_idx {
@@ -1599,7 +1617,7 @@ fn run_split_sapi4_audiobook(
         }
 
         let part_chunks = &chunks[start_idx..end_idx];
-        let part_output = if parts > 1 {
+        let part_output = if parts_count > 1 {
             let stem = options
                 .output
                 .file_stem()
@@ -1617,48 +1635,24 @@ fn run_split_sapi4_audiobook(
             options.output.to_path_buf()
         };
 
-        let progress_hwnd_clone = options.progress_hwnd;
-        let cancel_clone = options.cancel.clone();
+        let part_options = AudiobookCommonOptions {
+            voice: options.voice,
+            output: &part_output,
+            progress_hwnd: options.progress_hwnd,
+            cancel: options.cancel.clone(),
+            language: options.language,
+            rate: options.rate,
+            pitch: options.pitch,
+            volume: options.volume,
+            sapi4_threads: options.sapi4_threads,
+        };
 
-        crate::sapi4_engine::speak_sapi4_to_file(
+        run_sapi4_parallel_part(
             part_chunks,
             voice_idx,
-            &part_output,
-            crate::sapi4_engine::Sapi4Options {
-                rate: options.rate,
-                pitch: options.pitch,
-                volume: options.volume,
-                cancel: cancel_clone,
-            },
-            |_chunk_idx| {
-                current_global_progress += 1;
-                if progress_hwnd_clone.0 != 0 {
-                    unsafe {
-                        if let Err(e) = PostMessageW(
-                            progress_hwnd_clone,
-                            crate::WM_UPDATE_PROGRESS,
-                            WPARAM(current_global_progress),
-                            LPARAM(0),
-                        ) {
-                            crate::log_debug(&format!("Failed to post WM_UPDATE_PROGRESS: {}", e));
-                        }
-                    }
-                }
-            },
-        )
-        .map_err(|e| {
-            if let Err(rem_err) = std::fs::remove_file(&part_output) {
-                crate::log_debug(&format!(
-                    "Failed to remove part output after error {}: {}",
-                    e, rem_err
-                ));
-            }
-            if e == "Cancelled" {
-                cancelled_message(options.language)
-            } else {
-                e
-            }
-        })?;
+            &mut current_global_progress,
+            &part_options,
+        )?;
     }
     Ok(())
 }
@@ -1668,14 +1662,13 @@ fn run_marker_split_sapi4_audiobook(
     voice_idx: i32,
     options: AudiobookCommonOptions,
 ) -> Result<(), String> {
-    let parts_len = parts.len();
     let mut current_global_progress = 0;
-
     for (part_idx, part_chunks) in parts.iter().enumerate() {
         if part_chunks.is_empty() {
             continue;
         }
-        let part_output = if parts_len > 1 {
+
+        let part_output = if parts.len() > 1 {
             let stem = options
                 .output
                 .file_stem()
@@ -1693,46 +1686,208 @@ fn run_marker_split_sapi4_audiobook(
             options.output.to_path_buf()
         };
 
-        let progress_hwnd_clone = options.progress_hwnd;
-        let cancel_clone = options.cancel.clone();
+        let part_options = AudiobookCommonOptions {
+            voice: options.voice,
+            output: &part_output,
+            progress_hwnd: options.progress_hwnd,
+            cancel: options.cancel.clone(),
+            language: options.language,
+            rate: options.rate,
+            pitch: options.pitch,
+            volume: options.volume,
+            sapi4_threads: options.sapi4_threads,
+        };
 
-        crate::sapi4_engine::speak_sapi4_to_file(
+        run_sapi4_parallel_part(
             part_chunks,
             voice_idx,
-            &part_output,
-            crate::sapi4_engine::Sapi4Options {
-                rate: options.rate,
-                pitch: options.pitch,
-                volume: options.volume,
-                cancel: cancel_clone,
-            },
-            |_chunk_idx| {
-                current_global_progress += 1;
-                if progress_hwnd_clone.0 != 0 {
-                    unsafe {
-                        if let Err(e) = PostMessageW(
-                            progress_hwnd_clone,
-                            crate::WM_UPDATE_PROGRESS,
-                            WPARAM(current_global_progress),
-                            LPARAM(0),
-                        ) {
-                            crate::log_debug(&format!("Failed to post WM_UPDATE_PROGRESS: {}", e));
-                        }
-                    }
+            &mut current_global_progress,
+            &part_options,
+        )?;
+    }
+    Ok(())
+}
+
+fn run_sapi4_parallel_part(
+    chunks: &[String],
+    voice_idx: i32,
+    global_progress: &mut usize,
+    options: &AudiobookCommonOptions,
+) -> Result<(), String> {
+    if chunks.is_empty() {
+        return Ok(());
+    }
+
+    // Parallel processing for chunks within this part
+    let temp_dir = options
+        .output
+        .parent()
+        .unwrap_or(Path::new("."))
+        .join(format!(
+            "sapi4_tmp_{}",
+            options
+                .output
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("part")
+        ));
+    let _ = std::fs::create_dir_all(&temp_dir);
+
+    let mut internal_parts = Vec::new();
+    let pool_size = options.sapi4_threads.unwrap_or(30) as usize;
+    let chunks_count = chunks.len();
+    let sub_parts_count = if chunks_count < pool_size {
+        chunks_count
+    } else {
+        pool_size
+    };
+    let chunks_per_sub = chunks_count.div_ceil(sub_parts_count);
+
+    for i in 0..sub_parts_count {
+        let s = i * chunks_per_sub;
+        let e = std::cmp::min(s + chunks_per_sub, chunks_count);
+        if s >= e {
+            break;
+        }
+        let sub_chunks = chunks[s..e].to_vec();
+        let sub_output = temp_dir.join(format!("sub_{}.wav", i));
+        internal_parts.push((sub_chunks, sub_output));
+    }
+
+    let progress_counter = Arc::new(std::sync::atomic::AtomicUsize::new(*global_progress));
+    let (tx, rx) = std::sync::mpsc::channel::<Result<PathBuf, String>>();
+    let parts_shared = Arc::new(Mutex::new(internal_parts.into_iter()));
+    let mut handles = Vec::new();
+
+    for _ in 0..pool_size {
+        let tx = tx.clone();
+        let parts_shared = parts_shared.clone();
+        let progress_counter = progress_counter.clone();
+        let cancel_token = options.cancel.clone();
+        let (r, p, v) = (options.rate, options.pitch, options.volume);
+        let progress_hwnd = options.progress_hwnd;
+
+        let handle = std::thread::spawn(move || {
+            loop {
+                let part = {
+                    let mut guard = parts_shared.lock().unwrap();
+                    guard.next()
+                };
+                let Some((sub_chunks, sub_output)) = part else {
+                    break;
+                };
+                if cancel_token.load(Ordering::Relaxed) {
+                    break;
                 }
-            },
-        )
-        .map_err(|e| {
-            if let Err(rem_err) = std::fs::remove_file(&part_output) {
-                crate::log_debug(&format!(
-                    "Failed to remove part output after error {}: {}",
-                    e, rem_err
-                ));
+
+                let res = crate::sapi4_engine::speak_sapi4_to_file(
+                    &sub_chunks,
+                    voice_idx,
+                    &sub_output,
+                    crate::sapi4_engine::Sapi4Options {
+                        rate: r,
+                        pitch: p,
+                        volume: v,
+                        cancel: cancel_token.clone(),
+                    },
+                    |_| {
+                        let current = progress_counter.fetch_add(1, Ordering::SeqCst) + 1;
+                        if progress_hwnd.0 != 0 {
+                            unsafe {
+                                let _ = PostMessageW(
+                                    progress_hwnd,
+                                    crate::WM_UPDATE_PROGRESS,
+                                    WPARAM(current),
+                                    LPARAM(0),
+                                );
+                            }
+                        }
+                    },
+                );
+
+                if let Err(e) = res {
+                    let _ = std::fs::remove_file(&sub_output);
+                    let _ = tx.send(Err(e));
+                    break;
+                } else {
+                    let _ = tx.send(Ok(sub_output));
+                }
             }
-            if e == "Cancelled" {
-                cancelled_message(options.language)
+        });
+        handles.push(handle);
+    }
+
+    drop(tx);
+    let mut produced_files: Vec<PathBuf> = Vec::new();
+    let mut error = None;
+    for res in rx {
+        match res {
+            Ok(path) => produced_files.push(path),
+            Err(e) => {
+                if error.is_none() {
+                    error = Some(e);
+                }
+            }
+        }
+    }
+    for h in handles {
+        let _ = h.join();
+    }
+
+    if let Some(e) = error {
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        return Err(if e == "Cancelled" {
+            cancelled_message(options.language)
+        } else {
+            e
+        });
+    }
+
+    produced_files.sort_by_key(|p: &PathBuf| {
+        p.file_stem()
+            .and_then(|s| s.to_str())
+            .and_then(|s| s.strip_prefix("sub_"))
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(0)
+    });
+
+    let result = merge_and_finalize_sapi4_audio(&produced_files, options.output, options.language);
+    let _ = std::fs::remove_dir_all(&temp_dir);
+    *global_progress = progress_counter.load(Ordering::SeqCst);
+    result
+}
+
+fn merge_and_finalize_sapi4_audio(
+    wav_files: &[PathBuf],
+    output: &Path,
+    language: Language,
+) -> Result<(), String> {
+    if wav_files.is_empty() {
+        return Ok(());
+    }
+
+    let is_mp3 = output
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.eq_ignore_ascii_case("mp3"))
+        .unwrap_or(false);
+    let final_wav = if is_mp3 {
+        output.with_extension("wav.tmp")
+    } else {
+        output.to_path_buf()
+    };
+
+    crate::audio_utils::join_wav_files(wav_files, &final_wav)
+        .map_err(|e| format!("Failed to join audio parts: {}", e))?;
+
+    if is_mp3 {
+        let res = crate::mf_encoder::encode_wav_to_mp3(&final_wav, output);
+        let _ = std::fs::remove_file(&final_wav);
+        res.map_err(|e| {
+            if e.contains("Media Foundation") {
+                i18n::tr(language, "sapi5.mf_not_available")
             } else {
-                e
+                i18n::tr_f(language, "sapi5.mf_error", &[("err", &e)])
             }
         })?;
     }

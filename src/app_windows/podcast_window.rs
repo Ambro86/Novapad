@@ -1,5 +1,6 @@
 use crate::accessibility::{handle_accessibility, to_wide};
 use crate::app_windows::podcast_save_window;
+use crate::audio_monitor::{MonitorHandle, start_monitoring};
 // VIDEO REMOVED: MonitorInfo and list_monitors imports removed
 use crate::podcast_recorder::{
     AudioDevice, RecorderConfig, RecorderHandle, RecorderStatus, default_output_folder,
@@ -64,6 +65,7 @@ const PODCAST_ID_LEVEL_SYSTEM: usize = 11018;
 const PODCAST_ID_HINT: usize = 11019;
 const PODCAST_ID_SYSTEM_UNAVAILABLE: usize = 11020;
 const PODCAST_ID_SOURCE: usize = 11025;
+const PODCAST_ID_MONITOR_CHECK: usize = 11026;
 const WM_PODCAST_SAVE_RESULT: u32 = windows::Win32::UI::WindowsAndMessaging::WM_APP + 74;
 
 struct PodcastSaveResult {
@@ -108,6 +110,7 @@ struct PodcastState {
     include_system: HWND,
     system_device: HWND,
     system_gain: HWND,
+    monitor_check: HWND,
     // VIDEO REMOVED: include_video, monitor_combo, video_unavailable_text removed
     format_combo: HWND,
     bitrate_combo: HWND,
@@ -129,6 +132,7 @@ struct PodcastState {
     system_devices: Vec<AudioDevice>,
     // VIDEO REMOVED: monitors removed
     recorder: Option<RecorderHandle>,
+    monitor_handle: Option<MonitorHandle>,
     system_available: bool,
     saving_dialog: HWND,
     save_cancel: Option<Arc<AtomicBool>>,
@@ -141,6 +145,7 @@ struct PodcastLabels {
     controls_group: String,
     status_group: String,
     include_mic: String,
+    monitor_mic: String,
     mic_device: String,
     mic_gain_label: String,
     system_gain_label: String,
@@ -181,6 +186,7 @@ fn labels(language: Language) -> PodcastLabels {
         controls_group: i18n::tr(language, "podcast.group.controls"),
         status_group: i18n::tr(language, "podcast.group.status"),
         include_mic: i18n::tr(language, "podcast.include_mic"),
+        monitor_mic: i18n::tr(language, "podcast.monitor_mic"),
         mic_device: i18n::tr(language, "podcast.mic_device"),
         mic_gain_label: i18n::tr(language, "podcast.mic_gain"),
         system_gain_label: i18n::tr(language, "podcast.system_gain"),
@@ -379,13 +385,28 @@ unsafe extern "system" fn podcast_wndproc(
                 None,
             );
 
+            let monitor_check = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.monitor_mic).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                40,
+                108,
+                220,
+                22,
+                hwnd,
+                HMENU(PODCAST_ID_MONITOR_CHECK as isize),
+                None,
+                None,
+            );
+
             let include_system = CreateWindowExW(
                 Default::default(),
                 WC_BUTTON,
                 PCWSTR(to_wide(&labels.include_system).as_ptr()),
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
                 20,
-                111,
+                135,
                 220,
                 22,
                 hwnd,
@@ -400,7 +421,7 @@ unsafe extern "system" fn podcast_wndproc(
                 PCWSTR(to_wide(&labels.system_device).as_ptr()),
                 WS_CHILD | WS_VISIBLE,
                 40,
-                138,
+                162,
                 180,
                 18,
                 hwnd,
@@ -415,7 +436,7 @@ unsafe extern "system" fn podcast_wndproc(
                 PCWSTR::null(),
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
                 230,
-                134,
+                158,
                 350,
                 200,
                 hwnd,
@@ -430,7 +451,7 @@ unsafe extern "system" fn podcast_wndproc(
                 PCWSTR(to_wide(&labels.system_gain_label).as_ptr()),
                 WS_CHILD | WS_VISIBLE,
                 40,
-                161,
+                185,
                 180,
                 18,
                 hwnd,
@@ -445,7 +466,7 @@ unsafe extern "system" fn podcast_wndproc(
                 PCWSTR::null(),
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
                 230,
-                157,
+                181,
                 140,
                 200,
                 hwnd,
@@ -460,7 +481,7 @@ unsafe extern "system" fn podcast_wndproc(
                 PCWSTR(to_wide(&labels.system_unavailable).as_ptr()),
                 WS_CHILD,
                 40,
-                182,
+                206,
                 540,
                 18,
                 hwnd,
@@ -883,6 +904,7 @@ unsafe extern "system" fn podcast_wndproc(
                 mic_device,
                 label_mic_gain,
                 mic_gain,
+                monitor_check,
                 include_system,
                 label_system,
                 system_device,
@@ -943,6 +965,7 @@ unsafe extern "system" fn podcast_wndproc(
                 include_system,
                 system_device,
                 system_gain,
+                monitor_check,
                 // VIDEO REMOVED: include_video, monitor_combo, video_unavailable_text removed
                 format_combo,
                 bitrate_combo,
@@ -964,6 +987,7 @@ unsafe extern "system" fn podcast_wndproc(
                 system_devices,
                 // VIDEO REMOVED: monitors removed
                 recorder: None,
+                monitor_handle: None,
                 system_available,
                 saving_dialog: HWND(0),
                 save_cancel: None,
@@ -995,10 +1019,61 @@ unsafe extern "system" fn podcast_wndproc(
                     update_source_controls(state);
                     update_recording_controls(state);
                     persist_settings(state);
+                    // Stop monitor if mic is disabled
+                    if !is_checked(state.include_mic) && state.monitor_handle.is_some() {
+                        if let Some(handle) = state.monitor_handle.take() {
+                            handle.stop();
+                        }
+                        SendMessageW(
+                            state.monitor_check,
+                            BM_SETCHECK,
+                            WPARAM(BST_UNCHECKED.0 as usize),
+                            LPARAM(0),
+                        );
+                    }
                     handled = true;
                 }
-                PODCAST_ID_MIC_DEVICE
-                | PODCAST_ID_MIC_GAIN
+                PODCAST_ID_MONITOR_CHECK => {
+                    let checked = is_checked(state.monitor_check);
+                    if checked {
+                        if state.monitor_handle.is_none() {
+                            let device_id = selected_device_id(state, true);
+                            match start_monitoring(device_id) {
+                                Ok(handle) => state.monitor_handle = Some(handle),
+                                Err(e) => {
+                                    SendMessageW(
+                                        state.monitor_check,
+                                        BM_SETCHECK,
+                                        WPARAM(BST_UNCHECKED.0 as usize),
+                                        LPARAM(0),
+                                    );
+                                    unsafe {
+                                        show_error(state.parent, state.language, &e);
+                                    }
+                                }
+                            }
+                        }
+                    } else if let Some(handle) = state.monitor_handle.take() {
+                        handle.stop();
+                    }
+                    handled = true;
+                }
+                PODCAST_ID_MIC_DEVICE => {
+                    if code == CBN_SELCHANGE as u16 {
+                        persist_settings(state);
+                        if state.monitor_handle.is_some() {
+                            if let Some(handle) = state.monitor_handle.take() {
+                                handle.stop();
+                            }
+                            let device_id = selected_device_id(state, true);
+                            if let Ok(handle) = start_monitoring(device_id) {
+                                state.monitor_handle = Some(handle);
+                            }
+                        }
+                    }
+                    handled = true;
+                }
+                PODCAST_ID_MIC_GAIN
                 | PODCAST_ID_SYSTEM_DEVICE
                 | PODCAST_ID_SYSTEM_GAIN
                 | PODCAST_ID_MONITOR => {
@@ -1201,6 +1276,9 @@ unsafe extern "system" fn podcast_wndproc(
         }
         WM_DESTROY => {
             if with_podcast_state(hwnd, |state| {
+                if let Some(handle) = state.monitor_handle.take() {
+                    handle.stop();
+                }
                 if let Some(recorder) = state.recorder.take()
                     && let Err(e) = recorder.stop()
                 {
@@ -1485,6 +1563,7 @@ fn update_source_controls(state: &PodcastState) {
         // VIDEO REMOVED: video_checked removed
         EnableWindow(state.mic_device, mic_checked);
         EnableWindow(state.mic_gain, mic_checked);
+        EnableWindow(state.monitor_check, mic_checked);
         EnableWindow(state.system_device, system_checked);
         EnableWindow(state.system_gain, system_checked);
         // VIDEO REMOVED: monitor_combo removed

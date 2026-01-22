@@ -1,10 +1,12 @@
 use crate::accessibility::{handle_accessibility, to_wide};
+use crate::app_windows::interpreter_select_window;
 use crate::editor_manager::{apply_word_wrap_to_all_edits, update_window_title};
 use crate::settings::{
     Language, ModifiedMarkerPosition, OpenBehavior, TRUSTED_CLIENT_TOKEN, TtsEngine,
     VOICE_LIST_URL, VoiceInfo, save_settings_with_default_copy, sync_context_menu,
 };
 use crate::{i18n, rebuild_menus, refresh_voice_panel, tts_engine, with_state};
+use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::thread;
@@ -12,6 +14,10 @@ use tokio::sync::mpsc;
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::UI::Controls::Dialogs::{
+    GetOpenFileNameW, OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY, OFN_PATHMUSTEXIST,
+    OPENFILENAMEW,
+};
 use windows::Win32::UI::Controls::{
     BST_CHECKED, NMHDR, TCIF_TEXT, TCITEMW, TCM_GETCURSEL, TCM_INSERTITEMW, TCM_SETCURSEL,
     TCN_SELCHANGE, WC_BUTTON, WC_COMBOBOXW, WC_STATIC, WC_TABCONTROLW,
@@ -68,6 +74,9 @@ const OPTIONS_ID_PODCASTINDEX_SECRET: usize = 6036;
 const OPTIONS_ID_PODCASTINDEX_SIGNUP: usize = 6037;
 const OPTIONS_ID_DICTIONARY_TRANSLATION: usize = 6038;
 const OPTIONS_ID_WIKIPEDIA_LANGUAGE: usize = 6040;
+const OPTIONS_ID_INTERPRETER_PATH: usize = 6041;
+const OPTIONS_ID_INTERPRETER_BROWSE: usize = 6042;
+const OPTIONS_ID_INTERPRETER_SEARCH: usize = 6043;
 const OPTIONS_ID_WRAP_WIDTH: usize = 6017;
 const OPTIONS_ID_QUOTE_PREFIX: usize = 6018;
 const OPTIONS_ID_CHECK_UPDATES: usize = 6015;
@@ -196,6 +205,10 @@ struct OptionsDialogState {
     edit_wrap_width: HWND,
     label_quote_prefix: HWND,
     edit_quote_prefix: HWND,
+    label_interpreter_path: HWND,
+    edit_interpreter_path: HWND,
+    button_interpreter_browse: HWND,
+    button_interpreter_search: HWND,
     checkbox_move_cursor: HWND,
     checkbox_check_updates: HWND,
     checkbox_context_menu: HWND,
@@ -231,6 +244,9 @@ struct OptionsLabels {
     label_wikipedia_language: String,
     label_wrap_width: String,
     label_quote_prefix: String,
+    label_interpreter_path: String,
+    label_interpreter_browse: String,
+    label_interpreter_search: String,
     label_move_cursor: String,
     label_check_updates: String,
     label_context_menu: String,
@@ -247,6 +263,7 @@ struct OptionsLabels {
     lang_en: String,
     lang_es: String,
     lang_pt: String,
+    lang_sv: String,
     lang_vi: String,
     marker_position_end: String,
     marker_position_beginning: String,
@@ -312,6 +329,9 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_wikipedia_language: i18n::tr(language, "options.label.wikipedia_language"),
         label_wrap_width: i18n::tr(language, "options.label.wrap_width"),
         label_quote_prefix: i18n::tr(language, "options.label.quote_prefix"),
+        label_interpreter_path: i18n::tr(language, "options.label.interpreter_path"),
+        label_interpreter_browse: i18n::tr(language, "options.button.browse"),
+        label_interpreter_search: i18n::tr(language, "options.button.search_computer"),
         label_move_cursor: i18n::tr(language, "options.label.move_cursor"),
         label_check_updates: i18n::tr(language, "options.label.check_updates"),
         label_context_menu: i18n::tr(language, "options.label.context_menu"),
@@ -331,6 +351,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         lang_en: i18n::tr(language, "options.lang.en"),
         lang_es: i18n::tr(language, "options.lang.es"),
         lang_pt: i18n::tr(language, "options.lang.pt"),
+        lang_sv: i18n::tr(language, "options.lang.sv"),
         lang_vi: i18n::tr(language, "options.lang.vi"),
         marker_position_end: i18n::tr(language, "options.modified_marker_position.end"),
         marker_position_beginning: i18n::tr(language, "options.modified_marker_position.beginning"),
@@ -1305,6 +1326,64 @@ unsafe extern "system" fn options_wndproc(
             );
             y += 30;
 
+            let label_interpreter_path = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_interpreter_path).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let edit_interpreter_path = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                170,
+                y - 2,
+                140,
+                22,
+                hwnd,
+                HMENU(OPTIONS_ID_INTERPRETER_PATH as isize),
+                HINSTANCE(0),
+                None,
+            );
+            let button_interpreter_browse = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_interpreter_browse).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                315,
+                y - 2,
+                70,
+                24,
+                hwnd,
+                HMENU(OPTIONS_ID_INTERPRETER_BROWSE as isize),
+                HINSTANCE(0),
+                None,
+            );
+            let button_interpreter_search = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_interpreter_search).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                390,
+                y - 2,
+                100,
+                24,
+                hwnd,
+                HMENU(OPTIONS_ID_INTERPRETER_SEARCH as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
             let checkbox_move_cursor = CreateWindowExW(
                 Default::default(),
                 WC_BUTTON,
@@ -1465,6 +1544,9 @@ unsafe extern "system" fn options_wndproc(
                 edit_wrap_width,
                 label_quote_prefix,
                 edit_quote_prefix,
+                label_interpreter_path,
+                edit_interpreter_path,
+                button_interpreter_browse,
                 checkbox_move_cursor,
                 checkbox_check_updates,
                 checkbox_context_menu,
@@ -1533,6 +1615,10 @@ unsafe extern "system" fn options_wndproc(
                 edit_wrap_width,
                 label_quote_prefix,
                 edit_quote_prefix,
+                label_interpreter_path,
+                edit_interpreter_path,
+                button_interpreter_browse,
+                button_interpreter_search,
                 checkbox_move_cursor,
                 checkbox_check_updates,
                 checkbox_context_menu,
@@ -1615,6 +1701,14 @@ unsafe extern "system" fn options_wndproc(
                 }
                 OPTIONS_ID_PODCASTINDEX_SIGNUP => {
                     open_podcastindex_signup();
+                    LRESULT(0)
+                }
+                OPTIONS_ID_INTERPRETER_BROWSE => {
+                    browse_for_interpreter(hwnd);
+                    LRESULT(0)
+                }
+                OPTIONS_ID_INTERPRETER_SEARCH => {
+                    search_for_interpreter(hwnd);
                     LRESULT(0)
                 }
                 _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -1756,6 +1850,9 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         edit_wrap_width,
         _label_quote_prefix,
         edit_quote_prefix,
+        _label_interpreter_path,
+        edit_interpreter_path,
+        _button_interpreter_browse,
         checkbox_move_cursor,
         checkbox_check_updates,
         checkbox_context_menu,
@@ -1803,6 +1900,9 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.edit_wrap_width,
             state.label_quote_prefix,
             state.edit_quote_prefix,
+            state.label_interpreter_path,
+            state.edit_interpreter_path,
+            state.button_interpreter_browse,
             state.checkbox_move_cursor,
             state.checkbox_check_updates,
             state.checkbox_context_menu,
@@ -1846,6 +1946,12 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         combo_lang,
         CB_ADDSTRING,
         WPARAM(0),
+        LPARAM(to_wide(&labels.lang_sv).as_ptr() as isize),
+    );
+    SendMessageW(
+        combo_lang,
+        CB_ADDSTRING,
+        WPARAM(0),
         LPARAM(to_wide(&labels.lang_vi).as_ptr() as isize),
     );
     let lang_index = match settings.language {
@@ -1853,7 +1959,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         Language::English => 1,
         Language::Spanish => 2,
         Language::Portuguese => 3,
-        Language::Vietnamese => 4,
+        Language::Swedish => 4,
+        Language::Vietnamese => 5,
     };
     SendMessageW(combo_lang, CB_SETCURSEL, WPARAM(lang_index), LPARAM(0));
 
@@ -2217,6 +2324,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         (labels.lang_en.clone(), "en"),
         (labels.lang_es.clone(), "es"),
         (labels.lang_pt.clone(), "pt"),
+        (labels.lang_sv.clone(), "sv"),
         (labels.lang_vi.clone(), "vi"),
     ];
     let current_dict_lang = settings
@@ -2254,6 +2362,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         (labels.lang_en.clone(), "en"),
         (labels.lang_es.clone(), "es"),
         (labels.lang_pt.clone(), "pt"),
+        (labels.lang_sv.clone(), "sv"),
         (labels.lang_vi.clone(), "vi"),
     ];
     let current_wikipedia_lang = settings.wikipedia_language.trim().to_ascii_lowercase();
@@ -2283,6 +2392,10 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
     if let Err(_e) = SetWindowTextW(
         edit_quote_prefix,
         PCWSTR(to_wide(&settings.quote_prefix).as_ptr()),
+    ) {}
+    if let Err(_e) = SetWindowTextW(
+        edit_interpreter_path,
+        PCWSTR(to_wide(&settings.interpreter_path).as_ptr()),
     ) {}
     SendMessageW(
         checkbox_move_cursor,
@@ -2859,6 +2972,9 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         combo_wikipedia_language,
         edit_wrap_width,
         edit_quote_prefix,
+        edit_interpreter_path,
+        _button_interpreter_browse,
+        _button_interpreter_search,
         checkbox_move_cursor,
         checkbox_check_updates,
         checkbox_context_menu,
@@ -2896,6 +3012,9 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.combo_wikipedia_language,
             state.edit_wrap_width,
             state.edit_quote_prefix,
+            state.edit_interpreter_path,
+            state.button_interpreter_browse,
+            state.button_interpreter_search,
             state.checkbox_move_cursor,
             state.checkbox_check_updates,
             state.checkbox_context_menu,
@@ -2938,7 +3057,8 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         1 => Language::English,
         2 => Language::Spanish,
         3 => Language::Portuguese,
-        4 => Language::Vietnamese,
+        4 => Language::Swedish,
+        5 => Language::Vietnamese,
         _ => Language::Italian,
     };
 
@@ -3099,6 +3219,13 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         let read = GetWindowTextW(edit_quote_prefix, &mut buf);
         let text = String::from_utf16_lossy(&buf[..read as usize]);
         settings.quote_prefix = text;
+    }
+    let interpreter_len = GetWindowTextLengthW(edit_interpreter_path);
+    if interpreter_len >= 0 {
+        let mut buf = vec![0u16; (interpreter_len + 1) as usize];
+        let read = GetWindowTextW(edit_interpreter_path, &mut buf);
+        let text = String::from_utf16_lossy(&buf[..read as usize]);
+        settings.interpreter_path = text;
     }
     settings.move_cursor_during_reading =
         SendMessageW(checkbox_move_cursor, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
@@ -3384,6 +3511,10 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.edit_wrap_width,
             state.label_quote_prefix,
             state.edit_quote_prefix,
+            state.label_interpreter_path,
+            state.edit_interpreter_path,
+            state.button_interpreter_browse,
+            state.button_interpreter_search,
             state.checkbox_move_cursor,
         ] {
             ShowWindow(control, if show_editor { SW_SHOW } else { SW_HIDE });
@@ -3543,4 +3674,100 @@ fn fetch_voice_list() -> Result<Vec<VoiceInfo>, String> {
     }
     results.sort_by(|a, b| a.short_name.cmp(&b.short_name));
     Ok(results)
+}
+
+unsafe fn browse_for_interpreter(hwnd: HWND) {
+    let mut buffer = [0u16; 1024];
+    let filter = to_wide("Executables (*.exe)\0*.exe\0All files (*.*)\0*.*\0\0");
+    let mut ofn = OPENFILENAMEW {
+        lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
+        hwndOwner: hwnd,
+        lpstrFilter: PCWSTR(filter.as_ptr()),
+        lpstrFile: PWSTR(buffer.as_mut_ptr()),
+        nMaxFile: buffer.len() as u32,
+        Flags: OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY,
+        ..Default::default()
+    };
+
+    if GetOpenFileNameW(&mut ofn).as_bool() {
+        let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
+        let path = String::from_utf16_lossy(&buffer[..len]);
+        if let Some(edit) = with_options_state(hwnd, |state| state.edit_interpreter_path) {
+            let _ = SetWindowTextW(edit, PCWSTR(to_wide(&path).as_ptr()));
+        }
+    }
+}
+
+unsafe fn search_for_interpreter(hwnd: HWND) {
+    let query = if let Some(edit) = with_options_state(hwnd, |state| state.edit_interpreter_path) {
+        let len = GetWindowTextLengthW(edit);
+        if len > 0 {
+            let mut buf = vec![0u16; (len + 1) as usize];
+            let read = GetWindowTextW(edit, &mut buf);
+            String::from_utf16_lossy(&buf[..read as usize])
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
+    let parent = with_options_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
+    let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
+
+    if query.trim().is_empty() {
+        let msg = i18n::tr(language, "options.interpreter_search.empty_query");
+        crate::show_info(hwnd, language, &msg);
+        return;
+    }
+
+    // Try both with and without .exe extension
+    let exec_name = if query.to_lowercase().ends_with(".exe") {
+        query.clone()
+    } else {
+        format!("{}.exe", query)
+    };
+
+    let output = Command::new("where").arg(&exec_name).output();
+    let mut paths = match output {
+        Ok(out) if out.status.success() => {
+            let s = String::from_utf8_lossy(&out.stdout);
+            s.lines()
+                .map(|l| l.trim().to_string())
+                .filter(|l| !l.is_empty())
+                .collect::<Vec<_>>()
+        }
+        _ => Vec::new(),
+    };
+
+    // If still no paths, try exact query
+    if paths.is_empty() {
+        let output = Command::new("where").arg(&query).output();
+        if let Ok(out) = output
+            && out.status.success()
+        {
+            let s = String::from_utf8_lossy(&out.stdout);
+            paths = s
+                .lines()
+                .map(|l| l.trim().to_string())
+                .filter(|l| !l.is_empty())
+                .collect::<Vec<_>>();
+        }
+    }
+
+    if paths.is_empty() {
+        let msg = i18n::tr_f(
+            language,
+            "options.interpreter_search.no_results",
+            &[("query", &query)],
+        );
+        crate::show_info(hwnd, language, &msg);
+        return;
+    }
+
+    if let Some(selected) = interpreter_select_window::select_interpreter(hwnd, paths, language)
+        && let Some(edit) = with_options_state(hwnd, |state| state.edit_interpreter_path)
+    {
+        crate::log_if_err!(SetWindowTextW(edit, PCWSTR(to_wide(&selected).as_ptr())));
+    }
 }

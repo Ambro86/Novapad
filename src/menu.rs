@@ -21,6 +21,7 @@ pub const IDM_FILE_EXIT: usize = 1007;
 pub const IDM_FILE_READ_START: usize = 1008;
 pub const IDM_FILE_READ_PAUSE: usize = 1009;
 pub const IDM_FILE_READ_STOP: usize = 1010;
+pub const IDM_FILE_EXECUTE: usize = 1015;
 pub const IDM_FILE_AUDIOBOOK: usize = 1011;
 pub const IDM_FILE_PODCAST: usize = 1012;
 pub const IDM_FILE_BATCH_AUDIOBOOK: usize = 1013;
@@ -145,8 +146,9 @@ pub struct MenuLabels {
     pub file_close: String,
     pub file_close_others: String,
     pub file_recent: String,
-    pub file_read_start: String,
-    pub file_read_pause: String,
+    file_read_start: String,
+    file_execute: String,
+    file_read_pause: String,
     pub file_read_stop: String,
     pub file_audiobook: String,
     pub file_podcast: String,
@@ -231,6 +233,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         file_close_others: i18n::tr(language, "file.close_others"),
         file_recent: i18n::tr(language, "file.recent"),
         file_read_start: i18n::tr(language, "file.read_start"),
+        file_execute: i18n::tr(language, "file.execute"),
         file_read_pause: i18n::tr(language, "file.read_pause"),
         file_read_stop: i18n::tr(language, "file.read_stop"),
         file_audiobook: i18n::tr(language, "file.audiobook"),
@@ -463,6 +466,7 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         IDM_FILE_READ_START,
         &labels.file_read_start,
     );
+    append_menu_string(file_menu, MF_STRING, IDM_FILE_EXECUTE, &labels.file_execute);
     append_menu_string(
         file_menu,
         MF_STRING,

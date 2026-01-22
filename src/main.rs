@@ -87,7 +87,7 @@ use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
 use windows::Win32::UI::Shell::{
     DragAcceptFiles, DragFinish, DragQueryFileW, FileSaveDialog, HDROP, IFileDialog,
     IFileDialogControlEvents, IFileDialogControlEvents_Impl, IFileDialogCustomize,
-    IFileDialogEvents, IFileDialogEvents_Impl, IFileSaveDialog, IShellItem,
+    IFileDialogEvents, IFileDialogEvents_Impl, IFileSaveDialog, IShellItem, ShellExecuteW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     ACCEL, AllowSetForegroundWindow, AppendMenuW, BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX,
@@ -99,18 +99,18 @@ use windows::Win32::UI::WindowsAndMessaging::{
     FCONTROL, FSHIFT, FVIRTKEY, FindWindowW, GWLP_USERDATA, GWLP_WNDPROC, GetClassNameW,
     GetCursorPos, GetForegroundWindow, GetMenu, GetMenuItemCount, GetMessageW, GetParent,
     GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, HACCEL,
-    HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, IDYES, IsChild, IsIconic, IsWindow,
-    KillTimer, LoadCursorW, LoadIconW, MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION,
-    MB_ICONQUESTION, MB_OK, MB_YESNO, MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED,
-    MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, OBJID_CLIENT,
-    PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_RESTORE,
-    SW_SHOW, SW_SHOWMAXIMIZED, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW,
-    SetWindowTextW, ShowWindow, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW,
-    TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY,
-    WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES, WM_INITMENUPOPUP, WM_KEYDOWN,
-    WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SIZE,
-    WM_SYSKEYDOWN, WM_TIMER, WM_UNDO, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN,
-    WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
+    HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, IsChild, IsIconic, IsWindow, KillTimer,
+    LoadCursorW, LoadIconW, MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_OK,
+    MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_GRAYED, MF_POPUP, MF_SEPARATOR,
+    MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW, PostQuitMessage,
+    RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED,
+    SW_SHOWNORMAL, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW,
+    ShowWindow, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage,
+    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE,
+    WM_CUT, WM_DESTROY, WM_DROPFILES, WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL,
+    WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER,
+    WM_UNDO, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW,
+    WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{HSTRING, Interface, PCWSTR, PWSTR, implement, w};
 
@@ -136,7 +136,6 @@ pub const WM_UPDATE_DIALOG: u32 = WM_APP + 80;
 const WM_AUTO_UPDATE_CHECK: u32 = WM_APP + 81;
 const WM_CHECK_PENDING_UPDATE: u32 = WM_APP + 82;
 const WM_SHOW_CHANGELOG: u32 = WM_APP + 83;
-const WM_SHOW_PDF_OCR_PROMPT: u32 = WM_APP + 84;
 const WM_PODCAST_CHAPTERS_READY: u32 = WM_APP + 31;
 const WM_DICTIONARY_LOADED: u32 = WM_APP + 32;
 const FOCUS_EDITOR_TIMER_ID: usize = 1;
@@ -144,6 +143,7 @@ const FOCUS_EDITOR_TIMER_ID2: usize = 2;
 const FOCUS_EDITOR_TIMER_ID3: usize = 3;
 const FOCUS_EDITOR_TIMER_ID4: usize = 4;
 const CHAPTER_ANNOUNCE_TIMER_ID: usize = 5;
+const PDF_OCR_PROMPT_TIMEOUT_COPYDATA_SECS: u64 = 30;
 const COPYDATA_OPEN_FILE: usize = 1;
 const VOICE_PANEL_ID_ENGINE: usize = 21001;
 const VOICE_PANEL_ID_VOICE: usize = 21002;
@@ -248,6 +248,7 @@ struct PdfLoadResult {
     hwnd_edit: HWND,
     path: PathBuf,
     result: Result<PdfTextResult, String>,
+    from_copydata: bool,
 }
 
 pub struct UpdateDialogRequest {
@@ -262,6 +263,7 @@ struct PdfLoadingState {
     timer_id: usize,
     frame: usize,
     start_time: Instant,
+    ocr_timeout_secs: u64,
 }
 
 struct PodcastChaptersReady {
@@ -436,6 +438,7 @@ fn dictionary_cache_key(language: Language, pref: &str, word: &str) -> String {
         Language::English => "en",
         Language::Spanish => "es",
         Language::Portuguese => "pt",
+        Language::Swedish => "sv",
         Language::Vietnamese => "vi",
     };
     format!(
@@ -2629,90 +2632,6 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             handle_pdf_loaded(hwnd, *payload);
             LRESULT(0)
         }
-        WM_SHOW_PDF_OCR_PROMPT => {
-            if lparam.0 == 0 {
-                return LRESULT(0);
-            }
-            let payload = Box::from_raw(lparam.0 as *mut (PathBuf, HWND));
-            let (path, hwnd_edit) = *payload;
-            let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-
-            // Ensure main window is foreground before showing modal
-            unsafe {
-                SetForegroundWindow(hwnd);
-            }
-
-            let msg = i18n::tr(language, "dialog.pdf_no_text_ocr");
-            let title = i18n::tr(language, "dialog.ocr_title");
-
-            // Use wide string conversion compatible with Windows crate
-            let msg_wide = to_wide(&msg);
-            let title_wide = to_wide(&title);
-
-            let response = MessageBoxW(
-                hwnd,
-                PCWSTR(msg_wide.as_ptr()),
-                PCWSTR(title_wide.as_ptr()),
-                MB_YESNO | MB_ICONQUESTION,
-            );
-
-            if response == IDYES {
-                start_pdf_loading_animation(hwnd, hwnd_edit);
-                let hwnd_main = hwnd;
-                let path_clone = path.clone();
-                std::thread::spawn(move || {
-                    let ocr_result = win_ocr::recognize_text_from_pdf(&path_clone, language);
-                    let final_result = match ocr_result {
-                        Ok(text) => Ok(PdfTextResult::Text(text)),
-                        Err(e) => Err(e),
-                    };
-                    let payload = Box::new(PdfLoadResult {
-                        hwnd_edit,
-                        path: path_clone,
-                        result: final_result,
-                    });
-                    unsafe {
-                        let payload_ptr = Box::into_raw(payload);
-                        if let Err(e) = PostMessageW(
-                            hwnd_main,
-                            WM_PDF_LOADED,
-                            WPARAM(0),
-                            LPARAM(payload_ptr as isize),
-                        ) {
-                            crate::log_debug(&format!("Failed to post WM_PDF_LOADED: {}", e));
-                        }
-                    }
-                });
-            } else {
-                let text = i18n::tr(language, "file_handler.pdf_no_text");
-                editor_manager::set_edit_text(hwnd_edit, &text);
-
-                // Re-find index
-                let doc_index = with_state(hwnd, |state| {
-                    state.docs.iter().position(|doc| doc.hwnd_edit == hwnd_edit)
-                })
-                .flatten();
-
-                if let Some(index) = doc_index {
-                    with_state(hwnd, |state| {
-                        goto_first_bookmark(hwnd_edit, &path, &state.bookmarks, FileFormat::Pdf);
-                    });
-                    show_info(hwnd, language, &pdf_loaded_message(language));
-                    let mut update_title = false;
-                    with_state(hwnd, |state| {
-                        if let Some(doc) = state.docs.get_mut(index) {
-                            doc.dirty = false;
-                            update_tab_title(state.hwnd_tab, index, &doc.title, false);
-                            update_title = state.current == index;
-                        }
-                    });
-                    if update_title {
-                        update_window_title(hwnd);
-                    }
-                }
-            }
-            LRESULT(0)
-        }
         WM_TTS_VOICES_LOADED => {
             if lparam.0 == 0 {
                 return LRESULT(0);
@@ -3105,6 +3024,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     tts_engine::start_tts_from_caret(hwnd);
                     LRESULT(0)
                 }
+                IDM_FILE_EXECUTE => {
+                    log_debug("Menu: Execute file");
+                    execute_current_file(hwnd);
+                    LRESULT(0)
+                }
                 IDM_FILE_READ_PAUSE => {
                     log_debug("Menu: Pause/resume reading");
                     tts_engine::toggle_tts_pause(hwnd);
@@ -3478,7 +3402,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 if !joined_paths.is_empty() {
                     for path_str in joined_paths.split('|') {
                         if !path_str.is_empty() {
-                            open_document(hwnd, Path::new(path_str));
+                            editor_manager::open_document_from_copydata(hwnd, Path::new(path_str));
                         }
                     }
                     ShowWindow(hwnd, SW_SHOWMAXIMIZED);
@@ -6034,6 +5958,11 @@ unsafe fn create_accelerators() -> HACCEL {
             cmd: IDM_FILE_READ_START as u16,
         },
         ACCEL {
+            fVirt: FSHIFT | FVIRTKEY,
+            key: VK_F5.0,
+            cmd: IDM_FILE_EXECUTE as u16,
+        },
+        ACCEL {
             fVirt: FVIRTKEY,
             key: VK_F6.0,
             cmd: IDM_FILE_READ_STOP as u16,
@@ -6386,7 +6315,7 @@ where
     }
 }
 
-pub(crate) unsafe fn open_pdf_document_async(hwnd: HWND, path: &Path) {
+pub(crate) unsafe fn open_pdf_document_async(hwnd: HWND, path: &Path, from_copydata: bool) {
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
     let path_buf = path.to_path_buf();
     let title = path
@@ -6424,7 +6353,12 @@ pub(crate) unsafe fn open_pdf_document_async(hwnd: HWND, path: &Path) {
     }
     select_tab(hwnd, new_index);
 
-    start_pdf_loading_animation(hwnd, hwnd_edit);
+    let ocr_timeout_secs = if from_copydata {
+        PDF_OCR_PROMPT_TIMEOUT_COPYDATA_SECS
+    } else {
+        0
+    };
+    start_pdf_loading_animation(hwnd, hwnd_edit, ocr_timeout_secs);
 
     let hwnd_main = hwnd;
     std::thread::spawn(move || {
@@ -6433,6 +6367,44 @@ pub(crate) unsafe fn open_pdf_document_async(hwnd: HWND, path: &Path) {
             hwnd_edit,
             path: path_buf,
             result,
+            from_copydata,
+        });
+        unsafe {
+            let payload_ptr = Box::into_raw(payload);
+            if PostMessageW(
+                hwnd_main,
+                WM_PDF_LOADED,
+                WPARAM(0),
+                LPARAM(payload_ptr as isize),
+            )
+            .is_err()
+            {
+                drop(Box::from_raw(payload_ptr));
+            }
+        }
+    });
+}
+
+unsafe fn start_ocr_for_pdf(
+    hwnd: HWND,
+    hwnd_edit: HWND,
+    path: PathBuf,
+    from_copydata: bool,
+    language: Language,
+) {
+    start_pdf_loading_animation(hwnd, hwnd_edit, 0);
+    let hwnd_main = hwnd;
+    std::thread::spawn(move || {
+        let ocr_result = win_ocr::recognize_text_from_pdf(&path, language);
+        let final_result = match ocr_result {
+            Ok(text) => Ok(PdfTextResult::Text(text)),
+            Err(e) => Err(e),
+        };
+        let payload = Box::new(PdfLoadResult {
+            hwnd_edit,
+            path,
+            result: final_result,
+            from_copydata,
         });
         unsafe {
             let payload_ptr = Box::into_raw(payload);
@@ -6455,6 +6427,7 @@ unsafe fn handle_pdf_loaded(hwnd: HWND, payload: PdfLoadResult) {
         hwnd_edit,
         path,
         result,
+        from_copydata,
     } = payload;
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
 
@@ -6497,21 +6470,7 @@ unsafe fn handle_pdf_loaded(hwnd: HWND, payload: PdfLoadResult) {
             push_recent_file(hwnd, &path);
         }
         Ok(PdfTextResult::NoText) => {
-            let path_clone = path.clone();
-            std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_millis(500));
-                let payload = Box::new((path_clone, hwnd_edit));
-                unsafe {
-                    if let Err(e) = PostMessageW(
-                        hwnd,
-                        WM_SHOW_PDF_OCR_PROMPT,
-                        WPARAM(0),
-                        LPARAM(Box::into_raw(payload) as isize),
-                    ) {
-                        crate::log_debug(&format!("Failed to post WM_SHOW_PDF_OCR_PROMPT: {}", e));
-                    }
-                }
-            });
+            start_ocr_for_pdf(hwnd, hwnd_edit, path, from_copydata, language);
         }
         Err(message) => {
             // Instead of closing the document, show error message as placeholder text
@@ -6537,7 +6496,7 @@ unsafe fn handle_pdf_loaded(hwnd: HWND, payload: PdfLoadResult) {
     }
 }
 
-unsafe fn start_pdf_loading_animation(hwnd: HWND, hwnd_edit: HWND) {
+unsafe fn start_pdf_loading_animation(hwnd: HWND, hwnd_edit: HWND, ocr_timeout_secs: u64) {
     let timer_id = with_state(hwnd, |state| {
         let timer_id = state.next_timer_id;
         state.next_timer_id = state.next_timer_id.saturating_add(1);
@@ -6546,6 +6505,7 @@ unsafe fn start_pdf_loading_animation(hwnd: HWND, hwnd_edit: HWND) {
             timer_id,
             frame: 0,
             start_time: Instant::now(),
+            ocr_timeout_secs,
         });
         timer_id
     })
@@ -6587,66 +6547,29 @@ unsafe fn handle_pdf_loading_timer(hwnd: HWND, timer_id: usize) {
             .find(|entry| entry.timer_id == timer_id)
         {
             entry.frame = entry.frame.wrapping_add(1);
-            if entry.start_time.elapsed().as_secs() >= 15 {
+            let timeout_secs = entry.ocr_timeout_secs;
+            if timeout_secs == 0 || entry.start_time.elapsed().as_secs() >= timeout_secs {
                 should_timeout = true;
             }
-            target = Some((entry.hwnd_edit, entry.frame));
+            target = Some((entry.hwnd_edit, entry.frame, timeout_secs));
         }
     });
 
-    if should_timeout && let Some((hwnd_edit, _)) = target {
+    if should_timeout && let Some((hwnd_edit, _, timeout_secs)) = target {
         stop_pdf_loading_animation(hwnd, hwnd_edit);
         let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-        let msg = format!(
-            "{}\n\n{}",
-            i18n::tr(language, "app.pdf_error_hint"),
-            i18n::tr(language, "dialog.pdf_no_text_ocr")
-        );
-        let title = i18n::tr(language, "dialog.ocr_title");
-        let response = MessageBoxW(
-            hwnd,
-            PCWSTR(to_wide(&msg).as_ptr()),
-            PCWSTR(to_wide(&title).as_ptr()),
-            MB_YESNO | MB_ICONQUESTION,
-        );
+        let from_copydata = timeout_secs != 0;
+        let path = with_state(hwnd, |state| {
+            state
+                .docs
+                .iter()
+                .find(|d| d.hwnd_edit == hwnd_edit)
+                .and_then(|d| d.path.clone())
+        })
+        .flatten();
 
-        if response == IDYES {
-            let path = with_state(hwnd, |state| {
-                state
-                    .docs
-                    .iter()
-                    .find(|d| d.hwnd_edit == hwnd_edit)
-                    .and_then(|d| d.path.clone())
-            })
-            .flatten();
-
-            if let Some(path) = path {
-                start_pdf_loading_animation(hwnd, hwnd_edit);
-                let hwnd_main = hwnd;
-                std::thread::spawn(move || {
-                    let ocr_result = win_ocr::recognize_text_from_pdf(&path, language);
-                    let final_result = match ocr_result {
-                        Ok(text) => Ok(PdfTextResult::Text(text)),
-                        Err(e) => Err(e),
-                    };
-                    let payload = Box::new(PdfLoadResult {
-                        hwnd_edit,
-                        path,
-                        result: final_result,
-                    });
-                    unsafe {
-                        let payload_ptr = Box::into_raw(payload);
-                        if let Err(e) = PostMessageW(
-                            hwnd_main,
-                            WM_PDF_LOADED,
-                            WPARAM(0),
-                            LPARAM(payload_ptr as isize),
-                        ) {
-                            crate::log_debug(&format!("Failed to post WM_PDF_LOADED: {}", e));
-                        }
-                    }
-                });
-            }
+        if let Some(path) = path {
+            start_ocr_for_pdf(hwnd, hwnd_edit, path, from_copydata, language);
         } else {
             let err = i18n::tr(language, "app.pdf_error_hint");
             editor_manager::set_edit_text(hwnd_edit, &err);
@@ -6654,7 +6577,7 @@ unsafe fn handle_pdf_loading_timer(hwnd: HWND, timer_id: usize) {
         return;
     }
 
-    if let Some((hwnd_edit, frame)) = target {
+    if let Some((hwnd_edit, frame, _)) = target {
         editor_manager::set_edit_text(hwnd_edit, &pdf_loading_placeholder(frame));
     }
 }
@@ -6704,6 +6627,91 @@ unsafe fn next_tab_with_prompt(hwnd: HWND) {
     }
     let next = (current + 1) % count;
     select_tab(hwnd, next);
+}
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
+}
+
+fn suggest_extension_for_interpreter(interpreter: &str) -> &'static str {
+    let lower = interpreter.to_lowercase();
+    if lower.contains("python") || lower.ends_with("py.exe") || lower.ends_with("py") {
+        "py"
+    } else if lower.contains("java") {
+        "java"
+    } else if lower.contains("node") {
+        "js"
+    } else if lower.contains("ruby") {
+        "rb"
+    } else if lower.contains("perl") {
+        "pl"
+    } else if lower.contains("php") {
+        "php"
+    } else if lower.contains("lua") {
+        "lua"
+    } else if lower.contains("htm") || lower.contains("html") {
+        "html"
+    } else if lower.contains("powershell") || lower.contains("pwsh") {
+        "ps1"
+    } else if lower.contains("bash") || lower.contains("sh.exe") || lower == "sh" {
+        "sh"
+    } else {
+        "txt"
+    }
+}
+
+unsafe fn execute_current_file(hwnd: HWND) {
+    let (path, content, interpreter) = match with_state(hwnd, |state| {
+        let doc = state.docs.get(state.current)?;
+        let path = doc.path.clone();
+        let hwnd_edit = doc.hwnd_edit;
+        let content = editor_manager::get_edit_text(hwnd_edit);
+        let interpreter = state.settings.interpreter_path.clone();
+        Some((path, content, interpreter))
+    }) {
+        Some(Some(v)) => v,
+        _ => return,
+    };
+
+    let (exec_path, working_dir) = if let Some(p) = path {
+        let dir = p.parent().map(|d| d.to_path_buf());
+        (p, dir)
+    } else {
+        // Not saved: create temp file
+        let ext = suggest_extension_for_interpreter(&interpreter);
+        let temp_dir = std::env::temp_dir();
+        let temp_file = temp_dir.join(format!("novapad_exec_{}.{}", now_ms(), ext));
+        if let Err(e) = std::fs::write(&temp_file, content) {
+            log_debug(&format!("Failed to write temp file for execution: {}", e));
+            return;
+        }
+        (temp_file, Some(temp_dir))
+    };
+
+    let extension = exec_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    if extension == "html" || extension == "htm" {
+        unsafe {
+            let _ = ShellExecuteW(
+                hwnd,
+                w!("open"),
+                PCWSTR(to_wide(&exec_path.to_string_lossy()).as_ptr()),
+                PCWSTR::null(),
+                PCWSTR::null(),
+                SW_SHOWNORMAL,
+            );
+        }
+        return;
+    }
+
+    let command = format!("\"{}\" \"{}\"", interpreter, exec_path.to_string_lossy());
+    app_windows::prompt_window::open_with_command(hwnd, Some(command), working_dir);
 }
 
 unsafe fn attempt_switch_to_selected_tab(hwnd: HWND) {

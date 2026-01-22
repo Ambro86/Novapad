@@ -1947,10 +1947,11 @@ pub unsafe fn new_document(hwnd: HWND) {
     select_tab(hwnd, new_index);
 }
 
-pub unsafe fn open_document_with_encoding(
+unsafe fn open_document_with_encoding_internal(
     hwnd: HWND,
     path: &Path,
     user_encoding: Option<TextEncoding>,
+    from_copydata: bool,
 ) {
     log_debug(&format!(
         "Open document: {} (encoding: {:?})",
@@ -1960,7 +1961,7 @@ pub unsafe fn open_document_with_encoding(
 
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
     if is_pdf_path(path) {
-        crate::open_pdf_document_async(hwnd, path);
+        crate::open_pdf_document_async(hwnd, path, from_copydata);
         return;
     }
     let (content, format, opened_text_encoding) = if is_docx_path(path) {
@@ -2097,8 +2098,28 @@ pub unsafe fn open_document_with_encoding(
     crate::push_recent_file(hwnd, path);
 }
 
+pub unsafe fn open_document_with_encoding(
+    hwnd: HWND,
+    path: &Path,
+    user_encoding: Option<TextEncoding>,
+) {
+    open_document_with_encoding_internal(hwnd, path, user_encoding, false);
+}
+
+pub unsafe fn open_document_with_encoding_from_copydata(
+    hwnd: HWND,
+    path: &Path,
+    user_encoding: Option<TextEncoding>,
+) {
+    open_document_with_encoding_internal(hwnd, path, user_encoding, true);
+}
+
 pub unsafe fn open_document(hwnd: HWND, path: &Path) {
     open_document_with_encoding(hwnd, path, None);
+}
+
+pub unsafe fn open_document_from_copydata(hwnd: HWND, path: &Path) {
+    open_document_with_encoding_from_copydata(hwnd, path, None);
 }
 
 pub unsafe fn mark_current_document_from_rss(hwnd: HWND, from_rss: bool) {

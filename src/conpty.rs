@@ -16,6 +16,8 @@ use windows::Win32::System::Threading::{
 };
 use windows::core::{PCWSTR, PWSTR};
 
+use std::path::Path;
+
 pub struct ConPtySession {
     hpc: HPCON,
     input_write: HANDLE,
@@ -29,7 +31,12 @@ pub struct ConPtySpawn {
 }
 
 impl ConPtySession {
-    pub fn spawn(command: &str, cols: i16, rows: i16) -> windows::core::Result<ConPtySpawn> {
+    pub fn spawn(
+        command: &str,
+        cols: i16,
+        rows: i16,
+        working_dir: Option<&Path>,
+    ) -> windows::core::Result<ConPtySpawn> {
         let mut input_read = HANDLE(0);
         let mut input_write = HANDLE(0);
         unsafe {
@@ -37,8 +44,11 @@ impl ConPtySession {
         }
 
         log_debug(&format!(
-            "ConPty: spawn() called with command: {}, cols: {}, rows: {}",
-            command, cols, rows
+            "ConPty: spawn() called with command: {}, cols: {}, rows: {}, dir: {:?}",
+            command,
+            cols,
+            rows,
+            working_dir.map(|p| p.display())
         ));
 
         let mut output_read = HANDLE(0);
@@ -110,6 +120,13 @@ impl ConPtySession {
         let mut cmdline = to_wide(command);
         let mut proc_info = PROCESS_INFORMATION::default();
         let flags = EXTENDED_STARTUPINFO_PRESENT | CREATE_NEW_PROCESS_GROUP;
+
+        let working_dir_wide = working_dir.map(|p| to_wide(&p.to_string_lossy()));
+        let lp_current_directory = working_dir_wide
+            .as_ref()
+            .map(|v| PCWSTR(v.as_ptr()))
+            .unwrap_or(PCWSTR::null());
+
         if let Err(err) = unsafe {
             CreateProcessW(
                 PCWSTR::null(),
@@ -119,7 +136,7 @@ impl ConPtySession {
                 true,
                 flags,
                 None,
-                None,
+                lp_current_directory,
                 &si_ex.StartupInfo,
                 &mut proc_info,
             )

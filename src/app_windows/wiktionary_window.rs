@@ -62,6 +62,7 @@ fn dictionary_cache_key(language: Language, pref: &str, word: &str) -> String {
         Language::English => "en",
         Language::Spanish => "es",
         Language::Portuguese => "pt",
+        Language::Swedish => "sv",
         Language::Vietnamese => "vi",
     };
     format!(

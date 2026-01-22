@@ -24,6 +24,34 @@ const DONATIONS_IT: &str = include_str!("../../donations_it.txt");
 const DONATIONS_EN: &str = include_str!("../../donations_en.txt");
 const DONATIONS_ES: &str = include_str!("../../donations_es.txt");
 const DONATIONS_PT: &str = include_str!("../../donations_pt.txt");
+const DONATIONS_SV: &str = include_str!("../../donations_sv.txt");
+
+fn read_override_text(file_name: &str) -> Option<String> {
+    let exe_path = match std::env::current_exe() {
+        Ok(path) => path,
+        Err(err) => {
+            crate::log_debug(&format!("Help content: failed to resolve exe path: {err}"));
+            return None;
+        }
+    };
+    let Some(dir) = exe_path.parent() else {
+        crate::log_debug("Help content: exe path has no parent directory");
+        return None;
+    };
+    let path = dir.join(file_name);
+    if !path.exists() {
+        return None;
+    }
+    match std::fs::read_to_string(&path) {
+        Ok(content) => Some(content),
+        Err(err) => {
+            crate::log_debug(&format!(
+                "Help content: failed to read override {file_name}: {err}"
+            ));
+            None
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 enum HelpWindowKind {
@@ -209,6 +237,8 @@ unsafe extern "system" fn help_wndproc(
                     Language::English => include_str!("../../guida_en.txt").to_string(),
                     Language::Spanish => include_str!("../../guida_es.txt").to_string(),
                     Language::Portuguese => include_str!("../../guida_pt.txt").to_string(),
+                    Language::Swedish => read_override_text("guida_sv.txt")
+                        .unwrap_or_else(|| include_str!("../../guida_sv.txt").to_string()),
                     Language::Vietnamese => include_str!("../../guida_vi.txt").to_string(),
                 },
                 HelpWindowKind::Changelog => match init.language {
@@ -216,6 +246,7 @@ unsafe extern "system" fn help_wndproc(
                     Language::English => include_str!("../../CHANGELOG.md").to_string(),
                     Language::Spanish => include_str!("../../CHANGELOG_ES.md").to_string(),
                     Language::Portuguese => include_str!("../../CHANGELOG_PT.md").to_string(),
+                    Language::Swedish => include_str!("../../CHANGELOG.md").to_string(),
                     Language::Vietnamese => include_str!("../../CHANGELOG_VI.md").to_string(),
                 },
                 HelpWindowKind::Donations => donations_content(init.language),
@@ -349,6 +380,9 @@ fn donations_content(language: Language) -> String {
         Language::English => DONATIONS_EN.to_string(),
         Language::Spanish => DONATIONS_ES.to_string(),
         Language::Portuguese => DONATIONS_PT.to_string(),
+        Language::Swedish => {
+            read_override_text("donations_sv.txt").unwrap_or_else(|| DONATIONS_SV.to_string())
+        }
         Language::Vietnamese => DONATIONS_EN.to_string(),
     }
 }

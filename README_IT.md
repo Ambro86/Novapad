@@ -69,7 +69,7 @@ oltre alla **registrazione podcast da microfono e audio di sistema**.
 - **Importazione trascrizioni YouTube**
   - Importa le trascrizioni con selezione lingua e timestamp opzionali.
 - **Localizzazione**
-  - Italiano, inglese, spagnolo, portoghese.
+  - Italiano, inglese, spagnolo, portoghese, svedese.
 - **Tecnologia moderna**
   Scritto in Rust per garantire sicurezza, affidabilità e ottime prestazioni.
 

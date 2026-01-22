@@ -960,7 +960,7 @@ pub enum SortOrder {
 pub fn sort_rss_sources(settings: &mut AppSettings, order: SortOrder) {
     settings.rss_sources.sort_by(|a, b| match order {
         SortOrder::TitleAsc => {
-            let ta = if a.user_title { &a.title } else { &a.title }; // Logic to prefer user title or fallback is already in title usually
+            let ta = &a.title;
             let tb = &b.title;
             ta.to_lowercase().cmp(&tb.to_lowercase())
         }

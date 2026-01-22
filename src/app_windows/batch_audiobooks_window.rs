@@ -1870,6 +1870,7 @@ fn export_parts(
                     rate: tts.tts_rate,
                     pitch: tts.tts_pitch,
                     volume: tts.tts_volume,
+                    sapi4_threads: None,
                 };
                 run_tts_audiobook_part(part_chunks, &mut progress, &options)?;
             }

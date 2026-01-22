@@ -1633,20 +1633,15 @@ fn speak_to_file(
         // OTTIMIZZAZIONE: prova non-real-time SOLO in registrazione
         // (non cambia la velocità del parlato, cambia il modo di output/buffering)
         // =========================
-        let hr_rt0 = (audio_vtbl.real_time_set)(audio_file_ptr.as_ptr(), 0);
-        if !hr_ok(hr_rt0) {
-            // fallback al comportamento precedente
-            let hr_rt = (audio_vtbl.real_time_set)(audio_file_ptr.as_ptr(), 0x100);
-            if !hr_ok(hr_rt) {
-                eprintln!("AudioFile RealTimeSet failed: {:#x} / fallback {:#x}", hr_rt0, hr_rt);
-            }
-        }
+        // =========================
+        // OTTIMIZZAZIONE: prova non-real-time
+        // =========================
+        let _ = (audio_vtbl.real_time_set)(audio_file_ptr.as_ptr(), 0);
 
         let audio_unknown = audio_file_ptr.as_ptr() as *mut IUnknown;
         let (_enum_ptr, central_ptr) = init_central_with_audio(target_idx, audio_unknown)?;
         let central_vtbl = &*(*central_ptr.as_ptr()).lpVtbl;
 
-        // NON cambiamo “velocità parlato” oltre ai parametri utente
         apply_tts_attributes(central_ptr.as_ptr(), rate, pitch, volume);
 
         let state = Arc::new(SpeakState::new());
@@ -1670,9 +1665,6 @@ fn speak_to_file(
             &mut reg_key,
         );
         let registered = hr_ok(hr_reg_tts);
-        if !registered {
-            eprintln!("ITTSCentral Register failed: {:#x}", hr_reg_tts);
-        }
 
         // --- AudioFile notify sink ---
         let af_sink_box = Box::new(IAudioFileNotifySink {
@@ -1685,26 +1677,17 @@ fn speak_to_file(
             .ok_or_else(|| "Failed to create audiofile notify sink".to_string())?;
         af_handle.add_ref();
 
-        let hr_reg_af = (audio_vtbl.register)(audio_file_ptr.as_ptr(), af_handle.as_void_ptr());
-        if !hr_ok(hr_reg_af) {
-            eprintln!("AudioFile Register failed: {:#x}", hr_reg_af);
-        }
+        let _ = (audio_vtbl.register)(audio_file_ptr.as_ptr(), af_handle.as_void_ptr());
 
         // =========================
         // READ TEXT
         // =========================
         let mut text = String::new();
-        match io::stdin().read_to_string(&mut text) {
-            Ok(_) => {}
-            Err(e) => eprintln!("Failed to read text from stdin: {}", e),
-        }
+        let _ = io::stdin().read_to_string(&mut text);
 
         if text.is_empty() {
             if registered {
-                let hr_un = (central_vtbl.un_register)(central_ptr.as_ptr(), reg_key);
-                if !hr_ok(hr_un) {
-                    eprintln!("UnRegister failed: {:#x}", hr_un);
-                }
+                let _ = (central_vtbl.un_register)(central_ptr.as_ptr(), reg_key);
             }
             tts_handle.release();
             af_handle.release();
@@ -1713,36 +1696,21 @@ fn speak_to_file(
             return Ok(());
         }
 
-        // =========================
-        // OTTIMIZZAZIONE: CHUNKING
-        // =========================
-        // Nota: non accelera oltre realtime se la voce è realtime,
-        // ma riduce overhead e “buchi” tra blocchi.
         let cleaned = sanitize_text_for_u16c(&text);
+        let chunks = split_text_for_recording(&cleaned, 8000); // Chunks più grandi per meno overhead
 
-        // 3500 è un buon compromesso; puoi provare 2000..8000
-        let chunks = split_text_for_recording(&cleaned, 3500);
-
-        // Metti tutto in coda come U16CString (così la memoria resta viva finché serve)
         for ch in chunks {
-            match U16CString::from_str(&ch) {
-                Ok(u16c) => enqueue_text(&state, u16c),
-                Err(_) => eprintln!("Skipped a chunk due to interior NUL"),
+            if let Ok(u16c) = U16CString::from_str(&ch) {
+                enqueue_text(&state, u16c);
             }
         }
 
-        // avvia il primo chunk
-        state.mark_done(); // per permettere try_start_next...
-        try_start_next_recording_chunk(
-            central_ptr.as_ptr(),
-            &state,
-            TTSDATAFLAG_TAGGED,
-        );
+        state.mark_done(); 
+        try_start_next_recording_chunk(central_ptr.as_ptr(), &state, TTSDATAFLAG_TAGGED);
 
-        // Pump finché la coda è vuota e siamo done
         let mut msg: MSG = std::mem::zeroed();
         let start_wait = std::time::Instant::now();
-        let timeout = std::time::Duration::from_secs(60 * 60); // 1h (audiolibri lunghi)
+        let timeout = std::time::Duration::from_secs(60 * 60);
 
         loop {
             while PeekMessageW(&mut msg, ptr::null_mut(), 0, 0, PM_REMOVE) != 0 {
@@ -1750,48 +1718,24 @@ fn speak_to_file(
                 DispatchMessageW(&msg);
             }
 
-            // se finito un chunk, parte il prossimo
-            try_start_next_recording_chunk(
-                central_ptr.as_ptr(),
-                &state,
-                TTSDATAFLAG_TAGGED,
-            );
+            try_start_next_recording_chunk(central_ptr.as_ptr(), &state, TTSDATAFLAG_TAGGED);
 
-            // condizione uscita: done e queue vuota e nessun current_text
-            let done = state.done.load(Ordering::Acquire);
-
-            let queue_empty = {
-                let q = match state.queue.lock() {
-                    Ok(g) => g,
-                    Err(poisoned) => poisoned.into_inner(),
-                };
-                q.is_empty()
-            };
-
-            let no_current = {
-                let cur = match state.current_text.lock() {
-                    Ok(g) => g,
-                    Err(poisoned) => poisoned.into_inner(),
-                };
-                cur.is_none()
-            };
-
-            if done && queue_empty && no_current {
-                break;
+            if state.done.load(Ordering::Acquire) {
+                let queue_empty = state.queue.lock().map(|q| q.is_empty()).unwrap_or(true);
+                let no_current = state.current_text.lock().map(|c| c.is_none()).unwrap_or(true);
+                if queue_empty && no_current {
+                    break;
+                }
             }
 
             if start_wait.elapsed() >= timeout {
-                eprintln!("Recording timeout reached");
                 break;
             }
-
-            std::thread::sleep(std::time::Duration::from_millis(2));
+            // Ridotto lo sleep per non frenare l'engine se è veloce
+            std::thread::sleep(std::time::Duration::from_millis(1));
         }
 
-        let hr_flush = (audio_vtbl.flush)(audio_file_ptr.as_ptr());
-        if !hr_ok(hr_flush) {
-            eprintln!("AudioFile Flush failed: {:#x}", hr_flush);
-        }
+        let _ = (audio_vtbl.flush)(audio_file_ptr.as_ptr());
 
         if registered {
             let hr_un = (central_vtbl.un_register)(central_ptr.as_ptr(), reg_key);

@@ -19,7 +19,8 @@ use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use windows::Win32::UI::WindowsAndMessaging::{
     BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, CreateWindowExW, GetClientRect, GetParent,
     GetWindowRect, HMENU, MB_ICONWARNING, MB_OK, MessageBoxW, SWP_NOMOVE, SWP_NOZORDER,
-    SendMessageW, SetWindowPos, WINDOW_STYLE, WM_COMMAND, WM_INITDIALOG, WM_SETFONT,
+    SendMessageW, SetWindowPos, WINDOW_STYLE, WM_COMMAND, WM_GETTEXTLENGTH, WM_INITDIALOG,
+    WM_SETFONT,
 };
 use windows::core::{PCWSTR, PWSTR};
 
@@ -291,13 +292,14 @@ pub unsafe fn find_next(
     );
 
     let down = (flags & FR_DOWN) != FINDREPLACE_FLAGS(0);
+    let wide_search = to_wide(search);
 
     let mut ft = FINDTEXTEXW {
         chrg: CHARRANGE {
             cpMin: if down { cr.cpMax } else { cr.cpMin },
             cpMax: if down { -1 } else { 0 },
         },
-        lpstrText: PCWSTR(to_wide(search).as_ptr()),
+        lpstrText: PCWSTR(wide_search.as_ptr()),
         chrgText: CHARRANGE { cpMin: 0, cpMax: 0 },
     };
 
@@ -323,7 +325,8 @@ pub unsafe fn find_next(
     }
 
     if wrap {
-        ft.chrg.cpMin = if down { 0 } else { -1 };
+        let text_len = SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as i32;
+        ft.chrg.cpMin = if down { 0 } else { text_len };
         ft.chrg.cpMax = if down { -1 } else { 0 };
         let result = SendMessageW(
             hwnd_edit,
@@ -425,6 +428,7 @@ pub unsafe fn replace_all(
     let mut start = 0i32;
     let mut count = 0usize;
     let replace_wide = to_wide(replace);
+    let search_wide = to_wide(search);
 
     loop {
         let mut ft = FINDTEXTEXW {
@@ -432,7 +436,7 @@ pub unsafe fn replace_all(
                 cpMin: start,
                 cpMax: -1,
             },
-            lpstrText: PCWSTR(to_wide(search).as_ptr()),
+            lpstrText: PCWSTR(search_wide.as_ptr()),
             chrgText: CHARRANGE { cpMin: 0, cpMax: 0 },
         };
 
@@ -1086,6 +1090,7 @@ unsafe fn replace_all_in_range(
     let mut end = end_utf16;
     let mut count = 0usize;
     let replace_wide = to_wide(replace);
+    let search_wide = to_wide(search);
     let replace_len = replace.chars().map(|c| c.len_utf16() as i32).sum::<i32>();
 
     loop {
@@ -1094,7 +1099,7 @@ unsafe fn replace_all_in_range(
                 cpMin: start,
                 cpMax: end,
             },
-            lpstrText: PCWSTR(to_wide(search).as_ptr()),
+            lpstrText: PCWSTR(search_wide.as_ptr()),
             chrgText: CHARRANGE { cpMin: 0, cpMax: 0 },
         };
         let res = SendMessageW(

@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use windows::Win32::Foundation::{HANDLE, HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
-use windows::Win32::Graphics::Gdi::{GetDC, GetTextMetricsW, ReleaseDC, TEXTMETRICW};
+use windows::Win32::Graphics::Gdi::{GetDC, GetTextMetricsW, HFONT, ReleaseDC, TEXTMETRICW};
 use windows::Win32::Storage::FileSystem::ReadFile;
 use windows::Win32::System::DataExchange::{
     CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
@@ -27,10 +27,11 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, CreateWindowExW, DefWindowProcW, DestroyWindow,
-    ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_READONLY, GetClientRect, GetParent,
-    GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, KillTimer,
-    LoadCursorW, MB_ICONQUESTION, MB_OKCANCEL, MESSAGEBOX_STYLE, MSG, MessageBoxW, PostMessageW,
-    RegisterClassW, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW,
+    DispatchMessageW, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_READONLY, GWLP_USERDATA,
+    GetClientRect, GetMessageW, GetParent, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW,
+    HMENU, IDC_ARROW, IsWindow, KillTimer, LoadCursorW, MB_ICONQUESTION, MB_OKCANCEL,
+    MESSAGEBOX_STYLE, MSG, MessageBoxW, PostMessageW, RegisterClassW, SendMessageW,
+    SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, TranslateMessage,
     WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY,
     WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD,
     WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SIZEBOX, WS_SYSMENU, WS_TABSTOP,
@@ -228,6 +229,235 @@ fn prompt_labels(language: Language) -> PromptLabels {
         beep_on_idle: i18n::tr(language, "prompt.beep_on_idle"),
         prevent_sleep: i18n::tr(language, "prompt.prevent_sleep"),
         clear_confirm: i18n::tr(language, "prompt.clear_confirm"),
+    }
+}
+
+pub unsafe fn prompt_user(
+    parent: HWND,
+    title: &str,
+    body: &str,
+    default_val: &str,
+    _language: Language,
+) -> Option<String> {
+    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+    let class_name = to_wide("NovapadSimplePrompt");
+
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        let wc = WNDCLASSW {
+            hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+                LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
+            ),
+            hInstance: hinstance,
+            lpszClassName: PCWSTR(class_name.as_ptr()),
+            lpfnWndProc: Some(simple_prompt_wndproc),
+            ..Default::default()
+        };
+        RegisterClassW(&wc);
+    });
+
+    let mut data = SimplePromptData {
+        body: body.to_string(),
+        value: default_val.to_string(),
+        confirmed: false,
+    };
+
+    let hwnd = CreateWindowExW(
+        WS_EX_DLGMODALFRAME,
+        PCWSTR(class_name.as_ptr()),
+        PCWSTR(to_wide(title).as_ptr()),
+        WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+        200,
+        200,
+        400,
+        220,
+        parent,
+        HMENU(0),
+        hinstance,
+        Some(&mut data as *mut _ as *const std::ffi::c_void),
+    );
+
+    if hwnd.0 == 0 {
+        return None;
+    }
+
+    windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow(parent, false);
+
+    let mut msg = MSG::default();
+    while IsWindow(hwnd).as_bool() && GetMessageW(&mut msg, HWND(0), 0, 0).into() {
+        TranslateMessage(&msg);
+        DispatchMessageW(&msg);
+    }
+
+    windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow(parent, true);
+    SetForegroundWindow(parent);
+
+    if data.confirmed {
+        Some(data.value)
+    } else {
+        None
+    }
+}
+
+struct SimplePromptData {
+    body: String,
+    value: String,
+    confirmed: bool,
+}
+
+unsafe extern "system" fn simple_prompt_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    match msg {
+        WM_CREATE => {
+            let create_struct =
+                lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
+            let data_ptr = (*create_struct).lpCreateParams as *mut SimplePromptData;
+            SetWindowLongPtrW(hwnd, GWLP_USERDATA, data_ptr as isize);
+
+            let data = &*data_ptr;
+            let hfont = HFONT(
+                windows::Win32::Graphics::Gdi::GetStockObject(
+                    windows::Win32::Graphics::Gdi::DEFAULT_GUI_FONT,
+                )
+                .0,
+            );
+
+            // Get language from parent or default
+            let parent = GetParent(hwnd);
+            let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
+
+            let _label = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&data.body).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                20,
+                350,
+                60,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+
+            let edit = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_EDIT,
+                PCWSTR(to_wide(&data.value).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                20,
+                90,
+                345,
+                24,
+                hwnd,
+                HMENU(101),
+                HINSTANCE(0),
+                None,
+            );
+
+            let ok = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&i18n::tr(language, "options.ok")).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                180,
+                135,
+                80,
+                28,
+                hwnd,
+                HMENU(1),
+                HINSTANCE(0),
+                None,
+            );
+
+            let cancel = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&i18n::tr(language, "options.cancel")).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                270,
+                135,
+                95,
+                28,
+                hwnd,
+                HMENU(2),
+                HINSTANCE(0),
+                None,
+            );
+
+            if hfont.0 != 0 {
+                SendMessageW(_label, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                SendMessageW(edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                SendMessageW(ok, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                SendMessageW(cancel, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+            }
+
+            SetFocus(edit);
+            SendMessageW(edit, 0x00B1, WPARAM(0), LPARAM(-1)); // EM_SETSEL: select all
+
+            LRESULT(0)
+        }
+        WM_COMMAND => {
+            let id = wparam.0 & 0xffff;
+            if id == 1 {
+                // OK
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut SimplePromptData;
+                if !ptr.is_null() {
+                    let data = &mut *ptr;
+                    let edit = windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, 101);
+                    let len = GetWindowTextLengthW(edit);
+                    let mut buf = vec![0u16; (len + 1) as usize];
+                    let read = GetWindowTextW(edit, &mut buf);
+                    data.value = String::from_utf16_lossy(&buf[..read as usize]);
+                    data.confirmed = true;
+                }
+                crate::log_if_err!(DestroyWindow(hwnd));
+            } else if id == 2 {
+                // Cancel
+                crate::log_if_err!(DestroyWindow(hwnd));
+            }
+            LRESULT(0)
+        }
+        WM_KEYDOWN => {
+            let key = wparam.0 as u32;
+            if key == VK_TAB.0 as u32 {
+                let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+                let current_focus = GetFocus();
+                let edit = windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, 101);
+                let ok = windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, 1);
+                let cancel = windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, 2);
+
+                let order = [edit, ok, cancel];
+                let mut idx = order.iter().position(|&h| h == current_focus).unwrap_or(0);
+
+                if shift_down {
+                    idx = if idx == 0 { order.len() - 1 } else { idx - 1 };
+                } else {
+                    idx = (idx + 1) % order.len();
+                }
+                SetFocus(order[idx]);
+                return LRESULT(0);
+            }
+            if key == VK_RETURN.0 as u32 {
+                SendMessageW(hwnd, WM_COMMAND, WPARAM(1), LPARAM(0));
+                return LRESULT(0);
+            }
+            if key == VK_ESCAPE.0 as u32 {
+                SendMessageW(hwnd, WM_COMMAND, WPARAM(2), LPARAM(0));
+                return LRESULT(0);
+            }
+            DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
+        WM_CLOSE => {
+            crate::log_if_err!(DestroyWindow(hwnd));
+            LRESULT(0)
+        }
+        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 

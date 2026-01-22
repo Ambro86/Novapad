@@ -1039,7 +1039,8 @@ unsafe extern "system" fn podcast_wndproc(
                         if state.monitor_handle.is_none() {
                             let device_id = selected_device_id(state, true);
                             let device_name = selected_device_name(state, true);
-                            match start_monitoring(device_id, device_name) {
+                            let gain = selected_mic_gain(state);
+                            match start_monitoring(device_id, device_name, gain) {
                                 Ok(handle) => state.monitor_handle = Some(handle),
                                 Err(e) => {
                                     SendMessageW(
@@ -1068,17 +1069,33 @@ unsafe extern "system" fn podcast_wndproc(
                             }
                             let device_id = selected_device_id(state, true);
                             let device_name = selected_device_name(state, true);
-                            if let Ok(handle) = start_monitoring(device_id, device_name) {
+                            let gain = selected_mic_gain(state);
+                            if let Ok(handle) = start_monitoring(device_id, device_name, gain) {
                                 state.monitor_handle = Some(handle);
                             }
                         }
                     }
                     handled = true;
                 }
-                PODCAST_ID_MIC_GAIN
-                | PODCAST_ID_SYSTEM_DEVICE
-                | PODCAST_ID_SYSTEM_GAIN
-                | PODCAST_ID_MONITOR => {
+                PODCAST_ID_MIC_GAIN => {
+                    if code == CBN_SELCHANGE as u16 {
+                        persist_settings(state);
+                        // Restart monitor with new gain if active
+                        if state.monitor_handle.is_some() {
+                            if let Some(handle) = state.monitor_handle.take() {
+                                handle.stop();
+                            }
+                            let device_id = selected_device_id(state, true);
+                            let device_name = selected_device_name(state, true);
+                            let gain = selected_mic_gain(state);
+                            if let Ok(handle) = start_monitoring(device_id, device_name, gain) {
+                                state.monitor_handle = Some(handle);
+                            }
+                        }
+                    }
+                    handled = true;
+                }
+                PODCAST_ID_SYSTEM_DEVICE | PODCAST_ID_SYSTEM_GAIN | PODCAST_ID_MONITOR => {
                     if code == CBN_SELCHANGE as u16 {
                         persist_settings(state);
                     }
@@ -1728,6 +1745,19 @@ fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
     let include_system = is_checked(state.include_system);
     if !include_mic && !include_system {
         return;
+    }
+
+    // Stop microphone monitor if active to avoid conflicts
+    if let Some(handle) = state.monitor_handle.take() {
+        handle.stop();
+        unsafe {
+            SendMessageW(
+                state.monitor_check,
+                BM_SETCHECK,
+                WPARAM(BST_UNCHECKED.0 as usize),
+                LPARAM(0),
+            );
+        }
     }
 
     let mic_device_id = selected_device_id(state, true);

@@ -238,6 +238,10 @@ pub struct AppSettings {
     #[serde(default)]
     pub rss_default_pt_keys: Vec<String>,
     #[serde(default)]
+    pub rss_removed_default_vi: Vec<String>,
+    #[serde(default)]
+    pub rss_default_vi_keys: Vec<String>,
+    #[serde(default)]
     pub rss_global_max_concurrency: usize,
     #[serde(default)]
     pub rss_per_host_max_concurrency: usize,
@@ -337,6 +341,8 @@ impl Default for AppSettings {
             rss_default_es_keys: Vec::new(),
             rss_removed_default_pt: Vec::new(),
             rss_default_pt_keys: Vec::new(),
+            rss_removed_default_vi: Vec::new(),
+            rss_default_vi_keys: Vec::new(),
             podcast_sources: Vec::new(),
             rss_global_max_concurrency: 8,
             rss_per_host_max_concurrency: 2,

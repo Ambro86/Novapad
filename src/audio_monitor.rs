@@ -14,7 +14,17 @@ impl MonitorHandle {
     }
 }
 
-pub fn start_monitoring(device_id: String, device_name: String) -> Result<MonitorHandle, String> {
+/// Starts audio monitoring with the specified device and gain.
+///
+/// # Arguments
+/// * `device_id` - The device ID to use (or PODCAST_DEVICE_DEFAULT for default)
+/// * `device_name` - The device name to match (used as fallback)
+/// * `gain` - Volume multiplier (1.0 = normal, 0.5 = half, 2.0 = double)
+pub fn start_monitoring(
+    device_id: String,
+    device_name: String,
+    gain: f32,
+) -> Result<MonitorHandle, String> {
     let host = cpal::default_host();
 
     let input_device =
@@ -25,7 +35,7 @@ pub fn start_monitoring(device_id: String, device_name: String) -> Result<Monito
             if let Ok(devices) = host.input_devices() {
                 for device in devices {
                     if let Ok(name) = device.name() {
-                        // Try exact match on name
+                        // Try exact match on name (cpal uses name as identifier)
                         if name == device_name {
                             found = Some(device);
                             break;
@@ -48,31 +58,38 @@ pub fn start_monitoring(device_id: String, device_name: String) -> Result<Monito
         .default_output_config()
         .map_err(|e| format!("Failed to get output config: {}", e))?;
 
-    // We use a shared buffer of f32 samples.
-    // If channels differ, we mix or duplicate.
-    // If sample rates differ, we rely on cpal to handle it? No, cpal doesn't resample automatically.
-    // We must handle resampling if rates differ.
-    // For simplicity, let's just push to buffer and pop. The pitch will change if rates differ!
-    // But usually both are 44.1 or 48k. If they differ, we might have pitch shift.
-    // Given the complexity of resampling, we'll try raw first.
-
-    let buffer = Arc::new(Mutex::new(VecDeque::<f32>::with_capacity(48000 * 2))); // 1 sec stereo approx
-    let buffer_producer = buffer.clone();
-    let buffer_consumer = buffer.clone();
-
+    let in_sample_rate = input_config.sample_rate().0;
+    let out_sample_rate = output_config.sample_rate().0;
     let in_channels = input_config.channels() as usize;
     let out_channels = output_config.channels() as usize;
 
+    // Buffer holds mono samples at input sample rate, will be resampled and expanded to stereo on output
+    let buffer = Arc::new(Mutex::new(VecDeque::<f32>::with_capacity(48000 * 2)));
+    let buffer_producer = buffer.clone();
+    let buffer_consumer = buffer.clone();
+
     let input_stream = match input_config.sample_format() {
-        cpal::SampleFormat::F32 => {
-            build_input_stream::<f32>(&input_device, &input_config, buffer_producer, in_channels)
-        }
-        cpal::SampleFormat::I16 => {
-            build_input_stream::<i16>(&input_device, &input_config, buffer_producer, in_channels)
-        }
-        cpal::SampleFormat::U16 => {
-            build_input_stream::<u16>(&input_device, &input_config, buffer_producer, in_channels)
-        }
+        cpal::SampleFormat::F32 => build_input_stream::<f32>(
+            &input_device,
+            &input_config,
+            buffer_producer,
+            in_channels,
+            gain,
+        ),
+        cpal::SampleFormat::I16 => build_input_stream::<i16>(
+            &input_device,
+            &input_config,
+            buffer_producer,
+            in_channels,
+            gain,
+        ),
+        cpal::SampleFormat::U16 => build_input_stream::<u16>(
+            &input_device,
+            &input_config,
+            buffer_producer,
+            in_channels,
+            gain,
+        ),
         _ => Err("Unsupported input format".to_string()),
     }?;
 
@@ -82,18 +99,24 @@ pub fn start_monitoring(device_id: String, device_name: String) -> Result<Monito
             &output_config,
             buffer_consumer,
             out_channels,
+            in_sample_rate,
+            out_sample_rate,
         ),
         cpal::SampleFormat::I16 => build_output_stream::<i16>(
             &output_device,
             &output_config,
             buffer_consumer,
             out_channels,
+            in_sample_rate,
+            out_sample_rate,
         ),
         cpal::SampleFormat::U16 => build_output_stream::<u16>(
             &output_device,
             &output_config,
             buffer_consumer,
             out_channels,
+            in_sample_rate,
+            out_sample_rate,
         ),
         _ => Err("Unsupported output format".to_string()),
     }?;
@@ -115,7 +138,8 @@ fn build_input_stream<T>(
     device: &cpal::Device,
     config: &SupportedStreamConfig,
     buffer: Arc<Mutex<VecDeque<f32>>>,
-    _channels: usize,
+    channels: usize,
+    gain: f32,
 ) -> Result<Stream, String>
 where
     T: cpal::Sample + cpal::SizedSample,
@@ -127,15 +151,23 @@ where
             &config.clone().into(),
             move |data: &[T], _: &_| {
                 let mut q = buffer.lock().unwrap();
-                // Convert to f32 and push
-                // If buffer too full, drop oldest
+                // If buffer too full, drop oldest to prevent memory growth
                 if q.len() > 96000 {
-                    // Safety cap
                     let drop = data.len().min(q.len());
                     q.drain(0..drop);
                 }
-                for &sample in data {
-                    q.push_back(f32::from(sample));
+                // Convert to mono f32 with gain, mix channels if stereo
+                for frame in data.chunks(channels) {
+                    let mono: f32 = if channels == 1 {
+                        f32::from(frame[0])
+                    } else {
+                        // Mix all channels to mono
+                        let sum: f32 = frame.iter().map(|&s| f32::from(s)).sum();
+                        sum / channels as f32
+                    };
+                    // Apply gain and clamp to avoid clipping
+                    let gained = (mono * gain).clamp(-1.0, 1.0);
+                    q.push_back(gained);
                 }
             },
             err_fn,
@@ -149,41 +181,50 @@ fn build_output_stream<T>(
     device: &cpal::Device,
     config: &SupportedStreamConfig,
     buffer: Arc<Mutex<VecDeque<f32>>>,
-    _channels: usize,
+    out_channels: usize,
+    in_sample_rate: u32,
+    out_sample_rate: u32,
 ) -> Result<Stream, String>
 where
     T: cpal::Sample + cpal::SizedSample + cpal::FromSample<f32>,
 {
     let err_fn = |err| crate::log_debug(&format!("Monitor Output Error: {}", err));
+
+    // Calculate resampling ratio (how many input samples per output sample)
+    let resample_ratio = in_sample_rate as f64 / out_sample_rate as f64;
+
+    // State for linear interpolation resampling
+    let resample_state = Arc::new(Mutex::new(ResampleState {
+        position: 0.0,
+        last_sample: 0.0,
+    }));
+
     let stream = device
         .build_output_stream(
             &config.clone().into(),
             move |data: &mut [T], _: &_| {
                 let mut q = buffer.lock().unwrap();
-                // We need to fill data.len() samples.
-                // But we might have different channel count in buffer (from input).
-                // This naive copy assumes input channels == output channels or we don't care (speedup/slowdown).
-                // Actually, if in_channels != out_channels, we have a problem.
-                // Let's assume user wants to hear mic (usually mono/stereo) on speakers (stereo).
-                // The buffer contains interleaved samples.
+                let mut rs = resample_state.lock().unwrap();
 
-                // NOTE: Ideally we should handle channel mixing here.
-                // But since we don't know input channels here (it's lost in closure type),
-                // we rely on luck or simple 1:1 mapping for now.
-                // Most mics are mono/stereo, speakers stereo.
-                // If mic is mono, we read 1 sample per frame. If speaker is stereo, we write 2 samples per frame.
-                // We'll run out of buffer twice as fast.
+                // Buffer contains mono samples at input rate
+                // We need to output stereo samples at output rate
+                let frames_needed = data.len() / out_channels;
 
-                // To fix this properly, we need to know input channels here or normalize buffer to stereo.
-                // Let's normalize buffer to Mono in input and expand to Stereo in output?
-                // Or just copy.
+                for frame_idx in 0..frames_needed {
+                    // Get the resampled mono sample
+                    let mono_sample =
+                        if (in_sample_rate == out_sample_rate) || resample_ratio == 1.0 {
+                            // No resampling needed
+                            q.pop_front().unwrap_or(0.0)
+                        } else {
+                            // Linear interpolation resampling
+                            resample_sample(&mut q, &mut rs, resample_ratio)
+                        };
 
-                for sample in data.iter_mut() {
-                    *sample = if let Some(v) = q.pop_front() {
-                        T::from_sample(v)
-                    } else {
-                        T::from_sample(0.0f32)
-                    };
+                    // Write mono sample to all output channels (expand to stereo)
+                    for ch in 0..out_channels {
+                        data[frame_idx * out_channels + ch] = T::from_sample(mono_sample);
+                    }
                 }
             },
             err_fn,
@@ -191,4 +232,28 @@ where
         )
         .map_err(|e| e.to_string())?;
     Ok(stream)
+}
+
+struct ResampleState {
+    position: f64,
+    last_sample: f32,
+}
+
+/// Simple linear interpolation resampling
+fn resample_sample(buffer: &mut VecDeque<f32>, state: &mut ResampleState, ratio: f64) -> f32 {
+    // Advance position by the ratio
+    state.position += ratio;
+
+    // Consume samples from buffer as needed
+    while state.position >= 1.0 {
+        state.last_sample = buffer.pop_front().unwrap_or(state.last_sample);
+        state.position -= 1.0;
+    }
+
+    // Get next sample for interpolation
+    let next_sample = buffer.front().copied().unwrap_or(state.last_sample);
+
+    // Linear interpolation between last and next sample
+    let t = state.position as f32;
+    state.last_sample * (1.0 - t) + next_sample * t
 }

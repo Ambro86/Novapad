@@ -159,6 +159,7 @@ pub fn language_to_code(language: Language) -> &'static str {
         Language::Portuguese => "pt",
         Language::Swedish => "sv",
         Language::Vietnamese => "vi",
+        Language::Czech => "cs",
     }
 }
 
@@ -168,7 +169,7 @@ pub fn resolve_language_code(language: Language, preference: &str) -> String {
         return language_to_code(language).to_string();
     }
     match pref.as_str() {
-        "it" | "en" | "es" | "pt" | "sv" | "vi" => pref,
+        "it" | "en" | "es" | "pt" | "sv" | "vi" | "cs" => pref,
         _ => language_to_code(language).to_string(),
     }
 }

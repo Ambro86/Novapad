@@ -2004,6 +2004,44 @@ unsafe fn open_document_with_encoding_internal(
                 return;
             }
         }
+    } else if is_gdoc_path(path) {
+        // Special handling for Google Docs pointer files (JSON files with a "url" key)
+        if let Ok(bytes) = std::fs::read(path) {
+            let text = String::from_utf8_lossy(&bytes);
+            if let Some(url_pos) = text.find("\"url\"") {
+                let after_url = &text[url_pos + 5..];
+                if let Some(start_quote) = after_url.find('\"') {
+                    let from_quote = &after_url[start_quote + 1..];
+                    if let Some(end_quote) = from_quote.find('\"') {
+                        let url = &from_quote[..end_quote];
+                        if url.starts_with("http") {
+                            if let Err(e) = crate::audio_utils::open_url_in_browser(url) {
+                                crate::log_debug(&format!("Failed to open GDoc URL: {}", e));
+                            }
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+        // Fallback: if we can't find a URL, open as normal text
+        match std::fs::read(path) {
+            Ok(bytes) => match decode_text(&bytes, language) {
+                Ok((text, encoding)) => (text, FileFormat::Text(encoding), Some(encoding)),
+                Err(message) => {
+                    crate::show_error(hwnd, language, &message);
+                    return;
+                }
+            },
+            Err(err) => {
+                crate::show_error(
+                    hwnd,
+                    language,
+                    &crate::settings::error_open_file_message(language, err),
+                );
+                return;
+            }
+        }
     } else if is_audio_path(path) {
         (String::new(), FileFormat::Audiobook, None)
     } else if is_doc_path(path) {

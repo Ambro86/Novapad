@@ -67,6 +67,17 @@ pub fn is_epub_path(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
+pub fn is_gdoc_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|s| s.to_str())
+        .map(|s| {
+            s.eq_ignore_ascii_case("gdoc")
+                || s.eq_ignore_ascii_case("gsheet")
+                || s.eq_ignore_ascii_case("gslides")
+        })
+        .unwrap_or(false)
+}
+
 pub fn is_html_path(path: &Path) -> bool {
     path.extension()
         .and_then(|s| s.to_str())

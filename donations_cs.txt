@@ -1,0 +1,21 @@
+Dary
+
+Novapad je program, který byl původně vytvořen pro osobní potřeby, ale postupem času stále více rostl. Jeho vývoj vyžaduje neustálou práci na vylepšování funkcí, opravování chyb, hledání nových nápadů a pečlivé testování všech funkcí.
+
+Pokud považujete tento program za užitečný a chcete podpořit jeho vývoj, můžete přispět darem.
+
+PayPal
+
+Můžete přispět přes PayPal pomocí tohoto odkazu:
+https://www.paypal.me/ambrogio86
+
+Pokud je to možné, uveďte prosím do poznámky k platbě „Novapad“.
+
+Bankovní převod
+
+Můžete také přispět bankovním převodem na účet vedený na jméno Ambrogio Riili.
+IBAN: IT77W0306901020100000064149
+
+Pokud je to možné, použijte prosím jasný účel platby, například „Novapad“.
+
+Každý, kdo projekt podpoří, bude zmíněn v programu a v repozitáři na GitHubu, pokud nebude preferovat zůstat v anonymitě nebo použít přezdívku.

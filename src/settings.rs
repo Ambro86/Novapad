@@ -109,6 +109,8 @@ pub enum Language {
     Swedish,
     #[serde(rename = "vi")]
     Vietnamese,
+    #[serde(rename = "cs")]
+    Czech,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -469,6 +471,9 @@ fn system_language() -> Language {
         if lower.starts_with("vi") {
             return Language::Vietnamese;
         }
+        if lower.starts_with("cs") {
+            return Language::Czech;
+        }
         return Language::English;
     }
     Language::Italian
@@ -680,7 +685,82 @@ pub fn save_settings_with_default_copy(settings: AppSettings, _keep_default_copy
 const CONTEXT_MENU_EXTENSIONS: &[&str] = &[
     "txt", "md", "pdf", "epub", "mp3", "m4a", "mp4", "aac", "doc", "docx", "xls", "xlsx", "rtf",
     "htm", "html", "ppt", "pptx", "py", "java", "js", "rb", "pl", "php", "lua", "ps1", "sh",
+    "gdoc", "gsheet", "gslides",
 ];
+
+pub fn register_application_capabilities() {
+    let exe_path = match std::env::current_exe() {
+        Ok(path) => path,
+        Err(err) => {
+            crate::log_debug(&format!("Capabilities: failed to get exe path: {err}"));
+            return;
+        }
+    };
+    let exe_path_str = exe_path.to_string_lossy();
+    let app_name = "Novapad";
+    let prog_id_prefix = "Novapad.Assoc";
+
+    // 1. Register App Class and Program IDs for each extension
+    for ext in CONTEXT_MENU_EXTENSIONS {
+        let prog_id = format!("{}.{}", prog_id_prefix, ext);
+        let class_key = format!("Software\\Classes\\{}", prog_id);
+        if let Some(key) = create_registry_key(&class_key) {
+            set_registry_string_value(key, None, &format!("{} Document", app_name));
+            unsafe {
+                RegCloseKey(key);
+            }
+        }
+
+        let shell_open_key = format!("{}\\shell\\open\\command", class_key);
+        if let Some(key) = create_registry_key(&shell_open_key) {
+            set_registry_string_value(key, None, &format!("\"{}\" \"%1\"", exe_path_str));
+            unsafe {
+                RegCloseKey(key);
+            }
+        }
+
+        let icon_key = format!("{}\\DefaultIcon", class_key);
+        if let Some(key) = create_registry_key(&icon_key) {
+            set_registry_string_value(key, None, &format!("\"{}\",0", exe_path_str));
+            unsafe {
+                RegCloseKey(key);
+            }
+        }
+    }
+
+    // 2. Register Application Capabilities
+    let capabilities_key = "Software\\Novapad\\Capabilities";
+    if let Some(key) = create_registry_key(capabilities_key) {
+        set_registry_string_value(key, Some("ApplicationName"), app_name);
+        set_registry_string_value(
+            key,
+            Some("ApplicationDescription"),
+            "A modern Notepad with PDF, DOCX, XLS and EPUB support and TTS capabilities.",
+        );
+        unsafe {
+            RegCloseKey(key);
+        }
+    }
+
+    let file_assoc_key = format!("{}\\FileAssociations", capabilities_key);
+    if let Some(key) = create_registry_key(&file_assoc_key) {
+        for ext in CONTEXT_MENU_EXTENSIONS {
+            let prog_id = format!("{}.{}", prog_id_prefix, ext);
+            set_registry_string_value(key, Some(&format!(".{}", ext)), &prog_id);
+        }
+        unsafe {
+            RegCloseKey(key);
+        }
+    }
+
+    // 3. Register in RegisteredApplications
+    if let Some(key) = create_registry_key("Software\\RegisteredApplications") {
+        set_registry_string_value(key, Some(app_name), capabilities_key);
+        unsafe {
+            RegCloseKey(key);
+        }
+    }
+}
 
 pub fn sync_context_menu(settings: &AppSettings) {
     let label = crate::i18n::tr(settings.language, "context_menu.open_with");

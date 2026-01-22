@@ -63,12 +63,17 @@ extensions = ["md"]
 description = "Novapad Markdown Document"
 name = "Novapad Markdown Document"
 
+[[package.metadata.packager.file_associations]]
+extensions = ["gdoc", "gsheet", "gslides"]
+description = "Google Drive Shortcut"
+name = "Google Drive Shortcut"
+
 [[package.metadata.packager.binaries]]
 path = "novapad"
 main = true
 
 [package.metadata.packager.nsis]
-languages = ["Italian", "English"]
+languages = ["English", "Italian", "Spanish", "Portuguese", "Swedish", "Vietnamese"]
 template = "packager/nsis/installer.nsi"
 
 [package.metadata.packager.wix]

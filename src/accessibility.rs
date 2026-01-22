@@ -112,6 +112,7 @@ pub enum PlayerCommand {
     Seek(i64),
     Volume(f32),
     Speed(f32),
+    SpeedReset,
     MuteToggle,
     GoToTime,
     AnnounceTime,

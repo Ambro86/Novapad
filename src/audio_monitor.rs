@@ -175,6 +175,7 @@ fn monitor_loop(device_id: String, stop: Arc<AtomicBool>) -> Result<(), String> 
             }
 
             let samples = if flags & (AUDCLNT_BUFFERFLAGS_SILENT.0 as u32) != 0 {
+                // crate::log_debug("Monitor: Silence flag set"); // Uncomment if needed
                 vec![0f32; frames_available as usize * in_channels as usize]
             } else {
                 read_samples(data_ptr, frames_available, in_channels, in_fmt)
@@ -215,6 +216,11 @@ fn monitor_loop(device_id: String, stop: Arc<AtomicBool>) -> Result<(), String> 
                         render_service
                             .ReleaseBuffer(frames_to_write as u32, 0)
                             .map_err(|e| format!("Render ReleaseBuffer failed: {e}"))?;
+                    } else {
+                        crate::log_debug(&format!(
+                            "Monitor: Dropping {} frames (available {})",
+                            frames_to_write, available
+                        ));
                     }
                 }
             }

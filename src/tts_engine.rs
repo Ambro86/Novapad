@@ -1329,12 +1329,19 @@ pub fn start_audiobook(hwnd: HWND) {
 
     if tts_engine == TtsEngine::Sapi4 {
         let title = i18n::tr(language, "audiobook.sapi4_threads_title");
+
         let body = i18n::tr(language, "audiobook.sapi4_threads_body");
+
         if let Some(val_str) = unsafe {
             crate::app_windows::prompt_window::prompt_user(hwnd, &title, &body, "30", language)
-        } && let Ok(val) = val_str.parse::<u32>()
-        {
-            sapi4_threads = Some(val.clamp(1, 100));
+        } {
+            if let Ok(val) = val_str.parse::<u32>() {
+                sapi4_threads = Some(val.clamp(1, 100));
+            }
+        } else {
+            // User cancelled the prompt, abort the whole process
+
+            return;
         }
     }
 

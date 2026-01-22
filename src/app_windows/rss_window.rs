@@ -37,12 +37,12 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, DestroyWindow,
     EVENT_OBJECT_FOCUS, GWLP_USERDATA, GWLP_WNDPROC, GetCursorPos, GetDlgCtrlID, GetDlgItem,
     GetParent, GetWindowLongPtrW, GetWindowRect, HMENU, IDYES, KillTimer, MB_ICONQUESTION,
-    MB_YESNO, MF_GRAYED, MF_POPUP, MF_STRING, MessageBoxW, OBJID_CLIENT, PostMessageW,
-    RegisterClassW, SW_SHOW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW,
-    TrackPopupMenu, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CREATE, WM_DESTROY,
-    WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_SETFOCUS, WM_SETFONT,
-    WM_SETREDRAW, WM_SYSKEYDOWN, WM_TIMER, WM_USER, WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    MB_YESNO, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MessageBoxW, OBJID_CLIENT,
+    PostMessageW, RegisterClassW, SW_SHOW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
+    SetWindowTextW, TrackPopupMenu, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CREATE,
+    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_SETFOCUS,
+    WM_SETFONT, WM_SETREDRAW, WM_SYSKEYDOWN, WM_TIMER, WM_USER, WNDCLASSW, WNDPROC, WS_CAPTION,
+    WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
     WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
@@ -60,6 +60,10 @@ const ID_CTX_REORDER_DOWN: usize = 1302;
 const ID_CTX_REORDER_TOP: usize = 1303;
 const ID_CTX_REORDER_BOTTOM: usize = 1304;
 const ID_CTX_REORDER_POSITION: usize = 1305;
+const ID_CTX_SORT_ASC: usize = 1306;
+const ID_CTX_SORT_DESC: usize = 1307;
+const ID_CTX_SORT_NEWEST: usize = 1308;
+const ID_CTX_SORT_OLDEST: usize = 1309;
 const ID_CTX_OPEN_BROWSER: usize = 1201;
 const ID_CTX_SHARE_FACEBOOK: usize = 1202;
 const ID_CTX_SHARE_TWITTER: usize = 1203;
@@ -254,6 +258,7 @@ unsafe fn import_sources_from_file(hwnd: HWND, path: &Path) {
                     unread: false,
                     cache: RssFeedCache::default(),
                     last_seen_guid: None,
+                    last_updated: None,
                 });
                 existing.insert(key);
                 added += 1;
@@ -647,6 +652,7 @@ fn apply_default_sources(
             unread: false,
             cache: rss::RssFeedCache::default(),
             last_seen_guid: None,
+            last_updated: None,
         });
         existing.insert(key.clone());
         changed = true;
@@ -898,6 +904,10 @@ unsafe fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) 
     let reorder_top = i18n::tr(language, "rss.reorder.move_top");
     let reorder_bottom = i18n::tr(language, "rss.reorder.move_bottom");
     let reorder_position = i18n::tr(language, "rss.reorder.move_to_position");
+    let sort_asc = i18n::tr(language, "rss.reorder.title_asc");
+    let sort_desc = i18n::tr(language, "rss.reorder.title_desc");
+    let sort_newest = i18n::tr(language, "rss.reorder.date_newest");
+    let sort_oldest = i18n::tr(language, "rss.reorder.date_oldest");
     let open_label = i18n::tr(language, "rss.context.open_browser");
     let facebook_label = i18n::tr(language, "rss.context.share_facebook");
     let twitter_label = i18n::tr(language, "rss.context.share_twitter");
@@ -975,6 +985,31 @@ unsafe fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) 
                         MF_STRING,
                         ID_CTX_REORDER_POSITION,
                         PCWSTR(to_wide(&reorder_position).as_ptr()),
+                    ) {}
+                    if let Err(_e) = AppendMenuW(submenu, MF_SEPARATOR, 0, PCWSTR::null()) {}
+                    if let Err(_e) = AppendMenuW(
+                        submenu,
+                        MF_STRING,
+                        ID_CTX_SORT_ASC,
+                        PCWSTR(to_wide(&sort_asc).as_ptr()),
+                    ) {}
+                    if let Err(_e) = AppendMenuW(
+                        submenu,
+                        MF_STRING,
+                        ID_CTX_SORT_DESC,
+                        PCWSTR(to_wide(&sort_desc).as_ptr()),
+                    ) {}
+                    if let Err(_e) = AppendMenuW(
+                        submenu,
+                        MF_STRING,
+                        ID_CTX_SORT_NEWEST,
+                        PCWSTR(to_wide(&sort_newest).as_ptr()),
+                    ) {}
+                    if let Err(_e) = AppendMenuW(
+                        submenu,
+                        MF_STRING,
+                        ID_CTX_SORT_OLDEST,
+                        PCWSTR(to_wide(&sort_oldest).as_ptr()),
                     ) {}
                     if let Err(_e) = AppendMenuW(
                         menu,
@@ -1219,6 +1254,22 @@ unsafe extern "system" fn rss_wndproc(
                     handle_reorder_action(hwnd, ReorderAction::Position);
                     LRESULT(0)
                 }
+                ID_CTX_SORT_ASC => {
+                    handle_sort_action(hwnd, crate::settings::SortOrder::TitleAsc);
+                    LRESULT(0)
+                }
+                ID_CTX_SORT_DESC => {
+                    handle_sort_action(hwnd, crate::settings::SortOrder::TitleDesc);
+                    LRESULT(0)
+                }
+                ID_CTX_SORT_NEWEST => {
+                    handle_sort_action(hwnd, crate::settings::SortOrder::DateNewest);
+                    LRESULT(0)
+                }
+                ID_CTX_SORT_OLDEST => {
+                    handle_sort_action(hwnd, crate::settings::SortOrder::DateOldest);
+                    LRESULT(0)
+                }
                 ID_CTX_OPEN_BROWSER => {
                     handle_article_action(hwnd, ArticleAction::OpenInBrowser);
                     LRESULT(0)
@@ -1284,6 +1335,7 @@ unsafe extern "system" fn rss_wndproc(
                             unread: false,
                             cache: rss::RssFeedCache::default(),
                             last_seen_guid: None,
+                            last_updated: None,
                         });
                         crate::settings::save_settings(state.settings.clone());
                     });
@@ -2402,6 +2454,10 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                                 src.kind = outcome.kind;
                             }
                             src.cache = outcome.cache.clone();
+                            let max_ts = outcome.items.iter().filter_map(|i| i.pub_date).max();
+                            if let Some(ts) = max_ts {
+                                src.last_updated = Some(ts);
+                            }
                         }
                         crate::settings::save_settings(ps.settings.clone());
                     });
@@ -3179,6 +3235,15 @@ unsafe fn handle_reorder_action(hwnd: HWND, action: ReorderAction) {
         let message = template.replace("{x}", &(new_index + 1).to_string());
         announce_rss_status(&message);
     }
+}
+
+unsafe fn handle_sort_action(hwnd: HWND, order: crate::settings::SortOrder) {
+    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    with_state(parent, |ps| {
+        crate::settings::sort_rss_sources(&mut ps.settings, order);
+        crate::settings::save_settings(ps.settings.clone());
+    });
+    reload_tree(hwnd);
 }
 
 #[derive(Clone, Copy)]

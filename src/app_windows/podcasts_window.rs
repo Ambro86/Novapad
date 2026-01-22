@@ -91,6 +91,10 @@ const ID_CTX_REORDER_DOWN: usize = 13006;
 const ID_CTX_REORDER_TOP: usize = 13007;
 const ID_CTX_REORDER_BOTTOM: usize = 13008;
 const ID_CTX_REORDER_POSITION: usize = 13009;
+const ID_CTX_SORT_ASC: usize = 13010;
+const ID_CTX_SORT_DESC: usize = 13011;
+const ID_CTX_SORT_NEWEST: usize = 13012;
+const ID_CTX_SORT_OLDEST: usize = 13013;
 
 const ID_CTX_PLAY: usize = 13101;
 const ID_CTX_OPEN_EPISODE: usize = 13102;
@@ -283,6 +287,7 @@ fn import_podcast_sources_from_file(hwnd: HWND, path: &Path) -> Option<usize> {
                     unread: false,
                     cache: rss::RssFeedCache::default(),
                     last_seen_guid: None,
+                    last_updated: None,
                 });
                 existing.insert(key);
                 added += 1;
@@ -838,10 +843,18 @@ unsafe fn load_episode_children(hwnd: HWND, hitem: HTREEITEM, source_index: usiz
     });
 }
 
-unsafe fn update_source_cache(parent: HWND, source_index: usize, cache: rss::RssFeedCache) {
+unsafe fn update_source_cache(
+    parent: HWND,
+    source_index: usize,
+    cache: rss::RssFeedCache,
+    last_updated: Option<i64>,
+) {
     if with_state(parent, |ps| {
         if let Some(src) = ps.settings.podcast_sources.get_mut(source_index) {
             src.cache = cache;
+            if let Some(ts) = last_updated {
+                src.last_updated = Some(ts);
+            }
             settings::save_settings(ps.settings.clone());
         }
     })
@@ -1444,6 +1457,7 @@ unsafe fn add_podcast_source(parent: HWND, feed_url: &str, title: &str) -> Optio
             unread: false,
             cache: rss::RssFeedCache::default(),
             last_seen_guid: None,
+            last_updated: None,
         });
         settings::save_settings(ps.settings.clone());
         Some(ps.settings.podcast_sources.len() - 1)
@@ -2163,6 +2177,10 @@ unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool)
             let reorder_top = i18n::tr(language, "rss.reorder.move_top");
             let reorder_bottom = i18n::tr(language, "rss.reorder.move_bottom");
             let reorder_position = i18n::tr(language, "rss.reorder.move_to_position");
+            let sort_asc = i18n::tr(language, "rss.reorder.title_asc");
+            let sort_desc = i18n::tr(language, "rss.reorder.title_desc");
+            let sort_newest = i18n::tr(language, "rss.reorder.date_newest");
+            let sort_oldest = i18n::tr(language, "rss.reorder.date_oldest");
             let copy_url = i18n::tr(language, "podcasts.context.copy_url");
             let open_feed = i18n::tr(language, "podcasts.context.open_feed");
             if let Err(_e) = AppendMenuW(
@@ -2225,6 +2243,31 @@ unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool)
                     MF_STRING,
                     ID_CTX_REORDER_POSITION,
                     PCWSTR(to_wide(&reorder_position).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(submenu, MF_SEPARATOR, 0, PCWSTR::null()) {}
+                if let Err(_e) = AppendMenuW(
+                    submenu,
+                    MF_STRING,
+                    ID_CTX_SORT_ASC,
+                    PCWSTR(to_wide(&sort_asc).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    submenu,
+                    MF_STRING,
+                    ID_CTX_SORT_DESC,
+                    PCWSTR(to_wide(&sort_desc).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    submenu,
+                    MF_STRING,
+                    ID_CTX_SORT_NEWEST,
+                    PCWSTR(to_wide(&sort_newest).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    submenu,
+                    MF_STRING,
+                    ID_CTX_SORT_OLDEST,
+                    PCWSTR(to_wide(&sort_oldest).as_ptr()),
                 ) {}
                 if let Err(_e) = AppendMenuW(
                     menu,
@@ -2317,6 +2360,10 @@ unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool)
         ID_CTX_REORDER_TOP => handle_reorder_action(hwnd, ReorderAction::Top),
         ID_CTX_REORDER_BOTTOM => handle_reorder_action(hwnd, ReorderAction::Bottom),
         ID_CTX_REORDER_POSITION => handle_reorder_action(hwnd, ReorderAction::Position),
+        ID_CTX_SORT_ASC => handle_sort_action(hwnd, crate::settings::SortOrder::TitleAsc),
+        ID_CTX_SORT_DESC => handle_sort_action(hwnd, crate::settings::SortOrder::TitleDesc),
+        ID_CTX_SORT_NEWEST => handle_sort_action(hwnd, crate::settings::SortOrder::DateNewest),
+        ID_CTX_SORT_OLDEST => handle_sort_action(hwnd, crate::settings::SortOrder::DateOldest),
         ID_CTX_PLAY => handle_episode_action(hwnd, EpisodeAction::Play),
         ID_CTX_OPEN_EPISODE => handle_episode_action(hwnd, EpisodeAction::OpenEpisode),
         ID_CTX_COPY_AUDIO => handle_episode_action(hwnd, EpisodeAction::CopyAudio),
@@ -2567,6 +2614,15 @@ unsafe fn handle_reorder_action(hwnd: HWND, action: ReorderAction) {
         let message = template.replace("{x}", &(new_index + 1).to_string());
         announce_status(&message);
     }
+}
+
+unsafe fn handle_sort_action(hwnd: HWND, order: crate::settings::SortOrder) {
+    let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    with_state(parent, |ps| {
+        crate::settings::sort_podcast_sources(&mut ps.settings, order);
+        crate::settings::save_settings(ps.settings.clone());
+    });
+    reload_tree(hwnd);
 }
 
 unsafe fn show_reorder_dialog(parent_hwnd: HWND, source_index: usize, total: usize) {
@@ -3965,7 +4021,8 @@ unsafe extern "system" fn podcast_wndproc(
                             &outcome.title,
                         );
                     }
-                    update_source_cache(parent, msg.source_index, outcome.cache);
+                    let max_ts = outcome.items.iter().filter_map(|i| i.pub_date).max();
+                    update_source_cache(parent, msg.source_index, outcome.cache, max_ts);
                     if outcome.not_modified {
                         apply_episode_results(hwnd, HTREEITEM(msg.hitem), Vec::new());
                     } else {

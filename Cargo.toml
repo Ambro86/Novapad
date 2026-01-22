@@ -48,6 +48,21 @@ extensions = ["ppt", "pptx"]
 description = "Novapad PowerPoint Document"
 name = "Novapad PowerPoint Document"
 
+[[package.metadata.packager.file_associations]]
+extensions = ["py", "java", "js", "rb", "pl", "php", "lua", "ps1", "sh"]
+description = "Novapad Programming File"
+name = "Novapad Programming File"
+
+[[package.metadata.packager.file_associations]]
+extensions = ["mp3", "m4a", "mp4", "aac"]
+description = "Novapad Audio File"
+name = "Novapad Audio File"
+
+[[package.metadata.packager.file_associations]]
+extensions = ["md"]
+description = "Novapad Markdown Document"
+name = "Novapad Markdown Document"
+
 [[package.metadata.packager.binaries]]
 path = "novapad"
 main = true

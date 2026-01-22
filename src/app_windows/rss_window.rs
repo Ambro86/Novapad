@@ -450,6 +450,7 @@ fn default_feed_path(language: crate::settings::Language) -> Option<PathBuf> {
         crate::settings::Language::Italian => "feed_it.txt",
         crate::settings::Language::Spanish => "feed_es.txt",
         crate::settings::Language::Portuguese => "feed_pt.txt",
+        crate::settings::Language::Swedish => "feed_en.txt",
         crate::settings::Language::Vietnamese => "feed_en.txt",
     };
     let exe_dir = std::env::current_exe()
@@ -471,6 +472,7 @@ fn embedded_default_feeds(language: crate::settings::Language) -> &'static str {
         crate::settings::Language::Italian => FEED_IT_DATA,
         crate::settings::Language::Spanish => FEED_ES_DATA,
         crate::settings::Language::Portuguese => FEED_PT_DATA,
+        crate::settings::Language::Swedish => FEED_EN_DATA,
         crate::settings::Language::Vietnamese => FEED_EN_DATA,
     }
 }
@@ -504,6 +506,10 @@ fn is_default_key(
 ) -> bool {
     match language {
         crate::settings::Language::English => settings
+            .rss_default_en_keys
+            .iter()
+            .any(|k| normalize_rss_url_key(k) == key),
+        crate::settings::Language::Swedish => settings
             .rss_default_en_keys
             .iter()
             .any(|k| normalize_rss_url_key(k) == key),
@@ -665,6 +671,12 @@ unsafe fn ensure_default_sources(parent: HWND) {
     with_state(parent, |s| {
         let changed = match language {
             crate::settings::Language::English => apply_default_sources(
+                &mut s.settings.rss_sources,
+                &s.settings.rss_removed_default_en,
+                &mut s.settings.rss_default_en_keys,
+                &defaults,
+            ),
+            crate::settings::Language::Swedish => apply_default_sources(
                 &mut s.settings.rss_sources,
                 &s.settings.rss_removed_default_en,
                 &mut s.settings.rss_default_en_keys,
@@ -2846,6 +2858,7 @@ unsafe fn handle_delete(hwnd: HWND) {
                 if matches!(
                     language,
                     crate::settings::Language::English
+                        | crate::settings::Language::Swedish
                         | crate::settings::Language::Italian
                         | crate::settings::Language::Spanish
                         | crate::settings::Language::Portuguese
@@ -2864,6 +2877,9 @@ unsafe fn handle_delete(hwnd: HWND) {
                         if !key.is_empty() && default_keys.contains(&key) {
                             let removed_list = match language {
                                 crate::settings::Language::English => {
+                                    &mut ps.settings.rss_removed_default_en
+                                }
+                                crate::settings::Language::Swedish => {
                                     &mut ps.settings.rss_removed_default_en
                                 }
                                 crate::settings::Language::Italian => {

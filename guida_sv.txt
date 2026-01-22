@@ -1,0 +1,109 @@
+Programguide
+
+Arkiv:
+Ny: skapar ett nytt dokument (Ctrl+N).
+Öppna: öppnar textfiler, PDF, EPUB, MP3 och andra format som stöds (Ctrl+O).
+Spara: sparar dokumentet (Ctrl+S).
+Spara som: sparar med ett nytt namn.
+Spara alla: sparar alla dokument (Ctrl+Shift+S).
+Stäng flik: stänger det aktuella dokumentet (Ctrl+W).
+Senaste filer: öppnar en nyligen använd fil.
+Läsning: F5 startar läsning, F4 pausa/återuppta, F6 stoppa läsning.
+Favoriter under läsning: F9 föregående favoritröst, F10 nästa favoritröst.
+Spela in ljudbok: skapar en MP3-fil från den aktuella texten (Ctrl+R).
+Skapa podd: skapar en podd från mikrofon och/eller systemljud (Ctrl+Shift+R).
+
+MP3-ljudböcker:
+När du öppnar en MP3-fil blir Novapad en ljudspelare.
+Tangentbordskommandon:
+
+* MELLANSLAG: Spela / Pausa.
+* HÖGERPIL: Framåt 1 minut.
+* VÄNSTERPIL: Bakåt 1 minut.
+* UPPPIL: Öka volymen.
+* NEDPIL: Sänk volymen.
+* +: Öka uppspelningshastigheten.
+* -: Sänk uppspelningshastigheten.
+* CTRL+I: Avisera uppspelningstiden.
+* CTRL+T: Gå till en specifik tid.
+* CTRL+B: Infoga ett bokmärke vid exakt minut.
+
+Redigera:
+Ångra: ångrar den senaste åtgärden (Ctrl+Z).
+Klipp ut: tar bort markerad text och kopierar den till urklipp (Ctrl+X).
+Kopiera: kopierar markerad text till urklipp (Ctrl+C).
+Klistra in: klistrar in innehållet från urklipp i dokumentet (Ctrl+V).
+Markera allt: markerar all text (Ctrl+A).
+Sök: söker efter text i dokumentet (Ctrl+F).
+Sök i filer: söker efter text i flera filer (Ctrl+Shift+F).
+Sök nästa: hittar nästa förekomst (F3).
+Ersätt: söker och ersätter text (Ctrl+H).
+Normalisera blanksteg: tar bort inledande/avslutande mellanslag och minskar tomma rader (Ctrl+Shift+Enter).
+Slå ihop rader: slår ihop raderna i stycket eller markeringen (Ctrl+Shift+J).
+Hård radbrytning: formaterar om stycket eller markeringen (Ctrl+Shift+H).
+Rensa Markdown-text: tar bort Markdown-taggar (Ctrl+Shift+M).
+Sortera rader: sorterar raderna i stycket eller markeringen (Alt+Shift+O).
+Ta bort dubbletter: tar bort dubblettrader i stycket eller markeringen (Alt+Shift+K).
+Vänd rader: vänder ordningen på raderna i stycket eller markeringen (Alt+Shift+Z).
+Citera rader: lägger till ett prefix på raderna i stycket eller markeringen (Ctrl+Q).
+Avcitera rader: tar bort prefixet från raderna i stycket eller markeringen (Ctrl+Shift+Q).
+Textstatistik: visar tecken, ord och rader för markering eller dokument (Alt+Y).
+Navigering av stavfel: F7 föregående fel, F8 nästa fel.
+
+Visa:
+Visa röster i redigeraren: visar kontroller för röstsystem, röstlista och flerspråkigt filter.
+Visa favoritröster: visar listan över favoritröster i redigeraren.
+Textfärg: ändrar textfärgen (inklusive ljusa och mörka färger).
+Textstorlek: ändrar textstorleken (liten, normal, stor, mycket stor, extra stor).
+När röstlistan är synlig flyttar Tab fokus mellan redigerare och kontroller, Shift+Tab går tillbaka.
+För att lägga till eller ta bort en röst från favoriter, flytta med Tab till röstlistan och lägg till eller ta bort den med applikationstangenten eller högerklick. Från listan med favoritröster kan du också trycka på applikationstangenten för att ta bort röster som redan lagts till.
+Snabbtangenter: det är möjligt att trycka på tangenterna F9 och F10 för att byta röst under läsning bland de som lagts till i favoriter.
+
+Infoga:
+Infoga bokmärke: sparar den aktuella markörpositionen eller ljudbokstiden (Ctrl+B).
+Hantera bokmärken: visa, hoppa till eller ta bort sparade bokmärken. När en fil med bokmärken öppnas startar markören eller uppspelningen automatiskt från det första tillgängliga.
+
+Verktyg:
+Satsvis ljudböcker: öppnar fönstret för att konvertera en lista med filer (eller hela mappar) till ljudböcker.
+
+* Lägg till filer/mappar i kön.
+* Välj utmatningsmapp och format (MP3 eller WAV).
+* Alternativ för att skapa undermappar och undvika överskrivning.
+* Tryck på Starta för att bearbeta allt i bakgrunden.
+Ordlista: öppnar ordlistefönstret. Listan navigeras med upp/ner-pilar.
+Tab går till knappen "Lägg till poster i ordlista", som aktiveras med Enter eller Mellanslag.
+I fönstret för tillägg/redigering: ange "Ursprungligt ord", sedan Tab till "Ersättningsord", därefter OK eller Avbryt (Enter/Mellanslag). ESC avbryter.
+I listan går Tab till knapparna "Redigera post" och "Ta bort vald post".
+Ordlisteersättningar tillämpas under läsning och skapande av ljudbok och sparas.
+Importera transkriptering från YouTube: klistra in en URL, välj språk och importera texten i redigeraren (Ctrl+Y). Alternativ för att inkludera tidsstämplar.
+Sök och importera från Wikipedia: söker efter en artikel på Wikipedia och importerar texten till redigeraren (Alt+Shift+W).
+Online-ordlista: sök definitioner och översättningar i Wiktionary online (Alt+Shift+D).
+Tillgänglig terminal: öppnar en dedikerad terminal med separat och stabil utdata för skärmläsare (Ctrl+Shift+T).
+Genvägar: Alt+I fokusera inmatning, Alt+O fokusera utdata, Tab/Shift+Tab för att flytta mellan inmatning, utdata och alternativ.
+Enter skickar texten. Ctrl+C kopierar utdata (eller skickar Ctrl+C till programmet). Ctrl+L rensar utdata med bekräftelse.
+Alternativ i terminalen: autoscroll, rensa ANSI, avisera nya rader, ljudsignal efter 1s, undvik energisparläge.
+Programval: Kommandotolken (cmd.exe), PowerShell, Codex CLI (från Alternativ).
+
+RSS / Artiklar: öppnar RSS/Artiklar-fönstret, lägg till källor, expandera ett flöde och tryck på Enter för att importera en artikel till redigeraren.
+I RSS-fönstret, välj ett flöde eller en webbplats och tryck på Delete för att ta bort det från biblioteket.
+I snabbmenyn för flöden eller webbplatser kan du redigera eller ta bort en RSS eller webbplats.
+När du har importerat en nyhet, tryck på Esc för att återgå till RSS-listan.
+Poddar: öppnar Podd-fönstret för att söka och hantera prenumerationer.
+I avsnittslistan, tryck på Enter för att spela upp avsnittet.
+Under uppspelning stoppar Esc podden och återgår till biblioteket.
+
+Alternativ:
+Språk: ändrar gränssnittsspråket.
+Filöppning: öppnar filer i ny flik eller nytt fönster.
+Välj röst: väljer rösten för läsning.
+Endast flerspråkiga röster: filtrerar röstlistan.
+Välj tonhöjd, hastighet och volym: ställer in rösternas tonhöjd, hastighet och volym (både Microsoft och SAPI5). Gäller för läsning och ljudböcker.
+Flytta markör under läsning: följer texten visuellt medan den läses.
+Uppdelning av ljudbok efter text: delar ljudboken när den angivna texten visas i början av raden (skiftlägeskänslig: "Kapitel" och "kapitel" är olika). Exempel: med "Kapitel" skapas en del för varje kapitel, inklusive författare och introduktion i den första delen fram till det första kapitlet. Om det inte hittas, ingen uppdelning.
+Andra alternativ för att dela ljudboken: 2 delar, 4 delar, 6 delar, 8 delar.
+
+Hjälp:
+Guide: öppnar denna guide (F1).
+Sök efter uppdateringar: kontrollerar om det finns uppdateringar (F2).
+Ändringslogg: visar ändringsloggen.
+Om programmet: visar information om programmet.

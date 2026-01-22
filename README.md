@@ -68,7 +68,7 @@ plus **podcast recording from microphone and system audio**.
 - **YouTube Transcript Import**
   - Import YouTube captions with language selection and optional timestamps.
 - **Localization**
-  - English, Italian, Spanish, Portuguese.
+  - English, Italian, Spanish, Portuguese, Swedish.
 
 ---
 

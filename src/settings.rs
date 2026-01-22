@@ -105,6 +105,8 @@ pub enum Language {
     Spanish,
     #[serde(rename = "pt")]
     Portuguese,
+    #[serde(rename = "sv")]
+    Swedish,
     #[serde(rename = "vi")]
     Vietnamese,
 }
@@ -210,6 +212,7 @@ pub struct AppSettings {
     pub prompt_beep_on_idle: bool,
     pub prompt_prevent_sleep: bool,
     pub prompt_announce_lines: bool,
+    pub interpreter_path: String,
     pub context_menu_open_with: bool,
     pub spellcheck_enabled: bool,
     pub spellcheck_language_mode: SpellcheckLanguageMode,
@@ -320,6 +323,7 @@ impl Default for AppSettings {
             prompt_beep_on_idle: true,
             prompt_prevent_sleep: true,
             prompt_announce_lines: true,
+            interpreter_path: "python.exe".to_string(),
             context_menu_open_with: false,
             spellcheck_enabled: false,
             spellcheck_language_mode: SpellcheckLanguageMode::FollowEditorLanguage,
@@ -452,6 +456,9 @@ fn system_language() -> Language {
         }
         if lower.starts_with("pt") {
             return Language::Portuguese;
+        }
+        if lower.starts_with("sv") {
+            return Language::Swedish;
         }
         if lower.starts_with("vi") {
             return Language::Vietnamese;
@@ -665,8 +672,8 @@ pub fn save_settings_with_default_copy(settings: AppSettings, _keep_default_copy
 }
 
 const CONTEXT_MENU_EXTENSIONS: &[&str] = &[
-    "txt", "md", "pdf", "epub", "mp3", "doc", "docx", "xls", "xlsx", "rtf", "htm", "html", "ppt",
-    "pptx",
+    "txt", "md", "pdf", "epub", "mp3", "m4a", "mp4", "aac", "doc", "docx", "xls", "xlsx", "rtf",
+    "htm", "html", "ppt", "pptx", "py", "java", "js", "rb", "pl", "php", "lua", "ps1", "sh",
 ];
 
 pub fn sync_context_menu(settings: &AppSettings) {

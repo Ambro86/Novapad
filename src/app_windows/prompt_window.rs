@@ -3,6 +3,7 @@ use crate::conpty::{ConPtySession, ConPtySpawn};
 use crate::settings::{Language, confirm_title, save_settings};
 use crate::{i18n, log_debug, show_error, with_state};
 use std::collections::VecDeque;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -55,6 +56,12 @@ const PROMPT_OUTPUT_LIMIT: usize = 40_000;
 const PROMPT_OUTPUT_KEEP: usize = 10_000;
 const PROMPT_OUTPUT_TIMER_ID: usize = 3;
 const PROMPT_OUTPUT_FLUSH_CHARS: usize = 2048;
+
+struct PromptWindowInit {
+    parent: HWND,
+    initial_command: Option<String>,
+    working_dir: Option<PathBuf>,
+}
 
 struct PromptLabels {
     title: String,
@@ -225,9 +232,26 @@ fn prompt_labels(language: Language) -> PromptLabels {
 }
 
 pub unsafe fn open(parent: HWND) {
+    open_with_command(parent, None, None);
+}
+
+pub unsafe fn open_with_command(
+    parent: HWND,
+    initial_command: Option<String>,
+    working_dir: Option<PathBuf>,
+) {
     let existing = with_state(parent, |state| state.prompt_window).unwrap_or(HWND(0));
     if existing.0 != 0 {
         SetForegroundWindow(existing);
+        if let Some(cmd) = initial_command {
+            with_prompt_state(existing, |state| {
+                if let Some(session) = &state.session {
+                    let newline = if state.program_is_codex { "\n" } else { "\r\n" };
+                    let payload = format!("{}{}", cmd, newline);
+                    session.write_input(&payload);
+                }
+            });
+        }
         return;
     }
 
@@ -248,6 +272,13 @@ pub unsafe fn open(parent: HWND) {
     let labels = prompt_labels(language);
     let title = to_wide(&labels.title);
 
+    let init = Box::new(PromptWindowInit {
+        parent,
+        initial_command,
+        working_dir,
+    });
+    let init_ptr: *mut PromptWindowInit = Box::into_raw(init);
+
     let hwnd = CreateWindowExW(
         WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
         PCWSTR(class_name.as_ptr()),
@@ -260,10 +291,15 @@ pub unsafe fn open(parent: HWND) {
         None,
         HMENU(0),
         hinstance,
-        Some(parent.0 as *const std::ffi::c_void),
+        Some(init_ptr as *const std::ffi::c_void),
     );
 
     if hwnd.0 == 0 {
+        if !init_ptr.is_null() {
+            unsafe {
+                drop(Box::from_raw(init_ptr));
+            }
+        }
         return;
     }
 
@@ -397,7 +433,12 @@ unsafe extern "system" fn prompt_wndproc(
         WM_CREATE => {
             let create_struct =
                 lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
-            let parent = HWND((*create_struct).lpCreateParams as isize);
+            let init_ptr = (*create_struct).lpCreateParams as *mut PromptWindowInit;
+            if init_ptr.is_null() {
+                return LRESULT(0);
+            }
+            let init = unsafe { Box::from_raw(init_ptr) };
+            let parent = init.parent;
             let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
             let labels = prompt_labels(language);
             let hfont = with_state(parent, |state| state.hfont).unwrap_or_default();
@@ -630,9 +671,20 @@ unsafe extern "system" fn prompt_wndproc(
 
             layout_prompt(hwnd, &state);
 
-            if let Some(spawn) = start_prompt_session(hwnd, &settings.prompt_program, &state) {
+            if let Some(spawn) = start_prompt_session(
+                hwnd,
+                &settings.prompt_program,
+                &state,
+                init.working_dir.as_deref(),
+            ) {
                 state.session = Some(spawn.session);
                 start_output_reader(hwnd, spawn.output_read, reader_cancel, beep_state);
+
+                if let Some(cmd) = init.initial_command {
+                    let newline = if state.program_is_codex { "\n" } else { "\r\n" };
+                    let payload = format!("{}{}", cmd, newline);
+                    state.session.as_ref().unwrap().write_input(&payload);
+                }
             }
 
             SetWindowLongPtrW(
@@ -1043,9 +1095,14 @@ fn copy_output_selection(hwnd_output: HWND) {
     }
 }
 
-fn start_prompt_session(hwnd: HWND, program: &str, state: &PromptState) -> Option<ConPtySpawn> {
+fn start_prompt_session(
+    hwnd: HWND,
+    program: &str,
+    state: &PromptState,
+    working_dir: Option<&Path>,
+) -> Option<ConPtySpawn> {
     let (cols, rows) = output_cells(state.output).unwrap_or((80, 24));
-    match ConPtySession::spawn(program, cols, rows) {
+    match ConPtySession::spawn(program, cols, rows, working_dir) {
         Ok(spawn) => Some(spawn),
         Err(err) => {
             log_debug(&format!("Prompt spawn failed: {err}"));

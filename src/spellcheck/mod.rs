@@ -195,6 +195,7 @@ pub fn editor_language_tag(language: Language) -> &'static str {
         Language::English => "en-US",
         Language::Spanish => "es-ES",
         Language::Portuguese => "pt-PT",
+        Language::Swedish => "sv-SE",
         Language::Vietnamese => "vi-VN",
     }
 }

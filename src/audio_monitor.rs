@@ -188,6 +188,15 @@ fn monitor_loop(device_id: String, stop: Arc<AtomicBool>) -> Result<(), String> 
     let mut resampler = LinearResampler::new(in_rate, out_rate, in_channels as usize);
     let mut first_packet = true;
     let mut debug_counter = 0;
+    let mut silence_counter = 0;
+
+    let mut debug_wav = crate::audio_utils::WavWriter::create(
+        std::path::Path::new("monitor_debug.wav"),
+        out_rate,
+        out_channels,
+        16,
+    )
+    .ok();
 
     // Main loop
     while !stop.load(Ordering::Relaxed) {
@@ -213,7 +222,10 @@ fn monitor_loop(device_id: String, stop: Arc<AtomicBool>) -> Result<(), String> 
             }
 
             let samples = if flags & (AUDCLNT_BUFFERFLAGS_SILENT.0 as u32) != 0 {
-                // crate::log_debug("Monitor: Silence flag set"); // Uncomment if needed
+                silence_counter += 1;
+                if silence_counter % 100 == 0 {
+                    crate::log_debug("Monitor: Silence detected");
+                }
                 vec![0f32; frames_available as usize * in_channels as usize]
             } else {
                 read_samples(data_ptr, frames_available, in_channels, in_fmt)
@@ -226,7 +238,11 @@ fn monitor_loop(device_id: String, stop: Arc<AtomicBool>) -> Result<(), String> 
             }
 
             // Resample
-            let resampled = resampler.push(&samples);
+            let resampled = if in_rate == out_rate {
+                samples
+            } else {
+                resampler.push(&samples)
+            };
 
             // Channel mix (naive) if needed
             let output_samples = if in_channels == out_channels {
@@ -235,11 +251,15 @@ fn monitor_loop(device_id: String, stop: Arc<AtomicBool>) -> Result<(), String> 
                 mix_channels(&resampled, in_channels as usize, out_channels as usize)
             };
 
+            if let Some(w) = debug_wav.as_mut() {
+                let _ = w.write_samples_f32(&output_samples);
+            }
+
             // Write to Render
             let frames_to_write = output_samples.len() / out_channels as usize;
             if frames_to_write > 0 {
                 debug_counter += 1;
-                if debug_counter % 500 == 0 {
+                if debug_counter % 50 == 0 {
                     crate::log_debug(&format!("Monitor: Writing {} frames", frames_to_write));
                 }
                 unsafe {
@@ -282,6 +302,10 @@ fn monitor_loop(device_id: String, stop: Arc<AtomicBool>) -> Result<(), String> 
         let _ = capture_client_interface.Stop();
         CoTaskMemFree(Some(render_format_ptr as *const _));
         CoTaskMemFree(Some(capture_format_ptr as *const _));
+    }
+
+    if let Some(mut w) = debug_wav {
+        let _ = w.finalize();
     }
 
     Ok(())

@@ -1038,7 +1038,8 @@ unsafe extern "system" fn podcast_wndproc(
                     if checked {
                         if state.monitor_handle.is_none() {
                             let device_id = selected_device_id(state, true);
-                            match start_monitoring(device_id) {
+                            let device_name = selected_device_name(state, true);
+                            match start_monitoring(device_id, device_name) {
                                 Ok(handle) => state.monitor_handle = Some(handle),
                                 Err(e) => {
                                     SendMessageW(
@@ -1066,7 +1067,8 @@ unsafe extern "system" fn podcast_wndproc(
                                 handle.stop();
                             }
                             let device_id = selected_device_id(state, true);
-                            if let Ok(handle) = start_monitoring(device_id) {
+                            let device_name = selected_device_name(state, true);
+                            if let Ok(handle) = start_monitoring(device_id, device_name) {
                                 state.monitor_handle = Some(handle);
                             }
                         }
@@ -2030,6 +2032,19 @@ fn device_display_name(devices: &[AudioDevice], device_id: &str, fallback: &str)
         .find(|d| d.id == device_id)
         .map(|d| d.name.clone())
         .unwrap_or_else(|| fallback.to_string())
+}
+
+fn selected_device_name(state: &PodcastState, mic: bool) -> String {
+    let list = if mic {
+        &state.mic_devices
+    } else {
+        &state.system_devices
+    };
+    let id = selected_device_id(state, mic);
+    list.iter()
+        .find(|d| d.id == id)
+        .map(|d| d.name.clone())
+        .unwrap_or_default()
 }
 
 fn selected_save_folder(state: &PodcastState) -> PathBuf {

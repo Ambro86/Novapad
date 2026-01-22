@@ -2000,6 +2000,7 @@ dependencies = [
  "calamine",
  "cfb",
  "chrono",
+ "cpal",
  "curl",
  "curl-sys",
  "docx-rs",

@@ -7,7 +7,7 @@ use std::time::Duration;
 use windows::Win32::Media::Audio::{
     AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, IAudioCaptureClient, IAudioClient,
     IAudioRenderClient, IMMDevice, IMMDeviceEnumerator, ISimpleAudioVolume, MMDeviceEnumerator,
-    WAVEFORMATEX, WAVEFORMATEXTENSIBLE, eCapture, eMultimedia, eRender,
+    WAVEFORMATEX, WAVEFORMATEXTENSIBLE, eCapture, eConsole, eMultimedia, eRender,
 };
 use windows::Win32::Media::KernelStreaming::WAVE_FORMAT_EXTENSIBLE;
 use windows::Win32::Media::Multimedia::{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT};
@@ -315,7 +315,7 @@ fn resolve_device(enumerator: &IMMDeviceEnumerator, device_id: &str) -> Result<I
     if device_id.is_empty() || device_id == PODCAST_DEVICE_DEFAULT {
         unsafe {
             enumerator
-                .GetDefaultAudioEndpoint(eCapture, eMultimedia)
+                .GetDefaultAudioEndpoint(eCapture, eConsole)
                 .map_err(|e| format!("GetDefaultAudioEndpoint failed: {e}"))
         }
     } else {

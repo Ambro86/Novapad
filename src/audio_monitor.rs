@@ -14,7 +14,7 @@ use windows::Win32::Media::Multimedia::{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FO
 use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
 use windows::core::PCWSTR;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum SampleFormat {
     I16,
     F32,
@@ -114,6 +114,11 @@ fn monitor_loop(device_id: String, stop: Arc<AtomicBool>) -> Result<(), String> 
     let capture_format = unsafe { *capture_format_ptr };
     let (in_rate, in_channels, in_fmt) = parse_format(&capture_format);
 
+    crate::log_debug(&format!(
+        "Monitor: Capture {} Hz {} ch {:?}, Render {} Hz {} ch {:?}",
+        in_rate, in_channels, in_fmt, out_rate, out_channels, out_fmt
+    ));
+
     unsafe {
         capture_client_interface
             .Initialize(
@@ -144,6 +149,7 @@ fn monitor_loop(device_id: String, stop: Arc<AtomicBool>) -> Result<(), String> 
     }
 
     let mut resampler = LinearResampler::new(in_rate, out_rate, in_channels as usize);
+    let mut first_packet = true;
 
     // Main loop
     while !stop.load(Ordering::Relaxed) {
@@ -154,6 +160,10 @@ fn monitor_loop(device_id: String, stop: Arc<AtomicBool>) -> Result<(), String> 
         };
 
         while packet_len > 0 {
+            if first_packet {
+                crate::log_debug("Monitor: First packet received");
+                first_packet = false;
+            }
             let mut data_ptr: *mut u8 = std::ptr::null_mut();
             let mut frames_available = 0u32;
             let mut flags = 0u32;

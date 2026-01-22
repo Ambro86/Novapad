@@ -948,3 +948,49 @@ pub fn untitled_title(language: Language, number: usize) -> String {
         format!("{} {}", base, number)
     }
 }
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SortOrder {
+    TitleAsc,
+    TitleDesc,
+    DateNewest,
+    DateOldest,
+}
+
+pub fn sort_rss_sources(settings: &mut AppSettings, order: SortOrder) {
+    settings.rss_sources.sort_by(|a, b| match order {
+        SortOrder::TitleAsc => {
+            let ta = if a.user_title { &a.title } else { &a.title }; // Logic to prefer user title or fallback is already in title usually
+            let tb = &b.title;
+            ta.to_lowercase().cmp(&tb.to_lowercase())
+        }
+        SortOrder::TitleDesc => {
+            let ta = &a.title;
+            let tb = &b.title;
+            tb.to_lowercase().cmp(&ta.to_lowercase())
+        }
+        SortOrder::DateNewest => b
+            .last_updated
+            .unwrap_or(0)
+            .cmp(&a.last_updated.unwrap_or(0)),
+        SortOrder::DateOldest => a
+            .last_updated
+            .unwrap_or(0)
+            .cmp(&b.last_updated.unwrap_or(0)),
+    });
+}
+
+pub fn sort_podcast_sources(settings: &mut AppSettings, order: SortOrder) {
+    settings.podcast_sources.sort_by(|a, b| match order {
+        SortOrder::TitleAsc => a.title.to_lowercase().cmp(&b.title.to_lowercase()),
+        SortOrder::TitleDesc => b.title.to_lowercase().cmp(&a.title.to_lowercase()),
+        SortOrder::DateNewest => b
+            .last_updated
+            .unwrap_or(0)
+            .cmp(&a.last_updated.unwrap_or(0)),
+        SortOrder::DateOldest => a
+            .last_updated
+            .unwrap_or(0)
+            .cmp(&b.last_updated.unwrap_or(0)),
+    });
+}

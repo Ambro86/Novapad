@@ -59,6 +59,8 @@ pub struct RssSource {
     pub cache: RssFeedCache,
     #[serde(default)]
     pub last_seen_guid: Option<String>,
+    #[serde(default)]
+    pub last_updated: Option<i64>,
 }
 
 #[derive(Debug, Clone)]
@@ -68,6 +70,7 @@ pub struct RssItem {
     pub description: String,
     pub is_folder: bool,
     pub guid: String,
+    pub pub_date: Option<i64>,
 }
 
 #[derive(Debug, Clone)]
@@ -80,6 +83,7 @@ pub struct PodcastEpisode {
     pub chapters_url: Option<String>,
     pub chapters_type: Option<String>,
     pub podlove_chapters: Vec<Chapter>,
+    pub pub_date: Option<i64>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -380,12 +384,14 @@ fn parse_feed_bytes(
                 .map(|s| s.content.clone())
                 .unwrap_or_default();
             let description = truncate_excerpt(&description, max_excerpt_chars);
+            let pub_date = entry.published.or(entry.updated).map(|d| d.timestamp());
             RssItem {
                 title,
                 link,
                 description,
                 is_folder: false,
                 guid,
+                pub_date,
             }
         })
         .collect();
@@ -427,6 +433,7 @@ fn parse_podcast_feed_bytes(
             };
             let (enclosure_url, enclosure_type) = select_podcast_enclosure(&entry);
             let (chapters_url, chapters_type) = select_podcast_chapters_link(&entry);
+            let pub_date = entry.published.or(entry.updated).map(|d| d.timestamp());
             PodcastEpisode {
                 title,
                 link,
@@ -436,6 +443,7 @@ fn parse_podcast_feed_bytes(
                 chapters_url,
                 chapters_type,
                 podlove_chapters: Vec::new(),
+                pub_date,
             }
         })
         .collect();

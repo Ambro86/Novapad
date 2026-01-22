@@ -19,6 +19,8 @@
   "find.regex": "Regulární výraz",
   "find.dot_matches_newline": "Tečka odpovídá i novému řádku",
   "find.wrap_around": "Hledat dokola",
+  "find.match_case": "Rozlišovat velikost písmen",
+  "find.whole_word": "Pouze celá slova",
   "find.replace_in_selection": "Nahradit ve výběru",
   "find.replace_in_all_docs": "Nahradit ve všech otevřených dokumentech",
   "find.replaced_count": "Provedeno {count} nahrazení.",

@@ -19,6 +19,8 @@
   "find.regex": "Regular expression",
   "find.dot_matches_newline": "Dot matches newline",
   "find.wrap_around": "Wrap around",
+  "find.match_case": "Match case",
+  "find.whole_word": "Whole word",
   "find.replace_in_selection": "Replace in selection",
   "find.replace_in_all_docs": "Replace in all open documents",
   "find.replaced_count": "{count} replacement(s) made.",

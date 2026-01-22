@@ -199,6 +199,9 @@ fn bring_window_to_foreground(hwnd: HWND) {
 }
 
 pub(crate) fn focus_editor(hwnd: HWND) {
+    if has_secondary_window_open(hwnd) {
+        return;
+    }
     bring_window_to_foreground(hwnd);
     unsafe {
         let result = with_state(hwnd, |state| {
@@ -1231,6 +1234,36 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
             handle_chapter_list(hwnd);
         }
         PlayerCommand::BlockNavigation | PlayerCommand::None => {}
+    }
+}
+
+fn has_secondary_window_open(hwnd: HWND) -> bool {
+    unsafe {
+        with_state(hwnd, |state| {
+            state.find_dialog.0 != 0
+                || state.replace_dialog.0 != 0
+                || state.options_dialog.0 != 0
+                || state.help_window.0 != 0
+                || state.changelog_window.0 != 0
+                || state.donations_window.0 != 0
+                || state.bookmarks_window.0 != 0
+                || state.dictionary_window.0 != 0
+                || state.dictionary_entry_dialog.0 != 0
+                || state.wiktionary_window.0 != 0
+                || state.wikipedia_window.0 != 0
+                || state.prompt_window.0 != 0
+                || state.podcast_window.0 != 0
+                || state.podcast_save_window.0 != 0
+                || state.batch_audiobooks_window.0 != 0
+                || state.podcasts_window.0 != 0
+                || state.podcasts_add_dialog.0 != 0
+                || state.podcasts_description_dialog.0 != 0
+                || state.rss_window.0 != 0
+                || state.rss_add_dialog.0 != 0
+                || state.go_to_time_dialog.0 != 0
+                || state.audiobook_progress.0 != 0
+        })
+        .unwrap_or(false)
     }
 }
 
@@ -2650,15 +2683,21 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             LRESULT(0)
         }
         WM_AUTO_UPDATE_CHECK => {
-            updater::check_for_update(hwnd, false);
+            if !has_secondary_window_open(hwnd) {
+                updater::check_for_update(hwnd, false);
+            }
             LRESULT(0)
         }
         WM_CHECK_PENDING_UPDATE => {
-            updater::check_pending_update(hwnd, false);
+            if !has_secondary_window_open(hwnd) {
+                updater::check_pending_update(hwnd, false);
+            }
             LRESULT(0)
         }
         WM_SHOW_CHANGELOG => {
-            app_windows::help_window::open_changelog(hwnd);
+            if !has_secondary_window_open(hwnd) {
+                app_windows::help_window::open_changelog(hwnd);
+            }
             LRESULT(0)
         }
         WM_PDF_LOADED => {
@@ -2815,6 +2854,9 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             LRESULT(0)
         }
         WM_FOCUS_EDITOR => {
+            if has_secondary_window_open(hwnd) {
+                return LRESULT(0);
+            }
             focus_editor(hwnd);
             if SetTimer(hwnd, FOCUS_EDITOR_TIMER_ID, 80, None) == 0 {
                 crate::log_debug("Failed to set FOCUS_EDITOR_TIMER_ID");

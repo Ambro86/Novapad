@@ -33,6 +33,7 @@ use audio_player::*;
 mod editor_manager;
 use editor_manager::*;
 mod app_windows;
+mod audio_monitor;
 mod audio_utils;
 mod i18n;
 mod podcast;

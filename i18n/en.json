@@ -485,6 +485,7 @@
   "podcast.group.controls": "Controls",
   "podcast.group.status": "Status",
   "podcast.include_mic": "Include Microphone",
+  "podcast.monitor_mic": "Test microphone",
   "podcast.mic_device": "Microphone device:",
   "podcast.mic_gain": "Microphone volume:",
   "podcast.system_gain": "System audio volume:",

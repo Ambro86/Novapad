@@ -423,7 +423,7 @@
   "encoding.utf8bom": "UTF-8 con BOM",
   "encoding.utf16le": "UTF-16 LE (con BOM)",
   "encoding.utf16be": "UTF-16 BE (con BOM)",
-  "dialog.save_audio_filter": "File audio (*.mp3;*.m4a;*.aac;*.ogg;*.opus;*.wav;*.flac)\\0*.mp3;*.m4a;*.aac;*.ogg;*.opus;*.wav;*.flac\\0Tutti i file (*.*)\\0*.*\\0\\0",
+  "dialog.save_audio_filter": "MP3 (*.mp3)\\0*.mp3\\0Audiolibro M4B (*.m4b)\\0*.m4b\\0Tutti i file (*.*)\\0*.*\\0\\0",
   "dialog.save_audio_title": "Audiolibro",
   "player.time_announce": "Tempo {current} di {total}",
   "player.time_announce_no_total": "Tempo {current}",

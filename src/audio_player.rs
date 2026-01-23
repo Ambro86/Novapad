@@ -504,7 +504,7 @@ fn start_audiobook_at_with_options(
             && !path.to_string_lossy().contains("podcast cache")
         {
             let cache_dir = settings_dir().join("podcast cache");
-            let _ = std::fs::create_dir_all(&cache_dir);
+            std::fs::create_dir_all(&cache_dir).ok();
             let mut hasher = sha2::Sha256::new();
             hasher.update(path.to_string_lossy().as_bytes());
             let hash = hex::encode(hasher.finalize());
@@ -516,7 +516,7 @@ fn start_audiobook_at_with_options(
                     && e.kind() != std::io::ErrorKind::AlreadyExists
                 {
                     // Fallback to copy if on different volume (slow, but only once)
-                    let _ = std::fs::copy(&path, &linked_path);
+                    if std::fs::copy(&path, &linked_path).is_err() {}
                 }
             }
 

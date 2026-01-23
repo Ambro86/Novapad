@@ -1306,7 +1306,7 @@ fn acquire_update_lock(current_exe: &Path) -> Result<UpdateLock, UpdateLockError
                 log_debug(&format!("Update lock: process {pid} is NOT running."));
             }
             crate::log_debug(&format!("Removing stale update lock at {:?}", path));
-            let _ = std::fs::remove_file(&path);
+            if std::fs::remove_file(&path).is_err() {}
         }
         let mut file = match OpenOptions::new().write(true).create_new(true).open(&path) {
             Ok(file) => file,

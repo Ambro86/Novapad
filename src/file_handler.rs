@@ -8,6 +8,7 @@ use docx_rs::{
 };
 use encoding_rs::{Encoding, WINDOWS_1252};
 use pdf_extract::extract_text;
+use printpdf::{BuiltinFont, Mm, PdfDocument};
 use quick_xml::events::Event;
 use quick_xml::reader::Reader as XmlReader;
 use std::io::Read;
@@ -1447,6 +1448,24 @@ fn extract_table_cell_text(cell: &docx_rs::TableCell) -> String {
     out
 }
 
+pub fn write_docx_text(path: &Path, text: &str) -> Result<(), String> {
+    let file = std::fs::File::create(path).map_err(|err| err.to_string())?;
+    let mut docx = Docx::new();
+    for line in text.lines() {
+        let paragraph = if line.trim().is_empty() {
+            Paragraph::new()
+        } else {
+            Paragraph::new().add_run(Run::new().add_text(line))
+        };
+        docx = docx.add_paragraph(paragraph);
+    }
+    docx.build()
+        .pack(file)
+        .map_err(|err| format!("DOCX build error: {}", err))?;
+    crate::log_debug(&format!("DOCX: Successfully saved to {:?}", path));
+    Ok(())
+}
+
 // --- PDF Parsing ---
 
 pub enum PdfTextResult {
@@ -1455,12 +1474,22 @@ pub enum PdfTextResult {
 }
 
 pub fn read_pdf_text_with_status(path: &Path, language: Language) -> Result<PdfTextResult, String> {
+    crate::log_debug(&format!("PDF: Starting extraction for {:?}", path));
+    let start = std::time::Instant::now();
+
     // Use catch_unwind to handle potential panics in pdf_extract library
     let extraction_result =
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| extract_text(path)));
 
     let text = match extraction_result {
-        Ok(Ok(text)) => text,
+        Ok(Ok(text)) => {
+            crate::log_debug(&format!(
+                "PDF: Raw extraction completed in {:?}, length={}",
+                start.elapsed(),
+                text.len()
+            ));
+            text
+        }
         Ok(Err(err)) => {
             return Err(i18n::tr_f(
                 language,
@@ -1479,10 +1508,19 @@ pub fn read_pdf_text_with_status(path: &Path, language: Language) -> Result<PdfT
 
     // Handle empty or whitespace-only PDFs
     if text.trim().is_empty() {
+        crate::log_debug("PDF: No text extracted.");
         return Ok(PdfTextResult::NoText);
     }
 
-    Ok(PdfTextResult::Text(normalize_pdf_paragraphs(&text)))
+    let norm_start = std::time::Instant::now();
+    let normalized = normalize_pdf_paragraphs(&text);
+    crate::log_debug(&format!(
+        "PDF: Normalization completed in {:?}, final length={}",
+        norm_start.elapsed(),
+        normalized.len()
+    ));
+
+    Ok(PdfTextResult::Text(normalized))
 }
 
 pub fn read_pdf_text(path: &Path, language: Language) -> Result<String, String> {
@@ -1592,7 +1630,8 @@ fn looks_like_list_item(line: &str) -> bool {
 fn average_pdf_line_len(text: &str) -> usize {
     let mut total = 0usize;
     let mut count = 0usize;
-    for raw_line in text.lines() {
+    // For performance on large files, sample only the first 2000 lines
+    for raw_line in text.lines().take(2000) {
         let line = raw_line.trim();
         if line.is_empty() || looks_like_list_item(line) {
             continue;
@@ -1606,6 +1645,49 @@ fn average_pdf_line_len(text: &str) -> usize {
 // Error message helpers (copied from main.rs)
 fn error_invalid_encoding_message(language: Language) -> String {
     i18n::tr(language, "file_handler.invalid_encoding")
+}
+
+pub fn write_pdf_text(path: &Path, title: &str, text: &str) -> Result<(), String> {
+    let page_width = Mm(210.0);
+    let page_height = Mm(297.0);
+    let margin: f32 = 18.0;
+    let header_height: f32 = 18.0;
+    let body_font_size: f32 = 12.0;
+    let line_height: f32 = 14.0;
+
+    let title = if title.trim().is_empty() {
+        "Novapad Document"
+    } else {
+        title
+    };
+
+    let (doc, page1, layer1) = PdfDocument::new(title, page_width, page_height, "Layer 1");
+    let font = doc
+        .add_builtin_font(BuiltinFont::Helvetica)
+        .map_err(|e| format!("Font error: {}", e))?;
+
+    let mut current_page = page1;
+    let mut current_layer = layer1;
+    let mut y = page_height.0 - margin - header_height;
+
+    for line in text.lines() {
+        if y < margin + line_height {
+            let (new_page, new_layer) = doc.add_page(page_width, page_height, "Layer");
+            current_page = new_page;
+            current_layer = new_layer;
+            y = page_height.0 - margin;
+        }
+
+        let layer = doc.get_page(current_page).get_layer(current_layer);
+        layer.use_text(line.trim_end(), body_font_size, Mm(margin), Mm(y), &font);
+        y -= line_height;
+    }
+
+    let file = std::fs::File::create(path).map_err(|e| e.to_string())?;
+    doc.save(&mut std::io::BufWriter::new(file))
+        .map_err(|e| e.to_string())?;
+    crate::log_debug(&format!("PDF: Successfully saved to {:?}", path));
+    Ok(())
 }
 
 fn error_invalid_utf16le_message(language: Language) -> String {

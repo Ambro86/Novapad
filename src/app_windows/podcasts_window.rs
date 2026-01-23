@@ -1176,12 +1176,13 @@ unsafe fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpis
                 last_reported_pct = (pct / 10) * 10;
                 unsafe {
                     if windows::Win32::UI::WindowsAndMessaging::IsWindow(hwnd_copy).as_bool() {
-                        let _ = PostMessageW(
+                        PostMessageW(
                             hwnd_copy,
                             WM_PODCAST_DOWNLOAD_PROGRESS,
                             WPARAM(last_reported_pct as usize),
                             LPARAM(0),
-                        );
+                        )
+                        .ok();
                     }
                 }
             }
@@ -2572,7 +2573,7 @@ unsafe fn show_description_dialog(parent: HWND, title: &str, content: &str) {
         hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
         ..Default::default()
     };
-    let _ = RegisterClassW(&wc);
+    let _atom = RegisterClassW(&wc);
 
     let window_title = i18n::tr(
         with_podcast_state(parent, |s| s.language).unwrap_or_default(),

@@ -56,7 +56,9 @@ impl MfSource {
                     .map_err(|e| format!("MFCreateSourceReaderFromURL failed: {}", e))?;
 
             // Disable all streams and try to find the first audio stream
-            let _ = reader.SetStreamSelection(MF_SOURCE_READER_ALL_STREAMS.0 as u32, false);
+            reader
+                .SetStreamSelection(MF_SOURCE_READER_ALL_STREAMS.0 as u32, false)
+                .ok();
             reader
                 .SetStreamSelection(MF_SOURCE_READER_FIRST_AUDIO_STREAM.0 as u32, true)
                 .map_err(|e| format!("Enable audio stream failed: {}", e))?;

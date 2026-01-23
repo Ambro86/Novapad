@@ -3,13 +3,18 @@ use crate::mf_encoder::MfGuard;
 use rodio::Source;
 use std::time::Duration;
 use windows::Win32::Media::MediaFoundation::{
-    IMFSourceReader, MF_MT_AUDIO_BITS_PER_SAMPLE, MF_MT_AUDIO_NUM_CHANNELS,
+    IMFAttributes, IMFSourceReader, MF_MT_AUDIO_BITS_PER_SAMPLE, MF_MT_AUDIO_NUM_CHANNELS,
     MF_MT_AUDIO_SAMPLES_PER_SECOND, MF_MT_MAJOR_TYPE, MF_MT_SUBTYPE, MF_PD_DURATION,
-    MF_SOURCE_READER_FIRST_AUDIO_STREAM, MF_SOURCE_READERF_ENDOFSTREAM, MFAudioFormat_PCM,
-    MFCreateMediaType, MFCreateSourceReaderFromURL, MFMediaType_Audio,
+    MF_SOURCE_READER_ALL_STREAMS, MF_SOURCE_READER_FIRST_AUDIO_STREAM,
+    MF_SOURCE_READER_MEDIASOURCE, MF_SOURCE_READERF_ENDOFSTREAM, MFAudioFormat_PCM,
+    MFCreateAttributes, MFCreateMediaType, MFCreateSourceReaderFromURL, MFMediaType_Audio,
 };
 use windows::Win32::System::Com::StructuredStorage::PropVariantToInt64;
 use windows::core::{GUID, PCWSTR, PROPVARIANT};
+
+// GUID for MF_READWRITE_ENABLE_FORMAT_CONVERSION: 17445a34-22f1-4fd7-a07d-87660c21be13
+const MF_READWRITE_ENABLE_FORMAT_CONVERSION: GUID =
+    GUID::from_u128(0x17445a34_22f1_4fd7_a07d_87660c21be13);
 
 pub struct MfSource {
     _guard: MfGuard,
@@ -30,11 +35,45 @@ impl MfSource {
         unsafe {
             let guard = MfGuard::start()?;
             let path_wide = to_wide(path.to_str().ok_or("Invalid path")?);
+
+            // Create attributes to enable format conversion and hardware/system decoders
+            let mut attributes: Option<IMFAttributes> = None;
+            MFCreateAttributes(&mut attributes, 2)
+                .map_err(|e| format!("MFCreateAttributes failed: {}", e))?;
+            let attributes = attributes.ok_or("Failed to create attributes")?;
+
+            attributes
+                .SetUINT32(&MF_READWRITE_ENABLE_FORMAT_CONVERSION, 1)
+                .map_err(|e| format!("Failed to enable format conversion: {}", e))?;
+
+            // Allow all decoders (hardware and system)
+            attributes
+                .SetUINT32(&windows::Win32::Media::MediaFoundation::MF_SOURCE_READER_ENABLE_VIDEO_PROCESSING, 1)
+                .map_err(|e| e.to_string())?;
+
             let reader: IMFSourceReader =
-                MFCreateSourceReaderFromURL(PCWSTR(path_wide.as_ptr()), None)
+                MFCreateSourceReaderFromURL(PCWSTR(path_wide.as_ptr()), Some(&attributes))
                     .map_err(|e| format!("MFCreateSourceReaderFromURL failed: {}", e))?;
 
-            // Configure output to PCM
+            // Disable all streams and try to find the first audio stream
+            let _ = reader.SetStreamSelection(MF_SOURCE_READER_ALL_STREAMS.0 as u32, false);
+            reader
+                .SetStreamSelection(MF_SOURCE_READER_FIRST_AUDIO_STREAM.0 as u32, true)
+                .map_err(|e| format!("Enable audio stream failed: {}", e))?;
+
+            // Get native format to match sample rate and channels
+            let native_type = reader
+                .GetNativeMediaType(MF_SOURCE_READER_FIRST_AUDIO_STREAM.0 as u32, 0)
+                .map_err(|e| format!("GetNativeMediaType failed: {}", e))?;
+
+            let native_channels = native_type
+                .GetUINT32(&MF_MT_AUDIO_NUM_CHANNELS)
+                .unwrap_or(2);
+            let native_rate = native_type
+                .GetUINT32(&MF_MT_AUDIO_SAMPLES_PER_SECOND)
+                .unwrap_or(44100);
+
+            // Configure output to PCM matching native parameters
             let pcm_type =
                 MFCreateMediaType().map_err(|e| format!("MFCreateMediaType failed: {}", e))?;
             pcm_type
@@ -46,6 +85,12 @@ impl MfSource {
             pcm_type
                 .SetUINT32(&MF_MT_AUDIO_BITS_PER_SAMPLE, 16)
                 .map_err(|e| format!("Set bits failed: {}", e))?;
+            pcm_type
+                .SetUINT32(&MF_MT_AUDIO_NUM_CHANNELS, native_channels)
+                .map_err(|e| format!("Set channels failed: {}", e))?;
+            pcm_type
+                .SetUINT32(&MF_MT_AUDIO_SAMPLES_PER_SECOND, native_rate)
+                .map_err(|e| format!("Set rate failed: {}", e))?;
 
             reader
                 .SetCurrentMediaType(
@@ -61,11 +106,11 @@ impl MfSource {
 
             let channels = current_type
                 .GetUINT32(&MF_MT_AUDIO_NUM_CHANNELS)
-                .map_err(|e| format!("Get channels failed: {}", e))?
+                .map_err(|e| format!("Get channels (final) failed: {}", e))?
                 as u16;
             let sample_rate = current_type
                 .GetUINT32(&MF_MT_AUDIO_SAMPLES_PER_SECOND)
-                .map_err(|e| format!("Get sample rate failed: {}", e))?;
+                .map_err(|e| format!("Get sample rate (final) failed: {}", e))?;
 
             let duration = get_reader_duration(&reader).map(Duration::from_secs);
 
@@ -175,10 +220,9 @@ impl Source for MfSource {
 
 fn get_reader_duration(reader: &IMFSourceReader) -> Option<u64> {
     unsafe {
-        // Use MF_SOURCE_READER_MEDIASOURCE (0xFFFFFFFF) for presentation-wide attributes
-
+        // Use MF_SOURCE_READER_MEDIASOURCE for presentation-wide attributes
         let var = reader
-            .GetPresentationAttribute(0xffffffff, &MF_PD_DURATION)
+            .GetPresentationAttribute(MF_SOURCE_READER_MEDIASOURCE.0 as u32, &MF_PD_DURATION)
             .ok()?;
 
         let hns = PropVariantToInt64(&var).ok()?;

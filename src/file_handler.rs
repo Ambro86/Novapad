@@ -11,7 +11,7 @@ use pdf_extract::extract_text;
 use printpdf::{BuiltinFont, Mm, PdfDocument};
 use quick_xml::events::Event;
 use quick_xml::reader::Reader as XmlReader;
-use std::io::Read;
+use std::io::{BufWriter, Read};
 use std::path::Path;
 use windows::Win32::Globalization::{CP_ACP, WideCharToMultiByte};
 use zip::ZipArchive;
@@ -1448,21 +1448,31 @@ fn extract_table_cell_text(cell: &docx_rs::TableCell) -> String {
     out
 }
 
-pub fn write_docx_text(path: &Path, text: &str) -> Result<(), String> {
-    let file = std::fs::File::create(path).map_err(|err| err.to_string())?;
+pub fn write_docx_text(path: &Path, text: &str, language: Language) -> Result<(), String> {
+    let file = std::fs::File::create(path).map_err(|err| {
+        i18n::tr_f(
+            language,
+            "file_handler.file_save_error",
+            &[("err", &err.to_string())],
+        )
+    })?;
     let mut docx = Docx::new();
-    for line in text.lines() {
-        let paragraph = if line.trim().is_empty() {
+    for line in text.split('\n') {
+        let line = line.strip_suffix('\r').unwrap_or(line);
+        let paragraph = if line.is_empty() {
             Paragraph::new()
         } else {
             Paragraph::new().add_run(Run::new().add_text(line))
         };
         docx = docx.add_paragraph(paragraph);
     }
-    docx.build()
-        .pack(file)
-        .map_err(|err| format!("DOCX build error: {}", err))?;
-    crate::log_debug(&format!("DOCX: Successfully saved to {:?}", path));
+    docx.build().pack(file).map_err(|err| {
+        i18n::tr_f(
+            language,
+            "file_handler.docx_save_error",
+            &[("err", &err.to_string())],
+        )
+    })?;
     Ok(())
 }
 
@@ -1647,47 +1657,260 @@ fn error_invalid_encoding_message(language: Language) -> String {
     i18n::tr(language, "file_handler.invalid_encoding")
 }
 
-pub fn write_pdf_text(path: &Path, title: &str, text: &str) -> Result<(), String> {
+pub fn write_pdf_text(
+    path: &Path,
+    title: &str,
+    text: &str,
+    language: Language,
+) -> Result<(), String> {
     let page_width = Mm(210.0);
     let page_height = Mm(297.0);
     let margin: f32 = 18.0;
     let header_height: f32 = 18.0;
+    let footer_height: f32 = 12.0;
     let body_font_size: f32 = 12.0;
+    let header_font_size: f32 = 14.0;
     let line_height: f32 = 14.0;
-
+    let bullet_indent_mm: f32 = 6.0;
+    let bullet_indent_chars = 4usize;
+    let max_chars = estimate_max_chars(page_width.0, margin, body_font_size);
     let title = if title.trim().is_empty() {
-        "Novapad Document"
+        "Novapad"
     } else {
         title
     };
-
     let (doc, page1, layer1) = PdfDocument::new(title, page_width, page_height, "Layer 1");
     let font = doc
         .add_builtin_font(BuiltinFont::Helvetica)
-        .map_err(|e| format!("Font error: {}", e))?;
-
-    let mut current_page = page1;
-    let mut current_layer = layer1;
-    let mut y = page_height.0 - margin - header_height;
-
-    for line in text.lines() {
-        if y < margin + line_height {
-            let (new_page, new_layer) = doc.add_page(page_width, page_height, "Layer");
-            current_page = new_page;
-            current_layer = new_layer;
-            y = page_height.0 - margin;
+        .map_err(|err| {
+            i18n::tr_f(
+                language,
+                "file_handler.pdf_font_error",
+                &[("err", &err.to_string())],
+            )
+        })?;
+    let font_bold = doc
+        .add_builtin_font(BuiltinFont::HelveticaBold)
+        .map_err(|err| {
+            i18n::tr_f(
+                language,
+                "file_handler.pdf_font_error",
+                &[("err", &err.to_string())],
+            )
+        })?;
+    let lines = layout_pdf_lines(
+        text,
+        max_chars,
+        bullet_indent_chars,
+        body_font_size,
+        bullet_indent_mm,
+    );
+    let content_top = page_height.0 - margin - header_height;
+    let content_bottom = margin + footer_height;
+    let mut pages: Vec<Vec<PdfLine>> = Vec::new();
+    let mut current: Vec<PdfLine> = Vec::new();
+    let mut y = content_top;
+    for line in lines {
+        if y < content_bottom + line_height {
+            pages.push(current);
+            current = Vec::new();
+            y = content_top;
         }
-
-        let layer = doc.get_page(current_page).get_layer(current_layer);
-        layer.use_text(line.trim_end(), body_font_size, Mm(margin), Mm(y), &font);
+        current.push(line);
         y -= line_height;
     }
-
-    let file = std::fs::File::create(path).map_err(|e| e.to_string())?;
-    doc.save(&mut std::io::BufWriter::new(file))
-        .map_err(|e| e.to_string())?;
-    crate::log_debug(&format!("PDF: Successfully saved to {:?}", path));
+    if !current.is_empty() {
+        pages.push(current);
+    } else if pages.is_empty() {
+        pages.push(Vec::new());
+    }
+    for (page_index, page_lines) in pages.iter().enumerate() {
+        let (page, layer_id) = if page_index == 0 {
+            (page1, layer1)
+        } else {
+            doc.add_page(page_width, page_height, "Layer")
+        };
+        let layer = doc.get_page(page).get_layer(layer_id);
+        let header_y = page_height.0 - margin - 8.0;
+        layer.use_text(
+            title,
+            header_font_size,
+            Mm(margin),
+            Mm(header_y),
+            &font_bold,
+        );
+        let page_label = i18n::tr_f(
+            language,
+            "file_handler.pdf_page_label",
+            &[
+                ("page", &(page_index + 1).to_string()),
+                ("total", &pages.len().to_string()),
+            ],
+        );
+        layer.use_text(&page_label, 9.0, Mm(margin), Mm(margin - 6.0), &font);
+        let mut y = content_top;
+        for line in page_lines {
+            if line.is_blank {
+                y -= line_height;
+                continue;
+            }
+            layer.use_text(
+                &line.text,
+                line.font_size,
+                Mm(margin + line.indent),
+                Mm(y),
+                &font,
+            );
+            y -= line_height;
+        }
+    }
+    let file = std::fs::File::create(path).map_err(|err| {
+        i18n::tr_f(
+            language,
+            "file_handler.file_save_error",
+            &[("err", &err.to_string())],
+        )
+    })?;
+    doc.save(&mut BufWriter::new(file)).map_err(|err| {
+        i18n::tr_f(
+            language,
+            "file_handler.pdf_save_error",
+            &[("err", &err.to_string())],
+        )
+    })?;
     Ok(())
+}
+
+struct PdfLine {
+    text: String,
+    indent: f32,
+    font_size: f32,
+    is_blank: bool,
+}
+
+fn estimate_max_chars(page_width: f32, margin: f32, font_size: f32) -> usize {
+    let usable_mm = page_width - (margin * 2.0);
+    let avg_char_mm = (font_size * 0.3528) * 0.5;
+    let estimate = (usable_mm / avg_char_mm) as usize;
+    estimate.clamp(60, 110)
+}
+
+fn layout_pdf_lines(
+    text: &str,
+    max_chars: usize,
+    bullet_indent_chars: usize,
+    font_size: f32,
+    bullet_indent_mm: f32,
+) -> Vec<PdfLine> {
+    let mut lines = Vec::new();
+    for raw_line in text.lines() {
+        let line = raw_line.trim_end_matches('\r');
+        if line.trim().is_empty() {
+            lines.push(PdfLine {
+                text: String::new(),
+                indent: 0.0,
+                font_size,
+                is_blank: true,
+            });
+            continue;
+        }
+        if let Some((prefix, content)) = split_list_prefix(line) {
+            let first_max = max_chars.saturating_sub(prefix.len());
+            let next_max = max_chars.saturating_sub(bullet_indent_chars);
+            let mut wrapped = wrap_list_item(content, first_max, next_max);
+            if wrapped.is_empty() {
+                wrapped.push(String::new());
+            }
+            lines.push(PdfLine {
+                text: format!("{}{}", prefix, wrapped[0]),
+                indent: 0.0,
+                font_size,
+                is_blank: false,
+            });
+            for rest in wrapped.into_iter().skip(1) {
+                lines.push(PdfLine {
+                    text: rest,
+                    indent: bullet_indent_mm,
+                    font_size,
+                    is_blank: false,
+                });
+            }
+            continue;
+        }
+        for wrapped in wrap_words(line, max_chars) {
+            lines.push(PdfLine {
+                text: wrapped,
+                indent: 0.0,
+                font_size,
+                is_blank: false,
+            });
+        }
+    }
+    lines
+}
+
+fn split_list_prefix(line: &str) -> Option<(String, &str)> {
+    let trimmed = line.trim_start();
+    if let Some(rest) = trimmed.strip_prefix("- ") {
+        return Some(("- ".to_string(), rest));
+    }
+    if let Some(rest) = trimmed.strip_prefix("* ") {
+        return Some(("* ".to_string(), rest));
+    }
+    let bytes = trimmed.as_bytes();
+    let mut i = 0usize;
+    while i < bytes.len() && bytes[i].is_ascii_digit() {
+        i += 1;
+    }
+    if i > 0 && i + 1 < bytes.len() && bytes[i] == b'.' && bytes[i + 1] == b' ' {
+        return Some((trimmed[..i + 2].to_string(), &trimmed[i + 2..]));
+    }
+    None
+}
+
+fn wrap_words(text: &str, max_chars: usize) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut current = String::new();
+    for word in text.split_whitespace() {
+        if current.is_empty() {
+            current.push_str(word);
+        } else if current.len() + 1 + word.len() <= max_chars {
+            current.push(' ');
+            current.push_str(word);
+        } else {
+            lines.push(current);
+            current = word.to_string();
+        }
+    }
+    if !current.is_empty() {
+        lines.push(current);
+    }
+    lines
+}
+
+fn wrap_list_item(content: &str, first_max: usize, next_max: usize) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut current = String::new();
+    for word in content.split_whitespace() {
+        let limit = if lines.is_empty() {
+            first_max
+        } else {
+            next_max
+        };
+        if current.is_empty() {
+            current.push_str(word);
+        } else if current.len() + 1 + word.len() <= limit {
+            current.push(' ');
+            current.push_str(word);
+        } else {
+            lines.push(current);
+            current = word.to_string();
+        }
+    }
+    if !current.is_empty() {
+        lines.push(current);
+    }
+    lines
 }
 
 fn error_invalid_utf16le_message(language: Language) -> String {

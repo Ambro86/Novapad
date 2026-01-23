@@ -482,11 +482,51 @@ fn select_podcast_enclosure(entry: &feed_rs::model::Entry) -> (Option<String>, O
             return (Some(link.href.clone()), link.media_type.clone());
         }
     }
+    // First pass: prefer URLs with audio file extensions (.mp3, .m4a, etc.) or audio path
     for media in &entry.media {
         for content in &media.content {
             if let Some(url) = content.url.as_ref() {
-                let media_type = content.content_type.as_ref().map(|m| m.to_string());
-                return (Some(url.to_string()), media_type);
+                let url_str = url.as_str().to_lowercase();
+                let has_audio_ext = url_str.ends_with(".mp3")
+                    || url_str.ends_with(".m4a")
+                    || url_str.ends_with(".aac")
+                    || url_str.ends_with(".ogg")
+                    || url_str.ends_with(".opus")
+                    || url_str.ends_with(".wav")
+                    || url_str.contains("/audio.mp3")
+                    || url_str.contains("/audio.");
+                let is_embed = url_str.contains("/embed");
+                if has_audio_ext && !is_embed {
+                    let media_type = content.content_type.as_ref().map(|m| m.to_string());
+                    return (Some(url.to_string()), media_type);
+                }
+            }
+        }
+    }
+    // Second pass: take any audio/video content that's not an embed page
+    for media in &entry.media {
+        for content in &media.content {
+            if let Some(url) = content.url.as_ref() {
+                let url_str = url.as_str().to_lowercase();
+                let is_embed = url_str.contains("/embed");
+                if let Some(media_type) = content.content_type.as_ref() {
+                    let mt = media_type.to_string().to_lowercase();
+                    if (mt.starts_with("audio/") || mt.starts_with("video/")) && !is_embed {
+                        return (Some(url.to_string()), Some(media_type.to_string()));
+                    }
+                }
+            }
+        }
+    }
+    // Fallback: take first media content but skip embed URLs
+    for media in &entry.media {
+        for content in &media.content {
+            if let Some(url) = content.url.as_ref() {
+                let url_str = url.as_str().to_lowercase();
+                if !url_str.contains("/embed") {
+                    let media_type = content.content_type.as_ref().map(|m| m.to_string());
+                    return (Some(url.to_string()), media_type);
+                }
             }
         }
     }

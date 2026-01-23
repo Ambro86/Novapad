@@ -511,17 +511,15 @@ fn start_audiobook_at_with_options(
             let linked_path = cache_dir.join(format!("link_{}.m4a", &hash[..16]));
 
             if !linked_path.exists() {
-                log_debug(&format!(
-                    "Audio player: Creating M4A alias for extension {}: {}",
-                    extension,
-                    linked_path.display()
-                ));
                 // Try hard link first (instant, no space)
-                if std::fs::hard_link(&path, &linked_path).is_err() {
-                    // Fallback to copy if on different volume (slow, but only once)
-                    let _ = std::fs::copy(&path, &linked_path);
+                if let Err(e) = std::fs::hard_link(&path, &linked_path) {
+                    if e.kind() != std::io::ErrorKind::AlreadyExists {
+                        // Fallback to copy if on different volume (slow, but only once)
+                        let _ = std::fs::copy(&path, &linked_path);
+                    }
                 }
             }
+
             if linked_path.exists() {
                 final_path = linked_path;
             }
@@ -553,45 +551,28 @@ fn start_audiobook_at_with_options(
                 }
                 Err(e) => {
                     log_debug(&format!(
-                        "Audio player: MfSource failed, falling back to rodio: {}",
-                        e
+                        "Audio player: MfSource failed for {}, falling back to rodio: {}",
+                        extension, e
                     ));
                     // Fallback to rodio decoder
-                    if file_size > 100 * 1024 * 1024 {
-                        let reader = std::io::BufReader::with_capacity(
-                            8 * 1024 * 1024,
-                            std::fs::File::open(&path).unwrap(),
-                        );
+                    let file = std::fs::File::open(&path).map_err(|e| e.to_string()).ok();
+                    if let Some(file) = file {
+                        let reader = std::io::BufReader::with_capacity(8 * 1024 * 1024, file);
                         match Decoder::new(reader) {
                             Ok(d) => Box::new(
                                 d.convert_samples()
                                     .skip_duration(std::time::Duration::from_secs(seconds)),
                             ),
-                            Err(e) => {
-                                log_debug(&format!("Audio player: Decoder failed: {}", e));
+                            Err(err) => {
+                                log_debug(&format!(
+                                    "Audio player: Rodio fallback decoder failed: {}",
+                                    err
+                                ));
                                 return;
                             }
                         }
                     } else {
-                        match std::fs::read(&path) {
-                            Ok(bytes) => match Decoder::new(std::io::Cursor::new(bytes)) {
-                                Ok(d) => Box::new(
-                                    d.convert_samples()
-                                        .skip_duration(std::time::Duration::from_secs(seconds)),
-                                ),
-                                Err(e) => {
-                                    log_debug(&format!(
-                                        "Audio player: Memory decoder failed: {}",
-                                        e
-                                    ));
-                                    return;
-                                }
-                            },
-                            Err(e) => {
-                                log_debug(&format!("Audio player: Failed to read file: {}", e));
-                                return;
-                            }
-                        }
+                        return;
                     }
                 }
             }

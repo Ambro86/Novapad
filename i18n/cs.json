@@ -423,7 +423,7 @@
   "encoding.utf8bom": "UTF-8 s BOM",
   "encoding.utf16le": "UTF-16 LE (s BOM)",
   "encoding.utf16be": "UTF-8 BE (s BOM)",
-  "dialog.save_audio_filter": "Zvukové soubory (*.mp3;*.m4a;*.aac;*.ogg;*.opus;*.wav;*.flac)\\0*.mp3;*.m4a;*.aac;*.ogg;*.opus;*.wav;*.flac\\0Všechny soubory (*.*)\\0*.*\\0\\0",
+  "dialog.save_audio_filter": "MP3 (*.mp3)\\0*.mp3\\0M4B Audiokniha (*.m4b)\\0*.m4b\\0Všechny soubory (*.*)\\0*.*\\0\\0",
   "dialog.save_audio_title": "Audiokniha",
   "player.time_announce": "Čas {current} z {total}",
   "player.time_announce_no_total": "Čas {current}",

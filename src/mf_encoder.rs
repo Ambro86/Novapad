@@ -9,8 +9,9 @@ use windows::Win32::Media::MediaFoundation::{
     MF_MT_AUDIO_NUM_CHANNELS, MF_MT_AUDIO_SAMPLES_PER_SECOND, MF_MT_FIXED_SIZE_SAMPLES,
     MF_MT_MAJOR_TYPE, MF_MT_SAMPLE_SIZE, MF_MT_SUBTYPE, MF_PD_DURATION,
     MF_SOURCE_READER_FIRST_AUDIO_STREAM, MF_SOURCE_READERF_ENDOFSTREAM, MF_VERSION,
-    MFAudioFormat_MP3, MFAudioFormat_PCM, MFCreateMediaType, MFCreateMemoryBuffer, MFCreateSample,
-    MFCreateSinkWriterFromURL, MFCreateSourceReaderFromURL, MFMediaType_Audio, MFStartup,
+    MFAudioFormat_AAC, MFAudioFormat_MP3, MFAudioFormat_PCM, MFCreateMediaType,
+    MFCreateMemoryBuffer, MFCreateSample, MFCreateSinkWriterFromURL, MFCreateSourceReaderFromURL,
+    MFMediaType_Audio, MFStartup,
 };
 use windows::core::PCWSTR;
 
@@ -267,20 +268,24 @@ fn read_wav_data_info(path: &Path) -> Result<(u64, u32, i16), String> {
 }
 
 pub fn encode_wav_to_mp3(wav_path: &Path, mp3_path: &Path) -> Result<(), String> {
-    encode_wav_to_mp3_with_bitrate(wav_path, mp3_path, 128)
+    encode_wav_to_audio(wav_path, mp3_path, 128)
 }
 
-pub fn encode_wav_to_mp3_with_bitrate(
+pub fn encode_wav_to_m4b(wav_path: &Path, m4b_path: &Path) -> Result<(), String> {
+    encode_wav_to_audio(wav_path, m4b_path, 128)
+}
+
+pub fn encode_wav_to_audio(
     wav_path: &Path,
-    mp3_path: &Path,
+    output_path: &Path,
     bitrate_kbps: u32,
 ) -> Result<(), String> {
-    encode_wav_to_mp3_with_bitrate_progress(wav_path, mp3_path, bitrate_kbps, |_| {}, None)
+    encode_wav_to_audio_progress(wav_path, output_path, bitrate_kbps, |_| {}, None)
 }
 
-pub fn encode_wav_to_mp3_with_bitrate_progress<F>(
+pub fn encode_wav_to_audio_progress<F>(
     wav_path: &Path,
-    mp3_path: &Path,
+    output_path: &Path,
     bitrate_kbps: u32,
     mut progress: F,
     cancel: Option<&std::sync::atomic::AtomicBool>,
@@ -289,19 +294,37 @@ where
     F: FnMut(u32),
 {
     unsafe {
+        let extension = output_path
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+        let is_aac = extension == "m4b" || extension == "m4a" || extension == "mp4";
+
         let bitrate_kbps = match bitrate_kbps {
             192 => 192,
             256 => 256,
             _ => 128,
         };
         crate::log_debug(&format!(
-            "MF: encode wav to mp3. wav={:?} mp3={:?} bitrate_kbps={}",
-            wav_path, mp3_path, bitrate_kbps
+            "MF: encode wav to {}. wav={:?} out={:?} bitrate_kbps={}",
+            if is_aac { "aac" } else { "mp3" },
+            wav_path,
+            output_path,
+            bitrate_kbps
         ));
         let _guard = MfGuard::start()?;
 
+        // MFCreateSinkWriterFromURL often fails with .m4b extension (0xC00D36D5).
+        // We use .m4a internally if target is AAC and extension is not recognized.
+        let actual_output_path = if is_aac && extension == "m4b" {
+            output_path.with_extension("m4a")
+        } else {
+            output_path.to_path_buf()
+        };
+
         let wav_wide = to_wide(wav_path.to_str().ok_or("Invalid wav path")?);
-        let mp3_wide = to_wide(mp3_path.to_str().ok_or("Invalid mp3 path")?);
+        let output_wide = to_wide(actual_output_path.to_str().ok_or("Invalid output path")?);
 
         let reader: IMFSourceReader = MFCreateSourceReaderFromURL(PCWSTR(wav_wide.as_ptr()), None)
             .map_err(|e| format!("MFCreateSourceReaderFromURL failed: {}", e))?;
@@ -399,30 +422,34 @@ where
         }
 
         let out_type: IMFMediaType =
-            MFCreateMediaType().map_err(|e| format!("MFCreateMediaType (mp3) failed: {}", e))?;
+            MFCreateMediaType().map_err(|e| format!("MFCreateMediaType (output) failed: {}", e))?;
         out_type
             .SetGUID(&MF_MT_MAJOR_TYPE, &MFMediaType_Audio)
             .map_err(|e| format!("SetGUID major type (out) failed: {}", e))?;
-        out_type
-            .SetGUID(&MF_MT_SUBTYPE, &MFAudioFormat_MP3)
-            .map_err(|e| format!("SetGUID subtype MP3 failed: {}", e))?;
+
+        if is_aac {
+            out_type
+                .SetGUID(&MF_MT_SUBTYPE, &MFAudioFormat_AAC)
+                .map_err(|e| format!("SetGUID subtype AAC failed: {}", e))?;
+        } else {
+            out_type
+                .SetGUID(&MF_MT_SUBTYPE, &MFAudioFormat_MP3)
+                .map_err(|e| format!("SetGUID subtype MP3 failed: {}", e))?;
+        }
+
         out_type
             .SetUINT32(&MF_MT_AUDIO_NUM_CHANNELS, requested_channels)
             .map_err(|e| format!("Set channels failed: {}", e))?;
         out_type
             .SetUINT32(&MF_MT_AUDIO_SAMPLES_PER_SECOND, requested_rate)
             .map_err(|e| format!("Set sample rate failed: {}", e))?;
-        let mp3_avg_bytes = (bitrate_kbps * 1000) / 8;
+        let output_avg_bytes = (bitrate_kbps * 1000) / 8;
         out_type
-            .SetUINT32(&MF_MT_AUDIO_AVG_BYTES_PER_SECOND, mp3_avg_bytes)
-            .map_err(|e| format!("Set mp3 bitrate failed: {}", e))?;
-        crate::log_debug(&format!(
-            "MF: output mp3 rate={} ch={} avg_bytes={}",
-            requested_rate, requested_channels, mp3_avg_bytes
-        ));
+            .SetUINT32(&MF_MT_AUDIO_AVG_BYTES_PER_SECOND, output_avg_bytes)
+            .map_err(|e| format!("Set output bitrate failed: {}", e))?;
 
         let writer: IMFSinkWriter =
-            MFCreateSinkWriterFromURL(PCWSTR(mp3_wide.as_ptr()), None, None)
+            MFCreateSinkWriterFromURL(PCWSTR(output_wide.as_ptr()), None, None)
                 .map_err(|e| format!("MFCreateSinkWriterFromURL failed: {}", e))?;
         let stream_index = writer
             .AddStream(&out_type)
@@ -491,12 +518,18 @@ where
         writer
             .Finalize()
             .map_err(|e| format!("SinkWriter Finalize failed: {}", e))?;
+
+        if actual_output_path != output_path {
+            let _ = std::fs::remove_file(output_path); // Just in case
+            std::fs::rename(&actual_output_path, output_path).map_err(|e| e.to_string())?;
+        }
+
         crate::log_debug(&format!(
             "MF: samples_written={} total_bytes={}",
             sample_count, total_bytes
         ));
-        if let Ok(size) = std::fs::metadata(mp3_path).map(|m| m.len()) {
-            crate::log_debug(&format!("MF: encode completed. mp3_size={}", size));
+        if let Ok(size) = std::fs::metadata(output_path).map(|m| m.len()) {
+            crate::log_debug(&format!("MF: encode completed. output_size={}", size));
         } else {
             crate::log_debug("MF: encode completed.");
         }

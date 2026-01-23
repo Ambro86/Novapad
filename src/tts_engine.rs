@@ -1725,12 +1725,13 @@ fn run_sapi4_parallel_part(
         return Ok(());
     }
 
-    let is_mp3 = options
+    let extension = options
         .output
         .extension()
         .and_then(|s| s.to_str())
-        .map(|s| s.eq_ignore_ascii_case("mp3"))
-        .unwrap_or(false);
+        .unwrap_or("")
+        .to_lowercase();
+    let is_mp3 = extension == "mp3";
 
     // Parallel processing for chunks within this part
     let temp_dir = options
@@ -1825,19 +1826,22 @@ fn run_sapi4_parallel_part(
                     let _ = tx.send(Err(e));
                     break;
                 } else {
-                    // If we want MP3, convert this chunk immediately in parallel
+                    // Only parallel encode for MP3 because they can be concatenated binary.
+                    // AAC/M4B must be joined as WAV first and then encoded as a whole.
                     if is_mp3 {
-                        let mp3_sub = sub_output.with_extension("mp3");
+                        let encoded_sub = sub_output.with_extension("mp3");
                         let _com_guard = crate::com_guard::ComGuard::new_mta();
-                        if let Err(e) = crate::mf_encoder::encode_wav_to_mp3(&sub_output, &mp3_sub)
+                        if let Err(e) =
+                            crate::mf_encoder::encode_wav_to_audio(&sub_output, &encoded_sub, 128)
                         {
                             let _ = std::fs::remove_file(&sub_output);
-                            let _ = tx.send(Err(format!("Parallel MP3 encode failed: {}", e)));
+                            let _ = tx.send(Err(format!("Parallel audio encode failed: {}", e)));
                             break;
                         }
                         let _ = std::fs::remove_file(&sub_output);
-                        let _ = tx.send(Ok(mp3_sub));
+                        let _ = tx.send(Ok(encoded_sub));
                     } else {
+                        // Keep as WAV for now (M4B or standard WAV)
                         let _ = tx.send(Ok(sub_output));
                     }
                 }
@@ -1880,15 +1884,17 @@ fn run_sapi4_parallel_part(
     produced_files.sort_by_key(|p: &PathBuf| {
         let name = p.file_stem().and_then(|s| s.to_str()).unwrap_or("");
         name.strip_prefix("sub_")
+            .and_then(|s| s.strip_prefix("part_")) // support both naming conventions if any
             .and_then(|s| s.parse::<usize>().ok())
             .unwrap_or(0)
     });
 
     let result = if is_mp3 {
-        // Fast MP3 join
+        // Fast binary join for MP3
         merge_and_finalize_sapi4_mp3(&produced_files, options.output, options.language)
     } else {
-        // Standard WAV join
+        // This covers M4B (AAC) and standard WAV.
+        // For M4B, it joins WAV chunks and then encodes to AAC in one pass.
         merge_and_finalize_sapi4_audio(&produced_files, options.output, options.language)
     };
 
@@ -1923,12 +1929,15 @@ fn merge_and_finalize_sapi4_audio(
         return Ok(());
     }
 
-    let is_mp3 = output
+    let extension = output
         .extension()
         .and_then(|s| s.to_str())
-        .map(|s| s.eq_ignore_ascii_case("mp3"))
-        .unwrap_or(false);
-    let final_wav = if is_mp3 {
+        .unwrap_or("")
+        .to_lowercase();
+    let is_mp3 = extension == "mp3";
+    let is_aac = extension == "m4b" || extension == "m4a" || extension == "mp4";
+
+    let final_wav = if is_mp3 || is_aac {
         output.with_extension("wav.tmp")
     } else {
         output.to_path_buf()
@@ -1937,8 +1946,12 @@ fn merge_and_finalize_sapi4_audio(
     crate::audio_utils::join_wav_files(wav_files, &final_wav)
         .map_err(|e| format!("Failed to join audio parts: {}", e))?;
 
-    if is_mp3 {
-        let res = crate::mf_encoder::encode_wav_to_mp3(&final_wav, output);
+    if is_mp3 || is_aac {
+        let res = if is_aac {
+            crate::mf_encoder::encode_wav_to_m4b(&final_wav, output)
+        } else {
+            crate::mf_encoder::encode_wav_to_mp3(&final_wav, output)
+        };
         let _ = std::fs::remove_file(&final_wav);
         res.map_err(|e| {
             if e.contains("Media Foundation") {
@@ -1997,6 +2010,18 @@ fn run_split_sapi_audiobook(
             options.output.to_path_buf()
         };
 
+        let extension = part_output
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+        let is_aac = extension == "m4b" || extension == "m4a" || extension == "mp4";
+        let actual_output = if is_aac {
+            part_output.with_extension("wav.tmp")
+        } else {
+            part_output.clone()
+        };
+
         let progress_hwnd_clone = options.progress_hwnd;
         let cancel_clone = options.cancel.clone();
 
@@ -2004,7 +2029,7 @@ fn run_split_sapi_audiobook(
             crate::sapi5_engine::SapiExportOptions {
                 chunks: part_chunks,
                 voice_name: options.voice,
-                output_path: &part_output,
+                output_path: &actual_output,
                 language: options.language,
                 rate: options.rate,
                 pitch: options.pitch,
@@ -2028,7 +2053,7 @@ fn run_split_sapi_audiobook(
             },
         )
         .map_err(|e| {
-            if let Err(rem_err) = std::fs::remove_file(&part_output) {
+            if let Err(rem_err) = std::fs::remove_file(&actual_output) {
                 crate::log_debug(&format!(
                     "Failed to remove part output after error {}: {}",
                     e, rem_err
@@ -2036,6 +2061,12 @@ fn run_split_sapi_audiobook(
             }
             e
         })?;
+
+        if is_aac {
+            let res = crate::mf_encoder::encode_wav_to_m4b(&actual_output, &part_output);
+            let _ = std::fs::remove_file(&actual_output);
+            res?;
+        }
     }
     Ok(())
 }
@@ -2069,6 +2100,18 @@ fn run_marker_split_sapi_audiobook(
             options.output.to_path_buf()
         };
 
+        let extension = part_output
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+        let is_aac = extension == "m4b" || extension == "m4a" || extension == "mp4";
+        let actual_output = if is_aac {
+            part_output.with_extension("wav.tmp")
+        } else {
+            part_output.clone()
+        };
+
         let progress_hwnd_clone = options.progress_hwnd;
         let cancel_clone = options.cancel.clone();
 
@@ -2076,7 +2119,7 @@ fn run_marker_split_sapi_audiobook(
             crate::sapi5_engine::SapiExportOptions {
                 chunks: part_chunks,
                 voice_name: options.voice,
-                output_path: &part_output,
+                output_path: &actual_output,
                 language: options.language,
                 rate: options.rate,
                 pitch: options.pitch,
@@ -2100,7 +2143,7 @@ fn run_marker_split_sapi_audiobook(
             },
         )
         .map_err(|e| {
-            if let Err(rem_err) = std::fs::remove_file(&part_output) {
+            if let Err(rem_err) = std::fs::remove_file(&actual_output) {
                 crate::log_debug(&format!(
                     "Failed to remove part output after error {}: {}",
                     e, rem_err
@@ -2108,6 +2151,12 @@ fn run_marker_split_sapi_audiobook(
             }
             e
         })?;
+
+        if is_aac {
+            let res = crate::mf_encoder::encode_wav_to_m4b(&actual_output, &part_output);
+            let _ = std::fs::remove_file(&actual_output);
+            res?;
+        }
     }
     Ok(())
 }
@@ -2211,14 +2260,25 @@ pub(crate) fn run_tts_audiobook_part(
         }
         writer.flush().map_err(|err| err.to_string())?;
         Ok(())
-    })
-    .map_err(|e| {
-        if let Err(rem_err) = std::fs::remove_file(options.output) {
-            crate::log_debug(&format!(
-                "Failed to remove part output after error {}: {}",
-                e, rem_err
-            ));
+    })?;
+
+    let extension = options
+        .output
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    let is_aac = extension == "m4b" || extension == "m4a" || extension == "mp4";
+
+    if is_aac {
+        let wav_path = options.output.with_extension("wav.tmp");
+        if let Err(e) = std::fs::rename(options.output, &wav_path) {
+            return Err(format!("Failed to rename for M4B conversion: {}", e));
         }
-        e
-    })
+        let res = crate::mf_encoder::encode_wav_to_m4b(&wav_path, options.output);
+        let _ = std::fs::remove_file(&wav_path);
+        res?;
+    }
+
+    Ok(())
 }

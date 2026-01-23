@@ -7186,6 +7186,7 @@ pub(crate) unsafe fn save_audio_dialog(
         nMaxFile: file_buf.len() as u32,
         lpstrFilter: PCWSTR(filter.as_ptr()),
         lpstrTitle: PCWSTR(title.as_ptr()),
+        nFilterIndex: 1,
         Flags: OFN_EXPLORER | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST,
         ..Default::default()
     };
@@ -7194,10 +7195,13 @@ pub(crate) unsafe fn save_audio_dialog(
             .iter()
             .position(|&c| c == 0)
             .unwrap_or(file_buf.len());
-        let path = PathBuf::from(String::from_utf16_lossy(&file_buf[..len]));
-        let mut path = path;
+        let mut path = PathBuf::from(String::from_utf16_lossy(&file_buf[..len]));
         if path.extension().is_none() {
-            path.set_extension("mp3");
+            if ofn.nFilterIndex == 2 {
+                path.set_extension("m4b");
+            } else {
+                path.set_extension("mp3");
+            }
         }
         Some(path)
     } else {

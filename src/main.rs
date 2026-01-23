@@ -617,8 +617,9 @@ fn audiobook_position_ms_from_state(state: &AppState) -> Option<u64> {
     if player.is_paused {
         return Some(accumulated_ms);
     }
-    let elapsed_ms = player.start_instant.elapsed().as_millis() as u64;
-    Some(accumulated_ms.saturating_add(elapsed_ms))
+    let elapsed_real_ms = player.start_instant.elapsed().as_millis() as f64;
+    let elapsed_audio_ms = (elapsed_real_ms * player.speed as f64) as u64;
+    Some(accumulated_ms.saturating_add(elapsed_audio_ms))
 }
 
 unsafe fn update_chapter_announcement(hwnd: HWND) {
@@ -872,18 +873,54 @@ pub(crate) fn download_podcast_episode(
         return;
     };
     let cache_path = cache_path.clone();
+    let url = url.clone();
     std::thread::spawn(move || {
         let Some(cache_path) = cache_path.as_ref() else {
-            log_debug("podcast_episode_save_failed no_cache");
+            log_debug("podcast_episode_save_failed no_cache_path");
             return;
         };
+
         if !cache_path.exists() {
+            let Some(url) = url.as_ref() else {
+                log_debug("podcast_episode_save_failed no_cache_and_no_url");
+                return;
+            };
             log_debug(&format!(
-                "podcast_episode_save_failed missing_cache {}",
-                cache_path.to_string_lossy()
+                "podcast_episode_save: cache missing, downloading from {}",
+                url
             ));
-            return;
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .ok();
+            let bytes = if let Some(rt) = rt {
+                rt.block_on(crate::tools::rss::fetch_url_bytes(
+                    url,
+                    crate::tools::rss::RssFetchConfig::default(),
+                ))
+            } else {
+                return;
+            };
+            match bytes {
+                Ok(b) => {
+                    if let Some(parent) = cache_path.parent() {
+                        let _ = std::fs::create_dir_all(parent);
+                    }
+                    if let Err(e) = std::fs::write(cache_path, b) {
+                        log_debug(&format!(
+                            "podcast_episode_save: failed to write to cache: {}",
+                            e
+                        ));
+                        return;
+                    }
+                }
+                Err(e) => {
+                    log_debug(&format!("podcast_episode_save: download failed: {}", e));
+                    return;
+                }
+            }
         }
+
         if std::fs::copy(cache_path, &target).is_ok() {
             log_debug(&format!(
                 "podcast_episode_saved src=cache dst={}",
@@ -1058,7 +1095,9 @@ fn announce_player_time(hwnd: HWND) {
                 if player.is_paused {
                     player.accumulated_seconds
                 } else {
-                    player.accumulated_seconds + player.start_instant.elapsed().as_secs()
+                    let elapsed_real_secs = player.start_instant.elapsed().as_secs_f64();
+                    let elapsed_audio_secs = (elapsed_real_secs * player.speed as f64) as u64;
+                    player.accumulated_seconds + elapsed_audio_secs
                 }
             });
             let path = state

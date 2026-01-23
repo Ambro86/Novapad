@@ -8,10 +8,12 @@ use docx_rs::{
 };
 use encoding_rs::{Encoding, WINDOWS_1252};
 use pdf_extract::extract_text;
-use printpdf::{BuiltinFont, Mm, PdfDocument};
+use printpdf::{
+    BuiltinFont, Color, Mm, Op, PdfDocument, PdfPage, PdfSaveOptions, Point, Pt, Rgb, TextItem,
+};
 use quick_xml::events::Event;
 use quick_xml::reader::Reader as XmlReader;
-use std::io::{BufWriter, Read};
+use std::io::Read;
 use std::path::Path;
 use windows::Win32::Globalization::{CP_ACP, WideCharToMultiByte};
 use zip::ZipArchive;
@@ -1678,25 +1680,7 @@ pub fn write_pdf_text(
     } else {
         title
     };
-    let (doc, page1, layer1) = PdfDocument::new(title, page_width, page_height, "Layer 1");
-    let font = doc
-        .add_builtin_font(BuiltinFont::Helvetica)
-        .map_err(|err| {
-            i18n::tr_f(
-                language,
-                "file_handler.pdf_font_error",
-                &[("err", &err.to_string())],
-            )
-        })?;
-    let font_bold = doc
-        .add_builtin_font(BuiltinFont::HelveticaBold)
-        .map_err(|err| {
-            i18n::tr_f(
-                language,
-                "file_handler.pdf_font_error",
-                &[("err", &err.to_string())],
-            )
-        })?;
+
     let lines = layout_pdf_lines(
         text,
         max_chars,
@@ -1706,12 +1690,14 @@ pub fn write_pdf_text(
     );
     let content_top = page_height.0 - margin - header_height;
     let content_bottom = margin + footer_height;
-    let mut pages: Vec<Vec<PdfLine>> = Vec::new();
+
+    // Split lines into pages
+    let mut page_contents: Vec<Vec<PdfLine>> = Vec::new();
     let mut current: Vec<PdfLine> = Vec::new();
     let mut y = content_top;
     for line in lines {
         if y < content_bottom + line_height {
-            pages.push(current);
+            page_contents.push(current);
             current = Vec::new();
             y = content_top;
         }
@@ -1719,61 +1705,102 @@ pub fn write_pdf_text(
         y -= line_height;
     }
     if !current.is_empty() {
-        pages.push(current);
-    } else if pages.is_empty() {
-        pages.push(Vec::new());
+        page_contents.push(current);
+    } else if page_contents.is_empty() {
+        page_contents.push(Vec::new());
     }
-    for (page_index, page_lines) in pages.iter().enumerate() {
-        let (page, layer_id) = if page_index == 0 {
-            (page1, layer1)
-        } else {
-            doc.add_page(page_width, page_height, "Layer")
-        };
-        let layer = doc.get_page(page).get_layer(layer_id);
+
+    let total_pages = page_contents.len();
+    let black = Color::Rgb(Rgb {
+        r: 0.0,
+        g: 0.0,
+        b: 0.0,
+        icc_profile: None,
+    });
+
+    // Build PDF pages
+    let mut pdf_pages: Vec<PdfPage> = Vec::new();
+    for (page_index, page_lines) in page_contents.iter().enumerate() {
+        let mut ops: Vec<Op> = Vec::new();
+
+        // Header (title in bold)
         let header_y = page_height.0 - margin - 8.0;
-        layer.use_text(
-            title,
-            header_font_size,
-            Mm(margin),
-            Mm(header_y),
-            &font_bold,
-        );
+        ops.push(Op::StartTextSection);
+        ops.push(Op::SetTextCursor {
+            pos: Point::new(Mm(margin), Mm(header_y)),
+        });
+        ops.push(Op::SetFontSizeBuiltinFont {
+            size: Pt(header_font_size),
+            font: BuiltinFont::HelveticaBold,
+        });
+        ops.push(Op::SetFillColor { col: black.clone() });
+        ops.push(Op::WriteTextBuiltinFont {
+            items: vec![TextItem::Text(title.to_string())],
+            font: BuiltinFont::HelveticaBold,
+        });
+        ops.push(Op::EndTextSection);
+
+        // Footer (page number)
         let page_label = i18n::tr_f(
             language,
             "file_handler.pdf_page_label",
             &[
                 ("page", &(page_index + 1).to_string()),
-                ("total", &pages.len().to_string()),
+                ("total", &total_pages.to_string()),
             ],
         );
-        layer.use_text(&page_label, 9.0, Mm(margin), Mm(margin - 6.0), &font);
+        ops.push(Op::StartTextSection);
+        ops.push(Op::SetTextCursor {
+            pos: Point::new(Mm(margin), Mm(margin - 6.0)),
+        });
+        ops.push(Op::SetFontSizeBuiltinFont {
+            size: Pt(9.0),
+            font: BuiltinFont::Helvetica,
+        });
+        ops.push(Op::SetFillColor { col: black.clone() });
+        ops.push(Op::WriteTextBuiltinFont {
+            items: vec![TextItem::Text(page_label)],
+            font: BuiltinFont::Helvetica,
+        });
+        ops.push(Op::EndTextSection);
+
+        // Body content
         let mut y = content_top;
         for line in page_lines {
             if line.is_blank {
                 y -= line_height;
                 continue;
             }
-            layer.use_text(
-                &line.text,
-                line.font_size,
-                Mm(margin + line.indent),
-                Mm(y),
-                &font,
-            );
+            ops.push(Op::StartTextSection);
+            ops.push(Op::SetTextCursor {
+                pos: Point::new(Mm(margin + line.indent), Mm(y)),
+            });
+            ops.push(Op::SetFontSizeBuiltinFont {
+                size: Pt(line.font_size),
+                font: BuiltinFont::Helvetica,
+            });
+            ops.push(Op::SetFillColor { col: black.clone() });
+            ops.push(Op::WriteTextBuiltinFont {
+                items: vec![TextItem::Text(line.text.clone())],
+                font: BuiltinFont::Helvetica,
+            });
+            ops.push(Op::EndTextSection);
             y -= line_height;
         }
+
+        pdf_pages.push(PdfPage::new(page_width, page_height, ops));
     }
-    let file = std::fs::File::create(path).map_err(|err| {
+
+    // Create document and save
+    let mut doc = PdfDocument::new(title);
+    let bytes = doc
+        .with_pages(pdf_pages)
+        .save(&PdfSaveOptions::default(), &mut Vec::new());
+
+    std::fs::write(path, bytes).map_err(|err| {
         i18n::tr_f(
             language,
             "file_handler.file_save_error",
-            &[("err", &err.to_string())],
-        )
-    })?;
-    doc.save(&mut BufWriter::new(file)).map_err(|err| {
-        i18n::tr_f(
-            language,
-            "file_handler.pdf_save_error",
             &[("err", &err.to_string())],
         )
     })?;

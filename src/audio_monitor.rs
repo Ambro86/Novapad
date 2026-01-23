@@ -150,7 +150,7 @@ where
         .build_input_stream(
             &config.clone().into(),
             move |data: &[T], _: &_| {
-                let mut q = buffer.lock().unwrap();
+                let mut q = buffer.lock().unwrap_or_else(|e| e.into_inner());
                 // If buffer too full, drop oldest to prevent memory growth
                 if q.len() > 96000 {
                     let drop = data.len().min(q.len());
@@ -203,8 +203,8 @@ where
         .build_output_stream(
             &config.clone().into(),
             move |data: &mut [T], _: &_| {
-                let mut q = buffer.lock().unwrap();
-                let mut rs = resample_state.lock().unwrap();
+                let mut q = buffer.lock().unwrap_or_else(|e| e.into_inner());
+                let mut rs = resample_state.lock().unwrap_or_else(|e| e.into_inner());
 
                 // Buffer contains mono samples at input rate
                 // We need to output stereo samples at output rate

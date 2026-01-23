@@ -38,7 +38,7 @@ impl AudioQueue {
     }
 
     pub fn push(&self, sample: AudioSample) {
-        let mut queue = self.inner.lock().unwrap();
+        let mut queue = self.inner.lock().unwrap_or_else(|e| e.into_inner());
 
         if queue.len() >= self.max_samples {
             queue.remove(0); // Drop oldest
@@ -53,10 +53,13 @@ impl AudioQueue {
     }
 
     pub fn pop(&self, timeout: Duration) -> Option<AudioSample> {
-        let mut queue = self.inner.lock().unwrap();
+        let mut queue = self.inner.lock().unwrap_or_else(|e| e.into_inner());
 
         if queue.is_empty() {
-            let result = self.condvar.wait_timeout(queue, timeout).unwrap();
+            let result = self
+                .condvar
+                .wait_timeout(queue, timeout)
+                .unwrap_or_else(|e| e.into_inner());
             queue = result.0;
         }
 
@@ -68,11 +71,15 @@ impl AudioQueue {
     }
 
     pub fn len(&self) -> usize {
-        self.inner.lock().unwrap().len()
+        self.inner.lock().unwrap_or_else(|e| e.into_inner()).len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.inner.lock().unwrap().is_empty()
+        self
+            .inner
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .is_empty()
     }
 }
 

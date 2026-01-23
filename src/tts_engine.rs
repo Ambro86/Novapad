@@ -1848,7 +1848,7 @@ fn run_sapi4_parallel_part(
         let handle = std::thread::spawn(move || {
             loop {
                 let part = {
-                    let mut guard = parts_shared.lock().unwrap();
+                    let mut guard = parts_shared.lock().unwrap_or_else(|e| e.into_inner());
                     guard.next()
                 };
                 let Some((sub_chunks, sub_output)) = part else {

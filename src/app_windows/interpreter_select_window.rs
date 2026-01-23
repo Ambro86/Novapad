@@ -122,7 +122,7 @@ pub fn select_interpreter(parent: HWND, items: Vec<String>, language: Language) 
         SetForegroundWindow(parent);
     }
 
-    let guard = result.lock().unwrap();
+    let guard = result.lock().unwrap_or_else(|e| e.into_inner());
     guard.clone()
 }
 
@@ -235,7 +235,8 @@ unsafe extern "system" fn interpreter_select_wndproc(
                                     LPARAM(buf.as_mut_ptr() as isize),
                                 );
                                 let path = String::from_utf16_lossy(&buf[..len as usize]);
-                                *state.result.lock().unwrap() = Some(path);
+                                *state.result.lock().unwrap_or_else(|e| e.into_inner()) =
+                                    Some(path);
                             }
                         }
                     });

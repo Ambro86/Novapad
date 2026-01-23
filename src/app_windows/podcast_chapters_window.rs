@@ -162,7 +162,7 @@ pub fn select_chapter(parent: HWND, chapters: &[Chapter], language: Language) ->
         SetForegroundWindow(parent);
     }
 
-    *result.lock().unwrap()
+    *result.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 unsafe extern "system" fn chapter_list_wndproc(

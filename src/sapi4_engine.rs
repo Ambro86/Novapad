@@ -221,7 +221,7 @@ fn parse_voices(output: &str) -> Vec<VoiceInfo> {
 }
 
 pub fn get_voices() -> Vec<VoiceInfo> {
-    let mut cache = VOICE_CACHE.lock().unwrap();
+    let mut cache = VOICE_CACHE.lock().unwrap_or_else(|e| e.into_inner());
     if !cache.is_empty() {
         return cache.clone();
     }

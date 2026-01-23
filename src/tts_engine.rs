@@ -8,7 +8,7 @@ use crate::{get_active_edit, log_debug, save_audio_dialog, show_error, with_stat
 use chrono::Local;
 use futures_util::{SinkExt, StreamExt};
 use rand::Rng;
-use rodio::{Decoder, OutputStream, Sink};
+use rodio::{Decoder, OutputStreamBuilder, Sink};
 use sha2::{Digest, Sha256};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -356,8 +356,8 @@ pub fn start_tts_playback_with_chunks(options: TtsPlaybackOptions) {
             chunks.len(),
             cleaned.len()
         ));
-        let (_stream, handle) = match OutputStream::try_default() {
-            Ok(values) => values,
+        let stream_handle = match OutputStreamBuilder::open_default_stream() {
+            Ok(handle) => handle,
             Err(_) => {
                 post_tts_error(
                     hwnd_copy,
@@ -367,17 +367,7 @@ pub fn start_tts_playback_with_chunks(options: TtsPlaybackOptions) {
                 return;
             }
         };
-        let sink = match Sink::try_new(&handle) {
-            Ok(sink) => sink,
-            Err(_) => {
-                post_tts_error(
-                    hwnd_copy,
-                    session_id,
-                    "Failed to create audio sink.".to_string(),
-                );
-                return;
-            }
-        };
+        let sink = Sink::connect_new(&stream_handle.mixer());
         let rt = match tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()

@@ -2734,7 +2734,6 @@ pub unsafe fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> 
                 let initial_encoding = state.docs[index]
                     .current_save_text_encoding
                     .or(state.docs[index].opened_text_encoding)
-                    .or(state.docs[index].opened_text_encoding)
                     .unwrap_or_default();
                 match crate::save_file_dialog_with_encoding(
                     hwnd,
@@ -2747,50 +2746,25 @@ pub unsafe fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> 
             }
         };
 
-        let mut path = path;
-        if is_lossy_doc {
-            path.set_extension("txt");
-        }
-
-        let is_docx = is_docx_path(&path);
-        let is_pdf = is_pdf_path(&path);
-        if !is_lossy_doc && is_docx {
-            if let Err(message) = write_docx_text(&path, &text, language) {
-                crate::show_error(hwnd, language, &message);
-                return None;
-            }
-            state.docs[index].format = FileFormat::Docx;
-        } else if !is_lossy_doc && is_pdf {
-            let pdf_title = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("Documento");
-            if let Err(message) = write_pdf_text(&path, pdf_title, &text, language) {
-                crate::show_error(hwnd, language, &message);
-                return None;
-            }
-            state.docs[index].format = FileFormat::Pdf;
+        let encoding = if let Some(enc) = user_selected_encoding {
+            state.docs[index].current_save_text_encoding = Some(enc);
+            enc
         } else {
-            let encoding = if let Some(enc) = user_selected_encoding {
-                state.docs[index].current_save_text_encoding = Some(enc);
-                enc
-            } else {
-                state.docs[index]
-                    .current_save_text_encoding
-                    .or(state.docs[index].opened_text_encoding)
-                    .unwrap_or_default()
-            };
-            let bytes = encode_text(&text, encoding);
-            if let Err(err) = std::fs::write(&path, bytes) {
-                crate::show_error(
-                    hwnd,
-                    language,
-                    &crate::settings::error_save_file_message(language, err),
-                );
-                return None;
-            }
-            state.docs[index].format = FileFormat::Text(encoding);
+            state.docs[index]
+                .current_save_text_encoding
+                .or(state.docs[index].opened_text_encoding)
+                .unwrap_or_default()
+        };
+        let bytes = encode_text(&text, encoding);
+        if let Err(err) = std::fs::write(&path, bytes) {
+            crate::show_error(
+                hwnd,
+                language,
+                &crate::settings::error_save_file_message(language, err),
+            );
+            return None;
         }
+        state.docs[index].format = FileFormat::Text(encoding);
 
         let hwnd_edit = state.docs[index].hwnd_edit;
         state.docs[index].path = Some(path.clone());

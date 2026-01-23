@@ -2764,13 +2764,15 @@ pub unsafe fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> 
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("Novapad Document");
-            if let Err(message) = crate::file_handler::write_pdf_text(&path, pdf_title, &text) {
+            if let Err(message) =
+                crate::file_handler::write_pdf_text(&path, pdf_title, &text, language)
+            {
                 crate::show_error(hwnd, language, &message);
                 return None;
             }
             state.docs[index].format = FileFormat::Pdf;
         } else if is_docx || is_doc {
-            if let Err(message) = crate::file_handler::write_docx_text(&path, &text) {
+            if let Err(message) = crate::file_handler::write_docx_text(&path, &text, language) {
                 crate::show_error(hwnd, language, &message);
                 return None;
             }

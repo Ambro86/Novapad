@@ -915,7 +915,9 @@ unsafe extern "system" fn prompt_wndproc(
                 if let Some(cmd) = init.initial_command {
                     let newline = if state.program_is_codex { "\n" } else { "\r\n" };
                     let payload = format!("{}{}", cmd, newline);
-                    state.session.as_ref().unwrap().write_input(&payload);
+                    if let Some(session) = state.session.as_ref() {
+                        session.write_input(&payload);
+                    }
                 }
             }
 

@@ -580,7 +580,13 @@ fn start_audiobook_at_with_options(
             log_debug(
                 "Audio player: Large file detected (>100MB). Indexing may take a few seconds...",
             );
-            let file = std::fs::File::open(&path).unwrap();
+            let file = match std::fs::File::open(&path) {
+                Ok(f) => f,
+                Err(e) => {
+                    log_debug(&format!("Audio player: failed to open large file: {}", e));
+                    return;
+                }
+            };
             let reader = std::io::BufReader::with_capacity(8 * 1024 * 1024, file);
             match Decoder::new(reader) {
                 Ok(d) => {
@@ -631,7 +637,16 @@ fn start_audiobook_at_with_options(
                         "Audio player: Failed to read file into memory: {}",
                         e
                     ));
-                    let file = std::fs::File::open(&path).unwrap();
+                    let file = match std::fs::File::open(&path) {
+                        Ok(f) => f,
+                        Err(e) => {
+                            log_debug(&format!(
+                                "Audio player: failed to open file for fallback: {}",
+                                e
+                            ));
+                            return;
+                        }
+                    };
                     match Decoder::new(std::io::BufReader::new(file)) {
                         Ok(d) => {
                             let src = d.convert_samples();

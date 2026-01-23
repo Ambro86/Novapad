@@ -512,11 +512,11 @@ fn start_audiobook_at_with_options(
 
             if !linked_path.exists() {
                 // Try hard link first (instant, no space)
-                if let Err(e) = std::fs::hard_link(&path, &linked_path) {
-                    if e.kind() != std::io::ErrorKind::AlreadyExists {
-                        // Fallback to copy if on different volume (slow, but only once)
-                        let _ = std::fs::copy(&path, &linked_path);
-                    }
+                if let Err(e) = std::fs::hard_link(&path, &linked_path)
+                    && e.kind() != std::io::ErrorKind::AlreadyExists
+                {
+                    // Fallback to copy if on different volume (slow, but only once)
+                    let _ = std::fs::copy(&path, &linked_path);
                 }
             }
 

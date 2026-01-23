@@ -1414,6 +1414,13 @@ pub fn start_audiobook(hwnd: HWND) {
 
     let cancel_clone = cancel_token.clone();
     std::thread::spawn(move || {
+        let extension = output
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+        let is_aac = extension == "m4b" || extension == "m4a" || extension == "mp4";
+
         let options = AudiobookCommonOptions {
             voice: &voice,
             output: &output,
@@ -1428,29 +1435,83 @@ pub fn start_audiobook(hwnd: HWND) {
 
         let result = match tts_engine {
             TtsEngine::Edge => {
-                if let Some(parts) = marker_parts {
-                    run_marker_split_audiobook(&parts, options)
+                if let Some(ref parts) = marker_parts {
+                    if is_aac {
+                        // Merge all marker parts into one for AAC
+                        let all_chunks: Vec<String> = parts.iter().flatten().cloned().collect();
+                        run_split_audiobook(&all_chunks, 0, options)
+                    } else {
+                        run_marker_split_audiobook(parts, options)
+                    }
                 } else {
-                    run_split_audiobook(&chunks, split_parts, options)
+                    run_split_audiobook(&chunks, if is_aac { 0 } else { split_parts }, options)
                 }
             }
             TtsEngine::Sapi4 => {
                 let voice_idx = parse_sapi4_voice_index(&voice);
-                if let Some(parts) = marker_parts {
-                    run_marker_split_sapi4_audiobook(&parts, voice_idx, options)
+                if let Some(ref parts) = marker_parts {
+                    if is_aac {
+                        let all_chunks: Vec<String> = parts.iter().flatten().cloned().collect();
+                        run_split_sapi4_audiobook(&all_chunks, voice_idx, 0, options)
+                    } else {
+                        run_marker_split_sapi4_audiobook(parts, voice_idx, options)
+                    }
                 } else {
-                    run_split_sapi4_audiobook(&chunks, voice_idx, split_parts, options)
+                    run_split_sapi4_audiobook(
+                        &chunks,
+                        voice_idx,
+                        if is_aac { 0 } else { split_parts },
+                        options,
+                    )
                 }
             }
             TtsEngine::Sapi5 => {
-                if let Some(parts) = marker_parts {
-                    run_marker_split_sapi_audiobook(&parts, options)
+                if let Some(ref parts) = marker_parts {
+                    if is_aac {
+                        let all_chunks: Vec<String> = parts.iter().flatten().cloned().collect();
+                        run_split_sapi_audiobook(&all_chunks, 0, options)
+                    } else {
+                        run_marker_split_sapi_audiobook(parts, options)
+                    }
                 } else {
-                    run_split_sapi_audiobook(&chunks, split_parts, options)
+                    run_split_sapi_audiobook(&chunks, if is_aac { 0 } else { split_parts }, options)
                 }
             }
         };
         let success = result.is_ok();
+
+        if success && is_aac {
+            // Set metadata for the single M4B file
+            let file_title = output
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("Audiobook");
+            let mut comment = String::new();
+
+            // If it was supposed to be split, we can provide a "table of contents" in comments
+            if split_parts > 1 || marker_parts.is_some() {
+                comment.push_str("Chapters:\n");
+                // Note: accurate timestamps would require dry-run or parsing generated audio.
+                // For now, we provide the labels if using markers.
+                if let Some(ref parts) = marker_parts {
+                    for (i, _p) in parts.iter().enumerate() {
+                        comment.push_str(&format!("Part {}\n", i + 1));
+                    }
+                }
+            }
+
+            let _ = crate::audio_utils::set_file_metadata(
+                &output,
+                Some(file_title),
+                Some("Novapad"),
+                if comment.is_empty() {
+                    None
+                } else {
+                    Some(&comment)
+                },
+            );
+        }
+
         let message = match result {
             Ok(()) => i18n::tr(language, "tts.audiobook_saved"),
             Err(err) => err,

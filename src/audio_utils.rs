@@ -3,8 +3,33 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use windows::Win32::Foundation::HWND;
-use windows::Win32::UI::Shell::ShellExecuteW;
-use windows::core::{PCWSTR, w};
+use windows::Win32::System::Com::StructuredStorage::PropVariantClear;
+use windows::Win32::System::Com::{COINIT_MULTITHREADED, CoInitializeEx, CoUninitialize};
+use windows::Win32::UI::Shell::PropertiesSystem::{
+    GPS_READWRITE, IPropertyStore, PROPERTYKEY, SHGetPropertyStoreFromParsingName,
+};
+use windows::Win32::UI::Shell::{SHStrDupW, ShellExecuteW};
+use windows::core::{GUID, PCWSTR, PROPVARIANT, PWSTR, w};
+
+const VT_LPWSTR: u16 = 31;
+
+// System.Title: {F29F85E0-4FF9-1068-AB91-08002B27B3D9} 2
+const PKEY_TITLE: PROPERTYKEY = PROPERTYKEY {
+    fmtid: GUID::from_u128(0xF29F85E0_4FF9_1068_AB91_08002B27B3D9),
+    pid: 2,
+};
+
+// System.Author: {F29F85E0-4FF9-1068-AB91-08002B27B3D9} 4
+const PKEY_AUTHOR: PROPERTYKEY = PROPERTYKEY {
+    fmtid: GUID::from_u128(0xF29F85E0_4FF9_1068_AB91_08002B27B3D9),
+    pid: 4,
+};
+
+// System.Comment: {F29F85E0-4FF9-1068-AB91-08002B27B3D9} 6
+const PKEY_COMMENT: PROPERTYKEY = PROPERTYKEY {
+    fmtid: GUID::from_u128(0xF29F85E0_4FF9_1068_AB91_08002B27B3D9),
+    pid: 6,
+};
 
 /// Errors that can occur during audio operations
 #[derive(Debug)]
@@ -293,4 +318,65 @@ pub fn open_url_in_browser(url: &str) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+pub fn set_file_metadata(
+    path: &Path,
+    title: Option<&str>,
+    author: Option<&str>,
+    comment: Option<&str>,
+) -> Result<(), String> {
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        let path_wide = to_wide(path.to_str().ok_or("Invalid path")?);
+
+        let store: IPropertyStore =
+            SHGetPropertyStoreFromParsingName(PCWSTR(path_wide.as_ptr()), None, GPS_READWRITE)
+                .map_err(|e| format!("SHGetPropertyStoreFromParsingName failed: {}", e))?;
+
+        if let Some(t) = title {
+            set_prop(&store, &PKEY_TITLE, t)?;
+        }
+        if let Some(a) = author {
+            set_prop(&store, &PKEY_AUTHOR, a)?;
+        }
+        if let Some(c) = comment {
+            set_prop(&store, &PKEY_COMMENT, c)?;
+        }
+
+        store
+            .Commit()
+            .map_err(|e| format!("IPropertyStore::Commit failed: {}", e))?;
+        CoUninitialize();
+    }
+    Ok(())
+}
+
+#[repr(C)]
+struct MyPropVariant {
+    vt: u16,
+    w_reserved1: u16,
+    w_reserved2: u16,
+    w_reserved3: u16,
+    pwsz_val: PWSTR,
+    _padding: [u8; 8],
+}
+
+unsafe fn set_prop(store: &IPropertyStore, key: &PROPERTYKEY, value: &str) -> Result<(), String> {
+    let wide = to_wide(value);
+    let psz = SHStrDupW(PCWSTR(wide.as_ptr())).map_err(|e| e.to_string())?;
+
+    let mut pv = MyPropVariant {
+        vt: VT_LPWSTR,
+        w_reserved1: 0,
+        w_reserved2: 0,
+        w_reserved3: 0,
+        pwsz_val: psz,
+        _padding: [0; 8],
+    };
+
+    let res = store.SetValue(key, &pv as *const MyPropVariant as *const PROPVARIANT);
+    let _ = PropVariantClear(&mut pv as *mut MyPropVariant as *mut PROPVARIANT);
+
+    res.map_err(|e| format!("IPropertyStore::SetValue failed: {}", e))
 }

@@ -520,7 +520,7 @@ fn pptx_slide_number(name: &str) -> Option<u32> {
 
 fn extract_pptx_slide_text(xml: &str) -> String {
     let mut reader = XmlReader::from_str(xml);
-    reader.trim_text(true);
+    reader.config_mut().trim_text(true);
     let mut buf = Vec::new();
     let mut out = String::new();
     let mut paragraph_has_text = false;
@@ -548,9 +548,8 @@ fn extract_pptx_slide_text(xml: &str) -> String {
                 }
             }
             Ok(Event::Text(e)) => {
-                if let Ok(text) = e.unescape()
-                    && !text.is_empty()
-                {
+                let text = e.decode().unwrap_or_default();
+                if !text.is_empty() {
                     out.push_str(&text);
                     paragraph_has_text = true;
                 }

@@ -149,7 +149,7 @@ fn parse_single_path(buffer: &[u16]) -> Option<PathBuf> {
 
 fn parse_opml_sources(text: &str) -> Vec<(String, String)> {
     let mut reader = Reader::from_str(text);
-    reader.trim_text(true);
+    reader.config_mut().trim_text(true);
     let mut buf = Vec::new();
     let mut out = Vec::new();
     loop {
@@ -164,7 +164,7 @@ fn parse_opml_sources(text: &str) -> Vec<(String, String)> {
                 for attr in e.attributes().flatten() {
                     let key = attr.key.as_ref();
                     let value = attr
-                        .decode_and_unescape_value(&reader)
+                        .decode_and_unescape_value(reader.decoder())
                         .unwrap_or_default()
                         .to_string();
                     if key.eq_ignore_ascii_case(b"xmlUrl") {

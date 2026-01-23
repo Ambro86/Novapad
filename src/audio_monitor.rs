@@ -34,9 +34,9 @@ pub fn start_monitoring(
             let mut found = None;
             if let Ok(devices) = host.input_devices() {
                 for device in devices {
-                    if let Ok(name) = device.name() {
-                        // Try exact match on name (cpal uses name as identifier)
-                        if name == device_name {
+                    if let Ok(desc) = device.description() {
+                        // Try exact match on description (cpal uses description as identifier)
+                        if desc.name() == device_name {
                             found = Some(device);
                             break;
                         }
@@ -58,8 +58,8 @@ pub fn start_monitoring(
         .default_output_config()
         .map_err(|e| format!("Failed to get output config: {}", e))?;
 
-    let in_sample_rate = input_config.sample_rate().0;
-    let out_sample_rate = output_config.sample_rate().0;
+    let in_sample_rate = input_config.sample_rate();
+    let out_sample_rate = output_config.sample_rate();
     let in_channels = input_config.channels() as usize;
     let out_channels = output_config.channels() as usize;
 

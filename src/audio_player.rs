@@ -481,7 +481,7 @@ fn start_audiobook_at_with_options(
                 return;
             }
         };
-        let sink: Arc<Sink> = Arc::new(Sink::connect_new(&stream_handle.mixer()));
+        let sink: Arc<Sink> = Arc::new(Sink::connect_new(stream_handle.mixer()));
 
         log_debug(&format!("Audio player: Opening file {}", path.display()));
         let file_size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);

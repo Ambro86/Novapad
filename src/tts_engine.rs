@@ -367,7 +367,7 @@ pub fn start_tts_playback_with_chunks(options: TtsPlaybackOptions) {
                 return;
             }
         };
-        let sink = Sink::connect_new(&stream_handle.mixer());
+        let sink = Sink::connect_new(stream_handle.mixer());
         let rt = match tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()

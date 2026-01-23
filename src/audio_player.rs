@@ -2,7 +2,7 @@ use crate::log_debug;
 use crate::settings::{FileFormat, settings_dir};
 use crate::with_state;
 use libloading::Library;
-use rodio::{Decoder, OutputStream, Sink, Source};
+use rodio::{Decoder, OutputStream, OutputStreamBuilder, Sink, Source};
 use sha2::Digest;
 use std::ffi::c_void;
 use std::path::{Path, PathBuf};
@@ -345,7 +345,7 @@ impl<S> Source for SoundTouchSource<S>
 where
     S: Source<Item = f32>,
 {
-    fn current_frame_len(&self) -> Option<usize> {
+    fn current_span_len(&self) -> Option<usize> {
         None
     }
 
@@ -471,7 +471,7 @@ fn start_audiobook_at_with_options(
             "Audio player: Thread started for {}",
             path.display()
         ));
-        let (_stream, handle) = match OutputStream::try_default() {
+        let stream_handle = match OutputStreamBuilder::open_default_stream() {
             Ok(v) => v,
             Err(e) => {
                 log_debug(&format!(
@@ -481,13 +481,7 @@ fn start_audiobook_at_with_options(
                 return;
             }
         };
-        let sink: Arc<Sink> = match Sink::try_new(&handle) {
-            Ok(s) => Arc::new(s),
-            Err(e) => {
-                log_debug(&format!("Audio player: Failed to create sink: {}", e));
-                return;
-            }
-        };
+        let sink: Arc<Sink> = Arc::new(Sink::connect_new(&stream_handle.mixer()));
 
         log_debug(&format!("Audio player: Opening file {}", path.display()));
         let file_size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
@@ -559,10 +553,9 @@ fn start_audiobook_at_with_options(
                     if let Some(file) = file {
                         let reader = std::io::BufReader::with_capacity(8 * 1024 * 1024, file);
                         match Decoder::new(reader) {
-                            Ok(d) => Box::new(
-                                d.convert_samples()
-                                    .skip_duration(std::time::Duration::from_secs(seconds)),
-                            ),
+                            Ok(d) => {
+                                Box::new(d.skip_duration(std::time::Duration::from_secs(seconds)))
+                            }
                             Err(err) => {
                                 log_debug(&format!(
                                     "Audio player: Rodio fallback decoder failed: {}",
@@ -590,12 +583,11 @@ fn start_audiobook_at_with_options(
             let reader = std::io::BufReader::with_capacity(8 * 1024 * 1024, file);
             match Decoder::new(reader) {
                 Ok(d) => {
-                    let src = d.convert_samples();
                     if seconds > 0 {
                         log_debug(&format!("Audio player: Skipping to {} seconds", seconds));
-                        Box::new(src.skip_duration(std::time::Duration::from_secs(seconds)))
+                        Box::new(d.skip_duration(std::time::Duration::from_secs(seconds)))
                     } else {
-                        Box::new(src)
+                        Box::new(d)
                     }
                 }
                 Err(e) => {
@@ -612,15 +604,14 @@ fn start_audiobook_at_with_options(
                     ));
                     match Decoder::new(std::io::Cursor::new(bytes)) {
                         Ok(d) => {
-                            let src = d.convert_samples();
                             if seconds > 0 {
                                 log_debug(&format!(
                                     "Audio player: Skipping to {} seconds",
                                     seconds
                                 ));
-                                Box::new(src.skip_duration(std::time::Duration::from_secs(seconds)))
+                                Box::new(d.skip_duration(std::time::Duration::from_secs(seconds)))
                             } else {
-                                Box::new(src)
+                                Box::new(d)
                             }
                         }
                         Err(e) => {
@@ -649,15 +640,14 @@ fn start_audiobook_at_with_options(
                     };
                     match Decoder::new(std::io::BufReader::new(file)) {
                         Ok(d) => {
-                            let src = d.convert_samples();
                             if seconds > 0 {
                                 log_debug(&format!(
                                     "Audio player: Skipping to {} seconds",
                                     seconds
                                 ));
-                                Box::new(src.skip_duration(std::time::Duration::from_secs(seconds)))
+                                Box::new(d.skip_duration(std::time::Duration::from_secs(seconds)))
                             } else {
-                                Box::new(src)
+                                Box::new(d)
                             }
                         }
                         err => {
@@ -699,7 +689,7 @@ fn start_audiobook_at_with_options(
         let player = AudiobookPlayer {
             path,
             sink: sink.clone(),
-            _stream,
+            _stream: stream_handle,
             is_paused: options.paused,
             start_instant: std::time::Instant::now(),
             accumulated_seconds: seconds,

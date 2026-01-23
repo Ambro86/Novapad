@@ -416,7 +416,7 @@
   "batch_audiobooks.report_filename": "BatchReport.txt",
   "batch_audiobooks.done": "Batch audiobook creation completed.",
   "dialog.open_filter": "All supported formats (*.txt;*.md;*.pdf;*.epub;*.mp3;*.m4a;*.mp4;*.aac;*.doc;*.docx;*.xls;*.xlsx;*.rtf;*.htm;*.html;*.ppt;*.pptx;*.py;*.java;*.js;*.rb;*.pl;*.php;*.lua;*.ps1;*.sh)\\0*.txt;*.md;*.pdf;*.epub;*.mp3;*.m4a;*.mp4;*.aac;*.doc;*.docx;*.xls;*.xlsx;*.rtf;*.htm;*.html;*.ppt;*.pptx;*.py;*.java;*.js;*.rb;*.pl;*.php;*.lua;*.ps1;*.sh\\0TXT (*.txt)\\0*.txt\\0Markdown (*.md)\\0*.md\\0PDF (*.pdf)\\0*.pdf\\0EPUB (*.epub)\\0*.epub\\0Audio/Video (*.mp3;*.m4a;*.mp4;*.aac)\\0*.mp3;*.m4a;*.mp4;*.aac\\0Word (*.doc;*.docx)\\0*.doc;*.docx\\0Excel (*.xls;*.xlsx)\\0*.xls;*.xlsx\\0RTF (*.rtf)\\0*.rtf\\0HTML (*.htm;*.html)\\0*.htm;*.html\\0PowerPoint (*.ppt;*.pptx)\\0*.ppt;*.pptx\\0Programming files (*.py;*.java;*.js;*.rb;*.pl;*.php;*.lua;*.ps1;*.sh)\\0*.py;*.java;*.js;*.rb;*.pl;*.php;*.lua;*.ps1;*.sh\\0All files (*.*)\\0*.*\\0\\0",
-  "dialog.save_filter": "Text files (*.txt)\\0*.txt\\0Markdown (*.md)\\0*.md\\0HTML (*.htm;*.html)\\0*.htm;*.html\\0All files (*.*)\\0*.*\\0\\0",
+  "dialog.save_filter": "Text files (*.txt)\\0*.txt\\0Markdown (*.md)\\0*.md\\0DOCX (Word Document) (*.docx)\\0*.docx\\0DOC (Old Word Document) (*.doc)\\0*.doc\\0RTF (Rich Text Format) (*.rtf)\\0*.rtf\\0PDF (*.pdf)\\0*.pdf\\0HTML (*.htm;*.html)\\0*.htm;*.html\\0Programming files (*.py;*.java;*.js;*.rb;*.pl;*.php;*.lua;*.ps1;*.sh)\\0*.py;*.java;*.js;*.rb;*.pl;*.php;*.lua;*.ps1;*.sh\\0All files (*.*)\\0*.*\\0\\0",
   "dialog.encoding_label": "Encoding:",
   "encoding.ansi": "ANSI (System)",
   "encoding.utf8": "UTF-8",

@@ -520,7 +520,7 @@ where
             .map_err(|e| format!("SinkWriter Finalize failed: {}", e))?;
 
         if actual_output_path != output_path {
-            let _ = std::fs::remove_file(output_path); // Just in case
+            std::fs::remove_file(output_path).ok(); // Just in case
             std::fs::rename(&actual_output_path, output_path).map_err(|e| e.to_string())?;
         }
 

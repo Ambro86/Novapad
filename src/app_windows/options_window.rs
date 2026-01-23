@@ -3764,7 +3764,7 @@ unsafe fn browse_for_interpreter(hwnd: HWND) {
         let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
         let path = String::from_utf16_lossy(&buffer[..len]);
         if let Some(edit) = with_options_state(hwnd, |state| state.edit_interpreter_path) {
-            let _ = SetWindowTextW(edit, PCWSTR(to_wide(&path).as_ptr()));
+            SetWindowTextW(edit, PCWSTR(to_wide(&path).as_ptr())).ok();
         }
     }
 }

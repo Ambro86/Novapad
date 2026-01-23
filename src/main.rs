@@ -904,7 +904,7 @@ pub(crate) fn download_podcast_episode(
             match bytes {
                 Ok(b) => {
                     if let Some(parent) = cache_path.parent() {
-                        let _ = std::fs::create_dir_all(parent);
+                        crate::log_if_err!(std::fs::create_dir_all(parent));
                     }
                     if let Err(e) = std::fs::write(cache_path, b) {
                         log_debug(&format!(
@@ -6854,7 +6854,9 @@ unsafe fn handle_pdf_loaded(hwnd: HWND, payload: PdfLoadResult) {
             let msg = pdf_loaded_message(language);
             crate::log_debug(&format!("Info (speech): {msg}"));
             crate::accessibility::nvda_speak(&msg);
-            let _ = unsafe { MessageBeep(MB_ICONASTERISK) };
+            unsafe {
+                crate::log_if_err!(MessageBeep(MB_ICONASTERISK));
+            }
             let mut update_title = false;
             with_state(hwnd, |state| {
                 if let Some(doc) = state.docs.get_mut(index) {
@@ -7097,7 +7099,7 @@ unsafe fn execute_current_file(hwnd: HWND) {
         .to_lowercase();
     if extension == "html" || extension == "htm" {
         unsafe {
-            let _ = ShellExecuteW(
+            let res = ShellExecuteW(
                 hwnd,
                 w!("open"),
                 PCWSTR(to_wide(&exec_path.to_string_lossy()).as_ptr()),
@@ -7105,6 +7107,9 @@ unsafe fn execute_current_file(hwnd: HWND) {
                 PCWSTR::null(),
                 SW_SHOWNORMAL,
             );
+            if res.0 as isize <= 32 {
+                crate::log_debug(&format!("ShellExecuteW failed to open HTML: {}", res.0));
+            }
         }
         return;
     }

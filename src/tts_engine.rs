@@ -1500,7 +1500,7 @@ pub fn start_audiobook(hwnd: HWND) {
                 }
             }
 
-            let _ = crate::audio_utils::set_file_metadata(
+            if crate::audio_utils::set_file_metadata(
                 &output,
                 Some(file_title),
                 Some("Novapad"),
@@ -1509,7 +1509,9 @@ pub fn start_audiobook(hwnd: HWND) {
                 } else {
                     Some(&comment)
                 },
-            );
+            )
+            .is_err()
+            {}
         }
 
         let message = match result {
@@ -1807,7 +1809,7 @@ fn run_sapi4_parallel_part(
                 .and_then(|s| s.to_str())
                 .unwrap_or("part")
         ));
-    let _ = std::fs::create_dir_all(&temp_dir);
+    std::fs::create_dir_all(&temp_dir).ok();
 
     let mut internal_parts = Vec::new();
     let pool_size = options.sapi4_threads.unwrap_or(30) as usize;
@@ -1853,7 +1855,7 @@ fn run_sapi4_parallel_part(
                     break;
                 };
                 if cancel_token.load(Ordering::Relaxed) {
-                    let _ = tx.send(Err("Cancelled".to_string()));
+                    tx.send(Err("Cancelled".to_string())).ok();
                     break;
                 }
 
@@ -1871,20 +1873,23 @@ fn run_sapi4_parallel_part(
                         let current = progress_counter.fetch_add(1, Ordering::SeqCst) + 1;
                         if progress_hwnd.0 != 0 {
                             unsafe {
-                                let _ = PostMessageW(
+                                if PostMessageW(
                                     progress_hwnd,
                                     crate::WM_UPDATE_PROGRESS,
                                     WPARAM(current),
                                     LPARAM(0),
-                                );
+                                )
+                                .ok()
+                                .is_some()
+                                {}
                             }
                         }
                     },
                 );
 
                 if let Err(e) = res {
-                    let _ = std::fs::remove_file(&sub_output);
-                    let _ = tx.send(Err(e));
+                    std::fs::remove_file(&sub_output).ok();
+                    tx.send(Err(e)).ok();
                     break;
                 } else {
                     // Only parallel encode for MP3 because they can be concatenated binary.
@@ -1895,15 +1900,16 @@ fn run_sapi4_parallel_part(
                         if let Err(e) =
                             crate::mf_encoder::encode_wav_to_audio(&sub_output, &encoded_sub, 128)
                         {
-                            let _ = std::fs::remove_file(&sub_output);
-                            let _ = tx.send(Err(format!("Parallel audio encode failed: {}", e)));
+                            std::fs::remove_file(&sub_output).ok();
+                            tx.send(Err(format!("Parallel audio encode failed: {}", e)))
+                                .ok();
                             break;
                         }
-                        let _ = std::fs::remove_file(&sub_output);
-                        let _ = tx.send(Ok(encoded_sub));
+                        std::fs::remove_file(&sub_output).ok();
+                        tx.send(Ok(encoded_sub)).ok();
                     } else {
                         // Keep as WAV for now (M4B or standard WAV)
-                        let _ = tx.send(Ok(sub_output));
+                        tx.send(Ok(sub_output)).ok();
                     }
                 }
             }
@@ -1925,11 +1931,11 @@ fn run_sapi4_parallel_part(
         }
     }
     for h in handles {
-        let _ = h.join();
+        h.join().ok();
     }
 
     if error.is_some() || options.cancel.load(Ordering::Relaxed) {
-        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::remove_dir_all(&temp_dir).ok();
         let msg = if let Some(e) = error {
             e
         } else {
@@ -1959,7 +1965,7 @@ fn run_sapi4_parallel_part(
         merge_and_finalize_sapi4_audio(&produced_files, options.output, options.language)
     };
 
-    let _ = std::fs::remove_dir_all(&temp_dir);
+    std::fs::remove_dir_all(&temp_dir).ok();
     *global_progress = progress_counter.load(Ordering::SeqCst);
     result
 }
@@ -2013,7 +2019,7 @@ fn merge_and_finalize_sapi4_audio(
         } else {
             crate::mf_encoder::encode_wav_to_mp3(&final_wav, output)
         };
-        let _ = std::fs::remove_file(&final_wav);
+        std::fs::remove_file(&final_wav).ok();
         res.map_err(|e| {
             if e.contains("Media Foundation") {
                 i18n::tr(language, "sapi5.mf_not_available")
@@ -2125,7 +2131,7 @@ fn run_split_sapi_audiobook(
 
         if is_aac {
             let res = crate::mf_encoder::encode_wav_to_m4b(&actual_output, &part_output);
-            let _ = std::fs::remove_file(&actual_output);
+            std::fs::remove_file(&actual_output).ok();
             res?;
         }
     }
@@ -2215,7 +2221,7 @@ fn run_marker_split_sapi_audiobook(
 
         if is_aac {
             let res = crate::mf_encoder::encode_wav_to_m4b(&actual_output, &part_output);
-            let _ = std::fs::remove_file(&actual_output);
+            std::fs::remove_file(&actual_output).ok();
             res?;
         }
     }
@@ -2337,7 +2343,7 @@ pub(crate) fn run_tts_audiobook_part(
             return Err(format!("Failed to rename for M4B conversion: {}", e));
         }
         let res = crate::mf_encoder::encode_wav_to_m4b(&wav_path, options.output);
-        let _ = std::fs::remove_file(&wav_path);
+        std::fs::remove_file(&wav_path).ok();
         res?;
     }
 

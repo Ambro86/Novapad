@@ -2,13 +2,15 @@ use crate::accessibility::to_wide;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
-use windows::Win32::Foundation::HWND;
+use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
 use windows::Win32::System::Com::StructuredStorage::PropVariantClear;
 use windows::Win32::System::Com::{COINIT_MULTITHREADED, CoInitializeEx, CoUninitialize};
+use windows::Win32::UI::Controls::RichEdit::{EDITSTREAM, EM_STREAMOUT, SF_RTF};
 use windows::Win32::UI::Shell::PropertiesSystem::{
     GPS_READWRITE, IPropertyStore, PROPERTYKEY, SHGetPropertyStoreFromParsingName,
 };
 use windows::Win32::UI::Shell::{SHStrDupW, ShellExecuteW};
+use windows::Win32::UI::WindowsAndMessaging::SendMessageW;
 use windows::core::{GUID, PCWSTR, PROPVARIANT, PWSTR, w};
 
 const VT_LPWSTR: u16 = 31;
@@ -327,7 +329,8 @@ pub fn set_file_metadata(
     comment: Option<&str>,
 ) -> Result<(), String> {
     unsafe {
-        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        let _hr = CoInitializeEx(None, COINIT_MULTITHREADED);
+
         let path_wide = to_wide(path.to_str().ok_or("Invalid path")?);
 
         let store: IPropertyStore =
@@ -353,6 +356,7 @@ pub fn set_file_metadata(
 }
 
 #[repr(C)]
+#[allow(non_snake_case)]
 struct MyPropVariant {
     vt: u16,
     w_reserved1: u16,
@@ -364,7 +368,7 @@ struct MyPropVariant {
 
 unsafe fn set_prop(store: &IPropertyStore, key: &PROPERTYKEY, value: &str) -> Result<(), String> {
     let wide = to_wide(value);
-    let psz = SHStrDupW(PCWSTR(wide.as_ptr())).map_err(|e| e.to_string())?;
+    let psz = SHStrDupW(PCWSTR(wide.as_ptr())).map_err(|e: windows::core::Error| e.to_string())?;
 
     let mut pv = MyPropVariant {
         vt: VT_LPWSTR,
@@ -376,7 +380,50 @@ unsafe fn set_prop(store: &IPropertyStore, key: &PROPERTYKEY, value: &str) -> Re
     };
 
     let res = store.SetValue(key, &pv as *const MyPropVariant as *const PROPVARIANT);
-    let _ = PropVariantClear(&mut pv as *mut MyPropVariant as *mut PROPVARIANT);
+    unsafe {
+        PropVariantClear(&mut pv as *mut MyPropVariant as *mut PROPVARIANT).ok();
+    }
 
     res.map_err(|e| format!("IPropertyStore::SetValue failed: {}", e))
+}
+
+pub unsafe fn write_rtf_text(path: &Path, hwnd_edit: HWND) -> Result<(), String> {
+    let mut file = File::create(path).map_err(|e| e.to_string())?;
+
+    unsafe extern "system" fn stream_out_callback(
+        dw_cookie: usize,
+        pb_buff: *mut u8,
+        cb: i32,
+        pcb: *mut i32,
+    ) -> u32 {
+        let file = &mut *(dw_cookie as *mut File);
+        let data = std::slice::from_raw_parts(pb_buff, cb as usize);
+        match file.write_all(data) {
+            Ok(_) => {
+                *pcb = cb;
+                0
+            }
+            Err(_) => 1,
+        }
+    }
+
+    let mut es = EDITSTREAM {
+        dwCookie: &mut file as *mut _ as usize,
+        dwError: 0,
+        pfnCallback: Some(stream_out_callback),
+    };
+
+    SendMessageW(
+        hwnd_edit,
+        EM_STREAMOUT,
+        WPARAM(SF_RTF as usize),
+        LPARAM(&mut es as *mut _ as isize),
+    );
+
+    if es.dwError != 0 {
+        return Err(format!("RTF stream out failed: {}", es.dwError));
+    }
+
+    crate::log_debug(&format!("RTF: Successfully saved to {:?}", path));
+    Ok(())
 }

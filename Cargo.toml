@@ -160,7 +160,7 @@ rodio = { version = "0.18", features = ["symphonia-aac", "symphonia-isomp4"] }
 sha2 = "0.10"
 sha1 = "0.10"
 tokio = { version = "1.49", features = ["macros", "rt-multi-thread"] }
-tokio-tungstenite = { version = "0.21", features = ["rustls-tls-native-roots"] }
+tokio-tungstenite = { version = "0.28", features = ["rustls-tls-native-roots"] }
 cpal = "0.15"
 url = "2.5"
 uuid = { version = "1.19", features = ["v4"] }

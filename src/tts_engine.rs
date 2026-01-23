@@ -17,8 +17,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio_tungstenite::{
-    connect_async, tungstenite::client::IntoClientRequest, tungstenite::http::HeaderValue,
-    tungstenite::protocol::Message,
+    connect_async, tungstenite, tungstenite::client::IntoClientRequest,
+    tungstenite::http::HeaderValue, tungstenite::protocol::Message,
 };
 use url::Url;
 use uuid::Uuid;
@@ -662,7 +662,10 @@ async fn download_audio_chunk_attempt(
     );
     let url = Url::parse(&url_str).map_err(|err| err.to_string())?;
 
-    let mut request = url.into_client_request().map_err(|err| err.to_string())?;
+    let mut request = url
+        .as_str()
+        .into_client_request()
+        .map_err(|e: tungstenite::Error| e.to_string())?;
     let headers = request.headers_mut();
     headers.insert("Pragma", HeaderValue::from_static("no-cache"));
     headers.insert("Cache-Control", HeaderValue::from_static("no-cache"));
@@ -687,21 +690,24 @@ async fn download_audio_chunk_attempt(
 
     let connect_timeout = Duration::from_secs(3);
     let (ws_stream, _) = match tokio::time::timeout(connect_timeout, connect_async(request)).await {
-        Ok(res) => res.map_err(|err| err.to_string())?,
+        Ok(res) => res.map_err(|e: tungstenite::Error| e.to_string())?,
         Err(_) => {
             return Err("WebSocket connect timeout".to_string());
         }
     };
-    let (mut write, mut read) = ws_stream.split();
+    let (mut write, mut read): (
+        futures_util::stream::SplitSink<_, Message>,
+        futures_util::stream::SplitStream<_>,
+    ) = ws_stream.split();
 
     let config_msg = format!(
         "X-Timestamp:{}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{{\"context\":{{\"synthesis\":{{\"audio\":{{\"metadataoptions\":{{\"sentenceBoundaryEnabled\":\"false\",\"wordBoundaryEnabled\":\"false\"}},\"outputFormat\":\"audio-24khz-48kbitrate-mono-mp3\"}}}}}}}}",
         get_date_string()
     );
     write
-        .send(Message::Text(config_msg))
+        .send(Message::Text(config_msg.into()))
         .await
-        .map_err(|err| err.to_string())?;
+        .map_err(|e: tungstenite::Error| e.to_string())?;
 
     let ssml = mkssml(text, voice, tts_rate, tts_pitch, tts_volume);
     let ssml_msg = format!(
@@ -711,13 +717,13 @@ async fn download_audio_chunk_attempt(
         ssml
     );
     write
-        .send(Message::Text(ssml_msg))
+        .send(Message::Text(ssml_msg.into()))
         .await
-        .map_err(|err| err.to_string())?;
+        .map_err(|e: tungstenite::Error| e.to_string())?;
 
     let mut audio_data = Vec::new();
     while let Some(msg) = read.next().await {
-        let msg = msg.map_err(|err| err.to_string())?;
+        let msg: Message = msg.map_err(|e: tungstenite::Error| e.to_string())?;
         match msg {
             Message::Text(text) => {
                 if text.contains("Path:turn.end") {

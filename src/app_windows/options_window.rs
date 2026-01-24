@@ -69,7 +69,6 @@ const OPTIONS_ID_AUDIO_SPLIT: usize = 6011;
 const OPTIONS_ID_AUDIO_SPLIT_TEXT: usize = 6013;
 const OPTIONS_ID_AUDIO_SPLIT_REQUIRE_NEWLINE: usize = 6016;
 const OPTIONS_ID_SUBTITLE_MODE: usize = 6045;
-const OPTIONS_ID_AUDIO_WASAPI: usize = 6046;
 const OPTIONS_ID_SUBTITLE_OFFSET: usize = 6047;
 const OPTIONS_ID_PODCAST_CACHE_LIMIT: usize = 6030;
 const OPTIONS_ID_PODCASTINDEX_KEY: usize = 6035;
@@ -190,7 +189,6 @@ struct OptionsDialogState {
     combo_subtitle_mode: HWND,
     label_subtitle_offset: HWND,
     edit_subtitle_offset: HWND,
-    checkbox_audio_wasapi: HWND,
     label_podcast_cache_limit: HWND,
     edit_podcast_cache_limit: HWND,
     label_podcastindex_key: HWND,
@@ -273,7 +271,6 @@ struct OptionsLabels {
     subtitle_mode_off: String,
     subtitle_mode_nvda: String,
     subtitle_mode_user: String,
-    label_audio_wasapi: String,
     label_podcast_cache_limit: String,
     label_podcastindex_key: String,
     label_podcastindex_secret: String,
@@ -370,7 +367,6 @@ fn options_labels(language: Language) -> OptionsLabels {
         subtitle_mode_off: i18n::tr(language, "options.subtitle_mode.off"),
         subtitle_mode_nvda: i18n::tr(language, "options.subtitle_mode.nvda"),
         subtitle_mode_user: i18n::tr(language, "options.subtitle_mode.user"),
-        label_audio_wasapi: i18n::tr(language, "options.label.audio_wasapi"),
         label_podcast_cache_limit: i18n::tr(language, "options.label.podcast_cache_limit"),
         label_podcastindex_key: i18n::tr(language, "options.label.podcastindex_key"),
         label_podcastindex_secret: i18n::tr(language, "options.label.podcastindex_secret"),
@@ -1060,22 +1056,6 @@ unsafe extern "system" fn options_wndproc(
             );
             y += 26;
 
-            let checkbox_audio_wasapi = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_audio_wasapi).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                320,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_AUDIO_WASAPI as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 26;
-
             let label_podcast_cache_limit = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -1659,7 +1639,6 @@ unsafe extern "system" fn options_wndproc(
                 combo_subtitle_mode,
                 label_subtitle_offset,
                 edit_subtitle_offset,
-                checkbox_audio_wasapi,
                 label_podcast_cache_limit,
                 edit_podcast_cache_limit,
                 label_podcastindex_key,
@@ -1738,7 +1717,6 @@ unsafe extern "system" fn options_wndproc(
                 combo_subtitle_mode,
                 label_subtitle_offset,
                 edit_subtitle_offset,
-                checkbox_audio_wasapi,
                 label_podcast_cache_limit,
                 edit_podcast_cache_limit,
                 label_podcastindex_key,
@@ -1995,7 +1973,6 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         combo_subtitle_mode,
         _label_subtitle_offset,
         edit_subtitle_offset,
-        checkbox_audio_wasapi,
         _label_podcast_cache_limit,
         edit_podcast_cache_limit,
         _label_podcastindex_key,
@@ -2050,7 +2027,6 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.combo_subtitle_mode,
             state.label_subtitle_offset,
             state.edit_subtitle_offset,
-            state.checkbox_audio_wasapi,
             state.label_podcast_cache_limit,
             state.edit_podcast_cache_limit,
             state.label_podcastindex_key,
@@ -2752,17 +2728,6 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         crate::log_debug(&format!("Error: {:?}", _e));
     }
 
-    SendMessageW(
-        checkbox_audio_wasapi,
-        BM_SETCHECK,
-        WPARAM(if settings.audiobook_use_wasapi_output {
-            BST_CHECKED.0 as usize
-        } else {
-            0
-        }),
-        LPARAM(0),
-    );
-
     let cache_limit_text = settings.podcast_cache_limit_mb.to_string();
     if let Err(_e) = SetWindowTextW(
         edit_podcast_cache_limit,
@@ -3188,7 +3153,6 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         checkbox_audio_split_requires_newline,
         combo_subtitle_mode,
         edit_subtitle_offset,
-        checkbox_audio_wasapi,
         edit_podcast_cache_limit,
         edit_podcastindex_key,
         edit_podcastindex_secret,
@@ -3231,7 +3195,6 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.checkbox_audio_split_requires_newline,
             state.combo_subtitle_mode,
             state.edit_subtitle_offset,
-            state.checkbox_audio_wasapi,
             state.edit_podcast_cache_limit,
             state.edit_podcastindex_key,
             state.edit_podcastindex_secret,
@@ -3380,9 +3343,6 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             settings.subtitle_offset_ms = parsed;
         }
     }
-    settings.audiobook_use_wasapi_output =
-        SendMessageW(checkbox_audio_wasapi, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
-            == BST_CHECKED.0;
     settings.split_on_newline =
         SendMessageW(checkbox_split_on_newline, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
             == BST_CHECKED.0;
@@ -3788,7 +3748,6 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.combo_subtitle_mode,
             state.label_subtitle_offset,
             state.edit_subtitle_offset,
-            state.checkbox_audio_wasapi,
             state.label_podcast_cache_limit,
             state.edit_podcast_cache_limit,
             state.label_podcastindex_key,

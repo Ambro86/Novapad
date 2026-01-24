@@ -193,8 +193,6 @@ pub struct AppSettings {
     pub audiobook_skip_seconds: u32,
     pub audiobook_playback_speed: f32,
     pub audiobook_playback_volume: f32,
-    #[serde(default)]
-    pub audiobook_use_wasapi_output: bool,
     pub audiobook_split: u32,
     pub audiobook_split_by_text: bool,
     pub audiobook_split_text: String,
@@ -314,7 +312,6 @@ impl Default for AppSettings {
             audiobook_skip_seconds: 60,
             audiobook_playback_speed: 1.0,
             audiobook_playback_volume: 1.0,
-            audiobook_use_wasapi_output: false,
             audiobook_split: 0,
             audiobook_split_by_text: false,
             audiobook_split_text: String::new(),

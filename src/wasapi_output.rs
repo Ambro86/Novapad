@@ -24,6 +24,16 @@ const WAVE_FORMAT_IEEE_FLOAT: u16 = 0x0003;
 const WAVE_FORMAT_EXTENSIBLE: u16 = 0xFFFE;
 const KSDATAFORMAT_SUBTYPE_PCM: GUID = GUID::from_u128(0x00000001_0000_0010_8000_00AA00389B71);
 
+/// Clock references for subtitle synchronization.
+pub type ClockRefs = (
+    Arc<AtomicU64>,
+    Arc<AtomicU64>,
+    Arc<AtomicU64>,
+    Arc<AtomicU64>,
+    Arc<AtomicU64>,
+    Arc<AtomicBool>,
+);
+
 #[derive(Clone, Copy, Debug)]
 enum WasapiSampleFormat {
     Pcm16,
@@ -64,6 +74,7 @@ pub struct WasapiOutput {
     sample_rate_hz: Arc<AtomicU32>,
     volume_bits: Arc<AtomicU32>,
     stopped: Arc<AtomicBool>,
+    paused: Arc<AtomicBool>,
 }
 
 impl WasapiOutput {
@@ -84,6 +95,7 @@ impl WasapiOutput {
         let sample_rate_hz = Arc::new(AtomicU32::new(0));
         let volume_bits = Arc::new(AtomicU32::new(volume.to_bits()));
         let stopped = Arc::new(AtomicBool::new(false));
+        let paused = Arc::new(AtomicBool::new(start_paused));
 
         let position_units_thread = position_units.clone();
         let last_qpc_thread = last_qpc.clone();
@@ -94,6 +106,7 @@ impl WasapiOutput {
         let sample_rate_hz_thread = sample_rate_hz.clone();
         let volume_bits_thread = volume_bits.clone();
         let stopped_thread = stopped.clone();
+        let paused_thread = paused.clone();
 
         thread::spawn(move || {
             let _com = match ComGuard::new_mta() {
@@ -272,6 +285,7 @@ impl WasapiOutput {
                                     log_debug(&format!("WASAPI: Start failed: {}", e));
                                 } else {
                                     playing = true;
+                                    paused_thread.store(false, Ordering::Relaxed);
                                 }
                             }
                         }
@@ -281,6 +295,7 @@ impl WasapiOutput {
                                     log_debug(&format!("WASAPI: Stop failed: {}", e));
                                 } else {
                                     playing = false;
+                                    paused_thread.store(true, Ordering::Relaxed);
                                 }
                             }
                         }
@@ -408,6 +423,7 @@ impl WasapiOutput {
             sample_rate_hz,
             volume_bits,
             stopped,
+            paused,
         }))
     }
 
@@ -437,14 +453,15 @@ impl WasapiOutput {
         if self.stopped.load(Ordering::Relaxed) {
             return None;
         }
+        let clock_freq = self.clock_freq.load(Ordering::Relaxed);
+        let sample_rate = self.sample_rate_hz.load(Ordering::Relaxed);
+        // WASAPI not ready yet - clock not initialized
+        if clock_freq == 0 || sample_rate == 0 {
+            return None;
+        }
         let base = self.base_micros.load(Ordering::Relaxed);
         let units = self.position_units.load(Ordering::Relaxed);
-        let clock_freq = self.clock_freq.load(Ordering::Relaxed);
-        let mut secs = if clock_freq > 0 {
-            units as f64 / clock_freq as f64
-        } else {
-            0.0
-        };
+        let mut secs = units as f64 / clock_freq as f64;
         let last_qpc = self.last_qpc.load(Ordering::Relaxed);
         let qpc_freq = self.qpc_freq.load(Ordering::Relaxed);
         if last_qpc > 0 && qpc_freq > 0 {
@@ -454,13 +471,8 @@ impl WasapiOutput {
                 secs += delta as f64 / qpc_freq as f64;
             }
         }
-        let sample_rate = self.sample_rate_hz.load(Ordering::Relaxed);
         let padding = self.padding_frames.load(Ordering::Relaxed);
-        let padding_secs = if sample_rate > 0 {
-            padding as f64 / sample_rate as f64
-        } else {
-            0.0
-        };
+        let padding_secs = padding as f64 / sample_rate as f64;
         Some(((base as f64 / 1_000_000.0) + secs - padding_secs).max(0.0))
     }
 
@@ -481,6 +493,18 @@ impl WasapiOutput {
 
     pub fn sample_rate_hz(&self) -> u32 {
         self.sample_rate_hz.load(Ordering::Relaxed)
+    }
+
+    /// Get clock references for subtitle synchronization.
+    pub fn clock_refs(&self) -> ClockRefs {
+        (
+            self.position_units.clone(),
+            self.clock_freq.clone(),
+            self.base_micros.clone(),
+            self.last_qpc.clone(),
+            self.qpc_freq.clone(),
+            self.paused.clone(),
+        )
     }
 }
 

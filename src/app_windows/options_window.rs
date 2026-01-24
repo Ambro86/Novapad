@@ -70,6 +70,7 @@ const OPTIONS_ID_AUDIO_SPLIT_TEXT: usize = 6013;
 const OPTIONS_ID_AUDIO_SPLIT_REQUIRE_NEWLINE: usize = 6016;
 const OPTIONS_ID_SUBTITLE_MODE: usize = 6045;
 const OPTIONS_ID_AUDIO_WASAPI: usize = 6046;
+const OPTIONS_ID_SUBTITLE_OFFSET: usize = 6047;
 const OPTIONS_ID_PODCAST_CACHE_LIMIT: usize = 6030;
 const OPTIONS_ID_PODCASTINDEX_KEY: usize = 6035;
 const OPTIONS_ID_PODCASTINDEX_SECRET: usize = 6036;
@@ -187,6 +188,8 @@ struct OptionsDialogState {
     checkbox_audio_split_requires_newline: HWND,
     label_subtitle_mode: HWND,
     combo_subtitle_mode: HWND,
+    label_subtitle_offset: HWND,
+    edit_subtitle_offset: HWND,
     checkbox_audio_wasapi: HWND,
     label_podcast_cache_limit: HWND,
     edit_podcast_cache_limit: HWND,
@@ -266,6 +269,7 @@ struct OptionsLabels {
     label_audio_split_text: String,
     label_audio_split_requires_newline: String,
     label_subtitle_mode: String,
+    label_subtitle_offset: String,
     subtitle_mode_off: String,
     subtitle_mode_nvda: String,
     subtitle_mode_user: String,
@@ -362,6 +366,7 @@ fn options_labels(language: Language) -> OptionsLabels {
             "options.label.audio_split_requires_newline",
         ),
         label_subtitle_mode: i18n::tr(language, "options.label.subtitle_mode"),
+        label_subtitle_offset: i18n::tr(language, "options.label.subtitle_offset"),
         subtitle_mode_off: i18n::tr(language, "options.subtitle_mode.off"),
         subtitle_mode_nvda: i18n::tr(language, "options.subtitle_mode.nvda"),
         subtitle_mode_user: i18n::tr(language, "options.subtitle_mode.user"),
@@ -1025,6 +1030,36 @@ unsafe extern "system" fn options_wndproc(
             );
             y += 40;
 
+            let label_subtitle_offset = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_subtitle_offset).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let edit_subtitle_offset = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                170,
+                y - 2,
+                80,
+                20,
+                hwnd,
+                HMENU(OPTIONS_ID_SUBTITLE_OFFSET as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 26;
+
             let checkbox_audio_wasapi = CreateWindowExW(
                 Default::default(),
                 WC_BUTTON,
@@ -1622,6 +1657,8 @@ unsafe extern "system" fn options_wndproc(
                 checkbox_audio_split_requires_newline,
                 label_subtitle_mode,
                 combo_subtitle_mode,
+                label_subtitle_offset,
+                edit_subtitle_offset,
                 checkbox_audio_wasapi,
                 label_podcast_cache_limit,
                 edit_podcast_cache_limit,
@@ -1699,6 +1736,8 @@ unsafe extern "system" fn options_wndproc(
                 checkbox_audio_split_requires_newline,
                 label_subtitle_mode,
                 combo_subtitle_mode,
+                label_subtitle_offset,
+                edit_subtitle_offset,
                 checkbox_audio_wasapi,
                 label_podcast_cache_limit,
                 edit_podcast_cache_limit,
@@ -1954,6 +1993,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         checkbox_audio_split_requires_newline,
         _label_subtitle_mode,
         combo_subtitle_mode,
+        _label_subtitle_offset,
+        edit_subtitle_offset,
         checkbox_audio_wasapi,
         _label_podcast_cache_limit,
         edit_podcast_cache_limit,
@@ -2007,6 +2048,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.checkbox_audio_split_requires_newline,
             state.label_subtitle_mode,
             state.combo_subtitle_mode,
+            state.label_subtitle_offset,
+            state.edit_subtitle_offset,
             state.checkbox_audio_wasapi,
             state.label_podcast_cache_limit,
             state.edit_podcast_cache_limit,
@@ -2701,6 +2744,14 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         LPARAM(0),
     );
 
+    let subtitle_offset_text = settings.subtitle_offset_ms.to_string();
+    if let Err(_e) = SetWindowTextW(
+        edit_subtitle_offset,
+        PCWSTR(to_wide(&subtitle_offset_text).as_ptr()),
+    ) {
+        crate::log_debug(&format!("Error: {:?}", _e));
+    }
+
     SendMessageW(
         checkbox_audio_wasapi,
         BM_SETCHECK,
@@ -3136,6 +3187,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         edit_audio_split_text,
         checkbox_audio_split_requires_newline,
         combo_subtitle_mode,
+        edit_subtitle_offset,
         checkbox_audio_wasapi,
         edit_podcast_cache_limit,
         edit_podcastindex_key,
@@ -3178,6 +3230,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.edit_audio_split_text,
             state.checkbox_audio_split_requires_newline,
             state.combo_subtitle_mode,
+            state.edit_subtitle_offset,
             state.checkbox_audio_wasapi,
             state.edit_podcast_cache_limit,
             state.edit_podcastindex_key,
@@ -3318,6 +3371,15 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         2 => SubtitleReadMode::User,
         _ => SubtitleReadMode::Off,
     };
+    let offset_len = GetWindowTextLengthW(edit_subtitle_offset);
+    if offset_len >= 0 {
+        let mut buf = vec![0u16; (offset_len + 1) as usize];
+        let read = GetWindowTextW(edit_subtitle_offset, &mut buf);
+        let text = String::from_utf16_lossy(&buf[..read as usize]);
+        if let Ok(parsed) = text.trim().parse::<i32>() {
+            settings.subtitle_offset_ms = parsed;
+        }
+    }
     settings.audiobook_use_wasapi_output =
         SendMessageW(checkbox_audio_wasapi, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
             == BST_CHECKED.0;
@@ -3724,6 +3786,8 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.checkbox_audio_split_requires_newline,
             state.label_subtitle_mode,
             state.combo_subtitle_mode,
+            state.label_subtitle_offset,
+            state.edit_subtitle_offset,
             state.checkbox_audio_wasapi,
             state.label_podcast_cache_limit,
             state.edit_podcast_cache_limit,

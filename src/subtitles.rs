@@ -13,6 +13,7 @@ pub struct SubtitleCue {
     pub end: Duration,
     pub text: String,
     pub audio_path: Option<PathBuf>,
+    pub audio_data: Option<std::sync::Arc<[u8]>>,
 }
 
 pub fn find_subtitle_for_media(media_path: &Path) -> Option<PathBuf> {
@@ -86,6 +87,7 @@ fn parse_srt(input: &str) -> Vec<SubtitleCue> {
                 end,
                 text,
                 audio_path: None,
+                audio_data: None,
             });
         }
     }
@@ -129,6 +131,7 @@ fn parse_vtt(input: &str) -> Vec<SubtitleCue> {
                 end,
                 text,
                 audio_path: None,
+                audio_data: None,
             });
         }
     }
@@ -161,6 +164,7 @@ fn parse_ass(input: &str) -> Vec<SubtitleCue> {
                 end,
                 text,
                 audio_path: None,
+                audio_data: None,
             });
         }
     }
@@ -202,6 +206,7 @@ fn parse_sub(input: &str) -> Vec<SubtitleCue> {
                 end,
                 text,
                 audio_path: None,
+                audio_data: None,
             });
         }
     }
@@ -253,6 +258,7 @@ fn parse_sbv(input: &str) -> Vec<SubtitleCue> {
                 end,
                 text,
                 audio_path: None,
+                audio_data: None,
             });
         }
     }
@@ -300,6 +306,7 @@ fn parse_lrc(input: &str) -> Vec<SubtitleCue> {
                 end,
                 text,
                 audio_path: None,
+                audio_data: None,
             });
         }
     }
@@ -352,6 +359,7 @@ fn parse_sami(input: &str) -> Vec<SubtitleCue> {
             end,
             text,
             audio_path: None,
+            audio_data: None,
         });
     }
     cues

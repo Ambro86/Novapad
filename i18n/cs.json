@@ -189,6 +189,7 @@
   "options.label.audio_split_text": "Text značky rozdělení:",
   "options.label.audio_split_requires_newline": "Vyžadovat značku na začátku řádku",
   "options.label.subtitle_mode": "Čtení titulků:",
+  "options.label.subtitle_offset": "Posun titulků (ms):",
   "options.label.audio_wasapi": "Použít výstup WASAPI (beta)",
   "options.subtitle_mode.off": "Vypnuto",
   "options.subtitle_mode.nvda": "NVDA",

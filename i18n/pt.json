@@ -178,6 +178,7 @@
   "options.label.audio_split_text": "Texto do marcador:",
   "options.label.audio_split_requires_newline": "Exigir marcador no inicio da linha",
   "options.label.subtitle_mode": "Leitura de legendas:",
+  "options.label.subtitle_offset": "Offset de legendas (ms):",
   "options.label.audio_wasapi": "Usar saida WASAPI (beta)",
   "options.subtitle_mode.off": "Desativada",
   "options.subtitle_mode.nvda": "NVDA",

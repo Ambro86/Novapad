@@ -185,6 +185,7 @@
   "options.label.audio_split_text": "Text för delningsmarkör:",
   "options.label.audio_split_requires_newline": "Kräv markören i början av raden",
   "options.label.subtitle_mode": "Undertextläsning:",
+  "options.label.subtitle_offset": "Undertextoffset (ms):",
   "options.label.audio_wasapi": "Använd WASAPI-utdata (beta)",
   "options.subtitle_mode.off": "Inaktiverad",
   "options.subtitle_mode.nvda": "NVDA",

@@ -5,6 +5,7 @@ use crate::log_debug;
 use crate::settings::{FileFormat, SubtitleReadMode, confirm_title, settings_dir};
 use crate::subtitles::{find_subtitle_for_media, load_subtitles};
 use crate::tts_engine;
+use crate::wasapi_output::WasapiOutput;
 use crate::with_state;
 use libloading::Library;
 use rodio::{Decoder, OutputStream, OutputStreamBuilder, Sink, Source};
@@ -22,10 +23,19 @@ use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::{IDYES, MB_ICONQUESTION, MB_YESNO, MessageBoxW};
 use windows::core::PCWSTR;
 
+enum AudioBackend {
+    Rodio {
+        sink: Arc<Sink>,
+        _stream: OutputStream,
+    },
+    Wasapi {
+        output: Arc<WasapiOutput>,
+    },
+}
+
 pub struct AudiobookPlayer {
     pub path: PathBuf,
-    pub sink: Arc<Sink>,
-    pub _stream: OutputStream, // Deve essere mantenuto in vita
+    backend: AudioBackend,
     pub is_paused: bool,
     pub start_instant: std::time::Instant,
     pub accumulated_seconds: u64,
@@ -35,6 +45,51 @@ pub struct AudiobookPlayer {
     pub speed: f32,
     pub subtitle_cancel: Arc<AtomicBool>,
     pub subtitle_hold: bool,
+    pub session_id: u64,
+}
+
+impl AudiobookPlayer {
+    fn play(&self) {
+        match &self.backend {
+            AudioBackend::Rodio { sink, .. } => sink.play(),
+            AudioBackend::Wasapi { output } => output.play(),
+        }
+    }
+
+    fn pause(&self) {
+        match &self.backend {
+            AudioBackend::Rodio { sink, .. } => sink.pause(),
+            AudioBackend::Wasapi { output } => output.pause(),
+        }
+    }
+
+    fn stop(&self) {
+        match &self.backend {
+            AudioBackend::Rodio { sink, .. } => sink.stop(),
+            AudioBackend::Wasapi { output } => output.stop(),
+        }
+    }
+
+    fn set_volume(&self, volume: f32) {
+        match &self.backend {
+            AudioBackend::Rodio { sink, .. } => sink.set_volume(volume),
+            AudioBackend::Wasapi { output } => output.set_volume(volume),
+        }
+    }
+
+    fn try_seek(&self, position: Duration) -> bool {
+        match &self.backend {
+            AudioBackend::Rodio { sink, .. } => sink.try_seek(position).is_ok(),
+            AudioBackend::Wasapi { .. } => false,
+        }
+    }
+
+    fn backend_position_secs(&self) -> Option<f64> {
+        match &self.backend {
+            AudioBackend::Rodio { .. } => None,
+            AudioBackend::Wasapi { output } => output.position_secs(),
+        }
+    }
 }
 
 type SoundTouchHandle = *mut c_void;
@@ -568,6 +623,9 @@ fn start_audiobook_at_with_options(
     seconds: u64,
     options: AudiobookPlaybackOptions,
 ) {
+    let use_wasapi_output = unsafe {
+        with_state(hwnd, |state| state.settings.audiobook_use_wasapi_output).unwrap_or(false)
+    };
     let subtitle_hold = should_hold_for_edge_subtitles(hwnd, &path);
     let effective_paused = options.paused || subtitle_hold;
     let subtitle_cancel = Arc::new(AtomicBool::new(false));
@@ -584,18 +642,6 @@ fn start_audiobook_at_with_options(
             "Audio player: Thread started for {}",
             path.display()
         ));
-        let stream_handle = match OutputStreamBuilder::open_default_stream() {
-            Ok(v) => v,
-            Err(e) => {
-                log_debug(&format!(
-                    "Audio player: Failed to get default output stream: {}",
-                    e
-                ));
-                return;
-            }
-        };
-        let sink: Arc<Sink> = Arc::new(Sink::connect_new(stream_handle.mixer()));
-
         log_debug(&format!("Audio player: Opening file {}", path.display()));
         let file_size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
         let extension = path
@@ -603,30 +649,7 @@ fn start_audiobook_at_with_options(
             .and_then(|e| e.to_str())
             .unwrap_or("")
             .to_lowercase();
-        let use_ffmpeg = matches!(
-            extension.as_str(),
-            "mkv"
-                | "avi"
-                | "mov"
-                | "m4v"
-                | "webm"
-                | "mpg"
-                | "mpeg"
-                | "ts"
-                | "m2ts"
-                | "mts"
-                | "wmv"
-                | "asf"
-                | "flv"
-                | "vob"
-                | "3gp"
-                | "flac"
-                | "ogg"
-                | "opus"
-                | "wma"
-                | "aiff"
-                | "m4b"
-        );
+        let use_ffmpeg = true;
         let prefer_streaming = use_ffmpeg;
         log_mkv_probe_once(&path);
 
@@ -713,13 +736,68 @@ fn start_audiobook_at_with_options(
             ));
             match crate::mf_source::MfSource::try_new(&final_path) {
                 Ok(mut mfs) => {
+                    let mut fallback_source: Option<Box<dyn Source<Item = f32> + Send>> = None;
                     if seconds > 0 {
                         log_debug(&format!("Audio player: Efficient seek to {}s", seconds));
                         if let Err(e) = mfs.seek(std::time::Duration::from_secs(seconds)) {
                             log_debug(&format!("Audio player: MfSource seek failed: {}", e));
+                            match FfmpegSource::try_new(&final_path, seconds) {
+                                Ok(src) => {
+                                    log_debug(
+                                        "Audio player: Falling back to FFmpeg after MF seek failure.",
+                                    );
+                                    fallback_source = Some(Box::new(src));
+                                }
+                                Err(err) => {
+                                    log_debug(&format!(
+                                        "Audio player: FFmpeg fallback failed after MF seek failure: {}",
+                                        err
+                                    ));
+                                    let file = match std::fs::File::open(&path) {
+                                        Ok(file) => file,
+                                        Err(e) => {
+                                            log_debug(&format!(
+                                                "Audio player: Rodio fallback failed to open file: {}",
+                                                e
+                                            ));
+                                            return;
+                                        }
+                                    };
+                                    let reader =
+                                        std::io::BufReader::with_capacity(8 * 1024 * 1024, file);
+                                    let mut builder = Decoder::builder().with_data(reader);
+                                    if file_size > 0 {
+                                        builder = builder.with_byte_len(file_size);
+                                    }
+                                    if !extension.is_empty() {
+                                        builder = builder.with_hint(&extension);
+                                    }
+                                    if prefer_streaming {
+                                        builder = builder.with_gapless(false);
+                                    }
+                                    match builder.build() {
+                                        Ok(d) => {
+                                            fallback_source = Some(Box::new(d.skip_duration(
+                                                std::time::Duration::from_secs(seconds),
+                                            )));
+                                        }
+                                        Err(err) => {
+                                            log_debug(&format!(
+                                                "Audio player: Rodio fallback decoder failed: {}",
+                                                err
+                                            ));
+                                            return;
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
-                    Box::new(mfs)
+                    if let Some(source) = fallback_source {
+                        source
+                    } else {
+                        Box::new(mfs)
+                    }
                 }
                 Err(e) => {
                     log_debug(&format!(
@@ -895,34 +973,72 @@ fn start_audiobook_at_with_options(
             source.sample_rate()
         ));
 
-        if (effective_speed - 1.0).abs() > f32::EPSILON {
-            log_debug(&format!(
-                "Audio player: Applying speed factor {}",
-                effective_speed
-            ));
-            match SoundTouchSource::try_new(source, effective_speed) {
-                Ok(st_source) => sink.append(st_source),
-                Err(source) => sink.append(source),
+        let source: Box<dyn Source<Item = f32> + Send> =
+            if (effective_speed - 1.0).abs() > f32::EPSILON {
+                log_debug(&format!(
+                    "Audio player: Applying speed factor {}",
+                    effective_speed
+                ));
+                match SoundTouchSource::try_new(source, effective_speed) {
+                    Ok(st_source) => Box::new(st_source),
+                    Err(source) => source,
+                }
+            } else {
+                source
+            };
+
+        let backend = if use_wasapi_output {
+            log_debug("Audio player: Using WASAPI output (beta).");
+            let initial_volume = if options.muted { 0.0 } else { options.volume };
+            let base_secs = seconds as f64;
+            match WasapiOutput::start(source, effective_paused, initial_volume, base_secs) {
+                Ok(output) => AudioBackend::Wasapi { output },
+                Err(err) => {
+                    log_debug(&format!("Audio player: WASAPI output failed: {}", err));
+                    return;
+                }
             }
         } else {
+            let stream_handle = match OutputStreamBuilder::open_default_stream() {
+                Ok(v) => v,
+                Err(e) => {
+                    log_debug(&format!(
+                        "Audio player: Failed to get default output stream: {}",
+                        e
+                    ));
+                    return;
+                }
+            };
+            let sink: Arc<Sink> = Arc::new(Sink::connect_new(stream_handle.mixer()));
             log_debug("Audio player: Appending source to sink");
             sink.append(source);
-        }
+            if options.muted {
+                sink.set_volume(0.0);
+            } else {
+                sink.set_volume(options.volume);
+            }
+            if effective_paused {
+                sink.pause();
+            }
+            AudioBackend::Rodio {
+                sink,
+                _stream: stream_handle,
+            }
+        };
 
-        if options.muted {
-            sink.set_volume(0.0);
-        } else {
-            sink.set_volume(options.volume);
-        }
-        if effective_paused {
-            sink.pause();
-        }
         log_debug("Audio player: Playback started");
+
+        let session_id = unsafe {
+            with_state(hwnd_main, |state| {
+                state.audiobook_session_id = state.audiobook_session_id.wrapping_add(1);
+                state.audiobook_session_id
+            })
+            .unwrap_or(0)
+        };
 
         let player = AudiobookPlayer {
             path,
-            sink: sink.clone(),
-            _stream: stream_handle,
+            backend,
             is_paused: effective_paused,
             start_instant: std::time::Instant::now(),
             accumulated_seconds: seconds,
@@ -932,6 +1048,7 @@ fn start_audiobook_at_with_options(
             speed: effective_speed,
             subtitle_cancel: subtitle_cancel.clone(),
             subtitle_hold,
+            session_id,
         };
 
         unsafe {
@@ -991,14 +1108,15 @@ pub unsafe fn toggle_audiobook_pause(hwnd: HWND) {
         if let Some(player) = &mut state.active_audiobook {
             if player.is_paused {
                 crate::log_debug("Audio player: Resuming playback");
-                player.sink.play();
+                player.play();
                 player.is_paused = false;
                 player.start_instant = std::time::Instant::now();
             } else {
                 crate::log_debug("Audio player: Pausing playback");
-                player.sink.pause();
+                player.pause();
                 player.is_paused = true;
-                player.accumulated_seconds += player.start_instant.elapsed().as_secs();
+                let pos = audiobook_position_secs(player);
+                player.accumulated_seconds = pos.floor() as u64;
             }
             return None;
         }
@@ -1045,16 +1163,13 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
 
     let result = with_state(hwnd, |state| {
         if let Some(player) = &mut state.active_audiobook {
+            let current_pos = audiobook_position_secs(player);
             if !player.is_paused {
-                player.accumulated_seconds += player.start_instant.elapsed().as_secs();
                 player.start_instant = std::time::Instant::now();
             }
-            let new_pos = (player.accumulated_seconds as i64 + seconds).max(0);
+            let new_pos = (current_pos as i64 + seconds).max(0);
             if (player.speed - 1.0).abs() <= f32::EPSILON
-                && player
-                    .sink
-                    .try_seek(std::time::Duration::from_secs(new_pos as u64))
-                    .is_ok()
+                && player.try_seek(std::time::Duration::from_secs(new_pos as u64))
             {
                 player.accumulated_seconds = new_pos as u64;
                 if !player.is_paused {
@@ -1124,10 +1239,7 @@ pub unsafe fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> 
     let action = with_state(hwnd, |state| {
         if let Some(player) = &mut state.active_audiobook {
             if (player.speed - 1.0).abs() <= f32::EPSILON
-                && player
-                    .sink
-                    .try_seek(std::time::Duration::from_secs(seconds))
-                    .is_ok()
+                && player.try_seek(std::time::Duration::from_secs(seconds))
             {
                 player.accumulated_seconds = seconds;
                 if !player.is_paused {
@@ -1161,7 +1273,7 @@ pub unsafe fn stop_audiobook_playback(hwnd: HWND) {
             ));
             state.last_stopped_audiobook = Some(player.path.clone());
             player.subtitle_cancel.store(true, Ordering::Relaxed);
-            player.sink.stop();
+            player.stop();
         }
     })
     .is_none()
@@ -1214,7 +1326,7 @@ pub unsafe fn change_audiobook_volume(hwnd: HWND, delta: f32) {
                 return None;
             }
             player.volume = (player.volume + delta).clamp(0.0, 3.0);
-            player.sink.set_volume(player.volume);
+            player.set_volume(player.volume);
             Some(player.volume)
         } else {
             None
@@ -1237,13 +1349,9 @@ pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
     load_soundtouch_api()?;
     let result = with_state(hwnd, |state| {
         if let Some(player) = state.active_audiobook.take() {
-            let current = if player.is_paused {
-                player.accumulated_seconds
-            } else {
-                player.accumulated_seconds + player.start_instant.elapsed().as_secs()
-            };
+            let current = audiobook_position_secs(&player).floor() as u64;
             let new_speed = (player.speed + delta).clamp(0.5, 3.0);
-            player.sink.stop();
+            player.stop();
             Some((
                 player.path,
                 current,
@@ -1291,13 +1399,9 @@ pub unsafe fn reset_audiobook_speed(hwnd: HWND) -> Option<f32> {
     load_soundtouch_api()?;
     let result = with_state(hwnd, |state| {
         if let Some(player) = state.active_audiobook.take() {
-            let current = if player.is_paused {
-                player.accumulated_seconds
-            } else {
-                player.accumulated_seconds + player.start_instant.elapsed().as_secs()
-            };
+            let current = audiobook_position_secs(&player).floor() as u64;
             let new_speed = 1.0;
-            player.sink.stop();
+            player.stop();
             Some((
                 player.path,
                 current,
@@ -1362,14 +1466,14 @@ pub unsafe fn toggle_audiobook_mute(hwnd: HWND) {
                 };
                 player.volume = restored;
                 player.muted = false;
-                player.sink.set_volume(player.volume);
+                player.set_volume(player.volume);
             } else {
                 if player.volume > 0.0 {
                     player.prev_volume = player.volume;
                 }
                 player.volume = 0.0;
                 player.muted = true;
-                player.sink.set_volume(0.0);
+                player.set_volume(0.0);
             }
         }
     })
@@ -1382,12 +1486,25 @@ pub unsafe fn toggle_audiobook_mute(hwnd: HWND) {
 struct SubtitlePlaybackState {
     paused: bool,
     position_secs: f64,
+    session_id: u64,
+    wasapi_latency_secs: Option<f64>,
+    wasapi_padding_secs: Option<f64>,
+    wasapi_sample_rate_hz: Option<u32>,
 }
 
 static SUBTITLE_EDGE_CONFIRMED: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
 const SUBTITLE_AUDIO_LATENCY_SECS: f64 = 0.28;
+const SUBTITLE_START_GUARD_SECS: f64 = 0.03;
 
 fn audiobook_position_secs(player: &AudiobookPlayer) -> f64 {
+    if let AudioBackend::Wasapi { output } = &player.backend {
+        if let Some(pos) = output.position_secs() {
+            let latency = output.latency_secs();
+            return (pos - latency).max(0.0);
+        }
+    } else if let Some(pos) = player.backend_position_secs() {
+        return pos;
+    }
     if player.is_paused {
         player.accumulated_seconds as f64
     } else {
@@ -1406,6 +1523,19 @@ fn subtitle_playback_state(hwnd: HWND, path: &Path) -> Option<SubtitlePlaybackSt
             Some(SubtitlePlaybackState {
                 paused: player.is_paused,
                 position_secs: audiobook_position_secs(player),
+                session_id: player.session_id,
+                wasapi_latency_secs: match &player.backend {
+                    AudioBackend::Wasapi { output } => Some(output.latency_secs()),
+                    _ => None,
+                },
+                wasapi_padding_secs: match &player.backend {
+                    AudioBackend::Wasapi { output } => Some(output.padding_secs()),
+                    _ => None,
+                },
+                wasapi_sample_rate_hz: match &player.backend {
+                    AudioBackend::Wasapi { output } => Some(output.sample_rate_hz()),
+                    _ => None,
+                },
             })
         })
         .flatten()
@@ -1438,9 +1568,39 @@ fn clear_subtitle_hold(hwnd: HWND, path: &Path) -> bool {
             player.subtitle_hold = false;
             player.is_paused = false;
             player.start_instant = std::time::Instant::now();
-            player.sink.play();
+            player.play();
             true
         })
+        .unwrap_or(false)
+    }
+}
+
+fn pause_active_backend(hwnd: HWND, path: &Path) -> bool {
+    unsafe {
+        with_state(hwnd, |state| {
+            let player = state.active_audiobook.as_ref()?;
+            if player.path.as_path() != path {
+                return None;
+            }
+            player.pause();
+            Some(true)
+        })
+        .flatten()
+        .unwrap_or(false)
+    }
+}
+
+fn resume_active_backend(hwnd: HWND, path: &Path) -> bool {
+    unsafe {
+        with_state(hwnd, |state| {
+            let player = state.active_audiobook.as_ref()?;
+            if player.path.as_path() != path {
+                return None;
+            }
+            player.play();
+            Some(true)
+        })
+        .flatten()
         .unwrap_or(false)
     }
 }
@@ -1536,6 +1696,10 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
         if mode == SubtitleReadMode::Off {
             return;
         }
+        let session_id = match subtitle_playback_state(hwnd, &media_path) {
+            Some(state) => state.session_id,
+            None => return,
+        };
         let effective_mode = match mode {
             SubtitleReadMode::Off => SubtitleReadMode::Off,
             SubtitleReadMode::Nvda => SubtitleReadMode::Nvda,
@@ -1555,6 +1719,17 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
         if cues.is_empty() {
             return;
         }
+        if let (Some(first), Some(last)) = (cues.first(), cues.last()) {
+            log_debug(&format!(
+                "Subtitle: loaded {} cues from {} (first {:.3}-{:.3}s, last {:.3}-{:.3}s)",
+                cues.len(),
+                subtitle_path.display(),
+                first.start.as_secs_f64(),
+                first.end.as_secs_f64(),
+                last.start.as_secs_f64(),
+                last.end.as_secs_f64()
+            ));
+        }
 
         let mut subtitle_stream: Option<OutputStream> = None;
         let mut subtitle_sink: Option<Sink> = None;
@@ -1570,16 +1745,10 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
             let title_w = to_wide(&title);
             let mut paused_for_prompt = false;
             if !paused_for_download
-                && let Some(player) = unsafe {
-                    with_state(hwnd, |state| {
-                        state.active_audiobook.as_ref().map(|p| p.sink.clone())
-                    })
-                }
-                .flatten()
                 && let Some(state) = subtitle_playback_state(hwnd, &media_path)
                 && !state.paused
+                && pause_active_backend(hwnd, &media_path)
             {
-                player.pause();
                 paused_for_download = true;
                 paused_for_prompt = true;
             }
@@ -1594,16 +1763,10 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                 };
                 if response != IDYES {
                     if paused_for_prompt
-                        && let Some(player) = unsafe {
-                            with_state(hwnd, |state| {
-                                state.active_audiobook.as_ref().map(|p| p.sink.clone())
-                            })
-                        }
-                        .flatten()
                         && let Some(state) = subtitle_playback_state(hwnd, &media_path)
                         && !state.paused
                     {
-                        player.play();
+                        resume_active_backend(hwnd, &media_path);
                     }
                     return;
                 }
@@ -1656,16 +1819,10 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
             };
 
             if !cache_ready {
-                if let Some(player) = unsafe {
-                    with_state(hwnd, |state| {
-                        state.active_audiobook.as_ref().map(|p| p.sink.clone())
-                    })
-                }
-                .flatten()
-                    && let Some(state) = subtitle_playback_state(hwnd, &media_path)
+                if let Some(state) = subtitle_playback_state(hwnd, &media_path)
                     && !state.paused
+                    && pause_active_backend(hwnd, &media_path)
                 {
-                    player.pause();
                     paused_for_download = true;
                 }
                 for (idx, cue) in cues.iter_mut().enumerate() {
@@ -1731,22 +1888,17 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
             {
                 clear_subtitle_hold(hwnd, &media_path);
             } else if paused_for_download
-                && let Some(player) = unsafe {
-                    with_state(hwnd, |state| {
-                        state.active_audiobook.as_ref().map(|p| p.sink.clone())
-                    })
-                }
-                .flatten()
                 && let Some(state) = subtitle_playback_state(hwnd, &media_path)
                 && !state.paused
             {
-                player.play();
+                resume_active_backend(hwnd, &media_path);
             }
         }
 
         let (mut index, mut last_position, mut last_paused) =
             if let Some(state) = subtitle_playback_state(hwnd, &media_path) {
-                let adjusted_pos = (state.position_secs - SUBTITLE_AUDIO_LATENCY_SECS).max(0.0);
+                let raw_pos = state.position_secs;
+                let adjusted_pos = (raw_pos - SUBTITLE_AUDIO_LATENCY_SECS).max(0.0);
                 let index = cues
                     .iter()
                     .position(|cue| cue.end.as_secs_f64() >= adjusted_pos)
@@ -1768,6 +1920,21 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                 Some(state) => state,
                 None => break,
             };
+            if state.session_id != session_id {
+                break;
+            }
+            let wasapi_latency = state
+                .wasapi_latency_secs
+                .map(|v| format!("{:.3}", v))
+                .unwrap_or_else(|| "n/a".to_string());
+            let wasapi_padding = state
+                .wasapi_padding_secs
+                .map(|v| format!("{:.3}", v))
+                .unwrap_or_else(|| "n/a".to_string());
+            let wasapi_sr = state
+                .wasapi_sample_rate_hz
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "n/a".to_string());
 
             if state.paused {
                 if !last_paused && let Some(sink) = subtitle_sink.as_ref() {
@@ -1783,8 +1950,10 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                 last_paused = false;
             }
 
-            let adjusted_pos = (state.position_secs - SUBTITLE_AUDIO_LATENCY_SECS).max(0.0);
-            if adjusted_pos + 0.05 < last_position {
+            let raw_pos = state.position_secs;
+            let adjusted_pos = (raw_pos - SUBTITLE_AUDIO_LATENCY_SECS).max(0.0);
+            let seek_delta = adjusted_pos - last_position;
+            if seek_delta.abs() > 0.5 {
                 log_debug(&format!(
                     "SubtitleSync: seek detected at {:.3}s (prev {:.3}s) for {}",
                     adjusted_pos,
@@ -1799,22 +1968,44 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                 } else {
                     index = cues.len();
                 }
+                if let Some(sink) = subtitle_sink.as_ref() {
+                    sink.stop();
+                }
+                if let Some(stream) = subtitle_stream.as_ref() {
+                    let new_sink = Sink::connect_new(stream.mixer());
+                    if last_paused {
+                        new_sink.pause();
+                    }
+                    subtitle_sink = Some(new_sink);
+                }
             }
             last_position = adjusted_pos;
 
-            while index < cues.len() && adjusted_pos >= cues[index].start.as_secs_f64() {
+            while index < cues.len()
+                && adjusted_pos >= cues[index].start.as_secs_f64() + SUBTITLE_START_GUARD_SECS
+            {
                 let cue = cues[index].clone();
+                let cue_start = cue.start.as_secs_f64();
+                let cue_end = cue.end.as_secs_f64();
+                let delta_from_start = adjusted_pos - cue_start;
                 let mut preview = cue.text.replace('\n', " ");
                 if preview.len() > 80 {
                     preview.truncate(80);
                     preview.push_str("...");
                 }
                 log_debug(&format!(
-                    "SubtitleSync: speak idx={} start={:.3}s end={:.3}s pos={:.3}s speed={:.2} text='{}'",
+                    "SubtitleSync: speak idx={} start={:.3}s end={:.3}s raw={:.3}s adj={:.3}s delta={:.3}s guard={:.3}s audio_lat={:.3}s wasapi_lat={}s wasapi_pad={}s wasapi_sr={} speed={:.2} text='{}'",
                     index,
-                    cue.start.as_secs_f64(),
-                    cue.end.as_secs_f64(),
+                    cue_start,
+                    cue_end,
+                    raw_pos,
                     adjusted_pos,
+                    delta_from_start,
+                    SUBTITLE_START_GUARD_SECS,
+                    SUBTITLE_AUDIO_LATENCY_SECS,
+                    wasapi_latency,
+                    wasapi_padding,
+                    wasapi_sr,
                     settings.audiobook_playback_speed,
                     preview
                 ));

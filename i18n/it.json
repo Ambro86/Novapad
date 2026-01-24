@@ -190,6 +190,7 @@
   "options.label.audio_split_text": "Testo per divisione:",
   "options.label.audio_split_requires_newline": "Il testo deve iniziare a capo",
   "options.label.subtitle_mode": "Lettura sottotitoli:",
+  "options.label.audio_wasapi": "Usa output WASAPI (beta)",
   "options.subtitle_mode.off": "Disattivata",
   "options.subtitle_mode.nvda": "NVDA",
   "options.subtitle_mode.user": "Usa voce selezionata",

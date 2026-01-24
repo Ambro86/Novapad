@@ -178,6 +178,7 @@
   "options.label.audio_split_text": "Texto para dividir:",
   "options.label.audio_split_requires_newline": "Requiere marcador al inicio de linea",
   "options.label.subtitle_mode": "Lectura de subtítulos:",
+  "options.label.audio_wasapi": "Usar salida WASAPI (beta)",
   "options.subtitle_mode.off": "Desactivada",
   "options.subtitle_mode.nvda": "NVDA",
   "options.subtitle_mode.user": "Usar voz seleccionada",

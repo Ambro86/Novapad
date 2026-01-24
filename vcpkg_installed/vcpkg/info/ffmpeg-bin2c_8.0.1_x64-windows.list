@@ -1,9 +1,0 @@
-x64-windows/
-x64-windows/manual-tools/
-x64-windows/manual-tools/ffmpeg-bin2c/
-x64-windows/manual-tools/ffmpeg-bin2c/bin2c.exe
-x64-windows/share/
-x64-windows/share/ffmpeg-bin2c/
-x64-windows/share/ffmpeg-bin2c/copyright
-x64-windows/share/ffmpeg-bin2c/vcpkg.spdx.json
-x64-windows/share/ffmpeg-bin2c/vcpkg_abi_info.txt

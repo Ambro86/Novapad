@@ -34,6 +34,7 @@ mod editor_manager;
 mod ffmpeg_dyn;
 mod ffmpeg_source;
 mod subtitles;
+mod wasapi_output;
 use editor_manager::*;
 mod app_windows;
 mod audio_monitor;
@@ -1409,6 +1410,7 @@ pub(crate) struct AppState {
     audiobook_progress: HWND,
     audiobook_cancel: Option<Arc<AtomicBool>>,
     active_audiobook: Option<AudiobookPlayer>,
+    audiobook_session_id: u64,
     last_stopped_audiobook: Option<std::path::PathBuf>,
     active_podcast_episode_url: Option<String>,
     active_podcast_episode_title: Option<String>,
@@ -2437,6 +2439,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 audiobook_progress: HWND(0),
                 audiobook_cancel: None,
                 active_audiobook: None,
+                audiobook_session_id: 0,
                 last_stopped_audiobook: None,
                 active_podcast_episode_url: None,
                 active_podcast_episode_title: None,

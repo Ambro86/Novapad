@@ -49,7 +49,8 @@ jobs:
 
     - name: Set FFMPEG_DIR for Rust
       # Collega la build di vcpkg alla variabile che Rust si aspetta
-      run: echo "FFMPEG_DIR=C:\vcpkg\installed\x64-windows" >> $env:GITHUB_ENV
+      # Vcpkg in manifest mode installa in vcpkg_installed nella root del progetto
+      run: echo "FFMPEG_DIR=${{ github.workspace }}\vcpkg_installed\x64-windows" >> $env:GITHUB_ENV
       shell: powershell
     # --- FINE BLOCCO VCPKG ---
     

@@ -1,15 +1,26 @@
+use crate::accessibility::{nvda_speak, to_wide};
+use crate::ffmpeg_source::FfmpegSource;
+use crate::i18n;
 use crate::log_debug;
-use crate::settings::{FileFormat, settings_dir};
+use crate::settings::{FileFormat, SubtitleReadMode, confirm_title, settings_dir};
+use crate::subtitles::{find_subtitle_for_media, load_subtitles};
+use crate::tts_engine;
 use crate::with_state;
 use libloading::Library;
 use rodio::{Decoder, OutputStream, OutputStreamBuilder, Sink, Source};
 use sha2::Digest;
+use std::collections::HashSet;
 use std::ffi::c_void;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
+use uuid::Uuid;
 use windows::Win32::Foundation::HWND;
+use windows::Win32::UI::WindowsAndMessaging::{IDYES, MB_ICONQUESTION, MB_YESNO, MessageBoxW};
+use windows::core::PCWSTR;
 
 pub struct AudiobookPlayer {
     pub path: PathBuf,
@@ -22,6 +33,8 @@ pub struct AudiobookPlayer {
     pub muted: bool,
     pub prev_volume: f32,
     pub speed: f32,
+    pub subtitle_cancel: Arc<AtomicBool>,
+    pub subtitle_hold: bool,
 }
 
 type SoundTouchHandle = *mut c_void;
@@ -362,6 +375,102 @@ where
     }
 }
 
+fn codec_name(codec: symphonia::core::codecs::CodecType) -> &'static str {
+    use symphonia::core::codecs::{
+        CODEC_TYPE_AAC, CODEC_TYPE_FLAC, CODEC_TYPE_MP3, CODEC_TYPE_OPUS, CODEC_TYPE_PCM_S16BE,
+        CODEC_TYPE_PCM_S16LE, CODEC_TYPE_PCM_U8, CODEC_TYPE_VORBIS, CODEC_TYPE_WMA,
+    };
+
+    if codec == CODEC_TYPE_OPUS {
+        "opus"
+    } else if codec == CODEC_TYPE_AAC {
+        "aac"
+    } else if codec == CODEC_TYPE_VORBIS {
+        "vorbis"
+    } else if codec == CODEC_TYPE_MP3 {
+        "mp3"
+    } else if codec == CODEC_TYPE_FLAC {
+        "flac"
+    } else if codec == CODEC_TYPE_WMA {
+        "wma"
+    } else if codec == CODEC_TYPE_PCM_S16LE {
+        "pcm_s16le"
+    } else if codec == CODEC_TYPE_PCM_S16BE {
+        "pcm_s16be"
+    } else if codec == CODEC_TYPE_PCM_U8 {
+        "pcm_u8"
+    } else {
+        "unknown"
+    }
+}
+
+fn log_mkv_probe_once(path: &Path) {
+    let extension = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    if extension != "mkv" {
+        return;
+    }
+
+    static LOGGED: OnceLock<Mutex<HashSet<PathBuf>>> = OnceLock::new();
+    let logged = LOGGED.get_or_init(|| Mutex::new(HashSet::new()));
+    let mut guard = match logged.lock() {
+        Ok(guard) => guard,
+        Err(_) => {
+            log_debug("Audio probe: failed to lock log set.");
+            return;
+        }
+    };
+    if !guard.insert(path.to_path_buf()) {
+        return;
+    }
+    drop(guard);
+
+    let file = match std::fs::File::open(path) {
+        Ok(file) => file,
+        Err(e) => {
+            log_debug(&format!("Audio probe: failed to open file: {}", e));
+            return;
+        }
+    };
+    let mss = symphonia::core::io::MediaSourceStream::new(
+        Box::new(file),
+        symphonia::core::io::MediaSourceStreamOptions::default(),
+    );
+    let mut hint = symphonia::core::probe::Hint::new();
+    hint.with_extension("mkv");
+
+    let probed = symphonia::default::get_probe().format(
+        &hint,
+        mss,
+        &symphonia::core::formats::FormatOptions::default(),
+        &symphonia::core::meta::MetadataOptions::default(),
+    );
+
+    match probed {
+        Ok(probed) => {
+            let format = probed.format;
+            for track in format.tracks() {
+                let params = &track.codec_params;
+                let channels = params.channels.map(|c| c.count());
+                log_debug(&format!(
+                    "Audio probe: track={} codec={} ({}) rate={:?} ch={:?}",
+                    track.id,
+                    codec_name(params.codec),
+                    params.codec,
+                    params.sample_rate,
+                    channels
+                ));
+            }
+        }
+        Err(err) => {
+            log_debug(&format!("Audio probe: failed to parse MKV: {}", err));
+        }
+    }
+}
+
 pub fn parse_time_input(input: &str) -> Result<u64, String> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
@@ -459,6 +568,10 @@ fn start_audiobook_at_with_options(
     seconds: u64,
     options: AudiobookPlaybackOptions,
 ) {
+    let subtitle_hold = should_hold_for_edge_subtitles(hwnd, &path);
+    let effective_paused = options.paused || subtitle_hold;
+    let subtitle_cancel = Arc::new(AtomicBool::new(false));
+    let subtitle_path = path.clone();
     let effective_speed =
         if (options.speed - 1.0).abs() > f32::EPSILON && load_soundtouch_api().is_some() {
             options.speed
@@ -490,6 +603,32 @@ fn start_audiobook_at_with_options(
             .and_then(|e| e.to_str())
             .unwrap_or("")
             .to_lowercase();
+        let use_ffmpeg = matches!(
+            extension.as_str(),
+            "mkv"
+                | "avi"
+                | "mov"
+                | "m4v"
+                | "webm"
+                | "mpg"
+                | "mpeg"
+                | "ts"
+                | "m2ts"
+                | "mts"
+                | "wmv"
+                | "asf"
+                | "flv"
+                | "vob"
+                | "3gp"
+                | "flac"
+                | "ogg"
+                | "opus"
+                | "wma"
+                | "aiff"
+                | "m4b"
+        );
+        let prefer_streaming = use_ffmpeg;
+        log_mkv_probe_once(&path);
 
         // Force M4A extension for Media Foundation to avoid indexing hangs on .mp4 video files
         // and to speed up .mp3/.aac opening.
@@ -528,7 +667,46 @@ fn start_audiobook_at_with_options(
             extension == "m4a" || extension == "mp4" || extension == "aac" || extension == "mp3";
 
         log_debug("Audio player: Creating decoder...");
-        let source: Box<dyn Source<Item = f32> + Send> = if is_mf_favored {
+        let source: Box<dyn Source<Item = f32> + Send> = if use_ffmpeg {
+            log_debug(&format!("Audio player: Using FFmpeg for {}", extension));
+            match FfmpegSource::try_new(&final_path, seconds) {
+                Ok(src) => Box::new(src),
+                Err(err) => {
+                    log_debug(&format!(
+                        "Audio player: FFmpeg failed for {}, falling back to rodio: {}",
+                        extension, err
+                    ));
+                    let file = match std::fs::File::open(&path) {
+                        Ok(file) => file,
+                        Err(e) => {
+                            log_debug(&format!(
+                                "Audio player: Rodio fallback failed to open file: {}",
+                                e
+                            ));
+                            return;
+                        }
+                    };
+                    let reader = std::io::BufReader::with_capacity(8 * 1024 * 1024, file);
+                    let mut builder = Decoder::builder().with_data(reader);
+                    if file_size > 0 {
+                        builder = builder.with_byte_len(file_size);
+                    }
+                    if !extension.is_empty() {
+                        builder = builder.with_hint(&extension);
+                    }
+                    match builder.build() {
+                        Ok(d) => Box::new(d.skip_duration(std::time::Duration::from_secs(seconds))),
+                        Err(err) => {
+                            log_debug(&format!(
+                                "Audio player: Rodio fallback decoder failed: {}",
+                                err
+                            ));
+                            return;
+                        }
+                    }
+                }
+            }
+        } else if is_mf_favored {
             log_debug(&format!(
                 "Audio player: Using Media Foundation for {}",
                 extension
@@ -549,30 +727,47 @@ fn start_audiobook_at_with_options(
                         extension, e
                     ));
                     // Fallback to rodio decoder
-                    let file = std::fs::File::open(&path).map_err(|e| e.to_string()).ok();
-                    if let Some(file) = file {
-                        let reader = std::io::BufReader::with_capacity(8 * 1024 * 1024, file);
-                        match Decoder::new(reader) {
-                            Ok(d) => {
-                                Box::new(d.skip_duration(std::time::Duration::from_secs(seconds)))
-                            }
-                            Err(err) => {
-                                log_debug(&format!(
-                                    "Audio player: Rodio fallback decoder failed: {}",
-                                    err
-                                ));
-                                return;
-                            }
+                    let file = match std::fs::File::open(&path) {
+                        Ok(file) => file,
+                        Err(e) => {
+                            log_debug(&format!(
+                                "Audio player: Rodio fallback failed to open file: {}",
+                                e
+                            ));
+                            return;
                         }
-                    } else {
-                        return;
+                    };
+                    let reader = std::io::BufReader::with_capacity(8 * 1024 * 1024, file);
+                    let mut builder = Decoder::builder().with_data(reader);
+                    if file_size > 0 {
+                        builder = builder.with_byte_len(file_size);
+                    }
+                    if !extension.is_empty() {
+                        builder = builder.with_hint(&extension);
+                    }
+                    if prefer_streaming {
+                        builder = builder.with_gapless(false);
+                    }
+                    match builder.build() {
+                        Ok(d) => Box::new(d.skip_duration(std::time::Duration::from_secs(seconds))),
+                        Err(err) => {
+                            log_debug(&format!(
+                                "Audio player: Rodio fallback decoder failed: {}",
+                                err
+                            ));
+                            return;
+                        }
                     }
                 }
             }
-        } else if file_size > 100 * 1024 * 1024 {
-            log_debug(
-                "Audio player: Large file detected (>100MB). Indexing may take a few seconds...",
-            );
+        } else if prefer_streaming || file_size > 100 * 1024 * 1024 {
+            if prefer_streaming {
+                log_debug("Audio player: Streaming decode path selected.");
+            } else {
+                log_debug(
+                    "Audio player: Large file detected (>100MB). Indexing may take a few seconds...",
+                );
+            }
             let file = match std::fs::File::open(&path) {
                 Ok(f) => f,
                 Err(e) => {
@@ -581,7 +776,17 @@ fn start_audiobook_at_with_options(
                 }
             };
             let reader = std::io::BufReader::with_capacity(8 * 1024 * 1024, file);
-            match Decoder::new(reader) {
+            let mut builder = Decoder::builder().with_data(reader);
+            if file_size > 0 {
+                builder = builder.with_byte_len(file_size);
+            }
+            if !extension.is_empty() {
+                builder = builder.with_hint(&extension);
+            }
+            if prefer_streaming {
+                builder = builder.with_gapless(false);
+            }
+            match builder.build() {
                 Ok(d) => {
                     if seconds > 0 {
                         log_debug(&format!("Audio player: Skipping to {} seconds", seconds));
@@ -602,7 +807,18 @@ fn start_audiobook_at_with_options(
                         "Audio player: Read {} bytes into memory",
                         bytes.len()
                     ));
-                    match Decoder::new(std::io::Cursor::new(bytes)) {
+                    let bytes_len = bytes.len() as u64;
+                    let mut builder = Decoder::builder().with_data(std::io::Cursor::new(bytes));
+                    if bytes_len > 0 {
+                        builder = builder.with_byte_len(bytes_len);
+                    }
+                    if !extension.is_empty() {
+                        builder = builder.with_hint(&extension);
+                    }
+                    if prefer_streaming {
+                        builder = builder.with_gapless(false);
+                    }
+                    match builder.build() {
                         Ok(d) => {
                             if seconds > 0 {
                                 log_debug(&format!(
@@ -638,7 +854,18 @@ fn start_audiobook_at_with_options(
                             return;
                         }
                     };
-                    match Decoder::new(std::io::BufReader::new(file)) {
+                    let reader = std::io::BufReader::new(file);
+                    let mut builder = Decoder::builder().with_data(reader);
+                    if file_size > 0 {
+                        builder = builder.with_byte_len(file_size);
+                    }
+                    if !extension.is_empty() {
+                        builder = builder.with_hint(&extension);
+                    }
+                    if prefer_streaming {
+                        builder = builder.with_gapless(false);
+                    }
+                    match builder.build() {
                         Ok(d) => {
                             if seconds > 0 {
                                 log_debug(&format!(
@@ -650,10 +877,10 @@ fn start_audiobook_at_with_options(
                                 Box::new(d)
                             }
                         }
-                        err => {
+                        Err(err) => {
                             log_debug(&format!(
-                                "Audio player: Final decoder attempt failed: {:?}",
-                                err.is_err()
+                                "Audio player: Final decoder attempt failed: {}",
+                                err
                             ));
                             return;
                         }
@@ -661,6 +888,12 @@ fn start_audiobook_at_with_options(
                 }
             }
         };
+
+        log_debug(&format!(
+            "Audio player: Source format {}ch @ {} Hz",
+            source.channels(),
+            source.sample_rate()
+        ));
 
         if (effective_speed - 1.0).abs() > f32::EPSILON {
             log_debug(&format!(
@@ -681,7 +914,7 @@ fn start_audiobook_at_with_options(
         } else {
             sink.set_volume(options.volume);
         }
-        if options.paused {
+        if effective_paused {
             sink.pause();
         }
         log_debug("Audio player: Playback started");
@@ -690,13 +923,15 @@ fn start_audiobook_at_with_options(
             path,
             sink: sink.clone(),
             _stream: stream_handle,
-            is_paused: options.paused,
+            is_paused: effective_paused,
             start_instant: std::time::Instant::now(),
             accumulated_seconds: seconds,
             volume: options.volume,
             muted: options.muted,
             prev_volume: options.prev_volume,
             speed: effective_speed,
+            subtitle_cancel: subtitle_cancel.clone(),
+            subtitle_hold,
         };
 
         unsafe {
@@ -708,6 +943,7 @@ fn start_audiobook_at_with_options(
                 crate::log_debug("Failed to access audio player state");
             }
         }
+        start_subtitle_reader(hwnd_main, subtitle_path, subtitle_cancel);
     });
 }
 
@@ -794,6 +1030,19 @@ pub unsafe fn toggle_audiobook_pause(hwnd: HWND) {
 }
 
 pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
+    enum SeekAction {
+        Applied,
+        Restart {
+            path: PathBuf,
+            current_pos: u64,
+            speed: f32,
+            paused: bool,
+            volume: f32,
+            muted: bool,
+            prev_volume: f32,
+        },
+    }
+
     let result = with_state(hwnd, |state| {
         if let Some(player) = &mut state.active_audiobook {
             if !player.is_paused {
@@ -801,25 +1050,54 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
                 player.start_instant = std::time::Instant::now();
             }
             let new_pos = (player.accumulated_seconds as i64 + seconds).max(0);
+            if (player.speed - 1.0).abs() <= f32::EPSILON
+                && player
+                    .sink
+                    .try_seek(std::time::Duration::from_secs(new_pos as u64))
+                    .is_ok()
+            {
+                player.accumulated_seconds = new_pos as u64;
+                if !player.is_paused {
+                    player.start_instant = std::time::Instant::now();
+                }
+                return Some(SeekAction::Applied);
+            }
             player.accumulated_seconds = new_pos as u64;
-            Some((
-                player.path.clone(),
-                new_pos as u64,
-                player.speed,
-                player.is_paused,
-                player.volume,
-                player.muted,
-                player.prev_volume,
-            ))
+            Some(SeekAction::Restart {
+                path: player.path.clone(),
+                current_pos: new_pos as u64,
+                speed: player.speed,
+                paused: player.is_paused,
+                volume: player.volume,
+                muted: player.muted,
+                prev_volume: player.prev_volume,
+            })
         } else {
             None
         }
     })
     .flatten();
 
-    let (path, current_pos, speed, paused, volume, muted, prev_volume) = match result {
+    let action = match result {
         Some(v) => v,
         None => return,
+    };
+
+    if matches!(action, SeekAction::Applied) {
+        return;
+    }
+
+    let SeekAction::Restart {
+        path,
+        current_pos,
+        speed,
+        paused,
+        volume,
+        muted,
+        prev_volume,
+    } = action
+    else {
+        return;
     };
 
     stop_audiobook_playback(hwnd);
@@ -838,14 +1116,36 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
 }
 
 pub unsafe fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> {
-    let path = with_state(hwnd, |state| {
-        state
-            .active_audiobook
-            .as_ref()
-            .map(|player| player.path.clone())
+    enum SeekToAction {
+        Applied,
+        Restart(PathBuf),
+    }
+
+    let action = with_state(hwnd, |state| {
+        if let Some(player) = &mut state.active_audiobook {
+            if (player.speed - 1.0).abs() <= f32::EPSILON
+                && player
+                    .sink
+                    .try_seek(std::time::Duration::from_secs(seconds))
+                    .is_ok()
+            {
+                player.accumulated_seconds = seconds;
+                if !player.is_paused {
+                    player.start_instant = std::time::Instant::now();
+                }
+                return Some(SeekToAction::Applied);
+            }
+            return Some(SeekToAction::Restart(player.path.clone()));
+        }
+        None
     })
     .flatten()
     .ok_or_else(|| "No active audiobook".to_string())?;
+
+    let path = match action {
+        SeekToAction::Applied => return Ok(()),
+        SeekToAction::Restart(path) => path,
+    };
 
     start_audiobook_at(hwnd, &path, seconds);
     Ok(())
@@ -860,6 +1160,7 @@ pub unsafe fn stop_audiobook_playback(hwnd: HWND) {
                 player.path.display()
             ));
             state.last_stopped_audiobook = Some(player.path.clone());
+            player.subtitle_cancel.store(true, Ordering::Relaxed);
             player.sink.stop();
         }
     })
@@ -1076,6 +1377,526 @@ pub unsafe fn toggle_audiobook_mute(hwnd: HWND) {
     {
         crate::log_debug("Failed to access audio player state");
     }
+}
+
+struct SubtitlePlaybackState {
+    paused: bool,
+    position_secs: f64,
+}
+
+static SUBTITLE_EDGE_CONFIRMED: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+const SUBTITLE_AUDIO_LATENCY_SECS: f64 = 0.28;
+
+fn audiobook_position_secs(player: &AudiobookPlayer) -> f64 {
+    if player.is_paused {
+        player.accumulated_seconds as f64
+    } else {
+        player.accumulated_seconds as f64
+            + player.start_instant.elapsed().as_secs_f64() * player.speed as f64
+    }
+}
+
+fn subtitle_playback_state(hwnd: HWND, path: &Path) -> Option<SubtitlePlaybackState> {
+    unsafe {
+        with_state(hwnd, |state| {
+            let player = state.active_audiobook.as_ref()?;
+            if player.path.as_path() != path {
+                return None;
+            }
+            Some(SubtitlePlaybackState {
+                paused: player.is_paused,
+                position_secs: audiobook_position_secs(player),
+            })
+        })
+        .flatten()
+    }
+}
+
+fn subtitle_hold_state(hwnd: HWND, path: &Path) -> Option<bool> {
+    unsafe {
+        with_state(hwnd, |state| {
+            let player = state.active_audiobook.as_ref()?;
+            if player.path.as_path() != path {
+                return None;
+            }
+            Some(player.subtitle_hold)
+        })
+        .flatten()
+    }
+}
+
+fn clear_subtitle_hold(hwnd: HWND, path: &Path) -> bool {
+    unsafe {
+        with_state(hwnd, |state| {
+            let player = match state.active_audiobook.as_mut() {
+                Some(player) => player,
+                None => return false,
+            };
+            if player.path.as_path() != path {
+                return false;
+            }
+            player.subtitle_hold = false;
+            player.is_paused = false;
+            player.start_instant = std::time::Instant::now();
+            player.sink.play();
+            true
+        })
+        .unwrap_or(false)
+    }
+}
+
+fn parse_sapi4_voice_index(voice: &str) -> Option<i32> {
+    let rest = voice.strip_prefix("SAPI4#")?;
+    let idx = rest.split('|').next()?;
+    idx.parse::<i32>().ok()
+}
+
+fn should_hold_for_edge_subtitles(hwnd: HWND, media_path: &Path) -> bool {
+    let settings = match unsafe { with_state(hwnd, |state| state.settings.clone()) } {
+        Some(settings) => settings,
+        None => return false,
+    };
+    if settings.subtitle_read_mode != SubtitleReadMode::User {
+        return false;
+    }
+    if settings.tts_engine != crate::settings::TtsEngine::Edge {
+        return false;
+    }
+    let subtitle_path = match find_subtitle_for_media(media_path) {
+        Some(path) => path,
+        None => return false,
+    };
+    let _ = subtitle_path;
+    let base_cache_dir = settings_dir().join("subtitle_cache");
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(media_path.to_string_lossy().as_bytes());
+    hasher.update(settings.tts_voice.as_bytes());
+    let hash = hex::encode(hasher.finalize());
+    let dir = base_cache_dir.join(&hash[..16]);
+    if !dir.exists() {
+        return true;
+    }
+    let cache_ready = std::fs::read_dir(&dir)
+        .map(|mut it| {
+            it.any(|entry| {
+                entry
+                    .ok()
+                    .and_then(|e| {
+                        e.path()
+                            .extension()
+                            .and_then(|s| s.to_str())
+                            .map(|s| s.eq_ignore_ascii_case("mp3"))
+                    })
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(false);
+    if !cache_ready {
+        return true;
+    }
+    false
+}
+
+fn edge_subtitle_key(media_path: &Path, settings: &crate::settings::AppSettings) -> String {
+    format!(
+        "{}|{}|{}|{}|{}",
+        media_path.to_string_lossy(),
+        settings.tts_voice,
+        settings.tts_rate,
+        settings.tts_pitch,
+        settings.tts_volume
+    )
+}
+
+fn mark_edge_confirmed(key: &str) {
+    let confirmed = SUBTITLE_EDGE_CONFIRMED.get_or_init(|| Mutex::new(HashSet::new()));
+    if let Ok(mut set) = confirmed.lock() {
+        set.insert(key.to_string());
+    }
+}
+
+fn is_edge_confirmed(key: &str) -> bool {
+    let confirmed = SUBTITLE_EDGE_CONFIRMED.get_or_init(|| Mutex::new(HashSet::new()));
+    confirmed
+        .lock()
+        .map(|set| set.contains(key))
+        .unwrap_or(false)
+}
+
+fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool>) {
+    std::thread::spawn(move || {
+        let settings = match unsafe { with_state(hwnd, |state| state.settings.clone()) } {
+            Some(settings) => settings,
+            None => {
+                log_debug("Subtitle: Failed to access settings.");
+                return;
+            }
+        };
+        let mode = settings.subtitle_read_mode;
+        if mode == SubtitleReadMode::Off {
+            return;
+        }
+        let effective_mode = match mode {
+            SubtitleReadMode::Off => SubtitleReadMode::Off,
+            SubtitleReadMode::Nvda => SubtitleReadMode::Nvda,
+            _ => SubtitleReadMode::User,
+        };
+        let subtitle_path = match find_subtitle_for_media(&media_path) {
+            Some(path) => path,
+            None => return,
+        };
+        let mut cues = match load_subtitles(&subtitle_path) {
+            Ok(cues) => cues,
+            Err(err) => {
+                log_debug(&format!("Subtitle: {}", err));
+                return;
+            }
+        };
+        if cues.is_empty() {
+            return;
+        }
+
+        let mut subtitle_stream: Option<OutputStream> = None;
+        let mut subtitle_sink: Option<Sink> = None;
+
+        let mut paused_for_download = subtitle_hold_state(hwnd, &media_path).unwrap_or(false);
+        if effective_mode == SubtitleReadMode::User
+            && settings.tts_engine == crate::settings::TtsEngine::Edge
+        {
+            let edge_key = edge_subtitle_key(&media_path, &settings);
+            let msg = i18n::tr(settings.language, "subtitles.edge_confirm");
+            let title = confirm_title(settings.language);
+            let msg_w = to_wide(&msg);
+            let title_w = to_wide(&title);
+            let mut paused_for_prompt = false;
+            if !paused_for_download
+                && let Some(player) = unsafe {
+                    with_state(hwnd, |state| {
+                        state.active_audiobook.as_ref().map(|p| p.sink.clone())
+                    })
+                }
+                .flatten()
+                && let Some(state) = subtitle_playback_state(hwnd, &media_path)
+                && !state.paused
+            {
+                player.pause();
+                paused_for_download = true;
+                paused_for_prompt = true;
+            }
+            if !is_edge_confirmed(&edge_key) {
+                let response = unsafe {
+                    MessageBoxW(
+                        hwnd,
+                        PCWSTR(msg_w.as_ptr()),
+                        PCWSTR(title_w.as_ptr()),
+                        MB_YESNO | MB_ICONQUESTION,
+                    )
+                };
+                if response != IDYES {
+                    if paused_for_prompt
+                        && let Some(player) = unsafe {
+                            with_state(hwnd, |state| {
+                                state.active_audiobook.as_ref().map(|p| p.sink.clone())
+                            })
+                        }
+                        .flatten()
+                        && let Some(state) = subtitle_playback_state(hwnd, &media_path)
+                        && !state.paused
+                    {
+                        player.play();
+                    }
+                    return;
+                }
+                mark_edge_confirmed(&edge_key);
+            }
+
+            let base_cache_dir = settings_dir().join("subtitle_cache");
+            if let Err(e) = std::fs::create_dir_all(&base_cache_dir) {
+                log_debug(&format!("Subtitle: cache dir create failed: {}", e));
+                return;
+            }
+            let mut hasher = sha2::Sha256::new();
+            hasher.update(media_path.to_string_lossy().as_bytes());
+            hasher.update(settings.tts_voice.as_bytes());
+            let hash = hex::encode(hasher.finalize());
+            let dir = base_cache_dir.join(&hash[..16]);
+            let cache_ready = dir.exists()
+                && std::fs::read_dir(&dir)
+                    .map(|mut it| {
+                        it.any(|entry| {
+                            entry
+                                .ok()
+                                .and_then(|e| {
+                                    e.path()
+                                        .extension()
+                                        .and_then(|s| s.to_str())
+                                        .map(|s| s.eq_ignore_ascii_case("mp3"))
+                                })
+                                .unwrap_or(false)
+                        })
+                    })
+                    .unwrap_or(false);
+            if !cache_ready {
+                if dir.exists()
+                    && let Err(e) = std::fs::remove_dir_all(&dir)
+                {
+                    log_debug(&format!("Subtitle: cache cleanup failed: {}", e));
+                }
+                if let Err(e) = std::fs::create_dir_all(&dir) {
+                    log_debug(&format!("Subtitle: cache dir create failed: {}", e));
+                    return;
+                }
+            }
+            let rt = match tokio::runtime::Runtime::new() {
+                Ok(rt) => rt,
+                Err(e) => {
+                    log_debug(&format!("Subtitle: failed to create runtime: {}", e));
+                    return;
+                }
+            };
+
+            if !cache_ready {
+                if let Some(player) = unsafe {
+                    with_state(hwnd, |state| {
+                        state.active_audiobook.as_ref().map(|p| p.sink.clone())
+                    })
+                }
+                .flatten()
+                    && let Some(state) = subtitle_playback_state(hwnd, &media_path)
+                    && !state.paused
+                {
+                    player.pause();
+                    paused_for_download = true;
+                }
+                for (idx, cue) in cues.iter_mut().enumerate() {
+                    if cancel.load(Ordering::Relaxed) {
+                        return;
+                    }
+                    let text = cue.text.trim();
+                    if text.is_empty() {
+                        continue;
+                    }
+                    let request_id = Uuid::new_v4().simple().to_string();
+                    match rt.block_on(tts_engine::download_audio_chunk(
+                        text,
+                        &settings.tts_voice,
+                        &request_id,
+                        settings.tts_rate,
+                        settings.tts_pitch,
+                        settings.tts_volume,
+                        settings.language,
+                    )) {
+                        Ok(bytes) => {
+                            let path = dir.join(format!("cue_{:04}.mp3", idx));
+                            match std::fs::write(&path, bytes) {
+                                Ok(()) => cue.audio_path = Some(path),
+                                Err(e) => {
+                                    log_debug(&format!(
+                                        "Subtitle: failed to write audio chunk: {}",
+                                        e
+                                    ));
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            log_debug(&format!("Subtitle: download failed: {}", err));
+                        }
+                    }
+                }
+            } else {
+                for (idx, cue) in cues.iter_mut().enumerate() {
+                    let path = dir.join(format!("cue_{:04}.mp3", idx));
+                    if path.exists() {
+                        cue.audio_path = Some(path);
+                    }
+                }
+            }
+
+            if cancel.load(Ordering::Relaxed) {
+                return;
+            }
+            let stream_handle = match OutputStreamBuilder::open_default_stream() {
+                Ok(v) => v,
+                Err(e) => {
+                    log_debug(&format!("Subtitle: Failed to get output stream: {}", e));
+                    return;
+                }
+            };
+            let sink = Sink::connect_new(stream_handle.mixer());
+            subtitle_stream = Some(stream_handle);
+            subtitle_sink = Some(sink);
+            if paused_for_download
+                && let Some(held) = subtitle_hold_state(hwnd, &media_path)
+                && held
+            {
+                clear_subtitle_hold(hwnd, &media_path);
+            } else if paused_for_download
+                && let Some(player) = unsafe {
+                    with_state(hwnd, |state| {
+                        state.active_audiobook.as_ref().map(|p| p.sink.clone())
+                    })
+                }
+                .flatten()
+                && let Some(state) = subtitle_playback_state(hwnd, &media_path)
+                && !state.paused
+            {
+                player.play();
+            }
+        }
+
+        let (mut index, mut last_position, mut last_paused) =
+            if let Some(state) = subtitle_playback_state(hwnd, &media_path) {
+                let adjusted_pos = (state.position_secs - SUBTITLE_AUDIO_LATENCY_SECS).max(0.0);
+                let index = cues
+                    .iter()
+                    .position(|cue| cue.end.as_secs_f64() >= adjusted_pos)
+                    .unwrap_or(cues.len());
+                let last_paused = state.paused;
+                if last_paused && let Some(sink) = subtitle_sink.as_ref() {
+                    sink.pause();
+                }
+                (index, adjusted_pos, last_paused)
+            } else {
+                return;
+            };
+
+        loop {
+            if cancel.load(Ordering::Relaxed) {
+                break;
+            }
+            let state = match subtitle_playback_state(hwnd, &media_path) {
+                Some(state) => state,
+                None => break,
+            };
+
+            if state.paused {
+                if !last_paused && let Some(sink) = subtitle_sink.as_ref() {
+                    sink.pause();
+                }
+                last_paused = true;
+                std::thread::sleep(Duration::from_millis(80));
+                continue;
+            } else if last_paused {
+                if let Some(sink) = subtitle_sink.as_ref() {
+                    sink.play();
+                }
+                last_paused = false;
+            }
+
+            let adjusted_pos = (state.position_secs - SUBTITLE_AUDIO_LATENCY_SECS).max(0.0);
+            if adjusted_pos + 0.05 < last_position {
+                log_debug(&format!(
+                    "SubtitleSync: seek detected at {:.3}s (prev {:.3}s) for {}",
+                    adjusted_pos,
+                    last_position,
+                    media_path.display()
+                ));
+                if let Some(pos) = cues
+                    .iter()
+                    .position(|cue| cue.end.as_secs_f64() >= adjusted_pos)
+                {
+                    index = pos;
+                } else {
+                    index = cues.len();
+                }
+            }
+            last_position = adjusted_pos;
+
+            while index < cues.len() && adjusted_pos >= cues[index].start.as_secs_f64() {
+                let cue = cues[index].clone();
+                let mut preview = cue.text.replace('\n', " ");
+                if preview.len() > 80 {
+                    preview.truncate(80);
+                    preview.push_str("...");
+                }
+                log_debug(&format!(
+                    "SubtitleSync: speak idx={} start={:.3}s end={:.3}s pos={:.3}s speed={:.2} text='{}'",
+                    index,
+                    cue.start.as_secs_f64(),
+                    cue.end.as_secs_f64(),
+                    adjusted_pos,
+                    settings.audiobook_playback_speed,
+                    preview
+                ));
+                match effective_mode {
+                    SubtitleReadMode::Off => {}
+                    SubtitleReadMode::Nvda => {
+                        if !nvda_speak(&cue.text) {
+                            log_debug("Subtitle: NVDA speak failed.");
+                        }
+                    }
+                    SubtitleReadMode::User
+                    | SubtitleReadMode::Sapi5
+                    | SubtitleReadMode::Sapi4
+                    | SubtitleReadMode::Edge => match settings.tts_engine {
+                        crate::settings::TtsEngine::Edge => {
+                            if let (Some(path), Some(sink)) =
+                                (cue.audio_path.as_ref(), subtitle_sink.as_ref())
+                            {
+                                match std::fs::File::open(path) {
+                                    Ok(file) => match Decoder::new(std::io::BufReader::new(file)) {
+                                        Ok(source) => sink.append(source),
+                                        Err(e) => log_debug(&format!(
+                                            "Subtitle: failed to decode audio chunk: {}",
+                                            e
+                                        )),
+                                    },
+                                    Err(e) => {
+                                        log_debug(&format!(
+                                            "Subtitle: failed to open chunk: {}",
+                                            e
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                        crate::settings::TtsEngine::Sapi5 => {
+                            let cancel_flag = Arc::new(AtomicBool::new(false));
+                            let (command_tx, command_rx) = tokio::sync::mpsc::unbounded_channel();
+                            drop(command_tx);
+                            if let Err(err) = crate::sapi5_engine::play_sapi(
+                                vec![cue.text.clone()],
+                                settings.tts_voice.clone(),
+                                settings.tts_rate,
+                                settings.tts_pitch,
+                                settings.tts_volume,
+                                cancel_flag,
+                                command_rx,
+                            ) {
+                                log_debug(&format!("Subtitle: SAPI5 failed: {}", err));
+                            }
+                        }
+                        crate::settings::TtsEngine::Sapi4 => {
+                            let voice_index = match parse_sapi4_voice_index(&settings.tts_voice) {
+                                Some(idx) => idx,
+                                None => {
+                                    log_debug("Subtitle: invalid SAPI4 voice, defaulting to 0.");
+                                    0
+                                }
+                            };
+                            let cancel_flag = Arc::new(AtomicBool::new(false));
+                            let (_command_tx, command_rx) = tokio::sync::mpsc::unbounded_channel();
+                            crate::sapi4_engine::play_sapi4(
+                                voice_index,
+                                cue.text.clone(),
+                                settings.tts_rate,
+                                settings.tts_pitch,
+                                settings.tts_volume,
+                                cancel_flag,
+                                command_rx,
+                            );
+                        }
+                    },
+                }
+                index += 1;
+            }
+
+            std::thread::sleep(Duration::from_millis(80));
+        }
+
+        drop(subtitle_sink);
+        drop(subtitle_stream);
+    });
 }
 
 #[cfg(test)]

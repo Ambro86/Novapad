@@ -1,0 +1,2 @@
+[env]
+FFMPEG_DIR = { value = "C:\\rustnotepad\\rustnotepad\\vcpkg_installed\\x64-windows", force = true }

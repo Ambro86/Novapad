@@ -31,6 +31,9 @@ use search::*;
 mod audio_player;
 use audio_player::*;
 mod editor_manager;
+mod ffmpeg_dyn;
+mod ffmpeg_source;
+mod subtitles;
 use editor_manager::*;
 mod app_windows;
 mod audio_monitor;
@@ -58,7 +61,10 @@ use std::time::{Duration, Instant};
 use chrono::Local;
 use serde::{Deserialize, Serialize};
 
-use windows::Win32::Foundation::{BOOL, HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM};
+use windows::Win32::Foundation::{
+    BOOL, ERROR_INVALID_PARAMETER, ERROR_INVALID_WINDOW_HANDLE, GetLastError, HINSTANCE, HWND,
+    LPARAM, LRESULT, POINT, SetLastError, WIN32_ERROR, WPARAM,
+};
 use windows::Win32::Graphics::Gdi::{
     COLOR_WINDOW, DEFAULT_GUI_FONT, GetStockObject, HBRUSH, HFONT, ScreenToClient,
 };
@@ -409,6 +415,25 @@ pub(crate) fn log_debug(message: &str) {
     }
 }
 
+fn kill_timer_best_effort(hwnd: HWND, timer_id: usize, context: &str) {
+    unsafe {
+        SetLastError(WIN32_ERROR(0));
+        if let Err(err) = KillTimer(hwnd, timer_id) {
+            let last_error = GetLastError();
+            if last_error == WIN32_ERROR(0)
+                || last_error == ERROR_INVALID_PARAMETER
+                || last_error == ERROR_INVALID_WINDOW_HANDLE
+            {
+                return;
+            }
+            log_debug(&format!(
+                "{} failed: {:?} (win32={})",
+                context, err, last_error.0
+            ));
+        }
+    }
+}
+
 fn clean_menu_label(label: &str) -> String {
     let main = label.split('\t').next().unwrap_or(label);
     let mut cleaned = String::with_capacity(main.len());
@@ -713,7 +738,11 @@ pub(crate) fn clear_active_podcast_chapters(hwnd: HWND) {
         {
             crate::log_debug("Failed to clear active podcast chapters");
         }
-        crate::log_if_err!(KillTimer(hwnd, CHAPTER_ANNOUNCE_TIMER_ID));
+        kill_timer_best_effort(
+            hwnd,
+            CHAPTER_ANNOUNCE_TIMER_ID,
+            "KillTimer CHAPTER_ANNOUNCE",
+        );
     }
 }
 
@@ -737,7 +766,11 @@ pub(crate) fn reset_active_podcast_chapters_for_playback(hwnd: HWND) {
                 state.active_podcast_episode_title = None;
                 state.active_podcast_episode_cache = None;
             });
-            crate::log_if_err!(KillTimer(hwnd, CHAPTER_ANNOUNCE_TIMER_ID));
+            kill_timer_best_effort(
+                hwnd,
+                CHAPTER_ANNOUNCE_TIMER_ID,
+                "KillTimer CHAPTER_ANNOUNCE",
+            );
         }
         return;
     }
@@ -797,7 +830,11 @@ pub(crate) fn activate_pending_podcast_chapters(hwnd: HWND) {
             }
             announce_current_chapter_on_start(hwnd, &chapters, current_pos_ms, language);
         } else {
-            crate::log_if_err!(KillTimer(hwnd, CHAPTER_ANNOUNCE_TIMER_ID));
+            kill_timer_best_effort(
+                hwnd,
+                CHAPTER_ANNOUNCE_TIMER_ID,
+                "KillTimer CHAPTER_ANNOUNCE",
+            );
         }
         if should_announce_unavailable {
             let message = i18n::tr(language, "playback.chapters_unavailable");
@@ -2536,7 +2573,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             let hdr = &*(lparam.0 as *const NMHDR);
             if hdr.code == TCN_SELCHANGE && hdr.hwndFrom == editor_manager::get_tab(hwnd) {
                 // Cancel pending spellcheck highlight when switching tabs
-                crate::log_if_err!(KillTimer(hwnd, SPELLCHECK_HIGHLIGHT_TIMER_ID));
+                kill_timer_best_effort(
+                    hwnd,
+                    SPELLCHECK_HIGHLIGHT_TIMER_ID,
+                    "KillTimer SPELLCHECK_HIGHLIGHT",
+                );
                 with_state(hwnd, |state| {
                     state.spellcheck_highlight_pending = None;
                     state.spellcheck_last_highlighted_line = None;
@@ -2565,7 +2606,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 || wparam.0 == FOCUS_EDITOR_TIMER_ID3
                 || wparam.0 == FOCUS_EDITOR_TIMER_ID4
             {
-                crate::log_if_err!(KillTimer(hwnd, wparam.0));
+                kill_timer_best_effort(hwnd, wparam.0, "KillTimer FOCUS_EDITOR");
                 focus_editor(hwnd);
                 return LRESULT(0);
             }
@@ -2574,7 +2615,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 return LRESULT(0);
             }
             if wparam.0 == SPELLCHECK_HIGHLIGHT_TIMER_ID {
-                crate::log_if_err!(KillTimer(hwnd, SPELLCHECK_HIGHLIGHT_TIMER_ID));
+                kill_timer_best_effort(
+                    hwnd,
+                    SPELLCHECK_HIGHLIGHT_TIMER_ID,
+                    "KillTimer SPELLCHECK_HIGHLIGHT",
+                );
                 handle_spellcheck_highlight_timer(hwnd);
                 return LRESULT(0);
             }
@@ -2635,7 +2680,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     }
                     announce_current_chapter_on_start(hwnd, &chapters, current_pos_ms, language);
                 } else {
-                    crate::log_if_err!(KillTimer(hwnd, CHAPTER_ANNOUNCE_TIMER_ID));
+                    kill_timer_best_effort(
+                        hwnd,
+                        CHAPTER_ANNOUNCE_TIMER_ID,
+                        "KillTimer CHAPTER_ANNOUNCE",
+                    );
                 }
                 if announce_unavailable {
                     let message = i18n::tr(language, "playback.chapters_unavailable");
@@ -3111,7 +3160,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 IDM_FILE_OPEN => {
                     log_debug("Menu: Open document");
                     // Cancel spellcheck highlight to avoid focus issues
-                    crate::log_if_err!(KillTimer(hwnd, SPELLCHECK_HIGHLIGHT_TIMER_ID));
+                    kill_timer_best_effort(
+                        hwnd,
+                        SPELLCHECK_HIGHLIGHT_TIMER_ID,
+                        "KillTimer SPELLCHECK_HIGHLIGHT",
+                    );
                     with_state(hwnd, |state| {
                         state.spellcheck_highlight_pending = None;
                         state.spellcheck_last_highlighted_line = None;
@@ -6934,7 +6987,7 @@ unsafe fn stop_pdf_loading_animation(hwnd: HWND, hwnd_edit: HWND) {
         }
     });
     if let Some(timer_id) = timer_id {
-        crate::log_if_err!(KillTimer(hwnd, timer_id));
+        kill_timer_best_effort(hwnd, timer_id, "KillTimer PDF_LOADING");
     }
 }
 

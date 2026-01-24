@@ -17,6 +17,13 @@ const CACERT_PEM: &[u8] = include_bytes!("../dll/cacert.pem");
 const SOUNDTOUCH_DLL: &[u8] = include_bytes!("../dll/SoundTouch64.dll");
 // NVDA: integrazione con screen reader tramite controller client.
 const NVDA_CLIENT_DLL: &[u8] = include_bytes!("../dll/nvdaControllerClient64.dll");
+// FFmpeg: runtime per decoding audio (MKV/Vorbis/Opus).
+const AVCODEC_DLL: &[u8] = include_bytes!("../dll/avcodec-62.dll");
+const AVFORMAT_DLL: &[u8] = include_bytes!("../dll/avformat-62.dll");
+const AVUTIL_DLL: &[u8] = include_bytes!("../dll/avutil-60.dll");
+const SWRESAMPLE_DLL: &[u8] = include_bytes!("../dll/swresample-6.dll");
+const SWSCALE_DLL: &[u8] = include_bytes!("../dll/swscale-9.dll");
+const OPUS_DLL: &[u8] = include_bytes!("../dll/opus.dll");
 
 /// Scrive un file solo se non esiste o se l'hash è diverso
 fn write_if_changed(path: &PathBuf, data: &[u8]) -> std::io::Result<bool> {
@@ -57,6 +64,12 @@ pub fn extract_all() -> std::io::Result<PathBuf> {
         ("cacert.pem", CACERT_PEM),
         ("SoundTouch64.dll", SOUNDTOUCH_DLL),
         ("nvdaControllerClient64.dll", NVDA_CLIENT_DLL),
+        ("avcodec-62.dll", AVCODEC_DLL),
+        ("avformat-62.dll", AVFORMAT_DLL),
+        ("avutil-60.dll", AVUTIL_DLL),
+        ("swresample-6.dll", SWRESAMPLE_DLL),
+        ("swscale-9.dll", SWSCALE_DLL),
+        ("opus.dll", OPUS_DLL),
         ("sapi4_bridge_32.exe", SAPI4_BRIDGE_32_EXE),
     ];
 

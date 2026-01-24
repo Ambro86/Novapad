@@ -2,8 +2,8 @@ use crate::accessibility::{handle_accessibility, to_wide};
 use crate::app_windows::interpreter_select_window;
 use crate::editor_manager::{apply_word_wrap_to_all_edits, update_window_title};
 use crate::settings::{
-    Language, ModifiedMarkerPosition, OpenBehavior, TRUSTED_CLIENT_TOKEN, TtsEngine,
-    VOICE_LIST_URL, VoiceInfo, save_settings_with_default_copy, sync_context_menu,
+    Language, ModifiedMarkerPosition, OpenBehavior, SubtitleReadMode, TRUSTED_CLIENT_TOKEN,
+    TtsEngine, VOICE_LIST_URL, VoiceInfo, save_settings_with_default_copy, sync_context_menu,
 };
 use crate::{i18n, rebuild_menus, refresh_voice_panel, tts_engine, with_state};
 use std::process::Command;
@@ -68,6 +68,7 @@ const OPTIONS_ID_AUDIO_SKIP: usize = 6010;
 const OPTIONS_ID_AUDIO_SPLIT: usize = 6011;
 const OPTIONS_ID_AUDIO_SPLIT_TEXT: usize = 6013;
 const OPTIONS_ID_AUDIO_SPLIT_REQUIRE_NEWLINE: usize = 6016;
+const OPTIONS_ID_SUBTITLE_MODE: usize = 6045;
 const OPTIONS_ID_PODCAST_CACHE_LIMIT: usize = 6030;
 const OPTIONS_ID_PODCASTINDEX_KEY: usize = 6035;
 const OPTIONS_ID_PODCASTINDEX_SECRET: usize = 6036;
@@ -183,6 +184,8 @@ struct OptionsDialogState {
     label_audio_split_text: HWND,
     edit_audio_split_text: HWND,
     checkbox_audio_split_requires_newline: HWND,
+    label_subtitle_mode: HWND,
+    combo_subtitle_mode: HWND,
     label_podcast_cache_limit: HWND,
     edit_podcast_cache_limit: HWND,
     label_podcastindex_key: HWND,
@@ -260,6 +263,10 @@ struct OptionsLabels {
     label_audio_split: String,
     label_audio_split_text: String,
     label_audio_split_requires_newline: String,
+    label_subtitle_mode: String,
+    subtitle_mode_off: String,
+    subtitle_mode_nvda: String,
+    subtitle_mode_user: String,
     label_podcast_cache_limit: String,
     label_podcastindex_key: String,
     label_podcastindex_secret: String,
@@ -351,6 +358,10 @@ fn options_labels(language: Language) -> OptionsLabels {
             language,
             "options.label.audio_split_requires_newline",
         ),
+        label_subtitle_mode: i18n::tr(language, "options.label.subtitle_mode"),
+        subtitle_mode_off: i18n::tr(language, "options.subtitle_mode.off"),
+        subtitle_mode_nvda: i18n::tr(language, "options.subtitle_mode.nvda"),
+        subtitle_mode_user: i18n::tr(language, "options.subtitle_mode.user"),
         label_podcast_cache_limit: i18n::tr(language, "options.label.podcast_cache_limit"),
         label_podcastindex_key: i18n::tr(language, "options.label.podcastindex_key"),
         label_podcastindex_secret: i18n::tr(language, "options.label.podcastindex_secret"),
@@ -980,6 +991,36 @@ unsafe extern "system" fn options_wndproc(
             );
             y += 24;
 
+            let label_subtitle_mode = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_subtitle_mode).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_subtitle_mode = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                140,
+                hwnd,
+                HMENU(OPTIONS_ID_SUBTITLE_MODE as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 40;
+
             let label_podcast_cache_limit = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -1559,6 +1600,8 @@ unsafe extern "system" fn options_wndproc(
                 label_audio_split_text,
                 edit_audio_split_text,
                 checkbox_audio_split_requires_newline,
+                label_subtitle_mode,
+                combo_subtitle_mode,
                 label_podcast_cache_limit,
                 edit_podcast_cache_limit,
                 label_podcastindex_key,
@@ -1633,6 +1676,8 @@ unsafe extern "system" fn options_wndproc(
                 label_audio_split_text,
                 edit_audio_split_text,
                 checkbox_audio_split_requires_newline,
+                label_subtitle_mode,
+                combo_subtitle_mode,
                 label_podcast_cache_limit,
                 edit_podcast_cache_limit,
                 label_podcastindex_key,
@@ -1885,6 +1930,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         _label_audio_split_text,
         edit_audio_split_text,
         checkbox_audio_split_requires_newline,
+        _label_subtitle_mode,
+        combo_subtitle_mode,
         _label_podcast_cache_limit,
         edit_podcast_cache_limit,
         _label_podcastindex_key,
@@ -1935,6 +1982,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.label_audio_split_text,
             state.edit_audio_split_text,
             state.checkbox_audio_split_requires_newline,
+            state.label_subtitle_mode,
+            state.combo_subtitle_mode,
             state.label_podcast_cache_limit,
             state.edit_podcast_cache_limit,
             state.label_podcastindex_key,
@@ -2602,6 +2651,32 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
     }
     update_audio_split_text_visibility(hwnd);
 
+    SendMessageW(combo_subtitle_mode, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    let subtitle_options = [
+        labels.subtitle_mode_off.clone(),
+        labels.subtitle_mode_nvda.clone(),
+        labels.subtitle_mode_user.clone(),
+    ];
+    for label in subtitle_options.iter() {
+        SendMessageW(
+            combo_subtitle_mode,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(label).as_ptr() as isize),
+        );
+    }
+    let subtitle_index = match settings.subtitle_read_mode {
+        SubtitleReadMode::Off => 0,
+        SubtitleReadMode::Nvda => 1,
+        _ => 2,
+    };
+    SendMessageW(
+        combo_subtitle_mode,
+        CB_SETCURSEL,
+        WPARAM(subtitle_index),
+        LPARAM(0),
+    );
+
     let cache_limit_text = settings.podcast_cache_limit_mb.to_string();
     if let Err(_e) = SetWindowTextW(
         edit_podcast_cache_limit,
@@ -3025,6 +3100,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         combo_audio_split,
         edit_audio_split_text,
         checkbox_audio_split_requires_newline,
+        combo_subtitle_mode,
         edit_podcast_cache_limit,
         edit_podcastindex_key,
         edit_podcastindex_secret,
@@ -3065,6 +3141,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.combo_audio_split,
             state.edit_audio_split_text,
             state.checkbox_audio_split_requires_newline,
+            state.combo_subtitle_mode,
             state.edit_podcast_cache_limit,
             state.edit_podcastindex_key,
             state.edit_podcastindex_secret,
@@ -3198,6 +3275,12 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     )
     .0 as u32
         == BST_CHECKED.0;
+    let subtitle_mode_sel = SendMessageW(combo_subtitle_mode, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    settings.subtitle_read_mode = match subtitle_mode_sel {
+        1 => SubtitleReadMode::Nvda,
+        2 => SubtitleReadMode::User,
+        _ => SubtitleReadMode::Off,
+    };
     settings.split_on_newline =
         SendMessageW(checkbox_split_on_newline, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
             == BST_CHECKED.0;
@@ -3599,6 +3682,8 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.label_audio_split_text,
             state.edit_audio_split_text,
             state.checkbox_audio_split_requires_newline,
+            state.label_subtitle_mode,
+            state.combo_subtitle_mode,
             state.label_podcast_cache_limit,
             state.edit_podcast_cache_limit,
             state.label_podcastindex_key,

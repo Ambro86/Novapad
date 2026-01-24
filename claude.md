@@ -49,7 +49,7 @@
 - Code touching FFI must behave correctly on the supported architecture (`x86_64`) and fail clearly on unsupported ones.
 
 ### Dependencies and binaries
-- Do NOT vendor `.dll` / `.lib` files directly in the repository.
+- Do NOT vendor `.dll` / `.lib` files directly in the repository unless is confirmed by user.
 - Prefer reproducible dependency management (crates, vcpkg, or pure-Rust alternatives).
 
 ### Lints posture (strict by default)

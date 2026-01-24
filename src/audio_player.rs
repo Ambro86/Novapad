@@ -3,16 +3,18 @@ use crate::ffmpeg_source::FfmpegSource;
 use crate::i18n;
 use crate::log_debug;
 use crate::settings::{FileFormat, SubtitleReadMode, confirm_title, settings_dir};
-use crate::subtitles::{find_subtitle_for_media, load_subtitles};
+use crate::subtitle_wasapi::{
+    MainAudioClock, ScheduledChunk, SubtitleWasapiOutput, decode_mp3_to_pcm, resample_pcm,
+};
+use crate::subtitles::{SubtitlePcmData, find_subtitle_for_media, load_subtitles};
 use crate::tts_engine;
 use crate::wasapi_output::WasapiOutput;
 use crate::with_state;
 use libloading::Library;
-use rodio::{Decoder, OutputStream, OutputStreamBuilder, Sink, Source};
+use rodio::{Decoder, Source};
 use sha2::Digest;
 use std::collections::HashSet;
 use std::ffi::c_void;
-use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -27,19 +29,9 @@ use windows::Win32::System::Threading::{
 use windows::Win32::UI::WindowsAndMessaging::{IDYES, MB_ICONQUESTION, MB_YESNO, MessageBoxW};
 use windows::core::PCWSTR;
 
-enum AudioBackend {
-    Rodio {
-        sink: Arc<Sink>,
-        _stream: OutputStream,
-    },
-    Wasapi {
-        output: Arc<WasapiOutput>,
-    },
-}
-
 pub struct AudiobookPlayer {
     pub path: PathBuf,
-    backend: AudioBackend,
+    output: Arc<WasapiOutput>,
     pub is_paused: bool,
     pub start_instant: std::time::Instant,
     pub accumulated_seconds: u64,
@@ -54,45 +46,19 @@ pub struct AudiobookPlayer {
 
 impl AudiobookPlayer {
     fn play(&self) {
-        match &self.backend {
-            AudioBackend::Rodio { sink, .. } => sink.play(),
-            AudioBackend::Wasapi { output } => output.play(),
-        }
+        self.output.play();
     }
 
     fn pause(&self) {
-        match &self.backend {
-            AudioBackend::Rodio { sink, .. } => sink.pause(),
-            AudioBackend::Wasapi { output } => output.pause(),
-        }
+        self.output.pause();
     }
 
     fn stop(&self) {
-        match &self.backend {
-            AudioBackend::Rodio { sink, .. } => sink.stop(),
-            AudioBackend::Wasapi { output } => output.stop(),
-        }
+        self.output.stop();
     }
 
     fn set_volume(&self, volume: f32) {
-        match &self.backend {
-            AudioBackend::Rodio { sink, .. } => sink.set_volume(volume),
-            AudioBackend::Wasapi { output } => output.set_volume(volume),
-        }
-    }
-
-    fn try_seek(&self, position: Duration) -> bool {
-        match &self.backend {
-            AudioBackend::Rodio { sink, .. } => sink.try_seek(position).is_ok(),
-            AudioBackend::Wasapi { .. } => false,
-        }
-    }
-
-    fn backend_position_secs(&self) -> Option<f64> {
-        match &self.backend {
-            AudioBackend::Rodio { .. } => None,
-            AudioBackend::Wasapi { output } => output.position_secs(),
-        }
+        self.output.set_volume(volume);
     }
 }
 
@@ -627,9 +593,6 @@ fn start_audiobook_at_with_options(
     seconds: u64,
     options: AudiobookPlaybackOptions,
 ) {
-    let use_wasapi_output = unsafe {
-        with_state(hwnd, |state| state.settings.audiobook_use_wasapi_output).unwrap_or(false)
-    };
     let subtitle_hold = should_hold_for_edge_subtitles(hwnd, &path);
     let effective_paused = options.paused || subtitle_hold;
     let subtitle_cancel = Arc::new(AtomicBool::new(false));
@@ -991,42 +954,15 @@ fn start_audiobook_at_with_options(
                 source
             };
 
-        let backend = if use_wasapi_output {
-            log_debug("Audio player: Using WASAPI output (beta).");
-            let initial_volume = if options.muted { 0.0 } else { options.volume };
-            let base_secs = seconds as f64;
-            match WasapiOutput::start(source, effective_paused, initial_volume, base_secs) {
-                Ok(output) => AudioBackend::Wasapi { output },
-                Err(err) => {
-                    log_debug(&format!("Audio player: WASAPI output failed: {}", err));
-                    return;
-                }
-            }
-        } else {
-            let stream_handle = match OutputStreamBuilder::open_default_stream() {
-                Ok(v) => v,
-                Err(e) => {
-                    log_debug(&format!(
-                        "Audio player: Failed to get default output stream: {}",
-                        e
-                    ));
-                    return;
-                }
-            };
-            let sink: Arc<Sink> = Arc::new(Sink::connect_new(stream_handle.mixer()));
-            log_debug("Audio player: Appending source to sink");
-            sink.append(source);
-            if options.muted {
-                sink.set_volume(0.0);
-            } else {
-                sink.set_volume(options.volume);
-            }
-            if effective_paused {
-                sink.pause();
-            }
-            AudioBackend::Rodio {
-                sink,
-                _stream: stream_handle,
+        log_debug("Audio player: Using WASAPI output.");
+        let initial_volume = if options.muted { 0.0 } else { options.volume };
+        let base_secs = seconds as f64;
+        let output = match WasapiOutput::start(source, effective_paused, initial_volume, base_secs)
+        {
+            Ok(output) => output,
+            Err(err) => {
+                log_debug(&format!("Audio player: WASAPI output failed: {}", err));
+                return;
             }
         };
 
@@ -1042,7 +978,7 @@ fn start_audiobook_at_with_options(
 
         let player = AudiobookPlayer {
             path,
-            backend,
+            output,
             is_paused: effective_paused,
             start_instant: std::time::Instant::now(),
             accumulated_seconds: seconds,
@@ -1153,7 +1089,6 @@ pub unsafe fn toggle_audiobook_pause(hwnd: HWND) {
 
 pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
     enum SeekAction {
-        Applied,
         Restart {
             path: PathBuf,
             current_pos: u64,
@@ -1172,15 +1107,7 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
                 player.start_instant = std::time::Instant::now();
             }
             let new_pos = (current_pos as i64 + seconds).max(0);
-            if (player.speed - 1.0).abs() <= f32::EPSILON
-                && player.try_seek(std::time::Duration::from_secs(new_pos as u64))
-            {
-                player.accumulated_seconds = new_pos as u64;
-                if !player.is_paused {
-                    player.start_instant = std::time::Instant::now();
-                }
-                return Some(SeekAction::Applied);
-            }
+            // WASAPI doesn't support direct seek, always restart
             player.accumulated_seconds = new_pos as u64;
             Some(SeekAction::Restart {
                 path: player.path.clone(),
@@ -1202,10 +1129,6 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
         None => return,
     };
 
-    if matches!(action, SeekAction::Applied) {
-        return;
-    }
-
     let SeekAction::Restart {
         path,
         current_pos,
@@ -1214,10 +1137,7 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
         volume,
         muted,
         prev_volume,
-    } = action
-    else {
-        return;
-    };
+    } = action;
 
     stop_audiobook_playback(hwnd);
     start_audiobook_at_with_options(
@@ -1235,34 +1155,16 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
 }
 
 pub unsafe fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> {
-    enum SeekToAction {
-        Applied,
-        Restart(PathBuf),
-    }
-
-    let action = with_state(hwnd, |state| {
-        if let Some(player) = &mut state.active_audiobook {
-            if (player.speed - 1.0).abs() <= f32::EPSILON
-                && player.try_seek(std::time::Duration::from_secs(seconds))
-            {
-                player.accumulated_seconds = seconds;
-                if !player.is_paused {
-                    player.start_instant = std::time::Instant::now();
-                }
-                return Some(SeekToAction::Applied);
-            }
-            return Some(SeekToAction::Restart(player.path.clone()));
-        }
-        None
+    let path = with_state(hwnd, |state| {
+        state
+            .active_audiobook
+            .as_ref()
+            .map(|player| player.path.clone())
     })
     .flatten()
     .ok_or_else(|| "No active audiobook".to_string())?;
 
-    let path = match action {
-        SeekToAction::Applied => return Ok(()),
-        SeekToAction::Restart(path) => path,
-    };
-
+    // WASAPI doesn't support direct seek, always restart
     start_audiobook_at(hwnd, &path, seconds);
     Ok(())
 }
@@ -1501,18 +1403,13 @@ const SUBTITLE_AUDIO_LATENCY_SECS: f64 = 0.28;
 const SUBTITLE_START_GUARD_SECS: f64 = 0.03;
 const SUBTITLE_PRELOAD_MAX_BYTES: usize = 64 * 1024 * 1024;
 const SUBTITLE_SEEK_GUARD_SECS: f64 = 0.12;
-const SUBTITLE_AUTO_OFFSET_MAX_SECS: f64 = 0.2;
-const SUBTITLE_AUTO_OFFSET_SMOOTH: f64 = 0.2;
+
 const SUBTITLE_PRE_SCHEDULE_SECS: f64 = 0.3;
 
 fn audiobook_position_secs(player: &AudiobookPlayer) -> f64 {
-    if let AudioBackend::Wasapi { output } = &player.backend {
-        if let Some(pos) = output.position_secs() {
-            let latency = output.latency_secs();
-            return (pos - latency).max(0.0);
-        }
-    } else if let Some(pos) = player.backend_position_secs() {
-        return pos;
+    if let Some(pos) = player.output.position_secs() {
+        let latency = player.output.latency_secs();
+        return (pos - latency).max(0.0);
     }
     if player.is_paused {
         player.accumulated_seconds as f64
@@ -1533,19 +1430,32 @@ fn subtitle_playback_state(hwnd: HWND, path: &Path) -> Option<SubtitlePlaybackSt
                 paused: player.is_paused,
                 position_secs: audiobook_position_secs(player),
                 session_id: player.session_id,
-                wasapi_latency_secs: match &player.backend {
-                    AudioBackend::Wasapi { output } => Some(output.latency_secs()),
-                    _ => None,
-                },
-                wasapi_padding_secs: match &player.backend {
-                    AudioBackend::Wasapi { output } => Some(output.padding_secs()),
-                    _ => None,
-                },
-                wasapi_sample_rate_hz: match &player.backend {
-                    AudioBackend::Wasapi { output } => Some(output.sample_rate_hz()),
-                    _ => None,
-                },
+                wasapi_latency_secs: Some(player.output.latency_secs()),
+                wasapi_padding_secs: Some(player.output.padding_secs()),
+                wasapi_sample_rate_hz: Some(player.output.sample_rate_hz()),
             })
+        })
+        .flatten()
+    }
+}
+
+fn get_main_audio_clock(hwnd: HWND, path: &Path) -> Option<Arc<MainAudioClock>> {
+    unsafe {
+        with_state(hwnd, |state| {
+            let player = state.active_audiobook.as_ref()?;
+            if player.path.as_path() != path {
+                return None;
+            }
+            let (position_units, clock_freq, base_micros, last_qpc, qpc_freq, paused) =
+                player.output.clock_refs();
+            Some(Arc::new(MainAudioClock::new(
+                position_units,
+                clock_freq,
+                base_micros,
+                last_qpc,
+                qpc_freq,
+                paused,
+            )))
         })
         .flatten()
     }
@@ -1743,8 +1653,7 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
             ));
         }
 
-        let mut subtitle_stream: Option<OutputStream> = None;
-        let mut subtitle_sink: Option<Sink> = None;
+        let mut subtitle_wasapi: Option<Arc<SubtitleWasapiOutput>> = None;
 
         let mut paused_for_download = subtitle_hold_state(hwnd, &media_path).unwrap_or(false);
         if effective_mode == SubtitleReadMode::User
@@ -1900,9 +1809,11 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                 ));
             }
 
+            // Pre-decode MP3 to PCM for synchronized WASAPI playback
             let mut preload_bytes: usize = 0;
             let mut preload_count: usize = 0;
             let mut preload_skipped: usize = 0;
+            let mut decode_failed: usize = 0;
             for cue in cues.iter_mut() {
                 let Some(path) = cue.audio_path.as_ref() else {
                     continue;
@@ -1914,8 +1825,27 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                 match std::fs::read(path) {
                     Ok(bytes) => {
                         preload_bytes = preload_bytes.saturating_add(bytes.len());
-                        cue.audio_data = Some(Arc::from(bytes));
-                        preload_count += 1;
+                        // Decode MP3 to PCM for precise timing
+                        match decode_mp3_to_pcm(&bytes) {
+                            Ok((samples, sample_rate, channels)) => {
+                                cue.pcm_data = Some(SubtitlePcmData {
+                                    samples: Arc::from(samples),
+                                    sample_rate,
+                                    channels,
+                                });
+                                preload_count += 1;
+                            }
+                            Err(e) => {
+                                log_debug(&format!(
+                                    "Subtitle: PCM decode failed for {}: {}",
+                                    path.display(),
+                                    e
+                                ));
+                                // Fallback to raw MP3 bytes
+                                cue.audio_data = Some(Arc::from(bytes));
+                                decode_failed += 1;
+                            }
+                        }
                     }
                     Err(e) => {
                         log_debug(&format!(
@@ -1927,26 +1857,57 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                 }
             }
             log_debug(&format!(
-                "Subtitle: preload complete ({}/{}) bytes={} skipped={}",
-                preload_count,
+                "Subtitle: preload complete ({}/{}) pcm={} fallback={} skipped={}",
+                preload_count + decode_failed,
                 cues.len(),
-                preload_bytes,
+                preload_count,
+                decode_failed,
                 preload_skipped
             ));
 
             if cancel.load(Ordering::Relaxed) {
                 return;
             }
-            let stream_handle = match OutputStreamBuilder::open_default_stream() {
-                Ok(v) => v,
-                Err(e) => {
-                    log_debug(&format!("Subtitle: Failed to get output stream: {}", e));
-                    return;
+
+            // Try to get WASAPI clock for synchronized playback
+            let main_clock = get_main_audio_clock(hwnd, &media_path);
+            subtitle_wasapi = if let Some(ref clock) = main_clock {
+                // Wait for WASAPI to be ready
+                let mut attempts = 0;
+                while clock.position_secs().is_none() && attempts < 50 {
+                    std::thread::sleep(Duration::from_millis(10));
+                    attempts += 1;
                 }
+                match SubtitleWasapiOutput::start(clock.clone(), 1.0) {
+                    Ok(output) => {
+                        // Wait for device to initialize
+                        let mut init_attempts = 0;
+                        while !output.is_ready() && init_attempts < 50 {
+                            std::thread::sleep(Duration::from_millis(10));
+                            init_attempts += 1;
+                        }
+                        if output.is_ready() {
+                            log_debug(&format!(
+                                "SubtitleWASAPI: ready (device {}ch @ {} Hz)",
+                                output.device_channels(),
+                                output.device_sample_rate()
+                            ));
+                            Some(output)
+                        } else {
+                            log_debug("SubtitleWASAPI: device init timeout, skipping");
+                            None
+                        }
+                    }
+                    Err(e) => {
+                        log_debug(&format!("SubtitleWASAPI: start failed: {}, skipping", e));
+                        None
+                    }
+                }
+            } else {
+                log_debug("Subtitle: no WASAPI clock available, skipping");
+                None
             };
-            let sink = Sink::connect_new(stream_handle.mixer());
-            subtitle_stream = Some(stream_handle);
-            subtitle_sink = Some(sink);
+
             if paused_for_download
                 && let Some(held) = subtitle_hold_state(hwnd, &media_path)
                 && held
@@ -1963,7 +1924,7 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
         let offset_secs = settings.subtitle_offset_ms as f64 / 1000.0;
         let edge_tts = effective_mode == SubtitleReadMode::User
             && settings.tts_engine == crate::settings::TtsEngine::Edge;
-        let mut auto_offset_secs: f64 = 0.0;
+        let auto_offset_secs: f64 = 0.0;
         let (mut index, mut last_position, mut last_paused) = if let Some(state) =
             subtitle_playback_state(hwnd, &media_path)
         {
@@ -1975,9 +1936,6 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                 .position(|cue| cue.end.as_secs_f64() >= adjusted_pos)
                 .unwrap_or(cues.len());
             let last_paused = state.paused;
-            if last_paused && let Some(sink) = subtitle_sink.as_ref() {
-                sink.pause();
-            }
             (index, adjusted_pos, last_paused)
         } else {
             return;
@@ -2009,16 +1967,10 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                 .unwrap_or_else(|| "n/a".to_string());
 
             if state.paused {
-                if !last_paused && let Some(sink) = subtitle_sink.as_ref() {
-                    sink.pause();
-                }
                 last_paused = true;
                 std::thread::sleep(Duration::from_millis(80));
                 continue;
             } else if last_paused {
-                if let Some(sink) = subtitle_sink.as_ref() {
-                    sink.play();
-                }
                 last_paused = false;
             }
 
@@ -2042,15 +1994,9 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                 } else {
                     index = cues.len();
                 }
-                if let Some(sink) = subtitle_sink.as_ref() {
-                    sink.stop();
-                }
-                if let Some(stream) = subtitle_stream.as_ref() {
-                    let new_sink = Sink::connect_new(stream.mixer());
-                    if last_paused {
-                        new_sink.pause();
-                    }
-                    subtitle_sink = Some(new_sink);
+                // Clear pending audio on seek
+                if let Some(ref wasapi_out) = subtitle_wasapi {
+                    wasapi_out.clear();
                 }
                 seek_guard_extra = SUBTITLE_SEEK_GUARD_SECS;
             }
@@ -2137,56 +2083,33 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                     | SubtitleReadMode::Sapi4
                     | SubtitleReadMode::Edge => match settings.tts_engine {
                         crate::settings::TtsEngine::Edge => {
-                            if let Some(sink) = subtitle_sink.as_ref() {
-                                let delay_secs = (target - adjusted_pos).max(0.0);
-                                if let Some(data) = cue.audio_data.as_ref() {
-                                    let data = data.clone();
-                                    match Decoder::new(Cursor::new(data)) {
-                                        Ok(source) => {
-                                            let source =
-                                                source.delay(Duration::from_secs_f64(delay_secs));
-                                            sink.append(source);
-                                        }
-                                        Err(e) => {
-                                            log_debug(&format!(
-                                                "Subtitle: failed to decode preloaded chunk: {}",
-                                                e
-                                            ));
-                                        }
-                                    }
-                                } else if let Some(path) = cue.audio_path.as_ref() {
-                                    match std::fs::File::open(path) {
-                                        Ok(file) => {
-                                            match Decoder::new(std::io::BufReader::new(file)) {
-                                                Ok(source) => {
-                                                    let source = source
-                                                        .delay(Duration::from_secs_f64(delay_secs));
-                                                    sink.append(source);
-                                                }
-                                                Err(e) => log_debug(&format!(
-                                                    "Subtitle: failed to decode audio chunk: {}",
-                                                    e
-                                                )),
-                                            }
-                                            let desired_delta =
-                                                SUBTITLE_START_GUARD_SECS + seek_guard_extra;
-                                            let error = delta_from_start - desired_delta;
-                                            auto_offset_secs = (auto_offset_secs
-                                                - error * SUBTITLE_AUTO_OFFSET_SMOOTH)
-                                                .clamp(
-                                                    -SUBTITLE_AUTO_OFFSET_MAX_SECS,
-                                                    SUBTITLE_AUTO_OFFSET_MAX_SECS,
-                                                );
-                                            seek_guard_extra = 0.0;
-                                        }
-                                        Err(e) => {
-                                            log_debug(&format!(
-                                                "Subtitle: failed to open chunk: {}",
-                                                e
-                                            ));
-                                        }
-                                    }
-                                }
+                            // Use synchronized WASAPI output if available
+                            if let Some(ref wasapi_out) = subtitle_wasapi
+                                && let Some(ref pcm) = cue.pcm_data
+                            {
+                                // Resample to device format if needed
+                                let device_rate = wasapi_out.device_sample_rate();
+                                let device_ch = wasapi_out.device_channels() as u16;
+                                let samples = if pcm.sample_rate != device_rate
+                                    || pcm.channels != device_ch
+                                {
+                                    Arc::from(resample_pcm(
+                                        &pcm.samples,
+                                        pcm.sample_rate,
+                                        pcm.channels,
+                                        device_rate,
+                                        device_ch,
+                                    ))
+                                } else {
+                                    pcm.samples.clone()
+                                };
+                                // Schedule at exact target time
+                                let chunk = ScheduledChunk {
+                                    samples,
+                                    target_secs: cue_start,
+                                };
+                                wasapi_out.schedule(chunk);
+                                seek_guard_extra = 0.0;
                             }
                         }
                         crate::settings::TtsEngine::Sapi5 => {
@@ -2230,11 +2153,14 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                 index += 1;
             }
 
-            std::thread::sleep(Duration::from_millis(80));
+            // Reduced polling for better timing precision
+            std::thread::sleep(Duration::from_millis(10));
         }
 
-        drop(subtitle_sink);
-        drop(subtitle_stream);
+        // Cleanup
+        if let Some(ref wasapi_out) = subtitle_wasapi {
+            wasapi_out.stop();
+        }
     });
 }
 

@@ -7,6 +7,14 @@ pub const SUBTITLE_EXTENSIONS: &[&str] = &[
     "srt", "vtt", "ass", "ssa", "sub", "sbv", "lrc", "smi", "sami",
 ];
 
+/// Pre-decoded PCM audio data for a subtitle cue.
+#[derive(Clone)]
+pub struct SubtitlePcmData {
+    pub samples: std::sync::Arc<[f32]>,
+    pub sample_rate: u32,
+    pub channels: u16,
+}
+
 #[derive(Clone)]
 pub struct SubtitleCue {
     pub start: Duration,
@@ -14,6 +22,8 @@ pub struct SubtitleCue {
     pub text: String,
     pub audio_path: Option<PathBuf>,
     pub audio_data: Option<std::sync::Arc<[u8]>>,
+    /// Pre-decoded PCM data for synchronized WASAPI playback.
+    pub pcm_data: Option<SubtitlePcmData>,
 }
 
 pub fn find_subtitle_for_media(media_path: &Path) -> Option<PathBuf> {
@@ -88,6 +98,7 @@ fn parse_srt(input: &str) -> Vec<SubtitleCue> {
                 text,
                 audio_path: None,
                 audio_data: None,
+                pcm_data: None,
             });
         }
     }
@@ -132,6 +143,7 @@ fn parse_vtt(input: &str) -> Vec<SubtitleCue> {
                 text,
                 audio_path: None,
                 audio_data: None,
+                pcm_data: None,
             });
         }
     }
@@ -165,6 +177,7 @@ fn parse_ass(input: &str) -> Vec<SubtitleCue> {
                 text,
                 audio_path: None,
                 audio_data: None,
+                pcm_data: None,
             });
         }
     }
@@ -207,6 +220,7 @@ fn parse_sub(input: &str) -> Vec<SubtitleCue> {
                 text,
                 audio_path: None,
                 audio_data: None,
+                pcm_data: None,
             });
         }
     }
@@ -259,6 +273,7 @@ fn parse_sbv(input: &str) -> Vec<SubtitleCue> {
                 text,
                 audio_path: None,
                 audio_data: None,
+                pcm_data: None,
             });
         }
     }
@@ -307,6 +322,7 @@ fn parse_lrc(input: &str) -> Vec<SubtitleCue> {
                 text,
                 audio_path: None,
                 audio_data: None,
+                pcm_data: None,
             });
         }
     }
@@ -360,6 +376,7 @@ fn parse_sami(input: &str) -> Vec<SubtitleCue> {
             text,
             audio_path: None,
             audio_data: None,
+            pcm_data: None,
         });
     }
     cues

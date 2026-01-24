@@ -33,6 +33,7 @@ use audio_player::*;
 mod editor_manager;
 mod ffmpeg_dyn;
 mod ffmpeg_source;
+mod subtitle_wasapi;
 mod subtitles;
 mod wasapi_output;
 use editor_manager::*;

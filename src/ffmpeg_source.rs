@@ -136,22 +136,52 @@ fn load_symbol<T: Copy>(lib: &Library, name: &[u8]) -> Result<T, String> {
 
 fn load_ffmpeg_api() -> Result<FfmpegApi, String> {
     let deps_dir = settings_dir();
-    let dlls = [
+    let vcpkg_local = Path::new(r"C:\rustnotepad\rustnotepad\vcpkg_installed\x64-windows\bin");
+    let vcpkg_ci = Path::new(r"C:\vcpkg\installed\x64-windows\bin");
+
+    let ffmpeg_root = if vcpkg_local.exists() {
+        Some(vcpkg_local)
+    } else if vcpkg_ci.exists() {
+        Some(vcpkg_ci)
+    } else {
+        None
+    };
+
+    let ffmpeg_dlls = [
         "avutil-60.dll",
         "swresample-6.dll",
         "avcodec-62.dll",
         "avformat-62.dll",
         "swscale-9.dll",
-        "opus.dll",
     ];
 
     let mut libs = Vec::new();
-    for dll in dlls {
+    let flags = LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS;
+
+    for dll in ffmpeg_dlls {
+        let mut path = deps_dir.join(dll);
+        if let Some(root) = ffmpeg_root {
+            let p = root.join(dll);
+            if p.exists() {
+                path = p;
+            }
+        }
+
+        if !path.exists() {
+            return Err(format!("FFmpeg: missing DLL {}", path.display()));
+        }
+
+        let lib = unsafe { Library::load_with_flags(&path, flags) }
+            .map_err(|e| format!("FFmpeg: failed to load {}: {}", path.display(), e))?;
+        libs.push(lib);
+    }
+
+    let other_dlls = ["opus.dll"];
+    for dll in other_dlls {
         let path = deps_dir.join(dll);
         if !path.exists() {
             return Err(format!("FFmpeg: missing DLL {}", path.display()));
         }
-        let flags = LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS;
         let lib = unsafe { Library::load_with_flags(&path, flags) }
             .map_err(|e| format!("FFmpeg: failed to load {}: {}", path.display(), e))?;
         libs.push(lib);

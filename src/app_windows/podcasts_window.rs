@@ -2750,7 +2750,7 @@ unsafe extern "system" fn description_wndproc(
                 SendMessageW(ok_button, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
 
                 // Subclass controls for Tab navigation
-                let proc_ptr = description_control_subclass_proc as usize;
+                let proc_ptr = description_control_subclass_proc as *const () as usize;
 
                 let prev_edit = SetWindowLongPtrW(
                     edit,
@@ -3152,7 +3152,7 @@ unsafe extern "system" fn reorder_wndproc(
                 hinstance,
                 None,
             );
-            let proc_ptr = reorder_control_subclass_proc as usize;
+            let proc_ptr = reorder_control_subclass_proc as *const () as usize;
             let prev = SetWindowLongPtrW(
                 edit,
                 windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
@@ -3163,7 +3163,7 @@ unsafe extern "system" fn reorder_wndproc(
                 windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
                 prev,
             );
-            let proc_ptr = reorder_control_subclass_proc as usize;
+            let proc_ptr = reorder_control_subclass_proc as *const () as usize;
             let prev_ok = SetWindowLongPtrW(
                 ok,
                 windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
@@ -3174,7 +3174,7 @@ unsafe extern "system" fn reorder_wndproc(
                 windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
                 prev_ok,
             );
-            let proc_ptr = reorder_control_subclass_proc as usize;
+            let proc_ptr = reorder_control_subclass_proc as *const () as usize;
             let prev_cancel = SetWindowLongPtrW(
                 cancel,
                 windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
@@ -3546,7 +3546,7 @@ unsafe fn create_controls(hwnd: HWND) {
         None,
     );
     if hwnd_tree.0 != 0 {
-        let proc_ptr = podcast_tree_wndproc as usize;
+        let proc_ptr = podcast_tree_wndproc as *const () as usize;
         let old = SetWindowLongPtrW(
             hwnd_tree,
             windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
@@ -3614,7 +3614,7 @@ unsafe fn create_controls(hwnd: HWND) {
         None,
     );
     if hwnd_search.0 != 0 {
-        let proc_ptr = podcast_search_wndproc as usize;
+        let proc_ptr = podcast_search_wndproc as *const () as usize;
         let old = SetWindowLongPtrW(
             hwnd_search,
             windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,

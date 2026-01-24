@@ -2348,14 +2348,14 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 None,
             );
             let combo_voice_proc = if combo_voice.0 != 0 {
-                let proc_ptr = voice_combo_subclass_proc as usize;
+                let proc_ptr = voice_combo_subclass_proc as *const () as usize;
                 let old = SetWindowLongPtrW(combo_voice, GWLP_WNDPROC, proc_ptr as isize);
                 std::mem::transmute::<isize, WNDPROC>(old)
             } else {
                 None
             };
             let combo_favorites_proc = if combo_favorites.0 != 0 {
-                let proc_ptr = voice_combo_subclass_proc as usize;
+                let proc_ptr = voice_combo_subclass_proc as *const () as usize;
                 let old = SetWindowLongPtrW(combo_favorites, GWLP_WNDPROC, proc_ptr as isize);
                 std::mem::transmute::<isize, WNDPROC>(old)
             } else {

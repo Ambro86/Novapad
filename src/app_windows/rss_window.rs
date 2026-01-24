@@ -1713,7 +1713,7 @@ unsafe extern "system" fn reorder_wndproc(
                 hinstance,
                 None,
             );
-            let proc_ptr = reorder_control_subclass_proc as usize;
+            let proc_ptr = reorder_control_subclass_proc as *const () as usize;
             for control in [edit, ok, cancel] {
                 let prev = SetWindowLongPtrW(control, GWLP_WNDPROC, proc_ptr as isize);
                 SetWindowLongPtrW(control, GWLP_USERDATA, prev);
@@ -1879,7 +1879,7 @@ unsafe fn create_controls(hwnd: HWND) {
         None,
     );
     if hwnd_tree.0 != 0 {
-        let proc_ptr = rss_tree_wndproc as usize;
+        let proc_ptr = rss_tree_wndproc as *const () as usize;
         let old = SetWindowLongPtrW(hwnd_tree, GWLP_WNDPROC, proc_ptr as isize);
         with_rss_state(hwnd, |s| {
             s.tree_proc = mem::transmute::<isize, WNDPROC>(old)

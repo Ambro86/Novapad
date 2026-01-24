@@ -299,7 +299,7 @@ unsafe extern "system" fn wikipedia_wndproc(
             (*init_ptr).results = results;
             (*init_ptr).status = status;
             (*init_ptr).close = close;
-            let proc_ptr = tab_subclass_proc as usize;
+            let proc_ptr = tab_subclass_proc as *const () as usize;
             for control in [input, search, results, close] {
                 let prev = SetWindowLongPtrW(
                     control,

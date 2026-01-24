@@ -189,6 +189,7 @@
   "options.label.audio_split_text": "Split marker text:",
   "options.label.audio_split_requires_newline": "Require the marker at line start",
   "options.label.subtitle_mode": "Subtitle reading:",
+  "options.label.subtitle_offset": "Subtitle timing offset (ms):",
   "options.label.audio_wasapi": "Use WASAPI output (beta)",
   "options.subtitle_mode.off": "Disabled",
   "options.subtitle_mode.nvda": "NVDA",

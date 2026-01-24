@@ -7,13 +7,16 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
+use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
 use windows::Win32::Media::Audio::{
-    AUDCLNT_SHAREMODE_SHARED, IAudioClient, IAudioClock, IAudioRenderClient, IMMDeviceEnumerator,
-    WAVEFORMATEX, WAVEFORMATEXTENSIBLE,
+    AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, IAudioClient, IAudioClock,
+    IAudioRenderClient, IMMDeviceEnumerator, WAVEFORMATEX, WAVEFORMATEXTENSIBLE,
 };
 use windows::Win32::Media::Audio::{MMDeviceEnumerator, eConsole, eRender};
 use windows::Win32::Media::Multimedia::KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
 use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
+use windows::Win32::System::Performance::{QueryPerformanceCounter, QueryPerformanceFrequency};
+use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 use windows::core::GUID;
 
 const WAVE_FORMAT_PCM: u16 = 0x0001;
@@ -39,9 +42,22 @@ enum WasapiCommand {
     Stop,
 }
 
+struct HandleGuard(HANDLE);
+
+impl Drop for HandleGuard {
+    fn drop(&mut self) {
+        if self.0.0 != 0 {
+            let _ = unsafe { CloseHandle(self.0) };
+        }
+    }
+}
+
 pub struct WasapiOutput {
     tx: mpsc::Sender<WasapiCommand>,
-    position_micros: Arc<AtomicU64>,
+    position_units: Arc<AtomicU64>,
+    last_qpc: Arc<AtomicU64>,
+    qpc_freq: Arc<AtomicU64>,
+    clock_freq: Arc<AtomicU64>,
     base_micros: Arc<AtomicU64>,
     latency_micros: Arc<AtomicU64>,
     padding_frames: Arc<AtomicU32>,
@@ -58,7 +74,10 @@ impl WasapiOutput {
         base_secs: f64,
     ) -> Result<Arc<Self>, String> {
         let (tx, rx) = mpsc::channel();
-        let position_micros = Arc::new(AtomicU64::new(0));
+        let position_units = Arc::new(AtomicU64::new(0));
+        let last_qpc = Arc::new(AtomicU64::new(0));
+        let qpc_freq = Arc::new(AtomicU64::new(0));
+        let clock_freq = Arc::new(AtomicU64::new(0));
         let base_micros = Arc::new(AtomicU64::new((base_secs.max(0.0) * 1_000_000.0) as u64));
         let latency_micros = Arc::new(AtomicU64::new(0));
         let padding_frames = Arc::new(AtomicU32::new(0));
@@ -66,7 +85,10 @@ impl WasapiOutput {
         let volume_bits = Arc::new(AtomicU32::new(volume.to_bits()));
         let stopped = Arc::new(AtomicBool::new(false));
 
-        let position_micros_thread = position_micros.clone();
+        let position_units_thread = position_units.clone();
+        let last_qpc_thread = last_qpc.clone();
+        let qpc_freq_thread = qpc_freq.clone();
+        let clock_freq_thread = clock_freq.clone();
         let latency_micros_thread = latency_micros.clone();
         let padding_frames_thread = padding_frames.clone();
         let sample_rate_hz_thread = sample_rate_hz.clone();
@@ -130,7 +152,7 @@ impl WasapiOutput {
             if let Err(e) = unsafe {
                 client.Initialize(
                     AUDCLNT_SHAREMODE_SHARED,
-                    0,
+                    AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
                     buffer_duration,
                     0,
                     format_ptr,
@@ -148,6 +170,18 @@ impl WasapiOutput {
                     return;
                 }
             };
+            let event_handle = match unsafe { CreateEventW(None, false, false, None) } {
+                Ok(handle) => handle,
+                Err(e) => {
+                    log_debug(&format!("WASAPI: CreateEvent failed: {}", e));
+                    return;
+                }
+            };
+            let _event_guard = HandleGuard(event_handle);
+            if let Err(e) = unsafe { client.SetEventHandle(event_handle) } {
+                log_debug(&format!("WASAPI: SetEventHandle failed: {}", e));
+                return;
+            }
             let mut default_period: i64 = 0;
             let mut min_period: i64 = 0;
             if let Err(e) =
@@ -199,6 +233,13 @@ impl WasapiOutput {
                     sample_rate as u64
                 }
             };
+            clock_freq_thread.store(clock_freq, Ordering::Relaxed);
+            let mut qpc_freq_val: i64 = 0;
+            if unsafe { QueryPerformanceFrequency(&mut qpc_freq_val) }.is_ok() {
+                qpc_freq_thread.store(qpc_freq_val as u64, Ordering::Relaxed);
+            } else {
+                log_debug("WASAPI: QueryPerformanceFrequency failed.");
+            }
             if default_period > 0 || min_period > 0 {
                 log_debug(&format!(
                     "WASAPI: format {}ch @ {} Hz, buffer {} frames, clock {} Hz, device period {:.3} ms (min {:.3} ms)",
@@ -263,6 +304,15 @@ impl WasapiOutput {
                     continue;
                 }
 
+                let wait_res = unsafe { WaitForSingleObject(event_handle, 2000) };
+                if wait_res == WAIT_TIMEOUT {
+                    update_clock(&clock, &position_units_thread, &last_qpc_thread);
+                    continue;
+                } else if wait_res != WAIT_OBJECT_0 {
+                    log_debug("WASAPI: WaitForSingleObject failed.");
+                    return;
+                }
+
                 let padding = match unsafe { client.GetCurrentPadding() } {
                     Ok(padding) => padding,
                     Err(e) => {
@@ -273,7 +323,7 @@ impl WasapiOutput {
                 padding_frames_thread.store(padding, Ordering::Relaxed);
                 let available = buffer_frames.saturating_sub(padding);
                 if available == 0 {
-                    update_clock(&clock, clock_freq, &position_micros_thread);
+                    update_clock(&clock, &position_units_thread, &last_qpc_thread);
                     thread::sleep(Duration::from_millis(5));
                     continue;
                 }
@@ -336,7 +386,7 @@ impl WasapiOutput {
                     return;
                 }
 
-                update_clock(&clock, clock_freq, &position_micros_thread);
+                update_clock(&clock, &position_units_thread, &last_qpc_thread);
 
                 if finished {
                     stopped_thread.store(true, Ordering::Relaxed);
@@ -348,7 +398,10 @@ impl WasapiOutput {
 
         Ok(Arc::new(Self {
             tx,
-            position_micros,
+            position_units,
+            last_qpc,
+            qpc_freq,
+            clock_freq,
             base_micros,
             latency_micros,
             padding_frames,
@@ -385,7 +438,22 @@ impl WasapiOutput {
             return None;
         }
         let base = self.base_micros.load(Ordering::Relaxed);
-        let micros = self.position_micros.load(Ordering::Relaxed);
+        let units = self.position_units.load(Ordering::Relaxed);
+        let clock_freq = self.clock_freq.load(Ordering::Relaxed);
+        let mut secs = if clock_freq > 0 {
+            units as f64 / clock_freq as f64
+        } else {
+            0.0
+        };
+        let last_qpc = self.last_qpc.load(Ordering::Relaxed);
+        let qpc_freq = self.qpc_freq.load(Ordering::Relaxed);
+        if last_qpc > 0 && qpc_freq > 0 {
+            let mut now_qpc: i64 = 0;
+            if unsafe { QueryPerformanceCounter(&mut now_qpc) }.is_ok() {
+                let delta = now_qpc.saturating_sub(last_qpc as i64);
+                secs += delta as f64 / qpc_freq as f64;
+            }
+        }
         let sample_rate = self.sample_rate_hz.load(Ordering::Relaxed);
         let padding = self.padding_frames.load(Ordering::Relaxed);
         let padding_secs = if sample_rate > 0 {
@@ -393,7 +461,7 @@ impl WasapiOutput {
         } else {
             0.0
         };
-        Some((((base + micros) as f64 / 1_000_000.0) - padding_secs).max(0.0))
+        Some(((base as f64 / 1_000_000.0) + secs - padding_secs).max(0.0))
     }
 
     pub fn latency_secs(&self) -> f64 {
@@ -416,12 +484,12 @@ impl WasapiOutput {
     }
 }
 
-fn update_clock(clock: &IAudioClock, clock_freq: u64, position_micros: &AtomicU64) {
+fn update_clock(clock: &IAudioClock, position_units: &AtomicU64, last_qpc: &AtomicU64) {
     let mut position: u64 = 0;
     let mut _qpc: u64 = 0;
     if unsafe { clock.GetPosition(&mut position, Some(&mut _qpc)) }.is_ok() {
-        let secs = position as f64 / clock_freq as f64;
-        position_micros.store((secs * 1_000_000.0) as u64, Ordering::Relaxed);
+        position_units.store(position, Ordering::Relaxed);
+        last_qpc.store(_qpc, Ordering::Relaxed);
     }
 }
 

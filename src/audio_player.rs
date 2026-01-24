@@ -12,6 +12,7 @@ use rodio::{Decoder, OutputStream, OutputStreamBuilder, Sink, Source};
 use sha2::Digest;
 use std::collections::HashSet;
 use std::ffi::c_void;
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -20,6 +21,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use uuid::Uuid;
 use windows::Win32::Foundation::HWND;
+use windows::Win32::System::Threading::{
+    GetCurrentThread, SetThreadPriority, THREAD_PRIORITY_HIGHEST,
+};
 use windows::Win32::UI::WindowsAndMessaging::{IDYES, MB_ICONQUESTION, MB_YESNO, MessageBoxW};
 use windows::core::PCWSTR;
 
@@ -1495,6 +1499,11 @@ struct SubtitlePlaybackState {
 static SUBTITLE_EDGE_CONFIRMED: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
 const SUBTITLE_AUDIO_LATENCY_SECS: f64 = 0.28;
 const SUBTITLE_START_GUARD_SECS: f64 = 0.03;
+const SUBTITLE_PRELOAD_MAX_BYTES: usize = 64 * 1024 * 1024;
+const SUBTITLE_SEEK_GUARD_SECS: f64 = 0.12;
+const SUBTITLE_AUTO_OFFSET_MAX_SECS: f64 = 0.2;
+const SUBTITLE_AUTO_OFFSET_SMOOTH: f64 = 0.2;
+const SUBTITLE_PRE_SCHEDULE_SECS: f64 = 0.3;
 
 fn audiobook_position_secs(player: &AudiobookPlayer) -> f64 {
     if let AudioBackend::Wasapi { output } = &player.backend {
@@ -1685,6 +1694,9 @@ fn is_edge_confirmed(key: &str) -> bool {
 
 fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool>) {
     std::thread::spawn(move || {
+        if let Err(e) = unsafe { SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST) } {
+            log_debug(&format!("Subtitle: SetThreadPriority failed: {}", e));
+        }
         let settings = match unsafe { with_state(hwnd, |state| state.settings.clone()) } {
             Some(settings) => settings,
             None => {
@@ -1819,6 +1831,11 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
             };
 
             if !cache_ready {
+                log_debug(&format!(
+                    "Subtitle: predownload start ({} cues) for {}",
+                    cues.len(),
+                    subtitle_path.display()
+                ));
                 if let Some(state) = subtitle_playback_state(hwnd, &media_path)
                     && !state.paused
                     && pause_active_backend(hwnd, &media_path)
@@ -1860,6 +1877,13 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                         }
                     }
                 }
+                let available = cues.iter().filter(|cue| cue.audio_path.is_some()).count();
+                log_debug(&format!(
+                    "Subtitle: predownload complete ({}/{}) for {}",
+                    available,
+                    cues.len(),
+                    subtitle_path.display()
+                ));
             } else {
                 for (idx, cue) in cues.iter_mut().enumerate() {
                     let path = dir.join(format!("cue_{:04}.mp3", idx));
@@ -1867,7 +1891,48 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                         cue.audio_path = Some(path);
                     }
                 }
+                let available = cues.iter().filter(|cue| cue.audio_path.is_some()).count();
+                log_debug(&format!(
+                    "Subtitle: cache ready ({}/{}) for {}",
+                    available,
+                    cues.len(),
+                    subtitle_path.display()
+                ));
             }
+
+            let mut preload_bytes: usize = 0;
+            let mut preload_count: usize = 0;
+            let mut preload_skipped: usize = 0;
+            for cue in cues.iter_mut() {
+                let Some(path) = cue.audio_path.as_ref() else {
+                    continue;
+                };
+                if preload_bytes >= SUBTITLE_PRELOAD_MAX_BYTES {
+                    preload_skipped += 1;
+                    continue;
+                }
+                match std::fs::read(path) {
+                    Ok(bytes) => {
+                        preload_bytes = preload_bytes.saturating_add(bytes.len());
+                        cue.audio_data = Some(Arc::from(bytes));
+                        preload_count += 1;
+                    }
+                    Err(e) => {
+                        log_debug(&format!(
+                            "Subtitle: preload failed for {}: {}",
+                            path.display(),
+                            e
+                        ));
+                    }
+                }
+            }
+            log_debug(&format!(
+                "Subtitle: preload complete ({}/{}) bytes={} skipped={}",
+                preload_count,
+                cues.len(),
+                preload_bytes,
+                preload_skipped
+            ));
 
             if cancel.load(Ordering::Relaxed) {
                 return;
@@ -1895,22 +1960,29 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
             }
         }
 
-        let (mut index, mut last_position, mut last_paused) =
-            if let Some(state) = subtitle_playback_state(hwnd, &media_path) {
-                let raw_pos = state.position_secs;
-                let adjusted_pos = (raw_pos - SUBTITLE_AUDIO_LATENCY_SECS).max(0.0);
-                let index = cues
-                    .iter()
-                    .position(|cue| cue.end.as_secs_f64() >= adjusted_pos)
-                    .unwrap_or(cues.len());
-                let last_paused = state.paused;
-                if last_paused && let Some(sink) = subtitle_sink.as_ref() {
-                    sink.pause();
-                }
-                (index, adjusted_pos, last_paused)
-            } else {
-                return;
-            };
+        let offset_secs = settings.subtitle_offset_ms as f64 / 1000.0;
+        let edge_tts = effective_mode == SubtitleReadMode::User
+            && settings.tts_engine == crate::settings::TtsEngine::Edge;
+        let mut auto_offset_secs: f64 = 0.0;
+        let (mut index, mut last_position, mut last_paused) = if let Some(state) =
+            subtitle_playback_state(hwnd, &media_path)
+        {
+            let raw_pos = state.position_secs;
+            let effective_offset = offset_secs + auto_offset_secs;
+            let adjusted_pos = (raw_pos - SUBTITLE_AUDIO_LATENCY_SECS - effective_offset).max(0.0);
+            let index = cues
+                .iter()
+                .position(|cue| cue.end.as_secs_f64() >= adjusted_pos)
+                .unwrap_or(cues.len());
+            let last_paused = state.paused;
+            if last_paused && let Some(sink) = subtitle_sink.as_ref() {
+                sink.pause();
+            }
+            (index, adjusted_pos, last_paused)
+        } else {
+            return;
+        };
+        let mut seek_guard_extra = 0.0;
 
         loop {
             if cancel.load(Ordering::Relaxed) {
@@ -1950,8 +2022,10 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                 last_paused = false;
             }
 
-            let raw_pos = state.position_secs;
-            let adjusted_pos = (raw_pos - SUBTITLE_AUDIO_LATENCY_SECS).max(0.0);
+            let mut raw_pos = state.position_secs;
+            let effective_offset = offset_secs + auto_offset_secs;
+            let mut adjusted_pos =
+                (raw_pos - SUBTITLE_AUDIO_LATENCY_SECS - effective_offset).max(0.0);
             let seek_delta = adjusted_pos - last_position;
             if seek_delta.abs() > 0.5 {
                 log_debug(&format!(
@@ -1978,15 +2052,52 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                     }
                     subtitle_sink = Some(new_sink);
                 }
+                seek_guard_extra = SUBTITLE_SEEK_GUARD_SECS;
             }
             last_position = adjusted_pos;
 
-            while index < cues.len()
-                && adjusted_pos >= cues[index].start.as_secs_f64() + SUBTITLE_START_GUARD_SECS
-            {
+            while index < cues.len() {
                 let cue = cues[index].clone();
                 let cue_start = cue.start.as_secs_f64();
                 let cue_end = cue.end.as_secs_f64();
+                let target = cue_start + SUBTITLE_START_GUARD_SECS + seek_guard_extra;
+                let schedule_ready = adjusted_pos >= target
+                    || (edge_tts && adjusted_pos + SUBTITLE_PRE_SCHEDULE_SECS >= target);
+                if !schedule_ready {
+                    break;
+                }
+                let mut waited_ms = 0.0;
+                if edge_tts && adjusted_pos < target {
+                    let start_wait = std::time::Instant::now();
+                    loop {
+                        if cancel.load(Ordering::Relaxed) {
+                            return;
+                        }
+                        let Some(wait_state) = subtitle_playback_state(hwnd, &media_path) else {
+                            return;
+                        };
+                        if wait_state.session_id != session_id {
+                            return;
+                        }
+                        if wait_state.paused {
+                            std::thread::sleep(Duration::from_millis(20));
+                            continue;
+                        }
+                        raw_pos = wait_state.position_secs;
+                        adjusted_pos =
+                            (raw_pos - SUBTITLE_AUDIO_LATENCY_SECS - effective_offset).max(0.0);
+                        if adjusted_pos >= target {
+                            break;
+                        }
+                        let remaining = target - adjusted_pos;
+                        if remaining > 0.02 {
+                            std::thread::sleep(Duration::from_millis(10));
+                        } else {
+                            std::hint::spin_loop();
+                        }
+                    }
+                    waited_ms = start_wait.elapsed().as_secs_f64() * 1000.0;
+                }
                 let delta_from_start = adjusted_pos - cue_start;
                 let mut preview = cue.text.replace('\n', " ");
                 if preview.len() > 80 {
@@ -1994,15 +2105,20 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                     preview.push_str("...");
                 }
                 log_debug(&format!(
-                    "SubtitleSync: speak idx={} start={:.3}s end={:.3}s raw={:.3}s adj={:.3}s delta={:.3}s guard={:.3}s audio_lat={:.3}s wasapi_lat={}s wasapi_pad={}s wasapi_sr={} speed={:.2} text='{}'",
+                    "SubtitleSync: speak idx={} start={:.3}s end={:.3}s raw={:.3}s adj={:.3}s target={:.3}s delta={:.3}s guard={:.3}s seek_guard={:.3}s audio_lat={:.3}s offset={:.3}s auto_offset={:.3}s wait_ms={:.1} wasapi_lat={}s wasapi_pad={}s wasapi_sr={} speed={:.2} text='{}'",
                     index,
                     cue_start,
                     cue_end,
                     raw_pos,
                     adjusted_pos,
+                    target,
                     delta_from_start,
                     SUBTITLE_START_GUARD_SECS,
+                    seek_guard_extra,
                     SUBTITLE_AUDIO_LATENCY_SECS,
+                    offset_secs,
+                    auto_offset_secs,
+                    waited_ms,
                     wasapi_latency,
                     wasapi_padding,
                     wasapi_sr,
@@ -2021,22 +2137,54 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                     | SubtitleReadMode::Sapi4
                     | SubtitleReadMode::Edge => match settings.tts_engine {
                         crate::settings::TtsEngine::Edge => {
-                            if let (Some(path), Some(sink)) =
-                                (cue.audio_path.as_ref(), subtitle_sink.as_ref())
-                            {
-                                match std::fs::File::open(path) {
-                                    Ok(file) => match Decoder::new(std::io::BufReader::new(file)) {
-                                        Ok(source) => sink.append(source),
-                                        Err(e) => log_debug(&format!(
-                                            "Subtitle: failed to decode audio chunk: {}",
-                                            e
-                                        )),
-                                    },
-                                    Err(e) => {
-                                        log_debug(&format!(
-                                            "Subtitle: failed to open chunk: {}",
-                                            e
-                                        ));
+                            if let Some(sink) = subtitle_sink.as_ref() {
+                                let delay_secs = (target - adjusted_pos).max(0.0);
+                                if let Some(data) = cue.audio_data.as_ref() {
+                                    let data = data.clone();
+                                    match Decoder::new(Cursor::new(data)) {
+                                        Ok(source) => {
+                                            let source =
+                                                source.delay(Duration::from_secs_f64(delay_secs));
+                                            sink.append(source);
+                                        }
+                                        Err(e) => {
+                                            log_debug(&format!(
+                                                "Subtitle: failed to decode preloaded chunk: {}",
+                                                e
+                                            ));
+                                        }
+                                    }
+                                } else if let Some(path) = cue.audio_path.as_ref() {
+                                    match std::fs::File::open(path) {
+                                        Ok(file) => {
+                                            match Decoder::new(std::io::BufReader::new(file)) {
+                                                Ok(source) => {
+                                                    let source = source
+                                                        .delay(Duration::from_secs_f64(delay_secs));
+                                                    sink.append(source);
+                                                }
+                                                Err(e) => log_debug(&format!(
+                                                    "Subtitle: failed to decode audio chunk: {}",
+                                                    e
+                                                )),
+                                            }
+                                            let desired_delta =
+                                                SUBTITLE_START_GUARD_SECS + seek_guard_extra;
+                                            let error = delta_from_start - desired_delta;
+                                            auto_offset_secs = (auto_offset_secs
+                                                - error * SUBTITLE_AUTO_OFFSET_SMOOTH)
+                                                .clamp(
+                                                    -SUBTITLE_AUTO_OFFSET_MAX_SECS,
+                                                    SUBTITLE_AUTO_OFFSET_MAX_SECS,
+                                                );
+                                            seek_guard_extra = 0.0;
+                                        }
+                                        Err(e) => {
+                                            log_debug(&format!(
+                                                "Subtitle: failed to open chunk: {}",
+                                                e
+                                            ));
+                                        }
                                     }
                                 }
                             }

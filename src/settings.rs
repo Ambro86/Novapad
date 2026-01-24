@@ -201,6 +201,8 @@ pub struct AppSettings {
     pub audiobook_split_text_requires_newline: bool,
     #[serde(default)]
     pub subtitle_read_mode: SubtitleReadMode,
+    #[serde(default)]
+    pub subtitle_offset_ms: i32,
     pub podcast_include_microphone: bool,
     pub podcast_microphone_device_id: String,
     pub podcast_microphone_gain: f32,
@@ -318,6 +320,7 @@ impl Default for AppSettings {
             audiobook_split_text: String::new(),
             audiobook_split_text_requires_newline: true,
             subtitle_read_mode: SubtitleReadMode::Off,
+            subtitle_offset_ms: 60,
             podcast_include_microphone: true,
             podcast_microphone_device_id: PODCAST_DEVICE_DEFAULT.to_string(),
             podcast_microphone_gain: 1.5,

@@ -2654,7 +2654,7 @@ pub unsafe fn create_edit(
             LPARAM((ENM_CHANGE | ENM_SELCHANGE) as isize),
         );
         // Install subclass for smart quotes
-        let proc_ptr = edit_subclass_proc as usize;
+        let proc_ptr = edit_subclass_proc as *const () as usize;
         let prev = SetWindowLongPtrW(hwnd_edit, GWLP_WNDPROC, proc_ptr as isize);
         SetWindowLongPtrW(hwnd_edit, GWLP_USERDATA, prev);
     }

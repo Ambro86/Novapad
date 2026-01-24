@@ -328,7 +328,7 @@ unsafe extern "system" fn wiktionary_wndproc(
             (*init_ptr).output = output;
             (*init_ptr).search = search;
             (*init_ptr).close = close;
-            let proc_ptr = tab_subclass_proc as usize;
+            let proc_ptr = tab_subclass_proc as *const () as usize;
             for control in [input, search, output, close] {
                 let prev = SetWindowLongPtrW(
                     control,

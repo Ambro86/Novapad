@@ -2,12 +2,37 @@
 
 Version 0.6.2 – 2026-01-24
 New features
+• Added file execution support (Shift+F5). Users can select an interpreter (e.g., python) in Options, and pressing F5 runs the current script. HTML files open in the browser.
+• Added support for Google Docs pointer files (.gdoc, .gsheet, .gslides), which automatically open in the default browser.
+• Added support for M4B audiobook format (Apple/AAC).
 • Added "Go to Line" feature (Edit menu or Ctrl+J) to quickly jump to a specific line number.
+• Added context menu options to order RSS feeds and podcasts (alphabetically or by date).
+• Added Vietnamese default RSS feeds.
+• Added a microphone test box in the recording dialog to check levels before starting.
+• Added "Show description" for podcast episodes in the context menu.
+• Added support for extended audio/video formats via FFmpeg: mkv, avi, mov, m4v, webm, mpg, ts, wmv, flv, vob, 3gp, flac, ogg, wma, aiff.
+• Added synchronized subtitle reading support (srt, vtt, ass, sub, sbv, lrc, smi) with NVDA or selected voice.
+• Added file associations for all new supported audio/video formats in the "Open with Novapad" context menu.
 Improvements
-• Refactored the audio player to exclusively use WASAPI for better stability and synchronization, removing legacy rodio fallbacks.
-• Optimized FFmpeg integration: DLLs are now loaded from local vcpkg installations or CI artifacts when available, ensuring cleaner builds and deployments.
-• Updated project build configuration to automatically detect local FFmpeg paths, fixing build warnings.
-• Codebase cleanup and clippy fixes for improved code quality.
+• Opening an audio/video file from Explorer now opens the player view directly instead of the text editor.
+• Removed the OCR prompt for inaccessible PDFs; OCR is now performed automatically to improve speed and user experience.
+• Improved Accessible Terminal: NVDA reading now remembers the last read line for better continuity.
+• SAPI 4: Audiobook creation is now fully parallelized and nearly instant. Added a prompt to choose the number of concurrent processes.
+• SAPI 4: Eliminated the WAV-to-MP3 bottleneck by converting chunks in parallel during synthesis.
+• SAPI 4: Improved error handling and automatic cleanup of temporary files.
+• Find dialog: Renamed "Regex" to "Regular expression" for clarity and fixed a critical bug preventing some words from being found.
+• M4B Audiobooks: Better output handling; splitting by parts/markers now produces a single M4B file with proper metadata chapters.
+• Player: Fixed bookmark and time announcement precision when playback speed is not 1.0x.
+• Restored Ctrl+Tab and Ctrl+Shift+Tab navigation in Options.
+• Added an option in the Playback menu to instantly reset speed to Normal (1.0x).
+• Updated all dependencies to the latest versions for better performance and stability.
+• Integrated FFmpeg with dynamic DLL loading to ensure compatibility without blocking startup.
+• Updated podcast download filters to include new audio/video formats.
+• Prevented Ctrl+S from saving audio/video files to avoid corruption.
+Fixes
+• Fixed a bug where the changelog did not open on startup.
+• Fixed a bug where the OCR prompt did not appear for inaccessible PDFs opened from Explorer.
+• Fixed a startup bug that could cause loss of focus or window closure immediately after opening.
 
 Version 0.6.1 – 2026-01-20
 Fixes

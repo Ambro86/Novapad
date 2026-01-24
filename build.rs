@@ -57,9 +57,19 @@ fn main() {
 }
 
 fn generate_ffmpeg_bindings() {
-    let ffmpeg_dir = match std::env::var("FFMPEG_DIR") {
-        Ok(dir) => dir,
-        Err(_) => {
+    let ffmpeg_dir = std::env::var("FFMPEG_DIR").ok().or_else(|| {
+        let local_path =
+            std::path::Path::new(r"C:\rustnotepad\rustnotepad\vcpkg_installed\x64-windows");
+        if local_path.exists() {
+            Some(local_path.to_string_lossy().to_string())
+        } else {
+            None
+        }
+    });
+
+    let ffmpeg_dir = match ffmpeg_dir {
+        Some(dir) => dir,
+        None => {
             println!("cargo:warning=FFMPEG_DIR not set; skipping FFmpeg bindings.");
             return;
         }

@@ -3305,32 +3305,21 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                         let body = i18n::tr(language, "goto_line.prompt_body");
                         if let Some(res) = app_windows::prompt_window::prompt_user(
                             hwnd, &title, &body, "", language,
-                        ) {
-                            if let Ok(line) = res.trim().parse::<usize>() {
-                                if line > 0 {
-                                    let line_idx = line - 1;
-                                    let char_idx = SendMessageW(
-                                        hwnd_edit,
-                                        EM_LINEINDEX,
-                                        WPARAM(line_idx),
-                                        LPARAM(0),
-                                    )
+                        ) && let Ok(line) = res.trim().parse::<usize>()
+                            && line > 0
+                        {
+                            let line_idx = line - 1;
+                            let char_idx =
+                                SendMessageW(hwnd_edit, EM_LINEINDEX, WPARAM(line_idx), LPARAM(0))
                                     .0;
-                                    if char_idx != -1 {
-                                        SendMessageW(
-                                            hwnd_edit,
-                                            EM_SETSEL,
-                                            WPARAM(char_idx as usize),
-                                            LPARAM(char_idx as isize),
-                                        );
-                                        SendMessageW(
-                                            hwnd_edit,
-                                            EM_SCROLLCARET,
-                                            WPARAM(0),
-                                            LPARAM(0),
-                                        );
-                                    }
-                                }
+                            if char_idx != -1 {
+                                SendMessageW(
+                                    hwnd_edit,
+                                    EM_SETSEL,
+                                    WPARAM(char_idx as usize),
+                                    LPARAM(char_idx as isize),
+                                );
+                                SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
                             }
                         }
                     }

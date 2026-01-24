@@ -153,6 +153,7 @@ fn load_ffmpeg_api() -> Result<FfmpegApi, String> {
         "avcodec-62.dll",
         "avformat-62.dll",
         "swscale-9.dll",
+        "opus.dll",
     ];
 
     let mut libs = Vec::new();
@@ -171,17 +172,6 @@ fn load_ffmpeg_api() -> Result<FfmpegApi, String> {
             return Err(format!("FFmpeg: missing DLL {}", path.display()));
         }
 
-        let lib = unsafe { Library::load_with_flags(&path, flags) }
-            .map_err(|e| format!("FFmpeg: failed to load {}: {}", path.display(), e))?;
-        libs.push(lib);
-    }
-
-    let other_dlls = ["opus.dll"];
-    for dll in other_dlls {
-        let path = deps_dir.join(dll);
-        if !path.exists() {
-            return Err(format!("FFmpeg: missing DLL {}", path.display()));
-        }
         let lib = unsafe { Library::load_with_flags(&path, flags) }
             .map_err(|e| format!("FFmpeg: failed to load {}: {}", path.display(), e))?;
         libs.push(lib);

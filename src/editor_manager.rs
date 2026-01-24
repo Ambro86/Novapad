@@ -2692,8 +2692,13 @@ pub unsafe fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> 
         if state.docs.is_empty() || index >= state.docs.len() {
             return None;
         }
-        // Prevent saving audio files (MP3, etc.) which would corrupt them
+        // Prevent saving audio/video files which would corrupt them
         if matches!(state.docs[index].format, FileFormat::Audiobook) {
+            return None;
+        }
+        if let Some(path) = state.docs[index].path.as_ref()
+            && crate::file_handler::is_audio_path(path)
+        {
             return None;
         }
         let language = state.settings.language;
@@ -2745,6 +2750,9 @@ pub unsafe fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> 
                 }
             }
         };
+        if crate::file_handler::is_audio_path(&path) {
+            return None;
+        }
 
         let is_pdf = crate::file_handler::is_pdf_path(&path);
         let is_docx = crate::file_handler::is_docx_path(&path);

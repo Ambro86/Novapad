@@ -153,6 +153,23 @@ pub enum PodcastFormat {
     Wav,
 }
 
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum SubtitleReadMode {
+    #[serde(rename = "off")]
+    #[default]
+    Off,
+    #[serde(rename = "nvda")]
+    Nvda,
+    #[serde(rename = "user")]
+    User,
+    #[serde(rename = "sapi5")]
+    Sapi5,
+    #[serde(rename = "sapi4")]
+    Sapi4,
+    #[serde(rename = "edge")]
+    Edge,
+}
+
 pub const PODCAST_DEVICE_DEFAULT: &str = "default";
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -180,6 +197,8 @@ pub struct AppSettings {
     pub audiobook_split_by_text: bool,
     pub audiobook_split_text: String,
     pub audiobook_split_text_requires_newline: bool,
+    #[serde(default)]
+    pub subtitle_read_mode: SubtitleReadMode,
     pub podcast_include_microphone: bool,
     pub podcast_microphone_device_id: String,
     pub podcast_microphone_gain: f32,
@@ -295,6 +314,7 @@ impl Default for AppSettings {
             audiobook_split_by_text: false,
             audiobook_split_text: String::new(),
             audiobook_split_text_requires_newline: true,
+            subtitle_read_mode: SubtitleReadMode::Off,
             podcast_include_microphone: true,
             podcast_microphone_device_id: PODCAST_DEVICE_DEFAULT.to_string(),
             podcast_microphone_gain: 1.5,
@@ -683,9 +703,10 @@ pub fn save_settings_with_default_copy(settings: AppSettings, _keep_default_copy
 }
 
 const CONTEXT_MENU_EXTENSIONS: &[&str] = &[
-    "txt", "md", "pdf", "epub", "mp3", "m4a", "mp4", "aac", "doc", "docx", "xls", "xlsx", "rtf",
-    "htm", "html", "ppt", "pptx", "py", "java", "js", "rb", "pl", "php", "lua", "ps1", "sh",
-    "gdoc", "gsheet", "gslides",
+    "txt", "md", "pdf", "epub", "mp3", "m4a", "mp4", "aac", "mkv", "avi", "mov", "m4v", "webm",
+    "mpg", "mpeg", "ts", "m2ts", "mts", "wmv", "asf", "flv", "vob", "3gp", "flac", "ogg", "opus",
+    "wma", "aiff", "m4b", "doc", "docx", "xls", "xlsx", "rtf", "htm", "html", "ppt", "pptx", "py",
+    "java", "js", "rb", "pl", "php", "lua", "ps1", "sh", "gdoc", "gsheet", "gslides",
 ];
 
 pub fn register_application_capabilities() {

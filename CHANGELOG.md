@@ -1,5 +1,14 @@
 # Changelog
 
+Version 0.6.2 – 2026-01-24
+New features
+• Added "Go to Line" feature (Edit menu or Ctrl+J) to quickly jump to a specific line number.
+Improvements
+• Refactored the audio player to exclusively use WASAPI for better stability and synchronization, removing legacy rodio fallbacks.
+• Optimized FFmpeg integration: DLLs are now loaded from local vcpkg installations or CI artifacts when available, ensuring cleaner builds and deployments.
+• Updated project build configuration to automatically detect local FFmpeg paths, fixing build warnings.
+• Codebase cleanup and clippy fixes for improved code quality.
+
 Version 0.6.1 – 2026-01-20
 Fixes
 • Fixed a bug where enabling “Show voices in the editor” caused podcast playback to stop.

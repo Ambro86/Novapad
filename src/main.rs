@@ -131,6 +131,7 @@ const EM_CHARFROMPOS: u32 = 0x00D7;
 const EM_LINEFROMCHAR: u32 = 0x00C9;
 const EM_LINEINDEX: u32 = 0x00BB;
 const EM_LINELENGTH: u32 = 0x00C1;
+const EM_SETSEL: u32 = 0x00B1;
 
 use crate::app_windows::find_in_files_window::FindInFilesCache;
 use crate::podcast::chapters::Chapter;
@@ -3295,6 +3296,46 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     search::open_replace_dialog(hwnd);
                     LRESULT(0)
                 }
+                IDM_EDIT_GO_TO_LINE => {
+                    log_debug("Menu: Go to Line");
+                    if let Some(hwnd_edit) = get_active_edit(hwnd) {
+                        let language =
+                            with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+                        let title = i18n::tr(language, "goto_line.prompt_title");
+                        let body = i18n::tr(language, "goto_line.prompt_body");
+                        if let Some(res) = app_windows::prompt_window::prompt_user(
+                            hwnd, &title, &body, "", language,
+                        ) {
+                            if let Ok(line) = res.trim().parse::<usize>() {
+                                if line > 0 {
+                                    let line_idx = line - 1;
+                                    let char_idx = SendMessageW(
+                                        hwnd_edit,
+                                        EM_LINEINDEX,
+                                        WPARAM(line_idx),
+                                        LPARAM(0),
+                                    )
+                                    .0;
+                                    if char_idx != -1 {
+                                        SendMessageW(
+                                            hwnd_edit,
+                                            EM_SETSEL,
+                                            WPARAM(char_idx as usize),
+                                            LPARAM(char_idx as isize),
+                                        );
+                                        SendMessageW(
+                                            hwnd_edit,
+                                            EM_SCROLLCARET,
+                                            WPARAM(0),
+                                            LPARAM(0),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    LRESULT(0)
+                }
                 IDM_EDIT_PREV_SPELLING_ERROR => {
                     log_debug("Menu: Previous spelling error");
                     go_to_spelling_error(hwnd, false);
@@ -6347,6 +6388,11 @@ unsafe fn create_accelerators() -> HACCEL {
             fVirt: virt,
             key: 'H' as u16,
             cmd: IDM_EDIT_REPLACE as u16,
+        },
+        ACCEL {
+            fVirt: virt,
+            key: 'J' as u16,
+            cmd: IDM_EDIT_GO_TO_LINE as u16,
         },
         ACCEL {
             fVirt: virt,

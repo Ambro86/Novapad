@@ -192,6 +192,7 @@
   "options.label.audio_split": "Dividi l'audiolibro in:",
   "options.label.audio_split_text": "Testo per divisione:",
   "options.label.audio_split_requires_newline": "Il testo deve iniziare a capo",
+  "options.label.subtitle_ducking": "Ducking sottotitoli",
   "options.label.subtitle_mode": "Lettura sottotitoli:",
   "options.label.subtitle_offset": "Offset sottotitoli (ms):",
   "options.label.audio_wasapi": "Usa output WASAPI (beta)",

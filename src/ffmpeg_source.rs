@@ -25,6 +25,21 @@ type AvformatOpenInput = unsafe extern "C" fn(
 type AvformatFindStreamInfo =
     unsafe extern "C" fn(*mut AVFormatContext, *mut *mut AVDictionary) -> libc::c_int;
 type AvformatCloseInput = unsafe extern "C" fn(*mut *mut AVFormatContext);
+type AvformatAllocOutputContext2 = unsafe extern "C" fn(
+    *mut *mut AVFormatContext,
+    *mut AVOutputFormat,
+    *const libc::c_char,
+    *const libc::c_char,
+) -> libc::c_int;
+type AvformatNewStream =
+    unsafe extern "C" fn(*mut AVFormatContext, *const AVCodec) -> *mut AVStream;
+type AvformatWriteHeader =
+    unsafe extern "C" fn(*mut AVFormatContext, *mut *mut AVDictionary) -> libc::c_int;
+type AvWriteTrailer = unsafe extern "C" fn(*mut AVFormatContext) -> libc::c_int;
+type AvformatFreeContext = unsafe extern "C" fn(*mut AVFormatContext);
+type AvInterleavedWriteFrame =
+    unsafe extern "C" fn(*mut AVFormatContext, *mut AVPacket) -> libc::c_int;
+type AvPacketRescaleTs = unsafe extern "C" fn(*mut AVPacket, AVRational, AVRational);
 type AvformatSeekFile = unsafe extern "C" fn(
     *mut AVFormatContext,
     libc::c_int,
@@ -43,9 +58,14 @@ type AvFindBestStream = unsafe extern "C" fn(
     libc::c_int,
 ) -> libc::c_int;
 type AvcodecFindDecoder = unsafe extern "C" fn(codec_id: AVCodecID) -> *const AVCodec;
+type AvcodecFindEncoder = unsafe extern "C" fn(codec_id: AVCodecID) -> *const AVCodec;
 type AvcodecAllocContext3 = unsafe extern "C" fn(*const AVCodec) -> *mut AVCodecContext;
 type AvcodecParametersToContext =
     unsafe extern "C" fn(*mut AVCodecContext, *const AVCodecParameters) -> libc::c_int;
+type AvcodecParametersFromContext =
+    unsafe extern "C" fn(*mut AVCodecParameters, *const AVCodecContext) -> libc::c_int;
+type AvcodecParametersCopy =
+    unsafe extern "C" fn(*mut AVCodecParameters, *const AVCodecParameters) -> libc::c_int;
 type AvcodecOpen2 = unsafe extern "C" fn(
     *mut AVCodecContext,
     *const AVCodec,
@@ -54,6 +74,8 @@ type AvcodecOpen2 = unsafe extern "C" fn(
 type AvcodecSendPacket = unsafe extern "C" fn(*mut AVCodecContext, *const AVPacket) -> libc::c_int;
 type AvcodecReceiveFrame = unsafe extern "C" fn(*mut AVCodecContext, *mut AVFrame) -> libc::c_int;
 type AvcodecFlushBuffers = unsafe extern "C" fn(*mut AVCodecContext);
+type AvcodecSendFrame = unsafe extern "C" fn(*mut AVCodecContext, *const AVFrame) -> libc::c_int;
+type AvcodecReceivePacket = unsafe extern "C" fn(*mut AVCodecContext, *mut AVPacket) -> libc::c_int;
 type AvcodecFreeContext = unsafe extern "C" fn(*mut *mut AVCodecContext);
 type AvPacketAlloc = unsafe extern "C" fn() -> *mut AVPacket;
 type AvPacketFree = unsafe extern "C" fn(*mut *mut AVPacket);
@@ -61,6 +83,8 @@ type AvPacketUnref = unsafe extern "C" fn(*mut AVPacket);
 type AvFrameAlloc = unsafe extern "C" fn() -> *mut AVFrame;
 type AvFrameFree = unsafe extern "C" fn(*mut *mut AVFrame);
 type AvFrameUnref = unsafe extern "C" fn(*mut AVFrame);
+type AvFrameGetBuffer = unsafe extern "C" fn(*mut AVFrame, libc::c_int) -> libc::c_int;
+type AvFrameMakeWritable = unsafe extern "C" fn(*mut AVFrame) -> libc::c_int;
 type AvStrerror = unsafe extern "C" fn(libc::c_int, *mut libc::c_char, libc::size_t) -> libc::c_int;
 type AvutilVersion = unsafe extern "C" fn() -> libc::c_uint;
 type SwrAllocSetOpts2 = unsafe extern "C" fn(
@@ -90,42 +114,61 @@ type AvChannelLayoutCopy =
     unsafe extern "C" fn(*mut AVChannelLayout, *const AVChannelLayout) -> libc::c_int;
 type AvChannelLayoutDefault = unsafe extern "C" fn(*mut AVChannelLayout, libc::c_int);
 type AvChannelLayoutUninit = unsafe extern "C" fn(*mut AVChannelLayout);
+type AvioOpen =
+    unsafe extern "C" fn(*mut *mut AVIOContext, *const libc::c_char, libc::c_int) -> libc::c_int;
+type AvioClosep = unsafe extern "C" fn(*mut *mut AVIOContext) -> libc::c_int;
 
-struct FfmpegApi {
+pub(crate) struct FfmpegApi {
     _libs: Vec<Library>,
-    avformat_network_init: AvformatNetworkInit,
-    avformat_open_input: AvformatOpenInput,
-    avformat_find_stream_info: AvformatFindStreamInfo,
-    avformat_close_input: AvformatCloseInput,
-    avformat_seek_file: AvformatSeekFile,
-    av_read_frame: AvReadFrame,
-    av_find_best_stream: AvFindBestStream,
-    avcodec_find_decoder: AvcodecFindDecoder,
-    avcodec_alloc_context3: AvcodecAllocContext3,
-    avcodec_parameters_to_context: AvcodecParametersToContext,
-    avcodec_open2: AvcodecOpen2,
-    avcodec_send_packet: AvcodecSendPacket,
-    avcodec_receive_frame: AvcodecReceiveFrame,
-    avcodec_flush_buffers: AvcodecFlushBuffers,
-    avcodec_free_context: AvcodecFreeContext,
-    av_packet_alloc: AvPacketAlloc,
-    av_packet_free: AvPacketFree,
-    av_packet_unref: AvPacketUnref,
-    av_frame_alloc: AvFrameAlloc,
-    av_frame_free: AvFrameFree,
-    av_frame_unref: AvFrameUnref,
-    av_strerror: AvStrerror,
-    avutil_version: AvutilVersion,
-    swr_alloc_set_opts2: SwrAllocSetOpts2,
-    swr_init: SwrInit,
-    swr_close: SwrClose,
-    swr_free: SwrFree,
-    swr_convert: SwrConvert,
-    swr_get_out_samples: SwrGetOutSamples,
-    av_channel_layout_check: AvChannelLayoutCheck,
-    av_channel_layout_copy: AvChannelLayoutCopy,
-    av_channel_layout_default: AvChannelLayoutDefault,
-    av_channel_layout_uninit: AvChannelLayoutUninit,
+    pub(crate) avformat_network_init: AvformatNetworkInit,
+    pub(crate) avformat_open_input: AvformatOpenInput,
+    pub(crate) avformat_find_stream_info: AvformatFindStreamInfo,
+    pub(crate) avformat_close_input: AvformatCloseInput,
+    pub(crate) avformat_alloc_output_context2: AvformatAllocOutputContext2,
+    pub(crate) avformat_new_stream: AvformatNewStream,
+    pub(crate) avformat_write_header: AvformatWriteHeader,
+    pub(crate) av_write_trailer: AvWriteTrailer,
+    pub(crate) avformat_free_context: AvformatFreeContext,
+    pub(crate) av_interleaved_write_frame: AvInterleavedWriteFrame,
+    pub(crate) av_packet_rescale_ts: AvPacketRescaleTs,
+    pub(crate) avformat_seek_file: AvformatSeekFile,
+    pub(crate) av_read_frame: AvReadFrame,
+    pub(crate) av_find_best_stream: AvFindBestStream,
+    pub(crate) avcodec_find_decoder: AvcodecFindDecoder,
+    pub(crate) avcodec_find_encoder: AvcodecFindEncoder,
+    pub(crate) avcodec_alloc_context3: AvcodecAllocContext3,
+    pub(crate) avcodec_parameters_to_context: AvcodecParametersToContext,
+    pub(crate) avcodec_parameters_from_context: AvcodecParametersFromContext,
+    pub(crate) avcodec_parameters_copy: AvcodecParametersCopy,
+    pub(crate) avcodec_open2: AvcodecOpen2,
+    pub(crate) avcodec_send_packet: AvcodecSendPacket,
+    pub(crate) avcodec_receive_frame: AvcodecReceiveFrame,
+    pub(crate) avcodec_flush_buffers: AvcodecFlushBuffers,
+    pub(crate) avcodec_send_frame: AvcodecSendFrame,
+    pub(crate) avcodec_receive_packet: AvcodecReceivePacket,
+    pub(crate) avcodec_free_context: AvcodecFreeContext,
+    pub(crate) av_packet_alloc: AvPacketAlloc,
+    pub(crate) av_packet_free: AvPacketFree,
+    pub(crate) av_packet_unref: AvPacketUnref,
+    pub(crate) av_frame_alloc: AvFrameAlloc,
+    pub(crate) av_frame_free: AvFrameFree,
+    pub(crate) av_frame_unref: AvFrameUnref,
+    pub(crate) av_frame_get_buffer: AvFrameGetBuffer,
+    pub(crate) av_frame_make_writable: AvFrameMakeWritable,
+    pub(crate) av_strerror: AvStrerror,
+    pub(crate) avutil_version: AvutilVersion,
+    pub(crate) swr_alloc_set_opts2: SwrAllocSetOpts2,
+    pub(crate) swr_init: SwrInit,
+    pub(crate) swr_close: SwrClose,
+    pub(crate) swr_free: SwrFree,
+    pub(crate) swr_convert: SwrConvert,
+    pub(crate) swr_get_out_samples: SwrGetOutSamples,
+    pub(crate) av_channel_layout_check: AvChannelLayoutCheck,
+    pub(crate) av_channel_layout_copy: AvChannelLayoutCopy,
+    pub(crate) av_channel_layout_default: AvChannelLayoutDefault,
+    pub(crate) av_channel_layout_uninit: AvChannelLayoutUninit,
+    pub(crate) avio_open: AvioOpen,
+    pub(crate) avio_closep: AvioClosep,
 }
 
 fn load_symbol<T: Copy>(lib: &Library, name: &[u8]) -> Result<T, String> {
@@ -191,16 +234,29 @@ fn load_ffmpeg_api() -> Result<FfmpegApi, String> {
     let avformat_open_input = load_symbol(avformat, b"avformat_open_input\0")?;
     let avformat_find_stream_info = load_symbol(avformat, b"avformat_find_stream_info\0")?;
     let avformat_close_input = load_symbol(avformat, b"avformat_close_input\0")?;
+    let avformat_alloc_output_context2 =
+        load_symbol(avformat, b"avformat_alloc_output_context2\0")?;
+    let avformat_new_stream = load_symbol(avformat, b"avformat_new_stream\0")?;
+    let avformat_write_header = load_symbol(avformat, b"avformat_write_header\0")?;
+    let av_write_trailer = load_symbol(avformat, b"av_write_trailer\0")?;
+    let avformat_free_context = load_symbol(avformat, b"avformat_free_context\0")?;
+    let av_interleaved_write_frame = load_symbol(avformat, b"av_interleaved_write_frame\0")?;
     let avformat_seek_file = load_symbol(avformat, b"avformat_seek_file\0")?;
     let av_read_frame = load_symbol(avformat, b"av_read_frame\0")?;
     let av_find_best_stream = load_symbol(avformat, b"av_find_best_stream\0")?;
     let avcodec_find_decoder = load_symbol(avcodec, b"avcodec_find_decoder\0")?;
+    let avcodec_find_encoder = load_symbol(avcodec, b"avcodec_find_encoder\0")?;
     let avcodec_alloc_context3 = load_symbol(avcodec, b"avcodec_alloc_context3\0")?;
     let avcodec_parameters_to_context = load_symbol(avcodec, b"avcodec_parameters_to_context\0")?;
+    let avcodec_parameters_from_context =
+        load_symbol(avcodec, b"avcodec_parameters_from_context\0")?;
+    let avcodec_parameters_copy = load_symbol(avcodec, b"avcodec_parameters_copy\0")?;
     let avcodec_open2 = load_symbol(avcodec, b"avcodec_open2\0")?;
     let avcodec_send_packet = load_symbol(avcodec, b"avcodec_send_packet\0")?;
     let avcodec_receive_frame = load_symbol(avcodec, b"avcodec_receive_frame\0")?;
     let avcodec_flush_buffers = load_symbol(avcodec, b"avcodec_flush_buffers\0")?;
+    let avcodec_send_frame = load_symbol(avcodec, b"avcodec_send_frame\0")?;
+    let avcodec_receive_packet = load_symbol(avcodec, b"avcodec_receive_packet\0")?;
     let avcodec_free_context = load_symbol(avcodec, b"avcodec_free_context\0")?;
     let av_packet_alloc = load_symbol(avcodec, b"av_packet_alloc\0")?;
     let av_packet_free = load_symbol(avcodec, b"av_packet_free\0")?;
@@ -208,6 +264,11 @@ fn load_ffmpeg_api() -> Result<FfmpegApi, String> {
     let av_frame_alloc = load_symbol(avutil, b"av_frame_alloc\0")?;
     let av_frame_free = load_symbol(avutil, b"av_frame_free\0")?;
     let av_frame_unref = load_symbol(avutil, b"av_frame_unref\0")?;
+    let av_frame_get_buffer = load_symbol(avutil, b"av_frame_get_buffer\0")?;
+    let av_frame_make_writable = load_symbol(avutil, b"av_frame_make_writable\0")?;
+    let av_packet_rescale_ts = load_symbol(avcodec, b"av_packet_rescale_ts\0")?;
+    let avio_open = load_symbol(avformat, b"avio_open\0")?;
+    let avio_closep = load_symbol(avformat, b"avio_closep\0")?;
     let av_strerror = load_symbol(avutil, b"av_strerror\0")?;
     let avutil_version = load_symbol(avutil, b"avutil_version\0")?;
     let swr_alloc_set_opts2 = load_symbol(swresample, b"swr_alloc_set_opts2\0")?;
@@ -227,16 +288,28 @@ fn load_ffmpeg_api() -> Result<FfmpegApi, String> {
         avformat_open_input,
         avformat_find_stream_info,
         avformat_close_input,
+        avformat_alloc_output_context2,
+        avformat_new_stream,
+        avformat_write_header,
+        av_write_trailer,
+        avformat_free_context,
+        av_interleaved_write_frame,
+        av_packet_rescale_ts,
         avformat_seek_file,
         av_read_frame,
         av_find_best_stream,
         avcodec_find_decoder,
+        avcodec_find_encoder,
         avcodec_alloc_context3,
         avcodec_parameters_to_context,
+        avcodec_parameters_from_context,
+        avcodec_parameters_copy,
         avcodec_open2,
         avcodec_send_packet,
         avcodec_receive_frame,
         avcodec_flush_buffers,
+        avcodec_send_frame,
+        avcodec_receive_packet,
         avcodec_free_context,
         av_packet_alloc,
         av_packet_free,
@@ -244,6 +317,8 @@ fn load_ffmpeg_api() -> Result<FfmpegApi, String> {
         av_frame_alloc,
         av_frame_free,
         av_frame_unref,
+        av_frame_get_buffer,
+        av_frame_make_writable,
         av_strerror,
         avutil_version,
         swr_alloc_set_opts2,
@@ -256,12 +331,14 @@ fn load_ffmpeg_api() -> Result<FfmpegApi, String> {
         av_channel_layout_copy,
         av_channel_layout_default,
         av_channel_layout_uninit,
+        avio_open,
+        avio_closep,
     })
 }
 
 static FFMPEG_API: OnceLock<Result<FfmpegApi, String>> = OnceLock::new();
 
-fn ffmpeg_api() -> Result<&'static FfmpegApi, String> {
+pub(crate) fn ffmpeg_api() -> Result<&'static FfmpegApi, String> {
     let res = FFMPEG_API.get_or_init(load_ffmpeg_api);
     res.as_ref().map_err(|e| e.clone())
 }

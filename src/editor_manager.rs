@@ -3006,6 +3006,9 @@ pub unsafe fn try_close_app(hwnd: HWND) -> bool {
     }
     crate::audio_player::stop_audiobook_playback(hwnd);
     crate::clear_active_podcast_chapters(hwnd);
+    if let Err(e) = crate::ffmpeg_export::cleanup_tts_artifacts() {
+        crate::log_debug(&e);
+    }
     crate::log_if_err!(DestroyWindow(hwnd));
     true
 }

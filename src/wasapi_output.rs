@@ -2,6 +2,7 @@ use crate::com_guard::ComGuard;
 use crate::log_debug;
 use rodio::Source;
 use rodio::source::UniformSourceIterator;
+use std::collections::VecDeque;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::mpsc;
@@ -24,16 +25,6 @@ const WAVE_FORMAT_IEEE_FLOAT: u16 = 0x0003;
 const WAVE_FORMAT_EXTENSIBLE: u16 = 0xFFFE;
 const KSDATAFORMAT_SUBTYPE_PCM: GUID = GUID::from_u128(0x00000001_0000_0010_8000_00AA00389B71);
 
-/// Clock references for subtitle synchronization.
-pub type ClockRefs = (
-    Arc<AtomicU64>,
-    Arc<AtomicU64>,
-    Arc<AtomicU64>,
-    Arc<AtomicU64>,
-    Arc<AtomicU64>,
-    Arc<AtomicBool>,
-);
-
 #[derive(Clone, Copy, Debug)]
 enum WasapiSampleFormat {
     Pcm16,
@@ -46,10 +37,23 @@ enum MixFormat {
     Extensible(WAVEFORMATEXTENSIBLE),
 }
 
+/// A subtitle audio chunk scheduled at an exact sample position.
+#[derive(Clone)]
+pub struct ScheduledSubtitle {
+    /// PCM samples (interleaved f32, must match device sample rate and channels)
+    pub samples: Arc<[f32]>,
+    /// Target playback time in seconds (absolute position in media)
+    pub target_secs: f64,
+    /// Volume multiplier for this subtitle (0.0 to 1.0)
+    pub volume: f32,
+}
+
 enum WasapiCommand {
     Play,
     Pause,
     Stop,
+    ScheduleSubtitle(ScheduledSubtitle),
+    ClearSubtitles,
 }
 
 struct HandleGuard(HANDLE);
@@ -72,8 +76,11 @@ pub struct WasapiOutput {
     latency_micros: Arc<AtomicU64>,
     padding_frames: Arc<AtomicU32>,
     sample_rate_hz: Arc<AtomicU32>,
+    device_channels: Arc<AtomicU32>,
     volume_bits: Arc<AtomicU32>,
     stopped: Arc<AtomicBool>,
+    /// Paused state, shared with the thread for potential future use.
+    #[allow(dead_code)]
     paused: Arc<AtomicBool>,
 }
 
@@ -93,6 +100,7 @@ impl WasapiOutput {
         let latency_micros = Arc::new(AtomicU64::new(0));
         let padding_frames = Arc::new(AtomicU32::new(0));
         let sample_rate_hz = Arc::new(AtomicU32::new(0));
+        let device_channels = Arc::new(AtomicU32::new(0));
         let volume_bits = Arc::new(AtomicU32::new(volume.to_bits()));
         let stopped = Arc::new(AtomicBool::new(false));
         let paused = Arc::new(AtomicBool::new(start_paused));
@@ -104,6 +112,7 @@ impl WasapiOutput {
         let latency_micros_thread = latency_micros.clone();
         let padding_frames_thread = padding_frames.clone();
         let sample_rate_hz_thread = sample_rate_hz.clone();
+        let device_channels_thread = device_channels.clone();
         let volume_bits_thread = volume_bits.clone();
         let stopped_thread = stopped.clone();
         let paused_thread = paused.clone();
@@ -235,6 +244,7 @@ impl WasapiOutput {
             let channels = format_ref.nChannels;
             let sample_rate = format_ref.nSamplesPerSec;
             sample_rate_hz_thread.store(sample_rate, Ordering::Relaxed);
+            device_channels_thread.store(channels as u32, Ordering::Relaxed);
             let bytes_per_sample = match sample_format {
                 WasapiSampleFormat::Pcm16 => 2usize,
                 WasapiSampleFormat::Float32 => 4usize,
@@ -276,6 +286,20 @@ impl WasapiOutput {
                 return;
             }
 
+            // Subtitle mixing state
+            struct ActiveSubtitle {
+                samples: Arc<[f32]>,
+                read_offset: usize,
+                volume: f32,
+            }
+            let mut pending_subtitles: VecDeque<ScheduledSubtitle> = VecDeque::new();
+            let mut active_subtitle: Option<ActiveSubtitle> = None;
+            // Track position for subtitle timing
+            // We track samples written to the buffer, which represents when the audio
+            // will actually be heard (accounting for buffer latency)
+            let base_samples: u64 = (base_secs * sample_rate as f64 * channels as f64) as u64;
+            let mut samples_written_since_start: u64 = 0;
+
             loop {
                 while let Ok(cmd) = rx.try_recv() {
                     match cmd {
@@ -305,6 +329,13 @@ impl WasapiOutput {
                                 log_debug(&format!("WASAPI: Stop failed: {}", e));
                             }
                             return;
+                        }
+                        WasapiCommand::ScheduleSubtitle(sub) => {
+                            pending_subtitles.push_back(sub);
+                        }
+                        WasapiCommand::ClearSubtitles => {
+                            pending_subtitles.clear();
+                            active_subtitle = None;
                         }
                     }
                 }
@@ -355,22 +386,75 @@ impl WasapiOutput {
                 let volume = f32::from_bits(volume_bits_thread.load(Ordering::Relaxed));
                 let sample_count = available as usize * channels as usize;
 
+                // Helper to get subtitle sample for current position
+                // `written_in_buffer` is samples written so far in this buffer fill
+                let get_subtitle_sample = |sample_idx: usize,
+                                           pending: &mut VecDeque<ScheduledSubtitle>,
+                                           active: &mut Option<ActiveSubtitle>,
+                                           base: u64,
+                                           written_since_start: u64|
+                 -> f32 {
+                    // Current absolute sample position (when this sample will be heard)
+                    // = base position + samples written since start + current index in buffer
+                    let current_sample = base + written_since_start + sample_idx as u64;
+
+                    // Check if we should start a pending subtitle
+                    if active.is_none()
+                        && let Some(sub) = pending.front()
+                    {
+                        let target_sample =
+                            (sub.target_secs * sample_rate as f64 * channels as f64) as u64;
+                        if current_sample >= target_sample {
+                            // Time to start this subtitle
+                            let sub = pending.pop_front().unwrap();
+                            *active = Some(ActiveSubtitle {
+                                samples: sub.samples,
+                                read_offset: 0,
+                                volume: sub.volume,
+                            });
+                        }
+                        // Otherwise wait until the target time
+                    }
+
+                    // Mix active subtitle if any
+                    if let Some(sub) = active {
+                        if sub.read_offset < sub.samples.len() {
+                            let s = sub.samples[sub.read_offset] * sub.volume;
+                            sub.read_offset += 1;
+                            return s;
+                        } else {
+                            // Subtitle finished
+                            *active = None;
+                        }
+                    }
+                    0.0
+                };
+
                 unsafe {
                     let byte_len = sample_count * bytes_per_sample;
                     let out = std::slice::from_raw_parts_mut(buf_ptr, byte_len);
                     match sample_format {
                         WasapiSampleFormat::Pcm16 => {
                             let mut offset = 0usize;
-                            for _ in 0..sample_count {
-                                let sample = match source.next() {
+                            for i in 0..sample_count {
+                                let audio_sample = match source.next() {
                                     Some(v) => v,
                                     None => {
                                         finished = true;
                                         0.0
                                     }
                                 };
-                                let scaled = (sample * volume).clamp(-1.0, 1.0);
-                                let val = (scaled * i16::MAX as f32) as i16;
+                                let subtitle_sample = get_subtitle_sample(
+                                    i,
+                                    &mut pending_subtitles,
+                                    &mut active_subtitle,
+                                    base_samples,
+                                    samples_written_since_start,
+                                );
+                                // Mix audio + subtitle
+                                let mixed =
+                                    (audio_sample * volume + subtitle_sample).clamp(-1.0, 1.0);
+                                let val = (mixed * i16::MAX as f32) as i16;
                                 let bytes = val.to_le_bytes();
                                 out[offset] = bytes[0];
                                 out[offset + 1] = bytes[1];
@@ -379,22 +463,33 @@ impl WasapiOutput {
                         }
                         WasapiSampleFormat::Float32 => {
                             let mut offset = 0usize;
-                            for _ in 0..sample_count {
-                                let sample = match source.next() {
+                            for i in 0..sample_count {
+                                let audio_sample = match source.next() {
                                     Some(v) => v,
                                     None => {
                                         finished = true;
                                         0.0
                                     }
                                 };
-                                let scaled = sample * volume;
-                                let bytes = scaled.to_le_bytes();
+                                let subtitle_sample = get_subtitle_sample(
+                                    i,
+                                    &mut pending_subtitles,
+                                    &mut active_subtitle,
+                                    base_samples,
+                                    samples_written_since_start,
+                                );
+                                // Mix audio + subtitle
+                                let mixed = audio_sample * volume + subtitle_sample;
+                                let bytes = mixed.to_le_bytes();
                                 out[offset..offset + 4].copy_from_slice(&bytes);
                                 offset += 4;
                             }
                         }
                     }
                 }
+
+                // Update sample counter
+                samples_written_since_start += sample_count as u64;
 
                 if let Err(e) = unsafe { render.ReleaseBuffer(available, 0) } {
                     log_debug(&format!("WASAPI: ReleaseBuffer failed: {}", e));
@@ -421,6 +516,7 @@ impl WasapiOutput {
             latency_micros,
             padding_frames,
             sample_rate_hz,
+            device_channels,
             volume_bits,
             stopped,
             paused,
@@ -447,6 +543,31 @@ impl WasapiOutput {
 
     pub fn set_volume(&self, volume: f32) {
         self.volume_bits.store(volume.to_bits(), Ordering::Relaxed);
+    }
+
+    /// Schedule a subtitle to be mixed at an exact time.
+    /// The subtitle audio will be mixed with the main audio at sample-accurate timing.
+    pub fn schedule_subtitle(&self, subtitle: ScheduledSubtitle) {
+        if let Err(e) = self.tx.send(WasapiCommand::ScheduleSubtitle(subtitle)) {
+            log_debug(&format!("WASAPI: schedule_subtitle failed: {}", e));
+        }
+    }
+
+    /// Clear all pending and active subtitles (e.g., on seek).
+    pub fn clear_subtitles(&self) {
+        if let Err(e) = self.tx.send(WasapiCommand::ClearSubtitles) {
+            log_debug(&format!("WASAPI: clear_subtitles failed: {}", e));
+        }
+    }
+
+    /// Get the device sample rate (for resampling subtitle audio).
+    pub fn device_sample_rate(&self) -> u32 {
+        self.sample_rate_hz.load(Ordering::Relaxed)
+    }
+
+    /// Get the device channel count (for resampling subtitle audio).
+    pub fn device_channels(&self) -> u32 {
+        self.device_channels.load(Ordering::Relaxed)
     }
 
     pub fn position_secs(&self) -> Option<f64> {
@@ -481,6 +602,7 @@ impl WasapiOutput {
         micros as f64 / 1_000_000.0
     }
 
+    #[allow(dead_code)]
     pub fn padding_secs(&self) -> f64 {
         let sample_rate = self.sample_rate_hz.load(Ordering::Relaxed);
         let padding = self.padding_frames.load(Ordering::Relaxed);
@@ -491,20 +613,9 @@ impl WasapiOutput {
         }
     }
 
+    #[allow(dead_code)]
     pub fn sample_rate_hz(&self) -> u32 {
         self.sample_rate_hz.load(Ordering::Relaxed)
-    }
-
-    /// Get clock references for subtitle synchronization.
-    pub fn clock_refs(&self) -> ClockRefs {
-        (
-            self.position_units.clone(),
-            self.clock_freq.clone(),
-            self.base_micros.clone(),
-            self.last_qpc.clone(),
-            self.qpc_freq.clone(),
-            self.paused.clone(),
-        )
     }
 }
 

@@ -3,12 +3,10 @@ use crate::ffmpeg_source::FfmpegSource;
 use crate::i18n;
 use crate::log_debug;
 use crate::settings::{FileFormat, SubtitleReadMode, confirm_title, settings_dir};
-use crate::subtitle_wasapi::{
-    MainAudioClock, ScheduledChunk, SubtitleWasapiOutput, decode_mp3_to_pcm, resample_pcm,
-};
+use crate::subtitle_wasapi::{decode_mp3_to_pcm, resample_pcm};
 use crate::subtitles::{SubtitlePcmData, find_subtitle_for_media, load_subtitles};
 use crate::tts_engine;
-use crate::wasapi_output::WasapiOutput;
+use crate::wasapi_output::{ScheduledSubtitle, WasapiOutput};
 use crate::with_state;
 use libloading::Library;
 use rodio::{Decoder, Source};
@@ -1393,18 +1391,10 @@ struct SubtitlePlaybackState {
     paused: bool,
     position_secs: f64,
     session_id: u64,
-    wasapi_latency_secs: Option<f64>,
-    wasapi_padding_secs: Option<f64>,
-    wasapi_sample_rate_hz: Option<u32>,
 }
 
 static SUBTITLE_EDGE_CONFIRMED: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
-const SUBTITLE_AUDIO_LATENCY_SECS: f64 = 0.28;
-const SUBTITLE_START_GUARD_SECS: f64 = 0.03;
 const SUBTITLE_PRELOAD_MAX_BYTES: usize = 64 * 1024 * 1024;
-const SUBTITLE_SEEK_GUARD_SECS: f64 = 0.12;
-
-const SUBTITLE_PRE_SCHEDULE_SECS: f64 = 0.3;
 
 fn audiobook_position_secs(player: &AudiobookPlayer) -> f64 {
     if let Some(pos) = player.output.position_secs() {
@@ -1430,32 +1420,21 @@ fn subtitle_playback_state(hwnd: HWND, path: &Path) -> Option<SubtitlePlaybackSt
                 paused: player.is_paused,
                 position_secs: audiobook_position_secs(player),
                 session_id: player.session_id,
-                wasapi_latency_secs: Some(player.output.latency_secs()),
-                wasapi_padding_secs: Some(player.output.padding_secs()),
-                wasapi_sample_rate_hz: Some(player.output.sample_rate_hz()),
             })
         })
         .flatten()
     }
 }
 
-fn get_main_audio_clock(hwnd: HWND, path: &Path) -> Option<Arc<MainAudioClock>> {
+/// Get the main audio output for subtitle mixing.
+fn get_main_wasapi_output(hwnd: HWND, path: &Path) -> Option<Arc<WasapiOutput>> {
     unsafe {
         with_state(hwnd, |state| {
             let player = state.active_audiobook.as_ref()?;
             if player.path.as_path() != path {
                 return None;
             }
-            let (position_units, clock_freq, base_micros, last_qpc, qpc_freq, paused) =
-                player.output.clock_refs();
-            Some(Arc::new(MainAudioClock::new(
-                position_units,
-                clock_freq,
-                base_micros,
-                last_qpc,
-                qpc_freq,
-                paused,
-            )))
+            Some(player.output.clone())
         })
         .flatten()
     }
@@ -1652,8 +1631,6 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                 last.end.as_secs_f64()
             ));
         }
-
-        let mut subtitle_wasapi: Option<Arc<SubtitleWasapiOutput>> = None;
 
         let mut paused_for_download = subtitle_hold_state(hwnd, &media_path).unwrap_or(false);
         if effective_mode == SubtitleReadMode::User
@@ -1869,45 +1846,6 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                 return;
             }
 
-            // Try to get WASAPI clock for synchronized playback
-            let main_clock = get_main_audio_clock(hwnd, &media_path);
-            subtitle_wasapi = if let Some(ref clock) = main_clock {
-                // Wait for WASAPI to be ready
-                let mut attempts = 0;
-                while clock.position_secs().is_none() && attempts < 50 {
-                    std::thread::sleep(Duration::from_millis(10));
-                    attempts += 1;
-                }
-                match SubtitleWasapiOutput::start(clock.clone(), 1.0) {
-                    Ok(output) => {
-                        // Wait for device to initialize
-                        let mut init_attempts = 0;
-                        while !output.is_ready() && init_attempts < 50 {
-                            std::thread::sleep(Duration::from_millis(10));
-                            init_attempts += 1;
-                        }
-                        if output.is_ready() {
-                            log_debug(&format!(
-                                "SubtitleWASAPI: ready (device {}ch @ {} Hz)",
-                                output.device_channels(),
-                                output.device_sample_rate()
-                            ));
-                            Some(output)
-                        } else {
-                            log_debug("SubtitleWASAPI: device init timeout, skipping");
-                            None
-                        }
-                    }
-                    Err(e) => {
-                        log_debug(&format!("SubtitleWASAPI: start failed: {}, skipping", e));
-                        None
-                    }
-                }
-            } else {
-                log_debug("Subtitle: no WASAPI clock available, skipping");
-                None
-            };
-
             if paused_for_download
                 && let Some(held) = subtitle_hold_state(hwnd, &media_path)
                 && held
@@ -1921,26 +1859,40 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
             }
         }
 
-        let offset_secs = settings.subtitle_offset_ms as f64 / 1000.0;
-        let edge_tts = effective_mode == SubtitleReadMode::User
-            && settings.tts_engine == crate::settings::TtsEngine::Edge;
-        let auto_offset_secs: f64 = 0.0;
-        let (mut index, mut last_position, mut last_paused) = if let Some(state) =
-            subtitle_playback_state(hwnd, &media_path)
-        {
-            let raw_pos = state.position_secs;
-            let effective_offset = offset_secs + auto_offset_secs;
-            let adjusted_pos = (raw_pos - SUBTITLE_AUDIO_LATENCY_SECS - effective_offset).max(0.0);
-            let index = cues
-                .iter()
-                .position(|cue| cue.end.as_secs_f64() >= adjusted_pos)
-                .unwrap_or(cues.len());
-            let last_paused = state.paused;
-            (index, adjusted_pos, last_paused)
+        // Get the main WASAPI output for sample-accurate subtitle mixing
+        let main_output = get_main_wasapi_output(hwnd, &media_path);
+        if let Some(ref output) = main_output {
+            // Wait for WASAPI to be ready
+            let mut attempts = 0;
+            while output.device_sample_rate() == 0 && attempts < 50 {
+                std::thread::sleep(Duration::from_millis(10));
+                attempts += 1;
+            }
+            if output.device_sample_rate() > 0 {
+                log_debug(&format!(
+                    "Subtitle: main WASAPI ready ({}ch @ {} Hz)",
+                    output.device_channels(),
+                    output.device_sample_rate()
+                ));
+            } else {
+                log_debug("Subtitle: main WASAPI not ready, subtitle mixing disabled");
+            }
         } else {
-            return;
-        };
-        let mut seek_guard_extra = 0.0;
+            log_debug("Subtitle: no main WASAPI output available");
+        }
+
+        let offset_secs = settings.subtitle_offset_ms as f64 / 1000.0;
+        let (mut index, mut last_position, mut last_paused) =
+            if let Some(state) = subtitle_playback_state(hwnd, &media_path) {
+                let raw_pos = state.position_secs;
+                let index = cues
+                    .iter()
+                    .position(|cue| cue.end.as_secs_f64() >= raw_pos)
+                    .unwrap_or(cues.len());
+                (index, raw_pos, state.paused)
+            } else {
+                return;
+            };
 
         loop {
             if cancel.load(Ordering::Relaxed) {
@@ -1953,18 +1905,6 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
             if state.session_id != session_id {
                 break;
             }
-            let wasapi_latency = state
-                .wasapi_latency_secs
-                .map(|v| format!("{:.3}", v))
-                .unwrap_or_else(|| "n/a".to_string());
-            let wasapi_padding = state
-                .wasapi_padding_secs
-                .map(|v| format!("{:.3}", v))
-                .unwrap_or_else(|| "n/a".to_string());
-            let wasapi_sr = state
-                .wasapi_sample_rate_hz
-                .map(|v| v.to_string())
-                .unwrap_or_else(|| "n/a".to_string());
 
             if state.paused {
                 last_paused = true;
@@ -1975,46 +1915,42 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
             }
 
             let mut raw_pos = state.position_secs;
-            let effective_offset = offset_secs + auto_offset_secs;
-            let mut adjusted_pos =
-                (raw_pos - SUBTITLE_AUDIO_LATENCY_SECS - effective_offset).max(0.0);
-            let seek_delta = adjusted_pos - last_position;
-            if seek_delta.abs() > 0.5 {
+            let seek_delta = raw_pos - last_position;
+            if seek_delta.abs() > 1.0 {
                 log_debug(&format!(
                     "SubtitleSync: seek detected at {:.3}s (prev {:.3}s) for {}",
-                    adjusted_pos,
+                    raw_pos,
                     last_position,
                     media_path.display()
                 ));
-                if let Some(pos) = cues
-                    .iter()
-                    .position(|cue| cue.end.as_secs_f64() >= adjusted_pos)
-                {
+                if let Some(pos) = cues.iter().position(|cue| cue.end.as_secs_f64() >= raw_pos) {
                     index = pos;
                 } else {
                     index = cues.len();
                 }
                 // Clear pending audio on seek
-                if let Some(ref wasapi_out) = subtitle_wasapi {
-                    wasapi_out.clear();
+                if let Some(ref output) = main_output {
+                    output.clear_subtitles();
                 }
-                seek_guard_extra = SUBTITLE_SEEK_GUARD_SECS;
             }
-            last_position = adjusted_pos;
+            last_position = raw_pos;
 
             while index < cues.len() {
                 let cue = cues[index].clone();
                 let cue_start = cue.start.as_secs_f64();
-                let cue_end = cue.end.as_secs_f64();
-                let target = cue_start + SUBTITLE_START_GUARD_SECS + seek_guard_extra;
-                let schedule_ready = adjusted_pos >= target
-                    || (edge_tts && adjusted_pos + SUBTITLE_PRE_SCHEDULE_SECS >= target);
+
+                // Simple unified timing for all backends:
+                // Schedule/speak when we're within 0.5 second of cue start
+                // Target is exactly cue_start (+ user offset)
+                let target = cue_start + offset_secs;
+                let schedule_ready = raw_pos + 0.5 >= target;
+
                 if !schedule_ready {
                     break;
                 }
-                let mut waited_ms = 0.0;
-                if edge_tts && adjusted_pos < target {
-                    let start_wait = std::time::Instant::now();
+
+                // Wait until we reach the target time
+                if raw_pos < target {
                     loop {
                         if cancel.load(Ordering::Relaxed) {
                             return;
@@ -2030,46 +1966,27 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                             continue;
                         }
                         raw_pos = wait_state.position_secs;
-                        adjusted_pos =
-                            (raw_pos - SUBTITLE_AUDIO_LATENCY_SECS - effective_offset).max(0.0);
-                        if adjusted_pos >= target {
+                        if raw_pos >= target {
                             break;
                         }
-                        let remaining = target - adjusted_pos;
+                        let remaining = target - raw_pos;
                         if remaining > 0.02 {
-                            std::thread::sleep(Duration::from_millis(10));
+                            std::thread::sleep(Duration::from_millis(5));
                         } else {
                             std::hint::spin_loop();
                         }
                     }
-                    waited_ms = start_wait.elapsed().as_secs_f64() * 1000.0;
                 }
-                let delta_from_start = adjusted_pos - cue_start;
+
+                let delta_from_start = raw_pos - cue_start;
                 let mut preview = cue.text.replace('\n', " ");
                 if preview.len() > 80 {
                     preview.truncate(80);
                     preview.push_str("...");
                 }
                 log_debug(&format!(
-                    "SubtitleSync: speak idx={} start={:.3}s end={:.3}s raw={:.3}s adj={:.3}s target={:.3}s delta={:.3}s guard={:.3}s seek_guard={:.3}s audio_lat={:.3}s offset={:.3}s auto_offset={:.3}s wait_ms={:.1} wasapi_lat={}s wasapi_pad={}s wasapi_sr={} speed={:.2} text='{}'",
-                    index,
-                    cue_start,
-                    cue_end,
-                    raw_pos,
-                    adjusted_pos,
-                    target,
-                    delta_from_start,
-                    SUBTITLE_START_GUARD_SECS,
-                    seek_guard_extra,
-                    SUBTITLE_AUDIO_LATENCY_SECS,
-                    offset_secs,
-                    auto_offset_secs,
-                    waited_ms,
-                    wasapi_latency,
-                    wasapi_padding,
-                    wasapi_sr,
-                    settings.audiobook_playback_speed,
-                    preview
+                    "SubtitleSync: idx={} start={:.3}s raw={:.3}s delta={:.3}s offset={:.3}s text='{}'",
+                    index, cue_start, raw_pos, delta_from_start, offset_secs, preview
                 ));
                 match effective_mode {
                     SubtitleReadMode::Off => {}
@@ -2083,13 +2000,14 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                     | SubtitleReadMode::Sapi4
                     | SubtitleReadMode::Edge => match settings.tts_engine {
                         crate::settings::TtsEngine::Edge => {
-                            // Use synchronized WASAPI output if available
-                            if let Some(ref wasapi_out) = subtitle_wasapi
+                            // Use synchronized WASAPI output for sample-accurate mixing
+                            if let Some(ref output) = main_output
                                 && let Some(ref pcm) = cue.pcm_data
+                                && output.device_sample_rate() > 0
                             {
                                 // Resample to device format if needed
-                                let device_rate = wasapi_out.device_sample_rate();
-                                let device_ch = wasapi_out.device_channels() as u16;
+                                let device_rate = output.device_sample_rate();
+                                let device_ch = output.device_channels() as u16;
                                 let samples = if pcm.sample_rate != device_rate
                                     || pcm.channels != device_ch
                                 {
@@ -2103,13 +2021,15 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                                 } else {
                                     pcm.samples.clone()
                                 };
-                                // Schedule at exact target time
-                                let chunk = ScheduledChunk {
+                                // Schedule at exact target time (sample-accurate)
+                                // Apply user offset: positive offset = subtitle later, negative = earlier
+                                let target_secs = (cue_start + offset_secs).max(0.0);
+                                let subtitle = ScheduledSubtitle {
                                     samples,
-                                    target_secs: cue_start,
+                                    target_secs,
+                                    volume: settings.tts_volume as f32 / 100.0,
                                 };
-                                wasapi_out.schedule(chunk);
-                                seek_guard_extra = 0.0;
+                                output.schedule_subtitle(subtitle);
                             }
                         }
                         crate::settings::TtsEngine::Sapi5 => {
@@ -2157,9 +2077,9 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
             std::thread::sleep(Duration::from_millis(10));
         }
 
-        // Cleanup
-        if let Some(ref wasapi_out) = subtitle_wasapi {
-            wasapi_out.stop();
+        // Cleanup: clear any pending subtitles
+        if let Some(ref output) = main_output {
+            output.clear_subtitles();
         }
     });
 }

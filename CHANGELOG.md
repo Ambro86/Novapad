@@ -5,6 +5,7 @@ New features
 • Added file execution support (Shift+F5). Users can select an interpreter (e.g., python) in Options, and pressing F5 runs the current script. HTML files open in the browser.
 • Added support for Google Docs pointer files (.gdoc, .gsheet, .gslides), which automatically open in the default browser.
 • Added support for M4B audiobook format (Apple/AAC).
+• Added "Show episodes" option in podcast search results context menu to browse and play episodes without subscribing.
 • Added "Go to Line" feature (Edit menu or Ctrl+J) to quickly jump to a specific line number.
 • Added context menu options to order RSS feeds and podcasts (alphabetically or by date).
 • Added Vietnamese default RSS feeds.

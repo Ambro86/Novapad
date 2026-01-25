@@ -63,11 +63,39 @@ jobs:
     - name: Tests
       run: cargo test --all
 
-    - name: Install NSIS
-      run: choco install nsis
-
-    - name: Install WiX Toolset
-      run: choco install wixtoolset
+    - name: Install NSIS and WiX with Retry
+      shell: powershell
+      run: |
+        function Install-WithRetry {
+            param([string]$package)
+            $maxRetries = 5
+            $retryCount = 0
+            $completed = $false
+            
+            while (-not $completed) {
+                try {
+                    Write-Host "Attempting to install $package (Attempt $($retryCount + 1)/$maxRetries)..."
+                    choco install $package -y --no-progress
+                    if ($LASTEXITCODE -eq 0) {
+                        $completed = $true
+                        Write-Host "Successfully installed $package"
+                    } else {
+                        throw "Exit code $LASTEXITCODE"
+                    }
+                } catch {
+                    $retryCount++
+                    Write-Error "Failed to install $package. Error: $_"
+                    if ($retryCount -ge $maxRetries) {
+                        throw "Failed to install $package after $maxRetries attempts."
+                    }
+                    Write-Host "Waiting 10 seconds before retrying..."
+                    Start-Sleep -Seconds 10
+                }
+            }
+        }
+        
+        Install-WithRetry "nsis"
+        Install-WithRetry "wixtoolset"
 
     - name: Cache cargo-packager
       id: cache-cargo-packager

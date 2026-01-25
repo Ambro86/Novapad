@@ -629,6 +629,7 @@
   "podcasts.context.view_description": "View Description",
   "podcasts.description_title": "Episode Description",
   "podcasts.context.subscribe": "Subscribe",
+  "podcasts.context.show_episodes": "Show episodes",
   "podcasts.context.info": "Info",
   "podcasts.subscribed_title": "Subscription complete",
   "podcasts.subscribed_message": "You have successfully subscribed to the podcast.",

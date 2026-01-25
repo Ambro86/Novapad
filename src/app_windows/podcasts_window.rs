@@ -105,6 +105,7 @@ const ID_CTX_VIEW_DESCRIPTION: usize = 13106;
 const ID_CTX_SUBSCRIBE: usize = 13201;
 const ID_CTX_SEARCH_INFO: usize = 13202;
 const ID_CTX_SEARCH_COPY_URL: usize = 13203;
+const ID_CTX_SEARCH_SHOW_EPISODES: usize = 13204;
 const PODCAST_ADD_COPYDATA: usize = 0x504F4443;
 
 #[derive(Clone)]
@@ -143,11 +144,13 @@ struct PodcastWindowState {
     reorder_dialog: HWND,
     last_selected: isize,
     pending_play: Option<String>,
+    preview_sources: Vec<crate::tools::rss::RssSource>,
 }
 
 #[derive(Clone)]
 enum NodeData {
     Source(usize),
+    PreviewSource(usize),
     Episode(Box<PodcastEpisode>),
 }
 
@@ -417,7 +420,7 @@ struct AddDialogInit {
 
 struct FetchResult {
     hitem: isize,
-    source_index: usize,
+    node: NodeData,
     result: Result<rss::PodcastFetchOutcome, rss::FeedFetchError>,
 }
 
@@ -649,6 +652,14 @@ unsafe fn selected_source_index(hwnd: HWND) -> Option<usize> {
     .flatten()
 }
 
+unsafe fn selected_node_data(hwnd: HWND) -> Option<NodeData> {
+    let hitem = selected_tree_item(hwnd);
+    if hitem.0 == 0 {
+        return None;
+    }
+    with_podcast_state(hwnd, |s| s.node_data.get(&hitem.0).cloned()).flatten()
+}
+
 unsafe fn selected_source_name(hwnd: HWND) -> Option<String> {
     let index = selected_source_index(hwnd)?;
     let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
@@ -700,7 +711,7 @@ fn episode_key(item: &PodcastEpisode) -> String {
     item.title.trim().to_string()
 }
 
-unsafe fn load_episode_children(hwnd: HWND, hitem: HTREEITEM, source_index: usize, force: bool) {
+unsafe fn load_episode_children(hwnd: HWND, hitem: HTREEITEM, node: NodeData, force: bool) {
     let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     if hwnd_tree.0 == 0 {
         return;
@@ -712,13 +723,20 @@ unsafe fn load_episode_children(hwnd: HWND, hitem: HTREEITEM, source_index: usiz
             .get(&hitem.0)
             .map(|state| state.items.is_empty())
             .unwrap_or(true);
-        let (url, cache) = with_state(parent, |ps| {
-            ps.settings
-                .podcast_sources
-                .get(source_index)
-                .map(|src| (src.url.clone(), src.cache.clone()))
-        })
-        .unwrap_or(None)
+        let (url, cache) = match node {
+            NodeData::Source(idx) => with_state(parent, |ps| {
+                ps.settings
+                    .podcast_sources
+                    .get(idx)
+                    .map(|src| (src.url.clone(), src.cache.clone()))
+            })
+            .flatten(),
+            NodeData::PreviewSource(idx) => s
+                .preview_sources
+                .get(idx)
+                .map(|src| (src.url.clone(), src.cache.clone())),
+            _ => None,
+        }
         .unwrap_or((String::new(), rss::RssFeedCache::default()));
         (parent, url, cache, empty_items)
     })
@@ -799,6 +817,7 @@ unsafe fn load_episode_children(hwnd: HWND, hitem: HTREEITEM, source_index: usiz
     SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(hitem.0));
 
     let hwnd_copy = hwnd;
+    let node_copy = node.clone();
     std::thread::spawn(move || {
         let rt = match tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -818,7 +837,7 @@ unsafe fn load_episode_children(hwnd: HWND, hitem: HTREEITEM, source_index: usiz
         ));
         let msg = Box::new(FetchResult {
             hitem: hitem.0,
-            source_index,
+            node: node_copy,
             result: res,
         });
         if let Err(_e) = PostMessageW(
@@ -1714,7 +1733,7 @@ unsafe fn subscribe_selected_result(hwnd: HWND) {
                     WPARAM(TVGN_CARET as usize),
                     LPARAM(hitem.0),
                 );
-                load_episode_children(hwnd, hitem, index, false);
+                load_episode_children(hwnd, hitem, NodeData::Source(index), false);
             }
         }
     }
@@ -2077,6 +2096,55 @@ unsafe fn show_search_result_info(hwnd: HWND) {
     );
 }
 
+unsafe fn show_selected_result_episodes(hwnd: HWND) {
+    let (_parent, result) = with_podcast_state(hwnd, |s| {
+        let idx = SendMessageW(s.hwnd_results, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
+        if idx >= 0 && (idx as usize) < s.search_results.len() {
+            (s.parent, Some(s.search_results[idx as usize].clone()))
+        } else {
+            (s.parent, None)
+        }
+    })
+    .unwrap_or((HWND(0), None));
+
+    if let Some(res) = result {
+        let preview_idx = with_podcast_state(hwnd, |s| {
+            s.preview_sources.push(crate::tools::rss::RssSource {
+                title: format!("{} [Preview]", res.title),
+                url: res.feed_url.clone(),
+                kind: crate::tools::rss::RssSourceType::Feed,
+                user_title: true,
+                unread: false,
+                cache: crate::tools::rss::RssFeedCache::default(),
+                last_seen_guid: None,
+                last_updated: None,
+            });
+            s.preview_sources.len() - 1
+        })
+        .unwrap_or(0);
+
+        let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+        if hwnd_tree.0 != 0 {
+            let title = format!("{} [Preview]", res.title);
+            let hitem = create_tree_item(hwnd_tree, &title, preview_idx);
+            if hitem.0 != 0 {
+                with_podcast_state(hwnd, |s| {
+                    s.node_data
+                        .insert(hitem.0, NodeData::PreviewSource(preview_idx));
+                });
+                SendMessageW(
+                    hwnd_tree,
+                    TVM_SELECTITEM,
+                    WPARAM(TVGN_CARET as usize),
+                    LPARAM(hitem.0),
+                );
+                SetFocus(hwnd_tree);
+                load_episode_children(hwnd, hitem, NodeData::PreviewSource(preview_idx), false);
+            }
+        }
+    }
+}
+
 unsafe fn show_search_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
     let hwnd_results = with_podcast_state(hwnd, |s| s.hwnd_results).unwrap_or(HWND(0));
     if hwnd_results.0 == 0 {
@@ -2091,6 +2159,7 @@ unsafe fn show_search_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: boo
     }
     let language = with_podcast_state(hwnd, |s| s.language).unwrap_or_default();
     let label = i18n::tr(language, "podcasts.context.subscribe");
+    let show_episodes_label = i18n::tr(language, "podcasts.context.show_episodes");
     let info_label = i18n::tr(language, "podcasts.context.info");
     let copy_label = i18n::tr(language, "podcasts.context.copy_url");
     let menu = CreateMenu().unwrap_or(HMENU(0));
@@ -2099,6 +2168,12 @@ unsafe fn show_search_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: boo
         MF_STRING,
         ID_CTX_SUBSCRIBE,
         PCWSTR(to_wide(&label).as_ptr()),
+    ) {}
+    if let Err(_e) = AppendMenuW(
+        menu,
+        MF_STRING,
+        ID_CTX_SEARCH_SHOW_EPISODES,
+        PCWSTR(to_wide(&show_episodes_label).as_ptr()),
     ) {}
     if let Err(_e) = AppendMenuW(
         menu,
@@ -2124,6 +2199,7 @@ unsafe fn show_search_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: boo
     .0 as usize;
     match cmd {
         ID_CTX_SUBSCRIBE => subscribe_selected_result(hwnd),
+        ID_CTX_SEARCH_SHOW_EPISODES => show_selected_result_episodes(hwnd),
         ID_CTX_SEARCH_INFO => show_search_result_info(hwnd),
         ID_CTX_SEARCH_COPY_URL => {
             if let Some(result) = selected_search_result(hwnd) {
@@ -2282,7 +2358,38 @@ unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool)
                 PCWSTR(to_wide(&open_feed).as_ptr()),
             ) {}
         }
-        Some(NodeData::Episode(_)) => {
+        Some(NodeData::PreviewSource(_)) => {
+            let update_label = i18n::tr(language, "podcasts.context.update");
+            let remove_label = i18n::tr(language, "podcasts.context.remove");
+            let copy_url = i18n::tr(language, "podcasts.context.copy_url");
+            let open_feed = i18n::tr(language, "podcasts.context.open_feed");
+            if let Err(_e) = AppendMenuW(
+                menu,
+                MF_STRING,
+                ID_CTX_UPDATE,
+                PCWSTR(to_wide(&update_label).as_ptr()),
+            ) {}
+            if let Err(_e) = AppendMenuW(
+                menu,
+                MF_STRING,
+                ID_CTX_REMOVE,
+                PCWSTR(to_wide(&remove_label).as_ptr()),
+            ) {}
+            if let Err(_e) = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()) {}
+            if let Err(_e) = AppendMenuW(
+                menu,
+                MF_STRING,
+                ID_CTX_COPY_URL,
+                PCWSTR(to_wide(&copy_url).as_ptr()),
+            ) {}
+            if let Err(_e) = AppendMenuW(
+                menu,
+                MF_STRING,
+                ID_CTX_OPEN_FEED,
+                PCWSTR(to_wide(&open_feed).as_ptr()),
+            ) {}
+        }
+        Some(NodeData::Episode(_item)) => {
             let play_label = i18n::tr(language, "podcasts.context.play");
             let open_label = i18n::tr(language, "podcasts.context.open_episode");
             let copy_audio = i18n::tr(language, "podcasts.context.copy_audio");
@@ -2389,7 +2496,7 @@ unsafe fn handle_source_action(hwnd: HWND, verb: SourceAction) {
         SourceAction::Update => {
             let hitem = selected_tree_item(hwnd);
             if hitem.0 != 0 {
-                load_episode_children(hwnd, hitem, source_index, true);
+                load_episode_children(hwnd, hitem, NodeData::Source(source_index), true);
                 if parent.0 != 0 {
                     let language = with_state(parent, |s| s.settings.language).unwrap_or_default();
                     announce_status(&i18n::tr(language, "podcasts.updated"));
@@ -3318,11 +3425,12 @@ unsafe extern "system" fn podcast_tree_wndproc(
         if key == VK_RIGHT.0 as u32 {
             let parent = GetParent(hwnd);
             if parent.0 != 0
-                && let Some(idx) = selected_source_index(parent)
+                && let Some(node) = selected_node_data(parent)
+                && matches!(node, NodeData::Source(_) | NodeData::PreviewSource(_))
             {
                 let hitem = selected_tree_item(parent);
                 if hitem.0 != 0 {
-                    load_episode_children(parent, hitem, idx, false);
+                    load_episode_children(parent, hitem, node, false);
                     SendMessageW(
                         hwnd,
                         TVM_EXPAND,
@@ -3376,10 +3484,12 @@ unsafe extern "system" fn podcast_tree_wndproc(
                     open_episode_in_player(parent, main_hwnd, &item);
                     return LRESULT(0);
                 }
-                if let Some(idx) = selected_source_index(parent) {
+                if let Some(node) = selected_node_data(parent)
+                    && matches!(node, NodeData::Source(_) | NodeData::PreviewSource(_))
+                {
                     let hitem = selected_tree_item(parent);
                     if hitem.0 != 0 {
-                        load_episode_children(parent, hitem, idx, false);
+                        load_episode_children(parent, hitem, node, false);
                     }
                     return LRESULT(0);
                 }
@@ -4035,6 +4145,7 @@ unsafe extern "system" fn podcast_wndproc(
                 reorder_dialog: HWND(0),
                 last_selected: 0,
                 pending_play: None,
+                preview_sources: Vec::new(),
             });
             SetWindowLongPtrW(
                 hwnd,
@@ -4079,10 +4190,21 @@ unsafe extern "system" fn podcast_wndproc(
                 if nmhdr.code == TVN_ITEMEXPANDINGW {
                     let info = &*(lparam.0 as *const windows::Win32::UI::Controls::NMTREEVIEWW);
                     let hitem = info.itemNew.hItem;
-                    if let Some(NodeData::Source(idx)) =
+                    if let Some(node) =
                         with_podcast_state(hwnd, |s| s.node_data.get(&hitem.0).cloned()).flatten()
                     {
-                        load_episode_children(hwnd, hitem, idx, false);
+                        match node {
+                            NodeData::Source(idx) => {
+                                load_episode_children(hwnd, hitem, NodeData::Source(idx), false)
+                            }
+                            NodeData::PreviewSource(idx) => load_episode_children(
+                                hwnd,
+                                hitem,
+                                NodeData::PreviewSource(idx),
+                                false,
+                            ),
+                            _ => {}
+                        }
                     }
                 }
                 if nmhdr.code == TVN_SELCHANGEDW {
@@ -4178,27 +4300,37 @@ unsafe extern "system" fn podcast_wndproc(
                     open_episode_in_player(hwnd, parent, &item);
                     return LRESULT(0);
                 }
-                if let Some(idx) = selected_source_index(hwnd) {
-                    let hitem = selected_tree_item(hwnd);
-                    if hitem.0 != 0 {
-                        load_episode_children(hwnd, hitem, idx, false);
+                if let Some(node) = selected_node_data(hwnd) {
+                    match node {
+                        NodeData::Source(_) | NodeData::PreviewSource(_) => {
+                            let hitem = selected_tree_item(hwnd);
+                            if hitem.0 != 0 {
+                                load_episode_children(hwnd, hitem, node, false);
+                            }
+                            return LRESULT(0);
+                        }
+                        _ => {}
                     }
-                    return LRESULT(0);
                 }
             }
             if focus == hwnd_tree
                 && key == VK_RIGHT.0 as u32
-                && let Some(idx) = selected_source_index(hwnd)
+                && let Some(node) = selected_node_data(hwnd)
             {
-                let hitem = selected_tree_item(hwnd);
-                if hitem.0 != 0 {
-                    load_episode_children(hwnd, hitem, idx, false);
-                    SendMessageW(
-                        hwnd_tree,
-                        TVM_EXPAND,
-                        WPARAM(windows::Win32::UI::Controls::TVE_EXPAND.0 as usize),
-                        LPARAM(hitem.0),
-                    );
+                match node {
+                    NodeData::Source(_) | NodeData::PreviewSource(_) => {
+                        let hitem = selected_tree_item(hwnd);
+                        if hitem.0 != 0 {
+                            load_episode_children(hwnd, hitem, node, false);
+                            SendMessageW(
+                                hwnd_tree,
+                                TVM_EXPAND,
+                                WPARAM(windows::Win32::UI::Controls::TVE_EXPAND.0 as usize),
+                                LPARAM(hitem.0),
+                            );
+                        }
+                    }
+                    _ => {}
                 }
                 return LRESULT(0);
             }
@@ -4264,7 +4396,7 @@ unsafe extern "system" fn podcast_wndproc(
                                 WPARAM(TVGN_CARET as usize),
                                 LPARAM(hitem.0),
                             );
-                            load_episode_children(hwnd, hitem, index, false);
+                            load_episode_children(hwnd, hitem, NodeData::Source(index), false);
                         }
                     }
                 } else {
@@ -4298,7 +4430,12 @@ unsafe extern "system" fn podcast_wndproc(
                                     WPARAM(TVGN_CARET as usize),
                                     LPARAM(hitem),
                                 );
-                                load_episode_children(hwnd, HTREEITEM(hitem), idx, true);
+                                load_episode_children(
+                                    hwnd,
+                                    HTREEITEM(hitem),
+                                    NodeData::Source(idx),
+                                    true,
+                                );
                             }
                         }
                     }
@@ -4308,35 +4445,85 @@ unsafe extern "system" fn podcast_wndproc(
             DefWindowProcW(hwnd, msg, wparam, lparam)
         }
         WM_PODCAST_FETCH_COMPLETE => {
-            let ptr = lparam.0 as *mut FetchResult;
-            if ptr.is_null() {
-                return LRESULT(0);
-            }
-            let msg = Box::from_raw(ptr);
+            let msg_ptr = lparam.0 as *mut FetchResult;
+            let msg = Box::from_raw(msg_ptr);
             with_podcast_state(hwnd, |s| {
-                s.pending_fetches.retain(|_, h| *h != msg.hitem);
+                if let Some(src) = match msg.node {
+                    NodeData::Source(idx) => with_state(s.parent, |ps| {
+                        ps.settings.podcast_sources.get(idx).map(|s| s.url.clone())
+                    })
+                    .flatten(),
+                    NodeData::PreviewSource(idx) => {
+                        s.preview_sources.get(idx).map(|s| s.url.clone())
+                    }
+                    _ => None,
+                } {
+                    s.pending_fetches.remove(&src);
+                }
             });
             match msg.result {
                 Ok(outcome) => {
-                    let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-                    if !outcome.title.trim().is_empty() {
-                        update_source_title(
-                            hwnd,
-                            HTREEITEM(msg.hitem),
-                            msg.source_index,
-                            &outcome.title,
-                        );
+                    match msg.node {
+                        NodeData::Source(idx) => {
+                            let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                            if parent.0 != 0 {
+                                update_source_cache(parent, idx, outcome.cache, None);
+                                if !outcome.title.trim().is_empty() {
+                                    update_source_title(
+                                        hwnd,
+                                        HTREEITEM(msg.hitem),
+                                        idx,
+                                        &outcome.title,
+                                    );
+                                }
+                            }
+                        }
+                        NodeData::PreviewSource(idx) => {
+                            let title = outcome.title.clone();
+                            with_podcast_state(hwnd, |s| {
+                                if let Some(src) = s.preview_sources.get_mut(idx) {
+                                    src.cache = outcome.cache;
+                                    if !title.trim().is_empty() {
+                                        src.title = title.clone();
+                                    }
+                                }
+                            });
+                            if !title.trim().is_empty() {
+                                let title_wide = to_wide(&title);
+                                let mut tvi = TVITEMW {
+                                    mask: TVIF_TEXT,
+                                    hItem: HTREEITEM(msg.hitem),
+                                    pszText: windows::core::PWSTR(title_wide.as_ptr() as *mut _),
+                                    ..Default::default()
+                                };
+                                SendMessageW(
+                                    hwnd,
+                                    TVM_SETITEMW,
+                                    WPARAM(0),
+                                    LPARAM(&mut tvi as *mut _ as isize),
+                                );
+                            }
+                        }
+                        _ => {}
                     }
-                    let max_ts = outcome.items.iter().filter_map(|i| i.pub_date).max();
-                    update_source_cache(parent, msg.source_index, outcome.cache, max_ts);
-                    if outcome.not_modified {
-                        apply_episode_results(hwnd, HTREEITEM(msg.hitem), Vec::new());
-                    } else {
-                        apply_episode_results(hwnd, HTREEITEM(msg.hitem), outcome.items);
-                    }
+                    apply_episode_results(hwnd, HTREEITEM(msg.hitem), outcome.items);
                 }
-                Err(err) => {
-                    log_debug(&format!("podcasts_fetch_error {}", err));
+                Err(_e) => {
+                    let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+                    if hwnd_tree.0 != 0 {
+                        let child = HTREEITEM(
+                            SendMessageW(
+                                hwnd_tree,
+                                TVM_GETNEXTITEM,
+                                WPARAM(TVGN_CHILD as usize),
+                                LPARAM(msg.hitem),
+                            )
+                            .0,
+                        );
+                        if child.0 != 0 {
+                            SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
+                        }
+                    }
                 }
             }
             LRESULT(0)

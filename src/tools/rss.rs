@@ -1,5 +1,4 @@
 use crate::log_debug;
-use crate::podcast::chapters::Chapter;
 use crate::tools::reader;
 use feed_rs::parser;
 use reqwest::{self, StatusCode, header};
@@ -83,7 +82,8 @@ pub struct PodcastEpisode {
     pub enclosure_type: Option<String>,
     pub chapters_url: Option<String>,
     pub chapters_type: Option<String>,
-    pub podlove_chapters: Vec<Chapter>,
+    pub podlove_chapters: Vec<crate::podcast::chapters::Chapter>,
+    #[allow(dead_code)]
     pub pub_date: Option<i64>,
 }
 
@@ -159,6 +159,7 @@ pub struct PodcastFetchOutcome {
     pub title: String,
     pub items: Vec<PodcastEpisode>,
     pub cache: RssFeedCache,
+    #[allow(dead_code)]
     pub not_modified: bool,
 }
 

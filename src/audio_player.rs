@@ -4,25 +4,27 @@ use crate::i18n;
 use crate::log_debug;
 use crate::settings::{FileFormat, SubtitleReadMode, confirm_title, settings_dir};
 use crate::subtitle_wasapi::{decode_mp3_to_pcm, resample_pcm};
-use crate::subtitles::{SubtitlePcmData, find_subtitle_for_media, load_subtitles};
+use crate::subtitles::{SubtitleCue, SubtitlePcmData, find_subtitle_for_media, load_subtitles};
 use crate::tts_engine;
 use crate::wasapi_output::{ScheduledSubtitle, WasapiOutput};
 use crate::with_state;
 use libloading::Library;
 use rodio::{Decoder, Source};
 use sha2::Digest;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::ffi::c_void;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::time::Duration;
+use std::time::UNIX_EPOCH;
 use uuid::Uuid;
-use windows::Win32::Foundation::HWND;
+use windows::Win32::Foundation::{CloseHandle, HANDLE, HWND, WAIT_OBJECT_0};
 use windows::Win32::System::Threading::{
-    GetCurrentThread, SetThreadPriority, THREAD_PRIORITY_HIGHEST,
+    CreateWaitableTimerW, GetCurrentThread, SetThreadPriority, SetWaitableTimer,
+    THREAD_PRIORITY_HIGHEST, WaitForSingleObject,
 };
 use windows::Win32::UI::WindowsAndMessaging::{IDYES, MB_ICONQUESTION, MB_YESNO, MessageBoxW};
 use windows::core::PCWSTR;
@@ -595,12 +597,7 @@ fn start_audiobook_at_with_options(
     let effective_paused = options.paused || subtitle_hold;
     let subtitle_cancel = Arc::new(AtomicBool::new(false));
     let subtitle_path = path.clone();
-    let effective_speed =
-        if (options.speed - 1.0).abs() > f32::EPSILON && load_soundtouch_api().is_some() {
-            options.speed
-        } else {
-            1.0
-        };
+    let requested_speed = options.speed;
     let hwnd_main = hwnd;
     std::thread::spawn(move || {
         log_debug(&format!(
@@ -614,7 +611,23 @@ fn start_audiobook_at_with_options(
             .and_then(|e| e.to_str())
             .unwrap_or("")
             .to_lowercase();
+        let subtitle_mode =
+            unsafe { with_state(hwnd_main, |state| state.settings.subtitle_read_mode) }
+                .unwrap_or(SubtitleReadMode::Off);
+        let cached_subtitles = get_or_load_subtitles(&path, subtitle_mode);
+        let subtitles_available = cached_subtitles
+            .as_ref()
+            .map(|entry| !entry.cues.is_empty())
+            .unwrap_or(false);
+        let force_ffmpeg = subtitle_mode != SubtitleReadMode::Off && subtitles_available;
         let use_ffmpeg = true;
+        let effective_speed = if force_ffmpeg {
+            1.0
+        } else if (requested_speed - 1.0).abs() > f32::EPSILON && load_soundtouch_api().is_some() {
+            requested_speed
+        } else {
+            1.0
+        };
         let prefer_streaming = use_ffmpeg;
         log_mkv_probe_once(&path);
 
@@ -655,11 +668,26 @@ fn start_audiobook_at_with_options(
             extension == "m4a" || extension == "mp4" || extension == "aac" || extension == "mp3";
 
         log_debug("Audio player: Creating decoder...");
+        let pts_clock = if force_ffmpeg {
+            Some(Arc::new(AtomicI64::new(
+                (seconds as i64).saturating_mul(1_000_000),
+            )))
+        } else {
+            None
+        };
+
         let source: Box<dyn Source<Item = f32> + Send> = if use_ffmpeg {
             log_debug(&format!("Audio player: Using FFmpeg for {}", extension));
-            match FfmpegSource::try_new(&final_path, seconds) {
+            match FfmpegSource::try_new(&final_path, seconds, pts_clock.clone()) {
                 Ok(src) => Box::new(src),
                 Err(err) => {
+                    if force_ffmpeg {
+                        log_debug(&format!(
+                            "Audio player: FFmpeg required for subtitles, aborting: {}",
+                            err
+                        ));
+                        return;
+                    }
                     log_debug(&format!(
                         "Audio player: FFmpeg failed for {}, falling back to rodio: {}",
                         extension, err
@@ -706,7 +734,7 @@ fn start_audiobook_at_with_options(
                         log_debug(&format!("Audio player: Efficient seek to {}s", seconds));
                         if let Err(e) = mfs.seek(std::time::Duration::from_secs(seconds)) {
                             log_debug(&format!("Audio player: MfSource seek failed: {}", e));
-                            match FfmpegSource::try_new(&final_path, seconds) {
+                            match FfmpegSource::try_new(&final_path, seconds, None) {
                                 Ok(src) => {
                                     log_debug(
                                         "Audio player: Falling back to FFmpeg after MF seek failure.",
@@ -955,8 +983,13 @@ fn start_audiobook_at_with_options(
         log_debug("Audio player: Using WASAPI output.");
         let initial_volume = if options.muted { 0.0 } else { options.volume };
         let base_secs = seconds as f64;
-        let output = match WasapiOutput::start(source, effective_paused, initial_volume, base_secs)
-        {
+        let output = match WasapiOutput::start(
+            source,
+            effective_paused,
+            initial_volume,
+            base_secs,
+            pts_clock.clone(),
+        ) {
             Ok(output) => output,
             Err(err) => {
                 log_debug(&format!("Audio player: WASAPI output failed: {}", err));
@@ -973,6 +1006,11 @@ fn start_audiobook_at_with_options(
             })
             .unwrap_or(0)
         };
+        if force_ffmpeg && (requested_speed - 1.0).abs() > f32::EPSILON {
+            log_debug(
+                "Subtitles active: forcing speed=1.0 (time-stretch disabled) for accurate sync.",
+            );
+        }
 
         let player = AudiobookPlayer {
             path,
@@ -998,7 +1036,7 @@ fn start_audiobook_at_with_options(
                 crate::log_debug("Failed to access audio player state");
             }
         }
-        start_subtitle_reader(hwnd_main, subtitle_path, subtitle_cancel);
+        start_subtitle_reader(hwnd_main, subtitle_path, subtitle_cancel, cached_subtitles);
     });
 }
 
@@ -1251,6 +1289,20 @@ pub unsafe fn change_audiobook_volume(hwnd: HWND, delta: f32) {
 
 pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
     load_soundtouch_api()?;
+    let (path, mode, current_speed) = with_state(hwnd, |state| {
+        state.active_audiobook.as_ref().map(|player| {
+            (
+                player.path.clone(),
+                state.settings.subtitle_read_mode,
+                player.speed,
+            )
+        })
+    })
+    .flatten()?;
+    if mode != SubtitleReadMode::Off && get_or_load_subtitles(&path, mode).is_some() {
+        log_debug("Subtitles active: forcing speed=1.0 (time-stretch disabled) for accurate sync.");
+        return Some(current_speed);
+    }
     let result = with_state(hwnd, |state| {
         if let Some(player) = state.active_audiobook.take() {
             let current = audiobook_position_secs(&player).floor() as u64;
@@ -1393,13 +1445,158 @@ struct SubtitlePlaybackState {
     session_id: u64,
 }
 
+struct WaitableTimer {
+    handle: HANDLE,
+}
+
+impl WaitableTimer {
+    fn new() -> Option<Self> {
+        match unsafe { CreateWaitableTimerW(None, true, None) } {
+            Ok(handle) => {
+                if handle.is_invalid() {
+                    None
+                } else {
+                    Some(Self { handle })
+                }
+            }
+            Err(e) => {
+                log_debug(&format!("Subtitle: CreateWaitableTimerW failed: {}", e));
+                None
+            }
+        }
+    }
+}
+
+impl Drop for WaitableTimer {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = CloseHandle(self.handle);
+        }
+    }
+}
+
+fn sleep_precise(timer: &WaitableTimer, duration: Duration) -> bool {
+    if duration.is_zero() {
+        return true;
+    }
+    let nanos = duration.as_nanos();
+    let mut due = -((nanos / 100) as i64);
+    if due == 0 {
+        due = -1;
+    }
+    if let Err(e) = unsafe { SetWaitableTimer(timer.handle, &due, 0, None, None, false) } {
+        log_debug(&format!("Subtitle: SetWaitableTimer failed: {}", e));
+        return false;
+    }
+    let wait = unsafe { WaitForSingleObject(timer.handle, u32::MAX) };
+    wait == WAIT_OBJECT_0
+}
+
 static SUBTITLE_EDGE_CONFIRMED: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
-const SUBTITLE_PRELOAD_MAX_BYTES: usize = 64 * 1024 * 1024;
+static SUBTITLE_CACHE: OnceLock<Mutex<HashMap<String, SubtitleCacheEntry>>> = OnceLock::new();
+const SUBTITLE_PRELOAD_MAX_BYTES: Option<usize> = None;
+const SUBTITLE_SCHEDULE_AHEAD_SECS: f64 = 10.0;
+
+#[derive(Clone)]
+struct SubtitleCacheEntry {
+    subtitle_path: PathBuf,
+    stamp: (u128, u64),
+    cues: Vec<SubtitleCue>,
+}
+
+fn subtitle_mode_key(mode: SubtitleReadMode) -> &'static str {
+    match mode {
+        SubtitleReadMode::Off => "off",
+        SubtitleReadMode::Nvda => "nvda",
+        SubtitleReadMode::User => "user",
+        SubtitleReadMode::Sapi5 => "sapi5",
+        SubtitleReadMode::Sapi4 => "sapi4",
+        SubtitleReadMode::Edge => "edge",
+    }
+}
+
+fn subtitle_cache_key(media_path: &Path, mode: SubtitleReadMode) -> String {
+    format!(
+        "{}|{}",
+        media_path.to_string_lossy(),
+        subtitle_mode_key(mode)
+    )
+}
+
+fn subtitle_file_stamp(path: &Path) -> Option<(u128, u64)> {
+    let meta = std::fs::metadata(path).ok()?;
+    let len = meta.len();
+    let modified = meta.modified().ok()?;
+    let duration = modified.duration_since(UNIX_EPOCH).ok()?;
+    Some((duration.as_nanos(), len))
+}
+
+fn get_or_load_subtitles(media_path: &Path, mode: SubtitleReadMode) -> Option<SubtitleCacheEntry> {
+    if mode == SubtitleReadMode::Off {
+        return None;
+    }
+    let subtitle_path = find_subtitle_for_media(media_path)?;
+    let stamp = subtitle_file_stamp(&subtitle_path)?;
+    let key = subtitle_cache_key(media_path, mode);
+    let cache = SUBTITLE_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Ok(map) = cache.lock()
+        && let Some(entry) = map.get(&key)
+        && entry.subtitle_path == subtitle_path
+        && entry.stamp == stamp
+    {
+        return Some(entry.clone());
+    }
+
+    let cues = match load_subtitles(&subtitle_path) {
+        Ok(cues) => cues,
+        Err(err) => {
+            log_debug(&format!("Subtitle: precheck failed: {}", err));
+            return None;
+        }
+    };
+    if cues.is_empty() {
+        return None;
+    }
+    let entry = SubtitleCacheEntry {
+        subtitle_path,
+        stamp,
+        cues,
+    };
+    if let Ok(mut map) = cache.lock() {
+        map.insert(key, entry.clone());
+    }
+    Some(entry)
+}
 
 fn audiobook_position_secs(player: &AudiobookPlayer) -> f64 {
-    if let Some(pos) = player.output.position_secs() {
-        let latency = player.output.latency_secs();
-        return (pos - latency).max(0.0);
+    let audible_us = player.output.audible_time_us();
+    let pos_secs = player.output.position_secs();
+    if let (Some(audible), Some(pos)) = (audible_us, pos_secs) {
+        let pos_us = (pos * 1_000_000.0) as i64;
+        let diff = (pos_us - audible).abs();
+        if diff > 200_000 {
+            log_debug(&format!(
+                "SubtitleClock: audible/clock diff {:.3}s (audible {} us, clock {} us) using clock",
+                diff as f64 / 1_000_000.0,
+                audible,
+                pos_us
+            ));
+            return pos.max(0.0);
+        }
+    }
+    if let Some(us) = audible_us {
+        if let Some((padding_frames, padding_us, last_end, sample_rate)) =
+            player.output.subtitle_timing_debug()
+        {
+            log_debug(&format!(
+                "SubtitleClock: audible_us={} padding_frames={} padding_us={} last_written_end_pts_us={} sample_rate={}",
+                us, padding_frames, padding_us, last_end, sample_rate
+            ));
+        }
+        return (us as f64 / 1_000_000.0).max(0.0);
+    }
+    if let Some(pos) = pos_secs {
+        return pos.max(0.0);
     }
     if player.is_paused {
         player.accumulated_seconds as f64
@@ -1581,7 +1778,12 @@ fn is_edge_confirmed(key: &str) -> bool {
         .unwrap_or(false)
 }
 
-fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool>) {
+fn start_subtitle_reader(
+    hwnd: HWND,
+    media_path: PathBuf,
+    cancel: Arc<AtomicBool>,
+    cached: Option<SubtitleCacheEntry>,
+) {
     std::thread::spawn(move || {
         if let Err(e) = unsafe { SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST) } {
             log_debug(&format!("Subtitle: SetThreadPriority failed: {}", e));
@@ -1606,16 +1808,21 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
             SubtitleReadMode::Nvda => SubtitleReadMode::Nvda,
             _ => SubtitleReadMode::User,
         };
-        let subtitle_path = match find_subtitle_for_media(&media_path) {
-            Some(path) => path,
-            None => return,
-        };
-        let mut cues = match load_subtitles(&subtitle_path) {
-            Ok(cues) => cues,
-            Err(err) => {
-                log_debug(&format!("Subtitle: {}", err));
-                return;
-            }
+        let (subtitle_path, mut cues) = if let Some(entry) = cached {
+            (entry.subtitle_path.clone(), entry.cues.clone())
+        } else {
+            let subtitle_path = match find_subtitle_for_media(&media_path) {
+                Some(path) => path,
+                None => return,
+            };
+            let cues = match load_subtitles(&subtitle_path) {
+                Ok(cues) => cues,
+                Err(err) => {
+                    log_debug(&format!("Subtitle: {}", err));
+                    return;
+                }
+            };
+            (subtitle_path, cues)
         };
         if cues.is_empty() {
             return;
@@ -1630,6 +1837,32 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                 last.start.as_secs_f64(),
                 last.end.as_secs_f64()
             ));
+        }
+
+        // Get the main WASAPI output early for resampling during preload.
+        let main_output = get_main_wasapi_output(hwnd, &media_path);
+        let mut device_rate: u32 = 0;
+        let mut device_ch: u16 = 0;
+        if let Some(ref output) = main_output {
+            // Wait for WASAPI to be ready
+            let mut attempts = 0;
+            while output.device_sample_rate() == 0 && attempts < 200 {
+                std::thread::sleep(Duration::from_millis(10));
+                attempts += 1;
+            }
+            if output.device_sample_rate() > 0 {
+                device_rate = output.device_sample_rate();
+                device_ch = output.device_channels() as u16;
+                log_debug(&format!(
+                    "Subtitle: main WASAPI ready ({}ch @ {} Hz)",
+                    output.device_channels(),
+                    output.device_sample_rate()
+                ));
+            } else {
+                log_debug("Subtitle: main WASAPI not ready, resampling deferred");
+            }
+        } else {
+            log_debug("Subtitle: no main WASAPI output available");
         }
 
         let mut paused_for_download = subtitle_hold_state(hwnd, &media_path).unwrap_or(false);
@@ -1795,7 +2028,9 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                 let Some(path) = cue.audio_path.as_ref() else {
                     continue;
                 };
-                if preload_bytes >= SUBTITLE_PRELOAD_MAX_BYTES {
+                if let Some(max_bytes) = SUBTITLE_PRELOAD_MAX_BYTES
+                    && preload_bytes >= max_bytes
+                {
                     preload_skipped += 1;
                     continue;
                 }
@@ -1805,11 +2040,31 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                         // Decode MP3 to PCM for precise timing
                         match decode_mp3_to_pcm(&bytes) {
                             Ok((samples, sample_rate, channels)) => {
-                                cue.pcm_data = Some(SubtitlePcmData {
-                                    samples: Arc::from(samples),
-                                    sample_rate,
-                                    channels,
-                                });
+                                if device_rate > 0 && device_ch > 0 {
+                                    let resampled =
+                                        if sample_rate != device_rate || channels != device_ch {
+                                            Arc::from(resample_pcm(
+                                                &samples,
+                                                sample_rate,
+                                                channels,
+                                                device_rate,
+                                                device_ch,
+                                            ))
+                                        } else {
+                                            Arc::from(samples)
+                                        };
+                                    cue.pcm_data = Some(SubtitlePcmData {
+                                        samples: resampled,
+                                        sample_rate: device_rate,
+                                        channels: device_ch,
+                                    });
+                                } else {
+                                    cue.pcm_data = Some(SubtitlePcmData {
+                                        samples: Arc::from(samples),
+                                        sample_rate,
+                                        channels,
+                                    });
+                                }
                                 preload_count += 1;
                             }
                             Err(e) => {
@@ -1859,28 +2114,6 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
             }
         }
 
-        // Get the main WASAPI output for sample-accurate subtitle mixing
-        let main_output = get_main_wasapi_output(hwnd, &media_path);
-        if let Some(ref output) = main_output {
-            // Wait for WASAPI to be ready
-            let mut attempts = 0;
-            while output.device_sample_rate() == 0 && attempts < 50 {
-                std::thread::sleep(Duration::from_millis(10));
-                attempts += 1;
-            }
-            if output.device_sample_rate() > 0 {
-                log_debug(&format!(
-                    "Subtitle: main WASAPI ready ({}ch @ {} Hz)",
-                    output.device_channels(),
-                    output.device_sample_rate()
-                ));
-            } else {
-                log_debug("Subtitle: main WASAPI not ready, subtitle mixing disabled");
-            }
-        } else {
-            log_debug("Subtitle: no main WASAPI output available");
-        }
-
         let offset_secs = settings.subtitle_offset_ms as f64 / 1000.0;
         let (mut index, mut last_position, mut last_paused) =
             if let Some(state) = subtitle_playback_state(hwnd, &media_path) {
@@ -1893,6 +2126,52 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
             } else {
                 return;
             };
+
+        let timer = WaitableTimer::new();
+        if timer.is_none() {
+            log_debug("Subtitle: high-precision timer unavailable, falling back to sleep.");
+        }
+
+        let wait_until_target = |mut current_pos: f64, target: f64| -> Option<f64> {
+            if current_pos >= target {
+                return Some(current_pos);
+            }
+            loop {
+                if cancel.load(Ordering::Relaxed) {
+                    return None;
+                }
+                let wait_state = subtitle_playback_state(hwnd, &media_path)?;
+                if wait_state.session_id != session_id {
+                    return None;
+                }
+                if wait_state.paused {
+                    std::thread::sleep(Duration::from_millis(20));
+                    continue;
+                }
+                current_pos = wait_state.position_secs;
+                if current_pos >= target {
+                    return Some(current_pos);
+                }
+                let remaining = target - current_pos;
+                if remaining > 0.02 {
+                    let mut sleep_secs = remaining - 0.002;
+                    sleep_secs = sleep_secs.clamp(0.0, 0.05);
+                    if sleep_secs > 0.0 {
+                        if let Some(ref timer) = timer {
+                            if !sleep_precise(timer, Duration::from_secs_f64(sleep_secs)) {
+                                std::thread::sleep(Duration::from_secs_f64(sleep_secs));
+                            }
+                        } else {
+                            std::thread::sleep(Duration::from_secs_f64(sleep_secs));
+                        }
+                    } else {
+                        std::thread::sleep(Duration::from_millis(5));
+                    }
+                } else {
+                    std::hint::spin_loop();
+                }
+            }
+        };
 
         loop {
             if cancel.load(Ordering::Relaxed) {
@@ -1938,44 +2217,22 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
             while index < cues.len() {
                 let cue = cues[index].clone();
                 let cue_start = cue.start.as_secs_f64();
+                let cue_end = cue.end.as_secs_f64();
 
                 // Simple unified timing for all backends:
-                // Schedule/speak when we're within 0.5 second of cue start
+                // Schedule/speak when we're within a window ahead of cue start
                 // Target is exactly cue_start (+ user offset)
                 let target = cue_start + offset_secs;
-                let schedule_ready = raw_pos + 0.5 >= target;
+                let schedule_ready = raw_pos + SUBTITLE_SCHEDULE_AHEAD_SECS >= target;
 
                 if !schedule_ready {
                     break;
                 }
 
-                // Wait until we reach the target time
-                if raw_pos < target {
-                    loop {
-                        if cancel.load(Ordering::Relaxed) {
-                            return;
-                        }
-                        let Some(wait_state) = subtitle_playback_state(hwnd, &media_path) else {
-                            return;
-                        };
-                        if wait_state.session_id != session_id {
-                            return;
-                        }
-                        if wait_state.paused {
-                            std::thread::sleep(Duration::from_millis(20));
-                            continue;
-                        }
-                        raw_pos = wait_state.position_secs;
-                        if raw_pos >= target {
-                            break;
-                        }
-                        let remaining = target - raw_pos;
-                        if remaining > 0.02 {
-                            std::thread::sleep(Duration::from_millis(5));
-                        } else {
-                            std::hint::spin_loop();
-                        }
-                    }
+                // If we're already past the cue end, skip it.
+                if raw_pos > cue_end {
+                    index += 1;
+                    continue;
                 }
 
                 let delta_from_start = raw_pos - cue_start;
@@ -1991,6 +2248,11 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                 match effective_mode {
                     SubtitleReadMode::Off => {}
                     SubtitleReadMode::Nvda => {
+                        if let Some(pos) = wait_until_target(raw_pos, target) {
+                            raw_pos = pos;
+                        } else {
+                            return;
+                        }
                         if !nvda_speak(&cue.text) {
                             log_debug("Subtitle: NVDA speak failed.");
                         }
@@ -2030,9 +2292,16 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                                     volume: settings.tts_volume as f32 / 100.0,
                                 };
                                 output.schedule_subtitle(subtitle);
+                            } else {
+                                log_debug("Subtitle: Edge PCM missing, skipping cue for accuracy.");
                             }
                         }
                         crate::settings::TtsEngine::Sapi5 => {
+                            if let Some(pos) = wait_until_target(raw_pos, target) {
+                                raw_pos = pos;
+                            } else {
+                                return;
+                            }
                             let cancel_flag = Arc::new(AtomicBool::new(false));
                             let (command_tx, command_rx) = tokio::sync::mpsc::unbounded_channel();
                             drop(command_tx);
@@ -2049,6 +2318,11 @@ fn start_subtitle_reader(hwnd: HWND, media_path: PathBuf, cancel: Arc<AtomicBool
                             }
                         }
                         crate::settings::TtsEngine::Sapi4 => {
+                            if let Some(pos) = wait_until_target(raw_pos, target) {
+                                raw_pos = pos;
+                            } else {
+                                return;
+                            }
                             let voice_index = match parse_sapi4_voice_index(&settings.tts_voice) {
                                 Some(idx) => idx,
                                 None => {

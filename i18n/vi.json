@@ -180,6 +180,7 @@
   "options.label.audio_split": "Chia nhỏ sách nói thành:",
   "options.label.audio_split_text": "Văn bản đánh dấu chia nhỏ:",
   "options.label.audio_split_requires_newline": "Bắt buộc dấu đánh dấu ở đầu dòng",
+  "options.label.subtitle_ducking": "Ducking phụ đề",
   "options.label.subtitle_mode": "Đọc phụ đề:",
   "options.label.subtitle_offset": "Độ lệch phụ đề (ms):",
   "options.label.audio_wasapi": "Dùng đầu ra WASAPI (beta)",

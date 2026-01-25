@@ -187,6 +187,7 @@
   "options.label.audio_split": "Dela upp ljudbok i:",
   "options.label.audio_split_text": "Text för delningsmarkör:",
   "options.label.audio_split_requires_newline": "Kräv markören i början av raden",
+  "options.label.subtitle_ducking": "Ducking for undertexter",
   "options.label.subtitle_mode": "Undertextläsning:",
   "options.label.subtitle_offset": "Undertextoffset (ms):",
   "options.label.audio_wasapi": "Använd WASAPI-utdata (beta)",

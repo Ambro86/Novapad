@@ -1,4 +1,5 @@
 use crate::accessibility::{nvda_speak, to_wide};
+use crate::ffmpeg_export::{MixExportOptions, export_mixed_media, is_mixed_output};
 use crate::ffmpeg_source::FfmpegSource;
 use crate::i18n;
 use crate::log_debug;
@@ -579,12 +580,14 @@ pub fn audiobook_duration_secs(path: &Path) -> Option<u64> {
     }
 }
 
+#[derive(Clone, Copy)]
 struct AudiobookPlaybackOptions {
     speed: f32,
     paused: bool,
     volume: f32,
     muted: bool,
     prev_volume: f32,
+    mix_export: bool,
 }
 
 fn start_audiobook_at_with_options(
@@ -593,6 +596,50 @@ fn start_audiobook_at_with_options(
     seconds: u64,
     options: AudiobookPlaybackOptions,
 ) {
+    if options.mix_export && !is_mixed_output(&path) {
+        let settings =
+            unsafe { with_state(hwnd, |state| state.settings.clone()) }.unwrap_or_default();
+        if settings.subtitle_read_mode != SubtitleReadMode::Off {
+            let path_clone = path.clone();
+            let opts = options;
+            std::thread::spawn(move || {
+                log_debug(&format!(
+                    "Subtitle: offline mix requested for {}",
+                    path_clone.display()
+                ));
+                let mix_opts = MixExportOptions {
+                    ducking: settings.subtitle_mix_ducking,
+                };
+                match export_mixed_media(&path_clone, &settings, &mix_opts) {
+                    Ok(mixed_path) => {
+                        start_audiobook_at_with_options(
+                            hwnd,
+                            mixed_path,
+                            seconds,
+                            AudiobookPlaybackOptions {
+                                mix_export: false,
+                                ..opts
+                            },
+                        );
+                    }
+                    Err(err) => {
+                        log_debug(&format!("Subtitle: mix export failed: {}", err));
+                        start_audiobook_at_with_options(
+                            hwnd,
+                            path_clone,
+                            seconds,
+                            AudiobookPlaybackOptions {
+                                mix_export: false,
+                                ..opts
+                            },
+                        );
+                    }
+                }
+            });
+            return;
+        }
+    }
+
     let subtitle_hold = should_hold_for_edge_subtitles(hwnd, &path);
     let effective_paused = options.paused || subtitle_hold;
     let subtitle_cancel = Arc::new(AtomicBool::new(false));
@@ -635,6 +682,7 @@ fn start_audiobook_at_with_options(
         // and to speed up .mp3/.aac opening.
         let mut final_path = path.clone();
         if (extension == "mp4" || extension == "aac" || extension == "mp3")
+            && !is_mixed_output(&path)
             && !path.to_string_lossy().contains("podcast cache")
         {
             let cache_dir = settings_dir().join("podcast cache");
@@ -1048,7 +1096,7 @@ pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
     crate::reset_active_podcast_chapters_for_playback(hwnd);
     let path_buf = path.to_path_buf();
 
-    let (bookmark_pos, speed, volume) = with_state(hwnd, |state| {
+    let (bookmark_pos, speed, volume, mix_export) = with_state(hwnd, |state| {
         let pos = state
             .bookmarks
             .files
@@ -1060,9 +1108,10 @@ pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
             pos,
             state.settings.audiobook_playback_speed,
             state.settings.audiobook_playback_volume,
+            state.settings.subtitle_mix_export_on_play,
         )
     })
-    .unwrap_or((0, 1.0, 1.0));
+    .unwrap_or((0, 1.0, 1.0, false));
 
     start_audiobook_at_with_options(
         hwnd,
@@ -1074,6 +1123,7 @@ pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
             volume,
             muted: false,
             prev_volume: volume,
+            mix_export,
         },
     );
 }
@@ -1186,6 +1236,7 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
             volume,
             muted,
             prev_volume,
+            mix_export: false,
         },
     );
 }
@@ -1256,6 +1307,7 @@ pub unsafe fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
             volume,
             muted,
             prev_volume,
+            mix_export: false,
         },
     );
 }
@@ -1335,6 +1387,7 @@ pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
             volume,
             muted,
             prev_volume,
+            mix_export: false,
         },
     );
 
@@ -1385,6 +1438,7 @@ pub unsafe fn reset_audiobook_speed(hwnd: HWND) -> Option<f32> {
             volume,
             muted,
             prev_volume,
+            mix_export: false,
         },
     );
 

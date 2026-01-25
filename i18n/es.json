@@ -180,6 +180,7 @@
   "options.label.audio_split": "Dividir audiolibro en:",
   "options.label.audio_split_text": "Texto para dividir:",
   "options.label.audio_split_requires_newline": "Requiere marcador al inicio de linea",
+  "options.label.subtitle_ducking": "Ducking de subtitulos",
   "options.label.subtitle_mode": "Lectura de subtítulos:",
   "options.label.subtitle_offset": "Offset de subtítulos (ms):",
   "options.label.audio_wasapi": "Usar salida WASAPI (beta)",

@@ -8,8 +8,12 @@ use rodio::Source;
 use std::ffi::{CStr, CString};
 use std::path::Path;
 use std::ptr;
+use std::sync::Arc;
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::Duration;
+
+const AV_NOPTS_VALUE_I64: i64 = i64::MIN;
 
 type AvformatNetworkInit = unsafe extern "C" fn() -> libc::c_int;
 type AvformatOpenInput = unsafe extern "C" fn(
@@ -312,8 +316,17 @@ pub struct FfmpegSource {
     frame: *mut AVFrame,
     buffer: Vec<f32>,
     buffer_pos: usize,
+    buffer_start_pts_us: Option<i64>,
+    buffer_frame_count: usize,
     channels: u16,
     sample_rate: u32,
+    time_base_num: i64,
+    time_base_den: i64,
+    next_pts_us: i64,
+    stream_start_us: i64,
+    fmt_start_us: i64,
+    pts_offset_us: Option<i64>,
+    pts_clock: Option<Arc<AtomicI64>>,
     total_duration: Option<Duration>,
     eof: bool,
     sent_eof: bool,
@@ -323,7 +336,11 @@ pub struct FfmpegSource {
 unsafe impl Send for FfmpegSource {}
 
 impl FfmpegSource {
-    pub fn try_new(path: &Path, start_seconds: u64) -> Result<Self, String> {
+    pub fn try_new(
+        path: &Path,
+        start_seconds: u64,
+        pts_clock: Option<Arc<AtomicI64>>,
+    ) -> Result<Self, String> {
         let api = ffmpeg_api()?;
         init_ffmpeg_once(api);
 
@@ -457,6 +474,41 @@ impl FfmpegSource {
             }
         };
 
+        let time_base = unsafe { (*stream).time_base };
+        let time_base_num = if time_base.num == 0 {
+            1
+        } else {
+            time_base.num as i64
+        };
+        let time_base_den = if time_base.den == 0 {
+            1
+        } else {
+            time_base.den as i64
+        };
+        let start_pts_us = (start_seconds as i64).saturating_mul(1_000_000);
+        let stream_start_raw = unsafe { (*stream).start_time };
+        let stream_start_us = if stream_start_raw != AV_NOPTS_VALUE_I64 {
+            (stream_start_raw as i128)
+                .saturating_mul(time_base_num as i128)
+                .saturating_mul(1_000_000)
+                .saturating_div(time_base_den as i128)
+                .clamp(i64::MIN as i128, i64::MAX as i128) as i64
+        } else {
+            0
+        };
+        let fmt_start_raw = unsafe { (*fmt_ctx).start_time };
+        let fmt_start_us = if fmt_start_raw != AV_NOPTS_VALUE_I64 {
+            fmt_start_raw
+        } else {
+            0
+        };
+        if stream_start_us != 0 || fmt_start_us != 0 {
+            log_debug(&format!(
+                "FFmpeg: start_time stream={} us fmt={} us",
+                stream_start_us, fmt_start_us
+            ));
+        }
+
         let mut source = Self {
             api,
             fmt_ctx,
@@ -467,8 +519,17 @@ impl FfmpegSource {
             frame,
             buffer: Vec::new(),
             buffer_pos: 0,
+            buffer_start_pts_us: None,
+            buffer_frame_count: 0,
             channels,
             sample_rate,
+            time_base_num,
+            time_base_den,
+            next_pts_us: start_pts_us,
+            stream_start_us,
+            fmt_start_us,
+            pts_offset_us: None,
+            pts_clock,
             total_duration,
             eof: false,
             sent_eof: false,
@@ -626,8 +687,33 @@ impl FfmpegSource {
         if produced == 0 {
             return Ok(false);
         }
+        let mut pts_us = self.frame_pts_us().unwrap_or(self.next_pts_us);
+        if self.pts_offset_us.is_none() {
+            let mut offset = 0i64;
+            if self.stream_start_us > 0 && pts_us >= 0 && pts_us < self.stream_start_us / 2 {
+                offset = self.stream_start_us;
+            } else if self.fmt_start_us > 0 && pts_us >= 0 && pts_us < self.fmt_start_us / 2 {
+                offset = self.fmt_start_us;
+            }
+            if offset != 0 {
+                log_debug(&format!(
+                    "FFmpeg: applying start_time offset {:.3}s",
+                    offset as f64 / 1_000_000.0
+                ));
+            }
+            self.pts_offset_us = Some(offset);
+        }
+        if let Some(offset) = self.pts_offset_us {
+            pts_us = pts_us.saturating_add(offset);
+        }
         out_buffer.truncate(produced);
         self.buffer.extend_from_slice(&out_buffer);
+        self.buffer_start_pts_us = Some(pts_us);
+        self.buffer_frame_count = produced / channels;
+        let duration_us = (self.buffer_frame_count as i128)
+            .saturating_mul(1_000_000)
+            .saturating_div(self.sample_rate as i128) as i64;
+        self.next_pts_us = pts_us.saturating_add(duration_us);
         Ok(true)
     }
 
@@ -677,6 +763,8 @@ impl FfmpegSource {
 
         self.buffer.clear();
         self.buffer_pos = 0;
+        self.buffer_start_pts_us = None;
+        self.buffer_frame_count = 0;
 
         loop {
             match self.receive_frame() {
@@ -737,6 +825,15 @@ impl Iterator for FfmpegSource {
         if self.buffer_pos >= self.buffer.len() && !self.refill() {
             return None;
         }
+        if let (Some(start_pts), Some(clock)) = (self.buffer_start_pts_us, &self.pts_clock) {
+            let frame_index = self.buffer_pos / self.channels as usize;
+            let pts_us = (start_pts as i128).saturating_add(
+                (frame_index as i128)
+                    .saturating_mul(1_000_000)
+                    .saturating_div(self.sample_rate as i128),
+            ) as i64;
+            clock.store(pts_us, Ordering::Release);
+        }
         let sample = self.buffer[self.buffer_pos];
         self.buffer_pos += 1;
         Some(sample)
@@ -788,9 +885,36 @@ impl Source for FfmpegSource {
 
         self.buffer.clear();
         self.buffer_pos = 0;
+        self.buffer_start_pts_us = None;
+        self.buffer_frame_count = 0;
         self.eof = false;
         self.sent_eof = false;
+        let pos_us = pos.as_micros().min(i64::MAX as u128) as i64;
+        let mut next_pts = pos_us;
+        if let Some(offset) = self.pts_offset_us {
+            next_pts = next_pts.saturating_add(offset);
+        }
+        self.next_pts_us = next_pts;
+        if let Some(clock) = &self.pts_clock {
+            clock.store(next_pts, Ordering::Release);
+        }
         Ok(())
+    }
+}
+
+impl FfmpegSource {
+    fn frame_pts_us(&self) -> Option<i64> {
+        let pts = unsafe { (*self.frame).pts };
+        if pts == AV_NOPTS_VALUE_I64 {
+            return None;
+        }
+        let num = self.time_base_num as i128;
+        let den = self.time_base_den as i128;
+        let pts_us = (pts as i128)
+            .saturating_mul(num)
+            .saturating_mul(1_000_000)
+            .saturating_div(den);
+        Some(pts_us.clamp(i64::MIN as i128, i64::MAX as i128) as i64)
     }
 }
 

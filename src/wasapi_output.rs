@@ -4,7 +4,7 @@ use rodio::Source;
 use rodio::source::UniformSourceIterator;
 use std::collections::VecDeque;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU32, AtomicU64, Ordering};
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
@@ -60,8 +60,10 @@ struct HandleGuard(HANDLE);
 
 impl Drop for HandleGuard {
     fn drop(&mut self) {
-        if self.0.0 != 0 {
-            let _ = unsafe { CloseHandle(self.0) };
+        if self.0.0 != 0
+            && let Err(e) = unsafe { CloseHandle(self.0) }
+        {
+            log_debug(&format!("WASAPI: CloseHandle failed: {}", e));
         }
     }
 }
@@ -73,12 +75,12 @@ pub struct WasapiOutput {
     qpc_freq: Arc<AtomicU64>,
     clock_freq: Arc<AtomicU64>,
     base_micros: Arc<AtomicU64>,
-    latency_micros: Arc<AtomicU64>,
     padding_frames: Arc<AtomicU32>,
     sample_rate_hz: Arc<AtomicU32>,
     device_channels: Arc<AtomicU32>,
     volume_bits: Arc<AtomicU32>,
     stopped: Arc<AtomicBool>,
+    last_written_end_pts_us: Arc<AtomicI64>,
     /// Paused state, shared with the thread for potential future use.
     #[allow(dead_code)]
     paused: Arc<AtomicBool>,
@@ -90,6 +92,7 @@ impl WasapiOutput {
         start_paused: bool,
         volume: f32,
         base_secs: f64,
+        source_pts_us: Option<Arc<AtomicI64>>,
     ) -> Result<Arc<Self>, String> {
         let (tx, rx) = mpsc::channel();
         let position_units = Arc::new(AtomicU64::new(0));
@@ -97,25 +100,28 @@ impl WasapiOutput {
         let qpc_freq = Arc::new(AtomicU64::new(0));
         let clock_freq = Arc::new(AtomicU64::new(0));
         let base_micros = Arc::new(AtomicU64::new((base_secs.max(0.0) * 1_000_000.0) as u64));
-        let latency_micros = Arc::new(AtomicU64::new(0));
         let padding_frames = Arc::new(AtomicU32::new(0));
         let sample_rate_hz = Arc::new(AtomicU32::new(0));
         let device_channels = Arc::new(AtomicU32::new(0));
         let volume_bits = Arc::new(AtomicU32::new(volume.to_bits()));
         let stopped = Arc::new(AtomicBool::new(false));
+        let last_written_end_pts_us = Arc::new(AtomicI64::new(0));
         let paused = Arc::new(AtomicBool::new(start_paused));
 
         let position_units_thread = position_units.clone();
         let last_qpc_thread = last_qpc.clone();
         let qpc_freq_thread = qpc_freq.clone();
         let clock_freq_thread = clock_freq.clone();
-        let latency_micros_thread = latency_micros.clone();
+        let base_micros_thread = base_micros.clone();
+        let pts_offset_us_thread = Arc::new(AtomicI64::new(i64::MIN));
         let padding_frames_thread = padding_frames.clone();
         let sample_rate_hz_thread = sample_rate_hz.clone();
         let device_channels_thread = device_channels.clone();
         let volume_bits_thread = volume_bits.clone();
         let stopped_thread = stopped.clone();
+        let last_written_end_pts_us_thread = last_written_end_pts_us.clone();
         let paused_thread = paused.clone();
+        let source_pts_us_thread = source_pts_us.clone();
 
         thread::spawn(move || {
             let _com = match ComGuard::new_mta() {
@@ -214,7 +220,6 @@ impl WasapiOutput {
             match unsafe { client.GetStreamLatency() } {
                 Ok(latency) => {
                     let micros = (latency / 10).max(0);
-                    latency_micros_thread.store(micros as u64, Ordering::Relaxed);
                     log_debug(&format!(
                         "WASAPI: Stream latency {:.3} ms",
                         micros as f64 / 1000.0
@@ -385,6 +390,7 @@ impl WasapiOutput {
                 let mut finished = false;
                 let volume = f32::from_bits(volume_bits_thread.load(Ordering::Relaxed));
                 let sample_count = available as usize * channels as usize;
+                let mut buffer_start_pts_us: Option<i64> = None;
 
                 // Helper to get subtitle sample for current position
                 // `written_in_buffer` is samples written so far in this buffer fill
@@ -402,8 +408,15 @@ impl WasapiOutput {
                     if active.is_none()
                         && let Some(sub) = pending.front()
                     {
+                        let offset_us = pts_offset_us_thread.load(Ordering::Acquire);
+                        let offset_secs = if offset_us == i64::MIN {
+                            0.0
+                        } else {
+                            offset_us as f64 / 1_000_000.0
+                        };
+                        let effective_target_secs = (sub.target_secs - offset_secs).max(0.0);
                         let target_sample =
-                            (sub.target_secs * sample_rate as f64 * channels as f64) as u64;
+                            (effective_target_secs * sample_rate as f64 * channels as f64) as u64;
                         if current_sample >= target_sample {
                             // Time to start this subtitle
                             let sub = pending.pop_front().unwrap();
@@ -444,6 +457,34 @@ impl WasapiOutput {
                                         0.0
                                     }
                                 };
+                                if i == 0
+                                    && buffer_start_pts_us.is_none()
+                                    && let Some(ref pts_clock) = source_pts_us_thread
+                                {
+                                    let start_pts = pts_clock.load(Ordering::Acquire);
+                                    buffer_start_pts_us = Some(start_pts);
+                                    if pts_offset_us_thread.load(Ordering::Acquire) == i64::MIN {
+                                        let base =
+                                            base_micros_thread.load(Ordering::Relaxed) as i64;
+                                        let offset = start_pts.saturating_sub(base);
+                                        if pts_offset_us_thread
+                                            .compare_exchange(
+                                                i64::MIN,
+                                                offset,
+                                                Ordering::AcqRel,
+                                                Ordering::Acquire,
+                                            )
+                                            .is_ok()
+                                        {
+                                            log_debug(&format!(
+                                                "SubtitleClock: PTS offset set to {:.3}s (pts {} us, base {} us)",
+                                                offset as f64 / 1_000_000.0,
+                                                start_pts,
+                                                base
+                                            ));
+                                        }
+                                    }
+                                }
                                 let subtitle_sample = get_subtitle_sample(
                                     i,
                                     &mut pending_subtitles,
@@ -471,6 +512,34 @@ impl WasapiOutput {
                                         0.0
                                     }
                                 };
+                                if i == 0
+                                    && buffer_start_pts_us.is_none()
+                                    && let Some(ref pts_clock) = source_pts_us_thread
+                                {
+                                    let start_pts = pts_clock.load(Ordering::Acquire);
+                                    buffer_start_pts_us = Some(start_pts);
+                                    if pts_offset_us_thread.load(Ordering::Acquire) == i64::MIN {
+                                        let base =
+                                            base_micros_thread.load(Ordering::Relaxed) as i64;
+                                        let offset = start_pts.saturating_sub(base);
+                                        if pts_offset_us_thread
+                                            .compare_exchange(
+                                                i64::MIN,
+                                                offset,
+                                                Ordering::AcqRel,
+                                                Ordering::Acquire,
+                                            )
+                                            .is_ok()
+                                        {
+                                            log_debug(&format!(
+                                                "SubtitleClock: PTS offset set to {:.3}s (pts {} us, base {} us)",
+                                                offset as f64 / 1_000_000.0,
+                                                start_pts,
+                                                base
+                                            ));
+                                        }
+                                    }
+                                }
                                 let subtitle_sample = get_subtitle_sample(
                                     i,
                                     &mut pending_subtitles,
@@ -496,6 +565,38 @@ impl WasapiOutput {
                     return;
                 }
 
+                if let Some(start_pts) = buffer_start_pts_us
+                    && sample_rate > 0
+                    && channels > 0
+                {
+                    let frames_written = sample_count / channels as usize;
+                    let end_pts = (start_pts as i128).saturating_add(
+                        (frames_written as i128)
+                            .saturating_mul(1_000_000)
+                            .saturating_div(sample_rate as i128),
+                    ) as i64;
+                    let mut candidate = end_pts;
+                    loop {
+                        let prev = last_written_end_pts_us_thread.load(Ordering::Acquire);
+                        if candidate < prev {
+                            candidate = prev;
+                        }
+                        match last_written_end_pts_us_thread.compare_exchange(
+                            prev,
+                            candidate,
+                            Ordering::AcqRel,
+                            Ordering::Acquire,
+                        ) {
+                            Ok(_) => break,
+                            Err(actual) => {
+                                if candidate < actual {
+                                    candidate = actual;
+                                }
+                            }
+                        }
+                    }
+                }
+
                 update_clock(&clock, &position_units_thread, &last_qpc_thread);
 
                 if finished {
@@ -513,12 +614,12 @@ impl WasapiOutput {
             qpc_freq,
             clock_freq,
             base_micros,
-            latency_micros,
             padding_frames,
             sample_rate_hz,
             device_channels,
             volume_bits,
             stopped,
+            last_written_end_pts_us,
             paused,
         }))
     }
@@ -597,9 +698,44 @@ impl WasapiOutput {
         Some(((base as f64 / 1_000_000.0) + secs - padding_secs).max(0.0))
     }
 
-    pub fn latency_secs(&self) -> f64 {
-        let micros = self.latency_micros.load(Ordering::Relaxed);
-        micros as f64 / 1_000_000.0
+    pub fn audible_time_us(&self) -> Option<i64> {
+        if self.stopped.load(Ordering::Relaxed) {
+            return None;
+        }
+        let end_pts = self.last_written_end_pts_us.load(Ordering::Acquire);
+        if end_pts <= 0 {
+            return None;
+        }
+        let sample_rate = self.sample_rate_hz.load(Ordering::Relaxed);
+        if sample_rate == 0 {
+            return None;
+        }
+        let padding = self.padding_frames.load(Ordering::Relaxed);
+        let padding_us = (padding as i128)
+            .saturating_mul(1_000_000)
+            .saturating_div(sample_rate as i128);
+        let audible = (end_pts as i128).saturating_sub(padding_us);
+        Some(audible.max(0) as i64)
+    }
+
+    pub fn subtitle_timing_debug(&self) -> Option<(u32, i64, i64, u32)> {
+        if self.stopped.load(Ordering::Relaxed) {
+            return None;
+        }
+        let last_end = self.last_written_end_pts_us.load(Ordering::Acquire);
+        if last_end <= 0 {
+            return None;
+        }
+        let sample_rate = self.sample_rate_hz.load(Ordering::Relaxed);
+        if sample_rate == 0 {
+            return None;
+        }
+        let padding = self.padding_frames.load(Ordering::Relaxed);
+        let padding_us = (padding as i128)
+            .saturating_mul(1_000_000)
+            .saturating_div(sample_rate as i128)
+            .max(0) as i64;
+        Some((padding, padding_us, last_end, sample_rate))
     }
 
     #[allow(dead_code)]

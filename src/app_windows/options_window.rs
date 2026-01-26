@@ -2,8 +2,8 @@ use crate::accessibility::{handle_accessibility, to_wide};
 use crate::app_windows::interpreter_select_window;
 use crate::editor_manager::{apply_word_wrap_to_all_edits, update_window_title};
 use crate::settings::{
-    Language, ModifiedMarkerPosition, OpenBehavior, TRUSTED_CLIENT_TOKEN, TtsEngine,
-    VOICE_LIST_URL, VoiceInfo, save_settings_with_default_copy, sync_context_menu,
+    Language, ModifiedMarkerPosition, OpenBehavior, SubtitleReadMode, TRUSTED_CLIENT_TOKEN,
+    TtsEngine, VOICE_LIST_URL, VoiceInfo, save_settings_with_default_copy, sync_context_menu,
 };
 use crate::{i18n, rebuild_menus, refresh_voice_panel, tts_engine, with_state};
 use std::process::Command;
@@ -68,6 +68,7 @@ const OPTIONS_ID_AUDIO_SKIP: usize = 6010;
 const OPTIONS_ID_AUDIO_SPLIT: usize = 6011;
 const OPTIONS_ID_AUDIO_SPLIT_TEXT: usize = 6013;
 const OPTIONS_ID_AUDIO_SPLIT_REQUIRE_NEWLINE: usize = 6016;
+const OPTIONS_ID_SUBTITLE_MODE: usize = 6046;
 const OPTIONS_ID_SUBTITLE_DUCKING: usize = 6045;
 const OPTIONS_ID_PODCAST_CACHE_LIMIT: usize = 6030;
 const OPTIONS_ID_PODCASTINDEX_KEY: usize = 6035;
@@ -212,6 +213,8 @@ struct OptionsDialogState {
     edit_interpreter_path: HWND,
     button_interpreter_browse: HWND,
     button_interpreter_search: HWND,
+    label_subtitle_mode: HWND,
+    combo_subtitle_mode: HWND,
     checkbox_move_cursor: HWND,
     checkbox_check_updates: HWND,
     checkbox_context_menu: HWND,
@@ -252,6 +255,7 @@ struct OptionsLabels {
     label_interpreter_path: String,
     label_interpreter_browse: String,
     label_interpreter_search: String,
+    label_subtitle_mode: String,
     label_move_cursor: String,
     label_check_updates: String,
     label_context_menu: String,
@@ -281,6 +285,9 @@ struct OptionsLabels {
     engine_edge: String,
     engine_sapi5: String,
     engine_sapi4: String,
+    subtitle_mode_off: String,
+    subtitle_mode_nvda: String,
+    subtitle_mode_user: String,
 
     split_none: String,
     split_by_text: String,
@@ -341,6 +348,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_interpreter_path: i18n::tr(language, "options.label.interpreter_path"),
         label_interpreter_browse: i18n::tr(language, "options.button.browse"),
         label_interpreter_search: i18n::tr(language, "options.button.search_computer"),
+        label_subtitle_mode: i18n::tr(language, "options.label.subtitle_mode"),
         label_move_cursor: i18n::tr(language, "options.label.move_cursor"),
         label_check_updates: i18n::tr(language, "options.label.check_updates"),
         label_context_menu: i18n::tr(language, "options.label.context_menu"),
@@ -373,6 +381,9 @@ fn options_labels(language: Language) -> OptionsLabels {
         engine_edge: i18n::tr(language, "options.engine.edge"),
         engine_sapi5: i18n::tr(language, "options.engine.sapi5"),
         engine_sapi4: "SAPI 4".to_string(),
+        subtitle_mode_off: i18n::tr(language, "options.subtitle_mode.off"),
+        subtitle_mode_nvda: i18n::tr(language, "options.subtitle_mode.nvda"),
+        subtitle_mode_user: i18n::tr(language, "options.subtitle_mode.user"),
 
         split_none: i18n::tr(language, "options.split.none"),
         split_by_text: i18n::tr(language, "options.split.by_text"),
@@ -1413,6 +1424,36 @@ unsafe extern "system" fn options_wndproc(
             );
             y += 30;
 
+            let label_subtitle_mode = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_subtitle_mode).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_subtitle_mode = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                140,
+                hwnd,
+                HMENU(OPTIONS_ID_SUBTITLE_MODE as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
             let checkbox_move_cursor = CreateWindowExW(
                 Default::default(),
                 WC_BUTTON,
@@ -1607,6 +1648,8 @@ unsafe extern "system" fn options_wndproc(
                 label_interpreter_path,
                 edit_interpreter_path,
                 button_interpreter_browse,
+                label_subtitle_mode,
+                combo_subtitle_mode,
                 checkbox_move_cursor,
                 checkbox_check_updates,
                 checkbox_context_menu,
@@ -1682,6 +1725,8 @@ unsafe extern "system" fn options_wndproc(
                 edit_interpreter_path,
                 button_interpreter_browse,
                 button_interpreter_search,
+                label_subtitle_mode,
+                combo_subtitle_mode,
                 checkbox_move_cursor,
                 checkbox_check_updates,
                 checkbox_context_menu,
@@ -1934,6 +1979,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         _label_interpreter_path,
         edit_interpreter_path,
         _button_interpreter_browse,
+        _label_subtitle_mode,
+        combo_subtitle_mode,
         checkbox_move_cursor,
         checkbox_check_updates,
         checkbox_context_menu,
@@ -1985,6 +2032,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.label_interpreter_path,
             state.edit_interpreter_path,
             state.button_interpreter_browse,
+            state.label_subtitle_mode,
+            state.combo_subtitle_mode,
             state.checkbox_move_cursor,
             state.checkbox_check_updates,
             state.checkbox_context_menu,
@@ -2499,6 +2548,31 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         edit_interpreter_path,
         PCWSTR(to_wide(&settings.interpreter_path).as_ptr()),
     ) {}
+    SendMessageW(combo_subtitle_mode, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    let subtitle_mode_options = [
+        labels.subtitle_mode_off.clone(),
+        labels.subtitle_mode_nvda.clone(),
+        labels.subtitle_mode_user.clone(),
+    ];
+    for label in subtitle_mode_options.iter() {
+        SendMessageW(
+            combo_subtitle_mode,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(label).as_ptr() as isize),
+        );
+    }
+    let subtitle_mode_index = match settings.subtitle_read_mode {
+        SubtitleReadMode::Off => 0,
+        SubtitleReadMode::Nvda => 1,
+        _ => 2,
+    };
+    SendMessageW(
+        combo_subtitle_mode,
+        CB_SETCURSEL,
+        WPARAM(subtitle_mode_index),
+        LPARAM(0),
+    );
     SendMessageW(
         checkbox_move_cursor,
         BM_SETCHECK,
@@ -3078,6 +3152,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         edit_interpreter_path,
         _button_interpreter_browse,
         _button_interpreter_search,
+        combo_subtitle_mode,
         checkbox_move_cursor,
         checkbox_check_updates,
         checkbox_context_menu,
@@ -3119,6 +3194,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.edit_interpreter_path,
             state.button_interpreter_browse,
             state.button_interpreter_search,
+            state.combo_subtitle_mode,
             state.checkbox_move_cursor,
             state.checkbox_check_updates,
             state.checkbox_context_menu,
@@ -3335,6 +3411,12 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         let text = String::from_utf16_lossy(&buf[..read as usize]);
         settings.interpreter_path = text;
     }
+    let subtitle_sel = SendMessageW(combo_subtitle_mode, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    settings.subtitle_read_mode = match subtitle_sel {
+        1 => SubtitleReadMode::Nvda,
+        2 => SubtitleReadMode::User,
+        _ => SubtitleReadMode::Off,
+    };
     settings.move_cursor_during_reading =
         SendMessageW(checkbox_move_cursor, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
             == BST_CHECKED.0;
@@ -3625,6 +3707,8 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.edit_interpreter_path,
             state.button_interpreter_browse,
             state.button_interpreter_search,
+            state.label_subtitle_mode,
+            state.combo_subtitle_mode,
             state.checkbox_move_cursor,
         ] {
             ShowWindow(control, if show_editor { SW_SHOW } else { SW_HIDE });

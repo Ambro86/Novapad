@@ -18,7 +18,6 @@ mod tts_engine;
 use tts_engine::*;
 mod file_handler;
 mod mf_encoder;
-mod mf_source;
 
 mod sapi4_engine;
 mod sapi5_engine;
@@ -34,9 +33,10 @@ mod editor_manager;
 mod ffmpeg_dyn;
 mod ffmpeg_export;
 mod ffmpeg_source;
+mod miniaudio_output;
+mod miniaudio_sys;
 mod subtitle_wasapi;
 mod subtitles;
-mod wasapi_output;
 use editor_manager::*;
 mod app_windows;
 mod audio_monitor;
@@ -642,6 +642,9 @@ fn format_time_hms(seconds: u64) -> String {
 
 fn audiobook_position_ms_from_state(state: &AppState) -> Option<u64> {
     let player = state.active_audiobook.as_ref()?;
+    if let Some(pos_secs) = player.position_secs() {
+        return Some((pos_secs * 1000.0).max(0.0) as u64);
+    }
     let accumulated_ms = player.accumulated_seconds.saturating_mul(1000);
     if player.is_paused {
         return Some(accumulated_ms);

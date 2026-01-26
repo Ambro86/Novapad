@@ -144,6 +144,7 @@ pub fn play_sapi4(
                 return;
             }
         };
+        crate::log_debug(&format!("SAPI4: using bridge {}", exe_path.display()));
         let mut child = match Command::new(exe_path)
             .arg("--voice")
             .arg(voice_index.to_string())
@@ -159,13 +160,20 @@ pub fn play_sapi4(
             .spawn()
         {
             Ok(child) => child,
-            Err(_) => return,
+            Err(err) => {
+                crate::log_debug(&format!("SAPI4: failed to spawn bridge: {}", err));
+                return;
+            }
         };
         let mut stdin = match child.stdin.take() {
             Some(stdin) => stdin,
-            None => return,
+            None => {
+                crate::log_debug("SAPI4: failed to open stdin");
+                return;
+            }
         };
         if send_speak(&mut stdin, &text).is_err() {
+            crate::log_debug("SAPI4: failed to send SPEAK command");
             crate::log_if_err!(child.wait());
             return;
         }

@@ -1,24 +1,24 @@
 use crate::accessibility::{nvda_speak, to_wide};
+use crate::bass_output::BassOutput;
 use crate::ffmpeg_export::{MixExportOptions, export_mixed_media, is_mixed_output};
 use crate::ffmpeg_source::FfmpegSource;
 use crate::i18n;
 use crate::log_debug;
-use crate::miniaudio_output::{MiniaudioDecoderSource, MiniaudioOutput, ScheduledSubtitle};
 use crate::settings::{FileFormat, SubtitleReadMode, confirm_title, settings_dir};
-use crate::subtitle_wasapi::{decode_mp3_to_pcm, resample_pcm};
-use crate::subtitles::{SubtitleCue, SubtitlePcmData, find_subtitle_for_media, load_subtitles};
+use crate::subtitles::{SubtitleCue, find_subtitle_for_media, load_subtitles};
 use crate::tts_engine;
+use crate::tts_engine::TtsCommand;
 use crate::with_state;
-use libloading::Library;
 use rodio::{Decoder, Source};
 use sha2::Digest;
 use std::collections::{HashMap, HashSet};
-use std::ffi::c_void;
+use std::fs::File;
+use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use std::time::UNIX_EPOCH;
 use uuid::Uuid;
@@ -30,9 +30,13 @@ use windows::Win32::System::Threading::{
 use windows::Win32::UI::WindowsAndMessaging::{IDYES, MB_ICONQUESTION, MB_YESNO, MessageBoxW};
 use windows::core::PCWSTR;
 
+type SubtitleSpeechCancel = Arc<Mutex<Option<Arc<AtomicBool>>>>;
+type SubtitleSpeechCommand = Arc<Mutex<Option<tokio::sync::mpsc::UnboundedSender<TtsCommand>>>>;
+type SubtitleSpeechHandles = (SubtitleSpeechCancel, SubtitleSpeechCommand);
+
 pub struct AudiobookPlayer {
     pub path: PathBuf,
-    output: Arc<MiniaudioOutput>,
+    output: Arc<BassOutput>,
     pub is_paused: bool,
     pub start_instant: std::time::Instant,
     pub accumulated_seconds: u64,
@@ -42,9 +46,9 @@ pub struct AudiobookPlayer {
     pub speed: f32,
     pub subtitle_cancel: Arc<AtomicBool>,
     pub subtitle_hold: bool,
+    pub subtitle_speech_cancel: SubtitleSpeechCancel,
+    pub subtitle_speech_command: SubtitleSpeechCommand,
     pub session_id: u64,
-    pub pts_clock: Option<Arc<AtomicI64>>,
-    pub miniaudio_cursor: Option<(Arc<AtomicU64>, u32)>,
 }
 
 impl AudiobookPlayer {
@@ -66,344 +70,6 @@ impl AudiobookPlayer {
 
     pub(crate) fn position_secs(&self) -> Option<f64> {
         self.output.position_secs()
-    }
-}
-
-type SoundTouchHandle = *mut c_void;
-type SoundTouchCreate = unsafe extern "C" fn() -> SoundTouchHandle;
-type SoundTouchDestroy = unsafe extern "C" fn(SoundTouchHandle);
-type SoundTouchSetSampleRate = unsafe extern "C" fn(SoundTouchHandle, u32);
-type SoundTouchSetChannels = unsafe extern "C" fn(SoundTouchHandle, u32);
-type SoundTouchSetTempo = unsafe extern "C" fn(SoundTouchHandle, f32);
-type SoundTouchPutSamples = unsafe extern "C" fn(SoundTouchHandle, *const f32, u32);
-type SoundTouchReceiveSamples = unsafe extern "C" fn(SoundTouchHandle, *mut f32, u32) -> u32;
-type SoundTouchFlush = unsafe extern "C" fn(SoundTouchHandle);
-type SoundTouchClear = unsafe extern "C" fn(SoundTouchHandle);
-
-struct SoundTouchApi {
-    _lib: Library,
-    create: SoundTouchCreate,
-    destroy: SoundTouchDestroy,
-    set_sample_rate: SoundTouchSetSampleRate,
-    set_channels: SoundTouchSetChannels,
-    set_tempo: SoundTouchSetTempo,
-    put_samples: SoundTouchPutSamples,
-    receive_samples: SoundTouchReceiveSamples,
-    flush: SoundTouchFlush,
-    clear: SoundTouchClear,
-}
-
-fn load_symbol<T: Copy>(lib: &Library, names: &[&str]) -> Option<T> {
-    for name in names {
-        let mut symbol_name = Vec::with_capacity(name.len() + 1);
-        symbol_name.extend_from_slice(name.as_bytes());
-        symbol_name.push(0);
-        if let Ok(symbol) = unsafe { lib.get::<T>(&symbol_name) } {
-            return Some(*symbol);
-        }
-    }
-    log_debug(&format!("SoundTouch symbol missing: {:?}", names));
-    None
-}
-
-fn load_soundtouch_api() -> Option<&'static SoundTouchApi> {
-    static SOUND_TOUCH: OnceLock<Option<SoundTouchApi>> = OnceLock::new();
-    SOUND_TOUCH
-        .get_or_init(|| {
-            if !cfg!(target_arch = "x86_64") {
-                log_debug("SoundTouch DLL not available for this architecture.");
-                return None;
-            }
-            let dll_name = "SoundTouch64.dll";
-            let mut candidates = Vec::new();
-            candidates.push(settings_dir().join(dll_name));
-            if let Ok(appdata) = std::env::var("APPDATA") {
-                candidates.push(PathBuf::from(appdata).join("Novapad").join(dll_name));
-            }
-            if let Ok(exe) = std::env::current_exe()
-                && let Some(dir) = exe.parent()
-            {
-                candidates.push(dir.join("dll").join(dll_name));
-                candidates.push(dir.join(dll_name));
-            }
-            if let Ok(dir) = std::env::current_dir() {
-                candidates.push(dir.join("dll").join(dll_name));
-                candidates.push(dir.join(dll_name));
-            }
-
-            let mut lib = None;
-            for path in candidates {
-                match unsafe { Library::new(&path) } {
-                    Ok(loaded) => {
-                        lib = Some(loaded);
-                        log_debug(&format!("SoundTouch loaded: {}", path.to_string_lossy()));
-                        break;
-                    }
-                    Err(_) => {
-                        log_debug(&format!(
-                            "SoundTouch load failed: {}",
-                            path.to_string_lossy()
-                        ));
-                    }
-                }
-            }
-            let lib = lib?;
-            let create = load_symbol::<SoundTouchCreate>(
-                &lib,
-                &[
-                    "soundtouch_createInstance",
-                    "_soundtouch_createInstance",
-                    "soundtouch_createInstance@0",
-                ],
-            )?;
-            let destroy = load_symbol::<SoundTouchDestroy>(
-                &lib,
-                &[
-                    "soundtouch_destroyInstance",
-                    "_soundtouch_destroyInstance",
-                    "soundtouch_destroyInstance@4",
-                ],
-            )?;
-            let set_sample_rate = load_symbol::<SoundTouchSetSampleRate>(
-                &lib,
-                &[
-                    "soundtouch_setSampleRate",
-                    "_soundtouch_setSampleRate",
-                    "soundtouch_setSampleRate@8",
-                ],
-            )?;
-            let set_channels = load_symbol::<SoundTouchSetChannels>(
-                &lib,
-                &[
-                    "soundtouch_setChannels",
-                    "_soundtouch_setChannels",
-                    "soundtouch_setChannels@8",
-                ],
-            )?;
-            let set_tempo = load_symbol::<SoundTouchSetTempo>(
-                &lib,
-                &[
-                    "soundtouch_setTempo",
-                    "_soundtouch_setTempo",
-                    "soundtouch_setTempo@8",
-                ],
-            )?;
-            let put_samples = load_symbol::<SoundTouchPutSamples>(
-                &lib,
-                &[
-                    "soundtouch_putSamples",
-                    "_soundtouch_putSamples",
-                    "soundtouch_putSamples@12",
-                ],
-            )?;
-            let receive_samples = load_symbol::<SoundTouchReceiveSamples>(
-                &lib,
-                &[
-                    "soundtouch_receiveSamples",
-                    "_soundtouch_receiveSamples",
-                    "soundtouch_receiveSamples@12",
-                ],
-            )?;
-            let flush = load_symbol::<SoundTouchFlush>(
-                &lib,
-                &[
-                    "soundtouch_flush",
-                    "_soundtouch_flush",
-                    "soundtouch_flush@4",
-                ],
-            )?;
-            let clear = load_symbol::<SoundTouchClear>(
-                &lib,
-                &[
-                    "soundtouch_clear",
-                    "_soundtouch_clear",
-                    "soundtouch_clear@4",
-                ],
-            )?;
-            Some(SoundTouchApi {
-                _lib: lib,
-                create,
-                destroy,
-                set_sample_rate,
-                set_channels,
-                set_tempo,
-                put_samples,
-                receive_samples,
-                flush,
-                clear,
-            })
-        })
-        .as_ref()
-}
-
-struct SoundTouch {
-    api: &'static SoundTouchApi,
-    handle: SoundTouchHandle,
-    channels: u16,
-}
-
-unsafe impl Send for SoundTouch {}
-
-impl SoundTouch {
-    fn new(sample_rate: u32, channels: u16, tempo: f32) -> Option<Self> {
-        let api = load_soundtouch_api()?;
-        unsafe {
-            let handle = (api.create)();
-            if handle.is_null() {
-                return None;
-            }
-            (api.set_sample_rate)(handle, sample_rate);
-            (api.set_channels)(handle, channels as u32);
-            (api.set_tempo)(handle, tempo);
-            Some(Self {
-                api,
-                handle,
-                channels,
-            })
-        }
-    }
-
-    fn put_samples(&self, samples: &[f32], frames: u32) {
-        unsafe {
-            (self.api.put_samples)(self.handle, samples.as_ptr(), frames);
-        }
-    }
-
-    fn receive_samples(&self, out: &mut [f32], max_frames: u32) -> u32 {
-        unsafe { (self.api.receive_samples)(self.handle, out.as_mut_ptr(), max_frames) }
-    }
-
-    fn flush(&self) {
-        unsafe {
-            (self.api.flush)(self.handle);
-        }
-    }
-}
-
-impl Drop for SoundTouch {
-    fn drop(&mut self) {
-        unsafe {
-            (self.api.clear)(self.handle);
-            (self.api.destroy)(self.handle);
-        }
-    }
-}
-
-struct SoundTouchSource<S>
-where
-    S: Source<Item = f32>,
-{
-    input: S,
-    st: SoundTouch,
-    buffer: Vec<f32>,
-    index: usize,
-    finished: bool,
-}
-
-unsafe impl<S> Send for SoundTouchSource<S> where S: Source<Item = f32> + Send {}
-
-impl<S> SoundTouchSource<S>
-where
-    S: Source<Item = f32>,
-{
-    fn try_new(input: S, tempo: f32) -> Result<Self, S> {
-        let channels = input.channels();
-        let sample_rate = input.sample_rate();
-        let st = match SoundTouch::new(sample_rate, channels, tempo) {
-            Some(st) => st,
-            None => return Err(input),
-        };
-        Ok(Self {
-            input,
-            st,
-            buffer: Vec::new(),
-            index: 0,
-            finished: false,
-        })
-    }
-
-    fn refill(&mut self) -> bool {
-        const INPUT_FRAMES: usize = 2048;
-        const OUTPUT_FRAMES: usize = 4096;
-        let channels = self.st.channels as usize;
-
-        self.buffer.clear();
-        self.index = 0;
-        let mut produced = false;
-        let mut attempts = 0;
-
-        while !produced && attempts < 8 {
-            attempts += 1;
-            if !self.finished {
-                let mut input_samples = Vec::with_capacity(INPUT_FRAMES * channels);
-                while input_samples.len() < INPUT_FRAMES * channels {
-                    if let Some(sample) = self.input.next() {
-                        input_samples.push(sample);
-                    } else {
-                        break;
-                    }
-                }
-                let frames = input_samples.len() / channels;
-                if frames > 0 {
-                    self.st.put_samples(&input_samples, frames as u32);
-                } else {
-                    self.st.flush();
-                    self.finished = true;
-                }
-            } else {
-                self.st.flush();
-            }
-
-            let mut out = vec![0.0f32; OUTPUT_FRAMES * channels];
-            loop {
-                let received = self.st.receive_samples(&mut out, OUTPUT_FRAMES as u32);
-                if received == 0 {
-                    break;
-                }
-                produced = true;
-                let count = received as usize * channels;
-                self.buffer.extend_from_slice(&out[..count]);
-            }
-        }
-
-        !self.buffer.is_empty()
-    }
-}
-
-impl<S> Iterator for SoundTouchSource<S>
-where
-    S: Source<Item = f32>,
-{
-    type Item = f32;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.index >= self.buffer.len() && !self.refill() {
-            return None;
-        }
-        let sample = self.buffer[self.index];
-        self.index += 1;
-        Some(sample)
-    }
-}
-
-impl<S> Source for SoundTouchSource<S>
-where
-    S: Source<Item = f32>,
-{
-    fn current_span_len(&self) -> Option<usize> {
-        None
-    }
-
-    fn channels(&self) -> u16 {
-        self.st.channels
-    }
-
-    fn sample_rate(&self) -> u32 {
-        self.input.sample_rate()
-    }
-
-    fn total_duration(&self) -> Option<Duration> {
-        None
     }
 }
 
@@ -501,6 +167,88 @@ fn log_mkv_probe_once(path: &Path) {
             log_debug(&format!("Audio probe: failed to parse MKV: {}", err));
         }
     }
+}
+
+fn ffmpeg_cache_key(path: &Path) -> String {
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(path.to_string_lossy().as_bytes());
+    if let Ok(meta) = std::fs::metadata(path) {
+        hasher.update(meta.len().to_le_bytes());
+        if let Ok(modified) = meta.modified()
+            && let Ok(duration) = modified.duration_since(UNIX_EPOCH)
+        {
+            hasher.update(duration.as_secs().to_le_bytes());
+            hasher.update(duration.subsec_nanos().to_le_bytes());
+        }
+    }
+    hex::encode(hasher.finalize())
+}
+
+fn write_wav_header(
+    file: &mut File,
+    data_bytes: u64,
+    channels: u16,
+    sample_rate: u32,
+) -> std::io::Result<()> {
+    let data_bytes = data_bytes.min(u32::MAX as u64) as u32;
+    let chunk_size = 36u32.saturating_add(data_bytes);
+    let byte_rate = sample_rate
+        .saturating_mul(channels as u32)
+        .saturating_mul(2);
+    let block_align = channels.saturating_mul(2);
+    let bits_per_sample = 16u16;
+
+    file.seek(SeekFrom::Start(0))?;
+    file.write_all(b"RIFF")?;
+    file.write_all(&chunk_size.to_le_bytes())?;
+    file.write_all(b"WAVE")?;
+    file.write_all(b"fmt ")?;
+    file.write_all(&16u32.to_le_bytes())?;
+    file.write_all(&1u16.to_le_bytes())?;
+    file.write_all(&channels.to_le_bytes())?;
+    file.write_all(&sample_rate.to_le_bytes())?;
+    file.write_all(&byte_rate.to_le_bytes())?;
+    file.write_all(&block_align.to_le_bytes())?;
+    file.write_all(&bits_per_sample.to_le_bytes())?;
+    file.write_all(b"data")?;
+    file.write_all(&data_bytes.to_le_bytes())?;
+    Ok(())
+}
+
+fn decode_ffmpeg_to_wav(path: &Path) -> Result<PathBuf, String> {
+    let cache_dir = settings_dir().join("ffmpeg_cache");
+    std::fs::create_dir_all(&cache_dir)
+        .map_err(|e| format!("FFmpeg cache dir create failed: {}", e))?;
+    let key = ffmpeg_cache_key(path);
+    let wav_path = cache_dir.join(format!("{}.wav", &key[..16]));
+    if wav_path.exists() {
+        return Ok(wav_path);
+    }
+
+    let mut source = FfmpegSource::try_new(path, 0, None)?;
+    let sample_rate = source.sample_rate();
+    let channels = source.channels();
+    if sample_rate == 0 || channels == 0 {
+        return Err("FFmpeg: invalid output format".to_string());
+    }
+
+    let mut file =
+        File::create(&wav_path).map_err(|e| format!("FFmpeg: wav create failed: {}", e))?;
+    write_wav_header(&mut file, 0, channels, sample_rate)
+        .map_err(|e| format!("FFmpeg: wav header failed: {}", e))?;
+
+    let mut data_bytes: u64 = 0;
+    for sample in source.by_ref() {
+        let scaled = (sample * i16::MAX as f32).round();
+        let clamped = scaled.clamp(i16::MIN as f32, i16::MAX as f32) as i16;
+        file.write_all(&clamped.to_le_bytes())
+            .map_err(|e| format!("FFmpeg: wav write failed: {}", e))?;
+        data_bytes = data_bytes.saturating_add(2);
+    }
+
+    write_wav_header(&mut file, data_bytes, channels, sample_rate)
+        .map_err(|e| format!("FFmpeg: wav finalize failed: {}", e))?;
+    Ok(wav_path)
 }
 
 pub fn parse_time_input(input: &str) -> Result<u64, String> {
@@ -649,6 +397,8 @@ fn start_audiobook_at_with_options(
     let subtitle_hold = should_hold_for_edge_subtitles(hwnd, &path);
     let effective_paused = options.paused || subtitle_hold;
     let subtitle_cancel = Arc::new(AtomicBool::new(false));
+    let subtitle_speech_cancel = Arc::new(Mutex::new(None));
+    let subtitle_speech_command = Arc::new(Mutex::new(None));
     let subtitle_path = path.clone();
     let requested_speed = options.speed;
     let hwnd_main = hwnd;
@@ -658,7 +408,6 @@ fn start_audiobook_at_with_options(
             path.display()
         ));
         log_debug(&format!("Audio player: Opening file {}", path.display()));
-        let file_size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
         let extension = path
             .extension()
             .and_then(|e| e.to_str())
@@ -675,12 +424,9 @@ fn start_audiobook_at_with_options(
         let subtitles_active = subtitle_mode != SubtitleReadMode::Off && subtitles_available;
         let effective_speed = if subtitles_active {
             1.0
-        } else if (requested_speed - 1.0).abs() > f32::EPSILON && load_soundtouch_api().is_some() {
-            requested_speed
         } else {
-            1.0
+            requested_speed
         };
-        let prefer_streaming = true;
         log_mkv_probe_once(&path);
 
         // Force M4A extension for Media Foundation to avoid indexing hangs on .mp4 video files
@@ -712,117 +458,39 @@ fn start_audiobook_at_with_options(
             }
         }
 
-        let extension = final_path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("")
-            .to_lowercase();
-
-        log_debug("Audio player: Creating decoder...");
-        let mut pts_clock: Option<Arc<AtomicI64>> = None;
-        let mut miniaudio_cursor: Option<(Arc<AtomicU64>, u32)> = None;
-        let source: Box<dyn Source<Item = f32> + Send> =
-            match MiniaudioDecoderSource::try_new(&final_path, seconds) {
-                Ok(src) => {
-                    miniaudio_cursor = Some((src.cursor_frames_handle(), src.sample_rate_hz()));
-                    log_debug(&format!(
-                        "Audio player: Using miniaudio decoder for {}",
-                        extension
-                    ));
-                    Box::new(src)
-                }
-                Err(err) => {
-                    log_debug(&format!(
-                        "Audio player: miniaudio decoder failed for {}, falling back to FFmpeg: {}",
-                        extension, err
-                    ));
-                    let clock = Arc::new(AtomicI64::new(0));
-                    match FfmpegSource::try_new(&final_path, seconds, Some(Arc::clone(&clock))) {
-                        Ok(src) => {
-                            pts_clock = Some(clock);
-                            Box::new(src)
-                        }
+        log_debug("Audio player: Opening with BASS...");
+        let initial_volume = if options.muted { 0.0 } else { options.volume };
+        let output = match BassOutput::start(
+            &final_path,
+            seconds,
+            effective_speed,
+            initial_volume,
+            effective_paused,
+        ) {
+            Ok(output) => output,
+            Err(err) => {
+                log_debug(&format!("Audio player: BASS open failed: {}", err));
+                match decode_ffmpeg_to_wav(&final_path) {
+                    Ok(wav_path) => match BassOutput::start(
+                        &wav_path,
+                        seconds,
+                        effective_speed,
+                        initial_volume,
+                        effective_paused,
+                    ) {
+                        Ok(output) => output,
                         Err(err) => {
-                            if subtitles_active {
-                                log_debug(&format!(
-                                    "Audio player: FFmpeg required for subtitles, aborting: {}",
-                                    err
-                                ));
-                                return;
-                            }
-                            log_debug(&format!(
-                                "Audio player: FFmpeg failed for {}, falling back to rodio: {}",
-                                extension, err
-                            ));
-                            let file = match std::fs::File::open(&final_path) {
-                                Ok(file) => file,
-                                Err(e) => {
-                                    log_debug(&format!(
-                                        "Audio player: Rodio fallback failed to open file: {}",
-                                        e
-                                    ));
-                                    return;
-                                }
-                            };
-                            let reader = std::io::BufReader::with_capacity(8 * 1024 * 1024, file);
-                            let mut builder = Decoder::builder().with_data(reader);
-                            if file_size > 0 {
-                                builder = builder.with_byte_len(file_size);
-                            }
-                            if !extension.is_empty() {
-                                builder = builder.with_hint(&extension);
-                            }
-                            if prefer_streaming {
-                                builder = builder.with_gapless(false);
-                            }
-                            match builder.build() {
-                                Ok(d) => Box::new(
-                                    d.skip_duration(std::time::Duration::from_secs(seconds)),
-                                ),
-                                Err(err) => {
-                                    log_debug(&format!(
-                                        "Audio player: Rodio fallback decoder failed: {}",
-                                        err
-                                    ));
-                                    return;
-                                }
-                            }
+                            log_debug(&format!("Audio player: BASS fallback failed: {}", err));
+                            return;
                         }
+                    },
+                    Err(err) => {
+                        log_debug(&format!("Audio player: FFmpeg fallback failed: {}", err));
+                        return;
                     }
                 }
-            };
-
-        log_debug(&format!(
-            "Audio player: Source format {}ch @ {} Hz",
-            source.channels(),
-            source.sample_rate()
-        ));
-
-        let source: Box<dyn Source<Item = f32> + Send> =
-            if (effective_speed - 1.0).abs() > f32::EPSILON {
-                log_debug(&format!(
-                    "Audio player: Applying speed factor {}",
-                    effective_speed
-                ));
-                match SoundTouchSource::try_new(source, effective_speed) {
-                    Ok(st_source) => Box::new(st_source),
-                    Err(source) => source,
-                }
-            } else {
-                source
-            };
-
-        log_debug("Audio player: Using miniaudio output.");
-        let initial_volume = if options.muted { 0.0 } else { options.volume };
-        let base_secs = seconds as f64;
-        let output =
-            match MiniaudioOutput::start(source, effective_paused, initial_volume, base_secs) {
-                Ok(output) => output,
-                Err(err) => {
-                    log_debug(&format!("Audio player: miniaudio output failed: {}", err));
-                    return;
-                }
-            };
+            }
+        };
 
         log_debug("Audio player: Playback started");
 
@@ -851,9 +519,9 @@ fn start_audiobook_at_with_options(
             speed: effective_speed,
             subtitle_cancel: subtitle_cancel.clone(),
             subtitle_hold,
+            subtitle_speech_cancel: subtitle_speech_cancel.clone(),
+            subtitle_speech_command: subtitle_speech_command.clone(),
             session_id,
-            pts_clock,
-            miniaudio_cursor,
         };
 
         unsafe {
@@ -969,6 +637,11 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
 
     let result = with_state(hwnd, |state| {
         if let Some(player) = &mut state.active_audiobook {
+            stop_shared_subtitle_speech(
+                &player.subtitle_speech_cancel,
+                &player.subtitle_speech_command,
+                "seek",
+            );
             let current_pos = audiobook_position_secs(player);
             if !player.is_paused {
                 player.start_instant = std::time::Instant::now();
@@ -1024,10 +697,16 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
 
 pub unsafe fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> {
     let path = with_state(hwnd, |state| {
-        state
-            .active_audiobook
-            .as_ref()
-            .map(|player| player.path.clone())
+        if let Some(player) = &state.active_audiobook {
+            stop_shared_subtitle_speech(
+                &player.subtitle_speech_cancel,
+                &player.subtitle_speech_command,
+                "seek",
+            );
+            Some(player.path.clone())
+        } else {
+            None
+        }
     })
     .flatten()
     .ok_or_else(|| "No active audiobook".to_string())?;
@@ -1045,6 +724,11 @@ pub unsafe fn stop_audiobook_playback(hwnd: HWND) {
                 "Audio player: Stopping and removing player for {}",
                 player.path.display()
             ));
+            stop_shared_subtitle_speech(
+                &player.subtitle_speech_cancel,
+                &player.subtitle_speech_command,
+                "stop",
+            );
             state.last_stopped_audiobook = Some(player.path.clone());
             player.subtitle_cancel.store(true, Ordering::Relaxed);
             player.stop();
@@ -1121,7 +805,6 @@ pub unsafe fn change_audiobook_volume(hwnd: HWND, delta: f32) {
 }
 
 pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
-    load_soundtouch_api()?;
     let (path, mode, current_speed) = with_state(hwnd, |state| {
         state.active_audiobook.as_ref().map(|player| {
             (
@@ -1186,7 +869,6 @@ pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
 }
 
 pub unsafe fn reset_audiobook_speed(hwnd: HWND) -> Option<f32> {
-    load_soundtouch_api()?;
     let result = with_state(hwnd, |state| {
         if let Some(player) = state.active_audiobook.take() {
             let current = audiobook_position_secs(&player).floor() as u64;
@@ -1404,21 +1086,7 @@ fn get_or_load_subtitles(media_path: &Path, mode: SubtitleReadMode) -> Option<Su
 }
 
 fn audiobook_position_secs(player: &AudiobookPlayer) -> f64 {
-    if let Some((cursor, sample_rate)) = &player.miniaudio_cursor
-        && *sample_rate > 0
-    {
-        let frames = cursor.load(Ordering::Acquire);
-        if frames > 0 {
-            return (frames as f64 / *sample_rate as f64).max(0.0);
-        }
-    }
     if let Some(pos) = player.output.position_secs() {
-        if let Some(clock) = &player.pts_clock {
-            let pts_us = clock.load(Ordering::Acquire);
-            if pts_us > 0 {
-                return (pts_us as f64 / 1_000_000.0).max(0.0);
-            }
-        }
         return pos.max(0.0);
     }
     if player.is_paused {
@@ -1447,7 +1115,7 @@ fn subtitle_playback_state(hwnd: HWND, path: &Path) -> Option<SubtitlePlaybackSt
 }
 
 /// Get the main audio output for subtitle mixing.
-fn get_main_audio_output(hwnd: HWND, path: &Path) -> Option<Arc<MiniaudioOutput>> {
+fn get_main_audio_output(hwnd: HWND, path: &Path) -> Option<Arc<BassOutput>> {
     unsafe {
         with_state(hwnd, |state| {
             let player = state.active_audiobook.as_ref()?;
@@ -1457,6 +1125,42 @@ fn get_main_audio_output(hwnd: HWND, path: &Path) -> Option<Arc<MiniaudioOutput>
             Some(player.output.clone())
         })
         .flatten()
+    }
+}
+
+fn subtitle_speech_handles(hwnd: HWND, path: &Path) -> Option<SubtitleSpeechHandles> {
+    unsafe {
+        with_state(hwnd, |state| {
+            let player = state.active_audiobook.as_ref()?;
+            if player.path.as_path() != path {
+                return None;
+            }
+            Some((
+                Arc::clone(&player.subtitle_speech_cancel),
+                Arc::clone(&player.subtitle_speech_command),
+            ))
+        })
+        .flatten()
+    }
+}
+
+fn stop_shared_subtitle_speech(
+    cancel_store: &SubtitleSpeechCancel,
+    command_store: &SubtitleSpeechCommand,
+    reason: &str,
+) {
+    let cancel = cancel_store.lock().ok().and_then(|mut guard| guard.take());
+    if let Some(cancel) = cancel {
+        cancel.store(true, Ordering::SeqCst);
+    }
+    let command = command_store.lock().ok().and_then(|mut guard| guard.take());
+    if let Some(tx) = command
+        && let Err(err) = tx.send(TtsCommand::Stop)
+    {
+        log_debug(&format!("Subtitle: stop command failed: {}", err));
+    }
+    if !reason.is_empty() {
+        log_debug(&format!("Subtitle: stopped active speech ({})", reason));
     }
 }
 
@@ -1554,21 +1258,7 @@ fn should_hold_for_edge_subtitles(hwnd: HWND, media_path: &Path) -> bool {
     if !dir.exists() {
         return true;
     }
-    let cache_ready = std::fs::read_dir(&dir)
-        .map(|mut it| {
-            it.any(|entry| {
-                entry
-                    .ok()
-                    .and_then(|e| {
-                        e.path()
-                            .extension()
-                            .and_then(|s| s.to_str())
-                            .map(|s| s.eq_ignore_ascii_case("mp3"))
-                    })
-                    .unwrap_or(false)
-            })
-        })
-        .unwrap_or(false);
+    let cache_ready = edge_cache_has_valid_mp3(&dir);
     if !cache_ready {
         return true;
     }
@@ -1584,6 +1274,29 @@ fn edge_subtitle_key(media_path: &Path, settings: &crate::settings::AppSettings)
         settings.tts_pitch,
         settings.tts_volume
     )
+}
+
+fn edge_cache_has_valid_mp3(dir: &Path) -> bool {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(_) => return false,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let is_mp3 = path
+            .extension()
+            .and_then(|s| s.to_str())
+            .map(|s| s.eq_ignore_ascii_case("mp3"))
+            .unwrap_or(false);
+        if !is_mp3 {
+            continue;
+        }
+        let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+        if size > 0 {
+            return true;
+        }
+    }
+    false
 }
 
 fn mark_edge_confirmed(key: &str) {
@@ -1662,36 +1375,18 @@ fn start_subtitle_reader(
             ));
         }
 
-        // Get the main output early for resampling during preload.
         let main_output = get_main_audio_output(hwnd, &media_path);
-        let mut device_rate: u32 = 0;
-        let mut device_ch: u16 = 0;
-        if let Some(ref output) = main_output {
-            // Wait for output to be ready
-            let mut attempts = 0;
-            while output.device_sample_rate() == 0 && attempts < 200 {
-                std::thread::sleep(Duration::from_millis(10));
-                attempts += 1;
-            }
-            if output.device_sample_rate() > 0 {
-                device_rate = output.device_sample_rate();
-                device_ch = output.device_channels() as u16;
-                log_debug(&format!(
-                    "Subtitle: main output ready ({}ch @ {} Hz)",
-                    output.device_channels(),
-                    output.device_sample_rate()
-                ));
-            } else {
-                log_debug("Subtitle: main output not ready, resampling deferred");
-            }
-        } else {
-            log_debug("Subtitle: no main output available");
-        }
+        let speech_handles = subtitle_speech_handles(hwnd, &media_path);
 
         let mut paused_for_download = subtitle_hold_state(hwnd, &media_path).unwrap_or(false);
         if effective_mode == SubtitleReadMode::User
             && settings.tts_engine == crate::settings::TtsEngine::Edge
         {
+            log_debug(&format!(
+                "Subtitle: Edge TTS enabled for {} (settings_dir={})",
+                media_path.display(),
+                settings_dir().display()
+            ));
             let edge_key = edge_subtitle_key(&media_path, &settings);
             let msg = i18n::tr(settings.language, "subtitles.edge_confirm");
             let title = confirm_title(settings.language);
@@ -1737,22 +1432,13 @@ fn start_subtitle_reader(
             hasher.update(settings.tts_voice.as_bytes());
             let hash = hex::encode(hasher.finalize());
             let dir = base_cache_dir.join(&hash[..16]);
-            let cache_ready = dir.exists()
-                && std::fs::read_dir(&dir)
-                    .map(|mut it| {
-                        it.any(|entry| {
-                            entry
-                                .ok()
-                                .and_then(|e| {
-                                    e.path()
-                                        .extension()
-                                        .and_then(|s| s.to_str())
-                                        .map(|s| s.eq_ignore_ascii_case("mp3"))
-                                })
-                                .unwrap_or(false)
-                        })
-                    })
-                    .unwrap_or(false);
+            let cache_ready = dir.exists() && edge_cache_has_valid_mp3(&dir);
+            log_debug(&format!(
+                "Subtitle: Edge cache status ready={} dir={} voice={}",
+                cache_ready,
+                dir.display(),
+                settings.tts_voice
+            ));
             if !cache_ready {
                 if dir.exists()
                     && let Err(e) = std::fs::remove_dir_all(&dir)
@@ -1792,30 +1478,81 @@ fn start_subtitle_reader(
                     if text.is_empty() {
                         continue;
                     }
-                    let request_id = Uuid::new_v4().simple().to_string();
-                    match rt.block_on(tts_engine::download_audio_chunk(
-                        text,
-                        &settings.tts_voice,
-                        &request_id,
-                        settings.tts_rate,
-                        settings.tts_pitch,
-                        settings.tts_volume,
-                        settings.language,
-                    )) {
-                        Ok(bytes) => {
-                            let path = dir.join(format!("cue_{:04}.mp3", idx));
-                            match std::fs::write(&path, bytes) {
-                                Ok(()) => cue.audio_path = Some(path),
-                                Err(e) => {
+                    let path = dir.join(format!("cue_{:04}.mp3", idx));
+                    let mut empty_attempts = 0u64;
+                    let mut attempts = 0u64;
+                    loop {
+                        if cancel.load(Ordering::Relaxed) {
+                            return;
+                        }
+                        attempts = attempts.saturating_add(1);
+                        if attempts == 1 {
+                            log_debug(&format!(
+                                "Subtitle: downloading Edge cue {} -> {}",
+                                idx,
+                                path.display()
+                            ));
+                        }
+                        let request_id = Uuid::new_v4().simple().to_string();
+                        match rt.block_on(tts_engine::download_audio_chunk(
+                            text,
+                            &settings.tts_voice,
+                            &request_id,
+                            settings.tts_rate,
+                            settings.tts_pitch,
+                            settings.tts_volume,
+                            settings.language,
+                        )) {
+                            Ok(bytes) => {
+                                if bytes.is_empty() {
+                                    empty_attempts = empty_attempts.saturating_add(1);
                                     log_debug(&format!(
-                                        "Subtitle: failed to write audio chunk: {}",
-                                        e
+                                        "Subtitle: empty Edge audio (attempt {}) for cue {}",
+                                        empty_attempts, idx
+                                    ));
+                                    std::thread::sleep(Duration::from_millis(200));
+                                    continue;
+                                }
+                                match std::fs::write(&path, bytes) {
+                                    Ok(()) => {
+                                        let size =
+                                            std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+                                        log_debug(&format!(
+                                            "Subtitle: wrote Edge cue {} ({} bytes)",
+                                            idx, size
+                                        ));
+                                        if size == 0 {
+                                            empty_attempts = empty_attempts.saturating_add(1);
+                                            log_debug(&format!(
+                                                "Subtitle: zero-byte Edge audio (attempt {}) for {}",
+                                                empty_attempts,
+                                                path.display()
+                                            ));
+                                            let _ = std::fs::remove_file(&path);
+                                            std::thread::sleep(Duration::from_millis(200));
+                                            continue;
+                                        }
+                                        cue.audio_path = Some(path.clone());
+                                    }
+                                    Err(e) => {
+                                        log_debug(&format!(
+                                            "Subtitle: failed to write audio chunk: {}",
+                                            e
+                                        ));
+                                    }
+                                }
+                                break;
+                            }
+                            Err(err) => {
+                                log_debug(&format!("Subtitle: download failed: {}", err));
+                                if attempts.is_multiple_of(5) {
+                                    log_debug(&format!(
+                                        "Subtitle: download retrying (attempt {}) for cue {}",
+                                        attempts, idx
                                     ));
                                 }
+                                std::thread::sleep(Duration::from_millis(500));
                             }
-                        }
-                        Err(err) => {
-                            log_debug(&format!("Subtitle: download failed: {}", err));
                         }
                     }
                 }
@@ -1826,6 +1563,22 @@ fn start_subtitle_reader(
                     cues.len(),
                     subtitle_path.display()
                 ));
+                log_debug(&format!(
+                    "Subtitle: cache dir {} (base {})",
+                    dir.display(),
+                    base_cache_dir.display()
+                ));
+                for (idx, cue) in cues.iter().enumerate().take(3) {
+                    if let Some(path) = cue.audio_path.as_ref() {
+                        let size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+                        log_debug(&format!(
+                            "Subtitle: cache cue {} -> {} ({} bytes)",
+                            idx,
+                            path.display(),
+                            size
+                        ));
+                    }
+                }
             } else {
                 for (idx, cue) in cues.iter_mut().enumerate() {
                     let path = dir.join(format!("cue_{:04}.mp3", idx));
@@ -1840,13 +1593,27 @@ fn start_subtitle_reader(
                     cues.len(),
                     subtitle_path.display()
                 ));
+                log_debug(&format!(
+                    "Subtitle: cache dir {} (base {})",
+                    dir.display(),
+                    base_cache_dir.display()
+                ));
+                for (idx, cue) in cues.iter().enumerate().take(3) {
+                    if let Some(path) = cue.audio_path.as_ref() {
+                        let size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+                        log_debug(&format!(
+                            "Subtitle: cache cue {} -> {} ({} bytes)",
+                            idx,
+                            path.display(),
+                            size
+                        ));
+                    }
+                }
             }
 
-            // Pre-decode MP3 to PCM for synchronized playback
             let mut preload_bytes: usize = 0;
             let mut preload_count: usize = 0;
             let mut preload_skipped: usize = 0;
-            let mut decode_failed: usize = 0;
             for cue in cues.iter_mut() {
                 let Some(path) = cue.audio_path.as_ref() else {
                     continue;
@@ -1860,47 +1627,8 @@ fn start_subtitle_reader(
                 match std::fs::read(path) {
                     Ok(bytes) => {
                         preload_bytes = preload_bytes.saturating_add(bytes.len());
-                        // Decode MP3 to PCM for precise timing
-                        match decode_mp3_to_pcm(&bytes) {
-                            Ok((samples, sample_rate, channels)) => {
-                                if device_rate > 0 && device_ch > 0 {
-                                    let resampled =
-                                        if sample_rate != device_rate || channels != device_ch {
-                                            Arc::from(resample_pcm(
-                                                &samples,
-                                                sample_rate,
-                                                channels,
-                                                device_rate,
-                                                device_ch,
-                                            ))
-                                        } else {
-                                            Arc::from(samples)
-                                        };
-                                    cue.pcm_data = Some(SubtitlePcmData {
-                                        samples: resampled,
-                                        sample_rate: device_rate,
-                                        channels: device_ch,
-                                    });
-                                } else {
-                                    cue.pcm_data = Some(SubtitlePcmData {
-                                        samples: Arc::from(samples),
-                                        sample_rate,
-                                        channels,
-                                    });
-                                }
-                                preload_count += 1;
-                            }
-                            Err(e) => {
-                                log_debug(&format!(
-                                    "Subtitle: PCM decode failed for {}: {}",
-                                    path.display(),
-                                    e
-                                ));
-                                // Fallback to raw MP3 bytes
-                                cue.audio_data = Some(Arc::from(bytes));
-                                decode_failed += 1;
-                            }
-                        }
+                        cue.audio_data = Some(Arc::from(bytes));
+                        preload_count += 1;
                     }
                     Err(e) => {
                         log_debug(&format!(
@@ -1912,11 +1640,10 @@ fn start_subtitle_reader(
                 }
             }
             log_debug(&format!(
-                "Subtitle: preload complete ({}/{}) pcm={} fallback={} skipped={}",
-                preload_count + decode_failed,
+                "Subtitle: preload complete ({}/{}) cached={} skipped={}",
+                preload_count,
                 cues.len(),
                 preload_count,
-                decode_failed,
                 preload_skipped
             ));
 
@@ -1951,6 +1678,8 @@ fn start_subtitle_reader(
             };
         let mut last_spoken_index: Option<usize> = None;
         let mut last_spoken_pos = 0.0f64;
+        let mut last_spoken_text: Option<String> = None;
+        let mut spoken_once: HashSet<usize> = HashSet::new();
 
         let timer = WaitableTimer::new();
         if timer.is_none() {
@@ -2027,12 +1756,14 @@ fn start_subtitle_reader(
                     last_position,
                     media_path.display()
                 ));
+                // Seek interrupts are handled by the main thread.
                 if let Some(pos) = cues.iter().position(|cue| cue.end.as_secs_f64() >= raw_pos) {
                     index = pos;
                 } else {
                     index = cues.len();
                 }
                 last_spoken_index = None;
+                spoken_once.clear();
                 // Clear pending audio on seek
                 if let Some(ref output) = main_output {
                     output.clear_subtitles();
@@ -2041,6 +1772,8 @@ fn start_subtitle_reader(
             last_position = raw_pos;
             if raw_pos + 0.5 < last_spoken_pos {
                 last_spoken_index = None;
+                spoken_once.clear();
+                last_spoken_text = None;
             }
 
             while index < cues.len() {
@@ -2067,6 +1800,17 @@ fn start_subtitle_reader(
                     && last == index
                     && (raw_pos - last_spoken_pos).abs() < 0.5
                 {
+                    index += 1;
+                    continue;
+                }
+                if let Some(ref last_text) = last_spoken_text
+                    && last_text == &cue.text
+                    && (raw_pos - last_spoken_pos).abs() < 1.0
+                {
+                    index += 1;
+                    continue;
+                }
+                if spoken_once.contains(&index) {
                     index += 1;
                     continue;
                 }
@@ -2100,39 +1844,53 @@ fn start_subtitle_reader(
                     | SubtitleReadMode::Sapi4
                     | SubtitleReadMode::Edge => match settings.tts_engine {
                         crate::settings::TtsEngine::Edge => {
-                            // Use synchronized output for sample-accurate mixing
-                            if let Some(ref output) = main_output
-                                && let Some(ref pcm) = cue.pcm_data
-                                && output.device_sample_rate() > 0
-                            {
-                                // Resample to device format if needed
-                                let device_rate = output.device_sample_rate();
-                                let device_ch = output.device_channels() as u16;
-                                let samples = if pcm.sample_rate != device_rate
-                                    || pcm.channels != device_ch
-                                {
-                                    Arc::from(resample_pcm(
-                                        &pcm.samples,
-                                        pcm.sample_rate,
-                                        pcm.channels,
-                                        device_rate,
-                                        device_ch,
-                                    ))
+                            if main_output.is_some() {
+                                if let Some(pos) = wait_until_target(raw_pos, target) {
+                                    raw_pos = pos;
                                 } else {
-                                    pcm.samples.clone()
-                                };
-                                // Schedule at exact target time (sample-accurate)
-                                // Apply user offset: positive offset = subtitle later, negative = earlier
-                                let target_secs = (cue_start + offset_secs).max(0.0);
-                                let subtitle = ScheduledSubtitle {
-                                    samples,
-                                    target_secs,
-                                    volume: settings.tts_volume as f32 / 100.0,
-                                };
-                                output.schedule_subtitle(subtitle);
-                                did_emit = true;
+                                    return;
+                                }
+                                if let Some(ref path) = cue.audio_path {
+                                    if let Ok(bytes) = std::fs::read(path) {
+                                        let cancel = crate::tts_engine::play_edge_bytes_async(
+                                            bytes,
+                                            settings.tts_volume,
+                                        );
+                                        if let Some((ref cancel_store, ref command_store)) =
+                                            speech_handles
+                                        {
+                                            if let Ok(mut guard) = cancel_store.lock() {
+                                                *guard = Some(cancel);
+                                            }
+                                            if let Ok(mut guard) = command_store.lock() {
+                                                *guard = None;
+                                            }
+                                        }
+                                        did_emit = true;
+                                    } else {
+                                        log_debug("Subtitle: Edge audio missing, skipping cue.");
+                                    }
+                                } else if let Some(ref audio) = cue.audio_data {
+                                    let cancel = crate::tts_engine::play_edge_bytes_async(
+                                        audio.to_vec(),
+                                        settings.tts_volume,
+                                    );
+                                    if let Some((ref cancel_store, ref command_store)) =
+                                        speech_handles
+                                    {
+                                        if let Ok(mut guard) = cancel_store.lock() {
+                                            *guard = Some(cancel);
+                                        }
+                                        if let Ok(mut guard) = command_store.lock() {
+                                            *guard = None;
+                                        }
+                                    }
+                                    did_emit = true;
+                                } else {
+                                    log_debug("Subtitle: Edge audio missing, skipping cue.");
+                                }
                             } else {
-                                log_debug("Subtitle: Edge PCM missing, skipping cue for accuracy.");
+                                log_debug("Subtitle: main output missing, skipping cue.");
                             }
                         }
                         crate::settings::TtsEngine::Sapi5 => {
@@ -2143,17 +1901,25 @@ fn start_subtitle_reader(
                             }
                             let cancel_flag = Arc::new(AtomicBool::new(false));
                             let (command_tx, command_rx) = tokio::sync::mpsc::unbounded_channel();
-                            drop(command_tx);
                             if let Err(err) = crate::sapi5_engine::play_sapi(
                                 vec![cue.text.clone()],
                                 settings.tts_voice.clone(),
                                 settings.tts_rate,
                                 settings.tts_pitch,
                                 settings.tts_volume,
-                                cancel_flag,
+                                cancel_flag.clone(),
                                 command_rx,
                             ) {
                                 log_debug(&format!("Subtitle: SAPI5 failed: {}", err));
+                            } else if let Some((ref cancel_store, ref command_store)) =
+                                speech_handles
+                            {
+                                if let Ok(mut guard) = cancel_store.lock() {
+                                    *guard = Some(cancel_flag);
+                                }
+                                if let Ok(mut guard) = command_store.lock() {
+                                    *guard = Some(command_tx);
+                                }
                             }
                             did_emit = true;
                         }
@@ -2170,17 +1936,36 @@ fn start_subtitle_reader(
                                     0
                                 }
                             };
+                            log_debug(&format!(
+                                "Subtitle: SAPI4 speak voice='{}' idx={}",
+                                settings.tts_voice, voice_index
+                            ));
                             let cancel_flag = Arc::new(AtomicBool::new(false));
-                            let (_command_tx, command_rx) = tokio::sync::mpsc::unbounded_channel();
+                            let (command_tx, command_rx) = tokio::sync::mpsc::unbounded_channel();
                             crate::sapi4_engine::play_sapi4(
                                 voice_index,
                                 cue.text.clone(),
                                 settings.tts_rate,
                                 settings.tts_pitch,
                                 settings.tts_volume,
-                                cancel_flag,
+                                cancel_flag.clone(),
                                 command_rx,
                             );
+                            if let Some((ref cancel_store, ref command_store)) = speech_handles {
+                                if let Ok(mut guard) = cancel_store.lock() {
+                                    *guard = Some(cancel_flag.clone());
+                                }
+                                if let Ok(mut guard) = command_store.lock() {
+                                    *guard = Some(command_tx.clone());
+                                }
+                            }
+                            let stop_after = (cue_end - cue_start).max(0.5);
+                            std::thread::spawn(move || {
+                                std::thread::sleep(Duration::from_secs_f64(stop_after));
+                                if let Err(err) = command_tx.send(TtsCommand::Stop) {
+                                    log_debug(&format!("Subtitle: SAPI4 stop failed: {}", err));
+                                }
+                            });
                             did_emit = true;
                         }
                     },
@@ -2188,6 +1973,8 @@ fn start_subtitle_reader(
                 if did_emit {
                     last_spoken_index = Some(index);
                     last_spoken_pos = raw_pos;
+                    last_spoken_text = Some(cue.text.clone());
+                    spoken_once.insert(index);
                 }
                 index += 1;
             }
@@ -2199,6 +1986,14 @@ fn start_subtitle_reader(
         // Cleanup: clear any pending subtitles
         if let Some(ref output) = main_output {
             output.clear_subtitles();
+        }
+        if let Some((cancel_store, command_store)) = speech_handles {
+            if let Ok(mut guard) = cancel_store.lock() {
+                *guard = None;
+            }
+            if let Ok(mut guard) = command_store.lock() {
+                *guard = None;
+            }
         }
     });
 }

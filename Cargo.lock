@@ -2585,7 +2585,6 @@ dependencies = [
  "anyhow",
  "bindgen",
  "calamine",
- "cc",
  "cfb",
  "chrono",
  "cpal 0.17.1",

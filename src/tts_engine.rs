@@ -533,6 +533,43 @@ pub fn start_tts_playback_with_chunks(options: TtsPlaybackOptions) {
     });
 }
 
+pub fn play_edge_bytes_async(bytes: Vec<u8>, volume: i32) -> Arc<AtomicBool> {
+    let cancel = Arc::new(AtomicBool::new(false));
+    let cancel_flag = cancel.clone();
+    std::thread::spawn(move || {
+        let stream_handle = match OutputStreamBuilder::open_default_stream() {
+            Ok(handle) => handle,
+            Err(_) => {
+                crate::log_debug("Edge TTS: audio output device not available.");
+                return;
+            }
+        };
+        let sink = Sink::connect_new(stream_handle.mixer());
+        let vol = (volume as f32 / 100.0).clamp(0.0, 1.0);
+        sink.set_volume(vol);
+        let cursor = std::io::Cursor::new(bytes);
+        let source = match Decoder::new(cursor) {
+            Ok(source) => source,
+            Err(err) => {
+                crate::log_debug(&format!("Edge TTS: decoder failed: {}", err));
+                return;
+            }
+        };
+        sink.append(source);
+        loop {
+            if cancel_flag.load(Ordering::SeqCst) {
+                sink.stop();
+                break;
+            }
+            if sink.empty() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    });
+    cancel
+}
+
 pub async fn download_audio_chunk(
     text: &str,
     voice: &str,

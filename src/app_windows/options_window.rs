@@ -1011,6 +1011,36 @@ unsafe extern "system" fn options_wndproc(
             );
             y += 26;
 
+            let label_subtitle_mode = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_subtitle_mode).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_subtitle_mode = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                140,
+                hwnd,
+                HMENU(OPTIONS_ID_SUBTITLE_MODE as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
             let label_podcast_cache_limit = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -1419,36 +1449,6 @@ unsafe extern "system" fn options_wndproc(
                 24,
                 hwnd,
                 HMENU(OPTIONS_ID_INTERPRETER_SEARCH as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_subtitle_mode = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_subtitle_mode).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_subtitle_mode = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                140,
-                hwnd,
-                HMENU(OPTIONS_ID_SUBTITLE_MODE as isize),
                 HINSTANCE(0),
                 None,
             );
@@ -3707,8 +3707,6 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.edit_interpreter_path,
             state.button_interpreter_browse,
             state.button_interpreter_search,
-            state.label_subtitle_mode,
-            state.combo_subtitle_mode,
             state.checkbox_move_cursor,
         ] {
             ShowWindow(control, if show_editor { SW_SHOW } else { SW_HIDE });
@@ -3723,6 +3721,8 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.edit_audio_split_text,
             state.checkbox_audio_split_requires_newline,
             state.checkbox_subtitle_ducking,
+            state.label_subtitle_mode,
+            state.combo_subtitle_mode,
             state.label_podcast_cache_limit,
             state.edit_podcast_cache_limit,
             state.label_podcastindex_key,

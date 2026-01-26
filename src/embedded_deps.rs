@@ -17,6 +17,14 @@ const CACERT_PEM: &[u8] = include_bytes!("../dll/cacert.pem");
 const SOUNDTOUCH_DLL: &[u8] = include_bytes!("../dll/SoundTouch64.dll");
 // NVDA: integrazione con screen reader tramite controller client.
 const NVDA_CLIENT_DLL: &[u8] = include_bytes!("../dll/nvdaControllerClient64.dll");
+// BASS: backend audio per riproduzione e timing precisi.
+const BASS_DLL: &[u8] = include_bytes!("../dll/bass.dll");
+const BASS_FX_DLL: &[u8] = include_bytes!("../dll/bass_fx.dll");
+const BASS_AAC_DLL: &[u8] = include_bytes!("../dll/bass_aac.dll");
+const BASS_ALAC_DLL: &[u8] = include_bytes!("../dll/bass_alac.dll");
+const BASS_FLAC_DLL: &[u8] = include_bytes!("../dll/bassflac.dll");
+const BASS_OPUS_DLL: &[u8] = include_bytes!("../dll/bassopus.dll");
+const BASS_WMA_DLL: &[u8] = include_bytes!("../dll/basswma.dll");
 
 // FFmpeg da vcpkg (link locale)
 const AVCODEC_DLL: &[u8] = include_bytes!("../vcpkg_installed/x64-windows/bin/avcodec-62.dll");
@@ -65,6 +73,13 @@ pub fn extract_all() -> std::io::Result<PathBuf> {
         ("cacert.pem", CACERT_PEM),
         ("SoundTouch64.dll", SOUNDTOUCH_DLL),
         ("nvdaControllerClient64.dll", NVDA_CLIENT_DLL),
+        ("bass.dll", BASS_DLL),
+        ("bass_fx.dll", BASS_FX_DLL),
+        ("bass_aac.dll", BASS_AAC_DLL),
+        ("bass_alac.dll", BASS_ALAC_DLL),
+        ("bassflac.dll", BASS_FLAC_DLL),
+        ("bassopus.dll", BASS_OPUS_DLL),
+        ("basswma.dll", BASS_WMA_DLL),
         ("avcodec-62.dll", AVCODEC_DLL),
         ("avformat-62.dll", AVFORMAT_DLL),
         ("avutil-60.dll", AVUTIL_DLL),

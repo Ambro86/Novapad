@@ -2,6 +2,25 @@ fn main() {
     let root = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     let lib_dir = std::path::Path::new(&root).join("lib64");
 
+    // Build miniaudio (header-only) as a static object.
+    let miniaudio_dir = std::path::Path::new(&root).join("dll");
+    let miniaudio_c = miniaudio_dir.join("miniaudio.c");
+    let miniaudio_h = miniaudio_dir.join("miniaudio.h");
+    if miniaudio_c.exists() && miniaudio_h.exists() {
+        println!("cargo:rerun-if-changed={}", miniaudio_c.display());
+        println!("cargo:rerun-if-changed={}", miniaudio_h.display());
+        cc::Build::new()
+            .file(&miniaudio_c)
+            .include(&miniaudio_dir)
+            .compile("miniaudio");
+    } else {
+        println!(
+            "cargo:warning=Miniaudio source missing: {} or {}",
+            miniaudio_c.display(),
+            miniaudio_h.display()
+        );
+    }
+
     println!("cargo:rustc-link-search=native={}", lib_dir.display());
     println!("cargo:rustc-link-lib=static=libcurl");
     println!("cargo:rustc-link-lib=static=ssl");
@@ -54,6 +73,7 @@ fn main() {
 
     // Generate minimal FFmpeg bindings for runtime dynamic loading.
     generate_ffmpeg_bindings();
+    generate_miniaudio_bindings();
 }
 
 fn generate_ffmpeg_bindings() {
@@ -181,6 +201,79 @@ fn generate_ffmpeg_bindings() {
             && let Err(err) = std::fs::write(&bindings_path, updated)
         {
             println!("cargo:warning=Failed to patch FFmpeg bindings: {}", err);
+        }
+    }
+}
+
+fn generate_miniaudio_bindings() {
+    let root = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+    let header = std::path::Path::new(&root).join("dll").join("miniaudio.h");
+    if !header.exists() {
+        println!(
+            "cargo:warning=Miniaudio header missing: {}",
+            header.display()
+        );
+        return;
+    }
+
+    let out_dir = std::env::var("OUT_DIR").unwrap();
+    let bindings_path = std::path::Path::new(&out_dir).join("miniaudio_bindings.rs");
+
+    let bindings = match bindgen::Builder::default()
+        .header(header.to_string_lossy())
+        .allowlist_function("ma_device_config_init")
+        .allowlist_function("ma_device_init")
+        .allowlist_function("ma_device_uninit")
+        .allowlist_function("ma_device_start")
+        .allowlist_function("ma_device_stop")
+        .allowlist_function("ma_decoder_config_init")
+        .allowlist_function("ma_decoder_init_file_w")
+        .allowlist_function("ma_decoder_init_file")
+        .allowlist_function("ma_decoder_uninit")
+        .allowlist_function("ma_decoder_read_pcm_frames")
+        .allowlist_function("ma_decoder_get_data_format")
+        .allowlist_function("ma_decoder_seek_to_pcm_frame")
+        .allowlist_function("ma_decoder_get_length_in_pcm_frames")
+        .allowlist_function("ma_decoder_get_cursor_in_pcm_frames")
+        .allowlist_type("ma_device")
+        .allowlist_type("ma_device_config")
+        .allowlist_type("ma_device_type")
+        .allowlist_type("ma_format")
+        .allowlist_type("ma_decoder")
+        .allowlist_type("ma_decoder_config")
+        .allowlist_type("ma_uint32")
+        .allowlist_type("ma_uint64")
+        .allowlist_type("ma_result")
+        .allowlist_type("ma_bool32")
+        .allowlist_type("ma_wchar")
+        .allowlist_var("ma_format_f32")
+        .allowlist_var("ma_device_type_playback")
+        .allowlist_var("MA_SUCCESS")
+        .allowlist_var("MA_AT_END")
+        .layout_tests(false)
+        .generate()
+    {
+        Ok(bindings) => bindings,
+        Err(err) => {
+            println!(
+                "cargo:warning=Failed to generate miniaudio bindings: {}",
+                err
+            );
+            return;
+        }
+    };
+
+    if let Err(err) = bindings.write_to_file(&bindings_path) {
+        println!("cargo:warning=Failed to write miniaudio bindings: {}", err);
+        return;
+    }
+
+    if let Ok(contents) = std::fs::read_to_string(&bindings_path) {
+        let updated = contents.replace("extern \"C\" {", "unsafe extern \"C\" {");
+        if updated != contents
+            && let Err(err) = std::fs::write(&bindings_path, updated)
+        {
+            println!("cargo:warning=Failed to patch miniaudio bindings: {}", err);
         }
     }
 }

@@ -3,11 +3,11 @@ use crate::ffmpeg_export::{MixExportOptions, export_mixed_media, is_mixed_output
 use crate::ffmpeg_source::FfmpegSource;
 use crate::i18n;
 use crate::log_debug;
+use crate::miniaudio_output::{MiniaudioDecoderSource, MiniaudioOutput, ScheduledSubtitle};
 use crate::settings::{FileFormat, SubtitleReadMode, confirm_title, settings_dir};
 use crate::subtitle_wasapi::{decode_mp3_to_pcm, resample_pcm};
 use crate::subtitles::{SubtitleCue, SubtitlePcmData, find_subtitle_for_media, load_subtitles};
 use crate::tts_engine;
-use crate::wasapi_output::{ScheduledSubtitle, WasapiOutput};
 use crate::with_state;
 use libloading::Library;
 use rodio::{Decoder, Source};
@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::time::Duration;
 use std::time::UNIX_EPOCH;
 use uuid::Uuid;
@@ -32,7 +32,7 @@ use windows::core::PCWSTR;
 
 pub struct AudiobookPlayer {
     pub path: PathBuf,
-    output: Arc<WasapiOutput>,
+    output: Arc<MiniaudioOutput>,
     pub is_paused: bool,
     pub start_instant: std::time::Instant,
     pub accumulated_seconds: u64,
@@ -43,6 +43,8 @@ pub struct AudiobookPlayer {
     pub subtitle_cancel: Arc<AtomicBool>,
     pub subtitle_hold: bool,
     pub session_id: u64,
+    pub pts_clock: Option<Arc<AtomicI64>>,
+    pub miniaudio_cursor: Option<(Arc<AtomicU64>, u32)>,
 }
 
 impl AudiobookPlayer {
@@ -60,6 +62,10 @@ impl AudiobookPlayer {
 
     fn set_volume(&self, volume: f32) {
         self.output.set_volume(volume);
+    }
+
+    pub(crate) fn position_secs(&self) -> Option<f64> {
+        self.output.position_secs()
     }
 }
 
@@ -666,16 +672,15 @@ fn start_audiobook_at_with_options(
             .as_ref()
             .map(|entry| !entry.cues.is_empty())
             .unwrap_or(false);
-        let force_ffmpeg = subtitle_mode != SubtitleReadMode::Off && subtitles_available;
-        let use_ffmpeg = true;
-        let effective_speed = if force_ffmpeg {
+        let subtitles_active = subtitle_mode != SubtitleReadMode::Off && subtitles_available;
+        let effective_speed = if subtitles_active {
             1.0
         } else if (requested_speed - 1.0).abs() > f32::EPSILON && load_soundtouch_api().is_some() {
             requested_speed
         } else {
             1.0
         };
-        let prefer_streaming = use_ffmpeg;
+        let prefer_streaming = true;
         log_mkv_probe_once(&path);
 
         // Force M4A extension for Media Foundation to avoid indexing hangs on .mp4 video files
@@ -712,301 +717,80 @@ fn start_audiobook_at_with_options(
             .and_then(|e| e.to_str())
             .unwrap_or("")
             .to_lowercase();
-        let is_mf_favored =
-            extension == "m4a" || extension == "mp4" || extension == "aac" || extension == "mp3";
 
         log_debug("Audio player: Creating decoder...");
-        let pts_clock = if force_ffmpeg {
-            Some(Arc::new(AtomicI64::new(
-                (seconds as i64).saturating_mul(1_000_000),
-            )))
-        } else {
-            None
-        };
-
-        let source: Box<dyn Source<Item = f32> + Send> = if use_ffmpeg {
-            log_debug(&format!("Audio player: Using FFmpeg for {}", extension));
-            match FfmpegSource::try_new(&final_path, seconds, pts_clock.clone()) {
-                Ok(src) => Box::new(src),
-                Err(err) => {
-                    if force_ffmpeg {
-                        log_debug(&format!(
-                            "Audio player: FFmpeg required for subtitles, aborting: {}",
-                            err
-                        ));
-                        return;
-                    }
+        let mut pts_clock: Option<Arc<AtomicI64>> = None;
+        let mut miniaudio_cursor: Option<(Arc<AtomicU64>, u32)> = None;
+        let source: Box<dyn Source<Item = f32> + Send> =
+            match MiniaudioDecoderSource::try_new(&final_path, seconds) {
+                Ok(src) => {
+                    miniaudio_cursor = Some((src.cursor_frames_handle(), src.sample_rate_hz()));
                     log_debug(&format!(
-                        "Audio player: FFmpeg failed for {}, falling back to rodio: {}",
+                        "Audio player: Using miniaudio decoder for {}",
+                        extension
+                    ));
+                    Box::new(src)
+                }
+                Err(err) => {
+                    log_debug(&format!(
+                        "Audio player: miniaudio decoder failed for {}, falling back to FFmpeg: {}",
                         extension, err
                     ));
-                    let file = match std::fs::File::open(&path) {
-                        Ok(file) => file,
-                        Err(e) => {
-                            log_debug(&format!(
-                                "Audio player: Rodio fallback failed to open file: {}",
-                                e
-                            ));
-                            return;
+                    let clock = Arc::new(AtomicI64::new(0));
+                    match FfmpegSource::try_new(&final_path, seconds, Some(Arc::clone(&clock))) {
+                        Ok(src) => {
+                            pts_clock = Some(clock);
+                            Box::new(src)
                         }
-                    };
-                    let reader = std::io::BufReader::with_capacity(8 * 1024 * 1024, file);
-                    let mut builder = Decoder::builder().with_data(reader);
-                    if file_size > 0 {
-                        builder = builder.with_byte_len(file_size);
-                    }
-                    if !extension.is_empty() {
-                        builder = builder.with_hint(&extension);
-                    }
-                    match builder.build() {
-                        Ok(d) => Box::new(d.skip_duration(std::time::Duration::from_secs(seconds))),
                         Err(err) => {
+                            if subtitles_active {
+                                log_debug(&format!(
+                                    "Audio player: FFmpeg required for subtitles, aborting: {}",
+                                    err
+                                ));
+                                return;
+                            }
                             log_debug(&format!(
-                                "Audio player: Rodio fallback decoder failed: {}",
-                                err
+                                "Audio player: FFmpeg failed for {}, falling back to rodio: {}",
+                                extension, err
                             ));
-                            return;
-                        }
-                    }
-                }
-            }
-        } else if is_mf_favored {
-            log_debug(&format!(
-                "Audio player: Using Media Foundation for {}",
-                extension
-            ));
-            match crate::mf_source::MfSource::try_new(&final_path) {
-                Ok(mut mfs) => {
-                    let mut fallback_source: Option<Box<dyn Source<Item = f32> + Send>> = None;
-                    if seconds > 0 {
-                        log_debug(&format!("Audio player: Efficient seek to {}s", seconds));
-                        if let Err(e) = mfs.seek(std::time::Duration::from_secs(seconds)) {
-                            log_debug(&format!("Audio player: MfSource seek failed: {}", e));
-                            match FfmpegSource::try_new(&final_path, seconds, None) {
-                                Ok(src) => {
-                                    log_debug(
-                                        "Audio player: Falling back to FFmpeg after MF seek failure.",
-                                    );
-                                    fallback_source = Some(Box::new(src));
+                            let file = match std::fs::File::open(&final_path) {
+                                Ok(file) => file,
+                                Err(e) => {
+                                    log_debug(&format!(
+                                        "Audio player: Rodio fallback failed to open file: {}",
+                                        e
+                                    ));
+                                    return;
                                 }
+                            };
+                            let reader = std::io::BufReader::with_capacity(8 * 1024 * 1024, file);
+                            let mut builder = Decoder::builder().with_data(reader);
+                            if file_size > 0 {
+                                builder = builder.with_byte_len(file_size);
+                            }
+                            if !extension.is_empty() {
+                                builder = builder.with_hint(&extension);
+                            }
+                            if prefer_streaming {
+                                builder = builder.with_gapless(false);
+                            }
+                            match builder.build() {
+                                Ok(d) => Box::new(
+                                    d.skip_duration(std::time::Duration::from_secs(seconds)),
+                                ),
                                 Err(err) => {
                                     log_debug(&format!(
-                                        "Audio player: FFmpeg fallback failed after MF seek failure: {}",
+                                        "Audio player: Rodio fallback decoder failed: {}",
                                         err
                                     ));
-                                    let file = match std::fs::File::open(&path) {
-                                        Ok(file) => file,
-                                        Err(e) => {
-                                            log_debug(&format!(
-                                                "Audio player: Rodio fallback failed to open file: {}",
-                                                e
-                                            ));
-                                            return;
-                                        }
-                                    };
-                                    let reader =
-                                        std::io::BufReader::with_capacity(8 * 1024 * 1024, file);
-                                    let mut builder = Decoder::builder().with_data(reader);
-                                    if file_size > 0 {
-                                        builder = builder.with_byte_len(file_size);
-                                    }
-                                    if !extension.is_empty() {
-                                        builder = builder.with_hint(&extension);
-                                    }
-                                    if prefer_streaming {
-                                        builder = builder.with_gapless(false);
-                                    }
-                                    match builder.build() {
-                                        Ok(d) => {
-                                            fallback_source = Some(Box::new(d.skip_duration(
-                                                std::time::Duration::from_secs(seconds),
-                                            )));
-                                        }
-                                        Err(err) => {
-                                            log_debug(&format!(
-                                                "Audio player: Rodio fallback decoder failed: {}",
-                                                err
-                                            ));
-                                            return;
-                                        }
-                                    }
+                                    return;
                                 }
                             }
                         }
                     }
-                    if let Some(source) = fallback_source {
-                        source
-                    } else {
-                        Box::new(mfs)
-                    }
-                }
-                Err(e) => {
-                    log_debug(&format!(
-                        "Audio player: MfSource failed for {}, falling back to rodio: {}",
-                        extension, e
-                    ));
-                    // Fallback to rodio decoder
-                    let file = match std::fs::File::open(&path) {
-                        Ok(file) => file,
-                        Err(e) => {
-                            log_debug(&format!(
-                                "Audio player: Rodio fallback failed to open file: {}",
-                                e
-                            ));
-                            return;
-                        }
-                    };
-                    let reader = std::io::BufReader::with_capacity(8 * 1024 * 1024, file);
-                    let mut builder = Decoder::builder().with_data(reader);
-                    if file_size > 0 {
-                        builder = builder.with_byte_len(file_size);
-                    }
-                    if !extension.is_empty() {
-                        builder = builder.with_hint(&extension);
-                    }
-                    if prefer_streaming {
-                        builder = builder.with_gapless(false);
-                    }
-                    match builder.build() {
-                        Ok(d) => Box::new(d.skip_duration(std::time::Duration::from_secs(seconds))),
-                        Err(err) => {
-                            log_debug(&format!(
-                                "Audio player: Rodio fallback decoder failed: {}",
-                                err
-                            ));
-                            return;
-                        }
-                    }
-                }
-            }
-        } else if prefer_streaming || file_size > 100 * 1024 * 1024 {
-            if prefer_streaming {
-                log_debug("Audio player: Streaming decode path selected.");
-            } else {
-                log_debug(
-                    "Audio player: Large file detected (>100MB). Indexing may take a few seconds...",
-                );
-            }
-            let file = match std::fs::File::open(&path) {
-                Ok(f) => f,
-                Err(e) => {
-                    log_debug(&format!("Audio player: failed to open large file: {}", e));
-                    return;
                 }
             };
-            let reader = std::io::BufReader::with_capacity(8 * 1024 * 1024, file);
-            let mut builder = Decoder::builder().with_data(reader);
-            if file_size > 0 {
-                builder = builder.with_byte_len(file_size);
-            }
-            if !extension.is_empty() {
-                builder = builder.with_hint(&extension);
-            }
-            if prefer_streaming {
-                builder = builder.with_gapless(false);
-            }
-            match builder.build() {
-                Ok(d) => {
-                    if seconds > 0 {
-                        log_debug(&format!("Audio player: Skipping to {} seconds", seconds));
-                        Box::new(d.skip_duration(std::time::Duration::from_secs(seconds)))
-                    } else {
-                        Box::new(d)
-                    }
-                }
-                Err(e) => {
-                    log_debug(&format!("Audio player: Failed to create decoder: {}", e));
-                    return;
-                }
-            }
-        } else {
-            match std::fs::read(&path) {
-                Ok(bytes) => {
-                    log_debug(&format!(
-                        "Audio player: Read {} bytes into memory",
-                        bytes.len()
-                    ));
-                    let bytes_len = bytes.len() as u64;
-                    let mut builder = Decoder::builder().with_data(std::io::Cursor::new(bytes));
-                    if bytes_len > 0 {
-                        builder = builder.with_byte_len(bytes_len);
-                    }
-                    if !extension.is_empty() {
-                        builder = builder.with_hint(&extension);
-                    }
-                    if prefer_streaming {
-                        builder = builder.with_gapless(false);
-                    }
-                    match builder.build() {
-                        Ok(d) => {
-                            if seconds > 0 {
-                                log_debug(&format!(
-                                    "Audio player: Skipping to {} seconds",
-                                    seconds
-                                ));
-                                Box::new(d.skip_duration(std::time::Duration::from_secs(seconds)))
-                            } else {
-                                Box::new(d)
-                            }
-                        }
-                        Err(e) => {
-                            log_debug(&format!(
-                                "Audio player: Failed to create memory decoder: {}",
-                                e
-                            ));
-                            return;
-                        }
-                    }
-                }
-                Err(e) => {
-                    log_debug(&format!(
-                        "Audio player: Failed to read file into memory: {}",
-                        e
-                    ));
-                    let file = match std::fs::File::open(&path) {
-                        Ok(f) => f,
-                        Err(e) => {
-                            log_debug(&format!(
-                                "Audio player: failed to open file for fallback: {}",
-                                e
-                            ));
-                            return;
-                        }
-                    };
-                    let reader = std::io::BufReader::new(file);
-                    let mut builder = Decoder::builder().with_data(reader);
-                    if file_size > 0 {
-                        builder = builder.with_byte_len(file_size);
-                    }
-                    if !extension.is_empty() {
-                        builder = builder.with_hint(&extension);
-                    }
-                    if prefer_streaming {
-                        builder = builder.with_gapless(false);
-                    }
-                    match builder.build() {
-                        Ok(d) => {
-                            if seconds > 0 {
-                                log_debug(&format!(
-                                    "Audio player: Skipping to {} seconds",
-                                    seconds
-                                ));
-                                Box::new(d.skip_duration(std::time::Duration::from_secs(seconds)))
-                            } else {
-                                Box::new(d)
-                            }
-                        }
-                        Err(err) => {
-                            log_debug(&format!(
-                                "Audio player: Final decoder attempt failed: {}",
-                                err
-                            ));
-                            return;
-                        }
-                    }
-                }
-            }
-        };
 
         log_debug(&format!(
             "Audio player: Source format {}ch @ {} Hz",
@@ -1028,22 +812,17 @@ fn start_audiobook_at_with_options(
                 source
             };
 
-        log_debug("Audio player: Using WASAPI output.");
+        log_debug("Audio player: Using miniaudio output.");
         let initial_volume = if options.muted { 0.0 } else { options.volume };
         let base_secs = seconds as f64;
-        let output = match WasapiOutput::start(
-            source,
-            effective_paused,
-            initial_volume,
-            base_secs,
-            pts_clock.clone(),
-        ) {
-            Ok(output) => output,
-            Err(err) => {
-                log_debug(&format!("Audio player: WASAPI output failed: {}", err));
-                return;
-            }
-        };
+        let output =
+            match MiniaudioOutput::start(source, effective_paused, initial_volume, base_secs) {
+                Ok(output) => output,
+                Err(err) => {
+                    log_debug(&format!("Audio player: miniaudio output failed: {}", err));
+                    return;
+                }
+            };
 
         log_debug("Audio player: Playback started");
 
@@ -1054,7 +833,7 @@ fn start_audiobook_at_with_options(
             })
             .unwrap_or(0)
         };
-        if force_ffmpeg && (requested_speed - 1.0).abs() > f32::EPSILON {
+        if subtitles_active && (requested_speed - 1.0).abs() > f32::EPSILON {
             log_debug(
                 "Subtitles active: forcing speed=1.0 (time-stretch disabled) for accurate sync.",
             );
@@ -1073,6 +852,8 @@ fn start_audiobook_at_with_options(
             subtitle_cancel: subtitle_cancel.clone(),
             subtitle_hold,
             session_id,
+            pts_clock,
+            miniaudio_cursor,
         };
 
         unsafe {
@@ -1193,7 +974,7 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
                 player.start_instant = std::time::Instant::now();
             }
             let new_pos = (current_pos as i64 + seconds).max(0);
-            // WASAPI doesn't support direct seek, always restart
+            // Output doesn't support direct seek, always restart
             player.accumulated_seconds = new_pos as u64;
             Some(SeekAction::Restart {
                 path: player.path.clone(),
@@ -1251,7 +1032,7 @@ pub unsafe fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> 
     .flatten()
     .ok_or_else(|| "No active audiobook".to_string())?;
 
-    // WASAPI doesn't support direct seek, always restart
+    // Output doesn't support direct seek, always restart
     start_audiobook_at(hwnd, &path, seconds);
     Ok(())
 }
@@ -1623,33 +1404,21 @@ fn get_or_load_subtitles(media_path: &Path, mode: SubtitleReadMode) -> Option<Su
 }
 
 fn audiobook_position_secs(player: &AudiobookPlayer) -> f64 {
-    let audible_us = player.output.audible_time_us();
-    let pos_secs = player.output.position_secs();
-    if let (Some(audible), Some(pos)) = (audible_us, pos_secs) {
-        let pos_us = (pos * 1_000_000.0) as i64;
-        let diff = (pos_us - audible).abs();
-        if diff > 200_000 {
-            log_debug(&format!(
-                "SubtitleClock: audible/clock diff {:.3}s (audible {} us, clock {} us) using clock",
-                diff as f64 / 1_000_000.0,
-                audible,
-                pos_us
-            ));
-            return pos.max(0.0);
+    if let Some((cursor, sample_rate)) = &player.miniaudio_cursor
+        && *sample_rate > 0
+    {
+        let frames = cursor.load(Ordering::Acquire);
+        if frames > 0 {
+            return (frames as f64 / *sample_rate as f64).max(0.0);
         }
     }
-    if let Some(us) = audible_us {
-        if let Some((padding_frames, padding_us, last_end, sample_rate)) =
-            player.output.subtitle_timing_debug()
-        {
-            log_debug(&format!(
-                "SubtitleClock: audible_us={} padding_frames={} padding_us={} last_written_end_pts_us={} sample_rate={}",
-                us, padding_frames, padding_us, last_end, sample_rate
-            ));
+    if let Some(pos) = player.output.position_secs() {
+        if let Some(clock) = &player.pts_clock {
+            let pts_us = clock.load(Ordering::Acquire);
+            if pts_us > 0 {
+                return (pts_us as f64 / 1_000_000.0).max(0.0);
+            }
         }
-        return (us as f64 / 1_000_000.0).max(0.0);
-    }
-    if let Some(pos) = pos_secs {
         return pos.max(0.0);
     }
     if player.is_paused {
@@ -1678,7 +1447,7 @@ fn subtitle_playback_state(hwnd: HWND, path: &Path) -> Option<SubtitlePlaybackSt
 }
 
 /// Get the main audio output for subtitle mixing.
-fn get_main_wasapi_output(hwnd: HWND, path: &Path) -> Option<Arc<WasapiOutput>> {
+fn get_main_audio_output(hwnd: HWND, path: &Path) -> Option<Arc<MiniaudioOutput>> {
     unsafe {
         with_state(hwnd, |state| {
             let player = state.active_audiobook.as_ref()?;
@@ -1893,12 +1662,12 @@ fn start_subtitle_reader(
             ));
         }
 
-        // Get the main WASAPI output early for resampling during preload.
-        let main_output = get_main_wasapi_output(hwnd, &media_path);
+        // Get the main output early for resampling during preload.
+        let main_output = get_main_audio_output(hwnd, &media_path);
         let mut device_rate: u32 = 0;
         let mut device_ch: u16 = 0;
         if let Some(ref output) = main_output {
-            // Wait for WASAPI to be ready
+            // Wait for output to be ready
             let mut attempts = 0;
             while output.device_sample_rate() == 0 && attempts < 200 {
                 std::thread::sleep(Duration::from_millis(10));
@@ -1908,15 +1677,15 @@ fn start_subtitle_reader(
                 device_rate = output.device_sample_rate();
                 device_ch = output.device_channels() as u16;
                 log_debug(&format!(
-                    "Subtitle: main WASAPI ready ({}ch @ {} Hz)",
+                    "Subtitle: main output ready ({}ch @ {} Hz)",
                     output.device_channels(),
                     output.device_sample_rate()
                 ));
             } else {
-                log_debug("Subtitle: main WASAPI not ready, resampling deferred");
+                log_debug("Subtitle: main output not ready, resampling deferred");
             }
         } else {
-            log_debug("Subtitle: no main WASAPI output available");
+            log_debug("Subtitle: no main output available");
         }
 
         let mut paused_for_download = subtitle_hold_state(hwnd, &media_path).unwrap_or(false);
@@ -2073,7 +1842,7 @@ fn start_subtitle_reader(
                 ));
             }
 
-            // Pre-decode MP3 to PCM for synchronized WASAPI playback
+            // Pre-decode MP3 to PCM for synchronized playback
             let mut preload_bytes: usize = 0;
             let mut preload_count: usize = 0;
             let mut preload_skipped: usize = 0;
@@ -2168,7 +1937,7 @@ fn start_subtitle_reader(
             }
         }
 
-        let offset_secs = settings.subtitle_offset_ms as f64 / 1000.0;
+        let offset_secs = 0.0;
         let (mut index, mut last_position, mut last_paused) =
             if let Some(state) = subtitle_playback_state(hwnd, &media_path) {
                 let raw_pos = state.position_secs;
@@ -2180,6 +1949,8 @@ fn start_subtitle_reader(
             } else {
                 return;
             };
+        let mut last_spoken_index: Option<usize> = None;
+        let mut last_spoken_pos = 0.0f64;
 
         let timer = WaitableTimer::new();
         if timer.is_none() {
@@ -2207,9 +1978,9 @@ fn start_subtitle_reader(
                     return Some(current_pos);
                 }
                 let remaining = target - current_pos;
-                if remaining > 0.02 {
-                    let mut sleep_secs = remaining - 0.002;
-                    sleep_secs = sleep_secs.clamp(0.0, 0.05);
+                if remaining > 0.01 {
+                    let mut sleep_secs = remaining - 0.001;
+                    sleep_secs = sleep_secs.clamp(0.0, 0.01);
                     if sleep_secs > 0.0 {
                         if let Some(ref timer) = timer {
                             if !sleep_precise(timer, Duration::from_secs_f64(sleep_secs)) {
@@ -2261,12 +2032,16 @@ fn start_subtitle_reader(
                 } else {
                     index = cues.len();
                 }
+                last_spoken_index = None;
                 // Clear pending audio on seek
                 if let Some(ref output) = main_output {
                     output.clear_subtitles();
                 }
             }
             last_position = raw_pos;
+            if raw_pos + 0.5 < last_spoken_pos {
+                last_spoken_index = None;
+            }
 
             while index < cues.len() {
                 let cue = cues[index].clone();
@@ -2288,6 +2063,13 @@ fn start_subtitle_reader(
                     index += 1;
                     continue;
                 }
+                if let Some(last) = last_spoken_index
+                    && last == index
+                    && (raw_pos - last_spoken_pos).abs() < 0.5
+                {
+                    index += 1;
+                    continue;
+                }
 
                 let delta_from_start = raw_pos - cue_start;
                 let mut preview = cue.text.replace('\n', " ");
@@ -2299,6 +2081,7 @@ fn start_subtitle_reader(
                     "SubtitleSync: idx={} start={:.3}s raw={:.3}s delta={:.3}s offset={:.3}s text='{}'",
                     index, cue_start, raw_pos, delta_from_start, offset_secs, preview
                 ));
+                let mut did_emit = false;
                 match effective_mode {
                     SubtitleReadMode::Off => {}
                     SubtitleReadMode::Nvda => {
@@ -2310,13 +2093,14 @@ fn start_subtitle_reader(
                         if !nvda_speak(&cue.text) {
                             log_debug("Subtitle: NVDA speak failed.");
                         }
+                        did_emit = true;
                     }
                     SubtitleReadMode::User
                     | SubtitleReadMode::Sapi5
                     | SubtitleReadMode::Sapi4
                     | SubtitleReadMode::Edge => match settings.tts_engine {
                         crate::settings::TtsEngine::Edge => {
-                            // Use synchronized WASAPI output for sample-accurate mixing
+                            // Use synchronized output for sample-accurate mixing
                             if let Some(ref output) = main_output
                                 && let Some(ref pcm) = cue.pcm_data
                                 && output.device_sample_rate() > 0
@@ -2346,6 +2130,7 @@ fn start_subtitle_reader(
                                     volume: settings.tts_volume as f32 / 100.0,
                                 };
                                 output.schedule_subtitle(subtitle);
+                                did_emit = true;
                             } else {
                                 log_debug("Subtitle: Edge PCM missing, skipping cue for accuracy.");
                             }
@@ -2370,6 +2155,7 @@ fn start_subtitle_reader(
                             ) {
                                 log_debug(&format!("Subtitle: SAPI5 failed: {}", err));
                             }
+                            did_emit = true;
                         }
                         crate::settings::TtsEngine::Sapi4 => {
                             if let Some(pos) = wait_until_target(raw_pos, target) {
@@ -2395,8 +2181,13 @@ fn start_subtitle_reader(
                                 cancel_flag,
                                 command_rx,
                             );
+                            did_emit = true;
                         }
                     },
+                }
+                if did_emit {
+                    last_spoken_index = Some(index);
+                    last_spoken_pos = raw_pos;
                 }
                 index += 1;
             }

@@ -206,6 +206,7 @@ libc = "0.2"
 
 [build-dependencies]
 bindgen = { version = "0.70", default-features = false, features = ["runtime"] }
+cc = "1.0"
 
 [features]
 portable = []

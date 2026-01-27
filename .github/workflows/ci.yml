@@ -111,6 +111,14 @@ jobs:
       if: steps.cache-cargo-packager.outputs.cache-hit != 'true'
       run: cargo install cargo-packager --locked
 
+    - name: Build Standalone (Release)
+      run: cargo build --verbose --release --features standalone
+
+    - name: Prepare Standalone Artifact
+      shell: powershell
+      run: |
+        Copy-Item -Path "target/release/novapad.exe" -Destination "target/release/novapad-standalone.exe"
+
     - name: Build (Release)
       run: cargo build --verbose --release
 
@@ -145,3 +153,9 @@ jobs:
       with:
         name: Novapad-MSI
         path: target/release/*.msi
+
+    - name: Upload Standalone (Exe)
+      uses: actions/upload-artifact@v4
+      with:
+        name: Novapad-Standalone
+        path: target/release/novapad-standalone.exe

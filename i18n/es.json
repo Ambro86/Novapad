@@ -163,6 +163,7 @@
   "options.label.quote_prefix": "Prefijo de cita:",
   "options.label.move_cursor": "Mover cursor durante la lectura",
   "options.label.check_updates": "Buscar actualizaciones al iniciar",
+  "options.label.send_crash_reports": "Enviar informes de errores anónimos",
   "options.label.context_menu": "Agregar \"Abrir con Novapad\" al menu contextual",
   "context_menu.open_with": "Abrir con Novapad",
   "context_menu.spelling_ok": "Ortografia: OK",

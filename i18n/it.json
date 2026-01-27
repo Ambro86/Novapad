@@ -173,6 +173,7 @@
   "options.button.browse": "Sfoglia...",
   "options.label.move_cursor": "Sposta il cursore durante la lettura",
   "options.label.check_updates": "Controlla aggiornamenti all'avvio",
+  "options.label.send_crash_reports": "Invia segnalazioni di crash anonime",
   "options.label.context_menu": "Aggiungi \"Apri con Novapad\" al menu contestuale",
   "options.label.file_associations": "Associazioni file:",
   "options.button.manage_associations": "Imposta come applicazione predefinita...",

@@ -163,6 +163,7 @@
   "options.label.quote_prefix": "Tiền tố trích dẫn:",
   "options.label.move_cursor": "Di chuyển con trỏ trong khi đọc",
   "options.label.check_updates": "Kiểm tra cập nhật khi khởi động",
+  "options.label.send_crash_reports": "Gửi báo cáo lỗi ẩn danh",
   "options.label.context_menu": "Thêm \"Mở bằng Novapad\" vào menu chuột phải",
   "context_menu.open_with": "Mở bằng Novapad",
   "context_menu.spelling_ok": "Chính tả: OK",

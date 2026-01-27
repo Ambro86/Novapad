@@ -83,6 +83,7 @@ const OPTIONS_ID_INTERPRETER_SEARCH: usize = 6043;
 const OPTIONS_ID_WRAP_WIDTH: usize = 6017;
 const OPTIONS_ID_QUOTE_PREFIX: usize = 6018;
 const OPTIONS_ID_CHECK_UPDATES: usize = 6015;
+const OPTIONS_ID_SEND_CRASH_REPORTS: usize = 6048;
 const OPTIONS_ID_MANAGE_ASSOCIATIONS: usize = 6044;
 const OPTIONS_ID_PROMPT_PROGRAM: usize = 6019;
 const OPTIONS_ID_TABS: usize = 6024;
@@ -220,6 +221,7 @@ struct OptionsDialogState {
     combo_subtitle_mode: HWND,
     checkbox_move_cursor: HWND,
     checkbox_check_updates: HWND,
+    checkbox_send_crash_reports: HWND,
     checkbox_context_menu: HWND,
     label_file_associations: HWND,
     button_manage_associations: HWND,
@@ -261,6 +263,7 @@ struct OptionsLabels {
     label_subtitle_mode: String,
     label_move_cursor: String,
     label_check_updates: String,
+    label_send_crash_reports: String,
     label_context_menu: String,
     label_file_associations: String,
     label_manage_associations: String,
@@ -356,6 +359,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_subtitle_mode: i18n::tr(language, "options.label.subtitle_mode"),
         label_move_cursor: i18n::tr(language, "options.label.move_cursor"),
         label_check_updates: i18n::tr(language, "options.label.check_updates"),
+        label_send_crash_reports: i18n::tr(language, "options.label.send_crash_reports"),
         label_context_menu: i18n::tr(language, "options.label.context_menu"),
         label_file_associations: i18n::tr(language, "options.label.file_associations"),
         label_manage_associations: i18n::tr(language, "options.button.manage_associations"),
@@ -1523,6 +1527,22 @@ unsafe extern "system" fn options_wndproc(
             );
             y += 24;
 
+            let checkbox_send_crash_reports = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_send_crash_reports).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                170,
+                y,
+                300,
+                20,
+                hwnd,
+                HMENU(OPTIONS_ID_SEND_CRASH_REPORTS as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 24;
+
             let checkbox_context_menu = CreateWindowExW(
                 Default::default(),
                 WC_BUTTON,
@@ -1693,6 +1713,7 @@ unsafe extern "system" fn options_wndproc(
                 edit_subtitle_offset,
                 checkbox_move_cursor,
                 checkbox_check_updates,
+                checkbox_send_crash_reports,
                 checkbox_context_menu,
                 label_file_associations,
                 button_manage_associations,
@@ -1772,6 +1793,7 @@ unsafe extern "system" fn options_wndproc(
                 combo_subtitle_mode,
                 checkbox_move_cursor,
                 checkbox_check_updates,
+                checkbox_send_crash_reports,
                 checkbox_context_menu,
                 label_file_associations,
                 button_manage_associations,
@@ -2034,6 +2056,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         edit_subtitle_offset,
         checkbox_move_cursor,
         checkbox_check_updates,
+        checkbox_send_crash_reports,
         checkbox_context_menu,
         _label_prompt_program,
         combo_prompt_program,
@@ -2089,6 +2112,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.edit_subtitle_offset,
             state.checkbox_move_cursor,
             state.checkbox_check_updates,
+            state.checkbox_send_crash_reports,
             state.checkbox_context_menu,
             state.label_prompt_program,
             state.combo_prompt_program,
@@ -2648,6 +2672,16 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         checkbox_check_updates,
         BM_SETCHECK,
         WPARAM(if settings.check_updates_on_startup {
+            BST_CHECKED.0 as usize
+        } else {
+            0
+        }),
+        LPARAM(0),
+    );
+    SendMessageW(
+        checkbox_send_crash_reports,
+        BM_SETCHECK,
+        WPARAM(if settings.send_crash_reports {
             BST_CHECKED.0 as usize
         } else {
             0
@@ -3217,6 +3251,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         edit_subtitle_offset,
         checkbox_move_cursor,
         checkbox_check_updates,
+        checkbox_send_crash_reports,
         checkbox_context_menu,
         combo_prompt_program,
     ) = match with_options_state(hwnd, |state| {
@@ -3260,6 +3295,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.edit_subtitle_offset,
             state.checkbox_move_cursor,
             state.checkbox_check_updates,
+            state.checkbox_send_crash_reports,
             state.checkbox_context_menu,
             state.combo_prompt_program,
         )
@@ -3496,6 +3532,14 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     settings.check_updates_on_startup =
         SendMessageW(checkbox_check_updates, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
             == BST_CHECKED.0;
+    settings.send_crash_reports = SendMessageW(
+        checkbox_send_crash_reports,
+        BM_GETCHECK,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0 as u32
+        == BST_CHECKED.0;
     settings.context_menu_open_with =
         SendMessageW(checkbox_context_menu, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
             == BST_CHECKED.0;
@@ -3748,6 +3792,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.label_prompt_program,
             state.combo_prompt_program,
             state.checkbox_check_updates,
+            state.checkbox_send_crash_reports,
             state.checkbox_context_menu,
             state.label_file_associations,
             state.button_manage_associations,

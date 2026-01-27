@@ -172,6 +172,7 @@
   "options.button.browse": "Procházet...",
   "options.label.move_cursor": "Posouvat kurzor během čtení",
   "options.label.check_updates": "Zkontrolovat aktualizace při spuštění",
+  "options.label.send_crash_reports": "Odesílat anonymní hlášení o chybách",
   "options.label.context_menu": "Přidat \"Otevřít v Novapadu\" do kontextového menu",
   "options.label.file_associations": "Asociace souborů:",
   "options.button.manage_associations": "Nastavit jako výchozí aplikaci...",

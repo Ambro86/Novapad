@@ -170,6 +170,7 @@
   "options.button.browse": "Bläddra...",
   "options.label.move_cursor": "Flytta markören under läsning",
   "options.label.check_updates": "Sök efter uppdateringar vid start",
+  "options.label.send_crash_reports": "Skicka anonyma felrapporter",
   "options.label.context_menu": "Lägg till \"Öppna med Novapad\" i snabbmenyn",
   "context_menu.open_with": "Öppna med Novapad",
   "context_menu.spelling_ok": "Stavning: OK",

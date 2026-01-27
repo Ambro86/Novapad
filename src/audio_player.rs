@@ -125,7 +125,7 @@ fn log_mkv_probe_once(path: &Path) {
     if !guard.insert(path.to_path_buf()) {
         return;
     }
-    drop(guard);
+    std::mem::drop(guard);
 
     let file = match std::fs::File::open(path) {
         Ok(file) => file,
@@ -1048,7 +1048,9 @@ impl WaitableTimer {
 impl Drop for WaitableTimer {
     fn drop(&mut self) {
         unsafe {
-            let _ = CloseHandle(self.handle);
+            if let Err(e) = CloseHandle(self.handle) {
+                log_debug(&format!("CloseHandle failed: {:?}", e));
+            }
         }
     }
 }
@@ -1306,11 +1308,11 @@ fn should_hold_for_edge_subtitles(hwnd: HWND, media_path: &Path) -> bool {
     if settings.tts_engine != crate::settings::TtsEngine::Edge {
         return false;
     }
-    let subtitle_path = match find_subtitle_for_media(media_path) {
+    let _subtitle_path = match find_subtitle_for_media(media_path) {
         Some(path) => path,
         None => return false,
     };
-    let _ = subtitle_path;
+    // subtitle_path will be dropped at end of scope
     let base_cache_dir = settings_dir().join("subtitle_cache");
     let mut hasher = sha2::Sha256::new();
     hasher.update(media_path.to_string_lossy().as_bytes());
@@ -1591,7 +1593,12 @@ fn start_subtitle_reader(
                                                 empty_attempts,
                                                 path.display()
                                             ));
-                                            let _ = std::fs::remove_file(&path);
+                                            if let Err(e) = std::fs::remove_file(&path) {
+                                                log_debug(&format!(
+                                                    "Subtitle: failed to remove empty file: {}",
+                                                    e
+                                                ));
+                                            }
                                             std::thread::sleep(Duration::from_millis(200));
                                             continue;
                                         }

@@ -247,7 +247,7 @@ unsafe extern "system" fn bookmarks_wndproc(
         WM_NCDESTROY => {
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut BookmarksWindowState;
             if !ptr.is_null() {
-                drop(Box::from_raw(ptr));
+                let _unused_box = Box::from_raw(ptr);
             }
             LRESULT(0)
         }

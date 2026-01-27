@@ -1781,7 +1781,9 @@ unsafe fn show_add_dialog(parent_hwnd: HWND) {
         Some(init_ptr as *const _),
     );
     if hwnd.0 == 0 {
-        drop(Box::from_raw(init_ptr));
+        unsafe {
+            let _unused_box = Box::from_raw(init_ptr);
+        }
         return;
     }
     with_state(main_hwnd, |s| s.podcasts_add_dialog = hwnd);
@@ -1800,7 +1802,7 @@ unsafe extern "system" fn add_wndproc(
             let parent = if init_ptr.is_null() {
                 HWND(0)
             } else {
-                let init = Box::from_raw(init_ptr);
+                let init = unsafe { Box::from_raw(init_ptr) };
                 init.parent
             };
             let language = with_podcast_state(parent, |s| s.language).unwrap_or_default();
@@ -2719,7 +2721,7 @@ unsafe fn show_description_dialog(parent: HWND, title: &str, content: &str) {
         }
     } else {
         unsafe {
-            drop(Box::from_raw(init_ptr));
+            let _unused_box = Box::from_raw(init_ptr);
         }
     }
 }
@@ -2790,7 +2792,7 @@ unsafe extern "system" fn description_wndproc(
             let cs = lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
             let init_ptr = (*cs).lpCreateParams as *mut DescriptionDialogInit;
             if !init_ptr.is_null() {
-                let init = Box::from_raw(init_ptr);
+                let init = unsafe { Box::from_raw(init_ptr) };
                 let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
 
                 let full_text = format!("{}\r\n\r\n{}", init.title, init.content);
@@ -3082,7 +3084,9 @@ unsafe fn show_reorder_dialog(parent_hwnd: HWND, source_index: usize, total: usi
         Some(init_ptr as *const _),
     );
     if hwnd.0 == 0 {
-        drop(Box::from_raw(init_ptr));
+        unsafe {
+            let _unused_box = Box::from_raw(init_ptr);
+        }
         return;
     }
     with_podcast_state(parent_hwnd, |s| s.reorder_dialog = hwnd);
@@ -3385,7 +3389,7 @@ unsafe extern "system" fn reorder_wndproc(
                 GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
                     as *mut ReorderDialogInit;
             if !ptr.is_null() {
-                let init = Box::from_raw(ptr);
+                let init = unsafe { Box::from_raw(ptr) };
                 with_podcast_state(init.parent, |s| s.reorder_dialog = HWND(0));
             }
             LRESULT(0)
@@ -4446,7 +4450,7 @@ unsafe extern "system" fn podcast_wndproc(
         }
         WM_PODCAST_FETCH_COMPLETE => {
             let msg_ptr = lparam.0 as *mut FetchResult;
-            let msg = Box::from_raw(msg_ptr);
+            let msg = unsafe { Box::from_raw(msg_ptr) };
             with_podcast_state(hwnd, |s| {
                 if let Some(src) = match msg.node {
                     NodeData::Source(idx) => with_state(s.parent, |ps| {
@@ -4533,7 +4537,7 @@ unsafe extern "system" fn podcast_wndproc(
             if ptr.is_null() {
                 return LRESULT(0);
             }
-            let msg = Box::from_raw(ptr);
+            let msg = unsafe { Box::from_raw(ptr) };
             update_search_results(hwnd, msg.results);
             LRESULT(0)
         }
@@ -4542,7 +4546,7 @@ unsafe extern "system" fn podcast_wndproc(
             if ptr.is_null() {
                 return LRESULT(0);
             }
-            let msg = Box::from_raw(ptr);
+            let msg = unsafe { Box::from_raw(ptr) };
             with_podcast_state(hwnd, |s| s.pending_play = None);
             let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
             mark_podcast_episode_played(&msg.path);
@@ -4599,7 +4603,9 @@ unsafe extern "system" fn podcast_wndproc(
                 GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
                     as *mut PodcastWindowState;
             if !ptr.is_null() {
-                drop(Box::from_raw(ptr));
+                unsafe {
+                    let _unused_box = Box::from_raw(ptr);
+                }
             }
             LRESULT(0)
         }

@@ -254,7 +254,7 @@ unsafe extern "system" fn find_in_files_wndproc(
             if init_ptr.is_null() {
                 return LRESULT(0);
             }
-            let init = Box::from_raw(init_ptr);
+            let init = unsafe { Box::from_raw(init_ptr) };
             let labels = labels(init.language);
             let hfont = with_state(init.parent, |state| state.hfont).unwrap_or(HFONT(0));
 
@@ -643,7 +643,7 @@ unsafe extern "system" fn find_in_files_wndproc(
             let results_ptr = lparam.0 as *mut Vec<SearchResult>;
             if !results_ptr.is_null() {
                 let results = unsafe { Box::from_raw(results_ptr) };
-                if with_find_state(hwnd, |state| {
+                let res = with_find_state(hwnd, |state| {
                     state.results = *results;
                     state.searching = false;
                     state.cancel_flag = None;
@@ -651,9 +651,8 @@ unsafe extern "system" fn find_in_files_wndproc(
                     set_progress(state, 100);
                     populate_results_tree(state);
                     store_cache(state);
-                })
-                .is_none()
-                {
+                });
+                if res.is_none() {
                     crate::log_debug("Failed to access find state");
                 }
             }
@@ -689,7 +688,7 @@ unsafe extern "system" fn find_in_files_wndproc(
                 GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
                     as *mut FindInFilesState;
             if !ptr.is_null() {
-                drop(Box::from_raw(ptr));
+                let _unused_box = Box::from_raw(ptr);
             }
             LRESULT(0)
         }

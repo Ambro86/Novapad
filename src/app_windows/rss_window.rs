@@ -1126,7 +1126,7 @@ unsafe extern "system" fn rss_wndproc(
                 if parent.0 != 0 {
                     force_focus_editor_on_parent(parent);
                 }
-                drop(Box::from_raw(ptr));
+                let _unused_box = Box::from_raw(ptr);
             }
             LRESULT(0)
         }
@@ -1494,13 +1494,13 @@ unsafe extern "system" fn rss_wndproc(
         }
         WM_RSS_FETCH_COMPLETE => {
             let ptr = lparam.0 as *mut FetchResult;
-            let res = *Box::from_raw(ptr);
+            let res = *unsafe { Box::from_raw(ptr) };
             process_fetch_result(hwnd, res);
             LRESULT(0)
         }
         WM_RSS_BACKGROUND_CHECK_COMPLETE => {
             let ptr = lparam.0 as *mut BackgroundCheckResult;
-            let res = *Box::from_raw(ptr);
+            let res = *unsafe { Box::from_raw(ptr) };
             process_background_check_result(hwnd, res);
             LRESULT(0)
         }
@@ -1527,7 +1527,7 @@ unsafe extern "system" fn rss_wndproc(
 
         WM_RSS_IMPORT_COMPLETE => {
             let ptr = lparam.0 as *mut ImportResult;
-            let res = Box::from_raw(ptr);
+            let res = unsafe { Box::from_raw(ptr) };
 
             let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
             let mut hwnd_edit = crate::get_active_edit(parent);
@@ -1795,7 +1795,7 @@ unsafe extern "system" fn reorder_wndproc(
         WM_NCDESTROY => {
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ReorderDialogInit;
             if !ptr.is_null() {
-                let init = Box::from_raw(ptr);
+                let init = unsafe { Box::from_raw(ptr) };
                 with_rss_state(init.parent, |s| s.reorder_dialog = HWND(0));
             }
             LRESULT(0)
@@ -3509,7 +3509,7 @@ unsafe fn show_reorder_dialog(parent_hwnd: HWND, source_index: usize, total: usi
         Some(init_ptr as *const _),
     );
     if hwnd.0 == 0 {
-        drop(Box::from_raw(init_ptr));
+        let _unused_box = Box::from_raw(init_ptr);
         return;
     }
     with_rss_state(parent_hwnd, |s| s.reorder_dialog = hwnd);
@@ -3627,7 +3627,7 @@ unsafe fn show_add_dialog_with_prefill(parent_hwnd: HWND, title: String, url: St
         Some(init_ptr as *const _),
     );
     if hwnd.0 == 0 {
-        drop(Box::from_raw(init_ptr));
+        let _unused_box = Box::from_raw(init_ptr);
         return;
     }
 
@@ -3645,10 +3645,11 @@ unsafe extern "system" fn input_wndproc(
         WM_CREATE => {
             let cs = lparam.0 as *const CREATESTRUCTW;
             let init_ptr = (*cs).lpCreateParams as *mut AddDialogInit;
-            let (parent, prefill_title, prefill_url) = if init_ptr.is_null() {
+            let (parent, prefill_title, prefill_url): (HWND, String, String) = if init_ptr.is_null()
+            {
                 (HWND(0), String::new(), String::new())
             } else {
-                let init = Box::from_raw(init_ptr);
+                let init = unsafe { Box::from_raw(init_ptr) };
                 (init.parent, init.prefill_title, init.prefill_url)
             };
             // We need language. But we can't easily pass it.

@@ -346,7 +346,12 @@ impl WasapiOutput {
                 }
 
                 if stopped_thread.load(Ordering::Relaxed) {
-                    let _ = unsafe { client.Stop() };
+        // Stop and cleanup
+        unsafe {
+            if let Err(e) = client.Stop() {
+                crate::log_debug(&format!("WASAPI: client.Stop failed: {:?}", e));
+            }
+        }
                     return;
                 }
 
@@ -419,12 +424,13 @@ impl WasapiOutput {
                             (effective_target_secs * sample_rate as f64 * channels as f64) as u64;
                         if current_sample >= target_sample {
                             // Time to start this subtitle
-                            let sub = pending.pop_front().unwrap();
-                            *active = Some(ActiveSubtitle {
-                                samples: sub.samples,
-                                read_offset: 0,
-                                volume: sub.volume,
-                            });
+                            if let Some(sub) = pending.pop_front() {
+                                *active = Some(ActiveSubtitle {
+                                    samples: sub.samples,
+                                    read_offset: 0,
+                                    volume: sub.volume,
+                                });
+                            }
                         }
                         // Otherwise wait until the target time
                     }
@@ -601,7 +607,12 @@ impl WasapiOutput {
 
                 if finished {
                     stopped_thread.store(true, Ordering::Relaxed);
-                    let _ = unsafe { client.Stop() };
+        // Stop and cleanup
+        unsafe {
+            if let Err(e) = client.Stop() {
+                crate::log_debug(&format!("WASAPI: client.Stop failed: {:?}", e));
+            }
+        }
                     return;
                 }
             }

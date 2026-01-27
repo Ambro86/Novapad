@@ -107,37 +107,42 @@ impl BassOutput {
 
         let mut source = create_stream_from_path(api, path, flags)?;
         let handle = if want_tempo {
-            let fx_api = fx_api.unwrap();
-            let tempo_handle =
-                unsafe { (fx_api.tempo_create)(source, BASS_FX_FREESOURCE | BASS_SAMPLE_FLOAT) };
-            if tempo_handle == 0 {
-                log_bass_error(api, "BASS_FX_TempoCreate");
-                let free_ok = unsafe { (api.stream_free)(source) };
-                if free_ok == 0 {
-                    log_bass_error(api, "BASS_StreamFree");
-                }
-                source = create_stream_from_path(api, path, BASS_STREAM_PRESCAN)?;
-                source
-            } else {
-                let tempo = ((speed as f64 - 1.0) * 100.0) as f32;
-                let tempo = tempo.clamp(-95.0, 5000.0);
-                let set_ok =
-                    unsafe { (api.channel_set_attribute)(tempo_handle, BASS_ATTRIB_TEMPO, tempo) };
-                if set_ok == 0 {
-                    log_bass_error(api, "BASS_ChannelSetAttribute tempo");
-                }
-                let pitch_clamped = pitch.clamp(-60.0, 60.0);
-                let set_pitch_ok = unsafe {
-                    (api.channel_set_attribute)(
-                        tempo_handle,
-                        BASS_ATTRIB_TEMPO_PITCH,
-                        pitch_clamped,
-                    )
+            if let Some(fx_api) = fx_api {
+                let tempo_handle = unsafe {
+                    (fx_api.tempo_create)(source, BASS_FX_FREESOURCE | BASS_SAMPLE_FLOAT)
                 };
-                if set_pitch_ok == 0 {
-                    log_bass_error(api, "BASS_ChannelSetAttribute pitch");
+                if tempo_handle == 0 {
+                    log_bass_error(api, "BASS_FX_TempoCreate");
+                    let free_ok = unsafe { (api.stream_free)(source) };
+                    if free_ok == 0 {
+                        log_bass_error(api, "BASS_StreamFree");
+                    }
+                    source = create_stream_from_path(api, path, BASS_STREAM_PRESCAN)?;
+                    source
+                } else {
+                    let tempo = ((speed as f64 - 1.0) * 100.0) as f32;
+                    let tempo = tempo.clamp(-95.0, 5000.0);
+                    let set_ok = unsafe {
+                        (api.channel_set_attribute)(tempo_handle, BASS_ATTRIB_TEMPO, tempo)
+                    };
+                    if set_ok == 0 {
+                        log_bass_error(api, "BASS_ChannelSetAttribute tempo");
+                    }
+                    let pitch_clamped = pitch.clamp(-60.0, 60.0);
+                    let set_pitch_ok = unsafe {
+                        (api.channel_set_attribute)(
+                            tempo_handle,
+                            BASS_ATTRIB_TEMPO_PITCH,
+                            pitch_clamped,
+                        )
+                    };
+                    if set_pitch_ok == 0 {
+                        log_bass_error(api, "BASS_ChannelSetAttribute pitch");
+                    }
+                    tempo_handle
                 }
-                tempo_handle
+            } else {
+                source
             }
         } else {
             if speed != 1.0 {
@@ -174,7 +179,7 @@ impl BassOutput {
     }
 
     pub fn play(&self) {
-        let handle = *self.handle.lock().unwrap();
+        let handle = *self.handle.lock().unwrap_or_else(|e| e.into_inner());
         let ok = unsafe { (self.api.channel_play)(handle, 0) };
         if ok == 0 {
             log_bass_error(self.api, "BASS_ChannelPlay");
@@ -182,7 +187,7 @@ impl BassOutput {
     }
 
     pub fn pause(&self) {
-        let handle = *self.handle.lock().unwrap();
+        let handle = *self.handle.lock().unwrap_or_else(|e| e.into_inner());
         let ok = unsafe { (self.api.channel_pause)(handle) };
         if ok == 0 {
             log_bass_error(self.api, "BASS_ChannelPause");
@@ -190,7 +195,7 @@ impl BassOutput {
     }
 
     pub fn stop(&self) {
-        let handle = *self.handle.lock().unwrap();
+        let handle = *self.handle.lock().unwrap_or_else(|e| e.into_inner());
         let ok = unsafe { (self.api.channel_stop)(handle) };
         if ok == 0 {
             log_bass_error(self.api, "BASS_ChannelStop");
@@ -202,7 +207,7 @@ impl BassOutput {
     }
 
     pub fn set_volume(&self, volume: f32) {
-        let handle = *self.handle.lock().unwrap();
+        let handle = *self.handle.lock().unwrap_or_else(|e| e.into_inner());
         let volume = volume.clamp(0.0, 6.0);
         let ok = unsafe { (self.api.channel_set_attribute)(handle, BASS_ATTRIB_VOL, volume) };
         if ok == 0 {
@@ -211,7 +216,7 @@ impl BassOutput {
     }
 
     pub fn position_secs(&self) -> Option<f64> {
-        let handle = *self.handle.lock().unwrap();
+        let handle = *self.handle.lock().unwrap_or_else(|e| e.into_inner());
         let pos = unsafe { (self.api.channel_get_position)(handle, BASS_POS_BYTE) };
         if pos == 0 {
             let err = bass_error(self.api);

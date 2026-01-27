@@ -165,7 +165,7 @@ pub unsafe fn open(parent: HWND) {
         Some(state_ptr as *const _),
     );
     if hwnd.0 == 0 {
-        drop(Box::from_raw(state_ptr));
+        let _unused_box = Box::from_raw(state_ptr);
         return;
     }
     with_state(parent, |state| state.wikipedia_window = hwnd);
@@ -363,7 +363,7 @@ unsafe extern "system" fn wikipedia_wndproc(
             if generation != SEARCH_GENERATION.load(Ordering::SeqCst) {
                 let payload_ptr = lparam.0 as *mut SearchPayload;
                 if !payload_ptr.is_null() {
-                    drop(Box::from_raw(payload_ptr));
+                    let _unused_box = Box::from_raw(payload_ptr);
                 }
                 return LRESULT(0);
             }
@@ -371,7 +371,7 @@ unsafe extern "system" fn wikipedia_wndproc(
             if payload_ptr.is_null() {
                 return LRESULT(0);
             }
-            let payload = Box::from_raw(payload_ptr);
+            let payload = unsafe { Box::from_raw(payload_ptr) };
             let language = with_window_state(hwnd, |state| state.parent)
                 .and_then(|parent| with_state(parent, |s| s.settings.language))
                 .unwrap_or_default();
@@ -417,7 +417,7 @@ unsafe extern "system" fn wikipedia_wndproc(
             if generation != IMPORT_GENERATION.load(Ordering::SeqCst) {
                 let payload_ptr = lparam.0 as *mut ImportPayload;
                 if !payload_ptr.is_null() {
-                    drop(Box::from_raw(payload_ptr));
+                    let _unused_box = Box::from_raw(payload_ptr);
                 }
                 return LRESULT(0);
             }
@@ -425,7 +425,7 @@ unsafe extern "system" fn wikipedia_wndproc(
             if payload_ptr.is_null() {
                 return LRESULT(0);
             }
-            let payload = Box::from_raw(payload_ptr);
+            let payload = unsafe { Box::from_raw(payload_ptr) };
             let parent = with_window_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
             let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
             let label_set = labels(language);
@@ -437,11 +437,13 @@ unsafe extern "system" fn wikipedia_wndproc(
                 );
                 return LRESULT(0);
             }
-            let Some(text) = payload.text else {
+            let text = if let Some(ref text) = payload.text {
+                text
+            } else {
                 show_error(parent, language, &label_set.status_import_error);
                 return LRESULT(0);
             };
-            if !apply_import_text(parent, &text) {
+            if !apply_import_text(parent, text) {
                 show_error(parent, language, &label_set.status_import_error);
                 return LRESULT(0);
             }
@@ -452,7 +454,7 @@ unsafe extern "system" fn wikipedia_wndproc(
         WM_NCDESTROY => {
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut WikipediaWindowState;
             if !ptr.is_null() {
-                let state = Box::from_raw(ptr);
+                let state = unsafe { Box::from_raw(ptr) };
                 with_state(state.parent, |s| s.wikipedia_window = HWND(0));
             }
             LRESULT(0)
@@ -656,9 +658,10 @@ unsafe fn run_search(hwnd: HWND) {
                     LPARAM(payload_ptr as isize),
                 ) {
                     crate::log_debug(&format!("Failed to post WM_WIKI_SEARCH_DONE: {}", e));
+                    let _unused_box = Box::from_raw(payload_ptr);
                 }
             } else {
-                drop(Box::from_raw(payload_ptr));
+                let _unused_box = Box::from_raw(payload_ptr);
             }
         }
     });
@@ -730,9 +733,10 @@ unsafe fn start_import(hwnd: HWND) {
                     LPARAM(payload_ptr as isize),
                 ) {
                     crate::log_debug(&format!("Failed to post WM_WIKI_IMPORT_DONE: {}", e));
+                    let _unused_box = Box::from_raw(payload_ptr);
                 }
             } else {
-                drop(Box::from_raw(payload_ptr));
+                let _unused_box = Box::from_raw(payload_ptr);
             }
         }
     });

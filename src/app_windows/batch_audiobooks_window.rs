@@ -887,7 +887,7 @@ unsafe extern "system" fn batch_wndproc(
                         windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
                         0,
                     );
-                    drop(Box::from_raw(ptr));
+                    let _unused_box = Box::from_raw(ptr);
                 }
             }
             LRESULT(0)

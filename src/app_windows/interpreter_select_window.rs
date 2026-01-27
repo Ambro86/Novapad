@@ -139,7 +139,7 @@ unsafe extern "system" fn interpreter_select_wndproc(
             if init_ptr.is_null() {
                 return LRESULT(0);
             }
-            let init = Box::from_raw(init_ptr);
+            let init = unsafe { Box::from_raw(init_ptr) };
             let parent = init.parent;
             let hfont = with_state(parent, |state| state.hfont).unwrap_or(HFONT(0));
 
@@ -257,7 +257,7 @@ unsafe extern "system" fn interpreter_select_wndproc(
         WM_NCDESTROY => {
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut InterpreterSelectState;
             if !ptr.is_null() {
-                drop(Box::from_raw(ptr));
+                let _unused_box = Box::from_raw(ptr);
             }
             LRESULT(0)
         }

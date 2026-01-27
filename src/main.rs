@@ -1,4 +1,7 @@
 #![deny(warnings)]
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(let_underscore_drop)]
 #![allow(unsafe_op_in_unsafe_fn)]
 #![windows_subsystem = "windows"]
 
@@ -563,7 +566,7 @@ fn start_dictionary_lookup(
                     LPARAM(Box::into_raw(result) as isize),
                 ));
             } else {
-                drop(result);
+                std::mem::drop(result);
             }
         }
     });
@@ -2658,7 +2661,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             if ptr.is_null() {
                 return LRESULT(0);
             }
-            let msg = Box::from_raw(ptr);
+            let msg = unsafe { Box::from_raw(ptr) };
             let (apply_now, chapters, language, announce_unavailable, current_pos_ms) =
                 with_state(hwnd, |state| {
                     let chapters = msg.chapters.clone();
@@ -2725,7 +2728,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             if lparam.0 == 0 {
                 return LRESULT(0);
             }
-            let result = Box::from_raw(lparam.0 as *mut DictionaryLookupResult);
+            let result = unsafe { Box::from_raw(lparam.0 as *mut DictionaryLookupResult) };
             let updated = with_state(hwnd, |state| {
                 let current_gen = state.dictionary_prefetch_generation;
                 if result.generation != current_gen {
@@ -2832,7 +2835,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             if lparam.0 == 0 {
                 return LRESULT(0);
             }
-            let payload = Box::from_raw(lparam.0 as *mut PdfLoadResult);
+            let payload = unsafe { Box::from_raw(lparam.0 as *mut PdfLoadResult) };
             handle_pdf_loaded(hwnd, *payload);
             LRESULT(0)
         }
@@ -2840,7 +2843,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             if lparam.0 == 0 {
                 return LRESULT(0);
             }
-            let payload = Box::from_raw(lparam.0 as *mut Vec<VoiceInfo>);
+            let payload = unsafe { Box::from_raw(lparam.0 as *mut Vec<VoiceInfo>) };
             let voices: Vec<VoiceInfo> = *payload;
             with_state(hwnd, |state| {
                 state.edge_voices = voices.clone();
@@ -2857,7 +2860,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             if lparam.0 == 0 {
                 return LRESULT(0);
             }
-            let payload = Box::from_raw(lparam.0 as *mut Vec<VoiceInfo>);
+            let payload = unsafe { Box::from_raw(lparam.0 as *mut Vec<VoiceInfo>) };
             let voices: Vec<VoiceInfo> = *payload;
             with_state(hwnd, |state| {
                 state.sapi_voices = voices.clone();
@@ -2918,7 +2921,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             if lparam.0 == 0 {
                 return LRESULT(0);
             }
-            let payload = Box::from_raw(lparam.0 as *mut String);
+            let payload = unsafe { Box::from_raw(lparam.0 as *mut String) };
             let message: String = *payload;
             let session_id = wparam.0 as u64;
             let mut should_show = false;
@@ -2959,7 +2962,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 }
             });
 
-            let payload = Box::from_raw(lparam.0 as *mut AudiobookResult);
+            let payload = unsafe { Box::from_raw(lparam.0 as *mut AudiobookResult) };
             let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
             let title = if payload.success {
                 audiobook_done_title(language)
@@ -3678,7 +3681,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         WM_NCDESTROY => {
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut AppState;
             if !ptr.is_null() {
-                drop(Box::from_raw(ptr));
+                let _unused_box = unsafe { Box::from_raw(ptr) };
             }
             LRESULT(0)
         }
@@ -6896,15 +6899,14 @@ pub(crate) unsafe fn open_pdf_document_async(hwnd: HWND, path: &Path, from_copyd
         });
         unsafe {
             let payload_ptr = Box::into_raw(payload);
-            if PostMessageW(
+            if let Err(e) = PostMessageW(
                 hwnd_main,
                 WM_PDF_LOADED,
                 WPARAM(0),
                 LPARAM(payload_ptr as isize),
-            )
-            .is_err()
-            {
-                drop(Box::from_raw(payload_ptr));
+            ) {
+                crate::log_debug(&format!("Failed to post WM_PDF_LOADED: {}", e));
+                let _unused_box = Box::from_raw(payload_ptr);
             }
         }
     });
@@ -6933,15 +6935,14 @@ unsafe fn start_ocr_for_pdf(
         });
         unsafe {
             let payload_ptr = Box::into_raw(payload);
-            if PostMessageW(
+            if let Err(e) = PostMessageW(
                 hwnd_main,
                 WM_PDF_LOADED,
                 WPARAM(0),
                 LPARAM(payload_ptr as isize),
-            )
-            .is_err()
-            {
-                drop(Box::from_raw(payload_ptr));
+            ) {
+                crate::log_debug(&format!("Failed to post WM_PDF_LOADED (OCR): {}", e));
+                let _unused_box = Box::from_raw(payload_ptr);
             }
         }
     });

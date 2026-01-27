@@ -1041,8 +1041,14 @@ pub(crate) fn collect_marker_entries(
 
     let mut entries = Vec::new();
     for (idx, _) in normalized.match_indices(marker) {
-        if require_newline && idx != 0 && !normalized[..idx].ends_with('\n') {
-            continue;
+        // If require_newline is true, we ensure the marker is at the start of a line.
+        // normalized only has \n (no \r), but we check both just in case or for robustness.
+        // We also allow the start of the file (idx == 0).
+        if require_newline && idx > 0 {
+            let prefix = &normalized[..idx];
+            if !prefix.ends_with('\n') {
+                continue;
+            }
         }
         let label = marker_label_for_position(&normalized, idx, marker);
         entries.push(MarkerEntry { pos: idx, label });
@@ -1066,13 +1072,18 @@ fn split_text_by_positions(text: &str, positions: &[usize]) -> Option<Vec<String
         if *pos == 0 {
             continue;
         }
+        // Ensure we don't go out of bounds and that we advance
         if *pos > start && *pos <= text.len() {
             parts.push(text[start..*pos].to_string());
             start = *pos;
         }
     }
-    if start <= text.len() {
+    // Push the remainder of the text
+    if start < text.len() {
         parts.push(text[start..].to_string());
+    } else if start == text.len() && parts.is_empty() {
+        // Edge case: empty text or positions at end?
+        // If text is not empty, but start reached end, we are done.
     }
     Some(parts)
 }
@@ -1089,8 +1100,14 @@ pub(crate) fn build_audiobook_parts_by_positions(
     for part_text in parts_text {
         let prepared = prepare_tts_text(&part_text, split_on_newline, dictionary);
         let chunks = split_text(&prepared);
+        // Even if chunks is empty (e.g. only whitespace part), we might want to keep the structure?
+        // But run_tts_audiobook_part handles empty chunks by skipping.
         if !chunks.is_empty() {
             parts_chunks.push(chunks);
+        } else {
+            // If a part is empty, we push an empty vec to maintain index alignment if needed,
+            // though currently the caller just iterates.
+            parts_chunks.push(Vec::new());
         }
     }
 
@@ -1103,20 +1120,30 @@ pub(crate) fn build_audiobook_parts_by_positions(
 
 pub fn split_text(text: &str) -> Vec<String> {
     let mut chunks = Vec::new();
+    // Trim input to avoid processing leading/trailing whitespace as separate empty chunks
+    let text = text.trim();
+    if text.is_empty() {
+        return chunks;
+    }
+
     let char_indices: Vec<(usize, char)> = text.char_indices().collect();
     let char_len = char_indices.len();
     let mut current_char = 0;
+
     let is_long = char_len > TTS_LONG_TEXT_THRESHOLD;
     let max_len = if is_long {
         MAX_TTS_TEXT_LEN_LONG
     } else {
         MAX_TTS_TEXT_LEN
     };
-    let first_len = if is_long {
+    // First chunk can be smaller if text is very long to start playback faster?
+    // But for recording, consistency is better.
+    let target_chunk_len = if is_long {
         MAX_TTS_FIRST_CHUNK_LEN_LONG
     } else {
         max_len
     };
+
     let byte_index_at = |char_idx: usize| -> usize {
         if char_idx >= char_len {
             text.len()
@@ -1124,77 +1151,110 @@ pub fn split_text(text: &str) -> Vec<String> {
             char_indices[char_idx].0
         }
     };
+
     while current_char < char_len {
-        let target_len = if chunks.is_empty() {
-            first_len
+        // Calculate potential end
+        let effective_target = if chunks.is_empty() {
+            target_chunk_len
         } else {
             max_len
         };
-        let mut split_char = current_char + target_len;
+
+        let mut split_char = current_char + effective_target;
+
         if split_char >= char_len {
+            // Take the rest
             let chunk = text[byte_index_at(current_char)..].trim().to_string();
             if !chunk.is_empty() {
                 chunks.push(chunk);
             }
             break;
         }
+
+        // Search backwards for a good split point
         let search_end = split_char;
-        let search_start = current_char;
+        let search_start = current_char; // Don't go back past start
         let mut split_found = None;
+
+        // Priority 1: Sentence endings
         for idx in (search_start..search_end).rev() {
             let c = char_indices[idx].1;
-            if c == '.' || c == '!' || c == '?' {
+            if matches!(c, '.' | '!' | '?') {
                 let next_idx = idx + 1;
+                // Split if next char is end of string or whitespace
                 if next_idx >= char_len || char_indices[next_idx].1.is_whitespace() {
                     split_found = Some(next_idx);
                     break;
                 }
             }
         }
+
+        // Priority 2: Newlines or major punctuation
         if split_found.is_none() {
             for idx in (search_start..search_end).rev() {
                 let c = char_indices[idx].1;
                 if c == '\n' {
+                    // Try to keep newlines together?
                     if idx + 1 < char_len && char_indices[idx + 1].1 == '\n' {
                         split_found = Some(idx + 2);
                         break;
+                    } else {
+                        split_found = Some(idx + 1);
+                        break;
                     }
-                } else if c == ';' || c == ':' {
+                } else if matches!(c, ';' | ':') {
                     split_found = Some(idx + 1);
                     break;
                 }
             }
         }
+
+        // Priority 3: Spaces
         if split_found.is_none() {
             for idx in (search_start..search_end).rev() {
-                if char_indices[idx].1 == ' ' {
+                if char_indices[idx].1.is_whitespace() {
                     split_found = Some(idx + 1);
                     break;
                 }
             }
         }
+
+        // Apply split
         if let Some(split_at) = split_found {
-            split_char = split_at;
+            // Ensure we advance
+            if split_at > current_char {
+                split_char = split_at;
+            }
         }
-        if split_char > current_char {
-            let chunk = text[byte_index_at(current_char)..byte_index_at(split_char)]
-                .trim()
-                .to_string();
+
+        // Extract chunk
+        let end_byte = byte_index_at(split_char);
+        let start_byte = byte_index_at(current_char);
+
+        if end_byte > start_byte {
+            let chunk = text[start_byte..end_byte].trim().to_string();
             if !chunk.is_empty() {
                 chunks.push(chunk);
             }
             current_char = split_char;
         } else {
-            let hard_limit = std::cmp::min(current_char + target_len, char_len);
-            let chunk = text[byte_index_at(current_char)..byte_index_at(hard_limit)]
+            // Should not happen if logic is correct, but prevent infinite loop
+            // Force advance by 1 char or target if something is wrong
+            let next_char = std::cmp::min(current_char + effective_target, char_len);
+            if next_char == current_char {
+                // Force break
+                break;
+            }
+            let chunk = text[start_byte..byte_index_at(next_char)]
                 .trim()
                 .to_string();
             if !chunk.is_empty() {
                 chunks.push(chunk);
             }
-            current_char = hard_limit;
+            current_char = next_char;
         }
     }
+
     chunks
 }
 

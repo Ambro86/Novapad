@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
@@ -42,6 +43,7 @@ const YT_ID_TIMESTAMP: usize = 9304;
 const YT_ID_OK: usize = 9305;
 const YT_ID_CANCEL: usize = 9306;
 const WM_YT_LOAD_COMPLETE: u32 = WM_APP + 40;
+const WM_YT_TEXT_COMPLETE: u32 = WM_APP + 41;
 const EVENT_OBJECT_FOCUS: u32 = 0x8005;
 const EVENT_OBJECT_VALUECHANGE: u32 = 0x800E;
 const OBJID_CLIENT: i32 = -4;
@@ -49,7 +51,7 @@ const CHILDID_SELF: i32 = 0;
 
 #[derive(Clone)]
 struct ImportResult {
-    transcript: Transcript,
+    text: String,
     include_timestamps: bool,
 }
 
@@ -57,7 +59,7 @@ struct ImportInit {
     parent: HWND,
     language: Language,
     include_timestamps: bool,
-    result: Arc<Mutex<Option<ImportResult>>>,
+    result: Arc<Mutex<Option<ImportResult>>>, // Corrected from `лық>` to `>`
 }
 
 struct ImportState {
@@ -70,8 +72,9 @@ struct ImportState {
     ok_button: HWND,
     status_label: HWND,
     loading: bool,
+    cancelled: Arc<AtomicBool>,
     transcripts: Vec<Transcript>,
-    result: Arc<Mutex<Option<ImportResult>>>,
+    result: Arc<Mutex<Option<ImportResult>>>, // Corrected from `лық>` to `>`
 }
 
 struct Labels {
@@ -139,18 +142,7 @@ pub fn import_youtube_transcript(parent: HWND) {
         }
     }
 
-    let text = match fetch_transcript_text(&result.transcript, result.include_timestamps) {
-        Ok(text) => text,
-        Err(err) => {
-            unsafe {
-                show_error(parent, language, &error_message(language, &err));
-                if let Err(e) = PostMessageW(parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) {
-                    crate::log_debug(&format!("Failed to post WM_FOCUS_EDITOR: {}", e));
-                }
-            }
-            return;
-        }
-    };
+    let text = result.text;
 
     unsafe {
         let Some(hwnd_edit) = get_active_edit(parent) else {
@@ -265,7 +257,7 @@ fn show_import_dialog(
             break;
         }
         let res = unsafe { GetMessageW(&mut msg, HWND(0), 0, 0) };
-        if res.0 == 0 {
+        if res.0 == 0 || res.0 == -1 {
             break;
         }
         unsafe {
@@ -478,6 +470,7 @@ unsafe extern "system" fn import_wndproc(
                 ok_button,
                 status_label,
                 loading: false,
+                cancelled: Arc::new(AtomicBool::new(false)),
                 transcripts: Vec::new(),
                 result: init.result.clone(),
             });
@@ -504,7 +497,6 @@ unsafe extern "system" fn import_wndproc(
                 start_load_languages(hwnd);
                 LRESULT(0)
             } else if cmd_id == YT_ID_OK {
-                let mut should_close = false;
                 if with_import_state(hwnd, |state| {
                     if state.loading {
                         return;
@@ -522,24 +514,21 @@ unsafe extern "system" fn import_wndproc(
                     let include_timestamps =
                         SendMessageW(state.timestamp_check, BM_GETCHECK, WPARAM(0), LPARAM(0)).0
                             == BST_CHECKED.0 as isize;
+
                     let transcript = state.transcripts[idx as usize].clone();
-                    *state.result.lock().unwrap_or_else(|e| e.into_inner()) = Some(ImportResult {
-                        transcript,
-                        include_timestamps,
-                    });
-                    should_close = true;
+                    // Start loading text instead of closing immediately
+                    if !start_load_transcript_text(hwnd, transcript, include_timestamps) {
+                        crate::log_debug("Failed to start load transcript text");
+                    }
                 })
                 .is_none()
                 {
                     crate::log_debug("Failed to access import state");
                 }
-                if should_close && let Err(_e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0))
-                {
-                    crate::log_debug(&format!("Error: {:?}", _e));
-                }
                 LRESULT(0)
             } else if cmd_id == YT_ID_CANCEL {
                 if with_import_state(hwnd, |state| {
+                    state.cancelled.store(true, Ordering::SeqCst);
                     *state.result.lock().unwrap_or_else(|e| e.into_inner()) = None;
                 })
                 .is_none()
@@ -570,6 +559,11 @@ unsafe extern "system" fn import_wndproc(
         WM_YT_LOAD_COMPLETE => {
             let result = unsafe { Box::from_raw(lparam.0 as *mut LoadResult) };
             finish_load_languages(hwnd, *result);
+            LRESULT(0)
+        }
+        WM_YT_TEXT_COMPLETE => {
+            let result = unsafe { Box::from_raw(lparam.0 as *mut TextLoadResult) };
+            finish_load_text(hwnd, *result);
             LRESULT(0)
         }
         WM_KEYDOWN => {
@@ -642,6 +636,12 @@ struct LoadResult {
     error: Option<ImportError>,
 }
 
+struct TextLoadResult {
+    text: String,
+    include_timestamps: bool,
+    error: Option<ImportError>,
+}
+
 fn start_load_languages(hwnd: HWND) -> bool {
     let mut language = Language::English;
     let mut url = String::new();
@@ -652,6 +652,7 @@ fn start_load_languages(hwnd: HWND) -> bool {
     let mut timestamp = HWND(0);
     let mut status = HWND(0);
     let mut already_loading = false;
+    let mut cancelled_flag: Option<Arc<AtomicBool>> = None;
 
     if unsafe {
         with_import_state(hwnd, |state| {
@@ -665,6 +666,8 @@ fn start_load_languages(hwnd: HWND) -> bool {
             url = read_edit_text(state.url_edit);
             already_loading = state.loading;
             state.loading = true;
+            state.cancelled.store(false, Ordering::SeqCst);
+            cancelled_flag = Some(state.cancelled.clone());
         })
     }
     .is_none()
@@ -687,41 +690,75 @@ fn start_load_languages(hwnd: HWND) -> bool {
         EnableWindow(ok_button, false);
     }
 
+    let cancelled = cancelled_flag.expect("Cancelled flag should be available");
+
     std::thread::spawn(move || {
-        let result = if let Some(video_id) = extract_video_id(&url) {
-            match fetch_transcript_list(&video_id) {
-                Ok(list) => {
-                    let transcripts = collect_transcripts(list);
-                    if transcripts.is_empty() {
-                        LoadResult {
-                            transcripts: Vec::new(),
-                            error: Some(ImportError::NoTranscript),
-                        }
-                    } else {
-                        LoadResult {
-                            transcripts,
-                            error: None,
+        let result = std::panic::catch_unwind(|| {
+            if cancelled.load(Ordering::Relaxed) {
+                return LoadResult {
+                    transcripts: Vec::new(),
+                    error: None,
+                };
+            }
+
+            if let Some(video_id) = extract_video_id(&url) {
+                let fetch_result = fetch_transcript_list_with_retry(&video_id, &cancelled);
+
+                if cancelled.load(Ordering::Relaxed) {
+                    return LoadResult {
+                        transcripts: Vec::new(),
+                        error: None,
+                    };
+                }
+
+                match fetch_result {
+                    Ok(list) => {
+                        let transcripts = collect_transcripts(list);
+                        if transcripts.is_empty() {
+                            LoadResult {
+                                transcripts: Vec::new(),
+                                error: Some(ImportError::NoTranscript),
+                            }
+                        } else {
+                            LoadResult {
+                                transcripts,
+                                error: None,
+                            }
                         }
                     }
+                    Err(err) => LoadResult {
+                        transcripts: Vec::new(),
+                        error: Some(err),
+                    },
                 }
-                Err(err) => LoadResult {
+            } else {
+                LoadResult {
                     transcripts: Vec::new(),
-                    error: Some(err),
-                },
+                    error: Some(ImportError::InvalidUrl),
+                }
             }
-        } else {
+        })
+        .unwrap_or_else(|e| {
+            crate::log_debug(&format!("YouTube transcript thread panicked: {:?}", e));
             LoadResult {
                 transcripts: Vec::new(),
-                error: Some(ImportError::InvalidUrl),
+                error: Some(ImportError::Other("Thread panicked".to_string())),
             }
-        };
+        });
+
+        if cancelled.load(Ordering::Relaxed) {
+            return;
+        }
+
         unsafe {
-            if let Err(e) = PostMessageW(
-                hwnd,
-                WM_YT_LOAD_COMPLETE,
-                WPARAM(0),
-                LPARAM(Box::into_raw(Box::new(result)) as isize),
-            ) {
+            if IsWindow(hwnd).as_bool()
+                && let Err(e) = PostMessageW(
+                    hwnd,
+                    WM_YT_LOAD_COMPLETE,
+                    WPARAM(0),
+                    LPARAM(Box::into_raw(Box::new(result)) as isize),
+                )
+            {
                 crate::log_debug(&format!("Failed to post WM_YT_LOAD_COMPLETE: {}", e));
             }
         }
@@ -738,7 +775,7 @@ fn finish_load_languages(hwnd: HWND, result: LoadResult) {
     let mut timestamp = HWND(0);
     let mut status = HWND(0);
 
-    if unsafe {
+    let state_ok = unsafe {
         with_import_state(hwnd, |state| {
             edit = state.url_edit;
             ok_button = state.ok_button;
@@ -750,9 +787,11 @@ fn finish_load_languages(hwnd: HWND, result: LoadResult) {
             state.loading = false;
         })
     }
-    .is_none()
-    {
-        crate::log_debug("Failed to access import state at L731");
+    .is_some();
+
+    if !state_ok {
+        crate::log_debug("Failed to access import state in finish_load_languages");
+        return;
     }
 
     let labels_data = labels(language);
@@ -768,9 +807,13 @@ fn finish_load_languages(hwnd: HWND, result: LoadResult) {
     }
 
     if let Some(err) = result.error {
+        crate::log_debug(&format!("YouTube transcript error: {:?}", err));
         unsafe {
             show_error(hwnd, language, &error_message(language, &err));
-            SetFocus(edit);
+            SetForegroundWindow(hwnd);
+            if edit.0 != 0 {
+                SetFocus(edit);
+            }
         }
         return;
     }
@@ -802,6 +845,189 @@ fn finish_load_languages(hwnd: HWND, result: LoadResult) {
     .is_none()
     {
         crate::log_debug("Failed to access import state at L786");
+    }
+}
+
+fn start_load_transcript_text(
+    hwnd: HWND,
+    transcript: Transcript,
+    include_timestamps: bool,
+) -> bool {
+    let mut language = Language::English;
+    let mut edit = HWND(0);
+    let mut ok_button = HWND(0);
+    let mut load_button = HWND(0);
+    let mut combo = HWND(0);
+    let mut timestamp = HWND(0);
+    let mut status = HWND(0);
+    let mut already_loading = false;
+    let mut cancelled_flag: Option<Arc<AtomicBool>> = None;
+
+    if unsafe {
+        with_import_state(hwnd, |state| {
+            edit = state.url_edit;
+            ok_button = state.ok_button;
+            load_button = state.load_button;
+            combo = state.lang_combo;
+            timestamp = state.timestamp_check;
+            status = state.status_label;
+            language = state.language;
+            already_loading = state.loading;
+            state.loading = true;
+            state.cancelled.store(false, Ordering::SeqCst);
+            cancelled_flag = Some(state.cancelled.clone());
+        })
+    }
+    .is_none()
+    {
+        crate::log_debug("Failed to access import state at start_load_transcript_text");
+    }
+    if already_loading {
+        return false;
+    }
+
+    let labels_data = labels(language);
+    unsafe {
+        if let Err(e) = SetWindowTextW(status, PCWSTR(to_wide(&labels_data.loading).as_ptr())) {
+            crate::log_debug(&format!("Failed to set status text: {}", e));
+        }
+        EnableWindow(edit, false);
+        EnableWindow(load_button, false);
+        EnableWindow(combo, false);
+        EnableWindow(timestamp, false);
+        EnableWindow(ok_button, false);
+    }
+
+    let cancelled = cancelled_flag.expect("Cancelled flag should be available");
+
+    std::thread::spawn(move || {
+        let result = std::panic::catch_unwind(|| {
+            if cancelled.load(Ordering::Relaxed) {
+                return TextLoadResult {
+                    text: String::new(),
+                    include_timestamps,
+                    error: None,
+                };
+            }
+
+            let fetch_result =
+                fetch_transcript_text_with_retry(&transcript, include_timestamps, &cancelled);
+
+            if cancelled.load(Ordering::Relaxed) {
+                return TextLoadResult {
+                    text: String::new(),
+                    include_timestamps,
+                    error: None,
+                };
+            }
+
+            match fetch_result {
+                Ok(text) => TextLoadResult {
+                    text,
+                    include_timestamps,
+                    error: None,
+                },
+                Err(err) => TextLoadResult {
+                    text: String::new(),
+                    include_timestamps,
+                    error: Some(err),
+                },
+            }
+        })
+        .unwrap_or_else(|e| {
+            crate::log_debug(&format!("YouTube transcript text thread panicked: {:?}", e));
+            TextLoadResult {
+                text: String::new(),
+                include_timestamps,
+                error: Some(ImportError::Other("Thread panicked".to_string())),
+            }
+        });
+
+        if cancelled.load(Ordering::Relaxed) {
+            return;
+        }
+
+        unsafe {
+            if IsWindow(hwnd).as_bool()
+                && let Err(e) = PostMessageW(
+                    hwnd,
+                    WM_YT_TEXT_COMPLETE,
+                    WPARAM(0),
+                    LPARAM(Box::into_raw(Box::new(result)) as isize),
+                )
+            {
+                crate::log_debug(&format!("Failed to post WM_YT_TEXT_COMPLETE: {}", e));
+            }
+        }
+    });
+    true
+}
+
+fn finish_load_text(hwnd: HWND, result: TextLoadResult) {
+    let mut language = Language::English;
+    let mut edit = HWND(0);
+    let mut ok_button = HWND(0);
+    let mut load_button = HWND(0);
+    let mut combo = HWND(0);
+    let mut timestamp = HWND(0);
+    let mut status = HWND(0);
+
+    let state_ok = unsafe {
+        with_import_state(hwnd, |state| {
+            edit = state.url_edit;
+            ok_button = state.ok_button;
+            load_button = state.load_button;
+            combo = state.lang_combo;
+            timestamp = state.timestamp_check;
+            status = state.status_label;
+            language = state.language;
+            state.loading = false;
+        })
+    }
+    .is_some();
+
+    if !state_ok {
+        crate::log_debug("Failed to access import state in finish_load_text");
+        return;
+    }
+
+    unsafe {
+        if let Err(_e) = SetWindowTextW(status, PCWSTR(to_wide("").as_ptr())) {
+            crate::log_debug(&format!("Failed to set status text: {:?}", _e));
+        }
+        EnableWindow(edit, true);
+        EnableWindow(load_button, true);
+        EnableWindow(combo, true);
+        EnableWindow(timestamp, true);
+        EnableWindow(ok_button, true);
+    }
+
+    if let Some(err) = result.error {
+        crate::log_debug(&format!("YouTube transcript text error: {:?}", err));
+        unsafe {
+            show_error(hwnd, language, &error_message(language, &err));
+            SetForegroundWindow(hwnd);
+        }
+        return;
+    }
+
+    if unsafe {
+        with_import_state(hwnd, |state| {
+            *state.result.lock().unwrap_or_else(|e| e.into_inner()) = Some(ImportResult {
+                text: result.text,
+                include_timestamps: result.include_timestamps,
+            });
+        })
+    }
+    .is_none()
+    {
+        crate::log_debug("Failed to access import state at finish_load_text");
+    }
+
+    unsafe {
+        if let Err(_e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
+            crate::log_debug(&format!("Error closing window: {:?}", _e));
+        }
     }
 }
 
@@ -894,19 +1120,25 @@ enum ImportError {
     InvalidUrl,
     NoTranscript,
     Network,
-    Other,
+    Other(String),
 }
 
 fn fetch_transcript_list(video_id: &str) -> Result<TranscriptList, ImportError> {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-        .map_err(|_| ImportError::Other)?;
+        .map_err(|e| ImportError::Other(e.to_string()))?;
     rt.block_on(async {
-        let api = YouTubeTranscriptApi::new(None, None, None).map_err(|_| ImportError::Other)?;
-        api.list_transcripts(video_id)
-            .await
-            .map_err(map_transcript_error)
+        let api = YouTubeTranscriptApi::new(None, None, None)
+            .map_err(|e| ImportError::Other(e.to_string()))?;
+        let future = api.list_transcripts(video_id);
+        match tokio::time::timeout(std::time::Duration::from_secs(30), future).await {
+            Ok(result) => result.map_err(map_transcript_error),
+            Err(_) => {
+                crate::log_debug("YouTube transcript list request timed out after 30 seconds");
+                Err(ImportError::Network)
+            }
+        }
     })
 }
 
@@ -917,13 +1149,20 @@ fn fetch_transcript_text(
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-        .map_err(|_| ImportError::Other)?;
+        .map_err(|e| ImportError::Other(e.to_string()))?;
     rt.block_on(async {
-        let client = reqwest::Client::new();
-        let fetched = transcript
-            .fetch(&client, false)
-            .await
-            .map_err(map_transcript_error)?;
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .map_err(|e| ImportError::Other(e.to_string()))?;
+        let future = transcript.fetch(&client, false);
+        let fetched = match tokio::time::timeout(std::time::Duration::from_secs(30), future).await {
+            Ok(result) => result.map_err(map_transcript_error)?,
+            Err(_) => {
+                crate::log_debug("YouTube transcript fetch request timed out after 30 seconds");
+                return Err(ImportError::Network);
+            }
+        };
         if include_timestamps {
             Ok(format_with_timestamps(&fetched))
         } else {
@@ -944,7 +1183,7 @@ fn map_transcript_error(err: yt_transcript_rs::errors::CouldNotRetrieveTranscrip
         Some(CouldNotRetrieveTranscriptReason::YouTubeRequestFailed(_))
         | Some(CouldNotRetrieveTranscriptReason::RequestBlocked(_))
         | Some(CouldNotRetrieveTranscriptReason::IpBlocked(_)) => ImportError::Network,
-        _ => ImportError::Other,
+        _ => ImportError::Other(format!("{:?}", err)),
     }
 }
 
@@ -954,7 +1193,10 @@ fn error_message(language: Language, err: &ImportError) -> String {
         ImportError::InvalidUrl => labels.invalid_url,
         ImportError::NoTranscript => labels.no_transcript,
         ImportError::Network => labels.network_error,
-        ImportError::Other => labels.import_error,
+        ImportError::Other(msg) => {
+            crate::log_debug(&format!("YouTube transcript import error: {}", msg));
+            labels.import_error
+        }
     }
 }
 
@@ -998,5 +1240,64 @@ fn format_timestamp(seconds: f64) -> String {
         format!("{hours:02}:{minutes:02}:{secs:02}")
     } else {
         format!("{minutes:02}:{secs:02}")
+    }
+}
+
+fn fetch_transcript_list_with_retry(
+    video_id: &str,
+    cancelled: &Arc<AtomicBool>,
+) -> Result<TranscriptList, ImportError> {
+    let mut attempts = 0;
+    loop {
+        if cancelled.load(Ordering::Relaxed) {
+            return Err(ImportError::Other("Cancelled".to_string()));
+        }
+        match fetch_transcript_list(video_id) {
+            Ok(list) => return Ok(list),
+            Err(e) => {
+                attempts += 1;
+                if attempts >= 5 {
+                    return Err(e);
+                }
+                match e {
+                    ImportError::Network | ImportError::Other(_) => {
+                        std::thread::sleep(std::time::Duration::from_millis(
+                            500 * 2u64.pow(attempts - 1),
+                        ));
+                    }
+                    _ => return Err(e),
+                }
+            }
+        }
+    }
+}
+
+fn fetch_transcript_text_with_retry(
+    transcript: &Transcript,
+    include_timestamps: bool,
+    cancelled: &Arc<AtomicBool>,
+) -> Result<String, ImportError> {
+    let mut attempts = 0;
+    loop {
+        if cancelled.load(Ordering::Relaxed) {
+            return Err(ImportError::Other("Cancelled".to_string()));
+        }
+        match fetch_transcript_text(transcript, include_timestamps) {
+            Ok(text) => return Ok(text),
+            Err(e) => {
+                attempts += 1;
+                if attempts >= 5 {
+                    return Err(e);
+                }
+                match e {
+                    ImportError::Network | ImportError::Other(_) => {
+                        std::thread::sleep(std::time::Duration::from_millis(
+                            500 * 2u64.pow(attempts - 1),
+                        ));
+                    }
+                    _ => return Err(e),
+                }
+            }
+        }
     }
 }

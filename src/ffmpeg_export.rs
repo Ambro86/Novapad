@@ -927,7 +927,16 @@ pub fn export_mixed_media(
     // Temporary audio file in cache
     let out_audio = cache_dir.join(format!("{stem}{MIX_SUFFIX}{}.m4a", &mix_hash[..8]));
 
+    log_debug(&format!(
+        "Subtitle: output path will be {}",
+        out_mp4.display()
+    ));
+
     if out_mp4.exists() {
+        log_debug(&format!(
+            "Subtitle: mixed file already exists at {}",
+            out_mp4.display()
+        ));
         return Ok(out_mp4);
     }
 
@@ -956,6 +965,10 @@ pub fn export_mixed_media(
         ));
     }
     register_mix_output(&out_mp4);
+    log_debug(&format!(
+        "Subtitle: mixed file created successfully at {}",
+        out_mp4.display()
+    ));
     Ok(out_mp4)
 }
 

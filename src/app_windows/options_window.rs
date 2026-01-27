@@ -70,6 +70,7 @@ const OPTIONS_ID_AUDIO_SPLIT_TEXT: usize = 6013;
 const OPTIONS_ID_AUDIO_SPLIT_REQUIRE_NEWLINE: usize = 6016;
 const OPTIONS_ID_SUBTITLE_MODE: usize = 6046;
 const OPTIONS_ID_SUBTITLE_DUCKING: usize = 6045;
+const OPTIONS_ID_SUBTITLE_OFFSET: usize = 6047;
 const OPTIONS_ID_PODCAST_CACHE_LIMIT: usize = 6030;
 const OPTIONS_ID_PODCASTINDEX_KEY: usize = 6035;
 const OPTIONS_ID_PODCASTINDEX_SECRET: usize = 6036;
@@ -186,6 +187,8 @@ struct OptionsDialogState {
     edit_audio_split_text: HWND,
     checkbox_audio_split_requires_newline: HWND,
     checkbox_subtitle_ducking: HWND,
+    label_subtitle_offset: HWND,
+    edit_subtitle_offset: HWND,
     label_podcast_cache_limit: HWND,
     edit_podcast_cache_limit: HWND,
     label_podcastindex_key: HWND,
@@ -267,6 +270,7 @@ struct OptionsLabels {
     label_audio_split_text: String,
     label_audio_split_requires_newline: String,
     label_subtitle_ducking: String,
+    label_subtitle_offset: String,
     label_podcast_cache_limit: String,
     label_podcastindex_key: String,
     label_podcastindex_secret: String,
@@ -288,6 +292,7 @@ struct OptionsLabels {
     subtitle_mode_off: String,
     subtitle_mode_nvda: String,
     subtitle_mode_user: String,
+    subtitle_mode_record: String,
 
     split_none: String,
     split_by_text: String,
@@ -363,6 +368,7 @@ fn options_labels(language: Language) -> OptionsLabels {
             "options.label.audio_split_requires_newline",
         ),
         label_subtitle_ducking: i18n::tr(language, "options.label.subtitle_ducking"),
+        label_subtitle_offset: i18n::tr(language, "options.label.subtitle_offset"),
         label_podcast_cache_limit: i18n::tr(language, "options.label.podcast_cache_limit"),
         label_podcastindex_key: i18n::tr(language, "options.label.podcastindex_key"),
         label_podcastindex_secret: i18n::tr(language, "options.label.podcastindex_secret"),
@@ -384,6 +390,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         subtitle_mode_off: i18n::tr(language, "options.subtitle_mode.off"),
         subtitle_mode_nvda: i18n::tr(language, "options.subtitle_mode.nvda"),
         subtitle_mode_user: i18n::tr(language, "options.subtitle_mode.user"),
+        subtitle_mode_record: i18n::tr(language, "options.subtitle_mode.record"),
 
         split_none: i18n::tr(language, "options.split.none"),
         split_by_text: i18n::tr(language, "options.split.by_text"),
@@ -1041,6 +1048,36 @@ unsafe extern "system" fn options_wndproc(
             );
             y += 30;
 
+            let label_subtitle_offset = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_subtitle_offset).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let edit_subtitle_offset = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                170,
+                y - 2,
+                300,
+                22,
+                hwnd,
+                HMENU(OPTIONS_ID_SUBTITLE_OFFSET as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
             let label_podcast_cache_limit = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -1621,6 +1658,8 @@ unsafe extern "system" fn options_wndproc(
                 edit_audio_split_text,
                 checkbox_audio_split_requires_newline,
                 checkbox_subtitle_ducking,
+                label_subtitle_offset,
+                edit_subtitle_offset,
                 label_podcast_cache_limit,
                 edit_podcast_cache_limit,
                 label_podcastindex_key,
@@ -1650,6 +1689,8 @@ unsafe extern "system" fn options_wndproc(
                 button_interpreter_browse,
                 label_subtitle_mode,
                 combo_subtitle_mode,
+                label_subtitle_offset,
+                edit_subtitle_offset,
                 checkbox_move_cursor,
                 checkbox_check_updates,
                 checkbox_context_menu,
@@ -1698,6 +1739,8 @@ unsafe extern "system" fn options_wndproc(
                 edit_audio_split_text,
                 checkbox_audio_split_requires_newline,
                 checkbox_subtitle_ducking,
+                label_subtitle_offset,
+                edit_subtitle_offset,
                 label_podcast_cache_limit,
                 edit_podcast_cache_limit,
                 label_podcastindex_key,
@@ -1798,6 +1841,12 @@ unsafe extern "system" fn options_wndproc(
                 OPTIONS_ID_AUDIO_SPLIT => {
                     if code == CBN_SELCHANGE {
                         update_audio_split_text_visibility(hwnd);
+                    }
+                    LRESULT(0)
+                }
+                OPTIONS_ID_SUBTITLE_MODE => {
+                    if code == CBN_SELCHANGE {
+                        update_subtitle_ducking_visibility(hwnd);
                     }
                     LRESULT(0)
                 }
@@ -1981,6 +2030,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         _button_interpreter_browse,
         _label_subtitle_mode,
         combo_subtitle_mode,
+        _label_subtitle_offset,
+        edit_subtitle_offset,
         checkbox_move_cursor,
         checkbox_check_updates,
         checkbox_context_menu,
@@ -2034,6 +2085,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.button_interpreter_browse,
             state.label_subtitle_mode,
             state.combo_subtitle_mode,
+            state.label_subtitle_offset,
+            state.edit_subtitle_offset,
             state.checkbox_move_cursor,
             state.checkbox_check_updates,
             state.checkbox_context_menu,
@@ -2548,11 +2601,16 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         edit_interpreter_path,
         PCWSTR(to_wide(&settings.interpreter_path).as_ptr()),
     ) {}
+    if let Err(_e) = SetWindowTextW(
+        edit_subtitle_offset,
+        PCWSTR(to_wide(&settings.subtitle_offset_ms.to_string()).as_ptr()),
+    ) {}
     SendMessageW(combo_subtitle_mode, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
     let subtitle_mode_options = [
         labels.subtitle_mode_off.clone(),
         labels.subtitle_mode_nvda.clone(),
         labels.subtitle_mode_user.clone(),
+        labels.subtitle_mode_record.clone(),
     ];
     for label in subtitle_mode_options.iter() {
         SendMessageW(
@@ -2565,6 +2623,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
     let subtitle_mode_index = match settings.subtitle_read_mode {
         SubtitleReadMode::Off => 0,
         SubtitleReadMode::Nvda => 1,
+        SubtitleReadMode::User => 2,
+        SubtitleReadMode::Record => 3,
         _ => 2,
     };
     SendMessageW(
@@ -2573,6 +2633,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         WPARAM(subtitle_mode_index),
         LPARAM(0),
     );
+    update_subtitle_ducking_visibility(hwnd);
     SendMessageW(
         checkbox_move_cursor,
         BM_SETCHECK,
@@ -3153,6 +3214,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         _button_interpreter_browse,
         _button_interpreter_search,
         combo_subtitle_mode,
+        edit_subtitle_offset,
         checkbox_move_cursor,
         checkbox_check_updates,
         checkbox_context_menu,
@@ -3195,6 +3257,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.button_interpreter_browse,
             state.button_interpreter_search,
             state.combo_subtitle_mode,
+            state.edit_subtitle_offset,
             state.checkbox_move_cursor,
             state.checkbox_check_updates,
             state.checkbox_context_menu,
@@ -3415,8 +3478,18 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     settings.subtitle_read_mode = match subtitle_sel {
         1 => SubtitleReadMode::Nvda,
         2 => SubtitleReadMode::User,
+        3 => SubtitleReadMode::Record,
         _ => SubtitleReadMode::Off,
     };
+    let offset_len = GetWindowTextLengthW(edit_subtitle_offset);
+    if offset_len >= 0 {
+        let mut buf = vec![0u16; (offset_len + 1) as usize];
+        let read = GetWindowTextW(edit_subtitle_offset, &mut buf);
+        let text = String::from_utf16_lossy(&buf[..read as usize]);
+        if let Ok(parsed) = text.trim().parse::<i32>() {
+            settings.subtitle_offset_ms = parsed;
+        }
+    }
     settings.move_cursor_during_reading =
         SendMessageW(checkbox_move_cursor, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
             == BST_CHECKED.0;
@@ -3614,6 +3687,22 @@ unsafe fn update_audio_split_text_visibility(hwnd: HWND) {
     EnableWindow(checkbox_audio_split_requires_newline, selected);
 }
 
+unsafe fn update_subtitle_ducking_visibility(hwnd: HWND) {
+    let (combo_subtitle_mode, checkbox_subtitle_ducking) = match with_options_state(hwnd, |state| {
+        (state.combo_subtitle_mode, state.checkbox_subtitle_ducking)
+    }) {
+        Some(values) => values,
+        None => return,
+    };
+    let sel = SendMessageW(combo_subtitle_mode, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    let show = sel == 3;
+    ShowWindow(
+        checkbox_subtitle_ducking,
+        if show { SW_SHOW } else { SW_HIDE },
+    );
+    EnableWindow(checkbox_subtitle_ducking, show);
+}
+
 unsafe fn update_spellcheck_language_visibility(hwnd: HWND) {
     let (checkbox_spellcheck, label_spellcheck_language, combo_spellcheck_language) =
         match with_options_state(hwnd, |state| {
@@ -3723,6 +3812,8 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.checkbox_subtitle_ducking,
             state.label_subtitle_mode,
             state.combo_subtitle_mode,
+            state.label_subtitle_offset,
+            state.edit_subtitle_offset,
             state.label_podcast_cache_limit,
             state.edit_podcast_cache_limit,
             state.label_podcastindex_key,
@@ -3741,6 +3832,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
 
     if index == OPTIONS_TAB_AUDIO {
         update_audio_split_text_visibility(hwnd);
+        update_subtitle_ducking_visibility(hwnd);
     } else if index == OPTIONS_TAB_VOICE {
         update_tts_manual_visibility(hwnd);
     } else if let Some((label, edit, checkbox)) = with_options_state(hwnd, |state| {

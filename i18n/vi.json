@@ -187,6 +187,7 @@
   "options.subtitle_mode.off": "Tắt",
   "options.subtitle_mode.nvda": "NVDA",
   "options.subtitle_mode.user": "Dùng giọng đã chọn",
+  "options.subtitle_mode.record": "Ghi vào tệp",
   "options.label.podcast_cache_limit": "Giới hạn bộ nhớ đệm Podcast (MB):",
   "options.label.podcastindex_key": "Podcast Index API key:",
   "options.label.podcastindex_secret": "Podcast Index API secret:",

@@ -194,6 +194,7 @@
   "options.subtitle_mode.off": "Inaktiverad",
   "options.subtitle_mode.nvda": "NVDA",
   "options.subtitle_mode.user": "Använd vald röst",
+  "options.subtitle_mode.record": "Spela in till fil",
   "options.label.podcast_cache_limit": "Podd-cachegräns (MB):",
   "options.label.podcastindex_key": "Podcast Index API-nyckel:",
   "options.label.podcastindex_secret": "Podcast Index API-hemlighet:",

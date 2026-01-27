@@ -350,48 +350,46 @@ fn start_audiobook_at_with_options(
     seconds: u64,
     options: AudiobookPlaybackOptions,
 ) {
-    if options.mix_export && !is_mixed_output(&path) {
-        let settings =
-            unsafe { with_state(hwnd, |state| state.settings.clone()) }.unwrap_or_default();
-        if settings.subtitle_read_mode != SubtitleReadMode::Off {
-            let path_clone = path.clone();
-            let opts = options;
-            std::thread::spawn(move || {
-                log_debug(&format!(
-                    "Subtitle: offline mix requested for {}",
-                    path_clone.display()
-                ));
-                let mix_opts = MixExportOptions {
-                    ducking: settings.subtitle_mix_ducking,
-                };
-                match export_mixed_media(&path_clone, &settings, &mix_opts) {
-                    Ok(mixed_path) => {
-                        start_audiobook_at_with_options(
-                            hwnd,
-                            mixed_path,
-                            seconds,
-                            AudiobookPlaybackOptions {
-                                mix_export: false,
-                                ..opts
-                            },
-                        );
-                    }
-                    Err(err) => {
-                        log_debug(&format!("Subtitle: mix export failed: {}", err));
-                        start_audiobook_at_with_options(
-                            hwnd,
-                            path_clone,
-                            seconds,
-                            AudiobookPlaybackOptions {
-                                mix_export: false,
-                                ..opts
-                            },
-                        );
-                    }
+    let settings = unsafe { with_state(hwnd, |state| state.settings.clone()) }.unwrap_or_default();
+    let want_mix = settings.subtitle_read_mode == SubtitleReadMode::Record || options.mix_export;
+    if want_mix && !is_mixed_output(&path) && settings.subtitle_read_mode != SubtitleReadMode::Off {
+        let path_clone = path.clone();
+        let opts = options;
+        std::thread::spawn(move || {
+            log_debug(&format!(
+                "Subtitle: offline mix requested for {}",
+                path_clone.display()
+            ));
+            let mix_opts = MixExportOptions {
+                ducking: settings.subtitle_mix_ducking,
+            };
+            match export_mixed_media(&path_clone, &settings, &mix_opts) {
+                Ok(mixed_path) => {
+                    start_audiobook_at_with_options(
+                        hwnd,
+                        mixed_path,
+                        seconds,
+                        AudiobookPlaybackOptions {
+                            mix_export: false,
+                            ..opts
+                        },
+                    );
                 }
-            });
-            return;
-        }
+                Err(err) => {
+                    log_debug(&format!("Subtitle: mix export failed: {}", err));
+                    start_audiobook_at_with_options(
+                        hwnd,
+                        path_clone,
+                        seconds,
+                        AudiobookPlaybackOptions {
+                            mix_export: false,
+                            ..opts
+                        },
+                    );
+                }
+            }
+        });
+        return;
     }
 
     let subtitle_hold = should_hold_for_edge_subtitles(hwnd, &path);
@@ -416,12 +414,18 @@ fn start_audiobook_at_with_options(
         let subtitle_mode =
             unsafe { with_state(hwnd_main, |state| state.settings.subtitle_read_mode) }
                 .unwrap_or(SubtitleReadMode::Off);
-        let cached_subtitles = get_or_load_subtitles(&path, subtitle_mode);
+        let effective_subtitle_mode = if subtitle_mode == SubtitleReadMode::Record {
+            SubtitleReadMode::Off
+        } else {
+            subtitle_mode
+        };
+        let cached_subtitles = get_or_load_subtitles(&path, effective_subtitle_mode);
         let subtitles_available = cached_subtitles
             .as_ref()
             .map(|entry| !entry.cues.is_empty())
             .unwrap_or(false);
-        let subtitles_active = subtitle_mode != SubtitleReadMode::Off && subtitles_available;
+        let subtitles_active =
+            effective_subtitle_mode != SubtitleReadMode::Off && subtitles_available;
         let effective_speed = if subtitles_active {
             1.0
         } else {
@@ -557,7 +561,7 @@ pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
             pos,
             state.settings.audiobook_playback_speed,
             state.settings.audiobook_playback_volume,
-            state.settings.subtitle_mix_export_on_play,
+            state.settings.subtitle_read_mode == SubtitleReadMode::Record,
         )
     })
     .unwrap_or((0, 1.0, 1.0, false));
@@ -1029,6 +1033,7 @@ fn subtitle_mode_key(mode: SubtitleReadMode) -> &'static str {
         SubtitleReadMode::Sapi5 => "sapi5",
         SubtitleReadMode::Sapi4 => "sapi4",
         SubtitleReadMode::Edge => "edge",
+        SubtitleReadMode::Record => "record",
     }
 }
 
@@ -1049,7 +1054,7 @@ fn subtitle_file_stamp(path: &Path) -> Option<(u128, u64)> {
 }
 
 fn get_or_load_subtitles(media_path: &Path, mode: SubtitleReadMode) -> Option<SubtitleCacheEntry> {
-    if mode == SubtitleReadMode::Off {
+    if mode == SubtitleReadMode::Off || mode == SubtitleReadMode::Record {
         return None;
     }
     let subtitle_path = find_subtitle_for_media(media_path)?;
@@ -1342,6 +1347,7 @@ fn start_subtitle_reader(
         let effective_mode = match mode {
             SubtitleReadMode::Off => SubtitleReadMode::Off,
             SubtitleReadMode::Nvda => SubtitleReadMode::Nvda,
+            SubtitleReadMode::Record => SubtitleReadMode::Off,
             _ => SubtitleReadMode::User,
         };
         let (subtitle_path, mut cues) = if let Some(entry) = cached {
@@ -1664,7 +1670,7 @@ fn start_subtitle_reader(
             }
         }
 
-        let offset_secs = 0.0;
+        let offset_secs = settings.subtitle_offset_ms as f64 / 1000.0;
         let (mut index, mut last_position, mut last_paused) =
             if let Some(state) = subtitle_playback_state(hwnd, &media_path) {
                 let raw_pos = state.position_secs;
@@ -1827,7 +1833,7 @@ fn start_subtitle_reader(
                 ));
                 let mut did_emit = false;
                 match effective_mode {
-                    SubtitleReadMode::Off => {}
+                    SubtitleReadMode::Off | SubtitleReadMode::Record => {}
                     SubtitleReadMode::Nvda => {
                         if let Some(pos) = wait_until_target(raw_pos, target) {
                             raw_pos = pos;

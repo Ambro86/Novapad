@@ -198,6 +198,7 @@
   "options.subtitle_mode.off": "Vypnuto",
   "options.subtitle_mode.nvda": "NVDA",
   "options.subtitle_mode.user": "Použít vybraný hlas",
+  "options.subtitle_mode.record": "Nahrát do souboru",
   "options.label.podcast_cache_limit": "Limit mezipaměti podcastů (MB):",
   "options.label.podcastindex_key": "Klíč API Podcast Index:",
   "options.label.podcastindex_secret": "Tajný klíč API Podcast Index:",

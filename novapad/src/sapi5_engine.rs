@@ -1,8 +1,8 @@
 use crate::accessibility::to_wide;
-use crate::com_guard::ComGuard;
 use crate::i18n;
 use crate::settings::{Language, VoiceInfo};
 use crate::tts_engine::TtsCommand;
+use platform_windows::ComGuard;
 use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::path::Path;

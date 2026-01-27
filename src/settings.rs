@@ -1,15 +1,19 @@
 use crate::accessibility::to_wide;
 use crate::tools::rss::RssSource;
 use serde::{Deserialize, Serialize};
+#[cfg(not(feature = "standalone"))]
 use std::ffi::OsStr;
+#[cfg(not(feature = "standalone"))]
 use std::os::windows::prelude::*;
 use std::path::PathBuf;
+#[cfg(not(feature = "standalone"))]
 use std::path::{Component, Prefix};
 use windows::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS, HANDLE, HLOCAL, LocalFree};
 use windows::Win32::Globalization::GetUserDefaultLocaleName;
 use windows::Win32::Security::Cryptography::{
     CRYPT_INTEGER_BLOB, CRYPTPROTECT_UI_FORBIDDEN, CryptProtectData, CryptUnprotectData,
 };
+#[cfg(not(feature = "standalone"))]
 use windows::Win32::Storage::FileSystem::GetDriveTypeW;
 use windows::Win32::System::Com::CoTaskMemFree;
 use windows::Win32::System::Registry::{
@@ -19,6 +23,7 @@ use windows::Win32::System::Registry::{
 use windows::Win32::UI::Shell::{FOLDERID_Documents, SHGetKnownFolderPath};
 use windows::core::PCWSTR;
 
+#[cfg(not(feature = "standalone"))]
 pub const DRIVE_REMOVABLE: u32 = 2;
 
 pub const TRUSTED_CLIENT_TOKEN: &str = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
@@ -396,10 +401,12 @@ impl Default for AppSettings {
     }
 }
 
+#[cfg(not(feature = "standalone"))]
 fn wide(s: &str) -> Vec<u16> {
     OsStr::new(s).encode_wide().chain(Some(0)).collect()
 }
 
+#[cfg(not(feature = "standalone"))]
 fn is_portable_folder(exe_dir: &std::path::Path) -> bool {
     exe_dir
         .file_name()
@@ -408,6 +415,7 @@ fn is_portable_folder(exe_dir: &std::path::Path) -> bool {
         .unwrap_or(false)
 }
 
+#[cfg(not(feature = "standalone"))]
 fn exe_drive_type(exe: &std::path::Path) -> Option<u32> {
     match exe.components().next()? {
         Component::Prefix(p) => match p.kind() {
@@ -421,6 +429,7 @@ fn exe_drive_type(exe: &std::path::Path) -> Option<u32> {
     }
 }
 
+#[cfg(not(feature = "standalone"))]
 fn dir_is_writable(dir: &std::path::Path) -> bool {
     if std::fs::create_dir_all(dir).is_err() {
         return false;
@@ -439,6 +448,21 @@ fn dir_is_writable(dir: &std::path::Path) -> bool {
     }
 }
 
+#[cfg(feature = "standalone")]
+fn resolve_settings_dir() -> PathBuf {
+    let exe_path = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("."));
+    let exe_dir = exe_path
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."))
+        .to_path_buf();
+
+    // Standalone: sempre usa config/ locale
+    let portable_dir = exe_dir.join("config");
+    crate::log_if_err!(std::fs::create_dir_all(&portable_dir));
+    portable_dir
+}
+
+#[cfg(not(feature = "standalone"))]
 fn resolve_settings_dir() -> PathBuf {
     let exe_path = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("."));
     let exe_dir = exe_path

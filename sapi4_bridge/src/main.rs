@@ -24,12 +24,12 @@ use widestring::U16CString;
 
 use windows::core::PCWSTR;
 use windows::Win32::Media::MediaFoundation::{
-    IMFMediaType, IMFSinkWriter, IMFSourceReader, MFCreateMediaType, MFCreateSinkWriterFromURL,
-    MFCreateSourceReaderFromURL, MFShutdown, MFStartup, MFMediaType_Audio,
-    MF_MT_AUDIO_AVG_BYTES_PER_SECOND, MF_MT_AUDIO_BITS_PER_SAMPLE, MF_MT_AUDIO_BLOCK_ALIGNMENT,
-    MF_MT_AUDIO_NUM_CHANNELS, MF_MT_AUDIO_SAMPLES_PER_SECOND, MF_MT_MAJOR_TYPE, MF_MT_SUBTYPE,
-    MF_SOURCE_READERF_ENDOFSTREAM, MF_SOURCE_READER_FIRST_AUDIO_STREAM, MF_VERSION,
-    MFAudioFormat_MP3, MFAudioFormat_PCM,
+    IMFMediaType, IMFSinkWriter, IMFSourceReader, MFAudioFormat_MP3, MFAudioFormat_PCM,
+    MFCreateMediaType, MFCreateSinkWriterFromURL, MFCreateSourceReaderFromURL, MFMediaType_Audio,
+    MFShutdown, MFStartup, MF_MT_AUDIO_AVG_BYTES_PER_SECOND, MF_MT_AUDIO_BITS_PER_SAMPLE,
+    MF_MT_AUDIO_BLOCK_ALIGNMENT, MF_MT_AUDIO_NUM_CHANNELS, MF_MT_AUDIO_SAMPLES_PER_SECOND,
+    MF_MT_MAJOR_TYPE, MF_MT_SUBTYPE, MF_SOURCE_READERF_ENDOFSTREAM,
+    MF_SOURCE_READER_FIRST_AUDIO_STREAM, MF_VERSION,
 };
 
 // =========================
@@ -261,7 +261,8 @@ struct ITTSEnumVtbl {
     skip: unsafe extern "system" fn(*mut ITTSEnum, u32) -> i32,
     reset: unsafe extern "system" fn(*mut ITTSEnum) -> i32,
     clone: unsafe extern "system" fn(*mut ITTSEnum, *mut *mut ITTSEnum) -> i32,
-    select: unsafe extern "system" fn(*mut ITTSEnum, GUID, *mut *mut ITTSCentral, *mut IUnknown) -> i32,
+    select:
+        unsafe extern "system" fn(*mut ITTSEnum, GUID, *mut *mut ITTSCentral, *mut IUnknown) -> i32,
 }
 #[repr(C)]
 struct ITTSEnum {
@@ -278,8 +279,14 @@ struct ITTSCentralVtbl {
     mode_get: unsafe extern "system" fn(*mut ITTSCentral, *mut TTSMODEINFO) -> i32,
     phoneme: unsafe extern "system" fn(*mut ITTSCentral, u32, DWORD, SDATA, *mut SDATA) -> i32,
     posn_get: unsafe extern "system" fn(*mut ITTSCentral, *mut QWORD) -> i32,
-    text_data:
-        unsafe extern "system" fn(*mut ITTSCentral, u32, DWORD, SDATA, *mut std::ffi::c_void, GUID) -> i32,
+    text_data: unsafe extern "system" fn(
+        *mut ITTSCentral,
+        u32,
+        DWORD,
+        SDATA,
+        *mut std::ffi::c_void,
+        GUID,
+    ) -> i32,
     to_file_time: unsafe extern "system" fn(*mut ITTSCentral, *mut QWORD, *mut FILETIME) -> i32,
     audio_pause: unsafe extern "system" fn(*mut ITTSCentral) -> i32,
     audio_resume: unsafe extern "system" fn(*mut ITTSCentral) -> i32,
@@ -463,8 +470,11 @@ static NOTIFY_VTBL: ITTSNotifySinkVtbl = ITTSNotifySinkVtbl {
 
 #[repr(C)]
 struct IAudioFileNotifySinkVtbl {
-    query_interface:
-        unsafe extern "system" fn(*mut IAudioFileNotifySink, REFIID, *mut *mut std::ffi::c_void) -> i32,
+    query_interface: unsafe extern "system" fn(
+        *mut IAudioFileNotifySink,
+        REFIID,
+        *mut *mut std::ffi::c_void,
+    ) -> i32,
     add_ref: unsafe extern "system" fn(*mut IAudioFileNotifySink) -> u32,
     release: unsafe extern "system" fn(*mut IAudioFileNotifySink) -> u32,
     file_begin: unsafe extern "system" fn(*mut IAudioFileNotifySink, DWORD) -> i32,
@@ -518,10 +528,16 @@ unsafe extern "system" fn audio_file_notify_release(this: *mut IAudioFileNotifyS
     next
 }
 
-unsafe extern "system" fn audio_file_notify_file_begin(_this: *mut IAudioFileNotifySink, _id: DWORD) -> i32 {
+unsafe extern "system" fn audio_file_notify_file_begin(
+    _this: *mut IAudioFileNotifySink,
+    _id: DWORD,
+) -> i32 {
     S_OK
 }
-unsafe extern "system" fn audio_file_notify_file_end(this: *mut IAudioFileNotifySink, _id: DWORD) -> i32 {
+unsafe extern "system" fn audio_file_notify_file_end(
+    this: *mut IAudioFileNotifySink,
+    _id: DWORD,
+) -> i32 {
     if !this.is_null() {
         let sink = &*this;
         sink.state.mark_done();
@@ -614,8 +630,12 @@ fn encode_wav_to_mp3(wav_path: &Path, mp3_path: &Path) -> Result<(), String> {
     unsafe {
         let _mf = MfGuard::start()?;
 
-        let wav_str = wav_path.to_str().ok_or_else(|| "Invalid wav path".to_string())?;
-        let mp3_str = mp3_path.to_str().ok_or_else(|| "Invalid mp3 path".to_string())?;
+        let wav_str = wav_path
+            .to_str()
+            .ok_or_else(|| "Invalid wav path".to_string())?;
+        let mp3_str = mp3_path
+            .to_str()
+            .ok_or_else(|| "Invalid mp3 path".to_string())?;
 
         let wav_wide = U16CString::from_str(wav_str).map_err(|_| "Invalid wav path".to_string())?;
         let mp3_wide = U16CString::from_str(mp3_str).map_err(|_| "Invalid mp3 path".to_string())?;
@@ -655,7 +675,11 @@ fn encode_wav_to_mp3(wav_path: &Path, mp3_path: &Path) -> Result<(), String> {
             .map_err(|e| format!("Set avg bytes failed: {}", e))?;
 
         reader
-            .SetCurrentMediaType(MF_SOURCE_READER_FIRST_AUDIO_STREAM.0 as u32, None, &pcm_type)
+            .SetCurrentMediaType(
+                MF_SOURCE_READER_FIRST_AUDIO_STREAM.0 as u32,
+                None,
+                &pcm_type,
+            )
             .map_err(|e| format!("SetCurrentMediaType failed: {}", e))?;
 
         let in_type = reader
@@ -682,10 +706,13 @@ fn encode_wav_to_mp3(wav_path: &Path, mp3_path: &Path) -> Result<(), String> {
             .SetUINT32(&MF_MT_AUDIO_AVG_BYTES_PER_SECOND, mp3_avg_bytes)
             .map_err(|e| format!("Set mp3 bitrate failed: {}", e))?;
 
-        let writer: IMFSinkWriter = MFCreateSinkWriterFromURL(PCWSTR(mp3_wide.as_ptr()), None, None)
-            .map_err(|e| format!("MFCreateSinkWriterFromURL failed: {}", e))?;
+        let writer: IMFSinkWriter =
+            MFCreateSinkWriterFromURL(PCWSTR(mp3_wide.as_ptr()), None, None)
+                .map_err(|e| format!("MFCreateSinkWriterFromURL failed: {}", e))?;
 
-        let stream_index = writer.AddStream(&out_type).map_err(|e| format!("AddStream failed: {}", e))?;
+        let stream_index = writer
+            .AddStream(&out_type)
+            .map_err(|e| format!("AddStream failed: {}", e))?;
         writer
             .SetInputMediaType(stream_index, &in_type, None)
             .map_err(|e| format!("SetInputMediaType failed: {}", e))?;
@@ -721,7 +748,9 @@ fn encode_wav_to_mp3(wav_path: &Path, mp3_path: &Path) -> Result<(), String> {
             }
         }
 
-        writer.Finalize().map_err(|e| format!("Finalize failed: {}", e))?;
+        writer
+            .Finalize()
+            .map_err(|e| format!("Finalize failed: {}", e))?;
         Ok(())
     }
 }
@@ -868,7 +897,10 @@ unsafe fn init_central_with_audio(
         if hr_ok(hra) && !audio_unknown.is_null() {
             audio_ptr = audio_unknown;
         } else {
-            eprintln!("Failed to create MMAudioDest, hr={:#x}. Continuing without it.", hra);
+            eprintln!(
+                "Failed to create MMAudioDest, hr={:#x}. Continuing without it.",
+                hra
+            );
             audio_ptr = ptr::null_mut();
         }
     }
@@ -1336,7 +1368,8 @@ impl Drop for ServerSession {
     fn drop(&mut self) {
         unsafe {
             if self.registered {
-                let hr_un = ((*self.central_vtbl).un_register)(self.central_ptr.as_ptr(), self.reg_key);
+                let hr_un =
+                    ((*self.central_vtbl).un_register)(self.central_ptr.as_ptr(), self.reg_key);
                 if !hr_ok(hr_un) {
                     eprintln!("UnRegister failed: {:#x}", hr_un);
                 }
@@ -1444,7 +1477,8 @@ fn speak_with_voice(
     }
 
     let cleaned = sanitize_text_for_u16c(&text);
-    let u16c = U16CString::from_str(&cleaned).map_err(|_| "Input contains interior NUL".to_string())?;
+    let u16c =
+        U16CString::from_str(&cleaned).map_err(|_| "Input contains interior NUL".to_string())?;
 
     state.mark_running();
     set_current_text(&state, u16c);
@@ -1624,7 +1658,9 @@ fn speak_to_file(
             out_path.to_path_buf()
         };
 
-        let wav_str = wav_path.to_str().ok_or_else(|| "Invalid output path".to_string())?;
+        let wav_str = wav_path
+            .to_str()
+            .ok_or_else(|| "Invalid output path".to_string())?;
         let out_wide = U16CString::from_str(wav_str)
             .map_err(|_| "Invalid output path (interior NUL?)".to_string())?;
 
@@ -1718,7 +1754,7 @@ fn speak_to_file(
             }
         }
 
-        state.mark_done(); 
+        state.mark_done();
         try_start_next_recording_chunk(central_ptr.as_ptr(), &state, TTSDATAFLAG_TAGGED);
 
         let mut msg: MSG = std::mem::zeroed();
@@ -1735,7 +1771,11 @@ fn speak_to_file(
 
             if state.done.load(Ordering::Acquire) {
                 let queue_empty = state.queue.lock().map(|q| q.is_empty()).unwrap_or(true);
-                let no_current = state.current_text.lock().map(|c| c.is_none()).unwrap_or(true);
+                let no_current = state
+                    .current_text
+                    .lock()
+                    .map(|c| c.is_none())
+                    .unwrap_or(true);
                 if queue_empty && no_current {
                     break;
                 }

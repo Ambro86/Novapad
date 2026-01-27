@@ -12,6 +12,7 @@ mod embedded_deps;
 mod macros;
 use accessibility::*;
 mod conpty;
+mod sentry_integration;
 mod settings;
 use editor_manager::Document;
 use settings::*;
@@ -1514,6 +1515,27 @@ fn main() -> windows::core::Result<()> {
     updater::cleanup_update_lock_on_start();
     updater::cleanup_update_temp_on_start();
 
+    // Inizializza Sentry per crash reporting (opt-in)
+    {
+        let settings = load_settings();
+        sentry_integration::init(settings.send_crash_reports, option_env!("SENTRY_DSN"));
+    }
+
+    // Installa panic hook (logga + invia a Sentry)
+    sentry_integration::install_panic_hook();
+
+    // Error boundary: cattura errori fatali
+    if let Err(e) = run_app(&args) {
+        sentry_integration::capture_fatal_windows_error("run_app", &e);
+        sentry_integration::flush(2);
+        return Err(e);
+    }
+
+    Ok(())
+}
+
+/// Core dell'applicazione - separato per error boundary
+fn run_app(args: &[String]) -> windows::core::Result<()> {
     unsafe {
         crate::log_if_err!(LoadLibraryW(w!("Msftedit.dll")));
         let hinstance = HINSTANCE(GetModuleHandleW(None)?.0);
@@ -2103,9 +2125,9 @@ fn main() -> windows::core::Result<()> {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
-    }
 
-    Ok(())
+        Ok(())
+    }
 }
 
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {

@@ -302,6 +302,9 @@ pub struct AppSettings {
     pub rss_cooldown_not_found_secs: u64,
     #[serde(default)]
     pub rss_cooldown_rate_limited_secs: u64,
+    /// Se true, invia crash report anonimi a Sentry
+    #[serde(default)]
+    pub send_crash_reports: bool,
 }
 
 impl Default for AppSettings {
@@ -397,6 +400,7 @@ impl Default for AppSettings {
             rss_cooldown_blocked_secs: 3600,
             rss_cooldown_not_found_secs: 86400,
             rss_cooldown_rate_limited_secs: 300,
+            send_crash_reports: false, // Opt-in, default disabilitato
         }
     }
 }

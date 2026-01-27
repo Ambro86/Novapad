@@ -7,12 +7,14 @@ pub mod about_window;
 mod com_guard;
 pub mod dialogs;
 pub mod list_select_dialog;
+pub mod text_input_dialog;
 
 pub use com_guard::ComGuard;
 pub use dialogs::{DialogResult, DialogStyle, show_message_box};
 pub use list_select_dialog::{
     ListSelectDialogParams, show_list_select_dialog, show_list_select_dialog_index,
 };
+pub use text_input_dialog::{TextInputDialogParams, show_text_input_dialog};
 
 #[derive(Debug)]
 pub enum PlatformError {

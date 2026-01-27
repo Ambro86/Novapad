@@ -2603,6 +2603,7 @@ dependencies = [
  "mp3-duration",
  "once_cell",
  "pdf-extract",
+ "platform_windows",
  "printpdf",
  "quick-xml 0.39.0",
  "rand 0.8.5",
@@ -3169,6 +3170,13 @@ name = "pkg-config"
 version = "0.3.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
+
+[[package]]
+name = "platform_windows"
+version = "0.1.0"
+dependencies = [
+ "windows 0.54.0",
+]
 
 [[package]]
 name = "png"
@@ -3862,6 +3870,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "sapi4_bridge"
+version = "0.1.0"
+dependencies = [
+ "widestring",
+ "winapi",
+ "windows 0.54.0",
 ]
 
 [[package]]
@@ -5306,6 +5323,12 @@ name = "weezl"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a28ac98ddc8b9274cb41bb4d9d4d5c425b6020c50c46f25559911905610b4a88"
+
+[[package]]
+name = "widestring"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72069c3113ab32ab29e5584db3c6ec55d416895e60715417b5b883a357c3e471"
 
 [[package]]
 name = "winapi"

@@ -1,3 +1,4 @@
+// #![forbid(unsafe_code)] // To be enabled in Step 2 when all unsafe is moved to platform_windows
 #![deny(warnings)]
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
@@ -1490,7 +1491,8 @@ struct RecentFileStore {
     files: Vec<String>,
 }
 
-fn main() -> windows::core::Result<()> {
+fn main() -> anyhow::Result<()> {
+    platform_windows::init().map_err(|e| anyhow::anyhow!(e))?;
     // Initialize COM for the main UI thread (STA)
     let _com = com_guard::ComGuard::new_sta().ok();
 

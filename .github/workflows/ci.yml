@@ -7,155 +7,189 @@ on:
     branches: [ "master" ]
   workflow_dispatch:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build-windows:
-    name: Build & Package (Windows)
+    name: Windows - ${{ matrix.variant }}
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [portable, standalone, installer]
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Rust
-      uses: dtolnay/rust-toolchain@stable
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
 
-    - name: Rust Cache
-      uses: swatinem/rust-cache@v2
-    # --- INIZIO BLOCCO VCPKG ---
-    - name: Set VCPKG_ROOT Environment
-      # Imposta la root di vcpkg (già presente nell'immagine windows-latest)
-      run: echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
-      shell: powershell
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.variant }}
 
-    - name: Vcpkg Cache
-      id: vcpkg-cache
-      uses: actions/cache@v4
-      with:
-        # Cacha la cartella dove vcpkg installa le librerie compilate
-        path: C:\vcpkg\installed
-        # La chiave dipende dal sistema operativo e dal contenuto di vcpkg.json
-        key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json') }}
-        restore-keys: |
-          ${{ runner.os }}-vcpkg-
+      # --- INIZIO BLOCCO VCPKG ---
+      - name: Set VCPKG_ROOT Environment
+        run: echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
+        shell: powershell
 
-    - name: Install vcpkg dependencies
-      # Se la cache c'è (cache-hit), salta questo passaggio per risparmiare tempo
-      if: steps.vcpkg-cache.outputs.cache-hit != 'true'
-      run: vcpkg install --triplet x64-windows
-      shell: cmd
+      - name: Vcpkg Cache
+        id: vcpkg-cache
+        uses: actions/cache@v4
+        with:
+          path: C:\vcpkg\installed
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-
 
-    - name: Set FFMPEG_DIR for Rust
-      # Collega la build di vcpkg alla variabile che Rust si aspetta
-      # Vcpkg in manifest mode installa in vcpkg_installed nella root del progetto
-      run: echo "FFMPEG_DIR=${{ github.workspace }}\vcpkg_installed\x64-windows" >> $env:GITHUB_ENV
-      shell: powershell
-    # --- FINE BLOCCO VCPKG ---
-    
-    - name: Format check
-      run: cargo fmt --check
+      - name: Install vcpkg dependencies
+        if: steps.vcpkg-cache.outputs.cache-hit != 'true'
+        run: vcpkg install --triplet x64-windows
+        shell: cmd
 
-    - name: Clippy (advisory)
-      run: cargo clippy --all
+      - name: Set FFMPEG_DIR for Rust
+        run: echo "FFMPEG_DIR=${{ github.workspace }}\vcpkg_installed\x64-windows" >> $env:GITHUB_ENV
+        shell: powershell
+      # --- FINE BLOCCO VCPKG ---
 
-    - name: Tests
-      run: cargo test --all
+      # (Opzionale) Esegui controlli solo una volta: qui li faccio solo su "installer"
+      - name: Format check
+        if: matrix.variant == 'installer'
+        run: cargo fmt --check
 
-    - name: Install NSIS and WiX with Retry
-      shell: powershell
-      run: |
-        function Install-WithRetry {
-            param([string]$package)
-            $maxRetries = 5
-            $retryCount = 0
-            $completed = $false
-            
-            while (-not $completed) {
-                try {
-                    Write-Host "Attempting to install $package (Attempt $($retryCount + 1)/$maxRetries)..."
-                    choco install $package -y --no-progress
-                    if ($LASTEXITCODE -eq 0) {
-                        $completed = $true
-                        Write-Host "Successfully installed $package"
-                    } else {
-                        throw "Exit code $LASTEXITCODE"
-                    }
-                } catch {
-                    $retryCount++
-                    Write-Error "Failed to install $package. Error: $_"
-                    if ($retryCount -ge $maxRetries) {
-                        throw "Failed to install $package after $maxRetries attempts."
-                    }
-                    Write-Host "Waiting 10 seconds before retrying..."
-                    Start-Sleep -Seconds 10
-                }
-            }
-        }
-        
-        Install-WithRetry "nsis"
-        Install-WithRetry "wixtoolset"
+      - name: Clippy (advisory)
+        if: matrix.variant == 'installer'
+        run: cargo clippy --all
 
-    - name: Cache cargo-packager
-      id: cache-cargo-packager
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/bin/cargo-packager.exe
-          ~/.cargo/.crates.toml
-          ~/.cargo/.crates2.json
-        key: ${{ runner.os }}-cargo-packager-locked
+      - name: Tests
+        if: matrix.variant == 'installer'
+        run: cargo test --all
 
-    - name: Install cargo-packager
-      if: steps.cache-cargo-packager.outputs.cache-hit != 'true'
-      run: cargo install cargo-packager --locked
+      # -------------------------
+      # BUILD PORTABLE
+      # -------------------------
+      - name: Build Portable (Release)
+        if: matrix.variant == 'portable'
+        run: cargo build --verbose --release
 
-    - name: Build Standalone (Release)
-      run: cargo build --verbose --release --features standalone
+      - name: Upload Portable (Exe)
+        if: matrix.variant == 'portable'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Novapad-Portable
+          path: target/release/novapad.exe
 
-    - name: Prepare Standalone Artifact
-      shell: powershell
-      run: |
-        Copy-Item -Path "target/release/novapad.exe" -Destination "target/release/novapad-standalone.exe"
+      # -------------------------
+      # BUILD STANDALONE
+      # -------------------------
+      - name: Build Standalone (Release)
+        if: matrix.variant == 'standalone'
+        run: cargo build --verbose --release --features standalone
 
-    - name: Build (Release)
-      run: cargo build --verbose --release
+      - name: Prepare Standalone Artifact
+        if: matrix.variant == 'standalone'
+        shell: powershell
+        run: Copy-Item -Path "target/release/novapad.exe" -Destination "target/release/novapad-standalone.exe" -Force
 
-    - name: Package Application (NSIS)
-      run: cargo packager --release --formats nsis
+      - name: Upload Standalone (Exe)
+        if: matrix.variant == 'standalone'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Novapad-Standalone
+          path: target/release/novapad-standalone.exe
 
-    - name: Generate WiX Artifacts
-      run: cargo packager --release --formats wix || cmd /c "exit /b 0"
+      # -------------------------
+      # INSTALLER (BUILD + PACKAGE)
+      # -------------------------
+      - name: Cache cargo-packager
+        if: matrix.variant == 'installer'
+        id: cache-cargo-packager
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-packager.exe
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+          key: ${{ runner.os }}-cargo-packager-locked
 
-    - name: Package Application (MSI)
-      shell: powershell
-      run: .\scripts\build_msi.ps1
+      - name: Install cargo-packager
+        if: matrix.variant == 'installer' && steps.cache-cargo-packager.outputs.cache-hit != 'true'
+        run: cargo install cargo-packager --locked
 
-    - name: List target directory (Debug)
-      shell: powershell
-      run: Get-ChildItem -Path target/release -Recurse
+      - name: Install NSIS and WiX with Retry
+        if: matrix.variant == 'installer'
+        shell: powershell
+        run: |
+          function Install-WithRetry {
+              param([string]$package)
+              $maxRetries = 5
+              $retryCount = 0
+              $completed = $false
 
-    - name: Upload Portable (Exe)
-      uses: actions/upload-artifact@v4
-      with:
-        name: Novapad-Portable
-        path: target/release/novapad.exe
+              while (-not $completed) {
+                  try {
+                      Write-Host "Attempting to install $package (Attempt $($retryCount + 1)/$maxRetries)..."
+                      choco install $package -y --no-progress
+                      if ($LASTEXITCODE -eq 0) {
+                          $completed = $true
+                          Write-Host "Successfully installed $package"
+                      } else {
+                          throw "Exit code $LASTEXITCODE"
+                      }
+                  } catch {
+                      $retryCount++
+                      Write-Error "Failed to install $package. Error: $_"
+                      if ($retryCount -ge $maxRetries) {
+                          throw "Failed to install $package after $maxRetries attempts."
+                      }
+                      Write-Host "Waiting 10 seconds before retrying..."
+                      Start-Sleep -Seconds 10
+                  }
+              }
+          }
 
-    - name: Upload Installer (Setup)
-      uses: actions/upload-artifact@v4
-      with:
-        name: Novapad-Setup
-        path: target/release/*-setup.exe
+          Install-WithRetry "nsis"
+          Install-WithRetry "wixtoolset"
 
-    - name: Upload Installer (MSI)
-      uses: actions/upload-artifact@v4
-      with:
-        name: Novapad-MSI
-        path: target/release/*.msi
+      - name: Build (Release) - Installer
+        if: matrix.variant == 'installer'
+        run: cargo build --verbose --release
 
-    - name: Upload Standalone (Exe)
-      uses: actions/upload-artifact@v4
-      with:
-        name: Novapad-Standalone
-        path: target/release/novapad-standalone.exe
+      - name: Package Application (NSIS)
+        if: matrix.variant == 'installer'
+        run: cargo packager --release --formats nsis
+
+      - name: Generate WiX Artifacts
+        if: matrix.variant == 'installer'
+        run: cargo packager --release --formats wix || cmd /c "exit /b 0"
+
+      - name: Package Application (MSI)
+        if: matrix.variant == 'installer'
+        shell: powershell
+        run: .\scripts\build_msi.ps1
+
+      - name: List target directory (Debug)
+        if: matrix.variant == 'installer'
+        shell: powershell
+        run: Get-ChildItem -Path target/release -Recurse
+
+      - name: Upload Installer (Setup)
+        if: matrix.variant == 'installer'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Novapad-Setup
+          path: target/release/*-setup.exe
+
+      - name: Upload Installer (MSI)
+        if: matrix.variant == 'installer'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Novapad-MSI
+          path: target/release/*.msi

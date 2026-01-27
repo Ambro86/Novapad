@@ -7403,8 +7403,22 @@ pub(crate) unsafe fn save_audio_dialog(
 }
 
 pub(crate) unsafe fn show_error(hwnd: HWND, language: Language, message: &str) {
-    log_debug(&format!("Error shown: {message}"));
-    let wide = to_wide(message);
+    show_error_with_id(hwnd, language, message, None);
+}
+
+pub(crate) unsafe fn show_error_with_id(
+    hwnd: HWND,
+    language: Language,
+    message: &str,
+    event_id: Option<&sentry_integration::EventId>,
+) {
+    let full_message = format!(
+        "{}{}",
+        message,
+        sentry_integration::format_event_id(event_id)
+    );
+    log_debug(&format!("Error shown: {full_message}"));
+    let wide = to_wide(&full_message);
     let title = to_wide(&error_title(language));
     MessageBoxW(
         hwnd,

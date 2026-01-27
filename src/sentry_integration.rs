@@ -9,6 +9,9 @@
 use std::panic::PanicHookInfo;
 use std::sync::OnceLock;
 
+/// ID univoco dell'evento Sentry (re-export di Uuid)
+pub type EventId = uuid::Uuid;
+
 static SENTRY_GUARD: OnceLock<sentry::ClientInitGuard> = OnceLock::new();
 
 // Regex per path Windows (compilata una volta sola)
@@ -90,38 +93,50 @@ pub fn init(send_crash_reports: bool, dsn: Option<&str>) {
 
 /// Cattura un errore fatale come stringa e lo invia a Sentry.
 /// Usare per errori critici che non sono panic.
-pub fn capture_fatal_string(message: &str) {
+/// Ritorna l'EventId se l'evento è stato inviato.
+pub fn capture_fatal_string(context: &str, message: &str) -> Option<EventId> {
     if !is_enabled() {
-        return;
+        return None;
     }
 
-    let sanitized = sanitize_message(message);
+    let sanitized_context = sanitize_message(context);
+    let sanitized_message = sanitize_message(message);
+    let full_message = format!("{}: {}", sanitized_context, sanitized_message);
 
     sentry::with_scope(
         |scope| {
             scope.set_tag("err.severity", "fatal");
+            scope.set_tag("err.context", sanitized_context);
         },
-        || {
-            sentry::capture_message(&sanitized, sentry::Level::Error);
-        },
-    );
+        || Some(sentry::capture_message(&full_message, sentry::Level::Error)),
+    )
 }
 
 /// Cattura un errore non fatale.
-pub fn capture_error_string(message: &str) {
+/// Ritorna l'EventId se l'evento è stato inviato.
+pub fn capture_error_string(context: &str, message: &str) -> Option<EventId> {
     if !is_enabled() {
-        return;
+        return None;
     }
 
-    let sanitized = sanitize_message(message);
-    sentry::capture_message(&sanitized, sentry::Level::Error);
+    let sanitized_context = sanitize_message(context);
+    let sanitized_message = sanitize_message(message);
+    let full_message = format!("{}: {}", sanitized_context, sanitized_message);
+
+    sentry::with_scope(
+        |scope| {
+            scope.set_tag("err.context", sanitized_context);
+        },
+        || Some(sentry::capture_message(&full_message, sentry::Level::Error)),
+    )
 }
 
 /// Cattura un errore Windows con contesto.
 /// Invia HRESULT code e messaggio come extra/tags.
-pub fn capture_windows_error(context: &str, err: &windows::core::Error) {
+/// Ritorna l'EventId se l'evento è stato inviato.
+pub fn capture_windows_error(context: &str, err: &windows::core::Error) -> Option<EventId> {
     if !is_enabled() {
-        return;
+        return None;
     }
 
     let sanitized_context = sanitize_message(context);
@@ -131,6 +146,7 @@ pub fn capture_windows_error(context: &str, err: &windows::core::Error) {
     sentry::with_scope(
         |scope| {
             scope.set_tag("err.type", "windows");
+            scope.set_tag("err.context", &sanitized_context);
             scope.set_tag("err.hresult", format!("0x{:08X}", error_code as u32));
             scope.set_extra("windows.hresult_decimal", error_code.into());
             scope.set_extra(
@@ -140,15 +156,16 @@ pub fn capture_windows_error(context: &str, err: &windows::core::Error) {
         },
         || {
             let message = format!("{}: HRESULT 0x{:08X}", sanitized_context, error_code as u32);
-            sentry::capture_message(&message, sentry::Level::Error);
+            Some(sentry::capture_message(&message, sentry::Level::Error))
         },
-    );
+    )
 }
 
 /// Cattura un errore Windows fatale con contesto.
-pub fn capture_fatal_windows_error(context: &str, err: &windows::core::Error) {
+/// Ritorna l'EventId se l'evento è stato inviato.
+pub fn capture_fatal_windows_error(context: &str, err: &windows::core::Error) -> Option<EventId> {
     if !is_enabled() {
-        return;
+        return None;
     }
 
     let sanitized_context = sanitize_message(context);
@@ -159,6 +176,7 @@ pub fn capture_fatal_windows_error(context: &str, err: &windows::core::Error) {
         |scope| {
             scope.set_tag("err.severity", "fatal");
             scope.set_tag("err.type", "windows");
+            scope.set_tag("err.context", &sanitized_context);
             scope.set_tag("err.hresult", format!("0x{:08X}", error_code as u32));
             scope.set_extra("windows.hresult_decimal", error_code.into());
             scope.set_extra(
@@ -168,9 +186,9 @@ pub fn capture_fatal_windows_error(context: &str, err: &windows::core::Error) {
         },
         || {
             let message = format!("{}: HRESULT 0x{:08X}", sanitized_context, error_code as u32);
-            sentry::capture_message(&message, sentry::Level::Error);
+            Some(sentry::capture_message(&message, sentry::Level::Error))
         },
-    );
+    )
 }
 
 /// Aggiunge contesto utente anonimo (opzionale, per debugging).
@@ -223,6 +241,15 @@ pub fn flush(timeout_secs: u64) {
 /// Verifica se Sentry è attivo.
 pub fn is_enabled() -> bool {
     SENTRY_GUARD.get().map(|g| g.is_enabled()).unwrap_or(false)
+}
+
+/// Formatta un EventId per la visualizzazione all'utente.
+/// Ritorna una stringa nel formato "Error ID: <short_id>" o stringa vuota se None.
+pub fn format_event_id(event_id: Option<&EventId>) -> String {
+    match event_id {
+        Some(id) => format!("\n\nError ID: {}", id),
+        None => String::new(),
+    }
 }
 
 /// Installa un panic hook che:

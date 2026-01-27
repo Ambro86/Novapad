@@ -172,6 +172,7 @@
   "options.button.browse": "Browse...",
   "options.label.move_cursor": "Move cursor during reading",
   "options.label.check_updates": "Check updates on startup",
+  "options.label.send_crash_reports": "Send anonymous crash reports",
   "options.label.context_menu": "Add \"Open with Novapad\" to the context menu",
   "options.label.file_associations": "File associations:",
   "options.button.manage_associations": "Set as default application...",

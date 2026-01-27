@@ -210,26 +210,3 @@ bindgen = { version = "0.70", default-features = false, features = ["runtime"] }
 
 [features]
 portable = []
-
-[profile.dev.package.symphonia]
-opt-level = 3
-
-[profile.dev.package.symphonia-core]
-opt-level = 3
-
-[profile.dev.package.symphonia-format-isomp4]
-opt-level = 3
-
-[profile.dev.package.symphonia-codec-aac]
-opt-level = 3
-
-[profile.dev.package.rodio]
-opt-level = 3
-
-[profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
-panic = "unwind"
-debug = 0
-strip = true

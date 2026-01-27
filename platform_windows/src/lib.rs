@@ -4,8 +4,10 @@ use windows::Win32::Foundation::HWND;
 
 pub mod about_window;
 mod com_guard;
+pub mod dialogs;
 
 pub use com_guard::ComGuard;
+pub use dialogs::{DialogResult, DialogStyle, show_message_box};
 
 #[derive(Debug)]
 pub enum PlatformError {

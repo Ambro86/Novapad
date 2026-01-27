@@ -168,6 +168,8 @@ pub enum SubtitleReadMode {
     Sapi4,
     #[serde(rename = "edge")]
     Edge,
+    #[serde(rename = "record")]
+    Record,
 }
 
 pub const PODCAST_DEVICE_DEFAULT: &str = "default";

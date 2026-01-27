@@ -900,6 +900,7 @@ pub fn export_mixed_media(
     hasher.update(settings.tts_rate.to_string().as_bytes());
     hasher.update(settings.tts_pitch.to_string().as_bytes());
     hasher.update(settings.tts_volume.to_string().as_bytes());
+    hasher.update(settings.subtitle_offset_ms.to_string().as_bytes());
     hasher.update(if options.ducking { b"duck1" } else { b"duck0" });
     let mix_hash = hex::encode(hasher.finalize());
 
@@ -907,33 +908,24 @@ pub fn export_mixed_media(
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("media");
-    let mut path_hasher = sha2::Sha256::new();
-    path_hasher.update(media_path.to_string_lossy().as_bytes());
-    if let Ok(meta) = std::fs::metadata(media_path) {
-        path_hasher.update(meta.len().to_le_bytes());
-        if let Ok(modified) = meta.modified()
-            && let Ok(since_epoch) = modified.duration_since(std::time::UNIX_EPOCH)
-        {
-            path_hasher.update(since_epoch.as_nanos().to_le_bytes());
-        }
-    }
-    let path_hash = hex::encode(path_hasher.finalize());
+
+    // Output directory is the same as the source media file
+    let output_dir = media_path
+        .parent()
+        .ok_or_else(|| "Subtitle: media path has no parent directory".to_string())?;
+
+    // Cache directory for temporary files
     let cache_dir = crate::settings::settings_dir()
         .join("subtitle_cache")
         .join("mixed");
     if let Err(e) = std::fs::create_dir_all(&cache_dir) {
         return Err(format!("Subtitle: failed to create cache dir: {}", e));
     }
-    let out_mp4 = cache_dir.join(format!(
-        "{stem}{MIX_SUFFIX}{}_{}.mp4",
-        &path_hash[..8],
-        &mix_hash[..8]
-    ));
-    let out_audio = cache_dir.join(format!(
-        "{stem}{MIX_SUFFIX}{}_{}.m4a",
-        &path_hash[..8],
-        &mix_hash[..8]
-    ));
+
+    // Final output goes next to the original media file
+    let out_mp4 = output_dir.join(format!("{stem}{MIX_SUFFIX}{}.mp4", &mix_hash[..8]));
+    // Temporary audio file in cache
+    let out_audio = cache_dir.join(format!("{stem}{MIX_SUFFIX}{}.m4a", &mix_hash[..8]));
 
     if out_mp4.exists() {
         return Ok(out_mp4);

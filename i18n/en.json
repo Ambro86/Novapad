@@ -198,6 +198,7 @@
   "options.subtitle_mode.off": "Disabled",
   "options.subtitle_mode.nvda": "NVDA",
   "options.subtitle_mode.user": "Use selected voice",
+  "options.subtitle_mode.record": "Record to file",
   "options.label.podcast_cache_limit": "Podcast cache limit (MB):",
   "options.label.podcastindex_key": "Podcast Index API key:",
   "options.label.podcastindex_secret": "Podcast Index API secret:",

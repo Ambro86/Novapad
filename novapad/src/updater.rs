@@ -17,11 +17,10 @@ use windows::Win32::System::Threading::{
     WaitForSingleObject,
 };
 use windows::Win32::UI::Shell::ShellExecuteW;
-use windows::Win32::UI::WindowsAndMessaging::{
-    FindWindowW, IDYES, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK, MB_SETFOREGROUND,
-    MB_YESNO, MESSAGEBOX_STYLE, MessageBoxW, PostMessageW, SW_SHOW, WM_CLOSE,
-};
-use windows::core::{HSTRING, PCWSTR};
+use windows::Win32::UI::WindowsAndMessaging::{FindWindowW, PostMessageW, SW_SHOW, WM_CLOSE};
+use windows::core::PCWSTR;
+
+use platform_windows::{DialogResult, DialogStyle, show_message_box};
 
 use crate::accessibility::to_wide;
 use crate::i18n;
@@ -287,37 +286,22 @@ fn prompt_update(hwnd: HWND, language: Language, current: &str, latest: &str) ->
         &[("current", current), ("latest", latest)],
     );
     let title = i18n::tr(language, "updater.title");
-    let result = show_update_message(
-        hwnd,
-        &text,
-        &title,
-        MB_YESNO | MB_ICONQUESTION | MB_SETFOREGROUND,
-    );
-    result == IDYES
+    let result = show_update_message(hwnd, &text, &title, DialogStyle::YesNo);
+    result == DialogResult::Yes
 }
 
 fn prompt_restart_after_download(hwnd: HWND, language: Language) -> bool {
     let text = i18n::tr(language, "updater.prompt.restart");
     let title = i18n::tr(language, "updater.title");
-    let result = show_update_message(
-        hwnd,
-        &text,
-        &title,
-        MB_YESNO | MB_ICONQUESTION | MB_SETFOREGROUND,
-    );
-    result == IDYES
+    let result = show_update_message(hwnd, &text, &title, DialogStyle::YesNo);
+    result == DialogResult::Yes
 }
 
 fn prompt_pending_update(hwnd: HWND, language: Language) -> bool {
     let text = i18n::tr(language, "updater.prompt.pending");
     let title = i18n::tr(language, "updater.title");
-    let result = show_update_message(
-        hwnd,
-        &text,
-        &title,
-        MB_YESNO | MB_ICONQUESTION | MB_SETFOREGROUND,
-    );
-    result == IDYES
+    let result = show_update_message(hwnd, &text, &title, DialogStyle::YesNo);
+    result == DialogResult::Yes
 }
 
 enum UpdateAction {
@@ -1407,12 +1391,7 @@ fn restore_backup(current: &Path) -> io::Result<()> {
 fn show_permission_error(language: Language) {
     let text = i18n::tr(language, "updater.permission_error");
     let title = i18n::tr(language, "updater.title");
-    show_update_message(
-        HWND(0),
-        &text,
-        &title,
-        MB_OK | MB_ICONERROR | MB_SETFOREGROUND,
-    );
+    show_update_message(HWND(0), &text, &title, DialogStyle::Error);
 }
 
 enum UpdateError {
@@ -1449,34 +1428,19 @@ fn show_update_error(language: Language, error: UpdateError) {
     };
     let text = i18n::tr(language, text_key);
     let title = i18n::tr(language, "updater.title");
-    show_update_message(
-        HWND(0),
-        &text,
-        &title,
-        MB_OK | MB_ICONERROR | MB_SETFOREGROUND,
-    );
+    show_update_message(HWND(0), &text, &title, DialogStyle::Error);
 }
 
 fn show_update_error_with_url(language: Language, key: &str, url: &str) {
     let text = i18n::tr_f(language, key, &[("url", url)]);
     let title = i18n::tr(language, "updater.title");
-    show_update_message(
-        HWND(0),
-        &text,
-        &title,
-        MB_OK | MB_ICONERROR | MB_SETFOREGROUND,
-    );
+    show_update_message(HWND(0), &text, &title, DialogStyle::Error);
 }
 
 fn show_update_error_args(language: Language, key: &str, args: &[(&str, &str)]) {
     let text = i18n::tr_f(language, key, args);
     let title = i18n::tr(language, "updater.title");
-    show_update_message(
-        HWND(0),
-        &text,
-        &title,
-        MB_OK | MB_ICONERROR | MB_SETFOREGROUND,
-    );
+    show_update_message(HWND(0), &text, &title, DialogStyle::Error);
 }
 
 pub(crate) fn cleanup_backup_on_start() {
@@ -1647,37 +1611,27 @@ fn show_update_info(language: Language, info: UpdateInfo) {
     };
     let text = i18n::tr(language, text_key);
     let title = i18n::tr(language, "updater.title");
-    show_update_message(
-        HWND(0),
-        &text,
-        &title,
-        MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND,
-    );
+    show_update_message(HWND(0), &text, &title, DialogStyle::Info);
 }
 
-fn show_update_message(
-    owner: HWND,
-    text: &str,
-    title: &str,
-    flags: MESSAGEBOX_STYLE,
-) -> windows::Win32::UI::WindowsAndMessaging::MESSAGEBOX_RESULT {
+fn show_update_message(owner: HWND, text: &str, title: &str, style: DialogStyle) -> DialogResult {
     let mut target = owner;
     if target.0 == 0 {
         let class_name = to_wide("NovapadWin32");
         target = unsafe { FindWindowW(PCWSTR(class_name.as_ptr()), PCWSTR::null()) };
     }
 
+    // If no main window found, show dialog directly with set_foreground=true
     if target.0 == 0 {
-        let msg = HSTRING::from(text);
-        let tit = HSTRING::from(title);
-        return unsafe { MessageBoxW(None, &msg, &tit, flags) };
+        return show_message_box(None, title, text, style, true);
     }
 
     let (tx, rx) = std::sync::mpsc::channel();
     let req = Box::new(crate::UpdateDialogRequest {
         text: text.to_string(),
         title: title.to_string(),
-        flags,
+        style,
+        set_foreground: true,
         response_tx: tx,
     });
     let ptr = Box::into_raw(req);
@@ -1694,14 +1648,14 @@ fn show_update_message(
         ) {
             log_debug(&format!("Updater: PostMessageW failed: {}", e));
             let _unused_box = Box::from_raw(ptr);
-            return windows::Win32::UI::WindowsAndMessaging::MESSAGEBOX_RESULT(0);
+            return DialogResult::Unknown;
         }
     }
 
     log_debug("Updater: Waiting for response channel...");
     let response = rx
         .recv_timeout(std::time::Duration::from_secs(60))
-        .unwrap_or(0);
-    log_debug(&format!("Updater: Received response: {}", response));
-    windows::Win32::UI::WindowsAndMessaging::MESSAGEBOX_RESULT(response)
+        .unwrap_or(DialogResult::Unknown);
+    log_debug(&format!("Updater: Received response: {:?}", response));
+    response
 }

@@ -116,19 +116,19 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetCursorPos, GetForegroundWindow, GetMenu, GetMenuItemCount, GetMessageW, GetParent,
     GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, HACCEL,
     HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, IsChild, IsIconic, IsWindow, KillTimer,
-    LoadCursorW, LoadIconW, MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_OK,
-    MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_GRAYED, MF_POPUP, MF_SEPARATOR,
-    MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW, PostQuitMessage,
-    RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED,
-    SW_SHOWNORMAL, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW,
-    ShowWindow, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage,
-    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE,
-    WM_CUT, WM_DESTROY, WM_DROPFILES, WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL,
-    WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSKEYDOWN,
-    WM_TIMER, WM_UNDO, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE,
-    WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
+    LoadCursorW, LoadIconW, MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MF_BYCOMMAND,
+    MF_BYPOSITION, MF_CHECKED, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG,
+    MessageBoxW, OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW,
+    RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED, SW_SHOWNORMAL,
+    SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
+    TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE, WM_APP,
+    WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY,
+    WM_DROPFILES, WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL,
+    WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WM_UNDO,
+    WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW,
+    WS_TABSTOP, WS_VISIBLE,
 };
-use windows::core::{HSTRING, Interface, PCWSTR, PWSTR, implement, w};
+use windows::core::{Interface, PCWSTR, PWSTR, implement, w};
 
 const EM_SCROLLCARET: u32 = 0x00B7;
 const EM_CHARFROMPOS: u32 = 0x00D7;
@@ -276,8 +276,9 @@ struct PdfLoadResult {
 pub struct UpdateDialogRequest {
     pub text: String,
     pub title: String,
-    pub flags: MESSAGEBOX_STYLE,
-    pub response_tx: mpsc::Sender<i32>,
+    pub style: platform_windows::DialogStyle,
+    pub set_foreground: bool,
+    pub response_tx: mpsc::Sender<platform_windows::DialogResult>,
 }
 
 struct PdfLoadingState {
@@ -2798,16 +2799,16 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             }
             crate::log_debug("UI: Received WM_UPDATE_DIALOG");
             let req = unsafe { Box::from_raw(lparam.0 as *mut UpdateDialogRequest) };
-            let result = unsafe {
-                MessageBoxW(
-                    hwnd,
-                    &HSTRING::from(&req.text),
-                    &HSTRING::from(&req.title),
-                    req.flags,
-                )
-            };
+            let parent = platform_windows::WindowHandle::from_isize(hwnd.0);
+            let result = platform_windows::show_message_box(
+                Some(parent),
+                &req.title,
+                &req.text,
+                req.style,
+                req.set_foreground,
+            );
             crate::log_debug(&format!("UI: Update dialog result: {:?}", result));
-            if let Err(e) = req.response_tx.send(result.0) {
+            if let Err(e) = req.response_tx.send(result) {
                 crate::log_debug(&format!("UI: Failed to send response to channel: {}", e));
             } else {
                 crate::log_debug("UI: Response sent to channel successfully");

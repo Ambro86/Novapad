@@ -1939,7 +1939,6 @@ fn run_sapi4_parallel_part(
         let progress_hwnd = options.progress_hwnd;
 
         let handle = std::thread::spawn(move || {
-            let _com_guard = platform_windows::ComGuard::new_mta();
             loop {
                 let part = {
                     let mut guard = parts_shared.lock().unwrap_or_else(|e| e.into_inner());
@@ -1990,6 +1989,7 @@ fn run_sapi4_parallel_part(
                     // AAC/M4B must be joined as WAV first and then encoded as a whole.
                     if is_mp3 {
                         let encoded_sub = sub_output.with_extension("mp3");
+                        let _com_guard = crate::com_guard::ComGuard::new_mta();
                         if let Err(e) =
                             crate::mf_encoder::encode_wav_to_audio(&sub_output, &encoded_sub, 128)
                         {

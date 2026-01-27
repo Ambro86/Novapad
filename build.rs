@@ -53,14 +53,13 @@ fn main() {
     }
 
     // Generate minimal FFmpeg bindings for runtime dynamic loading.
-    generate_ffmpeg_bindings(&root);
+    generate_ffmpeg_bindings();
 }
 
-fn generate_ffmpeg_bindings(root: &str) {
+fn generate_ffmpeg_bindings() {
     let ffmpeg_dir = std::env::var("FFMPEG_DIR").ok().or_else(|| {
-        let local_path = std::path::Path::new(root)
-            .join("vcpkg_installed")
-            .join("x64-windows");
+        let local_path =
+            std::path::Path::new(r"C:\rustnotepad\rustnotepad\vcpkg_installed\x64-windows");
         if local_path.exists() {
             Some(local_path.to_string_lossy().to_string())
         } else {

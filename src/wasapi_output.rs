@@ -1,4 +1,7 @@
-use platform_windows::ComGuard;
+use crate::com_guard::ComGuard;
+use crate::log_debug;
+use rodio::Source;
+use rodio::source::UniformSourceIterator;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU32, AtomicU64, Ordering};

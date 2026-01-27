@@ -1,13 +1,16 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 use windows::Win32::Foundation::HWND;
+use windows::Win32::Graphics::Gdi::HFONT;
 
 pub mod about_window;
 mod com_guard;
 pub mod dialogs;
+pub mod list_select_dialog;
 
 pub use com_guard::ComGuard;
 pub use dialogs::{DialogResult, DialogStyle, show_message_box};
+pub use list_select_dialog::{ListSelectDialogParams, show_list_select_dialog};
 
 #[derive(Debug)]
 pub enum PlatformError {
@@ -48,6 +51,28 @@ impl WindowHandle {
 
     /// Access the raw HWND. Restricted to the crate.
     pub(crate) fn raw(&self) -> HWND {
+        self.0
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.0.0 != 0
+    }
+}
+
+/// A safe wrapper around a Win32 HFONT.
+/// Does NOT own the font - the caller is responsible for the font's lifetime.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FontHandle(HFONT);
+
+impl FontHandle {
+    /// Create from a raw handle value.
+    /// This is used to bridge existing Win32 code during migration.
+    pub fn from_isize(handle: isize) -> Self {
+        Self(HFONT(handle))
+    }
+
+    /// Access the raw HFONT. Restricted to the crate.
+    pub(crate) fn raw(&self) -> HFONT {
         self.0
     }
 

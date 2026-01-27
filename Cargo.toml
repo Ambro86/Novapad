@@ -1,5 +1,6 @@
 [workspace]
 members = ["novapad", "platform_windows", "sapi4_bridge"]
+default-members = ["novapad"]
 resolver = "2"
 
 [profile.dev.package.symphonia]

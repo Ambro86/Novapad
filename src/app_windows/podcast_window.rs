@@ -1343,7 +1343,7 @@ unsafe extern "system" fn podcast_wndproc(
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
             if ptr != 0 {
                 unsafe {
-                    drop(Box::from_raw(ptr as *mut PodcastState));
+                    let _unused_box = Box::from_raw(ptr as *mut PodcastState);
                 }
             }
             LRESULT(0)

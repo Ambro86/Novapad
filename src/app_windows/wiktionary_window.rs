@@ -207,7 +207,7 @@ pub unsafe fn open(parent: HWND) {
         Some(state_ptr as *const _),
     );
     if hwnd.0 == 0 {
-        drop(Box::from_raw(state_ptr));
+        let _unused_box = Box::from_raw(state_ptr);
         return;
     }
     with_state(parent, |state| state.wiktionary_window = hwnd);
@@ -383,9 +383,10 @@ unsafe extern "system" fn wiktionary_wndproc(
             }
             let result_ptr = lparam.0 as *mut String;
             if !result_ptr.is_null() {
-                let text = Box::from_raw(result_ptr);
+                let _unused_box = Box::from_raw(result_ptr);
+                let text = &*_unused_box;
                 if let Some(output) = with_window_state(hwnd, |state| state.output)
-                    && let Err(_e) = SetWindowTextW(output, PCWSTR(to_wide(&text).as_ptr()))
+                    && let Err(_e) = SetWindowTextW(output, PCWSTR(to_wide(text).as_ptr()))
                 {
                     crate::log_debug(&format!("Error: {:?}", _e));
                 }
@@ -396,8 +397,8 @@ unsafe extern "system" fn wiktionary_wndproc(
         WM_NCDESTROY => {
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut WiktionaryWindowState;
             if !ptr.is_null() {
-                let state = Box::from_raw(ptr);
-                with_state(state.parent, |s| s.wiktionary_window = HWND(0));
+                let _unused_box = Box::from_raw(ptr);
+                with_state(_unused_box.parent, |s| s.wiktionary_window = HWND(0));
             }
             LRESULT(0)
         }
@@ -610,9 +611,10 @@ unsafe fn run_lookup(hwnd: HWND) {
                     LPARAM(text_ptr as isize),
                 ) {
                     crate::log_debug(&format!("Failed to post WM_LOOKUP_DONE: {}", e));
+                    let _unused_box = Box::from_raw(text_ptr);
                 }
             } else {
-                drop(Box::from_raw(text_ptr));
+                let _unused_box = Box::from_raw(text_ptr);
             }
         }
     });

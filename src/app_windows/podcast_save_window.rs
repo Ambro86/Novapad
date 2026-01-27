@@ -330,7 +330,7 @@ unsafe extern "system" fn save_wndproc(
             }
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
             if ptr != 0 {
-                drop(Box::from_raw(ptr as *mut SaveState));
+                let _unused_box = Box::from_raw(ptr as *mut SaveState);
             }
             LRESULT(0)
         }

@@ -529,7 +529,7 @@ pub unsafe fn open_with_command(
     if hwnd.0 == 0 {
         if !init_ptr.is_null() {
             unsafe {
-                drop(Box::from_raw(init_ptr));
+                let _unused_box = Box::from_raw(init_ptr);
             }
         }
         return;
@@ -1232,7 +1232,7 @@ unsafe extern "system" fn prompt_wndproc(
                 GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
                     as *mut PromptState;
             if !ptr.is_null() {
-                drop(Box::from_raw(ptr));
+                let _unused_box = Box::from_raw(ptr);
             }
             LRESULT(0)
         }
@@ -1439,7 +1439,7 @@ fn start_output_reader(
                 )
                 .is_err()
                 {
-                    drop(Box::from_raw(payload_ptr));
+                    let _unused_box = Box::from_raw(payload_ptr);
                     break;
                 }
             }

@@ -333,7 +333,7 @@ unsafe extern "system" fn dictionary_wndproc(
         WM_NCDESTROY => {
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut DictionaryWindowState;
             if !ptr.is_null() {
-                drop(Box::from_raw(ptr));
+                let _unused_box = Box::from_raw(ptr);
             }
             LRESULT(0)
         }
@@ -526,7 +526,7 @@ unsafe extern "system" fn dictionary_entry_wndproc(
             if state_ptr.is_null() {
                 return LRESULT(0);
             }
-            let mut state = Box::from_raw(state_ptr);
+            let mut state = unsafe { Box::from_raw(state_ptr) };
             let language = with_state(state.parent, |s| s.settings.language).unwrap_or_default();
             let labels = dictionary_labels(language);
             let hfont = with_state(state.parent, |s| s.hfont).unwrap_or(HFONT(0));
@@ -709,7 +709,7 @@ unsafe extern "system" fn dictionary_entry_wndproc(
         WM_NCDESTROY => {
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut DictionaryEntryState;
             if !ptr.is_null() {
-                drop(Box::from_raw(ptr));
+                let _unused_box = Box::from_raw(ptr);
             }
             LRESULT(0)
         }

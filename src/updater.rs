@@ -1693,7 +1693,7 @@ fn show_update_message(
             LPARAM(ptr as isize),
         ) {
             log_debug(&format!("Updater: PostMessageW failed: {}", e));
-            drop(Box::from_raw(ptr));
+            let _unused_box = Box::from_raw(ptr);
             return windows::Win32::UI::WindowsAndMessaging::MESSAGEBOX_RESULT(0);
         }
     }

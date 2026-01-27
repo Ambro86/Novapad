@@ -147,7 +147,7 @@ unsafe fn open_window(parent: HWND, kind: HelpWindowKind) {
         }
         SetForegroundWindow(window);
     } else if !init_ptr.is_null() {
-        drop(Box::from_raw(init_ptr));
+        let _unused_box = Box::from_raw(init_ptr);
     }
 }
 
@@ -180,7 +180,7 @@ unsafe extern "system" fn help_wndproc(
             if init_ptr.is_null() {
                 return LRESULT(0);
             }
-            let init = Box::from_raw(init_ptr);
+            let init = unsafe { Box::from_raw(init_ptr) };
             let parent = init.parent;
             let hfont = with_state(parent, |state| state.hfont).unwrap_or(HFONT(0));
 
@@ -331,7 +331,7 @@ unsafe extern "system" fn help_wndproc(
         WM_NCDESTROY => {
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut HelpWindowState;
             if !ptr.is_null() {
-                drop(Box::from_raw(ptr));
+                let _unused_box = Box::from_raw(ptr);
             }
             LRESULT(0)
         }

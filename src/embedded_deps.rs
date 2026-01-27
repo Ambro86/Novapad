@@ -49,7 +49,7 @@ fn write_if_changed(path: &PathBuf, data: &[u8]) -> std::io::Result<bool> {
     let mut file = fs::File::create(&tmp_path)?;
     file.write_all(data)?;
     file.sync_all()?;
-    drop(file);
+    std::mem::drop(file);
 
     // Rimuovi vecchio file se esiste
     crate::log_if_err!(fs::remove_file(path));

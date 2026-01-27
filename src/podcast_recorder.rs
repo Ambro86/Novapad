@@ -688,7 +688,7 @@ fn write_mixed_audio_wav(
             mixed.push(left.clamp(-1.0, 1.0));
             mixed.push(right.clamp(-1.0, 1.0));
         }
-        drop(inner);
+        std::mem::drop(inner);
 
         writer
             .write_samples_f32(&mixed)
@@ -769,7 +769,7 @@ fn write_mixed_audio_mp3(
             mixed.push(left.clamp(-1.0, 1.0));
             mixed.push(right.clamp(-1.0, 1.0));
         }
-        drop(inner);
+        std::mem::drop(inner);
 
         let mut pcm = Vec::with_capacity(mixed.len());
         for sample in mixed {

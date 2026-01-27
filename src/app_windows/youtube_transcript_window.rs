@@ -611,7 +611,7 @@ unsafe extern "system" fn import_wndproc(
         WM_NCDESTROY => {
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ImportState;
             if !ptr.is_null() {
-                drop(Box::from_raw(ptr));
+                let _unused_box = Box::from_raw(ptr);
             }
             LRESULT(0)
         }
@@ -690,7 +690,7 @@ fn start_load_languages(hwnd: HWND) -> bool {
         EnableWindow(ok_button, false);
     }
 
-    let cancelled = cancelled_flag.expect("Cancelled flag should be available");
+    let cancelled = cancelled_flag.unwrap_or_else(|| Arc::new(AtomicBool::new(false)));
 
     std::thread::spawn(move || {
         let result = std::panic::catch_unwind(|| {
@@ -898,7 +898,7 @@ fn start_load_transcript_text(
         EnableWindow(ok_button, false);
     }
 
-    let cancelled = cancelled_flag.expect("Cancelled flag should be available");
+    let cancelled = cancelled_flag.unwrap_or_else(|| Arc::new(AtomicBool::new(false)));
 
     std::thread::spawn(move || {
         let result = std::panic::catch_unwind(|| {

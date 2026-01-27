@@ -178,7 +178,7 @@ unsafe extern "system" fn chapter_list_wndproc(
             if init_ptr.is_null() {
                 return LRESULT(0);
             }
-            let init = Box::from_raw(init_ptr);
+            let init = unsafe { Box::from_raw(init_ptr) };
             let hfont = with_state(init.parent, |state| state.hfont).unwrap_or(HFONT(0));
 
             let list = CreateWindowExW(
@@ -291,7 +291,7 @@ unsafe extern "system" fn chapter_list_wndproc(
             }
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ChapterListState;
             if !ptr.is_null() {
-                drop(Box::from_raw(ptr));
+                let _unused_box = Box::from_raw(ptr);
             }
             LRESULT(0)
         }

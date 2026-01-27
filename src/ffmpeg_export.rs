@@ -522,11 +522,12 @@ fn encode_mixed_audio_to_m4a(
      -> f32 {
         while let Some(front) = pending.front() {
             if current_sample >= front.start_sample {
-                let cue = pending.pop_front().unwrap();
-                active.push(ActiveCue {
-                    samples: cue.samples,
-                    read_offset: 0,
-                });
+                if let Some(cue) = pending.pop_front() {
+                    active.push(ActiveCue {
+                        samples: cue.samples,
+                        read_offset: 0,
+                    });
+                }
             } else {
                 break;
             }
@@ -659,7 +660,10 @@ fn encode_mixed_audio_to_m4a(
                 break;
             }
         }
-        let _ = (api.av_write_trailer)(out_ctx);
+        let trailer_ret = (api.av_write_trailer)(out_ctx);
+        if trailer_ret < 0 {
+            log_debug(&format!("FFmpeg: av_write_trailer failed: {}", trailer_ret));
+        }
         (api.swr_free)(&mut swr_ctx);
         (api.av_frame_free)(&mut frame);
         (api.avio_closep)(&mut io);
@@ -851,7 +855,13 @@ fn mux_video_with_audio(
                     (*in_v_stream).time_base,
                     (*out_v_stream).time_base,
                 );
-                let _ = (api.av_interleaved_write_frame)(out_ctx, pkt_v);
+                let write_ret = (api.av_interleaved_write_frame)(out_ctx, pkt_v);
+                if write_ret < 0 {
+                    log_debug(&format!(
+                        "FFmpeg: av_interleaved_write_frame (V) failed: {}",
+                        write_ret
+                    ));
+                }
                 (api.av_packet_unref)(pkt_v);
             }
             has_v = unsafe { (api.av_read_frame)(in_video, pkt_v) } >= 0;
@@ -863,7 +873,13 @@ fn mux_video_with_audio(
                     (*in_a_stream).time_base,
                     (*out_a_stream).time_base,
                 );
-                let _ = (api.av_interleaved_write_frame)(out_ctx, pkt_a);
+                let write_ret = (api.av_interleaved_write_frame)(out_ctx, pkt_a);
+                if write_ret < 0 {
+                    log_debug(&format!(
+                        "FFmpeg: av_interleaved_write_frame (A) failed: {}",
+                        write_ret
+                    ));
+                }
                 (api.av_packet_unref)(pkt_a);
             }
             has_a = unsafe { (api.av_read_frame)(in_audio, pkt_a) } >= 0;
@@ -871,7 +887,10 @@ fn mux_video_with_audio(
     }
 
     unsafe {
-        let _ = (api.av_write_trailer)(out_ctx);
+        let trailer_ret = (api.av_write_trailer)(out_ctx);
+        if trailer_ret < 0 {
+            log_debug(&format!("FFmpeg: av_write_trailer failed: {}", trailer_ret));
+        }
         if !pkt_v.is_null() {
             (api.av_packet_free)(&mut pkt_v);
         }

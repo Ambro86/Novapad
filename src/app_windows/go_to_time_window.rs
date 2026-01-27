@@ -79,7 +79,7 @@ pub unsafe fn open(parent: HWND) {
         Some(state_ptr as *const _),
     );
     if hwnd.0 == 0 {
-        drop(Box::from_raw(state_ptr));
+        let _unused_box = Box::from_raw(state_ptr);
         return;
     }
     EnableWindow(parent, false);
@@ -290,7 +290,7 @@ unsafe extern "system" fn go_to_time_wndproc(
                 GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
                     as *mut GoToTimeState;
             if !ptr.is_null() {
-                let state = Box::from_raw(ptr);
+                let state = unsafe { Box::from_raw(ptr) };
                 let parent = state.parent;
                 with_state(parent, |s| s.go_to_time_dialog = HWND(0));
                 if parent.0 != 0 && state.prev_focus.0 != 0 {

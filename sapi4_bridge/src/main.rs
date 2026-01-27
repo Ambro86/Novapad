@@ -1,3 +1,7 @@
+#![deny(warnings)]
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(let_underscore_drop)]
 #![allow(non_snake_case)]
 #![allow(clippy::upper_case_acronyms)]
 
@@ -411,7 +415,7 @@ unsafe extern "system" fn notify_release(this: *mut ITTSNotifySink) -> u32 {
     let prev = sink.refcnt.fetch_sub(1, Ordering::SeqCst);
     let next = prev.saturating_sub(1);
     if next == 0 {
-        drop(Box::from_raw(this));
+        let _unused_box = Box::from_raw(this);
     }
     next
 }
@@ -509,7 +513,7 @@ unsafe extern "system" fn audio_file_notify_release(this: *mut IAudioFileNotifyS
     let prev = sink.refcnt.fetch_sub(1, Ordering::SeqCst);
     let next = prev.saturating_sub(1);
     if next == 0 {
-        drop(Box::from_raw(this));
+        let _unused_box = Box::from_raw(this);
     }
     next
 }
@@ -1636,7 +1640,10 @@ fn speak_to_file(
         // =========================
         // OTTIMIZZAZIONE: prova non-real-time
         // =========================
-        let _ = (audio_vtbl.real_time_set)(audio_file_ptr.as_ptr(), 0);
+        let hr_rt = (audio_vtbl.real_time_set)(audio_file_ptr.as_ptr(), 0);
+        if hr_rt != S_OK {
+            eprintln!("Warning: real_time_set failed: {hr_rt:x}");
+        }
 
         let audio_unknown = audio_file_ptr.as_ptr() as *mut IUnknown;
         let (_enum_ptr, central_ptr) = init_central_with_audio(target_idx, audio_unknown)?;
@@ -1677,20 +1684,26 @@ fn speak_to_file(
             .ok_or_else(|| "Failed to create audiofile notify sink".to_string())?;
         af_handle.add_ref();
 
-        let _ = (audio_vtbl.register)(audio_file_ptr.as_ptr(), af_handle.as_void_ptr());
+        let hr = (audio_vtbl.register)(audio_file_ptr.as_ptr(), af_handle.as_void_ptr());
+        if hr != S_OK {
+            eprintln!("Warning: audio register failed: {hr:x}");
+        }
 
         // =========================
         // READ TEXT
         // =========================
         let mut text = String::new();
-        let _ = io::stdin().read_to_string(&mut text);
+        if let Err(e) = io::stdin().read_to_string(&mut text) {
+            eprintln!("Failed to read from stdin: {}", e);
+        }
 
         if text.is_empty() {
             if registered {
-                let _ = (central_vtbl.un_register)(central_ptr.as_ptr(), reg_key);
+                let hr = (central_vtbl.un_register)(central_ptr.as_ptr(), reg_key);
+                if hr != S_OK {
+                    eprintln!("Warning: un_register failed: {hr:x}");
+                }
             }
-            tts_handle.release();
-            af_handle.release();
             tts_handle.release();
             af_handle.release();
             return Ok(());
@@ -1735,7 +1748,10 @@ fn speak_to_file(
             std::thread::sleep(std::time::Duration::from_millis(1));
         }
 
-        let _ = (audio_vtbl.flush)(audio_file_ptr.as_ptr());
+        let hr_flush = (audio_vtbl.flush)(audio_file_ptr.as_ptr());
+        if hr_flush != S_OK {
+            eprintln!("Warning: audio flush failed: {hr_flush:x}");
+        }
 
         if registered {
             let hr_un = (central_vtbl.un_register)(central_ptr.as_ptr(), reg_key);
@@ -1744,9 +1760,7 @@ fn speak_to_file(
             }
         }
 
-        // release handles (2 refs come prima)
-        tts_handle.release();
-        af_handle.release();
+        // release handles
         tts_handle.release();
         af_handle.release();
 

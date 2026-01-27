@@ -3634,8 +3634,10 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     LRESULT(0)
                 }
                 IDM_HELP_ABOUT => {
-                    log_debug("Menu: About");
-                    app_windows::about_window::show(hwnd);
+                    let language =
+                        with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+                    let handle = platform_windows::WindowHandle::from_isize(hwnd.0);
+                    app_windows::about_window::show(Some(handle), language);
                     LRESULT(0)
                 }
                 _ => DefWindowProcW(hwnd, msg, wparam, lparam),

@@ -107,6 +107,7 @@ pub const IDM_HELP_ABOUT: usize = 7002;
 pub const IDM_HELP_CHECK_UPDATES: usize = 7003;
 pub const IDM_HELP_CHANGELOG: usize = 7004;
 pub const IDM_HELP_DONATIONS: usize = 7006;
+pub const IDM_HELP_EXPORT_DIAGNOSTICS: usize = 7007;
 pub const MAX_RECENT: usize = 5;
 
 pub struct MenuLabels {
@@ -189,6 +190,7 @@ pub struct MenuLabels {
     pub manage_bookmarks: String,
     pub help_guide: String,
     pub help_changelog: String,
+    pub help_export_diagnostics: String,
     pub help_donations: String,
     pub help_check_updates: String,
     pub help_about: String,
@@ -279,6 +281,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         manage_bookmarks: i18n::tr(language, "insert.manage_bookmarks"),
         help_guide: i18n::tr(language, "help.guide"),
         help_changelog: i18n::tr(language, "help.changelog"),
+        help_export_diagnostics: i18n::tr(language, "help.export_diagnostics"),
         help_donations: i18n::tr(language, "help.donations"),
         help_check_updates: i18n::tr(language, "help.check_updates"),
         help_about: i18n::tr(language, "help.about"),
@@ -842,6 +845,12 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         MF_STRING,
         IDM_HELP_CHECK_UPDATES,
         &labels.help_check_updates,
+    );
+    append_menu_string(
+        help_menu,
+        MF_STRING,
+        IDM_HELP_EXPORT_DIAGNOSTICS,
+        &labels.help_export_diagnostics,
     );
     append_menu_string(help_menu, MF_STRING, IDM_HELP_ABOUT, &labels.help_about);
     append_menu_string(hmenu, MF_POPUP, help_menu.0 as usize, &labels.menu_help);

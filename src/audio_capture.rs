@@ -2,7 +2,7 @@
 //!
 //! This module provides audio capture functionality for screen recording
 
-use platform_windows::ComGuard;
+use crate::com_guard::ComGuard;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle};

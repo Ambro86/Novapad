@@ -10,7 +10,9 @@ pub mod list_select_dialog;
 
 pub use com_guard::ComGuard;
 pub use dialogs::{DialogResult, DialogStyle, show_message_box};
-pub use list_select_dialog::{ListSelectDialogParams, show_list_select_dialog};
+pub use list_select_dialog::{
+    ListSelectDialogParams, show_list_select_dialog, show_list_select_dialog_index,
+};
 
 #[derive(Debug)]
 pub enum PlatformError {

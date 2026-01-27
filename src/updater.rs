@@ -68,150 +68,161 @@ pub(crate) fn check_for_update(hwnd: HWND, interactive: bool) {
         "Update check triggered: interactive={interactive}"
     ));
     thread::spawn(move || {
-        let current_version = env!("CARGO_PKG_VERSION");
-        log_debug("Update check: fetching latest release...");
-        let latest = match fetch_latest_release() {
-            Ok(info) => info,
-            Err(err) => {
-                log_debug(&format!("Update check failed: {err}"));
-                if interactive {
-                    show_update_error(language, UpdateError::Network);
+        if let Err(e) = std::panic::catch_unwind(move || {
+            let current_version = env!("CARGO_PKG_VERSION");
+            log_debug("Update check: fetching latest release...");
+            let latest = match fetch_latest_release() {
+                Ok(info) => info,
+                Err(err) => {
+                    log_debug(&format!("Update check failed: {err}"));
+                    if interactive {
+                        show_update_error(language, UpdateError::Network);
+                    }
+                    return;
                 }
-                return;
-            }
-        };
+            };
 
-        let latest_version = normalize_version(&latest.tag_name);
-        log_debug(&format!(
-            "Update check: current={} latest={}",
-            current_version, latest_version
-        ));
-        if !is_newer_version(&latest_version, current_version) {
-            log_debug("Update check: no newer version available.");
-            if interactive {
-                show_update_info(language, UpdateInfo::NoUpdate);
-            }
-            return;
-        }
-
-        log_debug("Update check: newer version found. Selecting asset...");
-        let Some(asset) = select_portable_asset(&latest.assets) else {
-            log_debug("Update check: no portable asset found.");
-            if interactive {
-                show_update_error(language, UpdateError::NoPortableAsset);
-            }
-            return;
-        };
-        let sha_asset = select_sha256_asset(&latest.assets, &asset.name);
-
-        let current_exe = match std::env::current_exe() {
-            Ok(path) => path,
-            Err(err) => {
-                log_debug(&format!("Update check: current exe not available: {err}"));
-                if interactive {
-                    show_update_error_with_url(
-                        language,
-                        "updater.error.access",
-                        DIRECT_DOWNLOAD_URL,
-                    );
-                }
-                return;
-            }
-        };
-        if let Err(err) = probe_dir_writable(&current_exe) {
+            let latest_version = normalize_version(&latest.tag_name);
             log_debug(&format!(
-                "Update check: exe dir not writable: {err} class={}",
-                classify_io_error(&err)
+                "Update check: current={} latest={}",
+                current_version, latest_version
             ));
-        }
-        if let Err(err) = can_open_exe_for_update(&current_exe) {
-            log_debug(&format!(
-                "Update check: exe open diagnostic failed: {err} class={}",
-                classify_io_error(&err)
-            ));
-        }
-        log_debug("Update check: acquiring lock...");
-        let mut update_lock = match acquire_update_lock(&current_exe) {
-            Ok(lock) => {
-                log_debug("Update check: lock acquired.");
-                lock
-            }
-            Err(UpdateLockError::InProgress) => {
-                log_debug(
-                    "Update check: lock already held by another thread/process. Skipping silent check.",
-                );
+            if !is_newer_version(&latest_version, current_version) {
+                log_debug("Update check: no newer version available.");
                 if interactive {
-                    show_update_error(language, UpdateError::Concurrent);
+                    show_update_info(language, UpdateInfo::NoUpdate);
                 }
                 return;
             }
-            Err(UpdateLockError::Other(err)) => {
-                log_debug(&format!("Update check: cannot create update lock: {err}"));
+
+            log_debug("Update check: newer version found. Selecting asset...");
+            let Some(asset) = select_portable_asset(&latest.assets) else {
+                log_debug("Update check: no portable asset found.");
                 if interactive {
-                    show_update_error_with_url(
-                        language,
-                        "updater.error.access",
-                        DIRECT_DOWNLOAD_URL,
+                    show_update_error(language, UpdateError::NoPortableAsset);
+                }
+                return;
+            };
+            let sha_asset = select_sha256_asset(&latest.assets, &asset.name);
+
+            let current_exe = match std::env::current_exe() {
+                Ok(path) => path,
+                Err(err) => {
+                    log_debug(&format!("Update check: current exe not available: {err}"));
+                    if interactive {
+                        show_update_error_with_url(
+                            language,
+                            "updater.error.access",
+                            DIRECT_DOWNLOAD_URL,
+                        );
+                    }
+                    return;
+                }
+            };
+            if let Err(err) = probe_dir_writable(&current_exe) {
+                log_debug(&format!(
+                    "Update check: exe dir not writable: {err} class={}",
+                    classify_io_error(&err)
+                ));
+            }
+            if let Err(err) = can_open_exe_for_update(&current_exe) {
+                log_debug(&format!(
+                    "Update check: exe open diagnostic failed: {err} class={}",
+                    classify_io_error(&err)
+                ));
+            }
+            log_debug("Update check: acquiring lock...");
+            let mut update_lock = match acquire_update_lock(&current_exe) {
+                Ok(lock) => {
+                    log_debug("Update check: lock acquired.");
+                    lock
+                }
+                Err(UpdateLockError::InProgress) => {
+                    log_debug(
+                        "Update check: lock already held by another thread/process. Skipping silent check.",
                     );
+                    if interactive {
+                        show_update_error(language, UpdateError::Concurrent);
+                    }
+                    return;
                 }
-                return;
-            }
-        };
-        if asset.size > 0 {
-            let required = asset.size.saturating_add(MIN_FREE_SPACE_BYTES);
-            match available_disk_bytes(&current_exe) {
-                Ok(available) => {
-                    if available < required {
-                        log_debug(&format!(
-                            "Update check: insufficient disk space. needed={} avail={}",
-                            required, available
-                        ));
-                        if interactive {
-                            let needed = format_mb(required);
-                            let available = format_mb(available);
-                            show_update_error_args(
-                                language,
-                                "updater.error.space",
-                                &[("needed", &needed), ("available", &available)],
-                            );
+                Err(UpdateLockError::Other(err)) => {
+                    log_debug(&format!("Update check: cannot create update lock: {err}"));
+                    if interactive {
+                        show_update_error_with_url(
+                            language,
+                            "updater.error.access",
+                            DIRECT_DOWNLOAD_URL,
+                        );
+                    }
+                    return;
+                }
+            };
+            if asset.size > 0 {
+                let required = asset.size.saturating_add(MIN_FREE_SPACE_BYTES);
+                match available_disk_bytes(&current_exe) {
+                    Ok(available) => {
+                        if available < required {
+                            log_debug(&format!(
+                                "Update check: insufficient disk space. needed={} avail={}",
+                                required, available
+                            ));
+                            if interactive {
+                                let needed = format_mb(required);
+                                let available = format_mb(available);
+                                show_update_error_args(
+                                    language,
+                                    "updater.error.space",
+                                    &[("needed", &needed), ("available", &available)],
+                                );
+                            }
+                            return;
                         }
-                        return;
+                    }
+                    Err(err) => {
+                        log_debug(&format!("Update check: disk space check failed: {err}"));
                     }
                 }
+            }
+
+            log_debug("Update check: prompting user...");
+            if !prompt_update(hwnd, language, current_version, &latest_version) {
+                log_debug("Update check: user declined update.");
+                return;
+            }
+
+            log_debug("Update check: starting download...");
+            match download_and_update(
+                hwnd,
+                language,
+                &asset.browser_download_url,
+                asset.size,
+                sha_asset.map(|asset| asset.browser_download_url.as_str()),
+                &asset.name,
+            ) {
+                Ok(UpdateAction::Started) => {
+                    log_debug("Update check: update process started successfully.");
+                    update_lock.keep();
+                }
+                Ok(UpdateAction::Deferred) => {
+                    log_debug("Update check: update downloaded but deferred by user.");
+                }
                 Err(err) => {
-                    log_debug(&format!("Update check: disk space check failed: {err}"));
+                    log_debug(&format!("Update failed: {err}"));
+                    if interactive {
+                        show_update_error(language, UpdateError::Download);
+                    }
                 }
             }
-        }
-
-        log_debug("Update check: prompting user...");
-        if !prompt_update(hwnd, language, current_version, &latest_version) {
-            log_debug("Update check: user declined update.");
-            return;
-        }
-
-        log_debug("Update check: starting download...");
-        match download_and_update(
-            hwnd,
-            language,
-            &asset.browser_download_url,
-            asset.size,
-            sha_asset.map(|asset| asset.browser_download_url.as_str()),
-            &asset.name,
-        ) {
-            Ok(UpdateAction::Started) => {
-                log_debug("Update check: update process started successfully.");
-                update_lock.keep();
-            }
-            Ok(UpdateAction::Deferred) => {
-                log_debug("Update check: update downloaded but deferred by user.");
-            }
-            Err(err) => {
-                log_debug(&format!("Update failed: {err}"));
-                if interactive {
-                    show_update_error(language, UpdateError::Download);
-                }
-            }
+        }) {
+            let msg = if let Some(s) = e.downcast_ref::<&str>() {
+                format!("Panic: {}", s)
+            } else if let Some(s) = e.downcast_ref::<String>() {
+                format!("Panic: {}", s)
+            } else {
+                "Panic: unknown".to_string()
+            };
+            log_debug(&format!("Update check thread panicked: {}", msg));
         }
     });
 }

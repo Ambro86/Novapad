@@ -229,6 +229,6 @@ opt-level = 3
 opt-level = 3
 lto = true
 codegen-units = 1
-panic = "abort"
+panic = "unwind"
 debug = 0
 strip = true

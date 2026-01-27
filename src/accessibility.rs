@@ -75,9 +75,19 @@ pub fn handle_player_keyboard(msg: &MSG, skip_seconds: u32) -> PlayerCommand {
             vk if vk == VK_RIGHT.0 as u32 => PlayerCommand::Seek(skip_seconds as i64),
             vk if vk == VK_UP.0 as u32 => PlayerCommand::Volume(0.1),
             vk if vk == VK_DOWN.0 as u32 => PlayerCommand::Volume(-0.1),
-            vk if vk == VK_OEM_PLUS.0 as u32 || vk == VK_ADD.0 as u32 => PlayerCommand::Speed(0.1),
+            vk if vk == VK_OEM_PLUS.0 as u32 || vk == VK_ADD.0 as u32 => {
+                if shift_down {
+                    PlayerCommand::Pitch(1.0)
+                } else {
+                    PlayerCommand::Speed(0.1)
+                }
+            }
             vk if vk == VK_OEM_MINUS.0 as u32 || vk == VK_SUBTRACT.0 as u32 => {
-                PlayerCommand::Speed(-0.1)
+                if shift_down {
+                    PlayerCommand::Pitch(-1.0)
+                } else {
+                    PlayerCommand::Speed(-0.1)
+                }
             }
             vk if vk == VK_OEM_PERIOD.0 as u32 => PlayerCommand::Stop,
             vk if vk == VK_ESCAPE.0 as u32 => PlayerCommand::Stop,
@@ -112,6 +122,7 @@ pub enum PlayerCommand {
     Seek(i64),
     Volume(f32),
     Speed(f32),
+    Pitch(f32),
     SpeedReset,
     MuteToggle,
     GoToTime,

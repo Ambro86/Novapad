@@ -44,6 +44,7 @@ pub struct AudiobookPlayer {
     pub muted: bool,
     pub prev_volume: f32,
     pub speed: f32,
+    pub pitch: f32,
     pub subtitle_cancel: Arc<AtomicBool>,
     pub subtitle_hold: bool,
     pub subtitle_speech_cancel: SubtitleSpeechCancel,
@@ -337,6 +338,7 @@ pub fn audiobook_duration_secs(path: &Path) -> Option<u64> {
 #[derive(Clone, Copy)]
 struct AudiobookPlaybackOptions {
     speed: f32,
+    pitch: f32,
     paused: bool,
     volume: f32,
     muted: bool,
@@ -351,7 +353,8 @@ fn start_audiobook_at_with_options(
     options: AudiobookPlaybackOptions,
 ) {
     let settings = unsafe { with_state(hwnd, |state| state.settings.clone()) }.unwrap_or_default();
-    let want_mix = settings.subtitle_read_mode == SubtitleReadMode::Record || options.mix_export;
+    let want_mix = (settings.subtitle_read_mode == SubtitleReadMode::Record || options.mix_export)
+        && crate::subtitles::find_subtitle_for_media(&path).is_some();
     if want_mix && !is_mixed_output(&path) && settings.subtitle_read_mode != SubtitleReadMode::Off {
         let path_clone = path.clone();
         let opts = options;
@@ -424,13 +427,9 @@ fn start_audiobook_at_with_options(
             .as_ref()
             .map(|entry| !entry.cues.is_empty())
             .unwrap_or(false);
-        let subtitles_active =
+        let _subtitles_active =
             effective_subtitle_mode != SubtitleReadMode::Off && subtitles_available;
-        let effective_speed = if subtitles_active {
-            1.0
-        } else {
-            requested_speed
-        };
+        let effective_speed = requested_speed;
         log_mkv_probe_once(&path);
 
         // Force M4A extension for Media Foundation to avoid indexing hangs on .mp4 video files
@@ -468,6 +467,7 @@ fn start_audiobook_at_with_options(
             &final_path,
             seconds,
             effective_speed,
+            options.pitch,
             initial_volume,
             effective_paused,
         ) {
@@ -479,6 +479,7 @@ fn start_audiobook_at_with_options(
                         &wav_path,
                         seconds,
                         effective_speed,
+                        options.pitch,
                         initial_volume,
                         effective_paused,
                     ) {
@@ -505,11 +506,14 @@ fn start_audiobook_at_with_options(
             })
             .unwrap_or(0)
         };
+        // Speed check removed: allowing BASS tempo to handle speed with subtitles.
+        /*
         if subtitles_active && (requested_speed - 1.0).abs() > f32::EPSILON {
             log_debug(
                 "Subtitles active: forcing speed=1.0 (time-stretch disabled) for accurate sync.",
             );
         }
+        */
 
         let player = AudiobookPlayer {
             path,
@@ -521,6 +525,7 @@ fn start_audiobook_at_with_options(
             muted: options.muted,
             prev_volume: options.prev_volume,
             speed: effective_speed,
+            pitch: options.pitch,
             subtitle_cancel: subtitle_cancel.clone(),
             subtitle_hold,
             subtitle_speech_cancel: subtitle_speech_cancel.clone(),
@@ -549,7 +554,7 @@ pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
     crate::reset_active_podcast_chapters_for_playback(hwnd);
     let path_buf = path.to_path_buf();
 
-    let (bookmark_pos, speed, volume, mix_export) = with_state(hwnd, |state| {
+    let (bookmark_pos, speed, pitch, volume, mix_export) = with_state(hwnd, |state| {
         let pos = state
             .bookmarks
             .files
@@ -560,11 +565,12 @@ pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
         (
             pos,
             state.settings.audiobook_playback_speed,
+            state.settings.audiobook_playback_pitch,
             state.settings.audiobook_playback_volume,
             state.settings.subtitle_read_mode == SubtitleReadMode::Record,
         )
     })
-    .unwrap_or((0, 1.0, 1.0, false));
+    .unwrap_or((0, 1.0, 0.0, 1.0, false));
 
     start_audiobook_at_with_options(
         hwnd,
@@ -572,6 +578,7 @@ pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
         bookmark_pos as u64,
         AudiobookPlaybackOptions {
             speed,
+            pitch,
             paused: false,
             volume,
             muted: false,
@@ -632,6 +639,7 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
             path: PathBuf,
             current_pos: u64,
             speed: f32,
+            pitch: f32,
             paused: bool,
             volume: f32,
             muted: bool,
@@ -657,6 +665,7 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
                 path: player.path.clone(),
                 current_pos: new_pos as u64,
                 speed: player.speed,
+                pitch: player.pitch,
                 paused: player.is_paused,
                 volume: player.volume,
                 muted: player.muted,
@@ -677,6 +686,7 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
         path,
         current_pos,
         speed,
+        pitch,
         paused,
         volume,
         muted,
@@ -690,6 +700,7 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
         current_pos,
         AudiobookPlaybackOptions {
             speed,
+            pitch,
             paused,
             volume,
             muted,
@@ -750,19 +761,20 @@ pub unsafe fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
         path.display(),
         seconds
     ));
-    let (speed, volume, muted, prev_volume) = with_state(hwnd, |state| {
+    let (speed, pitch, volume, muted, prev_volume) = with_state(hwnd, |state| {
         if let Some(player) = &state.active_audiobook {
             (
                 player.speed,
+                player.pitch,
                 player.volume,
                 player.muted,
                 player.prev_volume,
             )
         } else {
-            (1.0, 1.0, false, 1.0)
+            (1.0, 0.0, 1.0, false, 1.0)
         }
     })
-    .unwrap_or((1.0, 1.0, false, 1.0));
+    .unwrap_or((1.0, 0.0, 1.0, false, 1.0));
 
     stop_audiobook_playback(hwnd);
     let path_buf = path.to_path_buf();
@@ -772,6 +784,7 @@ pub unsafe fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
         seconds,
         AudiobookPlaybackOptions {
             speed,
+            pitch,
             paused: false,
             volume,
             muted,
@@ -785,10 +798,10 @@ pub unsafe fn change_audiobook_volume(hwnd: HWND, delta: f32) {
     let new_volume = with_state(hwnd, |state| {
         if let Some(player) = &mut state.active_audiobook {
             if player.muted {
-                player.prev_volume = (player.prev_volume + delta).clamp(0.0, 3.0);
+                player.prev_volume = (player.prev_volume + delta).clamp(0.0, 6.0);
                 return None;
             }
-            player.volume = (player.volume + delta).clamp(0.0, 3.0);
+            player.volume = (player.volume + delta).clamp(0.0, 6.0);
             player.set_volume(player.volume);
             Some(player.volume)
         } else {
@@ -809,20 +822,7 @@ pub unsafe fn change_audiobook_volume(hwnd: HWND, delta: f32) {
 }
 
 pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
-    let (path, mode, current_speed) = with_state(hwnd, |state| {
-        state.active_audiobook.as_ref().map(|player| {
-            (
-                player.path.clone(),
-                state.settings.subtitle_read_mode,
-                player.speed,
-            )
-        })
-    })
-    .flatten()?;
-    if mode != SubtitleReadMode::Off && get_or_load_subtitles(&path, mode).is_some() {
-        log_debug("Subtitles active: forcing speed=1.0 (time-stretch disabled) for accurate sync.");
-        return Some(current_speed);
-    }
+    // We allow speed change even with subtitles now, relying on BASS tempo.
     let result = with_state(hwnd, |state| {
         if let Some(player) = state.active_audiobook.take() {
             let current = audiobook_position_secs(&player).floor() as u64;
@@ -832,6 +832,7 @@ pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
                 player.path,
                 current,
                 new_speed,
+                player.pitch,
                 player.is_paused,
                 player.volume,
                 player.muted,
@@ -843,7 +844,7 @@ pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
     })
     .flatten();
 
-    let (path, current, speed, paused, volume, muted, prev_volume) = result?;
+    let (path, current, speed, pitch, paused, volume, muted, prev_volume) = result?;
 
     start_audiobook_at_with_options(
         hwnd,
@@ -851,6 +852,7 @@ pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
         current,
         AudiobookPlaybackOptions {
             speed,
+            pitch,
             paused,
             volume,
             muted,
@@ -872,16 +874,18 @@ pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
     Some(speed)
 }
 
-pub unsafe fn reset_audiobook_speed(hwnd: HWND) -> Option<f32> {
+pub unsafe fn change_audiobook_pitch(hwnd: HWND, delta: f32) -> Option<f32> {
+    // Pitch change via BASS tempo
     let result = with_state(hwnd, |state| {
         if let Some(player) = state.active_audiobook.take() {
             let current = audiobook_position_secs(&player).floor() as u64;
-            let new_speed = 1.0;
+            let new_pitch = (player.pitch + delta).clamp(-12.0, 12.0);
             player.stop();
             Some((
                 player.path,
                 current,
-                new_speed,
+                player.speed,
+                new_pitch,
                 player.is_paused,
                 player.volume,
                 player.muted,
@@ -893,7 +897,7 @@ pub unsafe fn reset_audiobook_speed(hwnd: HWND) -> Option<f32> {
     })
     .flatten();
 
-    let (path, current, speed, paused, volume, muted, prev_volume) = result?;
+    let (path, current, speed, pitch, paused, volume, muted, prev_volume) = result?;
 
     start_audiobook_at_with_options(
         hwnd,
@@ -901,6 +905,59 @@ pub unsafe fn reset_audiobook_speed(hwnd: HWND) -> Option<f32> {
         current,
         AudiobookPlaybackOptions {
             speed,
+            pitch,
+            paused,
+            volume,
+            muted,
+            prev_volume,
+            mix_export: false,
+        },
+    );
+
+    // Save pitch to settings
+    if with_state(hwnd, |state| {
+        state.settings.audiobook_playback_pitch = pitch;
+        crate::settings::save_settings(state.settings.clone());
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access audio player state");
+    }
+
+    Some(pitch)
+}
+
+pub unsafe fn reset_audiobook_speed(hwnd: HWND) -> Option<f32> {
+    let result = with_state(hwnd, |state| {
+        if let Some(player) = state.active_audiobook.take() {
+            let current = audiobook_position_secs(&player).floor() as u64;
+            let new_speed = 1.0;
+            player.stop();
+            Some((
+                player.path,
+                current,
+                new_speed,
+                player.pitch,
+                player.is_paused,
+                player.volume,
+                player.muted,
+                player.prev_volume,
+            ))
+        } else {
+            None
+        }
+    })
+    .flatten();
+
+    let (path, current, speed, pitch, paused, volume, muted, prev_volume) = result?;
+
+    start_audiobook_at_with_options(
+        hwnd,
+        path,
+        current,
+        AudiobookPlaybackOptions {
+            speed,
+            pitch,
             paused,
             volume,
             muted,

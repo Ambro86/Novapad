@@ -715,7 +715,7 @@ async fn download_audio_chunk_attempt(
         HeaderValue::from_str(&cookie).map_err(|err| err.to_string())?,
     );
 
-    let connect_timeout = Duration::from_secs(3);
+    let connect_timeout = Duration::from_secs(10);
     let (ws_stream, _) = match tokio::time::timeout(connect_timeout, connect_async(request)).await {
         Ok(res) => res.map_err(|e: tungstenite::Error| e.to_string())?,
         Err(_) => {

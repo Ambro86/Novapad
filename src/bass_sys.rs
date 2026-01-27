@@ -19,6 +19,7 @@ pub const BASS_FX_FREESOURCE: Dword = 0x0001_0000;
 pub const BASS_POS_BYTE: Dword = 0;
 pub const BASS_ATTRIB_VOL: Dword = 2;
 pub const BASS_ATTRIB_TEMPO: Dword = 0x0001_0000;
+pub const BASS_ATTRIB_TEMPO_PITCH: Dword = 0x0001_0001;
 type BassInit = unsafe extern "C" fn(
     device: i32,
     freq: Dword,

@@ -1,9 +1,9 @@
 use crate::audio_utils;
-use crate::com_guard::ComGuard;
 use crate::mf_encoder;
 use crate::settings;
 use crate::settings::{PODCAST_DEVICE_DEFAULT, PodcastFormat};
 use chrono::Local;
+use platform_windows::ComGuard;
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};

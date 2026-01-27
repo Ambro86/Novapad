@@ -1,14 +1,12 @@
 //! RAII guard for COM initialization.
-//!
-//! This module provides a thread-safe COM initialization guard that ensures
-//! proper pairing of CoInitializeEx/CoUninitialize calls.
 
+use crate::PlatformError;
 use windows::Win32::Foundation::RPC_E_CHANGED_MODE;
 use windows::Win32::System::Com::{
     COINIT_APARTMENTTHREADED, COINIT_MULTITHREADED, CoInitializeEx, CoUninitialize,
 };
 
-/// RAII guard for COM apartment-threaded initialization.
+/// RAII guard for COM initialization.
 /// Automatically calls CoUninitialize when dropped.
 pub struct ComGuard {
     should_uninit: bool,
@@ -16,21 +14,20 @@ pub struct ComGuard {
 
 impl ComGuard {
     /// Initialize COM with apartment-threaded model (STA).
-    /// Use this for UI threads and most SAPI operations.
-    pub fn new_sta() -> Result<Self, windows::core::Error> {
+    pub fn new_sta() -> Result<Self, PlatformError> {
         Self::init(COINIT_APARTMENTTHREADED)
     }
 
     /// Initialize COM with multi-threaded model (MTA).
-    /// Use this for background worker threads.
-    pub fn new_mta() -> Result<Self, windows::core::Error> {
+    pub fn new_mta() -> Result<Self, PlatformError> {
         Self::init(COINIT_MULTITHREADED)
     }
 
-    fn init(coinit: windows::Win32::System::Com::COINIT) -> Result<Self, windows::core::Error> {
+    fn init(coinit: windows::Win32::System::Com::COINIT) -> Result<Self, PlatformError> {
+        // SAFETY: CoInitializeEx is a standard Win32 call.
+        // We properly handle the pairing with CoUninitialize via the Drop trait.
         let result = unsafe { CoInitializeEx(None, coinit) };
 
-        // S_OK = success, we initialized COM
         if result.is_ok() {
             return Ok(Self {
                 should_uninit: true,
@@ -54,8 +51,10 @@ impl ComGuard {
             });
         }
 
-        // Other errors - propagate
-        result.ok()?;
+        result
+            .ok()
+            .map_err(|e| PlatformError::ComError(e.to_string()))?;
+
         Ok(Self {
             should_uninit: false,
         })
@@ -65,6 +64,7 @@ impl ComGuard {
 impl Drop for ComGuard {
     fn drop(&mut self) {
         if self.should_uninit {
+            // SAFETY: Pairing with CoInitializeEx is guaranteed by RAII and should_uninit flag.
             unsafe { CoUninitialize() };
         }
     }

@@ -7,7 +7,6 @@
 #![windows_subsystem = "windows"]
 
 mod accessibility;
-mod com_guard;
 mod curl_client;
 mod embedded_deps;
 mod macros;
@@ -1494,7 +1493,7 @@ struct RecentFileStore {
 fn main() -> anyhow::Result<()> {
     platform_windows::init().map_err(|e| anyhow::anyhow!(e))?;
     // Initialize COM for the main UI thread (STA)
-    let _com = com_guard::ComGuard::new_sta().ok();
+    let _com = platform_windows::ComGuard::new_sta().ok();
 
     // Estrai le dipendenze embedded (DLL, certificati, ecc.)
     if let Err(e) = embedded_deps::extract_all() {

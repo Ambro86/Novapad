@@ -32,8 +32,12 @@ use crate::with_state;
 const REPO_OWNER: &str = "Ambro86";
 const REPO_NAME: &str = "Novapad";
 const USER_AGENT: &str = "NovapadUpdater";
+#[cfg(not(feature = "standalone"))]
 const DIRECT_DOWNLOAD_URL: &str =
     "https://github.com/Ambro86/Novapad/releases/latest/download/novapad.exe";
+#[cfg(feature = "standalone")]
+const DIRECT_DOWNLOAD_URL: &str =
+    "https://github.com/Ambro86/Novapad/releases/latest/download/novapad-standalone.exe";
 const MIN_FREE_SPACE_BYTES: u64 = 5 * 1024 * 1024;
 const UPDATE_LOCK_NAME: &str = "novapad.update.lock";
 const UPDATER_DIR_NAME: &str = "Novapad\\updater";
@@ -244,10 +248,24 @@ fn fetch_latest_release() -> Result<ReleaseInfo, String> {
 }
 
 fn select_portable_asset(assets: &[ReleaseAsset]) -> Option<&ReleaseAsset> {
-    assets.iter().find(|asset| {
-        let name = asset.name.to_lowercase();
-        name.ends_with(".exe") && !name.contains("setup") && !name.contains(".msi")
-    })
+    #[cfg(feature = "standalone")]
+    {
+        // Standalone: cerca specificamente novapad-standalone.exe
+        assets
+            .iter()
+            .find(|asset| asset.name.eq_ignore_ascii_case("novapad-standalone.exe"))
+    }
+    #[cfg(not(feature = "standalone"))]
+    {
+        // Normal/Portable: cerca novapad.exe (esclude setup e msi)
+        assets.iter().find(|asset| {
+            let name = asset.name.to_lowercase();
+            name.ends_with(".exe")
+                && !name.contains("setup")
+                && !name.contains(".msi")
+                && !name.contains("standalone")
+        })
+    }
 }
 
 fn select_sha256_asset<'a>(assets: &'a [ReleaseAsset], exe_name: &str) -> Option<&'a ReleaseAsset> {

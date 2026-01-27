@@ -1172,6 +1172,13 @@ fn announce_player_time(hwnd: HWND) {
         )
     };
     nvda_speak(&message);
+    crate::accessibility::nvda_speak(&message);
+}
+
+fn announce_player_pitch(language: Language, pitch: f32) {
+    let pitch_text = format!("{:+.0}", pitch);
+    let message = i18n::tr_f(language, "player.pitch_announce", &[("pitch", &pitch_text)]);
+    crate::accessibility::nvda_speak(&message);
 }
 
 fn announce_player_volume(hwnd: HWND) {
@@ -1297,6 +1304,14 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
             let speed = unsafe { change_audiobook_speed(hwnd, delta) };
             if let Some(speed) = speed {
                 announce_player_speed(language, speed);
+            }
+        }
+        PlayerCommand::Pitch(delta) => {
+            let language =
+                unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+            let pitch = unsafe { change_audiobook_pitch(hwnd, delta) };
+            if let Some(pitch) = pitch {
+                announce_player_pitch(language, pitch);
             }
         }
         PlayerCommand::SpeedReset => {
@@ -1473,6 +1488,9 @@ struct RecentFileStore {
 }
 
 fn main() -> windows::core::Result<()> {
+    // Initialize COM for the main UI thread (STA)
+    let _com = com_guard::ComGuard::new_sta().ok();
+
     // Estrai le dipendenze embedded (DLL, certificati, ecc.)
     if let Err(e) = embedded_deps::extract_all() {
         log_debug(&format!("Warning: Failed to extract embedded deps: {}", e));
@@ -3167,6 +3185,10 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     LRESULT(0)
                 }
                 IDM_FILE_OPEN => {
+                    if unsafe { with_state(hwnd, |_| {}).is_none() } {
+                        log_debug("Menu: Open document ignored (not initialized)");
+                        return LRESULT(0);
+                    }
                     log_debug("Menu: Open document");
                     // Cancel spellcheck highlight to avoid focus issues
                     kill_timer_best_effort(
@@ -3492,6 +3514,14 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 }
                 IDM_PLAYBACK_SPEED_RESET => {
                     handle_player_command(hwnd, PlayerCommand::SpeedReset);
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_PITCH_UP => {
+                    handle_player_command(hwnd, PlayerCommand::Pitch(1.0));
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_PITCH_DOWN => {
+                    handle_player_command(hwnd, PlayerCommand::Pitch(-1.0));
                     LRESULT(0)
                 }
                 IDM_PLAYBACK_MUTE_TOGGLE => {

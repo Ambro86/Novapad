@@ -1,8 +1,8 @@
 use crate::accessibility::to_wide;
 use crate::bass_sys::{
-    BASS_ATTRIB_TEMPO, BASS_ATTRIB_VOL, BASS_FX_FREESOURCE, BASS_POS_BYTE, BASS_SAMPLE_FLOAT,
-    BASS_STREAM_DECODE, BASS_STREAM_PRESCAN, BASS_UNICODE, BassApi, Dword, Hplugin, Hstream,
-    bass_api, bass_error, bass_fx_api, log_bass_error,
+    BASS_ATTRIB_TEMPO, BASS_ATTRIB_TEMPO_PITCH, BASS_ATTRIB_VOL, BASS_FX_FREESOURCE, BASS_POS_BYTE,
+    BASS_SAMPLE_FLOAT, BASS_STREAM_DECODE, BASS_STREAM_PRESCAN, BASS_UNICODE, BassApi, Dword,
+    Hplugin, Hstream, bass_api, bass_error, bass_fx_api, log_bass_error,
 };
 use crate::embedded_deps;
 use crate::log_debug;
@@ -88,6 +88,7 @@ impl BassOutput {
         path: &Path,
         start_seconds: u64,
         speed: f32,
+        pitch: f32,
         volume: f32,
         paused: bool,
     ) -> Result<Arc<Self>, String> {
@@ -98,8 +99,8 @@ impl BassOutput {
             log_debug(&format!("BASS: plugin load failed: {}", err));
         }
 
-        let want_tempo = speed != 1.0 && fx_api.is_some();
-        let mut flags = BASS_STREAM_PRESCAN;
+        let want_tempo = (speed != 1.0 || pitch != 0.0) && fx_api.is_some();
+        let mut flags = BASS_STREAM_PRESCAN | BASS_SAMPLE_FLOAT;
         if want_tempo {
             flags |= BASS_STREAM_DECODE;
         }
@@ -125,6 +126,17 @@ impl BassOutput {
                 if set_ok == 0 {
                     log_bass_error(api, "BASS_ChannelSetAttribute tempo");
                 }
+                let pitch_clamped = pitch.clamp(-60.0, 60.0);
+                let set_pitch_ok = unsafe {
+                    (api.channel_set_attribute)(
+                        tempo_handle,
+                        BASS_ATTRIB_TEMPO_PITCH,
+                        pitch_clamped,
+                    )
+                };
+                if set_pitch_ok == 0 {
+                    log_bass_error(api, "BASS_ChannelSetAttribute pitch");
+                }
                 tempo_handle
             }
         } else {
@@ -134,7 +146,7 @@ impl BassOutput {
             source
         };
 
-        let volume = volume.clamp(0.0, 1.0);
+        let volume = volume.clamp(0.0, 6.0);
         let set_ok = unsafe { (api.channel_set_attribute)(handle, BASS_ATTRIB_VOL, volume) };
         if set_ok == 0 {
             log_bass_error(api, "BASS_ChannelSetAttribute volume");
@@ -191,7 +203,7 @@ impl BassOutput {
 
     pub fn set_volume(&self, volume: f32) {
         let handle = *self.handle.lock().unwrap();
-        let volume = volume.clamp(0.0, 1.0);
+        let volume = volume.clamp(0.0, 6.0);
         let ok = unsafe { (self.api.channel_set_attribute)(handle, BASS_ATTRIB_VOL, volume) };
         if ok == 0 {
             log_bass_error(self.api, "BASS_ChannelSetAttribute volume");

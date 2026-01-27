@@ -13,8 +13,6 @@ const LIBCURL_DLL: &[u8] = include_bytes!("../dll/libcurl.dll");
 const ZLIB_DLL: &[u8] = include_bytes!("../dll/zlib.dll");
 // cacert: bundle CA per la verifica TLS con libcurl embedded.
 const CACERT_PEM: &[u8] = include_bytes!("../dll/cacert.pem");
-// SoundTouch: time-stretching audio senza installazioni esterne.
-const SOUNDTOUCH_DLL: &[u8] = include_bytes!("../dll/SoundTouch64.dll");
 // NVDA: integrazione con screen reader tramite controller client.
 const NVDA_CLIENT_DLL: &[u8] = include_bytes!("../dll/nvdaControllerClient64.dll");
 // BASS: backend audio per riproduzione e timing precisi.
@@ -71,7 +69,6 @@ pub fn extract_all() -> std::io::Result<PathBuf> {
         ("libcurl.dll", LIBCURL_DLL),
         ("zlib.dll", ZLIB_DLL),
         ("cacert.pem", CACERT_PEM),
-        ("SoundTouch64.dll", SOUNDTOUCH_DLL),
         ("nvdaControllerClient64.dll", NVDA_CLIENT_DLL),
         ("bass.dll", BASS_DLL),
         ("bass_fx.dll", BASS_FX_DLL),

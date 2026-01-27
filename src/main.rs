@@ -12,8 +12,10 @@ mod embedded_deps;
 mod macros;
 use accessibility::*;
 mod conpty;
+mod diagnostics;
 mod sentry_integration;
 mod settings;
+mod watchdog;
 use editor_manager::Document;
 use settings::*;
 mod bookmarks;
@@ -1658,7 +1660,17 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
 
         let accel = create_accelerators();
         let mut msg = MSG::default();
+
+        // Avvia watchdog per rilevare freeze
+        let watchdog = watchdog::start_watchdog(watchdog::WatchdogConfig::default());
+        let mut heartbeat_counter = 0u32;
+
         while GetMessageW(&mut msg, HWND(0), 0, 0).into() {
+            // Heartbeat ogni ~100 messaggi per non impattare performance
+            heartbeat_counter = heartbeat_counter.wrapping_add(1);
+            if heartbeat_counter.is_multiple_of(100) {
+                watchdog.heartbeat();
+            }
             // Priority 1: Global navigation keys (Ctrl+Tab)
             if msg.message == WM_KEYDOWN
                 && msg.wParam.0 as u32 == VK_TAB.0 as u32
@@ -2125,6 +2137,9 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
+
+        // Ferma watchdog prima di uscire
+        watchdog.stop();
 
         Ok(())
     }
@@ -3657,6 +3672,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 IDM_HELP_ABOUT => {
                     log_debug("Menu: About");
                     app_windows::about_window::show(hwnd);
+                    LRESULT(0)
+                }
+                IDM_HELP_EXPORT_DIAGNOSTICS => {
+                    log_debug("Menu: Export diagnostics");
+                    export_diagnostics_dialog(hwnd);
                     LRESULT(0)
                 }
                 _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -7399,6 +7419,58 @@ pub(crate) unsafe fn save_audio_dialog(
         Some(path)
     } else {
         None
+    }
+}
+
+/// Mostra dialog per salvare file diagnostici zip.
+unsafe fn export_diagnostics_dialog(hwnd: HWND) {
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+
+    // Genera nome file con timestamp
+    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+    let default_name = format!("novapad_diagnostics_{}.zip", timestamp);
+    let mut default_wide = to_wide(&default_name);
+    default_wide.resize(260, 0);
+
+    let filter = to_wide("ZIP Archive (*.zip)\0*.zip\0All Files (*.*)\0*.*\0\0");
+    let title = to_wide(&i18n::tr(language, "dialog.export_diagnostics_title"));
+
+    let mut ofn = OPENFILENAMEW {
+        lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
+        hwndOwner: hwnd,
+        lpstrFile: PWSTR(default_wide.as_mut_ptr()),
+        nMaxFile: default_wide.len() as u32,
+        lpstrFilter: PCWSTR(filter.as_ptr()),
+        lpstrTitle: PCWSTR(title.as_ptr()),
+        lpstrDefExt: PCWSTR(to_wide("zip").as_ptr()),
+        nFilterIndex: 1,
+        Flags: OFN_EXPLORER | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST,
+        ..Default::default()
+    };
+
+    if !GetSaveFileNameW(&mut ofn).as_bool() {
+        return;
+    }
+
+    let len = default_wide
+        .iter()
+        .position(|&c| c == 0)
+        .unwrap_or(default_wide.len());
+    let path = PathBuf::from(String::from_utf16_lossy(&default_wide[..len]));
+
+    match diagnostics::export_diagnostics_zip(&path) {
+        Ok(()) => {
+            let message = i18n::tr(language, "dialog.export_diagnostics_success");
+            show_info(hwnd, language, &message);
+        }
+        Err(e) => {
+            let message = format!(
+                "{}: {}",
+                i18n::tr(language, "dialog.export_diagnostics_error"),
+                e
+            );
+            show_error(hwnd, language, &message);
+        }
     }
 }
 

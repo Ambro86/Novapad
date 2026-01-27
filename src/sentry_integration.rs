@@ -9,6 +9,10 @@
 use std::panic::PanicHookInfo;
 use std::sync::OnceLock;
 
+// DSN di default per le release ufficiali (non è PII).
+// Nota: evita di stamparlo nei log.
+const DEFAULT_SENTRY_DSN: &str = "https://1ca59fd9ca0412302237d0c576eccec5@o4510784617316352.ingest.de.sentry.io/4510784634159184";
+
 /// ID univoco dell'evento Sentry (re-export di Uuid)
 pub type EventId = uuid::Uuid;
 
@@ -43,10 +47,9 @@ pub fn init(send_crash_reports: bool, dsn: Option<&str>) {
         return;
     }
 
-    let Some(dsn) = dsn.filter(|s| !s.trim().is_empty()) else {
-        crate::log_debug("Sentry: no DSN configured, skipping initialization");
-        return;
-    };
+    let dsn = dsn
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or(DEFAULT_SENTRY_DSN);
 
     let guard = sentry::init((
         dsn,
@@ -84,10 +87,67 @@ pub fn init(send_crash_reports: bool, dsn: Option<&str>) {
         if SENTRY_GUARD.set(guard).is_err() {
             crate::log_debug("Sentry: already initialized");
         } else {
+            // Configura tag globali (zero PII)
+            configure_global_tags();
             crate::log_debug("Sentry: initialized successfully");
         }
     } else {
         crate::log_debug("Sentry: initialization failed (guard not enabled)");
+    }
+}
+
+/// Configura tag e extra globali sullo scope Sentry.
+/// Questi tag vengono aggiunti a tutti gli eventi.
+/// Non contiene PII.
+fn configure_global_tags() {
+    sentry::configure_scope(|scope| {
+        // App mode: standalone vs normal
+        #[cfg(feature = "standalone")]
+        scope.set_tag("app.mode", "standalone");
+        #[cfg(not(feature = "standalone"))]
+        scope.set_tag("app.mode", "normal");
+
+        // App version
+        scope.set_tag("app.version", env!("CARGO_PKG_VERSION"));
+
+        // Build type
+        scope.set_tag(
+            "build.debug",
+            if cfg!(debug_assertions) {
+                "true"
+            } else {
+                "false"
+            },
+        );
+
+        // Feature flags (compile-time)
+        scope.set_tag("feature.updater", "true"); // Updater sempre compilato
+
+        // Audio backend
+        scope.set_tag("audio.backend", "bass");
+
+        // Build target info (no PII)
+        scope.set_extra(
+            "build.target",
+            sentry::protocol::Value::from(std::env::consts::ARCH),
+        );
+        scope.set_extra(
+            "build.rustc",
+            sentry::protocol::Value::from(built_info::rustc_version()),
+        );
+        scope.set_extra(
+            "build.os",
+            sentry::protocol::Value::from(std::env::consts::OS),
+        );
+    });
+}
+
+/// Informazioni di build (senza PII)
+mod built_info {
+    /// Versione del compilatore Rust usato per la build.
+    /// Fallback a "unknown" se non disponibile.
+    pub fn rustc_version() -> &'static str {
+        option_env!("RUSTC_VERSION").unwrap_or("unknown")
     }
 }
 
@@ -213,6 +273,33 @@ pub fn set_user_context(anonymous_id: Option<&str>) {
 /// Aggiunge un breadcrumb per tracciare il flusso dell'applicazione.
 /// I messaggi vengono sanitizzati automaticamente.
 pub fn add_breadcrumb(category: &str, message: &str) {
+    add_breadcrumb_with_level(category, message, BreadcrumbLevel::Info);
+}
+
+/// Livelli di breadcrumb supportati
+#[derive(Clone, Copy)]
+pub enum BreadcrumbLevel {
+    Debug,
+    Info,
+    Warning,
+    Error,
+}
+
+impl From<BreadcrumbLevel> for sentry::Level {
+    fn from(level: BreadcrumbLevel) -> Self {
+        match level {
+            BreadcrumbLevel::Debug => sentry::Level::Debug,
+            BreadcrumbLevel::Info => sentry::Level::Info,
+            BreadcrumbLevel::Warning => sentry::Level::Warning,
+            BreadcrumbLevel::Error => sentry::Level::Error,
+        }
+    }
+}
+
+/// Aggiunge un breadcrumb con livello specifico.
+/// I messaggi vengono sanitizzati automaticamente.
+/// Non alloca se Sentry non è abilitato.
+pub fn add_breadcrumb_with_level(category: &str, message: &str, level: BreadcrumbLevel) {
     if !is_enabled() {
         return;
     }
@@ -222,9 +309,64 @@ pub fn add_breadcrumb(category: &str, message: &str) {
     sentry::add_breadcrumb(sentry::Breadcrumb {
         category: Some(category.to_string()),
         message: Some(sanitized),
-        level: sentry::Level::Info,
+        level: level.into(),
         ..Default::default()
     });
+}
+
+/// Macro per aggiungere breadcrumb in modo leggero.
+/// Non alloca se Sentry non è abilitato.
+///
+/// # Forme supportate:
+/// ```ignore
+/// breadcrumb!("category", "message");
+/// breadcrumb!("category", "format {} string", arg);
+/// breadcrumb!("category", level: Warning, "message");
+/// breadcrumb!("category", level: Error, "format {}", arg);
+/// ```
+#[macro_export]
+macro_rules! breadcrumb {
+    // Forma semplice: breadcrumb!("category", "message")
+    ($category:expr, $message:expr) => {
+        if $crate::sentry_integration::is_enabled() {
+            $crate::sentry_integration::add_breadcrumb($category, $message);
+        }
+    };
+    // Forma con format: breadcrumb!("category", "format {}", arg)
+    ($category:expr, $($arg:tt)+) => {
+        if $crate::sentry_integration::is_enabled() {
+            $crate::sentry_integration::add_breadcrumb($category, &format!($($arg)+));
+        }
+    };
+}
+
+/// Macro per breadcrumb con livello specifico.
+///
+/// # Forme supportate:
+/// ```ignore
+/// breadcrumb_level!(Debug, "category", "message");
+/// breadcrumb_level!(Warning, "category", "format {}", arg);
+/// ```
+#[macro_export]
+macro_rules! breadcrumb_level {
+    ($level:ident, $category:expr, $message:expr) => {
+        if $crate::sentry_integration::is_enabled() {
+            $crate::sentry_integration::add_breadcrumb_with_level(
+                $category,
+                $message,
+                $crate::sentry_integration::BreadcrumbLevel::$level,
+            );
+        }
+    };
+    ($level:ident, $category:expr, $($arg:tt)+) => {
+        if $crate::sentry_integration::is_enabled() {
+            $crate::sentry_integration::add_breadcrumb_with_level(
+                $category,
+                &format!($($arg)+),
+                $crate::sentry_integration::BreadcrumbLevel::$level,
+            );
+        }
+    };
 }
 
 /// Flush esplicito prima della chiusura.
@@ -249,6 +391,30 @@ pub fn format_event_id(event_id: Option<&EventId>) -> String {
     match event_id {
         Some(id) => format!("\n\nError ID: {}", id),
         None => String::new(),
+    }
+}
+
+/// Salva l'ultimo errore fatale su file per inclusione nei diagnostici.
+/// Il messaggio viene sanitizzato per rimuovere path sensibili.
+pub fn save_last_fatal(message: &str, event_id: Option<&EventId>) {
+    let settings_dir = crate::settings::settings_dir();
+    let path = settings_dir.join("last_error.txt");
+
+    let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
+    let sanitized = sanitize_message(message);
+    let event_id_str = event_id
+        .map(|id| format!("Event ID: {}\n", id))
+        .unwrap_or_default();
+
+    let content = format!(
+        "Timestamp: {}\n\
+         {}\
+         Message: {}\n",
+        timestamp, event_id_str, sanitized
+    );
+
+    if let Err(e) = std::fs::write(&path, content) {
+        crate::log_debug(&format!("Failed to save last fatal error: {}", e));
     }
 }
 

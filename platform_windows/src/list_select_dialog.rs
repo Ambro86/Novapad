@@ -7,7 +7,7 @@
 //! - SetFocus on listbox at creation
 //! - IsDialogMessageW for Tab navigation
 //! - WS_EX_CONTROLPARENT for proper child navigation
-//! - ESC to cancel, ENTER to confirm
+//! - ESC to cancel, ENTER or SPACE to confirm
 
 use std::sync::{Arc, Mutex};
 
@@ -15,15 +15,18 @@ use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::WC_BUTTON;
-use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, SetFocus, VK_ESCAPE, VK_RETURN};
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    EnableWindow, GetFocus, SetFocus, VK_ESCAPE, VK_RETURN, VK_SPACE,
+};
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow,
     DispatchMessageW, GWLP_USERDATA, GetMessageW, GetWindowLongPtrW, HCURSOR, HMENU, IDC_ARROW,
     IsDialogMessageW, IsWindow, LB_ADDSTRING, LB_GETCURSEL, LB_GETTEXT, LB_GETTEXTLEN,
-    LB_SETCURSEL, LBS_NOTIFY, LoadCursorW, MSG, PostMessageW, RegisterClassW, SendMessageW,
-    SetForegroundWindow, SetWindowLongPtrW, TranslateMessage, WINDOW_STYLE, WM_CLOSE, WM_COMMAND,
-    WM_CREATE, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD,
-    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    LB_SETCURSEL, LBS_HASSTRINGS, LBS_NOINTEGRALHEIGHT, LBS_NOTIFY, LoadCursorW, MSG, PostMessageW,
+    RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, TranslateMessage,
+    WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW,
+    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU,
+    WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -43,20 +46,28 @@ pub struct ListSelectDialogParams<'a> {
     pub font: Option<FontHandle>,
 }
 
+/// Internal result containing both index and value.
+#[derive(Clone)]
+struct ListSelectResult {
+    index: usize,
+    value: String,
+}
+
 struct ListSelectInit {
     items: Vec<String>,
     ok_label: String,
     cancel_label: String,
     font: HFONT,
-    result: Arc<Mutex<Option<String>>>,
+    result: Arc<Mutex<Option<ListSelectResult>>>,
 }
 
 struct ListSelectState {
     list: HWND,
-    result: Arc<Mutex<Option<String>>>,
+    ok_btn: HWND,
+    result: Arc<Mutex<Option<ListSelectResult>>>,
 }
 
-/// Shows a modal list selection dialog.
+/// Shows a modal list selection dialog and returns the selected string.
 ///
 /// Returns:
 /// - `Ok(Some(selected_item))` if user selected an item and pressed OK
@@ -67,11 +78,38 @@ struct ListSelectState {
 /// - Focus is set to the listbox on creation
 /// - First item is pre-selected so NVDA announces it
 /// - Tab navigates between listbox and buttons
-/// - ESC cancels, ENTER confirms
+/// - ESC cancels, ENTER or SPACE confirms (when focus is on list or OK button)
 pub fn show_list_select_dialog(
     parent: Option<WindowHandle>,
     params: ListSelectDialogParams,
 ) -> Result<Option<String>, PlatformError> {
+    show_list_select_dialog_impl(parent, params).map(|opt| opt.map(|r| r.value))
+}
+
+/// Shows a modal list selection dialog and returns the selected index.
+///
+/// Returns:
+/// - `Ok(Some(selected_index))` if user selected an item and pressed OK
+/// - `Ok(None)` if user cancelled
+/// - `Err(PlatformError)` if dialog creation failed
+///
+/// # Accessibility
+/// - Focus is set to the listbox on creation
+/// - First item is pre-selected so NVDA announces it
+/// - Tab navigates between listbox and buttons
+/// - ESC cancels, ENTER or SPACE confirms (when focus is on list or OK button)
+pub fn show_list_select_dialog_index(
+    parent: Option<WindowHandle>,
+    params: ListSelectDialogParams,
+) -> Result<Option<usize>, PlatformError> {
+    show_list_select_dialog_impl(parent, params).map(|opt| opt.map(|r| r.index))
+}
+
+/// Internal implementation that returns both index and value.
+fn show_list_select_dialog_impl(
+    parent: Option<WindowHandle>,
+    params: ListSelectDialogParams,
+) -> Result<Option<ListSelectResult>, PlatformError> {
     if params.items.is_empty() {
         return Ok(None);
     }
@@ -162,16 +200,24 @@ pub fn show_list_select_dialog(
 
         // SAFETY: Message handling
         unsafe {
-            // ESC closes dialog
+            // ESC closes dialog (cancel)
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
-                let _ = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
+                let _ = PostMessageW(hwnd, WM_COMMAND, WPARAM(ID_CANCEL), LPARAM(0));
                 continue;
             }
 
-            // ENTER confirms selection
-            if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
-                let _ = PostMessageW(hwnd, WM_COMMAND, WPARAM(ID_OK), LPARAM(0));
-                continue;
+            // ENTER or SPACE confirms selection (when focus is on list or OK button)
+            let is_enter = msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RETURN.0 as u32;
+            let is_space = msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_SPACE.0 as u32;
+
+            if is_enter || is_space {
+                let (list, ok_btn) = with_list_state(hwnd, |state| (state.list, state.ok_btn))
+                    .unwrap_or((HWND(0), HWND(0)));
+                let focus = GetFocus();
+                if focus == list || focus == ok_btn {
+                    let _ = PostMessageW(hwnd, WM_COMMAND, WPARAM(ID_OK), LPARAM(0));
+                    continue;
+                }
             }
 
             // IsDialogMessageW handles Tab navigation and control interaction
@@ -223,21 +269,24 @@ unsafe extern "system" fn list_select_wndproc(
             // Create listbox with accessibility-critical styles:
             // - WS_TABSTOP: allows Tab navigation
             // - LBS_NOTIFY: sends notification messages
+            // - LBS_HASSTRINGS: listbox stores strings
+            // - LBS_NOINTEGRALHEIGHT: allows partial item display
             // - WS_VSCROLL: scrollbar for long lists
+            // - WS_EX_CLIENTEDGE: 3D border for visual clarity
             // SAFETY: CreateWindowExW with valid parameters
             let list = unsafe {
                 CreateWindowExW(
-                    Default::default(),
+                    WS_EX_CLIENTEDGE,
                     w!("LISTBOX"),
                     PCWSTR::null(),
                     WS_CHILD
                         | WS_VISIBLE
                         | WS_TABSTOP
                         | WS_VSCROLL
-                        | WINDOW_STYLE(LBS_NOTIFY as u32),
-                    10,
-                    10,
-                    460,
+                        | WINDOW_STYLE((LBS_NOTIFY | LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT) as u32),
+                    16,
+                    16,
+                    452,
                     200,
                     hwnd,
                     HMENU(ID_LIST as isize),
@@ -277,7 +326,7 @@ unsafe extern "system" fn list_select_wndproc(
                     PCWSTR(to_wide(&init.ok_label).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
                     280,
-                    220,
+                    228,
                     90,
                     28,
                     hwnd,
@@ -295,8 +344,8 @@ unsafe extern "system" fn list_select_wndproc(
                     WC_BUTTON,
                     PCWSTR(to_wide(&init.cancel_label).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                    380,
-                    220,
+                    378,
+                    228,
                     90,
                     28,
                     hwnd,
@@ -324,6 +373,7 @@ unsafe extern "system" fn list_select_wndproc(
             // Store state for later access
             let state = Box::new(ListSelectState {
                 list,
+                ok_btn,
                 result: init.result.clone(),
             });
 
@@ -334,10 +384,10 @@ unsafe extern "system" fn list_select_wndproc(
         }
 
         WM_COMMAND => {
-            let id = wparam.0;
+            let id = wparam.0 & 0xffff;
             match id {
                 ID_OK => {
-                    // Get selected item and store in result
+                    // Get selected item index and text, store in result
                     with_list_state(hwnd, |state| {
                         // SAFETY: SendMessageW with valid listbox handle
                         let sel =
@@ -366,7 +416,10 @@ unsafe extern "system" fn list_select_wndproc(
                                 }
                                 let text = String::from_utf16_lossy(&buf[..len as usize]);
                                 if let Ok(mut guard) = state.result.lock() {
-                                    *guard = Some(text);
+                                    *guard = Some(ListSelectResult {
+                                        index: sel as usize,
+                                        value: text,
+                                    });
                                 }
                             }
                         }

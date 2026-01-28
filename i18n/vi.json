@@ -13,6 +13,8 @@
   "dialog.yes": "Có",
   "dialog.no": "Không",
   "app.pdf_loaded": "Đã tải xong PDF.",
+  "app.pdf_loading": "Đang tải PDF...",
+  "app.pdf_analyzing": "Đang phân tích...",
   "app.pdf_error_hint": "Không thể đọc PDF. Hãy thử mở lại hoặc dùng một trình xem PDF khác.",
   "app.text_not_found": "Không tìm thấy văn bản.",
   "app.find_title": "Tìm kiếm",

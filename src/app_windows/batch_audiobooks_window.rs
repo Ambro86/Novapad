@@ -202,6 +202,8 @@ struct TtsSettings {
     tts_rate: i32,
     tts_pitch: i32,
     tts_volume: i32,
+    use_dialogue_voice: bool,
+    dialogue_voice: String,
     language: Language,
 }
 
@@ -1465,6 +1467,8 @@ fn load_tts_settings(parent: HWND, voice: String, language: Language) -> TtsSett
             tts_rate: state.settings.tts_rate,
             tts_pitch: state.settings.tts_pitch,
             tts_volume: state.settings.tts_volume,
+            use_dialogue_voice: state.settings.use_dialogue_voice,
+            dialogue_voice: state.settings.dialogue_voice.clone(),
             language,
         })
         .unwrap_or_else(|| TtsSettings {
@@ -1479,6 +1483,8 @@ fn load_tts_settings(parent: HWND, voice: String, language: Language) -> TtsSett
             tts_rate: 0,
             tts_pitch: 0,
             tts_volume: 100,
+            use_dialogue_voice: false,
+            dialogue_voice: String::new(),
             language,
         })
     }
@@ -1870,6 +1876,11 @@ fn export_parts(
                     rate: tts.tts_rate,
                     pitch: tts.tts_pitch,
                     volume: tts.tts_volume,
+                    dialogue_voice: if tts.use_dialogue_voice && !tts.dialogue_voice.is_empty() {
+                        Some(tts.dialogue_voice.clone())
+                    } else {
+                        None
+                    },
                     sapi4_threads: None,
                 };
                 run_tts_audiobook_part(part_chunks, &mut progress, &options)?;
@@ -1883,6 +1894,12 @@ fn export_parts(
                     crate::sapi5_engine::SapiExportOptions {
                         chunks: part_chunks,
                         voice_name: &tts.voice,
+                        dialogue_voice: if tts.use_dialogue_voice && !tts.dialogue_voice.is_empty()
+                        {
+                            Some(tts.dialogue_voice.clone())
+                        } else {
+                            None
+                        },
                         output_path: output,
                         language: tts.language,
                         rate: tts.tts_rate,

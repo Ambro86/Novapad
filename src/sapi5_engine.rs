@@ -290,6 +290,7 @@ pub fn play_sapi(
 pub struct SapiExportOptions<'a> {
     pub chunks: &'a [String],
     pub voice_name: &'a str,
+    pub dialogue_voice: Option<String>,
     pub output_path: &'a Path,
     pub language: Language,
     pub rate: i32,
@@ -327,6 +328,12 @@ pub fn speak_sapi_to_file(
             let voice_token = find_voice_token(options.voice_name).ok_or_else(|| {
                 "Selected SAPI voice not found. Please select a voice in Options.".to_string()
             })?;
+            let dialogue_voice_token = if let Some(ref dv) = options.dialogue_voice {
+                find_voice_token(dv)
+            } else {
+                None
+            };
+
             voice
                 .SetVoice(&voice_token)
                 .map_err(|e| format!("SetVoice failed: {}", e))?;
@@ -375,6 +382,17 @@ pub fn speak_sapi_to_file(
                     }
                     return Err("Cancelled".to_string());
                 }
+
+                // Voice switching for dialogues
+                let is_dialogue = crate::tts_engine::detect_dialogue_in_text(chunk);
+                if is_dialogue && dialogue_voice_token.is_some() {
+                    if let Some(ref dv_token) = dialogue_voice_token {
+                        let _unused = voice.SetVoice(dv_token);
+                    }
+                } else {
+                    let _unused = voice.SetVoice(&voice_token);
+                }
+
                 let ssml = mk_sapi_ssml(chunk, options.rate, options.pitch, options.volume);
                 let chunk_wide = to_wide(&ssml);
                 voice

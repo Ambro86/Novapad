@@ -87,6 +87,9 @@ const OPTIONS_ID_SEND_CRASH_REPORTS: usize = 6048;
 const OPTIONS_ID_MANAGE_ASSOCIATIONS: usize = 6044;
 const OPTIONS_ID_PROMPT_PROGRAM: usize = 6019;
 const OPTIONS_ID_TABS: usize = 6024;
+const OPTIONS_ID_USE_DIALOGUE_VOICE: usize = 6049;
+const OPTIONS_ID_DIALOGUE_VOICE: usize = 6050;
+const OPTIONS_ID_DIALOGUE_VOICE_PREVIEW: usize = 6051;
 
 const OPTIONS_ID_OK: usize = 6005;
 const OPTIONS_ID_CANCEL: usize = 6006;
@@ -198,6 +201,10 @@ struct OptionsDialogState {
     edit_podcastindex_secret: HWND,
     button_podcastindex_signup: HWND,
     checkbox_multilingual: HWND,
+    checkbox_use_dialogue_voice: HWND,
+    label_dialogue_voice: HWND,
+    combo_dialogue_voice: HWND,
+    button_dialogue_voice_preview: HWND,
     checkbox_split_on_newline: HWND,
     checkbox_word_wrap: HWND,
     checkbox_smart_quotes: HWND,
@@ -242,6 +249,9 @@ struct OptionsLabels {
     label_tts_engine: String,
     label_voice: String,
     label_multilingual: String,
+    label_use_dialogue_voice: String,
+    label_dialogue_voice: String,
+    label_dialogue_voice_preview: String,
     label_tts_speed: String,
     label_tts_pitch: String,
     label_tts_volume: String,
@@ -337,6 +347,9 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_tts_engine: i18n::tr(language, "options.label.tts_engine"),
         label_voice: i18n::tr(language, "options.label.voice"),
         label_multilingual: i18n::tr(language, "options.label.multilingual"),
+        label_use_dialogue_voice: i18n::tr(language, "options.label.use_dialogue_voice"),
+        label_dialogue_voice: i18n::tr(language, "options.label.dialogue_voice"),
+        label_dialogue_voice_preview: i18n::tr(language, "options.label.dialogue_voice_preview"),
         label_tts_speed: i18n::tr(language, "tts_tuning.label_speed"),
         label_tts_pitch: i18n::tr(language, "tts_tuning.label_pitch"),
         label_tts_volume: i18n::tr(language, "tts_tuning.label_volume"),
@@ -478,17 +491,19 @@ pub unsafe fn open(parent: HWND) {
 }
 
 pub unsafe fn refresh_voices(hwnd: HWND) {
-    let (parent, combo_voice, combo_engine, checkbox) = match with_options_state(hwnd, |state| {
-        (
-            state.parent,
-            state.combo_voice,
-            state.combo_tts_engine,
-            state.checkbox_multilingual,
-        )
-    }) {
-        Some(values) => values,
-        None => return,
-    };
+    let (parent, combo_voice, combo_dialogue_voice, combo_engine, checkbox) =
+        match with_options_state(hwnd, |state| {
+            (
+                state.parent,
+                state.combo_voice,
+                state.combo_dialogue_voice,
+                state.combo_tts_engine,
+                state.checkbox_multilingual,
+            )
+        }) {
+            Some(values) => values,
+            None => return,
+        };
     let settings = with_state(parent, |state| state.settings.clone()).unwrap_or_default();
 
     // Determine current engine from combo if possible, otherwise settings
@@ -533,6 +548,15 @@ pub unsafe fn refresh_voices(hwnd: HWND) {
         combo_voice,
         &voices,
         &settings.tts_voice,
+        filter_multilingual,
+        &labels,
+    );
+
+    // Also populate dialogue voice combo
+    populate_voice_combo(
+        combo_dialogue_voice,
+        &voices,
+        &settings.dialogue_voice,
         filter_multilingual,
         &labels,
     );
@@ -899,6 +923,68 @@ unsafe extern "system" fn options_wndproc(
                 26,
                 hwnd,
                 HMENU(OPTIONS_ID_TTS_PREVIEW as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
+            let checkbox_use_dialogue_voice = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_use_dialogue_voice).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                170,
+                y,
+                300,
+                20,
+                hwnd,
+                HMENU(OPTIONS_ID_USE_DIALOGUE_VOICE as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 26;
+
+            let label_dialogue_voice = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_dialogue_voice).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_dialogue_voice = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                200,
+                hwnd,
+                HMENU(OPTIONS_ID_DIALOGUE_VOICE as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
+            let button_dialogue_voice_preview = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_dialogue_voice_preview).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                170,
+                y,
+                300,
+                26,
+                hwnd,
+                HMENU(OPTIONS_ID_DIALOGUE_VOICE_PREVIEW as isize),
                 HINSTANCE(0),
                 None,
             );
@@ -1693,6 +1779,10 @@ unsafe extern "system" fn options_wndproc(
                 button_podcastindex_signup,
                 checkbox_tts_manual,
                 checkbox_multilingual,
+                checkbox_use_dialogue_voice,
+                label_dialogue_voice,
+                combo_dialogue_voice,
+                button_dialogue_voice_preview,
                 checkbox_split_on_newline,
                 checkbox_word_wrap,
                 checkbox_smart_quotes,
@@ -1774,6 +1864,10 @@ unsafe extern "system" fn options_wndproc(
                 edit_podcastindex_secret,
                 button_podcastindex_signup,
                 checkbox_multilingual,
+                checkbox_use_dialogue_voice,
+                label_dialogue_voice,
+                combo_dialogue_voice,
+                button_dialogue_voice_preview,
                 checkbox_split_on_newline,
                 checkbox_word_wrap,
                 checkbox_smart_quotes,
@@ -1882,6 +1976,14 @@ unsafe extern "system" fn options_wndproc(
                 }
                 OPTIONS_ID_TTS_MANUAL_TUNING => {
                     update_tts_manual_visibility(hwnd);
+                    LRESULT(0)
+                }
+                OPTIONS_ID_USE_DIALOGUE_VOICE => {
+                    update_dialogue_voice_visibility(hwnd);
+                    LRESULT(0)
+                }
+                OPTIONS_ID_DIALOGUE_VOICE_PREVIEW => {
+                    preview_dialogue_voice(hwnd);
                     LRESULT(0)
                 }
                 OPTIONS_ID_PODCASTINDEX_SIGNUP => {
@@ -2037,6 +2139,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         _button_podcastindex_signup,
         checkbox_tts_manual,
         checkbox_multilingual,
+        checkbox_use_dialogue_voice,
+        combo_dialogue_voice,
         checkbox_split_on_newline,
         checkbox_word_wrap,
         checkbox_smart_quotes,
@@ -2093,6 +2197,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.button_podcastindex_signup,
             state.checkbox_tts_manual,
             state.checkbox_multilingual,
+            state.checkbox_use_dialogue_voice,
+            state.combo_dialogue_voice,
             state.checkbox_split_on_newline,
             state.checkbox_word_wrap,
             state.checkbox_smart_quotes,
@@ -2441,6 +2547,20 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         }),
         LPARAM(0),
     );
+    SendMessageW(
+        checkbox_use_dialogue_voice,
+        BM_SETCHECK,
+        WPARAM(if settings.use_dialogue_voice {
+            BST_CHECKED.0 as usize
+        } else {
+            0
+        }),
+        LPARAM(0),
+    );
+    // Populate dialogue voice combo - will be filled in refresh_voices
+    SendMessageW(combo_dialogue_voice, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    update_dialogue_voice_visibility(hwnd);
+
     SendMessageW(
         checkbox_audio_split_requires_newline,
         BM_SETCHECK,
@@ -3048,6 +3168,25 @@ unsafe fn update_tts_manual_visibility(hwnd: HWND) {
     EnableWindow(edit_volume, manual);
 }
 
+unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
+    let (checkbox, label, combo, button) = match with_options_state(hwnd, |state| {
+        (
+            state.checkbox_use_dialogue_voice,
+            state.label_dialogue_voice,
+            state.combo_dialogue_voice,
+            state.button_dialogue_voice_preview,
+        )
+    }) {
+        Some(values) => values,
+        None => return,
+    };
+    let enabled =
+        SendMessageW(checkbox, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 == BST_CHECKED.0;
+    EnableWindow(label, enabled);
+    EnableWindow(combo, enabled);
+    EnableWindow(button, enabled);
+}
+
 fn open_podcastindex_signup() {
     unsafe {
         let url = to_wide("https://api.podcastindex.org/signup");
@@ -3165,6 +3304,141 @@ unsafe fn preview_voice(hwnd: HWND) {
                 rate,
                 pitch,
                 volume,
+                dialogue_voice: None,
+            };
+            tts_engine::start_tts_playback_with_chunks(options);
+        }
+        TtsEngine::Sapi4 => {
+            tts_engine::stop_tts_playback(parent);
+            let voice_idx = if let Some(hash_pos) = voice.find('#') {
+                let rest = &voice[hash_pos + 1..];
+                if let Some(pipe_pos) = rest.find('|') {
+                    rest[..pipe_pos].parse::<i32>().unwrap_or(1)
+                } else {
+                    rest.parse::<i32>().unwrap_or(1)
+                }
+            } else {
+                1
+            };
+            let cancel = Arc::new(AtomicBool::new(false));
+            let (command_tx, command_rx) = mpsc::unbounded_channel();
+            if with_state(parent, |state| {
+                state.tts_session = Some(tts_engine::TtsSession {
+                    id: state.tts_next_session_id,
+                    command_tx,
+                    cancel: cancel.clone(),
+                    paused: false,
+                    initial_caret_pos: 0,
+                });
+                state.tts_next_session_id += 1;
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access state in options_window");
+            }
+            crate::sapi4_engine::play_sapi4(
+                voice_idx, text, rate, pitch, volume, cancel, command_rx,
+            );
+        }
+        TtsEngine::Sapi5 => {
+            tts_engine::stop_tts_playback(parent);
+            let cancel = Arc::new(AtomicBool::new(false));
+            let (command_tx, command_rx) = mpsc::unbounded_channel();
+            if with_state(parent, |state| {
+                state.tts_session = Some(tts_engine::TtsSession {
+                    id: state.tts_next_session_id,
+                    command_tx,
+                    cancel: cancel.clone(),
+                    paused: false,
+                    initial_caret_pos: 0,
+                });
+                state.tts_next_session_id += 1;
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access state in options_window");
+            }
+            if let Err(e) = crate::sapi5_engine::play_sapi(
+                vec![text],
+                voice,
+                rate,
+                pitch,
+                volume,
+                cancel,
+                command_rx,
+            ) {
+                crate::log_debug(&format!("SAPI5 test playback failed: {}", e));
+            }
+        }
+    }
+}
+
+unsafe fn preview_dialogue_voice(hwnd: HWND) {
+    let (parent, combo_tts_engine, combo_dialogue_voice) = match with_options_state(hwnd, |state| {
+        (
+            state.parent,
+            state.combo_tts_engine,
+            state.combo_dialogue_voice,
+        )
+    }) {
+        Some(values) => values,
+        None => return,
+    };
+
+    let language = with_state(parent, |state| state.settings.language).unwrap_or(Language::Italian);
+
+    let text = i18n::tr(language, "tts.preview_text");
+    if text.trim().is_empty() {
+        return;
+    }
+
+    let engine_sel = SendMessageW(combo_tts_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    let engine = match engine_sel {
+        1 => TtsEngine::Sapi5,
+        2 => TtsEngine::Sapi4,
+        _ => TtsEngine::Edge,
+    };
+    let voices = with_state(parent, |state| match engine {
+        TtsEngine::Edge => state.edge_voices.clone(),
+        TtsEngine::Sapi5 => state.sapi_voices.clone(),
+        TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
+    })
+    .unwrap_or_default();
+
+    let voice_sel = SendMessageW(combo_dialogue_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    if voice_sel < 0 {
+        return;
+    }
+    let voice_index = SendMessageW(
+        combo_dialogue_voice,
+        CB_GETITEMDATA,
+        WPARAM(voice_sel as usize),
+        LPARAM(0),
+    )
+    .0 as usize;
+    if voice_index >= voices.len() {
+        return;
+    }
+    let voice = voices[voice_index].short_name.clone();
+
+    // Use default rate/pitch/volume for dialogue voice preview
+    let rate = 0;
+    let pitch = 0;
+    let volume = 100;
+
+    match engine {
+        TtsEngine::Edge => {
+            let chunks = tts_engine::split_into_tts_chunks(&text, false, &[]);
+            let options = tts_engine::TtsPlaybackOptions {
+                hwnd: parent,
+                cleaned: text,
+                voice,
+                chunks,
+                initial_caret_pos: 0,
+                rate,
+                pitch,
+                volume,
+                dialogue_voice: None,
             };
             tts_engine::start_tts_playback_with_chunks(options);
         }
@@ -3257,6 +3531,8 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         edit_podcastindex_secret,
         checkbox_tts_manual,
         checkbox_multilingual,
+        checkbox_use_dialogue_voice,
+        combo_dialogue_voice,
         checkbox_split_on_newline,
         checkbox_word_wrap,
         checkbox_smart_quotes,
@@ -3301,6 +3577,8 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.edit_podcastindex_secret,
             state.checkbox_tts_manual,
             state.checkbox_multilingual,
+            state.checkbox_use_dialogue_voice,
+            state.combo_dialogue_voice,
             state.checkbox_split_on_newline,
             state.checkbox_word_wrap,
             state.checkbox_smart_quotes,
@@ -3600,6 +3878,31 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         }
     }
 
+    // Dialogue voice settings
+    settings.use_dialogue_voice = SendMessageW(
+        checkbox_use_dialogue_voice,
+        BM_GETCHECK,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0 as u32
+        == BST_CHECKED.0;
+
+    let dialogue_voice_sel =
+        SendMessageW(combo_dialogue_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    if dialogue_voice_sel >= 0 {
+        let voice_index = SendMessageW(
+            combo_dialogue_voice,
+            CB_GETITEMDATA,
+            WPARAM(dialogue_voice_sel as usize),
+            LPARAM(0),
+        )
+        .0 as usize;
+        if voice_index < voices.len() {
+            settings.dialogue_voice = voices[voice_index].short_name.clone();
+        }
+    }
+
     let skip_sel = SendMessageW(combo_audio_skip, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     if skip_sel >= 0 {
         let skip_secs = SendMessageW(
@@ -3846,6 +4149,10 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.checkbox_multilingual,
             state.checkbox_tts_manual,
             state.checkbox_split_on_newline,
+            state.checkbox_use_dialogue_voice,
+            state.label_dialogue_voice,
+            state.combo_dialogue_voice,
+            state.button_dialogue_voice_preview,
         ] {
             ShowWindow(control, if show_voice { SW_SHOW } else { SW_HIDE });
         }
@@ -3908,6 +4215,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
         update_subtitle_ducking_visibility(hwnd);
     } else if index == OPTIONS_TAB_VOICE {
         update_tts_manual_visibility(hwnd);
+        update_dialogue_voice_visibility(hwnd);
     } else if let Some((label, edit, checkbox)) = with_options_state(hwnd, |state| {
         (
             state.label_audio_split_text,

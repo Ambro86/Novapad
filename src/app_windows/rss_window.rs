@@ -87,6 +87,7 @@ const FEED_ES_DATA: &str = include_str!("../../i18n/feed_es.txt");
 const FEED_PT_DATA: &str = include_str!("../../i18n/feed_pt.txt");
 const FEED_VI_DATA: &str = include_str!("../../i18n/feed_vi.txt");
 const FEED_CS_DATA: &str = include_str!("../../i18n/feed_cs.txt");
+const FEED_PL_DATA: &str = include_str!("../../i18n/feed_pl.txt");
 const EM_SETSEL: u32 = 0x00B1;
 const EM_SCROLLCARET: u32 = 0x00B7;
 const EM_LIMITTEXT: u32 = 0x00C5;
@@ -440,6 +441,7 @@ fn default_feed_path(language: crate::settings::Language) -> Option<PathBuf> {
         crate::settings::Language::Swedish => "feed_en.txt",
         crate::settings::Language::Vietnamese => "feed_vi.txt",
         crate::settings::Language::Czech => "feed_cs.txt",
+        crate::settings::Language::Polish => "feed_pl.txt",
     };
     let exe_dir = std::env::current_exe()
         .ok()
@@ -463,6 +465,7 @@ fn embedded_default_feeds(language: crate::settings::Language) -> &'static str {
         crate::settings::Language::Swedish => FEED_EN_DATA,
         crate::settings::Language::Vietnamese => FEED_VI_DATA,
         crate::settings::Language::Czech => FEED_CS_DATA,
+        crate::settings::Language::Polish => FEED_PL_DATA,
     }
 }
 
@@ -520,6 +523,10 @@ fn is_default_key(
             .any(|k| normalize_rss_url_key(k) == key),
         crate::settings::Language::Czech => settings
             .rss_default_cs_keys
+            .iter()
+            .any(|k| normalize_rss_url_key(k) == key),
+        crate::settings::Language::Polish => settings
+            .rss_default_pl_keys
             .iter()
             .any(|k| normalize_rss_url_key(k) == key),
     }
@@ -704,6 +711,12 @@ unsafe fn ensure_default_sources(parent: HWND) {
                 &mut s.settings.rss_sources,
                 &s.settings.rss_removed_default_cs,
                 &mut s.settings.rss_default_cs_keys,
+                &defaults,
+            ),
+            crate::settings::Language::Polish => apply_default_sources(
+                &mut s.settings.rss_sources,
+                &s.settings.rss_removed_default_pl,
+                &mut s.settings.rss_default_pl_keys,
                 &defaults,
             ),
         };
@@ -2914,6 +2927,7 @@ unsafe fn handle_delete(hwnd: HWND) {
                         | crate::settings::Language::Portuguese
                         | crate::settings::Language::Vietnamese
                         | crate::settings::Language::Czech
+                        | crate::settings::Language::Polish
                 ) {
                     let defaults = load_default_feeds(language);
                     if !defaults.is_empty() {
@@ -2947,6 +2961,9 @@ unsafe fn handle_delete(hwnd: HWND) {
                                 }
                                 crate::settings::Language::Czech => {
                                     &mut ps.settings.rss_removed_default_en
+                                }
+                                crate::settings::Language::Polish => {
+                                    &mut ps.settings.rss_removed_default_pl
                                 }
                             };
                             let already =

@@ -1,0 +1,125 @@
+Przewodnik po programie
+
+Plik:
+
+ Nowy: Utwórz nowy dokument (Ctrl+N).
+ Otwórz: Otwórz pliki tekstowe, PDF, EPUB, MP3 i inne obsługiwane formaty (Ctrl+O).
+ Zapisz: Zapisz dokument (Ctrl+S).
+ Zapisz jako: Zapisz pod nową nazwą.
+ Zapisz wszystko: Zapisz wszystkie dokumenty (Ctrl+Shift+S).
+ Zamknij kartę: Zamknij bieżący dokument (Ctrl+W).
+ Ostatnie pliki: Otwórz ostatnio używany plik.
+ Czytanie: F5 Rozpocznij czytanie, F4 Pauza/Wznów, F6 Zatrzymaj czytanie.
+ Ulubione podczas czytania: F9 poprzedni ulubiony głos, F10 następny ulubiony głos.
+ Nagraj audiobook: Utwórz plik MP3 z bieżącego tekstu (Ctrl+R).
+ Nagraj podcast: Nagraj podcast z mikrofonu i/lub dźwięku systemowego (Ctrl+Shift+R).
+
+Audiobooki MP3:
+Po otwarciu pliku MP3, Novapad działa jako odtwarzacz audio.
+Sterowanie klawiaturą:
+
+ SPACJA: Odtwarzaj / Pauza.
+ STRZAŁKA W PRAWO: Przewiń do przodu o 1 minutę.
+ STRZAŁKA W LEWO: Przewiń do tyłu o 1 minutę.
+ STRZAŁKA W GÓRĘ: Zwiększ głośność.
+ STRZAŁKA W DÓŁ: Zmniejsz głośność.
+ +: Zwiększ prędkość odtwarzania.
+ -: Zmniejsz prędkość odtwarzania.
+ CTRL+I: Ogłoś czas odtwarzania.
+ CTRL+T: Idź do określonego czasu.
+ CTRL+B: Wstaw zakładkę w dokładnym czasie.
+
+Edycja:
+
+ Cofnij: Cofnij ostatnią operację (Ctrl+Z).
+ Wytnij: Usuń zaznaczony tekst i skopiuj go do schowka (Ctrl+X).
+ Kopiuj: Skopiuj zaznaczony tekst do schowka (Ctrl+C).
+ Wklej: Wklej zawartość schowka do dokumentu (Ctrl+V).
+ Zaznacz wszystko: Zaznacz cały tekst (Ctrl+A).
+ Znajdź: Szukaj tekstu w dokumencie (Ctrl+F).
+ Znajdź w plikach: Szukaj tekstu w wielu plikach (Ctrl+Shift+F).
+ Znajdź następny: Znajdź następne wystąpienie (F3).
+ Zamień: Znajdź i zamień tekst (Ctrl+H).
+ Normalizuj białe znaki: Przytnij krawędzie linii i zredukuj ciągi spacji (Ctrl+Shift+Enter).
+ Połącz linie: Połącz linie w akapicie lub zaznaczeniu (Ctrl+Shift+J).
+ Twarde łamanie wiersza: Przeformatuj akapit lub zaznaczenie (Ctrl+Shift+H).
+ Usuń znaczniki Markdown: Usuń znaczniki Markdown (Ctrl+Shift+M).
+ Sortuj elementy: Sortuj linie akapitu lub zaznaczenia (Alt+Shift+O).
+ Zachowaj unikalne elementy: Usuń zduplikowane linie w akapicie lub zaznaczeniu (Alt+Shift+K).
+ Odwróć kolejność elementów: Odwróć linie w akapicie lub zaznaczeniu (Alt+Shift+Z).
+ Cytuj linie: Dodaj prefiks do linii w akapicie lub zaznaczeniu (Ctrl+Q).
+ Usuń cytowanie linii: Usuń prefiks z linii w akapicie lub zaznaczeniu (Ctrl+Shift+Q).
+ Statystyki tekstu: Pokaż znaki, słowa i linie dla zaznaczenia lub dokumentu (Alt+Y).
+ Nawigacja sprawdzania pisowni: F7 poprzedni błąd, F8 następny błąd.
+
+Widok:
+
+ Pokaż głosy w edytorze: Pokaż system głosowy, listę głosów i filtr wielojęzyczny.
+ Pokaż ulubione głosy: Pokaż listę ulubionych głosów w edytorze.
+ Kolor tekstu: Zmień kolor tekstu (w tym jasne i ciemne kolory).
+ Rozmiar tekstu: Zmień rozmiar tekstu (mały, normalny, duży, bardzo duży, ekstra duży).
+ Gdy lista wpisów jest widoczna, naciśnięcie Tab przenosi fokus między edytorem a kontrolkami, a Shift+Tab cofa go.
+ Aby dodać lub usunąć wpis z ulubionych, użyj Tab, aby przejść do listy wpisów i dodaj lub usuń go za pomocą klawisza Aplikacji lub prawego przycisku myszy. Z listy ulubionych wpisów można również nacisnąć klawisz Aplikacji, aby usunąć już dodane wpisy.
+ Skróty klawiszowe: można nacisnąć F9 i F10, aby przełączać się między wpisami podczas czytania, cyklicznie przechodząc przez te dodane do ulubionych.
+
+Wstaw:
+
+ Wstaw zakładkę: Zapisz bieżącą pozycję kursora lub czas audiobooka (Ctrl+B).
+ Zarządzaj zakładkami: Wyświetl, przejdź do lub usuń zapisane zakładki. Podczas otwierania pliku z zakładkami, kursor lub odtwarzanie automatycznie wznowi się od pierwszej dostępnej.
+
+Narzędzia:
+
+ Audiobooki wsadowo: otwiera okno do konwersji listy plików (lub całych folderów) na audiobooki.
+ Dodaj pliki/foldery do kolejki.
+ Wybierz folder docelowy i format (MP3 lub WAV).
+ Opcje tworzenia podfolderów i unikania nadpisywania.
+ Naciśnij Start, aby przetworzyć wszystko w tle.
+
+
+ Słownik: Otwórz okno słownika. Po liście porusza się za pomocą strzałek Góra/Dół.
+ Tab przenosi do przycisku "Dodaj wpisy do słownika", aktywowanego Enterem lub Spacją.
+ W oknie dodawania/edycji: wprowadź "Oryginalne słowo", następnie Tab do "Słowo zamienne", a następnie OK lub Anuluj (Enter/Spacja). ESC anuluje.
+ Na liście Tab przenosi do "Edytuj wpis" i "Usuń wybrany wpis".
+ Zamiany słownikowe są stosowane podczas czytania i tworzenia audiobooków oraz są zapisywane.
+
+
+ Importuj transkrypcję YouTube: wklej adres URL, wybierz język i zaimportuj tekst do edytora (Ctrl+Y). Opcjonalne znaczniki czasu.
+ Szukaj i importuj z Wikipedii: wyszukaj artykuł w Wikipedii i zaimportuj jego tekst do edytora (Alt+Shift+W).
+ Słownik online: szukaj definicji i tłumaczeń w internetowym Wikisłowniku (Alt+Shift+D).
+ Dostępny terminal: otwiera dedykowany terminal ze stabilnym wyjściem dla czytników ekranu (Ctrl+Shift+T).
+ Skróty: Alt+I aktywuje wejście, Alt+O aktywuje wyjście, Tab/Shift+Tab przenosi między wejściem, wyjściem i opcjami.
+ Enter wysyła wejście. Ctrl+C kopiuje wyjście (lub wysyła Ctrl+C do programu). Ctrl+L czyści wyjście po potwierdzeniu.
+ Opcje terminala: autoprzewijanie, usuwanie ANSI, ogłaszanie nowych linii, sygnał po 1s bezczynności, zapobieganie uśpieniu.
+ Wybór programu: Wiersz polecenia (cmd.exe), PowerShell, Codex CLI (z Opcji).
+
+
+
+RSS / Artykuły:
+Otwiera okno RSS/Artykuły, pozwala dodawać źródła, rozwijać kanał i nacisnąć Enter, aby zaimportować artykuł do edytora.
+
+ W oknie RSS wybierz kanał lub stronę i naciśnij Delete, aby usunąć je z biblioteki.
+ Z menu kontekstowego kanału lub strony można edytować lub usunąć RSS lub stronę.
+ Po zaimportowaniu artykułu RSS naciśnij Esc, aby powrócić do listy RSS.
+ Podcasty: otwiera okno Podcasty do wyszukiwania i zarządzania subskrypcjami.
+ Na liście odcinków naciśnij Enter, aby odtworzyć odcinek.
+ Podczas odtwarzania Esc zatrzymuje podcast i powraca do biblioteki.
+
+
+
+Opcje:
+
+ Język: Zmień język interfejsu.
+ Zachowanie przy otwieraniu: Otwórz pliki w nowej karcie lub nowym oknie.
+ Głos: Wybierz głos do czytania.
+ Głosy wielojęzyczne: Filtruj listę głosów.
+ Wybierz ton, prędkość i głośność: Ustaw ton, prędkość i głośność dla głosów (zarówno Microsoft, jak i SAPI5). Dotyczy czytania i audiobooków.
+ Przesuwaj kursor podczas czytania: Wizualnie śledź tekst podczas jego odczytywania.
+ Podział audiobooka według tekstu: Podziel, gdy znacznik pojawi się na początku linii (wielkość liter ma znaczenie: "Rozdział" i "rozdział" to co innego). Przykład: przy "Rozdział" tworzy jedną część na rozdział, w tym autora i wstęp w pierwszej części aż do pierwszego Rozdziału. Jeśli nie znaleziono, brak podziału.
+ Inne opcje podziału audiobooka: 2 części, 4 części, 6 części, 8 części.
+
+Pomoc:
+
+ Przewodnik: Otwórz ten przewodnik (F1).
+ Sprawdź aktualizacje: Sprawdź, czy dostępne są aktualizacje (F2).
+ Dziennik zmian: Otwórz okno dziennika zmian.
+ O programie: Pokaż informacje o programie.

@@ -285,6 +285,7 @@ struct OptionsLabels {
     lang_sv: String,
     lang_vi: String,
     lang_cs: String,
+    lang_pl: String,
     marker_position_end: String,
     marker_position_beginning: String,
     open_new_tab: String,
@@ -384,6 +385,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         lang_sv: i18n::tr(language, "options.lang.sv"),
         lang_vi: i18n::tr(language, "options.lang.vi"),
         lang_cs: i18n::tr(language, "options.lang.cs"),
+        lang_pl: i18n::tr(language, "options.lang.pl"),
         marker_position_end: i18n::tr(language, "options.modified_marker_position.end"),
         marker_position_beginning: i18n::tr(language, "options.modified_marker_position.beginning"),
         open_new_tab: i18n::tr(language, "options.open.new_tab"),
@@ -2168,6 +2170,12 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         WPARAM(0),
         LPARAM(to_wide(&labels.lang_cs).as_ptr() as isize),
     );
+    SendMessageW(
+        combo_lang,
+        CB_ADDSTRING,
+        WPARAM(0),
+        LPARAM(to_wide(&labels.lang_pl).as_ptr() as isize),
+    );
 
     let lang_index = match settings.language {
         Language::Italian => 0,
@@ -2177,6 +2185,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         Language::Swedish => 4,
         Language::Vietnamese => 5,
         Language::Czech => 6,
+        Language::Polish => 7,
     };
     SendMessageW(combo_lang, CB_SETCURSEL, WPARAM(lang_index), LPARAM(0));
 
@@ -2508,6 +2517,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         (labels.spellcheck_lang_pt_br.clone(), "pt-BR"),
         (labels.spellcheck_lang_fr.clone(), "fr-FR"),
         (labels.spellcheck_lang_de.clone(), "de-DE"),
+        ("Polski (Polska)".to_string(), "pl-PL"),
     ];
     let mut selected_idx = 0;
     let current_val = if settings.spellcheck_language_mode
@@ -2553,6 +2563,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         (labels.lang_sv.clone(), "sv"),
         (labels.lang_vi.clone(), "vi"),
         (labels.lang_cs.clone(), "cs"),
+        (labels.lang_pl.clone(), "pl"),
     ];
     let current_dict_lang = settings
         .dictionary_translation_language
@@ -2592,6 +2603,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         (labels.lang_sv.clone(), "sv"),
         (labels.lang_vi.clone(), "vi"),
         (labels.lang_cs.clone(), "cs"),
+        (labels.lang_pl.clone(), "pl"),
     ];
     let current_wikipedia_lang = settings.wikipedia_language.trim().to_ascii_lowercase();
     let mut wiki_selected_idx = 0;
@@ -3339,6 +3351,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         4 => Language::Swedish,
         5 => Language::Vietnamese,
         6 => Language::Czech,
+        7 => Language::Polish,
         _ => Language::Italian,
     };
 
@@ -3452,6 +3465,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             5 => "pt-BR",
             6 => "fr-FR",
             7 => "de-DE",
+            8 => "pl-PL",
             _ => "en-US",
         };
         settings.spellcheck_fixed_language = val.to_string();
@@ -3464,7 +3478,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         LPARAM(0),
     )
     .0;
-    let dict_values = ["auto", "none", "it", "en", "es", "pt", "vi"];
+    let dict_values = ["auto", "none", "it", "en", "es", "pt", "vi", "cs", "pl"];
     settings.dictionary_translation_language = if dict_sel >= 0 {
         dict_values
             .get(dict_sel as usize)
@@ -3475,7 +3489,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     };
 
     let wiki_sel = SendMessageW(combo_wikipedia_language, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-    let wiki_values = ["auto", "it", "en", "es", "pt", "vi"];
+    let wiki_values = ["auto", "it", "en", "es", "pt", "vi", "cs", "pl"];
     settings.wikipedia_language = if wiki_sel >= 0 {
         wiki_values
             .get(wiki_sel as usize)

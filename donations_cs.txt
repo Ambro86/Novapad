@@ -1,8 +1,8 @@
-Dary
+Příspěvek na vývoj
 
 Novapad je program, který byl původně vytvořen pro osobní potřeby, ale postupem času stále více rostl. Jeho vývoj vyžaduje neustálou práci na vylepšování funkcí, opravování chyb, hledání nových nápadů a pečlivé testování všech funkcí.
 
-Pokud považujete tento program za užitečný a chcete podpořit jeho vývoj, můžete přispět darem.
+Pokud považujete tento program za užitečný a chcete podpořit jeho vývoj, můžete finančně přispět.
 
 PayPal
 

@@ -116,6 +116,8 @@ pub enum Language {
     Vietnamese,
     #[serde(rename = "cs")]
     Czech,
+    #[serde(rename = "pl")]
+    Polish,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -281,6 +283,10 @@ pub struct AppSettings {
     #[serde(default)]
     pub rss_default_cs_keys: Vec<String>,
     #[serde(default)]
+    pub rss_removed_default_pl: Vec<String>,
+    #[serde(default)]
+    pub rss_default_pl_keys: Vec<String>,
+    #[serde(default)]
     pub rss_global_max_concurrency: usize,
     #[serde(default)]
     pub rss_per_host_max_concurrency: usize,
@@ -396,6 +402,8 @@ impl Default for AppSettings {
             rss_default_vi_keys: Vec::new(),
             rss_removed_default_cs: Vec::new(),
             rss_default_cs_keys: Vec::new(),
+            rss_removed_default_pl: Vec::new(),
+            rss_default_pl_keys: Vec::new(),
             podcast_sources: Vec::new(),
             rss_global_max_concurrency: 8,
             rss_per_host_max_concurrency: 2,
@@ -544,6 +552,9 @@ fn system_language() -> Language {
         }
         if lower.starts_with("cs") {
             return Language::Czech;
+        }
+        if lower.starts_with("pl") {
+            return Language::Polish;
         }
         return Language::English;
     }

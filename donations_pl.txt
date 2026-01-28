@@ -1,4 +1,4 @@
-Darowizny
+﻿Darowizny
 
 Novapad to program, który powstał początkowo na własne potrzeby, ale z czasem coraz bardziej się rozwinął. Jego rozwój wymaga ciągłej pracy nad ulepszaniem funkcji, naprawianiem błędów, poszukiwaniem nowych pomysłów i starannym testowaniem wszystkich mechanizmów.
 Jeśli uważasz ten program za przydatny i chcesz wesprzeć jego rozwój, możesz przekazać darowiznę.
@@ -14,3 +14,7 @@ IBAN: IT77W0306901020100000064149
 Proszę, jeśli to możliwe, wpisz jasny tytuł przelewu, na przykład „Novapad”.
 
 Każdy, kto wesprze projekt, zostanie wymieniony w programie oraz w repozytorium GitHub, chyba że woli pozostać anonimowy lub użyć pseudonimu.
+
+Dziękujemy Jiri Holzingerowi i Paola Vagata za wkład.
+Za tłumaczenie na wietnamski dziękujemy Anh Đức Nguyễn.
+Za tłumaczenie na czeski dziękujemy Radkowi Žaludowi i Jiri Holzingerowi.

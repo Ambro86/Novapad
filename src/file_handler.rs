@@ -27,6 +27,13 @@ pub fn is_docx_path(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
+pub fn is_odt_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.eq_ignore_ascii_case("odt"))
+        .unwrap_or(false)
+}
+
 pub fn is_doc_path(path: &Path) -> bool {
     path.extension()
         .and_then(|s| s.to_str())
@@ -52,6 +59,13 @@ pub fn is_ppt_path(path: &Path) -> bool {
     path.extension()
         .and_then(|s| s.to_str())
         .map(|s| s.eq_ignore_ascii_case("ppt"))
+        .unwrap_or(false)
+}
+
+pub fn is_odp_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.eq_ignore_ascii_case("odp"))
         .unwrap_or(false)
 }
 
@@ -533,6 +547,136 @@ fn read_pptx_text(path: &Path, language: Language) -> Result<String, String> {
         out.push_str(trimmed);
     }
     Ok(out)
+}
+
+pub fn read_odp_text(path: &Path, language: Language) -> Result<String, String> {
+    let file = std::fs::File::open(path).map_err(|err| error_open_file_message(language, err))?;
+    let mut archive = ZipArchive::new(file).map_err(|err| {
+        i18n::tr_f(
+            language,
+            "file_handler.file_read_error",
+            &[("err", &err.to_string())],
+        )
+    })?;
+    let mut file = archive.by_name("content.xml").map_err(|err| {
+        i18n::tr_f(
+            language,
+            "file_handler.file_read_error",
+            &[("err", &err.to_string())],
+        )
+    })?;
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes).map_err(|err| {
+        i18n::tr_f(
+            language,
+            "file_handler.file_read_error",
+            &[("err", &err.to_string())],
+        )
+    })?;
+    let xml = String::from_utf8_lossy(&bytes);
+    Ok(extract_odf_text(&xml))
+}
+
+pub fn read_odt_text(path: &Path, language: Language) -> Result<String, String> {
+    let file = std::fs::File::open(path).map_err(|err| error_open_file_message(language, err))?;
+    let mut archive = ZipArchive::new(file).map_err(|err| {
+        i18n::tr_f(
+            language,
+            "file_handler.file_read_error",
+            &[("err", &err.to_string())],
+        )
+    })?;
+    let mut file = archive.by_name("content.xml").map_err(|err| {
+        i18n::tr_f(
+            language,
+            "file_handler.file_read_error",
+            &[("err", &err.to_string())],
+        )
+    })?;
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes).map_err(|err| {
+        i18n::tr_f(
+            language,
+            "file_handler.file_read_error",
+            &[("err", &err.to_string())],
+        )
+    })?;
+    let xml = String::from_utf8_lossy(&bytes);
+    Ok(extract_odf_text(&xml))
+}
+
+fn extract_odf_text(xml: &str) -> String {
+    let mut reader = XmlReader::from_str(xml);
+    reader.config_mut().trim_text(true);
+    let mut buf = Vec::new();
+    let mut out = String::new();
+    let mut paragraph_has_text = false;
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                let name = e.name();
+                if name.as_ref() == b"text:p" || name.as_ref() == b"text:h" {
+                    paragraph_has_text = false;
+                }
+            }
+            Ok(Event::End(e)) => {
+                let name = e.name();
+                if (name.as_ref() == b"text:p" || name.as_ref() == b"text:h")
+                    && paragraph_has_text
+                    && !out.ends_with('\n')
+                {
+                    out.push('\n');
+                }
+            }
+            Ok(Event::Empty(e)) => {
+                let name = e.name();
+                if name.as_ref() == b"text:line-break" {
+                    if !out.ends_with('\n') {
+                        out.push('\n');
+                    }
+                } else if name.as_ref() == b"text:tab" {
+                    out.push('\t');
+                    paragraph_has_text = true;
+                } else if name.as_ref() == b"text:s" {
+                    let mut count = 1usize;
+                    for attr in e.attributes().flatten() {
+                        if attr.key.as_ref() == b"text:c"
+                            && let Ok(val) = attr.unescape_value()
+                            && let Ok(parsed) = val.parse::<usize>()
+                        {
+                            count = parsed.max(1);
+                        }
+                    }
+                    for _ in 0..count {
+                        out.push(' ');
+                    }
+                    paragraph_has_text = true;
+                }
+            }
+            Ok(Event::Text(e)) => {
+                let text = e.decode().unwrap_or_default();
+                if !text.is_empty() {
+                    out.push_str(&text);
+                    paragraph_has_text = true;
+                }
+            }
+            Ok(Event::CData(e)) => {
+                let text = String::from_utf8_lossy(e.as_ref());
+                if !text.is_empty() {
+                    out.push_str(&text);
+                    paragraph_has_text = true;
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(_) => break,
+            _ => {}
+        }
+        buf.clear();
+    }
+    while out.ends_with('\n') {
+        out.pop();
+    }
+    out
 }
 
 fn pptx_slide_number(name: &str) -> Option<u32> {

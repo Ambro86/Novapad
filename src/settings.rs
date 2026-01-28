@@ -87,6 +87,8 @@ pub enum FileFormat {
     Html,
     Ppt,
     Pptx,
+    Odp,
+    Odt,
     Audiobook,
 }
 

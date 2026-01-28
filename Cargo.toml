@@ -24,6 +24,11 @@ description = "Novapad Word Document"
 name = "Novapad Word Document"
 
 [[package.metadata.packager.file_associations]]
+extensions = ["odt"]
+description = "Novapad OpenDocument Text"
+name = "Novapad OpenDocument Text"
+
+[[package.metadata.packager.file_associations]]
 extensions = ["epub"]
 description = "Novapad EPUB Document"
 name = "Novapad EPUB Document"
@@ -47,6 +52,11 @@ name = "Novapad HTML Document"
 extensions = ["ppt", "pptx"]
 description = "Novapad PowerPoint Document"
 name = "Novapad PowerPoint Document"
+
+[[package.metadata.packager.file_associations]]
+extensions = ["odp"]
+description = "Novapad OpenDocument Presentation"
+name = "Novapad OpenDocument Presentation"
 
 [[package.metadata.packager.file_associations]]
 extensions = ["py", "java", "js", "rb", "pl", "php", "lua", "ps1", "sh"]
@@ -80,6 +90,7 @@ extensions = [
   "wma",
   "aiff",
   "m4b",
+  "wav",
 ]
 description = "Novapad Audio File"
 name = "Novapad Audio File"

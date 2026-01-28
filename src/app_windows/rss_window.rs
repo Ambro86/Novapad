@@ -86,6 +86,7 @@ const FEED_IT_DATA: &str = include_str!("../../i18n/feed_it.txt");
 const FEED_ES_DATA: &str = include_str!("../../i18n/feed_es.txt");
 const FEED_PT_DATA: &str = include_str!("../../i18n/feed_pt.txt");
 const FEED_VI_DATA: &str = include_str!("../../i18n/feed_vi.txt");
+const FEED_CS_DATA: &str = include_str!("../../i18n/feed_cs.txt");
 const EM_SETSEL: u32 = 0x00B1;
 const EM_SCROLLCARET: u32 = 0x00B7;
 const EM_LIMITTEXT: u32 = 0x00C5;
@@ -438,7 +439,7 @@ fn default_feed_path(language: crate::settings::Language) -> Option<PathBuf> {
         crate::settings::Language::Portuguese => "feed_pt.txt",
         crate::settings::Language::Swedish => "feed_en.txt",
         crate::settings::Language::Vietnamese => "feed_vi.txt",
-        crate::settings::Language::Czech => "feed_en.txt",
+        crate::settings::Language::Czech => "feed_cs.txt",
     };
     let exe_dir = std::env::current_exe()
         .ok()
@@ -461,7 +462,7 @@ fn embedded_default_feeds(language: crate::settings::Language) -> &'static str {
         crate::settings::Language::Portuguese => FEED_PT_DATA,
         crate::settings::Language::Swedish => FEED_EN_DATA,
         crate::settings::Language::Vietnamese => FEED_VI_DATA,
-        crate::settings::Language::Czech => FEED_EN_DATA,
+        crate::settings::Language::Czech => FEED_CS_DATA,
     }
 }
 
@@ -518,7 +519,7 @@ fn is_default_key(
             .iter()
             .any(|k| normalize_rss_url_key(k) == key),
         crate::settings::Language::Czech => settings
-            .rss_default_en_keys
+            .rss_default_cs_keys
             .iter()
             .any(|k| normalize_rss_url_key(k) == key),
     }
@@ -701,8 +702,8 @@ unsafe fn ensure_default_sources(parent: HWND) {
             ),
             crate::settings::Language::Czech => apply_default_sources(
                 &mut s.settings.rss_sources,
-                &s.settings.rss_removed_default_en,
-                &mut s.settings.rss_default_en_keys,
+                &s.settings.rss_removed_default_cs,
+                &mut s.settings.rss_default_cs_keys,
                 &defaults,
             ),
         };

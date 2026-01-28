@@ -101,9 +101,18 @@ fn ensure_tts_cache(
                 let rt = tokio::runtime::Runtime::new()
                     .map_err(|e| format!("Subtitle: failed to create runtime: {}", e))?;
                 let request_id = uuid::Uuid::new_v4().simple().to_string();
+                let is_dialogue = tts_engine::detect_dialogue_in_text(text);
+                let voice = if is_dialogue
+                    && settings.use_dialogue_voice
+                    && !settings.dialogue_voice.is_empty()
+                {
+                    &settings.dialogue_voice
+                } else {
+                    &settings.tts_voice
+                };
                 match rt.block_on(tts_engine::download_audio_chunk(
                     text,
-                    &settings.tts_voice,
+                    voice,
                     &request_id,
                     settings.tts_rate,
                     settings.tts_pitch,
@@ -124,6 +133,13 @@ fn ensure_tts_cache(
                 let options = sapi5_engine::SapiExportOptions {
                     chunks: &[text.to_string()],
                     voice_name: &settings.tts_voice,
+                    dialogue_voice: if settings.use_dialogue_voice
+                        && !settings.dialogue_voice.is_empty()
+                    {
+                        Some(settings.dialogue_voice.clone())
+                    } else {
+                        None
+                    },
                     output_path: &path,
                     language: settings.language,
                     rate: settings.tts_rate,

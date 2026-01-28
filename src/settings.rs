@@ -191,6 +191,10 @@ pub struct AppSettings {
     pub modified_marker_position: ModifiedMarkerPosition,
     pub tts_engine: TtsEngine,
     pub tts_voice: String,
+    #[serde(default)]
+    pub use_dialogue_voice: bool,
+    #[serde(default)]
+    pub dialogue_voice: String,
     pub tts_only_multilingual: bool,
     pub tts_manual_tuning: bool,
     pub split_on_newline: bool,
@@ -335,6 +339,8 @@ impl Default for AppSettings {
             modified_marker_position: ModifiedMarkerPosition::End,
             tts_engine: TtsEngine::Edge,
             tts_voice: "it-IT-IsabellaNeural".to_string(),
+            use_dialogue_voice: false,
+            dialogue_voice: String::new(),
             tts_only_multilingual: false,
             tts_manual_tuning: false,
             split_on_newline: false,

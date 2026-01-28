@@ -10,6 +10,7 @@ const SV_JSON: &str = include_str!("../i18n/sv.json");
 const VI_JSON: &str = include_str!("../i18n/vi.json");
 const CS_JSON: &str = include_str!("../i18n/cs.json");
 const PL_JSON: &str = include_str!("../i18n/pl.json");
+const FR_JSON: &str = include_str!("../i18n/fr.json");
 
 fn load_map(raw: &str) -> HashMap<String, String> {
     let mut map: HashMap<String, String> = serde_json::from_str(raw).unwrap_or_default();
@@ -132,6 +133,43 @@ fn load_pl_map() -> HashMap<String, String> {
     load_map(PL_JSON)
 }
 
+fn load_fr_map() -> HashMap<String, String> {
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(dir) = exe_path.parent() {
+            let override_path = dir.join("fr.json");
+            if override_path.exists() {
+                match std::fs::read_to_string(&override_path) {
+                    Ok(content) => {
+                        match serde_json::from_str::<HashMap<String, String>>(&content) {
+                            Ok(mut map) => {
+                                for value in map.values_mut() {
+                                    if value.contains("\\n") {
+                                        *value = value.replace("\\n", "\n");
+                                    }
+                                }
+                                return map;
+                            }
+                            Err(err) => {
+                                crate::log_debug(&format!(
+                                    "Failed to parse French translation override: {err}"
+                                ));
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        crate::log_debug(&format!(
+                            "Failed to read French translation override: {err}"
+                        ));
+                    }
+                }
+            }
+        }
+    } else {
+        crate::log_debug("Failed to resolve executable path for French translation override.");
+    }
+    load_map(FR_JSON)
+}
+
 fn map_for_language(language: Language) -> &'static HashMap<String, String> {
     static EN: OnceLock<HashMap<String, String>> = OnceLock::new();
     static IT: OnceLock<HashMap<String, String>> = OnceLock::new();
@@ -141,6 +179,7 @@ fn map_for_language(language: Language) -> &'static HashMap<String, String> {
     static VI: OnceLock<HashMap<String, String>> = OnceLock::new();
     static CS: OnceLock<HashMap<String, String>> = OnceLock::new();
     static PL: OnceLock<HashMap<String, String>> = OnceLock::new();
+    static FR: OnceLock<HashMap<String, String>> = OnceLock::new();
     match language {
         Language::Italian => IT.get_or_init(|| load_map(IT_JSON)),
         Language::Spanish => ES.get_or_init(|| load_map(ES_JSON)),
@@ -149,6 +188,7 @@ fn map_for_language(language: Language) -> &'static HashMap<String, String> {
         Language::Vietnamese => VI.get_or_init(|| load_map(VI_JSON)),
         Language::Czech => CS.get_or_init(load_cs_map),
         Language::Polish => PL.get_or_init(load_pl_map),
+        Language::French => FR.get_or_init(load_fr_map),
         Language::English => EN.get_or_init(|| load_map(EN_JSON)),
     }
 }

@@ -561,6 +561,7 @@ fn language_to_code(language: Language) -> &'static str {
         Language::Vietnamese => "vi",
         Language::Czech => "cs",
         Language::Polish => "pl",
+        Language::French => "fr",
     }
 }
 
@@ -584,6 +585,7 @@ fn translation_target(language: Language, preference: &str) -> Option<String> {
         "vi" => "vi",
         "cs" => "cs",
         "pl" => "pl",
+        "fr" => "fr",
         _ => {
             return match language {
                 Language::English => None,

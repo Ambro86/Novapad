@@ -27,6 +27,7 @@ const DONATIONS_PT: &str = include_str!("../../donations_pt.txt");
 const DONATIONS_SV: &str = include_str!("../../donations_sv.txt");
 const DONATIONS_CS: &str = include_str!("../../donations_cs.txt");
 const DONATIONS_PL: &str = include_str!("../../donations_pl.txt");
+const DONATIONS_FR: &str = include_str!("../../donations_fr.txt");
 
 fn read_override_text(file_name: &str) -> Option<String> {
     let exe_path = match std::env::current_exe() {
@@ -246,6 +247,8 @@ unsafe extern "system" fn help_wndproc(
                         .unwrap_or_else(|| include_str!("../../guida_cs.txt").to_string()),
                     Language::Polish => read_override_text("guida_pl.txt")
                         .unwrap_or_else(|| include_str!("../../guida_pl.txt").to_string()),
+                    Language::French => read_override_text("guida_fr.txt")
+                        .unwrap_or_else(|| include_str!("../../guida_fr.txt").to_string()),
                 },
                 HelpWindowKind::Changelog => match init.language {
                     Language::Italian => include_str!("../../CHANGELOG_IT.md").to_string(),
@@ -255,7 +258,8 @@ unsafe extern "system" fn help_wndproc(
                     Language::Swedish => include_str!("../../CHANGELOG.md").to_string(),
                     Language::Vietnamese => include_str!("../../CHANGELOG_VI.md").to_string(),
                     Language::Czech => include_str!("../../CHANGELOG.md").to_string(),
-                    Language::Polish => include_str!("../../CHANGELOG.md").to_string(),
+                    Language::Polish => include_str!("../../CHANGELOG_PL.md").to_string(),
+                    Language::French => include_str!("../../CHANGELOG_FR.md").to_string(),
                 },
                 HelpWindowKind::Donations => donations_content(init.language),
             };
@@ -397,6 +401,9 @@ fn donations_content(language: Language) -> String {
         }
         Language::Polish => {
             read_override_text("donations_pl.txt").unwrap_or_else(|| DONATIONS_PL.to_string())
+        }
+        Language::French => {
+            read_override_text("donations_fr.txt").unwrap_or_else(|| DONATIONS_FR.to_string())
         }
     }
 }

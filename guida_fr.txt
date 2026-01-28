@@ -1,0 +1,118 @@
+Guide du programme
+
+Menu Fichier :
+
+ Nouveau : Crée un nouveau document (Ctrl+N).
+ Ouvrir : Ouvre des fichiers texte, PDF, EPUB, MP3 et d'autres formats pris en charge (Ctrl+O).
+ Enregistrer : Enregistre le document (Ctrl+S).
+ Enregistrer sous : Enregistre avec un nouveau nom.
+ Enregistrer tout : Enregistre tous les documents (Ctrl+Maj+S).
+ Fermer l'onglet : Ferme le document actuel (Ctrl+W).
+ Fichiers récents : Ouvre un fichier récent.
+ Lecture : F5 Démarrer la lecture, F4 Pause/Reprise, F6 Arrêter la lecture.
+ Favoris pendant la lecture : F9 voix favorite précédente, F10 voix favorite suivante.
+ Enregistrer un audiolivre : Crée un fichier MP3 ou WAV à partir du texte actuel (Ctrl+R).
+ Enregistrer un podcast : Enregistre un podcast à partir du microphone et/ou de l'audio système (Ctrl+Maj+R).
+
+Lecture de fichier MP3 ou Livre audio :
+Lorsque vous ouvrez un fichier MP3, Novapad fonctionne comme un lecteur audio.
+Raccourcis clavier du lecteur :
+
+ ESPACE : Lecture / Pause.
+ FLÈCHE DROITE : Avance rapide de 1 minute.
+ FLÈCHE GAUCHE : Retour rapide de 1 minute.
+ FLÈCHE HAUT : Augmenter le volume.
+ FLÈCHE BAS : Diminuer le volume.
+ + : Augmenter la vitesse de lecture.
+ - : Diminuer la vitesse de lecture.
+ Ctrl+I : Annoncer le temps de lecture.
+ Ctrl+T : Aller à un temps spécifique.
+ Ctrl+B : Insérer un signet au temps exact.
+La durée du saut dans le fichier peut être configurée dans la section audio des paramètres.
+
+Menu Édition :
+
+ Annuler : Annule la dernière opération (Ctrl+Z).
+ Couper : Supprime le texte sélectionné et le copie dans le presse-papiers (Ctrl+X).
+ Copier : Copie le texte sélectionné dans le presse-papiers (Ctrl+C).
+ Coller : Insère le contenu du presse-papiers dans le document (Ctrl+V).
+ Tout sélectionner : Sélectionne tout le texte (Ctrl+A).
+ Rechercher : Cherche du texte dans le document (Ctrl+F).
+ Rechercher dans les fichiers : Cherche du texte dans plusieurs fichiers (Ctrl+Maj+F).
+ Rechercher le suivant : Trouve l'occurrence suivante (F3).
+ Remplacer : Rechercher et remplacer du texte (Ctrl+H).
+ Normaliser les espaces : Supprimer les marges des lignes et réduire les espaces (Ctrl+Maj+Entrée).
+ Joindre les lignes : Joint les lignes dans un paragraphe ou une sélection (Ctrl+Maj+J).
+ Saut de ligne dur : Reformate le paragraphe ou la sélection (Ctrl+Maj+H).
+ Supprimer les balises Markdown : Supprime les balises du langage Markdown (Ctrl+Maj+M).
+ Ordonner les éléments : Trie les lignes du paragraphe ou la sélection (Alt+Maj+O).
+ Garder les éléments uniques : Supprime les lignes dupliquées dans le paragraphe ou la sélection (Alt+Maj+K).
+ Inverser les éléments : Inverse l'ordre des lignes dans le paragraphe ou la sélection (Alt+Maj+Z).
+ Citer les lignes : Ajoute un préfixe aux lignes du paragraphe ou de la sélection (Ctrl+Q).
+ Retirer la citation des lignes : Supprime le préfixe des lignes du paragraphe ou de la sélection (Ctrl+Maj+Q).
+ Statistiques du texte : Affiche le nombre de caractères, de mots et de lignes pour la sélection ou le document (Alt+Y).
+ Navigation du correcteur orthographique : F7 erreur précédente, F8 erreur suivante.
+
+Menu Affichage :
+
+ Afficher les voix dans l'éditeur : Affiche le système vocal, la liste des voix et le filtre multilingue.
+ Afficher les voix favorites : Affiche la liste des voix favorites dans l'éditeur.
+ Couleur du texte : Change la couleur du texte (y compris les couleurs claires et foncées).
+ Taille du texte : Change la taille du texte (petit, normal, grand, très grand, extra grand).
+ Lorsque la liste des éléments est visible, appuyer sur la touche Tab déplace le focus entre l'éditeur et les contrôles, tandis que Maj+Tab le déplace en arrière.
+ Pour ajouter ou supprimer un élément des favoris, utilisez Tab pour accéder à la liste des éléments et ajoutez-le ou supprimez-le à l'aide de la touche de menu contextuel ou du clic droit de la souris. Dans la liste des éléments favoris, vous pouvez également appuyer sur la touche Applications pour supprimer les éléments déjà ajoutés.
+ Raccourcis clavier : pendant la lecture, il est possible d'appuyer sur F9 et F10 pour basculer entre les éléments, en parcourant ceux ajoutés aux favoris.
+
+Menu Insérer :
+
+ Insérer un signet : Enregistre la position actuelle du curseur ou le temps du livre audio (Ctrl+B).
+ Gérer les signets : Affiche, accède à un signet spécifique ou supprime les signets enregistrés. Lors de l'ouverture d'un fichier avec des signets, le curseur ou la lecture reprendra automatiquement à partir du premier disponible.
+
+Menu Outils :
+
+ Audiolivres par lots : ouvre une fenêtre pour convertir une liste de fichiers (ou des dossiers entiers) en audiolivres avec la synthèse vocale sélectionnée au format WAV ou MP3.
+ Ajouter des fichiers/dossiers à la file d'attente.
+ Choisissez le dossier de destination et le format (MP3 ou WAV).
+ Options pour créer des sous-dossiers et éviter l'écrasement.
+ Appuyez sur Démarrer pour tout traiter en arrière-plan.
+
+ Dictionnaire : Ouvrir la fenêtre du dictionnaire. Naviguez dans la liste avec les flèches Haut/Bas.
+ Tab déplace vers le bouton "Ajouter des entrées au dictionnaire", activé par la touche Entrée ou Espace.
+ Dans la fenêtre d'ajout/modification : entrez "Mot original", puis Tab vers "Mot de remplacement", puis OK ou Annuler (Entrée/Espace). Échap annule.
+ Dans la liste, Tab déplace vers "Modifier l'entrée" et "Supprimer l'entrée sélectionnée".
+ Les remplacements du dictionnaire s'appliquent pendant la lecture et la création d'audiolivres et sont enregistrés.
+
+ Importer une transcription YouTube : insérez l'URL, choisissez la langue et importez le texte dans l'éditeur (Ctrl+Y). Horodatages optionnels.
+ Rechercher et importer depuis Wikipédia : Trouve un article sur Wikipédia et importe son texte dans l'éditeur (Alt+Maj+W).
+ Dictionnaire en ligne : recherche des définitions et des traductions dans le Wiktionnaire en ligne (Alt+Maj+D).
+ Terminal accessible : ouvre un terminal dédié avec une sortie stable pour les lecteurs d'écran (Ctrl+Maj+T).
+ Raccourcis : Alt+I place le focus sur le champ d'entrée, Alt+O place le focus sur le champ de sortie, Tab/Maj+Tab déplace entre l'entrée, la sortie et les options.
+ Entrée envoie la commande. Ctrl+C copie la sortie (ou envoie Ctrl+C au programme). Ctrl+L efface la sortie avec confirmation.
+ Options du terminal : défilement automatique, suppression ANSI, annoncer les nouvelles lignes, bip après 1s d'inactivité, empêcher la veille.
+ Choix du programme : Invite de commandes (cmd.exe), PowerShell, Codex CLI (depuis les Options).
+
+RSS / Articles : ouvre la fenêtre RSS/Articles, ajouter des sources, flèche droite pour développer le flux et appuyez sur Entrée pour importer l'article dans l'éditeur de Novapad.
+ Dans la fenêtre RSS, sélectionnez un flux ou une page et appuyez sur Suppr pour le supprimer de la bibliothèque.
+ Depuis le menu contextuel sur un flux ou une page, vous pouvez modifier ou supprimer le RSS ou la page.
+ Après l'importation d'un article RSS, appuyez sur la touche Échap pour revenir à la liste RSS.
+ Podcasts : ouvre la fenêtre Podcasts pour rechercher et gérer les abonnements.
+ Dans la liste des épisodes, appuyez sur Entrée pour lire l'épisode.
+ Pendant la lecture, Échap arrête le podcast et revient à la bibliothèque.
+
+Options :
+
+ Langue : Changer la langue de l'interface.
+ Comportement à l'ouverture : Ouvrir les fichiers dans un nouvel onglet ou dans une nouvelle fenêtre.
+ Voix : Choisir la voix pour la lecture.
+ Voix multilingues : Filtre la liste des voix.
+ Choisir la hauteur, la vitesse et le volume : Définit la hauteur, la vitesse et le volume pour les voix (Microsoft et SAPI5). S'applique à la lecture et aux audiolivres.
+ Déplacer le curseur pendant la lecture : Suit visuellement le texte au fur et à mesure qu'il est lu.
+ Division du livre audio par texte : Divise le texte lorsque le marqueur apparaît au début de la ligne (distinction majuscules/minuscules : "Chapitre" et "chapitre" sont différents). Exemple : avec "Chapitre", crée une partie par chapitre, incluant l'auteur et l'introduction dans la première partie jusqu'au premier Chapitre. Si non trouvé, rien n'est divisé.
+ Autres options de division du livre audio : 2 parties, 4 parties, 6 parties, 8 parties.
+
+Menu Aide :
+
+ Guide : Ouvre ce guide (F1).
+ Vérifier les mises à jour : Vérifie si des mises à jour sont disponibles (F2).
+ Journal des modifications : Ouvre la fenêtre avec la liste des changements.
+ À propos du programme : Affiche des informations sur le programme.

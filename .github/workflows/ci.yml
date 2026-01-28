@@ -24,19 +24,20 @@ jobs:
 
     - name: Rust Cache
       uses: swatinem/rust-cache@v2
-    # --- INIZIO BLOCCO VCPKG ---
+
+    # --- INIZIO BLOCCO VCPKG (FIXED) ---
     - name: Set VCPKG_ROOT Environment
       # Imposta la root di vcpkg (già presente nell'immagine windows-latest)
       run: echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
       shell: powershell
 
-    - name: Vcpkg Cache
+    - name: Cache vcpkg (installed + downloads)
       id: vcpkg-cache
       uses: actions/cache@v4
       with:
-        # Cacha la cartella dove vcpkg installa le librerie compilate
-        path: C:\vcpkg\installed
-        # La chiave dipende dal sistema operativo e dal contenuto di vcpkg.json
+        path: |
+          ${{ github.workspace }}\vcpkg_installed
+          C:\vcpkg\downloads
         key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json') }}
         restore-keys: |
           ${{ runner.os }}-vcpkg-
@@ -44,16 +45,16 @@ jobs:
     - name: Install vcpkg dependencies
       # Se la cache c'è (cache-hit), salta questo passaggio per risparmiare tempo
       if: steps.vcpkg-cache.outputs.cache-hit != 'true'
-      run: vcpkg install --triplet x64-windows
-      shell: cmd
+      shell: powershell
+      run: vcpkg install --triplet x64-windows --x-install-root="${{ github.workspace }}\vcpkg_installed"
 
     - name: Set FFMPEG_DIR for Rust
       # Collega la build di vcpkg alla variabile che Rust si aspetta
       # Vcpkg in manifest mode installa in vcpkg_installed nella root del progetto
       run: echo "FFMPEG_DIR=${{ github.workspace }}\vcpkg_installed\x64-windows" >> $env:GITHUB_ENV
       shell: powershell
-    # --- FINE BLOCCO VCPKG ---
-    
+    # --- FINE BLOCCO VCPKG (FIXED) ---
+
     - name: Format check
       run: cargo fmt --check
 

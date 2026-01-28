@@ -13,6 +13,8 @@
   "dialog.yes": "Ja",
   "dialog.no": "Nej",
   "app.pdf_loaded": "PDF laddad.",
+  "app.pdf_loading": "Laddar PDF...",
+  "app.pdf_analyzing": "Analyserar...",
   "app.pdf_error_hint": "PDF-filen kunde inte läsas. Försök att öppna den igen eller använd en annan PDF-läsare.",
   "app.text_not_found": "Texten hittades inte.",
   "app.find_title": "Sök",

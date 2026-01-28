@@ -13,6 +13,8 @@
   "dialog.yes": "Ano",
   "dialog.no": "Ne",
   "app.pdf_loaded": "PDF načteno.",
+  "app.pdf_loading": "Načítání PDF...",
+  "app.pdf_analyzing": "Probíhá analýza...",
   "app.pdf_error_hint": "PDF se nepodařilo přečíst. Zkuste jej znovu otevřít nebo použijte jiný prohlížeč PDF.",
   "app.text_not_found": "Text nenalezen.",
   "app.find_title": "Najít",

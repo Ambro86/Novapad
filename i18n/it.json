@@ -13,6 +13,8 @@
   "dialog.yes": "Sì",
   "dialog.no": "No",
   "app.pdf_loaded": "PDF caricato.",
+  "app.pdf_loading": "Caricamento PDF...",
+  "app.pdf_analyzing": "Analisi in corso",
   "app.pdf_error_hint": "Impossibile leggere il PDF. Prova a riaprirlo o usa un altro visualizzatore PDF.",
   "app.text_not_found": "Testo non trovato.",
   "app.find_title": "Trova",

@@ -6901,7 +6901,7 @@ pub(crate) unsafe fn open_pdf_document_async(hwnd: HWND, path: &Path, from_copyd
             state.settings.text_color,
             state.settings.text_size,
         );
-        editor_manager::set_edit_text(hwnd_edit, &pdf_loading_placeholder(0));
+        editor_manager::set_edit_text(hwnd_edit, &pdf_loading_placeholder(0, language));
         let doc = Document {
             title: title.clone(),
             path: Some(path_buf.clone()),
@@ -7148,11 +7148,12 @@ unsafe fn handle_pdf_loading_timer(hwnd: HWND, timer_id: usize) {
     }
 
     if let Some((hwnd_edit, frame, _)) = target {
-        editor_manager::set_edit_text(hwnd_edit, &pdf_loading_placeholder(frame));
+        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+        editor_manager::set_edit_text(hwnd_edit, &pdf_loading_placeholder(frame, language));
     }
 }
 
-pub(crate) fn pdf_loading_placeholder(frame: usize) -> String {
+pub(crate) fn pdf_loading_placeholder(frame: usize, language: crate::settings::Language) -> String {
     let spinner = ['|', '/', '-', '\\'][frame % 4];
     let bar_width = 24;
     let filled = frame % (bar_width + 1);
@@ -7161,7 +7162,9 @@ pub(crate) fn pdf_loading_placeholder(frame: usize) -> String {
         "#".repeat(filled),
         "-".repeat(bar_width.saturating_sub(filled))
     );
-    format!("Caricamento PDF...\r\n\r\n[{bar}]\r\nAnalisi in corso {spinner}")
+    let loading = i18n::tr(language, "app.pdf_loading");
+    let analyzing = i18n::tr(language, "app.pdf_analyzing");
+    format!("{loading}\r\n\r\n[{bar}]\r\n{analyzing} {spinner}")
 }
 
 unsafe fn handle_drop_files(hwnd: HWND, hdrop: HDROP) {

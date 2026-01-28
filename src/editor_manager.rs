@@ -2,8 +2,8 @@ use crate::accessibility::{EM_REPLACESEL, to_wide, to_wide_normalized};
 use crate::file_handler::decode_text_with_encoding;
 use crate::file_handler::*;
 use crate::settings::{
-    FileFormat, ModifiedMarkerPosition, TextEncoding, confirm_save_message, confirm_title,
-    untitled_title,
+    FileFormat, Language, ModifiedMarkerPosition, TextEncoding, confirm_save_message,
+    confirm_title, untitled_title,
 };
 use crate::{log_debug, with_state};
 use std::collections::HashSet;
@@ -24,9 +24,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CallWindowProcW, DefWindowProcW, DestroyWindow, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE,
     ES_WANTRETURN, GWLP_USERDATA, GWLP_WNDPROC, GetClientRect, GetParent, GetWindowLongPtrW,
     GetWindowTextLengthW, GetWindowTextW, HMENU, IDNO, IDYES, MB_ICONWARNING, MB_YESNOCANCEL,
-    MessageBoxW, MoveWindow, SW_HIDE, SW_SHOW, SendMessageW, SetWindowLongPtrW, SetWindowTextW,
-    ShowWindow, WM_CHAR, WM_CONTEXTMENU, WM_SETFONT, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE,
-    WS_GROUP, WS_HSCROLL, WS_VSCROLL,
+    MessageBoxW, MoveWindow, PostMessageW, SW_HIDE, SW_SHOW, SendMessageW, SetWindowLongPtrW,
+    SetWindowTextW, ShowWindow, WM_CHAR, WM_CONTEXTMENU, WM_SETFONT, WS_CHILD, WS_CLIPCHILDREN,
+    WS_EX_CLIENTEDGE, WS_GROUP, WS_HSCROLL, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR};
 
@@ -38,6 +38,17 @@ const EM_SETTEXTEX: u32 = 0x0461;
 const EM_GETTEXTLENGTHEX: u32 = 0x045F;
 const ST_KEEPUNDO: u32 = 0x0001;
 const ST_SELECTION: u32 = 0x0002;
+
+pub(crate) struct LoadedDocument {
+    pub(crate) content: String,
+    pub(crate) format: FileFormat,
+    pub(crate) opened_text_encoding: Option<TextEncoding>,
+}
+
+pub(crate) struct DocumentLoadResult {
+    pub(crate) path: PathBuf,
+    pub(crate) result: Result<Option<LoadedDocument>, String>,
+}
 const GTL_NUMCHARS: u32 = 0x0008;
 const CP_UNICODE: u32 = 1200;
 const VOICE_PANEL_PADDING: i32 = 6;
@@ -1971,176 +1982,172 @@ unsafe fn open_document_with_encoding_internal(
         crate::open_pdf_document_async(hwnd, path, from_copydata);
         return;
     }
-    let (content, format, opened_text_encoding) = if is_docx_path(path) {
-        match read_docx_text(path, language) {
-            Ok(text) => (text, FileFormat::Docx, None),
-            Err(message) => {
-                crate::show_error(hwnd, language, &message);
-                return;
-            }
-        }
-    } else if is_pptx_path(path) {
-        match read_ppt_text(path, language) {
-            Ok(text) => (text, FileFormat::Pptx, None),
-            Err(message) => {
-                crate::show_error(hwnd, language, &message);
-                return;
-            }
-        }
-    } else if is_ppt_path(path) {
-        match read_ppt_text(path, language) {
-            Ok(text) => (text, FileFormat::Ppt, None),
-            Err(message) => {
-                crate::show_error(hwnd, language, &message);
-                return;
-            }
-        }
-    } else if is_epub_path(path) {
-        match read_epub_text(path, language) {
-            Ok(text) => (text, FileFormat::Epub, None),
-            Err(message) => {
-                crate::show_error(hwnd, language, &message);
-                return;
-            }
-        }
-    } else if is_html_path(path) {
-        match read_html_text(path, language) {
-            Ok((text, _encoding)) => (text, FileFormat::Html, None),
-            Err(message) => {
-                crate::show_error(hwnd, language, &message);
-                return;
-            }
-        }
-    } else if is_gdoc_path(path) {
-        // Special handling for Google Docs pointer files (JSON files with a "url" key)
-        if let Ok(bytes) = std::fs::read(path) {
-            let text = String::from_utf8_lossy(&bytes);
-            if let Some(url_pos) = text.find("\"url\"") {
-                let after_url = &text[url_pos + 5..];
-                if let Some(start_quote) = after_url.find('\"') {
-                    let from_quote = &after_url[start_quote + 1..];
-                    if let Some(end_quote) = from_quote.find('\"') {
-                        let url = &from_quote[..end_quote];
-                        if url.starts_with("http") {
-                            if let Err(e) = crate::audio_utils::open_url_in_browser(url) {
-                                crate::log_debug(&format!("Failed to open GDoc URL: {}", e));
-                            }
-                            return;
-                        }
-                    }
-                }
-            }
-        }
-        // Fallback: if we can't find a URL, open as normal text
-        match std::fs::read(path) {
-            Ok(bytes) => match decode_text(&bytes, language) {
-                Ok((text, encoding)) => (text, FileFormat::Text(encoding), Some(encoding)),
-                Err(message) => {
-                    crate::show_error(hwnd, language, &message);
-                    return;
-                }
-            },
-            Err(err) => {
-                crate::show_error(
-                    hwnd,
-                    language,
-                    &crate::settings::error_open_file_message(language, err),
-                );
-                return;
-            }
-        }
-    } else if is_audio_path(path) {
-        (String::new(), FileFormat::Audiobook, None)
-    } else if is_doc_path(path) {
-        match read_doc_text(path, language) {
-            Ok(text) => (text, FileFormat::Doc, None),
-            Err(message) => {
-                crate::show_error(hwnd, language, &message);
-                return;
-            }
-        }
-    } else if is_spreadsheet_path(path) {
-        match read_spreadsheet_text(path, language) {
-            Ok(text) => (text, FileFormat::Spreadsheet, None),
-            Err(message) => {
-                crate::show_error(hwnd, language, &message);
-                return;
-            }
-        }
-    } else {
-        match std::fs::read(path) {
-            Ok(bytes) => {
-                if let Some(encoding) = user_encoding {
-                    // User specified encoding
-                    match decode_text_with_encoding(&bytes, encoding, language) {
-                        Ok(text) => (text, FileFormat::Text(encoding), Some(encoding)),
-                        Err(message) => {
-                            crate::show_error(hwnd, language, &message);
-                            return;
-                        }
-                    }
-                } else {
-                    // Auto-detect encoding
-                    match decode_text(&bytes, language) {
-                        Ok((text, encoding)) => (text, FileFormat::Text(encoding), Some(encoding)),
-                        Err(message) => {
-                            crate::show_error(hwnd, language, &message);
-                            return;
-                        }
-                    }
-                }
-            }
-            Err(err) => {
-                crate::show_error(
-                    hwnd,
-                    language,
-                    &crate::settings::error_open_file_message(language, err),
-                );
-                return;
-            }
-        }
-    };
+    if is_audio_path(path) {
+        let new_index = with_state(hwnd, |state| {
+            let title = path.file_name().and_then(|s| s.to_str()).unwrap_or("File");
+            let hwnd_edit = create_edit(
+                hwnd,
+                state.hfont,
+                state.settings.word_wrap,
+                state.settings.text_color,
+                state.settings.text_size,
+            );
+            set_edit_text(hwnd_edit, "");
 
-    let new_index = with_state(hwnd, |state| {
-        let title = path.file_name().and_then(|s| s.to_str()).unwrap_or("File");
-        let hwnd_edit = create_edit(
-            hwnd,
-            state.hfont,
-            state.settings.word_wrap,
-            state.settings.text_color,
-            state.settings.text_size,
-        );
-        set_edit_text(hwnd_edit, &content);
-
-        let doc = Document {
-            title: title.to_string(),
-            path: Some(path.to_path_buf()),
-            hwnd_edit,
-            dirty: false,
-            format,
-            opened_text_encoding,
-            current_save_text_encoding: None,
-            from_rss: false,
-        };
-        if matches!(format, FileFormat::Audiobook) {
+            let doc = Document {
+                title: title.to_string(),
+                path: Some(path.to_path_buf()),
+                hwnd_edit,
+                dirty: false,
+                format: FileFormat::Audiobook,
+                opened_text_encoding: None,
+                current_save_text_encoding: None,
+                from_rss: false,
+            };
             unsafe {
                 SendMessageW(hwnd_edit, EM_SETREADONLY, WPARAM(1), LPARAM(0));
                 ShowWindow(hwnd_edit, SW_HIDE);
             }
-        }
-        state.docs.push(doc);
-        insert_tab(state.hwnd_tab, title, (state.docs.len() - 1) as i32);
-        crate::goto_first_bookmark(hwnd_edit, path, &state.bookmarks, format);
-        state.docs.len() - 1
-    })
-    .unwrap_or(0);
-    select_tab(hwnd, new_index);
-    if matches!(format, FileFormat::Audiobook) {
+            state.docs.push(doc);
+            insert_tab(state.hwnd_tab, title, (state.docs.len() - 1) as i32);
+            state.docs.len() - 1
+        })
+        .unwrap_or(0);
+        select_tab(hwnd, new_index);
         unsafe {
             crate::audio_player::start_audiobook_playback(hwnd, path);
         }
+        crate::push_recent_file(hwnd, path);
+        return;
     }
-    crate::push_recent_file(hwnd, path);
+
+    let path_buf = path.to_path_buf();
+    let hwnd_main = hwnd;
+    std::thread::spawn(move || {
+        let result = load_document_content(&path_buf, user_encoding, language);
+        let payload = Box::new(DocumentLoadResult {
+            path: path_buf,
+            result,
+        });
+        unsafe {
+            let payload_ptr = Box::into_raw(payload);
+            if let Err(e) = PostMessageW(
+                hwnd_main,
+                crate::WM_DOCUMENT_LOADED,
+                WPARAM(0),
+                LPARAM(payload_ptr as isize),
+            ) {
+                crate::log_debug(&format!("Failed to post WM_DOCUMENT_LOADED: {}", e));
+                let _unused_box = Box::from_raw(payload_ptr);
+            }
+        }
+    });
+}
+
+fn load_document_content(
+    path: &Path,
+    user_encoding: Option<TextEncoding>,
+    language: Language,
+) -> Result<Option<LoadedDocument>, String> {
+    if is_docx_path(path) {
+        let text = read_docx_text(path, language)?;
+        return Ok(Some(LoadedDocument {
+            content: text,
+            format: FileFormat::Docx,
+            opened_text_encoding: None,
+        }));
+    }
+    if is_pptx_path(path) {
+        let text = read_ppt_text(path, language)?;
+        return Ok(Some(LoadedDocument {
+            content: text,
+            format: FileFormat::Pptx,
+            opened_text_encoding: None,
+        }));
+    }
+    if is_ppt_path(path) {
+        let text = read_ppt_text(path, language)?;
+        return Ok(Some(LoadedDocument {
+            content: text,
+            format: FileFormat::Ppt,
+            opened_text_encoding: None,
+        }));
+    }
+    if is_epub_path(path) {
+        let text = read_epub_text(path, language)?;
+        return Ok(Some(LoadedDocument {
+            content: text,
+            format: FileFormat::Epub,
+            opened_text_encoding: None,
+        }));
+    }
+    if is_html_path(path) {
+        let (text, _encoding) = read_html_text(path, language)?;
+        return Ok(Some(LoadedDocument {
+            content: text,
+            format: FileFormat::Html,
+            opened_text_encoding: None,
+        }));
+    }
+    if is_gdoc_path(path) {
+        let bytes = std::fs::read(path)
+            .map_err(|err| crate::settings::error_open_file_message(language, err))?;
+        let text = String::from_utf8_lossy(&bytes);
+        if let Some(url_pos) = text.find("\"url\"") {
+            let after_url = &text[url_pos + 5..];
+            if let Some(start_quote) = after_url.find('\"') {
+                let from_quote = &after_url[start_quote + 1..];
+                if let Some(end_quote) = from_quote.find('\"') {
+                    let url = &from_quote[..end_quote];
+                    if url.starts_with("http") {
+                        if let Err(e) = crate::audio_utils::open_url_in_browser(url) {
+                            crate::log_debug(&format!("Failed to open GDoc URL: {}", e));
+                        }
+                        return Ok(None);
+                    }
+                }
+            }
+        }
+        let (text, encoding) = decode_text(&bytes, language)?;
+        return Ok(Some(LoadedDocument {
+            content: text,
+            format: FileFormat::Text(encoding),
+            opened_text_encoding: Some(encoding),
+        }));
+    }
+    if is_doc_path(path) {
+        let text = read_doc_text(path, language)?;
+        return Ok(Some(LoadedDocument {
+            content: text,
+            format: FileFormat::Doc,
+            opened_text_encoding: None,
+        }));
+    }
+    if is_spreadsheet_path(path) {
+        let text = read_spreadsheet_text(path, language)?;
+        return Ok(Some(LoadedDocument {
+            content: text,
+            format: FileFormat::Spreadsheet,
+            opened_text_encoding: None,
+        }));
+    }
+
+    let bytes = std::fs::read(path)
+        .map_err(|err| crate::settings::error_open_file_message(language, err))?;
+    if let Some(encoding) = user_encoding {
+        let text = decode_text_with_encoding(&bytes, encoding, language)?;
+        return Ok(Some(LoadedDocument {
+            content: text,
+            format: FileFormat::Text(encoding),
+            opened_text_encoding: Some(encoding),
+        }));
+    }
+    let (text, encoding) = decode_text(&bytes, language)?;
+    Ok(Some(LoadedDocument {
+        content: text,
+        format: FileFormat::Text(encoding),
+        opened_text_encoding: Some(encoding),
+    }))
 }
 
 pub unsafe fn open_document_with_encoding(

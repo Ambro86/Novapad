@@ -69,6 +69,8 @@ pub const IDM_PLAYBACK_SPEED_DOWN: usize = 8011;
 pub const IDM_PLAYBACK_SPEED_RESET: usize = 8016;
 pub const IDM_PLAYBACK_PITCH_UP: usize = 8017;
 pub const IDM_PLAYBACK_PITCH_DOWN: usize = 8018;
+pub const IDM_PLAYBACK_ADD_SUBTITLES: usize = 8019;
+pub const IDM_PLAYBACK_REMOVE_SUBTITLES: usize = 8020;
 pub const IDM_PLAYBACK_CHAPTER_PREV: usize = 8012;
 pub const IDM_PLAYBACK_CHAPTER_NEXT: usize = 8013;
 pub const IDM_PLAYBACK_CHAPTER_LIST: usize = 8014;
@@ -329,6 +331,8 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
         let pitch_up = i18n::tr(language, "playback.pitch_up");
         let pitch_down = i18n::tr(language, "playback.pitch_down");
         let mute_toggle = i18n::tr(language, "playback.mute_toggle");
+        let add_subtitles = i18n::tr(language, "playback.add_subtitles");
+        let remove_subtitles = i18n::tr(language, "playback.remove_subtitles");
         let chapter_prev = i18n::tr(language, "playback.chapter_prev");
         let chapter_next = i18n::tr(language, "playback.chapter_next");
         let chapter_list = i18n::tr(language, "playback.chapter_list");
@@ -394,6 +398,18 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
             MF_STRING,
             IDM_PLAYBACK_ANNOUNCE_TIME,
             &announce_time,
+        );
+        append_menu_string(
+            playback_menu,
+            MF_STRING,
+            IDM_PLAYBACK_ADD_SUBTITLES,
+            &add_subtitles,
+        );
+        append_menu_string(
+            playback_menu,
+            MF_STRING,
+            IDM_PLAYBACK_REMOVE_SUBTITLES,
+            &remove_subtitles,
         );
         append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_VOLUME_UP, &volume_up);
         append_menu_string(

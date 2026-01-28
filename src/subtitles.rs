@@ -1,6 +1,8 @@
 use crate::log_debug;
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
 pub const SUBTITLE_EXTENSIONS: &[&str] = &[
@@ -16,7 +18,40 @@ pub struct SubtitleCue {
     pub audio_data: Option<std::sync::Arc<[u8]>>,
 }
 
+static SUBTITLE_OVERRIDES: OnceLock<Mutex<HashMap<String, PathBuf>>> = OnceLock::new();
+
+fn subtitle_overrides() -> &'static Mutex<HashMap<String, PathBuf>> {
+    SUBTITLE_OVERRIDES.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+pub fn set_subtitle_override(media_path: &Path, subtitle_path: PathBuf) {
+    let key = media_path.to_string_lossy().to_string();
+    if let Ok(mut overrides) = subtitle_overrides().lock() {
+        overrides.insert(key, subtitle_path);
+    }
+}
+
+pub fn clear_subtitle_override(media_path: &Path) {
+    let key = media_path.to_string_lossy().to_string();
+    if let Ok(mut overrides) = subtitle_overrides().lock() {
+        overrides.remove(&key);
+    }
+}
+
+fn get_subtitle_override(media_path: &Path) -> Option<PathBuf> {
+    let key = media_path.to_string_lossy().to_string();
+    subtitle_overrides()
+        .lock()
+        .ok()
+        .and_then(|overrides| overrides.get(&key).cloned())
+}
+
 pub fn find_subtitle_for_media(media_path: &Path) -> Option<PathBuf> {
+    if let Some(path) = get_subtitle_override(media_path)
+        && path.exists()
+    {
+        return Some(path);
+    }
     let stem = media_path.file_stem()?.to_string_lossy();
     let dir = media_path.parent()?;
     for ext in SUBTITLE_EXTENSIONS {

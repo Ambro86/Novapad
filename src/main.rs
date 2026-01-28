@@ -85,8 +85,8 @@ use windows::Win32::System::LibraryLoader::{GetModuleHandleW, LoadLibraryW};
 use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::Dialogs::{
-    FINDREPLACE_FLAGS, FINDREPLACEW, GetSaveFileNameW, OFN_EXPLORER, OFN_HIDEREADONLY,
-    OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST, OPENFILENAMEW,
+    FINDREPLACE_FLAGS, FINDREPLACEW, GetOpenFileNameW, GetSaveFileNameW, OFN_EXPLORER,
+    OFN_FILEMUSTEXIST, OFN_HIDEREADONLY, OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST, OPENFILENAMEW,
 };
 use windows::Win32::UI::Controls::RichEdit::{
     CFE_AUTOBACKCOLOR, CFM_BACKCOLOR, CHARFORMAT2W, CHARRANGE, EM_EXGETSEL, EM_EXSETSEL,
@@ -146,6 +146,7 @@ use crate::podcast::chapters::Chapter;
 
 const WM_PDF_LOADED: u32 = WM_APP + 1;
 const WM_TTS_VOICES_LOADED: u32 = WM_APP + 2;
+pub(crate) const WM_DOCUMENT_LOADED: u32 = WM_APP + 9;
 const WM_TTS_AUDIOBOOK_DONE: u32 = WM_APP + 4;
 const WM_TTS_PLAYBACK_ERROR: u32 = WM_APP + 5;
 const WM_UPDATE_PROGRESS: u32 = WM_APP + 6;
@@ -2898,6 +2899,15 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             handle_pdf_loaded(hwnd, *payload);
             LRESULT(0)
         }
+        WM_DOCUMENT_LOADED => {
+            if lparam.0 == 0 {
+                return LRESULT(0);
+            }
+            let payload =
+                unsafe { Box::from_raw(lparam.0 as *mut editor_manager::DocumentLoadResult) };
+            handle_document_loaded(hwnd, *payload);
+            LRESULT(0)
+        }
         WM_TTS_VOICES_LOADED => {
             if lparam.0 == 0 {
                 return LRESULT(0);
@@ -3556,6 +3566,41 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 }
                 IDM_PLAYBACK_ANNOUNCE_TIME => {
                     handle_player_command(hwnd, PlayerCommand::AnnounceTime);
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_ADD_SUBTITLES => {
+                    if let Some(path) = open_subtitle_file_dialog(hwnd) {
+                        let language =
+                            with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+                        match audio_player::set_audiobook_subtitle_override(hwnd, &path) {
+                            Ok(()) => {}
+                            Err(code) => {
+                                let key = match code.as_str() {
+                                    "invalid_subtitle" => "playback.add_subtitles_invalid",
+                                    "no_media" => "playback.add_subtitles_no_media",
+                                    _ => "playback.add_subtitles_state",
+                                };
+                                let message = i18n::tr(language, key);
+                                show_error(hwnd, language, &message);
+                            }
+                        }
+                    }
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_REMOVE_SUBTITLES => {
+                    let language =
+                        with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+                    match audio_player::clear_audiobook_subtitle_override(hwnd) {
+                        Ok(()) => {}
+                        Err(code) => {
+                            let key = match code.as_str() {
+                                "no_media" => "playback.remove_subtitles_no_media",
+                                _ => "playback.remove_subtitles_state",
+                            };
+                            let message = i18n::tr(language, key);
+                            show_error(hwnd, language, &message);
+                        }
+                    }
                     LRESULT(0)
                 }
                 IDM_PLAYBACK_VOLUME_UP => {
@@ -7088,6 +7133,57 @@ unsafe fn handle_pdf_loaded(hwnd: HWND, payload: PdfLoadResult) {
     }
 }
 
+unsafe fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLoadResult) {
+    let editor_manager::DocumentLoadResult { path, result } = payload;
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+
+    let loaded = match result {
+        Ok(loaded) => loaded,
+        Err(message) => {
+            show_error(hwnd, language, &message);
+            return;
+        }
+    };
+    let Some(loaded) = loaded else {
+        return;
+    };
+
+    let title = path.file_name().and_then(|s| s.to_str()).unwrap_or("File");
+    let (hwnd_edit, new_index) = with_state(hwnd, |state| {
+        let hwnd_edit = editor_manager::create_edit(
+            hwnd,
+            state.hfont,
+            state.settings.word_wrap,
+            state.settings.text_color,
+            state.settings.text_size,
+        );
+        editor_manager::set_edit_text(hwnd_edit, &loaded.content);
+
+        let doc = Document {
+            title: title.to_string(),
+            path: Some(path.clone()),
+            hwnd_edit,
+            dirty: false,
+            format: loaded.format,
+            opened_text_encoding: loaded.opened_text_encoding,
+            current_save_text_encoding: None,
+            from_rss: false,
+        };
+        state.docs.push(doc);
+        insert_tab(state.hwnd_tab, title, (state.docs.len() - 1) as i32);
+        goto_first_bookmark(hwnd_edit, &path, &state.bookmarks, loaded.format);
+        (hwnd_edit, state.docs.len() - 1)
+    })
+    .unwrap_or((HWND(0), 0));
+
+    if hwnd_edit.0 == 0 {
+        return;
+    }
+
+    editor_manager::select_tab(hwnd, new_index);
+    push_recent_file(hwnd, &path);
+}
+
 unsafe fn start_pdf_loading_animation(hwnd: HWND, hwnd_edit: HWND, ocr_timeout_secs: u64) {
     let timer_id = with_state(hwnd, |state| {
         let timer_id = state.next_timer_id;
@@ -7815,6 +7911,48 @@ pub(crate) unsafe fn open_file_dialog_with_encoding(
         pfd.Unadvise(cookie).ok()?;
         None
     }
+}
+
+pub(crate) unsafe fn open_subtitle_file_dialog(hwnd: HWND) -> Option<PathBuf> {
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let title = i18n::tr(language, "dialog.open_subtitles_title");
+    let filter_label = i18n::tr(language, "dialog.subtitles_filter");
+    let all_files_label = i18n::tr(language, "dialog.all_files");
+
+    let pattern = crate::subtitles::SUBTITLE_EXTENSIONS
+        .iter()
+        .map(|ext| format!("*.{ext}"))
+        .collect::<Vec<_>>()
+        .join(";");
+
+    let filter = format!(
+        "{} ({})\0{}\0{} (*.*)\0*.*\0",
+        filter_label, pattern, pattern, all_files_label
+    );
+    let mut filter_wide: Vec<u16> = filter.encode_utf16().collect();
+    filter_wide.push(0);
+
+    let mut buffer = [0u16; 1024];
+    let title_wide = to_wide(&title);
+    let mut ofn = OPENFILENAMEW {
+        lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
+        hwndOwner: hwnd,
+        lpstrFilter: PCWSTR(filter_wide.as_ptr()),
+        lpstrFile: PWSTR(buffer.as_mut_ptr()),
+        nMaxFile: buffer.len() as u32,
+        lpstrTitle: PCWSTR(title_wide.as_ptr()),
+        Flags: OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY,
+        ..Default::default()
+    };
+
+    if !GetOpenFileNameW(&mut ofn).as_bool() {
+        return None;
+    }
+    let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
+    if len == 0 {
+        return None;
+    }
+    Some(PathBuf::from(String::from_utf16_lossy(&buffer[..len])))
 }
 
 pub(crate) unsafe fn save_file_dialog_with_encoding(

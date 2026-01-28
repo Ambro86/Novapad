@@ -5,7 +5,10 @@ use crate::ffmpeg_source::FfmpegSource;
 use crate::i18n;
 use crate::log_debug;
 use crate::settings::{FileFormat, SubtitleReadMode, confirm_title, settings_dir};
-use crate::subtitles::{SubtitleCue, find_subtitle_for_media, load_subtitles};
+use crate::subtitles::{
+    SUBTITLE_EXTENSIONS, SubtitleCue, clear_subtitle_override, find_subtitle_for_media,
+    load_subtitles, set_subtitle_override,
+};
 use crate::tts_engine;
 use crate::tts_engine::TtsCommand;
 use crate::with_state;
@@ -72,6 +75,122 @@ impl AudiobookPlayer {
     pub(crate) fn position_secs(&self) -> Option<f64> {
         self.output.position_secs()
     }
+}
+
+pub unsafe fn set_audiobook_subtitle_override(
+    hwnd: HWND,
+    subtitle_path: &Path,
+) -> Result<(), String> {
+    let ext_ok = subtitle_path
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| {
+            SUBTITLE_EXTENSIONS
+                .iter()
+                .any(|ext| s.eq_ignore_ascii_case(ext))
+        })
+        .unwrap_or(false);
+    if !ext_ok {
+        return Err("invalid_subtitle".to_string());
+    }
+
+    let mut active = None;
+    let mut current_media = None;
+    let mut new_cancel = None;
+    let mut old_cancel = None;
+    let mut speech_handles = None;
+    let state_ok = with_state(hwnd, |state| {
+        if let Some(player) = &mut state.active_audiobook {
+            current_media = Some(player.path.clone());
+            old_cancel = Some(player.subtitle_cancel.clone());
+            let fresh_cancel = Arc::new(AtomicBool::new(false));
+            player.subtitle_cancel = fresh_cancel.clone();
+            new_cancel = Some(fresh_cancel);
+            speech_handles = Some((
+                player.subtitle_speech_cancel.clone(),
+                player.subtitle_speech_command.clone(),
+            ));
+            active = Some(player.path.clone());
+            return;
+        }
+        if let Some(doc) = state.docs.get(state.current)
+            && matches!(doc.format, FileFormat::Audiobook)
+        {
+            current_media = doc.path.clone();
+        }
+    })
+    .is_some();
+    if !state_ok {
+        return Err("state_unavailable".to_string());
+    }
+
+    let Some(media_path) = current_media else {
+        return Err("no_media".to_string());
+    };
+
+    set_subtitle_override(&media_path, subtitle_path.to_path_buf());
+
+    if let Some(cancel) = old_cancel {
+        cancel.store(true, Ordering::Relaxed);
+    }
+    if let Some(handles) = speech_handles {
+        stop_shared_subtitle_speech(&handles.0, &handles.1, "subtitle_override");
+    }
+    if let (Some(active_path), Some(cancel)) = (active, new_cancel) {
+        start_subtitle_reader(hwnd, active_path, cancel, None);
+    }
+
+    Ok(())
+}
+
+pub unsafe fn clear_audiobook_subtitle_override(hwnd: HWND) -> Result<(), String> {
+    let mut active = None;
+    let mut current_media = None;
+    let mut new_cancel = None;
+    let mut old_cancel = None;
+    let mut speech_handles = None;
+    let state_ok = with_state(hwnd, |state| {
+        if let Some(player) = &mut state.active_audiobook {
+            current_media = Some(player.path.clone());
+            old_cancel = Some(player.subtitle_cancel.clone());
+            let fresh_cancel = Arc::new(AtomicBool::new(false));
+            player.subtitle_cancel = fresh_cancel.clone();
+            new_cancel = Some(fresh_cancel);
+            speech_handles = Some((
+                player.subtitle_speech_cancel.clone(),
+                player.subtitle_speech_command.clone(),
+            ));
+            active = Some(player.path.clone());
+            return;
+        }
+        if let Some(doc) = state.docs.get(state.current)
+            && matches!(doc.format, FileFormat::Audiobook)
+        {
+            current_media = doc.path.clone();
+        }
+    })
+    .is_some();
+    if !state_ok {
+        return Err("state_unavailable".to_string());
+    }
+
+    let Some(media_path) = current_media else {
+        return Err("no_media".to_string());
+    };
+
+    clear_subtitle_override(&media_path);
+
+    if let Some(cancel) = old_cancel {
+        cancel.store(true, Ordering::Relaxed);
+    }
+    if let Some(handles) = speech_handles {
+        stop_shared_subtitle_speech(&handles.0, &handles.1, "subtitle_override_clear");
+    }
+    if let (Some(active_path), Some(cancel)) = (active, new_cancel) {
+        start_subtitle_reader(hwnd, active_path, cancel, None);
+    }
+
+    Ok(())
 }
 
 fn codec_name(codec: symphonia::core::codecs::CodecType) -> &'static str {
@@ -352,58 +471,63 @@ fn start_audiobook_at_with_options(
     seconds: u64,
     options: AudiobookPlaybackOptions,
 ) {
-    let settings = unsafe { with_state(hwnd, |state| state.settings.clone()) }.unwrap_or_default();
-    let want_mix = (settings.subtitle_read_mode == SubtitleReadMode::Record || options.mix_export)
-        && crate::subtitles::find_subtitle_for_media(&path).is_some();
-    if want_mix && !is_mixed_output(&path) && settings.subtitle_read_mode != SubtitleReadMode::Off {
-        let path_clone = path.clone();
-        let opts = options;
-        std::thread::spawn(move || {
-            log_debug(&format!(
-                "Subtitle: offline mix requested for {}",
-                path_clone.display()
-            ));
-            let mix_opts = MixExportOptions {
-                ducking: settings.subtitle_mix_ducking,
-            };
-            match export_mixed_media(&path_clone, &settings, &mix_opts) {
-                Ok(mixed_path) => {
-                    start_audiobook_at_with_options(
-                        hwnd,
-                        mixed_path,
-                        seconds,
-                        AudiobookPlaybackOptions {
-                            mix_export: false,
-                            ..opts
-                        },
-                    );
-                }
-                Err(err) => {
-                    log_debug(&format!("Subtitle: mix export failed: {}", err));
-                    start_audiobook_at_with_options(
-                        hwnd,
-                        path_clone,
-                        seconds,
-                        AudiobookPlaybackOptions {
-                            mix_export: false,
-                            ..opts
-                        },
-                    );
-                }
-            }
-        });
-        return;
-    }
-
-    let subtitle_hold = should_hold_for_edge_subtitles(hwnd, &path);
-    let effective_paused = options.paused || subtitle_hold;
-    let subtitle_cancel = Arc::new(AtomicBool::new(false));
-    let subtitle_speech_cancel = Arc::new(Mutex::new(None));
-    let subtitle_speech_command = Arc::new(Mutex::new(None));
-    let subtitle_path = path.clone();
-    let requested_speed = options.speed;
     let hwnd_main = hwnd;
     std::thread::spawn(move || {
+        let settings =
+            unsafe { with_state(hwnd_main, |state| state.settings.clone()) }.unwrap_or_default();
+        let want_mix = (settings.subtitle_read_mode == SubtitleReadMode::Record
+            || options.mix_export)
+            && crate::subtitles::find_subtitle_for_media(&path).is_some();
+        if want_mix
+            && !is_mixed_output(&path)
+            && settings.subtitle_read_mode != SubtitleReadMode::Off
+        {
+            let path_clone = path.clone();
+            let opts = options;
+            std::thread::spawn(move || {
+                log_debug(&format!(
+                    "Subtitle: offline mix requested for {}",
+                    path_clone.display()
+                ));
+                let mix_opts = MixExportOptions {
+                    ducking: settings.subtitle_mix_ducking,
+                };
+                match export_mixed_media(&path_clone, &settings, &mix_opts) {
+                    Ok(mixed_path) => {
+                        start_audiobook_at_with_options(
+                            hwnd_main,
+                            mixed_path,
+                            seconds,
+                            AudiobookPlaybackOptions {
+                                mix_export: false,
+                                ..opts
+                            },
+                        );
+                    }
+                    Err(err) => {
+                        log_debug(&format!("Subtitle: mix export failed: {}", err));
+                        start_audiobook_at_with_options(
+                            hwnd_main,
+                            path_clone,
+                            seconds,
+                            AudiobookPlaybackOptions {
+                                mix_export: false,
+                                ..opts
+                            },
+                        );
+                    }
+                }
+            });
+            return;
+        }
+
+        let subtitle_hold = should_hold_for_edge_subtitles(hwnd_main, &path);
+        let effective_paused = options.paused || subtitle_hold;
+        let subtitle_cancel = Arc::new(AtomicBool::new(false));
+        let subtitle_speech_cancel = Arc::new(Mutex::new(None));
+        let subtitle_speech_command = Arc::new(Mutex::new(None));
+        let subtitle_path = path.clone();
+        let requested_speed = options.speed;
         log_debug(&format!(
             "Audio player: Thread started for {}",
             path.display()

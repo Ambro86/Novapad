@@ -47,6 +47,12 @@ pub struct FavoriteVoice {
 pub struct DictionaryEntry {
     pub original: String,
     pub replacement: String,
+    #[serde(default)]
+    pub use_custom_voice: bool,
+    #[serde(default)]
+    pub custom_voice_engine: Option<TtsEngine>,
+    #[serde(default)]
+    pub custom_voice: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

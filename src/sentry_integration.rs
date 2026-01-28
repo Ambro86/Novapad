@@ -420,7 +420,7 @@ pub fn save_last_fatal(message: &str, event_id: Option<&EventId>) {
 
 /// Installa un panic hook che:
 /// 1. Logga su file
-/// 2. Invia a Sentry (se abilitato)
+/// 2. Invia a Sentry (se abilitato) con contesto di telemetry
 /// 3. Chiama il panic hook precedente
 pub fn install_panic_hook() {
     let previous_hook = std::panic::take_hook();
@@ -445,13 +445,72 @@ pub fn install_panic_hook() {
         // 2. Logga sempre su file (prima di tutto)
         crate::log_debug(&panic_message);
 
-        // 3. Invia a Sentry se abilitato
+        // 3. Invia a Sentry se abilitato, con contesto di telemetry
         if is_enabled() {
             let sanitized = sanitize_message(&panic_message);
+
+            // Prendi snapshot del contesto telemetry
+            let ctx = crate::telemetry::snapshot_context();
+
             sentry::with_scope(
                 |scope| {
+                    // Tags per filtraggio
                     scope.set_tag("err.severity", "fatal");
                     scope.set_tag("err.type", "panic");
+                    scope.set_tag("panic.last_action", &ctx.last_action);
+
+                    if !ctx.current_window.is_empty() {
+                        scope.set_tag("panic.window", &ctx.current_window);
+                    }
+
+                    // Extra data - contesto completo
+                    scope.set_extra(
+                        "panic.last_action_age_secs",
+                        sentry::protocol::Value::from(ctx.action_age_secs),
+                    );
+                    scope.set_extra(
+                        "panic.last_action_details",
+                        sentry::protocol::Value::from(ctx.last_action_details.clone()),
+                    );
+                    scope.set_extra(
+                        "panic.audio_playing",
+                        sentry::protocol::Value::from(ctx.audio_playing),
+                    );
+                    scope.set_extra(
+                        "panic.tts_active",
+                        sentry::protocol::Value::from(ctx.tts_active),
+                    );
+
+                    if !ctx.updater_state.is_empty() {
+                        scope.set_extra(
+                            "panic.updater_state",
+                            sentry::protocol::Value::from(ctx.updater_state.clone()),
+                        );
+                    }
+
+                    // Recent actions as a list
+                    if !ctx.recent_actions.is_empty() {
+                        scope.set_extra(
+                            "panic.recent_actions",
+                            sentry::protocol::Value::from(ctx.recent_actions.join("\n")),
+                        );
+                    }
+
+                    // Recent logs (truncated to avoid huge payloads)
+                    if !ctx.recent_logs.is_empty() {
+                        let logs_truncated = if ctx.recent_logs.len() > 8000 {
+                            format!(
+                                "...(truncated)...\n{}",
+                                &ctx.recent_logs[ctx.recent_logs.len() - 8000..]
+                            )
+                        } else {
+                            ctx.recent_logs.clone()
+                        };
+                        scope.set_extra(
+                            "panic.recent_logs",
+                            sentry::protocol::Value::from(logs_truncated),
+                        );
+                    }
                 },
                 || {
                     sentry::capture_message(&sanitized, sentry::Level::Error);

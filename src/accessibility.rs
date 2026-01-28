@@ -68,7 +68,9 @@ pub fn handle_player_keyboard(msg: &MSG, skip_seconds: u32) -> PlayerCommand {
             vk if alt_down && shift_down && vk == 'P' as u32 => PlayerCommand::ChapterPrev,
             vk if alt_down && shift_down && vk == 'N' as u32 => PlayerCommand::ChapterNext,
             vk if alt_down && shift_down && vk == 'L' as u32 => PlayerCommand::ChapterList,
-            vk if ctrl_down && vk == 'T' as u32 => PlayerCommand::GoToTime,
+            vk if ctrl_down && !alt_down && !shift_down && vk == 'T' as u32 => {
+                PlayerCommand::GoToTime
+            }
             vk if ctrl_down && vk == 'I' as u32 => PlayerCommand::AnnounceTime,
             vk if vk == VK_SPACE.0 as u32 => PlayerCommand::TogglePause,
             vk if vk == VK_LEFT.0 as u32 => PlayerCommand::Seek(-(skip_seconds as i64)),

@@ -1,22 +1,26 @@
 use crate::accessibility::{handle_accessibility, to_wide};
 use crate::i18n;
-use crate::settings::{DictionaryEntry, Language, save_settings};
-use crate::with_state;
+use crate::settings::{DictionaryEntry, Language, TtsEngine, VoiceInfo, save_settings};
+use crate::{tts_engine, with_state};
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use tokio::sync::mpsc;
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::UI::Controls::{WC_BUTTON, WC_LISTBOXW, WC_STATIC};
+use windows::Win32::UI::Controls::{BST_CHECKED, WC_BUTTON, WC_COMBOBOXW, WC_LISTBOXW, WC_STATIC};
 use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, SetFocus, VK_ESCAPE, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
-    BS_DEFPUSHBUTTON, CREATESTRUCTW, CreateWindowExW, DefWindowProcW, DestroyWindow,
-    ES_AUTOHSCROLL, GWLP_USERDATA, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU,
-    IDC_ARROW, IDCANCEL, IDOK, LB_ADDSTRING, LB_GETCOUNT, LB_GETCURSEL, LB_GETITEMDATA,
-    LB_RESETCONTENT, LB_SETCURSEL, LB_SETITEMDATA, LBN_SELCHANGE, LBS_HASSTRINGS, LBS_NOTIFY,
-    LoadCursorW, MSG, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow,
-    SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE,
-    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
-    WS_VSCROLL,
+    BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL,
+    CB_GETITEMDATA, CB_RESETCONTENT, CB_SETCURSEL, CB_SETITEMDATA, CBS_DROPDOWNLIST, CREATESTRUCTW,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, ES_AUTOHSCROLL, GWLP_USERDATA,
+    GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, IDCANCEL, IDOK,
+    LB_ADDSTRING, LB_GETCOUNT, LB_GETCURSEL, LB_GETITEMDATA, LB_RESETCONTENT, LB_SETCURSEL,
+    LB_SETITEMDATA, LBN_SELCHANGE, LBS_HASSTRINGS, LBS_NOTIFY, LoadCursorW, MSG, PostMessageW,
+    RegisterClassW, SW_HIDE, SW_SHOW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
+    SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY,
+    WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -33,6 +37,10 @@ const DICT_ENTRY_ID_ORIGINAL: usize = 9201;
 const DICT_ENTRY_ID_REPLACEMENT: usize = 9202;
 const DICT_ENTRY_ID_OK: usize = 9203;
 const DICT_ENTRY_ID_CANCEL: usize = 9204;
+const DICT_ENTRY_ID_USE_VOICE: usize = 9205;
+const DICT_ENTRY_ID_ENGINE: usize = 9206;
+const DICT_ENTRY_ID_VOICE: usize = 9207;
+const DICT_ENTRY_ID_PREVIEW: usize = 9208;
 const DICT_FOCUS_LIST_MSG: u32 = WM_APP + 9;
 
 struct DictionaryWindowState {
@@ -49,6 +57,12 @@ struct DictionaryEntryState {
     edit_replacement: HWND,
     ok_button: HWND,
     index: Option<usize>,
+    checkbox_use_voice: HWND,
+    label_engine: HWND,
+    combo_engine: HWND,
+    label_voice: HWND,
+    combo_voice: HWND,
+    button_preview: HWND,
 }
 
 struct DictionaryLabels {
@@ -63,6 +77,14 @@ struct DictionaryLabels {
     entry_replacement: String,
     entry_ok: String,
     entry_cancel: String,
+    entry_use_voice: String,
+    entry_engine: String,
+    entry_voice: String,
+    entry_preview: String,
+    engine_edge: String,
+    engine_sapi5: String,
+    engine_sapi4: String,
+    voices_empty: String,
 }
 
 fn dictionary_labels(language: Language) -> DictionaryLabels {
@@ -78,6 +100,14 @@ fn dictionary_labels(language: Language) -> DictionaryLabels {
         entry_replacement: i18n::tr(language, "dictionary.entry_replacement"),
         entry_ok: i18n::tr(language, "dictionary.entry_ok"),
         entry_cancel: i18n::tr(language, "dictionary.entry_cancel"),
+        entry_use_voice: i18n::tr(language, "dictionary.entry_use_voice"),
+        entry_engine: i18n::tr(language, "dictionary.entry_engine"),
+        entry_voice: i18n::tr(language, "dictionary.entry_voice"),
+        entry_preview: i18n::tr(language, "dictionary.entry_preview"),
+        engine_edge: i18n::tr(language, "options.engine.edge"),
+        engine_sapi5: i18n::tr(language, "options.engine.sapi5"),
+        engine_sapi4: "SAPI 4".to_string(),
+        voices_empty: i18n::tr(language, "voice_panel.voices_empty"),
     }
 }
 
@@ -316,9 +346,12 @@ unsafe extern "system" fn dictionary_wndproc(
             if parent.0 != 0 {
                 EnableWindow(parent, true);
                 SetForegroundWindow(parent);
-                SetFocus(parent);
-                if let Some(edit) = crate::get_active_edit(parent) {
-                    SetFocus(edit);
+                // Only focus editor if not in player mode (audiobook)
+                if !crate::editor_manager::is_current_audiobook(parent) {
+                    SetFocus(parent);
+                    if let Some(edit) = crate::get_active_edit(parent) {
+                        SetFocus(edit);
+                    }
                 }
                 if with_state(parent, |state| {
                     state.dictionary_window = HWND(0);
@@ -483,6 +516,12 @@ unsafe fn open_entry_dialog(owner: HWND, index: Option<usize>) {
         edit_replacement: HWND(0),
         ok_button: HWND(0),
         index,
+        checkbox_use_voice: HWND(0),
+        label_engine: HWND(0),
+        combo_engine: HWND(0),
+        label_voice: HWND(0),
+        combo_voice: HWND(0),
+        button_preview: HWND(0),
     });
 
     let dialog = CreateWindowExW(
@@ -493,7 +532,7 @@ unsafe fn open_entry_dialog(owner: HWND, index: Option<usize>) {
         0,
         0,
         420,
-        220,
+        380,
         owner,
         None,
         hinstance,
@@ -589,13 +628,123 @@ unsafe extern "system" fn dictionary_entry_wndproc(
                 None,
             );
 
+            // Voice controls
+            let checkbox_use_voice = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.entry_use_voice).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                10,
+                120,
+                380,
+                20,
+                hwnd,
+                HMENU(DICT_ENTRY_ID_USE_VOICE as isize),
+                HINSTANCE(0),
+                None,
+            );
+
+            let label_engine = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.entry_engine).as_ptr()),
+                WS_CHILD,
+                10,
+                150,
+                120,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_engine = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                140,
+                148,
+                250,
+                120,
+                hwnd,
+                HMENU(DICT_ENTRY_ID_ENGINE as isize),
+                HINSTANCE(0),
+                None,
+            );
+
+            let label_voice = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.entry_voice).as_ptr()),
+                WS_CHILD,
+                10,
+                185,
+                120,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_voice = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                140,
+                183,
+                250,
+                200,
+                hwnd,
+                HMENU(DICT_ENTRY_ID_VOICE as isize),
+                HINSTANCE(0),
+                None,
+            );
+
+            let button_preview = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.entry_preview).as_ptr()),
+                WS_CHILD | WS_TABSTOP,
+                140,
+                218,
+                250,
+                26,
+                hwnd,
+                HMENU(DICT_ENTRY_ID_PREVIEW as isize),
+                HINSTANCE(0),
+                None,
+            );
+
+            // Populate engine combo
+            SendMessageW(
+                combo_engine,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&labels.engine_edge).as_ptr() as isize),
+            );
+            SendMessageW(
+                combo_engine,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&labels.engine_sapi5).as_ptr() as isize),
+            );
+            SendMessageW(
+                combo_engine,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&labels.engine_sapi4).as_ptr() as isize),
+            );
+            SendMessageW(combo_engine, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+
             let ok_button = CreateWindowExW(
                 Default::default(),
                 WC_BUTTON,
                 PCWSTR(to_wide(&labels.entry_ok).as_ptr()),
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
                 200,
-                130,
+                290,
                 90,
                 28,
                 hwnd,
@@ -609,7 +758,7 @@ unsafe extern "system" fn dictionary_entry_wndproc(
                 PCWSTR(to_wide(&labels.entry_cancel).as_ptr()),
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                 300,
-                130,
+                290,
                 90,
                 28,
                 hwnd,
@@ -623,6 +772,12 @@ unsafe extern "system" fn dictionary_entry_wndproc(
                 edit_original,
                 label_replacement,
                 edit_replacement,
+                checkbox_use_voice,
+                label_engine,
+                combo_engine,
+                label_voice,
+                combo_voice,
+                button_preview,
                 ok_button,
                 cancel_button,
             ] {
@@ -631,7 +786,8 @@ unsafe extern "system" fn dictionary_entry_wndproc(
                 }
             }
 
-            if let Some(index) = state.index
+            // Load existing entry data if editing
+            let saved_voice: Option<String> = if let Some(index) = state.index
                 && let Some(entry) =
                     with_state(state.parent, |s| s.settings.dictionary.get(index).cloned())
                         .unwrap_or(None)
@@ -647,13 +803,48 @@ unsafe extern "system" fn dictionary_entry_wndproc(
                 ) {
                     crate::log_debug(&format!("Failed to set edit_replacement text: {:?}", _e));
                 }
-            }
+
+                if entry.use_custom_voice {
+                    SendMessageW(
+                        checkbox_use_voice,
+                        BM_SETCHECK,
+                        WPARAM(BST_CHECKED.0 as usize),
+                        LPARAM(0),
+                    );
+                }
+
+                // Set engine combo selection
+                if let Some(engine) = entry.custom_voice_engine {
+                    let engine_idx = match engine {
+                        TtsEngine::Edge => 0,
+                        TtsEngine::Sapi5 => 1,
+                        TtsEngine::Sapi4 => 2,
+                    };
+                    SendMessageW(combo_engine, CB_SETCURSEL, WPARAM(engine_idx), LPARAM(0));
+                }
+
+                entry.custom_voice.clone()
+            } else {
+                None
+            };
 
             state.edit_original = edit_original;
             state.edit_replacement = edit_replacement;
             state.ok_button = ok_button;
+            state.checkbox_use_voice = checkbox_use_voice;
+            state.label_engine = label_engine;
+            state.combo_engine = combo_engine;
+            state.label_voice = label_voice;
+            state.combo_voice = combo_voice;
+            state.button_preview = button_preview;
+
             let state_ptr = Box::into_raw(state);
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, state_ptr as isize);
+
+            // Populate voice combo and update visibility
+            populate_entry_voice_combo(hwnd, saved_voice.as_deref());
+            update_voice_controls_visibility(hwnd);
+
             SetFocus(edit_original);
             LRESULT(0)
         }
@@ -670,6 +861,18 @@ unsafe extern "system" fn dictionary_entry_wndproc(
                 }
                 DICT_ENTRY_ID_CANCEL | 2 => {
                     crate::log_if_err!(DestroyWindow(hwnd));
+                    LRESULT(0)
+                }
+                DICT_ENTRY_ID_USE_VOICE => {
+                    update_voice_controls_visibility(hwnd);
+                    LRESULT(0)
+                }
+                DICT_ENTRY_ID_ENGINE => {
+                    populate_entry_voice_combo(hwnd, None);
+                    LRESULT(0)
+                }
+                DICT_ENTRY_ID_PREVIEW => {
+                    preview_entry_voice(hwnd);
                     LRESULT(0)
                 }
                 _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -730,7 +933,7 @@ where
 }
 
 unsafe fn apply_entry_dialog(hwnd: HWND) {
-    let (parent, owner, edit_original, edit_replacement, index) =
+    let (parent, owner, edit_original, edit_replacement, index, checkbox_use_voice, combo_engine) =
         match with_entry_state(hwnd, |s| {
             (
                 s.parent,
@@ -738,6 +941,8 @@ unsafe fn apply_entry_dialog(hwnd: HWND) {
                 s.edit_original,
                 s.edit_replacement,
                 s.index,
+                s.checkbox_use_voice,
+                s.combo_engine,
             )
         }) {
             Some(values) => values,
@@ -750,21 +955,40 @@ unsafe fn apply_entry_dialog(hwnd: HWND) {
         return;
     }
 
+    // Get voice settings
+    let use_voice = SendMessageW(checkbox_use_voice, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
+        == BST_CHECKED.0;
+
+    let (custom_engine, custom_voice) = if use_voice {
+        let engine_sel = SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+        let engine = match engine_sel {
+            1 => TtsEngine::Sapi5,
+            2 => TtsEngine::Sapi4,
+            _ => TtsEngine::Edge,
+        };
+
+        let voice = get_selected_voice(hwnd);
+        (Some(engine), voice)
+    } else {
+        (None, None)
+    };
+
     if with_state(parent, |state| {
+        let entry = DictionaryEntry {
+            original,
+            replacement,
+            use_custom_voice: use_voice,
+            custom_voice_engine: custom_engine,
+            custom_voice,
+        };
         match index {
             Some(idx) => {
                 if idx < state.settings.dictionary.len() {
-                    state.settings.dictionary[idx] = DictionaryEntry {
-                        original,
-                        replacement,
-                    };
+                    state.settings.dictionary[idx] = entry;
                 }
             }
             None => {
-                state.settings.dictionary.push(DictionaryEntry {
-                    original,
-                    replacement,
-                });
+                state.settings.dictionary.push(entry);
             }
         }
         save_settings(state.settings.clone());
@@ -789,4 +1013,284 @@ unsafe fn get_window_text(hwnd: HWND) -> String {
     let mut buf = vec![0u16; (len + 1) as usize];
     let read = GetWindowTextW(hwnd, &mut buf);
     String::from_utf16_lossy(&buf[..read as usize])
+}
+
+unsafe fn update_voice_controls_visibility(hwnd: HWND) {
+    let (checkbox_use_voice, label_engine, combo_engine, label_voice, combo_voice, button_preview) =
+        match with_entry_state(hwnd, |s| {
+            (
+                s.checkbox_use_voice,
+                s.label_engine,
+                s.combo_engine,
+                s.label_voice,
+                s.combo_voice,
+                s.button_preview,
+            )
+        }) {
+            Some(values) => values,
+            None => return,
+        };
+
+    let use_voice = SendMessageW(checkbox_use_voice, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
+        == BST_CHECKED.0;
+
+    let show = if use_voice { SW_SHOW } else { SW_HIDE };
+    ShowWindow(label_engine, show);
+    ShowWindow(combo_engine, show);
+    ShowWindow(label_voice, show);
+    ShowWindow(combo_voice, show);
+    ShowWindow(button_preview, show);
+}
+
+unsafe fn populate_entry_voice_combo(hwnd: HWND, selected_voice: Option<&str>) {
+    let (parent, combo_engine, combo_voice) =
+        match with_entry_state(hwnd, |s| (s.parent, s.combo_engine, s.combo_voice)) {
+            Some(values) => values,
+            None => return,
+        };
+
+    let engine_sel = SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    let engine = match engine_sel {
+        1 => TtsEngine::Sapi5,
+        2 => TtsEngine::Sapi4,
+        _ => TtsEngine::Edge,
+    };
+
+    let voices: Vec<VoiceInfo> = with_state(parent, |state| match engine {
+        TtsEngine::Edge => state.edge_voices.clone(),
+        TtsEngine::Sapi5 => state.sapi_voices.clone(),
+        TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
+    })
+    .unwrap_or_default();
+
+    let language = with_state(parent, |state| state.settings.language).unwrap_or(Language::Italian);
+    let labels = dictionary_labels(language);
+
+    SendMessageW(combo_voice, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+
+    if voices.is_empty() {
+        SendMessageW(
+            combo_voice,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.voices_empty).as_ptr() as isize),
+        );
+        SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+        return;
+    }
+
+    let mut selected_index: Option<usize> = None;
+    let mut combo_index = 0usize;
+
+    for (voice_index, voice) in voices.iter().enumerate() {
+        let label = format!("{} ({})", voice.short_name, voice.locale);
+        let wide = to_wide(&label);
+        let idx = SendMessageW(
+            combo_voice,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(wide.as_ptr() as isize),
+        )
+        .0;
+        if idx >= 0 {
+            SendMessageW(
+                combo_voice,
+                CB_SETITEMDATA,
+                WPARAM(idx as usize),
+                LPARAM(voice_index as isize),
+            );
+            if let Some(sel) = selected_voice
+                && voice.short_name == sel
+            {
+                selected_index = Some(combo_index);
+            }
+            combo_index += 1;
+        }
+    }
+
+    if let Some(idx) = selected_index {
+        SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(idx), LPARAM(0));
+    } else if combo_index > 0 {
+        SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+    }
+}
+
+unsafe fn get_selected_voice(hwnd: HWND) -> Option<String> {
+    let (parent, combo_engine, combo_voice) =
+        with_entry_state(hwnd, |s| (s.parent, s.combo_engine, s.combo_voice))?;
+
+    let engine_sel = SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    let engine = match engine_sel {
+        1 => TtsEngine::Sapi5,
+        2 => TtsEngine::Sapi4,
+        _ => TtsEngine::Edge,
+    };
+
+    let voices: Vec<VoiceInfo> = with_state(parent, |state| match engine {
+        TtsEngine::Edge => state.edge_voices.clone(),
+        TtsEngine::Sapi5 => state.sapi_voices.clone(),
+        TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
+    })
+    .unwrap_or_default();
+
+    let voice_sel = SendMessageW(combo_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    if voice_sel < 0 {
+        return None;
+    }
+    let voice_index = SendMessageW(
+        combo_voice,
+        CB_GETITEMDATA,
+        WPARAM(voice_sel as usize),
+        LPARAM(0),
+    )
+    .0 as usize;
+    if voice_index >= voices.len() {
+        return None;
+    }
+    Some(voices[voice_index].short_name.clone())
+}
+
+unsafe fn preview_entry_voice(hwnd: HWND) {
+    let (parent, edit_original, edit_replacement, combo_engine, combo_voice) =
+        match with_entry_state(hwnd, |s| {
+            (
+                s.parent,
+                s.edit_original,
+                s.edit_replacement,
+                s.combo_engine,
+                s.combo_voice,
+            )
+        }) {
+            Some(values) => values,
+            None => return,
+        };
+
+    let language = with_state(parent, |state| state.settings.language).unwrap_or(Language::Italian);
+
+    // Use the replacement text if available, otherwise use the original word
+    let replacement = get_window_text(edit_replacement);
+    let original = get_window_text(edit_original);
+    let text = if replacement.trim().is_empty() {
+        if original.trim().is_empty() {
+            i18n::tr(language, "tts.preview_text")
+        } else {
+            original
+        }
+    } else {
+        replacement
+    };
+
+    if text.trim().is_empty() {
+        return;
+    }
+
+    let engine_sel = SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    let engine = match engine_sel {
+        1 => TtsEngine::Sapi5,
+        2 => TtsEngine::Sapi4,
+        _ => TtsEngine::Edge,
+    };
+
+    let voices: Vec<VoiceInfo> = with_state(parent, |state| match engine {
+        TtsEngine::Edge => state.edge_voices.clone(),
+        TtsEngine::Sapi5 => state.sapi_voices.clone(),
+        TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
+    })
+    .unwrap_or_default();
+
+    let voice_sel = SendMessageW(combo_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    if voice_sel < 0 {
+        return;
+    }
+    let voice_index = SendMessageW(
+        combo_voice,
+        CB_GETITEMDATA,
+        WPARAM(voice_sel as usize),
+        LPARAM(0),
+    )
+    .0 as usize;
+    if voice_index >= voices.len() {
+        return;
+    }
+    let voice = voices[voice_index].short_name.clone();
+
+    // Use default rate/pitch/volume
+    let rate = 0;
+    let pitch = 0;
+    let volume = 100;
+
+    match engine {
+        TtsEngine::Edge => {
+            let chunks = tts_engine::split_into_tts_chunks(&text, false, &[]);
+            let options = tts_engine::TtsPlaybackOptions {
+                hwnd: parent,
+                cleaned: text,
+                voice,
+                chunks,
+                initial_caret_pos: 0,
+                rate,
+                pitch,
+                volume,
+                dialogue_voice: None,
+            };
+            tts_engine::start_tts_playback_with_chunks(options);
+        }
+        TtsEngine::Sapi4 => {
+            tts_engine::stop_tts_playback(parent);
+            let voice_idx = if let Some(hash_pos) = voice.find('#') {
+                let rest = &voice[hash_pos + 1..];
+                if let Some(pipe_pos) = rest.find('|') {
+                    rest[..pipe_pos].parse::<i32>().unwrap_or(1)
+                } else {
+                    rest.parse::<i32>().unwrap_or(1)
+                }
+            } else {
+                1
+            };
+            let cancel = Arc::new(AtomicBool::new(false));
+            let (command_tx, command_rx) = mpsc::unbounded_channel();
+            if with_state(parent, |state| {
+                state.tts_session = Some(tts_engine::TtsSession {
+                    id: state.tts_next_session_id,
+                    command_tx,
+                    cancel: cancel.clone(),
+                    paused: false,
+                    initial_caret_pos: 0,
+                });
+                state.tts_next_session_id += 1;
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access state in dictionary_window");
+            }
+            crate::sapi4_engine::play_sapi4(
+                voice_idx, text, rate, pitch, volume, cancel, command_rx,
+            );
+        }
+        TtsEngine::Sapi5 => {
+            tts_engine::stop_tts_playback(parent);
+            let cancel = Arc::new(AtomicBool::new(false));
+            let (command_tx, command_rx) = mpsc::unbounded_channel();
+            if with_state(parent, |state| {
+                state.tts_session = Some(tts_engine::TtsSession {
+                    id: state.tts_next_session_id,
+                    command_tx,
+                    cancel: cancel.clone(),
+                    paused: false,
+                    initial_caret_pos: 0,
+                });
+                state.tts_next_session_id += 1;
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access state in dictionary_window");
+            }
+            let chunks = vec![text];
+            if let Err(e) = crate::sapi5_engine::play_sapi(
+                chunks, voice, rate, pitch, volume, cancel, command_rx,
+            ) {
+                crate::log_debug(&format!("SAPI5 preview error: {}", e));
+            }
+        }
+    }
 }

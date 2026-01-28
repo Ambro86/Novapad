@@ -15,6 +15,7 @@ mod conpty;
 mod diagnostics;
 mod sentry_integration;
 mod settings;
+mod telemetry;
 mod watchdog;
 use editor_manager::Document;
 use settings::*;
@@ -406,6 +407,9 @@ fn truncate_log_if_needed(path: &Path) {
 }
 
 pub(crate) fn log_debug(message: &str) {
+    // Push to telemetry ring buffer for hang diagnostics
+    telemetry::push_log_line(message);
+
     let Some(path) = log_path() else {
         return;
     };
@@ -1195,7 +1199,7 @@ fn announce_player_volume(hwnd: HWND) {
     let Some(volume) = volume else {
         return;
     };
-    let percent = (volume * 100.0).round().clamp(0.0, 300.0) as u32;
+    let percent = (volume * 100.0).round().clamp(0.0, 600.0) as u32;
     let message = i18n::tr_f(
         language,
         "player.volume_announce",
@@ -1526,6 +1530,9 @@ fn main() -> windows::core::Result<()> {
         let settings = load_settings();
         sentry_integration::init(settings.send_crash_reports, option_env!("SENTRY_DSN"));
     }
+
+    // Inizializza telemetry per hang diagnostics
+    telemetry::init();
 
     // Installa panic hook (logga + invia a Sentry)
     sentry_integration::install_panic_hook();

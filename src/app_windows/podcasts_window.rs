@@ -5997,7 +5997,10 @@ unsafe extern "system" fn podcast_wndproc(
                 if with_state(parent, |s| s.podcasts_window = HWND(0)).is_none() {
                     crate::log_debug("Failed to reset podcasts_window state");
                 }
-                force_focus_editor_on_parent(parent);
+                // Only focus editor if not in player mode (audiobook)
+                if !crate::editor_manager::is_current_audiobook(parent) {
+                    force_focus_editor_on_parent(parent);
+                }
             }
             let ptr =
                 GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)

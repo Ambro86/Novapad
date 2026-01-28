@@ -2065,13 +2065,17 @@ unsafe extern "system" fn options_wndproc(
             if parent.0 != 0 {
                 EnableWindow(parent, true);
                 SetForegroundWindow(parent);
-                SetFocus(parent);
-                if let Some(edit) = crate::get_active_edit(parent) {
-                    SetFocus(edit);
-                }
-                if let Err(_e) = PostMessageW(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0))
-                {
-                    crate::log_debug(&format!("Error: {:?}", _e));
+                // Only focus editor if not in player mode (audiobook)
+                if !crate::editor_manager::is_current_audiobook(parent) {
+                    SetFocus(parent);
+                    if let Some(edit) = crate::get_active_edit(parent) {
+                        SetFocus(edit);
+                    }
+                    if let Err(_e) =
+                        PostMessageW(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0))
+                    {
+                        crate::log_debug(&format!("Error: {:?}", _e));
+                    }
                 }
                 if with_state(parent, |state| {
                     state.options_dialog = HWND(0);

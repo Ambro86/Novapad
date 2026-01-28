@@ -1135,7 +1135,10 @@ unsafe extern "system" fn rss_wndproc(
                     crate::log_debug("Failed to reset rss_window state");
                 }
                 // Parent was never disabled; just bring it to front as a convenience.
-                force_focus_editor_on_parent(parent);
+                // Only focus editor if not in player mode (audiobook)
+                if !crate::editor_manager::is_current_audiobook(parent) {
+                    force_focus_editor_on_parent(parent);
+                }
             }
             LRESULT(0)
         }

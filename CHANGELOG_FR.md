@@ -1,0 +1,205 @@
+# Journal des modifications
+
+Version 0.6.2 – 24/01/2026
+Nouvelles fonctionnalités
+• Ajout de la prise en charge de l'exécution de fichiers (Maj+F5). Les utilisateurs peuvent sélectionner un interpréteur (par exemple, python) dans les Options, et appuyer sur F5 exécute le script actuel. Les fichiers HTML s'ouvrent dans le navigateur.
+• Ajout de la prise en charge des fichiers pointeurs Google Docs (.gdoc, .gsheet, .gslides), qui s'ouvrent automatiquement dans le navigateur par défaut.
+• Ajout de la prise en charge du format de livre audio M4B (Apple/AAC).
+• Ajout de l'option "Afficher les épisodes" dans le menu contextuel des résultats de recherche de podcasts pour parcourir et lire des épisodes sans s'abonner.
+• Ajout de la fonctionnalité "Aller à la ligne" (menu Édition ou Ctrl+J) pour accéder rapidement à un numéro de ligne spécifique.
+• Ajout d'options de menu contextuel pour ordonner les flux RSS et les podcasts (alphabétiquement ou par date).
+• Ajout de flux RSS vietnamiens par défaut.
+• Ajout d'une case de test du microphone dans la boîte de dialogue d'enregistrement pour vérifier les niveaux avant de commencer.
+• Ajout de "Afficher la description" pour les épisodes de podcast dans le menu contextuel.
+• Ajout de la prise en charge des formats audio/vidéo étendus via FFmpeg : mkv, avi, mov, m4v, webm, mpg, ts, wmv, flv, vob, 3gp, flac, ogg, wma, aiff.
+• Ajout de la prise en charge de la lecture synchronisée des sous-titres (srt, vtt, ass, sub, sbv, lrc, smi) avec NVDA ou la voix sélectionnée.
+• Ajout d'associations de fichiers pour tous les nouveaux formats audio/vidéo pris en charge dans le menu contextuel "Ouvrir avec Novapad".
+Améliorations
+• L'ouverture d'un fichier audio/vidéo depuis l'Explorateur ouvre désormais directement la vue du lecteur au lieu de l'éditeur de texte.
+• Suppression de l'invite OCR pour les PDF inaccessibles ; l'OCR est désormais effectué automatiquement pour améliorer la vitesse et l'expérience utilisateur.
+• Amélioration du terminal accessible : la lecture NVDA mémorise désormais la dernière ligne lue pour une meilleure continuité.
+• SAPI 4 : La création de livres audio est désormais entièrement parallélisée et presque instantanée. Ajout d'une invite pour choisir le nombre de processus simultanés.
+• SAPI 4 : Élimination du goulot d'étranglement de la conversion WAV vers MP3 en convertissant les morceaux en parallèle pendant la synthèse.
+• SAPI 4 : Amélioration de la gestion des erreurs et du nettoyage automatique des fichiers temporaires.
+• Boîte de dialogue Rechercher : Renommage de "Regex" en "Expression régulière" pour plus de clarté et correction d'un bug critique empêchant de trouver certains mots.
+• Livres audio M4B : Meilleure gestion de la sortie ; la division par parties/marqueurs produit désormais un seul fichier M4B avec des chapitres de métadonnées appropriés.
+• Lecteur : Correction de la précision des signets et de l'annonce du temps lorsque la vitesse de lecture n'est pas de 1.0x.
+• Restauration de la navigation Ctrl+Tab et Ctrl+Maj+Tab dans les Options.
+• Ajout d'une option dans le menu Lecture pour réinitialiser instantanément la vitesse à la normale (1.0x).
+• Mise à jour de toutes les dépendances vers les dernières versions pour de meilleures performances et stabilité.
+• Intégration de FFmpeg avec chargement dynamique de DLL pour assurer la compatibilité sans bloquer le démarrage.
+• Mise à jour des filtres de téléchargement de podcasts pour inclure les nouveaux formats audio/vidéo.
+• Empêchement de Ctrl+S d'enregistrer les fichiers audio/vidéo pour éviter la corruption.
+Corrections
+• Correction d'un bug où le journal des modifications ne s'ouvrait pas au démarrage.
+• Correction d'un bug où l'invite OCR n'apparaissait pas pour les PDF inaccessibles ouverts depuis l'Explorateur.
+• Correction d'un bug au démarrage pouvant entraîner une perte de focus ou la fermeture de la fenêtre immédiatement après l'ouverture.
+
+Version 0.6.1 – 20/01/2026
+Corrections
+• Correction d'un bug où l'activation de "Afficher les voix dans l'éditeur" provoquait l'arrêt de la lecture du podcast.
+• Correction d'un problème où certains podcasts ne pouvaient pas être ajoutés via URL car l'URL était tronquée.
+• Correction d'un bug où les URL normales ne pouvaient plus être ajoutées dans la fonctionnalité de flux RSS.
+• Correction d'un problème où l'option de langue de Wikipédia était affichée plusieurs fois dans différents onglets de paramètres.
+• Suppression de la création de fichiers de débogage qui étaient générés incorrectement même en mode release.
+Améliorations
+• Amélioration de la prise en charge des voix Microsoft, qui utilisent désormais une méthode de lecture dédiée avec un agent utilisateur différent.
+• Ajout de la prise en charge des fichiers MP4.
+
+Version 0.6.0 – 20/01/2025
+Nouvelles fonctionnalités
+• Ajout du correcteur orthographique. Depuis le menu contextuel, les utilisateurs peuvent vérifier si le mot actuel est correct et, sinon, obtenir des suggestions d'orthographe.
+• Ajout de l'importation et de l'exportation de podcasts via des fichiers OPML.
+• Ajout de la prise en charge de la recherche Podcast Index en plus d'iTunes. Les utilisateurs peuvent saisir leur clé API et leur secret gratuits (générés uniquement à l'aide d'une adresse e-mail).
+• Ajout de la prise en charge des voix SAPI4, tant pour la lecture en temps réel que pour la création de livres audio.
+• Ajout du repli automatique OCR pour les PDF non accessibles : lorsqu'aucun texte extractible n'est trouvé, le document est reconnu via OCR.
+• Ajout de la prise en charge du dictionnaire utilisant le Wiktionnaire. Appuyer sur la touche Applications affiche les définitions et, lorsqu'ils sont disponibles, les synonymes et les traductions dans d'autres langues.
+• Ajout de l'importation d'articles Wikipédia avec recherche, sélection de résultats et importation directe dans l'éditeur.
+• Ajout du raccourci Maj+Entrée dans le module RSS pour ouvrir un article directement sur le site web d'origine.
+Améliorations
+• La sélection du microphone est désormais toujours respectée par l'application.
+• Dans la fenêtre des podcasts, appuyer sur Entrée sur un épisode annonce désormais immédiatement "chargement" via NVDA pour confirmer l'action.
+• Dans les résultats de recherche de podcasts, appuyer sur Entrée s'abonne désormais au podcast sélectionné.
+• Correction et amélioration des étiquettes pour les raccourcis Ctrl+Maj+O et Podcast Ctrl+Maj+P.
+• La vitesse et le volume de lecture sont désormais enregistrés dans les paramètres et persistent pour tous les fichiers audio.
+• Ajout d'un dossier cache dédié pour les épisodes de podcast. Les utilisateurs peuvent conserver les épisodes via "Garder le podcast" dans le menu Lecture. Le cache est automatiquement nettoyé lorsqu'il dépasse la taille définie par l'utilisateur (Options → Audio).
+• Amélioration significative de la récupération des articles RSS en utilisant l'emprunt d'identité libcurl avec des profils Chrome et iPhone, assurant une compatibilité avec ~99% des sites.
+• Ajout de l'état lu / non lu pour les articles RSS, avec une indication claire dans la liste RSS.
+• Tout remplacer signale désormais le nombre de remplacements effectués.
+• Ajout d'un bouton Supprimer le podcast lors de la navigation dans la bibliothèque de podcasts à l'aide de Tab.
+Corrections
+• Suppression de l'entrée redondante "mise à jour en attente" du menu Aide (les mises à jour sont déjà gérées automatiquement).
+• Correction d'un bug où appuyer sur Ctrl+S sur un fichier MP3 ouvert enregistrait et corrompait le fichier.
+• Correction d'un problème d'interface utilisateur où "Audiolivres par lots" était affiché comme "(B)… Ctrl+Maj+B" (suppression de l'étiquette redondante).
+• Correction des guillemets intelligents : lorsqu'ils sont activés, les guillemets normaux sont désormais correctement remplacés par des guillemets intelligents.
+• Correction d'un bug où l'utilisation de "Aller au signet" réinitialisait la vitesse de lecture à 1.0.
+• Correction d'un problème où les épisodes de podcast déjà téléchargés étaient retéléchargés au lieu d'utiliser la version en cache.
+Raccourcis clavier
+• F1 ouvre désormais le Guide d'aide.
+• F2 vérifie désormais les mises à jour.
+• F7 / F8 sautent désormais à l'erreur d'orthographe précédente ou suivante.
+• F9 / F10 basculent désormais rapidement entre les voix favorites.
+Améliorations développeur
+• Les erreurs ne sont plus ignorées silencieusement : tous les modèles let _ = ont été supprimés, et les erreurs sont désormais gérées explicitement.
+• Le projet ne compile plus s'il y a des avertissements.
+• Les implémentations personnalisées telles que les aides de style strlen / wcslen ont été supprimées.
+• La gestion des DLL a été nettoyée et consolidée autour de libloading.
+• Les aides d'analyse d'octets manuelles ont été supprimées au profit des méthodes standard.
+
+Version 0.5.9 - 13/01/2025
+Nouvelles fonctionnalités
+• Ajout de la réorganisation RSS depuis le menu contextuel (monter/descendre/vers la position) avec vérification de position invalide.
+• Ajout d'un menu contextuel d'article avec ouverture du site d'origine et partage via WhatsApp, Facebook et X.
+• Ajout du raccourci Échap pour revenir des articles importés à la liste RSS.
+• Ajout du mode podcast : recherche, abonnement, écoute ; réorganisation des abonnements ; Échap arrête la lecture et revient à la liste ; Entrée sur un épisode démarre la lecture.
+• Ajout du contrôle de la vitesse de lecture pour les podcasts et les fichiers MP3.
+• Ajout de Ctrl+T pour sauter à un temps spécifique.
+• Ajout d'un bouton d'aperçu vocal après le combo de volume.
+• Ajout de la recherche et du remplacement par regex (style Notepad++).
+• Ajout de l'importation RSS depuis des fichiers OPML et TXT.
+• Ajout d'une option pour activer "Ouvrir avec Novapad" dans l'Explorateur de fichiers, y compris pour les versions portables.
+Améliorations
+• Amélioration de la sélection de la vitesse/hauteur/volume de la voix, respectant les limites maximales TTS.
+• Diverses améliorations RSS pour télécharger tous les articles sans déplacer le focus NVDA pendant les mises à jour.
+• Amélioration de la lecture audio avec un menu dédié, annonce du temps Ctrl+I, et volume jusqu'à 300%.
+• Ajout de raccourcis manquants pour certaines fonctions.
+• Réorganisation du menu Édition avec un sous-menu de nettoyage de texte.
+• Réorganisation des Options en onglets, avec navigation Ctrl+Tab et Ctrl+Maj+Tab.
+• Le lecteur RSS télécharge désormais le contenu complet de l'article, correspondant à la vue du navigateur.
+Corrections
+• Correction du nettoyage Markdown supprimant les numéros au début des lignes.
+• Correction de AltGr+Z déclenchant l'annulation.
+• Correction de l'annulation de l'enregistrement de livre audio pour qu'il s'arrête rapidement.
+Localisation
+• Ajout de la traduction vietnamienne (merci à Anh Đức Nguyễn).
+
+Version 0.5.8 - 10/01/2026
+Nouvelles fonctionnalités
+• Ajout du contrôle du volume pour le microphone et l'audio système lors de l'enregistrement de podcasts.
+• Ajout d'une nouvelle fonctionnalité pour importer des articles depuis des sites web ou des flux RSS, y compris les flux les plus importants pour chaque langue.
+• Ajout d'une fonction pour supprimer tous les signets du fichier actuel.
+• Ajout d'une fonction pour supprimer les lignes dupliquées et les lignes consécutives dupliquées.
+• Ajout d'une fonction pour fermer tous les onglets ou fenêtres sauf l'actuel.
+• Ajout d'une entrée Dons dans le menu Aide pour toutes les langues.
+Améliorations
+• Amélioration du terminal accessible pour éviter certains plantages.
+• Amélioration et correction des touches d'accès et des raccourcis clavier dans toute l'application.
+• Correction d'un problème où la fermeture de la fenêtre de lecture audio n'arrêtait pas la lecture.
+• Ajout de boîtes de dialogue de confirmation pour les actions importantes (ex: supprimer les lignes dupliquées, supprimer les traits d'union de fin de ligne, supprimer tous les signets).
+• Ajout de la possibilité de supprimer des flux/sites RSS de la bibliothèque en les sélectionnant et en appuyant sur Suppr.
+• Ajout d'un menu contextuel dans la fenêtre RSS pour modifier ou supprimer des flux/sites RSS.
+• Suppression du paramètre pour déplacer les paramètres vers le dossier actuel ; l'application gère désormais cela automatiquement en fonction de l'emplacement.
+
+Version 0.5.7 - 05/01/2026
+Nouvelles fonctionnalités
+• Ajout de la fonctionnalité Audiolivres par lots pour convertir plusieurs fichiers/dossiers à la fois.
+• Ajout de la prise en charge des fichiers Markdown (.md).
+• Ajout de la sélection de l'encodage de fichier lors de l'ouverture de fichiers texte.
+• Ajout d'une option dans le terminal accessible pour annoncer les nouvelles lignes avec NVDA.
+Améliorations
+• L'enregistrement de livre audio sauvegarde désormais nativement en MP3 lorsqu'il est sélectionné.
+• L'utilisateur peut désormais choisir la position de l'astérisque (*) "modifications non enregistrées" dans le titre de la fenêtre.
+• Amélioration de la robustesse du système de mise à jour.
+• Ajout de "Supprimer les traits d'union" dans le menu Édition pour corriger les fins de ligne OCR.
+
+Version 0.5.6 - 04/01/2026
+Corrections
+  Amélioration de la recherche dans les fichiers pour que l'appui sur Entrée ouvre le fichier exactement à l'extrait sélectionné.
+Améliorations
+  Ajout de la prise en charge PPT/PPTX (ouvrir comme texte).
+  L'ouverture de formats non textuels enregistre désormais en .txt pour éviter la corruption de formatage (PDF/DOC/DOCX/EPUB/HTML/PPT/PPTX).
+  Ajout de l'enregistrement de podcast à partir du microphone et de l'audio système (menu Fichier, Ctrl+Maj+R).
+
+Version 0.5.5 – 03/01/2026
+Nouvelles fonctionnalités
+• Ajout d'un terminal accessible optimisé pour les grandes sorties et les lecteurs d'écran (Ctrl+Maj+P).
+• Ajout d'un paramètre pour enregistrer les paramètres utilisateur dans le dossier actuel (mode portable).
+Corrections
+• Amélioration des extraits de recherche dans les fichiers pour que l'aperçu reste aligné avec la correspondance.
+
+Version 0.5.4 – 03/01/2026
+Améliorations
+• Correction de la normalisation des espaces (Ctrl+Maj+Entrée).
+• Ajout de la prise en charge HTML/HTM (ouvrir comme texte).
+
+Version 0.5.3 – 02/01/2026
+Nouvelles fonctionnalités
+• Ajout de la recherche dans les fichiers.
+• Ajout de nouveaux outils de texte : Normaliser les espaces, Saut de ligne dur et Supprimer Markdown.
+• Ajout des statistiques de texte (Alt+Y).
+• Ajout de nouvelles commandes de liste dans le menu Édition :
+• Ordonner les éléments (Alt+Maj+O)
+• Garder les éléments uniques (Alt+Maj+K)
+• Inverser les éléments (Alt+Maj+Z)
+• Ajout de Citer / Retirer la citation des lignes (Ctrl+Q / Ctrl+Maj+Q).
+Localisation
+• Ajout de la localisation espagnole.
+• Ajout de la localisation portugaise.
+Améliorations
+• Lorsqu'un fichier EPUB est ouvert, Enregistrer bascule désormais automatiquement vers Enregistrer sous et exporte le contenu en fichier .txt pour éviter la corruption de l'EPUB.
+
+## 0.5.2 - 01/01/2026
+- Ajout d'un journal des modifications.
+- Ajout des options ouvrir avec Novapad et des associations de fichiers lors de l'installation.
+- Amélioration de la localisation des messages.
+- Ajout de la sélection de partie lors de l'utilisation de "Diviser le livre audio par texte".
+- Ajout de l'importation de transcription YouTube.
+
+## 0.5.1 - 31/12/2025
+- Mises à jour automatiques avec confirmation.
+- Améliorations de l'exportation de livres audio.
+- Améliorations TTS.
+- Menu Affichage et panneaux voix/favoris.
+- Langue par défaut du système et améliorations de la localisation.
+- CI et empaquetage Windows.
+
+## 0.5.0 - 27/12/2025
+- Refactorisation modulaire.
+- Flux de travail de construction/empaquetage Windows.
+- Correction de la navigation par TAB dans la fenêtre d'aide.
+
+## 0.5 - 27/12/2025
+- Changement de version préliminaire.
+
+## 0.1.0 - 25/12/2025
+- Version initiale.

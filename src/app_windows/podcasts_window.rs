@@ -51,12 +51,14 @@ use windows::core::{PCWSTR, PWSTR, w};
 const PODCASTS_WINDOW_CLASS: &str = "NovapadPodcasts";
 const PODCASTS_REORDER_CLASS: &str = "NovapadPodcastsReorder";
 const PODCASTS_ADD_CLASS: &str = "NovapadPodcastsAdd";
+const PODCASTS_CATEGORIES_CLASS: &str = "NovapadPodcastsCategories";
 
 const ID_TREE: usize = 12001;
 const ID_SEARCH_LABEL: usize = 12005;
 const ID_SEARCH_EDIT: usize = 12002;
 const ID_SEARCH_PROVIDER: usize = 12011;
 const ID_SEARCH_BUTTON: usize = 12006;
+const ID_SEARCH_CATEGORIES_BUTTON: usize = 12012;
 const ID_RESULTS: usize = 12003;
 const ID_ADD_BUTTON: usize = 12004;
 const ID_IMPORT_BUTTON: usize = 12009;
@@ -77,6 +79,7 @@ const WM_PODCAST_SEARCH_COMPLETE: u32 = windows::Win32::UI::WindowsAndMessaging:
 const WM_PODCAST_PLAY_READY: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 312;
 const WM_PODCAST_PLAY_FAILED: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 313;
 const WM_PODCAST_DOWNLOAD_PROGRESS: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 314;
+const WM_PODCAST_CATEGORIES_READY: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 315;
 
 const EM_SETSEL: u32 = 0x00B1;
 const EM_SCROLLCARET: u32 = 0x00B7;
@@ -108,6 +111,14 @@ const ID_CTX_SEARCH_COPY_URL: usize = 13203;
 const ID_CTX_SEARCH_SHOW_EPISODES: usize = 13204;
 const PODCAST_ADD_COPYDATA: usize = 0x504F4443;
 
+const CATEGORIES_SOURCE_COMBO_ID: usize = 14101;
+const CATEGORIES_MODE_COMBO_ID: usize = 14102;
+const CATEGORIES_LIST_ID: usize = 14103;
+const CATEGORIES_TERM_EDIT_ID: usize = 14104;
+const CATEGORIES_OPEN_ID: usize = 14105;
+const CATEGORIES_CANCEL_ID: usize = 14106;
+const CATEGORIES_STATUS_ID: usize = 14107;
+
 #[derive(Clone)]
 struct PodcastSearchResult {
     title: String,
@@ -121,6 +132,24 @@ enum SearchProvider {
     PodcastIndex,
 }
 
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct Category {
+    id: u32,
+    name: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Source {
+    Apple,
+    PodcastIndex,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Mode {
+    Top,
+    SearchInCategory,
+}
+
 struct PodcastWindowState {
     parent: HWND,
     language: Language,
@@ -129,6 +158,7 @@ struct PodcastWindowState {
     hwnd_search: HWND,
     hwnd_search_provider: HWND,
     hwnd_search_button: HWND,
+    hwnd_search_categories: HWND,
     hwnd_results: HWND,
     hwnd_add: HWND,
     hwnd_import: HWND,
@@ -418,6 +448,36 @@ struct AddDialogInit {
     parent: HWND,
 }
 
+struct CategoryDialogInit {
+    parent: HWND,
+    initial_source: Source,
+    initial_term: String,
+}
+
+struct CategoryDialogState {
+    parent: HWND,
+    language: Language,
+    hwnd_source_label: HWND,
+    hwnd_source: HWND,
+    hwnd_mode_label: HWND,
+    hwnd_mode: HWND,
+    hwnd_list_label: HWND,
+    hwnd_list: HWND,
+    hwnd_term_label: HWND,
+    hwnd_term_edit: HWND,
+    hwnd_open: HWND,
+    hwnd_cancel: HWND,
+    hwnd_status: HWND,
+    source: Source,
+    mode: Mode,
+    categories: Vec<Category>,
+}
+
+struct CategoryListMsg {
+    categories: Vec<Category>,
+    error: Option<String>,
+}
+
 struct FetchResult {
     hitem: isize,
     node: NodeData,
@@ -426,6 +486,8 @@ struct FetchResult {
 
 struct SearchResultMsg {
     results: Vec<PodcastSearchResult>,
+    status: Option<String>,
+    error: Option<String>,
 }
 
 struct PlayReadyMsg {
@@ -1472,12 +1534,21 @@ unsafe fn add_podcast_source(parent: HWND, feed_url: &str, title: &str) -> Optio
     .flatten()
 }
 
-unsafe fn update_search_results(hwnd: HWND, results: Vec<PodcastSearchResult>) {
+unsafe fn update_search_results(
+    hwnd: HWND,
+    results: Vec<PodcastSearchResult>,
+    status: Option<&str>,
+) {
     let hwnd_results = with_podcast_state(hwnd, |s| s.hwnd_results).unwrap_or(HWND(0));
     if hwnd_results.0 == 0 {
         return;
     }
     SendMessageW(hwnd_results, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    if let Some(status) = status
+        && !status.trim().is_empty()
+    {
+        announce_status(status);
+    }
     if results.is_empty() {
         let text = to_wide(&i18n::tr(
             with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
@@ -1513,6 +1584,26 @@ unsafe fn update_search_results(hwnd: HWND, results: Vec<PodcastSearchResult>) {
     SetFocus(hwnd_results);
 }
 
+unsafe fn show_search_loading(hwnd: HWND) {
+    let hwnd_results = with_podcast_state(hwnd, |s| s.hwnd_results).unwrap_or(HWND(0));
+    if hwnd_results.0 == 0 {
+        return;
+    }
+    SendMessageW(hwnd_results, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    let text = to_wide(&i18n::tr(
+        with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
+        "podcasts.loading",
+    ));
+    SendMessageW(
+        hwnd_results,
+        LB_ADDSTRING,
+        WPARAM(0),
+        LPARAM(text.as_ptr() as isize),
+    );
+    SendMessageW(hwnd_results, LB_SETCURSEL, WPARAM(0), LPARAM(0));
+    SetFocus(hwnd_results);
+}
+
 unsafe fn selected_search_provider(hwnd: HWND) -> SearchProvider {
     let combo = with_podcast_state(hwnd, |s| s.hwnd_search_provider).unwrap_or(HWND(0));
     if combo.0 == 0 {
@@ -1531,74 +1622,20 @@ unsafe fn perform_search(hwnd: HWND, query: &str) {
     if trimmed.is_empty() {
         return;
     }
-    let hwnd_results = with_podcast_state(hwnd, |s| s.hwnd_results).unwrap_or(HWND(0));
-    if hwnd_results.0 != 0 {
-        SendMessageW(hwnd_results, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
-        let text = to_wide(&i18n::tr(
-            with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
-            "podcasts.loading",
-        ));
-        SendMessageW(
-            hwnd_results,
-            LB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(text.as_ptr() as isize),
-        );
-        SendMessageW(hwnd_results, LB_SETCURSEL, WPARAM(0), LPARAM(0));
-        SetFocus(hwnd_results);
-    }
+    show_search_loading(hwnd);
     let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
     if parent.0 != 0 {
         ensure_rss_http(parent);
     }
     let provider = selected_search_provider(hwnd);
-    let (podcastindex_key, podcastindex_secret) =
-        if matches!(provider, SearchProvider::PodcastIndex) {
-            let (user_key, user_secret) = with_state(parent, |ps| {
-                (
-                    ps.settings.podcast_index_api_key.clone(),
-                    settings::decrypt_podcast_index_secret(&ps.settings.podcast_index_api_secret),
-                )
-            })
-            .unwrap_or((String::new(), None));
-
-            let (key, secret) = if !user_key.trim().is_empty()
-                && user_secret
-                    .as_deref()
-                    .map(|s| !s.trim().is_empty())
-                    .unwrap_or(false)
-            {
-                // Chiavi utente
-                (user_key, user_secret.unwrap_or_default())
-            } else {
-                // Nessuna chiave disponibile
-                (String::new(), String::new())
-            };
-
-            let missing = key.trim().is_empty() || secret.trim().is_empty();
-            if missing {
-                let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
-                let title = i18n::tr(language, "podcasts.podcastindex.missing_title");
-                let body = i18n::tr(language, "podcasts.podcastindex.missing_body");
-                let response = MessageBoxW(
-                    hwnd,
-                    PCWSTR(to_wide(&body).as_ptr()),
-                    PCWSTR(to_wide(&title).as_ptr()),
-                    MB_YESNO | MB_ICONINFORMATION,
-                );
-                if response == IDYES
-                    && let Err(_e) = crate::audio_utils::open_url_in_browser(
-                        "https://api.podcastindex.org/signup",
-                    )
-                {
-                    crate::log_debug(&format!("Error: {:?}", _e));
-                }
-                return;
-            }
-            (key, secret)
-        } else {
-            (String::new(), String::new())
-        };
+    let podcastindex_auth = if matches!(provider, SearchProvider::PodcastIndex) {
+        podcastindex_credentials_or_prompt(hwnd, parent)
+    } else {
+        None
+    };
+    if matches!(provider, SearchProvider::PodcastIndex) && podcastindex_auth.is_none() {
+        return;
+    }
     let query = percent_encode(trimmed);
     let hwnd_copy = hwnd;
     std::thread::spawn(move || {
@@ -1620,49 +1657,55 @@ unsafe fn perform_search(hwnd: HWND, query: &str) {
                     query
                 );
                 let fetch_config = rss_fetch_config(parent);
-                let bytes = rt.block_on(rss::fetch_url_bytes(&url, fetch_config));
-                if let Ok(bytes) = bytes
-                    && let Ok(parsed) = serde_json::from_slice::<ItunesSearchResponse>(&bytes)
-                {
-                    for item in parsed.results {
-                        if let Some(feed_url) = item.feed_url {
-                            results.push(PodcastSearchResult {
-                                title: item.collection_name.unwrap_or_default(),
-                                artist: item.artist_name.unwrap_or_default(),
-                                feed_url,
-                            });
+                match rt.block_on(rss::fetch_url_bytes(&url, fetch_config)) {
+                    Ok(bytes) => {
+                        if let Ok(parsed) = serde_json::from_slice::<ItunesSearchResponse>(&bytes) {
+                            results.extend(itunes_items_to_results(parsed.results));
                         }
+                    }
+                    Err(err) => {
+                        log_debug(&format!("itunes_search_failed: {}", err));
                     }
                 }
             }
             SearchProvider::PodcastIndex => {
-                let key = podcastindex_key.trim().to_string();
-                let secret = podcastindex_secret;
-                if !key.is_empty() && !secret.trim().is_empty() {
-                    let auth_date = SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_secs()
-                        .to_string();
-                    let mut hasher = Sha1::new();
-                    hasher.update(format!("{key}{secret}{auth_date}").as_bytes());
-                    let hash = format!("{:x}", hasher.finalize());
-                    let url = format!(
-                        "https://api.podcastindex.org/api/1.0/search/byterm?q={}&max=20",
-                        query
-                    );
-                    if let Ok(resp) = reqwest::blocking::Client::new()
-                        .get(url)
-                        .header("User-Agent", "Novapad")
-                        .header("X-Auth-Date", auth_date)
-                        .header("X-Auth-Key", key)
-                        .header("Authorization", hash)
+                let Some((key, secret)) = podcastindex_auth else {
+                    log_debug("PodcastIndex search skipped: missing API keys");
+                    let msg = Box::new(SearchResultMsg {
+                        results,
+                        status: None,
+                        error: None,
+                    });
+                    if let Err(e) = PostMessageW(
+                        hwnd_copy,
+                        WM_PODCAST_SEARCH_COMPLETE,
+                        WPARAM(0),
+                        LPARAM(Box::into_raw(msg) as isize),
+                    ) {
+                        crate::log_debug(&format!("PostMessageW failed: {:?}", e));
+                    }
+                    return;
+                };
+                let url = format!(
+                    "https://api.podcastindex.org/api/1.0/search/byterm?q={}&max=20",
+                    query
+                );
+                let result = rt.block_on(async {
+                    let client = reqwest::Client::new();
+                    let resp = add_podcastindex_auth_headers(client.get(url), &key, &secret)
                         .send()
-                        && let Ok(bytes) = resp.bytes()
-                        && let Ok(parsed) =
-                            serde_json::from_slice::<PodcastIndexSearchResponse>(&bytes)
-                        && let Some(feeds) = parsed.feeds
-                    {
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    if !resp.status().is_success() {
+                        return Err(format!("HTTP {}", resp.status().as_u16()));
+                    }
+                    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+                    let parsed: PodcastIndexSearchResponse =
+                        serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+                    Ok(parsed.feeds.unwrap_or_default())
+                });
+                match result {
+                    Ok(feeds) => {
                         for feed in feeds {
                             let feed_url = feed.feed_url.or(feed.url);
                             if let Some(feed_url) = feed_url {
@@ -1674,19 +1717,1298 @@ unsafe fn perform_search(hwnd: HWND, query: &str) {
                             }
                         }
                     }
-                } else {
-                    log_debug("PodcastIndex search skipped: missing API keys");
+                    Err(e) => {
+                        log_debug(&format!("podcastindex_search_failed: {}", e));
+                    }
                 }
             }
         }
-        let msg = Box::new(SearchResultMsg { results });
-        if let Err(_e) = PostMessageW(
+        let msg = Box::new(SearchResultMsg {
+            results,
+            status: None,
+            error: None,
+        });
+        if let Err(e) = PostMessageW(
             hwnd_copy,
             WM_PODCAST_SEARCH_COMPLETE,
             WPARAM(0),
             LPARAM(Box::into_raw(msg) as isize),
-        ) {}
+        ) {
+            crate::log_debug(&format!("PostMessageW failed: {:?}", e));
+        }
     });
+}
+
+fn parse_apple_top_ids(bytes: &[u8]) -> Vec<u64> {
+    let mut ids = Vec::new();
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes) else {
+        return ids;
+    };
+    let entries = value
+        .get("feed")
+        .and_then(|feed| feed.get("entry"))
+        .cloned();
+    let Some(entries) = entries else {
+        return ids;
+    };
+    let list = match entries {
+        serde_json::Value::Array(items) => items,
+        other => vec![other],
+    };
+    for entry in list {
+        if let Some(id_val) = entry
+            .get("id")
+            .and_then(|id| id.get("attributes"))
+            .and_then(|attrs| attrs.get("im:id"))
+            .and_then(|v| v.as_str())
+            && let Ok(id) = id_val.parse::<u64>()
+        {
+            ids.push(id);
+        }
+    }
+    ids
+}
+
+fn itunes_items_to_results(items: Vec<ItunesSearchItem>) -> Vec<PodcastSearchResult> {
+    let mut results = Vec::new();
+    for item in items {
+        if let Some(feed_url) = item.feed_url {
+            results.push(PodcastSearchResult {
+                title: item.collection_name.unwrap_or_default(),
+                artist: item.artist_name.unwrap_or_default(),
+                feed_url,
+            });
+        }
+    }
+    results
+}
+
+#[cfg(debug_assertions)]
+fn log_itunes_items(context: &str, genre_id: u32, items: &[ItunesSearchItem]) {
+    let mut lines = Vec::new();
+    for item in items.iter().take(50) {
+        let title = item.collection_name.clone().unwrap_or_default();
+        let artist = item.artist_name.clone().unwrap_or_default();
+        let primary = item
+            .primary_genre_id
+            .map(|id| id.to_string())
+            .unwrap_or_else(|| "-".to_string());
+        let genre_ids = item
+            .genre_ids
+            .as_ref()
+            .map(|ids| ids.join(","))
+            .unwrap_or_else(|| "-".to_string());
+        let matches = itunes_item_matches_genre(item, genre_id);
+        lines.push(format!(
+            "title=\"{}\" artist=\"{}\" primary={} genreIds={} match={}",
+            title, artist, primary, genre_ids, matches
+        ));
+    }
+    log_debug(&format!(
+        "itunes_category_debug context={} genre_id={} count={} items=[{}]",
+        context,
+        genre_id,
+        items.len(),
+        lines.join(" | ")
+    ));
+}
+
+#[cfg(not(debug_assertions))]
+fn log_itunes_items(_context: &str, _genre_id: u32, _items: &[ItunesSearchItem]) {}
+
+fn itunes_items_to_results_slice(items: &[ItunesSearchItem]) -> Vec<PodcastSearchResult> {
+    let mut results = Vec::new();
+    for item in items {
+        if let Some(feed_url) = item.feed_url.as_ref() {
+            results.push(PodcastSearchResult {
+                title: item.collection_name.clone().unwrap_or_default(),
+                artist: item.artist_name.clone().unwrap_or_default(),
+                feed_url: feed_url.clone(),
+            });
+        }
+    }
+    results
+}
+
+fn itunes_item_matches_genre(item: &ItunesSearchItem, genre_id: u32) -> bool {
+    if let Some(ids) = item.genre_ids.as_ref() {
+        return ids.iter().any(|id| id == &genre_id.to_string());
+    }
+    if let Some(primary) = item.primary_genre_id {
+        return primary == genre_id;
+    }
+    false
+}
+
+fn itunes_filter_by_genre(
+    items: &[ItunesSearchItem],
+    genre_id: u32,
+    language: Language,
+) -> (Vec<PodcastSearchResult>, Option<String>) {
+    let mut filtered = Vec::new();
+    for item in items {
+        if itunes_item_matches_genre(item, genre_id)
+            && let Some(feed_url) = item.feed_url.as_ref()
+        {
+            filtered.push(PodcastSearchResult {
+                title: item.collection_name.clone().unwrap_or_default(),
+                artist: item.artist_name.clone().unwrap_or_default(),
+                feed_url: feed_url.clone(),
+            });
+        }
+    }
+    if !filtered.is_empty() {
+        return (filtered, None);
+    }
+    let status = i18n::tr(language, "podcasts.categories.apple_unfiltered_notice");
+    (Vec::new(), Some(status))
+}
+
+fn normalize_category_name(name: &str) -> String {
+    name.trim().to_ascii_lowercase()
+}
+
+fn podcastindex_feeds_to_results(
+    feeds: Vec<PodcastIndexFeed>,
+    category: Option<&Category>,
+) -> (Vec<PodcastSearchResult>, bool) {
+    let mut results = Vec::new();
+    let (filter_key, filter_name) = category.map_or((None, None), |c| {
+        (
+            Some(c.id.to_string()),
+            Some(normalize_category_name(&c.name)),
+        )
+    });
+    let has_categories = filter_key.is_some() && feeds.iter().any(|f| f.categories.is_some());
+    for feed in feeds {
+        if let Some(filter_key) = filter_key.as_deref() {
+            match feed.categories.as_ref() {
+                Some(categories) => {
+                    let mut matched = categories.contains_key(filter_key);
+                    if !matched && let Some(filter_name) = filter_name.as_deref() {
+                        matched = categories
+                            .values()
+                            .any(|name| normalize_category_name(name) == filter_name);
+                    }
+                    if !matched {
+                        continue;
+                    }
+                }
+                None => {
+                    if has_categories {
+                        continue;
+                    }
+                }
+            }
+        }
+        let feed_url = feed.feed_url.or(feed.url);
+        if let Some(feed_url) = feed_url {
+            results.push(PodcastSearchResult {
+                title: feed.title.unwrap_or_default(),
+                artist: feed.author.or(feed.owner_name).unwrap_or_default(),
+                feed_url,
+            });
+        }
+    }
+    (results, has_categories)
+}
+
+async fn fetch_podcastindex_categories(
+    api_key: &str,
+    api_secret: &str,
+) -> Result<Vec<Category>, String> {
+    let client = reqwest::Client::new();
+    let resp = add_podcastindex_auth_headers(
+        client.get(podcastindex_categories_url()),
+        api_key,
+        api_secret,
+    )
+    .send()
+    .await
+    .map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("HTTP {}", resp.status().as_u16()));
+    }
+    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+    let parsed: PodcastIndexCategoriesResponse =
+        serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+    if !parsed.status.eq_ignore_ascii_case("true") {
+        return Err("PodcastIndex categories: status not ok".to_string());
+    }
+    let mut categories = Vec::with_capacity(parsed.items.len());
+    for (key, item) in parsed.items {
+        let id = key.parse::<u32>().unwrap_or(item.id);
+        categories.push(Category {
+            id,
+            name: item.name,
+        });
+    }
+    categories.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    if categories.is_empty() {
+        return Err("PodcastIndex categories: empty".to_string());
+    }
+    Ok(categories)
+}
+
+async fn load_by_category(
+    source: Source,
+    mode: Mode,
+    category: Category,
+    search_term: &str,
+    language: Language,
+    fetch_config: rss::RssFetchConfig,
+    podcastindex_auth: Option<(String, String)>,
+) -> Result<(Vec<PodcastSearchResult>, Option<String>), String> {
+    match source {
+        Source::Apple => {
+            let mut status = None;
+            let results = match mode {
+                Mode::Top => {
+                    let url = apple_top_podcasts_by_genre(category.id, APPLE_COUNTRY, APPLE_LIMIT);
+                    let ids = match rss::fetch_url_bytes(&url, fetch_config).await {
+                        Ok(bytes) => parse_apple_top_ids(&bytes),
+                        Err(err) => {
+                            log_debug(&format!("apple_top_fetch_failed: {}", err));
+                            Vec::new()
+                        }
+                    };
+                    let lookup_url = apple_lookup_by_ids(&ids, APPLE_COUNTRY);
+                    if let Some(lookup_url) = lookup_url
+                        && let Ok(bytes) = rss::fetch_url_bytes(&lookup_url, fetch_config).await
+                        && let Ok(parsed) = serde_json::from_slice::<ItunesSearchResponse>(&bytes)
+                    {
+                        log_itunes_items("apple_top_lookup", category.id, &parsed.results);
+                        let mut map = HashMap::new();
+                        for item in parsed.results {
+                            if let (Some(id), Some(feed_url)) =
+                                (item.collection_id, item.feed_url.clone())
+                                && itunes_item_matches_genre(&item, category.id)
+                            {
+                                map.insert(
+                                    id,
+                                    PodcastSearchResult {
+                                        title: item.collection_name.unwrap_or_default(),
+                                        artist: item.artist_name.unwrap_or_default(),
+                                        feed_url,
+                                    },
+                                );
+                            }
+                        }
+                        let mut ordered = Vec::new();
+                        for id in ids {
+                            if let Some(item) = map.get(&id) {
+                                ordered.push(item.clone());
+                            }
+                        }
+                        if !ordered.is_empty() {
+                            return Ok((ordered, None));
+                        }
+                    }
+                    status = Some(i18n::tr(language, "podcasts.categories.top_fallback"));
+                    Vec::new()
+                }
+                Mode::SearchInCategory => {
+                    if search_term.trim().is_empty() {
+                        return Err(i18n::tr(language, "podcasts.categories.term_required"));
+                    }
+                    Vec::new()
+                }
+            };
+            if !results.is_empty() {
+                return Ok((results, status));
+            }
+            let url = if matches!(mode, Mode::SearchInCategory) {
+                apple_search_in_category(search_term, category.id, APPLE_COUNTRY, APPLE_LIMIT)
+            } else {
+                apple_search_by_category(category.id, APPLE_COUNTRY, APPLE_LIMIT)
+            };
+            let bytes = rss::fetch_url_bytes(&url, fetch_config)
+                .await
+                .map_err(|e| e.to_string())?;
+            let parsed: ItunesSearchResponse =
+                serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+            let items = parsed.results;
+            log_itunes_items("apple_search", category.id, &items);
+            let (filtered, fallback_status) = itunes_filter_by_genre(&items, category.id, language);
+            let results = if filtered.is_empty() && fallback_status.is_some() {
+                itunes_items_to_results_slice(&items)
+            } else {
+                filtered
+            };
+            if status.is_none() {
+                status = fallback_status;
+            }
+            Ok((results, status))
+        }
+        Source::PodcastIndex => {
+            let (key, secret) = podcastindex_auth
+                .ok_or_else(|| i18n::tr(language, "podcasts.categories.missing_credentials"))?;
+            let client = reqwest::Client::new();
+            let mut status = None;
+            let feeds = match mode {
+                Mode::Top => {
+                    let url = "https://api.podcastindex.org/api/1.0/podcasts/trending?max=50";
+                    let resp = add_podcastindex_auth_headers(client.get(url), &key, &secret)
+                        .send()
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    if !resp.status().is_success() {
+                        return Err(format!("HTTP {}", resp.status().as_u16()));
+                    }
+                    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+                    let parsed: PodcastIndexTrendingResponse =
+                        serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+                    parsed.feeds.unwrap_or_default()
+                }
+                Mode::SearchInCategory => {
+                    if search_term.trim().is_empty() {
+                        return Err(i18n::tr(language, "podcasts.categories.term_required"));
+                    }
+                    let url = format!(
+                        "https://api.podcastindex.org/api/1.0/search/byterm?q={}&max=50",
+                        percent_encode(search_term)
+                    );
+                    let resp = add_podcastindex_auth_headers(client.get(url), &key, &secret)
+                        .send()
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    if !resp.status().is_success() {
+                        return Err(format!("HTTP {}", resp.status().as_u16()));
+                    }
+                    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+                    let parsed: PodcastIndexSearchResponse =
+                        serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+                    parsed.feeds.unwrap_or_default()
+                }
+            };
+            let (results, has_categories) = podcastindex_feeds_to_results(feeds, Some(&category));
+            if !has_categories {
+                status = Some(i18n::tr(language, "podcasts.categories.unfiltered_notice"));
+            }
+            Ok((results, status))
+        }
+    }
+}
+
+unsafe fn update_category_status(hwnd: HWND, message: Option<&str>) {
+    let hwnd_status = with_category_dialog_state(hwnd, |s| s.hwnd_status).unwrap_or(HWND(0));
+    if hwnd_status.0 == 0 {
+        return;
+    }
+    let text = message.unwrap_or_default();
+    let wide = to_wide(text);
+    if let Err(e) = SetWindowTextW(hwnd_status, PCWSTR(wide.as_ptr())) {
+        crate::log_debug(&format!("SetWindowTextW failed: {:?}", e));
+    }
+}
+
+unsafe fn update_category_list(hwnd: HWND, categories: Vec<Category>) {
+    let hwnd_list = with_category_dialog_state(hwnd, |s| s.hwnd_list).unwrap_or(HWND(0));
+    if hwnd_list.0 == 0 {
+        return;
+    }
+    SendMessageW(hwnd_list, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    for category in &categories {
+        let wide = to_wide(&category.name);
+        SendMessageW(
+            hwnd_list,
+            LB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(wide.as_ptr() as isize),
+        );
+    }
+    with_category_dialog_state(hwnd, |s| s.categories = categories);
+    SendMessageW(hwnd_list, LB_SETCURSEL, WPARAM(0), LPARAM(0));
+}
+
+unsafe fn load_categories_for_source(hwnd: HWND, source: Source) {
+    let parent = with_category_dialog_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    let language = with_category_dialog_state(hwnd, |s| s.language).unwrap_or_default();
+    with_category_dialog_state(hwnd, |s| s.source = source);
+    match source {
+        Source::Apple => {
+            update_category_status(hwnd, None);
+            update_category_list(hwnd, apple_categories(language));
+        }
+        Source::PodcastIndex => {
+            let Some(parent_hwnd) = (parent.0 != 0).then_some(parent) else {
+                update_category_status(hwnd, None);
+                update_category_list(hwnd, Vec::new());
+                return;
+            };
+            let Some((key, secret)) = podcastindex_credentials_or_prompt(hwnd, parent_hwnd) else {
+                update_category_status(hwnd, None);
+                update_category_list(hwnd, Vec::new());
+                return;
+            };
+            if let Some(categories) = load_podcastindex_categories_cache() {
+                update_category_status(hwnd, None);
+                update_category_list(hwnd, categories);
+                return;
+            }
+            update_category_status(
+                hwnd,
+                Some(&i18n::tr(language, "podcasts.categories.loading")),
+            );
+            let hwnd_copy = hwnd;
+            std::thread::spawn(move || {
+                let rt = match tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                {
+                    Ok(rt) => rt,
+                    Err(e) => {
+                        crate::log_debug(&format!("Failed to build tokio runtime: {}", e));
+                        return;
+                    }
+                };
+                let result = rt.block_on(fetch_podcastindex_categories(&key, &secret));
+                match result {
+                    Ok(categories) => {
+                        store_podcastindex_categories_cache(&categories);
+                        let msg = Box::new(CategoryListMsg {
+                            categories,
+                            error: None,
+                        });
+                        if let Err(e) = PostMessageW(
+                            hwnd_copy,
+                            WM_PODCAST_CATEGORIES_READY,
+                            WPARAM(0),
+                            LPARAM(Box::into_raw(msg) as isize),
+                        ) {
+                            crate::log_debug(&format!("PostMessageW failed: {:?}", e));
+                        }
+                    }
+                    Err(err) => {
+                        let msg = Box::new(CategoryListMsg {
+                            categories: Vec::new(),
+                            error: Some(err),
+                        });
+                        if let Err(e) = PostMessageW(
+                            hwnd_copy,
+                            WM_PODCAST_CATEGORIES_READY,
+                            WPARAM(0),
+                            LPARAM(Box::into_raw(msg) as isize),
+                        ) {
+                            crate::log_debug(&format!("PostMessageW failed: {:?}", e));
+                        }
+                    }
+                }
+            });
+        }
+    }
+}
+
+unsafe fn set_category_mode(hwnd: HWND, mode: Mode) {
+    with_category_dialog_state(hwnd, |s| s.mode = mode);
+    let (label, edit) = with_category_dialog_state(hwnd, |s| (s.hwnd_term_label, s.hwnd_term_edit))
+        .unwrap_or((HWND(0), HWND(0)));
+    let visible = matches!(mode, Mode::SearchInCategory);
+    let show_flag = if visible {
+        windows::Win32::UI::WindowsAndMessaging::SW_SHOW
+    } else {
+        windows::Win32::UI::WindowsAndMessaging::SW_HIDE
+    };
+    if label.0 != 0 {
+        windows::Win32::UI::WindowsAndMessaging::ShowWindow(label, show_flag);
+    }
+    if edit.0 != 0 {
+        windows::Win32::UI::WindowsAndMessaging::ShowWindow(edit, show_flag);
+    }
+}
+
+unsafe fn read_window_text(hwnd: HWND) -> String {
+    if hwnd.0 == 0 {
+        return String::new();
+    }
+    let len = SendMessageW(
+        hwnd,
+        windows::Win32::UI::WindowsAndMessaging::WM_GETTEXTLENGTH,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0;
+    if len == 0 {
+        return String::new();
+    }
+    let mut buf = vec![0u16; len as usize + 1];
+    SendMessageW(
+        hwnd,
+        windows::Win32::UI::WindowsAndMessaging::WM_GETTEXT,
+        WPARAM(buf.len()),
+        LPARAM(buf.as_mut_ptr() as isize),
+    );
+    String::from_utf16_lossy(&buf[..len as usize])
+}
+
+unsafe fn trigger_category_load(
+    hwnd: HWND,
+    source: Source,
+    mode: Mode,
+    category: Category,
+    search_term: String,
+) {
+    show_search_loading(hwnd);
+    let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    if parent.0 != 0 {
+        ensure_rss_http(parent);
+    }
+    let language = with_podcast_state(hwnd, |s| s.language).unwrap_or_default();
+    let fetch_config = rss_fetch_config(parent);
+    let podcastindex_auth = if matches!(source, Source::PodcastIndex) {
+        podcastindex_credentials_or_prompt(hwnd, parent)
+    } else {
+        None
+    };
+    if matches!(source, Source::PodcastIndex) && podcastindex_auth.is_none() {
+        return;
+    }
+    let hwnd_copy = hwnd;
+    std::thread::spawn(move || {
+        let rt = match tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+        {
+            Ok(rt) => rt,
+            Err(e) => {
+                crate::log_debug(&format!("Failed to build tokio runtime: {}", e));
+                return;
+            }
+        };
+        let result = rt.block_on(load_by_category(
+            source,
+            mode,
+            category.clone(),
+            &search_term,
+            language,
+            fetch_config,
+            podcastindex_auth,
+        ));
+        let msg = match result {
+            Ok((results, status)) => SearchResultMsg {
+                results,
+                status,
+                error: None,
+            },
+            Err(err) => SearchResultMsg {
+                results: Vec::new(),
+                status: None,
+                error: Some(err),
+            },
+        };
+        if let Err(e) = PostMessageW(
+            hwnd_copy,
+            WM_PODCAST_SEARCH_COMPLETE,
+            WPARAM(0),
+            LPARAM(Box::into_raw(Box::new(msg)) as isize),
+        ) {
+            crate::log_debug(&format!("PostMessageW failed: {:?}", e));
+        }
+    });
+}
+
+unsafe fn apply_category_selection(hwnd: HWND) {
+    let (list, mode, term_edit, parent) =
+        with_category_dialog_state(hwnd, |s| (s.hwnd_list, s.mode, s.hwnd_term_edit, s.parent))
+            .unwrap_or((HWND(0), Mode::Top, HWND(0), HWND(0)));
+    if list.0 == 0 {
+        return;
+    }
+    let idx = SendMessageW(list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
+    if idx < 0 {
+        let language = with_category_dialog_state(hwnd, |s| s.language).unwrap_or_default();
+        let message = i18n::tr(language, "podcasts.categories.no_selection");
+        MessageBoxW(
+            hwnd,
+            PCWSTR(to_wide(&message).as_ptr()),
+            PCWSTR(to_wide(&i18n::tr(language, "podcasts.window.title")).as_ptr()),
+            MB_OK | MB_ICONINFORMATION,
+        );
+        return;
+    }
+    let category =
+        with_category_dialog_state(hwnd, |s| s.categories.get(idx as usize).cloned()).flatten();
+    let Some(category) = category else {
+        return;
+    };
+    let source = with_category_dialog_state(hwnd, |s| s.source).unwrap_or(Source::Apple);
+    let term = if matches!(mode, Mode::SearchInCategory) {
+        read_window_text(term_edit)
+    } else {
+        String::new()
+    };
+    if matches!(mode, Mode::SearchInCategory) && term.trim().is_empty() {
+        let language = with_category_dialog_state(hwnd, |s| s.language).unwrap_or_default();
+        let message = i18n::tr(language, "podcasts.categories.term_required");
+        MessageBoxW(
+            hwnd,
+            PCWSTR(to_wide(&message).as_ptr()),
+            PCWSTR(to_wide(&i18n::tr(language, "podcasts.window.title")).as_ptr()),
+            MB_OK | MB_ICONINFORMATION,
+        );
+        if term_edit.0 != 0 {
+            SetFocus(term_edit);
+        }
+        return;
+    }
+    if parent.0 != 0 {
+        trigger_category_load(parent, source, mode, category, term);
+    }
+    crate::log_if_err!(DestroyWindow(hwnd));
+}
+
+unsafe fn show_categories_dialog(parent_hwnd: HWND) {
+    let main_hwnd = with_podcast_state(parent_hwnd, |s| s.parent).unwrap_or(HWND(0));
+    let existing = with_state(main_hwnd, |s| s.podcasts_categories_dialog).unwrap_or(HWND(0));
+    if existing.0 != 0 {
+        SetForegroundWindow(existing);
+        return;
+    }
+    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+    let class_name = to_wide(PODCASTS_CATEGORIES_CLASS);
+    let wc = WNDCLASSW {
+        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+            windows::Win32::UI::WindowsAndMessaging::LoadCursorW(None, IDC_ARROW)
+                .unwrap_or_default()
+                .0,
+        ),
+        hInstance: hinstance,
+        lpszClassName: PCWSTR(class_name.as_ptr()),
+        lpfnWndProc: Some(categories_wndproc),
+        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+        ..Default::default()
+    };
+    RegisterClassW(&wc);
+
+    let language = with_podcast_state(parent_hwnd, |s| s.language).unwrap_or_default();
+    let title = i18n::tr(language, "podcasts.categories.dialog.title");
+    let initial_source = match selected_search_provider(parent_hwnd) {
+        SearchProvider::PodcastIndex => Source::PodcastIndex,
+        SearchProvider::Itunes => Source::Apple,
+    };
+    let search_edit = with_podcast_state(parent_hwnd, |s| s.hwnd_search).unwrap_or(HWND(0));
+    let initial_term = read_window_text(search_edit);
+    let init_ptr = Box::into_raw(Box::new(CategoryDialogInit {
+        parent: parent_hwnd,
+        initial_source,
+        initial_term,
+    }));
+    let hwnd = CreateWindowExW(
+        WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
+        PCWSTR(class_name.as_ptr()),
+        PCWSTR(to_wide(&title).as_ptr()),
+        WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_POPUP,
+        windows::Win32::UI::WindowsAndMessaging::CW_USEDEFAULT,
+        windows::Win32::UI::WindowsAndMessaging::CW_USEDEFAULT,
+        520,
+        420,
+        parent_hwnd,
+        None,
+        hinstance,
+        Some(init_ptr as *const _),
+    );
+    if hwnd.0 == 0 {
+        unsafe {
+            let _unused_box = Box::from_raw(init_ptr);
+        }
+        return;
+    }
+    if main_hwnd.0 != 0 {
+        with_state(main_hwnd, |s| s.podcasts_categories_dialog = hwnd);
+    }
+}
+
+unsafe extern "system" fn categories_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    match msg {
+        WM_CREATE => {
+            let cs = lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
+            let init_ptr = (*cs).lpCreateParams as *mut CategoryDialogInit;
+            let init = if init_ptr.is_null() {
+                return LRESULT(0);
+            } else {
+                unsafe { Box::from_raw(init_ptr) }
+            };
+            let language = with_podcast_state(init.parent, |s| s.language).unwrap_or_default();
+            let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+
+            let label_source = CreateWindowExW(
+                Default::default(),
+                w!("STATIC"),
+                PCWSTR(to_wide(&i18n::tr(language, "podcasts.categories.source.label")).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                0,
+                0,
+                0,
+                0,
+                hwnd,
+                HMENU(1),
+                hinstance,
+                None,
+            );
+            let combo_source = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("COMBOBOX"),
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                0,
+                0,
+                0,
+                0,
+                hwnd,
+                HMENU(CATEGORIES_SOURCE_COMBO_ID as isize),
+                hinstance,
+                None,
+            );
+
+            let label_mode = CreateWindowExW(
+                Default::default(),
+                w!("STATIC"),
+                PCWSTR(to_wide(&i18n::tr(language, "podcasts.categories.mode.label")).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                0,
+                0,
+                0,
+                0,
+                hwnd,
+                HMENU(2),
+                hinstance,
+                None,
+            );
+            let combo_mode = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("COMBOBOX"),
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                0,
+                0,
+                0,
+                0,
+                hwnd,
+                HMENU(CATEGORIES_MODE_COMBO_ID as isize),
+                hinstance,
+                None,
+            );
+
+            let label_list = CreateWindowExW(
+                Default::default(),
+                w!("STATIC"),
+                PCWSTR(to_wide(&i18n::tr(language, "podcasts.categories.list.label")).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                0,
+                0,
+                0,
+                0,
+                hwnd,
+                HMENU(3),
+                hinstance,
+                None,
+            );
+            let list = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("LISTBOX"),
+                PCWSTR::null(),
+                WS_CHILD
+                    | WS_VISIBLE
+                    | WS_TABSTOP
+                    | WINDOW_STYLE(
+                        (LBS_NOTIFY as u32) | windows::Win32::UI::WindowsAndMessaging::WS_VSCROLL.0,
+                    ),
+                0,
+                0,
+                0,
+                0,
+                hwnd,
+                HMENU(CATEGORIES_LIST_ID as isize),
+                hinstance,
+                None,
+            );
+
+            let term_label = CreateWindowExW(
+                Default::default(),
+                w!("STATIC"),
+                PCWSTR(to_wide(&i18n::tr(language, "podcasts.categories.term.label")).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                0,
+                0,
+                0,
+                0,
+                hwnd,
+                HMENU(4),
+                hinstance,
+                None,
+            );
+            let term_edit = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                0,
+                0,
+                0,
+                0,
+                hwnd,
+                HMENU(CATEGORIES_TERM_EDIT_ID as isize),
+                hinstance,
+                None,
+            );
+            if term_edit.0 != 0 && !init.initial_term.trim().is_empty() {
+                let wide = to_wide(&init.initial_term);
+                if let Err(e) = SetWindowTextW(term_edit, PCWSTR(wide.as_ptr())) {
+                    crate::log_debug(&format!("SetWindowTextW failed: {:?}", e));
+                }
+            }
+
+            let status = CreateWindowExW(
+                Default::default(),
+                w!("STATIC"),
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE,
+                0,
+                0,
+                0,
+                0,
+                hwnd,
+                HMENU(CATEGORIES_STATUS_ID as isize),
+                hinstance,
+                None,
+            );
+
+            let open_btn = CreateWindowExW(
+                Default::default(),
+                w!("BUTTON"),
+                PCWSTR(to_wide(&i18n::tr(language, "podcasts.categories.open")).as_ptr()),
+                WS_CHILD
+                    | WS_VISIBLE
+                    | WS_TABSTOP
+                    | WINDOW_STYLE(
+                        windows::Win32::UI::WindowsAndMessaging::BS_DEFPUSHBUTTON as u32,
+                    ),
+                0,
+                0,
+                0,
+                0,
+                hwnd,
+                HMENU(CATEGORIES_OPEN_ID as isize),
+                hinstance,
+                None,
+            );
+            let cancel_btn = CreateWindowExW(
+                Default::default(),
+                w!("BUTTON"),
+                PCWSTR(to_wide(&i18n::tr(language, "podcasts.categories.cancel")).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                0,
+                0,
+                0,
+                0,
+                hwnd,
+                HMENU(CATEGORIES_CANCEL_ID as isize),
+                hinstance,
+                None,
+            );
+
+            if combo_source.0 != 0 {
+                let apple_label = i18n::tr(language, "podcasts.categories.source.apple");
+                let podcastindex_label =
+                    i18n::tr(language, "podcasts.categories.source.podcastindex");
+                let apple_wide = to_wide(&apple_label);
+                let podcastindex_wide = to_wide(&podcastindex_label);
+                SendMessageW(
+                    combo_source,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(apple_wide.as_ptr() as isize),
+                );
+                SendMessageW(
+                    combo_source,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(podcastindex_wide.as_ptr() as isize),
+                );
+                let source_index = if matches!(init.initial_source, Source::PodcastIndex) {
+                    1
+                } else {
+                    0
+                };
+                SendMessageW(combo_source, CB_SETCURSEL, WPARAM(source_index), LPARAM(0));
+            }
+            if combo_mode.0 != 0 {
+                let top_label = i18n::tr(language, "podcasts.categories.mode.top");
+                let search_label = i18n::tr(language, "podcasts.categories.mode.search");
+                let top_wide = to_wide(&top_label);
+                let search_wide = to_wide(&search_label);
+                SendMessageW(
+                    combo_mode,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(top_wide.as_ptr() as isize),
+                );
+                SendMessageW(
+                    combo_mode,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(search_wide.as_ptr() as isize),
+                );
+                SendMessageW(combo_mode, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+            }
+
+            let state = Box::new(CategoryDialogState {
+                parent: init.parent,
+                language,
+                hwnd_source_label: label_source,
+                hwnd_source: combo_source,
+                hwnd_mode_label: label_mode,
+                hwnd_mode: combo_mode,
+                hwnd_list_label: label_list,
+                hwnd_list: list,
+                hwnd_term_label: term_label,
+                hwnd_term_edit: term_edit,
+                hwnd_open: open_btn,
+                hwnd_cancel: cancel_btn,
+                hwnd_status: status,
+                source: init.initial_source,
+                mode: Mode::Top,
+                categories: Vec::new(),
+            });
+            SetWindowLongPtrW(
+                hwnd,
+                windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+                Box::into_raw(state) as isize,
+            );
+
+            let hfont = HFONT(
+                windows::Win32::Graphics::Gdi::GetStockObject(
+                    windows::Win32::Graphics::Gdi::DEFAULT_GUI_FONT,
+                )
+                .0,
+            );
+            for ctrl in [
+                label_source,
+                combo_source,
+                label_mode,
+                combo_mode,
+                label_list,
+                list,
+                term_label,
+                term_edit,
+                status,
+                open_btn,
+                cancel_btn,
+            ] {
+                if ctrl.0 != 0 {
+                    SendMessageW(ctrl, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                }
+            }
+
+            load_categories_for_source(hwnd, init.initial_source);
+            set_category_mode(hwnd, Mode::Top);
+            SetFocus(list);
+            LRESULT(0)
+        }
+        WM_SIZE => {
+            let mut rect = windows::Win32::Foundation::RECT::default();
+            crate::log_if_err!(GetClientRect(hwnd, &mut rect));
+            let width = (rect.right - rect.left).max(0);
+            let height = (rect.bottom - rect.top).max(0);
+            let margin = 10;
+            let spacing = 6;
+            let label_h = 16;
+            let row_h = 24;
+            let button_h = 26;
+            let status_h = 18;
+
+            let (
+                label_source,
+                combo_source,
+                label_mode,
+                combo_mode,
+                label_list,
+                list,
+                term_label,
+                term_edit,
+                open_btn,
+                cancel_btn,
+                status,
+            ) = with_category_dialog_state(hwnd, |s| {
+                (
+                    s.hwnd_source_label,
+                    s.hwnd_source,
+                    s.hwnd_mode_label,
+                    s.hwnd_mode,
+                    s.hwnd_list_label,
+                    s.hwnd_list,
+                    s.hwnd_term_label,
+                    s.hwnd_term_edit,
+                    s.hwnd_open,
+                    s.hwnd_cancel,
+                    s.hwnd_status,
+                )
+            })
+            .unwrap_or((
+                HWND(0),
+                HWND(0),
+                HWND(0),
+                HWND(0),
+                HWND(0),
+                HWND(0),
+                HWND(0),
+                HWND(0),
+                HWND(0),
+                HWND(0),
+                HWND(0),
+            ));
+
+            let mut y = margin;
+            if label_source.0 != 0 {
+                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                    label_source,
+                    margin,
+                    y,
+                    width - margin * 2,
+                    label_h,
+                    true,
+                ));
+            }
+            y += label_h + spacing;
+            if combo_source.0 != 0 {
+                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                    combo_source,
+                    margin,
+                    y,
+                    width - margin * 2,
+                    row_h,
+                    true,
+                ));
+            }
+            y += row_h + spacing;
+            if label_mode.0 != 0 {
+                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                    label_mode,
+                    margin,
+                    y,
+                    width - margin * 2,
+                    label_h,
+                    true,
+                ));
+            }
+            y += label_h + spacing;
+            if combo_mode.0 != 0 {
+                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                    combo_mode,
+                    margin,
+                    y,
+                    width - margin * 2,
+                    row_h,
+                    true,
+                ));
+            }
+            y += row_h + spacing;
+            if label_list.0 != 0 {
+                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                    label_list,
+                    margin,
+                    y,
+                    width - margin * 2,
+                    label_h,
+                    true,
+                ));
+            }
+            y += label_h + spacing;
+
+            let term_visible = with_category_dialog_state(hwnd, |s| s.mode)
+                .map(|m| matches!(m, Mode::SearchInCategory))
+                .unwrap_or(false);
+            let term_block = if term_visible {
+                label_h + spacing + row_h + spacing
+            } else {
+                0
+            };
+            let list_h = (height - y - term_block - status_h - button_h - margin * 2).max(80);
+            if list.0 != 0 {
+                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                    list,
+                    margin,
+                    y,
+                    width - margin * 2,
+                    list_h,
+                    true,
+                ));
+            }
+            y += list_h + spacing;
+            if term_visible {
+                if term_label.0 != 0 {
+                    crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                        term_label,
+                        margin,
+                        y,
+                        width - margin * 2,
+                        label_h,
+                        true,
+                    ));
+                }
+                y += label_h + spacing;
+                if term_edit.0 != 0 {
+                    crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                        term_edit,
+                        margin,
+                        y,
+                        width - margin * 2,
+                        row_h,
+                        true,
+                    ));
+                }
+                y += row_h + spacing;
+            }
+            if status.0 != 0 {
+                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                    status,
+                    margin,
+                    y,
+                    width - margin * 2,
+                    status_h,
+                    true,
+                ));
+            }
+            y += status_h + spacing;
+
+            let button_w = 100;
+            let cancel_x = (width - margin - button_w).max(margin);
+            let open_x = (cancel_x - spacing - button_w).max(margin);
+            if open_btn.0 != 0 {
+                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                    open_btn, open_x, y, button_w, button_h, true,
+                ));
+            }
+            if cancel_btn.0 != 0 {
+                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                    cancel_btn, cancel_x, y, button_w, button_h, true,
+                ));
+            }
+            LRESULT(0)
+        }
+        WM_COMMAND => {
+            let id = wparam.0 & 0xffff;
+            let code = ((wparam.0 >> 16) & 0xffff) as u16;
+            match id {
+                CATEGORIES_OPEN_ID => {
+                    apply_category_selection(hwnd);
+                    LRESULT(0)
+                }
+                CATEGORIES_CANCEL_ID | 2 => {
+                    crate::log_if_err!(DestroyWindow(hwnd));
+                    LRESULT(0)
+                }
+                CATEGORIES_SOURCE_COMBO_ID => {
+                    if code == windows::Win32::UI::WindowsAndMessaging::CBN_SELCHANGE as u16 {
+                        let sel = SendMessageW(
+                            with_category_dialog_state(hwnd, |s| s.hwnd_source).unwrap_or(HWND(0)),
+                            CB_GETCURSEL,
+                            WPARAM(0),
+                            LPARAM(0),
+                        )
+                        .0;
+                        let source = if sel == 1 {
+                            Source::PodcastIndex
+                        } else {
+                            Source::Apple
+                        };
+                        load_categories_for_source(hwnd, source);
+                    }
+                    LRESULT(0)
+                }
+                CATEGORIES_MODE_COMBO_ID => {
+                    if code == windows::Win32::UI::WindowsAndMessaging::CBN_SELCHANGE as u16 {
+                        let sel = SendMessageW(
+                            with_category_dialog_state(hwnd, |s| s.hwnd_mode).unwrap_or(HWND(0)),
+                            CB_GETCURSEL,
+                            WPARAM(0),
+                            LPARAM(0),
+                        )
+                        .0;
+                        let mode = if sel == 1 {
+                            Mode::SearchInCategory
+                        } else {
+                            Mode::Top
+                        };
+                        set_category_mode(hwnd, mode);
+                        SendMessageW(hwnd, WM_SIZE, WPARAM(0), LPARAM(0));
+                    }
+                    LRESULT(0)
+                }
+                CATEGORIES_LIST_ID => {
+                    if code == LBN_DBLCLK as u16 {
+                        apply_category_selection(hwnd);
+                    }
+                    LRESULT(0)
+                }
+                _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+            }
+        }
+        WM_KEYDOWN => {
+            let key = wparam.0 as u16;
+            if key == VK_ESCAPE.0 {
+                crate::log_if_err!(DestroyWindow(hwnd));
+                return LRESULT(0);
+            }
+            if key == VK_RETURN.0 {
+                apply_category_selection(hwnd);
+                return LRESULT(0);
+            }
+            DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
+        WM_PODCAST_CATEGORIES_READY => {
+            let ptr = lparam.0 as *mut CategoryListMsg;
+            if ptr.is_null() {
+                return LRESULT(0);
+            }
+            let msg = unsafe { Box::from_raw(ptr) };
+            if let Some(error) = msg.error.as_deref() {
+                let language = with_category_dialog_state(hwnd, |s| s.language).unwrap_or_default();
+                update_category_status(hwnd, Some(error));
+                let title = i18n::tr(language, "app.error_title");
+                MessageBoxW(
+                    hwnd,
+                    PCWSTR(to_wide(error).as_ptr()),
+                    PCWSTR(to_wide(&title).as_ptr()),
+                    MB_OK | MB_ICONINFORMATION,
+                );
+                announce_status(error);
+            } else {
+                update_category_status(hwnd, None);
+                update_category_list(hwnd, msg.categories);
+            }
+            LRESULT(0)
+        }
+        WM_DESTROY => {
+            let parent = GetParent(hwnd);
+            if parent.0 != 0 {
+                let main_hwnd = with_podcast_state(parent, |s| s.parent).unwrap_or(HWND(0));
+                if main_hwnd.0 != 0 {
+                    with_state(main_hwnd, |s| s.podcasts_categories_dialog = HWND(0));
+                }
+                let hwnd_results =
+                    with_podcast_state(parent, |s| s.hwnd_results).unwrap_or(HWND(0));
+                if hwnd_results.0 != 0 {
+                    SetFocus(hwnd_results);
+                }
+            }
+            let ptr =
+                GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+                    as *mut CategoryDialogState;
+            if !ptr.is_null() {
+                unsafe {
+                    let _unused_box = Box::from_raw(ptr);
+                }
+            }
+            LRESULT(0)
+        }
+        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+    }
 }
 
 unsafe fn subscribe_selected_result(hwnd: HWND) {
@@ -1939,12 +3261,18 @@ struct ItunesSearchResponse {
 
 #[derive(serde::Deserialize)]
 struct ItunesSearchItem {
+    #[serde(rename = "collectionId")]
+    collection_id: Option<u64>,
     #[serde(rename = "collectionName")]
     collection_name: Option<String>,
     #[serde(rename = "artistName")]
     artist_name: Option<String>,
     #[serde(rename = "feedUrl")]
     feed_url: Option<String>,
+    #[serde(rename = "primaryGenreId")]
+    primary_genre_id: Option<u32>,
+    #[serde(rename = "genreIds")]
+    genre_ids: Option<Vec<String>>,
 }
 
 #[derive(serde::Deserialize)]
@@ -1961,6 +3289,24 @@ struct PodcastIndexFeed {
     url: Option<String>,
     #[serde(rename = "feedUrl")]
     feed_url: Option<String>,
+    categories: Option<HashMap<String, String>>,
+}
+
+#[derive(serde::Deserialize)]
+struct PodcastIndexTrendingResponse {
+    feeds: Option<Vec<PodcastIndexFeed>>,
+}
+
+#[derive(serde::Deserialize)]
+struct PodcastIndexCategoriesResponse {
+    status: String,
+    items: HashMap<String, PodcastIndexCategory>,
+}
+
+#[derive(serde::Deserialize)]
+struct PodcastIndexCategory {
+    id: u32,
+    name: String,
 }
 
 pub unsafe fn show_context_menu_from_keyboard(hwnd: HWND) {
@@ -3800,6 +5146,27 @@ unsafe fn create_controls(hwnd: HWND) {
         None,
     );
 
+    let hwnd_search_categories = CreateWindowExW(
+        Default::default(),
+        w!("BUTTON"),
+        PCWSTR(
+            to_wide(&i18n::tr(
+                with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
+                "podcasts.categories.browse_button",
+            ))
+            .as_ptr(),
+        ),
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+        160,
+        396,
+        200,
+        26,
+        hwnd,
+        HMENU(ID_SEARCH_CATEGORIES_BUTTON as isize),
+        hinstance,
+        None,
+    );
+
     let hwnd_results = CreateWindowExW(
         WS_EX_CLIENTEDGE,
         w!("LISTBOX"),
@@ -3905,6 +5272,7 @@ unsafe fn create_controls(hwnd: HWND) {
         s.hwnd_search = hwnd_search;
         s.hwnd_search_provider = hwnd_search_provider;
         s.hwnd_search_button = hwnd_search_button;
+        s.hwnd_search_categories = hwnd_search_categories;
         s.hwnd_results = hwnd_results;
         s.hwnd_add = hwnd_add;
         s.hwnd_import = hwnd_import;
@@ -3925,6 +5293,7 @@ unsafe fn create_controls(hwnd: HWND) {
         hwnd_search,
         hwnd_search_provider,
         hwnd_search_button,
+        hwnd_search_categories,
         hwnd_results,
         hwnd_add,
         hwnd_import,
@@ -3969,6 +5338,7 @@ unsafe fn resize_controls(hwnd: HWND) {
             s.hwnd_search,
             s.hwnd_search_provider,
             s.hwnd_search_button,
+            s.hwnd_search_categories,
             s.hwnd_results,
             s.hwnd_add,
             s.hwnd_import,
@@ -3977,6 +5347,7 @@ unsafe fn resize_controls(hwnd: HWND) {
         )
     })
     .unwrap_or((
+        HWND(0),
         HWND(0),
         HWND(0),
         HWND(0),
@@ -4025,17 +5396,27 @@ unsafe fn resize_controls(hwnd: HWND) {
             true,
         ));
         y += search_h + spacing;
+        let button_total_w = (width - margin * 2).max(0);
+        let button_w = ((button_total_w - spacing) / 2).max(120);
         crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
             controls.4,
             margin,
             y,
-            200,
+            button_w,
+            search_button_h,
+            true,
+        ));
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+            controls.5,
+            margin + button_w + spacing,
+            y,
+            button_w,
             search_button_h,
             true,
         ));
         y += search_button_h + spacing;
         crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            controls.5,
+            controls.6,
             margin,
             y,
             width - margin * 2,
@@ -4044,10 +5425,10 @@ unsafe fn resize_controls(hwnd: HWND) {
         ));
         y += results_h + spacing;
         crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            controls.6, margin, y, 200, button_h, true,
+            controls.7, margin, y, 200, button_h, true,
         ));
         crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            controls.9,
+            controls.10,
             (width - margin - 200).max(margin),
             y,
             200,
@@ -4056,11 +5437,11 @@ unsafe fn resize_controls(hwnd: HWND) {
         ));
         y += button_h + spacing;
         crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            controls.7, margin, y, 200, button_h, true,
+            controls.8, margin, y, 200, button_h, true,
         ));
         y += button_h + spacing;
         crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            controls.8, margin, y, 200, button_h, true,
+            controls.9, margin, y, 200, button_h, true,
         ));
     }
 }
@@ -4134,6 +5515,7 @@ unsafe extern "system" fn podcast_wndproc(
                 hwnd_search: HWND(0),
                 hwnd_search_provider: HWND(0),
                 hwnd_search_button: HWND(0),
+                hwnd_search_categories: HWND(0),
                 hwnd_results: HWND(0),
                 hwnd_add: HWND(0),
                 hwnd_import: HWND(0),
@@ -4248,6 +5630,13 @@ unsafe extern "system" fn podcast_wndproc(
                 ID_SEARCH_BUTTON => {
                     if code == windows::Win32::UI::WindowsAndMessaging::BN_CLICKED as u16 {
                         trigger_search_from_edit(hwnd);
+                        return LRESULT(0);
+                    }
+                    LRESULT(0)
+                }
+                ID_SEARCH_CATEGORIES_BUTTON => {
+                    if code == windows::Win32::UI::WindowsAndMessaging::BN_CLICKED as u16 {
+                        show_categories_dialog(hwnd);
                         return LRESULT(0);
                     }
                     LRESULT(0)
@@ -4538,7 +5927,18 @@ unsafe extern "system" fn podcast_wndproc(
                 return LRESULT(0);
             }
             let msg = unsafe { Box::from_raw(ptr) };
-            update_search_results(hwnd, msg.results);
+            if let Some(error) = msg.error.as_deref() {
+                let language = with_podcast_state(hwnd, |s| s.language).unwrap_or_default();
+                let title = i18n::tr(language, "app.error_title");
+                MessageBoxW(
+                    hwnd,
+                    PCWSTR(to_wide(error).as_ptr()),
+                    PCWSTR(to_wide(&title).as_ptr()),
+                    MB_OK | MB_ICONINFORMATION,
+                );
+                announce_status(error);
+            }
+            update_search_results(hwnd, msg.results, msg.status.as_deref());
             LRESULT(0)
         }
         WM_PODCAST_PLAY_READY => {
@@ -4627,7 +6027,267 @@ unsafe fn with_podcast_state<R>(
     }
 }
 
+unsafe fn with_category_dialog_state<R>(
+    hwnd: HWND,
+    f: impl FnOnce(&mut CategoryDialogState) -> R,
+) -> Option<R> {
+    let ptr = GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+        as *mut CategoryDialogState;
+    if ptr.is_null() {
+        None
+    } else {
+        Some(f(&mut *ptr))
+    }
+}
+
 fn percent_encode(input: &str) -> String {
     use url::form_urlencoded::byte_serialize;
     byte_serialize(input.as_bytes()).collect()
+}
+
+const APPLE_COUNTRY: &str = "it";
+const APPLE_LIMIT: u32 = 50;
+const PODCASTINDEX_CATEGORY_CACHE_SECS: u64 = 24 * 60 * 60;
+
+fn apple_categories(language: Language) -> Vec<Category> {
+    let (
+        arts,
+        business,
+        comedy,
+        education,
+        health_fitness,
+        news,
+        technology,
+        society_culture,
+        true_crime,
+        science,
+        sports,
+    ) = if matches!(language, Language::Italian) {
+        (
+            "Arti",
+            "Affari",
+            "Commedia",
+            "Istruzione",
+            "Salute e fitness",
+            "Notizie",
+            "Tecnologia",
+            "Societa e cultura",
+            "True crime",
+            "Scienza",
+            "Sport",
+        )
+    } else {
+        (
+            "Arts",
+            "Business",
+            "Comedy",
+            "Education",
+            "Health & Fitness",
+            "News",
+            "Technology",
+            "Society & Culture",
+            "True Crime",
+            "Science",
+            "Sports",
+        )
+    };
+    vec![
+        Category {
+            id: 1301,
+            name: arts.to_string(),
+        },
+        Category {
+            id: 1321,
+            name: business.to_string(),
+        },
+        Category {
+            id: 1303,
+            name: comedy.to_string(),
+        },
+        Category {
+            id: 1304,
+            name: education.to_string(),
+        },
+        Category {
+            id: 1512,
+            name: health_fitness.to_string(),
+        },
+        Category {
+            id: 1489,
+            name: news.to_string(),
+        },
+        Category {
+            id: 1545,
+            name: sports.to_string(),
+        },
+        Category {
+            id: 1318,
+            name: technology.to_string(),
+        },
+        Category {
+            id: 1324,
+            name: society_culture.to_string(),
+        },
+        Category {
+            id: 1488,
+            name: true_crime.to_string(),
+        },
+        Category {
+            id: 1533,
+            name: science.to_string(),
+        },
+    ]
+}
+
+fn apple_search_by_category(genre_id: u32, country: &str, limit: u32) -> String {
+    format!(
+        "https://itunes.apple.com/search?media=podcast&entity=podcast&genreId={}&country={}&limit={}",
+        genre_id, country, limit
+    )
+}
+
+fn apple_search_in_category(term: &str, genre_id: u32, country: &str, limit: u32) -> String {
+    format!(
+        "https://itunes.apple.com/search?media=podcast&entity=podcast&term={}&genreId={}&country={}&limit={}",
+        percent_encode(term),
+        genre_id,
+        country,
+        limit
+    )
+}
+
+fn apple_top_podcasts_by_genre(genre_id: u32, country: &str, limit: u32) -> String {
+    format!(
+        "https://itunes.apple.com/{}/rss/toppodcasts/limit={}/genre={}/json",
+        country, limit, genre_id
+    )
+}
+
+fn apple_lookup_by_ids(ids: &[u64], country: &str) -> Option<String> {
+    if ids.is_empty() {
+        return None;
+    }
+    let joined = ids
+        .iter()
+        .map(|id| id.to_string())
+        .collect::<Vec<String>>()
+        .join(",");
+    Some(format!(
+        "https://itunes.apple.com/lookup?id={}&country={}",
+        joined, country
+    ))
+}
+
+fn podcastindex_categories_url() -> &'static str {
+    "https://api.podcastindex.org/api/1.0/categories/list"
+}
+
+fn podcastindex_categories_cache_path() -> PathBuf {
+    settings::settings_dir().join("podcastindex_categories_cache.json")
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct PodcastIndexCategoryCache {
+    fetched_at_unix: u64,
+    categories: Vec<Category>,
+}
+
+fn load_podcastindex_categories_cache() -> Option<Vec<Category>> {
+    let path = podcastindex_categories_cache_path();
+    let bytes = std::fs::read(path).ok()?;
+    let cache: PodcastIndexCategoryCache = serde_json::from_slice(&bytes).ok()?;
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    if now.saturating_sub(cache.fetched_at_unix) <= PODCASTINDEX_CATEGORY_CACHE_SECS {
+        return Some(cache.categories);
+    }
+    None
+}
+
+fn store_podcastindex_categories_cache(categories: &[Category]) {
+    let path = podcastindex_categories_cache_path();
+    let cache = PodcastIndexCategoryCache {
+        fetched_at_unix: SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs(),
+        categories: categories.to_vec(),
+    };
+    match serde_json::to_vec(&cache) {
+        Ok(bytes) => {
+            if let Some(parent) = path.parent()
+                && let Err(e) = std::fs::create_dir_all(parent)
+            {
+                log_debug(&format!("podcastindex_categories_cache_dir_failed: {}", e));
+                return;
+            }
+            if let Err(e) = std::fs::write(&path, bytes) {
+                log_debug(&format!(
+                    "podcastindex_categories_cache_write_failed {}: {}",
+                    path.display(),
+                    e
+                ));
+            }
+        }
+        Err(e) => {
+            log_debug(&format!(
+                "podcastindex_categories_cache_serialize_failed: {}",
+                e
+            ));
+        }
+    }
+}
+
+unsafe fn podcastindex_credentials_or_prompt(hwnd: HWND, parent: HWND) -> Option<(String, String)> {
+    let (user_key, user_secret) = with_state(parent, |ps| {
+        (
+            ps.settings.podcast_index_api_key.clone(),
+            settings::decrypt_podcast_index_secret(&ps.settings.podcast_index_api_secret),
+        )
+    })
+    .unwrap_or((String::new(), None));
+
+    let key = user_key.trim().to_string();
+    let secret = user_secret.unwrap_or_default();
+    let missing = key.trim().is_empty() || secret.trim().is_empty();
+    if missing {
+        let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
+        let title = i18n::tr(language, "podcasts.podcastindex.missing_title");
+        let body = i18n::tr(language, "podcasts.podcastindex.missing_body");
+        let response = MessageBoxW(
+            hwnd,
+            PCWSTR(to_wide(&body).as_ptr()),
+            PCWSTR(to_wide(&title).as_ptr()),
+            MB_YESNO | MB_ICONINFORMATION,
+        );
+        if response == IDYES
+            && let Err(e) =
+                crate::audio_utils::open_url_in_browser("https://api.podcastindex.org/signup")
+        {
+            crate::log_debug(&format!("Error: {:?}", e));
+        }
+        return None;
+    }
+    Some((key, secret))
+}
+
+fn add_podcastindex_auth_headers(
+    rb: reqwest::RequestBuilder,
+    api_key: &str,
+    api_secret: &str,
+) -> reqwest::RequestBuilder {
+    let auth_date = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+        .to_string();
+    let mut hasher = Sha1::new();
+    hasher.update(format!("{api_key}{api_secret}{auth_date}").as_bytes());
+    let hash = format!("{:x}", hasher.finalize());
+    rb.header("User-Agent", "Novapad")
+        .header("X-Auth-Date", auth_date)
+        .header("X-Auth-Key", api_key)
+        .header("Authorization", hash)
 }

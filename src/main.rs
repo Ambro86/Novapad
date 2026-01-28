@@ -1372,6 +1372,7 @@ fn has_secondary_window_open(hwnd: HWND) -> bool {
                 || state.batch_audiobooks_window.0 != 0
                 || state.podcasts_window.0 != 0
                 || state.podcasts_add_dialog.0 != 0
+                || state.podcasts_categories_dialog.0 != 0
                 || state.podcasts_description_dialog.0 != 0
                 || state.rss_window.0 != 0
                 || state.rss_add_dialog.0 != 0
@@ -1410,6 +1411,7 @@ pub(crate) struct AppState {
     batch_audiobooks_window: HWND,
     podcasts_window: HWND,
     podcasts_add_dialog: HWND,
+    podcasts_categories_dialog: HWND,
     podcasts_description_dialog: HWND,
     rss_window: HWND,
     rss_add_dialog: HWND, // Input dialog for RSS
@@ -1907,6 +1909,7 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                         || state.dictionary_entry_dialog.0 != 0
                         || state.go_to_time_dialog.0 != 0
                         || state.podcasts_add_dialog.0 != 0
+                        || state.podcasts_categories_dialog.0 != 0
                         || state.podcasts_description_dialog.0 != 0;
 
                     // Exclude voice panel controls from player keyboard handling
@@ -2109,6 +2112,15 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                 if state.podcasts_description_dialog.0 != 0
                     && app_windows::podcasts_window::handle_navigation(
                         state.podcasts_description_dialog,
+                        &msg,
+                    )
+                {
+                    handled = true;
+                    return;
+                }
+                if state.podcasts_categories_dialog.0 != 0
+                    && app_windows::podcasts_window::handle_navigation(
+                        state.podcasts_categories_dialog,
                         &msg,
                     )
                 {
@@ -2474,6 +2486,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 rss_window: HWND(0),
                 podcasts_window: HWND(0),
                 podcasts_add_dialog: HWND(0),
+                podcasts_categories_dialog: HWND(0),
                 podcasts_description_dialog: HWND(0),
                 rss_add_dialog: HWND(0),
                 go_to_time_dialog: HWND(0),

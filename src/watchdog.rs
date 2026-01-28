@@ -181,23 +181,88 @@ fn watchdog_loop(state: Arc<WatchdogState>, config: WatchdogConfig) {
     crate::log_debug("Watchdog: stopped");
 }
 
-/// Riporta hang a Sentry
+/// Riporta hang a Sentry con contesto ricco
 fn report_hang_to_sentry(elapsed_secs: u64) {
     use crate::sentry_integration;
+    use crate::telemetry;
+
+    // Rate limiting: evita spam
+    if !telemetry::should_report_hang() {
+        crate::log_debug("Watchdog: hang report rate-limited");
+        return;
+    }
+
+    // Prendi snapshot del contesto
+    let ctx = telemetry::snapshot_context();
 
     sentry::with_scope(
         |scope| {
+            // Tags per filtraggio
             scope.set_tag("err.type", "hang");
             scope.set_tag("err.severity", "warning");
+            scope.set_tag("hang.last_action", &ctx.last_action);
+
+            if !ctx.current_window.is_empty() {
+                scope.set_tag("hang.window", &ctx.current_window);
+            }
+
+            // Extra data
             scope.set_extra(
                 "hang.duration_secs",
                 sentry::protocol::Value::from(elapsed_secs),
             );
+            scope.set_extra(
+                "hang.last_action_age_secs",
+                sentry::protocol::Value::from(ctx.action_age_secs),
+            );
+            scope.set_extra(
+                "hang.last_action_details",
+                sentry::protocol::Value::from(ctx.last_action_details.clone()),
+            );
+            scope.set_extra(
+                "hang.audio_playing",
+                sentry::protocol::Value::from(ctx.audio_playing),
+            );
+            scope.set_extra(
+                "hang.tts_active",
+                sentry::protocol::Value::from(ctx.tts_active),
+            );
+
+            if !ctx.updater_state.is_empty() {
+                scope.set_extra(
+                    "hang.updater_state",
+                    sentry::protocol::Value::from(ctx.updater_state.clone()),
+                );
+            }
+
+            // Recent actions as a list
+            if !ctx.recent_actions.is_empty() {
+                scope.set_extra(
+                    "hang.recent_actions",
+                    sentry::protocol::Value::from(ctx.recent_actions.join("\n")),
+                );
+            }
+
+            // Recent logs (truncated to avoid huge payloads)
+            if !ctx.recent_logs.is_empty() {
+                let logs_truncated = if ctx.recent_logs.len() > 8000 {
+                    format!(
+                        "...(truncated)...\n{}",
+                        &ctx.recent_logs[ctx.recent_logs.len() - 8000..]
+                    )
+                } else {
+                    ctx.recent_logs.clone()
+                };
+                scope.set_extra(
+                    "hang.recent_logs",
+                    sentry::protocol::Value::from(logs_truncated),
+                );
+            }
         },
         || {
             let message = format!(
-                "Possible hang: UI unresponsive for {} seconds",
-                elapsed_secs
+                "Possible hang: UI unresponsive for {} seconds (last action: {})",
+                elapsed_secs, ctx.last_action
             );
             let event_id = sentry::capture_message(&message, sentry::Level::Warning);
 
@@ -205,6 +270,9 @@ fn report_hang_to_sentry(elapsed_secs: u64) {
             sentry_integration::save_last_fatal(&message, Some(&event_id));
         },
     );
+
+    // Marca come riportato (per rate limiting)
+    telemetry::mark_hang_reported();
 
     // Flush per assicurarsi che l'evento sia inviato
     if let Some(client) = sentry::Hub::current().client() {

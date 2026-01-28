@@ -309,6 +309,7 @@ pub fn toggle_tts_pause(hwnd: HWND) {
 }
 
 pub fn stop_tts_playback(hwnd: HWND) {
+    crate::telemetry::set_tts_active(false);
     prevent_sleep(false);
     if unsafe {
         with_state(hwnd, |state| {
@@ -353,6 +354,10 @@ fn handle_tts_command(
 }
 
 pub fn start_tts_playback_with_chunks(options: TtsPlaybackOptions) {
+    // Record telemetry
+    crate::telemetry::record_action("tts_start", format!("chunks={}", options.chunks.len()));
+    crate::telemetry::set_tts_active(true);
+
     stop_tts_playback(options.hwnd);
     prevent_sleep(true);
     if options.chunks.is_empty() {

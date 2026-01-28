@@ -547,6 +547,11 @@ fn start_audiobook_at_with_options(
 }
 
 pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
+    // Record telemetry
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("audio");
+    crate::telemetry::record_action("audio_play", ext);
+    crate::telemetry::set_audio_playing(true);
+
     crate::log_debug(&format!(
         "Audio player: start_audiobook_playback called for {}",
         path.display()
@@ -732,6 +737,7 @@ pub unsafe fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> 
 }
 
 pub unsafe fn stop_audiobook_playback(hwnd: HWND) {
+    crate::telemetry::set_audio_playing(false);
     crate::log_debug("Audio player: stop_audiobook_playback called");
     if with_state(hwnd, |state| {
         if let Some(player) = state.active_audiobook.take() {

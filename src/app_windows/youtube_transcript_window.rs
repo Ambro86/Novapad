@@ -593,13 +593,16 @@ unsafe extern "system" fn import_wndproc(
             if with_import_state(hwnd, |state| {
                 EnableWindow(state.parent, true);
                 SetForegroundWindow(state.parent);
-                if let Err(e) =
-                    PostMessageW(state.parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0))
-                {
-                    crate::log_debug(&format!("Failed to post WM_FOCUS_EDITOR: {}", e));
-                }
-                if let Some(hwnd_edit) = get_active_edit(state.parent) {
-                    NotifyWinEvent(EVENT_OBJECT_FOCUS, hwnd_edit, OBJID_CLIENT, CHILDID_SELF);
+                // Only focus editor if not in player mode (audiobook)
+                if !crate::editor_manager::is_current_audiobook(state.parent) {
+                    if let Err(e) =
+                        PostMessageW(state.parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0))
+                    {
+                        crate::log_debug(&format!("Failed to post WM_FOCUS_EDITOR: {}", e));
+                    }
+                    if let Some(hwnd_edit) = get_active_edit(state.parent) {
+                        NotifyWinEvent(EVENT_OBJECT_FOCUS, hwnd_edit, OBJID_CLIENT, CHILDID_SELF);
+                    }
                 }
             })
             .is_none()

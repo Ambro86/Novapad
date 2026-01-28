@@ -1953,6 +1953,13 @@ unsafe fn open_document_with_encoding_internal(
     user_encoding: Option<TextEncoding>,
     from_copydata: bool,
 ) {
+    // Record telemetry for hang diagnostics
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("unknown");
+    crate::telemetry::record_action("file_open", ext);
+
     log_debug(&format!(
         "Open document: {} (encoding: {:?})",
         path.display(),
@@ -2158,6 +2165,21 @@ pub unsafe fn open_document(hwnd: HWND, path: &Path) {
 
 pub unsafe fn open_document_from_copydata(hwnd: HWND, path: &Path) {
     open_document_with_encoding_from_copydata(hwnd, path, None);
+}
+
+/// Returns true if the current document is an audiobook (player mode).
+/// Use this to avoid showing/focusing the editor when in player mode.
+pub fn is_current_audiobook(hwnd: HWND) -> bool {
+    unsafe {
+        with_state(hwnd, |state| {
+            state
+                .docs
+                .get(state.current)
+                .map(|doc| matches!(doc.format, FileFormat::Audiobook))
+                .unwrap_or(false)
+        })
+        .unwrap_or(false)
+    }
 }
 
 pub unsafe fn mark_current_document_from_rss(hwnd: HWND, from_rss: bool) {

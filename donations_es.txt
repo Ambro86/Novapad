@@ -1,4 +1,4 @@
-Donaciones
+﻿Donaciones
 Novapad es un programa creado inicialmente para cubrir necesidades personales, pero con el tiempo ha crecido cada vez más. Su desarrollo requiere un trabajo constante para mejorar las funciones, corregir errores, buscar nuevas ideas y probar cuidadosamente todas las funciones.
 Si consideras útil este programa y deseas apoyar su desarrollo, puedes hacer una donación.
 PayPal
@@ -10,3 +10,7 @@ También puedes contribuir mediante transferencia bancaria a la cuenta a nombre 
 IBAN: IT77W0306901020100000064149
 Si es posible, utiliza un concepto claro, por ejemplo “Novapad”.
 Las personas que apoyen el proyecto serán mencionadas en el programa y en el repositorio de GitHub, salvo que prefieran permanecer en el anonimato o usar un apodo.
+
+Se agradece la contribución de Jiri Holzinger y Paola Vagata.
+Por la traducción al vietnamita, gracias a Anh Đức Nguyễn.
+Por la traducción al checo, gracias a Radek Žalud y Jiri Holzinger.

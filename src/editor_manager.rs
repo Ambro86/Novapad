@@ -2057,6 +2057,14 @@ fn load_document_content(
             opened_text_encoding: None,
         }));
     }
+    if is_odt_path(path) {
+        let text = read_odt_text(path, language)?;
+        return Ok(Some(LoadedDocument {
+            content: text,
+            format: FileFormat::Odt,
+            opened_text_encoding: None,
+        }));
+    }
     if is_pptx_path(path) {
         let text = read_ppt_text(path, language)?;
         return Ok(Some(LoadedDocument {
@@ -2070,6 +2078,14 @@ fn load_document_content(
         return Ok(Some(LoadedDocument {
             content: text,
             format: FileFormat::Ppt,
+            opened_text_encoding: None,
+        }));
+    }
+    if is_odp_path(path) {
+        let text = read_odp_text(path, language)?;
+        return Ok(Some(LoadedDocument {
+            content: text,
+            format: FileFormat::Odp,
             opened_text_encoding: None,
         }));
     }
@@ -2735,6 +2751,7 @@ pub unsafe fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> 
         let is_lossy_doc = matches!(
             state.docs[index].format,
             FileFormat::Docx
+                | FileFormat::Odt
                 | FileFormat::Doc
                 | FileFormat::Pdf
                 | FileFormat::Spreadsheet
@@ -2742,6 +2759,7 @@ pub unsafe fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> 
                 | FileFormat::Html
                 | FileFormat::Ppt
                 | FileFormat::Pptx
+                | FileFormat::Odp
         );
         let mut suggested_name = crate::suggested_filename_from_text(&text)
             .filter(|name| !name.is_empty())

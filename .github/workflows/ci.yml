@@ -123,6 +123,32 @@ jobs:
     - name: Build (Release)
       run: cargo build --verbose --release
 
+    - name: Download Sentry CLI
+      shell: powershell
+      run: |
+        $cli = "$env:RUNNER_TEMP\\sentry-cli.exe"
+        Invoke-WebRequest -Uri "https://downloads.sentry-cdn.com/sentry-cli/latest/sentry-cli-Windows-x86_64.exe" -OutFile $cli
+        echo "SENTRY_CLI=$cli" >> $env:GITHUB_ENV
+
+    - name: Upload PDBs to Sentry
+      if: env.SENTRY_AUTH_TOKEN != ''
+      shell: powershell
+      env:
+        SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+        SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+      run: |
+        if (-not $env:SENTRY_ORG -or -not $env:SENTRY_PROJECT) {
+          Write-Host "Sentry org/project not set; skipping PDB upload."
+          exit 0
+        }
+        $pdbs = Get-ChildItem -Path "target/release" -Recurse -Filter *.pdb
+        if ($pdbs.Count -eq 0) {
+          Write-Host "No PDBs found; skipping PDB upload."
+          exit 0
+        }
+        & $env:SENTRY_CLI upload-dif --org $env:SENTRY_ORG --project $env:SENTRY_PROJECT --wait $pdbs.FullName
+
     - name: Package Application (NSIS)
       run: cargo packager --release --formats nsis
 

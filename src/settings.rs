@@ -203,6 +203,14 @@ pub struct AppSettings {
     pub use_dialogue_voice: bool,
     #[serde(default)]
     pub dialogue_voice: String,
+    #[serde(default = "default_dialogue_voice_rate")]
+    pub dialogue_voice_rate: i32,
+    #[serde(default = "default_dialogue_voice_pitch")]
+    pub dialogue_voice_pitch: i32,
+    #[serde(default = "default_dialogue_voice_volume")]
+    pub dialogue_voice_volume: i32,
+    #[serde(default = "default_dialogue_tts_engine")]
+    pub dialogue_tts_engine: TtsEngine,
     pub tts_only_multilingual: bool,
     pub tts_manual_tuning: bool,
     pub split_on_newline: bool,
@@ -339,6 +347,22 @@ fn default_true() -> bool {
     true
 }
 
+fn default_dialogue_voice_rate() -> i32 {
+    0
+}
+
+fn default_dialogue_voice_pitch() -> i32 {
+    0
+}
+
+fn default_dialogue_voice_volume() -> i32 {
+    100
+}
+
+fn default_dialogue_tts_engine() -> TtsEngine {
+    TtsEngine::Edge
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         AppSettings {
@@ -349,6 +373,10 @@ impl Default for AppSettings {
             tts_voice: "it-IT-IsabellaNeural".to_string(),
             use_dialogue_voice: false,
             dialogue_voice: String::new(),
+            dialogue_voice_rate: 0,
+            dialogue_voice_pitch: 0,
+            dialogue_voice_volume: 100,
+            dialogue_tts_engine: TtsEngine::Edge,
             tts_only_multilingual: false,
             tts_manual_tuning: false,
             split_on_newline: false,

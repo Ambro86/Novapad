@@ -90,6 +90,10 @@ const OPTIONS_ID_TABS: usize = 6024;
 const OPTIONS_ID_USE_DIALOGUE_VOICE: usize = 6049;
 const OPTIONS_ID_DIALOGUE_VOICE: usize = 6050;
 const OPTIONS_ID_DIALOGUE_VOICE_PREVIEW: usize = 6051;
+const OPTIONS_ID_DIALOGUE_VOICE_RATE: usize = 6052;
+const OPTIONS_ID_DIALOGUE_VOICE_PITCH: usize = 6053;
+const OPTIONS_ID_DIALOGUE_VOICE_VOLUME: usize = 6054;
+const OPTIONS_ID_DIALOGUE_TTS_ENGINE: usize = 6055;
 
 const OPTIONS_ID_OK: usize = 6005;
 const OPTIONS_ID_CANCEL: usize = 6006;
@@ -205,6 +209,14 @@ struct OptionsDialogState {
     label_dialogue_voice: HWND,
     combo_dialogue_voice: HWND,
     button_dialogue_voice_preview: HWND,
+    label_dialogue_engine: HWND,
+    combo_dialogue_engine: HWND,
+    label_dialogue_voice_rate: HWND,
+    combo_dialogue_voice_rate: HWND,
+    label_dialogue_voice_pitch: HWND,
+    combo_dialogue_voice_pitch: HWND,
+    label_dialogue_voice_volume: HWND,
+    combo_dialogue_voice_volume: HWND,
     checkbox_split_on_newline: HWND,
     checkbox_word_wrap: HWND,
     checkbox_smart_quotes: HWND,
@@ -252,6 +264,10 @@ struct OptionsLabels {
     label_use_dialogue_voice: String,
     label_dialogue_voice: String,
     label_dialogue_voice_preview: String,
+    label_dialogue_engine: String,
+    label_dialogue_voice_rate: String,
+    label_dialogue_voice_pitch: String,
+    label_dialogue_voice_volume: String,
     label_tts_speed: String,
     label_tts_pitch: String,
     label_tts_volume: String,
@@ -350,6 +366,10 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_use_dialogue_voice: i18n::tr(language, "options.label.use_dialogue_voice"),
         label_dialogue_voice: i18n::tr(language, "options.label.dialogue_voice"),
         label_dialogue_voice_preview: i18n::tr(language, "options.label.dialogue_voice_preview"),
+        label_dialogue_engine: i18n::tr(language, "options.label.tts_engine"),
+        label_dialogue_voice_rate: i18n::tr(language, "tts_tuning.label_speed"),
+        label_dialogue_voice_pitch: i18n::tr(language, "tts_tuning.label_pitch"),
+        label_dialogue_voice_volume: i18n::tr(language, "tts_tuning.label_volume"),
         label_tts_speed: i18n::tr(language, "tts_tuning.label_speed"),
         label_tts_pitch: i18n::tr(language, "tts_tuning.label_pitch"),
         label_tts_volume: i18n::tr(language, "tts_tuning.label_volume"),
@@ -491,13 +511,14 @@ pub unsafe fn open(parent: HWND) {
 }
 
 pub unsafe fn refresh_voices(hwnd: HWND) {
-    let (parent, combo_voice, combo_dialogue_voice, combo_engine, checkbox) =
+    let (parent, combo_voice, combo_dialogue_voice, combo_engine, combo_dialogue_engine, checkbox) =
         match with_options_state(hwnd, |state| {
             (
                 state.parent,
                 state.combo_voice,
                 state.combo_dialogue_voice,
                 state.combo_tts_engine,
+                state.combo_dialogue_engine,
                 state.checkbox_multilingual,
             )
         }) {
@@ -520,6 +541,23 @@ pub unsafe fn refresh_voices(hwnd: HWND) {
     };
 
     let voices = with_state(parent, |state| match engine {
+        TtsEngine::Edge => state.edge_voices.clone(),
+        TtsEngine::Sapi5 => state.sapi_voices.clone(),
+        TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
+    })
+    .unwrap_or_default();
+    let dialogue_engine_sel =
+        SendMessageW(combo_dialogue_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    let dialogue_engine = if dialogue_engine_sel >= 0 {
+        match dialogue_engine_sel {
+            1 => TtsEngine::Sapi5,
+            2 => TtsEngine::Sapi4,
+            _ => TtsEngine::Edge,
+        }
+    } else {
+        settings.dialogue_tts_engine
+    };
+    let dialogue_voices = with_state(parent, |state| match dialogue_engine {
         TtsEngine::Edge => state.edge_voices.clone(),
         TtsEngine::Sapi5 => state.sapi_voices.clone(),
         TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
@@ -555,9 +593,13 @@ pub unsafe fn refresh_voices(hwnd: HWND) {
     // Also populate dialogue voice combo
     populate_voice_combo(
         combo_dialogue_voice,
-        &voices,
+        &dialogue_voices,
         &settings.dialogue_voice,
-        filter_multilingual,
+        if dialogue_engine == TtsEngine::Edge {
+            filter_multilingual
+        } else {
+            false
+        },
         &labels,
     );
 }
@@ -944,6 +986,36 @@ unsafe extern "system" fn options_wndproc(
             );
             y += 26;
 
+            let label_dialogue_engine = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_dialogue_engine).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_dialogue_engine = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                120,
+                hwnd,
+                HMENU(OPTIONS_ID_DIALOGUE_TTS_ENGINE as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
             let label_dialogue_voice = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -973,6 +1045,96 @@ unsafe extern "system" fn options_wndproc(
                 None,
             );
             y += 30;
+
+            let label_dialogue_voice_rate = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_dialogue_voice_rate).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_dialogue_voice_rate = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                140,
+                hwnd,
+                HMENU(OPTIONS_ID_DIALOGUE_VOICE_RATE as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 40;
+
+            let label_dialogue_voice_pitch = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_dialogue_voice_pitch).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_dialogue_voice_pitch = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                140,
+                hwnd,
+                HMENU(OPTIONS_ID_DIALOGUE_VOICE_PITCH as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 40;
+
+            let label_dialogue_voice_volume = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_dialogue_voice_volume).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_dialogue_voice_volume = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                140,
+                hwnd,
+                HMENU(OPTIONS_ID_DIALOGUE_VOICE_VOLUME as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 36;
 
             let button_dialogue_voice_preview = CreateWindowExW(
                 Default::default(),
@@ -1780,8 +1942,16 @@ unsafe extern "system" fn options_wndproc(
                 checkbox_tts_manual,
                 checkbox_multilingual,
                 checkbox_use_dialogue_voice,
+                label_dialogue_engine,
+                combo_dialogue_engine,
                 label_dialogue_voice,
                 combo_dialogue_voice,
+                label_dialogue_voice_rate,
+                combo_dialogue_voice_rate,
+                label_dialogue_voice_pitch,
+                combo_dialogue_voice_pitch,
+                label_dialogue_voice_volume,
+                combo_dialogue_voice_volume,
                 button_dialogue_voice_preview,
                 checkbox_split_on_newline,
                 checkbox_word_wrap,
@@ -1865,8 +2035,16 @@ unsafe extern "system" fn options_wndproc(
                 button_podcastindex_signup,
                 checkbox_multilingual,
                 checkbox_use_dialogue_voice,
+                label_dialogue_engine,
+                combo_dialogue_engine,
                 label_dialogue_voice,
                 combo_dialogue_voice,
+                label_dialogue_voice_rate,
+                combo_dialogue_voice_rate,
+                label_dialogue_voice_pitch,
+                combo_dialogue_voice_pitch,
+                label_dialogue_voice_volume,
+                combo_dialogue_voice_volume,
                 button_dialogue_voice_preview,
                 checkbox_split_on_newline,
                 checkbox_word_wrap,
@@ -1954,6 +2132,25 @@ unsafe extern "system" fn options_wndproc(
                             }
                         }
 
+                        refresh_voices(hwnd);
+                    }
+                    LRESULT(0)
+                }
+                OPTIONS_ID_DIALOGUE_TTS_ENGINE => {
+                    if code == CBN_SELCHANGE {
+                        let combo = with_options_state(hwnd, |s| s.combo_dialogue_engine)
+                            .unwrap_or(HWND(0));
+                        let sel = SendMessageW(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+                        if sel == 1 {
+                            let parent = with_options_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                            let has_sapi =
+                                with_state(parent, |s| !s.sapi_voices.is_empty()).unwrap_or(false);
+                            if !has_sapi {
+                                let lang =
+                                    with_state(parent, |s| s.settings.language).unwrap_or_default();
+                                ensure_sapi_voices_loaded(parent, lang);
+                            }
+                        }
                         refresh_voices(hwnd);
                     }
                     LRESULT(0)
@@ -2144,7 +2341,11 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         checkbox_tts_manual,
         checkbox_multilingual,
         checkbox_use_dialogue_voice,
+        combo_dialogue_engine,
         combo_dialogue_voice,
+        combo_dialogue_voice_rate,
+        combo_dialogue_voice_pitch,
+        combo_dialogue_voice_volume,
         checkbox_split_on_newline,
         checkbox_word_wrap,
         checkbox_smart_quotes,
@@ -2202,7 +2403,11 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.checkbox_tts_manual,
             state.checkbox_multilingual,
             state.checkbox_use_dialogue_voice,
+            state.combo_dialogue_engine,
             state.combo_dialogue_voice,
+            state.combo_dialogue_voice_rate,
+            state.combo_dialogue_voice_pitch,
+            state.combo_dialogue_voice_volume,
             state.checkbox_split_on_newline,
             state.checkbox_word_wrap,
             state.checkbox_smart_quotes,
@@ -2390,6 +2595,37 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         LPARAM(0),
     );
 
+    SendMessageW(combo_dialogue_engine, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    SendMessageW(
+        combo_dialogue_engine,
+        CB_ADDSTRING,
+        WPARAM(0),
+        LPARAM(to_wide(&labels.engine_edge).as_ptr() as isize),
+    );
+    SendMessageW(
+        combo_dialogue_engine,
+        CB_ADDSTRING,
+        WPARAM(0),
+        LPARAM(to_wide(&labels.engine_sapi5).as_ptr() as isize),
+    );
+    SendMessageW(
+        combo_dialogue_engine,
+        CB_ADDSTRING,
+        WPARAM(0),
+        LPARAM(to_wide(&labels.engine_sapi4).as_ptr() as isize),
+    );
+    let dialogue_engine_index = match settings.dialogue_tts_engine {
+        TtsEngine::Edge => 0,
+        TtsEngine::Sapi5 => 1,
+        TtsEngine::Sapi4 => 2,
+    };
+    SendMessageW(
+        combo_dialogue_engine,
+        CB_SETCURSEL,
+        WPARAM(dialogue_engine_index),
+        LPARAM(0),
+    );
+
     let speed_items = [
         (
             i18n::tr(settings.language, "tts_tuning.speed.extremely_slow"),
@@ -2508,9 +2744,15 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
     init_tts_combo(combo_tts_speed, &speed_items);
     init_tts_combo(combo_tts_pitch, &pitch_items);
     init_tts_combo(combo_tts_volume, &volume_items);
+    init_tts_combo(combo_dialogue_voice_rate, &speed_items);
+    init_tts_combo(combo_dialogue_voice_pitch, &pitch_items);
+    init_tts_combo(combo_dialogue_voice_volume, &volume_items);
     select_combo_value(combo_tts_speed, settings.tts_rate);
     select_combo_value(combo_tts_pitch, settings.tts_pitch);
     select_combo_value(combo_tts_volume, settings.tts_volume);
+    select_combo_value(combo_dialogue_voice_rate, settings.dialogue_voice_rate);
+    select_combo_value(combo_dialogue_voice_pitch, settings.dialogue_voice_pitch);
+    select_combo_value(combo_dialogue_voice_volume, settings.dialogue_voice_volume);
     if let Err(_e) = SetWindowTextW(
         edit_tts_speed,
         PCWSTR(to_wide(&settings.tts_rate.to_string()).as_ptr()),
@@ -3173,12 +3415,33 @@ unsafe fn update_tts_manual_visibility(hwnd: HWND) {
 }
 
 unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
-    let (checkbox, label, combo, button) = match with_options_state(hwnd, |state| {
+    let (
+        checkbox,
+        label,
+        combo,
+        button,
+        label_engine,
+        combo_engine,
+        label_rate,
+        combo_rate,
+        label_pitch,
+        combo_pitch,
+        label_volume,
+        combo_volume,
+    ) = match with_options_state(hwnd, |state| {
         (
             state.checkbox_use_dialogue_voice,
             state.label_dialogue_voice,
             state.combo_dialogue_voice,
             state.button_dialogue_voice_preview,
+            state.label_dialogue_engine,
+            state.combo_dialogue_engine,
+            state.label_dialogue_voice_rate,
+            state.combo_dialogue_voice_rate,
+            state.label_dialogue_voice_pitch,
+            state.combo_dialogue_voice_pitch,
+            state.label_dialogue_voice_volume,
+            state.combo_dialogue_voice_volume,
         )
     }) {
         Some(values) => values,
@@ -3189,6 +3452,14 @@ unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
     EnableWindow(label, enabled);
     EnableWindow(combo, enabled);
     EnableWindow(button, enabled);
+    EnableWindow(label_engine, enabled);
+    EnableWindow(combo_engine, enabled);
+    EnableWindow(label_rate, enabled);
+    EnableWindow(combo_rate, enabled);
+    EnableWindow(label_pitch, enabled);
+    EnableWindow(combo_pitch, enabled);
+    EnableWindow(label_volume, enabled);
+    EnableWindow(combo_volume, enabled);
 }
 
 fn open_podcastindex_signup() {
@@ -3309,6 +3580,10 @@ unsafe fn preview_voice(hwnd: HWND) {
                 pitch,
                 volume,
                 dialogue_voice: None,
+                dialogue_rate: 0,
+                dialogue_pitch: 0,
+                dialogue_volume: 100,
+                dialogue_engine: TtsEngine::Edge,
             };
             tts_engine::start_tts_playback_with_chunks(options);
         }
@@ -3378,11 +3653,21 @@ unsafe fn preview_voice(hwnd: HWND) {
 }
 
 unsafe fn preview_dialogue_voice(hwnd: HWND) {
-    let (parent, combo_tts_engine, combo_dialogue_voice) = match with_options_state(hwnd, |state| {
+    let (
+        parent,
+        combo_dialogue_engine,
+        combo_dialogue_voice,
+        combo_dialogue_voice_rate,
+        combo_dialogue_voice_pitch,
+        combo_dialogue_voice_volume,
+    ) = match with_options_state(hwnd, |state| {
         (
             state.parent,
-            state.combo_tts_engine,
+            state.combo_dialogue_engine,
             state.combo_dialogue_voice,
+            state.combo_dialogue_voice_rate,
+            state.combo_dialogue_voice_pitch,
+            state.combo_dialogue_voice_volume,
         )
     }) {
         Some(values) => values,
@@ -3396,7 +3681,7 @@ unsafe fn preview_dialogue_voice(hwnd: HWND) {
         return;
     }
 
-    let engine_sel = SendMessageW(combo_tts_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    let engine_sel = SendMessageW(combo_dialogue_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     let engine = match engine_sel {
         1 => TtsEngine::Sapi5,
         2 => TtsEngine::Sapi4,
@@ -3425,10 +3710,9 @@ unsafe fn preview_dialogue_voice(hwnd: HWND) {
     }
     let voice = voices[voice_index].short_name.clone();
 
-    // Use default rate/pitch/volume for dialogue voice preview
-    let rate = 0;
-    let pitch = 0;
-    let volume = 100;
+    let rate = combo_value(combo_dialogue_voice_rate);
+    let pitch = combo_value(combo_dialogue_voice_pitch);
+    let volume = combo_value(combo_dialogue_voice_volume);
 
     match engine {
         TtsEngine::Edge => {
@@ -3443,6 +3727,10 @@ unsafe fn preview_dialogue_voice(hwnd: HWND) {
                 pitch,
                 volume,
                 dialogue_voice: None,
+                dialogue_rate: 0,
+                dialogue_pitch: 0,
+                dialogue_volume: 100,
+                dialogue_engine: TtsEngine::Edge,
             };
             tts_engine::start_tts_playback_with_chunks(options);
         }
@@ -3536,7 +3824,11 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         checkbox_tts_manual,
         checkbox_multilingual,
         checkbox_use_dialogue_voice,
+        combo_dialogue_engine,
         combo_dialogue_voice,
+        combo_dialogue_voice_rate,
+        combo_dialogue_voice_pitch,
+        combo_dialogue_voice_volume,
         checkbox_split_on_newline,
         checkbox_word_wrap,
         checkbox_smart_quotes,
@@ -3582,7 +3874,11 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.checkbox_tts_manual,
             state.checkbox_multilingual,
             state.checkbox_use_dialogue_voice,
+            state.combo_dialogue_engine,
             state.combo_dialogue_voice,
+            state.combo_dialogue_voice_rate,
+            state.combo_dialogue_voice_pitch,
+            state.combo_dialogue_voice_volume,
             state.checkbox_split_on_newline,
             state.checkbox_word_wrap,
             state.checkbox_smart_quotes,
@@ -3624,15 +3920,40 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.settings.tts_rate,
             state.settings.tts_pitch,
             state.settings.tts_volume,
+            state.settings.use_dialogue_voice,
+            state.settings.dialogue_voice.clone(),
+            state.settings.dialogue_voice_rate,
+            state.settings.dialogue_voice_pitch,
+            state.settings.dialogue_voice_volume,
+            state.settings.dialogue_tts_engine,
             state.tts_session.is_some(),
         )
     });
-    let (old_engine, old_voice, old_rate, old_pitch, old_volume, was_tts_active) = res.unwrap_or((
+    let (
+        old_engine,
+        old_voice,
+        old_rate,
+        old_pitch,
+        old_volume,
+        old_use_dialogue_voice,
+        old_dialogue_voice,
+        old_dialogue_rate,
+        old_dialogue_pitch,
+        old_dialogue_volume,
+        old_dialogue_engine,
+        was_tts_active,
+    ) = res.unwrap_or((
         settings.tts_engine,
         settings.tts_voice.clone(),
         settings.tts_rate,
         settings.tts_pitch,
         settings.tts_volume,
+        settings.use_dialogue_voice,
+        settings.dialogue_voice.clone(),
+        settings.dialogue_voice_rate,
+        settings.dialogue_voice_pitch,
+        settings.dialogue_voice_volume,
+        settings.dialogue_tts_engine,
         false,
     ));
 
@@ -3674,6 +3995,14 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         1 => TtsEngine::Sapi5,
         2 => TtsEngine::Sapi4,
 
+        _ => TtsEngine::Edge,
+    };
+
+    let dialogue_engine_sel =
+        SendMessageW(combo_dialogue_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    settings.dialogue_tts_engine = match dialogue_engine_sel {
+        1 => TtsEngine::Sapi5,
+        2 => TtsEngine::Sapi4,
         _ => TtsEngine::Edge,
     };
 
@@ -3867,6 +4196,12 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
     })
     .unwrap_or_default();
+    let dialogue_voices = with_state(parent, |state| match settings.dialogue_tts_engine {
+        TtsEngine::Edge => state.edge_voices.clone(),
+        TtsEngine::Sapi5 => state.sapi_voices.clone(),
+        TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
+    })
+    .unwrap_or_default();
 
     let voice_sel = SendMessageW(combo_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     if voice_sel >= 0 {
@@ -3902,10 +4237,13 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             LPARAM(0),
         )
         .0 as usize;
-        if voice_index < voices.len() {
-            settings.dialogue_voice = voices[voice_index].short_name.clone();
+        if voice_index < dialogue_voices.len() {
+            settings.dialogue_voice = dialogue_voices[voice_index].short_name.clone();
         }
     }
+    settings.dialogue_voice_rate = combo_value(combo_dialogue_voice_rate);
+    settings.dialogue_voice_pitch = combo_value(combo_dialogue_voice_pitch);
+    settings.dialogue_voice_volume = combo_value(combo_dialogue_voice_volume);
 
     let skip_sel = SendMessageW(combo_audio_skip, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     if skip_sel >= 0 {
@@ -4014,7 +4352,13 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             || old_voice != settings.tts_voice
             || old_rate != settings.tts_rate
             || old_pitch != settings.tts_pitch
-            || old_volume != settings.tts_volume)
+            || old_volume != settings.tts_volume
+            || old_use_dialogue_voice != settings.use_dialogue_voice
+            || old_dialogue_voice != settings.dialogue_voice
+            || old_dialogue_rate != settings.dialogue_voice_rate
+            || old_dialogue_pitch != settings.dialogue_voice_pitch
+            || old_dialogue_volume != settings.dialogue_voice_volume
+            || old_dialogue_engine != settings.dialogue_tts_engine)
     {
         crate::restart_tts_from_current_offset(parent);
     }
@@ -4156,6 +4500,12 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.checkbox_use_dialogue_voice,
             state.label_dialogue_voice,
             state.combo_dialogue_voice,
+            state.label_dialogue_voice_rate,
+            state.combo_dialogue_voice_rate,
+            state.label_dialogue_voice_pitch,
+            state.combo_dialogue_voice_pitch,
+            state.label_dialogue_voice_volume,
+            state.combo_dialogue_voice_volume,
             state.button_dialogue_voice_preview,
         ] {
             ShowWindow(control, if show_voice { SW_SHOW } else { SW_HIDE });

@@ -22,11 +22,10 @@ use windows::Win32::UI::Controls::{
 use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use windows::Win32::UI::WindowsAndMessaging::{
     CallWindowProcW, DefWindowProcW, DestroyWindow, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE,
-    ES_WANTRETURN, GWLP_USERDATA, GWLP_WNDPROC, GetClientRect, GetParent, GetWindowLongPtrW,
-    GetWindowTextLengthW, GetWindowTextW, HMENU, IDNO, IDYES, MB_ICONWARNING, MB_YESNOCANCEL,
-    MessageBoxW, MoveWindow, PostMessageW, SW_HIDE, SW_SHOW, SendMessageW, SetWindowLongPtrW,
-    SetWindowTextW, ShowWindow, WM_CHAR, WM_CONTEXTMENU, WM_SETFONT, WS_CHILD, WS_CLIPCHILDREN,
-    WS_EX_CLIENTEDGE, WS_GROUP, WS_HSCROLL, WS_VSCROLL,
+    ES_WANTRETURN, GWLP_USERDATA, GWLP_WNDPROC, GetClientRect, GetParent, GetWindowLongPtrW, HMENU,
+    IDNO, IDYES, MB_ICONWARNING, MB_YESNOCANCEL, MessageBoxW, MoveWindow, PostMessageW, SW_HIDE,
+    SW_SHOW, SendMessageW, SetWindowLongPtrW, SetWindowTextW, ShowWindow, WM_CHAR, WM_CONTEXTMENU,
+    WM_SETFONT, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_GROUP, WS_HSCROLL, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR};
 
@@ -250,13 +249,19 @@ pub unsafe fn set_edit_text(hwnd_edit: HWND, text: &str) {
 }
 
 pub unsafe fn get_edit_text(hwnd_edit: HWND) -> String {
-    let len = GetWindowTextLengthW(hwnd_edit);
+    use windows::Win32::UI::WindowsAndMessaging::{WM_GETTEXT, WM_GETTEXTLENGTH};
+    let len = SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as usize;
     if len == 0 {
         return String::new();
     }
-    let mut buf = vec![0u16; (len + 1) as usize];
-    GetWindowTextW(hwnd_edit, &mut buf);
-    String::from_utf16_lossy(&buf[..len as usize])
+    let mut buf = vec![0u16; len + 1];
+    SendMessageW(
+        hwnd_edit,
+        WM_GETTEXT,
+        WPARAM(buf.len()),
+        LPARAM(buf.as_mut_ptr() as isize),
+    );
+    String::from_utf16_lossy(&buf[..len])
 }
 
 pub unsafe fn send_to_active_edit(hwnd: HWND, msg: u32) {

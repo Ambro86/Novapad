@@ -463,6 +463,7 @@ struct CategoryDialogState {
     hwnd_mode: HWND,
     hwnd_list_label: HWND,
     hwnd_list: HWND,
+    list_proc: WNDPROC,
     hwnd_term_label: HWND,
     hwnd_term_edit: HWND,
     hwnd_open: HWND,
@@ -1871,6 +1872,7 @@ fn normalize_category_name(name: &str) -> String {
 fn podcastindex_feeds_to_results(
     feeds: Vec<PodcastIndexFeed>,
     category: Option<&Category>,
+    language: Language,
 ) -> (Vec<PodcastSearchResult>, bool) {
     let mut results = Vec::new();
     let (filter_key, filter_name) = category.map_or((None, None), |c| {
@@ -1880,7 +1882,28 @@ fn podcastindex_feeds_to_results(
         )
     });
     let has_categories = filter_key.is_some() && feeds.iter().any(|f| f.categories.is_some());
+    let lang_filter = podcastindex_language_code(language);
+    let has_languages = !lang_filter.is_empty()
+        && feeds
+            .iter()
+            .any(|f| f.language.as_deref().unwrap_or_default().trim().len() >= 2);
     for feed in feeds {
+        if !lang_filter.is_empty() {
+            let feed_lang = feed.language.as_deref().unwrap_or_default().trim();
+            let matches_lang = feed_lang.eq_ignore_ascii_case(lang_filter)
+                || feed_lang
+                    .split(&['-', '_'][..])
+                    .next()
+                    .map(|short| short.eq_ignore_ascii_case(lang_filter))
+                    .unwrap_or(false);
+            if has_languages {
+                if !matches_lang {
+                    continue;
+                }
+            } else if !feed_lang.is_empty() && !matches_lang {
+                continue;
+            }
+        }
         if let Some(filter_key) = filter_key.as_deref() {
             match feed.categories.as_ref() {
                 Some(categories) => {
@@ -1962,9 +1985,10 @@ async fn load_by_category(
     match source {
         Source::Apple => {
             let mut status = None;
+            let country = apple_country_for_language(language);
             let results = match mode {
                 Mode::Top => {
-                    let url = apple_top_podcasts_by_genre(category.id, APPLE_COUNTRY, APPLE_LIMIT);
+                    let url = apple_top_podcasts_by_genre(category.id, country, APPLE_LIMIT);
                     let ids = match rss::fetch_url_bytes(&url, fetch_config).await {
                         Ok(bytes) => parse_apple_top_ids(&bytes),
                         Err(err) => {
@@ -1972,7 +1996,7 @@ async fn load_by_category(
                             Vec::new()
                         }
                     };
-                    let lookup_url = apple_lookup_by_ids(&ids, APPLE_COUNTRY);
+                    let lookup_url = apple_lookup_by_ids(&ids, country);
                     if let Some(lookup_url) = lookup_url
                         && let Ok(bytes) = rss::fetch_url_bytes(&lookup_url, fetch_config).await
                         && let Ok(parsed) = serde_json::from_slice::<ItunesSearchResponse>(&bytes)
@@ -2018,9 +2042,9 @@ async fn load_by_category(
                 return Ok((results, status));
             }
             let url = if matches!(mode, Mode::SearchInCategory) {
-                apple_search_in_category(search_term, category.id, APPLE_COUNTRY, APPLE_LIMIT)
+                apple_search_in_category(search_term, category.id, country, APPLE_LIMIT)
             } else {
-                apple_search_by_category(category.id, APPLE_COUNTRY, APPLE_LIMIT)
+                apple_search_by_category(category.id, country, APPLE_LIMIT)
             };
             let bytes = rss::fetch_url_bytes(&url, fetch_config)
                 .await
@@ -2081,7 +2105,8 @@ async fn load_by_category(
                     parsed.feeds.unwrap_or_default()
                 }
             };
-            let (results, has_categories) = podcastindex_feeds_to_results(feeds, Some(&category));
+            let (results, has_categories) =
+                podcastindex_feeds_to_results(feeds, Some(&category), language);
             if !has_categories {
                 status = Some(i18n::tr(language, "podcasts.categories.unfiltered_notice"));
             }
@@ -2527,6 +2552,17 @@ unsafe extern "system" fn categories_wndproc(
                 hinstance,
                 None,
             );
+            let list_proc = if list.0 != 0 {
+                let proc_ptr = category_list_wndproc as *const () as usize;
+                let old = SetWindowLongPtrW(
+                    list,
+                    windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
+                    proc_ptr as isize,
+                );
+                std::mem::transmute::<isize, WNDPROC>(old)
+            } else {
+                None
+            };
 
             let term_label = CreateWindowExW(
                 Default::default(),
@@ -2666,6 +2702,7 @@ unsafe extern "system" fn categories_wndproc(
                 hwnd_mode: combo_mode,
                 hwnd_list_label: label_list,
                 hwnd_list: list,
+                list_proc,
                 hwnd_term_label: term_label,
                 hwnd_term_edit: term_edit,
                 hwnd_open: open_btn,
@@ -3011,6 +3048,40 @@ unsafe extern "system" fn categories_wndproc(
     }
 }
 
+unsafe extern "system" fn category_list_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    use windows::Win32::UI::WindowsAndMessaging::{DLGC_WANTALLKEYS, WM_GETDLGCODE};
+
+    // Tell the dialog we want to handle all keys including Enter
+    if msg == WM_GETDLGCODE {
+        return LRESULT(DLGC_WANTALLKEYS as isize);
+    }
+
+    // Handle Enter key - check both WM_KEYDOWN and WM_CHAR
+    if (msg == WM_KEYDOWN || msg == WM_CHAR) && wparam.0 as u16 == VK_RETURN.0 {
+        let parent = GetParent(hwnd);
+        if parent.0 != 0 {
+            apply_category_selection(parent);
+        }
+        return LRESULT(0);
+    }
+    let parent = GetParent(hwnd);
+    let prev_proc = if parent.0 != 0 {
+        with_category_dialog_state(parent, |s| s.list_proc).unwrap_or(None)
+    } else {
+        None
+    };
+    if let Some(proc) = prev_proc {
+        CallWindowProcW(Some(proc), hwnd, msg, wparam, lparam)
+    } else {
+        DefWindowProcW(hwnd, msg, wparam, lparam)
+    }
+}
+
 unsafe fn subscribe_selected_result(hwnd: HWND) {
     let (parent, results, idx) = with_podcast_state(hwnd, |s| {
         let idx = SendMessageW(s.hwnd_results, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
@@ -3289,6 +3360,7 @@ struct PodcastIndexFeed {
     url: Option<String>,
     #[serde(rename = "feedUrl")]
     feed_url: Option<String>,
+    language: Option<String>,
     categories: Option<HashMap<String, String>>,
 }
 
@@ -6048,9 +6120,36 @@ fn percent_encode(input: &str) -> String {
     byte_serialize(input.as_bytes()).collect()
 }
 
-const APPLE_COUNTRY: &str = "it";
 const APPLE_LIMIT: u32 = 50;
 const PODCASTINDEX_CATEGORY_CACHE_SECS: u64 = 24 * 60 * 60;
+
+fn apple_country_for_language(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "it",
+        Language::English => "us",
+        Language::Spanish => "es",
+        Language::Portuguese => "pt",
+        Language::Swedish => "se",
+        Language::Vietnamese => "vn",
+        Language::Czech => "cz",
+        Language::Polish => "pl",
+        Language::French => "fr",
+    }
+}
+
+fn podcastindex_language_code(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "it",
+        Language::English => "en",
+        Language::Spanish => "es",
+        Language::Portuguese => "pt",
+        Language::Swedish => "sv",
+        Language::Vietnamese => "vi",
+        Language::Czech => "cs",
+        Language::Polish => "pl",
+        Language::French => "fr",
+    }
+}
 
 fn apple_categories(language: Language) -> Vec<Category> {
     let (
@@ -6065,8 +6164,8 @@ fn apple_categories(language: Language) -> Vec<Category> {
         true_crime,
         science,
         sports,
-    ) = if matches!(language, Language::Italian) {
-        (
+    ) = match language {
+        Language::Italian => (
             "Arti",
             "Affari",
             "Commedia",
@@ -6078,9 +6177,8 @@ fn apple_categories(language: Language) -> Vec<Category> {
             "True crime",
             "Scienza",
             "Sport",
-        )
-    } else {
-        (
+        ),
+        Language::English => (
             "Arts",
             "Business",
             "Comedy",
@@ -6092,7 +6190,98 @@ fn apple_categories(language: Language) -> Vec<Category> {
             "True Crime",
             "Science",
             "Sports",
-        )
+        ),
+        Language::Spanish => (
+            "Arte",
+            "Negocios",
+            "Comedia",
+            "Educacion",
+            "Salud y fitness",
+            "Noticias",
+            "Tecnologia",
+            "Sociedad y cultura",
+            "True crime",
+            "Ciencia",
+            "Deportes",
+        ),
+        Language::Portuguese => (
+            "Artes",
+            "Negocios",
+            "Comedia",
+            "Educacao",
+            "Saude e fitness",
+            "Noticias",
+            "Tecnologia",
+            "Sociedade e cultura",
+            "True crime",
+            "Ciencia",
+            "Desporto",
+        ),
+        Language::Swedish => (
+            "Konst",
+            "Foretag",
+            "Komedi",
+            "Utbildning",
+            "Halsa och fitness",
+            "Nyheter",
+            "Teknik",
+            "Samhalle och kultur",
+            "True crime",
+            "Vetenskap",
+            "Sport",
+        ),
+        Language::Vietnamese => (
+            "Nghe thuat",
+            "Kinh doanh",
+            "Hai",
+            "Giao duc",
+            "Suc khoe va the hinh",
+            "Tin tuc",
+            "Cong nghe",
+            "Xa hoi va van hoa",
+            "True crime",
+            "Khoa hoc",
+            "The thao",
+        ),
+        Language::Czech => (
+            "Umeni",
+            "Byznys",
+            "Komedie",
+            "Vzdelavani",
+            "Zdravi a fitness",
+            "Zpravy",
+            "Technologie",
+            "Spolecnost a kultura",
+            "True crime",
+            "Veda",
+            "Sport",
+        ),
+        Language::Polish => (
+            "Sztuka",
+            "Biznes",
+            "Komedia",
+            "Edukacja",
+            "Zdrowie i fitness",
+            "Wiadomosci",
+            "Technologia",
+            "Spoleczenstwo i kultura",
+            "True crime",
+            "Nauka",
+            "Sport",
+        ),
+        Language::French => (
+            "Arts",
+            "Affaires",
+            "Comedie",
+            "Education",
+            "Sante et fitness",
+            "Actualites",
+            "Technologie",
+            "Societe et culture",
+            "True crime",
+            "Science",
+            "Sports",
+        ),
     };
     vec![
         Category {

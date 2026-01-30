@@ -1,8 +1,8 @@
 # Changelog
 
-Version 0.6.2 – 2026-01-24
+Version 0.6.2 – 2026-01-29
 New features
-• Added file execution support (Shift+F5). Users can select an interpreter (e.g., python) in Options, and pressing F5 runs the current script. HTML files open in the browser.
+• Added file execution support (F5). Users can select an interpreter (e.g., python) in Options, search for it on the computer, and pressing F5 runs the current script. HTML files open in the browser.
 • Added support for Google Docs pointer files (.gdoc, .gsheet, .gslides), which automatically open in the default browser.
 • Added support for M4B audiobook format (Apple/AAC).
 • Added "Show episodes" option in podcast search results context menu to browse and play episodes without subscribing.
@@ -12,8 +12,12 @@ New features
 • Added a microphone test box in the recording dialog to check levels before starting.
 • Added "Show description" for podcast episodes in the context menu.
 • Added support for extended audio/video formats via FFmpeg: mkv, avi, mov, m4v, webm, mpg, ts, wmv, flv, vob, 3gp, flac, ogg, wma, aiff.
-• Added synchronized subtitle reading support (srt, vtt, ass, sub, sbv, lrc, smi) with NVDA or selected voice.
+• Added synchronized subtitle reading support (srt, vtt, ass, sub, sbv, lrc, smi) with NVDA or selected voice. The program searches for a subtitle file with the same name as the media file. Added "Import subtitles" and "Remove subtitles" options in the Playback menu for files with different names.
 • Added file associations for all new supported audio/video formats in the "Open with Novapad" context menu.
+• Added pitch adjustment setting for any file.
+• Added option in General settings to enable or disable anonymous error reports. Added a menu item in Help to create a diagnostic ZIP file.
+• Added option to use a different voice for dialogues, both for live reading and audiobook creation.
+• Added podcast categories browser to explore podcasts by category (business, art, sport, etc.).
 Improvements
 • Opening an audio/video file from Explorer now opens the player view directly instead of the text editor.
 • Removed the OCR prompt for inaccessible PDFs; OCR is now performed automatically to improve speed and user experience.
@@ -21,8 +25,8 @@ Improvements
 • SAPI 4: Audiobook creation is now fully parallelized and nearly instant. Added a prompt to choose the number of concurrent processes.
 • SAPI 4: Eliminated the WAV-to-MP3 bottleneck by converting chunks in parallel during synthesis.
 • SAPI 4: Improved error handling and automatic cleanup of temporary files.
-• Find dialog: Renamed "Regex" to "Regular expression" for clarity and fixed a critical bug preventing some words from being found.
-• M4B Audiobooks: Better output handling; splitting by parts/markers now produces a single M4B file with proper metadata chapters.
+• Find dialog: Renamed "Regex" to "Regular expression" for clarity and added missing translations for search options.
+• M4B Audiobooks: Better output handling; splitting by parts/markers now produces a single M4B file with proper metadata chapters including title and author.
 • Player: Fixed bookmark and time announcement precision when playback speed is not 1.0x.
 • Restored Ctrl+Tab and Ctrl+Shift+Tab navigation in Options.
 • Added an option in the Playback menu to instantly reset speed to Normal (1.0x).
@@ -30,10 +34,20 @@ Improvements
 • Integrated FFmpeg with dynamic DLL loading to ensure compatibility without blocking startup.
 • Updated podcast download filters to include new audio/video formats.
 • Prevented Ctrl+S from saving audio/video files to avoid corruption.
+• Improved YouTube transcript import making it more robust and resilient.
+• Improved audiobook part splitting robustness, ensuring no text is lost.
+• Installer is now fully multilingual, supporting Italian, English, Spanish, Portuguese, Swedish, and Vietnamese based on the user's system language. English is the default for unsupported systems.
+• Podcast categories: pressing Enter on a category now confirms the selection (equivalent to OK button).
+• Improved hang detection system to avoid false positives when modal dialogs (error messages, "text not found") are open.
 Fixes
 • Fixed a bug where the changelog did not open on startup.
 • Fixed a bug where the OCR prompt did not appear for inaccessible PDFs opened from Explorer.
 • Fixed a startup bug that could cause loss of focus or window closure immediately after opening.
+• Fixed a critical bug in regex search that prevented finding text, including issues with "Wrap around" search and "Dot matches newline" option with Windows line endings.
+Localization
+• Added Polish translation.
+• Added French translation.
+• Added Czech translation (thanks to Radek Žalud and Jiri Holzinger).
 
 Version 0.6.1 – 2026-01-20
 Fixes

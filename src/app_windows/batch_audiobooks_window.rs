@@ -41,8 +41,10 @@ use crate::file_handler::{
 use crate::i18n;
 use crate::settings::{DictionaryEntry, Language, TtsEngine};
 use crate::tts_engine::{
-    build_audiobook_parts_by_positions, collect_marker_entries, prepare_tts_text,
-    run_tts_audiobook_part, split_text, strip_dashed_lines,
+    MixedAudiobookConfig, TtsChunk, build_audiobook_parts_by_positions,
+    build_mixed_audiobook_parts_by_positions, collect_marker_entries, prepare_tts_text,
+    render_mixed_audiobook_part, run_tts_audiobook_part, split_into_tts_chunks, split_text,
+    strip_dashed_lines,
 };
 use crate::{log_debug, sanitize_filename, show_error, with_state};
 
@@ -204,6 +206,10 @@ struct TtsSettings {
     tts_volume: i32,
     use_dialogue_voice: bool,
     dialogue_voice: String,
+    dialogue_tts_engine: TtsEngine,
+    dialogue_voice_rate: i32,
+    dialogue_voice_pitch: i32,
+    dialogue_voice_volume: i32,
     language: Language,
 }
 
@@ -1469,6 +1475,10 @@ fn load_tts_settings(parent: HWND, voice: String, language: Language) -> TtsSett
             tts_volume: state.settings.tts_volume,
             use_dialogue_voice: state.settings.use_dialogue_voice,
             dialogue_voice: state.settings.dialogue_voice.clone(),
+            dialogue_tts_engine: state.settings.dialogue_tts_engine,
+            dialogue_voice_rate: state.settings.dialogue_voice_rate,
+            dialogue_voice_pitch: state.settings.dialogue_voice_pitch,
+            dialogue_voice_volume: state.settings.dialogue_voice_volume,
             language,
         })
         .unwrap_or_else(|| TtsSettings {
@@ -1485,6 +1495,10 @@ fn load_tts_settings(parent: HWND, voice: String, language: Language) -> TtsSett
             tts_volume: 100,
             use_dialogue_voice: false,
             dialogue_voice: String::new(),
+            dialogue_tts_engine: TtsEngine::Edge,
+            dialogue_voice_rate: 0,
+            dialogue_voice_pitch: 0,
+            dialogue_voice_volume: 100,
             language,
         })
     }
@@ -1686,52 +1700,133 @@ fn export_single_audiobook(
         return Err(crate::settings::tts_no_text_message(tts.language));
     }
     let cleaned = strip_dashed_lines(&text);
-    let (parts, _marker_entries) = if tts.audiobook_split_by_text {
+    let has_custom_voice = tts.dictionary.iter().any(|entry| {
+        entry.use_custom_voice
+            && entry.custom_voice_engine.is_some()
+            && entry.custom_voice.as_ref().is_some_and(|v| !v.is_empty())
+    });
+    let mixed_needed =
+        has_custom_voice || (tts.use_dialogue_voice && tts.dialogue_tts_engine != tts.tts_engine);
+
+    let (parts, mixed_parts) = if tts.audiobook_split_by_text {
         let (normalized, entries) = collect_marker_entries(
             &cleaned,
             &tts.audiobook_split_text,
             tts.audiobook_split_text_requires_newline,
         );
-        let positions: Vec<usize> = entries.iter().map(|e| e.pos).collect();
-        let parts = build_audiobook_parts_by_positions(
-            &normalized,
-            &positions,
-            tts.split_on_newline,
-            &tts.dictionary,
-        );
-        (parts, entries)
+        if entries.is_empty() {
+            (None, None)
+        } else {
+            let positions: Vec<usize> = entries.iter().map(|e| e.pos).collect();
+            if mixed_needed {
+                (
+                    None,
+                    build_mixed_audiobook_parts_by_positions(
+                        &normalized,
+                        &positions,
+                        tts.split_on_newline,
+                        &tts.dictionary,
+                    ),
+                )
+            } else {
+                (
+                    build_audiobook_parts_by_positions(
+                        &normalized,
+                        &positions,
+                        tts.split_on_newline,
+                        &tts.dictionary,
+                    ),
+                    None,
+                )
+            }
+        }
     } else {
-        (None, Vec::new())
+        (None, None)
     };
 
-    let parts = match parts {
-        Some(parts) => parts,
-        None => {
-            let prepared = prepare_tts_text(&cleaned, tts.split_on_newline, &tts.dictionary);
-            let chunks = split_text(&prepared);
-            split_chunks_by_count(&chunks, tts.audiobook_split)
+    if mixed_needed {
+        let parts = match mixed_parts {
+            Some(parts) => parts,
+            None => {
+                let chunks = split_into_tts_chunks(&cleaned, tts.split_on_newline, &tts.dictionary);
+                split_tts_chunks_by_count(&chunks, tts.audiobook_split)
+            }
+        };
+        if parts.is_empty() {
+            return Err(crate::settings::tts_no_text_message(tts.language));
         }
-    };
-    if parts.is_empty() {
-        return Err(crate::settings::tts_no_text_message(tts.language));
-    }
-    let output_paths = build_output_paths(input, parts.len(), batch_settings, tts.language)?;
-    match export_parts(&parts, &output_paths, tts, cancel.clone()) {
-        Ok(()) => Ok(output_paths),
-        Err(err) => {
-            if !cancel.load(Ordering::SeqCst) {
-                for path in &output_paths {
-                    if let Err(e) = std::fs::remove_file(path) {
-                        crate::log_debug(&format!("Failed to remove temp batch file: {}", e));
+        let output_paths = build_output_paths(input, parts.len(), batch_settings, tts.language)?;
+        match export_parts_mixed(&parts, &output_paths, tts, cancel.clone()) {
+            Ok(()) => Ok(output_paths),
+            Err(err) => {
+                if !cancel.load(Ordering::SeqCst) {
+                    for path in &output_paths {
+                        if let Err(e) = std::fs::remove_file(path) {
+                            crate::log_debug(&format!("Failed to remove temp batch file: {}", e));
+                        }
                     }
                 }
+                Err(err)
             }
-            Err(err)
+        }
+    } else {
+        let parts = match parts {
+            Some(parts) => parts,
+            None => {
+                let prepared = prepare_tts_text(&cleaned, tts.split_on_newline, &tts.dictionary);
+                let chunks = split_text(&prepared);
+                split_chunks_by_count(&chunks, tts.audiobook_split)
+            }
+        };
+        if parts.is_empty() {
+            return Err(crate::settings::tts_no_text_message(tts.language));
+        }
+        let output_paths = build_output_paths(input, parts.len(), batch_settings, tts.language)?;
+        match export_parts(&parts, &output_paths, tts, cancel.clone()) {
+            Ok(()) => Ok(output_paths),
+            Err(err) => {
+                if !cancel.load(Ordering::SeqCst) {
+                    for path in &output_paths {
+                        if let Err(e) = std::fs::remove_file(path) {
+                            crate::log_debug(&format!("Failed to remove temp batch file: {}", e));
+                        }
+                    }
+                }
+                Err(err)
+            }
         }
     }
 }
 
 fn split_chunks_by_count(chunks: &[String], split_parts: u32) -> Vec<Vec<String>> {
+    let parts = if split_parts == 0 {
+        1
+    } else {
+        split_parts as usize
+    };
+    let total_chunks = chunks.len();
+    if total_chunks == 0 {
+        return Vec::new();
+    }
+    let parts = if total_chunks < parts {
+        total_chunks
+    } else {
+        parts
+    };
+    let chunks_per_part = total_chunks.div_ceil(parts);
+    let mut out = Vec::new();
+    for part_idx in 0..parts {
+        let start_idx = part_idx * chunks_per_part;
+        let end_idx = std::cmp::min(start_idx + chunks_per_part, total_chunks);
+        if start_idx >= end_idx {
+            break;
+        }
+        out.push(chunks[start_idx..end_idx].to_vec());
+    }
+    out
+}
+
+fn split_tts_chunks_by_count(chunks: &[TtsChunk], split_parts: u32) -> Vec<Vec<TtsChunk>> {
     let parts = if split_parts == 0 {
         1
     } else {
@@ -1881,6 +1976,9 @@ fn export_parts(
                     } else {
                         None
                     },
+                    dialogue_rate: tts.dialogue_voice_rate,
+                    dialogue_pitch: tts.dialogue_voice_pitch,
+                    dialogue_volume: tts.dialogue_voice_volume,
                     sapi4_threads: None,
                 };
                 run_tts_audiobook_part(part_chunks, &mut progress, &options)?;
@@ -1905,6 +2003,9 @@ fn export_parts(
                         rate: tts.tts_rate,
                         pitch: tts.tts_pitch,
                         volume: tts.tts_volume,
+                        dialogue_rate: tts.dialogue_voice_rate,
+                        dialogue_pitch: tts.dialogue_voice_pitch,
+                        dialogue_volume: tts.dialogue_voice_volume,
                         cancel: cancel.clone(),
                     },
                     |_chunk_idx| {
@@ -1913,6 +2014,52 @@ fn export_parts(
                 )?;
             }
         }
+    }
+    Ok(())
+}
+
+fn export_parts_mixed(
+    parts: &[Vec<TtsChunk>],
+    outputs: &[PathBuf],
+    tts: &TtsSettings,
+    cancel: Arc<AtomicBool>,
+) -> Result<(), String> {
+    if parts.len() != outputs.len() {
+        return Err("Output count mismatch.".to_string());
+    }
+    let dialogue_voice = if tts.use_dialogue_voice && !tts.dialogue_voice.is_empty() {
+        Some(tts.dialogue_voice.clone())
+    } else {
+        None
+    };
+    let mut progress = 0usize;
+    for (part_idx, part_chunks) in parts.iter().enumerate() {
+        if cancel.load(Ordering::SeqCst) {
+            return Err("Cancelled".to_string());
+        }
+        let output = &outputs[part_idx];
+        let options = crate::tts_engine::AudiobookCommonOptions {
+            voice: &tts.voice,
+            output,
+            progress_hwnd: HWND(0),
+            cancel: cancel.clone(),
+            language: tts.language,
+            rate: tts.tts_rate,
+            pitch: tts.tts_pitch,
+            volume: tts.tts_volume,
+            dialogue_voice: dialogue_voice.clone(),
+            dialogue_rate: tts.dialogue_voice_rate,
+            dialogue_pitch: tts.dialogue_voice_pitch,
+            dialogue_volume: tts.dialogue_voice_volume,
+            sapi4_threads: None,
+        };
+        let config = MixedAudiobookConfig {
+            main_engine: tts.tts_engine,
+            use_dialogue_voice: tts.use_dialogue_voice,
+            dialogue_voice: dialogue_voice.clone(),
+            dialogue_engine: tts.dialogue_tts_engine,
+        };
+        render_mixed_audiobook_part(part_chunks, &mut progress, output, &options, &config)?;
     }
     Ok(())
 }

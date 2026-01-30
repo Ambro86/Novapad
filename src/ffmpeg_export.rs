@@ -110,13 +110,25 @@ fn ensure_tts_cache(
                 } else {
                     &settings.tts_voice
                 };
+                let (rate, pitch, volume) = if is_dialogue
+                    && settings.use_dialogue_voice
+                    && !settings.dialogue_voice.is_empty()
+                {
+                    (
+                        settings.dialogue_voice_rate,
+                        settings.dialogue_voice_pitch,
+                        settings.dialogue_voice_volume,
+                    )
+                } else {
+                    (settings.tts_rate, settings.tts_pitch, settings.tts_volume)
+                };
                 match rt.block_on(tts_engine::download_audio_chunk(
                     text,
                     voice,
                     &request_id,
-                    settings.tts_rate,
-                    settings.tts_pitch,
-                    settings.tts_volume,
+                    rate,
+                    pitch,
+                    volume,
                     settings.language,
                 )) {
                     Ok(bytes) => {
@@ -145,6 +157,9 @@ fn ensure_tts_cache(
                     rate: settings.tts_rate,
                     pitch: settings.tts_pitch,
                     volume: settings.tts_volume,
+                    dialogue_rate: settings.dialogue_voice_rate,
+                    dialogue_pitch: settings.dialogue_voice_pitch,
+                    dialogue_volume: settings.dialogue_voice_volume,
                     cancel,
                 };
                 sapi5_engine::speak_sapi_to_file(options, |_| {})?;

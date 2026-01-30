@@ -1,5 +1,54 @@
 # Changelog
 
+Versão 0.6.2 – 2026-01-29
+Novas funcionalidades
+• Adicionado suporte à execução de arquivos (F5). Os usuários podem selecionar um interpretador (ex. python) nas Opções, procurá-lo no computador, e pressionando F5 o script atual é executado. Arquivos HTML abrem no navegador.
+• Adicionado suporte para arquivos de ponteiro do Google Docs (.gdoc, .gsheet, .gslides), que abrem automaticamente no navegador padrão.
+• Adicionado suporte para o formato de audiolivro M4B (Apple/AAC).
+• Adicionada a opção "Mostrar episódios" no menu de contexto dos resultados de pesquisa de podcasts para navegar e reproduzir episódios sem se inscrever.
+• Adicionada a função "Ir para linha" (menu Editar ou Ctrl+J) para pular rapidamente para um número de linha específico.
+• Adicionadas opções no menu de contexto para ordenar feeds RSS e podcasts (alfabeticamente ou por data).
+• Adicionados feeds RSS padrão em vietnamita.
+• Adicionada uma caixa de teste de microfone no diálogo de gravação para verificar os níveis antes de começar.
+• Adicionada "Mostrar descrição" para episódios de podcast no menu de contexto.
+• Adicionado suporte para formatos de áudio/vídeo estendidos via FFmpeg: mkv, avi, mov, m4v, webm, mpg, ts, wmv, flv, vob, 3gp, flac, ogg, wma, aiff.
+• Adicionada leitura sincronizada de legendas (srt, vtt, ass, sub, sbv, lrc, smi) com NVDA ou voz selecionada. O programa procura um arquivo de legendas com o mesmo nome do arquivo de mídia. Adicionadas as opções "Importar legendas" e "Remover legendas" no menu Reprodução para arquivos com nomes diferentes.
+• Adicionadas associações de arquivos para todos os novos formatos de áudio/vídeo suportados no menu de contexto "Abrir com Novapad".
+• Adicionada configuração para ajustar o pitch de qualquer arquivo.
+• Adicionada opção nas Configurações Gerais para ativar ou desativar relatórios de erros anônimos. Adicionada uma entrada no menu Ajuda para criar um arquivo ZIP de diagnóstico.
+• Adicionada opção para usar uma voz diferente para diálogos, tanto para leitura ao vivo quanto para criação de audiolivros.
+• Adicionado o navegador de categorias de podcasts para explorar podcasts por categoria (negócios, arte, esportes, etc.).
+Melhorias
+• Abrir um arquivo de áudio/vídeo do Explorador agora abre diretamente a visualização do reprodutor em vez do editor de texto.
+• Removida a solicitação de OCR para PDFs não acessíveis; o OCR agora é realizado automaticamente para melhorar a velocidade e experiência do usuário.
+• Melhorado o Terminal Acessível: a leitura NVDA agora lembra a última linha lida para melhor continuidade.
+• SAPI 4: A criação de audiolivros agora está totalmente paralelizada e é quase instantânea. Adicionada uma solicitação para escolher o número de processos simultâneos.
+• SAPI 4: Eliminado o gargalo WAV-MP3 convertendo fragmentos em paralelo durante a síntese.
+• SAPI 4: Melhorado o tratamento de erros e limpeza automática de arquivos temporários.
+• Diálogo Localizar: Renomeado "Regex" para "Expressão regular" para maior clareza e adicionadas as traduções ausentes para as opções de pesquisa.
+• Audiolivros M4B: Melhor tratamento de saída; dividir por partes/marcadores agora produz um único arquivo M4B com metadados de capítulos incluindo título e autor.
+• Reprodutor: Corrigida a precisão de marcadores e anúncios de tempo quando a velocidade de reprodução não é 1.0x.
+• Restaurada a navegação Ctrl+Tab e Ctrl+Shift+Tab nas Opções.
+• Adicionada uma opção no menu Reprodução para redefinir instantaneamente a velocidade para Normal (1.0x).
+• Atualizadas todas as dependências para as versões mais recentes para melhor desempenho e estabilidade.
+• Integrado FFmpeg com carregamento dinâmico de DLL para garantir compatibilidade sem bloquear a inicialização.
+• Atualizados os filtros de download de podcasts para incluir os novos formatos de áudio/vídeo.
+• Impedido que Ctrl+S salve arquivos de áudio/vídeo para evitar corrupção.
+• Melhorada a importação de transcrições do YouTube tornando-a mais robusta e resiliente.
+• Melhorada a robustez da divisão em partes de audiolivros, garantindo que nenhum texto seja perdido.
+• O instalador agora é totalmente multilíngue, suportando Italiano, Inglês, Espanhol, Português, Sueco e Vietnamita com base no idioma do sistema do usuário. O inglês é o padrão para sistemas não suportados.
+• Categorias de podcasts: pressionar Enter em uma categoria agora confirma a seleção (equivalente ao botão OK).
+• Melhorado o sistema de detecção de travamentos para evitar falsos positivos quando há diálogos modais abertos (mensagens de erro, "texto não encontrado").
+Correções
+• Corrigido um erro em que o changelog não abria na inicialização.
+• Corrigido um erro em que a solicitação de OCR não aparecia para PDFs não acessíveis abertos do Explorador.
+• Corrigido um erro de inicialização que podia causar perda de foco ou fechamento de janelas imediatamente após abrir.
+• Corrigido um erro crítico na pesquisa regex que impedia encontrar texto, incluindo problemas com "Pesquisa circular" e a opção "Ponto equivale a nova linha" com terminações de linha do Windows.
+Localização
+• Adicionada a tradução para polonês.
+• Adicionada a tradução para francês.
+• Adicionada a tradução para tcheco (graças a Radek Žalud e Jiri Holzinger).
+
 Versão 0.6.1 – 2026-01-20
 Correções
 • Corrigido um erro em que, ao ativar “Mostrar vozes no editor” e reproduzir um podcast, a reprodução era interrompida.

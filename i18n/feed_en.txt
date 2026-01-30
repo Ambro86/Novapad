@@ -8,7 +8,7 @@ Financial Times – Home | https://www.ft.com/rss/home
 NPR – News | https://feeds.npr.org/1001/rss.xml
 Reddit – World News | https://www.reddit.com/r/worldnews/.rss
 CNBC – Top News | https://www.cnbc.com/id/100003114/device/rss/rss.html
-Wall Street Journal – World News | https://www.wsj.com/xml/rss/3_7085.xml
+Wall Street Journal – World News | https://feeds.content.dowjones.io/public/rss/RSSWorldNews
 Dow Jones – World News | https://feeds.a.dj.com/rss/RSSWorldNews.xml
 Investing.com – News | https://www.investing.com/rss/news.rss
 Seeking Alpha – Market News | https://seekingalpha.com/feed.xml

@@ -30,17 +30,17 @@ use crate::settings::{Language, load_settings};
 use crate::with_state;
 
 const REPO_OWNER: &str = "Ambro86";
-const REPO_NAME: &str = "Novapad";
-const USER_AGENT: &str = "NovapadUpdater";
+const REPO_NAME: &str = "Sonarpad";
+const USER_AGENT: &str = "SonarpadUpdater";
 #[cfg(not(feature = "standalone"))]
 const DIRECT_DOWNLOAD_URL: &str =
-    "https://github.com/Ambro86/Novapad/releases/latest/download/novapad.exe";
+    "https://github.com/Ambro86/Sonarpad/releases/latest/download/sonarpad.exe";
 #[cfg(feature = "standalone")]
 const DIRECT_DOWNLOAD_URL: &str =
-    "https://github.com/Ambro86/Novapad/releases/latest/download/novapad-standalone.exe";
+    "https://github.com/Ambro86/Sonarpad/releases/latest/download/sonarpad-standalone.exe";
 const MIN_FREE_SPACE_BYTES: u64 = 5 * 1024 * 1024;
-const UPDATE_LOCK_NAME: &str = "novapad.update.lock";
-const UPDATER_DIR_NAME: &str = "Novapad\\updater";
+const UPDATE_LOCK_NAME: &str = "sonarpad.update.lock";
+const UPDATER_DIR_NAME: &str = "Sonarpad\\updater";
 
 const EXIT_OK: i32 = 0;
 const EXIT_INTEGRITY_FAILED: i32 = 3;
@@ -250,14 +250,14 @@ fn fetch_latest_release() -> Result<ReleaseInfo, String> {
 fn select_portable_asset(assets: &[ReleaseAsset]) -> Option<&ReleaseAsset> {
     #[cfg(feature = "standalone")]
     {
-        // Standalone: cerca specificamente novapad-standalone.exe
+        // Standalone: cerca specificamente sonarpad-standalone.exe
         assets
             .iter()
-            .find(|asset| asset.name.eq_ignore_ascii_case("novapad-standalone.exe"))
+            .find(|asset| asset.name.eq_ignore_ascii_case("sonarpad-standalone.exe"))
     }
     #[cfg(not(feature = "standalone"))]
     {
-        // Normal/Portable: cerca novapad.exe (esclude setup e msi)
+        // Normal/Portable: cerca sonarpad.exe (esclude setup e msi)
         assets.iter().find(|asset| {
             let name = asset.name.to_lowercase();
             name.ends_with(".exe")
@@ -422,7 +422,7 @@ fn probe_dir_writable(current_exe: &Path) -> Result<(), io::Error> {
     let dir = current_exe
         .parent()
         .ok_or_else(|| io::Error::other("Missing executable directory"))?;
-    let probe_name = format!("novapad_write_probe_{}.tmp", std::process::id());
+    let probe_name = format!("sonarpad_write_probe_{}.tmp", std::process::id());
     let probe_path = dir.join(probe_name);
     let mut file = std::fs::OpenOptions::new()
         .write(true)
@@ -670,7 +670,7 @@ fn parse_sha256_file(content: &str, target_name: &str) -> Option<String> {
 
 fn download_sha256_optional(url: &str, target_name: &str) -> Option<String> {
     let mut temp = std::env::temp_dir();
-    temp.push(format!("novapad_sha256_{}.tmp", std::process::id()));
+    temp.push(format!("sonarpad_sha256_{}.tmp", std::process::id()));
     match download_file(url, &temp) {
         Ok(()) => {
             let content = std::fs::read_to_string(&temp).ok();
@@ -865,7 +865,7 @@ fn runner_updater_candidates(current_exe: &Path) -> Vec<PathBuf> {
     let file_name = current_exe
         .file_name()
         .and_then(|name| name.to_str())
-        .unwrap_or("novapad.exe");
+        .unwrap_or("sonarpad.exe");
     let mut candidates = Vec::new();
     if let Some(base) = std::env::var_os("LOCALAPPDATA") {
         let mut path = PathBuf::from(base);
@@ -886,7 +886,7 @@ fn ensure_dir_writable_for_runner(path: &Path) -> bool {
     if std::fs::create_dir_all(parent).is_err() {
         return false;
     }
-    let probe_name = format!("novapad_updater_probe_{}.tmp", std::process::id());
+    let probe_name = format!("sonarpad_updater_probe_{}.tmp", std::process::id());
     let probe_path = parent.join(probe_name);
     match OpenOptions::new()
         .write(true)
@@ -1371,7 +1371,7 @@ fn update_lock_path_temp(current_exe: &Path) -> PathBuf {
     let file_name = current_exe
         .file_name()
         .and_then(|name| name.to_str())
-        .unwrap_or("novapad.exe");
+        .unwrap_or("sonarpad.exe");
     let mut path = std::env::temp_dir();
     path.push(format!("{UPDATE_LOCK_NAME}.{file_name}"));
     path
@@ -1564,22 +1564,37 @@ pub(crate) fn check_pending_update(hwnd: HWND, force: bool) {
         return;
     }
 
-    let language = app_language(hwnd);
     let (meta_size, meta_hash) = read_update_metadata(&pending);
+
+    // Early integrity check BEFORE showing any dialog - silently clean up corrupted files
     if let Err(err) = stabilize_download(&pending) {
-        log_debug(&format!("Pending update: staged file unstable: {err}"));
+        log_debug(&format!(
+            "Pending update: staged file unstable, removing silently: {err}"
+        ));
         crate::log_if_err!(std::fs::remove_file(&pending));
         crate::log_if_err!(std::fs::remove_file(temp_update_meta_path(&pending)));
-        show_update_error(language, UpdateError::Download);
+        // Don't show error for automatic checks - only for forced/interactive
+        if force {
+            let language = app_language(hwnd);
+            show_update_error(language, UpdateError::Download);
+        }
         return;
     }
     if let Err(err) = verify_download_integrity(&pending, meta_size, meta_hash.as_deref()) {
-        log_debug(&format!("Pending update: integrity failed: {err}"));
+        log_debug(&format!(
+            "Pending update: integrity failed, removing silently: {err}"
+        ));
         crate::log_if_err!(std::fs::remove_file(&pending));
         crate::log_if_err!(std::fs::remove_file(temp_update_meta_path(&pending)));
-        show_update_error(language, UpdateError::Download);
+        // Don't show error for automatic checks - only for forced/interactive
+        if force {
+            let language = app_language(hwnd);
+            show_update_error(language, UpdateError::Download);
+        }
         return;
     }
+
+    let language = app_language(hwnd);
     let current_exe = match std::env::current_exe() {
         Ok(path) => path,
         Err(err) => {
@@ -1646,12 +1661,36 @@ pub(crate) fn cleanup_update_temp_on_start() {
         if (name.starts_with(&updater_prefix) && name.ends_with(".exe")) || name == update_meta_name
         {
             crate::log_if_err!(std::fs::remove_file(path));
-        } else if name == update_name
-            && let Ok(meta) = path.metadata()
-            && meta.len() == 0
-        {
-            crate::log_if_err!(std::fs::remove_file(&path));
-            crate::log_if_err!(std::fs::remove_file(temp_update_meta_path(&path)));
+        } else if name == update_name {
+            // Check if this is an incomplete/corrupted download that should be cleaned up
+            if let Ok(meta) = path.metadata() {
+                let should_remove = if meta.len() == 0 {
+                    // Empty file - always remove
+                    true
+                } else {
+                    // Check if this is an incomplete download by verifying integrity
+                    let (meta_size, meta_hash) = read_update_metadata(&path);
+                    if let Some(expected_size) = meta_size {
+                        // If we have metadata, check if size matches
+                        meta.len() != expected_size
+                    } else {
+                        // No metadata - check if file is suspiciously small (< 1MB is likely incomplete)
+                        // or if integrity verification fails
+                        meta.len() < 1_000_000
+                            || verify_download_integrity(&path, meta_size, meta_hash.as_deref())
+                                .is_err()
+                    }
+                };
+                if should_remove {
+                    log_debug(&format!(
+                        "Cleanup: removing incomplete/corrupted update file: {} (size={})",
+                        path.display(),
+                        meta.len()
+                    ));
+                    crate::log_if_err!(std::fs::remove_file(&path));
+                    crate::log_if_err!(std::fs::remove_file(temp_update_meta_path(&path)));
+                }
+            }
         }
     }
 }
@@ -1681,7 +1720,7 @@ fn show_update_message(
 ) -> windows::Win32::UI::WindowsAndMessaging::MESSAGEBOX_RESULT {
     let mut target = owner;
     if target.0 == 0 {
-        let class_name = to_wide("NovapadWin32");
+        let class_name = to_wide("SonarpadWin32");
         target = unsafe { FindWindowW(PCWSTR(class_name.as_ptr()), PCWSTR::null()) };
     }
 
@@ -1717,9 +1756,14 @@ fn show_update_message(
     }
 
     log_debug("Updater: Waiting for response channel...");
+    // Use a shorter timeout to avoid blocking the UI for too long
+    // If the window is not responding, we should fail gracefully
     let response = rx
-        .recv_timeout(std::time::Duration::from_secs(60))
-        .unwrap_or(0);
+        .recv_timeout(std::time::Duration::from_secs(30))
+        .unwrap_or_else(|_| {
+            log_debug("Updater: Response channel timeout - window may not be responding");
+            0
+        });
     log_debug(&format!("Updater: Received response: {}", response));
     windows::Win32::UI::WindowsAndMessaging::MESSAGEBOX_RESULT(response)
 }

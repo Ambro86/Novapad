@@ -1,6 +1,6 @@
 ﻿Contribution au développement
 
-Novapad est un programme qui a été initialement créé pour des besoins personnels, mais qui a grandi de plus en plus avec le temps. Son développement nécessite un travail constant pour améliorer les fonctionnalités, corriger les bugs, trouver de nouvelles idées et tester soigneusement toutes les fonctions.
+Sonarpad est un programme qui a été initialement créé pour des besoins personnels, mais qui a grandi de plus en plus avec le temps. Son développement nécessite un travail constant pour améliorer les fonctionnalités, corriger les bugs, trouver de nouvelles idées et tester soigneusement toutes les fonctions.
 
 Si vous trouvez ce programme utile et souhaitez soutenir son développement, vous pouvez contribuer financièrement.
 
@@ -9,14 +9,14 @@ PayPal
 Vous pouvez contribuer via PayPal en utilisant ce lien :
 https://www.paypal.me/ambrogio86
 
-Si possible, veuillez indiquer "Novapad" dans la note de paiement.
+Si possible, veuillez indiquer "Sonarpad" dans la note de paiement.
 
 Virement bancaire
 
 Vous pouvez également contribuer par virement bancaire sur le compte au nom d'Ambrogio Riili.
 IBAN : IT77W0306901020100000064149
 
-Si possible, veuillez utiliser un motif de paiement clair, par exemple "Novapad".
+Si possible, veuillez utiliser un motif de paiement clair, par exemple "Sonarpad".
 
 Toute personne soutenant le projet sera mentionnée dans le programme et dans le dépôt sur GitHub, sauf si elle préfère rester anonyme ou utiliser un pseudonyme.
 

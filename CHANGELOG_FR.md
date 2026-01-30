@@ -20,7 +20,7 @@ Nouvelles fonctionnalités
 • Ajout de "Afficher la description" pour les épisodes de podcast dans le menu contextuel.
 • Ajout de la prise en charge des formats audio/vidéo étendus via FFmpeg : mkv, avi, mov, m4v, webm, mpg, ts, wmv, flv, vob, 3gp, flac, ogg, wma, aiff.
 • Ajout de la prise en charge de la lecture synchronisée des sous-titres (srt, vtt, ass, sub, sbv, lrc, smi) avec NVDA ou la voix sélectionnée. Le programme recherche un fichier de sous-titres portant le même nom que le fichier multimédia. Ajout des options "Importer des sous-titres" et "Supprimer les sous-titres" dans le menu Lecture pour les fichiers aux noms différents.
-• Ajout d'associations de fichiers pour tous les nouveaux formats audio/vidéo pris en charge dans le menu contextuel "Ouvrir avec Novapad".
+• Ajout d'associations de fichiers pour tous les nouveaux formats audio/vidéo pris en charge dans le menu contextuel "Ouvrir avec Sonarpad".
 • Ajout d'un paramètre de réglage de la hauteur tonale pour n'importe quel fichier.
 • Ajout d'une option dans les Paramètres généraux pour activer ou désactiver les rapports d'erreurs anonymes. Ajout d'une entrée dans le menu Aide pour créer un fichier ZIP de diagnostic.
 • Ajout d'une option pour utiliser une voix différente pour les dialogues, à la fois pour la lecture en direct et la création de livres audio.
@@ -118,7 +118,7 @@ Nouvelles fonctionnalités
 • Ajout d'un bouton d'aperçu vocal après le combo de volume.
 • Ajout de la recherche et du remplacement par regex (style Notepad++).
 • Ajout de l'importation RSS depuis des fichiers OPML et TXT.
-• Ajout d'une option pour activer "Ouvrir avec Novapad" dans l'Explorateur de fichiers, y compris pour les versions portables.
+• Ajout d'une option pour activer "Ouvrir avec Sonarpad" dans l'Explorateur de fichiers, y compris pour les versions portables.
 Améliorations
 • Amélioration de la sélection de la vitesse/hauteur/volume de la voix, respectant les limites maximales TTS.
 • Diverses améliorations RSS pour télécharger tous les articles sans déplacer le focus NVDA pendant les mises à jour.
@@ -201,7 +201,7 @@ Améliorations
 
 ## 0.5.2 - 01/01/2026
 - Ajout d'un journal des modifications.
-- Ajout des options ouvrir avec Novapad et des associations de fichiers lors de l'installation.
+- Ajout des options ouvrir avec Sonarpad et des associations de fichiers lors de l'installation.
 - Amélioration de la localisation des messages.
 - Ajout de la sélection de partie lors de l'utilisation de "Diviser le livre audio par texte".
 - Ajout de l'importation de transcription YouTube.

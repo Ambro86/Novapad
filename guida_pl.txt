@@ -15,7 +15,7 @@ Plik:
  Nagraj podcast: Nagraj podcast z mikrofonu i/lub dźwięku systemowego (Ctrl+Shift+R).
 
 Audiobooki MP3:
-Po otwarciu pliku MP3, Novapad działa jako odtwarzacz audio.
+Po otwarciu pliku MP3, Sonarpad działa jako odtwarzacz audio.
 Sterowanie klawiaturą:
 
  SPACJA: Odtwarzaj / Pauza.

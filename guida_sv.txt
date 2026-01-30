@@ -14,7 +14,7 @@ Spela in ljudbok: skapar en MP3-fil från den aktuella texten (Ctrl+R).
 Skapa podd: skapar en podd från mikrofon och/eller systemljud (Ctrl+Shift+R).
 
 MP3-ljudböcker:
-När du öppnar en MP3-fil blir Novapad en ljudspelare.
+När du öppnar en MP3-fil blir Sonarpad en ljudspelare.
 Tangentbordskommandon:
 
 * MELLANSLAG: Spela / Pausa.

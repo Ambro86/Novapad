@@ -1,14 +1,14 @@
-# Novapad
+# Sonarpad
 
 [Read it in Italian 🇮🇹](README_IT.md)
 
 **Download the latest release:**
 
 
-- [Portable (EXE)](https://github.com/Ambro86/Novapad/releases/latest/download/novapad.exe)
-- [Installer (Setup)](https://github.com/Ambro86/Novapad/releases/latest/download/novapad_x64-setup.exe)
-- [Installer (MSI)](https://github.com/Ambro86/Novapad/releases/latest/download/novapad_x64_en-US.msi)
-**Novapad** is a modern, feature-rich Notepad alternative for Windows, built with Rust.
+- [Portable (EXE)](https://github.com/Ambro86/Sonarpad/releases/latest/download/sonarpad.exe)
+- [Installer (Setup)](https://github.com/Ambro86/Sonarpad/releases/latest/download/sonarpad_x64-setup.exe)
+- [Installer (MSI)](https://github.com/Ambro86/Sonarpad/releases/latest/download/sonarpad_x64_en-US.msi)
+**Sonarpad** is a modern, feature-rich Notepad alternative for Windows, built with Rust.
 It extends traditional text editing with multi-format document support,
 advanced accessibility features, and Text-to-Speech (TTS) capabilities.
 
@@ -80,8 +80,8 @@ Clippy runs in CI as advisory (Windows/TTS glue still emits warnings).
 Core text logic is the target for stricter linting/tests.
 
 ```bash
-git clone https://github.com/Ambro86/Novapad.git
-cd Novapad
+git clone https://github.com/Ambro86/Sonarpad.git
+cd Sonarpad
 cargo build --release
 ```
 

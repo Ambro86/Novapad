@@ -13,7 +13,7 @@ Yêu thích khi đang đọc: F9 giọng đọc yêu thích trước đó, F10 g
 Ghi âm sách nói: Tạo một tệp MP3 từ văn bản hiện tại (Ctrl+R).
 Ghi âm podcast: Ghi âm một podcast từ micro và/hoặc âm thanh hệ thống (Ctrl+Shift+R).
 Sách nói MP3: 
-Khi bạn mở một tệp MP3, Novapad hoạt động như một trình phát âm thanh.
+Khi bạn mở một tệp MP3, Sonarpad hoạt động như một trình phát âm thanh.
 Các phím điều khiển bàn phím:
 
 * PHÍM CÁCH: Phát / Tạm dừng.

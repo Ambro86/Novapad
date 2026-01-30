@@ -41,7 +41,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
-const OPTIONS_CLASS_NAME: &str = "NovapadOptions";
+const OPTIONS_CLASS_NAME: &str = "SonarpadOptions";
 const OPTIONS_ID_LANG: usize = 6001;
 const OPTIONS_ID_MODIFIED_MARKER_POSITION: usize = 6023;
 const OPTIONS_ID_OPEN: usize = 6002;
@@ -2198,7 +2198,7 @@ unsafe extern "system" fn options_wndproc(
                 OPTIONS_ID_MANAGE_ASSOCIATIONS => {
                     unsafe {
                         crate::settings::register_application_capabilities();
-                        let url = to_wide("ms-settings:defaultapps?registeredApp=Novapad");
+                        let url = to_wide("ms-settings:defaultapps?registeredApp=Sonarpad");
                         ShellExecuteW(
                             HWND(0),
                             w!("open"),

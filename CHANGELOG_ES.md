@@ -20,7 +20,7 @@ Nuevas funcionalidades
 • Añadida "Mostrar descripción" para episodios de podcast en el menú contextual.
 • Añadido soporte para formatos de audio/video extendidos vía FFmpeg: mkv, avi, mov, m4v, webm, mpg, ts, wmv, flv, vob, 3gp, flac, ogg, wma, aiff.
 • Añadida lectura sincronizada de subtítulos (srt, vtt, ass, sub, sbv, lrc, smi) con NVDA o voz seleccionada. El programa busca un archivo de subtítulos con el mismo nombre que el archivo multimedia. Añadidas las opciones "Importar subtítulos" y "Eliminar subtítulos" en el menú Reproducción para archivos con nombres diferentes.
-• Añadidas asociaciones de archivos para todos los nuevos formatos de audio/video soportados en el menú contextual "Abrir con Novapad".
+• Añadidas asociaciones de archivos para todos los nuevos formatos de audio/video soportados en el menú contextual "Abrir con Sonarpad".
 • Añadida configuración para ajustar el pitch de cualquier archivo.
 • Añadida opción en Configuración General para activar o desactivar los informes de errores anónimos. Añadida una entrada en el menú Ayuda para crear un archivo ZIP de diagnóstico.
 • Añadida opción para usar una voz diferente para los diálogos, tanto para la lectura en vivo como para la creación de audiolibros.
@@ -119,7 +119,7 @@ Nuevas funciones
 • Aniadido un boton de vista previa de voz despues del combo de volumen.
 • Aniadida la funcion de regex para Buscar y Reemplazar, estilo Notepad++.
 • Aniadida la importacion de RSS desde archivos OPML y TXT.
-• Aniadida la casilla en Opciones para habilitar "Abrir con Novapad" en el Explorador de archivos, tambien en version portable.
+• Aniadida la casilla en Opciones para habilitar "Abrir con Sonarpad" en el Explorador de archivos, tambien en version portable.
 Mejoras
 • Mejorada la seleccion de velocidad, tono y volumen de las voces, respetando los limites maximos del TTS.
 • Varias mejoras de RSS para descargar todos los articulos sin mover el foco de NVDA durante las actualizaciones.
@@ -150,7 +150,7 @@ Mejoras
 • Aniadidas ventanas de confirmacion para acciones importantes (p. ej., eliminar lineas duplicadas, eliminar guiones al final de linea, eliminar todos los marcadores del archivo actual). No se muestra confirmacion si la accion no se aplica.
 • Aniadida la posibilidad de eliminar feeds/sitios RSS de la biblioteca seleccionandolos y pulsando Supr.
 • Aniadido un menu contextual en la ventana RSS para modificar o eliminar feeds/sitios RSS.
-• Eliminada la casilla para mover la configuracion a la carpeta actual; ahora el programa lo gestiona automaticamente (si la carpeta del exe se llama "novapad portable" o el exe esta en una unidad extraible, guarda en la carpeta del exe en `config`, si no en `%APPDATA%\\Novapad`, con fallback a `config` si la carpeta preferida no es escribible).
+• Eliminada la casilla para mover la configuracion a la carpeta actual; ahora el programa lo gestiona automaticamente (si la carpeta del exe se llama "sonarpad portable" o el exe esta en una unidad extraible, guarda en la carpeta del exe en `config`, si no en `%APPDATA%\\Sonarpad`, con fallback a `config` si la carpeta preferida no es escribible).
 
 Version 0.5.7 - 2026-01-05
 Nuevas funciones
@@ -202,7 +202,7 @@ Mejoras
 
 ## 0.5.2 - 2026-01-01
 - Se agrego un changelog.
-- Se agregaron opciones "Abrir con Novapad" y asociaciones de archivos compatibles durante la instalacion.
+- Se agregaron opciones "Abrir con Sonarpad" y asociaciones de archivos compatibles durante la instalacion.
 - Se mejoro la localizacion de mensajes (errores, dialogos, exportacion de audiolibro).
 - Se agrego la seleccion de partes al usar "Dividir audiolibro por texto", con la opcion "Requerir el marcador al inicio de la linea".
 - Se agrego la importacion de transcripciones de YouTube con seleccion de idioma, opcion de marca de tiempo y mejoras de foco.

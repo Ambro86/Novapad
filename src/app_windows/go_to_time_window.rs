@@ -15,7 +15,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{PCWSTR, w};
 
-const GO_TO_TIME_CLASS: &str = "NovapadGoToTime";
+const GO_TO_TIME_CLASS: &str = "SonarpadGoToTime";
 const GO_TO_TIME_EDIT_ID: usize = 1801;
 const GO_TO_TIME_OK_ID: usize = 1802;
 const GO_TO_TIME_CANCEL_ID: usize = 1803;

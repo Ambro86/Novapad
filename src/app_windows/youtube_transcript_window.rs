@@ -35,7 +35,7 @@ use crate::settings::{Language, save_settings};
 use crate::with_state;
 use crate::{WM_FOCUS_EDITOR, get_active_edit, show_error};
 
-const YT_IMPORT_CLASS_NAME: &str = "NovapadYouTubeTranscript";
+const YT_IMPORT_CLASS_NAME: &str = "SonarpadYouTubeTranscript";
 const YT_ID_URL: usize = 9301;
 const YT_ID_LOAD: usize = 9302;
 const YT_ID_LANG: usize = 9303;

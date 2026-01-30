@@ -25,7 +25,7 @@ use crate::podcast::chapters::Chapter;
 use crate::settings::Language;
 use crate::with_state;
 
-const CHAPTER_LIST_CLASS_NAME: &str = "NovapadChapterList";
+const CHAPTER_LIST_CLASS_NAME: &str = "SonarpadChapterList";
 const CHAPTER_LIST_ID_LIST: usize = 9201;
 const CHAPTER_LIST_ID_OK: usize = 9202;
 const CHAPTER_LIST_ID_CANCEL: usize = 9203;

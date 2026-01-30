@@ -39,7 +39,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::PCWSTR;
 
-const PROMPT_CLASS_NAME: &str = "NovapadPrompt";
+const PROMPT_CLASS_NAME: &str = "SonarpadPrompt";
 
 const PROMPT_ID_INPUT: usize = 9301;
 const PROMPT_ID_OUTPUT: usize = 9302;
@@ -240,7 +240,7 @@ pub unsafe fn prompt_user(
     _language: Language,
 ) -> Option<String> {
     let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-    let class_name = to_wide("NovapadSimplePrompt");
+    let class_name = to_wide("SonarpadSimplePrompt");
 
     static ONCE: std::sync::Once = std::sync::Once::new();
     ONCE.call_once(|| {

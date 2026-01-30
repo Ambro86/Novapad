@@ -14,7 +14,7 @@ Registra audiolibro: crea un file MP3 dal testo corrente (Ctrl+R).
 Crea podcast: crea un podcast da microfono e/o audio di sistema (Ctrl+Shift+R).
 
 Audiolibri MP3:
-Quando apri un file MP3, Novapad diventa un lettore audio.
+Quando apri un file MP3, Sonarpad diventa un lettore audio.
 Comandi da tastiera:
 - SPAZIO: Play / Pausa.
 - FRECCIA DESTRA: Avanti di 1 minuto.

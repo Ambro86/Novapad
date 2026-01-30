@@ -44,7 +44,7 @@ use crate::i18n;
 use crate::settings::Language;
 use crate::{WM_FOCUS_EDITOR, with_state};
 
-const FIND_IN_FILES_CLASS_NAME: &str = "NovapadFindInFiles";
+const FIND_IN_FILES_CLASS_NAME: &str = "SonarpadFindInFiles";
 const FIND_IN_FILES_ID_TERM: usize = 9201;
 const FIND_IN_FILES_ID_FOLDER: usize = 9202;
 const FIND_IN_FILES_ID_BROWSE: usize = 9203;

@@ -333,7 +333,7 @@ struct SpellcheckWordContext {
 
 fn log_path() -> Option<PathBuf> {
     let mut path = settings::settings_dir();
-    path.push("Novapad.log");
+    path.push("Sonarpad.log");
     Some(path)
 }
 
@@ -341,7 +341,7 @@ const MAX_LOG_SIZE: u64 = 150 * 1024;
 
 fn log_lock_path(log_path: &Path) -> Option<PathBuf> {
     let parent = log_path.parent()?;
-    Some(parent.join("Novapad.log.lock"))
+    Some(parent.join("Sonarpad.log.lock"))
 }
 
 fn truncate_log_if_needed(path: &Path) {
@@ -1555,7 +1555,7 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
     unsafe {
         crate::log_if_err!(LoadLibraryW(w!("Msftedit.dll")));
         let hinstance = HINSTANCE(GetModuleHandleW(None)?.0);
-        let class_name = w!("NovapadWin32");
+        let class_name = w!("SonarpadWin32");
 
         let wc = WNDCLASSW {
             hCursor: HCURSOR(LoadCursorW(None, IDC_ARROW)?.0),
@@ -1608,7 +1608,7 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
         let hwnd = CreateWindowExW(
             Default::default(),
             class_name,
-            w!("Novapad"),
+            w!("Sonarpad"),
             WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_VISIBLE,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
@@ -6681,7 +6681,7 @@ unsafe extern "system" fn enum_close_other_windows(hwnd: HWND, lparam: LPARAM) -
         return BOOL(1);
     }
     let name = String::from_utf16_lossy(&buf[..len as usize]);
-    if name == "NovapadWin32" {
+    if name == "SonarpadWin32" {
         crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
     }
     BOOL(1)
@@ -7376,7 +7376,7 @@ unsafe fn execute_current_file(hwnd: HWND) {
         // Not saved: create temp file
         let ext = suggest_extension_for_interpreter(&interpreter);
         let temp_dir = std::env::temp_dir();
-        let temp_file = temp_dir.join(format!("novapad_exec_{}.{}", now_ms(), ext));
+        let temp_file = temp_dir.join(format!("sonarpad_exec_{}.{}", now_ms(), ext));
         if let Err(e) = std::fs::write(&temp_file, content) {
             log_debug(&format!("Failed to write temp file for execution: {}", e));
             return;
@@ -7551,7 +7551,7 @@ unsafe fn export_diagnostics_dialog(hwnd: HWND) {
 
     // Genera nome file con timestamp
     let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
-    let default_name = format!("novapad_diagnostics_{}.zip", timestamp);
+    let default_name = format!("sonarpad_diagnostics_{}.zip", timestamp);
     let mut default_wide = to_wide(&default_name);
     default_wide.resize(260, 0);
 

@@ -146,7 +146,7 @@ fn parse_or_error<T: for<'de> Deserialize<'de>>(value: Value) -> Result<T, Wikip
 fn http_client() -> Result<Client, WikipediaError> {
     Client::builder()
         .timeout(Duration::from_secs(10))
-        .user_agent("Novapad/0.5 (Wikipedia import)")
+        .user_agent("Sonarpad/0.5 (Wikipedia import)")
         .build()
         .map_err(|e| WikipediaError::Other(e.to_string()))
 }

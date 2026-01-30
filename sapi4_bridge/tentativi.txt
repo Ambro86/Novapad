@@ -47,7 +47,7 @@ C:\rustnotepad\rustnotepad>claude --dangerously-skip-permissions
 ▝▜█████▛▘  Opus 4.5 · Claude Pro
   ▘▘ ▝▝    C:\rustnotepad\rustnotepad
 
-> sto costruendo un bridge per sapi4 per novapad, e la voce funziona però non funziona il cambio di voce io scelgo
+> sto costruendo un bridge per sapi4 per sonarpad, e la voce funziona però non funziona il cambio di voce io scelgo
   la voce 51 ma riproduce sempre la voce 1. mi aiuti "C:\rustnotepad\rustnotepad\sapi4_bridge\tentativi.txt"
 
 ● Read(sapi4_bridge\tentativi.txt)

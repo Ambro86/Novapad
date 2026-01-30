@@ -721,9 +721,9 @@ Section Install
   ${If} $ContextMenuCheckboxState == 1
     {{#each file_associations as |association| ~}}
       {{#each association.extensions as |ext| ~}}
-        WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithNovapad" "" "$(ctxMenuLabel)"
-        WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithNovapad\DefaultIcon" "" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\",0"
-        WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithNovapad\command" "" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\" $\"%1$\""
+        WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad" "" "$(ctxMenuLabel)"
+        WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad\DefaultIcon" "" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\",0"
+        WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad\command" "" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\" $\"%1$\""
       {{/each}}
     {{/each}}
     WriteRegStr SHCTX "${MANUPRODUCTKEY}" "ContextMenu" "1"
@@ -844,7 +844,7 @@ Section Uninstall
   ${If} $R0 == "1"
     {{#each file_associations as |association| ~}}
       {{#each association.extensions as |ext| ~}}
-        DeleteRegKey SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithNovapad"
+        DeleteRegKey SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad"
       {{/each}}
     {{/each}}
     DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "ContextMenu"

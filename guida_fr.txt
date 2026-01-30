@@ -15,7 +15,7 @@ Menu Fichier :
  Enregistrer un podcast : Enregistre un podcast à partir du microphone et/ou de l'audio système (Ctrl+Maj+R).
 
 Lecture de fichier MP3 ou Livre audio :
-Lorsque vous ouvrez un fichier MP3, Novapad fonctionne comme un lecteur audio.
+Lorsque vous ouvrez un fichier MP3, Sonarpad fonctionne comme un lecteur audio.
 Raccourcis clavier du lecteur :
 
  ESPACE : Lecture / Pause.
@@ -91,7 +91,7 @@ Menu Outils :
  Options du terminal : défilement automatique, suppression ANSI, annoncer les nouvelles lignes, bip après 1s d'inactivité, empêcher la veille.
  Choix du programme : Invite de commandes (cmd.exe), PowerShell, Codex CLI (depuis les Options).
 
-RSS / Articles : ouvre la fenêtre RSS/Articles, ajouter des sources, flèche droite pour développer le flux et appuyez sur Entrée pour importer l'article dans l'éditeur de Novapad.
+RSS / Articles : ouvre la fenêtre RSS/Articles, ajouter des sources, flèche droite pour développer le flux et appuyez sur Entrée pour importer l'article dans l'éditeur de Sonarpad.
  Dans la fenêtre RSS, sélectionnez un flux ou une page et appuyez sur Suppr pour le supprimer de la bibliothèque.
  Depuis le menu contextuel sur un flux ou une page, vous pouvez modifier ou supprimer le RSS ou la page.
  Après l'importation d'un article RSS, appuyez sur la touche Échap pour revenir à la liste RSS.

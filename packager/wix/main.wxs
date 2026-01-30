@@ -40,7 +40,7 @@
         <InstallExecuteSequence>
             <RemoveShortcuts>Installed AND NOT UPGRADINGPRODUCTCODE</RemoveShortcuts>
             <RemoveExistingProducts After="InstallInitialize">WIX_UPGRADE_DETECTED</RemoveExistingProducts>
-            <Custom Action="SetNovapadExePath" Before="WriteRegistryValues">NOT Installed</Custom>
+            <Custom Action="SetSonarpadExePath" Before="WriteRegistryValues">NOT Installed</Custom>
         </InstallExecuteSequence>
 
         <Media Id="1" Cabinet="app.cab" EmbedCab="yes" />
@@ -62,7 +62,7 @@
         <Property Id="ARPNOREPAIR" Value="yes" Secure="yes" />
         <SetProperty Id="ARPNOMODIFY" Value="1" After="InstallValidate" Sequence="execute"/>
         <Property Id="NOVAPAD_EXE_PATH" Secure="yes" />
-        <CustomAction Id="SetNovapadExePath" Property="NOVAPAD_EXE_PATH" Value="[INSTALLDIR]novapad.exe" />
+        <CustomAction Id="SetSonarpadExePath" Property="NOVAPAD_EXE_PATH" Value="[INSTALLDIR]sonarpad.exe" />
 
         <!-- initialize with previous InstallDir -->
         <Property Id="INSTALLDIR">
@@ -137,10 +137,10 @@
                 <RegistryValue Root="HKLM" Key="Software\\{{manufacturer}}\\{{product_name}}" Name="Context Menu" Type="integer" Value="1" KeyPath="yes" />
                 {{#each file_associations as |association| ~}}
                 {{#each association.extensions as |ext| ~}}
-                <RegistryKey Root="HKLM" Key="Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithNovapad">
+                <RegistryKey Root="HKLM" Key="Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad">
                     <RegistryValue Type="string" Value="Open with {{../../product_name}}" />
                     <RegistryKey Key="command">
-                        <RegistryValue Type="string" Value="&quot;[INSTALLDIR]novapad.exe&quot; &quot;%1&quot;" />
+                        <RegistryValue Type="string" Value="&quot;[INSTALLDIR]sonarpad.exe&quot; &quot;%1&quot;" />
                     </RegistryKey>
                 </RegistryKey>
                 {{/each~}}
@@ -169,7 +169,7 @@
 
         <DirectoryRef Id="CommonDesktopFolder">
             <Component Id="ApplicationShortcutDesktop" Guid="*">
-                <Shortcut Id="ApplicationDesktopShortcut" Name="{{product_name}}" Description="Runs {{product_name}}" Target="[INSTALLDIR]novapad.exe" WorkingDirectory="INSTALLDIR" {{#if icon_path}}Icon="ProductIcon"{{/if}} />
+                <Shortcut Id="ApplicationDesktopShortcut" Name="{{product_name}}" Description="Runs {{product_name}}" Target="[INSTALLDIR]sonarpad.exe" WorkingDirectory="INSTALLDIR" {{#if icon_path}}Icon="ProductIcon"{{/if}} />
                 <RemoveFolder Id="RemoveDesktopFolder" Directory="CommonDesktopFolder" On="uninstall" />
                 <RegistryValue Root="HKLM" Key="Software\\{{manufacturer}}\\{{product_name}}" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
             </Component>

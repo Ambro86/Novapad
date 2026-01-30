@@ -48,7 +48,7 @@ use crate::tts_engine::{
 };
 use crate::{log_debug, sanitize_filename, show_error, with_state};
 
-const BATCH_CLASS_NAME: &str = "NovapadBatchAudiobooks";
+const BATCH_CLASS_NAME: &str = "SonarpadBatchAudiobooks";
 
 const BATCH_ID_LIST: usize = 9401;
 const BATCH_ID_ADD_FILES: usize = 9402;

@@ -1,17 +1,17 @@
 ﻿Darowizny
 
-Novapad to program, który powstał początkowo na własne potrzeby, ale z czasem coraz bardziej się rozwinął. Jego rozwój wymaga ciągłej pracy nad ulepszaniem funkcji, naprawianiem błędów, poszukiwaniem nowych pomysłów i starannym testowaniem wszystkich mechanizmów.
+Sonarpad to program, który powstał początkowo na własne potrzeby, ale z czasem coraz bardziej się rozwinął. Jego rozwój wymaga ciągłej pracy nad ulepszaniem funkcji, naprawianiem błędów, poszukiwaniem nowych pomysłów i starannym testowaniem wszystkich mechanizmów.
 Jeśli uważasz ten program za przydatny i chcesz wesprzeć jego rozwój, możesz przekazać darowiznę.
 
 PayPal
 Możesz przekazać darowiznę przez PayPal, korzystając z tego linku:
 https://www.paypal.me/ambrogio86
-Proszę, jeśli to możliwe, dodaj dopisek „Novapad” do płatności.
+Proszę, jeśli to możliwe, dodaj dopisek „Sonarpad” do płatności.
 
 Przelew bankowy
 Możesz również dokonać wpłaty przelewem na konto bankowe na nazwisko Ambrogio Riili.
 IBAN: IT77W0306901020100000064149
-Proszę, jeśli to możliwe, wpisz jasny tytuł przelewu, na przykład „Novapad”.
+Proszę, jeśli to możliwe, wpisz jasny tytuł przelewu, na przykład „Sonarpad”.
 
 Każdy, kto wesprze projekt, zostanie wymieniony w programie oraz w repozytorium GitHub, chyba że woli pozostać anonimowy lub użyć pseudonimu.
 

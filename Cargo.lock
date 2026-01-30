@@ -2642,53 +2642,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "novapad"
-version = "0.6.2"
-dependencies = [
- "anyhow",
- "bindgen",
- "calamine",
- "cfb",
- "chrono",
- "cpal 0.17.1",
- "curl",
- "curl-sys",
- "docx-rs",
- "encoding_rs",
- "epub",
- "fancy-regex",
- "feed-rs",
- "futures-util",
- "hex",
- "httpdate",
- "libc",
- "libloading",
- "mp3-duration",
- "once_cell",
- "pdf-extract",
- "printpdf",
- "quick-xml 0.39.0",
- "rand 0.8.5",
- "reqwest",
- "rodio",
- "scraper 0.25.0",
- "sentry",
- "serde",
- "serde_json",
- "sevenz-rust",
- "sha1",
- "sha2",
- "symphonia",
- "tokio",
- "tokio-tungstenite",
- "url",
- "uuid",
- "windows 0.54.0",
- "yt-transcript-rs",
- "zip 0.6.6",
-]
-
-[[package]]
 name = "nt-time"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4517,6 +4470,53 @@ checksum = "17129e116933cf371d018bb80ae557e889637989d8638274fb25622827b03881"
 dependencies = [
  "libc",
  "windows-sys 0.60.2",
+]
+
+[[package]]
+name = "sonarpad"
+version = "0.6.3"
+dependencies = [
+ "anyhow",
+ "bindgen",
+ "calamine",
+ "cfb",
+ "chrono",
+ "cpal 0.17.1",
+ "curl",
+ "curl-sys",
+ "docx-rs",
+ "encoding_rs",
+ "epub",
+ "fancy-regex",
+ "feed-rs",
+ "futures-util",
+ "hex",
+ "httpdate",
+ "libc",
+ "libloading",
+ "mp3-duration",
+ "once_cell",
+ "pdf-extract",
+ "printpdf",
+ "quick-xml 0.39.0",
+ "rand 0.8.5",
+ "reqwest",
+ "rodio",
+ "scraper 0.25.0",
+ "sentry",
+ "serde",
+ "serde_json",
+ "sevenz-rust",
+ "sha1",
+ "sha2",
+ "symphonia",
+ "tokio",
+ "tokio-tungstenite",
+ "url",
+ "uuid",
+ "windows 0.54.0",
+ "yt-transcript-rs",
+ "zip 0.6.6",
 ]
 
 [[package]]

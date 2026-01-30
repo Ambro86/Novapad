@@ -37,7 +37,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::PCWSTR;
 
-const PODCAST_CLASS_NAME: &str = "NovapadPodcast";
+const PODCAST_CLASS_NAME: &str = "SonarpadPodcast";
 const PODCAST_TIMER_ID: usize = 1;
 
 const PODCAST_ID_INCLUDE_MIC: usize = 11001;

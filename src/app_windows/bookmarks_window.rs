@@ -20,7 +20,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{PCWSTR, w};
 
-const BOOKMARKS_CLASS_NAME: &str = "NovapadBookmarks";
+const BOOKMARKS_CLASS_NAME: &str = "SonarpadBookmarks";
 const BOOKMARKS_ID_LIST: usize = 9001;
 const BOOKMARKS_ID_DELETE: usize = 9002;
 const BOOKMARKS_ID_GOTO: usize = 9003;

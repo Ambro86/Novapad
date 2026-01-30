@@ -20,7 +20,7 @@ use crate::i18n;
 use crate::settings::Language;
 use crate::with_state;
 
-const INTERPRETER_SELECT_CLASS_NAME: &str = "NovapadInterpreterSelect";
+const INTERPRETER_SELECT_CLASS_NAME: &str = "SonarpadInterpreterSelect";
 const ID_LIST: usize = 9201;
 const ID_OK: usize = 9202;
 const ID_CANCEL: usize = 9203;

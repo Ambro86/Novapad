@@ -20,7 +20,7 @@ Tính năng mới
 • Thêm "Hiển thị mô tả" cho các tập podcast trong menu ngữ cảnh.
 • Thêm hỗ trợ cho các định dạng âm thanh/video mở rộng qua FFmpeg: mkv, avi, mov, m4v, webm, mpg, ts, wmv, flv, vob, 3gp, flac, ogg, wma, aiff.
 • Thêm đọc phụ đề đồng bộ (srt, vtt, ass, sub, sbv, lrc, smi) với NVDA hoặc giọng đã chọn. Chương trình tìm kiếm tệp phụ đề có cùng tên với tệp phương tiện. Thêm tùy chọn "Nhập phụ đề" và "Xóa phụ đề" trong menu Phát lại cho các tệp có tên khác nhau.
-• Thêm liên kết tệp cho tất cả các định dạng âm thanh/video mới được hỗ trợ trong menu ngữ cảnh "Mở bằng Novapad".
+• Thêm liên kết tệp cho tất cả các định dạng âm thanh/video mới được hỗ trợ trong menu ngữ cảnh "Mở bằng Sonarpad".
 • Thêm cài đặt để điều chỉnh cao độ của bất kỳ tệp nào.
 • Thêm tùy chọn trong Cài đặt Chung để bật hoặc tắt báo cáo lỗi ẩn danh. Thêm mục trong menu Trợ giúp để tạo tệp ZIP chẩn đoán.
 • Thêm tùy chọn sử dụng giọng khác cho đối thoại, cả cho đọc trực tiếp và tạo sách nói.
@@ -130,7 +130,7 @@ Tính năng mới
 • Thêm nút nghe thử giọng đọc sau hộp chọn âm lượng.
 • Thêm tính năng tìm kiếm và thay thế bằng biểu thức chính quy (Regex) theo phong cách Notepad++.
 • Thêm tính năng nhập RSS từ tệp OPML và TXT.
-• Thêm tùy chọn để bật "Mở bằng Novapad" trong File Explorer, bao gồm cả các bản portable.
+• Thêm tùy chọn để bật "Mở bằng Sonarpad" trong File Explorer, bao gồm cả các bản portable.
 Cải tiến
 • Cải thiện việc chọn tốc độ/cao độ/âm lượng giọng đọc, tuân thủ các giới hạn tối đa của TTS.
 • Nhiều cải tiến RSS để tải xuống tất cả bài viết mà không làm di chuyển tiêu điểm NVDA trong quá trình cập nhật.
@@ -161,7 +161,7 @@ Cải tiến
 • Thêm hộp thoại xác nhận cho các hành động quan trọng (ví dụ: xóa dòng trùng lặp, xóa dấu gạch nối cuối dòng, xóa tất cả dấu trang). Không có hộp thoại nào hiển thị khi hành động đó không thể thực hiện.
 • Thêm khả năng xóa các nguồn RSS/trang web khỏi thư viện bằng cách chọn chúng và nhấn phím Delete.
 • Thêm menu chuột phải trong cửa sổ RSS để chỉnh sửa hoặc xóa các nguồn RSS/trang web.
-• Loại bỏ cài đặt di chuyển cài đặt sang thư mục hiện tại; ứng dụng hiện tự động xử lý việc này dựa trên vị trí (nếu thư mục chứa file exe tên là "novapad portable" hoặc nằm trên ổ đĩa di động, cài đặt sẽ vào thư mục `config` của exe, nếu không sẽ vào `%APPDATA%\Novapad`).
+• Loại bỏ cài đặt di chuyển cài đặt sang thư mục hiện tại; ứng dụng hiện tự động xử lý việc này dựa trên vị trí (nếu thư mục chứa file exe tên là "sonarpad portable" hoặc nằm trên ổ đĩa di động, cài đặt sẽ vào thư mục `config` của exe, nếu không sẽ vào `%APPDATA%\Sonarpad`).
 
 Phiên bản 0.5.7 - 2026-01-05
 Tính năng mới
@@ -213,7 +213,7 @@ Cải tiến
 
 ## 0.5.2 - 2026-01-01
 - Thêm nhật ký thay đổi.
-- Thêm các tùy chọn mở bằng Novapad và liên kết tệp trong khi cài đặt.
+- Thêm các tùy chọn mở bằng Sonarpad và liên kết tệp trong khi cài đặt.
 - Cải thiện bản địa hóa thông báo (lỗi, hộp thoại, xuất sách nói).
 - Thêm lựa chọn phần khi dùng "Chia nhỏ sách nói dựa trên văn bản", với tùy chọn "Bắt buộc dấu đánh dấu ở đầu dòng".
 - Thêm tính năng nhập phụ đề YouTube với lựa chọn ngôn ngữ, mốc thời gian và cải thiện xử lý tiêu điểm.

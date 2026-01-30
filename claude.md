@@ -1,4 +1,4 @@
-## Novapad / Default working rules
+## Sonarpad / Default working rules
 
 ### General
 - Refactor as needed to eliminate compiler warnings and Clippy warnings/errors.

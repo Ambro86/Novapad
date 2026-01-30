@@ -24,7 +24,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{PCWSTR, w};
 
-const WIKIPEDIA_CLASS_NAME: &str = "NovapadWikipediaImport";
+const WIKIPEDIA_CLASS_NAME: &str = "SonarpadWikipediaImport";
 const WIKIPEDIA_INPUT_ID: usize = 9501;
 const WIKIPEDIA_SEARCH_ID: usize = 9502;
 const WIKIPEDIA_RESULTS_ID: usize = 9503;

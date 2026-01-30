@@ -15,7 +15,7 @@ Menu Soubor:
  Nahrát podcast: Nahraje podcast z mikrofonu a/nebo systémového zvuku (Ctrl+Shift+R).
 
 Přehrávání MP3 souboru nebo Audioknihy:
-Když otevřete soubor MP3, Novapad funguje jako audio přehrávač.
+Když otevřete soubor MP3, Sonarpad funguje jako audio přehrávač.
 Klávesové zkratky přehrávače:
 
  MEZERNÍK: Přehrát / Pozastavit.
@@ -95,7 +95,7 @@ Menu Nástroje:
 
 
 
-RSS / Články: otevře okno RSS/Články, přidat zdroje, šipkou doprava rozbalte kanál a stiskněte Enter pro import článku do editoru v Novapadu.
+RSS / Články: otevře okno RSS/Články, přidat zdroje, šipkou doprava rozbalte kanál a stiskněte Enter pro import článku do editoru v Sonarpadu.
 
  V okně RSS vyberte kanál nebo stránku a stiskněte Delete pro odstranění z knihovny.
  Z kontextového menu na kanálu nebo stránce můžete upravit nebo smazat RSS nebo stránku.

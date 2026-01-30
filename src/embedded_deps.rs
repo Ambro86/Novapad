@@ -1,5 +1,5 @@
 //! Modulo per l'estrazione delle dipendenze embedded nell'exe.
-//! Le DLL vengono estratte in %APPDATA%/novapad/ al primo avvio
+//! Le DLL vengono estratte in %APPDATA%/sonarpad/ al primo avvio
 //! e aggiornate solo se cambiano.
 
 use std::fs;
@@ -58,7 +58,7 @@ fn write_if_changed(path: &PathBuf, data: &[u8]) -> std::io::Result<bool> {
     Ok(true)
 }
 
-/// Estrae tutte le dipendenze in %APPDATA%/novapad/
+/// Estrae tutte le dipendenze in %APPDATA%/sonarpad/
 /// Ritorna il path della cartella delle dipendenze
 pub fn extract_all() -> std::io::Result<PathBuf> {
     let deps_dir = crate::settings::settings_dir();

@@ -304,8 +304,8 @@ fn ffmpeg_cache_key(path: &Path) -> String {
     hex::encode(hasher.finalize())
 }
 
-fn write_wav_header(
-    file: &mut File,
+fn write_wav_header<W: Write + Seek>(
+    writer: &mut W,
     data_bytes: u64,
     channels: u16,
     sample_rate: u32,
@@ -318,20 +318,20 @@ fn write_wav_header(
     let block_align = channels.saturating_mul(2);
     let bits_per_sample = 16u16;
 
-    file.seek(SeekFrom::Start(0))?;
-    file.write_all(b"RIFF")?;
-    file.write_all(&chunk_size.to_le_bytes())?;
-    file.write_all(b"WAVE")?;
-    file.write_all(b"fmt ")?;
-    file.write_all(&16u32.to_le_bytes())?;
-    file.write_all(&1u16.to_le_bytes())?;
-    file.write_all(&channels.to_le_bytes())?;
-    file.write_all(&sample_rate.to_le_bytes())?;
-    file.write_all(&byte_rate.to_le_bytes())?;
-    file.write_all(&block_align.to_le_bytes())?;
-    file.write_all(&bits_per_sample.to_le_bytes())?;
-    file.write_all(b"data")?;
-    file.write_all(&data_bytes.to_le_bytes())?;
+    writer.seek(SeekFrom::Start(0))?;
+    writer.write_all(b"RIFF")?;
+    writer.write_all(&chunk_size.to_le_bytes())?;
+    writer.write_all(b"WAVE")?;
+    writer.write_all(b"fmt ")?;
+    writer.write_all(&16u32.to_le_bytes())?;
+    writer.write_all(&1u16.to_le_bytes())?;
+    writer.write_all(&channels.to_le_bytes())?;
+    writer.write_all(&sample_rate.to_le_bytes())?;
+    writer.write_all(&byte_rate.to_le_bytes())?;
+    writer.write_all(&block_align.to_le_bytes())?;
+    writer.write_all(&bits_per_sample.to_le_bytes())?;
+    writer.write_all(b"data")?;
+    writer.write_all(&data_bytes.to_le_bytes())?;
     Ok(())
 }
 
@@ -342,30 +342,63 @@ fn decode_ffmpeg_to_wav(path: &Path) -> Result<PathBuf, String> {
     let key = ffmpeg_cache_key(path);
     let wav_path = cache_dir.join(format!("{}.wav", &key[..16]));
     if wav_path.exists() {
+        log_debug(&format!("FFmpeg: using cached WAV {}", wav_path.display()));
         return Ok(wav_path);
     }
 
+    log_debug(&format!("FFmpeg: decoding {} to WAV", path.display()));
     let mut source = FfmpegSource::try_new(path, 0, None)?;
     let sample_rate = source.sample_rate();
     let channels = source.channels();
+    log_debug(&format!(
+        "FFmpeg: source rate={} channels={}",
+        sample_rate, channels
+    ));
     if sample_rate == 0 || channels == 0 {
         return Err("FFmpeg: invalid output format".to_string());
     }
 
-    let mut file =
-        File::create(&wav_path).map_err(|e| format!("FFmpeg: wav create failed: {}", e))?;
-    write_wav_header(&mut file, 0, channels, sample_rate)
+    let file = File::create(&wav_path).map_err(|e| format!("FFmpeg: wav create failed: {}", e))?;
+    let mut writer = std::io::BufWriter::with_capacity(65536, file);
+    write_wav_header(&mut writer, 0, channels, sample_rate)
         .map_err(|e| format!("FFmpeg: wav header failed: {}", e))?;
 
     let mut data_bytes: u64 = 0;
+    let mut buffer = Vec::with_capacity(8192);
     for sample in source.by_ref() {
         let scaled = (sample * i16::MAX as f32).round();
         let clamped = scaled.clamp(i16::MIN as f32, i16::MAX as f32) as i16;
-        file.write_all(&clamped.to_le_bytes())
-            .map_err(|e| format!("FFmpeg: wav write failed: {}", e))?;
+        buffer.extend_from_slice(&clamped.to_le_bytes());
         data_bytes = data_bytes.saturating_add(2);
+
+        // Write in chunks for better performance
+        if buffer.len() >= 8192 {
+            writer
+                .write_all(&buffer)
+                .map_err(|e| format!("FFmpeg: wav write failed: {}", e))?;
+            buffer.clear();
+        }
+    }
+    // Write remaining samples
+    if !buffer.is_empty() {
+        writer
+            .write_all(&buffer)
+            .map_err(|e| format!("FFmpeg: wav write failed: {}", e))?;
+    }
+    writer
+        .flush()
+        .map_err(|e| format!("FFmpeg: wav flush failed: {}", e))?;
+
+    log_debug(&format!("FFmpeg: decoded {} bytes to WAV", data_bytes));
+    if data_bytes == 0 {
+        // Remove empty WAV file
+        crate::log_if_err!(std::fs::remove_file(&wav_path));
+        return Err("FFmpeg: no audio samples decoded".to_string());
     }
 
+    let mut file = writer
+        .into_inner()
+        .map_err(|e| format!("FFmpeg: into_inner failed: {}", e))?;
     write_wav_header(&mut file, data_bytes, channels, sample_rate)
         .map_err(|e| format!("FFmpeg: wav finalize failed: {}", e))?;
     Ok(wav_path)

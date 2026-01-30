@@ -14,7 +14,7 @@ Record Audiobook: Create an MP3 file from the current text (Ctrl+R).
 Record Podcast: Record a podcast from microphone and/or system audio (Ctrl+Shift+R).
 
 MP3 Audiobooks:
-When you open an MP3 file, Novapad acts as an audio player.
+When you open an MP3 file, Sonarpad acts as an audio player.
 Keyboard controls:
 - SPACE: Play / Pause.
 - RIGHT ARROW: Fast forward 1 minute.

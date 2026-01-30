@@ -1841,7 +1841,7 @@ pub fn write_pdf_text(
     let bullet_indent_chars = 4usize;
     let max_chars = estimate_max_chars(page_width.0, margin, body_font_size);
     let title = if title.trim().is_empty() {
-        "Novapad"
+        "Sonarpad"
     } else {
         title
     };

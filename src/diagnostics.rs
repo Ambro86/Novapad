@@ -46,7 +46,7 @@ fn generate_version_info() -> String {
     let os = std::env::consts::OS;
 
     format!(
-        "Novapad Diagnostics\n\
+        "Sonarpad Diagnostics\n\
          ==================\n\n\
          Version: {}\n\
          Mode: {}\n\
@@ -148,7 +148,7 @@ fn add_text_to_zip<W: Write + std::io::Seek>(
 ///
 /// Include:
 /// - version.txt: informazioni sulla versione e build
-/// - Novapad.log: file di log (sanitizzato)
+/// - Sonarpad.log: file di log (sanitizzato)
 /// - settings.json: configurazione (sanitizzata)
 /// - last_error.txt: ultimo errore fatale (se esiste)
 /// - sentry_last_event_id.txt: ultimo event ID Sentry (se esiste)
@@ -163,9 +163,9 @@ pub fn export_diagnostics_zip(dest_path: &Path) -> Result<(), String> {
     let version_info = generate_version_info();
     add_text_to_zip(&mut zip, "version.txt", &version_info)?;
 
-    // 2. Novapad.log - sanitizzato
-    let log_path = settings_dir.join("Novapad.log");
-    add_file_to_zip(&mut zip, &log_path, "Novapad.log", true)?;
+    // 2. Sonarpad.log - sanitizzato
+    let log_path = settings_dir.join("Sonarpad.log");
+    add_file_to_zip(&mut zip, &log_path, "Sonarpad.log", true)?;
 
     // 3. settings.json - sanitizzato
     let settings_path = settings_dir.join("settings.json");

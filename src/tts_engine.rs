@@ -395,7 +395,7 @@ fn handle_tts_command(
 fn temp_wav_path(prefix: &str) -> PathBuf {
     let mut path = std::env::temp_dir();
     let id = Uuid::new_v4().simple().to_string();
-    path.push(format!("novapad_{prefix}_{id}.wav"));
+    path.push(format!("sonarpad_{prefix}_{id}.wav"));
     path
 }
 
@@ -2276,7 +2276,7 @@ pub fn start_audiobook(hwnd: HWND) {
             if crate::audio_utils::set_file_metadata(
                 &output,
                 Some(file_title),
-                Some("Novapad"),
+                Some("Sonarpad"),
                 if comment.is_empty() {
                     None
                 } else {
@@ -2739,10 +2739,7 @@ fn run_sapi4_parallel_part(
 
     produced_files.sort_by_key(|p: &PathBuf| {
         let name = p.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-        name.strip_prefix("sub_")
-            .and_then(|s| s.strip_prefix("part_")) // support both naming conventions if any
-            .and_then(|s| s.parse::<usize>().ok())
-            .unwrap_or(0)
+        parse_sapi4_part_index(name)
     });
 
     let result = if is_mp3 {
@@ -2757,6 +2754,36 @@ fn run_sapi4_parallel_part(
     std::fs::remove_dir_all(&temp_dir).ok();
     *global_progress = progress_counter.load(Ordering::SeqCst);
     result
+}
+
+fn parse_sapi4_part_index(name: &str) -> usize {
+    if let Some(rest) = name.strip_prefix("sub_")
+        && let Ok(value) = rest.parse::<usize>()
+    {
+        return value;
+    }
+    if let Some(rest) = name.strip_prefix("part_")
+        && let Ok(value) = rest.parse::<usize>()
+    {
+        return value;
+    }
+    let mut digits = Vec::new();
+    for ch in name.chars().rev() {
+        if ch.is_ascii_digit() {
+            digits.push(ch);
+        } else if !digits.is_empty() {
+            break;
+        }
+    }
+    if digits.is_empty() {
+        return 0;
+    }
+    digits.reverse();
+    digits
+        .into_iter()
+        .collect::<String>()
+        .parse::<usize>()
+        .unwrap_or(0)
 }
 
 fn merge_and_finalize_sapi4_mp3(
@@ -2774,6 +2801,95 @@ fn merge_and_finalize_sapi4_mp3(
         std::io::copy(&mut in_file, &mut out_file).map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_sapi4_part_index;
+
+    #[test]
+    fn parse_sapi4_part_index_prefers_named_prefix() {
+        assert_eq!(parse_sapi4_part_index("sub_0"), 0);
+        assert_eq!(parse_sapi4_part_index("sub_12"), 12);
+        assert_eq!(parse_sapi4_part_index("part_3"), 3);
+        assert_eq!(parse_sapi4_part_index("part_20"), 20);
+    }
+
+    #[test]
+    fn parse_sapi4_part_index_falls_back_to_trailing_digits() {
+        assert_eq!(parse_sapi4_part_index("segment_0007"), 7);
+        assert_eq!(parse_sapi4_part_index("chunk99"), 99);
+        assert_eq!(parse_sapi4_part_index("audio"), 0);
+        assert_eq!(parse_sapi4_part_index("sub_foo_5"), 5);
+    }
+
+    #[test]
+    fn sapi4_part_sort_orders_by_index() {
+        let mut paths = vec![
+            std::path::PathBuf::from("sub_2.mp3"),
+            std::path::PathBuf::from("sub_10.mp3"),
+            std::path::PathBuf::from("sub_1.mp3"),
+            std::path::PathBuf::from("part_3.mp3"),
+            std::path::PathBuf::from("foo9.mp3"),
+        ];
+        paths.sort_by_key(|path| {
+            let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+            parse_sapi4_part_index(stem)
+        });
+        let names: Vec<String> = paths
+            .iter()
+            .map(|p| {
+                p.file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("")
+                    .to_string()
+            })
+            .collect();
+        assert_eq!(
+            names,
+            vec![
+                "sub_1.mp3",
+                "sub_2.mp3",
+                "part_3.mp3",
+                "foo9.mp3",
+                "sub_10.mp3"
+            ]
+        );
+    }
+
+    #[test]
+    fn sapi4_part_sort_handles_dirs_and_extensions() {
+        let mut paths = vec![
+            std::path::PathBuf::from("C:\\tmp\\sapi4\\sub_2.wav"),
+            std::path::PathBuf::from("C:\\tmp\\sapi4\\part_12.mp3"),
+            std::path::PathBuf::from("C:\\tmp\\sapi4\\foo9.m4a"),
+            std::path::PathBuf::from("C:\\tmp\\sapi4\\sub_1.mp3"),
+            std::path::PathBuf::from("C:\\tmp\\sapi4\\chunk_0003.wav"),
+        ];
+        paths.sort_by_key(|path| {
+            let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+            parse_sapi4_part_index(stem)
+        });
+        let names: Vec<String> = paths
+            .iter()
+            .map(|p| {
+                p.file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("")
+                    .to_string()
+            })
+            .collect();
+        assert_eq!(
+            names,
+            vec![
+                "sub_1.mp3",
+                "sub_2.wav",
+                "chunk_0003.wav",
+                "foo9.m4a",
+                "part_12.mp3"
+            ]
+        );
+    }
 }
 
 fn merge_and_finalize_sapi4_audio(

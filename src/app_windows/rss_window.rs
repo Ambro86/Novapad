@@ -46,7 +46,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
-const RSS_WINDOW_CLASS: &str = "NovapadRssWindow";
+const RSS_WINDOW_CLASS: &str = "SonarpadRssWindow";
 const ID_TREE: usize = 1001;
 const ID_BTN_ADD: usize = 1002;
 const ID_BTN_CLOSE: usize = 1003;
@@ -3504,7 +3504,7 @@ unsafe fn show_reorder_dialog(parent_hwnd: HWND, source_index: usize, total: usi
         return;
     }
     let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-    let class_name = to_wide("NovapadRssReorder");
+    let class_name = to_wide("SonarpadRssReorder");
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
             windows::Win32::UI::WindowsAndMessaging::LoadCursorW(
@@ -3624,7 +3624,7 @@ unsafe fn show_add_dialog(parent_hwnd: HWND) {
 
 unsafe fn show_add_dialog_with_prefill(parent_hwnd: HWND, title: String, url: String) {
     let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-    let class_name = to_wide("NovapadInput");
+    let class_name = to_wide("SonarpadInput");
 
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(

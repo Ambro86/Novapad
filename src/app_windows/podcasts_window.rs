@@ -48,10 +48,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
-const PODCASTS_WINDOW_CLASS: &str = "NovapadPodcasts";
-const PODCASTS_REORDER_CLASS: &str = "NovapadPodcastsReorder";
-const PODCASTS_ADD_CLASS: &str = "NovapadPodcastsAdd";
-const PODCASTS_CATEGORIES_CLASS: &str = "NovapadPodcastsCategories";
+const PODCASTS_WINDOW_CLASS: &str = "SonarpadPodcasts";
+const PODCASTS_REORDER_CLASS: &str = "SonarpadPodcastsReorder";
+const PODCASTS_ADD_CLASS: &str = "SonarpadPodcastsAdd";
+const PODCASTS_CATEGORIES_CLASS: &str = "SonarpadPodcastsCategories";
 
 const ID_TREE: usize = 12001;
 const ID_SEARCH_LABEL: usize = 12005;
@@ -272,6 +272,23 @@ fn normalize_podcast_key(url: &str) -> String {
     rss::normalize_url(url).to_ascii_lowercase()
 }
 
+fn podcast_source_display_title(source: &RssSource, language: crate::settings::Language) -> String {
+    let base_title = if source.title.trim().is_empty() {
+        source.url.clone()
+    } else {
+        source.title.clone()
+    };
+    if source.unread {
+        format!(
+            "{}{}",
+            i18n::tr(language, "podcasts.unheard_prefix"),
+            base_title
+        )
+    } else {
+        base_title
+    }
+}
+
 fn import_podcast_sources_from_file(hwnd: HWND, path: &Path) -> Option<usize> {
     let bytes = std::fs::read(path).ok()?;
     let text = String::from_utf8_lossy(&bytes);
@@ -363,7 +380,7 @@ fn export_podcast_sources_to_file(hwnd: HWND, path: &Path) -> Result<usize, Stri
     let mut file = File::create(path).map_err(|e| e.to_string())?;
     writeln!(
         file,
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<opml version=\"1.0\">\n<head>\n<title>Novapad Podcasts</title>\n</head>\n<body>"
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<opml version=\"1.0\">\n<head>\n<title>Sonarpad Podcasts</title>\n</head>\n<body>"
     )
     .map_err(|e| e.to_string())?;
     for src in sources.iter() {
@@ -933,38 +950,11 @@ unsafe fn update_source_cache(
     }
 }
 
-unsafe fn update_source_title(hwnd: HWND, hitem: HTREEITEM, source_index: usize, feed_title: &str) {
-    let title = feed_title.trim();
-    if title.is_empty() {
+unsafe fn update_source_tree_title(hwnd_tree: HWND, hitem: HTREEITEM, title: &str) {
+    if hwnd_tree.0 == 0 || hitem.0 == 0 {
         return;
     }
-    let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-    if parent.0 == 0 {
-        return;
-    }
-    let mut updated = None;
-    if with_state(parent, |ps| {
-        if let Some(src) = ps.settings.podcast_sources.get_mut(source_index) {
-            let looks_auto = src.title.trim().is_empty() || src.title == src.url;
-            if !src.user_title && looks_auto {
-                src.title = title.to_string();
-                updated = Some(src.title.clone());
-                settings::save_settings(ps.settings.clone());
-            }
-        }
-    })
-    .is_none()
-    {
-        crate::log_debug("Failed to update source title state");
-    }
-    let Some(updated) = updated else {
-        return;
-    };
-    let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-    if hwnd_tree.0 == 0 {
-        return;
-    }
-    let title_wide = to_wide(&updated);
+    let title_wide = to_wide(title);
     let mut tvi = TVITEMW {
         mask: TVIF_TEXT,
         hItem: hitem,
@@ -979,10 +969,42 @@ unsafe fn update_source_title(hwnd: HWND, hitem: HTREEITEM, source_index: usize,
     );
 }
 
-unsafe fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<PodcastEpisode>) {
+unsafe fn update_source_title(hwnd: HWND, hitem: HTREEITEM, source_index: usize, feed_title: &str) {
+    let title = feed_title.trim();
+    if title.is_empty() {
+        return;
+    }
+    let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    if parent.0 == 0 {
+        return;
+    }
+    let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
+    let mut updated = None;
+    let did_access = with_state(parent, |ps| {
+        if let Some(src) = ps.settings.podcast_sources.get_mut(source_index) {
+            let looks_auto = src.title.trim().is_empty() || src.title == src.url;
+            if !src.user_title && looks_auto {
+                src.title = title.to_string();
+                let display = podcast_source_display_title(src, language);
+                settings::save_settings(ps.settings.clone());
+                updated = Some(display);
+            }
+        }
+    })
+    .is_some();
+    if !did_access {
+        crate::log_debug("Failed to update source title state");
+        return;
+    }
+    let Some(updated) = updated else { return };
+    let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+    update_source_tree_title(hwnd_tree, hitem, &updated);
+}
+
+unsafe fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<PodcastEpisode>) -> usize {
     let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     if hwnd_tree.0 == 0 {
-        return;
+        return 0;
     }
 
     let existing_keys: HashSet<String> = with_podcast_state(hwnd, |s| {
@@ -1078,6 +1100,7 @@ unsafe fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<Podcast
         }
     }
 
+    let added = new_items.len();
     with_podcast_state(hwnd, |s| {
         let state = s
             .source_items
@@ -1085,6 +1108,7 @@ unsafe fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<Podcast
             .or_insert(SourceItemsState { items: Vec::new() });
         state.items.extend(new_items);
     });
+    added
 }
 
 unsafe fn create_tree_item(hwnd_tree: HWND, title: &str, index: usize) -> HTREEITEM {
@@ -1115,12 +1139,14 @@ unsafe fn create_tree_item(hwnd_tree: HWND, title: &str, index: usize) -> HTREEI
 }
 
 unsafe fn reload_tree(hwnd: HWND) {
-    let (hwnd_tree, sources) = with_podcast_state(hwnd, |s| {
-        let sources =
-            with_state(s.parent, |ps| ps.settings.podcast_sources.clone()).unwrap_or_default();
-        (s.hwnd_tree, sources)
+    let (hwnd_tree, sources, language) = with_podcast_state(hwnd, |s| {
+        let (sources, language) = with_state(s.parent, |ps| {
+            (ps.settings.podcast_sources.clone(), ps.settings.language)
+        })
+        .unwrap_or_default();
+        (s.hwnd_tree, sources, language)
     })
-    .unwrap_or((HWND(0), Vec::new()));
+    .unwrap_or((HWND(0), Vec::new(), crate::settings::Language::English));
     if hwnd_tree.0 == 0 {
         return;
     }
@@ -1136,11 +1162,7 @@ unsafe fn reload_tree(hwnd: HWND) {
     });
 
     for (i, src) in sources.iter().enumerate() {
-        let title = if src.title.trim().is_empty() {
-            src.url.clone()
-        } else {
-            src.title.clone()
-        };
+        let title = podcast_source_display_title(src, language);
         let hitem = create_tree_item(hwnd_tree, &title, i);
         if hitem.0 != 0 {
             with_podcast_state(hwnd, |s| {
@@ -1497,6 +1519,59 @@ fn mark_podcast_episode_played(path: &Path) {
     let marker = podcast_cache_marker_path(path);
     if let Err(e) = std::fs::write(marker, b"") {
         crate::log_debug(&format!("Failed to write marker file: {}", e));
+    }
+}
+
+unsafe fn set_source_unheard(hwnd: HWND, hitem: HTREEITEM, unheard: bool) {
+    let first_item_key: Option<String> = if !unheard {
+        with_podcast_state(hwnd, |s| {
+            s.source_items
+                .get(&hitem.0)
+                .and_then(|state| state.items.first().map(episode_key))
+        })
+        .flatten()
+    } else {
+        None
+    };
+
+    let (hwnd_tree, title_opt) = with_podcast_state(hwnd, |s| {
+        let hwnd_tree = s.hwnd_tree;
+        let parent = s.parent;
+        let source_idx = s.node_data.get(&hitem.0).and_then(|node| match node {
+            NodeData::Source(idx) => Some(*idx),
+            _ => None,
+        });
+        let Some(idx) = source_idx else {
+            return (hwnd_tree, None);
+        };
+        let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
+        let title_opt = with_state(parent, |ps| {
+            if let Some(src) = ps.settings.podcast_sources.get_mut(idx) {
+                let mut changed = false;
+                if src.unread != unheard {
+                    src.unread = unheard;
+                    changed = true;
+                }
+                if let Some(ref key) = first_item_key
+                    && src.last_seen_guid.as_ref() != Some(key)
+                {
+                    src.last_seen_guid = Some(key.clone());
+                    changed = true;
+                }
+                if changed {
+                    let title = podcast_source_display_title(src, language);
+                    settings::save_settings(ps.settings.clone());
+                    return Some(title);
+                }
+            }
+            None
+        })
+        .flatten();
+        (hwnd_tree, title_opt)
+    })
+    .unwrap_or((HWND(0), None));
+    if let Some(title) = title_opt {
+        update_source_tree_title(hwnd_tree, hitem, &title);
     }
 }
 
@@ -3111,12 +3186,21 @@ unsafe fn subscribe_selected_result(hwnd: HWND) {
 
         let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
         if hwnd_tree.0 != 0 {
-            let title = if result.title.trim().is_empty() {
-                result.feed_url.clone()
-            } else {
-                result.title.clone()
-            };
-            let hitem = create_tree_item(hwnd_tree, &title, index);
+            let display = with_state(parent, |ps| {
+                ps.settings
+                    .podcast_sources
+                    .get(index)
+                    .map(|src| podcast_source_display_title(src, language))
+            })
+            .flatten()
+            .unwrap_or_else(|| {
+                if result.title.trim().is_empty() {
+                    result.feed_url.clone()
+                } else {
+                    result.title.clone()
+                }
+            });
+            let hitem = create_tree_item(hwnd_tree, &display, index);
             if hitem.0 != 0 {
                 with_podcast_state(hwnd, |s| {
                     s.node_data.insert(hitem.0, NodeData::Source(index));
@@ -4081,7 +4165,7 @@ struct DescriptionDialogInit {
     content: String,
 }
 
-const DESCRIPTION_DIALOG_CLASS: &str = "NovapadPodcastDescription";
+const DESCRIPTION_DIALOG_CLASS: &str = "SonarpadPodcastDescription";
 const ID_DESCRIPTION_EDIT: usize = 14001;
 const ID_DESCRIPTION_OK: usize = 14002;
 
@@ -5654,6 +5738,16 @@ unsafe extern "system" fn podcast_wndproc(
                     {
                         match node {
                             NodeData::Source(idx) => {
+                                let has_loaded_items = with_podcast_state(hwnd, |s| {
+                                    s.source_items
+                                        .get(&hitem.0)
+                                        .map(|state| !state.items.is_empty())
+                                        .unwrap_or(false)
+                                })
+                                .unwrap_or(false);
+                                if has_loaded_items {
+                                    set_source_unheard(hwnd, hitem, false);
+                                }
                                 load_episode_children(hwnd, hitem, NodeData::Source(idx), false)
                             }
                             NodeData::PreviewSource(idx) => load_episode_children(
@@ -5851,7 +5945,15 @@ unsafe extern "system" fn podcast_wndproc(
                     announce_status(&i18n::tr(language, "podcasts.added"));
                     let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
                     if hwnd_tree.0 != 0 {
-                        let hitem = create_tree_item(hwnd_tree, &url, index);
+                        let display = with_state(parent, |ps| {
+                            ps.settings
+                                .podcast_sources
+                                .get(index)
+                                .map(|src| podcast_source_display_title(src, language))
+                        })
+                        .flatten()
+                        .unwrap_or_else(|| url.clone());
+                        let hitem = create_tree_item(hwnd_tree, &display, index);
                         if hitem.0 != 0 {
                             with_podcast_state(hwnd, |s| {
                                 s.node_data.insert(hitem.0, NodeData::Source(index));
@@ -5913,6 +6015,14 @@ unsafe extern "system" fn podcast_wndproc(
         WM_PODCAST_FETCH_COMPLETE => {
             let msg_ptr = lparam.0 as *mut FetchResult;
             let msg = unsafe { Box::from_raw(msg_ptr) };
+            let had_loaded_items = matches!(msg.node, NodeData::Source(_))
+                && with_podcast_state(hwnd, |s| {
+                    s.source_items
+                        .get(&msg.hitem)
+                        .map(|state| !state.items.is_empty())
+                        .unwrap_or(false)
+                })
+                .unwrap_or(false);
             with_podcast_state(hwnd, |s| {
                 if let Some(src) = match msg.node {
                     NodeData::Source(idx) => with_state(s.parent, |ps| {
@@ -5933,7 +6043,10 @@ unsafe extern "system" fn podcast_wndproc(
                         NodeData::Source(idx) => {
                             let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
                             if parent.0 != 0 {
-                                update_source_cache(parent, idx, outcome.cache, None);
+                                // Compute the most recent episode pub_date for sorting
+                                let max_pub_date =
+                                    outcome.items.iter().filter_map(|ep| ep.pub_date).max();
+                                update_source_cache(parent, idx, outcome.cache, max_pub_date);
                                 if !outcome.title.trim().is_empty() {
                                     update_source_title(
                                         hwnd,
@@ -5972,7 +6085,17 @@ unsafe extern "system" fn podcast_wndproc(
                         }
                         _ => {}
                     }
-                    apply_episode_results(hwnd, HTREEITEM(msg.hitem), outcome.items);
+                    let has_items = !outcome.items.is_empty();
+                    let appended = apply_episode_results(hwnd, HTREEITEM(msg.hitem), outcome.items);
+                    if matches!(msg.node, NodeData::Source(_)) {
+                        if had_loaded_items {
+                            if appended > 0 {
+                                set_source_unheard(hwnd, HTREEITEM(msg.hitem), true);
+                            }
+                        } else if has_items {
+                            set_source_unheard(hwnd, HTREEITEM(msg.hitem), false);
+                        }
+                    }
                 }
                 Err(_e) => {
                     let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
@@ -6153,138 +6276,220 @@ fn podcastindex_language_code(language: Language) -> &'static str {
 }
 
 fn apple_categories(language: Language) -> Vec<Category> {
+    // All 19 official Apple Podcasts categories with verified genre IDs
+    // Source: https://podcasters.apple.com/support/1691-apple-podcasts-categories
     let (
         arts,
         business,
         comedy,
         education,
+        fiction,
+        government,
         health_fitness,
+        history,
+        kids_family,
+        leisure,
+        music,
         news,
-        technology,
-        society_culture,
-        true_crime,
+        religion_spirituality,
         science,
+        society_culture,
         sports,
+        technology,
+        true_crime,
+        tv_film,
     ) = match language {
         Language::Italian => (
             "Arti",
             "Affari",
             "Commedia",
             "Istruzione",
+            "Narrativa",
+            "Governo",
             "Salute e fitness",
+            "Storia",
+            "Bambini e famiglia",
+            "Tempo libero",
+            "Musica",
             "Notizie",
-            "Tecnologia",
-            "Societa e cultura",
-            "True crime",
+            "Religione e spiritualita",
             "Scienza",
+            "Societa e cultura",
             "Sport",
+            "Tecnologia",
+            "True crime",
+            "TV e film",
         ),
         Language::English => (
             "Arts",
             "Business",
             "Comedy",
             "Education",
+            "Fiction",
+            "Government",
             "Health & Fitness",
+            "History",
+            "Kids & Family",
+            "Leisure",
+            "Music",
             "News",
-            "Technology",
-            "Society & Culture",
-            "True Crime",
+            "Religion & Spirituality",
             "Science",
+            "Society & Culture",
             "Sports",
+            "Technology",
+            "True Crime",
+            "TV & Film",
         ),
         Language::Spanish => (
             "Arte",
             "Negocios",
             "Comedia",
             "Educacion",
+            "Ficcion",
+            "Gobierno",
             "Salud y fitness",
+            "Historia",
+            "Ninos y familia",
+            "Ocio",
+            "Musica",
             "Noticias",
-            "Tecnologia",
-            "Sociedad y cultura",
-            "True crime",
+            "Religion y espiritualidad",
             "Ciencia",
+            "Sociedad y cultura",
             "Deportes",
+            "Tecnologia",
+            "True crime",
+            "TV y cine",
         ),
         Language::Portuguese => (
             "Artes",
             "Negocios",
             "Comedia",
             "Educacao",
+            "Ficcao",
+            "Governo",
             "Saude e fitness",
+            "Historia",
+            "Criancas e familia",
+            "Lazer",
+            "Musica",
             "Noticias",
-            "Tecnologia",
-            "Sociedade e cultura",
-            "True crime",
+            "Religiao e espiritualidade",
             "Ciencia",
+            "Sociedade e cultura",
             "Desporto",
+            "Tecnologia",
+            "True crime",
+            "TV e cinema",
         ),
         Language::Swedish => (
             "Konst",
             "Foretag",
             "Komedi",
             "Utbildning",
+            "Fiktion",
+            "Regering",
             "Halsa och fitness",
+            "Historia",
+            "Barn och familj",
+            "Fritid",
+            "Musik",
             "Nyheter",
-            "Teknik",
-            "Samhalle och kultur",
-            "True crime",
+            "Religion och andlighet",
             "Vetenskap",
+            "Samhalle och kultur",
             "Sport",
+            "Teknik",
+            "True crime",
+            "TV och film",
         ),
         Language::Vietnamese => (
             "Nghe thuat",
             "Kinh doanh",
             "Hai",
             "Giao duc",
+            "Hu cau",
+            "Chinh phu",
             "Suc khoe va the hinh",
+            "Lich su",
+            "Tre em va gia dinh",
+            "Giai tri",
+            "Am nhac",
             "Tin tuc",
-            "Cong nghe",
-            "Xa hoi va van hoa",
-            "True crime",
+            "Ton giao va tam linh",
             "Khoa hoc",
+            "Xa hoi va van hoa",
             "The thao",
+            "Cong nghe",
+            "True crime",
+            "TV va phim",
         ),
         Language::Czech => (
             "Umeni",
             "Byznys",
             "Komedie",
             "Vzdelavani",
+            "Beletrie",
+            "Vlada",
             "Zdravi a fitness",
+            "Historie",
+            "Deti a rodina",
+            "Volny cas",
+            "Hudba",
             "Zpravy",
-            "Technologie",
-            "Spolecnost a kultura",
-            "True crime",
+            "Nabozenstvi a duchovno",
             "Veda",
+            "Spolecnost a kultura",
             "Sport",
+            "Technologie",
+            "True crime",
+            "TV a film",
         ),
         Language::Polish => (
             "Sztuka",
             "Biznes",
             "Komedia",
             "Edukacja",
+            "Fikcja",
+            "Rzad",
             "Zdrowie i fitness",
+            "Historia",
+            "Dzieci i rodzina",
+            "Rozrywka",
+            "Muzyka",
             "Wiadomosci",
-            "Technologia",
-            "Spoleczenstwo i kultura",
-            "True crime",
+            "Religia i duchownosc",
             "Nauka",
+            "Spoleczenstwo i kultura",
             "Sport",
+            "Technologia",
+            "True crime",
+            "TV i film",
         ),
         Language::French => (
             "Arts",
             "Affaires",
             "Comedie",
             "Education",
+            "Fiction",
+            "Gouvernement",
             "Sante et fitness",
+            "Histoire",
+            "Enfants et famille",
+            "Loisirs",
+            "Musique",
             "Actualites",
-            "Technologie",
-            "Societe et culture",
-            "True crime",
+            "Religion et spiritualite",
             "Science",
+            "Societe et culture",
             "Sports",
+            "Technologie",
+            "True crime",
+            "TV et cinema",
         ),
     };
-    vec![
+    let mut categories = vec![
         Category {
             id: 1301,
             name: arts.to_string(),
@@ -6302,12 +6507,48 @@ fn apple_categories(language: Language) -> Vec<Category> {
             name: education.to_string(),
         },
         Category {
+            id: 1483,
+            name: fiction.to_string(),
+        },
+        Category {
+            id: 1511,
+            name: government.to_string(),
+        },
+        Category {
             id: 1512,
             name: health_fitness.to_string(),
         },
         Category {
+            id: 1487,
+            name: history.to_string(),
+        },
+        Category {
+            id: 1305,
+            name: kids_family.to_string(),
+        },
+        Category {
+            id: 1502,
+            name: leisure.to_string(),
+        },
+        Category {
+            id: 1310,
+            name: music.to_string(),
+        },
+        Category {
             id: 1489,
             name: news.to_string(),
+        },
+        Category {
+            id: 1314,
+            name: religion_spirituality.to_string(),
+        },
+        Category {
+            id: 1533,
+            name: science.to_string(),
+        },
+        Category {
+            id: 1324,
+            name: society_culture.to_string(),
         },
         Category {
             id: 1545,
@@ -6318,18 +6559,1002 @@ fn apple_categories(language: Language) -> Vec<Category> {
             name: technology.to_string(),
         },
         Category {
-            id: 1324,
-            name: society_culture.to_string(),
-        },
-        Category {
             id: 1488,
             name: true_crime.to_string(),
         },
         Category {
-            id: 1533,
-            name: science.to_string(),
+            id: 1309,
+            name: tv_film.to_string(),
         },
-    ]
+    ];
+    categories.extend(apple_subcategories(language));
+    categories
+}
+
+fn apple_subcategories(language: Language) -> Vec<Category> {
+    // Apple genre IDs from the official Podcasts genre tree.
+    // Subcategory names are localized per app language (ASCII only).
+    let subcategories: &[(u32, &str)] = match language {
+        Language::Italian => &[
+            // Arts
+            (1482, "Libri"),
+            (1402, "Design"),
+            (1459, "Moda e bellezza"),
+            (1306, "Cibo"),
+            (1405, "Arti performative"),
+            (1406, "Arti visive"),
+            // Business
+            (1410, "Carriere"),
+            (1493, "Imprenditoria"),
+            (1412, "Investimenti"),
+            (1491, "Management"),
+            (1492, "Marketing"),
+            (1494, "Non profit"),
+            // Comedy
+            (1496, "Interviste comiche"),
+            (1495, "Improvvisazione"),
+            (1497, "Stand-up"),
+            // Education
+            (1501, "Corsi"),
+            (1499, "Come fare"),
+            (1498, "Apprendimento lingue"),
+            (1500, "Crescita personale"),
+            // Fiction
+            (1486, "Narrativa comica"),
+            (1484, "Dramma"),
+            (1485, "Fantascienza"),
+            // Health & Fitness
+            (1513, "Salute alternativa"),
+            (1514, "Fitness"),
+            (1518, "Medicina"),
+            (1517, "Salute mentale"),
+            (1515, "Nutrizione"),
+            (1516, "Sessualita"),
+            // Kids & Family
+            (1519, "Educazione per bambini"),
+            (1521, "Genitorialita"),
+            (1522, "Animali domestici"),
+            (1520, "Storie per bambini"),
+            // Leisure
+            (1510, "Animazione e manga"),
+            (1503, "Automobili"),
+            (1504, "Aviazione"),
+            (1506, "Artigianato"),
+            (1507, "Giochi"),
+            (1505, "Hobby"),
+            (1508, "Casa e giardino"),
+            (1509, "Videogiochi"),
+            // Music
+            (1523, "Commenti musicali"),
+            (1524, "Storia della musica"),
+            (1525, "Interviste musicali"),
+            // News
+            (1490, "Notizie di economia"),
+            (1526, "Notizie quotidiane"),
+            (1531, "Notizie di spettacolo"),
+            (1530, "Commenti alle notizie"),
+            (1527, "Politica"),
+            (1529, "Notizie sportive"),
+            (1528, "Notizie tecnologiche"),
+            // Religion & Spirituality
+            (1438, "Buddismo"),
+            (1439, "Cristianesimo"),
+            (1463, "Induismo"),
+            (1440, "Islam"),
+            (1441, "Ebraismo"),
+            (1532, "Religione"),
+            (1444, "Spiritualita"),
+            // Science
+            (1538, "Astronomia"),
+            (1539, "Chimica"),
+            (1540, "Scienze della terra"),
+            (1541, "Scienze della vita"),
+            (1536, "Matematica"),
+            (1534, "Scienze naturali"),
+            (1537, "Natura"),
+            (1542, "Fisica"),
+            (1535, "Scienze sociali"),
+            // Society & Culture
+            (1543, "Documentari"),
+            (1302, "Diari personali"),
+            (1443, "Filosofia"),
+            (1320, "Luoghi e viaggi"),
+            (1544, "Relazioni"),
+            // Sports
+            (1549, "Baseball"),
+            (1548, "Pallacanestro"),
+            (1554, "Cricket"),
+            (1560, "Fantasy sport"),
+            (1547, "Football americano"),
+            (1553, "Golf"),
+            (1550, "Hockey"),
+            (1552, "Rugby"),
+            (1551, "Corsa"),
+            (1546, "Calcio"),
+            (1558, "Nuoto"),
+            (1556, "Tennis"),
+            (1557, "Pallavolo"),
+            (1559, "Natura selvaggia"),
+            (1555, "Lotta"),
+            // TV & Film
+            (1562, "Dopo show"),
+            (1564, "Storia del cinema"),
+            (1565, "Interviste sul cinema"),
+            (1563, "Recensioni di film"),
+            (1561, "Recensioni TV"),
+        ],
+        Language::English => &[
+            // Arts
+            (1482, "Books"),
+            (1402, "Design"),
+            (1459, "Fashion & Beauty"),
+            (1306, "Food"),
+            (1405, "Performing Arts"),
+            (1406, "Visual Arts"),
+            // Business
+            (1410, "Careers"),
+            (1493, "Entrepreneurship"),
+            (1412, "Investing"),
+            (1491, "Management"),
+            (1492, "Marketing"),
+            (1494, "Non-Profit"),
+            // Comedy
+            (1496, "Comedy Interviews"),
+            (1495, "Improv"),
+            (1497, "Stand-Up"),
+            // Education
+            (1501, "Courses"),
+            (1499, "How To"),
+            (1498, "Language Learning"),
+            (1500, "Self-Improvement"),
+            // Fiction
+            (1486, "Comedy Fiction"),
+            (1484, "Drama"),
+            (1485, "Science Fiction"),
+            // Health & Fitness
+            (1513, "Alternative Health"),
+            (1514, "Fitness"),
+            (1518, "Medicine"),
+            (1517, "Mental Health"),
+            (1515, "Nutrition"),
+            (1516, "Sexuality"),
+            // Kids & Family
+            (1519, "Education for Kids"),
+            (1521, "Parenting"),
+            (1522, "Pets & Animals"),
+            (1520, "Stories for Kids"),
+            // Leisure
+            (1510, "Animation & Manga"),
+            (1503, "Automotive"),
+            (1504, "Aviation"),
+            (1506, "Crafts"),
+            (1507, "Games"),
+            (1505, "Hobbies"),
+            (1508, "Home & Garden"),
+            (1509, "Video Games"),
+            // Music
+            (1523, "Music Commentary"),
+            (1524, "Music History"),
+            (1525, "Music Interviews"),
+            // News
+            (1490, "Business News"),
+            (1526, "Daily News"),
+            (1531, "Entertainment News"),
+            (1530, "News Commentary"),
+            (1527, "Politics"),
+            (1529, "Sports News"),
+            (1528, "Tech News"),
+            // Religion & Spirituality
+            (1438, "Buddhism"),
+            (1439, "Christianity"),
+            (1463, "Hinduism"),
+            (1440, "Islam"),
+            (1441, "Judaism"),
+            (1532, "Religion"),
+            (1444, "Spirituality"),
+            // Science
+            (1538, "Astronomy"),
+            (1539, "Chemistry"),
+            (1540, "Earth Sciences"),
+            (1541, "Life Sciences"),
+            (1536, "Mathematics"),
+            (1534, "Natural Sciences"),
+            (1537, "Nature"),
+            (1542, "Physics"),
+            (1535, "Social Sciences"),
+            // Society & Culture
+            (1543, "Documentary"),
+            (1302, "Personal Journals"),
+            (1443, "Philosophy"),
+            (1320, "Places & Travel"),
+            (1544, "Relationships"),
+            // Sports
+            (1549, "Baseball"),
+            (1548, "Basketball"),
+            (1554, "Cricket"),
+            (1560, "Fantasy Sports"),
+            (1547, "Football"),
+            (1553, "Golf"),
+            (1550, "Hockey"),
+            (1552, "Rugby"),
+            (1551, "Running"),
+            (1546, "Soccer"),
+            (1558, "Swimming"),
+            (1556, "Tennis"),
+            (1557, "Volleyball"),
+            (1559, "Wilderness"),
+            (1555, "Wrestling"),
+            // TV & Film
+            (1562, "After Shows"),
+            (1564, "Film History"),
+            (1565, "Film Interviews"),
+            (1563, "Film Reviews"),
+            (1561, "TV Reviews"),
+        ],
+        Language::Spanish => &[
+            // Arts
+            (1482, "Libros"),
+            (1402, "Diseno"),
+            (1459, "Moda y belleza"),
+            (1306, "Comida"),
+            (1405, "Artes escenicas"),
+            (1406, "Artes visuales"),
+            // Business
+            (1410, "Carreras"),
+            (1493, "Emprendimiento"),
+            (1412, "Inversion"),
+            (1491, "Gestion"),
+            (1492, "Marketing"),
+            (1494, "Sin fines de lucro"),
+            // Comedy
+            (1496, "Entrevistas de comedia"),
+            (1495, "Improvisacion"),
+            (1497, "Stand-up"),
+            // Education
+            (1501, "Cursos"),
+            (1499, "Como hacer"),
+            (1498, "Aprendizaje de idiomas"),
+            (1500, "Desarrollo personal"),
+            // Fiction
+            (1486, "Ficcion comica"),
+            (1484, "Drama"),
+            (1485, "Ciencia ficcion"),
+            // Health & Fitness
+            (1513, "Salud alternativa"),
+            (1514, "Fitness"),
+            (1518, "Medicina"),
+            (1517, "Salud mental"),
+            (1515, "Nutricion"),
+            (1516, "Sexualidad"),
+            // Kids & Family
+            (1519, "Educacion para ninos"),
+            (1521, "Crianza"),
+            (1522, "Mascotas y animales"),
+            (1520, "Cuentos para ninos"),
+            // Leisure
+            (1510, "Animacion y manga"),
+            (1503, "Automocion"),
+            (1504, "Aviacion"),
+            (1506, "Manualidades"),
+            (1507, "Juegos"),
+            (1505, "Pasatiempos"),
+            (1508, "Hogar y jardin"),
+            (1509, "Videojuegos"),
+            // Music
+            (1523, "Comentarios musicales"),
+            (1524, "Historia de la musica"),
+            (1525, "Entrevistas musicales"),
+            // News
+            (1490, "Noticias de negocios"),
+            (1526, "Noticias diarias"),
+            (1531, "Noticias de entretenimiento"),
+            (1530, "Comentario de noticias"),
+            (1527, "Politica"),
+            (1529, "Noticias deportivas"),
+            (1528, "Noticias de tecnologia"),
+            // Religion & Spirituality
+            (1438, "Budismo"),
+            (1439, "Cristianismo"),
+            (1463, "Hinduismo"),
+            (1440, "Islam"),
+            (1441, "Judaismo"),
+            (1532, "Religion"),
+            (1444, "Espiritualidad"),
+            // Science
+            (1538, "Astronomia"),
+            (1539, "Quimica"),
+            (1540, "Ciencias de la tierra"),
+            (1541, "Ciencias de la vida"),
+            (1536, "Matematicas"),
+            (1534, "Ciencias naturales"),
+            (1537, "Naturaleza"),
+            (1542, "Fisica"),
+            (1535, "Ciencias sociales"),
+            // Society & Culture
+            (1543, "Documentales"),
+            (1302, "Diarios personales"),
+            (1443, "Filosofia"),
+            (1320, "Lugares y viajes"),
+            (1544, "Relaciones"),
+            // Sports
+            (1549, "Beisbol"),
+            (1548, "Baloncesto"),
+            (1554, "Cricket"),
+            (1560, "Deportes fantasy"),
+            (1547, "Futbol americano"),
+            (1553, "Golf"),
+            (1550, "Hockey"),
+            (1552, "Rugby"),
+            (1551, "Correr"),
+            (1546, "Futbol"),
+            (1558, "Natacion"),
+            (1556, "Tenis"),
+            (1557, "Voleibol"),
+            (1559, "Naturaleza salvaje"),
+            (1555, "Lucha"),
+            // TV & Film
+            (1562, "After show"),
+            (1564, "Historia del cine"),
+            (1565, "Entrevistas de cine"),
+            (1563, "Criticas de cine"),
+            (1561, "Criticas de TV"),
+        ],
+        Language::Portuguese => &[
+            // Arts
+            (1482, "Livros"),
+            (1402, "Design"),
+            (1459, "Moda e beleza"),
+            (1306, "Comida"),
+            (1405, "Artes performaticas"),
+            (1406, "Artes visuais"),
+            // Business
+            (1410, "Carreiras"),
+            (1493, "Empreendedorismo"),
+            (1412, "Investimentos"),
+            (1491, "Gestao"),
+            (1492, "Marketing"),
+            (1494, "Sem fins lucrativos"),
+            // Comedy
+            (1496, "Entrevistas de comedia"),
+            (1495, "Improvisacao"),
+            (1497, "Stand-up"),
+            // Education
+            (1501, "Cursos"),
+            (1499, "Como fazer"),
+            (1498, "Aprendizagem de idiomas"),
+            (1500, "Desenvolvimento pessoal"),
+            // Fiction
+            (1486, "Ficcao comica"),
+            (1484, "Drama"),
+            (1485, "Ficcao cientifica"),
+            // Health & Fitness
+            (1513, "Saude alternativa"),
+            (1514, "Fitness"),
+            (1518, "Medicina"),
+            (1517, "Saude mental"),
+            (1515, "Nutricao"),
+            (1516, "Sexualidade"),
+            // Kids & Family
+            (1519, "Educacao para criancas"),
+            (1521, "Parentalidade"),
+            (1522, "Animais de estimacao"),
+            (1520, "Historias para criancas"),
+            // Leisure
+            (1510, "Animacao e manga"),
+            (1503, "Automotivo"),
+            (1504, "Aviacao"),
+            (1506, "Artesanato"),
+            (1507, "Jogos"),
+            (1505, "Hobbies"),
+            (1508, "Casa e jardim"),
+            (1509, "Jogos eletronicos"),
+            // Music
+            (1523, "Comentarios musicais"),
+            (1524, "Historia da musica"),
+            (1525, "Entrevistas musicais"),
+            // News
+            (1490, "Noticias de negocios"),
+            (1526, "Noticias diarias"),
+            (1531, "Noticias de entretenimento"),
+            (1530, "Comentarios de noticias"),
+            (1527, "Politica"),
+            (1529, "Noticias esportivas"),
+            (1528, "Noticias de tecnologia"),
+            // Religion & Spirituality
+            (1438, "Budismo"),
+            (1439, "Cristianismo"),
+            (1463, "Hinduismo"),
+            (1440, "Islam"),
+            (1441, "Judaismo"),
+            (1532, "Religiao"),
+            (1444, "Espiritualidade"),
+            // Science
+            (1538, "Astronomia"),
+            (1539, "Quimica"),
+            (1540, "Ciencias da terra"),
+            (1541, "Ciencias da vida"),
+            (1536, "Matematica"),
+            (1534, "Ciencias naturais"),
+            (1537, "Natureza"),
+            (1542, "Fisica"),
+            (1535, "Ciencias sociais"),
+            // Society & Culture
+            (1543, "Documentarios"),
+            (1302, "Diarios pessoais"),
+            (1443, "Filosofia"),
+            (1320, "Lugares e viagens"),
+            (1544, "Relacionamentos"),
+            // Sports
+            (1549, "Beisebol"),
+            (1548, "Basquete"),
+            (1554, "Cricket"),
+            (1560, "Esportes fantasy"),
+            (1547, "Futebol americano"),
+            (1553, "Golfe"),
+            (1550, "Hoquei"),
+            (1552, "Rugby"),
+            (1551, "Corrida"),
+            (1546, "Futebol"),
+            (1558, "Natacao"),
+            (1556, "Tenis"),
+            (1557, "Volei"),
+            (1559, "Natureza selvagem"),
+            (1555, "Luta"),
+            // TV & Film
+            (1562, "After show"),
+            (1564, "Historia do cinema"),
+            (1565, "Entrevistas de cinema"),
+            (1563, "Criticas de cinema"),
+            (1561, "Criticas de TV"),
+        ],
+        Language::Swedish => &[
+            // Arts
+            (1482, "Bocker"),
+            (1402, "Design"),
+            (1459, "Mode och skonhet"),
+            (1306, "Mat"),
+            (1405, "Scenkonst"),
+            (1406, "Visuell konst"),
+            // Business
+            (1410, "Karriar"),
+            (1493, "Entreprenorskap"),
+            (1412, "Investeringar"),
+            (1491, "Ledning"),
+            (1492, "Marknadsforing"),
+            (1494, "Ideell verksamhet"),
+            // Comedy
+            (1496, "Komedintervjuer"),
+            (1495, "Improvisation"),
+            (1497, "Stand-up"),
+            // Education
+            (1501, "Kurser"),
+            (1499, "Sa gor du"),
+            (1498, "Sprakinlarning"),
+            (1500, "Sjalvutveckling"),
+            // Fiction
+            (1486, "Komedifiktion"),
+            (1484, "Drama"),
+            (1485, "Science fiction"),
+            // Health & Fitness
+            (1513, "Alternativ halsa"),
+            (1514, "Fitness"),
+            (1518, "Medicin"),
+            (1517, "Mental halsa"),
+            (1515, "Naringslara"),
+            (1516, "Sexualitet"),
+            // Kids & Family
+            (1519, "Utbildning for barn"),
+            (1521, "Foraldraskap"),
+            (1522, "Husdjur och djur"),
+            (1520, "Berattelser for barn"),
+            // Leisure
+            (1510, "Animation och manga"),
+            (1503, "Bil"),
+            (1504, "Flyg"),
+            (1506, "Hantverk"),
+            (1507, "Spel"),
+            (1505, "Hobbyer"),
+            (1508, "Hem och tradgard"),
+            (1509, "Datorspel"),
+            // Music
+            (1523, "Musikkommentarer"),
+            (1524, "Musikhistoria"),
+            (1525, "Musikintervjuer"),
+            // News
+            (1490, "Ekonominyheter"),
+            (1526, "Dagens nyheter"),
+            (1531, "Nojesnyheter"),
+            (1530, "Nyhetskommentarer"),
+            (1527, "Politik"),
+            (1529, "Sportnyheter"),
+            (1528, "Tekniknyheter"),
+            // Religion & Spirituality
+            (1438, "Buddhism"),
+            (1439, "Kristendom"),
+            (1463, "Hinduism"),
+            (1440, "Islam"),
+            (1441, "Judendom"),
+            (1532, "Religion"),
+            (1444, "Andlighet"),
+            // Science
+            (1538, "Astronomi"),
+            (1539, "Kemi"),
+            (1540, "Geovetenskaper"),
+            (1541, "Livsvetenskaper"),
+            (1536, "Matematik"),
+            (1534, "Naturvetenskap"),
+            (1537, "Natur"),
+            (1542, "Fysik"),
+            (1535, "Samhallsvetenskaper"),
+            // Society & Culture
+            (1543, "Dokumentar"),
+            (1302, "Personliga dagbocker"),
+            (1443, "Filosofi"),
+            (1320, "Platser och resor"),
+            (1544, "Relationer"),
+            // Sports
+            (1549, "Baseboll"),
+            (1548, "Basket"),
+            (1554, "Cricket"),
+            (1560, "Fantasisport"),
+            (1547, "Amerikansk fotboll"),
+            (1553, "Golf"),
+            (1550, "Hockey"),
+            (1552, "Rugby"),
+            (1551, "Lopning"),
+            (1546, "Fotboll"),
+            (1558, "Simning"),
+            (1556, "Tennis"),
+            (1557, "Volleyboll"),
+            (1559, "Vildmark"),
+            (1555, "Brotning"),
+            // TV & Film
+            (1562, "Eftershow"),
+            (1564, "Filmhistoria"),
+            (1565, "Filmintervjuer"),
+            (1563, "Filmrecensioner"),
+            (1561, "TV-recensioner"),
+        ],
+        Language::Vietnamese => &[
+            // Arts
+            (1482, "Sach"),
+            (1402, "Thiet ke"),
+            (1459, "Thoi trang va lam dep"),
+            (1306, "Am thuc"),
+            (1405, "Nghe thuat bieu dien"),
+            (1406, "Nghe thuat thi giac"),
+            // Business
+            (1410, "Nghe nghiep"),
+            (1493, "Khoi nghiep"),
+            (1412, "Dau tu"),
+            (1491, "Quan ly"),
+            (1492, "Tiep thi"),
+            (1494, "Phi loi nhuan"),
+            // Comedy
+            (1496, "Phong van hai"),
+            (1495, "Ung tac"),
+            (1497, "Hai doc thoai"),
+            // Education
+            (1501, "Khoa hoc"),
+            (1499, "Cach lam"),
+            (1498, "Hoc ngon ngu"),
+            (1500, "Phat trien ban than"),
+            // Fiction
+            (1486, "Tieu thuyet hai"),
+            (1484, "Drama"),
+            (1485, "Khoa hoc vien tuong"),
+            // Health & Fitness
+            (1513, "Suc khoe thay the"),
+            (1514, "The hinh"),
+            (1518, "Y hoc"),
+            (1517, "Suc khoe tam than"),
+            (1515, "Dinh duong"),
+            (1516, "Tinh duc"),
+            // Kids & Family
+            (1519, "Giao duc tre em"),
+            (1521, "Nuoi day con"),
+            (1522, "Thu cung va dong vat"),
+            (1520, "Truyen cho tre"),
+            // Leisure
+            (1510, "Hoat hinh va manga"),
+            (1503, "O to"),
+            (1504, "Hang khong"),
+            (1506, "Thu cong"),
+            (1507, "Tro choi"),
+            (1505, "So thich"),
+            (1508, "Nha va vuon"),
+            (1509, "Tro choi dien tu"),
+            // Music
+            (1523, "Binh luan am nhac"),
+            (1524, "Lich su am nhac"),
+            (1525, "Phong van am nhac"),
+            // News
+            (1490, "Tin kinh doanh"),
+            (1526, "Tin hang ngay"),
+            (1531, "Tin giai tri"),
+            (1530, "Binh luan thoi su"),
+            (1527, "Chinh tri"),
+            (1529, "Tin the thao"),
+            (1528, "Tin cong nghe"),
+            // Religion & Spirituality
+            (1438, "Phat giao"),
+            (1439, "Kito giao"),
+            (1463, "An do giao"),
+            (1440, "Hoi giao"),
+            (1441, "Do thai"),
+            (1532, "Ton giao"),
+            (1444, "Tam linh"),
+            // Science
+            (1538, "Thien van hoc"),
+            (1539, "Hoa hoc"),
+            (1540, "Khoa hoc trai dat"),
+            (1541, "Khoa hoc doi song"),
+            (1536, "Toan hoc"),
+            (1534, "Khoa hoc tu nhien"),
+            (1537, "Thien nhien"),
+            (1542, "Vat ly"),
+            (1535, "Khoa hoc xa hoi"),
+            // Society & Culture
+            (1543, "Tai lieu"),
+            (1302, "Nhat ky ca nhan"),
+            (1443, "Triet hoc"),
+            (1320, "Dia diem va du lich"),
+            (1544, "Moi quan he"),
+            // Sports
+            (1549, "Bong chay"),
+            (1548, "Bong ro"),
+            (1554, "Cricket"),
+            (1560, "The thao ao"),
+            (1547, "Bong bau duc"),
+            (1553, "Golf"),
+            (1550, "Hockey"),
+            (1552, "Rugby"),
+            (1551, "Chay bo"),
+            (1546, "Bong da"),
+            (1558, "Boi"),
+            (1556, "Quan vot"),
+            (1557, "Bong chuyen"),
+            (1559, "Hoang da"),
+            (1555, "Vat"),
+            // TV & Film
+            (1562, "After show"),
+            (1564, "Lich su dien anh"),
+            (1565, "Phong van dien anh"),
+            (1563, "Danh gia phim"),
+            (1561, "Danh gia TV"),
+        ],
+        Language::Czech => &[
+            // Arts
+            (1482, "Knihy"),
+            (1402, "Design"),
+            (1459, "Moda a krasa"),
+            (1306, "Jidlo"),
+            (1405, "Scenicka umeni"),
+            (1406, "Vytvarne umeni"),
+            // Business
+            (1410, "Kariera"),
+            (1493, "Podnikani"),
+            (1412, "Investovani"),
+            (1491, "Rizeni"),
+            (1492, "Marketing"),
+            (1494, "Neziskove organizace"),
+            // Comedy
+            (1496, "Komedialni rozhovory"),
+            (1495, "Improvizace"),
+            (1497, "Stand-up"),
+            // Education
+            (1501, "Kurzy"),
+            (1499, "Jak na to"),
+            (1498, "Vyuka jazyku"),
+            (1500, "Sebezlepseni"),
+            // Fiction
+            (1486, "Komedialni fikce"),
+            (1484, "Drama"),
+            (1485, "Sci-fi"),
+            // Health & Fitness
+            (1513, "Alternativni zdravi"),
+            (1514, "Fitness"),
+            (1518, "Medicina"),
+            (1517, "Du sevni zdravi"),
+            (1515, "Vyziva"),
+            (1516, "Sexualita"),
+            // Kids & Family
+            (1519, "Vzdelavani pro deti"),
+            (1521, "Rodicovstvi"),
+            (1522, "Domaci mazlicci a zvirata"),
+            (1520, "Pribehy pro deti"),
+            // Leisure
+            (1510, "Animace a manga"),
+            (1503, "Automobily"),
+            (1504, "Letectvi"),
+            (1506, "Remesla"),
+            (1507, "Hry"),
+            (1505, "Zajmy"),
+            (1508, "Dum a zahrada"),
+            (1509, "Videohry"),
+            // Music
+            (1523, "Hudebni komentar"),
+            (1524, "Dejiny hudby"),
+            (1525, "Hudebni rozhovory"),
+            // News
+            (1490, "Byznysove zpravy"),
+            (1526, "Denni zpravy"),
+            (1531, "Zpravy ze zabavy"),
+            (1530, "Komentare ke zpravam"),
+            (1527, "Politika"),
+            (1529, "Sportovni zpravy"),
+            (1528, "Technologicke zpravy"),
+            // Religion & Spirituality
+            (1438, "Buddhismus"),
+            (1439, "Krestanstvi"),
+            (1463, "Hinduismus"),
+            (1440, "Islam"),
+            (1441, "Judaismus"),
+            (1532, "Nabozenstvi"),
+            (1444, "Spiritualita"),
+            // Science
+            (1538, "Astronomie"),
+            (1539, "Chemie"),
+            (1540, "Vedy o Zemi"),
+            (1541, "Zivotni vedy"),
+            (1536, "Matematika"),
+            (1534, "Prirodni vedy"),
+            (1537, "Priroda"),
+            (1542, "Fyzika"),
+            (1535, "Spolecenske vedy"),
+            // Society & Culture
+            (1543, "Dokument"),
+            (1302, "Osobni deniky"),
+            (1443, "Filozofie"),
+            (1320, "Mista a cestovani"),
+            (1544, "Vztahy"),
+            // Sports
+            (1549, "Baseball"),
+            (1548, "Basketbal"),
+            (1554, "Kriket"),
+            (1560, "Fantasy sporty"),
+            (1547, "Americky fotbal"),
+            (1553, "Golf"),
+            (1550, "Hokej"),
+            (1552, "Ragby"),
+            (1551, "Beh"),
+            (1546, "Fotbal"),
+            (1558, "Plavani"),
+            (1556, "Tenis"),
+            (1557, "Volejbal"),
+            (1559, "Divocina"),
+            (1555, "Zapas"),
+            // TV & Film
+            (1562, "After show"),
+            (1564, "Dejiny filmu"),
+            (1565, "Filmove rozhovory"),
+            (1563, "Filmove recenze"),
+            (1561, "Recenze TV"),
+        ],
+        Language::Polish => &[
+            // Arts
+            (1482, "Ksiazki"),
+            (1402, "Design"),
+            (1459, "Moda i uroda"),
+            (1306, "Jedzenie"),
+            (1405, "Sztuki widowiskowe"),
+            (1406, "Sztuki wizualne"),
+            // Business
+            (1410, "Kariera"),
+            (1493, "Przedsiebiorczosc"),
+            (1412, "Inwestowanie"),
+            (1491, "Zarzadzanie"),
+            (1492, "Marketing"),
+            (1494, "Non-profit"),
+            // Comedy
+            (1496, "Wywiady komediowe"),
+            (1495, "Improwizacja"),
+            (1497, "Stand-up"),
+            // Education
+            (1501, "Kursy"),
+            (1499, "Jak to zrobic"),
+            (1498, "Nauka jezykow"),
+            (1500, "Rozwoj osobisty"),
+            // Fiction
+            (1486, "Fikcja komediowa"),
+            (1484, "Dramat"),
+            (1485, "Science fiction"),
+            // Health & Fitness
+            (1513, "Zdrowie alternatywne"),
+            (1514, "Fitness"),
+            (1518, "Medycyna"),
+            (1517, "Zdrowie psychiczne"),
+            (1515, "Zywienie"),
+            (1516, "Seksualnosc"),
+            // Kids & Family
+            (1519, "Edukacja dla dzieci"),
+            (1521, "Rodzicielstwo"),
+            (1522, "Zwierzeta domowe"),
+            (1520, "Bajki dla dzieci"),
+            // Leisure
+            (1510, "Animacja i manga"),
+            (1503, "Motoryzacja"),
+            (1504, "Lotnictwo"),
+            (1506, "Rekodzielo"),
+            (1507, "Gry"),
+            (1505, "Hobby"),
+            (1508, "Dom i ogrod"),
+            (1509, "Gry wideo"),
+            // Music
+            (1523, "Komentarze muzyczne"),
+            (1524, "Historia muzyki"),
+            (1525, "Wywiady muzyczne"),
+            // News
+            (1490, "Wiadomosci biznesowe"),
+            (1526, "Wiadomosci dnia"),
+            (1531, "Wiadomosci rozrywkowe"),
+            (1530, "Komentarze do wiadomosci"),
+            (1527, "Polityka"),
+            (1529, "Wiadomosci sportowe"),
+            (1528, "Wiadomosci technologiczne"),
+            // Religion & Spirituality
+            (1438, "Buddyzm"),
+            (1439, "Chrzescijanstwo"),
+            (1463, "Hinduizm"),
+            (1440, "Islam"),
+            (1441, "Judaizm"),
+            (1532, "Religia"),
+            (1444, "Duchowosc"),
+            // Science
+            (1538, "Astronomia"),
+            (1539, "Chemia"),
+            (1540, "Nauki o Ziemi"),
+            (1541, "Nauki o zyciu"),
+            (1536, "Matematyka"),
+            (1534, "Nauki przyrodnicze"),
+            (1537, "Natura"),
+            (1542, "Fizyka"),
+            (1535, "Nauki spoleczne"),
+            // Society & Culture
+            (1543, "Dokument"),
+            (1302, "Dzienniki osobiste"),
+            (1443, "Filozofia"),
+            (1320, "Miejsca i podroze"),
+            (1544, "Relacje"),
+            // Sports
+            (1549, "Baseball"),
+            (1548, "Koszykowka"),
+            (1554, "Krykiet"),
+            (1560, "Fantasy sport"),
+            (1547, "Futbol amerykanski"),
+            (1553, "Golf"),
+            (1550, "Hokej"),
+            (1552, "Rugby"),
+            (1551, "Bieganie"),
+            (1546, "Pilka nozna"),
+            (1558, "Plywanie"),
+            (1556, "Tenis"),
+            (1557, "Siatkowka"),
+            (1559, "Dzicz"),
+            (1555, "Zapasy"),
+            // TV & Film
+            (1562, "After show"),
+            (1564, "Historia filmu"),
+            (1565, "Wywiady filmowe"),
+            (1563, "Recenzje filmowe"),
+            (1561, "Recenzje TV"),
+        ],
+        Language::French => &[
+            // Arts
+            (1482, "Livres"),
+            (1402, "Design"),
+            (1459, "Mode et beaute"),
+            (1306, "Cuisine"),
+            (1405, "Arts du spectacle"),
+            (1406, "Arts visuels"),
+            // Business
+            (1410, "Carrieres"),
+            (1493, "Entrepreneuriat"),
+            (1412, "Investissement"),
+            (1491, "Gestion"),
+            (1492, "Marketing"),
+            (1494, "Sans but lucratif"),
+            // Comedy
+            (1496, "Interviews humoristiques"),
+            (1495, "Improvisation"),
+            (1497, "Stand-up"),
+            // Education
+            (1501, "Cours"),
+            (1499, "Comment faire"),
+            (1498, "Apprentissage des langues"),
+            (1500, "Developpement personnel"),
+            // Fiction
+            (1486, "Fiction comique"),
+            (1484, "Drame"),
+            (1485, "Science-fiction"),
+            // Health & Fitness
+            (1513, "Sante alternative"),
+            (1514, "Fitness"),
+            (1518, "Medecine"),
+            (1517, "Sante mentale"),
+            (1515, "Nutrition"),
+            (1516, "Sexualite"),
+            // Kids & Family
+            (1519, "Education pour enfants"),
+            (1521, "Parentalite"),
+            (1522, "Animaux de compagnie"),
+            (1520, "Histoires pour enfants"),
+            // Leisure
+            (1510, "Animation et manga"),
+            (1503, "Automobile"),
+            (1504, "Aviation"),
+            (1506, "Artisanat"),
+            (1507, "Jeux"),
+            (1505, "Loisirs"),
+            (1508, "Maison et jardin"),
+            (1509, "Jeux video"),
+            // Music
+            (1523, "Commentaires musicaux"),
+            (1524, "Histoire de la musique"),
+            (1525, "Interviews musicales"),
+            // News
+            (1490, "Actualites business"),
+            (1526, "Actualites quotidiennes"),
+            (1531, "Actualites divertissement"),
+            (1530, "Commentaires sur l'actualite"),
+            (1527, "Politique"),
+            (1529, "Actualites sportives"),
+            (1528, "Actualites tech"),
+            // Religion & Spirituality
+            (1438, "Bouddhisme"),
+            (1439, "Christianisme"),
+            (1463, "Hindouisme"),
+            (1440, "Islam"),
+            (1441, "Judaisme"),
+            (1532, "Religion"),
+            (1444, "Spiritualite"),
+            // Science
+            (1538, "Astronomie"),
+            (1539, "Chimie"),
+            (1540, "Sciences de la Terre"),
+            (1541, "Sciences de la vie"),
+            (1536, "Mathematiques"),
+            (1534, "Sciences naturelles"),
+            (1537, "Nature"),
+            (1542, "Physique"),
+            (1535, "Sciences sociales"),
+            // Society & Culture
+            (1543, "Documentaire"),
+            (1302, "Journaux personnels"),
+            (1443, "Philosophie"),
+            (1320, "Lieux et voyages"),
+            (1544, "Relations"),
+            // Sports
+            (1549, "Baseball"),
+            (1548, "Basket-ball"),
+            (1554, "Cricket"),
+            (1560, "Sports fantasy"),
+            (1547, "Football americain"),
+            (1553, "Golf"),
+            (1550, "Hockey"),
+            (1552, "Rugby"),
+            (1551, "Course a pied"),
+            (1546, "Football"),
+            (1558, "Natation"),
+            (1556, "Tennis"),
+            (1557, "Volleyball"),
+            (1559, "Nature sauvage"),
+            (1555, "Lutte"),
+            // TV & Film
+            (1562, "After show"),
+            (1564, "Histoire du cinema"),
+            (1565, "Interviews de cinema"),
+            (1563, "Critiques de films"),
+            (1561, "Critiques TV"),
+        ],
+    };
+    subcategories
+        .iter()
+        .map(|(id, name)| Category {
+            id: *id,
+            name: (*name).to_string(),
+        })
+        .collect()
 }
 
 fn apple_search_by_category(genre_id: u32, country: &str, limit: u32) -> String {
@@ -6479,7 +7704,7 @@ fn add_podcastindex_auth_headers(
     let mut hasher = Sha1::new();
     hasher.update(format!("{api_key}{api_secret}{auth_date}").as_bytes());
     let hash = format!("{:x}", hasher.finalize());
-    rb.header("User-Agent", "Novapad")
+    rb.header("User-Agent", "Sonarpad")
         .header("X-Auth-Date", auth_date)
         .header("X-Auth-Key", api_key)
         .header("Authorization", hash)

@@ -2333,9 +2333,9 @@ pub unsafe fn update_window_title(hwnd: HWND) {
         if let Some(doc) = state.docs.get(state.current) {
             let display_title = &doc.title;
             let base_title = if display_title.trim().is_empty() {
-                "Novapad".to_string()
+                "Sonarpad".to_string()
             } else {
-                format!("{display_title} - Novapad")
+                format!("{display_title} - Sonarpad")
             };
             let full_title = apply_modified_marker(
                 &base_title,
@@ -2823,7 +2823,7 @@ pub unsafe fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> 
             let pdf_title = path
                 .file_stem()
                 .and_then(|s| s.to_str())
-                .unwrap_or("Novapad Document");
+                .unwrap_or("Sonarpad Document");
             if let Err(message) =
                 crate::file_handler::write_pdf_text(&path, pdf_title, &text, language)
             {

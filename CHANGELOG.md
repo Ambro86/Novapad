@@ -20,7 +20,7 @@ New features
 • Added "Show description" for podcast episodes in the context menu.
 • Added support for extended audio/video formats via FFmpeg: mkv, avi, mov, m4v, webm, mpg, ts, wmv, flv, vob, 3gp, flac, ogg, wma, aiff.
 • Added synchronized subtitle reading support (srt, vtt, ass, sub, sbv, lrc, smi) with NVDA or selected voice. The program searches for a subtitle file with the same name as the media file. Added "Import subtitles" and "Remove subtitles" options in the Playback menu for files with different names.
-• Added file associations for all new supported audio/video formats in the "Open with Novapad" context menu.
+• Added file associations for all new supported audio/video formats in the "Open with Sonarpad" context menu.
 • Added pitch adjustment setting for any file.
 • Added option in General settings to enable or disable anonymous error reports. Added a menu item in Help to create a diagnostic ZIP file.
 • Added option to use a different voice for dialogues, both for live reading and audiobook creation.
@@ -119,7 +119,7 @@ New features
 • Added a voice preview button after the volume combo.
 • Added regex find and replace (Notepad++ style).
 • Added RSS import from OPML and TXT files.
-• Added an option to enable "Open with Novapad" in File Explorer, including portable builds.
+• Added an option to enable "Open with Sonarpad" in File Explorer, including portable builds.
 Improvements
 • Improved voice speed/pitch/volume selection, respecting TTS max limits.
 • Various RSS improvements to download all articles without moving NVDA focus during updates.
@@ -150,7 +150,7 @@ Improvements
 • Added confirmation dialogs for important actions (e.g., remove duplicate lines, remove end-of-line hyphens, remove all bookmarks in the current file). No dialog is shown when the action does not apply.
 • Added the ability to delete RSS feeds/sites from the library by selecting them and pressing Delete.
 • Added a context menu in the RSS window to edit or delete RSS feeds/sites.
-• Removed the setting to move settings to the current folder; the app now handles this automatically based on location (if the exe folder is named "novapad portable" or the exe is on a removable drive, settings go to the exe folder in `config`, otherwise `%APPDATA%\\Novapad`, with fallback to the exe `config` if the preferred folder is not writable).
+• Removed the setting to move settings to the current folder; the app now handles this automatically based on location (if the exe folder is named "sonarpad portable" or the exe is on a removable drive, settings go to the exe folder in `config`, otherwise `%APPDATA%\\Sonarpad`, with fallback to the exe `config` if the preferred folder is not writable).
 
 Version 0.5.7 - 2026-01-05
 New features
@@ -202,7 +202,7 @@ Improvements
 
 ## 0.5.2 - 2026-01-01
 - Added a changelog.
-- Added open-with-Novapad options and file associations for supported files during installation.
+- Added open-with-Sonarpad options and file associations for supported files during installation.
 - Improved message localization (errors, dialogs, audiobook export).
 - Added part selection when using "Split audiobook based on text", with a "Require the marker at line start" option.
 - Added YouTube transcript import with language selection, timestamp option, and improved focus handling.

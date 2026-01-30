@@ -1,17 +1,17 @@
 ﻿Donationer
 
-Novapad är ett program som ursprungligen skapades för att möta personliga behov, men som med tiden har vuxit alltmer. Utvecklingen kräver ständigt arbete för att förbättra funktioner, åtgärda buggar, utforska nya idéer och noggrant testa varje del av programmet.
+Sonarpad är ett program som ursprungligen skapades för att möta personliga behov, men som med tiden har vuxit alltmer. Utvecklingen kräver ständigt arbete för att förbättra funktioner, åtgärda buggar, utforska nya idéer och noggrant testa varje del av programmet.
 Om du tycker att programmet är användbart och vill stödja dess utveckling kan du göra en donation.
 
 PayPal
 Du kan donera via PayPal via följande länk:
 https://www.paypal.me/ambrogio86
-Om möjligt, ange "Novapad" som referens.
+Om möjligt, ange "Sonarpad" som referens.
 
 Banköverföring
 Det går även att bidra via banköverföring till kontot som tillhör Ambrogio Riili.
 IBAN: IT77W0306901020100000064149
-Om möjligt, ange en tydlig referens, till exempel "Novapad".
+Om möjligt, ange en tydlig referens, till exempel "Sonarpad".
 
 Alla som väljer att stödja projektet kommer att tackas i programmet och på GitHub-repositoryt, i sektionen för understödjare, såvida inte anonymitet begärs eller ett smeknamn används.
 

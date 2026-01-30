@@ -1,13 +1,13 @@
 [package]
-name = "novapad"
+name = "sonarpad"
 version = "0.6.3"
 edition = "2024"
 authors = ["Ambrogio Riili"]
 description = "A modern Notepad with PDF, DOCX, XLS and EPUB support and TTS capabilities."
 
 [package.metadata.packager]
-product_name = "Novapad"
-identifier = "com.ambrogioriili.novapad"
+product_name = "Sonarpad"
+identifier = "com.ambrogioriili.sonarpad"
 authors = ["Ambrogio Riili"]
 publisher = "Ambrogio Riili"
 description = "A modern Notepad with PDF, DOCX, XLS and EPUB support and TTS capabilities."
@@ -15,53 +15,53 @@ formats = ["nsis", "wix"]
 
 [[package.metadata.packager.file_associations]]
 extensions = ["txt"]
-description = "Novapad Text Document"
-name = "Novapad Text Document"
+description = "Sonarpad Text Document"
+name = "Sonarpad Text Document"
 
 [[package.metadata.packager.file_associations]]
 extensions = ["doc", "docx"]
-description = "Novapad Word Document"
-name = "Novapad Word Document"
+description = "Sonarpad Word Document"
+name = "Sonarpad Word Document"
 
 [[package.metadata.packager.file_associations]]
 extensions = ["odt"]
-description = "Novapad OpenDocument Text"
-name = "Novapad OpenDocument Text"
+description = "Sonarpad OpenDocument Text"
+name = "Sonarpad OpenDocument Text"
 
 [[package.metadata.packager.file_associations]]
 extensions = ["epub"]
-description = "Novapad EPUB Document"
-name = "Novapad EPUB Document"
+description = "Sonarpad EPUB Document"
+name = "Sonarpad EPUB Document"
 
 [[package.metadata.packager.file_associations]]
 extensions = ["pdf"]
-description = "Novapad PDF Document"
-name = "Novapad PDF Document"
+description = "Sonarpad PDF Document"
+name = "Sonarpad PDF Document"
 
 [[package.metadata.packager.file_associations]]
 extensions = ["xls"]
-description = "Novapad Excel Document"
-name = "Novapad Excel Document"
+description = "Sonarpad Excel Document"
+name = "Sonarpad Excel Document"
 
 [[package.metadata.packager.file_associations]]
 extensions = ["html", "htm"]
-description = "Novapad HTML Document"
-name = "Novapad HTML Document"
+description = "Sonarpad HTML Document"
+name = "Sonarpad HTML Document"
 
 [[package.metadata.packager.file_associations]]
 extensions = ["ppt", "pptx"]
-description = "Novapad PowerPoint Document"
-name = "Novapad PowerPoint Document"
+description = "Sonarpad PowerPoint Document"
+name = "Sonarpad PowerPoint Document"
 
 [[package.metadata.packager.file_associations]]
 extensions = ["odp"]
-description = "Novapad OpenDocument Presentation"
-name = "Novapad OpenDocument Presentation"
+description = "Sonarpad OpenDocument Presentation"
+name = "Sonarpad OpenDocument Presentation"
 
 [[package.metadata.packager.file_associations]]
 extensions = ["py", "java", "js", "rb", "pl", "php", "lua", "ps1", "sh"]
-description = "Novapad Programming File"
-name = "Novapad Programming File"
+description = "Sonarpad Programming File"
+name = "Sonarpad Programming File"
 
 [[package.metadata.packager.file_associations]]
 extensions = [
@@ -92,13 +92,13 @@ extensions = [
   "m4b",
   "wav",
 ]
-description = "Novapad Audio File"
-name = "Novapad Audio File"
+description = "Sonarpad Audio File"
+name = "Sonarpad Audio File"
 
 [[package.metadata.packager.file_associations]]
 extensions = ["md"]
-description = "Novapad Markdown Document"
-name = "Novapad Markdown Document"
+description = "Sonarpad Markdown Document"
+name = "Sonarpad Markdown Document"
 
 [[package.metadata.packager.file_associations]]
 extensions = ["gdoc", "gsheet", "gslides"]
@@ -106,7 +106,7 @@ description = "Google Drive Shortcut"
 name = "Google Drive Shortcut"
 
 [[package.metadata.packager.binaries]]
-path = "novapad"
+path = "sonarpad"
 main = true
 
 [package.metadata.packager.nsis]

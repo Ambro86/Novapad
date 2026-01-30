@@ -24,8 +24,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{PCWSTR, w};
 
-const DICTIONARY_CLASS_NAME: &str = "NovapadDictionary";
-const DICTIONARY_ENTRY_CLASS_NAME: &str = "NovapadDictionaryEntry";
+const DICTIONARY_CLASS_NAME: &str = "SonarpadDictionary";
+const DICTIONARY_ENTRY_CLASS_NAME: &str = "SonarpadDictionaryEntry";
 
 const DICT_ID_LIST: usize = 9101;
 const DICT_ID_ADD: usize = 9102;

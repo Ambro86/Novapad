@@ -14,7 +14,7 @@ Grabar audiolibro: Crear un archivo MP3 desde el texto actual (Ctrl+R).
 Grabar podcast: Grabar un podcast desde microfono y/o audio del sistema (Ctrl+Shift+R).
 
 Audiolibros MP3:
-Cuando abres un archivo MP3, Novapad actua como reproductor de audio.
+Cuando abres un archivo MP3, Sonarpad actua como reproductor de audio.
 Controles de teclado:
 - ESPACIO: Reproducir / Pausar.
 - FLECHA DERECHA: Avanzar 1 minuto.

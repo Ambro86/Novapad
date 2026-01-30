@@ -18,7 +18,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{PCWSTR, w};
 
-const HELP_CLASS_NAME: &str = "NovapadHelp";
+const HELP_CLASS_NAME: &str = "SonarpadHelp";
 const HELP_ID_OK: usize = 7003;
 const DONATIONS_IT: &str = include_str!("../../donations_it.txt");
 const DONATIONS_EN: &str = include_str!("../../donations_en.txt");

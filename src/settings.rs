@@ -483,8 +483,160 @@ fn is_portable_folder(exe_dir: &std::path::Path) -> bool {
     exe_dir
         .file_name()
         .and_then(|n| n.to_str())
-        .map(|n| n.eq_ignore_ascii_case("novapad portable"))
+        .map(|n| {
+            n.eq_ignore_ascii_case("sonarpad portable")
+                || n.eq_ignore_ascii_case("novapad portable")
+        })
         .unwrap_or(false)
+}
+
+#[cfg(not(feature = "standalone"))]
+fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    let entries = std::fs::read_dir(src)?;
+    for entry_result in entries {
+        let entry = match entry_result {
+            Ok(entry) => entry,
+            Err(e) => {
+                crate::log_debug(&format!(
+                    "settings_migrate_read_dir_entry_failed {}: {}",
+                    src.display(),
+                    e
+                ));
+                continue;
+            }
+        };
+        let file_type = match entry.file_type() {
+            Ok(file_type) => file_type,
+            Err(e) => {
+                crate::log_debug(&format!(
+                    "settings_migrate_file_type_failed {}: {}",
+                    entry.path().display(),
+                    e
+                ));
+                continue;
+            }
+        };
+        let target = dst.join(entry.file_name());
+        if file_type.is_dir() {
+            if let Err(e) = std::fs::create_dir_all(&target) {
+                crate::log_debug(&format!(
+                    "settings_migrate_create_dir_failed {}: {}",
+                    target.display(),
+                    e
+                ));
+                continue;
+            }
+            if let Err(e) = copy_dir_recursive(&entry.path(), &target) {
+                crate::log_debug(&format!(
+                    "settings_migrate_copy_dir_failed {} -> {}: {}",
+                    entry.path().display(),
+                    target.display(),
+                    e
+                ));
+            }
+        } else if file_type.is_file() {
+            if let Err(e) = std::fs::copy(entry.path(), &target) {
+                crate::log_debug(&format!(
+                    "settings_migrate_copy_file_failed {} -> {}: {}",
+                    entry.path().display(),
+                    target.display(),
+                    e
+                ));
+            }
+        } else {
+            crate::log_debug(&format!(
+                "settings_migrate_skip_special {}",
+                entry.path().display()
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(not(feature = "standalone"))]
+fn migrate_legacy_settings_dir(legacy_dir: &std::path::Path, new_dir: &std::path::Path) {
+    if new_dir.exists() || !legacy_dir.exists() {
+        return;
+    }
+    match std::fs::rename(legacy_dir, new_dir) {
+        Ok(_) => {
+            crate::log_debug(&format!(
+                "settings_migrate_renamed {} -> {}",
+                legacy_dir.display(),
+                new_dir.display()
+            ));
+        }
+        Err(e) => {
+            crate::log_debug(&format!(
+                "settings_migrate_rename_failed {} -> {}: {}",
+                legacy_dir.display(),
+                new_dir.display(),
+                e
+            ));
+            if let Err(e) = std::fs::create_dir_all(new_dir) {
+                crate::log_debug(&format!(
+                    "settings_migrate_create_dir_failed {}: {}",
+                    new_dir.display(),
+                    e
+                ));
+                return;
+            }
+            if let Err(e) = copy_dir_recursive(legacy_dir, new_dir) {
+                crate::log_debug(&format!(
+                    "settings_migrate_copy_failed {} -> {}: {}",
+                    legacy_dir.display(),
+                    new_dir.display(),
+                    e
+                ));
+            }
+        }
+    }
+}
+
+#[cfg(not(feature = "standalone"))]
+fn migrate_legacy_log_files(settings_dir: &std::path::Path) {
+    let legacy_log = settings_dir.join("Novapad.log");
+    let new_log = settings_dir.join("Sonarpad.log");
+    if legacy_log.exists() && !new_log.exists() {
+        match std::fs::rename(&legacy_log, &new_log) {
+            Ok(_) => {
+                crate::log_debug(&format!(
+                    "settings_migrate_log_renamed {} -> {}",
+                    legacy_log.display(),
+                    new_log.display()
+                ));
+            }
+            Err(e) => {
+                crate::log_debug(&format!(
+                    "settings_migrate_log_rename_failed {} -> {}: {}",
+                    legacy_log.display(),
+                    new_log.display(),
+                    e
+                ));
+                if let Err(e) = std::fs::copy(&legacy_log, &new_log) {
+                    crate::log_debug(&format!(
+                        "settings_migrate_log_copy_failed {} -> {}: {}",
+                        legacy_log.display(),
+                        new_log.display(),
+                        e
+                    ));
+                }
+            }
+        }
+    }
+    let legacy_lock = settings_dir.join("Novapad.log.lock");
+    let new_lock = settings_dir.join("Sonarpad.log.lock");
+    if legacy_lock.exists()
+        && !new_lock.exists()
+        && let Err(e) = std::fs::rename(&legacy_lock, &new_lock)
+    {
+        crate::log_debug(&format!(
+            "settings_migrate_log_lock_rename_failed {} -> {}: {}",
+            legacy_lock.display(),
+            new_lock.display(),
+            e
+        ));
+    }
 }
 
 #[cfg(not(feature = "standalone"))]
@@ -545,20 +697,26 @@ fn resolve_settings_dir() -> PathBuf {
     // Portable: <exe_dir>\config\settings.json
     let portable_dir = exe_dir.join("config");
 
-    // Non-portable: %APPDATA%\Novapad\settings.json
-    let appdata_dir = std::env::var_os("APPDATA")
-        .map(PathBuf::from)
-        .map(|p| p.join("Novapad"))
+    // Non-portable: %APPDATA%\Sonarpad\settings.json
+    let appdata_root = std::env::var_os("APPDATA").map(PathBuf::from);
+    let appdata_dir = appdata_root
+        .as_ref()
+        .map(|p| p.join("Sonarpad"))
         .unwrap_or_else(|| portable_dir.clone());
+    if let Some(root) = appdata_root.as_ref() {
+        let legacy_dir = root.join("Novapad");
+        migrate_legacy_settings_dir(&legacy_dir, &appdata_dir);
+        migrate_legacy_log_files(&appdata_dir);
+    }
 
-    // 1) "novapad portable" -> portable forzato
+    // 1) "sonarpad portable" -> portable forzato
     // 2) drive removibile -> portable
     let preferred_dir = if is_portable_folder(&exe_dir)
         || matches!(exe_drive_type(&exe_path), Some(t) if t == DRIVE_REMOVABLE)
     {
         portable_dir.clone()
     }
-    // 3) default -> AppData\Novapad
+    // 3) default -> AppData\Sonarpad
     else {
         appdata_dir
     };
@@ -621,7 +779,7 @@ pub fn default_podcast_save_folder() -> String {
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
             .join("Documents")
     });
-    base.push("Novapad Recordings");
+    base.push("Sonarpad Recordings");
     base.to_string_lossy().to_string()
 }
 
@@ -833,8 +991,8 @@ pub fn register_application_capabilities() {
         }
     };
     let exe_path_str = exe_path.to_string_lossy();
-    let app_name = "Novapad";
-    let prog_id_prefix = "Novapad.Assoc";
+    let app_name = "Sonarpad";
+    let prog_id_prefix = "Sonarpad.Assoc";
 
     // 1. Register App Class and Program IDs for each extension
     for ext in CONTEXT_MENU_EXTENSIONS {
@@ -865,7 +1023,7 @@ pub fn register_application_capabilities() {
     }
 
     // 2. Register Application Capabilities
-    let capabilities_key = "Software\\Novapad\\Capabilities";
+    let capabilities_key = "Software\\Sonarpad\\Capabilities";
     if let Some(key) = create_registry_key(capabilities_key) {
         set_registry_string_value(key, Some("ApplicationName"), app_name);
         set_registry_string_value(
@@ -913,7 +1071,7 @@ pub fn sync_context_menu(settings: &AppSettings) {
 
     for ext in CONTEXT_MENU_EXTENSIONS {
         let base_key = format!(
-            "Software\\Classes\\SystemFileAssociations\\.{}\\shell\\OpenWithNovapad",
+            "Software\\Classes\\SystemFileAssociations\\.{}\\shell\\OpenWithSonarpad",
             ext
         );
         if settings.context_menu_open_with {

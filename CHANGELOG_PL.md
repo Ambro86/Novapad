@@ -20,7 +20,7 @@ Nowe funkcje
 • Dodano "Pokaż opis" dla odcinków podcastów w menu kontekstowym.
 • Dodano obsługę rozszerzonych formatów audio/wideo przez FFmpeg: mkv, avi, mov, m4v, webm, mpg, ts, wmv, flv, vob, 3gp, flac, ogg, wma, aiff.
 • Dodano obsługę zsynchronizowanego odczytu napisów (srt, vtt, ass, sub, sbv, lrc, smi) za pomocą NVDA lub wybranego głosu. Program szuka pliku napisów o tej samej nazwie co plik multimedialny. Dodano opcje "Importuj napisy" i "Usuń napisy" w menu Odtwarzanie dla plików o różnych nazwach.
-• Dodano skojarzenia plików dla wszystkich nowych obsługiwanych formatów audio/wideo w menu kontekstowym "Otwórz w Novapad".
+• Dodano skojarzenia plików dla wszystkich nowych obsługiwanych formatów audio/wideo w menu kontekstowym "Otwórz w Sonarpad".
 • Dodano ustawienie regulacji wysokości dźwięku dla dowolnego pliku.
 • Dodano opcję w Ustawieniach ogólnych, aby włączyć lub wyłączyć anonimowe raporty o błędach. Dodano wpis w menu Pomoc, aby utworzyć diagnostyczny plik ZIP.
 • Dodano opcję używania innego głosu dla dialogów, zarówno do czytania na żywo, jak i tworzenia audiobooków.
@@ -119,7 +119,7 @@ Nowe funkcje
 • Dodano przycisk podglądu głosu za polem wyboru głośności.
 • Dodano wyszukiwanie i zamianę za pomocą wyrażeń regularnych (styl Notepad++).
 • Dodano import RSS z plików OPML i TXT.
-• Dodano opcję włączenia "Otwórz w Novapad" w Eksploratorze plików, w tym w wersjach portable.
+• Dodano opcję włączenia "Otwórz w Sonarpad" w Eksploratorze plików, w tym w wersjach portable.
 Ulepszenia
 • Ulepszono wybór prędkości/tonu/głośności głosu, respektując maksymalne limity TTS.
 • Różne ulepszenia RSS, aby pobierać wszystkie artykuły bez przesuwania fokusu NVDA podczas aktualizacji.
@@ -150,7 +150,7 @@ Ulepszenia
 • Dodano okna dialogowe potwierdzenia dla ważnych działań (np. usuń zduplikowane linie, usuń łączniki na końcu linii, usuń wszystkie zakładki w bieżącym pliku). Okno dialogowe nie jest wyświetlane, gdy akcja nie ma zastosowania.
 • Dodano możliwość usuwania kanałów/stron RSS z biblioteki poprzez wybranie ich i naciśnięcie Delete.
 • Dodano menu kontekstowe w oknie RSS do edycji lub usuwania kanałów/stron RSS.
-• Usunięto ustawienie przenoszenia ustawień do bieżącego folderu; aplikacja teraz obsługuje to automatycznie na podstawie lokalizacji (jeśli folder exe nazywa się "novapad portable" lub exe znajduje się na dysku wymiennym, ustawienia trafiają do folderu exe w `config`, w przeciwnym razie `%APPDATA%\Novapad`, z fallbackiem do exe `config`, jeśli preferowany folder nie jest zapisywalny).
+• Usunięto ustawienie przenoszenia ustawień do bieżącego folderu; aplikacja teraz obsługuje to automatycznie na podstawie lokalizacji (jeśli folder exe nazywa się "sonarpad portable" lub exe znajduje się na dysku wymiennym, ustawienia trafiają do folderu exe w `config`, w przeciwnym razie `%APPDATA%\Sonarpad`, z fallbackiem do exe `config`, jeśli preferowany folder nie jest zapisywalny).
 
 Version 0.5.7 - 2026-01-05
 New features
@@ -202,7 +202,7 @@ Improvements
 
 ## 0.5.2 - 2026-01-01
 - Added a changelog.
-- Added open-with-Novapad options and file associations for supported files during installation.
+- Added open-with-Sonarpad options and file associations for supported files during installation.
 - Improved message localization (errors, dialogs, audiobook export).
 - Added part selection when using "Split audiobook based on text", with a "Require the marker at line start" option.
 - Added YouTube transcript import with language selection, timestamp option, and improved focus handling.

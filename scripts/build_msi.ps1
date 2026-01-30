@@ -24,7 +24,7 @@ try {
         throw "Version not found in Cargo.toml"
     }
     $version = $versionLine.Matches[0].Groups[1].Value
-    $msiName = "novapad_${version}_x64_en-US.msi"
+    $msiName = "sonarpad_${version}_x64_en-US.msi"
     $dest = Join-Path $repo "target\\release\\$msiName"
     Move-Item $outTemp -Destination $dest -Force
 } finally {

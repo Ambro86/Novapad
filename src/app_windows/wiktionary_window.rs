@@ -21,7 +21,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{PCWSTR, w};
 
-const WIKTIONARY_CLASS_NAME: &str = "NovapadWiktionary";
+const WIKTIONARY_CLASS_NAME: &str = "SonarpadWiktionary";
 const WIKTIONARY_INPUT_ID: usize = 9401;
 const WIKTIONARY_SEARCH_ID: usize = 9402;
 const WIKTIONARY_OUTPUT_ID: usize = 9403;

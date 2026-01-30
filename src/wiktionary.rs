@@ -284,7 +284,7 @@ pub struct WiktionaryService {
 impl WiktionaryService {
     pub fn new() -> Result<Self, LookupError> {
         let client = Client::builder()
-            .user_agent("Novapad/0.5 (Wiktionary dictionary)")
+            .user_agent("Sonarpad/0.5 (Wiktionary dictionary)")
             .timeout(Duration::from_secs(4))
             .build()
             .map_err(|err| LookupError::Other(err.to_string()))?;
@@ -382,7 +382,7 @@ impl WiktionaryService {
     ) -> Result<String, LookupError> {
         let url = build_parse_wikitext_url(lang, word)?;
         let client = Client::builder()
-            .user_agent("Novapad/0.5 (Wiktionary dictionary)")
+            .user_agent("Sonarpad/0.5 (Wiktionary dictionary)")
             .timeout(timeout)
             .build()
             .map_err(|err| LookupError::Other(err.to_string()))?;

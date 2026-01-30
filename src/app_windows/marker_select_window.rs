@@ -25,7 +25,7 @@ use crate::i18n;
 use crate::settings::Language;
 use crate::with_state;
 
-const MARKER_SELECT_CLASS_NAME: &str = "NovapadMarkerSelect";
+const MARKER_SELECT_CLASS_NAME: &str = "SonarpadMarkerSelect";
 const MARKER_ID_LIST: usize = 9101;
 const MARKER_ID_TOGGLE_ALL: usize = 9102;
 const MARKER_ID_OK: usize = 9103;

@@ -18,7 +18,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{PCWSTR, w};
 
-const PROGRESS_CLASS_NAME: &str = "NovapadProgress";
+const PROGRESS_CLASS_NAME: &str = "SonarpadProgress";
 const PROGRESS_ID_CANCEL: usize = 8001;
 const WM_UPDATE_PROGRESS: u32 = WM_APP + 6;
 

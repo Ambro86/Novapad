@@ -1,14 +1,14 @@
-# Novapad
+# Sonarpad
 
 [Leggilo in Inglese 🇬🇧](README.md)
 
 **Scarica l'ultima versione:**
 
 
-- [Portable (EXE)](https://github.com/Ambro86/Novapad/releases/latest/download/novapad.exe)
-- [Installer (Setup)](https://github.com/Ambro86/Novapad/releases/latest/download/novapad_x64-setup.exe)
-- [Installer (MSI)](https://github.com/Ambro86/Novapad/releases/latest/download/novapad_x64_en-US.msi)
-**Novapad** è un Notepad moderno e avanzato per Windows, sviluppato in Rust.
+- [Portable (EXE)](https://github.com/Ambro86/Sonarpad/releases/latest/download/sonarpad.exe)
+- [Installer (Setup)](https://github.com/Ambro86/Sonarpad/releases/latest/download/sonarpad_x64-setup.exe)
+- [Installer (MSI)](https://github.com/Ambro86/Sonarpad/releases/latest/download/sonarpad_x64_en-US.msi)
+**Sonarpad** è un Notepad moderno e avanzato per Windows, sviluppato in Rust.
 Estende il classico editor di testo con il supporto a più formati di documento,
 funzionalità avanzate di accessibilità e capacità di Text-to-Speech (TTS).
 
@@ -83,8 +83,8 @@ La formattazione del codice e' gestita con `cargo fmt`.
 Clona il repository:
 
 ```bash
-git clone https://github.com/Ambro86/Novapad.git
-cd Novapad
+git clone https://github.com/Ambro86/Sonarpad.git
+cd Sonarpad
 ```
 
 Compila il progetto:
@@ -114,7 +114,7 @@ studio, valutazione e uso personale**.
 - Utilizzare il software per scopi commerciali
 - Redistribuire il codice sorgente o i binari
 - Effettuare fork del repository per la distribuzione
-- Integrare Novapad in altri progetti o prodotti
+- Integrare Sonarpad in altri progetti o prodotti
 - Creare e distribuire opere derivate senza autorizzazione scritta
 
 Le funzionalità di Text-to-Speech possono utilizzare voci Microsoft

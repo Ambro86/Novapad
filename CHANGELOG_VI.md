@@ -1,5 +1,12 @@
 # Nhật ký thay đổi
 
+Phiên bản 0.6.4 – 2026-01-30
+Cải tiến
+• Chương trình đã được đổi tên thành Sonarpad để nhấn mạnh âm thanh và audio, là điểm then chốt của chương trình.
+• Bổ sung danh mục podcast.
+Sửa lỗi
+• Khắc phục lỗi khiến sách nói SAPI4 có thể được tạo ra khác với mong đợi.
+
 Phiên bản 0.6.3 – 2026-01-30
 Cải tiến
 • Cải thiện phát hiện micrô.

@@ -1,5 +1,12 @@
 # Dziennik zmian
 
+Wersja 0.6.4 – 30.01.2026
+Ulepszenia
+• Program został przemianowany na Sonarpad, aby podkreślić dźwięk i audio jako klucz tego programu.
+• Rozszerzono kategorie podcastów.
+Poprawki błędów
+• Naprawiono błąd, przez który audiobooki SAPI4 mogły być tworzone inaczej niż oczekiwano.
+
 Wersja 0.6.3 – 30.01.2026
 Ulepszenia
 • Ulepszone wykrywanie mikrofonu.

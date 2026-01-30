@@ -1,8 +1,8 @@
 # Journal des modifications
 
-Version 0.6.2 – 24/01/2026
+Version 0.6.2 – 29/01/2026
 Nouvelles fonctionnalités
-• Ajout de la prise en charge de l'exécution de fichiers (Maj+F5). Les utilisateurs peuvent sélectionner un interpréteur (par exemple, python) dans les Options, et appuyer sur F5 exécute le script actuel. Les fichiers HTML s'ouvrent dans le navigateur.
+• Ajout de la prise en charge de l'exécution de fichiers (F5). Les utilisateurs peuvent sélectionner un interpréteur (par exemple, python) dans les Options, le rechercher sur l'ordinateur, et appuyer sur F5 exécute le script actuel. Les fichiers HTML s'ouvrent dans le navigateur.
 • Ajout de la prise en charge des fichiers pointeurs Google Docs (.gdoc, .gsheet, .gslides), qui s'ouvrent automatiquement dans le navigateur par défaut.
 • Ajout de la prise en charge du format de livre audio M4B (Apple/AAC).
 • Ajout de l'option "Afficher les épisodes" dans le menu contextuel des résultats de recherche de podcasts pour parcourir et lire des épisodes sans s'abonner.
@@ -12,8 +12,12 @@ Nouvelles fonctionnalités
 • Ajout d'une case de test du microphone dans la boîte de dialogue d'enregistrement pour vérifier les niveaux avant de commencer.
 • Ajout de "Afficher la description" pour les épisodes de podcast dans le menu contextuel.
 • Ajout de la prise en charge des formats audio/vidéo étendus via FFmpeg : mkv, avi, mov, m4v, webm, mpg, ts, wmv, flv, vob, 3gp, flac, ogg, wma, aiff.
-• Ajout de la prise en charge de la lecture synchronisée des sous-titres (srt, vtt, ass, sub, sbv, lrc, smi) avec NVDA ou la voix sélectionnée.
+• Ajout de la prise en charge de la lecture synchronisée des sous-titres (srt, vtt, ass, sub, sbv, lrc, smi) avec NVDA ou la voix sélectionnée. Le programme recherche un fichier de sous-titres portant le même nom que le fichier multimédia. Ajout des options "Importer des sous-titres" et "Supprimer les sous-titres" dans le menu Lecture pour les fichiers aux noms différents.
 • Ajout d'associations de fichiers pour tous les nouveaux formats audio/vidéo pris en charge dans le menu contextuel "Ouvrir avec Novapad".
+• Ajout d'un paramètre de réglage de la hauteur tonale pour n'importe quel fichier.
+• Ajout d'une option dans les Paramètres généraux pour activer ou désactiver les rapports d'erreurs anonymes. Ajout d'une entrée dans le menu Aide pour créer un fichier ZIP de diagnostic.
+• Ajout d'une option pour utiliser une voix différente pour les dialogues, à la fois pour la lecture en direct et la création de livres audio.
+• Ajout d'un navigateur de catégories de podcasts pour explorer les podcasts par catégorie (affaires, art, sport, etc.).
 Améliorations
 • L'ouverture d'un fichier audio/vidéo depuis l'Explorateur ouvre désormais directement la vue du lecteur au lieu de l'éditeur de texte.
 • Suppression de l'invite OCR pour les PDF inaccessibles ; l'OCR est désormais effectué automatiquement pour améliorer la vitesse et l'expérience utilisateur.
@@ -21,8 +25,8 @@ Améliorations
 • SAPI 4 : La création de livres audio est désormais entièrement parallélisée et presque instantanée. Ajout d'une invite pour choisir le nombre de processus simultanés.
 • SAPI 4 : Élimination du goulot d'étranglement de la conversion WAV vers MP3 en convertissant les morceaux en parallèle pendant la synthèse.
 • SAPI 4 : Amélioration de la gestion des erreurs et du nettoyage automatique des fichiers temporaires.
-• Boîte de dialogue Rechercher : Renommage de "Regex" en "Expression régulière" pour plus de clarté et correction d'un bug critique empêchant de trouver certains mots.
-• Livres audio M4B : Meilleure gestion de la sortie ; la division par parties/marqueurs produit désormais un seul fichier M4B avec des chapitres de métadonnées appropriés.
+• Boîte de dialogue Rechercher : Renommage de "Regex" en "Expression régulière" pour plus de clarté et ajout des traductions manquantes pour les options de recherche.
+• Livres audio M4B : Meilleure gestion de la sortie ; la division par parties/marqueurs produit désormais un seul fichier M4B avec des métadonnées de chapitres incluant le titre et l'auteur.
 • Lecteur : Correction de la précision des signets et de l'annonce du temps lorsque la vitesse de lecture n'est pas de 1.0x.
 • Restauration de la navigation Ctrl+Tab et Ctrl+Maj+Tab dans les Options.
 • Ajout d'une option dans le menu Lecture pour réinitialiser instantanément la vitesse à la normale (1.0x).
@@ -30,10 +34,20 @@ Améliorations
 • Intégration de FFmpeg avec chargement dynamique de DLL pour assurer la compatibilité sans bloquer le démarrage.
 • Mise à jour des filtres de téléchargement de podcasts pour inclure les nouveaux formats audio/vidéo.
 • Empêchement de Ctrl+S d'enregistrer les fichiers audio/vidéo pour éviter la corruption.
+• Amélioration de l'importation des transcriptions YouTube, la rendant plus robuste et résiliente.
+• Amélioration de la robustesse de la division des livres audio en parties, garantissant qu'aucun texte n'est perdu.
+• L'installateur est désormais entièrement multilingue, prenant en charge l'italien, l'anglais, l'espagnol, le portugais, le suédois et le vietnamien en fonction de la langue du système de l'utilisateur. L'anglais est la valeur par défaut pour les systèmes non pris en charge.
+• Catégories de podcasts : appuyer sur Entrée sur une catégorie confirme désormais la sélection (équivalent au bouton OK).
+• Amélioration du système de détection des blocages pour éviter les faux positifs lorsque des boîtes de dialogue modales sont ouvertes (messages d'erreur, "texte non trouvé").
 Corrections
 • Correction d'un bug où le journal des modifications ne s'ouvrait pas au démarrage.
 • Correction d'un bug où l'invite OCR n'apparaissait pas pour les PDF inaccessibles ouverts depuis l'Explorateur.
 • Correction d'un bug au démarrage pouvant entraîner une perte de focus ou la fermeture de la fenêtre immédiatement après l'ouverture.
+• Correction d'un bug critique dans la recherche par expression régulière empêchant de trouver du texte, y compris des problèmes avec la "Recherche circulaire" et l'option "Le point équivaut à une nouvelle ligne" avec les fins de ligne Windows.
+Localisation
+• Ajout de la traduction en polonais.
+• Ajout de la traduction en français.
+• Ajout de la traduction en tchèque (merci à Radek Žalud et Jiri Holzinger).
 
 Version 0.6.1 – 20/01/2026
 Corrections

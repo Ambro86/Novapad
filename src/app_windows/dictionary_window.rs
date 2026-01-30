@@ -1232,6 +1232,10 @@ unsafe fn preview_entry_voice(hwnd: HWND) {
                 pitch,
                 volume,
                 dialogue_voice: None,
+                dialogue_rate: 0,
+                dialogue_pitch: 0,
+                dialogue_volume: 100,
+                dialogue_engine: TtsEngine::Edge,
             };
             tts_engine::start_tts_playback_with_chunks(options);
         }

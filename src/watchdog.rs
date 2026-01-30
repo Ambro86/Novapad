@@ -3,9 +3,26 @@
 // Watchdog thread per rilevare freeze/hang dell'applicazione.
 // Monitora un heartbeat che deve essere aggiornato dal message loop principale.
 
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, OnceLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+/// Handle globale del watchdog per accesso da qualsiasi punto dell'app
+static GLOBAL_WATCHDOG: OnceLock<Arc<WatchdogState>> = OnceLock::new();
+
+/// Chiamare quando si apre un dialog modale per sospendere il rilevamento hang.
+pub fn enter_modal_dialog() {
+    if let Some(state) = GLOBAL_WATCHDOG.get() {
+        state.enter_modal();
+    }
+}
+
+/// Chiamare quando si chiude un dialog modale per riprendere il rilevamento hang.
+pub fn exit_modal_dialog() {
+    if let Some(state) = GLOBAL_WATCHDOG.get() {
+        state.exit_modal();
+    }
+}
 
 /// Stato condiviso del watchdog
 pub struct WatchdogState {
@@ -15,6 +32,8 @@ pub struct WatchdogState {
     should_stop: AtomicBool,
     /// Flag che indica se un hang è già stato riportato (evita spam)
     hang_reported: AtomicBool,
+    /// Contatore di dialogs modali aperti (quando > 0, il watchdog è sospeso)
+    modal_dialog_count: AtomicU64,
 }
 
 impl WatchdogState {
@@ -23,6 +42,7 @@ impl WatchdogState {
             last_heartbeat_ms: AtomicU64::new(current_time_ms()),
             should_stop: AtomicBool::new(false),
             hang_reported: AtomicBool::new(false),
+            modal_dialog_count: AtomicU64::new(0),
         }
     }
 
@@ -39,12 +59,28 @@ impl WatchdogState {
         self.should_stop.store(true, Ordering::Relaxed);
     }
 
+    /// Incrementa il contatore di dialogs modali (sospende il watchdog)
+    pub fn enter_modal(&self) {
+        self.modal_dialog_count.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Decrementa il contatore di dialogs modali e aggiorna heartbeat
+    pub fn exit_modal(&self) {
+        self.modal_dialog_count.fetch_sub(1, Ordering::Relaxed);
+        // Aggiorna heartbeat all'uscita dal dialog per evitare falsi positivi
+        self.heartbeat();
+    }
+
     fn should_stop(&self) -> bool {
         self.should_stop.load(Ordering::Relaxed)
     }
 
     fn last_heartbeat_ms(&self) -> u64 {
         self.last_heartbeat_ms.load(Ordering::Relaxed)
+    }
+
+    fn is_in_modal(&self) -> bool {
+        self.modal_dialog_count.load(Ordering::Relaxed) > 0
     }
 
     fn mark_hang_reported(&self) -> bool {
@@ -107,6 +143,10 @@ pub fn start_watchdog(config: WatchdogConfig) -> WatchdogHandle {
     let state = Arc::new(WatchdogState::new());
     let state_clone = Arc::clone(&state);
 
+    // Salva lo state globalmente per accesso dai dialogs modali
+    // Ignoriamo l'errore se già impostato (può succedere solo in test)
+    drop(GLOBAL_WATCHDOG.set(Arc::clone(&state)));
+
     let thread = std::thread::Builder::new()
         .name("watchdog".to_string())
         .spawn(move || {
@@ -153,8 +193,8 @@ fn watchdog_loop(state: Arc<WatchdogState>, config: WatchdogConfig) {
             crate::log_debug(&format!("Watchdog: heartbeat age = {}ms", elapsed_ms));
         }
 
-        // Rileva hang
-        if elapsed_ms > hang_threshold_ms {
+        // Rileva hang (ma ignora se siamo in un dialog modale)
+        if elapsed_ms > hang_threshold_ms && !state.is_in_modal() {
             // Evita di riportare lo stesso hang più volte
             if state.mark_hang_reported() {
                 continue;

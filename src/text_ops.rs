@@ -86,17 +86,12 @@ pub fn remove_duplicate_consecutive_lines(scope: &str) -> String {
     let mut out_lines = Vec::new();
 
     let mut last_line: Option<&str> = None;
-
     for line in lines {
-        match last_line {
-            Some(last) if last == line => {
-                // Duplicate, skip
-            }
-            _ => {
-                out_lines.push(line);
-                last_line = Some(line);
-            }
+        if last_line == Some(line) {
+            continue;
         }
+        out_lines.push(line);
+        last_line = Some(line);
     }
 
     let mut out = out_lines.join(eol);
@@ -152,6 +147,15 @@ mod tests {
     }
 
     #[test]
+    fn test_case_sensitive_consecutive() {
+        let input = "Attenzione: questo e un test.\nAttenzione: questo e un test.\nattenzione: questo e un test.\n";
+        assert_eq!(
+            remove_duplicate_consecutive_lines(input),
+            "Attenzione: questo e un test.\nattenzione: questo e un test.\n"
+        );
+    }
+
+    #[test]
     fn test_crlf_preserved() {
         let input = "a\r\na\r\nb";
         assert_eq!(remove_duplicate_lines(input), "a\r\nb");
@@ -191,5 +195,31 @@ mod tests {
         // Global: seen "", insert. seen "", skip. seen "a", insert. seen "", skip.
         // Out: ["", "a"]. Join("\n") -> "\na". Trailing=true -> "\na\n".
         assert_eq!(remove_duplicate_lines("\n\na\n\n"), "\na\n");
+    }
+
+    #[test]
+    fn test_empty_lines_consecutive_behavior() {
+        let input = "A\n\nA\nA\n\n";
+        assert_eq!(remove_duplicate_consecutive_lines(input), "A\n\nA\n\n");
+    }
+
+    #[test]
+    fn test_consecutive_crlf_preserved() {
+        let input = "A\r\n\r\nA\r\nA\r\n";
+        assert_eq!(remove_duplicate_consecutive_lines(input), "A\r\n\r\nA\r\n");
+    }
+
+    #[test]
+    fn test_consecutive_idempotent() {
+        let input = "A\n\nA\nA\n\n";
+        let once = remove_duplicate_consecutive_lines(input);
+        let twice = remove_duplicate_consecutive_lines(&once);
+        assert_eq!(once, twice);
+    }
+
+    #[test]
+    fn test_consecutive_trailing_newline_preserved() {
+        let input = "A\nA\n\nB\n\n";
+        assert_eq!(remove_duplicate_consecutive_lines(input), "A\n\nB\n\n");
     }
 }

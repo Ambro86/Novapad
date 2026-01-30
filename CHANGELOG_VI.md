@@ -1,5 +1,54 @@
 # Nhật ký thay đổi
 
+Phiên bản 0.6.2 – 2026-01-29
+Tính năng mới
+• Thêm hỗ trợ chạy tệp (F5). Người dùng có thể chọn trình thông dịch (ví dụ: python) trong Tùy chọn, tìm kiếm trên máy tính, và nhấn F5 để chạy tập lệnh hiện tại. Các tệp HTML mở trong trình duyệt.
+• Thêm hỗ trợ cho các tệp con trỏ Google Docs (.gdoc, .gsheet, .gslides), tự động mở trong trình duyệt mặc định.
+• Thêm hỗ trợ định dạng sách nói M4B (Apple/AAC).
+• Thêm tùy chọn "Hiển thị tập" trong menu ngữ cảnh kết quả tìm kiếm podcast để duyệt và phát các tập mà không cần đăng ký.
+• Thêm tính năng "Đi đến dòng" (menu Chỉnh sửa hoặc Ctrl+J) để nhảy nhanh đến số dòng cụ thể.
+• Thêm tùy chọn menu ngữ cảnh để sắp xếp nguồn cấp RSS và podcast (theo bảng chữ cái hoặc theo ngày).
+• Thêm nguồn cấp RSS mặc định bằng tiếng Việt.
+• Thêm hộp kiểm tra micrô trong hộp thoại ghi âm để kiểm tra mức độ trước khi bắt đầu.
+• Thêm "Hiển thị mô tả" cho các tập podcast trong menu ngữ cảnh.
+• Thêm hỗ trợ cho các định dạng âm thanh/video mở rộng qua FFmpeg: mkv, avi, mov, m4v, webm, mpg, ts, wmv, flv, vob, 3gp, flac, ogg, wma, aiff.
+• Thêm đọc phụ đề đồng bộ (srt, vtt, ass, sub, sbv, lrc, smi) với NVDA hoặc giọng đã chọn. Chương trình tìm kiếm tệp phụ đề có cùng tên với tệp phương tiện. Thêm tùy chọn "Nhập phụ đề" và "Xóa phụ đề" trong menu Phát lại cho các tệp có tên khác nhau.
+• Thêm liên kết tệp cho tất cả các định dạng âm thanh/video mới được hỗ trợ trong menu ngữ cảnh "Mở bằng Novapad".
+• Thêm cài đặt để điều chỉnh cao độ của bất kỳ tệp nào.
+• Thêm tùy chọn trong Cài đặt Chung để bật hoặc tắt báo cáo lỗi ẩn danh. Thêm mục trong menu Trợ giúp để tạo tệp ZIP chẩn đoán.
+• Thêm tùy chọn sử dụng giọng khác cho đối thoại, cả cho đọc trực tiếp và tạo sách nói.
+• Thêm trình duyệt danh mục podcast để khám phá podcast theo danh mục (kinh doanh, nghệ thuật, thể thao, v.v.).
+Cải tiến
+• Mở tệp âm thanh/video từ Explorer giờ mở trực tiếp giao diện trình phát thay vì trình soạn thảo văn bản.
+• Loại bỏ yêu cầu OCR cho PDF không thể truy cập; OCR giờ được thực hiện tự động để cải thiện tốc độ và trải nghiệm người dùng.
+• Cải thiện Terminal Trợ năng: đọc NVDA giờ nhớ dòng cuối cùng đã đọc để liên tục tốt hơn.
+• SAPI 4: Tạo sách nói giờ hoàn toàn song song và gần như tức thì. Thêm yêu cầu để chọn số quy trình đồng thời.
+• SAPI 4: Loại bỏ nút cổ chai WAV-MP3 bằng cách chuyển đổi các đoạn song song trong quá trình tổng hợp.
+• SAPI 4: Cải thiện xử lý lỗi và dọn dẹp tự động các tệp tạm thời.
+• Hộp thoại Tìm: Đổi tên "Regex" thành "Biểu thức chính quy" để rõ ràng hơn và thêm các bản dịch còn thiếu cho các tùy chọn tìm kiếm.
+• Sách nói M4B: Xử lý đầu ra tốt hơn; chia theo phần/đánh dấu giờ tạo ra một tệp M4B duy nhất với siêu dữ liệu chương bao gồm tiêu đề và tác giả.
+• Trình phát: Sửa độ chính xác của dấu trang và thông báo thời gian khi tốc độ phát không phải 1.0x.
+• Khôi phục điều hướng Ctrl+Tab và Ctrl+Shift+Tab trong Tùy chọn.
+• Thêm tùy chọn trong menu Phát lại để đặt lại ngay tốc độ về Bình thường (1.0x).
+• Cập nhật tất cả các phụ thuộc lên phiên bản mới nhất để có hiệu suất và độ ổn định tốt hơn.
+• Tích hợp FFmpeg với tải DLL động để đảm bảo khả năng tương thích mà không chặn khởi động.
+• Cập nhật bộ lọc tải xuống podcast để bao gồm các định dạng âm thanh/video mới.
+• Ngăn Ctrl+S lưu các tệp âm thanh/video để tránh hỏng.
+• Cải thiện nhập bản ghi YouTube làm cho nó mạnh mẽ và linh hoạt hơn.
+• Cải thiện độ bền của việc chia sách nói thành các phần, đảm bảo không mất văn bản nào.
+• Trình cài đặt giờ hoàn toàn đa ngôn ngữ, hỗ trợ tiếng Ý, Anh, Tây Ban Nha, Bồ Đào Nha, Thụy Điển và Việt Nam dựa trên ngôn ngữ hệ thống của người dùng. Tiếng Anh là mặc định cho các hệ thống không được hỗ trợ.
+• Danh mục podcast: nhấn Enter trên một danh mục giờ xác nhận lựa chọn (tương đương nút OK).
+• Cải thiện hệ thống phát hiện treo để tránh dương tính giả khi có hộp thoại modal mở (thông báo lỗi, "không tìm thấy văn bản").
+Sửa lỗi
+• Sửa lỗi changelog không mở khi khởi động.
+• Sửa lỗi yêu cầu OCR không xuất hiện cho PDF không thể truy cập được mở từ Explorer.
+• Sửa lỗi khởi động có thể gây mất tiêu điểm hoặc đóng cửa sổ ngay sau khi mở.
+• Sửa lỗi nghiêm trọng trong tìm kiếm regex ngăn tìm văn bản, bao gồm các vấn đề với "Tìm kiếm vòng" và tùy chọn "Dấu chấm tương đương dòng mới" với kết thúc dòng Windows.
+Bản địa hóa
+• Thêm bản dịch tiếng Ba Lan.
+• Thêm bản dịch tiếng Pháp.
+• Thêm bản dịch tiếng Séc (cảm ơn Radek Žalud và Jiri Holzinger).
+
 Phiên bản 0.6.1 – 2026-01-20
 
 Sửa lỗi

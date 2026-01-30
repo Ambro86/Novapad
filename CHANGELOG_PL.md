@@ -1,8 +1,8 @@
 # Dziennik zmian
 
-Wersja 0.6.2 – 24.01.2026
+Wersja 0.6.2 – 29.01.2026
 Nowe funkcje
-• Dodano obsługę wykonywania plików (Shift+F5). Użytkownicy mogą wybrać interpreter (np. python) w Opcjach, a naciśnięcie F5 uruchamia bieżący skrypt. Pliki HTML otwierają się w przeglądarce.
+• Dodano obsługę wykonywania plików (F5). Użytkownicy mogą wybrać interpreter (np. python) w Opcjach, wyszukać go na komputerze, a naciśnięcie F5 uruchamia bieżący skrypt. Pliki HTML otwierają się w przeglądarce.
 • Dodano obsługę plików wskaźników Google Docs (.gdoc, .gsheet, .gslides), które automatycznie otwierają się w domyślnej przeglądarce.
 • Dodano obsługę formatu audiobooków M4B (Apple/AAC).
 • Dodano opcję "Pokaż odcinki" w menu kontekstowym wyników wyszukiwania podcastów, aby przeglądać i odtwarzać odcinki bez subskrypcji.
@@ -12,8 +12,12 @@ Nowe funkcje
 • Dodano pole testowe mikrofonu w oknie nagrywania, aby sprawdzić poziomy przed rozpoczęciem.
 • Dodano "Pokaż opis" dla odcinków podcastów w menu kontekstowym.
 • Dodano obsługę rozszerzonych formatów audio/wideo przez FFmpeg: mkv, avi, mov, m4v, webm, mpg, ts, wmv, flv, vob, 3gp, flac, ogg, wma, aiff.
-• Dodano obsługę zsynchronizowanego odczytu napisów (srt, vtt, ass, sub, sbv, lrc, smi) za pomocą NVDA lub wybranego głosu.
+• Dodano obsługę zsynchronizowanego odczytu napisów (srt, vtt, ass, sub, sbv, lrc, smi) za pomocą NVDA lub wybranego głosu. Program szuka pliku napisów o tej samej nazwie co plik multimedialny. Dodano opcje "Importuj napisy" i "Usuń napisy" w menu Odtwarzanie dla plików o różnych nazwach.
 • Dodano skojarzenia plików dla wszystkich nowych obsługiwanych formatów audio/wideo w menu kontekstowym "Otwórz w Novapad".
+• Dodano ustawienie regulacji wysokości dźwięku dla dowolnego pliku.
+• Dodano opcję w Ustawieniach ogólnych, aby włączyć lub wyłączyć anonimowe raporty o błędach. Dodano wpis w menu Pomoc, aby utworzyć diagnostyczny plik ZIP.
+• Dodano opcję używania innego głosu dla dialogów, zarówno do czytania na żywo, jak i tworzenia audiobooków.
+• Dodano przeglądarkę kategorii podcastów do eksplorowania podcastów według kategorii (biznes, sztuka, sport itp.).
 Ulepszenia
 • Otwarcie pliku audio/wideo z Eksploratora otwiera teraz bezpośrednio widok odtwarzacza zamiast edytora tekstu.
 • Usunięto monit o OCR dla niedostępnych plików PDF; OCR jest teraz wykonywany automatycznie, aby poprawić szybkość i wrażenia użytkownika.
@@ -21,8 +25,8 @@ Ulepszenia
 • SAPI 4: Tworzenie audiobooków jest teraz w pełni zrównoleglone i prawie natychmiastowe. Dodano monit o wybór liczby współbieżnych procesów.
 • SAPI 4: Wyeliminowano wąskie gardło konwersji WAV do MP3 poprzez równoległe konwertowanie fragmentów podczas syntezy.
 • SAPI 4: Ulepszono obsługę błędów i automatyczne czyszczenie plików tymczasowych.
-• Okno Znajdź: Zmieniono nazwę "Regex" na "Wyrażenie regularne" dla jasności i naprawiono krytyczny błąd uniemożliwiający znalezienie niektórych słów.
-• Audiobooki M4B: Lepsza obsługa wyjścia; podział na części/znaczniki tworzy teraz pojedynczy plik M4B z prawidłowymi rozdziałami w metadanych.
+• Okno Znajdź: Zmieniono nazwę "Regex" na "Wyrażenie regularne" dla jasności i dodano brakujące tłumaczenia dla opcji wyszukiwania.
+• Audiobooki M4B: Lepsza obsługa wyjścia; podział na części/znaczniki tworzy teraz pojedynczy plik M4B z metadanymi rozdziałów, w tym tytułem i autorem.
 • Odtwarzacz: Naprawiono precyzję zakładek i ogłaszania czasu, gdy prędkość odtwarzania nie wynosi 1.0x.
 • Przywrócono nawigację Ctrl+Tab i Ctrl+Shift+Tab w Opcjach.
 • Dodano opcję w menu Odtwarzanie, aby natychmiast zresetować prędkość do Normalnej (1.0x).
@@ -30,10 +34,20 @@ Ulepszenia
 • Zintegrowano FFmpeg z dynamicznym ładowaniem DLL, aby zapewnić kompatybilność bez blokowania uruchamiania.
 • Zaktualizowano filtry pobierania podcastów, aby uwzględnić nowe formaty audio/wideo.
 • Zablokowano zapisywanie plików audio/wideo przez Ctrl+S, aby uniknąć uszkodzenia.
+• Ulepszono import transkrypcji YouTube, czyniąc go bardziej odpornym i niezawodnym.
+• Ulepszono odporność dzielenia audiobooków na części, zapewniając, że żaden tekst nie zostanie utracony.
+• Instalator jest teraz w pełni wielojęzyczny, obsługując włoski, angielski, hiszpański, portugalski, szwedzki i wietnamski w oparciu o język systemu użytkownika. Angielski jest domyślny dla nieobsługiwanych systemów.
+• Kategorie podcastów: naciśnięcie Enter na kategorii potwierdza teraz wybór (odpowiednik przycisku OK).
+• Ulepszono system wykrywania zawieszania, aby uniknąć fałszywych alarmów, gdy otwarte są modalne okna dialogowe (komunikaty o błędach, "nie znaleziono tekstu").
 Poprawki
 • Naprawiono błąd, przez który dziennik zmian nie otwierał się przy starcie.
 • Naprawiono błąd, przez który monit o OCR nie pojawiał się dla niedostępnych plików PDF otwieranych z Eksploratora.
 • Naprawiono błąd przy starcie, który mógł powodować utratę fokusu lub zamknięcie okna natychmiast po otwarciu.
+• Naprawiono krytyczny błąd w wyszukiwaniu regex, który uniemożliwiał znalezienie tekstu, w tym problemy z "Wyszukiwaniem cyklicznym" i opcją "Kropka odpowiada nowej linii" z zakończeniami linii Windows.
+Lokalizacja
+• Dodano tłumaczenie na język polski.
+• Dodano tłumaczenie na język francuski.
+• Dodano tłumaczenie na język czeski (dzięki Radkowi Žaludowi i Jiri Holzingerowi).
 
 Wersja 0.6.1 – 20.01.2026
 Poprawki

@@ -19,9 +19,8 @@ use windows::Win32::UI::Controls::{BST_CHECKED, WC_BUTTON};
 use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use windows::Win32::UI::WindowsAndMessaging::{
     BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, CreateWindowExW, GetClientRect, GetParent,
-    GetWindowRect, HMENU, MB_ICONWARNING, MB_OK, MessageBoxW, SWP_NOMOVE, SWP_NOZORDER,
-    SendMessageW, SetWindowPos, WINDOW_STYLE, WM_COMMAND, WM_GETTEXTLENGTH, WM_INITDIALOG,
-    WM_SETFONT,
+    GetWindowRect, HMENU, MB_ICONWARNING, MB_OK, SWP_NOMOVE, SWP_NOZORDER, SendMessageW,
+    SetWindowPos, WINDOW_STYLE, WM_COMMAND, WM_GETTEXTLENGTH, WM_INITDIALOG, WM_SETFONT,
 };
 use windows::core::{PCWSTR, PWSTR};
 
@@ -124,13 +123,9 @@ pub unsafe fn handle_find_message(hwnd: HWND, lparam: LPARAM) {
     }
 
     let search = {
-        let len = fr.wFindWhatLen as usize;
-        let slice = std::slice::from_raw_parts(fr.lpstrFindWhat.0, len);
-        let len = if len > 0 && slice[len - 1] == 0 {
-            len - 1
-        } else {
-            len
-        };
+        let buf_len = fr.wFindWhatLen as usize;
+        let slice = std::slice::from_raw_parts(fr.lpstrFindWhat.0, buf_len);
+        let len = slice.iter().position(|&c| c == 0).unwrap_or(buf_len);
         String::from_utf16_lossy(&slice[..len])
     };
     if search.is_empty() {
@@ -154,13 +149,9 @@ pub unsafe fn handle_find_message(hwnd: HWND, lparam: LPARAM) {
             hwnd_edit,
             &search,
             &{
-                let len = fr.wReplaceWithLen as usize;
-                let slice = std::slice::from_raw_parts(fr.lpstrReplaceWith.0, len);
-                let len = if len > 0 && slice[len - 1] == 0 {
-                    len - 1
-                } else {
-                    len
-                };
+                let buf_len = fr.wReplaceWithLen as usize;
+                let slice = std::slice::from_raw_parts(fr.lpstrReplaceWith.0, buf_len);
+                let len = slice.iter().position(|&c| c == 0).unwrap_or(buf_len);
                 String::from_utf16_lossy(&slice[..len])
             },
             find_flags,
@@ -171,13 +162,9 @@ pub unsafe fn handle_find_message(hwnd: HWND, lparam: LPARAM) {
 
     if (fr.Flags & FR_REPLACE) != FINDREPLACE_FLAGS(0) {
         let replace = {
-            let len = fr.wReplaceWithLen as usize;
-            let slice = std::slice::from_raw_parts(fr.lpstrReplaceWith.0, len);
-            let len = if len > 0 && slice[len - 1] == 0 {
-                len - 1
-            } else {
-                len
-            };
+            let buf_len = fr.wReplaceWithLen as usize;
+            let slice = std::slice::from_raw_parts(fr.lpstrReplaceWith.0, buf_len);
+            let len = slice.iter().position(|&c| c == 0).unwrap_or(buf_len);
             String::from_utf16_lossy(&slice[..len])
         };
         let replaced =
@@ -193,7 +180,7 @@ pub unsafe fn handle_find_message(hwnd: HWND, lparam: LPARAM) {
         if !replaced && !found {
             let message = to_wide(&text_not_found_message(language));
             let title = to_wide(&find_title(language));
-            MessageBoxW(
+            crate::message_box_modal(
                 hwnd,
                 PCWSTR(message.as_ptr()),
                 PCWSTR(title.as_ptr()),
@@ -215,7 +202,7 @@ pub unsafe fn handle_find_message(hwnd: HWND, lparam: LPARAM) {
     }
     let message = to_wide(&text_not_found_message(language));
     let title = to_wide(&find_title(language));
-    MessageBoxW(
+    crate::message_box_modal(
         hwnd,
         PCWSTR(message.as_ptr()),
         PCWSTR(title.as_ptr()),
@@ -226,12 +213,11 @@ pub unsafe fn handle_find_message(hwnd: HWND, lparam: LPARAM) {
 pub unsafe fn find_next_from_state(hwnd: HWND) {
     let (search, flags, language): (String, FINDREPLACE_FLAGS, Language) =
         with_state(hwnd, |state| {
-            let len = state.find_text.len();
-            let len = if len > 0 && state.find_text[len - 1] == 0 {
-                len - 1
-            } else {
-                len
-            };
+            let len = state
+                .find_text
+                .iter()
+                .position(|&c| c == 0)
+                .unwrap_or(state.find_text.len());
             let search = String::from_utf16_lossy(&state.find_text[..len]);
             (search, state.last_find_flags, state.settings.language)
         })
@@ -254,7 +240,7 @@ pub unsafe fn find_next_from_state(hwnd: HWND) {
     ) {
         let message = to_wide(&text_not_found_message(language));
         let title = to_wide(&find_title(language));
-        MessageBoxW(
+        crate::message_box_modal(
             hwnd,
             PCWSTR(message.as_ptr()),
             PCWSTR(title.as_ptr()),
@@ -484,7 +470,7 @@ pub unsafe fn replace_all(
     if count == 0 {
         let message = to_wide(&text_not_found_message(language));
         let title = to_wide(&find_title(language));
-        MessageBoxW(
+        crate::message_box_modal(
             hwnd,
             PCWSTR(message.as_ptr()),
             PCWSTR(title.as_ptr()),
@@ -830,10 +816,21 @@ unsafe fn find_next_regex(
             return false;
         }
     };
-    let text = get_edit_text(hwnd_edit);
-    if text.is_empty() {
+    let original_text = get_edit_text(hwnd_edit);
+    if original_text.is_empty() {
         return false;
     }
+
+    // Only normalize \r\n to \n when dot_matches_newline is enabled
+    // This way, when disabled, \r\n remains two chars and . won't match newlines
+    let (text, index_map) = if options.dot_matches_newline {
+        normalize_line_endings_for_search(&original_text)
+    } else {
+        // No normalization - create identity mapping
+        let map: Vec<usize> = (0..=original_text.len()).collect();
+        (original_text.clone(), map)
+    };
+
     let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
     SendMessageW(
         hwnd_edit,
@@ -843,7 +840,17 @@ unsafe fn find_next_regex(
     );
     let down = (flags & FR_DOWN) != FINDREPLACE_FLAGS(0);
     let start_utf16 = if down { cr.cpMax } else { cr.cpMin };
-    let start_byte = utf16_index_to_byte(&text, start_utf16);
+    let start_byte_original = utf16_index_to_byte(&original_text, start_utf16);
+    // Find the normalized index that corresponds to this original index
+    let start_byte = if options.dot_matches_newline {
+        index_map
+            .iter()
+            .position(|&orig| orig >= start_byte_original)
+            .unwrap_or(text.len())
+    } else {
+        start_byte_original
+    };
+
     let found = if down {
         regex_find_forward(&regex, &text, start_byte).or_else(|| {
             if wrap {
@@ -861,12 +868,23 @@ unsafe fn find_next_regex(
             }
         })
     };
-    let Some((start, end)) = found else {
+    let Some((norm_start, norm_end)) = found else {
         return false;
     };
+
+    // Map indices back to original text
+    let (orig_start, orig_end) = if options.dot_matches_newline {
+        (
+            map_normalized_to_original(&index_map, norm_start),
+            map_normalized_to_original(&index_map, norm_end),
+        )
+    } else {
+        (norm_start, norm_end)
+    };
+
     let mut sel = CHARRANGE {
-        cpMin: byte_index_to_utf16(&text, start),
-        cpMax: byte_index_to_utf16(&text, end),
+        cpMin: byte_index_to_utf16(&original_text, orig_start),
+        cpMax: byte_index_to_utf16(&original_text, orig_end),
     };
     std::mem::swap(&mut sel.cpMin, &mut sel.cpMax);
     SendMessageW(
@@ -1026,7 +1044,7 @@ unsafe fn replace_all_regex(
     if total_count == 0 {
         let message = to_wide(&text_not_found_message(language));
         let title = to_wide(&find_title(language));
-        MessageBoxW(
+        crate::message_box_modal(
             hwnd,
             PCWSTR(message.as_ptr()),
             PCWSTR(title.as_ptr()),
@@ -1064,7 +1082,7 @@ unsafe fn replace_all_in_all_docs(
     if total_count == 0 {
         let message = to_wide(&text_not_found_message(language));
         let title = to_wide(&find_title(language));
-        MessageBoxW(
+        crate::message_box_modal(
             hwnd,
             PCWSTR(message.as_ptr()),
             PCWSTR(title.as_ptr()),
@@ -1102,7 +1120,7 @@ unsafe fn replace_all_in_selection(
     if count == 0 {
         let message = to_wide(&text_not_found_message(language));
         let title = to_wide(&find_title(language));
-        MessageBoxW(
+        crate::message_box_modal(
             hwnd,
             PCWSTR(message.as_ptr()),
             PCWSTR(title.as_ptr()),
@@ -1204,6 +1222,38 @@ unsafe fn replace_range_text(hwnd_edit: HWND, start_utf16: i32, end_utf16: i32, 
     );
 }
 
+/// Normalizes Windows line endings (\r\n) to Unix (\n) for regex searching.
+/// Returns the normalized text and a mapping from normalized byte indices to original byte indices.
+fn normalize_line_endings_for_search(text: &str) -> (String, Vec<usize>) {
+    let mut normalized = String::with_capacity(text.len());
+    let mut index_map = Vec::with_capacity(text.len() + 1);
+
+    let mut chars = text.char_indices().peekable();
+    while let Some((orig_idx, ch)) = chars.next() {
+        if ch == '\r'
+            && let Some(&(_, '\n')) = chars.peek()
+        {
+            // Skip \r, the \n will be added in next iteration
+            continue;
+        }
+        index_map.push(orig_idx);
+        normalized.push(ch);
+    }
+    // Map the end position
+    index_map.push(text.len());
+
+    (normalized, index_map)
+}
+
+/// Maps a byte index in normalized text back to byte index in original text
+fn map_normalized_to_original(index_map: &[usize], normalized_idx: usize) -> usize {
+    if normalized_idx >= index_map.len() {
+        *index_map.last().unwrap_or(&0)
+    } else {
+        index_map[normalized_idx]
+    }
+}
+
 fn utf16_index_to_byte(text: &str, target: i32) -> usize {
     if target <= 0 {
         return 0;
@@ -1233,4 +1283,160 @@ fn byte_index_to_utf16(text: &str, byte_idx: usize) -> i32 {
         utf16_count += ch.len_utf16();
     }
     utf16_count as i32
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_regex_dot_matches_space() {
+        let options = FindOptions {
+            use_regex: true,
+            dot_matches_newline: false,
+            wrap_around: false,
+            match_case: false,
+            whole_word: false,
+            replace_in_selection: false,
+            replace_in_all_docs: false,
+        };
+        let flags = FR_DOWN;
+        let regex = build_regex("hello.world", flags, &options).unwrap();
+        let text = "hello world";
+        let result = regex_find_forward(&regex, text, 0);
+        assert!(result.is_some(), "hello.world should match 'hello world'");
+        let (start, end) = result.unwrap();
+        assert_eq!(&text[start..end], "hello world");
+    }
+
+    #[test]
+    fn test_regex_dot_matches_newline_disabled() {
+        let options = FindOptions {
+            use_regex: true,
+            dot_matches_newline: false,
+            wrap_around: false,
+            match_case: false,
+            whole_word: false,
+            replace_in_selection: false,
+            replace_in_all_docs: false,
+        };
+        let flags = FR_DOWN;
+        let regex = build_regex("hello.world", flags, &options).unwrap();
+        let text = "hello\nworld";
+        let result = regex_find_forward(&regex, text, 0);
+        assert!(
+            result.is_none(),
+            "hello.world should NOT match 'hello\\nworld' without (?s)"
+        );
+    }
+
+    #[test]
+    fn test_regex_dot_matches_newline_enabled() {
+        let options = FindOptions {
+            use_regex: true,
+            dot_matches_newline: true,
+            wrap_around: false,
+            match_case: false,
+            whole_word: false,
+            replace_in_selection: false,
+            replace_in_all_docs: false,
+        };
+        let flags = FR_DOWN;
+        let regex = build_regex("hello.world", flags, &options).unwrap();
+        let text = "hello\nworld";
+        let result = regex_find_forward(&regex, text, 0);
+        assert!(
+            result.is_some(),
+            "hello.world should match 'hello\\nworld' with (?s)"
+        );
+    }
+
+    #[test]
+    fn test_regex_simple_space_verbose() {
+        // Exactly what the user is doing
+        let search = "hello.world";
+        let text = "hello world";
+
+        let options = FindOptions {
+            use_regex: true,
+            dot_matches_newline: false,
+            wrap_around: false,
+            match_case: false,
+            whole_word: false,
+            replace_in_selection: false,
+            replace_in_all_docs: false,
+        };
+        let flags = FR_DOWN;
+
+        println!("Search pattern: '{}'", search);
+        println!("Text: '{}'", text);
+        println!("Text bytes: {:?}", text.as_bytes());
+        println!("Text len: {}", text.len());
+
+        let regex = build_regex(search, flags, &options).unwrap();
+        println!("Built regex pattern: {:?}", regex.as_str());
+
+        // Direct regex test
+        let direct_match = regex.find(text);
+        println!("Direct regex.find result: {:?}", direct_match);
+
+        // Through our function
+        let result = regex_find_forward(&regex, text, 0);
+        println!("regex_find_forward result: {:?}", result);
+
+        assert!(result.is_some(), "hello.world MUST match 'hello world'");
+    }
+
+    #[test]
+    fn test_regex_with_crlf_after_normalization() {
+        // Test that normalization converts \r\n to \n so hello.world matches
+        let options = FindOptions {
+            use_regex: true,
+            dot_matches_newline: true,
+            wrap_around: false,
+            match_case: false,
+            whole_word: false,
+            replace_in_selection: false,
+            replace_in_all_docs: false,
+        };
+        let flags = FR_DOWN;
+        let regex = build_regex("hello.world", flags, &options).unwrap();
+
+        // Original text with Windows line endings
+        let original_text = "hello\r\nworld";
+
+        // After normalization, \r\n becomes \n
+        let (normalized, index_map) = normalize_line_endings_for_search(original_text);
+        assert_eq!(normalized, "hello\nworld");
+
+        // Now the search should find it
+        let result = regex_find_forward(&regex, &normalized, 0);
+        assert!(
+            result.is_some(),
+            "hello.world should match 'hello\\r\\nworld' after normalization"
+        );
+
+        // Verify index mapping works correctly
+        let (norm_start, norm_end) = result.unwrap();
+        let orig_start = map_normalized_to_original(&index_map, norm_start);
+        let orig_end = map_normalized_to_original(&index_map, norm_end);
+
+        // The match in normalized text is "hello\nworld" (0..11)
+        // In original text, it should map to "hello\r\nworld" (0..12)
+        assert_eq!(orig_start, 0);
+        assert_eq!(orig_end, 12); // 12 because original has \r\n (2 chars) instead of \n (1 char)
+    }
+
+    #[test]
+    fn test_normalize_line_endings() {
+        let (normalized, index_map) = normalize_line_endings_for_search("a\r\nb\r\nc");
+        assert_eq!(normalized, "a\nb\nc");
+        // index_map should map: 0->0 (a), 1->1 (\n, skipping \r at 1), 2->3 (b), 3->4 (\n), 4->6 (c), 5->7 (end)
+        assert_eq!(index_map[0], 0); // 'a'
+        assert_eq!(index_map[1], 2); // '\n' (original position after \r)
+        assert_eq!(index_map[2], 3); // 'b'
+        assert_eq!(index_map[3], 5); // '\n'
+        assert_eq!(index_map[4], 6); // 'c'
+        assert_eq!(index_map[5], 7); // end
+    }
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+Versione 0.6.4 – 2026-01-30
+Miglioramenti
+• Il programma e' stato rinominato in Sonarpad per dare maggiore enfasi a suono e audio, che sono la chiave di questo programma.
+• Arricchite le categorie dei podcast.
+Correzioni di bug
+• Corretto un bug per cui gli audiolibri con SAPI4 potevano essere creati in modo diverso da quanto previsto.
+
 Versione 0.6.3 – 2026-01-30
 Miglioramenti
 • Migliorata la rilevazione del microfono.

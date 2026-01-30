@@ -1,259 +1,407 @@
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Stream, SupportedStreamConfig};
+//! Audio monitoring using WASAPI directly (same as podcast recorder)
+//! This ensures device IDs match between the UI list and actual capture.
+
+use crate::com_guard::ComGuard;
+use crate::settings::PODCAST_DEVICE_DEFAULT;
 use std::collections::VecDeque;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::thread::{self, JoinHandle};
+use std::time::Duration;
+use windows::Win32::Media::Audio::{
+    AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, IAudioCaptureClient, IAudioClient,
+    IAudioRenderClient, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator, WAVEFORMATEX,
+    WAVEFORMATEXTENSIBLE, eCapture, eConsole, eRender,
+};
+use windows::Win32::Media::KernelStreaming::WAVE_FORMAT_EXTENSIBLE;
+use windows::Win32::Media::Multimedia::{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT};
+use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
+use windows::core::PCWSTR;
 
 pub struct MonitorHandle {
-    _input_stream: Stream,
-    _output_stream: Stream,
+    stop: Arc<AtomicBool>,
+    capture_thread: Option<JoinHandle<()>>,
+    playback_thread: Option<JoinHandle<()>>,
 }
 
 impl MonitorHandle {
-    pub fn stop(self) {
-        // Dropping the streams stops them
+    pub fn stop(mut self) {
+        self.stop.store(true, Ordering::SeqCst);
+        if let Some(handle) = self.capture_thread.take() {
+            crate::log_if_err!(handle.join());
+        }
+        if let Some(handle) = self.playback_thread.take() {
+            crate::log_if_err!(handle.join());
+        }
     }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SampleFormat {
+    I16,
+    F32,
 }
 
 /// Starts audio monitoring with the specified device and gain.
 ///
 /// # Arguments
-/// * `device_id` - The device ID to use (or PODCAST_DEVICE_DEFAULT for default)
-/// * `device_name` - The device name to match (used as fallback)
+/// * `device_id` - The Windows MMDevice ID to use (or PODCAST_DEVICE_DEFAULT for default)
+/// * `_device_name` - The device name (unused, kept for API compatibility)
 /// * `gain` - Volume multiplier (1.0 = normal, 0.5 = half, 2.0 = double)
 pub fn start_monitoring(
     device_id: String,
-    device_name: String,
+    _device_name: String,
     gain: f32,
 ) -> Result<MonitorHandle, String> {
-    let host = cpal::default_host();
+    let stop = Arc::new(AtomicBool::new(false));
 
-    let input_device =
-        if device_id.is_empty() || device_id == crate::settings::PODCAST_DEVICE_DEFAULT {
-            host.default_input_device()
-        } else {
-            let mut found = None;
-            if let Ok(devices) = host.input_devices() {
-                for device in devices {
-                    if let Ok(desc) = device.description() {
-                        // Try exact match on description (cpal uses description as identifier)
-                        if desc.name() == device_name {
-                            found = Some(device);
-                            break;
-                        }
-                    }
-                }
-            }
-            found.or_else(|| host.default_input_device())
+    // Shared buffer between capture and playback threads (small for low latency)
+    let buffer = Arc::new(Mutex::new(VecDeque::<f32>::with_capacity(4800)));
+
+    // Start capture thread
+    let capture_stop = stop.clone();
+    let capture_buffer = buffer.clone();
+    let capture_device_id = device_id.clone();
+    let capture_thread = thread::spawn(move || {
+        if let Err(e) = capture_loop(capture_device_id, gain, capture_buffer, capture_stop) {
+            crate::log_debug(&format!("Monitor capture error: {}", e));
         }
-        .ok_or("No input device available")?;
+    });
 
-    let output_device = host
-        .default_output_device()
-        .ok_or("No output device available")?;
-
-    let input_config = input_device
-        .default_input_config()
-        .map_err(|e| format!("Failed to get input config: {}", e))?;
-    let output_config = output_device
-        .default_output_config()
-        .map_err(|e| format!("Failed to get output config: {}", e))?;
-
-    let in_sample_rate = input_config.sample_rate();
-    let out_sample_rate = output_config.sample_rate();
-    let in_channels = input_config.channels() as usize;
-    let out_channels = output_config.channels() as usize;
-
-    // Buffer holds mono samples at input sample rate, will be resampled and expanded to stereo on output
-    let buffer = Arc::new(Mutex::new(VecDeque::<f32>::with_capacity(48000 * 2)));
-    let buffer_producer = buffer.clone();
-    let buffer_consumer = buffer.clone();
-
-    let input_stream = match input_config.sample_format() {
-        cpal::SampleFormat::F32 => build_input_stream::<f32>(
-            &input_device,
-            &input_config,
-            buffer_producer,
-            in_channels,
-            gain,
-        ),
-        cpal::SampleFormat::I16 => build_input_stream::<i16>(
-            &input_device,
-            &input_config,
-            buffer_producer,
-            in_channels,
-            gain,
-        ),
-        cpal::SampleFormat::U16 => build_input_stream::<u16>(
-            &input_device,
-            &input_config,
-            buffer_producer,
-            in_channels,
-            gain,
-        ),
-        _ => Err("Unsupported input format".to_string()),
-    }?;
-
-    let output_stream = match output_config.sample_format() {
-        cpal::SampleFormat::F32 => build_output_stream::<f32>(
-            &output_device,
-            &output_config,
-            buffer_consumer,
-            out_channels,
-            in_sample_rate,
-            out_sample_rate,
-        ),
-        cpal::SampleFormat::I16 => build_output_stream::<i16>(
-            &output_device,
-            &output_config,
-            buffer_consumer,
-            out_channels,
-            in_sample_rate,
-            out_sample_rate,
-        ),
-        cpal::SampleFormat::U16 => build_output_stream::<u16>(
-            &output_device,
-            &output_config,
-            buffer_consumer,
-            out_channels,
-            in_sample_rate,
-            out_sample_rate,
-        ),
-        _ => Err("Unsupported output format".to_string()),
-    }?;
-
-    input_stream
-        .play()
-        .map_err(|e| format!("Failed to play input stream: {}", e))?;
-    output_stream
-        .play()
-        .map_err(|e| format!("Failed to play output stream: {}", e))?;
+    // Start playback thread
+    let playback_stop = stop.clone();
+    let playback_buffer = buffer;
+    let playback_thread = thread::spawn(move || {
+        if let Err(e) = playback_loop(playback_buffer, playback_stop) {
+            crate::log_debug(&format!("Monitor playback error: {}", e));
+        }
+    });
 
     Ok(MonitorHandle {
-        _input_stream: input_stream,
-        _output_stream: output_stream,
+        stop,
+        capture_thread: Some(capture_thread),
+        playback_thread: Some(playback_thread),
     })
 }
 
-fn build_input_stream<T>(
-    device: &cpal::Device,
-    config: &SupportedStreamConfig,
-    buffer: Arc<Mutex<VecDeque<f32>>>,
-    channels: usize,
-    gain: f32,
-) -> Result<Stream, String>
-where
-    T: cpal::Sample + cpal::SizedSample,
-    f32: From<T>,
-{
-    let err_fn = |err| crate::log_debug(&format!("Monitor Input Error: {}", err));
-    let stream = device
-        .build_input_stream(
-            &config.clone().into(),
-            move |data: &[T], _: &_| {
-                let mut q = buffer.lock().unwrap_or_else(|e| e.into_inner());
-                // If buffer too full, drop oldest to prevent memory growth
-                if q.len() > 96000 {
-                    let drop = data.len().min(q.len());
-                    q.drain(0..drop);
-                }
-                // Convert to mono f32 with gain, mix channels if stereo
-                for frame in data.chunks(channels) {
-                    let mono: f32 = if channels == 1 {
-                        f32::from(frame[0])
-                    } else {
-                        // Mix all channels to mono
-                        let sum: f32 = frame.iter().map(|&s| f32::from(s)).sum();
-                        sum / channels as f32
-                    };
-                    // Apply gain and clamp to avoid clipping
-                    let gained = (mono * gain).clamp(-1.0, 1.0);
-                    q.push_back(gained);
-                }
-            },
-            err_fn,
-            None,
-        )
-        .map_err(|e| e.to_string())?;
-    Ok(stream)
-}
+fn resolve_input_device(device_id: &str) -> Result<IMMDevice, String> {
+    let enumerator: IMMDeviceEnumerator = unsafe {
+        CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
+            .map_err(|e| format!("MMDeviceEnumerator failed: {e}"))?
+    };
 
-fn build_output_stream<T>(
-    device: &cpal::Device,
-    config: &SupportedStreamConfig,
-    buffer: Arc<Mutex<VecDeque<f32>>>,
-    out_channels: usize,
-    in_sample_rate: u32,
-    out_sample_rate: u32,
-) -> Result<Stream, String>
-where
-    T: cpal::Sample + cpal::SizedSample + cpal::FromSample<f32>,
-{
-    let err_fn = |err| crate::log_debug(&format!("Monitor Output Error: {}", err));
-
-    // Calculate resampling ratio (how many input samples per output sample)
-    let resample_ratio = in_sample_rate as f64 / out_sample_rate as f64;
-
-    // State for linear interpolation resampling
-    let resample_state = Arc::new(Mutex::new(ResampleState {
-        position: 0.0,
-        last_sample: 0.0,
-    }));
-
-    let stream = device
-        .build_output_stream(
-            &config.clone().into(),
-            move |data: &mut [T], _: &_| {
-                let mut q = buffer.lock().unwrap_or_else(|e| e.into_inner());
-                let mut rs = resample_state.lock().unwrap_or_else(|e| e.into_inner());
-
-                // Buffer contains mono samples at input rate
-                // We need to output stereo samples at output rate
-                let frames_needed = data.len() / out_channels;
-
-                for frame_idx in 0..frames_needed {
-                    // Get the resampled mono sample
-                    let mono_sample =
-                        if (in_sample_rate == out_sample_rate) || resample_ratio == 1.0 {
-                            // No resampling needed
-                            q.pop_front().unwrap_or(0.0)
-                        } else {
-                            // Linear interpolation resampling
-                            resample_sample(&mut q, &mut rs, resample_ratio)
-                        };
-
-                    // Write mono sample to all output channels (expand to stereo)
-                    for ch in 0..out_channels {
-                        data[frame_idx * out_channels + ch] = T::from_sample(mono_sample);
-                    }
-                }
-            },
-            err_fn,
-            None,
-        )
-        .map_err(|e| e.to_string())?;
-    Ok(stream)
-}
-
-struct ResampleState {
-    position: f64,
-    last_sample: f32,
-}
-
-/// Simple linear interpolation resampling
-fn resample_sample(buffer: &mut VecDeque<f32>, state: &mut ResampleState, ratio: f64) -> f32 {
-    // Advance position by the ratio
-    state.position += ratio;
-
-    // Consume samples from buffer as needed
-    while state.position >= 1.0 {
-        state.last_sample = buffer.pop_front().unwrap_or(state.last_sample);
-        state.position -= 1.0;
+    if device_id.is_empty() || device_id == PODCAST_DEVICE_DEFAULT {
+        crate::log_debug("Monitor: using default input device");
+        return unsafe {
+            enumerator
+                .GetDefaultAudioEndpoint(eCapture, eConsole)
+                .map_err(|e| format!("GetDefaultAudioEndpoint(capture) failed: {e}"))
+        };
     }
 
-    // Get next sample for interpolation
-    let next_sample = buffer.front().copied().unwrap_or(state.last_sample);
+    crate::log_debug(&format!("Monitor: looking for device_id='{}'", device_id));
+    let wide = crate::accessibility::to_wide(device_id);
+    let result = unsafe {
+        enumerator
+            .GetDevice(PCWSTR(wide.as_ptr()))
+            .map_err(|e| format!("GetDevice({}) failed: {e}", device_id))
+    };
+    if result.is_ok() {
+        crate::log_debug("Monitor: input device found successfully");
+    }
+    result
+}
 
-    // Linear interpolation between last and next sample
-    let t = state.position as f32;
-    state.last_sample * (1.0 - t) + next_sample * t
+fn resolve_output_device() -> Result<IMMDevice, String> {
+    let enumerator: IMMDeviceEnumerator = unsafe {
+        CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
+            .map_err(|e| format!("MMDeviceEnumerator failed: {e}"))?
+    };
+
+    unsafe {
+        enumerator
+            .GetDefaultAudioEndpoint(eRender, eConsole)
+            .map_err(|e| format!("GetDefaultAudioEndpoint(render) failed: {e}"))
+    }
+}
+
+fn parse_format(fmt: &WAVEFORMATEX) -> (u32, u16, SampleFormat) {
+    let channels = fmt.nChannels;
+    let rate = fmt.nSamplesPerSec;
+    let mut format = match fmt.wFormatTag as u32 {
+        WAVE_FORMAT_IEEE_FLOAT => SampleFormat::F32,
+        _ => SampleFormat::I16,
+    };
+    if fmt.wFormatTag as u32 == WAVE_FORMAT_EXTENSIBLE {
+        let ext = unsafe { &*(fmt as *const _ as *const WAVEFORMATEXTENSIBLE) };
+        let subformat = unsafe { std::ptr::read_unaligned(std::ptr::addr_of!(ext.SubFormat)) };
+        if subformat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT {
+            format = SampleFormat::F32;
+        } else {
+            format = SampleFormat::I16;
+        }
+    }
+    (rate, channels, format)
+}
+
+fn read_samples(ptr: *mut u8, frames: u32, channels: u16, format: SampleFormat) -> Vec<f32> {
+    let sample_count = frames as usize * channels as usize;
+    if ptr.is_null() || sample_count == 0 {
+        return Vec::new();
+    }
+    unsafe {
+        match format {
+            SampleFormat::F32 => {
+                let slice = std::slice::from_raw_parts(ptr as *const f32, sample_count);
+                slice.to_vec()
+            }
+            SampleFormat::I16 => {
+                let slice = std::slice::from_raw_parts(ptr as *const i16, sample_count);
+                slice.iter().map(|s| *s as f32 / i16::MAX as f32).collect()
+            }
+        }
+    }
+}
+
+fn to_mono_f32(samples: &[f32], channels: usize, gain: f32) -> Vec<f32> {
+    let frames = samples.len() / channels;
+    let mut out = Vec::with_capacity(frames);
+    for frame in 0..frames {
+        let base = frame * channels;
+        let sum: f32 = samples[base..base + channels].iter().sum();
+        let mono = sum / channels as f32;
+        out.push((mono * gain).clamp(-1.0, 1.0));
+    }
+    out
+}
+
+fn capture_loop(
+    device_id: String,
+    gain: f32,
+    buffer: Arc<Mutex<VecDeque<f32>>>,
+    stop: Arc<AtomicBool>,
+) -> Result<(), String> {
+    let _com = ComGuard::new_mta().map_err(|e| format!("CoInitializeEx failed: {e}"))?;
+
+    let device = resolve_input_device(&device_id)?;
+    let client: IAudioClient = unsafe {
+        device
+            .Activate(CLSCTX_ALL, None)
+            .map_err(|e| format!("AudioClient activate failed: {e}"))?
+    };
+
+    let mix_format = unsafe {
+        client
+            .GetMixFormat()
+            .map_err(|e| format!("GetMixFormat failed: {e}"))?
+    };
+    let (input_rate, input_channels, input_format) = parse_format(unsafe { &*mix_format });
+    crate::log_debug(&format!(
+        "Monitor capture: rate={}, channels={}, format={:?}",
+        input_rate,
+        input_channels,
+        match input_format {
+            SampleFormat::F32 => "F32",
+            SampleFormat::I16 => "I16",
+        }
+    ));
+
+    unsafe {
+        client
+            .Initialize(
+                AUDCLNT_SHAREMODE_SHARED,
+                0,
+                500_000, // 50ms buffer for low latency
+                0,
+                mix_format,
+                None,
+            )
+            .map_err(|e| format!("AudioClient initialize failed: {e}"))?;
+        CoTaskMemFree(Some(mix_format as *const _));
+    }
+
+    let capture: IAudioCaptureClient = unsafe {
+        client
+            .GetService()
+            .map_err(|e| format!("GetService capture failed: {e}"))?
+    };
+
+    unsafe {
+        client.Start().map_err(|e| format!("Start failed: {e}"))?;
+    }
+
+    while !stop.load(Ordering::SeqCst) {
+        let packet_len = unsafe {
+            capture
+                .GetNextPacketSize()
+                .map_err(|e| format!("GetNextPacketSize failed: {e}"))?
+        };
+
+        if packet_len == 0 {
+            thread::sleep(Duration::from_millis(5));
+            continue;
+        }
+
+        let mut data_ptr: *mut u8 = std::ptr::null_mut();
+        let mut frames = 0u32;
+        let mut flags = 0u32;
+        unsafe {
+            capture
+                .GetBuffer(&mut data_ptr, &mut frames, &mut flags, None, None)
+                .map_err(|e| format!("GetBuffer failed: {e}"))?;
+        }
+
+        let samples = if flags & (AUDCLNT_BUFFERFLAGS_SILENT.0 as u32) != 0 {
+            vec![0f32; frames as usize * input_channels as usize]
+        } else {
+            read_samples(data_ptr, frames, input_channels, input_format)
+        };
+
+        unsafe {
+            capture
+                .ReleaseBuffer(frames)
+                .map_err(|e| format!("ReleaseBuffer failed: {e}"))?;
+        }
+
+        // Convert to mono and apply gain
+        let mono = to_mono_f32(&samples, input_channels as usize, gain);
+
+        // Push to shared buffer
+        if let Ok(mut q) = buffer.lock() {
+            // Prevent buffer from growing too large (keep latency low)
+            if q.len() > 4800 {
+                q.clear(); // Drop all old samples to reset latency
+            }
+            q.extend(mono);
+        }
+    }
+
+    unsafe {
+        crate::log_if_err!(client.Stop());
+    }
+    Ok(())
+}
+
+fn playback_loop(buffer: Arc<Mutex<VecDeque<f32>>>, stop: Arc<AtomicBool>) -> Result<(), String> {
+    let _com = ComGuard::new_mta().map_err(|e| format!("CoInitializeEx failed: {e}"))?;
+
+    let device = resolve_output_device()?;
+    let client: IAudioClient = unsafe {
+        device
+            .Activate(CLSCTX_ALL, None)
+            .map_err(|e| format!("AudioClient activate failed: {e}"))?
+    };
+
+    let mix_format = unsafe {
+        client
+            .GetMixFormat()
+            .map_err(|e| format!("GetMixFormat failed: {e}"))?
+    };
+    let (output_rate, output_channels, output_format) = parse_format(unsafe { &*mix_format });
+    crate::log_debug(&format!(
+        "Monitor playback: rate={}, channels={}, format={:?}",
+        output_rate,
+        output_channels,
+        match output_format {
+            SampleFormat::F32 => "F32",
+            SampleFormat::I16 => "I16",
+        }
+    ));
+
+    let buffer_size = unsafe {
+        client
+            .Initialize(
+                AUDCLNT_SHAREMODE_SHARED,
+                0,
+                500_000, // 50ms buffer for low latency
+                0,
+                mix_format,
+                None,
+            )
+            .map_err(|e| format!("AudioClient initialize failed: {e}"))?;
+
+        client
+            .GetBufferSize()
+            .map_err(|e| format!("GetBufferSize failed: {e}"))?
+    };
+
+    let render: IAudioRenderClient = unsafe {
+        client
+            .GetService()
+            .map_err(|e| format!("GetService render failed: {e}"))?
+    };
+
+    unsafe {
+        client.Start().map_err(|e| format!("Start failed: {e}"))?;
+    }
+
+    while !stop.load(Ordering::SeqCst) {
+        let padding = unsafe {
+            client
+                .GetCurrentPadding()
+                .map_err(|e| format!("GetCurrentPadding failed: {e}"))?
+        };
+
+        let frames_available = buffer_size - padding;
+        if frames_available == 0 {
+            thread::sleep(Duration::from_millis(5));
+            continue;
+        }
+
+        let frames_to_write = frames_available.min(1024); // Write in small chunks
+
+        let data_ptr = unsafe {
+            render
+                .GetBuffer(frames_to_write)
+                .map_err(|e| format!("GetBuffer failed: {e}"))?
+        };
+
+        // Get samples from shared buffer
+        let mut samples_needed = frames_to_write as usize * output_channels as usize;
+        let mut output_samples = Vec::with_capacity(samples_needed);
+
+        if let Ok(mut q) = buffer.lock() {
+            while samples_needed > 0 && !q.is_empty() {
+                let mono = q.pop_front().unwrap_or(0.0);
+                // Expand mono to all output channels
+                for _ in 0..output_channels {
+                    output_samples.push(mono);
+                    samples_needed = samples_needed.saturating_sub(1);
+                }
+            }
+        }
+
+        // Fill remaining with silence
+        output_samples.resize(frames_to_write as usize * output_channels as usize, 0.0);
+
+        // Write to output buffer
+        unsafe {
+            match output_format {
+                SampleFormat::F32 => {
+                    let out_slice =
+                        std::slice::from_raw_parts_mut(data_ptr as *mut f32, output_samples.len());
+                    out_slice.copy_from_slice(&output_samples);
+                }
+                SampleFormat::I16 => {
+                    let out_slice =
+                        std::slice::from_raw_parts_mut(data_ptr as *mut i16, output_samples.len());
+                    for (i, &sample) in output_samples.iter().enumerate() {
+                        out_slice[i] = (sample.clamp(-1.0, 1.0) * i16::MAX as f32) as i16;
+                    }
+                }
+            }
+
+            render
+                .ReleaseBuffer(frames_to_write, 0)
+                .map_err(|e| format!("ReleaseBuffer failed: {e}"))?;
+        }
+
+        thread::sleep(Duration::from_millis(5));
+    }
+
+    unsafe {
+        crate::log_if_err!(client.Stop());
+        CoTaskMemFree(Some(mix_format as *const _));
+    }
+    Ok(())
 }

@@ -483,11 +483,17 @@ impl FfmpegSource {
             return Err("FFmpeg: codec parameters missing".to_string());
         }
 
-        let codec = unsafe { (api.avcodec_find_decoder)((*codecpar).codec_id) };
+        let codec_id = unsafe { (*codecpar).codec_id };
+        log_debug(&format!("FFmpeg: codec_id={}", codec_id));
+        let codec = unsafe { (api.avcodec_find_decoder)(codec_id) };
         if codec.is_null() {
             unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
-            return Err("FFmpeg: decoder not found".to_string());
+            return Err(format!(
+                "FFmpeg: decoder not found for codec_id={}",
+                codec_id
+            ));
         }
+        log_debug("FFmpeg: decoder found");
 
         let mut codec_ctx = unsafe { (api.avcodec_alloc_context3)(codec) };
         if codec_ctx.is_null() {

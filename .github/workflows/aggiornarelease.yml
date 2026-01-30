@@ -75,7 +75,7 @@ jobs:
         for artifact_dir in ./artifacts/*/; do
           if [ -d "$artifact_dir" ]; then
             echo "Processando artifact: $(basename "$artifact_dir")"
-            find "$artifact_dir" -maxdepth 2 -type f \( -name "*.exe" -o -name "*.msi" \) -print -exec cp "{}" release_files/ \;
+            find "$artifact_dir" -type f \( -name "*.exe" -o -name "*.msi" \) -print -exec cp "{}" release_files/ \;
           fi
         done
 

@@ -801,6 +801,15 @@ struct CaptureOptions {
 
 fn capture_source(options: CaptureOptions) -> Result<(), String> {
     let _com = ComGuard::new_mta().map_err(|e| format!("CoInitializeEx failed: {e}"))?;
+    crate::log_debug(&format!(
+        "capture_source: kind={:?}, device_id='{}', loopback={}",
+        match options.kind {
+            SourceKind::Microphone => "Microphone",
+            SourceKind::System => "System",
+        },
+        options.device_id,
+        options.loopback
+    ));
     let device = resolve_device(&options.device_id, options.loopback)?;
     let client: IAudioClient = unsafe {
         device
@@ -918,6 +927,10 @@ fn resolve_device(device_id: &str, loopback: bool) -> Result<IMMDevice, String> 
 
     if device_id.is_empty() || device_id == PODCAST_DEVICE_DEFAULT {
         let flow = if loopback { eRender } else { eCapture };
+        crate::log_debug(&format!(
+            "resolve_device: using default device (loopback={})",
+            loopback
+        ));
         return unsafe {
             enumerator
                 .GetDefaultAudioEndpoint(flow, eConsole)
@@ -925,12 +938,20 @@ fn resolve_device(device_id: &str, loopback: bool) -> Result<IMMDevice, String> 
         };
     }
 
+    crate::log_debug(&format!(
+        "resolve_device: looking for device_id='{}'",
+        device_id
+    ));
     let wide = crate::accessibility::to_wide(device_id);
-    unsafe {
+    let result = unsafe {
         enumerator
             .GetDevice(PCWSTR(wide.as_ptr()))
             .map_err(|e| format!("GetDevice({}) failed: {e}", device_id))
+    };
+    if result.is_ok() {
+        crate::log_debug("resolve_device: device found successfully");
     }
+    result
 }
 
 fn parse_format(fmt: &WAVEFORMATEX) -> (u32, u16, SampleFormat) {

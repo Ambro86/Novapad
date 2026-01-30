@@ -1,8 +1,8 @@
 # Journal des modifications
 
-Version 0.6.2 – 29/01/2026
+Version 0.6.2 – 30/01/2026
 Nouvelles fonctionnalités
-• Ajout de la prise en charge de l'exécution de fichiers (F5). Les utilisateurs peuvent sélectionner un interpréteur (par exemple, python) dans les Options, le rechercher sur l'ordinateur, et appuyer sur F5 exécute le script actuel. Les fichiers HTML s'ouvrent dans le navigateur.
+• Ajout de la prise en charge de l'exécution de fichiers (Shift+F5). Les utilisateurs peuvent sélectionner un interpréteur (par exemple, python) dans les Options, le rechercher sur l'ordinateur, et appuyer sur Shift+F5 exécute le script actuel. Les fichiers HTML s'ouvrent dans le navigateur.
 • Ajout de la prise en charge des fichiers pointeurs Google Docs (.gdoc, .gsheet, .gslides), qui s'ouvrent automatiquement dans le navigateur par défaut.
 • Ajout de la prise en charge du format de livre audio M4B (Apple/AAC).
 • Ajout de l'option "Afficher les épisodes" dans le menu contextuel des résultats de recherche de podcasts pour parcourir et lire des épisodes sans s'abonner.

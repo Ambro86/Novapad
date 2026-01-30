@@ -1,8 +1,8 @@
 # Dziennik zmian
 
-Wersja 0.6.2 – 29.01.2026
+Wersja 0.6.2 – 30.01.2026
 Nowe funkcje
-• Dodano obsługę wykonywania plików (F5). Użytkownicy mogą wybrać interpreter (np. python) w Opcjach, wyszukać go na komputerze, a naciśnięcie F5 uruchamia bieżący skrypt. Pliki HTML otwierają się w przeglądarce.
+• Dodano obsługę wykonywania plików (Shift+F5). Użytkownicy mogą wybrać interpreter (np. python) w Opcjach, wyszukać go na komputerze, a naciśnięcie Shift+F5 uruchamia bieżący skrypt. Pliki HTML otwierają się w przeglądarce.
 • Dodano obsługę plików wskaźników Google Docs (.gdoc, .gsheet, .gslides), które automatycznie otwierają się w domyślnej przeglądarce.
 • Dodano obsługę formatu audiobooków M4B (Apple/AAC).
 • Dodano opcję "Pokaż odcinki" w menu kontekstowym wyników wyszukiwania podcastów, aby przeglądać i odtwarzać odcinki bez subskrypcji.

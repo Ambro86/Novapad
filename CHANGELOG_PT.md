@@ -1,8 +1,8 @@
 # Changelog
 
-Versão 0.6.2 – 2026-01-29
+Versão 0.6.2 – 2026-01-30
 Novas funcionalidades
-• Adicionado suporte à execução de arquivos (F5). Os usuários podem selecionar um interpretador (ex. python) nas Opções, procurá-lo no computador, e pressionando F5 o script atual é executado. Arquivos HTML abrem no navegador.
+• Adicionado suporte à execução de arquivos (Shift+F5). Os usuários podem selecionar um interpretador (ex. python) nas Opções, procurá-lo no computador, e pressionando Shift+F5 o script atual é executado. Arquivos HTML abrem no navegador.
 • Adicionado suporte para arquivos de ponteiro do Google Docs (.gdoc, .gsheet, .gslides), que abrem automaticamente no navegador padrão.
 • Adicionado suporte para o formato de audiolivro M4B (Apple/AAC).
 • Adicionada a opção "Mostrar episódios" no menu de contexto dos resultados de pesquisa de podcasts para navegar e reproduzir episódios sem se inscrever.

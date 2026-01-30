@@ -1,8 +1,8 @@
 # Nhật ký thay đổi
 
-Phiên bản 0.6.2 – 2026-01-29
+Phiên bản 0.6.2 – 2026-01-30
 Tính năng mới
-• Thêm hỗ trợ chạy tệp (F5). Người dùng có thể chọn trình thông dịch (ví dụ: python) trong Tùy chọn, tìm kiếm trên máy tính, và nhấn F5 để chạy tập lệnh hiện tại. Các tệp HTML mở trong trình duyệt.
+• Thêm hỗ trợ chạy tệp (Shift+F5). Người dùng có thể chọn trình thông dịch (ví dụ: python) trong Tùy chọn, tìm kiếm trên máy tính, và nhấn Shift+F5 để chạy tập lệnh hiện tại. Các tệp HTML mở trong trình duyệt.
 • Thêm hỗ trợ cho các tệp con trỏ Google Docs (.gdoc, .gsheet, .gslides), tự động mở trong trình duyệt mặc định.
 • Thêm hỗ trợ định dạng sách nói M4B (Apple/AAC).
 • Thêm tùy chọn "Hiển thị tập" trong menu ngữ cảnh kết quả tìm kiếm podcast để duyệt và phát các tập mà không cần đăng ký.

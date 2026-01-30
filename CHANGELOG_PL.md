@@ -1,5 +1,12 @@
 # Dziennik zmian
 
+Wersja 0.6.3 – 30.01.2026
+Ulepszenia
+• Ulepszone wykrywanie mikrofonu.
+• Dodano natychmiastowe odtwarzanie dla wszystkich formatów.
+Poprawki błędów
+• Naprawiono awarię w oknie kategorii podcastów.
+
 Wersja 0.6.2 – 30.01.2026
 Nowe funkcje
 • Dodano obsługę wykonywania plików (Shift+F5). Użytkownicy mogą wybrać interpreter (np. python) w Opcjach, wyszukać go na komputerze, a naciśnięcie Shift+F5 uruchamia bieżący skrypt. Pliki HTML otwierają się w przeglądarce.

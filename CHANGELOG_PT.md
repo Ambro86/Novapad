@@ -1,5 +1,12 @@
 # Changelog
 
+Versão 0.6.3 – 2026-01-30
+Melhorias
+• Melhorada a detecção do microfone.
+• Adicionada reprodução instantânea para todos os formatos.
+Correções
+• Corrigido o travamento na janela de categorias de podcasts.
+
 Versão 0.6.2 – 2026-01-30
 Novas funcionalidades
 • Adicionado suporte à execução de arquivos (Shift+F5). Os usuários podem selecionar um interpretador (ex. python) nas Opções, procurá-lo no computador, e pressionando Shift+F5 o script atual é executado. Arquivos HTML abrem no navegador.

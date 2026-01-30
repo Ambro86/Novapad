@@ -1,5 +1,12 @@
 # Journal des modifications
 
+Version 0.6.3 – 30/01/2026
+Améliorations
+• Amélioration de la détection du microphone.
+• Ajout de la lecture instantanée pour tous les formats.
+Corrections de bugs
+• Correction du plantage dans la fenêtre des catégories de podcasts.
+
 Version 0.6.2 – 30/01/2026
 Nouvelles fonctionnalités
 • Ajout de la prise en charge de l'exécution de fichiers (Shift+F5). Les utilisateurs peuvent sélectionner un interpréteur (par exemple, python) dans les Options, le rechercher sur l'ordinateur, et appuyer sur Shift+F5 exécute le script actuel. Les fichiers HTML s'ouvrent dans le navigateur.

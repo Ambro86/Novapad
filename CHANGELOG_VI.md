@@ -1,5 +1,12 @@
 # Nhật ký thay đổi
 
+Phiên bản 0.6.3 – 2026-01-30
+Cải tiến
+• Cải thiện phát hiện micrô.
+• Thêm phát lại tức thì cho tất cả các định dạng.
+Sửa lỗi
+• Sửa lỗi sập trong cửa sổ danh mục podcast.
+
 Phiên bản 0.6.2 – 2026-01-30
 Tính năng mới
 • Thêm hỗ trợ chạy tệp (Shift+F5). Người dùng có thể chọn trình thông dịch (ví dụ: python) trong Tùy chọn, tìm kiếm trên máy tính, và nhấn Shift+F5 để chạy tập lệnh hiện tại. Các tệp HTML mở trong trình duyệt.

@@ -2407,6 +2407,7 @@ unsafe fn show_categories_dialog(parent_hwnd: HWND) {
 
     let language = with_podcast_state(parent_hwnd, |s| s.language).unwrap_or_default();
     let title = i18n::tr(language, "podcasts.categories.dialog.title");
+    let title_wide = to_wide(&title);
     let initial_source = match selected_search_provider(parent_hwnd) {
         SearchProvider::PodcastIndex => Source::PodcastIndex,
         SearchProvider::Itunes => Source::Apple,
@@ -2421,7 +2422,7 @@ unsafe fn show_categories_dialog(parent_hwnd: HWND) {
     let hwnd = CreateWindowExW(
         WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
         PCWSTR(class_name.as_ptr()),
-        PCWSTR(to_wide(&title).as_ptr()),
+        PCWSTR(title_wide.as_ptr()),
         WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_POPUP,
         windows::Win32::UI::WindowsAndMessaging::CW_USEDEFAULT,
         windows::Win32::UI::WindowsAndMessaging::CW_USEDEFAULT,

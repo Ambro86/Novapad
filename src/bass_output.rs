@@ -1,4 +1,5 @@
 use crate::accessibility::to_wide;
+use crate::bass_ffmpeg_stream::FfmpegBassStream;
 use crate::bass_sys::{
     BASS_ATTRIB_TEMPO, BASS_ATTRIB_TEMPO_PITCH, BASS_ATTRIB_VOL, BASS_FX_FREESOURCE, BASS_POS_BYTE,
     BASS_SAMPLE_FLOAT, BASS_STREAM_DECODE, BASS_STREAM_PRESCAN, BASS_UNICODE, BassApi, Dword,
@@ -14,6 +15,10 @@ use std::sync::{Arc, Mutex, OnceLock};
 pub struct BassOutput {
     api: &'static BassApi,
     handle: Mutex<Hstream>,
+    /// Keep FFmpeg stream alive while playing
+    _ffmpeg_stream: Option<FfmpegBassStream>,
+    /// Offset in seconds for FFmpeg streams (seek position)
+    start_offset_secs: f64,
 }
 
 static BASS_INIT: OnceLock<Result<(), String>> = OnceLock::new();
@@ -175,6 +180,87 @@ impl BassOutput {
         Ok(Arc::new(Self {
             api,
             handle: Mutex::new(handle),
+            _ffmpeg_stream: None,
+            start_offset_secs: 0.0,
+        }))
+    }
+
+    /// Start playback using FFmpeg streaming (no intermediate WAV file)
+    pub fn start_with_ffmpeg(
+        path: &Path,
+        start_seconds: u64,
+        speed: f32,
+        pitch: f32,
+        volume: f32,
+        paused: bool,
+    ) -> Result<Arc<Self>, String> {
+        init_bass_once()?;
+        let api = bass_api()?;
+        let fx_api = bass_fx_api().ok();
+
+        // Create FFmpeg stream with BASS callback
+        let (ffmpeg_stream, source_handle) = FfmpegBassStream::new(path, start_seconds)?;
+
+        let want_tempo = (speed != 1.0 || pitch != 0.0) && fx_api.is_some();
+        let handle = if want_tempo {
+            if let Some(fx_api) = fx_api {
+                let tempo_handle = unsafe {
+                    (fx_api.tempo_create)(source_handle, BASS_FX_FREESOURCE | BASS_SAMPLE_FLOAT)
+                };
+                if tempo_handle == 0 {
+                    log_bass_error(api, "BASS_FX_TempoCreate (ffmpeg)");
+                    source_handle
+                } else {
+                    let tempo = ((speed as f64 - 1.0) * 100.0) as f32;
+                    let tempo = tempo.clamp(-95.0, 5000.0);
+                    let set_ok = unsafe {
+                        (api.channel_set_attribute)(tempo_handle, BASS_ATTRIB_TEMPO, tempo)
+                    };
+                    if set_ok == 0 {
+                        log_bass_error(api, "BASS_ChannelSetAttribute tempo (ffmpeg)");
+                    }
+                    let pitch_clamped = pitch.clamp(-60.0, 60.0);
+                    let set_pitch_ok = unsafe {
+                        (api.channel_set_attribute)(
+                            tempo_handle,
+                            BASS_ATTRIB_TEMPO_PITCH,
+                            pitch_clamped,
+                        )
+                    };
+                    if set_pitch_ok == 0 {
+                        log_bass_error(api, "BASS_ChannelSetAttribute pitch (ffmpeg)");
+                    }
+                    tempo_handle
+                }
+            } else {
+                source_handle
+            }
+        } else {
+            if speed != 1.0 {
+                log_debug("BASS: bass_fx unavailable, forcing speed=1.0.");
+            }
+            source_handle
+        };
+
+        let volume = volume.clamp(0.0, 6.0);
+        let set_ok = unsafe { (api.channel_set_attribute)(handle, BASS_ATTRIB_VOL, volume) };
+        if set_ok == 0 {
+            log_bass_error(api, "BASS_ChannelSetAttribute volume (ffmpeg)");
+        }
+
+        if !paused {
+            let play_ok = unsafe { (api.channel_play)(handle, 0) };
+            if play_ok == 0 {
+                log_bass_error(api, "BASS_ChannelPlay (ffmpeg)");
+            }
+        }
+
+        log_debug("BASS: FFmpeg streaming started");
+        Ok(Arc::new(Self {
+            api,
+            handle: Mutex::new(handle),
+            _ffmpeg_stream: Some(ffmpeg_stream),
+            start_offset_secs: start_seconds as f64,
         }))
     }
 
@@ -225,7 +311,9 @@ impl BassOutput {
                 return None;
             }
         }
-        Some(unsafe { (self.api.channel_bytes2seconds)(handle, pos) }.max(0.0))
+        let bass_pos = unsafe { (self.api.channel_bytes2seconds)(handle, pos) }.max(0.0);
+        // Add start offset for FFmpeg streams that were seeked
+        Some(bass_pos + self.start_offset_secs)
     }
 
     pub fn clear_subtitles(&self) {

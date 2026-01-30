@@ -618,10 +618,12 @@ impl FfmpegSource {
             sent_eof: false,
         };
 
-        if start_seconds > 0
-            && let Err(err) = source.try_seek(Duration::from_secs(start_seconds))
-        {
-            log_debug(&format!("FFmpeg: initial seek failed: {}", err));
+        if start_seconds > 0 {
+            log_debug(&format!("FFmpeg: seeking to {}s", start_seconds));
+            match source.try_seek(Duration::from_secs(start_seconds)) {
+                Ok(()) => log_debug(&format!("FFmpeg: seek to {}s succeeded", start_seconds)),
+                Err(err) => log_debug(&format!("FFmpeg: initial seek failed: {}", err)),
+            }
         }
 
         Ok(source)
@@ -841,6 +843,7 @@ impl FfmpegSource {
 
     fn refill(&mut self) -> bool {
         if self.eof {
+            log_debug("FFmpeg refill: already eof");
             return false;
         }
 
@@ -854,7 +857,7 @@ impl FfmpegSource {
                 Ok(true) => return true,
                 Ok(false) => {}
                 Err(err) => {
-                    log_debug(&err);
+                    log_debug(&format!("FFmpeg refill: receive_frame error: {}", err));
                     return false;
                 }
             }
@@ -864,11 +867,16 @@ impl FfmpegSource {
                     return true;
                 }
                 self.eof = true;
+                log_debug("FFmpeg refill: sent_eof, setting eof=true");
                 return false;
             }
 
             let read_ret = unsafe { (self.api.av_read_frame)(self.fmt_ctx, self.packet) };
             if read_ret < 0 {
+                log_debug(&format!(
+                    "FFmpeg refill: av_read_frame returned {}",
+                    read_ret
+                ));
                 self.sent_eof = true;
                 let send_ret =
                     unsafe { (self.api.avcodec_send_packet)(self.codec_ctx, ptr::null()) };
@@ -942,6 +950,13 @@ impl Source for FfmpegSource {
 
     fn try_seek(&mut self, pos: Duration) -> Result<(), rodio::source::SeekError> {
         let target = (pos.as_secs_f64() * AV_TIME_BASE as f64) as i64;
+        log_debug(&format!(
+            "FFmpeg: try_seek to {} (target={}, eof={}, sent_eof={})",
+            pos.as_secs_f64(),
+            target,
+            self.eof,
+            self.sent_eof
+        ));
         let seek_ret = unsafe {
             (self.api.avformat_seek_file)(self.fmt_ctx, -1, i64::MIN, target, i64::MAX, 0)
         };
@@ -952,6 +967,7 @@ impl Source for FfmpegSource {
             ));
             return Err(rodio::source::SeekError::Other(Box::new(err)));
         }
+        log_debug("FFmpeg: avformat_seek_file succeeded");
 
         unsafe {
             (self.api.avcodec_flush_buffers)(self.codec_ctx);

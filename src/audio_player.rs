@@ -631,24 +631,51 @@ fn start_audiobook_at_with_options(
             Ok(output) => output,
             Err(err) => {
                 log_debug(&format!("Audio player: BASS open failed: {}", err));
-                match decode_ffmpeg_to_wav(&final_path) {
-                    Ok(wav_path) => match BassOutput::start(
-                        &wav_path,
-                        seconds,
-                        effective_speed,
-                        options.pitch,
-                        initial_volume,
-                        effective_paused,
-                    ) {
-                        Ok(output) => output,
-                        Err(err) => {
-                            log_debug(&format!("Audio player: BASS fallback failed: {}", err));
-                            return;
+                // Try FFmpeg streaming first (instant playback)
+                match BassOutput::start_with_ffmpeg(
+                    &final_path,
+                    seconds,
+                    effective_speed,
+                    options.pitch,
+                    initial_volume,
+                    effective_paused,
+                ) {
+                    Ok(output) => {
+                        log_debug("Audio player: using FFmpeg streaming");
+                        output
+                    }
+                    Err(stream_err) => {
+                        log_debug(&format!(
+                            "Audio player: FFmpeg streaming failed: {}",
+                            stream_err
+                        ));
+                        // Fallback to WAV decode (slower but reliable)
+                        match decode_ffmpeg_to_wav(&final_path) {
+                            Ok(wav_path) => match BassOutput::start(
+                                &wav_path,
+                                seconds,
+                                effective_speed,
+                                options.pitch,
+                                initial_volume,
+                                effective_paused,
+                            ) {
+                                Ok(output) => output,
+                                Err(err) => {
+                                    log_debug(&format!(
+                                        "Audio player: BASS fallback failed: {}",
+                                        err
+                                    ));
+                                    return;
+                                }
+                            },
+                            Err(err) => {
+                                log_debug(&format!(
+                                    "Audio player: FFmpeg fallback failed: {}",
+                                    err
+                                ));
+                                return;
+                            }
                         }
-                    },
-                    Err(err) => {
-                        log_debug(&format!("Audio player: FFmpeg fallback failed: {}", err));
-                        return;
                     }
                 }
             }

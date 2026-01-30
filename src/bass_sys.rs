@@ -20,6 +20,17 @@ pub const BASS_POS_BYTE: Dword = 0;
 pub const BASS_ATTRIB_VOL: Dword = 2;
 pub const BASS_ATTRIB_TEMPO: Dword = 0x0001_0000;
 pub const BASS_ATTRIB_TEMPO_PITCH: Dword = 0x0001_0001;
+
+/// BASS_StreamCreate callback: return number of bytes written, or BASS_STREAMPROC_END
+pub type StreamProc = unsafe extern "C" fn(
+    handle: Hstream,
+    buffer: *mut c_void,
+    length: Dword,
+    user: *mut c_void,
+) -> Dword;
+
+/// Return value to signal end of stream
+pub const BASS_STREAMPROC_END: Dword = 0x8000_0000;
 type BassInit = unsafe extern "C" fn(
     device: i32,
     freq: Dword,
@@ -47,6 +58,14 @@ type BassChannelSeconds2Bytes = unsafe extern "C" fn(handle: Dword, pos: f64) ->
 type BassChannelSetAttribute =
     unsafe extern "C" fn(handle: Dword, attrib: Dword, value: f32) -> Bool;
 
+type BassStreamCreate = unsafe extern "C" fn(
+    freq: Dword,
+    chans: Dword,
+    flags: Dword,
+    proc_: StreamProc,
+    user: *mut c_void,
+) -> Hstream;
+
 type BassFxTempoCreate = unsafe extern "C" fn(handle: Dword, flags: Dword) -> Hstream;
 
 pub struct BassApi {
@@ -55,6 +74,7 @@ pub struct BassApi {
     pub error_get_code: BassErrorGetCode,
     pub plugin_load: BassPluginLoad,
     pub stream_create_file: BassStreamCreateFile,
+    pub stream_create: BassStreamCreate,
     pub stream_free: BassStreamFree,
     pub channel_play: BassChannelPlay,
     pub channel_pause: BassChannelPause,
@@ -91,6 +111,7 @@ fn load_bass_api(path: &Path) -> Result<BassApi, String> {
         error_get_code: load_symbol(&lib, b"BASS_ErrorGetCode\0")?,
         plugin_load: load_symbol(&lib, b"BASS_PluginLoad\0")?,
         stream_create_file: load_symbol(&lib, b"BASS_StreamCreateFile\0")?,
+        stream_create: load_symbol(&lib, b"BASS_StreamCreate\0")?,
         stream_free: load_symbol(&lib, b"BASS_StreamFree\0")?,
         channel_play: load_symbol(&lib, b"BASS_ChannelPlay\0")?,
         channel_pause: load_symbol(&lib, b"BASS_ChannelPause\0")?,

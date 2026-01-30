@@ -36,6 +36,7 @@ mod search;
 use search::*;
 mod audio_player;
 use audio_player::*;
+mod bass_ffmpeg_stream;
 mod bass_output;
 mod bass_sys;
 mod editor_manager;

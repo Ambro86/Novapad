@@ -126,7 +126,7 @@ jobs:
           echo "Release ${RELEASE_VERSION} already exists. Skipping creation."
         else
           gh release create "${{ env.RELEASE_VERSION }}" \
-            --title "Novapad Release ${{ env.RELEASE_VERSION }}" \
+            --title "Sonarpad Release ${{ env.RELEASE_VERSION }}" \
             --notes "Build: ${{ steps.get_run.outputs.run_id }} (${{ steps.get_run.outputs.run_sha }})"
         fi
       env:

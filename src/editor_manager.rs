@@ -114,6 +114,19 @@ unsafe extern "system" fn edit_subclass_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    crate::panic_guard::guard(
+        "edit_subclass_proc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { edit_subclass_proc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn edit_subclass_proc_inner(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
     if msg == WM_CHAR {
         let ch = wparam.0 as u32;
         if matches!(

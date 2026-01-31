@@ -513,6 +513,19 @@ unsafe extern "system" fn find_replace_hook_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> usize {
+    crate::panic_guard::guard(
+        "find_replace_hook_proc",
+        || 0,
+        || unsafe { find_replace_hook_proc_inner(hdlg, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn find_replace_hook_proc_inner(
+    hdlg: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> usize {
     match msg {
         WM_INITDIALOG => {
             let fr = &*(lparam.0 as *const FINDREPLACEW);

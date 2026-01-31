@@ -183,6 +183,19 @@ unsafe extern "system" fn dictionary_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    crate::panic_guard::guard(
+        "dictionary_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { dictionary_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn dictionary_wndproc_inner(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
     match msg {
         WM_CREATE => {
             let create_struct = lparam.0 as *const CREATESTRUCTW;
@@ -553,6 +566,19 @@ unsafe fn open_entry_dialog(owner: HWND, index: Option<usize>) {
 }
 
 unsafe extern "system" fn dictionary_entry_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    crate::panic_guard::guard(
+        "dictionary_entry_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { dictionary_entry_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn dictionary_entry_wndproc_inner(
     hwnd: HWND,
     msg: u32,
     wparam: WPARAM,

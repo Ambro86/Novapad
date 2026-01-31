@@ -319,9 +319,15 @@ unsafe extern "system" fn rss_tree_compare(
     lparam2: LPARAM,
     _lparam_sort: LPARAM,
 ) -> i32 {
-    let a = lparam1.0;
-    let b = lparam2.0;
-    a.cmp(&b) as i32
+    crate::panic_guard::guard(
+        "rss_tree_compare",
+        || 0,
+        || {
+            let a = lparam1.0;
+            let b = lparam2.0;
+            a.cmp(&b) as i32
+        },
+    )
 }
 
 fn collect_root_items(hwnd_tree: HWND) -> Vec<windows::Win32::UI::Controls::HTREEITEM> {
@@ -1098,6 +1104,14 @@ unsafe extern "system" fn rss_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    crate::panic_guard::guard(
+        "rss_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { rss_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_CREATE => {
             let cs = lparam.0 as *const CREATESTRUCTW;
@@ -1649,6 +1663,14 @@ unsafe extern "system" fn reorder_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    crate::panic_guard::guard(
+        "reorder_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { reorder_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn reorder_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_CREATE => {
             let cs = lparam.0 as *const CREATESTRUCTW;
@@ -1852,6 +1874,14 @@ unsafe extern "system" fn rss_tree_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    crate::panic_guard::guard(
+        "rss_tree_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { rss_tree_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn rss_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN {
         let key = wparam.0 as u32;
         if key == u32::from(VK_APPS.0)
@@ -3559,6 +3589,19 @@ unsafe extern "system" fn reorder_control_subclass_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    crate::panic_guard::guard(
+        "reorder_control_subclass_proc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { reorder_control_subclass_proc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn reorder_control_subclass_proc_inner(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
     if msg == windows::Win32::UI::WindowsAndMessaging::WM_CHAR && wparam.0 as u16 == VK_TAB.0 {
         return LRESULT(0);
     }
@@ -3679,6 +3722,14 @@ unsafe extern "system" fn input_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    crate::panic_guard::guard(
+        "input_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { input_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn input_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_CREATE => {
             let cs = lparam.0 as *const CREATESTRUCTW;

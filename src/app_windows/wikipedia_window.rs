@@ -177,6 +177,14 @@ unsafe extern "system" fn wikipedia_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    crate::panic_guard::guard(
+        "wikipedia_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { wikipedia_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_CREATE => {
             let cs = lparam.0 as *const CREATESTRUCTW;
@@ -494,6 +502,14 @@ unsafe extern "system" fn tab_subclass_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    crate::panic_guard::guard(
+        "tab_subclass_proc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { tab_subclass_proc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if msg == windows::Win32::UI::WindowsAndMessaging::WM_KEYDOWN {
         let key = wparam.0 as u16;
         if key == windows::Win32::UI::Input::KeyboardAndMouse::VK_TAB.0 {

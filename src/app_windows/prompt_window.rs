@@ -313,6 +313,19 @@ unsafe extern "system" fn simple_prompt_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    crate::panic_guard::guard(
+        "simple_prompt_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { simple_prompt_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn simple_prompt_wndproc_inner(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
     match msg {
         WM_CREATE => {
             let create_struct =
@@ -661,6 +674,14 @@ unsafe extern "system" fn prompt_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    crate::panic_guard::guard(
+        "prompt_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { prompt_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_CREATE => {
             let create_struct =
@@ -1172,12 +1193,20 @@ unsafe extern "system" fn prompt_wndproc(
             if wparam.0 == PROMPT_OUTPUT_TIMER_ID {
                 if with_prompt_state(hwnd, |state| {
                     let mut budget = PROMPT_OUTPUT_FLUSH_CHARS;
+                    let mut merged = String::new();
                     while budget > 0 {
                         let Some(chunk) = state.output_queue.pop_front() else {
                             break;
                         };
+                        if merged.is_empty() && chunk.len() > budget {
+                            append_output(state, &chunk);
+                            break;
+                        }
                         budget = budget.saturating_sub(chunk.len());
-                        append_output(state, &chunk);
+                        merged.push_str(&chunk);
+                    }
+                    if !merged.is_empty() {
+                        append_output(state, &merged);
                     }
                     if state.output_queue.is_empty() {
                         state.output_flush_active = false;
@@ -1428,6 +1457,9 @@ fn start_output_reader(
                 apply_prevent_sleep(true);
             }
             let chunk = String::from_utf8_lossy(&buffer[..read as usize]).to_string();
+            if chunk.trim().is_empty() {
+                continue;
+            }
             let payload = Box::new(chunk);
             unsafe {
                 let payload_ptr = Box::into_raw(payload);
@@ -1696,11 +1728,16 @@ fn append_output(state: &mut PromptState, text: &str) {
         delta.clone() // Clone for debug log
     };
 
+    if replace_text.is_empty() {
+        return;
+    }
+    if !replace_text.trim().is_empty() && replace_text.len() <= 200 {
+        log_debug(&format!(
+            "Prompt: appending output '{}'",
+            replace_text.trim()
+        ));
+    }
     let wide = to_wide(&replace_text);
-    log_debug(&format!(
-        "Prompt: appending output '{}'",
-        replace_text.trim()
-    ));
     unsafe {
         SendMessageW(
             output,

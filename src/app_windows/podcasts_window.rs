@@ -334,7 +334,7 @@ fn import_podcast_sources_from_file(hwnd: HWND, path: &Path) -> Option<usize> {
                     url: url.clone(),
                     kind: rss::RssSourceType::Feed,
                     user_title: title.trim() != url.trim(),
-                    unread: false,
+                    unread: true,
                     cache: rss::RssFeedCache::default(),
                     last_seen_guid: None,
                     last_updated: None,
@@ -1599,7 +1599,7 @@ unsafe fn add_podcast_source(parent: HWND, feed_url: &str, title: &str) -> Optio
             url: normalized,
             kind: RssSourceType::Feed,
             user_title: !title.trim().is_empty(),
-            unread: false,
+            unread: true,
             cache: rss::RssFeedCache::default(),
             last_seen_guid: None,
             last_updated: None,
@@ -6093,6 +6093,7 @@ unsafe extern "system" fn podcast_wndproc(
                                 set_source_unheard(hwnd, HTREEITEM(msg.hitem), true);
                             }
                         } else if has_items {
+                            // First load: user expanded the feed, mark as heard
                             set_source_unheard(hwnd, HTREEITEM(msg.hitem), false);
                         }
                     }

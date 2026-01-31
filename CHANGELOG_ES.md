@@ -3,6 +3,12 @@
 Version 0.6.4 – 2026-01-30
 Mejoras
 • El programa se ha renombrado a Sonarpad para dar mayor enfasis al sonido y al audio, que son la clave de este programa.
+• Añadida la selección de pistas de audio en el menú Reproducción para archivos multimedia con múltiples pistas de audio (ej. MKV con varios idiomas).
+• Los podcasts ahora indican claramente los no escuchados con el prefijo "No escuchado" antes del nombre.
+• Nuevo sistema de etiquetas para cambiar la voz en el texto. Ejemplos:
+  - Voces Microsoft (Edge): <voice edge it-IT-IsabellaNeural>Hola</voice>
+  - Voces SAPI5: <voice sapi5 Microsoft Helena Desktop>Hola</voice>
+  - Voces SAPI4: <voice sapi4 #1>Hola</voice>
 • Enriquecidas las categorias de podcasts.
 Correcciones de errores
 • Corregido un error por el cual los audiolibros con SAPI4 podian crearse de forma diferente a lo esperado.

@@ -42,9 +42,9 @@ use crate::i18n;
 use crate::settings::{DictionaryEntry, Language, TtsEngine};
 use crate::tts_engine::{
     MixedAudiobookConfig, TtsChunk, build_audiobook_parts_by_positions,
-    build_mixed_audiobook_parts_by_positions, collect_marker_entries, prepare_tts_text,
-    render_mixed_audiobook_part, run_tts_audiobook_part, split_into_tts_chunks, split_text,
-    strip_dashed_lines,
+    build_mixed_audiobook_parts_by_positions, collect_marker_entries, has_voice_tags,
+    prepare_tts_text, render_mixed_audiobook_part, run_tts_audiobook_part, split_into_tts_chunks,
+    split_text, strip_dashed_lines,
 };
 use crate::{log_debug, sanitize_filename, show_error, with_state};
 
@@ -204,12 +204,6 @@ struct TtsSettings {
     tts_rate: i32,
     tts_pitch: i32,
     tts_volume: i32,
-    use_dialogue_voice: bool,
-    dialogue_voice: String,
-    dialogue_tts_engine: TtsEngine,
-    dialogue_voice_rate: i32,
-    dialogue_voice_pitch: i32,
-    dialogue_voice_volume: i32,
     language: Language,
 }
 
@@ -1473,12 +1467,6 @@ fn load_tts_settings(parent: HWND, voice: String, language: Language) -> TtsSett
             tts_rate: state.settings.tts_rate,
             tts_pitch: state.settings.tts_pitch,
             tts_volume: state.settings.tts_volume,
-            use_dialogue_voice: state.settings.use_dialogue_voice,
-            dialogue_voice: state.settings.dialogue_voice.clone(),
-            dialogue_tts_engine: state.settings.dialogue_tts_engine,
-            dialogue_voice_rate: state.settings.dialogue_voice_rate,
-            dialogue_voice_pitch: state.settings.dialogue_voice_pitch,
-            dialogue_voice_volume: state.settings.dialogue_voice_volume,
             language,
         })
         .unwrap_or_else(|| TtsSettings {
@@ -1493,12 +1481,6 @@ fn load_tts_settings(parent: HWND, voice: String, language: Language) -> TtsSett
             tts_rate: 0,
             tts_pitch: 0,
             tts_volume: 100,
-            use_dialogue_voice: false,
-            dialogue_voice: String::new(),
-            dialogue_tts_engine: TtsEngine::Edge,
-            dialogue_voice_rate: 0,
-            dialogue_voice_pitch: 0,
-            dialogue_voice_volume: 100,
             language,
         })
     }
@@ -1700,13 +1682,7 @@ fn export_single_audiobook(
         return Err(crate::settings::tts_no_text_message(tts.language));
     }
     let cleaned = strip_dashed_lines(&text);
-    let has_custom_voice = tts.dictionary.iter().any(|entry| {
-        entry.use_custom_voice
-            && entry.custom_voice_engine.is_some()
-            && entry.custom_voice.as_ref().is_some_and(|v| !v.is_empty())
-    });
-    let mixed_needed =
-        has_custom_voice || (tts.use_dialogue_voice && tts.dialogue_tts_engine != tts.tts_engine);
+    let mixed_needed = has_voice_tags(&cleaned);
 
     let (parts, mixed_parts) = if tts.audiobook_split_by_text {
         let (normalized, entries) = collect_marker_entries(
@@ -1726,6 +1702,7 @@ fn export_single_audiobook(
                         &positions,
                         tts.split_on_newline,
                         &tts.dictionary,
+                        tts.tts_engine,
                     ),
                 )
             } else {
@@ -1748,7 +1725,12 @@ fn export_single_audiobook(
         let parts = match mixed_parts {
             Some(parts) => parts,
             None => {
-                let chunks = split_into_tts_chunks(&cleaned, tts.split_on_newline, &tts.dictionary);
+                let chunks = split_into_tts_chunks(
+                    &cleaned,
+                    tts.split_on_newline,
+                    &tts.dictionary,
+                    tts.tts_engine,
+                );
                 split_tts_chunks_by_count(&chunks, tts.audiobook_split)
             }
         };
@@ -1971,14 +1953,6 @@ fn export_parts(
                     rate: tts.tts_rate,
                     pitch: tts.tts_pitch,
                     volume: tts.tts_volume,
-                    dialogue_voice: if tts.use_dialogue_voice && !tts.dialogue_voice.is_empty() {
-                        Some(tts.dialogue_voice.clone())
-                    } else {
-                        None
-                    },
-                    dialogue_rate: tts.dialogue_voice_rate,
-                    dialogue_pitch: tts.dialogue_voice_pitch,
-                    dialogue_volume: tts.dialogue_voice_volume,
                     sapi4_threads: None,
                 };
                 run_tts_audiobook_part(part_chunks, &mut progress, &options)?;
@@ -1992,20 +1966,11 @@ fn export_parts(
                     crate::sapi5_engine::SapiExportOptions {
                         chunks: part_chunks,
                         voice_name: &tts.voice,
-                        dialogue_voice: if tts.use_dialogue_voice && !tts.dialogue_voice.is_empty()
-                        {
-                            Some(tts.dialogue_voice.clone())
-                        } else {
-                            None
-                        },
                         output_path: output,
                         language: tts.language,
                         rate: tts.tts_rate,
                         pitch: tts.tts_pitch,
                         volume: tts.tts_volume,
-                        dialogue_rate: tts.dialogue_voice_rate,
-                        dialogue_pitch: tts.dialogue_voice_pitch,
-                        dialogue_volume: tts.dialogue_voice_volume,
                         cancel: cancel.clone(),
                     },
                     |_chunk_idx| {
@@ -2027,11 +1992,6 @@ fn export_parts_mixed(
     if parts.len() != outputs.len() {
         return Err("Output count mismatch.".to_string());
     }
-    let dialogue_voice = if tts.use_dialogue_voice && !tts.dialogue_voice.is_empty() {
-        Some(tts.dialogue_voice.clone())
-    } else {
-        None
-    };
     let mut progress = 0usize;
     for (part_idx, part_chunks) in parts.iter().enumerate() {
         if cancel.load(Ordering::SeqCst) {
@@ -2047,17 +2007,10 @@ fn export_parts_mixed(
             rate: tts.tts_rate,
             pitch: tts.tts_pitch,
             volume: tts.tts_volume,
-            dialogue_voice: dialogue_voice.clone(),
-            dialogue_rate: tts.dialogue_voice_rate,
-            dialogue_pitch: tts.dialogue_voice_pitch,
-            dialogue_volume: tts.dialogue_voice_volume,
             sapi4_threads: None,
         };
         let config = MixedAudiobookConfig {
             main_engine: tts.tts_engine,
-            use_dialogue_voice: tts.use_dialogue_voice,
-            dialogue_voice: dialogue_voice.clone(),
-            dialogue_engine: tts.dialogue_tts_engine,
         };
         render_mixed_audiobook_part(part_chunks, &mut progress, output, &options, &config)?;
     }

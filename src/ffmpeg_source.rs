@@ -14,6 +14,26 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::Duration;
 
 const AV_NOPTS_VALUE_I64: i64 = i64::MIN;
+const AV_DICT_IGNORE_SUFFIX: i32 = 2;
+
+/// Metadata about an audio stream in a media file.
+#[derive(Debug, Clone)]
+pub struct AudioStreamInfo {
+    /// Stream index (used to select this stream).
+    pub index: i32,
+    /// Language code (e.g., "eng", "ita") if available.
+    pub language: Option<String>,
+    /// Stream title/name if available.
+    pub title: Option<String>,
+    /// Codec name (e.g., "aac", "ac3", "opus").
+    pub codec: String,
+    /// Number of channels.
+    pub channels: i32,
+    /// Sample rate in Hz.
+    pub sample_rate: i32,
+    /// Whether this is the default stream.
+    pub is_default: bool,
+}
 
 type AvformatNetworkInit = unsafe extern "C" fn() -> libc::c_int;
 type AvformatOpenInput = unsafe extern "C" fn(
@@ -117,6 +137,12 @@ type AvChannelLayoutUninit = unsafe extern "C" fn(*mut AVChannelLayout);
 type AvioOpen =
     unsafe extern "C" fn(*mut *mut AVIOContext, *const libc::c_char, libc::c_int) -> libc::c_int;
 type AvioClosep = unsafe extern "C" fn(*mut *mut AVIOContext) -> libc::c_int;
+type AvDictGet = unsafe extern "C" fn(
+    *const AVDictionary,
+    *const libc::c_char,
+    *const AVDictionaryEntry,
+    libc::c_int,
+) -> *mut AVDictionaryEntry;
 
 pub(crate) struct FfmpegApi {
     _libs: Vec<Library>,
@@ -169,6 +195,7 @@ pub(crate) struct FfmpegApi {
     pub(crate) av_channel_layout_uninit: AvChannelLayoutUninit,
     pub(crate) avio_open: AvioOpen,
     pub(crate) avio_closep: AvioClosep,
+    pub(crate) av_dict_get: AvDictGet,
 }
 
 fn load_symbol<T: Copy>(lib: &Library, name: &[u8]) -> Result<T, String> {
@@ -281,6 +308,7 @@ fn load_ffmpeg_api() -> Result<FfmpegApi, String> {
     let av_channel_layout_copy = load_symbol(avutil, b"av_channel_layout_copy\0")?;
     let av_channel_layout_default = load_symbol(avutil, b"av_channel_layout_default\0")?;
     let av_channel_layout_uninit = load_symbol(avutil, b"av_channel_layout_uninit\0")?;
+    let av_dict_get = load_symbol(avutil, b"av_dict_get\0")?;
 
     Ok(FfmpegApi {
         _libs: libs,
@@ -333,6 +361,7 @@ fn load_ffmpeg_api() -> Result<FfmpegApi, String> {
         av_channel_layout_uninit,
         avio_open,
         avio_closep,
+        av_dict_get,
     })
 }
 
@@ -383,6 +412,130 @@ fn init_ffmpeg_once(api: &FfmpegApi) {
     });
 }
 
+/// Helper to read a string value from an AVDictionary.
+unsafe fn dict_get_string(api: &FfmpegApi, dict: *mut AVDictionary, key: &str) -> Option<String> {
+    if dict.is_null() {
+        return None;
+    }
+    let key_c = CString::new(key).ok()?;
+    let entry = (api.av_dict_get)(dict, key_c.as_ptr(), ptr::null(), AV_DICT_IGNORE_SUFFIX);
+    if entry.is_null() {
+        return None;
+    }
+    let value_ptr = (*entry).value;
+    if value_ptr.is_null() {
+        return None;
+    }
+    Some(CStr::from_ptr(value_ptr).to_string_lossy().into_owned())
+}
+
+/// List all audio streams in a media file.
+pub fn list_audio_streams(path: &Path) -> Result<Vec<AudioStreamInfo>, String> {
+    let api = ffmpeg_api()?;
+    init_ffmpeg_once(api);
+
+    let path_c = CString::new(path.to_string_lossy().as_bytes())
+        .map_err(|_| "FFmpeg: invalid path".to_string())?;
+
+    let mut fmt_ctx: *mut AVFormatContext = ptr::null_mut();
+    let open_ret = unsafe {
+        (api.avformat_open_input)(
+            &mut fmt_ctx,
+            path_c.as_ptr(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+        )
+    };
+    if open_ret < 0 || fmt_ctx.is_null() {
+        return Err(format!(
+            "FFmpeg: input open failed: {}",
+            ffmpeg_err(api, open_ret)
+        ));
+    }
+
+    let info_ret = unsafe { (api.avformat_find_stream_info)(fmt_ctx, ptr::null_mut()) };
+    if info_ret < 0 {
+        unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+        return Err(format!(
+            "FFmpeg: stream info failed: {}",
+            ffmpeg_err(api, info_ret)
+        ));
+    }
+
+    // Find the default audio stream index
+    let default_stream = unsafe {
+        (api.av_find_best_stream)(
+            fmt_ctx,
+            AVMediaType_AVMEDIA_TYPE_AUDIO,
+            -1,
+            -1,
+            ptr::null_mut(),
+            0,
+        )
+    };
+
+    let mut streams = Vec::new();
+    let nb_streams = unsafe { (*fmt_ctx).nb_streams };
+    let streams_ptr = unsafe { (*fmt_ctx).streams };
+
+    if streams_ptr.is_null() {
+        unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+        return Ok(streams);
+    }
+
+    for i in 0..nb_streams {
+        let stream = unsafe { *streams_ptr.add(i as usize) };
+        if stream.is_null() {
+            continue;
+        }
+
+        let codecpar = unsafe { (*stream).codecpar };
+        if codecpar.is_null() {
+            continue;
+        }
+
+        let codec_type = unsafe { (*codecpar).codec_type };
+        if codec_type != AVMediaType_AVMEDIA_TYPE_AUDIO {
+            continue;
+        }
+
+        let codec_id = unsafe { (*codecpar).codec_id };
+        let codec = unsafe { (api.avcodec_find_decoder)(codec_id) };
+        let codec_name = if !codec.is_null() {
+            let name_ptr = unsafe { (*codec).name };
+            if !name_ptr.is_null() {
+                unsafe { CStr::from_ptr(name_ptr).to_string_lossy().into_owned() }
+            } else {
+                format!("codec_{}", codec_id)
+            }
+        } else {
+            format!("codec_{}", codec_id)
+        };
+
+        let channels = unsafe { (*codecpar).ch_layout.nb_channels };
+        let sample_rate = unsafe { (*codecpar).sample_rate };
+        let metadata = unsafe { (*stream).metadata };
+
+        let language = unsafe { dict_get_string(api, metadata, "language") };
+        let title = unsafe { dict_get_string(api, metadata, "title") };
+
+        let is_default = i as i32 == default_stream;
+
+        streams.push(AudioStreamInfo {
+            index: i as i32,
+            language,
+            title,
+            codec: codec_name,
+            channels,
+            sample_rate,
+            is_default,
+        });
+    }
+
+    unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+    Ok(streams)
+}
+
 pub struct FfmpegSource {
     api: &'static FfmpegApi,
     fmt_ctx: *mut AVFormatContext,
@@ -413,10 +566,17 @@ pub struct FfmpegSource {
 unsafe impl Send for FfmpegSource {}
 
 impl FfmpegSource {
+    /// Create a new FFmpeg audio source.
+    ///
+    /// - `path`: Path to the media file.
+    /// - `start_seconds`: Start position in seconds.
+    /// - `pts_clock`: Optional atomic for PTS tracking.
+    /// - `preferred_stream_index`: Optional audio stream index. If `None`, uses the default stream.
     pub fn try_new(
         path: &Path,
         start_seconds: u64,
         pts_clock: Option<Arc<AtomicI64>>,
+        preferred_stream_index: Option<i32>,
     ) -> Result<Self, String> {
         let api = ffmpeg_api()?;
         init_ffmpeg_once(api);
@@ -449,20 +609,67 @@ impl FfmpegSource {
             ));
         }
 
-        let stream_index = unsafe {
-            (api.av_find_best_stream)(
-                fmt_ctx,
-                AVMediaType_AVMEDIA_TYPE_AUDIO,
-                -1,
-                -1,
-                ptr::null_mut(),
-                0,
-            )
+        // Determine which audio stream to use
+        let stream_index = if let Some(preferred) = preferred_stream_index {
+            // Validate that the preferred stream exists and is an audio stream
+            let nb_streams = unsafe { (*fmt_ctx).nb_streams } as i32;
+            if preferred < 0 || preferred >= nb_streams {
+                unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+                return Err(format!(
+                    "FFmpeg: stream index {} out of range (0-{})",
+                    preferred,
+                    nb_streams - 1
+                ));
+            }
+            let streams = unsafe { (*fmt_ctx).streams };
+            if streams.is_null() {
+                unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+                return Err("FFmpeg: stream list missing".to_string());
+            }
+            let stream = unsafe { *streams.add(preferred as usize) };
+            if stream.is_null() {
+                unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+                return Err(format!("FFmpeg: stream {} is null", preferred));
+            }
+            let codecpar = unsafe { (*stream).codecpar };
+            if codecpar.is_null() {
+                unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+                return Err(format!(
+                    "FFmpeg: stream {} has no codec parameters",
+                    preferred
+                ));
+            }
+            let codec_type = unsafe { (*codecpar).codec_type };
+            if codec_type != AVMediaType_AVMEDIA_TYPE_AUDIO {
+                unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+                return Err(format!(
+                    "FFmpeg: stream {} is not an audio stream",
+                    preferred
+                ));
+            }
+            log_debug(&format!(
+                "FFmpeg: using preferred audio stream {}",
+                preferred
+            ));
+            preferred
+        } else {
+            // Use the best audio stream
+            let idx = unsafe {
+                (api.av_find_best_stream)(
+                    fmt_ctx,
+                    AVMediaType_AVMEDIA_TYPE_AUDIO,
+                    -1,
+                    -1,
+                    ptr::null_mut(),
+                    0,
+                )
+            };
+            if idx < 0 {
+                unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+                return Err("FFmpeg: audio stream not found".to_string());
+            }
+            idx
         };
-        if stream_index < 0 {
-            unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
-            return Err("FFmpeg: audio stream not found".to_string());
-        }
 
         let stream = unsafe {
             let streams = (*fmt_ctx).streams;

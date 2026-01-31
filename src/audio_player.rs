@@ -335,19 +335,27 @@ fn write_wav_header<W: Write + Seek>(
     Ok(())
 }
 
-fn decode_ffmpeg_to_wav(path: &Path) -> Result<PathBuf, String> {
+fn decode_ffmpeg_to_wav(path: &Path, stream_index: Option<i32>) -> Result<PathBuf, String> {
     let cache_dir = settings_dir().join("ffmpeg_cache");
     std::fs::create_dir_all(&cache_dir)
         .map_err(|e| format!("FFmpeg cache dir create failed: {}", e))?;
-    let key = ffmpeg_cache_key(path);
-    let wav_path = cache_dir.join(format!("{}.wav", &key[..16]));
+    // Include stream_index in cache key to separate different audio tracks
+    let mut key = ffmpeg_cache_key(path);
+    if let Some(idx) = stream_index {
+        key.push_str(&format!("_s{}", idx));
+    }
+    let wav_path = cache_dir.join(format!("{}.wav", &key[..key.len().min(20)]));
     if wav_path.exists() {
         log_debug(&format!("FFmpeg: using cached WAV {}", wav_path.display()));
         return Ok(wav_path);
     }
 
-    log_debug(&format!("FFmpeg: decoding {} to WAV", path.display()));
-    let mut source = FfmpegSource::try_new(path, 0, None)?;
+    log_debug(&format!(
+        "FFmpeg: decoding {} (stream {:?}) to WAV",
+        path.display(),
+        stream_index
+    ));
+    let mut source = FfmpegSource::try_new(path, 0, None, stream_index)?;
     let sample_rate = source.sample_rate();
     let channels = source.channels();
     log_debug(&format!(
@@ -496,6 +504,7 @@ struct AudiobookPlaybackOptions {
     muted: bool,
     prev_volume: f32,
     mix_export: bool,
+    audio_track: Option<i32>,
 }
 
 fn start_audiobook_at_with_options(
@@ -639,6 +648,7 @@ fn start_audiobook_at_with_options(
                     options.pitch,
                     initial_volume,
                     effective_paused,
+                    options.audio_track,
                 ) {
                     Ok(output) => {
                         log_debug("Audio player: using FFmpeg streaming");
@@ -650,7 +660,7 @@ fn start_audiobook_at_with_options(
                             stream_err
                         ));
                         // Fallback to WAV decode (slower but reliable)
-                        match decode_ffmpeg_to_wav(&final_path) {
+                        match decode_ffmpeg_to_wav(&final_path, options.audio_track) {
                             Ok(wav_path) => match BassOutput::start(
                                 &wav_path,
                                 seconds,
@@ -743,6 +753,39 @@ pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
     crate::reset_active_podcast_chapters_for_playback(hwnd);
     let path_buf = path.to_path_buf();
 
+    // List available audio tracks and store them in state
+    let audio_tracks = match crate::ffmpeg_source::list_audio_streams(path) {
+        Ok(tracks) => {
+            log_debug(&format!(
+                "Audio player: found {} audio tracks",
+                tracks.len()
+            ));
+            for track in &tracks {
+                log_debug(&format!(
+                    "  Track {}: {:?} {:?} {} {}ch {}Hz default={}",
+                    track.index,
+                    track.language,
+                    track.title,
+                    track.codec,
+                    track.channels,
+                    track.sample_rate,
+                    track.is_default
+                ));
+            }
+            tracks
+        }
+        Err(e) => {
+            log_debug(&format!("Audio player: failed to list audio tracks: {}", e));
+            Vec::new()
+        }
+    };
+
+    // Store tracks in state and clear any previous selection for new files
+    with_state(hwnd, |state| {
+        state.available_audio_tracks = audio_tracks;
+        state.selected_audio_track = None;
+    });
+
     let (bookmark_pos, speed, pitch, volume, mix_export) = with_state(hwnd, |state| {
         let pos = state
             .bookmarks
@@ -773,6 +816,7 @@ pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
             muted: false,
             prev_volume: volume,
             mix_export,
+            audio_track: None,
         },
     );
 }
@@ -882,6 +926,7 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
         prev_volume,
     } = action;
 
+    let audio_track = with_state(hwnd, |state| state.selected_audio_track).flatten();
     stop_audiobook_playback(hwnd);
     start_audiobook_at_with_options(
         hwnd,
@@ -895,6 +940,7 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
             muted,
             prev_volume,
             mix_export: false,
+            audio_track,
         },
     );
 }
@@ -966,6 +1012,7 @@ pub unsafe fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
     })
     .unwrap_or((1.0, 0.0, 1.0, false, 1.0));
 
+    let audio_track = with_state(hwnd, |state| state.selected_audio_track).flatten();
     stop_audiobook_playback(hwnd);
     let path_buf = path.to_path_buf();
     start_audiobook_at_with_options(
@@ -980,6 +1027,7 @@ pub unsafe fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
             muted,
             prev_volume,
             mix_export: false,
+            audio_track,
         },
     );
 }
@@ -1035,6 +1083,7 @@ pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
     .flatten();
 
     let (path, current, speed, pitch, paused, volume, muted, prev_volume) = result?;
+    let audio_track = with_state(hwnd, |state| state.selected_audio_track).flatten();
 
     start_audiobook_at_with_options(
         hwnd,
@@ -1048,6 +1097,7 @@ pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
             muted,
             prev_volume,
             mix_export: false,
+            audio_track,
         },
     );
 
@@ -1088,6 +1138,7 @@ pub unsafe fn change_audiobook_pitch(hwnd: HWND, delta: f32) -> Option<f32> {
     .flatten();
 
     let (path, current, speed, pitch, paused, volume, muted, prev_volume) = result?;
+    let audio_track = with_state(hwnd, |state| state.selected_audio_track).flatten();
 
     start_audiobook_at_with_options(
         hwnd,
@@ -1101,6 +1152,7 @@ pub unsafe fn change_audiobook_pitch(hwnd: HWND, delta: f32) -> Option<f32> {
             muted,
             prev_volume,
             mix_export: false,
+            audio_track,
         },
     );
 
@@ -1140,6 +1192,7 @@ pub unsafe fn reset_audiobook_speed(hwnd: HWND) -> Option<f32> {
     .flatten();
 
     let (path, current, speed, pitch, paused, volume, muted, prev_volume) = result?;
+    let audio_track = with_state(hwnd, |state| state.selected_audio_track).flatten();
 
     start_audiobook_at_with_options(
         hwnd,
@@ -1153,6 +1206,7 @@ pub unsafe fn reset_audiobook_speed(hwnd: HWND) -> Option<f32> {
             muted,
             prev_volume,
             mix_export: false,
+            audio_track,
         },
     );
 
@@ -1177,6 +1231,67 @@ pub unsafe fn audiobook_volume_level(hwnd: HWND) -> Option<f32> {
             .map(|player| if player.muted { 0.0 } else { player.volume })
     })
     .flatten()
+}
+
+/// Switch to a different audio track and restart playback.
+pub unsafe fn switch_audio_track(hwnd: HWND, track_index: i32) {
+    let result = with_state(hwnd, |state| {
+        // Verify the track exists
+        let valid = state
+            .available_audio_tracks
+            .iter()
+            .any(|t| t.index == track_index);
+        if !valid {
+            return None;
+        }
+        state.selected_audio_track = Some(track_index);
+
+        if let Some(player) = state.active_audiobook.take() {
+            let current = audiobook_position_secs(&player).floor() as u64;
+            player.stop();
+            Some((
+                player.path,
+                current,
+                player.speed,
+                player.pitch,
+                player.is_paused,
+                player.volume,
+                player.muted,
+                player.prev_volume,
+            ))
+        } else {
+            None
+        }
+    })
+    .flatten();
+
+    let Some((path, current, speed, pitch, paused, volume, muted, prev_volume)) = result else {
+        return;
+    };
+
+    log_debug(&format!(
+        "Audio player: switching to track {} at {}s",
+        track_index, current
+    ));
+
+    start_audiobook_at_with_options(
+        hwnd,
+        path,
+        current,
+        AudiobookPlaybackOptions {
+            speed,
+            pitch,
+            paused,
+            volume,
+            muted,
+            prev_volume,
+            mix_export: false,
+            audio_track: Some(track_index),
+        },
+    );
+
+    // Update the playback menu to reflect the new selection
+    crate::menu::update_playback_menu(hwnd, true);
 }
 
 pub unsafe fn toggle_audiobook_mute(hwnd: HWND) {

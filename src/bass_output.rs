@@ -193,13 +193,15 @@ impl BassOutput {
         pitch: f32,
         volume: f32,
         paused: bool,
+        stream_index: Option<i32>,
     ) -> Result<Arc<Self>, String> {
         init_bass_once()?;
         let api = bass_api()?;
         let fx_api = bass_fx_api().ok();
 
         // Create FFmpeg stream with BASS callback
-        let (ffmpeg_stream, source_handle) = FfmpegBassStream::new(path, start_seconds)?;
+        let (ffmpeg_stream, source_handle) =
+            FfmpegBassStream::new(path, start_seconds, stream_index)?;
 
         let want_tempo = (speed != 1.0 || pitch != 0.0) && fx_api.is_some();
         let handle = if want_tempo {

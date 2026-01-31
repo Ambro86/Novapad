@@ -3,6 +3,12 @@
 Version 0.6.4 – 2026-01-30
 Improvements
 • The program has been renamed to Sonarpad to emphasize sound and audio as the key focus.
+• Added audio track selection in the Playback menu for media files with multiple audio tracks (e.g., MKV files with multiple languages).
+• Podcasts now clearly indicate unheard episodes with an "Unheard" prefix before the name.
+• New tag-based voice switching in text. Examples:
+  - Microsoft voices (Edge): <voice edge it-IT-IsabellaNeural>Hello</voice>
+  - SAPI5 voices: <voice sapi5 Microsoft Helena Desktop>Hello</voice>
+  - SAPI4 voices: <voice sapi4 #1>Hello</voice>
 • Enriched podcast categories.
 Bug fixes
 • Fixed a bug where SAPI4 audiobooks could be created differently than expected.

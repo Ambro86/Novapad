@@ -181,6 +181,7 @@ const VOICE_PANEL_ID_VOLUME: usize = 21007;
 const VOICE_PANEL_ID_SPEED_EDIT: usize = 21008;
 const VOICE_PANEL_ID_PITCH_EDIT: usize = 21009;
 const VOICE_PANEL_ID_VOLUME_EDIT: usize = 21010;
+const VOICE_PANEL_ID_INSERT_TAG: usize = 21011;
 const VOICE_MENU_ID_ADD_FAVORITE: u32 = 9001;
 const VOICE_MENU_ID_REMOVE_FAVORITE: u32 = 9002;
 
@@ -1458,11 +1459,14 @@ pub(crate) struct AppState {
     active_podcast_chapters_key: Option<String>,
     active_podcast_chapters: Vec<Chapter>,
     last_announced_chapter_index: Option<usize>,
+    available_audio_tracks: Vec<crate::ffmpeg_source::AudioStreamInfo>,
+    selected_audio_track: Option<i32>,
     voice_panel_visible: bool,
     voice_label_engine: HWND,
     voice_combo_engine: HWND,
     voice_label_voice: HWND,
     voice_combo_voice: HWND,
+    voice_button_insert_tag: HWND,
     voice_label_speed: HWND,
     voice_combo_speed: HWND,
     voice_edit_speed: HWND,
@@ -2265,6 +2269,20 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 HINSTANCE(0),
                 None,
             );
+            let button_insert_tag = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(empty_label.as_ptr()),
+                WS_CHILD | WS_TABSTOP,
+                0,
+                0,
+                0,
+                0,
+                hwnd,
+                HMENU(VOICE_PANEL_ID_INSERT_TAG as isize),
+                HINSTANCE(0),
+                None,
+            );
             let label_speed = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -2452,6 +2470,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 combo_engine,
                 label_voice,
                 combo_voice,
+                button_insert_tag,
                 label_speed,
                 combo_speed,
                 edit_speed,
@@ -2538,11 +2557,14 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 active_podcast_chapters_key: None,
                 active_podcast_chapters: Vec::new(),
                 last_announced_chapter_index: None,
+                available_audio_tracks: Vec::new(),
+                selected_audio_track: None,
                 voice_panel_visible: false,
                 voice_label_engine: label_engine,
                 voice_combo_engine: combo_engine,
                 voice_label_voice: label_voice,
                 voice_combo_voice: combo_voice,
+                voice_button_insert_tag: button_insert_tag,
                 voice_label_speed: label_speed,
                 voice_combo_speed: combo_speed,
                 voice_edit_speed: edit_speed,
@@ -3201,6 +3223,10 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 handle_voice_panel_multilingual_toggle(hwnd);
                 return LRESULT(0);
             }
+            if cmd_id == VOICE_PANEL_ID_INSERT_TAG {
+                insert_voice_tag_from_voice_panel(hwnd);
+                return LRESULT(0);
+            }
             if (cmd_id == VOICE_PANEL_ID_SPEED
                 || cmd_id == VOICE_PANEL_ID_PITCH
                 || cmd_id == VOICE_PANEL_ID_VOLUME)
@@ -3637,6 +3663,24 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     handle_player_command(hwnd, PlayerCommand::MuteToggle);
                     LRESULT(0)
                 }
+                cmd_id
+                    if (IDM_PLAYBACK_AUDIO_TRACK_BASE
+                        ..IDM_PLAYBACK_AUDIO_TRACK_BASE + IDM_PLAYBACK_AUDIO_TRACK_MAX)
+                        .contains(&cmd_id) =>
+                {
+                    let track_menu_index = cmd_id - IDM_PLAYBACK_AUDIO_TRACK_BASE;
+                    let track_index = with_state(hwnd, |state| {
+                        state
+                            .available_audio_tracks
+                            .get(track_menu_index)
+                            .map(|t| t.index)
+                    })
+                    .flatten();
+                    if let Some(idx) = track_index {
+                        audio_player::switch_audio_track(hwnd, idx);
+                    }
+                    LRESULT(0)
+                }
                 IDM_VIEW_SHOW_VOICES => {
                     log_debug("Menu: Toggle voice panel");
                     toggle_voice_panel(hwnd);
@@ -3861,6 +3905,7 @@ struct VoicePanelLabels {
     label_volume: String,
     label_favorites: String,
     label_multilingual: String,
+    button_insert_tag: String,
     engine_edge: String,
     engine_sapi: String,
     engine_sapi4: String,
@@ -3879,6 +3924,7 @@ fn voice_panel_labels(language: Language) -> VoicePanelLabels {
         label_volume: i18n::tr(language, "tts_tuning.label_volume"),
         label_favorites: i18n::tr(language, "voice_panel.label_favorites"),
         label_multilingual: i18n::tr(language, "voice_panel.label_multilingual"),
+        button_insert_tag: i18n::tr(language, "voice_panel.insert_tag"),
         engine_edge: i18n::tr(language, "voice_panel.engine_edge"),
         engine_sapi: i18n::tr(language, "voice_panel.engine_sapi"),
         engine_sapi4: i18n::tr(language, "voice_panel.engine_sapi4"),
@@ -4134,6 +4180,7 @@ unsafe fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: b
         combo_engine,
         label_voice,
         combo_voice,
+        button_insert_tag,
         label_speed,
         combo_speed,
         edit_speed,
@@ -4154,6 +4201,7 @@ unsafe fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: b
             state.voice_combo_engine,
             state.voice_label_voice,
             state.voice_combo_voice,
+            state.voice_button_insert_tag,
             state.voice_label_speed,
             state.voice_combo_speed,
             state.voice_edit_speed,
@@ -4177,6 +4225,7 @@ unsafe fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: b
         combo_engine,
         label_voice,
         combo_voice,
+        button_insert_tag,
         label_speed,
         combo_speed,
         edit_speed,
@@ -4260,6 +4309,7 @@ pub(crate) unsafe fn refresh_voice_panel(hwnd: HWND) {
         combo_engine,
         label_voice,
         combo_voice,
+        button_insert_tag,
         label_speed,
         combo_speed,
         edit_speed,
@@ -4280,6 +4330,7 @@ pub(crate) unsafe fn refresh_voice_panel(hwnd: HWND) {
             state.voice_combo_engine,
             state.voice_label_voice,
             state.voice_combo_voice,
+            state.voice_button_insert_tag,
             state.voice_label_speed,
             state.voice_combo_speed,
             state.voice_edit_speed,
@@ -4317,6 +4368,11 @@ pub(crate) unsafe fn refresh_voice_panel(hwnd: HWND) {
         crate::log_if_err!(SetWindowTextW(
             label_voice,
             PCWSTR(label_voice_wide.as_ptr())
+        ));
+        let button_insert_wide = to_wide(&labels.button_insert_tag);
+        crate::log_if_err!(SetWindowTextW(
+            button_insert_tag,
+            PCWSTR(button_insert_wide.as_ptr())
         ));
         crate::log_if_err!(SetWindowTextW(
             label_speed,
@@ -4834,6 +4890,17 @@ unsafe fn handle_voice_panel_multilingual_toggle(hwnd: HWND) {
         save_settings(settings);
     }
     refresh_voice_panel_voice_list(hwnd);
+}
+
+unsafe fn insert_voice_tag_from_voice_panel(hwnd: HWND) {
+    let engine = with_state(hwnd, |state| state.settings.tts_engine).unwrap_or_default();
+    let voice_name = current_voice_selection(hwnd, engine)
+        .or_else(|| with_state(hwnd, |state| Some(state.settings.tts_voice.clone())).flatten())
+        .unwrap_or_default();
+    if voice_name.trim().is_empty() {
+        return;
+    }
+    crate::editor_manager::insert_voice_tag_at_caret(hwnd, engine, &voice_name);
 }
 
 unsafe fn is_voice_panel_tuning_edit(hwnd: HWND, target: HWND) -> bool {
@@ -6255,6 +6322,7 @@ unsafe fn is_focus_in_voice_panel(hwnd: HWND) -> bool {
             |ctrl: HWND| ctrl.0 != 0 && (focus == ctrl || IsChild(ctrl, focus).as_bool());
         is_match(state.voice_combo_engine)
             || is_match(state.voice_combo_voice)
+            || is_match(state.voice_button_insert_tag)
             || is_match(state.voice_combo_speed)
             || is_match(state.voice_combo_pitch)
             || is_match(state.voice_combo_volume)
@@ -6272,6 +6340,7 @@ unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
         visible,
         combo_engine,
         combo_voice,
+        button_insert_tag,
         combo_speed,
         combo_pitch,
         combo_volume,
@@ -6289,6 +6358,7 @@ unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
             state.voice_panel_visible,
             state.voice_combo_engine,
             state.voice_combo_voice,
+            state.voice_button_insert_tag,
             state.voice_combo_speed,
             state.voice_combo_pitch,
             state.voice_combo_volume,
@@ -6317,6 +6387,8 @@ unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
         combo_engine
     } else if raw_focus == combo_voice || IsChild(combo_voice, raw_focus).as_bool() {
         combo_voice
+    } else if raw_focus == button_insert_tag || IsChild(button_insert_tag, raw_focus).as_bool() {
+        button_insert_tag
     } else if raw_focus == combo_speed || IsChild(combo_speed, raw_focus).as_bool() {
         combo_speed
     } else if raw_focus == combo_pitch || IsChild(combo_pitch, raw_focus).as_bool() {
@@ -6330,6 +6402,7 @@ unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
     };
     let is_combo_focus = focus == combo_engine
         || focus == combo_voice
+        || focus == button_insert_tag
         || (!manual_tuning && focus == combo_speed)
         || (!manual_tuning && focus == combo_pitch)
         || (!manual_tuning && focus == combo_volume)
@@ -6370,6 +6443,7 @@ unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
     if focus != hwnd_edit
         && focus != combo_engine
         && focus != combo_voice
+        && focus != button_insert_tag
         && focus != speed_control
         && focus != pitch_control
         && focus != volume_control
@@ -6397,6 +6471,7 @@ unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
     if visible {
         order.push(combo_engine);
         order.push(combo_voice);
+        order.push(button_insert_tag);
         order.push(speed_control);
         order.push(pitch_control);
         order.push(volume_control);

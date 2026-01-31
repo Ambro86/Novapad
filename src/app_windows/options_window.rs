@@ -1,6 +1,8 @@
 use crate::accessibility::{handle_accessibility, to_wide};
 use crate::app_windows::interpreter_select_window;
-use crate::editor_manager::{apply_word_wrap_to_all_edits, update_window_title};
+use crate::editor_manager::{
+    apply_word_wrap_to_all_edits, insert_voice_tag_at_caret, update_window_title,
+};
 use crate::settings::{
     Language, ModifiedMarkerPosition, OpenBehavior, SubtitleReadMode, TRUSTED_CLIENT_TOKEN,
     TtsEngine, VOICE_LIST_URL, VoiceInfo, save_settings_with_default_copy, sync_context_menu,
@@ -94,6 +96,7 @@ const OPTIONS_ID_DIALOGUE_VOICE_RATE: usize = 6052;
 const OPTIONS_ID_DIALOGUE_VOICE_PITCH: usize = 6053;
 const OPTIONS_ID_DIALOGUE_VOICE_VOLUME: usize = 6054;
 const OPTIONS_ID_DIALOGUE_TTS_ENGINE: usize = 6055;
+const OPTIONS_ID_TTS_INSERT_TAG: usize = 6056;
 
 const OPTIONS_ID_OK: usize = 6005;
 const OPTIONS_ID_CANCEL: usize = 6006;
@@ -143,6 +146,13 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
         if GetParent(focus) == hwnd {
             let dropped = SendMessageW(focus, CB_GETDROPPEDSTATE, WPARAM(0), LPARAM(0)).0 != 0;
             if !dropped {
+                // If focus is on the insert tag button, insert the tag before closing
+                let is_insert_tag_button =
+                    with_options_state(hwnd, |state| focus == state.button_tts_insert_tag)
+                        .unwrap_or(false);
+                if is_insert_tag_button {
+                    insert_voice_tag_from_options(hwnd);
+                }
                 if with_options_state(hwnd, |state| {
                     SendMessageW(
                         hwnd,
@@ -175,6 +185,7 @@ struct OptionsDialogState {
     label_tts_pitch: HWND,
     label_tts_volume: HWND,
     button_tts_preview: HWND,
+    button_tts_insert_tag: HWND,
     combo_lang: HWND,
     combo_modified_marker_position: HWND,
     combo_open: HWND,
@@ -272,6 +283,7 @@ struct OptionsLabels {
     label_tts_pitch: String,
     label_tts_volume: String,
     label_tts_preview: String,
+    label_tts_insert_tag: String,
     label_tts_manual_tuning: String,
     label_split_on_newline: String,
     label_word_wrap: String,
@@ -374,6 +386,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_tts_pitch: i18n::tr(language, "tts_tuning.label_pitch"),
         label_tts_volume: i18n::tr(language, "tts_tuning.label_volume"),
         label_tts_preview: i18n::tr(language, "options.label.voice_preview"),
+        label_tts_insert_tag: i18n::tr(language, "options.label.insert_voice_tag"),
         label_tts_manual_tuning: i18n::tr(language, "options.label.tts_manual_tuning"),
         label_split_on_newline: i18n::tr(language, "options.label.split_on_newline"),
         label_word_wrap: i18n::tr(language, "options.label.word_wrap"),
@@ -965,6 +978,22 @@ unsafe extern "system" fn options_wndproc(
                 26,
                 hwnd,
                 HMENU(OPTIONS_ID_TTS_PREVIEW as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
+            let button_tts_insert_tag = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_tts_insert_tag).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                170,
+                y,
+                300,
+                26,
+                hwnd,
+                HMENU(OPTIONS_ID_TTS_INSERT_TAG as isize),
                 HINSTANCE(0),
                 None,
             );
@@ -1922,6 +1951,7 @@ unsafe extern "system" fn options_wndproc(
                 edit_tts_pitch,
                 edit_tts_volume,
                 button_tts_preview,
+                button_tts_insert_tag,
                 label_audio_skip,
                 combo_audio_skip,
                 label_audio_split,
@@ -2004,6 +2034,7 @@ unsafe extern "system" fn options_wndproc(
                 label_tts_pitch,
                 label_tts_volume,
                 button_tts_preview,
+                button_tts_insert_tag,
                 combo_lang,
                 combo_modified_marker_position,
                 combo_open,
@@ -2112,6 +2143,10 @@ unsafe extern "system" fn options_wndproc(
                 }
                 OPTIONS_ID_TTS_PREVIEW => {
                     preview_voice(hwnd);
+                    LRESULT(0)
+                }
+                OPTIONS_ID_TTS_INSERT_TAG => {
+                    insert_voice_tag_from_options(hwnd);
                     LRESULT(0)
                 }
                 OPTIONS_ID_TTS_ENGINE => {
@@ -3447,19 +3482,24 @@ unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
         Some(values) => values,
         None => return,
     };
-    let enabled =
-        SendMessageW(checkbox, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 == BST_CHECKED.0;
-    EnableWindow(label, enabled);
-    EnableWindow(combo, enabled);
-    EnableWindow(button, enabled);
-    EnableWindow(label_engine, enabled);
-    EnableWindow(combo_engine, enabled);
-    EnableWindow(label_rate, enabled);
-    EnableWindow(combo_rate, enabled);
-    EnableWindow(label_pitch, enabled);
-    EnableWindow(combo_pitch, enabled);
-    EnableWindow(label_volume, enabled);
-    EnableWindow(combo_volume, enabled);
+    let controls = [
+        checkbox,
+        label,
+        combo,
+        button,
+        label_engine,
+        combo_engine,
+        label_rate,
+        combo_rate,
+        label_pitch,
+        combo_pitch,
+        label_volume,
+        combo_volume,
+    ];
+    for control in controls {
+        ShowWindow(control, SW_HIDE);
+        EnableWindow(control, false);
+    }
 }
 
 fn open_podcastindex_signup() {
@@ -3566,12 +3606,13 @@ unsafe fn preview_voice(hwnd: HWND) {
     } else {
         combo_value(combo_tts_volume)
     };
-    let chunks = tts_engine::split_into_tts_chunks(&text, split_on_newline, &dictionary);
+    let chunks = tts_engine::split_into_tts_chunks(&text, split_on_newline, &dictionary, engine);
 
     match engine {
         TtsEngine::Edge => {
             let options = tts_engine::TtsPlaybackOptions {
                 hwnd: parent,
+                engine,
                 cleaned: text,
                 voice,
                 chunks,
@@ -3579,11 +3620,6 @@ unsafe fn preview_voice(hwnd: HWND) {
                 rate,
                 pitch,
                 volume,
-                dialogue_voice: None,
-                dialogue_rate: 0,
-                dialogue_pitch: 0,
-                dialogue_volume: 100,
-                dialogue_engine: TtsEngine::Edge,
             };
             tts_engine::start_tts_playback_with_chunks(options);
         }
@@ -3652,6 +3688,48 @@ unsafe fn preview_voice(hwnd: HWND) {
     }
 }
 
+unsafe fn insert_voice_tag_from_options(hwnd: HWND) {
+    let (parent, combo_tts_engine, combo_voice) = match with_options_state(hwnd, |state| {
+        (state.parent, state.combo_tts_engine, state.combo_voice)
+    }) {
+        Some(values) => values,
+        None => return,
+    };
+
+    let engine_sel = SendMessageW(combo_tts_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    let engine = match engine_sel {
+        1 => TtsEngine::Sapi5,
+        2 => TtsEngine::Sapi4,
+        _ => TtsEngine::Edge,
+    };
+    let voices = with_state(parent, |state| match engine {
+        TtsEngine::Edge => state.edge_voices.clone(),
+        TtsEngine::Sapi5 => state.sapi_voices.clone(),
+        TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
+    })
+    .unwrap_or_default();
+
+    let voice_sel = SendMessageW(combo_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    if voice_sel < 0 {
+        return;
+    }
+    let voice_index = SendMessageW(
+        combo_voice,
+        CB_GETITEMDATA,
+        WPARAM(voice_sel as usize),
+        LPARAM(0),
+    )
+    .0 as usize;
+    if voice_index >= voices.len() {
+        return;
+    }
+    let voice = voices[voice_index].short_name.clone();
+    if voice.trim().is_empty() {
+        return;
+    }
+    insert_voice_tag_at_caret(parent, engine, &voice);
+}
+
 unsafe fn preview_dialogue_voice(hwnd: HWND) {
     let (
         parent,
@@ -3716,9 +3794,10 @@ unsafe fn preview_dialogue_voice(hwnd: HWND) {
 
     match engine {
         TtsEngine::Edge => {
-            let chunks = tts_engine::split_into_tts_chunks(&text, false, &[]);
+            let chunks = tts_engine::split_into_tts_chunks(&text, false, &[], engine);
             let options = tts_engine::TtsPlaybackOptions {
                 hwnd: parent,
+                engine,
                 cleaned: text,
                 voice,
                 chunks,
@@ -3726,11 +3805,6 @@ unsafe fn preview_dialogue_voice(hwnd: HWND) {
                 rate,
                 pitch,
                 volume,
-                dialogue_voice: None,
-                dialogue_rate: 0,
-                dialogue_pitch: 0,
-                dialogue_volume: 100,
-                dialogue_engine: TtsEngine::Edge,
             };
             tts_engine::start_tts_playback_with_chunks(options);
         }
@@ -4494,6 +4568,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.edit_tts_pitch,
             state.edit_tts_volume,
             state.button_tts_preview,
+            state.button_tts_insert_tag,
             state.checkbox_multilingual,
             state.checkbox_tts_manual,
             state.checkbox_split_on_newline,

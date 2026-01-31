@@ -6,8 +6,8 @@ use std::path::Path;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreateMenu, DeleteMenu, DestroyMenu, DrawMenuBar, GetMenu, GetMenuItemCount,
-    HMENU, InsertMenuW, MENU_ITEM_FLAGS, MF_BYCOMMAND, MF_BYPOSITION, MF_GRAYED, MF_POPUP,
-    MF_SEPARATOR, MF_STRING, SetMenu,
+    HMENU, InsertMenuW, MENU_ITEM_FLAGS, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_GRAYED,
+    MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, SetMenu,
 };
 use windows::core::PCWSTR;
 
@@ -75,6 +75,8 @@ pub const IDM_PLAYBACK_CHAPTER_PREV: usize = 8012;
 pub const IDM_PLAYBACK_CHAPTER_NEXT: usize = 8013;
 pub const IDM_PLAYBACK_CHAPTER_LIST: usize = 8014;
 pub const IDM_PLAYBACK_DOWNLOAD_EPISODE: usize = 8015;
+pub const IDM_PLAYBACK_AUDIO_TRACK_BASE: usize = 8100;
+pub const IDM_PLAYBACK_AUDIO_TRACK_MAX: usize = 20;
 pub const IDM_INSERT_BOOKMARK: usize = 2101;
 pub const IDM_MANAGE_BOOKMARKS: usize = 2102;
 pub const IDM_INSERT_CLEAR_BOOKMARKS: usize = 2103;
@@ -339,6 +341,13 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
         let download_episode = i18n::tr(language, "playback.download_episode");
         let has_chapters =
             with_state(hwnd, |state| !state.active_podcast_chapters.is_empty()).unwrap_or(false);
+        let (audio_tracks, selected_track) = with_state(hwnd, |state| {
+            (
+                state.available_audio_tracks.clone(),
+                state.selected_audio_track,
+            )
+        })
+        .unwrap_or_default();
 
         append_menu_string(
             playback_menu,
@@ -411,6 +420,49 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
             IDM_PLAYBACK_REMOVE_SUBTITLES,
             &remove_subtitles,
         );
+        // Audio tracks submenu
+        if !audio_tracks.is_empty() {
+            let audio_track_label = i18n::tr(language, "playback.audio_track");
+            let audio_tracks_menu = CreateMenu().unwrap_or(HMENU(0));
+            if audio_tracks_menu.0 != 0 {
+                for (i, track) in audio_tracks.iter().enumerate() {
+                    if i >= IDM_PLAYBACK_AUDIO_TRACK_MAX {
+                        break;
+                    }
+                    let mut label = format!("{}", track.index);
+                    if let Some(ref lang) = track.language {
+                        label.push_str(&format!(" [{}]", lang));
+                    }
+                    if let Some(ref title) = track.title {
+                        label.push_str(&format!(" - {}", title));
+                    }
+                    label.push_str(&format!(
+                        " ({}, {}ch, {}Hz)",
+                        track.codec, track.channels, track.sample_rate
+                    ));
+                    let is_selected = selected_track
+                        .map(|s| s == track.index)
+                        .unwrap_or(track.is_default);
+                    let flags = if is_selected {
+                        MF_STRING | MF_CHECKED
+                    } else {
+                        MF_STRING | MF_UNCHECKED
+                    };
+                    append_menu_string(
+                        audio_tracks_menu,
+                        flags,
+                        IDM_PLAYBACK_AUDIO_TRACK_BASE + i,
+                        &label,
+                    );
+                }
+                append_menu_string(
+                    playback_menu,
+                    MF_POPUP,
+                    audio_tracks_menu.0 as usize,
+                    &audio_track_label,
+                );
+            }
+        }
         append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_VOLUME_UP, &volume_up);
         append_menu_string(
             playback_menu,

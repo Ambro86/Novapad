@@ -3,6 +3,12 @@
 Wersja 0.6.4 – 30.01.2026
 Ulepszenia
 • Program został przemianowany na Sonarpad, aby podkreślić dźwięk i audio jako klucz tego programu.
+• Dodano wybór ścieżek audio w menu Odtwarzanie dla plików multimedialnych z wieloma ścieżkami audio (np. MKV z wieloma językami).
+• Podcasty teraz wyraźnie wskazują te nieprzesłuchane z prefiksem „Nieprzesłuchane" przed nazwą.
+• Nowy system tagów do zmiany głosu w tekście. Przykłady:
+  - Głosy Microsoft (Edge): <voice edge it-IT-IsabellaNeural>Cześć</voice>
+  - Głosy SAPI5: <voice sapi5 Microsoft Helena Desktop>Cześć</voice>
+  - Głosy SAPI4: <voice sapi4 #1>Cześć</voice>
 • Rozszerzono kategorie podcastów.
 Poprawki błędów
 • Naprawiono błąd, przez który audiobooki SAPI4 mogły być tworzone inaczej niż oczekiwano.

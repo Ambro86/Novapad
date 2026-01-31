@@ -55,24 +55,10 @@ pub struct TtsSession {
     pub initial_caret_pos: i32,
 }
 
-/// Quotation mark characters used to identify dialogues.
-/// Includes straight quotes, curly quotes, guillemets, and various international styles.
-#[allow(dead_code)]
-pub const DIALOGUE_QUOTES: &[char] = &[
-    '"', '“', '”', '«', '»', '‹', '›', '„', '‚', '\'', '‘', '’', '‟',
-];
-
-/// Opening quotes that start a dialogue span.
-const OPENING_QUOTES: &[char] = &['"', '“', '«', '‹', '„', '‚', '\'', '‘', '‟'];
-
-/// Closing quotes that end a dialogue span.
-const CLOSING_QUOTES: &[char] = &['"', '”', '»', '›', '’', '\''];
-
 #[derive(Clone)]
 pub struct TtsChunk {
     pub text_to_read: String,
     pub original_len: usize,
-    pub is_dialogue: bool,
     pub override_voice: Option<VoiceOverride>,
 }
 
@@ -82,8 +68,157 @@ pub struct VoiceOverride {
     pub voice: String,
 }
 
+fn parse_voice_tag_override(tag: &str, default_engine: TtsEngine) -> Option<VoiceOverride> {
+    let raw = tag.trim();
+    if raw.is_empty() {
+        return None;
+    }
+    let lower = raw.to_ascii_lowercase();
+    let mut engine: Option<TtsEngine> = None;
+    let mut voice: Option<String> = None;
+
+    for key in ["engine", "tts"] {
+        if let Some(pos) = lower.find(key)
+            && let Some(eq_pos) = lower[pos..].find('=')
+        {
+            let val_start = pos + eq_pos + 1;
+            let val = raw[val_start..].trim_start();
+            let val = if let Some(rest) = val.strip_prefix('"') {
+                rest.split('"').next().unwrap_or("").to_string()
+            } else {
+                val.split_whitespace().next().unwrap_or("").to_string()
+            };
+            engine = match val.to_ascii_lowercase().as_str() {
+                "edge" => Some(TtsEngine::Edge),
+                "sapi4" => Some(TtsEngine::Sapi4),
+                "sapi5" => Some(TtsEngine::Sapi5),
+                _ => None,
+            };
+        }
+    }
+    for key in ["voice", "name"] {
+        if let Some(pos) = lower.find(key)
+            && let Some(eq_pos) = lower[pos..].find('=')
+        {
+            let val_start = pos + eq_pos + 1;
+            let val = raw[val_start..].trim_start();
+            let val = if let Some(rest) = val.strip_prefix('"') {
+                rest.split('"').next().unwrap_or("").to_string()
+            } else {
+                val.split_whitespace().next().unwrap_or("").to_string()
+            };
+            if !val.is_empty() {
+                voice = Some(val);
+            }
+        }
+    }
+
+    let mut tokens: Vec<&str> = raw.split_whitespace().collect();
+    if let Some(first) = tokens.first().copied() {
+        let first_lower = first.to_ascii_lowercase();
+        if engine.is_none() {
+            engine = match first_lower.as_str() {
+                "edge" => Some(TtsEngine::Edge),
+                "sapi4" => Some(TtsEngine::Sapi4),
+                "sapi5" => Some(TtsEngine::Sapi5),
+                _ => None,
+            };
+            if engine.is_some() {
+                tokens.remove(0);
+            }
+        }
+    }
+    if voice.is_none() && !tokens.is_empty() {
+        let merged = tokens.join(" ");
+        if !merged.is_empty() {
+            voice = Some(merged);
+        }
+    }
+
+    let voice = voice?;
+    let engine = engine.unwrap_or(default_engine);
+    Some(VoiceOverride { engine, voice })
+}
+
+pub(crate) fn has_voice_tags(text: &str) -> bool {
+    text.to_ascii_lowercase().contains("<voice")
+}
+
+pub(crate) fn split_voice_tag_spans(
+    text: &str,
+    default_engine: TtsEngine,
+) -> Vec<(String, Option<VoiceOverride>, usize)> {
+    if text.is_empty() {
+        return Vec::new();
+    }
+    let lower = text.to_ascii_lowercase();
+    let mut segments = Vec::new();
+    let mut cursor = 0usize;
+    let mut pending_len = 0usize;
+    let mut current_override: Option<VoiceOverride> = None;
+
+    let mut i = 0usize;
+    let bytes = lower.as_bytes();
+    while i < bytes.len() {
+        if bytes[i] == b'<' {
+            let remaining = &lower[i..];
+            let is_open = remaining.starts_with("<voice");
+            let is_close = remaining.starts_with("</voice");
+            if (is_open || is_close)
+                && let Some(end_rel) = remaining.find('>')
+            {
+                let end = i + end_rel + 1;
+                if i > cursor {
+                    let chunk = &text[cursor..i];
+                    if !chunk.is_empty() {
+                        let mut orig_len = chunk.chars().count();
+                        if pending_len > 0 {
+                            orig_len += pending_len;
+                            pending_len = 0;
+                        }
+                        segments.push((chunk.to_string(), current_override.clone(), orig_len));
+                    }
+                }
+                let tag_len = text[i..end].chars().count();
+                pending_len += tag_len;
+                if is_open {
+                    let tag_inner = text[i + "<voice".len()..end - 1].trim();
+                    current_override = parse_voice_tag_override(tag_inner, default_engine);
+                } else {
+                    current_override = None;
+                }
+                cursor = end;
+                i = end;
+                continue;
+            }
+        }
+        i += 1;
+    }
+
+    if cursor < text.len() {
+        let tail = &text[cursor..];
+        if !tail.is_empty() {
+            let mut orig_len = tail.chars().count();
+            if pending_len > 0 {
+                orig_len += pending_len;
+            }
+            segments.push((tail.to_string(), current_override.clone(), orig_len));
+        }
+    } else if pending_len > 0
+        && let Some(last) = segments.last_mut()
+    {
+        last.2 += pending_len;
+    }
+
+    if segments.is_empty() {
+        segments.push((text.to_string(), None, text.chars().count()));
+    }
+    segments
+}
+
 pub struct TtsPlaybackOptions {
     pub hwnd: HWND,
+    pub engine: TtsEngine,
     pub cleaned: String,
     pub voice: String,
     pub chunks: Vec<TtsChunk>,
@@ -91,11 +226,6 @@ pub struct TtsPlaybackOptions {
     pub rate: i32,
     pub pitch: i32,
     pub volume: i32,
-    pub dialogue_voice: Option<String>,
-    pub dialogue_rate: i32,
-    pub dialogue_pitch: i32,
-    pub dialogue_volume: i32,
-    pub dialogue_engine: TtsEngine,
 }
 
 pub struct AudiobookCommonOptions<'a> {
@@ -107,10 +237,6 @@ pub struct AudiobookCommonOptions<'a> {
     pub rate: i32,
     pub pitch: i32,
     pub volume: i32,
-    pub dialogue_voice: Option<String>,
-    pub dialogue_rate: i32,
-    pub dialogue_pitch: i32,
-    pub dialogue_volume: i32,
     pub sapi4_threads: Option<u32>,
 }
 
@@ -158,54 +284,29 @@ pub fn start_tts_from_caret(hwnd: HWND) {
     let Some(hwnd_edit) = (unsafe { get_active_edit(hwnd) }) else {
         return;
     };
-    let (
-        language,
-        split_on_newline,
-        tts_engine,
-        dictionary,
-        tts_rate,
-        tts_pitch,
-        tts_volume,
-        use_dialogue_voice,
-        dialogue_voice,
-        dialogue_tts_engine,
-        dialogue_rate,
-        dialogue_pitch,
-        dialogue_volume,
-    ) = unsafe {
-        with_state(hwnd, |state| {
-            (
-                state.settings.language,
-                state.settings.split_on_newline,
-                state.settings.tts_engine,
-                state.settings.dictionary.clone(),
-                state.settings.tts_rate,
-                state.settings.tts_pitch,
-                state.settings.tts_volume,
-                state.settings.use_dialogue_voice,
-                state.settings.dialogue_voice.clone(),
-                state.settings.dialogue_tts_engine,
-                state.settings.dialogue_voice_rate,
-                state.settings.dialogue_voice_pitch,
-                state.settings.dialogue_voice_volume,
-            )
-        })
-    }
-    .unwrap_or((
-        Language::Italian,
-        true,
-        TtsEngine::Edge,
-        Vec::new(),
-        0,
-        0,
-        100,
-        false,
-        String::new(),
-        TtsEngine::Edge,
-        0,
-        0,
-        100,
-    ));
+    let (language, split_on_newline, tts_engine, dictionary, tts_rate, tts_pitch, tts_volume) =
+        unsafe {
+            with_state(hwnd, |state| {
+                (
+                    state.settings.language,
+                    state.settings.split_on_newline,
+                    state.settings.tts_engine,
+                    state.settings.dictionary.clone(),
+                    state.settings.tts_rate,
+                    state.settings.tts_pitch,
+                    state.settings.tts_volume,
+                )
+            })
+        }
+        .unwrap_or((
+            Language::Italian,
+            true,
+            TtsEngine::Edge,
+            Vec::new(),
+            0,
+            0,
+            100,
+        ));
 
     let (text, initial_caret_pos) = unsafe { get_text_from_caret(hwnd_edit) };
     if text.trim().is_empty() {
@@ -218,23 +319,13 @@ pub fn start_tts_from_caret(hwnd: HWND) {
         with_state(hwnd, |state| state.settings.tts_voice.clone())
             .unwrap_or_else(|| "it-IT-IsabellaNeural".to_string())
     };
-    let chunks = split_into_tts_chunks(&text, split_on_newline, &dictionary);
+    let chunks = split_into_tts_chunks(&text, split_on_newline, &dictionary, tts_engine);
+    let has_tags = has_voice_tags(&text);
 
-    // Determine dialogue voice - use it only if enabled and set
-    let dialogue_voice_option = if use_dialogue_voice && !dialogue_voice.is_empty() {
-        Some(dialogue_voice)
-    } else {
-        None
-    };
-    let dialogue_engine = if dialogue_voice_option.is_some() {
-        dialogue_tts_engine
-    } else {
-        tts_engine
-    };
-
-    match tts_engine {
-        TtsEngine::Edge => start_tts_playback_with_chunks(TtsPlaybackOptions {
+    if has_tags && tts_engine != TtsEngine::Edge {
+        start_tts_playback_with_chunks(TtsPlaybackOptions {
             hwnd,
+            engine: tts_engine,
             cleaned: text,
             voice,
             chunks,
@@ -242,11 +333,21 @@ pub fn start_tts_from_caret(hwnd: HWND) {
             rate: tts_rate,
             pitch: tts_pitch,
             volume: tts_volume,
-            dialogue_voice: dialogue_voice_option,
-            dialogue_rate,
-            dialogue_pitch,
-            dialogue_volume,
-            dialogue_engine,
+        });
+        return;
+    }
+
+    match tts_engine {
+        TtsEngine::Edge => start_tts_playback_with_chunks(TtsPlaybackOptions {
+            hwnd,
+            engine: tts_engine,
+            cleaned: text,
+            voice,
+            chunks,
+            initial_caret_pos,
+            rate: tts_rate,
+            pitch: tts_pitch,
+            volume: tts_volume,
         }),
         TtsEngine::Sapi4 => {
             stop_tts_playback(hwnd);
@@ -414,15 +515,11 @@ fn synthesize_sapi5_bytes(
         crate::sapi5_engine::SapiExportOptions {
             chunks: &chunks,
             voice_name: voice,
-            dialogue_voice: None,
             output_path: &path,
             language,
             rate,
             pitch,
             volume,
-            dialogue_rate: rate,
-            dialogue_pitch: pitch,
-            dialogue_volume: volume,
             cancel,
         },
         |_chunk_idx| {},
@@ -609,18 +706,13 @@ pub fn start_tts_playback_with_chunks(options: TtsPlaybackOptions) {
     let tts_rate = options.rate;
     let tts_pitch = options.pitch;
     let tts_volume = options.volume;
-    let dialogue_voice = options.dialogue_voice;
-    let dialogue_rate = options.dialogue_rate;
-    let dialogue_pitch = options.dialogue_pitch;
-    let dialogue_volume = options.dialogue_volume;
-    let dialogue_engine = options.dialogue_engine;
+    let tts_engine = options.engine;
 
     std::thread::spawn(move || {
         log_debug(&format!(
-            "TTS start: voice={voice} chunks={} text_len={} dialogue_voice={:?}",
+            "TTS start: voice={voice} chunks={} text_len={}",
             chunks.len(),
-            cleaned.len(),
-            dialogue_voice
+            cleaned.len()
         ));
         let stream_handle = match OutputStreamBuilder::open_default_stream() {
             Ok(handle) => handle,
@@ -649,47 +741,29 @@ pub fn start_tts_playback_with_chunks(options: TtsPlaybackOptions) {
         let cancel_downloader = cancel_flag.clone();
         let chunks_downloader = chunks.clone();
         let voice_downloader = voice.clone();
-        let dialogue_voice_downloader = dialogue_voice.clone();
         let rate = tts_rate;
         let pitch = tts_pitch;
         let volume = tts_volume;
-        let dialogue_rate = dialogue_rate;
-        let dialogue_pitch = dialogue_pitch;
-        let dialogue_volume = dialogue_volume;
-        let dialogue_engine = dialogue_engine;
+        let tts_engine = tts_engine;
 
         rt.spawn(async move {
             for chunk_obj in chunks_downloader {
                 if cancel_downloader.load(Ordering::SeqCst) {
                     break;
                 }
-                let is_dialogue = chunk_obj.is_dialogue;
                 let (engine, chunk_voice) = if let Some(override_voice) = &chunk_obj.override_voice
                 {
                     (override_voice.engine, override_voice.voice.as_str())
-                } else if is_dialogue && dialogue_voice_downloader.is_some() {
-                    (
-                        dialogue_engine,
-                        dialogue_voice_downloader
-                            .as_deref()
-                            .unwrap_or(&voice_downloader),
-                    )
                 } else {
-                    (TtsEngine::Edge, voice_downloader.as_str())
+                    (tts_engine, voice_downloader.as_str())
                 };
-                let (chunk_rate, chunk_pitch, chunk_volume) =
-                    if is_dialogue && dialogue_voice_downloader.is_some() {
-                        (dialogue_rate, dialogue_pitch, dialogue_volume)
-                    } else {
-                        (rate, pitch, volume)
-                    };
                 match synthesize_segment_bytes(
                     engine,
                     &chunk_obj.text_to_read,
                     chunk_voice,
-                    chunk_rate,
-                    chunk_pitch,
-                    chunk_volume,
+                    rate,
+                    pitch,
+                    volume,
                     language,
                 )
                 .await
@@ -1413,12 +1487,13 @@ pub(crate) fn build_mixed_audiobook_parts_by_positions(
     positions: &[usize],
     split_on_newline: bool,
     dictionary: &[DictionaryEntry],
+    tts_engine: TtsEngine,
 ) -> Option<Vec<Vec<TtsChunk>>> {
     let parts_text = split_text_by_positions(text, positions)?;
     let mut parts_chunks = Vec::new();
 
     for part_text in parts_text {
-        let chunks = split_into_tts_chunks(&part_text, split_on_newline, dictionary);
+        let chunks = split_into_tts_chunks(&part_text, split_on_newline, dictionary, tts_engine);
         parts_chunks.push(chunks);
     }
 
@@ -1430,7 +1505,7 @@ pub(crate) fn build_mixed_audiobook_parts_by_positions(
 }
 
 pub fn split_text(text: &str) -> Vec<String> {
-    let mut chunks = Vec::new();
+    let mut chunks: Vec<String> = Vec::new();
     // Trim input to avoid processing leading/trailing whitespace as separate empty chunks
     let text = text.trim();
     if text.is_empty() {
@@ -1569,274 +1644,66 @@ pub fn split_text(text: &str) -> Vec<String> {
     chunks
 }
 
-/// Returns true if this character is an opening quote.
-fn is_opening_quote(ch: char) -> bool {
-    OPENING_QUOTES.contains(&ch)
-}
-
-/// Returns true if this character is a closing quote.
-fn is_closing_quote(ch: char) -> bool {
-    CLOSING_QUOTES.contains(&ch)
-}
-
-/// Detects if text is predominantly inside a dialogue (quoted text).
-/// Uses a simple heuristic: tracks open/close quote balance.
-pub fn detect_dialogue_in_text(text: &str) -> bool {
-    let mut inside_dialogue = false;
-    let mut dialogue_char_count = 0usize;
-    let mut total_char_count = 0usize;
-
-    for ch in text.chars() {
-        if !ch.is_whitespace() {
-            total_char_count += 1;
-            if inside_dialogue {
-                dialogue_char_count += 1;
-            }
-        }
-
-        if is_opening_quote(ch) {
-            inside_dialogue = true;
-        } else if is_closing_quote(ch) {
-            inside_dialogue = false;
-        }
-    }
-
-    // If more than half the text is inside quotes, consider it a dialogue chunk
-    if total_char_count == 0 {
-        return false;
-    }
-    dialogue_char_count * 2 > total_char_count
-}
-
 fn split_by_custom_dictionary(
     text: &str,
     custom_entries: &[DictionaryEntry],
 ) -> Vec<(String, Option<VoiceOverride>, usize)> {
-    if custom_entries.is_empty() || text.is_empty() {
-        return vec![(text.to_string(), None, text.chars().count())];
+    let _ = custom_entries;
+    if text.is_empty() {
+        Vec::new()
+    } else {
+        vec![(text.to_string(), None, text.chars().count())]
     }
-
-    let mut segments = Vec::new();
-    let mut cursor = 0usize;
-    while cursor < text.len() {
-        let remaining = &text[cursor..];
-        let mut best_pos: Option<usize> = None;
-        let mut best_len: usize = 0;
-        let mut best_entry: Option<&DictionaryEntry> = None;
-
-        for entry in custom_entries {
-            let needle = entry.original.as_str();
-            if needle.is_empty() {
-                continue;
-            }
-            if let Some(pos) = remaining.find(needle) {
-                let abs_pos = cursor + pos;
-                let replace_len = needle.len();
-                let take = match best_pos {
-                    None => true,
-                    Some(current) if abs_pos < current => true,
-                    Some(current) if abs_pos == current && replace_len > best_len => true,
-                    _ => false,
-                };
-                if take {
-                    best_pos = Some(abs_pos);
-                    best_len = replace_len;
-                    best_entry = Some(entry);
-                }
-            }
-        }
-
-        let Some(match_pos) = best_pos else {
-            let tail = &text[cursor..];
-            if !tail.is_empty() {
-                segments.push((tail.to_string(), None, tail.chars().count()));
-            }
-            break;
-        };
-
-        if match_pos > cursor {
-            let prefix = &text[cursor..match_pos];
-            segments.push((prefix.to_string(), None, prefix.chars().count()));
-        }
-
-        if let Some(entry) = best_entry {
-            let replacement = if entry.replacement.is_empty() {
-                entry.original.clone()
-            } else {
-                entry.replacement.clone()
-            };
-            let override_voice = if entry.use_custom_voice {
-                if let (Some(engine), Some(voice)) =
-                    (entry.custom_voice_engine, entry.custom_voice.clone())
-                {
-                    if !voice.is_empty() {
-                        Some(VoiceOverride { engine, voice })
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-            segments.push((replacement, override_voice, entry.original.chars().count()));
-        }
-
-        cursor = match_pos.saturating_add(best_len);
-    }
-
-    segments
-}
-
-pub(crate) fn split_dialogue_spans(text: &str) -> Vec<(String, bool, usize)> {
-    let mut segments = Vec::new();
-    let mut current = String::new();
-    let mut current_len = 0usize;
-    let mut inside_dialogue = false;
-
-    for ch in text.chars() {
-        if inside_dialogue {
-            current.push(ch);
-            current_len += 1;
-            if is_closing_quote(ch) {
-                if !current.is_empty() {
-                    segments.push((std::mem::take(&mut current), inside_dialogue, current_len));
-                    current_len = 0;
-                }
-                inside_dialogue = false;
-            }
-        } else if is_opening_quote(ch) {
-            if !current.is_empty() {
-                segments.push((std::mem::take(&mut current), inside_dialogue, current_len));
-                current_len = 0;
-            }
-            inside_dialogue = true;
-            current.push(ch);
-            current_len += 1;
-        } else {
-            current.push(ch);
-            current_len += 1;
-        }
-    }
-
-    if !current.is_empty() {
-        segments.push((current, inside_dialogue, current_len));
-    }
-
-    segments
 }
 
 pub fn split_into_tts_chunks(
     text: &str,
     split_on_newline: bool,
     dictionary: &[DictionaryEntry],
+    default_engine: TtsEngine,
 ) -> Vec<TtsChunk> {
-    let mut normal_entries = Vec::new();
-    let mut custom_entries = Vec::new();
-    for entry in dictionary {
-        let has_custom = entry.use_custom_voice
-            && entry.custom_voice_engine.is_some()
-            && entry.custom_voice.as_ref().is_some_and(|v| !v.is_empty());
-        if has_custom {
-            custom_entries.push(entry.clone());
-        } else {
-            normal_entries.push(entry.clone());
-        }
+    let voice_spans = split_voice_tag_spans(text, default_engine);
+    if voice_spans.is_empty() {
+        return Vec::new();
     }
-    let mut sentences = Vec::new();
-    let mut current_sentence = String::new();
-    let mut current_orig_len = 0usize;
-    let chars: Vec<char> = text.chars().collect();
-    for (idx, ch) in chars.iter().copied().enumerate() {
-        current_sentence.push(ch);
-        current_orig_len += 1;
-        let next_ch = chars.get(idx + 1).copied();
-        let punct_before_newline = split_on_newline
-            && matches!(
-                ch,
-                '.' | '!'
-                    | '?'
-                    | ','
-                    | ';'
-                    | ':'
-                    | ')'
-                    | ']'
-                    | '}'
-                    | '"'
-                    | '\''
-                    | '-'
-                    | '…'
-                    | '—'
-                    | '«'
-                    | '»'
-                    | '“'
-                    | '”'
-                    | '‘'
-                    | '’'
-                    | '‐'
-                    | '‑'
-                    | '–'
-                    | '·'
-            )
-            && matches!(next_ch, Some('\n') | Some('\r'));
-        let is_terminal = !punct_before_newline
-            && (matches!(ch, '.' | '!' | '?') || (split_on_newline && ch == '\n'));
-        if is_terminal {
-            if !current_sentence.trim().is_empty() {
-                sentences.push((current_sentence.clone(), current_orig_len));
+
+    let mut chunks: Vec<TtsChunk> = Vec::new();
+
+    for (span_text, span_override, span_orig_len) in voice_spans {
+        if span_text.trim().is_empty() {
+            if let Some(last) = chunks.last_mut() {
+                last.original_len += span_orig_len;
             }
-            current_sentence.clear();
-            current_orig_len = 0;
+            continue;
         }
-    }
-    if !current_sentence.trim().is_empty() {
-        sentences.push((current_sentence, current_orig_len));
-    }
-    let mut chunks = Vec::new();
-    let mut current_chunk_text = String::new();
-    let max_chars = 150;
-    for (s_text, _s_len) in sentences {
-        let potential_new_len = current_chunk_text.chars().count() + s_text.chars().count();
-        if !current_chunk_text.is_empty() && potential_new_len > max_chars {
-            let segments = split_dialogue_spans(&current_chunk_text);
-            let mut pending_len = 0usize;
-            for (segment, is_dialogue, _seg_len) in segments {
-                let cleaned = strip_dashed_lines(&segment);
-                let dict_segments = split_by_custom_dictionary(&cleaned, &custom_entries);
-                for (dict_text, override_voice, dict_len) in dict_segments {
-                    let prepared = prepare_tts_text(&dict_text, split_on_newline, &normal_entries);
-                    if prepared.trim().is_empty() {
-                        pending_len += dict_len;
-                        continue;
-                    }
-                    let orig_len = dict_len + pending_len;
-                    pending_len = 0;
-                    chunks.push(TtsChunk {
-                        text_to_read: prepared,
-                        original_len: orig_len,
-                        is_dialogue,
-                        override_voice,
-                    });
+        let mut sentences = Vec::new();
+        let mut current_sentence = String::new();
+        let mut current_len = 0usize;
+        let chars: Vec<char> = span_text.chars().collect();
+        for ch in chars.iter().copied() {
+            current_sentence.push(ch);
+            current_len += 1;
+            let is_terminal = matches!(ch, '.' | '!' | '?' | ';' | ':');
+            if is_terminal {
+                if !current_sentence.trim().is_empty() {
+                    sentences.push((current_sentence.clone(), current_len));
                 }
+                current_sentence.clear();
+                current_len = 0;
             }
-            if pending_len > 0
-                && let Some(last) = chunks.last_mut()
-            {
-                last.original_len += pending_len;
-            }
-            current_chunk_text.clear();
         }
-        current_chunk_text.push_str(&s_text);
-    }
-    if !current_chunk_text.is_empty() {
-        let segments = split_dialogue_spans(&current_chunk_text);
-        let mut pending_len = 0usize;
-        for (segment, is_dialogue, _seg_len) in segments {
-            let cleaned = strip_dashed_lines(&segment);
-            let dict_segments = split_by_custom_dictionary(&cleaned, &custom_entries);
-            for (dict_text, override_voice, dict_len) in dict_segments {
-                let prepared = prepare_tts_text(&dict_text, split_on_newline, &normal_entries);
+        if !current_sentence.trim().is_empty() {
+            sentences.push((current_sentence, current_len));
+        }
+
+        let extra_len = span_orig_len.saturating_sub(span_text.chars().count());
+        let mut pending_len = extra_len;
+
+        for (s_text, _s_len) in sentences.into_iter() {
+            let cleaned = strip_dashed_lines(&s_text);
+            let dict_segments = split_by_custom_dictionary(&cleaned, &[]);
+            for (dict_text, _override_voice, dict_len) in dict_segments {
+                let prepared = prepare_tts_text(&dict_text, split_on_newline, dictionary);
                 if prepared.trim().is_empty() {
                     pending_len += dict_len;
                     continue;
@@ -1846,15 +1713,14 @@ pub fn split_into_tts_chunks(
                 chunks.push(TtsChunk {
                     text_to_read: prepared,
                     original_len: orig_len,
-                    is_dialogue,
-                    override_voice,
+                    override_voice: span_override.clone(),
                 });
             }
-        }
-        if pending_len > 0
-            && let Some(last) = chunks.last_mut()
-        {
-            last.original_len += pending_len;
+            if pending_len > 0
+                && let Some(last) = chunks.last_mut()
+            {
+                last.original_len += pending_len;
+            }
         }
     }
     chunks
@@ -1927,12 +1793,6 @@ pub fn start_audiobook(hwnd: HWND) {
         tts_rate,
         tts_pitch,
         tts_volume,
-        use_dialogue_voice,
-        dialogue_voice,
-        dialogue_tts_engine,
-        dialogue_rate,
-        dialogue_pitch,
-        dialogue_volume,
     ) = unsafe {
         with_state(hwnd, |state| {
             (
@@ -1946,12 +1806,6 @@ pub fn start_audiobook(hwnd: HWND) {
                 state.settings.tts_rate,
                 state.settings.tts_pitch,
                 state.settings.tts_volume,
-                state.settings.use_dialogue_voice,
-                state.settings.dialogue_voice.clone(),
-                state.settings.dialogue_tts_engine,
-                state.settings.dialogue_voice_rate,
-                state.settings.dialogue_voice_pitch,
-                state.settings.dialogue_voice_volume,
             )
         })
     }
@@ -1966,19 +1820,7 @@ pub fn start_audiobook(hwnd: HWND) {
         0,
         0,
         100,
-        false,
-        String::new(),
-        TtsEngine::Edge,
-        0,
-        0,
-        100,
     ));
-
-    let dialogue_voice_option = if use_dialogue_voice && !dialogue_voice.is_empty() {
-        Some(dialogue_voice)
-    } else {
-        None
-    };
 
     let cleaned = strip_dashed_lines(&text);
     let mut split_parts = audiobook_split;
@@ -2043,13 +1885,7 @@ pub fn start_audiobook(hwnd: HWND) {
         }
     }
 
-    let has_custom_voice = dictionary.iter().any(|entry| {
-        entry.use_custom_voice
-            && entry.custom_voice_engine.is_some()
-            && entry.custom_voice.as_ref().is_some_and(|v| !v.is_empty())
-    });
-    let mixed_needed =
-        has_custom_voice || (use_dialogue_voice && dialogue_tts_engine != tts_engine);
+    let mixed_needed = has_voice_tags(&cleaned);
 
     let prepared = if marker_parts.is_some() || mixed_needed {
         String::new()
@@ -2068,6 +1904,7 @@ pub fn start_audiobook(hwnd: HWND) {
             &cleaned,
             split_on_newline,
             &dictionary,
+            tts_engine,
         ))
     } else {
         None
@@ -2079,6 +1916,7 @@ pub fn start_audiobook(hwnd: HWND) {
                 positions,
                 split_on_newline,
                 &dictionary,
+                tts_engine,
             ),
             _ => None,
         }
@@ -2119,7 +1957,6 @@ pub fn start_audiobook(hwnd: HWND) {
             .to_lowercase();
         let is_aac = extension == "m4b" || extension == "m4a" || extension == "mp4";
 
-        let dialogue_voice_clone = dialogue_voice_option.clone();
         let options = AudiobookCommonOptions {
             voice: &voice,
             output: &output,
@@ -2129,25 +1966,13 @@ pub fn start_audiobook(hwnd: HWND) {
             rate: tts_rate,
             pitch: tts_pitch,
             volume: tts_volume,
-            dialogue_voice: dialogue_voice_clone,
-            dialogue_rate,
-            dialogue_pitch,
-            dialogue_volume,
             sapi4_threads,
         };
 
         let result = if mixed_needed {
             let mut current_global_progress = 0usize;
-            let dialogue_voice_for_use = if use_dialogue_voice {
-                dialogue_voice_option.clone()
-            } else {
-                None
-            };
             let mixed_config = MixedAudiobookConfig {
                 main_engine: tts_engine,
-                use_dialogue_voice,
-                dialogue_voice: dialogue_voice_for_use.clone(),
-                dialogue_engine: dialogue_tts_engine,
             };
             (|| {
                 if let Some(ref parts) = mixed_marker_parts {
@@ -2377,10 +2202,6 @@ fn run_split_audiobook(
             rate: options.rate,
             pitch: options.pitch,
             volume: options.volume,
-            dialogue_voice: options.dialogue_voice.clone(),
-            dialogue_rate: options.dialogue_rate,
-            dialogue_pitch: options.dialogue_pitch,
-            dialogue_volume: options.dialogue_volume,
             sapi4_threads: options.sapi4_threads,
         };
 
@@ -2427,10 +2248,6 @@ fn run_marker_split_audiobook(
             rate: options.rate,
             pitch: options.pitch,
             volume: options.volume,
-            dialogue_voice: options.dialogue_voice.clone(),
-            dialogue_rate: options.dialogue_rate,
-            dialogue_pitch: options.dialogue_pitch,
-            dialogue_volume: options.dialogue_volume,
             sapi4_threads: options.sapi4_threads,
         };
 
@@ -2495,10 +2312,6 @@ fn run_split_sapi4_audiobook(
             rate: options.rate,
             pitch: options.pitch,
             volume: options.volume,
-            dialogue_voice: options.dialogue_voice.clone(),
-            dialogue_rate: options.dialogue_rate,
-            dialogue_pitch: options.dialogue_pitch,
-            dialogue_volume: options.dialogue_volume,
             sapi4_threads: options.sapi4_threads,
         };
 
@@ -2550,10 +2363,6 @@ fn run_marker_split_sapi4_audiobook(
             rate: options.rate,
             pitch: options.pitch,
             volume: options.volume,
-            dialogue_voice: options.dialogue_voice.clone(),
-            dialogue_rate: options.dialogue_rate,
-            dialogue_pitch: options.dialogue_pitch,
-            dialogue_volume: options.dialogue_volume,
             sapi4_threads: options.sapi4_threads,
         };
 
@@ -3001,15 +2810,11 @@ fn run_split_sapi_audiobook(
             crate::sapi5_engine::SapiExportOptions {
                 chunks: part_chunks,
                 voice_name: options.voice,
-                dialogue_voice: options.dialogue_voice.clone(),
                 output_path: &actual_output,
                 language: options.language,
                 rate: options.rate,
                 pitch: options.pitch,
                 volume: options.volume,
-                dialogue_rate: options.dialogue_rate,
-                dialogue_pitch: options.dialogue_pitch,
-                dialogue_volume: options.dialogue_volume,
                 cancel: cancel_clone,
             },
             |_chunk_idx| {
@@ -3095,15 +2900,11 @@ fn run_marker_split_sapi_audiobook(
             crate::sapi5_engine::SapiExportOptions {
                 chunks: part_chunks,
                 voice_name: options.voice,
-                dialogue_voice: options.dialogue_voice.clone(),
                 output_path: &actual_output,
                 language: options.language,
                 rate: options.rate,
                 pitch: options.pitch,
                 volume: options.volume,
-                dialogue_rate: options.dialogue_rate,
-                dialogue_pitch: options.dialogue_pitch,
-                dialogue_volume: options.dialogue_volume,
                 cancel: cancel_clone,
             },
             |_chunk_idx| {
@@ -3157,80 +2958,56 @@ pub(crate) fn run_tts_audiobook_part(
         let tasks = chunks.iter().enumerate().map(|(i, chunk)| {
             let chunk = chunk.clone();
             let voice = options.voice.to_string();
-            let dialogue_voice = options.dialogue_voice.clone();
             let cancel = options.cancel.clone();
             let lang = options.language;
             let rate = options.rate;
             let pitch = options.pitch;
             let volume = options.volume;
-            let dialogue_rate = options.dialogue_rate;
-            let dialogue_pitch = options.dialogue_pitch;
-            let dialogue_volume = options.dialogue_volume;
             async move {
                 let mut combined = Vec::new();
-                let segments = if dialogue_voice.is_some() {
-                    split_dialogue_spans(&chunk)
-                } else {
-                    vec![(chunk, false, 0)]
-                };
-
-                for (segment, is_dialogue, _seg_len) in segments {
-                    if segment.trim().is_empty() {
-                        continue;
+                if chunk.trim().is_empty() {
+                    return Ok::<Vec<u8>, String>(combined);
+                }
+                loop {
+                    if cancel.load(Ordering::Relaxed) {
+                        return Err("Cancelled".to_string());
                     }
-                    let chunk_voice = if is_dialogue && dialogue_voice.is_some() {
-                        dialogue_voice.as_deref().unwrap_or(&voice)
-                    } else {
-                        &voice
-                    };
-                    let (chunk_rate, chunk_pitch, chunk_volume) =
-                        if is_dialogue && dialogue_voice.is_some() {
-                            (dialogue_rate, dialogue_pitch, dialogue_volume)
-                        } else {
-                            (rate, pitch, volume)
-                        };
-
-                    loop {
-                        if cancel.load(Ordering::Relaxed) {
-                            return Err("Cancelled".to_string());
+                    let request_id = Uuid::new_v4().simple().to_string();
+                    match download_audio_chunk_cancel(DownloadChunkOptions {
+                        text: &chunk,
+                        voice: &voice,
+                        request_id: &request_id,
+                        rate,
+                        pitch,
+                        volume,
+                        language: lang,
+                        cancel: cancel.as_ref(),
+                    })
+                    .await
+                    {
+                        Ok(data) => {
+                            combined.extend_from_slice(&data);
+                            break;
                         }
-                        let request_id = Uuid::new_v4().simple().to_string();
-                        match download_audio_chunk_cancel(DownloadChunkOptions {
-                            text: &segment,
-                            voice: chunk_voice,
-                            request_id: &request_id,
-                            rate: chunk_rate,
-                            pitch: chunk_pitch,
-                            volume: chunk_volume,
-                            language: lang,
-                            cancel: cancel.as_ref(),
-                        })
-                        .await
-                        {
-                            Ok(data) => {
-                                combined.extend_from_slice(&data);
-                                break;
+                        Err(err) => {
+                            if cancel.load(Ordering::Relaxed) {
+                                return Err("Cancelled".to_string());
                             }
-                            Err(err) => {
-                                if cancel.load(Ordering::Relaxed) {
-                                    return Err("Cancelled".to_string());
-                                }
-                                let msg = i18n::tr_f(
-                                    lang,
-                                    "tts.chunk_download_retry_wait",
-                                    &[("index", &(i + 1).to_string()), ("err", &err)],
-                                );
-                                log_debug(&msg);
+                            let msg = i18n::tr_f(
+                                lang,
+                                "tts.chunk_download_retry_wait",
+                                &[("index", &(i + 1).to_string()), ("err", &err)],
+                            );
+                            log_debug(&msg);
 
-                                tokio::select! {
-                                    _ = tokio::time::sleep(Duration::from_secs(5)) => {},
-                                    _ = async {
-                                        while !cancel.load(Ordering::Relaxed) {
-                                            tokio::time::sleep(Duration::from_millis(100)).await;
-                                        }
-                                    } => {
-                                        return Err("Cancelled".to_string());
+                            tokio::select! {
+                                _ = tokio::time::sleep(Duration::from_secs(5)) => {},
+                                _ = async {
+                                    while !cancel.load(Ordering::Relaxed) {
+                                        tokio::time::sleep(Duration::from_millis(100)).await;
                                     }
+                                } => {
+                                    return Err("Cancelled".to_string());
                                 }
                             }
                         }
@@ -3298,9 +3075,6 @@ pub(crate) fn run_tts_audiobook_part(
 
 pub(crate) struct MixedAudiobookConfig {
     pub(crate) main_engine: TtsEngine,
-    pub(crate) use_dialogue_voice: bool,
-    pub(crate) dialogue_voice: Option<String>,
-    pub(crate) dialogue_engine: TtsEngine,
 }
 
 pub(crate) fn render_mixed_audiobook_part(
@@ -3346,20 +3120,6 @@ pub(crate) fn render_mixed_audiobook_part(
                     options.rate,
                     options.pitch,
                     options.volume,
-                )
-            } else if chunk.is_dialogue
-                && config.use_dialogue_voice
-                && config
-                    .dialogue_voice
-                    .as_ref()
-                    .is_some_and(|v| !v.is_empty())
-            {
-                (
-                    config.dialogue_engine,
-                    config.dialogue_voice.as_deref().unwrap_or(options.voice),
-                    options.dialogue_rate,
-                    options.dialogue_pitch,
-                    options.dialogue_volume,
                 )
             } else {
                 (

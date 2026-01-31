@@ -3,6 +3,12 @@
 Phiên bản 0.6.4 – 2026-01-30
 Cải tiến
 • Chương trình đã được đổi tên thành Sonarpad để nhấn mạnh âm thanh và audio, là điểm then chốt của chương trình.
+• Thêm lựa chọn track âm thanh trong menu Phát lại cho các tệp đa phương tiện có nhiều track âm thanh (ví dụ: MKV với nhiều ngôn ngữ).
+• Podcast giờ đây hiển thị rõ ràng những tập chưa nghe với tiền tố "Chưa nghe" trước tên.
+• Hệ thống thẻ mới để đổi giọng trong văn bản. Ví dụ:
+  - Giọng Microsoft (Edge): <voice edge it-IT-IsabellaNeural>Xin chào</voice>
+  - Giọng SAPI5: <voice sapi5 Microsoft Helena Desktop>Xin chào</voice>
+  - Giọng SAPI4: <voice sapi4 #1>Xin chào</voice>
 • Bổ sung danh mục podcast.
 Sửa lỗi
 • Khắc phục lỗi khiến sách nói SAPI4 có thể được tạo ra khác với mong đợi.

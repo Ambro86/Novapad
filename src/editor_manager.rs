@@ -1,11 +1,11 @@
-use crate::accessibility::{EM_REPLACESEL, to_wide, to_wide_normalized};
+use crate::accessibility::{EM_GETSEL, EM_REPLACESEL, EM_SCROLLCARET, to_wide, to_wide_normalized};
 use crate::file_handler::decode_text_with_encoding;
 use crate::file_handler::*;
 use crate::settings::{
-    FileFormat, Language, ModifiedMarkerPosition, TextEncoding, confirm_save_message,
+    FileFormat, Language, ModifiedMarkerPosition, TextEncoding, TtsEngine, confirm_save_message,
     confirm_title, untitled_title,
 };
-use crate::{log_debug, with_state};
+use crate::{get_active_edit, log_debug, with_state};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM};
@@ -30,6 +30,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use windows::core::{PCWSTR, PWSTR};
 
 const EM_LIMITTEXT: u32 = 0x00C5;
+const EM_SETSEL: u32 = 0x00B1;
 const EM_BEGINUNDOACTION: u32 = 0x0459;
 const EM_ENDUNDOACTION: u32 = 0x045A;
 const EM_STOPGROUPTYPING: u32 = 0x0477;
@@ -55,6 +56,7 @@ const VOICE_PANEL_ROW_HEIGHT: i32 = 22;
 const VOICE_PANEL_SPACING: i32 = 6;
 const VOICE_PANEL_LABEL_WIDTH: i32 = 140;
 const VOICE_PANEL_COMBO_HEIGHT: i32 = 140;
+const VOICE_PANEL_BUTTON_WIDTH: i32 = 90;
 
 unsafe fn should_use_opening_quote(hwnd_edit: HWND) -> bool {
     let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
@@ -188,6 +190,49 @@ pub unsafe fn apply_text_limit_to_all_edits(hwnd: HWND) {
 
     for hwnd_edit in edits {
         apply_text_limit(hwnd_edit);
+    }
+}
+
+pub fn insert_voice_tag_at_caret(hwnd: HWND, engine: TtsEngine, voice: &str) {
+    let voice = voice.trim();
+    if voice.is_empty() {
+        return;
+    }
+    let Some(hwnd_edit) = (unsafe { get_active_edit(hwnd) }) else {
+        return;
+    };
+    let engine_token = match engine {
+        TtsEngine::Edge => "edge",
+        TtsEngine::Sapi5 => "sapi5",
+        TtsEngine::Sapi4 => "sapi4",
+    };
+    let open = format!("<voice {engine_token} {voice}>");
+    let close = "</voice>";
+    let insert = format!("{open}{close}");
+    let mut start: u32 = 0;
+    let mut end: u32 = 0;
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_GETSEL,
+            WPARAM(&mut start as *mut u32 as usize),
+            LPARAM(&mut end as *mut u32 as isize),
+        );
+        let wide = to_wide(&insert);
+        SendMessageW(
+            hwnd_edit,
+            EM_REPLACESEL,
+            WPARAM(1),
+            LPARAM(wide.as_ptr() as isize),
+        );
+        let caret = start as i32 + open.encode_utf16().count() as i32;
+        SendMessageW(
+            hwnd_edit,
+            EM_SETSEL,
+            WPARAM(caret as usize),
+            LPARAM(caret as isize),
+        );
+        SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
     }
 }
 
@@ -2376,6 +2421,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
             state.voice_combo_engine,
             state.voice_label_voice,
             state.voice_combo_voice,
+            state.voice_button_insert_tag,
             state.voice_label_speed,
             state.voice_combo_speed,
             state.voice_edit_speed,
@@ -2405,6 +2451,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
         combo_engine,
         label_voice,
         combo_voice,
+        button_insert_tag,
         label_speed,
         combo_speed,
         edit_speed,
@@ -2462,6 +2509,9 @@ pub unsafe fn layout_children(hwnd: HWND) {
         let combo_x = label_x + VOICE_PANEL_LABEL_WIDTH + VOICE_PANEL_PADDING;
         let combo_width = (tab_rc.right - VOICE_PANEL_PADDING) - combo_x;
         let combo_width = if combo_width < 120 { 120 } else { combo_width };
+        let combo_voice_width =
+            (combo_width - (VOICE_PANEL_BUTTON_WIDTH + VOICE_PANEL_PADDING)).max(120);
+        let button_voice_x = combo_x + combo_voice_width + VOICE_PANEL_PADDING;
         let row1_top = tab_rc.top + VOICE_PANEL_PADDING;
         let row2_top = row1_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
         let row3_top = row2_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
@@ -2499,8 +2549,16 @@ pub unsafe fn layout_children(hwnd: HWND) {
                 combo_voice,
                 combo_x,
                 row2_top - 2,
-                combo_width,
+                combo_voice_width,
                 VOICE_PANEL_COMBO_HEIGHT,
+                true,
+            ));
+            crate::log_if_err!(MoveWindow(
+                button_insert_tag,
+                button_voice_x,
+                row2_top,
+                VOICE_PANEL_BUTTON_WIDTH,
+                VOICE_PANEL_ROW_HEIGHT,
                 true,
             ));
             crate::log_if_err!(MoveWindow(

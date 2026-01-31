@@ -14,6 +14,7 @@ use std::ffi::CString;
 use std::path::{Path, PathBuf};
 use std::ptr;
 use std::sync::{Arc, Mutex, OnceLock};
+use windows::Win32::Foundation::HWND;
 
 const MIX_SUFFIX: &str = "_tts_mix_";
 const FILM_BASE_VOLUME: f32 = 0.7;
@@ -96,90 +97,141 @@ fn ensure_tts_cache(
         if text.is_empty() {
             continue;
         }
+        let chunks = tts_engine::split_into_tts_chunks(text, false, &[], settings.tts_engine);
+        let has_overrides = chunks.iter().any(|chunk| chunk.override_voice.is_some());
+
         match settings.tts_engine {
             crate::settings::TtsEngine::Edge => {
-                let rt = tokio::runtime::Runtime::new()
-                    .map_err(|e| format!("Subtitle: failed to create runtime: {}", e))?;
-                let request_id = uuid::Uuid::new_v4().simple().to_string();
-                let is_dialogue = tts_engine::detect_dialogue_in_text(text);
-                let voice = if is_dialogue
-                    && settings.use_dialogue_voice
-                    && !settings.dialogue_voice.is_empty()
-                {
-                    &settings.dialogue_voice
+                if has_overrides {
+                    let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
+                    let options = tts_engine::AudiobookCommonOptions {
+                        voice: &settings.tts_voice,
+                        output: &path,
+                        progress_hwnd: HWND(0),
+                        cancel,
+                        language: settings.language,
+                        rate: settings.tts_rate,
+                        pitch: settings.tts_pitch,
+                        volume: settings.tts_volume,
+                        sapi4_threads: None,
+                    };
+                    let config = tts_engine::MixedAudiobookConfig {
+                        main_engine: settings.tts_engine,
+                    };
+                    let mut progress = 0usize;
+                    tts_engine::render_mixed_audiobook_part(
+                        &chunks,
+                        &mut progress,
+                        &path,
+                        &options,
+                        &config,
+                    )?;
                 } else {
-                    &settings.tts_voice
-                };
-                let (rate, pitch, volume) = if is_dialogue
-                    && settings.use_dialogue_voice
-                    && !settings.dialogue_voice.is_empty()
-                {
-                    (
-                        settings.dialogue_voice_rate,
-                        settings.dialogue_voice_pitch,
-                        settings.dialogue_voice_volume,
-                    )
-                } else {
-                    (settings.tts_rate, settings.tts_pitch, settings.tts_volume)
-                };
-                match rt.block_on(tts_engine::download_audio_chunk(
-                    text,
-                    voice,
-                    &request_id,
-                    rate,
-                    pitch,
-                    volume,
-                    settings.language,
-                )) {
-                    Ok(bytes) => {
-                        std::fs::write(&path, bytes)
-                            .map_err(|e| format!("Subtitle: failed to write audio chunk: {}", e))?;
-                    }
-                    Err(err) => {
-                        return Err(format!("Subtitle: download failed: {}", err));
+                    let rt = tokio::runtime::Runtime::new()
+                        .map_err(|e| format!("Subtitle: failed to create runtime: {}", e))?;
+                    let request_id = uuid::Uuid::new_v4().simple().to_string();
+                    match rt.block_on(tts_engine::download_audio_chunk(
+                        text,
+                        &settings.tts_voice,
+                        &request_id,
+                        settings.tts_rate,
+                        settings.tts_pitch,
+                        settings.tts_volume,
+                        settings.language,
+                    )) {
+                        Ok(bytes) => {
+                            std::fs::write(&path, bytes).map_err(|e| {
+                                format!("Subtitle: failed to write audio chunk: {}", e)
+                            })?;
+                        }
+                        Err(err) => {
+                            return Err(format!("Subtitle: download failed: {}", err));
+                        }
                     }
                 }
             }
             crate::settings::TtsEngine::Sapi5 => {
-                let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
-                let options = sapi5_engine::SapiExportOptions {
-                    chunks: &[text.to_string()],
-                    voice_name: &settings.tts_voice,
-                    dialogue_voice: if settings.use_dialogue_voice
-                        && !settings.dialogue_voice.is_empty()
-                    {
-                        Some(settings.dialogue_voice.clone())
-                    } else {
-                        None
-                    },
-                    output_path: &path,
-                    language: settings.language,
-                    rate: settings.tts_rate,
-                    pitch: settings.tts_pitch,
-                    volume: settings.tts_volume,
-                    dialogue_rate: settings.dialogue_voice_rate,
-                    dialogue_pitch: settings.dialogue_voice_pitch,
-                    dialogue_volume: settings.dialogue_voice_volume,
-                    cancel,
-                };
-                sapi5_engine::speak_sapi_to_file(options, |_| {})?;
+                if has_overrides {
+                    let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
+                    let options = tts_engine::AudiobookCommonOptions {
+                        voice: &settings.tts_voice,
+                        output: &path,
+                        progress_hwnd: HWND(0),
+                        cancel,
+                        language: settings.language,
+                        rate: settings.tts_rate,
+                        pitch: settings.tts_pitch,
+                        volume: settings.tts_volume,
+                        sapi4_threads: None,
+                    };
+                    let config = tts_engine::MixedAudiobookConfig {
+                        main_engine: settings.tts_engine,
+                    };
+                    let mut progress = 0usize;
+                    tts_engine::render_mixed_audiobook_part(
+                        &chunks,
+                        &mut progress,
+                        &path,
+                        &options,
+                        &config,
+                    )?;
+                } else {
+                    let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
+                    let options = sapi5_engine::SapiExportOptions {
+                        chunks: &[text.to_string()],
+                        voice_name: &settings.tts_voice,
+                        output_path: &path,
+                        language: settings.language,
+                        rate: settings.tts_rate,
+                        pitch: settings.tts_pitch,
+                        volume: settings.tts_volume,
+                        cancel,
+                    };
+                    sapi5_engine::speak_sapi_to_file(options, |_| {})?;
+                }
             }
             crate::settings::TtsEngine::Sapi4 => {
-                let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
-                let voice_idx = parse_sapi4_voice_index(&settings.tts_voice);
-                let options = sapi4_engine::Sapi4Options {
-                    rate: settings.tts_rate,
-                    pitch: settings.tts_pitch,
-                    volume: settings.tts_volume,
-                    cancel,
-                };
-                sapi4_engine::speak_sapi4_to_file(
-                    &[text.to_string()],
-                    voice_idx,
-                    &path,
-                    options,
-                    |_| {},
-                )?;
+                if has_overrides {
+                    let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
+                    let options = tts_engine::AudiobookCommonOptions {
+                        voice: &settings.tts_voice,
+                        output: &path,
+                        progress_hwnd: HWND(0),
+                        cancel,
+                        language: settings.language,
+                        rate: settings.tts_rate,
+                        pitch: settings.tts_pitch,
+                        volume: settings.tts_volume,
+                        sapi4_threads: None,
+                    };
+                    let config = tts_engine::MixedAudiobookConfig {
+                        main_engine: settings.tts_engine,
+                    };
+                    let mut progress = 0usize;
+                    tts_engine::render_mixed_audiobook_part(
+                        &chunks,
+                        &mut progress,
+                        &path,
+                        &options,
+                        &config,
+                    )?;
+                } else {
+                    let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
+                    let voice_idx = parse_sapi4_voice_index(&settings.tts_voice);
+                    let options = sapi4_engine::Sapi4Options {
+                        rate: settings.tts_rate,
+                        pitch: settings.tts_pitch,
+                        volume: settings.tts_volume,
+                        cancel,
+                    };
+                    sapi4_engine::speak_sapi4_to_file(
+                        &[text.to_string()],
+                        voice_idx,
+                        &path,
+                        options,
+                        |_| {},
+                    )?;
+                }
             }
         }
     }
@@ -357,7 +409,7 @@ fn encode_mixed_audio_to_m4a(
 ) -> Result<(), String> {
     let cues = ensure_tts_cache(input_path, subtitle_path, settings)?;
 
-    let mut source = FfmpegSource::try_new(input_path, 0, None)?;
+    let mut source = FfmpegSource::try_new(input_path, 0, None, None)?;
     let sample_rate = source.sample_rate();
     let channels = source.channels();
 

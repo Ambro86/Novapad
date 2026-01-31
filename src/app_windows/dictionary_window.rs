@@ -8,19 +8,19 @@ use tokio::sync::mpsc;
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::UI::Controls::{BST_CHECKED, WC_BUTTON, WC_COMBOBOXW, WC_LISTBOXW, WC_STATIC};
+use windows::Win32::UI::Controls::{WC_BUTTON, WC_COMBOBOXW, WC_LISTBOXW, WC_STATIC};
 use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, SetFocus, VK_ESCAPE, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
-    BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL,
-    CB_GETITEMDATA, CB_RESETCONTENT, CB_SETCURSEL, CB_SETITEMDATA, CBS_DROPDOWNLIST, CREATESTRUCTW,
-    CreateWindowExW, DefWindowProcW, DestroyWindow, ES_AUTOHSCROLL, GWLP_USERDATA,
-    GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, IDCANCEL, IDOK,
-    LB_ADDSTRING, LB_GETCOUNT, LB_GETCURSEL, LB_GETITEMDATA, LB_RESETCONTENT, LB_SETCURSEL,
-    LB_SETITEMDATA, LBN_SELCHANGE, LBS_HASSTRINGS, LBS_NOTIFY, LoadCursorW, MSG, PostMessageW,
-    RegisterClassW, SW_HIDE, SW_SHOW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
-    SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY,
-    WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
-    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_GETITEMDATA, CB_RESETCONTENT,
+    CB_SETCURSEL, CB_SETITEMDATA, CBS_DROPDOWNLIST, CREATESTRUCTW, CreateWindowExW, DefWindowProcW,
+    DestroyWindow, ES_AUTOHSCROLL, GWLP_USERDATA, GetWindowLongPtrW, GetWindowTextLengthW,
+    GetWindowTextW, HMENU, IDC_ARROW, IDCANCEL, IDOK, LB_ADDSTRING, LB_GETCOUNT, LB_GETCURSEL,
+    LB_GETITEMDATA, LB_RESETCONTENT, LB_SETCURSEL, LB_SETITEMDATA, LBN_SELCHANGE, LBS_HASSTRINGS,
+    LBS_NOTIFY, LoadCursorW, MSG, PostMessageW, RegisterClassW, SW_HIDE, SendMessageW,
+    SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_APP,
+    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW,
+    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU,
+    WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -803,27 +803,7 @@ unsafe extern "system" fn dictionary_entry_wndproc(
                 ) {
                     crate::log_debug(&format!("Failed to set edit_replacement text: {:?}", _e));
                 }
-
-                if entry.use_custom_voice {
-                    SendMessageW(
-                        checkbox_use_voice,
-                        BM_SETCHECK,
-                        WPARAM(BST_CHECKED.0 as usize),
-                        LPARAM(0),
-                    );
-                }
-
-                // Set engine combo selection
-                if let Some(engine) = entry.custom_voice_engine {
-                    let engine_idx = match engine {
-                        TtsEngine::Edge => 0,
-                        TtsEngine::Sapi5 => 1,
-                        TtsEngine::Sapi4 => 2,
-                    };
-                    SendMessageW(combo_engine, CB_SETCURSEL, WPARAM(engine_idx), LPARAM(0));
-                }
-
-                entry.custom_voice.clone()
+                None
             } else {
                 None
             };
@@ -933,7 +913,7 @@ where
 }
 
 unsafe fn apply_entry_dialog(hwnd: HWND) {
-    let (parent, owner, edit_original, edit_replacement, index, checkbox_use_voice, combo_engine) =
+    let (parent, owner, edit_original, edit_replacement, index) =
         match with_entry_state(hwnd, |s| {
             (
                 s.parent,
@@ -941,8 +921,6 @@ unsafe fn apply_entry_dialog(hwnd: HWND) {
                 s.edit_original,
                 s.edit_replacement,
                 s.index,
-                s.checkbox_use_voice,
-                s.combo_engine,
             )
         }) {
             Some(values) => values,
@@ -955,23 +933,10 @@ unsafe fn apply_entry_dialog(hwnd: HWND) {
         return;
     }
 
-    // Get voice settings
-    let use_voice = SendMessageW(checkbox_use_voice, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
-        == BST_CHECKED.0;
-
-    let (custom_engine, custom_voice) = if use_voice {
-        let engine_sel = SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-        let engine = match engine_sel {
-            1 => TtsEngine::Sapi5,
-            2 => TtsEngine::Sapi4,
-            _ => TtsEngine::Edge,
-        };
-
-        let voice = get_selected_voice(hwnd);
-        (Some(engine), voice)
-    } else {
-        (None, None)
-    };
+    // Custom voices are now handled via explicit <voice> tags in the text.
+    let use_voice = false;
+    let custom_engine = None;
+    let custom_voice = None;
 
     if with_state(parent, |state| {
         let entry = DictionaryEntry {
@@ -1031,15 +996,18 @@ unsafe fn update_voice_controls_visibility(hwnd: HWND) {
             None => return,
         };
 
-    let use_voice = SendMessageW(checkbox_use_voice, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
-        == BST_CHECKED.0;
-
-    let show = if use_voice { SW_SHOW } else { SW_HIDE };
-    ShowWindow(label_engine, show);
-    ShowWindow(combo_engine, show);
-    ShowWindow(label_voice, show);
-    ShowWindow(combo_voice, show);
-    ShowWindow(button_preview, show);
+    let controls = [
+        checkbox_use_voice,
+        label_engine,
+        combo_engine,
+        label_voice,
+        combo_voice,
+        button_preview,
+    ];
+    for control in controls {
+        ShowWindow(control, SW_HIDE);
+        EnableWindow(control, false);
+    }
 }
 
 unsafe fn populate_entry_voice_combo(hwnd: HWND, selected_voice: Option<&str>) {
@@ -1115,41 +1083,6 @@ unsafe fn populate_entry_voice_combo(hwnd: HWND, selected_voice: Option<&str>) {
     }
 }
 
-unsafe fn get_selected_voice(hwnd: HWND) -> Option<String> {
-    let (parent, combo_engine, combo_voice) =
-        with_entry_state(hwnd, |s| (s.parent, s.combo_engine, s.combo_voice))?;
-
-    let engine_sel = SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-    let engine = match engine_sel {
-        1 => TtsEngine::Sapi5,
-        2 => TtsEngine::Sapi4,
-        _ => TtsEngine::Edge,
-    };
-
-    let voices: Vec<VoiceInfo> = with_state(parent, |state| match engine {
-        TtsEngine::Edge => state.edge_voices.clone(),
-        TtsEngine::Sapi5 => state.sapi_voices.clone(),
-        TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
-    })
-    .unwrap_or_default();
-
-    let voice_sel = SendMessageW(combo_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-    if voice_sel < 0 {
-        return None;
-    }
-    let voice_index = SendMessageW(
-        combo_voice,
-        CB_GETITEMDATA,
-        WPARAM(voice_sel as usize),
-        LPARAM(0),
-    )
-    .0 as usize;
-    if voice_index >= voices.len() {
-        return None;
-    }
-    Some(voices[voice_index].short_name.clone())
-}
-
 unsafe fn preview_entry_voice(hwnd: HWND) {
     let (parent, edit_original, edit_replacement, combo_engine, combo_voice) =
         match with_entry_state(hwnd, |s| {
@@ -1221,9 +1154,10 @@ unsafe fn preview_entry_voice(hwnd: HWND) {
 
     match engine {
         TtsEngine::Edge => {
-            let chunks = tts_engine::split_into_tts_chunks(&text, false, &[]);
+            let chunks = tts_engine::split_into_tts_chunks(&text, false, &[], engine);
             let options = tts_engine::TtsPlaybackOptions {
                 hwnd: parent,
+                engine,
                 cleaned: text,
                 voice,
                 chunks,
@@ -1231,11 +1165,6 @@ unsafe fn preview_entry_voice(hwnd: HWND) {
                 rate,
                 pitch,
                 volume,
-                dialogue_voice: None,
-                dialogue_rate: 0,
-                dialogue_pitch: 0,
-                dialogue_volume: 100,
-                dialogue_engine: TtsEngine::Edge,
             };
             tts_engine::start_tts_playback_with_chunks(options);
         }

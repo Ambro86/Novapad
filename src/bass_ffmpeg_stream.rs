@@ -39,11 +39,15 @@ pub struct FfmpegBassStream {
 
 impl FfmpegBassStream {
     /// Create a new FFmpeg->BASS stream for the given file
-    pub fn new(path: &Path, start_seconds: u64) -> Result<(Self, Hstream), String> {
+    pub fn new(
+        path: &Path,
+        start_seconds: u64,
+        stream_index: Option<i32>,
+    ) -> Result<(Self, Hstream), String> {
         let api = bass_api()?;
 
         // Create FFmpeg source to get format info
-        let source = FfmpegSource::try_new(path, start_seconds, None)?;
+        let source = FfmpegSource::try_new(path, start_seconds, None, stream_index)?;
         let sample_rate = source.sample_rate();
         let channels = source.channels();
 

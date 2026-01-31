@@ -396,15 +396,21 @@ pub unsafe fn write_rtf_text(path: &Path, hwnd_edit: HWND) -> Result<(), String>
         cb: i32,
         pcb: *mut i32,
     ) -> u32 {
-        let file = &mut *(dw_cookie as *mut File);
-        let data = std::slice::from_raw_parts(pb_buff, cb as usize);
-        match file.write_all(data) {
-            Ok(_) => {
-                *pcb = cb;
-                0
-            }
-            Err(_) => 1,
-        }
+        crate::panic_guard::guard(
+            "stream_out_callback",
+            || 1,
+            || {
+                let file = &mut *(dw_cookie as *mut File);
+                let data = std::slice::from_raw_parts(pb_buff, cb as usize);
+                match file.write_all(data) {
+                    Ok(_) => {
+                        *pcb = cb;
+                        0
+                    }
+                    Err(_) => 1,
+                }
+            },
+        )
     }
 
     let mut es = EDITSTREAM {

@@ -175,6 +175,14 @@ unsafe extern "system" fn help_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    crate::panic_guard::guard(
+        "help_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { help_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_CREATE => {
             let create_struct = lparam.0 as *const CREATESTRUCTW;

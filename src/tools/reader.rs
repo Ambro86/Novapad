@@ -85,8 +85,83 @@ fn extract_json_string(s: &str) -> Option<(String, usize)> {
     }
 }
 
+fn decode_html_entities(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '&' {
+            let mut entity = String::new();
+            while let Some(&next) = chars.peek() {
+                chars.next();
+                if next == ';' {
+                    break;
+                }
+                if entity.len() >= 16 {
+                    entity.push(next);
+                    break;
+                }
+                entity.push(next);
+            }
+            if entity.starts_with("#x") || entity.starts_with("#X") {
+                if let Ok(code) = u32::from_str_radix(&entity[2..], 16)
+                    && let Some(decoded) = std::char::from_u32(code)
+                {
+                    out.push(decoded);
+                    continue;
+                }
+            } else if let Some(num) = entity.strip_prefix('#')
+                && let Ok(code) = num.parse::<u32>()
+                && let Some(decoded) = std::char::from_u32(code)
+            {
+                out.push(decoded);
+                continue;
+            } else {
+                match entity.as_str() {
+                    "nbsp" => out.push(' '),
+                    "amp" => out.push('&'),
+                    "quot" => out.push('"'),
+                    "apos" => out.push('\''),
+                    "hellip" => out.push('…'),
+                    "ndash" => out.push('–'),
+                    "mdash" => out.push('—'),
+                    "rsquo" => out.push('’'),
+                    "lsquo" => out.push('‘'),
+                    "rdquo" => out.push('”'),
+                    "ldquo" => out.push('“'),
+                    _ => {
+                        out.push('&');
+                        out.push_str(&entity);
+                        out.push(';');
+                    }
+                }
+                continue;
+            }
+            out.push('&');
+            out.push_str(&entity);
+            out.push(';');
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+fn looks_like_teaser(value: &str) -> bool {
+    let v = value.trim();
+    if v.len() < 120 {
+        return true;
+    }
+    v.contains("&hellip;")
+        || v.contains("&#8230;")
+        || v.contains("[&hellip;]")
+        || v.contains("[…]")
+        || v.contains("[...]")
+        || v.ends_with("…")
+        || v.ends_with("...")
+}
+
 pub fn clean_text(input: &str) -> String {
-    let decoded = decode_unicode(input);
+    let decoded = decode_html_entities(&decode_unicode(input));
     // Pulizia encoding Mediaset/TGCOM24
     let mut text = decoded
         .replace("ÃƒÂ¨", "Ã¨")
@@ -102,10 +177,6 @@ pub fn clean_text(input: &str) -> String {
         .replace("&nbsp;", " ")
         .replace("&#160;", " ")
         .replace("\u{00a0}", " ");
-    text = text
-        .replace("&amp;", "&")
-        .replace("&quot;", "\"")
-        .replace("&apos;", "'");
     text = text
         .replace("\\\"", "\"")
         .replace("\\n", "\n")
@@ -141,9 +212,24 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
 
             // Cerchiamo Autore e Data
             if author_info.is_empty() {
-                if let Some(a_idx) = json.find("\"name\":\"") {
+                if let Some(author_idx) = json.find("\"author\"") {
+                    let author_part = &json[author_idx..];
+                    if let Some(name_idx) = author_part.find("\"name\":\"") {
+                        let part = &author_part[name_idx + 8..];
+                        if let Some((name, _)) = extract_json_string(part)
+                            && !name.eq_ignore_ascii_case(&title)
+                        {
+                            author_info.push_str(&name);
+                        }
+                    }
+                }
+                if author_info.is_empty()
+                    && let Some(a_idx) = json.find("\"name\":\"")
+                {
                     let part = &json[a_idx + 8..];
-                    if let Some((name, _)) = extract_json_string(part) {
+                    if let Some((name, _)) = extract_json_string(part)
+                        && !name.eq_ignore_ascii_case(&title)
+                    {
                         author_info.push_str(&name);
                     }
                 }
@@ -171,7 +257,11 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
                     let abs_start = search_pos + key_pos + key.len();
                     if abs_start < json.len() {
                         if let Some((val, end_pos)) = extract_json_string(&json[abs_start..]) {
-                            if val.len() > 40 && !val.contains("http") && !body_acc.contains(&val) {
+                            if val.len() > 40
+                                && !val.contains("http")
+                                && !body_acc.contains(&val)
+                                && !looks_like_teaser(&val)
+                            {
                                 body_acc.push_str(&val);
                                 body_acc.push_str("\n\n");
                                 found_anything = true;
@@ -256,6 +346,8 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
     // 3. FALLBACK CSS
     if !found_anything || body_acc.len() < 300 {
         let content_selectors = [
+            ".ifq-post__content p",
+            ".ifq-post__content",
             "p[data-type='paragraph']", // WSJ modern
             ".wsj-article-body p",
             "article p",

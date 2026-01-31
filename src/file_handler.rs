@@ -15,6 +15,7 @@ use quick_xml::events::Event;
 use quick_xml::reader::Reader as XmlReader;
 use std::io::Read;
 use std::path::Path;
+use std::sync::{Mutex, OnceLock};
 use windows::Win32::Globalization::{CP_ACP, WideCharToMultiByte};
 use zip::ZipArchive;
 
@@ -1649,54 +1650,76 @@ pub enum PdfTextResult {
     NoText,
 }
 
+static PDF_EXTRACT_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
 pub fn read_pdf_text_with_status(path: &Path, language: Language) -> Result<PdfTextResult, String> {
-    crate::log_debug(&format!("PDF: Starting extraction for {:?}", path));
     let start = std::time::Instant::now();
-
-    // Use catch_unwind to handle potential panics in pdf_extract library
-    let extraction_result =
-        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| extract_text(path)));
-
-    let text = match extraction_result {
-        Ok(Ok(text)) => {
+    let lock = PDF_EXTRACT_LOCK.get_or_init(|| Mutex::new(()));
+    let guard = match lock.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => {
+            crate::log_debug("PDF: Extraction lock poisoned; continuing.");
+            poisoned.into_inner()
+        }
+    };
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        crate::sentry_integration::with_suppressed_panic_reporting(|| {
+            let _guard = guard;
+            crate::log_debug(&format!("PDF: Starting extraction for {:?}", path));
+            let text = extract_text(path).map_err(|err| {
+                let err_str = err.to_string();
+                if is_pdf_parse_error(&err_str) {
+                    i18n::tr(language, "file_handler.pdf_parse_error")
+                } else {
+                    i18n::tr_f(
+                        language,
+                        "file_handler.pdf_read_error",
+                        &[("err", &err_str)],
+                    )
+                }
+            })?;
             crate::log_debug(&format!(
                 "PDF: Raw extraction completed in {:?}, length={}",
                 start.elapsed(),
                 text.len()
             ));
-            text
-        }
-        Ok(Err(err)) => {
-            return Err(i18n::tr_f(
-                language,
-                "file_handler.pdf_read_error",
-                &[("err", &err.to_string())],
+
+            // Handle empty or whitespace-only PDFs
+            if text.trim().is_empty() {
+                crate::log_debug("PDF: No text extracted.");
+                return Ok(PdfTextResult::NoText);
+            }
+
+            let norm_start = std::time::Instant::now();
+            let normalized = normalize_pdf_paragraphs(&text);
+            crate::log_debug(&format!(
+                "PDF: Normalization completed in {:?}, final length={}",
+                norm_start.elapsed(),
+                normalized.len()
             ));
-        }
-        Err(_panic) => {
-            return Err(i18n::tr_f(
+
+            Ok(PdfTextResult::Text(normalized))
+        })
+    }));
+
+    match result {
+        Ok(result) => result,
+        Err(panic) => {
+            let panic_msg = if let Some(msg) = panic.downcast_ref::<&str>() {
+                (*msg).to_string()
+            } else if let Some(msg) = panic.downcast_ref::<String>() {
+                msg.clone()
+            } else {
+                "unknown panic payload".to_string()
+            };
+            crate::log_debug(&format!("PDF: Panic during extraction: {}", panic_msg));
+            Err(i18n::tr_f(
                 language,
                 "file_handler.pdf_read_error",
                 &[("err", "PDF extraction crashed unexpectedly")],
-            ));
+            ))
         }
-    };
-
-    // Handle empty or whitespace-only PDFs
-    if text.trim().is_empty() {
-        crate::log_debug("PDF: No text extracted.");
-        return Ok(PdfTextResult::NoText);
     }
-
-    let norm_start = std::time::Instant::now();
-    let normalized = normalize_pdf_paragraphs(&text);
-    crate::log_debug(&format!(
-        "PDF: Normalization completed in {:?}, final length={}",
-        norm_start.elapsed(),
-        normalized.len()
-    ));
-
-    Ok(PdfTextResult::Text(normalized))
 }
 
 pub fn read_pdf_text(path: &Path, language: Language) -> Result<String, String> {
@@ -1704,6 +1727,16 @@ pub fn read_pdf_text(path: &Path, language: Language) -> Result<String, String> 
         PdfTextResult::Text(text) => Ok(text),
         PdfTextResult::NoText => Ok(i18n::tr(language, "file_handler.pdf_no_text")),
     }
+}
+
+fn is_pdf_parse_error(err: &str) -> bool {
+    err.contains("InvalidContentStream")
+        || err.contains("operation.operands.len() == 6")
+        || err.contains("expect repeat at least 1 times, found 0 times")
+        || err.contains("missing unicode map and encoding")
+        || err.contains("bad length of hexstring")
+        || err.contains("Mismatch { message:")
+        || err.contains("Parse(")
 }
 
 fn normalize_pdf_paragraphs(text: &str) -> String {

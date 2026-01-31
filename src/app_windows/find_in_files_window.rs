@@ -246,6 +246,19 @@ unsafe extern "system" fn find_in_files_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    crate::panic_guard::guard(
+        "find_in_files_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { find_in_files_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn find_in_files_wndproc_inner(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
     match msg {
         WM_CREATE => {
             let create_struct =

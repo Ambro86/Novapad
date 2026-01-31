@@ -640,9 +640,15 @@ unsafe extern "system" fn podcast_tree_compare(
     lparam2: LPARAM,
     _lparam_sort: LPARAM,
 ) -> i32 {
-    let a = lparam1.0;
-    let b = lparam2.0;
-    a.cmp(&b) as i32
+    crate::panic_guard::guard(
+        "podcast_tree_compare",
+        || 0,
+        || {
+            let a = lparam1.0;
+            let b = lparam2.0;
+            a.cmp(&b) as i32
+        },
+    )
 }
 
 unsafe fn collect_root_items(hwnd_tree: HWND) -> Vec<HTREEITEM> {
@@ -2525,6 +2531,19 @@ unsafe extern "system" fn categories_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    crate::panic_guard::guard(
+        "categories_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { categories_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn categories_wndproc_inner(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
     match msg {
         WM_CREATE => {
             let cs = lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
@@ -3130,6 +3149,19 @@ unsafe extern "system" fn category_list_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    crate::panic_guard::guard(
+        "category_list_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { category_list_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn category_list_wndproc_inner(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
     use windows::Win32::UI::WindowsAndMessaging::{DLGC_WANTALLKEYS, WM_GETDLGCODE};
 
     // Tell the dialog we want to handle all keys including Enter
@@ -3273,6 +3305,14 @@ unsafe extern "system" fn add_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    crate::panic_guard::guard(
+        "add_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { add_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn add_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_CREATE => {
             let cs = lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
@@ -4235,6 +4275,19 @@ unsafe extern "system" fn description_control_subclass_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    crate::panic_guard::guard(
+        "description_control_subclass_proc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { description_control_subclass_proc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn description_control_subclass_proc_inner(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
     if msg == WM_CHAR && wparam.0 as u16 == VK_TAB.0 {
         return LRESULT(0);
     }
@@ -4285,6 +4338,19 @@ unsafe extern "system" fn description_control_subclass_proc(
 }
 
 unsafe extern "system" fn description_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    crate::panic_guard::guard(
+        "description_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { description_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn description_wndproc_inner(
     hwnd: HWND,
     msg: u32,
     wparam: WPARAM,
@@ -4601,6 +4667,19 @@ unsafe extern "system" fn reorder_control_subclass_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    crate::panic_guard::guard(
+        "reorder_control_subclass_proc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { reorder_control_subclass_proc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn reorder_control_subclass_proc_inner(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
     if msg == WM_CHAR && wparam.0 as u16 == VK_TAB.0 {
         return LRESULT(0);
     }
@@ -4666,6 +4745,14 @@ unsafe extern "system" fn reorder_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    crate::panic_guard::guard(
+        "reorder_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { reorder_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn reorder_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_CREATE => {
             let cs = lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
@@ -4907,6 +4994,19 @@ unsafe extern "system" fn podcast_tree_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    crate::panic_guard::guard(
+        "podcast_tree_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { podcast_tree_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn podcast_tree_wndproc_inner(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
     if msg == WM_KEYDOWN
         || msg == windows::Win32::UI::WindowsAndMessaging::WM_SYSKEYDOWN
         || msg == WM_CHAR
@@ -5031,6 +5131,19 @@ unsafe extern "system" fn podcast_tree_wndproc(
 }
 
 unsafe extern "system" fn podcast_search_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    crate::panic_guard::guard(
+        "podcast_search_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { podcast_search_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn podcast_search_wndproc_inner(
     hwnd: HWND,
     msg: u32,
     wparam: WPARAM,
@@ -5659,6 +5772,14 @@ unsafe extern "system" fn podcast_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    crate::panic_guard::guard(
+        "podcast_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { podcast_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_CREATE => {
             let cs = lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;

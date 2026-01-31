@@ -228,6 +228,19 @@ pub struct TtsPlaybackOptions {
     pub volume: i32,
 }
 
+struct TtsQueuedPlayback {
+    hwnd: HWND,
+    engine: TtsEngine,
+    text: String,
+    voice: String,
+    split_on_newline: bool,
+    dictionary: Vec<DictionaryEntry>,
+    initial_caret_pos: i32,
+    rate: i32,
+    pitch: i32,
+    volume: i32,
+}
+
 pub struct AudiobookCommonOptions<'a> {
     pub voice: &'a str,
     pub output: &'a Path,
@@ -319,16 +332,16 @@ pub fn start_tts_from_caret(hwnd: HWND) {
         with_state(hwnd, |state| state.settings.tts_voice.clone())
             .unwrap_or_else(|| "it-IT-IsabellaNeural".to_string())
     };
-    let chunks = split_into_tts_chunks(&text, split_on_newline, &dictionary, tts_engine);
     let has_tags = has_voice_tags(&text);
 
     if has_tags && tts_engine != TtsEngine::Edge {
-        start_tts_playback_with_chunks(TtsPlaybackOptions {
+        queue_tts_playback_from_text(TtsQueuedPlayback {
             hwnd,
             engine: tts_engine,
-            cleaned: text,
+            text,
             voice,
-            chunks,
+            split_on_newline,
+            dictionary,
             initial_caret_pos,
             rate: tts_rate,
             pitch: tts_pitch,
@@ -338,12 +351,13 @@ pub fn start_tts_from_caret(hwnd: HWND) {
     }
 
     match tts_engine {
-        TtsEngine::Edge => start_tts_playback_with_chunks(TtsPlaybackOptions {
+        TtsEngine::Edge => queue_tts_playback_from_text(TtsQueuedPlayback {
             hwnd,
             engine: tts_engine,
-            cleaned: text,
+            text,
             voice,
-            chunks,
+            split_on_newline,
+            dictionary,
             initial_caret_pos,
             rate: tts_rate,
             pitch: tts_pitch,
@@ -405,6 +419,7 @@ pub fn start_tts_from_caret(hwnd: HWND) {
                 crate::log_debug("Failed to update TTS session state");
             }
 
+            let chunks = split_into_tts_chunks(&text, split_on_newline, &dictionary, tts_engine);
             let chunk_strings: Vec<String> = chunks.into_iter().map(|c| c.text_to_read).collect();
             if let Err(e) = crate::sapi5_engine::play_sapi(
                 chunk_strings,
@@ -419,6 +434,42 @@ pub fn start_tts_from_caret(hwnd: HWND) {
             }
         }
     }
+}
+
+fn queue_tts_playback_from_text(options: TtsQueuedPlayback) {
+    std::thread::spawn(move || {
+        let chunks = split_into_tts_chunks(
+            &options.text,
+            options.split_on_newline,
+            &options.dictionary,
+            options.engine,
+        );
+        let payload = Box::new(TtsPlaybackOptions {
+            hwnd: options.hwnd,
+            engine: options.engine,
+            cleaned: options.text,
+            voice: options.voice,
+            chunks,
+            initial_caret_pos: options.initial_caret_pos,
+            rate: options.rate,
+            pitch: options.pitch,
+            volume: options.volume,
+        });
+        unsafe {
+            let payload_ptr = Box::into_raw(payload);
+            if PostMessageW(
+                options.hwnd,
+                crate::WM_TTS_START,
+                WPARAM(0),
+                LPARAM(payload_ptr as isize),
+            )
+            .is_err()
+            {
+                crate::log_debug("Failed to post WM_TTS_START");
+                let _unused_box = Box::from_raw(payload_ptr);
+            }
+        }
+    });
 }
 
 pub fn toggle_tts_pause(hwnd: HWND) {
@@ -681,7 +732,7 @@ pub fn start_tts_playback_with_chunks(options: TtsPlaybackOptions) {
 
     let language =
         unsafe { with_state(options.hwnd, |state| state.settings.language) }.unwrap_or_default();
-    let (tx, mut rx) = mpsc::unbounded_channel::<TtsCommand>();
+    let (tx, rx) = mpsc::unbounded_channel::<TtsCommand>();
     let cancel = Arc::new(AtomicBool::new(false));
     let cancel_flag = cancel.clone();
     let session_id = unsafe {
@@ -709,192 +760,240 @@ pub fn start_tts_playback_with_chunks(options: TtsPlaybackOptions) {
     let tts_engine = options.engine;
 
     std::thread::spawn(move || {
-        log_debug(&format!(
-            "TTS start: voice={voice} chunks={} text_len={}",
-            chunks.len(),
-            cleaned.len()
-        ));
-        let stream_handle = match OutputStreamBuilder::open_default_stream() {
-            Ok(handle) => handle,
-            Err(_) => {
-                post_tts_error(
-                    hwnd_copy,
-                    session_id,
-                    "Audio output device not available.".to_string(),
-                );
-                return;
-            }
-        };
-        let sink = Sink::connect_new(stream_handle.mixer());
-        let rt = match tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-        {
-            Ok(rt) => rt,
-            Err(err) => {
-                post_tts_error(hwnd_copy, session_id, err.to_string());
-                return;
-            }
-        };
+        // Wrap entire TTS playback in catch_unwind to prevent panics from crashing the app
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            tts_playback_inner(
+                hwnd_copy,
+                session_id,
+                chunks,
+                cleaned,
+                voice,
+                tts_rate,
+                tts_pitch,
+                tts_volume,
+                tts_engine,
+                language,
+                cancel_flag,
+                rx,
+            );
+        }));
 
-        let (audio_tx, mut audio_rx) = mpsc::channel::<Result<(Vec<u8>, usize), String>>(10);
-        let cancel_downloader = cancel_flag.clone();
-        let chunks_downloader = chunks.clone();
-        let voice_downloader = voice.clone();
-        let rate = tts_rate;
-        let pitch = tts_pitch;
-        let volume = tts_volume;
-        let tts_engine = tts_engine;
+        if let Err(panic_info) = result {
+            let panic_msg = if let Some(s) = panic_info.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = panic_info.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "Unknown panic in TTS playback".to_string()
+            };
+            crate::log_debug(&format!("TTS thread panic caught: {}", panic_msg));
+            post_tts_error(
+                hwnd_copy,
+                session_id,
+                format!("Audio playback error: {}", panic_msg),
+            );
+        }
+    });
+}
 
-        rt.spawn(async move {
-            for chunk_obj in chunks_downloader {
-                if cancel_downloader.load(Ordering::SeqCst) {
+#[allow(clippy::too_many_arguments)]
+fn tts_playback_inner(
+    hwnd_copy: HWND,
+    session_id: u64,
+    chunks: Vec<crate::TtsChunk>,
+    cleaned: String,
+    voice: String,
+    tts_rate: i32,
+    tts_pitch: i32,
+    tts_volume: i32,
+    tts_engine: TtsEngine,
+    language: Language,
+    cancel_flag: Arc<AtomicBool>,
+    mut rx: mpsc::UnboundedReceiver<TtsCommand>,
+) {
+    log_debug(&format!(
+        "TTS start: voice={voice} chunks={} text_len={}",
+        chunks.len(),
+        cleaned.len()
+    ));
+    let stream_handle = match OutputStreamBuilder::open_default_stream() {
+        Ok(handle) => handle,
+        Err(_) => {
+            post_tts_error(
+                hwnd_copy,
+                session_id,
+                "Audio output device not available.".to_string(),
+            );
+            return;
+        }
+    };
+    let sink = Sink::connect_new(stream_handle.mixer());
+    let rt = match tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(rt) => rt,
+        Err(err) => {
+            post_tts_error(hwnd_copy, session_id, err.to_string());
+            return;
+        }
+    };
+
+    let (audio_tx, mut audio_rx) = mpsc::channel::<Result<(Vec<u8>, usize), String>>(10);
+    let cancel_downloader = cancel_flag.clone();
+    let chunks_downloader = chunks.clone();
+    let voice_downloader = voice.clone();
+    let rate = tts_rate;
+    let pitch = tts_pitch;
+    let volume = tts_volume;
+
+    rt.spawn(async move {
+        for chunk_obj in chunks_downloader {
+            if cancel_downloader.load(Ordering::SeqCst) {
+                break;
+            }
+            let (engine, chunk_voice) = if let Some(override_voice) = &chunk_obj.override_voice {
+                (override_voice.engine, override_voice.voice.as_str())
+            } else {
+                (tts_engine, voice_downloader.as_str())
+            };
+            match synthesize_segment_bytes(
+                engine,
+                &chunk_obj.text_to_read,
+                chunk_voice,
+                rate,
+                pitch,
+                volume,
+                language,
+            )
+            .await
+            {
+                Ok(data) => {
+                    if audio_tx
+                        .send(Ok((data, chunk_obj.original_len)))
+                        .await
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    if let Err(err) = audio_tx.send(Err(e)).await {
+                        crate::log_debug(&format!("Failed to send audio error: {:?}", err));
+                    }
                     break;
                 }
-                let (engine, chunk_voice) = if let Some(override_voice) = &chunk_obj.override_voice
-                {
-                    (override_voice.engine, override_voice.voice.as_str())
-                } else {
-                    (tts_engine, voice_downloader.as_str())
-                };
-                match synthesize_segment_bytes(
-                    engine,
-                    &chunk_obj.text_to_read,
-                    chunk_voice,
-                    rate,
-                    pitch,
-                    volume,
-                    language,
-                )
-                .await
-                {
-                    Ok(data) => {
-                        if audio_tx
-                            .send(Ok((data, chunk_obj.original_len)))
-                            .await
-                            .is_err()
-                        {
-                            break;
-                        }
+            }
+        }
+    });
+
+    let mut appended_any = false;
+    let mut paused = false;
+    let mut current_offset: usize = 0;
+
+    loop {
+        if cancel_flag.load(Ordering::SeqCst) {
+            break;
+        }
+
+        let packet = rt.block_on(async {
+            loop {
+                if cancel_flag.load(Ordering::SeqCst) {
+                    return None;
+                }
+                while let Ok(cmd) = rx.try_recv() {
+                    if handle_tts_command(cmd, &sink, cancel_flag.as_ref(), &mut paused) {
+                        return None;
                     }
-                    Err(e) => {
-                        if let Err(err) = audio_tx.send(Err(e)).await {
-                            crate::log_debug(&format!("Failed to send audio error: {:?}", err));
+                }
+                if paused {
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    continue;
+                }
+                tokio::select! {
+                    res = audio_rx.recv() => return res,
+                    cmd_opt = rx.recv() => {
+                        if let Some(cmd) = cmd_opt
+                            && handle_tts_command(cmd, &sink, cancel_flag.as_ref(), &mut paused)
+                        {
+                            return None;
                         }
-                        break;
                     }
                 }
             }
         });
 
-        let mut appended_any = false;
-        let mut paused = false;
-        let mut current_offset: usize = 0;
-
-        loop {
-            if cancel_flag.load(Ordering::SeqCst) {
+        let Some(res) = packet else {
+            break;
+        };
+        let (audio, orig_len) = match res {
+            Ok(data) => data,
+            Err(e) => {
+                post_tts_error(hwnd_copy, session_id, e);
                 break;
             }
+        };
 
-            let packet = rt.block_on(async {
-                loop {
-                    if cancel_flag.load(Ordering::SeqCst) {
-                        return None;
-                    }
-                    while let Ok(cmd) = rx.try_recv() {
-                        if handle_tts_command(cmd, &sink, cancel_flag.as_ref(), &mut paused) {
-                            return None;
-                        }
-                    }
-                    if paused {
-                        tokio::time::sleep(Duration::from_millis(100)).await;
-                        continue;
-                    }
-                    tokio::select! {
-                        res = audio_rx.recv() => return res,
-                        cmd_opt = rx.recv() => {
-                            if let Some(cmd) = cmd_opt
-                                && handle_tts_command(cmd, &sink, cancel_flag.as_ref(), &mut paused)
-                            {
-                                return None;
-                            }
-                        }
-                    }
-                }
-            });
-
-            let Some(res) = packet else {
-                break;
-            };
-            let (audio, orig_len) = match res {
-                Ok(data) => data,
-                Err(e) => {
-                    post_tts_error(hwnd_copy, session_id, e);
-                    break;
-                }
-            };
-
-            if audio.is_empty() {
-                continue;
-            }
-
-            unsafe {
-                if let Err(e) = PostMessageW(
-                    hwnd_copy,
-                    WM_TTS_CHUNK_START,
-                    WPARAM(session_id as usize),
-                    LPARAM(current_offset as isize),
-                ) {
-                    crate::log_debug(&format!("Failed to post WM_TTS_CHUNK_START: {}", e));
-                }
-            }
-
-            let cursor = std::io::Cursor::new(audio);
-            let source = match Decoder::new(cursor) {
-                Ok(source) => source,
-                Err(_) => {
-                    post_tts_error(hwnd_copy, session_id, "Failed to decode audio.".to_string());
-                    break;
-                }
-            };
-
-            sink.append(source);
-            appended_any = true;
-            while !sink.empty() {
-                if cancel_flag.load(Ordering::SeqCst) {
-                    sink.stop();
-                    break;
-                }
-                while let Ok(cmd) = rx.try_recv() {
-                    if handle_tts_command(cmd, &sink, cancel_flag.as_ref(), &mut paused) {
-                        break;
-                    }
-                }
-                if cancel_flag.load(Ordering::SeqCst) {
-                    sink.stop();
-                    break;
-                }
-                std::thread::sleep(Duration::from_millis(50));
-            }
-            if cancel_flag.load(Ordering::SeqCst) {
-                break;
-            }
-            current_offset += orig_len;
+        if audio.is_empty() {
+            continue;
         }
 
-        if appended_any {
-            unsafe {
-                if let Err(e) = PostMessageW(
-                    hwnd_copy,
-                    WM_TTS_PLAYBACK_DONE,
-                    WPARAM(session_id as usize),
-                    LPARAM(0),
-                ) {
-                    crate::log_debug(&format!("Failed to post WM_TTS_PLAYBACK_DONE: {}", e));
-                }
+        unsafe {
+            if let Err(e) = PostMessageW(
+                hwnd_copy,
+                WM_TTS_CHUNK_START,
+                WPARAM(session_id as usize),
+                LPARAM(current_offset as isize),
+            ) {
+                crate::log_debug(&format!("Failed to post WM_TTS_CHUNK_START: {}", e));
             }
         }
-    });
+
+        let cursor = std::io::Cursor::new(audio);
+        let source = match Decoder::new(cursor) {
+            Ok(source) => source,
+            Err(_) => {
+                post_tts_error(hwnd_copy, session_id, "Failed to decode audio.".to_string());
+                break;
+            }
+        };
+
+        sink.append(source);
+        appended_any = true;
+        while !sink.empty() {
+            if cancel_flag.load(Ordering::SeqCst) {
+                sink.stop();
+                break;
+            }
+            while let Ok(cmd) = rx.try_recv() {
+                if handle_tts_command(cmd, &sink, cancel_flag.as_ref(), &mut paused) {
+                    break;
+                }
+            }
+            if cancel_flag.load(Ordering::SeqCst) {
+                sink.stop();
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        if cancel_flag.load(Ordering::SeqCst) {
+            break;
+        }
+        current_offset += orig_len;
+    }
+
+    if appended_any {
+        unsafe {
+            if let Err(e) = PostMessageW(
+                hwnd_copy,
+                WM_TTS_PLAYBACK_DONE,
+                WPARAM(session_id as usize),
+                LPARAM(0),
+            ) {
+                crate::log_debug(&format!("Failed to post WM_TTS_PLAYBACK_DONE: {}", e));
+            }
+        }
+    }
 }
 
 pub fn play_edge_bytes_async(bytes: Vec<u8>, volume: i32) -> Arc<AtomicBool> {

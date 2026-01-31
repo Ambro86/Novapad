@@ -92,6 +92,19 @@ unsafe extern "system" fn go_to_time_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    crate::panic_guard::guard(
+        "go_to_time_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { go_to_time_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn go_to_time_wndproc_inner(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
     match msg {
         WM_CREATE => {
             let cs = lparam.0 as *const CREATESTRUCTW;

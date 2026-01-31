@@ -203,7 +203,6 @@ cpal = "0.17"
 url = "2.5"
 uuid = { version = "1.19", features = ["v4"] }
 epub = "2.1"
-yt-transcript-rs = "0.1"
 zip = "0.6"
 feed-rs = "2.3"
 scraper = "0.25"

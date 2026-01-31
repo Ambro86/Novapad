@@ -680,10 +680,25 @@ fn resolve_settings_dir() -> PathBuf {
         .unwrap_or_else(|| std::path::Path::new("."))
         .to_path_buf();
 
-    // Standalone: sempre usa config/ locale
+    // Standalone: preferisce config/ locale, ma fallback su %APPDATA% se non scrivibile
     let portable_dir = exe_dir.join("config");
-    crate::log_if_err!(std::fs::create_dir_all(&portable_dir));
-    portable_dir
+    let appdata_dir = std::env::var_os("APPDATA")
+        .map(PathBuf::from)
+        .map(|p| p.join("Sonarpad"))
+        .unwrap_or_else(|| portable_dir.clone());
+
+    if dir_is_writable(&portable_dir) {
+        crate::log_if_err!(std::fs::create_dir_all(&portable_dir));
+        portable_dir
+    } else {
+        crate::log_if_err!(std::fs::create_dir_all(&appdata_dir));
+        if dir_is_writable(&appdata_dir) {
+            appdata_dir
+        } else {
+            crate::log_if_err!(std::fs::create_dir_all(&portable_dir));
+            portable_dir
+        }
+    }
 }
 
 #[cfg(not(feature = "standalone"))]
@@ -943,7 +958,10 @@ pub fn decrypt_podcast_index_secret(secret: &str) -> Option<String> {
     if secret.trim().is_empty() {
         return None;
     }
-    let decoded = hex::decode(secret).ok()?;
+    let decoded = match hex::decode(secret) {
+        Ok(decoded) => decoded,
+        Err(_) => return Some(secret.to_string()),
+    };
     let bytes = dpapi_unprotect(&decoded)?;
     String::from_utf8(bytes).ok()
 }

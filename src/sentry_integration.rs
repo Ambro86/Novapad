@@ -6,6 +6,7 @@
 // Alcune funzioni sono API pubbliche per uso futuro
 #![allow(dead_code)]
 
+use std::cell::Cell;
 use std::panic::PanicHookInfo;
 use std::sync::OnceLock;
 
@@ -20,6 +21,64 @@ static SENTRY_GUARD: OnceLock<sentry::ClientInitGuard> = OnceLock::new();
 
 // Regex per path Windows (compilata una volta sola)
 static PATH_REGEX: OnceLock<Option<fancy_regex::Regex>> = OnceLock::new();
+
+thread_local! {
+    static SUPPRESS_PANIC_REPORTING: Cell<bool> = const { Cell::new(false) };
+}
+
+fn is_panic_reporting_suppressed() -> bool {
+    SUPPRESS_PANIC_REPORTING.with(|flag| flag.get())
+}
+
+fn is_pdf_parsing_panic(info: &PanicHookInfo<'_>) -> bool {
+    let location = info.location().map(|loc| loc.file()).unwrap_or("");
+    if location.contains("\\pdf-extract-")
+        || location.contains("\\type1-encoding-parser-")
+        || location.contains("\\cff-parser-")
+        || location.contains("\\adobe-cmap-parser-")
+        || location.contains("\\pom-")
+    {
+        return true;
+    }
+
+    let payload = if let Some(s) = info.payload().downcast_ref::<&str>() {
+        *s
+    } else if let Some(s) = info.payload().downcast_ref::<String>() {
+        s.as_str()
+    } else {
+        ""
+    };
+    payload.contains("InvalidContentStream")
+        || payload.contains("operation.operands.len() == 6")
+        || payload.contains("expect repeat at least 1 times, found 0 times")
+        || payload.contains("missing unicode map and encoding")
+        || payload.contains("bad length of hexstring")
+}
+
+pub fn with_suppressed_panic_reporting<F, R>(f: F) -> R
+where
+    F: FnOnce() -> R,
+{
+    struct SuppressGuard {
+        prev: bool,
+    }
+
+    impl Drop for SuppressGuard {
+        fn drop(&mut self) {
+            SUPPRESS_PANIC_REPORTING.with(|flag| {
+                flag.set(self.prev);
+            });
+        }
+    }
+
+    let guard = SUPPRESS_PANIC_REPORTING.with(|flag| {
+        let prev = flag.replace(true);
+        SuppressGuard { prev }
+    });
+    let result = f();
+    drop(guard);
+    result
+}
 
 fn get_path_regex() -> Option<&'static fancy_regex::Regex> {
     PATH_REGEX
@@ -426,6 +485,16 @@ pub fn install_panic_hook() {
     let previous_hook = std::panic::take_hook();
 
     std::panic::set_hook(Box::new(move |info: &PanicHookInfo<'_>| {
+        if is_panic_reporting_suppressed() {
+            crate::log_debug("Panic reporting suppressed for this thread.");
+            previous_hook(info);
+            return;
+        }
+        if is_pdf_parsing_panic(info) {
+            crate::log_debug("Panic reporting suppressed for PDF parsing panic.");
+            previous_hook(info);
+            return;
+        }
         // 1. Costruisci il messaggio di panic
         let location = info
             .location()

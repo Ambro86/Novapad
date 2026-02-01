@@ -7671,6 +7671,39 @@ pub(crate) unsafe fn save_audio_dialog(
                 path.set_extension("mp3");
             }
         }
+        let is_m4b = path
+            .extension()
+            .and_then(|s| s.to_str())
+            .map(|s| s.eq_ignore_ascii_case("m4b"))
+            .unwrap_or(false);
+        if is_m4b {
+            let current_bitrate =
+                with_state(hwnd, |state| state.settings.audiobook_m4b_bitrate).unwrap_or(128);
+            let title = i18n::tr(language, "audiobook.bitrate_title");
+            let body = i18n::tr(language, "audiobook.bitrate_body");
+            let default_value = current_bitrate.to_string();
+            let input = crate::app_windows::prompt_window::prompt_user(
+                hwnd,
+                &title,
+                &body,
+                &default_value,
+                language,
+            );
+            let input = input?;
+            if let Ok(parsed) = input.trim().parse::<u32>() {
+                let bitrate = parsed.clamp(64, 256);
+                if let Some(settings) = with_state(hwnd, |state| {
+                    state.settings.audiobook_m4b_bitrate = bitrate;
+                    state.settings.clone()
+                }) {
+                    save_settings(settings);
+                } else {
+                    log_debug("Failed to access settings for audiobook bitrate");
+                }
+            } else {
+                log_debug("Invalid audiobook bitrate input; keeping existing value");
+            }
+        }
         Some(path)
     } else {
         None

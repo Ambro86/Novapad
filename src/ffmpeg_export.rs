@@ -13,7 +13,7 @@ use std::collections::VecDeque;
 use std::ffi::CString;
 use std::path::{Path, PathBuf};
 use std::ptr;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use windows::Win32::Foundation::HWND;
 
@@ -113,6 +113,7 @@ fn ensure_tts_cache(
                         progress_hwnd: HWND(0),
                         cancel,
                         language: settings.language,
+                        audiobook_bitrate_kbps: settings.audiobook_m4b_bitrate,
                         rate: settings.tts_rate,
                         pitch: settings.tts_pitch,
                         volume: settings.tts_volume,
@@ -162,6 +163,7 @@ fn ensure_tts_cache(
                         progress_hwnd: HWND(0),
                         cancel,
                         language: settings.language,
+                        audiobook_bitrate_kbps: settings.audiobook_m4b_bitrate,
                         rate: settings.tts_rate,
                         pitch: settings.tts_pitch,
                         volume: settings.tts_volume,
@@ -202,6 +204,7 @@ fn ensure_tts_cache(
                         progress_hwnd: HWND(0),
                         cancel,
                         language: settings.language,
+                        audiobook_bitrate_kbps: settings.audiobook_m4b_bitrate,
                         rate: settings.tts_rate,
                         pitch: settings.tts_pitch,
                         volume: settings.tts_volume,
@@ -1217,6 +1220,7 @@ pub fn convert_audio_file(
     output_path: &Path,
     settings: &ConvertAudioSettings,
     cancel: Option<Arc<AtomicBool>>,
+    mut progress: Option<&mut dyn FnMut(u32)>,
 ) -> Result<(), String> {
     let api = ffmpeg_api()?;
     let args = build_ffmpeg_args(settings);
@@ -1237,9 +1241,32 @@ pub fn convert_audio_file(
         return Err("FFmpeg: no audio streams found".to_string());
     };
 
-    let mut source = FfmpegSource::try_new(input_path, 0, None, Some(stream_index))?;
+    let pts_clock = Arc::new(AtomicI64::new(0));
+    let mut source =
+        FfmpegSource::try_new(input_path, 0, Some(pts_clock.clone()), Some(stream_index))?;
     let in_sample_rate = source.sample_rate();
     let channels = source.channels();
+    let total_duration = source.total_duration();
+    let total_duration_us = total_duration.and_then(|d| {
+        let micros = d.as_micros();
+        if micros == 0 {
+            None
+        } else {
+            Some(micros.min(i64::MAX as u128) as i64)
+        }
+    });
+    let total_frames = total_duration.and_then(|d| {
+        if d.is_zero() {
+            None
+        } else {
+            let frames = (d.as_secs_f64() * in_sample_rate as f64).round();
+            if frames.is_finite() && frames > 0.0 {
+                Some(frames as u64)
+            } else {
+                None
+            }
+        }
+    });
     let out_sample_rate = match settings.format {
         ConvertAudioFormat::Opus => 48_000,
         _ => in_sample_rate,
@@ -1444,6 +1471,12 @@ pub fn convert_audio_file(
     let channel_count = channels as usize;
     let mut next_pts: i64 = 0;
     let mut canceled = false;
+    let mut processed_frames: u64 = 0;
+    let mut last_pct: u32 = 0;
+    let mut last_pts_us: i64 = 0;
+    if let Some(cb) = progress.as_mut() {
+        cb(0);
+    }
     let is_canceled = |flag: &Option<Arc<AtomicBool>>| -> bool {
         flag.as_ref()
             .map(|cancel| cancel.load(Ordering::Relaxed))
@@ -1501,6 +1534,34 @@ pub fn convert_audio_file(
         }
         if input_frame.len() < in_frame_size * channel_count {
             input_frame.resize(in_frame_size * channel_count, 0.0);
+        }
+        processed_frames =
+            processed_frames.saturating_add((input_frame.len() / channel_count) as u64);
+        if let (Some(total_us), Some(cb)) = (total_duration_us, progress.as_mut())
+            && total_us > 0
+        {
+            let mut pts_us = pts_clock.load(Ordering::Acquire);
+            if pts_us < 0 {
+                pts_us = 0;
+            }
+            if pts_us < last_pts_us {
+                pts_us = last_pts_us;
+            } else {
+                last_pts_us = pts_us;
+            }
+            let pct = ((pts_us as u128 * 10000) / total_us as u128).min(10000) as u32;
+            if pct > last_pct {
+                last_pct = pct;
+                cb(pct);
+            }
+        } else if let (Some(total), Some(cb)) = (total_frames, progress.as_mut())
+            && total > 0
+        {
+            let pct = ((processed_frames.saturating_mul(10000)) / total).min(10000) as u32;
+            if pct > last_pct {
+                last_pct = pct;
+                cb(pct);
+            }
         }
 
         unsafe {
@@ -1588,6 +1649,10 @@ pub fn convert_audio_file(
             (api.av_channel_layout_uninit)(&mut out_layout);
         }
         return Err("Conversion canceled.".to_string());
+    }
+
+    if let Some(cb) = progress.as_mut() {
+        cb(10000);
     }
 
     unsafe {

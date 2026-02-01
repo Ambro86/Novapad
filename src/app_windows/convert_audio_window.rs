@@ -682,7 +682,7 @@ unsafe fn convert_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
 
                     std::thread::spawn(move || {
                         let result =
-                            convert_audio_file(&input, &output, &settings, Some(cancel_flag))
+                            convert_audio_file(&input, &output, &settings, Some(cancel_flag), None)
                                 .map(|_| output);
                         let boxed = Box::new(result);
                         unsafe {

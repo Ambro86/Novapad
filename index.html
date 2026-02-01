@@ -44,27 +44,10 @@
       border-left: 5px solid rgba(220,120,0,.9);
       padding-left: 10px;
     }
-
-    /* Invisible focus target for skip link */
-    .skip-target {
-      position: absolute;
-      left: -9999px;
-      top: auto;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-    }
-    .skip-target:focus {
-      position: static;
-      width: auto;
-      height: auto;
-      overflow: visible;
-      padding: 8px 0;
-    }
   </style>
 </head>
 <body>
-  <a class="skip-link" href="#content">Skip to content</a>
+  <a class="skip-link" href="#main">Skip to content</a>
 
   <header>
     <h1>Sonarpad</h1>
@@ -74,9 +57,11 @@
     </p>
 
     <nav aria-label="Primary">
-      <a href="https://github.com/Ambro86/Sonarpad/releases">Download</a>
-      <a href="https://github.com/Ambro86/Sonarpad">GitHub</a>
-      <a href="https://github.com/Ambro86/Sonarpad/issues">Issues</a>
+      <a href="#download">Download</a>
+      <a href="#features">Features</a>
+      <a href="#build">Build</a>
+      <a href="#license">License</a>
+      <a href="#links">Links</a>
     </nav>
 
     <p class="muted">
@@ -84,12 +69,9 @@
     </p>
   </header>
 
-  <main>
-    <!-- Target for the skip link (not a section anchor) -->
-    <a id="content" class="skip-target" tabindex="-1">Content</a>
-
-    <section class="card">
-      <h2>Download the latest release</h2>
+  <main id="main">
+    <section id="download" class="card" aria-labelledby="download-title">
+      <h2 id="download-title">Download the latest release</h2>
       <p>
         <a class="btn" href="https://github.com/Ambro86/Sonarpad/releases/latest/download/sonarpad.exe">Portable (EXE)</a>
         <a class="btn" href="https://github.com/Ambro86/Sonarpad/releases/latest/download/novapad_x64-setup.exe">Installer (Setup)</a>
@@ -110,8 +92,8 @@
       </div>
     </section>
 
-    <section class="card">
-      <h2>Features</h2>
+    <section id="features" class="card" aria-labelledby="features-title">
+      <h2 id="features-title">Features</h2>
 
       <ul>
         <li><strong>Native Windows UI</strong> — built directly on the Windows API for performance and accessibility.</li>
@@ -149,7 +131,7 @@
           </ul>
         </li>
         <li><strong>Podcast Recording</strong> — record from microphone and/or system audio (File menu, Ctrl+Shift+R).</li>
-        <li><strong>Accessibility-Focused</strong> — designed to work correctly with screen readers such as NVDA and JAWS.</li>
+        <li><strong>Accessibility-Focused</strong> — designed to work with screen readers such as NVDA and JAWS.</li>
         <li><strong>Accessible Terminal</strong>
           <ul>
             <li>Dedicated terminal window with stable output for screen readers</li>
@@ -166,8 +148,8 @@
       </ul>
     </section>
 
-    <section class="card">
-      <h2>Build Instructions</h2>
+    <section id="build" class="card" aria-labelledby="build-title">
+      <h2 id="build-title">Build Instructions</h2>
       <p>Ensure you have the Rust toolchain installed. Formatting is enforced with <code>cargo fmt --check</code>.</p>
 
       <pre><code>git clone https://github.com/Ambro86/Sonarpad.git
@@ -178,8 +160,8 @@ cargo build --release</code></pre>
       <pre><code>cargo run --release</code></pre>
     </section>
 
-    <section class="card">
-      <h2>Legal &amp; Licensing</h2>
+    <section id="license" class="card" aria-labelledby="license-title">
+      <h2 id="license-title">Legal &amp; Licensing</h2>
       <p>This repository is published for <strong>transparency, evaluation, and personal use only</strong>.</p>
 
       <h3>You MAY</h3>
@@ -204,8 +186,8 @@ cargo build --release</code></pre>
       <p class="muted">Refer to the <code>LICENSE</code> file for full terms.</p>
     </section>
 
-    <section class="card">
-      <h2>Links</h2>
+    <section id="links" class="card" aria-labelledby="links-title">
+      <h2 id="links-title">Links</h2>
       <ul>
         <li><a href="https://github.com/Ambro86/Sonarpad">GitHub repository</a></li>
         <li><a href="https://github.com/Ambro86/Sonarpad/releases">Releases</a></li>

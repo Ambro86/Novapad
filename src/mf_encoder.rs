@@ -274,11 +274,28 @@ where
     encode_wav_to_audio(wav_path, mp3_path, 128, progress)
 }
 
-pub fn encode_wav_to_m4b<F>(wav_path: &Path, m4b_path: &Path, progress: F) -> Result<(), String>
+pub fn encode_wav_to_m4b<F>(
+    wav_path: &Path,
+    m4b_path: &Path,
+    bitrate_kbps: u32,
+    progress: F,
+) -> Result<(), String>
 where
     F: FnMut(u32),
 {
-    encode_wav_to_audio(wav_path, m4b_path, 128, progress)
+    let mut progress = progress;
+    let bitrate_kbps = bitrate_kbps.clamp(64, 256);
+    let settings = crate::ffmpeg_export::ConvertAudioSettings {
+        format: crate::ffmpeg_export::ConvertAudioFormat::Aac,
+        quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(bitrate_kbps),
+    };
+    crate::ffmpeg_export::convert_audio_file(
+        wav_path,
+        m4b_path,
+        &settings,
+        None,
+        Some(&mut progress),
+    )
 }
 
 pub fn encode_wav_to_audio<F>(

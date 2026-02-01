@@ -225,6 +225,7 @@ pub struct AppSettings {
     pub audiobook_playback_speed: f32,
     pub audiobook_playback_pitch: f32,
     pub audiobook_playback_volume: f32,
+    pub audiobook_m4b_bitrate: u32,
     pub audiobook_split: u32,
     pub audiobook_split_by_text: bool,
     pub audiobook_split_text: String,
@@ -390,6 +391,7 @@ impl Default for AppSettings {
             audiobook_playback_speed: 1.0,
             audiobook_playback_pitch: 0.0,
             audiobook_playback_volume: 1.0,
+            audiobook_m4b_bitrate: 128,
             audiobook_split: 0,
             audiobook_split_by_text: false,
             audiobook_split_text: String::new(),
@@ -843,6 +845,10 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     if settings.podcast_mp3_bitrate == 0 {
         settings.podcast_mp3_bitrate = 128;
     }
+    if settings.audiobook_m4b_bitrate == 0 {
+        settings.audiobook_m4b_bitrate = 128;
+    }
+    settings.audiobook_m4b_bitrate = settings.audiobook_m4b_bitrate.clamp(64, 256);
     if settings.modified_marker_position == ModifiedMarkerPosition::Unknown {
         settings.modified_marker_position = ModifiedMarkerPosition::End;
     }

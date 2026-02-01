@@ -247,6 +247,7 @@ pub struct AudiobookCommonOptions<'a> {
     pub progress_hwnd: HWND,
     pub cancel: Arc<AtomicBool>,
     pub language: Language,
+    pub audiobook_bitrate_kbps: u32,
     pub rate: i32,
     pub pitch: i32,
     pub volume: i32,
@@ -1887,6 +1888,7 @@ pub fn start_audiobook(hwnd: HWND) {
         audiobook_split_by_text,
         audiobook_split_text,
         audiobook_split_text_requires_newline,
+        audiobook_m4b_bitrate,
         tts_engine,
         dictionary,
         tts_rate,
@@ -1900,6 +1902,7 @@ pub fn start_audiobook(hwnd: HWND) {
                 state.settings.audiobook_split_by_text,
                 state.settings.audiobook_split_text.clone(),
                 state.settings.audiobook_split_text_requires_newline,
+                state.settings.audiobook_m4b_bitrate,
                 state.settings.tts_engine,
                 state.settings.dictionary.clone(),
                 state.settings.tts_rate,
@@ -1914,6 +1917,7 @@ pub fn start_audiobook(hwnd: HWND) {
         false,
         String::new(),
         true,
+        128,
         TtsEngine::Edge,
         Vec::new(),
         0,
@@ -2062,6 +2066,7 @@ pub fn start_audiobook(hwnd: HWND) {
             progress_hwnd,
             cancel: cancel_clone,
             language,
+            audiobook_bitrate_kbps: audiobook_m4b_bitrate,
             rate: tts_rate,
             pitch: tts_pitch,
             volume: tts_volume,
@@ -2298,6 +2303,7 @@ fn run_split_audiobook(
             progress_hwnd: options.progress_hwnd,
             cancel: options.cancel.clone(),
             language: options.language,
+            audiobook_bitrate_kbps: options.audiobook_bitrate_kbps,
             rate: options.rate,
             pitch: options.pitch,
             volume: options.volume,
@@ -2344,6 +2350,7 @@ fn run_marker_split_audiobook(
             progress_hwnd: options.progress_hwnd,
             cancel: options.cancel.clone(),
             language: options.language,
+            audiobook_bitrate_kbps: options.audiobook_bitrate_kbps,
             rate: options.rate,
             pitch: options.pitch,
             volume: options.volume,
@@ -2408,6 +2415,7 @@ fn run_split_sapi4_audiobook(
             progress_hwnd: options.progress_hwnd,
             cancel: options.cancel.clone(),
             language: options.language,
+            audiobook_bitrate_kbps: options.audiobook_bitrate_kbps,
             rate: options.rate,
             pitch: options.pitch,
             volume: options.volume,
@@ -2459,6 +2467,7 @@ fn run_marker_split_sapi4_audiobook(
             progress_hwnd: options.progress_hwnd,
             cancel: options.cancel.clone(),
             language: options.language,
+            audiobook_bitrate_kbps: options.audiobook_bitrate_kbps,
             rate: options.rate,
             pitch: options.pitch,
             volume: options.volume,
@@ -2843,18 +2852,23 @@ fn merge_and_finalize_sapi4_audio(
         }
 
         let res = if is_aac {
-            crate::mf_encoder::encode_wav_to_m4b(&final_wav, output, |p| {
-                if options.progress_hwnd.0 != 0 {
-                    unsafe {
-                        let _unused = PostMessageW(
-                            options.progress_hwnd,
-                            crate::WM_UPDATE_PROGRESS,
-                            WPARAM(p as usize),
-                            LPARAM(0),
-                        );
+            crate::mf_encoder::encode_wav_to_m4b(
+                &final_wav,
+                output,
+                options.audiobook_bitrate_kbps,
+                |p| {
+                    if options.progress_hwnd.0 != 0 {
+                        unsafe {
+                            let _unused = PostMessageW(
+                                options.progress_hwnd,
+                                crate::WM_UPDATE_PROGRESS,
+                                WPARAM(p as usize),
+                                LPARAM(0),
+                            );
+                        }
                     }
-                }
-            })
+                },
+            )
         } else {
             crate::mf_encoder::encode_wav_to_mp3(&final_wav, output, |p| {
                 if options.progress_hwnd.0 != 0 {
@@ -2990,18 +3004,23 @@ fn run_split_sapi_audiobook(
                     );
                 }
             }
-            let res = crate::mf_encoder::encode_wav_to_m4b(&actual_output, &part_output, |p| {
-                if options.progress_hwnd.0 != 0 {
-                    unsafe {
-                        let _unused = PostMessageW(
-                            options.progress_hwnd,
-                            crate::WM_UPDATE_PROGRESS,
-                            WPARAM(p as usize),
-                            LPARAM(0),
-                        );
+            let res = crate::mf_encoder::encode_wav_to_m4b(
+                &actual_output,
+                &part_output,
+                options.audiobook_bitrate_kbps,
+                |p| {
+                    if options.progress_hwnd.0 != 0 {
+                        unsafe {
+                            let _unused = PostMessageW(
+                                options.progress_hwnd,
+                                crate::WM_UPDATE_PROGRESS,
+                                WPARAM(p as usize),
+                                LPARAM(0),
+                            );
+                        }
                     }
-                }
-            });
+                },
+            );
             std::fs::remove_file(&actual_output).ok();
             res?;
         }
@@ -3101,18 +3120,23 @@ fn run_marker_split_sapi_audiobook(
                     );
                 }
             }
-            let res = crate::mf_encoder::encode_wav_to_m4b(&actual_output, &part_output, |p| {
-                if options.progress_hwnd.0 != 0 {
-                    unsafe {
-                        let _unused = PostMessageW(
-                            options.progress_hwnd,
-                            crate::WM_UPDATE_PROGRESS,
-                            WPARAM(p as usize),
-                            LPARAM(0),
-                        );
+            let res = crate::mf_encoder::encode_wav_to_m4b(
+                &actual_output,
+                &part_output,
+                options.audiobook_bitrate_kbps,
+                |p| {
+                    if options.progress_hwnd.0 != 0 {
+                        unsafe {
+                            let _unused = PostMessageW(
+                                options.progress_hwnd,
+                                crate::WM_UPDATE_PROGRESS,
+                                WPARAM(p as usize),
+                                LPARAM(0),
+                            );
+                        }
                     }
-                }
-            });
+                },
+            );
             std::fs::remove_file(&actual_output).ok();
             res?;
         }
@@ -3255,19 +3279,24 @@ pub(crate) fn run_tts_audiobook_part(
             }
         }
 
-        let res = crate::mf_encoder::encode_wav_to_m4b(&wav_path, options.output, |p| {
-            crate::log_debug(&format!("M4B Encoding progress: {}%", p as f32 / 100.0));
-            if options.progress_hwnd.0 != 0 {
-                unsafe {
-                    let _unused = PostMessageW(
-                        options.progress_hwnd,
-                        crate::WM_UPDATE_PROGRESS,
-                        WPARAM(p as usize),
-                        LPARAM(0),
-                    );
+        let res = crate::mf_encoder::encode_wav_to_m4b(
+            &wav_path,
+            options.output,
+            options.audiobook_bitrate_kbps,
+            |p| {
+                crate::log_debug(&format!("M4B Encoding progress: {}%", p as f32 / 100.0));
+                if options.progress_hwnd.0 != 0 {
+                    unsafe {
+                        let _unused = PostMessageW(
+                            options.progress_hwnd,
+                            crate::WM_UPDATE_PROGRESS,
+                            WPARAM(p as usize),
+                            LPARAM(0),
+                        );
+                    }
                 }
-            }
-        });
+            },
+        );
         std::fs::remove_file(&wav_path).ok();
         res?;
     }
@@ -3383,18 +3412,23 @@ pub(crate) fn render_mixed_audiobook_part(
     }
 
     if is_aac {
-        let res = crate::mf_encoder::encode_wav_to_m4b(&actual_output, output, |p| {
-            if options.progress_hwnd.0 != 0 {
-                unsafe {
-                    let _unused = PostMessageW(
-                        options.progress_hwnd,
-                        crate::WM_UPDATE_PROGRESS,
-                        WPARAM(p as usize),
-                        LPARAM(0),
-                    );
+        let res = crate::mf_encoder::encode_wav_to_m4b(
+            &actual_output,
+            output,
+            options.audiobook_bitrate_kbps,
+            |p| {
+                if options.progress_hwnd.0 != 0 {
+                    unsafe {
+                        let _unused = PostMessageW(
+                            options.progress_hwnd,
+                            crate::WM_UPDATE_PROGRESS,
+                            WPARAM(p as usize),
+                            LPARAM(0),
+                        );
+                    }
                 }
-            }
-        });
+            },
+        );
         std::fs::remove_file(&actual_output).ok();
         res?;
     } else if is_mp3 {

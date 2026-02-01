@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sonarpad</title>
+  <meta name="description" content="Sonarpad is a modern, feature-rich Notepad alternative for Windows, built with Rust, with accessibility and TTS features." />
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; margin: 0; line-height: 1.55; }
+    header, main, footer { max-width: 980px; margin: 0 auto; padding: 16px; }
+    header { border-bottom: 1px solid rgba(128,128,128,.35); }
+    h1 { margin: 0 0 6px; }
+    nav a { margin-right: 14px; }
+    a { color: inherit; }
+    .skip-link {
+      position: absolute; left: -9999px; top: 8px;
+      background: Canvas; color: CanvasText;
+      padding: 10px 12px; border: 1px solid rgba(128,128,128,.5);
+      border-radius: 10px;
+    }
+    .skip-link:focus { left: 12px; z-index: 999; }
+    .card {
+      border: 1px solid rgba(128,128,128,.35);
+      border-radius: 14px;
+      padding: 14px;
+      margin: 14px 0;
+      background: color-mix(in srgb, Canvas 96%, transparent);
+    }
+    .btn {
+      display: inline-block;
+      padding: 10px 14px;
+      border: 1px solid rgba(128,128,128,.6);
+      border-radius: 12px;
+      text-decoration: none;
+      margin: 6px 10px 6px 0;
+    }
+    .btn:focus { outline: 3px solid; outline-offset: 2px; }
+    ul { margin-top: 8px; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    pre { padding: 12px; border: 1px solid rgba(128,128,128,.35); border-radius: 12px; overflow: auto; }
+    .muted { opacity: .85; }
+    .warn {
+      border-left: 5px solid rgba(220,120,0,.9);
+      padding-left: 10px;
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header>
+    <h1>Sonarpad</h1>
+    <p class="muted">
+      A modern, feature-rich Notepad alternative for Windows, built with Rust.
+      Multi-format support, accessibility features, and Text-to-Speech (TTS) capabilities.
+    </p>
+
+    <nav aria-label="Primary">
+      <a href="#download">Download</a>
+      <a href="#features">Features</a>
+      <a href="#build">Build</a>
+      <a href="#license">License</a>
+      <a href="#links">Links</a>
+    </nav>
+
+    <p class="muted">
+      Read it in Italian: <a href="README_IT.md">README_IT.md 🇮🇹</a>
+    </p>
+  </header>
+
+  <main id="main">
+    <section id="download" class="card" aria-labelledby="download-title">
+      <h2 id="download-title">Download the latest release</h2>
+      <p>
+        <a class="btn" href="https://github.com/Ambro86/Sonarpad/releases/latest/download/sonarpad.exe">Portable (EXE)</a>
+        <a class="btn" href="https://github.com/Ambro86/Sonarpad/releases/latest/download/novapad_x64-setup.exe">Installer (Setup)</a>
+        <a class="btn" href="https://github.com/Ambro86/Sonarpad/releases/latest/download/novapad_x64_en-US.msi">Installer (MSI)</a>
+      </p>
+      <p class="muted">
+        Sonarpad extends traditional text editing with multi-format document support, advanced accessibility,
+        and Text-to-Speech (TTS). It also includes an integrated MP3 audiobook player, bookmarks for both text and audio,
+        audiobook creation from text (Microsoft voices / Edge Neural / SAPI5), and podcast recording (microphone + system audio).
+      </p>
+
+      <div class="warn">
+        <p><strong>⚠️ License Notice</strong></p>
+        <p>
+          This project is <strong>source-available but NOT open source</strong>.
+          Commercial use, redistribution, and derivative works are strictly prohibited.
+        </p>
+      </div>
+    </section>
+
+    <section id="features" class="card" aria-labelledby="features-title">
+      <h2 id="features-title">Features</h2>
+
+      <ul>
+        <li><strong>Native Windows UI</strong> — built directly on the Windows API for performance and accessibility.</li>
+        <li><strong>Multi-Format Support</strong>
+          <ul>
+            <li>Plain text files</li>
+            <li>PDF documents (text extraction)</li>
+            <li>Microsoft Word (DOCX)</li>
+            <li>Spreadsheets (Excel / ODS via <code>calamine</code>)</li>
+            <li>EPUB e-books</li>
+          </ul>
+        </li>
+        <li><strong>Text-to-Speech (TTS) &amp; Audiobook Creation</strong>
+          <ul>
+            <li>Read documents aloud using Microsoft voices (Edge Neural) and SAPI5 (including OneCore)</li>
+            <li>Create MP3 audiobooks directly from text</li>
+            <li>Split audiobooks by fixed parts or by marker text (case sensitive, line start)</li>
+            <li>Supports both Microsoft voices and SAPI5/OneCore for playback and audiobook saving</li>
+            <li>Favorites for voices and quick switching during reading</li>
+            <li>User dictionary for word replacements during reading and audiobook creation</li>
+          </ul>
+        </li>
+        <li><strong>MP3 Audiobook Player</strong>
+          <ul>
+            <li>Open and play MP3 files</li>
+            <li>Seek forward/backward using arrow keys</li>
+            <li>Play/Pause with the Space bar</li>
+            <li>Volume up/down using arrow keys</li>
+          </ul>
+        </li>
+        <li><strong>Bookmarks</strong>
+          <ul>
+            <li>Create/manage bookmarks for both text files and MP3 playback</li>
+            <li>Quickly jump to saved positions in documents or audio</li>
+          </ul>
+        </li>
+        <li><strong>Podcast Recording</strong> — record from microphone and/or system audio (File menu, Ctrl+Shift+R).</li>
+        <li><strong>Accessibility-Focused</strong> — designed to work with screen readers such as NVDA and JAWS.</li>
+        <li><strong>Accessible Terminal</strong>
+          <ul>
+            <li>Dedicated terminal window with stable output for screen readers</li>
+            <li>Shortcuts: Ctrl+Shift+P, Alt+I (input), Alt+O (output)</li>
+            <li>Options: auto-scroll, strip ANSI, beep on idle, prevent sleep; choose cmd/PowerShell/Codex CLI</li>
+          </ul>
+        </li>
+        <li><strong>RSS / Articles Reader</strong> — browse and import articles from RSS feeds.</li>
+        <li><strong>Readable UI Options</strong> — text color and text size controls, including light/dark and larger sizes.</li>
+        <li><strong>Editing tools</strong> — Find in Files, Strip Markdown Tags, Normalize Whitespace, Hard Line Break.</li>
+        <li><strong>Voice Tuning Options</strong> — pitch, speed, volume (Microsoft and SAPI5), applied to reading and saving.</li>
+        <li><strong>YouTube Transcript Import</strong> — import captions with language selection and optional timestamps.</li>
+        <li><strong>Localization</strong> — English, Italian, Spanish, Portuguese, Swedish.</li>
+      </ul>
+    </section>
+
+    <section id="build" class="card" aria-labelledby="build-title">
+      <h2 id="build-title">Build Instructions</h2>
+      <p>Ensure you have the Rust toolchain installed. Formatting is enforced with <code>cargo fmt --check</code>.</p>
+
+      <pre><code>git clone https://github.com/Ambro86/Sonarpad.git
+cd Sonarpad
+cargo build --release</code></pre>
+
+      <p>Run the application:</p>
+      <pre><code>cargo run --release</code></pre>
+    </section>
+
+    <section id="license" class="card" aria-labelledby="license-title">
+      <h2 id="license-title">Legal &amp; Licensing</h2>
+      <p>This repository is published for <strong>transparency, evaluation, and personal use only</strong>.</p>
+
+      <h3>You MAY</h3>
+      <ul>
+        <li>View and study the source code</li>
+        <li>Build and run the software for personal or evaluation purposes</li>
+      </ul>
+
+      <h3>You MAY NOT</h3>
+      <ul>
+        <li>Use the software for commercial purposes</li>
+        <li>Redistribute the source code or binaries</li>
+        <li>Fork this repository for redistribution</li>
+        <li>Include this software in other products or projects</li>
+        <li>Create or distribute derivative works without written permission</li>
+      </ul>
+
+      <p class="muted">
+        Text-to-Speech features may rely on Microsoft voices and are subject to Microsoft Terms of Service.
+        <strong>Commercial usage is explicitly prohibited.</strong>
+      </p>
+      <p class="muted">Refer to the <code>LICENSE</code> file for full terms.</p>
+    </section>
+
+    <section id="links" class="card" aria-labelledby="links-title">
+      <h2 id="links-title">Links</h2>
+      <ul>
+        <li><a href="https://github.com/Ambro86/Sonarpad">GitHub repository</a></li>
+        <li><a href="https://github.com/Ambro86/Sonarpad/releases">Releases</a></li>
+        <li><a href="https://github.com/Ambro86/Sonarpad/issues">Issues / bug reports</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <p><strong>Author:</strong> Ambrogio Riili</p>
+    <p class="muted"><small>© Ambro86 — Sonarpad</small></p>
+  </footer>
+</body>
+</html>

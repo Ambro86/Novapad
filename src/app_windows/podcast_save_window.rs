@@ -30,6 +30,19 @@ const SAVE_PROGRESS_TIMER_ID: usize = 1;
 const SAVE_PROGRESS_TICK_MS: u32 = 250;
 const SAVE_PROGRESS_MAX_FAKE: usize = 95;
 
+pub struct SaveDialogLabels {
+    pub title: String,
+    pub in_progress: String,
+    pub cancel: String,
+}
+
+struct SaveCreateParams {
+    parent: HWND,
+    language: Language,
+    labels: SaveDialogLabels,
+    show_cancel: bool,
+}
+
 struct SaveState {
     parent: HWND,
     label: HWND,
@@ -38,17 +51,16 @@ struct SaveState {
     cancel_requested: bool,
     language: Language,
     current_pct: usize,
+    labels: SaveDialogLabels,
+    show_cancel: bool,
 }
 
-fn save_labels(language: Language) -> (String, String, String, String, String, String) {
-    (
-        i18n::tr(language, "podcast.save.title"),
-        i18n::tr(language, "podcast.save.in_progress"),
-        i18n::tr(language, "podcast.save.done"),
-        i18n::tr(language, "podcast.save.failed"),
-        i18n::tr(language, "podcast.save.canceled"),
-        i18n::tr(language, "podcast.save.cancel"),
-    )
+fn save_labels(language: Language) -> SaveDialogLabels {
+    SaveDialogLabels {
+        title: i18n::tr(language, "podcast.save.title"),
+        in_progress: i18n::tr(language, "podcast.save.in_progress"),
+        cancel: i18n::tr(language, "podcast.save.cancel"),
+    }
 }
 
 pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
@@ -85,7 +97,7 @@ pub unsafe fn open(parent: HWND) -> HWND {
     } else {
         crate::app_windows::podcast_window::language_for_window(parent).unwrap_or_default()
     };
-    let title = i18n::tr(language, "podcast.save.title");
+    let labels = save_labels(language);
 
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
@@ -99,10 +111,17 @@ pub unsafe fn open(parent: HWND) -> HWND {
     };
     RegisterClassW(&wc);
 
+    let params = Box::new(SaveCreateParams {
+        parent,
+        language,
+        labels,
+        show_cancel: true,
+    });
+    let params_ptr = Box::into_raw(params);
     let window = CreateWindowExW(
         WS_EX_DLGMODALFRAME,
         PCWSTR(class_name.as_ptr()),
-        PCWSTR(to_wide(&title).as_ptr()),
+        PCWSTR::null(),
         WS_POPUP | WS_CAPTION | WS_VISIBLE,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
@@ -111,8 +130,12 @@ pub unsafe fn open(parent: HWND) -> HWND {
         parent,
         HMENU(0),
         hinstance,
-        Some(parent.0 as *const std::ffi::c_void),
+        Some(params_ptr as *const std::ffi::c_void),
     );
+    if window.0 == 0 {
+        let _unused = Box::from_raw(params_ptr);
+        return window;
+    }
 
     if window.0 != 0 {
         EnableWindow(parent, false);
@@ -142,6 +165,79 @@ pub unsafe fn open(parent: HWND) -> HWND {
     window
 }
 
+pub unsafe fn open_with_labels(
+    parent: HWND,
+    language: Language,
+    labels: SaveDialogLabels,
+    show_cancel: bool,
+) -> HWND {
+    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+    let class_name = to_wide(SAVE_CLASS_NAME);
+    let wc = WNDCLASSW {
+        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+            LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
+        ),
+        hInstance: hinstance,
+        lpszClassName: PCWSTR(class_name.as_ptr()),
+        lpfnWndProc: Some(save_wndproc),
+        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+        ..Default::default()
+    };
+    RegisterClassW(&wc);
+
+    let params = Box::new(SaveCreateParams {
+        parent,
+        language,
+        labels,
+        show_cancel,
+    });
+    let params_ptr = Box::into_raw(params);
+    let window = CreateWindowExW(
+        WS_EX_DLGMODALFRAME,
+        PCWSTR(class_name.as_ptr()),
+        PCWSTR::null(),
+        WS_POPUP | WS_CAPTION | WS_VISIBLE,
+        CW_USEDEFAULT,
+        CW_USEDEFAULT,
+        300,
+        150,
+        parent,
+        HMENU(0),
+        hinstance,
+        Some(params_ptr as *const std::ffi::c_void),
+    );
+    if window.0 == 0 {
+        let _unused = Box::from_raw(params_ptr);
+        return window;
+    }
+
+    EnableWindow(parent, false);
+    SetForegroundWindow(window);
+
+    let mut rc_parent = RECT::default();
+    let mut rc_dlg = RECT::default();
+    crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::GetWindowRect(
+        parent,
+        &mut rc_parent
+    ));
+    crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::GetWindowRect(
+        window,
+        &mut rc_dlg
+    ));
+    let dlg_w = rc_dlg.right - rc_dlg.left;
+    let dlg_h = rc_dlg.bottom - rc_dlg.top;
+    let parent_w = rc_parent.right - rc_parent.left;
+    let parent_h = rc_parent.bottom - rc_parent.top;
+    let x = rc_parent.left + (parent_w - dlg_w) / 2;
+    let y = rc_parent.top + (parent_h - dlg_h) / 2;
+    use windows::Win32::UI::WindowsAndMessaging::{HWND_TOP, SWP_SHOWWINDOW, SetWindowPos};
+    if let Err(e) = SetWindowPos(window, HWND_TOP, x, y, dlg_w, dlg_h, SWP_SHOWWINDOW) {
+        crate::log_debug(&format!("Failed to position save window: {}", e));
+    }
+
+    window
+}
+
 unsafe extern "system" fn save_wndproc(
     hwnd: HWND,
     msg: u32,
@@ -159,16 +255,14 @@ unsafe fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
     match msg {
         WM_CREATE => {
             let create_struct = lparam.0 as *const CREATESTRUCTW;
-            let parent = HWND((*create_struct).lpCreateParams as isize);
+            let params = Box::from_raw((*create_struct).lpCreateParams as *mut SaveCreateParams);
+            let parent = params.parent;
+            let language = params.language;
+            let labels = params.labels;
+            let show_cancel = params.show_cancel;
             let main = GetParent(parent);
-            let language = if main.0 != 0 {
-                with_state(main, |state| state.settings.language).unwrap_or_default()
-            } else {
-                crate::app_windows::podcast_window::language_for_window(parent).unwrap_or_default()
-            };
-            let (title, in_progress, _, _, _, cancel_text) = save_labels(language);
             let hfont = with_state(main, |state| state.hfont).unwrap_or(HFONT(0));
-            let label_text = format!("{in_progress} 0%");
+            let label_text = format!("{} 0%", labels.in_progress);
 
             let label = CreateWindowExW(
                 Default::default(),
@@ -200,32 +294,38 @@ unsafe fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
                 None,
             );
 
-            let cancel_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&cancel_text).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                95,
-                80,
-                90,
-                28,
-                hwnd,
-                HMENU(SAVE_ID_CANCEL as isize),
-                HINSTANCE(0),
-                None,
-            );
+            let cancel_button = if show_cancel {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.cancel).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    95,
+                    80,
+                    90,
+                    28,
+                    hwnd,
+                    HMENU(SAVE_ID_CANCEL as isize),
+                    HINSTANCE(0),
+                    None,
+                )
+            } else {
+                HWND(0)
+            };
 
-            if let Err(e) = SetWindowTextW(hwnd, PCWSTR(to_wide(&title).as_ptr())) {
+            if let Err(e) = SetWindowTextW(hwnd, PCWSTR(to_wide(&labels.title).as_ptr())) {
                 crate::log_debug(&format!("Failed to set title: {}", e));
             }
             SendMessageW(label, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
             SendMessageW(progress, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-            SendMessageW(
-                cancel_button,
-                WM_SETFONT,
-                WPARAM(hfont.0 as usize),
-                LPARAM(1),
-            );
+            if cancel_button.0 != 0 {
+                SendMessageW(
+                    cancel_button,
+                    WM_SETFONT,
+                    WPARAM(hfont.0 as usize),
+                    LPARAM(1),
+                );
+            }
             SendMessageW(progress, PBM_SETRANGE, WPARAM(0), LPARAM((100isize) << 16));
             SendMessageW(progress, PBM_SETPOS, WPARAM(0), LPARAM(0));
 
@@ -237,6 +337,8 @@ unsafe fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
                 cancel_requested: false,
                 language,
                 current_pct: 0,
+                labels,
+                show_cancel,
             };
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(Box::new(state)) as isize);
             SetFocus(label);
@@ -356,8 +458,7 @@ fn with_save_state<T>(hwnd: HWND, f: impl FnOnce(&mut SaveState) -> T) -> Option
 }
 
 fn update_progress_label(state: &SaveState) {
-    let (_, in_progress, _, _, _, _) = save_labels(state.language);
-    let text = format!("{in_progress} {}%", state.current_pct);
+    let text = format!("{} {}%", state.labels.in_progress, state.current_pct);
     unsafe {
         if let Err(e) = SetWindowTextW(state.label, PCWSTR(to_wide(&text).as_ptr())) {
             crate::log_debug(&format!("Failed to set label text: {}", e));
@@ -368,6 +469,9 @@ fn update_progress_label(state: &SaveState) {
 fn request_cancel(hwnd: HWND) {
     let mut should_post = false;
     if with_save_state(hwnd, |state| {
+        if !state.show_cancel || state.cancel_button.0 == 0 {
+            return;
+        }
         if state.cancel_requested {
             return;
         }

@@ -1380,6 +1380,7 @@ fn has_secondary_window_open(hwnd: HWND) -> bool {
                 || state.podcast_window.0 != 0
                 || state.podcast_save_window.0 != 0
                 || state.batch_audiobooks_window.0 != 0
+                || state.convert_audio_window.0 != 0
                 || state.podcasts_window.0 != 0
                 || state.podcasts_add_dialog.0 != 0
                 || state.podcasts_categories_dialog.0 != 0
@@ -1419,6 +1420,7 @@ pub(crate) struct AppState {
     podcast_window: HWND,
     podcast_save_window: HWND,
     batch_audiobooks_window: HWND,
+    convert_audio_window: HWND,
     podcasts_window: HWND,
     podcasts_add_dialog: HWND,
     podcasts_categories_dialog: HWND,
@@ -2108,6 +2110,21 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                     handled = true;
                     return;
                 }
+                if state.convert_audio_window.0 != 0
+                    && app_windows::convert_audio_window::handle_navigation(
+                        state.convert_audio_window,
+                        &msg,
+                    )
+                {
+                    handled = true;
+                    return;
+                }
+                if state.convert_audio_window.0 != 0
+                    && handle_accessibility(state.convert_audio_window, &msg)
+                {
+                    handled = true;
+                    return;
+                }
 
                 if state.prompt_window.0 != 0
                     && app_windows::prompt_window::handle_navigation(state.prompt_window, &msg)
@@ -2532,6 +2549,7 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 playback_menu: HMENU(0),
                 podcast_save_window: HWND(0),
                 batch_audiobooks_window: HWND(0),
+                convert_audio_window: HWND(0),
 
                 find_msg,
                 find_text: vec![0u16; 256],
@@ -3391,6 +3409,11 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 IDM_FILE_PODCAST => {
                     log_debug("Menu: Record podcast");
                     app_windows::podcast_window::open(hwnd);
+                    LRESULT(0)
+                }
+                IDM_FILE_CONVERT_AUDIO => {
+                    log_debug("Menu: Convert audio");
+                    app_windows::convert_audio_window::open(hwnd);
                     LRESULT(0)
                 }
                 IDM_EDIT_UNDO => {

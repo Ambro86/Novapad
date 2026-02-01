@@ -26,6 +26,7 @@ pub const IDM_FILE_AUDIOBOOK: usize = 1011;
 pub const IDM_FILE_PODCAST: usize = 1012;
 pub const IDM_FILE_BATCH_AUDIOBOOK: usize = 1013;
 pub const IDM_FILE_CLOSE_OTHERS: usize = 1014;
+pub const IDM_FILE_CONVERT_AUDIO: usize = 1016;
 pub const IDM_EDIT_UNDO: usize = 2001;
 pub const IDM_EDIT_CUT: usize = 2002;
 pub const IDM_EDIT_COPY: usize = 2003;
@@ -162,6 +163,7 @@ pub struct MenuLabels {
     pub file_audiobook: String,
     pub file_podcast: String,
     pub file_batch_audiobooks: String,
+    pub file_convert_audio: String,
     pub file_exit: String,
     pub edit_undo: String,
     pub edit_cut: String,
@@ -250,6 +252,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         file_audiobook: i18n::tr(language, "file.audiobook"),
         file_podcast: i18n::tr(language, "file.podcast"),
         file_batch_audiobooks: i18n::tr(language, "file.batch_audiobooks"),
+        file_convert_audio: i18n::tr(language, "file.convert_audio"),
         file_exit: i18n::tr(language, "file.exit"),
         edit_undo: i18n::tr(language, "edit.undo"),
         edit_cut: i18n::tr(language, "edit.cut"),
@@ -586,6 +589,12 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         &labels.file_batch_audiobooks,
     );
     append_menu_string(file_menu, MF_STRING, IDM_FILE_PODCAST, &labels.file_podcast);
+    append_menu_string(
+        file_menu,
+        MF_STRING,
+        IDM_FILE_CONVERT_AUDIO,
+        &labels.file_convert_audio,
+    );
     crate::log_if_err!(AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null()));
     append_menu_string(file_menu, MF_STRING, IDM_FILE_EXIT, &labels.file_exit);
     append_menu_string(hmenu, MF_POPUP, file_menu.0 as usize, &labels.menu_file);

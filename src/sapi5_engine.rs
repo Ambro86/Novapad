@@ -416,7 +416,7 @@ pub fn speak_sapi_to_file(
                     crate::log_debug(&format!("Failed to write silence file: {}", e));
                 }
             }
-            match crate::mf_encoder::encode_wav_to_mp3(&wav_path, options.output_path) {
+            match crate::mf_encoder::encode_wav_to_mp3(&wav_path, options.output_path, |_| {}) {
                 Ok(()) => {
                     if let Err(e) = std::fs::remove_file(&wav_path) {
                         crate::log_debug(&format!("Failed to remove SAPI5 temp WAV: {}", e));

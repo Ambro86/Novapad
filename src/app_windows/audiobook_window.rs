@@ -21,6 +21,7 @@ use windows::core::{PCWSTR, w};
 const PROGRESS_CLASS_NAME: &str = "SonarpadProgress";
 const PROGRESS_ID_CANCEL: usize = 8001;
 const WM_UPDATE_PROGRESS: u32 = WM_APP + 6;
+pub const WM_SET_PROGRESS_TOTAL: u32 = WM_APP + 8;
 
 struct ProgressDialogState {
     hwnd_pb: HWND,
@@ -237,6 +238,23 @@ unsafe fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: L
             .is_none()
             {
                 crate::log_debug("Failed to access audiobook state");
+            }
+            LRESULT(0)
+        }
+        WM_SET_PROGRESS_TOTAL => {
+            let total = wparam.0;
+            if with_progress_state(hwnd, |state| {
+                state.total = total;
+                SendMessageW(
+                    state.hwnd_pb,
+                    PBM_SETRANGE,
+                    WPARAM(0),
+                    LPARAM((total as isize) << 16),
+                );
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access audiobook state for SET_TOTAL");
             }
             LRESULT(0)
         }

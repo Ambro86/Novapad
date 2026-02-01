@@ -267,20 +267,30 @@ fn read_wav_data_info(path: &Path) -> Result<(u64, u32, i16), String> {
     Err("WAV data chunk not found".to_string())
 }
 
-pub fn encode_wav_to_mp3(wav_path: &Path, mp3_path: &Path) -> Result<(), String> {
-    encode_wav_to_audio(wav_path, mp3_path, 128)
+pub fn encode_wav_to_mp3<F>(wav_path: &Path, mp3_path: &Path, progress: F) -> Result<(), String>
+where
+    F: FnMut(u32),
+{
+    encode_wav_to_audio(wav_path, mp3_path, 128, progress)
 }
 
-pub fn encode_wav_to_m4b(wav_path: &Path, m4b_path: &Path) -> Result<(), String> {
-    encode_wav_to_audio(wav_path, m4b_path, 128)
+pub fn encode_wav_to_m4b<F>(wav_path: &Path, m4b_path: &Path, progress: F) -> Result<(), String>
+where
+    F: FnMut(u32),
+{
+    encode_wav_to_audio(wav_path, m4b_path, 128, progress)
 }
 
-pub fn encode_wav_to_audio(
+pub fn encode_wav_to_audio<F>(
     wav_path: &Path,
     output_path: &Path,
     bitrate_kbps: u32,
-) -> Result<(), String> {
-    encode_wav_to_audio_progress(wav_path, output_path, bitrate_kbps, |_| {}, None)
+    progress: F,
+) -> Result<(), String>
+where
+    F: FnMut(u32),
+{
+    encode_wav_to_audio_progress(wav_path, output_path, bitrate_kbps, progress, None)
 }
 
 pub fn encode_wav_to_audio_progress<F>(
@@ -399,9 +409,14 @@ where
             avg_bytes_in = val;
         }
 
+        let mut duration_hns = 0u64;
+        if let Ok(secs) = get_audio_duration_mf(wav_path) {
+            duration_hns = secs * 10_000_000;
+        }
+
         crate::log_debug(&format!(
-            "MF: input wfx rate={} ch={} bits={} block_align={} avg_bytes={}",
-            sample_rate, channels, bits_per_sample, block_align, avg_bytes_in
+            "MF: input wfx rate={} ch={} bits={} block_align={} avg_bytes={} duration_hns={}",
+            sample_rate, channels, bits_per_sample, block_align, avg_bytes_in, duration_hns
         ));
         crate::log_debug(&format!(
             "MF: requested rate={} ch={} bits={}",
@@ -497,8 +512,17 @@ where
                 writer
                     .WriteSample(stream_index, &sample)
                     .map_err(|e| format!("WriteSample failed: {}", e))?;
-                if data_size > 0 {
-                    let pct = ((total_bytes.saturating_mul(100)) / data_size).min(100) as u32;
+
+                if duration_hns > 0 {
+                    if let Ok(time) = sample.GetSampleTime() {
+                        let pct = ((time as u64 * 10000) / duration_hns).min(10000) as u32;
+                        if pct > last_pct {
+                            last_pct = pct;
+                            progress(pct);
+                        }
+                    }
+                } else if data_size > 0 {
+                    let pct = ((total_bytes.saturating_mul(10000)) / data_size).min(10000) as u32;
                     if pct > last_pct {
                         last_pct = pct;
                         progress(pct);
@@ -512,8 +536,8 @@ where
         {
             return Err("Saving canceled.".to_string());
         }
-        if last_pct < 100 {
-            progress(100);
+        if last_pct < 10000 {
+            progress(10000);
         }
         writer
             .Finalize()

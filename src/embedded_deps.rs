@@ -23,6 +23,8 @@ const BASS_ALAC_DLL: &[u8] = include_bytes!("../dll/bass_alac.dll");
 const BASS_FLAC_DLL: &[u8] = include_bytes!("../dll/bassflac.dll");
 const BASS_OPUS_DLL: &[u8] = include_bytes!("../dll/bassopus.dll");
 const BASS_WMA_DLL: &[u8] = include_bytes!("../dll/basswma.dll");
+// PDFium: rendering/estrazione testo PDF più robusta.
+const PDFIUM_DLL: &[u8] = include_bytes!("../dll/pdfium.dll");
 
 // FFmpeg da vcpkg (link locale)
 const AVCODEC_DLL: &[u8] = include_bytes!("../vcpkg_installed/x64-windows/bin/avcodec-62.dll");
@@ -77,6 +79,7 @@ pub fn extract_all() -> std::io::Result<PathBuf> {
         ("bassflac.dll", BASS_FLAC_DLL),
         ("bassopus.dll", BASS_OPUS_DLL),
         ("basswma.dll", BASS_WMA_DLL),
+        ("pdfium.dll", PDFIUM_DLL),
         ("avcodec-62.dll", AVCODEC_DLL),
         ("avformat-62.dll", AVFORMAT_DLL),
         ("avutil-60.dll", AVUTIL_DLL),

@@ -342,6 +342,9 @@ pub struct AppSettings {
     /// Se true, invia crash report anonimi a Sentry
     #[serde(default = "default_true")]
     pub send_crash_reports: bool,
+    /// Se true, usa il nome legacy "Novapad" per il titolo finestra e collegamenti.
+    #[serde(default)]
+    pub use_legacy_name: bool,
 }
 
 fn default_true() -> bool {
@@ -471,7 +474,16 @@ impl Default for AppSettings {
             rss_cooldown_not_found_secs: 86400,
             rss_cooldown_rate_limited_secs: 300,
             send_crash_reports: true, // Attivato di default
+            use_legacy_name: false,
         }
+    }
+}
+
+pub fn app_display_name(settings: &AppSettings) -> &'static str {
+    if settings.use_legacy_name {
+        "Novapad"
+    } else {
+        "Sonarpad"
     }
 }
 
@@ -799,6 +811,63 @@ pub fn default_podcast_save_folder() -> String {
     base.to_string_lossy().to_string()
 }
 
+fn legacy_podcast_save_folder() -> String {
+    let mut base = known_folder_path(&FOLDERID_Documents).unwrap_or_else(|| {
+        std::env::var_os("USERPROFILE")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+            .join("Documents")
+    });
+    base.push("Novapad Recordings");
+    base.to_string_lossy().to_string()
+}
+
+fn migrate_legacy_podcast_folder(legacy: &std::path::Path, target: &std::path::Path) {
+    if !legacy.exists() || target.exists() {
+        return;
+    }
+    if let Err(e) = std::fs::rename(legacy, target) {
+        crate::log_debug(&format!(
+            "podcast_folder_rename_failed {} -> {}: {}",
+            legacy.display(),
+            target.display(),
+            e
+        ));
+        if let Err(e) = copy_dir_recursive_simple(legacy, target) {
+            crate::log_debug(&format!(
+                "podcast_folder_copy_failed {} -> {}: {}",
+                legacy.display(),
+                target.display(),
+                e
+            ));
+        } else if let Err(e) = std::fs::remove_dir_all(legacy) {
+            crate::log_debug(&format!(
+                "podcast_folder_remove_failed {}: {}",
+                legacy.display(),
+                e
+            ));
+        }
+    }
+}
+
+fn copy_dir_recursive_simple(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    let entries = std::fs::read_dir(src)?;
+    if !dst.exists() {
+        std::fs::create_dir_all(dst)?;
+    }
+    for entry_result in entries {
+        let entry = entry_result?;
+        let file_type = entry.file_type()?;
+        let target = dst.join(entry.file_name());
+        if file_type.is_dir() {
+            copy_dir_recursive_simple(&entry.path(), &target)?;
+        } else if file_type.is_file() {
+            std::fs::copy(entry.path(), &target)?;
+        }
+    }
+    Ok(())
+}
+
 fn known_folder_path(folder: &windows::core::GUID) -> Option<PathBuf> {
     unsafe {
         let raw = SHGetKnownFolderPath(
@@ -831,15 +900,29 @@ pub fn load_settings() -> AppSettings {
         && let Ok(data) = std::fs::read_to_string(&path)
         && let Ok(settings) = serde_json::from_str(&data)
     {
-        return normalize_settings(settings);
+        let normalized = normalize_settings(settings);
+        save_settings(normalized.clone());
+        return normalized;
     }
 
-    normalize_settings(default_settings)
+    let normalized = normalize_settings(default_settings);
+    save_settings(normalized.clone());
+    normalized
 }
 
 fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     if settings.podcast_save_folder.trim().is_empty() {
         settings.podcast_save_folder = default_podcast_save_folder();
+    }
+    if settings
+        .podcast_save_folder
+        .trim()
+        .eq_ignore_ascii_case(&legacy_podcast_save_folder())
+    {
+        let legacy_path = PathBuf::from(legacy_podcast_save_folder());
+        let new_path = PathBuf::from(default_podcast_save_folder());
+        migrate_legacy_podcast_folder(&legacy_path, &new_path);
+        settings.podcast_save_folder = new_path.to_string_lossy().to_string();
     }
     if settings.podcast_mp3_bitrate == 0 {
         settings.podcast_mp3_bitrate = 128;
@@ -1101,6 +1184,96 @@ pub fn sync_context_menu(settings: &AppSettings) {
             create_context_menu_entry(&base_key, &label, &command, &icon);
         } else {
             delete_context_menu_entry(&base_key);
+        }
+    }
+}
+
+pub fn sync_start_menu_shortcuts(settings: &AppSettings) {
+    let (from, to) = if settings.use_legacy_name {
+        ("Sonarpad", "Novapad")
+    } else {
+        ("Novapad", "Sonarpad")
+    };
+    for dir in start_menu_program_dirs() {
+        rename_start_menu_entries(&dir, from, to);
+    }
+}
+
+fn start_menu_program_dirs() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    if let Ok(appdata) = std::env::var("APPDATA") {
+        dirs.push(
+            PathBuf::from(appdata)
+                .join("Microsoft")
+                .join("Windows")
+                .join("Start Menu")
+                .join("Programs"),
+        );
+    }
+    if let Ok(program_data) = std::env::var("ProgramData") {
+        dirs.push(
+            PathBuf::from(program_data)
+                .join("Microsoft")
+                .join("Windows")
+                .join("Start Menu")
+                .join("Programs"),
+        );
+    }
+    dirs
+}
+
+fn rename_start_menu_entries(dir: &std::path::Path, from: &str, to: &str) {
+    if !dir.exists() {
+        return;
+    }
+    let from_link = dir.join(format!("{from}.lnk"));
+    let to_link = dir.join(format!("{to}.lnk"));
+    if from_link.exists()
+        && !to_link.exists()
+        && let Err(e) = std::fs::rename(&from_link, &to_link)
+    {
+        crate::log_debug(&format!(
+            "start_menu_rename_failed {} -> {}: {}",
+            from_link.display(),
+            to_link.display(),
+            e
+        ));
+    }
+
+    let from_folder = dir.join(from);
+    let to_folder = dir.join(to);
+    if from_folder.exists()
+        && !to_folder.exists()
+        && let Err(e) = std::fs::rename(&from_folder, &to_folder)
+    {
+        crate::log_debug(&format!(
+            "start_menu_folder_rename_failed {} -> {}: {}",
+            from_folder.display(),
+            to_folder.display(),
+            e
+        ));
+        return;
+    }
+
+    // If folder exists (either renamed or already there), rename inner shortcut.
+    let target_folder = if to_folder.exists() {
+        to_folder
+    } else {
+        from_folder
+    };
+    if target_folder.exists() {
+        let inner_from = target_folder.join(format!("{from}.lnk"));
+        let inner_to = target_folder.join(format!("{to}.lnk"));
+        if inner_from.exists()
+            && !inner_to.exists()
+            && let Err(e) = std::fs::rename(&inner_from, &inner_to)
+        {
+            crate::log_debug(&format!(
+                "start_menu_inner_rename_failed {} -> {}: {}",
+                inner_from.display(),
+                inner_to.display(),
+                e
+            ));
         }
     }
 }

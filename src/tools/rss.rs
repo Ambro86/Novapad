@@ -253,8 +253,21 @@ pub fn normalize_url(input: &str) -> String {
     if s.is_empty() {
         return String::new();
     }
+    if s.starts_with("//") {
+        return format!("https:{s}");
+    }
     if s.starts_with("http://") || s.starts_with("https://") {
-        return s.to_string();
+        let mut out = s.to_string();
+        if out.starts_with("http:////") {
+            out = out.replacen("http:////", "http://", 1);
+        } else if out.starts_with("https:////") {
+            out = out.replacen("https:////", "https://", 1);
+        } else if out.starts_with("http:///") {
+            out = out.replacen("http:///", "http://", 1);
+        } else if out.starts_with("https:///") {
+            out = out.replacen("https:///", "https://", 1);
+        }
+        return out;
     }
     format!("https://{s}")
 }

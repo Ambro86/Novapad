@@ -1,6 +1,7 @@
 fn main() {
     let root = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     let lib_dir = std::path::Path::new(&root).join("lib64");
+    let dll_dir = std::path::Path::new(&root).join("dll");
 
     println!("cargo:rustc-link-search=native={}", lib_dir.display());
     println!("cargo:rustc-link-lib=static=libcurl");
@@ -39,6 +40,16 @@ fn main() {
 
     for dll in &["libcurl.dll", "zlib.dll"] {
         let src = lib_dir.join(dll);
+        let dst = target_dir.join(dll);
+        if src.exists() {
+            std::fs::copy(&src, &dst).expect("Failed to copy DLL");
+        }
+    }
+
+    // Copia DLL aggiuntive dalla cartella dll (es. pdfium)
+    {
+        let dll = "pdfium.dll";
+        let src = dll_dir.join(dll);
         let dst = target_dir.join(dll);
         if src.exists() {
             std::fs::copy(&src, &dst).expect("Failed to copy DLL");

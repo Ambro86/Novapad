@@ -1340,6 +1340,14 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
                 announce_player_speed(language, speed);
             }
         }
+        PlayerCommand::PitchReset => {
+            let language =
+                unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+            let pitch = unsafe { reset_audiobook_pitch(hwnd) };
+            if let Some(pitch) = pitch {
+                announce_player_pitch(language, pitch);
+            }
+        }
         PlayerCommand::MuteToggle => unsafe {
             toggle_audiobook_mute(hwnd);
         },
@@ -1583,6 +1591,7 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
             Vec::new()
         };
         let settings = load_settings();
+        crate::settings::sync_start_menu_shortcuts(&settings);
         let file_to_open = extra_paths.first().cloned();
         if !extra_paths.is_empty() && settings.open_behavior == OpenBehavior::NewTab {
             let existing = FindWindowW(class_name, PCWSTR::null());
@@ -1613,10 +1622,11 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
         }
         let lp_param = &file_to_open as *const Option<String> as *const std::ffi::c_void;
 
+        let title_wide = to_wide(crate::settings::app_display_name(&settings));
         let hwnd = CreateWindowExW(
             Default::default(),
             class_name,
-            w!("Sonarpad"),
+            PCWSTR(title_wide.as_ptr()),
             WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_VISIBLE,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
@@ -3698,6 +3708,10 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 }
                 IDM_PLAYBACK_PITCH_DOWN => {
                     handle_player_command(hwnd, PlayerCommand::Pitch(-1.0));
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_PITCH_RESET => {
+                    handle_player_command(hwnd, PlayerCommand::PitchReset);
                     LRESULT(0)
                 }
                 IDM_PLAYBACK_MUTE_TOGGLE => {

@@ -2390,10 +2390,11 @@ pub unsafe fn update_window_title(hwnd: HWND) {
     if with_state(hwnd, |state| {
         if let Some(doc) = state.docs.get(state.current) {
             let display_title = &doc.title;
+            let app_name = crate::settings::app_display_name(&state.settings);
             let base_title = if display_title.trim().is_empty() {
-                "Sonarpad".to_string()
+                app_name.to_string()
             } else {
-                format!("{display_title} - Sonarpad")
+                format!("{display_title} - {app_name}")
             };
             let full_title = apply_modified_marker(
                 &base_title,

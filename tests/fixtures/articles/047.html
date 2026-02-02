@@ -1,0 +1,2245 @@
+
+
+
+
+
+
+
+
+
+
+
+        
+        
+        
+        
+        
+        
+
+        
+        
+        
+        
+        
+    
+<!DOCTYPE html>
+<!--[if lt IE 8 ]><html lang="it" class="no-js"><![endif]-->
+<!--[if IE 8 ]><html lang="it" class="no-js ie8"><![endif]-->
+<!--[if IE 9 ]><html lang="it" class="no-js ie9"><![endif]-->
+<!--[if (gt IE 9)|!(IE)]><!--><html lang="it" class="no-js"><!--<![endif]-->
+	<head>
+	
+<script type="text/javascript">(window.NREUM||(NREUM={})).init={privacy:{cookies_enabled:true},ajax:{deny_list:["bam.eu01.nr-data.net"]},feature_flags:["soft_nav"],distributed_tracing:{enabled:true}};(window.NREUM||(NREUM={})).loader_config={agentID:"322547580",accountID:"3373219",trustKey:"3373219",xpid:"VwUAUlRSARACV1RSDgcEVFA=",licenseKey:"NRJS-fcd3b3138332119cd4b",applicationID:"235096324",browserID:"322547580"};;/*! For license information please see nr-loader-spa-1.308.0.min.js.LICENSE.txt */
+(()=>{var e,t,r={384:(e,t,r)=>{"use strict";r.d(t,{NT:()=>a,US:()=>u,Zm:()=>o,bQ:()=>d,dV:()=>c,pV:()=>l});var n=r(6154),i=r(1863),s=r(1910);const a={beacon:"bam.nr-data.net",errorBeacon:"bam.nr-data.net"};function o(){return n.gm.NREUM||(n.gm.NREUM={}),void 0===n.gm.newrelic&&(n.gm.newrelic=n.gm.NREUM),n.gm.NREUM}function c(){let e=o();return e.o||(e.o={ST:n.gm.setTimeout,SI:n.gm.setImmediate||n.gm.setInterval,CT:n.gm.clearTimeout,XHR:n.gm.XMLHttpRequest,REQ:n.gm.Request,EV:n.gm.Event,PR:n.gm.Promise,MO:n.gm.MutationObserver,FETCH:n.gm.fetch,WS:n.gm.WebSocket},(0,s.i)(...Object.values(e.o))),e}function d(e,t){let r=o();r.initializedAgents??={},t.initializedAt={ms:(0,i.t)(),date:new Date},r.initializedAgents[e]=t}function u(e,t){o()[e]=t}function l(){return function(){let e=o();const t=e.info||{};e.info={beacon:a.beacon,errorBeacon:a.errorBeacon,...t}}(),function(){let e=o();const t=e.init||{};e.init={...t}}(),c(),function(){let e=o();const t=e.loader_config||{};e.loader_config={...t}}(),o()}},782:(e,t,r)=>{"use strict";r.d(t,{T:()=>n});const n=r(860).K7.pageViewTiming},860:(e,t,r)=>{"use strict";r.d(t,{$J:()=>u,K7:()=>c,P3:()=>d,XX:()=>i,Yy:()=>o,df:()=>s,qY:()=>n,v4:()=>a});const n="events",i="jserrors",s="browser/blobs",a="rum",o="browser/logs",c={ajax:"ajax",genericEvents:"generic_events",jserrors:i,logging:"logging",metrics:"metrics",pageAction:"page_action",pageViewEvent:"page_view_event",pageViewTiming:"page_view_timing",sessionReplay:"session_replay",sessionTrace:"session_trace",softNav:"soft_navigations",spa:"spa"},d={[c.pageViewEvent]:1,[c.pageViewTiming]:2,[c.metrics]:3,[c.jserrors]:4,[c.spa]:5,[c.ajax]:6,[c.sessionTrace]:7,[c.softNav]:8,[c.sessionReplay]:9,[c.logging]:10,[c.genericEvents]:11},u={[c.pageViewEvent]:a,[c.pageViewTiming]:n,[c.ajax]:n,[c.spa]:n,[c.softNav]:n,[c.metrics]:i,[c.jserrors]:i,[c.sessionTrace]:s,[c.sessionReplay]:s,[c.logging]:o,[c.genericEvents]:"ins"}},944:(e,t,r)=>{"use strict";r.d(t,{R:()=>i});var n=r(3241);function i(e,t){"function"==typeof console.debug&&(console.debug("New Relic Warning: https://github.com/newrelic/newrelic-browser-agent/blob/main/docs/warning-codes.md#".concat(e),t),(0,n.W)({agentIdentifier:null,drained:null,type:"data",name:"warn",feature:"warn",data:{code:e,secondary:t}}))}},993:(e,t,r)=>{"use strict";r.d(t,{A$:()=>s,ET:()=>a,TZ:()=>o,p_:()=>i});var n=r(860);const i={ERROR:"ERROR",WARN:"WARN",INFO:"INFO",DEBUG:"DEBUG",TRACE:"TRACE"},s={OFF:0,ERROR:1,WARN:2,INFO:3,DEBUG:4,TRACE:5},a="log",o=n.K7.logging},1541:(e,t,r)=>{"use strict";r.d(t,{U:()=>i,f:()=>n});const n={MFE:"MFE",BA:"BA"};function i(e,t){if(2!==t?.harvestEndpointVersion)return{};const r=t.agentRef.runtime.appMetadata.agents[0].entityGuid;return e?{"source.id":e.id,"source.name":e.name,"source.type":e.type,"parent.id":e.parent?.id||r,"parent.type":e.parent?.type||n.BA}:{"entity.guid":r,appId:t.agentRef.info.applicationID}}},1687:(e,t,r)=>{"use strict";r.d(t,{Ak:()=>d,Ze:()=>h,x3:()=>u});var n=r(3241),i=r(7836),s=r(3606),a=r(860),o=r(2646);const c={};function d(e,t){const r={staged:!1,priority:a.P3[t]||0};l(e),c[e].get(t)||c[e].set(t,r)}function u(e,t){e&&c[e]&&(c[e].get(t)&&c[e].delete(t),p(e,t,!1),c[e].size&&f(e))}function l(e){if(!e)throw new Error("agentIdentifier required");c[e]||(c[e]=new Map)}function h(e="",t="feature",r=!1){if(l(e),!e||!c[e].get(t)||r)return p(e,t);c[e].get(t).staged=!0,f(e)}function f(e){const t=Array.from(c[e]);t.every(([e,t])=>t.staged)&&(t.sort((e,t)=>e[1].priority-t[1].priority),t.forEach(([t])=>{c[e].delete(t),p(e,t)}))}function p(e,t,r=!0){const a=e?i.ee.get(e):i.ee,c=s.i.handlers;if(!a.aborted&&a.backlog&&c){if((0,n.W)({agentIdentifier:e,type:"lifecycle",name:"drain",feature:t}),r){const e=a.backlog[t],r=c[t];if(r){for(let t=0;e&&t<e.length;++t)g(e[t],r);Object.entries(r).forEach(([e,t])=>{Object.values(t||{}).forEach(t=>{t[0]?.on&&t[0]?.context()instanceof o.y&&t[0].on(e,t[1])})})}}a.isolatedBacklog||delete c[t],a.backlog[t]=null,a.emit("drain-"+t,[])}}function g(e,t){var r=e[1];Object.values(t[r]||{}).forEach(t=>{var r=e[0];if(t[0]===r){var n=t[1],i=e[3],s=e[2];n.apply(i,s)}})}},1738:(e,t,r)=>{"use strict";r.d(t,{U:()=>f,Y:()=>h});var n=r(3241),i=r(9908),s=r(1863),a=r(944),o=r(5701),c=r(3969),d=r(8362),u=r(860),l=r(4261);function h(e,t,r,s){const h=s||r;!h||h[e]&&h[e]!==d.d.prototype[e]||(h[e]=function(){(0,i.p)(c.xV,["API/"+e+"/called"],void 0,u.K7.metrics,r.ee),(0,n.W)({agentIdentifier:r.agentIdentifier,drained:!!o.B?.[r.agentIdentifier],type:"data",name:"api",feature:l.Pl+e,data:{}});try{return t.apply(this,arguments)}catch(e){(0,a.R)(23,e)}})}function f(e,t,r,n,a){const o=e.info;null===r?delete o.jsAttributes[t]:o.jsAttributes[t]=r,(a||null===r)&&(0,i.p)(l.Pl+n,[(0,s.t)(),t,r],void 0,"session",e.ee)}},1741:(e,t,r)=>{"use strict";r.d(t,{W:()=>s});var n=r(944),i=r(4261);class s{#e(e,...t){if(this[e]!==s.prototype[e])return this[e](...t);(0,n.R)(35,e)}addPageAction(e,t){return this.#e(i.hG,e,t)}register(e){return this.#e(i.eY,e)}recordCustomEvent(e,t){return this.#e(i.fF,e,t)}setPageViewName(e,t){return this.#e(i.Fw,e,t)}setCustomAttribute(e,t,r){return this.#e(i.cD,e,t,r)}noticeError(e,t){return this.#e(i.o5,e,t)}setUserId(e,t=!1){return this.#e(i.Dl,e,t)}setApplicationVersion(e){return this.#e(i.nb,e)}setErrorHandler(e){return this.#e(i.bt,e)}addRelease(e,t){return this.#e(i.k6,e,t)}log(e,t){return this.#e(i.$9,e,t)}start(){return this.#e(i.d3)}finished(e){return this.#e(i.BL,e)}recordReplay(){return this.#e(i.CH)}pauseReplay(){return this.#e(i.Tb)}addToTrace(e){return this.#e(i.U2,e)}setCurrentRouteName(e){return this.#e(i.PA,e)}interaction(e){return this.#e(i.dT,e)}wrapLogger(e,t,r){return this.#e(i.Wb,e,t,r)}measure(e,t){return this.#e(i.V1,e,t)}consent(e){return this.#e(i.Pv,e)}}},1863:(e,t,r)=>{"use strict";function n(){return Math.floor(performance.now())}r.d(t,{t:()=>n})},1910:(e,t,r)=>{"use strict";r.d(t,{i:()=>s});var n=r(944);const i=new Map;function s(...e){return e.every(e=>{if(i.has(e))return i.get(e);const t="function"==typeof e?e.toString():"",r=t.includes("[native code]"),s=t.includes("nrWrapper");return r||s||(0,n.R)(64,e?.name||t),i.set(e,r),r})}},2555:(e,t,r)=>{"use strict";r.d(t,{D:()=>o,f:()=>a});var n=r(384),i=r(8122);const s={beacon:n.NT.beacon,errorBeacon:n.NT.errorBeacon,licenseKey:void 0,applicationID:void 0,sa:void 0,queueTime:void 0,applicationTime:void 0,ttGuid:void 0,user:void 0,account:void 0,product:void 0,extra:void 0,jsAttributes:{},userAttributes:void 0,atts:void 0,transactionName:void 0,tNamePlain:void 0};function a(e){try{return!!e.licenseKey&&!!e.errorBeacon&&!!e.applicationID}catch(e){return!1}}const o=e=>(0,i.a)(e,s)},2614:(e,t,r)=>{"use strict";r.d(t,{BB:()=>a,H3:()=>n,g:()=>d,iL:()=>c,tS:()=>o,uh:()=>i,wk:()=>s});const n="NRBA",i="SESSION",s=144e5,a=18e5,o={STARTED:"session-started",PAUSE:"session-pause",RESET:"session-reset",RESUME:"session-resume",UPDATE:"session-update"},c={SAME_TAB:"same-tab",CROSS_TAB:"cross-tab"},d={OFF:0,FULL:1,ERROR:2}},2646:(e,t,r)=>{"use strict";r.d(t,{y:()=>n});class n{constructor(e){this.contextId=e}}},2843:(e,t,r)=>{"use strict";r.d(t,{G:()=>s,u:()=>i});var n=r(3878);function i(e,t=!1,r,i){(0,n.DD)("visibilitychange",function(){if(t)return void("hidden"===document.visibilityState&&e());e(document.visibilityState)},r,i)}function s(e,t,r){(0,n.sp)("pagehide",e,t,r)}},3241:(e,t,r)=>{"use strict";r.d(t,{W:()=>s});var n=r(6154);const i="newrelic";function s(e={}){try{n.gm.dispatchEvent(new CustomEvent(i,{detail:e}))}catch(e){}}},3304:(e,t,r)=>{"use strict";r.d(t,{A:()=>s});var n=r(7836);const i=()=>{const e=new WeakSet;return(t,r)=>{if("object"==typeof r&&null!==r){if(e.has(r))return;e.add(r)}return r}};function s(e){try{return JSON.stringify(e,i())??""}catch(e){try{n.ee.emit("internal-error",[e])}catch(e){}return""}}},3333:(e,t,r)=>{"use strict";r.d(t,{$v:()=>u,TZ:()=>n,Xh:()=>c,Zp:()=>i,kd:()=>d,mq:()=>o,nf:()=>a,qN:()=>s});const n=r(860).K7.genericEvents,i=["auxclick","click","copy","keydown","paste","scrollend"],s=["focus","blur"],a=4,o=1e3,c=2e3,d=["PageAction","UserAction","BrowserPerformance"],u={RESOURCES:"experimental.resources",REGISTER:"register"}},3434:(e,t,r)=>{"use strict";r.d(t,{Jt:()=>s,YM:()=>d});var n=r(7836),i=r(5607);const s="nr@original:".concat(i.W),a=50;var o=Object.prototype.hasOwnProperty,c=!1;function d(e,t){return e||(e=n.ee),r.inPlace=function(e,t,n,i,s){n||(n="");const a="-"===n.charAt(0);for(let o=0;o<t.length;o++){const c=t[o],d=e[c];l(d)||(e[c]=r(d,a?c+n:n,i,c,s))}},r.flag=s,r;function r(t,r,n,c,d){return l(t)?t:(r||(r=""),nrWrapper[s]=t,function(e,t,r){if(Object.defineProperty&&Object.keys)try{return Object.keys(e).forEach(function(r){Object.defineProperty(t,r,{get:function(){return e[r]},set:function(t){return e[r]=t,t}})}),t}catch(e){u([e],r)}for(var n in e)o.call(e,n)&&(t[n]=e[n])}(t,nrWrapper,e),nrWrapper);function nrWrapper(){var s,o,l,h;let f;try{o=this,s=[...arguments],l="function"==typeof n?n(s,o):n||{}}catch(t){u([t,"",[s,o,c],l],e)}i(r+"start",[s,o,c],l,d);const p=performance.now();let g;try{return h=t.apply(o,s),g=performance.now(),h}catch(e){throw g=performance.now(),i(r+"err",[s,o,e],l,d),f=e,f}finally{const e=g-p,t={start:p,end:g,duration:e,isLongTask:e>=a,methodName:c,thrownError:f};t.isLongTask&&i("long-task",[t,o],l,d),i(r+"end",[s,o,h],l,d)}}}function i(r,n,i,s){if(!c||t){var a=c;c=!0;try{e.emit(r,n,i,t,s)}catch(t){u([t,r,n,i],e)}c=a}}}function u(e,t){t||(t=n.ee);try{t.emit("internal-error",e)}catch(e){}}function l(e){return!(e&&"function"==typeof e&&e.apply&&!e[s])}},3606:(e,t,r)=>{"use strict";r.d(t,{i:()=>s});var n=r(9908);s.on=a;var i=s.handlers={};function s(e,t,r,s){a(s||n.d,i,e,t,r)}function a(e,t,r,i,s){s||(s="feature"),e||(e=n.d);var a=t[s]=t[s]||{};(a[r]=a[r]||[]).push([e,i])}},3738:(e,t,r)=>{"use strict";r.d(t,{He:()=>i,Kp:()=>o,Lc:()=>d,Rz:()=>u,TZ:()=>n,bD:()=>s,d3:()=>a,jx:()=>l,sl:()=>h,uP:()=>c});const n=r(860).K7.sessionTrace,i="bstResource",s="resource",a="-start",o="-end",c="fn"+a,d="fn"+o,u="pushState",l=1e3,h=3e4},3785:(e,t,r)=>{"use strict";r.d(t,{R:()=>c,b:()=>d});var n=r(9908),i=r(1863),s=r(860),a=r(3969),o=r(993);function c(e,t,r={},c=o.p_.INFO,d=!0,u,l=(0,i.t)()){(0,n.p)(a.xV,["API/logging/".concat(c.toLowerCase(),"/called")],void 0,s.K7.metrics,e),(0,n.p)(o.ET,[l,t,r,c,d,u],void 0,s.K7.logging,e)}function d(e){return"string"==typeof e&&Object.values(o.p_).some(t=>t===e.toUpperCase().trim())}},3878:(e,t,r)=>{"use strict";function n(e,t){return{capture:e,passive:!1,signal:t}}function i(e,t,r=!1,i){window.addEventListener(e,t,n(r,i))}function s(e,t,r=!1,i){document.addEventListener(e,t,n(r,i))}r.d(t,{DD:()=>s,jT:()=>n,sp:()=>i})},3962:(e,t,r)=>{"use strict";r.d(t,{AM:()=>a,O2:()=>l,OV:()=>s,Qu:()=>h,TZ:()=>c,ih:()=>f,pP:()=>o,t1:()=>u,tC:()=>i,wD:()=>d});var n=r(860);const i=["click","keydown","submit"],s="popstate",a="api",o="initialPageLoad",c=n.K7.softNav,d=5e3,u=500,l={INITIAL_PAGE_LOAD:"",ROUTE_CHANGE:1,UNSPECIFIED:2},h={INTERACTION:1,AJAX:2,CUSTOM_END:3,CUSTOM_TRACER:4},f={IP:"in progress",PF:"pending finish",FIN:"finished",CAN:"cancelled"}},3969:(e,t,r)=>{"use strict";r.d(t,{TZ:()=>n,XG:()=>o,rs:()=>i,xV:()=>a,z_:()=>s});const n=r(860).K7.metrics,i="sm",s="cm",a="storeSupportabilityMetrics",o="storeEventMetrics"},4234:(e,t,r)=>{"use strict";r.d(t,{W:()=>s});var n=r(7836),i=r(1687);class s{constructor(e,t){this.agentIdentifier=e,this.ee=n.ee.get(e),this.featureName=t,this.blocked=!1}deregisterDrain(){(0,i.x3)(this.agentIdentifier,this.featureName)}}},4261:(e,t,r)=>{"use strict";r.d(t,{$9:()=>u,BL:()=>c,CH:()=>p,Dl:()=>R,Fw:()=>w,PA:()=>v,Pl:()=>n,Pv:()=>A,Tb:()=>h,U2:()=>a,V1:()=>E,Wb:()=>T,bt:()=>y,cD:()=>b,d3:()=>x,dT:()=>d,eY:()=>g,fF:()=>f,hG:()=>s,hw:()=>i,k6:()=>o,nb:()=>m,o5:()=>l});const n="api-",i=n+"ixn-",s="addPageAction",a="addToTrace",o="addRelease",c="finished",d="interaction",u="log",l="noticeError",h="pauseReplay",f="recordCustomEvent",p="recordReplay",g="register",m="setApplicationVersion",v="setCurrentRouteName",b="setCustomAttribute",y="setErrorHandler",w="setPageViewName",R="setUserId",x="start",T="wrapLogger",E="measure",A="consent"},5205:(e,t,r)=>{"use strict";r.d(t,{j:()=>S});var n=r(384),i=r(1741);var s=r(2555),a=r(3333);const o=e=>{if(!e||"string"!=typeof e)return!1;try{document.createDocumentFragment().querySelector(e)}catch{return!1}return!0};var c=r(2614),d=r(944),u=r(8122);const l="[data-nr-mask]",h=e=>(0,u.a)(e,(()=>{const e={feature_flags:[],experimental:{allow_registered_children:!1,resources:!1},mask_selector:"*",block_selector:"[data-nr-block]",mask_input_options:{color:!1,date:!1,"datetime-local":!1,email:!1,month:!1,number:!1,range:!1,search:!1,tel:!1,text:!1,time:!1,url:!1,week:!1,textarea:!1,select:!1,password:!0}};return{ajax:{deny_list:void 0,block_internal:!0,enabled:!0,autoStart:!0},api:{get allow_registered_children(){return e.feature_flags.includes(a.$v.REGISTER)||e.experimental.allow_registered_children},set allow_registered_children(t){e.experimental.allow_registered_children=t},duplicate_registered_data:!1},browser_consent_mode:{enabled:!1},distributed_tracing:{enabled:void 0,exclude_newrelic_header:void 0,cors_use_newrelic_header:void 0,cors_use_tracecontext_headers:void 0,allowed_origins:void 0},get feature_flags(){return e.feature_flags},set feature_flags(t){e.feature_flags=t},generic_events:{enabled:!0,autoStart:!0},harvest:{interval:30},jserrors:{enabled:!0,autoStart:!0},logging:{enabled:!0,autoStart:!0},metrics:{enabled:!0,autoStart:!0},obfuscate:void 0,page_action:{enabled:!0},page_view_event:{enabled:!0,autoStart:!0},page_view_timing:{enabled:!0,autoStart:!0},performance:{capture_marks:!1,capture_measures:!1,capture_detail:!0,resources:{get enabled(){return e.feature_flags.includes(a.$v.RESOURCES)||e.experimental.resources},set enabled(t){e.experimental.resources=t},asset_types:[],first_party_domains:[],ignore_newrelic:!0}},privacy:{cookies_enabled:!0},proxy:{assets:void 0,beacon:void 0},session:{expiresMs:c.wk,inactiveMs:c.BB},session_replay:{autoStart:!0,enabled:!1,preload:!1,sampling_rate:10,error_sampling_rate:100,collect_fonts:!1,inline_images:!1,fix_stylesheets:!0,mask_all_inputs:!0,get mask_text_selector(){return e.mask_selector},set mask_text_selector(t){o(t)?e.mask_selector="".concat(t,",").concat(l):""===t||null===t?e.mask_selector=l:(0,d.R)(5,t)},get block_class(){return"nr-block"},get ignore_class(){return"nr-ignore"},get mask_text_class(){return"nr-mask"},get block_selector(){return e.block_selector},set block_selector(t){o(t)?e.block_selector+=",".concat(t):""!==t&&(0,d.R)(6,t)},get mask_input_options(){return e.mask_input_options},set mask_input_options(t){t&&"object"==typeof t?e.mask_input_options={...t,password:!0}:(0,d.R)(7,t)}},session_trace:{enabled:!0,autoStart:!0},soft_navigations:{enabled:!0,autoStart:!0},spa:{enabled:!0,autoStart:!0},ssl:void 0,user_actions:{enabled:!0,elementAttributes:["id","className","tagName","type"]}}})());var f=r(6154),p=r(9324);let g=0;const m={buildEnv:p.F3,distMethod:p.Xs,version:p.xv,originTime:f.WN},v={consented:!1},b={appMetadata:{},get consented(){return this.session?.state?.consent||v.consented},set consented(e){v.consented=e},customTransaction:void 0,denyList:void 0,disabled:!1,harvester:void 0,isolatedBacklog:!1,isRecording:!1,loaderType:void 0,maxBytes:3e4,obfuscator:void 0,onerror:void 0,ptid:void 0,releaseIds:{},session:void 0,timeKeeper:void 0,registeredEntities:[],jsAttributesMetadata:{bytes:0},get harvestCount(){return++g}},y=e=>{const t=(0,u.a)(e,b),r=Object.keys(m).reduce((e,t)=>(e[t]={value:m[t],writable:!1,configurable:!0,enumerable:!0},e),{});return Object.defineProperties(t,r)};var w=r(5701);const R=e=>{const t=e.startsWith("http");e+="/",r.p=t?e:"https://"+e};var x=r(7836),T=r(3241);const E={accountID:void 0,trustKey:void 0,agentID:void 0,licenseKey:void 0,applicationID:void 0,xpid:void 0},A=e=>(0,u.a)(e,E),_=new Set;function S(e,t={},r,a){let{init:o,info:c,loader_config:d,runtime:u={},exposed:l=!0}=t;if(!c){const e=(0,n.pV)();o=e.init,c=e.info,d=e.loader_config}e.init=h(o||{}),e.loader_config=A(d||{}),c.jsAttributes??={},f.bv&&(c.jsAttributes.isWorker=!0),e.info=(0,s.D)(c);const p=e.init,g=[c.beacon,c.errorBeacon];_.has(e.agentIdentifier)||(p.proxy.assets&&(R(p.proxy.assets),g.push(p.proxy.assets)),p.proxy.beacon&&g.push(p.proxy.beacon),e.beacons=[...g],function(e){const t=(0,n.pV)();Object.getOwnPropertyNames(i.W.prototype).forEach(r=>{const n=i.W.prototype[r];if("function"!=typeof n||"constructor"===n)return;let s=t[r];e[r]&&!1!==e.exposed&&"micro-agent"!==e.runtime?.loaderType&&(t[r]=(...t)=>{const n=e[r](...t);return s?s(...t):n})})}(e),(0,n.US)("activatedFeatures",w.B)),u.denyList=[...p.ajax.deny_list||[],...p.ajax.block_internal?g:[]],u.ptid=e.agentIdentifier,u.loaderType=r,e.runtime=y(u),_.has(e.agentIdentifier)||(e.ee=x.ee.get(e.agentIdentifier),e.exposed=l,(0,T.W)({agentIdentifier:e.agentIdentifier,drained:!!w.B?.[e.agentIdentifier],type:"lifecycle",name:"initialize",feature:void 0,data:e.config})),_.add(e.agentIdentifier)}},5270:(e,t,r)=>{"use strict";r.d(t,{Aw:()=>a,SR:()=>s,rF:()=>o});var n=r(384),i=r(7767);function s(e){return!!(0,n.dV)().o.MO&&(0,i.V)(e)&&!0===e?.session_trace.enabled}function a(e){return!0===e?.session_replay.preload&&s(e)}function o(e,t){try{if("string"==typeof t?.type){if("password"===t.type.toLowerCase())return"*".repeat(e?.length||0);if(void 0!==t?.dataset?.nrUnmask||t?.classList?.contains("nr-unmask"))return e}}catch(e){}return"string"==typeof e?e.replace(/[\S]/g,"*"):"*".repeat(e?.length||0)}},5289:(e,t,r)=>{"use strict";r.d(t,{GG:()=>a,Qr:()=>c,sB:()=>o});var n=r(3878),i=r(6389);function s(){return"undefined"==typeof document||"complete"===document.readyState}function a(e,t){if(s())return e();const r=(0,i.J)(e),a=setInterval(()=>{s()&&(clearInterval(a),r())},500);(0,n.sp)("load",r,t)}function o(e){if(s())return e();(0,n.DD)("DOMContentLoaded",e)}function c(e){if(s())return e();(0,n.sp)("popstate",e)}},5607:(e,t,r)=>{"use strict";r.d(t,{W:()=>n});const n=(0,r(9566).bz)()},5701:(e,t,r)=>{"use strict";r.d(t,{B:()=>s,t:()=>a});var n=r(3241);const i=new Set,s={};function a(e,t){const r=t.agentIdentifier;s[r]??={},e&&"object"==typeof e&&(i.has(r)||(t.ee.emit("rumresp",[e]),s[r]=e,i.add(r),(0,n.W)({agentIdentifier:r,loaded:!0,drained:!0,type:"lifecycle",name:"load",feature:void 0,data:e})))}},6154:(e,t,r)=>{"use strict";r.d(t,{OF:()=>d,RI:()=>i,WN:()=>h,bv:()=>s,eN:()=>f,gm:()=>a,lR:()=>l,m:()=>c,mw:()=>o,sb:()=>u});var n=r(1863);const i="undefined"!=typeof window&&!!window.document,s="undefined"!=typeof WorkerGlobalScope&&("undefined"!=typeof self&&self instanceof WorkerGlobalScope&&self.navigator instanceof WorkerNavigator||"undefined"!=typeof globalThis&&globalThis instanceof WorkerGlobalScope&&globalThis.navigator instanceof WorkerNavigator),a=i?window:"undefined"!=typeof WorkerGlobalScope&&("undefined"!=typeof self&&self instanceof WorkerGlobalScope&&self||"undefined"!=typeof globalThis&&globalThis instanceof WorkerGlobalScope&&globalThis),o=Boolean("hidden"===a?.document?.visibilityState),c=""+a?.location,d=/iPad|iPhone|iPod/.test(a.navigator?.userAgent),u=d&&"undefined"==typeof SharedWorker,l=(()=>{const e=a.navigator?.userAgent?.match(/Firefox[/\s](\d+\.\d+)/);return Array.isArray(e)&&e.length>=2?+e[1]:0})(),h=Date.now()-(0,n.t)(),f=()=>"undefined"!=typeof PerformanceNavigationTiming&&a?.performance?.getEntriesByType("navigation")?.[0]?.responseStart},6344:(e,t,r)=>{"use strict";r.d(t,{BB:()=>u,Qb:()=>l,TZ:()=>i,Ug:()=>a,Vh:()=>s,_s:()=>o,bc:()=>d,yP:()=>c});var n=r(2614);const i=r(860).K7.sessionReplay,s="errorDuringReplay",a=.12,o={DomContentLoaded:0,Load:1,FullSnapshot:2,IncrementalSnapshot:3,Meta:4,Custom:5},c={[n.g.ERROR]:15e3,[n.g.FULL]:3e5,[n.g.OFF]:0},d={RESET:{message:"Session was reset",sm:"Reset"},IMPORT:{message:"Recorder failed to import",sm:"Import"},TOO_MANY:{message:"429: Too Many Requests",sm:"Too-Many"},TOO_BIG:{message:"Payload was too large",sm:"Too-Big"},CROSS_TAB:{message:"Session Entity was set to OFF on another tab",sm:"Cross-Tab"},ENTITLEMENTS:{message:"Session Replay is not allowed and will not be started",sm:"Entitlement"}},u=5e3,l={API:"api",RESUME:"resume",SWITCH_TO_FULL:"switchToFull",INITIALIZE:"initialize",PRELOAD:"preload"}},6389:(e,t,r)=>{"use strict";function n(e,t=500,r={}){const n=r?.leading||!1;let i;return(...r)=>{n&&void 0===i&&(e.apply(this,r),i=setTimeout(()=>{i=clearTimeout(i)},t)),n||(clearTimeout(i),i=setTimeout(()=>{e.apply(this,r)},t))}}function i(e){let t=!1;return(...r)=>{t||(t=!0,e.apply(this,r))}}r.d(t,{J:()=>i,s:()=>n})},6630:(e,t,r)=>{"use strict";r.d(t,{T:()=>n});const n=r(860).K7.pageViewEvent},6774:(e,t,r)=>{"use strict";r.d(t,{T:()=>n});const n=r(860).K7.jserrors},7295:(e,t,r)=>{"use strict";r.d(t,{Xv:()=>a,gX:()=>i,iW:()=>s});var n=[];function i(e){if(!e||s(e))return!1;if(0===n.length)return!0;if("*"===n[0].hostname)return!1;for(var t=0;t<n.length;t++){var r=n[t];if(r.hostname.test(e.hostname)&&r.pathname.test(e.pathname))return!1}return!0}function s(e){return void 0===e.hostname}function a(e){if(n=[],e&&e.length)for(var t=0;t<e.length;t++){let r=e[t];if(!r)continue;if("*"===r)return void(n=[{hostname:"*"}]);0===r.indexOf("http://")?r=r.substring(7):0===r.indexOf("https://")&&(r=r.substring(8));const i=r.indexOf("/");let s,a;i>0?(s=r.substring(0,i),a=r.substring(i)):(s=r,a="*");let[c]=s.split(":");n.push({hostname:o(c),pathname:o(a,!0)})}}function o(e,t=!1){const r=e.replace(/[.+?^${}()|[\]\\]/g,e=>"\\"+e).replace(/\*/g,".*?");return new RegExp((t?"^":"")+r+"$")}},7485:(e,t,r)=>{"use strict";r.d(t,{D:()=>i});var n=r(6154);function i(e){if(0===(e||"").indexOf("data:"))return{protocol:"data"};try{const t=new URL(e,location.href),r={port:t.port,hostname:t.hostname,pathname:t.pathname,search:t.search,protocol:t.protocol.slice(0,t.protocol.indexOf(":")),sameOrigin:t.protocol===n.gm?.location?.protocol&&t.host===n.gm?.location?.host};return r.port&&""!==r.port||("http:"===t.protocol&&(r.port="80"),"https:"===t.protocol&&(r.port="443")),r.pathname&&""!==r.pathname?r.pathname.startsWith("/")||(r.pathname="/".concat(r.pathname)):r.pathname="/",r}catch(e){return{}}}},7699:(e,t,r)=>{"use strict";r.d(t,{It:()=>s,KC:()=>o,No:()=>i,qh:()=>a});var n=r(860);const i=16e3,s=1e6,a="SESSION_ERROR",o={[n.K7.logging]:!0,[n.K7.genericEvents]:!1,[n.K7.jserrors]:!1,[n.K7.ajax]:!1}},7767:(e,t,r)=>{"use strict";r.d(t,{V:()=>i});var n=r(6154);const i=e=>n.RI&&!0===e?.privacy.cookies_enabled},7836:(e,t,r)=>{"use strict";r.d(t,{P:()=>o,ee:()=>c});var n=r(384),i=r(8990),s=r(2646),a=r(5607);const o="nr@context:".concat(a.W),c=function e(t,r){var n={},a={},u={},l=!1;try{l=16===r.length&&d.initializedAgents?.[r]?.runtime.isolatedBacklog}catch(e){}var h={on:p,addEventListener:p,removeEventListener:function(e,t){var r=n[e];if(!r)return;for(var i=0;i<r.length;i++)r[i]===t&&r.splice(i,1)},emit:function(e,r,n,i,s){!1!==s&&(s=!0);if(c.aborted&&!i)return;t&&s&&t.emit(e,r,n);var o=f(n);g(e).forEach(e=>{e.apply(o,r)});var d=v()[a[e]];d&&d.push([h,e,r,o]);return o},get:m,listeners:g,context:f,buffer:function(e,t){const r=v();if(t=t||"feature",h.aborted)return;Object.entries(e||{}).forEach(([e,n])=>{a[n]=t,t in r||(r[t]=[])})},abort:function(){h._aborted=!0,Object.keys(h.backlog).forEach(e=>{delete h.backlog[e]})},isBuffering:function(e){return!!v()[a[e]]},debugId:r,backlog:l?{}:t&&"object"==typeof t.backlog?t.backlog:{},isolatedBacklog:l};return Object.defineProperty(h,"aborted",{get:()=>{let e=h._aborted||!1;return e||(t&&(e=t.aborted),e)}}),h;function f(e){return e&&e instanceof s.y?e:e?(0,i.I)(e,o,()=>new s.y(o)):new s.y(o)}function p(e,t){n[e]=g(e).concat(t)}function g(e){return n[e]||[]}function m(t){return u[t]=u[t]||e(h,t)}function v(){return h.backlog}}(void 0,"globalEE"),d=(0,n.Zm)();d.ee||(d.ee=c)},8122:(e,t,r)=>{"use strict";r.d(t,{a:()=>i});var n=r(944);function i(e,t){try{if(!e||"object"!=typeof e)return(0,n.R)(3);if(!t||"object"!=typeof t)return(0,n.R)(4);const r=Object.create(Object.getPrototypeOf(t),Object.getOwnPropertyDescriptors(t)),s=0===Object.keys(r).length?e:r;for(let a in s)if(void 0!==e[a])try{if(null===e[a]){r[a]=null;continue}Array.isArray(e[a])&&Array.isArray(t[a])?r[a]=Array.from(new Set([...e[a],...t[a]])):"object"==typeof e[a]&&"object"==typeof t[a]?r[a]=i(e[a],t[a]):r[a]=e[a]}catch(e){r[a]||(0,n.R)(1,e)}return r}catch(e){(0,n.R)(2,e)}}},8139:(e,t,r)=>{"use strict";r.d(t,{u:()=>h});var n=r(7836),i=r(3434),s=r(8990),a=r(6154);const o={},c=a.gm.XMLHttpRequest,d="addEventListener",u="removeEventListener",l="nr@wrapped:".concat(n.P);function h(e){var t=function(e){return(e||n.ee).get("events")}(e);if(o[t.debugId]++)return t;o[t.debugId]=1;var r=(0,i.YM)(t,!0);function h(e){r.inPlace(e,[d,u],"-",p)}function p(e,t){return e[1]}return"getPrototypeOf"in Object&&(a.RI&&f(document,h),c&&f(c.prototype,h),f(a.gm,h)),t.on(d+"-start",function(e,t){var n=e[1];if(null!==n&&("function"==typeof n||"object"==typeof n)&&"newrelic"!==e[0]){var i=(0,s.I)(n,l,function(){var e={object:function(){if("function"!=typeof n.handleEvent)return;return n.handleEvent.apply(n,arguments)},function:n}[typeof n];return e?r(e,"fn-",null,e.name||"anonymous"):n});this.wrapped=e[1]=i}}),t.on(u+"-start",function(e){e[1]=this.wrapped||e[1]}),t}function f(e,t,...r){let n=e;for(;"object"==typeof n&&!Object.prototype.hasOwnProperty.call(n,d);)n=Object.getPrototypeOf(n);n&&t(n,...r)}},8362:(e,t,r)=>{"use strict";r.d(t,{d:()=>s});var n=r(9566),i=r(1741);class s extends i.W{agentIdentifier=(0,n.LA)(16)}},8374:(e,t,r)=>{r.nc=(()=>{try{return document?.currentScript?.nonce}catch(e){}return""})()},8990:(e,t,r)=>{"use strict";r.d(t,{I:()=>i});var n=Object.prototype.hasOwnProperty;function i(e,t,r){if(n.call(e,t))return e[t];var i=r();if(Object.defineProperty&&Object.keys)try{return Object.defineProperty(e,t,{value:i,writable:!0,enumerable:!1}),i}catch(e){}return e[t]=i,i}},9119:(e,t,r)=>{"use strict";r.d(t,{L:()=>s});var n=/([^?#]*)[^#]*(#[^?]*|$).*/,i=/([^?#]*)().*/;function s(e,t){return e?e.replace(t?n:i,"$1$2"):e}},9300:(e,t,r)=>{"use strict";r.d(t,{T:()=>n});const n=r(860).K7.ajax},9324:(e,t,r)=>{"use strict";r.d(t,{AJ:()=>a,F3:()=>i,Xs:()=>s,Yq:()=>o,xv:()=>n});const n="1.308.0",i="PROD",s="CDN",a="@newrelic/rrweb",o="1.0.1"},9566:(e,t,r)=>{"use strict";r.d(t,{LA:()=>o,ZF:()=>c,bz:()=>a,el:()=>d});var n=r(6154);const i="xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx";function s(e,t){return e?15&e[t]:16*Math.random()|0}function a(){const e=n.gm?.crypto||n.gm?.msCrypto;let t,r=0;return e&&e.getRandomValues&&(t=e.getRandomValues(new Uint8Array(30))),i.split("").map(e=>"x"===e?s(t,r++).toString(16):"y"===e?(3&s()|8).toString(16):e).join("")}function o(e){const t=n.gm?.crypto||n.gm?.msCrypto;let r,i=0;t&&t.getRandomValues&&(r=t.getRandomValues(new Uint8Array(e)));const a=[];for(var o=0;o<e;o++)a.push(s(r,i++).toString(16));return a.join("")}function c(){return o(16)}function d(){return o(32)}},9908:(e,t,r)=>{"use strict";r.d(t,{d:()=>n,p:()=>i});var n=r(7836).ee.get("handle");function i(e,t,r,i,s){s?(s.buffer([e],i),s.emit(e,t,r)):(n.buffer([e],i),n.emit(e,t,r))}}},n={};function i(e){var t=n[e];if(void 0!==t)return t.exports;var s=n[e]={exports:{}};return r[e](s,s.exports,i),s.exports}i.m=r,i.d=(e,t)=>{for(var r in t)i.o(t,r)&&!i.o(e,r)&&Object.defineProperty(e,r,{enumerable:!0,get:t[r]})},i.f={},i.e=e=>Promise.all(Object.keys(i.f).reduce((t,r)=>(i.f[r](e,t),t),[])),i.u=e=>({212:"nr-spa-compressor",249:"nr-spa-recorder",478:"nr-spa"}[e]+"-1.308.0.min.js"),i.o=(e,t)=>Object.prototype.hasOwnProperty.call(e,t),e={},t="NRBA-1.308.0.PROD:",i.l=(r,n,s,a)=>{if(e[r])e[r].push(n);else{var o,c;if(void 0!==s)for(var d=document.getElementsByTagName("script"),u=0;u<d.length;u++){var l=d[u];if(l.getAttribute("src")==r||l.getAttribute("data-webpack")==t+s){o=l;break}}if(!o){c=!0;var h={478:"sha512-RSfSVnmHk59T/uIPbdSE0LPeqcEdF4/+XhfJdBuccH5rYMOEZDhFdtnh6X6nJk7hGpzHd9Ujhsy7lZEz/ORYCQ==",249:"sha512-ehJXhmntm85NSqW4MkhfQqmeKFulra3klDyY0OPDUE+sQ3GokHlPh1pmAzuNy//3j4ac6lzIbmXLvGQBMYmrkg==",212:"sha512-B9h4CR46ndKRgMBcK+j67uSR2RCnJfGefU+A7FrgR/k42ovXy5x/MAVFiSvFxuVeEk/pNLgvYGMp1cBSK/G6Fg=="};(o=document.createElement("script")).charset="utf-8",i.nc&&o.setAttribute("nonce",i.nc),o.setAttribute("data-webpack",t+s),o.src=r,0!==o.src.indexOf(window.location.origin+"/")&&(o.crossOrigin="anonymous"),h[a]&&(o.integrity=h[a])}e[r]=[n];var f=(t,n)=>{o.onerror=o.onload=null,clearTimeout(p);var i=e[r];if(delete e[r],o.parentNode&&o.parentNode.removeChild(o),i&&i.forEach(e=>e(n)),t)return t(n)},p=setTimeout(f.bind(null,void 0,{type:"timeout",target:o}),12e4);o.onerror=f.bind(null,o.onerror),o.onload=f.bind(null,o.onload),c&&document.head.appendChild(o)}},i.r=e=>{"undefined"!=typeof Symbol&&Symbol.toStringTag&&Object.defineProperty(e,Symbol.toStringTag,{value:"Module"}),Object.defineProperty(e,"__esModule",{value:!0})},i.p="https://js-agent.newrelic.com/",(()=>{var e={38:0,788:0};i.f.j=(t,r)=>{var n=i.o(e,t)?e[t]:void 0;if(0!==n)if(n)r.push(n[2]);else{var s=new Promise((r,i)=>n=e[t]=[r,i]);r.push(n[2]=s);var a=i.p+i.u(t),o=new Error;i.l(a,r=>{if(i.o(e,t)&&(0!==(n=e[t])&&(e[t]=void 0),n)){var s=r&&("load"===r.type?"missing":r.type),a=r&&r.target&&r.target.src;o.message="Loading chunk "+t+" failed: ("+s+": "+a+")",o.name="ChunkLoadError",o.type=s,o.request=a,n[1](o)}},"chunk-"+t,t)}};var t=(t,r)=>{var n,s,[a,o,c]=r,d=0;if(a.some(t=>0!==e[t])){for(n in o)i.o(o,n)&&(i.m[n]=o[n]);if(c)c(i)}for(t&&t(r);d<a.length;d++)s=a[d],i.o(e,s)&&e[s]&&e[s][0](),e[s]=0},r=self["webpackChunk:NRBA-1.308.0.PROD"]=self["webpackChunk:NRBA-1.308.0.PROD"]||[];r.forEach(t.bind(null,0)),r.push=t.bind(null,r.push.bind(r))})(),(()=>{"use strict";i(8374);var e=i(8362),t=i(860);const r=Object.values(t.K7);var n=i(5205);var s=i(9908),a=i(1863),o=i(4261),c=i(1738);var d=i(1687),u=i(4234),l=i(5289),h=i(6154),f=i(944),p=i(5270),g=i(7767),m=i(6389),v=i(7699);class b extends u.W{constructor(e,t){super(e.agentIdentifier,t),this.agentRef=e,this.abortHandler=void 0,this.featAggregate=void 0,this.loadedSuccessfully=void 0,this.onAggregateImported=new Promise(e=>{this.loadedSuccessfully=e}),this.deferred=Promise.resolve(),!1===e.init[this.featureName].autoStart?this.deferred=new Promise((t,r)=>{this.ee.on("manual-start-all",(0,m.J)(()=>{(0,d.Ak)(e.agentIdentifier,this.featureName),t()}))}):(0,d.Ak)(e.agentIdentifier,t)}importAggregator(e,t,r={}){if(this.featAggregate)return;const n=async()=>{let n;await this.deferred;try{if((0,g.V)(e.init)){const{setupAgentSession:t}=await i.e(478).then(i.bind(i,8766));n=t(e)}}catch(e){(0,f.R)(20,e),this.ee.emit("internal-error",[e]),(0,s.p)(v.qh,[e],void 0,this.featureName,this.ee)}try{if(!this.#t(this.featureName,n,e.init))return(0,d.Ze)(this.agentIdentifier,this.featureName),void this.loadedSuccessfully(!1);const{Aggregate:i}=await t();this.featAggregate=new i(e,r),e.runtime.harvester.initializedAggregates.push(this.featAggregate),this.loadedSuccessfully(!0)}catch(e){(0,f.R)(34,e),this.abortHandler?.(),(0,d.Ze)(this.agentIdentifier,this.featureName,!0),this.loadedSuccessfully(!1),this.ee&&this.ee.abort()}};h.RI?(0,l.GG)(()=>n(),!0):n()}#t(e,r,n){if(this.blocked)return!1;switch(e){case t.K7.sessionReplay:return(0,p.SR)(n)&&!!r;case t.K7.sessionTrace:return!!r;default:return!0}}}var y=i(6630),w=i(2614),R=i(3241);class x extends b{static featureName=y.T;constructor(e){var t;super(e,y.T),this.setupInspectionEvents(e.agentIdentifier),t=e,(0,c.Y)(o.Fw,function(e,r){"string"==typeof e&&("/"!==e.charAt(0)&&(e="/"+e),t.runtime.customTransaction=(r||"http://custom.transaction")+e,(0,s.p)(o.Pl+o.Fw,[(0,a.t)()],void 0,void 0,t.ee))},t),this.importAggregator(e,()=>i.e(478).then(i.bind(i,2467)))}setupInspectionEvents(e){const t=(t,r)=>{t&&(0,R.W)({agentIdentifier:e,timeStamp:t.timeStamp,loaded:"complete"===t.target.readyState,type:"window",name:r,data:t.target.location+""})};(0,l.sB)(e=>{t(e,"DOMContentLoaded")}),(0,l.GG)(e=>{t(e,"load")}),(0,l.Qr)(e=>{t(e,"navigate")}),this.ee.on(w.tS.UPDATE,(t,r)=>{(0,R.W)({agentIdentifier:e,type:"lifecycle",name:"session",data:r})})}}var T=i(384);class E extends e.d{constructor(e){var t;(super(),h.gm)?(this.features={},(0,T.bQ)(this.agentIdentifier,this),this.desiredFeatures=new Set(e.features||[]),this.desiredFeatures.add(x),(0,n.j)(this,e,e.loaderType||"agent"),t=this,(0,c.Y)(o.cD,function(e,r,n=!1){if("string"==typeof e){if(["string","number","boolean"].includes(typeof r)||null===r)return(0,c.U)(t,e,r,o.cD,n);(0,f.R)(40,typeof r)}else(0,f.R)(39,typeof e)},t),function(e){(0,c.Y)(o.Dl,function(t,r=!1){if("string"!=typeof t&&null!==t)return void(0,f.R)(41,typeof t);const n=e.info.jsAttributes["enduser.id"];r&&null!=n&&n!==t?(0,s.p)(o.Pl+"setUserIdAndResetSession",[t],void 0,"session",e.ee):(0,c.U)(e,"enduser.id",t,o.Dl,!0)},e)}(this),function(e){(0,c.Y)(o.nb,function(t){if("string"==typeof t||null===t)return(0,c.U)(e,"application.version",t,o.nb,!1);(0,f.R)(42,typeof t)},e)}(this),function(e){(0,c.Y)(o.d3,function(){e.ee.emit("manual-start-all")},e)}(this),function(e){(0,c.Y)(o.Pv,function(t=!0){if("boolean"==typeof t){if((0,s.p)(o.Pl+o.Pv,[t],void 0,"session",e.ee),e.runtime.consented=t,t){const t=e.features.page_view_event;t.onAggregateImported.then(e=>{const r=t.featAggregate;e&&!r.sentRum&&r.sendRum()})}}else(0,f.R)(65,typeof t)},e)}(this),this.run()):(0,f.R)(21)}get config(){return{info:this.info,init:this.init,loader_config:this.loader_config,runtime:this.runtime}}get api(){return this}run(){try{const e=function(e){const t={};return r.forEach(r=>{t[r]=!!e[r]?.enabled}),t}(this.init),n=[...this.desiredFeatures];n.sort((e,r)=>t.P3[e.featureName]-t.P3[r.featureName]),n.forEach(r=>{if(!e[r.featureName]&&r.featureName!==t.K7.pageViewEvent)return;if(r.featureName===t.K7.spa)return void(0,f.R)(67);const n=function(e){switch(e){case t.K7.ajax:return[t.K7.jserrors];case t.K7.sessionTrace:return[t.K7.ajax,t.K7.pageViewEvent];case t.K7.sessionReplay:return[t.K7.sessionTrace];case t.K7.pageViewTiming:return[t.K7.pageViewEvent];default:return[]}}(r.featureName).filter(e=>!(e in this.features));n.length>0&&(0,f.R)(36,{targetFeature:r.featureName,missingDependencies:n}),this.features[r.featureName]=new r(this)})}catch(e){(0,f.R)(22,e);for(const e in this.features)this.features[e].abortHandler?.();const t=(0,T.Zm)();delete t.initializedAgents[this.agentIdentifier]?.features,delete this.sharedAggregator;return t.ee.get(this.agentIdentifier).abort(),!1}}}var A=i(2843),_=i(782);class S extends b{static featureName=_.T;constructor(e){super(e,_.T),h.RI&&((0,A.u)(()=>(0,s.p)("docHidden",[(0,a.t)()],void 0,_.T,this.ee),!0),(0,A.G)(()=>(0,s.p)("winPagehide",[(0,a.t)()],void 0,_.T,this.ee)),this.importAggregator(e,()=>i.e(478).then(i.bind(i,9917))))}}var O=i(3969);class I extends b{static featureName=O.TZ;constructor(e){super(e,O.TZ),h.RI&&document.addEventListener("securitypolicyviolation",e=>{(0,s.p)(O.xV,["Generic/CSPViolation/Detected"],void 0,this.featureName,this.ee)}),this.importAggregator(e,()=>i.e(478).then(i.bind(i,6555)))}}var N=i(6774),P=i(3878),k=i(3304);class D{constructor(e,t,r,n,i){this.name="UncaughtError",this.message="string"==typeof e?e:(0,k.A)(e),this.sourceURL=t,this.line=r,this.column=n,this.__newrelic=i}}function C(e){return M(e)?e:new D(void 0!==e?.message?e.message:e,e?.filename||e?.sourceURL,e?.lineno||e?.line,e?.colno||e?.col,e?.__newrelic,e?.cause)}function j(e){const t="Unhandled Promise Rejection: ";if(!e?.reason)return;if(M(e.reason)){try{e.reason.message.startsWith(t)||(e.reason.message=t+e.reason.message)}catch(e){}return C(e.reason)}const r=C(e.reason);return(r.message||"").startsWith(t)||(r.message=t+r.message),r}function L(e){if(e.error instanceof SyntaxError&&!/:\d+$/.test(e.error.stack?.trim())){const t=new D(e.message,e.filename,e.lineno,e.colno,e.error.__newrelic,e.cause);return t.name=SyntaxError.name,t}return M(e.error)?e.error:C(e)}function M(e){return e instanceof Error&&!!e.stack}function H(e,r,n,i,o=(0,a.t)()){"string"==typeof e&&(e=new Error(e)),(0,s.p)("err",[e,o,!1,r,n.runtime.isRecording,void 0,i],void 0,t.K7.jserrors,n.ee),(0,s.p)("uaErr",[],void 0,t.K7.genericEvents,n.ee)}var B=i(1541),K=i(993),W=i(3785);function U(e,{customAttributes:t={},level:r=K.p_.INFO}={},n,i,s=(0,a.t)()){(0,W.R)(n.ee,e,t,r,!1,i,s)}function F(e,r,n,i,c=(0,a.t)()){(0,s.p)(o.Pl+o.hG,[c,e,r,i],void 0,t.K7.genericEvents,n.ee)}function V(e,r,n,i,c=(0,a.t)()){const{start:d,end:u,customAttributes:l}=r||{},h={customAttributes:l||{}};if("object"!=typeof h.customAttributes||"string"!=typeof e||0===e.length)return void(0,f.R)(57);const p=(e,t)=>null==e?t:"number"==typeof e?e:e instanceof PerformanceMark?e.startTime:Number.NaN;if(h.start=p(d,0),h.end=p(u,c),Number.isNaN(h.start)||Number.isNaN(h.end))(0,f.R)(57);else{if(h.duration=h.end-h.start,!(h.duration<0))return(0,s.p)(o.Pl+o.V1,[h,e,i],void 0,t.K7.genericEvents,n.ee),h;(0,f.R)(58)}}function G(e,r={},n,i,c=(0,a.t)()){(0,s.p)(o.Pl+o.fF,[c,e,r,i],void 0,t.K7.genericEvents,n.ee)}function z(e){(0,c.Y)(o.eY,function(t){return Y(e,t)},e)}function Y(e,r,n){(0,f.R)(54,"newrelic.register"),r||={},r.type=B.f.MFE,r.licenseKey||=e.info.licenseKey,r.blocked=!1,r.parent=n||{},Array.isArray(r.tags)||(r.tags=[]);const i={};r.tags.forEach(e=>{"name"!==e&&"id"!==e&&(i["source.".concat(e)]=!0)}),r.isolated??=!0;let o=()=>{};const c=e.runtime.registeredEntities;if(!r.isolated){const e=c.find(({metadata:{target:{id:e}}})=>e===r.id&&!r.isolated);if(e)return e}const d=e=>{r.blocked=!0,o=e};function u(e){return"string"==typeof e&&!!e.trim()&&e.trim().length<501||"number"==typeof e}e.init.api.allow_registered_children||d((0,m.J)(()=>(0,f.R)(55))),u(r.id)&&u(r.name)||d((0,m.J)(()=>(0,f.R)(48,r)));const l={addPageAction:(t,n={})=>g(F,[t,{...i,...n},e],r),deregister:()=>{d((0,m.J)(()=>(0,f.R)(68)))},log:(t,n={})=>g(U,[t,{...n,customAttributes:{...i,...n.customAttributes||{}}},e],r),measure:(t,n={})=>g(V,[t,{...n,customAttributes:{...i,...n.customAttributes||{}}},e],r),noticeError:(t,n={})=>g(H,[t,{...i,...n},e],r),register:(t={})=>g(Y,[e,t],l.metadata.target),recordCustomEvent:(t,n={})=>g(G,[t,{...i,...n},e],r),setApplicationVersion:e=>p("application.version",e),setCustomAttribute:(e,t)=>p(e,t),setUserId:e=>p("enduser.id",e),metadata:{customAttributes:i,target:r}},h=()=>(r.blocked&&o(),r.blocked);h()||c.push(l);const p=(e,t)=>{h()||(i[e]=t)},g=(r,n,i)=>{if(h())return;const o=(0,a.t)();(0,s.p)(O.xV,["API/register/".concat(r.name,"/called")],void 0,t.K7.metrics,e.ee);try{if(e.init.api.duplicate_registered_data&&"register"!==r.name){let e=n;if(n[1]instanceof Object){const t={"child.id":i.id,"child.type":i.type};e="customAttributes"in n[1]?[n[0],{...n[1],customAttributes:{...n[1].customAttributes,...t}},...n.slice(2)]:[n[0],{...n[1],...t},...n.slice(2)]}r(...e,void 0,o)}return r(...n,i,o)}catch(e){(0,f.R)(50,e)}};return l}class Z extends b{static featureName=N.T;constructor(e){var t;super(e,N.T),t=e,(0,c.Y)(o.o5,(e,r)=>H(e,r,t),t),function(e){(0,c.Y)(o.bt,function(t){e.runtime.onerror=t},e)}(e),function(e){let t=0;(0,c.Y)(o.k6,function(e,r){++t>10||(this.runtime.releaseIds[e.slice(-200)]=(""+r).slice(-200))},e)}(e),z(e);try{this.removeOnAbort=new AbortController}catch(e){}this.ee.on("internal-error",(t,r)=>{this.abortHandler&&(0,s.p)("ierr",[C(t),(0,a.t)(),!0,{},e.runtime.isRecording,r],void 0,this.featureName,this.ee)}),h.gm.addEventListener("unhandledrejection",t=>{this.abortHandler&&(0,s.p)("err",[j(t),(0,a.t)(),!1,{unhandledPromiseRejection:1},e.runtime.isRecording],void 0,this.featureName,this.ee)},(0,P.jT)(!1,this.removeOnAbort?.signal)),h.gm.addEventListener("error",t=>{this.abortHandler&&(0,s.p)("err",[L(t),(0,a.t)(),!1,{},e.runtime.isRecording],void 0,this.featureName,this.ee)},(0,P.jT)(!1,this.removeOnAbort?.signal)),this.abortHandler=this.#r,this.importAggregator(e,()=>i.e(478).then(i.bind(i,2176)))}#r(){this.removeOnAbort?.abort(),this.abortHandler=void 0}}var q=i(8990);let X=1;function J(e){const t=typeof e;return!e||"object"!==t&&"function"!==t?-1:e===h.gm?0:(0,q.I)(e,"nr@id",function(){return X++})}function Q(e){if("string"==typeof e&&e.length)return e.length;if("object"==typeof e){if("undefined"!=typeof ArrayBuffer&&e instanceof ArrayBuffer&&e.byteLength)return e.byteLength;if("undefined"!=typeof Blob&&e instanceof Blob&&e.size)return e.size;if(!("undefined"!=typeof FormData&&e instanceof FormData))try{return(0,k.A)(e).length}catch(e){return}}}var ee=i(8139),te=i(7836),re=i(3434);const ne={},ie=["open","send"];function se(e){var t=e||te.ee;const r=function(e){return(e||te.ee).get("xhr")}(t);if(void 0===h.gm.XMLHttpRequest)return r;if(ne[r.debugId]++)return r;ne[r.debugId]=1,(0,ee.u)(t);var n=(0,re.YM)(r),i=h.gm.XMLHttpRequest,s=h.gm.MutationObserver,a=h.gm.Promise,o=h.gm.setInterval,c="readystatechange",d=["onload","onerror","onabort","onloadstart","onloadend","onprogress","ontimeout"],u=[],l=h.gm.XMLHttpRequest=function(e){const t=new i(e),s=r.context(t);try{r.emit("new-xhr",[t],s),t.addEventListener(c,(a=s,function(){var e=this;e.readyState>3&&!a.resolved&&(a.resolved=!0,r.emit("xhr-resolved",[],e)),n.inPlace(e,d,"fn-",y)}),(0,P.jT)(!1))}catch(e){(0,f.R)(15,e);try{r.emit("internal-error",[e])}catch(e){}}var a;return t};function p(e,t){n.inPlace(t,["onreadystatechange"],"fn-",y)}if(function(e,t){for(var r in e)t[r]=e[r]}(i,l),l.prototype=i.prototype,n.inPlace(l.prototype,ie,"-xhr-",y),r.on("send-xhr-start",function(e,t){p(e,t),function(e){u.push(e),s&&(g?g.then(b):o?o(b):(m=-m,v.data=m))}(t)}),r.on("open-xhr-start",p),s){var g=a&&a.resolve();if(!o&&!a){var m=1,v=document.createTextNode(m);new s(b).observe(v,{characterData:!0})}}else t.on("fn-end",function(e){e[0]&&e[0].type===c||b()});function b(){for(var e=0;e<u.length;e++)p(0,u[e]);u.length&&(u=[])}function y(e,t){return t}return r}var ae="fetch-",oe=ae+"body-",ce=["arrayBuffer","blob","json","text","formData"],de=h.gm.Request,ue=h.gm.Response,le="prototype";const he={};function fe(e){const t=function(e){return(e||te.ee).get("fetch")}(e);if(!(de&&ue&&h.gm.fetch))return t;if(he[t.debugId]++)return t;function r(e,r,n){var i=e[r];"function"==typeof i&&(e[r]=function(){var e,r=[...arguments],s={};t.emit(n+"before-start",[r],s),s[te.P]&&s[te.P].dt&&(e=s[te.P].dt);var a=i.apply(this,r);return t.emit(n+"start",[r,e],a),a.then(function(e){return t.emit(n+"end",[null,e],a),e},function(e){throw t.emit(n+"end",[e],a),e})})}return he[t.debugId]=1,ce.forEach(e=>{r(de[le],e,oe),r(ue[le],e,oe)}),r(h.gm,"fetch",ae),t.on(ae+"end",function(e,r){var n=this;if(r){var i=r.headers.get("content-length");null!==i&&(n.rxSize=i),t.emit(ae+"done",[null,r],n)}else t.emit(ae+"done",[e],n)}),t}var pe=i(7485),ge=i(9566);class me{constructor(e){this.agentRef=e}generateTracePayload(e){const t=this.agentRef.loader_config;if(!this.shouldGenerateTrace(e)||!t)return null;var r=(t.accountID||"").toString()||null,n=(t.agentID||"").toString()||null,i=(t.trustKey||"").toString()||null;if(!r||!n)return null;var s=(0,ge.ZF)(),a=(0,ge.el)(),o=Date.now(),c={spanId:s,traceId:a,timestamp:o};return(e.sameOrigin||this.isAllowedOrigin(e)&&this.useTraceContextHeadersForCors())&&(c.traceContextParentHeader=this.generateTraceContextParentHeader(s,a),c.traceContextStateHeader=this.generateTraceContextStateHeader(s,o,r,n,i)),(e.sameOrigin&&!this.excludeNewrelicHeader()||!e.sameOrigin&&this.isAllowedOrigin(e)&&this.useNewrelicHeaderForCors())&&(c.newrelicHeader=this.generateTraceHeader(s,a,o,r,n,i)),c}generateTraceContextParentHeader(e,t){return"00-"+t+"-"+e+"-01"}generateTraceContextStateHeader(e,t,r,n,i){return i+"@nr=0-1-"+r+"-"+n+"-"+e+"----"+t}generateTraceHeader(e,t,r,n,i,s){if(!("function"==typeof h.gm?.btoa))return null;var a={v:[0,1],d:{ty:"Browser",ac:n,ap:i,id:e,tr:t,ti:r}};return s&&n!==s&&(a.d.tk=s),btoa((0,k.A)(a))}shouldGenerateTrace(e){return this.agentRef.init?.distributed_tracing?.enabled&&this.isAllowedOrigin(e)}isAllowedOrigin(e){var t=!1;const r=this.agentRef.init?.distributed_tracing;if(e.sameOrigin)t=!0;else if(r?.allowed_origins instanceof Array)for(var n=0;n<r.allowed_origins.length;n++){var i=(0,pe.D)(r.allowed_origins[n]);if(e.hostname===i.hostname&&e.protocol===i.protocol&&e.port===i.port){t=!0;break}}return t}excludeNewrelicHeader(){var e=this.agentRef.init?.distributed_tracing;return!!e&&!!e.exclude_newrelic_header}useNewrelicHeaderForCors(){var e=this.agentRef.init?.distributed_tracing;return!!e&&!1!==e.cors_use_newrelic_header}useTraceContextHeadersForCors(){var e=this.agentRef.init?.distributed_tracing;return!!e&&!!e.cors_use_tracecontext_headers}}var ve=i(9300),be=i(7295);function ye(e){return"string"==typeof e?e:e instanceof(0,T.dV)().o.REQ?e.url:h.gm?.URL&&e instanceof URL?e.href:void 0}var we=["load","error","abort","timeout"],Re=we.length,xe=(0,T.dV)().o.REQ,Te=(0,T.dV)().o.XHR;const Ee="X-NewRelic-App-Data";class Ae extends b{static featureName=ve.T;constructor(e){super(e,ve.T),this.dt=new me(e),this.handler=(e,t,r,n)=>(0,s.p)(e,t,r,n,this.ee);try{const e={xmlhttprequest:"xhr",fetch:"fetch",beacon:"beacon"};h.gm?.performance?.getEntriesByType("resource").forEach(r=>{if(r.initiatorType in e&&0!==r.responseStatus){const n={status:r.responseStatus},i={rxSize:r.transferSize,duration:Math.floor(r.duration),cbTime:0};_e(n,r.name),this.handler("xhr",[n,i,r.startTime,r.responseEnd,e[r.initiatorType]],void 0,t.K7.ajax)}})}catch(e){}fe(this.ee),se(this.ee),function(e,r,n,i){function o(e){var t=this;t.totalCbs=0,t.called=0,t.cbTime=0,t.end=T,t.ended=!1,t.xhrGuids={},t.lastSize=null,t.loadCaptureCalled=!1,t.params=this.params||{},t.metrics=this.metrics||{},t.latestLongtaskEnd=0,e.addEventListener("load",function(r){E(t,e)},(0,P.jT)(!1)),h.lR||e.addEventListener("progress",function(e){t.lastSize=e.loaded},(0,P.jT)(!1))}function c(e){this.params={method:e[0]},_e(this,e[1]),this.metrics={}}function d(t,r){e.loader_config.xpid&&this.sameOrigin&&r.setRequestHeader("X-NewRelic-ID",e.loader_config.xpid);var n=i.generateTracePayload(this.parsedOrigin);if(n){var s=!1;n.newrelicHeader&&(r.setRequestHeader("newrelic",n.newrelicHeader),s=!0),n.traceContextParentHeader&&(r.setRequestHeader("traceparent",n.traceContextParentHeader),n.traceContextStateHeader&&r.setRequestHeader("tracestate",n.traceContextStateHeader),s=!0),s&&(this.dt=n)}}function u(e,t){var n=this.metrics,i=e[0],s=this;if(n&&i){var o=Q(i);o&&(n.txSize=o)}this.startTime=(0,a.t)(),this.body=i,this.listener=function(e){try{"abort"!==e.type||s.loadCaptureCalled||(s.params.aborted=!0),("load"!==e.type||s.called===s.totalCbs&&(s.onloadCalled||"function"!=typeof t.onload)&&"function"==typeof s.end)&&s.end(t)}catch(e){try{r.emit("internal-error",[e])}catch(e){}}};for(var c=0;c<Re;c++)t.addEventListener(we[c],this.listener,(0,P.jT)(!1))}function l(e,t,r){this.cbTime+=e,t?this.onloadCalled=!0:this.called+=1,this.called!==this.totalCbs||!this.onloadCalled&&"function"==typeof r.onload||"function"!=typeof this.end||this.end(r)}function f(e,t){var r=""+J(e)+!!t;this.xhrGuids&&!this.xhrGuids[r]&&(this.xhrGuids[r]=!0,this.totalCbs+=1)}function p(e,t){var r=""+J(e)+!!t;this.xhrGuids&&this.xhrGuids[r]&&(delete this.xhrGuids[r],this.totalCbs-=1)}function g(){this.endTime=(0,a.t)()}function m(e,t){t instanceof Te&&"load"===e[0]&&r.emit("xhr-load-added",[e[1],e[2]],t)}function v(e,t){t instanceof Te&&"load"===e[0]&&r.emit("xhr-load-removed",[e[1],e[2]],t)}function b(e,t,r){t instanceof Te&&("onload"===r&&(this.onload=!0),("load"===(e[0]&&e[0].type)||this.onload)&&(this.xhrCbStart=(0,a.t)()))}function y(e,t){this.xhrCbStart&&r.emit("xhr-cb-time",[(0,a.t)()-this.xhrCbStart,this.onload,t],t)}function w(e){var t,r=e[1]||{};if("string"==typeof e[0]?0===(t=e[0]).length&&h.RI&&(t=""+h.gm.location.href):e[0]&&e[0].url?t=e[0].url:h.gm?.URL&&e[0]&&e[0]instanceof URL?t=e[0].href:"function"==typeof e[0].toString&&(t=e[0].toString()),"string"==typeof t&&0!==t.length){t&&(this.parsedOrigin=(0,pe.D)(t),this.sameOrigin=this.parsedOrigin.sameOrigin);var n=i.generateTracePayload(this.parsedOrigin);if(n&&(n.newrelicHeader||n.traceContextParentHeader))if(e[0]&&e[0].headers)o(e[0].headers,n)&&(this.dt=n);else{var s={};for(var a in r)s[a]=r[a];s.headers=new Headers(r.headers||{}),o(s.headers,n)&&(this.dt=n),e.length>1?e[1]=s:e.push(s)}}function o(e,t){var r=!1;return t.newrelicHeader&&(e.set("newrelic",t.newrelicHeader),r=!0),t.traceContextParentHeader&&(e.set("traceparent",t.traceContextParentHeader),t.traceContextStateHeader&&e.set("tracestate",t.traceContextStateHeader),r=!0),r}}function R(e,t){this.params={},this.metrics={},this.startTime=(0,a.t)(),this.dt=t,e.length>=1&&(this.target=e[0]),e.length>=2&&(this.opts=e[1]);var r=this.opts||{},n=this.target;_e(this,ye(n));var i=(""+(n&&n instanceof xe&&n.method||r.method||"GET")).toUpperCase();this.params.method=i,this.body=r.body,this.txSize=Q(r.body)||0}function x(e,r){if(this.endTime=(0,a.t)(),this.params||(this.params={}),(0,be.iW)(this.params))return;let i;this.params.status=r?r.status:0,"string"==typeof this.rxSize&&this.rxSize.length>0&&(i=+this.rxSize);const s={txSize:this.txSize,rxSize:i,duration:(0,a.t)()-this.startTime};n("xhr",[this.params,s,this.startTime,this.endTime,"fetch"],this,t.K7.ajax)}function T(e){const r=this.params,i=this.metrics;if(!this.ended){this.ended=!0;for(let t=0;t<Re;t++)e.removeEventListener(we[t],this.listener,!1);r.aborted||(0,be.iW)(r)||(i.duration=(0,a.t)()-this.startTime,this.loadCaptureCalled||4!==e.readyState?null==r.status&&(r.status=0):E(this,e),i.cbTime=this.cbTime,n("xhr",[r,i,this.startTime,this.endTime,"xhr"],this,t.K7.ajax))}}function E(e,n){e.params.status=n.status;var i=function(e,t){var r=e.responseType;return"json"===r&&null!==t?t:"arraybuffer"===r||"blob"===r||"json"===r?Q(e.response):"text"===r||""===r||void 0===r?Q(e.responseText):void 0}(n,e.lastSize);if(i&&(e.metrics.rxSize=i),e.sameOrigin&&n.getAllResponseHeaders().indexOf(Ee)>=0){var a=n.getResponseHeader(Ee);a&&((0,s.p)(O.rs,["Ajax/CrossApplicationTracing/Header/Seen"],void 0,t.K7.metrics,r),e.params.cat=a.split(", ").pop())}e.loadCaptureCalled=!0}r.on("new-xhr",o),r.on("open-xhr-start",c),r.on("open-xhr-end",d),r.on("send-xhr-start",u),r.on("xhr-cb-time",l),r.on("xhr-load-added",f),r.on("xhr-load-removed",p),r.on("xhr-resolved",g),r.on("addEventListener-end",m),r.on("removeEventListener-end",v),r.on("fn-end",y),r.on("fetch-before-start",w),r.on("fetch-start",R),r.on("fn-start",b),r.on("fetch-done",x)}(e,this.ee,this.handler,this.dt),this.importAggregator(e,()=>i.e(478).then(i.bind(i,3845)))}}function _e(e,t){var r=(0,pe.D)(t),n=e.params||e;n.hostname=r.hostname,n.port=r.port,n.protocol=r.protocol,n.host=r.hostname+":"+r.port,n.pathname=r.pathname,e.parsedOrigin=r,e.sameOrigin=r.sameOrigin}const Se={},Oe=["pushState","replaceState"];function Ie(e){const t=function(e){return(e||te.ee).get("history")}(e);return!h.RI||Se[t.debugId]++||(Se[t.debugId]=1,(0,re.YM)(t).inPlace(window.history,Oe,"-")),t}var Ne=i(3738);function Pe(e){(0,c.Y)(o.BL,function(r=Date.now()){const n=r-h.WN;n<0&&(0,f.R)(62,r),(0,s.p)(O.XG,[o.BL,{time:n}],void 0,t.K7.metrics,e.ee),e.addToTrace({name:o.BL,start:r,origin:"nr"}),(0,s.p)(o.Pl+o.hG,[n,o.BL],void 0,t.K7.genericEvents,e.ee)},e)}const{He:ke,bD:De,d3:Ce,Kp:je,TZ:Le,Lc:Me,uP:He,Rz:Be}=Ne;class Ke extends b{static featureName=Le;constructor(e){var r;super(e,Le),r=e,(0,c.Y)(o.U2,function(e){if(!(e&&"object"==typeof e&&e.name&&e.start))return;const n={n:e.name,s:e.start-h.WN,e:(e.end||e.start)-h.WN,o:e.origin||"",t:"api"};n.s<0||n.e<0||n.e<n.s?(0,f.R)(61,{start:n.s,end:n.e}):(0,s.p)("bstApi",[n],void 0,t.K7.sessionTrace,r.ee)},r),Pe(e);if(!(0,g.V)(e.init))return void this.deregisterDrain();const n=this.ee;let d;Ie(n),this.eventsEE=(0,ee.u)(n),this.eventsEE.on(He,function(e,t){this.bstStart=(0,a.t)()}),this.eventsEE.on(Me,function(e,r){(0,s.p)("bst",[e[0],r,this.bstStart,(0,a.t)()],void 0,t.K7.sessionTrace,n)}),n.on(Be+Ce,function(e){this.time=(0,a.t)(),this.startPath=location.pathname+location.hash}),n.on(Be+je,function(e){(0,s.p)("bstHist",[location.pathname+location.hash,this.startPath,this.time],void 0,t.K7.sessionTrace,n)});try{d=new PerformanceObserver(e=>{const r=e.getEntries();(0,s.p)(ke,[r],void 0,t.K7.sessionTrace,n)}),d.observe({type:De,buffered:!0})}catch(e){}this.importAggregator(e,()=>i.e(478).then(i.bind(i,6974)),{resourceObserver:d})}}var We=i(6344);class Ue extends b{static featureName=We.TZ;#n;recorder;constructor(e){var r;let n;super(e,We.TZ),r=e,(0,c.Y)(o.CH,function(){(0,s.p)(o.CH,[],void 0,t.K7.sessionReplay,r.ee)},r),function(e){(0,c.Y)(o.Tb,function(){(0,s.p)(o.Tb,[],void 0,t.K7.sessionReplay,e.ee)},e)}(e);try{n=JSON.parse(localStorage.getItem("".concat(w.H3,"_").concat(w.uh)))}catch(e){}(0,p.SR)(e.init)&&this.ee.on(o.CH,()=>this.#i()),this.#s(n)&&this.importRecorder().then(e=>{e.startRecording(We.Qb.PRELOAD,n?.sessionReplayMode)}),this.importAggregator(this.agentRef,()=>i.e(478).then(i.bind(i,6167)),this),this.ee.on("err",e=>{this.blocked||this.agentRef.runtime.isRecording&&(this.errorNoticed=!0,(0,s.p)(We.Vh,[e],void 0,this.featureName,this.ee))})}#s(e){return e&&(e.sessionReplayMode===w.g.FULL||e.sessionReplayMode===w.g.ERROR)||(0,p.Aw)(this.agentRef.init)}importRecorder(){return this.recorder?Promise.resolve(this.recorder):(this.#n??=Promise.all([i.e(478),i.e(249)]).then(i.bind(i,4866)).then(({Recorder:e})=>(this.recorder=new e(this),this.recorder)).catch(e=>{throw this.ee.emit("internal-error",[e]),this.blocked=!0,e}),this.#n)}#i(){this.blocked||(this.featAggregate?this.featAggregate.mode!==w.g.FULL&&this.featAggregate.initializeRecording(w.g.FULL,!0,We.Qb.API):this.importRecorder().then(()=>{this.recorder.startRecording(We.Qb.API,w.g.FULL)}))}}var Fe=i(3962);class Ve extends b{static featureName=Fe.TZ;constructor(e){if(super(e,Fe.TZ),function(e){const r=e.ee.get("tracer");function n(){}(0,c.Y)(o.dT,function(e){return(new n).get("object"==typeof e?e:{})},e);const i=n.prototype={createTracer:function(n,i){var o={},c=this,d="function"==typeof i;return(0,s.p)(O.xV,["API/createTracer/called"],void 0,t.K7.metrics,e.ee),function(){if(r.emit((d?"":"no-")+"fn-start",[(0,a.t)(),c,d],o),d)try{return i.apply(this,arguments)}catch(e){const t="string"==typeof e?new Error(e):e;throw r.emit("fn-err",[arguments,this,t],o),t}finally{r.emit("fn-end",[(0,a.t)()],o)}}}};["actionText","setName","setAttribute","save","ignore","onEnd","getContext","end","get"].forEach(r=>{c.Y.apply(this,[r,function(){return(0,s.p)(o.hw+r,[performance.now(),...arguments],this,t.K7.softNav,e.ee),this},e,i])}),(0,c.Y)(o.PA,function(){(0,s.p)(o.hw+"routeName",[performance.now(),...arguments],void 0,t.K7.softNav,e.ee)},e)}(e),!h.RI||!(0,T.dV)().o.MO)return;const r=Ie(this.ee);try{this.removeOnAbort=new AbortController}catch(e){}Fe.tC.forEach(e=>{(0,P.sp)(e,e=>{l(e)},!0,this.removeOnAbort?.signal)});const n=()=>(0,s.p)("newURL",[(0,a.t)(),""+window.location],void 0,this.featureName,this.ee);r.on("pushState-end",n),r.on("replaceState-end",n),(0,P.sp)(Fe.OV,e=>{l(e),(0,s.p)("newURL",[e.timeStamp,""+window.location],void 0,this.featureName,this.ee)},!0,this.removeOnAbort?.signal);let d=!1;const u=new((0,T.dV)().o.MO)((e,t)=>{d||(d=!0,requestAnimationFrame(()=>{(0,s.p)("newDom",[(0,a.t)()],void 0,this.featureName,this.ee),d=!1}))}),l=(0,m.s)(e=>{"loading"!==document.readyState&&((0,s.p)("newUIEvent",[e],void 0,this.featureName,this.ee),u.observe(document.body,{attributes:!0,childList:!0,subtree:!0,characterData:!0}))},100,{leading:!0});this.abortHandler=function(){this.removeOnAbort?.abort(),u.disconnect(),this.abortHandler=void 0},this.importAggregator(e,()=>i.e(478).then(i.bind(i,4393)),{domObserver:u})}}var Ge=i(3333),ze=i(9119);const Ye={},Ze=new Set;function qe(e){return"string"==typeof e?{type:"string",size:(new TextEncoder).encode(e).length}:e instanceof ArrayBuffer?{type:"ArrayBuffer",size:e.byteLength}:e instanceof Blob?{type:"Blob",size:e.size}:e instanceof DataView?{type:"DataView",size:e.byteLength}:ArrayBuffer.isView(e)?{type:"TypedArray",size:e.byteLength}:{type:"unknown",size:0}}class Xe{constructor(e,t){this.timestamp=(0,a.t)(),this.currentUrl=(0,ze.L)(window.location.href),this.socketId=(0,ge.LA)(8),this.requestedUrl=(0,ze.L)(e),this.requestedProtocols=Array.isArray(t)?t.join(","):t||"",this.openedAt=void 0,this.protocol=void 0,this.extensions=void 0,this.binaryType=void 0,this.messageOrigin=void 0,this.messageCount=0,this.messageBytes=0,this.messageBytesMin=0,this.messageBytesMax=0,this.messageTypes=void 0,this.sendCount=0,this.sendBytes=0,this.sendBytesMin=0,this.sendBytesMax=0,this.sendTypes=void 0,this.closedAt=void 0,this.closeCode=void 0,this.closeReason="unknown",this.closeWasClean=void 0,this.connectedDuration=0,this.hasErrors=void 0}}class $e extends b{static featureName=Ge.TZ;constructor(e){super(e,Ge.TZ);const r=e.init.feature_flags.includes("websockets"),n=[e.init.page_action.enabled,e.init.performance.capture_marks,e.init.performance.capture_measures,e.init.performance.resources.enabled,e.init.user_actions.enabled,r];var d;let u,l;if(d=e,(0,c.Y)(o.hG,(e,t)=>F(e,t,d),d),function(e){(0,c.Y)(o.fF,(t,r)=>G(t,r,e),e)}(e),Pe(e),z(e),function(e){(0,c.Y)(o.V1,(t,r)=>V(t,r,e),e)}(e),r&&(l=function(e){if(!(0,T.dV)().o.WS)return e;const t=e.get("websockets");if(Ye[t.debugId]++)return t;Ye[t.debugId]=1,(0,A.G)(()=>{const e=(0,a.t)();Ze.forEach(r=>{r.nrData.closedAt=e,r.nrData.closeCode=1001,r.nrData.closeReason="Page navigating away",r.nrData.closeWasClean=!1,r.nrData.openedAt&&(r.nrData.connectedDuration=e-r.nrData.openedAt),t.emit("ws",[r.nrData],r)})});class r extends WebSocket{static name="WebSocket";static toString(){return"function WebSocket() { [native code] }"}toString(){return"[object WebSocket]"}get[Symbol.toStringTag](){return r.name}#a(e){(e.__newrelic??={}).socketId=this.nrData.socketId,this.nrData.hasErrors??=!0}constructor(...e){super(...e),this.nrData=new Xe(e[0],e[1]),this.addEventListener("open",()=>{this.nrData.openedAt=(0,a.t)(),["protocol","extensions","binaryType"].forEach(e=>{this.nrData[e]=this[e]}),Ze.add(this)}),this.addEventListener("message",e=>{const{type:t,size:r}=qe(e.data);this.nrData.messageOrigin??=(0,ze.L)(e.origin),this.nrData.messageCount++,this.nrData.messageBytes+=r,this.nrData.messageBytesMin=Math.min(this.nrData.messageBytesMin||1/0,r),this.nrData.messageBytesMax=Math.max(this.nrData.messageBytesMax,r),(this.nrData.messageTypes??"").includes(t)||(this.nrData.messageTypes=this.nrData.messageTypes?"".concat(this.nrData.messageTypes,",").concat(t):t)}),this.addEventListener("close",e=>{this.nrData.closedAt=(0,a.t)(),this.nrData.closeCode=e.code,e.reason&&(this.nrData.closeReason=e.reason),this.nrData.closeWasClean=e.wasClean,this.nrData.connectedDuration=this.nrData.closedAt-this.nrData.openedAt,Ze.delete(this),t.emit("ws",[this.nrData],this)})}addEventListener(e,t,...r){const n=this,i="function"==typeof t?function(...e){try{return t.apply(this,e)}catch(e){throw n.#a(e),e}}:t?.handleEvent?{handleEvent:function(...e){try{return t.handleEvent.apply(t,e)}catch(e){throw n.#a(e),e}}}:t;return super.addEventListener(e,i,...r)}send(e){if(this.readyState===WebSocket.OPEN){const{type:t,size:r}=qe(e);this.nrData.sendCount++,this.nrData.sendBytes+=r,this.nrData.sendBytesMin=Math.min(this.nrData.sendBytesMin||1/0,r),this.nrData.sendBytesMax=Math.max(this.nrData.sendBytesMax,r),(this.nrData.sendTypes??"").includes(t)||(this.nrData.sendTypes=this.nrData.sendTypes?"".concat(this.nrData.sendTypes,",").concat(t):t)}try{return super.send(e)}catch(e){throw this.#a(e),e}}close(...e){try{super.close(...e)}catch(e){throw this.#a(e),e}}}return h.gm.WebSocket=r,t}(this.ee)),h.RI){if(fe(this.ee),se(this.ee),u=Ie(this.ee),e.init.user_actions.enabled){function f(t){const r=(0,pe.D)(t);return e.beacons.includes(r.hostname+":"+r.port)}function p(){u.emit("navChange")}Ge.Zp.forEach(e=>(0,P.sp)(e,e=>(0,s.p)("ua",[e],void 0,this.featureName,this.ee),!0)),Ge.qN.forEach(e=>{const t=(0,m.s)(e=>{(0,s.p)("ua",[e],void 0,this.featureName,this.ee)},500,{leading:!0});(0,P.sp)(e,t)}),h.gm.addEventListener("error",()=>{(0,s.p)("uaErr",[],void 0,t.K7.genericEvents,this.ee)},(0,P.jT)(!1,this.removeOnAbort?.signal)),this.ee.on("open-xhr-start",(e,r)=>{f(e[1])||r.addEventListener("readystatechange",()=>{2===r.readyState&&(0,s.p)("uaXhr",[],void 0,t.K7.genericEvents,this.ee)})}),this.ee.on("fetch-start",e=>{e.length>=1&&!f(ye(e[0]))&&(0,s.p)("uaXhr",[],void 0,t.K7.genericEvents,this.ee)}),u.on("pushState-end",p),u.on("replaceState-end",p),window.addEventListener("hashchange",p,(0,P.jT)(!0,this.removeOnAbort?.signal)),window.addEventListener("popstate",p,(0,P.jT)(!0,this.removeOnAbort?.signal))}if(e.init.performance.resources.enabled&&h.gm.PerformanceObserver?.supportedEntryTypes.includes("resource")){new PerformanceObserver(e=>{e.getEntries().forEach(e=>{(0,s.p)("browserPerformance.resource",[e],void 0,this.featureName,this.ee)})}).observe({type:"resource",buffered:!0})}}r&&l.on("ws",e=>{(0,s.p)("ws-complete",[e],void 0,this.featureName,this.ee)});try{this.removeOnAbort=new AbortController}catch(g){}this.abortHandler=()=>{this.removeOnAbort?.abort(),this.abortHandler=void 0},n.some(e=>e)?this.importAggregator(e,()=>i.e(478).then(i.bind(i,8019))):this.deregisterDrain()}}var Je=i(2646);const Qe=new Map;function et(e,t,r,n,i=!0){if("object"!=typeof t||!t||"string"!=typeof r||!r||"function"!=typeof t[r])return(0,f.R)(29);const s=function(e){return(e||te.ee).get("logger")}(e),a=(0,re.YM)(s),o=new Je.y(te.P);o.level=n.level,o.customAttributes=n.customAttributes,o.autoCaptured=i;const c=t[r]?.[re.Jt]||t[r];return Qe.set(c,o),a.inPlace(t,[r],"wrap-logger-",()=>Qe.get(c)),s}var tt=i(1910);class rt extends b{static featureName=K.TZ;constructor(e){var t;super(e,K.TZ),t=e,(0,c.Y)(o.$9,(e,r)=>U(e,r,t),t),function(e){(0,c.Y)(o.Wb,(t,r,{customAttributes:n={},level:i=K.p_.INFO}={})=>{et(e.ee,t,r,{customAttributes:n,level:i},!1)},e)}(e),z(e);const r=this.ee;["log","error","warn","info","debug","trace"].forEach(e=>{(0,tt.i)(h.gm.console[e]),et(r,h.gm.console,e,{level:"log"===e?"info":e})}),this.ee.on("wrap-logger-end",function([e]){const{level:t,customAttributes:n,autoCaptured:i}=this;(0,W.R)(r,e,n,t,i)}),this.importAggregator(e,()=>i.e(478).then(i.bind(i,5288)))}}new E({features:[Ae,x,S,Ke,Ue,I,Z,$e,rt,Ve],loaderType:"spa"})})()})();</script><script>
+		var author_nameSEO = '';
+		var pup_dateSEO = '2026-02-02 20:15';
+		
+		var isPayArticle = false;
+		</script>
+		<script>isPayArticle=false;</script>
+<title>Un posto al sole: Raffaele sta male per la partenza di Ornella | Il Foglio</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Il portiere soffre per la lontananza dalla compagna. Gli amici provano a stargli vicino, ma non riescono a consolarlo. Nel frattempo Giulia &amp;egrave; in partenza per andare a trovare Angela, anche se ha timore che&amp;nbsp;questo non far&amp;agrave; bene a Luca" />
+<meta name="Keywords" content="upas,un posto al sole" />
+<meta name="sections" content="televisione" />
+
+<meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+<meta http-equiv="Content-Type" content="text/html;charset=UTF-8" />
+
+<link rel="canonical" href="https://www.ilfoglio.it/televisione/2026/02/02/news/un-posto-al-sole-raffaele-sta-male-per-la-partenza-di-ornella-8608369/"/>
+<link rel="amphtml" href="https://www.ilfoglio.it/televisione/2026/02/02/news/un-posto-al-sole-raffaele-sta-male-per-la-partenza-di-ornella-8608369/amp/"/>
+<meta property="og:type" content="article">
+<meta property="og:title" content="Un posto al sole: Raffaele sta male per la partenza di Ornella">
+<meta property="og:description" content="Il portiere soffre per la lontananza dalla compagna. Gli amici provano a stargli vicino, ma non riescono a consolarlo. Nel frattempo Giulia &amp;egrave; in partenza per andare a trovare Angela, anche se ha timore che&amp;nbsp;questo non far&amp;agrave; bene a Luca">
+<meta property="og:image" content="https://img-prod.ilfoglio.it/2026/02/02/191919963-de29f885-8221-4619-9bdc-35485ba11141.jpg">
+<meta property="og:image:width"  content="1200" >
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://www.ilfoglio.it/televisione/2026/02/02/news/un-posto-al-sole-raffaele-sta-male-per-la-partenza-di-ornella-8608369/">
+<meta property="fb:app_id" content="1853129581606944">
+<meta property="twitter:card" content="summary_large_image">
+<meta property="twitter:site" content="@ilfoglio_it">
+<meta property="twitter:creator" content="@ilfoglio_it">
+<meta property="twitter:title" content="Un posto al sole: Raffaele sta male per la partenza di Ornella">
+<meta property="twitter:description" content="Il portiere soffre per la lontananza dalla compagna. Gli amici provano a stargli vicino, ma non riescono a consolarlo. Nel frattempo Giulia &amp;egrave; in partenza per andare a trovare Angela, anche se ha timore che&amp;nbsp;questo non far&amp;agrave; bene a Luca">
+<meta property="twitter:url" content="https://www.ilfoglio.it/televisione/2026/02/02/news/un-posto-al-sole-raffaele-sta-male-per-la-partenza-di-ornella-8608369/">
+<meta property="twitter:image" content="https://img-prod.ilfoglio.it/2026/02/02/191919963-de29f885-8221-4619-9bdc-35485ba11141.jpg">
+<meta property="twitter:image:width"  content="1200">
+<meta property="twitter:image:height" content="630">
+<link rel="image_src" href="https://img-prod.ilfoglio.it/2026/02/02/191919963-de29f885-8221-4619-9bdc-35485ba11141.jpg" />
+<meta name="publisher" content="Il Foglio" /> 
+<meta name="url" content="https://www.ilfoglio.it/televisione/2026/02/02/news/un-posto-al-sole-raffaele-sta-male-per-la-partenza-di-ornella-8608369/" />
+<meta property="fb:pages" content="61703722992" />
+<script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "NewsArticle",
+            "url": "https://www.ilfoglio.it/televisione/2026/02/02/news/un-posto-al-sole-raffaele-sta-male-per-la-partenza-di-ornella-8608369/",
+            "mainEntityOfPage": "https://www.ilfoglio.it/televisione/2026/02/02/news/un-posto-al-sole-raffaele-sta-male-per-la-partenza-di-ornella-8608369/",
+            "headline": "Un posto al sole: Raffaele sta male per la partenza di Ornella",
+            "text": "&lt;p&gt;Raffaele sta veramente male per la partenza di Ornella. E anche al telefono lei &amp;egrave; fredda e lontana. Gli amici del palazzo lo aiutano, invitandolo a cena e standogli vicino. Ma non basta. Lui sente che ormai tra i due si &amp;egrave; rotto qualcosa e forse stavolta non &amp;egrave; riparabile. Nel frattempo anche Giulia &amp;egrave; in partenza per andare a trovare Angela, anche se ha timore che allontanarsi per tanto tempo non far&amp;agrave; bene a Luca. A Napoli per&amp;ograve; &amp;egrave; tornato Vinicio con Alice. Il ragazzo &amp;egrave; determinato a riparare i danni commessi dal fratello, ma sa di essere ancora troppo giovane per occuparsene in prima persona. Ora per&amp;ograve; la situazione si fa complicata. Perch&amp;eacute; &amp;egrave; vero che sia Chiara che Roberto sono d&amp;rsquo;accordo per nominare Filippo amministratore delegato, ma la maggioranza ce l&amp;rsquo;ha Vinicio e quindi ora la sorte dei Cantieri &amp;egrave; nelle sue mani. &lt;em&gt;(A.d.)&lt;/em&gt;&lt;/p&gt;",
+            "keywords": "upas,un posto al sole",
+            "articleSection": "Televisione",
+            "publisher": {
+                "@type": "Organization",
+                "name": "Il Foglio",
+                "logo": {
+                "@type": "ImageObject",
+                "url": "https://www.ilfoglio.it/assets/2020/images/il_foglio_logo.png",
+                "height": "233",
+                "width":"1080"
+                }
+            },
+            "image": {
+                "contentUrl": "https://img-prod.ilfoglio.it/2026/02/02/191919963-de29f885-8221-4619-9bdc-35485ba11141.jpg",
+                "url": "https://img-prod.ilfoglio.it/2026/02/02/191919963-de29f885-8221-4619-9bdc-35485ba11141.jpg",
+                "@type": "ImageObject",
+                "width": "1200",
+                "height": "630"
+            },
+            "author": {
+                "@type": "Person",
+                "name": "Il Foglio"
+            },
+            "dateCreated": "2026-02-02T19:16:05Z",
+            "dateModified": "2026-02-02T19:28:53Z",
+            "datePublished": "2026-02-02T20:15:00Z"
+        }
+        </script>
+    
+
+<script>
+	const ssoUrlTop = " //sso.ilfoglio.it";
+	const ssoApiUrlTop = "//api.ilfoglio.it/api/v1";
+    const ssoWebisteUrl = "https://www.ilfoglio.it/assets";
+</script>
+<meta name="google-signin-client_id" content="743046822656-je9m5a3ccvp3ml68p4r5bthmj92ff8ce.apps.googleusercontent.com" />
+
+      
+<script src="https://news.google.com/swg/js/v1/swg-gaa.js"></script>
+<script async src="https://news.google.com/swg/js/v1/swg.js"></script>
+<script src="https://apis.google.com/js/platform.js" async defer></script>
+ 
+<script>
+
+
+
+
+    /**
+     * Returns anchor element from a given URL.
+     * @return {HTMLAnchorElement}
+     */
+    function getAnchorFromUrl(url) {
+        const a = document.createElement('a');
+        a.href = url;
+        return a.hostname;
+    }
+
+    /**
+     * Returns query params from URL.
+     * @return {!Object<string, string>}
+     */
+    function getQueryParams() {
+        const queryParams = {};
+        location.search
+            .substring(1)
+            .split('&')
+            .forEach(pair => {
+                const parts = pair.split('=');
+                queryParams[parts[0]] = parts[1];
+            });
+        return queryParams;
+    }
+    /**
+     * Returns true if the URL contains valid Google Article Access (GAA) params.
+     * @return {boolean}
+     */
+    function isGaa() {
+        // Validate GAA params.
+        const params = getQueryParams();
+        if (!params.gaa_at) {
+            return false;
+        }
+        if (!params.gaa_n) {
+            console.error('SwG Entitlements: The `gaa_n` URL param is missing.');
+            return false;
+        }
+        if (!params.gaa_sig) {
+            console.error('SwG Entitlements: The `gaa_sig` URL param is missing.');
+            return false;
+        }
+        if (!params.gaa_ts) {
+            console.error('SwG Entitlements: The `gaa_ts` URL param is missing.');
+            return false;
+        }
+        if (parseInt(params.gaa_ts, 16) < Date.now() / 1000) {
+            console.error(
+                'SwG Entitlements: The `gaa_ts` URL param should ' +
+                'contain a hex string timestamp which points to the future.'
+            );
+            return false;
+        }
+
+        // Validate referrer.
+        // NOTE: This regex was copied from SwG's AMP extension. https://github.com/ampproject/amphtml/blob/c23bf281f817a2ee5df73f6fd45e9f4b71bb68b6/extensions/amp-subscriptions-google/0.1/amp-subscriptions-google.js#L56
+        const GOOGLE_DOMAIN_RE = /(https?:\/\/(.+?\.)?google\.com(\/[A-Za-z0-9\-\._~:\/\?#\[\]@!$&'\(\)\*\+,;\=]*)?)/;
+        const referrer = document.referrer;
+        if (
+            referrer.indexOf('https') < 0 ||
+            !GOOGLE_DOMAIN_RE.test(referrer)
+        ) {
+            // Real publications should bail if this referrer check fails.
+            // This script is only logging a warning for metering demo purposes.
+            console.warn(
+                `SwG Entitlements: This page's referrer ("${referrer.origin}") can't ` +
+                'grant Google Article Access. Real publications should bail if this ' +
+                'referrer check fails.'
+            );
+            return false;
+        }
+
+        return true;
+    }
+
+    function parseJwt(token) {
+        var base64Url = token.split('.')[1];
+        var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        var jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+
+        return JSON.parse(jsonPayload);
+    };
+
+    function readCookie(name) {
+        var nameEQ = name + "=";
+        var ca = document.cookie.split(';');
+        for (var i = 0; i < ca.length; i++) {
+            var c = ca[i];
+            while (c.charAt(0) === ' ') {
+                c = c.substring(1, c.length);
+            }
+            if (c.indexOf(nameEQ) === 0) {
+                return c.substring(nameEQ.length, c.length);
+            }
+        }
+        return null;
+    }
+
+    function deleteCookie(name) {
+        document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    }
+    let userloginTop = {
+        ssoData: {},
+        cogit: readCookie('_cogit'),
+        cogat: readCookie('_cogat'),
+        isLogged: function() {
+            if (this.cogit != null) {
+                this.ssoData = parseJwt(this.cogit);
+            }
+            return this.cogit != null;
+        }
+    }
+    let authWeb = false;
+    let entitlementsSubscriptions = null;
+    let entitlements_access_token = null;
+    if (userloginTop.isLogged()) {
+        if (userloginTop.ssoData.auth_web == "true")
+            authWeb = true;
+    }
+
+    function checkAccountLinking() {
+
+        if (readCookie("saveSubscription") === "false")
+            return;
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', ssoApiUrlTop + '/swg/need_save_subscription');
+        //xhr.withCredentials = true;
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        xhr.setRequestHeader('Authorization', 'Bearer ' + userloginTop.cogat);
+        xhr.onload = function() {
+            //console.log('Signed in as: ' + xhr.responseText);
+        };
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState == XMLHttpRequest.DONE) {
+                var data = jQuery.parseJSON(xhr.responseText);
+
+                if (data && data.entitlements_access_token) {
+                    entitlements_access_token = data.entitlements_access_token;
+
+                    (self.SWG = self.SWG || []).push(async subscriptions => {
+                        subscriptions.saveSubscription(() => {
+                            return {
+                                token: entitlements_access_token
+                            }
+                        }).then(
+                            // handle flow completion or user declining as shown in above example
+                            result => {
+                                if (result) {
+                                    updateAccountLining(entitlements_access_token, userloginTop.cogat);
+
+                                } else {
+                                    document.cookie = "saveSubscription=false";
+                                }
+                            }
+                        );
+                    })
+                } else {
+                    console.log("ALREADY LINKED", data);
+                    document.cookie = "saveSubscription=false";
+                }
+            }
+        };
+        xhr_string = [];
+
+        if (userloginTop.cogat) {
+            xhr_string.push('access_token=' + userloginTop.cogat);
+        }
+        /* if (token != undefined) {
+             xhr_string.push('id_token=' + token);
+         }*/
+        xhr.send(xhr_string.join('&'));
+    }
+
+    function updateAccountLining(entitlements_access_token, accesstoken) {
+
+        var xhr = new XMLHttpRequest(entitlements_access_token);
+        xhr.open('POST', ssoApiUrlTop + '/swg/confirm_entitlements_access_token');
+        //xhr.withCredentials = true;
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        xhr.setRequestHeader('Authorization', 'Bearer ' + userloginTop.cogat);
+        xhr.onload = function() {
+            //console.log('Signed in as: ' + xhr.responseText);
+        };
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState == XMLHttpRequest.DONE) {
+                var data = jQuery.parseJSON(xhr.responseText);
+                console.log(data);
+            } else {
+                console.log("Error confirm accesstoken");
+            }
+        };
+        xhr_string = [];
+        /*
+        if (id_token != undefined) {
+            xhr_string.push('id_token=' + id_token);
+        }
+        */
+        if (accesstoken != undefined) {
+            xhr_string.push('access_token=' + accesstoken);
+        }
+        if (entitlements_access_token != undefined) {
+            xhr_string.push('entitlements_access_token=' + entitlements_access_token);
+        }
+        xhr.send(xhr_string.join('&'));
+    }
+
+    function updateUserPackage(subscribeData) {
+        var xhr = new XMLHttpRequest(subscribeData);
+        xhr.open('POST', ssoApiUrlTop + '/swg/complete_deferred_account_creation');
+        //xhr.withCredentials = true;
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        xhr.onload = function() {
+            //console.log('Signed in as: ' + xhr.responseText);
+        };
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState == XMLHttpRequest.DONE) {
+                var data = jQuery.parseJSON(xhr.responseText);
+                console.log(data);
+
+            } else {
+                console.log("Error deferred creation");
+            }
+        };
+        xhr_string = [];
+
+        if (subscribeData != undefined) {
+            xhr_string.push('subscribeData=' + subscribeData);
+        }
+        xhr.send(xhr_string.join('&'));
+    }
+
+    function loginSocialAuto() {
+        let urlSSO = ssoUrlTop + "/signin.html?provider=google&redirect=" + window.location.href;
+        location.href = urlSSO;
+    }
+
+    function sendEventToGoogleSubs(event) {
+
+        switch (event.eventType) {
+            case 1007: //ACTION_SWG_BUTTON_CLICK: 1007,
+                gtag('event', 'ACTION_SWG_BUTTON_CLICK', {
+                    'event_category': 'GoogleSubscriptions',
+                    'event_label': 'Subscribi with Gooogle'
+                });
+                break;
+            default:
+                gtag('event', event.eventType, {
+                    'event_category': 'GoogleSubscriptions',
+                    'event_label': event.eventType
+                });
+        }
+    }
+
+    function getProductList(ents) {
+        var products = [];
+        var entitlements = ents && ents['entitlements'];
+
+        if (!entitlements) {
+            return products;
+        }
+
+        for (var i = 0; i < entitlements.length; i++) {
+            var entitlement = entitlements[i];
+            var entitlementProducts = entitlement['products'];
+
+            for (var j = 0; j < entitlementProducts.length; j++) {
+                var product = entitlementProducts[j];
+                products.push(product);
+            }
+        }
+
+        return products;
+    }
+
+    function openPayWall() {
+        //appStart();
+        fetchMetering();
+        if (typeof isPayArticle === "undefined") {
+            isPayArticle = true;
+        }
+
+        if (isPayArticle) {
+            if (localStorage.getItem('meteringRegistrationId')) {
+                userlogin.idTokenGg = localStorage.getItem('meteringRegistrationId');
+            }
+            userlogin.paywallContentExtendedAccess(encodeURIComponent(location.href));
+        }
+    }
+
+
+    function initSwg() {
+
+        (self.SWG = self.SWG || []).push(function(subscriptions) {
+            // SwG is ready to be called via subscriptions interface.
+            console.log("SwG is ready", subscriptions);
+            subscriptions.getEventManager().then(manager => {
+                manager.registerEventListener((event) => {
+                    // Add code here to send the event to your analytics
+                    sendEventToGoogleSubs(event);
+                    console.log("new event", event.eventType);
+                })
+            });
+
+
+            subscriptions.setOnEntitlementsResponse(function(entitlementsPromise) {
+                entitlementsPromise.then(function(entitlements) {
+                    // Handle the entitlements.
+                    console.log("entitlements", entitlements);
+
+                    if (entitlements) {
+                        var products = getProductList(entitlements.json());
+
+                        subscriptions.getPropensityModule().then(function(module) {
+                            if (products.length > 0) {
+                                module.sendSubscriptionState('subscriber', {
+                                    'product': products
+                                });
+                            } else {
+                                module.sendSubscriptionState('non_subscriber');
+                            } // Get initial propensity scores
+
+
+                            module.getPropensity().then(function(score) {
+                                if (score.header && score.header.ok) {
+                                    var scores = score.body.scores;
+                                    scores.forEach(function(scoreDetail) {
+                                        var value = scoreDetail.score && scoreDetail.score.value;
+                                        (0, _log.log)('Propensity to subscribe for ', scoreDetail.product);
+
+                                        if (value) {
+                                            (0, _log.log)('bucketed: ', scoreDetail.score.bucketed);
+                                            (0, _log.log)('score: ', value);
+                                        } else {
+                                            (0, _log.log)('Not available: ', scoreDetail.error);
+                                        }
+                                    });
+                                } else {
+                                    var reason;
+
+                                    if (score.header) {
+                                        reason = score.body && score.body.error;
+                                    }
+
+                                    (0, _log.log)('Propensity score unavailable: ', reason);
+                                }
+                            });
+                        });
+                    } else {
+                        subscriptions.getPropensityModule().then(function(module) {
+                            module.sendSubscriptionState('unknown');
+                        });
+                    }
+
+                    if (entitlements.entitlements.length > 0 && entitlements.entitlements[0].source == "google" && !authWeb) {
+                        //put entitlements for extend access check and remove
+                        entitlementsSubscriptions = entitlements;
+
+                        setTimeout(function(entitlements) {
+                            data = {
+                                'purchaseData': entitlements.entitlements[0].subscriptionToken,
+                            };
+
+                            const accountPromise = new Promise(function(resolve, reject) {
+                                var xhr = new XMLHttpRequest();
+                                xhr.open('POST', ssoApiUrlTop + '/swg/check_entitlement');
+                                //xhr.withCredentials = true;
+                                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                                xhr.onload = function() {
+                                    //console.log('Signed in as: ' + xhr.responseText);
+                                };
+                                xhr.onreadystatechange = function() {
+                                    if (xhr.readyState == XMLHttpRequest.DONE) {
+                                        var data = jQuery.parseJSON(xhr.responseText);
+                                        console.log(data);
+                                        if (data.status == "OK") {
+                                            resolve(true);
+                                        } else {
+                                            resolve(false);
+                                        }
+                                    }
+                                };
+                                xhr_string = [];
+
+                                if (data.purchaseData != undefined) {
+                                    try {
+                                        let purchaseData = JSON.parse(data.purchaseData);
+                                        console.log(purchaseData.purchaseToken);
+                                        xhr_string.push('purchaseData=' + purchaseData.purchaseToken);
+                                    } catch (e) {
+                                        console.log("problem check entitlement!");
+                                    }
+                                }
+                                xhr.send(xhr_string.join('&'));
+                            });
+
+
+
+                            subscriptions.waitForSubscriptionLookup(accountPromise).then(function(account) {
+                                if (account) {
+
+                                    subscriptions.showLoginPrompt().then(function(response) {
+                                        subscriptions.showLoginNotification().then(function(response) {
+                                            console.log("waitForSubscriptionLookup", response);
+                                            loginSocialAuto();
+
+                                        });
+
+                                    }, function(reason) {
+                                        //openPayWall();
+                                        console.log("NO waitForSubscriptionLookup", reason);
+                                    });
+
+                                } else {
+                                    // Account was not found, or existing account has no subscription.
+                                    // Let's create a new one or link to the existing publisher account.
+                                    subscriptions.completeDeferredAccountCreation({
+                                        entitlements: entitlements,
+                                        consent: true
+                                    }).then(response => {
+                                        // 1. The user has consented to account creation. Create account
+                                        // based on the response.
+                                        // 2. Signal that the account creation is complete.
+                                        console.log(response);
+                                        updateUserPackage(JSON.stringify(response));
+                                        response.complete().then(() => {
+                                            // 3. The flow is complete.
+                                            loginSocialAuto();
+                                        });
+                                    });
+
+                                }
+                            });
+
+                            entitlements.ack();
+                        }, 2000, entitlements);
+                    } else {
+                        //openPayWall();
+                        subscriptions.setOnPaymentResponse(function(paymentResponse) {
+                            paymentResponse.then(function(response) {
+                                // 1. Handle the payment response.
+                                // 2. Once the payment is processed (see Create Accounts for New Subscribers):
+                                updateUserPackage(JSON.stringify(response));
+                                response.complete().then(function() {
+                                    // 3. The subscription is fully processed.
+                                    loginSocialAuto();
+                                });
+                            });
+                        });
+
+                        subscriptions.setOnLoginRequest(function() {
+                            // Handles user clicking "Already Subscribed?"
+                            // Redirects user to publisher login page
+                            if (isGaa()) {
+                                localStorage.setItem('fromGoogleNews', 'true');
+                            }
+                            let urlSSO = ssoUrlTop + "/login.html?redirect=" + window.location.href;
+                            location.href = urlSSO;
+                        });
+                        setTimeout(function(subscriptions) {
+
+                            if (userloginTop.cogat != null) {
+                                checkAccountLinking();
+                                console.log("START saveSubscriptions");
+                            } else {
+                                console.log('not registerd');
+                            }
+
+                        }, 2000, subscriptions);
+                    }
+
+                });
+            });
+        });
+
+    }
+
+</script>
+<link rel="icon" href="//www.ilfoglio.it/assets/2020/images/favicon.ico?v=1.8.6
+" type="image/x-icon" />
+<link rel="apple-touch-icon" href="//www.ilfoglio.it/assets/2020/images/favicon.ico?v=1.8.6
+" type="image/x-icon" />
+
+<link rel="stylesheet" type="text/css" href="//www.ilfoglio.it/assets/2020/css/main.css?v=1.8.6
+">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.css"/>
+<link rel="stylesheet" type="text/css" href="//www.ilfoglio.it/assets/2020/css/jquery-ui.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Unna:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Karla:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="//www.ilfoglio.it/assets/2020/css/custom.css?v=1.8.6
+">
+<script src="https://ilfoglio-ita-pw.newsmemory.com/?meter&service=onstop&v=2" async></script>
+
+
+
+<!-- TCF stub -->
+<script type="text/javascript">
+!function(){"use strict";function t(r){return t="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(t){return typeof t}:function(t){return t&&"function"==typeof Symbol&&t.constructor===Symbol&&t!==Symbol.prototype?"symbol":typeof t},t(r)}var r="undefined"!=typeof globalThis?globalThis:"undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof self?self:{};function n(t,r){return t(r={exports:{}},r.exports),r.exports}var e,o,i=function(t){return t&&t.Math===Math&&t},u=i("object"==typeof globalThis&&globalThis)||i("object"==typeof window&&window)||i("object"==typeof self&&self)||i("object"==typeof r&&r)||i("object"==typeof r&&r)||function(){return this}()||Function("return this")(),c=function(t){try{return!!t()}catch(t){return!0}},a=!c((function(){return 7!==Object.defineProperty({},1,{get:function(){return 7}})[1]})),f=!c((function(){var t=function(){}.bind();return"function"!=typeof t||t.hasOwnProperty("prototype")})),s=Function.prototype.call,l=f?s.bind(s):function(){return s.apply(s,arguments)},p={}.propertyIsEnumerable,y=Object.getOwnPropertyDescriptor,v={f:y&&!p.call({1:2},1)?function(t){var r=y(this,t);return!!r&&r.enumerable}:p},b=function(t,r){return{enumerable:!(1&t),configurable:!(2&t),writable:!(4&t),value:r}},g=Function.prototype,d=g.call,h=f&&g.bind.bind(d,d),m=f?h:function(t){return function(){return d.apply(t,arguments)}},S=m({}.toString),w=m("".slice),O=function(t){return w(S(t),8,-1)},j=Object,P=m("".split),T=c((function(){return!j("z").propertyIsEnumerable(0)}))?function(t){return"String"===O(t)?P(t,""):j(t)}:j,L=function(t){return null==t},A=TypeError,_=function(t){if(L(t))throw new A("Can't call method on "+t);return t},E=function(t){return T(_(t))},F="object"==typeof document&&document.all,I={all:F,IS_HTMLDDA:void 0===F&&void 0!==F},M=I.all,k=I.IS_HTMLDDA?function(t){return"function"==typeof t||t===M}:function(t){return"function"==typeof t},C=I.all,D=I.IS_HTMLDDA?function(t){return"object"==typeof t?null!==t:k(t)||t===C}:function(t){return"object"==typeof t?null!==t:k(t)},R=function(t,r){return arguments.length<2?(n=u[t],k(n)?n:void 0):u[t]&&u[t][r];var n},x=m({}.isPrototypeOf),N="undefined"!=typeof navigator&&String(navigator.userAgent)||"",G=u.process,V=u.Deno,z=G&&G.versions||V&&V.version,B=z&&z.v8;B&&(o=(e=B.split("."))[0]>0&&e[0]<4?1:+(e[0]+e[1])),!o&&N&&(!(e=N.match(/Edge\/(\d+)/))||e[1]>=74)&&(e=N.match(/Chrome\/(\d+)/))&&(o=+e[1]);var H=o,U=u.String,W=!!Object.getOwnPropertySymbols&&!c((function(){var t=Symbol("symbol detection");return!U(t)||!(Object(t)instanceof Symbol)||!Symbol.sham&&H&&H<41})),$=W&&!Symbol.sham&&"symbol"==typeof Symbol.iterator,J=Object,X=$?function(t){return"symbol"==typeof t}:function(t){var r=R("Symbol");return k(r)&&x(r.prototype,J(t))},Y=String,q=function(t){try{return Y(t)}catch(t){return"Object"}},K=TypeError,Q=function(t){if(k(t))return t;throw new K(q(t)+" is not a function")},Z=TypeError,tt=Object.defineProperty,rt=function(t,r){try{tt(u,t,{value:r,configurable:!0,writable:!0})}catch(n){u[t]=r}return r},nt="__core-js_shared__",et=u[nt]||rt(nt,{}),ot=n((function(t){(t.exports=function(t,r){return et[t]||(et[t]=void 0!==r?r:{})})("versions",[]).push({version:"3.33.3",mode:"global",copyright:"© 2014-2023 Denis Pushkarev (zloirock.ru)",license:"https://github.com/zloirock/core-js/blob/v3.33.3/LICENSE",source:"https://github.com/zloirock/core-js"})})),it=Object,ut=function(t){return it(_(t))},ct=m({}.hasOwnProperty),at=Object.hasOwn||function(t,r){return ct(ut(t),r)},ft=0,st=Math.random(),lt=m(1..toString),pt=function(t){return"Symbol("+(void 0===t?"":t)+")_"+lt(++ft+st,36)},yt=u.Symbol,vt=ot("wks"),bt=$?yt.for||yt:yt&&yt.withoutSetter||pt,gt=function(t){return at(vt,t)||(vt[t]=W&&at(yt,t)?yt[t]:bt("Symbol."+t)),vt[t]},dt=TypeError,ht=gt("toPrimitive"),mt=function(t){var r=function(t,r){if(!D(t)||X(t))return t;var n,e,o=(n=t[ht],L(n)?void 0:Q(n));if(o){if(void 0===r&&(r="default"),e=l(o,t,r),!D(e)||X(e))return e;throw new dt("Can't convert object to primitive value")}return void 0===r&&(r="number"),function(t,r){var n,e;if("string"===r&&k(n=t.toString)&&!D(e=l(n,t)))return e;if(k(n=t.valueOf)&&!D(e=l(n,t)))return e;if("string"!==r&&k(n=t.toString)&&!D(e=l(n,t)))return e;throw new Z("Can't convert object to primitive value")}(t,r)}(t,"string");return X(r)?r:r+""},St=u.document,wt=D(St)&&D(St.createElement),Ot=function(t){return wt?St.createElement(t):{}},jt=!a&&!c((function(){return 7!==Object.defineProperty(Ot("div"),"a",{get:function(){return 7}}).a})),Pt=Object.getOwnPropertyDescriptor,Tt={f:a?Pt:function(t,r){if(t=E(t),r=mt(r),jt)try{return Pt(t,r)}catch(t){}if(at(t,r))return b(!l(v.f,t,r),t[r])}},Lt=a&&c((function(){return 42!==Object.defineProperty((function(){}),"prototype",{value:42,writable:!1}).prototype})),At=String,_t=TypeError,Et=function(t){if(D(t))return t;throw new _t(At(t)+" is not an object")},Ft=TypeError,It=Object.defineProperty,Mt=Object.getOwnPropertyDescriptor,kt="enumerable",Ct="configurable",Dt="writable",Rt={f:a?Lt?function(t,r,n){if(Et(t),r=mt(r),Et(n),"function"==typeof t&&"prototype"===r&&"value"in n&&Dt in n&&!n[Dt]){var e=Mt(t,r);e&&e[Dt]&&(t[r]=n.value,n={configurable:Ct in n?n[Ct]:e[Ct],enumerable:kt in n?n[kt]:e[kt],writable:!1})}return It(t,r,n)}:It:function(t,r,n){if(Et(t),r=mt(r),Et(n),jt)try{return It(t,r,n)}catch(t){}if("get"in n||"set"in n)throw new Ft("Accessors not supported");return"value"in n&&(t[r]=n.value),t}},xt=a?function(t,r,n){return Rt.f(t,r,b(1,n))}:function(t,r,n){return t[r]=n,t},Nt=Function.prototype,Gt=a&&Object.getOwnPropertyDescriptor,Vt=at(Nt,"name"),zt={EXISTS:Vt,PROPER:Vt&&"something"===function(){}.name,CONFIGURABLE:Vt&&(!a||a&&Gt(Nt,"name").configurable)},Bt=m(Function.toString);k(et.inspectSource)||(et.inspectSource=function(t){return Bt(t)});var Ht,Ut,Wt,$t=et.inspectSource,Jt=u.WeakMap,Xt=k(Jt)&&/native code/.test(String(Jt)),Yt=ot("keys"),qt=function(t){return Yt[t]||(Yt[t]=pt(t))},Kt={},Qt="Object already initialized",Zt=u.TypeError,tr=u.WeakMap;if(Xt||et.state){var rr=et.state||(et.state=new tr);rr.get=rr.get,rr.has=rr.has,rr.set=rr.set,Ht=function(t,r){if(rr.has(t))throw new Zt(Qt);return r.facade=t,rr.set(t,r),r},Ut=function(t){return rr.get(t)||{}},Wt=function(t){return rr.has(t)}}else{var nr=qt("state");Kt[nr]=!0,Ht=function(t,r){if(at(t,nr))throw new Zt(Qt);return r.facade=t,xt(t,nr,r),r},Ut=function(t){return at(t,nr)?t[nr]:{}},Wt=function(t){return at(t,nr)}}var er={set:Ht,get:Ut,has:Wt,enforce:function(t){return Wt(t)?Ut(t):Ht(t,{})},getterFor:function(t){return function(r){var n;if(!D(r)||(n=Ut(r)).type!==t)throw new Zt("Incompatible receiver, "+t+" required");return n}}},or=n((function(t){var r=zt.CONFIGURABLE,n=er.enforce,e=er.get,o=String,i=Object.defineProperty,u=m("".slice),f=m("".replace),s=m([].join),l=a&&!c((function(){return 8!==i((function(){}),"length",{value:8}).length})),p=String(String).split("String"),y=t.exports=function(t,e,c){"Symbol("===u(o(e),0,7)&&(e="["+f(o(e),/^Symbol\(([^)]*)\)/,"$1")+"]"),c&&c.getter&&(e="get "+e),c&&c.setter&&(e="set "+e),(!at(t,"name")||r&&t.name!==e)&&(a?i(t,"name",{value:e,configurable:!0}):t.name=e),l&&c&&at(c,"arity")&&t.length!==c.arity&&i(t,"length",{value:c.arity});try{c&&at(c,"constructor")&&c.constructor?a&&i(t,"prototype",{writable:!1}):t.prototype&&(t.prototype=void 0)}catch(t){}var y=n(t);return at(y,"source")||(y.source=s(p,"string"==typeof e?e:"")),t};Function.prototype.toString=y((function(){return k(this)&&e(this).source||$t(this)}),"toString")})),ir=function(t,r,n,e){e||(e={});var o=e.enumerable,i=void 0!==e.name?e.name:r;if(k(n)&&or(n,i,e),e.global)o?t[r]=n:rt(r,n);else{try{e.unsafe?t[r]&&(o=!0):delete t[r]}catch(t){}o?t[r]=n:Rt.f(t,r,{value:n,enumerable:!1,configurable:!e.nonConfigurable,writable:!e.nonWritable})}return t},ur=Math.ceil,cr=Math.floor,ar=Math.trunc||function(t){var r=+t;return(r>0?cr:ur)(r)},fr=function(t){var r=+t;return r!=r||0===r?0:ar(r)},sr=Math.max,lr=Math.min,pr=function(t,r){var n=fr(t);return n<0?sr(n+r,0):lr(n,r)},yr=Math.min,vr=function(t){return(r=t.length)>0?yr(fr(r),9007199254740991):0;var r},br=function(t){return function(r,n,e){var o,i=E(r),u=vr(i),c=pr(e,u);if(t&&n!=n){for(;u>c;)if((o=i[c++])!=o)return!0}else for(;u>c;c++)if((t||c in i)&&i[c]===n)return t||c||0;return!t&&-1}},gr=(br(!0),br(!1)),dr=m([].push),hr=function(t,r){var n,e=E(t),o=0,i=[];for(n in e)!at(Kt,n)&&at(e,n)&&dr(i,n);for(;r.length>o;)at(e,n=r[o++])&&(~gr(i,n)||dr(i,n));return i},mr=["constructor","hasOwnProperty","isPrototypeOf","propertyIsEnumerable","toLocaleString","toString","valueOf"],Sr=mr.concat("length","prototype"),wr={f:Object.getOwnPropertyNames||function(t){return hr(t,Sr)}},Or={f:Object.getOwnPropertySymbols},jr=m([].concat),Pr=R("Reflect","ownKeys")||function(t){var r=wr.f(Et(t)),n=Or.f;return n?jr(r,n(t)):r},Tr=function(t,r,n){for(var e=Pr(r),o=Rt.f,i=Tt.f,u=0;u<e.length;u++){var c=e[u];at(t,c)||n&&at(n,c)||o(t,c,i(r,c))}},Lr=/#|\.prototype\./,Ar=function(t,r){var n=Er[_r(t)];return n===Ir||n!==Fr&&(k(r)?c(r):!!r)},_r=Ar.normalize=function(t){return String(t).replace(Lr,".").toLowerCase()},Er=Ar.data={},Fr=Ar.NATIVE="N",Ir=Ar.POLYFILL="P",Mr=Ar,kr=Tt.f,Cr=function(t,r){var n,e,o,i,c,a=t.target,f=t.global,s=t.stat;if(n=f?u:s?u[a]||rt(a,{}):(u[a]||{}).prototype)for(e in r){if(i=r[e],o=t.dontCallGetSet?(c=kr(n,e))&&c.value:n[e],!Mr(f?e:a+(s?".":"#")+e,t.forced)&&void 0!==o){if(typeof i==typeof o)continue;Tr(i,o)}(t.sham||o&&o.sham)&&xt(i,"sham",!0),ir(n,e,i,t)}},Dr={};Dr[gt("toStringTag")]="z";var Rr,xr="[object z]"===String(Dr),Nr=gt("toStringTag"),Gr=Object,Vr="Arguments"===O(function(){return arguments}()),zr=xr?O:function(t){var r,n,e;return void 0===t?"Undefined":null===t?"Null":"string"==typeof(n=function(t,r){try{return t[r]}catch(t){}}(r=Gr(t),Nr))?n:Vr?O(r):"Object"===(e=O(r))&&k(r.callee)?"Arguments":e},Br=String,Hr=function(t){if("Symbol"===zr(t))throw new TypeError("Cannot convert a Symbol value to a string");return Br(t)},Ur=Object.keys||function(t){return hr(t,mr)},Wr=a&&!Lt?Object.defineProperties:function(t,r){Et(t);for(var n,e=E(r),o=Ur(r),i=o.length,u=0;i>u;)Rt.f(t,n=o[u++],e[n]);return t},$r={f:Wr},Jr=R("document","documentElement"),Xr="prototype",Yr="script",qr=qt("IE_PROTO"),Kr=function(){},Qr=function(t){return"<"+Yr+">"+t+"</"+Yr+">"},Zr=function(t){t.write(Qr("")),t.close();var r=t.parentWindow.Object;return t=null,r},tn=function(){try{Rr=new ActiveXObject("htmlfile")}catch(t){}var t,r,n;tn="undefined"!=typeof document?document.domain&&Rr?Zr(Rr):(r=Ot("iframe"),n="java"+Yr+":",r.style.display="none",Jr.appendChild(r),r.src=String(n),(t=r.contentWindow.document).open(),t.write(Qr("document.F=Object")),t.close(),t.F):Zr(Rr);for(var e=mr.length;e--;)delete tn[Xr][mr[e]];return tn()};Kt[qr]=!0;var rn=Object.create||function(t,r){var n;return null!==t?(Kr[Xr]=Et(t),n=new Kr,Kr[Xr]=null,n[qr]=t):n=tn(),void 0===r?n:$r.f(n,r)},nn=Array,en=Math.max,on=wr.f,un="object"==typeof window&&window&&Object.getOwnPropertyNames?Object.getOwnPropertyNames(window):[],cn={f:function(t){return un&&"Window"===O(t)?function(t){try{return on(t)}catch(t){return function(t,r,n){for(var e,o,i,u,c=vr(t),a=pr(void 0,c),f=pr(c,c),s=nn(en(f-a,0)),l=0;a<f;a++,l++)e=s,o=l,i=t[a],(u=mt(o))in e?Rt.f(e,u,b(0,i)):e[u]=i;return s.length=l,s}(un)}}(t):on(E(t))}},an=function(t,r,n){return n.get&&or(n.get,r,{getter:!0}),n.set&&or(n.set,r,{setter:!0}),Rt.f(t,r,n)},fn={f:gt},sn=u,ln=Rt.f,pn=function(t){var r=sn.Symbol||(sn.Symbol={});at(r,t)||ln(r,t,{value:fn.f(t)})},yn=Rt.f,vn=gt("toStringTag"),bn=function(t,r,n){t&&!n&&(t=t.prototype),t&&!at(t,vn)&&yn(t,vn,{configurable:!0,value:r})},gn=function(t){if("Function"===O(t))return m(t)},dn=gn(gn.bind),hn=Array.isArray||function(t){return"Array"===O(t)},mn=function(){},Sn=[],wn=R("Reflect","construct"),On=/^\s*(?:class|function)\b/,jn=m(On.exec),Pn=!On.test(mn),Tn=function(t){if(!k(t))return!1;try{return wn(mn,Sn,t),!0}catch(t){return!1}},Ln=function(t){if(!k(t))return!1;switch(zr(t)){case"AsyncFunction":case"GeneratorFunction":case"AsyncGeneratorFunction":return!1}try{return Pn||!!jn(On,$t(t))}catch(t){return!0}};Ln.sham=!0;var An=!wn||c((function(){var t;return Tn(Tn.call)||!Tn(Object)||!Tn((function(){t=!0}))||t}))?Ln:Tn,_n=gt("species"),En=Array,Fn=function(t,r){return new(function(t){var r;return hn(t)&&(r=t.constructor,(An(r)&&(r===En||hn(r.prototype))||D(r)&&null===(r=r[_n]))&&(r=void 0)),void 0===r?En:r}(t))(0===r?0:r)},In=m([].push),Mn=function(t){var r=1===t,n=2===t,e=3===t,o=4===t,i=6===t,u=7===t,c=5===t||i;return function(a,s,l,p){for(var y,v,b=ut(a),g=T(b),d=function(t,r){return Q(t),void 0===r?t:f?dn(t,r):function(){return t.apply(r,arguments)}}(s,l),h=vr(g),m=0,S=p||Fn,w=r?S(a,h):n||u?S(a,0):void 0;h>m;m++)if((c||m in g)&&(v=d(y=g[m],m,b),t))if(r)w[m]=v;else if(v)switch(t){case 3:return!0;case 5:return y;case 6:return m;case 2:In(w,y)}else switch(t){case 4:return!1;case 7:In(w,y)}return i?-1:e||o?o:w}},kn=[Mn(0),Mn(1),Mn(2),Mn(3),Mn(4),Mn(5),Mn(6),Mn(7)][0],Cn=qt("hidden"),Dn="Symbol",Rn="prototype",xn=er.set,Nn=er.getterFor(Dn),Gn=Object[Rn],Vn=u.Symbol,zn=Vn&&Vn[Rn],Bn=u.RangeError,Hn=u.TypeError,Un=u.QObject,Wn=Tt.f,$n=Rt.f,Jn=cn.f,Xn=v.f,Yn=m([].push),qn=ot("symbols"),Kn=ot("op-symbols"),Qn=ot("wks"),Zn=!Un||!Un[Rn]||!Un[Rn].findChild,te=function(t,r,n){var e=Wn(Gn,r);e&&delete Gn[r],$n(t,r,n),e&&t!==Gn&&$n(Gn,r,e)},re=a&&c((function(){return 7!==rn($n({},"a",{get:function(){return $n(this,"a",{value:7}).a}})).a}))?te:$n,ne=function(t,r){var n=qn[t]=rn(zn);return xn(n,{type:Dn,tag:t,description:r}),a||(n.description=r),n},ee=function(t,r,n){t===Gn&&ee(Kn,r,n),Et(t);var e=mt(r);return Et(n),at(qn,e)?(n.enumerable?(at(t,Cn)&&t[Cn][e]&&(t[Cn][e]=!1),n=rn(n,{enumerable:b(0,!1)})):(at(t,Cn)||$n(t,Cn,b(1,{})),t[Cn][e]=!0),re(t,e,n)):$n(t,e,n)},oe=function(t,r){Et(t);var n=E(r),e=Ur(n).concat(ae(n));return kn(e,(function(r){a&&!l(ie,n,r)||ee(t,r,n[r])})),t},ie=function(t){var r=mt(t),n=l(Xn,this,r);return!(this===Gn&&at(qn,r)&&!at(Kn,r))&&(!(n||!at(this,r)||!at(qn,r)||at(this,Cn)&&this[Cn][r])||n)},ue=function(t,r){var n=E(t),e=mt(r);if(n!==Gn||!at(qn,e)||at(Kn,e)){var o=Wn(n,e);return!o||!at(qn,e)||at(n,Cn)&&n[Cn][e]||(o.enumerable=!0),o}},ce=function(t){var r=Jn(E(t)),n=[];return kn(r,(function(t){at(qn,t)||at(Kt,t)||Yn(n,t)})),n},ae=function(t){var r=t===Gn,n=Jn(r?Kn:E(t)),e=[];return kn(n,(function(t){!at(qn,t)||r&&!at(Gn,t)||Yn(e,qn[t])})),e};W||(Vn=function(){if(x(zn,this))throw new Hn("Symbol is not a constructor");var t=arguments.length&&void 0!==arguments[0]?Hr(arguments[0]):void 0,r=pt(t),n=function(t){var e=void 0===this?u:this;e===Gn&&l(n,Kn,t),at(e,Cn)&&at(e[Cn],r)&&(e[Cn][r]=!1);var o=b(1,t);try{re(e,r,o)}catch(t){if(!(t instanceof Bn))throw t;te(e,r,o)}};return a&&Zn&&re(Gn,r,{configurable:!0,set:n}),ne(r,t)},zn=Vn[Rn],ir(zn,"toString",(function(){return Nn(this).tag})),ir(Vn,"withoutSetter",(function(t){return ne(pt(t),t)})),v.f=ie,Rt.f=ee,$r.f=oe,Tt.f=ue,wr.f=cn.f=ce,Or.f=ae,fn.f=function(t){return ne(gt(t),t)},a&&(an(zn,"description",{configurable:!0,get:function(){return Nn(this).description}}),ir(Gn,"propertyIsEnumerable",ie,{unsafe:!0}))),Cr({global:!0,constructor:!0,wrap:!0,forced:!W,sham:!W},{Symbol:Vn}),kn(Ur(Qn),(function(t){pn(t)})),Cr({target:Dn,stat:!0,forced:!W},{useSetter:function(){Zn=!0},useSimple:function(){Zn=!1}}),Cr({target:"Object",stat:!0,forced:!W,sham:!a},{create:function(t,r){return void 0===r?rn(t):oe(rn(t),r)},defineProperty:ee,defineProperties:oe,getOwnPropertyDescriptor:ue}),Cr({target:"Object",stat:!0,forced:!W},{getOwnPropertyNames:ce}),function(){var t=R("Symbol"),r=t&&t.prototype,n=r&&r.valueOf,e=gt("toPrimitive");r&&!r[e]&&ir(r,e,(function(t){return l(n,this)}),{arity:1})}(),bn(Vn,Dn),Kt[Cn]=!0;var fe=W&&!!Symbol.for&&!!Symbol.keyFor,se=ot("string-to-symbol-registry"),le=ot("symbol-to-string-registry");Cr({target:"Symbol",stat:!0,forced:!fe},{for:function(t){var r=Hr(t);if(at(se,r))return se[r];var n=R("Symbol")(r);return se[r]=n,le[n]=r,n}});var pe=ot("symbol-to-string-registry");Cr({target:"Symbol",stat:!0,forced:!fe},{keyFor:function(t){if(!X(t))throw new TypeError(q(t)+" is not a symbol");if(at(pe,t))return pe[t]}});var ye=Function.prototype,ve=ye.apply,be=ye.call,ge="object"==typeof Reflect&&Reflect.apply||(f?be.bind(ve):function(){return be.apply(ve,arguments)}),de=m([].slice),he=m([].push),me=String,Se=R("JSON","stringify"),we=m(/./.exec),Oe=m("".charAt),je=m("".charCodeAt),Pe=m("".replace),Te=m(1..toString),Le=/[\uD800-\uDFFF]/g,Ae=/^[\uD800-\uDBFF]$/,_e=/^[\uDC00-\uDFFF]$/,Ee=!W||c((function(){var t=R("Symbol")("stringify detection");return"[null]"!==Se([t])||"{}"!==Se({a:t})||"{}"!==Se(Object(t))})),Fe=c((function(){return'"\udf06\ud834"'!==Se("\uDF06\uD834")||'"\udead"'!==Se("\uDEAD")})),Ie=function(t,r){var n=de(arguments),e=function(t){if(k(t))return t;if(hn(t)){for(var r=t.length,n=[],e=0;e<r;e++){var o=t[e];"string"==typeof o?he(n,o):"number"!=typeof o&&"Number"!==O(o)&&"String"!==O(o)||he(n,Hr(o))}var i=n.length,u=!0;return function(t,r){if(u)return u=!1,r;if(hn(this))return r;for(var e=0;e<i;e++)if(n[e]===t)return r}}}(r);if(k(e)||void 0!==t&&!X(t))return n[1]=function(t,r){if(k(e)&&(r=l(e,this,me(t),r)),!X(r))return r},ge(Se,null,n)},Me=function(t,r,n){var e=Oe(n,r-1),o=Oe(n,r+1);return we(Ae,t)&&!we(_e,o)||we(_e,t)&&!we(Ae,e)?"\\u"+Te(je(t,0),16):t};Se&&Cr({target:"JSON",stat:!0,arity:3,forced:Ee||Fe},{stringify:function(t,r,n){var e=de(arguments),o=ge(Ee?Ie:Se,null,e);return Fe&&"string"==typeof o?Pe(o,Le,Me):o}});var ke=!W||c((function(){Or.f(1)}));Cr({target:"Object",stat:!0,forced:ke},{getOwnPropertySymbols:function(t){var r=Or.f;return r?r(ut(t)):[]}});var Ce=u.Symbol,De=Ce&&Ce.prototype;if(a&&k(Ce)&&(!("description"in De)||void 0!==Ce().description)){var Re={},xe=function(){var t=arguments.length<1||void 0===arguments[0]?void 0:Hr(arguments[0]),r=x(De,this)?new Ce(t):void 0===t?Ce():Ce(t);return""===t&&(Re[r]=!0),r};Tr(xe,Ce),xe.prototype=De,De.constructor=xe;var Ne="Symbol(description detection)"===String(Ce("description detection")),Ge=m(De.valueOf),Ve=m(De.toString),ze=/^Symbol\((.*)\)[^)]+$/,Be=m("".replace),He=m("".slice);an(De,"description",{configurable:!0,get:function(){var t=Ge(this);if(at(Re,t))return"";var r=Ve(t),n=Ne?He(r,7,-1):Be(r,ze,"$1");return""===n?void 0:n}}),Cr({global:!0,constructor:!0,forced:!0},{Symbol:xe})}var Ue=xr?{}.toString:function(){return"[object "+zr(this)+"]"};xr||ir(Object.prototype,"toString",Ue,{unsafe:!0}),pn("iterator");var We=Rt.f,$e=gt("unscopables"),Je=Array.prototype;void 0===Je[$e]&&We(Je,$e,{configurable:!0,value:rn(null)});var Xe,Ye,qe,Ke=function(t){Je[$e][t]=!0},Qe={},Ze=!c((function(){function t(){}return t.prototype.constructor=null,Object.getPrototypeOf(new t)!==t.prototype})),to=qt("IE_PROTO"),ro=Object,no=ro.prototype,eo=Ze?ro.getPrototypeOf:function(t){var r=ut(t);if(at(r,to))return r[to];var n=r.constructor;return k(n)&&r instanceof n?n.prototype:r instanceof ro?no:null},oo=gt("iterator"),io=!1;[].keys&&("next"in(qe=[].keys())?(Ye=eo(eo(qe)))!==Object.prototype&&(Xe=Ye):io=!0);var uo=!D(Xe)||c((function(){var t={};return Xe[oo].call(t)!==t}));uo&&(Xe={}),k(Xe[oo])||ir(Xe,oo,(function(){return this}));var co={IteratorPrototype:Xe,BUGGY_SAFARI_ITERATORS:io},ao=co.IteratorPrototype,fo=function(){return this},so=String,lo=TypeError,po=Object.setPrototypeOf||("__proto__"in{}?function(){var t,r=!1,n={};try{(t=function(t,r,n){try{return m(Q(Object.getOwnPropertyDescriptor(t,"__proto__").set))}catch(t){}}(Object.prototype))(n,[]),r=n instanceof Array}catch(t){}return function(n,e){return Et(n),function(t){if("object"==typeof t||k(t))return t;throw new lo("Can't set "+so(t)+" as a prototype")}(e),r?t(n,e):n.__proto__=e,n}}():void 0),yo=zt.PROPER,vo=zt.CONFIGURABLE,bo=co.IteratorPrototype,go=co.BUGGY_SAFARI_ITERATORS,ho=gt("iterator"),mo="keys",So="values",wo="entries",Oo=function(){return this},jo=function(t,r,n,e,o,i,u){!function(t,r,n,e){var o=r+" Iterator";t.prototype=rn(ao,{next:b(1,n)}),bn(t,o,!1),Qe[o]=fo}(n,r,e);var c,a,f,s=function(t){if(t===o&&d)return d;if(!go&&t&&t in v)return v[t];switch(t){case mo:case So:case wo:return function(){return new n(this,t)}}return function(){return new n(this)}},p=r+" Iterator",y=!1,v=t.prototype,g=v[ho]||v["@@iterator"]||o&&v[o],d=!go&&g||s(o),h="Array"===r&&v.entries||g;if(h&&(c=eo(h.call(new t)))!==Object.prototype&&c.next&&(eo(c)!==bo&&(po?po(c,bo):k(c[ho])||ir(c,ho,Oo)),bn(c,p,!0)),yo&&o===So&&g&&g.name!==So&&(vo?xt(v,"name",So):(y=!0,d=function(){return l(g,this)})),o)if(a={values:s(So),keys:i?d:s(mo),entries:s(wo)},u)for(f in a)(go||y||!(f in v))&&ir(v,f,a[f]);else Cr({target:r,proto:!0,forced:go||y},a);return v[ho]!==d&&ir(v,ho,d,{name:o}),Qe[r]=d,a},Po=function(t,r){return{value:t,done:r}},To=Rt.f,Lo="Array Iterator",Ao=er.set,_o=er.getterFor(Lo),Eo=jo(Array,"Array",(function(t,r){Ao(this,{type:Lo,target:E(t),index:0,kind:r})}),(function(){var t=_o(this),r=t.target,n=t.index++;if(!r||n>=r.length)return t.target=void 0,Po(void 0,!0);switch(t.kind){case"keys":return Po(n,!1);case"values":return Po(r[n],!1)}return Po([n,r[n]],!1)}),"values"),Fo=Qe.Arguments=Qe.Array;if(Ke("keys"),Ke("values"),Ke("entries"),a&&"values"!==Fo.name)try{To(Fo,"name",{value:"values"})}catch(t){}var Io=m("".charAt),Mo=m("".charCodeAt),ko=m("".slice),Co=function(t){return function(r,n){var e,o,i=Hr(_(r)),u=fr(n),c=i.length;return u<0||u>=c?t?"":void 0:(e=Mo(i,u))<55296||e>56319||u+1===c||(o=Mo(i,u+1))<56320||o>57343?t?Io(i,u):e:t?ko(i,u,u+2):o-56320+(e-55296<<10)+65536}},Do=(Co(!1),Co(!0)),Ro="String Iterator",xo=er.set,No=er.getterFor(Ro);jo(String,"String",(function(t){xo(this,{type:Ro,string:Hr(t),index:0})}),(function(){var t,r=No(this),n=r.string,e=r.index;return e>=n.length?Po(void 0,!0):(t=Do(n,e),r.index+=t.length,Po(t,!1))}));var Go={CSSRuleList:0,CSSStyleDeclaration:0,CSSValueList:0,ClientRectList:0,DOMRectList:0,DOMStringList:0,DOMTokenList:1,DataTransferItemList:0,FileList:0,HTMLAllCollection:0,HTMLCollection:0,HTMLFormElement:0,HTMLSelectElement:0,MediaList:0,MimeTypeArray:0,NamedNodeMap:0,NodeList:1,PaintRequestList:0,Plugin:0,PluginArray:0,SVGLengthList:0,SVGNumberList:0,SVGPathSegList:0,SVGPointList:0,SVGStringList:0,SVGTransformList:0,SourceBufferList:0,StyleSheetList:0,TextTrackCueList:0,TextTrackList:0,TouchList:0},Vo=Ot("span").classList,zo=Vo&&Vo.constructor&&Vo.constructor.prototype,Bo=zo===Object.prototype?void 0:zo,Ho=gt("iterator"),Uo=gt("toStringTag"),Wo=Eo.values,$o=function(t,r){if(t){if(t[Ho]!==Wo)try{xt(t,Ho,Wo)}catch(r){t[Ho]=Wo}if(t[Uo]||xt(t,Uo,r),Go[r])for(var n in Eo)if(t[n]!==Eo[n])try{xt(t,n,Eo[n])}catch(r){t[n]=Eo[n]}}};for(var Jo in Go)$o(u[Jo]&&u[Jo].prototype,Jo);$o(Bo,"DOMTokenList");var Xo=zt.EXISTS,Yo=Function.prototype,qo=m(Yo.toString),Ko=/function\b(?:\s|\/\*[\S\s]*?\*\/|\/\/[^\n\r]*[\n\r]+)*([^\s(/]*)/,Qo=m(Ko.exec);a&&!Xo&&an(Yo,"name",{configurable:!0,get:function(){try{return Qo(Ko,qo(this))[1]}catch(t){return""}}});var Zo=c((function(){Ur(1)}));Cr({target:"Object",stat:!0,forced:Zo},{keys:function(t){return Ur(ut(t))}});var ti=n((function(r){function n(r){return(n="function"==typeof Symbol&&"symbol"==t(Symbol.iterator)?function(r){return t(r)}:function(r){return r&&"function"==typeof Symbol&&r.constructor===Symbol&&r!==Symbol.prototype?"symbol":t(r)})(r)}r.exports=function(){for(var t,r,e=[],o=window,i=o;i;){try{if(i.frames.__tcfapiLocator){t=i;break}}catch(t){}if(i===o.top)break;i=i.parent}t||(function t(){var r=o.document,n=!!o.frames.__tcfapiLocator;if(!n)if(r.body){var e=r.createElement("iframe");e.style.cssText="display:none",e.name="__tcfapiLocator",r.body.appendChild(e)}else setTimeout(t,5);return!n}(),o.__tcfapi=function(){for(var t=arguments.length,n=new Array(t),o=0;o<t;o++)n[o]=arguments[o];if(!n.length)return e;"setGdprApplies"===n[0]?n.length>3&&2===parseInt(n[1],10)&&"boolean"==typeof n[3]&&(r=n[3],"function"==typeof n[2]&&n[2]("set",!0)):"ping"===n[0]?"function"==typeof n[2]&&n[2]({gdprApplies:r,cmpLoaded:!1,cmpStatus:"stub"}):e.push(n)},o.addEventListener("message",(function(t){var r="string"==typeof t.data,e={};if(r)try{e=JSON.parse(t.data)}catch(t){}else e=t.data;var o="object"===n(e)&&null!==e?e.__tcfapiCall:null;o&&window.__tcfapi(o.command,o.version,(function(n,e){var i={__tcfapiReturn:{returnValue:n,success:e,callId:o.callId}};t&&t.source&&t.source.postMessage&&t.source.postMessage(r?JSON.stringify(i):i,"*")}),o.parameter)}),!1))}}));ti()}();
+</script>
+    
+    <!-- Default Consent Mode config -->
+<script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    (function(){
+        gtag('consent', 'default', {
+            'ad_storage': 'denied',
+            'analytics_storage': 'denied',
+            'functionality_storage': 'denied',
+            'personalization_storage': 'denied',
+            'security_storage': 'denied',
+            'ad_user_data': 'denied',
+            'ad_personalization': 'denied',
+            'wait_for_update': 1500
+        });
+        gtag('set', 'ads_data_redaction', false);
+        gtag('set', 'url_passthrough', false);
+        const s={adStorage:{storageName:"ad_storage",serialNumber:0},analyticsStorage:{storageName:"analytics_storage",serialNumber:1},functionalityStorage:{storageName:"functionality_storage",serialNumber:2},personalizationStorage:{storageName:"personalization_storage",serialNumber:3},securityStorage:{storageName:"security_storage",serialNumber:4},adUserData:{storageName:"ad_user_data",serialNumber:5},adPersonalization:{storageName:"ad_personalization",serialNumber:6}};let c=localStorage.getItem("__lxG__consent__v2");if(c){c=JSON.parse(c);if(c&&c.cls_val)c=c.cls_val;if(c)c=c.split("|");if(c&&c.length&&typeof c[14]!==undefined){c=c[14].split("").map(e=>e-0);if(c.length){let t={};Object.values(s).sort((e,t)=>e.serialNumber-t.serialNumber).forEach(e=>{t[e.storageName]=c[e.serialNumber]?"granted":"denied"});gtag("consent","update",t)}}}
+        if(Math.random() < 0.05) {if (window.dataLayer && (window.dataLayer.some(e => e[0] === 'js' && e[1] instanceof Date) || window.dataLayer.some(e => e['event'] === 'gtm.js' && e['gtm.start'] == true ))) {document.head.appendChild(document.createElement('img')).src = "//clickiocdn.com/utr/gtag/?sid=236004";}}
+    })();
+</script>
+    
+
+
+    <!-- Clickio Consent Main tag -->
+    <script async type="text/javascript" src="//clickiocmp.com/t/consent_221138.js"></script>
+
+
+<!-- adv type by category ************** ----- adv_type:  ------*************** adv type by category -->
+
+<!-- 
+    page: detail
+    category: /televisione/
+    detail type: Articolo
+-->
+
+
+
+
+
+<script>
+    var _ismobile = false;
+    var _istablet = false;
+    _ismobile = (/iphone|ipod|android|blackberry|opera|mini|windows\sce|palm|smartphone|iemobile/i.test(navigator.userAgent.toLowerCase()));
+    _istablet = (/ipad|android|android 3.0|xoom|sch-i800|playbook|tablet|kindle/i.test(navigator.userAgent.toLowerCase()));
+    if (navigator.userAgent.toLowerCase().indexOf("android") > 0) { // if android devo discriminare ulteriormente
+        if (navigator.userAgent.toLowerCase().search("mobile") > -1) {
+            _ismobile = true;
+            _istablet = false;
+        } else {
+            _istablet = true;
+            _ismobile = false;
+        }
+    }
+    var isMobile = _ismobile;
+    var HTMLTAG = document.getElementsByTagName( 'html' )[0];
+    HTMLTAG.className += (isMobile ? ' mobile' : ' desktop');
+    
+    var locationUrl = document.location.href;
+    var ilfoglio_section = "";
+    
+        
+            
+                var pagetype = "free article";//"freearticle";
+               
+        
+
+    
+
+    if (locationUrl.indexOf("\/cultura\/") > 0){
+        ilfoglio_section = "sezione-cultura";
+    }else if(locationUrl.indexOf("\/politica\/") > 0){
+        ilfoglio_section = "sezione-politica";
+    }else if(locationUrl.indexOf("\/chiesa\/") > 0){
+        ilfoglio_section = "sezione-chiesa";
+    }else if(locationUrl.indexOf("\/giustizia\/") > 0){
+        ilfoglio_section = "sezione-giustizia";
+    }else if(locationUrl.indexOf("\/societa\/") > 0){
+        ilfoglio_section = "sezione-societa";
+    }else if(locationUrl.indexOf("\/esteri\/") > 0){
+        ilfoglio_section = "sezione-esteri";
+    }else if(locationUrl.indexOf("\/bioetica\/") > 0){
+        ilfoglio_section = "sezione-bioetica";
+    }else if(locationUrl.indexOf("\/economia\/") > 0){
+        ilfoglio_section = "sezione-economia";
+    }else if(locationUrl.indexOf("\/sport\/") > 0){
+        ilfoglio_section = "sezione-sport";
+    }    
+</script>
+<script type="text/javascript">
+window._gmp = {
+    pageType: pagetype,
+    section: ilfoglio_section
+};
+
+window._gmp = new Proxy(window._gmp, {
+    set(target, property, value) {
+        if (property === 'userType' && value === 'subscriber' || ((property == 'pageType' && value ==
+                'homepage') || (property == 'pageType' && value == 'free article'))) {
+            console.log('userType changed to subscriber');
+            try {
+                googletag.destroySlots();
+            } catch (e) {
+                console.warn(e.message);
+            }
+        }
+        target[property] = value;
+        return true;
+    }
+});
+
+if (typeof authWeb !== "undefined" && authWeb && typeof isPayArticle !== "undefined" && isPayArticle) {
+    window._gmp.userType = "subscriber";
+}
+initSwg();
+</script>
+
+
+<!-- consent -->
+<script>
+    localStorage.setItem('__CONSENT', '0')
+    document.addEventListener('consentGranted', 
+    function(evt) {
+        // console.log(a);
+        console.log("consentGranted intercepted!");
+        localStorage.setItem('__CONSENT', JSON.stringify(event.detail.purposes));
+		if (evt.detail.purposes["1"]) { // da gestire
+			// inserire qui le chiamate a servizi del publisher che utilizzano cookie: ADV
+			console.log('adv granted');
+		}
+		if (evt.detail.purposes["8"] && evt.detail.purposes["9"]) { // gestito
+			// inserire qui le chiamate a servizi che misurano efficacia del contenuto: ok, es. Analytics, Tag Manager, AdForm, Linkedin (e.g. google analytics)... altro? 
+            console.log('audiweb granted');
+			console.log('Analytics, Tag Manager, AdForm granted');
+            fbq('init', '916540528499612');
+            fbq('track', 'PageView');
+
+
+            var dataLayerGtag = {'send_to': '(none)'};
+
+            gtag('config', '(none)',{
+                'custom_map': {'dimension1': 'content_type','dimension2': 'category'}, 'send_page_view': false
+            });
+             /*var category = '/televisione/';
+            cateogry = category.slice(1,-1);
+            dataLayerGtag.content_type = "articolo";
+            dataLayerGtag.category = cateogry;
+            console.log(dataLayerGtag);
+            gtag('event', 'page_view', dataLayerGtag);
+            */
+            // gtag('js', new Date());
+            // gtag('config', 'UA-3334333-1');
+            // track24years
+            var consentStatus = getConsentStatus(8) && getConsentStatus(9);
+            // console.log('### consentStatus 74: ' + consentStatus);
+            
+            function gtag() { dataLayer.push(arguments); }
+            gtag("consent", "update", {
+                ad_storage: "granted",
+                analytics_storage: "granted",
+                wait_for_update: 2000 // milliseconds
+            });
+		}
+        /*
+		if (evt.detail.purposes["9"]) { // gestito
+			// inserire qui le chiamate a servizi per ricerche di mercato (e.g. audiweb ?): su questo non c'è nulla attualmente sul sito
+			console.log('audiweb granted');
+		}
+        */
+		if (evt.detail.purposes["10"]) { // gestito
+			// inserire qui le chiamate a servizi per misurare come migliorare il prodotto: AdPlay ha a che fare con questo punto?
+			console.log('AdPlay granted');
+		}
+    });
+
+    var getConsentStatus = function(index) {
+        try {
+            const purpose = JSON.parse(localStorage.getItem('__CONSENT') || '[]');
+            return !!purpose[index];
+            // return localStorage.getItem('__CONSENT')==='0'
+            /**
+            var lxGConsent = JSON.parse(localStorage.getItem('__lxG__consent__v2'));
+            return lxGConsent && lxGConsent.cls_val &&  lxGConsent.cls_val.split('|')[0]==='1'
+            **/
+        } catch (e) {
+            console.log('Error in getConsentStatus: ' + e);
+            return false;
+        }
+    }
+    var onConsentFinished = function(status) {
+        console.log('CMP status ' + status);   
+        if ( !status ) {
+            setCookie('_ga', undefined);
+            __deleteAllCookies();
+        }else {
+            // initSwg();
+        }
+
+    };
+
+    window.__isConsentedRequested = function() {
+        return !!JSON.parse(localStorage.getItem('__lxG__consent__v2'));
+    }
+
+    function __deleteAllCookies() {
+        var cookies = document.cookie.split(";");
+        for (var i = 0; i < cookies.length; i++) {
+            var cookie = cookies[i];
+            var eqPos = cookie.indexOf("=");
+            var name = eqPos > -1 ? cookie.substr(0, eqPos) : cookie;
+            document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        }
+    }
+
+    var __timer = setInterval(function() {
+        var isConsentRequestResult = __isConsentedRequested();
+        if (isConsentRequestResult) {
+            clearInterval(__timer);
+            // var status = getConsentStatus(8) && getConsentStatus(9);
+            var status = true;
+            //  console.log('### status 149: ' + status);
+            onConsentFinished(status);
+        }
+    }, 1000);
+
+
+</script>
+<script>
+    var _adv = { id: "17127", analytics: true };
+    _dL = window._dL || []; _dI = window._dI || false; _dT = window._dT || function(a) {_dL.push(a);};  _dT(_adv);
+    if (!_dI) { _dI = true; (function (e, t) { var n = e.createElement(t), r = e.getElementsByTagName(t)[0]; n.src = "https://js.datafront.co/df.16533.js"; n.async = true; r.parentNode.insertBefore(n, r) })(document, "scr" + "ipt")}
+</script>
+<!-- *PPID* retrieval script -->
+<script>
+  var individual_id = null;
+  var oz_cfg_done = false;
+  var n14_done = false;
+  function oz_enable_gpt() {
+    window.googletag = window.googletag || {cmd: []};
+    googletag.cmd.push(function() {
+      // Passing of PPID to GPT tag
+      if (individual_id)
+        googletag.pubads().setPublisherProvidedId(individual_id);
+      googletag.pubads().enableSingleRequest();
+      googletag.enableServices();
+    });    
+  }
+  function n14callback(event) {
+    // Access the parameter passed to the event
+    individual_id = event.detail;
+    // Process the parameter
+    n14_done = true;
+    if (oz_cfg_done) {
+      oz_enable_gpt();
+    }
+  }
+  // Add the event listener to the document or any specific element
+  document.addEventListener('next_id_event_x2a', n14callback);
+</script>
+<!-- Facebook Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function()
+
+{n.callMethod? n.callMethod.apply(n,arguments):n.queue.push(arguments)}
+;
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+if ( getConsentStatus(8) && getConsentStatus(9)) {
+    fbq('init', '916540528499612');
+    fbq('track', 'PageView');
+} else {
+        // console.log('### not consent status on fbq 178: adv_head.html');
+} 
+</script>
+<script>
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=916540528499612&ev=PageView&noscript=1"
+/></noscript>
+<!-- End Facebook Pixel Code -->
+
+ 
+
+    
+        
+    
+
+    <script async src='https://www.googletagmanager.com/gtag/js?id=UA-3334333-1'></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){ dataLayer.push(arguments);}
+            gtag("consent", "default", {
+            ad_storage: "denied",
+            analytics_storage: "granted",
+            wait_for_update: 2000 // milliseconds
+        });
+        gtag('js', new Date());
+        var dataLayerGtag = {'send_to': 'UA-3334333-1'};
+        function gtag(){ dataLayer.push(arguments);}
+            if ( getConsentStatus(8) && getConsentStatus(9)) {
+                    gtag("consent", "default", {
+                    ad_storage: "granted",
+                    analytics_storage: "granted",
+                    wait_for_update: 2000 // milliseconds
+                });
+                gtag('js', new Date());
+                
+                gtag('config', 'UA-3334333-1',{
+                    'custom_map': {'dimension1': 'content_type','dimension2': 'category'}, 'send_page_view': false
+                });
+                var category = '/televisione/';
+                cateogry = category.slice(1,-1);
+                dataLayerGtag.content_type = "articolo";
+                dataLayerGtag.category = cateogry;
+                console.log(dataLayerGtag);
+                gtag('event', 'page_view', dataLayerGtag);
+            } else {
+                function gtag(){ dataLayer.push(arguments);}
+                gtag("consent", "default", {
+                    ad_storage: "denied",
+                    analytics_storage: "denied",
+                    wait_for_update: 2000 // milliseconds
+                });
+                gtag('js', new Date());
+                
+                gtag('config', 'UA-3334333-1',{
+                    'custom_map': {'dimension1': 'content_type','dimension2': 'category'}, 'send_page_view': false
+                });
+                var category = '/televisione/';
+                cateogry = category.slice(1,-1);
+                dataLayerGtag.content_type = "articolo";
+                dataLayerGtag.category = cateogry;
+                console.log(dataLayerGtag);
+                gtag('event', 'page_view', dataLayerGtag);
+            }
+    
+        </script>
+
+
+
+<!--
+<script type="text/javascript">
+(function(c,l,a,r,i,t,y){
+if (!getConsentStatus()) {
+    return false;
+}
+c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+})(window, document, "clarity", "script", "7jhtkj315t");
+</script>
+-->
+
+<!-- feature/IF-447 -->
+<!-- Google Tag Manager -->
+<script>
+(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','GTM-M8X584Q');
+</script>
+<!-- End Google Tag Manager -->
+<!-- feature/IF-447 -->
+<script>
+    const suppressMessage = () => {
+      window.googlefc = window.googlefc || {};
+      window.googlefc.controlledMessagingFunction = (message) => {
+        message.proceed(false);
+      };
+    };
+    suppressMessage();
+  </script>
+  
+<script async src="https://fundingchoicesmessages.google.com/i/pub-7074224334010734?ers=1" nonce="6vuVmAqTcFyllwLtCCvxfQ"></script><script nonce="6vuVmAqTcFyllwLtCCvxfQ">(function() {function signalGooglefcPresent() {if (!window.frames['googlefcPresent']) {if (document.body) {const iframe = document.createElement('iframe'); iframe.style = 'width: 0; height: 0; border: none; z-index: -1000; left: -1000px; top: -1000px;'; iframe.style.display = 'none'; iframe.name = 'googlefcPresent'; document.body.appendChild(iframe);} else {setTimeout(signalGooglefcPresent, 0);}}}signalGooglefcPresent();})();</script>
+
+<script async src="https://securepubads.g.doubleclick.net/tag/js/gpt.js"></script>
+<script async src="//dvagh3p3rk8xj.cloudfront.net/prebid8.17.0.js"></script>
+<script src="//dvagh3p3rk8xj.cloudfront.net/prebid_header/ilfoglio_tcf2_pb817.js"></script>
+<!-- feature/IF-477 - FO24-31 -->
+<!--adv_cat: (none) -->
+
+
+
+
+
+<script>
+    var loadADV = function(){
+        console.log("start GOOGLE ASYNC LOADADV")
+        window.googletag = window.googletag || {cmd: []};
+        googletag.cmd.push(function() {
+            googletag.defineSlot('/57491254/www.ilfoglio.it/ros/Top', [1, 1], 'div-gpt-ad-Top').addService(googletag.pubads());
+            googletag.defineSlot('/57491254/www.ilfoglio.it/ros/MaxTicker', [[970, 250], [320, 50], [320, 100], [990, 30], [990, 250], [728, 90]], 'div-gpt-ad-MaxTicker').addService(googletag.pubads());
+            googletag.defineSlot('/57491254/www.ilfoglio.it/ros/MPU_Top', [[320, 101], [300, 250], [320, 51]], 'div-gpt-ad-MPU_Top').addService(googletag.pubads());
+            googletag.defineSlot('/57491254/www.ilfoglio.it/ros/MPU_Middle', [[320, 102], [320, 52], [300, 601], [300, 251]], 'div-gpt-ad-MPU_Middle').addService(googletag.pubads());
+            googletag.defineSlot('/57491254/www.ilfoglio.it/ros/MPU_Bottom', [300, 252], 'div-gpt-ad-MPU_Bottom').addService(googletag.pubads());
+            googletag.defineOutOfPageSlot('/57491254/www.ilfoglio.it/ros/Overlay', 'div-gpt-ad-Overlay').addService(googletag.pubads());
+            
+            googletag.pubads().enableSingleRequest();
+            googletag.pubads().collapseEmptyDivs();
+            
+            oz_config(googletag);
+            oz_cfg_done = true;
+            if (n14_done) {
+                oz_enable_gpt();
+            }
+
+            googletag.enableServices();
+        });
+    };
+
+    var displayAds = function() {
+        googletag.cmd.push(function() {
+            googletag.display('div-gpt-ad-Top');
+            googletag.display('div-gpt-ad-MaxTicker');
+            googletag.display('div-gpt-ad-MPU_Top');
+            googletag.display('div-gpt-ad-MPU_Middle');
+            googletag.display('div-gpt-ad-MPU_Bottom');
+            googletag.display('div-gpt-ad-Overlay');
+        });
+    };
+
+    loadADV();
+    window.__lxG__consent__=window.__lxG__consent__||{};
+    window.__lxG__consent__.consentCallback = function (consentState) {
+        console.log("consentCallback", consentState);
+        if (consentState === null) {
+            // consent not applicable, non-eu user
+        } else if (consentState === -1) {
+            // eu user, consent interface shown, cmp loaded, user has not decided yet, waiting for user consent
+        } else if (consentState === 0) {
+            // is not reported from Clickio code, may be used for different timeout fallbacks
+        } else if (consentState === 1) {
+            console.log('entrato dentro displayAds')
+            displayAds();
+            // mind consentState === 1 does not mean, that user consented to everything
+        }
+    };
+
+
+
+</script>
+<!-- feature/IF-477 - FO24-31 -->
+</head>
+
+	<body class="article" data-content="article" data-sezione="article">
+		<!-- feature/IF-447 -->
+<!-- Google Tag Manager (noscript) -->
+<noscript>
+    <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-M8X584Q" height="0" width="0" style="display:none;visibility:hidden"></iframe>
+</noscript>
+<!-- End Google Tag Manager (noscript) -->
+<!-- feature/IF-447 -->
+
+<div class="top-row print" style="display: none;">
+    <a href="/" class="logo"><img src="https://www.ilfoglio.it/assets/2020/images/il-foglio-logo.svg" class="loading" alt="Il Foglio" data-was-processed="true"></a>
+</div><section class='module advertisement'>
+    <article class='ad desktop-970x250 div-gpt-ad-Top'>
+        <div id='div-gpt-ad-Top'>
+        </div>
+    </article>
+</section><header itemscope="itemscope" itemtype="http://schema.org/WPHeader">
+    <!-- HEADER -->
+            <!-- /assets/2020/html/header.html?category=&title= -->
+                    
+
+
+
+
+
+<div class="top-row">
+    <div class="search-wrapper">
+        <div class="search"></div>
+        <form action="/search/">
+            <input type="text" class="search-field" placeholder="Cerca" required name="keyword"/>
+            <input type="submit" hidden/>
+        </form>
+    </div>
+    <ul class="social-media">
+        <li><a href="https://www.facebook.com/ilfoglio" class="facebook" title="Facebook" target="_blank"></a></li>
+        <li><a href="https://twitter.com/ilfoglio_it" class="twitter" title="Twitter"  target="_blank"></a></li>
+        <li><a href="https://www.instagram.com/ilfoglio/?hl=it" class="instagram" title="Instagram"  target="_blank"></a></li>
+        <li><a href="https://www.youtube.com/channel/UCa6VWUj6Qy43oxVpb6GGe5Q" class="youtube" title="YouTube"  target="_blank"></a></li>
+        <li><a href="https://flipboard.com/@ilfoglioit/le-notizie-principali-rguf1aubz" class="flipboard" title="Flipboard"  target="_blank"></a></li>
+    </ul>
+</div>
+<div class="mid-row">
+    <ul class="actions first" itemscope itemtype="https://schema.org/BreadcrumbList">
+        <li><div class="hamburger"></div></li>
+        <li><div class="search"></div></li>
+        <li style="display:none" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+            <a itemscope itemtype="https://schema.org/WebPage" itemprop="item" itemid="https://www.ilfoglio.it/" href="//www.ilfoglio.it/" ><span itemprop="name">il Foglio</span></a>
+            <meta itemprop="position" content="1" />            
+        </li>
+        <li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" class="section-name">
+        
+            <a itemscope itemtype="https://schema.org/WebPage" itemprop="item" itemid="/televisione/" href="/televisione/">
+                <span itemprop="name">Televisione</span>
+            </a>
+            <meta itemprop="position" content="2" />
+        
+        </li>
+
+    </ul>
+    <ul class="newspapers">
+        <li>
+  <figure>
+    <a
+      href="https://edicoladigitale.ilfoglio.it/?editionStart=Il%20Foglio"
+      target="_blank"
+    >
+      <img
+        data-src="https://eu01.newsmemory.com/?pSetup=ilfoglio&getprima&editionname=Il%20Foglio"
+        class="lazy"
+      />
+    </a>
+  </figure>
+  <a
+    href="https://edicoladigitale.ilfoglio.it/?editionStart=Il%20Foglio"
+    target="_blank"
+  >
+    Il Foglio di Oggi</a
+  >
+</li>
+<li>
+  <figure>
+    <a
+      href="https://edicoladigitale.ilfoglio.it/?editionStart=Il%20Foglio%20Weekend"
+      target="_blank"
+    >
+      <img
+        data-src="https://eu01.newsmemory.com/?pSetup=ilfoglio&getprima&editionname=Il%20Foglio%20Weekend"
+        class="lazy"
+      />
+    </a>
+  </figure>
+  <a
+    href="https://edicoladigitale.ilfoglio.it/?editionStart=Il%20Foglio%20Weekend"
+    target="_blank"
+  >
+    Il Foglio Weekend</a
+  >
+</li>
+<li>
+  <figure>
+    <a
+      href="https://edicoladigitale.ilfoglio.it/?editionStart=Il%20Foglio%20Sportivo"
+      target="_blank"
+    >
+      <img
+        data-src="https://eu01.newsmemory.com/?pSetup=ilfoglio&getprima&editionname=Il%20Foglio%20Sportivo"
+        class="lazy"
+      />
+    </a>
+  </figure>
+  <a
+    href="https://edicoladigitale.ilfoglio.it/?editionStart=Il%20Foglio%20Sportivo"
+    target="_blank"
+  >
+    Il Foglio Sportivo</a
+  >
+</li>
+<li>
+  <figure>
+    <a
+      href="https://edicoladigitale.ilfoglio.it/?editionStart=Il%20Foglio%20Review"
+      target="_blank"
+    >
+      <img
+        data-src="https://eu01.newsmemory.com/?pSetup=ilfoglioreview&getprima&editionname=Il%20Foglio%20Review"
+        class="lazy"
+      />
+    </a>
+  </figure>
+  <a
+    href="https://edicoladigitale.ilfoglio.it/?editionStart=Il%20Foglio%20Review"
+    target="_blank"
+  >
+    Il Foglio Review</a
+  >
+</li>
+<li>
+  <figure>
+    <a
+      href="https://edicoladigitale.ilfoglio.it/?editionStart=Il%20Foglio%20AI"
+      target="_blank"
+    >
+      <img
+        data-src="https://eu01.newsmemory.com/?pSetup=ilfoglio&getprima&editionname=Il%20Foglio%20AI"
+        class="lazy"
+      />
+    </a>
+  </figure>
+  <a
+    href="https://edicoladigitale.ilfoglio.it/?editionStart=Il%20Foglio%20AI"
+    target="_blank"
+  >
+    Il Foglio AI</a
+  >
+</li>
+
+    </ul>
+    <a href="/" class="logo">
+        <img src="/assets/2020/images/il-foglio-logo.svg" class="" alt="Il Foglio">
+    </a>
+    <ul class="actions last">
+        <li class="subscribe-container"><a href="#" class="subscribe button store-action">Abbonati</a></li>
+        <li class="login-container"><a class="button login ta_account_button" onclick="ta_account()" title="login"></a></li>
+        <li class="logout-container"><a href="#" class="logout logout-action" title="Logout"></a></li>
+<!--        <li class="save"><a href="#"></a></li>-->
+<!--        <li class="share"><a href="#"></a></li>-->
+    </ul>
+</div>
+<div class="bottom-row">
+    <div class="hamburger"></div>
+    <ul class="tags" data-text="Temi:">
+        
+
+
+
+
+                
+
+
+
+
+
+
+
+
+
+<li><a href="https://www.ilfoglio.it/il-foglio-ai/">Il Foglio AI</a></li>
+	<li><a href="https://www.ilfoglio.it/russia-ucraina/">La guerra in Ucraina</a></li>
+	<li><a href="https://www.ilfoglio.it/tag/iran">Iran</a></li>
+	
+            
+    </ul>
+    <ul class="article-data">
+        
+        <li class="section-name">Televisione</li>
+        
+        
+        <li class="article-title">Un posto al sole: Raffaele sta male per la partenza di Ornella</li>
+        
+    </ul>
+    <div class="right">
+        <ul class="links" >
+            
+
+
+
+
+                
+
+
+
+
+
+
+
+
+
+<li><a href="https://podcast.ilfoglio.it/">Podcast</a></li>
+	<li><a href="https://www.ilfoglio.it/editoriali/">Editoriali</a></li>
+	<li><a href="https://edicoladigitale.ilfoglio.it/">Leggi il Foglio</a></li>
+	<li><a href="https://lab.ilfoglio.it/newsletter.html">Newsletter</a></li>
+	<li><a href="https://www.ilfoglio.it/lettere/">Lettere al direttore</a></li>
+	
+            
+        </ul>
+
+        <ul class="actions">
+<!--            <li><a href="" class="save" title="Save"></a></li>-->
+            <li class="login-container"><a class="button login ta_account_button" onclick="ta_account()" title="login"></a></li>
+            <li class="logout-container"><a href="#" class="logout logout-action" title="Logout"></a></li>
+        </ul>
+    </div>
+</div>
+<!-- Error -->
+<div class="progress-bar" style="width: 25%"></div>
+
+
+<div class="slide-out-nav">
+    <div class="top-wrapper">
+        <img src="//www.ilfoglio.it/assets/2020/images/il-foglio-logo.svg" class="logo" alt="Il Foglio">
+        <span class="close"></span>
+    </div>
+    <div class="search-wrapper">
+        <form action="/search">
+            <button class="search-button"></button>
+            <input type="text" class="search-field" placeholder="Cerca" required name="keyword"/>
+            <input type="submit" hidden/>
+        </form>
+    </div>
+    <nav itemscope="itemscope" itemtype="http://schema.org/SiteNavigationElement">
+        <ul itemtype="http://schema.org/SiteNavigationElement" itemscope="itemscope">
+            
+
+
+
+
+                
+
+
+
+
+
+
+
+
+
+
+
+<li itemprop="name">
+			<a itemprop="url" href="/politica/">Politica</a>
+		</li>
+	<li itemprop="name">
+			<a itemprop="url" href="/esteri/">Esteri</a>
+		</li>
+	<li itemprop="name">
+			<a itemprop="url" href="/chiesa/">Chiesa</a>
+		</li>
+	<li itemprop="name">
+			<a itemprop="url" href="/bioetica-e-diritti/">Bioetica e diritti</a>
+		</li>
+	<li itemprop="name">
+			<a itemprop="url" href="/giustizia/">Giustizia</a>
+		</li>
+	<li itemprop="name">
+			<a itemprop="url" href="/economia/">Economia</a>
+		</li>
+	<li itemprop="name">
+			<a itemprop="url" href="/cultura/">Cultura</a>
+		</li>
+	<li itemprop="name">
+			<a itemprop="url" href="/sport/">Sport</a>
+		</li>
+	<li itemprop="name">
+			<a itemprop="url" href="https://www.ilfoglio.it/salute/">Salute </a>
+		</li>
+	<li itemprop="name">
+			<a itemprop="url" href="https://www.ilfoglio.it/scuola/">Scuola</a>
+		</li>
+	<li itemprop="name">
+			<a itemprop="url" href="https://www.ilfoglio.it/cinema/">Cinema</a>
+		</li>
+	<li itemprop="name">
+			<a itemprop="url" href="https://www.ilfoglio.it/scienza/">Scienza </a>
+		</li>
+	
+            
+        </ul>
+    </nav>
+    <a href="https://edicoladigitale.ilfoglio.it/?purchase" class="subscribe button subscribe-container">Abbonati</a>
+    <div class="slide">
+        <span>Leggi il foglio</span>
+        <ul class="newspapers">
+            <li>
+  <figure>
+    <a
+      href="https://edicoladigitale.ilfoglio.it/?editionStart=Il%20Foglio"
+      target="_blank"
+    >
+      <img
+        data-src="https://eu01.newsmemory.com/?pSetup=ilfoglio&getprima&editionname=Il%20Foglio"
+        class="lazy"
+      />
+    </a>
+  </figure>
+  <a
+    href="https://edicoladigitale.ilfoglio.it/?editionStart=Il%20Foglio"
+    target="_blank"
+  >
+    Il Foglio di Oggi</a
+  >
+</li>
+<li>
+  <figure>
+    <a
+      href="https://edicoladigitale.ilfoglio.it/?editionStart=Il%20Foglio%20Weekend"
+      target="_blank"
+    >
+      <img
+        data-src="https://eu01.newsmemory.com/?pSetup=ilfoglio&getprima&editionname=Il%20Foglio%20Weekend"
+        class="lazy"
+      />
+    </a>
+  </figure>
+  <a
+    href="https://edicoladigitale.ilfoglio.it/?editionStart=Il%20Foglio%20Weekend"
+    target="_blank"
+  >
+    Il Foglio Weekend</a
+  >
+</li>
+<li>
+  <figure>
+    <a
+      href="https://edicoladigitale.ilfoglio.it/?editionStart=Il%20Foglio%20Sportivo"
+      target="_blank"
+    >
+      <img
+        data-src="https://eu01.newsmemory.com/?pSetup=ilfoglio&getprima&editionname=Il%20Foglio%20Sportivo"
+        class="lazy"
+      />
+    </a>
+  </figure>
+  <a
+    href="https://edicoladigitale.ilfoglio.it/?editionStart=Il%20Foglio%20Sportivo"
+    target="_blank"
+  >
+    Il Foglio Sportivo</a
+  >
+</li>
+<li>
+  <figure>
+    <a
+      href="https://edicoladigitale.ilfoglio.it/?editionStart=Il%20Foglio%20Review"
+      target="_blank"
+    >
+      <img
+        data-src="https://eu01.newsmemory.com/?pSetup=ilfoglioreview&getprima&editionname=Il%20Foglio%20Review"
+        class="lazy"
+      />
+    </a>
+  </figure>
+  <a
+    href="https://edicoladigitale.ilfoglio.it/?editionStart=Il%20Foglio%20Review"
+    target="_blank"
+  >
+    Il Foglio Review</a
+  >
+</li>
+<li>
+  <figure>
+    <a
+      href="https://edicoladigitale.ilfoglio.it/?editionStart=Il%20Foglio%20AI"
+      target="_blank"
+    >
+      <img
+        data-src="https://eu01.newsmemory.com/?pSetup=ilfoglio&getprima&editionname=Il%20Foglio%20AI"
+        class="lazy"
+      />
+    </a>
+  </figure>
+  <a
+    href="https://edicoladigitale.ilfoglio.it/?editionStart=Il%20Foglio%20AI"
+    target="_blank"
+  >
+    Il Foglio AI</a
+  >
+</li>
+
+        </ul>
+    </div>
+    <ul class="secondary-nav">
+        
+
+
+
+
+                
+
+
+
+
+
+
+
+
+
+
+
+<li><a href="/gran-milano/">Gran Milano</a></li>
+	<li><a href="/roma-capoccia/">Roma Capoccia</a></li>
+	<li><a href="https://foglioeuropeo.ilfoglio.it/">Il Foglio europeo</a></li>
+	<li><a href="https://review.ilfoglio.it/">Review</a></li>
+	<li><a href="https://www.ilfoglio.it/il-foglio-internazionale/">Un Foglio internazionale</a></li>
+	<li><a href="https://www.ilfoglio.it/terrazzo/">Terrazzo</a></li>
+	<li><a href="https://www.ilfoglio.it/una-fogliata-di-libri/">Una Fogliata di Libri</a></li>
+	<li><a href="https://www.ilfoglio.it/il-figlio/">Il Figlio</a></li>
+	<li><a href="https://mobilita.ilfoglio.it/">Mobilità</a></li>
+	<li><a href="https://agrifoglio.ilfoglio.it/">Agrifoglio </a></li>
+	<li><a href="https://www.ilfoglio.it/rubriche/">Rubriche</a></li>
+	<li><a href="https://www.ilfoglio.it/conosci-i-foglianti/">Conosci i foglianti </a></li>
+	<li><a href="https://www.ilfoglio.it/lettere/">Lettere al direttore</a></li>
+	<li><a href="https://www.ilfoglio.it/gallery/makkox/">Le vignette di Makkox</a></li>
+	<li><a href="https://www.ilfoglio.it/autori/claudio-cerasa/">Gli articoli del direttore</a></li>
+	<li><a href="https://www.ilfoglio.it/autori/giuliano-ferrara/">Gli articoli di Giuliano Ferrara</a></li>
+	<li><a href="https://www.ilfoglio.it/il-foglio-arte/">Il Foglio Arte</a></li>
+	<li><a href="https://www.ilfoglio.it/archivio/moda/">Il Foglio della Moda</a></li>
+	<li><a href="https://ilfoglio-ita-app.newsmemory.com/eeLayout/ilfoglio/1.0.a/optionspage/template/customhtml1.html">Podcast</a></li>
+	
+            
+    </ul>
+    <!--
+    <ul class="secondary-nav">
+        <li><a href="">Archivio</a></li>
+    </ul>
+    -->
+    <ul class="tertiary-nav">
+    <!--
+        <li><a href="/conosci-i-foglianti/">Conosci i foglianti</a></li>
+    -->
+        <li><a href="/editoriali/">Editoriali</a></li>  
+        <li class="newsletter-container"><a class="" href="/newsletter/">Iscriviti alle newsletter</a></li>
+        <li><a class="" href="https://www.ilfoglio.it/gli-speciali-del-foglio/2024/04/03/news/vuoi-fare-uno-stage-al-foglio-leggi-qui-6400738/">Stage al Foglio</a></li>
+    </ul>
+    <ul class="social-media">
+        <li><a href="https://www.facebook.com/ilfoglio" class="facebook" title="Facebook" target="_blank"></a></li>
+        <li><a href="https://twitter.com/ilfoglio_it" class="twitter" title="Twitter" target="_blank"></a></li>
+        <li><a href="https://www.instagram.com/ilfoglio/?hl=it" class="instagram" title="Instagram" target="_blank"></a></li>
+        <li><a href="https://www.youtube.com/channel/UCa6VWUj6Qy43oxVpb6GGe5Q" class="youtube" title="YouTube" target="_blank"></a></li>
+        <li><a href="https://flipboard.com/@ilfoglioit/le-notizie-principali-rguf1aubz" class="flipboard" title="Flipboard" target="_blank"></a></li>
+    </ul>
+</div></header>
+<main>
+			<!-- <section class='module advertisement desktop-adv'>
+    <article class='ad desktop-970x250'>
+        <div id='gmp-masthead' class="gmp"></div>
+    </article>
+</section> -->
+
+<section class='module advertisement'>
+    <article class='ad desktop-970x250' id='div-gpt-ad-MaxTicker'>
+    </article>
+</section><section class="article">
+				<article >
+					<div class="content-wrapper">
+						<!-- 
+	Taglio richiesto: 993x543 : https://img-prod.ilfoglio.it/2026/02/02/191919962-3272f89d-dd9a-49e9-8056-867ac742b785.jpg
+	Real width: 993
+	Real height: 543
+	
+	Versione con emphasis="true": https://img-prod.ilfoglio.it/2026/02/02/191919962-3272f89d-dd9a-49e9-8056-867ac742b785.jpg
+	Real width: 993
+	Real height: 543
+	
+ -->
+<figure >
+    <!-- TEST1 - false -->
+<!-- TEST1 - https://img-prod.ilfoglio.it/2026/02/02/191919962-3272f89d-dd9a-49e9-8056-867ac742b785.jpg -->
+
+<picture>
+            <source media="(min-width: 1200px)" data-srcset="https://img-prod.ilfoglio.it/2026/02/02/191919962-3272f89d-dd9a-49e9-8056-867ac742b785.jpg">
+
+            <source media="(min-width: 768px)" data-srcset="https://img-prod.ilfoglio.it/2026/02/02/191919966-ec7791d1-ead6-4b5f-8596-6fa36642e013.jpg">
+
+            <img data-src="https://img-prod.ilfoglio.it/2026/02/02/191919962-c0c79f91-b41e-447a-8363-d948fe49bc66.jpg" class="lazy" src="/assets/2020/images/placeholder_orizzontale.jpg">
+                <header class="dida-articolo">
+                    <p>Screenshot da RaiPlay</p>
+                </header>
+            </picture>
+    </figure>
+<header>
+    <p class="overtitle">Recensire upas</p>
+    <h1 >
+        <span>Un posto al sole: Raffaele sta male per la partenza di Ornella</span>
+    </h1>
+
+    <p></p>
+    <div class="article-data">
+        <span class="author"></span>
+        <time>02 feb 2026</time>
+        <ul class="share-widget details">
+                    <li class="share">
+                        <ul class="tooltip social-media">
+                            <li><a href="https://www.facebook.com/sharer.php?u=https%3a%2f%2fwww.ilfoglio.it%2ftelevisione%2f2026%2f02%2f02%2fnews%2fun-posto-al-sole-raffaele-sta-male-per-la-partenza-di-ornella-8608369%2f" class="facebook" title="Facebook" target="_blank"></a></li>
+                            <li><a href="https://twitter.com/intent/tweet?text=Un%20posto%20al%20sole%3a%20Raffaele%20sta%20male%20per%20la%20partenza%20di%20Ornella&url=https%3a%2f%2fwww.ilfoglio.it%2ftelevisione%2f2026%2f02%2f02%2fnews%2fun-posto-al-sole-raffaele-sta-male-per-la-partenza-di-ornella-8608369%2f&hashtags=&via=ilfoglio_it" class="twitter" title="Twitter" target="_blank"></a></li>
+                            <li><a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3a%2f%2fwww.ilfoglio.it%2ftelevisione%2f2026%2f02%2f02%2fnews%2fun-posto-al-sole-raffaele-sta-male-per-la-partenza-di-ornella-8608369%2f" class="linkedin" title="LinkedIn" target="_blank"></a></li>
+                            <li><a href="whatsapp://send?text=Un%20posto%20al%20sole%3a%20Raffaele%20sta%20male%20per%20la%20partenza%20di%20Ornella%20https%3a%2f%2fwww.ilfoglio.it%2ftelevisione%2f2026%2f02%2f02%2fnews%2fun-posto-al-sole-raffaele-sta-male-per-la-partenza-di-ornella-8608369%2f" class="whatsapp" title="WhatsApp" target="_blank"></a></li>
+                            <li><a href="/cdn-cgi/l/email-protection#c8f7bbbdaaa2adabbcf59da6edfaf8b8a7bbbca7edfaf8a9a4edfaf8bba7a4adedfba9edfaf89aa9aeaea9ada4adedfaf8bbbca9edfaf8a5a9a4adedfaf8b8adbaedfaf8a4a9edfaf8b8a9babcada6b2a9edfaf8aca1edfaf887baa6ada4a4a9eeaaa7acb1f5a0bcbcb8bbedfba9edfaaeedfaaebfbfbfe6a1a4aea7afa4a1a7e6a1bcedfaaebcada4adbea1bba1a7a6adedfaaefaf8fafeedfaaef8faedfaaef8faedfaaea6adbfbbedfaaebda6e5b8a7bbbca7e5a9a4e5bba7a4ade5baa9aeaea9ada4ade5bbbca9e5a5a9a4ade5b8adbae5a4a9e5b8a9babcada6b2a9e5aca1e5a7baa6ada4a4a9e5f0fef8f0fbfef1edfaae" class="email" title="Email" target="_blank"></a></li>
+                            <li><a href="" class="share print" title="Print content" target="_blank"></a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+</header>
+</div>
+					<div class="content-adv">
+						</div>
+
+					<div class="desc body-content">
+						<div class="intro">
+							<p>Il portiere soffre per la lontananza dalla compagna. Gli amici provano a stargli vicino, ma non riescono a consolarlo. Nel frattempo Giulia &egrave; in partenza per andare a trovare Angela, anche se ha timore che&nbsp;questo non far&agrave; bene a Luca</p>
+</div>
+						<div class="related-articles">
+    <span>Sullo stesso argomento:</span>
+    <ul>
+        
+
+
+
+
+
+
+
+
+
+
+
+
+        
+        
+        
+        
+        
+        
+
+        
+        
+        
+        
+        
+    
+<li>
+    <a href="https://www.ilfoglio.it/televisione/2026/01/30/news/un-posto-al-sole-gagliotti-accoltella-la-ex-moglie-8600009/">
+        <h3>Un posto al sole: Gagliotti accoltella la ex moglie</h3>
+    </a>
+</li>
+
+
+
+
+
+
+
+
+
+
+
+
+        
+        
+        
+        
+        
+        
+
+        
+        
+        
+        
+        
+    
+<li>
+    <a href="https://www.ilfoglio.it/televisione/2026/01/31/news/un-posto-al-sole-gennaro-tenta-il-suicidio-e-finisce-in-carcere-8602169/">
+        <h3>Un posto al sole: Gennaro tenta il suicidio e finisce in carcere</h3>
+    </a>
+</li></ul>
+</div>
+<!-- <div class='module advertisement desktop-adv'>
+    <article class='ad size-300x250' style='display:block;'>
+        <div id="gmp-first-article-dsk" class="gmp" style="max-width: 430px; margin: 7px auto 15px"></div>
+    </article>
+</div> -->
+<div class='module advertisement'>
+    <article class='ad size-300x250' style='display:block;'>
+        <div id='div-gpt-ad-MPU_Top' >
+        </div>
+    </article>
+</div>
+<!-- <section class='module advertisement mobile-adv'>
+    <article class='ad '>
+    <div id="gmp-first-article-mob" class="gmp" style="max-width: 430px; margin: 7px auto 15px"></div>
+    </article>
+</section> -->
+<!-- <section class='module advertisement mobile-adv' style="width: 500px; height: 500px; border: 2px solid red;">
+  <article class='ad '>
+    <div id='div-gpt-ad-MPU_Middle' class="gmp MPU_Middle" style="max-width: 430px; margin: 7px auto 15px">
+      <script>
+        googletag.cmd.push(function() { googletag.display('div-gpt-ad-MPU_Middle'); });
+      </script>
+    </div>
+  </article>
+</section> -->
+<p>Raffaele sta veramente male per la partenza di Ornella. E anche al telefono lei &egrave; fredda e lontana. Gli amici del palazzo lo aiutano, invitandolo a cena e standogli vicino. Ma non basta. Lui sente che ormai tra i due si &egrave; rotto qualcosa e forse stavolta non &egrave; riparabile. Nel frattempo anche Giulia &egrave; in partenza per andare a trovare Angela, anche se ha timore che allontanarsi per tanto tempo non far&agrave; bene a Luca. A Napoli per&ograve; &egrave; tornato Vinicio con Alice. Il ragazzo &egrave; determinato a riparare i danni commessi dal fratello, ma sa di essere ancora troppo giovane per occuparsene in prima persona. Ora per&ograve; la situazione si fa complicata. Perch&eacute; &egrave; vero che sia Chiara che Roberto sono d&rsquo;accordo per nominare Filippo amministratore delegato, ma la maggioranza ce l&rsquo;ha Vinicio e quindi ora la sorte dei Cantieri &egrave; nelle sue mani. <em>(A.d.)</em></p><div class="tags-container">
+        <span>Di pi&ugrave; su questi argomenti:</span>
+        <ul class="tags">
+                <li><a href="/tag/upas/">upas</a></li>
+                <li><a href="/tag/un-posto-al-sole/">un posto al sole</a></li>
+                </ul>
+        </div>
+        </div>
+				</article>
+			</section>
+
+			<!-- <div class='module advertisement under-article'><article class='ad size-300x250'>
+<div id='gmp-native-first-dsk' class="gmp"></div>
+<div id='gmp-native-first-mob' class="gmp"></div>
+</article></div> -->
+<div class='module advertisement under-article'>
+    <article class='ad size-300x250' id='div-gpt-ad-MPU_Bottom'>
+
+    </article>
+</div>
+
+
+
+
+
+
+
+<section class="module listing type-2">
+    <div class="header">
+        <a href="/televisione/">I pi&ugrave; letti di Televisione</a>
+        <a href="/televisione/" class="more"></a>
+    </div>
+
+    <div class="multimodule-wrapper">
+        <div class="article-wrapper">
+            <article >
+                    <figure >
+                        <a href="https://www.ilfoglio.it/televisione/2026/01/31/news/un-posto-al-sole-gennaro-tenta-il-suicidio-e-finisce-in-carcere-8602169/">
+                            <picture>
+                                <source media="(min-width: 1200px)" data-srcset="https://img-prod.ilfoglio.it/2026/01/31/175432493-00e68d83-a51b-4711-9608-9c5211880dbb.jpg">
+
+                                <source media="(min-width: 768px)" data-srcset="https://img-prod.ilfoglio.it/2026/01/31/175432493-00e68d83-a51b-4711-9608-9c5211880dbb.jpg">
+
+                                <img data-src="https://img-prod.ilfoglio.it/2026/01/31/175432493-00e68d83-a51b-4711-9608-9c5211880dbb.jpg" class="lazy" src="/assets/2020/images/placeholder_orizzontale.jpg">
+                            </picture>
+                        </a>
+                    </figure>
+
+                    <div class="content-wrapper">
+                        <header>
+                            <p class="overtitle">recensire upas</p>
+                            <h2>
+                                <span>
+                                    <a href="https://www.ilfoglio.it/televisione/2026/01/31/news/un-posto-al-sole-gennaro-tenta-il-suicidio-e-finisce-in-carcere-8602169/">Un posto al sole: Gennaro tenta il suicidio e finisce in carcere</a>
+                                </span>
+                            </h2>
+                        </header>
+
+                        <div class="desc" >
+                            <a href="https://www.ilfoglio.it/televisione/2026/01/31/news/un-posto-al-sole-gennaro-tenta-il-suicidio-e-finisce-in-carcere-8602169/"><p><p>La moglie di Gennaro &egrave; fuori pericolo, ma in ospedale riappare la megera, pronta a rovinare la vita della povera ragazza e degli spettatori.&nbsp;Filippo intanto sogna la poltrona di amministratore delegato, mentre Roberto resta interdetto</p>
+</p></a>
+
+                            <time>31 GEN 2026</time>
+                            <ul class="share-widget ">
+                    <li class="save"><a href="#"></a></li>
+                    <li class="share show-tooltip">
+                        <ul class="tooltip social-media">
+                            <li><a href="https://www.facebook.com/sharer.php?u=https%3a%2f%2fwww.ilfoglio.it%2ftelevisione%2f2026%2f01%2f31%2fnews%2fun-posto-al-sole-gennaro-tenta-il-suicidio-e-finisce-in-carcere-8602169%2f" class="facebook" title="Facebook" target="_blank"></a></li>
+                            <li><a href="https://twitter.com/intent/tweet?text=Un%20posto%20al%20sole%3a%20Gennaro%20tenta%20il%20suicidio%20e%20finisce%20in%20carcere&url=https%3a%2f%2fwww.ilfoglio.it%2ftelevisione%2f2026%2f01%2f31%2fnews%2fun-posto-al-sole-gennaro-tenta-il-suicidio-e-finisce-in-carcere-8602169%2f&hashtags=&via=ilfoglio_it" class="twitter" title="Twitter" target="_blank"></a></li>
+                            <li><a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3a%2f%2fwww.ilfoglio.it%2ftelevisione%2f2026%2f01%2f31%2fnews%2fun-posto-al-sole-gennaro-tenta-il-suicidio-e-finisce-in-carcere-8602169%2f" class="linkedin" title="LinkedIn" target="_blank"></a></li>
+                            <li><a href="whatsapp://send?text=Un%20posto%20al%20sole%3a%20Gennaro%20tenta%20il%20suicidio%20e%20finisce%20in%20carcere%20https%3a%2f%2fwww.ilfoglio.it%2ftelevisione%2f2026%2f01%2f31%2fnews%2fun-posto-al-sole-gennaro-tenta-il-suicidio-e-finisce-in-carcere-8602169%2f" class="whatsapp" title="WhatsApp" target="_blank"></a></li>
+                            <li><a href="/cdn-cgi/l/email-protection#57682422353d3234236a02397265672738242338726567363b72656724383b327264367265671032393936253872656723323923367265673e3b72656724223e343e333e3872656732726567313e393e2434327265673e3972656734362534322532713538332e6a7265613b237264352772656130237264351b367265673a38303b3e32726567333e72656710323939362538726567726561363a27726435323025362132726435726567312238253e7265672732253e34383b387265347265673a367265673e397265673824273233363b32726567253e3627273625327265673b367265673a3230322536726534726567272538392336726567367265672538213e393625327265673b36726567213e233672656733323b3b36726567273821322536726567253630362d2d36726567327265673332303b3e7265672427322323362338253e79726561363a2772643539352427726435113e3b3e2727387265673e39233639233872656724383039367265673b3672656727383b2325383936726567333e726567363a3a3e393e242325362338253272656733323b32303623387265347265673a32392325327265670538353225233872656725322423367265673e3923322533322323387265613b237264357265312772656130237264357265673f23232724726436726531726531202020793e3b3138303b3e38793e2372653123323b32213e243e38393272653165676561726531676672653164667265313932202472653122397a27382423387a363b7a24383b327a303239393625387a23323923367a3e3b7a24223e343e333e387a327a313e393e2434327a3e397a343625343225327a6f61676566616e726531" class="email" title="Email" target="_blank"></a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+                    </div>
+                </article>
+            <div class="secondary-articles">
+                
+                    <article >
+                        <figure >
+                            <a href="https://www.ilfoglio.it/televisione/2026/01/31/news/fabrizio-corona-lo-scarface-del-giornalismo-8597975/">
+                                <picture>
+                                    <source media="(min-width: 1200px)" data-srcset="https://img-prod.ilfoglio.it/2026/01/30/143832015-11d94ea8-e5d9-42e5-a78f-b3ac30f962b8.jpg">
+
+                                    <source media="(min-width: 768px)" data-srcset="https://img-prod.ilfoglio.it/2026/01/30/143832015-11d94ea8-e5d9-42e5-a78f-b3ac30f962b8.jpg">
+
+                                    <img data-src="https://img-prod.ilfoglio.it/2026/01/30/143832015-11d94ea8-e5d9-42e5-a78f-b3ac30f962b8.jpg" class="lazy" src="/assets/2020/images/placeholder_orizzontale.jpg">
+                                </picture>
+                            </a>
+                        </figure>
+
+                        <div class="content-wrapper">
+                            <header>
+                                <p class="overtitle">magazine</p>
+                                <h2>
+                                <span>
+                                    <a href="https://www.ilfoglio.it/televisione/2026/01/31/news/fabrizio-corona-lo-scarface-del-giornalismo-8597975/">Fabrizio Corona, lo scarface del giornalismo</a>
+                                </span>
+                                </h2>
+                            </header>
+
+                            <div class="desc" >
+                                <a href="https://www.ilfoglio.it/televisione/2026/01/31/news/fabrizio-corona-lo-scarface-del-giornalismo-8597975/"><p><p>Col suo talento per l&rsquo;affabulazione, fa l&rsquo;eroe contro il sistema di cui un tempo era ingranaggio. &ldquo;Falsissimo&rdquo; &egrave; un minestrone che mette insieme il trash, Report e la televendita, perfetto per la caciara da social</p>
+</p></a>
+
+                                <span class="author">
+                                        <a href="https://www.ilfoglio.it/televisione/2026/01/31/news/fabrizio-corona-lo-scarface-del-giornalismo-8597975/">Andrea Minuz</a>
+                                    </span>
+                                <time>31 GEN 2026</time>
+                                <ul class="share-widget ">
+                    <li class="save"><a href="#"></a></li>
+                    <li class="share show-tooltip">
+                        <ul class="tooltip social-media">
+                            <li><a href="https://www.facebook.com/sharer.php?u=https%3a%2f%2fwww.ilfoglio.it%2ftelevisione%2f2026%2f01%2f31%2fnews%2ffabrizio-corona-lo-scarface-del-giornalismo-8597975%2f" class="facebook" title="Facebook" target="_blank"></a></li>
+                            <li><a href="https://twitter.com/intent/tweet?text=Fabrizio%20Corona%2c%20lo%20scarface%20del%20giornalismo&url=https%3a%2f%2fwww.ilfoglio.it%2ftelevisione%2f2026%2f01%2f31%2fnews%2ffabrizio-corona-lo-scarface-del-giornalismo-8597975%2f&hashtags=&via=ilfoglio_it" class="twitter" title="Twitter" target="_blank"></a></li>
+                            <li><a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3a%2f%2fwww.ilfoglio.it%2ftelevisione%2f2026%2f01%2f31%2fnews%2ffabrizio-corona-lo-scarface-del-giornalismo-8597975%2f" class="linkedin" title="LinkedIn" target="_blank"></a></li>
+                            <li><a href="whatsapp://send?text=Fabrizio%20Corona%2c%20lo%20scarface%20del%20giornalismo%20https%3a%2f%2fwww.ilfoglio.it%2ftelevisione%2f2026%2f01%2f31%2fnews%2ffabrizio-corona-lo-scarface-del-giornalismo-8597975%2f" class="whatsapp" title="WhatsApp" target="_blank"></a></li>
+                            <li><a href="/cdn-cgi/l/email-protection#4e713d3b2c242b2d3a73082f2c3c273427216b7c7e0d213c21202f6b7c2d6b7c7e22216b7c7e3d2d2f3c282f2d2b6b7c7e2a2b226b7c7e2927213c202f22273d2321682c212a37736b7c78223a6b7d2c3e6b7c78293a6b7d2c0d21226b7c7e3d3b216b7c7e3a2f222b203a216b7c7e3e2b3c6b7c7e226b7c782f233e6b7d2c3c3d3f3b216b7d2c2f28282f2c3b222f342721202b6b7c2d6b7c7e282f6b7c7e226b7c782f233e6b7d2c3c3d3f3b216b7d2c2b3c212b6b7c7e2d21203a3c216b7c7e27226b7c7e3d273d3a2b232f6b7c7e2a276b7c7e2d3b276b7c7e3b206b7c7e3a2b233e216b7c7e2b3c2f6b7c7e2720293c2f202f29292721606b7c7e6b7c782f233e6b7d2c222a3f3b216b7d2c082f223d273d3d2723216b7c782f233e6b7d2c3c2a3f3b216b7d2c6b7c7e6b7c782f233e6b7d2c2b293c2f382b6b7d2c6b7c7e3b206b7c7e2327202b3d3a3c21202b6b7c7e2d262b6b7c7e232b3a3a2b6b7c7e27203d272b232b6b7c7e27226b7c7e3a3c2f3d266b7c2d6b7c7e1c2b3e213c3a6b7c7e2b6b7c7e222f6b7c7e3a2b222b382b202a273a2f6b7c2d6b7c7e3e2b3c282b3a3a216b7c7e3e2b3c6b7c7e222f6b7c7e2d2f2d272f3c2f6b7c7e2a2f6b7c7e3d212d272f226b7c78223a6b7d2c6b7c283e6b7c78293a6b7d2c6b7c7e263a3a3e3d6b7d2f6b7c286b7c2839393960272228212922272160273a6b7c283a2b222b38273d2721202b6b7c287c7e7c786b7c287e7f6b7c287d7f6b7c28202b393d6b7c28282f2c3c27342721632d213c21202f632221633d2d2f3c282f2d2b632a2b22632927213c202f22273d232163767b777977797b6b7c28" class="email" title="Email" target="_blank"></a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+                        </div>
+                    </article>
+                    
+                
+                    <article >
+                        <figure >
+                            <a href="https://www.ilfoglio.it/magazine/2026/01/30/news/melania-e-gli-altri-il-documentario-nell-e-ra-dell-ego-espanso-e-del-riciclo-8600014/">
+                                <picture>
+                                    <source media="(min-width: 1200px)" data-srcset="https://img-prod.ilfoglio.it/2026/01/30/193857883-af10bace-51eb-4412-a7b8-a1565774d2a4.jpg">
+
+                                    <source media="(min-width: 768px)" data-srcset="https://img-prod.ilfoglio.it/2026/01/30/193857883-af10bace-51eb-4412-a7b8-a1565774d2a4.jpg">
+
+                                    <img data-src="https://img-prod.ilfoglio.it/2026/01/30/193857883-af10bace-51eb-4412-a7b8-a1565774d2a4.jpg" class="lazy" src="/assets/2020/images/placeholder_orizzontale.jpg">
+                                </picture>
+                            </a>
+                        </figure>
+
+                        <div class="content-wrapper">
+                            <header>
+                                <p class="overtitle">Il Foglio Weekend</p>
+                                <h2>
+                                <span>
+                                    <a href="https://www.ilfoglio.it/magazine/2026/01/30/news/melania-e-gli-altri-il-documentario-nell-e-ra-dell-ego-espanso-e-del-riciclo-8600014/">Melania e gli altri. Il documentario nell'èra dell'ego espanso e del riciclo </a>
+                                </span>
+                                </h2>
+                            </header>
+
+                            <div class="desc" >
+                                <a href="https://www.ilfoglio.it/magazine/2026/01/30/news/melania-e-gli-altri-il-documentario-nell-e-ra-dell-ego-espanso-e-del-riciclo-8600014/"><p><p>La first lady americana lancia il suo film. Non si vedevano tanti attacchi preventivi a un film da &quot;L&#39;ultima tentazione di Cristo&quot; di Scorsese</p>
+</p></a>
+
+                                <span class="author">
+                                        
+
+
+
+
+<a href="/autori/michele-masneri/">Michele Masneri</a>
+
+</span>
+                                <time>31 GEN 2026</time>
+                                <ul class="share-widget ">
+                    <li class="save"><a href="#"></a></li>
+                    <li class="share show-tooltip">
+                        <ul class="tooltip social-media">
+                            <li><a href="https://www.facebook.com/sharer.php?u=https%3a%2f%2fwww.ilfoglio.it%2fmagazine%2f2026%2f01%2f30%2fnews%2fmelania-e-gli-altri-il-documentario-nell-e-ra-dell-ego-espanso-e-del-riciclo-8600014%2f" class="facebook" title="Facebook" target="_blank"></a></li>
+                            <li><a href="https://twitter.com/intent/tweet?text=Melania%20e%20gli%20altri.%20Il%20documentario%20nell'%c3%a8ra%20dell'ego%20espanso%20e%20del%20riciclo%20&url=https%3a%2f%2fwww.ilfoglio.it%2fmagazine%2f2026%2f01%2f30%2fnews%2fmelania-e-gli-altri-il-documentario-nell-e-ra-dell-ego-espanso-e-del-riciclo-8600014%2f&hashtags=&via=ilfoglio_it" class="twitter" title="Twitter" target="_blank"></a></li>
+                            <li><a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3a%2f%2fwww.ilfoglio.it%2fmagazine%2f2026%2f01%2f30%2fnews%2fmelania-e-gli-altri-il-documentario-nell-e-ra-dell-ego-espanso-e-del-riciclo-8600014%2f" class="linkedin" title="LinkedIn" target="_blank"></a></li>
+                            <li><a href="whatsapp://send?text=Melania%20e%20gli%20altri.%20Il%20documentario%20nell'%c3%a8ra%20dell'ego%20espanso%20e%20del%20riciclo%20%20https%3a%2f%2fwww.ilfoglio.it%2fmagazine%2f2026%2f01%2f30%2fnews%2fmelania-e-gli-altri-il-documentario-nell-e-ra-dell-ego-espanso-e-del-riciclo-8600014%2f" class="whatsapp" title="WhatsApp" target="_blank"></a></li>
+                            <li><a href="/cdn-cgi/l/email-protection#211e5254434b4442551c6c444d404f484004131144041311464d48041311404d5553480f041311684d041311454e42544c444f554053484e0413114f444d4d06044212044019534004131145444d4d0644464e041311445251404f524e0413114404131145444d04131153484248424d4e04131107434e45581c0413174d550412435104131746550412436d4004131147485352550413114d404558041311404c44534842404f400413114d404f424840041311484d04131152544e04131147484d4c0f0413116f4e4f04131152480413115744454457404f4e04131155404f5548041311405555404242494804131151534457444f5548574804131140041311544f04131147484d4c0413114540041311041317404c5104124350544e550412436d041317404c510412430413121218041243544d55484c4004131155444f55405b484e4f44041311454804131162534852554e041317404c5104124350544e55041243041311454804131172424e53524452440413174d5504124304134751041317465504124304131149555551520412400413470413475656560f484d474e464d484e0f48550413474c4046405b484f4404134713111317041347111004134712110413474f4456520413474c444d404f48400c440c464d480c404d5553480c484d0c454e42544c444f554053484e0c4f444d4d0c440c53400c45444d4d0c44464e0c445251404f524e0c440c45444d0c53484248424d4e0c19171111111015041347" class="email" title="Email" target="_blank"></a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+                        </div>
+                    </article>
+                    
+                
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- <div class='module advertisement under-article' style='padding: 20px 0;'>
+    <div id='gmp-native-second-dsk' class="gmp"></div>
+    <div id='gmp-native-second-mob' class="gmp"></div>
+</div> -->
+
+<div id='div-gpt-ad-Overlay'>
+
+</div></main>
+
+		<!-- FOOTER 0 -->
+                
+<footer>
+    <div class="top-row">
+        <a href="/" class="logo"><img src="https://www.ilfoglio.it/assets/2020/images/il-foglio-logo.svg" class="" alt="Il Foglio"></a>
+        <ul class="social-media">
+            <li><a href="https://www.facebook.com/ilfoglio" class="facebook" title="Facebook"></a></li>
+            <li><a href="https://twitter.com/ilfoglio_it" class="twitter" title="Twitter"></a></li>
+            <li><a href="https://www.instagram.com/ilfoglio/?hl=it" class="instagram" title="Instagram"></a></li>
+            <li><a href="https://www.youtube.com/channel/UCa6VWUj6Qy43oxVpb6GGe5Q" class="youtube" title="YouTube"></a></li>
+            <li><a href="https://flipboard.com/@ilfoglioit/le-notizie-principali-rguf1aubz" class="flipboard" title="Flipboard"></a></li>
+        </ul>
+    </div>
+    <div class="bottom-row">
+        <nav>
+            <ul>
+                <li><a href="/privacy-policy/">Privacy Policy</a></li>
+                <li><a href="/contatti/">Contatti</a></li>
+                <li><a href="/pubblicita/">Pubblicità</a></li>
+                <li><a href="/faq-domande-e-risposte/">FAQ - Domande e risposte</a></li>
+                <li><a href="/rss/">RSS</a></li>
+                <li><a href="/termini-di-utilizzo/">Termini di utilizzo</a></li>
+                <li><a href="#" onclick="if(window.__lxG__consent__!==undefined&&window.__lxG__consent__.getState()!==null){window.__lxG__consent__.showConsent()} else {alert('This function only for users from European Economic Area (EEA)')}; return false">Change privacy settings</a></li>
+            </ul>
+        </nav>
+        <div class="back-to-top">Torna All’inizio</div>
+    </div>
+</footer>
+<div id="visibility-left" style="position: fixed; left: 0;z-index: -1; height: 100%; ">
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" style="width: 100%;height: 100%;">
+</div><!-- FOOTER 1 -->
+                
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="https://code.jquery.com/jquery-3.5.1.min.js" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>
+<script type="text/javascript" src="//www.ilfoglio.it/assets/2020/js/lazyload.min.js?v=1.8.6
+"></script>
+<script type="text/javascript" src="//www.ilfoglio.it/assets/2020/js/jquery-ui.min.js?v=1.8.6
+"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.min.js"></script>
+<script type="text/javascript" src="//www.ilfoglio.it/assets/2020/js/main.js?v=1.8.6
+"></script>
+<script type="text/javascript" src="//www.ilfoglio.it/assets/2020/js/custom.js?v=1.8.6
+"></script>
+<script type="text/javascript" src="https://ilfoglio-ita-pw.newsmemory.com/?meter&v=2"></script>
+
+<script type="text/javascript" src="//www.ilfoglio.it/assets/2020/js/login.js?v=1.8.6
+"></script>
+
+<script>
+	userlogin.ssoUrl = " //sso.ilfoglio.it";
+	userlogin.ssoApiUrl = "//api.ilfoglio.it/api/v1";
+	userlogin.storeUrl = "//edicoladigitale.ilfoglio.it/?purchase";
+	userlogin.payUrl = "//apinews.ilfoglio.it/paywall/content";
+</script>
+
+<script>
+function redirectToLogoutPageIfCogatCookieExists() {
+    if (document.cookie.includes('_cogat')) {
+        window.location.href = 'https://sso.ilfoglio.it/logout.html?redirect=https://www.ilfoglio.it/';
+    }
+}
+window.onload = redirectToLogoutPageIfCogatCookieExists;
+</script>
+
+
+
+<!-- <script>var advUrl = 'https://s.adplay.it/ilfoglio/adplay.js';</script> -->
+
+<!-- <script>
+    function userTypeCheck(){ 
+        var s = document.createElement("script");
+        s.type = "text/javascript";
+        s.src = advUrl;
+        $("head").append(s);
+    }
+</script> -->
+
+
+<script>
+    const productPackageSWG = "com.paperlit.android.ilfoglio:article";
+</script>
+
+<script>
+function parseJwt (token) {
+	var base64Url = token.split('.')[1];
+	var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+	var jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+		return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+	}).join(''));
+
+	return JSON.parse(jsonPayload);
+};
+function readCookie(name) {
+	var nameEQ = name + "=";
+	var ca = document.cookie.split(';');
+	for(var i=0;i < ca.length;i++) {
+		var c = ca[i];
+		while (c.charAt(0) === ' ') {
+			c = c.substring(1,c.length);
+		}
+		if (c.indexOf(nameEQ) === 0) {
+			return c.substring(nameEQ.length,c.length);
+		}
+	}
+	return null;
+}
+function deleteCookie(name) {
+  document.cookie = name +'=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+}
+
+var auth2; // The Sign-In object.
+var googleUser; // The current user.
+
+
+/**
+ * Calls startAuth after Sign in V2 finishes setting up.
+ */
+var appStart = function() {
+  gapi.load('auth2', initSigninV2);
+};
+
+
+/**
+ * Initializes Signin v2 and sets up listeners.
+ */
+var initSigninV2 = function() {
+   //auth2 = gapi.auth2.getAuthInstance();
+  
+  auth2 = gapi.auth2.init({
+      client_id: '992549890525-eos9kj950vruaac02n4p4momu6b6rjpe.apps.googleusercontent.com',
+      scope: 'profile'
+  }).then(function(auth2){
+    /**
+    * Listener method for sign-out live value.
+    *
+    * @param {boolean} val the updated signed out state.
+    */
+    var signinChanged = function (val) {
+      console.log('Signin state changed to ', val);
+
+    };
+
+
+    /**
+    * Listener method for when the user changes.
+    *
+    * @param {GoogleUser} user the updated user.
+    */
+    var userChanged = function (user) {
+      if (googleUser != user){
+        console.log('User now: ', user);
+
+        googleUser = user;
+        updateGoogleUser();
+      }
+    };
+
+
+    /**
+    * Updates the properties in the Google User table using the current user.
+    */
+    var updateGoogleUser = function () {
+          
+    if (googleUser.getAuthResponse().id_token && isPayArticle){
+       // userlogin.idTokenGg = googleUser.getAuthResponse().id_token;
+       // userlogin.paywallContentExtendedAccess(encodeURIComponent(location.href));    
+      }else if (isPayArticle) {
+       //   userlogin.idTokenGg = "";
+       //   userlogin.paywallContentExtendedAccess(encodeURIComponent(location.href));
+      }  
+    };
+
+
+    /**
+    * Retrieves the current user and signed in states from the GoogleAuth
+    * object.
+    */
+    var refreshValues = function() {
+      if (auth2){
+        console.log('Refreshing values...');
+
+        googleUser = auth2.currentUser.get();
+
+        updateGoogleUser();
+      }
+    }
+
+    // Listen for sign-in state changes.
+    auth2.isSignedIn.listen(signinChanged);
+
+    // Listen for changes to current user.
+    auth2.currentUser.listen(userChanged);
+
+    // Sign in the user if they are currently signed in.
+    if (auth2.isSignedIn.get() == true) {
+      //auth2.signIn();
+    }
+
+    // Start with the current live values.
+    refreshValues();
+
+  });
+
+};
+
+
+
+function registerUser(idToken){
+    console.log("start rgister user State:" + idToken);
+    return new Promise(function (resolve, reject) {
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', ssoApiUrlTop + '/swg/get_userstate');
+        //xhr.withCredentials = true;
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        //xhr.setRequestHeader('Authorization', 'Bearer ' + userloginTop.cogat);
+        xhr.onload = function() {
+            //console.log('Signed in as: ' + xhr.responseText);
+        };
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState == XMLHttpRequest.DONE) {
+                var data = jQuery.parseJSON(xhr.responseText);
+                
+                if (data){
+                    resolve(data);
+                    //console.log(data)
+                }else{
+                    console.log("PROBLEM USER GOOGLE",data);
+                    //reject(data);
+                }             
+            }
+        };
+        xhr_string = [];
+        xhr_string.push('id_token=' + idToken);
+        xhr.send(xhr_string.join('&'));
+
+    
+    });
+
+   
+}
+
+  function fetchMetering(){
+
+      if (localStorage.getItem('meteringRegistrationId') && localStorage.getItem('meteringRegistrationTimestamp')){
+        let tokenGG = parseJwt(localStorage.getItem('meteringRegistrationId'));
+        let timestampNow = new Date().getTime() / 1000;;
+        let expTime = tokenGG.exp;
+        if (timestampNow > expTime ){
+          localStorage.removeItem("meteringRegistrationTimestamp");
+          localStorage.removeItem("meteringRegistrationId");
+        }
+
+      }
+  }
+ function  resetMeteringDemo(){// Forget the existing registration timestamp.
+	localStorage.removeItem("meteringRegistrationTimestamp");
+	localStorage.removeItem("meteringRegistrationId");
+
+	if(typeof gapi !== "undefined"){
+	//	gapi.auth2.getAuthInstance().disconnect();
+	}
+	// Sign out of Google Sign-In.
+	GaaMeteringRegwall.signOut().then(() => void location.reload());
+  }
+</script>
+
+
+<!--
+<div class="g-signin2" data-onsuccess="appStart" data-onfailure="appStart" style="display:block;"></div>
+-->
+<!--
+<script type="text/javascript">
+if ( getConsentStatus()) {
+    _linkedin_partner_id = "3110601";
+    window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
+    window._linkedin_data_partner_ids.push(_linkedin_partner_id);
+}
+</script><script type="text/javascript">
+(function(){
+    if ( getConsentStatus()) {
+        var s = document.getElementsByTagName("script")[0];
+        var b = document.createElement("script");
+        b.type = "text/javascript";b.async = true;
+        b.src = "https://snap.licdn.com/li.lms-analytics/insight.min.js";
+        s.parentNode.insertBefore(b, s);
+    }
+})();
+</script>
+<noscript>
+<img height="1" width="1" style="display:none;" alt="" src="https://px.ads.linkedin.com/collect/?pid=3110601&fmt=gif" />
+</noscript>
+-->
+<script type="text/javascript">
+    var consentStatus = getConsentStatus(8) && getConsentStatus(9);
+    //  console.log('### consentStatus 3: ' + consentStatus);
+</script>
+<!-- Adform Tracking Code BEGIN -->
+<script type="text/javascript">
+    if (consentStatus) {
+        window._adftrack = Array.isArray(window._adftrack) ? window._adftrack : (window._adftrack ? [window._adftrack] : []);
+        window._adftrack.push({
+            pm: 2252038,
+            divider: encodeURIComponent('|'),
+            pagename: encodeURIComponent('DAN_WS_Il_Foglio_Quotidiano'),
+            order : {
+                 sv1: (userlogin.isLogged()) ? ((userlogin.ssoData.auth_web == "true") ?  'abbonato' : 'non abbonato' ) : 'anonimo'
+            }
+        });
+        (function () { var s = document.createElement('script'); s.type = 'text/javascript'; s.async = true; s.src = 'https://track.adform.net/serving/scripts/trackpoint/async/'; var x = document.getElementsByTagName('script')[0]; x.parentNode.insertBefore(s, x); })();
+    }
+</script>
+<noscript>
+    <p style="margin:0;padding:0;border:0;">
+        <img src="https://track.adform.net/Serving/TrackPoint/?pm=2252038&ADFPageName=DAN_WS_Il_Foglio_Quotidiano&ADFdivider=|" width="1" height="1" alt="" />
+    </p>
+</noscript>
+<!-- Adform Tracking Code END -->
+
+<!-- Adform Tracking Code BEGIN -->
+<script type="text/javascript">
+    if (consentStatus) {
+        window._adftrack = Array.isArray(window._adftrack) ? window._adftrack : (window._adftrack ? [window._adftrack] : []);
+        window._adftrack.push({
+            HttpHost: 'track.adform.net',
+            pm: 2255879,
+            divider: encodeURIComponent('|'),
+            pagename: encodeURIComponent('All Pages')
+        });
+        (function () { var s = document.createElement('script'); s.type = 'text/javascript'; s.async = true; s.src = 'https://s2.adform.net/banners/scripts/st/trackpoint-async.js'; var x = document.getElementsByTagName('script')[0]; x.parentNode.insertBefore(s, x); })();
+    }
+</script>
+<noscript>
+    <p style="margin:0;padding:0;border:0;">
+        <img src="https://track.adform.net/Serving/TrackPoint/?pm=2255879&ADFPageName=All%20Pages&ADFdivider=|" width="1" height="1" alt="" />
+    </p>
+</noscript>
+<!-- Adform Tracking Code END -->
+<script type="text/javascript">window.NREUM||(NREUM={});NREUM.info={"errorBeacon":"bam.eu01.nr-data.net","licenseKey":"NRJS-fcd3b3138332119cd4b","agent":"","beacon":"bam.eu01.nr-data.net","applicationTime":122,"applicationID":"235096324","transactionName":"MhBSZQoZDxZWAhIPXAtaemIoVzYgdUwvKHVKA1lUDwtODlgNEwtREAYfWBQeDgJbCAlJRwAYQF0ZDAQWGAUDElIMGUMeGQoVDFQOCgkdDwZA","queueTime":0}</script></body>
+</html>

@@ -160,6 +160,84 @@ fn looks_like_teaser(value: &str) -> bool {
         || v.ends_with("...")
 }
 
+fn looks_like_ui_chrome(value: &str) -> bool {
+    let v = value.to_lowercase();
+    v.contains("cookie")
+        || v.contains("privacy policy")
+        || v.contains("terms and conditions")
+        || v.contains("sign up")
+        || v.contains("log in")
+        || v.contains("subscribe")
+        || v.contains("newsletter")
+        || v.contains("all rights reserved")
+        || v.contains("enable js")
+        || v.contains("advert")
+        || v.contains("sponsored")
+        || v.contains("consent")
+}
+
+fn count_sentences(value: &str) -> usize {
+    value
+        .chars()
+        .filter(|c| matches!(c, '.' | '!' | '?'))
+        .count()
+}
+
+fn extract_json_values(json_text: &str, key: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut search_pos = 0;
+    while let Some(text_start) = json_text[search_pos..].find(key) {
+        let abs_start = search_pos + text_start + key.len();
+        if abs_start < json_text.len() {
+            if let Some((val, end_pos)) = extract_json_string(&json_text[abs_start..]) {
+                out.push(val);
+                search_pos = abs_start + end_pos;
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+    out
+}
+
+fn pick_best_json_article_text(json_text: &str) -> Option<String> {
+    let keys = [
+        "\"articleBody\":\"",
+        "\"body\":\"",
+        "\"bodyHtml\":\"",
+        "\"content\":\"",
+        "\"contentHtml\":\"",
+        "\"full_text\":\"",
+        "\"text\":\"",
+    ];
+    let mut best = String::new();
+    for key in keys {
+        for val in extract_json_values(json_text, key) {
+            if val.len() < 80 {
+                continue;
+            }
+            let cleaned = clean_text(&val);
+            let cleaned = collapse_blank_lines(&cleaned);
+            let trimmed = cleaned.trim();
+            if trimmed.len() < 300 {
+                continue;
+            }
+            if looks_like_teaser(trimmed) || looks_like_ui_chrome(trimmed) {
+                continue;
+            }
+            if count_sentences(trimmed) < 2 {
+                continue;
+            }
+            if trimmed.len() > best.len() {
+                best = trimmed.to_string();
+            }
+        }
+    }
+    if best.is_empty() { None } else { Some(best) }
+}
+
 pub fn clean_text(input: &str) -> String {
     let decoded = decode_html_entities(&decode_unicode(input));
     // Pulizia encoding Mediaset/TGCOM24
@@ -217,10 +295,14 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
                     let author_part = &json[author_idx..];
                     if let Some(name_idx) = author_part.find("\"name\":\"") {
                         let part = &author_part[name_idx + 8..];
-                        if let Some((name, _)) = extract_json_string(part)
-                            && !name.eq_ignore_ascii_case(&title)
-                        {
-                            author_info.push_str(&name);
+                        if let Some((name, _)) = extract_json_string(part) {
+                            let trimmed = name.trim();
+                            if !trimmed.eq_ignore_ascii_case(&title)
+                                && !trimmed.eq_ignore_ascii_case("home")
+                                && trimmed.len() >= 3
+                            {
+                                author_info.push_str(trimmed);
+                            }
                         }
                     }
                 }
@@ -228,10 +310,14 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
                     && let Some(a_idx) = json.find("\"name\":\"")
                 {
                     let part = &json[a_idx + 8..];
-                    if let Some((name, _)) = extract_json_string(part)
-                        && !name.eq_ignore_ascii_case(&title)
-                    {
-                        author_info.push_str(&name);
+                    if let Some((name, _)) = extract_json_string(part) {
+                        let trimmed = name.trim();
+                        if !trimmed.eq_ignore_ascii_case(&title)
+                            && !trimmed.eq_ignore_ascii_case("home")
+                            && trimmed.len() >= 3
+                        {
+                            author_info.push_str(trimmed);
+                        }
                     }
                 }
                 if let Some(d_idx) = json.find("\"datePublished\":\"") {
@@ -361,16 +447,27 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
                 }
             }
         }
+        if !found_anything && let Some(best) = pick_best_json_article_text(&json_text) {
+            body_acc.push_str(&best);
+            body_acc.push_str("\n\n");
+            found_anything = true;
+        }
     }
 
     // 3. FALLBACK CSS
     if !found_anything || body_acc.len() < 300 {
         let content_selectors = [
+            ".node-text .textarea-content-body",
+            ".node-summary",
             ".entry-content p",
             ".wp-block-post-content p",
             ".ifq-post__content p",
             ".ifq-post__content",
             "p[data-type='paragraph']", // WSJ modern
+            "article [data-testid='article-body'] p",
+            "article [data-testid='paragraph']",
+            "article [data-type='paragraph']",
+            ".prose p",
             ".wsj-article-body p",
             "article p",
             ".atext",
@@ -379,6 +476,7 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
             ".article-body p",
             "#col-sx-interna p",
         ];
+        let mut best_sel_acc = String::new();
         for sel_str in content_selectors {
             if let Ok(selector) = Selector::parse(sel_str) {
                 let mut sel_acc = String::new();
@@ -390,11 +488,13 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
                     sel_acc.push_str(&text);
                     sel_acc.push_str("\n\n");
                 }
-                if sel_acc.len() > 200 {
-                    body_acc.push_str(&sel_acc);
-                    break;
+                if sel_acc.len() > best_sel_acc.len() {
+                    best_sel_acc = sel_acc;
                 }
             }
+        }
+        if best_sel_acc.len() > 200 {
+            body_acc.push_str(&best_sel_acc);
         }
     }
 
@@ -405,7 +505,23 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
     final_text.push_str(&body_acc);
 
     let content = clean_text(&final_text);
-    let final_content = collapse_blank_lines(&content);
+    let mut final_content = collapse_blank_lines(&content);
+    if let Some(meta_desc) = pick_meta_description(&document) {
+        let should_fallback = body_acc.trim().len() < 120
+            || count_sentences(&final_content) < 2
+            || looks_like_ui_chrome(&final_content);
+        if should_fallback {
+            let mut fallback = String::new();
+            if !author_info.is_empty() {
+                fallback.push_str(&format!("Di {}\n\n", author_info));
+            }
+            fallback.push_str(meta_desc.trim());
+            let fallback_content = collapse_blank_lines(&clean_text(&fallback));
+            if fallback_content.len() > final_content.len() {
+                final_content = fallback_content;
+            }
+        }
+    }
     Some(ArticleContent {
         title: title.trim().to_string(),
         content: final_content,
@@ -432,9 +548,31 @@ fn pick_title(document: &Html) -> String {
     "No Title".to_string()
 }
 
+fn pick_meta_description(document: &Html) -> Option<String> {
+    let selectors = [
+        "meta[name='description']",
+        "meta[property='og:description']",
+        "meta[name='twitter:description']",
+    ];
+    let mut best = String::new();
+    for sel in selectors {
+        if let Ok(s) = Selector::parse(sel)
+            && let Some(el) = document.select(&s).next()
+            && let Some(content) = el.value().attr("content")
+        {
+            let clean = decode_unicode(content.trim());
+            if clean.len() > best.len() {
+                best = clean;
+            }
+        }
+    }
+    if best.len() >= 40 { Some(best) } else { None }
+}
+
 pub fn collapse_blank_lines(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut blank_run = 0usize;
+    let mut seen_short = std::collections::HashSet::new();
     for line in s.lines() {
         let l = line.trim();
         if l.is_empty() {
@@ -443,6 +581,17 @@ pub fn collapse_blank_lines(s: &str) -> String {
                 out.push('\n');
             }
         } else {
+            if let Some(prev) = out.lines().last()
+                && prev.eq_ignore_ascii_case(l)
+            {
+                continue;
+            }
+            if l.len() <= 40 {
+                let key = l.to_ascii_lowercase();
+                if !seen_short.insert(key) {
+                    continue;
+                }
+            }
             blank_run = 0;
             out.push_str(l);
             out.push('\n');

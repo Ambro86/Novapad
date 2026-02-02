@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-US">
+<head>
+            
+        <!-- START email detection/removal script -->
+        <script>
+            !function(){"use strict";function e(e){const t=e.match(/((?=([a-z0-9._!#$%+^&*()[\]<>-]+))@[a-z0-9._-]+\.[a-z0-9._-]+)/gi);return t?t[0]:""}function t(t){return e(a(t.toLowerCase()))}function a(e){return e.replace(/\s/g,"")}async function n(e){const t={sha256Hash:"",sha1Hash:""};if(!("msCrypto"in window)&&"https:"===location.protocol&&"crypto"in window&&"TextEncoder"in window){const a=(new TextEncoder).encode(e),[n,c]=await Promise.all([s("SHA-256",a),s("SHA-1",a)]);t.sha256Hash=n,t.sha1Hash=c}return t}async function s(e,t){const a=await crypto.subtle.digest(e,t);return Array.from(new Uint8Array(a)).map(e=>("00"+e.toString(16)).slice(-2)).join("")}function c(e){let t=!0;return Object.keys(e).forEach(a=>{0===e[a].length&&(t=!1)}),t}function i(e,t,a){e.splice(t,1);const n="?"+e.join("&")+a.hash;history.replaceState(null,"",n)}var o={checkEmail:e,validateEmail:t,trimInput:a,hashEmail:n,hasHashes:c,removeEmailAndReplaceHistory:i,detectEmails:async function(){const e=new URL(window.location.href),a=Array.from(e.searchParams.entries()).map(e=>`=`);let s,o;const r=["adt_eih","sh_kit"];if(a.forEach((e,t)=>{const a=decodeURIComponent(e),[n,c]=a.split("=");if("adt_ei"===n&&(s={value:c,index:t,emsrc:"url"}),r.includes(n)){o={value:c,index:t,emsrc:"sh_kit"===n?"urlhck":"urlh"}}}),s)t(s.value)&&n(s.value).then(e=>{if(c(e)){const t={value:e,created:Date.now()};localStorage.setItem("adt_ei",JSON.stringify(t)),localStorage.setItem("adt_emsrc",s.emsrc)}});else if(o){const e={value:{sha256Hash:o.value,sha1Hash:""},created:Date.now()};localStorage.setItem("adt_ei",JSON.stringify(e)),localStorage.setItem("adt_emsrc",o.emsrc)}s&&i(a,s.index,e),o&&i(a,o.index,e)},cb:"adthrive"};const{detectEmails:r,cb:l}=o;r()}();
+        </script>
+        <!-- END email detection/removal script -->
+        <!-- AdThrive Head Tag Manual -->
+        <script data-no-optimize="1" data-cfasync="false">
+            (function(w, d) {
+                w.adthrive = w.adthrive || {};
+                w.adthrive.cmd = w.
+                    adthrive.cmd || [];
+                w.adthrive.plugin = 'adthrive-ads-manual';
+                w.adthrive.host = 'ads.adthrive.com';var s = d.createElement('script');
+                s.async = true;
+                s.referrerpolicy='no-referrer-when-downgrade';
+                s.src = 'https://' + w.adthrive.host + '/sites/6863f6ee809b0623d4e626d8/ads.min.js?referrer=' + w.encodeURIComponent(w.location.href) + '&cb=' + (Math.floor(Math.random() * 100) + 1);
+                var n = d.getElementsByTagName('script')[0];
+                n.parentNode.insertBefore(s, n);
+            })(window, document);
+        </script>
+        <!-- End of AdThrive Head Tag -->            <link rel="preload" href="/wp-content/themes/unified/css/article.bgr.min.css?design=3&v=1769008544" as="style"><link rel="preload" href="https://www.bgr.com/img/gallery/why-do-electrical-plug-outlets-have-different-sized-holes/intro-1769697230.sm.webp" as="image">
+<link class="preloadFont" rel="preload" href="https://www.bgr.com/font/poppins-bold-webfont.woff2" as="font" crossorigin>
+<link class="preloadFont" rel="preload" href="https://www.bgr.com/font/poppins-bold-italic.woff2" as="font" crossorigin>
+<link class="preloadFont" rel="preload" href="https://www.bgr.com/font/poppins-regular.woff2" as="font" crossorigin>
+
+        <link rel="stylesheet" type="text/css" href="/wp-content/themes/unified/css/article.bgr.min.css?design=3&v=1769008544" />
+        <meta http-equiv="Content-Type" content="text/html; charset=utf8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="Content-Security-Policy" content="block-all-mixed-content" />
+        <meta http-equiv="X-UA-Compatible" content="IE=10" />
+        
+        
+                <meta name="robots" content="max-image-preview:large">
+        <meta name="thumbnail" content="https://www.bgr.com/img/gallery/why-do-electrical-plug-outlets-have-different-sized-holes/l-intro-1769697230.jpg">
+        <title>Why Do Electrical Plug Outlets Have Different Sized Holes?</title>
+        <meta name='description' content="Most modern electrical outlets have one wider hole and one narrower slot, and many of today's appliances have plug prongs that match. Here's why." />
+        <meta property="mrf:tags" content="Content Type:Short Article;Primary Category:Technology;Category:Technology;Headline Approver:Adam De'Seta;Trello Board:News;Pitcher:Justin Broach;Ideation Source:O&O Hits;Intent:Evergreen;Important Topic:False" />
+        
+                <meta property="og:site_name" content="BGR" />
+        <meta property="og:title" content="Why Do Electrical Plug Outlets Have Different Sized Holes? - BGR">
+        <meta property="og:image" content="https://www.bgr.com/img/gallery/why-do-electrical-plug-outlets-have-different-sized-holes/l-intro-1769697230.jpg" />
+        <meta property="og:description" content="Most modern electrical outlets have one wider hole and one narrower slot, and many of today's appliances have plug prongs that match. Here's why.">
+        <meta property="og:type" content="article">
+        <meta property="og:url" content="https://www.bgr.com/2088016/why-electrical-plug-outlet-different-size-holes/">
+                <meta name="twitter:title" content="Why Do Electrical Plug Outlets Have Different Sized Holes? - BGR">
+        <meta name="twitter:description" content="Most modern electrical outlets have one wider hole and one narrower slot, and many of today's appliances have plug prongs that match. Here's why.">
+        <meta name="twitter:site" content="@BGR">
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:image" content="https://www.bgr.com/img/gallery/why-do-electrical-plug-outlets-have-different-sized-holes/l-intro-1769697230.jpg">
+            <meta property="article:published_time" content="2026-02-02T21:47:00+00:00" />
+    <meta property="article:modified_time" content="2026-02-02T21:47:00+00:00" />
+    <meta property="article:author" content="Eduardo Ariedo" />
+        
+        <link rel="shortcut icon" href="https://looper-static.s3.amazonaws.com/img/BGR-favicon-448x448.png">
+        <link rel="icon" href="https://looper-static.s3.amazonaws.com/img/BGR-favicon-448x448.png">
+        <link rel="canonical" href="https://www.bgr.com/2088016/why-electrical-plug-outlet-different-size-holes/"/>
+        <link rel="alternate" type="application/rss+xml" title="Technology - BGR" href="https://www.bgr.com/category/technology/feed/" />
+
+        
+        <script type="application/ld+json">{"@context":"http:\/\/schema.org","@type":"Article","mainEntityOfPage":{"@type":"WebPage","@id":"https:\/\/www.bgr.com\/2088016\/why-electrical-plug-outlet-different-size-holes\/","url":"https:\/\/www.bgr.com\/2088016\/why-electrical-plug-outlet-different-size-holes\/","breadcrumb":{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"item":{"@id":"https:\/\/www.bgr.com\/category\/technology\/","name":"Technology"}}]}},"isAccessibleForFree":true,"headline":"Why Do Electrical Plug Outlets Have Different Sized Holes?","image":{"@type":"ImageObject","url":"https:\/\/www.bgr.com\/img\/gallery\/why-do-electrical-plug-outlets-have-different-sized-holes\/l-intro-1769697230.jpg","height":898,"width":1600},"datePublished":"2026-02-02T21:47:00+00:00","dateModified":"2026-02-02T21:47:00+00:00","author":[{"@type":"Person","name":"Eduardo Ariedo","description":"Eduardo developed his digital journalism background at Showmetech, where he produced reviews and covered major industry events such as Gamescom LATAM, CES, and Brasil Game Show (BGS). He also reported on new game and tech releases and served as Showmetech's commercial coordinator, managing partnerships and contributing to the site's editorial direction by supporting writers with text review and content evaluation.","url":"https:\/\/www.bgr.com\/author\/eduardoariedo\/","knowsAbout":["Gaming hardware","Console ecosystems","Emerging consumer tech"],"alumniOf":[{"@type":"Organization","name":"ETEC de Mairinque"},{"@type":"Organization","name":"Cruzeiro do Sul University"}],"sameAs":["https:\/\/www.twitter.com\/sirariedo"]}],"publisher":{"@type":"Organization","address":{"@type":"PostalAddress","streetAddress":"11787 Lantern Road #201","addressLocality":"Fishers","addressRegion":"IN","postalCode":"46038","addressCountry":"US"},"contactPoint":{"@type":"ContactPoint","telephone":"(908) 514-8038","contactType":"customer support","email":"staff@bgr.com"},"publishingPrinciples":"https:\/\/www.bgr.com\/policies\/","@id":"https:\/\/www.bgr.com\/","name":"BGR","url":"https:\/\/www.bgr.com\/","logo":{"@type":"ImageObject","url":"https:\/\/looper-static.s3.amazonaws.com\/img\/BGR-meta-image-1280x720.png","caption":"BGR Logo"},"description":"Expert analysis of the leading stories in tech and entertainment plus reviews of the latest gadgets.","sameAs":["https:\/\/www.facebook.com\/BGR","https:\/\/twitter.com\/BGR","https:\/\/www.instagram.com\/bgr","https:\/\/flipboard.com\/@BGR","https:\/\/subscribe.bgr.com\/newsletter"]},"description":"Most modern electrical outlets have one wider hole and one narrower slot, and many of today's appliances have plug prongs that match. Here's why."}</script>
+                </head>
+<body>
+<div id="wrapper">
+    <div class="page-wrap">
+        <header id="header" class="">
+            <div class="nav-drop">
+                <div class="jcf-scrollable">
+                    <div class="aside-holder">
+                                    <nav id="aside-nav">
+                <div class="nav-top">
+                    <div class="logo">
+                        <a href="/" class="logo-holder">
+                            <img src="https://looper-static.s3.amazonaws.com/img/BGR-Logo-RGB-Mono-Negative.svg" alt="BGR" width="69" height="28">
+                        </a>
+                        <a href="#" class="nav-opener close"></a>
+                    </div>
+                </div>
+                
+                <ul class="main-nav"><li class="navlink navlink-news"><a href="/category/news/">News</a></li><li class="navlink navlink-tech"><a href="/category/tech/">Tech</a><input type="checkbox" id="subnav-button-tech"><label for="subnav-button-tech"></label><ul class="main-nav"><li class="subnavlink navlink-accessories"><a href="/category/accessories/">Accessories</a></li><li class="subnavlink navlink-apps-software"><a href="/category/apps-software/">Apps & Software</a></li><li class="subnavlink navlink-computers"><a href="/category/computers/">Computers</a></li><li class="subnavlink navlink-mobile"><a href="/category/mobile/">Mobile</a></li><li class="subnavlink navlink-audio"><a href="/category/audio/">Audio</a></li><li class="subnavlink navlink-security"><a href="/category/security/">Security</a></li><li class="subnavlink navlink-wearables"><a href="/category/wearables/">Wearables</a></li><li class="subnavlink navlink-artificial-intelligence"><a href="/category/artificial-intelligence/">Artificial Intelligence</a></li></ul></li><li class="navlink navlink-science"><a href="/category/science/">Science</a><input type="checkbox" id="subnav-button-science"><label for="subnav-button-science"></label><ul class="main-nav"><li class="subnavlink navlink-space"><a href="/category/space/">Space</a></li></ul></li><li class="navlink navlink-entertainment"><a href="/category/entertainment/">Entertainment</a><input type="checkbox" id="subnav-button-entertainment"><label for="subnav-button-entertainment"></label><ul class="main-nav"><li class="subnavlink navlink-tv"><a href="/category/tv/">TV</a></li><li class="subnavlink navlink-movies"><a href="/category/movies/">Movies</a></li><li class="subnavlink navlink-gaming"><a href="/category/gaming/">Gaming</a></li></ul></li><li class="navlink navlink-cars"><a href="/category/cars/">Cars</a><input type="checkbox" id="subnav-button-cars"><label for="subnav-button-cars"></label><ul class="main-nav"><li class="subnavlink navlink-electric-vehicles"><a href="/category/electric-vehicles/">Electric Vehicles</a></li></ul></li><li class="navlink navlink-guides"><a href="/category/guides/">Guides</a></li><li class="navlink navlink-deals"><a href="/category/deals/">Deals</a></li><li class="navlink navlink-reviews"><a href="/category/reviews/">Reviews</a><input type="checkbox" id="subnav-button-reviews"><label for="subnav-button-reviews"></label><ul class="main-nav"><li class="subnavlink navlink-computer-reviews"><a href="/category/computer-reviews/">Computer Reviews</a></li><li class="subnavlink navlink-mobile-reviews"><a href="/category/mobile-reviews/">Mobile Reviews</a></li><li class="subnavlink navlink-home-electronics-reviews"><a href="/category/home-electronics-reviews/">Home Electronics Reviews</a></li></ul></li></ul>        <ul class="social-buttons">
+            <li><a href="http://www.facebook.com/BGR" target="_blank" title="Facebook" aria-label="Facebook"><svg class="icon"><use xlink:href="#facebook"></use></svg></a></li><li><a href="https://twitter.com/BGR" target="_blank" title="Twitter" aria-label="Twitter"><svg class="icon"><use xlink:href="#twitter"></use></svg></a></li><li><a href="https://www.instagram.com/bgr" target="_blank" title="Instagram" aria-label="Instagram"><svg class="icon"><use xlink:href="#instagram"></use></svg></a></li><li><a href="https://flipboard.com/@BGR" target="_blank" title="Flipboard" aria-label="Flipboard"><svg class="icon"><use xlink:href="#flipboard"></use></svg></a></li><li><a href="/feed/" target="_blank" title="RSS" aria-label="RSS"><svg class="icon"><use xlink:href="#rss"></use></svg></a></li>
+            
+            <li class="menu-btn newsletter-btn"><a href="https://subscribe.bgr.com/newsletter?utm_source=bgr&utm_medium=side-nav" target="_blank" title="Newsletter" aria-label="Newsletter"><svg class="icon"><use xlink:href="#revue"></use></svg>Newsletter</a></li>
+        </ul>            <ul class="info-links">
+                <li class="info-link first-info-link"><a href="/about/">About</a></li>
+                <li class="info-link"><a href="/policies/">Editorial Policies</a></li>
+                <li class="info-link"><a href="/reviews-policy-guidelines/">Reviews Policy</a></li>
+                
+                <li class="info-link"><a href="https://www.static.com/bgr-privacy-policy" target="_blank">Privacy Policy</a></a>
+                <li class="info-link"><a href="https://www.static.com/terms" target="_blank">Terms of Use</a></li>
+            </ul>
+            </nav>                        <div class="nav-bottom">
+                            <span class="copyright-info">&copy; 2026                                <a href="https://www.static.com/" target="_blank">Static Media</a>. All Rights Reserved
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="bg"></div>
+         
+            <div id="header-container">
+                <div id="hamburger-holder">
+                    <div class="hamburger nav-opener"></div>
+                </div>
+
+                    <div id="logo" class="top-nav-standard">
+        <a href="/"><img src="https://looper-static.s3.amazonaws.com/img/BGR-Logo-RGB-Mono-Negative.svg" alt="BGR" width="69" height="28"></a>
+    </div>
+                <div id="logo-icon" class="top-nav-scrolled">
+                    <a href="/" >
+                        <img src="https://looper-static.s3.amazonaws.com/img/BGR-Icon-RGB-Mono-Negative.svg" alt="BGR" width="25" height="28">                    </a>
+                </div>
+
+                <div id="top-nav-title" class="top-nav-scrolled">Why Do Electrical Plug Outlets Have Different Sized Holes?</div>
+
+                            <div id="top-nav" class="top-nav-standard">
+                <nav id="top-nav-holder">
+                    
+                    <a href="/category/news/" class="navlink-news">News</a>
+<a href="/category/tech/" class="navlink-tech">Tech</a>
+<a href="/category/science/" class="navlink-science">Science</a>
+<a href="/category/entertainment/" class="navlink-entertainment">Entertainment</a>
+<a href="/category/cars/" class="navlink-cars">Cars</a>
+<a href="/category/guides/" class="navlink-guides">Guides</a>
+<a href="/category/deals/" class="navlink-deals">Deals</a>
+<a href="/category/reviews/" class="navlink-reviews">Reviews</a>
+
+                </nav>
+            </div>                <svg width="0" height="0" class="hidden">
+            <symbol version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" id="rss">
+    <path d="M2.13 11.733c-1.175 0-2.13 0.958-2.13 2.126 0 1.174 0.955 2.122 2.13 2.122 1.179 0 2.133-0.948 2.133-2.122-0-1.168-0.954-2.126-2.133-2.126zM0.002 5.436v3.067c1.997 0 3.874 0.781 5.288 2.196 1.412 1.411 2.192 3.297 2.192 5.302h3.080c-0-5.825-4.739-10.564-10.56-10.564zM0.006 0v3.068c7.122 0 12.918 5.802 12.918 12.932h3.076c0-8.82-7.176-16-15.994-16z"></path>
+</symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" id="twitter">
+    <path d="M389.2 48h70.6L305.6 224.2 487 464H345L233.7 318.6 106.5 464H35.8L200.7 275.5 26.8 48H172.4L272.9 180.9 389.2 48zM364.4 421.8h39.1L151.1 88h-42L364.4 421.8z"></path>
+</symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" id="facebook">
+    <path d="M19 6h5V0h-5c-3.86 0-7 3.14-7 7v3H8v6h4v16h6V16h5l1-6h-6V7c0-.542.458-1 1-1z"></path>
+</symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14" id="flipboard">
+    <path d="m 6.9999999,0.99982 5.9993001,0 0,1.99835 0,1.99357 -1.993367,0 -1.9980673,0 -0.014998,1.99357 -0.01,1.99835 -1.9980669,0.01 -1.9933674,0.0146 -0.014998,1.99835 -0.01,1.99357 -1.9834686,0 -1.9836686,0 0,-6.00006 0,-5.99994 5.9992001,0 z"></path>
+</symbol>
+        <symbol viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" id="instagram">
+    <path d="M17.3183118,0.0772036939 C18.5358869,0.132773211 19.3775594,0.311686093 20.156489,0.614412318 C20.9357539,0.917263935 21.5259307,1.30117806 22.1124276,1.88767349 C22.6988355,2.47414659 23.0827129,3.06422396 23.3856819,3.84361655 C23.688357,4.62263666 23.8672302,5.46418415 23.9227984,6.68172489 C23.9916356,8.19170553 24,8.72394829 24,11.9999742 C24,15.2760524 23.9916355,15.808302 23.9227954,17.3182896 C23.8672306,18.5358038 23.6883589,19.3773584 23.3855877,20.1566258 C23.0826716,20.9358162 22.6987642,21.5259396 22.1124276,22.1122749 C21.5259871,22.6987804 20.9357958,23.0827198 20.1563742,23.3856323 C19.3772192,23.6883583 18.5357324,23.8672318 17.3183209,23.9227442 C15.8086874,23.9916325 15.2765626,24 12,24 C8.72343739,24 8.19131258,23.9916325 6.68172382,23.9227463 C5.46426077,23.8672314 4.62270711,23.6883498 3.84342369,23.3855738 C3.0641689,23.0827004 2.47399369,22.6987612 1.88762592,22.1123283 C1.30117312,21.525877 0.91721975,20.9357071 0.614318116,20.1563835 C0.311643016,19.3773633 0.132769821,18.5358159 0.0772038909,17.3183251 C0.0083529426,15.8092887 0,15.2774634 0,11.9999742 C0,8.7225328 0.00835296697,8.19071076 0.0772047368,6.68165632 C0.132769821,5.46418415 0.311643016,4.62263666 0.614362729,3.84350174 C0.91719061,3.06430165 1.30113536,2.4741608 1.88757245,1.88772514 C2.47399369,1.30123879 3.0641689,0.917299613 3.84345255,0.614414972 C4.62236201,0.311696581 5.46409415,0.132773979 6.68163888,0.0772035898 C8.19074867,0.00835221992 8.72252573,0 12,0 C15.2774788,0 15.8092594,0.00835235053 17.3183118,0.0772036939 Z M12,2.66666667 C8.75959504,2.66666667 8.26400713,2.67445049 6.80319929,2.74109814 C5.87614637,2.78341009 5.31952221,2.90172878 4.80947575,3.09995521 C4.37397765,3.26922052 4.09725505,3.44924273 3.77324172,3.77329203 C3.44916209,4.09737087 3.26913181,4.37408574 3.09996253,4.80937168 C2.90169965,5.31965737 2.78340891,5.87618164 2.74109927,6.80321713 C2.67445122,8.26397158 2.66666667,8.75960374 2.66666667,11.9999742 C2.66666667,15.2403924 2.67445121,15.7360281 2.74109842,17.1967643 C2.78340891,18.1238184 2.90169965,18.6803426 3.09990404,19.1904778 C3.26914133,19.6259017 3.44919889,19.9026659 3.77329519,20.2267614 C4.09725505,20.5507573 4.37397765,20.7307795 4.80932525,20.8999863 C5.31971515,21.0982887 5.87621193,21.2165784 6.80323907,21.2588497 C8.26460439,21.3255353 8.76051223,21.3333333 12,21.3333333 C15.2394878,21.3333333 15.7353956,21.3255353 17.1968056,21.2588476 C18.123775,21.216579 18.6802056,21.0982995 19.1905083,20.9000309 C19.6260288,20.7307713 19.9027426,20.5507596 20.2267583,20.226708 C20.5507492,19.9027179 20.7308046,19.6259456 20.9000375,19.1906283 C21.0983009,18.6803412 21.2165908,18.1238118 21.2588986,17.196779 C21.3255376,15.7350718 21.3333333,15.2390126 21.3333333,11.9999742 C21.3333333,8.76098665 21.3255376,8.26493375 21.2589016,6.80323567 C21.2165911,5.87618164 21.0983004,5.31965737 20.9001178,4.80957831 C20.7308131,4.37403932 20.550774,4.09729207 20.2267583,3.77324038 C19.9027658,3.44924868 19.6260264,3.26922777 19.1905015,3.09996643 C18.6803988,2.90171817 18.1238378,2.78341062 17.1967608,2.74109868 C15.7359966,2.67445057 15.2404012,2.66666667 12,2.66666667 Z M12,18.2222222 C8.56356156,18.2222222 5.77777778,15.4364384 5.77777778,12 C5.77777778,8.56356156 8.56356156,5.77777778 12,5.77777778 C15.4364384,5.77777778 18.2222222,8.56356156 18.2222222,12 C18.2222222,15.4364384 15.4364384,18.2222222 12,18.2222222 Z M12,15.5555556 C13.9636791,15.5555556 15.5555556,13.9636791 15.5555556,12 C15.5555556,10.0363209 13.9636791,8.44444444 12,8.44444444 C10.0363209,8.44444444 8.44444444,10.0363209 8.44444444,12 C8.44444444,13.9636791 10.0363209,15.5555556 12,15.5555556 Z M18.2222222,7.11111111 C17.4858426,7.11111111 16.8888889,6.51415744 16.8888889,5.77777778 C16.8888889,5.04139811 17.4858426,4.44444444 18.2222222,4.44444444 C18.9586019,4.44444444 19.5555556,5.04139811 19.5555556,5.77777778 C19.5555556,6.51415744 18.9586019,7.11111111 18.2222222,7.11111111 Z"/>
+</symbol>
+         <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" id="linkedin">
+    <path d="M100.3 448H7.4V148.9h92.9zM53.8 108.1C24.1 108.1 0 83.5 0 53.8a53.8 53.8 0 0 1 107.6 0c0 29.7-24.1 54.3-53.8 54.3zM447.9 448h-92.7V302.4c0-34.7-.7-79.2-48.3-79.2-48.3 0-55.7 37.7-55.7 76.7V448h-92.8V148.9h89.1v40.8h1.3c12.4-23.5 42.7-48.3 87.9-48.3 94 0 111.3 61.9 111.3 142.3V448z"/>
+</symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240.1 113.49" id="muckrack">
+    <path class="b" d="M223.2,73.59c11.2-7.6,16.8-20.3,16.9-33.3C240.1,20.39,226.8.09,199.4.09c-8.35-.1-18.27-.1-28.14-.07-9.86.02-19.66.07-27.76.07v113.4h29.6v-35h17l17.1,35h30.6l.8-5-18.7-33.4c2.5-.8,3.3-1.5,3.3-1.5ZM199,54.29h-25.8v-29.7h25.8c8.4,0,12.3,7.4,12.3,14.6s-4.1,15.1-12.3,15.1Z"/><polygon class="b" points="0 .14 10.9 .14 64.5 49.24 117.9 .14 129.3 .14 129.3 113.34 99.7 113.34 99.7 54.24 66.1 83.74 62.7 83.74 29.6 54.24 29.6 113.34 0 113.34 0 .14"/>
+</symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="7 2 2 12" id="youtube">
+    <path d="M15.841 4.8c0 0-0.156-1.103-0.637-1.587-0.609-0.637-1.291-0.641-1.603-0.678-2.237-0.163-5.597-0.163-5.597-0.163h-0.006c0 0-3.359 0-5.597 0.163-0.313 0.038-0.994 0.041-1.603 0.678-0.481 0.484-0.634 1.587-0.634 1.587s-0.159 1.294-0.159 2.591v1.213c0 1.294 0.159 2.591 0.159 2.591s0.156 1.103 0.634 1.588c0.609 0.637 1.409 0.616 1.766 0.684 1.281 0.122 5.441 0.159 5.441 0.159s3.363-0.006 5.6-0.166c0.313-0.037 0.994-0.041 1.603-0.678 0.481-0.484 0.637-1.588 0.637-1.588s0.159-1.294 0.159-2.591v-1.213c-0.003-1.294-0.162-2.591-0.162-2.591zM6.347 10.075v-4.497l4.322 2.256-4.322 2.241z"></path>
+</symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" id="pinterest">
+    <g>
+    <path d="M220.646,338.475C207.223,408.825,190.842,476.269,142.3,511.5
+            c-14.996-106.33,21.994-186.188,39.173-270.971c-29.293-49.292,3.518-148.498,65.285-124.059
+            c76.001,30.066-65.809,183.279,29.38,202.417c99.405,19.974,139.989-172.476,78.359-235.054
+            C265.434-6.539,95.253,81.775,116.175,211.161c5.09,31.626,37.765,41.22,13.062,84.884c-57.001-12.65-74.005-57.6-71.822-117.533
+            c3.53-98.108,88.141-166.787,173.024-176.293c107.34-12.014,208.081,39.398,221.991,140.376
+            c15.67,113.978-48.442,237.412-163.23,228.529C258.085,368.704,245.023,353.283,220.646,338.475z">
+    </path>
+    </g>
+</symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" id="tiktok">
+    <path d="M 22.472559,-3.8146973e-6 C 23.000559,4.5408962 25.535059,7.2481962 29.941559,7.5361962 v 5.1073998 c -2.5536,0.2496 -4.7905,-0.5856 -7.3922,-2.1601 v 9.5523 c 0,12.1348 -13.2292004,15.927 -18.5478004,7.2291 -3.4177,-5.597 -1.3248,-15.4181 9.6387004,-15.8117 v 5.3857 c -0.8352,0.1344 -1.728,0.3456 -2.5441,0.6241 -2.4384004,0.8256 -3.8209004,2.3712 -3.4369004,5.0977 0.7392,5.2226 10.3204004,6.7682 9.5235004,-3.4369 V 0.00959619 h 5.2898 z" />
+</symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" id="twitch">
+    <path d="M3 0l-3 5v23h8v4h4l4-4h5l9-9v-19h-27zM26 17l-5 5h-5l-4 4v-4h-6v-18h20v13z"></path><path d="M19 8h3v8h-3v-8z"></path><path d="M13 8h3v8h-3v-8z"></path>
+</symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512.016 512.016" id="snapchat" >
+    <g>
+        <g>
+            <path d="M500.459,375.368c-64.521-10.633-93.918-75.887-97.058-83.294c-0.06-0.145-0.307-0.666-0.375-0.819
+                c-3.234-6.571-4.036-11.904-2.347-15.838c3.388-8.013,17.741-12.553,26.931-15.462c2.586-0.836,5.009-1.604,6.938-2.372
+                c18.586-7.339,27.913-16.717,27.716-27.895c-0.179-8.866-7.134-17.007-17.434-20.651c-3.55-1.485-7.774-2.295-11.887-2.295
+                c-2.842,0-7.066,0.401-11.102,2.287c-7.868,3.678-14.865,5.658-20.156,5.888c-2.355-0.094-4.139-0.486-5.427-0.922
+                c0.162-2.79,0.35-5.658,0.529-8.585l0.094-1.493c2.193-34.807,4.915-78.123-6.673-104.081
+                c-34.27-76.834-106.999-82.807-128.478-82.807l-10.018,0.094c-21.436,0-94.029,5.965-128.265,82.756
+                c-11.614,26.018-8.866,69.316-6.664,104.115c0.213,3.422,0.427,6.758,0.614,10.01c-1.468,0.503-3.584,0.947-6.46,0.947
+                c-6.161,0-13.542-1.997-21.931-5.922c-12.126-5.683-34.295,1.911-37.291,17.647c-1.63,8.516,1.801,20.796,27.383,30.908
+                c1.988,0.785,4.489,1.587,7.561,2.56c8.576,2.722,22.929,7.27,26.325,15.266c1.681,3.951,0.879,9.284-2.662,16.512
+                c-1.263,2.944-31.65,72.124-98.765,83.174c-6.963,1.143-11.93,7.322-11.537,14.353c0.111,1.954,0.563,3.917,1.399,5.897
+                c5.641,13.193,27.119,22.349,67.55,28.766c0.887,2.295,1.92,7.006,2.509,9.737c0.853,3.9,1.749,7.927,2.97,12.1
+                c1.229,4.224,4.881,11.307,15.445,11.307c3.575,0,7.714-0.811,12.211-1.681c6.468-1.271,15.309-2.995,26.274-2.995
+                c6.084,0,12.416,0.546,18.825,1.604c12.092,2.005,22.699,9.506,35.004,18.202c18.116,12.809,34.586,22.605,67.524,22.605
+                c0.87,0,1.732-0.026,2.577-0.085c1.22,0.06,2.449,0.085,3.695,0.085c28.851,0,54.246-7.62,75.494-22.63
+                c11.742-8.311,22.835-16.162,34.935-18.176c6.426-1.058,12.766-1.604,18.85-1.604c10.513,0,18.901,1.348,26.385,2.816
+                c5.06,0.998,9.02,1.476,12.672,1.476c7.373,0,12.8-4.053,14.874-11.127c1.195-4.113,2.091-8.021,2.961-12.015
+                c0.461-2.125,1.57-7.211,2.509-9.66c39.851-6.34,60.203-15.138,65.835-28.297c0.845-1.894,1.34-3.9,1.476-6.033
+                C512.372,382.707,507.422,376.529,500.459,375.368z"/>
+        </g>
+    </g>
+</symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" id="threads">
+    <path d="M141.537 88.9883C140.71 88.5919 139.87 88.2104 139.019 87.8451C137.537 60.5382 122.616 44.905 97.5619 44.745C97.4484 44.7443 97.3355 44.7443 97.222 44.7443C82.2364 44.7443 69.7731 51.1409 62.102 62.7807L75.881 72.2328C81.6116 63.5383 90.6052 61.6848 97.2286 61.6848C97.3051 61.6848 97.3819 61.6848 97.4576 61.6855C105.707 61.7381 111.932 64.1366 115.961 68.814C118.893 72.2193 120.854 76.925 121.825 82.8638C114.511 81.6207 106.601 81.2385 98.145 81.7233C74.3247 83.0954 59.0111 96.9879 60.0396 116.292C60.5615 126.084 65.4397 134.508 73.775 140.011C80.8224 144.663 89.899 146.938 99.3323 146.423C111.79 145.74 121.563 140.987 128.381 132.296C133.559 125.696 136.834 117.143 138.28 106.366C144.217 109.949 148.617 114.664 151.047 120.332C155.179 129.967 155.42 145.8 142.501 158.708C131.182 170.016 117.576 174.908 97.0135 175.059C74.2042 174.89 56.9538 167.575 45.7381 153.317C35.2355 139.966 29.8077 120.682 29.6052 96C29.8077 71.3178 35.2355 52.0336 45.7381 38.6827C56.9538 24.4249 74.2039 17.11 97.0132 16.9405C119.988 17.1113 137.539 24.4614 149.184 38.788C154.894 45.8136 159.199 54.6488 162.037 64.9503L178.184 60.6422C174.744 47.9622 169.331 37.0357 161.965 27.974C147.036 9.60668 125.202 0.195148 97.0695 0H96.9569C68.8816 0.19447 47.2921 9.6418 32.7883 28.0793C19.8819 44.4864 13.2244 67.3157 13.0007 95.9325L13 96L13.0007 96.0675C13.2244 124.684 19.8819 147.514 32.7883 163.921C47.2921 182.358 68.8816 191.806 96.9569 192H97.0695C122.03 191.827 139.624 185.292 154.118 170.811C173.081 151.866 172.51 128.119 166.26 113.541C161.776 103.087 153.227 94.5962 141.537 88.9883ZM98.4405 129.507C88.0005 130.095 77.1544 125.409 76.6196 115.372C76.2232 107.93 81.9158 99.626 99.0812 98.6368C101.047 98.5234 102.976 98.468 104.871 98.468C111.106 98.468 116.939 99.0737 122.242 100.233C120.264 124.935 108.662 128.946 98.4405 129.507Z" />
+</symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" id="bluesky">
+    <path d="M111.8 62.2C170.2 105.9 233 194.7 256 242.4c23-47.6 85.8-136.4 144.2-180.2c42.1-31.6 110.3-56 110.3 21.8c0 15.5-8.9 130.5-14.1 149.2C478.2 298 412 314.6 353.1 304.5c102.9 17.5 129.1 75.5 72.5 133.5c-107.4 110.2-154.3-27.6-166.3-62.9l0 0c-1.7-4.9-2.6-7.8-3.3-7.8s-1.6 3-3.3 7.8l0 0c-12 35.3-59 173.1-166.3 62.9c-56.5-58-30.4-116 72.5-133.5C100 314.6 33.8 298 15.7 233.1C10.4 214.4 1.5 99.4 1.5 83.9c0-77.8 68.2-53.4 110.3-21.8z"/>
+</symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 618 478" id="google">
+    <path d="M617.84 456.59C617.82 467.86 608.68 477 597.41 477.02H20.43C9.16 477 0.02 467.86 0 456.59V20.43C0.02 9.16 9.16 0.02 20.43 0H597.41C608.68 0.02 617.82 9.16 617.84 20.43V456.59ZM516.79 342.6V302.74C516.79 301.26 515.59 300.06 514.11 300.06H335.02V345.46H514.11C515.61 345.44 516.82 344.2 516.79 342.7C516.79 342.67 516.79 342.64 516.79 342.6ZM544.02 256.35V216.31C544.04 214.83 542.86 213.61 541.38 213.59C541.37 213.59 541.35 213.59 541.34 213.59H335.02V258.99H541.34C542.79 259.02 543.99 257.86 544.02 256.41C544.02 256.36 544.02 256.32 544.02 256.27V256.36V256.35ZM516.79 170.1V129.88C516.79 128.4 515.59 127.2 514.11 127.2H335.02V172.6H514.11C515.56 172.58 516.74 171.42 516.79 169.97V170.11V170.1ZM180.59 218.08V258.93H239.6C234.74 283.9 212.77 302.01 180.59 302.01C144.24 300.72 115.81 270.2 117.11 233.84C118.34 199.3 146.05 171.59 180.59 170.36C196.12 170.1 211.13 175.97 222.35 186.7L253.49 155.6C233.78 137.06 207.65 126.88 180.59 127.18C120.42 127.18 71.64 175.96 71.64 236.13C71.64 296.3 120.42 345.08 180.59 345.08C240.76 345.08 285 300.82 285 238.49C284.96 231.59 284.39 224.69 283.27 217.88L180.59 218.06V218.08Z"/>
+</symbol>
+        <symbol id="website" viewBox="0 0 17 17" xmlns="http://www.w3.org/2000/svg">
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M1.91041 1.47245C3.56879 -0.185927 6.25755 -0.185927 7.91592 1.47245L10.9186 4.47521C12.577 6.13361 12.577 8.82231 10.9186 10.4807C10.5041 10.8954 9.83185 10.8954 9.41728 10.4807C9.00271 10.0661 9.00271 9.39389 9.41728 8.97932C10.2465 8.15019 10.2465 6.80573 9.41728 5.97659L6.41454 2.97383C5.58535 2.14465 4.24097 2.14465 3.41178 2.97383C2.58261 3.80302 2.58261 5.1474 3.41178 5.97659L4.16248 6.72728C4.57708 7.14185 4.57707 7.81407 4.16248 8.22864C3.74789 8.64321 3.07569 8.64321 2.6611 8.22864L1.91041 7.47796C0.252031 5.81959 0.252031 3.13083 1.91041 1.47245ZM7.91592 5.9766C8.33049 6.39116 8.33049 7.06339 7.91592 7.47796C7.08678 8.3072 7.08678 9.65155 7.91592 10.4807L10.9186 13.4835C11.7479 14.3127 13.0922 14.3127 13.9215 13.4835C14.7506 12.6543 14.7506 11.3099 13.9215 10.4807L13.1708 9.73C12.7561 9.31544 12.7561 8.64321 13.1708 8.22864C13.5854 7.81407 14.2575 7.81407 14.6722 8.22864L15.4228 8.97932C17.0812 10.6377 17.0812 13.3265 15.4228 14.9849C13.7645 16.6433 11.0757 16.6433 9.41728 14.9849L6.41455 11.9822C4.75618 10.3238 4.75618 7.63498 6.41455 5.9766C6.82912 5.562 7.50135 5.562 7.91592 5.9766Z"/>
+</symbol>
+            <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" id="revue">
+        <path d="M48 64C21.5 64 0 85.5 0 112c0 15.1 7.1 29.3 19.2 38.4L236.8 313.6c11.4 8.5 27 8.5 38.4 0L492.8 150.4c12.1-9.1 19.2-23.3 19.2-38.4c0-26.5-21.5-48-48-48H48zM0 176V384c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V176L294.4 339.2c-22.8 17.1-54 17.1-76.8 0L0 176z"/>
+    </symbol>
+        
+        
+        
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" id="advertise">
+            <g clip-path="url(#clip0_1911_5435)">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M12 1.40497L2.26973 4.27073L0 2.34144V12.6558L2.26967 10.7271L3.84476 11.191V14.1933C3.84529 15.229 4.55813 16.067 5.43904 16.0676H9.23405C9.67247 16.0682 10.0745 15.8571 10.3609 15.5183C10.6488 15.1814 10.8284 14.709 10.8278 14.1932V13.2478L12 13.593V1.40497ZM5.09306 14.5997C5.00434 14.4935 4.95039 14.3537 4.94986 14.1932V11.5168L9.72281 12.9219V14.1932C9.72227 14.3537 9.66885 14.4935 9.5796 14.5997C9.48985 14.7047 9.37052 14.7676 9.23409 14.7676H5.4391C5.30214 14.7676 5.18281 14.7047 5.09306 14.5997Z" />
+            <path d="M13 1.11045L17 -0.067627V15.0654L13 13.8875V1.11045Z" />
+            </g>
+            <defs>
+            <clipPath id="clip0_1911_5435">
+            <rect width="16" height="16" fill="white"/>
+            </clipPath>
+            </defs>
+        </symbol>
+    
+</svg>                    <nav id="social-nav-holder" class="top-nav-standard">
+        <ul class="social-buttons">
+            <li><a href="http://www.facebook.com/BGR" target="_blank" title="Facebook" aria-label="Facebook"><svg class="icon"><use xlink:href="#facebook"></use></svg></a></li><li><a href="https://twitter.com/BGR" target="_blank" title="Twitter" aria-label="Twitter"><svg class="icon"><use xlink:href="#twitter"></use></svg></a></li><li><a href="https://www.instagram.com/bgr" target="_blank" title="Instagram" aria-label="Instagram"><svg class="icon"><use xlink:href="#instagram"></use></svg></a></li><li><a href="https://flipboard.com/@BGR" target="_blank" title="Flipboard" aria-label="Flipboard"><svg class="icon"><use xlink:href="#flipboard"></use></svg></a></li><li><a href="/feed/" target="_blank" title="RSS" aria-label="RSS"><svg class="icon"><use xlink:href="#rss"></use></svg></a></li>
+            
+            <li class="menu-btn newsletter-btn"><a href="https://subscribe.bgr.com/newsletter?utm_source=bgr&utm_medium=top-nav" target="_blank" title="Newsletter" aria-label="Newsletter"><svg class="icon"><use xlink:href="#revue"></use></svg>Newsletter</a></li>
+        </ul>
+    </nav>
+                                <div id="top-nav-share" class="top-nav-scrolled"></div>
+	                        </div>
+            <div id="is-tablet"></div>
+            <div id="is-mobile"></div>
+        </header>
+<main id="main" role="main" class="infinite gallery" data-post-type="articles">
+    <div class="holder">
+        <div id="content" class="article">
+            
+
+            <article class="news-post">
+    
+    
+    <ul class="breadcrumbs"><li>
+<a href="/category/tech/">Technology</a> </li></ul>
+                <div class="news-article">
+                <h1 class="title-gallery" data-post-id="2088016" id="title-gallery" data-has-pixel-tags="1" data-pixel-tag="bgr" data-author="Eduardo Ariedo" data-category="technology" data-content_type="Short Article" data-mod_date="2026-02-02" data-layout="Infinite" data-post_id="2088016" data-pub_date="2026-02-02" data-day="Monday" data-dayhour="Monday-4PM" data-pubhour="4PM" data-num_slides="2" data-num_words="500" data-pitcher="Justin Broach" data-trello_board="News" data-intent="evergreen" data-ideation="oo-hits">Why Do Electrical Plug Outlets Have Different Sized Holes?</h1>
+            </div>
+
+    
+                <div class="news-article">
+                
+                                <div class="byline-container">
+                    <div class="byline-text-wrap">
+                        <span class="byline-by">By</span> <a href="/author/eduardoariedo/" class="byline-author">Eduardo Ariedo</a>
+                        
+                        <span class="byline-slash"></span>
+                        <span class="byline-timestamp">
+                            <time datetime="2026-02-02T21:47:00+00:00">Feb. 2, 2026 4:47 pm EST</time></span>
+                        
+                    </div>
+                    
+                </div>
+                                <div class="slide-key image-holder gallery-image-holder credit-image-wrap lead-image-holder" data-post-url="https://www.bgr.com/2088016/why-electrical-plug-outlet-different-size-holes/" data-post-title="Why Do Electrical Plug Outlets Have Different Sized Holes?" data-slide-num="0" data-post-id="2088016">
+                         
+                                             <picture id="pb3325c9d8810a3a31f8d406040dd5ea6">
+                                                    <source media="(min-width: 429px)" srcset="https://www.bgr.com/img/gallery/why-do-electrical-plug-outlets-have-different-sized-holes/intro-1769697230.webp" type="image/webp">
+                            <source media="(max-width: 428px)" srcset="https://www.bgr.com/img/gallery/why-do-electrical-plug-outlets-have-different-sized-holes/intro-1769697230.sm.webp" type="image/webp">
+                        <img class="gallery-image " src="https://www.bgr.com/img/gallery/why-do-electrical-plug-outlets-have-different-sized-holes/intro-1769697230.jpg" data-slide-url="https://www.bgr.com/2088016/why-electrical-plug-outlet-different-size-holes/" data-post-id="2088016" data-slide-num="0" data-slide-title="Why Do Electrical Plug Outlets Have Different Sized Holes?: " width="780" height="438" alt="Hand holding a polarized power plug near a wall outlet with other devices already connected">
+                    </source></source></picture>
+                    <span class="gallery-image-credit">Jannhuizenga/Getty Images</span>
+                    </div>
+				            <div class="columns-holder ">
+                
+                
+                <p dir="ltr">If you've ever looked closely at an electrical plug, you've likely noticed that <a href="https://www.bgr.com/2077781/electrical-plug-prong-holes-use-explained/" target="_blank">the ends of the prongs have little holes in them</a>. While this is a leftover design element from early electrical systems, modern plugs have another quirk you may have spotted: The prongs themselves come in different sizes on many of today's electrical devices. Lots of devices, such as phones, laptops, and especially appliances, use these uneven prongs as a safety feature. However, this also comes as a small annoyance when trying to plug them into a power source, since they can only be connected in one way — but this design choice is about reducing hazards.</p>
+<p dir="ltr">This asymmetry exists to discourage improper use, since if you try to connect a modern plug backwards, a newer power outlet won't accept it. In the past, older plugs were fully reversible, but they also could let electricity flow through internal components even when a device was turned off. So, to reduce the risk of shocks and other hazards caused by that, this different size feature became more popular as a safety standard for many devices.</p>
+<p dir="ltr">Known as polarization, this design uses plug prongs with different sizes to help control how electricity flows into a device when it is plugged in, making it safer to use without the need to do anything extra. While it may be an inconvenience for many users, especially if the power outlet is placed in an odd place, it greatly improves safety in your home.</p>
+
+            </div>
+            </div>
+
+            <div class="news-article">
+                
+                <h2 class="">Electrical plug prongs are different sizes to ensure polarization</h2>
+                                <div class="slide-key image-holder gallery-image-holder credit-image-wrap " data-post-url="https://www.bgr.com/2088016/why-electrical-plug-outlet-different-size-holes/" data-post-title="Why Do Electrical Plug Outlets Have Different Sized Holes?" data-slide-num="1" data-post-id="2088016">
+                         
+                                             <picture id="p80a86d63c375bc3ba85734835613ba68">
+                                                    <source media="(min-width: 429px)" srcset="https://www.bgr.com/img/gallery/why-do-electrical-plug-outlets-have-different-sized-holes/electrical-plug-prongs-are-different-sizes-to-ensure-polarization-1769697232.webp" type="image/webp">
+                            <source media="(max-width: 428px)" srcset="https://www.bgr.com/img/gallery/why-do-electrical-plug-outlets-have-different-sized-holes/electrical-plug-prongs-are-different-sizes-to-ensure-polarization-1769697232.sm.webp" type="image/webp">
+                        <img class="gallery-image " src="https://www.bgr.com/img/gallery/why-do-electrical-plug-outlets-have-different-sized-holes/electrical-plug-prongs-are-different-sizes-to-ensure-polarization-1769697232.jpg" data-slide-url="https://www.bgr.com/2088016/why-electrical-plug-outlet-different-size-holes/" data-post-id="2088016" data-slide-num="1" data-slide-title="Why Do Electrical Plug Outlets Have Different Sized Holes?: Electrical plug prongs are different sizes to ensure polarization" width="780" height="438" alt="Hand plugging a polarized power cord into a wall electrical outlet">
+                    </source></source></picture>
+                    <span class="gallery-image-credit">Richard Stephen/Getty Images</span>
+                    </div>
+				            <div class="columns-holder ">
+                <p dir="ltr">If you inspect the plug on a modern appliance, it's very likely that you'll see that the electrical plug prongs are different in size. However, this choice is not made only to annoy you when you are trying to connect them, but as a safety measure that ensures that polarization works properly and guides electricity safely. This means that the narrow slot is connected to the hot wire, which is the side with dangerous voltage from the breaker panel.</p>
+<p dir="ltr">The wider slot is connected to the neutral wire, which completes the circuit by providing a return path for the current. So, the asymmetrical design is there to essentially force you to connect the plug correctly, which ensures that when you flip the switch to "off," power is cut on the intended side of the circuit before it reaches internal components. This helps prevent parts of the device from remaining energized when it appears to be turned off, something that may occur in reversible plugs.</p>
+<p dir="ltr">Additionally, this scenario with reversible plug prongs can create some hidden hazards for the user. For example, without the protection provided by a polarized plug, the threaded metal collar of a light socket can become energized if the plug is not inserted correctly in some cases. So, when changing a lightbulb, a user may accidentally touch that metal casing and receive a shock, which is why forcing the hot wire to align with the switch properly cuts off the threat before it can cause harm.</p>
+
+            </div>
+            </div>
+
+    
+</article>                        
+            <div class="under-art" data-post-url="https://www.bgr.com/2088016/why-electrical-plug-outlet-different-size-holes/" data-post-title="Why Do Electrical Plug Outlets Have Different Sized Holes?"> 
+                <h2 class="section-header">Recommended</h2>
+                <input type="hidden" class="next-article-url" value="https://www.bgr.com/1995890/clever-old-laptops-uses-2025/"/>
+                                <div class="zergnet-widget" id="zergnet-widget-93545" data-lazyload="2000" data-no-snippet>
+                    <div class="loading-more">
+   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid" width="42" height="42" style="shape-rendering: auto; display: block; background: transparent;" xmlns:xlink="http://www.w3.org/1999/xlink"><g><circle stroke-linecap="round" fill="none"  stroke-dasharray="50.26548245743669 50.26548245743669" stroke-width="8" r="32" cy="50" cx="50">
+  <animateTransform values="0 50 50;360 50 50" keyTimes="0;1" dur="1s" repeatCount="indefinite" type="rotate" attributeName="transform"></animateTransform>
+</circle><g></g></g><!-- [ldio] generated by https://loading.io --></svg>
+</div>
+                </div>
+        	</div>
+                            <script language="javascript" type="text/javascript">
+                    setTimeout(function() {
+                        var n = document.getElementById("#zergnet-widget-93545");
+                        var h = false;
+                        if ( n ) {
+                            h = n.innerHTML;
+                        }
+                        if ( h ) {
+                            return false;
+                        }
+                        var zergnet = document.createElement('script');
+                        zergnet.type = 'text/javascript'; zergnet.async = true;
+                        zergnet.src = '//www.zergnet.com/zerg.js?v=1&id=93545';
+                        var znscr = document.getElementsByTagName('script')[0];
+                        znscr.parentNode.insertBefore(zergnet, znscr);
+                    }, 3500);
+                </script>
+                           <div id="div-ad-1x1a" class="google-ad-placeholder clear placeholder placeholder-1-1" data-ad-height="any" data-ad-width="any" data-ad-pos="1x1"></div>
+
+        </div>
+    </div>
+    <div class="sidebar-container">
+                <div id="floatingAd">
+                    </div>
+    </div>
+    </main>
+
+</div>
+</div>
+
+            
+                        <script async src="https://www.googletagmanager.com/gtag/js?id=G-5XFM11336W"></script>
+    <script>
+        window.LooperConfig = window.LooperConfig || {};
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);} 
+        gtag('js', new Date());
+        window.LooperConfig.ga4tag = "G-5XFM11336W";
+        window.LooperConfig.ga4data = {"author":"Eduardo Ariedo","category":"technology","content_type":"Short Article","mod_date":"2026-02-02","layout":"Infinite","post_id":2088016,"pub_date":"2026-02-02","day":"Monday","dayhour":"Monday-4PM","pubhour":"4PM","num_slides":2,"num_words":500,"pitcher":"Justin Broach","trello_board":"News","intent":"evergreen","ideation":"oo-hits"};
+        window.LooperConfig.categories = ["Technology"];
+        window.LooperReady = function(){
+            if ( typeof( window.LooperReadyInside ) !== 'undefined' ) {
+                window.LooperReadyInside();
+            }
+            LooperConfig.params = false;
+            try {
+                LooperConfig.params = (new URL(document.location)).searchParams;
+            } catch( e ) {
+                //do nothing
+            }
+            
+            var widgets = document.querySelectorAll(".zergnet-widget");
+            var hasWidget = false;
+            for ( i = 0; i < widgets.length; i++ ) {
+                if ( !hasWidget && LoopGalObj.isVisible(widgets[i]) ) {
+                    hasWidget = true;
+                }
+            }
+            if (!hasWidget) {
+                LooperConfig['ga4data']["ad_block"] = true;
+            } else {
+                LooperConfig['ga4data']["ad_block"] = false;
+            }
+
+            var validZSource = {"newsletter":"newsletter","flipboard":"flipboard","smartnews":"smartnews","smartnews_sponsored":"smartnews_sponsored","msnsyndicated":"msnsyndicated","newsbreakapp":"newsbreakapp","topbuzz":"topbuzz","zinf_abtest":"zinf_abtest","nexthighlights":"nexthighlights","fb":"fb","fb_ios":"fb_ios","fb_android":"fb_android","gemini":"gemini","facebook_organic":"facebook_organic","gdiscover_sponsored":"gdiscover_sponsored","googlenewsapp":"googlenewsapp","snapchat":"snapchat","dt_app":"dt_app","youtube":"youtube","opera":"opera","aol":"aol"};
+
+            if (window.location.href.indexOf("zsource") !== -1) {
+                var vars = {};
+                var parts = window.location.href.replace(/[?&]+([^=&]+)=([^&]*)/gi, function (m, key, value) {
+                    vars[key] = value.toLowerCase();
+                });
+                if (typeof( vars['zsource'] !== "undefined") && typeof( validZSource[vars['zsource']] ) !== "undefined") {
+                    LooperConfig['zsource'] = validZSource[vars['zsource']];
+                    document.cookie = "zsource=" + LooperConfig['zsource'] + "; path=/; max-age=600";
+                }
+            } else if (document.cookie.indexOf("zsource") !== -1) {
+                var cookieval = document.cookie;
+                var zsource = "";
+                if (cookieval) {
+                    var arr = cookieval.split(";");
+                    if (arr.length) {
+                        for (var i = 0; i < arr.length; i++) {
+                            var keyval = arr[i].split("=");
+                            if (keyval.length && keyval[0].indexOf("zsource") !== -1) {
+                                zsource = keyval[1].trim();
+                            }
+                        }
+                    }
+                }
+                if (typeof( validZSource[zsource] !== "undefined" )) {
+                    LooperConfig['zsource'] = validZSource[zsource];
+                }
+            }
+
+            if (typeof( LooperConfig['zsource'] ) !== "undefined") {
+                LooperConfig['ga4data']["zsource"] = LooperConfig['zsource'];
+            }
+
+            // ga4 first view setup
+            LooperConfig['ga4data']["first_view"] = false;
+            var ga4CookieName = '_ga_5XFM11336W' ;
+
+            let decodedCookie = decodeURIComponent(document.cookie);
+            let decodedCookieArray = decodedCookie.split(';').map((d) => d.trim()).filter((d) => d.substring(0, ga4CookieName.length) === ga4CookieName);
+            var isGa4CookiePresent =  decodedCookieArray.length > 0;
+            if(!isGa4CookiePresent) {
+                LooperConfig['ga4data']["first_view"] = true;
+            }
+            LooperConfig['ga4data']['send_page_view'] = false;
+            
+            LooperConfig['ga4data']['view_type'] = Looper.viewType;
+            LooperConfig['ga4data']['last_id'] = Looper.lastID;
+            LooperConfig['ga4data']['last_url'] = Looper.lastURL;
+            LooperConfig['ga4data']['infinite_position'] = 0;
+            
+            gtag("config", LooperConfig.ga4tag, LooperConfig.ga4data);
+            gtag("event", "page_view");
+        };
+    </script>
+                <script type="text/javascript" src="/wp-content/themes/unified/js/loopgal.min.js?v=1763058001"></script>
+        <script>
+        (function(){
+                    var config = {};
+        config['v3UI'] = true;
+config['allowFullUrlForID'] = true;
+
+            window.LoopGalObj = new LoopGal( config );
+                    window.Looper = new LoopEs();
+        if ( typeof( LooperReady ) !== "undefined" ){
+            LooperReady();
+        }
+        })();
+        </script>
+        <script type="text/javascript" async src="https://btloader.com/tag?o=5698917485248512&upapi=true&domain=bgr.com"></script>
+
+<script>!function(){"use strict";var e;e=document,function(){var t,n;function r(){var t=e.createElement("script");t.src="https://cafemedia-com.videoplayerhub.com/galleryplayer.js",e.head.appendChild(t)}function a(){var t=e.cookie.match("(^|[^;]+)\s*__adblocker\s*=\s*([^;]+)");return t&&t.pop()}function c(){clearInterval(n)}return{init:function(){var e;"true"===(t=a())?r():(e=0,n=setInterval((function(){100!==e&&"false" !== t || c(), "true" === t && (r(), c()), t = a(), e++}), 50))}}}().init()}();
+</script>
+        
+        <script>
+    (function(){
+        !function(){"use strict";function e(e){var t=!(arguments.length>1&&void 0!==arguments[1])||arguments[1],c=document.createElement("script");c.src=e,t?c.type="module":(c.async=!0,c.type="text/javascript",c.setAttribute("nomodule",""));var n=document.getElementsByTagName("script")[0];n.parentNode.insertBefore(c,n)}!function(t,c){!function(t,c,n){var a,o,r;n.accountId=c,null!==(a=t.marfeel)&&void 0!==a||(t.marfeel={}),null!==(o=(r=t.marfeel).cmd)&&void 0!==o||(r.cmd=[]),t.marfeel.config=n;var i="https://sdk.mrf.io/statics";e("".concat(i,"/marfeel-sdk.js?id=").concat(c),!0),e("".concat(i,"/marfeel-sdk.es5.js?id=").concat(c),!1)}(t,c,arguments.length>2&&void 0!==arguments[2]?arguments[2]:{})}(window,3544,{} /*config*/)}();
+     })();
+</script>
+        
+        
+    <script async id="ebx" src="https://applets.ebxcdn.com/ebx.js"></script>
+
+            <script>
+    window.LooperConfig = window.LooperConfig || {};
+    window.LooperConfig.clip = {"readmore":{"text":"Read More: "},"followus":{"text":"Follow Us: ","enabled":0},"visitus":{"text":"Visit Us At: ","enabled":0}};
+    
+</script>
+</body>
+</html>

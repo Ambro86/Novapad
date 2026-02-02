@@ -6,7 +6,7 @@ use std::path::Path;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreateMenu, DeleteMenu, DestroyMenu, DrawMenuBar, GetMenu, GetMenuItemCount,
-    HMENU, InsertMenuW, MENU_ITEM_FLAGS, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_GRAYED,
+    GetSubMenu, HMENU, InsertMenuW, MENU_ITEM_FLAGS, MF_BYPOSITION, MF_CHECKED, MF_GRAYED,
     MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, SetMenu,
 };
 use windows::core::PCWSTR;
@@ -70,6 +70,7 @@ pub const IDM_PLAYBACK_SPEED_DOWN: usize = 8011;
 pub const IDM_PLAYBACK_SPEED_RESET: usize = 8016;
 pub const IDM_PLAYBACK_PITCH_UP: usize = 8017;
 pub const IDM_PLAYBACK_PITCH_DOWN: usize = 8018;
+pub const IDM_PLAYBACK_PITCH_RESET: usize = 8021;
 pub const IDM_PLAYBACK_ADD_SUBTITLES: usize = 8019;
 pub const IDM_PLAYBACK_REMOVE_SUBTITLES: usize = 8020;
 pub const IDM_PLAYBACK_CHAPTER_PREV: usize = 8012;
@@ -313,8 +314,7 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
     .unwrap_or(false);
     if show {
         if existing.0 != 0 {
-            crate::log_if_err!(DeleteMenu(hmenu, existing.0 as u32, MF_BYCOMMAND));
-            crate::log_if_err!(DestroyMenu(existing));
+            remove_playback_menu(hmenu, existing);
             with_state(hwnd, |state| state.playback_menu = HMENU(0));
         }
         let playback_menu = CreateMenu().unwrap_or(HMENU(0));
@@ -335,6 +335,7 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
         let speed_reset = i18n::tr(language, "playback.speed_reset");
         let pitch_up = i18n::tr(language, "playback.pitch_up");
         let pitch_down = i18n::tr(language, "playback.pitch_down");
+        let pitch_reset = i18n::tr(language, "playback.pitch_reset");
         let mute_toggle = i18n::tr(language, "playback.mute_toggle");
         let add_subtitles = i18n::tr(language, "playback.add_subtitles");
         let remove_subtitles = i18n::tr(language, "playback.remove_subtitles");
@@ -496,6 +497,12 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
         append_menu_string(
             playback_menu,
             MF_STRING,
+            IDM_PLAYBACK_PITCH_RESET,
+            &pitch_reset,
+        );
+        append_menu_string(
+            playback_menu,
+            MF_STRING,
             IDM_PLAYBACK_MUTE_TOGGLE,
             &mute_toggle,
         );
@@ -510,11 +517,26 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
         with_state(hwnd, |state| state.playback_menu = playback_menu);
         crate::log_if_err!(DrawMenuBar(hwnd));
     } else if existing.0 != 0 {
-        crate::log_if_err!(DeleteMenu(hmenu, existing.0 as u32, MF_BYCOMMAND));
-        crate::log_if_err!(DestroyMenu(existing));
+        remove_playback_menu(hmenu, existing);
         with_state(hwnd, |state| state.playback_menu = HMENU(0));
         crate::log_if_err!(DrawMenuBar(hwnd));
     }
+}
+
+unsafe fn remove_playback_menu(hmenu: HMENU, playback_menu: HMENU) {
+    if hmenu.0 == 0 || playback_menu.0 == 0 {
+        return;
+    }
+    let count = GetMenuItemCount(hmenu);
+    if count > 0 {
+        for index in 0..count {
+            if GetSubMenu(hmenu, index) == playback_menu {
+                crate::log_if_err!(DeleteMenu(hmenu, index as u32, MF_BYPOSITION));
+                break;
+            }
+        }
+    }
+    crate::log_if_err!(DestroyMenu(playback_menu));
 }
 
 pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {

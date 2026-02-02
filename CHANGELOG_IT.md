@@ -10,8 +10,13 @@ Miglioramenti
   - Voci SAPI5: <voice sapi5 Microsoft Helena Desktop>Ciao</voice>
   - Voci SAPI4: <voice sapi4 #1>Ciao</voice>
 • Arricchite le categorie dei podcast.
+• Migliorata la lettura dei PDF grazie al fallback automatico su PDFium.
+• Migliorato il parser degli articoli che in alcuni casi non venivano letti in modo integrale.
+• Aggiunto il reset del pitch nel menu Riproduci.
+• Aggiunta un'opzione per usare il nome legacy "Novapad" nel titolo della finestra e nei collegamenti del menu Avvio.
 Correzioni di bug
 • Corretto un bug per cui gli audiolibri con SAPI4 potevano essere creati in modo diverso da quanto previsto.
+• Corretto un bug per cui, andando oltre la fine con il seek, la riproduzione ripartiva dall'inizio.
 
 Versione 0.6.3 – 2026-01-30
 Miglioramenti

@@ -873,6 +873,7 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
         Restart {
             path: PathBuf,
             current_pos: u64,
+            duration: Option<u64>,
             speed: f32,
             pitch: f32,
             paused: bool,
@@ -899,6 +900,7 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
             Some(SeekAction::Restart {
                 path: player.path.clone(),
                 current_pos: new_pos as u64,
+                duration: audiobook_duration_secs(&player.path),
                 speed: player.speed,
                 pitch: player.pitch,
                 paused: player.is_paused,
@@ -920,6 +922,7 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
     let SeekAction::Restart {
         path,
         current_pos,
+        duration,
         speed,
         pitch,
         paused,
@@ -927,6 +930,13 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
         muted,
         prev_volume,
     } = action;
+
+    if let Some(duration) = duration
+        && current_pos >= duration
+    {
+        stop_audiobook_playback(hwnd);
+        return;
+    }
 
     let audio_track = with_state(hwnd, |state| state.selected_audio_track).flatten();
     stop_audiobook_playback(hwnd);
@@ -962,6 +972,13 @@ pub unsafe fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> 
     })
     .flatten()
     .ok_or_else(|| "No active audiobook".to_string())?;
+
+    if let Some(duration) = audiobook_duration_secs(&path)
+        && seconds >= duration
+    {
+        stop_audiobook_playback(hwnd);
+        return Ok(());
+    }
 
     // Output doesn't support direct seek, always restart
     start_audiobook_at(hwnd, &path, seconds);
@@ -1223,6 +1240,60 @@ pub unsafe fn reset_audiobook_speed(hwnd: HWND) -> Option<f32> {
     }
 
     Some(speed)
+}
+
+pub unsafe fn reset_audiobook_pitch(hwnd: HWND) -> Option<f32> {
+    let result = with_state(hwnd, |state| {
+        if let Some(player) = state.active_audiobook.take() {
+            let current = audiobook_position_secs(&player).floor() as u64;
+            let new_pitch = 0.0;
+            player.stop();
+            Some((
+                player.path,
+                current,
+                player.speed,
+                new_pitch,
+                player.is_paused,
+                player.volume,
+                player.muted,
+                player.prev_volume,
+            ))
+        } else {
+            None
+        }
+    })
+    .flatten();
+
+    let (path, current, speed, pitch, paused, volume, muted, prev_volume) = result?;
+    let audio_track = with_state(hwnd, |state| state.selected_audio_track).flatten();
+
+    start_audiobook_at_with_options(
+        hwnd,
+        path,
+        current,
+        AudiobookPlaybackOptions {
+            speed,
+            pitch,
+            paused,
+            volume,
+            muted,
+            prev_volume,
+            mix_export: false,
+            audio_track,
+        },
+    );
+
+    // Save pitch to settings
+    if with_state(hwnd, |state| {
+        state.settings.audiobook_playback_pitch = pitch;
+        crate::settings::save_settings(state.settings.clone());
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access audio player state");
+    }
+
+    Some(pitch)
 }
 
 pub unsafe fn audiobook_volume_level(hwnd: HWND) -> Option<f32> {

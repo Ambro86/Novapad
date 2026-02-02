@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="it-IT" class="wpex-classic-style">
+<head>
+<meta charset="UTF-8">
+<script>if(navigator.userAgent.match(/MSIE|Internet Explorer/i)||navigator.userAgent.match(/Trident\/7\..*?rv:11/i)){var href=document.location.href;if(!href.match(/[?&]nowprocket/)){if(href.indexOf("?")==-1){if(href.indexOf("#")==-1){document.location.href=href+"?nowprocket=1"}else{document.location.href=href.replace("#","?nowprocket=1#")}}else{if(href.indexOf("#")==-1){document.location.href=href+"&nowprocket=1"}else{document.location.href=href.replace("#","&nowprocket=1#")}}}}</script><script>(()=>{class RocketLazyLoadScripts{constructor(){this.v="2.0.4",this.userEvents=["keydown","keyup","mousedown","mouseup","mousemove","mouseover","mouseout","touchmove","touchstart","touchend","touchcancel","wheel","click","dblclick","input"],this.attributeEvents=["onblur","onclick","oncontextmenu","ondblclick","onfocus","onmousedown","onmouseenter","onmouseleave","onmousemove","onmouseout","onmouseover","onmouseup","onmousewheel","onscroll","onsubmit"]}async t(){this.i(),this.o(),/iP(ad|hone)/.test(navigator.userAgent)&&this.h(),this.u(),this.l(this),this.m(),this.k(this),this.p(this),this._(),await Promise.all([this.R(),this.L()]),this.lastBreath=Date.now(),this.S(this),this.P(),this.D(),this.O(),this.M(),await this.C(this.delayedScripts.normal),await this.C(this.delayedScripts.defer),await this.C(this.delayedScripts.async),await this.T(),await this.F(),await this.j(),await this.A(),window.dispatchEvent(new Event("rocket-allScriptsLoaded")),this.everythingLoaded=!0,this.lastTouchEnd&&await new Promise(t=>setTimeout(t,500-Date.now()+this.lastTouchEnd)),this.I(),this.H(),this.U(),this.W()}i(){this.CSPIssue=sessionStorage.getItem("rocketCSPIssue"),document.addEventListener("securitypolicyviolation",t=>{this.CSPIssue||"script-src-elem"!==t.violatedDirective||"data"!==t.blockedURI||(this.CSPIssue=!0,sessionStorage.setItem("rocketCSPIssue",!0))},{isRocket:!0})}o(){window.addEventListener("pageshow",t=>{this.persisted=t.persisted,this.realWindowLoadedFired=!0},{isRocket:!0}),window.addEventListener("pagehide",()=>{this.onFirstUserAction=null},{isRocket:!0})}h(){let t;function e(e){t=e}window.addEventListener("touchstart",e,{isRocket:!0}),window.addEventListener("touchend",function i(o){o.changedTouches[0]&&t.changedTouches[0]&&Math.abs(o.changedTouches[0].pageX-t.changedTouches[0].pageX)<10&&Math.abs(o.changedTouches[0].pageY-t.changedTouches[0].pageY)<10&&o.timeStamp-t.timeStamp<200&&(window.removeEventListener("touchstart",e,{isRocket:!0}),window.removeEventListener("touchend",i,{isRocket:!0}),"INPUT"===o.target.tagName&&"text"===o.target.type||(o.target.dispatchEvent(new TouchEvent("touchend",{target:o.target,bubbles:!0})),o.target.dispatchEvent(new MouseEvent("mouseover",{target:o.target,bubbles:!0})),o.target.dispatchEvent(new PointerEvent("click",{target:o.target,bubbles:!0,cancelable:!0,detail:1,clientX:o.changedTouches[0].clientX,clientY:o.changedTouches[0].clientY})),event.preventDefault()))},{isRocket:!0})}q(t){this.userActionTriggered||("mousemove"!==t.type||this.firstMousemoveIgnored?"keyup"===t.type||"mouseover"===t.type||"mouseout"===t.type||(this.userActionTriggered=!0,this.onFirstUserAction&&this.onFirstUserAction()):this.firstMousemoveIgnored=!0),"click"===t.type&&t.preventDefault(),t.stopPropagation(),t.stopImmediatePropagation(),"touchstart"===this.lastEvent&&"touchend"===t.type&&(this.lastTouchEnd=Date.now()),"click"===t.type&&(this.lastTouchEnd=0),this.lastEvent=t.type,t.composedPath&&t.composedPath()[0].getRootNode()instanceof ShadowRoot&&(t.rocketTarget=t.composedPath()[0]),this.savedUserEvents.push(t)}u(){this.savedUserEvents=[],this.userEventHandler=this.q.bind(this),this.userEvents.forEach(t=>window.addEventListener(t,this.userEventHandler,{passive:!1,isRocket:!0})),document.addEventListener("visibilitychange",this.userEventHandler,{isRocket:!0})}U(){this.userEvents.forEach(t=>window.removeEventListener(t,this.userEventHandler,{passive:!1,isRocket:!0})),document.removeEventListener("visibilitychange",this.userEventHandler,{isRocket:!0}),this.savedUserEvents.forEach(t=>{(t.rocketTarget||t.target).dispatchEvent(new window[t.constructor.name](t.type,t))})}m(){const t="return false",e=Array.from(this.attributeEvents,t=>"data-rocket-"+t),i="["+this.attributeEvents.join("],[")+"]",o="[data-rocket-"+this.attributeEvents.join("],[data-rocket-")+"]",s=(e,i,o)=>{o&&o!==t&&(e.setAttribute("data-rocket-"+i,o),e["rocket"+i]=new Function("event",o),e.setAttribute(i,t))};new MutationObserver(t=>{for(const n of t)"attributes"===n.type&&(n.attributeName.startsWith("data-rocket-")||this.everythingLoaded?n.attributeName.startsWith("data-rocket-")&&this.everythingLoaded&&this.N(n.target,n.attributeName.substring(12)):s(n.target,n.attributeName,n.target.getAttribute(n.attributeName))),"childList"===n.type&&n.addedNodes.forEach(t=>{if(t.nodeType===Node.ELEMENT_NODE)if(this.everythingLoaded)for(const i of[t,...t.querySelectorAll(o)])for(const t of i.getAttributeNames())e.includes(t)&&this.N(i,t.substring(12));else for(const e of[t,...t.querySelectorAll(i)])for(const t of e.getAttributeNames())this.attributeEvents.includes(t)&&s(e,t,e.getAttribute(t))})}).observe(document,{subtree:!0,childList:!0,attributeFilter:[...this.attributeEvents,...e]})}I(){this.attributeEvents.forEach(t=>{document.querySelectorAll("[data-rocket-"+t+"]").forEach(e=>{this.N(e,t)})})}N(t,e){const i=t.getAttribute("data-rocket-"+e);i&&(t.setAttribute(e,i),t.removeAttribute("data-rocket-"+e))}k(t){Object.defineProperty(HTMLElement.prototype,"onclick",{get(){return this.rocketonclick||null},set(e){this.rocketonclick=e,this.setAttribute(t.everythingLoaded?"onclick":"data-rocket-onclick","this.rocketonclick(event)")}})}S(t){function e(e,i){let o=e[i];e[i]=null,Object.defineProperty(e,i,{get:()=>o,set(s){t.everythingLoaded?o=s:e["rocket"+i]=o=s}})}e(document,"onreadystatechange"),e(window,"onload"),e(window,"onpageshow");try{Object.defineProperty(document,"readyState",{get:()=>t.rocketReadyState,set(e){t.rocketReadyState=e},configurable:!0}),document.readyState="loading"}catch(t){console.log("WPRocket DJE readyState conflict, bypassing")}}l(t){this.originalAddEventListener=EventTarget.prototype.addEventListener,this.originalRemoveEventListener=EventTarget.prototype.removeEventListener,this.savedEventListeners=[],EventTarget.prototype.addEventListener=function(e,i,o){o&&o.isRocket||!t.B(e,this)&&!t.userEvents.includes(e)||t.B(e,this)&&!t.userActionTriggered||e.startsWith("rocket-")||t.everythingLoaded?t.originalAddEventListener.call(this,e,i,o):(t.savedEventListeners.push({target:this,remove:!1,type:e,func:i,options:o}),"mouseenter"!==e&&"mouseleave"!==e||t.originalAddEventListener.call(this,e,t.savedUserEvents.push,o))},EventTarget.prototype.removeEventListener=function(e,i,o){o&&o.isRocket||!t.B(e,this)&&!t.userEvents.includes(e)||t.B(e,this)&&!t.userActionTriggered||e.startsWith("rocket-")||t.everythingLoaded?t.originalRemoveEventListener.call(this,e,i,o):t.savedEventListeners.push({target:this,remove:!0,type:e,func:i,options:o})}}J(t,e){this.savedEventListeners=this.savedEventListeners.filter(i=>{let o=i.type,s=i.target||window;return e!==o||t!==s||(this.B(o,s)&&(i.type="rocket-"+o),this.$(i),!1)})}H(){EventTarget.prototype.addEventListener=this.originalAddEventListener,EventTarget.prototype.removeEventListener=this.originalRemoveEventListener,this.savedEventListeners.forEach(t=>this.$(t))}$(t){t.remove?this.originalRemoveEventListener.call(t.target,t.type,t.func,t.options):this.originalAddEventListener.call(t.target,t.type,t.func,t.options)}p(t){let e;function i(e){return t.everythingLoaded?e:e.split(" ").map(t=>"load"===t||t.startsWith("load.")?"rocket-jquery-load":t).join(" ")}function o(o){function s(e){const s=o.fn[e];o.fn[e]=o.fn.init.prototype[e]=function(){return this[0]===window&&t.userActionTriggered&&("string"==typeof arguments[0]||arguments[0]instanceof String?arguments[0]=i(arguments[0]):"object"==typeof arguments[0]&&Object.keys(arguments[0]).forEach(t=>{const e=arguments[0][t];delete arguments[0][t],arguments[0][i(t)]=e})),s.apply(this,arguments),this}}if(o&&o.fn&&!t.allJQueries.includes(o)){const e={DOMContentLoaded:[],"rocket-DOMContentLoaded":[]};for(const t in e)document.addEventListener(t,()=>{e[t].forEach(t=>t())},{isRocket:!0});o.fn.ready=o.fn.init.prototype.ready=function(i){function s(){parseInt(o.fn.jquery)>2?setTimeout(()=>i.bind(document)(o)):i.bind(document)(o)}return"function"==typeof i&&(t.realDomReadyFired?!t.userActionTriggered||t.fauxDomReadyFired?s():e["rocket-DOMContentLoaded"].push(s):e.DOMContentLoaded.push(s)),o([])},s("on"),s("one"),s("off"),t.allJQueries.push(o)}e=o}t.allJQueries=[],o(window.jQuery),Object.defineProperty(window,"jQuery",{get:()=>e,set(t){o(t)}})}P(){const t=new Map;document.write=document.writeln=function(e){const i=document.currentScript,o=document.createRange(),s=i.parentElement;let n=t.get(i);void 0===n&&(n=i.nextSibling,t.set(i,n));const c=document.createDocumentFragment();o.setStart(c,0),c.appendChild(o.createContextualFragment(e)),s.insertBefore(c,n)}}async R(){return new Promise(t=>{this.userActionTriggered?t():this.onFirstUserAction=t})}async L(){return new Promise(t=>{document.addEventListener("DOMContentLoaded",()=>{this.realDomReadyFired=!0,t()},{isRocket:!0})})}async j(){return this.realWindowLoadedFired?Promise.resolve():new Promise(t=>{window.addEventListener("load",t,{isRocket:!0})})}M(){this.pendingScripts=[];this.scriptsMutationObserver=new MutationObserver(t=>{for(const e of t)e.addedNodes.forEach(t=>{"SCRIPT"!==t.tagName||t.noModule||t.isWPRocket||this.pendingScripts.push({script:t,promise:new Promise(e=>{const i=()=>{const i=this.pendingScripts.findIndex(e=>e.script===t);i>=0&&this.pendingScripts.splice(i,1),e()};t.addEventListener("load",i,{isRocket:!0}),t.addEventListener("error",i,{isRocket:!0}),setTimeout(i,1e3)})})})}),this.scriptsMutationObserver.observe(document,{childList:!0,subtree:!0})}async F(){await this.X(),this.pendingScripts.length?(await this.pendingScripts[0].promise,await this.F()):this.scriptsMutationObserver.disconnect()}D(){this.delayedScripts={normal:[],async:[],defer:[]},document.querySelectorAll("script[type$=rocketlazyloadscript]").forEach(t=>{t.hasAttribute("data-rocket-src")?t.hasAttribute("async")&&!1!==t.async?this.delayedScripts.async.push(t):t.hasAttribute("defer")&&!1!==t.defer||"module"===t.getAttribute("data-rocket-type")?this.delayedScripts.defer.push(t):this.delayedScripts.normal.push(t):this.delayedScripts.normal.push(t)})}async _(){await this.L();let t=[];document.querySelectorAll("script[type$=rocketlazyloadscript][data-rocket-src]").forEach(e=>{let i=e.getAttribute("data-rocket-src");if(i&&!i.startsWith("data:")){i.startsWith("//")&&(i=location.protocol+i);try{const o=new URL(i).origin;o!==location.origin&&t.push({src:o,crossOrigin:e.crossOrigin||"module"===e.getAttribute("data-rocket-type")})}catch(t){}}}),t=[...new Map(t.map(t=>[JSON.stringify(t),t])).values()],this.Y(t,"preconnect")}async G(t){if(await this.K(),!0!==t.noModule||!("noModule"in HTMLScriptElement.prototype))return new Promise(e=>{let i;function o(){(i||t).setAttribute("data-rocket-status","executed"),e()}try{if(navigator.userAgent.includes("Firefox/")||""===navigator.vendor||this.CSPIssue)i=document.createElement("script"),[...t.attributes].forEach(t=>{let e=t.nodeName;"type"!==e&&("data-rocket-type"===e&&(e="type"),"data-rocket-src"===e&&(e="src"),i.setAttribute(e,t.nodeValue))}),t.text&&(i.text=t.text),t.nonce&&(i.nonce=t.nonce),i.hasAttribute("src")?(i.addEventListener("load",o,{isRocket:!0}),i.addEventListener("error",()=>{i.setAttribute("data-rocket-status","failed-network"),e()},{isRocket:!0}),setTimeout(()=>{i.isConnected||e()},1)):(i.text=t.text,o()),i.isWPRocket=!0,t.parentNode.replaceChild(i,t);else{const i=t.getAttribute("data-rocket-type"),s=t.getAttribute("data-rocket-src");i?(t.type=i,t.removeAttribute("data-rocket-type")):t.removeAttribute("type"),t.addEventListener("load",o,{isRocket:!0}),t.addEventListener("error",i=>{this.CSPIssue&&i.target.src.startsWith("data:")?(console.log("WPRocket: CSP fallback activated"),t.removeAttribute("src"),this.G(t).then(e)):(t.setAttribute("data-rocket-status","failed-network"),e())},{isRocket:!0}),s?(t.fetchPriority="high",t.removeAttribute("data-rocket-src"),t.src=s):t.src="data:text/javascript;base64,"+window.btoa(unescape(encodeURIComponent(t.text)))}}catch(i){t.setAttribute("data-rocket-status","failed-transform"),e()}});t.setAttribute("data-rocket-status","skipped")}async C(t){const e=t.shift();return e?(e.isConnected&&await this.G(e),this.C(t)):Promise.resolve()}O(){this.Y([...this.delayedScripts.normal,...this.delayedScripts.defer,...this.delayedScripts.async],"preload")}Y(t,e){this.trash=this.trash||[];let i=!0;var o=document.createDocumentFragment();t.forEach(t=>{const s=t.getAttribute&&t.getAttribute("data-rocket-src")||t.src;if(s&&!s.startsWith("data:")){const n=document.createElement("link");n.href=s,n.rel=e,"preconnect"!==e&&(n.as="script",n.fetchPriority=i?"high":"low"),t.getAttribute&&"module"===t.getAttribute("data-rocket-type")&&(n.crossOrigin=!0),t.crossOrigin&&(n.crossOrigin=t.crossOrigin),t.integrity&&(n.integrity=t.integrity),t.nonce&&(n.nonce=t.nonce),o.appendChild(n),this.trash.push(n),i=!1}}),document.head.appendChild(o)}W(){this.trash.forEach(t=>t.remove())}async T(){try{document.readyState="interactive"}catch(t){}this.fauxDomReadyFired=!0;try{await this.K(),this.J(document,"readystatechange"),document.dispatchEvent(new Event("rocket-readystatechange")),await this.K(),document.rocketonreadystatechange&&document.rocketonreadystatechange(),await this.K(),this.J(document,"DOMContentLoaded"),document.dispatchEvent(new Event("rocket-DOMContentLoaded")),await this.K(),this.J(window,"DOMContentLoaded"),window.dispatchEvent(new Event("rocket-DOMContentLoaded"))}catch(t){console.error(t)}}async A(){try{document.readyState="complete"}catch(t){}try{await this.K(),this.J(document,"readystatechange"),document.dispatchEvent(new Event("rocket-readystatechange")),await this.K(),document.rocketonreadystatechange&&document.rocketonreadystatechange(),await this.K(),this.J(window,"load"),window.dispatchEvent(new Event("rocket-load")),await this.K(),window.rocketonload&&window.rocketonload(),await this.K(),this.allJQueries.forEach(t=>t(window).trigger("rocket-jquery-load")),await this.K(),this.J(window,"pageshow");const t=new Event("rocket-pageshow");t.persisted=this.persisted,window.dispatchEvent(t),await this.K(),window.rocketonpageshow&&window.rocketonpageshow({persisted:this.persisted})}catch(t){console.error(t)}}async K(){Date.now()-this.lastBreath>45&&(await this.X(),this.lastBreath=Date.now())}async X(){return document.hidden?new Promise(t=>setTimeout(t)):new Promise(t=>requestAnimationFrame(t))}B(t,e){return e===document&&"readystatechange"===t||(e===document&&"DOMContentLoaded"===t||(e===window&&"DOMContentLoaded"===t||(e===window&&"load"===t||e===window&&"pageshow"===t)))}static run(){(new RocketLazyLoadScripts).t()}}RocketLazyLoadScripts.run()})();</script>
+
+<link rel="profile" href="http://gmpg.org/xfn/11">
+			<script type="rocketlazyloadscript" data-rocket-type="text/javascript" class="_iub_cs_skip">
+				var _iub = _iub || {};
+				_iub.csConfiguration = _iub.csConfiguration || {};
+				_iub.csConfiguration.siteId = "1972671";
+				_iub.csConfiguration.cookiePolicyId = "17251881";
+			</script>
+			<script type="rocketlazyloadscript" data-minify="1" class="_iub_cs_skip" data-rocket-src="https://www.startmag.it/wp-content/cache/min/1/sync/1972671.js?ver=1768292939" data-rocket-defer defer></script>
+			<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+	<!-- This site is optimized with the Yoast SEO plugin v26.8 - https://yoast.com/product/yoast-seo-wordpress/ -->
+	<title>Addio a Maria Rita Parsi, la psicologa della delicatezza - Startmag</title>
+<link data-rocket-prefetch href="https://cdn.confiant-integrations.net" rel="dns-prefetch">
+<link data-rocket-prefetch href="https://fonts.googleapis.com" rel="dns-prefetch">
+<link data-rocket-prefetch href="https://ads.talkscreativity.com" rel="dns-prefetch">
+<link data-rocket-prefetch href="https://securepubads.g.doubleclick.net" rel="dns-prefetch">
+<link data-rocket-prefetch href="https://www.googletagmanager.com" rel="dns-prefetch">
+<link data-rocket-prefetch href="https://www.youtube.com" rel="dns-prefetch">
+<link rel="preload" data-rocket-preload as="image" href="https://www.startmag.it/wp-content/uploads/Imagoeconomica_1924929-scaled-1170x550.jpg" imagesrcset="https://www.startmag.it/wp-content/uploads/Imagoeconomica_1924929-scaled-1170x550@2x.jpg 2x" imagesizes="" fetchpriority="high">
+	<meta name="description" content="Sono rimasto colpito e profondamente addolorato dalla notizia della scomparsa di Maria Rita Parsi, psicologa e psicoterapeuta di grande">
+	<link rel="canonical" href="https://www.startmag.it/sanita/addio-a-maria-rita-parsi-la-psicologa-della-delicatezza/">
+	<meta property="og:locale" content="it_IT">
+	<meta property="og:type" content="article">
+	<meta property="og:title" content="Addio a Maria Rita Parsi, la psicologa della delicatezza - Startmag">
+	<meta property="og:description" content="Sono rimasto colpito e profondamente addolorato dalla notizia della scomparsa di Maria Rita Parsi, psicologa e psicoterapeuta di grande">
+	<meta property="og:url" content="https://www.startmag.it/sanita/addio-a-maria-rita-parsi-la-psicologa-della-delicatezza/">
+	<meta property="og:site_name" content="Startmag">
+	<meta property="article:publisher" content="https://www.facebook.com/start.mag.news">
+	<meta property="article:published_time" content="2026-02-02T15:56:51+00:00">
+	<meta property="og:image" content="https://www.startmag.it/wp-content/uploads/Imagoeconomica_1924929-scaled.jpg">
+	<meta property="og:image:width" content="2560">
+	<meta property="og:image:height" content="1707">
+	<meta property="og:image:type" content="image/jpeg">
+	<meta name="author" content="Francesco Provinciali">
+	<meta name="twitter:card" content="summary_large_image">
+	<meta name="twitter:label1" content="Scritto da">
+	<meta name="twitter:data1" content="Francesco Provinciali">
+	<meta name="twitter:label2" content="Tempo di lettura stimato">
+	<meta name="twitter:data2" content="4 minuti">
+	<script type="application/ld+json" class="yoast-schema-graph">{"@context":"https://schema.org","@graph":[{"@type":"Article","@id":"https://www.startmag.it/sanita/addio-a-maria-rita-parsi-la-psicologa-della-delicatezza/#article","isPartOf":{"@id":"https://www.startmag.it/sanita/addio-a-maria-rita-parsi-la-psicologa-della-delicatezza/"},"author":{"name":"Francesco Provinciali","@id":"https://www.startmag.it/#/schema/person/bdd20f02a520c2207cb8a7c56c3ae733"},"headline":"Addio a Maria Rita Parsi, la psicologa della delicatezza","datePublished":"2026-02-02T15:56:51+00:00","mainEntityOfPage":{"@id":"https://www.startmag.it/sanita/addio-a-maria-rita-parsi-la-psicologa-della-delicatezza/"},"wordCount":735,"publisher":{"@id":"https://www.startmag.it/#organization"},"image":{"@id":"https://www.startmag.it/sanita/addio-a-maria-rita-parsi-la-psicologa-della-delicatezza/#primaryimage"},"thumbnailUrl":"https://www.startmag.it/wp-content/uploads/Imagoeconomica_1924929-scaled.jpg","keywords":["Maria Rita Parsi"],"articleSection":["Salute e ricerca"],"inLanguage":"it-IT"},{"@type":"WebPage","@id":"https://www.startmag.it/sanita/addio-a-maria-rita-parsi-la-psicologa-della-delicatezza/","url":"https://www.startmag.it/sanita/addio-a-maria-rita-parsi-la-psicologa-della-delicatezza/","name":"Addio a Maria Rita Parsi, la psicologa della delicatezza - Startmag","isPartOf":{"@id":"https://www.startmag.it/#website"},"primaryImageOfPage":{"@id":"https://www.startmag.it/sanita/addio-a-maria-rita-parsi-la-psicologa-della-delicatezza/#primaryimage"},"image":{"@id":"https://www.startmag.it/sanita/addio-a-maria-rita-parsi-la-psicologa-della-delicatezza/#primaryimage"},"thumbnailUrl":"https://www.startmag.it/wp-content/uploads/Imagoeconomica_1924929-scaled.jpg","datePublished":"2026-02-02T15:56:51+00:00","description":"Sono rimasto colpito e profondamente addolorato dalla notizia della scomparsa di Maria Rita Parsi, psicologa e psicoterapeuta di grande","breadcrumb":{"@id":"https://www.startmag.it/sanita/addio-a-maria-rita-parsi-la-psicologa-della-delicatezza/#breadcrumb"},"inLanguage":"it-IT","potentialAction":[{"@type":"ReadAction","target":["https://www.startmag.it/sanita/addio-a-maria-rita-parsi-la-psicologa-della-delicatezza/"]}]},{"@type":"ImageObject","inLanguage":"it-IT","@id":"https://www.startmag.it/sanita/addio-a-maria-rita-parsi-la-psicologa-della-delicatezza/#primaryimage","url":"https://www.startmag.it/wp-content/uploads/Imagoeconomica_1924929-scaled.jpg","contentUrl":"https://www.startmag.it/wp-content/uploads/Imagoeconomica_1924929-scaled.jpg","width":2560,"height":1707,"caption":"MARIA RITA PARSI, PSICOLOGA"},{"@type":"BreadcrumbList","@id":"https://www.startmag.it/sanita/addio-a-maria-rita-parsi-la-psicologa-della-delicatezza/#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"STARTMAG","item":"https://www.startmag.it/"},{"@type":"ListItem","position":2,"name":"Salute e ricerca","item":"https://www.startmag.it/sanita/"},{"@type":"ListItem","position":3,"name":"Addio a Maria Rita Parsi, la psicologa della delicatezza"}]},{"@type":"WebSite","@id":"https://www.startmag.it/#website","url":"https://www.startmag.it/","name":"Startmag","description":"il magazine online dedicato all&#039;innovazione ed alla crescita","publisher":{"@id":"https://www.startmag.it/#organization"},"potentialAction":[{"@type":"SearchAction","target":{"@type":"EntryPoint","urlTemplate":"https://www.startmag.it/?s={search_term_string}"},"query-input":{"@type":"PropertyValueSpecification","valueRequired":true,"valueName":"search_term_string"}}],"inLanguage":"it-IT"},{"@type":"Organization","@id":"https://www.startmag.it/#organization","name":"Startmag","url":"https://www.startmag.it/","logo":{"@type":"ImageObject","inLanguage":"it-IT","@id":"https://www.startmag.it/#/schema/logo/image/","url":"https://www.startmag.it/wp-content/uploads/logo-startmagazine_v2.svg","contentUrl":"https://www.startmag.it/wp-content/uploads/logo-startmagazine_v2.svg","width":1518,"height":553,"caption":"Startmag"},"image":{"@id":"https://www.startmag.it/#/schema/logo/image/"},"sameAs":["https://www.facebook.com/start.mag.news"]},{"@type":"Person","@id":"https://www.startmag.it/#/schema/person/bdd20f02a520c2207cb8a7c56c3ae733","name":"Francesco Provinciali","image":{"@type":"ImageObject","inLanguage":"it-IT","@id":"https://www.startmag.it/#/schema/person/image/","url":"https://www.startmag.it/wp-content/uploads/094f86ce-bcad-4c12-8d5a-927be90e63ea-150x150.png","contentUrl":"https://www.startmag.it/wp-content/uploads/094f86ce-bcad-4c12-8d5a-927be90e63ea-150x150.png","caption":"Francesco Provinciali"},"url":"https://www.startmag.it/author/francesco_provinciali/"}]}</script>
+	<!-- / Yoast SEO plugin. -->
+
+
+<link rel="dns-prefetch" href="//cdn.iubenda.com">
+<link rel="dns-prefetch" href="//fonts.googleapis.com">
+<link href="https://fonts.gstatic.com" crossorigin rel="preconnect">
+<link rel="alternate" type="application/rss+xml" title="Startmag &raquo; Feed" href="https://www.startmag.it/feed/">
+<link rel="alternate" type="application/rss+xml" title="Startmag &raquo; Feed dei commenti" href="https://www.startmag.it/comments/feed/">
+<link rel="alternate" type="application/rss+xml" title="Startmag &raquo; Addio a Maria Rita Parsi, la psicologa della delicatezza Feed dei commenti" href="https://www.startmag.it/sanita/addio-a-maria-rita-parsi-la-psicologa-della-delicatezza/feed/">
+<link rel="alternate" title="oEmbed (JSON)" type="application/json+oembed" href="https://www.startmag.it/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fwww.startmag.it%2Fsanita%2Faddio-a-maria-rita-parsi-la-psicologa-della-delicatezza%2F">
+<link rel="alternate" title="oEmbed (XML)" type="text/xml+oembed" href="https://www.startmag.it/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fwww.startmag.it%2Fsanita%2Faddio-a-maria-rita-parsi-la-psicologa-della-delicatezza%2F&amp;format=xml">
+<link rel="preload" href="https://fonts.googleapis.com/css2?family=Archivo:wght@100;300;400;500;600;700;800;900&amp;display=swap&amp;subset=latin,latin-ext" as="style">
+<link rel="preload" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,900;1,900&amp;display=swap&amp;subset=latin,latin-ext" as="style">
+<style id="wp-img-auto-sizes-contain-inline-css">
+img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
+/*# sourceURL=wp-img-auto-sizes-contain-inline-css */
+</style>
+<link data-minify="1" rel="stylesheet" id="js_composer_front-css" href="https://www.startmag.it/wp-content/cache/min/1/wp-content/plugins/js_composer/assets/css/js_composer.min.css?ver=1768292938" media="all">
+<link rel="stylesheet" id="wpex-fm-238025-css" href="https://fonts.googleapis.com/css2?family=Archivo:wght@100;300;400;500;600;700;800;900&amp;display=swap&amp;subset=latin,latin-ext" media="all">
+<link rel="stylesheet" id="wpex-fm-238024-css" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,900;1,900&amp;display=swap&amp;subset=latin,latin-ext" media="all">
+<link rel="stylesheet" id="wp-components-css" href="https://www.startmag.it/wp-includes/css/dist/components/style.min.css?ver=0e84235e271ec73611ae6e4ca6a78404" media="all">
+<link rel="stylesheet" id="wp-preferences-css" href="https://www.startmag.it/wp-includes/css/dist/preferences/style.min.css?ver=0e84235e271ec73611ae6e4ca6a78404" media="all">
+<link rel="stylesheet" id="wp-block-editor-css" href="https://www.startmag.it/wp-includes/css/dist/block-editor/style.min.css?ver=0e84235e271ec73611ae6e4ca6a78404" media="all">
+<link data-minify="1" rel="stylesheet" id="popup-maker-block-library-style-css" href="https://www.startmag.it/wp-content/cache/min/1/wp-content/plugins/popup-maker/dist/packages/block-library-style.css?ver=1768292939" media="all">
+<link data-minify="1" rel="stylesheet" id="parent-style-child-css" href="https://www.startmag.it/wp-content/cache/min/1/wp-content/themes/Total/style.css?ver=1768292939" media="all">
+<link data-minify="1" rel="stylesheet" id="parent-style-focus-css" href="https://www.startmag.it/wp-content/cache/min/1/wp-content/themes/total-child-theme/style-focus.css?ver=1768292941" media="all">
+<link data-minify="1" rel="stylesheet" id="wpex-style-css" href="https://www.startmag.it/wp-content/cache/min/1/wp-content/themes/total-child-theme/style.css?ver=1768292939" media="all">
+<link rel="stylesheet" id="wpex-mobile-menu-breakpoint-max-css" href="https://www.startmag.it/wp-content/themes/Total/assets/css/frontend/breakpoints/max.min.css?ver=6.5" media="">
+<link rel="stylesheet" id="vcex-shortcodes-css" href="https://www.startmag.it/wp-content/themes/Total/assets/css/frontend/vcex-shortcodes.min.css?ver=6.5" media="all">
+<link rel="stylesheet" id="wpex-wpbakery-css" href="https://www.startmag.it/wp-content/themes/Total/assets/css/frontend/wpbakery.min.css?ver=6.5" media="all">
+
+<script type="rocketlazyloadscript" data-rocket-type="text/javascript" class=" _iub_cs_skip" id="iubenda-head-inline-scripts-0">
+var _iub = _iub || [];
+_iub.csConfiguration = {"askConsentAtCookiePolicyUpdate":true,"countryDetection":true,"enableLgpd":true,"enableTcf":true,"enableUspr":true,"floatingPreferencesButtonDisplay":"bottom-right","googleAdditionalConsentMode":true,"lgpdAppliesGlobally":false,"perPurposeConsent":true,"siteId":1972671,"tcfPurposes":{"2":"consent_only","7":"consent_only","8":"consent_only","9":"consent_only","10":"consent_only"},"cookiePolicyId":17251881,"lang":"it","banner":{"acceptButtonCaptionColor":"#FFFFFF","acceptButtonColor":"#0DBE38","acceptButtonDisplay":true,"backgroundColor":"#FFFFFF","brandBackgroundColor":"#3846BC","brandTextColor":"#000000","closeButtonDisplay":false,"customizeButtonCaptionColor":"#4D4D4D","customizeButtonColor":"#DADADA","customizeButtonDisplay":true,"explicitWithdrawal":true,"listPurposes":true,"logo":"https://www.startmag.it/wp-content/uploads/startmagazine-w.svg","linksColor":"#3846BC","position":"float-top-center","rejectButtonCaptionColor":"#919191","rejectButtonColor":"#E8E8E8","rejectButtonDisplay":true,"textColor":"#000000"}};
+
+//# sourceURL=iubenda-head-inline-scripts-0
+</script>
+<script type="rocketlazyloadscript" data-minify="1" data-rocket-type="text/javascript" class=" _iub_cs_skip" data-rocket-src="https://www.startmag.it/wp-content/cache/min/1/cs/tcf/stub-v2.js?ver=1768292939" id="iubenda-head-scripts-1-js" data-rocket-defer defer></script>
+<script type="rocketlazyloadscript" data-minify="1" data-rocket-type="text/javascript" class=" _iub_cs_skip" data-rocket-src="https://www.startmag.it/wp-content/cache/min/1/cs/tcf/safe-tcf-v2.js?ver=1768292939" id="iubenda-head-scripts-2-js" data-rocket-defer defer></script>
+<script type="rocketlazyloadscript" data-minify="1" data-rocket-type="text/javascript" class=" _iub_cs_skip" data-rocket-src="https://www.startmag.it/wp-content/cache/min/1/cs/gpp/stub.js?ver=1768292939" id="iubenda-head-scripts-3-js" data-rocket-defer defer></script>
+<script type="rocketlazyloadscript" data-minify="1" data-rocket-type="text/javascript" charset="UTF-8" async="" class=" _iub_cs_skip" data-rocket-src="https://www.startmag.it/wp-content/cache/min/1/cs/iubenda_cs.js?ver=1768292940" id="iubenda-head-scripts-4-js"></script>
+<script id="wpex-core-js-extra">
+var wpex_theme_params = {"selectArrowIcon":"\u003Cspan class=\"wpex-select-arrow__icon wpex-icon--sm wpex-flex wpex-icon\" aria-hidden=\"true\"\u003E\u003Csvg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"\u003E\u003Crect fill=\"none\" height=\"24\" width=\"24\"/\u003E\u003Cg transform=\"matrix(0, -1, 1, 0, -0.115, 23.885)\"\u003E\u003Cpolygon points=\"17.77,3.77 16,2 6,12 16,22 17.77,20.23 9.54,12\"/\u003E\u003C/g\u003E\u003C/svg\u003E\u003C/span\u003E","customSelects":".widget_categories form,.widget_archive select,.vcex-form-shortcode select","scrollToHash":"1","localScrollFindLinks":"1","localScrollHighlight":"1","localScrollUpdateHash":"1","scrollToHashTimeout":"500","localScrollTargets":"li.local-scroll a, a.local-scroll, .local-scroll-link, .local-scroll-link \u003E a,.sidr-class-local-scroll-link,li.sidr-class-local-scroll \u003E span \u003E a,li.sidr-class-local-scroll \u003E a","scrollToBehavior":"smooth"};
+//# sourceURL=wpex-core-js-extra
+</script>
+<script type="rocketlazyloadscript" data-rocket-src="https://www.startmag.it/wp-content/themes/Total/assets/js/frontend/core.min.js?ver=6.5" id="wpex-core-js" defer data-wp-strategy="defer"></script>
+<script type="rocketlazyloadscript" id="wpex-inline-js-after">
+!function(){const e=document.querySelector("html"),t=()=>{const t=window.innerWidth-document.documentElement.clientWidth;t&&e.style.setProperty("--wpex-scrollbar-width",`${t}px`)};t(),window.addEventListener("resize",(()=>{t()}))}();
+//# sourceURL=wpex-inline-js-after
+</script>
+<script type="rocketlazyloadscript" data-rocket-src="https://www.startmag.it/wp-content/themes/Total/assets/js/frontend/search/header-replace.min.js?ver=6.5" id="wpex-search-header_replace-js" defer data-wp-strategy="defer"></script>
+<script id="wpex-sticky-main-nav-js-extra">
+var wpex_sticky_main_nav_params = {"breakpoint":"9999"};
+//# sourceURL=wpex-sticky-main-nav-js-extra
+</script>
+<script type="rocketlazyloadscript" data-rocket-src="https://www.startmag.it/wp-content/themes/Total/assets/js/frontend/sticky/main-nav.min.js?ver=6.5" id="wpex-sticky-main-nav-js" defer data-wp-strategy="defer"></script>
+<script id="wpex-sticky-header-js-extra">
+var wpex_sticky_header_params = {"breakpoint":"10000","mobileSupport":"1"};
+//# sourceURL=wpex-sticky-header-js-extra
+</script>
+<script type="rocketlazyloadscript" data-rocket-src="https://www.startmag.it/wp-content/themes/Total/assets/js/frontend/sticky/header.min.js?ver=6.5" id="wpex-sticky-header-js" defer data-wp-strategy="defer"></script>
+<script id="wpex-mobile-menu-sidr-js-extra">
+var wpex_mobile_menu_sidr_params = {"breakpoint":"9999","i18n":{"openSubmenu":"Aprire il sottomenu di %s","closeSubmenu":"Chiudere il sottomenu di %s"},"openSubmenuIcon":"\u003Cspan class=\"wpex-open-submenu__icon wpex-transition-transform wpex-duration-300 wpex-icon\" aria-hidden=\"true\"\u003E\u003Csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 448 512\"\u003E\u003Cpath d=\"M201.4 342.6c12.5 12.5 32.8 12.5 45.3 0l160-160c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L224 274.7 86.6 137.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l160 160z\"/\u003E\u003C/svg\u003E\u003C/span\u003E","source":"#mobile-menu-alternative, #mobile-menu-search","side":"right","dark_surface":"1","displace":"","aria_label":"Mobile menu","aria_label_close":"Close mobile menu","class":["wpex-mobile-menu"],"speed":"300"};
+//# sourceURL=wpex-mobile-menu-sidr-js-extra
+</script>
+<script type="rocketlazyloadscript" data-rocket-src="https://www.startmag.it/wp-content/themes/Total/assets/js/frontend/mobile-menu/sidr.min.js?ver=6.5" id="wpex-mobile-menu-sidr-js" defer data-wp-strategy="defer"></script>
+<script type="rocketlazyloadscript"></script><link rel="https://api.w.org/" href="https://www.startmag.it/wp-json/">
+<link rel="alternate" title="JSON" type="application/json" href="https://www.startmag.it/wp-json/wp/v2/posts/348578">
+<link rel="EditURI" type="application/rsd+xml" title="RSD" href="https://www.startmag.it/xmlrpc.php?rsd">
+
+<link rel="shortlink" href="https://www.startmag.it/?p=348578">
+<!-- HFCM by 99 Robots - Snippet # 51: SIMEST -->
+<script type="rocketlazyloadscript">
+	var axel = Math.random() + "";
+var num = axel * 1000000000000000000;
+document.writeln('<IMG SRC="https://ad.doubleclick.net/ddm/trackimp/N3308.5290566INNOVATIVEPUBLISHIN/B34150888.429865258;dc_trk_aid=623176455;dc_trk_cid=242121209;ord='+num+';dc_lat=;dc_rdid=;tag_for_child_directed_treatment=;tfua=;gdpr=${GDPR};gdpr_consent=${GDPR_CONSENT_755};ltd=;dc_tdv=1?" attributionsrc BORDER="0" HEIGHT="1" WIDTH="1" ALT="Advertisement" style="display:none">');
+</script>
+
+
+
+<!-- /end HFCM by 99 Robots -->
+<!-- HFCM by 99 Robots - Snippet # 54: acea desktop new -->
+<script type="rocketlazyloadscript">
+	var axel = Math.random() + "";
+var num = axel * 1000000000000000000;
+document.writeln('<IMG src="<img src="https://track.adform.net/adfserve/?bn=86310997;1x1inv=1;srctype=3;ord='+num+'" BORDER="0" HEIGHT="1" WIDTH="1" ALT="Advertisement" style="display:none">');
+</script>
+
+<!-- /end HFCM by 99 Robots -->
+<meta name="pbstck_context:section" content="genr">
+<!-- Google tag (gtag.js) -->
+<script type="rocketlazyloadscript" async data-rocket-src="https://www.googletagmanager.com/gtag/js?id=G-8S195KFTFD"></script>
+<script type="rocketlazyloadscript">
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-8S195KFTFD');
+</script>
+
+<meta name="pbstck_context:site_name" content="startmag.it">
+<link rel="preconnect" href="https://ads.talkscreativity.com">
+<link rel="preconnect" href="https://securepubads.g.doubleclick.net">
+<link rel="preload" as="script" href="https://ads.talkscreativity.com/assets/publisher/startmagit/init.js">
+<link rel="preload" as="script" href="https://securepubads.g.doubleclick.net/tag/js/gpt.js">
+<script async src="https://securepubads.g.doubleclick.net/tag/js/gpt.js" type="text/plain" class=" _iub_cs_activate" data-iub-purposes="5"></script>
+<script type="rocketlazyloadscript" data-rocket-type="text/javascript">
+    window.googletag = window.googletag || { cmd: [] };
+    window.googletag.cmd = window.googletag.cmd || [];
+</script>
+<script data-cfasync="false" async src="https://ads.talkscreativity.com/assets/publisher/startmagit/init.js"></script>
+
+<noscript><style>body:not(.content-full-screen) .wpex-vc-row-stretched[data-vc-full-width-init="false"]{visibility:visible;}</style></noscript>
+<style></style>		<style id="wp-custom-css">
+			/*div#div-gpt-ad-headofpage{height:auto;text-align:center;padding:10px;border:3px solid #f7f7f7;}*/.meta-author-avatar img{width:85px;height:85px;border-radius:50%;object-fit:cover;display:block;}.primissimo-immagine-principale img{object-fit:cover;width:100%;}.div-on-demand{background:url(https://www.startmag.it/wp-content/uploads/logo_economia_on_demand_.jpg);background-size:contain;background-repeat:no-repeat;width:70%;height:40px;position:absolute;bottom:4px;left:0;}.economia-ondemand-box .card-media-container::after{display:none}@media screen and (min-width:1100px){.primissimo .overlay{height:580px !important;}.primissimo img{height:580px;object-fit:cover}}#text-233 p{margin:0;}#text-233{border:2px solid #dedede;}#div-gpt-ad-teads{margin:35px 0;}.ads iframe{transform:scale(0.55);transform-origin:top left;width:calc(100% / 0.55);/* inverso della scala per compensare */height:calc(100% / 0.55);border:none;}.category-podcast .wpex-card-primary-term{display:none;}.iframe-link{position:relative;display:inline-block;}.blocker-iframe{position:absolute;height:100%;width:100%;z-index:1;background:rgba(255,0,0,0);}.iframe-link iframe{z-index:2;}@media screen and (min-width:1024px){.social-share-articolo-mobile{display:none}}@media only screen and (min-width:959px){.colonna-centrale-articolo{margin-top:-100px;}}@media only screen and (max-width:958){.vc_column-inner{border:none !important}}div.wpforms-container-full{margin:12px auto !important;font-size:0.9em !important}.wpforms-container .wpforms-field{padding:7px 0 !important;}div.wpforms-container-full .wpforms-form .wpforms-submit-container{margin-top:0 !important;}div.wpforms-container-full label{font-size:0.9em !important}div.wpforms-container-full input{font-weight:800 !important},div.wpforms-container-full label{font-size:0.9em !important}div.wpforms-container-full input,div.wpforms-container-full select{}.wpforms-container .wpforms-submit-container{padding:0 !important;}.wpforms-submit{width:100% !important;background:#FE782C !important}.headofpage-desktop{/*min-height:250px;*/background:#f7f7f7;width:auto;margin-top:20px;position:relative;text-align:center;}.headofpage-desktop::after{content:'ADV';position:absolute;left:50%;top:50%;color:#fff;font-size:0.9em;z-index:-1;}.linkwrap{position:relative;display:inline-block;}.blocker{position:absolute;height:100%;width:100%;z-index:1;}.linkwrap iframe{z-index:2;}.ads-350 iframe{width:250px;zoom:1;-moz-transform:scale(0.8);-moz-transform-origin:0 0;-o-transform:scale(0.8);-o-transform-origin:0 0;-webkit-transform:scale(0.8);-webkit-transform-origin:0 0;}element.style{}#post-media img{max-height:inherit !important}.templatera_shortcode .wpb_raw_html,.wpex-templatera-widget-content{padding:20px !important;background:#efefef;text-align:center !important;}.startmag_adv{position:relative;text-align:center;}@media only screen and (max-width:768px){#custom_html-107,#custom_html-108,#custom_html-109{display:none;}.ads-desktop iframe{width:250px;zoom:1;-moz-transform:scale(0.55);-moz-transform-origin:0 0;-o-transform:scale(0.55);-o-transform-origin:0 0;-webkit-transform:scale(0.55);-webkit-transform-origin:0 0;}}div#black-studio-tinymce-188 .textwidget{padding:0 !important;width:100%;}#black-studio-tinymce-188 .textwidget a,#black-studio-tinymce-188 .textwidget img{width:100%}		</style>
+		<noscript><style> .wpb_animate_when_almost_visible { opacity: 1; }</style></noscript>
+<style data-type="wpex-css" id="wpex-css">/*TYPOGRAPHY*/:root{--wpex-body-font-family:Archivo;--wpex-body-font-size:16px;--wpex-body-color:#000000;}:root{--wpex-btn-font-weight:700;--wpex-btn-text-transform:uppercase;}#top-bar-content{font-weight:600;font-size:11px;}.main-navigation-ul .link-inner{font-weight:700;text-transform:uppercase;}.page-header .page-header-title{font-family:Fraunces;font-weight:900;font-size:28px;}body.single-post .single-post-title{font-style:normal;font-size:55px;line-height:52px;}.sidebar-box .widget-title{font-family:Fraunces;font-weight:900;font-size:25px;margin-block-end:10px;}h2,.wpex-h2{font-weight:800;font-size:18px;}#footer-widgets{font-size:15px;}.footer-widget .widget-title{font-weight:700;font-size:15px;}@media(max-width:1024px){body.single-post .single-post-title{font-size:35px;}}@media(max-width:959px){body.single-post .single-post-title{font-size:25px;}}@media(max-width:479px){body.single-post .single-post-title{font-size:22px;}}/*ADVANCED STYLING CSS*/#site-logo .logo-img{height:80px;width:auto;}/*CUSTOMIZER STYLING*/:root{--wpex-bg-color:#e5e5e5;--wpex-accent:#3846bc;--wpex-accent-alt:#3846bc;--wpex-accent-alt:#f6ece5;--wpex-surface-2:#f6ece5;--wpex-surface-4:#f6ece5;--wpex-link-decoration-line:underline;--wpex-link-color:#3846bc;--wpex-hover-heading-link-color:#3846bc;--wpex-btn-border-radius:200px;--wpex-btn-color:#000000;--wpex-hover-btn-color:#000000;--wpex-btn-bg:#ffffff;--wpex-btn-border-style:solid;--wpex-btn-border-width:1px;--wpex-boxed-layout-padding:120px 0px;--wpex-vc-column-inner-margin-bottom:40px;}.site-boxed{--wpex-bg-color:#e5e5e5;}.page-header-disabled:not(.has-overlay-header):not(.no-header-margin) #content-wrap{padding-block-start:20px;}.page-header.wpex-supports-mods{padding-block-start:5px;padding-block-end:5px;background-color:#ffffff;border-top-width:1px;border-bottom-width:1px;}.page-header{margin-block-end:20px;}.page-header.wpex-supports-mods .page-header-title{color:#ffffff;}.wpex-load-more-spinner,.vcex-loadmore-spinner{color:#f6ece5;}:root,.site-boxed.wpex-responsive #wrap{--wpex-container-width:1380px;}#top-bar-wrap{background-color:#f6ece5;}.wpex-top-bar-sticky{background-color:#f6ece5;}#top-bar{color:#000000;--wpex-text-2:#000000;--wpex-text-3:#000000;--wpex-text-4:#000000;--wpex-link-color:#000000;--wpex-hover-link-color:#ffffff;padding-block-start:7px;padding-block-end:7px;}#top-bar-social a.wpex-social-btn-no-style{color:#000000;}#top-bar-social a.wpex-social-btn-no-style:hover{color:#4c4c4c;}#site-navigation-wrap{--wpex-main-nav-link-color:#000000;--wpex-hover-main-nav-link-color:#000000;--wpex-active-main-nav-link-color:#000000;}#sidebar{padding:0px 0px 0px 10px;}#footer{--wpex-link-decoration-line:underline;--wpex-hover-link-decoration-line:underline;--wpex-surface-1:#303030;background-color:#303030;color:#ffffff;--wpex-heading-color:#ffffff;--wpex-text-2:#ffffff;--wpex-text-3:#ffffff;--wpex-text-4:#ffffff;--wpex-link-color:#ffffff;--wpex-hover-link-color:#ffffff;}#footer-bottom{--wpex-link-decoration-line:underline;--wpex-hover-link-decoration-line:underline;background-color:#303030;color:#ffffff;--wpex-text-2:#ffffff;--wpex-text-3:#ffffff;--wpex-text-4:#ffffff;--wpex-link-color:#ffffff;--wpex-hover-link-color:#ffffff;}@media only screen and (min-width:960px){:root{--wpex-content-area-width:72%;--wpex-primary-sidebar-width:27%;}}@media only screen and (max-width:767px){#site-logo .logo-img{max-width:120px;}}@media only screen and (min-width:768px) and (max-width:959px){#site-logo .logo-img{max-width:150px;}}</style>
+<noscript><style id="rocket-lazyload-nojs-css">.rll-youtube-player, [data-lazy-src]{display:none !important;}</style></noscript>
+<link rel="stylesheet" id="wpforms-modern-full-css" href="https://www.startmag.it/wp-content/plugins/wpforms/assets/css/frontend/modern/wpforms-full.min.css?ver=1.9.9.2" media="all">
+<style id="wpforms-modern-full-inline-css">
+:root {
+				--wpforms-field-border-radius: 3px;
+--wpforms-field-border-style: solid;
+--wpforms-field-border-size: 1px;
+--wpforms-field-background-color: #ffffff;
+--wpforms-field-border-color: rgba( 0, 0, 0, 0.25 );
+--wpforms-field-border-color-spare: rgba( 0, 0, 0, 0.25 );
+--wpforms-field-text-color: rgba( 0, 0, 0, 0.7 );
+--wpforms-field-menu-color: #ffffff;
+--wpforms-label-color: rgba( 0, 0, 0, 0.85 );
+--wpforms-label-sublabel-color: rgba( 0, 0, 0, 0.55 );
+--wpforms-label-error-color: #d63637;
+--wpforms-button-border-radius: 3px;
+--wpforms-button-border-style: none;
+--wpforms-button-border-size: 1px;
+--wpforms-button-background-color: #066aab;
+--wpforms-button-border-color: #066aab;
+--wpforms-button-text-color: #ffffff;
+--wpforms-page-break-color: #066aab;
+--wpforms-background-image: none;
+--wpforms-background-position: center center;
+--wpforms-background-repeat: no-repeat;
+--wpforms-background-size: cover;
+--wpforms-background-width: 100px;
+--wpforms-background-height: 100px;
+--wpforms-background-color: rgba( 0, 0, 0, 0 );
+--wpforms-background-url: none;
+--wpforms-container-padding: 0px;
+--wpforms-container-border-style: none;
+--wpforms-container-border-width: 1px;
+--wpforms-container-border-color: #000000;
+--wpforms-container-border-radius: 3px;
+--wpforms-field-size-input-height: 43px;
+--wpforms-field-size-input-spacing: 15px;
+--wpforms-field-size-font-size: 16px;
+--wpforms-field-size-line-height: 19px;
+--wpforms-field-size-padding-h: 14px;
+--wpforms-field-size-checkbox-size: 16px;
+--wpforms-field-size-sublabel-spacing: 5px;
+--wpforms-field-size-icon-size: 1;
+--wpforms-label-size-font-size: 16px;
+--wpforms-label-size-line-height: 19px;
+--wpforms-label-size-sublabel-font-size: 14px;
+--wpforms-label-size-sublabel-line-height: 17px;
+--wpforms-button-size-font-size: 17px;
+--wpforms-button-size-height: 41px;
+--wpforms-button-size-padding-h: 15px;
+--wpforms-button-size-margin-top: 10px;
+--wpforms-container-shadow-size-box-shadow: none;
+			}
+/*# sourceURL=wpforms-modern-full-inline-css */
+</style>
+<link rel="stylesheet" id="wpforms-pro-modern-full-css" href="https://www.startmag.it/wp-content/plugins/wpforms/assets/pro/css/frontend/modern/wpforms-full.min.css?ver=1.9.9.2" media="all">
+<style id="rocket-lazyrender-inline-css">[data-wpr-lazyrender] {content-visibility: auto;}</style>
+<meta name="generator" content="WP Rocket 3.20.3" data-wpr-features="wpr_delay_js wpr_defer_js wpr_minify_js wpr_lazyload_images wpr_preconnect_external_domains wpr_automatic_lazy_rendering wpr_oci wpr_image_dimensions wpr_minify_css wpr_preload_links wpr_desktop">
+</head>
+
+<body class="wp-singular post-template-default single single-post postid-348578 single-format-standard wp-custom-logo wp-embed-responsive wp-theme-Total wp-child-theme-total-child-theme wpex-theme wpex-responsive boxed-main-layout no-composer wpex-live-site site-boxed content-right-sidebar has-sidebar has-topbar post-in-category-sanita sidebar-widget-icons hasnt-overlay-header has-mobile-menu wpex-mobile-toggle-menu-icon_buttons wpex-no-js wpb-js-composer js-comp-ver-8.7.2 vc_responsive">
+
+	
+<a href="#content" class="skip-to-content">Skip to content</a>
+<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5ST6Z5BT" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
+	
+	<span data-ls_id="#site_top" tabindex="-1"></span>
+	<div id="outer-wrap" class="wpex-overflow-clip">
+		
+		
+		
+		<div id="wrap" class="wpex-clr">
+
+			
+			<div id="top-bar-wrap" class="wpex-text-sm wpex-print-hidden">
+			<div id="top-bar" class="container wpex-relative wpex-py-15 wpex-md-flex wpex-justify-between wpex-items-center wpex-text-left wpex-md-text-initial">
+	<div id="top-bar-content" class="has-content top-bar-left wpex-clr">
+<nav class="top-bar-nav wpex-inline-block" aria-label="Utility menu"><ul id="menu-top" class="top-bar-menu wpex-inline-block wpex-m-0 wpex-list-none wpex-last-mr-0 wpex-mr-20">
+<li id="menu-item-19827" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-19827"><a href="https://www.startmag.it"><span class="link-inner">HOME</span></a></li>
+<li id="menu-item-19826" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-19826"><a href="https://www.startmag.it/148-chi-siamo/"><span class="link-inner">CHI SIAMO</span></a></li>
+</ul></nav>
+<a href="https://www.startmag.it" title="torna alla home"><img width="120" height="44" src="https://www.startmag.it/wp-content/uploads/logo-startmagazine.svg" class="topbar-logo" alt="Logo StartMag"></a>
+</div>
+
+<div class="templatera_shortcode">
+<p></p>
+<div class="vc_row wpb_row vc_row-fluid wpex-relative no-bottom-margins"><div class="wpb_column vc_column_container vc_col-sm-12"><div class="vc_column-inner"><div class="wpb_wrapper">
+<style>.vcex-social-links.vcex_6981271c6f083{font-size:14px;}.vcex-social-links.vcex_6981271c6f083 .vcex-social-links__item{color:#000000;}.vcex-social-links.vcex_6981271c6f083 .vcex-social-links__item:hover{color:#545454;}</style>
+<div class="vcex-social-links vcex-module wpex-flex wpex-flex-wrap wpex-social-btns vcex-social-btns wpex-items-center wpex-gap-5 wpex-last-mr-0 vcex_6981271c6f083">
+<a href="https://twitter.com/intent/follow?source=followbutton&amp;variant=1.0&amp;screen_name=StartMagNews" class="vcex-social-links__item wpex-social-btn wpex-social-btn-minimal wpex-social-color-hover wpex-has-custom-color wpex-twitter"><span class="vcex-social-links__icon wpex-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 512 512"><path d="M389.2 48h70.6L305.6 224.2 487 464H345L233.7 318.6 106.5 464H35.8L200.7 275.5 26.8 48H172.4L272.9 180.9 389.2 48zM364.4 421.8h39.1L151.1 88h-42L364.4 421.8z"></path></svg></span><span class="screen-reader-text">Twitter</span></a><a href="https://www.facebook.com/start.mag.news" class="vcex-social-links__item wpex-social-btn wpex-social-btn-minimal wpex-social-color-hover wpex-has-custom-color wpex-facebook"><span class="vcex-social-links__icon wpex-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 512 512"><path d="M512 256C512 114.6 397.4 0 256 0S0 114.6 0 256C0 376 82.7 476.8 194.2 504.5V334.2H141.4V256h52.8V222.3c0-87.1 39.4-127.5 125-127.5c16.2 0 44.2 3.2 55.7 6.4V172c-6-.6-16.5-1-29.6-1c-42 0-58.2 15.9-58.2 57.2V256h83.6l-14.4 78.2H287V510.1C413.8 494.8 512 386.9 512 256h0z"></path></svg></span><span class="screen-reader-text">Facebook</span></a><a href="https://www.youtube.com/user/StartMagNews?sub_confirmation=1" class="vcex-social-links__item wpex-social-btn wpex-social-btn-minimal wpex-social-color-hover wpex-has-custom-color wpex-youtube"><span class="vcex-social-links__icon wpex-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 576 512"><path d="M549.7 124.1c-6.3-23.7-24.8-42.3-48.3-48.6C458.8 64 288 64 288 64S117.2 64 74.6 75.5c-23.5 6.3-42 24.9-48.3 48.6-11.4 42.9-11.4 132.3-11.4 132.3s0 89.4 11.4 132.3c6.3 23.7 24.8 41.5 48.3 47.8C117.2 448 288 448 288 448s170.8 0 213.4-11.5c23.5-6.3 42-24.2 48.3-47.8 11.4-42.9 11.4-132.3 11.4-132.3s0-89.4-11.4-132.3zm-317.5 213.5V175.2l142.7 81.2-142.7 81.2z"></path></svg></span><span class="screen-reader-text">YouTube</span></a><a href="https://www.linkedin.com/company/start-mag/" class="vcex-social-links__item wpex-social-btn wpex-social-btn-minimal wpex-social-color-hover wpex-has-custom-color wpex-linkedin"><span class="vcex-social-links__icon wpex-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 448 512"><path d="M100.3 448H7.4V148.9h92.9zM53.8 108.1C24.1 108.1 0 83.5 0 53.8a53.8 53.8 0 0 1 107.6 0c0 29.7-24.1 54.3-53.8 54.3zM447.9 448h-92.7V302.4c0-34.7-.7-79.2-48.3-79.2-48.3 0-55.7 37.7-55.7 76.7V448h-92.8V148.9h89.1v40.8h1.3c12.4-23.5 42.7-48.3 87.9-48.3 94 0 111.3 61.9 111.3 142.3V448z"></path></svg></span><span class="screen-reader-text">LinkedIn</span></a><a href="https://instagram.com/startmagnews?igshid=MzNlNGNkZWQ4Mg==" class="vcex-social-links__item wpex-social-btn wpex-social-btn-minimal wpex-social-color-hover wpex-has-custom-color wpex-instagram"><span class="vcex-social-links__icon wpex-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 448 512"><path d="M224.1 141c-63.6 0-114.9 51.3-114.9 114.9s51.3 114.9 114.9 114.9S339 319.5 339 255.9 287.7 141 224.1 141zm0 189.6c-41.1 0-74.7-33.5-74.7-74.7s33.5-74.7 74.7-74.7 74.7 33.5 74.7 74.7-33.6 74.7-74.7 74.7zm146.4-194.3c0 14.9-12 26.8-26.8 26.8-14.9 0-26.8-12-26.8-26.8s12-26.8 26.8-26.8 26.8 12 26.8 26.8zm76.1 27.2c-1.7-35.9-9.9-67.7-36.2-93.9-26.2-26.2-58-34.4-93.9-36.2-37-2.1-147.9-2.1-184.9 0-35.8 1.7-67.6 9.9-93.9 36.1s-34.4 58-36.2 93.9c-2.1 37-2.1 147.9 0 184.9 1.7 35.9 9.9 67.7 36.2 93.9s58 34.4 93.9 36.2c37 2.1 147.9 2.1 184.9 0 35.9-1.7 67.7-9.9 93.9-36.2 26.2-26.2 34.4-58 36.2-93.9 2.1-37 2.1-147.8 0-184.8zM398.8 388c-7.8 19.6-22.9 34.7-42.6 42.6-29.5 11.7-99.5 9-132.1 9s-102.7 2.6-132.1-9c-19.6-7.8-34.7-22.9-42.6-42.6-11.7-29.5-9-99.5-9-132.1s-2.6-102.7 9-132.1c7.8-19.6 22.9-34.7 42.6-42.6 29.5-11.7 99.5-9 132.1-9s102.7-2.6 132.1 9c19.6 7.8 34.7 22.9 42.6 42.6 11.7 29.5 9 99.5 9 132.1s2.7 102.7-9 132.1z"></path></svg></span><span class="screen-reader-text">Instagram</span></a><a href="https://www.startmag.it/feed/" class="vcex-social-links__item wpex-social-btn wpex-social-btn-minimal wpex-social-color-hover wpex-has-custom-color wpex-rss"><span class="vcex-social-links__icon wpex-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 448 512"><path d="M0 64C0 46.3 14.3 32 32 32c229.8 0 416 186.2 416 416c0 17.7-14.3 32-32 32s-32-14.3-32-32C384 253.6 226.4 96 32 96C14.3 96 0 81.7 0 64zM0 416a64 64 0 1 1 128 0A64 64 0 1 1 0 416zM32 160c159.1 0 288 128.9 288 288c0 17.7-14.3 32-32 32s-32-14.3-32-32c0-123.7-100.3-224-224-224c-17.7 0-32-14.3-32-32s14.3-32 32-32z"></path></svg></span><span class="screen-reader-text">RSS</span></a>
+</div>
+</div></div></div></div>
+</div>
+</div>
+		</div>
+	
+
+
+    <header id="site-header" class="header-three wpex-z-sticky wpex-dropdowns-shadow-three fixed-scroll fixed-scroll--mobile-only has-sticky-dropshadow dyn-styles wpex-print-hidden wpex-relative wpex-clr">
+
+        
+        <div id="site-header-inner" class="header-three-inner header-padding container wpex-relative wpex-h-100 wpex-py-30 wpex-clr">
+            <div class="iwy-header-right"><div class="templatera_shortcode">
+<p></p>
+<div class="vc_row wpb_row vc_row-fluid wpex-relative"><div class="wpb_column vc_column_container vc_col-sm-12"><div class="vc_column-inner"><div class="wpb_wrapper"><div class="vcex-flex-container vcex-module wpex-flex wpex-gap-20 wpex-items-center wpex-justify-end">
+<a href="/podcast/" class="vcex-button theme-button inline"><span class="vcex-button-inner theme-button-inner wpex-flex wpex-flex-wrap wpex-items-center wpex-justify-center">Podcast</span></a> <a href="https://www.startmag.it/pagina-focus/" class="vcex-button theme-button inline"><span class="vcex-button-inner theme-button-inner wpex-flex wpex-flex-wrap wpex-items-center wpex-justify-center">FOCUS</span></a> <a href="#" class="vcex-button theme-button inline search-header-replace-toggle"><span class="vcex-button-inner theme-button-inner wpex-flex wpex-flex-wrap wpex-items-center wpex-justify-center"><span class="wpex-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 512 512"><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z"></path></svg></span></span></a> </div></div></div></div></div>
+</div></div>
+<div class="iwy-header-left"><div class="templatera_shortcode">
+<p></p>
+<div class="vc_row wpb_row vc_row-fluid wpex-relative no-bottom-margins"><div class="wpb_column vc_column_container vc_col-sm-12"><div class="vc_column-inner"><div class="wpb_wrapper">
+<a href="https://www.startmag.it/come-iscriversi-alla-newsletter/" class="vcex-button theme-button medium align-left inline"><span class="vcex-button-inner theme-button-inner wpex-flex wpex-flex-wrap wpex-items-center wpex-justify-center">Newsletter</span></a> </div></div></div></div>
+</div></div>
+<div id="site-logo" class="site-branding header-three-logo logo-padding wpex-flex wpex-items-center wpex-text-center wpex-justify-center">
+	<div id="site-logo-inner"><a id="site-logo-link" href="/pagina-focus" rel="home" class="main-logo"><img width="268" height="80" src="https://www.startmag.it/wp-content/uploads/focus.svg" alt="Startmag" class="logo-img wpex-h-auto wpex-max-w-100 wpex-align-middle" data-no-retina data-skip-lazy fetchpriority="high"></a></div>
+
+</div>
+        </div>
+
+        <div class="focus-tagline"><p>TUTTI GLI SPECIALI DI START MAGAZINE</p></div>
+<div id="site-navigation-wrap" class="navbar-style-three navbar-allows-inner-bg wpex-z-sticky navbar-fixed-line-height fixed-nav wpex-dropdown-top-border hide-at-mm-breakpoint wpex-clr wpex-print-hidden">
+	<nav id="site-navigation" class="navigation main-navigation main-navigation-three container wpex-relative wpex-clr" aria-label="Main menu"><ul id="menu-main_menu" class="main-navigation-ul dropdown-menu wpex-dropdown-menu wpex-dropdown-menu--onhover">
+<li id="menu-item-5872" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-5872 menu-category-2820"><a href="https://www.startmag.it/energia/"><span class="link-inner">Energia</span></a></li>
+<li id="menu-item-25320" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-25320 menu-category-5230"><a href="https://www.startmag.it/economia/"><span class="link-inner">Economia</span></a></li>
+<li id="menu-item-25321" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-25321 menu-category-5229"><a href="https://www.startmag.it/mondo/"><span class="link-inner">Mondo</span></a></li>
+<li id="menu-item-5875" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-5875 menu-category-2823"><a href="https://www.startmag.it/smartcity/"><span class="link-inner">Mobilit&agrave;</span></a></li>
+<li id="menu-item-5873" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-5873 menu-category-2824"><a href="https://www.startmag.it/innovazione/"><span class="link-inner">Innovazione</span></a></li>
+<li id="menu-item-296064" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-296064 menu-category-34033"><a href="https://www.startmag.it/spazio-e-difesa/"><span class="link-inner">Spazio e Difesa</span></a></li>
+<li class="search-toggle-li menu-item wpex-menu-extra no-icon-margin"><a href="#" class="site-search-toggle search-header-replace-toggle" role="button" aria-expanded="false" aria-controls="searchform-header-replace" aria-label="Search"><span class="link-inner"><span class="wpex-menu-search-text wpex-hidden">Cerca</span><span class="wpex-menu-search-icon wpex-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 512 512"><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z"></path></svg></span></span></a></li>
+</ul></nav>
+</div>
+
+
+<div id="searchform-header-replace" class="header-searchform-wrap wpex-absolute wpex-z-dropdown wpex-inset-0 wpex-transition-all wpex-duration-300 wpex-invisible wpex-opacity-0 wpex-text-xl">
+	<div class="searchform-header-replace__inner container wpex-flex wpex-justify-between wpex-items-center wpex-relative wpex-h-100">
+        
+<form role="search" method="get" class="searchform searchform--header-replace wpex-h-100 wpex-w-100" action="https://www.startmag.it/" autocomplete="off">
+	<label for="searchform-input-6981271c742bd" class="searchform-label screen-reader-text">Search</label>
+	<input id="searchform-input-6981271c742bd" type="search" class="searchform-input wpex-unstyled-input wpex-outline-0 wpex-h-100 wpex-w-100 wpex-uppercase wpex-tracking-wide" name="s" placeholder="Digitare e premere invio per effettuare la ricerca;" required>
+			<button type="submit" class="searchform-submit wpex-unstyled-button wpex-hidden wpex-absolute wpex-top-50 wpex-right-0 wpex-mr-25 -wpex-translate-y-50" aria-label="Submit search"><span class="wpex-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 512 512"><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z"></path></svg></span></button>
+</form>
+        <button id="searchform-header-replace-close" class="wpex-unstyled-button wpex-transition-colors wpex-flex wpex-items-center wpex-justify-center wpex-user-select-none wpex-hover-text-1">
+            <span class="searchform-header-replace-close__icon wpex-flex wpex-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 24 24"><path d="M0 0h24v24H0V0z" fill="none"></path><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"></path></svg></span>            <span class="screen-reader-text">Chiudi ricerca</span>
+        </button>
+    </div>
+</div>
+
+    </header>
+
+
+<div class="wpex-text-center"><div id="div-gpt-ad-headofpage" class="mp-code headofpage headofpage-desktop"></div></div>
+			
+			<main id="main" class="site-main wpex-clr">
+
+				
+<header class="page-header centered-minimal-page-header wpex-relative wpex-mb-40 wpex-surface-1 wpex-py-30 wpex-border-t wpex-border-b wpex-border-solid wpex-border-main wpex-text-2 wpex-text-left wpex-supports-mods">
+
+	
+	<div class="page-header-inner container">
+<div class="page-header-content">
+
+<span class="page-header-title wpex-block wpex-m-0 wpex-text-5xl">
+
+	<span>Salute e ricerca</span>
+
+</span>
+
+</div>
+</div>
+
+	
+</header>
+
+
+<div id="content-wrap" class="container wpex-clr">
+
+	
+	<div id="post-media" class="single-blog-media single-media wpex-relative wpex-mb-20 wpex-md-mb-30 wpex-w-100 wpex-shrink-0"><img fetchpriority="high" class="blog-single-media-img wpex-align-middle" decoding="async" src="https://www.startmag.it/wp-content/uploads/Imagoeconomica_1924929-scaled-1170x550.jpg" alt="Maria Rita Parsi" srcset="https://www.startmag.it/wp-content/uploads/Imagoeconomica_1924929-scaled-1170x550@2x.jpg 2x" width="1170" height="550"></div>
+
+
+	<div id="primary" class="content-area wpex-clr">
+
+		
+		<div id="content" class="site-content wpex-clr">
+
+			
+			<style>.vc_custom_1685020692058{padding-top: 20px !important;padding-right: 20px !important;padding-bottom: 20px !important;padding-left: 20px !important;background-color: #ffffff !important;}.vc_custom_1764932033450{margin-bottom: 20px !important;border-top-width: 1px !important;border-bottom-width: 1px !important;padding-top: 10px !important;padding-bottom: 10px !important;border-top-style: solid !important;border-bottom-style: solid !important;border-color: #c1c1c1 !important;}.vc_custom_1687428414921{margin-bottom: 20px !important;}.vc_custom_1685018171400{margin-bottom: 20px !important;}.vc_custom_1685018527668{margin-top: 20px !important;}.vc_custom_1685960985421{margin-bottom: 20px !important;border-top-width: 1px !important;border-bottom-width: 1px !important;padding-top: 10px !important;padding-bottom: 10px !important;border-top-color: #c1c1c1 !important;border-top-style: solid !important;border-bottom-color: #c1c1c1 !important;border-bottom-style: solid !important;}</style>
+<div class="custom-singular-template entry wpex-clr">
+<div class="vc_row wpb_row vc_row-fluid wpex-relative">
+<div class="wpb_column vc_column_container vc_col-sm-3 visible-desktop"><div class="vc_column-inner"><div class="wpb_wrapper">
+<style>.vcex-post-meta.vcex_6981271c769b3{font-size:16px;}</style>
+<ul class="vcex-post-meta meta vcex-module wpex-flex wpex-flex-wrap wpex-items-center vc_custom_1764932033450 autore-meta-desktop vcex_6981271c769b3"><li class="meta-author"><a class="wpex-inline-flex wpex-items-center" href="https://www.startmag.it/author/francesco_provinciali/"><span class="meta-author-avatar wpex-mr-10"><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2085%2085'%3E%3C/svg%3E" width="85" height="85" data-lazy-srcset="https://www.startmag.it/wp-content/uploads/094f86ce-bcad-4c12-8d5a-927be90e63ea.png 2x" alt="Francesco Provinciali" class="avatar avatar-85 wp-user-avatar wp-user-avatar-85 alignnone photo wpex-align-middle wpex-rounded-full" data-lazy-src="https://www.startmag.it/wp-content/uploads/094f86ce-bcad-4c12-8d5a-927be90e63ea-150x150.png"><noscript><img src="https://www.startmag.it/wp-content/uploads/094f86ce-bcad-4c12-8d5a-927be90e63ea-150x150.png" width="85" height="85" srcset="https://www.startmag.it/wp-content/uploads/094f86ce-bcad-4c12-8d5a-927be90e63ea.png 2x" alt="Francesco Provinciali" class="avatar avatar-85 wp-user-avatar wp-user-avatar-85 alignnone photo wpex-align-middle wpex-rounded-full"></noscript></span><span class="vcard author"><span class="fn">Francesco Provinciali</span></span></a></li></ul>
+<style>.vcex-social-share.vcex_6981271c77228 .vcex-social-share__button{font-size:14px;}</style>
+	<div class="vcex-social-share vcex-module visible-desktop social-share-articolo-desktop vcex_6981271c77228" data-target="_blank" data-source="https%3A%2F%2Fwww.startmag.it%2F" data-url="https%3A%2F%2Fwww.startmag.it%2Fsanita%2Faddio-a-maria-rita-parsi-la-psicologa-della-delicatezza%2F" data-title="Addio a Maria Rita Parsi, la psicologa della delicatezza" data-image="https%3A%2F%2Fwww.startmag.it%2Fwp-content%2Fuploads%2FImagoeconomica_1924929-scaled.jpg" data-summary="Maria%20Rita%20Parsi%2C%20psicologa%20e%20psicoterapeuta%20di%20fama%20internazionale%2C%20ha%20dedicato%20la%20vita%20ai%20bambini%20e%20agli%20adolescenti%20con%20una%20pedagogia%20dell%E2%80%99ascolto%2C%20della%20delicatezza%20e%20del%20cuore.%20Il%20ricordo%20di%C2%A0Francesco%20Provinciali" data-email-subject="Volevo che vedeste questo link" data-email-body="Volevo che vedeste questo link https%3A%2F%2Fwww.startmag.it%2Fsanita%2Faddio-a-maria-rita-parsi-la-psicologa-della-delicatezza%2F"><div class="vcex-social-share__buttons wpex-flex wpex-flex-wrap wpex-gap-5">
+<button class="vcex-social-share__button vcex-social-share__button--twitter wpex-rounded-full wpex-twitter wpex-social-btn wpex-social-bg wpex-gap-10" aria-label="Post on X"><span class="vcex-social-share__icon wpex-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 512 512"><path d="M389.2 48h70.6L305.6 224.2 487 464H345L233.7 318.6 106.5 464H35.8L200.7 275.5 26.8 48H172.4L272.9 180.9 389.2 48zM364.4 421.8h39.1L151.1 88h-42L364.4 421.8z"></path></svg></span></button><button class="vcex-social-share__button vcex-social-share__button--facebook wpex-rounded-full wpex-facebook wpex-social-btn wpex-social-bg wpex-gap-10" aria-label="Condividi su Facebook"><span class="vcex-social-share__icon wpex-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 512 512"><path d="M512 256C512 114.6 397.4 0 256 0S0 114.6 0 256C0 376 82.7 476.8 194.2 504.5V334.2H141.4V256h52.8V222.3c0-87.1 39.4-127.5 125-127.5c16.2 0 44.2 3.2 55.7 6.4V172c-6-.6-16.5-1-29.6-1c-42 0-58.2 15.9-58.2 57.2V256h83.6l-14.4 78.2H287V510.1C413.8 494.8 512 386.9 512 256h0z"></path></svg></span></button><button class="vcex-social-share__button vcex-social-share__button--linkedin wpex-rounded-full wpex-linkedin wpex-social-btn wpex-social-bg wpex-gap-10" aria-label="Condividi su LinkedIn"><span class="vcex-social-share__icon wpex-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 448 512"><path d="M100.3 448H7.4V148.9h92.9zM53.8 108.1C24.1 108.1 0 83.5 0 53.8a53.8 53.8 0 0 1 107.6 0c0 29.7-24.1 54.3-53.8 54.3zM447.9 448h-92.7V302.4c0-34.7-.7-79.2-48.3-79.2-48.3 0-55.7 37.7-55.7 76.7V448h-92.8V148.9h89.1v40.8h1.3c12.4-23.5 42.7-48.3 87.9-48.3 94 0 111.3 61.9 111.3 142.3V448z"></path></svg></span></button><button class="vcex-social-share__button vcex-social-share__button--whatsapp wpex-rounded-full wpex-whatsapp wpex-social-btn wpex-social-bg wpex-gap-10" aria-label="Share via Whatsapp"><span class="vcex-social-share__icon wpex-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 448 512"><path d="M380.9 97.1C339 55.1 283.2 32 223.9 32c-122.4 0-222 99.6-222 222 0 39.1 10.2 77.3 29.6 111L0 480l117.7-30.9c32.4 17.7 68.9 27 106.1 27h.1c122.3 0 224.1-99.6 224.1-222 0-59.3-25.2-115-67.1-157zm-157 341.6c-33.2 0-65.7-8.9-94-25.7l-6.7-4-69.8 18.3L72 359.2l-4.4-7c-18.5-29.4-28.2-63.3-28.2-98.2 0-101.7 82.8-184.5 184.6-184.5 49.3 0 95.6 19.2 130.4 54.1 34.8 34.9 56.2 81.2 56.1 130.5 0 101.8-84.9 184.6-186.6 184.6zm101.2-138.2c-5.5-2.8-32.8-16.2-37.9-18-5.1-1.9-8.8-2.8-12.5 2.8-3.7 5.6-14.3 18-17.6 21.8-3.2 3.7-6.5 4.2-12 1.4-32.6-16.3-54-29.1-75.5-66-5.7-9.8 5.7-9.1 16.3-30.3 1.8-3.7 .9-6.9-.5-9.7-1.4-2.8-12.5-30.1-17.1-41.2-4.5-10.8-9.1-9.3-12.5-9.5-3.2-.2-6.9-.2-10.6-.2-3.7 0-9.7 1.4-14.8 6.9-5.1 5.6-19.4 19-19.4 46.3 0 27.3 19.9 53.7 22.6 57.4 2.8 3.7 39.1 59.7 94.8 83.8 35.2 15.2 49 16.5 66.6 13.9 10.7-1.6 32.8-13.4 37.4-26.4 4.6-13 4.6-24.1 3.2-26.4-1.3-2.5-5-3.9-10.5-6.6z"></path></svg></span></button><button class="vcex-social-share__button vcex-social-share__button--email wpex-rounded-full wpex-email wpex-social-btn wpex-social-bg wpex-gap-10" aria-label="Condividi via e-mail"><span class="vcex-social-share__icon wpex-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 512 512"><path d="M48 64C21.5 64 0 85.5 0 112c0 15.1 7.1 29.3 19.2 38.4L236.8 313.6c11.4 8.5 27 8.5 38.4 0L492.8 150.4c12.1-9.1 19.2-23.3 19.2-38.4c0-26.5-21.5-48-48-48H48zM0 176V384c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V176L294.4 339.2c-22.8 17.1-54 17.1-76.8 0L0 176z"></path></svg></span></button>
+</div></div>
+
+</div></div></div>
+<div class="wpb_column colonna-centrale-articolo vc_column_container vc_col-sm-9 wpex-vc_col-has-fill"><div class="vc_column-inner vc_custom_1685020692058"><div class="wpb_wrapper">
+<style>@media (max-width:959px){.vcex-breadcrumbs.vcex_6981271c7777a{font-size:12px;}}@media (max-width:767px){.vcex-breadcrumbs.vcex_6981271c7777a{font-size:12px;}}@media (max-width:479px){.vcex-breadcrumbs.vcex_6981271c7777a{font-size:12px;}}</style>
+<nav class="vcex-breadcrumbs vc_custom_1687428414921 vcex_6981271c7777a"><span><span><a href="https://www.startmag.it/">STARTMAG</a></span> &raquo; <span><a href="https://www.startmag.it/sanita/">Salute e ricerca</a></span> &raquo; <span class="breadcrumb_last" aria-current="page">Addio a Maria Rita Parsi, la psicologa della delicatezza</span></span></nav><style>.vcex-page-title.vcex_6981271c77964 .vcex-page-title__heading{font-size:44px;font-weight:800;line-height:50px;}</style>
+<div class="vcex-page-title vcex-module vc_custom_1685018171400 vcex_6981271c77964"><h1 class="vcex-page-title__heading wpex-heading wpex-text-3xl"><span class="vcex-page-title__text">Addio a Maria Rita Parsi, la psicologa della delicatezza</span></h1></div>
+<style>.vcex-post-excerpt.vcex_6981271c77b87{color:#6c6c6c;font-size:19px;font-weight:600;}@media (max-width:767px){.vcex-post-excerpt.vcex_6981271c77b87{font-size:15px;}}@media (max-width:479px){.vcex-post-excerpt.vcex_6981271c77b87{font-size:15px;}}</style>
+<div class="vcex-post-excerpt vcex-module wpex-text-pretty wpex-last-mb-0 vcex_6981271c77b87">
+<p>Maria Rita Parsi, psicologa e psicoterapeuta di fama internazionale, ha dedicato la vita ai bambini e agli adolescenti con una pedagogia dell&rsquo;ascolto, della delicatezza e del cuore. Il ricordo di&nbsp;Francesco Provinciali</p>
+</div>
+<div class="meta-date"><span itemprop="datePublished" datetime="2026-02-02 16:56" class="updated">2 Febbraio 2026 16:56</span></div>
+<ul class="vcex-post-meta meta vcex-module wpex-flex wpex-flex-wrap wpex-items-center vc_custom_1685018527668"><li class="meta-callback"></ul>
+<style>.vcex-post-meta.vcex_6981271c78086{font-size:16px;}</style>
+<ul class="vcex-post-meta meta vcex-module wpex-flex wpex-flex-wrap wpex-items-center visible-phone vc_custom_1685960985421 autore-meta-desktop vcex_6981271c78086"><li class="meta-author"><a class="wpex-inline-flex wpex-items-center" href="https://www.startmag.it/author/francesco_provinciali/"><span class="meta-author-avatar wpex-mr-10"><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2085%2085'%3E%3C/svg%3E" width="85" height="85" data-lazy-srcset="https://www.startmag.it/wp-content/uploads/094f86ce-bcad-4c12-8d5a-927be90e63ea.png 2x" alt="Francesco Provinciali" class="avatar avatar-85 wp-user-avatar wp-user-avatar-85 alignnone photo wpex-align-middle wpex-rounded-full" data-lazy-src="https://www.startmag.it/wp-content/uploads/094f86ce-bcad-4c12-8d5a-927be90e63ea-150x150.png"><noscript><img src="https://www.startmag.it/wp-content/uploads/094f86ce-bcad-4c12-8d5a-927be90e63ea-150x150.png" width="85" height="85" srcset="https://www.startmag.it/wp-content/uploads/094f86ce-bcad-4c12-8d5a-927be90e63ea.png 2x" alt="Francesco Provinciali" class="avatar avatar-85 wp-user-avatar wp-user-avatar-85 alignnone photo wpex-align-middle wpex-rounded-full"></noscript></span><span class="vcard author"><span class="fn">Francesco Provinciali</span></span></a></li></ul>
+<style>.vcex-social-share.vcex_6981271c78a43 .vcex-social-share__button{font-size:14px;}</style>
+	<div class="vcex-social-share vcex-module hidden-desktop social-share-articolo-mobile vcex_6981271c78a43" data-target="_blank" data-source="https%3A%2F%2Fwww.startmag.it%2F" data-url="https%3A%2F%2Fwww.startmag.it%2Fsanita%2Faddio-a-maria-rita-parsi-la-psicologa-della-delicatezza%2F" data-title="Addio a Maria Rita Parsi, la psicologa della delicatezza" data-image="https%3A%2F%2Fwww.startmag.it%2Fwp-content%2Fuploads%2FImagoeconomica_1924929-scaled.jpg" data-summary="Maria%20Rita%20Parsi%2C%20psicologa%20e%20psicoterapeuta%20di%20fama%20internazionale%2C%20ha%20dedicato%20la%20vita%20ai%20bambini%20e%20agli%20adolescenti%20con%20una%20pedagogia%20dell%E2%80%99ascolto%2C%20della%20delicatezza%20e%20del%20cuore.%20Il%20ricordo%20di%C2%A0Francesco%20Provinciali" data-email-subject="Volevo che vedeste questo link" data-email-body="Volevo che vedeste questo link https%3A%2F%2Fwww.startmag.it%2Fsanita%2Faddio-a-maria-rita-parsi-la-psicologa-della-delicatezza%2F"><div class="vcex-social-share__buttons wpex-flex wpex-flex-wrap wpex-gap-5">
+<button class="vcex-social-share__button vcex-social-share__button--twitter wpex-rounded-full wpex-twitter wpex-social-btn wpex-social-bg wpex-gap-10" aria-label="Post on X"><span class="vcex-social-share__icon wpex-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 512 512"><path d="M389.2 48h70.6L305.6 224.2 487 464H345L233.7 318.6 106.5 464H35.8L200.7 275.5 26.8 48H172.4L272.9 180.9 389.2 48zM364.4 421.8h39.1L151.1 88h-42L364.4 421.8z"></path></svg></span></button><button class="vcex-social-share__button vcex-social-share__button--facebook wpex-rounded-full wpex-facebook wpex-social-btn wpex-social-bg wpex-gap-10" aria-label="Condividi su Facebook"><span class="vcex-social-share__icon wpex-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 512 512"><path d="M512 256C512 114.6 397.4 0 256 0S0 114.6 0 256C0 376 82.7 476.8 194.2 504.5V334.2H141.4V256h52.8V222.3c0-87.1 39.4-127.5 125-127.5c16.2 0 44.2 3.2 55.7 6.4V172c-6-.6-16.5-1-29.6-1c-42 0-58.2 15.9-58.2 57.2V256h83.6l-14.4 78.2H287V510.1C413.8 494.8 512 386.9 512 256h0z"></path></svg></span></button><button class="vcex-social-share__button vcex-social-share__button--linkedin wpex-rounded-full wpex-linkedin wpex-social-btn wpex-social-bg wpex-gap-10" aria-label="Condividi su LinkedIn"><span class="vcex-social-share__icon wpex-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 448 512"><path d="M100.3 448H7.4V148.9h92.9zM53.8 108.1C24.1 108.1 0 83.5 0 53.8a53.8 53.8 0 0 1 107.6 0c0 29.7-24.1 54.3-53.8 54.3zM447.9 448h-92.7V302.4c0-34.7-.7-79.2-48.3-79.2-48.3 0-55.7 37.7-55.7 76.7V448h-92.8V148.9h89.1v40.8h1.3c12.4-23.5 42.7-48.3 87.9-48.3 94 0 111.3 61.9 111.3 142.3V448z"></path></svg></span></button><button class="vcex-social-share__button vcex-social-share__button--whatsapp wpex-rounded-full wpex-whatsapp wpex-social-btn wpex-social-bg wpex-gap-10" aria-label="Share via Whatsapp"><span class="vcex-social-share__icon wpex-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 448 512"><path d="M380.9 97.1C339 55.1 283.2 32 223.9 32c-122.4 0-222 99.6-222 222 0 39.1 10.2 77.3 29.6 111L0 480l117.7-30.9c32.4 17.7 68.9 27 106.1 27h.1c122.3 0 224.1-99.6 224.1-222 0-59.3-25.2-115-67.1-157zm-157 341.6c-33.2 0-65.7-8.9-94-25.7l-6.7-4-69.8 18.3L72 359.2l-4.4-7c-18.5-29.4-28.2-63.3-28.2-98.2 0-101.7 82.8-184.5 184.6-184.5 49.3 0 95.6 19.2 130.4 54.1 34.8 34.9 56.2 81.2 56.1 130.5 0 101.8-84.9 184.6-186.6 184.6zm101.2-138.2c-5.5-2.8-32.8-16.2-37.9-18-5.1-1.9-8.8-2.8-12.5 2.8-3.7 5.6-14.3 18-17.6 21.8-3.2 3.7-6.5 4.2-12 1.4-32.6-16.3-54-29.1-75.5-66-5.7-9.8 5.7-9.1 16.3-30.3 1.8-3.7 .9-6.9-.5-9.7-1.4-2.8-12.5-30.1-17.1-41.2-4.5-10.8-9.1-9.3-12.5-9.5-3.2-.2-6.9-.2-10.6-.2-3.7 0-9.7 1.4-14.8 6.9-5.1 5.6-19.4 19-19.4 46.3 0 27.3 19.9 53.7 22.6 57.4 2.8 3.7 39.1 59.7 94.8 83.8 35.2 15.2 49 16.5 66.6 13.9 10.7-1.6 32.8-13.4 37.4-26.4 4.6-13 4.6-24.1 3.2-26.4-1.3-2.5-5-3.9-10.5-6.6z"></path></svg></span></button><button class="vcex-social-share__button vcex-social-share__button--email wpex-rounded-full wpex-email wpex-social-btn wpex-social-bg wpex-gap-10" aria-label="Condividi via e-mail"><span class="vcex-social-share__icon wpex-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 512 512"><path d="M48 64C21.5 64 0 85.5 0 112c0 15.1 7.1 29.3 19.2 38.4L236.8 313.6c11.4 8.5 27 8.5 38.4 0L492.8 150.4c12.1-9.1 19.2-23.3 19.2-38.4c0-26.5-21.5-48-48-48H48zM0 176V384c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V176L294.4 339.2c-22.8 17.1-54 17.1-76.8 0L0 176z"></path></svg></span></button>
+</div></div>
+
+<style>
+    #speakup-player {
+        margin: 15px 0 !important;
+        max-width: none !important;
+        min-height: 130px !important;
+    }
+
+    #speakup-player:not(#speakup-player:has(.speakup-container))::after {
+        align-items: center;
+        background-color: #fff;
+        border-radius: 4px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+        font-family: sans-serif;
+        content: 'Loading...';
+        display: flex !important;
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1;
+        justify-content: center;
+        max-width: 750px;
+        margin: 0 auto;
+        min-height: 130px;
+        text-transform: uppercase;
+    }
+
+    #speakup-player:not(#speakup-player:has(.speakup-container)) {
+        display: block;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        #speakup-player:not(#speakup-player:has(.speakup-container))::after {
+            color: #fff;
+            background-color: #000;
+        }
+    }
+</style>
+<div id="speakup-player"></div>
+<div class="vcex-shortcode wpex-clr"></div>
+<div class="vcex-post-content">
+	<p>&nbsp;</p>
+<p>Sono rimasto colpito e profondamente addolorato dalla notizia della scomparsa di Maria Rita Parsi, psicologa e psicoterapeuta di grande esperienza professionale e di fama internazionale.</p>
+<p>Ci legava un sentimento di amicizia del quale ero molto onorato, considerando la sua competenza e la sua autorevolezza: nella sua casa di Milano a due passi dal Tribunale per i minorenni mi aveva ricevuto con grande cordialit&agrave; e senso di ospitalit&agrave;, sapeva mettermi a mio agio soprattutto nei primi anni della nostra conoscenza quando mi facevo prendere da un onesto sentimento di timore reverenziale. Di questa Milano da bere e per taluni da ostentare porter&ograve; con me il ricordo di tre donne eccezionali, riservate, miti ma forti e ricche di grande umanit&agrave;: Alda Merini, Milva Biolcati e Maria Rita, appunto. Oltre al lavoro queste conoscenze mi avevano arricchito spiritualmente e ne serbo un grato, memore ricordo.</p>
+<p>Maria Rita Parsi ha vissuto la sua intera esistenza nel segno dei bambini e degli adolescenti, si &egrave; sempre messa in prima linea per la tutela dei loro diritti. Di lei posso dire che sapeva unire una naturale disponibilit&agrave; all&rsquo;ascolto delle mille e mille vicende umane di cui si era occupata, una dote naturale, una passione ed un talento e insieme la seriet&agrave; dell&rsquo;approfondimento, la discrezione della considerazione dei vissuti (non generalizzava mai, desiderava cogliere i bisogni e le peculiarit&agrave; di ciascuno, perch&eacute; non ci sono diritti che non siano incardinati in una irripetibile identit&agrave;).</p>
+<p>Non ha mai usato la sua professionalit&agrave; per esercitare altezzosit&agrave;, per sentenziare, per giudicare: vorrei definirla la psicologa della delicatezza, mai in lei i test e le alchimie terapeutiche formali si sono tramutate in una sorta di clava per reprimere la spontaneit&agrave;. Era un aspetto della sua vocazione creativa, per questo, per farne una ragione di vita personale, intimista e professionale aveva fondato Movimento bambino: sempre dalla parte dei minori anche se questo termine le sembrava troppo giuridico, preferendo parlare e scrivere di bambine e bambini, di ragazze e ragazzi.</p>
+<p>Non potr&ograve; mai dimenticare la disponibilit&agrave; con cui scrisse la prefazione del mio libro &ldquo;Figli smarriti&rdquo; edito da San Paolo. Del titolo aveva colto il senso del doppio smarrimento: quello fisico e quello spirituale, sapeva esplorare le ferite nascoste e usava sempre la grammatica del cuore, un approccio di cui le sono debitore perch&eacute; nelle alterne vicende della vita i sentimenti e l&rsquo;attitudine a farne uso si sono rivelati &ndash; e lo saranno sempre &ndash; la scelta e la soluzione pi&ugrave; efficaci.</p>
+<p>Scriveva dunque nella prefazione: &ldquo;Quelle narrate da Francesco Provinciali sono storie sospese, in itinere, aperte, dove il lieto fine &egrave; tutt&rsquo;al pi&ugrave; auspicabile, &lsquo;situazioni dove le risposte te le d&agrave; pi&ugrave; il cuore che la ragione&rsquo;. Di ognuna &egrave; possibile scrivere: &lsquo;non importa sapere come era poi andata a finire, di storie come questa ce ne sono tante e a sentirle sembrano tutte uguali&rsquo;. Tale incompiutezza ci muove eticamente: sono le storie di tutti noi, ovvero storie, distinte da un nome proprio, di cui ciascuno &egrave; chiamato, con il proprio nome, ad assumersi la responsabilit&agrave;&hellip;.. A differenza delle fiabe, il lieto fine, se c&rsquo;&egrave;, &egrave; fuori dal libro ed &egrave; nel percorso. E il percorso ci passa vicino&rdquo;.</p>
+<p>Chi scrive oggi il rimpianto per la sua scomparsa che ci lascia orfani di questa pedagogia del cuore, di questo alfabeto dei sentimenti, ricorder&agrave; i riconoscimenti inanellati da Maria Rita a livello internazionale, fino al titolo di Cavaliere del lavoro, fino alle attivit&agrave; di consulenza per l&rsquo;ONU.</p>
+<p>Per me, se posso esprimere questo ricordo molto personale unito ad una sorta di debito morale per ogni insegnamento da lei ricevuto, prevale la relazione umana fatta di scambi epistolari, di suggerimenti, di correzioni benevole: quando le scrivevo che essere bambini oggi, tra tecnologie e social, pu&ograve; procurare pi&ugrave; insidie che certezze sapeva sempre convincermi del contrario.</p>
+<p>Perch&eacute; era capace di aprire uno spazio di dialogo, di benevolenza, di intima disponibilit&agrave; all&rsquo;ascolto che pensava risolutivi. Credeva &ndash; e questo non potr&ograve; mai dimenticarlo &ndash; che il bene pu&ograve; prevalere sul male se il mondo degli adulti sa inchinarsi di fronte alla riverenza che i fanciulli meritano, senza riserve, sempre. &lsquo;Maxima debetur puero reverentia&rsquo;: grazie di vero cuore, Maria Rita, per avercelo ricordato.</p>
+		</div>
+
+<div class="vcex-post-content">
+			</div>
+</div></div></div>
+</div>
+<div class="vc_row wpb_row vc_row-fluid wpex-relative"><div class="wpb_column vc_column_container vc_col-sm-12"><div class="vc_column-inner"><div class="wpb_wrapper"><div class="wpex-template-shortcode">
+<div class="vc_row wpb_row vc_row-fluid wpex-relative"><div class="wpb_column vc_column_container vc_col-sm-12"><div class="vc_column-inner"><div class="wpb_wrapper"><figure class="vcex-image vcex-module hidden"><div class="vcex-image-inner wpex-relative wpex-inline-block">
+<img width="1624" height="585" src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%201624%20585'%3E%3C/svg%3E" class="vcex-image-img wpex-align-middle" alt="banner giornale" decoding="async" data-lazy-srcset="https://www.startmag.it/wp-content/uploads/Bannergiornale.jpg 1624w, https://www.startmag.it/wp-content/uploads/Bannergiornale-300x108.jpg 300w, https://www.startmag.it/wp-content/uploads/Bannergiornale-1024x369.jpg 1024w, https://www.startmag.it/wp-content/uploads/Bannergiornale-768x277.jpg 768w, https://www.startmag.it/wp-content/uploads/Bannergiornale-1536x553.jpg 1536w" data-lazy-sizes="auto, (max-width: 1624px) 100vw, 1624px" data-lazy-src="https://www.startmag.it/wp-content/uploads/Bannergiornale.jpg"><noscript><img width="1624" height="585" src="https://www.startmag.it/wp-content/uploads/Bannergiornale.jpg" class="vcex-image-img wpex-align-middle" alt="banner giornale" loading="lazy" decoding="async" srcset="https://www.startmag.it/wp-content/uploads/Bannergiornale.jpg 1624w, https://www.startmag.it/wp-content/uploads/Bannergiornale-300x108.jpg 300w, https://www.startmag.it/wp-content/uploads/Bannergiornale-1024x369.jpg 1024w, https://www.startmag.it/wp-content/uploads/Bannergiornale-768x277.jpg 768w, https://www.startmag.it/wp-content/uploads/Bannergiornale-1536x553.jpg 1536w" sizes="auto, (max-width: 1624px) 100vw, 1624px"></noscript>
+</div></figure></div></div></div></div>
+</div></div></div></div></div>
+<div class="vc_row wpb_row vc_row-fluid wpex-relative"><div class="wpb_column vc_column_container vc_col-sm-12"><div class="vc_column-inner"><div class="wpb_wrapper"><div class="templatera_shortcode">
+<style type="text/css" data-type="vc_shortcodes-custom-css">.vc_custom_1684940071247{padding-top: 20px !important;padding-right: 20px !important;padding-bottom: 20px !important;padding-left: 20px !important;background: #f6ece5 url(https://www.startmag.it/wp-content/uploads/background-newsletter.png?id=231084) !important;background-position: center !important;background-repeat: no-repeat !important;background-size: contain !important;}</style>
+<div class="vc_row wpb_row vc_row-fluid newsletter-form vc_custom_1684940071247 vc_row-o-content-middle vc_row-flex wpex-relative wpex-vc_row-has-fill no-bottom-margins wpex-vc-reset-negative-margin" style="background-position:90% center!important;">
+<div class="wpb_column vc_column_container vc_col-sm-3"><div class="vc_column-inner"><div class="wpb_wrapper">
+	<div class="wpb_single_image wpb_content_element vc_align_ wpb_content_element">
+		
+		<figure class="wpb_wrapper vc_figure">
+			<div class="vc_single_image-wrapper   vc_box_border_grey">
+<img width="369" height="183" src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20369%20183'%3E%3C/svg%3E" class="vc_single_image-img attachment-full" alt="" title="newsletter" decoding="async" fetchpriority="high" data-lazy-srcset="https://www.startmag.it/wp-content/uploads/newsletter.png 369w, https://www.startmag.it/wp-content/uploads/newsletter-300x149.png 300w" data-lazy-sizes="(max-width: 369px) 100vw, 369px" data-lazy-src="https://www.startmag.it/wp-content/uploads/newsletter.png"><noscript><img width="369" height="183" src="https://www.startmag.it/wp-content/uploads/newsletter.png" class="vc_single_image-img attachment-full" alt="" title="newsletter" decoding="async" fetchpriority="high" srcset="https://www.startmag.it/wp-content/uploads/newsletter.png 369w, https://www.startmag.it/wp-content/uploads/newsletter-300x149.png 300w" sizes="(max-width: 369px) 100vw, 369px"></noscript>
+</div>
+		</figure>
+	</div>
+</div></div></div>
+<div class="wpb_column vc_column_container vc_col-sm-6"><div class="vc_column-inner"><div class="wpb_wrapper">
+<style id="wpforms-css-vars-238572">
+				#wpforms-238572 {
+				
+			}
+			</style>
+<div class="wpforms-container wpforms-container-full wpforms-render-modern" id="wpforms-238572"><form id="wpforms-form-238572" class="wpforms-validate wpforms-form wpforms-ajax-form" data-formid="238572" method="post" enctype="multipart/form-data" action="/sanita/addio-a-maria-rita-parsi-la-psicologa-della-delicatezza/" data-token="20877dbb250f7c24776ae29aa8c465e6" data-token-time="1770071836">
+<noscript class="wpforms-error-noscript">Abilita JavaScript nel browser per completare questo modulo.</noscript>
+<div id="wpforms-error-noscript" style="display: none;">Abilita JavaScript nel browser per completare questo modulo.</div>
+<div class="wpforms-field-container">
+<div id="wpforms-238572-field_3-container" class="wpforms-field wpforms-field-text" data-field-id="3">
+<label class="wpforms-field-label wpforms-label-hide" for="wpforms-238572-field_3" aria-hidden="false">Nome</label><input type="text" id="wpforms-238572-field_3" class="wpforms-field-large" name="wpforms[fields][3]" placeholder="Nome" aria-errormessage="wpforms-238572-field_3-error">
+</div>
+<div id="wpforms-238572-field_1-container" class="wpforms-field wpforms-field-email" data-field-id="1">
+<label class="wpforms-field-label wpforms-label-hide" for="wpforms-238572-field_1" aria-hidden="false">Email <span class="wpforms-required-label" aria-hidden="true">*</span></label><input type="email" id="wpforms-238572-field_1" class="wpforms-field-large wpforms-field-required" name="wpforms[fields][1]" placeholder="Email" spellcheck="false" aria-errormessage="wpforms-238572-field_1-error" required>
+</div>
+<div id="wpforms-238572-field_2-container" class="wpforms-field wpforms-field-gdpr-checkbox" data-field-id="2">
+<label class="wpforms-field-label">Accettazione GDPR <span class="wpforms-required-label" aria-hidden="true">*</span></label><ul id="wpforms-238572-field_2" class="wpforms-field-required"><li class="choice-1">
+<input type="checkbox" id="wpforms-238572-field_2_1" name="wpforms[fields][2][]" value="Confermo di aver preso visione della privacy policy di Innovative Publishing e accetto il trattamento dei dati come ivi descritto" aria-errormessage="wpforms-238572-field_2_1-error" required><label class="wpforms-field-label-inline" for="wpforms-238572-field_2_1">Confermo di aver preso visione della privacy policy di Innovative Publishing e accetto il trattamento dei dati come ivi descritto</label>
+</li></ul>
+</div>
+</div>
+<!-- .wpforms-field-container --><div class="wpforms-submit-container">
+<input type="hidden" name="wpforms[id]" value="238572"><input type="hidden" name="page_title" value="Addio a Maria Rita Parsi, la psicologa della delicatezza"><input type="hidden" name="page_url" value="https://www.startmag.it/sanita/addio-a-maria-rita-parsi-la-psicologa-della-delicatezza/"><input type="hidden" name="url_referer" value=""><input type="hidden" name="page_id" value="348578"><input type="hidden" name="wpforms[post_id]" value="348578"><button type="submit" name="wpforms[submit]" id="wpforms-submit-238572" class="wpforms-submit" data-alt-text="Inviando..." data-submit-text="ISCRIVITI ORA" aria-live="assertive" value="wpforms-submit">ISCRIVITI ORA</button><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2026%2026'%3E%3C/svg%3E" class="wpforms-submit-spinner" style="display: none;" width="26" height="26" alt="Caricamento" data-lazy-src="https://www.startmag.it/wp-content/plugins/wpforms/assets/images/submit-spin.svg"><noscript><img src="https://www.startmag.it/wp-content/plugins/wpforms/assets/images/submit-spin.svg" class="wpforms-submit-spinner" style="display: none;" width="26" height="26" alt="Caricamento"></noscript>
+</div>
+</form></div>  <!-- .wpforms-container -->
+</div></div></div>
+<div class="wpb_column vc_column_container vc_col-sm-3"><div class="vc_column-inner"><div class="wpb_wrapper"></div></div></div>
+</div>
+</div></div></div></div></div>
+</div>
+			
+		</div>
+
+		
+	</div>
+
+	
+<aside id="sidebar" class="sidebar-primary sidebar-container wpex-print-hidden">
+
+	
+	<div id="sidebar-inner" class="sidebar-container-inner wpex-mb-40">
+<div id="text-231" class="sidebar-box widget widget_text wpex-mb-30 wpex-clr">
+<div class="widget-title wpex-heading wpex-text-md wpex-mb-20">Focus Salute e ricerca &ndash; in collaborazione con:</div>			<div class="textwidget">
+<p>&nbsp;</p>
+<p><a href="https://www.uniamo.org/" target="_blank" rel="noopener"><img decoding="async" class="alignnone wp-image-181389 size-full" src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%201322%20460'%3E%3C/svg%3E" alt="" width="1322" height="460" data-lazy-srcset="https://www.startmag.it/wp-content/uploads/UNIAMO-TAG-LEG-4.png 1322w, https://www.startmag.it/wp-content/uploads/UNIAMO-TAG-LEG-4-300x104.png 300w, https://www.startmag.it/wp-content/uploads/UNIAMO-TAG-LEG-4-1024x356.png 1024w, https://www.startmag.it/wp-content/uploads/UNIAMO-TAG-LEG-4-768x267.png 768w" data-lazy-sizes="(max-width: 1322px) 100vw, 1322px" data-lazy-src="https://www.startmag.it/wp-content/uploads/UNIAMO-TAG-LEG-4.png"><noscript><img decoding="async" class="alignnone wp-image-181389 size-full" src="https://www.startmag.it/wp-content/uploads/UNIAMO-TAG-LEG-4.png" alt="" width="1322" height="460" srcset="https://www.startmag.it/wp-content/uploads/UNIAMO-TAG-LEG-4.png 1322w, https://www.startmag.it/wp-content/uploads/UNIAMO-TAG-LEG-4-300x104.png 300w, https://www.startmag.it/wp-content/uploads/UNIAMO-TAG-LEG-4-1024x356.png 1024w, https://www.startmag.it/wp-content/uploads/UNIAMO-TAG-LEG-4-768x267.png 768w" sizes="(max-width: 1322px) 100vw, 1322px"></noscript></a></p>
+<p><a href="https://www.eng.it/" target="_blank" rel="noopener"><img decoding="async" class="alignnone wp-image-199503 size-large" src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20980%20265'%3E%3C/svg%3E" alt="" width="980" height="265" data-lazy-srcset="https://www.startmag.it/wp-content/uploads/Logo-Extended-Claim-Color-100-1024x277.jpg 1024w, https://www.startmag.it/wp-content/uploads/Logo-Extended-Claim-Color-100-300x81.jpg 300w, https://www.startmag.it/wp-content/uploads/Logo-Extended-Claim-Color-100-768x208.jpg 768w, https://www.startmag.it/wp-content/uploads/Logo-Extended-Claim-Color-100-1536x415.jpg 1536w, https://www.startmag.it/wp-content/uploads/Logo-Extended-Claim-Color-100-2048x554.jpg 2048w" data-lazy-sizes="(max-width: 980px) 100vw, 980px" data-lazy-src="https://www.startmag.it/wp-content/uploads/Logo-Extended-Claim-Color-100-1024x277.jpg"><noscript><img decoding="async" class="alignnone wp-image-199503 size-large" src="https://www.startmag.it/wp-content/uploads/Logo-Extended-Claim-Color-100-1024x277.jpg" alt="" width="980" height="265" srcset="https://www.startmag.it/wp-content/uploads/Logo-Extended-Claim-Color-100-1024x277.jpg 1024w, https://www.startmag.it/wp-content/uploads/Logo-Extended-Claim-Color-100-300x81.jpg 300w, https://www.startmag.it/wp-content/uploads/Logo-Extended-Claim-Color-100-768x208.jpg 768w, https://www.startmag.it/wp-content/uploads/Logo-Extended-Claim-Color-100-1536x415.jpg 1536w, https://www.startmag.it/wp-content/uploads/Logo-Extended-Claim-Color-100-2048x554.jpg 2048w" sizes="(max-width: 980px) 100vw, 980px"></noscript></a></p>
+</div>
+		</div>
+<div id="text-232" class="sidebar-box widget widget_text wpex-mb-30 wpex-clr">
+<div class="widget-title wpex-heading wpex-text-md wpex-mb-20">Salute e ricerca, immaginare nuovi modelli di sanit&agrave;. Il white paper</div>			<div class="textwidget">
+<p><a href="https://www.startmag.it/wp-content/uploads/PaperSalute2web-1.pdf"><img decoding="async" class="alignnone wp-image-216030 size-full" src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%201250%201042'%3E%3C/svg%3E" alt="" width="1250" height="1042" data-lazy-srcset="https://www.startmag.it/wp-content/uploads/300x250_con-copertineSR.jpg 1250w, https://www.startmag.it/wp-content/uploads/300x250_con-copertineSR-300x250.jpg 300w, https://www.startmag.it/wp-content/uploads/300x250_con-copertineSR-1024x854.jpg 1024w, https://www.startmag.it/wp-content/uploads/300x250_con-copertineSR-768x640.jpg 768w" data-lazy-sizes="(max-width: 1250px) 100vw, 1250px" data-lazy-src="https://www.startmag.it/wp-content/uploads/300x250_con-copertineSR.jpg"><noscript><img decoding="async" class="alignnone wp-image-216030 size-full" src="https://www.startmag.it/wp-content/uploads/300x250_con-copertineSR.jpg" alt="" width="1250" height="1042" srcset="https://www.startmag.it/wp-content/uploads/300x250_con-copertineSR.jpg 1250w, https://www.startmag.it/wp-content/uploads/300x250_con-copertineSR-300x250.jpg 300w, https://www.startmag.it/wp-content/uploads/300x250_con-copertineSR-1024x854.jpg 1024w, https://www.startmag.it/wp-content/uploads/300x250_con-copertineSR-768x640.jpg 768w" sizes="(max-width: 1250px) 100vw, 1250px"></noscript></a></p>
+</div>
+		</div>
+<div id="black-studio-tinymce-66" class="sidebar-box widget widget_black_studio_tinymce wpex-mb-30 wpex-clr">
+<div class="widget-title wpex-heading wpex-text-md wpex-mb-20">Presentazione del Focus Salute e Ricerca</div>
+<div class="textwidget">
+<p><iframe title="YouTube video player" src="//cdn.iubenda.com/cookie_solution/empty.html" width="100%" height="315" frameborder="0" allowfullscreen="allowfullscreen" suppressedsrc="https://www.youtube.com/embed/7nDKBOzxqrA" class=" _iub_cs_activate" data-iub-purposes="3"></iframe></p>
+</div>
+</div>
+</div>
+
+	
+</aside>
+
+
+</div>
+
+
+			
+		</main>
+
+		
+		
+<div data-wpr-lazyrender="1" class="footer-before-logo"><a title="torna alla homepage" href="https://www.startmag.it"><img width="210" height="76" src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20210%2076'%3E%3C/svg%3E" data-lazy-src="https://www.startmag.it/wp-content/uploads/startmagazine-w.svg"><noscript><img width="210" height="76" src="https://www.startmag.it/wp-content/uploads/startmagazine-w.svg"></noscript></a></div>
+
+	
+		<footer data-wpr-lazyrender="1" id="footer" class="site-footer wpex-surface-dark wpex-link-decoration-vars-none wpex-print-hidden">
+
+			
+			<div id="footer-inner" class="site-footer-inner container wpex-pt-40 wpex-clr">
+<div id="footer-widgets" class="wpex-row wpex-clr gap-30">
+		<div class="footer-box span_1_of_4 col col-1"><div id="black-studio-tinymce-11" class="footer-widget widget wpex-pb-40 wpex-clr widget_black_studio_tinymce"><div class="textwidget">
+<p><strong>Direttore responsabile:</strong><br>
+Michele Arnese<br>
+<strong>Editore:</strong><br>
+Innovative Publishing srl &ndash; IP srl<br>
+<a href="http://www.innovativepublishing.it/">www.innovativepublishing.it</a><br>
+Via Po, 16/B<br>
+00198 Roma<br>
+C.F. 12653211008<br>
+<strong>Redazione:<br>
+</strong>Via Po, 16/B<br>
+00198 Roma<br>
+info@startmag.it<br>
+<strong>Direttore editoriale:</strong><br>
+Michele Guerriero</p>
+</div></div></div>
+
+	
+		<div class="footer-box span_1_of_4 col col-2"><div id="black-studio-tinymce-12" class="footer-widget widget wpex-pb-40 wpex-clr widget_black_studio_tinymce">
+<div class="widget-title wpex-heading wpex-text-md wpex-mb-20">Registrazione Tribunale di Roma</div>
+<div class="textwidget">
+<p>n . 198/2017 del 21.12.2017<br>
+ROC n. 26146<br>
+Provider: Kinsta<br>
+L'editore &egrave; a disposizione per la eventuale rimozione di foto coperte da copyright</p>
+</div>
+</div></div>
+
+	
+		<div class="footer-box span_1_of_4 col col-3"><div id="black-studio-tinymce-13" class="footer-widget widget wpex-pb-40 wpex-clr widget_black_studio_tinymce">
+<div class="widget-title wpex-heading wpex-text-md wpex-mb-20">Chi siamo</div>
+<div class="textwidget">
+<p class="widget-title">Start Magazine &egrave; il magazine online dedicato all'innovazione ed alla crescita.</p>
+<div class="textwidget">
+<p>Start Magazine vuole parlare di crescita e sviluppo dopo anni spesi a parlare di crisi, e vuole farlo partendo da una delle parole chiave pi&ugrave; importanti: l'innovazione</p>
+</div>
+</div>
+</div></div>
+
+	
+		<div class="footer-box span_1_of_4 col col-4"><div id="black-studio-tinymce-16" class="footer-widget widget wpex-pb-40 wpex-clr widget_black_studio_tinymce"><div class="textwidget">
+<p><strong>Start Magazine &egrave; un progetto editoriale </strong><strong>di</strong><br>
+<strong><br>
+<a href="https://www.innovativepublishing.it/" target="_blank" rel="noopener"><img class="alignnone wp-image-231094 size-medium" src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20300%20300'%3E%3C/svg%3E" alt="" width="300" height="300" data-lazy-src="https://www.startmag.it/wp-content/uploads/innovative-w.svg"><noscript><img class="alignnone wp-image-231094 size-medium" src="https://www.startmag.it/wp-content/uploads/innovative-w.svg" alt="" width="300" height="300"></noscript></a></strong></p>
+<p><strong>Fanno parte del nostro network editoriale:</strong></p>
+<p><a href="https://www.energiaoltre.it" target="_blank" rel="noopener"><img class="loghi alignnone wp-image-231095 size-medium" role="img" src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20300%20300'%3E%3C/svg%3E" alt="" width="300" height="300" data-lazy-src="https://www.startmag.it/wp-content/uploads/logo_eo_w.png"><noscript><img class="loghi alignnone wp-image-231095 size-medium" role="img" src="https://www.startmag.it/wp-content/uploads/logo_eo_w.png" alt="" width="300" height="300"></noscript></a><br>
+<a href="https://www.policymakermag.it" target="_blank" rel="noopener"><img class="loghi alignnone wp-image-231060 size-medium" role="img" src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20300%20300'%3E%3C/svg%3E" alt="" width="300" height="300" data-lazy-src="https://www.startmag.it/wp-content/uploads/policy_w.svg"><noscript><img class="loghi alignnone wp-image-231060 size-medium" role="img" src="https://www.startmag.it/wp-content/uploads/policy_w.svg" alt="" width="300" height="300"></noscript></a></p>
+</div></div></div>
+
+	</div>
+</div>
+
+			
+		</footer>
+
+	
+
+
+
+
+	<div data-wpr-lazyrender="1" id="footer-bottom" class="wpex-py-20 wpex-text-sm wpex-surface-dark wpex-bg-gray-900 wpex-text-center wpex-print-hidden">
+
+		
+		<div id="footer-bottom-inner" class="container"><div class="footer-bottom-flex wpex-flex wpex-flex-col wpex-gap-10">
+
+<div id="copyright" class="wpex-last-mb-0">StartMagazine 2026 - All Rights Reserved - <a href="https://www.startmag.it/privacy-policy/" title="Privacy policy">Privacy Policy</a>
+</div>
+</div></div>
+
+		
+	</div>
+
+
+
+	</div>
+
+	
+	
+</div>
+
+
+<div id="mobile-menu-alternative" class="wpex-hidden"><ul id="menu-mobile" class="dropdown-menu">
+<li id="menu-item-210722" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-210722 menu-category-2820"><a href="https://www.startmag.it/energia/"><span class="link-inner">Energia</span></a></li>
+<li id="menu-item-210721" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-210721 menu-category-5230"><a href="https://www.startmag.it/economia/"><span class="link-inner">Economia</span></a></li>
+<li id="menu-item-210725" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-210725 menu-category-5229"><a href="https://www.startmag.it/mondo/"><span class="link-inner">Mondo</span></a></li>
+<li id="menu-item-210724" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-210724 menu-category-2823"><a href="https://www.startmag.it/smartcity/"><span class="link-inner">Mobilit&agrave;</span></a></li>
+<li id="menu-item-210723" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-210723 menu-category-2824"><a href="https://www.startmag.it/innovazione/"><span class="link-inner">Innovazione</span></a></li>
+<li id="menu-item-296065" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-296065 menu-category-34033"><a href="https://www.startmag.it/spazio-e-difesa/"><span class="link-inner">Spazio e Difesa</span></a></li>
+<li id="menu-item-210726" class="menu-item menu-item-type-taxonomy menu-item-object-category current-post-ancestor current-menu-parent current-post-parent menu-item-210726 menu-category-13564"><a href="https://www.startmag.it/sanita/"><span class="link-inner">Salute e ricerca</span></a></li>
+<li id="menu-item-210737" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-210737 menu-category-23036"><a href="https://www.startmag.it/podcast/"><span class="link-inner">Podcast</span></a></li>
+<li id="menu-item-210727" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-has-children menu-item-210727">
+<a href="#"><span class="link-inner">Focus</span></a>
+<ul class="sub-menu">
+	<li id="menu-item-210729" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-210729 menu-category-19890"><a href="https://www.startmag.it/cybersecurity/"><span class="link-inner">Cybersecurity</span></a></li>
+	<li id="menu-item-210730" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-210730 menu-category-7385"><a href="https://www.startmag.it/circular-economy/"><span class="link-inner">Circular economy</span></a></li>
+	<li id="menu-item-210731" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-210731 menu-category-2805"><a href="https://www.startmag.it/smart-city/"><span class="link-inner">Smart City</span></a></li>
+	<li id="menu-item-210732" class="menu-item menu-item-type-taxonomy menu-item-object-category current-post-ancestor current-menu-parent current-post-parent menu-item-210732 menu-category-13564"><a href="https://www.startmag.it/sanita/"><span class="link-inner">Salute e ricerca</span></a></li>
+	<li id="menu-item-210733" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-210733 menu-category-3994"><a href="https://www.startmag.it/fintech/"><span class="link-inner">Pagamenti digitali</span></a></li>
+	<li id="menu-item-210734" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-210734 menu-category-3569"><a href="https://www.startmag.it/emobility/"><span class="link-inner">Mobilit&agrave; elettrica</span></a></li>
+	<li id="menu-item-210736" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-210736 menu-category-5195"><a href="https://www.startmag.it/reti-per-la-crescita/"><span class="link-inner">Reti per la crescita</span></a></li>
+	<li id="menu-item-210735" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-210735 menu-category-7036"><a href="https://www.startmag.it/investimenti/"><span class="link-inner">Investimenti</span></a></li>
+	<li id="menu-item-274795" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-274795 menu-category-31336"><a href="https://www.startmag.it/esg/"><span class="link-inner">ESG</span></a></li>
+</ul>
+</li>
+<li id="menu-item-210728" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-210728"><a href="https://www.startmag.it/blogger/"><span class="link-inner">Blogger</span></a></li>
+</ul></div>
+
+<a href="#top" id="site-scroll-top" class="wpex-z-popover wpex-flex wpex-items-center wpex-justify-center wpex-fixed wpex-rounded-full wpex-text-center wpex-box-content wpex-transition-all wpex-duration-200 wpex-bottom-0 wpex-right-0 wpex-mr-25 wpex-mb-25 wpex-no-underline wpex-print-hidden wpex-surface-2 wpex-text-4 wpex-hover-bg-accent wpex-invisible wpex-opacity-0"><span class="wpex-flex wpex-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 512 512"><path d="M233.4 105.4c12.5-12.5 32.8-12.5 45.3 0l192 192c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L256 173.3 86.6 342.6c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3l192-192z"></path></svg></span><span class="screen-reader-text">Torna su</span></a>
+
+
+<div id="mobile-menu-search" class="wpex-hidden">
+	<form method="get" action="https://www.startmag.it/" class="mobile-menu-searchform wpex-relative">
+		<label for="mobile-menu-search-input" class="screen-reader-text">Search</label>
+		<input id="mobile-menu-search-input" class="mobile-menu-searchform__input wpex-unstyled-input wpex-outline-0 wpex-w-100" type="search" name="s" autocomplete="off" placeholder="Cerca" required>
+						<button type="submit" class="mobile-menu-searchform__submit searchform-submit wpex-unstyled-button wpex-block wpex-absolute wpex-top-50 wpex-text-right" aria-label="Submit search"><span class="wpex-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 512 512"><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z"></path></svg></span></button>
+	</form>
+</div>
+
+<template id="wpex-template-sidr-mobile-menu-top">		<div class="wpex-mobile-menu__top wpex-p-20 wpex-gap-15 wpex-flex wpex-justify-between">
+						<a href="#" role="button" class="wpex-mobile-menu__close wpex-inline-flex wpex-no-underline" aria-label="Close mobile menu"><span class="wpex-mobile-menu__close-icon wpex-flex wpex-icon wpex-icon--xl" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 24 24"><path d="M0 0h24v24H0V0z" fill="none"></path><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"></path></svg></span></a>
+		</div>
+		</template>
+
+<div class="wpex-sidr-overlay wpex-fixed wpex-inset-0 wpex-hidden wpex-z-backdrop wpex-bg-backdrop"></div>
+
+<script type="speculationrules">
+{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":["/wp-*.php","/wp-admin/*","/wp-content/uploads/*","/wp-content/*","/wp-content/plugins/*","/wp-content/themes/total-child-theme/*","/wp-content/themes/Total/*","/*\\?(.+)"]}},{"not":{"selector_matches":"a[rel~=\"nofollow\"]"}},{"not":{"selector_matches":".no-prefetch, .no-prefetch a"}}]},"eagerness":"conservative"}]}
+</script>
+<script type="rocketlazyloadscript" data-minify="1" id="speakup-player-script" data-rocket-src="https://www.startmag.it/wp-content/cache/min/1/loader.speakup.min.js?ver=1768292940" data-lang="it" data-layout="boxed-small" data-theme="black-white" async></script><script type="text/html" id="wpb-modifications"> window.wpbCustomElement = 1; </script><script type="rocketlazyloadscript" id="rocket-browser-checker-js-after">
+"use strict";var _createClass=function(){function defineProperties(target,props){for(var i=0;i<props.length;i++){var descriptor=props[i];descriptor.enumerable=descriptor.enumerable||!1,descriptor.configurable=!0,"value"in descriptor&&(descriptor.writable=!0),Object.defineProperty(target,descriptor.key,descriptor)}}return function(Constructor,protoProps,staticProps){return protoProps&&defineProperties(Constructor.prototype,protoProps),staticProps&&defineProperties(Constructor,staticProps),Constructor}}();function _classCallCheck(instance,Constructor){if(!(instance instanceof Constructor))throw new TypeError("Cannot call a class as a function")}var RocketBrowserCompatibilityChecker=function(){function RocketBrowserCompatibilityChecker(options){_classCallCheck(this,RocketBrowserCompatibilityChecker),this.passiveSupported=!1,this._checkPassiveOption(this),this.options=!!this.passiveSupported&&options}return _createClass(RocketBrowserCompatibilityChecker,[{key:"_checkPassiveOption",value:function(self){try{var options={get passive(){return!(self.passiveSupported=!0)}};window.addEventListener("test",null,options),window.removeEventListener("test",null,options)}catch(err){self.passiveSupported=!1}}},{key:"initRequestIdleCallback",value:function(){!1 in window&&(window.requestIdleCallback=function(cb){var start=Date.now();return setTimeout(function(){cb({didTimeout:!1,timeRemaining:function(){return Math.max(0,50-(Date.now()-start))}})},1)}),!1 in window&&(window.cancelIdleCallback=function(id){return clearTimeout(id)})}},{key:"isDataSaverModeOn",value:function(){return"connection"in navigator&&!0===navigator.connection.saveData}},{key:"supportsLinkPrefetch",value:function(){var elem=document.createElement("link");return elem.relList&&elem.relList.supports&&elem.relList.supports("prefetch")&&window.IntersectionObserver&&"isIntersecting"in IntersectionObserverEntry.prototype}},{key:"isSlowConnection",value:function(){return"connection"in navigator&&"effectiveType"in navigator.connection&&("2g"===navigator.connection.effectiveType||"slow-2g"===navigator.connection.effectiveType)}}]),RocketBrowserCompatibilityChecker}();
+//# sourceURL=rocket-browser-checker-js-after
+</script>
+<script id="rocket-preload-links-js-extra">
+var RocketPreloadLinksConfig = {"excludeUris":"/(?:.+/)?feed(?:/(?:.+/?)?)?$|/(?:.+/)?embed/|/(index.php/)?(.*)wp-json(/.*|$)|/refer/|/go/|/recommend/|/recommends/","usesTrailingSlash":"1","imageExt":"jpg|jpeg|gif|png|tiff|bmp|webp|avif|pdf|doc|docx|xls|xlsx|php","fileExt":"jpg|jpeg|gif|png|tiff|bmp|webp|avif|pdf|doc|docx|xls|xlsx|php|html|htm","siteUrl":"https://www.startmag.it","onHoverDelay":"100","rateThrottle":"3"};
+//# sourceURL=rocket-preload-links-js-extra
+</script>
+<script type="rocketlazyloadscript" id="rocket-preload-links-js-after">
+(function() {
+"use strict";var r="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(e){return typeof e}:function(e){return e&&"function"==typeof Symbol&&e.constructor===Symbol&&e!==Symbol.prototype?"symbol":typeof e},e=function(){function i(e,t){for(var n=0;n<t.length;n++){var i=t[n];i.enumerable=i.enumerable||!1,i.configurable=!0,"value"in i&&(i.writable=!0),Object.defineProperty(e,i.key,i)}}return function(e,t,n){return t&&i(e.prototype,t),n&&i(e,n),e}}();function i(e,t){if(!(e instanceof t))throw new TypeError("Cannot call a class as a function")}var t=function(){function n(e,t){i(this,n),this.browser=e,this.config=t,this.options=this.browser.options,this.prefetched=new Set,this.eventTime=null,this.threshold=1111,this.numOnHover=0}return e(n,[{key:"init",value:function(){!this.browser.supportsLinkPrefetch()||this.browser.isDataSaverModeOn()||this.browser.isSlowConnection()||(this.regex={excludeUris:RegExp(this.config.excludeUris,"i"),images:RegExp(".("+this.config.imageExt+")$","i"),fileExt:RegExp(".("+this.config.fileExt+")$","i")},this._initListeners(this))}},{key:"_initListeners",value:function(e){-1<this.config.onHoverDelay&&document.addEventListener("mouseover",e.listener.bind(e),e.listenerOptions),document.addEventListener("mousedown",e.listener.bind(e),e.listenerOptions),document.addEventListener("touchstart",e.listener.bind(e),e.listenerOptions)}},{key:"listener",value:function(e){var t=e.target.closest("a"),n=this._prepareUrl(t);if(null!==n)switch(e.type){case"mousedown":case"touchstart":this._addPrefetchLink(n);break;case"mouseover":this._earlyPrefetch(t,n,"mouseout")}}},{key:"_earlyPrefetch",value:function(t,e,n){var i=this,r=setTimeout(function(){if(r=null,0===i.numOnHover)setTimeout(function(){return i.numOnHover=0},1e3);else if(i.numOnHover>i.config.rateThrottle)return;i.numOnHover++,i._addPrefetchLink(e)},this.config.onHoverDelay);t.addEventListener(n,function e(){t.removeEventListener(n,e,{passive:!0}),null!==r&&(clearTimeout(r),r=null)},{passive:!0})}},{key:"_addPrefetchLink",value:function(i){return this.prefetched.add(i.href),new Promise(function(e,t){var n=document.createElement("link");n.rel="prefetch",n.href=i.href,n.onload=e,n.onerror=t,document.head.appendChild(n)}).catch(function(){})}},{key:"_prepareUrl",value:function(e){if(null===e||"object"!==(void 0===e?"undefined":r(e))||!1 in e||-1===["http:","https:"].indexOf(e.protocol))return null;var t=e.href.substring(0,this.config.siteUrl.length),n=this._getPathname(e.href,t),i={original:e.href,protocol:e.protocol,origin:t,pathname:n,href:t+n};return this._isLinkOk(i)?i:null}},{key:"_getPathname",value:function(e,t){var n=t?e.substring(this.config.siteUrl.length):e;return n.startsWith("/")||(n="/"+n),this._shouldAddTrailingSlash(n)?n+"/":n}},{key:"_shouldAddTrailingSlash",value:function(e){return this.config.usesTrailingSlash&&!e.endsWith("/")&&!this.regex.fileExt.test(e)}},{key:"_isLinkOk",value:function(e){return null!==e&&"object"===(void 0===e?"undefined":r(e))&&(!this.prefetched.has(e.href)&&e.origin===this.config.siteUrl&&-1===e.href.indexOf("?")&&-1===e.href.indexOf("#")&&!this.regex.excludeUris.test(e.href)&&!this.regex.images.test(e.href))}}],[{key:"run",value:function(){"undefined"!=typeof RocketPreloadLinksConfig&&new n(new RocketBrowserCompatibilityChecker({capture:!0,passive:!0}),RocketPreloadLinksConfig).init()}}]),n}();t.run();
+}());
+
+//# sourceURL=rocket-preload-links-js-after
+</script>
+<script type="rocketlazyloadscript" data-rocket-src="https://www.startmag.it/wp-includes/js/jquery/jquery.min.js?ver=3.7.1" id="jquery-core-js" data-rocket-defer defer></script>
+<script type="rocketlazyloadscript" data-rocket-src="https://www.startmag.it/wp-content/plugins/js_composer/assets/js/dist/js_composer_front.min.js?ver=8.7.2" id="wpb_composer_front_js-js" data-rocket-defer defer></script>
+<script type="rocketlazyloadscript" data-rocket-src="https://www.startmag.it/wp-content/themes/Total/assets/js/frontend/social-share.min.js?ver=6.5" id="wpex-social-share-js" defer data-wp-strategy="defer"></script>
+<script type="rocketlazyloadscript" data-rocket-src="https://www.startmag.it/wp-includes/js/jquery/jquery-migrate.min.js?ver=3.4.1" id="jquery-migrate-js" data-rocket-defer defer></script>
+<script type="rocketlazyloadscript" data-rocket-src="https://www.startmag.it/wp-content/plugins/wpforms/assets/lib/jquery.validate.min.js?ver=1.21.0" id="wpforms-validation-js" data-rocket-defer defer></script>
+<script type="rocketlazyloadscript" data-rocket-src="https://www.startmag.it/wp-content/plugins/wpforms/assets/lib/mailcheck.min.js?ver=1.1.2" id="wpforms-mailcheck-js" data-rocket-defer defer></script>
+<script type="rocketlazyloadscript" data-rocket-src="https://www.startmag.it/wp-content/plugins/wpforms/assets/lib/punycode.min.js?ver=1.0.0" id="wpforms-punycode-js" data-rocket-defer defer></script>
+<script type="rocketlazyloadscript" data-rocket-src="https://www.startmag.it/wp-content/plugins/wpforms/assets/js/share/utils.min.js?ver=1.9.9.2" id="wpforms-generic-utils-js" data-rocket-defer defer></script>
+<script type="rocketlazyloadscript" data-rocket-src="https://www.startmag.it/wp-content/plugins/wpforms/assets/js/frontend/wpforms.min.js?ver=1.9.9.2" id="wpforms-js" data-rocket-defer defer></script>
+<script type="rocketlazyloadscript" data-rocket-src="https://www.startmag.it/wp-content/plugins/wpforms/assets/js/frontend/wpforms-modern.min.js?ver=1.9.9.2" id="wpforms-modern-js" data-rocket-defer defer></script>
+<script type="rocketlazyloadscript" data-rocket-src="https://www.startmag.it/wp-content/plugins/wpforms/assets/js/frontend/fields/address.min.js?ver=1.9.9.2" id="wpforms-address-field-js" data-rocket-defer defer></script>
+<script type="rocketlazyloadscript"></script><script type="text/javascript">
+/* <![CDATA[ */
+var wpforms_settings = {"val_required":"Questo campo \u00e8 obbligatorio.","val_email":"Inserisci un indirizzo email valido.","val_email_suggestion":"Volevi dire {suggestion}?","val_email_suggestion_title":"Fai clic per accettare il suggerimento.","val_email_restricted":"Questo indirizzo email non \u00e8 consentito.","val_number":"Inserisci un numero valido.","val_number_positive":"Inserisci un numero di telefono valido.","val_minimum_price":"L&#039;importo inserito \u00e8 inferiore al minimo necessario.","val_confirm":"I valori dei campi non coincidono.","val_checklimit":"Hai superato il limite delle selezioni consentite: {#}.","val_limit_characters":"{count} di {limit} caratteri max.","val_limit_words":"{count} di {limit} parole max.","val_min":"Please enter a value greater than or equal to {0}.","val_max":"Please enter a value less than or equal to {0}.","val_recaptcha_fail_msg":"La verifica di Google reCAPTCHA non \u00e8 riuscita, riprova pi\u00f9 tardi.","val_turnstile_fail_msg":"La verifica di Cloudflare Turnstile non \u00e8 riuscita, riprova pi\u00f9 tardi.","val_inputmask_incomplete":"Completa il campo nel formato obbligatorio.","uuid_cookie":"","locale":"it","country":"","country_list_label":"Elenco dei paesi","wpforms_plugin_url":"https:\/\/www.startmag.it\/wp-content\/plugins\/wpforms\/","gdpr":"1","ajaxurl":"https:\/\/www.startmag.it\/wp-admin\/admin-ajax.php","mailcheck_enabled":"1","mailcheck_domains":[],"mailcheck_toplevel_domains":["dev"],"is_ssl":"1","currency_code":"USD","currency_thousands":",","currency_decimals":"2","currency_decimal":".","currency_symbol":"$","currency_symbol_pos":"left","val_requiredpayment":"Il pagamento \u00e8 necessario.","val_creditcard":"Inserisci un numero valido di Carta di credito.","css_vars":["field-border-radius","field-border-style","field-border-size","field-background-color","field-border-color","field-text-color","field-menu-color","label-color","label-sublabel-color","label-error-color","button-border-radius","button-border-style","button-border-size","button-background-color","button-border-color","button-text-color","page-break-color","background-image","background-position","background-repeat","background-size","background-width","background-height","background-color","background-url","container-padding","container-border-style","container-border-width","container-border-color","container-border-radius","field-size-input-height","field-size-input-spacing","field-size-font-size","field-size-line-height","field-size-padding-h","field-size-checkbox-size","field-size-sublabel-spacing","field-size-icon-size","label-size-font-size","label-size-line-height","label-size-sublabel-font-size","label-size-sublabel-line-height","button-size-font-size","button-size-height","button-size-padding-h","button-size-margin-top","container-shadow-size-box-shadow"],"val_post_max_size":"La dimensione totale dei file selezionati, {totalSize} Mb, supera il limite consentito di {maxSize} Mb.","val_time12h":"Inserisci l&#039;orario nel formato 12-ore AM\/PM (es: 8:45 PM).","val_time24h":"Inserisci l&#039;orario nel formato 24-ore (es: 22:45).","val_time_limit":"Inserisci un orario tra {minTime} e {maxTime}.","val_url":"Inserisci un&#039;URL valida.","val_fileextension":"Il tipo di file non \u00e8 consentito.","val_filesize":"Il file supera la dimensione massima consentita. Il file non \u00e8 stato caricato.","post_max_size":"134217728","isModernMarkupEnabled":"1","formErrorMessagePrefix":"Messaggio di errore del modulo","errorMessagePrefix":"Messaggio di errore","submitBtnDisabled":"Il pulsante Invia \u00e8 disabilitato durante l&#039;invio del modulo.","readOnlyDisallowedFields":["captcha","repeater","content","divider","hidden","html","entry-preview","pagebreak","layout","payment-total","gdpr-checkbox"],"error_updating_token":"Errore nell&#039;aggiornare il token. Riprova o contatta l&#039;assistenza se il problema persiste.","network_error":"Errore di rete o server non raggiungibile. Verifica la connessione o riprova pi\u00f9 tardi.","token_cache_lifetime":"86400","hn_data":[],"address_field":{"list_countries_without_states":["GB","DE","CH","NL"]},"val_phone":"Inserisci un numero di telefono valido.","val_password_strength":"\u00c8 necessaria una password pi\u00f9 forte. Usa lettere maiuscole e minuscole, numeri e simboli.","entry_preview_iframe_styles":["https:\/\/www.startmag.it\/wp-includes\/js\/tinymce\/skins\/lightgray\/content.min.css?ver=6.9","https:\/\/www.startmag.it\/wp-includes\/css\/dashicons.min.css?ver=6.9","https:\/\/www.startmag.it\/wp-includes\/js\/tinymce\/skins\/wordpress\/wp-content.css?ver=6.9","https:\/\/www.startmag.it\/wp-content\/plugins\/wpforms\/assets\/pro\/css\/fields\/richtext\/editor-content.min.css"],"indicatorStepsPattern":"Passo {current} di {total}"}
+/* ]]> */
+</script>
+<script>window.lazyLoadOptions=[{elements_selector:"img[data-lazy-src],.rocket-lazyload",data_src:"lazy-src",data_srcset:"lazy-srcset",data_sizes:"lazy-sizes",class_loading:"lazyloading",class_loaded:"lazyloaded",threshold:300,callback_loaded:function(element){if(element.tagName==="IFRAME"&&element.dataset.rocketLazyload=="fitvidscompatible"){if(element.classList.contains("lazyloaded")){if(typeof window.jQuery!="undefined"){if(jQuery.fn.fitVids){jQuery(element).parent().fitVids()}}}}}},{elements_selector:".rocket-lazyload",data_src:"lazy-src",data_srcset:"lazy-srcset",data_sizes:"lazy-sizes",class_loading:"lazyloading",class_loaded:"lazyloaded",threshold:300,}];window.addEventListener('LazyLoad::Initialized',function(e){var lazyLoadInstance=e.detail.instance;if(window.MutationObserver){var observer=new MutationObserver(function(mutations){var image_count=0;var iframe_count=0;var rocketlazy_count=0;mutations.forEach(function(mutation){for(var i=0;i<mutation.addedNodes.length;i++){if(typeof mutation.addedNodes[i].getElementsByTagName!=='function'){continue}
+if(typeof mutation.addedNodes[i].getElementsByClassName!=='function'){continue}
+images=mutation.addedNodes[i].getElementsByTagName('img');is_image=mutation.addedNodes[i].tagName=="IMG";iframes=mutation.addedNodes[i].getElementsByTagName('iframe');is_iframe=mutation.addedNodes[i].tagName=="IFRAME";rocket_lazy=mutation.addedNodes[i].getElementsByClassName('rocket-lazyload');image_count+=images.length;iframe_count+=iframes.length;rocketlazy_count+=rocket_lazy.length;if(is_image){image_count+=1}
+if(is_iframe){iframe_count+=1}}});if(image_count>0||iframe_count>0||rocketlazy_count>0){lazyLoadInstance.update()}});var b=document.getElementsByTagName("body")[0];var config={childList:!0,subtree:!0};observer.observe(b,config)}},!1)</script><script data-no-minify="1" async src="https://www.startmag.it/wp-content/plugins/wp-rocket/assets/js/lazyload/17.8.3/lazyload.min.js"></script>
+</body>
+</html>
+<!-- Parsed with iubenda experimental class in 0.0082 sec. -->
+<!-- This website is like a Rocket, isn't it? Performance optimized by WP Rocket. Learn more: https://wp-rocket.me -->

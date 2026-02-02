@@ -8,6 +8,7 @@ use docx_rs::{
 };
 use encoding_rs::{Encoding, WINDOWS_1252};
 use pdf_extract::extract_text;
+use pdfium_render::prelude::*;
 use printpdf::{
     BuiltinFont, Color, Mm, Op, PdfDocument, PdfPage, PdfSaveOptions, Point, Pt, Rgb, TextItem,
 };
@@ -1666,18 +1667,7 @@ pub fn read_pdf_text_with_status(path: &Path, language: Language) -> Result<PdfT
         crate::sentry_integration::with_suppressed_panic_reporting(|| {
             let _guard = guard;
             crate::log_debug(&format!("PDF: Starting extraction for {:?}", path));
-            let text = extract_text(path).map_err(|err| {
-                let err_str = err.to_string();
-                if is_pdf_parse_error(&err_str) {
-                    i18n::tr(language, "file_handler.pdf_parse_error")
-                } else {
-                    i18n::tr_f(
-                        language,
-                        "file_handler.pdf_read_error",
-                        &[("err", &err_str)],
-                    )
-                }
-            })?;
+            let text = extract_pdf_text_with_fallback(path, language)?;
             crate::log_debug(&format!(
                 "PDF: Raw extraction completed in {:?}, length={}",
                 start.elapsed(),
@@ -1705,19 +1695,29 @@ pub fn read_pdf_text_with_status(path: &Path, language: Language) -> Result<PdfT
     match result {
         Ok(result) => result,
         Err(panic) => {
-            let panic_msg = if let Some(msg) = panic.downcast_ref::<&str>() {
-                (*msg).to_string()
-            } else if let Some(msg) = panic.downcast_ref::<String>() {
-                msg.clone()
-            } else {
-                "unknown panic payload".to_string()
-            };
+            let panic_msg = panic_payload_to_string(&panic);
             crate::log_debug(&format!("PDF: Panic during extraction: {}", panic_msg));
-            Err(i18n::tr_f(
-                language,
-                "file_handler.pdf_read_error",
-                &[("err", "PDF extraction crashed unexpectedly")],
-            ))
+            match extract_pdf_text_pdfium(path) {
+                Ok(text) => {
+                    crate::log_debug("PDF: pdfium extraction succeeded after panic.");
+                    if text.trim().is_empty() {
+                        Ok(PdfTextResult::NoText)
+                    } else {
+                        Ok(PdfTextResult::Text(normalize_pdf_paragraphs(&text)))
+                    }
+                }
+                Err(pdfium_err) => {
+                    crate::log_debug(&format!(
+                        "PDF: pdfium extraction failed after panic: {}",
+                        pdfium_err
+                    ));
+                    Err(i18n::tr_f(
+                        language,
+                        "file_handler.pdf_read_error",
+                        &[("err", "PDF extraction crashed unexpectedly")],
+                    ))
+                }
+            }
         }
     }
 }
@@ -1726,6 +1726,96 @@ pub fn read_pdf_text(path: &Path, language: Language) -> Result<String, String> 
     match read_pdf_text_with_status(path, language)? {
         PdfTextResult::Text(text) => Ok(text),
         PdfTextResult::NoText => Ok(i18n::tr(language, "file_handler.pdf_no_text")),
+    }
+}
+
+fn extract_pdf_text_with_fallback(path: &Path, language: Language) -> Result<String, String> {
+    let extract_result =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| extract_text(path)));
+    match extract_result {
+        Ok(Ok(text)) => Ok(text),
+        Ok(Err(err)) => {
+            let err_str = err.to_string();
+            crate::log_debug(&format!("PDF: pdf_extract failed: {}", err_str));
+            match extract_pdf_text_pdfium(path) {
+                Ok(text) => {
+                    crate::log_debug("PDF: pdfium extraction succeeded after pdf_extract failure.");
+                    Ok(text)
+                }
+                Err(pdfium_err) => {
+                    crate::log_debug(&format!("PDF: pdfium extraction failed: {}", pdfium_err));
+                    if is_pdf_parse_error(&err_str) {
+                        Err(i18n::tr(language, "file_handler.pdf_parse_error"))
+                    } else {
+                        Err(i18n::tr_f(
+                            language,
+                            "file_handler.pdf_read_error",
+                            &[("err", &err_str)],
+                        ))
+                    }
+                }
+            }
+        }
+        Err(panic) => {
+            let panic_msg = panic_payload_to_string(&panic);
+            crate::log_debug(&format!("PDF: pdf_extract panicked: {}", panic_msg));
+            match extract_pdf_text_pdfium(path) {
+                Ok(text) => {
+                    crate::log_debug("PDF: pdfium extraction succeeded after pdf_extract panic.");
+                    Ok(text)
+                }
+                Err(pdfium_err) => {
+                    crate::log_debug(&format!("PDF: pdfium extraction failed: {}", pdfium_err));
+                    Err(i18n::tr_f(
+                        language,
+                        "file_handler.pdf_read_error",
+                        &[("err", "PDF extraction crashed unexpectedly")],
+                    ))
+                }
+            }
+        }
+    }
+}
+
+fn extract_pdf_text_pdfium(path: &Path) -> Result<String, String> {
+    let deps_dir = crate::settings::settings_dir();
+    let pdfium_path = Pdfium::pdfium_platform_library_name_at_path(&deps_dir);
+    if !pdfium_path.exists() {
+        crate::log_debug(&format!(
+            "PDF: pdfium.dll not found at {}",
+            pdfium_path.display()
+        ));
+    }
+    let bindings = Pdfium::bind_to_library(pdfium_path)
+        .or_else(|_| Pdfium::bind_to_system_library())
+        .map_err(|err| format!("pdfium bind failed: {err}"))?;
+    let pdfium = Pdfium::new(bindings);
+    let document = pdfium
+        .load_pdf_from_file(path, None)
+        .map_err(|err| format!("pdfium load failed: {err}"))?;
+    let mut out = String::new();
+    for page in document.pages().iter() {
+        let page_text = page
+            .text()
+            .map_err(|err| format!("pdfium page text failed: {err}"))?;
+        let text = page_text.all();
+        if !text.is_empty() {
+            if !out.is_empty() {
+                out.push('\n');
+            }
+            out.push_str(&text);
+        }
+    }
+    Ok(out)
+}
+
+fn panic_payload_to_string(panic: &Box<dyn std::any::Any + Send>) -> String {
+    if let Some(msg) = panic.downcast_ref::<&str>() {
+        (*msg).to_string()
+    } else if let Some(msg) = panic.downcast_ref::<String>() {
+        msg.clone()
+    } else {
+        "unknown panic payload".to_string()
     }
 }
 

@@ -1,0 +1,999 @@
+<!doctype html>
+<html lang="it-IT" prefix="og: https://ogp.me/ns#" class="no-js">
+<head>
+	<meta charset="UTF-8">
+<!--[a]-->
+
+<style>	
+/*
+*****************************************************************************************************
+
+Ciao
+Benvenuto/a su gamesource.it, mi chiamo Marco e gestisco il sito dal 2008.
+
+Se stai leggendo questo testo noterai che il codice è abbastanza confusionario; nel 2013 siamo migrati
+su WP, e da allora non faccio che mettere pezze e scrivere plugins di ottimizzazione.
+Se hai buone conoscenze di php, mysql, css o node/nextjs e vuoi darmi una mano
+contattami all'indirizzo: marco.martinelli[AT]gamesource.it
+
+Se invece vuoi scrivere recensioni, editoriali e news, usa il form -collabora con noi-, nel footer.
+
+Lo staff e l'amministrazione di gamesource collabora in forma volontaria.
+Tutte le entrate sono reinvestite tra pagamento delle spese dei server e promozione del sito stesso.
+
+__________________|      |___________________
+     ,--.    ,--.          ,--.   ,--.
+    |oo  | _  \  `.       | oo | |  oo|
+o  o|~~  |(_) /   ;       | ~~ | |  ~~|o  o  
+    |/\/\|   '._,'        |/\/\| |/\/\|
+__________________        ___________________
+                  |      |dwb
+
+*****************************************************************************************************
+*/
+</style>
+
+	<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+	<link rel='stylesheet' id='kadence-dark-mode-css' href='https://www.gamesource.it/wp-content/plugins/kadence-pro/dist/dark-mode/dark-mode.css?ver=1.0.7' media='all' />
+<style id='kadence-dark-mode-inline-css'>
+:root{color-scheme:light dark;}html{color-scheme:light;}html body{--global-light-toggle-switch:#F7FAFC;--global-dark-toggle-switch:#2D3748;}body.color-switch-dark{color-scheme:dark;--global-gray-400:#4B5563;--global-gray-500:#6B7280;--global-palette1:rgba(230,230,230,0.19);--global-palette2:#2370c0;--global-palette3:#ffffff;--global-palette4:#ffffff;--global-palette5:#ffffff;--global-palette6:#718096;--global-palette7:#050505;--global-palette8:#000000;--global-palette9:#242222;--global-palette9rgb:36, 34, 34;--global-palette-highlight:#f04737;--global-palette-highlight-alt:#f04737;--global-palette-highlight-alt2:var(--global-palette9);--global-palette-btn-bg:var(--global-palette1);--global-palette-btn-bg-hover:var(--global-palette2);--global-palette-btn:var(--global-palette9);--global-palette-btn-hover:var(--global-palette9);--tec-color-background-events:var(--global-palette9);--tec-color-text-event-date:var(--global-palette3);--tec-color-text-event-title:var(--global-palette3);--tec-color-text-events-title:var(--global-palette3);--tec-color-background-view-selector-list-item-hover:var(--global-palette7);--tec-color-background-secondary:var(--global-palette7);--tec-color-link-primary:var(--global-palette3);--tec-color-icon-active:var(--global-palette3);--tec-color-day-marker-month:var(--global-palette4);--tec-color-border-active-month-grid-hover:var(--global-palette5);--tec-color-accent-primary:var(--global-palette1);}.kadence-color-palette-fixed-switcher{bottom:30px;}.kadence-color-palette-fixed-switcher.kcpf-position-right{right:30px;}.kadence-color-palette-fixed-switcher.kcpf-position-left{left:30px;}.kadence-color-palette-fixed-switcher .kadence-color-palette-switcher.kcps-style-switch.kcps-type-icon button.kadence-color-palette-toggle:after{width:calc( 1.2em + .3em );height:calc( 1.2em + .3em );}.kadence-color-palette-fixed-switcher .kadence-color-palette-switcher button.kadence-color-palette-toggle .kadence-color-palette-icon{font-size:1.2em;}@media all and (max-width: 1024px){.kadence-color-palette-fixed-switcher .kadence-color-palette-switcher.kcps-style-switch.kcps-type-icon button.kadence-color-palette-toggle:after{width:calc(  + .3em );height:calc(  + .3em );}}@media all and (max-width: 767px){.kadence-color-palette-fixed-switcher .kadence-color-palette-switcher.kcps-style-switch.kcps-type-icon button.kadence-color-palette-toggle:after{width:calc(  + .3em );height:calc(  + .3em );}}.kadence-color-palette-header-switcher{--global-light-toggle-switch:#F7FAFC;--global-dark-toggle-switch:#2D3748;}.kadence-color-palette-header-switcher .kadence-color-palette-switcher.kcps-style-switch.kcps-type-icon button.kadence-color-palette-toggle:after{width:calc( 1.2em + .3em );height:calc( 1.2em + .3em );}.kadence-color-palette-header-switcher .kadence-color-palette-switcher button.kadence-color-palette-toggle .kadence-color-palette-icon{font-size:1.2em;}@media all and (max-width: 1024px){.kadence-color-palette-header-switcher .kadence-color-palette-switcher.kcps-style-switch.kcps-type-icon button.kadence-color-palette-toggle:after{width:calc(  + .3em );height:calc(  + .3em );}}@media all and (max-width: 767px){.kadence-color-palette-header-switcher .kadence-color-palette-switcher.kcps-style-switch.kcps-type-icon button.kadence-color-palette-toggle:after{width:calc(  + .3em );height:calc(  + .3em );}}.kadence-color-palette-mobile-switcher{--global-light-toggle-switch:#F7FAFC;--global-dark-toggle-switch:#2D3748;}.kadence-color-palette-mobile-switcher .kadence-color-palette-switcher.kcps-style-switch.kcps-type-icon button.kadence-color-palette-toggle:after{width:calc( 1.2em + .3em );height:calc( 1.2em + .3em );}.kadence-color-palette-mobile-switcher .kadence-color-palette-switcher button.kadence-color-palette-toggle .kadence-color-palette-icon{font-size:1.2em;}@media all and (max-width: 1024px){.kadence-color-palette-mobile-switcher .kadence-color-palette-switcher.kcps-style-switch.kcps-type-icon button.kadence-color-palette-toggle:after{width:calc(  + .3em );height:calc(  + .3em );}}@media all and (max-width: 767px){.kadence-color-palette-mobile-switcher .kadence-color-palette-switcher.kcps-style-switch.kcps-type-icon button.kadence-color-palette-toggle:after{width:calc(  + .3em );height:calc(  + .3em );}}.kadence-color-palette-footer-switcher{--global-light-toggle-switch:#F7FAFC;--global-dark-toggle-switch:#2D3748;}.kadence-color-palette-footer-switcher .kadence-color-palette-switcher.kcps-style-switch.kcps-type-icon button.kadence-color-palette-toggle:after{width:calc( 1.2em + .3em );height:calc( 1.2em + .3em );}.kadence-color-palette-footer-switcher .kadence-color-palette-switcher button.kadence-color-palette-toggle .kadence-color-palette-icon{font-size:1.2em;}@media all and (max-width: 1024px){.kadence-color-palette-footer-switcher .kadence-color-palette-switcher.kcps-style-switch.kcps-type-icon button.kadence-color-palette-toggle:after{width:calc(  + .3em );height:calc(  + .3em );}}@media all and (max-width: 767px){.kadence-color-palette-footer-switcher .kadence-color-palette-switcher.kcps-style-switch.kcps-type-icon button.kadence-color-palette-toggle:after{width:calc(  + .3em );height:calc(  + .3em );}}
+/*# sourceURL=kadence-dark-mode-inline-css */
+</style>
+	
+
+
+<!-- InMobi Choice. Consent Manager Tag v3.0 (for TCF 2.2) -->
+<script type="7a03866fbfeef80a768a0891-text/javascript" async=true>
+(function() {
+  var host = window.location.hostname;
+  var element = document.createElement('script');
+  var firstScript = document.getElementsByTagName('script')[0];
+  var url = 'https://cmp.inmobi.com'
+    .concat('/choice/', '-jTa9bpdNYfKw', '/', host, '/choice.js?tag_version=V3');
+  var uspTries = 0;
+  var uspTriesLimit = 3;
+  element.async = true;
+  element.type = 'text/javascript';
+  element.src = url;
+
+  firstScript.parentNode.insertBefore(element, firstScript);
+
+  function makeStub() {
+    var TCF_LOCATOR_NAME = '__tcfapiLocator';
+    var queue = [];
+    var win = window;
+    var cmpFrame;
+
+    function addFrame() {
+      var doc = win.document;
+      var otherCMP = !!(win.frames[TCF_LOCATOR_NAME]);
+
+      if (!otherCMP) {
+        if (doc.body) {
+          var iframe = doc.createElement('iframe');
+
+          iframe.style.cssText = 'display:none';
+          iframe.name = TCF_LOCATOR_NAME;
+          doc.body.appendChild(iframe);
+        } else {
+          setTimeout(addFrame, 5);
+        }
+      }
+      return !otherCMP;
+    }
+
+    function tcfAPIHandler() {
+      var gdprApplies;
+      var args = arguments;
+
+      if (!args.length) {
+        return queue;
+      } else if (args[0] === 'setGdprApplies') {
+        if (
+          args.length > 3 &&
+          args[2] === 2 &&
+          typeof args[3] === 'boolean'
+        ) {
+          gdprApplies = args[3];
+          if (typeof args[2] === 'function') {
+            args[2]('set', true);
+          }
+        }
+      } else if (args[0] === 'ping') {
+        var retr = {
+          gdprApplies: gdprApplies,
+          cmpLoaded: false,
+          cmpStatus: 'stub'
+        };
+
+        if (typeof args[2] === 'function') {
+          args[2](retr);
+        }
+      } else {
+        if(args[0] === 'init' && typeof args[3] === 'object') {
+          args[3] = Object.assign(args[3], { tag_version: 'V3' });
+        }
+        queue.push(args);
+      }
+    }
+
+    function postMessageEventHandler(event) {
+      var msgIsString = typeof event.data === 'string';
+      var json = {};
+
+      try {
+        if (msgIsString) {
+          json = JSON.parse(event.data);
+        } else {
+          json = event.data;
+        }
+      } catch (ignore) {}
+
+      var payload = json.__tcfapiCall;
+
+      if (payload) {
+        window.__tcfapi(
+          payload.command,
+          payload.version,
+          function(retValue, success) {
+            var returnMsg = {
+              __tcfapiReturn: {
+                returnValue: retValue,
+                success: success,
+                callId: payload.callId
+              }
+            };
+            if (msgIsString) {
+              returnMsg = JSON.stringify(returnMsg);
+            }
+            if (event && event.source && event.source.postMessage) {
+              event.source.postMessage(returnMsg, '*');
+            }
+          },
+          payload.parameter
+        );
+      }
+    }
+
+    while (win) {
+      try {
+        if (win.frames[TCF_LOCATOR_NAME]) {
+          cmpFrame = win;
+          break;
+        }
+      } catch (ignore) {}
+
+      if (win === window.top) {
+        break;
+      }
+      win = win.parent;
+    }
+    if (!cmpFrame) {
+      addFrame();
+      win.__tcfapi = tcfAPIHandler;
+      win.addEventListener('message', postMessageEventHandler, false);
+    }
+  };
+
+  makeStub();
+
+  function makeGppStub() {
+    const CMP_ID = 10;
+    const SUPPORTED_APIS = [
+      '2:tcfeuv2',
+      '6:uspv1',
+      '7:usnatv1',
+      '8:usca',
+      '9:usvav1',
+      '10:uscov1',
+      '11:usutv1',
+      '12:usctv1'
+    ];
+
+    window.__gpp_addFrame = function (n) {
+      if (!window.frames[n]) {
+        if (document.body) {
+          var i = document.createElement("iframe");
+          i.style.cssText = "display:none";
+          i.name = n;
+          document.body.appendChild(i);
+        } else {
+          window.setTimeout(window.__gpp_addFrame, 10, n);
+        }
+      }
+    };
+    window.__gpp_stub = function () {
+      var b = arguments;
+      __gpp.queue = __gpp.queue || [];
+      __gpp.events = __gpp.events || [];
+
+      if (!b.length || (b.length == 1 && b[0] == "queue")) {
+        return __gpp.queue;
+      }
+
+      if (b.length == 1 && b[0] == "events") {
+        return __gpp.events;
+      }
+
+      var cmd = b[0];
+      var clb = b.length > 1 ? b[1] : null;
+      var par = b.length > 2 ? b[2] : null;
+      if (cmd === "ping") {
+        clb(
+          {
+            gppVersion: "1.1", // must be “Version.Subversion”, current: “1.1”
+            cmpStatus: "stub", // possible values: stub, loading, loaded, error
+            cmpDisplayStatus: "hidden", // possible values: hidden, visible, disabled
+            signalStatus: "not ready", // possible values: not ready, ready
+            supportedAPIs: SUPPORTED_APIS, // list of supported APIs
+            cmpId: CMP_ID, // IAB assigned CMP ID, may be 0 during stub/loading
+            sectionList: [],
+            applicableSections: [-1],
+            gppString: "",
+            parsedSections: {},
+          },
+          true
+        );
+      } else if (cmd === "addEventListener") {
+        if (!("lastId" in __gpp)) {
+          __gpp.lastId = 0;
+        }
+        __gpp.lastId++;
+        var lnr = __gpp.lastId;
+        __gpp.events.push({
+          id: lnr,
+          callback: clb,
+          parameter: par,
+        });
+        clb(
+          {
+            eventName: "listenerRegistered",
+            listenerId: lnr, // Registered ID of the listener
+            data: true, // positive signal
+            pingData: {
+              gppVersion: "1.1", // must be “Version.Subversion”, current: “1.1”
+              cmpStatus: "stub", // possible values: stub, loading, loaded, error
+              cmpDisplayStatus: "hidden", // possible values: hidden, visible, disabled
+              signalStatus: "not ready", // possible values: not ready, ready
+              supportedAPIs: SUPPORTED_APIS, // list of supported APIs
+              cmpId: CMP_ID, // list of supported APIs
+              sectionList: [],
+              applicableSections: [-1],
+              gppString: "",
+              parsedSections: {},
+            },
+          },
+          true
+        );
+      } else if (cmd === "removeEventListener") {
+        var success = false;
+        for (var i = 0; i < __gpp.events.length; i++) {
+          if (__gpp.events[i].id == par) {
+            __gpp.events.splice(i, 1);
+            success = true;
+            break;
+          }
+        }
+        clb(
+          {
+            eventName: "listenerRemoved",
+            listenerId: par, // Registered ID of the listener
+            data: success, // status info
+            pingData: {
+              gppVersion: "1.1", // must be “Version.Subversion”, current: “1.1”
+              cmpStatus: "stub", // possible values: stub, loading, loaded, error
+              cmpDisplayStatus: "hidden", // possible values: hidden, visible, disabled
+              signalStatus: "not ready", // possible values: not ready, ready
+              supportedAPIs: SUPPORTED_APIS, // list of supported APIs
+              cmpId: CMP_ID, // CMP ID
+              sectionList: [],
+              applicableSections: [-1],
+              gppString: "",
+              parsedSections: {},
+            },
+          },
+          true
+        );
+      } else if (cmd === "hasSection") {
+        clb(false, true);
+      } else if (cmd === "getSection" || cmd === "getField") {
+        clb(null, true);
+      }
+      //queue all other commands
+      else {
+        __gpp.queue.push([].slice.apply(b));
+      }
+    };
+    window.__gpp_msghandler = function (event) {
+      var msgIsString = typeof event.data === "string";
+      try {
+        var json = msgIsString ? JSON.parse(event.data) : event.data;
+      } catch (e) {
+        var json = null;
+      }
+      if (typeof json === "object" && json !== null && "__gppCall" in json) {
+        var i = json.__gppCall;
+        window.__gpp(
+          i.command,
+          function (retValue, success) {
+            var returnMsg = {
+              __gppReturn: {
+                returnValue: retValue,
+                success: success,
+                callId: i.callId,
+              },
+            };
+            event.source.postMessage(msgIsString ? JSON.stringify(returnMsg) : returnMsg, "*");
+          },
+          "parameter" in i ? i.parameter : null,
+          "version" in i ? i.version : "1.1"
+        );
+      }
+    };
+    if (!("__gpp" in window) || typeof window.__gpp !== "function") {
+      window.__gpp = window.__gpp_stub;
+      window.addEventListener("message", window.__gpp_msghandler, false);
+      window.__gpp_addFrame("__gppLocator");
+    }
+  };
+
+  makeGppStub();
+
+  var uspStubFunction = function() {
+    var arg = arguments;
+    if (typeof window.__uspapi !== uspStubFunction) {
+      setTimeout(function() {
+        if (typeof window.__uspapi !== 'undefined') {
+          window.__uspapi.apply(window.__uspapi, arg);
+        }
+      }, 500);
+    }
+  };
+
+  var checkIfUspIsReady = function() {
+    uspTries++;
+    if (window.__uspapi === uspStubFunction && uspTries < uspTriesLimit) {
+      console.warn('USP is not accessible');
+    } else {
+      clearInterval(uspInterval);
+    }
+  };
+
+  if (typeof window.__uspapi === 'undefined') {
+    window.__uspapi = uspStubFunction;
+    var uspInterval = setInterval(checkIfUspIsReady, 6000);
+  }
+})();
+</script>
+<!-- End InMobi Choice. Consent Manager Tag v3.0 (for TCF 2.2) -->
+
+
+
+<!-- NEW QC TAGS END -->
+		
+<!-- Ottimizzazione per i motori di ricerca di Rank Math - https://rankmath.com/ -->
+<title>I game developer snobbano Xbox e premiano PC, secondo una survey - GameSource</title>
+<meta name="description" content="Una indagine fatta alla Game Developer Conference fornisce una fotografia delle preferenze degli sviluppatori."/>
+<meta name="robots" content="follow, index, max-snippet:-1, max-video-preview:-1, max-image-preview:large"/>
+<link rel="canonical" href="https://www.gamesource.it/notizie/developer-snobbano-xbox-premiano-pc/" />
+<meta property="og:locale" content="it_IT" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="I game developer snobbano Xbox e premiano PC, secondo una survey - GameSource" />
+<meta property="og:description" content="Una indagine fatta alla Game Developer Conference fornisce una fotografia delle preferenze degli sviluppatori." />
+<meta property="og:url" content="https://www.gamesource.it/notizie/developer-snobbano-xbox-premiano-pc/" />
+<meta property="og:site_name" content="Gamesource.it" />
+<meta property="article:publisher" content="https://www.facebook.com/GameSource.it" />
+<meta property="article:tag" content="Game Developers Conference" />
+<meta property="article:tag" content="Microsoft" />
+<meta property="article:tag" content="PC" />
+<meta property="article:tag" content="Xbox Series S/X" />
+<meta property="article:section" content="News" />
+<meta property="og:image" content="https://www.gamesource.it/wp-content/uploads/2026/02/console-e-pc.webp" />
+<meta property="og:image:secure_url" content="https://www.gamesource.it/wp-content/uploads/2026/02/console-e-pc.webp" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="450" />
+<meta property="og:image:alt" content="Xbox snobbata dagli sviluppatori, che preferiscono PC e altre console secondo una survey" />
+<meta property="og:image:type" content="image/webp" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="I game developer snobbano Xbox e premiano PC, secondo una survey - GameSource" />
+<meta name="twitter:description" content="Una indagine fatta alla Game Developer Conference fornisce una fotografia delle preferenze degli sviluppatori." />
+<meta name="twitter:site" content="@GameSourceIT" />
+<meta name="twitter:creator" content="@GameSourceIT" />
+<meta name="twitter:image" content="https://www.gamesource.it/wp-content/uploads/2026/02/console-e-pc.webp" />
+<!-- /Rank Math WordPress SEO plugin -->
+
+<link rel='dns-prefetch' href='//cdnjs.cloudflare.com' />
+<link rel='dns-prefetch' href='//addendo.network' />
+<link rel="alternate" type="application/rss+xml" title="GameSource &raquo; Feed" href="https://www.gamesource.it/feed/" />
+<link rel="alternate" type="application/rss+xml" title="GameSource &raquo; Feed dei commenti" href="https://www.gamesource.it/comments/feed/" />
+			<script type="7a03866fbfeef80a768a0891-text/javascript">document.documentElement.classList.remove( 'no-js' );</script>
+			<link rel="alternate" type="application/rss+xml" title="GameSource &raquo; I game developer snobbano Xbox e premiano PC, secondo una survey Feed dei commenti" href="https://www.gamesource.it/notizie/developer-snobbano-xbox-premiano-pc/feed/" />
+<link rel="alternate" title="oEmbed (JSON)" type="application/json+oembed" href="https://www.gamesource.it/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fwww.gamesource.it%2Fnotizie%2Fdeveloper-snobbano-xbox-premiano-pc%2F" />
+<link rel="alternate" title="oEmbed (XML)" type="text/xml+oembed" href="https://www.gamesource.it/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fwww.gamesource.it%2Fnotizie%2Fdeveloper-snobbano-xbox-premiano-pc%2F&#038;format=xml" />
+        <meta name="author-id" content="11771">
+        <meta name="author-name" content="Matteo D’Eramo">
+        <meta name="publication-date" content="2026-02-02">
+        <meta name="post-id" content="1116877">
+        <meta name="content-type" content="notizie">
+        <style id='wp-img-auto-sizes-contain-inline-css'>
+img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
+/*# sourceURL=wp-img-auto-sizes-contain-inline-css */
+</style>
+
+<style id='wp-emoji-styles-inline-css'>
+
+	img.wp-smiley, img.emoji {
+		display: inline !important;
+		border: none !important;
+		box-shadow: none !important;
+		height: 1em !important;
+		width: 1em !important;
+		margin: 0 0.07em !important;
+		vertical-align: -0.1em !important;
+		background: none !important;
+		padding: 0 !important;
+	}
+/*# sourceURL=wp-emoji-styles-inline-css */
+</style>
+<link rel='stylesheet' id='gn-frontend-gnfollow-style-css' href='https://www.gamesource.it/wp-content/plugins/gn-publisher/assets/css/gn-frontend-gnfollow.min.css?ver=1.5.26' media='all' />
+<link rel='stylesheet' id='gamesource6-css' href='https://www.gamesource.it/wp-content/themes/gamesource6/style.css?ver=10' media='all' />
+<link rel='stylesheet' id='kadence-global-css' href='https://www.gamesource.it/wp-content/themes/kadence/assets/css/global.min.css?ver=1.4.0' media='all' />
+<style id='kadence-global-inline-css'>
+/* Kadence Base CSS */
+:root{--global-palette1:#e6e6e6;--global-palette2:#215387;--global-palette3:#1A202C;--global-palette4:#2D3748;--global-palette5:#4A5568;--global-palette6:#718096;--global-palette7:#EDF2F7;--global-palette8:#F7FAFC;--global-palette9:#ffffff;--global-palette10:oklch(from var(--global-palette1) calc(l + 0.10 * (1 - l)) calc(c * 1.00) calc(h + 180) / 100%);--global-palette11:#13612e;--global-palette12:#1159af;--global-palette13:#b82105;--global-palette14:#f7630c;--global-palette15:#f5a524;--global-palette9rgb:255, 255, 255;--global-palette-highlight:#f04737;--global-palette-highlight-alt:#f04737;--global-palette-highlight-alt2:var(--global-palette9);--global-palette-btn-bg:var(--global-palette1);--global-palette-btn-bg-hover:var(--global-palette2);--global-palette-btn:var(--global-palette9);--global-palette-btn-hover:var(--global-palette9);--global-palette-btn-sec-bg:var(--global-palette7);--global-palette-btn-sec-bg-hover:var(--global-palette2);--global-palette-btn-sec:var(--global-palette3);--global-palette-btn-sec-hover:var(--global-palette9);--global-body-font-family:Roboto, sans-serif;--global-heading-font-family:Poppins, sans-serif;--global-primary-nav-font-family:Poppins, sans-serif;--global-fallback-font:sans-serif;--global-display-fallback-font:sans-serif;--global-content-width:1290px;--global-content-wide-width:calc(1290px + 230px);--global-content-narrow-width:842px;--global-content-edge-padding:1.5rem;--global-content-boxed-padding:2rem;--global-calc-content-width:calc(1290px - var(--global-content-edge-padding) - var(--global-content-edge-padding) );--wp--style--global--content-size:var(--global-calc-content-width);}.wp-site-blocks{--global-vw:calc( 100vw - ( 0.5 * var(--scrollbar-offset)));}body{background:var(--global-palette8);}body, input, select, optgroup, textarea{font-style:normal;font-weight:normal;font-size:19px;line-height:1.7;font-family:var(--global-body-font-family);color:var(--global-palette4);}.content-bg, body.content-style-unboxed .site{background:var(--global-palette9);}h1,h2,h3,h4,h5,h6{font-family:var(--global-heading-font-family);}h1{font-weight:700;font-size:32px;line-height:1.5;color:var(--global-palette3);}h2{font-weight:700;font-size:28px;line-height:1.5;color:var(--global-palette3);}h3{font-weight:700;font-size:24px;line-height:1.5;color:var(--global-palette3);}h4{font-weight:700;font-size:22px;line-height:1.5;color:var(--global-palette4);}h5{font-weight:700;font-size:20px;line-height:1.5;color:var(--global-palette4);}h6{font-weight:700;font-size:18px;line-height:1.5;color:var(--global-palette5);}.entry-hero .kadence-breadcrumbs{max-width:1290px;}.site-container, .site-header-row-layout-contained, .site-footer-row-layout-contained, .entry-hero-layout-contained, .comments-area, .alignfull > .wp-block-cover__inner-container, .alignwide > .wp-block-cover__inner-container{max-width:var(--global-content-width);}.content-width-narrow .content-container.site-container, .content-width-narrow .hero-container.site-container{max-width:var(--global-content-narrow-width);}@media all and (min-width: 1520px){.wp-site-blocks .content-container  .alignwide{margin-left:-115px;margin-right:-115px;width:unset;max-width:unset;}}@media all and (min-width: 1102px){.content-width-narrow .wp-site-blocks .content-container .alignwide{margin-left:-130px;margin-right:-130px;width:unset;max-width:unset;}}.content-style-boxed .wp-site-blocks .entry-content .alignwide{margin-left:calc( -1 * var( --global-content-boxed-padding ) );margin-right:calc( -1 * var( --global-content-boxed-padding ) );}.content-area{margin-top:1rem;margin-bottom:1rem;}@media all and (max-width: 1024px){.content-area{margin-top:3rem;margin-bottom:3rem;}}@media all and (max-width: 767px){.content-area{margin-top:2rem;margin-bottom:2rem;}}@media all and (max-width: 1024px){:root{--global-content-boxed-padding:2rem;}}@media all and (max-width: 767px){:root{--global-content-boxed-padding:1.5rem;}}.entry-content-wrap{padding:2rem;}@media all and (max-width: 1024px){.entry-content-wrap{padding:2rem;}}@media all and (max-width: 767px){.entry-content-wrap{padding:1.5rem;}}.entry.single-entry{box-shadow:0px 15px 15px -10px rgba(0,0,0,0.05);}.entry.loop-entry{box-shadow:0px 15px 15px -10px rgba(0,0,0,0.05);}.loop-entry .entry-content-wrap{padding:2rem;}@media all and (max-width: 1024px){.loop-entry .entry-content-wrap{padding:2rem;}}@media all and (max-width: 767px){.loop-entry .entry-content-wrap{padding:1.5rem;}}.primary-sidebar.widget-area .widget{margin-bottom:1em;color:var(--global-palette4);}.primary-sidebar.widget-area .widget-title{font-weight:700;font-size:20px;line-height:1.5;color:var(--global-palette3);}button, .button, .wp-block-button__link, input[type="button"], input[type="reset"], input[type="submit"], .fl-button, .elementor-button-wrapper .elementor-button, .wc-block-components-checkout-place-order-button, .wc-block-cart__submit{box-shadow:0px 0px 0px -7px rgba(0,0,0,0);}button:hover, button:focus, button:active, .button:hover, .button:focus, .button:active, .wp-block-button__link:hover, .wp-block-button__link:focus, .wp-block-button__link:active, input[type="button"]:hover, input[type="button"]:focus, input[type="button"]:active, input[type="reset"]:hover, input[type="reset"]:focus, input[type="reset"]:active, input[type="submit"]:hover, input[type="submit"]:focus, input[type="submit"]:active, .elementor-button-wrapper .elementor-button:hover, .elementor-button-wrapper .elementor-button:focus, .elementor-button-wrapper .elementor-button:active, .wc-block-cart__submit:hover{box-shadow:0px 15px 25px -7px rgba(0,0,0,0.1);}.kb-button.kb-btn-global-outline.kb-btn-global-inherit{padding-top:calc(px - 2px);padding-right:calc(px - 2px);padding-bottom:calc(px - 2px);padding-left:calc(px - 2px);}@media all and (min-width: 1025px){.transparent-header .entry-hero .entry-hero-container-inner{padding-top:80px;}}@media all and (max-width: 1024px){.mobile-transparent-header .entry-hero .entry-hero-container-inner{padding-top:80px;}}@media all and (max-width: 767px){.mobile-transparent-header .entry-hero .entry-hero-container-inner{padding-top:80px;}}#kt-scroll-up-reader, #kt-scroll-up{border-radius:0px 0px 0px 0px;bottom:91px;font-size:2.13em;padding:0.4em 0.4em 0.4em 0.4em;}#kt-scroll-up-reader.scroll-up-side-right, #kt-scroll-up.scroll-up-side-right{right:30px;}#kt-scroll-up-reader.scroll-up-side-left, #kt-scroll-up.scroll-up-side-left{left:30px;}@media all and (max-width: 1024px){#kt-scroll-up-reader, #kt-scroll-up{bottom:77px;}#kt-scroll-up-reader.scroll-up-side-right, #kt-scroll-up.scroll-up-side-right{right:11px;}#kt-scroll-up-reader.scroll-up-side-left, #kt-scroll-up.scroll-up-side-left{left:11px;}}@media all and (max-width: 767px){#kt-scroll-up-reader, #kt-scroll-up{bottom:5px;font-size:1.4em;}#kt-scroll-up-reader.scroll-up-side-right, #kt-scroll-up.scroll-up-side-right{right:20px;}#kt-scroll-up-reader.scroll-up-side-left, #kt-scroll-up.scroll-up-side-left{left:20px;}}
+/* Kadence Header CSS */
+@media all and (max-width: 1024px){.mobile-transparent-header #masthead{position:absolute;left:0px;right:0px;z-index:100;}.kadence-scrollbar-fixer.mobile-transparent-header #masthead{right:var(--scrollbar-offset,0);}.mobile-transparent-header #masthead, .mobile-transparent-header .site-top-header-wrap .site-header-row-container-inner, .mobile-transparent-header .site-main-header-wrap .site-header-row-container-inner, .mobile-transparent-header .site-bottom-header-wrap .site-header-row-container-inner{background:transparent;}.site-header-row-tablet-layout-fullwidth, .site-header-row-tablet-layout-standard{padding:0px;}}@media all and (min-width: 1025px){.transparent-header #masthead{position:absolute;left:0px;right:0px;z-index:100;}.transparent-header.kadence-scrollbar-fixer #masthead{right:var(--scrollbar-offset,0);}.transparent-header #masthead, .transparent-header .site-top-header-wrap .site-header-row-container-inner, .transparent-header .site-main-header-wrap .site-header-row-container-inner, .transparent-header .site-bottom-header-wrap .site-header-row-container-inner{background:transparent;}}.site-branding a.brand img{max-width:200px;}.site-branding a.brand img.svg-logo-image{width:200px;}.site-branding{padding:0px 0px 0px 0px;}#masthead, #masthead .kadence-sticky-header.item-is-fixed:not(.item-at-start):not(.site-header-row-container):not(.site-main-header-wrap), #masthead .kadence-sticky-header.item-is-fixed:not(.item-at-start) > .site-header-row-container-inner{background:var(--global-palette9);}.site-main-header-inner-wrap{min-height:80px;}.site-main-header-wrap.site-header-row-container.site-header-focus-item.site-header-row-layout-standard.kadence-sticky-header.item-is-fixed.item-is-stuck, .site-header-upper-inner-wrap.kadence-sticky-header.item-is-fixed.item-is-stuck, .site-header-inner-wrap.kadence-sticky-header.item-is-fixed.item-is-stuck, .site-top-header-wrap.site-header-row-container.site-header-focus-item.site-header-row-layout-standard.kadence-sticky-header.item-is-fixed.item-is-stuck, .site-bottom-header-wrap.site-header-row-container.site-header-focus-item.site-header-row-layout-standard.kadence-sticky-header.item-is-fixed.item-is-stuck{box-shadow:0px 0px 0px 0px rgba(0,0,0,0);}.header-navigation[class*="header-navigation-style-underline"] .header-menu-container.secondary-menu-container>ul>li>a:after{width:calc( 100% - 1.2em);}.secondary-navigation .secondary-menu-container > ul > li.menu-item > a{padding-left:calc(1.2em / 2);padding-right:calc(1.2em / 2);padding-top:0.6em;padding-bottom:0.6em;color:var(--global-palette5);}.secondary-navigation .primary-menu-container > ul > li.menu-item .dropdown-nav-special-toggle{right:calc(1.2em / 2);}.secondary-navigation .secondary-menu-container > ul li.menu-item > a{font-style:normal;font-weight:500;font-size:21px;font-family:Poppins, sans-serif;}.secondary-navigation .secondary-menu-container > ul > li.menu-item > a:hover{color:var(--global-palette-highlight);}.secondary-navigation .secondary-menu-container > ul > li.menu-item.current-menu-item > a{color:var(--global-palette3);}.header-navigation .header-menu-container ul ul.sub-menu, .header-navigation .header-menu-container ul ul.submenu{box-shadow:0px 2px 13px 0px rgba(0,0,0,0.1);}.header-navigation .header-menu-container ul ul li.menu-item, .header-menu-container ul.menu > li.kadence-menu-mega-enabled > ul > li.menu-item > a{border-bottom:1px solid rgba(255,255,255,0.1);background:var(--global-palette9);border-radius:0px 0px 0px 0px;}.header-navigation .header-menu-container ul ul li.menu-item > a{width:200px;padding-top:1em;padding-bottom:1em;color:var(--global-palette3);font-size:12px;}.header-navigation .header-menu-container ul ul li.menu-item > a:hover{color:var(--global-palette5);background:var(--global-palette8);border-radius:0px 0px 0px 0px;}.header-navigation .header-menu-container ul ul li.menu-item.current-menu-item > a{color:var(--global-palette6);background:var(--global-palette7);border-radius:0px 0px 0px 0px;}.mobile-toggle-open-container .menu-toggle-open, .mobile-toggle-open-container .menu-toggle-open:focus{color:var(--global-palette5);padding:0.4em 0.6em 0.4em 0.6em;font-size:14px;}.mobile-toggle-open-container .menu-toggle-open.menu-toggle-style-bordered{border:1px solid currentColor;}.mobile-toggle-open-container .menu-toggle-open .menu-toggle-icon{font-size:20px;}.mobile-toggle-open-container .menu-toggle-open:hover, .mobile-toggle-open-container .menu-toggle-open:focus-visible{color:var(--global-palette-highlight);}.mobile-navigation ul li{font-size:14px;}.mobile-navigation ul li a{padding-top:1em;padding-bottom:1em;}.mobile-navigation ul li > a, .mobile-navigation ul li.menu-item-has-children > .drawer-nav-drop-wrap{background:var(--global-palette9);color:var(--global-palette3);}.mobile-navigation ul li > a:hover, .mobile-navigation ul li.menu-item-has-children > .drawer-nav-drop-wrap:hover{background:var(--global-palette8);color:var(--global-palette4);}.mobile-navigation ul li.current-menu-item > a, .mobile-navigation ul li.current-menu-item.menu-item-has-children > .drawer-nav-drop-wrap{background:var(--global-palette7);color:var(--global-palette-highlight);}.mobile-navigation ul li.menu-item-has-children .drawer-nav-drop-wrap, .mobile-navigation ul li:not(.menu-item-has-children) a{border-bottom:1px solid rgba(255,255,255,0.1);}.mobile-navigation:not(.drawer-navigation-parent-toggle-true) ul li.menu-item-has-children .drawer-nav-drop-wrap button{border-left:1px solid rgba(255,255,255,0.1);}#mobile-drawer .drawer-header .drawer-toggle{padding:0.6em 0.15em 0.6em 0.15em;font-size:24px;}
+/* Kadence Footer CSS */
+.site-middle-footer-wrap .site-footer-row-container-inner{font-style:normal;font-weight:400;font-size:17px;}.site-middle-footer-inner-wrap{padding-top:30px;padding-bottom:30px;grid-column-gap:30px;grid-row-gap:30px;}.site-middle-footer-inner-wrap .widget{margin-bottom:30px;}.site-middle-footer-inner-wrap .site-footer-section:not(:last-child):after{right:calc(-30px / 2);}.site-bottom-footer-inner-wrap{padding-top:30px;padding-bottom:30px;grid-column-gap:30px;}.site-bottom-footer-inner-wrap .widget{margin-bottom:30px;}.site-bottom-footer-inner-wrap .site-footer-section:not(:last-child):after{right:calc(-30px / 2);}#colophon .footer-navigation .footer-menu-container > ul > li > a{padding-left:calc(1.2em / 2);padding-right:calc(1.2em / 2);padding-top:calc(0.6em / 2);padding-bottom:calc(0.6em / 2);color:var(--global-palette5);}#colophon .footer-navigation .footer-menu-container > ul li a:hover{color:var(--global-palette-highlight);}#colophon .footer-navigation .footer-menu-container > ul li.current-menu-item > a{color:var(--global-palette3);}
+/* Kadence Pro Header CSS */
+.header-navigation-dropdown-direction-left ul ul.submenu, .header-navigation-dropdown-direction-left ul ul.sub-menu{right:0px;left:auto;}.rtl .header-navigation-dropdown-direction-right ul ul.submenu, .rtl .header-navigation-dropdown-direction-right ul ul.sub-menu{left:0px;right:auto;}.header-account-button .nav-drop-title-wrap > .kadence-svg-iconset, .header-account-button > .kadence-svg-iconset{font-size:1.2em;}.site-header-item .header-account-button .nav-drop-title-wrap, .site-header-item .header-account-wrap > .header-account-button{display:flex;align-items:center;}.header-account-style-icon_label .header-account-label{padding-left:5px;}.header-account-style-label_icon .header-account-label{padding-right:5px;}.site-header-item .header-account-wrap .header-account-button{text-decoration:none;box-shadow:none;color:inherit;background:transparent;padding:0.6em 0em 0.6em 0em;}.header-mobile-account-wrap .header-account-button .nav-drop-title-wrap > .kadence-svg-iconset, .header-mobile-account-wrap .header-account-button > .kadence-svg-iconset{font-size:1.2em;}.header-mobile-account-wrap .header-account-button .nav-drop-title-wrap, .header-mobile-account-wrap > .header-account-button{display:flex;align-items:center;}.header-mobile-account-wrap.header-account-style-icon_label .header-account-label{padding-left:5px;}.header-mobile-account-wrap.header-account-style-label_icon .header-account-label{padding-right:5px;}.header-mobile-account-wrap .header-account-button{text-decoration:none;box-shadow:none;color:inherit;background:transparent;padding:0.6em 0em 0.6em 0em;}#login-drawer .drawer-inner .drawer-content{display:flex;justify-content:center;align-items:center;position:absolute;top:0px;bottom:0px;left:0px;right:0px;padding:0px;}#loginform p label{display:block;}#login-drawer #loginform{width:100%;}#login-drawer #loginform input{width:100%;}#login-drawer #loginform input[type="checkbox"]{width:auto;}#login-drawer .drawer-inner .drawer-header{position:relative;z-index:100;}#login-drawer .drawer-content_inner.widget_login_form_inner{padding:2em;width:100%;max-width:350px;border-radius:.25rem;background:var(--global-palette9);color:var(--global-palette4);}#login-drawer .lost_password a{color:var(--global-palette6);}#login-drawer .lost_password, #login-drawer .register-field{text-align:center;}#login-drawer .widget_login_form_inner p{margin-top:1.2em;margin-bottom:0em;}#login-drawer .widget_login_form_inner p:first-child{margin-top:0em;}#login-drawer .widget_login_form_inner label{margin-bottom:0.5em;}#login-drawer hr.register-divider{margin:1.2em 0;border-width:1px;}#login-drawer .register-field{font-size:90%;}.tertiary-navigation .tertiary-menu-container > ul > li.menu-item > a{padding-left:calc(1.2em / 2);padding-right:calc(1.2em / 2);padding-top:0.6em;padding-bottom:0.6em;color:var(--global-palette5);}.tertiary-navigation .tertiary-menu-container > ul > li.menu-item > a:hover{color:var(--global-palette-highlight);}.tertiary-navigation .tertiary-menu-container > ul > li.menu-item.current-menu-item > a{color:var(--global-palette3);}.quaternary-navigation .quaternary-menu-container > ul > li.menu-item > a{padding-left:calc(1.2em / 2);padding-right:calc(1.2em / 2);padding-top:0.6em;padding-bottom:0.6em;color:var(--global-palette5);}.quaternary-navigation .quaternary-menu-container > ul > li.menu-item > a:hover{color:var(--global-palette-highlight);}.quaternary-navigation .quaternary-menu-container > ul > li.menu-item.current-menu-item > a{color:var(--global-palette3);}#main-header .header-divider{border-right:1px solid var(--global-palette6);height:50%;}#main-header .header-divider2{border-right:1px solid var(--global-palette6);height:50%;}#main-header .header-divider3{border-right:1px solid var(--global-palette6);height:50%;}#mobile-header .header-mobile-divider{border-right:1px solid var(--global-palette6);height:50%;}#mobile-header .header-mobile-divider2{border-right:1px solid var(--global-palette6);height:50%;}.header-item-search-bar form ::-webkit-input-placeholder{color:currentColor;opacity:0.5;}.header-item-search-bar form ::placeholder{color:currentColor;opacity:0.5;}.header-search-bar form{max-width:100%;width:240px;}.header-mobile-search-bar form{max-width:calc(100vw - var(--global-sm-spacing) - var(--global-sm-spacing));width:240px;}.header-widget-lstyle-normal .header-widget-area-inner a:not(.button){text-decoration:underline;}.element-contact-inner-wrap{display:flex;flex-wrap:wrap;align-items:center;margin-top:-0.6em;margin-left:calc(-0.6em / 2);margin-right:calc(-0.6em / 2);}.element-contact-inner-wrap .header-contact-item{display:inline-flex;flex-wrap:wrap;align-items:center;margin-top:0.6em;margin-left:calc(0.6em / 2);margin-right:calc(0.6em / 2);}.element-contact-inner-wrap .header-contact-item .kadence-svg-iconset{font-size:1em;}.header-contact-item img{display:inline-block;}.header-contact-item .contact-label{margin-left:0.3em;}.rtl .header-contact-item .contact-label{margin-right:0.3em;margin-left:0px;}.header-mobile-contact-wrap .element-contact-inner-wrap{display:flex;flex-wrap:wrap;align-items:center;margin-top:-0.6em;margin-left:calc(-0.6em / 2);margin-right:calc(-0.6em / 2);}.header-mobile-contact-wrap .element-contact-inner-wrap .header-contact-item{display:inline-flex;flex-wrap:wrap;align-items:center;margin-top:0.6em;margin-left:calc(0.6em / 2);margin-right:calc(0.6em / 2);}.header-mobile-contact-wrap .element-contact-inner-wrap .header-contact-item .kadence-svg-iconset{font-size:1em;}#main-header .header-button2{border:2px none transparent;box-shadow:0px 0px 0px -7px rgba(0,0,0,0);}#main-header .header-button2:hover{box-shadow:0px 15px 25px -7px rgba(0,0,0,0.1);}.mobile-header-button2-wrap .mobile-header-button-inner-wrap .mobile-header-button2{border:2px none transparent;box-shadow:0px 0px 0px -7px rgba(0,0,0,0);}.mobile-header-button2-wrap .mobile-header-button-inner-wrap .mobile-header-button2:hover{box-shadow:0px 15px 25px -7px rgba(0,0,0,0.1);}#widget-drawer.popup-drawer-layout-fullwidth .drawer-content .header-widget2, #widget-drawer.popup-drawer-layout-sidepanel .drawer-inner{max-width:400px;}#widget-drawer.popup-drawer-layout-fullwidth .drawer-content .header-widget2{margin:0 auto;}.widget-toggle-open{display:flex;align-items:center;background:transparent;box-shadow:none;}.widget-toggle-open:hover, .widget-toggle-open:focus{border-color:currentColor;background:transparent;box-shadow:none;}.widget-toggle-open .widget-toggle-icon{display:flex;}.widget-toggle-open .widget-toggle-label{padding-right:5px;}.rtl .widget-toggle-open .widget-toggle-label{padding-left:5px;padding-right:0px;}.widget-toggle-open .widget-toggle-label:empty, .rtl .widget-toggle-open .widget-toggle-label:empty{padding-right:0px;padding-left:0px;}.widget-toggle-open-container .widget-toggle-open{color:var(--global-palette5);padding:0.4em 0.6em 0.4em 0.6em;font-size:14px;}.widget-toggle-open-container .widget-toggle-open.widget-toggle-style-bordered{border:1px solid currentColor;}.widget-toggle-open-container .widget-toggle-open .widget-toggle-icon{font-size:20px;}.widget-toggle-open-container .widget-toggle-open:hover, .widget-toggle-open-container .widget-toggle-open:focus{color:var(--global-palette-highlight);}#widget-drawer .header-widget-2style-normal a:not(.button){text-decoration:underline;}#widget-drawer .header-widget-2style-plain a:not(.button){text-decoration:none;}#widget-drawer .header-widget2 .widget-title{color:var(--global-palette9);}#widget-drawer .header-widget2{color:var(--global-palette8);}#widget-drawer .header-widget2 a:not(.button), #widget-drawer .header-widget2 .drawer-sub-toggle{color:var(--global-palette8);}#widget-drawer .header-widget2 a:not(.button):hover, #widget-drawer .header-widget2 .drawer-sub-toggle:hover{color:var(--global-palette9);}#mobile-secondary-site-navigation ul li{font-size:14px;}#mobile-secondary-site-navigation ul li a{padding-top:1em;padding-bottom:1em;}#mobile-secondary-site-navigation ul li > a, #mobile-secondary-site-navigation ul li.menu-item-has-children > .drawer-nav-drop-wrap{color:var(--global-palette8);}#mobile-secondary-site-navigation ul li.current-menu-item > a, #mobile-secondary-site-navigation ul li.current-menu-item.menu-item-has-children > .drawer-nav-drop-wrap{color:var(--global-palette-highlight);}#mobile-secondary-site-navigation ul li.menu-item-has-children .drawer-nav-drop-wrap, #mobile-secondary-site-navigation ul li:not(.menu-item-has-children) a{border-bottom:1px solid rgba(255,255,255,0.1);}#mobile-secondary-site-navigation:not(.drawer-navigation-parent-toggle-true) ul li.menu-item-has-children .drawer-nav-drop-wrap button{border-left:1px solid rgba(255,255,255,0.1);}
+/*# sourceURL=kadence-global-inline-css */
+</style>
+<link rel='stylesheet' id='slb_core-css' href='https://www.gamesource.it/wp-content/plugins/simple-lightbox/client/css/app.css?ver=2.9.4' media='all' />
+<link rel='stylesheet' id='tablepress-default-css' href='https://www.gamesource.it/wp-content/plugins/tablepress/css/build/default.css?ver=3.2.6' media='all' />
+<link rel='stylesheet' id='kadence-rankmath-css' href='https://www.gamesource.it/wp-content/themes/kadence/assets/css/rankmath.min.css?ver=1.4.0' media='all' />
+<link rel='stylesheet' id='addendo-stylesheet-css' href='https://addendo.network/assets/039/addendoStyleSheet.css' media='all' />
+<script id="jquery-core-js-extra" type="7a03866fbfeef80a768a0891-text/javascript">
+var twitch2plugin = {"ajaxurl":"https://www.gamesource.it/wp-admin/admin-ajax.php"};
+//# sourceURL=jquery-core-js-extra
+</script>
+<script src="https://www.gamesource.it/wp-includes/js/jquery/jquery.min.js?ver=3.7.1" id="jquery-core-js" type="7a03866fbfeef80a768a0891-text/javascript"></script>
+<script src="https://www.gamesource.it/wp-includes/js/jquery/jquery-migrate.min.js?ver=3.4.1" id="jquery-migrate-js" type="7a03866fbfeef80a768a0891-text/javascript"></script>
+<script src="https://www.gamesource.it/wp-content/themes/gamesource6/javascript/gamesource_6.js?ver=2" id="scripts_gs-js" type="7a03866fbfeef80a768a0891-text/javascript"></script>
+<script id="kadence-dark-mode-js-extra" type="7a03866fbfeef80a768a0891-text/javascript">
+var kadenceDarkModeConfig = {"siteSlug":"4eln22aer890","auto":""};
+//# sourceURL=kadence-dark-mode-js-extra
+</script>
+<script src="https://www.gamesource.it/wp-content/plugins/kadence-pro/dist/dark-mode/dark-mode.min.js?ver=1.0.7" id="kadence-dark-mode-js" type="7a03866fbfeef80a768a0891-text/javascript"></script>
+<script async="async" src="https://addendo.network/assets/039/addendo-min.js" id="addendo-script-js" type="7a03866fbfeef80a768a0891-text/javascript"></script>
+<link rel="https://api.w.org/" href="https://www.gamesource.it/wp-json/" /><link rel="EditURI" type="application/rsd+xml" title="RSD" href="https://www.gamesource.it/xmlrpc.php?rsd" />
+<meta name="generator" content="WordPress 6.9" />
+<link rel='shortlink' href='https://www.gamesource.it/?p=1116877' />
+		<script async src="https://www.googletagmanager.com/gtag/js?id=G-40LWQYQ63B" type="7a03866fbfeef80a768a0891-text/javascript"></script>
+<script type="7a03866fbfeef80a768a0891-text/javascript">
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-40LWQYQ63B');
+// Aggiungi il tracciamento degli autori qui
+document.addEventListener('DOMContentLoaded', function() {
+    // Debug: Stampa le classi del body
+    console.log("Body classes:", document.body.className);
+    
+    // Controlla se siamo in una pagina di contenuto
+    if (document.body.classList.contains('single') && !document.body.classList.contains('page')) {
+        console.log("Siamo in una pagina di tipo single e non page");
+        
+        // Debug: Stampa tutti i meta tag
+        const metaTags = document.querySelectorAll('meta');
+        console.log("Tutti i meta tag presenti:", Array.from(metaTags).map(m => ({name: m.getAttribute('name'), content: m.getAttribute('content')})));
+        
+        // Recupera l'ID dell'autore e altre info da meta tag o dal DOM
+        const authorId = document.querySelector('meta[name="author-id"]')?.content;
+        const authorName = document.querySelector('meta[name="author-name"]')?.content;
+        const pubDate = document.querySelector('meta[name="publication-date"]')?.content;
+        const postId = document.querySelector('meta[name="post-id"]')?.content;
+        const contentType = document.querySelector('meta[name="content-type"]')?.content;
+        
+        // Debug: Stampa i valori recuperati
+        console.log("Dati recuperati dai meta:", {
+            authorId,
+            authorName,
+            pubDate,
+            postId,
+            contentType
+        });
+        
+        // Verifica se abbiamo l'ID dell'autore
+        if (authorId) {
+            console.log("Invio evento content_view a GA4 con dati autore:", {
+                'author_id': authorId,
+                'author_name': authorName,
+                'publication_date': pubDate,
+                'post_id': postId,
+                'content_type': contentType
+            });
+            
+            // Invia l'evento a GA4
+            gtag('event', 'content_view', {
+                'author_id': authorId,
+                'author_name': authorName,
+                'publication_date': pubDate,
+                'post_id': postId,
+                'content_type': contentType
+            });
+        } else {
+            console.log("ID autore non trovato nei meta tag");
+        }
+    } else {
+        console.log("Non siamo in una pagina di tipo 'single' o siamo in una 'page'");
+        console.log("Verifica condizione:", {
+            isSingle: document.body.classList.contains('single'),
+            isNotPage: !document.body.classList.contains('page')
+        });
+    }
+});
+</script>
+	<style>
+        #wp-admin-bar-new-content {
+            display: none !important;
+        }
+    </style><link rel="preload" id="kadence-header-preload" href="https://www.gamesource.it/wp-content/themes/kadence/assets/css/header.min.css?ver=1.4.0" as="style">
+<link rel="preload" id="kadence-content-preload" href="https://www.gamesource.it/wp-content/themes/kadence/assets/css/content.min.css?ver=1.4.0" as="style">
+<link rel="preload" id="kadence-sidebar-preload" href="https://www.gamesource.it/wp-content/themes/kadence/assets/css/sidebar.min.css?ver=1.4.0" as="style">
+<link rel="preload" id="kadence-author-box-preload" href="https://www.gamesource.it/wp-content/themes/kadence/assets/css/author-box.min.css?ver=1.4.0" as="style">
+<link rel="preload" id="kadence-related-posts-preload" href="https://www.gamesource.it/wp-content/themes/kadence/assets/css/related-posts.min.css?ver=1.4.0" as="style">
+<link rel="preload" id="kad-splide-preload" href="https://www.gamesource.it/wp-content/themes/kadence/assets/css/kadence-splide.min.css?ver=1.4.0" as="style">
+<link rel="preload" id="kadence-footer-preload" href="https://www.gamesource.it/wp-content/themes/kadence/assets/css/footer.min.css?ver=1.4.0" as="style">
+<link rel="preload" href="https://www.gamesource.it/wp-content/fonts/poppins/pxiByp8kv8JHgFVrLGT9Z1xlFQ.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="https://www.gamesource.it/wp-content/fonts/poppins/pxiByp8kv8JHgFVrLCz7Z1xlFQ.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="https://www.gamesource.it/wp-content/fonts/roboto/KFOmCnqEu92Fr1Mu4mxK.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="https://www.gamesource.it/wp-content/fonts/roboto/KFOlCnqEu92Fr1MmWUlfBBc4.woff2" as="font" type="font/woff2" crossorigin><link rel='stylesheet' id='kadence-fonts-gfonts-css' href='https://www.gamesource.it/wp-content/fonts/c17358cba7d6c9eb4fa23f5b943ad38b.css?ver=1.4.0' media='all' />
+<link rel="icon" href="https://www.gamesource.it/wp-content/uploads/2022/10/cropped-gslogo2022-512x512-1-32x32.png" sizes="32x32" />
+<link rel="icon" href="https://www.gamesource.it/wp-content/uploads/2022/10/cropped-gslogo2022-512x512-1-192x192.png" sizes="192x192" />
+<link rel="apple-touch-icon" href="https://www.gamesource.it/wp-content/uploads/2022/10/cropped-gslogo2022-512x512-1-180x180.png" />
+<meta name="msapplication-TileImage" content="https://www.gamesource.it/wp-content/uploads/2022/10/cropped-gslogo2022-512x512-1-270x270.png" />
+</head>
+
+<body class="wp-singular notizie-template-default single single-notizie postid-1116877 wp-custom-logo wp-embed-responsive wp-theme-kadence wp-child-theme-gamesource6 user-registration-page ur-settings-sidebar-show footer-on-bottom hide-focus-outline link-style-standard has-sidebar content-title-style-normal content-width-normal content-style-boxed content-vertical-padding-show non-transparent-header mobile-non-transparent-header color-switch-dark">
+<div id="wrapper" class="site wp-site-blocks">
+			<a class="skip-link screen-reader-text scroll-ignore" href="#main">Salta al contenuto</a>
+		<link rel='stylesheet' id='kadence-header-css' href='https://www.gamesource.it/wp-content/themes/kadence/assets/css/header.min.css?ver=1.4.0' media='all' />
+<header id="masthead" class="site-header" role="banner" itemtype="https://schema.org/WPHeader" itemscope>
+	<div id="main-header" class="site-header-wrap">
+		<div class="site-header-inner-wrap">
+			<div class="site-header-upper-wrap">
+				<div class="site-header-upper-inner-wrap">
+					<div class="site-main-header-wrap site-header-row-container site-header-focus-item site-header-row-layout-standard" data-section="kadence_customizer_header_main">
+	<div class="site-header-row-container-inner">
+				<div class="site-container">
+			<div class="site-main-header-inner-wrap site-header-row site-header-row-has-sides site-header-row-center-column">
+									<div class="site-header-main-section-left site-header-section site-header-section-left">
+						<div class="site-header-item site-header-focus-item" data-section="title_tagline">
+	<div class="site-branding branding-layout-standard site-brand-logo-only"><a class="brand has-logo-image" href="https://gamesource.it" rel="home"><svg id="logotipo_gamesource_nero" xmlns="http://www.w3.org/2000/svg" style="fill:var(--global-palette4)" viewBox="0 0 746.51 154.77" height="42" width="200"><defs><style>.cls-1{fill:#e47e3d;}</style></defs><g id="fireass_occhio_arancio"><g id="fireass_completo"><g id="pieno"><path id="sotto" d="M108.01,123.5c.1-.5-.1-.9-.2-1.2s-.2-.5-.5-.7c-.1-.1-.3-.2-.4-.3-.1,0-.1-.1-.2-.1s-.1-.1-.2-.1-.1,0-.2-.1c-.4-.1-.8-.1-1.2,.1-4.4,2.4-9.5,3.6-14.8,3.6-15.6,0-28.5-11.4-30.1-26h0l-.4-1.2c-.3-.8-1-.8-1.2,0l-.2,.7c-1.3,14.8-14.3,26.4-30.1,26.4-7,0-13.5-2.3-18.7-6.1-.3-.1-.4-.1-.6-.1-.3,0-.5,.1-.8,.2-.3,.1-.6,.3-.9,.6h0c-.6,.7-.6,1.7-.1,2.5,4.7,6.7,11.6,13.7,22,20.1,10.8,6.8,27.3,12.1,29.7,12.9,.2,.1,.4,.1,.6,0,22.8-7.2,37.9-19.4,41.6-22.6l.2-.2c2-2.1,3.8-4.2,5.4-6.3,.1-.2,.8-1.2,1.2-1.9"/><g id="occhi"><g id="occhi_completi"><path id="analogico_nero" d="M27.31,115.8c12.5,0,22.6-10.1,22.6-22.6s-10.1-22.6-22.6-22.6-22.6,10.1-22.6,22.6,10.1,22.6,22.6,22.6h0Zm0-30.6c4.5,0,8.1,3.6,8.1,8.1s-3.6,8.1-8.1,8.1-8.1-3.6-8.1-8.1,3.7-8.1,8.1-8.1Z"/><path id="croce_direzionale_arancio" class="cls-1" d="M111.81,83.3h-10.2v-10.2c0-1.1-.9-2-2-2h-16.7c-1.1,0-2,.9-2,2v10.2h-10.2c-1.1,0-2,.9-2,2v16.7c0,1.1,.9,2,2,2h10.2v10.2c0,1.1,.9,2,2,2h16.7c1.1,0,2-.9,2-2v-10.2h10.2c1.1,0,2-.9,2-2v-16.7c0-1.1-.9-2-2-2Zm-20.6,18.4c-4.5,0-8.1-3.6-8.1-8.1s3.6-8.1,8.1-8.1,8.1,3.6,8.1,8.1-3.6,8.1-8.1,8.1Z"/></g></g><path id="sopra" d="M1.81,71.8c5.8-6.8,14.8-11.2,24.8-11.2h1.9c12.6,0,23.9,7.9,28.3,19.6v.1l1.8,5.9c.3,.9,1,.9,1.3,0l1.1-3.3v-.1c.1-.3,.2-.6,.3-.9q0-.1,.1-.2l.6-1.9v-.1c4.4-11.4,15.3-19,27.5-19h.3c.7,0,1.3-.1,2-.1,8.3,0,15.9,3,21.6,8,.9,.7,2.1-.2,1.6-1.2v-.1c-3.6-7.4-7.4-13.3-7.4-13.3C88.31,24.8,71.01,14.6,70.51,14.3c.1,.2,2.2,4.1,1.9,7-.6,6-3.8,2.2-4.6,1.5-4.6-4.4-6.6-22.8-6.6-22.8C26.21,24.5,20.81,43.4,17.31,47.2c-.9,.6-1.1-.7-1.1-.7l-.1-2.5S7.31,55.1,1.01,68.6c-.3,.7-.6,1.4-.9,2.1-.5,1.1,.9,2,1.7,1.1h0Z"/></g></g></g><g id="scritta_gamesource_tutta_piccola_nera"><path id="g" d="M165.21,61.9c3.5,1.8,6.2,4,8.1,6.7v-8.4h12.1v58.8c0,5.3-1.1,10.1-3.4,14.2-2.2,4.2-5.5,7.4-9.7,9.8-4.2,2.4-9.3,3.6-15.2,3.6-7.8,0-14.4-1.8-19.5-5.5-5.2-3.7-8.1-8.7-8.8-15h11.9c.9,3,2.9,5.4,5.8,7.3,3,1.9,6.5,2.8,10.7,2.8,4.8,0,8.7-1.5,11.7-4.4s4.5-7.2,4.5-12.8v-9.7c-2,2.7-4.8,5-8.2,6.9-3.5,1.9-7.4,2.8-11.8,2.8-5,0-9.6-1.3-13.8-3.8s-7.5-6.1-9.9-10.7c-2.4-4.6-3.6-9.8-3.6-15.6s1.2-10.9,3.6-15.4c2.4-4.5,5.7-8,9.9-10.4,4.2-2.5,8.8-3.7,13.8-3.7,4.4-.1,8.4,.7,11.8,2.5h0Zm5.7,16.8c-1.6-2.9-3.8-5.2-6.5-6.7s-5.5-2.3-8.6-2.3-5.9,.8-8.6,2.3-4.8,3.7-6.5,6.6c-1.6,2.9-2.5,6.4-2.5,10.3s.8,7.5,2.5,10.5c1.6,3,3.8,5.3,6.5,6.9,2.7,1.6,5.6,2.4,8.6,2.4s5.9-.8,8.6-2.3,4.8-3.8,6.5-6.8c1.6-3,2.5-6.5,2.5-10.4s-.9-7.6-2.5-10.5h0Z"/><path id="a" d="M195.61,73.4c2.4-4.5,5.7-8,9.9-10.4,4.2-2.5,8.8-3.7,13.8-3.7,4.5,0,8.5,.9,11.9,2.7,3.4,1.8,6.1,4,8.1,6.7v-8.4h12.1v57.8h-12.1v-8.6c-2,2.7-4.8,5-8.3,6.8s-7.5,2.7-12,2.7c-5,0-9.5-1.3-13.6-3.8s-7.4-6.1-9.8-10.7c-2.4-4.6-3.6-9.8-3.6-15.6s1.2-11,3.6-15.5h0Zm41.2,5.3c-1.6-2.9-3.8-5.2-6.5-6.7s-5.5-2.3-8.6-2.3-6,.8-8.6,2.3c-2.7,1.5-4.8,3.7-6.5,6.6-1.6,2.9-2.5,6.4-2.5,10.3s.8,7.5,2.5,10.5c1.6,3,3.8,5.3,6.5,6.9,2.7,1.6,5.5,2.4,8.6,2.4s6-.8,8.6-2.3c2.7-1.5,4.8-3.8,6.5-6.8,1.6-3,2.5-6.5,2.5-10.4s-.8-7.6-2.5-10.5h0Z"/><path id="m" d="M344.21,62.1c3.6,1.9,6.4,4.7,8.5,8.4s3.1,8.2,3.1,13.4v34.1h-11.9v-32.3c0-5.2-1.3-9.1-3.9-11.9-2.6-2.8-6.1-4.1-10.6-4.1s-8,1.4-10.7,4.1c-2.6,2.8-3.9,6.7-3.9,11.9v32.3h-11.9v-32.3c0-5.2-1.3-9.1-3.9-11.9-2.6-2.8-6.1-4.1-10.6-4.1s-8,1.4-10.7,4.1c-2.6,2.8-3.9,6.7-3.9,11.9v32.3h-12V60.1h12v6.6c2-2.4,4.4-4.2,7.5-5.6,3-1.3,6.2-2,9.7-2,4.6,0,8.8,1,12.4,2.9,3.6,2,6.4,4.8,8.4,8.5,1.8-3.5,4.5-6.3,8.2-8.4s7.7-3.1,12-3.1c4.5,.2,8.5,1.2,12.2,3.1h0Z"/><path id="e1" d="M418.31,93.6h-44.2c.4,4.6,2.1,8.3,5.1,11.1,3.1,2.8,6.9,4.2,11.3,4.2,6.4,0,11-2.7,13.6-8.1h12.9c-1.8,5.3-4.9,9.7-9.5,13.1-4.6,3.4-10.3,5.1-17.1,5.1-5.5,0-10.5-1.2-14.9-3.7s-7.8-6-10.3-10.5-3.7-9.8-3.7-15.7,1.2-11.2,3.6-15.7,5.8-8,10.2-10.4,9.4-3.7,15.1-3.7,10.3,1.2,14.6,3.6c4.3,2.4,7.6,5.7,10,10s3.6,9.3,3.6,14.9c.1,2.1,0,4-.3,5.8h0Zm-12-9.7c-.1-4.4-1.6-7.9-4.7-10.6-3.1-2.7-6.9-4-11.4-4-4.1,0-7.7,1.3-10.6,3.9-2.9,2.6-4.7,6.2-5.2,10.7h31.9Z"/><path id="s" d="M434.01,116.9c-3.6-1.6-6.5-3.9-8.6-6.7s-3.2-6-3.4-9.5h12.4c.2,2.4,1.4,4.5,3.5,6.1s4.8,2.5,8,2.5,6-.6,7.8-1.9c1.8-1.3,2.8-3,2.8-5,0-2.2-1-3.8-3.1-4.8-2.1-1.1-5.3-2.2-9.8-3.5-4.3-1.2-7.9-2.3-10.6-3.5-2.7-1.1-5.1-2.8-7.1-5.1s-3-5.4-3-9.1c0-3.1,.9-5.9,2.7-8.4s4.4-4.6,7.8-6c3.4-1.5,7.3-2.2,11.7-2.2,6.6,0,11.9,1.7,15.9,5s6.2,7.9,6.5,13.6h-12c-.2-2.6-1.3-4.6-3.2-6.2-1.9-1.5-4.5-2.3-7.7-2.3s-5.6,.6-7.2,1.8c-1.7,1.2-2.5,2.8-2.5,4.7,0,1.5,.6,2.8,1.7,3.9s2.5,1.9,4.1,2.5,4,1.4,7.1,2.3c4.2,1.1,7.7,2.3,10.3,3.4,2.7,1.2,5,2.9,7,5.1,2,2.2,3,5.2,3,8.9,0,3.3-.9,6.2-2.7,8.8s-4.4,4.6-7.7,6.1-7.2,2.2-11.7,2.2-8.4-1.1-12-2.7h0Z"/><path id="o" d="M486.41,115.6c-4.4-2.5-7.9-6-10.4-10.5s-3.8-9.8-3.8-15.7,1.3-11.1,3.9-15.6,6.1-8.1,10.6-10.5c4.5-2.4,9.5-3.7,15-3.7s10.5,1.2,15,3.7c4.5,2.4,8,5.9,10.6,10.5s3.9,9.8,3.9,15.6-1.3,11.1-4,15.6c-2.7,4.6-6.3,8.1-10.9,10.6-4.6,2.5-9.6,3.7-15.2,3.7s-10.3-1.2-14.7-3.7h0Zm23.4-8.8c2.7-1.5,4.9-3.7,6.6-6.6s2.5-6.5,2.5-10.7-.8-7.8-2.4-10.7c-1.6-2.9-3.8-5.1-6.4-6.6s-5.5-2.2-8.6-2.2-5.9,.7-8.6,2.2-4.7,3.7-6.2,6.6c-1.5,2.9-2.3,6.5-2.3,10.7,0,6.2,1.6,11,4.8,14.4s7.2,5.1,12,5.1c3,0,5.9-.8,8.6-2.2h0Z"/><path id="u" d="M590.21,60.6v57.9h-12v-6.8c-1.9,2.4-4.4,4.2-7.4,5.6-3,1.4-6.3,2.1-9.7,2.1-4.5,0-8.6-.9-12.2-2.8-3.6-1.9-6.4-4.7-8.5-8.4s-3.1-8.2-3.1-13.4V60.8h11.9v32.2c0,5.2,1.3,9.1,3.9,11.9s6.1,4.1,10.6,4.1,8-1.4,10.7-4.1c2.6-2.8,3.9-6.7,3.9-11.9V60.8l11.9-.2h0Z"/><path id="r" d="M619.71,62.1c2.9-1.6,6.3-2.5,10.3-2.5v12.4h-3c-4.7,0-8.2,1.2-10.7,3.6s-3.6,6.5-3.6,12.4v30.4h-12V60.5h12v8.4c1.7-2.9,4.1-5.2,7-6.8h0Z"/><path id="c" d="M635.41,73.7c2.4-4.5,5.8-8,10-10.4s9.2-3.7,14.7-3.7c7,0,12.8,1.7,17.4,5,4.6,3.3,7.7,8.1,9.3,14.2h-12.9c-1-2.9-2.7-5.1-5-6.7s-5.2-2.4-8.7-2.4c-4.9,0-8.8,1.7-11.7,5.2s-4.4,8.3-4.4,14.5,1.5,11.1,4.4,14.6,6.8,5.2,11.7,5.2c6.9,0,11.5-3,13.8-9.1h12.9c-1.7,5.9-4.8,10.6-9.5,14s-10.4,5.2-17.2,5.2c-5.5,0-10.4-1.2-14.7-3.7s-7.6-6-10-10.5-3.6-9.8-3.6-15.7,1.1-11.1,3.5-15.7h0Z"/><path id="e" d="M746.11,94h-44.2c.3,4.6,2.1,8.3,5.1,11.1s6.9,4.2,11.3,4.2c6.4,0,11-2.7,13.7-8.1h12.9c-1.8,5.3-4.9,9.7-9.5,13.1-4.6,3.4-10.3,5.1-17.1,5.1-5.5,0-10.5-1.2-14.9-3.7s-7.8-6-10.3-10.5-3.7-9.8-3.7-15.7,1.2-11.2,3.6-15.7c2.4-4.5,5.8-8,10.2-10.4s9.4-3.7,15.1-3.7,10.3,1.2,14.6,3.6c4.3,2.4,7.6,5.7,10,10s3.6,9.3,3.6,14.9c0,2-.1,4-.4,5.8h0Zm-12-9.7c-.1-4.4-1.7-7.9-4.7-10.6-3.1-2.7-6.9-4-11.4-4-4.1,0-7.7,1.3-10.6,3.9-2.9,2.6-4.7,6.2-5.2,10.7h31.9Z"/></g></svg></a></div></div><!-- data-section="title_tagline" -->
+							<div class="site-header-main-section-left-center site-header-section site-header-section-left-center">
+															</div>
+												</div>
+													<div class="site-header-main-section-center site-header-section site-header-section-center">
+						<div class="site-header-item site-header-focus-item site-header-item-main-navigation header-navigation-layout-stretch-false header-navigation-layout-fill-stretch-false" data-section="kadence_customizer_secondary_navigation">
+		<nav id="secondary-navigation" class="secondary-navigation header-navigation hover-to-open nav--toggle-sub header-navigation-style-standard header-navigation-dropdown-animation-none" role="navigation" aria-label="Secondario">
+					<div class="secondary-menu-container header-menu-container">
+		<ul id="secondary-menu" class="menu"><li id="menu-item-1005366" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-has-children menu-item-1005366"><a><span class="nav-drop-title-wrap">Piattaforme<span class="dropdown-nav-toggle"><span class="kadence-svg-iconset svg-baseline"><svg aria-hidden="true" class="kadence-svg-icon kadence-arrow-down-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><title>Espandi</title><path d="M5.293 9.707l6 6c0.391 0.391 1.024 0.391 1.414 0l6-6c0.391-0.391 0.391-1.024 0-1.414s-1.024-0.391-1.414 0l-5.293 5.293-5.293-5.293c-0.391-0.391-1.024-0.391-1.414 0s-0.391 1.024 0 1.414z"></path>
+				</svg></span></span></span></a>
+<ul class="sub-menu">
+	<li id="menu-item-1005371" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-1005371"><a href="https://www.gamesource.it/playstation-5/">PlayStation 5</a></li>
+	<li id="menu-item-1017543" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1017543"><a href="https://www.gamesource.it/playstation-vr2/">PlayStation VR2</a></li>
+	<li id="menu-item-1005373" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-1005373"><a href="https://www.gamesource.it/xbox-series-x/">Xbox Series X | S</a></li>
+	<li id="menu-item-1005455" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-1005455"><a href="https://www.gamesource.it/switch/">Switch</a></li>
+	<li id="menu-item-1005369" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-1005369"><a href="https://www.gamesource.it/pc/">PC</a></li>
+	<li id="menu-item-1005370" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-1005370"><a href="https://www.gamesource.it/playstation-4/">PlayStation 4</a></li>
+	<li id="menu-item-1005372" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-1005372"><a href="https://www.gamesource.it/xbox-one/">Xbox One</a></li>
+</ul>
+</li>
+<li id="menu-item-1005367" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-has-children menu-item-1005367"><a><span class="nav-drop-title-wrap">Sezioni<span class="dropdown-nav-toggle"><span class="kadence-svg-iconset svg-baseline"><svg aria-hidden="true" class="kadence-svg-icon kadence-arrow-down-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><title>Espandi</title><path d="M5.293 9.707l6 6c0.391 0.391 1.024 0.391 1.414 0l6-6c0.391-0.391 0.391-1.024 0-1.414s-1.024-0.391-1.414 0l-5.293 5.293-5.293-5.293c-0.391-0.391-1.024-0.391-1.414 0s-0.391 1.024 0 1.414z"></path>
+				</svg></span></span></span></a>
+<ul class="sub-menu">
+	<li id="menu-item-1014267" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1014267"><a href="https://gamesource.it/videos/">Video</a></li>
+	<li id="menu-item-1005560" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1005560"><a href="https://www.gamesource.it/recensioni/">Recensioni</a></li>
+	<li id="menu-item-1005561" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1005561"><a href="https://www.gamesource.it/notizie/">Notizie</a></li>
+	<li id="menu-item-1005943" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1005943"><a href="https://www.gamesource.it/trucchi/">Trucchi &#038; Soluzioni</a></li>
+	<li id="menu-item-1005944" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1005944"><a href="https://www.gamesource.it/editoriali/">Editoriali</a></li>
+	<li id="menu-item-1007510" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1007510"><a href="https://www.gamesource.it/anteprime/">Anteprime</a></li>
+	<li id="menu-item-1018138" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1018138"><a href="https://www.gamesource.it/recap/">Tutto quello che sappiamo su &#8230;</a></li>
+</ul>
+</li>
+<li id="menu-item-1006779" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1006779"><a href="https://www.gamesource.it/cat/podcast/">Podcast</a></li>
+<li id="menu-item-1007543" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1007543"><a href="https://www.gamesource.it/live/">Live</a></li>
+<li id="menu-item-1010037" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-has-children menu-item-1010037"><a><span class="nav-drop-title-wrap">Network<span class="dropdown-nav-toggle"><span class="kadence-svg-iconset svg-baseline"><svg aria-hidden="true" class="kadence-svg-icon kadence-arrow-down-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><title>Espandi</title><path d="M5.293 9.707l6 6c0.391 0.391 1.024 0.391 1.414 0l6-6c0.391-0.391 0.391-1.024 0-1.414s-1.024-0.391-1.414 0l-5.293 5.293-5.293-5.293c-0.391-0.391-1.024-0.391-1.414 0s-0.391 1.024 0 1.414z"></path>
+				</svg></span></span></span></a>
+<ul class="sub-menu">
+	<li id="menu-item-1005368" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1005368"><a href="/tech/">Tech</a></li>
+	<li id="menu-item-1010038" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1010038"><a href="/movies/">Film e Serie Tv</a></li>
+	<li id="menu-item-1029002" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1029002"><a href="/nerd/">Nerd Zone</a></li>
+</ul>
+</li>
+<li id="menu-item-1005558" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-1005558"><a href="https://www.gamesource.it/cerca/">Cerca</a></li>
+</ul>			</div>
+	</nav><!-- #secondary-navigation -->
+	</div><!-- data-section="secondary_navigation" -->
+					</div>
+													<div class="site-header-main-section-right site-header-section site-header-section-right">
+													<div class="site-header-main-section-right-center site-header-section site-header-section-right-center">
+															</div>
+							<div class="site-header-item site-header-focus-item" data-section="kadence_customizer_header_account">
+	<div class="header-account-wrap header-account-control-wrap header-account-action-link header-account-style-icon"><a href="https://www.gamesource.it/login/" class="header-account-button"><span class="kadence-svg-iconset"><svg aria-hidden="true" class="kadence-svg-icon kadence-account-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><title>Account</title><path d="M21 21v-2c0-1.38-0.561-2.632-1.464-3.536s-2.156-1.464-3.536-1.464h-8c-1.38 0-2.632 0.561-3.536 1.464s-1.464 2.156-1.464 3.536v2c0 0.552 0.448 1 1 1s1-0.448 1-1v-2c0-0.829 0.335-1.577 0.879-2.121s1.292-0.879 2.121-0.879h8c0.829 0 1.577 0.335 2.121 0.879s0.879 1.292 0.879 2.121v2c0 0.552 0.448 1 1 1s1-0.448 1-1zM17 7c0-1.38-0.561-2.632-1.464-3.536s-2.156-1.464-3.536-1.464-2.632 0.561-3.536 1.464-1.464 2.156-1.464 3.536 0.561 2.632 1.464 3.536 2.156 1.464 3.536 1.464 2.632-0.561 3.536-1.464 1.464-2.156 1.464-3.536zM15 7c0 0.829-0.335 1.577-0.879 2.121s-1.292 0.879-2.121 0.879-1.577-0.335-2.121-0.879-0.879-1.292-0.879-2.121 0.335-1.577 0.879-2.121 1.292-0.879 2.121-0.879 1.577 0.335 2.121 0.879 0.879 1.292 0.879 2.121z"></path>
+				</svg></span></a></div></div><!-- data-section="header_account" -->
+					</div>
+							</div>
+		</div>
+	</div>
+</div>
+				</div>
+			</div>
+					</div>
+	</div>
+	
+<div id="mobile-header" class="site-mobile-header-wrap">
+	<div class="site-header-inner-wrap">
+		<div class="site-header-upper-wrap">
+			<div class="site-header-upper-inner-wrap">
+			<div class="site-main-header-wrap site-header-focus-item site-header-row-layout-standard site-header-row-tablet-layout-default site-header-row-mobile-layout-default  kadence-sticky-header" data-shrink="false" data-reveal-scroll-up="true">
+	<div class="site-header-row-container-inner">
+		<div class="site-container">
+			<div class="site-main-header-inner-wrap site-header-row site-header-row-has-sides site-header-row-center-column">
+									<div class="site-header-main-section-left site-header-section site-header-section-left">
+						<div class="site-header-item site-header-focus-item" data-section="kadence_customizer_header_mobile_account">
+	<div class="header-mobile-account-wrap header-account-control-wrap header-account-action-link header-account-style-icon"><a href="/login/" class="header-account-button"><span class="kadence-svg-iconset"><svg aria-hidden="true" class="kadence-svg-icon kadence-account-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><title>Account</title><path d="M21 21v-2c0-1.38-0.561-2.632-1.464-3.536s-2.156-1.464-3.536-1.464h-8c-1.38 0-2.632 0.561-3.536 1.464s-1.464 2.156-1.464 3.536v2c0 0.552 0.448 1 1 1s1-0.448 1-1v-2c0-0.829 0.335-1.577 0.879-2.121s1.292-0.879 2.121-0.879h8c0.829 0 1.577 0.335 2.121 0.879s0.879 1.292 0.879 2.121v2c0 0.552 0.448 1 1 1s1-0.448 1-1zM17 7c0-1.38-0.561-2.632-1.464-3.536s-2.156-1.464-3.536-1.464-2.632 0.561-3.536 1.464-1.464 2.156-1.464 3.536 0.561 2.632 1.464 3.536 2.156 1.464 3.536 1.464 2.632-0.561 3.536-1.464 1.464-2.156 1.464-3.536zM15 7c0 0.829-0.335 1.577-0.879 2.121s-1.292 0.879-2.121 0.879-1.577-0.335-2.121-0.879-0.879-1.292-0.879-2.121 0.335-1.577 0.879-2.121 1.292-0.879 2.121-0.879 1.577 0.335 2.121 0.879 0.879 1.292 0.879 2.121z"></path>
+				</svg></span></a></div></div><!-- data-section="header_mobile_account" -->
+					</div>
+													<div class="site-header-main-section-center site-header-section site-header-section-center">
+						<div class="site-header-item site-header-focus-item" data-section="title_tagline">
+	<div class="site-branding mobile-site-branding branding-layout-standard branding-tablet-layout-inherit site-brand-logo-only branding-mobile-layout-inherit"><a class="brand has-logo-image" href="https://gamesource.it" rel="home"><svg id="logotipo_gamesource_nero" xmlns="http://www.w3.org/2000/svg" style="fill:var(--global-palette4)" viewBox="0 0 746.51 154.77" height="42" width="200"><defs><style>.cls-1{fill:#e47e3d;}</style></defs><g id="fireass_occhio_arancio"><g id="fireass_completo"><g id="pieno"><path id="sotto" d="M108.01,123.5c.1-.5-.1-.9-.2-1.2s-.2-.5-.5-.7c-.1-.1-.3-.2-.4-.3-.1,0-.1-.1-.2-.1s-.1-.1-.2-.1-.1,0-.2-.1c-.4-.1-.8-.1-1.2,.1-4.4,2.4-9.5,3.6-14.8,3.6-15.6,0-28.5-11.4-30.1-26h0l-.4-1.2c-.3-.8-1-.8-1.2,0l-.2,.7c-1.3,14.8-14.3,26.4-30.1,26.4-7,0-13.5-2.3-18.7-6.1-.3-.1-.4-.1-.6-.1-.3,0-.5,.1-.8,.2-.3,.1-.6,.3-.9,.6h0c-.6,.7-.6,1.7-.1,2.5,4.7,6.7,11.6,13.7,22,20.1,10.8,6.8,27.3,12.1,29.7,12.9,.2,.1,.4,.1,.6,0,22.8-7.2,37.9-19.4,41.6-22.6l.2-.2c2-2.1,3.8-4.2,5.4-6.3,.1-.2,.8-1.2,1.2-1.9"/><g id="occhi"><g id="occhi_completi"><path id="analogico_nero" d="M27.31,115.8c12.5,0,22.6-10.1,22.6-22.6s-10.1-22.6-22.6-22.6-22.6,10.1-22.6,22.6,10.1,22.6,22.6,22.6h0Zm0-30.6c4.5,0,8.1,3.6,8.1,8.1s-3.6,8.1-8.1,8.1-8.1-3.6-8.1-8.1,3.7-8.1,8.1-8.1Z"/><path id="croce_direzionale_arancio" class="cls-1" d="M111.81,83.3h-10.2v-10.2c0-1.1-.9-2-2-2h-16.7c-1.1,0-2,.9-2,2v10.2h-10.2c-1.1,0-2,.9-2,2v16.7c0,1.1,.9,2,2,2h10.2v10.2c0,1.1,.9,2,2,2h16.7c1.1,0,2-.9,2-2v-10.2h10.2c1.1,0,2-.9,2-2v-16.7c0-1.1-.9-2-2-2Zm-20.6,18.4c-4.5,0-8.1-3.6-8.1-8.1s3.6-8.1,8.1-8.1,8.1,3.6,8.1,8.1-3.6,8.1-8.1,8.1Z"/></g></g><path id="sopra" d="M1.81,71.8c5.8-6.8,14.8-11.2,24.8-11.2h1.9c12.6,0,23.9,7.9,28.3,19.6v.1l1.8,5.9c.3,.9,1,.9,1.3,0l1.1-3.3v-.1c.1-.3,.2-.6,.3-.9q0-.1,.1-.2l.6-1.9v-.1c4.4-11.4,15.3-19,27.5-19h.3c.7,0,1.3-.1,2-.1,8.3,0,15.9,3,21.6,8,.9,.7,2.1-.2,1.6-1.2v-.1c-3.6-7.4-7.4-13.3-7.4-13.3C88.31,24.8,71.01,14.6,70.51,14.3c.1,.2,2.2,4.1,1.9,7-.6,6-3.8,2.2-4.6,1.5-4.6-4.4-6.6-22.8-6.6-22.8C26.21,24.5,20.81,43.4,17.31,47.2c-.9,.6-1.1-.7-1.1-.7l-.1-2.5S7.31,55.1,1.01,68.6c-.3,.7-.6,1.4-.9,2.1-.5,1.1,.9,2,1.7,1.1h0Z"/></g></g></g><g id="scritta_gamesource_tutta_piccola_nera"><path id="g" d="M165.21,61.9c3.5,1.8,6.2,4,8.1,6.7v-8.4h12.1v58.8c0,5.3-1.1,10.1-3.4,14.2-2.2,4.2-5.5,7.4-9.7,9.8-4.2,2.4-9.3,3.6-15.2,3.6-7.8,0-14.4-1.8-19.5-5.5-5.2-3.7-8.1-8.7-8.8-15h11.9c.9,3,2.9,5.4,5.8,7.3,3,1.9,6.5,2.8,10.7,2.8,4.8,0,8.7-1.5,11.7-4.4s4.5-7.2,4.5-12.8v-9.7c-2,2.7-4.8,5-8.2,6.9-3.5,1.9-7.4,2.8-11.8,2.8-5,0-9.6-1.3-13.8-3.8s-7.5-6.1-9.9-10.7c-2.4-4.6-3.6-9.8-3.6-15.6s1.2-10.9,3.6-15.4c2.4-4.5,5.7-8,9.9-10.4,4.2-2.5,8.8-3.7,13.8-3.7,4.4-.1,8.4,.7,11.8,2.5h0Zm5.7,16.8c-1.6-2.9-3.8-5.2-6.5-6.7s-5.5-2.3-8.6-2.3-5.9,.8-8.6,2.3-4.8,3.7-6.5,6.6c-1.6,2.9-2.5,6.4-2.5,10.3s.8,7.5,2.5,10.5c1.6,3,3.8,5.3,6.5,6.9,2.7,1.6,5.6,2.4,8.6,2.4s5.9-.8,8.6-2.3,4.8-3.8,6.5-6.8c1.6-3,2.5-6.5,2.5-10.4s-.9-7.6-2.5-10.5h0Z"/><path id="a" d="M195.61,73.4c2.4-4.5,5.7-8,9.9-10.4,4.2-2.5,8.8-3.7,13.8-3.7,4.5,0,8.5,.9,11.9,2.7,3.4,1.8,6.1,4,8.1,6.7v-8.4h12.1v57.8h-12.1v-8.6c-2,2.7-4.8,5-8.3,6.8s-7.5,2.7-12,2.7c-5,0-9.5-1.3-13.6-3.8s-7.4-6.1-9.8-10.7c-2.4-4.6-3.6-9.8-3.6-15.6s1.2-11,3.6-15.5h0Zm41.2,5.3c-1.6-2.9-3.8-5.2-6.5-6.7s-5.5-2.3-8.6-2.3-6,.8-8.6,2.3c-2.7,1.5-4.8,3.7-6.5,6.6-1.6,2.9-2.5,6.4-2.5,10.3s.8,7.5,2.5,10.5c1.6,3,3.8,5.3,6.5,6.9,2.7,1.6,5.5,2.4,8.6,2.4s6-.8,8.6-2.3c2.7-1.5,4.8-3.8,6.5-6.8,1.6-3,2.5-6.5,2.5-10.4s-.8-7.6-2.5-10.5h0Z"/><path id="m" d="M344.21,62.1c3.6,1.9,6.4,4.7,8.5,8.4s3.1,8.2,3.1,13.4v34.1h-11.9v-32.3c0-5.2-1.3-9.1-3.9-11.9-2.6-2.8-6.1-4.1-10.6-4.1s-8,1.4-10.7,4.1c-2.6,2.8-3.9,6.7-3.9,11.9v32.3h-11.9v-32.3c0-5.2-1.3-9.1-3.9-11.9-2.6-2.8-6.1-4.1-10.6-4.1s-8,1.4-10.7,4.1c-2.6,2.8-3.9,6.7-3.9,11.9v32.3h-12V60.1h12v6.6c2-2.4,4.4-4.2,7.5-5.6,3-1.3,6.2-2,9.7-2,4.6,0,8.8,1,12.4,2.9,3.6,2,6.4,4.8,8.4,8.5,1.8-3.5,4.5-6.3,8.2-8.4s7.7-3.1,12-3.1c4.5,.2,8.5,1.2,12.2,3.1h0Z"/><path id="e1" d="M418.31,93.6h-44.2c.4,4.6,2.1,8.3,5.1,11.1,3.1,2.8,6.9,4.2,11.3,4.2,6.4,0,11-2.7,13.6-8.1h12.9c-1.8,5.3-4.9,9.7-9.5,13.1-4.6,3.4-10.3,5.1-17.1,5.1-5.5,0-10.5-1.2-14.9-3.7s-7.8-6-10.3-10.5-3.7-9.8-3.7-15.7,1.2-11.2,3.6-15.7,5.8-8,10.2-10.4,9.4-3.7,15.1-3.7,10.3,1.2,14.6,3.6c4.3,2.4,7.6,5.7,10,10s3.6,9.3,3.6,14.9c.1,2.1,0,4-.3,5.8h0Zm-12-9.7c-.1-4.4-1.6-7.9-4.7-10.6-3.1-2.7-6.9-4-11.4-4-4.1,0-7.7,1.3-10.6,3.9-2.9,2.6-4.7,6.2-5.2,10.7h31.9Z"/><path id="s" d="M434.01,116.9c-3.6-1.6-6.5-3.9-8.6-6.7s-3.2-6-3.4-9.5h12.4c.2,2.4,1.4,4.5,3.5,6.1s4.8,2.5,8,2.5,6-.6,7.8-1.9c1.8-1.3,2.8-3,2.8-5,0-2.2-1-3.8-3.1-4.8-2.1-1.1-5.3-2.2-9.8-3.5-4.3-1.2-7.9-2.3-10.6-3.5-2.7-1.1-5.1-2.8-7.1-5.1s-3-5.4-3-9.1c0-3.1,.9-5.9,2.7-8.4s4.4-4.6,7.8-6c3.4-1.5,7.3-2.2,11.7-2.2,6.6,0,11.9,1.7,15.9,5s6.2,7.9,6.5,13.6h-12c-.2-2.6-1.3-4.6-3.2-6.2-1.9-1.5-4.5-2.3-7.7-2.3s-5.6,.6-7.2,1.8c-1.7,1.2-2.5,2.8-2.5,4.7,0,1.5,.6,2.8,1.7,3.9s2.5,1.9,4.1,2.5,4,1.4,7.1,2.3c4.2,1.1,7.7,2.3,10.3,3.4,2.7,1.2,5,2.9,7,5.1,2,2.2,3,5.2,3,8.9,0,3.3-.9,6.2-2.7,8.8s-4.4,4.6-7.7,6.1-7.2,2.2-11.7,2.2-8.4-1.1-12-2.7h0Z"/><path id="o" d="M486.41,115.6c-4.4-2.5-7.9-6-10.4-10.5s-3.8-9.8-3.8-15.7,1.3-11.1,3.9-15.6,6.1-8.1,10.6-10.5c4.5-2.4,9.5-3.7,15-3.7s10.5,1.2,15,3.7c4.5,2.4,8,5.9,10.6,10.5s3.9,9.8,3.9,15.6-1.3,11.1-4,15.6c-2.7,4.6-6.3,8.1-10.9,10.6-4.6,2.5-9.6,3.7-15.2,3.7s-10.3-1.2-14.7-3.7h0Zm23.4-8.8c2.7-1.5,4.9-3.7,6.6-6.6s2.5-6.5,2.5-10.7-.8-7.8-2.4-10.7c-1.6-2.9-3.8-5.1-6.4-6.6s-5.5-2.2-8.6-2.2-5.9,.7-8.6,2.2-4.7,3.7-6.2,6.6c-1.5,2.9-2.3,6.5-2.3,10.7,0,6.2,1.6,11,4.8,14.4s7.2,5.1,12,5.1c3,0,5.9-.8,8.6-2.2h0Z"/><path id="u" d="M590.21,60.6v57.9h-12v-6.8c-1.9,2.4-4.4,4.2-7.4,5.6-3,1.4-6.3,2.1-9.7,2.1-4.5,0-8.6-.9-12.2-2.8-3.6-1.9-6.4-4.7-8.5-8.4s-3.1-8.2-3.1-13.4V60.8h11.9v32.2c0,5.2,1.3,9.1,3.9,11.9s6.1,4.1,10.6,4.1,8-1.4,10.7-4.1c2.6-2.8,3.9-6.7,3.9-11.9V60.8l11.9-.2h0Z"/><path id="r" d="M619.71,62.1c2.9-1.6,6.3-2.5,10.3-2.5v12.4h-3c-4.7,0-8.2,1.2-10.7,3.6s-3.6,6.5-3.6,12.4v30.4h-12V60.5h12v8.4c1.7-2.9,4.1-5.2,7-6.8h0Z"/><path id="c" d="M635.41,73.7c2.4-4.5,5.8-8,10-10.4s9.2-3.7,14.7-3.7c7,0,12.8,1.7,17.4,5,4.6,3.3,7.7,8.1,9.3,14.2h-12.9c-1-2.9-2.7-5.1-5-6.7s-5.2-2.4-8.7-2.4c-4.9,0-8.8,1.7-11.7,5.2s-4.4,8.3-4.4,14.5,1.5,11.1,4.4,14.6,6.8,5.2,11.7,5.2c6.9,0,11.5-3,13.8-9.1h12.9c-1.7,5.9-4.8,10.6-9.5,14s-10.4,5.2-17.2,5.2c-5.5,0-10.4-1.2-14.7-3.7s-7.6-6-10-10.5-3.6-9.8-3.6-15.7,1.1-11.1,3.5-15.7h0Z"/><path id="e" d="M746.11,94h-44.2c.3,4.6,2.1,8.3,5.1,11.1s6.9,4.2,11.3,4.2c6.4,0,11-2.7,13.7-8.1h12.9c-1.8,5.3-4.9,9.7-9.5,13.1-4.6,3.4-10.3,5.1-17.1,5.1-5.5,0-10.5-1.2-14.9-3.7s-7.8-6-10.3-10.5-3.7-9.8-3.7-15.7,1.2-11.2,3.6-15.7c2.4-4.5,5.8-8,10.2-10.4s9.4-3.7,15.1-3.7,10.3,1.2,14.6,3.6c4.3,2.4,7.6,5.7,10,10s3.6,9.3,3.6,14.9c0,2-.1,4-.4,5.8h0Zm-12-9.7c-.1-4.4-1.7-7.9-4.7-10.6-3.1-2.7-6.9-4-11.4-4-4.1,0-7.7,1.3-10.6,3.9-2.9,2.6-4.7,6.2-5.2,10.7h31.9Z"/></g></svg></a></div></div><!-- data-section="title_tagline" -->
+					</div>
+													<div class="site-header-main-section-right site-header-section site-header-section-right">
+						<div class="site-header-item site-header-focus-item site-header-item-navgation-popup-toggle" data-section="kadence_customizer_mobile_trigger">
+		<div class="mobile-toggle-open-container">
+						<button id="mobile-toggle" class="menu-toggle-open drawer-toggle menu-toggle-style-default" aria-label="Apri il menu" data-toggle-target="#mobile-drawer" data-toggle-body-class="showing-popup-drawer-from-right" aria-expanded="false" data-set-focus=".menu-toggle-close"
+					>
+						<span class="menu-toggle-icon"><span class="kadence-svg-iconset"><svg aria-hidden="true" class="kadence-svg-icon kadence-menu-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><title>Attiva/disattiva menu</title><path d="M3 13h18c0.552 0 1-0.448 1-1s-0.448-1-1-1h-18c-0.552 0-1 0.448-1 1s0.448 1 1 1zM3 7h18c0.552 0 1-0.448 1-1s-0.448-1-1-1h-18c-0.552 0-1 0.448-1 1s0.448 1 1 1zM3 19h18c0.552 0 1-0.448 1-1s-0.448-1-1-1h-18c-0.552 0-1 0.448-1 1s0.448 1 1 1z"></path>
+				</svg></span></span>
+		</button>
+	</div>
+	</div><!-- data-section="mobile_trigger" -->
+					</div>
+							</div>
+		</div>
+	</div>
+</div>
+			</div>
+		</div>
+			</div>
+</div>
+</header><!-- #masthead -->
+<script type="application/ld+json">{"@context":"http:\/\/schema.org","@type":"NewsArticle","@id":"https:\/\/www.gamesource.it\/notizie\/developer-snobbano-xbox-premiano-pc\/","mainEntityOfPage":"https:\/\/www.gamesource.it\/notizie\/developer-snobbano-xbox-premiano-pc\/","headline":"I game developer snobbano Xbox e premiano PC, secondo una survey","datePublished":"2026-02-02T23:06:05+01:00","dateModified":"2026-02-02T23:06:05+01:00","author":{"@type":"Person","name":"Matteo D\u2019Eramo"},"publisher":{"@type":"Organization","name":"Gamesource.it","logo":{"@type":"ImageObject","url":"https:\/\/www.gamesource.it\/wp-content\/uploads\/2016\/04\/logo-grande.png"}},"articleBody":"Il 2025 di Xbox \u00e8 stato un anno di alti e bassi: da una parte il Game Pass ha ampliato a dismisura il proprio catalogo con titoli commercialmente importanti come i nuovi Call of Duty e grandi intuizioni come Clair Obscur: Expedition 33 e Blue Prince. Dall\u2019altro lato, per\u00f2, Microsoft ha attraversato momenti decisamente negativi, come le polemiche sull\u2019aumento di prezzo del Game Pass e, soprattutto, il calo rovinoso delle vendite delle console nel primo trimestre dell\u2019anno fiscale, confermato anche nel trimestre successivo. Nonostante la prossima console sia in sviluppo, \u00e8 chiaro che Microsoft voglia puntare maggiormente sul \u201cPlay Anywhere\u201d e sul Game Pass, che per\u00f2 faticano ancora a decollare. Il 2026 sar\u00e0 un anno decisivo per le sorti della console di Redmond, che per\u00f2 \u00e8 gi\u00e0 iniziato con una brutta notizia proveniente dagli addetti ai lavori. PC piattaforma preferita dagli sviluppatori, male Xbox Cloud Gaming Durante la Game Developer Conference (GDC), un evento dedicato ai lavoratori dell\u2019industria videoludica, 2300 sviluppatori sono stati coinvolti in una survey relativa a vari aspetti del gaming, tra cui le piattaforme di maggior interesse su cui lavorare. Le piattaforme comprendevano sia console standard come PlayStation 5 o Xbox Series S, portatili come Steam Deck o Asus ROG Ally, ma anche servizi come Xbox Cloud Gaming. Tra queste, il PC ha primeggiato su tutte le piattaforme con un 80% di preferenze, seguito da PlayStation 5 e Steam Deck con il 40%; Xbox Series S\/X ha invece ottenuto un misero 20%. Non hanno ottenuto un risultato migliore neanche le altre piattaforme legate a Microsoft, anzi: ROG Xbox Ally ha ottenuto un 7%, mentre Xbox Cloud Gaming, su cui, come gi\u00e0 detto, Microsoft punta molto, si \u00e8 fermato ad un non incoraggiante 5%. \u00c8 chiaro che 2300 intervistati non rappresentino la totalit\u00e0 degli sviluppatori nel mondo, ma si tratta comunque di un campione abbastanza grande da dare un\u2019idea delle preferenze lavorative, che sembrano piuttosto lontane dall\u2019ecosistema Xbox.","description":"L\u2019indagine fornisce una fotografia delle preferenze degli sviluppatori.","keywords":["Game Developers Conference","Microsoft","PC","Xbox Series S\/X"],"image":"https:\/\/www.gamesource.it\/wp-content\/uploads\/2026\/02\/console-e-pc-750x281.webp"}</script>
+	<div id="inner-wrap" class="wrap hfeed kt-clear">
+		
+<link rel='stylesheet' id='kadence-content-css' href='https://www.gamesource.it/wp-content/themes/kadence/assets/css/content.min.css?ver=1.4.0' media='all' />
+<div id="primary" class="content-area">
+	<div class="content-container site-container">
+		<main id="main" class="site-main" role="main">
+						<div class="content-wrap">
+
+				
+
+
+
+     <nav id="kadence-breadcrumbs" aria-label="Breadcrumb" class="kadence-breadcrumbs">
+     <div class="kadence-breadcrumb-container">
+     <span><a href="https://www.gamesource.it/" itemprop="url" class="kadence-bc-home">
+     <span>Home</span></a>
+     </span>
+
+            <span class="bc-delimiter">></span>
+       <span><a href="https://www.gamesource.it/notizie/" itemprop="url">
+       <span>Notizie</span></a>
+       </span>
+       
+     </div>
+     </nav>
+     <script type="application/ld+json">{"@context":"http:\/\/schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https:\/\/www.gamesource.it"},{"@type":"ListItem","position":2,"name":"Notizie","item":"https:\/\/www.gamesource.it\/notizie\/"}]}</script>
+
+     
+
+
+<article id="post-1116877" class="entry content-bg single-entry post-1116877 notizie type-notizie status-publish has-post-thumbnail hentry category-news tag-game-developers-conference tag-microsoft tag-pc tag-xbox-series-s-x">
+	<div class="entry-content-wrap">
+	
+
+		
+		      	<header class="entry-header notizie-title title-align-inherit title-tablet-align-inherit title-mobile-align-inherit">
+	<h1 class="entry-title">I game developer snobbano Xbox e premiano PC, secondo una survey</h1><p class="sottotitolo">L’indagine fornisce una fotografia delle preferenze degli sviluppatori.</p><div>
+<aside  class="entry-meta entry-meta-divider-dot">
+	<span class="posted-by"><span class="meta-label">Di</span><span class="author vcard"><a class="url fn n" href="https://www.gamesource.it/author/matteoderamo/">Matteo D’Eramo</a></span></span>					<span class="posted-on">
+						<time class="entry-date published updated" datetime="2026-02-02T23:06:05+01:00">2 Febbraio 2026</time>					</span>
+						</aside>
+</div><!-- .entry-meta -->
+</header><!-- .entry-header -->
+
+
+	<div class="post-thumbnail article-post-thumbnail kadence-thumbnail-position-below kadence-thumbnail-ratio-inherit">
+		<div class="post-thumbnail-inner">
+			<img width="1200" height="450" src="https://www.gamesource.it/wp-content/uploads/2026/02/console-e-pc.webp" class="post-top-featured wp-post-image" alt="Xbox snobbata dagli sviluppatori, che preferiscono PC e altre console secondo una survey" decoding="async" fetchpriority="high" srcset="https://www.gamesource.it/wp-content/uploads/2026/02/console-e-pc.webp 1200w, https://www.gamesource.it/wp-content/uploads/2026/02/console-e-pc-750x281.webp 750w, https://www.gamesource.it/wp-content/uploads/2026/02/console-e-pc-1024x384.webp 1024w" sizes="(max-width: 1200px) 100vw, 1200px" />		</div>
+	</div><!-- .post-thumbnail -->
+
+
+			
+<div class="entry-content single-content">
+	<p>Il 2025 di Xbox è stato un anno di alti e bassi: da una parte il Game Pass ha ampliato a dismisura il proprio catalogo con titoli commercialmente importanti come i nuovi Call of Duty e grandi intuizioni come Clair Obscur: Expedition 33 e Blue Prince.</p>
+<p>Dall’altro lato, però, Microsoft ha attraversato momenti decisamente negativi, come le polemiche sull’aumento di prezzo del Game Pass e, soprattutto, il <a href="https://www.gamesource.it/notizie/xbox-le-vendite-delle-console-in-calo/">calo rovinoso delle vendite delle console</a> nel primo trimestre dell’anno fiscale, confermato anche nel trimestre successivo.</p>
+<p>Nonostante la prossima console sia in sviluppo, è chiaro che Microsoft voglia puntare maggiormente sul “Play Anywhere” e sul Game Pass, che però faticano ancora a decollare. Il 2026 sarà un anno decisivo per le sorti della console di Redmond, che però è già iniziato con una brutta notizia proveniente dagli addetti ai lavori.</p>
+<div id="addendoContainer_9002" class="addendoBox"></div>
+		      <div class="blocco_youtube_container">
+    <div class="blocco_youtube_left">
+        <div class="blocco_youtube_image"></div>
+    </div>
+    <div class="blocco_youtube_right">
+        <div class="blocco_youtube_video">
+            <iframe src="https://www.youtube.com/embed/QbCgb512B44?feature=oembed" class="blocco_youtube_iframe" frameborder="0" allowfullscreen></iframe>
+        </div>
+    </div>
+</div>
+
+		
+		<h2><b>PC piattaforma preferita dagli sviluppatori, male Xbox Cloud Gaming</b></h2>
+<p>Durante la Game Developer Conference (GDC), un evento dedicato ai lavoratori dell’industria videoludica, 2300 sviluppatori sono stati coinvolti in una <a href="https://reg.gdconf.com/2026-SOTI" target="_blank" rel="noopener">survey</a> relativa a vari aspetti del gaming, tra cui le piattaforme di maggior interesse su cui lavorare.</p>
+<p>Le piattaforme comprendevano sia console standard come PlayStation 5 o Xbox Series S, portatili come Steam Deck o Asus ROG Ally, ma anche servizi come Xbox Cloud Gaming. Tra queste, il PC ha primeggiato su tutte le piattaforme con un 80% di preferenze, seguito da PlayStation 5 e Steam Deck con il 40%; Xbox Series S/X ha invece ottenuto un misero 20%.</p>
+<p>Non hanno ottenuto un risultato migliore neanche le altre piattaforme legate a Microsoft, anzi: ROG Xbox Ally ha ottenuto un 7%, mentre Xbox Cloud Gaming, su cui, come già detto, Microsoft punta molto, si è fermato ad un non incoraggiante 5%.</p>
+<p>È chiaro che 2300 intervistati non rappresentino la totalità degli sviluppatori nel mondo, ma si tratta comunque di un campione abbastanza grande da dare un’idea delle preferenze lavorative, che sembrano piuttosto lontane dall’ecosistema Xbox.</p>
+</div><!-- .entry-content -->
+
+			<div id="loader_ajax_animation">
+				<div class="d-flex justify-content-center">
+					<div class="spinner-border text-warning" role="status">
+						<span class="sr-only">Caricamento in corso...</span>
+					</div>
+				</div>
+			</div>
+		
+
+<script type="7a03866fbfeef80a768a0891-text/javascript">
+	var globale_post_id = 1116877;
+	var globale_filtro_rec = 26;
+	var post_class = 'class="entry content-bg single-entry post-1116877 notizie type-notizie status-publish has-post-thumbnail hentry category-news tag-game-developers-conference tag-microsoft tag-pc tag-xbox-series-s-x"';
+</script>
+
+
+
+<!-- CARICAMENTO INFINITO NEWS -->
+<script type="7a03866fbfeef80a768a0891-text/javascript">
+
+
+</script>		
+	</div>
+</article><!-- #post-1116877 -->
+
+<div style="font-family: monospace; padding:1em">
+	Ti è piaciuto quello che hai letto? Vuoi mettere le mani su giochi in anteprima, partecipare a eventi esclusivi e scrivere su quello che ti appassiona? Unisciti al nostro staff! <a rel="nofollow" href="https://bit.ly/gamesource_collabora" target="_blank" >Clicca qui</a> per venire a far parte della nostra squadra!
+	</div>
+			</div>
+					</main><!-- #main -->
+		<link rel='stylesheet' id='kadence-sidebar-css' href='https://www.gamesource.it/wp-content/themes/kadence/assets/css/sidebar.min.css?ver=1.4.0' media='all' />
+	<aside id="secondary" role="complementary" class="primary-sidebar widget-area sidebar-slug-sidebar-primary sidebar-link-style-normal">
+		<div class="sidebar-inner-wrap">
+				<div class="row">
+
+
+			<!-- straming twitch by Finalmarco & Alfio -->		
+			<div class="col-sm-12" style="padding:0;" id="streaming2">
+			</div>
+			<!-- end straming twitch-->
+
+	</div>
+
+		</div>
+		
+		<div class="sidebar-inner-wrap" style="top: 52px; max-height: calc(100vh - 52px);  position: sticky;">
+			<!-- primo 9003 -->
+	<div id="addendoContainer_9003" class="addendoHalfpage"></div>
+
+		<!-- secondo 9003 -->
+	<div id="addendoContainer_9003" class="addendoHalfpage"></div>
+			</div>
+		
+		
+	</aside><!-- #secondary -->
+
+		</div>
+</div><!-- #primary -->
+	</main><!-- #inner-wrap -->
+	<link rel='stylesheet' id='kadence-footer-css' href='https://www.gamesource.it/wp-content/themes/kadence/assets/css/footer.min.css?ver=1.4.0' media='all' />
+<footer id="colophon" class="site-footer" role="contentinfo">
+	<div class="site-footer-wrap">
+		<div class="site-middle-footer-wrap site-footer-row-container site-footer-focus-item site-footer-row-layout-standard site-footer-row-tablet-layout-default site-footer-row-mobile-layout-default" data-section="kadence_customizer_footer_middle">
+	<div class="site-footer-row-container-inner">
+				<div class="site-container">
+			<div class="site-middle-footer-inner-wrap site-footer-row site-footer-row-columns-2 site-footer-row-column-layout-equal site-footer-row-tablet-column-layout-default site-footer-row-mobile-column-layout-row ft-ro-dir-row ft-ro-collapse-normal ft-ro-t-dir-default ft-ro-m-dir-row ft-ro-lstyle-plain">
+									<div class="site-footer-middle-section-1 site-footer-section footer-section-inner-items-1">
+						<div class="footer-widget-area widget-area site-footer-focus-item footer-navigation-wrap content-align-left content-tablet-align-default content-mobile-align-default content-valign-middle content-tablet-valign-default content-mobile-valign-default footer-navigation-layout-stretch-false" data-section="kadence_customizer_footer_navigation">
+	<div class="footer-widget-area-inner footer-navigation-inner">
+			<nav id="footer-navigation" class="footer-navigation" role="navigation" aria-label="Footer">
+				<div class="footer-menu-container">
+			<ul id="footer-menu" class="menu"><li id="menu-item-791918" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-791918"><a href="https://www.gamesource.it/contattaci/">Chi siamo | Contact us</a></li>
+<li id="menu-item-1084680" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-1084680"><a href="https://www.gamesource.it/il-nostro-manifesto-onesta-passione-e-trasparenza/">Il nostro Manifesto</a></li>
+<li id="menu-item-791921" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-791921"><a href="https://www.gamesource.it/la-redazione-gamesource/">La Redazione</a></li>
+<li id="menu-item-791919" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-791919"><a href="https://www.gamesource.it/collabora/">Collabora con noi</a></li>
+<li id="menu-item-791917" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-791917"><a href="https://www.gamesource.it/advertising/">Advertising/Pubblicità</a></li>
+</ul>		</div>
+	</nav><!-- #footer-navigation -->
+		</div>
+</div><!-- data-section="footer_navigation" -->
+					</div>
+										<div class="site-footer-middle-section-2 site-footer-section footer-section-inner-items-1">
+						<div class="footer-widget-area widget-area site-footer-focus-item footer-widget1 content-align-default content-tablet-align-default content-mobile-align-default content-valign-default content-tablet-valign-default content-mobile-valign-default" data-section="sidebar-widgets-footer1">
+	<div class="footer-widget-area-inner site-info-inner">
+					<nav id="footer-navigation" class="footer-navigation" role="navigation" aria-label="Navigazione piè di pagina">
+				<div class="footer-menu-container">
+			<ul id="footer-menu" class="menu">
+<!-- <li id="menu-item-791918a" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-791918a"><a data-cc="c-settings" href="#">Modifica il consenso ai Cookies</a></li>  -->
+<li id="menu-item-791918a" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-791918a"><a href="#" id="change-consent">Modifica il consenso</a></li>
+<li id="menu-item-791921a" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-791921a"><a href="https://www.gamesource.it/cookie-policy/">Cookie policy</a></li>
+<li id="menu-item-791919a" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-791919a"><a href="https://www.gamesource.it/privacy-policy/">Privacy policy</a></li>
+<li id="menu-item-791920" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-791920"><a href="https://www.gamesource.it/feed-rss-videogiochi/">Feed RSS</a></li>
+<li id="menu-item-791922" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-791922"><a href="https://www.gamesource.it/sitemap_index.xml">Sitemap</a></li>
+<li id="menu-item-791922" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-791922"><a href="https://opencritic.com/" target="_blank"><img src="https://gamesource.it/opencritic.webp"></a></li>
+</ul>		</div>
+	</nav><!-- #footer-navigation -->
+<script type="7a03866fbfeef80a768a0891-text/javascript">
+document.getElementById('change-consent').onclick = function(e) {
+    e.preventDefault();
+    window.__tcfapi('displayConsentUi', 2, function() {}, {});
+}
+</script>			
+			
+			
+			
+			
+			
+			
+	</div>
+	
+</div><!-- .footer-widget1 -->
+
+
+
+
+					</div>
+								</div>
+		</div>
+	</div>
+</div>
+<div class="site-bottom-footer-wrap site-footer-row-container site-footer-focus-item site-footer-row-layout-standard site-footer-row-tablet-layout-default site-footer-row-mobile-layout-default" data-section="kadence_customizer_footer_bottom">
+	<div class="site-footer-row-container-inner">
+				<div class="site-container">
+			<div class="site-bottom-footer-inner-wrap site-footer-row site-footer-row-columns-1 site-footer-row-column-layout-row site-footer-row-tablet-column-layout-default site-footer-row-mobile-column-layout-row ft-ro-dir-row ft-ro-collapse-normal ft-ro-t-dir-default ft-ro-m-dir-default ft-ro-lstyle-plain">
+									<div class="site-footer-bottom-section-1 site-footer-section footer-section-inner-items-1">
+						
+<div class="footer-widget-area site-info site-footer-focus-item content-align-default content-tablet-align-default content-mobile-align-default content-valign-default content-tablet-valign-default content-mobile-valign-default" data-section="kadence_customizer_footer_html">
+	<div class="footer-widget-area-inner site-info-inner">
+		<div class="footer-html inner-link-style-normal"><div class="footer-html-inner"><p>&copy; 2008 - 2026 Gamesource Italia</p>
+</div></div>	</div>
+</div><!-- .site-info -->
+					</div>
+								</div>
+		</div>
+	</div>
+</div>
+	</div>
+</footer><!-- #colophon -->
+
+</div><!-- #wrapper -->
+
+			<script type="7a03866fbfeef80a768a0891-text/javascript">document.documentElement.style.setProperty('--scrollbar-offset', window.innerWidth - document.documentElement.clientWidth + 'px' );</script>
+			<script type="speculationrules">
+{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":["/wp-*.php","/wp-admin/*","/wp-content/uploads/*","/wp-content/*","/wp-content/plugins/*","/wp-content/themes/gamesource6/*","/wp-content/themes/kadence/*","/*\\?(.+)"]}},{"not":{"selector_matches":"a[rel~=\"nofollow\"]"}},{"not":{"selector_matches":".no-prefetch, .no-prefetch a"}}]},"eagerness":"conservative"}]}
+</script>
+    <script type="7a03866fbfeef80a768a0891-text/javascript">
+        jQuery().ready(function jQuery_ready()
+        {
+            add_new_visit("[1116877]");
+        });
+    </script>
+    	<script type="7a03866fbfeef80a768a0891-text/javascript">
+	    jQuery().ready(function jQuery_ready()
+        {
+            get_post_views("[1116877]");
+	    });
+    </script>
+	<a id="kt-scroll-up" tabindex="-1" aria-hidden="true" aria-label="Scorri in alto" href="#wrapper" class="kadence-scroll-to-top scroll-up-wrap scroll-ignore scroll-up-side-right scroll-up-style-outline vs-lg-true vs-md-true vs-sm-true"><span class="kadence-svg-iconset"><svg aria-hidden="true" class="kadence-svg-icon kadence-chevron-up2-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><title>Scorri in alto</title><path d="M26.297 20.797l-2.594 2.578c-0.391 0.391-1.016 0.391-1.406 0l-8.297-8.297-8.297 8.297c-0.391 0.391-1.016 0.391-1.406 0l-2.594-2.578c-0.391-0.391-0.391-1.031 0-1.422l11.594-11.578c0.391-0.391 1.016-0.391 1.406 0l11.594 11.578c0.391 0.391 0.391 1.031 0 1.422z"></path>
+				</svg></span></a><button id="kt-scroll-up-reader" href="#wrapper" aria-label="Scorri in alto" class="kadence-scroll-to-top scroll-up-wrap scroll-ignore scroll-up-side-right scroll-up-style-outline vs-lg-true vs-md-true vs-sm-true"><span class="kadence-svg-iconset"><svg aria-hidden="true" class="kadence-svg-icon kadence-chevron-up2-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><title>Scorri in alto</title><path d="M26.297 20.797l-2.594 2.578c-0.391 0.391-1.016 0.391-1.406 0l-8.297-8.297-8.297 8.297c-0.391 0.391-1.016 0.391-1.406 0l-2.594-2.578c-0.391-0.391-0.391-1.031 0-1.422l11.594-11.578c0.391-0.391 1.016-0.391 1.406 0l11.594 11.578c0.391 0.391 0.391 1.031 0 1.422z"></path>
+				</svg></span></button><div class="kadence-color-palette-fixed-switcher kcpf-position-right vs-lg-true vs-md-true vs-sm-false"><div class="kadence-color-palette-switcher kcps-style-switch kcps-type-icon"><button class="kadence-color-palette-toggle kadence-color-toggle" aria-label="Change site color palette"><span class="kadence-color-palette-light"><span class="kadence-color-palette-icon"><span class="kadence-svg-iconset svg-baseline"><svg aria-hidden="true" class="kadence-svg-icon kadence-sun-svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><title>Light</title><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+				</svg></span></span></span><span class="kadence-color-palette-dark"><span class="kadence-color-palette-icon"><span class="kadence-svg-iconset svg-baseline"><svg aria-hidden="true" class="kadence-svg-icon kadence-moon-svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><title>Dark</title><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+				</svg></span></span></span></button></div></div>	<div id="addendoContainer_9004"></div>	
+	
+		<div id="mobile-drawer" class="popup-drawer popup-drawer-layout-sidepanel popup-drawer-animation-fade popup-drawer-side-right" data-drawer-target-string="#mobile-drawer"
+			>
+		<div class="drawer-overlay" data-drawer-target-string="#mobile-drawer"></div>
+		<div class="drawer-inner">
+						<div class="drawer-header">
+				<button class="menu-toggle-close drawer-toggle" aria-label="Chiudi il menu"  data-toggle-target="#mobile-drawer" data-toggle-body-class="showing-popup-drawer-from-right" aria-expanded="false" data-set-focus=".menu-toggle-open"
+							>
+					<span class="toggle-close-bar"></span>
+					<span class="toggle-close-bar"></span>
+				</button>
+			</div>
+			<div class="drawer-content mobile-drawer-content content-align-left content-valign-top">
+								<div class="site-header-item site-header-focus-item site-header-item-mobile-navigation mobile-navigation-layout-stretch-false" data-section="kadence_customizer_mobile_navigation">
+		<nav id="mobile-site-navigation" class="mobile-navigation drawer-navigation drawer-navigation-parent-toggle-false" role="navigation" aria-label="Primary Mobile">
+				<div class="mobile-menu-container drawer-menu-container">
+			<ul id="mobile-menu" class="menu has-collapse-sub-nav"><li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-has-children menu-item-1005366"><div class="drawer-nav-drop-wrap"><a>Piattaforme</a><button class="drawer-sub-toggle" data-toggle-duration="10" data-toggle-target="#mobile-menu .menu-item-1005366 &gt; .sub-menu" aria-expanded="false"><span class="screen-reader-text">Alterna menu figlio</span><span class="kadence-svg-iconset"><svg aria-hidden="true" class="kadence-svg-icon kadence-arrow-down-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><title>Espandi</title><path d="M5.293 9.707l6 6c0.391 0.391 1.024 0.391 1.414 0l6-6c0.391-0.391 0.391-1.024 0-1.414s-1.024-0.391-1.414 0l-5.293 5.293-5.293-5.293c-0.391-0.391-1.024-0.391-1.414 0s-0.391 1.024 0 1.414z"></path>
+				</svg></span></button></div>
+<ul class="sub-menu">
+	<li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-1005371"><a href="https://www.gamesource.it/playstation-5/">PlayStation 5</a></li>
+	<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1017543"><a href="https://www.gamesource.it/playstation-vr2/">PlayStation VR2</a></li>
+	<li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-1005373"><a href="https://www.gamesource.it/xbox-series-x/">Xbox Series X | S</a></li>
+	<li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-1005455"><a href="https://www.gamesource.it/switch/">Switch</a></li>
+	<li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-1005369"><a href="https://www.gamesource.it/pc/">PC</a></li>
+	<li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-1005370"><a href="https://www.gamesource.it/playstation-4/">PlayStation 4</a></li>
+	<li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-1005372"><a href="https://www.gamesource.it/xbox-one/">Xbox One</a></li>
+</ul>
+</li>
+<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-has-children menu-item-1005367"><div class="drawer-nav-drop-wrap"><a>Sezioni</a><button class="drawer-sub-toggle" data-toggle-duration="10" data-toggle-target="#mobile-menu .menu-item-1005367 &gt; .sub-menu" aria-expanded="false"><span class="screen-reader-text">Alterna menu figlio</span><span class="kadence-svg-iconset"><svg aria-hidden="true" class="kadence-svg-icon kadence-arrow-down-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><title>Espandi</title><path d="M5.293 9.707l6 6c0.391 0.391 1.024 0.391 1.414 0l6-6c0.391-0.391 0.391-1.024 0-1.414s-1.024-0.391-1.414 0l-5.293 5.293-5.293-5.293c-0.391-0.391-1.024-0.391-1.414 0s-0.391 1.024 0 1.414z"></path>
+				</svg></span></button></div>
+<ul class="sub-menu">
+	<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1014267"><a href="https://gamesource.it/videos/">Video</a></li>
+	<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1005560"><a href="https://www.gamesource.it/recensioni/">Recensioni</a></li>
+	<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1005561"><a href="https://www.gamesource.it/notizie/">Notizie</a></li>
+	<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1005943"><a href="https://www.gamesource.it/trucchi/">Trucchi &#038; Soluzioni</a></li>
+	<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1005944"><a href="https://www.gamesource.it/editoriali/">Editoriali</a></li>
+	<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1007510"><a href="https://www.gamesource.it/anteprime/">Anteprime</a></li>
+	<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1018138"><a href="https://www.gamesource.it/recap/">Tutto quello che sappiamo su &#8230;</a></li>
+</ul>
+</li>
+<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1006779"><a href="https://www.gamesource.it/cat/podcast/">Podcast</a></li>
+<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1007543"><a href="https://www.gamesource.it/live/">Live</a></li>
+<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-has-children menu-item-1010037"><div class="drawer-nav-drop-wrap"><a>Network</a><button class="drawer-sub-toggle" data-toggle-duration="10" data-toggle-target="#mobile-menu .menu-item-1010037 &gt; .sub-menu" aria-expanded="false"><span class="screen-reader-text">Alterna menu figlio</span><span class="kadence-svg-iconset"><svg aria-hidden="true" class="kadence-svg-icon kadence-arrow-down-svg" fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><title>Espandi</title><path d="M5.293 9.707l6 6c0.391 0.391 1.024 0.391 1.414 0l6-6c0.391-0.391 0.391-1.024 0-1.414s-1.024-0.391-1.414 0l-5.293 5.293-5.293-5.293c-0.391-0.391-1.024-0.391-1.414 0s-0.391 1.024 0 1.414z"></path>
+				</svg></span></button></div>
+<ul class="sub-menu">
+	<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1005368"><a href="/tech/">Tech</a></li>
+	<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1010038"><a href="/movies/">Film e Serie Tv</a></li>
+	<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1029002"><a href="/nerd/">Nerd Zone</a></li>
+</ul>
+</li>
+<li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-1005558"><a href="https://www.gamesource.it/cerca/">Cerca</a></li>
+</ul>		</div>
+	</nav><!-- #site-navigation -->
+	</div><!-- data-section="mobile_navigation" -->
+							</div>
+		</div>
+	</div>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/lazysizes/5.3.2/lazysizes.min.js?ver=5.3.2" id="lazysizes-js" type="7a03866fbfeef80a768a0891-text/javascript"></script>
+<script id="footer_twitch-js-extra" type="7a03866fbfeef80a768a0891-text/javascript">
+var twitch2plugin = {"ajaxurl":"https://www.gamesource.it/wp-admin/admin-ajax.php","pluginUrl":"https://www.gamesource.it/wp-content/plugins/gs-twitch2/"};
+//# sourceURL=footer_twitch-js-extra
+</script>
+<script src="https://www.gamesource.it/wp-content/plugins/gs-twitch2/js/gamesource_twitch.js?ver=1765688363" id="footer_twitch-js" type="7a03866fbfeef80a768a0891-text/javascript"></script>
+<script src="https://www.gamesource.it/wp-content/themes/gamesource6/javascript/scorrimento_news.js?ver=1685968402" id="scorrimento_news-js" type="7a03866fbfeef80a768a0891-text/javascript"></script>
+<script src="https://www.gamesource.it/wp-includes/js/comment-reply.min.js?ver=6.9" id="comment-reply-js" async data-wp-strategy="async" fetchpriority="low" type="7a03866fbfeef80a768a0891-text/javascript"></script>
+<script id="kadence-navigation-js-extra" type="7a03866fbfeef80a768a0891-text/javascript">
+var kadenceConfig = {"screenReader":{"expand":"Menu figlio","expandOf":"Menu figlio di","collapse":"Menu figlio","collapseOf":"Menu figlio di"},"breakPoints":{"desktop":"1024","tablet":768},"scrollOffset":"0"};
+//# sourceURL=kadence-navigation-js-extra
+</script>
+<script src="https://www.gamesource.it/wp-content/themes/kadence/assets/js/navigation.min.js?ver=1.4.0" id="kadence-navigation-js" async type="7a03866fbfeef80a768a0891-text/javascript"></script>
+<script id="wp-emoji-settings" type="application/json">
+{"baseUrl":"https://s.w.org/images/core/emoji/17.0.2/72x72/","ext":".png","svgUrl":"https://s.w.org/images/core/emoji/17.0.2/svg/","svgExt":".svg","source":{"concatemoji":"https://www.gamesource.it/wp-includes/js/wp-emoji-release.min.js?ver=6.9"}}
+</script>
+<script type="7a03866fbfeef80a768a0891-module">
+/*! This file is auto-generated */
+const a=JSON.parse(document.getElementById("wp-emoji-settings").textContent),o=(window._wpemojiSettings=a,"wpEmojiSettingsSupports"),s=["flag","emoji"];function i(e){try{var t={supportTests:e,timestamp:(new Date).valueOf()};sessionStorage.setItem(o,JSON.stringify(t))}catch(e){}}function c(e,t,n){e.clearRect(0,0,e.canvas.width,e.canvas.height),e.fillText(t,0,0);t=new Uint32Array(e.getImageData(0,0,e.canvas.width,e.canvas.height).data);e.clearRect(0,0,e.canvas.width,e.canvas.height),e.fillText(n,0,0);const a=new Uint32Array(e.getImageData(0,0,e.canvas.width,e.canvas.height).data);return t.every((e,t)=>e===a[t])}function p(e,t){e.clearRect(0,0,e.canvas.width,e.canvas.height),e.fillText(t,0,0);var n=e.getImageData(16,16,1,1);for(let e=0;e<n.data.length;e++)if(0!==n.data[e])return!1;return!0}function u(e,t,n,a){switch(t){case"flag":return n(e,"\ud83c\udff3\ufe0f\u200d\u26a7\ufe0f","\ud83c\udff3\ufe0f\u200b\u26a7\ufe0f")?!1:!n(e,"\ud83c\udde8\ud83c\uddf6","\ud83c\udde8\u200b\ud83c\uddf6")&&!n(e,"\ud83c\udff4\udb40\udc67\udb40\udc62\udb40\udc65\udb40\udc6e\udb40\udc67\udb40\udc7f","\ud83c\udff4\u200b\udb40\udc67\u200b\udb40\udc62\u200b\udb40\udc65\u200b\udb40\udc6e\u200b\udb40\udc67\u200b\udb40\udc7f");case"emoji":return!a(e,"\ud83e\u1fac8")}return!1}function f(e,t,n,a){let r;const o=(r="undefined"!=typeof WorkerGlobalScope&&self instanceof WorkerGlobalScope?new OffscreenCanvas(300,150):document.createElement("canvas")).getContext("2d",{willReadFrequently:!0}),s=(o.textBaseline="top",o.font="600 32px Arial",{});return e.forEach(e=>{s[e]=t(o,e,n,a)}),s}function r(e){var t=document.createElement("script");t.src=e,t.defer=!0,document.head.appendChild(t)}a.supports={everything:!0,everythingExceptFlag:!0},new Promise(t=>{let n=function(){try{var e=JSON.parse(sessionStorage.getItem(o));if("object"==typeof e&&"number"==typeof e.timestamp&&(new Date).valueOf()<e.timestamp+604800&&"object"==typeof e.supportTests)return e.supportTests}catch(e){}return null}();if(!n){if("undefined"!=typeof Worker&&"undefined"!=typeof OffscreenCanvas&&"undefined"!=typeof URL&&URL.createObjectURL&&"undefined"!=typeof Blob)try{var e="postMessage("+f.toString()+"("+[JSON.stringify(s),u.toString(),c.toString(),p.toString()].join(",")+"));",a=new Blob([e],{type:"text/javascript"});const r=new Worker(URL.createObjectURL(a),{name:"wpTestEmojiSupports"});return void(r.onmessage=e=>{i(n=e.data),r.terminate(),t(n)})}catch(e){}i(n=f(s,u,c,p))}t(n)}).then(e=>{for(const n in e)a.supports[n]=e[n],a.supports.everything=a.supports.everything&&a.supports[n],"flag"!==n&&(a.supports.everythingExceptFlag=a.supports.everythingExceptFlag&&a.supports[n]);var t;a.supports.everythingExceptFlag=a.supports.everythingExceptFlag&&!a.supports.flag,a.supports.everything||((t=a.source||{}).concatemoji?r(t.concatemoji):t.wpemoji&&t.twemoji&&(r(t.twemoji),r(t.wpemoji)))});
+//# sourceURL=https://www.gamesource.it/wp-includes/js/wp-emoji-loader.min.js
+</script>
+<script type="7a03866fbfeef80a768a0891-text/javascript" id="slb_context">/* <![CDATA[ */if ( !!window.jQuery ) {(function($){$(document).ready(function(){if ( !!window.SLB ) { {$.extend(SLB, {"context":["public","user_guest"]});} }})})(jQuery);}/* ]]> */</script>
+
+<!-- JS generated by theme -->
+
+<script type="7a03866fbfeef80a768a0891-text/javascript">
+    
+</script>
+
+<script src="/cdn-cgi/scripts/7d0fa10a/cloudflare-static/rocket-loader.min.js" data-cf-settings="7a03866fbfeef80a768a0891-|49" defer></script></body>
+</html>
+
+
+<!-- Page supported by LiteSpeed Cache 7.7 on 2026-02-02 23:06:15 -->

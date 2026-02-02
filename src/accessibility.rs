@@ -126,6 +126,7 @@ pub enum PlayerCommand {
     Speed(f32),
     Pitch(f32),
     SpeedReset,
+    PitchReset,
     MuteToggle,
     GoToTime,
     AnnounceTime,

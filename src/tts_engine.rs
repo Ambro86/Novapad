@@ -15,7 +15,7 @@ use std::io::{BufWriter, Cursor, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use tokio_tungstenite::{
     connect_async, tungstenite, tungstenite::client::IntoClientRequest,
@@ -36,6 +36,7 @@ pub const MAX_TTS_TEXT_LEN: usize = 3000;
 pub const MAX_TTS_TEXT_LEN_LONG: usize = 2000;
 pub const MAX_TTS_FIRST_CHUNK_LEN_LONG: usize = 800;
 pub const TTS_LONG_TEXT_THRESHOLD: usize = MAX_TTS_TEXT_LEN;
+const EDGE_TTS_MAX_BYTES: usize = 4096;
 
 pub const WM_TTS_PLAYBACK_DONE: u32 = WM_APP + 3;
 pub const WM_TTS_PLAYBACK_ERROR: u32 = WM_APP + 5;
@@ -61,6 +62,8 @@ pub struct TtsChunk {
     pub original_len: usize,
     pub override_voice: Option<VoiceOverride>,
 }
+
+type EdgeAudioTx<'a> = Option<&'a mpsc::Sender<Result<(Vec<u8>, usize), String>>>;
 
 #[derive(Clone)]
 pub struct VoiceOverride {
@@ -252,17 +255,6 @@ pub struct AudiobookCommonOptions<'a> {
     pub pitch: i32,
     pub volume: i32,
     pub sapi4_threads: Option<u32>,
-}
-
-pub struct DownloadChunkOptions<'a> {
-    pub text: &'a str,
-    pub voice: &'a str,
-    pub request_id: &'a str,
-    pub rate: i32,
-    pub pitch: i32,
-    pub volume: i32,
-    pub language: Language,
-    pub cancel: &'a AtomicBool,
 }
 
 fn cancelled_message(language: Language) -> String {
@@ -812,8 +804,32 @@ fn tts_playback_inner(
     cancel_flag: Arc<AtomicBool>,
     mut rx: mpsc::UnboundedReceiver<TtsCommand>,
 ) {
+    let start = Instant::now();
+    let mut total_audio_bytes = 0usize;
+    let mut first_audio_at: Option<Instant> = None;
+    let log_end = |reason: &str, total_bytes: usize, first_audio_at: Option<Instant>| {
+        let elapsed_ms = start.elapsed().as_millis();
+        if let Some(first) = first_audio_at {
+            let first_ms = first.duration_since(start).as_millis();
+            log_debug(&format!(
+                "TTS end: reason={} elapsed_ms={} audio_bytes={} first_audio_ms={}",
+                reason, elapsed_ms, total_bytes, first_ms
+            ));
+        } else {
+            log_debug(&format!(
+                "TTS end: reason={} elapsed_ms={} audio_bytes={} first_audio_ms=na",
+                reason, elapsed_ms, total_bytes
+            ));
+        }
+    };
+    let engine_label = match tts_engine {
+        TtsEngine::Edge => "edge",
+        TtsEngine::Sapi4 => "sapi4",
+        TtsEngine::Sapi5 => "sapi5",
+    };
     log_debug(&format!(
-        "TTS start: voice={voice} chunks={} text_len={}",
+        "TTS start: engine={} voice={voice} chunks={} text_len={}",
+        engine_label,
         chunks.len(),
         cleaned.len()
     ));
@@ -824,6 +840,11 @@ fn tts_playback_inner(
                 hwnd_copy,
                 session_id,
                 "Audio output device not available.".to_string(),
+            );
+            log_end(
+                "output_device_unavailable",
+                total_audio_bytes,
+                first_audio_at,
             );
             return;
         }
@@ -836,6 +857,7 @@ fn tts_playback_inner(
         Ok(rt) => rt,
         Err(err) => {
             post_tts_error(hwnd_copy, session_id, err.to_string());
+            log_end("runtime_init_failed", total_audio_bytes, first_audio_at);
             return;
         }
     };
@@ -849,35 +871,108 @@ fn tts_playback_inner(
     let volume = tts_volume;
 
     rt.spawn(async move {
-        for chunk_obj in chunks_downloader {
+        let all_edge = tts_engine == TtsEngine::Edge
+            && chunks_downloader.iter().all(|chunk| {
+                chunk
+                    .override_voice
+                    .as_ref()
+                    .map(|v| v.engine == TtsEngine::Edge)
+                    .unwrap_or(true)
+            });
+
+        if all_edge {
+            const WS_RETRY_MAX: usize = 10;
+            for attempt in 1..=WS_RETRY_MAX {
+                let ws_result = download_edge_chunks_ws(
+                    &chunks_downloader,
+                    &voice_downloader,
+                    rate,
+                    pitch,
+                    volume,
+                    cancel_downloader.as_ref(),
+                    Some(&audio_tx),
+                )
+                .await;
+                match ws_result {
+                    Ok(_) => return,
+                    Err(e) => {
+                        if cancel_downloader.load(Ordering::SeqCst) {
+                            return;
+                        }
+                        crate::log_debug(&format!(
+                            "Edge WS reuse failed (attempt {}/{}): {}",
+                            attempt, WS_RETRY_MAX, e
+                        ));
+                        if attempt == WS_RETRY_MAX {
+                            let _unused = audio_tx.send(Err(e)).await;
+                            return;
+                        }
+                        tokio::time::sleep(Duration::from_millis(500)).await;
+                    }
+                }
+            }
+            return;
+        }
+
+        const PREFETCH_CONCURRENCY: usize = 6;
+        const FALLBACK_FIRST_AUDIO_TIMEOUT: Duration = Duration::from_secs(5);
+        let tasks = chunks_downloader.into_iter().map(|chunk_obj| {
+            let cancel = cancel_downloader.clone();
+            let voice = voice_downloader.clone();
+            async move {
+                if cancel.load(Ordering::SeqCst) {
+                    return Ok::<Option<(Vec<u8>, usize)>, String>(None);
+                }
+                let (engine, chunk_voice) = if let Some(override_voice) = &chunk_obj.override_voice
+                {
+                    (override_voice.engine, override_voice.voice.as_str())
+                } else {
+                    (tts_engine, voice.as_str())
+                };
+                let data = synthesize_segment_bytes(
+                    engine,
+                    &chunk_obj.text_to_read,
+                    chunk_voice,
+                    rate,
+                    pitch,
+                    volume,
+                    language,
+                )
+                .await?;
+                Ok(Some((data, chunk_obj.original_len)))
+            }
+        });
+
+        let mut stream = futures_util::stream::iter(tasks).buffered(PREFETCH_CONCURRENCY);
+        let mut sent_any = false;
+        loop {
             if cancel_downloader.load(Ordering::SeqCst) {
                 break;
             }
-            let (engine, chunk_voice) = if let Some(override_voice) = &chunk_obj.override_voice {
-                (override_voice.engine, override_voice.voice.as_str())
-            } else {
-                (tts_engine, voice_downloader.as_str())
-            };
-            match synthesize_segment_bytes(
-                engine,
-                &chunk_obj.text_to_read,
-                chunk_voice,
-                rate,
-                pitch,
-                volume,
-                language,
-            )
-            .await
-            {
-                Ok(data) => {
-                    if audio_tx
-                        .send(Ok((data, chunk_obj.original_len)))
-                        .await
-                        .is_err()
-                    {
+            let next = if !sent_any {
+                match tokio::time::timeout(FALLBACK_FIRST_AUDIO_TIMEOUT, stream.next()).await {
+                    Ok(value) => value,
+                    Err(_) => {
+                        let _unused = audio_tx
+                            .send(Err("Fallback: first audio timeout".to_string()))
+                            .await;
                         break;
                     }
                 }
+            } else {
+                stream.next().await
+            };
+            let Some(result) = next else {
+                break;
+            };
+            match result {
+                Ok(Some((data, len))) => {
+                    if audio_tx.send(Ok((data, len))).await.is_err() {
+                        break;
+                    }
+                    sent_any = true;
+                }
+                Ok(None) => break,
                 Err(e) => {
                     if let Err(err) = audio_tx.send(Err(e)).await {
                         crate::log_debug(&format!("Failed to send audio error: {:?}", err));
@@ -891,9 +986,11 @@ fn tts_playback_inner(
     let mut appended_any = false;
     let mut paused = false;
     let mut current_offset: usize = 0;
+    let mut end_reason = "completed";
 
     loop {
         if cancel_flag.load(Ordering::SeqCst) {
+            end_reason = "cancelled";
             break;
         }
 
@@ -925,18 +1022,37 @@ fn tts_playback_inner(
         });
 
         let Some(res) = packet else {
+            if !appended_any {
+                end_reason = "no_audio";
+                crate::log_debug(&format!(
+                    "TTS no audio received (engine={}, cancelled={})",
+                    engine_label,
+                    cancel_flag.load(Ordering::SeqCst)
+                ));
+            }
             break;
         };
         let (audio, orig_len) = match res {
             Ok(data) => data,
             Err(e) => {
                 post_tts_error(hwnd_copy, session_id, e);
+                end_reason = "download_error";
                 break;
             }
         };
 
         if audio.is_empty() {
             continue;
+        }
+
+        total_audio_bytes = total_audio_bytes.saturating_add(audio.len());
+        if first_audio_at.is_none() {
+            first_audio_at = Some(Instant::now());
+            let first_ms = first_audio_at
+                .as_ref()
+                .map(|t| t.duration_since(start).as_millis())
+                .unwrap_or(0);
+            log_debug(&format!("TTS first audio: elapsed_ms={}", first_ms));
         }
 
         unsafe {
@@ -955,6 +1071,7 @@ fn tts_playback_inner(
             Ok(source) => source,
             Err(_) => {
                 post_tts_error(hwnd_copy, session_id, "Failed to decode audio.".to_string());
+                end_reason = "decode_error";
                 break;
             }
         };
@@ -964,20 +1081,24 @@ fn tts_playback_inner(
         while !sink.empty() {
             if cancel_flag.load(Ordering::SeqCst) {
                 sink.stop();
+                end_reason = "cancelled";
                 break;
             }
             while let Ok(cmd) = rx.try_recv() {
                 if handle_tts_command(cmd, &sink, cancel_flag.as_ref(), &mut paused) {
+                    end_reason = "stopped";
                     break;
                 }
             }
             if cancel_flag.load(Ordering::SeqCst) {
                 sink.stop();
+                end_reason = "cancelled";
                 break;
             }
             std::thread::sleep(Duration::from_millis(50));
         }
         if cancel_flag.load(Ordering::SeqCst) {
+            end_reason = "cancelled";
             break;
         }
         current_offset += orig_len;
@@ -995,6 +1116,7 @@ fn tts_playback_inner(
             }
         }
     }
+    log_end(end_reason, total_audio_bytes, first_audio_at);
 }
 
 pub fn play_edge_bytes_async(bytes: Vec<u8>, volume: i32) -> Arc<AtomicBool> {
@@ -1076,66 +1198,6 @@ pub async fn download_audio_chunk(
     ))
 }
 
-async fn wait_or_cancel(duration: Duration, cancel: &AtomicBool) -> bool {
-    tokio::select! {
-        _ = tokio::time::sleep(duration) => false,
-        _ = async {
-            while !cancel.load(Ordering::Relaxed) {
-                tokio::time::sleep(Duration::from_millis(50)).await;
-            }
-        } => true,
-    }
-}
-
-pub async fn download_audio_chunk_cancel(
-    options: DownloadChunkOptions<'_>,
-) -> Result<Vec<u8>, String> {
-    let max_retries = 40;
-    let mut last_error = String::new();
-
-    for attempt in 1..=max_retries {
-        if options.cancel.load(Ordering::Relaxed) {
-            return Err(cancelled_message(options.language));
-        }
-        match download_audio_chunk_attempt(
-            options.text,
-            options.voice,
-            options.request_id,
-            options.rate,
-            options.pitch,
-            options.volume,
-        )
-        .await
-        {
-            Ok(data) => return Ok(data),
-            Err(e) => {
-                last_error = e;
-                let msg = i18n::tr_f(
-                    options.language,
-                    "tts.chunk_download_retry",
-                    &[
-                        ("attempt", &attempt.to_string()),
-                        ("max", &max_retries.to_string()),
-                        ("err", &last_error),
-                    ],
-                );
-                log_debug(&msg);
-                if attempt < max_retries
-                    && wait_or_cancel(Duration::from_millis(500 * attempt as u64), options.cancel)
-                        .await
-                {
-                    return Err(cancelled_message(options.language));
-                }
-            }
-        }
-    }
-    Err(i18n::tr_f(
-        options.language,
-        "tts.chunk_download_error",
-        &[("err", &last_error)],
-    ))
-}
-
 async fn download_audio_chunk_attempt(
     text: &str,
     voice: &str,
@@ -1179,7 +1241,7 @@ async fn download_audio_chunk_attempt(
         HeaderValue::from_str(&cookie).map_err(|err| err.to_string())?,
     );
 
-    let connect_timeout = Duration::from_secs(10);
+    let connect_timeout = Duration::from_secs(5);
     let (ws_stream, _) = match tokio::time::timeout(connect_timeout, connect_async(request)).await {
         Ok(res) => res.map_err(|e: tungstenite::Error| e.to_string())?,
         Err(_) => {
@@ -1249,6 +1311,179 @@ async fn download_audio_chunk_attempt(
         }
     }
     Ok(audio_data)
+}
+
+async fn read_edge_audio_turn(
+    read: &mut futures_util::stream::SplitStream<
+        tokio_tungstenite::WebSocketStream<
+            tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+        >,
+    >,
+) -> Result<Vec<u8>, String> {
+    let mut audio_data = Vec::new();
+    while let Some(msg) = read.next().await {
+        let msg: Message = msg.map_err(|e: tungstenite::Error| e.to_string())?;
+        match msg {
+            Message::Text(text) => {
+                if text.contains("Path:turn.end") {
+                    break;
+                }
+            }
+            Message::Binary(data) => {
+                if data.len() < 2 {
+                    continue;
+                }
+                let be_len = u16::from_be_bytes([data[0], data[1]]) as usize;
+                let le_len = u16::from_le_bytes([data[0], data[1]]) as usize;
+                let mut parsed = false;
+                for header_len in [be_len, le_len] {
+                    if header_len == 0 || data.len() < header_len + 2 {
+                        continue;
+                    }
+                    let headers_bytes = &data[2..2 + header_len];
+                    let headers_str = String::from_utf8_lossy(headers_bytes);
+                    if headers_str.contains("Path:audio") {
+                        audio_data.extend_from_slice(&data[2 + header_len..]);
+                        parsed = true;
+                        break;
+                    }
+                }
+                if parsed {
+                    continue;
+                }
+            }
+            Message::Close(_) => break,
+            _ => {}
+        }
+    }
+    Ok(audio_data)
+}
+
+async fn download_edge_chunks_ws(
+    chunks: &[TtsChunk],
+    default_voice: &str,
+    tts_rate: i32,
+    tts_pitch: i32,
+    tts_volume: i32,
+    cancel: &AtomicBool,
+    audio_tx: EdgeAudioTx<'_>,
+) -> Result<Vec<Vec<u8>>, String> {
+    let first_audio_timeout = Duration::from_secs(3);
+    let sec_ms_gec = generate_sec_ms_gec();
+    let sec_ms_gec_version = "1-132.0.2917.39";
+    let request_id = Uuid::new_v4().simple().to_string();
+
+    let url_str = format!(
+        "{}?TrustedClientToken={}&ConnectionId={}&Sec-MS-GEC={}&Sec-MS-GEC-Version={}",
+        WSS_URL_BASE, TRUSTED_CLIENT_TOKEN, request_id, sec_ms_gec, sec_ms_gec_version
+    );
+    let url = Url::parse(&url_str).map_err(|err| err.to_string())?;
+
+    let mut request = url
+        .as_str()
+        .into_client_request()
+        .map_err(|e: tungstenite::Error| e.to_string())?;
+    let headers = request.headers_mut();
+    headers.insert("Pragma", HeaderValue::from_static("no-cache"));
+    headers.insert("Cache-Control", HeaderValue::from_static("no-cache"));
+    headers.insert(
+        "Origin",
+        HeaderValue::from_static("chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold"),
+    );
+    headers.insert("User-Agent", HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0"));
+    headers.insert(
+        "Accept-Encoding",
+        HeaderValue::from_static("gzip, deflate, br"),
+    );
+    headers.insert(
+        "Accept-Language",
+        HeaderValue::from_static("en-US,en;q=0.9"),
+    );
+    let cookie = format!("muid={};", generate_muid());
+    headers.insert(
+        "Cookie",
+        HeaderValue::from_str(&cookie).map_err(|err| err.to_string())?,
+    );
+
+    let connect_timeout = Duration::from_secs(3);
+    let (ws_stream, _) = match tokio::time::timeout(connect_timeout, connect_async(request)).await {
+        Ok(res) => res.map_err(|e: tungstenite::Error| e.to_string())?,
+        Err(_) => {
+            return Err("WebSocket connect timeout".to_string());
+        }
+    };
+    crate::log_debug("Edge WS: connected.");
+    let (mut write, mut read) = ws_stream.split();
+
+    let config_msg = format!(
+        "X-Timestamp:{}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{{\"context\":{{\"synthesis\":{{\"audio\":{{\"metadataoptions\":{{\"sentenceBoundaryEnabled\":\"false\",\"wordBoundaryEnabled\":\"false\"}},\"outputFormat\":\"audio-24khz-48kbitrate-mono-mp3\"}}}}}}}}",
+        get_date_string()
+    );
+    write
+        .send(Message::Text(config_msg.into()))
+        .await
+        .map_err(|e: tungstenite::Error| e.to_string())?;
+
+    let mut out = Vec::with_capacity(chunks.len());
+    let mut sent_count = 0usize;
+    for (idx, chunk) in chunks.iter().enumerate() {
+        if cancel.load(Ordering::Relaxed) {
+            return Err("Cancelled".to_string());
+        }
+        let voice = chunk
+            .override_voice
+            .as_ref()
+            .map(|v| v.voice.as_str())
+            .unwrap_or(default_voice);
+        let req_id = Uuid::new_v4().simple().to_string();
+        let ssml = mkssml(&chunk.text_to_read, voice, tts_rate, tts_pitch, tts_volume);
+        let ssml_msg = format!(
+            "X-RequestId:{}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:{}Z\r\nPath:ssml\r\n\r\n{}",
+            req_id,
+            get_date_string(),
+            ssml
+        );
+        write
+            .send(Message::Text(ssml_msg.into()))
+            .await
+            .map_err(|e: tungstenite::Error| e.to_string())?;
+        let audio = if sent_count == 0 {
+            match tokio::time::timeout(first_audio_timeout, read_edge_audio_turn(&mut read)).await {
+                Ok(res) => res?,
+                Err(_) => {
+                    crate::log_debug(&format!(
+                        "Edge WS: first audio timeout (chunk_index={} text_len={} voice={})",
+                        idx,
+                        chunk.text_to_read.len(),
+                        voice
+                    ));
+                    return Err("Edge WS: first audio timeout".to_string());
+                }
+            }
+        } else {
+            read_edge_audio_turn(&mut read).await?
+        };
+        if audio.is_empty() {
+            crate::log_debug("Edge WS: received empty audio chunk.");
+            return Err("Edge WS: empty audio chunk".to_string());
+        }
+        if let Some(tx) = audio_tx {
+            let len = chunk.original_len;
+            if tx.send(Ok((audio, len))).await.is_err() {
+                return Ok(out);
+            }
+            sent_count = sent_count.saturating_add(1);
+        } else {
+            out.push(audio);
+        }
+    }
+
+    if audio_tx.is_some() && sent_count == 0 {
+        crate::log_debug("Edge WS: no audio sent to playback.");
+        return Err("Edge WS: no audio sent".to_string());
+    }
+
+    Ok(out)
 }
 
 unsafe fn get_text_from_caret(hwnd_edit: HWND) -> (String, i32) {
@@ -1557,13 +1792,14 @@ pub(crate) fn build_audiobook_parts_by_positions(
     positions: &[usize],
     split_on_newline: bool,
     dictionary: &[DictionaryEntry],
+    engine: TtsEngine,
 ) -> Option<Vec<Vec<String>>> {
     let parts_text = split_text_by_positions(text, positions)?;
     let mut parts_chunks = Vec::new();
 
     for part_text in parts_text {
         let prepared = prepare_tts_text(&part_text, split_on_newline, dictionary);
-        let chunks = split_text(&prepared);
+        let chunks = split_text_for_engine(&prepared, engine);
         // Even if chunks is empty (e.g. only whitespace part), we might want to keep the structure?
         // But run_tts_audiobook_part handles empty chunks by skipping.
         if !chunks.is_empty() {
@@ -1744,6 +1980,126 @@ pub fn split_text(text: &str) -> Vec<String> {
     chunks
 }
 
+fn remove_incompatible_characters_edge(text: &str) -> String {
+    text.chars()
+        .map(|ch| {
+            let code = ch as u32;
+            if (0..=8).contains(&code) || (11..=12).contains(&code) || (14..=31).contains(&code) {
+                ' '
+            } else {
+                ch
+            }
+        })
+        .collect()
+}
+
+fn escape_xml(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for ch in text.chars() {
+        match ch {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&apos;"),
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
+fn adjust_split_for_xml_entity(text: &str, mut split_at: usize) -> usize {
+    while split_at > 0 {
+        let prefix = &text[..split_at];
+        let Some(amp_idx) = prefix.rfind('&') else {
+            break;
+        };
+        if prefix[amp_idx..].contains(';') {
+            break;
+        }
+        split_at = amp_idx;
+    }
+    split_at
+}
+
+fn find_edge_split_idx(text: &str, max_bytes: usize) -> usize {
+    let total_bytes = text.len();
+    if total_bytes <= max_bytes {
+        return text.len();
+    }
+
+    let mut last_sentence = 0usize;
+    let mut last_newline = 0usize;
+    let mut last_space = 0usize;
+    let mut last_end = 0usize;
+
+    let mut iter = text.char_indices().peekable();
+    while let Some((idx, ch)) = iter.next() {
+        let end = idx + ch.len_utf8();
+        if end > max_bytes {
+            break;
+        }
+        last_end = end;
+
+        let next_is_space = iter.peek().map(|(_, c)| c.is_whitespace()).unwrap_or(true);
+        if matches!(ch, '.' | '!' | '?' | ';' | ':') && next_is_space {
+            last_sentence = end;
+        } else if ch == '\n' {
+            last_newline = end;
+        } else if ch.is_whitespace() {
+            last_space = end;
+        }
+    }
+
+    let mut split_at = if last_sentence > 0 {
+        last_sentence
+    } else if last_newline > 0 {
+        last_newline
+    } else if last_space > 0 {
+        last_space
+    } else {
+        last_end
+    };
+    split_at = adjust_split_for_xml_entity(text, split_at);
+    if split_at == 0 {
+        split_at = last_end;
+    }
+    split_at
+}
+
+fn split_text_edge(text: &str) -> Vec<String> {
+    let cleaned = remove_incompatible_characters_edge(text);
+    let escaped = escape_xml(&cleaned);
+    let mut remaining = escaped.as_str();
+    let mut out = Vec::new();
+
+    while remaining.len() > EDGE_TTS_MAX_BYTES {
+        let split_at = find_edge_split_idx(remaining, EDGE_TTS_MAX_BYTES);
+        if split_at == 0 || split_at >= remaining.len() {
+            break;
+        }
+        let (head, tail) = remaining.split_at(split_at);
+        let chunk = head.trim();
+        if !chunk.is_empty() {
+            out.push(chunk.to_string());
+        }
+        remaining = tail;
+    }
+    let tail = remaining.trim();
+    if !tail.is_empty() {
+        out.push(tail.to_string());
+    }
+    out
+}
+
+fn split_text_for_engine(text: &str, engine: TtsEngine) -> Vec<String> {
+    if engine == TtsEngine::Edge {
+        split_text_edge(text)
+    } else {
+        split_text(text)
+    }
+}
+
 fn split_by_custom_dictionary(
     text: &str,
     custom_entries: &[DictionaryEntry],
@@ -1770,6 +2126,10 @@ pub fn split_into_tts_chunks(
     let mut chunks: Vec<TtsChunk> = Vec::new();
 
     for (span_text, span_override, span_orig_len) in voice_spans {
+        let span_engine = span_override
+            .as_ref()
+            .map(|v| v.engine)
+            .unwrap_or(default_engine);
         if span_text.trim().is_empty() {
             if let Some(last) = chunks.last_mut() {
                 last.original_len += span_orig_len;
@@ -1810,11 +2170,28 @@ pub fn split_into_tts_chunks(
                 }
                 let orig_len = dict_len + pending_len;
                 pending_len = 0;
-                chunks.push(TtsChunk {
-                    text_to_read: prepared,
-                    original_len: orig_len,
-                    override_voice: span_override.clone(),
-                });
+                if span_engine == TtsEngine::Edge {
+                    let parts = split_text_edge(&prepared);
+                    if parts.is_empty() {
+                        continue;
+                    }
+                    let base = orig_len / parts.len();
+                    let extra = orig_len % parts.len();
+                    for (idx, part) in parts.into_iter().enumerate() {
+                        let part_len = base + if idx < extra { 1 } else { 0 };
+                        chunks.push(TtsChunk {
+                            text_to_read: part,
+                            original_len: part_len,
+                            override_voice: span_override.clone(),
+                        });
+                    }
+                } else {
+                    chunks.push(TtsChunk {
+                        text_to_read: prepared,
+                        original_len: orig_len,
+                        override_voice: span_override.clone(),
+                    });
+                }
             }
             if pending_len > 0
                 && let Some(last) = chunks.last_mut()
@@ -1980,6 +2357,7 @@ pub fn start_audiobook(hwnd: HWND) {
                     &positions,
                     split_on_newline,
                     &dictionary,
+                    tts_engine,
                 );
                 if marker_parts.is_none() {
                     split_parts = 0;
@@ -1999,7 +2377,7 @@ pub fn start_audiobook(hwnd: HWND) {
     let chunks = if marker_parts.is_some() || mixed_needed {
         Vec::new()
     } else {
-        split_text(&prepared)
+        split_text_for_engine(&prepared, tts_engine)
     };
 
     let mixed_chunks = if mixed_needed && marker_parts.is_none() {
@@ -3157,87 +3535,77 @@ pub(crate) fn run_tts_audiobook_part(
         .map_err(|err| err.to_string())?;
 
     rt.block_on(async {
-        let tasks = chunks.iter().enumerate().map(|(i, chunk)| {
-            let chunk = chunk.clone();
-            let voice = options.voice.to_string();
-            let cancel = options.cancel.clone();
-            let lang = options.language;
-            let rate = options.rate;
-            let pitch = options.pitch;
-            let volume = options.volume;
-            async move {
-                let mut combined = Vec::new();
-                if chunk.trim().is_empty() {
-                    return Ok::<Vec<u8>, String>(combined);
-                }
-                loop {
-                    if cancel.load(Ordering::Relaxed) {
-                        return Err("Cancelled".to_string());
-                    }
-                    let request_id = Uuid::new_v4().simple().to_string();
-                    match download_audio_chunk_cancel(DownloadChunkOptions {
-                        text: &chunk,
-                        voice: &voice,
-                        request_id: &request_id,
-                        rate,
-                        pitch,
-                        volume,
-                        language: lang,
-                        cancel: cancel.as_ref(),
-                    })
-                    .await
-                    {
-                        Ok(data) => {
-                            combined.extend_from_slice(&data);
+        if options.cancel.load(Ordering::Relaxed) {
+            return Err(cancelled_message(options.language));
+        }
+
+        if chunks.is_empty() {
+            return Ok(());
+        }
+
+        let edge_chunks: Vec<TtsChunk> = chunks
+            .iter()
+            .map(|chunk| TtsChunk {
+                text_to_read: chunk.clone(),
+                original_len: chunk.chars().count(),
+                override_voice: None,
+            })
+            .collect();
+
+        let edge_result = download_edge_chunks_ws(
+            &edge_chunks,
+            options.voice,
+            options.rate,
+            options.pitch,
+            options.volume,
+            options.cancel.as_ref(),
+            None,
+        )
+        .await;
+
+        let audio_parts = match edge_result {
+            Ok(parts) => parts,
+            Err(err) => {
+                const WS_RETRY_MAX: usize = 10;
+                let mut last_err = err;
+                let mut success = None;
+                for attempt in 1..=WS_RETRY_MAX {
+                    crate::log_debug(&format!(
+                        "Edge WS export failed (attempt {}/{}): {}",
+                        attempt, WS_RETRY_MAX, last_err
+                    ));
+                    let res = download_edge_chunks_ws(
+                        &edge_chunks,
+                        options.voice,
+                        options.rate,
+                        options.pitch,
+                        options.volume,
+                        options.cancel.as_ref(),
+                        None,
+                    )
+                    .await;
+                    match res {
+                        Ok(parts) => {
+                            success = Some(parts);
                             break;
                         }
-                        Err(err) => {
-                            if cancel.load(Ordering::Relaxed) {
-                                return Err("Cancelled".to_string());
-                            }
-                            let msg = i18n::tr_f(
-                                lang,
-                                "tts.chunk_download_retry_wait",
-                                &[("index", &(i + 1).to_string()), ("err", &err)],
-                            );
-                            log_debug(&msg);
-
-                            tokio::select! {
-                                _ = tokio::time::sleep(Duration::from_secs(5)) => {},
-                                _ = async {
-                                    while !cancel.load(Ordering::Relaxed) {
-                                        tokio::time::sleep(Duration::from_millis(100)).await;
-                                    }
-                                } => {
-                                    return Err("Cancelled".to_string());
-                                }
-                            }
-                        }
+                        Err(e) => last_err = e,
                     }
                 }
-
-                Ok::<Vec<u8>, String>(combined)
+                if let Some(parts) = success {
+                    parts
+                } else {
+                    return Err(last_err);
+                }
             }
-        });
-
-        let mut stream = futures_util::stream::iter(tasks).buffered(30);
-
-        while let Some(result) = stream.next().await {
+        };
+        for audio in audio_parts {
             if options.cancel.load(Ordering::Relaxed) {
                 return Err(cancelled_message(options.language));
             }
-            let audio = match result {
-                Ok(data) => data,
-                Err(e) if e == "Cancelled" => return Err(cancelled_message(options.language)),
-                Err(e) => return Err(e),
-            };
-
             writer.write_all(&audio).map_err(|err| err.to_string())?;
             *current_global_progress += 1;
             if options.progress_hwnd.0 != 0 {
-                if options.cancel.load(Ordering::Relaxed) {
-                    return Err(cancelled_message(options.language));
-                }
                 unsafe {
                     if let Err(e) = PostMessageW(
                         options.progress_hwnd,

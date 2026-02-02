@@ -1715,6 +1715,7 @@ fn export_single_audiobook(
                         &positions,
                         tts.split_on_newline,
                         &tts.dictionary,
+                        tts.tts_engine,
                     ),
                     None,
                 )

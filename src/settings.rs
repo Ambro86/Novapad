@@ -655,7 +655,6 @@ fn exe_drive_type(exe: &std::path::Path) -> Option<u32> {
     }
 }
 
-#[cfg(not(feature = "standalone"))]
 fn dir_is_writable(dir: &std::path::Path) -> bool {
     if std::fs::create_dir_all(dir).is_err() {
         return false;

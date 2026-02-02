@@ -12,6 +12,7 @@ use crate::subtitles::{
 use crate::tts_engine;
 use crate::tts_engine::TtsCommand;
 use crate::with_state;
+use futures_util::StreamExt;
 use rodio::{Decoder, Source};
 use sha2::Digest;
 use std::collections::{HashMap, HashSet};
@@ -21,6 +22,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::OnceLock;
+use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use std::time::UNIX_EPOCH;
@@ -1820,17 +1822,9 @@ fn start_subtitle_reader(
                     return;
                 }
             }
-            let rt = match tokio::runtime::Runtime::new() {
-                Ok(rt) => rt,
-                Err(e) => {
-                    log_debug(&format!("Subtitle: failed to create runtime: {}", e));
-                    return;
-                }
-            };
-
             if !cache_ready {
                 log_debug(&format!(
-                    "Subtitle: predownload start ({} cues) for {}",
+                    "Subtitle: predownload async start ({} cues) for {}",
                     cues.len(),
                     subtitle_path.display()
                 ));
@@ -1840,120 +1834,187 @@ fn start_subtitle_reader(
                 {
                     paused_for_download = true;
                 }
+
+                let first_idx = cues
+                    .iter()
+                    .position(|cue| !cue.text.trim().is_empty())
+                    .unwrap_or(0);
+                let (first_tx, first_rx) = std::sync::mpsc::channel::<()>();
+                let first_sent = Arc::new(AtomicBool::new(false));
+
+                let mut jobs = Vec::new();
                 for (idx, cue) in cues.iter_mut().enumerate() {
-                    if cancel.load(Ordering::Relaxed) {
-                        return;
-                    }
                     let text = cue.text.trim();
                     if text.is_empty() {
                         continue;
                     }
                     let path = dir.join(format!("cue_{:04}.mp3", idx));
-                    let mut empty_attempts = 0u64;
-                    let mut attempts = 0u64;
-                    loop {
-                        if cancel.load(Ordering::Relaxed) {
+                    cue.audio_path = Some(path.clone());
+                    jobs.push((idx, cue.text.clone(), path));
+                }
+                let total_jobs = jobs.len();
+
+                let cancel_bg = cancel.clone();
+                let voice = settings.tts_voice.clone();
+                let language = settings.language;
+                let rate = settings.tts_rate;
+                let pitch = settings.tts_pitch;
+                let volume = settings.tts_volume;
+                let record_mode = mode == SubtitleReadMode::Record;
+                let completed = Arc::new(AtomicUsize::new(0));
+                let first_sent_bg = first_sent.clone();
+                let first_tx_bg = first_tx.clone();
+                let completed_bg = completed.clone();
+                std::thread::spawn(move || {
+                    let rt = match tokio::runtime::Runtime::new() {
+                        Ok(rt) => rt,
+                        Err(e) => {
+                            log_debug(&format!("Subtitle: failed to create runtime: {}", e));
                             return;
                         }
-                        attempts = attempts.saturating_add(1);
-                        if attempts == 1 {
-                            log_debug(&format!(
-                                "Subtitle: downloading Edge cue {} -> {}",
-                                idx,
-                                path.display()
-                            ));
-                        }
-                        let request_id = Uuid::new_v4().simple().to_string();
-                        match rt.block_on(tts_engine::download_audio_chunk(
-                            text,
-                            &settings.tts_voice,
-                            &request_id,
-                            settings.tts_rate,
-                            settings.tts_pitch,
-                            settings.tts_volume,
-                            settings.language,
-                        )) {
-                            Ok(bytes) => {
-                                if bytes.is_empty() {
-                                    empty_attempts = empty_attempts.saturating_add(1);
-                                    log_debug(&format!(
-                                        "Subtitle: empty Edge audio (attempt {}) for cue {}",
-                                        empty_attempts, idx
-                                    ));
-                                    std::thread::sleep(Duration::from_millis(200));
-                                    continue;
+                    };
+                    rt.block_on(async move {
+                        const CUE_CONCURRENCY: usize = 30;
+                        let cancel_loop = cancel_bg.clone();
+                        let tasks = jobs.into_iter().map(|(idx, text, path)| {
+                            let cancel = cancel_bg.clone();
+                            let voice = voice.clone();
+                            let first_sent_bg = first_sent_bg.clone();
+                            let first_tx_bg = first_tx_bg.clone();
+                            let completed_bg = completed_bg.clone();
+                            async move {
+                            let mut empty_attempts = 0u64;
+                            let mut attempts = 0u64;
+                            loop {
+                                if cancel.load(Ordering::Relaxed) {
+                                    return;
                                 }
-                                match std::fs::write(&path, bytes) {
-                                    Ok(()) => {
-                                        let size =
-                                            std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-                                        log_debug(&format!(
-                                            "Subtitle: wrote Edge cue {} ({} bytes)",
-                                            idx, size
-                                        ));
-                                        if size == 0 {
+                                attempts = attempts.saturating_add(1);
+                                if attempts == 1 {
+                                    log_debug(&format!(
+                                        "Subtitle: downloading Edge cue {} -> {}",
+                                        idx,
+                                        path.display()
+                                    ));
+                                }
+                                let request_id = Uuid::new_v4().simple().to_string();
+                                match tts_engine::download_audio_chunk(
+                                    text.trim(),
+                                    &voice,
+                                    &request_id,
+                                    rate,
+                                    pitch,
+                                    volume,
+                                    language,
+                                )
+                                .await
+                                {
+                                    Ok(bytes) => {
+                                        if bytes.is_empty() {
                                             empty_attempts = empty_attempts.saturating_add(1);
                                             log_debug(&format!(
-                                                "Subtitle: zero-byte Edge audio (attempt {}) for {}",
-                                                empty_attempts,
-                                                path.display()
+                                                "Subtitle: empty Edge audio (attempt {}) for cue {}",
+                                                empty_attempts, idx
                                             ));
-                                            if let Err(e) = std::fs::remove_file(&path) {
+                                            tokio::time::sleep(Duration::from_millis(200)).await;
+                                            continue;
+                                        }
+                                        match std::fs::write(&path, bytes) {
+                                            Ok(()) => {
+                                                let size = std::fs::metadata(&path)
+                                                    .map(|m| m.len())
+                                                    .unwrap_or(0);
                                                 log_debug(&format!(
-                                                    "Subtitle: failed to remove empty file: {}",
+                                                    "Subtitle: wrote Edge cue {} ({} bytes)",
+                                                    idx, size
+                                                ));
+                                                if size == 0 {
+                                                    empty_attempts = empty_attempts.saturating_add(1);
+                                                    log_debug(&format!(
+                                                        "Subtitle: zero-byte Edge audio (attempt {}) for {}",
+                                                        empty_attempts,
+                                                        path.display()
+                                                    ));
+                                                    if let Err(e) = std::fs::remove_file(&path) {
+                                                        log_debug(&format!(
+                                                            "Subtitle: failed to remove empty file: {}",
+                                                            e
+                                                        ));
+                                                    }
+                                                    tokio::time::sleep(Duration::from_millis(200)).await;
+                                                    continue;
+                                                }
+                                                if idx == first_idx
+                                                    && !first_sent_bg.load(Ordering::Relaxed)
+                                                {
+                                                    first_sent_bg.store(true, Ordering::Relaxed);
+                                                    let _unused = first_tx_bg.send(());
+                                                }
+                                                let done = completed_bg.fetch_add(1, Ordering::Relaxed) + 1;
+                                                if record_mode
+                                                    && (done == total_jobs
+                                                        || done.is_multiple_of(10))
+                                                {
+                                                    let msg = format!(
+                                                        "{} sottotitoli di {} creati",
+                                                        done, total_jobs
+                                                    );
+                                                    let _ = nvda_speak(&msg);
+                                                }
+                                            }
+                                            Err(e) => {
+                                                log_debug(&format!(
+                                                    "Subtitle: failed to write audio chunk: {}",
                                                     e
                                                 ));
                                             }
-                                            std::thread::sleep(Duration::from_millis(200));
-                                            continue;
                                         }
-                                        cue.audio_path = Some(path.clone());
+                                        break;
                                     }
-                                    Err(e) => {
-                                        log_debug(&format!(
-                                            "Subtitle: failed to write audio chunk: {}",
-                                            e
-                                        ));
+                                    Err(err) => {
+                                        log_debug(&format!("Subtitle: download failed: {}", err));
+                                        if attempts.is_multiple_of(5) {
+                                            log_debug(&format!(
+                                                "Subtitle: download retrying (attempt {}) for cue {}",
+                                                attempts, idx
+                                            ));
+                                        }
+                                        tokio::time::sleep(Duration::from_millis(500)).await;
                                     }
                                 }
+                            }
+                            }
+                        });
+                        let mut stream =
+                            futures_util::stream::iter(tasks).buffered(CUE_CONCURRENCY);
+                        while let Some(()) = stream.next().await {
+                            if cancel_loop.load(Ordering::Relaxed) {
                                 break;
                             }
-                            Err(err) => {
-                                log_debug(&format!("Subtitle: download failed: {}", err));
-                                if attempts.is_multiple_of(5) {
-                                    log_debug(&format!(
-                                        "Subtitle: download retrying (attempt {}) for cue {}",
-                                        attempts, idx
-                                    ));
-                                }
-                                std::thread::sleep(Duration::from_millis(500));
-                            }
                         }
+                    });
+                });
+
+                let start_wait = std::time::Instant::now();
+                let mut first_ready = false;
+                while !first_ready {
+                    if cancel.load(Ordering::Relaxed) {
+                        return;
                     }
-                }
-                let available = cues.iter().filter(|cue| cue.audio_path.is_some()).count();
-                log_debug(&format!(
-                    "Subtitle: predownload complete ({}/{}) for {}",
-                    available,
-                    cues.len(),
-                    subtitle_path.display()
-                ));
-                log_debug(&format!(
-                    "Subtitle: cache dir {} (base {})",
-                    dir.display(),
-                    base_cache_dir.display()
-                ));
-                for (idx, cue) in cues.iter().enumerate().take(3) {
-                    if let Some(path) = cue.audio_path.as_ref() {
-                        let size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
-                        log_debug(&format!(
-                            "Subtitle: cache cue {} -> {} ({} bytes)",
-                            idx,
-                            path.display(),
-                            size
-                        ));
+                    if first_rx.try_recv().is_ok() {
+                        first_ready = true;
+                        break;
                     }
+                    if start_wait.elapsed() >= Duration::from_secs(10) {
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(100));
                 }
+                log_debug(&format!(
+                    "Subtitle: first cue ready={} wait_ms={}",
+                    first_ready,
+                    start_wait.elapsed().as_millis()
+                ));
             } else {
                 for (idx, cue) in cues.iter_mut().enumerate() {
                     let path = dir.join(format!("cue_{:04}.mp3", idx));
@@ -2059,6 +2120,19 @@ fn start_subtitle_reader(
         let timer = WaitableTimer::new();
         if timer.is_none() {
             log_debug("Subtitle: high-precision timer unavailable, falling back to sleep.");
+        }
+
+        fn try_read_edge_audio(path: &Path) -> Option<Vec<u8>> {
+            if let Ok(bytes) = std::fs::read(path) {
+                return Some(bytes);
+            }
+            for _ in 0..5 {
+                std::thread::sleep(Duration::from_millis(100));
+                if let Ok(bytes) = std::fs::read(path) {
+                    return Some(bytes);
+                }
+            }
+            None
         }
 
         let wait_until_target = |mut current_pos: f64, target: f64| -> Option<f64> {
@@ -2226,7 +2300,7 @@ fn start_subtitle_reader(
                                     return;
                                 }
                                 if let Some(ref path) = cue.audio_path {
-                                    if let Ok(bytes) = std::fs::read(path) {
+                                    if let Some(bytes) = try_read_edge_audio(path) {
                                         let cancel = crate::tts_engine::play_edge_bytes_async(
                                             bytes,
                                             settings.tts_volume,

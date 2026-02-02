@@ -12,10 +12,10 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
 use windows::Win32::Media::Audio::{
-    AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
-    DEVICE_STATE_ACTIVE, EDataFlow, IAudioCaptureClient, IAudioClient, IMMDevice,
-    IMMDeviceCollection, IMMDeviceEnumerator, MMDeviceEnumerator, WAVEFORMATEX,
-    WAVEFORMATEXTENSIBLE, eCapture, eConsole, eRender,
+    AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
+    AUDCLNT_STREAMFLAGS_LOOPBACK, DEVICE_STATE_ACTIVE, EDataFlow, IAudioCaptureClient,
+    IAudioClient, IMMDevice, IMMDeviceCollection, IMMDeviceEnumerator, MMDeviceEnumerator,
+    WAVEFORMATEX, WAVEFORMATEXTENSIBLE, eCapture, eConsole, eRender,
 };
 use windows::Win32::Media::KernelStreaming::WAVE_FORMAT_EXTENSIBLE;
 use windows::Win32::Media::Multimedia::{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT};
@@ -66,9 +66,13 @@ pub fn list_output_devices() -> Result<Vec<AudioDevice>, String> {
     list_devices(eRender)
 }
 
-pub fn probe_device(device_id: &str, loopback: bool) -> Result<(), String> {
+pub fn probe_device_with_name(
+    device_id: &str,
+    device_name: &str,
+    loopback: bool,
+) -> Result<(), String> {
     let _com = ComGuard::new_mta().map_err(|e| format!("CoInitializeEx failed: {e}"))?;
-    let device = resolve_device(device_id, loopback)?;
+    let device = resolve_device_with_name(device_id, device_name, loopback)?;
     let client: IAudioClient = unsafe {
         device
             .Activate(CLSCTX_ALL, None)
@@ -87,7 +91,7 @@ pub fn probe_device(device_id: &str, loopback: bool) -> Result<(), String> {
         client
             .Initialize(
                 AUDCLNT_SHAREMODE_SHARED,
-                stream_flags,
+                stream_flags | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
                 10_000_000,
                 0,
                 mix_format,
@@ -162,9 +166,11 @@ fn device_friendly_name(device: &IMMDevice) -> Option<String> {
 pub struct RecorderConfig {
     pub include_mic: bool,
     pub mic_device_id: String,
+    pub mic_device_name: String,
     pub mic_gain: f32,
     pub include_system: bool,
     pub system_device_id: String,
+    pub system_device_name: String,
     pub system_gain: f32,
     pub output_format: PodcastFormat,
     pub mp3_bitrate: u32,
@@ -271,12 +277,14 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
         let stop_flag = stop.clone();
         let paused_flag = paused.clone();
         let device_id = config.mic_device_id.clone();
+        let device_name = config.mic_device_name.clone();
         let mic_gain = config.mic_gain;
         threads.push(thread::spawn(move || {
             crate::log_debug("Microphone capture thread started");
             let result = capture_source(CaptureOptions {
                 kind: SourceKind::Microphone,
                 device_id,
+                device_name,
                 loopback: false,
                 gain: mic_gain,
                 buffer,
@@ -307,12 +315,14 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
         let stop_flag = stop.clone();
         let paused_flag = paused.clone();
         let device_id = config.system_device_id.clone();
+        let device_name = config.system_device_name.clone();
         let system_gain = config.system_gain;
         threads.push(thread::spawn(move || {
             crate::log_debug("System audio capture thread started");
             let result = capture_source(CaptureOptions {
                 kind: SourceKind::System,
                 device_id,
+                device_name,
                 loopback: true,
                 gain: system_gain,
                 buffer,
@@ -791,6 +801,7 @@ fn write_mixed_audio_mp3(
 struct CaptureOptions {
     kind: SourceKind,
     device_id: String,
+    device_name: String,
     loopback: bool,
     gain: f32,
     buffer: Arc<MixBuffer>,
@@ -802,15 +813,20 @@ struct CaptureOptions {
 fn capture_source(options: CaptureOptions) -> Result<(), String> {
     let _com = ComGuard::new_mta().map_err(|e| format!("CoInitializeEx failed: {e}"))?;
     crate::log_debug(&format!(
-        "capture_source: kind={:?}, device_id='{}', loopback={}",
+        "capture_source: kind={:?}, device_id='{}', name='{}', loopback={}",
         match options.kind {
             SourceKind::Microphone => "Microphone",
             SourceKind::System => "System",
         },
         options.device_id,
+        options.device_name,
         options.loopback
     ));
-    let device = resolve_device(&options.device_id, options.loopback)?;
+    let device =
+        resolve_device_with_name(&options.device_id, &options.device_name, options.loopback)?;
+    if matches!(options.kind, SourceKind::Microphone) {
+        crate::log_debug("Microphone capture: device resolved");
+    }
     let client: IAudioClient = unsafe {
         device
             .Activate(CLSCTX_ALL, None)
@@ -832,7 +848,7 @@ fn capture_source(options: CaptureOptions) -> Result<(), String> {
         client
             .Initialize(
                 AUDCLNT_SHAREMODE_SHARED,
-                stream_flags,
+                stream_flags | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
                 10_000_000,
                 0,
                 mix_format,
@@ -843,6 +859,9 @@ fn capture_source(options: CaptureOptions) -> Result<(), String> {
     unsafe {
         CoTaskMemFree(Some(mix_format as *const _));
     }
+    if matches!(options.kind, SourceKind::Microphone) {
+        crate::log_debug("Microphone capture: client initialized");
+    }
 
     let capture: IAudioCaptureClient = unsafe {
         client
@@ -851,6 +870,9 @@ fn capture_source(options: CaptureOptions) -> Result<(), String> {
     };
     unsafe {
         client.Start().map_err(|e| format!("Start failed: {e}"))?;
+    }
+    if matches!(options.kind, SourceKind::Microphone) {
+        crate::log_debug("Microphone capture: client started");
     }
 
     let mut resampler =
@@ -954,9 +976,68 @@ fn resolve_device(device_id: &str, loopback: bool) -> Result<IMMDevice, String> 
     result
 }
 
+fn resolve_device_with_name(
+    device_id: &str,
+    device_name: &str,
+    loopback: bool,
+) -> Result<IMMDevice, String> {
+    let name = device_name.trim();
+
+    // Attempt to resolve by ID first
+    match resolve_device(device_id, loopback) {
+        Ok(device) => Ok(device),
+        Err(err) => {
+            if name.is_empty() {
+                return Err(err);
+            }
+            let flow = if loopback { eRender } else { eCapture };
+            let enumerator: IMMDeviceEnumerator = unsafe {
+                CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
+                    .map_err(|e| format!("MMDeviceEnumerator failed: {e}"))?
+            };
+            let collection: IMMDeviceCollection = unsafe {
+                enumerator
+                    .EnumAudioEndpoints(flow, DEVICE_STATE_ACTIVE)
+                    .map_err(|e| format!("EnumAudioEndpoints failed: {e}"))?
+            };
+            let count = unsafe {
+                collection
+                    .GetCount()
+                    .map_err(|e| format!("GetCount failed: {e}"))?
+            };
+            let needle = name.to_lowercase();
+            for index in 0..count {
+                let device: IMMDevice = unsafe {
+                    collection
+                        .Item(index)
+                        .map_err(|e| format!("Device Item failed: {e}"))?
+                };
+                if let Some(render_name) = device_friendly_name(&device)
+                    && (render_name.to_lowercase().contains(&needle)
+                        || needle.contains(&render_name.to_lowercase()))
+                {
+                    crate::log_debug(&format!(
+                        "resolve_device: matched by name '{}'",
+                        render_name
+                    ));
+                    return Ok(device);
+                }
+            }
+
+            Err(err)
+        }
+    }
+}
+
 fn parse_format(fmt: &WAVEFORMATEX) -> (u32, u16, SampleFormat) {
     let channels = fmt.nChannels;
     let rate = fmt.nSamplesPerSec;
+    if channels < 1 {
+        crate::log_debug(&format!(
+            "Recorder: invalid channel count {} in mix format",
+            channels
+        ));
+    }
     let mut format = match fmt.wFormatTag as u32 {
         WAVE_FORMAT_IEEE_FLOAT => SampleFormat::F32,
         _ => SampleFormat::I16,
@@ -1004,6 +1085,9 @@ fn update_peak(shared: &SharedState, kind: &SourceKind, samples: &[f32]) {
     match kind {
         SourceKind::Microphone => {
             shared.mic_peak.store(value, Ordering::Relaxed);
+            if value > 0 && value.is_multiple_of(5000) {
+                crate::log_debug(&format!("Recorder mic peak={}", value));
+            }
         }
         SourceKind::System => {
             shared.system_peak.store(value, Ordering::Relaxed);

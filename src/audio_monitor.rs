@@ -8,14 +8,18 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
+use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
 use windows::Win32::Media::Audio::{
-    AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, IAudioCaptureClient, IAudioClient,
-    IAudioRenderClient, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator, WAVEFORMATEX,
+    AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
+    DEVICE_STATE_ACTIVE, IAudioCaptureClient, IAudioClient, IAudioRenderClient, IMMDevice,
+    IMMDeviceCollection, IMMDeviceEnumerator, MMDeviceEnumerator, WAVEFORMATEX,
     WAVEFORMATEXTENSIBLE, eCapture, eConsole, eRender,
 };
 use windows::Win32::Media::KernelStreaming::WAVE_FORMAT_EXTENSIBLE;
 use windows::Win32::Media::Multimedia::{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT};
-use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
+use windows::Win32::System::Com::StructuredStorage::PropVariantToStringAlloc;
+use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree, STGM_READ};
+use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
 use windows::core::PCWSTR;
 
 pub struct MonitorHandle {
@@ -56,7 +60,7 @@ pub fn start_monitoring(
     let stop = Arc::new(AtomicBool::new(false));
 
     // Shared buffer between capture and playback threads (small for low latency)
-    let buffer = Arc::new(Mutex::new(VecDeque::<f32>::with_capacity(4800)));
+    let buffer = Arc::new(Mutex::new(VecDeque::<f32>::with_capacity(24000)));
 
     // Start capture thread
     let capture_stop = stop.clone();
@@ -71,8 +75,10 @@ pub fn start_monitoring(
     // Start playback thread
     let playback_stop = stop.clone();
     let playback_buffer = buffer;
+    // Don't prefer any specific device, use system default
+    let playback_name = String::new();
     let playback_thread = thread::spawn(move || {
-        if let Err(e) = playback_loop(playback_buffer, playback_stop) {
+        if let Err(e) = playback_loop(playback_buffer, playback_stop, playback_name) {
             crate::log_debug(&format!("Monitor playback error: {}", e));
         }
     });
@@ -112,22 +118,86 @@ fn resolve_input_device(device_id: &str) -> Result<IMMDevice, String> {
     result
 }
 
-fn resolve_output_device() -> Result<IMMDevice, String> {
+fn device_friendly_name(device: &IMMDevice) -> Option<String> {
+    unsafe {
+        let store: IPropertyStore = device.OpenPropertyStore(STGM_READ).ok()?;
+        let value = store.GetValue(&PKEY_Device_FriendlyName).ok()?;
+        let name_ptr = PropVariantToStringAlloc(&value).ok()?;
+        if name_ptr.is_null() {
+            return None;
+        }
+        let name = name_ptr.to_string().unwrap_or_default();
+        CoTaskMemFree(Some(name_ptr.0 as *const _));
+        if name.is_empty() { None } else { Some(name) }
+    }
+}
+
+fn resolve_output_device(preferred_name: Option<&str>) -> Result<IMMDevice, String> {
     let enumerator: IMMDeviceEnumerator = unsafe {
         CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
             .map_err(|e| format!("MMDeviceEnumerator failed: {e}"))?
     };
 
+    if let Some(name) = preferred_name {
+        let needle = name.trim();
+        if !needle.is_empty() {
+            let needle_lower = needle.to_lowercase();
+            let collection: IMMDeviceCollection = unsafe {
+                enumerator
+                    .EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE)
+                    .map_err(|e| format!("EnumAudioEndpoints(render) failed: {e}"))?
+            };
+            let count = unsafe {
+                collection
+                    .GetCount()
+                    .map_err(|e| format!("GetCount(render) failed: {e}"))?
+            };
+            for index in 0..count {
+                let device: IMMDevice = unsafe {
+                    collection
+                        .Item(index)
+                        .map_err(|e| format!("Device Item(render) failed: {e}"))?
+                };
+                if let Some(render_name) = device_friendly_name(&device)
+                    && (render_name.to_lowercase().contains(&needle_lower)
+                        || needle_lower.contains(&render_name.to_lowercase()))
+                {
+                    crate::log_debug(&format!(
+                        "Monitor: matched output device by name '{}'",
+                        render_name
+                    ));
+                    return Ok(device);
+                }
+            }
+        }
+    }
+
     unsafe {
-        enumerator
+        let device = enumerator
             .GetDefaultAudioEndpoint(eRender, eConsole)
-            .map_err(|e| format!("GetDefaultAudioEndpoint(render) failed: {e}"))
+            .map_err(|e| format!("GetDefaultAudioEndpoint(render) failed: {e}"))?;
+        if let Ok(id) = device.GetId() {
+            if id.is_null() {
+                crate::log_debug("Monitor: output device id is null");
+            } else {
+                let value = id.to_string().unwrap_or_default();
+                CoTaskMemFree(Some(id.0 as *const _));
+                crate::log_debug(&format!("Monitor: output device id='{}'", value));
+            }
+        }
+        Ok(device)
     }
 }
 
 fn parse_format(fmt: &WAVEFORMATEX) -> (u32, u16, SampleFormat) {
     let channels = fmt.nChannels;
     let rate = fmt.nSamplesPerSec;
+    if channels < 1 {
+        crate::log_debug(&format!(
+            "Monitor: invalid channel count {} in mix format",
+            channels
+        ));
+    }
     let mut format = match fmt.wFormatTag as u32 {
         WAVE_FORMAT_IEEE_FLOAT => SampleFormat::F32,
         _ => SampleFormat::I16,
@@ -175,15 +245,37 @@ fn to_mono_f32(samples: &[f32], channels: usize, gain: f32) -> Vec<f32> {
     out
 }
 
+use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
+
 fn capture_loop(
     device_id: String,
     gain: f32,
     buffer: Arc<Mutex<VecDeque<f32>>>,
     stop: Arc<AtomicBool>,
 ) -> Result<(), String> {
+    crate::log_debug(&format!(
+        "Monitor capture_loop started for device_id='{}'",
+        device_id
+    ));
     let _com = ComGuard::new_mta().map_err(|e| format!("CoInitializeEx failed: {e}"))?;
 
     let device = resolve_input_device(&device_id)?;
+
+    // Check Endpoint Volume
+    unsafe {
+        if let Ok(endpoint_volume) = device.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None) {
+            let level = endpoint_volume.GetMasterVolumeLevelScalar().unwrap_or(0.0);
+            let mute = endpoint_volume
+                .GetMute()
+                .unwrap_or(windows::Win32::Foundation::BOOL(0));
+            crate::log_debug(&format!(
+                "Monitor: Device System Volume: {:.0}% Muted: {:?}",
+                level * 100.0,
+                mute.as_bool()
+            ));
+        }
+    }
+
     let client: IAudioClient = unsafe {
         device
             .Activate(CLSCTX_ALL, None)
@@ -210,8 +302,8 @@ fn capture_loop(
         client
             .Initialize(
                 AUDCLNT_SHAREMODE_SHARED,
-                0,
-                500_000, // 50ms buffer for low latency
+                AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
+                1_000_000, // 100ms buffer for better compatibility
                 0,
                 mix_format,
                 None,
@@ -251,7 +343,9 @@ fn capture_loop(
                 .map_err(|e| format!("GetBuffer failed: {e}"))?;
         }
 
-        let samples = if flags & (AUDCLNT_BUFFERFLAGS_SILENT.0 as u32) != 0 {
+        let is_silent = flags & (AUDCLNT_BUFFERFLAGS_SILENT.0 as u32) != 0;
+
+        let samples = if is_silent {
             vec![0f32; frames as usize * input_channels as usize]
         } else {
             read_samples(data_ptr, frames, input_channels, input_format)
@@ -269,7 +363,7 @@ fn capture_loop(
         // Push to shared buffer
         if let Ok(mut q) = buffer.lock() {
             // Prevent buffer from growing too large (keep latency low)
-            if q.len() > 4800 {
+            if q.len() > 24000 {
                 q.clear(); // Drop all old samples to reset latency
             }
             q.extend(mono);
@@ -282,10 +376,14 @@ fn capture_loop(
     Ok(())
 }
 
-fn playback_loop(buffer: Arc<Mutex<VecDeque<f32>>>, stop: Arc<AtomicBool>) -> Result<(), String> {
+fn playback_loop(
+    buffer: Arc<Mutex<VecDeque<f32>>>,
+    stop: Arc<AtomicBool>,
+    preferred_output_name: String,
+) -> Result<(), String> {
     let _com = ComGuard::new_mta().map_err(|e| format!("CoInitializeEx failed: {e}"))?;
 
-    let device = resolve_output_device()?;
+    let device = resolve_output_device(Some(&preferred_output_name))?;
     let client: IAudioClient = unsafe {
         device
             .Activate(CLSCTX_ALL, None)
@@ -313,7 +411,7 @@ fn playback_loop(buffer: Arc<Mutex<VecDeque<f32>>>, stop: Arc<AtomicBool>) -> Re
             .Initialize(
                 AUDCLNT_SHAREMODE_SHARED,
                 0,
-                500_000, // 50ms buffer for low latency
+                1_000_000, // 100ms buffer
                 0,
                 mix_format,
                 None,

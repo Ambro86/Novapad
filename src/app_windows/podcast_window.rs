@@ -1,10 +1,11 @@
 use crate::accessibility::{handle_accessibility, to_wide};
 use crate::app_windows::podcast_save_window;
 use crate::audio_monitor::{MonitorHandle, start_monitoring};
+use crate::log_debug;
 // VIDEO REMOVED: MonitorInfo and list_monitors imports removed
 use crate::podcast_recorder::{
     AudioDevice, RecorderConfig, RecorderHandle, RecorderStatus, default_output_folder,
-    list_input_devices, list_output_devices, probe_device, start_recording,
+    list_input_devices, list_output_devices, probe_device_with_name, start_recording,
 };
 use crate::settings::{
     AppSettings, Language, PODCAST_DEVICE_DEFAULT, PodcastFormat, confirm_title,
@@ -1071,17 +1072,7 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 PODCAST_ID_MIC_DEVICE => {
                     if code == CBN_SELCHANGE as u16 {
                         persist_settings(state);
-                        if state.monitor_handle.is_some() {
-                            if let Some(handle) = state.monitor_handle.take() {
-                                handle.stop();
-                            }
-                            let device_id = selected_device_id(state, true);
-                            let device_name = selected_device_name(state, true);
-                            let gain = selected_mic_gain(state);
-                            if let Ok(handle) = start_monitoring(device_id, device_name, gain) {
-                                state.monitor_handle = Some(handle);
-                            }
-                        }
+                        restart_mic_monitor(state);
                     }
                     handled = true;
                 }
@@ -1089,17 +1080,7 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                     if code == CBN_SELCHANGE as u16 {
                         persist_settings(state);
                         // Restart monitor with new gain if active
-                        if state.monitor_handle.is_some() {
-                            if let Some(handle) = state.monitor_handle.take() {
-                                handle.stop();
-                            }
-                            let device_id = selected_device_id(state, true);
-                            let device_name = selected_device_name(state, true);
-                            let gain = selected_mic_gain(state);
-                            if let Ok(handle) = start_monitoring(device_id, device_name, gain) {
-                                state.monitor_handle = Some(handle);
-                            }
-                        }
+                        restart_mic_monitor(state);
                     }
                     handled = true;
                 }
@@ -1744,6 +1725,42 @@ fn update_filename_preview(state: &PodcastState) {
         }
     }
 }
+
+fn restart_mic_monitor(state: &mut PodcastState) {
+    let checked = is_checked(state.monitor_check);
+    if !checked {
+        if let Some(handle) = state.monitor_handle.take() {
+            handle.stop();
+        }
+        return;
+    }
+    if let Some(handle) = state.monitor_handle.take() {
+        handle.stop();
+    }
+    let device_id = selected_device_id(state, true);
+    let device_name = selected_device_name(state, true);
+    let gain = selected_mic_gain(state);
+    log_debug(&format!(
+        "Podcast monitor: mic device_id='{}' name='{}' gain={}",
+        device_id, device_name, gain
+    ));
+    match start_monitoring(device_id, device_name, gain) {
+        Ok(handle) => state.monitor_handle = Some(handle),
+        Err(e) => {
+            unsafe {
+                SendMessageW(
+                    state.monitor_check,
+                    BM_SETCHECK,
+                    WPARAM(BST_UNCHECKED.0 as usize),
+                    LPARAM(0),
+                );
+            }
+            unsafe {
+                show_error(state.parent, state.language, &e);
+            }
+        }
+    }
+}
 fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
     if state.recorder.is_some() {
         return;
@@ -1770,7 +1787,21 @@ fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
 
     let mic_device_id = selected_device_id(state, true);
     let system_device_id = selected_device_id(state, false);
-    if include_mic && let Err(err) = probe_device(&mic_device_id, false) {
+    let mic_device_name = selected_device_name(state, true);
+    let system_device_name = selected_device_name(state, false);
+    log_debug(&format!(
+        "Podcast record: mic device_id='{}' name='{}' gain={} system device_id='{}' name='{}' gain={}",
+        mic_device_id,
+        mic_device_name,
+        selected_mic_gain(state),
+        system_device_id,
+        system_device_name,
+        selected_system_gain(state)
+    ));
+    if include_mic
+        && let Err(err) =
+            probe_device_with_name(&mic_device_id, &selected_device_name(state, true), false)
+    {
         unsafe {
             show_error(
                 state.parent,
@@ -1789,7 +1820,10 @@ fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
             }
         }
     }
-    if include_system && let Err(err) = probe_device(&system_device_id, true) {
+    if include_system
+        && let Err(err) =
+            probe_device_with_name(&system_device_id, &selected_device_name(state, false), true)
+    {
         unsafe {
             show_error(
                 state.parent,
@@ -1821,9 +1855,11 @@ fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
     let config = RecorderConfig {
         include_mic,
         mic_device_id: selected_device_id(state, true),
+        mic_device_name: selected_device_name(state, true),
         mic_gain: selected_mic_gain(state),
         include_system,
         system_device_id: selected_device_id(state, false),
+        system_device_name: selected_device_name(state, false),
         system_gain: selected_system_gain(state),
         output_format: selected_format(state),
         mp3_bitrate: selected_bitrate(state),

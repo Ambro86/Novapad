@@ -209,6 +209,7 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
     if let Ok(s) = Selector::parse("script[type='application/ld+json']") {
         for element in document.select(&s) {
             let json = element.text().collect::<Vec<_>>().join("");
+            let mut has_rich_json_body = false;
 
             // Cerchiamo Autore e Data
             if author_info.is_empty() {
@@ -257,6 +258,20 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
                     let abs_start = search_pos + key_pos + key.len();
                     if abs_start < json.len() {
                         if let Some((val, end_pos)) = extract_json_string(&json[abs_start..]) {
+                            if key == "\"description\":\"" {
+                                let window_start = key_pos.saturating_sub(400);
+                                let window = &json[window_start..key_pos];
+                                let is_person_or_org = window.contains("\"@type\":\"Person\"")
+                                    || window.contains("\"@type\":\"Organization\"");
+                                let is_article = window.contains("\"@type\":\"Article\"")
+                                    || window.contains("\"@type\":\"NewsArticle\"")
+                                    || window.contains("\"@type\":\"TechArticle\"")
+                                    || window.contains("\"@type\":\"BlogPosting\"");
+                                if is_person_or_org || !is_article {
+                                    search_pos = abs_start + end_pos;
+                                    continue;
+                                }
+                            }
                             if val.len() > 40
                                 && !val.contains("http")
                                 && !body_acc.contains(&val)
@@ -264,7 +279,9 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
                             {
                                 body_acc.push_str(&val);
                                 body_acc.push_str("\n\n");
-                                found_anything = true;
+                                if key == "\"articleBody\":\"" {
+                                    has_rich_json_body = true;
+                                }
                             }
                             search_pos = abs_start + end_pos;
                         } else {
@@ -274,6 +291,9 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
                         break;
                     }
                 }
+            }
+            if has_rich_json_body {
+                found_anything = true;
             }
         }
     }
@@ -346,6 +366,8 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
     // 3. FALLBACK CSS
     if !found_anything || body_acc.len() < 300 {
         let content_selectors = [
+            ".entry-content p",
+            ".wp-block-post-content p",
             ".ifq-post__content p",
             ".ifq-post__content",
             "p[data-type='paragraph']", // WSJ modern

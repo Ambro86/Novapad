@@ -3409,6 +3409,11 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                     tts_engine::start_audiobook(hwnd);
                     LRESULT(0)
                 }
+                IDM_EDIT_AUDIOBOOK_SELECTION => {
+                    log_debug("Menu: Record audiobook from selection");
+                    tts_engine::start_audiobook_from_selection(hwnd);
+                    LRESULT(0)
+                }
                 IDM_FILE_BATCH_AUDIOBOOK => {
                     log_debug("Menu: Batch audiobooks");
                     app_windows::batch_audiobooks_window::open(hwnd);
@@ -5971,6 +5976,28 @@ pub(crate) unsafe fn show_editor_context_menu(hwnd: HWND, hwnd_edit: HWND, lpara
                 PCWSTR(to_wide(&label).as_ptr()),
             ));
         }
+        crate::log_if_err!(AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()));
+    }
+
+    let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
+    SendMessageW(
+        hwnd_edit,
+        EM_EXGETSEL,
+        WPARAM(0),
+        LPARAM(&mut selection as *mut _ as isize),
+    );
+    if selection.cpMin > selection.cpMax {
+        std::mem::swap(&mut selection.cpMin, &mut selection.cpMax);
+    }
+    let has_selection = selection.cpMin != selection.cpMax;
+    if has_selection {
+        let label = i18n::tr(language_ui, "context_menu.audiobook_selection");
+        crate::log_if_err!(AppendMenuW(
+            menu,
+            MF_STRING,
+            menu::IDM_EDIT_AUDIOBOOK_SELECTION,
+            PCWSTR(to_wide(&label).as_ptr()),
+        ));
         crate::log_if_err!(AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()));
     }
 

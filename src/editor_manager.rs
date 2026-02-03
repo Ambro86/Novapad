@@ -778,6 +778,38 @@ pub unsafe fn normalize_whitespace_active_edit(hwnd: HWND) -> bool {
     true
 }
 
+pub unsafe fn get_selected_text(hwnd_edit: HWND) -> Option<String> {
+    let text = get_edit_text(hwnd_edit);
+    if text.is_empty() {
+        return None;
+    }
+
+    let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
+    SendMessageW(
+        hwnd_edit,
+        EM_EXGETSEL,
+        WPARAM(0),
+        LPARAM(&mut selection as *mut _ as isize),
+    );
+    if selection.cpMin > selection.cpMax {
+        std::mem::swap(&mut selection.cpMin, &mut selection.cpMax);
+    }
+    if selection.cpMin == selection.cpMax {
+        return None;
+    }
+
+    let start = utf16_index_to_byte(&text, selection.cpMin);
+    let end = utf16_index_to_byte(&text, selection.cpMax);
+    if start >= end || end > text.len() {
+        return None;
+    }
+    let selected = &text[start..end];
+    if selected.trim().is_empty() {
+        return None;
+    }
+    Some(selected.to_string())
+}
+
 pub unsafe fn hard_line_break_active_edit(hwnd: HWND) -> bool {
     let Some(hwnd_edit) = crate::get_active_edit(hwnd) else {
         return false;

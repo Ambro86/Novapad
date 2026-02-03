@@ -2226,30 +2226,14 @@ fn split_tts_chunks_by_parts(chunks: &[TtsChunk], parts: usize) -> Vec<Vec<TtsCh
     out
 }
 
-pub fn start_audiobook(hwnd: HWND) {
-    let Some(hwnd_edit) = (unsafe { get_active_edit(hwnd) }) else {
-        return;
-    };
+fn start_audiobook_with_text(hwnd: HWND, text: String, suggested_name: Option<String>) {
     let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
-    let text = unsafe { get_edit_text(hwnd_edit) };
     if text.trim().is_empty() {
         unsafe {
             show_error(hwnd, language, &settings::tts_no_text_message(language));
         }
         return;
     }
-    let suggested_name = unsafe {
-        with_state(hwnd, |state| {
-            state.docs.get(state.current).map(|doc| {
-                let p = Path::new(&doc.title);
-                p.file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or(&doc.title)
-                    .to_string()
-            })
-        })
-    }
-    .flatten();
 
     let Some(output) = (unsafe { save_audio_dialog(hwnd, suggested_name.as_deref()) }) else {
         return;
@@ -2610,6 +2594,54 @@ pub fn start_audiobook(hwnd: HWND) {
             }
         }
     });
+}
+
+pub fn start_audiobook(hwnd: HWND) {
+    let Some(hwnd_edit) = (unsafe { get_active_edit(hwnd) }) else {
+        return;
+    };
+    let text = unsafe { get_edit_text(hwnd_edit) };
+    let suggested_name = unsafe {
+        with_state(hwnd, |state| {
+            state.docs.get(state.current).map(|doc| {
+                let p = Path::new(&doc.title);
+                p.file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or(&doc.title)
+                    .to_string()
+            })
+        })
+    }
+    .flatten();
+    start_audiobook_with_text(hwnd, text, suggested_name);
+}
+
+pub fn start_audiobook_from_selection(hwnd: HWND) {
+    let Some(hwnd_edit) = (unsafe { get_active_edit(hwnd) }) else {
+        return;
+    };
+    let text = unsafe { crate::editor_manager::get_selected_text(hwnd_edit) };
+    let Some(text) = text else {
+        let language =
+            unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+        unsafe {
+            show_error(hwnd, language, &settings::tts_no_text_message(language));
+        }
+        return;
+    };
+    let suggested_name = unsafe {
+        with_state(hwnd, |state| {
+            state.docs.get(state.current).map(|doc| {
+                let p = Path::new(&doc.title);
+                p.file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or(&doc.title)
+                    .to_string()
+            })
+        })
+    }
+    .flatten();
+    start_audiobook_with_text(hwnd, text, suggested_name);
 }
 
 fn parse_sapi4_voice_index(voice: &str) -> i32 {

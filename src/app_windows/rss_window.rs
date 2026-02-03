@@ -3455,6 +3455,11 @@ unsafe fn import_item(hwnd: HWND, item: RssItem) {
     let url = item.link.clone();
 
     let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    let language = if parent.0 != 0 {
+        with_state(parent, |state| state.settings.language).unwrap_or_default()
+    } else {
+        crate::settings::Language::default()
+    };
     if parent.0 != 0 {
         ensure_rss_http(parent);
     }
@@ -3474,6 +3479,7 @@ unsafe fn import_item(hwnd: HWND, item: RssItem) {
             &url,
             &item.title,
             &item.description,
+            language,
         ));
 
         let text = match content_res {

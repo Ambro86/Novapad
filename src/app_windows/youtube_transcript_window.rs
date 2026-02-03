@@ -1132,35 +1132,43 @@ fn start_load_transcript_text(
                 };
             }
 
-            let ytdlp_path = match ensure_ytdlp_available(hwnd, language, &labels_data) {
-                Ok(Some(path)) => path,
-                Ok(None) => {
-                    return TextLoadResult {
-                        text: String::new(),
-                        include_timestamps,
-                        error: None,
-                    };
-                }
-                Err(err) => {
-                    crate::log_debug(&format!("yt-dlp download failed: {}", err));
-                    unsafe {
-                        show_error(hwnd, language, &labels_data.ytdlp_download_failed);
-                    }
-                    return TextLoadResult {
-                        text: String::new(),
-                        include_timestamps,
-                        error: None,
-                    };
-                }
-            };
-
-            let fetch_result = fetch_transcript_text_with_retry(
+            let mut fetch_result = fetch_transcript_text_with_retry(
                 &transcript,
                 include_timestamps,
                 &cancelled,
-                Some(&ytdlp_path),
+                None,
                 Some(&download_url),
             );
+            if matches!(fetch_result, Err(ImportError::YtdlpUnavailable)) {
+                let ytdlp_path = match ensure_ytdlp_available(hwnd, language, &labels_data) {
+                    Ok(Some(path)) => path,
+                    Ok(None) => {
+                        return TextLoadResult {
+                            text: String::new(),
+                            include_timestamps,
+                            error: None,
+                        };
+                    }
+                    Err(err) => {
+                        crate::log_debug(&format!("yt-dlp download failed: {}", err));
+                        unsafe {
+                            show_error(hwnd, language, &labels_data.ytdlp_download_failed);
+                        }
+                        return TextLoadResult {
+                            text: String::new(),
+                            include_timestamps,
+                            error: None,
+                        };
+                    }
+                };
+                fetch_result = fetch_transcript_text_with_retry(
+                    &transcript,
+                    include_timestamps,
+                    &cancelled,
+                    Some(&ytdlp_path),
+                    Some(&download_url),
+                );
+            }
 
             if cancelled.load(Ordering::Relaxed) {
                 return TextLoadResult {
@@ -1650,6 +1658,7 @@ fn is_subtitle_format_token(token: &str) -> bool {
 enum ImportError {
     InvalidUrl,
     NoTranscript,
+    YtdlpUnavailable,
     Other(String),
 }
 
@@ -1672,8 +1681,7 @@ fn fetch_transcript_text_with_fallback(
     }
 
     // Fallback to yt-dlp
-    let ytdlp_path =
-        ytdlp_path.ok_or_else(|| ImportError::Other("yt-dlp not available".to_string()))?;
+    let ytdlp_path = ytdlp_path.ok_or(ImportError::YtdlpUnavailable)?;
     let download_url = download_url.ok_or(ImportError::InvalidUrl)?;
     let language_code = get_transcript_language_code(transcript);
     fetch_transcript_text_with_ytdlp(
@@ -1772,6 +1780,7 @@ fn error_message(language: Language, err: &ImportError) -> String {
     match err {
         ImportError::InvalidUrl => labels.invalid_url,
         ImportError::NoTranscript => labels.no_transcript,
+        ImportError::YtdlpUnavailable => labels.ytdlp_download_failed,
         ImportError::Other(msg) => {
             crate::log_debug(&format!("YouTube transcript import error: {}", msg));
             labels.import_error

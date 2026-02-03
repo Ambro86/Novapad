@@ -334,6 +334,185 @@ fn register_mix_output(path: &Path) {
     }
 }
 
+fn dict_set_str(
+    api: &FfmpegApi,
+    dict: &mut *mut AVDictionary,
+    key: &str,
+    value: &str,
+) -> Result<(), String> {
+    let key_c = CString::new(key).map_err(|_| "FFmpeg: invalid dict key".to_string())?;
+    let value_c = CString::new(value).map_err(|_| "FFmpeg: invalid dict value".to_string())?;
+    let ret = unsafe { (api.av_dict_set)(dict, key_c.as_ptr(), value_c.as_ptr(), 0) };
+    if ret < 0 {
+        return Err(format!("FFmpeg: failed to set {} (code {})", key, ret));
+    }
+    Ok(())
+}
+
+fn segment_format_from_path(path: &Path) -> Option<&'static str> {
+    let ext = path.extension()?.to_str()?.to_ascii_lowercase();
+    match ext.as_str() {
+        "mp3" => Some("mp3"),
+        "m4a" | "m4b" | "mp4" => Some("ipod"),
+        "aac" => Some("adts"),
+        "ogg" => Some("ogg"),
+        "opus" => Some("opus"),
+        "flac" => Some("flac"),
+        "wav" => Some("wav"),
+        _ => None,
+    }
+}
+
+pub fn segment_audio_file(
+    input_path: &Path,
+    output_pattern: &Path,
+    segment_seconds: u32,
+    start_number: u32,
+) -> Result<(), String> {
+    let api = ffmpeg_api()?;
+    let input_c = CString::new(input_path.to_string_lossy().as_bytes())
+        .map_err(|_| "FFmpeg: invalid input path".to_string())?;
+    let output_c = CString::new(output_pattern.to_string_lossy().as_bytes())
+        .map_err(|_| "FFmpeg: invalid output pattern".to_string())?;
+    let format_c =
+        CString::new("segment").map_err(|_| "FFmpeg: invalid segment format".to_string())?;
+
+    let mut in_ctx: *mut AVFormatContext = ptr::null_mut();
+    let mut out_ctx: *mut AVFormatContext = ptr::null_mut();
+
+    let open_ret = unsafe {
+        (api.avformat_open_input)(
+            &mut in_ctx,
+            input_c.as_ptr(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+        )
+    };
+    if open_ret < 0 || in_ctx.is_null() {
+        return Err("FFmpeg: failed to open input".to_string());
+    }
+    if unsafe { (api.avformat_find_stream_info)(in_ctx, ptr::null_mut()) } < 0 {
+        unsafe { (api.avformat_close_input)(&mut in_ctx) };
+        return Err("FFmpeg: input stream info failed".to_string());
+    }
+
+    let audio_stream_idx = unsafe {
+        (api.av_find_best_stream)(
+            in_ctx,
+            AVMediaType_AVMEDIA_TYPE_AUDIO,
+            -1,
+            -1,
+            ptr::null_mut(),
+            0,
+        )
+    };
+    if audio_stream_idx < 0 {
+        unsafe { (api.avformat_close_input)(&mut in_ctx) };
+        return Err("FFmpeg: audio stream not found".to_string());
+    }
+
+    let alloc_ret = unsafe {
+        (api.avformat_alloc_output_context2)(
+            &mut out_ctx,
+            ptr::null_mut(),
+            format_c.as_ptr(),
+            output_c.as_ptr(),
+        )
+    };
+    if alloc_ret < 0 || out_ctx.is_null() {
+        unsafe { (api.avformat_close_input)(&mut in_ctx) };
+        return Err("FFmpeg: failed to allocate segment output".to_string());
+    }
+
+    let in_stream = unsafe { *(*in_ctx).streams.add(audio_stream_idx as usize) };
+    let out_stream = unsafe { (api.avformat_new_stream)(out_ctx, ptr::null()) };
+    if out_stream.is_null() {
+        unsafe {
+            (api.avformat_free_context)(out_ctx);
+            (api.avformat_close_input)(&mut in_ctx);
+        }
+        return Err("FFmpeg: failed to create output stream".to_string());
+    }
+    unsafe {
+        (api.avcodec_parameters_copy)((*out_stream).codecpar, (*in_stream).codecpar);
+        (*out_stream).time_base = (*in_stream).time_base;
+    }
+
+    let mut dict: *mut AVDictionary = ptr::null_mut();
+    if segment_seconds == 0 {
+        unsafe {
+            (api.avformat_free_context)(out_ctx);
+            (api.avformat_close_input)(&mut in_ctx);
+        }
+        return Err("FFmpeg: segment time must be > 0".to_string());
+    }
+    dict_set_str(api, &mut dict, "segment_time", &segment_seconds.to_string())?;
+    let start_number = start_number.max(1);
+    dict_set_str(
+        api,
+        &mut dict,
+        "segment_start_number",
+        &start_number.to_string(),
+    )?;
+    dict_set_str(api, &mut dict, "reset_timestamps", "1")?;
+    if let Some(fmt) = segment_format_from_path(output_pattern) {
+        dict_set_str(api, &mut dict, "segment_format", fmt)?;
+    }
+
+    let header_ret = unsafe { (api.avformat_write_header)(out_ctx, &mut dict) };
+    unsafe {
+        (api.av_dict_free)(&mut dict);
+    }
+    if header_ret < 0 {
+        unsafe {
+            (api.avformat_free_context)(out_ctx);
+            (api.avformat_close_input)(&mut in_ctx);
+        }
+        return Err("FFmpeg: failed to write segment header".to_string());
+    }
+
+    let mut pkt = unsafe { (api.av_packet_alloc)() };
+    if pkt.is_null() {
+        unsafe {
+            (api.av_write_trailer)(out_ctx);
+            (api.avformat_free_context)(out_ctx);
+            (api.avformat_close_input)(&mut in_ctx);
+        }
+        return Err("FFmpeg: packet alloc failed".to_string());
+    }
+
+    loop {
+        let read_ret = unsafe { (api.av_read_frame)(in_ctx, pkt) };
+        if read_ret < 0 {
+            break;
+        }
+        if unsafe { (*pkt).stream_index } != audio_stream_idx {
+            unsafe { (api.av_packet_unref)(pkt) };
+            continue;
+        }
+        unsafe {
+            (*pkt).stream_index = (*out_stream).index;
+            (api.av_packet_rescale_ts)(pkt, (*in_stream).time_base, (*out_stream).time_base);
+            let write_ret = (api.av_interleaved_write_frame)(out_ctx, pkt);
+            if write_ret < 0 {
+                log_debug(&format!("FFmpeg: segment write failed: {}", write_ret));
+            }
+            (api.av_packet_unref)(pkt);
+        }
+    }
+
+    unsafe {
+        let trailer_ret = (api.av_write_trailer)(out_ctx);
+        if trailer_ret < 0 {
+            log_debug(&format!("FFmpeg: av_write_trailer failed: {}", trailer_ret));
+        }
+        (api.av_packet_free)(&mut pkt);
+        (api.avformat_free_context)(out_ctx);
+        (api.avformat_close_input)(&mut in_ctx);
+    }
+    Ok(())
+}
+
 pub fn cleanup_tts_artifacts() -> Result<(), String> {
     let mut errors = Vec::new();
     let outputs = MIX_OUTPUTS.get_or_init(|| Mutex::new(Vec::new()));
@@ -445,6 +624,27 @@ fn rescale_q(value: i64, src: AVRational, dst: AVRational) -> i64 {
     let num = value as i128 * src.num as i128 * dst.den as i128;
     let den = src.den as i128 * dst.num as i128;
     if den == 0 { 0 } else { (num / den) as i64 }
+}
+
+fn read_next_packet_for_stream(
+    api: &FfmpegApi,
+    ctx: *mut AVFormatContext,
+    pkt: *mut AVPacket,
+    stream_idx: i32,
+) -> bool {
+    loop {
+        let ret = unsafe { (api.av_read_frame)(ctx, pkt) };
+        if ret < 0 {
+            return false;
+        }
+        let idx = unsafe { (*pkt).stream_index };
+        if idx == stream_idx {
+            return true;
+        }
+        unsafe {
+            (api.av_packet_unref)(pkt);
+        }
+    }
 }
 
 fn encode_mixed_audio_to_m4a(
@@ -958,8 +1158,8 @@ fn mux_video_with_audio(
 
     let mut pkt_v = unsafe { (api.av_packet_alloc)() };
     let mut pkt_a = unsafe { (api.av_packet_alloc)() };
-    let mut has_v = unsafe { (api.av_read_frame)(in_video, pkt_v) } >= 0;
-    let mut has_a = unsafe { (api.av_read_frame)(in_audio, pkt_a) } >= 0;
+    let mut has_v = read_next_packet_for_stream(api, in_video, pkt_v, video_stream_idx);
+    let mut has_a = read_next_packet_for_stream(api, in_audio, pkt_a, audio_stream_idx);
 
     while has_v || has_a {
         let write_video = if !has_a {
@@ -995,7 +1195,7 @@ fn mux_video_with_audio(
                 }
                 (api.av_packet_unref)(pkt_v);
             }
-            has_v = unsafe { (api.av_read_frame)(in_video, pkt_v) } >= 0;
+            has_v = read_next_packet_for_stream(api, in_video, pkt_v, video_stream_idx);
         } else {
             unsafe {
                 (*pkt_a).stream_index = (*out_a_stream).index;
@@ -1013,7 +1213,7 @@ fn mux_video_with_audio(
                 }
                 (api.av_packet_unref)(pkt_a);
             }
-            has_a = unsafe { (api.av_read_frame)(in_audio, pkt_a) } >= 0;
+            has_a = read_next_packet_for_stream(api, in_audio, pkt_a, audio_stream_idx);
         }
     }
 

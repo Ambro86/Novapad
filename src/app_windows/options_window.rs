@@ -69,6 +69,8 @@ const OPTIONS_ID_TTS_PITCH_EDIT: usize = 6033;
 const OPTIONS_ID_TTS_VOLUME_EDIT: usize = 6034;
 const OPTIONS_ID_AUDIO_SKIP: usize = 6010;
 const OPTIONS_ID_AUDIO_SPLIT: usize = 6011;
+const OPTIONS_ID_AUDIO_SPLIT_MINUTES: usize = 6058;
+const OPTIONS_ID_AUDIO_SPLIT_START_NUMBER: usize = 6059;
 const OPTIONS_ID_AUDIO_SPLIT_TEXT: usize = 6013;
 const OPTIONS_ID_AUDIO_SPLIT_REQUIRE_NEWLINE: usize = 6016;
 const OPTIONS_ID_SUBTITLE_MODE: usize = 6046;
@@ -106,6 +108,7 @@ const OPTIONS_ID_CANCEL: usize = 6006;
 const WM_TTS_VOICES_LOADED: u32 = WM_APP + 2;
 const WM_TTS_SAPI_VOICES_LOADED: u32 = WM_APP + 8;
 const AUDIOBOOK_SPLIT_BY_TEXT: u32 = u32::MAX;
+const AUDIOBOOK_SPLIT_BY_TIME: u32 = u32::MAX - 1;
 
 const OPTIONS_TAB_GENERAL: i32 = 0;
 const OPTIONS_TAB_VOICE: i32 = 1;
@@ -204,6 +207,10 @@ struct OptionsDialogState {
     combo_audio_skip: HWND,
     label_audio_split: HWND,
     combo_audio_split: HWND,
+    label_audio_split_minutes: HWND,
+    combo_audio_split_minutes: HWND,
+    label_audio_split_start_number: HWND,
+    combo_audio_split_start_number: HWND,
     label_audio_split_text: HWND,
     edit_audio_split_text: HWND,
     checkbox_audio_split_requires_newline: HWND,
@@ -312,6 +319,8 @@ struct OptionsLabels {
     label_prompt_program: String,
     label_audio_skip: String,
     label_audio_split: String,
+    label_audio_split_minutes: String,
+    label_audio_split_start_number: String,
     label_audio_split_text: String,
     label_audio_split_requires_newline: String,
     label_subtitle_ducking: String,
@@ -342,6 +351,7 @@ struct OptionsLabels {
     subtitle_mode_record: String,
 
     split_none: String,
+    split_by_time: String,
     split_by_text: String,
     split_parts: String,
     spellcheck_lang_follow: String,
@@ -419,6 +429,11 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_prompt_program: i18n::tr(language, "options.label.prompt_program"),
         label_audio_skip: i18n::tr(language, "options.label.audio_skip"),
         label_audio_split: i18n::tr(language, "options.label.audio_split"),
+        label_audio_split_minutes: i18n::tr(language, "options.label.audio_split_minutes"),
+        label_audio_split_start_number: i18n::tr(
+            language,
+            "options.label.audio_split_start_number",
+        ),
         label_audio_split_text: i18n::tr(language, "options.label.audio_split_text"),
         label_audio_split_requires_newline: i18n::tr(
             language,
@@ -452,6 +467,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         subtitle_mode_record: i18n::tr(language, "options.subtitle_mode.record"),
 
         split_none: i18n::tr(language, "options.split.none"),
+        split_by_time: i18n::tr(language, "options.split.by_time"),
         split_by_text: i18n::tr(language, "options.split.by_text"),
         split_parts: i18n::tr(language, "options.split.parts"),
         spellcheck_lang_follow: i18n::tr(language, "options.spellcheck.lang.follow"),
@@ -1254,6 +1270,66 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
             );
             y += 34;
 
+            let label_audio_split_minutes = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_audio_split_minutes).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_audio_split_minutes = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                140,
+                hwnd,
+                HMENU(OPTIONS_ID_AUDIO_SPLIT_MINUTES as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 34;
+
+            let label_audio_split_start_number = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_audio_split_start_number).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_audio_split_start_number = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                140,
+                hwnd,
+                HMENU(OPTIONS_ID_AUDIO_SPLIT_START_NUMBER as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 34;
+
             let label_audio_split_text = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -1985,6 +2061,10 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 combo_audio_skip,
                 label_audio_split,
                 combo_audio_split,
+                label_audio_split_minutes,
+                combo_audio_split_minutes,
+                label_audio_split_start_number,
+                combo_audio_split_start_number,
                 label_audio_split_text,
                 edit_audio_split_text,
                 checkbox_audio_split_requires_newline,
@@ -2081,6 +2161,10 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 combo_audio_skip,
                 label_audio_split,
                 combo_audio_split,
+                label_audio_split_minutes,
+                combo_audio_split_minutes,
+                label_audio_split_start_number,
+                combo_audio_split_start_number,
                 label_audio_split_text,
                 edit_audio_split_text,
                 checkbox_audio_split_requires_newline,
@@ -2223,7 +2307,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 }
                 OPTIONS_ID_AUDIO_SPLIT => {
                     if code == CBN_SELCHANGE {
-                        update_audio_split_text_visibility(hwnd);
+                        update_audio_split_visibility(hwnd);
                     }
                     LRESULT(0)
                 }
@@ -2393,6 +2477,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         edit_tts_volume,
         combo_audio_skip,
         combo_audio_split,
+        combo_audio_split_minutes,
+        combo_audio_split_start_number,
         _label_audio_split_text,
         edit_audio_split_text,
         checkbox_audio_split_requires_newline,
@@ -2456,6 +2542,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.edit_tts_volume,
             state.combo_audio_skip,
             state.combo_audio_split,
+            state.combo_audio_split_minutes,
+            state.combo_audio_split_start_number,
             state.label_audio_split_text,
             state.edit_audio_split_text,
             state.checkbox_audio_split_requires_newline,
@@ -3232,6 +3320,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
     SendMessageW(combo_audio_split, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
     let split_options = [
         (0, labels.split_none.clone()),
+        (AUDIOBOOK_SPLIT_BY_TIME, labels.split_by_time.clone()),
         (AUDIOBOOK_SPLIT_BY_TEXT, labels.split_by_text.clone()),
         (2, format!("2 {}", labels.split_parts)),
         (4, format!("4 {}", labels.split_parts)),
@@ -3253,8 +3342,11 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             WPARAM(idx),
             LPARAM(*parts as isize),
         );
-        if (settings.audiobook_split_by_text && *parts == AUDIOBOOK_SPLIT_BY_TEXT)
-            || (!settings.audiobook_split_by_text && *parts == settings.audiobook_split)
+        if (settings.audiobook_split_by_time && *parts == AUDIOBOOK_SPLIT_BY_TIME)
+            || (settings.audiobook_split_by_text && *parts == AUDIOBOOK_SPLIT_BY_TEXT)
+            || (!settings.audiobook_split_by_time
+                && !settings.audiobook_split_by_text
+                && *parts == settings.audiobook_split)
         {
             selected_split_idx = idx;
         }
@@ -3266,11 +3358,77 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         LPARAM(0),
     );
 
+    SendMessageW(
+        combo_audio_split_minutes,
+        CB_RESETCONTENT,
+        WPARAM(0),
+        LPARAM(0),
+    );
+    let mut selected_minutes_idx = 0;
+    for minutes in 1..=20u32 {
+        let label = format!("{minutes}");
+        let idx = SendMessageW(
+            combo_audio_split_minutes,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&label).as_ptr() as isize),
+        )
+        .0 as usize;
+        SendMessageW(
+            combo_audio_split_minutes,
+            CB_SETITEMDATA,
+            WPARAM(idx),
+            LPARAM(minutes as isize),
+        );
+        if minutes == settings.audiobook_split_minutes {
+            selected_minutes_idx = idx;
+        }
+    }
+    SendMessageW(
+        combo_audio_split_minutes,
+        CB_SETCURSEL,
+        WPARAM(selected_minutes_idx),
+        LPARAM(0),
+    );
+
+    SendMessageW(
+        combo_audio_split_start_number,
+        CB_RESETCONTENT,
+        WPARAM(0),
+        LPARAM(0),
+    );
+    let mut selected_start_idx = 0;
+    for number in 1..=99u32 {
+        let label = format!("{number:02}");
+        let idx = SendMessageW(
+            combo_audio_split_start_number,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&label).as_ptr() as isize),
+        )
+        .0 as usize;
+        SendMessageW(
+            combo_audio_split_start_number,
+            CB_SETITEMDATA,
+            WPARAM(idx),
+            LPARAM(number as isize),
+        );
+        if number == settings.audiobook_split_start_number {
+            selected_start_idx = idx;
+        }
+    }
+    SendMessageW(
+        combo_audio_split_start_number,
+        CB_SETCURSEL,
+        WPARAM(selected_start_idx),
+        LPARAM(0),
+    );
+
     let split_text_wide = to_wide(&settings.audiobook_split_text);
     if let Err(_e) = SetWindowTextW(edit_audio_split_text, PCWSTR(split_text_wide.as_ptr())) {
         crate::log_debug(&format!("Error: {:?}", _e));
     }
-    update_audio_split_text_visibility(hwnd);
+    update_audio_split_visibility(hwnd);
 
     let cache_limit_text = settings.podcast_cache_limit_mb.to_string();
     if let Err(_e) = SetWindowTextW(
@@ -3932,6 +4090,8 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         edit_tts_volume,
         combo_audio_skip,
         combo_audio_split,
+        combo_audio_split_minutes,
+        combo_audio_split_start_number,
         edit_audio_split_text,
         checkbox_audio_split_requires_newline,
         checkbox_subtitle_ducking,
@@ -3983,6 +4143,8 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.edit_tts_volume,
             state.combo_audio_skip,
             state.combo_audio_split,
+            state.combo_audio_split_minutes,
+            state.combo_audio_split_start_number,
             state.edit_audio_split_text,
             state.checkbox_audio_split_requires_newline,
             state.checkbox_subtitle_ducking,
@@ -4390,13 +4552,55 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         )
         .0;
         let split_parts = split_parts as u32;
-        if split_parts == AUDIOBOOK_SPLIT_BY_TEXT {
+        if split_parts == AUDIOBOOK_SPLIT_BY_TIME {
+            settings.audiobook_split_by_time = true;
+            settings.audiobook_split_by_text = false;
+            settings.audiobook_split = 0;
+        } else if split_parts == AUDIOBOOK_SPLIT_BY_TEXT {
+            settings.audiobook_split_by_time = false;
             settings.audiobook_split_by_text = true;
             settings.audiobook_split = 0;
         } else {
+            settings.audiobook_split_by_time = false;
             settings.audiobook_split_by_text = false;
             settings.audiobook_split = split_parts;
         }
+    }
+
+    let minutes_sel = SendMessageW(
+        combo_audio_split_minutes,
+        CB_GETCURSEL,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0;
+    if minutes_sel >= 0 {
+        let minutes = SendMessageW(
+            combo_audio_split_minutes,
+            CB_GETITEMDATA,
+            WPARAM(minutes_sel as usize),
+            LPARAM(0),
+        )
+        .0 as u32;
+        settings.audiobook_split_minutes = minutes.clamp(1, 20);
+    }
+
+    let start_sel = SendMessageW(
+        combo_audio_split_start_number,
+        CB_GETCURSEL,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0;
+    if start_sel >= 0 {
+        let start_number = SendMessageW(
+            combo_audio_split_start_number,
+            CB_GETITEMDATA,
+            WPARAM(start_sel as usize),
+            LPARAM(0),
+        )
+        .0 as u32;
+        settings.audiobook_split_start_number = start_number.clamp(1, 99);
     }
 
     let text_len = GetWindowTextLengthW(edit_audio_split_text);
@@ -4497,18 +4701,26 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     crate::log_if_err!(DestroyWindow(hwnd));
 }
 
-unsafe fn update_audio_split_text_visibility(hwnd: HWND) {
+unsafe fn update_audio_split_visibility(hwnd: HWND) {
     let (
         combo_audio_split,
         label_audio_split_text,
         edit_audio_split_text,
         checkbox_audio_split_requires_newline,
+        label_audio_split_minutes,
+        combo_audio_split_minutes,
+        label_audio_split_start_number,
+        combo_audio_split_start_number,
     ) = match with_options_state(hwnd, |state| {
         (
             state.combo_audio_split,
             state.label_audio_split_text,
             state.edit_audio_split_text,
             state.checkbox_audio_split_requires_newline,
+            state.label_audio_split_minutes,
+            state.combo_audio_split_minutes,
+            state.label_audio_split_start_number,
+            state.combo_audio_split_start_number,
         )
     }) {
         Some(values) => values,
@@ -4516,7 +4728,7 @@ unsafe fn update_audio_split_text_visibility(hwnd: HWND) {
     };
 
     let split_sel = SendMessageW(combo_audio_split, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-    let selected = if split_sel >= 0 {
+    let (selected_text, selected_time) = if split_sel >= 0 {
         let split_parts = SendMessageW(
             combo_audio_split,
             CB_GETITEMDATA,
@@ -4524,17 +4736,28 @@ unsafe fn update_audio_split_text_visibility(hwnd: HWND) {
             LPARAM(0),
         )
         .0 as u32;
-        split_parts == AUDIOBOOK_SPLIT_BY_TEXT
+        (
+            split_parts == AUDIOBOOK_SPLIT_BY_TEXT,
+            split_parts == AUDIOBOOK_SPLIT_BY_TIME,
+        )
     } else {
-        false
+        (false, false)
     };
 
-    let show = if selected { SW_SHOW } else { SW_HIDE };
-    ShowWindow(label_audio_split_text, show);
-    ShowWindow(edit_audio_split_text, show);
-    ShowWindow(checkbox_audio_split_requires_newline, show);
-    EnableWindow(edit_audio_split_text, selected);
-    EnableWindow(checkbox_audio_split_requires_newline, selected);
+    let show_text = if selected_text { SW_SHOW } else { SW_HIDE };
+    ShowWindow(label_audio_split_text, show_text);
+    ShowWindow(edit_audio_split_text, show_text);
+    ShowWindow(checkbox_audio_split_requires_newline, show_text);
+    EnableWindow(edit_audio_split_text, selected_text);
+    EnableWindow(checkbox_audio_split_requires_newline, selected_text);
+
+    let show_time = if selected_time { SW_SHOW } else { SW_HIDE };
+    ShowWindow(label_audio_split_minutes, show_time);
+    ShowWindow(combo_audio_split_minutes, show_time);
+    EnableWindow(combo_audio_split_minutes, selected_time);
+    ShowWindow(label_audio_split_start_number, show_time);
+    ShowWindow(combo_audio_split_start_number, show_time);
+    EnableWindow(combo_audio_split_start_number, selected_time);
 }
 
 unsafe fn update_subtitle_ducking_visibility(hwnd: HWND) {
@@ -4669,6 +4892,10 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.combo_audio_skip,
             state.label_audio_split,
             state.combo_audio_split,
+            state.label_audio_split_minutes,
+            state.combo_audio_split_minutes,
+            state.label_audio_split_start_number,
+            state.combo_audio_split_start_number,
             state.label_audio_split_text,
             state.edit_audio_split_text,
             state.checkbox_audio_split_requires_newline,
@@ -4694,23 +4921,41 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
     }
 
     if index == OPTIONS_TAB_AUDIO {
-        update_audio_split_text_visibility(hwnd);
+        update_audio_split_visibility(hwnd);
         update_subtitle_ducking_visibility(hwnd);
     } else if index == OPTIONS_TAB_VOICE {
         update_tts_manual_visibility(hwnd);
         update_dialogue_voice_visibility(hwnd);
-    } else if let Some((label, edit, checkbox)) = with_options_state(hwnd, |state| {
+    } else if let Some((
+        label_text,
+        edit_text,
+        checkbox,
+        label_minutes,
+        combo_minutes,
+        label_start,
+        combo_start,
+    )) = with_options_state(hwnd, |state| {
         (
             state.label_audio_split_text,
             state.edit_audio_split_text,
             state.checkbox_audio_split_requires_newline,
+            state.label_audio_split_minutes,
+            state.combo_audio_split_minutes,
+            state.label_audio_split_start_number,
+            state.combo_audio_split_start_number,
         )
     }) {
-        ShowWindow(label, SW_HIDE);
-        ShowWindow(edit, SW_HIDE);
+        ShowWindow(label_text, SW_HIDE);
+        ShowWindow(edit_text, SW_HIDE);
         ShowWindow(checkbox, SW_HIDE);
-        EnableWindow(edit, false);
+        ShowWindow(label_minutes, SW_HIDE);
+        ShowWindow(combo_minutes, SW_HIDE);
+        ShowWindow(label_start, SW_HIDE);
+        ShowWindow(combo_start, SW_HIDE);
+        EnableWindow(edit_text, false);
         EnableWindow(checkbox, false);
+        EnableWindow(combo_minutes, false);
+        EnableWindow(combo_start, false);
     }
 
     if focus_first {

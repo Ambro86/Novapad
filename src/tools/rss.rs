@@ -928,6 +928,7 @@ pub async fn fetch_article_text(
     url: &str,
     fallback_title: &str,
     fallback_description: &str,
+    language: crate::settings::Language,
 ) -> Result<String, String> {
     let start_total = Instant::now();
     let url_str = normalize_url(url);
@@ -965,7 +966,7 @@ pub async fn fetch_article_text(
         }
     };
 
-    let article = reader::reader_mode_extract(&html).unwrap_or(reader::ArticleContent {
+    let article = reader::reader_mode_extract(&html, language).unwrap_or(reader::ArticleContent {
         title: fallback_title.to_string(),
         content: fallback_description.to_string(),
     });

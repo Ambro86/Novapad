@@ -1188,7 +1188,6 @@ fn announce_player_time(hwnd: HWND) {
         )
     };
     nvda_speak(&message);
-    crate::accessibility::nvda_speak(&message);
 }
 
 fn announce_player_pitch(language: Language, pitch: f32) {
@@ -1649,6 +1648,7 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
 
         let current_version = env!("CARGO_PKG_VERSION");
         let mut show_changelog = false;
+        let mut cleanup_legacy_context_menu = false;
         with_state(hwnd, |state| {
             let last_seen = state.settings.last_seen_changelog_version.clone();
             if last_seen.is_empty() {
@@ -1660,8 +1660,12 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                 state.settings.last_seen_changelog_version = current_version.to_string();
                 save_settings(state.settings.clone());
                 show_changelog = true;
+                cleanup_legacy_context_menu = true;
             }
         });
+        if cleanup_legacy_context_menu {
+            crate::settings::cleanup_legacy_context_menu_entries();
+        }
         if show_changelog {
             let hwnd_val = hwnd.0;
             std::thread::spawn(move || {
@@ -5242,10 +5246,9 @@ unsafe fn adjust_tts_restart_pos(hwnd_edit: HWND, pos: i32) -> i32 {
     if text.is_empty() {
         return pos;
     }
-    let normalized = text.replace("\r\n", "\n");
     let mut items: Vec<(usize, usize, bool)> = Vec::new();
     let mut offset = 0usize;
-    for ch in normalized.chars() {
+    for ch in text.chars() {
         let start = offset;
         let len = ch.len_utf16();
         let end = start + len;
@@ -6880,17 +6883,8 @@ unsafe fn insert_bookmark(hwnd: HWND) {
     if matches!(format, FileFormat::Audiobook) {
         let (pos, snippet) = with_state(hwnd, |state| {
             if let Some(player) = &mut state.active_audiobook {
-                let current_total = if player.is_paused {
-                    player.accumulated_seconds
-                } else {
-                    player.accumulated_seconds + player.start_instant.elapsed().as_secs()
-                };
-                let mins = current_total / 60;
-                let secs = current_total % 60;
-                (
-                    current_total as i32,
-                    format!("Posizione audio: {:02}:{:02}", mins, secs),
-                )
+                let position_secs = crate::audio_player::audiobook_position_secs(player);
+                audio_bookmark_position_and_snippet(position_secs)
             } else {
                 (0, "Audio non in riproduzione".to_string())
             }
@@ -7008,6 +7002,16 @@ unsafe fn insert_bookmark(hwnd: HWND) {
     }
 }
 
+fn audio_bookmark_position_and_snippet(position_secs: f64) -> (i32, String) {
+    let current_total = position_secs.max(0.0).floor() as u64;
+    let mins = current_total / 60;
+    let secs = current_total % 60;
+    (
+        current_total as i32,
+        format!("Posizione audio: {:02}:{:02}", mins, secs),
+    )
+}
+
 unsafe fn clear_current_bookmarks(hwnd: HWND) -> bool {
     let path: std::path::PathBuf = match with_state(hwnd, |state| {
         state
@@ -7094,6 +7098,32 @@ fn spawn_new_window_with_path(path: &Path) -> bool {
         return false;
     };
     std::process::Command::new(exe).arg(path).spawn().is_ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::audio_bookmark_position_and_snippet;
+
+    #[test]
+    fn audio_bookmark_position_rounds_down_and_formats() {
+        let (pos, snippet) = audio_bookmark_position_and_snippet(73.9);
+        assert_eq!(pos, 73);
+        assert_eq!(snippet, "Posizione audio: 01:13");
+    }
+
+    #[test]
+    fn audio_bookmark_position_clamps_negative() {
+        let (pos, snippet) = audio_bookmark_position_and_snippet(-2.0);
+        assert_eq!(pos, 0);
+        assert_eq!(snippet, "Posizione audio: 00:00");
+    }
+
+    #[test]
+    fn audio_bookmark_position_formats_over_an_hour() {
+        let (pos, snippet) = audio_bookmark_position_and_snippet(3723.0);
+        assert_eq!(pos, 3723);
+        assert_eq!(snippet, "Posizione audio: 62:03");
+    }
 }
 
 unsafe fn open_document_with_encoding(hwnd: HWND, path: &Path, encoding: Option<TextEncoding>) {

@@ -10,6 +10,7 @@ Ulepszenia
   - Głosy SAPI5: <voice sapi5 Microsoft Helena Desktop>Cześć</voice>
   - Głosy SAPI4: <voice sapi4 #1>Cześć</voice>
 • Rozszerzono kategorie podcastów.
+• Dodano opcję w menu kontekstowym tworzenia audiobooka z zaznaczenia.
 Poprawki błędów
 • Naprawiono błąd, przez który audiobooki SAPI4 mogły być tworzone inaczej niż oczekiwano.
 

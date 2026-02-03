@@ -545,6 +545,46 @@ pub fn reader_mode_extract(html_content: &str, language: Language) -> Option<Art
     })
 }
 
+#[cfg(test)]
+mod tests {
+    use super::author_prefix;
+    use crate::settings::Language;
+
+    #[test]
+    fn author_prefix_covers_all_languages() {
+        let languages = [
+            Language::Italian,
+            Language::English,
+            Language::Spanish,
+            Language::Portuguese,
+            Language::Swedish,
+            Language::Vietnamese,
+            Language::Czech,
+            Language::Polish,
+            Language::French,
+        ];
+
+        for language in languages {
+            let prefix = author_prefix(language);
+            let name = match language {
+                Language::Italian => "Italian",
+                Language::English => "English",
+                Language::Spanish => "Spanish",
+                Language::Portuguese => "Portuguese",
+                Language::Swedish => "Swedish",
+                Language::Vietnamese => "Vietnamese",
+                Language::Czech => "Czech",
+                Language::Polish => "Polish",
+                Language::French => "French",
+            };
+            assert!(
+                !prefix.trim().is_empty(),
+                "empty author prefix for language {name}"
+            );
+        }
+    }
+}
+
 fn pick_title(document: &Html) -> String {
     let title_selectors = ["meta[property='og:title']", "h1", "title"];
     for sel in title_selectors {

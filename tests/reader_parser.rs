@@ -1,6 +1,22 @@
 use std::fs;
 use std::path::Path;
 
+mod settings {
+    #[derive(Clone, Copy)]
+    #[allow(dead_code)] // reader.rs matches on all variants; test only needs one.
+    pub enum Language {
+        English,
+        Italian,
+        French,
+        Spanish,
+        Portuguese,
+        Swedish,
+        Czech,
+        Polish,
+        Vietnamese,
+    }
+}
+
 #[path = "../src/tools/reader.rs"]
 mod reader;
 
@@ -49,7 +65,7 @@ fn reader_fixtures_meet_minimums() {
     for exp in expectations {
         let path = Path::new(&exp.file);
         let html = fs::read_to_string(path).expect("read fixture html");
-        let article = reader::reader_mode_extract(&html)
+        let article = reader::reader_mode_extract(&html, settings::Language::Italian)
             .unwrap_or_else(|| panic!("no article extracted from {}", exp.file));
 
         let title = article.title.trim();

@@ -25,7 +25,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     ES_WANTRETURN, GWLP_USERDATA, GWLP_WNDPROC, GetClientRect, GetParent, GetWindowLongPtrW, HMENU,
     IDNO, IDYES, MB_ICONWARNING, MB_YESNOCANCEL, MessageBoxW, MoveWindow, PostMessageW, SW_HIDE,
     SW_SHOW, SendMessageW, SetWindowLongPtrW, SetWindowTextW, ShowWindow, WM_CHAR, WM_CONTEXTMENU,
-    WM_SETFONT, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_GROUP, WS_HSCROLL, WS_VSCROLL,
+    WM_GETTEXTLENGTH, WM_SETFONT, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_GROUP,
+    WS_HSCROLL, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR};
 
@@ -212,6 +213,7 @@ pub fn insert_voice_tag_at_caret(hwnd: HWND, engine: TtsEngine, voice: &str) {
         return;
     }
     let Some(hwnd_edit) = (unsafe { get_active_edit(hwnd) }) else {
+        log_debug("insert_voice_tag_at_caret: no active edit");
         return;
     };
     let engine_token = match engine {
@@ -231,14 +233,108 @@ pub fn insert_voice_tag_at_caret(hwnd: HWND, engine: TtsEngine, voice: &str) {
             WPARAM(&mut start as *mut u32 as usize),
             LPARAM(&mut end as *mut u32 as isize),
         );
-        let wide = to_wide(&insert);
+        let text_len = SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as u32;
+        log_debug(&format!(
+            "insert_voice_tag_at_caret: hwnd_edit={:?} engine={} voice_len={} sel_start={} sel_end={} text_len={}",
+            hwnd_edit,
+            engine_token,
+            voice.len(),
+            start,
+            end,
+            text_len
+        ));
+        let full_text = get_edit_text(hwnd_edit);
+        let lower = full_text.to_ascii_lowercase();
+        let full_utf16: Vec<u16> = full_text.encode_utf16().collect();
+        let lower_utf16: Vec<u16> = lower.encode_utf16().collect();
+        let caret_pos = start as usize;
+        let open_needle: Vec<u16> = "<voice".encode_utf16().collect();
+        let close_needle: Vec<u16> = "</voice>".encode_utf16().collect();
+        let last_open = find_last_utf16_before(&lower_utf16, &open_needle, caret_pos);
+        let last_close = find_last_utf16_before(&lower_utf16, &close_needle, caret_pos);
+        let inside_voice =
+            matches!(last_open, Some(open_pos) if last_close.map(|c| open_pos > c).unwrap_or(true));
+        let mut insert_pos = caret_pos;
+        let mut needs_newline = false;
+        if let Some(close_pos) =
+            find_last_utf16_before(&lower_utf16, &close_needle, caret_pos.saturating_add(1))
+        {
+            let close_end = close_pos.saturating_add(close_needle.len());
+            if caret_pos < close_end {
+                insert_pos = close_end;
+                if insert_pos > 0 {
+                    let prev = full_utf16
+                        .get(insert_pos.saturating_sub(1))
+                        .copied()
+                        .unwrap_or(0);
+                    needs_newline = prev != '\n' as u16 && prev != '\r' as u16;
+                } else {
+                    needs_newline = true;
+                }
+                if needs_newline {
+                    log_debug(
+                        "insert_voice_tag_at_caret: caret inside closing tag, moving to new line after close",
+                    );
+                } else {
+                    log_debug(
+                        "insert_voice_tag_at_caret: caret inside closing tag, moving after close",
+                    );
+                }
+            }
+        }
+        if insert_pos == caret_pos
+            && inside_voice
+            && let Some(close_pos) = find_next_utf16_at_or_after(
+                &lower_utf16,
+                &close_needle,
+                caret_pos.saturating_sub(close_needle.len().saturating_sub(1)),
+            )
+        {
+            insert_pos = close_pos + close_needle.len();
+            if insert_pos > 0 {
+                let prev = full_utf16
+                    .get(insert_pos.saturating_sub(1))
+                    .copied()
+                    .unwrap_or(0);
+                needs_newline = prev != '\n' as u16 && prev != '\r' as u16;
+            } else {
+                needs_newline = true;
+            }
+            if needs_newline {
+                log_debug(
+                    "insert_voice_tag_at_caret: inside voice tag, moving to new line after close",
+                );
+            } else {
+                log_debug("insert_voice_tag_at_caret: inside voice tag, moving after close");
+            }
+        }
+        if insert_pos != caret_pos {
+            let insert_pos_i32 = insert_pos as i32;
+            SendMessageW(
+                hwnd_edit,
+                EM_SETSEL,
+                WPARAM(insert_pos_i32 as usize),
+                LPARAM(insert_pos_i32 as isize),
+            );
+        }
+        let insert_text = if needs_newline {
+            format!("\r\n{insert}")
+        } else {
+            insert.clone()
+        };
+        let wide = to_wide(&insert_text);
         SendMessageW(
             hwnd_edit,
             EM_REPLACESEL,
             WPARAM(1),
             LPARAM(wide.as_ptr() as isize),
         );
-        let caret = start as i32 + open.encode_utf16().count() as i32 + 1;
+        let caret_base = if insert_pos != caret_pos {
+            insert_pos as i32 + if needs_newline { 2 } else { 0 }
+        } else {
+            start as i32
+        };
+        let caret = caret_base + open.encode_utf16().count() as i32 + 1;
         SendMessageW(
             hwnd_edit,
             EM_SETSEL,
@@ -246,7 +342,52 @@ pub fn insert_voice_tag_at_caret(hwnd: HWND, engine: TtsEngine, voice: &str) {
             LPARAM(caret as isize),
         );
         SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+        let mut new_start: u32 = 0;
+        let mut new_end: u32 = 0;
+        SendMessageW(
+            hwnd_edit,
+            EM_GETSEL,
+            WPARAM(&mut new_start as *mut u32 as usize),
+            LPARAM(&mut new_end as *mut u32 as isize),
+        );
+        let new_text_len = SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as u32;
+        log_debug(&format!(
+            "insert_voice_tag_at_caret: after insert sel_start={} sel_end={} text_len={}",
+            new_start, new_end, new_text_len
+        ));
     }
+}
+
+fn find_last_utf16_before(haystack: &[u16], needle: &[u16], before: usize) -> Option<usize> {
+    if needle.is_empty() || haystack.is_empty() {
+        return None;
+    }
+    let limit = before.min(haystack.len());
+    if limit < needle.len() {
+        return None;
+    }
+    let mut last = None;
+    let end = limit - needle.len();
+    for idx in 0..=end {
+        if haystack[idx..idx + needle.len()] == *needle {
+            last = Some(idx);
+        }
+    }
+    last
+}
+
+fn find_next_utf16_at_or_after(haystack: &[u16], needle: &[u16], start: usize) -> Option<usize> {
+    if needle.is_empty() || haystack.is_empty() || start >= haystack.len() {
+        return None;
+    }
+    let mut idx = start;
+    while idx + needle.len() <= haystack.len() {
+        if haystack[idx..idx + needle.len()] == *needle {
+            return Some(idx);
+        }
+        idx += 1;
+    }
+    None
 }
 
 pub struct Document {

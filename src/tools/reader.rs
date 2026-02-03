@@ -1,3 +1,4 @@
+use crate::settings::Language;
 use scraper::{Html, Selector};
 
 #[derive(Debug, Clone)]
@@ -275,7 +276,21 @@ pub fn clean_text(input: &str) -> String {
     cleaned
 }
 
-pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
+fn author_prefix(language: Language) -> &'static str {
+    match language {
+        Language::English => "By",
+        Language::Italian => "Di",
+        Language::French => "Par",
+        Language::Spanish => "Por",
+        Language::Portuguese => "Por",
+        Language::Swedish => "Av",
+        Language::Czech => "Od",
+        Language::Polish => "Autor",
+        Language::Vietnamese => "Bởi",
+    }
+}
+
+pub fn reader_mode_extract(html_content: &str, language: Language) -> Option<ArticleContent> {
     let document = Html::parse_document(html_content);
     let title = pick_title(&document);
 
@@ -500,7 +515,8 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
 
     let mut final_text = String::new();
     if !author_info.is_empty() {
-        final_text.push_str(&format!("Di {}\n\n", author_info));
+        let prefix = author_prefix(language);
+        final_text.push_str(&format!("{prefix} {}\n\n", author_info));
     }
     final_text.push_str(&body_acc);
 
@@ -513,7 +529,8 @@ pub fn reader_mode_extract(html_content: &str) -> Option<ArticleContent> {
         if should_fallback {
             let mut fallback = String::new();
             if !author_info.is_empty() {
-                fallback.push_str(&format!("Di {}\n\n", author_info));
+                let prefix = author_prefix(language);
+                fallback.push_str(&format!("{prefix} {}\n\n", author_info));
             }
             fallback.push_str(meta_desc.trim());
             let fallback_content = collapse_blank_lines(&clean_text(&fallback));

@@ -11,6 +11,7 @@ use futures_util::{SinkExt, StreamExt};
 use rand::Rng;
 use rodio::{Decoder, OutputStreamBuilder, Sink, Source};
 use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
 use std::io::{BufWriter, Cursor, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -147,6 +148,10 @@ pub(crate) fn has_voice_tags(text: &str) -> bool {
     text.to_ascii_lowercase().contains("<voice")
 }
 
+fn utf16_len(text: &str) -> usize {
+    text.encode_utf16().count()
+}
+
 pub(crate) fn split_voice_tag_spans(
     text: &str,
     default_engine: TtsEngine,
@@ -174,7 +179,7 @@ pub(crate) fn split_voice_tag_spans(
                 if i > cursor {
                     let chunk = &text[cursor..i];
                     if !chunk.is_empty() {
-                        let mut orig_len = chunk.chars().count();
+                        let mut orig_len = utf16_len(chunk);
                         if pending_len > 0 {
                             orig_len += pending_len;
                             pending_len = 0;
@@ -182,7 +187,7 @@ pub(crate) fn split_voice_tag_spans(
                         segments.push((chunk.to_string(), current_override.clone(), orig_len));
                     }
                 }
-                let tag_len = text[i..end].chars().count();
+                let tag_len = utf16_len(&text[i..end]);
                 pending_len += tag_len;
                 if is_open {
                     let tag_inner = text[i + "<voice".len()..end - 1].trim();
@@ -201,7 +206,7 @@ pub(crate) fn split_voice_tag_spans(
     if cursor < text.len() {
         let tail = &text[cursor..];
         if !tail.is_empty() {
-            let mut orig_len = tail.chars().count();
+            let mut orig_len = utf16_len(tail);
             if pending_len > 0 {
                 orig_len += pending_len;
             }
@@ -214,7 +219,7 @@ pub(crate) fn split_voice_tag_spans(
     }
 
     if segments.is_empty() {
-        segments.push((text.to_string(), None, text.chars().count()));
+        segments.push((text.to_string(), None, utf16_len(text)));
     }
     segments
 }
@@ -1359,6 +1364,57 @@ async fn read_edge_audio_turn(
     Ok(audio_data)
 }
 
+async fn read_edge_audio_turn_to_writer(
+    read: &mut futures_util::stream::SplitStream<
+        tokio_tungstenite::WebSocketStream<
+            tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+        >,
+    >,
+    buffer: &mut Vec<u8>,
+) -> Result<bool, String> {
+    let mut audio_received = false;
+    while let Some(msg) = read.next().await {
+        let msg: Message = msg.map_err(|e: tungstenite::Error| e.to_string())?;
+        match msg {
+            Message::Text(text) => {
+                if text.contains("Path:turn.end") {
+                    break;
+                }
+            }
+            Message::Binary(data) => {
+                if data.len() < 2 {
+                    continue;
+                }
+                let be_len = u16::from_be_bytes([data[0], data[1]]) as usize;
+                let le_len = u16::from_le_bytes([data[0], data[1]]) as usize;
+                let mut parsed = false;
+                for header_len in [be_len, le_len] {
+                    if header_len == 0 || data.len() < header_len + 2 {
+                        continue;
+                    }
+                    let headers_bytes = &data[2..2 + header_len];
+                    let headers_str = String::from_utf8_lossy(headers_bytes);
+                    if headers_str.contains("Path:audio") {
+                        let audio = &data[2 + header_len..];
+                        if !audio.is_empty() {
+                            buffer.extend_from_slice(audio);
+                            audio_received = true;
+                        }
+                        parsed = true;
+                        break;
+                    }
+                }
+                if parsed {
+                    continue;
+                }
+            }
+            Message::Close(_) => break,
+            _ => {}
+        }
+    }
+    Ok(audio_received)
+}
+
 async fn download_edge_chunks_ws(
     chunks: &[TtsChunk],
     default_voice: &str,
@@ -1368,7 +1424,8 @@ async fn download_edge_chunks_ws(
     cancel: &AtomicBool,
     audio_tx: EdgeAudioTx<'_>,
 ) -> Result<Vec<Vec<u8>>, String> {
-    let first_audio_timeout = Duration::from_secs(3);
+    let first_audio_timeout = Duration::from_secs(60);
+    const FIRST_AUDIO_RETRIES: usize = 1;
     let sec_ms_gec = generate_sec_ms_gec();
     let sec_ms_gec_version = "1-132.0.2917.39";
     let request_id = Uuid::new_v4().simple().to_string();
@@ -1405,7 +1462,7 @@ async fn download_edge_chunks_ws(
         HeaderValue::from_str(&cookie).map_err(|err| err.to_string())?,
     );
 
-    let connect_timeout = Duration::from_secs(3);
+    let connect_timeout = Duration::from_secs(10);
     let (ws_stream, _) = match tokio::time::timeout(connect_timeout, connect_async(request)).await {
         Ok(res) => res.map_err(|e: tungstenite::Error| e.to_string())?,
         Err(_) => {
@@ -1448,18 +1505,34 @@ async fn download_edge_chunks_ws(
             .await
             .map_err(|e: tungstenite::Error| e.to_string())?;
         let audio = if sent_count == 0 {
-            match tokio::time::timeout(first_audio_timeout, read_edge_audio_turn(&mut read)).await {
-                Ok(res) => res?,
-                Err(_) => {
-                    crate::log_debug(&format!(
-                        "Edge WS: first audio timeout (chunk_index={} text_len={} voice={})",
-                        idx,
-                        chunk.text_to_read.len(),
-                        voice
-                    ));
-                    return Err("Edge WS: first audio timeout".to_string());
+            let mut audio = None;
+            for attempt in 1..=FIRST_AUDIO_RETRIES {
+                if cancel.load(Ordering::Relaxed) {
+                    return Err("Cancelled".to_string());
+                }
+                match tokio::time::timeout(first_audio_timeout, read_edge_audio_turn(&mut read))
+                    .await
+                {
+                    Ok(res) => {
+                        audio = Some(res?);
+                        break;
+                    }
+                    Err(_) => {
+                        crate::log_debug(&format!(
+                            "Edge WS: first audio timeout (attempt {}/{} chunk_index={} text_len={} voice={})",
+                            attempt,
+                            FIRST_AUDIO_RETRIES,
+                            idx,
+                            chunk.text_to_read.len(),
+                            voice
+                        ));
+                        if attempt < FIRST_AUDIO_RETRIES {
+                            tokio::time::sleep(Duration::from_secs((attempt * 2) as u64)).await;
+                        }
+                    }
                 }
             }
+            audio.ok_or_else(|| "Edge WS: first audio timeout".to_string())?
         } else {
             read_edge_audio_turn(&mut read).await?
         };
@@ -1486,6 +1559,614 @@ async fn download_edge_chunks_ws(
     Ok(out)
 }
 
+struct EdgeStreamOptions<'a> {
+    voice: &'a str,
+    rate: i32,
+    pitch: i32,
+    volume: i32,
+    cancel: &'a AtomicBool,
+    progress_hwnd: HWND,
+}
+
+async fn download_edge_chunk_ws(
+    chunk: &TtsChunk,
+    options: &EdgeStreamOptions<'_>,
+    idx: usize,
+) -> Result<Vec<u8>, String> {
+    let first_audio_timeout = Duration::from_secs(60);
+    let sec_ms_gec = generate_sec_ms_gec();
+    let sec_ms_gec_version = "1-132.0.2917.39";
+    let request_id = Uuid::new_v4().simple().to_string();
+
+    let url_str = format!(
+        "{}?TrustedClientToken={}&ConnectionId={}&Sec-MS-GEC={}&Sec-MS-GEC-Version={}",
+        WSS_URL_BASE, TRUSTED_CLIENT_TOKEN, request_id, sec_ms_gec, sec_ms_gec_version
+    );
+    let url = Url::parse(&url_str).map_err(|err| err.to_string())?;
+
+    let mut request = url
+        .as_str()
+        .into_client_request()
+        .map_err(|e: tungstenite::Error| e.to_string())?;
+    let headers = request.headers_mut();
+    headers.insert("Pragma", HeaderValue::from_static("no-cache"));
+    headers.insert("Cache-Control", HeaderValue::from_static("no-cache"));
+    headers.insert(
+        "Origin",
+        HeaderValue::from_static("chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold"),
+    );
+    headers.insert("User-Agent", HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0"));
+    headers.insert(
+        "Accept-Encoding",
+        HeaderValue::from_static("gzip, deflate, br"),
+    );
+    headers.insert(
+        "Accept-Language",
+        HeaderValue::from_static("en-US,en;q=0.9"),
+    );
+    let cookie = format!("muid={};", generate_muid());
+    headers.insert(
+        "Cookie",
+        HeaderValue::from_str(&cookie).map_err(|err| err.to_string())?,
+    );
+
+    let connect_timeout = Duration::from_secs(10);
+    let (ws_stream, _) = match tokio::time::timeout(connect_timeout, connect_async(request)).await {
+        Ok(res) => res.map_err(|e: tungstenite::Error| e.to_string())?,
+        Err(_) => {
+            return Err("WebSocket connect timeout".to_string());
+        }
+    };
+    crate::log_debug(&format!("Edge WS: connected (chunk {}).", idx));
+    let (mut write, mut read) = ws_stream.split();
+
+    let config_msg = format!(
+        "X-Timestamp:{}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{{\"context\":{{\"synthesis\":{{\"audio\":{{\"metadataoptions\":{{\"sentenceBoundaryEnabled\":\"false\",\"wordBoundaryEnabled\":\"false\"}},\"outputFormat\":\"audio-24khz-48kbitrate-mono-mp3\"}}}}}}}}",
+        get_date_string()
+    );
+    write
+        .send(Message::Text(config_msg.into()))
+        .await
+        .map_err(|e: tungstenite::Error| e.to_string())?;
+
+    if options.cancel.load(Ordering::Relaxed) {
+        return Err("Cancelled".to_string());
+    }
+    let voice = chunk
+        .override_voice
+        .as_ref()
+        .map(|v| v.voice.as_str())
+        .unwrap_or(options.voice);
+    let req_id = Uuid::new_v4().simple().to_string();
+    let ssml = mkssml(
+        &chunk.text_to_read,
+        voice,
+        options.rate,
+        options.pitch,
+        options.volume,
+    );
+    let ssml_msg = format!(
+        "X-RequestId:{}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:{}Z\r\nPath:ssml\r\n\r\n{}",
+        req_id,
+        get_date_string(),
+        ssml
+    );
+    write
+        .send(Message::Text(ssml_msg.into()))
+        .await
+        .map_err(|e: tungstenite::Error| e.to_string())?;
+
+    let mut chunk_buffer: Vec<u8> = Vec::new();
+    let audio_received = match tokio::time::timeout(
+        first_audio_timeout,
+        read_edge_audio_turn_to_writer(&mut read, &mut chunk_buffer),
+    )
+    .await
+    {
+        Ok(res) => res?,
+        Err(_) => {
+            crate::log_debug(&format!(
+                "Edge WS: first audio timeout (chunk_index={} text_len={} voice={})",
+                idx,
+                chunk.text_to_read.len(),
+                voice
+            ));
+            false
+        }
+    };
+
+    if !audio_received {
+        crate::log_debug("Edge WS: no audio sent to writer.");
+        return Err("Edge WS: no audio sent".to_string());
+    }
+
+    Ok(chunk_buffer)
+}
+
+async fn download_edge_chunk_ws_with_retry(
+    chunk: &TtsChunk,
+    options: &EdgeStreamOptions<'_>,
+    idx: usize,
+    max_retries: usize,
+) -> Result<Vec<u8>, String> {
+    let mut last_err = None;
+    for attempt in 1..=max_retries {
+        if options.cancel.load(Ordering::Relaxed) {
+            return Err("Cancelled".to_string());
+        }
+        match download_edge_chunk_ws(chunk, options, idx).await {
+            Ok(audio) => return Ok(audio),
+            Err(err) => {
+                last_err = Some(err);
+                crate::log_debug(&format!(
+                    "Edge WS: chunk download failed (attempt {}/{} chunk_index={}): {}",
+                    attempt,
+                    max_retries,
+                    idx,
+                    last_err.as_deref().unwrap_or("unknown")
+                ));
+                if attempt < max_retries {
+                    tokio::time::sleep(Duration::from_millis((attempt * 250) as u64)).await;
+                }
+            }
+        }
+    }
+    Err(last_err.unwrap_or_else(|| "Edge WS: chunk download failed".to_string()))
+}
+
+fn time_split_part_output(base: &Path, part_index: u32, start_number: u32) -> PathBuf {
+    let stem = base
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("audiobook");
+    let ext = base.extension().and_then(|s| s.to_str()).unwrap_or("mp3");
+    let number = start_number.saturating_add(part_index);
+    base.with_file_name(format!("{stem}_part{number:02}.{ext}"))
+}
+
+fn finish_time_split_part(
+    part_output: &Path,
+    wav_output: Option<PathBuf>,
+    options: &AudiobookCommonOptions,
+    is_aac: bool,
+    is_mp3: bool,
+) -> Result<(), String> {
+    if !is_aac && !is_mp3 {
+        return Ok(());
+    }
+    let Some(wav_path) = wav_output else {
+        return Ok(());
+    };
+    if options.progress_hwnd.0 != 0 {
+        unsafe {
+            let _unused = PostMessageW(
+                options.progress_hwnd,
+                crate::app_windows::audiobook_window::WM_SET_PROGRESS_TOTAL,
+                WPARAM(10000),
+                LPARAM(0),
+            );
+        }
+    }
+    let res = if is_aac {
+        crate::mf_encoder::encode_wav_to_m4b(
+            &wav_path,
+            part_output,
+            options.audiobook_bitrate_kbps,
+            |p| {
+                if options.progress_hwnd.0 != 0 {
+                    unsafe {
+                        let _unused = PostMessageW(
+                            options.progress_hwnd,
+                            crate::WM_UPDATE_PROGRESS,
+                            WPARAM(p as usize),
+                            LPARAM(0),
+                        );
+                    }
+                }
+            },
+        )
+    } else {
+        crate::mf_encoder::encode_wav_to_mp3(&wav_path, part_output, |p| {
+            if options.progress_hwnd.0 != 0 {
+                unsafe {
+                    let _unused = PostMessageW(
+                        options.progress_hwnd,
+                        crate::WM_UPDATE_PROGRESS,
+                        WPARAM(p as usize),
+                        LPARAM(0),
+                    );
+                }
+            }
+        })
+    };
+    if let Err(e) = std::fs::remove_file(&wav_path) {
+        crate::log_debug(&format!(
+            "Failed to remove temp wav after time split: {}",
+            e
+        ));
+    }
+    res.map_err(|e| {
+        if e.contains("Media Foundation") {
+            i18n::tr(options.language, "sapi5.mf_not_available")
+        } else {
+            i18n::tr_f(options.language, "sapi5.mf_error", &[("err", &e)])
+        }
+    })?;
+    Ok(())
+}
+
+fn run_split_audiobook_by_time_edge(
+    chunks: &[String],
+    split_minutes: u32,
+    start_number: u32,
+    options: AudiobookCommonOptions,
+) -> Result<(), String> {
+    if chunks.is_empty() {
+        return Ok(());
+    }
+    let split_seconds = split_minutes.saturating_mul(60) as f64;
+    let extension = options
+        .output
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    let is_aac = extension == "m4b" || extension == "m4a" || extension == "mp4";
+    let is_mp3 = extension == "mp3";
+
+    let edge_chunks: Vec<TtsChunk> = chunks
+        .iter()
+        .map(|chunk| TtsChunk {
+            text_to_read: chunk.clone(),
+            original_len: utf16_len(chunk),
+            override_voice: None,
+        })
+        .collect();
+
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .map_err(|err| err.to_string())?;
+
+    rt.block_on(async {
+        let stream_options = EdgeStreamOptions {
+            voice: options.voice,
+            rate: options.rate,
+            pitch: options.pitch,
+            volume: options.volume,
+            cancel: options.cancel.as_ref(),
+            progress_hwnd: options.progress_hwnd,
+        };
+
+        const MAX_PARALLEL_CHUNKS: usize = 30;
+        const CHUNK_RETRIES: usize = 3;
+
+        let mut pending: BTreeMap<usize, Vec<u8>> = BTreeMap::new();
+        let mut next_to_write = 0usize;
+        let mut part_index: u32 = 0;
+        let mut current_duration = 0.0f64;
+        let mut part_writer: Option<BufWriter<std::fs::File>> = None;
+        let mut wav_writer: Option<WavWriter> = None;
+        let mut wav_path: Option<PathBuf> = None;
+        let mut wav_rate: Option<u32> = None;
+        let mut wav_channels: Option<u16> = None;
+        let mut current_global_progress: usize = 0;
+
+        let stream_options_ref = &stream_options;
+        let mut stream = futures_util::stream::iter(edge_chunks.iter().enumerate())
+            .map(|(idx, chunk)| {
+                let opts = stream_options_ref;
+                async move {
+                    let res =
+                        download_edge_chunk_ws_with_retry(chunk, opts, idx, CHUNK_RETRIES).await;
+                    (idx, res)
+                }
+            })
+            .buffer_unordered(MAX_PARALLEL_CHUNKS);
+
+        while let Some((idx, res)) = stream.next().await {
+            if options.cancel.load(Ordering::Relaxed) {
+                return Err(cancelled_message(options.language));
+            }
+            let audio = res?;
+            pending.insert(idx, audio);
+
+            while let Some(data) = pending.remove(&next_to_write) {
+                if options.cancel.load(Ordering::Relaxed) {
+                    return Err(cancelled_message(options.language));
+                }
+
+                let (samples, src_rate, src_channels) =
+                    decode_mp3_to_pcm(&data).map_err(|e| e.to_string())?;
+                let chunk_duration = samples.len() as f64 / (src_rate as f64 * src_channels as f64);
+
+                if split_seconds > 0.0
+                    && current_duration > 0.0
+                    && current_duration + chunk_duration > split_seconds
+                {
+                    if let Some(mut writer) = part_writer.take()
+                        && let Err(e) = writer.flush()
+                    {
+                        crate::log_debug(&format!("Failed to flush time-split part: {}", e));
+                    }
+                    if let Some(mut w) = wav_writer.take()
+                        && let Err(e) = w.finalize()
+                    {
+                        crate::log_debug(&format!("Failed to finalize time-split wav: {}", e));
+                    }
+                    let part_output =
+                        time_split_part_output(options.output, part_index, start_number);
+                    finish_time_split_part(
+                        &part_output,
+                        wav_path.take(),
+                        &options,
+                        is_aac,
+                        is_mp3,
+                    )?;
+                    part_index = part_index.saturating_add(1);
+                    current_duration = 0.0;
+                    wav_rate = None;
+                    wav_channels = None;
+                }
+
+                if part_writer.is_none() && wav_writer.is_none() {
+                    let part_output =
+                        time_split_part_output(options.output, part_index, start_number);
+                    if is_aac || is_mp3 {
+                        let tmp_wav = part_output.with_extension("wav.tmp");
+                        wav_path = Some(tmp_wav.clone());
+                        wav_rate = Some(src_rate);
+                        wav_channels = Some(src_channels);
+                        let writer = WavWriter::create(&tmp_wav, src_rate, src_channels, 16)
+                            .map_err(|e| e.to_string())?;
+                        wav_writer = Some(writer);
+                    } else {
+                        let file =
+                            std::fs::File::create(&part_output).map_err(|e| e.to_string())?;
+                        part_writer = Some(BufWriter::new(file));
+                    }
+                }
+
+                if let Some(ref mut w) = wav_writer {
+                    let target_rate = wav_rate.unwrap_or(src_rate);
+                    let target_channels = wav_channels.unwrap_or(src_channels);
+                    let out_samples = if src_rate != target_rate || src_channels != target_channels
+                    {
+                        resample_pcm(
+                            &samples,
+                            src_rate,
+                            src_channels,
+                            target_rate,
+                            target_channels,
+                        )
+                    } else {
+                        samples
+                    };
+                    w.write_samples_f32(&out_samples)
+                        .map_err(|e| e.to_string())?;
+                } else if let Some(ref mut writer) = part_writer {
+                    writer.write_all(&data).map_err(|e| e.to_string())?;
+                }
+
+                current_duration += chunk_duration;
+                current_global_progress = current_global_progress.saturating_add(1);
+                if options.progress_hwnd.0 != 0 {
+                    unsafe {
+                        if let Err(e) = PostMessageW(
+                            options.progress_hwnd,
+                            crate::WM_UPDATE_PROGRESS,
+                            WPARAM(current_global_progress),
+                            LPARAM(0),
+                        ) {
+                            crate::log_debug(&format!("Failed to post WM_UPDATE_PROGRESS: {}", e));
+                        }
+                    }
+                }
+                next_to_write = next_to_write.saturating_add(1);
+            }
+        }
+
+        if let Some(mut writer) = part_writer.take()
+            && let Err(e) = writer.flush()
+        {
+            crate::log_debug(&format!("Failed to flush time-split part: {}", e));
+        }
+        if let Some(mut w) = wav_writer.take()
+            && let Err(e) = w.finalize()
+        {
+            crate::log_debug(&format!("Failed to finalize time-split wav: {}", e));
+        }
+        if next_to_write > 0 {
+            let part_output = time_split_part_output(options.output, part_index, start_number);
+            finish_time_split_part(&part_output, wav_path.take(), &options, is_aac, is_mp3)?;
+        }
+        Ok(())
+    })
+}
+
+fn run_split_audiobook_by_time_sapi(
+    engine: TtsEngine,
+    chunks: &[String],
+    split_minutes: u32,
+    start_number: u32,
+    options: AudiobookCommonOptions,
+) -> Result<(), String> {
+    if chunks.is_empty() {
+        return Ok(());
+    }
+    let split_seconds = split_minutes.saturating_mul(60) as f64;
+    let extension = options
+        .output
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    let is_aac = extension == "m4b" || extension == "m4a" || extension == "mp4";
+    let is_mp3 = extension == "mp3";
+
+    let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
+    let mut current_duration = 0.0f64;
+    let mut part_index: u32 = 0;
+    let mut wav_writer: Option<WavWriter> = None;
+    let mut wav_path: Option<PathBuf> = None;
+    let mut wav_rate: Option<u32> = None;
+    let mut wav_channels: Option<u16> = None;
+    let mut current_global_progress: usize = 0;
+
+    for chunk in chunks {
+        if options.cancel.load(Ordering::Relaxed) {
+            return Err(cancelled_message(options.language));
+        }
+        let bytes = rt.block_on(synthesize_segment_bytes(
+            engine,
+            chunk,
+            options.voice,
+            options.rate,
+            options.pitch,
+            options.volume,
+            options.language,
+        ))?;
+        let (samples, src_rate, src_channels) = decode_wav_to_pcm(&bytes)?;
+        let chunk_duration = samples.len() as f64 / (src_rate as f64 * src_channels as f64);
+
+        if split_seconds > 0.0
+            && current_duration > 0.0
+            && current_duration + chunk_duration > split_seconds
+        {
+            if let Some(mut w) = wav_writer.take()
+                && let Err(e) = w.finalize()
+            {
+                crate::log_debug(&format!("Failed to finalize time-split wav: {}", e));
+            }
+            let part_output = time_split_part_output(options.output, part_index, start_number);
+            finish_time_split_part(&part_output, wav_path.take(), &options, is_aac, is_mp3)?;
+            part_index = part_index.saturating_add(1);
+            current_duration = 0.0;
+            wav_rate = None;
+            wav_channels = None;
+        }
+
+        if wav_writer.is_none() {
+            let part_output = time_split_part_output(options.output, part_index, start_number);
+            if is_aac || is_mp3 {
+                let tmp_wav = part_output.with_extension("wav.tmp");
+                wav_path = Some(tmp_wav.clone());
+                wav_rate = Some(src_rate);
+                wav_channels = Some(src_channels);
+                let writer = WavWriter::create(&tmp_wav, src_rate, src_channels, 16)
+                    .map_err(|e| e.to_string())?;
+                wav_writer = Some(writer);
+            } else {
+                wav_rate = Some(src_rate);
+                wav_channels = Some(src_channels);
+                let writer = WavWriter::create(&part_output, src_rate, src_channels, 16)
+                    .map_err(|e| e.to_string())?;
+                wav_writer = Some(writer);
+            }
+        }
+
+        if let Some(ref mut w) = wav_writer {
+            let target_rate = wav_rate.unwrap_or(src_rate);
+            let target_channels = wav_channels.unwrap_or(src_channels);
+            let out_samples = if src_rate != target_rate || src_channels != target_channels {
+                resample_pcm(
+                    &samples,
+                    src_rate,
+                    src_channels,
+                    target_rate,
+                    target_channels,
+                )
+            } else {
+                samples
+            };
+            w.write_samples_f32(&out_samples)
+                .map_err(|e| e.to_string())?;
+        }
+
+        current_duration += chunk_duration;
+        current_global_progress = current_global_progress.saturating_add(1);
+        if options.progress_hwnd.0 != 0 {
+            unsafe {
+                if let Err(e) = PostMessageW(
+                    options.progress_hwnd,
+                    crate::WM_UPDATE_PROGRESS,
+                    WPARAM(current_global_progress),
+                    LPARAM(0),
+                ) {
+                    crate::log_debug(&format!("Failed to post WM_UPDATE_PROGRESS: {}", e));
+                }
+            }
+        }
+    }
+
+    if let Some(mut w) = wav_writer.take()
+        && let Err(e) = w.finalize()
+    {
+        crate::log_debug(&format!("Failed to finalize time-split wav: {}", e));
+    }
+    if !chunks.is_empty() {
+        let part_output = time_split_part_output(options.output, part_index, start_number);
+        finish_time_split_part(&part_output, wav_path.take(), &options, is_aac, is_mp3)?;
+    }
+
+    Ok(())
+}
+
+async fn download_edge_chunks_ws_parallel_to_writer(
+    chunks: &[TtsChunk],
+    start_index: usize,
+    options: &EdgeStreamOptions<'_>,
+    writer: &mut dyn std::io::Write,
+    current_global_progress: &mut usize,
+) -> Result<usize, String> {
+    const MAX_PARALLEL_CHUNKS: usize = 30;
+    const CHUNK_RETRIES: usize = 3;
+
+    if start_index >= chunks.len() {
+        return Ok(chunks.len());
+    }
+
+    let mut pending: BTreeMap<usize, Vec<u8>> = BTreeMap::new();
+    let mut next_to_write = start_index;
+
+    let mut stream = futures_util::stream::iter(chunks.iter().enumerate().skip(start_index))
+        .map(|(idx, chunk)| async move {
+            let res = download_edge_chunk_ws_with_retry(chunk, options, idx, CHUNK_RETRIES).await;
+            (idx, res)
+        })
+        .buffer_unordered(MAX_PARALLEL_CHUNKS);
+
+    while let Some((idx, res)) = stream.next().await {
+        if options.cancel.load(Ordering::Relaxed) {
+            return Err("Cancelled".to_string());
+        }
+        let audio = res?;
+        pending.insert(idx, audio);
+
+        while let Some(data) = pending.remove(&next_to_write) {
+            writer.write_all(&data).map_err(|err| err.to_string())?;
+            writer.flush().map_err(|err| err.to_string())?;
+
+            *current_global_progress += 1;
+            if options.progress_hwnd.0 != 0 {
+                unsafe {
+                    if let Err(e) = PostMessageW(
+                        options.progress_hwnd,
+                        crate::WM_UPDATE_PROGRESS,
+                        WPARAM(*current_global_progress),
+                        LPARAM(0),
+                    ) {
+                        crate::log_debug(&format!("Failed to post WM_UPDATE_PROGRESS: {}", e));
+                    }
+                }
+            }
+            next_to_write = next_to_write.saturating_add(1);
+        }
+    }
+
+    Ok(chunks.len())
+}
+
 unsafe fn get_text_from_caret(hwnd_edit: HWND) -> (String, i32) {
     let mut start: i32 = 0;
     let mut end: i32 = 0;
@@ -1503,8 +2184,7 @@ unsafe fn get_text_from_caret(hwnd_edit: HWND) -> (String, i32) {
         return (full_text, 0);
     }
 
-    let normalized = full_text.replace("\r\n", "\n");
-    let wide: Vec<u16> = normalized.encode_utf16().collect();
+    let wide: Vec<u16> = full_text.encode_utf16().collect();
 
     // Se la posizione del cursore Š oltre la lunghezza del testo (fine file),
     // ricomincia a leggere dall'inizio come richiesto.
@@ -1512,7 +2192,7 @@ unsafe fn get_text_from_caret(hwnd_edit: HWND) -> (String, i32) {
         return (full_text, 0);
     }
 
-    let adjusted_pos = adjust_tts_caret_pos(&normalized, caret_pos as i32);
+    let adjusted_pos = adjust_tts_caret_pos(&full_text, caret_pos as i32);
     let adjusted_pos = adjusted_pos.max(0) as usize;
     if adjusted_pos >= wide.len() {
         return (full_text, 0);
@@ -1842,139 +2522,72 @@ pub(crate) fn build_mixed_audiobook_parts_by_positions(
 
 pub fn split_text(text: &str) -> Vec<String> {
     let mut chunks: Vec<String> = Vec::new();
-    // Trim input to avoid processing leading/trailing whitespace as separate empty chunks
     let text = text.trim();
     if text.is_empty() {
         return chunks;
     }
 
-    let char_indices: Vec<(usize, char)> = text.char_indices().collect();
-    let char_len = char_indices.len();
-    let mut current_char = 0;
-
+    let char_len = text.chars().count();
     let is_long = char_len > TTS_LONG_TEXT_THRESHOLD;
     let max_len = if is_long {
         MAX_TTS_TEXT_LEN_LONG
     } else {
         MAX_TTS_TEXT_LEN
     };
-    // First chunk can be smaller if text is very long to start playback faster?
-    // But for recording, consistency is better.
     let target_chunk_len = if is_long {
         MAX_TTS_FIRST_CHUNK_LEN_LONG
     } else {
         max_len
     };
 
-    let byte_index_at = |char_idx: usize| -> usize {
-        if char_idx >= char_len {
-            text.len()
-        } else {
-            char_indices[char_idx].0
+    let sentences = split_sentences(text);
+    let mut current = String::new();
+    let mut current_limit = target_chunk_len;
+
+    for sentence in sentences {
+        let sentence_trim = sentence.trim();
+        if sentence_trim.is_empty() {
+            continue;
         }
-    };
-
-    while current_char < char_len {
-        // Calculate potential end
-        let effective_target = if chunks.is_empty() {
-            target_chunk_len
-        } else {
-            max_len
-        };
-
-        let mut split_char = current_char + effective_target;
-
-        if split_char >= char_len {
-            // Take the rest
-            let chunk = text[byte_index_at(current_char)..].trim().to_string();
-            if !chunk.is_empty() {
-                chunks.push(chunk);
-            }
-            break;
-        }
-
-        // Search backwards for a good split point
-        let search_end = split_char;
-        let search_start = current_char; // Don't go back past start
-        let mut split_found = None;
-
-        // Priority 1: Sentence endings
-        for idx in (search_start..search_end).rev() {
-            let c = char_indices[idx].1;
-            if matches!(c, '.' | '!' | '?') {
-                let next_idx = idx + 1;
-                // Split if next char is end of string or whitespace
-                if next_idx >= char_len || char_indices[next_idx].1.is_whitespace() {
-                    split_found = Some(next_idx);
-                    break;
+        let sentence_len = sentence_trim.chars().count();
+        if current.is_empty() {
+            if sentence_len > current_limit {
+                let parts = split_long_sentence_by_whitespace(sentence_trim, current_limit);
+                for part in parts {
+                    chunks.push(part);
                 }
+                current_limit = max_len;
+                continue;
             }
-        }
+            current.push_str(sentence_trim);
+        } else {
+            let combined_len = current
+                .chars()
+                .count()
+                .saturating_add(1)
+                .saturating_add(sentence_len);
+            if combined_len > current_limit {
+                chunks.push(current.trim().to_string());
+                current.clear();
+                current_limit = max_len;
 
-        // Priority 2: Newlines or major punctuation
-        if split_found.is_none() {
-            for idx in (search_start..search_end).rev() {
-                let c = char_indices[idx].1;
-                if c == '\n' {
-                    // Try to keep newlines together?
-                    if idx + 1 < char_len && char_indices[idx + 1].1 == '\n' {
-                        split_found = Some(idx + 2);
-                        break;
-                    } else {
-                        split_found = Some(idx + 1);
-                        break;
+                if sentence_len > current_limit {
+                    let parts = split_long_sentence_by_whitespace(sentence_trim, current_limit);
+                    for part in parts {
+                        chunks.push(part);
                     }
-                } else if matches!(c, ';' | ':') {
-                    split_found = Some(idx + 1);
-                    break;
+                } else {
+                    current.push_str(sentence_trim);
                 }
+            } else {
+                current.push(' ');
+                current.push_str(sentence_trim);
             }
         }
+    }
 
-        // Priority 3: Spaces
-        if split_found.is_none() {
-            for idx in (search_start..search_end).rev() {
-                if char_indices[idx].1.is_whitespace() {
-                    split_found = Some(idx + 1);
-                    break;
-                }
-            }
-        }
-
-        // Apply split
-        if let Some(split_at) = split_found {
-            // Ensure we advance
-            if split_at > current_char {
-                split_char = split_at;
-            }
-        }
-
-        // Extract chunk
-        let end_byte = byte_index_at(split_char);
-        let start_byte = byte_index_at(current_char);
-
-        if end_byte > start_byte {
-            let chunk = text[start_byte..end_byte].trim().to_string();
-            if !chunk.is_empty() {
-                chunks.push(chunk);
-            }
-            current_char = split_char;
-        } else {
-            // Should not happen if logic is correct, but prevent infinite loop
-            // Force advance by 1 char or target if something is wrong
-            let next_char = std::cmp::min(current_char + effective_target, char_len);
-            if next_char == current_char {
-                // Force break
-                break;
-            }
-            let chunk = text[start_byte..byte_index_at(next_char)]
-                .trim()
-                .to_string();
-            if !chunk.is_empty() {
-                chunks.push(chunk);
-            }
-            current_char = next_char;
-        }
+    if !current.trim().is_empty() {
+        chunks.push(current.trim().to_string());
     }
 
     chunks
@@ -2029,7 +2642,6 @@ fn find_edge_split_idx(text: &str, max_bytes: usize) -> usize {
     }
 
     let mut last_sentence = 0usize;
-    let mut last_newline = 0usize;
     let mut last_space = 0usize;
     let mut last_end = 0usize;
 
@@ -2044,8 +2656,6 @@ fn find_edge_split_idx(text: &str, max_bytes: usize) -> usize {
         let next_is_space = iter.peek().map(|(_, c)| c.is_whitespace()).unwrap_or(true);
         if matches!(ch, '.' | '!' | '?' | ';' | ':') && next_is_space {
             last_sentence = end;
-        } else if ch == '\n' {
-            last_newline = end;
         } else if ch.is_whitespace() {
             last_space = end;
         }
@@ -2053,8 +2663,6 @@ fn find_edge_split_idx(text: &str, max_bytes: usize) -> usize {
 
     let mut split_at = if last_sentence > 0 {
         last_sentence
-    } else if last_newline > 0 {
-        last_newline
     } else if last_space > 0 {
         last_space
     } else {
@@ -2070,9 +2678,114 @@ fn find_edge_split_idx(text: &str, max_bytes: usize) -> usize {
 fn split_text_edge(text: &str) -> Vec<String> {
     let cleaned = remove_incompatible_characters_edge(text);
     let escaped = escape_xml(&cleaned);
-    let mut remaining = escaped.as_str();
+    let sentences = split_sentences(&escaped);
     let mut out = Vec::new();
+    let mut current = String::new();
 
+    for sentence in sentences {
+        let sentence_trim = sentence.trim();
+        if sentence_trim.is_empty() {
+            continue;
+        }
+
+        let sentence_len = sentence_trim.len();
+        if current.is_empty() {
+            if sentence_len > EDGE_TTS_MAX_BYTES {
+                let parts = split_long_sentence_edge(sentence_trim);
+                out.extend(parts);
+                continue;
+            }
+            current.push_str(sentence_trim);
+        } else {
+            let combined_len = current.len().saturating_add(1).saturating_add(sentence_len);
+            if combined_len > EDGE_TTS_MAX_BYTES {
+                out.push(current.trim().to_string());
+                current.clear();
+
+                if sentence_len > EDGE_TTS_MAX_BYTES {
+                    let parts = split_long_sentence_edge(sentence_trim);
+                    out.extend(parts);
+                } else {
+                    current.push_str(sentence_trim);
+                }
+            } else {
+                current.push(' ');
+                current.push_str(sentence_trim);
+            }
+        }
+    }
+
+    if !current.trim().is_empty() {
+        out.push(current.trim().to_string());
+    }
+
+    out
+}
+
+fn split_sentences(text: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let mut start = 0usize;
+    let mut iter = text.char_indices().peekable();
+
+    while let Some((idx, ch)) = iter.next() {
+        if matches!(ch, '.' | '!' | '?' | ';' | ':') {
+            let next_is_space = iter.peek().map(|(_, c)| c.is_whitespace()).unwrap_or(true);
+            if next_is_space {
+                let end = idx + ch.len_utf8();
+                if end > start {
+                    out.push(&text[start..end]);
+                }
+                start = end;
+            }
+        }
+    }
+
+    if start < text.len() {
+        out.push(&text[start..]);
+    }
+
+    out
+}
+
+fn split_long_sentence_by_whitespace(text: &str, max_chars: usize) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut current = String::new();
+
+    for word in text.split_whitespace() {
+        if current.is_empty() {
+            if word.chars().count() > max_chars {
+                out.push(word.to_string());
+            } else {
+                current.push_str(word);
+            }
+            continue;
+        }
+
+        let combined_len = current
+            .chars()
+            .count()
+            .saturating_add(1)
+            .saturating_add(word.chars().count());
+        if combined_len > max_chars {
+            out.push(current.trim().to_string());
+            current.clear();
+            current.push_str(word);
+        } else {
+            current.push(' ');
+            current.push_str(word);
+        }
+    }
+
+    if !current.trim().is_empty() {
+        out.push(current.trim().to_string());
+    }
+
+    out
+}
+
+fn split_long_sentence_edge(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut remaining = text;
     while remaining.len() > EDGE_TTS_MAX_BYTES {
         let split_at = find_edge_split_idx(remaining, EDGE_TTS_MAX_BYTES);
         if split_at == 0 || split_at >= remaining.len() {
@@ -2108,7 +2821,7 @@ fn split_by_custom_dictionary(
     if text.is_empty() {
         Vec::new()
     } else {
-        vec![(text.to_string(), None, text.chars().count())]
+        vec![(text.to_string(), None, utf16_len(text))]
     }
 }
 
@@ -2156,7 +2869,7 @@ pub fn split_into_tts_chunks(
             sentences.push((current_sentence, current_len));
         }
 
-        let extra_len = span_orig_len.saturating_sub(span_text.chars().count());
+        let extra_len = span_orig_len.saturating_sub(utf16_len(&span_text));
         let mut pending_len = extra_len;
 
         for (s_text, _s_len) in sentences.into_iter() {
@@ -2249,6 +2962,9 @@ fn start_audiobook_with_text(hwnd: HWND, text: String, suggested_name: Option<St
         audiobook_split_by_text,
         audiobook_split_text,
         audiobook_split_text_requires_newline,
+        audiobook_split_by_time,
+        audiobook_split_minutes,
+        audiobook_split_start_number,
         audiobook_m4b_bitrate,
         tts_engine,
         dictionary,
@@ -2263,6 +2979,9 @@ fn start_audiobook_with_text(hwnd: HWND, text: String, suggested_name: Option<St
                 state.settings.audiobook_split_by_text,
                 state.settings.audiobook_split_text.clone(),
                 state.settings.audiobook_split_text_requires_newline,
+                state.settings.audiobook_split_by_time,
+                state.settings.audiobook_split_minutes,
+                state.settings.audiobook_split_start_number,
                 state.settings.audiobook_m4b_bitrate,
                 state.settings.tts_engine,
                 state.settings.dictionary.clone(),
@@ -2278,6 +2997,9 @@ fn start_audiobook_with_text(hwnd: HWND, text: String, suggested_name: Option<St
         false,
         String::new(),
         true,
+        false,
+        5,
+        1,
         128,
         TtsEngine::Edge,
         Vec::new(),
@@ -2287,7 +3009,15 @@ fn start_audiobook_with_text(hwnd: HWND, text: String, suggested_name: Option<St
     ));
 
     let cleaned = strip_dashed_lines(&text);
+    let split_by_time = audiobook_split_by_time;
+    let split_minutes = audiobook_split_minutes.clamp(1, 20);
+    let split_start_number = audiobook_split_start_number.clamp(1, 99);
     let mut split_parts = audiobook_split;
+    let mut split_by_text = audiobook_split_by_text;
+    if split_by_time {
+        split_parts = 0;
+        split_by_text = false;
+    }
     let mut marker_parts: Option<Vec<Vec<String>>> = None;
     let mut marker_positions: Option<Vec<usize>> = None;
     let mut marker_text: Option<String> = None;
@@ -2311,7 +3041,7 @@ fn start_audiobook_with_text(hwnd: HWND, text: String, suggested_name: Option<St
         }
     }
 
-    if audiobook_split_by_text {
+    if split_by_text {
         let (normalized, entries) = collect_marker_entries(
             &cleaned,
             &audiobook_split_text,
@@ -2435,7 +3165,8 @@ fn start_audiobook_with_text(hwnd: HWND, text: String, suggested_name: Option<St
             sapi4_threads,
         };
 
-        let result = if mixed_needed {
+        let mut time_split_done = false;
+        let mut result = if mixed_needed {
             let mut current_global_progress = 0usize;
             let mixed_config = MixedAudiobookConfig {
                 main_engine: tts_engine,
@@ -2502,6 +3233,14 @@ fn start_audiobook_with_text(hwnd: HWND, text: String, suggested_name: Option<St
                         } else {
                             run_marker_split_audiobook(parts, options)
                         }
+                    } else if split_by_time {
+                        time_split_done = true;
+                        run_split_audiobook_by_time_edge(
+                            &chunks,
+                            split_minutes,
+                            split_start_number,
+                            options,
+                        )
                     } else {
                         run_split_audiobook(&chunks, if is_aac { 0 } else { split_parts }, options)
                     }
@@ -2515,6 +3254,15 @@ fn start_audiobook_with_text(hwnd: HWND, text: String, suggested_name: Option<St
                         } else {
                             run_marker_split_sapi4_audiobook(parts, voice_idx, options)
                         }
+                    } else if split_by_time {
+                        time_split_done = true;
+                        run_split_audiobook_by_time_sapi(
+                            TtsEngine::Sapi4,
+                            &chunks,
+                            split_minutes,
+                            split_start_number,
+                            options,
+                        )
                     } else {
                         run_split_sapi4_audiobook(
                             &chunks,
@@ -2532,6 +3280,15 @@ fn start_audiobook_with_text(hwnd: HWND, text: String, suggested_name: Option<St
                         } else {
                             run_marker_split_sapi_audiobook(parts, options)
                         }
+                    } else if split_by_time {
+                        time_split_done = true;
+                        run_split_audiobook_by_time_sapi(
+                            TtsEngine::Sapi5,
+                            &chunks,
+                            split_minutes,
+                            split_start_number,
+                            options,
+                        )
                     } else {
                         run_split_sapi_audiobook(
                             &chunks,
@@ -2542,9 +3299,33 @@ fn start_audiobook_with_text(hwnd: HWND, text: String, suggested_name: Option<St
                 }
             }
         };
+        if result.is_ok() && split_by_time && !time_split_done {
+            let stem = output
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("audiobook");
+            let ext = output.extension().and_then(|s| s.to_str()).unwrap_or("mp3");
+            let pattern = output.with_file_name(format!("{stem}_part%02d.{ext}"));
+            let segment_seconds = split_minutes.saturating_mul(60);
+            result = crate::ffmpeg_export::segment_audio_file(
+                &output,
+                &pattern,
+                segment_seconds,
+                split_start_number,
+            );
+            if result.is_ok()
+                && let Err(e) = std::fs::remove_file(&output)
+            {
+                crate::log_debug(&format!(
+                    "Failed to remove original audiobook after segmenting: {}",
+                    e
+                ));
+            }
+        }
+
         let success = result.is_ok();
 
-        if success && is_aac {
+        if success && is_aac && !split_by_time {
             // Set metadata for the single M4B file
             let file_title = output
                 .file_stem()
@@ -2580,7 +3361,13 @@ fn start_audiobook_with_text(hwnd: HWND, text: String, suggested_name: Option<St
 
         let message = match result {
             Ok(()) => i18n::tr(language, "tts.audiobook_saved"),
-            Err(err) => err,
+            Err(err) => {
+                if err == "Cancelled" {
+                    cancelled_message(language)
+                } else {
+                    err
+                }
+            }
         };
         let payload = Box::new(AudiobookResult { success, message });
         unsafe {
@@ -3137,7 +3924,10 @@ fn merge_and_finalize_sapi4_mp3(
 
 #[cfg(test)]
 mod tests {
-    use super::parse_sapi4_part_index;
+    use super::{
+        TtsEngine, build_audiobook_parts_by_positions, collect_marker_entries,
+        parse_sapi4_part_index,
+    };
 
     #[test]
     fn parse_sapi4_part_index_prefers_named_prefix() {
@@ -3220,6 +4010,46 @@ mod tests {
                 "foo9.m4a",
                 "part_12.mp3"
             ]
+        );
+    }
+
+    #[test]
+    fn marker_split_with_chapter_and_m4b_merge_does_not_fail() {
+        let text = "Chapter 1\nHello world.\n\nChapter 2\nMore text.\n";
+        let (normalized, entries) = collect_marker_entries(text, "Chapter", true);
+        assert_eq!(entries.len(), 2);
+        let positions: Vec<usize> = entries.iter().map(|e| e.pos).collect();
+        let parts =
+            build_audiobook_parts_by_positions(&normalized, &positions, true, &[], TtsEngine::Edge)
+                .expect("marker split should produce parts");
+        let all_chunks: Vec<String> = parts.iter().flatten().cloned().collect();
+        assert!(!all_chunks.is_empty());
+    }
+
+    #[test]
+    fn sapi4_audiobook_chunks_merge_in_order() {
+        let mut produced_files = vec![
+            std::path::PathBuf::from("sub_10.wav"),
+            std::path::PathBuf::from("sub_2.wav"),
+            std::path::PathBuf::from("sub_1.wav"),
+            std::path::PathBuf::from("sub_3.wav"),
+        ];
+        produced_files.sort_by_key(|p| {
+            let name = p.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+            parse_sapi4_part_index(name)
+        });
+        let names: Vec<String> = produced_files
+            .iter()
+            .map(|p| {
+                p.file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("")
+                    .to_string()
+            })
+            .collect();
+        assert_eq!(
+            names,
+            vec!["sub_1.wav", "sub_2.wav", "sub_3.wav", "sub_10.wav"]
         );
     }
 }
@@ -3561,8 +4391,6 @@ pub(crate) fn run_tts_audiobook_part(
     current_global_progress: &mut usize,
     options: &AudiobookCommonOptions,
 ) -> Result<(), String> {
-    let file = std::fs::File::create(options.output).map_err(|err| err.to_string())?;
-    let mut writer = BufWriter::new(file);
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -3581,78 +4409,67 @@ pub(crate) fn run_tts_audiobook_part(
             .iter()
             .map(|chunk| TtsChunk {
                 text_to_read: chunk.clone(),
-                original_len: chunk.chars().count(),
+                original_len: utf16_len(chunk),
                 override_voice: None,
             })
             .collect();
 
-        let edge_result = download_edge_chunks_ws(
-            &edge_chunks,
-            options.voice,
-            options.rate,
-            options.pitch,
-            options.volume,
-            options.cancel.as_ref(),
-            None,
-        )
-        .await;
+        const WS_RETRY_MAX: usize = 3;
+        let mut last_err = None;
+        let mut next_index = 0usize;
 
-        let audio_parts = match edge_result {
-            Ok(parts) => parts,
-            Err(err) => {
-                const WS_RETRY_MAX: usize = 10;
-                let mut last_err = err;
-                let mut success = None;
-                for attempt in 1..=WS_RETRY_MAX {
-                    crate::log_debug(&format!(
-                        "Edge WS export failed (attempt {}/{}): {}",
-                        attempt, WS_RETRY_MAX, last_err
-                    ));
-                    let res = download_edge_chunks_ws(
-                        &edge_chunks,
-                        options.voice,
-                        options.rate,
-                        options.pitch,
-                        options.volume,
-                        options.cancel.as_ref(),
-                        None,
-                    )
-                    .await;
-                    match res {
-                        Ok(parts) => {
-                            success = Some(parts);
-                            break;
-                        }
-                        Err(e) => last_err = e,
-                    }
-                }
-                if let Some(parts) = success {
-                    parts
-                } else {
-                    return Err(last_err);
-                }
-            }
+        let file = std::fs::File::create(options.output).map_err(|err| err.to_string())?;
+        let mut writer = BufWriter::new(file);
+
+        let stream_options = EdgeStreamOptions {
+            voice: options.voice,
+            rate: options.rate,
+            pitch: options.pitch,
+            volume: options.volume,
+            cancel: options.cancel.as_ref(),
+            progress_hwnd: options.progress_hwnd,
         };
-        for audio in audio_parts {
+
+        for attempt in 1..=WS_RETRY_MAX {
             if options.cancel.load(Ordering::Relaxed) {
                 return Err(cancelled_message(options.language));
             }
-            writer.write_all(&audio).map_err(|err| err.to_string())?;
-            *current_global_progress += 1;
-            if options.progress_hwnd.0 != 0 {
-                unsafe {
-                    if let Err(e) = PostMessageW(
-                        options.progress_hwnd,
-                        crate::WM_UPDATE_PROGRESS,
-                        WPARAM(*current_global_progress),
-                        LPARAM(0),
-                    ) {
-                        crate::log_debug(&format!("Failed to post WM_UPDATE_PROGRESS: {}", e));
+
+            let base_progress = *current_global_progress;
+            let res = download_edge_chunks_ws_parallel_to_writer(
+                &edge_chunks,
+                next_index,
+                &stream_options,
+                &mut writer,
+                current_global_progress,
+            )
+            .await;
+
+            match res {
+                Ok(_) => {
+                    last_err = None;
+                    break;
+                }
+                Err(err) => {
+                    let completed = current_global_progress.saturating_sub(base_progress);
+                    next_index = (next_index + completed).min(edge_chunks.len());
+                    last_err = Some(err);
+                    crate::log_debug(&format!(
+                        "Edge WS export failed (attempt {}/{}): {}",
+                        attempt,
+                        WS_RETRY_MAX,
+                        last_err.as_deref().unwrap_or("unknown")
+                    ));
+                    if next_index >= edge_chunks.len() {
+                        break;
                     }
+                    std::thread::sleep(std::time::Duration::from_millis(250));
                 }
             }
         }
-        writer.flush().map_err(|err| err.to_string())?;
+        if let Some(err) = last_err {
+            return Err(err);
+        }
         Ok(())
     })?;
 

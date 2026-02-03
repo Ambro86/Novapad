@@ -231,6 +231,12 @@ pub struct AppSettings {
     pub audiobook_split_text: String,
     pub audiobook_split_text_requires_newline: bool,
     #[serde(default)]
+    pub audiobook_split_by_time: bool,
+    #[serde(default = "default_audiobook_split_minutes")]
+    pub audiobook_split_minutes: u32,
+    #[serde(default = "default_audiobook_split_start_number")]
+    pub audiobook_split_start_number: u32,
+    #[serde(default)]
     pub subtitle_read_mode: SubtitleReadMode,
     #[serde(default)]
     pub subtitle_offset_ms: i32,
@@ -367,6 +373,14 @@ fn default_dialogue_tts_engine() -> TtsEngine {
     TtsEngine::Edge
 }
 
+fn default_audiobook_split_minutes() -> u32 {
+    5
+}
+
+fn default_audiobook_split_start_number() -> u32 {
+    1
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         AppSettings {
@@ -399,6 +413,9 @@ impl Default for AppSettings {
             audiobook_split_by_text: false,
             audiobook_split_text: String::new(),
             audiobook_split_text_requires_newline: true,
+            audiobook_split_by_time: false,
+            audiobook_split_minutes: default_audiobook_split_minutes(),
+            audiobook_split_start_number: default_audiobook_split_start_number(),
             subtitle_read_mode: SubtitleReadMode::User,
             subtitle_offset_ms: 0,
             subtitle_mix_export_on_play: true,
@@ -1185,6 +1202,16 @@ pub fn sync_context_menu(settings: &AppSettings) {
         } else {
             delete_context_menu_entry(&base_key);
         }
+    }
+}
+
+pub fn cleanup_legacy_context_menu_entries() {
+    for ext in CONTEXT_MENU_EXTENSIONS {
+        let base_key = format!(
+            "Software\\Classes\\SystemFileAssociations\\.{}\\shell\\OpenWithNovapad",
+            ext
+        );
+        delete_context_menu_entry(&base_key);
     }
 }
 

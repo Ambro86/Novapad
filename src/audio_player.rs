@@ -101,8 +101,25 @@ pub unsafe fn set_audiobook_subtitle_override(
     let mut new_cancel = None;
     let mut old_cancel = None;
     let mut speech_handles = None;
+    let mut subtitle_mode = SubtitleReadMode::Off;
+    let mut settings_snapshot = None;
+    let mut resume_info: Option<(PathBuf, u64, AudiobookPlaybackOptions)> = None;
     let state_ok = with_state(hwnd, |state| {
+        subtitle_mode = state.settings.subtitle_read_mode;
+        settings_snapshot = Some(state.settings.clone());
         if let Some(player) = &mut state.active_audiobook {
+            let seconds = audiobook_position_secs(player).max(0.0).floor() as u64;
+            let options = AudiobookPlaybackOptions {
+                speed: player.speed,
+                pitch: player.pitch,
+                paused: player.is_paused,
+                volume: player.volume,
+                muted: player.muted,
+                prev_volume: player.prev_volume,
+                mix_export: false,
+                audio_track: None,
+            };
+            resume_info = Some((player.path.clone(), seconds, options));
             current_media = Some(player.path.clone());
             old_cancel = Some(player.subtitle_cancel.clone());
             let fresh_cancel = Arc::new(AtomicBool::new(false));
@@ -139,7 +156,54 @@ pub unsafe fn set_audiobook_subtitle_override(
         stop_shared_subtitle_speech(&handles.0, &handles.1, "subtitle_override");
     }
     if let (Some(active_path), Some(cancel)) = (active, new_cancel) {
-        start_subtitle_reader(hwnd, active_path, cancel, None);
+        if subtitle_mode == SubtitleReadMode::Record {
+            if let Some(settings) = settings_snapshot {
+                if resume_info.is_some() {
+                    stop_audiobook_playback(hwnd);
+                }
+                let path_clone = active_path.clone();
+                let resume_info = resume_info.clone();
+                std::thread::spawn(move || {
+                    if !confirm_edge_subtitle_download(hwnd, &path_clone, &settings) {
+                        log_debug("Subtitle: Edge download not confirmed for record mode.");
+                        if let Some((resume_path, seconds, options)) = resume_info {
+                            start_audiobook_at_with_options(hwnd, resume_path, seconds, options);
+                        }
+                        return;
+                    }
+                    let mix_opts = MixExportOptions {
+                        ducking: settings.subtitle_mix_ducking,
+                    };
+                    match export_mixed_media(&path_clone, &settings, &mix_opts) {
+                        Ok(out_path) => {
+                            log_debug(&format!(
+                                "Subtitle: mixed file created at {}",
+                                out_path.display()
+                            ));
+                            if let Some((_, seconds, mut options)) = resume_info {
+                                options.mix_export = false;
+                                start_audiobook_at_with_options(hwnd, out_path, seconds, options);
+                            }
+                        }
+                        Err(err) => {
+                            log_debug(&format!("Subtitle: mix export failed: {}", err));
+                            if let Some((resume_path, seconds, options)) = resume_info {
+                                start_audiobook_at_with_options(
+                                    hwnd,
+                                    resume_path,
+                                    seconds,
+                                    options,
+                                );
+                            }
+                        }
+                    }
+                });
+            } else {
+                log_debug("Subtitle: settings unavailable for record mode.");
+            }
+        } else {
+            start_subtitle_reader(hwnd, active_path, cancel, None);
+        }
     }
 
     Ok(())
@@ -530,6 +594,12 @@ fn start_audiobook_at_with_options(
             let path_clone = path.clone();
             let opts = options;
             std::thread::spawn(move || {
+                if settings.subtitle_read_mode == SubtitleReadMode::Record
+                    && !confirm_edge_subtitle_download(hwnd_main, &path_clone, &settings)
+                {
+                    log_debug("Subtitle: Edge download not confirmed for record mode.");
+                    return;
+                }
                 log_debug(&format!(
                     "Subtitle: offline mix requested for {}",
                     path_clone.display()
@@ -1528,16 +1598,31 @@ fn get_or_load_subtitles(media_path: &Path, mode: SubtitleReadMode) -> Option<Su
     Some(entry)
 }
 
-fn audiobook_position_secs(player: &AudiobookPlayer) -> f64 {
-    if let Some(pos) = player.output.position_secs() {
+fn compute_audiobook_position_secs(
+    output_pos: Option<f64>,
+    is_paused: bool,
+    accumulated_seconds: u64,
+    elapsed: Duration,
+    speed: f32,
+) -> f64 {
+    if let Some(pos) = output_pos {
         return pos.max(0.0);
     }
-    if player.is_paused {
-        player.accumulated_seconds as f64
+    if is_paused {
+        accumulated_seconds as f64
     } else {
-        player.accumulated_seconds as f64
-            + player.start_instant.elapsed().as_secs_f64() * player.speed as f64
+        accumulated_seconds as f64 + elapsed.as_secs_f64() * speed as f64
     }
+}
+
+pub(crate) fn audiobook_position_secs(player: &AudiobookPlayer) -> f64 {
+    compute_audiobook_position_secs(
+        player.output.position_secs(),
+        player.is_paused,
+        player.accumulated_seconds,
+        player.start_instant.elapsed(),
+        player.speed,
+    )
 }
 
 fn subtitle_playback_state(hwnd: HWND, path: &Path) -> Option<SubtitlePlaybackState> {
@@ -1740,6 +1825,37 @@ fn edge_cache_has_valid_mp3(dir: &Path) -> bool {
         }
     }
     false
+}
+
+fn confirm_edge_subtitle_download(
+    hwnd: HWND,
+    media_path: &Path,
+    settings: &crate::settings::AppSettings,
+) -> bool {
+    if settings.tts_engine != crate::settings::TtsEngine::Edge {
+        return true;
+    }
+    let edge_key = edge_subtitle_key(media_path, settings);
+    if is_edge_confirmed(&edge_key) {
+        return true;
+    }
+    let msg = i18n::tr(settings.language, "subtitles.edge_confirm");
+    let title = confirm_title(settings.language);
+    let msg_w = to_wide(&msg);
+    let title_w = to_wide(&title);
+    let response = unsafe {
+        MessageBoxW(
+            hwnd,
+            PCWSTR(msg_w.as_ptr()),
+            PCWSTR(title_w.as_ptr()),
+            MB_YESNO | MB_ICONQUESTION,
+        )
+    };
+    if response != IDYES {
+        return false;
+    }
+    mark_edge_confirmed(&edge_key);
+    true
 }
 
 fn mark_edge_confirmed(key: &str) {
@@ -2521,7 +2637,8 @@ fn start_subtitle_reader(
 
 #[cfg(test)]
 mod tests {
-    use super::parse_time_input;
+    use super::{compute_audiobook_position_secs, parse_time_input};
+    use std::time::Duration;
 
     #[test]
     fn parse_seconds() {
@@ -2546,5 +2663,31 @@ mod tests {
         assert!(parse_time_input("1:99").is_err());
         assert!(parse_time_input("1:2:99").is_err());
         assert!(parse_time_input("1:2:3:4").is_err());
+    }
+
+    #[test]
+    fn audiobook_position_uses_output_when_available() {
+        let pos =
+            compute_audiobook_position_secs(Some(12.5), false, 10, Duration::from_secs(2), 2.0);
+        assert!((pos - 12.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn audiobook_position_clamps_output_to_zero() {
+        let pos =
+            compute_audiobook_position_secs(Some(-3.0), false, 10, Duration::from_secs(2), 2.0);
+        assert!((pos - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn audiobook_position_respects_speed_when_playing() {
+        let pos = compute_audiobook_position_secs(None, false, 10, Duration::from_secs(2), 1.5);
+        assert!((pos - 13.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn audiobook_position_ignores_elapsed_when_paused() {
+        let pos = compute_audiobook_position_secs(None, true, 42, Duration::from_secs(99), 2.0);
+        assert!((pos - 42.0).abs() < f64::EPSILON);
     }
 }

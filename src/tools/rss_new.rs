@@ -1,8 +1,7 @@
-﻿pub async fn fetch_article_text(
+pub async fn fetch_article_text(
     url: &str,
     fallback_title: &str,
-    fallback_description: &str,
-) -> Result<String, String> {
+    fallback_description: &str,\r\n    language: crate::settings::Language,\r\n) -> Result<String, String> {
     let start_total = Instant::now();
     let url_str = normalize_url(url);
     if url_str.is_empty() {
@@ -24,7 +23,7 @@
         }
     };
 
-    let article = reader::reader_mode_extract(&html).unwrap_or(reader::ArticleContent {
+    let article = reader::reader_mode_extract(&html, language).unwrap_or(reader::ArticleContent {
         title: fallback_title.to_string(),
         content: fallback_description.to_string(),
     });
@@ -35,3 +34,4 @@
     ));
     Ok(format!("{}\n\n{}", article.title, article.content))
 }
+

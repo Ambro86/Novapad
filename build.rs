@@ -128,6 +128,8 @@ fn generate_ffmpeg_bindings() {
         .allowlist_function("av_read_frame")
         .allowlist_function("av_find_best_stream")
         .allowlist_function("av_dict_get")
+        .allowlist_function("av_dict_set")
+        .allowlist_function("av_dict_free")
         .allowlist_function("avcodec_find_decoder")
         .allowlist_function("avcodec_alloc_context3")
         .allowlist_function("avcodec_parameters_to_context")

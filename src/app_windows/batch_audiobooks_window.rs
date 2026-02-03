@@ -199,6 +199,9 @@ struct TtsSettings {
     audiobook_split_by_text: bool,
     audiobook_split_text: String,
     audiobook_split_text_requires_newline: bool,
+    audiobook_split_by_time: bool,
+    audiobook_split_minutes: u32,
+    audiobook_split_start_number: u32,
     audiobook_m4b_bitrate: u32,
     tts_engine: TtsEngine,
     dictionary: Vec<DictionaryEntry>,
@@ -1463,6 +1466,9 @@ fn load_tts_settings(parent: HWND, voice: String, language: Language) -> TtsSett
             audiobook_split_text_requires_newline: state
                 .settings
                 .audiobook_split_text_requires_newline,
+            audiobook_split_by_time: state.settings.audiobook_split_by_time,
+            audiobook_split_minutes: state.settings.audiobook_split_minutes,
+            audiobook_split_start_number: state.settings.audiobook_split_start_number,
             audiobook_m4b_bitrate: state.settings.audiobook_m4b_bitrate,
             tts_engine: state.settings.tts_engine,
             dictionary: state.settings.dictionary.clone(),
@@ -1478,6 +1484,9 @@ fn load_tts_settings(parent: HWND, voice: String, language: Language) -> TtsSett
             audiobook_split_by_text: false,
             audiobook_split_text: String::new(),
             audiobook_split_text_requires_newline: true,
+            audiobook_split_by_time: false,
+            audiobook_split_minutes: 5,
+            audiobook_split_start_number: 1,
             audiobook_m4b_bitrate: 128,
             tts_engine: TtsEngine::Edge,
             dictionary: Vec::new(),
@@ -1685,9 +1694,18 @@ fn export_single_audiobook(
         return Err(crate::settings::tts_no_text_message(tts.language));
     }
     let cleaned = strip_dashed_lines(&text);
+    let split_by_time = tts.audiobook_split_by_time;
+    let split_minutes = tts.audiobook_split_minutes.clamp(1, 20);
+    let split_start_number = tts.audiobook_split_start_number.clamp(1, 99);
+    let split_by_text = tts.audiobook_split_by_text && !split_by_time;
+    let split_parts = if split_by_time {
+        0
+    } else {
+        tts.audiobook_split
+    };
     let mixed_needed = has_voice_tags(&cleaned);
 
-    let (parts, mixed_parts) = if tts.audiobook_split_by_text {
+    let (parts, mixed_parts) = if split_by_text {
         let (normalized, entries) = collect_marker_entries(
             &cleaned,
             &tts.audiobook_split_text,
@@ -1735,7 +1753,7 @@ fn export_single_audiobook(
                     &tts.dictionary,
                     tts.tts_engine,
                 );
-                split_tts_chunks_by_count(&chunks, tts.audiobook_split)
+                split_tts_chunks_by_count(&chunks, split_parts)
             }
         };
         if parts.is_empty() {
@@ -1743,7 +1761,15 @@ fn export_single_audiobook(
         }
         let output_paths = build_output_paths(input, parts.len(), batch_settings, tts.language)?;
         match export_parts_mixed(&parts, &output_paths, tts, cancel.clone()) {
-            Ok(()) => Ok(output_paths),
+            Ok(()) => {
+                if split_by_time {
+                    let Some(output) = output_paths.first() else {
+                        return Err("Batch: missing output path for time split".to_string());
+                    };
+                    return segment_batch_output(output, split_minutes, split_start_number);
+                }
+                Ok(output_paths)
+            }
             Err(err) => {
                 if !cancel.load(Ordering::SeqCst) {
                     for path in &output_paths {
@@ -1761,7 +1787,7 @@ fn export_single_audiobook(
             None => {
                 let prepared = prepare_tts_text(&cleaned, tts.split_on_newline, &tts.dictionary);
                 let chunks = split_text(&prepared);
-                split_chunks_by_count(&chunks, tts.audiobook_split)
+                split_chunks_by_count(&chunks, split_parts)
             }
         };
         if parts.is_empty() {
@@ -1769,7 +1795,15 @@ fn export_single_audiobook(
         }
         let output_paths = build_output_paths(input, parts.len(), batch_settings, tts.language)?;
         match export_parts(&parts, &output_paths, tts, cancel.clone()) {
-            Ok(()) => Ok(output_paths),
+            Ok(()) => {
+                if split_by_time {
+                    let Some(output) = output_paths.first() else {
+                        return Err("Batch: missing output path for time split".to_string());
+                    };
+                    return segment_batch_output(output, split_minutes, split_start_number);
+                }
+                Ok(output_paths)
+            }
             Err(err) => {
                 if !cancel.load(Ordering::SeqCst) {
                     for path in &output_paths {
@@ -1782,6 +1816,65 @@ fn export_single_audiobook(
             }
         }
     }
+}
+
+fn segment_batch_output(
+    output: &Path,
+    split_minutes: u32,
+    split_start_number: u32,
+) -> Result<Vec<PathBuf>, String> {
+    let stem = output
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("audiobook");
+    let ext = output.extension().and_then(|s| s.to_str());
+    let pattern = if let Some(ext) = ext {
+        output.with_file_name(format!("{stem}_part%02d.{ext}"))
+    } else {
+        output.with_file_name(format!("{stem}_part%02d"))
+    };
+    let segment_seconds = split_minutes.saturating_mul(60);
+    crate::ffmpeg_export::segment_audio_file(
+        output,
+        &pattern,
+        segment_seconds,
+        split_start_number,
+    )?;
+
+    let parent = output
+        .parent()
+        .ok_or_else(|| "Batch: output has no parent directory".to_string())?;
+    let prefix = format!("{stem}_part");
+    let mut outputs = Vec::new();
+    for entry in
+        std::fs::read_dir(parent).map_err(|e| format!("Batch: failed to read output dir: {}", e))?
+    {
+        let entry = entry.map_err(|e| format!("Batch: output dir entry failed: {}", e))?;
+        let path = entry.path();
+        let Some(file_name) = path.file_name().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if !file_name.starts_with(&prefix) {
+            continue;
+        }
+        if let Some(ext) = ext
+            && path.extension().and_then(|s| s.to_str()).unwrap_or("") != ext
+        {
+            continue;
+        }
+        outputs.push(path);
+    }
+    outputs.sort();
+    if outputs.is_empty() {
+        return Err("Batch: no segments were generated".to_string());
+    }
+    if let Err(e) = std::fs::remove_file(output) {
+        crate::log_debug(&format!(
+            "Failed to remove original audiobook after segmenting: {}",
+            e
+        ));
+    }
+    Ok(outputs)
 }
 
 fn split_chunks_by_count(chunks: &[String], split_parts: u32) -> Vec<Vec<String>> {
@@ -1943,7 +2036,7 @@ fn export_parts(
     let mut progress = 0usize;
     for (part_idx, part_chunks) in parts.iter().enumerate() {
         if cancel.load(Ordering::SeqCst) {
-            return Err("Cancelled".to_string());
+            return Err(i18n::tr(tts.language, "tts.cancelled"));
         }
         let output = &outputs[part_idx];
         match tts.tts_engine {
@@ -2000,7 +2093,7 @@ fn export_parts_mixed(
     let mut progress = 0usize;
     for (part_idx, part_chunks) in parts.iter().enumerate() {
         if cancel.load(Ordering::SeqCst) {
-            return Err("Cancelled".to_string());
+            return Err(i18n::tr(tts.language, "tts.cancelled"));
         }
         let output = &outputs[part_idx];
         let options = crate::tts_engine::AudiobookCommonOptions {
@@ -2139,7 +2232,9 @@ fn write_report(
             AudioFormat::Wav => "WAV",
         }
     ));
-    let split_desc = if tts.audiobook_split_by_text {
+    let split_desc = if tts.audiobook_split_by_time {
+        format!("Split by time: {} minutes", tts.audiobook_split_minutes)
+    } else if tts.audiobook_split_by_text {
         format!("Split by text: {}", tts.audiobook_split_text)
     } else if tts.audiobook_split == 0 {
         "Split: disabled".to_string()

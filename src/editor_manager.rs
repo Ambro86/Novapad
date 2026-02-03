@@ -221,7 +221,7 @@ pub fn insert_voice_tag_at_caret(hwnd: HWND, engine: TtsEngine, voice: &str) {
     };
     let open = format!("<voice {engine_token} {voice}>");
     let close = "</voice>";
-    let insert = format!("{open}{close}");
+    let insert = format!("{open}  {close}");
     let mut start: u32 = 0;
     let mut end: u32 = 0;
     unsafe {
@@ -238,7 +238,7 @@ pub fn insert_voice_tag_at_caret(hwnd: HWND, engine: TtsEngine, voice: &str) {
             WPARAM(1),
             LPARAM(wide.as_ptr() as isize),
         );
-        let caret = start as i32 + open.encode_utf16().count() as i32;
+        let caret = start as i32 + open.encode_utf16().count() as i32 + 1;
         SendMessageW(
             hwnd_edit,
             EM_SETSEL,

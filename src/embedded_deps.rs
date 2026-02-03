@@ -48,10 +48,11 @@ fn write_if_changed(path: &PathBuf, data: &[u8]) -> std::io::Result<bool> {
 
     // Scrivi in file temporaneo poi rinomina (atomico)
     let tmp_path = path.with_extension("tmp");
-    let mut file = fs::File::create(&tmp_path)?;
-    file.write_all(data)?;
-    file.sync_all()?;
-    std::mem::drop(file);
+    {
+        let mut file = fs::File::create(&tmp_path)?;
+        file.write_all(data)?;
+        file.sync_all()?;
+    }
 
     // Rimuovi vecchio file se esiste
     crate::log_if_err!(fs::remove_file(path));

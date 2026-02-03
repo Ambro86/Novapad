@@ -572,16 +572,14 @@ fn start_dictionary_lookup(
             generation,
         });
         let hwnd = HWND(hwnd_val);
-        unsafe {
-            if IsWindow(hwnd).as_bool() {
+        if unsafe { IsWindow(hwnd).as_bool() } {
+            unsafe {
                 crate::log_if_err!(PostMessageW(
                     hwnd,
                     WM_DICTIONARY_LOADED,
                     WPARAM(0),
                     LPARAM(Box::into_raw(result) as isize),
                 ));
-            } else {
-                std::mem::drop(result);
             }
         }
     });

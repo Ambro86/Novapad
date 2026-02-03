@@ -236,17 +236,18 @@ fn log_mkv_probe_once(path: &Path) {
 
     static LOGGED: OnceLock<Mutex<HashSet<PathBuf>>> = OnceLock::new();
     let logged = LOGGED.get_or_init(|| Mutex::new(HashSet::new()));
-    let mut guard = match logged.lock() {
-        Ok(guard) => guard,
-        Err(_) => {
-            log_debug("Audio probe: failed to lock log set.");
+    {
+        let mut guard = match logged.lock() {
+            Ok(guard) => guard,
+            Err(_) => {
+                log_debug("Audio probe: failed to lock log set.");
+                return;
+            }
+        };
+        if !guard.insert(path.to_path_buf()) {
             return;
         }
-    };
-    if !guard.insert(path.to_path_buf()) {
-        return;
     }
-    std::mem::drop(guard);
 
     let file = match std::fs::File::open(path) {
         Ok(file) => file,

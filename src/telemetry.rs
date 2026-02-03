@@ -143,16 +143,6 @@ pub fn push_log_line(line: impl Into<String>) {
     }
 }
 
-/// Update current window/dialog state.
-#[allow(dead_code)]
-pub fn set_current_window(window: impl Into<String>) {
-    if let Some(telemetry) = TELEMETRY.get()
-        && let Ok(mut state) = telemetry.app_state.lock()
-    {
-        state.current_window = window.into();
-    }
-}
-
 /// Update audio playback state.
 pub fn set_audio_playing(playing: bool) {
     if let Some(telemetry) = TELEMETRY.get()
@@ -168,16 +158,6 @@ pub fn set_tts_active(active: bool) {
         && let Ok(mut state) = telemetry.app_state.lock()
     {
         state.tts_active = active;
-    }
-}
-
-/// Update updater state.
-#[allow(dead_code)]
-pub fn set_updater_state(state_str: impl Into<String>) {
-    if let Some(telemetry) = TELEMETRY.get()
-        && let Ok(mut state) = telemetry.app_state.lock()
-    {
-        state.updater_state = state_str.into();
     }
 }
 

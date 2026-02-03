@@ -189,36 +189,3 @@ pub fn export_diagnostics_zip(dest_path: &Path) -> Result<(), String> {
 
     Ok(())
 }
-
-/// Salva l'ultimo errore fatale su file per inclusione nei diagnostici.
-#[allow(dead_code)]
-pub fn save_last_error(context: &str, message: &str) {
-    let settings_dir = settings::settings_dir();
-    let path = settings_dir.join("last_error.txt");
-
-    let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
-    let content = format!(
-        "Timestamp: {}\nContext: {}\nMessage: {}\n",
-        timestamp,
-        sanitize_content(context),
-        sanitize_content(message)
-    );
-
-    if let Err(e) = std::fs::write(&path, content) {
-        crate::log_debug(&format!("Failed to save last error: {}", e));
-    }
-}
-
-/// Salva l'ultimo Sentry Event ID su file.
-#[allow(dead_code)]
-pub fn save_sentry_event_id(event_id: &sentry_integration::EventId) {
-    let settings_dir = settings::settings_dir();
-    let path = settings_dir.join("sentry_last_event_id.txt");
-
-    let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
-    let content = format!("Timestamp: {}\nEvent ID: {}\n", timestamp, event_id);
-
-    if let Err(e) = std::fs::write(&path, content) {
-        crate::log_debug(&format!("Failed to save Sentry event ID: {}", e));
-    }
-}

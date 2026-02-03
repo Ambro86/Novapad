@@ -346,21 +346,3 @@ fn current_time_ms() -> u64 {
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0)
 }
-
-/// Chiamare quando l'app sta per chiudersi per rilevare hang durante shutdown
-#[allow(dead_code)]
-pub fn check_shutdown_hang(state: &WatchdogState, threshold_secs: u64) {
-    let now_ms = current_time_ms();
-    let last_heartbeat = state.last_heartbeat_ms();
-    let elapsed_ms = now_ms.saturating_sub(last_heartbeat);
-    let threshold_ms = threshold_secs * 1000;
-
-    if elapsed_ms > threshold_ms {
-        let elapsed_secs = elapsed_ms / 1000;
-        crate::log_debug(&format!(
-            "Watchdog: hang detected during shutdown ({} seconds)",
-            elapsed_secs
-        ));
-        save_hang_report(elapsed_secs);
-    }
-}

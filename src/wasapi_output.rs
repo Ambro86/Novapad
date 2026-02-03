@@ -81,9 +81,6 @@ pub struct WasapiOutput {
     volume_bits: Arc<AtomicU32>,
     stopped: Arc<AtomicBool>,
     last_written_end_pts_us: Arc<AtomicI64>,
-    /// Paused state, shared with the thread for potential future use.
-    #[allow(dead_code)]
-    paused: Arc<AtomicBool>,
 }
 
 impl WasapiOutput {
@@ -106,7 +103,6 @@ impl WasapiOutput {
         let volume_bits = Arc::new(AtomicU32::new(volume.to_bits()));
         let stopped = Arc::new(AtomicBool::new(false));
         let last_written_end_pts_us = Arc::new(AtomicI64::new(0));
-        let paused = Arc::new(AtomicBool::new(start_paused));
 
         let position_units_thread = position_units.clone();
         let last_qpc_thread = last_qpc.clone();
@@ -120,7 +116,7 @@ impl WasapiOutput {
         let volume_bits_thread = volume_bits.clone();
         let stopped_thread = stopped.clone();
         let last_written_end_pts_us_thread = last_written_end_pts_us.clone();
-        let paused_thread = paused.clone();
+        let paused_thread = Arc::new(AtomicBool::new(start_paused));
         let source_pts_us_thread = source_pts_us.clone();
 
         thread::spawn(move || {
@@ -631,7 +627,6 @@ impl WasapiOutput {
             volume_bits,
             stopped,
             last_written_end_pts_us,
-            paused,
         }))
     }
 
@@ -749,21 +744,6 @@ impl WasapiOutput {
         Some((padding, padding_us, last_end, sample_rate))
     }
 
-    #[allow(dead_code)]
-    pub fn padding_secs(&self) -> f64 {
-        let sample_rate = self.sample_rate_hz.load(Ordering::Relaxed);
-        let padding = self.padding_frames.load(Ordering::Relaxed);
-        if sample_rate > 0 {
-            padding as f64 / sample_rate as f64
-        } else {
-            0.0
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn sample_rate_hz(&self) -> u32 {
-        self.sample_rate_hz.load(Ordering::Relaxed)
-    }
 }
 
 fn update_clock(clock: &IAudioClock, position_units: &AtomicU64, last_qpc: &AtomicU64) {

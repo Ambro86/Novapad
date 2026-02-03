@@ -83,7 +83,6 @@ pub struct PodcastEpisode {
     pub chapters_url: Option<String>,
     pub chapters_type: Option<String>,
     pub podlove_chapters: Vec<crate::podcast::chapters::Chapter>,
-    #[allow(dead_code)]
     pub pub_date: Option<i64>,
 }
 
@@ -159,8 +158,6 @@ pub struct PodcastFetchOutcome {
     pub title: String,
     pub items: Vec<PodcastEpisode>,
     pub cache: RssFeedCache,
-    #[allow(dead_code)]
-    pub not_modified: bool,
 }
 
 struct RssHttp {
@@ -1064,7 +1061,6 @@ pub async fn fetch_podcast_feed(
             title: String::new(),
             items: Vec::new(),
             cache,
-            not_modified: true,
         });
     }
     if let Some((title, items)) = parse_podcast_feed_bytes(out.bytes, &url) {
@@ -1072,7 +1068,6 @@ pub async fn fetch_podcast_feed(
             title,
             items: dedup_podcast_items(items, cfg.max_items_per_feed),
             cache,
-            not_modified: false,
         });
     }
     Err(FeedFetchError::Network {

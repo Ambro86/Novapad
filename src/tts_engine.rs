@@ -3004,7 +3004,9 @@ fn run_sapi4_parallel_part(
         handles.push(handle);
     }
 
-    std::mem::drop(tx);
+    {
+        let _tx = tx;
+    }
     let mut produced_files: Vec<PathBuf> = Vec::new();
     let mut error = None;
     for res in rx {

@@ -657,48 +657,50 @@ fn write_mixed_audio_wav(
             continue;
         }
 
-        let mut inner = buffer.inner.lock().unwrap_or_else(|e| e.into_inner());
-        let (need_mic, need_sys) = (shared.include_mic, shared.include_system);
-        let available_mic = inner.mic.len() / TARGET_CHANNELS as usize;
-        let available_sys = inner.system.len() / TARGET_CHANNELS as usize;
-        let can_mix = if need_mic && need_sys {
-            available_mic >= MIX_CHUNK_FRAMES && available_sys >= MIX_CHUNK_FRAMES
-        } else if need_mic {
-            available_mic >= MIX_CHUNK_FRAMES
-        } else {
-            available_sys >= MIX_CHUNK_FRAMES
+        let mixed = {
+            let mut inner = buffer.inner.lock().unwrap_or_else(|e| e.into_inner());
+            let (need_mic, need_sys) = (shared.include_mic, shared.include_system);
+            let available_mic = inner.mic.len() / TARGET_CHANNELS as usize;
+            let available_sys = inner.system.len() / TARGET_CHANNELS as usize;
+            let can_mix = if need_mic && need_sys {
+                available_mic >= MIX_CHUNK_FRAMES && available_sys >= MIX_CHUNK_FRAMES
+            } else if need_mic {
+                available_mic >= MIX_CHUNK_FRAMES
+            } else {
+                available_sys >= MIX_CHUNK_FRAMES
+            };
+
+            if !can_mix {
+                crate::log_if_err!(
+                    buffer
+                        .condvar
+                        .wait_timeout(inner, Duration::from_millis(40))
+                );
+                continue;
+            }
+
+            let frames = MIX_CHUNK_FRAMES;
+            let mut mixed = Vec::with_capacity(frames * TARGET_CHANNELS as usize);
+            for _ in 0..frames {
+                let mut left = 0.0f32;
+                let mut right = 0.0f32;
+                if need_mic {
+                    left += inner.mic.pop_front().unwrap_or(0.0);
+                    right += inner.mic.pop_front().unwrap_or(0.0);
+                }
+                if need_sys {
+                    left += inner.system.pop_front().unwrap_or(0.0);
+                    right += inner.system.pop_front().unwrap_or(0.0);
+                }
+                if need_mic && need_sys {
+                    left *= 0.5;
+                    right *= 0.5;
+                }
+                mixed.push(left.clamp(-1.0, 1.0));
+                mixed.push(right.clamp(-1.0, 1.0));
+            }
+            mixed
         };
-
-        if !can_mix {
-            crate::log_if_err!(
-                buffer
-                    .condvar
-                    .wait_timeout(inner, Duration::from_millis(40))
-            );
-            continue;
-        }
-
-        let frames = MIX_CHUNK_FRAMES;
-        let mut mixed = Vec::with_capacity(frames * TARGET_CHANNELS as usize);
-        for _ in 0..frames {
-            let mut left = 0.0f32;
-            let mut right = 0.0f32;
-            if need_mic {
-                left += inner.mic.pop_front().unwrap_or(0.0);
-                right += inner.mic.pop_front().unwrap_or(0.0);
-            }
-            if need_sys {
-                left += inner.system.pop_front().unwrap_or(0.0);
-                right += inner.system.pop_front().unwrap_or(0.0);
-            }
-            if need_mic && need_sys {
-                left *= 0.5;
-                right *= 0.5;
-            }
-            mixed.push(left.clamp(-1.0, 1.0));
-            mixed.push(right.clamp(-1.0, 1.0));
-        }
-        std::mem::drop(inner);
 
         writer
             .write_samples_f32(&mixed)
@@ -738,48 +740,50 @@ fn write_mixed_audio_mp3(
             continue;
         }
 
-        let mut inner = buffer.inner.lock().unwrap_or_else(|e| e.into_inner());
-        let (need_mic, need_sys) = (shared.include_mic, shared.include_system);
-        let available_mic = inner.mic.len() / TARGET_CHANNELS as usize;
-        let available_sys = inner.system.len() / TARGET_CHANNELS as usize;
-        let can_mix = if need_mic && need_sys {
-            available_mic >= MIX_CHUNK_FRAMES && available_sys >= MIX_CHUNK_FRAMES
-        } else if need_mic {
-            available_mic >= MIX_CHUNK_FRAMES
-        } else {
-            available_sys >= MIX_CHUNK_FRAMES
+        let mixed = {
+            let mut inner = buffer.inner.lock().unwrap_or_else(|e| e.into_inner());
+            let (need_mic, need_sys) = (shared.include_mic, shared.include_system);
+            let available_mic = inner.mic.len() / TARGET_CHANNELS as usize;
+            let available_sys = inner.system.len() / TARGET_CHANNELS as usize;
+            let can_mix = if need_mic && need_sys {
+                available_mic >= MIX_CHUNK_FRAMES && available_sys >= MIX_CHUNK_FRAMES
+            } else if need_mic {
+                available_mic >= MIX_CHUNK_FRAMES
+            } else {
+                available_sys >= MIX_CHUNK_FRAMES
+            };
+
+            if !can_mix {
+                crate::log_if_err!(
+                    buffer
+                        .condvar
+                        .wait_timeout(inner, Duration::from_millis(40))
+                );
+                continue;
+            }
+
+            let frames = MIX_CHUNK_FRAMES;
+            let mut mixed = Vec::with_capacity(frames * TARGET_CHANNELS as usize);
+            for _ in 0..frames {
+                let mut left = 0.0f32;
+                let mut right = 0.0f32;
+                if need_mic {
+                    left += inner.mic.pop_front().unwrap_or(0.0);
+                    right += inner.mic.pop_front().unwrap_or(0.0);
+                }
+                if need_sys {
+                    left += inner.system.pop_front().unwrap_or(0.0);
+                    right += inner.system.pop_front().unwrap_or(0.0);
+                }
+                if need_mic && need_sys {
+                    left *= 0.5;
+                    right *= 0.5;
+                }
+                mixed.push(left.clamp(-1.0, 1.0));
+                mixed.push(right.clamp(-1.0, 1.0));
+            }
+            mixed
         };
-
-        if !can_mix {
-            crate::log_if_err!(
-                buffer
-                    .condvar
-                    .wait_timeout(inner, Duration::from_millis(40))
-            );
-            continue;
-        }
-
-        let frames = MIX_CHUNK_FRAMES;
-        let mut mixed = Vec::with_capacity(frames * TARGET_CHANNELS as usize);
-        for _ in 0..frames {
-            let mut left = 0.0f32;
-            let mut right = 0.0f32;
-            if need_mic {
-                left += inner.mic.pop_front().unwrap_or(0.0);
-                right += inner.mic.pop_front().unwrap_or(0.0);
-            }
-            if need_sys {
-                left += inner.system.pop_front().unwrap_or(0.0);
-                right += inner.system.pop_front().unwrap_or(0.0);
-            }
-            if need_mic && need_sys {
-                left *= 0.5;
-                right *= 0.5;
-            }
-            mixed.push(left.clamp(-1.0, 1.0));
-            mixed.push(right.clamp(-1.0, 1.0));
-        }
-        std::mem::drop(inner);
 
         let mut pcm = Vec::with_capacity(mixed.len());
         for sample in mixed {

@@ -87,7 +87,7 @@ impl FfmpegBassStream {
         if handle == 0 {
             // Clean up the Arc we leaked
             unsafe {
-                drop(Arc::from_raw(state_ptr as *const StreamState));
+                let _cleanup = Arc::from_raw(state_ptr as *const StreamState);
             }
             return Err(format!(
                 "BASS_StreamCreate failed (error {})",

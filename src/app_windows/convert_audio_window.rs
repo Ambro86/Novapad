@@ -695,10 +695,10 @@ unsafe fn convert_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                                     LPARAM(raw as isize),
                                 ) {
                                     log_debug(&format!("Failed to post convert result: {}", err));
-                                    drop(Box::from_raw(raw));
+                                    let _cleanup = Box::from_raw(raw);
                                 }
                             } else {
-                                drop(boxed);
+                                let _boxed = boxed;
                             }
                         }
                     });

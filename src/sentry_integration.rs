@@ -71,13 +71,11 @@ where
         }
     }
 
-    let guard = SUPPRESS_PANIC_REPORTING.with(|flag| {
+    let _guard = SUPPRESS_PANIC_REPORTING.with(|flag| {
         let prev = flag.replace(true);
         SuppressGuard { prev }
     });
-    let result = f();
-    drop(guard);
-    result
+    f()
 }
 
 fn get_path_regex() -> Option<&'static fancy_regex::Regex> {

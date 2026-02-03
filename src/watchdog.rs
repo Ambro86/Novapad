@@ -145,7 +145,9 @@ pub fn start_watchdog(config: WatchdogConfig) -> WatchdogHandle {
 
     // Salva lo state globalmente per accesso dai dialogs modali
     // Ignoriamo l'errore se già impostato (può succedere solo in test)
-    drop(GLOBAL_WATCHDOG.set(Arc::clone(&state)));
+    if GLOBAL_WATCHDOG.set(Arc::clone(&state)).is_err() {
+        crate::log_debug("Watchdog: global state already set");
+    }
 
     let thread = std::thread::Builder::new()
         .name("watchdog".to_string())

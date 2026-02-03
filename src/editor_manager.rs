@@ -779,11 +779,6 @@ pub unsafe fn normalize_whitespace_active_edit(hwnd: HWND) -> bool {
 }
 
 pub unsafe fn get_selected_text(hwnd_edit: HWND) -> Option<String> {
-    let text = get_edit_text(hwnd_edit);
-    if text.is_empty() {
-        return None;
-    }
-
     let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
     SendMessageW(
         hwnd_edit,
@@ -798,16 +793,11 @@ pub unsafe fn get_selected_text(hwnd_edit: HWND) -> Option<String> {
         return None;
     }
 
-    let start = utf16_index_to_byte(&text, selection.cpMin);
-    let end = utf16_index_to_byte(&text, selection.cpMax);
-    if start >= end || end > text.len() {
-        return None;
-    }
-    let selected = &text[start..end];
+    let selected = get_text_range(hwnd_edit, selection);
     if selected.trim().is_empty() {
         return None;
     }
-    Some(selected.to_string())
+    Some(selected)
 }
 
 pub unsafe fn hard_line_break_active_edit(hwnd: HWND) -> bool {

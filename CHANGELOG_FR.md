@@ -10,6 +10,7 @@ Améliorations
   - Voix SAPI5 : <voice sapi5 Microsoft Helena Desktop>Bonjour</voice>
   - Voix SAPI4 : <voice sapi4 #1>Bonjour</voice>
 • Catégories de podcasts enrichies.
+• Ajout d’une option dans le menu contextuel pour créer un livre audio à partir de la sélection.
 Corrections de bugs
 • Corrigé un bug où les livres audio SAPI4 pouvaient être créés différemment de ce qui était attendu.
 

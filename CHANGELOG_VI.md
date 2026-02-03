@@ -10,6 +10,7 @@ Cải tiến
   - Giọng SAPI5: <voice sapi5 Microsoft Helena Desktop>Xin chào</voice>
   - Giọng SAPI4: <voice sapi4 #1>Xin chào</voice>
 • Bổ sung danh mục podcast.
+• Thêm tùy chọn trong menu ngữ cảnh để tạo sách nói từ phần chọn.
 Sửa lỗi
 • Khắc phục lỗi khiến sách nói SAPI4 có thể được tạo ra khác với mong đợi.
 

@@ -13,6 +13,7 @@ Improvements
 • Improved PDF reading with automatic fallback to PDFium.
 • Improved the article parser for cases where content was not read in full.
 • Added pitch reset to the Playback menu.
+• Added a context menu option to create an audiobook from the selected text.
 • Added an option to use the legacy "Novapad" name in the window title and Start Menu shortcuts.
 Bug fixes
 • Fixed a bug where SAPI4 audiobooks could be created differently than expected.

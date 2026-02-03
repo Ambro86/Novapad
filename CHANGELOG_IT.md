@@ -13,6 +13,7 @@ Miglioramenti
 • Migliorata la lettura dei PDF grazie al fallback automatico su PDFium.
 • Migliorato il parser degli articoli che in alcuni casi non venivano letti in modo integrale.
 • Aggiunto il reset del pitch nel menu Riproduci.
+• Aggiunta un'opzione nel menu contestuale per creare un audiolibro dalla selezione.
 • Aggiunta un'opzione per usare il nome legacy "Novapad" nel titolo della finestra e nei collegamenti del menu Avvio.
 Correzioni di bug
 • Corretto un bug per cui gli audiolibri con SAPI4 potevano essere creati in modo diverso da quanto previsto.

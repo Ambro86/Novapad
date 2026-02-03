@@ -9,9 +9,9 @@ fn load_keys(path: &Path) -> BTreeSet<String> {
         .unwrap_or_else(|err| panic!("Failed to read {}: {err}", path.display()));
     let json: Value = serde_json::from_str(&raw)
         .unwrap_or_else(|err| panic!("Invalid JSON in {}: {err}", path.display()));
-    let obj = json.as_object().unwrap_or_else(|| {
-        panic!("Expected a JSON object at top-level in {}", path.display())
-    });
+    let obj = json
+        .as_object()
+        .unwrap_or_else(|| panic!("Expected a JSON object at top-level in {}", path.display()));
     obj.keys().cloned().collect()
 }
 
@@ -51,5 +51,9 @@ fn i18n_files_have_matching_keys() {
         checked += 1;
     }
 
-    assert!(checked > 0, "No translation files found in {}", i18n_dir.display());
+    assert!(
+        checked > 0,
+        "No translation files found in {}",
+        i18n_dir.display()
+    );
 }

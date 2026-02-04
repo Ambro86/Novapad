@@ -997,7 +997,10 @@ pub fn abbreviate_recent_label(path: &Path) -> String {
     }
     let mut suffix = parent.to_string();
     if suffix.len() > 24 {
-        suffix = format!("...ருங்கள்{}", &suffix[suffix.len().saturating_sub(24)..]);
+        let start = suffix.len().saturating_sub(24);
+        // Advance to the next char boundary so we never slice inside a multi-byte character.
+        let start = suffix.ceil_char_boundary(start);
+        suffix = format!("...{}", &suffix[start..]);
     }
     format!("{filename} - {suffix}")
 }

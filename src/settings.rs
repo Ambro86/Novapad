@@ -775,7 +775,9 @@ fn resolve_settings_dir() -> PathBuf {
 }
 
 pub fn settings_dir() -> PathBuf {
-    resolve_settings_dir()
+    use std::sync::OnceLock;
+    static DIR: OnceLock<PathBuf> = OnceLock::new();
+    DIR.get_or_init(resolve_settings_dir).clone()
 }
 
 fn get_settings_path() -> PathBuf {

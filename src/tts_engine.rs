@@ -973,71 +973,44 @@ fn tts_playback_inner(
             return;
         }
 
-        const PREFETCH_CONCURRENCY: usize = 6;
-        const FALLBACK_FIRST_AUDIO_TIMEOUT: Duration = Duration::from_secs(5);
-        let tasks = chunks_downloader.into_iter().map(|chunk_obj| {
-            let cancel = cancel_downloader.clone();
-            let voice = voice_downloader.clone();
-            async move {
-                if cancel.load(Ordering::SeqCst) {
-                    return Ok::<Option<(Vec<u8>, usize)>, String>(None);
-                }
-                let (engine, chunk_voice, chunk_rate, chunk_pitch, chunk_volume) =
-                    if let Some(ov) = &chunk_obj.override_voice {
-                        (
-                            ov.engine,
-                            ov.voice.as_str(),
-                            ov.rate.unwrap_or(0),
-                            ov.pitch.unwrap_or(0),
-                            ov.volume.unwrap_or(100),
-                        )
-                    } else {
-                        (tts_engine, voice.as_str(), rate, pitch, volume)
-                    };
-                let data = synthesize_segment_bytes(
-                    engine,
-                    &chunk_obj.text_to_read,
-                    chunk_voice,
-                    chunk_rate,
-                    chunk_pitch,
-                    chunk_volume,
-                    language,
-                )
-                .await?;
-                Ok(Some((data, chunk_obj.original_len)))
-            }
-        });
-
-        let mut stream = futures_util::stream::iter(tasks).buffered(PREFETCH_CONCURRENCY);
-        let mut sent_any = false;
-        loop {
+        // Mixed-engine path: synthesise chunks sequentially to avoid
+        // COM conflicts between SAPI4/SAPI5 running on parallel threads.
+        for chunk_obj in &chunks_downloader {
             if cancel_downloader.load(Ordering::SeqCst) {
                 break;
             }
-            let next = if !sent_any {
-                match tokio::time::timeout(FALLBACK_FIRST_AUDIO_TIMEOUT, stream.next()).await {
-                    Ok(value) => value,
-                    Err(_) => {
-                        let _unused = audio_tx
-                            .send(Err("Fallback: first audio timeout".to_string()))
-                            .await;
-                        break;
-                    }
-                }
-            } else {
-                stream.next().await
-            };
-            let Some(result) = next else {
-                break;
-            };
+            let (engine, chunk_voice, chunk_rate, chunk_pitch, chunk_volume) =
+                if let Some(ov) = &chunk_obj.override_voice {
+                    (
+                        ov.engine,
+                        ov.voice.as_str(),
+                        ov.rate.unwrap_or(0),
+                        ov.pitch.unwrap_or(0),
+                        ov.volume.unwrap_or(100),
+                    )
+                } else {
+                    (tts_engine, voice_downloader.as_str(), rate, pitch, volume)
+                };
+            let result = synthesize_segment_bytes(
+                engine,
+                &chunk_obj.text_to_read,
+                chunk_voice,
+                chunk_rate,
+                chunk_pitch,
+                chunk_volume,
+                language,
+            )
+            .await;
             match result {
-                Ok(Some((data, len))) => {
-                    if audio_tx.send(Ok((data, len))).await.is_err() {
+                Ok(data) => {
+                    if audio_tx
+                        .send(Ok((data, chunk_obj.original_len)))
+                        .await
+                        .is_err()
+                    {
                         break;
                     }
-                    sent_any = true;
                 }
-                Ok(None) => break,
                 Err(e) => {
                     if let Err(err) = audio_tx.send(Err(e)).await {
                         crate::log_debug(&format!("Failed to send audio error: {:?}", err));

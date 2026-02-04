@@ -411,12 +411,22 @@ pub fn insert_voice_tag_at_caret(
             WPARAM(1),
             LPARAM(wide.as_ptr() as isize),
         );
-        let caret_base = if actual_insert != start as usize {
-            actual_insert as i32 + if needs_newline { 2 } else { 0 }
-        } else {
-            start as i32
-        };
-        let caret = caret_base + open.encode_utf16().count() as i32 + 1;
+        // After EM_REPLACESEL the caret sits at the end of the inserted text.
+        // Move it back by len(" </voice>") = close.len() + 1 to place it
+        // between the two padding spaces: "<voice ...> | </voice>".
+        let mut after_sel: u32 = 0;
+        SendMessageW(
+            hwnd_edit,
+            EM_GETSEL,
+            WPARAM(&mut after_sel as *mut u32 as usize),
+            LPARAM(0),
+        );
+        let close_u16_len = close.encode_utf16().count() as i32;
+        let caret = after_sel as i32 - close_u16_len - 1;
+        log_debug(&format!(
+            "insert_voice_tag_at_caret: after_sel={} close_u16_len={} caret={} actual_insert={} start={} needs_newline={}",
+            after_sel, close_u16_len, caret, actual_insert, start, needs_newline,
+        ));
         SendMessageW(
             hwnd_edit,
             EM_SETSEL,

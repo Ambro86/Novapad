@@ -3890,8 +3890,30 @@ unsafe fn preview_voice(hwnd: HWND) {
 }
 
 unsafe fn insert_voice_tag_from_options(hwnd: HWND) {
-    let (parent, combo_tts_engine, combo_voice) = match with_options_state(hwnd, |state| {
-        (state.parent, state.combo_tts_engine, state.combo_voice)
+    let (
+        parent,
+        combo_tts_engine,
+        combo_voice,
+        checkbox_manual,
+        combo_speed,
+        combo_pitch,
+        combo_volume,
+        edit_speed,
+        edit_pitch,
+        edit_volume,
+    ) = match with_options_state(hwnd, |state| {
+        (
+            state.parent,
+            state.combo_tts_engine,
+            state.combo_voice,
+            state.checkbox_tts_manual,
+            state.combo_tts_speed,
+            state.combo_tts_pitch,
+            state.combo_tts_volume,
+            state.edit_tts_speed,
+            state.edit_tts_pitch,
+            state.edit_tts_volume,
+        )
     }) {
         Some(values) => values,
         None => return,
@@ -3928,7 +3950,26 @@ unsafe fn insert_voice_tag_from_options(hwnd: HWND) {
     if voice.trim().is_empty() {
         return;
     }
-    insert_voice_tag_at_caret(parent, engine, &voice);
+
+    let manual =
+        SendMessageW(checkbox_manual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 == BST_CHECKED.0;
+    let rate = if manual {
+        read_tts_edit_value(edit_speed, 0, TTS_RATE_MIN, TTS_RATE_MAX)
+    } else {
+        combo_value(combo_speed)
+    };
+    let pitch = if manual {
+        read_tts_edit_value(edit_pitch, 0, TTS_PITCH_MIN, TTS_PITCH_MAX)
+    } else {
+        combo_value(combo_pitch)
+    };
+    let volume = if manual {
+        read_tts_edit_value(edit_volume, 100, TTS_VOLUME_MIN, TTS_VOLUME_MAX)
+    } else {
+        combo_value(combo_volume)
+    };
+
+    insert_voice_tag_at_caret(parent, engine, &voice, rate, pitch, volume);
 }
 
 unsafe fn preview_dialogue_voice(hwnd: HWND) {

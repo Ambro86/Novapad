@@ -207,7 +207,14 @@ pub unsafe fn apply_text_limit_to_all_edits(hwnd: HWND) {
     }
 }
 
-pub fn insert_voice_tag_at_caret(hwnd: HWND, engine: TtsEngine, voice: &str) {
+pub fn insert_voice_tag_at_caret(
+    hwnd: HWND,
+    engine: TtsEngine,
+    voice: &str,
+    rate: i32,
+    pitch: i32,
+    volume: i32,
+) {
     let voice = voice.trim();
     if voice.is_empty() {
         return;
@@ -221,7 +228,17 @@ pub fn insert_voice_tag_at_caret(hwnd: HWND, engine: TtsEngine, voice: &str) {
         TtsEngine::Sapi5 => "sapi5",
         TtsEngine::Sapi4 => "sapi4",
     };
-    let open = format!("<voice {engine_token} {voice}>");
+    let mut extras = String::new();
+    if rate != 0 {
+        extras.push_str(&format!(" speed={rate}"));
+    }
+    if pitch != 0 {
+        extras.push_str(&format!(" pitch={pitch}"));
+    }
+    if volume != 100 {
+        extras.push_str(&format!(" volume={volume}"));
+    }
+    let open = format!("<voice {engine_token} {voice}{extras}>");
     let close = "</voice>";
     let insert = format!("{open}  {close}");
     let mut start: u32 = 0;

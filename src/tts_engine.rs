@@ -70,6 +70,9 @@ type EdgeAudioTx<'a> = Option<&'a mpsc::Sender<Result<(Vec<u8>, usize), String>>
 pub struct VoiceOverride {
     pub engine: TtsEngine,
     pub voice: String,
+    pub rate: Option<i32>,
+    pub pitch: Option<i32>,
+    pub volume: Option<i32>,
 }
 
 fn parse_voice_tag_override(tag: &str, default_engine: TtsEngine) -> Option<VoiceOverride> {
@@ -117,6 +120,37 @@ fn parse_voice_tag_override(tag: &str, default_engine: TtsEngine) -> Option<Voic
         }
     }
 
+    let mut rate: Option<i32> = None;
+    let mut pitch: Option<i32> = None;
+    let mut volume: Option<i32> = None;
+
+    for (key, target) in [
+        ("speed", &mut rate),
+        ("pitch", &mut pitch),
+        ("volume", &mut volume),
+    ] {
+        if let Some(pos) = lower.find(key)
+            && let Some(eq_pos) = lower[pos..].find('=')
+        {
+            let val_start = pos + eq_pos + 1;
+            let val = raw[val_start..].trim_start();
+            let val = if let Some(rest) = val.strip_prefix('"') {
+                rest.split('"').next().unwrap_or("")
+            } else {
+                val.split_whitespace().next().unwrap_or("")
+            };
+            if let Ok(parsed) = val.parse::<i32>() {
+                *target = Some(parsed);
+            }
+        }
+    }
+
+    const KNOWN_KEYS: &[&str] = &["engine", "tts", "voice", "name", "speed", "pitch", "volume"];
+    let is_known_attr = |token: &str| {
+        let t = token.to_ascii_lowercase();
+        KNOWN_KEYS.iter().any(|k| t.starts_with(&format!("{k}=")))
+    };
+
     let mut tokens: Vec<&str> = raw.split_whitespace().collect();
     if let Some(first) = tokens.first().copied() {
         let first_lower = first.to_ascii_lowercase();
@@ -133,7 +167,8 @@ fn parse_voice_tag_override(tag: &str, default_engine: TtsEngine) -> Option<Voic
         }
     }
     if voice.is_none() && !tokens.is_empty() {
-        let merged = tokens.join(" ");
+        let name_tokens: Vec<&str> = tokens.into_iter().filter(|t| !is_known_attr(t)).collect();
+        let merged = name_tokens.join(" ");
         if !merged.is_empty() {
             voice = Some(merged);
         }
@@ -141,7 +176,14 @@ fn parse_voice_tag_override(tag: &str, default_engine: TtsEngine) -> Option<Voic
 
     let voice = voice?;
     let engine = engine.unwrap_or(default_engine);
-    Some(VoiceOverride { engine, voice })
+
+    Some(VoiceOverride {
+        engine,
+        voice,
+        rate,
+        pitch,
+        volume,
+    })
 }
 
 pub(crate) fn has_voice_tags(text: &str) -> bool {
@@ -220,6 +262,18 @@ pub(crate) fn split_voice_tag_spans(
 
     if segments.is_empty() {
         segments.push((text.to_string(), None, utf16_len(text)));
+    }
+    for (i, (txt, ov, len)) in segments.iter().enumerate() {
+        crate::log_debug(&format!(
+            "split_voice_tag_spans[{}]: text={:?} override={} rate={:?} pitch={:?} vol={:?} len={}",
+            i,
+            txt,
+            ov.as_ref().map(|o| o.voice.as_str()).unwrap_or("(none)"),
+            ov.as_ref().and_then(|o| o.rate),
+            ov.as_ref().and_then(|o| o.pitch),
+            ov.as_ref().and_then(|o| o.volume),
+            len,
+        ));
     }
     segments
 }
@@ -928,19 +982,25 @@ fn tts_playback_inner(
                 if cancel.load(Ordering::SeqCst) {
                     return Ok::<Option<(Vec<u8>, usize)>, String>(None);
                 }
-                let (engine, chunk_voice) = if let Some(override_voice) = &chunk_obj.override_voice
-                {
-                    (override_voice.engine, override_voice.voice.as_str())
-                } else {
-                    (tts_engine, voice.as_str())
-                };
+                let (engine, chunk_voice, chunk_rate, chunk_pitch, chunk_volume) =
+                    if let Some(ov) = &chunk_obj.override_voice {
+                        (
+                            ov.engine,
+                            ov.voice.as_str(),
+                            ov.rate.unwrap_or(0),
+                            ov.pitch.unwrap_or(0),
+                            ov.volume.unwrap_or(100),
+                        )
+                    } else {
+                        (tts_engine, voice.as_str(), rate, pitch, volume)
+                    };
                 let data = synthesize_segment_bytes(
                     engine,
                     &chunk_obj.text_to_read,
                     chunk_voice,
-                    rate,
-                    pitch,
-                    volume,
+                    chunk_rate,
+                    chunk_pitch,
+                    chunk_volume,
                     language,
                 )
                 .await?;
@@ -1487,13 +1547,38 @@ async fn download_edge_chunks_ws(
         if cancel.load(Ordering::Relaxed) {
             return Err("Cancelled".to_string());
         }
-        let voice = chunk
-            .override_voice
-            .as_ref()
-            .map(|v| v.voice.as_str())
-            .unwrap_or(default_voice);
+        let (voice, chunk_rate, chunk_pitch, chunk_volume) = if let Some(ov) = &chunk.override_voice
+        {
+            (
+                ov.voice.as_str(),
+                ov.rate.unwrap_or(0),
+                ov.pitch.unwrap_or(0),
+                ov.volume.unwrap_or(100),
+            )
+        } else {
+            (default_voice, tts_rate, tts_pitch, tts_volume)
+        };
+        crate::log_debug(&format!(
+            "Edge WS chunk {}: voice={} rate={} pitch={} volume={} override={:?} text={:?}",
+            idx,
+            voice,
+            chunk_rate,
+            chunk_pitch,
+            chunk_volume,
+            chunk
+                .override_voice
+                .as_ref()
+                .map(|ov| (ov.rate, ov.pitch, ov.volume)),
+            &chunk.text_to_read,
+        ));
         let req_id = Uuid::new_v4().simple().to_string();
-        let ssml = mkssml(&chunk.text_to_read, voice, tts_rate, tts_pitch, tts_volume);
+        let ssml = mkssml(
+            &chunk.text_to_read,
+            voice,
+            chunk_rate,
+            chunk_pitch,
+            chunk_volume,
+        );
         let ssml_msg = format!(
             "X-RequestId:{}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:{}Z\r\nPath:ssml\r\n\r\n{}",
             req_id,
@@ -1632,18 +1717,23 @@ async fn download_edge_chunk_ws(
     if options.cancel.load(Ordering::Relaxed) {
         return Err("Cancelled".to_string());
     }
-    let voice = chunk
-        .override_voice
-        .as_ref()
-        .map(|v| v.voice.as_str())
-        .unwrap_or(options.voice);
+    let (voice, chunk_rate, chunk_pitch, chunk_volume) = if let Some(ov) = &chunk.override_voice {
+        (
+            ov.voice.as_str(),
+            ov.rate.unwrap_or(0),
+            ov.pitch.unwrap_or(0),
+            ov.volume.unwrap_or(100),
+        )
+    } else {
+        (options.voice, options.rate, options.pitch, options.volume)
+    };
     let req_id = Uuid::new_v4().simple().to_string();
     let ssml = mkssml(
         &chunk.text_to_read,
         voice,
-        options.rate,
-        options.pitch,
-        options.volume,
+        chunk_rate,
+        chunk_pitch,
+        chunk_volume,
     );
     let ssml_msg = format!(
         "X-RequestId:{}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:{}Z\r\nPath:ssml\r\n\r\n{}",
@@ -4562,24 +4652,23 @@ pub(crate) fn render_mixed_audiobook_part(
             return Err(cancelled_message(options.language));
         }
 
-        let (engine, voice, rate, pitch, volume) =
-            if let Some(override_voice) = &chunk.override_voice {
-                (
-                    override_voice.engine,
-                    override_voice.voice.as_str(),
-                    options.rate,
-                    options.pitch,
-                    options.volume,
-                )
-            } else {
-                (
-                    config.main_engine,
-                    options.voice,
-                    options.rate,
-                    options.pitch,
-                    options.volume,
-                )
-            };
+        let (engine, voice, rate, pitch, volume) = if let Some(ov) = &chunk.override_voice {
+            (
+                ov.engine,
+                ov.voice.as_str(),
+                ov.rate.unwrap_or(0),
+                ov.pitch.unwrap_or(0),
+                ov.volume.unwrap_or(100),
+            )
+        } else {
+            (
+                config.main_engine,
+                options.voice,
+                options.rate,
+                options.pitch,
+                options.volume,
+            )
+        };
 
         let synth = SynthesisConfig {
             engine,

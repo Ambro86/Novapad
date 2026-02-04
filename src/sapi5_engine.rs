@@ -79,8 +79,8 @@ fn find_voice_token(voice_name: &str) -> Option<ISpObjectToken> {
         let category: windows::core::Result<ISpObjectTokenCategory> =
             unsafe { CoCreateInstance(&SpObjectTokenCategory, None, CLSCTX_ALL) };
         if let Ok(cat) = category {
-            if let Err(_e) = unsafe { cat.SetId(category_id, false) } {
-                crate::log_debug(&format!("Failed to set SAPI5 category: {:?}", _e));
+            if let Err(e) = unsafe { cat.SetId(category_id, false) } {
+                crate::log_debug(&format!("Failed to set SAPI5 category: {:?}", e));
             }
             if let Ok(enum_tokens) = unsafe { cat.EnumTokens(None, None) } {
                 let mut count = 0;
@@ -192,9 +192,13 @@ pub fn play_sapi(
                             }
                             TtsCommand::Stop => {
                                 cancel.store(true, Ordering::SeqCst);
-                                if let Err(_e) =
+                                if let Err(e) =
                                     voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None)
                                 {
+                                    crate::log_debug(&format!(
+                                        "SAPI5 Speak purge failed (stop): {}",
+                                        e
+                                    ));
                                 }
                                 return;
                             }
@@ -244,9 +248,13 @@ pub fn play_sapi(
                                         }
                                     }
                                 }
-                                if let Err(_e) =
+                                if let Err(e) =
                                     voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None)
                                 {
+                                    crate::log_debug(&format!(
+                                        "SAPI5 Speak purge failed (pause): {}",
+                                        e
+                                    ));
                                 }
                                 if let Some(rem) = remainder {
                                     pending.push_front(rem);
@@ -259,9 +267,13 @@ pub fn play_sapi(
                             }
                             TtsCommand::Stop => {
                                 cancel.store(true, Ordering::SeqCst);
-                                if let Err(_e) =
+                                if let Err(e) =
                                     voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None)
                                 {
+                                    crate::log_debug(&format!(
+                                        "SAPI5 Speak purge failed (stop): {}",
+                                        e
+                                    ));
                                 }
                                 return;
                             }
@@ -298,12 +310,45 @@ pub struct SapiExportOptions<'a> {
     pub cancel: Arc<AtomicBool>,
 }
 
-pub fn speak_sapi_to_file(
+pub struct SapiVoice {
+    voice: ISpVoice,
+}
+
+impl SapiVoice {
+    pub fn new() -> Result<Self, String> {
+        let voice: ISpVoice = unsafe { CoCreateInstance(&SpVoice, None, CLSCTX_ALL) }
+            .map_err(|e| format!("Failed to create SpVoice: {}", e))?;
+        Ok(Self { voice })
+    }
+}
+
+fn configure_sapi_voice(voice: &ISpVoice, options: &SapiExportOptions) -> Result<(), String> {
+    let voice_token = find_voice_token(options.voice_name).ok_or_else(|| {
+        "Selected SAPI voice not found. Please select a voice in Options.".to_string()
+    })?;
+    unsafe {
+        voice
+            .SetVoice(&voice_token)
+            .map_err(|e| format!("SetVoice failed: {}", e))?;
+    }
+    crate::log_debug(&format!(
+        "SAPI: voice set. voice_name={}",
+        options.voice_name
+    ));
+    if let Err(e) = unsafe { voice.SetRate(map_sapi_rate(options.rate)) } {
+        crate::log_debug(&format!("Failed to set SAPI5 rate: {}", e));
+    }
+    if let Err(e) = unsafe { voice.SetVolume(map_sapi_volume(options.volume)) } {
+        crate::log_debug(&format!("Failed to set SAPI5 volume: {}", e));
+    }
+    Ok(())
+}
+
+fn speak_sapi_to_file_with_voice(
+    voice: &ISpVoice,
     options: SapiExportOptions,
     mut progress_callback: impl FnMut(usize),
 ) -> Result<(), String> {
-    let _com = ComGuard::new_sta().map_err(|e| format!("CoInitializeEx failed: {}", e))?;
-
     unsafe {
         let is_mp3 = options
             .output_path
@@ -320,89 +365,90 @@ pub fn speak_sapi_to_file(
         };
         crate::log_debug(&format!("SAPI: Target wav_path={:?}", wav_path));
 
-        {
-            let voice: ISpVoice = CoCreateInstance(&SpVoice, None, CLSCTX_ALL)
-                .map_err(|e| format!("Failed to create SpVoice: {}", e))?;
+        configure_sapi_voice(voice, &options)?;
 
-            let voice_token = find_voice_token(options.voice_name).ok_or_else(|| {
-                "Selected SAPI voice not found. Please select a voice in Options.".to_string()
-            })?;
-            voice
-                .SetVoice(&voice_token)
-                .map_err(|e| format!("SetVoice failed: {}", e))?;
-            if let Err(e) = voice.SetRate(map_sapi_rate(options.rate)) {
-                crate::log_debug(&format!("Failed to set SAPI5 rate: {}", e));
-            }
-            if let Err(e) = voice.SetVolume(map_sapi_volume(options.volume)) {
-                crate::log_debug(&format!("Failed to set SAPI5 volume: {}", e));
-            }
+        let stream: ISpStream = CoCreateInstance(&SpFileStream, None, CLSCTX_ALL)
+            .map_err(|e| format!("Failed to create SpFileStream: {}", e))?;
 
-            let stream: ISpStream = CoCreateInstance(&SpFileStream, None, CLSCTX_ALL)
-                .map_err(|e| format!("Failed to create SpFileStream: {}", e))?;
+        let path_wide = to_wide(wav_path.to_str().ok_or("Invalid path")?);
 
-            let path_wide = to_wide(wav_path.to_str().ok_or("Invalid path")?);
+        let mut wfx = WAVEFORMATEX::default();
+        wfx.wFormatTag = WAVE_FORMAT_PCM as u16;
+        wfx.nChannels = 1;
+        wfx.nSamplesPerSec = 44100;
+        wfx.wBitsPerSample = 16;
+        wfx.nBlockAlign = wfx.nChannels * (wfx.wBitsPerSample / 8);
+        wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * (wfx.nBlockAlign as u32);
+        wfx.cbSize = 0;
 
-            let mut wfx = WAVEFORMATEX::default();
-            wfx.wFormatTag = WAVE_FORMAT_PCM as u16;
-            wfx.nChannels = 1;
-            wfx.nSamplesPerSec = 44100;
-            wfx.wBitsPerSample = 16;
-            wfx.nBlockAlign = wfx.nChannels * (wfx.wBitsPerSample / 8);
-            wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * (wfx.nBlockAlign as u32);
-            wfx.cbSize = 0;
+        stream
+            .BindToFile(
+                PCWSTR(path_wide.as_ptr()),
+                SPFM_CREATE_ALWAYS,
+                Some(&SPDFID_WAVEFORMATEX),
+                Some(&wfx),
+                0,
+            )
+            .map_err(|e| format!("BindToFile failed: {}", e))?;
+        crate::log_debug("SAPI: bound output file stream.");
 
-            stream
-                .BindToFile(
-                    PCWSTR(path_wide.as_ptr()),
-                    SPFM_CREATE_ALWAYS,
-                    Some(&SPDFID_WAVEFORMATEX),
-                    Some(&wfx),
-                    0,
-                )
-                .map_err(|e| format!("BindToFile failed: {}", e))?;
+        crate::log_debug("SAPI: SetOutput begin.");
+        voice
+            .SetOutput(&stream, true)
+            .map_err(|e| format!("SetOutput failed: {}", e))?;
+        crate::log_debug("SAPI: SetOutput ok.");
 
-            voice
-                .SetOutput(&stream, true)
-                .map_err(|e| format!("SetOutput failed: {}", e))?;
-
-            for (i, chunk) in options.chunks.iter().enumerate() {
-                if options.cancel.load(Ordering::Relaxed) {
-                    if let Err(e) = stream.Close() {
-                        crate::log_debug(&format!("Failed to close SAPI5 stream: {}", e));
-                    }
-                    if let Err(e) = std::fs::remove_file(&wav_path) {
-                        crate::log_debug(&format!("Failed to remove SAPI5 temp WAV: {}", e));
-                    }
-                    return Err("Cancelled".to_string());
+        crate::log_debug(&format!(
+            "SAPI: entering chunk loop. chunks={}",
+            options.chunks.len()
+        ));
+        for (i, chunk) in options.chunks.iter().enumerate() {
+            if options.cancel.load(Ordering::Relaxed) {
+                if let Err(e) = stream.Close() {
+                    crate::log_debug(&format!("Failed to close SAPI5 stream: {}", e));
                 }
-
-                if chunk.trim().is_empty() {
-                    continue;
+                if let Err(e) = std::fs::remove_file(&wav_path) {
+                    crate::log_debug(&format!("Failed to remove SAPI5 temp WAV: {}", e));
                 }
-                let ssml = mk_sapi_ssml(chunk, options.rate, options.pitch, options.volume);
-                let chunk_wide = to_wide(&ssml);
-                voice
-                    .Speak(PCWSTR(chunk_wide.as_ptr()), SPF_IS_XML.0 as u32, None)
-                    .map_err(|e| format!("Speak failed: {}", e))?;
-
-                progress_callback(i + 1);
+                return Err("Cancelled".to_string());
             }
 
-            if let Err(e) = voice.WaitUntilDone(u32::MAX) {
-                crate::log_debug(&format!("Failed to wait for SAPI5: {}", e));
+            if chunk.trim().is_empty() {
+                continue;
             }
-            if let Err(e) = voice.SetOutput(None, false) {
-                crate::log_debug(&format!("Failed to reset SAPI5 output: {}", e));
-            }
-            if let Err(e) = stream.Close() {
-                crate::log_debug(&format!("Failed to close SAPI5 stream: {}", e));
-            }
+            crate::log_debug(&format!(
+                "SAPI: chunk start. idx={} len={}",
+                i + 1,
+                chunk.len()
+            ));
+            let ssml = mk_sapi_ssml(chunk, options.rate, options.pitch, options.volume);
+            let chunk_wide = to_wide(&ssml);
+            voice
+                .Speak(PCWSTR(chunk_wide.as_ptr()), SPF_IS_XML.0 as u32, None)
+                .map_err(|e| format!("Speak failed: {}", e))?;
+            crate::log_debug(&format!("SAPI: chunk done. idx={}", i + 1));
+
+            progress_callback(i + 1);
+        }
+
+        if let Err(e) = voice.WaitUntilDone(u32::MAX) {
+            crate::log_debug(&format!("Failed to wait for SAPI5: {}", e));
+        }
+        crate::log_debug("SAPI: WaitUntilDone ok.");
+        crate::log_debug("SAPI: skipping SetOutput(None) to avoid COM hang.");
+        if let Err(e) = stream.Close() {
+            crate::log_debug(&format!("Failed to close SAPI5 stream: {}", e));
+        }
+        crate::log_debug("SAPI: stream Close ok.");
+        if let Ok(size) = std::fs::metadata(&wav_path).map(|m| m.len()) {
+            crate::log_debug(&format!("SAPI: wav written. size={}", size));
         }
 
         if is_mp3 {
             if let Ok(data_size) = crate::audio_utils::get_wav_data_size(&wav_path)
                 && data_size == 0
             {
+                crate::log_debug("SAPI: WAV data size is 0, writing silence.");
                 let sample_rate = 44100u32;
                 let channels = 1u16;
                 let bits_per_sample = 16u16;
@@ -416,16 +462,28 @@ pub fn speak_sapi_to_file(
                     crate::log_debug(&format!("Failed to write silence file: {}", e));
                 }
             }
+            if let Ok(size) = std::fs::metadata(&wav_path).map(|m| m.len()) {
+                crate::log_debug(&format!("SAPI: starting MF encode. wav_size={}", size));
+            } else {
+                crate::log_debug("SAPI: starting MF encode.");
+            }
             match crate::mf_encoder::encode_wav_to_mp3(&wav_path, options.output_path, |_| {}) {
                 Ok(()) => {
                     if let Err(e) = std::fs::remove_file(&wav_path) {
                         crate::log_debug(&format!("Failed to remove SAPI5 temp WAV: {}", e));
+                    } else {
+                        crate::log_debug("SAPI: temp WAV removed.");
                     }
                 }
                 Err(e) => {
                     let dest_wav = options.output_path.with_extension("wav");
                     if let Err(e) = std::fs::rename(&wav_path, &dest_wav) {
                         crate::log_debug(&format!("Failed to rename SAPI5 output: {}", e));
+                    } else {
+                        crate::log_debug(&format!(
+                            "SAPI: MF encode failed, preserved WAV at {:?}",
+                            dest_wav
+                        ));
                     }
                     let msg = if e.contains("Media Foundation not available") {
                         mf_not_available_message(options.language)
@@ -439,6 +497,34 @@ pub fn speak_sapi_to_file(
 
         Ok(())
     }
+}
+
+pub fn speak_sapi_to_file(
+    options: SapiExportOptions,
+    mut progress_callback: impl FnMut(usize),
+) -> Result<(), String> {
+    let _com = ComGuard::new_sta().map_err(|e| format!("CoInitializeEx failed: {}", e))?;
+    let thread_id = std::thread::current().id();
+    crate::log_debug(&format!(
+        "SAPI5 export start. thread={:?} chunks={} voice={} rate={} pitch={} volume={} out={:?}",
+        thread_id,
+        options.chunks.len(),
+        options.voice_name,
+        options.rate,
+        options.pitch,
+        options.volume,
+        options.output_path
+    ));
+    let voice = SapiVoice::new()?;
+    speak_sapi_to_file_with_voice(&voice.voice, options, &mut progress_callback)
+}
+
+pub fn speak_sapi_to_file_with_sapi_voice(
+    voice: &SapiVoice,
+    options: SapiExportOptions,
+    progress_callback: impl FnMut(usize),
+) -> Result<(), String> {
+    speak_sapi_to_file_with_voice(&voice.voice, options, progress_callback)
 }
 
 fn mf_not_available_message(language: Language) -> String {

@@ -1919,6 +1919,21 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                 continue;
             }
 
+            // Enter on the voice panel "Insert Tag" button: behave like the options dialog
+            if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
+                let focus = GetFocus();
+                let is_insert_tag = focus.0 != 0
+                    && with_state(hwnd, |state| focus == state.voice_button_insert_tag)
+                        .unwrap_or(false);
+                if is_insert_tag {
+                    insert_voice_tag_from_voice_panel(hwnd);
+                    if let Some(hwnd_edit) = get_active_edit(hwnd) {
+                        SetFocus(hwnd_edit);
+                    }
+                    continue;
+                }
+            }
+
             let mut handled = false;
             with_state(hwnd, |state| {
                 // Audiobook keyboard controls (ONLY if no secondary window is open)

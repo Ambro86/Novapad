@@ -250,6 +250,66 @@ pub fn insert_voice_tag_at_caret(hwnd: HWND, engine: TtsEngine, voice: &str) {
         let caret_pos = start as usize;
         let open_needle: Vec<u16> = "<voice".encode_utf16().collect();
         let close_needle: Vec<u16> = "</voice>".encode_utf16().collect();
+        let gt: u16 = '>' as u16;
+
+        // Check if the caret is inside a </voice> closing tag literal.
+        // If so, move insertion point after that closing tag.
+        let caret_pos = if let Some(ct_start) = find_next_utf16_at_or_after(
+            &lower_utf16,
+            &close_needle,
+            caret_pos.saturating_sub(close_needle.len().saturating_sub(1)),
+        ) {
+            let ct_end = ct_start + close_needle.len();
+            if caret_pos >= ct_start && caret_pos < ct_end {
+                log_debug(
+                    "insert_voice_tag_at_caret: caret inside closing tag literal, moving after it",
+                );
+                ct_end
+            } else {
+                caret_pos
+            }
+        } else {
+            caret_pos
+        };
+
+        // Check if the caret is inside an opening <voice ...> tag literal
+        // (between '<' and '>'). If so, move insertion point before that tag.
+        let caret_pos = if let Some(open_start) = find_last_utf16_before(
+            &lower_utf16,
+            &open_needle,
+            caret_pos.saturating_add(open_needle.len()),
+        ) {
+            // Make sure this is not a </voice match (slash before 'voice')
+            let is_closing = open_start > 0
+                && full_utf16.get(open_start.saturating_sub(1)).copied() == Some('/' as u16);
+            if !is_closing && caret_pos >= open_start {
+                // Find the closing '>' of this opening tag
+                let tag_end = full_utf16[open_start..]
+                    .iter()
+                    .position(|&c| c == gt)
+                    .map(|p| open_start + p + 1);
+                if let Some(end) = tag_end {
+                    if caret_pos < end {
+                        log_debug(
+                            "insert_voice_tag_at_caret: caret inside opening tag literal, moving before it",
+                        );
+                        open_start
+                    } else {
+                        caret_pos
+                    }
+                } else {
+                    log_debug(
+                        "insert_voice_tag_at_caret: caret inside malformed opening tag, moving before it",
+                    );
+                    open_start
+                }
+            } else {
+                caret_pos
+            }
+        } else {
+            caret_pos
+        };
+
         let last_open = find_last_utf16_before(&lower_utf16, &open_needle, caret_pos);
         let last_close = find_last_utf16_before(&lower_utf16, &close_needle, caret_pos);
         let inside_voice =
@@ -308,13 +368,18 @@ pub fn insert_voice_tag_at_caret(hwnd: HWND, engine: TtsEngine, voice: &str) {
                 log_debug("insert_voice_tag_at_caret: inside voice tag, moving after close");
             }
         }
-        if insert_pos != caret_pos {
-            let insert_pos_i32 = insert_pos as i32;
+        let actual_insert = if insert_pos != caret_pos {
+            insert_pos
+        } else {
+            caret_pos
+        };
+        if actual_insert != start as usize {
+            let pos_i32 = actual_insert as i32;
             SendMessageW(
                 hwnd_edit,
                 EM_SETSEL,
-                WPARAM(insert_pos_i32 as usize),
-                LPARAM(insert_pos_i32 as isize),
+                WPARAM(pos_i32 as usize),
+                LPARAM(pos_i32 as isize),
             );
         }
         let insert_text = if needs_newline {
@@ -329,8 +394,8 @@ pub fn insert_voice_tag_at_caret(hwnd: HWND, engine: TtsEngine, voice: &str) {
             WPARAM(1),
             LPARAM(wide.as_ptr() as isize),
         );
-        let caret_base = if insert_pos != caret_pos {
-            insert_pos as i32 + if needs_newline { 2 } else { 0 }
+        let caret_base = if actual_insert != start as usize {
+            actual_insert as i32 + if needs_newline { 2 } else { 0 }
         } else {
             start as i32
         };

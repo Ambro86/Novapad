@@ -4970,14 +4970,29 @@ unsafe fn handle_voice_panel_multilingual_toggle(hwnd: HWND) {
 }
 
 unsafe fn insert_voice_tag_from_voice_panel(hwnd: HWND) {
-    let engine = with_state(hwnd, |state| state.settings.tts_engine).unwrap_or_default();
+    let (engine, rate, pitch, volume) = with_state(hwnd, |state| {
+        (
+            state.settings.tts_engine,
+            state.settings.tts_rate,
+            state.settings.tts_pitch,
+            state.settings.tts_volume,
+        )
+    })
+    .unwrap_or_default();
     let voice_name = current_voice_selection(hwnd, engine)
         .or_else(|| with_state(hwnd, |state| Some(state.settings.tts_voice.clone())).flatten())
         .unwrap_or_default();
     if voice_name.trim().is_empty() {
         return;
     }
-    crate::editor_manager::insert_voice_tag_at_caret(hwnd, engine, &voice_name);
+    crate::editor_manager::insert_voice_tag_at_caret(
+        hwnd,
+        engine,
+        &voice_name,
+        rate,
+        pitch,
+        volume,
+    );
 }
 
 unsafe fn is_voice_panel_tuning_edit(hwnd: HWND, target: HWND) -> bool {

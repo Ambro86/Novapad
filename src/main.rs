@@ -82,10 +82,7 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
 use windows::Win32::System::DataExchange::COPYDATASTRUCT;
-use windows::Win32::System::Diagnostics::Debug::{
-    AddVectoredExceptionHandler, EXCEPTION_CONTINUE_SEARCH, EXCEPTION_POINTERS,
-    LPTOP_LEVEL_EXCEPTION_FILTER, MessageBeep, SetUnhandledExceptionFilter,
-};
+use windows::Win32::System::Diagnostics::Debug::MessageBeep;
 use windows::Win32::System::LibraryLoader::{GetModuleHandleW, LoadLibraryW};
 use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
@@ -139,8 +136,6 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WS_VISIBLE,
 };
 use windows::core::{HSTRING, Interface, PCWSTR, PWSTR, implement, w};
-
-use std::sync::OnceLock;
 
 const EM_SCROLLCARET: u32 = 0x00B7;
 const EM_CHARFROMPOS: u32 = 0x00D7;
@@ -217,11 +212,54 @@ fn bring_window_to_foreground(hwnd: HWND) {
             log_debug("SetForegroundWindow failed");
         }
         SetActiveWindow(hwnd);
+        notify_active_editor_focus(hwnd, false);
 
         if let Some(foreground_thread) = attached_thread
             && !AttachThreadInput(foreground_thread, current_thread, false).as_bool()
         {
             log_debug("AttachThreadInput (detach) failed");
+        }
+    }
+}
+
+unsafe fn notify_active_editor_focus(hwnd: HWND, notify_when_audiobook: bool) {
+    let is_audiobook = unsafe {
+        with_state(hwnd, |state| {
+            state
+                .docs
+                .get(state.current)
+                .map(|doc| matches!(doc.format, FileFormat::Audiobook))
+                .unwrap_or(false)
+        })
+    }
+    .unwrap_or(false);
+
+    if is_audiobook {
+        if !notify_when_audiobook {
+            return;
+        }
+        let tab_hwnd = unsafe { with_state(hwnd, |state| state.hwnd_tab) }.unwrap_or(HWND(0));
+        if tab_hwnd.0 != 0 {
+            unsafe {
+                NotifyWinEvent(
+                    EVENT_OBJECT_FOCUS,
+                    tab_hwnd,
+                    OBJID_CLIENT.0,
+                    CHILDID_SELF as i32,
+                );
+            }
+        }
+        return;
+    }
+
+    if let Some(hwnd_edit) = unsafe { get_active_edit(hwnd) } {
+        unsafe {
+            NotifyWinEvent(
+                EVENT_OBJECT_FOCUS,
+                hwnd_edit,
+                OBJID_CLIENT.0,
+                CHILDID_SELF as i32,
+            );
         }
     }
 }
@@ -437,83 +475,6 @@ pub(crate) fn log_debug(message: &str) {
     {
         let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S");
         if writeln!(log, "[{timestamp}] {message}").is_err() {}
-    }
-}
-
-static PREV_UNHANDLED_EXCEPTION_FILTER: OnceLock<LPTOP_LEVEL_EXCEPTION_FILTER> = OnceLock::new();
-static VECTORED_EXCEPTION_HANDLE: OnceLock<isize> = OnceLock::new();
-
-unsafe extern "system" fn unhandled_exception_filter(info: *const EXCEPTION_POINTERS) -> i32 {
-    let thread_id = unsafe { GetCurrentThreadId() };
-    if info.is_null() {
-        log_debug(&format!(
-            "Unhandled exception: null EXCEPTION_POINTERS thread_id={}",
-            thread_id
-        ));
-        return 0;
-    }
-    let record = unsafe { (*info).ExceptionRecord };
-    if record.is_null() {
-        log_debug(&format!(
-            "Unhandled exception: null EXCEPTION_RECORD thread_id={}",
-            thread_id
-        ));
-        return 0;
-    }
-    let code = unsafe { (*record).ExceptionCode.0 as u32 };
-    let addr = unsafe { (*record).ExceptionAddress };
-    log_debug(&format!(
-        "Unhandled exception: code=0x{code:08X} addr={addr:p} thread_id={thread_id}"
-    ));
-    if let Some(prev) = PREV_UNHANDLED_EXCEPTION_FILTER.get().copied().flatten() {
-        let _ = unsafe { prev(info) };
-    }
-    0
-}
-
-unsafe extern "system" fn vectored_exception_handler(info: *mut EXCEPTION_POINTERS) -> i32 {
-    if info.is_null() {
-        return EXCEPTION_CONTINUE_SEARCH;
-    }
-    let record = unsafe { (*info).ExceptionRecord };
-    if record.is_null() {
-        return EXCEPTION_CONTINUE_SEARCH;
-    }
-    let code = unsafe { (*record).ExceptionCode.0 as u32 };
-    if code != 0xC000041D {
-        return EXCEPTION_CONTINUE_SEARCH;
-    }
-    let addr = unsafe { (*record).ExceptionAddress };
-    let thread_id = unsafe { GetCurrentThreadId() };
-    log_debug(&format!(
-        "Vectored exception: code=0x{code:08X} addr={addr:p} thread_id={thread_id}"
-    ));
-    EXCEPTION_CONTINUE_SEARCH
-}
-
-fn install_unhandled_exception_logger() {
-    unsafe {
-        let prev = SetUnhandledExceptionFilter(Some(unhandled_exception_filter));
-        if PREV_UNHANDLED_EXCEPTION_FILTER.set(prev).is_err() {
-            log_debug("Unhandled exception logger already installed.");
-        } else {
-            log_debug("Unhandled exception logger installed.");
-        }
-    }
-}
-
-fn install_vectored_exception_logger() {
-    unsafe {
-        let handle = AddVectoredExceptionHandler(1, Some(vectored_exception_handler));
-        if handle.is_null() {
-            log_debug("Vectored exception logger install failed.");
-            return;
-        }
-        if VECTORED_EXCEPTION_HANDLE.set(handle as isize).is_err() {
-            log_debug("Vectored exception logger already installed.");
-        } else {
-            log_debug("Vectored exception logger installed.");
-        }
     }
 }
 
@@ -1608,8 +1569,6 @@ fn main() -> windows::core::Result<()> {
         log_debug(&format!("Warning: Failed to extract embedded deps: {}", e));
     }
     log_debug("Application started.");
-    install_unhandled_exception_logger();
-    install_vectored_exception_logger();
 
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|arg| arg == "--self-update") {
@@ -2762,34 +2721,8 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 ShowWindow(hwnd, SW_SHOWMAXIMIZED);
                 bring_window_to_foreground(hwnd);
 
-                let is_audiobook = with_state(hwnd, |state| {
-                    state
-                        .docs
-                        .get(state.current)
-                        .map(|doc| matches!(doc.format, FileFormat::Audiobook))
-                        .unwrap_or(false)
-                })
-                .unwrap_or(false);
-
-                if !is_audiobook {
-                    if let Some(hwnd_edit) = get_active_edit(hwnd) {
-                        NotifyWinEvent(
-                            EVENT_OBJECT_FOCUS,
-                            hwnd_edit,
-                            OBJID_CLIENT.0,
-                            CHILDID_SELF as i32,
-                        );
-                    }
-                } else {
-                    let tab_hwnd = with_state(hwnd, |state| state.hwnd_tab).unwrap_or(HWND(0));
-                    if tab_hwnd.0 != 0 {
-                        NotifyWinEvent(
-                            EVENT_OBJECT_FOCUS,
-                            tab_hwnd,
-                            OBJID_CLIENT.0,
-                            CHILDID_SELF as i32,
-                        );
-                    }
+                unsafe {
+                    notify_active_editor_focus(hwnd, true);
                 }
                 crate::log_if_err!(PostMessageW(hwnd, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)));
             } else {

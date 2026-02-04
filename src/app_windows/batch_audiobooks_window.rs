@@ -1251,20 +1251,6 @@ fn handle_batch_messages(hwnd: HWND) {
     if messages.is_empty() {
         return;
     }
-    let mut types = String::new();
-    for msg in &messages {
-        types.push(match msg {
-            BatchMessage::Log(_) => 'L',
-            BatchMessage::Status(_) => 'S',
-            BatchMessage::Progress(_) => 'P',
-            BatchMessage::Done(_) => 'D',
-        });
-    }
-    log_debug(&format!(
-        "Batch WM_BATCH_EVENT: {} messages",
-        messages.len()
-    ));
-    log_debug(&format!("Batch WM_BATCH_EVENT types: {types}"));
     for msg in &messages {
         if let BatchMessage::Done(update) = msg {
             done_report = update.report_path.clone();
@@ -1273,7 +1259,6 @@ fn handle_batch_messages(hwnd: HWND) {
     }
     if with_batch_state(hwnd, |state| {
         if done_report.is_some() {
-            log_debug("Batch WM_BATCH_EVENT: done-only handling.");
             done_dialog = Some(finish_batch(state, done_report.as_ref()));
             return;
         }
@@ -1287,7 +1272,6 @@ fn handle_batch_messages(hwnd: HWND) {
                     update_progress(state, update.completed, update.total);
                 }
                 BatchMessage::Done(update) => {
-                    log_debug("Batch WM_BATCH_EVENT: done received.");
                     done_dialog = Some(finish_batch(state, update.report_path.as_ref()));
                 }
             }
@@ -1580,7 +1564,7 @@ fn run_batch(
     // `speak_sapi_to_file` call creates and destroys its own COM apartment,
     // which can invalidate Media Foundation state that is initialized only
     // once (via `Once`), leading to crashes after several items.
-    let com_guard = match crate::com_guard::ComGuard::new_sta() {
+    let _com_guard = match crate::com_guard::ComGuard::new_sta() {
         Ok(g) => Some(g),
         Err(e) => {
             log_debug(&format!("Batch: COM init failed: {e}"));
@@ -1788,19 +1772,6 @@ fn run_batch(
             .unwrap_or_else(|| "(none)".to_string())
     ));
     post_done(&message_queue, hwnd, report_path);
-
-    // Workaround: avoid dropping COM/SAPI objects at thread end to prevent
-    // intermittent 0xc000041d crashes during COM teardown.
-    if matches!(tts_settings.tts_engine, TtsEngine::Sapi5) {
-        if let Some(voice) = sapi_voice {
-            log_debug("Batch: leaking SAPI5 voice to avoid COM teardown crash.");
-            std::mem::forget(voice);
-        }
-        if let Some(guard) = com_guard {
-            log_debug("Batch: leaking COM guard to avoid COM teardown crash.");
-            std::mem::forget(guard);
-        }
-    }
 }
 
 fn export_single_audiobook(

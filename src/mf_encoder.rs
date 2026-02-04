@@ -23,15 +23,18 @@ impl MfGuard {
     pub fn start() -> Result<Self, String> {
         let mut res = Ok(());
         MF_STARTUP.call_once(|| {
-                unsafe {
-                    if let Err(e) = MFStartup(MF_VERSION, 0) {
-                        res = Err(format!(
-                            "Media Foundation not available. Install Media Feature Pack on Windows N/KN. ({})",
-                            e
-                        ));
-                    }
+            crate::log_debug("MF: startup begin");
+            unsafe {
+                if let Err(e) = MFStartup(MF_VERSION, 0) {
+                    res = Err(format!(
+                        "Media Foundation not available. Install Media Feature Pack on Windows N/KN. ({})",
+                        e
+                    ));
+                } else {
+                    crate::log_debug("MF: startup ok");
                 }
-            });
+            }
+        });
         res.map(|_| MfGuard)
     }
 }
@@ -129,8 +132,8 @@ impl Mp3StreamWriter {
             if let Err(e) = pcm_type.SetUINT32(&MF_MT_FIXED_SIZE_SAMPLES, 1) {
                 crate::log_debug(&format!("Failed to set fixed size samples: {}", e));
             }
-            if let Err(_e) = pcm_type.SetUINT32(&MF_MT_SAMPLE_SIZE, block_align) {
-                crate::log_debug(&format!("Error: {:?}", _e));
+            if let Err(e) = pcm_type.SetUINT32(&MF_MT_SAMPLE_SIZE, block_align) {
+                crate::log_debug(&format!("MF: set sample size failed: {}", e));
             }
 
             let out_type: IMFMediaType = MFCreateMediaType()
@@ -349,12 +352,18 @@ where
         } else {
             output_path.to_path_buf()
         };
+        crate::log_debug(&format!(
+            "MF: actual output path = {:?}",
+            actual_output_path
+        ));
 
         let wav_wide = to_wide(wav_path.to_str().ok_or("Invalid wav path")?);
         let output_wide = to_wide(actual_output_path.to_str().ok_or("Invalid output path")?);
 
+        crate::log_debug("MF: creating source reader");
         let reader: IMFSourceReader = MFCreateSourceReaderFromURL(PCWSTR(wav_wide.as_ptr()), None)
             .map_err(|e| format!("MFCreateSourceReaderFromURL failed: {}", e))?;
+        crate::log_debug("MF: source reader created");
 
         let pcm_type: IMFMediaType =
             MFCreateMediaType().map_err(|e| format!("MFCreateMediaType (pcm) failed: {}", e))?;
@@ -372,18 +381,17 @@ where
         if let Err(e) = pcm_type.SetUINT32(&MF_MT_AUDIO_SAMPLES_PER_SECOND, requested_rate) {
             crate::log_debug(&format!("Failed to set audio samples per second: {}", e));
         }
-        if let Err(_e) = pcm_type.SetUINT32(&MF_MT_AUDIO_NUM_CHANNELS, requested_channels) {
-            crate::log_debug(&format!("Error: {:?}", _e));
+        if let Err(e) = pcm_type.SetUINT32(&MF_MT_AUDIO_NUM_CHANNELS, requested_channels) {
+            crate::log_debug(&format!("MF: set channels failed: {}", e));
         }
-        if let Err(_e) = pcm_type.SetUINT32(&MF_MT_AUDIO_BITS_PER_SAMPLE, requested_bits) {
-            crate::log_debug(&format!("Error: {:?}", _e));
+        if let Err(e) = pcm_type.SetUINT32(&MF_MT_AUDIO_BITS_PER_SAMPLE, requested_bits) {
+            crate::log_debug(&format!("MF: set bits failed: {}", e));
         }
-        if let Err(_e) = pcm_type.SetUINT32(&MF_MT_AUDIO_BLOCK_ALIGNMENT, requested_block_align) {
-            crate::log_debug(&format!("Error: {:?}", _e));
+        if let Err(e) = pcm_type.SetUINT32(&MF_MT_AUDIO_BLOCK_ALIGNMENT, requested_block_align) {
+            crate::log_debug(&format!("MF: set block alignment failed: {}", e));
         }
-        if let Err(_e) = pcm_type.SetUINT32(&MF_MT_AUDIO_AVG_BYTES_PER_SECOND, requested_avg_bytes)
-        {
-            crate::log_debug(&format!("Error: {:?}", _e));
+        if let Err(e) = pcm_type.SetUINT32(&MF_MT_AUDIO_AVG_BYTES_PER_SECOND, requested_avg_bytes) {
+            crate::log_debug(&format!("MF: set avg bytes failed: {}", e));
         }
         reader
             .SetCurrentMediaType(
@@ -392,18 +400,25 @@ where
                 &pcm_type,
             )
             .map_err(|e| format!("SetCurrentMediaType failed: {}", e))?;
+        crate::log_debug("MF: SetCurrentMediaType ok");
 
         let in_type = reader
             .GetCurrentMediaType(MF_SOURCE_READER_FIRST_AUDIO_STREAM.0 as u32)
             .map_err(|e| format!("GetCurrentMediaType failed: {}", e))?;
+        crate::log_debug("MF: GetCurrentMediaType ok");
 
         let mut data_size = 0u64;
-        if let Ok((data_offset, size, peak)) = read_wav_data_info(wav_path) {
-            data_size = size as u64;
-            crate::log_debug(&format!(
-                "MF: wav data offset={} size={} peak={}",
-                data_offset, size, peak
-            ));
+        match read_wav_data_info(wav_path) {
+            Ok((data_offset, size, peak)) => {
+                data_size = size as u64;
+                crate::log_debug(&format!(
+                    "MF: wav data offset={} size={} peak={}",
+                    data_offset, size, peak
+                ));
+            }
+            Err(e) => {
+                crate::log_debug(&format!("MF: read wav data info failed: {}", e));
+            }
         }
         let mut sample_rate = 0u32;
         let mut channels = 0u32;
@@ -427,8 +442,13 @@ where
         }
 
         let mut duration_hns = 0u64;
-        if let Ok(secs) = get_audio_duration_mf(wav_path) {
-            duration_hns = secs * 10_000_000;
+        match get_audio_duration_mf(wav_path) {
+            Ok(secs) => {
+                duration_hns = secs * 10_000_000;
+            }
+            Err(e) => {
+                crate::log_debug(&format!("MF: duration query failed: {}", e));
+            }
         }
 
         crate::log_debug(&format!(
@@ -444,13 +464,13 @@ where
         }
 
         let input_type = in_type;
-        if let Err(_e) = input_type.SetUINT32(&MF_MT_FIXED_SIZE_SAMPLES, 1) {
-            crate::log_debug(&format!("Error: {:?}", _e));
+        if let Err(e) = input_type.SetUINT32(&MF_MT_FIXED_SIZE_SAMPLES, 1) {
+            crate::log_debug(&format!("MF: set fixed size samples failed: {}", e));
         }
         if block_align != 0
-            && let Err(_e) = input_type.SetUINT32(&MF_MT_SAMPLE_SIZE, block_align)
+            && let Err(e) = input_type.SetUINT32(&MF_MT_SAMPLE_SIZE, block_align)
         {
-            crate::log_debug(&format!("Error: {:?}", _e));
+            crate::log_debug(&format!("MF: set sample size failed: {}", e));
         }
 
         let out_type: IMFMediaType =
@@ -480,9 +500,11 @@ where
             .SetUINT32(&MF_MT_AUDIO_AVG_BYTES_PER_SECOND, output_avg_bytes)
             .map_err(|e| format!("Set output bitrate failed: {}", e))?;
 
+        crate::log_debug("MF: creating sink writer");
         let writer: IMFSinkWriter =
             MFCreateSinkWriterFromURL(PCWSTR(output_wide.as_ptr()), None, None)
                 .map_err(|e| format!("MFCreateSinkWriterFromURL failed: {}", e))?;
+        crate::log_debug("MF: sink writer created");
         let stream_index = writer
             .AddStream(&out_type)
             .map_err(|e| format!("SinkWriter AddStream failed: {}", e))?;
@@ -490,9 +512,11 @@ where
             crate::log_debug(&format!("MF: SetInputMediaType failed: {}", e));
             return Err(format!("SinkWriter SetInputMediaType failed: {}", e));
         }
+        crate::log_debug("MF: SetInputMediaType ok");
         writer
             .BeginWriting()
             .map_err(|e| format!("SinkWriter BeginWriting failed: {}", e))?;
+        crate::log_debug("MF: BeginWriting ok");
 
         let mut sample_count: u64 = 0;
         let mut total_bytes: u64 = 0;
@@ -501,12 +525,17 @@ where
             if let Some(cancel) = cancel
                 && cancel.load(std::sync::atomic::Ordering::Relaxed)
             {
+                crate::log_debug("MF: cancel requested during encode.");
                 return Err("Saving canceled.".to_string());
             }
             let mut read_stream = 0u32;
             let mut flags = 0u32;
             let mut _timestamp = 0i64;
             let mut sample = None;
+            crate::log_debug(&format!(
+                "MF: ReadSample begin. sample_count={}",
+                sample_count
+            ));
             reader
                 .ReadSample(
                     MF_SOURCE_READER_FIRST_AUDIO_STREAM.0 as u32,
@@ -517,8 +546,19 @@ where
                     Some(&mut sample),
                 )
                 .map_err(|e| format!("ReadSample failed: {}", e))?;
+            crate::log_debug(&format!(
+                "MF: ReadSample ok. stream={} flags=0x{:X} ts={} has_sample={}",
+                read_stream,
+                flags,
+                _timestamp,
+                sample.is_some()
+            ));
 
             if flags & (MF_SOURCE_READERF_ENDOFSTREAM.0 as u32) != 0 {
+                crate::log_debug(&format!(
+                    "MF: end of stream. samples={} total_bytes={}",
+                    sample_count, total_bytes
+                ));
                 break;
             }
             if let Some(sample) = sample {
@@ -526,10 +566,24 @@ where
                 if let Ok(len) = sample.GetTotalLength() {
                     total_bytes = total_bytes.saturating_add(len as u64);
                 }
+                crate::log_debug(&format!(
+                    "MF: WriteSample begin. sample_count={}",
+                    sample_count
+                ));
                 writer
                     .WriteSample(stream_index, &sample)
                     .map_err(|e| format!("WriteSample failed: {}", e))?;
+                crate::log_debug(&format!(
+                    "MF: WriteSample ok. sample_count={}",
+                    sample_count
+                ));
 
+                if sample_count.is_multiple_of(200) {
+                    crate::log_debug(&format!(
+                        "MF: progress sample_count={} total_bytes={}",
+                        sample_count, total_bytes
+                    ));
+                }
                 if duration_hns > 0 {
                     if let Ok(time) = sample.GetSampleTime() {
                         let pct = ((time as u64 * 10000) / duration_hns).min(10000) as u32;
@@ -545,23 +599,40 @@ where
                         progress(pct);
                     }
                 }
+            } else {
+                crate::log_debug(&format!(
+                    "MF: ReadSample returned no sample. flags=0x{:X}",
+                    flags
+                ));
             }
         }
 
         if let Some(cancel) = cancel
             && cancel.load(std::sync::atomic::Ordering::Relaxed)
         {
+            crate::log_debug("MF: cancel requested before finalize.");
             return Err("Saving canceled.".to_string());
         }
         if last_pct < 10000 {
             progress(10000);
         }
+        crate::log_debug("MF: Finalize begin");
         writer
             .Finalize()
             .map_err(|e| format!("SinkWriter Finalize failed: {}", e))?;
+        crate::log_debug("MF: Finalize ok");
+
+        // Explicitly drop MF COM objects before any further file operations
+        // to ensure all handles are released promptly.
+        drop(writer);
+        drop(reader);
 
         if actual_output_path != output_path {
-            std::fs::remove_file(output_path).ok(); // Just in case
+            if let Err(e) = std::fs::remove_file(output_path)
+                && e.kind() != std::io::ErrorKind::NotFound
+            {
+                crate::log_debug(&format!("MF: failed to remove stale output file: {}", e));
+            }
             std::fs::rename(&actual_output_path, output_path).map_err(|e| e.to_string())?;
         }
 

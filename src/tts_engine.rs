@@ -3988,8 +3988,8 @@ fn merge_and_finalize_sapi4_mp3(
 #[cfg(test)]
 mod tests {
     use super::{
-        TtsEngine, build_audiobook_parts_by_positions, collect_marker_entries,
-        parse_sapi4_part_index,
+        TtsEngine, build_audiobook_parts_by_positions, collect_marker_entries, normalize_for_tts,
+        parse_sapi4_part_index, split_into_tts_chunks, strip_dashed_lines,
     };
 
     #[test]
@@ -4113,6 +4113,136 @@ mod tests {
         assert_eq!(
             names,
             vec!["sub_1.wav", "sub_2.wav", "sub_3.wav", "sub_10.wav"]
+        );
+    }
+
+    #[test]
+    fn audiobook_liturgia_no_skipped_or_reordered_lines() {
+        let path = r"C:\Users\ambro\Downloads\05-02-2026.txt";
+        let raw = match std::fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("Skipping test – cannot read {path}: {e}");
+                return;
+            }
+        };
+
+        let cleaned = strip_dashed_lines(&raw);
+        let chunks = split_into_tts_chunks(&cleaned, true, &[], TtsEngine::Edge);
+
+        assert!(
+            !chunks.is_empty(),
+            "split_into_tts_chunks produced 0 chunks"
+        );
+
+        // Reassemble all chunk text into a single string for searching
+        let reassembled: String = chunks
+            .iter()
+            .map(|c| c.text_to_read.as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        // Normalize the cleaned text the same way: split_on_newline=true, no dictionary
+        let normalized_input = normalize_for_tts(&cleaned, true);
+
+        // Collect non-empty input lines with their 1-based line numbers
+        let input_lines: Vec<(usize, &str)> = normalized_input
+            .lines()
+            .enumerate()
+            .filter_map(|(i, line)| {
+                let trimmed = line.trim();
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    Some((i + 1, trimmed))
+                }
+            })
+            .collect();
+
+        assert!(!input_lines.is_empty(), "Input file has no non-empty lines");
+
+        // For each input line, extract significant words (3+ chars) and check they
+        // appear in the reassembled chunks. Pure punctuation or very short tokens
+        // may be merged or transformed by XML escaping, so we check word presence.
+        let mut missing_lines: Vec<(usize, String)> = Vec::new();
+
+        for &(line_num, line_text) in &input_lines {
+            // Extract words of 3+ alphabetic chars from this line
+            let words: Vec<&str> = line_text
+                .split(|c: char| !c.is_alphanumeric())
+                .filter(|w| w.len() >= 3)
+                .collect();
+
+            if words.is_empty() {
+                // Line is only short tokens / punctuation – skip
+                continue;
+            }
+
+            // Check that at least half the significant words appear in the reassembled text
+            let found_count = words.iter().filter(|w| reassembled.contains(**w)).count();
+
+            if found_count < (words.len() + 1) / 2 {
+                missing_lines.push((line_num, line_text.to_string()));
+            }
+        }
+
+        if !missing_lines.is_empty() {
+            let report: String = missing_lines
+                .iter()
+                .take(50)
+                .map(|(num, text)| format!("  line {num}: {text}"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            panic!(
+                "{} lines appear to be skipped by the TTS chunking pipeline:\n{report}",
+                missing_lines.len()
+            );
+        }
+
+        // Verify ordering: for each pair of consecutive input lines, check that
+        // the first significant word of line N appears before the first significant
+        // word of line N+1 in the reassembled text.
+        let mut out_of_order: Vec<(usize, usize)> = Vec::new();
+        let mut last_pos: usize = 0;
+
+        for &(line_num, line_text) in &input_lines {
+            let first_word = line_text
+                .split(|c: char| !c.is_alphanumeric())
+                .find(|w| w.len() >= 3);
+
+            let Some(word) = first_word else {
+                continue;
+            };
+
+            if let Some(pos) = reassembled[last_pos..].find(word) {
+                last_pos += pos + word.len();
+            } else if let Some(pos) = reassembled.find(word) {
+                // Word found but before last_pos → out of order
+                if pos < last_pos {
+                    out_of_order.push((line_num, pos));
+                }
+            }
+        }
+
+        if !out_of_order.is_empty() {
+            let report: String = out_of_order
+                .iter()
+                .take(50)
+                .map(|(num, pos)| {
+                    format!("  line {num} found at chunk position {pos} (before previous line)")
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            panic!(
+                "{} lines appear to be recorded out of order:\n{report}",
+                out_of_order.len()
+            );
+        }
+
+        eprintln!(
+            "OK: {} non-empty lines processed into {} TTS chunks, all in order, none skipped.",
+            input_lines.len(),
+            chunks.len()
         );
     }
 }

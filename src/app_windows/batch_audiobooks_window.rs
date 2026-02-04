@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -22,16 +23,17 @@ use windows::Win32::UI::Controls::{
 use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, SetFocus, VK_ESCAPE};
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, CBS_DROPDOWNLIST,
-    CREATESTRUCTW, CreateWindowExW, DefWindowProcW, DestroyWindow, GetWindowLongPtrW,
-    GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, IsWindow, KillTimer, LoadCursorW, MSG,
-    PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW,
-    SetWindowTextW, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
-    WM_NCDESTROY, WM_SETFONT, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
-    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    CREATESTRUCTW, CreateWindowExW, DefWindowProcW, DestroyWindow, ES_AUTOVSCROLL, ES_MULTILINE,
+    GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, IsWindow, KillTimer,
+    LoadCursorW, MSG, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetTimer,
+    SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE,
+    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD,
+    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
-use crate::accessibility::{EM_REPLACESEL, ES_READONLY, to_wide};
+use crate::accessibility::{EM_REPLACESEL, ES_READONLY, to_wide, to_wide_normalized};
 use crate::app_windows::find_in_files_window::browse_for_folder;
 use crate::file_handler::{
     decode_text, is_audio_path, is_doc_path, is_docx_path, is_epub_path, is_html_path, is_pdf_path,
@@ -68,6 +70,7 @@ const BATCH_ID_PROGRESS: usize = 9415;
 
 const WM_BATCH_EVENT: u32 = WM_APP + 120;
 const BATCH_TIMER_ID: usize = 1;
+const EM_LIMITTEXT: u32 = 0x00C5;
 
 const EM_SETSEL: u32 = 0x00B1;
 
@@ -648,7 +651,11 @@ unsafe extern "system" fn batch_wndproc(
                 WS_EX_CLIENTEDGE,
                 WC_EDIT,
                 PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL | WINDOW_STYLE(ES_READONLY),
+                WS_CHILD
+                    | WS_VISIBLE
+                    | WS_TABSTOP
+                    | WS_VSCROLL
+                    | WINDOW_STYLE(ES_READONLY | (ES_MULTILINE as u32) | (ES_AUTOVSCROLL as u32)),
                 16,
                 484,
                 720,
@@ -658,6 +665,7 @@ unsafe extern "system" fn batch_wndproc(
                 HINSTANCE(0),
                 None,
             );
+            SendMessageW(log_edit, EM_LIMITTEXT, WPARAM(0x7FFF_FFFEusize), LPARAM(0));
 
             for control in [
                 list,
@@ -1011,6 +1019,13 @@ fn push_queue_item(state: &mut BatchState, path: PathBuf) {
     if path.as_os_str().is_empty() {
         return;
     }
+    if !is_supported_batch_input_path(&path) {
+        crate::log_debug(&format!(
+            "Batch: skipping unsupported or temp input: {}",
+            path.display()
+        ));
+        return;
+    }
     if state.items.iter().any(|item| item.input == path) {
         return;
     }
@@ -1283,6 +1298,10 @@ fn handle_batch_messages(hwnd: HWND) {
         crate::log_debug("Failed to access batch state");
     }
     if let Some((parent, language, list)) = done_dialog {
+        if unsafe { !IsWindow(parent).as_bool() } {
+            log_debug("Batch finished: parent window invalid, skipping dialog.");
+            return;
+        }
         log_debug("Batch finished. Showing completion dialog.");
         unsafe {
             crate::show_info(
@@ -1306,7 +1325,7 @@ fn update_progress(state: &mut BatchState, completed: usize, total: usize) {
     } else {
         ((completed as f32 / total as f32) * 100.0).round() as u32
     };
-    if unsafe { IsWindow(state.progress_bar).as_bool() } {
+    if is_window_valid(state.progress_bar, "progress_bar") {
         unsafe {
             SendMessageW(
                 state.progress_bar,
@@ -1324,7 +1343,7 @@ fn update_progress(state: &mut BatchState, completed: usize, total: usize) {
             ("total", &total.to_string()),
         ],
     );
-    if unsafe { IsWindow(state.progress_label).as_bool() } {
+    if is_window_valid(state.progress_label, "progress_label") {
         let wide = to_wide(&label);
         unsafe {
             if let Err(e) = SetWindowTextW(state.progress_label, PCWSTR(wide.as_ptr())) {
@@ -1335,14 +1354,14 @@ fn update_progress(state: &mut BatchState, completed: usize, total: usize) {
 }
 
 fn append_log(state: &mut BatchState, line: &str) {
-    if unsafe { !IsWindow(state.log_edit).as_bool() } {
+    if !is_window_valid(state.log_edit, "log_edit") {
         return;
     }
     let mut text = line.to_string();
     if !text.ends_with('\n') {
         text.push('\n');
     }
-    let wide = to_wide(&text);
+    let wide = to_wide_normalized(&text);
     unsafe {
         let len = GetWindowTextLengthW(state.log_edit);
         let len = if len < 0 { 0 } else { len };
@@ -1359,6 +1378,14 @@ fn append_log(state: &mut BatchState, line: &str) {
             LPARAM(wide.as_ptr() as isize),
         );
     }
+}
+
+fn is_window_valid(hwnd: HWND, label: &str) -> bool {
+    let ok = unsafe { IsWindow(hwnd).as_bool() };
+    if !ok {
+        log_debug(&format!("Batch: {label} window invalid. hwnd={}", hwnd.0));
+    }
+    ok
 }
 
 fn open_files_dialog(hwnd: HWND, language: Language) -> Option<Vec<PathBuf>> {
@@ -1414,7 +1441,14 @@ fn collect_folder_files(folder: &Path) -> Vec<PathBuf> {
     while let Some(dir) = stack.pop() {
         let entries = match std::fs::read_dir(&dir) {
             Ok(entries) => entries,
-            Err(_) => continue,
+            Err(e) => {
+                crate::log_debug(&format!(
+                    "Batch: failed to read dir {}: {}",
+                    dir.display(),
+                    e
+                ));
+                continue;
+            }
         };
         for entry in entries.flatten() {
             let path = entry.path();
@@ -1422,13 +1456,48 @@ fn collect_folder_files(folder: &Path) -> Vec<PathBuf> {
                 stack.push(path);
                 continue;
             }
-            if is_audio_path(&path) {
-                continue;
+            if is_supported_batch_input_path(&path) {
+                files.push(path);
             }
-            files.push(path);
         }
     }
     files
+}
+
+fn is_supported_batch_input_path(path: &Path) -> bool {
+    if is_temp_batch_path(path) {
+        return false;
+    }
+    if is_audio_path(path) {
+        return false;
+    }
+    if is_pdf_path(path)
+        || is_docx_path(path)
+        || is_doc_path(path)
+        || is_pptx_path(path)
+        || is_ppt_path(path)
+        || is_epub_path(path)
+        || is_html_path(path)
+        || is_spreadsheet_path(path)
+    {
+        return true;
+    }
+    matches!(
+        path.extension()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_ascii_lowercase())
+            .as_deref(),
+        None | Some("txt" | "md" | "rtf" | "csv" | "log")
+    )
+}
+
+fn is_temp_batch_path(path: &Path) -> bool {
+    let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+    let lower = name.to_ascii_lowercase();
+    if lower.ends_with(".tmp") || lower.ends_with(".part") {
+        return true;
+    }
+    false
 }
 
 fn is_checked(hwnd: HWND) -> bool {
@@ -1506,6 +1575,32 @@ fn run_batch(
     cancel: Arc<AtomicBool>,
     message_queue: Arc<Mutex<VecDeque<BatchMessage>>>,
 ) {
+    // Initialize COM once for the entire batch thread so that SAPI and Media
+    // Foundation objects stay valid across all items.  Without this, each
+    // `speak_sapi_to_file` call creates and destroys its own COM apartment,
+    // which can invalidate Media Foundation state that is initialized only
+    // once (via `Once`), leading to crashes after several items.
+    let com_guard = match crate::com_guard::ComGuard::new_sta() {
+        Ok(g) => Some(g),
+        Err(e) => {
+            log_debug(&format!("Batch: COM init failed: {e}"));
+            None
+        }
+    };
+
+    let mut sapi_voice: Option<crate::sapi5_engine::SapiVoice> = None;
+    if matches!(tts_settings.tts_engine, TtsEngine::Sapi5) {
+        match crate::sapi5_engine::SapiVoice::new() {
+            Ok(voice) => {
+                log_debug("Batch: SAPI5 voice initialized for reuse.");
+                sapi_voice = Some(voice);
+            }
+            Err(e) => {
+                log_debug(&format!("Batch: SAPI5 voice init failed: {e}"));
+            }
+        }
+    }
+
     let total = items.len();
     let mut completed = 0usize;
     let mut results: Vec<BatchResultItem> = Vec::new();
@@ -1553,7 +1648,13 @@ fn run_batch(
                 attempts,
                 input.display()
             ));
-            match export_single_audiobook(&input, &batch_settings, &tts_settings, cancel.clone()) {
+            match export_single_audiobook(
+                &input,
+                &batch_settings,
+                &tts_settings,
+                cancel.clone(),
+                sapi_voice.as_ref(),
+            ) {
                 Ok(outputs) => {
                     completed += 1;
                     log_debug(&format!(
@@ -1672,7 +1773,13 @@ fn run_batch(
         ));
     }
     log_debug("Batch worker finished items. Writing report.");
-    let report_path = write_report(&batch_settings, &tts_settings, &results).ok();
+    let report_path = match write_report(&batch_settings, &tts_settings, &results) {
+        Ok(path) => Some(path),
+        Err(e) => {
+            log_debug(&format!("Batch report failed: {}", e));
+            None
+        }
+    };
     log_debug(&format!(
         "Batch report done. path={}",
         report_path
@@ -1681,6 +1788,19 @@ fn run_batch(
             .unwrap_or_else(|| "(none)".to_string())
     ));
     post_done(&message_queue, hwnd, report_path);
+
+    // Workaround: avoid dropping COM/SAPI objects at thread end to prevent
+    // intermittent 0xc000041d crashes during COM teardown.
+    if matches!(tts_settings.tts_engine, TtsEngine::Sapi5) {
+        if let Some(voice) = sapi_voice {
+            log_debug("Batch: leaking SAPI5 voice to avoid COM teardown crash.");
+            std::mem::forget(voice);
+        }
+        if let Some(guard) = com_guard {
+            log_debug("Batch: leaking COM guard to avoid COM teardown crash.");
+            std::mem::forget(guard);
+        }
+    }
 }
 
 fn export_single_audiobook(
@@ -1688,6 +1808,7 @@ fn export_single_audiobook(
     batch_settings: &BatchSettings,
     tts: &TtsSettings,
     cancel: Arc<AtomicBool>,
+    sapi_voice: Option<&crate::sapi5_engine::SapiVoice>,
 ) -> Result<Vec<PathBuf>, String> {
     let text = read_text_for_audiobook(input, tts.language)?;
     if text.trim().is_empty() {
@@ -1794,7 +1915,7 @@ fn export_single_audiobook(
             return Err(crate::settings::tts_no_text_message(tts.language));
         }
         let output_paths = build_output_paths(input, parts.len(), batch_settings, tts.language)?;
-        match export_parts(&parts, &output_paths, tts, cancel.clone()) {
+        match export_parts(&parts, &output_paths, tts, cancel.clone(), sapi_voice) {
             Ok(()) => {
                 if split_by_time {
                     let Some(output) = output_paths.first() else {
@@ -2029,6 +2150,7 @@ fn export_parts(
     outputs: &[PathBuf],
     tts: &TtsSettings,
     cancel: Arc<AtomicBool>,
+    sapi_voice: Option<&crate::sapi5_engine::SapiVoice>,
 ) -> Result<(), String> {
     if parts.len() != outputs.len() {
         return Err("Output count mismatch.".to_string());
@@ -2060,8 +2182,75 @@ fn export_parts(
                 // The original code had empty block for Sapi4.
             }
             TtsEngine::Sapi5 => {
-                crate::sapi5_engine::speak_sapi_to_file(
-                    crate::sapi5_engine::SapiExportOptions {
+                crate::log_debug(&format!(
+                    "Batch SAPI5 part start. part_idx={} chunks={} output={}",
+                    part_idx + 1,
+                    part_chunks.len(),
+                    output.display()
+                ));
+                let is_mp3 = output
+                    .extension()
+                    .is_some_and(|e| e.eq_ignore_ascii_case("mp3"));
+                if is_mp3 {
+                    let wav_path = output.with_extension("wav.tmp");
+                    let options = crate::sapi5_engine::SapiExportOptions {
+                        chunks: part_chunks,
+                        voice_name: &tts.voice,
+                        output_path: &wav_path,
+                        language: tts.language,
+                        rate: tts.tts_rate,
+                        pitch: tts.tts_pitch,
+                        volume: tts.tts_volume,
+                        cancel: cancel.clone(),
+                    };
+                    if let Some(voice) = sapi_voice {
+                        crate::sapi5_engine::speak_sapi_to_file_with_sapi_voice(
+                            voice,
+                            options,
+                            |_chunk_idx| {
+                                progress += 1;
+                            },
+                        )?;
+                    } else {
+                        crate::sapi5_engine::speak_sapi_to_file(options, |_chunk_idx| {
+                            progress += 1;
+                        })?;
+                    }
+
+                    crate::log_debug("Batch SAPI5: converting WAV to MP3 via FFmpeg.");
+                    let convert_res =
+                        convert_wav_to_mp3_ffmpeg_with_timeout(&wav_path, output, cancel.clone());
+                    match convert_res {
+                        Ok(()) => {
+                            if let Err(e) = std::fs::remove_file(&wav_path) {
+                                crate::log_debug(&format!(
+                                    "Batch SAPI5: failed to remove temp WAV: {}",
+                                    e
+                                ));
+                            }
+                        }
+                        Err(e) => {
+                            if e == "FFmpeg MP3 conversion timed out" {
+                                crate::log_debug("Batch SAPI5: MP3 conversion timed out.");
+                            } else {
+                                let dest_wav = output.with_extension("wav");
+                                if let Err(rename_err) = std::fs::rename(&wav_path, &dest_wav) {
+                                    crate::log_debug(&format!(
+                                        "Batch SAPI5: failed to preserve WAV: {}",
+                                        rename_err
+                                    ));
+                                } else {
+                                    crate::log_debug(&format!(
+                                        "Batch SAPI5: preserved WAV at {:?}",
+                                        dest_wav
+                                    ));
+                                }
+                            }
+                            return Err(format!("FFmpeg MP3 conversion failed: {}", e));
+                        }
+                    }
+                } else {
+                    let options = crate::sapi5_engine::SapiExportOptions {
                         chunks: part_chunks,
                         voice_name: &tts.voice,
                         output_path: output,
@@ -2070,15 +2259,71 @@ fn export_parts(
                         pitch: tts.tts_pitch,
                         volume: tts.tts_volume,
                         cancel: cancel.clone(),
-                    },
-                    |_chunk_idx| {
-                        progress += 1;
-                    },
-                )?;
+                    };
+                    if let Some(voice) = sapi_voice {
+                        crate::sapi5_engine::speak_sapi_to_file_with_sapi_voice(
+                            voice,
+                            options,
+                            |_chunk_idx| {
+                                progress += 1;
+                            },
+                        )?;
+                    } else {
+                        crate::sapi5_engine::speak_sapi_to_file(options, |_chunk_idx| {
+                            progress += 1;
+                        })?;
+                    }
+                }
+                crate::log_debug(&format!(
+                    "Batch SAPI5 part done. part_idx={} output={}",
+                    part_idx + 1,
+                    output.display()
+                ));
             }
         }
     }
     Ok(())
+}
+
+fn convert_wav_to_mp3_ffmpeg_with_timeout(
+    wav_path: &Path,
+    mp3_path: &Path,
+    cancel: Arc<AtomicBool>,
+) -> Result<(), String> {
+    let data_size = crate::audio_utils::get_wav_data_size(wav_path).unwrap_or(0) as u64;
+    let bytes_per_sec = 44_100u64 * 2u64;
+    let duration_secs = if bytes_per_sec == 0 {
+        0
+    } else {
+        (data_size / bytes_per_sec) as u64
+    };
+    let timeout_secs = (duration_secs.saturating_mul(10))
+        .saturating_add(10)
+        .max(30);
+    let timeout = Duration::from_secs(timeout_secs);
+    let (tx, rx) = mpsc::channel();
+    let wav_path = wav_path.to_path_buf();
+    let mp3_path = mp3_path.to_path_buf();
+    let cancel = cancel.clone();
+    std::thread::spawn(move || {
+        let settings = crate::ffmpeg_export::ConvertAudioSettings {
+            format: crate::ffmpeg_export::ConvertAudioFormat::Mp3,
+            quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(128),
+        };
+        let res = crate::ffmpeg_export::convert_audio_file(
+            &wav_path,
+            &mp3_path,
+            &settings,
+            Some(cancel),
+            None,
+        );
+        let _unused = tx.send(res);
+    });
+    match rx.recv_timeout(timeout) {
+        Ok(res) => res,
+        Err(mpsc::RecvTimeoutError::Timeout) => Err("FFmpeg MP3 conversion timed out".to_string()),
+        Err(_) => Err("FFmpeg MP3 conversion worker failed".to_string()),
+    }
 }
 
 fn export_parts_mixed(

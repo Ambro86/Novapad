@@ -17,6 +17,8 @@ Miglioramenti
 • Aggiunta un'opzione nel menu contestuale per creare un audiolibro dalla selezione.
 • Aggiunta la divisione degli audiolibri in base alla durata, con la possibilita di scegliere il nome del primo file.
 • Localizzata la voce che indica l'autore nella lettura degli articoli (es. "di", "by", "par").
+• Aggiunte opzioni di indentazione (tab/spazi con larghezza) e Tab/Shift+Tab per indentare/deindentare le righe selezionate.
+• Corretto il ripulisci Markdown: ora gestisce anche i bullet '*' quando non si mantengono le liste.
 • Aggiunta un'opzione per usare il nome legacy "Novapad" nel titolo della finestra e nei collegamenti del menu Avvio.
 Correzioni di bug
 • Corretto un bug per cui gli audiolibri con SAPI4 potevano essere creati in modo diverso da quanto previsto.

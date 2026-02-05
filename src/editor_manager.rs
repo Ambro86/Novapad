@@ -2,10 +2,10 @@ use crate::accessibility::{EM_GETSEL, EM_REPLACESEL, EM_SCROLLCARET, to_wide, to
 use crate::file_handler::decode_text_with_encoding;
 use crate::file_handler::*;
 use crate::settings::{
-    FileFormat, Language, ModifiedMarkerPosition, TextEncoding, TtsEngine, confirm_save_message,
-    confirm_title, untitled_title,
+    AppSettings, FileFormat, IndentationMode, Language, ModifiedMarkerPosition, TextEncoding,
+    TtsEngine, confirm_save_message, confirm_title, untitled_title,
 };
-use crate::{get_active_edit, log_debug, with_state};
+use crate::{EM_LINEFROMCHAR, EM_LINEINDEX, get_active_edit, log_debug, with_state};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM};
@@ -19,14 +19,16 @@ use windows::Win32::UI::Controls::{
     EM_GETMODIFY, EM_SETMODIFY, EM_SETREADONLY, TCIF_TEXT, TCITEMW, TCM_ADJUSTRECT,
     TCM_INSERTITEMW, TCM_SETCURSEL, TCM_SETITEMW,
 };
-use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    GetKeyState, SetFocus, VK_CONTROL, VK_MENU, VK_SHIFT, VK_TAB,
+};
 use windows::Win32::UI::WindowsAndMessaging::{
     CallWindowProcW, DefWindowProcW, DestroyWindow, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE,
     ES_WANTRETURN, GWLP_USERDATA, GWLP_WNDPROC, GetClientRect, GetParent, GetWindowLongPtrW, HMENU,
     IDNO, IDYES, MB_ICONWARNING, MB_YESNOCANCEL, MessageBoxW, MoveWindow, PostMessageW, SW_HIDE,
     SW_SHOW, SendMessageW, SetWindowLongPtrW, SetWindowTextW, ShowWindow, WM_CHAR, WM_CONTEXTMENU,
-    WM_GETTEXTLENGTH, WM_SETFONT, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_GROUP,
-    WS_HSCROLL, WS_VSCROLL,
+    WM_GETTEXTLENGTH, WM_KEYDOWN, WM_SETFONT, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE,
+    WS_GROUP, WS_HSCROLL, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR};
 
@@ -37,6 +39,7 @@ const EM_ENDUNDOACTION: u32 = 0x045A;
 const EM_STOPGROUPTYPING: u32 = 0x0477;
 const EM_SETTEXTEX: u32 = 0x0461;
 const EM_GETTEXTLENGTHEX: u32 = 0x045F;
+const EM_SETTABSTOPS: u32 = 0x00CB;
 const ST_KEEPUNDO: u32 = 0x0001;
 const ST_SELECTION: u32 = 0x0002;
 
@@ -128,8 +131,34 @@ unsafe fn edit_subclass_proc_inner(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    if msg == WM_KEYDOWN && wparam.0 as u32 == VK_TAB.0 as u32 {
+        let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
+        let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+        let alt_down = (GetKeyState(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
+        if !ctrl_down && !alt_down {
+            let parent = GetParent(hwnd);
+            let (mode, space_width, tab_width) = with_state(parent, |state| {
+                (
+                    state.settings.indentation_mode,
+                    state.settings.indent_space_width,
+                    state.settings.indent_tab_width,
+                )
+            })
+            .unwrap_or((IndentationMode::Default, 4, 4));
+            if handle_indent_tab_key(hwnd, mode, space_width, tab_width, shift_down) {
+                return LRESULT(0);
+            }
+        }
+    }
     if msg == WM_CHAR {
         let ch = wparam.0 as u32;
+        if ch == VK_TAB.0 as u32 {
+            let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
+            let alt_down = (GetKeyState(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
+            if !ctrl_down && !alt_down {
+                return LRESULT(0);
+            }
+        }
         if matches!(
             ch,
             9 | 13 | 32 | 44 | 46 | 58 | 59 | 33 | 63 | 41 | 93 | 125
@@ -185,6 +214,321 @@ unsafe fn edit_subclass_proc_inner(
         )
     } else {
         DefWindowProcW(hwnd, msg, wparam, lparam)
+    }
+}
+
+fn normalize_indent_width(width: u32) -> u32 {
+    match width {
+        2 | 4 | 6 | 8 => width,
+        _ => 4,
+    }
+}
+
+fn handle_indent_tab_key(
+    hwnd: HWND,
+    mode: IndentationMode,
+    space_width: u32,
+    tab_width: u32,
+    shift_down: bool,
+) -> bool {
+    let mut sel = CHARRANGE::default();
+    unsafe {
+        SendMessageW(
+            hwnd,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut sel as *mut _ as isize),
+        );
+    }
+    let mut start = sel.cpMin;
+    let mut end = sel.cpMax;
+    if end < start {
+        std::mem::swap(&mut start, &mut end);
+    }
+
+    if start == end {
+        if shift_down {
+            outdent_single_line(hwnd, start, mode, space_width, tab_width);
+            return true;
+        }
+        let text = match mode {
+            IndentationMode::Spaces => " ".repeat(normalize_indent_width(space_width) as usize),
+            IndentationMode::Tabs => "\t".repeat(normalize_indent_width(tab_width) as usize),
+            IndentationMode::Default => "\t".to_string(),
+        };
+        let wide = to_wide(&text);
+        unsafe {
+            SendMessageW(
+                hwnd,
+                EM_REPLACESEL,
+                WPARAM(1),
+                LPARAM(wide.as_ptr() as isize),
+            );
+        }
+        return true;
+    }
+
+    indent_selection(hwnd, start, end, mode, space_width, tab_width, shift_down);
+    true
+}
+
+fn outdent_single_line(
+    hwnd: HWND,
+    caret_pos: i32,
+    mode: IndentationMode,
+    space_width: u32,
+    tab_width: u32,
+) {
+    let line = unsafe { SendMessageW(hwnd, EM_LINEFROMCHAR, WPARAM(caret_pos as usize), LPARAM(0)) }
+        .0 as i32;
+    let line_start =
+        unsafe { SendMessageW(hwnd, EM_LINEINDEX, WPARAM(line as usize), LPARAM(0)) }.0 as i32;
+    if line_start < 0 {
+        return;
+    }
+    let indent_width = normalize_indent_width(space_width);
+    let tab_width = normalize_indent_width(tab_width);
+    let remove_len = detect_indent_removal(hwnd, line_start, mode, indent_width, tab_width);
+    if remove_len <= 0 {
+        return;
+    }
+    unsafe {
+        let mut range = CHARRANGE {
+            cpMin: line_start,
+            cpMax: line_start + remove_len,
+        };
+        SendMessageW(
+            hwnd,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut range as *mut _ as isize),
+        );
+        SendMessageW(hwnd, EM_REPLACESEL, WPARAM(1), LPARAM(0));
+        let new_pos = (caret_pos - remove_len).max(line_start);
+        let mut caret = CHARRANGE {
+            cpMin: new_pos,
+            cpMax: new_pos,
+        };
+        SendMessageW(
+            hwnd,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut caret as *mut _ as isize),
+        );
+    }
+}
+
+fn indent_selection(
+    hwnd: HWND,
+    start: i32,
+    end: i32,
+    mode: IndentationMode,
+    space_width: u32,
+    tab_width: u32,
+    shift_down: bool,
+) {
+    let start_line =
+        unsafe { SendMessageW(hwnd, EM_LINEFROMCHAR, WPARAM(start as usize), LPARAM(0)) }.0 as i32;
+    let mut end_line =
+        unsafe { SendMessageW(hwnd, EM_LINEFROMCHAR, WPARAM(end as usize), LPARAM(0)) }.0 as i32;
+    let end_line_start =
+        unsafe { SendMessageW(hwnd, EM_LINEINDEX, WPARAM(end_line as usize), LPARAM(0)) }.0 as i32;
+    if end > start && end == end_line_start {
+        end_line -= 1;
+    }
+    if end_line < start_line {
+        return;
+    }
+
+    let indent_width = normalize_indent_width(space_width);
+    let tab_width = normalize_indent_width(tab_width);
+    let indent_text = match mode {
+        IndentationMode::Spaces => " ".repeat(indent_width as usize),
+        IndentationMode::Tabs => "\t".repeat(tab_width as usize),
+        IndentationMode::Default => "\t".to_string(),
+    };
+    let indent_len = indent_text.chars().count() as i32;
+
+    let mut start_delta = 0i32;
+    let mut end_delta = 0i32;
+
+    unsafe {
+        SendMessageW(hwnd, EM_BEGINUNDOACTION, WPARAM(0), LPARAM(0));
+    }
+    for line in (start_line..=end_line).rev() {
+        let line_start =
+            unsafe { SendMessageW(hwnd, EM_LINEINDEX, WPARAM(line as usize), LPARAM(0)) }.0 as i32;
+        if line_start < 0 {
+            continue;
+        }
+        if shift_down {
+            let remove_len = detect_indent_removal(hwnd, line_start, mode, indent_width, tab_width);
+            if remove_len > 0 {
+                unsafe {
+                    let mut range = CHARRANGE {
+                        cpMin: line_start,
+                        cpMax: line_start + remove_len,
+                    };
+                    SendMessageW(
+                        hwnd,
+                        EM_EXSETSEL,
+                        WPARAM(0),
+                        LPARAM(&mut range as *mut _ as isize),
+                    );
+                    SendMessageW(hwnd, EM_REPLACESEL, WPARAM(1), LPARAM(0));
+                }
+                if line == start_line && line_start < start {
+                    start_delta -= remove_len;
+                }
+                if line_start < end {
+                    end_delta -= remove_len;
+                }
+            }
+        } else {
+            let wide = to_wide(&indent_text);
+            unsafe {
+                let mut range = CHARRANGE {
+                    cpMin: line_start,
+                    cpMax: line_start,
+                };
+                SendMessageW(
+                    hwnd,
+                    EM_EXSETSEL,
+                    WPARAM(0),
+                    LPARAM(&mut range as *mut _ as isize),
+                );
+                SendMessageW(
+                    hwnd,
+                    EM_REPLACESEL,
+                    WPARAM(1),
+                    LPARAM(wide.as_ptr() as isize),
+                );
+            }
+            if line == start_line && line_start < start {
+                start_delta += indent_len;
+            }
+            if line_start < end {
+                end_delta += indent_len;
+            }
+        }
+    }
+    unsafe {
+        SendMessageW(hwnd, EM_ENDUNDOACTION, WPARAM(0), LPARAM(0));
+    }
+
+    let new_start = start + start_delta;
+    let new_end = end + end_delta;
+    unsafe {
+        let mut range = CHARRANGE {
+            cpMin: new_start,
+            cpMax: new_end,
+        };
+        SendMessageW(
+            hwnd,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut range as *mut _ as isize),
+        );
+    }
+}
+
+fn detect_indent_removal(
+    hwnd: HWND,
+    line_start: i32,
+    mode: IndentationMode,
+    indent_width: u32,
+    tab_width: u32,
+) -> i32 {
+    let max_len = match mode {
+        IndentationMode::Tabs => tab_width.max(1),
+        IndentationMode::Spaces => indent_width.max(1),
+        IndentationMode::Default => 1,
+    } as i32;
+    let text = get_text_range_simple(hwnd, line_start, line_start + max_len);
+    if text.is_empty() {
+        return 0;
+    }
+
+    let tab_first = text.starts_with('\t');
+    let spaces = text.chars().take_while(|c| *c == ' ').count() as i32;
+    match mode {
+        IndentationMode::Spaces => {
+            if spaces > 0 {
+                spaces.min(indent_width as i32)
+            } else {
+                0
+            }
+        }
+        IndentationMode::Tabs => {
+            if tab_first {
+                text.chars()
+                    .take_while(|c| *c == '\t')
+                    .count()
+                    .min(tab_width as usize) as i32
+            } else {
+                0
+            }
+        }
+        _ => {
+            if tab_first || spaces > 0 {
+                1
+            } else {
+                0
+            }
+        }
+    }
+}
+
+fn get_text_range_simple(hwnd: HWND, start: i32, end: i32) -> String {
+    if end <= start {
+        return String::new();
+    }
+    let mut buf = vec![0u16; (end - start) as usize + 1];
+    let mut range = TEXTRANGEW {
+        chrg: CHARRANGE {
+            cpMin: start,
+            cpMax: end,
+        },
+        lpstrText: PWSTR(buf.as_mut_ptr()),
+    };
+    unsafe {
+        SendMessageW(
+            hwnd,
+            EM_GETTEXTRANGE,
+            WPARAM(0),
+            LPARAM(&mut range as *mut _ as isize),
+        );
+    }
+    let len = buf.iter().position(|c| *c == 0).unwrap_or(buf.len());
+    String::from_utf16_lossy(&buf[..len])
+}
+
+fn apply_indent_settings_to_edit(hwnd_edit: HWND, settings: &AppSettings) {
+    let width = match settings.indentation_mode {
+        IndentationMode::Spaces => settings.indent_space_width,
+        _ => settings.indent_tab_width,
+    };
+    let width = normalize_indent_width(width);
+    let tab_stop = (width * 4) as i32;
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_SETTABSTOPS,
+            WPARAM(1),
+            LPARAM(&tab_stop as *const _ as isize),
+        );
+    }
+}
+
+pub(crate) fn apply_indent_settings_to_all_edits(hwnd: HWND, settings: &AppSettings) {
+    unsafe {
+        with_state(hwnd, |state| {
+            for doc in &state.docs {
+                if doc.hwnd_edit.0 != 0 {
+                    apply_indent_settings_to_edit(doc.hwnd_edit, settings);
+                }
+            }
+        });
     }
 }
 
@@ -2143,7 +2487,7 @@ fn strip_markdown_text(text: &str, keep_bullets: bool) -> String {
             trimmed = trimmed.trim_start_matches('>').trim_start();
         }
         let mut line: std::borrow::Cow<'_, str> = std::borrow::Cow::Borrowed(trimmed);
-        if trimmed.starts_with("- ") || trimmed.starts_with("+ ") {
+        if trimmed.starts_with("- ") || trimmed.starts_with("+ ") || trimmed.starts_with("* ") {
             if keep_bullets {
                 let bullet = trimmed.chars().next().unwrap_or('-');
                 let rest = trimmed[1..].trim_start();
@@ -3023,6 +3367,9 @@ pub unsafe fn create_edit(
         // Allow large pastes (default edit limit is ~32K).
         apply_text_limit(hwnd_edit);
         apply_text_appearance(hwnd_edit, text_color, text_size);
+        if let Some(settings) = with_state(parent, |state| state.settings.clone()) {
+            apply_indent_settings_to_edit(hwnd_edit, &settings);
+        }
         SendMessageW(hwnd_edit, EM_SETMODIFY, WPARAM(0), LPARAM(0));
         SendMessageW(
             hwnd_edit,

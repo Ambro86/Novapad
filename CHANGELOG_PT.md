@@ -14,6 +14,8 @@ Melhorias
 • Adicionada uma opção no menu de contexto para criar um audiolivro a partir da seleção.
 • Adicionada a divisão de audiolivros por duração, com a possibilidade de escolher o nome do primeiro arquivo.
 • Rótulo do autor localizado na leitura de artigos (ex.: "por", "by", "di").
+• Adicionadas opções de indentação (tabulações/espaços com largura) e Tab/Shift+Tab para indentar/desindentar linhas selecionadas.
+• Corrigida a limpeza de Markdown: agora trata bullets '*' quando a preservação de listas está desativada.
 Correções de bugs
 • Corrigido um bug em que audiolivros com SAPI4 podiam ser criados de forma diferente do esperado.
 

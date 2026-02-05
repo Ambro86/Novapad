@@ -9,8 +9,11 @@ Améliorations
   - Voix Microsoft (Edge) : <voice edge it-IT-IsabellaNeural>Bonjour</voice>
   - Voix SAPI5 : <voice sapi5 Microsoft Helena Desktop>Bonjour</voice>
   - Voix SAPI4 : <voice sapi4 #1>Bonjour</voice>
+  - Avec vitesse/tonalité/volume : <voice edge it-IT-ElsaNeural speed=-20 pitch=-5 volume=-10>Bonjour</voice>
 • Catégories de podcasts enrichies.
 • Ajout d’une option dans le menu contextuel pour créer un livre audio à partir de la sélection.
+• Ajout du découpage des livres audio par durée, avec la possibilité de choisir le nom du premier fichier.
+• Libellé de l’auteur localisé dans la lecture des articles (ex. « par », « by », « di »).
 Corrections de bugs
 • Corrigé un bug où les livres audio SAPI4 pouvaient être créés différemment de ce qui était attendu.
 

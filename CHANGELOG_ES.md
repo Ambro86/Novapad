@@ -9,8 +9,11 @@ Mejoras
   - Voces Microsoft (Edge): <voice edge it-IT-IsabellaNeural>Hola</voice>
   - Voces SAPI5: <voice sapi5 Microsoft Helena Desktop>Hola</voice>
   - Voces SAPI4: <voice sapi4 #1>Hola</voice>
+  - Con velocidad/tono/volumen: <voice edge it-IT-ElsaNeural speed=-20 pitch=-5 volume=-10>Hola</voice>
 • Enriquecidas las categorias de podcasts.
 • Añadida una opción en el menú contextual para crear un audiolibro desde la selección.
+• Añadida la división de audiolibros por duración, con la posibilidad de elegir el nombre del primer archivo.
+• Localizada la etiqueta del autor en la lectura de artículos (ej. "por", "by", "di").
 Correcciones de errores
 • Corregido un error por el cual los audiolibros con SAPI4 podian crearse de forma diferente a lo esperado.
 

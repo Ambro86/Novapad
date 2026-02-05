@@ -15,6 +15,9 @@ Sửa lỗi
 • Khắc phục lỗi khiến sách nói SAPI4 có thể được tạo ra khác với mong đợi.
 • Cửa sổ Tìm trong tệp: nhấn Enter trên một kết quả giờ mở đúng vị trí đoạn trích và Esc quay lại kết quả.
 • Cửa sổ Tùy chọn: chỉnh lại bố cục hiển thị ở các tab Chung, Giọng nói, Trình soạn thảo và Âm thanh để tránh thiếu hoặc bị cắt điều khiển.
+• Đã sửa lỗi dấu trang khi thay đổi tốc độ phát.
+• Đã sửa lỗi Podcast Index và danh mục không hiển thị đúng.
+• Đã sửa lỗi dấu nháy đơn làm ngắt đọc: không còn chế độ đọc riêng cho hội thoại, dùng thẻ giọng nói.
 
 Phiên bản 0.6.3 – 2026-01-30
 Cải tiến

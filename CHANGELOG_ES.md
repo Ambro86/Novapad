@@ -20,6 +20,9 @@ Correcciones de errores
 • Corregido un error por el cual los audiolibros con SAPI4 podian crearse de forma diferente a lo esperado.
 • Ventana Buscar en archivos: al pulsar Intro en un resultado ahora abre en la posición correcta del fragmento y Esc vuelve a los resultados.
 • Ventana Opciones: se ajustó el diseño visual de las pestañas General, Voz, Editor y Audio para evitar controles faltantes o recortados.
+• Corregido un problema de marcadores al cambiar la velocidad de reproducción.
+• Corregido un problema con Podcast Index y las categorías que no se mostraban correctamente.
+• Corregido el problema del apóstrofo que cortaba la lectura: ya no hay lectura separada para diálogos, se usan las etiquetas de voz.
 
 Versión 0.6.3 – 2026-01-30
 Mejoras

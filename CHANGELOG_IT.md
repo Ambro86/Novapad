@@ -25,6 +25,9 @@ Correzioni di bug
 • Corretto un bug per cui, andando oltre la fine con il seek, la riproduzione ripartiva dall'inizio.
 • Finestra Trova nei file: premendo Invio su un risultato ora apre alla posizione corretta dello snippet e Esc torna ai risultati.
 • Finestra Opzioni: sistemato il layout visivo delle schede Generale, Voce, Editor e Audio per evitare controlli mancanti o tagliati.
+• Corretto un problema dei segnalibri quando si cambiava la velocità di riproduzione.
+• Corretto un problema con Podcast Index e le categorie che non si visualizzavano correttamente.
+• Corretto il problema dell'apostrofo che spezzava la lettura: ora non esiste più una lettura separata per i dialoghi, si usano i tag voce.
 
 Versione 0.6.3 – 2026-01-30
 Miglioramenti

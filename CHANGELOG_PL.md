@@ -1,6 +1,6 @@
 # Dziennik zmian
 
-Wersja 0.6.4 – 30.01.2026
+Wersja 0.6.4 – 05/02/2026
 Ulepszenia
 • Program został przemianowany na Sonarpad, aby podkreślić dźwięk i audio jako klucz tego programu.
 • Dodano wybór ścieżek audio w menu Odtwarzanie dla plików multimedialnych z wieloma ścieżkami audio (np. MKV z wieloma językami).
@@ -18,6 +18,8 @@ Ulepszenia
 • Poprawiono czyszczenie Markdown: obsługa wypunktowań „*” gdy zachowanie list jest wyłączone.
 Poprawki błędów
 • Naprawiono błąd, przez który audiobooki SAPI4 mogły być tworzone inaczej niż oczekiwano.
+• Okno Znajdź w plikach: naciśnięcie Enter na wyniku otwiera teraz w prawidłowej pozycji fragmentu, a Esc wraca do wyników.
+• Okno Opcje: poprawiono układ wizualny kart Ogólne, Głos, Edytor i Audio, aby uniknąć brakujących lub uciętych kontrolek.
 
 Wersja 0.6.3 – 30.01.2026
 Ulepszenia

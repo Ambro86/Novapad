@@ -20,6 +20,9 @@ Poprawki błędów
 • Naprawiono błąd, przez który audiobooki SAPI4 mogły być tworzone inaczej niż oczekiwano.
 • Okno Znajdź w plikach: naciśnięcie Enter na wyniku otwiera teraz w prawidłowej pozycji fragmentu, a Esc wraca do wyników.
 • Okno Opcje: poprawiono układ wizualny kart Ogólne, Głos, Edytor i Audio, aby uniknąć brakujących lub uciętych kontrolek.
+• Naprawiono problem z zakładkami podczas zmiany prędkości odtwarzania.
+• Naprawiono problem z Podcast Index i kategoriami, które nie wyświetlały się poprawnie.
+• Naprawiono problem z apostrofem rozbijającym czytanie: nie ma już osobnego czytania dialogów, używane są tagi głosu.
 
 Wersja 0.6.3 – 30.01.2026
 Ulepszenia

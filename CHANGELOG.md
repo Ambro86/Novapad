@@ -25,6 +25,9 @@ Bug fixes
 • Fixed a bug where seeking past the end of a media file restarted playback from the beginning.
 • Find in Files window: pressing Enter on a result now opens at the correct snippet position, and Esc returns to results.
 • Options window: improved visual layout across General, Voice, Editor, and Audio tabs to prevent missing or clipped controls.
+• Fixed a bookmark issue when changing playback speed.
+• Fixed Podcast Index categories not displaying correctly.
+• Fixed apostrophes breaking reading by removing separate dialogue reading; voice tags are used instead.
 
 Version 0.6.3 – 2026-01-30
 Improvements

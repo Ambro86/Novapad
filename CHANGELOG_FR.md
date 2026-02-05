@@ -20,6 +20,9 @@ Corrections de bugs
 • Corrigé un bug où les livres audio SAPI4 pouvaient être créés différemment de ce qui était attendu.
 • Fenêtre Rechercher dans les fichiers : Entrée sur un résultat ouvre maintenant à la position correcte de l’extrait et Échap retourne aux résultats.
 • Fenêtre Options : ajustement du layout visuel des onglets Général, Voix, Éditeur et Audio pour éviter des contrôles manquants ou coupés.
+• Correction d’un problème de signets lors du changement de vitesse de lecture.
+• Correction d’un problème avec Podcast Index et les catégories qui ne s’affichaient pas correctement.
+• Correction du problème de l’apostrophe qui coupait la lecture : plus de lecture séparée pour les dialogues, utilisation des balises de voix.
 
 Version 0.6.3 – 30/01/2026
 Améliorations

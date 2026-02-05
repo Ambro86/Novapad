@@ -20,6 +20,9 @@ Correções de bugs
 • Corrigido um bug em que audiolivros com SAPI4 podiam ser criados de forma diferente do esperado.
 • Janela Buscar em arquivos: ao pressionar Enter em um resultado agora abre na posição correta do trecho e Esc volta aos resultados.
 • Janela Opções: ajustado o layout visual das abas Geral, Voz, Editor e Áudio para evitar controles ausentes ou cortados.
+• Corrigido um problema de marcadores ao alterar a velocidade de reprodução.
+• Corrigido um problema com o Podcast Index e categorias que não eram exibidas corretamente.
+• Corrigido o problema do apóstrofo que quebrava a leitura: não há mais leitura separada para diálogos, usam-se tags de voz.
 
 Versão 0.6.3 – 2026-01-30
 Melhorias

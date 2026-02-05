@@ -14,6 +14,8 @@ Ulepszenia
 • Dodano opcję w menu kontekstowym tworzenia audiobooka z zaznaczenia.
 • Dodano podział audiobooka według długości, z możliwością wyboru nazwy pierwszego pliku.
 • Zlokalizowano etykietę autora w odczycie artykułów (np. "by", "di", "par").
+• Dodano opcje wcięć (tabulatory/spacje z szerokością) oraz Tab/Shift+Tab do wcinania/odwcinania zaznaczonych linii.
+• Poprawiono czyszczenie Markdown: obsługa wypunktowań „*” gdy zachowanie list jest wyłączone.
 Poprawki błędów
 • Naprawiono błąd, przez który audiobooki SAPI4 mogły być tworzone inaczej niż oczekiwano.
 

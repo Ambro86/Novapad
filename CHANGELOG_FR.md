@@ -14,6 +14,8 @@ Améliorations
 • Ajout d’une option dans le menu contextuel pour créer un livre audio à partir de la sélection.
 • Ajout du découpage des livres audio par durée, avec la possibilité de choisir le nom du premier fichier.
 • Libellé de l’auteur localisé dans la lecture des articles (ex. « par », « by », « di »).
+• Ajout d’options d’indentation (tabulations/espaces avec largeur) et de Tab/Maj+Tab pour indenter/désindenter les lignes sélectionnées.
+• Correction du nettoyage Markdown : gestion des puces « * » lorsque la conservation des listes est désactivée.
 Corrections de bugs
 • Corrigé un bug où les livres audio SAPI4 pouvaient être créés différemment de ce qui était attendu.
 

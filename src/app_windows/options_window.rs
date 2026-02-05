@@ -1,7 +1,8 @@
 use crate::accessibility::{handle_accessibility, to_wide};
 use crate::app_windows::interpreter_select_window;
 use crate::editor_manager::{
-    apply_word_wrap_to_all_edits, insert_voice_tag_at_caret, update_window_title,
+    apply_indent_settings_to_all_edits, apply_word_wrap_to_all_edits, insert_voice_tag_at_caret,
+    update_window_title,
 };
 use crate::settings::{
     Language, ModifiedMarkerPosition, OpenBehavior, SubtitleReadMode, TRUSTED_CLIENT_TOKEN,
@@ -87,6 +88,9 @@ const OPTIONS_ID_INTERPRETER_BROWSE: usize = 6042;
 const OPTIONS_ID_INTERPRETER_SEARCH: usize = 6043;
 const OPTIONS_ID_WRAP_WIDTH: usize = 6017;
 const OPTIONS_ID_QUOTE_PREFIX: usize = 6018;
+const OPTIONS_ID_INDENT_MODE: usize = 6060;
+const OPTIONS_ID_TAB_WIDTH: usize = 6061;
+const OPTIONS_ID_SPACE_WIDTH: usize = 6062;
 const OPTIONS_ID_CHECK_UPDATES: usize = 6015;
 const OPTIONS_ID_SEND_CRASH_REPORTS: usize = 6048;
 const OPTIONS_ID_USE_LEGACY_NAME: usize = 6057;
@@ -250,6 +254,12 @@ struct OptionsDialogState {
     combo_wikipedia_language: HWND,
     label_wrap_width: HWND,
     edit_wrap_width: HWND,
+    label_indentation: HWND,
+    combo_indentation: HWND,
+    label_tab_width: HWND,
+    combo_tab_width: HWND,
+    label_space_width: HWND,
+    combo_space_width: HWND,
     label_quote_prefix: HWND,
     edit_quote_prefix: HWND,
     label_interpreter_path: HWND,
@@ -304,6 +314,12 @@ struct OptionsLabels {
     label_dictionary_translation: String,
     label_wikipedia_language: String,
     label_wrap_width: String,
+    label_indentation: String,
+    indent_default: String,
+    indent_tabs: String,
+    indent_spaces: String,
+    label_tab_width: String,
+    label_space_width: String,
     label_quote_prefix: String,
     label_interpreter_path: String,
     label_interpreter_browse: String,
@@ -414,6 +430,12 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_dictionary_translation: i18n::tr(language, "options.label.dictionary_translation"),
         label_wikipedia_language: i18n::tr(language, "options.label.wikipedia_language"),
         label_wrap_width: i18n::tr(language, "options.label.wrap_width"),
+        label_indentation: i18n::tr(language, "options.label.indentation"),
+        indent_default: i18n::tr(language, "options.indent.default"),
+        indent_tabs: i18n::tr(language, "options.indent.tabs"),
+        indent_spaces: i18n::tr(language, "options.indent.spaces"),
+        label_tab_width: i18n::tr(language, "options.label.tab_width"),
+        label_space_width: i18n::tr(language, "options.label.space_width"),
         label_quote_prefix: i18n::tr(language, "options.label.quote_prefix"),
         label_interpreter_path: i18n::tr(language, "options.label.interpreter_path"),
         label_interpreter_browse: i18n::tr(language, "options.button.browse"),
@@ -1777,6 +1799,94 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
             );
             y += 30;
 
+            let label_indentation = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_indentation).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_indentation = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                200,
+                hwnd,
+                HMENU(OPTIONS_ID_INDENT_MODE as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
+            let label_tab_width = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_tab_width).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_tab_width = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                80,
+                200,
+                hwnd,
+                HMENU(OPTIONS_ID_TAB_WIDTH as isize),
+                HINSTANCE(0),
+                None,
+            );
+            let label_space_width = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_space_width).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_space_width = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                80,
+                200,
+                hwnd,
+                HMENU(OPTIONS_ID_SPACE_WIDTH as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
             let label_quote_prefix = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -2105,6 +2215,12 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 combo_wikipedia_language,
                 label_wrap_width,
                 edit_wrap_width,
+                label_indentation,
+                combo_indentation,
+                label_tab_width,
+                combo_tab_width,
+                label_space_width,
+                combo_space_width,
                 label_quote_prefix,
                 edit_quote_prefix,
                 label_interpreter_path,
@@ -2204,6 +2320,12 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 combo_wikipedia_language,
                 label_wrap_width,
                 edit_wrap_width,
+                label_indentation,
+                combo_indentation,
+                label_tab_width,
+                combo_tab_width,
+                label_space_width,
+                combo_space_width,
                 label_quote_prefix,
                 edit_quote_prefix,
                 label_interpreter_path,
@@ -2314,6 +2436,12 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 OPTIONS_ID_SUBTITLE_MODE => {
                     if code == CBN_SELCHANGE {
                         update_subtitle_ducking_visibility(hwnd);
+                    }
+                    LRESULT(0)
+                }
+                OPTIONS_ID_INDENT_MODE => {
+                    if code == CBN_SELCHANGE {
+                        update_indentation_visibility(hwnd);
                     }
                     LRESULT(0)
                 }
@@ -2510,6 +2638,12 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         combo_wikipedia_language,
         _label_wrap_width,
         edit_wrap_width,
+        _label_indentation,
+        combo_indentation,
+        _label_tab_width,
+        combo_tab_width,
+        _label_space_width,
+        combo_space_width,
         _label_quote_prefix,
         edit_quote_prefix,
         _label_interpreter_path,
@@ -2575,6 +2709,12 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.combo_wikipedia_language,
             state.label_wrap_width,
             state.edit_wrap_width,
+            state.label_indentation,
+            state.combo_indentation,
+            state.label_tab_width,
+            state.combo_tab_width,
+            state.label_space_width,
+            state.combo_space_width,
             state.label_quote_prefix,
             state.edit_quote_prefix,
             state.label_interpreter_path,
@@ -3162,6 +3302,82 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
     if let Err(_e) = SetWindowTextW(edit_wrap_width, PCWSTR(to_wide(&wrap_text).as_ptr())) {
         crate::log_debug(&format!("Error: {:?}", _e));
     }
+
+    SendMessageW(combo_indentation, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    let indent_options = [
+        labels.indent_default.clone(),
+        labels.indent_tabs.clone(),
+        labels.indent_spaces.clone(),
+    ];
+    for label in indent_options.iter() {
+        SendMessageW(
+            combo_indentation,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(label).as_ptr() as isize),
+        );
+    }
+    let indent_index = match settings.indentation_mode {
+        crate::settings::IndentationMode::Default => 0,
+        crate::settings::IndentationMode::Tabs => 1,
+        crate::settings::IndentationMode::Spaces => 2,
+    };
+    SendMessageW(
+        combo_indentation,
+        CB_SETCURSEL,
+        WPARAM(indent_index),
+        LPARAM(0),
+    );
+
+    SendMessageW(combo_tab_width, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    SendMessageW(combo_space_width, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    let mut tab_sel = 0usize;
+    let mut space_sel = 0usize;
+    for (idx, width) in [2u32, 4, 6, 8].iter().enumerate() {
+        let label = width.to_string();
+        let tab_idx = SendMessageW(
+            combo_tab_width,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&label).as_ptr() as isize),
+        )
+        .0 as usize;
+        SendMessageW(
+            combo_tab_width,
+            CB_SETITEMDATA,
+            WPARAM(tab_idx),
+            LPARAM(*width as isize),
+        );
+        if *width == settings.indent_tab_width {
+            tab_sel = idx;
+        }
+
+        let space_idx = SendMessageW(
+            combo_space_width,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&label).as_ptr() as isize),
+        )
+        .0 as usize;
+        SendMessageW(
+            combo_space_width,
+            CB_SETITEMDATA,
+            WPARAM(space_idx),
+            LPARAM(*width as isize),
+        );
+        if *width == settings.indent_space_width {
+            space_sel = idx;
+        }
+    }
+    SendMessageW(combo_tab_width, CB_SETCURSEL, WPARAM(tab_sel), LPARAM(0));
+    SendMessageW(
+        combo_space_width,
+        CB_SETCURSEL,
+        WPARAM(space_sel),
+        LPARAM(0),
+    );
+    update_indentation_visibility(hwnd);
+
     if let Err(_e) = SetWindowTextW(
         edit_quote_prefix,
         PCWSTR(to_wide(&settings.quote_prefix).as_ptr()),
@@ -4156,6 +4372,9 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         combo_dictionary_translation,
         combo_wikipedia_language,
         edit_wrap_width,
+        combo_indentation,
+        combo_tab_width,
+        combo_space_width,
         edit_quote_prefix,
         edit_interpreter_path,
         _button_interpreter_browse,
@@ -4209,6 +4428,9 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.combo_dictionary_translation,
             state.combo_wikipedia_language,
             state.edit_wrap_width,
+            state.combo_indentation,
+            state.combo_tab_width,
+            state.combo_space_width,
             state.edit_quote_prefix,
             state.edit_interpreter_path,
             state.button_interpreter_browse,
@@ -4231,6 +4453,9 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     let old_language = settings.language;
     let old_marker_position = settings.modified_marker_position;
     let old_word_wrap = settings.word_wrap;
+    let old_indent_mode = settings.indentation_mode;
+    let old_tab_width = settings.indent_tab_width;
+    let old_space_width = settings.indent_space_width;
     let old_context_menu = settings.context_menu_open_with;
     let old_use_legacy_name = settings.use_legacy_name;
     let old_spellcheck_enabled = settings.spellcheck_enabled;
@@ -4456,6 +4681,39 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             && parsed > 0
         {
             settings.wrap_width = parsed;
+        }
+    }
+
+    let indent_sel = SendMessageW(combo_indentation, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    settings.indentation_mode = match indent_sel {
+        1 => crate::settings::IndentationMode::Tabs,
+        2 => crate::settings::IndentationMode::Spaces,
+        _ => crate::settings::IndentationMode::Default,
+    };
+    let tab_sel = SendMessageW(combo_tab_width, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    if tab_sel >= 0 {
+        let tab_width = SendMessageW(
+            combo_tab_width,
+            CB_GETITEMDATA,
+            WPARAM(tab_sel as usize),
+            LPARAM(0),
+        )
+        .0 as u32;
+        if matches!(tab_width, 2 | 4 | 6 | 8) {
+            settings.indent_tab_width = tab_width;
+        }
+    }
+    let space_sel = SendMessageW(combo_space_width, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    if space_sel >= 0 {
+        let space_width = SendMessageW(
+            combo_space_width,
+            CB_GETITEMDATA,
+            WPARAM(space_sel as usize),
+            LPARAM(0),
+        )
+        .0 as u32;
+        if matches!(space_width, 2 | 4 | 6 | 8) {
+            settings.indent_space_width = space_width;
         }
     }
     let prefix_len = GetWindowTextLengthW(edit_quote_prefix);
@@ -4718,6 +4976,12 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     if old_word_wrap != settings.word_wrap {
         apply_word_wrap_to_all_edits(parent, settings.word_wrap);
     }
+    if old_indent_mode != settings.indentation_mode
+        || old_tab_width != settings.indent_tab_width
+        || old_space_width != settings.indent_space_width
+    {
+        apply_indent_settings_to_all_edits(parent, &settings);
+    }
     refresh_voice_panel(parent);
     if was_tts_active
         && (old_engine != settings.tts_engine
@@ -4836,6 +5100,40 @@ unsafe fn update_spellcheck_language_visibility(hwnd: HWND) {
     EnableWindow(combo_spellcheck_language, spellcheck_enabled);
 }
 
+unsafe fn update_indentation_visibility(hwnd: HWND) {
+    let (combo_indentation, label_tab_width, combo_tab_width, label_space_width, combo_space_width) =
+        match with_options_state(hwnd, |state| {
+            (
+                state.combo_indentation,
+                state.label_tab_width,
+                state.combo_tab_width,
+                state.label_space_width,
+                state.combo_space_width,
+            )
+        }) {
+            Some(values) => values,
+            None => return,
+        };
+
+    let sel = SendMessageW(combo_indentation, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    let show_tab = sel == 1;
+    let show_space = sel == 2;
+
+    ShowWindow(label_tab_width, if show_tab { SW_SHOW } else { SW_HIDE });
+    ShowWindow(combo_tab_width, if show_tab { SW_SHOW } else { SW_HIDE });
+    EnableWindow(combo_tab_width, show_tab);
+
+    ShowWindow(
+        label_space_width,
+        if show_space { SW_SHOW } else { SW_HIDE },
+    );
+    ShowWindow(
+        combo_space_width,
+        if show_space { SW_SHOW } else { SW_HIDE },
+    );
+    EnableWindow(combo_space_width, show_space);
+}
+
 unsafe fn set_active_tab(hwnd: HWND, index: i32) {
     let focus_first = with_options_state(hwnd, |state| {
         if state.focus_initialized {
@@ -4917,6 +5215,12 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.combo_wikipedia_language,
             state.label_wrap_width,
             state.edit_wrap_width,
+            state.label_indentation,
+            state.combo_indentation,
+            state.label_tab_width,
+            state.combo_tab_width,
+            state.label_space_width,
+            state.combo_space_width,
             state.label_quote_prefix,
             state.edit_quote_prefix,
             state.label_interpreter_path,
@@ -4967,6 +5271,8 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
     } else if index == OPTIONS_TAB_VOICE {
         update_tts_manual_visibility(hwnd);
         update_dialogue_voice_visibility(hwnd);
+    } else if index == OPTIONS_TAB_EDITOR {
+        update_indentation_visibility(hwnd);
     } else if let Some((
         label_text,
         edit_text,

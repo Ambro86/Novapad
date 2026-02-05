@@ -57,6 +57,7 @@ const SNIPPET_MAX_CHARS: usize = 40;
 
 const WM_FIND_IN_FILES_PROGRESS: u32 = WM_APP + 40;
 const WM_FIND_IN_FILES_DONE: u32 = WM_APP + 41;
+const WM_FIND_IN_FILES_FOCUS_RESULTS: u32 = WM_APP + 42;
 
 struct FindInFilesInit {
     parent: HWND,
@@ -184,7 +185,6 @@ pub fn open_find_in_files_dialog(parent: HWND) {
     }
 
     unsafe {
-        EnableWindow(parent, false);
         SetForegroundWindow(hwnd);
     }
 
@@ -199,7 +199,17 @@ pub fn open_find_in_files_dialog(parent: HWND) {
         }
         unsafe {
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
-                if let Err(_e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
+                if let Some(hwnd_edit) = crate::get_active_edit(parent)
+                    && GetFocus() == hwnd_edit
+                {
+                    if with_find_state(hwnd, |state| {
+                        SetFocus(state.results_tree);
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access find state");
+                    }
+                } else if let Err(_e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
                     crate::log_debug(&format!("Error: {:?}", _e));
                 }
                 continue;
@@ -235,7 +245,6 @@ pub fn open_find_in_files_dialog(parent: HWND) {
     }
 
     unsafe {
-        EnableWindow(parent, true);
         SetForegroundWindow(parent);
     }
 }
@@ -251,6 +260,24 @@ unsafe extern "system" fn find_in_files_wndproc(
         || DefWindowProcW(hwnd, msg, wparam, lparam),
         || unsafe { find_in_files_wndproc_inner(hwnd, msg, wparam, lparam) },
     )
+}
+
+pub(crate) fn focus_find_in_files_results() -> bool {
+    let class_name = to_wide(FIND_IN_FILES_CLASS_NAME);
+    let hwnd = unsafe { FindWindowW(PCWSTR(class_name.as_ptr()), PCWSTR::null()) };
+    if hwnd.0 == 0 {
+        return false;
+    }
+    unsafe {
+        SetForegroundWindow(hwnd);
+        if let Err(e) = PostMessageW(hwnd, WM_FIND_IN_FILES_FOCUS_RESULTS, WPARAM(0), LPARAM(0)) {
+            crate::log_debug(&format!(
+                "Failed to post WM_FIND_IN_FILES_FOCUS_RESULTS: {}",
+                e
+            ));
+        }
+    }
+    true
 }
 
 unsafe fn find_in_files_wndproc_inner(
@@ -532,9 +559,6 @@ unsafe fn find_in_files_wndproc_inner(
                 {
                     crate::log_debug("Failed to access find state");
                 }
-                if let Err(_e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
-                    crate::log_debug(&format!("Error: {:?}", _e));
-                }
                 LRESULT(0)
             } else {
                 DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -576,9 +600,6 @@ unsafe fn find_in_files_wndproc_inner(
                         {
                             crate::log_debug("Failed to access find state");
                         }
-                        if let Err(_e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
-                            crate::log_debug(&format!("Error: {:?}", _e));
-                        }
                         return LRESULT(0);
                     }
                     if (*hdr).code == TVN_KEYDOWN && (*hdr).idFrom == FIND_IN_FILES_ID_RESULTS {
@@ -592,9 +613,6 @@ unsafe fn find_in_files_wndproc_inner(
                             .is_none()
                             {
                                 crate::log_debug("Failed to access find state");
-                            }
-                            if let Err(_e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
-                                crate::log_debug(&format!("Error: {:?}", _e));
                             }
                             return LRESULT(0);
                         }
@@ -671,6 +689,16 @@ unsafe fn find_in_files_wndproc_inner(
             }
             LRESULT(0)
         }
+        WM_FIND_IN_FILES_FOCUS_RESULTS => {
+            if with_find_state(hwnd, |state| unsafe {
+                SetFocus(state.results_tree);
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access find state");
+            }
+            LRESULT(0)
+        }
         WM_CLOSE => {
             if with_find_state(hwnd, |state| {
                 if let Some(flag) = &state.cancel_flag {
@@ -687,7 +715,6 @@ unsafe fn find_in_files_wndproc_inner(
         }
         WM_DESTROY => {
             if with_find_state(hwnd, |state| {
-                EnableWindow(state.parent, true);
                 SetForegroundWindow(state.parent);
             })
             .is_none()
@@ -898,19 +925,44 @@ fn open_selected_result(state: &mut FindInFilesState) {
         return;
     };
     let term = read_control_text(state.term_edit).trim().to_string();
+    let pending = crate::PendingFindInFilesSelection {
+        path: result.path.clone(),
+        snippet: result.snippet.clone(),
+        term,
+        start_utf16: result.start_utf16,
+        len_utf16: result.len_utf16,
+    };
     unsafe {
-        crate::editor_manager::open_document(state.parent, &result.path);
-        if let Some(hwnd_edit) = crate::get_active_edit(state.parent)
-            && !select_snippet_exact(hwnd_edit, &result.snippet)
+        if with_state(state.parent, |state| {
+            state.pending_find_in_files = Some(pending);
+        })
+        .is_none()
         {
-            let term = normalize_to_crlf(&term);
-            if result.snippet.trim().is_empty() {
-                select_term_at(hwnd_edit, &term, result.start_utf16, result.len_utf16);
-            }
+            crate::log_debug("Failed to set pending find-in-files selection");
         }
+        crate::editor_manager::open_document(state.parent, &result.path);
         if let Err(e) = PostMessageW(state.parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) {
             crate::log_debug(&format!("Failed to post WM_FOCUS_EDITOR: {}", e));
         }
+    }
+}
+
+pub(crate) fn apply_find_in_files_selection(
+    hwnd_edit: HWND,
+    snippet: &str,
+    term: &str,
+    start_utf16: i32,
+    len_utf16: i32,
+) {
+    unsafe {
+        if select_snippet_exact(hwnd_edit, snippet) {
+            return;
+        }
+        let term = normalize_to_crlf(term);
+        if term.is_empty() {
+            return;
+        }
+        select_term_at(hwnd_edit, &term, start_utf16, len_utf16);
     }
 }
 

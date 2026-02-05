@@ -17,6 +17,8 @@ Improvements
 • Added a context menu option to create an audiobook from the selected text.
 • Added audiobook splitting by duration, with the ability to choose the first file name.
 • Localized the author label in article reading (e.g., "by", "di", "par").
+• Added indentation options (tabs/spaces with width) and Tab/Shift+Tab indent/outdent on selected lines.
+• Fixed Markdown cleanup to handle '*' list bullets when bullet preservation is disabled.
 • Added an option to use the legacy "Novapad" name in the window title and Start Menu shortcuts.
 Bug fixes
 • Fixed a bug where SAPI4 audiobooks could be created differently than expected.

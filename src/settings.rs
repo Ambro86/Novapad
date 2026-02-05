@@ -162,6 +162,17 @@ pub enum SpellcheckLanguageMode {
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum IndentationMode {
+    #[serde(rename = "default")]
+    #[default]
+    Default,
+    #[serde(rename = "tabs")]
+    Tabs,
+    #[serde(rename = "spaces")]
+    Spaces,
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum PodcastFormat {
     #[serde(rename = "mp3")]
     #[default]
@@ -220,6 +231,12 @@ pub struct AppSettings {
     #[serde(default)]
     pub strip_markdown_keep_bullets: bool,
     pub quote_prefix: String,
+    #[serde(default)]
+    pub indentation_mode: IndentationMode,
+    #[serde(default = "default_indent_tab_width")]
+    pub indent_tab_width: u32,
+    #[serde(default = "default_indent_space_width")]
+    pub indent_space_width: u32,
     pub move_cursor_during_reading: bool,
     pub audiobook_skip_seconds: u32,
     pub audiobook_playback_speed: f32,
@@ -373,6 +390,14 @@ fn default_dialogue_tts_engine() -> TtsEngine {
     TtsEngine::Edge
 }
 
+fn default_indent_tab_width() -> u32 {
+    4
+}
+
+fn default_indent_space_width() -> u32 {
+    4
+}
+
 fn default_audiobook_split_minutes() -> u32 {
     5
 }
@@ -403,6 +428,9 @@ impl Default for AppSettings {
             smart_quotes: false,
             strip_markdown_keep_bullets: false,
             quote_prefix: "> ".to_string(),
+            indentation_mode: IndentationMode::Default,
+            indent_tab_width: default_indent_tab_width(),
+            indent_space_width: default_indent_space_width(),
             move_cursor_during_reading: false,
             audiobook_skip_seconds: 60,
             audiobook_playback_speed: 1.0,
@@ -930,6 +958,13 @@ pub fn load_settings() -> AppSettings {
 }
 
 fn normalize_settings(mut settings: AppSettings) -> AppSettings {
+    let valid_indent = [2, 4, 6, 8];
+    if !valid_indent.contains(&settings.indent_tab_width) {
+        settings.indent_tab_width = default_indent_tab_width();
+    }
+    if !valid_indent.contains(&settings.indent_space_width) {
+        settings.indent_space_width = default_indent_space_width();
+    }
     if settings.podcast_save_folder.trim().is_empty() {
         settings.podcast_save_folder = default_podcast_save_folder();
     }

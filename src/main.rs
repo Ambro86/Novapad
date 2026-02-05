@@ -144,7 +144,9 @@ const EM_LINEINDEX: u32 = 0x00BB;
 const EM_LINELENGTH: u32 = 0x00C1;
 const EM_SETSEL: u32 = 0x00B1;
 
-use crate::app_windows::find_in_files_window::FindInFilesCache;
+use crate::app_windows::find_in_files_window::{
+    FindInFilesCache, apply_find_in_files_selection, focus_find_in_files_results,
+};
 use crate::podcast::chapters::Chapter;
 
 const WM_PDF_LOADED: u32 = WM_APP + 1;
@@ -1536,6 +1538,7 @@ pub(crate) struct AppState {
     voice_combo_favorites_proc: WNDPROC,
     voice_context_voice: Option<FavoriteVoice>,
     find_in_files_cache: Option<FindInFilesCache>,
+    pending_find_in_files: Option<PendingFindInFilesSelection>,
     normalize_undo: Option<NormalizeUndo>,
     normalize_skip_change: bool,
     spellcheck_manager: spellcheck::SpellcheckManager,
@@ -1553,6 +1556,15 @@ pub(crate) struct AppState {
     dictionary_cache: HashMap<String, Vec<String>>,
     dictionary_pending_lookup: Option<String>,
     dictionary_prefetch_generation: usize,
+}
+
+#[derive(Clone)]
+pub(crate) struct PendingFindInFilesSelection {
+    pub(crate) path: PathBuf,
+    pub(crate) snippet: String,
+    pub(crate) term: String,
+    pub(crate) start_utf16: i32,
+    pub(crate) len_utf16: i32,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -1888,6 +1900,12 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                     with_state(hwnd, |state| state.podcast_save_window).unwrap_or(HWND(0));
                 if save_hwnd.0 != 0 {
                     crate::log_if_err!(PostMessageW(save_hwnd, WM_COMMAND, WPARAM(2), LPARAM(0)));
+                    continue;
+                }
+                if let Some(hwnd_edit) = get_active_edit(hwnd)
+                    && GetFocus() == hwnd_edit
+                    && focus_find_in_files_results()
+                {
                     continue;
                 }
             }
@@ -2680,6 +2698,7 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 voice_combo_favorites_proc: combo_favorites_proc,
                 voice_context_voice: None,
                 find_in_files_cache: None,
+                pending_find_in_files: None,
                 normalize_undo: None,
                 normalize_skip_change: false,
                 spellcheck_manager: spellcheck::SpellcheckManager::default(),
@@ -7428,6 +7447,22 @@ unsafe fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLo
 
     editor_manager::select_tab(hwnd, new_index);
     push_recent_file(hwnd, &path);
+
+    let pending = with_state(hwnd, |state| state.pending_find_in_files.clone()).unwrap_or(None);
+    if let Some(pending) = pending
+        && pending.path == path
+    {
+        apply_find_in_files_selection(
+            hwnd_edit,
+            &pending.snippet,
+            &pending.term,
+            pending.start_utf16,
+            pending.len_utf16,
+        );
+        with_state(hwnd, |state| {
+            state.pending_find_in_files = None;
+        });
+    }
 }
 
 unsafe fn start_pdf_loading_animation(hwnd: HWND, hwnd_edit: HWND, ocr_timeout_secs: u64) {

@@ -20,16 +20,18 @@ use windows::Win32::UI::Controls::{
     LVS_EX_GRIDLINES, LVS_REPORT, LVS_SHOWSELALWAYS, PBM_SETPOS, PBM_SETRANGE, PROGRESS_CLASSW,
     WC_BUTTON, WC_COMBOBOXW, WC_EDIT, WC_STATIC,
 };
-use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, SetFocus, VK_ESCAPE};
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    EnableWindow, GetKeyState, SetFocus, VK_ESCAPE, VK_SHIFT, VK_TAB,
+};
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, CBS_DROPDOWNLIST,
     CREATESTRUCTW, CreateWindowExW, DefWindowProcW, DestroyWindow, ES_AUTOVSCROLL, ES_MULTILINE,
-    GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, IsWindow, KillTimer,
-    LoadCursorW, MSG, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetTimer,
-    SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE,
-    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
-    WS_VSCROLL,
+    GetNextDlgTabItem, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW,
+    IsWindow, KillTimer, LoadCursorW, MSG, PostMessageW, RegisterClassW, SendMessageW,
+    SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP,
+    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WM_TIMER,
+    WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME,
+    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -85,11 +87,29 @@ enum BatchStatusCode {
 }
 
 pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
-    if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
-        if let Err(e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
-            crate::log_debug(&format!("Failed to post WM_CLOSE: {}", e));
+    if msg.message == WM_KEYDOWN {
+        let vk = msg.wParam.0 as u32;
+        if vk == VK_ESCAPE.0 as u32 {
+            if let Err(e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
+                crate::log_debug(&format!("Failed to post WM_CLOSE: {}", e));
+            }
+            return true;
         }
-        return true;
+        if vk == VK_TAB.0 as u32 {
+            let log_edit = with_batch_state(hwnd, |state| state.log_edit);
+            let Some(log_edit) = log_edit else {
+                crate::log_debug("Failed to access batch state in handle_navigation");
+                return false;
+            };
+            if msg.hwnd == log_edit {
+                let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+                let next = GetNextDlgTabItem(hwnd, log_edit, shift_down);
+                if next.0 != 0 {
+                    SetFocus(next);
+                    return true;
+                }
+            }
+        }
     }
     false
 }

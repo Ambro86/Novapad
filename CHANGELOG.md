@@ -9,11 +9,14 @@ Improvements
   - Microsoft voices (Edge): <voice edge it-IT-IsabellaNeural>Hello</voice>
   - SAPI5 voices: <voice sapi5 Microsoft Helena Desktop>Hello</voice>
   - SAPI4 voices: <voice sapi4 #1>Hello</voice>
+  - With speed/pitch/volume: <voice edge it-IT-ElsaNeural speed=-20 pitch=-5 volume=-10>Hello</voice>
 • Enriched podcast categories.
 • Improved PDF reading with automatic fallback to PDFium.
 • Improved the article parser for cases where content was not read in full.
 • Added pitch reset to the Playback menu.
 • Added a context menu option to create an audiobook from the selected text.
+• Added audiobook splitting by duration, with the ability to choose the first file name.
+• Localized the author label in article reading (e.g., "by", "di", "par").
 • Added an option to use the legacy "Novapad" name in the window title and Start Menu shortcuts.
 Bug fixes
 • Fixed a bug where SAPI4 audiobooks could be created differently than expected.

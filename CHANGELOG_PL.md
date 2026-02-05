@@ -9,8 +9,11 @@ Ulepszenia
   - Głosy Microsoft (Edge): <voice edge it-IT-IsabellaNeural>Cześć</voice>
   - Głosy SAPI5: <voice sapi5 Microsoft Helena Desktop>Cześć</voice>
   - Głosy SAPI4: <voice sapi4 #1>Cześć</voice>
+  - Z prędkością/tonem/głośnością: <voice edge it-IT-ElsaNeural speed=-20 pitch=-5 volume=-10>Cześć</voice>
 • Rozszerzono kategorie podcastów.
 • Dodano opcję w menu kontekstowym tworzenia audiobooka z zaznaczenia.
+• Dodano podział audiobooka według długości, z możliwością wyboru nazwy pierwszego pliku.
+• Zlokalizowano etykietę autora w odczycie artykułów (np. "by", "di", "par").
 Poprawki błędów
 • Naprawiono błąd, przez który audiobooki SAPI4 mogły być tworzone inaczej niż oczekiwano.
 

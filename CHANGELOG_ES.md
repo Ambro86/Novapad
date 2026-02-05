@@ -1,6 +1,6 @@
 # Changelog
 
-Version 0.6.4 – 2026-01-30
+Version 0.6.4 – 05/02/2026
 Mejoras
 • El programa se ha renombrado a Sonarpad para dar mayor enfasis al sonido y al audio, que son la clave de este programa.
 • Añadida la selección de pistas de audio en el menú Reproducción para archivos multimedia con múltiples pistas de audio (ej. MKV con varios idiomas).
@@ -18,6 +18,8 @@ Mejoras
 • Corregida la limpieza de Markdown: ahora gestiona los bullets '*' cuando no se conservan las listas.
 Correcciones de errores
 • Corregido un error por el cual los audiolibros con SAPI4 podian crearse de forma diferente a lo esperado.
+• Ventana Buscar en archivos: al pulsar Intro en un resultado ahora abre en la posición correcta del fragmento y Esc vuelve a los resultados.
+• Ventana Opciones: se ajustó el diseño visual de las pestañas General, Voz, Editor y Audio para evitar controles faltantes o recortados.
 
 Versión 0.6.3 – 2026-01-30
 Mejoras

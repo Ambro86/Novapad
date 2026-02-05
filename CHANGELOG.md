@@ -1,6 +1,6 @@
 # Changelog
 
-Version 0.6.4 – 2026-01-30
+Version 0.6.4 – 05/02/2026
 Improvements
 • The program has been renamed to Sonarpad to emphasize sound and audio as the key focus.
 • Added audio track selection in the Playback menu for media files with multiple audio tracks (e.g., MKV files with multiple languages).
@@ -23,6 +23,8 @@ Improvements
 Bug fixes
 • Fixed a bug where SAPI4 audiobooks could be created differently than expected.
 • Fixed a bug where seeking past the end of a media file restarted playback from the beginning.
+• Find in Files window: pressing Enter on a result now opens at the correct snippet position, and Esc returns to results.
+• Options window: improved visual layout across General, Voice, Editor, and Audio tabs to prevent missing or clipped controls.
 
 Version 0.6.3 – 2026-01-30
 Improvements

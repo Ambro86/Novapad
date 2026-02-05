@@ -15,7 +15,7 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::thread;
 use tokio::sync::mpsc;
-use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::Dialogs::{
@@ -35,11 +35,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
     BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCOUNT,
     CB_GETCURSEL, CB_GETDROPPEDSTATE, CB_GETITEMDATA, CB_RESETCONTENT, CB_SETCURSEL,
     CB_SETITEMDATA, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW,
-    DefWindowProcW, DestroyWindow, ES_AUTOHSCROLL, ES_PASSWORD, GWLP_USERDATA, GetParent,
-    GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, LoadCursorW, MSG,
-    PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW, SW_SHOWNORMAL, SendMessageW,
-    SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_APP,
-    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL,
+    DefWindowProcW, DestroyWindow, ES_AUTOHSCROLL, ES_PASSWORD, GWLP_USERDATA, GetClientRect,
+    GetParent, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW,
+    LoadCursorW, MSG, MoveWindow, PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW, SW_SHOWNORMAL,
+    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, ShowWindow, WINDOW_STYLE,
+    WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL,
     WM_NOTIFY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
     WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
@@ -119,6 +119,15 @@ const OPTIONS_TAB_VOICE: i32 = 1;
 const OPTIONS_TAB_EDITOR: i32 = 2;
 const OPTIONS_TAB_AUDIO: i32 = 3;
 const OPTIONS_TAB_COUNT: i32 = 4;
+const OPTIONS_CONTENT_TOP: i32 = 50;
+const OPTIONS_MARGIN_X: i32 = 20;
+const OPTIONS_LABEL_WIDTH: i32 = 220;
+const OPTIONS_CONTROL_X: i32 = OPTIONS_MARGIN_X + OPTIONS_LABEL_WIDTH + 10;
+const OPTIONS_CONTROL_WIDTH: i32 = 300;
+const OPTIONS_ROW_HEIGHT: i32 = 30;
+const OPTIONS_ROW_HEIGHT_COMPACT: i32 = 24;
+const OPTIONS_CHECKBOX_HEIGHT: i32 = 20;
+const OPTIONS_BUTTON_HEIGHT: i32 = 26;
 
 pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_TAB.0 as u32 {
@@ -278,6 +287,7 @@ struct OptionsDialogState {
     label_prompt_program: HWND,
     combo_prompt_program: HWND,
     ok_button: HWND,
+    cancel_button: HWND,
 }
 
 struct OptionsLabels {
@@ -544,7 +554,7 @@ pub unsafe fn open(parent: HWND) {
         WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
-        520,
+        620,
         710,
         parent,
         None,
@@ -690,7 +700,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                 20,
                 10,
-                460,
+                560,
                 28,
                 hwnd,
                 HMENU(OPTIONS_ID_TABS as isize),
@@ -2344,6 +2354,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 label_prompt_program,
                 combo_prompt_program,
                 ok_button,
+                cancel_button,
             });
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(dialog_state) as isize);
             initialize_options_dialog(hwnd);
@@ -5134,6 +5145,513 @@ unsafe fn update_indentation_visibility(hwnd: HWND) {
     EnableWindow(combo_space_width, show_space);
 }
 
+fn move_control_best_effort(name: &str, hwnd: HWND, x: i32, y: i32, w: i32, h: i32) {
+    if hwnd.0 == 0 {
+        return;
+    }
+    unsafe {
+        if MoveWindow(hwnd, x, y, w, h, true).is_err() {
+            crate::log_debug(&format!("MoveWindow failed for {}", name));
+        }
+    }
+}
+
+fn layout_dialog_buttons(hwnd: HWND, ok_button: HWND, cancel_button: HWND) {
+    let mut rect = RECT::default();
+    unsafe {
+        if GetClientRect(hwnd, &mut rect).is_err() {
+            crate::log_debug("GetClientRect failed for options dialog");
+            return;
+        }
+    }
+    let button_y = (rect.bottom - 40).max(OPTIONS_CONTENT_TOP);
+    move_control_best_effort("options_ok", ok_button, rect.right - 200, button_y, 90, 28);
+    move_control_best_effort(
+        "options_cancel",
+        cancel_button,
+        rect.right - 100,
+        button_y,
+        90,
+        28,
+    );
+}
+
+fn layout_label_control(
+    label_name: &str,
+    label: HWND,
+    control_name: &str,
+    control: HWND,
+    y: i32,
+    control_height: i32,
+) -> i32 {
+    move_control_best_effort(
+        label_name,
+        label,
+        OPTIONS_MARGIN_X,
+        y,
+        OPTIONS_LABEL_WIDTH,
+        20,
+    );
+    move_control_best_effort(
+        control_name,
+        control,
+        OPTIONS_CONTROL_X,
+        y - 2,
+        OPTIONS_CONTROL_WIDTH,
+        control_height,
+    );
+    y + OPTIONS_ROW_HEIGHT
+}
+
+fn layout_checkbox(name: &str, checkbox: HWND, y: i32) -> i32 {
+    move_control_best_effort(
+        name,
+        checkbox,
+        OPTIONS_CONTROL_X,
+        y,
+        OPTIONS_CONTROL_WIDTH,
+        OPTIONS_CHECKBOX_HEIGHT,
+    );
+    y + OPTIONS_ROW_HEIGHT
+}
+
+fn layout_button(name: &str, button: HWND, y: i32) -> i32 {
+    move_control_best_effort(
+        name,
+        button,
+        OPTIONS_CONTROL_X,
+        y,
+        OPTIONS_CONTROL_WIDTH,
+        OPTIONS_BUTTON_HEIGHT,
+    );
+    y + OPTIONS_ROW_HEIGHT
+}
+
+fn layout_button_compact(name: &str, button: HWND, y: i32) -> i32 {
+    move_control_best_effort(
+        name,
+        button,
+        OPTIONS_CONTROL_X,
+        y,
+        OPTIONS_CONTROL_WIDTH,
+        OPTIONS_BUTTON_HEIGHT,
+    );
+    y + OPTIONS_ROW_HEIGHT_COMPACT
+}
+
+fn layout_button_compact_height(name: &str, button: HWND, y: i32, height: i32) -> i32 {
+    move_control_best_effort(
+        name,
+        button,
+        OPTIONS_CONTROL_X,
+        y,
+        OPTIONS_CONTROL_WIDTH,
+        height,
+    );
+    y + OPTIONS_ROW_HEIGHT_COMPACT
+}
+
+fn layout_general_tab(state: &OptionsDialogState) {
+    let mut y = OPTIONS_CONTENT_TOP;
+    y = layout_label_control(
+        "label_language",
+        state.label_language,
+        "combo_lang",
+        state.combo_lang,
+        y,
+        120,
+    );
+    y = layout_label_control(
+        "label_modified_marker_position",
+        state.label_modified_marker_position,
+        "combo_modified_marker_position",
+        state.combo_modified_marker_position,
+        y,
+        120,
+    );
+    y = layout_label_control(
+        "label_open",
+        state.label_open,
+        "combo_open",
+        state.combo_open,
+        y,
+        120,
+    );
+    y = layout_label_control(
+        "label_prompt_program",
+        state.label_prompt_program,
+        "combo_prompt_program",
+        state.combo_prompt_program,
+        y,
+        120,
+    );
+    y = layout_checkbox("checkbox_check_updates", state.checkbox_check_updates, y);
+    y = layout_checkbox(
+        "checkbox_send_crash_reports",
+        state.checkbox_send_crash_reports,
+        y,
+    );
+    y = layout_checkbox(
+        "checkbox_use_legacy_name",
+        state.checkbox_use_legacy_name,
+        y,
+    );
+    y = layout_checkbox("checkbox_context_menu", state.checkbox_context_menu, y);
+    layout_label_control(
+        "label_file_associations",
+        state.label_file_associations,
+        "button_manage_associations",
+        state.button_manage_associations,
+        y,
+        OPTIONS_BUTTON_HEIGHT,
+    );
+}
+
+fn layout_voice_tab(state: &OptionsDialogState) {
+    let mut y = OPTIONS_CONTENT_TOP;
+    y = layout_label_control(
+        "label_tts_engine",
+        state.label_tts_engine,
+        "combo_tts_engine",
+        state.combo_tts_engine,
+        y,
+        120,
+    );
+    y = layout_label_control(
+        "label_voice",
+        state.label_voice,
+        "combo_voice",
+        state.combo_voice,
+        y,
+        140,
+    );
+    y = layout_checkbox("checkbox_multilingual", state.checkbox_multilingual, y);
+    y = layout_label_control(
+        "label_tts_speed",
+        state.label_tts_speed,
+        "combo_tts_speed",
+        state.combo_tts_speed,
+        y,
+        140,
+    );
+    move_control_best_effort(
+        "edit_tts_speed",
+        state.edit_tts_speed,
+        OPTIONS_CONTROL_X,
+        y - OPTIONS_ROW_HEIGHT - 2,
+        OPTIONS_CONTROL_WIDTH,
+        22,
+    );
+    y = layout_label_control(
+        "label_tts_pitch",
+        state.label_tts_pitch,
+        "combo_tts_pitch",
+        state.combo_tts_pitch,
+        y,
+        140,
+    );
+    move_control_best_effort(
+        "edit_tts_pitch",
+        state.edit_tts_pitch,
+        OPTIONS_CONTROL_X,
+        y - OPTIONS_ROW_HEIGHT - 2,
+        OPTIONS_CONTROL_WIDTH,
+        22,
+    );
+    y = layout_label_control(
+        "label_tts_volume",
+        state.label_tts_volume,
+        "combo_tts_volume",
+        state.combo_tts_volume,
+        y,
+        140,
+    );
+    move_control_best_effort(
+        "edit_tts_volume",
+        state.edit_tts_volume,
+        OPTIONS_CONTROL_X,
+        y - OPTIONS_ROW_HEIGHT - 2,
+        OPTIONS_CONTROL_WIDTH,
+        22,
+    );
+    y = layout_checkbox("checkbox_tts_manual", state.checkbox_tts_manual, y);
+    y = layout_button_compact("button_tts_preview", state.button_tts_preview, y);
+    y = layout_button_compact("button_tts_insert_tag", state.button_tts_insert_tag, y) + 6;
+    y = layout_checkbox(
+        "checkbox_split_on_newline",
+        state.checkbox_split_on_newline,
+        y,
+    );
+    y = layout_checkbox(
+        "checkbox_use_dialogue_voice",
+        state.checkbox_use_dialogue_voice,
+        y,
+    );
+    y = layout_label_control(
+        "label_dialogue_engine",
+        state.label_dialogue_engine,
+        "combo_dialogue_engine",
+        state.combo_dialogue_engine,
+        y,
+        120,
+    );
+    y = layout_label_control(
+        "label_dialogue_voice",
+        state.label_dialogue_voice,
+        "combo_dialogue_voice",
+        state.combo_dialogue_voice,
+        y,
+        200,
+    );
+    y = layout_label_control(
+        "label_dialogue_voice_rate",
+        state.label_dialogue_voice_rate,
+        "combo_dialogue_voice_rate",
+        state.combo_dialogue_voice_rate,
+        y,
+        140,
+    );
+    y = layout_label_control(
+        "label_dialogue_voice_pitch",
+        state.label_dialogue_voice_pitch,
+        "combo_dialogue_voice_pitch",
+        state.combo_dialogue_voice_pitch,
+        y,
+        140,
+    );
+    y = layout_label_control(
+        "label_dialogue_voice_volume",
+        state.label_dialogue_voice_volume,
+        "combo_dialogue_voice_volume",
+        state.combo_dialogue_voice_volume,
+        y,
+        140,
+    );
+    layout_button_compact(
+        "button_dialogue_voice_preview",
+        state.button_dialogue_voice_preview,
+        y,
+    );
+}
+
+fn layout_editor_tab(state: &OptionsDialogState) {
+    let mut y = OPTIONS_CONTENT_TOP;
+    y = layout_checkbox("checkbox_word_wrap", state.checkbox_word_wrap, y);
+    y = layout_checkbox("checkbox_smart_quotes", state.checkbox_smart_quotes, y);
+    y = layout_checkbox(
+        "checkbox_strip_markdown_keep_bullets",
+        state.checkbox_strip_markdown_keep_bullets,
+        y,
+    );
+    y = layout_checkbox("checkbox_spellcheck", state.checkbox_spellcheck, y);
+    y = layout_label_control(
+        "label_spellcheck_language",
+        state.label_spellcheck_language,
+        "combo_spellcheck_language",
+        state.combo_spellcheck_language,
+        y,
+        200,
+    );
+    y = layout_label_control(
+        "label_dictionary_translation",
+        state.label_dictionary_translation,
+        "combo_dictionary_translation",
+        state.combo_dictionary_translation,
+        y,
+        200,
+    );
+    y = layout_label_control(
+        "label_wikipedia_language",
+        state.label_wikipedia_language,
+        "combo_wikipedia_language",
+        state.combo_wikipedia_language,
+        y,
+        200,
+    );
+    y = layout_label_control(
+        "label_wrap_width",
+        state.label_wrap_width,
+        "edit_wrap_width",
+        state.edit_wrap_width,
+        y,
+        22,
+    );
+    y = layout_label_control(
+        "label_indentation",
+        state.label_indentation,
+        "combo_indentation",
+        state.combo_indentation,
+        y,
+        200,
+    );
+    y = layout_label_control(
+        "label_tab_width",
+        state.label_tab_width,
+        "combo_tab_width",
+        state.combo_tab_width,
+        y,
+        200,
+    );
+    y = layout_label_control(
+        "label_space_width",
+        state.label_space_width,
+        "combo_space_width",
+        state.combo_space_width,
+        y,
+        200,
+    );
+    y = layout_label_control(
+        "label_quote_prefix",
+        state.label_quote_prefix,
+        "edit_quote_prefix",
+        state.edit_quote_prefix,
+        y,
+        22,
+    );
+    y = layout_label_control(
+        "label_interpreter_path",
+        state.label_interpreter_path,
+        "edit_interpreter_path",
+        state.edit_interpreter_path,
+        y,
+        22,
+    );
+    y = layout_button_compact_height(
+        "button_interpreter_browse",
+        state.button_interpreter_browse,
+        y,
+        24,
+    );
+    y = layout_button_compact_height(
+        "button_interpreter_search",
+        state.button_interpreter_search,
+        y,
+        24,
+    );
+    layout_checkbox("checkbox_move_cursor", state.checkbox_move_cursor, y);
+}
+
+fn layout_audio_tab(state: &OptionsDialogState) {
+    let (show_text_split, show_time_split) = unsafe {
+        let split_sel = SendMessageW(state.combo_audio_split, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+        if split_sel >= 0 {
+            let split_parts = SendMessageW(
+                state.combo_audio_split,
+                CB_GETITEMDATA,
+                WPARAM(split_sel as usize),
+                LPARAM(0),
+            )
+            .0 as u32;
+            (
+                split_parts == AUDIOBOOK_SPLIT_BY_TEXT,
+                split_parts == AUDIOBOOK_SPLIT_BY_TIME,
+            )
+        } else {
+            (false, false)
+        }
+    };
+    let mut y = OPTIONS_CONTENT_TOP;
+    y = layout_label_control(
+        "label_audio_skip",
+        state.label_audio_skip,
+        "combo_audio_skip",
+        state.combo_audio_skip,
+        y,
+        140,
+    );
+    y = layout_label_control(
+        "label_audio_split",
+        state.label_audio_split,
+        "combo_audio_split",
+        state.combo_audio_split,
+        y,
+        140,
+    );
+    if show_time_split {
+        y = layout_label_control(
+            "label_audio_split_minutes",
+            state.label_audio_split_minutes,
+            "combo_audio_split_minutes",
+            state.combo_audio_split_minutes,
+            y,
+            140,
+        );
+        y = layout_label_control(
+            "label_audio_split_start_number",
+            state.label_audio_split_start_number,
+            "combo_audio_split_start_number",
+            state.combo_audio_split_start_number,
+            y,
+            140,
+        );
+    }
+    if show_text_split {
+        y = layout_label_control(
+            "label_audio_split_text",
+            state.label_audio_split_text,
+            "edit_audio_split_text",
+            state.edit_audio_split_text,
+            y,
+            22,
+        );
+        y = layout_checkbox(
+            "checkbox_audio_split_requires_newline",
+            state.checkbox_audio_split_requires_newline,
+            y,
+        );
+    }
+    y = layout_checkbox(
+        "checkbox_subtitle_ducking",
+        state.checkbox_subtitle_ducking,
+        y,
+    );
+    y = layout_label_control(
+        "label_subtitle_mode",
+        state.label_subtitle_mode,
+        "combo_subtitle_mode",
+        state.combo_subtitle_mode,
+        y,
+        140,
+    );
+    y = layout_label_control(
+        "label_subtitle_offset",
+        state.label_subtitle_offset,
+        "edit_subtitle_offset",
+        state.edit_subtitle_offset,
+        y,
+        22,
+    );
+    y = layout_label_control(
+        "label_podcast_cache_limit",
+        state.label_podcast_cache_limit,
+        "edit_podcast_cache_limit",
+        state.edit_podcast_cache_limit,
+        y,
+        22,
+    );
+    y = layout_label_control(
+        "label_podcastindex_key",
+        state.label_podcastindex_key,
+        "edit_podcastindex_key",
+        state.edit_podcastindex_key,
+        y,
+        22,
+    );
+    y = layout_label_control(
+        "label_podcastindex_secret",
+        state.label_podcastindex_secret,
+        "edit_podcastindex_secret",
+        state.edit_podcastindex_secret,
+        y,
+        22,
+    );
+    layout_button(
+        "button_podcastindex_signup",
+        state.button_podcastindex_signup,
+        y,
+    );
+}
+
 unsafe fn set_active_tab(hwnd: HWND, index: i32) {
     let focus_first = with_options_state(hwnd, |state| {
         if state.focus_initialized {
@@ -5149,6 +5667,15 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
         let show_voice = index == OPTIONS_TAB_VOICE;
         let show_editor = index == OPTIONS_TAB_EDITOR;
         let show_audio = index == OPTIONS_TAB_AUDIO;
+
+        match index {
+            OPTIONS_TAB_GENERAL => layout_general_tab(state),
+            OPTIONS_TAB_VOICE => layout_voice_tab(state),
+            OPTIONS_TAB_EDITOR => layout_editor_tab(state),
+            OPTIONS_TAB_AUDIO => layout_audio_tab(state),
+            _ => {}
+        }
+        layout_dialog_buttons(hwnd, state.ok_button, state.cancel_button);
 
         for control in [
             state.label_language,

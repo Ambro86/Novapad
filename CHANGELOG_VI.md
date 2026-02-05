@@ -1,6 +1,6 @@
 # Nhật ký thay đổi
 
-Phiên bản 0.6.4 – 2026-01-30
+Phiên bản 0.6.4 – 05/02/2026
 Cải tiến
 • Chương trình đã được đổi tên thành Sonarpad để nhấn mạnh âm thanh và audio, là điểm then chốt của chương trình.
 • Thêm lựa chọn track âm thanh trong menu Phát lại cho các tệp đa phương tiện có nhiều track âm thanh (ví dụ: MKV với nhiều ngôn ngữ).
@@ -13,6 +13,8 @@ Cải tiến
 • Thêm tùy chọn trong menu ngữ cảnh để tạo sách nói từ phần chọn.
 Sửa lỗi
 • Khắc phục lỗi khiến sách nói SAPI4 có thể được tạo ra khác với mong đợi.
+• Cửa sổ Tìm trong tệp: nhấn Enter trên một kết quả giờ mở đúng vị trí đoạn trích và Esc quay lại kết quả.
+• Cửa sổ Tùy chọn: chỉnh lại bố cục hiển thị ở các tab Chung, Giọng nói, Trình soạn thảo và Âm thanh để tránh thiếu hoặc bị cắt điều khiển.
 
 Phiên bản 0.6.3 – 2026-01-30
 Cải tiến

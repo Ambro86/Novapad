@@ -1626,8 +1626,10 @@ struct EdgeStreamOptions<'a> {
     rate: i32,
     pitch: i32,
     volume: i32,
+    language: Language,
     cancel: &'a AtomicBool,
     progress_hwnd: HWND,
+    allow_http_fallback: bool,
 }
 
 async fn download_edge_chunk_ws(
@@ -1743,7 +1745,12 @@ async fn download_edge_chunk_ws(
     };
 
     if !audio_received {
-        crate::log_debug("Edge WS: no audio sent to writer.");
+        crate::log_debug(&format!(
+            "Edge WS: no audio sent to writer (chunk_index={} bytes_len={} utf16_len={}).",
+            idx,
+            chunk.text_to_read.len(),
+            utf16_len(&chunk.text_to_read)
+        ));
         return Err("Edge WS: no audio sent".to_string());
     }
 
@@ -1765,18 +1772,42 @@ async fn download_edge_chunk_ws_with_retry(
             Ok(audio) => return Ok(audio),
             Err(err) => {
                 last_err = Some(err);
+                let err_str = last_err.as_deref().unwrap_or("unknown");
                 crate::log_debug(&format!(
                     "Edge WS: chunk download failed (attempt {}/{} chunk_index={}): {}",
-                    attempt,
-                    max_retries,
-                    idx,
-                    last_err.as_deref().unwrap_or("unknown")
+                    attempt, max_retries, idx, err_str
                 ));
                 if attempt < max_retries {
-                    tokio::time::sleep(Duration::from_millis((attempt * 250) as u64)).await;
+                    let is_conn_reset = err_str.contains("os error 10054")
+                        || err_str.to_ascii_lowercase().contains("connection reset");
+                    let is_timeout = err_str.to_ascii_lowercase().contains("timeout");
+                    let base_ms = if is_conn_reset || is_timeout {
+                        1000
+                    } else {
+                        400
+                    };
+                    tokio::time::sleep(Duration::from_millis((attempt as u64) * (base_ms as u64)))
+                        .await;
                 }
             }
         }
+    }
+    if options.allow_http_fallback && !options.cancel.load(Ordering::Relaxed) {
+        crate::log_debug(&format!(
+            "Edge WS: falling back to HTTP chunk (chunk_index={})",
+            idx
+        ));
+        let request_id = Uuid::new_v4().simple().to_string();
+        return download_audio_chunk(
+            &chunk.text_to_read,
+            options.voice,
+            &request_id,
+            options.rate,
+            options.pitch,
+            options.volume,
+            options.language,
+        )
+        .await;
     }
     Err(last_err.unwrap_or_else(|| "Edge WS: chunk download failed".to_string()))
 }
@@ -1864,6 +1895,7 @@ fn finish_time_split_part(
 
 fn filter_time_split_chunks(chunks: &[String], engine: TtsEngine) -> Vec<String> {
     let mut out = Vec::new();
+    let edge_max_bytes = EDGE_TTS_MAX_BYTES.saturating_sub(512).min(3000);
     for (idx, chunk) in chunks.iter().enumerate() {
         let trimmed = chunk.trim();
         if trimmed.is_empty() {
@@ -1872,13 +1904,37 @@ fn filter_time_split_chunks(chunks: &[String], engine: TtsEngine) -> Vec<String>
         }
         let len_utf16 = utf16_len(chunk);
         let len_trim_utf16 = utf16_len(trimmed);
+        let byte_len = chunk.len();
         crate::log_debug(&format!(
             "Time-split: chunk index={} utf16_len={} trimmed_utf16_len={} bytes_len={}",
-            idx,
-            len_utf16,
-            len_trim_utf16,
-            chunk.len()
+            idx, len_utf16, len_trim_utf16, byte_len
         ));
+        if engine == TtsEngine::Edge && byte_len > edge_max_bytes {
+            crate::log_debug(&format!(
+                "Time-split: chunk index={} exceeds edge byte limit ({} > {}), re-splitting",
+                idx, byte_len, edge_max_bytes
+            ));
+            for (sub_idx, sub) in split_long_sentence_edge_with_limit(chunk, edge_max_bytes)
+                .into_iter()
+                .enumerate()
+            {
+                if sub.trim().is_empty() {
+                    crate::log_debug(&format!(
+                        "Time-split: skipping empty sub-chunk parent_index={} sub_index={}",
+                        idx, sub_idx
+                    ));
+                    continue;
+                }
+                crate::log_debug(&format!(
+                    "Time-split: sub-chunk parent_index={} sub_index={} bytes_len={}",
+                    idx,
+                    sub_idx,
+                    sub.len()
+                ));
+                out.push(sub);
+            }
+            continue;
+        }
         if len_utf16 > MAX_TTS_TEXT_LEN {
             crate::log_debug(&format!(
                 "Time-split: chunk index={} exceeds max len ({} > {}), re-splitting",
@@ -1892,6 +1948,12 @@ fn filter_time_split_chunks(chunks: &[String], engine: TtsEngine) -> Vec<String>
                     ));
                     continue;
                 }
+                crate::log_debug(&format!(
+                    "Time-split: sub-chunk parent_index={} sub_index={} bytes_len={}",
+                    idx,
+                    sub_idx,
+                    sub.len()
+                ));
                 out.push(sub);
             }
             continue;
@@ -1944,12 +2006,14 @@ fn run_split_audiobook_by_time_edge(
             rate: options.rate,
             pitch: options.pitch,
             volume: options.volume,
+            language: options.language,
             cancel: options.cancel.as_ref(),
             progress_hwnd: options.progress_hwnd,
+            allow_http_fallback: true,
         };
 
-        const MAX_PARALLEL_CHUNKS: usize = 30;
-        const CHUNK_RETRIES: usize = 3;
+        const MAX_PARALLEL_CHUNKS: usize = 8;
+        const CHUNK_RETRIES: usize = 6;
 
         let mut pending: BTreeMap<usize, Vec<u8>> = BTreeMap::new();
         let mut next_to_write = 0usize;
@@ -2233,8 +2297,8 @@ async fn download_edge_chunks_ws_parallel_to_writer(
     writer: &mut dyn std::io::Write,
     current_global_progress: &mut usize,
 ) -> Result<usize, String> {
-    const MAX_PARALLEL_CHUNKS: usize = 30;
-    const CHUNK_RETRIES: usize = 3;
+    const MAX_PARALLEL_CHUNKS: usize = 8;
+    const CHUNK_RETRIES: usize = 6;
 
     if start_index >= chunks.len() {
         return Ok(chunks.len());
@@ -2928,10 +2992,14 @@ fn split_long_sentence_by_whitespace(text: &str, max_chars: usize) -> Vec<String
 }
 
 fn split_long_sentence_edge(text: &str) -> Vec<String> {
+    split_long_sentence_edge_with_limit(text, EDGE_TTS_MAX_BYTES)
+}
+
+fn split_long_sentence_edge_with_limit(text: &str, max_bytes: usize) -> Vec<String> {
     let mut out = Vec::new();
     let mut remaining = text;
-    while remaining.len() > EDGE_TTS_MAX_BYTES {
-        let split_at = find_edge_split_idx(remaining, EDGE_TTS_MAX_BYTES);
+    while remaining.len() > max_bytes {
+        let split_at = find_edge_split_idx(remaining, max_bytes);
         if split_at == 0 || split_at >= remaining.len() {
             break;
         }
@@ -4700,8 +4768,10 @@ pub(crate) fn run_tts_audiobook_part(
             rate: options.rate,
             pitch: options.pitch,
             volume: options.volume,
+            language: options.language,
             cancel: options.cancel.as_ref(),
             progress_hwnd: options.progress_hwnd,
+            allow_http_fallback: true,
         };
 
         for attempt in 1..=WS_RETRY_MAX {

@@ -26,7 +26,11 @@ use url::Url;
 use uuid::Uuid;
 use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
 use windows::Win32::System::Power::{ES_CONTINUOUS, ES_SYSTEM_REQUIRED, SetThreadExecutionState};
-use windows::Win32::UI::WindowsAndMessaging::{PostMessageW, SendMessageW, WM_APP};
+use windows::Win32::UI::Controls::RichEdit::{CHARRANGE, EM_EXGETSEL, EM_GETTEXTRANGE, TEXTRANGEW};
+use windows::Win32::UI::WindowsAndMessaging::{
+    PostMessageW, SendMessageW, WM_APP, WM_GETTEXTLENGTH,
+};
+use windows::core::PWSTR;
 
 use crate::audio_utils::WavWriter;
 use crate::subtitle_wasapi::{decode_mp3_to_pcm, resample_pcm};
@@ -1858,6 +1862,45 @@ fn finish_time_split_part(
     Ok(())
 }
 
+fn filter_time_split_chunks(chunks: &[String], engine: TtsEngine) -> Vec<String> {
+    let mut out = Vec::new();
+    for (idx, chunk) in chunks.iter().enumerate() {
+        let trimmed = chunk.trim();
+        if trimmed.is_empty() {
+            crate::log_debug(&format!("Time-split: skipping empty chunk index={}", idx));
+            continue;
+        }
+        let len_utf16 = utf16_len(chunk);
+        let len_trim_utf16 = utf16_len(trimmed);
+        crate::log_debug(&format!(
+            "Time-split: chunk index={} utf16_len={} trimmed_utf16_len={} bytes_len={}",
+            idx,
+            len_utf16,
+            len_trim_utf16,
+            chunk.len()
+        ));
+        if len_utf16 > MAX_TTS_TEXT_LEN {
+            crate::log_debug(&format!(
+                "Time-split: chunk index={} exceeds max len ({} > {}), re-splitting",
+                idx, len_utf16, MAX_TTS_TEXT_LEN
+            ));
+            for (sub_idx, sub) in split_text_for_engine(chunk, engine).into_iter().enumerate() {
+                if sub.trim().is_empty() {
+                    crate::log_debug(&format!(
+                        "Time-split: skipping empty sub-chunk parent_index={} sub_index={}",
+                        idx, sub_idx
+                    ));
+                    continue;
+                }
+                out.push(sub);
+            }
+            continue;
+        }
+        out.push(chunk.clone());
+    }
+    out
+}
+
 fn run_split_audiobook_by_time_edge(
     chunks: &[String],
     split_minutes: u32,
@@ -1866,6 +1909,10 @@ fn run_split_audiobook_by_time_edge(
 ) -> Result<(), String> {
     if chunks.is_empty() {
         return Ok(());
+    }
+    let filtered_chunks = filter_time_split_chunks(chunks, TtsEngine::Edge);
+    if filtered_chunks.is_empty() {
+        return Err("No readable text after time-split filtering".to_string());
     }
     let split_seconds = split_minutes.saturating_mul(60) as f64;
     let extension = options
@@ -1877,7 +1924,7 @@ fn run_split_audiobook_by_time_edge(
     let is_aac = extension == "m4b" || extension == "m4a" || extension == "mp4";
     let is_mp3 = extension == "mp3";
 
-    let edge_chunks: Vec<TtsChunk> = chunks
+    let edge_chunks: Vec<TtsChunk> = filtered_chunks
         .iter()
         .map(|chunk| TtsChunk {
             text_to_read: chunk.clone(),
@@ -2057,6 +2104,10 @@ fn run_split_audiobook_by_time_sapi(
     if chunks.is_empty() {
         return Ok(());
     }
+    let filtered_chunks = filter_time_split_chunks(chunks, engine);
+    if filtered_chunks.is_empty() {
+        return Err("No readable text after time-split filtering".to_string());
+    }
     let split_seconds = split_minutes.saturating_mul(60) as f64;
     let extension = options
         .output
@@ -2076,7 +2127,7 @@ fn run_split_audiobook_by_time_sapi(
     let mut wav_channels: Option<u16> = None;
     let mut current_global_progress: usize = 0;
 
-    for chunk in chunks {
+    for chunk in filtered_chunks.iter() {
         if options.cancel.load(Ordering::Relaxed) {
             return Err(cancelled_message(options.language));
         }
@@ -2231,31 +2282,37 @@ async fn download_edge_chunks_ws_parallel_to_writer(
 }
 
 unsafe fn get_text_from_caret(hwnd_edit: HWND) -> (String, i32) {
-    let mut start: i32 = 0;
-    let mut end: i32 = 0;
+    let mut range = CHARRANGE { cpMin: 0, cpMax: 0 };
     SendMessageW(
         hwnd_edit,
-        crate::accessibility::EM_GETSEL,
-        WPARAM(&mut start as *mut _ as usize),
-        LPARAM(&mut end as *mut _ as isize),
+        EM_EXGETSEL,
+        WPARAM(0),
+        LPARAM(&mut range as *mut _ as isize),
     );
-    let caret_pos = start.min(end).max(0) as usize;
-    let full_text = get_edit_text(hwnd_edit);
+    let caret_pos = range.cpMin.min(range.cpMax).max(0);
+    let total_len = SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as i32;
+    if total_len <= 0 {
+        return (String::new(), 0);
+    }
+    let full_text = get_text_range(hwnd_edit, 0, total_len);
 
     // Se siamo all'inizio, o se siamo alla fine del testo, leggi tutto dall'inizio
     if caret_pos == 0 {
         return (full_text, 0);
     }
 
-    let wide: Vec<u16> = full_text.encode_utf16().collect();
-
     // Se la posizione del cursore Š oltre la lunghezza del testo (fine file),
     // ricomincia a leggere dall'inizio come richiesto.
-    if caret_pos >= wide.len() {
+    if caret_pos >= total_len {
         return (full_text, 0);
     }
 
-    let adjusted_pos = adjust_tts_caret_pos(&full_text, caret_pos as i32);
+    let prefix = get_text_range(hwnd_edit, 0, caret_pos);
+    let caret_utf16 = prefix.encode_utf16().count() as i32;
+
+    let wide: Vec<u16> = full_text.encode_utf16().collect();
+
+    let adjusted_pos = adjust_tts_caret_pos(&full_text, caret_utf16);
     let adjusted_pos = adjusted_pos.max(0) as usize;
     if adjusted_pos >= wide.len() {
         return (full_text, 0);
@@ -2264,6 +2321,30 @@ unsafe fn get_text_from_caret(hwnd_edit: HWND) -> (String, i32) {
         String::from_utf16_lossy(&wide[adjusted_pos..]),
         adjusted_pos as i32,
     )
+}
+
+unsafe fn get_text_range(hwnd_edit: HWND, start: i32, end: i32) -> String {
+    let len = (end - start).max(0) as usize;
+    if len == 0 {
+        return String::new();
+    }
+    let mut buf = vec![0u16; len + 1];
+    let mut text_range = TEXTRANGEW {
+        chrg: CHARRANGE {
+            cpMin: start,
+            cpMax: end,
+        },
+        lpstrText: PWSTR(buf.as_mut_ptr()),
+    };
+    let copied = SendMessageW(
+        hwnd_edit,
+        EM_GETTEXTRANGE,
+        WPARAM(0),
+        LPARAM(&mut text_range as *mut _ as isize),
+    )
+    .0 as usize;
+    let used = copied.min(len);
+    String::from_utf16_lossy(&buf[..used])
 }
 
 fn adjust_tts_caret_pos(text: &str, pos: i32) -> i32 {

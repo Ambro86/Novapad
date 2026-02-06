@@ -33,7 +33,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, BS_DEFPUSHBUTTON, CHILDID_SELF, CREATESTRUCTW, CW_USEDEFAULT, CallWindowProcW,
-    CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, DestroyWindow,
+    CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, DestroyWindow, ES_AUTOHSCROLL,
     EVENT_OBJECT_FOCUS, GWLP_USERDATA, GWLP_WNDPROC, GetCursorPos, GetDlgCtrlID, GetDlgItem,
     GetParent, GetWindowLongPtrW, GetWindowRect, HMENU, IDYES, KillTimer, MB_ICONQUESTION,
     MB_YESNO, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MessageBoxW, OBJID_CLIENT,
@@ -743,6 +743,72 @@ unsafe fn ensure_default_sources(parent: HWND) {
             crate::settings::save_settings(s.settings.clone());
         }
     });
+}
+
+pub(crate) fn sync_default_sources_for_settings(
+    settings: &mut crate::settings::AppSettings,
+) -> bool {
+    let language = settings.language;
+    let defaults = load_default_feeds(language);
+    if defaults.is_empty() {
+        return false;
+    }
+    match language {
+        crate::settings::Language::English => apply_default_sources(
+            &mut settings.rss_sources,
+            &settings.rss_removed_default_en,
+            &mut settings.rss_default_en_keys,
+            &defaults,
+        ),
+        crate::settings::Language::Swedish => apply_default_sources(
+            &mut settings.rss_sources,
+            &settings.rss_removed_default_en,
+            &mut settings.rss_default_en_keys,
+            &defaults,
+        ),
+        crate::settings::Language::Italian => apply_default_sources(
+            &mut settings.rss_sources,
+            &settings.rss_removed_default_it,
+            &mut settings.rss_default_it_keys,
+            &defaults,
+        ),
+        crate::settings::Language::Spanish => apply_default_sources(
+            &mut settings.rss_sources,
+            &settings.rss_removed_default_es,
+            &mut settings.rss_default_es_keys,
+            &defaults,
+        ),
+        crate::settings::Language::Portuguese => apply_default_sources(
+            &mut settings.rss_sources,
+            &settings.rss_removed_default_pt,
+            &mut settings.rss_default_pt_keys,
+            &defaults,
+        ),
+        crate::settings::Language::Vietnamese => apply_default_sources(
+            &mut settings.rss_sources,
+            &settings.rss_removed_default_vi,
+            &mut settings.rss_default_vi_keys,
+            &defaults,
+        ),
+        crate::settings::Language::Czech => apply_default_sources(
+            &mut settings.rss_sources,
+            &settings.rss_removed_default_cs,
+            &mut settings.rss_default_cs_keys,
+            &defaults,
+        ),
+        crate::settings::Language::Polish => apply_default_sources(
+            &mut settings.rss_sources,
+            &settings.rss_removed_default_pl,
+            &mut settings.rss_default_pl_keys,
+            &defaults,
+        ),
+        crate::settings::Language::French => apply_default_sources(
+            &mut settings.rss_sources,
+            &settings.rss_removed_default_fr,
+            &mut settings.rss_default_fr_keys,
+            &defaults,
+        ),
+    }
 }
 
 struct RssWindowState {
@@ -3773,10 +3839,7 @@ unsafe fn input_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPAR
                 WS_EX_CLIENTEDGE,
                 w!("EDIT"),
                 PCWSTR::null(),
-                WS_CHILD
-                    | WS_VISIBLE
-                    | WS_TABSTOP
-                    | WINDOW_STYLE(windows::Win32::UI::Controls::PGS_AUTOSCROLL),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
                 10,
                 28,
                 360,
@@ -3806,10 +3869,7 @@ unsafe fn input_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPAR
                 WS_EX_CLIENTEDGE,
                 w!("EDIT"),
                 PCWSTR::null(),
-                WS_CHILD
-                    | WS_VISIBLE
-                    | WS_TABSTOP
-                    | WINDOW_STYLE(windows::Win32::UI::Controls::PGS_AUTOSCROLL),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
                 10,
                 76,
                 360,

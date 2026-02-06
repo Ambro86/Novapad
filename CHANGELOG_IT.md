@@ -1,5 +1,14 @@
 # Changelog
 
+Versione 0.6.5 – 05/02/2026
+Miglioramenti
+• Traduzione spagnola migliorata grazie ad Arturo Fernandez Rivas.
+• Aggiornati i feed predefiniti: Affaritaliani, HuffPost Italia, La Gazzetta dello Sport. Rimosso Wired Italia.
+Correzioni di bug
+• La lettura da cursore (F5) ora parte esattamente dal punto del cursore. Prima poteva partire alcune righe sopra perché l'offset del cursore non coincideva con le posizioni CRLF/UTF-16.
+• Corretto un problema di redraw: digitando su una selezione il testo precedente poteva sparire finché non si spostava la selezione.
+• Corretto il problema degli audiolibri da EPUB con divisione per tempo: Edge TTS poteva fallire su chunk vuoti o troppo lunghi ("Edge audio not sent").
+
 Versione 0.6.4 – 05/02/2026
 Miglioramenti
 • Il programma e' stato rinominato in Sonarpad per dare maggiore enfasi a suono e audio, che sono la chiave di questo programma.

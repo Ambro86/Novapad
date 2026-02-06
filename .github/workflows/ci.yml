@@ -119,15 +119,9 @@ jobs:
       shell: powershell
       run: |
         Copy-Item -Path "target/release/sonarpad.exe" -Destination "target/release/sonarpad-standalone.exe" -Force
-        Copy-Item -Path "target/release/sonarpad.exe" -Destination "target/release/novapad-standalone.exe" -Force
 
     - name: Build (Release)
       run: cargo build --verbose --release
-
-    - name: Prepare Legacy Binary (Novapad)
-      shell: powershell
-      run: |
-        Copy-Item -Path "target/release/sonarpad.exe" -Destination "target/release/novapad.exe" -Force
 
     - name: Download Sentry CLI
       shell: powershell
@@ -175,32 +169,8 @@ jobs:
         name: Sonarpad-Portable
         path: target/release/sonarpad.exe
 
-    - name: Upload Portable (Exe) Legacy
-      uses: actions/upload-artifact@v4
-      with:
-        name: Novapad-Portable
-        path: target/release/novapad.exe
-
-    - name: Upload Installer (Setup)
-      uses: actions/upload-artifact@v4
-      with:
-        name: Novapad-Setup
-        path: target/release/*-setup.exe
-
-    - name: Upload Installer (MSI)
-      uses: actions/upload-artifact@v4
-      with:
-        name: Novapad-MSI
-        path: target/release/*.msi
-
     - name: Upload Standalone (Exe)
       uses: actions/upload-artifact@v4
       with:
         name: Sonarpad-Standalone
         path: target/release/sonarpad-standalone.exe
-
-    - name: Upload Standalone (Exe) Legacy
-      uses: actions/upload-artifact@v4
-      with:
-        name: Novapad-Standalone
-        path: target/release/novapad-standalone.exe

@@ -78,7 +78,7 @@ use windows::Win32::Foundation::{
     LPARAM, LRESULT, POINT, SetLastError, WIN32_ERROR, WPARAM,
 };
 use windows::Win32::Graphics::Gdi::{
-    COLOR_WINDOW, DEFAULT_GUI_FONT, GetStockObject, HBRUSH, HFONT, ScreenToClient,
+    COLOR_WINDOW, DEFAULT_GUI_FONT, GetStockObject, HBRUSH, HFONT, InvalidateRect, ScreenToClient,
 };
 use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
 use windows::Win32::System::DataExchange::COPYDATASTRUCT;
@@ -1642,7 +1642,13 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
         } else {
             Vec::new()
         };
-        let settings = load_settings();
+        let current_version = env!("CARGO_PKG_VERSION");
+        let mut settings = load_settings();
+        if settings.last_seen_changelog_version != current_version
+            && app_windows::rss_window::sync_default_sources_for_settings(&mut settings)
+        {
+            save_settings(settings.clone());
+        }
         crate::settings::sync_start_menu_shortcuts(&settings);
         let file_to_open = extra_paths.first().cloned();
         if !extra_paths.is_empty() && settings.open_behavior == OpenBehavior::NewTab {
@@ -1701,7 +1707,6 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
             LPARAM(0)
         ));
 
-        let current_version = env!("CARGO_PKG_VERSION");
         let mut show_changelog = false;
         let mut cleanup_legacy_context_menu = false;
         with_state(hwnd, |state| {
@@ -5738,6 +5743,10 @@ unsafe fn reset_line_formatting(
 
     // Unlock redraw
     SendMessageW(hwnd_edit, WM_SETREDRAW, WPARAM(1), LPARAM(0));
+    // Force repaint to avoid stale/blank regions after formatting changes.
+    if !InvalidateRect(hwnd_edit, None, BOOL(1)).as_bool() {
+        crate::log_debug("InvalidateRect failed in reset_line_formatting");
+    }
 
     // Re-enable change notifications
     SendMessageW(
@@ -5815,6 +5824,10 @@ unsafe fn highlight_misspelled_word(hwnd_edit: HWND, start: i32, end: i32) {
 
     // Unlock redraw
     SendMessageW(hwnd_edit, WM_SETREDRAW, WPARAM(1), LPARAM(0));
+    // Force repaint to avoid stale/blank regions after formatting changes.
+    if !InvalidateRect(hwnd_edit, None, BOOL(1)).as_bool() {
+        crate::log_debug("InvalidateRect failed in highlight_misspelled_word");
+    }
 
     // Re-enable change notifications
     SendMessageW(

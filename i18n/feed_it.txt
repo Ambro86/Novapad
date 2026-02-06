@@ -10,9 +10,8 @@ Il Post | https://www.ilpost.it/feed/
 Fanpage | https://www.fanpage.it/feed/
 Open | https://www.open.online/feed/
 Internazionale | https://www.internazionale.it/rss
-Affaritaliani | https://www.affaritaliani.it/rss/rss-affaritaliani.html
-HuffPost Italia | https://www.huffingtonpost.it/feed/
-Wired Italia | https://www.wired.it/feed/
+Affaritaliani | https://www.affaritaliani.it/static/rss/rssGadget.aspx?idchannel=1
+HuffPost Italia | https://www.huffingtonpost.it/rss
 DDay | https://www.dday.it/rss
 HDblog | https://www.hdblog.it/feed/
 HWUpgrade | https://www.hwupgrade.it/rss/news.xml
@@ -22,7 +21,7 @@ GameSource | https://www.gamesource.it/feed/
 Aranzulla | https://www.aranzulla.it/feed/
 Il Meteo | https://www.ilmeteo.it/rss/
 Calcio e Finanza | https://www.calcioefinanza.it/feed/
-La Gazzetta dello Sport | https://www.gazzetta.it/rss/home.xml
+La Gazzetta dello Sport | https://www.gazzetta.it/dynamic-feed/rss/section/last.xml
 Corriere dello Sport | https://www.corrieredellosport.it/rss/home.xml
 Motorsport Italia | https://www.motorsport.com/rss/f1/news/
 AlVolante | https://www.alvolante.it/rss.xml

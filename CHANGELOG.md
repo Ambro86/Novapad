@@ -1,5 +1,13 @@
 # Changelog
 
+Version 0.6.5 – 05/02/2026
+Improvements
+• Spanish translation improved thanks to Arturo Fernandez Rivas.
+Bug fixes
+• Reading from the caret (F5) now starts exactly at the cursor. Previously it could start a couple of lines above because the caret offset did not match CRLF/UTF-16 positions.
+• Fixed a redraw issue where typing over a selection could make earlier text temporarily disappear until the selection moved.
+• Fixed audiobook time-splitting from EPUBs with Edge TTS failing on empty/oversized chunks ("Edge audio not sent").
+
 Version 0.6.4 – 05/02/2026
 Improvements
 • The program has been renamed to Sonarpad to emphasize sound and audio as the key focus.

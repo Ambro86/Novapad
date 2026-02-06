@@ -1,5 +1,13 @@
 # Changelog
 
+Version 0.6.5 – 05/02/2026
+Mejoras
+• Traducción al español mejorada gracias a Arturo Fernandez Rivas.
+Correcciones de errores
+• La lectura desde el cursor (F5) ahora empieza exactamente en el cursor. Antes podía comenzar un par de líneas arriba porque el desplazamiento del cursor no coincidía con las posiciones CRLF/UTF-16.
+• Corregido un problema de redibujado: al escribir sobre una selección, el texto anterior podía desaparecer hasta mover la selección.
+• Corregido el fallo al dividir por tiempo audiolibros desde EPUB: Edge TTS podía fallar con chunks vacíos o demasiado largos ("Edge audio not sent").
+
 Version 0.6.4 – 05/02/2026
 Mejoras
 • El programa se ha renombrado a Sonarpad para dar mayor enfasis al sonido y al audio, que son la clave de este programa.

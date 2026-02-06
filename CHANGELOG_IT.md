@@ -10,6 +10,7 @@ Correzioni di bug
 • La lettura da cursore (F5) ora parte esattamente dal punto del cursore. Prima poteva partire alcune righe sopra perché l'offset del cursore non coincideva con le posizioni CRLF/UTF-16.
 • Corretto un problema di redraw: digitando su una selezione il testo precedente poteva sparire finché non si spostava la selezione.
 • Corretto il problema degli audiolibri da EPUB con divisione per tempo: Edge TTS poteva fallire su chunk vuoti o troppo lunghi ("Edge audio not sent").
+• Gli articoli RSS ora decodificano le entità HTML (es. &quot;, &amp;, &lt;, &gt;).
 
 Versione 0.6.4 – 05/02/2026
 Miglioramenti

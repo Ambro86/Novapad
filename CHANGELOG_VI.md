@@ -8,6 +8,7 @@ Sửa lỗi
 • Đọc từ vị trí con trỏ (F5) giờ bắt đầu chính xác tại con trỏ. Trước đây có thể bắt đầu vài dòng phía trên vì offset con trỏ không khớp với vị trí CRLF/UTF-16.
 • Đã sửa lỗi vẽ lại: khi gõ đè lên vùng chọn, phần văn bản phía trước có thể biến mất cho tới khi di chuyển vùng chọn.
 • Đã sửa lỗi chia audiobook từ EPUB theo thời gian: Edge TTS có thể lỗi khi gặp đoạn rỗng hoặc quá dài ("Edge audio not sent").
+• Bài viết RSS giờ giải mã các thực thể HTML (ví dụ &quot;, &amp;, &lt;, &gt;).
 
 Phiên bản 0.6.4 – 05/02/2026
 Cải tiến

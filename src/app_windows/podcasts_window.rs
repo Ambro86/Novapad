@@ -80,6 +80,8 @@ const WM_PODCAST_PLAY_READY: u32 = windows::Win32::UI::WindowsAndMessaging::WM_U
 const WM_PODCAST_PLAY_FAILED: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 313;
 const WM_PODCAST_DOWNLOAD_PROGRESS: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 314;
 const WM_PODCAST_CATEGORIES_READY: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 315;
+const WM_PODCAST_BACKGROUND_CHECK_COMPLETE: u32 =
+    windows::Win32::UI::WindowsAndMessaging::WM_USER + 316;
 
 const EM_SETSEL: u32 = 0x00B1;
 const EM_SCROLLCARET: u32 = 0x00B7;
@@ -500,6 +502,11 @@ struct FetchResult {
     hitem: isize,
     node: NodeData,
     result: Result<rss::PodcastFetchOutcome, rss::FeedFetchError>,
+}
+
+struct BackgroundCheckResult {
+    source_idx: usize,
+    newest_item_key: Option<String>,
 }
 
 struct SearchResultMsg {
@@ -973,6 +980,136 @@ unsafe fn update_source_tree_title(hwnd_tree: HWND, hitem: HTREEITEM, title: &st
         WPARAM(0),
         LPARAM(&mut tvi as *mut _ as isize),
     );
+}
+
+/// Launch background check for all podcast feeds to detect new episodes
+unsafe fn start_background_unheard_check(hwnd: HWND) {
+    let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    if parent.0 == 0 {
+        return;
+    }
+
+    let sources: Vec<(usize, String, rss::RssFeedCache)> = with_state(parent, |ps| {
+        ps.settings
+            .podcast_sources
+            .iter()
+            .enumerate()
+            .map(|(i, src)| (i, src.url.clone(), src.cache.clone()))
+            .collect()
+    })
+    .unwrap_or_default();
+
+    if sources.is_empty() {
+        return;
+    }
+
+    let fetch_config = rss_fetch_config(parent);
+    ensure_rss_http(parent);
+
+    let hwnd_raw = hwnd.0;
+    std::thread::spawn(move || {
+        let rt = match tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+        {
+            Ok(rt) => rt,
+            Err(e) => {
+                crate::log_debug(&format!("Failed to build tokio runtime: {}", e));
+                return;
+            }
+        };
+
+        rt.block_on(async {
+            let semaphore = std::sync::Arc::new(tokio::sync::Semaphore::new(4));
+            let mut handles = Vec::new();
+
+            for (idx, url, cache) in sources {
+                let sem = semaphore.clone();
+                let cfg = fetch_config;
+                let hwnd_val = hwnd_raw;
+
+                let handle = tokio::spawn(async move {
+                    let _permit = sem.acquire().await.ok()?;
+                    let result = rss::fetch_podcast_feed(&url, cache, cfg, false).await;
+                    if let Ok(outcome) = result {
+                        let newest_key = outcome
+                            .items
+                            .first()
+                            .map(episode_key)
+                            .filter(|key| !key.trim().is_empty());
+                        if newest_key.is_none() {
+                            return Some(());
+                        }
+                        let msg = Box::new(BackgroundCheckResult {
+                            source_idx: idx,
+                            newest_item_key: newest_key,
+                        });
+                        if let Err(e) = PostMessageW(
+                            HWND(hwnd_val),
+                            WM_PODCAST_BACKGROUND_CHECK_COMPLETE,
+                            WPARAM(0),
+                            LPARAM(Box::into_raw(msg) as isize),
+                        ) {
+                            crate::log_debug(&format!(
+                                "Failed to post WM_PODCAST_BACKGROUND_CHECK_COMPLETE: {}",
+                                e
+                            ));
+                        }
+                    }
+                    Some(())
+                });
+                handles.push(handle);
+            }
+
+            for h in handles {
+                if let Err(e) = h.await {
+                    crate::log_debug(&format!("Background check handle await failed: {}", e));
+                }
+            }
+        });
+    });
+}
+
+/// Process background check result - update unheard state if new episodes detected
+unsafe fn process_background_check_result(hwnd: HWND, res: BackgroundCheckResult) {
+    let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    if parent.0 == 0 {
+        return;
+    }
+
+    let Some(newest_key) = res.newest_item_key else {
+        return;
+    };
+
+    let should_mark_unheard = with_state(parent, |ps| {
+        ps.settings
+            .podcast_sources
+            .get(res.source_idx)
+            .map(|src| match &src.last_seen_guid {
+                Some(last_seen) => last_seen != &newest_key,
+                None => true,
+            })
+            .unwrap_or(false)
+    })
+    .unwrap_or(false);
+
+    if should_mark_unheard {
+        let hitem_opt = with_podcast_state(hwnd, |s| {
+            for (&h, node) in &s.node_data {
+                if let NodeData::Source(idx) = node
+                    && *idx == res.source_idx
+                {
+                    return Some(HTREEITEM(h));
+                }
+            }
+            None
+        })
+        .flatten();
+
+        if let Some(hitem) = hitem_opt {
+            set_source_unheard(hwnd, hitem, true);
+        }
+    }
 }
 
 unsafe fn update_source_title(hwnd: HWND, hitem: HTREEITEM, source_index: usize, feed_title: &str) {
@@ -5716,6 +5853,7 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
             if hwnd_tree.0 != 0 {
                 SetFocus(hwnd_tree);
             }
+            start_background_unheard_check(hwnd);
             LRESULT(0)
         }
         WM_SIZE => {
@@ -6130,6 +6268,15 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                     }
                 }
             }
+            LRESULT(0)
+        }
+        WM_PODCAST_BACKGROUND_CHECK_COMPLETE => {
+            let ptr = lparam.0 as *mut BackgroundCheckResult;
+            if ptr.is_null() {
+                return LRESULT(0);
+            }
+            let msg = unsafe { Box::from_raw(ptr) };
+            process_background_check_result(hwnd, *msg);
             LRESULT(0)
         }
         WM_PODCAST_SEARCH_COMPLETE => {

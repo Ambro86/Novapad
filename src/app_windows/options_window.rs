@@ -122,13 +122,16 @@ const OPTIONS_TAB_AUDIO: i32 = 3;
 const OPTIONS_TAB_COUNT: i32 = 4;
 const OPTIONS_CONTENT_TOP: i32 = 50;
 const OPTIONS_MARGIN_X: i32 = 20;
-const OPTIONS_LABEL_WIDTH: i32 = 220;
-const OPTIONS_CONTROL_X: i32 = OPTIONS_MARGIN_X + OPTIONS_LABEL_WIDTH + 10;
-const OPTIONS_CONTROL_WIDTH: i32 = 300;
-const OPTIONS_ROW_HEIGHT: i32 = 30;
-const OPTIONS_ROW_HEIGHT_COMPACT: i32 = 24;
-const OPTIONS_CHECKBOX_HEIGHT: i32 = 20;
-const OPTIONS_BUTTON_HEIGHT: i32 = 26;
+const OPTIONS_LABEL_WIDTH: i32 = 235;
+const OPTIONS_CONTROL_X: i32 = OPTIONS_MARGIN_X + OPTIONS_LABEL_WIDTH + 16;
+const OPTIONS_CONTROL_WIDTH: i32 = 332;
+const OPTIONS_ROW_HEIGHT: i32 = 32;
+const OPTIONS_ROW_HEIGHT_COMPACT: i32 = 26;
+const OPTIONS_CHECKBOX_HEIGHT: i32 = 22;
+const OPTIONS_BUTTON_HEIGHT: i32 = 28;
+const OPTIONS_COMBO_HEIGHT: i32 = 28;
+const OPTIONS_EDIT_HEIGHT: i32 = 24;
+const OPTIONS_SECTION_GAP: i32 = 8;
 
 pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_TAB.0 as u32 {
@@ -5306,7 +5309,7 @@ fn layout_general_tab(state: &OptionsDialogState) {
         "combo_lang",
         state.combo_lang,
         y,
-        120,
+        OPTIONS_COMBO_HEIGHT,
     );
     y = layout_label_control(
         "label_modified_marker_position",
@@ -5314,7 +5317,7 @@ fn layout_general_tab(state: &OptionsDialogState) {
         "combo_modified_marker_position",
         state.combo_modified_marker_position,
         y,
-        120,
+        OPTIONS_COMBO_HEIGHT,
     );
     y = layout_label_control(
         "label_open",
@@ -5322,7 +5325,7 @@ fn layout_general_tab(state: &OptionsDialogState) {
         "combo_open",
         state.combo_open,
         y,
-        120,
+        OPTIONS_COMBO_HEIGHT,
     );
     y = layout_label_control(
         "label_prompt_program",
@@ -5330,8 +5333,9 @@ fn layout_general_tab(state: &OptionsDialogState) {
         "combo_prompt_program",
         state.combo_prompt_program,
         y,
-        120,
+        OPTIONS_COMBO_HEIGHT,
     );
+    y += OPTIONS_SECTION_GAP;
     y = layout_checkbox("checkbox_check_updates", state.checkbox_check_updates, y);
     y = layout_checkbox(
         "checkbox_send_crash_reports",
@@ -5344,6 +5348,7 @@ fn layout_general_tab(state: &OptionsDialogState) {
         y,
     );
     y = layout_checkbox("checkbox_context_menu", state.checkbox_context_menu, y);
+    y += OPTIONS_SECTION_GAP;
     layout_label_control(
         "label_file_associations",
         state.label_file_associations,
@@ -5362,7 +5367,7 @@ fn layout_voice_tab(state: &OptionsDialogState) {
         "combo_tts_engine",
         state.combo_tts_engine,
         y,
-        120,
+        OPTIONS_COMBO_HEIGHT,
     );
     y = layout_label_control(
         "label_voice",
@@ -5370,7 +5375,7 @@ fn layout_voice_tab(state: &OptionsDialogState) {
         "combo_voice",
         state.combo_voice,
         y,
-        140,
+        OPTIONS_COMBO_HEIGHT,
     );
     y = layout_checkbox("checkbox_multilingual", state.checkbox_multilingual, y);
     y = layout_label_control(
@@ -5379,7 +5384,7 @@ fn layout_voice_tab(state: &OptionsDialogState) {
         "combo_tts_speed",
         state.combo_tts_speed,
         y,
-        140,
+        OPTIONS_COMBO_HEIGHT,
     );
     move_control_best_effort(
         "edit_tts_speed",
@@ -5387,7 +5392,7 @@ fn layout_voice_tab(state: &OptionsDialogState) {
         OPTIONS_CONTROL_X,
         y - OPTIONS_ROW_HEIGHT - 2,
         OPTIONS_CONTROL_WIDTH,
-        22,
+        OPTIONS_EDIT_HEIGHT,
     );
     y = layout_label_control(
         "label_tts_pitch",
@@ -5395,7 +5400,7 @@ fn layout_voice_tab(state: &OptionsDialogState) {
         "combo_tts_pitch",
         state.combo_tts_pitch,
         y,
-        140,
+        OPTIONS_COMBO_HEIGHT,
     );
     move_control_best_effort(
         "edit_tts_pitch",
@@ -5403,7 +5408,7 @@ fn layout_voice_tab(state: &OptionsDialogState) {
         OPTIONS_CONTROL_X,
         y - OPTIONS_ROW_HEIGHT - 2,
         OPTIONS_CONTROL_WIDTH,
-        22,
+        OPTIONS_EDIT_HEIGHT,
     );
     y = layout_label_control(
         "label_tts_volume",
@@ -5411,7 +5416,7 @@ fn layout_voice_tab(state: &OptionsDialogState) {
         "combo_tts_volume",
         state.combo_tts_volume,
         y,
-        140,
+        OPTIONS_COMBO_HEIGHT,
     );
     move_control_best_effort(
         "edit_tts_volume",
@@ -5419,11 +5424,12 @@ fn layout_voice_tab(state: &OptionsDialogState) {
         OPTIONS_CONTROL_X,
         y - OPTIONS_ROW_HEIGHT - 2,
         OPTIONS_CONTROL_WIDTH,
-        22,
+        OPTIONS_EDIT_HEIGHT,
     );
     y = layout_checkbox("checkbox_tts_manual", state.checkbox_tts_manual, y);
     y = layout_button_compact("button_tts_preview", state.button_tts_preview, y);
-    y = layout_button_compact("button_tts_insert_tag", state.button_tts_insert_tag, y) + 6;
+    y = layout_button_compact("button_tts_insert_tag", state.button_tts_insert_tag, y);
+    y += OPTIONS_SECTION_GAP;
     y = layout_checkbox(
         "checkbox_split_on_newline",
         state.checkbox_split_on_newline,
@@ -5434,13 +5440,14 @@ fn layout_voice_tab(state: &OptionsDialogState) {
         state.checkbox_use_dialogue_voice,
         y,
     );
+    y += OPTIONS_SECTION_GAP;
     y = layout_label_control(
         "label_dialogue_engine",
         state.label_dialogue_engine,
         "combo_dialogue_engine",
         state.combo_dialogue_engine,
         y,
-        120,
+        OPTIONS_COMBO_HEIGHT,
     );
     y = layout_label_control(
         "label_dialogue_voice",
@@ -5448,7 +5455,7 @@ fn layout_voice_tab(state: &OptionsDialogState) {
         "combo_dialogue_voice",
         state.combo_dialogue_voice,
         y,
-        200,
+        OPTIONS_COMBO_HEIGHT,
     );
     y = layout_label_control(
         "label_dialogue_voice_rate",
@@ -5456,7 +5463,7 @@ fn layout_voice_tab(state: &OptionsDialogState) {
         "combo_dialogue_voice_rate",
         state.combo_dialogue_voice_rate,
         y,
-        140,
+        OPTIONS_COMBO_HEIGHT,
     );
     y = layout_label_control(
         "label_dialogue_voice_pitch",
@@ -5464,7 +5471,7 @@ fn layout_voice_tab(state: &OptionsDialogState) {
         "combo_dialogue_voice_pitch",
         state.combo_dialogue_voice_pitch,
         y,
-        140,
+        OPTIONS_COMBO_HEIGHT,
     );
     y = layout_label_control(
         "label_dialogue_voice_volume",
@@ -5472,7 +5479,7 @@ fn layout_voice_tab(state: &OptionsDialogState) {
         "combo_dialogue_voice_volume",
         state.combo_dialogue_voice_volume,
         y,
-        140,
+        OPTIONS_COMBO_HEIGHT,
     );
     layout_button_compact(
         "button_dialogue_voice_preview",
@@ -5497,7 +5504,7 @@ fn layout_editor_tab(state: &OptionsDialogState) {
         "combo_spellcheck_language",
         state.combo_spellcheck_language,
         y,
-        200,
+        OPTIONS_COMBO_HEIGHT,
     );
     y = layout_label_control(
         "label_dictionary_translation",
@@ -5505,7 +5512,7 @@ fn layout_editor_tab(state: &OptionsDialogState) {
         "combo_dictionary_translation",
         state.combo_dictionary_translation,
         y,
-        200,
+        OPTIONS_COMBO_HEIGHT,
     );
     y = layout_label_control(
         "label_wikipedia_language",
@@ -5513,7 +5520,7 @@ fn layout_editor_tab(state: &OptionsDialogState) {
         "combo_wikipedia_language",
         state.combo_wikipedia_language,
         y,
-        200,
+        OPTIONS_COMBO_HEIGHT,
     );
     y = layout_label_control(
         "label_wrap_width",
@@ -5521,7 +5528,7 @@ fn layout_editor_tab(state: &OptionsDialogState) {
         "edit_wrap_width",
         state.edit_wrap_width,
         y,
-        22,
+        OPTIONS_EDIT_HEIGHT,
     );
     y = layout_label_control(
         "label_indentation",
@@ -5529,7 +5536,7 @@ fn layout_editor_tab(state: &OptionsDialogState) {
         "combo_indentation",
         state.combo_indentation,
         y,
-        200,
+        OPTIONS_COMBO_HEIGHT,
     );
     y = layout_label_control(
         "label_tab_width",
@@ -5537,7 +5544,7 @@ fn layout_editor_tab(state: &OptionsDialogState) {
         "combo_tab_width",
         state.combo_tab_width,
         y,
-        200,
+        OPTIONS_COMBO_HEIGHT,
     );
     y = layout_label_control(
         "label_space_width",
@@ -5545,7 +5552,7 @@ fn layout_editor_tab(state: &OptionsDialogState) {
         "combo_space_width",
         state.combo_space_width,
         y,
-        200,
+        OPTIONS_COMBO_HEIGHT,
     );
     y = layout_label_control(
         "label_quote_prefix",
@@ -5553,7 +5560,7 @@ fn layout_editor_tab(state: &OptionsDialogState) {
         "edit_quote_prefix",
         state.edit_quote_prefix,
         y,
-        22,
+        OPTIONS_EDIT_HEIGHT,
     );
     y = layout_label_control(
         "label_interpreter_path",
@@ -5561,20 +5568,21 @@ fn layout_editor_tab(state: &OptionsDialogState) {
         "edit_interpreter_path",
         state.edit_interpreter_path,
         y,
-        22,
+        OPTIONS_EDIT_HEIGHT,
     );
     y = layout_button_compact_height(
         "button_interpreter_browse",
         state.button_interpreter_browse,
         y,
-        24,
+        OPTIONS_BUTTON_HEIGHT,
     );
     y = layout_button_compact_height(
         "button_interpreter_search",
         state.button_interpreter_search,
         y,
-        24,
+        OPTIONS_BUTTON_HEIGHT,
     );
+    y += OPTIONS_SECTION_GAP;
     layout_checkbox("checkbox_move_cursor", state.checkbox_move_cursor, y);
 }
 
@@ -5604,7 +5612,7 @@ fn layout_audio_tab(state: &OptionsDialogState) {
         "combo_audio_skip",
         state.combo_audio_skip,
         y,
-        140,
+        OPTIONS_COMBO_HEIGHT,
     );
     y = layout_label_control(
         "label_audio_split",
@@ -5612,7 +5620,7 @@ fn layout_audio_tab(state: &OptionsDialogState) {
         "combo_audio_split",
         state.combo_audio_split,
         y,
-        140,
+        OPTIONS_COMBO_HEIGHT,
     );
     if show_time_split {
         y = layout_label_control(
@@ -5621,7 +5629,7 @@ fn layout_audio_tab(state: &OptionsDialogState) {
             "combo_audio_split_minutes",
             state.combo_audio_split_minutes,
             y,
-            140,
+            OPTIONS_COMBO_HEIGHT,
         );
         y = layout_label_control(
             "label_audio_split_start_number",
@@ -5629,7 +5637,7 @@ fn layout_audio_tab(state: &OptionsDialogState) {
             "combo_audio_split_start_number",
             state.combo_audio_split_start_number,
             y,
-            140,
+            OPTIONS_COMBO_HEIGHT,
         );
     }
     if show_text_split {
@@ -5639,7 +5647,7 @@ fn layout_audio_tab(state: &OptionsDialogState) {
             "edit_audio_split_text",
             state.edit_audio_split_text,
             y,
-            22,
+            OPTIONS_EDIT_HEIGHT,
         );
         y = layout_checkbox(
             "checkbox_audio_split_requires_newline",
@@ -5652,6 +5660,7 @@ fn layout_audio_tab(state: &OptionsDialogState) {
         state.checkbox_audio_split_epub_chapters,
         y,
     );
+    y += OPTIONS_SECTION_GAP;
     y = layout_checkbox(
         "checkbox_subtitle_ducking",
         state.checkbox_subtitle_ducking,
@@ -5663,7 +5672,7 @@ fn layout_audio_tab(state: &OptionsDialogState) {
         "combo_subtitle_mode",
         state.combo_subtitle_mode,
         y,
-        140,
+        OPTIONS_COMBO_HEIGHT,
     );
     y = layout_label_control(
         "label_subtitle_offset",
@@ -5671,15 +5680,16 @@ fn layout_audio_tab(state: &OptionsDialogState) {
         "edit_subtitle_offset",
         state.edit_subtitle_offset,
         y,
-        22,
+        OPTIONS_EDIT_HEIGHT,
     );
+    y += OPTIONS_SECTION_GAP;
     y = layout_label_control(
         "label_podcast_cache_limit",
         state.label_podcast_cache_limit,
         "edit_podcast_cache_limit",
         state.edit_podcast_cache_limit,
         y,
-        22,
+        OPTIONS_EDIT_HEIGHT,
     );
     y = layout_label_control(
         "label_podcastindex_key",
@@ -5687,7 +5697,7 @@ fn layout_audio_tab(state: &OptionsDialogState) {
         "edit_podcastindex_key",
         state.edit_podcastindex_key,
         y,
-        22,
+        OPTIONS_EDIT_HEIGHT,
     );
     y = layout_label_control(
         "label_podcastindex_secret",
@@ -5695,7 +5705,7 @@ fn layout_audio_tab(state: &OptionsDialogState) {
         "edit_podcastindex_secret",
         state.edit_podcastindex_secret,
         y,
-        22,
+        OPTIONS_EDIT_HEIGHT,
     );
     layout_button(
         "button_podcastindex_signup",

@@ -99,8 +99,20 @@ const LOAD_MORE_COUNT: usize = 5;
 // - collapse multiple blank lines to a single blank line
 // - replace embedded NULs (which would truncate Win32 edit text)
 fn normalize_article_text(s: &str) -> String {
-    let no_nul: String = s.chars().map(|c| if c == '\0' { ' ' } else { c }).collect();
+    let decoded = decode_basic_html_entities(s);
+    let no_nul: String = decoded
+        .chars()
+        .map(|c| if c == '\0' { ' ' } else { c })
+        .collect();
     collapse_blank_lines(&no_nul)
+}
+
+fn decode_basic_html_entities(s: &str) -> String {
+    let mut out = s.replace("&amp;", "&").replace("&amp", "&");
+    out = out.replace("&quot;", "\"").replace("&quot", "\"");
+    out = out.replace("&lt;", "<").replace("&lt", "<");
+    out = out.replace("&gt;", ">").replace("&gt", ">");
+    out
 }
 
 fn normalize_rss_url_key(url: &str) -> String {

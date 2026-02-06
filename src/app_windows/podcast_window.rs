@@ -33,8 +33,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     MB_OKCANCEL, MSG, MessageBoxW, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow,
     SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_CLOSE, WM_COMMAND,
     WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WM_TIMER, WNDCLASSW, WS_CAPTION,
-    WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP,
-    WS_VISIBLE,
+    WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::PCWSTR;
 
@@ -253,7 +252,7 @@ pub fn open(parent: HWND) {
 
     let window = unsafe {
         CreateWindowExW(
-            WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
+            WS_EX_CONTROLPARENT,
             PCWSTR(class_name.as_ptr()),
             PCWSTR(title.as_ptr()),
             WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
@@ -261,7 +260,7 @@ pub fn open(parent: HWND) {
             CW_USEDEFAULT,
             640,
             620,
-            parent,
+            None,
             None,
             hinstance,
             Some(parent.0 as *const std::ffi::c_void),
@@ -277,7 +276,6 @@ pub fn open(parent: HWND) {
             {
                 crate::log_debug("Failed to access podcast state");
             }
-            EnableWindow(parent, false);
             SetForegroundWindow(window);
         }
     }
@@ -1304,7 +1302,6 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                         crate::log_debug("Failed to access podcast state");
                     }
                 }
-                EnableWindow(state.parent, true);
                 unsafe {
                     if let Err(e) =
                         PostMessageW(state.parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0))

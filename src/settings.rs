@@ -248,6 +248,8 @@ pub struct AppSettings {
     pub audiobook_split_text: String,
     pub audiobook_split_text_requires_newline: bool,
     #[serde(default)]
+    pub audiobook_split_by_epub_chapter: bool,
+    #[serde(default)]
     pub audiobook_split_by_time: bool,
     #[serde(default = "default_audiobook_split_minutes")]
     pub audiobook_split_minutes: u32,
@@ -441,6 +443,7 @@ impl Default for AppSettings {
             audiobook_split_by_text: false,
             audiobook_split_text: String::new(),
             audiobook_split_text_requires_newline: true,
+            audiobook_split_by_epub_chapter: false,
             audiobook_split_by_time: false,
             audiobook_split_minutes: default_audiobook_split_minutes(),
             audiobook_split_start_number: default_audiobook_split_start_number(),

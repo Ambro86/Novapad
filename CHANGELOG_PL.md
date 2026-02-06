@@ -3,6 +3,7 @@
 Wersja 0.6.5 – 05/02/2026
 Ulepszenia
 • Poprawiona wersja hiszpańska dzięki Arturo Fernandez Rivas.
+• Dodano opcję dzielenia audiobooków EPUB na rozdziały.
 Poprawki błędów
 • Odczyt od kursora (F5) teraz zaczyna się dokładnie w miejscu kursora. Wcześniej mógł startować kilka linii wyżej, bo offset kursora nie odpowiadał pozycjom CRLF/UTF-16.
 • Naprawiono problem z odświeżaniem: przy pisaniu na zaznaczeniu wcześniejszy tekst mógł znikać do czasu przesunięcia zaznaczenia.

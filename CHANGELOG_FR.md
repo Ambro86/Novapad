@@ -7,6 +7,7 @@ Corrections de bugs
 • La lecture depuis le curseur (F5) démarre exactement au niveau du curseur. Avant, elle pouvait commencer quelques lignes au-dessus car l’offset du curseur ne correspondait pas aux positions CRLF/UTF-16.
 • Correction d’un problème de redessin : en tapant sur une sélection, le texte précédent pouvait disparaître jusqu’au déplacement de la sélection.
 • Correction d’un échec lors du découpage par durée des EPUB : Edge TTS pouvait échouer avec des blocs vides ou trop longs ("Edge audio not sent").
+• La fenêtre d’enregistrement de podcast est maintenant indépendante : vous pouvez utiliser l’éditeur pendant l’enregistrement.
 
 Version 0.6.4 – 05/02/2026
 Améliorations

@@ -74,6 +74,7 @@ const OPTIONS_ID_AUDIO_SPLIT_MINUTES: usize = 6058;
 const OPTIONS_ID_AUDIO_SPLIT_START_NUMBER: usize = 6059;
 const OPTIONS_ID_AUDIO_SPLIT_TEXT: usize = 6013;
 const OPTIONS_ID_AUDIO_SPLIT_REQUIRE_NEWLINE: usize = 6016;
+const OPTIONS_ID_AUDIO_SPLIT_EPUB_CHAPTERS: usize = 6063;
 const OPTIONS_ID_SUBTITLE_MODE: usize = 6046;
 const OPTIONS_ID_SUBTITLE_DUCKING: usize = 6045;
 const OPTIONS_ID_SUBTITLE_OFFSET: usize = 6047;
@@ -227,6 +228,7 @@ struct OptionsDialogState {
     label_audio_split_text: HWND,
     edit_audio_split_text: HWND,
     checkbox_audio_split_requires_newline: HWND,
+    checkbox_audio_split_epub_chapters: HWND,
     checkbox_subtitle_ducking: HWND,
     label_subtitle_offset: HWND,
     edit_subtitle_offset: HWND,
@@ -349,6 +351,7 @@ struct OptionsLabels {
     label_audio_split_start_number: String,
     label_audio_split_text: String,
     label_audio_split_requires_newline: String,
+    label_audio_split_epub_chapters: String,
     label_subtitle_ducking: String,
     label_subtitle_offset: String,
     label_podcast_cache_limit: String,
@@ -470,6 +473,10 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_audio_split_requires_newline: i18n::tr(
             language,
             "options.label.audio_split_requires_newline",
+        ),
+        label_audio_split_epub_chapters: i18n::tr(
+            language,
+            "options.label.audio_split_epub_chapters",
         ),
         label_subtitle_ducking: i18n::tr(language, "options.label.subtitle_ducking"),
         label_subtitle_offset: i18n::tr(language, "options.label.subtitle_offset"),
@@ -1408,6 +1415,22 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
             );
             y += 24;
 
+            let checkbox_audio_split_epub_chapters = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_audio_split_epub_chapters).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                170,
+                y,
+                300,
+                20,
+                hwnd,
+                HMENU(OPTIONS_ID_AUDIO_SPLIT_EPUB_CHAPTERS as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 24;
+
             let checkbox_subtitle_ducking = CreateWindowExW(
                 Default::default(),
                 WC_BUTTON,
@@ -2188,6 +2211,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 label_audio_split_text,
                 edit_audio_split_text,
                 checkbox_audio_split_requires_newline,
+                checkbox_audio_split_epub_chapters,
                 checkbox_subtitle_ducking,
                 label_subtitle_offset,
                 edit_subtitle_offset,
@@ -2294,6 +2318,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 label_audio_split_text,
                 edit_audio_split_text,
                 checkbox_audio_split_requires_newline,
+                checkbox_audio_split_epub_chapters,
                 checkbox_subtitle_ducking,
                 label_subtitle_offset,
                 edit_subtitle_offset,
@@ -2621,6 +2646,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         _label_audio_split_text,
         edit_audio_split_text,
         checkbox_audio_split_requires_newline,
+        checkbox_audio_split_epub_chapters,
         checkbox_subtitle_ducking,
         _label_podcast_cache_limit,
         edit_podcast_cache_limit,
@@ -2692,6 +2718,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.label_audio_split_text,
             state.edit_audio_split_text,
             state.checkbox_audio_split_requires_newline,
+            state.checkbox_audio_split_epub_chapters,
             state.checkbox_subtitle_ducking,
             state.label_podcast_cache_limit,
             state.edit_podcast_cache_limit,
@@ -3118,6 +3145,16 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         checkbox_audio_split_requires_newline,
         BM_SETCHECK,
         WPARAM(if settings.audiobook_split_text_requires_newline {
+            BST_CHECKED.0 as usize
+        } else {
+            0
+        }),
+        LPARAM(0),
+    );
+    SendMessageW(
+        checkbox_audio_split_epub_chapters,
+        BM_SETCHECK,
+        WPARAM(if settings.audiobook_split_by_epub_chapter {
             BST_CHECKED.0 as usize
         } else {
             0
@@ -4362,6 +4399,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         combo_audio_split_start_number,
         edit_audio_split_text,
         checkbox_audio_split_requires_newline,
+        checkbox_audio_split_epub_chapters,
         checkbox_subtitle_ducking,
         edit_podcast_cache_limit,
         edit_podcastindex_key,
@@ -4418,6 +4456,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.combo_audio_split_start_number,
             state.edit_audio_split_text,
             state.checkbox_audio_split_requires_newline,
+            state.checkbox_audio_split_epub_chapters,
             state.checkbox_subtitle_ducking,
             state.edit_podcast_cache_limit,
             state.edit_podcastindex_key,
@@ -4598,6 +4637,14 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             == BST_CHECKED.0;
     settings.audiobook_split_text_requires_newline = SendMessageW(
         checkbox_audio_split_requires_newline,
+        BM_GETCHECK,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0 as u32
+        == BST_CHECKED.0;
+    settings.audiobook_split_by_epub_chapter = SendMessageW(
+        checkbox_audio_split_epub_chapters,
         BM_GETCHECK,
         WPARAM(0),
         LPARAM(0),
@@ -5601,6 +5648,11 @@ fn layout_audio_tab(state: &OptionsDialogState) {
         );
     }
     y = layout_checkbox(
+        "checkbox_audio_split_epub_chapters",
+        state.checkbox_audio_split_epub_chapters,
+        y,
+    );
+    y = layout_checkbox(
         "checkbox_subtitle_ducking",
         state.checkbox_subtitle_ducking,
         y,
@@ -5771,6 +5823,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.label_audio_split_text,
             state.edit_audio_split_text,
             state.checkbox_audio_split_requires_newline,
+            state.checkbox_audio_split_epub_chapters,
             state.checkbox_subtitle_ducking,
             state.label_subtitle_mode,
             state.combo_subtitle_mode,

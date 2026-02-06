@@ -3,6 +3,7 @@
 Version 0.6.5 – 05/02/2026
 Mejoras
 • Traducción al español mejorada gracias a Arturo Fernandez Rivas.
+• Se agregó una opción para dividir audiolibros EPUB por capítulos.
 Correcciones de errores
 • La lectura desde el cursor (F5) ahora empieza exactamente en el cursor. Antes podía comenzar un par de líneas arriba porque el desplazamiento del cursor no coincidía con las posiciones CRLF/UTF-16.
 • Corregido un problema de redibujado: al escribir sobre una selección, el texto anterior podía desaparecer hasta mover la selección.

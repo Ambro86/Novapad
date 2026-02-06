@@ -4,6 +4,7 @@ Versione 0.6.5 – 05/02/2026
 Miglioramenti
 • Traduzione spagnola migliorata grazie ad Arturo Fernandez Rivas.
 • Aggiornati i feed predefiniti: Affaritaliani, HuffPost Italia, La Gazzetta dello Sport. Rimosso Wired Italia.
+• Aggiunta un'opzione per dividere gli audiolibri EPUB per capitoli.
 Correzioni di bug
 • La lettura da cursore (F5) ora parte esattamente dal punto del cursore. Prima poteva partire alcune righe sopra perché l'offset del cursore non coincideva con le posizioni CRLF/UTF-16.
 • Corretto un problema di redraw: digitando su una selezione il testo precedente poteva sparire finché non si spostava la selezione.

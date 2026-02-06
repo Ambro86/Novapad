@@ -39,14 +39,16 @@ use crate::accessibility::{EM_REPLACESEL, ES_READONLY, to_wide, to_wide_normaliz
 use crate::app_windows::find_in_files_window::browse_for_folder;
 use crate::file_handler::{
     decode_text, is_audio_path, is_doc_path, is_docx_path, is_epub_path, is_html_path, is_pdf_path,
-    is_ppt_path, is_pptx_path, is_spreadsheet_path, read_doc_text, read_docx_text, read_epub_text,
-    read_html_text, read_pdf_text, read_ppt_text, read_spreadsheet_text,
+    is_ppt_path, is_pptx_path, is_spreadsheet_path, read_doc_text, read_docx_text,
+    read_epub_chapters, read_epub_text, read_html_text, read_pdf_text, read_ppt_text,
+    read_spreadsheet_text,
 };
 use crate::i18n;
 use crate::settings::{DictionaryEntry, Language, TtsEngine};
 use crate::tts_engine::{
     MixedAudiobookConfig, TtsChunk, build_audiobook_parts_by_positions,
-    build_mixed_audiobook_parts_by_positions, collect_marker_entries, has_voice_tags,
+    build_audiobook_parts_from_sections, build_mixed_audiobook_parts_by_positions,
+    build_mixed_audiobook_parts_from_sections, collect_marker_entries, has_voice_tags,
     prepare_tts_text, render_mixed_audiobook_part, run_tts_audiobook_part, split_into_tts_chunks,
     split_text, strip_dashed_lines,
 };
@@ -222,6 +224,7 @@ struct TtsSettings {
     audiobook_split_by_text: bool,
     audiobook_split_text: String,
     audiobook_split_text_requires_newline: bool,
+    audiobook_split_by_epub_chapter: bool,
     audiobook_split_by_time: bool,
     audiobook_split_minutes: u32,
     audiobook_split_start_number: u32,
@@ -1539,6 +1542,7 @@ fn load_tts_settings(parent: HWND, voice: String, language: Language) -> TtsSett
             audiobook_split_text_requires_newline: state
                 .settings
                 .audiobook_split_text_requires_newline,
+            audiobook_split_by_epub_chapter: state.settings.audiobook_split_by_epub_chapter,
             audiobook_split_by_time: state.settings.audiobook_split_by_time,
             audiobook_split_minutes: state.settings.audiobook_split_minutes,
             audiobook_split_start_number: state.settings.audiobook_split_start_number,
@@ -1557,6 +1561,7 @@ fn load_tts_settings(parent: HWND, voice: String, language: Language) -> TtsSett
             audiobook_split_by_text: false,
             audiobook_split_text: String::new(),
             audiobook_split_text_requires_newline: true,
+            audiobook_split_by_epub_chapter: false,
             audiobook_split_by_time: false,
             audiobook_split_minutes: 5,
             audiobook_split_start_number: 1,
@@ -1801,23 +1806,74 @@ fn export_single_audiobook(
     cancel: Arc<AtomicBool>,
     sapi_voice: Option<&crate::sapi5_engine::SapiVoice>,
 ) -> Result<Vec<PathBuf>, String> {
-    let text = read_text_for_audiobook(input, tts.language)?;
-    if text.trim().is_empty() {
+    let use_epub_split = tts.audiobook_split_by_epub_chapter && is_epub_path(input);
+    let epub_chapters = if use_epub_split {
+        read_epub_chapters(input, tts.language)?
+    } else {
+        Vec::new()
+    };
+    let text = if use_epub_split {
+        String::new()
+    } else {
+        read_text_for_audiobook(input, tts.language)?
+    };
+    if use_epub_split {
+        if epub_chapters
+            .iter()
+            .all(|chapter| chapter.trim().is_empty())
+        {
+            return Err(crate::settings::tts_no_text_message(tts.language));
+        }
+    } else if text.trim().is_empty() {
         return Err(crate::settings::tts_no_text_message(tts.language));
     }
-    let cleaned = strip_dashed_lines(&text);
-    let split_by_time = tts.audiobook_split_by_time;
+    let cleaned = if use_epub_split {
+        String::new()
+    } else {
+        strip_dashed_lines(&text)
+    };
+    let split_by_time = if use_epub_split {
+        false
+    } else {
+        tts.audiobook_split_by_time
+    };
     let split_minutes = tts.audiobook_split_minutes.clamp(1, 20);
     let split_start_number = tts.audiobook_split_start_number.clamp(1, 99);
-    let split_by_text = tts.audiobook_split_by_text && !split_by_time;
-    let split_parts = if split_by_time {
+    let split_by_text = tts.audiobook_split_by_text && !split_by_time && !use_epub_split;
+    let split_parts = if split_by_time || use_epub_split {
         0
     } else {
         tts.audiobook_split
     };
-    let mixed_needed = has_voice_tags(&cleaned);
+    let mixed_needed = if use_epub_split {
+        epub_chapters.iter().any(|chapter| has_voice_tags(chapter))
+    } else {
+        has_voice_tags(&cleaned)
+    };
 
-    let (parts, mixed_parts) = if split_by_text {
+    let (parts, mixed_parts) = if use_epub_split {
+        if mixed_needed {
+            (
+                None,
+                build_mixed_audiobook_parts_from_sections(
+                    &epub_chapters,
+                    tts.split_on_newline,
+                    &tts.dictionary,
+                    tts.tts_engine,
+                ),
+            )
+        } else {
+            (
+                build_audiobook_parts_from_sections(
+                    &epub_chapters,
+                    tts.split_on_newline,
+                    &tts.dictionary,
+                    tts.tts_engine,
+                ),
+                None,
+            )
+        }
+    } else if split_by_text {
         let (normalized, entries) = collect_marker_entries(
             &cleaned,
             &tts.audiobook_split_text,
@@ -1854,6 +1910,9 @@ fn export_single_audiobook(
     } else {
         (None, None)
     };
+    if use_epub_split && parts.is_none() && mixed_parts.is_none() {
+        return Err(crate::settings::tts_no_text_message(tts.language));
+    }
 
     if mixed_needed {
         let parts = match mixed_parts {

@@ -788,6 +788,58 @@ pub fn read_epub_text(path: &Path, language: Language) -> Result<String, String>
     Ok(full_text)
 }
 
+pub fn read_epub_chapters(path: &Path, language: Language) -> Result<Vec<String>, String> {
+    use epub::doc::EpubDoc;
+    let mut doc = EpubDoc::new(path).map_err(|e| {
+        i18n::tr_f(
+            language,
+            "file_handler.epub_read_error",
+            &[("err", &e.to_string())],
+        )
+    })?;
+    let mut chapters = Vec::new();
+
+    let spine = doc.spine.clone();
+    for item in spine {
+        if let Some((content, mime)) = doc.get_resource(&item.idref)
+            && (mime.contains("xhtml") || mime.contains("html") || mime.contains("xml"))
+        {
+            let text = String::from_utf8(content.clone())
+                .unwrap_or_else(|_| String::from_utf8_lossy(&content).to_string());
+
+            let cleaned = html_to_text(&text);
+            let mut lines: Vec<String> = Vec::new();
+            for line in cleaned.lines() {
+                let trimmed = line.trim();
+                if trimmed.is_empty() || (trimmed.starts_with("part") && trimmed.len() <= 12) {
+                    continue;
+                }
+                lines.push(trimmed.to_string());
+            }
+            if lines.len() >= 2 {
+                let first = lines[0].trim();
+                let second = lines[1].trim();
+                if !first.is_empty() && first == second {
+                    lines.remove(1);
+                }
+            }
+            let mut chapter_text = lines.join("\n");
+            if chapter_text.ends_with('\n') {
+                chapter_text.pop();
+            }
+            if !chapter_text.trim().is_empty() {
+                chapters.push(chapter_text);
+            }
+        }
+    }
+
+    if chapters.is_empty() {
+        return Err(i18n::tr(language, "file_handler.epub_no_text"));
+    }
+
+    Ok(chapters)
+}
+
 pub fn read_html_text(path: &Path, language: Language) -> Result<(String, TextEncoding), String> {
     let bytes = std::fs::read(path)
         .map_err(|err| crate::settings::error_open_file_message(language, err))?;

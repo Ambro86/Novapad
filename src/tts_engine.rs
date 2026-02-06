@@ -1,4 +1,5 @@
 use crate::editor_manager::get_edit_text;
+use crate::file_handler::{is_epub_path, read_epub_chapters};
 use crate::i18n;
 use crate::settings;
 use crate::settings::{
@@ -2675,6 +2676,26 @@ fn split_text_by_positions(text: &str, positions: &[usize]) -> Option<Vec<String
     Some(parts)
 }
 
+pub(crate) fn build_audiobook_parts_from_sections(
+    sections: &[String],
+    split_on_newline: bool,
+    dictionary: &[DictionaryEntry],
+    engine: TtsEngine,
+) -> Option<Vec<Vec<String>>> {
+    let mut parts = Vec::new();
+    for (idx, section) in sections.iter().enumerate() {
+        let cleaned = strip_dashed_lines(section);
+        let prepared = prepare_tts_text(&cleaned, split_on_newline, dictionary);
+        let chunks = split_text_for_engine(&prepared, engine);
+        if chunks.is_empty() {
+            crate::log_debug(&format!("EPUB split: skipping empty chapter index={}", idx));
+            continue;
+        }
+        parts.push(chunks);
+    }
+    if parts.is_empty() { None } else { Some(parts) }
+}
+
 pub(crate) fn build_audiobook_parts_by_positions(
     text: &str,
     positions: &[usize],
@@ -2704,6 +2725,28 @@ pub(crate) fn build_audiobook_parts_by_positions(
     } else {
         Some(parts_chunks)
     }
+}
+
+pub(crate) fn build_mixed_audiobook_parts_from_sections(
+    sections: &[String],
+    split_on_newline: bool,
+    dictionary: &[DictionaryEntry],
+    tts_engine: TtsEngine,
+) -> Option<Vec<Vec<TtsChunk>>> {
+    let mut parts = Vec::new();
+    for (idx, section) in sections.iter().enumerate() {
+        let cleaned = strip_dashed_lines(section);
+        let chunks = split_into_tts_chunks(&cleaned, split_on_newline, dictionary, tts_engine);
+        if chunks.is_empty() {
+            crate::log_debug(&format!(
+                "EPUB split (mixed): skipping empty chapter index={}",
+                idx
+            ));
+            continue;
+        }
+        parts.push(chunks);
+    }
+    if parts.is_empty() { None } else { Some(parts) }
 }
 
 pub(crate) fn build_mixed_audiobook_parts_by_positions(
@@ -3151,7 +3194,12 @@ fn split_tts_chunks_by_parts(chunks: &[TtsChunk], parts: usize) -> Vec<Vec<TtsCh
     out
 }
 
-fn start_audiobook_with_text(hwnd: HWND, text: String, suggested_name: Option<String>) {
+fn start_audiobook_with_text(
+    hwnd: HWND,
+    text: String,
+    suggested_name: Option<String>,
+    epub_chapters: Option<Vec<String>>,
+) {
     let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     if text.trim().is_empty() {
         unsafe {
@@ -3174,6 +3222,7 @@ fn start_audiobook_with_text(hwnd: HWND, text: String, suggested_name: Option<St
         audiobook_split_by_text,
         audiobook_split_text,
         audiobook_split_text_requires_newline,
+        audiobook_split_by_epub_chapter,
         audiobook_split_by_time,
         audiobook_split_minutes,
         audiobook_split_start_number,
@@ -3191,6 +3240,7 @@ fn start_audiobook_with_text(hwnd: HWND, text: String, suggested_name: Option<St
                 state.settings.audiobook_split_by_text,
                 state.settings.audiobook_split_text.clone(),
                 state.settings.audiobook_split_text_requires_newline,
+                state.settings.audiobook_split_by_epub_chapter,
                 state.settings.audiobook_split_by_time,
                 state.settings.audiobook_split_minutes,
                 state.settings.audiobook_split_start_number,
@@ -3210,6 +3260,7 @@ fn start_audiobook_with_text(hwnd: HWND, text: String, suggested_name: Option<St
         String::new(),
         true,
         false,
+        false,
         5,
         1,
         128,
@@ -3221,11 +3272,18 @@ fn start_audiobook_with_text(hwnd: HWND, text: String, suggested_name: Option<St
     ));
 
     let cleaned = strip_dashed_lines(&text);
-    let split_by_time = audiobook_split_by_time;
+    let mixed_needed = has_voice_tags(&cleaned);
+    let use_epub_split = audiobook_split_by_epub_chapter && epub_chapters.as_ref().is_some();
+    let mut split_by_time = audiobook_split_by_time;
     let split_minutes = audiobook_split_minutes.clamp(1, 20);
     let split_start_number = audiobook_split_start_number.clamp(1, 99);
     let mut split_parts = audiobook_split;
     let mut split_by_text = audiobook_split_by_text;
+    if use_epub_split {
+        split_by_time = false;
+        split_by_text = false;
+        split_parts = 0;
+    }
     if split_by_time {
         split_parts = 0;
         split_by_text = false;
@@ -3233,7 +3291,39 @@ fn start_audiobook_with_text(hwnd: HWND, text: String, suggested_name: Option<St
     let mut marker_parts: Option<Vec<Vec<String>>> = None;
     let mut marker_positions: Option<Vec<usize>> = None;
     let mut marker_text: Option<String> = None;
+    let mut mixed_marker_parts: Option<Vec<Vec<TtsChunk>>> = None;
     let mut sapi4_threads: Option<u32> = None;
+
+    if use_epub_split {
+        let Some(chapters) = epub_chapters.as_ref() else {
+            crate::log_debug("EPUB split requested without chapter data.");
+            unsafe {
+                show_error(hwnd, language, &settings::tts_no_text_message(language));
+            }
+            return;
+        };
+        if mixed_needed {
+            mixed_marker_parts = build_mixed_audiobook_parts_from_sections(
+                chapters,
+                split_on_newline,
+                &dictionary,
+                tts_engine,
+            );
+        } else {
+            marker_parts = build_audiobook_parts_from_sections(
+                chapters,
+                split_on_newline,
+                &dictionary,
+                tts_engine,
+            );
+        }
+        if marker_parts.is_none() && mixed_marker_parts.is_none() {
+            unsafe {
+                show_error(hwnd, language, &settings::tts_no_text_message(language));
+            }
+            return;
+        }
+    }
 
     if tts_engine == TtsEngine::Sapi4 {
         let title = i18n::tr(language, "audiobook.sapi4_threads_title");
@@ -3292,8 +3382,6 @@ fn start_audiobook_with_text(hwnd: HWND, text: String, suggested_name: Option<St
         }
     }
 
-    let mixed_needed = has_voice_tags(&cleaned);
-
     let prepared = if marker_parts.is_some() || mixed_needed {
         String::new()
     } else {
@@ -3306,7 +3394,7 @@ fn start_audiobook_with_text(hwnd: HWND, text: String, suggested_name: Option<St
         split_text_for_engine(&prepared, tts_engine)
     };
 
-    let mixed_chunks = if mixed_needed && marker_parts.is_none() {
+    let mixed_chunks = if mixed_needed && marker_parts.is_none() && mixed_marker_parts.is_none() {
         Some(split_into_tts_chunks(
             &cleaned,
             split_on_newline,
@@ -3316,8 +3404,8 @@ fn start_audiobook_with_text(hwnd: HWND, text: String, suggested_name: Option<St
     } else {
         None
     };
-    let mixed_marker_parts = if mixed_needed {
-        match (marker_text.as_ref(), marker_positions.as_ref()) {
+    if mixed_needed && mixed_marker_parts.is_none() {
+        mixed_marker_parts = match (marker_text.as_ref(), marker_positions.as_ref()) {
             (Some(text), Some(positions)) => build_mixed_audiobook_parts_by_positions(
                 text,
                 positions,
@@ -3326,10 +3414,8 @@ fn start_audiobook_with_text(hwnd: HWND, text: String, suggested_name: Option<St
                 tts_engine,
             ),
             _ => None,
-        }
-    } else {
-        None
-    };
+        };
+    }
 
     let chunks_len = if let Some(parts) = &mixed_marker_parts {
         parts.iter().map(|part| part.len()).sum()
@@ -3600,19 +3686,49 @@ pub fn start_audiobook(hwnd: HWND) {
         return;
     };
     let text = unsafe { get_edit_text(hwnd_edit) };
-    let suggested_name = unsafe {
+    let (suggested_name, doc_path, split_epub, language) = unsafe {
         with_state(hwnd, |state| {
             state.docs.get(state.current).map(|doc| {
                 let p = Path::new(&doc.title);
-                p.file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or(&doc.title)
-                    .to_string()
+                (
+                    p.file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or(&doc.title)
+                        .to_string(),
+                    doc.path.clone(),
+                    state.settings.audiobook_split_by_epub_chapter,
+                    state.settings.language,
+                )
             })
         })
     }
-    .flatten();
-    start_audiobook_with_text(hwnd, text, suggested_name);
+    .flatten()
+    .unwrap_or((String::new(), None, false, Language::Italian));
+
+    let mut epub_chapters = None;
+    if split_epub
+        && let Some(path) = doc_path
+        && is_epub_path(&path)
+    {
+        match read_epub_chapters(&path, language) {
+            Ok(chapters) => {
+                epub_chapters = Some(chapters);
+            }
+            Err(err) => {
+                unsafe {
+                    show_error(hwnd, language, &err);
+                }
+                return;
+            }
+        }
+    }
+
+    let suggested_name = if suggested_name.is_empty() {
+        None
+    } else {
+        Some(suggested_name)
+    };
+    start_audiobook_with_text(hwnd, text, suggested_name, epub_chapters);
 }
 
 pub fn start_audiobook_from_selection(hwnd: HWND) {
@@ -3640,7 +3756,7 @@ pub fn start_audiobook_from_selection(hwnd: HWND) {
         })
     }
     .flatten();
-    start_audiobook_with_text(hwnd, text, suggested_name);
+    start_audiobook_with_text(hwnd, text, suggested_name, None);
 }
 
 fn parse_sapi4_voice_index(voice: &str) -> i32 {

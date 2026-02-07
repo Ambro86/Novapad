@@ -12,6 +12,7 @@ Corrections de bugs
 • La fenêtre d’enregistrement de podcast est maintenant indépendante : vous pouvez utiliser l’éditeur pendant l’enregistrement.
 • Les articles RSS décodent désormais les entités HTML (par ex. &quot;, &amp;, &lt;, &gt;).
 • Enregistrer/Enregistrer sous propose désormais le nom du fichier existant lors de l’enregistrement de formats non réécrivables (ex. EPUB), au lieu de la première ligne.
+• Correction d’un problème où les podcasts avec de nouveaux épisodes n’étaient pas annoncés comme non joués, et renommage de « Non écouté » en « Non joué » pour un libellé plus professionnel.
 
 Version 0.6.4 – 05/02/2026
 Améliorations

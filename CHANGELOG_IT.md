@@ -14,6 +14,7 @@ Correzioni di bug
 • Corretto il problema degli audiolibri da EPUB con divisione per tempo: Edge TTS poteva fallire su chunk vuoti o troppo lunghi ("Edge audio not sent").
 • Gli articoli RSS ora decodificano le entità HTML (es. &quot;, &amp;, &lt;, &gt;).
 • Salva/Salva con nome ora propone il nome del file esistente quando si salvano formati non sovrascrivibili (es. EPUB), invece della prima riga.
+• Risolto un problema per cui i podcast con nuovi episodi non venivano annunciati come non riprodotti, e rinominato "non ascoltato" in "non riprodotto" perché più professionale.
 
 Versione 0.6.4 – 05/02/2026
 Miglioramenti

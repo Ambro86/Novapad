@@ -12,6 +12,7 @@ Bug fixes
 • Fixed audiobook time-splitting from EPUBs with Edge TTS failing on empty/oversized chunks ("Edge audio not sent").
 • RSS articles now decode HTML entities (e.g., &quot;, &amp;, &lt;, &gt;).
 • Save/Save As now suggests the existing filename when saving non-overwritable formats (e.g., EPUB) instead of the first line.
+• Fixed a bug where podcasts with new episodes were not announced as unplayed, and renamed "Unheard" to "Unplayed" for a more professional label.
 
 Version 0.6.4 – 05/02/2026
 Improvements

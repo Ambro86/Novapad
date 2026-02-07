@@ -12,6 +12,7 @@ Sửa lỗi
 • Đã sửa lỗi chia audiobook từ EPUB theo thời gian: Edge TTS có thể lỗi khi gặp đoạn rỗng hoặc quá dài ("Edge audio not sent").
 • Bài viết RSS giờ giải mã các thực thể HTML (ví dụ &quot;, &amp;, &lt;, &gt;).
 • Lưu/Lưu dưới tên giờ đây đề xuất tên tệp hiện có khi lưu các định dạng không nên ghi đè (ví dụ: EPUB), thay vì dòng đầu tiên.
+• Đã sửa lỗi khiến podcast có tập mới không được thông báo là chưa phát, đồng thời đổi "Chưa nghe" thành "Chưa phát" cho chuyên nghiệp hơn.
 
 Phiên bản 0.6.4 – 05/02/2026
 Cải tiến

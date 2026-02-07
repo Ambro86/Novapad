@@ -13,6 +13,7 @@ Correzioni di bug
 • Corretto un problema di redraw: digitando su una selezione il testo precedente poteva sparire finché non si spostava la selezione.
 • Corretto il problema degli audiolibri da EPUB con divisione per tempo: Edge TTS poteva fallire su chunk vuoti o troppo lunghi ("Edge audio not sent").
 • Gli articoli RSS ora decodificano le entità HTML (es. &quot;, &amp;, &lt;, &gt;).
+• Salva/Salva con nome ora propone il nome del file esistente quando si salvano formati non sovrascrivibili (es. EPUB), invece della prima riga.
 
 Versione 0.6.4 – 05/02/2026
 Miglioramenti

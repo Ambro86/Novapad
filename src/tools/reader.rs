@@ -478,6 +478,7 @@ pub fn reader_mode_extract(html_content: &str, language: Language) -> Option<Art
             ".wp-block-post-content p",
             ".ifq-post__content p",
             ".ifq-post__content",
+            ".media-content.news-txt p, .media-content.news-txt figcaption, .media-content.news-txt .image-caption",
             "p[data-type='paragraph']", // WSJ modern
             "article [data-testid='article-body'] p",
             "article [data-testid='paragraph']",

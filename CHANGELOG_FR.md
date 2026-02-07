@@ -11,6 +11,7 @@ Corrections de bugs
 • Correction d’un échec lors du découpage par durée des EPUB : Edge TTS pouvait échouer avec des blocs vides ou trop longs ("Edge audio not sent").
 • La fenêtre d’enregistrement de podcast est maintenant indépendante : vous pouvez utiliser l’éditeur pendant l’enregistrement.
 • Les articles RSS décodent désormais les entités HTML (par ex. &quot;, &amp;, &lt;, &gt;).
+• Enregistrer/Enregistrer sous propose désormais le nom du fichier existant lors de l’enregistrement de formats non réécrivables (ex. EPUB), au lieu de la première ligne.
 
 Version 0.6.4 – 05/02/2026
 Améliorations

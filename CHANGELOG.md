@@ -11,6 +11,7 @@ Bug fixes
 • Fixed a redraw issue where typing over a selection could make earlier text temporarily disappear until the selection moved.
 • Fixed audiobook time-splitting from EPUBs with Edge TTS failing on empty/oversized chunks ("Edge audio not sent").
 • RSS articles now decode HTML entities (e.g., &quot;, &amp;, &lt;, &gt;).
+• Save/Save As now suggests the existing filename when saving non-overwritable formats (e.g., EPUB) instead of the first line.
 
 Version 0.6.4 – 05/02/2026
 Improvements

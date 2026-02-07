@@ -11,6 +11,7 @@ Sửa lỗi
 • Đã sửa lỗi vẽ lại: khi gõ đè lên vùng chọn, phần văn bản phía trước có thể biến mất cho tới khi di chuyển vùng chọn.
 • Đã sửa lỗi chia audiobook từ EPUB theo thời gian: Edge TTS có thể lỗi khi gặp đoạn rỗng hoặc quá dài ("Edge audio not sent").
 • Bài viết RSS giờ giải mã các thực thể HTML (ví dụ &quot;, &amp;, &lt;, &gt;).
+• Lưu/Lưu dưới tên giờ đây đề xuất tên tệp hiện có khi lưu các định dạng không nên ghi đè (ví dụ: EPUB), thay vì dòng đầu tiên.
 
 Phiên bản 0.6.4 – 05/02/2026
 Cải tiến

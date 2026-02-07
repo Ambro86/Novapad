@@ -11,6 +11,7 @@ Poprawki błędów
 • Naprawiono problem z odświeżaniem: przy pisaniu na zaznaczeniu wcześniejszy tekst mógł znikać do czasu przesunięcia zaznaczenia.
 • Naprawiono błąd przy dzieleniu audiobooków z EPUB według czasu: Edge TTS mógł się wyłożyć na pustych lub zbyt długich fragmentach ("Edge audio not sent").
 • Artykuły RSS teraz dekodują encje HTML (np. &quot;, &amp;, &lt;, &gt;).
+• Zapis/Zapisz jako teraz podpowiada nazwę istniejącego pliku przy zapisie formatów nienadpisywalnych (np. EPUB), zamiast pierwszej linii.
 
 Wersja 0.6.4 – 05/02/2026
 Ulepszenia

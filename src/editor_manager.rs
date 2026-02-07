@@ -3481,8 +3481,19 @@ pub unsafe fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> 
                 | FileFormat::Pptx
                 | FileFormat::Odp
         );
-        let mut suggested_name = crate::suggested_filename_from_text(&text)
-            .filter(|name| !name.is_empty())
+        let mut suggested_name = state.docs[index]
+            .path
+            .as_ref()
+            .and_then(|path| {
+                if path.exists() {
+                    path.file_stem()
+                        .and_then(|name| name.to_str())
+                        .map(|s| s.to_string())
+                } else {
+                    None
+                }
+            })
+            .or_else(|| crate::suggested_filename_from_text(&text).filter(|name| !name.is_empty()))
             .unwrap_or_else(|| state.docs[index].title.clone());
         if is_lossy_doc {
             let mut name_path = PathBuf::from(&suggested_name);

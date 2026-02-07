@@ -8,6 +8,7 @@ Améliorations
 Corrections de bugs
 • La lecture depuis le curseur (F5) démarre exactement au niveau du curseur. Avant, elle pouvait commencer quelques lignes au-dessus car l’offset du curseur ne correspondait pas aux positions CRLF/UTF-16.
 • Correction d’un problème de redessin : en tapant sur une sélection, le texte précédent pouvait disparaître jusqu’au déplacement de la sélection.
+• Correction du parsing des chapitres EPUB : les pages de couverture ou uniquement images ne génèrent plus de lecture de CSS (ex. « padding ») ni de titres « Sconosciuto ».
 • Correction d’un échec lors du découpage par durée des EPUB : Edge TTS pouvait échouer avec des blocs vides ou trop longs ("Edge audio not sent").
 • La fenêtre d’enregistrement de podcast est maintenant indépendante : vous pouvez utiliser l’éditeur pendant l’enregistrement.
 • Les articles RSS décodent désormais les entités HTML (par ex. &quot;, &amp;, &lt;, &gt;).

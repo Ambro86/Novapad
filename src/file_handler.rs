@@ -853,18 +853,49 @@ fn html_to_text(html: &str) -> String {
     let mut inside = false;
     let mut tag = String::new();
     let mut last_newline = false;
+    let mut skip_stack: Vec<String> = Vec::new();
+    let mut in_comment = false;
 
     for ch in html.chars() {
+        if in_comment {
+            tag.push(ch);
+            if tag.ends_with("-->") {
+                in_comment = false;
+                tag.clear();
+            }
+            continue;
+        }
+
         if inside {
             if ch == '>' {
                 inside = false;
-                let tag_name = tag
+                let tag_trimmed = tag.trim();
+                if tag_trimmed.starts_with("!--") {
+                    in_comment = true;
+                    tag.clear();
+                    continue;
+                }
+
+                let tag_name = tag_trimmed
                     .trim()
                     .trim_start_matches('/')
                     .split_whitespace()
                     .next()
                     .unwrap_or("")
                     .to_ascii_lowercase();
+                let is_closing = tag_trimmed.starts_with('/');
+
+                if matches!(tag_name.as_str(), "head" | "style" | "script" | "title") {
+                    if is_closing {
+                        if let Some(pos) = skip_stack.iter().rposition(|t| t == &tag_name) {
+                            skip_stack.truncate(pos);
+                        }
+                    } else {
+                        skip_stack.push(tag_name.clone());
+                    }
+                    tag.clear();
+                    continue;
+                }
                 if matches!(
                     tag_name.as_str(),
                     "br" | "p"
@@ -881,7 +912,8 @@ fn html_to_text(html: &str) -> String {
                         | "h4"
                         | "h5"
                         | "h6"
-                ) && !last_newline
+                ) && skip_stack.is_empty()
+                    && !last_newline
                     && !out.is_empty()
                 {
                     out.push('\n');
@@ -895,6 +927,9 @@ fn html_to_text(html: &str) -> String {
         }
         if ch == '<' {
             inside = true;
+            continue;
+        }
+        if !skip_stack.is_empty() {
             continue;
         }
         out.push(ch);

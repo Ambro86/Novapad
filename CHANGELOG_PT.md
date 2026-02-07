@@ -9,6 +9,7 @@ Melhorias
 Correções de bugs
 • A leitura a partir do cursor (F5) agora começa exatamente no cursor. Antes podia começar algumas linhas acima porque o deslocamento do cursor não correspondia às posições CRLF/UTF-16.
 • Corrigido um problema de redesenho: ao digitar sobre uma seleção, o texto anterior podia desaparecer até mover a seleção.
+• Corrigido o parser de capítulos EPUB: páginas de capa ou apenas com imagens não geram mais leitura de CSS (ex.: "padding") nem títulos "Sconosciuto".
 • Corrigida a falha ao dividir por tempo audiolivros a partir de EPUB: o Edge TTS podia falhar com chunks vazios ou muito longos ("Edge audio not sent").
 • Os artigos RSS agora decodificam entidades HTML (por ex. &quot;, &amp;, &lt;, &gt;).
 • Salvar/Salvar como agora sugere o nome do arquivo existente ao salvar formatos que não devem ser sobrescritos (ex.: EPUB), em vez da primeira linha.

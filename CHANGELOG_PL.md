@@ -9,6 +9,7 @@ Ulepszenia
 Poprawki błędów
 • Odczyt od kursora (F5) teraz zaczyna się dokładnie w miejscu kursora. Wcześniej mógł startować kilka linii wyżej, bo offset kursora nie odpowiadał pozycjom CRLF/UTF-16.
 • Naprawiono problem z odświeżaniem: przy pisaniu na zaznaczeniu wcześniejszy tekst mógł znikać do czasu przesunięcia zaznaczenia.
+• Poprawiono parser rozdziałów EPUB: strony okładki lub tylko z obrazami nie generują już odczytu CSS (np. "padding") ani tytułów „Sconosciuto”.
 • Naprawiono błąd przy dzieleniu audiobooków z EPUB według czasu: Edge TTS mógł się wyłożyć na pustych lub zbyt długich fragmentach ("Edge audio not sent").
 • Artykuły RSS teraz dekodują encje HTML (np. &quot;, &amp;, &lt;, &gt;).
 • Zapis/Zapisz jako teraz podpowiada nazwę istniejącego pliku przy zapisie formatów nienadpisywalnych (np. EPUB), zamiast pierwszej linii.

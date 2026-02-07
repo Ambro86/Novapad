@@ -9,6 +9,7 @@ Improvements
 Bug fixes
 • Reading from the caret (F5) now starts exactly at the cursor. Previously it could start a couple of lines above because the caret offset did not match CRLF/UTF-16 positions.
 • Fixed a redraw issue where typing over a selection could make earlier text temporarily disappear until the selection moved.
+• Fixed EPUB chapter parsing so cover or image-only pages no longer produce spoken CSS (e.g., "padding") or "Sconosciuto" titles.
 • Fixed audiobook time-splitting from EPUBs with Edge TTS failing on empty/oversized chunks ("Edge audio not sent").
 • RSS articles now decode HTML entities (e.g., &quot;, &amp;, &lt;, &gt;).
 • Save/Save As now suggests the existing filename when saving non-overwritable formats (e.g., EPUB) instead of the first line.

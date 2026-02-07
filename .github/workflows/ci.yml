@@ -174,3 +174,15 @@ jobs:
       with:
         name: Sonarpad-Standalone
         path: target/release/sonarpad-standalone.exe
+
+    - name: Upload Setup (NSIS)
+      uses: actions/upload-artifact@v4
+      with:
+        name: Sonarpad-Setup
+        path: target/release/*-setup.exe
+
+    - name: Upload Installer (MSI)
+      uses: actions/upload-artifact@v4
+      with:
+        name: Sonarpad-MSI
+        path: target/release/*.msi

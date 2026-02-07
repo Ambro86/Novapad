@@ -3,6 +3,8 @@
 Version 0.6.5 – 05/02/2026
 Améliorations
 • Traduction espagnole améliorée grâce à Arturo Fernandez Rivas.
+• Les imports RSS utilisent désormais un onglet temporaire dédié (titre localisé) ; Enregistrer sous le convertit en document normal.
+• Les messages du lecteur d’écran sont désormais également envoyés à JAWS lorsqu’il est disponible.
 Corrections de bugs
 • La lecture depuis le curseur (F5) démarre exactement au niveau du curseur. Avant, elle pouvait commencer quelques lignes au-dessus car l’offset du curseur ne correspondait pas aux positions CRLF/UTF-16.
 • Correction d’un problème de redessin : en tapant sur une sélection, le texte précédent pouvait disparaître jusqu’au déplacement de la sélection.

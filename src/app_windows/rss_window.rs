@@ -1652,17 +1652,9 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
             let res = unsafe { Box::from_raw(ptr) };
 
             let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-            let mut hwnd_edit = crate::get_active_edit(parent);
-
-            if hwnd_edit.is_none() {
-                SendMessageW(
-                    parent,
-                    WM_COMMAND,
-                    WPARAM(crate::menu::IDM_FILE_NEW),
-                    LPARAM(0),
-                );
-                hwnd_edit = crate::get_active_edit(parent);
-            }
+            let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
+            let rss_title = i18n::tr(language, "rss.temp_title");
+            let hwnd_edit = editor_manager::get_or_create_rss_document(parent, &rss_title);
 
             if let Some(h_edit) = hwnd_edit {
                 // Bring the main window to the front *before* moving focus.

@@ -1,12 +1,19 @@
 use crate::settings;
 use std::sync::OnceLock;
 use windows::Win32::Foundation::HWND;
+use windows::Win32::System::Com::{
+    CLSCTX_ALL, CLSIDFromProgID, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx,
+    CoUninitialize, DISPATCH_METHOD, DISPPARAMS, EXCEPINFO, IDispatch,
+};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetKeyState, VK_ADD, VK_CONTROL, VK_DOWN, VK_END, VK_ESCAPE, VK_HOME, VK_LEFT, VK_MENU,
     VK_NEXT, VK_OEM_MINUS, VK_OEM_PERIOD, VK_OEM_PLUS, VK_PRIOR, VK_RIGHT, VK_SHIFT, VK_SPACE,
     VK_SUBTRACT, VK_UP,
 };
-use windows::Win32::UI::WindowsAndMessaging::{IsChild, IsDialogMessageW, MSG, WM_KEYDOWN};
+use windows::Win32::UI::WindowsAndMessaging::{
+    FindWindowW, IsChild, IsDialogMessageW, MSG, WM_KEYDOWN,
+};
+use windows::core::{BSTR, GUID, PCWSTR, VARIANT};
 
 pub const EM_GETSEL: u32 = 0x00B0;
 pub const EM_EXSETSEL: u32 = 0x0400 + 55;
@@ -139,30 +146,47 @@ pub enum PlayerCommand {
 
 static NVDA_LIB: OnceLock<libloading::Library> = OnceLock::new();
 static NVDA_SPEAK: OnceLock<Option<unsafe extern "C" fn(*const u16) -> i32>> = OnceLock::new();
+static NVDA_TEST: OnceLock<Option<unsafe extern "C" fn() -> i32>> = OnceLock::new();
+static JAWS_PROBE_LOGGED: OnceLock<()> = OnceLock::new();
 
-/// Attempts to speak text using the NVDA Controller Client DLL.
-/// Returns true if the DLL was loaded and the function called, false otherwise.
-pub fn nvda_speak(text: &str) -> bool {
-    let speak = match NVDA_SPEAK.get_or_init(|| {
-        let dll_name = if cfg!(target_arch = "x86_64") {
-            "nvdaControllerClient64.dll"
-        } else {
-            "nvdaControllerClient32.dll"
-        };
-        let dll_path = settings::settings_dir().join(dll_name);
-        let lib = unsafe { libloading::Library::new(&dll_path).ok()? };
-        let func = unsafe {
-            let symbol: libloading::Symbol<unsafe extern "C" fn(*const u16) -> i32> =
-                lib.get(b"nvdaController_speakText\0").ok()?;
-            *symbol
-        };
-        if NVDA_LIB.set(lib).is_err() {
-            return None;
-        }
-        Some(func)
-    }) {
-        Some(func) => *func,
-        None => return false,
+fn nvda_init() -> bool {
+    NVDA_SPEAK
+        .get_or_init(|| {
+            let dll_name = if cfg!(target_arch = "x86_64") {
+                "nvdaControllerClient64.dll"
+            } else {
+                "nvdaControllerClient32.dll"
+            };
+            let dll_path = settings::settings_dir().join(dll_name);
+            let lib = unsafe { libloading::Library::new(&dll_path).ok()? };
+            let func = unsafe {
+                let symbol: libloading::Symbol<unsafe extern "C" fn(*const u16) -> i32> =
+                    lib.get(b"nvdaController_speakText\0").ok()?;
+                *symbol
+            };
+            let test = unsafe {
+                let symbol: libloading::Symbol<unsafe extern "C" fn() -> i32> =
+                    lib.get(b"nvdaController_testIfRunning\0").ok()?;
+                *symbol
+            };
+            if NVDA_TEST.set(Some(test)).is_err() {
+                return None;
+            }
+            if NVDA_LIB.set(lib).is_err() {
+                return None;
+            }
+            Some(func)
+        })
+        .is_some()
+}
+
+fn nvda_speak_raw(text: &str) -> bool {
+    if !nvda_init() {
+        return false;
+    }
+    let speak = match NVDA_SPEAK.get() {
+        Some(Some(func)) => *func,
+        _ => return false,
     };
 
     let wide = to_wide(text);
@@ -170,6 +194,143 @@ pub fn nvda_speak(text: &str) -> bool {
         speak(wide.as_ptr());
     }
     true
+}
+
+fn nvda_is_active() -> bool {
+    if !nvda_init() {
+        return false;
+    }
+    match NVDA_TEST.get() {
+        Some(Some(test)) => unsafe { test() == 0 },
+        _ => false,
+    }
+}
+
+fn jaws_invoke_saystring(
+    text: &str,
+    interrupt: bool,
+    log_failures: bool,
+) -> windows::core::Result<()> {
+    let init_res = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
+    if let Err(e) = init_res.ok() {
+        if log_failures {
+            crate::log_debug(&format!("JAWS CoInitializeEx failed: {e}"));
+        }
+        return Err(e);
+    }
+    let should_uninit = init_res.is_ok();
+
+    let result = (|| {
+        let prog_id = to_wide("FreedomSci.JawsApi");
+        let clsid = match unsafe { CLSIDFromProgID(PCWSTR(prog_id.as_ptr())) } {
+            Ok(id) => id,
+            Err(e) => {
+                if log_failures {
+                    crate::log_debug(&format!("JAWS CLSIDFromProgID failed: {e}"));
+                }
+                return Err(e);
+            }
+        };
+
+        let disp: IDispatch = match unsafe { CoCreateInstance(&clsid, None, CLSCTX_ALL) } {
+            Ok(obj) => obj,
+            Err(e) => {
+                if log_failures {
+                    crate::log_debug(&format!("JAWS CoCreateInstance failed: {e}"));
+                }
+                return Err(e);
+            }
+        };
+
+        let mut dispid: i32 = 0;
+        let name = to_wide("SayString");
+        let names = [PCWSTR(name.as_ptr())];
+        let getid_res =
+            unsafe { disp.GetIDsOfNames(&GUID::default(), names.as_ptr(), 1, 0, &mut dispid) };
+        if let Err(e) = getid_res {
+            if log_failures {
+                crate::log_debug(&format!("JAWS GetIDsOfNames failed: {e}"));
+            }
+            return Err(e);
+        }
+
+        let text_with_pad = format!("      {text}");
+        let mut args = [
+            VARIANT::from(if interrupt { 1i32 } else { 0i32 }),
+            VARIANT::from(BSTR::from(text_with_pad)),
+        ];
+        let disp_params = DISPPARAMS {
+            rgvarg: args.as_mut_ptr(),
+            rgdispidNamedArgs: std::ptr::null_mut(),
+            cArgs: args.len() as u32,
+            cNamedArgs: 0,
+        };
+        let mut excep = EXCEPINFO::default();
+        let mut arg_err: u32 = 0;
+        let invoke_res = unsafe {
+            disp.Invoke(
+                dispid,
+                &GUID::default(),
+                0,
+                DISPATCH_METHOD,
+                &disp_params,
+                None,
+                Some(&mut excep),
+                Some(&mut arg_err),
+            )
+        };
+        if log_failures && let Err(ref e) = invoke_res {
+            crate::log_debug(&format!("JAWS Invoke failed: {e} (arg err: {arg_err})"));
+        }
+        invoke_res.map(|_| ())
+    })();
+
+    unsafe {
+        if should_uninit {
+            CoUninitialize();
+        }
+    }
+
+    result
+}
+
+fn jaws_is_active() -> bool {
+    match jaws_invoke_saystring("", false, false) {
+        Ok(()) => true,
+        Err(e) => {
+            if JAWS_PROBE_LOGGED.set(()).is_ok() {
+                crate::log_debug(&format!("JAWS probe via COM failed: {e}"));
+            }
+            let class = to_wide("JFWUI2");
+            let title = to_wide("JAWS");
+            unsafe { FindWindowW(PCWSTR(class.as_ptr()), PCWSTR(title.as_ptr())).0 != 0 }
+        }
+    }
+}
+
+fn jaws_speak(text: &str, interrupt: bool) -> bool {
+    if !jaws_is_active() {
+        return false;
+    }
+
+    jaws_invoke_saystring(text, interrupt, true).is_ok()
+}
+
+/// Speaks text through available screen readers (NVDA and JAWS).
+/// Returns true if any screen reader accepted the message.
+pub fn screen_reader_speak(text: &str) -> bool {
+    let mut ok = false;
+    if nvda_is_active() {
+        ok |= nvda_speak_raw(text);
+    }
+    ok |= jaws_speak(text, false);
+    ok
+}
+
+/// Attempts to speak text using the NVDA Controller Client DLL.
+/// Also mirrors output to JAWS when available.
+pub fn nvda_speak(text: &str) -> bool {
+    screen_reader_speak(text)
 }
 
 // Le DLL nvdaControllerClient64.dll e SoundTouch64.dll sono ora embedded

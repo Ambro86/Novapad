@@ -835,6 +835,7 @@ pub struct Document {
     pub opened_text_encoding: Option<TextEncoding>,
     pub current_save_text_encoding: Option<TextEncoding>,
     pub from_rss: bool,
+    pub is_temporary: bool,
 }
 
 #[derive(Clone)]
@@ -857,6 +858,7 @@ impl Default for Document {
             opened_text_encoding: None,
             current_save_text_encoding: None,
             from_rss: false,
+            is_temporary: false,
         }
     }
 }
@@ -2611,6 +2613,7 @@ pub unsafe fn new_document(hwnd: HWND) {
             opened_text_encoding: None,
             current_save_text_encoding: None,
             from_rss: false,
+            is_temporary: false,
         };
         state.docs.push(doc);
         insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);
@@ -2665,6 +2668,7 @@ unsafe fn open_document_with_encoding_internal(
                 opened_text_encoding: None,
                 current_save_text_encoding: None,
                 from_rss: false,
+                is_temporary: false,
             };
             unsafe {
                 SendMessageW(hwnd_edit, EM_SETREADONLY, WPARAM(1), LPARAM(0));
@@ -2887,6 +2891,43 @@ pub unsafe fn current_document_is_from_rss(hwnd: HWND) -> bool {
             .unwrap_or(false)
     })
     .unwrap_or(false)
+}
+
+pub unsafe fn get_or_create_rss_document(hwnd: HWND, title: &str) -> Option<HWND> {
+    let (index, hwnd_edit) = with_state(hwnd, |state| {
+        if let Some((idx, doc)) = state
+            .docs
+            .iter()
+            .enumerate()
+            .find(|(_i, doc)| doc.from_rss && doc.is_temporary)
+        {
+            return Some((idx, doc.hwnd_edit));
+        }
+        let hwnd_edit = create_edit(
+            hwnd,
+            state.hfont,
+            state.settings.word_wrap,
+            state.settings.text_color,
+            state.settings.text_size,
+        );
+        let doc = Document {
+            title: title.to_string(),
+            path: None,
+            hwnd_edit,
+            dirty: false,
+            format: FileFormat::Text(TextEncoding::Utf8),
+            opened_text_encoding: None,
+            current_save_text_encoding: None,
+            from_rss: true,
+            is_temporary: true,
+        };
+        state.docs.push(doc);
+        insert_tab(state.hwnd_tab, title, (state.docs.len() - 1) as i32);
+        Some((state.docs.len() - 1, hwnd_edit))
+    })
+    .flatten()?;
+    select_tab(hwnd, index);
+    Some(hwnd_edit)
 }
 
 pub unsafe fn select_tab(hwnd: HWND, index: usize) {
@@ -3548,6 +3589,10 @@ pub unsafe fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> 
         let hwnd_edit = state.docs[index].hwnd_edit;
         state.docs[index].path = Some(path.clone());
         state.docs[index].dirty = false;
+        if force_dialog {
+            state.docs[index].is_temporary = false;
+            state.docs[index].from_rss = false;
+        }
         SendMessageW(hwnd_edit, EM_SETMODIFY, WPARAM(0), LPARAM(0));
         let title = path.file_name().and_then(|s| s.to_str()).unwrap_or("File");
         state.docs[index].title = title.to_string();

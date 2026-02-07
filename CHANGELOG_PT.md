@@ -4,6 +4,8 @@ Versão 0.6.5 – 05/02/2026
 Melhorias
 • Tradução em espanhol aprimorada graças a Arturo Fernandez Rivas.
 • Adicionada uma opção para dividir audiolivros EPUB por capítulos.
+• As importações RSS agora usam uma aba temporária dedicada (título localizado); Salvar como a converte em um documento normal.
+• As mensagens do leitor de ecrã agora também são enviadas ao JAWS quando disponível.
 Correções de bugs
 • A leitura a partir do cursor (F5) agora começa exatamente no cursor. Antes podia começar algumas linhas acima porque o deslocamento do cursor não correspondia às posições CRLF/UTF-16.
 • Corrigido um problema de redesenho: ao digitar sobre uma seleção, o texto anterior podia desaparecer até mover a seleção.

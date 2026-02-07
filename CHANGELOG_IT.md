@@ -6,6 +6,8 @@ Miglioramenti
 • Aggiornati i feed predefiniti: Affaritaliani, HuffPost Italia, La Gazzetta dello Sport. Rimosso Wired Italia.
 • Aggiunta un'opzione per dividere gli audiolibri EPUB per capitoli.
 • Ora la finestra per registrare i podcast è indipendente, in modo che possiate fare delle registrazioni e allo stesso tempo usare iil programma Sonarpad!
+• Gli articoli RSS ora usano una scheda temporanea dedicata (titolo localizzato); con Salva con nome diventa un documento normale.
+• I messaggi dello screen reader ora vengono inviati anche a JAWS quando disponibile.
 Correzioni di bug
 • La lettura da cursore (F5) ora parte esattamente dal punto del cursore. Prima poteva partire alcune righe sopra perché l'offset del cursore non coincideva con le posizioni CRLF/UTF-16.
 • Corretto un problema di redraw: digitando su una selezione il testo precedente poteva sparire finché non si spostava la selezione.

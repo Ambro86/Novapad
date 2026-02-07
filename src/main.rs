@@ -7256,6 +7256,7 @@ pub(crate) unsafe fn open_pdf_document_async(hwnd: HWND, path: &Path, from_copyd
             opened_text_encoding: None,
             current_save_text_encoding: None,
             from_rss: false,
+            is_temporary: false,
         };
         state.docs.push(doc);
         insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);
@@ -7446,6 +7447,7 @@ unsafe fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLo
             opened_text_encoding: loaded.opened_text_encoding,
             current_save_text_encoding: None,
             from_rss: false,
+            is_temporary: false,
         };
         state.docs.push(doc);
         insert_tab(state.hwnd_tab, title, (state.docs.len() - 1) as i32);

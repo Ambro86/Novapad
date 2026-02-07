@@ -1,4 +1,5 @@
 /target
+/target_test
 **/*.rs.bac
 **/*.rs.segnalibri.bac
 **/*.rs.audiobook.bac
@@ -11,6 +12,7 @@ filedocapertocometxt.txt
 # log.txt
 service/
 vcpkg_installed/
+Service/integra.txt
 
 claude.md
 nul

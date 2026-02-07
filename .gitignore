@@ -1,5 +1,6 @@
 /target
 /target_test
+**/target/
 **/*.rs.bac
 **/*.rs.segnalibri.bac
 **/*.rs.audiobook.bac

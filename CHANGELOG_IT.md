@@ -1,6 +1,6 @@
 # Changelog
 
-Versione 0.6.5 – 05/02/2026
+Versione 0.6.5 – 07/02/2026
 Miglioramenti
 • Traduzione spagnola migliorata grazie ad Arturo Fernandez Rivas.
 • Aggiornati i feed predefiniti: Affaritaliani, HuffPost Italia, La Gazzetta dello Sport. Rimosso Wired Italia.

@@ -1,6 +1,6 @@
 # Nhật ký thay đổi
 
-Phiên bản 0.6.5 – 05/02/2026
+Phiên bản 0.6.5 – 07/02/2026
 Cải tiến
 • Bản dịch tiếng Tây Ban Nha được cải thiện nhờ Arturo Fernandez Rivas.
 • Đã thêm tùy chọn tách sách nói EPUB theo chương.

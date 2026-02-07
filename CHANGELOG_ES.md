@@ -1,6 +1,6 @@
 # Changelog
 
-Version 0.6.5 – 05/02/2026
+Version 0.6.5 – 07/02/2026
 Mejoras
 • Traducción al español mejorada gracias a Arturo Fernandez Rivas.
 • Se agregó una opción para dividir audiolibros EPUB por capítulos.

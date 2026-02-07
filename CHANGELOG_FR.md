@@ -1,6 +1,6 @@
 # Journal des modifications
 
-Version 0.6.5 – 05/02/2026
+Version 0.6.5 – 07/02/2026
 Améliorations
 • Traduction espagnole améliorée grâce à Arturo Fernandez Rivas.
 • Les imports RSS utilisent désormais un onglet temporaire dédié (titre localisé) ; Enregistrer sous le convertit en document normal.

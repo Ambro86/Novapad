@@ -1,6 +1,6 @@
 # Dziennik zmian
 
-Wersja 0.6.5 – 05/02/2026
+Wersja 0.6.5 – 07/02/2026
 Ulepszenia
 • Poprawiona wersja hiszpańska dzięki Arturo Fernandez Rivas.
 • Dodano opcję dzielenia audiobooków EPUB na rozdziały.

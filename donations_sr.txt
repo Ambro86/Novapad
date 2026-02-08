@@ -1,0 +1,20 @@
+﻿
+Donacije
+Sonarpad je program koji je u početku nastao da zadovolji lične potrebe, ali je vremenom sve više rastao. Njegov razvoj zahteva stalni rad na poboljšavanju funkcija, ispravljanju grešaka, traženju novih ideja i pažljivom testiranju svih mogućnosti.
+Ako smatraš da ti je ovaj program koristan i želiš da podržiš njegov razvoj, možeš dati donaciju.
+
+PayPal
+Donaciju možeš uplatiti putem PayPal‑a koristeći ovaj link:
+https://www.paypal.me/ambrogio86
+Molimo te, ako je moguće, dodaj „Sonarpad“ kao napomenu uz uplatu.
+
+Bankovni transfer
+Donaciju možeš uplatiti i bankovnim transferom na račun na ime Ambrogio Riili.
+IBAN: IT77W0306901020100000064149
+Molimo te, ako je moguće, navedi jasan razlog uplate, na primer „Sonarpad“.
+
+Svi koji podrže projekat biće pomenuti u programu i na GitHub repozitorijumu, osim ako žele da ostanu anonimni ili da koriste nadimak.
+
+Zahvaljujemo Jiri Holzingeru i Paoli Vagati na njihovom doprinosu.
+Za vijetnamski prevod, zahvaljujemo Anh Đức Nguyễnu.
+Za češki prevod, zahvaljujemo Radeku Žaludu i Jiri Holzingeru.

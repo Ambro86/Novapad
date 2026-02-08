@@ -1,0 +1,62 @@
+Danas
+https://www.danas.rs/feed/
+
+N1 Srbija
+https://rs.n1info.com/feed/
+
+Nova.rs
+https://nova.rs/feed/
+
+BBC News na srpskom
+https://www.bbc.com/serbian/index.xml
+
+Glas Amerike (VOA) – srpski
+https://www.glasamerike.net/api/
+
+CINS – Centar za istraživačko novinarstvo Srbije
+https://www.cins.rs/feed/
+
+KRIK
+https://www.krik.rs/feed/
+
+RTS Nauka
+https://www.rts.rs/page/stories/sr/rss/125/nauka.html
+
+Nauka kroz priče
+https://naukakrozprice.rs/feed/
+
+
+# Hrvatska — ozbiljni i nezavisni RSS izvori
+
+N1 Hrvatska
+https://hr.n1info.com/feed/
+
+Index.hr – vijesti
+https://www.index.hr/rss/vijesti
+
+Jutarnji list – vijesti
+https://www.jutarnji.hr/rss
+
+HRT – vijesti
+https://vijesti.hrt.hr/rss
+
+Telegram.hr
+https://www.telegram.hr/feed/
+
+Faktograf.hr
+https://faktograf.hr/feed/
+
+
+# Edukativni i naučni RSS (region + svet)
+
+National Geographic
+https://www.nationalgeographic.com/content/ngdotcom/rss/index.rss
+
+Science News
+https://www.sciencenews.org/feed
+
+Ars Technica – Science
+https://feeds.arstechnica.com/arstechnica/science
+
+MIT Technology Review
+https://www.technologyreview.com/feed/

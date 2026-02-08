@@ -28,6 +28,7 @@ const DONATIONS_SV: &str = include_str!("../../donations_sv.txt");
 const DONATIONS_CS: &str = include_str!("../../donations_cs.txt");
 const DONATIONS_PL: &str = include_str!("../../donations_pl.txt");
 const DONATIONS_FR: &str = include_str!("../../donations_fr.txt");
+const DONATIONS_SR: &str = include_str!("../../donations_sr.txt");
 
 fn read_override_text(file_name: &str) -> Option<String> {
     let exe_path = match std::env::current_exe() {
@@ -257,6 +258,8 @@ unsafe fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
                         .unwrap_or_else(|| include_str!("../../guida_pl.txt").to_string()),
                     Language::French => read_override_text("guida_fr.txt")
                         .unwrap_or_else(|| include_str!("../../guida_fr.txt").to_string()),
+                    Language::Serbian => read_override_text("guida_sr.txt")
+                        .unwrap_or_else(|| include_str!("../../guida_sr.txt").to_string()),
                 },
                 HelpWindowKind::Changelog => match init.language {
                     Language::Italian => include_str!("../../CHANGELOG_IT.md").to_string(),
@@ -268,6 +271,7 @@ unsafe fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
                     Language::Czech => include_str!("../../CHANGELOG.md").to_string(),
                     Language::Polish => include_str!("../../CHANGELOG_PL.md").to_string(),
                     Language::French => include_str!("../../CHANGELOG_FR.md").to_string(),
+                    Language::Serbian => include_str!("../../CHANGELOG.md").to_string(),
                 },
                 HelpWindowKind::Donations => donations_content(init.language),
             };
@@ -412,6 +416,9 @@ fn donations_content(language: Language) -> String {
         }
         Language::French => {
             read_override_text("donations_fr.txt").unwrap_or_else(|| DONATIONS_FR.to_string())
+        }
+        Language::Serbian => {
+            read_override_text("donations_sr.txt").unwrap_or_else(|| DONATIONS_SR.to_string())
         }
     }
 }

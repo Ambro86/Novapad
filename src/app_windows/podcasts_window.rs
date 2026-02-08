@@ -6489,6 +6489,7 @@ fn apple_country_for_language(language: Language) -> &'static str {
         Language::Czech => "cz",
         Language::Polish => "pl",
         Language::French => "fr",
+        Language::Serbian => "rs",
     }
 }
 
@@ -6503,6 +6504,7 @@ fn podcastindex_language_code(language: Language) -> &'static str {
         Language::Czech => "cs",
         Language::Polish => "pl",
         Language::French => "fr",
+        Language::Serbian => "sr",
     }
 }
 
@@ -6551,7 +6553,7 @@ fn apple_categories(language: Language) -> Vec<Category> {
             "True crime",
             "TV e film",
         ),
-        Language::English => (
+        Language::English | Language::Serbian => (
             "Arts",
             "Business",
             "Comedy",
@@ -6914,7 +6916,7 @@ fn apple_subcategories(language: Language) -> Vec<Category> {
             (1563, "Recensioni di film"),
             (1561, "Recensioni TV"),
         ],
-        Language::English => &[
+        Language::English | Language::Serbian => &[
             // Arts
             (1482, "Books"),
             (1402, "Design"),
@@ -7906,7 +7908,7 @@ fn podcastindex_categories(language: Language) -> Vec<Category> {
             (111, "Gioco di ruolo"),
             (112, "Cryptocurrency"),
         ],
-        Language::English => &[
+        Language::English | Language::Serbian => &[
             (1, "Arts"),
             (2, "Books"),
             (3, "Design"),

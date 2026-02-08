@@ -128,6 +128,8 @@ pub enum Language {
     Polish,
     #[serde(rename = "fr")]
     French,
+    #[serde(rename = "sr")]
+    Serbian,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -339,6 +341,10 @@ pub struct AppSettings {
     #[serde(default)]
     pub rss_default_fr_keys: Vec<String>,
     #[serde(default)]
+    pub rss_removed_default_sr: Vec<String>,
+    #[serde(default)]
+    pub rss_default_sr_keys: Vec<String>,
+    #[serde(default)]
     pub rss_global_max_concurrency: usize,
     #[serde(default)]
     pub rss_per_host_max_concurrency: usize,
@@ -507,6 +513,8 @@ impl Default for AppSettings {
             rss_default_pl_keys: Vec::new(),
             rss_removed_default_fr: Vec::new(),
             rss_default_fr_keys: Vec::new(),
+            rss_removed_default_sr: Vec::new(),
+            rss_default_sr_keys: Vec::new(),
             podcast_sources: Vec::new(),
             rss_global_max_concurrency: 8,
             rss_per_host_max_concurrency: 2,
@@ -844,6 +852,9 @@ fn system_language() -> Language {
         }
         if lower.starts_with("fr") {
             return Language::French;
+        }
+        if lower.starts_with("sr") {
+            return Language::Serbian;
         }
         return Language::English;
     }

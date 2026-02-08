@@ -1,0 +1,109 @@
+
+PROGRAMSKI VODIČ
+
+Datoteka: 
+Novo: Kreira novu datoteku (Ctrl+N). 
+Otvori: Otvara tekstualne datoteke, PDF, EPUB, MP3 i druge podržane formate (Ctrl+O). 
+Sačuvaj: Čuva datoteku (Ctrl+S). 
+Sačuvaj kao: Čuva pod novim imenom. 
+Sačuvaj sve: Čuva sve datoteke (Ctrl+Shift+S). 
+Zatvori karticu: Zatvara trenutnu datoteku (Ctrl+W). 
+Nedavne datoteke: Otvara nedavno korišćenu datoteku. 
+Čitanje: F5 pokreće čitanje, F4 pauzira ili nastavlja, F6 zaustavlja čitanje. 
+Omiljeni glasovi tokom čitanja: F9 prethodni omiljeni glas, F10 sledeći omiljeni glas. 
+Snimi audio‑knjigu: Kreira MP3 datoteku iz trenutnog teksta (Ctrl+R). 
+Snimi podkast: Snima podkast sa mikrofona i/ili sistemskog zvuka (Ctrl+Shift+R).
+
+MP3 audio‑knjige: 
+Kada otvoriš MP3 datoteku, Sonarpad radi kao audio plejer. 
+Tastaturne komande: 
+SPACE: Reprodukcija / pauza. 
+Strelica desno: Premotavanje 1 minut unapred. 
+Strelica levo: Premotavanje 1 minut unazad. 
+Strelica gore: Pojačavanje zvuka. 
+Strelica dole: Smanjivanje zvuka. 
++: Ubrzavanje reprodukcije. 
+-: Usporavanje reprodukcije. 
+CTRL+I: Najavljuje trenutno vreme reprodukcije. 
+CTRL+T: Ide na određeno vreme. 
+CTRL+B: Ubacuje marker na tačno vreme.
+
+Uređivanje: 
+Opozovi: Poništava poslednju radnju (Ctrl+Z). 
+Iseci: Uklanja označen tekst i kopira ga u privremenu memoriju (Ctrl+X). 
+Kopiraj: Kopira označen tekst u privremenu memoriju (Ctrl+C). 
+Zalepi: Ubacuje sadržaj iz privremene memorije u dokument (Ctrl+V). 
+Označi sve: Označava ceo tekst (Ctrl+A). 
+Pronađi: Pretraga teksta u dokumentu (Ctrl+F). 
+Pronađi u datotekama: Pretraga teksta kroz više datoteka (Ctrl+Shift+F). 
+Pronađi sledeće: Pronalazi sledeće pojavljivanje (F3). 
+Zameni: Pronalazi i zamenjuje tekst (Ctrl+H). 
+Normalizuj razmake: Uklanja razmake na ivicama i višestruke praznine (Ctrl+Shift+Enter). 
+Spoji redove: Spaja redove u pasusu ili selekciji (Ctrl+Shift+J). 
+Tvrdi prelom reda: Prelama pasus ili selekciju (Ctrl+Shift+H). 
+Ukloni oznake formatiranja: Uklanja oznake formatiranja (Ctrl+Shift+M). 
+Poređaj stavke: Sortira linije u pasusu ili selekciji (Alt+Shift+O). 
+Zadrži jedinstvene stavke: Uklanja duplikate linija (Alt+Shift+K). 
+Obrni stavke: Obrće redosled linija (Alt+Shift+Z). 
+Citiraj redove: Dodaje prefiks redovima (Ctrl+Q). 
+Ukloni citat iz redova: Uklanja prefiks (Ctrl+Shift+Q). 
+Statistika teksta: Prikazuje broj karaktera, reči i linija (Alt+Y). 
+Navigacija kroz pravopis: F7 prethodna greška, F8 sledeća greška.
+
+Prikaz: 
+Prikaži glasove u uređivaču: Prikazuje sistem glasova, listu glasova i višejezični filter. 
+Prikaži omiljene glasove: Prikazuje listu omiljenih glasova u uređivaču. 
+Boja teksta: Menja boju teksta (svetle i tamne varijante). 
+Veličina teksta: Menja veličinu teksta (mala, normalna, velika, veoma velika, izuzetno velika). 
+Kad je lista stavki vidljiva, taster Tab premešta fokus između uređivača i kontrola, dok ga Shift+Tab vraća unazad.  
+Da bi se stavka dodala u omiljene ili uklonila iz njih, koristi Tab da pređeš na listu stavki, pa je dodaj ili ukloni tasterom Applications ili desnim tasterom miša. Iz liste omiljenih stavki takođe možeš da pritisneš taster Applications da ukloniš stavke koje su već dodate.  
+Prečice na tastaturi: moguće je pritisnuti F9 i F10 da se prelazi između stavki tokom čitanja, kružno kroz one dodate u omiljene.
+
+Umetanje: 
+Ubaci obeleživač: Čuva trenutnu poziciju kursora ili vreme u audio‑knjizi (Ctrl+B). 
+Upravljaj obeleživačima: Pregled, skok na obeleživač ili brisanje sačuvanih obeleživača. Ako datoteka sadrži obeleživače, otvaranje automatski nastavlja od prvog dostupnog.
+
+Alati: 
+Pretvaranje teksta u audio knjige: otvara prozor za pretvaranje liste datoteka ili fascikli u audio‑knjige. 
+- Dodaj datoteke ili fascikle u red čekanja. 
+- Izaberi odredišnu fasciklu i format (MP3 ili WAV). 
+- Opcije za kreiranje podfascikli i izbegavanje prepisivanja. 
+- Pritisni dugme Započni da bi obrada krenula u pozadini. 
+Rečnik: Otvara prozor rečnika. Po listi se krećemo strelicama gore/dole. 
+Tab prelazi na dugme „Dodaj unose u rečnik“, a dugme se aktivira tasterom Enter ili Space.
+U prozoru za dodavanje ili izmenu: unosi se „Izvorna reč“, zatim Tab prelazi na „Zamenska reč“. Dugme OK se potvrđuje tasterom Enter ili Space, a ESC otkazuje.
+U listi, Tab prelazi na „Uredi unos“ i „Ukloni izabrani unos“. 
+Zamene iz rečnika primenjuju se tokom čitanja i kreiranja audio‑knjiga i automatski se čuvaju. 
+Uvezi YouTube transkript: nalepi link, izaberi jezik i uvezi tekst u uređivač (Ctrl+Y). Opcione vremenske oznake. 
+Pretraga i uvoz sa Wikipedije: pretraga članka i uvoz teksta u uređivač (Alt+Shift+W). 
+Mrežni rečnik: pretraga definicija i prevoda na servisu Wiktionary (Alt+Shift+D).
+Pristupačni terminal: otvara terminal sa stabilnim izlazom za čitače ekrana (Ctrl+Shift+T). 
+Prečice: Alt+I fokusira unos, Alt+O fokusira izlaz, Tab/Shift+Tab prelazi između unosa, izlaza i opcija. 
+Enter šalje unos. Ctrl+C kopira izlaz (ili prosleđuje komandu za kopiranje programu). Ctrl+L briše izlaz uz potvrdu.
+Opcije terminala: automatsko klizanje, uklanjanje ANSI oznaka, najava novih linija, zvučni signal posle 1 s neaktivnosti, sprečavanje uspavljivanja. 
+Programi: Command Prompt (cmd.exe), PowerShell, Codex CLI (iz Opcija).
+
+RSS / Članci: otvara prozor RSS/Članci, gde se dodaju izvori; proširi se kanal i pritisne Enter da se članak uveze u uređivač.
+U RSS prozoru, izaberi izvor ili sajt i pritisni Delete da ga ukloniš iz biblioteke. 
+Kontekst meni omogućava izmenu ili brisanje izvora. 
+Posle uvoza članka, Escape vraća na listu. 
+
+Podkasti: otvara prozor Podkasta za pretragu i upravljanje pretplatama. 
+U listi epizoda, Enter pušta epizodu. 
+Tokom reprodukcije, Escape zaustavlja podkast i vraća u biblioteku.
+
+Opcije: 
+Jezik: Menja jezik izgleda programa. 
+Način otvaranja: Otvara datoteke u novoj kartici ili novom prozoru. 
+Glas: Izbor glasa za čitanje. 
+Višejezični glasovi: Filter liste glasova. 
+Visina, brzina i jačina: Podešavanje za glasove (Microsoft i SAPI5). Važi za čitanje i audio‑knjige. 
+Pomeraj kursor tokom čitanja: Vizuelno prati tekst tokom čitanja. 
+Podela audio‑knjige po tekstu: Deli kada se marker pojavi na početku reda (razlikuje velika i mala slova: „Poglavlje“ i „poglavlje“ su različiti). Primer: sa markerom „Poglavlje“ pravi jednu celinu po poglavlju, uključujući autora i uvod u prvu celinu do prvog poglavlja. Ako marker ne postoji, nema podele.
+Ostale podele: 2 dela, 4 dela, 6 delova, 8 delova.
+
+Pomoć: 
+Vodič: Otvara ovaj vodič (F1). 
+Proveri ažuriranja: Proverava dostupna ažuriranja (F2). 
+Lista izmena: Otvara prozor sa izmenama. 
+O programu: Prikazuje informacije o programu.

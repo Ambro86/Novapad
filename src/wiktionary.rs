@@ -590,6 +590,7 @@ fn language_to_code(language: Language) -> &'static str {
         Language::Czech => "cs",
         Language::Polish => "pl",
         Language::French => "fr",
+        Language::Serbian => "sr",
     }
 }
 

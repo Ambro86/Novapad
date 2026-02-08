@@ -20,6 +20,7 @@ fn language_tag(language: Language) -> HSTRING {
         Language::Czech => HSTRING::from("cs-CZ"),
         Language::Polish => HSTRING::from("pl-PL"),
         Language::French => HSTRING::from("fr-FR"),
+        Language::Serbian => HSTRING::from("sr-RS"),
     }
 }
 

@@ -370,6 +370,7 @@ struct OptionsLabels {
     lang_cs: String,
     lang_pl: String,
     lang_fr: String,
+    lang_sr: String,
     marker_position_end: String,
     marker_position_beginning: String,
     open_new_tab: String,
@@ -496,6 +497,14 @@ fn options_labels(language: Language) -> OptionsLabels {
         lang_cs: i18n::tr(language, "options.lang.cs"),
         lang_pl: i18n::tr(language, "options.lang.pl"),
         lang_fr: i18n::tr(language, "options.lang.fr"),
+        lang_sr: {
+            let value = i18n::tr(language, "options.lang.sr");
+            if value == "options.lang.sr" {
+                "Serbian".to_string()
+            } else {
+                value
+            }
+        },
         marker_position_end: i18n::tr(language, "options.modified_marker_position.end"),
         marker_position_beginning: i18n::tr(language, "options.modified_marker_position.beginning"),
         open_new_tab: i18n::tr(language, "options.open.new_tab"),
@@ -2836,6 +2845,12 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         WPARAM(0),
         LPARAM(to_wide(&labels.lang_fr).as_ptr() as isize),
     );
+    SendMessageW(
+        combo_lang,
+        CB_ADDSTRING,
+        WPARAM(0),
+        LPARAM(to_wide(&labels.lang_sr).as_ptr() as isize),
+    );
 
     let lang_index = match settings.language {
         Language::Italian => 0,
@@ -2847,6 +2862,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         Language::Czech => 6,
         Language::Polish => 7,
         Language::French => 8,
+        Language::Serbian => 9,
     };
     SendMessageW(combo_lang, CB_SETCURSEL, WPARAM(lang_index), LPARAM(0));
 
@@ -4568,6 +4584,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         6 => Language::Czech,
         7 => Language::Polish,
         8 => Language::French,
+        9 => Language::Serbian,
         _ => Language::Italian,
     };
 

@@ -1,6 +1,8 @@
 # Changelog
 
 Versión 0.6.6 – 2026-02-08
+Mejoras
+• Añadida "Formateo automático para TTS" en el menú Editar para preparar rápidamente el texto para voz (elimina markdown/comillas y recompone líneas partidas).
 Correcciones de errores
 • Corregida la extracción de texto EPUB para libros con comentarios HTML inline (<!-- ... -->): ahora el texto de los capítulos se analiza correctamente en lugar de omitirse parcial o totalmente.
 • Corregido el diccionario Wiktionary en español y la caché del diccionario: palabras como "agua" ahora se encuentran correctamente y las entradas antiguas de "Palabra no encontrada" ya no se reutilizan.

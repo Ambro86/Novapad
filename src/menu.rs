@@ -53,6 +53,7 @@ pub const IDM_EDIT_PREV_SPELLING_ERROR: usize = 2023;
 pub const IDM_EDIT_NEXT_SPELLING_ERROR: usize = 2024;
 pub const IDM_EDIT_GO_TO_LINE: usize = 2025;
 pub const IDM_EDIT_AUDIOBOOK_SELECTION: usize = 2026;
+pub const IDM_EDIT_AUTO_FORMAT_TTS: usize = 2027;
 pub const IDM_SPELLCHECK_SUGGESTION_BASE: usize = 12000;
 pub const IDM_SPELLCHECK_SUGGESTION_MAX: usize = 10;
 pub const IDM_SPELLCHECK_ADD_TO_DICTIONARY: usize = 12100;
@@ -180,6 +181,7 @@ pub struct MenuLabels {
     pub edit_next_spelling_error: String,
     pub edit_goto_line: String,
     pub edit_text_menu: String,
+    pub edit_auto_format_tts: String,
     pub edit_strip_markdown: String,
     pub edit_normalize_whitespace: String,
     pub edit_hard_line_break: String,
@@ -269,6 +271,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         edit_next_spelling_error: i18n::tr(language, "edit.next_spelling_error"),
         edit_goto_line: i18n::tr(language, "menu.goto_line"),
         edit_text_menu: i18n::tr(language, "edit.text_menu"),
+        edit_auto_format_tts: i18n::tr(language, "edit.auto_format_tts"),
         edit_strip_markdown: i18n::tr(language, "edit.strip_markdown"),
         edit_normalize_whitespace: i18n::tr(language, "edit.normalize_whitespace"),
         edit_hard_line_break: i18n::tr(language, "edit.hard_line_break"),
@@ -669,6 +672,12 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
     );
     crate::log_if_err!(AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null()));
     let text_menu = CreateMenu().unwrap_or(HMENU(0));
+    append_menu_string(
+        text_menu,
+        MF_STRING,
+        IDM_EDIT_AUTO_FORMAT_TTS,
+        &labels.edit_auto_format_tts,
+    );
     append_menu_string(
         text_menu,
         MF_STRING,

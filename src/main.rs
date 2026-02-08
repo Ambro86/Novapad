@@ -3625,6 +3625,13 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                     }
                     LRESULT(0)
                 }
+                IDM_EDIT_AUTO_FORMAT_TTS => {
+                    log_debug("Menu: Auto format TTS");
+                    if editor_manager::auto_format_tts_active_edit(hwnd) {
+                        confirm_menu_action(hwnd, "edit.auto_format_tts");
+                    }
+                    LRESULT(0)
+                }
                 IDM_EDIT_NORMALIZE_WHITESPACE => {
                     log_debug("Menu: Normalize whitespace");
                     if editor_manager::normalize_whitespace_active_edit(hwnd) {

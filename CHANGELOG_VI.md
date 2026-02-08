@@ -1,6 +1,8 @@
 # Nhật ký thay đổi
 
 Phiên bản 0.6.6 – 2026-02-08
+Cải tiến
+• Đã thêm "Định dạng tự động cho TTS" trong menu Chỉnh sửa để chuẩn bị nhanh văn bản cho đọc giọng nói (xóa markdown/dấu ngoặc kép và ghép lại các dòng bị ngắt).
 Sửa lỗi
 • Đã sửa trích xuất văn bản EPUB cho sách có chứa chú thích HTML inline (<!-- ... -->): văn bản chương giờ được phân tích đúng thay vì bị bỏ qua một phần hoặc toàn bộ.
 • Đã sửa từ điển Wiktionary tiếng Tây Ban Nha và cơ chế cache từ điển: các từ như "agua" giờ được tìm đúng, và các mục cache cũ kiểu "Không tìm thấy từ" sẽ không còn được tái sử dụng.

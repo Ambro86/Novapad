@@ -989,6 +989,10 @@ pub unsafe fn remove_duplicate_consecutive_lines_active_edit(hwnd: HWND) -> bool
     apply_text_op_active_edit(hwnd, crate::text_ops::remove_duplicate_consecutive_lines)
 }
 
+pub unsafe fn auto_format_tts_active_edit(hwnd: HWND) -> bool {
+    apply_text_op_active_edit(hwnd, auto_format_tts_block)
+}
+
 unsafe fn apply_text_op_active_edit<F>(hwnd: HWND, op: F) -> bool
 where
     F: Fn(&str) -> String,
@@ -2341,6 +2345,43 @@ fn split_trailing_newline(text: &str, prefer_trailing: bool) -> (&str, bool) {
         return (&text[..text.len().saturating_sub(1)], true);
     }
     (text, false)
+}
+
+fn auto_format_tts_block(text: &str) -> String {
+    if text.trim().is_empty() {
+        return text.to_string();
+    }
+
+    let line_ending = if text.contains("\r\n") { "\r\n" } else { "\n" };
+    // 1) Remove markdown markers first.
+    let stripped = strip_markdown_text(text, false);
+    // 2) Join wrapped lines while preserving paragraph breaks.
+    let mut out = reflow_block_text(
+        &stripped,
+        1000,
+        line_ending,
+        stripped.ends_with('\n') || stripped.ends_with('\r'),
+    );
+    // 3) Remove common quote characters that often degrade TTS flow.
+    out.retain(|c| !matches!(c, '"' | '“' | '”' | '«' | '»' | '„' | '‟' | '‹' | '›'));
+    // 4) Collapse repeated blank lines.
+    let mut compact = String::with_capacity(out.len());
+    let mut blank_run = 0usize;
+    for line in out.lines() {
+        if line.trim().is_empty() {
+            blank_run += 1;
+            if blank_run <= 1 {
+                compact.push_str(line_ending);
+            }
+            continue;
+        }
+        blank_run = 0;
+        if !compact.is_empty() && !compact.ends_with('\n') && !compact.ends_with('\r') {
+            compact.push_str(line_ending);
+        }
+        compact.push_str(line.trim());
+    }
+    compact.trim().to_string()
 }
 
 fn wrap_words<'a, I>(words: I, wrap_width: usize) -> Vec<String>

@@ -3,6 +3,9 @@
 Wersja 0.6.6 – 2026-02-08
 Poprawki błędów
 • Naprawiono wyodrębnianie tekstu EPUB dla książek zawierających komentarze HTML inline (<!-- ... -->): tekst rozdziałów jest teraz poprawnie parsowany zamiast być częściowo lub całkowicie pomijany.
+• Naprawiono słownik Wiktionary dla języka hiszpańskiego i obsługę cache słownika: słowa takie jak „agua” są teraz poprawnie znajdowane, a stare wpisy „nie znaleziono słowa” nie są już ponownie używane.
+• Naprawiono kodowanie przy imporcie artykułów RSS dla niektórych hiszpańskich źródeł (np. El Mundo): akcenty i „ñ” są teraz poprawnie zachowywane w tymczasowym edytorze.
+• Dodano usuwanie pojedynczych artykułów RSS i pojedynczych odcinków podcastów (klawisz Delete + menu kontekstowe z potwierdzeniem), bez usuwania całego źródła RSS/podcastu.
 
 Wersja 0.6.5 – 2026-02-07
 Ulepszenia

@@ -38,13 +38,14 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CallWindowProcW, CreateMenu, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu,
     DestroyWindow, ES_AUTOHSCROLL, EVENT_OBJECT_FOCUS, GetClientRect, GetDlgCtrlID, GetDlgItem,
     GetParent, GetWindowLongPtrW, GetWindowRect, HMENU, IDC_ARROW, IDYES, IsChild, LB_ADDSTRING,
-    LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK, LBS_NOTIFY, MB_ICONINFORMATION, MB_OK,
-    MB_YESNO, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MSG, MessageBoxW, OBJID_CLIENT,
-    PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
-    SetWindowTextW, TrackPopupMenu, WINDOW_STYLE, WM_CHAR, WM_COMMAND, WM_CONTEXTMENU, WM_COPYDATA,
-    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_SETFOCUS,
-    WM_SETFONT, WM_SIZE, WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
-    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK, LBS_NOTIFY, MB_ICONINFORMATION,
+    MB_ICONQUESTION, MB_OK, MB_YESNO, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MSG,
+    MessageBoxW, OBJID_CLIENT, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow,
+    SetWindowLongPtrW, SetWindowTextW, TrackPopupMenu, WINDOW_STYLE, WM_CHAR, WM_COMMAND,
+    WM_CONTEXTMENU, WM_COPYDATA, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL,
+    WM_NOTIFY, WM_SETFOCUS, WM_SETFONT, WM_SIZE, WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD,
+    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP,
+    WS_VISIBLE,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -106,6 +107,7 @@ const ID_CTX_COPY_AUDIO: usize = 13103;
 const ID_CTX_COPY_TITLE: usize = 13104;
 const ID_CTX_DOWNLOAD_EPISODE: usize = 13105;
 const ID_CTX_VIEW_DESCRIPTION: usize = 13106;
+const ID_CTX_REMOVE_EPISODE: usize = 13107;
 
 const ID_CTX_SUBSCRIBE: usize = 13201;
 const ID_CTX_SEARCH_INFO: usize = 13202;
@@ -3971,6 +3973,7 @@ unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool)
             let copy_title = i18n::tr(language, "podcasts.context.copy_title");
             let download_label = i18n::tr(language, "podcasts.context.download_episode");
             let view_description = i18n::tr(language, "podcasts.context.view_description");
+            let remove_label = i18n::tr(language, "dictionary.remove");
             if let Err(_e) = AppendMenuW(
                 menu,
                 MF_STRING,
@@ -4006,6 +4009,13 @@ unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool)
                 MF_STRING,
                 ID_CTX_DOWNLOAD_EPISODE,
                 PCWSTR(to_wide(&download_label).as_ptr()),
+            ) {}
+            if let Err(_e) = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()) {}
+            if let Err(_e) = AppendMenuW(
+                menu,
+                MF_STRING,
+                ID_CTX_REMOVE_EPISODE,
+                PCWSTR(to_wide(&remove_label).as_ptr()),
             ) {}
         }
         None => {}
@@ -4049,6 +4059,7 @@ unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool)
         ID_CTX_COPY_TITLE => handle_episode_action(hwnd, EpisodeAction::CopyTitle),
         ID_CTX_DOWNLOAD_EPISODE => handle_episode_action(hwnd, EpisodeAction::Download),
         ID_CTX_VIEW_DESCRIPTION => handle_episode_action(hwnd, EpisodeAction::ViewDescription),
+        ID_CTX_REMOVE_EPISODE => handle_episode_action(hwnd, EpisodeAction::Remove),
         ID_CTX_SUBSCRIBE => subscribe_selected_result(hwnd),
         _ => {}
     }
@@ -4184,6 +4195,7 @@ enum EpisodeAction {
     CopyTitle,
     Download,
     ViewDescription,
+    Remove,
 }
 
 unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
@@ -4226,6 +4238,60 @@ unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
             let content = crate::tools::reader::clean_text(&item.description);
             let final_content = crate::tools::reader::collapse_blank_lines(&content);
             show_description_dialog(hwnd, &item.title, &final_content);
+        }
+        EpisodeAction::Remove => {
+            let language = with_state(parent, |s| s.settings.language).unwrap_or_default();
+            let caption = confirm_title(language);
+            let remove_label = i18n::tr(language, "dictionary.remove");
+            let title = if item.title.trim().is_empty() {
+                item.link.clone()
+            } else {
+                item.title.clone()
+            };
+            let msg = format!("{remove_label}: \"{title}\"?");
+            let confirmed = MessageBoxW(
+                hwnd,
+                PCWSTR(to_wide(&msg).as_ptr()),
+                PCWSTR(to_wide(&caption).as_ptr()),
+                MB_YESNO | MB_ICONQUESTION,
+            ) == IDYES;
+            if !confirmed {
+                return;
+            }
+
+            let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+            let hitem = selected_tree_item(hwnd);
+            if hwnd_tree.0 == 0 || hitem.0 == 0 {
+                return;
+            }
+            let parent_item = HTREEITEM(
+                SendMessageW(
+                    hwnd_tree,
+                    TVM_GETNEXTITEM,
+                    WPARAM(TVGN_PARENT as usize),
+                    LPARAM(hitem.0),
+                )
+                .0,
+            );
+            let key = episode_key(&item);
+            with_podcast_state(hwnd, |s| {
+                s.node_data.remove(&hitem.0);
+                if parent_item.0 != 0
+                    && let Some(state) = s.source_items.get_mut(&parent_item.0)
+                    && let Some(pos) = state.items.iter().position(|x| episode_key(x) == key)
+                {
+                    state.items.remove(pos);
+                }
+            });
+            SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(hitem.0));
+            if parent_item.0 != 0 {
+                SendMessageW(
+                    hwnd_tree,
+                    TVM_SELECTITEM,
+                    WPARAM(TVGN_CARET as usize),
+                    LPARAM(parent_item.0),
+                );
+            }
         }
     }
 }
@@ -5055,7 +5121,11 @@ unsafe fn podcast_tree_wndproc_inner(
         if key == VK_DELETE.0 as u32 {
             let parent = GetParent(hwnd);
             if parent.0 != 0 {
-                handle_source_action(parent, SourceAction::Remove);
+                if selected_episode(parent).is_some() {
+                    handle_episode_action(parent, EpisodeAction::Remove);
+                } else {
+                    handle_source_action(parent, SourceAction::Remove);
+                }
                 return LRESULT(0);
             }
         }

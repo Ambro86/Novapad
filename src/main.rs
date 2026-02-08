@@ -573,6 +573,10 @@ fn save_dictionary_cache(cache: &HashMap<String, Vec<String>>) {
     }
 }
 
+pub(crate) fn is_dictionary_not_found_cache_entry(language: Language, lines: &[String]) -> bool {
+    lines.len() == 1 && lines[0] == i18n::tr(language, "dictionary.not_found")
+}
+
 pub(crate) fn update_dictionary_cache(hwnd: HWND, key: String, lines: Vec<String>) {
     unsafe {
         if with_state(hwnd, |state| {
@@ -586,10 +590,26 @@ pub(crate) fn update_dictionary_cache(hwnd: HWND, key: String, lines: Vec<String
     }
 }
 
+pub(crate) fn remove_dictionary_cache(hwnd: HWND, key: &str) {
+    unsafe {
+        if with_state(hwnd, |state| {
+            let removed = state.dictionary_cache.remove(key).is_some();
+            if removed {
+                save_dictionary_cache(&state.dictionary_cache);
+            }
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to remove dictionary cache state");
+        }
+    }
+}
+
 struct DictionaryLookupResult {
     key: String,
     lines: Vec<String>,
     generation: usize,
+    cacheable: bool,
 }
 
 fn start_dictionary_lookup(
@@ -601,20 +621,21 @@ fn start_dictionary_lookup(
     generation: usize,
 ) {
     std::thread::spawn(move || {
-        let lines = match wiktionary::lookup_for_language(&word, language, &pref) {
-            Ok(entry) => wiktionary::format_menu_lines(language, &entry),
+        let (lines, cacheable) = match wiktionary::lookup_for_language(&word, language, &pref) {
+            Ok(entry) => (wiktionary::format_menu_lines(language, &entry), true),
             Err(wiktionary::LookupError::NotFound { .. }) => {
-                vec![i18n::tr(language, "dictionary.not_found")]
+                (vec![i18n::tr(language, "dictionary.not_found")], false)
             }
             Err(err) => {
                 log_debug(&format!("Dictionary lookup failed: {err}"));
-                vec![i18n::tr(language, "dictionary.not_found")]
+                (vec![i18n::tr(language, "dictionary.not_found")], false)
             }
         };
         let result = Box::new(DictionaryLookupResult {
             key,
             lines,
             generation,
+            cacheable,
         });
         let hwnd = HWND(hwnd_val);
         if unsafe { IsWindow(hwnd).as_bool() } {
@@ -673,8 +694,13 @@ unsafe fn prefetch_dictionary_for_selection(hwnd: HWND, hwnd_edit: HWND) {
         let language = state.settings.language;
         let pref = state.settings.dictionary_translation_language.clone();
         let key = dictionary_cache_key(language, &pref, &word);
-        if state.dictionary_cache.contains_key(&key) {
-            return None;
+        if let Some(lines) = state.dictionary_cache.get(&key).cloned() {
+            if is_dictionary_not_found_cache_entry(language, &lines) {
+                state.dictionary_cache.remove(&key);
+                save_dictionary_cache(&state.dictionary_cache);
+            } else {
+                return None;
+            }
         }
         if state.dictionary_pending_lookup.as_ref() == Some(&key) {
             return None;
@@ -2914,9 +2940,13 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 if result.generation != current_gen {
                     return false;
                 }
-                state
-                    .dictionary_cache
-                    .insert(result.key.clone(), result.lines.clone());
+                if result.cacheable {
+                    state
+                        .dictionary_cache
+                        .insert(result.key.clone(), result.lines.clone());
+                } else {
+                    state.dictionary_cache.remove(&result.key);
+                }
                 state.dictionary_pending_lookup = None;
                 save_dictionary_cache(&state.dictionary_cache);
 
@@ -3229,7 +3259,16 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                     &state.dictionary_context_pref,
                     &state.dictionary_context_word,
                 );
-                let cached = state.dictionary_cache.get(&key).cloned();
+                let not_found = i18n::tr(state.dictionary_context_language, "dictionary.not_found");
+                let cached = match state.dictionary_cache.get(&key) {
+                    Some(lines) if lines.len() == 1 && lines[0] == not_found => {
+                        state.dictionary_cache.remove(&key);
+                        save_dictionary_cache(&state.dictionary_cache);
+                        None
+                    }
+                    Some(lines) => Some(lines.clone()),
+                    None => None,
+                };
                 let pending = state.dictionary_pending_lookup.as_ref() == Some(&key);
                 Some((
                     state.dictionary_context_word.clone(),
@@ -5969,8 +6008,13 @@ pub(crate) unsafe fn show_editor_context_menu(hwnd: HWND, hwnd_edit: HWND, lpara
             let generation = state.dictionary_prefetch_generation;
 
             let key = dictionary_cache_key(language_ui, &dictionary_pref, &word_ctx.word);
-            if state.dictionary_cache.contains_key(&key) {
-                return None;
+            if let Some(lines) = state.dictionary_cache.get(&key).cloned() {
+                if is_dictionary_not_found_cache_entry(language_ui, &lines) {
+                    state.dictionary_cache.remove(&key);
+                    save_dictionary_cache(&state.dictionary_cache);
+                } else {
+                    return None;
+                }
             }
             if state.dictionary_pending_lookup.as_ref() == Some(&key) {
                 return None;

@@ -1,6 +1,8 @@
 use crate::accessibility::{handle_accessibility, to_wide};
 use crate::i18n;
+use crate::is_dictionary_not_found_cache_entry;
 use crate::log_debug;
+use crate::remove_dictionary_cache;
 use crate::settings::Language;
 use crate::update_dictionary_cache;
 use crate::wiktionary;
@@ -583,12 +585,16 @@ unsafe fn run_lookup(hwnd: HWND) {
     let cached_lines =
         with_state(parent, |state| state.dictionary_cache.get(&key).cloned()).unwrap_or(None);
     if let Some(lines) = cached_lines {
-        let text = format_cached_output(language, &lines);
-        if let Err(_e) = SetWindowTextW(
-            output,
-            PCWSTR(to_wide(&to_windows_newlines(&text)).as_ptr()),
-        ) {}
-        return;
+        if is_dictionary_not_found_cache_entry(language, &lines) {
+            remove_dictionary_cache(parent, &key);
+        } else {
+            let text = format_cached_output(language, &lines);
+            if let Err(_e) = SetWindowTextW(
+                output,
+                PCWSTR(to_wide(&to_windows_newlines(&text)).as_ptr()),
+            ) {}
+            return;
+        }
     }
 
     let generation = LOOKUP_GENERATION

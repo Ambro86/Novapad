@@ -235,8 +235,36 @@ fn extract_definitions_with_subpoints(
         }
         let l = line.trim_start();
 
-        if l.starts_with("# ") && main_count < max_main_defs {
-            let cleaned = clean_wikitext_line(l[2..].trim().to_string());
+        let mut candidate: Option<&str> = None;
+        if let Some(rest) = l.strip_prefix("# ") {
+            candidate = Some(rest.trim());
+        } else if let Some(rest) = l.strip_prefix(';') {
+            let mut idx = 0usize;
+            let chars: Vec<char> = rest.chars().collect();
+            while idx < chars.len() && chars[idx].is_ascii_digit() {
+                idx += 1;
+            }
+            if idx > 0 {
+                while idx < chars.len() && chars[idx].is_whitespace() {
+                    idx += 1;
+                }
+                if idx < chars.len() && chars[idx] == ':' {
+                    idx += 1;
+                }
+                while idx < chars.len() && chars[idx].is_whitespace() {
+                    idx += 1;
+                }
+                if idx < chars.len() {
+                    candidate = Some(rest[idx..].trim());
+                }
+            }
+        }
+
+        if let Some(text) = candidate {
+            if main_count >= max_main_defs {
+                break;
+            }
+            let cleaned = clean_wikitext_line(text.to_string());
             let truncated = cleaned.chars().take(MAX_CHARS_PER_DEF).collect::<String>();
             if !truncated.is_empty() {
                 out.push(truncated);

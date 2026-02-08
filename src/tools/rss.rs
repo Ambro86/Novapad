@@ -1,5 +1,6 @@
 use crate::log_debug;
 use crate::tools::reader;
+use encoding_rs::{Encoding, WINDOWS_1252};
 use feed_rs::parser;
 use reqwest::{self, StatusCode, header};
 use scraper::{Html, Selector};
@@ -341,6 +342,45 @@ fn host_from_url(url: &str) -> Option<String> {
     Url::parse(url)
         .ok()
         .and_then(|u| u.host_str().map(|h| h.to_string()))
+}
+
+fn detect_charset_label_from_html(bytes: &[u8]) -> Option<String> {
+    let probe_len = bytes.len().min(16 * 1024);
+    let probe = String::from_utf8_lossy(&bytes[..probe_len]).to_ascii_lowercase();
+    let charset_pos = probe.find("charset=")?;
+    let after = &probe[charset_pos + "charset=".len()..];
+    let mut out = String::new();
+    let mut started = false;
+    for ch in after.chars() {
+        if !started && (ch == '"' || ch == '\'' || ch.is_whitespace()) {
+            continue;
+        }
+        if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
+            started = true;
+            out.push(ch);
+            continue;
+        }
+        if started {
+            break;
+        }
+    }
+    if out.is_empty() { None } else { Some(out) }
+}
+
+fn decode_html_bytes(bytes: &[u8]) -> String {
+    if let Ok(text) = String::from_utf8(bytes.to_vec()) {
+        return text;
+    }
+
+    if let Some(label) = detect_charset_label_from_html(bytes)
+        && let Some(encoding) = Encoding::for_label(label.as_bytes())
+    {
+        let (decoded, _, _) = encoding.decode(bytes);
+        return decoded.into_owned();
+    }
+
+    let (decoded, _, _) = WINDOWS_1252.decode(bytes);
+    decoded.into_owned()
 }
 
 fn now_unix() -> i64 {
@@ -845,7 +885,7 @@ pub async fn fetch_and_parse(
     }
 
     // HTML Discovery
-    let html = String::from_utf8_lossy(&out.bytes);
+    let html = decode_html_bytes(&out.bytes);
     let feed_links = extract_feed_links(&html, &url);
     for feed_link in feed_links {
         crate::log_debug(&format!("Discovering feed at: {}", feed_link));
@@ -949,7 +989,7 @@ pub async fn fetch_article_text(
 
     let html = match bytes_res {
         Ok(bytes) => {
-            let s = String::from_utf8_lossy(&bytes).to_string();
+            let s = decode_html_bytes(&bytes);
             // DEBUG: Salva l'HTML grezzo in un file vicino all'exe
             #[cfg(debug_assertions)]
             if let Ok(mut exe_path) = std::env::current_exe() {
@@ -989,6 +1029,63 @@ pub fn fetch_config_from_settings(settings: &crate::settings::AppSettings) -> Rs
     RssFetchConfig {
         max_items_per_feed: settings.rss_max_items_per_feed,
         max_excerpt_chars: settings.rss_max_excerpt_chars,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn decode_html_bytes_preserves_spanish_accents_from_elmundo_fixture() {
+        let bytes = std::fs::read("tests/fixtures/rss/elmundo_first_article.html")
+            .expect("failed to read elmundo article fixture");
+        let decoded = decode_html_bytes(&bytes);
+        assert!(
+            decoded.chars().any(|c| matches!(
+                c,
+                'á' | 'é' | 'í' | 'ó' | 'ú' | 'ñ' | 'Á' | 'É' | 'Í' | 'Ó' | 'Ú' | 'Ñ'
+            )),
+            "decoded article does not contain expected Spanish accented characters"
+        );
+    }
+
+    #[test]
+    fn parse_elmundo_feed_fixture_extracts_items() {
+        let bytes = std::fs::read("tests/fixtures/rss/elmundo_portada.xml")
+            .expect("failed to read elmundo feed fixture");
+        let parsed = parse_feed_bytes(
+            bytes,
+            "http://estaticos.elmundo.es/elmundo/rss/portada.xml",
+            512,
+        );
+        let Some((title, items)) = parsed else {
+            panic!("failed to parse elmundo feed fixture");
+        };
+        assert!(!title.trim().is_empty(), "feed title is empty");
+        assert!(!items.is_empty(), "feed has no items");
+    }
+
+    #[test]
+    fn reader_extract_from_elmundo_fixture_keeps_spanish_accents() {
+        let bytes = std::fs::read("tests/fixtures/rss/elmundo_first_article.html")
+            .expect("failed to read elmundo article fixture");
+        let html = decode_html_bytes(&bytes);
+        let article = reader::reader_mode_extract(&html, crate::settings::Language::Spanish)
+            .unwrap_or_else(|| panic!("reader_mode_extract failed on elmundo article fixture"));
+
+        let combined = format!("{} {}", article.title, article.content);
+        assert!(
+            combined.chars().any(|c| matches!(
+                c,
+                'á' | 'é' | 'í' | 'ó' | 'ú' | 'ñ' | 'Á' | 'É' | 'Í' | 'Ó' | 'Ú' | 'Ñ'
+            )),
+            "reader output does not contain expected Spanish accented characters"
+        );
+        assert!(
+            article.content.trim().chars().count() >= 120,
+            "reader output is unexpectedly short"
+        );
     }
 }
 

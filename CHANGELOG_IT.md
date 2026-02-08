@@ -3,6 +3,9 @@
 Versione 0.6.6 – 2026-02-08
 Correzioni di bug
 • Corretto il parsing del testo EPUB per i libri che contengono commenti HTML inline (<!-- ... -->): il testo dei capitoli ora viene estratto correttamente invece di essere saltato in parte o del tutto.
+• Corretto il dizionario Wiktionary in spagnolo e la gestione cache del dizionario: parole come "agua" ora vengono trovate correttamente e le vecchie cache "parola non trovata" non vengono più riutilizzate.
+• Corretto l'encoding nell'import degli articoli RSS per alcune fonti spagnole (es. El Mundo): accenti e "ñ" ora vengono mantenuti correttamente nell'editor temporaneo.
+• Aggiunta la rimozione dei singoli articoli RSS e dei singoli episodi podcast (tasto Canc + menu contestuale con conferma), senza eliminare l'intera fonte RSS/podcast.
 
 Versione 0.6.5 – 2026-02-07
 Miglioramenti

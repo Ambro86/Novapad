@@ -3,6 +3,9 @@
 Versión 0.6.6 – 2026-02-08
 Correcciones de errores
 • Corregida la extracción de texto EPUB para libros con comentarios HTML inline (<!-- ... -->): ahora el texto de los capítulos se analiza correctamente en lugar de omitirse parcial o totalmente.
+• Corregido el diccionario Wiktionary en español y la caché del diccionario: palabras como "agua" ahora se encuentran correctamente y las entradas antiguas de "Palabra no encontrada" ya no se reutilizan.
+• Corregida la codificación al importar artículos RSS en algunas fuentes españolas (p. ej., El Mundo): los acentos y la "ñ" ahora se muestran correctamente en el editor temporal.
+• Añadida la eliminación de artículos RSS individuales y episodios de podcast individuales (tecla Supr + menú contextual con confirmación), sin eliminar toda la fuente RSS/podcast.
 
 Version 0.6.5 – 2026-02-07
 Mejoras

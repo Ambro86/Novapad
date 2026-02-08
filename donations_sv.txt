@@ -18,3 +18,5 @@ Alla som väljer att stödja projektet kommer att tackas i programmet och på Gi
 Tack till Jiri Holzinger och Paola Vagata för deras bidrag.
 För den vietnamesiska översättningen tack till Anh Đức Nguyễn.
 För den tjeckiska översättningen tack till Radek Žalud och Jiri Holzinger.
+För den spanska översättningen tack till Arturo Fernandez Rivas.
+För den serbiska översättningen tack till Mila Kuran.

@@ -18,3 +18,5 @@ Każdy, kto wesprze projekt, zostanie wymieniony w programie oraz w repozytorium
 Dziękujemy Jiri Holzingerowi i Paola Vagata za wkład.
 Za tłumaczenie na wietnamski dziękujemy Anh Đức Nguyễn.
 Za tłumaczenie na czeski dziękujemy Radkowi Žaludowi i Jiri Holzingerowi.
+Za tłumaczenie na hiszpański dziękujemy Arturo Fernandez Rivas.
+Za tłumaczenie na serbski dziękujemy Mila Kuran.

@@ -23,3 +23,5 @@ Každý, kdo projekt podpoří, bude zmíněn v programu a v repozitáři na Git
 Děkujeme Jirimu Holzingerovi a Paole Vagata za příspěvek.
 Za vietnamský překlad děkujeme Anh Đức Nguyễn.
 Za český překlad děkujeme Radku Žaludovi a Jirimu Holzingerovi.
+Za španělský překlad děkujeme Arturo Fernandez Rivas.
+Za srbský překlad děkujeme Mila Kuran.

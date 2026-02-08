@@ -18,3 +18,5 @@ Svi koji podrže projekat biće pomenuti u programu i na GitHub repozitorijumu, 
 Zahvaljujemo Jiri Holzingeru i Paoli Vagati na njihovom doprinosu.
 Za vijetnamski prevod, zahvaljujemo Anh Đức Nguyễnu.
 Za češki prevod, zahvaljujemo Radeku Žaludu i Jiri Holzingeru.
+Za španski prevod, zahvaljujemo Arturo Fernandez Rivasu.
+Za srpski prevod, zahvaljujemo Mila Kuran.

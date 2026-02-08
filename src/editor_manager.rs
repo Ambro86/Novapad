@@ -503,6 +503,65 @@ fn get_text_range_simple(hwnd: HWND, start: i32, end: i32) -> String {
     String::from_utf16_lossy(&buf[..len])
 }
 
+unsafe fn selected_line_block_from_selection(
+    hwnd_edit: HWND,
+    text: &str,
+    mut selection: CHARRANGE,
+) -> Option<(i32, i32, String, bool)> {
+    if selection.cpMin == selection.cpMax {
+        return None;
+    }
+    if selection.cpMax < selection.cpMin {
+        std::mem::swap(&mut selection.cpMin, &mut selection.cpMax);
+    }
+
+    let start = selection.cpMin;
+    let end = selection.cpMax;
+    let start_line = SendMessageW(
+        hwnd_edit,
+        EM_LINEFROMCHAR,
+        WPARAM(start as usize),
+        LPARAM(0),
+    )
+    .0 as i32;
+    let mut end_line =
+        SendMessageW(hwnd_edit, EM_LINEFROMCHAR, WPARAM(end as usize), LPARAM(0)).0 as i32;
+    let end_line_start = SendMessageW(
+        hwnd_edit,
+        EM_LINEINDEX,
+        WPARAM(end_line as usize),
+        LPARAM(0),
+    )
+    .0 as i32;
+    if end > start && end == end_line_start {
+        end_line -= 1;
+    }
+    if end_line < start_line {
+        return None;
+    }
+
+    let range_start = SendMessageW(
+        hwnd_edit,
+        EM_LINEINDEX,
+        WPARAM(start_line as usize),
+        LPARAM(0),
+    )
+    .0 as i32;
+    let mut range_end = SendMessageW(
+        hwnd_edit,
+        EM_LINEINDEX,
+        WPARAM((end_line + 1) as usize),
+        LPARAM(0),
+    )
+    .0 as i32;
+    if range_end < 0 {
+        range_end = byte_index_to_utf16(text, text.len());
+    }
+    let selected = get_text_range_simple(hwnd_edit, range_start, range_end);
+    let trailing = selected.ends_with('\n') || selected.ends_with('\r');
+    Some((range_start, range_end, selected, trailing))
+}
+
 fn apply_indent_settings_to_edit(hwnd_edit: HWND, settings: &AppSettings) {
     let width = match settings.indentation_mode {
         IndentationMode::Spaces => settings.indent_space_width,
@@ -1461,41 +1520,30 @@ pub unsafe fn order_items_active_edit(hwnd: HWND) -> bool {
         LPARAM(&mut selection as *mut _ as isize),
     );
 
-    let (affected_start, affected_end, has_trailing_newline) = if selection.cpMin != selection.cpMax
-    {
-        let start_byte = utf16_index_to_byte(&text, selection.cpMin);
-        let end_byte = utf16_index_to_byte(&text, selection.cpMax);
-        let mut effective_end = end_byte;
-        if end_byte > start_byte && end_byte > 0 && text.as_bytes()[end_byte - 1] == b'\n' {
-            effective_end = end_byte.saturating_sub(1);
-        }
-        let line_start = text[..start_byte].rfind('\n').map(|i| i + 1).unwrap_or(0);
-        let line_end = text[effective_end..]
-            .find('\n')
-            .map(|i| effective_end + i + 1)
-            .unwrap_or(text.len());
-        (
-            line_start,
-            line_end,
-            text[line_start..line_end].ends_with('\n'),
-        )
-    } else {
-        let caret = utf16_index_to_byte(&text, selection.cpMin);
-        let Some((start, end, trailing)) = paragraph_range_bytes(&text, caret) else {
-            return false;
+    let (replace_start, replace_end, affected, has_trailing_newline) =
+        if let Some((start, end, selected, trailing)) =
+            selected_line_block_from_selection(hwnd_edit, &text, selection)
+        {
+            (start, end, selected, trailing)
+        } else {
+            let caret = utf16_index_to_byte(&text, selection.cpMin);
+            let Some((start, end, trailing)) = paragraph_range_bytes(&text, caret) else {
+                return false;
+            };
+            let replace_start = byte_index_to_utf16(&text, start);
+            let replace_end = byte_index_to_utf16(&text, end);
+            let selected = text[start..end].to_string();
+            (replace_start, replace_end, selected, trailing)
         };
-        (start, end, trailing)
-    };
 
-    let affected = &text[affected_start..affected_end];
-    let ordered = order_lines_block(affected, line_ending, has_trailing_newline);
+    let ordered = order_lines_block(&affected, line_ending, has_trailing_newline);
     if ordered == affected {
         return false;
     }
 
     let mut replace_range = CHARRANGE {
-        cpMin: byte_index_to_utf16(&text, affected_start),
-        cpMax: byte_index_to_utf16(&text, affected_end),
+        cpMin: replace_start,
+        cpMax: replace_end,
     };
     SendMessageW(
         hwnd_edit,
@@ -1536,41 +1584,30 @@ pub unsafe fn keep_unique_items_active_edit(hwnd: HWND) -> bool {
         LPARAM(&mut selection as *mut _ as isize),
     );
 
-    let (affected_start, affected_end, has_trailing_newline) = if selection.cpMin != selection.cpMax
-    {
-        let start_byte = utf16_index_to_byte(&text, selection.cpMin);
-        let end_byte = utf16_index_to_byte(&text, selection.cpMax);
-        let mut effective_end = end_byte;
-        if end_byte > start_byte && end_byte > 0 && text.as_bytes()[end_byte - 1] == b'\n' {
-            effective_end = end_byte.saturating_sub(1);
-        }
-        let line_start = text[..start_byte].rfind('\n').map(|i| i + 1).unwrap_or(0);
-        let line_end = text[effective_end..]
-            .find('\n')
-            .map(|i| effective_end + i + 1)
-            .unwrap_or(text.len());
-        (
-            line_start,
-            line_end,
-            text[line_start..line_end].ends_with('\n'),
-        )
-    } else {
-        let caret = utf16_index_to_byte(&text, selection.cpMin);
-        let Some((start, end, trailing)) = paragraph_range_bytes(&text, caret) else {
-            return false;
+    let (replace_start, replace_end, affected, has_trailing_newline) =
+        if let Some((start, end, selected, trailing)) =
+            selected_line_block_from_selection(hwnd_edit, &text, selection)
+        {
+            (start, end, selected, trailing)
+        } else {
+            let caret = utf16_index_to_byte(&text, selection.cpMin);
+            let Some((start, end, trailing)) = paragraph_range_bytes(&text, caret) else {
+                return false;
+            };
+            let replace_start = byte_index_to_utf16(&text, start);
+            let replace_end = byte_index_to_utf16(&text, end);
+            let selected = text[start..end].to_string();
+            (replace_start, replace_end, selected, trailing)
         };
-        (start, end, trailing)
-    };
 
-    let affected = &text[affected_start..affected_end];
-    let cleaned = keep_unique_lines_block(affected, line_ending, has_trailing_newline);
+    let cleaned = keep_unique_lines_block(&affected, line_ending, has_trailing_newline);
     if cleaned == affected {
         return false;
     }
 
     let mut replace_range = CHARRANGE {
-        cpMin: byte_index_to_utf16(&text, affected_start),
-        cpMax: byte_index_to_utf16(&text, affected_end),
+        cpMin: replace_start,
+        cpMax: replace_end,
     };
     SendMessageW(
         hwnd_edit,
@@ -1611,41 +1648,30 @@ pub unsafe fn reverse_items_active_edit(hwnd: HWND) -> bool {
         LPARAM(&mut selection as *mut _ as isize),
     );
 
-    let (affected_start, affected_end, has_trailing_newline) = if selection.cpMin != selection.cpMax
-    {
-        let start_byte = utf16_index_to_byte(&text, selection.cpMin);
-        let end_byte = utf16_index_to_byte(&text, selection.cpMax);
-        let mut effective_end = end_byte;
-        if end_byte > start_byte && end_byte > 0 && text.as_bytes()[end_byte - 1] == b'\n' {
-            effective_end = end_byte.saturating_sub(1);
-        }
-        let line_start = text[..start_byte].rfind('\n').map(|i| i + 1).unwrap_or(0);
-        let line_end = text[effective_end..]
-            .find('\n')
-            .map(|i| effective_end + i + 1)
-            .unwrap_or(text.len());
-        (
-            line_start,
-            line_end,
-            text[line_start..line_end].ends_with('\n'),
-        )
-    } else {
-        let caret = utf16_index_to_byte(&text, selection.cpMin);
-        let Some((start, end, trailing)) = paragraph_range_bytes(&text, caret) else {
-            return false;
+    let (replace_start, replace_end, affected, has_trailing_newline) =
+        if let Some((start, end, selected, trailing)) =
+            selected_line_block_from_selection(hwnd_edit, &text, selection)
+        {
+            (start, end, selected, trailing)
+        } else {
+            let caret = utf16_index_to_byte(&text, selection.cpMin);
+            let Some((start, end, trailing)) = paragraph_range_bytes(&text, caret) else {
+                return false;
+            };
+            let replace_start = byte_index_to_utf16(&text, start);
+            let replace_end = byte_index_to_utf16(&text, end);
+            let selected = text[start..end].to_string();
+            (replace_start, replace_end, selected, trailing)
         };
-        (start, end, trailing)
-    };
 
-    let affected = &text[affected_start..affected_end];
-    let reversed = reverse_lines_block(affected, line_ending, has_trailing_newline);
+    let reversed = reverse_lines_block(&affected, line_ending, has_trailing_newline);
     if reversed == affected {
         return false;
     }
 
     let mut replace_range = CHARRANGE {
-        cpMin: byte_index_to_utf16(&text, affected_start),
-        cpMax: byte_index_to_utf16(&text, affected_end),
+        cpMin: replace_start,
+        cpMax: replace_end,
     };
     SendMessageW(
         hwnd_edit,
@@ -1692,41 +1718,30 @@ pub unsafe fn quote_lines_active_edit(hwnd: HWND) -> bool {
         LPARAM(&mut selection as *mut _ as isize),
     );
 
-    let (affected_start, affected_end, has_trailing_newline) = if selection.cpMin != selection.cpMax
-    {
-        let start_byte = utf16_index_to_byte(&text, selection.cpMin);
-        let end_byte = utf16_index_to_byte(&text, selection.cpMax);
-        let mut effective_end = end_byte;
-        if end_byte > start_byte && end_byte > 0 && text.as_bytes()[end_byte - 1] == b'\n' {
-            effective_end = end_byte.saturating_sub(1);
-        }
-        let line_start = text[..start_byte].rfind('\n').map(|i| i + 1).unwrap_or(0);
-        let line_end = text[effective_end..]
-            .find('\n')
-            .map(|i| effective_end + i + 1)
-            .unwrap_or(text.len());
-        (
-            line_start,
-            line_end,
-            text[line_start..line_end].ends_with('\n'),
-        )
-    } else {
-        let caret = utf16_index_to_byte(&text, selection.cpMin);
-        let Some((start, end, trailing)) = paragraph_range_bytes(&text, caret) else {
-            return false;
+    let (replace_start, replace_end, affected, has_trailing_newline) =
+        if let Some((start, end, selected, trailing)) =
+            selected_line_block_from_selection(hwnd_edit, &text, selection)
+        {
+            (start, end, selected, trailing)
+        } else {
+            let caret = utf16_index_to_byte(&text, selection.cpMin);
+            let Some((start, end, trailing)) = paragraph_range_bytes(&text, caret) else {
+                return false;
+            };
+            let replace_start = byte_index_to_utf16(&text, start);
+            let replace_end = byte_index_to_utf16(&text, end);
+            let selected = text[start..end].to_string();
+            (replace_start, replace_end, selected, trailing)
         };
-        (start, end, trailing)
-    };
 
-    let affected = &text[affected_start..affected_end];
-    let quoted = quote_lines_block(affected, line_ending, has_trailing_newline, &quote_prefix);
+    let quoted = quote_lines_block(&affected, line_ending, has_trailing_newline, &quote_prefix);
     if quoted == affected {
         return false;
     }
 
     let mut replace_range = CHARRANGE {
-        cpMin: byte_index_to_utf16(&text, affected_start),
-        cpMax: byte_index_to_utf16(&text, affected_end),
+        cpMin: replace_start,
+        cpMax: replace_end,
     };
     SendMessageW(
         hwnd_edit,
@@ -1773,41 +1788,30 @@ pub unsafe fn unquote_lines_active_edit(hwnd: HWND) -> bool {
         LPARAM(&mut selection as *mut _ as isize),
     );
 
-    let (affected_start, affected_end, has_trailing_newline) = if selection.cpMin != selection.cpMax
-    {
-        let start_byte = utf16_index_to_byte(&text, selection.cpMin);
-        let end_byte = utf16_index_to_byte(&text, selection.cpMax);
-        let mut effective_end = end_byte;
-        if end_byte > start_byte && end_byte > 0 && text.as_bytes()[end_byte - 1] == b'\n' {
-            effective_end = end_byte.saturating_sub(1);
-        }
-        let line_start = text[..start_byte].rfind('\n').map(|i| i + 1).unwrap_or(0);
-        let line_end = text[effective_end..]
-            .find('\n')
-            .map(|i| effective_end + i + 1)
-            .unwrap_or(text.len());
-        (
-            line_start,
-            line_end,
-            text[line_start..line_end].ends_with('\n'),
-        )
-    } else {
-        let caret = utf16_index_to_byte(&text, selection.cpMin);
-        let Some((start, end, trailing)) = paragraph_range_bytes(&text, caret) else {
-            return false;
+    let (replace_start, replace_end, affected, has_trailing_newline) =
+        if let Some((start, end, selected, trailing)) =
+            selected_line_block_from_selection(hwnd_edit, &text, selection)
+        {
+            (start, end, selected, trailing)
+        } else {
+            let caret = utf16_index_to_byte(&text, selection.cpMin);
+            let Some((start, end, trailing)) = paragraph_range_bytes(&text, caret) else {
+                return false;
+            };
+            let replace_start = byte_index_to_utf16(&text, start);
+            let replace_end = byte_index_to_utf16(&text, end);
+            let selected = text[start..end].to_string();
+            (replace_start, replace_end, selected, trailing)
         };
-        (start, end, trailing)
-    };
 
-    let affected = &text[affected_start..affected_end];
-    let unquoted = unquote_lines_block(affected, line_ending, has_trailing_newline, &quote_prefix);
+    let unquoted = unquote_lines_block(&affected, line_ending, has_trailing_newline, &quote_prefix);
     if unquoted == affected {
         return false;
     }
 
     let mut replace_range = CHARRANGE {
-        cpMin: byte_index_to_utf16(&text, affected_start),
-        cpMax: byte_index_to_utf16(&text, affected_end),
+        cpMin: replace_start,
+        cpMax: replace_end,
     };
     SendMessageW(
         hwnd_edit,
@@ -1848,41 +1852,30 @@ pub unsafe fn join_lines_active_edit(hwnd: HWND) -> bool {
         LPARAM(&mut selection as *mut _ as isize),
     );
 
-    let (affected_start, affected_end, has_trailing_newline) = if selection.cpMin != selection.cpMax
-    {
-        let start_byte = utf16_index_to_byte(&text, selection.cpMin);
-        let end_byte = utf16_index_to_byte(&text, selection.cpMax);
-        let mut effective_end = end_byte;
-        if end_byte > start_byte && end_byte > 0 && text.as_bytes()[end_byte - 1] == b'\n' {
-            effective_end = end_byte.saturating_sub(1);
-        }
-        let line_start = text[..start_byte].rfind('\n').map(|i| i + 1).unwrap_or(0);
-        let line_end = text[effective_end..]
-            .find('\n')
-            .map(|i| effective_end + i + 1)
-            .unwrap_or(text.len());
-        (
-            line_start,
-            line_end,
-            text[line_start..line_end].ends_with('\n'),
-        )
-    } else {
-        let caret = utf16_index_to_byte(&text, selection.cpMin);
-        let Some((start, end, trailing)) = paragraph_range_bytes(&text, caret) else {
-            return false;
+    let (replace_start, replace_end, affected, has_trailing_newline) =
+        if let Some((start, end, selected, trailing)) =
+            selected_line_block_from_selection(hwnd_edit, &text, selection)
+        {
+            (start, end, selected, trailing)
+        } else {
+            let caret = utf16_index_to_byte(&text, selection.cpMin);
+            let Some((start, end, trailing)) = paragraph_range_bytes(&text, caret) else {
+                return false;
+            };
+            let replace_start = byte_index_to_utf16(&text, start);
+            let replace_end = byte_index_to_utf16(&text, end);
+            let selected = text[start..end].to_string();
+            (replace_start, replace_end, selected, trailing)
         };
-        (start, end, trailing)
-    };
 
-    let affected = &text[affected_start..affected_end];
-    let joined = join_lines_block(affected, line_ending, has_trailing_newline);
+    let joined = join_lines_block(&affected, line_ending, has_trailing_newline);
     if joined == affected {
         return false;
     }
 
     let mut replace_range = CHARRANGE {
-        cpMin: byte_index_to_utf16(&text, affected_start),
-        cpMax: byte_index_to_utf16(&text, affected_end),
+        cpMin: replace_start,
+        cpMax: replace_end,
     };
     SendMessageW(
         hwnd_edit,
@@ -1923,37 +1916,28 @@ pub unsafe fn clean_end_of_line_hyphens_active_edit(hwnd: HWND) -> bool {
         LPARAM(&mut selection as *mut _ as isize),
     );
 
-    let (affected_start, affected_end, has_trailing_newline) = if selection.cpMin != selection.cpMax
-    {
-        let start_byte = utf16_index_to_byte(&text, selection.cpMin);
-        let end_byte = utf16_index_to_byte(&text, selection.cpMax);
-        let mut effective_end = end_byte;
-        if end_byte > start_byte && end_byte > 0 && text.as_bytes()[end_byte - 1] == b'\n' {
-            effective_end = end_byte.saturating_sub(1);
-        }
-        let line_start = text[..start_byte].rfind('\n').map(|i| i + 1).unwrap_or(0);
-        let line_end = text[effective_end..]
-            .find('\n')
-            .map(|i| effective_end + i + 1)
-            .unwrap_or(text.len());
-        (
-            line_start,
-            line_end,
-            text[line_start..line_end].ends_with('\n'),
-        )
-    } else {
-        (0, text.len(), text.ends_with('\n'))
-    };
+    let (replace_start, replace_end, affected, has_trailing_newline) =
+        if let Some((start, end, selected, trailing)) =
+            selected_line_block_from_selection(hwnd_edit, &text, selection)
+        {
+            (start, end, selected, trailing)
+        } else {
+            (
+                0,
+                byte_index_to_utf16(&text, text.len()),
+                text.clone(),
+                text.ends_with('\n') || text.ends_with('\r'),
+            )
+        };
 
-    let affected = &text[affected_start..affected_end];
-    let cleaned = clean_end_of_line_hyphens_block(affected, line_ending, has_trailing_newline);
+    let cleaned = clean_end_of_line_hyphens_block(&affected, line_ending, has_trailing_newline);
     if cleaned == affected {
         return false;
     }
 
     let mut replace_range = CHARRANGE {
-        cpMin: byte_index_to_utf16(&text, affected_start),
-        cpMax: byte_index_to_utf16(&text, affected_end),
+        cpMin: replace_start,
+        cpMax: replace_end,
     };
     SendMessageW(
         hwnd_edit,
@@ -2351,6 +2335,9 @@ fn split_trailing_newline(text: &str, prefer_trailing: bool) -> (&str, bool) {
         return (&text[..text.len().saturating_sub(2)], true);
     }
     if prefer_trailing && text.ends_with('\n') {
+        return (&text[..text.len().saturating_sub(1)], true);
+    }
+    if prefer_trailing && text.ends_with('\r') {
         return (&text[..text.len().saturating_sub(1)], true);
     }
     (text, false)

@@ -6,6 +6,8 @@ Poprawki błędów
 • Naprawiono słownik Wiktionary dla języka hiszpańskiego i obsługę cache słownika: słowa takie jak „agua” są teraz poprawnie znajdowane, a stare wpisy „nie znaleziono słowa” nie są już ponownie używane.
 • Naprawiono kodowanie przy imporcie artykułów RSS dla niektórych hiszpańskich źródeł (np. El Mundo): akcenty i „ñ” są teraz poprawnie zachowywane w tymczasowym edytorze.
 • Dodano usuwanie pojedynczych artykułów RSS i pojedynczych odcinków podcastów (klawisz Delete + menu kontekstowe z potwierdzeniem), bez usuwania całego źródła RSS/podcastu.
+• Dodano tłumaczenie serbskie dzięki Mila Kuran.
+• Naprawiono operacje tekstowe na liniach (np. Ctrl+Q / Ctrl+Shift+Q, sortowanie/odwracanie/unikalne/łączenie linii): po zaznaczeniu jednej linii przez Shift+Strzałka w dół sąsiednie linie nie są już łączone ani obcinane.
 
 Wersja 0.6.5 – 2026-02-07
 Ulepszenia

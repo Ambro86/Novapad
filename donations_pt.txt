@@ -14,3 +14,5 @@ Quem apoiar o projeto será mencionado no programa e no repositório do GitHub, 
 Agradecemos a contribuição de Jiri Holzinger e Paola Vagata.
 Pela tradução para o vietnamita, agradecemos a Anh Đức Nguyễn.
 Pela tradução para o tcheco, agradecemos a Radek Žalud e Jiri Holzinger.
+Pela tradução para o espanhol, agradecemos a Arturo Fernandez Rivas.
+Pela tradução para o sérvio, agradecemos a Mila Kuran.

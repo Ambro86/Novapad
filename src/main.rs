@@ -3619,6 +3619,9 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                     log_debug("Menu: Strip Markdown");
                     if editor_manager::strip_markdown_active_edit(hwnd) {
                         confirm_menu_action(hwnd, "edit.strip_markdown");
+                        if let Some(hwnd_edit) = get_active_edit(hwnd) {
+                            SetFocus(hwnd_edit);
+                        }
                     }
                     LRESULT(0)
                 }

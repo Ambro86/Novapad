@@ -6,6 +6,8 @@ Correzioni di bug
 • Corretto il dizionario Wiktionary in spagnolo e la gestione cache del dizionario: parole come "agua" ora vengono trovate correttamente e le vecchie cache "parola non trovata" non vengono più riutilizzate.
 • Corretto l'encoding nell'import degli articoli RSS per alcune fonti spagnole (es. El Mundo): accenti e "ñ" ora vengono mantenuti correttamente nell'editor temporaneo.
 • Aggiunta la rimozione dei singoli articoli RSS e dei singoli episodi podcast (tasto Canc + menu contestuale con conferma), senza eliminare l'intera fonte RSS/podcast.
+• Aggiunta la traduzione serba grazie a Mila Kuran.
+• Corrette le operazioni testuali a livello riga (es. Ctrl+Q / Ctrl+Shift+Q, ordina/inverti/righe uniche/unisci): selezionando una sola riga con Maiusc+Freccia giù non vengono più unite o troncate le righe adiacenti.
 
 Versione 0.6.5 – 2026-02-07
 Miglioramenti

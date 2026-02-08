@@ -14,3 +14,5 @@ Chiunque decida di supportare il progetto verrà ringraziato nel programma e sul
 Si ringrazia per il contributo Jiri Holzinger e Paola Vagata.
 Per la traduzione in vietnamita ringrazio Anh Đức Nguyễn.
 Per la traduzione in ceco ringrazio Radek Žalud e Jiri Holzinger.
+Per la traduzione in spagnolo ringrazio Arturo Fernandez Rivas.
+Per la traduzione in serbo ringrazio Mila Kuran.

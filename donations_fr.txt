@@ -23,3 +23,5 @@ Toute personne soutenant le projet sera mentionnée dans le programme et dans le
 Merci à Jiri Holzinger et Paola Vagata pour leur contribution.
 Pour la traduction vietnamienne, merci à Anh Đức Nguyễn.
 Pour la traduction tchèque, merci à Radek Žalud et Jiri Holzinger.
+Pour la traduction espagnole, merci à Arturo Fernandez Rivas.
+Pour la traduction serbe, merci à Mila Kuran.

@@ -14,3 +14,5 @@ Anyone who supports the project will be mentioned in the program and on the GitH
 Thanks to Jiri Holzinger and Paola Vagata for their contribution.
 For the Vietnamese translation, thanks to Anh Đức Nguyễn.
 For the Czech translation, thanks to Radek Žalud and Jiri Holzinger.
+For the Spanish translation, thanks to Arturo Fernandez Rivas.
+For the Serbian translation, thanks to Mila Kuran.

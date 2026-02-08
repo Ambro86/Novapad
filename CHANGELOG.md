@@ -6,6 +6,8 @@ Bug fixes
 • Fixed Spanish Wiktionary lookups and dictionary cache handling: Spanish entries like "agua" now load correctly, and old "Word not found" cache entries are no longer reused.
 • Fixed RSS article import character encoding for some Spanish sources (e.g., El Mundo): accented letters and "ñ" are now preserved correctly in the temporary editor.
 • Added removal of individual RSS articles and podcast episodes (Delete key + context menu with confirmation), without removing the entire RSS/podcast source.
+• Added Serbian translation thanks to Mila Kuran.
+• Fixed line-based text actions (e.g. Ctrl+Q / Ctrl+Shift+Q, sort/reverse/unique/join lines): selecting a single line with Shift+Down no longer merges or truncates adjacent lines.
 
 Version 0.6.5 – 2026-02-07
 Improvements

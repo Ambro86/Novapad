@@ -14,3 +14,5 @@ Las personas que apoyen el proyecto serán mencionadas en el programa y en el re
 Se agradece la contribución de Jiri Holzinger y Paola Vagata.
 Por la traducción al vietnamita, gracias a Anh Đức Nguyễn.
 Por la traducción al checo, gracias a Radek Žalud y Jiri Holzinger.
+Por la traducción al español, gracias a Arturo Fernandez Rivas.
+Por la traducción al serbio, gracias a Mila Kuran.

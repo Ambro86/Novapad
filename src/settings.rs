@@ -274,6 +274,8 @@ pub struct AppSettings {
     pub podcast_output_format: PodcastFormat,
     pub podcast_mp3_bitrate: u32,
     pub podcast_save_folder: String,
+    #[serde(default = "default_audiobook_save_folder")]
+    pub audiobook_save_folder: String,
     pub podcast_include_video: bool,
     pub podcast_monitor_id: String,
     pub podcast_cache_limit_mb: u32,
@@ -466,6 +468,7 @@ impl Default for AppSettings {
             podcast_output_format: PodcastFormat::Mp3,
             podcast_mp3_bitrate: 128,
             podcast_save_folder: default_podcast_save_folder(),
+            audiobook_save_folder: default_audiobook_save_folder(),
             podcast_include_video: false,
             podcast_monitor_id: String::new(),
             podcast_cache_limit_mb: 500,
@@ -872,6 +875,17 @@ pub fn default_podcast_save_folder() -> String {
     base.to_string_lossy().to_string()
 }
 
+pub fn default_audiobook_save_folder() -> String {
+    let mut base = known_folder_path(&FOLDERID_Documents).unwrap_or_else(|| {
+        std::env::var_os("USERPROFILE")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+            .join("Documents")
+    });
+    base.push("Sonarpad Audiobooks");
+    base.to_string_lossy().to_string()
+}
+
 fn legacy_podcast_save_folder() -> String {
     let mut base = known_folder_path(&FOLDERID_Documents).unwrap_or_else(|| {
         std::env::var_os("USERPROFILE")
@@ -981,6 +995,9 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     }
     if settings.podcast_save_folder.trim().is_empty() {
         settings.podcast_save_folder = default_podcast_save_folder();
+    }
+    if settings.audiobook_save_folder.trim().is_empty() {
+        settings.audiobook_save_folder = default_audiobook_save_folder();
     }
     if settings
         .podcast_save_folder

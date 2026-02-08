@@ -7865,6 +7865,17 @@ pub(crate) unsafe fn save_audio_dialog(
         file_buf[..copy_len].copy_from_slice(&name_wide[..copy_len]);
     }
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let initial_dir_setting =
+        with_state(hwnd, |state| state.settings.audiobook_save_folder.clone()).unwrap_or_default();
+    let initial_dir = initial_dir_setting.trim().to_string();
+    if !initial_dir.is_empty() {
+        crate::log_if_err!(std::fs::create_dir_all(&initial_dir));
+    }
+    let initial_dir_wide = if initial_dir.is_empty() {
+        None
+    } else {
+        Some(to_wide(&initial_dir))
+    };
     let filter_raw = i18n::tr(language, "dialog.save_audio_filter");
     let filter = to_wide(&filter_raw.replace("\\0", "\0"));
     let title = to_wide(&i18n::tr(language, "dialog.save_audio_title"));
@@ -7875,6 +7886,11 @@ pub(crate) unsafe fn save_audio_dialog(
         nMaxFile: file_buf.len() as u32,
         lpstrFilter: PCWSTR(filter.as_ptr()),
         lpstrTitle: PCWSTR(title.as_ptr()),
+        lpstrInitialDir: PCWSTR(
+            initial_dir_wide
+                .as_ref()
+                .map_or(std::ptr::null(), |v| v.as_ptr()),
+        ),
         nFilterIndex: 1,
         Flags: OFN_EXPLORER | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST,
         ..Default::default()

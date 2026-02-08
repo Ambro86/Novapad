@@ -70,6 +70,8 @@ const OPTIONS_ID_TTS_PITCH_EDIT: usize = 6033;
 const OPTIONS_ID_TTS_VOLUME_EDIT: usize = 6034;
 const OPTIONS_ID_AUDIO_SKIP: usize = 6010;
 const OPTIONS_ID_AUDIO_SPLIT: usize = 6011;
+const OPTIONS_ID_AUDIOBOOK_SAVE_FOLDER: usize = 6064;
+const OPTIONS_ID_AUDIOBOOK_SAVE_FOLDER_BROWSE: usize = 6065;
 const OPTIONS_ID_AUDIO_SPLIT_MINUTES: usize = 6058;
 const OPTIONS_ID_AUDIO_SPLIT_START_NUMBER: usize = 6059;
 const OPTIONS_ID_AUDIO_SPLIT_TEXT: usize = 6013;
@@ -222,6 +224,9 @@ struct OptionsDialogState {
     checkbox_tts_manual: HWND,
     label_audio_skip: HWND,
     combo_audio_skip: HWND,
+    label_audiobook_save_folder: HWND,
+    edit_audiobook_save_folder: HWND,
+    button_audiobook_save_folder_browse: HWND,
     label_audio_split: HWND,
     combo_audio_split: HWND,
     label_audio_split_minutes: HWND,
@@ -349,6 +354,8 @@ struct OptionsLabels {
     label_manage_associations: String,
     label_prompt_program: String,
     label_audio_skip: String,
+    label_audiobook_save_folder: String,
+    label_audiobook_save_folder_browse: String,
     label_audio_split: String,
     label_audio_split_minutes: String,
     label_audio_split_start_number: String,
@@ -467,6 +474,8 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_manage_associations: i18n::tr(language, "options.button.manage_associations"),
         label_prompt_program: i18n::tr(language, "options.label.prompt_program"),
         label_audio_skip: i18n::tr(language, "options.label.audio_skip"),
+        label_audiobook_save_folder: i18n::tr(language, "options.label.audiobook_save_folder"),
+        label_audiobook_save_folder_browse: i18n::tr(language, "options.button.browse"),
         label_audio_split: i18n::tr(language, "options.label.audio_split"),
         label_audio_split_minutes: i18n::tr(language, "options.label.audio_split_minutes"),
         label_audio_split_start_number: i18n::tr(
@@ -1290,6 +1299,50 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 None,
             );
             y += 40;
+
+            let label_audiobook_save_folder = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_audiobook_save_folder).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let edit_audiobook_save_folder = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                170,
+                y - 2,
+                220,
+                22,
+                hwnd,
+                HMENU(OPTIONS_ID_AUDIOBOOK_SAVE_FOLDER as isize),
+                HINSTANCE(0),
+                None,
+            );
+            let button_audiobook_save_folder_browse = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_audiobook_save_folder_browse).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                395,
+                y - 2,
+                75,
+                24,
+                hwnd,
+                HMENU(OPTIONS_ID_AUDIOBOOK_SAVE_FOLDER_BROWSE as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 36;
 
             let label_audio_split = CreateWindowExW(
                 Default::default(),
@@ -2214,6 +2267,9 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 button_tts_insert_tag,
                 label_audio_skip,
                 combo_audio_skip,
+                label_audiobook_save_folder,
+                edit_audiobook_save_folder,
+                button_audiobook_save_folder_browse,
                 label_audio_split,
                 combo_audio_split,
                 label_audio_split_minutes,
@@ -2321,6 +2377,9 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 checkbox_tts_manual,
                 label_audio_skip,
                 combo_audio_skip,
+                label_audiobook_save_folder,
+                edit_audiobook_save_folder,
+                button_audiobook_save_folder_browse,
                 label_audio_split,
                 combo_audio_split,
                 label_audio_split_minutes,
@@ -2517,6 +2576,10 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                     browse_for_interpreter(hwnd);
                     LRESULT(0)
                 }
+                OPTIONS_ID_AUDIOBOOK_SAVE_FOLDER_BROWSE => {
+                    browse_for_audiobook_folder(hwnd);
+                    LRESULT(0)
+                }
                 OPTIONS_ID_INTERPRETER_SEARCH => {
                     search_for_interpreter(hwnd);
                     LRESULT(0)
@@ -2652,6 +2715,9 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         edit_tts_pitch,
         edit_tts_volume,
         combo_audio_skip,
+        _label_audiobook_save_folder,
+        edit_audiobook_save_folder,
+        _button_audiobook_save_folder_browse,
         combo_audio_split,
         combo_audio_split_minutes,
         combo_audio_split_start_number,
@@ -2724,6 +2790,9 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.edit_tts_pitch,
             state.edit_tts_volume,
             state.combo_audio_skip,
+            state.label_audiobook_save_folder,
+            state.edit_audiobook_save_folder,
+            state.button_audiobook_save_folder_browse,
             state.combo_audio_split,
             state.combo_audio_split_minutes,
             state.combo_audio_split_start_number,
@@ -3599,6 +3668,10 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         WPARAM(selected_idx),
         LPARAM(0),
     );
+    if let Err(_e) = SetWindowTextW(
+        edit_audiobook_save_folder,
+        PCWSTR(to_wide(&settings.audiobook_save_folder).as_ptr()),
+    ) {}
 
     SendMessageW(combo_audio_split, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
     let split_options = [
@@ -4413,6 +4486,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         edit_tts_pitch,
         edit_tts_volume,
         combo_audio_skip,
+        edit_audiobook_save_folder,
         combo_audio_split,
         combo_audio_split_minutes,
         combo_audio_split_start_number,
@@ -4470,6 +4544,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.edit_tts_pitch,
             state.edit_tts_volume,
             state.combo_audio_skip,
+            state.edit_audiobook_save_folder,
             state.combo_audio_split,
             state.combo_audio_split_minutes,
             state.combo_audio_split_start_number,
@@ -4986,6 +5061,13 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         let read = GetWindowTextW(edit_audio_split_text, &mut buf);
         let text = String::from_utf16_lossy(&buf[..read as usize]);
         settings.audiobook_split_text = text;
+    }
+    let audiobook_folder_len = GetWindowTextLengthW(edit_audiobook_save_folder);
+    if audiobook_folder_len >= 0 {
+        let mut buf = vec![0u16; (audiobook_folder_len + 1) as usize];
+        let read = GetWindowTextW(edit_audiobook_save_folder, &mut buf);
+        let text = String::from_utf16_lossy(&buf[..read as usize]);
+        settings.audiobook_save_folder = text.trim().to_string();
     }
 
     let cache_len = GetWindowTextLengthW(edit_podcast_cache_limit);
@@ -5632,6 +5714,32 @@ fn layout_audio_tab(state: &OptionsDialogState) {
         OPTIONS_COMBO_HEIGHT,
     );
     y = layout_label_control(
+        "label_audiobook_save_folder",
+        state.label_audiobook_save_folder,
+        "edit_audiobook_save_folder",
+        state.edit_audiobook_save_folder,
+        y,
+        OPTIONS_EDIT_HEIGHT,
+    );
+    let browse_width = 88;
+    let edit_width = (OPTIONS_CONTROL_WIDTH - browse_width - 8).max(80);
+    move_control_best_effort(
+        "edit_audiobook_save_folder",
+        state.edit_audiobook_save_folder,
+        OPTIONS_CONTROL_X,
+        y - OPTIONS_ROW_HEIGHT - 2,
+        edit_width,
+        OPTIONS_EDIT_HEIGHT,
+    );
+    move_control_best_effort(
+        "button_audiobook_save_folder_browse",
+        state.button_audiobook_save_folder_browse,
+        OPTIONS_CONTROL_X + edit_width + 8,
+        y - OPTIONS_ROW_HEIGHT - 2,
+        browse_width,
+        OPTIONS_BUTTON_HEIGHT,
+    );
+    y = layout_label_control(
         "label_audio_split",
         state.label_audio_split,
         "combo_audio_split",
@@ -5841,6 +5949,9 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
         for control in [
             state.label_audio_skip,
             state.combo_audio_skip,
+            state.label_audiobook_save_folder,
+            state.edit_audiobook_save_folder,
+            state.button_audiobook_save_folder_browse,
             state.label_audio_split,
             state.combo_audio_split,
             state.label_audio_split_minutes,
@@ -6044,6 +6155,23 @@ unsafe fn browse_for_interpreter(hwnd: HWND) {
         let path = String::from_utf16_lossy(&buffer[..len]);
         if let Some(edit) = with_options_state(hwnd, |state| state.edit_interpreter_path) {
             SetWindowTextW(edit, PCWSTR(to_wide(&path).as_ptr())).ok();
+        }
+    }
+}
+
+unsafe fn browse_for_audiobook_folder(hwnd: HWND) {
+    let language = with_options_state(hwnd, |state| {
+        with_state(state.parent, |app| app.settings.language).unwrap_or_default()
+    })
+    .unwrap_or_default();
+    if let Some(folder) =
+        crate::app_windows::find_in_files_window::browse_for_folder(hwnd, language)
+    {
+        let path = folder.to_string_lossy().to_string();
+        if let Some(edit) = with_options_state(hwnd, |state| state.edit_audiobook_save_folder)
+            && let Err(_e) = SetWindowTextW(edit, PCWSTR(to_wide(&path).as_ptr()))
+        {
+            crate::log_debug(&format!("Error: {:?}", _e));
         }
     }
 }

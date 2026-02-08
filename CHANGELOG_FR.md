@@ -1,6 +1,10 @@
 # Journal des modifications
 
-Version 0.6.5 – 07/02/2026
+Version 0.6.6 – 2026-02-08
+Corrections de bugs
+• Correction de l’extraction de texte EPUB pour les livres contenant des commentaires HTML inline (<!-- ... -->) : le texte des chapitres est désormais correctement analysé au lieu d’être partiellement ou totalement ignoré.
+
+Version 0.6.5 – 2026-02-07
 Améliorations
 • Traduction espagnole améliorée grâce à Arturo Fernandez Rivas.
 • Les imports RSS utilisent désormais un onglet temporaire dédié (titre localisé) ; Enregistrer sous le convertit en document normal.
@@ -15,7 +19,7 @@ Corrections de bugs
 • Enregistrer/Enregistrer sous propose désormais le nom du fichier existant lors de l’enregistrement de formats non réécrivables (ex. EPUB), au lieu de la première ligne.
 • Correction d’un problème où les podcasts avec de nouveaux épisodes n’étaient pas annoncés comme non joués, et renommage de « Non écouté » en « Non joué » pour un libellé plus professionnel.
 
-Version 0.6.4 – 05/02/2026
+Version 0.6.4 – 2026-02-05
 Améliorations
 • Le programme a été renommé en Sonarpad pour mettre davantage l'accent sur le son et l'audio, qui sont la clé de ce programme.
 • Ajout de la sélection des pistes audio dans le menu Lecture pour les fichiers multimédias avec plusieurs pistes audio (ex. MKV avec plusieurs langues).
@@ -39,14 +43,14 @@ Corrections de bugs
 • Correction d’un problème avec Podcast Index et les catégories qui ne s’affichaient pas correctement.
 • Correction du problème de l’apostrophe qui coupait la lecture : plus de lecture séparée pour les dialogues, utilisation des balises de voix.
 
-Version 0.6.3 – 30/01/2026
+Version 0.6.3 – 2026-01-30
 Améliorations
 • Amélioration de la détection du microphone.
 • Ajout de la lecture instantanée pour tous les formats.
 Corrections de bugs
 • Correction du plantage dans la fenêtre des catégories de podcasts.
 
-Version 0.6.2 – 30/01/2026
+Version 0.6.2 – 2026-01-30
 Nouvelles fonctionnalités
 • Ajout de la prise en charge de l'exécution de fichiers (Shift+F5). Les utilisateurs peuvent sélectionner un interpréteur (par exemple, python) dans les Options, le rechercher sur l'ordinateur, et appuyer sur Shift+F5 exécute le script actuel. Les fichiers HTML s'ouvrent dans le navigateur.
 • Ajout de la prise en charge des fichiers pointeurs Google Docs (.gdoc, .gsheet, .gslides), qui s'ouvrent automatiquement dans le navigateur par défaut.
@@ -95,7 +99,7 @@ Localisation
 • Ajout de la traduction en français.
 • Ajout de la traduction en tchèque (merci à Radek Žalud et Jiri Holzinger).
 
-Version 0.6.1 – 20/01/2026
+Version 0.6.1 – 2026-01-20
 Corrections
 • Correction d'un bug où l'activation de "Afficher les voix dans l'éditeur" provoquait l'arrêt de la lecture du podcast.
 • Correction d'un problème où certains podcasts ne pouvaient pas être ajoutés via URL car l'URL était tronquée.
@@ -106,7 +110,7 @@ Améliorations
 • Amélioration de la prise en charge des voix Microsoft, qui utilisent désormais une méthode de lecture dédiée avec un agent utilisateur différent.
 • Ajout de la prise en charge des fichiers MP4.
 
-Version 0.6.0 – 20/01/2025
+Version 0.6.0 – 2025-01-20
 Nouvelles fonctionnalités
 • Ajout du correcteur orthographique. Depuis le menu contextuel, les utilisateurs peuvent vérifier si le mot actuel est correct et, sinon, obtenir des suggestions d'orthographe.
 • Ajout de l'importation et de l'exportation de podcasts via des fichiers OPML.
@@ -146,7 +150,7 @@ Améliorations développeur
 • La gestion des DLL a été nettoyée et consolidée autour de libloading.
 • Les aides d'analyse d'octets manuelles ont été supprimées au profit des méthodes standard.
 
-Version 0.5.9 - 13/01/2025
+Version 0.5.9 - 2025-01-13
 Nouvelles fonctionnalités
 • Ajout de la réorganisation RSS depuis le menu contextuel (monter/descendre/vers la position) avec vérification de position invalide.
 • Ajout d'un menu contextuel d'article avec ouverture du site d'origine et partage via WhatsApp, Facebook et X.
@@ -173,7 +177,7 @@ Corrections
 Localisation
 • Ajout de la traduction vietnamienne (merci à Anh Đức Nguyễn).
 
-Version 0.5.8 - 10/01/2026
+Version 0.5.8 - 2026-01-10
 Nouvelles fonctionnalités
 • Ajout du contrôle du volume pour le microphone et l'audio système lors de l'enregistrement de podcasts.
 • Ajout d'une nouvelle fonctionnalité pour importer des articles depuis des sites web ou des flux RSS, y compris les flux les plus importants pour chaque langue.
@@ -190,7 +194,7 @@ Améliorations
 • Ajout d'un menu contextuel dans la fenêtre RSS pour modifier ou supprimer des flux/sites RSS.
 • Suppression du paramètre pour déplacer les paramètres vers le dossier actuel ; l'application gère désormais cela automatiquement en fonction de l'emplacement.
 
-Version 0.5.7 - 05/01/2026
+Version 0.5.7 - 2026-01-05
 Nouvelles fonctionnalités
 • Ajout de la fonctionnalité Audiolivres par lots pour convertir plusieurs fichiers/dossiers à la fois.
 • Ajout de la prise en charge des fichiers Markdown (.md).
@@ -202,7 +206,7 @@ Améliorations
 • Amélioration de la robustesse du système de mise à jour.
 • Ajout de "Supprimer les traits d'union" dans le menu Édition pour corriger les fins de ligne OCR.
 
-Version 0.5.6 - 04/01/2026
+Version 0.5.6 - 2026-01-04
 Corrections
   Amélioration de la recherche dans les fichiers pour que l'appui sur Entrée ouvre le fichier exactement à l'extrait sélectionné.
 Améliorations
@@ -210,19 +214,19 @@ Améliorations
   L'ouverture de formats non textuels enregistre désormais en .txt pour éviter la corruption de formatage (PDF/DOC/DOCX/EPUB/HTML/PPT/PPTX).
   Ajout de l'enregistrement de podcast à partir du microphone et de l'audio système (menu Fichier, Ctrl+Maj+R).
 
-Version 0.5.5 – 03/01/2026
+Version 0.5.5 – 2026-01-03
 Nouvelles fonctionnalités
 • Ajout d'un terminal accessible optimisé pour les grandes sorties et les lecteurs d'écran (Ctrl+Maj+P).
 • Ajout d'un paramètre pour enregistrer les paramètres utilisateur dans le dossier actuel (mode portable).
 Corrections
 • Amélioration des extraits de recherche dans les fichiers pour que l'aperçu reste aligné avec la correspondance.
 
-Version 0.5.4 – 03/01/2026
+Version 0.5.4 – 2026-01-03
 Améliorations
 • Correction de la normalisation des espaces (Ctrl+Maj+Entrée).
 • Ajout de la prise en charge HTML/HTM (ouvrir comme texte).
 
-Version 0.5.3 – 02/01/2026
+Version 0.5.3 – 2026-01-02
 Nouvelles fonctionnalités
 • Ajout de la recherche dans les fichiers.
 • Ajout de nouveaux outils de texte : Normaliser les espaces, Saut de ligne dur et Supprimer Markdown.
@@ -238,14 +242,14 @@ Localisation
 Améliorations
 • Lorsqu'un fichier EPUB est ouvert, Enregistrer bascule désormais automatiquement vers Enregistrer sous et exporte le contenu en fichier .txt pour éviter la corruption de l'EPUB.
 
-## 0.5.2 - 01/01/2026
+## 0.5.2 - 2026-01-01
 - Ajout d'un journal des modifications.
 - Ajout des options ouvrir avec Sonarpad et des associations de fichiers lors de l'installation.
 - Amélioration de la localisation des messages.
 - Ajout de la sélection de partie lors de l'utilisation de "Diviser le livre audio par texte".
 - Ajout de l'importation de transcription YouTube.
 
-## 0.5.1 - 31/12/2025
+## 0.5.1 - 2025-12-31
 - Mises à jour automatiques avec confirmation.
 - Améliorations de l'exportation de livres audio.
 - Améliorations TTS.
@@ -253,13 +257,13 @@ Améliorations
 - Langue par défaut du système et améliorations de la localisation.
 - CI et empaquetage Windows.
 
-## 0.5.0 - 27/12/2025
+## 0.5.0 - 2025-12-27
 - Refactorisation modulaire.
 - Flux de travail de construction/empaquetage Windows.
 - Correction de la navigation par TAB dans la fenêtre d'aide.
 
-## 0.5 - 27/12/2025
+## 0.5 - 2025-12-27
 - Changement de version préliminaire.
 
-## 0.1.0 - 25/12/2025
+## 0.1.0 - 2025-12-25
 - Version initiale.

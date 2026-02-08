@@ -1,11 +1,15 @@
 # Changelog
 
-Versione 0.6.5 – 07/02/2026
+Versione 0.6.6 – 2026-02-08
+Correzioni di bug
+• Corretto il parsing del testo EPUB per i libri che contengono commenti HTML inline (<!-- ... -->): il testo dei capitoli ora viene estratto correttamente invece di essere saltato in parte o del tutto.
+
+Versione 0.6.5 – 2026-02-07
 Miglioramenti
 • Traduzione spagnola migliorata grazie ad Arturo Fernandez Rivas.
 • Aggiornati i feed predefiniti: Affaritaliani, HuffPost Italia, La Gazzetta dello Sport. Rimosso Wired Italia.
 • Aggiunta un'opzione per dividere gli audiolibri EPUB per capitoli.
-• Ora la finestra per registrare i podcast è indipendente, in modo che possiate fare delle registrazioni e allo stesso tempo usare iil programma Sonarpad!
+• Ora la finestra per registrare i podcast è indipendente, in modo che possiate fare delle registrazioni e allo stesso tempo usare il programma Sonarpad!
 • Gli articoli RSS ora usano una scheda temporanea dedicata (titolo localizzato); con Salva con nome diventa un documento normale.
 • I messaggi dello screen reader ora vengono inviati anche a JAWS quando disponibile.
 Correzioni di bug
@@ -17,7 +21,7 @@ Correzioni di bug
 • Salva/Salva con nome ora propone il nome del file esistente quando si salvano formati non sovrascrivibili (es. EPUB), invece della prima riga.
 • Risolto un problema per cui i podcast con nuovi episodi non venivano annunciati come non riprodotti, e rinominato "non ascoltato" in "non riprodotto" perché più professionale.
 
-Versione 0.6.4 – 05/02/2026
+Versione 0.6.4 – 2026-02-05
 Miglioramenti
 • Il programma e' stato rinominato in Sonarpad per dare maggiore enfasi a suono e audio, che sono la chiave di questo programma.
 • Aggiunta la selezione delle tracce audio nel menu Riproduzione per i file multimediali con più tracce audio (es. MKV con più lingue).

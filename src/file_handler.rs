@@ -871,7 +871,11 @@ fn html_to_text(html: &str) -> String {
                 inside = false;
                 let tag_trimmed = tag.trim();
                 if tag_trimmed.starts_with("!--") {
-                    in_comment = true;
+                    // Inline comments (<!-- ... -->) are fully contained in this tag.
+                    // Only keep comment mode when we saw an opening part that did not close yet.
+                    if !tag_trimmed.ends_with("--") {
+                        in_comment = true;
+                    }
                     tag.clear();
                     continue;
                 }
@@ -942,6 +946,27 @@ fn html_to_text(html: &str) -> String {
         .replace("&amp;", "&")
         .replace("&quot;", "\"")
         .replace("&apos;", "'")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::html_to_text;
+
+    #[test]
+    fn html_to_text_keeps_text_after_inline_comment() {
+        let html = "<html><!-- note --><body><p>Alpha</p><p>Beta</p></body></html>";
+        let out = html_to_text(html);
+        assert!(out.contains("Alpha"));
+        assert!(out.contains("Beta"));
+    }
+
+    #[test]
+    fn html_to_text_handles_comment_with_gt_character() {
+        let html = "<p>First</p><!-- 1 > 2 --><p>Second</p>";
+        let out = html_to_text(html);
+        assert!(out.contains("First"));
+        assert!(out.contains("Second"));
+    }
 }
 
 // --- DOC Parsing ---

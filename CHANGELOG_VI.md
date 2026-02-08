@@ -1,6 +1,10 @@
 # Nhật ký thay đổi
 
-Phiên bản 0.6.5 – 07/02/2026
+Phiên bản 0.6.6 – 2026-02-08
+Sửa lỗi
+• Đã sửa trích xuất văn bản EPUB cho sách có chứa chú thích HTML inline (<!-- ... -->): văn bản chương giờ được phân tích đúng thay vì bị bỏ qua một phần hoặc toàn bộ.
+
+Phiên bản 0.6.5 – 2026-02-07
 Cải tiến
 • Bản dịch tiếng Tây Ban Nha được cải thiện nhờ Arturo Fernandez Rivas.
 • Đã thêm tùy chọn tách sách nói EPUB theo chương.
@@ -15,7 +19,7 @@ Sửa lỗi
 • Lưu/Lưu dưới tên giờ đây đề xuất tên tệp hiện có khi lưu các định dạng không nên ghi đè (ví dụ: EPUB), thay vì dòng đầu tiên.
 • Đã sửa lỗi khiến podcast có tập mới không được thông báo là chưa phát, đồng thời đổi "Chưa nghe" thành "Chưa phát" cho chuyên nghiệp hơn.
 
-Phiên bản 0.6.4 – 05/02/2026
+Phiên bản 0.6.4 – 2026-02-05
 Cải tiến
 • Chương trình đã được đổi tên thành Sonarpad để nhấn mạnh âm thanh và audio, là điểm then chốt của chương trình.
 • Thêm lựa chọn track âm thanh trong menu Phát lại cho các tệp đa phương tiện có nhiều track âm thanh (ví dụ: MKV với nhiều ngôn ngữ).

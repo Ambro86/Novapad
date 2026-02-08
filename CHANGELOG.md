@@ -1,6 +1,10 @@
 # Changelog
 
-Version 0.6.5 – 07/02/2026
+Version 0.6.6 – 2026-02-08
+Bug fixes
+• Fixed EPUB text extraction for books containing inline HTML comments (<!-- ... -->): chapter text is now parsed correctly instead of being partially or fully skipped.
+
+Version 0.6.5 – 2026-02-07
 Improvements
 • Spanish translation improved thanks to Arturo Fernandez Rivas.
 • Added an option to split EPUB audiobooks by chapters.
@@ -15,7 +19,7 @@ Bug fixes
 • Save/Save As now suggests the existing filename when saving non-overwritable formats (e.g., EPUB) instead of the first line.
 • Fixed a bug where podcasts with new episodes were not announced as unplayed, and renamed "Unheard" to "Unplayed" for a more professional label.
 
-Version 0.6.4 – 05/02/2026
+Version 0.6.4 – 2026-02-05
 Improvements
 • The program has been renamed to Sonarpad to emphasize sound and audio as the key focus.
 • Added audio track selection in the Playback menu for media files with multiple audio tracks (e.g., MKV files with multiple languages).

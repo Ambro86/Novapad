@@ -1,6 +1,10 @@
 # Changelog
 
-Version 0.6.5 – 07/02/2026
+Versión 0.6.6 – 2026-02-08
+Correcciones de errores
+• Corregida la extracción de texto EPUB para libros con comentarios HTML inline (<!-- ... -->): ahora el texto de los capítulos se analiza correctamente en lugar de omitirse parcial o totalmente.
+
+Version 0.6.5 – 2026-02-07
 Mejoras
 • Traducción al español mejorada gracias a Arturo Fernandez Rivas.
 • Se agregó una opción para dividir audiolibros EPUB por capítulos.
@@ -15,7 +19,7 @@ Correcciones de errores
 • Guardar/Guardar como ahora propone el nombre del archivo existente al guardar formatos no sobrescribibles (p. ej., EPUB), en lugar de la primera línea.
 • Se corrigió un problema por el que los podcasts con nuevos episodios no se anunciaban como no reproducidos, y se renombró "No escuchado" a "No reproducido" por ser más profesional.
 
-Version 0.6.4 – 05/02/2026
+Version 0.6.4 – 2026-02-05
 Mejoras
 • El programa se ha renombrado a Sonarpad para dar mayor enfasis al sonido y al audio, que son la clave de este programa.
 • Añadida la selección de pistas de audio en el menú Reproducción para archivos multimedia con múltiples pistas de audio (ej. MKV con varios idiomas).

@@ -1,6 +1,10 @@
 # Dziennik zmian
 
-Wersja 0.6.5 – 07/02/2026
+Wersja 0.6.6 – 2026-02-08
+Poprawki błędów
+• Naprawiono wyodrębnianie tekstu EPUB dla książek zawierających komentarze HTML inline (<!-- ... -->): tekst rozdziałów jest teraz poprawnie parsowany zamiast być częściowo lub całkowicie pomijany.
+
+Wersja 0.6.5 – 2026-02-07
 Ulepszenia
 • Poprawiona wersja hiszpańska dzięki Arturo Fernandez Rivas.
 • Dodano opcję dzielenia audiobooków EPUB na rozdziały.
@@ -15,7 +19,7 @@ Poprawki błędów
 • Zapis/Zapisz jako teraz podpowiada nazwę istniejącego pliku przy zapisie formatów nienadpisywalnych (np. EPUB), zamiast pierwszej linii.
 • Naprawiono problem, przez który podcasty z nowymi odcinkami nie były oznaczane jako nieodtworzone, oraz zmieniono „Nieodsłuchane” na „Nieodtworzone” jako bardziej profesjonalne.
 
-Wersja 0.6.4 – 05/02/2026
+Wersja 0.6.4 – 2026-02-05
 Ulepszenia
 • Program został przemianowany na Sonarpad, aby podkreślić dźwięk i audio jako klucz tego programu.
 • Dodano wybór ścieżek audio w menu Odtwarzanie dla plików multimedialnych z wieloma ścieżkami audio (np. MKV z wieloma językami).

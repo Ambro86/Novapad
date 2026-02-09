@@ -1305,7 +1305,11 @@ async fn download_audio_chunk_attempt(
         .await
         .map_err(|e: tungstenite::Error| e.to_string())?;
 
-    let ssml = mkssml(text, voice, tts_rate, tts_pitch, tts_volume);
+    let sanitized_text = sanitize_edge_text(text);
+    if !is_edge_text_usable(&sanitized_text) {
+        return Err("Edge WS: empty text after sanitization".to_string());
+    }
+    let ssml = mkssml(&sanitized_text, voice, tts_rate, tts_pitch, tts_volume);
     let ssml_msg = format!(
         "X-RequestId:{}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:{}Z\r\nPath:ssml\r\n\r\n{}",
         request_id,
@@ -1550,8 +1554,16 @@ async fn download_edge_chunks_ws(
             &chunk.text_to_read,
         ));
         let req_id = Uuid::new_v4().simple().to_string();
+        let sanitized_text = sanitize_edge_text(&chunk.text_to_read);
+        if !is_edge_text_usable(&sanitized_text) {
+            crate::log_debug(&format!(
+                "Edge WS: skipping unusable chunk {} text={:?}",
+                idx, &chunk.text_to_read
+            ));
+            continue;
+        }
         let ssml = mkssml(
-            &chunk.text_to_read,
+            &sanitized_text,
             voice,
             chunk_rate,
             chunk_pitch,
@@ -1708,8 +1720,12 @@ async fn download_edge_chunk_ws(
         (options.voice, options.rate, options.pitch, options.volume)
     };
     let req_id = Uuid::new_v4().simple().to_string();
+    let sanitized_text = sanitize_edge_text(&chunk.text_to_read);
+    if !is_edge_text_usable(&sanitized_text) {
+        return Err("Edge WS: empty text after sanitization".to_string());
+    }
     let ssml = mkssml(
-        &chunk.text_to_read,
+        &sanitized_text,
         voice,
         chunk_rate,
         chunk_pitch,
@@ -2865,17 +2881,78 @@ pub fn split_text(text: &str) -> Vec<String> {
     chunks
 }
 
-fn remove_incompatible_characters_edge(text: &str) -> String {
-    text.chars()
-        .map(|ch| {
-            let code = ch as u32;
-            if (0..=8).contains(&code) || (11..=12).contains(&code) || (14..=31).contains(&code) {
-                ' '
-            } else {
-                ch
-            }
-        })
-        .collect()
+fn sanitize_edge_text(text: &str) -> String {
+    let normalized_spaces = normalize_weird_spaces(text);
+    let mut out = String::with_capacity(normalized_spaces.len());
+    let mut dot_run = 0usize;
+    let mut bang_run = 0usize;
+    let mut question_run = 0usize;
+
+    for ch in normalized_spaces.chars() {
+        if ch == '.' {
+            dot_run += 1;
+            continue;
+        }
+        if ch == '!' {
+            bang_run += 1;
+            continue;
+        }
+        if ch == '?' {
+            question_run += 1;
+            continue;
+        }
+
+        flush_edge_punctuation_runs(&mut out, &mut dot_run, &mut bang_run, &mut question_run);
+        let code = ch as u32;
+        if (0..=8).contains(&code) || (11..=12).contains(&code) || (14..=31).contains(&code) {
+            out.push(' ');
+        } else {
+            out.push(ch);
+        }
+    }
+    flush_edge_punctuation_runs(&mut out, &mut dot_run, &mut bang_run, &mut question_run);
+    out
+}
+
+fn is_edge_text_usable(text: &str) -> bool {
+    text.chars().any(|ch| ch.is_alphanumeric())
+}
+
+fn flush_edge_punctuation_runs(
+    out: &mut String,
+    dot_run: &mut usize,
+    bang_run: &mut usize,
+    question_run: &mut usize,
+) {
+    let trim_trailing_spaces = |s: &mut String| {
+        while s.chars().last().is_some_and(|ch| ch.is_whitespace()) {
+            s.pop();
+        }
+    };
+    if *dot_run >= 3 {
+        trim_trailing_spaces(out);
+        out.push('.');
+    } else if *dot_run > 0 {
+        trim_trailing_spaces(out);
+        out.extend(std::iter::repeat_n('.', *dot_run));
+    }
+    if *bang_run >= 3 {
+        trim_trailing_spaces(out);
+        out.push('!');
+    } else if *bang_run > 0 {
+        trim_trailing_spaces(out);
+        out.extend(std::iter::repeat_n('!', *bang_run));
+    }
+    if *question_run >= 3 {
+        trim_trailing_spaces(out);
+        out.push('?');
+    } else if *question_run > 0 {
+        trim_trailing_spaces(out);
+        out.extend(std::iter::repeat_n('?', *question_run));
+    }
+    *dot_run = 0;
+    *bang_run = 0;
+    *question_run = 0;
 }
 
 fn escape_xml(text: &str) -> String {
@@ -2948,7 +3025,7 @@ fn find_edge_split_idx(text: &str, max_bytes: usize) -> usize {
 }
 
 fn split_text_edge(text: &str) -> Vec<String> {
-    let cleaned = remove_incompatible_characters_edge(text);
+    let cleaned = sanitize_edge_text(text);
     let escaped = escape_xml(&cleaned);
     let sentences = split_sentences(&escaped);
     let mut out = Vec::new();
@@ -3129,11 +3206,14 @@ pub fn split_into_tts_chunks(
         let mut current_sentence = String::new();
         let mut current_len = 0usize;
         let chars: Vec<char> = span_text.chars().collect();
-        for ch in chars.iter().copied() {
+        for (idx, ch) in chars.iter().copied().enumerate() {
             current_sentence.push(ch);
             current_len += 1;
             let is_terminal = matches!(ch, '.' | '!' | '?' | ';' | ':');
-            if is_terminal {
+            let next_ch = chars.get(idx + 1).copied();
+            let edge_dot_run =
+                span_engine == TtsEngine::Edge && ch == '.' && matches!(next_ch, Some('.'));
+            if is_terminal && !edge_dot_run {
                 if !current_sentence.trim().is_empty() {
                     sentences.push((current_sentence.clone(), current_len));
                 }
@@ -4274,8 +4354,9 @@ fn merge_and_finalize_sapi4_mp3(
 #[cfg(test)]
 mod tests {
     use super::{
-        TtsEngine, build_audiobook_parts_by_positions, collect_marker_entries, normalize_for_tts,
-        parse_sapi4_part_index, split_into_tts_chunks, strip_dashed_lines,
+        TtsEngine, build_audiobook_parts_by_positions, collect_marker_entries, is_edge_text_usable,
+        normalize_for_tts, parse_sapi4_part_index, sanitize_edge_text, split_into_tts_chunks,
+        strip_dashed_lines,
     };
 
     #[test]
@@ -4360,6 +4441,37 @@ mod tests {
                 "part_12.mp3"
             ]
         );
+    }
+
+    #[test]
+    fn edge_normalizes_ascii_ellipsis_to_single_dot() {
+        assert_eq!(sanitize_edge_text("Ciao... come va..."), "Ciao. come va.");
+    }
+
+    #[test]
+    fn edge_sanitize_handles_weird_spaces_and_symbols() {
+        assert_eq!(
+            sanitize_edge_text("ciao\u{00A0}\u{200B}mondo\u{2409}!!!???"),
+            "ciao mondo!?"
+        );
+    }
+
+    #[test]
+    fn edge_text_usable_rejects_punctuation_only() {
+        assert!(!is_edge_text_usable("...?!"));
+        assert!(is_edge_text_usable("ciao."));
+    }
+
+    #[test]
+    fn edge_split_into_chunks_does_not_create_dot_only_chunks_from_ellipsis() {
+        let chunks = split_into_tts_chunks(
+            "ciao io sono ambro... e sono un campione... e sono un grande atleta...",
+            true,
+            &[],
+            TtsEngine::Edge,
+        );
+        assert!(!chunks.is_empty());
+        assert!(chunks.iter().all(|c| c.text_to_read.trim() != "."));
     }
 
     #[test]
@@ -4960,6 +5072,7 @@ pub(crate) fn run_tts_audiobook_part(
         .and_then(|s| s.to_str())
         .unwrap_or("")
         .to_lowercase();
+    let is_mp3 = extension == "mp3";
     let is_aac = extension == "m4b" || extension == "m4a" || extension == "mp4";
 
     if is_aac {
@@ -4999,6 +5112,96 @@ pub(crate) fn run_tts_audiobook_part(
         );
         std::fs::remove_file(&wav_path).ok();
         res?;
+    } else if is_mp3 {
+        let source_mp3 = options.output.with_extension("edge_source.tmp.mp3");
+        let source_wav = options.output.with_extension("edge_source.tmp.wav");
+        if let Err(e) = std::fs::rename(options.output, &source_mp3) {
+            return Err(format!("Failed to prepare MP3 conversion: {}", e));
+        }
+
+        let wav_result = (|| -> Result<(), String> {
+            let bytes = std::fs::read(&source_mp3)
+                .map_err(|e| format!("Failed to read source MP3 for re-encode: {}", e))?;
+            let (samples, src_rate, src_channels) = decode_mp3_to_pcm(&bytes)?;
+            let target_rate = 22_050u32;
+            let target_channels = 2u16;
+            let resampled = resample_pcm(
+                &samples,
+                src_rate,
+                src_channels,
+                target_rate,
+                target_channels,
+            );
+            write_wav_from_pcm(&source_wav, &resampled, target_rate, target_channels)
+        })();
+        if let Err(err) = wav_result {
+            if let Err(restore_err) = std::fs::rename(&source_mp3, options.output) {
+                crate::log_debug(&format!(
+                    "Failed to restore original MP3 after WAV conversion failure: {}",
+                    restore_err
+                ));
+            }
+            if let Err(remove_err) = std::fs::remove_file(&source_wav) {
+                crate::log_debug(&format!(
+                    "Failed to remove temp WAV after conversion failure: {}",
+                    remove_err
+                ));
+            }
+            return Err(err);
+        }
+
+        let mp3_settings = crate::ffmpeg_export::ConvertAudioSettings {
+            format: crate::ffmpeg_export::ConvertAudioFormat::Mp3,
+            quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(160),
+        };
+        let mut ffmpeg_progress = |p: u32| {
+            if options.progress_hwnd.0 != 0 {
+                unsafe {
+                    let _unused = PostMessageW(
+                        options.progress_hwnd,
+                        crate::WM_UPDATE_PROGRESS,
+                        WPARAM(p as usize),
+                        LPARAM(0),
+                    );
+                }
+            }
+        };
+        let reencode_result = crate::ffmpeg_export::convert_audio_file(
+            &source_wav,
+            options.output,
+            &mp3_settings,
+            None,
+            Some(&mut ffmpeg_progress),
+        );
+        if let Err(err) = reencode_result {
+            crate::log_if_err!(std::fs::remove_file(options.output));
+            if let Err(restore_err) = std::fs::rename(&source_mp3, options.output) {
+                crate::log_debug(&format!(
+                    "Failed to restore original MP3 after re-encode failure: {}",
+                    restore_err
+                ));
+            }
+            if let Err(remove_err) = std::fs::remove_file(&source_wav) {
+                crate::log_debug(&format!(
+                    "Failed to remove temp WAV after re-encode failure: {}",
+                    remove_err
+                ));
+            }
+            return Err(err);
+        }
+
+        if let Err(remove_err) = std::fs::remove_file(&source_wav) {
+            crate::log_debug(&format!(
+                "Failed to remove temp WAV after MP3 re-encode: {}",
+                remove_err
+            ));
+        }
+        if let Err(remove_err) = std::fs::remove_file(&source_mp3) {
+            crate::log_debug(&format!(
+                "Failed to remove source MP3 after re-encode: {}",
+                remove_err
+            ));
+        }
     }
 
     Ok(())

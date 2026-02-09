@@ -1533,8 +1533,15 @@ pub fn convert_audio_file(
     }
 
     match (settings.format, settings.quality) {
+        (ConvertAudioFormat::Mp3, ConvertAudioQuality::BitrateKbps(bitrate)) => unsafe {
+            let target = (bitrate as i64).saturating_mul(1000);
+            (*codec_ctx).bit_rate = target;
+            (*codec_ctx).rc_min_rate = target;
+            (*codec_ctx).rc_max_rate = target;
+            (*codec_ctx).bit_rate_tolerance = 0;
+        },
         (
-            ConvertAudioFormat::Mp3 | ConvertAudioFormat::Aac | ConvertAudioFormat::Opus,
+            ConvertAudioFormat::Aac | ConvertAudioFormat::Opus,
             ConvertAudioQuality::BitrateKbps(bitrate),
         ) => unsafe {
             (*codec_ctx).bit_rate = (bitrate as i64).saturating_mul(1000);

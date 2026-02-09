@@ -7856,20 +7856,28 @@ pub(crate) unsafe fn save_audio_dialog(
     suggested_name: Option<&str>,
 ) -> Option<PathBuf> {
     let mut file_buf = vec![0u16; 4096];
-    if let Some(name) = suggested_name {
-        let mut name_wide = to_wide(name);
-        if let Some(0) = name_wide.last() {
-            name_wide.pop();
-        }
-        let copy_len = name_wide.len().min(file_buf.len() - 1);
-        file_buf[..copy_len].copy_from_slice(&name_wide[..copy_len]);
-    }
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
     let initial_dir_setting =
         with_state(hwnd, |state| state.settings.audiobook_save_folder.clone()).unwrap_or_default();
     let initial_dir = initial_dir_setting.trim().to_string();
     if !initial_dir.is_empty() {
         crate::log_if_err!(std::fs::create_dir_all(&initial_dir));
+    }
+    if let Some(name) = suggested_name {
+        let default_name = if !initial_dir.is_empty() && Path::new(name).components().count() == 1 {
+            Path::new(&initial_dir)
+                .join(name)
+                .to_string_lossy()
+                .to_string()
+        } else {
+            name.to_string()
+        };
+        let mut name_wide = to_wide(&default_name);
+        if let Some(0) = name_wide.last() {
+            name_wide.pop();
+        }
+        let copy_len = name_wide.len().min(file_buf.len() - 1);
+        file_buf[..copy_len].copy_from_slice(&name_wide[..copy_len]);
     }
     let initial_dir_wide = if initial_dir.is_empty() {
         None

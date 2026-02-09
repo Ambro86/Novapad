@@ -13,6 +13,9 @@ Corrections de bugs
 • Correction des opérations de texte par ligne (ex. Ctrl+Q / Ctrl+Shift+Q, trier/inverser/lignes uniques/fusionner les lignes) : en sélectionnant une seule ligne avec Maj+Flèche bas, les lignes adjacentes ne sont plus fusionnées ni tronquées.
 • Extension de la normalisation d’entrée TTS pour les symboles visibles d’espace/tabulation/saut de ligne (␠/U+2420, ␣/U+2423, ␉/U+2409, ␊/U+240A, ␍/U+240D, ␤/U+2424), qui pouvaient provoquer des répétitions de paragraphes avec les voix multilingues.
 • Affinement de la sanitisation du texte Edge TTS avec une pipeline unique de validation : normalisation des espaces étranges/invisibles, compactage des longues séquences de ponctuation (comme "...", "!!!", "???") et suppression des segments composés uniquement de ponctuation pour éviter les boucles de lecture.
+• Correction de l’annonce du temps de lecture (Ctrl+I) pour les flux MP3/podcast : le temps courant est désormais borné à la durée de la piste, et la lecture est arrêtée automatiquement si la position dépasse la fin.
+• Amélioration de la couverture de localisation de l’installateur : setup.exe inclut désormais aussi le tchèque, le polonais, le français et le serbe, tandis que le MSI reste un paquet unique en-US pour éviter la confusion en release.
+• Correction du nettoyage à la désinstallation des entrées du menu contextuel : « Ouvrir avec Sonarpad » est maintenant supprimé de façon fiable, y compris dans des scénarios de registre legacy.
 
 Version 0.6.5 – 2026-02-07
 Améliorations

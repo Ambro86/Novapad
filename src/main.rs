@@ -1221,17 +1221,14 @@ fn extract_embedded_chapters_url(url: &str) -> Option<String> {
 }
 
 fn announce_player_time(hwnd: HWND) {
-    let (current, path, language) = unsafe {
+    const END_STOP_TOLERANCE_SECS: u64 = 1;
+
+    let (current_raw, path, language) = unsafe {
         with_state(hwnd, |state| {
-            let current = state.active_audiobook.as_ref().map(|player| {
-                if player.is_paused {
-                    player.accumulated_seconds
-                } else {
-                    let elapsed_real_secs = player.start_instant.elapsed().as_secs_f64();
-                    let elapsed_audio_secs = (elapsed_real_secs * player.speed as f64) as u64;
-                    player.accumulated_seconds + elapsed_audio_secs
-                }
-            });
+            let current = state
+                .active_audiobook
+                .as_ref()
+                .map(|player| audiobook_position_secs(player).max(0.0).floor() as u64);
             let path = state
                 .active_audiobook
                 .as_ref()
@@ -1240,11 +1237,28 @@ fn announce_player_time(hwnd: HWND) {
         })
     }
     .unwrap_or((None, None, Language::default()));
-    let Some(current) = current else {
+    let Some(current_raw) = current_raw else {
         return;
     };
-    let current_str = format_time_hms(current);
+
     let total = path.and_then(|p| audiobook_duration_secs(&p));
+    let (current, should_stop) = if let Some(total) = total {
+        let overrun = current_raw > total;
+        if overrun {
+            log_debug(&format!(
+                "Audio player: position beyond duration (current={} total={}), clamping",
+                current_raw, total
+            ));
+        }
+        (
+            current_raw.min(total),
+            overrun && current_raw >= total.saturating_add(END_STOP_TOLERANCE_SECS),
+        )
+    } else {
+        (current_raw, false)
+    };
+
+    let current_str = format_time_hms(current);
     let message = if let Some(total) = total {
         let total_str = format_time_hms(total);
         i18n::tr_f(
@@ -1260,6 +1274,11 @@ fn announce_player_time(hwnd: HWND) {
         )
     };
     nvda_speak(&message);
+    if should_stop {
+        unsafe {
+            stop_audiobook_playback(hwnd);
+        }
+    }
 }
 
 fn announce_player_pitch(language: Language, pitch: f32) {

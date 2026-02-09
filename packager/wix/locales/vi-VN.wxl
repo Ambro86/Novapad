@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WixLocalization xmlns="http://schemas.microsoft.com/wix/2006/localization" Culture="vi-vn">
+  <String Id="CargoPackagerLanguage">1066</String>
+  <String Id="CargoPackagerCodepage">1258</String>
+  <String Id="DowngradeErrorMessage">Da co phien ban moi hon cua [ProductName] duoc cai dat.</String>
+  <String Id="LaunchApp">Mo [ProductName]</String>
+  <String Id="InstallAppFeature">Cai dat [ProductName].</String>
+  <String Id="MainFeatureTitle">Ung dung</String>
+  <String Id="RunAppDescription">Chay [ProductName]</String>
+  <String Id="OpenWithLabel">Mo bang [ProductName]</String>
+  <String Id="UninstallShortcutName">Go cai dat [ProductName]</String>
+  <String Id="UninstallShortcutDescription">Go cai dat [ProductName]</String>
+  <String Id="DesktopShortcutFeatureTitle">Loi tat man hinh nen</String>
+  <String Id="DesktopShortcutFeatureDescription">Tao loi tat tren man hinh nen</String>
+  <String Id="FileAssociationsFeatureTitle">Lien ket tep</String>
+  <String Id="FileAssociationsFeatureDescription">Lien ket kieu tep voi [ProductName]</String>
+  <String Id="ContextMenuFeatureTitle">Menu chuot phai</String>
+  <String Id="ContextMenuFeatureDescription">Them '[OpenWithLabel]' vao menu chuot phai</String>
+</WixLocalization>

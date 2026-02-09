@@ -13,6 +13,9 @@ Bug fixes
 • Fixed line-based text actions (e.g. Ctrl+Q / Ctrl+Shift+Q, sort/reverse/unique/join lines): selecting a single line with Shift+Down no longer merges or truncates adjacent lines.
 • Extended TTS input normalization for visible whitespace symbols (␠/U+2420, ␣/U+2423, ␉/U+2409, ␊/U+240A, ␍/U+240D, ␤/U+2424) to prevent repeated paragraph playback with multilingual voices.
 • Refined Edge TTS text sanitization with a single validation pipeline: weird/invisible spaces are normalized, long punctuation runs (like "...", "!!!", "???") are compacted, and punctuation-only chunks are skipped to prevent playback loops.
+• Fixed playback time announcement (Ctrl+I) for MP3/podcast streams: current time is now clamped to track duration, and playback is auto-stopped if position runs past the end.
+• Improved installer localization coverage: setup.exe now includes additional installer languages (Czech, Polish, French, Serbian), while MSI is kept as a single en-US package to avoid release confusion.
+• Fixed uninstall cleanup for context menu entries: "Open with Sonarpad" is now removed reliably, including legacy registry scenarios.
 
 Version 0.6.5 – 2026-02-07
 Improvements

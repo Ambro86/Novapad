@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WixLocalization xmlns="http://schemas.microsoft.com/wix/2006/localization" Culture="sv-se">
+  <String Id="CargoPackagerLanguage">1053</String>
+  <String Id="CargoPackagerCodepage">1252</String>
+  <String Id="DowngradeErrorMessage">En nyare version av [ProductName] ar redan installerad.</String>
+  <String Id="LaunchApp">Starta [ProductName]</String>
+  <String Id="InstallAppFeature">Installerar [ProductName].</String>
+  <String Id="MainFeatureTitle">Program</String>
+  <String Id="RunAppDescription">Korer [ProductName]</String>
+  <String Id="OpenWithLabel">Oppna med [ProductName]</String>
+  <String Id="UninstallShortcutName">Avinstallera [ProductName]</String>
+  <String Id="UninstallShortcutDescription">Avinstallerar [ProductName]</String>
+  <String Id="DesktopShortcutFeatureTitle">Skrivbordsgenvag</String>
+  <String Id="DesktopShortcutFeatureDescription">Skapa en skrivbordsgenvag</String>
+  <String Id="FileAssociationsFeatureTitle">Filkopplingar</String>
+  <String Id="FileAssociationsFeatureDescription">Koppla filtyper till [ProductName]</String>
+  <String Id="ContextMenuFeatureTitle">Snabbmeny</String>
+  <String Id="ContextMenuFeatureDescription">Lagg till '[OpenWithLabel]' i snabbmenyn</String>
+</WixLocalization>

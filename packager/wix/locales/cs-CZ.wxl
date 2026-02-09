@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WixLocalization xmlns="http://schemas.microsoft.com/wix/2006/localization" Culture="cs-cz">
+  <String Id="CargoPackagerLanguage">1029</String>
+  <String Id="CargoPackagerCodepage">1250</String>
+  <String Id="DowngradeErrorMessage">Je jiz nainstalovana novejsi verze [ProductName].</String>
+  <String Id="LaunchApp">Spustit [ProductName]</String>
+  <String Id="InstallAppFeature">Nainstaluje [ProductName].</String>
+  <String Id="MainFeatureTitle">Aplikace</String>
+  <String Id="RunAppDescription">Spousti [ProductName]</String>
+  <String Id="OpenWithLabel">Otevrit v [ProductName]</String>
+  <String Id="UninstallShortcutName">Odinstalovat [ProductName]</String>
+  <String Id="UninstallShortcutDescription">Odinstaluje [ProductName]</String>
+  <String Id="DesktopShortcutFeatureTitle">Zastupce na plose</String>
+  <String Id="DesktopShortcutFeatureDescription">Vytvorit zastupce na plose</String>
+  <String Id="FileAssociationsFeatureTitle">Prirazeni souboru</String>
+  <String Id="FileAssociationsFeatureDescription">Priradit typy souboru k [ProductName]</String>
+  <String Id="ContextMenuFeatureTitle">Kontextova nabidka</String>
+  <String Id="ContextMenuFeatureDescription">Pridat '[OpenWithLabel]' do kontextove nabidky</String>
+</WixLocalization>

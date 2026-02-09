@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WixLocalization xmlns="http://schemas.microsoft.com/wix/2006/localization" Culture="sr-latn-cs">
+  <String Id="CargoPackagerLanguage">2074</String>
+  <String Id="CargoPackagerCodepage">1250</String>
+  <String Id="DowngradeErrorMessage">Novija verzija [ProductName] je vec instalirana.</String>
+  <String Id="LaunchApp">Pokreni [ProductName]</String>
+  <String Id="InstallAppFeature">Instalira [ProductName].</String>
+  <String Id="MainFeatureTitle">Aplikacija</String>
+  <String Id="RunAppDescription">Pokrece [ProductName]</String>
+  <String Id="OpenWithLabel">Otvori pomocu [ProductName]</String>
+  <String Id="UninstallShortcutName">Deinstaliraj [ProductName]</String>
+  <String Id="UninstallShortcutDescription">Deinstalira [ProductName]</String>
+  <String Id="DesktopShortcutFeatureTitle">Precica na radnoj povrsini</String>
+  <String Id="DesktopShortcutFeatureDescription">Napravi precicu na radnoj povrsini</String>
+  <String Id="FileAssociationsFeatureTitle">Povezivanje datoteka</String>
+  <String Id="FileAssociationsFeatureDescription">Povezi tipove datoteka sa [ProductName]</String>
+  <String Id="ContextMenuFeatureTitle">Kontekstni meni</String>
+  <String Id="ContextMenuFeatureDescription">Dodaj '[OpenWithLabel]' u kontekstni meni</String>
+</WixLocalization>

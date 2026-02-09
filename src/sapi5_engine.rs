@@ -12,12 +12,13 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use windows::Win32::Media::Audio::{WAVE_FORMAT_PCM, WAVEFORMATEX};
 use windows::Win32::Media::Speech::{
-    IEnumSpObjectTokens, ISpObjectToken, ISpObjectTokenCategory, ISpStream, ISpVoice, SPF_ASYNC,
+    IEnumSpObjectTokens, ISpEventSource, ISpMMSysAudio, ISpObjectToken, ISpObjectTokenCategory,
+    ISpStream, ISpVoice, SPAS_PAUSE, SPAS_RUN, SPAS_STOP, SPEI_WORD_BOUNDARY, SPEVENT, SPF_ASYNC,
     SPF_IS_XML, SPF_PURGEBEFORESPEAK, SPFM_CREATE_ALWAYS, SPRS_DONE, SPVOICESTATUS, SpFileStream,
-    SpObjectTokenCategory, SpVoice,
+    SpMMAudioOut, SpObjectTokenCategory, SpVoice,
 };
 use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
-use windows::core::{GUID, PCWSTR, w};
+use windows::core::{GUID, Interface, PCWSTR, w};
 
 // SPDFID_WaveFormatEx: {C31ADBAE-527F-4ff5-A230-F62BB61FF70C}
 const SPDFID_WAVEFORMATEX: GUID = GUID::from_values(
@@ -139,6 +140,10 @@ pub fn play_sapi(
     cancel: Arc<AtomicBool>,
     mut command_rx: mpsc::UnboundedReceiver<TtsCommand>,
 ) -> Result<(), String> {
+    const COMMAND_POLL_MS: u32 = 5;
+    const PAUSED_POLL_MS: u32 = 2;
+    const HARD_PAUSE_IMMEDIATE: bool = false;
+
     std::thread::spawn(move || {
         let _com = match ComGuard::new_sta() {
             Ok(g) => g,
@@ -170,8 +175,48 @@ pub fn play_sapi(
             if let Err(e) = voice.SetVolume(map_sapi_volume(tts_volume)) {
                 crate::log_debug(&format!("Failed to set SAPI5 volume: {}", e));
             }
+            let audio_output: Option<ISpMMSysAudio> =
+                match CoCreateInstance::<_, ISpMMSysAudio>(&SpMMAudioOut, None, CLSCTX_ALL) {
+                    Ok(audio) => {
+                        if let Err(e) = voice.SetOutput(&audio, true) {
+                            crate::log_debug(&format!("Failed to set SAPI5 audio output: {}", e));
+                            None
+                        } else {
+                            Some(audio)
+                        }
+                    }
+                    Err(e) => {
+                        crate::log_debug(&format!("Failed to create SAPI5 MM audio output: {}", e));
+                        None
+                    }
+                };
+            let event_source = match voice.cast::<ISpEventSource>() {
+                Ok(source) => {
+                    let mask = word_boundary_interest_mask();
+                    if mask != 0 {
+                        match source.SetInterest(mask, mask) {
+                            Ok(()) => {}
+                            Err(e) => {
+                                crate::log_debug(&format!(
+                                    "Failed to set SAPI5 event interest: {}",
+                                    e
+                                ));
+                            }
+                        }
+                    }
+                    Some(source)
+                }
+                Err(e) => {
+                    crate::log_debug(&format!(
+                        "Failed to cast SAPI5 voice to event source: {}",
+                        e
+                    ));
+                    None
+                }
+            };
 
             let mut paused = false;
+            let mut paused_by_purge = false;
             let mut pending: VecDeque<String> = VecDeque::from(chunks);
 
             while let Some(chunk) = pending.pop_front() {
@@ -188,10 +233,26 @@ pub fn play_sapi(
                     while let Ok(cmd) = command_rx.try_recv() {
                         match cmd {
                             TtsCommand::Resume => {
+                                if let Some(audio) = &audio_output {
+                                    if let Err(e) = audio.SetState(SPAS_RUN, 0) {
+                                        crate::log_debug(&format!(
+                                            "SAPI5 audio resume failed: {}",
+                                            e
+                                        ));
+                                    }
+                                } else if !paused_by_purge && let Err(e) = voice.Resume() {
+                                    crate::log_debug(&format!("SAPI5 Resume failed: {}", e));
+                                }
+                                paused_by_purge = false;
                                 paused = false;
                             }
                             TtsCommand::Stop => {
                                 cancel.store(true, Ordering::SeqCst);
+                                if let Some(audio) = &audio_output
+                                    && let Err(e) = audio.SetState(SPAS_STOP, 0)
+                                {
+                                    crate::log_debug(&format!("SAPI5 audio stop failed: {}", e));
+                                }
                                 if let Err(e) =
                                     voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None)
                                 {
@@ -205,7 +266,7 @@ pub fn play_sapi(
                             TtsCommand::Pause => {}
                         }
                     }
-                    std::thread::sleep(Duration::from_millis(50));
+                    std::thread::sleep(Duration::from_millis(PAUSED_POLL_MS as u64));
                 }
 
                 if cancel.load(Ordering::Relaxed) {
@@ -214,6 +275,8 @@ pub fn play_sapi(
 
                 let current_chunk = chunk;
                 let ssml = mk_sapi_ssml(&current_chunk, tts_rate, tts_pitch, tts_volume);
+                let mut last_word_stream_pos_utf16 = 0usize;
+                let mut has_word_boundary = false;
                 let chunk_wide = to_wide(&ssml);
                 if let Err(e) = voice.Speak(
                     PCWSTR(chunk_wide.as_ptr()),
@@ -224,6 +287,11 @@ pub fn play_sapi(
                 }
 
                 loop {
+                    if let Some(source) = &event_source
+                        && drain_word_boundary_events(source, &mut last_word_stream_pos_utf16)
+                    {
+                        has_word_boundary = true;
+                    }
                     if cancel.load(Ordering::Relaxed) {
                         if let Err(e) =
                             voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None)
@@ -235,38 +303,95 @@ pub fn play_sapi(
                     while let Ok(cmd) = command_rx.try_recv() {
                         match cmd {
                             TtsCommand::Pause => {
-                                let mut status = SPVOICESTATUS::default();
-                                let mut remainder: Option<String> = None;
-                                if voice.GetStatus(&mut status, std::ptr::null_mut()).is_ok() {
-                                    let pos = status.ulInputWordPos as usize;
-                                    let wide: Vec<u16> = current_chunk.encode_utf16().collect();
-                                    let start = pos.min(wide.len());
-                                    if start < wide.len() {
-                                        let tail = String::from_utf16_lossy(&wide[start..]);
+                                if let Some(audio) = &audio_output {
+                                    if let Err(e) = audio.SetState(SPAS_PAUSE, 0) {
+                                        crate::log_debug(&format!(
+                                            "SAPI5 audio pause failed: {}",
+                                            e
+                                        ));
+                                    }
+                                    paused_by_purge = false;
+                                } else if HARD_PAUSE_IMMEDIATE {
+                                    let mut remainder: Option<String> = None;
+                                    let text_wide: Vec<u16> =
+                                        current_chunk.encode_utf16().collect();
+                                    let mut start = if has_word_boundary {
+                                        resolve_stream_pos_to_text_pos(
+                                            &current_chunk,
+                                            &ssml,
+                                            last_word_stream_pos_utf16,
+                                        )
+                                    } else {
+                                        0
+                                    };
+                                    if start == 0 {
+                                        let mut status = SPVOICESTATUS::default();
+                                        if voice
+                                            .GetStatus(&mut status, std::ptr::null_mut())
+                                            .is_ok()
+                                        {
+                                            let stream_pos = status.ulInputWordPos as usize;
+                                            start = resolve_stream_pos_to_text_pos(
+                                                &current_chunk,
+                                                &ssml,
+                                                stream_pos,
+                                            );
+                                        }
+                                    }
+                                    let start = start.min(text_wide.len());
+                                    if start < text_wide.len() {
+                                        let tail = String::from_utf16_lossy(&text_wide[start..]);
                                         if !tail.trim().is_empty() {
                                             remainder = Some(tail);
                                         }
                                     }
-                                }
-                                if let Err(e) =
-                                    voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None)
-                                {
-                                    crate::log_debug(&format!(
-                                        "SAPI5 Speak purge failed (pause): {}",
-                                        e
-                                    ));
-                                }
-                                if let Some(rem) = remainder {
-                                    pending.push_front(rem);
+                                    if let Err(e) = voice.Speak(
+                                        PCWSTR::null(),
+                                        SPF_PURGEBEFORESPEAK.0 as u32,
+                                        None,
+                                    ) {
+                                        crate::log_debug(&format!(
+                                            "SAPI5 Speak purge failed (pause): {}",
+                                            e
+                                        ));
+                                    }
+                                    if let Some(rem) = remainder {
+                                        pending.push_front(rem);
+                                    } else {
+                                        // Preserve audible behavior when offset is unavailable.
+                                        pending.push_front(current_chunk.clone());
+                                    }
+                                    paused_by_purge = true;
+                                } else if let Err(e) = voice.Pause() {
+                                    crate::log_debug(&format!("SAPI5 Pause failed: {}", e));
+                                    paused_by_purge = false;
+                                } else {
+                                    paused_by_purge = false;
                                 }
                                 paused = true;
                                 break;
                             }
                             TtsCommand::Resume => {
+                                if let Some(audio) = &audio_output {
+                                    if let Err(e) = audio.SetState(SPAS_RUN, 0) {
+                                        crate::log_debug(&format!(
+                                            "SAPI5 audio resume failed: {}",
+                                            e
+                                        ));
+                                    }
+                                } else if !paused_by_purge && let Err(e) = voice.Resume() {
+                                    crate::log_debug(&format!("SAPI5 Resume failed: {}", e));
+                                }
+                                paused_by_purge = false;
                                 paused = false;
                             }
                             TtsCommand::Stop => {
                                 cancel.store(true, Ordering::SeqCst);
+                                if let Some(audio) = &audio_output
+                                    && let Err(e) = audio.SetState(SPAS_STOP, 0)
+                                {
+                                    crate::log_debug(&format!("SAPI5 audio stop failed: {}", e));
+                                }
                                 if let Err(e) =
                                     voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None)
                                 {
@@ -280,7 +405,8 @@ pub fn play_sapi(
                         }
                     }
                     if paused {
-                        break;
+                        std::thread::sleep(Duration::from_millis(PAUSED_POLL_MS as u64));
+                        continue;
                     }
 
                     let mut status = SPVOICESTATUS::default();
@@ -289,9 +415,7 @@ pub fn play_sapi(
                     {
                         break;
                     }
-                    if let Err(e) = voice.WaitUntilDone(50) {
-                        crate::log_debug(&format!("Failed to wait for SAPI5: {}", e));
-                    }
+                    std::thread::sleep(Duration::from_millis(COMMAND_POLL_MS as u64));
                 }
             }
         }
@@ -570,6 +694,102 @@ fn format_pitch(pitch: i32) -> String {
 fn format_volume(volume: i32) -> String {
     let delta = volume.saturating_sub(100);
     format!("{:+}%", delta)
+}
+
+fn map_ssml_pos_to_text_pos(ssml: &str, ssml_pos_utf16: usize) -> usize {
+    let mut ssml_units = 0usize;
+    let mut text_units = 0usize;
+    let mut in_tag = false;
+    let mut in_entity = false;
+
+    for ch in ssml.chars() {
+        let ch_units = ch.len_utf16();
+        if ssml_units >= ssml_pos_utf16 {
+            break;
+        }
+        ssml_units = ssml_units.saturating_add(ch_units);
+
+        if in_tag {
+            if ch == '>' {
+                in_tag = false;
+            }
+            continue;
+        }
+
+        if in_entity {
+            if ch == ';' {
+                // XML entity contributes exactly one text character.
+                text_units = text_units.saturating_add(1);
+                in_entity = false;
+            }
+            continue;
+        }
+
+        if ch == '<' {
+            in_tag = true;
+            continue;
+        }
+        if ch == '&' {
+            in_entity = true;
+            continue;
+        }
+
+        text_units = text_units.saturating_add(ch_units);
+    }
+
+    text_units
+}
+
+fn resolve_stream_pos_to_text_pos(text: &str, ssml: &str, stream_pos_utf16: usize) -> usize {
+    let text_len = text.encode_utf16().count();
+    if stream_pos_utf16 == 0 {
+        return 0;
+    }
+    if stream_pos_utf16 <= text_len {
+        return stream_pos_utf16;
+    }
+    map_ssml_pos_to_text_pos(ssml, stream_pos_utf16).min(text_len)
+}
+
+fn word_boundary_interest_mask() -> u64 {
+    const SPFEI_FLAGCHECK: u64 = (1u64 << 30) | (1u64 << 33);
+    let shift = SPEI_WORD_BOUNDARY.0;
+    if (0..64).contains(&shift) {
+        (1u64 << (shift as u32)) | SPFEI_FLAGCHECK
+    } else {
+        0
+    }
+}
+
+fn spevent_event_id(event: &SPEVENT) -> i32 {
+    (event._bitfield as u32 & 0xFFFF) as i32
+}
+
+fn drain_word_boundary_events(source: &ISpEventSource, last_text_pos_utf16: &mut usize) -> bool {
+    let mut saw_word_boundary = false;
+    unsafe {
+        loop {
+            let mut event = SPEVENT::default();
+            let mut fetched = 0u32;
+            if let Err(e) =
+                source.GetEvents(1, &mut event as *mut SPEVENT, &mut fetched as *mut u32)
+            {
+                crate::log_debug(&format!("Failed to read SAPI5 events: {}", e));
+                break;
+            }
+            if fetched == 0 {
+                break;
+            }
+            if spevent_event_id(&event) == SPEI_WORD_BOUNDARY.0 {
+                // SAPI word-boundary semantics:
+                // - lParam = input word position
+                // - wParam = input word length
+                *last_text_pos_utf16 = event.lParam.0.max(0) as usize;
+                saw_word_boundary = true;
+            }
+        }
+    }
+    saw_word_boundary
 }
 
 fn mk_sapi_ssml(text: &str, rate: i32, pitch: i32, volume: i32) -> String {

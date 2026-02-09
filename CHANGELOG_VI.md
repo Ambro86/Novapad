@@ -13,6 +13,9 @@ Sửa lỗi
 • Đã sửa các thao tác văn bản theo dòng (ví dụ Ctrl+Q / Ctrl+Shift+Q, sắp xếp/đảo/duy nhất/gộp dòng): khi chọn một dòng bằng Shift+Mũi tên xuống, các dòng liền kề không còn bị dính hoặc bị cắt.
 • Đã mở rộng chuẩn hóa đầu vào TTS cho các ký hiệu hiển thị của khoảng trắng/tab/xuống dòng (␠/U+2420, ␣/U+2423, ␉/U+2409, ␊/U+240A, ␍/U+240D, ␤/U+2424), vốn có thể gây lặp đoạn với giọng đa ngôn ngữ.
 • Đã tinh chỉnh bước làm sạch văn bản cho Edge TTS bằng một pipeline kiểm tra duy nhất: chuẩn hóa khoảng trắng lạ/vô hình, rút gọn các chuỗi dấu câu dài (như "...", "!!!", "???"), và bỏ qua các đoạn chỉ gồm dấu câu để tránh lặp vòng khi phát.
+• Đã sửa thông báo thời gian phát (Ctrl+I) cho luồng MP3/podcast: thời gian hiện tại giờ được giới hạn theo tổng thời lượng của track, và phát sẽ tự dừng nếu vị trí vượt quá điểm kết thúc.
+• Đã cải thiện phạm vi bản địa hóa của trình cài đặt: setup.exe giờ bao gồm thêm tiếng Séc, Ba Lan, Pháp và Serbia, trong khi MSI được giữ thành một gói en-US duy nhất để tránh gây rối trong bản phát hành.
+• Đã sửa dọn dẹp khi gỡ cài đặt các mục menu ngữ cảnh: mục "Mở bằng Sonarpad" giờ được xóa ổn định, kể cả trong các kịch bản registry cũ.
 
 Phiên bản 0.6.5 – 2026-02-07
 Cải tiến

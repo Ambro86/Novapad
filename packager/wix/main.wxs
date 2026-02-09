@@ -110,7 +110,7 @@
                     <Shortcut Id="ApplicationStartMenuShortcut"
                         Directory="ApplicationProgramsFolder"
                         Name="{{product_name}}"
-                        Description="Runs {{product_name}}"
+                        Description="!(loc.RunAppDescription)"
                         {{#if icon_path}}Icon="ProductIcon"{{/if}}
                         Advertise="yes">
                         <ShortcutProperty Key="System.AppUserModel.ID" Value="{{identifier}}"/>
@@ -126,7 +126,7 @@
                 {{#each association.extensions as |ext| ~}}
                 <ProgId Id="{{../../product_name}}.{{ext}}" Description="{{association.description}}">
                     <Extension Id="{{ext}}">
-                        <Verb Id="open" Command="Open with {{../../product_name}}" Argument="&quot;%1&quot;" TargetProperty="NOVAPAD_EXE_PATH" />
+                        <Verb Id="open" Command="!(loc.OpenWithLabel)" Argument="&quot;%1&quot;" TargetProperty="NOVAPAD_EXE_PATH" />
                     </Extension>
                 </ProgId>
                 {{/each~}}
@@ -138,7 +138,7 @@
                 {{#each file_associations as |association| ~}}
                 {{#each association.extensions as |ext| ~}}
                 <RegistryKey Root="HKLM" Key="Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad">
-                    <RegistryValue Type="string" Value="Open with {{../../product_name}}" />
+                    <RegistryValue Type="string" Value="!(loc.OpenWithLabel)" />
                     <RegistryKey Key="command">
                         <RegistryValue Type="string" Value="&quot;[INSTALLDIR]sonarpad.exe&quot; &quot;%1&quot;" />
                     </RegistryKey>
@@ -156,7 +156,7 @@
             {{resources}}
 
             <Component Id="CMP_UninstallShortcut" Guid="*">
-                <Shortcut Id="UninstallShortcut" Name="Uninstall {{product_name}}" Description="Uninstalls {{product_name}}" Target="[System64Folder]msiexec.exe" Arguments="/x [ProductCode]" />
+                <Shortcut Id="UninstallShortcut" Name="!(loc.UninstallShortcutName)" Description="!(loc.UninstallShortcutDescription)" Target="[System64Folder]msiexec.exe" Arguments="/x [ProductCode]" />
                 <RemoveFolder Id="INSTALLDIR_REMOVE" Directory="INSTALLDIR" On="uninstall" />
                 <RegistryValue Root="HKLM"
                                Key="Software\\{{manufacturer}}\\{{product_name}}"
@@ -169,28 +169,28 @@
 
         <DirectoryRef Id="CommonDesktopFolder">
             <Component Id="ApplicationShortcutDesktop" Guid="*">
-                <Shortcut Id="ApplicationDesktopShortcut" Name="{{product_name}}" Description="Runs {{product_name}}" Target="[INSTALLDIR]sonarpad.exe" WorkingDirectory="INSTALLDIR" {{#if icon_path}}Icon="ProductIcon"{{/if}} />
+                <Shortcut Id="ApplicationDesktopShortcut" Name="{{product_name}}" Description="!(loc.RunAppDescription)" Target="[INSTALLDIR]sonarpad.exe" WorkingDirectory="INSTALLDIR" {{#if icon_path}}Icon="ProductIcon"{{/if}} />
                 <RemoveFolder Id="RemoveDesktopFolder" Directory="CommonDesktopFolder" On="uninstall" />
                 <RegistryValue Root="HKLM" Key="Software\\{{manufacturer}}\\{{product_name}}" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
             </Component>
         </DirectoryRef>
 
-        <Feature Id="MainProgram" Title="Application" Description="!(loc.InstallAppFeature)" Level="1" ConfigurableDirectory="INSTALLDIR" AllowAdvertise="no" Display="expand" Absent="disallow">
+        <Feature Id="MainProgram" Title="!(loc.MainFeatureTitle)" Description="!(loc.InstallAppFeature)" Level="1" ConfigurableDirectory="INSTALLDIR" AllowAdvertise="no" Display="expand" Absent="disallow">
             <ComponentRef Id="RegistryEntries"/>
             <ComponentRef Id="Path"/>
             <ComponentRef Id="CMP_UninstallShortcut" />
             {{#each resource_file_ids as |id| ~}}<ComponentRef Id="{{ id }}"/>{{/each~}}
             {{#each binaries as |bin| ~}}<ComponentRef Id="{{ bin.id }}"/>{{/each~}}
 
-            <Feature Id="DesktopShortcutFeature" Title="Desktop Shortcut" Description="Create a desktop shortcut" Level="1" Absent="allow" Display="expand">
+            <Feature Id="DesktopShortcutFeature" Title="!(loc.DesktopShortcutFeatureTitle)" Description="!(loc.DesktopShortcutFeatureDescription)" Level="1" Absent="allow" Display="expand">
                 <ComponentRef Id="ApplicationShortcutDesktop" />
             </Feature>
 
             {{#if file_associations}}
-            <Feature Id="FileAssociationsFeature" Title="File Associations" Description="Associate file types with {{product_name}}" Level="1" Absent="allow" Display="expand">
+            <Feature Id="FileAssociationsFeature" Title="!(loc.FileAssociationsFeatureTitle)" Description="!(loc.FileAssociationsFeatureDescription)" Level="1" Absent="allow" Display="expand">
                 <ComponentRef Id="FileAssociations" />
             </Feature>
-            <Feature Id="ContextMenuFeature" Title="Context Menu" Description="Add 'Open with {{product_name}}' to the context menu" Level="1" Absent="allow" Display="expand">
+            <Feature Id="ContextMenuFeature" Title="!(loc.ContextMenuFeatureTitle)" Description="!(loc.ContextMenuFeatureDescription)" Level="1" Absent="allow" Display="expand">
                 <ComponentRef Id="ContextMenu" />
             </Feature>
             {{/if}}

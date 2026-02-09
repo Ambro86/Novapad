@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WixLocalization xmlns="http://schemas.microsoft.com/wix/2006/localization" Culture="pt-pt">
+  <String Id="CargoPackagerLanguage">2070</String>
+  <String Id="CargoPackagerCodepage">1252</String>
+  <String Id="DowngradeErrorMessage">Ja existe uma versao mais recente do [ProductName] instalada.</String>
+  <String Id="LaunchApp">Iniciar [ProductName]</String>
+  <String Id="InstallAppFeature">Instala [ProductName].</String>
+  <String Id="MainFeatureTitle">Aplicacao</String>
+  <String Id="RunAppDescription">Executa [ProductName]</String>
+  <String Id="OpenWithLabel">Abrir com [ProductName]</String>
+  <String Id="UninstallShortcutName">Desinstalar [ProductName]</String>
+  <String Id="UninstallShortcutDescription">Desinstala [ProductName]</String>
+  <String Id="DesktopShortcutFeatureTitle">Atalho da area de trabalho</String>
+  <String Id="DesktopShortcutFeatureDescription">Criar um atalho na area de trabalho</String>
+  <String Id="FileAssociationsFeatureTitle">Associacoes de ficheiros</String>
+  <String Id="FileAssociationsFeatureDescription">Associar tipos de ficheiro ao [ProductName]</String>
+  <String Id="ContextMenuFeatureTitle">Menu de contexto</String>
+  <String Id="ContextMenuFeatureDescription">Adicionar '[OpenWithLabel]' ao menu de contexto</String>
+</WixLocalization>

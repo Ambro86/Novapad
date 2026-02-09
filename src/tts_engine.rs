@@ -2562,11 +2562,32 @@ pub fn strip_dashed_lines(text: &str) -> String {
         .join("\n")
 }
 
+fn normalize_weird_spaces(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for ch in text.chars() {
+        match ch {
+            // Remove zero-width formatting chars that can confuse TTS segmentation.
+            '\u{200B}' | '\u{200C}' | '\u{200D}' | '\u{2060}' | '\u{FEFF}' => {}
+            // Convert uncommon Unicode spaces to ASCII space.
+            '\u{00A0}' | '\u{1680}' | '\u{2000}' | '\u{2001}' | '\u{2002}' | '\u{2003}'
+            | '\u{2004}' | '\u{2005}' | '\u{2006}' | '\u{2007}' | '\u{2008}' | '\u{2009}'
+            | '\u{200A}' | '\u{202F}' | '\u{205F}' | '\u{3000}'
+            // Visible symbols for spaces/tabs used in some copied texts.
+            | '\u{2420}' | '\u{2423}' | '\u{2409}' => out.push(' '),
+            // Visible symbols for LF/CR/newline.
+            '\u{240A}' | '\u{240D}' | '\u{2424}' => out.push('\n'),
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
 pub fn normalize_for_tts(text: &str, split_on_newline: bool) -> String {
+    let normalized_spaces = normalize_weird_spaces(text);
     let normalized = if split_on_newline {
-        text.to_string()
+        normalized_spaces
     } else {
-        text.replace('\n', " ").replace('\r', "")
+        normalized_spaces.replace('\n', " ").replace('\r', "")
     };
     normalized.replace(['«', '»'], "")
 }

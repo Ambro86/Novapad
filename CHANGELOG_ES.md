@@ -11,6 +11,7 @@ Correcciones de errores
 • Añadida la eliminación de artículos RSS individuales y episodios de podcast individuales (tecla Supr + menú contextual con confirmación), sin eliminar toda la fuente RSS/podcast.
 • Añadida la traducción serbia gracias a Mila Kuran.
 • Corregidas las operaciones de texto por líneas (p. ej. Ctrl+Q / Ctrl+Shift+Q, ordenar/invertir/únicas/unir líneas): al seleccionar una sola línea con Mayús+Flecha abajo ya no se unen ni se truncan las líneas adyacentes.
+• Ampliada la normalización de entrada TTS para símbolos visibles de espacio/tab/nueva línea (␠/U+2420, ␣/U+2423, ␉/U+2409, ␊/U+240A, ␍/U+240D, ␤/U+2424), que con voces multilingües podían causar repetición de párrafos.
 
 Version 0.6.5 – 2026-02-07
 Mejoras

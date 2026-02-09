@@ -11,6 +11,7 @@ Bug fixes
 • Added removal of individual RSS articles and podcast episodes (Delete key + context menu with confirmation), without removing the entire RSS/podcast source.
 • Added Serbian translation thanks to Mila Kuran.
 • Fixed line-based text actions (e.g. Ctrl+Q / Ctrl+Shift+Q, sort/reverse/unique/join lines): selecting a single line with Shift+Down no longer merges or truncates adjacent lines.
+• Extended TTS input normalization for visible whitespace symbols (␠/U+2420, ␣/U+2423, ␉/U+2409, ␊/U+240A, ␍/U+240D, ␤/U+2424) to prevent repeated paragraph playback with multilingual voices.
 
 Version 0.6.5 – 2026-02-07
 Improvements

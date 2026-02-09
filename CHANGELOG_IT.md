@@ -11,6 +11,7 @@ Correzioni di bug
 • Aggiunta la rimozione dei singoli articoli RSS e dei singoli episodi podcast (tasto Canc + menu contestuale con conferma), senza eliminare l'intera fonte RSS/podcast.
 • Aggiunta la traduzione serba grazie a Mila Kuran.
 • Corrette le operazioni testuali a livello riga (es. Ctrl+Q / Ctrl+Shift+Q, ordina/inverti/righe uniche/unisci): selezionando una sola riga con Maiusc+Freccia giù non vengono più unite o troncate le righe adiacenti.
+• Estesa la normalizzazione input TTS per simboli visibili di spazi/tab/newline (␠/U+2420, ␣/U+2423, ␉/U+2409, ␊/U+240A, ␍/U+240D, ␤/U+2424), che con voci multilingua potevano causare ripetizioni dei paragrafi.
 
 Versione 0.6.5 – 2026-02-07
 Miglioramenti

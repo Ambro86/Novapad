@@ -11,6 +11,7 @@ Corrections de bugs
 • Ajout de la suppression d’articles RSS individuels et d’épisodes de podcast individuels (touche Suppr + menu contextuel avec confirmation), sans supprimer toute la source RSS/podcast.
 • Ajout de la traduction serbe grâce à Mila Kuran.
 • Correction des opérations de texte par ligne (ex. Ctrl+Q / Ctrl+Shift+Q, trier/inverser/lignes uniques/fusionner les lignes) : en sélectionnant une seule ligne avec Maj+Flèche bas, les lignes adjacentes ne sont plus fusionnées ni tronquées.
+• Extension de la normalisation d’entrée TTS pour les symboles visibles d’espace/tabulation/saut de ligne (␠/U+2420, ␣/U+2423, ␉/U+2409, ␊/U+240A, ␍/U+240D, ␤/U+2424), qui pouvaient provoquer des répétitions de paragraphes avec les voix multilingues.
 
 Version 0.6.5 – 2026-02-07
 Améliorations

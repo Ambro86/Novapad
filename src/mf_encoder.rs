@@ -87,7 +87,14 @@ impl Mp3StreamWriter {
     ) -> Result<Self, String> {
         unsafe {
             let bitrate_kbps = match bitrate_kbps {
+                64 => 64,
+                80 => 80,
+                96 => 96,
+                112 => 112,
+                128 => 128,
+                160 => 160,
                 192 => 192,
+                224 => 224,
                 256 => 256,
                 _ => 128,
             };
@@ -270,11 +277,16 @@ fn read_wav_data_info(path: &Path) -> Result<(u64, u32, i16), String> {
     Err("WAV data chunk not found".to_string())
 }
 
-pub fn encode_wav_to_mp3<F>(wav_path: &Path, mp3_path: &Path, progress: F) -> Result<(), String>
+pub fn encode_wav_to_mp3<F>(
+    wav_path: &Path,
+    mp3_path: &Path,
+    bitrate_kbps: u32,
+    progress: F,
+) -> Result<(), String>
 where
     F: FnMut(u32),
 {
-    encode_wav_to_audio(wav_path, mp3_path, 128, progress)
+    encode_wav_to_audio(wav_path, mp3_path, bitrate_kbps, progress)
 }
 
 pub fn encode_wav_to_m4b<F>(
@@ -292,12 +304,13 @@ where
         format: crate::ffmpeg_export::ConvertAudioFormat::Aac,
         quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(bitrate_kbps),
     };
-    crate::ffmpeg_export::convert_audio_file(
+    crate::ffmpeg_export::convert_audio_file_with_channels(
         wav_path,
         m4b_path,
         &settings,
         None,
         Some(&mut progress),
+        Some(2),
     )
 }
 
@@ -332,7 +345,14 @@ where
         let is_aac = extension == "m4b" || extension == "m4a" || extension == "mp4";
 
         let bitrate_kbps = match bitrate_kbps {
+            64 => 64,
+            80 => 80,
+            96 => 96,
+            112 => 112,
+            128 => 128,
+            160 => 160,
             192 => 192,
+            224 => 224,
             256 => 256,
             _ => 128,
         };

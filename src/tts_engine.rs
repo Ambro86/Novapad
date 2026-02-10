@@ -628,6 +628,7 @@ fn synthesize_sapi5_bytes(
             rate,
             pitch,
             volume,
+            audiobook_bitrate_kbps: 128,
             cancel,
         },
         |_chunk_idx| {},
@@ -658,6 +659,7 @@ fn synthesize_sapi4_bytes(
             rate,
             pitch,
             volume,
+            mp3_bitrate_kbps: 128,
             cancel,
         },
         |_chunk_idx| {},
@@ -1881,18 +1883,23 @@ fn finish_time_split_part(
             },
         )
     } else {
-        crate::mf_encoder::encode_wav_to_mp3(&wav_path, part_output, |p| {
-            if options.progress_hwnd.0 != 0 {
-                unsafe {
-                    let _unused = PostMessageW(
-                        options.progress_hwnd,
-                        crate::WM_UPDATE_PROGRESS,
-                        WPARAM(p as usize),
-                        LPARAM(0),
-                    );
+        crate::mf_encoder::encode_wav_to_mp3(
+            &wav_path,
+            part_output,
+            options.audiobook_bitrate_kbps,
+            |p| {
+                if options.progress_hwnd.0 != 0 {
+                    unsafe {
+                        let _unused = PostMessageW(
+                            options.progress_hwnd,
+                            crate::WM_UPDATE_PROGRESS,
+                            WPARAM(p as usize),
+                            LPARAM(0),
+                        );
+                    }
                 }
-            }
-        })
+            },
+        )
     };
     if let Err(e) = std::fs::remove_file(&wav_path) {
         crate::log_debug(&format!(
@@ -3371,6 +3378,10 @@ fn start_audiobook_with_text(
         0,
         100,
     ));
+    crate::log_debug(&format!(
+        "Audiobook: settings bitrate resolved to {} kbps for output {:?}",
+        audiobook_m4b_bitrate, output
+    ));
 
     let cleaned = strip_dashed_lines(&text);
     let mixed_needed = has_voice_tags(&cleaned);
@@ -3563,6 +3574,15 @@ fn start_audiobook_with_text(
             volume: tts_volume,
             sapi4_threads,
         };
+        let engine_name = match tts_engine {
+            TtsEngine::Edge => "edge",
+            TtsEngine::Sapi5 => "sapi5",
+            TtsEngine::Sapi4 => "sapi4",
+        };
+        crate::log_debug(&format!(
+            "Audiobook: export start engine={} bitrate={} output={:?}",
+            engine_name, options.audiobook_bitrate_kbps, options.output
+        ));
 
         let mut time_split_done = false;
         let mut result = if mixed_needed {
@@ -4175,6 +4195,7 @@ fn run_sapi4_parallel_part(
         let progress_counter = progress_counter.clone();
         let cancel_token = options.cancel.clone();
         let (r, p, v) = (options.rate, options.pitch, options.volume);
+        let mp3_bitrate_kbps = options.audiobook_bitrate_kbps;
         let progress_hwnd = options.progress_hwnd;
 
         let handle = std::thread::spawn(move || {
@@ -4199,6 +4220,7 @@ fn run_sapi4_parallel_part(
                         rate: r,
                         pitch: p,
                         volume: v,
+                        mp3_bitrate_kbps,
                         cancel: cancel_token.clone(),
                     },
                     |_| {
@@ -4232,7 +4254,7 @@ fn run_sapi4_parallel_part(
                         if let Err(e) = crate::mf_encoder::encode_wav_to_audio(
                             &sub_output,
                             &encoded_sub,
-                            128,
+                            mp3_bitrate_kbps,
                             |_| {},
                         ) {
                             std::fs::remove_file(&sub_output).ok();
@@ -4703,18 +4725,23 @@ fn merge_and_finalize_sapi4_audio(
                 },
             )
         } else {
-            crate::mf_encoder::encode_wav_to_mp3(&final_wav, output, |p| {
-                if options.progress_hwnd.0 != 0 {
-                    unsafe {
-                        let _unused = PostMessageW(
-                            options.progress_hwnd,
-                            crate::WM_UPDATE_PROGRESS,
-                            WPARAM(p as usize),
-                            LPARAM(0),
-                        );
+            crate::mf_encoder::encode_wav_to_mp3(
+                &final_wav,
+                output,
+                options.audiobook_bitrate_kbps,
+                |p| {
+                    if options.progress_hwnd.0 != 0 {
+                        unsafe {
+                            let _unused = PostMessageW(
+                                options.progress_hwnd,
+                                crate::WM_UPDATE_PROGRESS,
+                                WPARAM(p as usize),
+                                LPARAM(0),
+                            );
+                        }
                     }
-                }
-            })
+                },
+            )
         };
         std::fs::remove_file(&final_wav).ok();
         res.map_err(|e| {
@@ -4798,6 +4825,7 @@ fn run_split_sapi_audiobook(
                 rate: options.rate,
                 pitch: options.pitch,
                 volume: options.volume,
+                audiobook_bitrate_kbps: options.audiobook_bitrate_kbps,
                 cancel: cancel_clone,
             },
             |_chunk_idx| {
@@ -4914,6 +4942,7 @@ fn run_marker_split_sapi_audiobook(
                 rate: options.rate,
                 pitch: options.pitch,
                 volume: options.volume,
+                audiobook_bitrate_kbps: options.audiobook_bitrate_kbps,
                 cancel: cancel_clone,
             },
             |_chunk_idx| {
@@ -5123,7 +5152,7 @@ pub(crate) fn run_tts_audiobook_part(
             let bytes = std::fs::read(&source_mp3)
                 .map_err(|e| format!("Failed to read source MP3 for re-encode: {}", e))?;
             let (samples, src_rate, src_channels) = decode_mp3_to_pcm(&bytes)?;
-            let target_rate = 22_050u32;
+            let target_rate = 44_100u32;
             let target_channels = 2u16;
             let resampled = resample_pcm(
                 &samples,
@@ -5152,7 +5181,9 @@ pub(crate) fn run_tts_audiobook_part(
 
         let mp3_settings = crate::ffmpeg_export::ConvertAudioSettings {
             format: crate::ffmpeg_export::ConvertAudioFormat::Mp3,
-            quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(160),
+            quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(
+                options.audiobook_bitrate_kbps,
+            ),
         };
         let mut ffmpeg_progress = |p: u32| {
             if options.progress_hwnd.0 != 0 {
@@ -5334,18 +5365,23 @@ pub(crate) fn render_mixed_audiobook_part(
         std::fs::remove_file(&actual_output).ok();
         res?;
     } else if is_mp3 {
-        let res = crate::mf_encoder::encode_wav_to_mp3(&actual_output, output, |p| {
-            if options.progress_hwnd.0 != 0 {
-                unsafe {
-                    let _unused = PostMessageW(
-                        options.progress_hwnd,
-                        crate::WM_UPDATE_PROGRESS,
-                        WPARAM(p as usize),
-                        LPARAM(0),
-                    );
+        let res = crate::mf_encoder::encode_wav_to_mp3(
+            &actual_output,
+            output,
+            options.audiobook_bitrate_kbps,
+            |p| {
+                if options.progress_hwnd.0 != 0 {
+                    unsafe {
+                        let _unused = PostMessageW(
+                            options.progress_hwnd,
+                            crate::WM_UPDATE_PROGRESS,
+                            WPARAM(p as usize),
+                            LPARAM(0),
+                        );
+                    }
                 }
-            }
-        });
+            },
+        );
         std::fs::remove_file(&actual_output).ok();
         res?;
     }

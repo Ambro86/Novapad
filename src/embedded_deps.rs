@@ -33,6 +33,7 @@ const AVUTIL_DLL: &[u8] = include_bytes!("../vcpkg_installed/x64-windows/bin/avu
 const SWRESAMPLE_DLL: &[u8] = include_bytes!("../vcpkg_installed/x64-windows/bin/swresample-6.dll");
 const SWSCALE_DLL: &[u8] = include_bytes!("../vcpkg_installed/x64-windows/bin/swscale-9.dll");
 const OPUS_DLL: &[u8] = include_bytes!("../vcpkg_installed/x64-windows/bin/opus.dll");
+const LIBMP3LAME_DLL: &[u8] = include_bytes!("../vcpkg_installed/x64-windows/bin/libmp3lame.dll");
 
 /// Scrive un file solo se non esiste o se l'hash è diverso
 fn write_if_changed(path: &PathBuf, data: &[u8]) -> std::io::Result<bool> {
@@ -41,8 +42,21 @@ fn write_if_changed(path: &PathBuf, data: &[u8]) -> std::io::Result<bool> {
         if let Ok(metadata) = fs::metadata(path)
             && metadata.len() == data.len() as u64
         {
-            // Stessa dimensione, probabilmente uguale - skip
-            return Ok(false);
+            // Per il bridge SAPI4 confronta i byte: può cambiare pur mantenendo la stessa size.
+            let is_sapi4_bridge = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.eq_ignore_ascii_case("sapi4_bridge_32.exe"));
+            if is_sapi4_bridge {
+                if let Ok(existing) = fs::read(path)
+                    && existing == data
+                {
+                    return Ok(false);
+                }
+            } else {
+                // Stessa dimensione, probabilmente uguale - skip
+                return Ok(false);
+            }
         }
     }
 
@@ -87,6 +101,7 @@ pub fn extract_all() -> std::io::Result<PathBuf> {
         ("swresample-6.dll", SWRESAMPLE_DLL),
         ("swscale-9.dll", SWSCALE_DLL),
         ("opus.dll", OPUS_DLL),
+        ("libmp3lame.dll", LIBMP3LAME_DLL),
         ("sapi4_bridge_32.exe", SAPI4_BRIDGE_32_EXE),
     ];
 

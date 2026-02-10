@@ -2251,6 +2251,7 @@ fn export_parts(
                         rate: tts.tts_rate,
                         pitch: tts.tts_pitch,
                         volume: tts.tts_volume,
+                        audiobook_bitrate_kbps: tts.audiobook_m4b_bitrate,
                         cancel: cancel.clone(),
                     };
                     if let Some(voice) = sapi_voice {
@@ -2268,8 +2269,12 @@ fn export_parts(
                     }
 
                     crate::log_debug("Batch SAPI5: converting WAV to MP3 via FFmpeg.");
-                    let convert_res =
-                        convert_wav_to_mp3_ffmpeg_with_timeout(&wav_path, output, cancel.clone());
+                    let convert_res = convert_wav_to_mp3_ffmpeg_with_timeout(
+                        &wav_path,
+                        output,
+                        tts.audiobook_m4b_bitrate,
+                        cancel.clone(),
+                    );
                     match convert_res {
                         Ok(()) => {
                             if let Err(e) = std::fs::remove_file(&wav_path) {
@@ -2308,6 +2313,7 @@ fn export_parts(
                         rate: tts.tts_rate,
                         pitch: tts.tts_pitch,
                         volume: tts.tts_volume,
+                        audiobook_bitrate_kbps: tts.audiobook_m4b_bitrate,
                         cancel: cancel.clone(),
                     };
                     if let Some(voice) = sapi_voice {
@@ -2338,6 +2344,7 @@ fn export_parts(
 fn convert_wav_to_mp3_ffmpeg_with_timeout(
     wav_path: &Path,
     mp3_path: &Path,
+    bitrate_kbps: u32,
     cancel: Arc<AtomicBool>,
 ) -> Result<(), String> {
     let data_size = crate::audio_utils::get_wav_data_size(wav_path).unwrap_or(0) as u64;
@@ -2358,7 +2365,7 @@ fn convert_wav_to_mp3_ffmpeg_with_timeout(
     std::thread::spawn(move || {
         let settings = crate::ffmpeg_export::ConvertAudioSettings {
             format: crate::ffmpeg_export::ConvertAudioFormat::Mp3,
-            quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(128),
+            quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(bitrate_kbps),
         };
         let res = crate::ffmpeg_export::convert_audio_file(
             &wav_path,

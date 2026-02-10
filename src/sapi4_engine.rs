@@ -17,6 +17,7 @@ pub struct Sapi4Options {
     pub rate: i32,
     pub pitch: i32,
     pub volume: i32,
+    pub mp3_bitrate_kbps: u32,
     pub cancel: Arc<AtomicBool>,
 }
 
@@ -51,6 +52,8 @@ pub fn speak_sapi4_to_file(
         .arg(options.pitch.to_string())
         .arg("--volume")
         .arg(options.volume.to_string())
+        .arg("--bitrate")
+        .arg(options.mp3_bitrate_kbps.to_string())
         .arg("--output")
         .arg(output)
         .stdin(Stdio::piped())

@@ -4,6 +4,7 @@ Phiên bản 0.6.6 – 2026-02-08
 Cải tiến
 • Đã thêm "Định dạng tự động cho TTS" trong menu Chỉnh sửa để chuẩn bị nhanh văn bản cho đọc giọng nói (xóa markdown/dấu ngoặc kép và ghép lại các dòng bị ngắt).
 • Đã thêm tùy chọn trong cài đặt Âm thanh để chọn thư mục mặc định lưu sách nói (mặc định: Documents\\Sonarpad Audiobooks).
+• Xuất sách nói giờ lưu MP3 stereo với bitrate do người dùng chọn cho giọng Edge, SAPI5 và SAPI4.
 • Đã tổ chức lại các tính năng giọng nói vào menu riêng "Giọng nói và âm thanh" và thêm/làm rõ mục "Chuyển đổi âm thanh", dùng để chuyển đổi mọi tệp đa phương tiện được hỗ trợ sang MP3, AAC, OGG, Opus, FLAC, WAV và AIFF.
 • Đã thêm khả năng xóa từng bài RSS và từng tập podcast riêng lẻ (phím Delete + menu ngữ cảnh có xác nhận), không cần xóa toàn bộ nguồn RSS/podcast.
 • Đã thêm bản dịch tiếng Serbia nhờ Mila Kuran.

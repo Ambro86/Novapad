@@ -431,6 +431,7 @@ pub struct SapiExportOptions<'a> {
     pub rate: i32,
     pub pitch: i32,
     pub volume: i32,
+    pub audiobook_bitrate_kbps: u32,
     pub cancel: Arc<AtomicBool>,
 }
 
@@ -591,7 +592,12 @@ fn speak_sapi_to_file_with_voice(
             } else {
                 crate::log_debug("SAPI: starting MF encode.");
             }
-            match crate::mf_encoder::encode_wav_to_mp3(&wav_path, options.output_path, |_| {}) {
+            match crate::mf_encoder::encode_wav_to_mp3(
+                &wav_path,
+                options.output_path,
+                options.audiobook_bitrate_kbps,
+                |_| {},
+            ) {
                 Ok(()) => {
                     if let Err(e) = std::fs::remove_file(&wav_path) {
                         crate::log_debug(&format!("Failed to remove SAPI5 temp WAV: {}", e));

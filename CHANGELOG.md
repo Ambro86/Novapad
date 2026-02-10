@@ -4,6 +4,7 @@ Version 0.6.6 – 2026-02-08
 Improvements
 • Added "Auto format for TTS" in the Edit menu to quickly prepare text for speech (removes markdown/quotes and reflows wrapped lines).
 • Added a default audiobook save folder option in Audio settings (default: Documents\\Sonarpad Audiobooks).
+• Audiobook export now saves MP3 in stereo with user-selected bitrate for Edge, SAPI5, and SAPI4 voices.
 • Reorganized voice features into a dedicated "Voice and audio" menu and added/clarified "Convert Audio", useful for converting any supported media file to MP3, AAC, OGG, Opus, FLAC, WAV, and AIFF.
 • Added removal of individual RSS articles and podcast episodes (Delete key + context menu with confirmation), without removing the entire RSS/podcast source.
 • Added Serbian translation thanks to Mila Kuran.

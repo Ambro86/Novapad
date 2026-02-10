@@ -67,7 +67,7 @@ use std::mem::size_of;
 use std::path::{Path, PathBuf};
 use std::sync::Once;
 use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, mpsc};
+use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
 use chrono::Local;
@@ -127,7 +127,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW,
     PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW,
     SW_SHOWMAXIMIZED, SW_SHOWNORMAL, SendMessageW, SetForegroundWindow, SetTimer,
-    SetWindowLongPtrW, SetWindowTextW, ShowWindow, TPM_RIGHTBUTTON, TrackPopupMenu,
+    SetWindowLongPtrW, SetWindowTextW, ShowWindow, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu,
     TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
     WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES,
     WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE,
@@ -7881,7 +7881,6 @@ pub(crate) unsafe fn save_audio_dialog(
     hwnd: HWND,
     suggested_name: Option<&str>,
 ) -> Option<PathBuf> {
-    let mut file_buf = vec![0u16; 4096];
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
     let initial_dir_setting =
         with_state(hwnd, |state| state.settings.audiobook_save_folder.clone()).unwrap_or_default();
@@ -7889,98 +7888,266 @@ pub(crate) unsafe fn save_audio_dialog(
     if !initial_dir.is_empty() {
         crate::log_if_err!(std::fs::create_dir_all(&initial_dir));
     }
+    let pfd: IFileSaveDialog = CoCreateInstance(&FileSaveDialog, None, CLSCTX_ALL).ok()?;
+
+    let filter_raw = i18n::tr(language, "dialog.save_audio_filter");
+    let parts: Vec<&str> = filter_raw.split("\\0").collect();
+    let mut spec = Vec::new();
+    let mut pattern_wides = Vec::new();
+    let mut name_wides = Vec::new();
+    for i in (0..parts.len().saturating_sub(1)).step_by(2) {
+        if parts[i].is_empty() {
+            break;
+        }
+        name_wides.push(to_wide(parts[i]));
+        pattern_wides.push(to_wide(parts[i + 1]));
+    }
+    for i in 0..name_wides.len() {
+        spec.push(COMDLG_FILTERSPEC {
+            pszName: PCWSTR(name_wides[i].as_ptr()),
+            pszSpec: PCWSTR(pattern_wides[i].as_ptr()),
+        });
+    }
+    pfd.SetFileTypes(&spec).ok()?;
+    pfd.SetFileTypeIndex(1).ok()?;
+    pfd.SetDefaultExtension(w!("mp3")).ok()?;
+    pfd.SetTitle(PCWSTR(
+        to_wide(&i18n::tr(language, "dialog.save_audio_title")).as_ptr(),
+    ))
+    .ok()?;
+
     if let Some(name) = suggested_name {
         let default_name = if !initial_dir.is_empty() && Path::new(name).components().count() == 1 {
-            Path::new(&initial_dir)
-                .join(name)
-                .to_string_lossy()
-                .to_string()
+            Path::new(&initial_dir).join(name)
         } else {
-            name.to_string()
+            PathBuf::from(name)
         };
-        let mut name_wide = to_wide(&default_name);
-        if let Some(0) = name_wide.last() {
-            name_wide.pop();
-        }
-        let copy_len = name_wide.len().min(file_buf.len() - 1);
-        file_buf[..copy_len].copy_from_slice(&name_wide[..copy_len]);
+        pfd.SetFileName(PCWSTR(to_wide(&default_name.to_string_lossy()).as_ptr()))
+            .ok()?;
     }
-    let initial_dir_wide = if initial_dir.is_empty() {
-        None
+
+    let current_bitrate =
+        with_state(hwnd, |state| state.settings.audiobook_m4b_bitrate).unwrap_or(128);
+    let bitrate_options = [80u32, 96, 128, 160, 192, 256];
+    let initial_bitrate = if bitrate_options.contains(&current_bitrate) {
+        current_bitrate
     } else {
-        Some(to_wide(&initial_dir))
+        128
     };
-    let filter_raw = i18n::tr(language, "dialog.save_audio_filter");
-    let filter = to_wide(&filter_raw.replace("\\0", "\0"));
-    let title = to_wide(&i18n::tr(language, "dialog.save_audio_title"));
-    let mut ofn = OPENFILENAMEW {
-        lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
-        hwndOwner: hwnd,
-        lpstrFile: PWSTR(file_buf.as_mut_ptr()),
-        nMaxFile: file_buf.len() as u32,
-        lpstrFilter: PCWSTR(filter.as_ptr()),
-        lpstrTitle: PCWSTR(title.as_ptr()),
-        lpstrInitialDir: PCWSTR(
-            initial_dir_wide
-                .as_ref()
-                .map_or(std::ptr::null(), |v| v.as_ptr()),
-        ),
-        nFilterIndex: 1,
-        Flags: OFN_EXPLORER | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST,
-        ..Default::default()
-    };
-    if GetSaveFileNameW(&mut ofn).as_bool() {
-        let len = file_buf
-            .iter()
-            .position(|&c| c == 0)
-            .unwrap_or(file_buf.len());
-        let mut path = PathBuf::from(String::from_utf16_lossy(&file_buf[..len]));
+    let selected_bitrate = Arc::new(Mutex::new(initial_bitrate));
+
+    const AUDIO_SAVE_BITRATE_BUTTON_ID: u32 = 201;
+    let pfdc: IFileDialogCustomize = pfd.cast().ok()?;
+    pfdc.AddPushButton(
+        AUDIO_SAVE_BITRATE_BUTTON_ID,
+        PCWSTR(to_wide(&audiobook_bitrate_button_label(language, initial_bitrate)).as_ptr()),
+    )
+    .ok()?;
+
+    let handler: IFileDialogEvents = AudiobookBitrateDialogHandler {
+        parent: hwnd,
+        language,
+        selected_bitrate: selected_bitrate.clone(),
+        allowed_bitrates: bitrate_options.to_vec(),
+    }
+    .into();
+    let cookie = pfd.Advise(&handler).ok()?;
+
+    let show_ok = pfd.Show(hwnd).is_ok();
+    pfd.Unadvise(cookie).ok()?;
+
+    if show_ok {
+        let item = pfd.GetResult().ok()?;
+        let path_ptr = item
+            .GetDisplayName(windows::Win32::UI::Shell::SIGDN_FILESYSPATH)
+            .ok()?;
+        let path_str = path_ptr.to_string().unwrap_or_default();
+        CoTaskMemFree(Some(path_ptr.0 as *const _));
+
+        let mut path = PathBuf::from(path_str);
         if path.extension().is_none() {
-            if ofn.nFilterIndex == 2 {
+            let filter_index = pfd.GetFileTypeIndex().ok().unwrap_or(1);
+            if filter_index == 2 {
                 path.set_extension("m4b");
             } else {
                 path.set_extension("mp3");
             }
         }
-        let is_m4b = path
-            .extension()
-            .and_then(|s| s.to_str())
-            .map(|s| s.eq_ignore_ascii_case("m4b"))
-            .unwrap_or(false);
-        if is_m4b {
-            let current_bitrate =
-                with_state(hwnd, |state| state.settings.audiobook_m4b_bitrate).unwrap_or(128);
-            let title = i18n::tr(language, "audiobook.bitrate_title");
-            let body = i18n::tr(language, "audiobook.bitrate_body");
-            let default_value = current_bitrate.to_string();
-            let input = crate::app_windows::prompt_window::prompt_user(
-                hwnd,
-                &title,
-                &body,
-                &default_value,
-                language,
-            );
-            let input = input?;
-            if let Ok(parsed) = input.trim().parse::<u32>() {
-                let bitrate = parsed.clamp(64, 256);
-                if let Some(settings) = with_state(hwnd, |state| {
-                    state.settings.audiobook_m4b_bitrate = bitrate;
-                    state.settings.clone()
-                }) {
-                    save_settings(settings);
-                } else {
-                    log_debug("Failed to access settings for audiobook bitrate");
-                }
-            } else {
-                log_debug("Invalid audiobook bitrate input; keeping existing value");
-            }
+
+        let selected_bitrate = selected_bitrate
+            .lock()
+            .map(|v| *v)
+            .unwrap_or(current_bitrate.clamp(64, 256));
+        log_debug(&format!(
+            "Save audio dialog: selected bitrate {} kbps (current {} kbps)",
+            selected_bitrate, current_bitrate
+        ));
+        if let Some(settings) = with_state(hwnd, |state| {
+            state.settings.audiobook_m4b_bitrate = selected_bitrate;
+            state.settings.clone()
+        }) {
+            save_settings(settings);
+        } else {
+            log_debug("Failed to access settings for audiobook bitrate");
         }
+
         Some(path)
     } else {
         None
     }
 }
 
+fn audiobook_bitrate_button_label(language: Language, bitrate_kbps: u32) -> String {
+    let bitrate_label = i18n::tr(language, "podcast.bitrate");
+    format!("Seleziona {bitrate_label} (attuale: {bitrate_kbps} kbps)")
+}
+
+#[implement(IFileDialogEvents, IFileDialogControlEvents)]
+struct AudiobookBitrateDialogHandler {
+    parent: HWND,
+    language: Language,
+    selected_bitrate: Arc<Mutex<u32>>,
+    allowed_bitrates: Vec<u32>,
+}
+
+impl IFileDialogEvents_Impl for AudiobookBitrateDialogHandler {
+    fn OnFileOk(&self, _pfd: Option<&IFileDialog>) -> windows::core::Result<()> {
+        Ok(())
+    }
+    fn OnFolderChange(&self, _pfd: Option<&IFileDialog>) -> windows::core::Result<()> {
+        Ok(())
+    }
+    fn OnFolderChanging(
+        &self,
+        _pfd: Option<&IFileDialog>,
+        _psi: Option<&IShellItem>,
+    ) -> windows::core::Result<()> {
+        Ok(())
+    }
+    fn OnSelectionChange(&self, _pfd: Option<&IFileDialog>) -> windows::core::Result<()> {
+        Ok(())
+    }
+    fn OnShareViolation(
+        &self,
+        _pfd: Option<&IFileDialog>,
+        _psi: Option<&IShellItem>,
+    ) -> windows::core::Result<windows::Win32::UI::Shell::FDE_SHAREVIOLATION_RESPONSE> {
+        Ok(windows::Win32::UI::Shell::FDESVR_DEFAULT)
+    }
+    fn OnTypeChange(&self, _pfd: Option<&IFileDialog>) -> windows::core::Result<()> {
+        Ok(())
+    }
+    fn OnOverwrite(
+        &self,
+        _pfd: Option<&IFileDialog>,
+        _psi: Option<&IShellItem>,
+    ) -> windows::core::Result<windows::Win32::UI::Shell::FDE_OVERWRITE_RESPONSE> {
+        Ok(windows::Win32::UI::Shell::FDEOR_DEFAULT)
+    }
+}
+
+impl IFileDialogControlEvents_Impl for AudiobookBitrateDialogHandler {
+    fn OnItemSelected(
+        &self,
+        _pfdc: Option<&IFileDialogCustomize>,
+        _dwidctl: u32,
+        _dwiditem: u32,
+    ) -> windows::core::Result<()> {
+        Ok(())
+    }
+
+    fn OnButtonClicked(
+        &self,
+        pfdc: Option<&IFileDialogCustomize>,
+        dwidctl: u32,
+    ) -> windows::core::Result<()> {
+        const AUDIO_SAVE_BITRATE_BUTTON_ID: u32 = 201;
+        if dwidctl != AUDIO_SAVE_BITRATE_BUTTON_ID {
+            return Ok(());
+        }
+        let current = self
+            .selected_bitrate
+            .lock()
+            .map(|v| *v)
+            .unwrap_or(128)
+            .clamp(64, 256);
+        let menu = unsafe { CreatePopupMenu().unwrap_or(HMENU(0)) };
+        if menu.0 == 0 {
+            return Ok(());
+        }
+        let mut ids = Vec::new();
+        for (i, bitrate) in self.allowed_bitrates.iter().enumerate() {
+            let id = 10_000u32 + i as u32;
+            ids.push((id, *bitrate));
+            let text = if *bitrate == current {
+                format!("{bitrate} kbps (attuale)")
+            } else {
+                format!("{bitrate} kbps")
+            };
+            unsafe {
+                crate::log_if_err!(AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    id as usize,
+                    PCWSTR(to_wide(&text).as_ptr()),
+                ));
+            }
+        }
+        let mut pt = POINT::default();
+        if unsafe { GetCursorPos(&mut pt).is_err() } {
+            return Ok(());
+        }
+        let owner = {
+            let fg = unsafe { GetForegroundWindow() };
+            if fg.0 != 0 { fg } else { self.parent }
+        };
+        let command = unsafe {
+            TrackPopupMenu(
+                menu,
+                TPM_RIGHTBUTTON | TPM_RETURNCMD,
+                pt.x,
+                pt.y,
+                0,
+                owner,
+                None,
+            )
+        };
+        let chosen = ids
+            .iter()
+            .find(|(id, _)| *id == command.0 as u32)
+            .map(|(_, bitrate)| *bitrate);
+        if let Some(next) = chosen {
+            if let Ok(mut guard) = self.selected_bitrate.lock() {
+                *guard = next;
+            }
+            if let Some(pfdc) = pfdc {
+                unsafe {
+                    let label = audiobook_bitrate_button_label(self.language, next);
+                    pfdc.SetControlLabel(dwidctl, PCWSTR(to_wide(&label).as_ptr()))
+                        .ok();
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn OnCheckButtonToggled(
+        &self,
+        _pfdc: Option<&IFileDialogCustomize>,
+        _dwidctl: u32,
+        _pbchecked: windows::Win32::Foundation::BOOL,
+    ) -> windows::core::Result<()> {
+        Ok(())
+    }
+
+    fn OnControlActivating(
+        &self,
+        _pfdc: Option<&IFileDialogCustomize>,
+        _dwidctl: u32,
+    ) -> windows::core::Result<()> {
+        Ok(())
+    }
+}
 /// Mostra dialog per salvare file diagnostici zip.
 unsafe fn export_diagnostics_dialog(hwnd: HWND) {
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();

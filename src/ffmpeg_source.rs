@@ -79,6 +79,7 @@ type AvFindBestStream = unsafe extern "C" fn(
 ) -> libc::c_int;
 type AvcodecFindDecoder = unsafe extern "C" fn(codec_id: AVCodecID) -> *const AVCodec;
 type AvcodecFindEncoder = unsafe extern "C" fn(codec_id: AVCodecID) -> *const AVCodec;
+type AvcodecFindEncoderByName = unsafe extern "C" fn(name: *const libc::c_char) -> *const AVCodec;
 type AvcodecAllocContext3 = unsafe extern "C" fn(*const AVCodec) -> *mut AVCodecContext;
 type AvcodecParametersToContext =
     unsafe extern "C" fn(*mut AVCodecContext, *const AVCodecParameters) -> libc::c_int;
@@ -169,6 +170,7 @@ pub(crate) struct FfmpegApi {
     pub(crate) av_find_best_stream: AvFindBestStream,
     pub(crate) avcodec_find_decoder: AvcodecFindDecoder,
     pub(crate) avcodec_find_encoder: AvcodecFindEncoder,
+    pub(crate) avcodec_find_encoder_by_name: AvcodecFindEncoderByName,
     pub(crate) avcodec_alloc_context3: AvcodecAllocContext3,
     pub(crate) avcodec_parameters_to_context: AvcodecParametersToContext,
     pub(crate) avcodec_parameters_from_context: AvcodecParametersFromContext,
@@ -233,13 +235,18 @@ fn load_ffmpeg_api() -> Result<FfmpegApi, String> {
     let ffmpeg_dlls = [
         "avutil-60.dll",
         "swresample-6.dll",
-        "avcodec-62.dll",
-        "avformat-62.dll",
         "swscale-9.dll",
         "opus.dll",
+        "libmp3lame.dll",
+        "avcodec-62.dll",
+        "avformat-62.dll",
     ];
 
     let mut libs = Vec::new();
+    let mut avutil_lib: Option<Library> = None;
+    let mut swresample_lib: Option<Library> = None;
+    let mut avcodec_lib: Option<Library> = None;
+    let mut avformat_lib: Option<Library> = None;
     let flags = LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS;
 
     for dll in ffmpeg_dlls {
@@ -257,14 +264,33 @@ fn load_ffmpeg_api() -> Result<FfmpegApi, String> {
 
         let lib = unsafe { Library::load_with_flags(&path, flags) }
             .map_err(|e| format!("FFmpeg: failed to load {}: {}", path.display(), e))?;
-        libs.push(lib);
+
+        match dll {
+            "avutil-60.dll" => avutil_lib = Some(lib),
+            "swresample-6.dll" => swresample_lib = Some(lib),
+            "avcodec-62.dll" => avcodec_lib = Some(lib),
+            "avformat-62.dll" => avformat_lib = Some(lib),
+            _ => libs.push(lib),
+        }
     }
 
+    let avutil_lib = avutil_lib.ok_or_else(|| "FFmpeg: avutil-60.dll not loaded".to_string())?;
+    let swresample_lib =
+        swresample_lib.ok_or_else(|| "FFmpeg: swresample-6.dll not loaded".to_string())?;
+    let avcodec_lib = avcodec_lib.ok_or_else(|| "FFmpeg: avcodec-62.dll not loaded".to_string())?;
+    let avformat_lib =
+        avformat_lib.ok_or_else(|| "FFmpeg: avformat-62.dll not loaded".to_string())?;
+
+    libs.push(avutil_lib);
+    libs.push(swresample_lib);
+    libs.push(avcodec_lib);
+    libs.push(avformat_lib);
+
     // Symbols are resolved from the specific libraries that export them.
-    let avutil = &libs[0];
-    let swresample = &libs[1];
-    let avcodec = &libs[2];
-    let avformat = &libs[3];
+    let avutil = &libs[libs.len() - 4];
+    let swresample = &libs[libs.len() - 3];
+    let avcodec = &libs[libs.len() - 2];
+    let avformat = &libs[libs.len() - 1];
 
     let avformat_network_init = load_symbol(avformat, b"avformat_network_init\0")?;
     let avformat_open_input = load_symbol(avformat, b"avformat_open_input\0")?;
@@ -282,6 +308,7 @@ fn load_ffmpeg_api() -> Result<FfmpegApi, String> {
     let av_find_best_stream = load_symbol(avformat, b"av_find_best_stream\0")?;
     let avcodec_find_decoder = load_symbol(avcodec, b"avcodec_find_decoder\0")?;
     let avcodec_find_encoder = load_symbol(avcodec, b"avcodec_find_encoder\0")?;
+    let avcodec_find_encoder_by_name = load_symbol(avcodec, b"avcodec_find_encoder_by_name\0")?;
     let avcodec_alloc_context3 = load_symbol(avcodec, b"avcodec_alloc_context3\0")?;
     let avcodec_parameters_to_context = load_symbol(avcodec, b"avcodec_parameters_to_context\0")?;
     let avcodec_parameters_from_context =
@@ -339,6 +366,7 @@ fn load_ffmpeg_api() -> Result<FfmpegApi, String> {
         av_find_best_stream,
         avcodec_find_decoder,
         avcodec_find_encoder,
+        avcodec_find_encoder_by_name,
         avcodec_alloc_context3,
         avcodec_parameters_to_context,
         avcodec_parameters_from_context,

@@ -10,7 +10,7 @@ use crate::tts_engine;
 use rodio::Source;
 use sha2::Digest;
 use std::collections::VecDeque;
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::path::{Path, PathBuf};
 use std::ptr;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
@@ -31,6 +31,18 @@ const DEFAULT_AAC_BITRATE: i64 = 192_000;
 const AVIO_FLAG_WRITE: i32 = 2;
 const AV_CODEC_FLAG_QSCALE_FALLBACK: i32 = 1 << 1;
 const FF_QP2LAMBDA_FALLBACK: i32 = 118;
+
+fn ffmpeg_error_text(api: &FfmpegApi, code: i32) -> String {
+    let mut buf = [0i8; 256];
+    let ret = unsafe { (api.av_strerror)(code, buf.as_mut_ptr(), buf.len()) };
+    if ret == 0 {
+        unsafe { CStr::from_ptr(buf.as_ptr()) }
+            .to_string_lossy()
+            .into_owned()
+    } else {
+        format!("ffmpeg error {}", code)
+    }
+}
 
 #[derive(Clone)]
 pub struct MixExportOptions {
@@ -190,6 +202,7 @@ fn ensure_tts_cache(
                         rate: settings.tts_rate,
                         pitch: settings.tts_pitch,
                         volume: settings.tts_volume,
+                        audiobook_bitrate_kbps: settings.audiobook_m4b_bitrate,
                         cancel,
                     };
                     sapi5_engine::speak_sapi_to_file(options, |_| {})?;
@@ -228,6 +241,7 @@ fn ensure_tts_cache(
                         rate: settings.tts_rate,
                         pitch: settings.tts_pitch,
                         volume: settings.tts_volume,
+                        mp3_bitrate_kbps: settings.audiobook_m4b_bitrate,
                         cancel,
                     };
                     sapi4_engine::speak_sapi4_to_file(
@@ -1420,7 +1434,18 @@ pub fn convert_audio_file(
     output_path: &Path,
     settings: &ConvertAudioSettings,
     cancel: Option<Arc<AtomicBool>>,
+    progress: Option<&mut dyn FnMut(u32)>,
+) -> Result<(), String> {
+    convert_audio_file_with_channels(input_path, output_path, settings, cancel, progress, None)
+}
+
+pub fn convert_audio_file_with_channels(
+    input_path: &Path,
+    output_path: &Path,
+    settings: &ConvertAudioSettings,
+    cancel: Option<Arc<AtomicBool>>,
     mut progress: Option<&mut dyn FnMut(u32)>,
+    forced_channels: Option<u16>,
 ) -> Result<(), String> {
     let api = ffmpeg_api()?;
     let args = build_ffmpeg_args(settings);
@@ -1445,7 +1470,7 @@ pub fn convert_audio_file(
     let mut source =
         FfmpegSource::try_new(input_path, 0, Some(pts_clock.clone()), Some(stream_index))?;
     let in_sample_rate = source.sample_rate();
-    let channels = source.channels();
+    let channels = forced_channels.unwrap_or(source.channels()).max(1);
     let total_duration = source.total_duration();
     let total_duration_us = total_duration.and_then(|d| {
         let micros = d.as_micros();
@@ -1496,7 +1521,18 @@ pub fn convert_audio_file(
         return Err("FFmpeg: failed to allocate output context".to_string());
     }
 
-    let codec = unsafe { (api.avcodec_find_encoder)(codec_id) };
+    let codec = if matches!(settings.format, ConvertAudioFormat::Mp3) {
+        let name =
+            CString::new("libmp3lame").map_err(|_| "FFmpeg: invalid encoder name".to_string())?;
+        let by_name = unsafe { (api.avcodec_find_encoder_by_name)(name.as_ptr()) };
+        if by_name.is_null() {
+            unsafe { (api.avcodec_find_encoder)(codec_id) }
+        } else {
+            by_name
+        }
+    } else {
+        unsafe { (api.avcodec_find_encoder)(codec_id) }
+    };
     if codec.is_null() {
         unsafe { (api.avformat_free_context)(out_ctx) };
         return Err("FFmpeg: encoder not found".to_string());
@@ -1597,7 +1633,8 @@ pub fn convert_audio_file(
         return Err("FFmpeg: failed to write output header".to_string());
     }
 
-    let in_frame_size = unsafe { (*codec_ctx).frame_size }.max(1024) as usize;
+    let encoder_frame_size = unsafe { (*codec_ctx).frame_size };
+    let in_frame_size = encoder_frame_size.max(1024) as usize;
     let mut in_layout: AVChannelLayout = unsafe { std::mem::zeroed() };
     let mut out_layout: AVChannelLayout = unsafe { std::mem::zeroed() };
     unsafe {
@@ -1652,7 +1689,11 @@ pub fn convert_audio_file(
         }
         return Err("FFmpeg: failed to allocate frame".to_string());
     }
-    let mut out_capacity = unsafe { (api.swr_get_out_samples)(swr_ctx, in_frame_size as i32) };
+    let mut out_capacity = if encoder_frame_size > 0 {
+        encoder_frame_size
+    } else {
+        unsafe { (api.swr_get_out_samples)(swr_ctx, in_frame_size as i32) }
+    };
     if out_capacity <= 0 {
         out_capacity = in_frame_size as i32;
     }
@@ -1791,6 +1832,9 @@ pub fn convert_audio_file(
         if converted < 0 {
             return Err("FFmpeg: resample failed".to_string());
         }
+        if converted == 0 {
+            continue;
+        }
         unsafe {
             (*frame).nb_samples = converted;
             (*frame).pts = next_pts;
@@ -1799,9 +1843,33 @@ pub fn convert_audio_file(
 
         let send_ret = unsafe { (api.avcodec_send_frame)(codec_ctx, frame) };
         if send_ret < 0 {
-            return Err("FFmpeg: send_frame failed".to_string());
+            unsafe {
+                (api.swr_free)(&mut swr_ctx);
+                (api.av_frame_free)(&mut frame);
+                (api.avio_closep)(&mut io);
+                (api.avcodec_free_context)(&mut codec_ctx);
+                (api.avformat_free_context)(out_ctx);
+                (api.av_channel_layout_uninit)(&mut in_layout);
+                (api.av_channel_layout_uninit)(&mut out_layout);
+            }
+            return Err(format!(
+                "FFmpeg: send_frame failed: {} ({})",
+                ffmpeg_error_text(api, send_ret),
+                send_ret
+            ));
         }
-        drain_packets()?;
+        if let Err(err) = drain_packets() {
+            unsafe {
+                (api.swr_free)(&mut swr_ctx);
+                (api.av_frame_free)(&mut frame);
+                (api.avio_closep)(&mut io);
+                (api.avcodec_free_context)(&mut codec_ctx);
+                (api.avformat_free_context)(out_ctx);
+                (api.av_channel_layout_uninit)(&mut in_layout);
+                (api.av_channel_layout_uninit)(&mut out_layout);
+            }
+            return Err(err);
+        }
     }
 
     if !canceled {
@@ -1839,9 +1907,33 @@ pub fn convert_audio_file(
             next_pts += converted as i64;
             let send_ret = unsafe { (api.avcodec_send_frame)(codec_ctx, frame) };
             if send_ret < 0 {
-                return Err("FFmpeg: send_frame failed".to_string());
+                unsafe {
+                    (api.swr_free)(&mut swr_ctx);
+                    (api.av_frame_free)(&mut frame);
+                    (api.avio_closep)(&mut io);
+                    (api.avcodec_free_context)(&mut codec_ctx);
+                    (api.avformat_free_context)(out_ctx);
+                    (api.av_channel_layout_uninit)(&mut in_layout);
+                    (api.av_channel_layout_uninit)(&mut out_layout);
+                }
+                return Err(format!(
+                    "FFmpeg: send_frame failed: {} ({})",
+                    ffmpeg_error_text(api, send_ret),
+                    send_ret
+                ));
             }
-            drain_packets()?;
+            if let Err(err) = drain_packets() {
+                unsafe {
+                    (api.swr_free)(&mut swr_ctx);
+                    (api.av_frame_free)(&mut frame);
+                    (api.avio_closep)(&mut io);
+                    (api.avcodec_free_context)(&mut codec_ctx);
+                    (api.avformat_free_context)(out_ctx);
+                    (api.av_channel_layout_uninit)(&mut in_layout);
+                    (api.av_channel_layout_uninit)(&mut out_layout);
+                }
+                return Err(err);
+            }
         }
     }
 

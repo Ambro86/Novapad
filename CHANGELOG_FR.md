@@ -4,6 +4,7 @@ Version 0.6.6 – 2026-02-08
 Améliorations
 • Ajout de « Formatage automatique pour TTS » dans le menu Édition pour préparer rapidement le texte à la lecture vocale (suppression markdown/guillemets et recomposition des lignes coupées).
 • Ajout d’une option dans les paramètres Audio pour choisir le dossier par défaut d’enregistrement des livres audio (par défaut : Documents\\Sonarpad Audiobooks).
+• L’export des livres audio enregistre désormais les MP3 en stéréo avec un bitrate choisi par l’utilisateur pour les voix Edge, SAPI5 et SAPI4.
 • Réorganisation des fonctions vocales dans un menu dédié « Voix et audio » et ajout/clarification de l’option « Convertir l’audio », utile pour convertir tout média pris en charge en MP3, AAC, OGG, Opus, FLAC, WAV et AIFF.
 • Ajout de la suppression d’articles RSS individuels et d’épisodes de podcast individuels (touche Suppr + menu contextuel avec confirmation), sans supprimer toute la source RSS/podcast.
 • Ajout de la traduction serbe grâce à Mila Kuran.

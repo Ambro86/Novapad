@@ -145,9 +145,14 @@ fn normalize_rss_url_key(url: &str) -> String {
     if s.is_empty() {
         return s;
     }
-    if s.len() >= 8 && s[..8].eq_ignore_ascii_case("https://") {
+    if s.get(..8)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("https://"))
+    {
         s = s[8..].to_string();
-    } else if s.len() >= 7 && s[..7].eq_ignore_ascii_case("http://") {
+    } else if s
+        .get(..7)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("http://"))
+    {
         s = s[7..].to_string();
     }
     if let Some((left, _)) = s.split_once('#') {

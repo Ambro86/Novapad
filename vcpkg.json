@@ -10,7 +10,8 @@
         "avformat",
         "swresample",
         "swscale",
-        "opus"
+        "opus",
+        "mp3lame"
       ]
     }
   ]

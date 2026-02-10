@@ -102,8 +102,8 @@ use windows::Win32::UI::Controls::{
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_APPS, VK_CONTROL, VK_ESCAPE,
-    VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_F10, VK_MENU, VK_RETURN,
-    VK_SHIFT, VK_TAB,
+    VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_F10, VK_MENU, VK_NEXT,
+    VK_PRIOR, VK_RETURN, VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
 use windows::Win32::UI::Shell::{
@@ -172,6 +172,7 @@ const FOCUS_EDITOR_TIMER_ID3: usize = 3;
 const FOCUS_EDITOR_TIMER_ID4: usize = 4;
 const CHAPTER_ANNOUNCE_TIMER_ID: usize = 5;
 const SPELLCHECK_HIGHLIGHT_TIMER_ID: usize = 6;
+const AUDIO_PLAYLIST_TIMER_ID: usize = 7;
 const SPELLCHECK_HIGHLIGHT_DEBOUNCE_MS: u32 = 100;
 const PDF_OCR_PROMPT_TIMEOUT_COPYDATA_SECS: u64 = 30;
 const COPYDATA_OPEN_FILE: usize = 1;
@@ -1405,6 +1406,12 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
             }
             announce_player_volume(hwnd);
         }
+        PlayerCommand::VolumeReset => {
+            unsafe {
+                reset_audiobook_volume(hwnd);
+            }
+            announce_player_volume(hwnd);
+        }
         PlayerCommand::Speed(delta) => {
             let language =
                 unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
@@ -1454,6 +1461,12 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
         }
         PlayerCommand::ChapterList => {
             handle_chapter_list(hwnd);
+        }
+        PlayerCommand::TrackPrev => {
+            let _ = switch_audio_playlist_relative(hwnd, -1);
+        }
+        PlayerCommand::TrackNext => {
+            let _ = switch_audio_playlist_relative(hwnd, 1);
         }
         PlayerCommand::BlockNavigation | PlayerCommand::None => {}
     }
@@ -1562,6 +1575,8 @@ pub(crate) struct AppState {
     last_announced_chapter_index: Option<usize>,
     available_audio_tracks: Vec<crate::ffmpeg_source::AudioStreamInfo>,
     selected_audio_track: Option<i32>,
+    audio_playlist: Vec<PathBuf>,
+    audio_playlist_index: Option<usize>,
     voice_panel_visible: bool,
     voice_label_engine: HWND,
     voice_combo_engine: HWND,
@@ -2728,6 +2743,8 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 last_announced_chapter_index: None,
                 available_audio_tracks: Vec::new(),
                 selected_audio_track: None,
+                audio_playlist: Vec::new(),
+                audio_playlist_index: None,
                 voice_panel_visible: false,
                 voice_label_engine: label_engine,
                 voice_combo_engine: combo_engine,
@@ -2772,6 +2789,9 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 dictionary_prefetch_generation: 0,
             });
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+            if SetTimer(hwnd, AUDIO_PLAYLIST_TIMER_ID, 700, None) == 0 {
+                log_debug("Failed to set AUDIO_PLAYLIST_TIMER");
+            }
 
             update_recent_menu(hwnd, recent_menu);
             if settings.show_voice_panel {
@@ -2880,6 +2900,10 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                     "KillTimer SPELLCHECK_HIGHLIGHT",
                 );
                 handle_spellcheck_highlight_timer(hwnd);
+                return LRESULT(0);
+            }
+            if wparam.0 == AUDIO_PLAYLIST_TIMER_ID {
+                handle_audio_playlist_timer(hwnd);
                 return LRESULT(0);
             }
             handle_pdf_loading_timer(hwnd, wparam.0);
@@ -3466,8 +3490,10 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                         state.spellcheck_highlight_pending = None;
                         state.spellcheck_last_highlighted_line = None;
                     });
-                    if let Some((path, encoding)) = open_file_dialog_with_encoding(hwnd) {
-                        open_document_with_encoding(hwnd, &path, encoding);
+                    if let Some(selected) = open_file_dialog_with_encoding(hwnd) {
+                        for (path, encoding) in selected {
+                            open_document_with_encoding(hwnd, &path, encoding);
+                        }
                         if with_state(hwnd, |state| state.prompt_window.0 != 0).unwrap_or(false) {
                             focus_editor(hwnd);
                         }
@@ -3758,6 +3784,14 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                     handle_player_command(hwnd, PlayerCommand::Seek(-(skip_seconds as i64)));
                     LRESULT(0)
                 }
+                IDM_PLAYBACK_TRACK_PREV => {
+                    handle_player_command(hwnd, PlayerCommand::TrackPrev);
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_TRACK_NEXT => {
+                    handle_player_command(hwnd, PlayerCommand::TrackNext);
+                    LRESULT(0)
+                }
                 IDM_PLAYBACK_CHAPTER_PREV => {
                     handle_chapter_navigation(hwnd, -1);
                     LRESULT(0)
@@ -3823,6 +3857,10 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 }
                 IDM_PLAYBACK_VOLUME_DOWN => {
                     handle_player_command(hwnd, PlayerCommand::Volume(-0.1));
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_VOLUME_RESET => {
+                    handle_player_command(hwnd, PlayerCommand::VolumeReset);
                     LRESULT(0)
                 }
                 IDM_PLAYBACK_SPEED_UP => {
@@ -6906,6 +6944,16 @@ unsafe fn create_accelerators() -> HACCEL {
             cmd: IDM_NEXT_TAB as u16,
         },
         ACCEL {
+            fVirt: virt,
+            key: VK_PRIOR.0,
+            cmd: IDM_PLAYBACK_TRACK_PREV as u16,
+        },
+        ACCEL {
+            fVirt: virt,
+            key: VK_NEXT.0,
+            cmd: IDM_PLAYBACK_TRACK_NEXT as u16,
+        },
+        ACCEL {
             fVirt: FVIRTKEY,
             key: VK_F4.0,
             cmd: IDM_FILE_READ_PAUSE as u16,
@@ -7295,7 +7343,140 @@ unsafe fn open_document_with_encoding(hwnd: HWND, path: &Path, encoding: Option<
     editor_manager::open_document_with_encoding(hwnd, path, encoding);
 }
 
+fn play_audio_playlist_item(hwnd: HWND, index: usize) {
+    let path = unsafe {
+        with_state(hwnd, |state| {
+            if index >= state.audio_playlist.len() {
+                return None;
+            }
+            state.audio_playlist_index = Some(index);
+            Some(state.audio_playlist[index].clone())
+        })
+        .flatten()
+    };
+    let Some(path) = path else {
+        return;
+    };
+
+    let tab_index = unsafe { editor_manager::ensure_audio_document_tab(hwnd, &path) };
+    if let Some(tab_index) = tab_index {
+        unsafe {
+            editor_manager::select_tab(hwnd, tab_index);
+        }
+    }
+    unsafe {
+        audio_player::stop_audiobook_playback(hwnd);
+        audio_player::start_audiobook_playback(hwnd, &path);
+    }
+}
+
+pub(crate) unsafe fn queue_audio_files_and_play(hwnd: HWND, paths: Vec<PathBuf>) {
+    if paths.is_empty() {
+        return;
+    }
+    for path in &paths {
+        let _ = editor_manager::ensure_audio_document_tab(hwnd, path);
+        push_recent_file(hwnd, path);
+    }
+    let target_index = with_state(hwnd, |state| {
+        let play_path = paths[0].clone();
+        if state.audio_playlist.is_empty() {
+            for path in &paths {
+                if !state.audio_playlist.iter().any(|p| p == path) {
+                    state.audio_playlist.push(path.clone());
+                }
+            }
+            let idx = state
+                .audio_playlist
+                .iter()
+                .position(|p| p == &play_path)
+                .unwrap_or(0);
+            state.audio_playlist_index = Some(idx);
+            return idx;
+        }
+        let current = state
+            .audio_playlist_index
+            .filter(|idx| *idx < state.audio_playlist.len())
+            .unwrap_or(0);
+        let mut insert_at = current.saturating_add(1);
+        for path in &paths {
+            if state.audio_playlist.iter().any(|p| p == path) {
+                continue;
+            }
+            state.audio_playlist.insert(insert_at, path.clone());
+            insert_at = insert_at.saturating_add(1);
+        }
+        let target = state
+            .audio_playlist
+            .iter()
+            .position(|p| p == &play_path)
+            .unwrap_or(current);
+        state.audio_playlist_index = Some(target);
+        target
+    })
+    .unwrap_or(0);
+
+    play_audio_playlist_item(hwnd, target_index);
+}
+
+fn switch_audio_playlist_relative(hwnd: HWND, delta: i32) -> bool {
+    let target = unsafe {
+        with_state(hwnd, |state| {
+            if state.audio_playlist.is_empty() {
+                return None;
+            }
+            let current = state.audio_playlist_index?;
+            let next = if delta > 0 {
+                current.checked_add(delta as usize)?
+            } else {
+                current.checked_sub(delta.unsigned_abs() as usize)?
+            };
+            if next >= state.audio_playlist.len() {
+                return None;
+            }
+            Some(next)
+        })
+        .flatten()
+    };
+    let Some(target) = target else {
+        return false;
+    };
+    play_audio_playlist_item(hwnd, target);
+    true
+}
+
+fn handle_audio_playlist_timer(hwnd: HWND) {
+    let should_advance = unsafe {
+        with_state(hwnd, |state| {
+            let player = state.active_audiobook.as_ref()?;
+            if player.is_paused {
+                return Some(false);
+            }
+            let duration = audio_player::audiobook_duration_secs(&player.path)?;
+            let current = audio_player::audiobook_position_secs(player)
+                .max(0.0)
+                .floor() as u64;
+            Some(current >= duration.saturating_add(1))
+        })
+        .flatten()
+        .unwrap_or(false)
+    };
+    let output_stopped = unsafe { audio_player::audiobook_output_stopped(hwnd) }.unwrap_or(false);
+    if !should_advance && !output_stopped {
+        return;
+    }
+    if !switch_audio_playlist_relative(hwnd, 1) {
+        unsafe {
+            audio_player::stop_audiobook_playback(hwnd);
+        }
+    }
+}
+
 unsafe fn open_path_with_behavior(hwnd: HWND, path: &Path) {
+    if is_audio_path(path) {
+        queue_audio_files_and_play(hwnd, vec![path.to_path_buf()]);
+        return;
+    }
     open_document_with_encoding(hwnd, path, None);
 }
 
@@ -7664,6 +7845,7 @@ pub(crate) fn pdf_loading_placeholder(frame: usize, language: crate::settings::L
 
 unsafe fn handle_drop_files(hwnd: HWND, hdrop: HDROP) {
     let count = DragQueryFileW(hdrop, 0xFFFFFFFF, None);
+    let mut dropped_paths = Vec::new();
     for index in 0..count {
         let mut buffer = [0u16; 260];
         let len = DragQueryFileW(hdrop, index, Some(&mut buffer));
@@ -7674,7 +7856,14 @@ unsafe fn handle_drop_files(hwnd: HWND, hdrop: HDROP) {
         if path.as_os_str().is_empty() {
             continue;
         }
-        open_path_with_behavior(hwnd, &path);
+        dropped_paths.push(path);
+    }
+    if !dropped_paths.is_empty() && dropped_paths.iter().all(|path| is_audio_path(path)) {
+        queue_audio_files_and_play(hwnd, dropped_paths);
+    } else {
+        for path in dropped_paths {
+            open_path_with_behavior(hwnd, &path);
+        }
     }
     DragFinish(hdrop);
 }
@@ -8426,12 +8615,13 @@ fn index_to_encoding(index: u32) -> TextEncoding {
 
 pub(crate) unsafe fn open_file_dialog_with_encoding(
     hwnd: HWND,
-) -> Option<(PathBuf, Option<TextEncoding>)> {
+) -> Option<Vec<(PathBuf, Option<TextEncoding>)>> {
     log_debug("open_file_dialog_with_encoding called");
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
 
     use windows::Win32::UI::Shell::FileOpenDialog;
     use windows::Win32::UI::Shell::IFileOpenDialog;
+    use windows::Win32::UI::Shell::{FILEOPENDIALOGOPTIONS, FOS_ALLOWMULTISELECT};
 
     let pfd: IFileOpenDialog = match CoCreateInstance(&FileOpenDialog, None, CLSCTX_ALL) {
         Ok(dialog) => {
@@ -8464,6 +8654,9 @@ pub(crate) unsafe fn open_file_dialog_with_encoding(
     }
     pfd.SetFileTypes(&spec).ok()?;
     pfd.SetFileTypeIndex(1).ok()?; // Default to "All supported formats"
+    let mut options = pfd.GetOptions().ok()?;
+    options |= FILEOPENDIALOGOPTIONS(FOS_ALLOWMULTISELECT.0);
+    pfd.SetOptions(options).ok()?;
 
     let pfdc: IFileDialogCustomize = pfd.cast().ok()?;
     let encoding_label = i18n::tr(language, "dialog.encoding_label");
@@ -8509,27 +8702,49 @@ pub(crate) unsafe fn open_file_dialog_with_encoding(
     log_debug("Showing open dialog");
     if pfd.Show(hwnd).is_ok() {
         log_debug("Dialog closed with OK");
-        let item = pfd.GetResult().ok()?;
-        let path_ptr = item
-            .GetDisplayName(windows::Win32::UI::Shell::SIGDN_FILESYSPATH)
-            .ok()?;
-        let path_str = path_ptr.to_string().unwrap_or_default();
-        CoTaskMemFree(Some(path_ptr.0 as *const _));
-
         let selected_encoding_idx = pfdc.GetSelectedControlItem(101).ok()?;
         let filter_index = pfd.GetFileTypeIndex().ok()?;
-
-        let path = PathBuf::from(path_str);
-
-        // Only return encoding for text files (filter index 2 = TXT)
-        let encoding = if filter_index == 2 {
+        let manual_encoding = if filter_index == 2 {
             Some(index_to_encoding(selected_encoding_idx))
         } else {
             None
         };
+        let mut out = Vec::new();
+        if let Ok(items) = pfd.GetResults()
+            && let Ok(count) = items.GetCount()
+        {
+            for i in 0..count {
+                if let Ok(item) = items.GetItemAt(i)
+                    && let Ok(path_ptr) =
+                        item.GetDisplayName(windows::Win32::UI::Shell::SIGDN_FILESYSPATH)
+                {
+                    let path_str = path_ptr.to_string().unwrap_or_default();
+                    CoTaskMemFree(Some(path_ptr.0 as *const _));
+                    if !path_str.is_empty() {
+                        out.push((PathBuf::from(path_str), None));
+                    }
+                }
+            }
+        }
+
+        if out.is_empty() {
+            let item = pfd.GetResult().ok()?;
+            let path_ptr = item
+                .GetDisplayName(windows::Win32::UI::Shell::SIGDN_FILESYSPATH)
+                .ok()?;
+            let path_str = path_ptr.to_string().unwrap_or_default();
+            CoTaskMemFree(Some(path_ptr.0 as *const _));
+            if path_str.is_empty() {
+                pfd.Unadvise(cookie).ok()?;
+                return None;
+            }
+            out.push((PathBuf::from(path_str), manual_encoding));
+        } else if out.len() == 1 {
+            out[0].1 = manual_encoding;
+        }
 
         pfd.Unadvise(cookie).ok()?;
-        Some((path, encoding))
+        Some(out)
     } else {
         pfd.Unadvise(cookie).ok()?;
         None

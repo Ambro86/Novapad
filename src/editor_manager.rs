@@ -2695,6 +2695,46 @@ pub unsafe fn new_document(hwnd: HWND) {
     select_tab(hwnd, new_index);
 }
 
+pub unsafe fn ensure_audio_document_tab(hwnd: HWND, path: &Path) -> Option<usize> {
+    with_state(hwnd, |state| {
+        if let Some((index, _)) = state.docs.iter().enumerate().find(|(_, doc)| {
+            matches!(doc.format, FileFormat::Audiobook)
+                && doc.path.as_deref().map(|p| p == path).unwrap_or(false)
+        }) {
+            return index;
+        }
+
+        let title = path.file_name().and_then(|s| s.to_str()).unwrap_or("File");
+        let hwnd_edit = create_edit(
+            hwnd,
+            state.hfont,
+            state.settings.word_wrap,
+            state.settings.text_color,
+            state.settings.text_size,
+        );
+        set_edit_text(hwnd_edit, "");
+
+        let doc = Document {
+            title: title.to_string(),
+            path: Some(path.to_path_buf()),
+            hwnd_edit,
+            dirty: false,
+            format: FileFormat::Audiobook,
+            opened_text_encoding: None,
+            current_save_text_encoding: None,
+            from_rss: false,
+            is_temporary: false,
+        };
+        unsafe {
+            SendMessageW(hwnd_edit, EM_SETREADONLY, WPARAM(1), LPARAM(0));
+            ShowWindow(hwnd_edit, SW_HIDE);
+        }
+        state.docs.push(doc);
+        insert_tab(state.hwnd_tab, title, (state.docs.len() - 1) as i32);
+        state.docs.len() - 1
+    })
+}
+
 unsafe fn open_document_with_encoding_internal(
     hwnd: HWND,
     path: &Path,
@@ -2720,42 +2760,9 @@ unsafe fn open_document_with_encoding_internal(
         return;
     }
     if is_audio_path(path) {
-        let new_index = with_state(hwnd, |state| {
-            let title = path.file_name().and_then(|s| s.to_str()).unwrap_or("File");
-            let hwnd_edit = create_edit(
-                hwnd,
-                state.hfont,
-                state.settings.word_wrap,
-                state.settings.text_color,
-                state.settings.text_size,
-            );
-            set_edit_text(hwnd_edit, "");
-
-            let doc = Document {
-                title: title.to_string(),
-                path: Some(path.to_path_buf()),
-                hwnd_edit,
-                dirty: false,
-                format: FileFormat::Audiobook,
-                opened_text_encoding: None,
-                current_save_text_encoding: None,
-                from_rss: false,
-                is_temporary: false,
-            };
-            unsafe {
-                SendMessageW(hwnd_edit, EM_SETREADONLY, WPARAM(1), LPARAM(0));
-                ShowWindow(hwnd_edit, SW_HIDE);
-            }
-            state.docs.push(doc);
-            insert_tab(state.hwnd_tab, title, (state.docs.len() - 1) as i32);
-            state.docs.len() - 1
-        })
-        .unwrap_or(0);
-        select_tab(hwnd, new_index);
         unsafe {
-            crate::audio_player::start_audiobook_playback(hwnd, path);
+            crate::queue_audio_files_and_play(hwnd, vec![path.to_path_buf()]);
         }
-        crate::push_recent_file(hwnd, path);
         return;
     }
 

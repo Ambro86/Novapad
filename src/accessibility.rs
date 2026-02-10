@@ -75,6 +75,12 @@ pub fn handle_player_keyboard(msg: &MSG, skip_seconds: u32) -> PlayerCommand {
             vk if alt_down && shift_down && vk == 'P' as u32 => PlayerCommand::ChapterPrev,
             vk if alt_down && shift_down && vk == 'N' as u32 => PlayerCommand::ChapterNext,
             vk if alt_down && shift_down && vk == 'L' as u32 => PlayerCommand::ChapterList,
+            vk if ctrl_down && !alt_down && !shift_down && vk == VK_PRIOR.0 as u32 => {
+                PlayerCommand::TrackPrev
+            }
+            vk if ctrl_down && !alt_down && !shift_down && vk == VK_NEXT.0 as u32 => {
+                PlayerCommand::TrackNext
+            }
             vk if ctrl_down && !alt_down && !shift_down && vk == 'T' as u32 => {
                 PlayerCommand::GoToTime
             }
@@ -130,6 +136,7 @@ pub enum PlayerCommand {
     Stop,
     Seek(i64),
     Volume(f32),
+    VolumeReset,
     Speed(f32),
     Pitch(f32),
     SpeedReset,
@@ -140,6 +147,8 @@ pub enum PlayerCommand {
     ChapterPrev,
     ChapterNext,
     ChapterList,
+    TrackPrev,
+    TrackNext,
     BlockNavigation,
     None,
 }

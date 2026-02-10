@@ -823,8 +823,16 @@ pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
         "Audio player: start_audiobook_playback called for {}",
         path.display()
     ));
-    crate::reset_active_podcast_chapters_for_playback(hwnd);
     let path_buf = path.to_path_buf();
+    with_state(hwnd, |state| {
+        if let Some(idx) = state.audio_playlist.iter().position(|p| p == &path_buf) {
+            state.audio_playlist_index = Some(idx);
+        } else {
+            state.audio_playlist.push(path_buf.clone());
+            state.audio_playlist_index = Some(state.audio_playlist.len().saturating_sub(1));
+        }
+    });
+    crate::reset_active_podcast_chapters_for_playback(hwnd);
 
     // List available audio tracks and store them in state
     let audio_tracks = match crate::ffmpeg_source::list_audio_streams(path) {
@@ -1149,6 +1157,33 @@ pub unsafe fn change_audiobook_volume(hwnd: HWND, delta: f32) {
     }
 }
 
+pub unsafe fn reset_audiobook_volume(hwnd: HWND) -> Option<f32> {
+    let new_volume = with_state(hwnd, |state| {
+        if let Some(player) = &mut state.active_audiobook {
+            player.volume = 1.0;
+            player.prev_volume = 1.0;
+            player.muted = false;
+            player.set_volume(1.0);
+            Some(player.volume)
+        } else {
+            None
+        }
+    })
+    .flatten();
+
+    if let Some(volume) = new_volume
+        && with_state(hwnd, |state| {
+            state.settings.audiobook_playback_volume = volume;
+            crate::settings::save_settings(state.settings.clone());
+        })
+        .is_none()
+    {
+        crate::log_debug("Failed to access audio player state");
+    }
+
+    new_volume
+}
+
 pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
     // We allow speed change even with subtitles now, relying on BASS tempo.
     let result = with_state(hwnd, |state| {
@@ -1373,6 +1408,16 @@ pub unsafe fn audiobook_volume_level(hwnd: HWND) -> Option<f32> {
             .active_audiobook
             .as_ref()
             .map(|player| if player.muted { 0.0 } else { player.volume })
+    })
+    .flatten()
+}
+
+pub unsafe fn audiobook_output_stopped(hwnd: HWND) -> Option<bool> {
+    with_state(hwnd, |state| {
+        state
+            .active_audiobook
+            .as_ref()
+            .map(|p| p.output.is_stopped())
     })
     .flatten()
 }

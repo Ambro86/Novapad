@@ -318,6 +318,13 @@ impl BassOutput {
         Some(bass_pos + self.start_offset_secs)
     }
 
+    pub fn is_stopped(&self) -> bool {
+        const BASS_ACTIVE_STOPPED: Dword = 0;
+        let handle = *self.handle.lock().unwrap_or_else(|e| e.into_inner());
+        let state = unsafe { (self.api.channel_is_active)(handle) };
+        state == BASS_ACTIVE_STOPPED
+    }
+
     pub fn clear_subtitles(&self) {
         // Edge subtitle audio is played through the TTS engine path (rodio).
     }

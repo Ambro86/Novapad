@@ -66,6 +66,7 @@ pub const IDM_PLAYBACK_GO_TO_TIME: usize = 8005;
 pub const IDM_PLAYBACK_ANNOUNCE_TIME: usize = 8006;
 pub const IDM_PLAYBACK_VOLUME_UP: usize = 8007;
 pub const IDM_PLAYBACK_VOLUME_DOWN: usize = 8008;
+pub const IDM_PLAYBACK_VOLUME_RESET: usize = 8024;
 pub const IDM_PLAYBACK_MUTE_TOGGLE: usize = 8009;
 pub const IDM_PLAYBACK_SPEED_UP: usize = 8010;
 pub const IDM_PLAYBACK_SPEED_DOWN: usize = 8011;
@@ -73,6 +74,8 @@ pub const IDM_PLAYBACK_SPEED_RESET: usize = 8016;
 pub const IDM_PLAYBACK_PITCH_UP: usize = 8017;
 pub const IDM_PLAYBACK_PITCH_DOWN: usize = 8018;
 pub const IDM_PLAYBACK_PITCH_RESET: usize = 8021;
+pub const IDM_PLAYBACK_TRACK_PREV: usize = 8022;
+pub const IDM_PLAYBACK_TRACK_NEXT: usize = 8023;
 pub const IDM_PLAYBACK_ADD_SUBTITLES: usize = 8019;
 pub const IDM_PLAYBACK_REMOVE_SUBTITLES: usize = 8020;
 pub const IDM_PLAYBACK_CHAPTER_PREV: usize = 8012;
@@ -332,16 +335,20 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
         let stop = i18n::tr(language, "playback.stop");
         let seek_forward = i18n::tr(language, "playback.seek_forward");
         let seek_backward = i18n::tr(language, "playback.seek_backward");
+        let track_prev = i18n::tr(language, "playback.track_prev");
+        let track_next = i18n::tr(language, "playback.track_next");
         let go_to_time = i18n::tr(language, "playback.go_to_time");
         let announce_time = i18n::tr(language, "playback.announce_time");
         let volume_up = i18n::tr(language, "playback.volume_up");
         let volume_down = i18n::tr(language, "playback.volume_down");
+        let volume_reset = i18n::tr(language, "playback.volume_reset");
         let speed_up = i18n::tr(language, "playback.speed_up");
         let speed_down = i18n::tr(language, "playback.speed_down");
         let speed_reset = i18n::tr(language, "playback.speed_reset");
         let pitch_up = i18n::tr(language, "playback.pitch_up");
         let pitch_down = i18n::tr(language, "playback.pitch_down");
         let pitch_reset = i18n::tr(language, "playback.pitch_reset");
+        let reset_menu_label = i18n::tr(language, "playback.reset_menu");
         let mute_toggle = i18n::tr(language, "playback.mute_toggle");
         let add_subtitles = i18n::tr(language, "playback.add_subtitles");
         let remove_subtitles = i18n::tr(language, "playback.remove_subtitles");
@@ -377,6 +384,18 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
             MF_STRING,
             IDM_PLAYBACK_SEEK_BACKWARD,
             &seek_backward,
+        );
+        append_menu_string(
+            playback_menu,
+            MF_STRING,
+            IDM_PLAYBACK_TRACK_PREV,
+            &track_prev,
+        );
+        append_menu_string(
+            playback_menu,
+            MF_STRING,
+            IDM_PLAYBACK_TRACK_NEXT,
+            &track_next,
         );
         if has_chapters {
             append_menu_string(
@@ -487,12 +506,6 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
             IDM_PLAYBACK_SPEED_DOWN,
             &speed_down,
         );
-        append_menu_string(
-            playback_menu,
-            MF_STRING,
-            IDM_PLAYBACK_SPEED_RESET,
-            &speed_reset,
-        );
         append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_PITCH_UP, &pitch_up);
         append_menu_string(
             playback_menu,
@@ -500,12 +513,33 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
             IDM_PLAYBACK_PITCH_DOWN,
             &pitch_down,
         );
-        append_menu_string(
-            playback_menu,
-            MF_STRING,
-            IDM_PLAYBACK_PITCH_RESET,
-            &pitch_reset,
-        );
+        let reset_menu = CreateMenu().unwrap_or(HMENU(0));
+        if reset_menu.0 != 0 {
+            append_menu_string(
+                reset_menu,
+                MF_STRING,
+                IDM_PLAYBACK_VOLUME_RESET,
+                &volume_reset,
+            );
+            append_menu_string(
+                reset_menu,
+                MF_STRING,
+                IDM_PLAYBACK_SPEED_RESET,
+                &speed_reset,
+            );
+            append_menu_string(
+                reset_menu,
+                MF_STRING,
+                IDM_PLAYBACK_PITCH_RESET,
+                &pitch_reset,
+            );
+            append_menu_string(
+                playback_menu,
+                MF_POPUP,
+                reset_menu.0 as usize,
+                &reset_menu_label,
+            );
+        }
         append_menu_string(
             playback_menu,
             MF_STRING,

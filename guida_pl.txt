@@ -9,11 +9,15 @@ Plik:
  Zapisz wszystko: Zapisz wszystkie dokumenty (Ctrl+Shift+S).
  Zamknij kartę: Zamknij bieżący dokument (Ctrl+W).
  Ostatnie pliki: Otwórz ostatnio używany plik.
+
+Głos i audio:
+
  Czytanie: F5 Rozpocznij czytanie, F4 Pauza/Wznów, F6 Zatrzymaj czytanie.
  Ulubione podczas czytania: F9 poprzedni ulubiony głos, F10 następny ulubiony głos.
  Nagraj audiobook: Utwórz plik MP3 z bieżącego tekstu (Ctrl+R).
+ Audiobooki wsadowe: Konwertuj listę plików na audiobooki (Ctrl+Shift+B).
  Nagraj podcast: Nagraj podcast z mikrofonu i/lub dźwięku systemowego (Ctrl+Shift+R).
-
+ Konwertuj audio: Konwertuj pliki audio/wideo do innych formatów audio (Ctrl+Shift+A).
 Audiobooki MP3:
 Po otwarciu pliku MP3, Sonarpad działa jako odtwarzacz audio.
 Sterowanie klawiaturą:

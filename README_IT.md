@@ -50,7 +50,15 @@ oltre alla **registrazione podcast da microfono e audio di sistema**.
   - Creazione e gestione di segnalibri sia per file di testo sia per la riproduzione MP3
   - Salto rapido alle posizioni salvate nei documenti o nell'audio
 - **Registrazione podcast**
-  - Registra da microfono e/o audio di sistema (menu File, Ctrl+Shift+R)
+  - Registra da microfono e/o audio di sistema (menu `Voce e audio`, Ctrl+Shift+R)
+- **Menu Voce e audio**
+  - Avvia lettura (F5)
+  - Pausa lettura (F4)
+  - Stop lettura (F6)
+  - Registra audiolibro (Ctrl+R)
+  - Registra in batch (Ctrl+Shift+B)
+  - Registra podcast (Ctrl+Shift+R)
+  - Converti audio (Ctrl+Shift+A)
 - **Accessibilità**
   Progettato per funzionare correttamente con screen reader
   come NVDA e JAWS.

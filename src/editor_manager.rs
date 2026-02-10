@@ -20,15 +20,16 @@ use windows::Win32::UI::Controls::{
     TCM_INSERTITEMW, TCM_SETCURSEL, TCM_SETITEMW,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetKeyState, SetFocus, VK_CONTROL, VK_MENU, VK_SHIFT, VK_TAB,
+    GetKeyState, SetFocus, VK_CONTROL, VK_DOWN, VK_END, VK_HOME, VK_LEFT, VK_MENU, VK_NEXT,
+    VK_PRIOR, VK_RIGHT, VK_SHIFT, VK_TAB, VK_UP,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CallWindowProcW, DefWindowProcW, DestroyWindow, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE,
     ES_WANTRETURN, GWLP_USERDATA, GWLP_WNDPROC, GetClientRect, GetParent, GetWindowLongPtrW, HMENU,
     IDNO, IDYES, MB_ICONWARNING, MB_YESNOCANCEL, MessageBoxW, MoveWindow, PostMessageW, SW_HIDE,
     SW_SHOW, SendMessageW, SetWindowLongPtrW, SetWindowTextW, ShowWindow, WM_CHAR, WM_CONTEXTMENU,
-    WM_GETTEXTLENGTH, WM_KEYDOWN, WM_SETFONT, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE,
-    WS_GROUP, WS_HSCROLL, WS_VSCROLL,
+    WM_GETTEXTLENGTH, WM_KEYDOWN, WM_LBUTTONUP, WM_SETFONT, WS_CHILD, WS_CLIPCHILDREN,
+    WS_EX_CLIENTEDGE, WS_GROUP, WS_HSCROLL, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR};
 
@@ -150,6 +151,29 @@ unsafe fn edit_subclass_proc_inner(
             }
         }
     }
+    if msg == WM_KEYDOWN {
+        let vk = wparam.0 as u32;
+        if matches!(
+            vk,
+            v if v == VK_LEFT.0 as u32
+                || v == VK_RIGHT.0 as u32
+                || v == VK_UP.0 as u32
+                || v == VK_DOWN.0 as u32
+                || v == VK_HOME.0 as u32
+                || v == VK_END.0 as u32
+                || v == VK_PRIOR.0 as u32
+                || v == VK_NEXT.0 as u32
+        ) {
+            let parent = GetParent(hwnd);
+            if with_state(parent, |state| {
+                state.spellcheck_typing_in_progress = false;
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access editor state");
+            }
+        }
+    }
     if msg == WM_CHAR {
         let ch = wparam.0 as u32;
         if ch == VK_TAB.0 as u32 {
@@ -166,6 +190,16 @@ unsafe fn edit_subclass_proc_inner(
             let parent = GetParent(hwnd);
             if with_state(parent, |state| {
                 state.spellcheck_space_trigger = Some(hwnd);
+                state.spellcheck_typing_in_progress = false;
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access editor state");
+            }
+        } else if ch >= 32 {
+            let parent = GetParent(hwnd);
+            if with_state(parent, |state| {
+                state.spellcheck_typing_in_progress = true;
             })
             .is_none()
             {
@@ -192,6 +226,16 @@ unsafe fn edit_subclass_proc_inner(
                 );
                 return LRESULT(0);
             }
+        }
+    }
+    if msg == WM_LBUTTONUP {
+        let parent = GetParent(hwnd);
+        if with_state(parent, |state| {
+            state.spellcheck_typing_in_progress = false;
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access editor state");
         }
     }
     if msg == WM_CONTEXTMENU {
@@ -2800,8 +2844,27 @@ fn load_document_content(
         }));
     }
     if is_gdoc_path(path) {
-        let bytes = std::fs::read(path)
-            .map_err(|err| crate::settings::error_open_file_message(language, err))?;
+        let bytes = match std::fs::read(path) {
+            Ok(bytes) => bytes,
+            Err(err) => {
+                crate::log_debug(&format!(
+                    "Failed to read Google pointer file '{}': {}. Trying shell fallback.",
+                    path.display(),
+                    err
+                ));
+                match crate::audio_utils::open_path_with_default_app(path) {
+                    Ok(()) => return Ok(None),
+                    Err(shell_err) => {
+                        crate::log_debug(&format!(
+                            "Google pointer fallback launch failed for '{}': {}",
+                            path.display(),
+                            shell_err
+                        ));
+                        return Err(crate::settings::error_open_file_message(language, err));
+                    }
+                }
+            }
+        };
         let text = String::from_utf8_lossy(&bytes);
         if let Some(url_pos) = text.find("\"url\"") {
             let after_url = &text[url_pos + 5..];

@@ -4,18 +4,23 @@ Version 0.6.6 – 2026-02-08
 Améliorations
 • Ajout de « Formatage automatique pour TTS » dans le menu Édition pour préparer rapidement le texte à la lecture vocale (suppression markdown/guillemets et recomposition des lignes coupées).
 • Ajout d’une option dans les paramètres Audio pour choisir le dossier par défaut d’enregistrement des livres audio (par défaut : Documents\\Sonarpad Audiobooks).
+• Réorganisation des fonctions vocales dans un menu dédié « Voix et audio » et ajout/clarification de l’option « Convertir l’audio », utile pour convertir tout média pris en charge en MP3, AAC, OGG, Opus, FLAC, WAV et AIFF.
+• Ajout de la suppression d’articles RSS individuels et d’épisodes de podcast individuels (touche Suppr + menu contextuel avec confirmation), sans supprimer toute la source RSS/podcast.
+• Ajout de la traduction serbe grâce à Mila Kuran.
 Corrections de bugs
 • Correction de l’extraction de texte EPUB pour les livres contenant des commentaires HTML inline (<!-- ... -->) : le texte des chapitres est désormais correctement analysé au lieu d’être partiellement ou totalement ignoré.
 • Correction du dictionnaire Wiktionary en espagnol et de la gestion du cache : des mots comme « agua » sont maintenant trouvés correctement et les anciennes entrées « mot introuvable » ne sont plus réutilisées.
 • Correction de l’encodage lors de l’import d’articles RSS pour certaines sources espagnoles (ex. El Mundo) : les accents et le « ñ » sont désormais correctement conservés dans l’éditeur temporaire.
-• Ajout de la suppression d’articles RSS individuels et d’épisodes de podcast individuels (touche Suppr + menu contextuel avec confirmation), sans supprimer toute la source RSS/podcast.
-• Ajout de la traduction serbe grâce à Mila Kuran.
+• Correction de la persistance des sources RSS avec paramètres d’URL (ex. `rss.aspx?c=...`) : ces flux sont maintenant correctement sauvegardés et restaurés après redémarrage de Sonarpad.
+• Correction de l’ouverture des fichiers pointeurs Google Drive (`.gdoc`, `.gsheet`, `.gslides`) depuis le menu contextuel de l’Explorateur : si la lecture directe échoue avec « Incorrect function (os error 1) », Sonarpad utilise désormais un fallback shell-open et le document s’ouvre correctement.
+• Correction du flux d’annonce du correcteur orthographique : les fautes sont désormais réannoncées lors d’une relecture ultérieure du texte, et la même faute est de nouveau signalée si elle est supprimée puis retapée.
 • Correction des opérations de texte par ligne (ex. Ctrl+Q / Ctrl+Shift+Q, trier/inverser/lignes uniques/fusionner les lignes) : en sélectionnant une seule ligne avec Maj+Flèche bas, les lignes adjacentes ne sont plus fusionnées ni tronquées.
 • Extension de la normalisation d’entrée TTS pour les symboles visibles d’espace/tabulation/saut de ligne (␠/U+2420, ␣/U+2423, ␉/U+2409, ␊/U+240A, ␍/U+240D, ␤/U+2424), qui pouvaient provoquer des répétitions de paragraphes avec les voix multilingues.
 • Affinement de la sanitisation du texte Edge TTS avec une pipeline unique de validation : normalisation des espaces étranges/invisibles, compactage des longues séquences de ponctuation (comme "...", "!!!", "???") et suppression des segments composés uniquement de ponctuation pour éviter les boucles de lecture.
 • Correction de l’annonce du temps de lecture (Ctrl+I) pour les flux MP3/podcast : le temps courant est désormais borné à la durée de la piste, et la lecture est arrêtée automatiquement si la position dépasse la fin.
 • Amélioration de la couverture de localisation de l’installateur : setup.exe inclut désormais aussi le tchèque, le polonais, le français et le serbe, tandis que le MSI reste un paquet unique en-US pour éviter la confusion en release.
 • Correction du nettoyage à la désinstallation des entrées du menu contextuel : « Ouvrir avec Sonarpad » est maintenant supprimé de façon fiable, y compris dans des scénarios de registre legacy.
+• Correction de la fiabilité pause/reprise en SAPI5 : la pause avec F4 fonctionne désormais correctement et la reprise revient au point attendu au lieu de redémarrer depuis le début.
 
 Version 0.6.5 – 2026-02-07
 Améliorations

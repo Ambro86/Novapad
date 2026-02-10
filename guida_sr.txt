@@ -9,11 +9,14 @@ Sačuvaj kao: Čuva pod novim imenom.
 Sačuvaj sve: Čuva sve datoteke (Ctrl+Shift+S). 
 Zatvori karticu: Zatvara trenutnu datoteku (Ctrl+W). 
 Nedavne datoteke: Otvara nedavno korišćenu datoteku. 
+
+Glas i audio:
 Čitanje: F5 pokreće čitanje, F4 pauzira ili nastavlja, F6 zaustavlja čitanje. 
 Omiljeni glasovi tokom čitanja: F9 prethodni omiljeni glas, F10 sledeći omiljeni glas. 
 Snimi audio‑knjigu: Kreira MP3 datoteku iz trenutnog teksta (Ctrl+R). 
+Serijsko pravljenje audio‑knjiga: Pretvara listu datoteka u audio‑knjige (Ctrl+Shift+B).
 Snimi podkast: Snima podkast sa mikrofona i/ili sistemskog zvuka (Ctrl+Shift+R).
-
+Konvertuj audio: Konvertuje audio/video datoteke u druge audio formate (Ctrl+Shift+A).
 MP3 audio‑knjige: 
 Kada otvoriš MP3 datoteku, Sonarpad radi kao audio plejer. 
 Tastaturne komande: 
@@ -107,3 +110,4 @@ Vodič: Otvara ovaj vodič (F1).
 Proveri ažuriranja: Proverava dostupna ažuriranja (F2). 
 Lista izmena: Otvara prozor sa izmenama. 
 O programu: Prikazuje informacije o programu.
+

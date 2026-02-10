@@ -8,10 +8,14 @@ Lưu mới thành: Lưu với tên mới.
 Lưu tất cả: Lưu tất cả tài liệu (Ctrl+Shift+S).
 Đóng tab: Đóng tài liệu hiện tại (Ctrl+W).
 Tệp gần đây: Mở một tệp gần đây.
+
+Giọng nói và âm thanh:
 Đọc: F5 Bắt đầu đọc, F4 Tạm dừng/Tiếp tục, F6 Dừng đọc.
 Yêu thích khi đang đọc: F9 giọng đọc yêu thích trước đó, F10 giọng đọc yêu thích tiếp theo.
 Ghi âm sách nói: Tạo một tệp MP3 từ văn bản hiện tại (Ctrl+R).
+Sách nói hàng loạt: Chuyển đổi danh sách tệp thành sách nói (Ctrl+Shift+B).
 Ghi âm podcast: Ghi âm một podcast từ micro và/hoặc âm thanh hệ thống (Ctrl+Shift+R).
+Chuyển đổi âm thanh: Chuyển đổi tệp âm thanh/video sang định dạng âm thanh khác (Ctrl+Shift+A).
 Sách nói MP3: 
 Khi bạn mở một tệp MP3, Sonarpad hoạt động như một trình phát âm thanh.
 Các phím điều khiển bàn phím:
@@ -123,3 +127,5 @@ Hướng dẫn: Mở bản hướng dẫn này (F1).
 Kiểm tra bản cập nhật: Kiểm tra xem có bản cập nhật mới không (F2).
 Nhật ký thay đổi: Mở cửa sổ nhật ký thay đổi.
 Giới thiệu: Hiển thị thông tin chương trình.
+
+

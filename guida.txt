@@ -8,11 +8,14 @@ Salva con nome: salva con un nuovo nome.
 Salva tutto: salva tutti i documenti (Ctrl+Shift+S).
 Chiudi tab: chiude il documento corrente (Ctrl+W).
 File recenti: apre un file recente.
+
+Voce e audio:
 Lettura: F5 avvia la lettura, F4 pausa/riprendi, F6 ferma la lettura.
 Preferiti durante la lettura: F9 voce preferita precedente, F10 voce preferita successiva.
 Registra audiolibro: crea un file MP3 dal testo corrente (Ctrl+R).
+Registra in batch: converte una lista di file in audiolibri (Ctrl+Shift+B).
 Crea podcast: crea un podcast da microfono e/o audio di sistema (Ctrl+Shift+R).
-
+Converti audio: converte file audio/video in altri formati audio (Ctrl+Shift+A).
 Audiolibri MP3:
 Quando apri un file MP3, Sonarpad diventa un lettore audio.
 Comandi da tastiera:
@@ -106,3 +109,4 @@ Guida: apre questa guida (F1).
 Controllo aggiornamenti: controlla se ci sono aggiornamenti (F2).
 Registro modifiche: mostra il changelog.
 Informazioni sul programma: mostra informazioni sul programma.
+

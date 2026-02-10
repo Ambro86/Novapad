@@ -4,18 +4,23 @@ Versione 0.6.6 – 2026-02-08
 Miglioramenti
 • Aggiunta "Formattazione automatica per TTS" nel menu Modifica per preparare rapidamente il testo alla lettura vocale (rimuove markdown/virgolette e ricompone le righe spezzate).
 • Aggiunta un'opzione nelle impostazioni Audio per scegliere la cartella predefinita di salvataggio audiolibri (predefinita: Documenti\\Sonarpad Audiobooks).
+• Riorganizzate le funzioni vocali in un menu dedicato "Voce e audio" e aggiunta/esplicitata la voce "Converti audio", utile per convertire qualunque file multimediale supportato in MP3, AAC, OGG, Opus, FLAC, WAV e AIFF.
+• Aggiunta la rimozione dei singoli articoli RSS e dei singoli episodi podcast (tasto Canc + menu contestuale con conferma), senza eliminare l'intera fonte RSS/podcast.
+• Aggiunta la traduzione serba grazie a Mila Kuran.
 Correzioni di bug
 • Corretto il parsing del testo EPUB per i libri che contengono commenti HTML inline (<!-- ... -->): il testo dei capitoli ora viene estratto correttamente invece di essere saltato in parte o del tutto.
 • Corretto il dizionario Wiktionary in spagnolo e la gestione cache del dizionario: parole come "agua" ora vengono trovate correttamente e le vecchie cache "parola non trovata" non vengono più riutilizzate.
 • Corretto l'encoding nell'import degli articoli RSS per alcune fonti spagnole (es. El Mundo): accenti e "ñ" ora vengono mantenuti correttamente nell'editor temporaneo.
-• Aggiunta la rimozione dei singoli articoli RSS e dei singoli episodi podcast (tasto Canc + menu contestuale con conferma), senza eliminare l'intera fonte RSS/podcast.
-• Aggiunta la traduzione serba grazie a Mila Kuran.
+• Corretta la persistenza delle fonti RSS con parametri nella URL (es. `rss.aspx?c=...`): questi feed ora vengono salvati e ripristinati correttamente dopo il riavvio di Sonarpad.
+• Corretta l'apertura dei file puntatore Google Drive (`.gdoc`, `.gsheet`, `.gslides`) dal menu contestuale di Esplora file: se la lettura diretta fallisce con “Incorrect function (os error 1)”, Sonarpad ora usa un fallback shell-open e il documento si apre correttamente.
+• Corretto il flusso di annuncio del correttore ortografico: gli errori vengono ora riannunciati quando si rilegge il testo, e lo stesso errore viene segnalato di nuovo se viene cancellato e riscritto.
 • Corrette le operazioni testuali a livello riga (es. Ctrl+Q / Ctrl+Shift+Q, ordina/inverti/righe uniche/unisci): selezionando una sola riga con Maiusc+Freccia giù non vengono più unite o troncate le righe adiacenti.
 • Estesa la normalizzazione input TTS per simboli visibili di spazi/tab/newline (␠/U+2420, ␣/U+2423, ␉/U+2409, ␊/U+240A, ␍/U+240D, ␤/U+2424), che con voci multilingua potevano causare ripetizioni dei paragrafi.
 • Raffinata la sanitizzazione del testo Edge TTS con una pipeline unica di validazione: normalizzazione di spazi strani/invisibili, compattazione delle sequenze lunghe di punteggiatura (come "...", "!!!", "???") e salto dei chunk composti solo da punteggiatura per evitare loop di riproduzione.
 • Corretto l'annuncio del tempo di riproduzione (Ctrl+I) per stream MP3/podcast: il tempo corrente ora viene limitato alla durata della traccia e la riproduzione viene fermata automaticamente se la posizione supera la fine.
 • Migliorata la copertura di localizzazione dell'installer: setup.exe ora include anche ceco, polacco, francese e serbo, mentre l'MSI resta un unico pacchetto en-US per evitare confusione nelle release.
 • Corretta la pulizia in disinstallazione delle voci del menu contestuale: "Apri con Sonarpad" ora viene rimosso in modo affidabile, anche in scenari legacy del registro.
+• Corretta l'affidabilità di pausa/riprendi con SAPI5: la pausa con F4 ora funziona correttamente e la ripresa torna al punto previsto invece di ripartire dall'inizio.
 
 Versione 0.6.5 – 2026-02-07
 Miglioramenti

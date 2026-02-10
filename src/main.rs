@@ -313,6 +313,7 @@ pub(crate) fn reset_spellcheck_state(hwnd: HWND) {
             state.spellcheck_manager.clear_cache();
             state.spellcheck_last_announce = None;
             state.spellcheck_context = None;
+            state.spellcheck_typing_in_progress = false;
         })
         .is_none()
         {
@@ -1591,6 +1592,7 @@ pub(crate) struct AppState {
     spellcheck_last_announce: Option<SpellcheckAnnounceKey>,
     spellcheck_context: Option<SpellcheckContextMenuState>,
     spellcheck_space_trigger: Option<HWND>,
+    spellcheck_typing_in_progress: bool,
     spellcheck_highlight_pending: Option<HWND>,
     spellcheck_last_highlighted_line: Option<(isize, i32)>, // (doc_id, line_index)
     dictionary_context_menu: HMENU,
@@ -2756,6 +2758,7 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 spellcheck_last_announce: None,
                 spellcheck_context: None,
                 spellcheck_space_trigger: None,
+                spellcheck_typing_in_progress: false,
                 spellcheck_highlight_pending: None,
                 spellcheck_last_highlighted_line: None,
                 dictionary_context_menu: HMENU(0),
@@ -5569,18 +5572,17 @@ unsafe fn spellcheck_word_context_from_lparam(
 }
 
 unsafe fn handle_spellcheck_selection_change(hwnd: HWND, hwnd_edit: HWND) {
-    let should_check = with_state(hwnd, |state| {
-        state.spellcheck_space_trigger == Some(hwnd_edit)
+    let announce_allowed = with_state(hwnd, |state| {
+        if state.spellcheck_space_trigger == Some(hwnd_edit) {
+            // Force re-highlight of current line when space/punctuation is pressed.
+            state.spellcheck_last_highlighted_line = None;
+            state.spellcheck_space_trigger = None;
+            state.spellcheck_typing_in_progress = false;
+            return true;
+        }
+        !state.spellcheck_typing_in_progress
     })
     .unwrap_or(false);
-    if !should_check {
-        return;
-    }
-    with_state(hwnd, |state| {
-        state.spellcheck_space_trigger = None;
-        // Force re-highlight of current line when space/punctuation is pressed
-        state.spellcheck_last_highlighted_line = None;
-    });
     let Some(caret_index) = spellcheck_caret_char_index(hwnd_edit) else {
         with_state(hwnd, |state| state.spellcheck_last_announce = None);
         return;
@@ -5626,7 +5628,7 @@ unsafe fn handle_spellcheck_selection_change(hwnd: HWND, hwnd_edit: HWND) {
                 line_hash: word_ctx.line_hash,
                 language: resolution.effective.clone(),
             };
-            if state.spellcheck_last_announce.as_ref() != Some(&key) {
+            if announce_allowed && state.spellcheck_last_announce.as_ref() != Some(&key) {
                 state.spellcheck_last_announce = Some(key);
                 let msg = i18n::tr_f(
                     language_ui,
@@ -6937,6 +6939,11 @@ unsafe fn create_accelerators() -> HACCEL {
             fVirt: virt_shift,
             key: 'R' as u16,
             cmd: IDM_FILE_PODCAST as u16,
+        },
+        ACCEL {
+            fVirt: virt_shift,
+            key: 'A' as u16,
+            cmd: IDM_FILE_CONVERT_AUDIO as u16,
         },
         ACCEL {
             fVirt: virt,

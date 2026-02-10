@@ -4,18 +4,23 @@ Phiên bản 0.6.6 – 2026-02-08
 Cải tiến
 • Đã thêm "Định dạng tự động cho TTS" trong menu Chỉnh sửa để chuẩn bị nhanh văn bản cho đọc giọng nói (xóa markdown/dấu ngoặc kép và ghép lại các dòng bị ngắt).
 • Đã thêm tùy chọn trong cài đặt Âm thanh để chọn thư mục mặc định lưu sách nói (mặc định: Documents\\Sonarpad Audiobooks).
+• Đã tổ chức lại các tính năng giọng nói vào menu riêng "Giọng nói và âm thanh" và thêm/làm rõ mục "Chuyển đổi âm thanh", dùng để chuyển đổi mọi tệp đa phương tiện được hỗ trợ sang MP3, AAC, OGG, Opus, FLAC, WAV và AIFF.
+• Đã thêm khả năng xóa từng bài RSS và từng tập podcast riêng lẻ (phím Delete + menu ngữ cảnh có xác nhận), không cần xóa toàn bộ nguồn RSS/podcast.
+• Đã thêm bản dịch tiếng Serbia nhờ Mila Kuran.
 Sửa lỗi
 • Đã sửa trích xuất văn bản EPUB cho sách có chứa chú thích HTML inline (<!-- ... -->): văn bản chương giờ được phân tích đúng thay vì bị bỏ qua một phần hoặc toàn bộ.
 • Đã sửa từ điển Wiktionary tiếng Tây Ban Nha và cơ chế cache từ điển: các từ như "agua" giờ được tìm đúng, và các mục cache cũ kiểu "Không tìm thấy từ" sẽ không còn được tái sử dụng.
 • Đã sửa mã hóa khi nhập bài RSS cho một số nguồn tiếng Tây Ban Nha (ví dụ El Mundo): dấu tiếng Tây Ban Nha và ký tự "ñ" giờ được giữ đúng trong trình soạn thảo tạm.
-• Đã thêm khả năng xóa từng bài RSS và từng tập podcast riêng lẻ (phím Delete + menu ngữ cảnh có xác nhận), không cần xóa toàn bộ nguồn RSS/podcast.
-• Đã thêm bản dịch tiếng Serbia nhờ Mila Kuran.
+• Đã sửa lỗi lưu nguồn RSS có tham số trong URL (ví dụ `rss.aspx?c=...`): các feed này giờ được lưu và khôi phục đúng sau khi khởi động lại Sonarpad.
+• Đã sửa lỗi mở các tệp con trỏ Google Drive (`.gdoc`, `.gsheet`, `.gslides`) từ menu ngữ cảnh Explorer: khi đọc trực tiếp bị lỗi “Incorrect function (os error 1)”, Sonarpad giờ dùng fallback shell-open để tài liệu vẫn mở đúng.
+• Đã sửa luồng thông báo lỗi chính tả: lỗi sẽ được đọc lại khi bạn rà soát văn bản sau đó, và cùng một lỗi sẽ được báo lại nếu bị xóa rồi gõ lại.
 • Đã sửa các thao tác văn bản theo dòng (ví dụ Ctrl+Q / Ctrl+Shift+Q, sắp xếp/đảo/duy nhất/gộp dòng): khi chọn một dòng bằng Shift+Mũi tên xuống, các dòng liền kề không còn bị dính hoặc bị cắt.
 • Đã mở rộng chuẩn hóa đầu vào TTS cho các ký hiệu hiển thị của khoảng trắng/tab/xuống dòng (␠/U+2420, ␣/U+2423, ␉/U+2409, ␊/U+240A, ␍/U+240D, ␤/U+2424), vốn có thể gây lặp đoạn với giọng đa ngôn ngữ.
 • Đã tinh chỉnh bước làm sạch văn bản cho Edge TTS bằng một pipeline kiểm tra duy nhất: chuẩn hóa khoảng trắng lạ/vô hình, rút gọn các chuỗi dấu câu dài (như "...", "!!!", "???"), và bỏ qua các đoạn chỉ gồm dấu câu để tránh lặp vòng khi phát.
 • Đã sửa thông báo thời gian phát (Ctrl+I) cho luồng MP3/podcast: thời gian hiện tại giờ được giới hạn theo tổng thời lượng của track, và phát sẽ tự dừng nếu vị trí vượt quá điểm kết thúc.
 • Đã cải thiện phạm vi bản địa hóa của trình cài đặt: setup.exe giờ bao gồm thêm tiếng Séc, Ba Lan, Pháp và Serbia, trong khi MSI được giữ thành một gói en-US duy nhất để tránh gây rối trong bản phát hành.
 • Đã sửa dọn dẹp khi gỡ cài đặt các mục menu ngữ cảnh: mục "Mở bằng Sonarpad" giờ được xóa ổn định, kể cả trong các kịch bản registry cũ.
+• Đã sửa độ ổn định của tạm dừng/tiếp tục với SAPI5: tạm dừng bằng F4 giờ hoạt động đúng và khi tiếp tục sẽ quay lại đúng vị trí mong đợi thay vì phát lại từ đầu.
 
 Phiên bản 0.6.5 – 2026-02-07
 Cải tiến

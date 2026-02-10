@@ -48,7 +48,15 @@ plus **podcast recording from microphone and system audio**.
   - Create and manage bookmarks for both text files and MP3 playback
   - Quickly jump to saved positions in documents or audio
 - **Podcast Recording**
-  - Record from microphone and/or system audio (File menu, Ctrl+Shift+R)
+  - Record from microphone and/or system audio (`Voice and audio` menu, Ctrl+Shift+R)
+- **Voice and Audio Menu**
+  - Start reading (F5)
+  - Pause reading (F4)
+  - Stop reading (F6)
+  - Record audiobook (Ctrl+R)
+  - Batch audiobooks (Ctrl+Shift+B)
+  - Record podcast (Ctrl+Shift+R)
+  - Convert Audio (Ctrl+Shift+A)
 - **Accessibility-Focused**
   Designed to work correctly with screen readers such as NVDA and JAWS.
 - **Accessible Terminal**

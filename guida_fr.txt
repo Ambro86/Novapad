@@ -9,11 +9,15 @@ Menu Fichier :
  Enregistrer tout : Enregistre tous les documents (Ctrl+Maj+S).
  Fermer l'onglet : Ferme le document actuel (Ctrl+W).
  Fichiers récents : Ouvre un fichier récent.
+
+Menu Voix et audio :
+
  Lecture : F5 Démarrer la lecture, F4 Pause/Reprise, F6 Arrêter la lecture.
  Favoris pendant la lecture : F9 voix favorite précédente, F10 voix favorite suivante.
  Enregistrer un audiolivre : Crée un fichier MP3 ou WAV à partir du texte actuel (Ctrl+R).
+ Livres audio en lot : Convertit une liste de fichiers en livres audio (Ctrl+Maj+B).
  Enregistrer un podcast : Enregistre un podcast à partir du microphone et/ou de l'audio système (Ctrl+Maj+R).
-
+ Convertir l'audio : Convertit des fichiers audio/vidéo vers d'autres formats audio (Ctrl+Maj+A).
 Lecture de fichier MP3 ou Livre audio :
 Lorsque vous ouvrez un fichier MP3, Sonarpad fonctionne comme un lecteur audio.
 Raccourcis clavier du lecteur :
@@ -116,3 +120,5 @@ Menu Aide :
  Vérifier les mises à jour : Vérifie si des mises à jour sont disponibles (F2).
  Journal des modifications : Ouvre la fenêtre avec la liste des changements.
  À propos du programme : Affiche des informations sur le programme.
+
+

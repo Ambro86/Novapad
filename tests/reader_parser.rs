@@ -14,6 +14,7 @@ mod settings {
         Czech,
         Polish,
         Vietnamese,
+        Serbian,
     }
 }
 

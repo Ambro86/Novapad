@@ -109,6 +109,29 @@ fn normalize_article_text(s: &str) -> String {
     collapse_blank_lines(&no_nul)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::normalize_rss_url_key;
+
+    #[test]
+    fn normalize_rss_url_key_keeps_query_parameters() {
+        let key = normalize_rss_url_key("https://servis.idnes.cz/rss.aspx?c=kultura");
+        assert_eq!(key, "servis.idnes.cz/rss.aspx?c=kultura");
+    }
+
+    #[test]
+    fn normalize_rss_url_key_removes_fragment_only() {
+        let key = normalize_rss_url_key("https://servis.idnes.cz/rss.aspx?c=technet#section");
+        assert_eq!(key, "servis.idnes.cz/rss.aspx?c=technet");
+    }
+
+    #[test]
+    fn normalize_rss_url_key_normalizes_scheme_case_and_trailing_slash() {
+        let key = normalize_rss_url_key("HTTP://EXAMPLE.COM/Feed/");
+        assert_eq!(key, "example.com/feed");
+    }
+}
+
 fn decode_basic_html_entities(s: &str) -> String {
     let mut out = s.replace("&amp;", "&").replace("&amp", "&");
     out = out.replace("&quot;", "\"").replace("&quot", "\"");
@@ -122,15 +145,12 @@ fn normalize_rss_url_key(url: &str) -> String {
     if s.is_empty() {
         return s;
     }
-    if let Some(rest) = s.strip_prefix("https://") {
-        s = rest.to_string();
-    } else if let Some(rest) = s.strip_prefix("http://") {
-        s = rest.to_string();
+    if s.len() >= 8 && s[..8].eq_ignore_ascii_case("https://") {
+        s = s[8..].to_string();
+    } else if s.len() >= 7 && s[..7].eq_ignore_ascii_case("http://") {
+        s = s[7..].to_string();
     }
     if let Some((left, _)) = s.split_once('#') {
-        s = left.to_string();
-    }
-    if let Some((left, _)) = s.split_once('?') {
         s = left.to_string();
     }
     while s.ends_with('/') && s.len() > 1 {

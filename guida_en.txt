@@ -8,11 +8,14 @@ Save As: Save with a new name.
 Save All: Save all documents (Ctrl+Shift+S).
 Close Tab: Close the current document (Ctrl+W).
 Recent Files: Open a recent file.
+
+Voice and audio:
 Reading: F5 Start reading, F4 Pause/Resume, F6 Stop reading.
 Favorites during reading: F9 previous favorite voice, F10 next favorite voice.
 Record Audiobook: Create an MP3 file from the current text (Ctrl+R).
+Batch Audiobooks: Convert a list of files into audiobooks (Ctrl+Shift+B).
 Record Podcast: Record a podcast from microphone and/or system audio (Ctrl+Shift+R).
-
+Convert Audio: Convert audio/video files to other audio formats (Ctrl+Shift+A).
 MP3 Audiobooks:
 When you open an MP3 file, Sonarpad acts as an audio player.
 Keyboard controls:
@@ -105,3 +108,4 @@ Guide: Open this guide (F1).
 Check for updates: Check if updates are available (F2).
 Changelog: Open the changelog window.
 About: Show program information.
+

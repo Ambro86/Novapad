@@ -8,11 +8,14 @@ Spara som: sparar med ett nytt namn.
 Spara alla: sparar alla dokument (Ctrl+Shift+S).
 Stäng flik: stänger det aktuella dokumentet (Ctrl+W).
 Senaste filer: öppnar en nyligen använd fil.
+
+Röst och ljud:
 Läsning: F5 startar läsning, F4 pausa/återuppta, F6 stoppa läsning.
 Favoriter under läsning: F9 föregående favoritröst, F10 nästa favoritröst.
 Spela in ljudbok: skapar en MP3-fil från den aktuella texten (Ctrl+R).
+Batch-ljudböcker: konverterar en lista med filer till ljudböcker (Ctrl+Shift+B).
 Skapa podd: skapar en podd från mikrofon och/eller systemljud (Ctrl+Shift+R).
-
+Konvertera ljud: konverterar ljud-/videofiler till andra ljudformat (Ctrl+Shift+A).
 MP3-ljudböcker:
 När du öppnar en MP3-fil blir Sonarpad en ljudspelare.
 Tangentbordskommandon:

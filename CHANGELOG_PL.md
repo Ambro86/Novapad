@@ -4,18 +4,23 @@ Wersja 0.6.6 – 2026-02-08
 Ulepszenia
 • Dodano „Automatyczne formatowanie dla TTS” w menu Edycja, aby szybko przygotować tekst do odczytu (usuwa markdown/cudzysłowy i scala połamane linie).
 • Dodano opcję w ustawieniach Audio, aby wybrać domyślny folder zapisu audiobooków (domyślnie: Dokumenty\\Sonarpad Audiobooks).
+• Przeniesiono funkcje głosowe do dedykowanego menu „Głos i audio” oraz dodano/doprecyzowano opcję „Konwertuj audio”, która służy do konwersji dowolnego obsługiwanego pliku multimedialnego do MP3, AAC, OGG, Opus, FLAC, WAV i AIFF.
+• Dodano usuwanie pojedynczych artykułów RSS i pojedynczych odcinków podcastów (klawisz Delete + menu kontekstowe z potwierdzeniem), bez usuwania całego źródła RSS/podcastu.
+• Dodano tłumaczenie serbskie dzięki Mila Kuran.
 Poprawki błędów
 • Naprawiono wyodrębnianie tekstu EPUB dla książek zawierających komentarze HTML inline (<!-- ... -->): tekst rozdziałów jest teraz poprawnie parsowany zamiast być częściowo lub całkowicie pomijany.
 • Naprawiono słownik Wiktionary dla języka hiszpańskiego i obsługę cache słownika: słowa takie jak „agua” są teraz poprawnie znajdowane, a stare wpisy „nie znaleziono słowa” nie są już ponownie używane.
 • Naprawiono kodowanie przy imporcie artykułów RSS dla niektórych hiszpańskich źródeł (np. El Mundo): akcenty i „ñ” są teraz poprawnie zachowywane w tymczasowym edytorze.
-• Dodano usuwanie pojedynczych artykułów RSS i pojedynczych odcinków podcastów (klawisz Delete + menu kontekstowe z potwierdzeniem), bez usuwania całego źródła RSS/podcastu.
-• Dodano tłumaczenie serbskie dzięki Mila Kuran.
+• Naprawiono zapisywanie źródeł RSS z parametrami w URL (np. `rss.aspx?c=...`): takie feedy są teraz poprawnie zapisywane i przywracane po ponownym uruchomieniu Sonarpad.
+• Naprawiono otwieranie plików wskaźnikowych Google Drive (`.gdoc`, `.gsheet`, `.gslides`) z menu kontekstowego Eksploratora: gdy bezpośredni odczyt kończył się błędem „Incorrect function (os error 1)”, Sonarpad używa teraz fallbacku shell-open i dokument otwiera się poprawnie.
+• Naprawiono sposób ogłaszania błędów pisowni: błędy są teraz ponownie odczytywane podczas późniejszego przeglądania tekstu, a ten sam błąd jest znów zgłaszany po usunięciu i ponownym wpisaniu.
 • Naprawiono operacje tekstowe na liniach (np. Ctrl+Q / Ctrl+Shift+Q, sortowanie/odwracanie/unikalne/łączenie linii): po zaznaczeniu jednej linii przez Shift+Strzałka w dół sąsiednie linie nie są już łączone ani obcinane.
 • Rozszerzono normalizację wejścia TTS o widoczne symbole spacji/tabulatora/nowej linii (␠/U+2420, ␣/U+2423, ␉/U+2409, ␊/U+240A, ␍/U+240D, ␤/U+2424), które przy głosach wielojęzycznych mogły powodować powtarzanie akapitów.
 • Dopracowano sanitizację tekstu dla Edge TTS przez jedną, wspólną ścieżkę walidacji: normalizacja nietypowych/niewidocznych spacji, skracanie długich sekwencji interpunkcji (np. "...", "!!!", "???") oraz pomijanie fragmentów złożonych wyłącznie z interpunkcji, aby uniknąć pętli odtwarzania.
 • Naprawiono komunikat czasu odtwarzania (Ctrl+I) dla strumieni MP3/podcast: bieżący czas jest teraz ograniczany do długości ścieżki, a odtwarzanie zatrzymuje się automatycznie, gdy pozycja wyjdzie poza koniec.
 • Ulepszono pokrycie lokalizacji instalatora: setup.exe zawiera teraz także czeski, polski, francuski i serbski, a MSI pozostaje pojedynczym pakietem en-US, aby uniknąć zamieszania w wydaniach.
 • Naprawiono czyszczenie podczas deinstalacji wpisów menu kontekstowego: „Otwórz za pomocą Sonarpad” jest teraz usuwane niezawodnie, także w starszych scenariuszach rejestru.
+• Naprawiono niezawodność pauzy/wznawiania w SAPI5: pauza pod F4 działa teraz poprawnie, a wznowienie wraca do oczekiwanego miejsca zamiast startować od początku.
 
 Wersja 0.6.5 – 2026-02-07
 Ulepszenia

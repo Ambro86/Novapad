@@ -322,6 +322,27 @@ pub fn open_url_in_browser(url: &str) -> Result<(), String> {
     Ok(())
 }
 
+pub fn open_path_with_default_app(path: &Path) -> Result<(), String> {
+    let path_str = path
+        .to_str()
+        .ok_or_else(|| "Invalid path encoding".to_string())?;
+    let wide = to_wide(path_str);
+    unsafe {
+        let result = ShellExecuteW(
+            HWND(0),
+            w!("open"),
+            PCWSTR(wide.as_ptr()),
+            PCWSTR::null(),
+            PCWSTR::null(),
+            windows::Win32::UI::WindowsAndMessaging::SW_SHOW,
+        );
+        if result.0 as isize <= 32 {
+            return Err(format!("ShellExecute failed: {}", result.0));
+        }
+    }
+    Ok(())
+}
+
 pub fn set_file_metadata(
     path: &Path,
     title: Option<&str>,

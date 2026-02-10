@@ -123,6 +123,7 @@ pub struct MenuLabels {
     pub menu_edit: String,
     pub menu_view: String,
     pub menu_insert: String,
+    pub menu_voice_audio: String,
     pub menu_tools: String,
     pub menu_help: String,
     pub menu_options: String,
@@ -213,6 +214,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         menu_edit: i18n::tr(language, "menu.edit"),
         menu_view: i18n::tr(language, "menu.view"),
         menu_insert: i18n::tr(language, "menu.insert"),
+        menu_voice_audio: i18n::tr(language, "menu.voice_audio"),
         menu_tools: i18n::tr(language, "menu.tools"),
         menu_help: i18n::tr(language, "menu.help"),
         menu_options: i18n::tr(language, "menu.options"),
@@ -552,6 +554,7 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
     let view_color_menu = CreateMenu().unwrap_or(HMENU(0));
     let view_size_menu = CreateMenu().unwrap_or(HMENU(0));
     let insert_menu = CreateMenu().unwrap_or(HMENU(0));
+    let voice_audio_menu = CreateMenu().unwrap_or(HMENU(0));
     let tools_menu = CreateMenu().unwrap_or(HMENU(0));
     let help_menu = CreateMenu().unwrap_or(HMENU(0));
 
@@ -582,45 +585,7 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         &labels.file_recent,
     );
     crate::log_if_err!(AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null()));
-    append_menu_string(
-        file_menu,
-        MF_STRING,
-        IDM_FILE_READ_START,
-        &labels.file_read_start,
-    );
     append_menu_string(file_menu, MF_STRING, IDM_FILE_EXECUTE, &labels.file_execute);
-    append_menu_string(
-        file_menu,
-        MF_STRING,
-        IDM_FILE_READ_PAUSE,
-        &labels.file_read_pause,
-    );
-    append_menu_string(
-        file_menu,
-        MF_STRING,
-        IDM_FILE_READ_STOP,
-        &labels.file_read_stop,
-    );
-    crate::log_if_err!(AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null()));
-    append_menu_string(
-        file_menu,
-        MF_STRING,
-        IDM_FILE_AUDIOBOOK,
-        &labels.file_audiobook,
-    );
-    append_menu_string(
-        file_menu,
-        MF_STRING,
-        IDM_FILE_BATCH_AUDIOBOOK,
-        &labels.file_batch_audiobooks,
-    );
-    append_menu_string(file_menu, MF_STRING, IDM_FILE_PODCAST, &labels.file_podcast);
-    append_menu_string(
-        file_menu,
-        MF_STRING,
-        IDM_FILE_CONVERT_AUDIO,
-        &labels.file_convert_audio,
-    );
     crate::log_if_err!(AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null()));
     append_menu_string(file_menu, MF_STRING, IDM_FILE_EXIT, &labels.file_exit);
     append_menu_string(hmenu, MF_POPUP, file_menu.0 as usize, &labels.menu_file);
@@ -895,6 +860,61 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         &labels.manage_bookmarks,
     );
     append_menu_string(hmenu, MF_POPUP, insert_menu.0 as usize, &labels.menu_insert);
+
+    append_menu_string(
+        voice_audio_menu,
+        MF_STRING,
+        IDM_FILE_READ_START,
+        &labels.file_read_start,
+    );
+    append_menu_string(
+        voice_audio_menu,
+        MF_STRING,
+        IDM_FILE_READ_PAUSE,
+        &labels.file_read_pause,
+    );
+    append_menu_string(
+        voice_audio_menu,
+        MF_STRING,
+        IDM_FILE_READ_STOP,
+        &labels.file_read_stop,
+    );
+    crate::log_if_err!(AppendMenuW(
+        voice_audio_menu,
+        MF_SEPARATOR,
+        0,
+        PCWSTR::null()
+    ));
+    append_menu_string(
+        voice_audio_menu,
+        MF_STRING,
+        IDM_FILE_AUDIOBOOK,
+        &labels.file_audiobook,
+    );
+    append_menu_string(
+        voice_audio_menu,
+        MF_STRING,
+        IDM_FILE_BATCH_AUDIOBOOK,
+        &labels.file_batch_audiobooks,
+    );
+    append_menu_string(
+        voice_audio_menu,
+        MF_STRING,
+        IDM_FILE_PODCAST,
+        &labels.file_podcast,
+    );
+    append_menu_string(
+        voice_audio_menu,
+        MF_STRING,
+        IDM_FILE_CONVERT_AUDIO,
+        &labels.file_convert_audio,
+    );
+    append_menu_string(
+        hmenu,
+        MF_POPUP,
+        voice_audio_menu.0 as usize,
+        &labels.menu_voice_audio,
+    );
 
     append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_PROMPT, &labels.menu_prompt);
     append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_RSS, &labels.menu_rss);

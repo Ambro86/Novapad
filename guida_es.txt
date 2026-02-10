@@ -8,11 +8,14 @@ Guardar como: Guardar con un nombre nuevo.
 Guardar todo: Guardar todos los documentos (Ctrl+Shift+S).
 Cerrar pestaña: Cerrar el documento actual (Ctrl+W).
 Archivos recientes: Abrir un archivo reciente.
+
+Voz y audio:
 Lectura: F5 iniciar lectura, F4 pausar/reanudar, F6 detener lectura.
 Favoritos durante lectura: F9 voz favorita anterior, F10 voz favorita siguiente.
 Grabar audiolibro: Crear un archivo MP3 desde el texto actual (Ctrl+R).
+Audiolibros por lotes: Convertir una lista de archivos en audiolibros (Ctrl+Shift+B).
 Grabar podcast: Grabar un podcast desde microfono y/o audio del sistema (Ctrl+Shift+R).
-
+Convertir audio: Convertir archivos de audio/video a otros formatos de audio (Ctrl+Shift+A).
 Audiolibros MP3:
 Cuando abres un archivo MP3, Sonarpad actua como reproductor de audio.
 Controles de teclado:
@@ -105,3 +108,5 @@ Guia: Abrir esta guia (F1).
 Buscar actualizaciones: Comprobar si hay actualizaciones (F2).
 Changelog: Abrir la ventana de cambios.
 Acerca de: Mostrar la informacion del programa.
+
+

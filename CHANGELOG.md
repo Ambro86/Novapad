@@ -4,18 +4,23 @@ Version 0.6.6 – 2026-02-08
 Improvements
 • Added "Auto format for TTS" in the Edit menu to quickly prepare text for speech (removes markdown/quotes and reflows wrapped lines).
 • Added a default audiobook save folder option in Audio settings (default: Documents\\Sonarpad Audiobooks).
+• Reorganized voice features into a dedicated "Voice and audio" menu and added/clarified "Convert Audio", useful for converting any supported media file to MP3, AAC, OGG, Opus, FLAC, WAV, and AIFF.
+• Added removal of individual RSS articles and podcast episodes (Delete key + context menu with confirmation), without removing the entire RSS/podcast source.
+• Added Serbian translation thanks to Mila Kuran.
 Bug fixes
 • Fixed EPUB text extraction for books containing inline HTML comments (<!-- ... -->): chapter text is now parsed correctly instead of being partially or fully skipped.
 • Fixed Spanish Wiktionary lookups and dictionary cache handling: Spanish entries like "agua" now load correctly, and old "Word not found" cache entries are no longer reused.
 • Fixed RSS article import character encoding for some Spanish sources (e.g., El Mundo): accented letters and "ñ" are now preserved correctly in the temporary editor.
-• Added removal of individual RSS articles and podcast episodes (Delete key + context menu with confirmation), without removing the entire RSS/podcast source.
-• Added Serbian translation thanks to Mila Kuran.
+• Fixed RSS source persistence for feeds with URL query parameters (e.g., `rss.aspx?c=...`): these feeds are now saved and restored correctly after restarting Sonarpad.
+• Fixed opening Google Drive pointer files (`.gdoc`, `.gsheet`, `.gslides`) from Explorer context menu: when direct read fails with “Incorrect function (os error 1)”, Sonarpad now falls back to shell-open so the document still opens correctly.
+• Fixed spellcheck announcement flow: misspellings are now announced again when reviewing text later, and the same mistake is reported again if it is deleted and retyped.
 • Fixed line-based text actions (e.g. Ctrl+Q / Ctrl+Shift+Q, sort/reverse/unique/join lines): selecting a single line with Shift+Down no longer merges or truncates adjacent lines.
 • Extended TTS input normalization for visible whitespace symbols (␠/U+2420, ␣/U+2423, ␉/U+2409, ␊/U+240A, ␍/U+240D, ␤/U+2424) to prevent repeated paragraph playback with multilingual voices.
 • Refined Edge TTS text sanitization with a single validation pipeline: weird/invisible spaces are normalized, long punctuation runs (like "...", "!!!", "???") are compacted, and punctuation-only chunks are skipped to prevent playback loops.
 • Fixed playback time announcement (Ctrl+I) for MP3/podcast streams: current time is now clamped to track duration, and playback is auto-stopped if position runs past the end.
 • Improved installer localization coverage: setup.exe now includes additional installer languages (Czech, Polish, French, Serbian), while MSI is kept as a single en-US package to avoid release confusion.
 • Fixed uninstall cleanup for context menu entries: "Open with Sonarpad" is now removed reliably, including legacy registry scenarios.
+• Fixed SAPI5 pause/resume reliability: F4 pause now works correctly and resume returns to the expected position instead of restarting from the beginning.
 
 Version 0.6.5 – 2026-02-07
 Improvements

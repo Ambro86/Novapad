@@ -34,7 +34,7 @@ tests/fixtures/articles\032.html,3445,562,title
 tests/fixtures/articles\033.html,1152,184,title
 tests/fixtures/articles\034.html,1325,192,title
 tests/fixtures/articles\035.html,158,21,title
-tests/fixtures/articles\036.html,0,0,title
+tests/fixtures/articles\036.html,40,2,title
 tests/fixtures/articles\037.html,3181,477,title
 tests/fixtures/articles\038.html,1245,209,title
 tests/fixtures/articles\039.html,83,15,title
@@ -74,3 +74,5 @@ tests/fixtures/articles\072.html,2673,432,title
 tests/fixtures/articles\073.html,1090,171,title
 tests/fixtures/articles\074.html,30000,4500,title
 tests/fixtures/articles\075.html,2000,300,title
+tests/fixtures/articles\076.html,8000,1200,title
+tests/fixtures/articles\077.html,1600,250,title

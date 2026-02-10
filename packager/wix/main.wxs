@@ -120,18 +120,21 @@
             </Component>
 
             {{#if file_associations}}
-            <Component Id="FileAssociations" Guid="*" Win64="$(var.Win64)">
+            <Component Id="FileAssociationsMarker" Guid="*" Win64="$(var.Win64)">
                 <RegistryValue Root="HKLM" Key="Software\\{{manufacturer}}\\{{product_name}}" Name="File Associations" Type="integer" Value="1" KeyPath="yes" />
-                {{#each file_associations as |association| ~}}
-                {{#each association.extensions as |ext| ~}}
+            </Component>
+            {{#each file_associations as |association| ~}}
+            {{#each association.extensions as |ext| ~}}
+            <Component Id="CmpFileAssocExt_{{ext}}" Guid="*" Win64="$(var.Win64)">
+                <RegistryValue Root="HKLM" Key="Software\\{{manufacturer}}\\{{product_name}}" Name="Assoc_{{ext}}" Type="integer" Value="1" KeyPath="yes" />
                 <ProgId Id="{{../../product_name}}.{{ext}}" Description="{{association.description}}">
                     <Extension Id="{{ext}}">
                         <Verb Id="open" Command="!(loc.OpenWithLabel)" Argument="&quot;%1&quot;" TargetProperty="NOVAPAD_EXE_PATH" />
                     </Extension>
                 </ProgId>
-                {{/each~}}
-                {{/each~}}
             </Component>
+            {{/each~}}
+            {{/each~}}
 
             <Component Id="ContextMenu" Guid="*" Win64="$(var.Win64)">
                 <RegistryValue Root="HKLM" Key="Software\\{{manufacturer}}\\{{product_name}}" Name="Context Menu" Type="integer" Value="1" KeyPath="yes" />
@@ -188,7 +191,14 @@
 
             {{#if file_associations}}
             <Feature Id="FileAssociationsFeature" Title="!(loc.FileAssociationsFeatureTitle)" Description="!(loc.FileAssociationsFeatureDescription)" Level="1" Absent="allow" Display="expand">
-                <ComponentRef Id="FileAssociations" />
+                <ComponentRef Id="FileAssociationsMarker" />
+                {{#each file_associations as |association| ~}}
+                {{#each association.extensions as |ext| ~}}
+                <Feature Id="FileAssocExt_{{ext}}" Title=".{{ext}}" Description="{{association.description}}" Level="1" Absent="allow" Display="expand">
+                    <ComponentRef Id="CmpFileAssocExt_{{ext}}" />
+                </Feature>
+                {{/each~}}
+                {{/each~}}
             </Feature>
             <Feature Id="ContextMenuFeature" Title="!(loc.ContextMenuFeatureTitle)" Description="!(loc.ContextMenuFeatureDescription)" Level="1" Absent="allow" Display="expand">
                 <ComponentRef Id="ContextMenu" />

@@ -475,6 +475,9 @@ pub fn reader_mode_extract(html_content: &str, language: Language) -> Option<Art
         let content_selectors = [
             ".node-text .textarea-content-body",
             ".node-summary",
+            ".section--content-news .left-content p",
+            ".section--content-news .title-quote-text p",
+            "#article-body .story__text",
             ".entry-content p",
             ".wp-block-post-content p",
             ".ifq-post__content p",
@@ -522,7 +525,7 @@ pub fn reader_mode_extract(html_content: &str, language: Language) -> Option<Art
     }
     final_text.push_str(&body_acc);
 
-    let content = clean_text(&final_text);
+    let content = strip_post_extraction_noise(&clean_text(&final_text));
     let mut final_content = collapse_blank_lines(&content);
     if let Some(meta_desc) = pick_meta_description(&document) {
         let should_fallback = body_acc.trim().len() < 120
@@ -535,16 +538,47 @@ pub fn reader_mode_extract(html_content: &str, language: Language) -> Option<Art
                 fallback.push_str(&format!("{prefix} {}\n\n", author_info));
             }
             fallback.push_str(meta_desc.trim());
-            let fallback_content = collapse_blank_lines(&clean_text(&fallback));
+            let fallback_content =
+                collapse_blank_lines(&strip_post_extraction_noise(&clean_text(&fallback)));
             if fallback_content.len() > final_content.len() {
                 final_content = fallback_content;
             }
         }
     }
+    if final_content.trim().len() < 10
+        && let Some(url) = pick_reddit_link_post_url(&document)
+    {
+        final_content = format!("External link:\n{url}");
+    }
     Some(ArticleContent {
         title: title.trim().to_string(),
         content: final_content,
     })
+}
+
+fn strip_post_extraction_noise(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    for line in input.lines() {
+        let trimmed = line.trim();
+        if is_known_js_noise_line(trimmed) {
+            continue;
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    out.trim_end_matches('\n').to_string()
+}
+
+fn is_known_js_noise_line(line: &str) -> bool {
+    if line.is_empty() {
+        return false;
+    }
+
+    let lower = line.to_ascii_lowercase();
+    lower.contains("window.datawrapper")
+        || lower.contains("datawrapper-height")
+        || lower.contains("addeventlistener(\"message\"")
+        || lower.contains("addeventlistener('message'")
 }
 
 #[cfg(test)]
@@ -628,6 +662,21 @@ fn pick_meta_description(document: &Html) -> Option<String> {
         }
     }
     if best.len() >= 40 { Some(best) } else { None }
+}
+
+fn pick_reddit_link_post_url(document: &Html) -> Option<String> {
+    let selector =
+        Selector::parse("shreddit-post[post-type='link'] div[slot='post-media-container'] a[href]")
+            .ok()?;
+    for el in document.select(&selector) {
+        if let Some(href) = el.value().attr("href") {
+            let trimmed = href.trim();
+            if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+                return Some(trimmed.to_string());
+            }
+        }
+    }
+    None
 }
 
 pub fn collapse_blank_lines(s: &str) -> String {

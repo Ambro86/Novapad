@@ -450,6 +450,183 @@ fn parse_feed_bytes(
     Some((title, items))
 }
 
+pub(crate) fn is_google_news_article_url(url: &str) -> bool {
+    let Ok(parsed) = Url::parse(url.trim()) else {
+        return false;
+    };
+    let host = parsed.host_str().unwrap_or("");
+    if !host.eq_ignore_ascii_case("news.google.com") {
+        return false;
+    }
+    let path = parsed.path().to_ascii_lowercase();
+    // Google News article links can appear in different path variants.
+    path.contains("/rss/articles/")
+        || path.contains("/articles/")
+        || path.contains("/read/")
+        || path.contains("/__i/rss/rd/articles/")
+}
+
+fn extract_between<'a>(s: &'a str, start: &str, end: &str) -> Option<&'a str> {
+    let from = s.find(start)? + start.len();
+    let rest = &s[from..];
+    let to = rest.find(end)?;
+    Some(&rest[..to])
+}
+
+fn extract_google_news_article_id(url: &str) -> Option<String> {
+    let parsed = Url::parse(url).ok()?;
+    let mut segments = parsed.path_segments()?;
+    let segments: Vec<&str> = segments.by_ref().collect();
+    let pos = segments
+        .iter()
+        .position(|seg| seg.eq_ignore_ascii_case("articles"))?;
+    let id = segments.get(pos + 1)?.trim();
+    if id.is_empty() {
+        None
+    } else {
+        Some(id.to_string())
+    }
+}
+
+fn extract_google_news_tokens(html: &str) -> Option<(String, String)> {
+    let signature = extract_between(html, "data-n-a-sg=\"", "\"")
+        .or_else(|| extract_between(html, "data-n-a-sg='", "'"))?
+        .trim()
+        .to_string();
+    let timestamp = extract_between(html, "data-n-a-ts=\"", "\"")
+        .or_else(|| extract_between(html, "data-n-a-ts='", "'"))?
+        .trim()
+        .to_string();
+    if signature.is_empty() || timestamp.is_empty() {
+        None
+    } else {
+        Some((signature, timestamp))
+    }
+}
+
+fn fetch_google_news_article_page_html(url: &str) -> Result<String, String> {
+    let html = String::from_utf8_lossy(
+        &crate::curl_client::CurlClient::fetch_url_impersonated(url).map_err(|e| e.to_string())?,
+    )
+    .to_string();
+    if extract_google_news_tokens(&html).is_some() {
+        return Ok(html);
+    }
+
+    reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(20))
+        .build()
+        .map_err(|e| e.to_string())?
+        .get(url)
+        .header(
+            reqwest::header::USER_AGENT,
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        )
+        .header(reqwest::header::ACCEPT_LANGUAGE, "en-US,en;q=0.9")
+        .send()
+        .and_then(|r| r.error_for_status())
+        .map_err(|e| e.to_string())?
+        .text()
+        .map_err(|e| e.to_string())
+}
+
+fn encode_form_value(value: &str) -> String {
+    url::form_urlencoded::byte_serialize(value.as_bytes()).collect()
+}
+
+fn extract_decoded_google_news_url(response: &str) -> Option<String> {
+    let normalized = response.replace("\\\"", "\"").replace("\\/", "/");
+    let url = extract_between(&normalized, "[\"garturlres\",\"", "\",")?.trim();
+    let parsed = Url::parse(url).ok()?;
+    match parsed.scheme() {
+        "http" | "https" => Some(url.to_string()),
+        _ => None,
+    }
+}
+
+pub(crate) fn resolve_google_news_article_url_blocking(
+    url: &str,
+) -> Result<Option<String>, String> {
+    if !is_google_news_article_url(url) {
+        return Ok(None);
+    }
+    let article_id = match extract_google_news_article_id(url) {
+        Some(id) => id,
+        None => {
+            log_debug(&format!(
+                "google_news_decode skip reason=article_id_missing url=\"{}\"",
+                url
+            ));
+            return Ok(None);
+        }
+    };
+
+    let html = fetch_google_news_article_page_html(url)?;
+    let (signature, timestamp) = match extract_google_news_tokens(&html) {
+        Some(tokens) => tokens,
+        None => {
+            log_debug(&format!(
+                "google_news_decode skip reason=tokens_missing url=\"{}\"",
+                url
+            ));
+            return Ok(None);
+        }
+    };
+
+    let req_inner = format!(
+        r#"["garturlreq",[["en-US","US",["WEB_TEST_1_0_0"],null,null,1,1,"US:en",null,180,null,null,null,null,null,0,null,null,[1608992183,723341000]],"en-US","US",1,[2,3,4,8],1,0,"655000234",0,0,null,0],"{article_id}",{timestamp},"{signature}"]"#
+    );
+    let req_inner_json = serde_json::to_string(&req_inner).map_err(|e| e.to_string())?;
+    let f_req = format!(r#"[[["Fbv4je",{}]]]"#, req_inner_json);
+    let body = format!("f.req={}", encode_form_value(&f_req));
+
+    let response = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(20))
+        .build()
+        .map_err(|e| e.to_string())?
+        .post("https://news.google.com/_/DotsSplashUi/data/batchexecute?rpcids=Fbv4je")
+        .header(
+            reqwest::header::CONTENT_TYPE,
+            "application/x-www-form-urlencoded;charset=UTF-8",
+        )
+        .header(
+            reqwest::header::USER_AGENT,
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        )
+        .header(reqwest::header::REFERER, "https://news.google.com/")
+        .header(reqwest::header::ORIGIN, "https://news.google.com")
+        .header("X-Same-Domain", "1")
+        .body(body)
+        .send()
+        .and_then(|r| r.error_for_status())
+        .map_err(|e| e.to_string())?
+        .text()
+        .map_err(|e| e.to_string())?;
+
+    let decoded = match extract_decoded_google_news_url(&response) {
+        Some(v) => v,
+        None => {
+            log_debug(&format!(
+                "google_news_decode skip reason=decoded_url_missing url=\"{}\"",
+                url
+            ));
+            return Ok(None);
+        }
+    };
+    if decoded == url {
+        log_debug(&format!(
+            "google_news_decode skip reason=same_url url=\"{}\"",
+            url
+        ));
+        return Ok(None);
+    }
+    log_debug(&format!(
+        "google_news_decode ok from=\"{}\" to=\"{}\"",
+        url, decoded
+    ));
+    Ok(Some(decoded))
+}
+
 fn parse_podcast_feed_bytes(
     bytes: Vec<u8>,
     fallback_title: &str,
@@ -971,9 +1148,41 @@ pub async fn fetch_article_text(
     language: crate::settings::Language,
 ) -> Result<String, String> {
     let start_total = Instant::now();
-    let url_str = normalize_url(url);
+    let mut url_str = normalize_url(url);
     if url_str.is_empty() {
         return Err("Empty URL".to_string());
+    }
+    if is_google_news_article_url(&url_str) {
+        log_debug(&format!(
+            "rss_article_fetch google_news_resolve_attempt url=\"{}\"",
+            url_str
+        ));
+        let original = url_str.clone();
+        match tokio::task::spawn_blocking(move || {
+            resolve_google_news_article_url_blocking(&original)
+        })
+        .await
+        {
+            Ok(Ok(Some(decoded))) => {
+                log_debug(&format!(
+                    "rss_article_fetch google_news_resolved from=\"{}\" to=\"{}\"",
+                    url_str, decoded
+                ));
+                url_str = decoded;
+            }
+            Ok(Ok(None)) => {}
+            Ok(Err(err)) => {
+                log_debug(&format!(
+                    "rss_article_fetch google_news_resolve_failed error=\"{err}\""
+                ));
+            }
+            Err(err) => {
+                log_debug(&format!(
+                    "rss_article_fetch google_news_resolve_join_failed error=\"{}\"",
+                    err
+                ));
+            }
+        }
     }
 
     log_debug(&format!(
@@ -1086,6 +1295,23 @@ mod tests {
             article.content.trim().chars().count() >= 120,
             "reader output is unexpectedly short"
         );
+    }
+
+    #[test]
+    fn extract_google_news_article_id_parses_rss_articles_path() {
+        let id = extract_google_news_article_id(
+            "https://news.google.com/rss/articles/CBMiQGh0dHBzOi8vZXhhbXBsZS5jb20v?oc=5",
+        );
+        assert_eq!(id.as_deref(), Some("CBMiQGh0dHBzOi8vZXhhbXBsZS5jb20v"));
+    }
+
+    #[test]
+    fn extract_decoded_google_news_url_parses_batchexecute_payload() {
+        let payload = r#")]}'
+
+[["wrb.fr","Fbv4je","[\"garturlres\",\"https://example.com/article\",1]",null,null,null,""]]"#;
+        let decoded = extract_decoded_google_news_url(payload);
+        assert_eq!(decoded.as_deref(), Some("https://example.com/article"));
     }
 }
 

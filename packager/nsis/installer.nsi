@@ -134,8 +134,17 @@ Var ReinstallPageCheck
 {{#if file_associations}}
 Var AssociateFilesCheckbox
 Var AssociateFilesCheckboxState
+Var AssociateFilesModeAllRadio
+Var AssociateFilesModeManualRadio
+Var AssociateFilesModeManualState
+Var AssociateExtensionsList
 Var ContextMenuCheckbox
 Var ContextMenuCheckboxState
+{{#each file_associations as |association| ~}}
+{{#each association.extensions as |ext| ~}}
+Var AssocExtState_{{ext}}
+{{/each~}}
+{{/each~}}
 {{/if}}
 Page custom PageReinstall PageLeaveReinstall
 Function PageReinstall
@@ -303,6 +312,11 @@ Function PageLeaveReinstall
 FunctionEnd
 
 {{#if file_associations}}
+!define LB_ADDSTRING 0x180
+!define LB_SETSEL 0x185
+!define LB_GETSEL 0x187
+!define LB_FINDSTRINGEXACT 0x1A2
+
 Function PageFileAssociations
   Call SkipIfPassive
   nsDialogs::Create 1018
@@ -316,7 +330,17 @@ Function PageFileAssociations
     ${NSD_Check} $AssociateFilesCheckbox
   ${EndIf}
 
-  ${NSD_CreateCheckbox} 0 36u 100% 12u "$(ctxMenuCheckbox)"
+  ${NSD_CreateRadioButton} 12u 38u 100% 10u "$(assocModeAll)"
+  Pop $AssociateFilesModeAllRadio
+  ${NSD_CreateRadioButton} 12u 50u 100% 10u "$(assocModeManual)"
+  Pop $AssociateFilesModeManualRadio
+  ${If} $AssociateFilesModeManualState == 1
+    ${NSD_Check} $AssociateFilesModeManualRadio
+  ${Else}
+    ${NSD_Check} $AssociateFilesModeAllRadio
+  ${EndIf}
+
+  ${NSD_CreateCheckbox} 0 70u 100% 12u "$(ctxMenuCheckbox)"
   Pop $ContextMenuCheckbox
   ${If} $ContextMenuCheckboxState == 1
     ${NSD_Check} $ContextMenuCheckbox
@@ -326,7 +350,61 @@ FunctionEnd
 
 Function PageLeaveFileAssociations
   ${NSD_GetState} $AssociateFilesCheckbox $AssociateFilesCheckboxState
+  ${NSD_GetState} $AssociateFilesModeManualRadio $AssociateFilesModeManualState
   ${NSD_GetState} $ContextMenuCheckbox $ContextMenuCheckboxState
+FunctionEnd
+
+Function PrePageFileAssociationExtensions
+  Call SkipIfPassive
+  ${If} $AssociateFilesCheckboxState != 1
+    Abort
+  ${EndIf}
+  ${If} $AssociateFilesModeManualState != 1
+    Abort
+  ${EndIf}
+FunctionEnd
+
+Function PageFileAssociationExtensions
+  Call SkipIfPassive
+  nsDialogs::Create 1018
+  Pop $R0
+  ${IfThen} $R0 == error ${|} Abort ${|}
+
+  !insertmacro MUI_HEADER_TEXT "$(assocExtTitle)" "$(assocExtSubtitle)"
+
+  ${NSD_CreateLabel} 0 18u 100% 12u "$(assocExtListLabel)"
+  Pop $R1
+  ${NSD_CreateListBox} 0 32u 100% 120u ""
+  Pop $AssociateExtensionsList
+
+  {{#each file_associations as |association| ~}}
+  {{#each association.extensions as |ext| ~}}
+    SendMessage $AssociateExtensionsList ${LB_ADDSTRING} 0 "STR:.{{ext}}" $R0
+    ${If} $AssocExtState_{{ext}} == 1
+      SendMessage $AssociateExtensionsList ${LB_SETSEL} 1 $R0
+    ${EndIf}
+  {{/each~}}
+  {{/each~}}
+
+  nsDialogs::Show
+FunctionEnd
+
+Function PageLeaveFileAssociationExtensions
+  {{#each file_associations as |association| ~}}
+  {{#each association.extensions as |ext| ~}}
+    SendMessage $AssociateExtensionsList ${LB_FINDSTRINGEXACT} -1 "STR:.{{ext}}" $R0
+    ${If} $R0 >= 0
+      SendMessage $AssociateExtensionsList ${LB_GETSEL} $R0 0 $R1
+      ${If} $R1 == 1
+        StrCpy $AssocExtState_{{ext}} 1
+      ${Else}
+        StrCpy $AssocExtState_{{ext}} 0
+      ${EndIf}
+    ${Else}
+      StrCpy $AssocExtState_{{ext}} 0
+    ${EndIf}
+  {{/each~}}
+  {{/each~}}
 FunctionEnd
 {{/if}}
 
@@ -343,6 +421,10 @@ Var AppStartMenuFolder
 ; 6b. File associations page
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
 Page custom PageFileAssociations PageLeaveFileAssociations
+
+; 6c. Manual file association selection page
+!define MUI_PAGE_CUSTOMFUNCTION_PRE PrePageFileAssociationExtensions
+Page custom PageFileAssociationExtensions PageLeaveFileAssociationExtensions
 {{/if}}
 
 ; 7. Installation page
@@ -432,6 +514,61 @@ LangString assocCheckbox ${LANG_CZECH} "Přidružit podporované typy souborů k
 LangString assocCheckbox ${LANG_POLISH} "Skojarz obslugiwane typy plikow z ${PRODUCTNAME}"
 LangString assocCheckbox ${LANG_FRENCH} "Associer les types de fichiers pris en charge a ${PRODUCTNAME}"
 LangString assocCheckbox ${LANG_SERBIAN} "Povezi podrzane tipove datoteka sa ${PRODUCTNAME}"
+
+LangString assocModeAll ${LANG_ENGLISH} "Associate all supported file extensions"
+LangString assocModeAll ${LANG_ITALIAN} "Associa tutte le estensioni supportate"
+LangString assocModeAll ${LANG_SPANISH} "Asociar todas las extensiones compatibles"
+LangString assocModeAll ${LANG_PORTUGUESE} "Associar todas as extensoes suportadas"
+LangString assocModeAll ${LANG_SWEDISH} "Associera alla filandelser som stöds"
+LangString assocModeAll ${LANG_VIETNAMESE} "Lien ket tat ca phan mo rong tep duoc ho tro"
+LangString assocModeAll ${LANG_CZECH} "Pridruzit vsechny podporovane pripony souboru"
+LangString assocModeAll ${LANG_POLISH} "Skojarz wszystkie obslugiwane rozszerzenia plikow"
+LangString assocModeAll ${LANG_FRENCH} "Associer toutes les extensions prises en charge"
+LangString assocModeAll ${LANG_SERBIAN} "Povezi sve podrzane ekstenzije datoteka"
+
+LangString assocModeManual ${LANG_ENGLISH} "Choose file extensions manually"
+LangString assocModeManual ${LANG_ITALIAN} "Scegli manualmente le estensioni file"
+LangString assocModeManual ${LANG_SPANISH} "Elegir manualmente las extensiones de archivo"
+LangString assocModeManual ${LANG_PORTUGUESE} "Escolher manualmente as extensoes de ficheiro"
+LangString assocModeManual ${LANG_SWEDISH} "Valj filandelser manuellt"
+LangString assocModeManual ${LANG_VIETNAMESE} "Chon thu cong cac phan mo rong tep"
+LangString assocModeManual ${LANG_CZECH} "Rucne vybrat pripony souboru"
+LangString assocModeManual ${LANG_POLISH} "Wybierz recznie rozszerzenia plikow"
+LangString assocModeManual ${LANG_FRENCH} "Choisir manuellement les extensions de fichier"
+LangString assocModeManual ${LANG_SERBIAN} "Rucno izaberi ekstenzije datoteka"
+
+LangString assocExtTitle ${LANG_ENGLISH} "Manual file association selection"
+LangString assocExtTitle ${LANG_ITALIAN} "Selezione manuale associazioni file"
+LangString assocExtTitle ${LANG_SPANISH} "Seleccion manual de asociaciones de archivos"
+LangString assocExtTitle ${LANG_PORTUGUESE} "Selecao manual de associacoes de ficheiros"
+LangString assocExtTitle ${LANG_SWEDISH} "Manuellt val av filkopplingar"
+LangString assocExtTitle ${LANG_VIETNAMESE} "Chon lien ket tep thu cong"
+LangString assocExtTitle ${LANG_CZECH} "Rucni vyber prirazeni souboru"
+LangString assocExtTitle ${LANG_POLISH} "Reczny wybor skojarzen plikow"
+LangString assocExtTitle ${LANG_FRENCH} "Selection manuelle des associations de fichiers"
+LangString assocExtTitle ${LANG_SERBIAN} "Rucni izbor povezivanja datoteka"
+
+LangString assocExtSubtitle ${LANG_ENGLISH} "Select the extensions to associate with ${PRODUCTNAME}."
+LangString assocExtSubtitle ${LANG_ITALIAN} "Seleziona le estensioni da associare a ${PRODUCTNAME}."
+LangString assocExtSubtitle ${LANG_SPANISH} "Seleccione las extensiones que desea asociar con ${PRODUCTNAME}."
+LangString assocExtSubtitle ${LANG_PORTUGUESE} "Selecione as extensoes a associar ao ${PRODUCTNAME}."
+LangString assocExtSubtitle ${LANG_SWEDISH} "Valj vilka filandelser som ska kopplas till ${PRODUCTNAME}."
+LangString assocExtSubtitle ${LANG_VIETNAMESE} "Chon cac phan mo rong can lien ket voi ${PRODUCTNAME}."
+LangString assocExtSubtitle ${LANG_CZECH} "Vyberte pripony, ktere chcete priradit k aplikaci ${PRODUCTNAME}."
+LangString assocExtSubtitle ${LANG_POLISH} "Wybierz rozszerzenia, ktore chcesz skojarzyc z ${PRODUCTNAME}."
+LangString assocExtSubtitle ${LANG_FRENCH} "Selectionnez les extensions a associer a ${PRODUCTNAME}."
+LangString assocExtSubtitle ${LANG_SERBIAN} "Izaberite ekstenzije koje zelite da povezete sa ${PRODUCTNAME}."
+
+LangString assocExtListLabel ${LANG_ENGLISH} "Extensions:"
+LangString assocExtListLabel ${LANG_ITALIAN} "Estensioni:"
+LangString assocExtListLabel ${LANG_SPANISH} "Extensiones:"
+LangString assocExtListLabel ${LANG_PORTUGUESE} "Extensoes:"
+LangString assocExtListLabel ${LANG_SWEDISH} "Filandelser:"
+LangString assocExtListLabel ${LANG_VIETNAMESE} "Phan mo rong:"
+LangString assocExtListLabel ${LANG_CZECH} "Pripony:"
+LangString assocExtListLabel ${LANG_POLISH} "Rozszerzenia:"
+LangString assocExtListLabel ${LANG_FRENCH} "Extensions :"
+LangString assocExtListLabel ${LANG_SERBIAN} "Ekstenzije:"
 
 LangString ctxMenuCheckbox ${LANG_ENGLISH} "Add 'Open with ${PRODUCTNAME}' to the context menu"
 LangString ctxMenuCheckbox ${LANG_ITALIAN} "Aggiungi $\"Apri con ${PRODUCTNAME}$\" al menu contestuale"
@@ -680,7 +817,13 @@ Function .onInit
 
 {{#if file_associations}}
   StrCpy $AssociateFilesCheckboxState 1
+  StrCpy $AssociateFilesModeManualState 0
   StrCpy $ContextMenuCheckboxState 1
+  {{#each file_associations as |association| ~}}
+  {{#each association.extensions as |ext| ~}}
+  StrCpy $AssocExtState_{{ext}} 1
+  {{/each~}}
+  {{/each~}}
 {{/if}}
 
   !if "${DISPLAYLANGUAGESELECTOR}" == "true"
@@ -797,27 +940,59 @@ Section Install
   ; Create file associations
   {{#if file_associations}}
   ${If} $AssociateFilesCheckboxState == 1
-    {{#each file_associations as |association| ~}}
-      {{#each association.extensions as |ext| ~}}
-        !insertmacro APP_ASSOCIATE "{{ext}}" "{{or association.name ext}}" "{{association-description association.description ext}}" "$INSTDIR\${MAINBINARYNAME}.exe,0" "Open with ${PRODUCTNAME}" "$INSTDIR\${MAINBINARYNAME}.exe $\"%1$\""
+    ${If} $AssociateFilesModeManualState == 1
+      {{#each file_associations as |association| ~}}
+        {{#each association.extensions as |ext| ~}}
+          ${If} $AssocExtState_{{ext}} == 1
+            !insertmacro APP_ASSOCIATE "{{ext}}" "{{or association.name ext}}" "{{association-description association.description ext}}" "$INSTDIR\${MAINBINARYNAME}.exe,0" "Open with ${PRODUCTNAME}" "$INSTDIR\${MAINBINARYNAME}.exe $\"%1$\""
+            WriteRegStr SHCTX "${MANUPRODUCTKEY}" "Assoc_{{ext}}" "1"
+          ${Else}
+            DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "Assoc_{{ext}}"
+          ${EndIf}
+        {{/each}}
       {{/each}}
-    {{/each}}
+    ${Else}
+      {{#each file_associations as |association| ~}}
+        {{#each association.extensions as |ext| ~}}
+          !insertmacro APP_ASSOCIATE "{{ext}}" "{{or association.name ext}}" "{{association-description association.description ext}}" "$INSTDIR\${MAINBINARYNAME}.exe,0" "Open with ${PRODUCTNAME}" "$INSTDIR\${MAINBINARYNAME}.exe $\"%1$\""
+          WriteRegStr SHCTX "${MANUPRODUCTKEY}" "Assoc_{{ext}}" "1"
+        {{/each}}
+      {{/each}}
+    ${EndIf}
     WriteRegStr SHCTX "${MANUPRODUCTKEY}" "FileAssociations" "1"
   ${Else}
     DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "FileAssociations"
+    {{#each file_associations as |association| ~}}
+      {{#each association.extensions as |ext| ~}}
+        DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "Assoc_{{ext}}"
+      {{/each}}
+    {{/each}}
   ${EndIf}
   {{/if}}
 
   ; Create context menu entries
   {{#if file_associations}}
   ${If} $ContextMenuCheckboxState == 1
-    {{#each file_associations as |association| ~}}
-      {{#each association.extensions as |ext| ~}}
-        WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad" "" "$(ctxMenuLabel)"
-        WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad\DefaultIcon" "" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\",0"
-        WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad\command" "" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\" $\"%1$\""
+    ${If} $AssociateFilesCheckboxState == 1
+    ${AndIf} $AssociateFilesModeManualState == 1
+      {{#each file_associations as |association| ~}}
+        {{#each association.extensions as |ext| ~}}
+          ${If} $AssocExtState_{{ext}} == 1
+            WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad" "" "$(ctxMenuLabel)"
+            WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad\DefaultIcon" "" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\",0"
+            WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad\command" "" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\" $\"%1$\""
+          ${EndIf}
+        {{/each}}
       {{/each}}
-    {{/each}}
+    ${Else}
+      {{#each file_associations as |association| ~}}
+        {{#each association.extensions as |ext| ~}}
+          WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad" "" "$(ctxMenuLabel)"
+          WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad\DefaultIcon" "" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\",0"
+          WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad\command" "" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\" $\"%1$\""
+        {{/each}}
+      {{/each}}
+    ${EndIf}
     WriteRegStr SHCTX "${MANUPRODUCTKEY}" "ContextMenu" "1"
   ${Else}
     {{#each file_associations as |association| ~}}
@@ -928,15 +1103,16 @@ Section Uninstall
 
   ; Delete app associations
   {{#if file_associations}}
-  ReadRegStr $R0 SHCTX "${MANUPRODUCTKEY}" "FileAssociations"
-  ${If} $R0 == "1"
-    {{#each file_associations as |association| ~}}
-      {{#each association.extensions as |ext| ~}}
+  {{#each file_associations as |association| ~}}
+    {{#each association.extensions as |ext| ~}}
+      ReadRegStr $R0 SHCTX "${MANUPRODUCTKEY}" "Assoc_{{ext}}"
+      ${If} $R0 == "1"
         !insertmacro APP_UNASSOCIATE "{{ext}}" "{{or association.name ext}}"
-      {{/each}}
+      ${EndIf}
+      DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "Assoc_{{ext}}"
     {{/each}}
-    DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "FileAssociations"
-  ${EndIf}
+  {{/each}}
+  DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "FileAssociations"
   {{/if}}
 
   ; Delete context menu entries

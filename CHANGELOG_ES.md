@@ -7,11 +7,14 @@ Mejoras
 • La exportación de audiolibros ahora guarda MP3 en estéreo con bitrate elegido por el usuario para voces Edge, SAPI5 y SAPI4.
 • Reorganizadas las funciones de voz en un menú dedicado "Voz y audio" y añadida/aclarada la opción "Convertir audio", útil para convertir cualquier archivo multimedia compatible a MP3, AAC, OGG, Opus, FLAC, WAV y AIFF.
 • Añadida la eliminación de artículos RSS individuales y episodios de podcast individuales (tecla Supr + menú contextual con confirmación), sin eliminar toda la fuente RSS/podcast.
+• Añadida la exportación de feeds RSS a OPML en la ventana RSS, para guardar y reimportar fácilmente las fuentes actuales.
+• Añadida la función "Buscar RSS por palabra clave" en la ventana RSS: al introducir una palabra clave se genera automáticamente la URL RSS de Google News y se abre el diálogo de añadir fuente ya prellenado, para crear feeds temáticos en un solo paso.
 • Añadida la traducción serbia gracias a Mila Kuran.
 • Añadida la apertura múltiple de archivos multimedia: al abrir varios archivos juntos se crea una cola de reproducción en lugar de sustituir el archivo actual.
 • Añadidos atajos de salto variable durante la reproducción: con base de 1 minuto, Izquierda/Derecha salta 60s, Shift+Izquierda/Derecha salta 20s y Ctrl+Izquierda/Derecha salta 3 minutos.
 • Añadidos atajos para pista anterior/siguiente en el reproductor: Ctrl+PageUp y Ctrl+PageDown.
 • Añadida la opción "Restablecer volumen" y agrupadas las acciones de reinicio en un submenú dedicado "Restablecer" en Reproducción, junto con "Restablecer velocidad" y "Restablecer tono".
+• Mejoras del instalador: setup.exe ahora permite elegir entre asociar todos los tipos de archivo compatibles o seleccionar manualmente las extensiones; el MSI también ofrece selección por extensión en el árbol de características (el valor predeterminado se mantiene: todas activadas).
 Correcciones de errores
 • Corregida la extracción de texto EPUB para libros con comentarios HTML inline (<!-- ... -->): ahora el texto de los capítulos se analiza correctamente en lugar de omitirse parcial o totalmente.
 • Corregido el diccionario Wiktionary en español y la caché del diccionario: palabras como "agua" ahora se encuentran correctamente y las entradas antiguas de "Palabra no encontrada" ya no se reutilizan.
@@ -293,4 +296,7 @@ Mejoras
 
 ## 0.1.0 - 2025-12-25
 - Version inicial: estructura del proyecto y README.
+
+
+
 

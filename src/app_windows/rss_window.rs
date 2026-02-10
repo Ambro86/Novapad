@@ -8,6 +8,8 @@ use crate::with_state;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::io::Write;
 use std::mem;
 use std::path::{Path, PathBuf};
 use url::Url;
@@ -17,8 +19,8 @@ use windows::Win32::System::DataExchange::COPYDATASTRUCT;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::Dialogs::{
-    GetOpenFileNameW, OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY, OFN_PATHMUSTEXIST,
-    OPENFILENAMEW,
+    GetOpenFileNameW, GetSaveFileNameW, OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY,
+    OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST, OPENFILENAMEW,
 };
 use windows::Win32::UI::Controls::{
     NM_RCLICK, NMHDR, NMTREEVIEWW, NMTVKEYDOWN, TVE_EXPAND, TVGN_CARET, TVGN_CHILD, TVGN_NEXT,
@@ -36,14 +38,14 @@ use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, BS_DEFPUSHBUTTON, CHILDID_SELF, CREATESTRUCTW, CW_USEDEFAULT, CallWindowProcW,
     CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, DestroyWindow, ES_AUTOHSCROLL,
     EVENT_OBJECT_FOCUS, GWLP_USERDATA, GWLP_WNDPROC, GetCursorPos, GetDlgCtrlID, GetDlgItem,
-    GetParent, GetWindowLongPtrW, GetWindowRect, HMENU, IDYES, KillTimer, MB_ICONQUESTION,
-    MB_YESNO, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MessageBoxW, OBJID_CLIENT,
-    PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
-    SetWindowTextW, TrackPopupMenu, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CREATE,
-    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_SETFOCUS,
-    WM_SETFONT, WM_SETREDRAW, WM_SYSKEYDOWN, WM_TIMER, WM_USER, WNDCLASSW, WNDPROC, WS_CAPTION,
-    WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
-    WS_VSCROLL,
+    GetParent, GetWindowLongPtrW, GetWindowRect, HMENU, IDYES, KillTimer, MB_ICONINFORMATION,
+    MB_ICONQUESTION, MB_OK, MB_YESNO, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MessageBoxW,
+    OBJID_CLIENT, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow,
+    SetWindowLongPtrW, SetWindowTextW, TrackPopupMenu, WINDOW_STYLE, WM_CLOSE, WM_COMMAND,
+    WM_CONTEXTMENU, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY,
+    WM_NULL, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SYSKEYDOWN, WM_TIMER, WM_USER, WNDCLASSW,
+    WNDPROC, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU,
+    WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -52,6 +54,8 @@ const ID_TREE: usize = 1001;
 const ID_BTN_ADD: usize = 1002;
 const ID_BTN_CLOSE: usize = 1003;
 const ID_BTN_IMPORT: usize = 1004;
+const ID_BTN_EXPORT: usize = 1005;
+const ID_BTN_SEARCH: usize = 1006;
 const ID_CTX_EDIT: usize = 1101;
 const ID_CTX_DELETE: usize = 1102;
 const ID_CTX_RETRY: usize = 1103;
@@ -81,6 +85,9 @@ const EM_REPLACESEL: u32 = 0x00C2;
 const REORDER_EDIT_ID: usize = 1401;
 const REORDER_OK_ID: usize = 1402;
 const REORDER_CANCEL_ID: usize = 1403;
+const SEARCH_EDIT_ID: usize = 1501;
+const SEARCH_OK_ID: usize = 1502;
+const SEARCH_CANCEL_ID: usize = 1503;
 
 const FEED_EN_DATA: &str = include_str!("../../i18n/feed_en.txt");
 const FEED_IT_DATA: &str = include_str!("../../i18n/feed_it.txt");
@@ -181,6 +188,41 @@ fn percent_encode(input: &str) -> String {
     url::form_urlencoded::byte_serialize(input.as_bytes()).collect()
 }
 
+fn tr_or(language: crate::settings::Language, key: &str, fallback: &str) -> String {
+    let translated = i18n::tr(language, key);
+    if translated == key {
+        fallback.to_string()
+    } else {
+        translated
+    }
+}
+
+fn google_news_params(
+    language: crate::settings::Language,
+) -> (&'static str, &'static str, &'static str) {
+    match language {
+        crate::settings::Language::Italian => ("it", "IT", "IT:it"),
+        crate::settings::Language::Spanish => ("es", "ES", "ES:es"),
+        crate::settings::Language::Portuguese => ("pt", "PT", "PT:pt"),
+        crate::settings::Language::Swedish => ("sv", "SE", "SE:sv"),
+        crate::settings::Language::Vietnamese => ("vi", "VN", "VN:vi"),
+        crate::settings::Language::Czech => ("cs", "CZ", "CZ:cs"),
+        crate::settings::Language::Polish => ("pl", "PL", "PL:pl"),
+        crate::settings::Language::French => ("fr", "FR", "FR:fr"),
+        crate::settings::Language::Serbian => ("sr", "RS", "RS:sr"),
+        crate::settings::Language::English => ("en", "US", "US:en"),
+    }
+}
+
+fn build_google_news_rss_url(keyword: &str, language: crate::settings::Language) -> String {
+    let (hl, gl, ceid) = google_news_params(language);
+    let query = percent_encode(keyword.trim());
+    format!(
+        "https://news.google.com/rss/search?q={}&hl={}&gl={}&ceid={}",
+        query, hl, gl, ceid
+    )
+}
+
 fn parse_single_path(buffer: &[u16]) -> Option<PathBuf> {
     let end = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
     if end == 0 {
@@ -247,6 +289,70 @@ fn open_import_txt_dialog(hwnd: HWND, language: crate::settings::Language) -> Op
         return None;
     }
     parse_single_path(&buffer)
+}
+
+fn open_export_opml_dialog(hwnd: HWND, language: crate::settings::Language) -> Option<PathBuf> {
+    let filter_raw = i18n::tr(language, "rss.import_filter");
+    let filter = to_wide(&filter_raw.replace("\\0", "\0"));
+    let mut buffer = vec![0u16; 4096];
+    let mut ofn = OPENFILENAMEW {
+        lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
+        hwndOwner: hwnd,
+        lpstrFilter: PCWSTR(filter.as_ptr()),
+        lpstrFile: PWSTR(buffer.as_mut_ptr()),
+        nMaxFile: buffer.len() as u32,
+        Flags: OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY,
+        ..Default::default()
+    };
+    if !unsafe { GetSaveFileNameW(&mut ofn).as_bool() } {
+        return None;
+    }
+    parse_single_path(&buffer)
+}
+
+fn escape_opml_attr(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
+unsafe fn export_sources_to_opml_file(hwnd: HWND, path: &Path) -> Result<usize, String> {
+    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    if parent.0 == 0 {
+        return Err("missing parent".to_string());
+    }
+    let sources =
+        with_state(parent, |state| state.settings.rss_sources.clone()).unwrap_or_default();
+    if sources.is_empty() {
+        return Ok(0);
+    }
+
+    let mut file = File::create(path).map_err(|e| e.to_string())?;
+    writeln!(
+        file,
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<opml version=\"1.0\">\n<head>\n<title>Sonarpad RSS</title>\n</head>\n<body>"
+    )
+    .map_err(|e| e.to_string())?;
+
+    for src in &sources {
+        let title = if src.title.trim().is_empty() {
+            src.url.clone()
+        } else {
+            src.title.clone()
+        };
+        writeln!(
+            file,
+            "  <outline text=\"{}\" title=\"{}\" xmlUrl=\"{}\" />",
+            escape_opml_attr(&title),
+            escape_opml_attr(&title),
+            escape_opml_attr(&src.url)
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    writeln!(file, "</body>\n</opml>").map_err(|e| e.to_string())?;
+    Ok(sources.len())
 }
 
 unsafe fn import_sources_from_file(hwnd: HWND, path: &Path) {
@@ -872,12 +978,14 @@ struct RssWindowState {
     parent: HWND,
     hwnd_tree: HWND,
     hwnd_import: HWND,
+    hwnd_export: HWND,
     node_data: HashMap<isize, NodeData>,
     pending_fetches: HashMap<String, isize>, // URL -> hItem
     source_items: HashMap<isize, SourceItemsState>,
     enter_guard: bool,
     add_guard: bool,
     reorder_dialog: HWND,
+    search_dialog: HWND,
     pending_edit: Option<usize>,
     tree_proc: WNDPROC,
     last_selected: isize,
@@ -898,6 +1006,10 @@ struct AddDialogInit {
     parent: HWND,
     prefill_title: String,
     prefill_url: String,
+}
+
+struct SearchDialogInit {
+    parent: HWND,
 }
 
 pub unsafe fn open(parent: HWND) {
@@ -1253,12 +1365,14 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                 parent,
                 hwnd_tree: HWND(0),
                 hwnd_import: HWND(0),
+                hwnd_export: HWND(0),
                 node_data: HashMap::new(),
                 pending_fetches: HashMap::new(),
                 source_items: HashMap::new(),
                 enter_guard: false,
                 add_guard: false,
                 reorder_dialog: HWND(0),
+                search_dialog: HWND(0),
                 pending_edit: None,
                 tree_proc: None,
                 last_selected: 0,
@@ -1342,11 +1456,44 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                     }
                     LRESULT(0)
                 }
+                ID_BTN_SEARCH => {
+                    show_rss_search_dialog(hwnd);
+                    LRESULT(0)
+                }
+                ID_BTN_EXPORT => {
+                    let language = with_rss_state(hwnd, |s| {
+                        with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
+                    })
+                    .unwrap_or_default();
+                    if let Some(path) = open_export_opml_dialog(hwnd, language) {
+                        match export_sources_to_opml_file(hwnd, &path) {
+                            Ok(count) => {
+                                if count > 0 {
+                                    announce_rss_status(&i18n::tr(language, "rss.exported"));
+                                }
+                            }
+                            Err(err) => {
+                                let title = i18n::tr(language, "rss.window.title");
+                                let message =
+                                    format!("{}: {}", i18n::tr(language, "rss.export_failed"), err);
+                                MessageBoxW(
+                                    hwnd,
+                                    PCWSTR(to_wide(&message).as_ptr()),
+                                    PCWSTR(to_wide(&title).as_ptr()),
+                                    MB_OK | MB_ICONINFORMATION,
+                                );
+                            }
+                        }
+                    }
+                    LRESULT(0)
+                }
                 1 => {
                     // IDOK (Enter key often triggers this generic command)
                     let focus = GetFocus();
                     let btn_add = GetDlgItem(hwnd, ID_BTN_ADD as i32);
+                    let btn_search = GetDlgItem(hwnd, ID_BTN_SEARCH as i32);
                     let btn_import = GetDlgItem(hwnd, ID_BTN_IMPORT as i32);
+                    let btn_export = GetDlgItem(hwnd, ID_BTN_EXPORT as i32);
                     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
 
                     if focus == btn_add {
@@ -1369,6 +1516,42 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                         .unwrap_or_default();
                         if let Some(path) = open_import_txt_dialog(hwnd, language) {
                             import_sources_from_file(hwnd, &path);
+                        }
+                        return LRESULT(0);
+                    }
+
+                    if focus == btn_search {
+                        show_rss_search_dialog(hwnd);
+                        return LRESULT(0);
+                    }
+
+                    if focus == btn_export {
+                        let language = with_rss_state(hwnd, |s| {
+                            with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
+                        })
+                        .unwrap_or_default();
+                        if let Some(path) = open_export_opml_dialog(hwnd, language) {
+                            match export_sources_to_opml_file(hwnd, &path) {
+                                Ok(count) => {
+                                    if count > 0 {
+                                        announce_rss_status(&i18n::tr(language, "rss.exported"));
+                                    }
+                                }
+                                Err(err) => {
+                                    let title = i18n::tr(language, "rss.window.title");
+                                    let message = format!(
+                                        "{}: {}",
+                                        i18n::tr(language, "rss.export_failed"),
+                                        err
+                                    );
+                                    MessageBoxW(
+                                        hwnd,
+                                        PCWSTR(to_wide(&message).as_ptr()),
+                                        PCWSTR(to_wide(&title).as_ptr()),
+                                        MB_OK | MB_ICONINFORMATION,
+                                    );
+                                }
+                            }
                         }
                         return LRESULT(0);
                     }
@@ -2082,10 +2265,26 @@ unsafe fn create_controls(hwnd: HWND) {
         WS_CHILD | WS_VISIBLE | WS_TABSTOP,
         10,
         520,
-        120,
+        90,
         30,
         hwnd,
         HMENU(ID_BTN_ADD as isize),
+        hinstance,
+        None,
+    );
+
+    let search_label = tr_or(language, "rss.tree.search_keyword", "Search RSS...");
+    let hwnd_search = CreateWindowExW(
+        Default::default(),
+        WC_BUTTON,
+        PCWSTR(to_wide(&search_label).as_ptr()),
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+        105,
+        520,
+        90,
+        30,
+        hwnd,
+        HMENU(ID_BTN_SEARCH as isize),
         hinstance,
         None,
     );
@@ -2095,12 +2294,33 @@ unsafe fn create_controls(hwnd: HWND) {
         WC_BUTTON,
         PCWSTR(to_wide(&i18n::tr(language, "rss.tree.import_txt")).as_ptr()),
         WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-        140,
+        200,
         520,
-        160,
+        90,
         30,
         hwnd,
         HMENU(ID_BTN_IMPORT as isize),
+        hinstance,
+        None,
+    );
+
+    let export_label = i18n::tr(language, "rss.tree.export_opml");
+    let export_label = if export_label == "rss.tree.export_opml" {
+        "Export OPML...".to_string()
+    } else {
+        export_label
+    };
+    let hwnd_export = CreateWindowExW(
+        Default::default(),
+        WC_BUTTON,
+        PCWSTR(to_wide(&export_label).as_ptr()),
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+        295,
+        520,
+        90,
+        30,
+        hwnd,
+        HMENU(ID_BTN_EXPORT as isize),
         hinstance,
         None,
     );
@@ -2110,9 +2330,9 @@ unsafe fn create_controls(hwnd: HWND) {
         WC_BUTTON,
         PCWSTR(to_wide(&i18n::tr(language, "rss.tree.close")).as_ptr()),
         WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-        320,
+        390,
         520,
-        120,
+        80,
         30,
         hwnd,
         HMENU(ID_BTN_CLOSE as isize),
@@ -2123,6 +2343,7 @@ unsafe fn create_controls(hwnd: HWND) {
     with_rss_state(hwnd, |s| {
         s.hwnd_tree = hwnd_tree;
         s.hwnd_import = hwnd_import;
+        s.hwnd_export = hwnd_export;
     });
 
     let hfont = with_rss_state(hwnd, |s| {
@@ -2132,7 +2353,9 @@ unsafe fn create_controls(hwnd: HWND) {
     if hfont.0 != 0 {
         SendMessageW(hwnd_tree, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
         SendMessageW(hwnd_add, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+        SendMessageW(hwnd_search, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
         SendMessageW(hwnd_import, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+        SendMessageW(hwnd_export, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
         SendMessageW(hwnd_close, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
     }
 
@@ -3526,6 +3749,31 @@ unsafe fn handle_article_action(hwnd: HWND, action: ArticleAction) {
         log_debug("rss_action kind=article action=unavailable reason=invalid_url");
         return;
     }
+    if matches!(action, ArticleAction::OpenInBrowser)
+        && crate::tools::rss::is_google_news_article_url(&url)
+    {
+        std::thread::spawn(move || {
+            let final_url = match crate::tools::rss::resolve_google_news_article_url_blocking(&url)
+            {
+                Ok(Some(decoded)) => decoded,
+                Ok(None) => url.clone(),
+                Err(err) => {
+                    log_debug(&format!(
+                        "rss_action kind=article action=google_news_resolve_failed error=\"{}\"",
+                        err
+                    ));
+                    url.clone()
+                }
+            };
+            if let Err(err) = crate::audio_utils::open_url_in_browser(&final_url) {
+                log_debug(&format!(
+                    "rss_action kind=article action=browser_error error=\"{}\"",
+                    err
+                ));
+            }
+        });
+        return;
+    }
     let title = item.title.trim().to_string();
     let share_url = match action {
         ArticleAction::OpenInBrowser => {
@@ -3788,22 +4036,46 @@ unsafe fn reorder_control_subclass_proc_inner(
     if msg == WM_KEYDOWN {
         let id = GetDlgCtrlID(hwnd) as usize;
         let parent = GetParent(hwnd);
-        let edit = GetDlgItem(parent, REORDER_EDIT_ID as i32);
-        let ok = GetDlgItem(parent, REORDER_OK_ID as i32);
-        let cancel = GetDlgItem(parent, REORDER_CANCEL_ID as i32);
+        let (edit_id, ok_id, cancel_id) =
+            if id == REORDER_EDIT_ID || id == REORDER_OK_ID || id == REORDER_CANCEL_ID {
+                (REORDER_EDIT_ID, REORDER_OK_ID, REORDER_CANCEL_ID)
+            } else if id == SEARCH_EDIT_ID || id == SEARCH_OK_ID || id == SEARCH_CANCEL_ID {
+                (SEARCH_EDIT_ID, SEARCH_OK_ID, SEARCH_CANCEL_ID)
+            } else {
+                (0, 0, 0)
+            };
+        if edit_id == 0 {
+            let prev = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+            if prev == 0 {
+                return DefWindowProcW(hwnd, msg, wparam, lparam);
+            }
+            return CallWindowProcW(
+                Some(std::mem::transmute::<
+                    isize,
+                    unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
+                >(prev)),
+                hwnd,
+                msg,
+                wparam,
+                lparam,
+            );
+        }
+        let edit = GetDlgItem(parent, edit_id as i32);
+        let ok = GetDlgItem(parent, ok_id as i32);
+        let cancel = GetDlgItem(parent, cancel_id as i32);
         if wparam.0 as u16 == VK_TAB.0 {
             let shift = (GetKeyState(VK_SHIFT.0 as i32) & 0x8000u16 as i16) != 0;
             let next = if shift {
-                if id == REORDER_EDIT_ID {
+                if id == edit_id {
                     cancel
-                } else if id == REORDER_CANCEL_ID {
+                } else if id == cancel_id {
                     ok
                 } else {
                     edit
                 }
-            } else if id == REORDER_EDIT_ID {
+            } else if id == edit_id {
                 ok
-            } else if id == REORDER_OK_ID {
+            } else if id == ok_id {
                 cancel
             } else {
                 edit
@@ -3812,16 +4084,12 @@ unsafe fn reorder_control_subclass_proc_inner(
             return LRESULT(0);
         }
         if wparam.0 as u16 == VK_RETURN.0 {
-            let target = if id == REORDER_CANCEL_ID {
-                REORDER_CANCEL_ID
-            } else {
-                REORDER_OK_ID
-            };
+            let target = if id == cancel_id { cancel_id } else { ok_id };
             SendMessageW(parent, WM_COMMAND, WPARAM(target), LPARAM(0));
             return LRESULT(0);
         }
         if wparam.0 as u16 == VK_ESCAPE.0 {
-            SendMessageW(parent, WM_COMMAND, WPARAM(REORDER_CANCEL_ID), LPARAM(0));
+            SendMessageW(parent, WM_COMMAND, WPARAM(cancel_id), LPARAM(0));
             return LRESULT(0);
         }
     }
@@ -3843,6 +4111,213 @@ unsafe fn reorder_control_subclass_proc_inner(
 
 unsafe fn show_add_dialog(parent_hwnd: HWND) {
     show_add_dialog_with_prefill(parent_hwnd, String::new(), String::new());
+}
+
+unsafe fn show_rss_search_dialog(parent_hwnd: HWND) {
+    let exists = with_rss_state(parent_hwnd, |s| s.search_dialog).unwrap_or(HWND(0));
+    if exists.0 != 0 {
+        SetForegroundWindow(exists);
+        return;
+    }
+
+    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+    let class_name = to_wide("SonarpadRssSearchKeyword");
+    let wc = WNDCLASSW {
+        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+            windows::Win32::UI::WindowsAndMessaging::LoadCursorW(
+                None,
+                windows::Win32::UI::WindowsAndMessaging::IDC_ARROW,
+            )
+            .unwrap_or_default()
+            .0,
+        ),
+        hInstance: hinstance,
+        lpszClassName: PCWSTR(class_name.as_ptr()),
+        lpfnWndProc: Some(search_keyword_wndproc),
+        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+        ..Default::default()
+    };
+    RegisterClassW(&wc);
+
+    let main_hwnd = with_rss_state(parent_hwnd, |s| s.parent).unwrap_or(HWND(0));
+    let language = with_state(main_hwnd, |s| s.settings.language).unwrap_or_default();
+    let title = tr_or(language, "rss.search_dialog.title", "Search RSS by keyword");
+    let init_ptr = Box::into_raw(Box::new(SearchDialogInit {
+        parent: parent_hwnd,
+    }));
+    let hwnd = CreateWindowExW(
+        WS_EX_DLGMODALFRAME,
+        PCWSTR(class_name.as_ptr()),
+        PCWSTR(to_wide(&title).as_ptr()),
+        WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_POPUP,
+        CW_USEDEFAULT,
+        CW_USEDEFAULT,
+        420,
+        170,
+        parent_hwnd,
+        None,
+        hinstance,
+        Some(init_ptr as *const _),
+    );
+    if hwnd.0 == 0 {
+        let _unused_box = Box::from_raw(init_ptr);
+        return;
+    }
+    with_rss_state(parent_hwnd, |s| s.search_dialog = hwnd);
+}
+
+unsafe extern "system" fn search_keyword_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    crate::panic_guard::guard(
+        "search_keyword_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { search_keyword_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn search_keyword_wndproc_inner(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    match msg {
+        WM_CREATE => {
+            let cs = lparam.0 as *const CREATESTRUCTW;
+            let init_ptr = (*cs).lpCreateParams as *mut SearchDialogInit;
+            let parent = if init_ptr.is_null() {
+                HWND(0)
+            } else {
+                let init = Box::from_raw(init_ptr);
+                init.parent
+            };
+            let main_hwnd = with_rss_state(parent, |s| s.parent).unwrap_or(HWND(0));
+            let language = with_state(main_hwnd, |s| s.settings.language).unwrap_or_default();
+            SetWindowLongPtrW(hwnd, GWLP_USERDATA, parent.0);
+
+            let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+            let keyword_label = tr_or(language, "rss.search_dialog.keyword_label", "Keyword:");
+            CreateWindowExW(
+                Default::default(),
+                w!("STATIC"),
+                PCWSTR(to_wide(&keyword_label).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                10,
+                12,
+                390,
+                18,
+                hwnd,
+                HMENU(1601),
+                hinstance,
+                None,
+            );
+            let edit = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                10,
+                34,
+                390,
+                24,
+                hwnd,
+                HMENU(SEARCH_EDIT_ID as isize),
+                hinstance,
+                None,
+            );
+            CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&i18n::tr(language, "rss.dialog.ok")).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                220,
+                80,
+                85,
+                28,
+                hwnd,
+                HMENU(SEARCH_OK_ID as isize),
+                hinstance,
+                None,
+            );
+            CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&i18n::tr(language, "rss.dialog.cancel")).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                315,
+                80,
+                85,
+                28,
+                hwnd,
+                HMENU(SEARCH_CANCEL_ID as isize),
+                hinstance,
+                None,
+            );
+            let ok = GetDlgItem(hwnd, SEARCH_OK_ID as i32);
+            let cancel = GetDlgItem(hwnd, SEARCH_CANCEL_ID as i32);
+            let proc_ptr = reorder_control_subclass_proc as *const () as usize;
+            for control in [edit, ok, cancel] {
+                let prev = SetWindowLongPtrW(control, GWLP_WNDPROC, proc_ptr as isize);
+                SetWindowLongPtrW(control, GWLP_USERDATA, prev);
+            }
+            SetFocus(edit);
+            LRESULT(0)
+        }
+        WM_COMMAND => {
+            let id = wparam.0 & 0xffff;
+            if id == SEARCH_CANCEL_ID || id == 2 {
+                crate::log_if_err!(DestroyWindow(hwnd));
+                return LRESULT(0);
+            }
+            if id == SEARCH_OK_ID || id == 1 {
+                let parent = HWND(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+                let main_hwnd = with_rss_state(parent, |s| s.parent).unwrap_or(HWND(0));
+                let language = with_state(main_hwnd, |s| s.settings.language).unwrap_or_default();
+                let edit = GetDlgItem(hwnd, SEARCH_EDIT_ID as i32);
+                let mut buf = vec![0u16; 1024];
+                let len = windows::Win32::UI::WindowsAndMessaging::GetWindowTextW(edit, &mut buf)
+                    as usize;
+                let keyword = String::from_utf16_lossy(&buf[..len]).trim().to_string();
+                if keyword.is_empty() {
+                    let title = tr_or(language, "rss.search_dialog.title", "Search RSS by keyword");
+                    let message = tr_or(
+                        language,
+                        "rss.search_dialog.empty_keyword",
+                        "Please enter a keyword.",
+                    );
+                    MessageBoxW(
+                        hwnd,
+                        PCWSTR(to_wide(&message).as_ptr()),
+                        PCWSTR(to_wide(&title).as_ptr()),
+                        MB_OK | MB_ICONINFORMATION,
+                    );
+                    return LRESULT(0);
+                }
+                let url = build_google_news_rss_url(&keyword, language);
+                let source_title = format!("Google News: {}", keyword);
+                show_add_dialog_with_prefill(parent, source_title, url);
+                crate::log_if_err!(DestroyWindow(hwnd));
+                return LRESULT(0);
+            }
+            DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
+        WM_CLOSE => {
+            crate::log_if_err!(DestroyWindow(hwnd));
+            LRESULT(0)
+        }
+        WM_NCDESTROY => {
+            let parent = HWND(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+            if parent.0 != 0 {
+                with_rss_state(parent, |s| s.search_dialog = HWND(0));
+            }
+            LRESULT(0)
+        }
+        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+    }
 }
 
 unsafe fn show_add_dialog_with_prefill(parent_hwnd: HWND, title: String, url: String) {

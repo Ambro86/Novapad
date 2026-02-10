@@ -17,7 +17,16 @@ try {
         throw "Missing wixobj. Run: cargo packager --release --format wix"
     }
 
-    & $lightExe -sval -ext WixUIExtension -ext WixUtilExtension -cultures:en-us -loc $locFile -out $outTemp $wixobj
+    if (-not (Test-Path $locFile)) {
+        throw "Missing locale file: $locFile"
+    }
+    [xml]$locXml = Get-Content -Path $locFile
+    $locCulture = $locXml.WixLocalization.Culture
+    if ([string]::IsNullOrWhiteSpace($locCulture)) {
+        $locCulture = "en-us"
+    }
+
+    & $lightExe -sval -ext WixUIExtension -ext WixUtilExtension -cultures:$locCulture -loc $locFile -out $outTemp $wixobj
 
     $versionLine = Select-String -Path (Join-Path $repo "Cargo.toml") -Pattern '^\s*version\s*=\s*"(.+)"'
     if (-not $versionLine) {

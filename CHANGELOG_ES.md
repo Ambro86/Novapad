@@ -12,6 +12,7 @@ Correcciones de errores
 • Corregida la extracción de texto EPUB para libros con comentarios HTML inline (<!-- ... -->): ahora el texto de los capítulos se analiza correctamente en lugar de omitirse parcial o totalmente.
 • Corregido el diccionario Wiktionary en español y la caché del diccionario: palabras como "agua" ahora se encuentran correctamente y las entradas antiguas de "Palabra no encontrada" ya no se reutilizan.
 • Corregida la codificación al importar artículos RSS en algunas fuentes españolas (p. ej., El Mundo): los acentos y la "ñ" ahora se muestran correctamente en el editor temporal.
+• Corregida la decodificación ANSI de archivos centroeuropeos (p. ej., checo/polaco): Sonarpad ahora distingue mejor entre UTF-8 y ANSI y elige la página de códigos correcta (incluida Windows-1250), evitando diacríticos corruptos.
 • Corregida la persistencia de fuentes RSS con parámetros en la URL (p. ej., `rss.aspx?c=...`): estos feeds ahora se guardan y restauran correctamente tras reiniciar Sonarpad.
 • Corregida la apertura de archivos puntero de Google Drive (`.gdoc`, `.gsheet`, `.gslides`) desde el menú contextual del Explorador: si la lectura directa falla con “Incorrect function (os error 1)”, Sonarpad ahora usa un fallback por shell-open y el documento se abre correctamente.
 • Corregido el flujo de anuncios del corrector ortográfico: los errores vuelven a anunciarse al revisar el texto más tarde, y el mismo error se informa de nuevo si se borra y se vuelve a escribir.

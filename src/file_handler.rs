@@ -6,7 +6,7 @@ use docx_rs::{
     DocumentChild, Docx, Paragraph, ParagraphChild, Run, RunChild, Table, TableCellContent,
     read_docx,
 };
-use encoding_rs::{Encoding, WINDOWS_1252};
+use encoding_rs::{Encoding, WINDOWS_1250, WINDOWS_1252};
 use pdf_extract::extract_text;
 use pdfium_render::prelude::*;
 use printpdf::{
@@ -17,7 +17,9 @@ use quick_xml::reader::Reader as XmlReader;
 use std::io::Read;
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};
-use windows::Win32::Globalization::{CP_ACP, WideCharToMultiByte};
+use windows::Win32::Globalization::{
+    CP_ACP, MULTI_BYTE_TO_WIDE_CHAR_FLAGS, MultiByteToWideChar, WideCharToMultiByte,
+};
 use zip::ZipArchive;
 
 // --- Path identification ---
@@ -142,6 +144,109 @@ pub fn is_audio_path(path: &Path) -> bool {
 
 // --- Text Encoding / Decoding ---
 
+fn decode_ansi_with_acp(bytes: &[u8]) -> Option<String> {
+    if bytes.is_empty() {
+        return Some(String::new());
+    }
+
+    unsafe {
+        let len = MultiByteToWideChar(CP_ACP, MULTI_BYTE_TO_WIDE_CHAR_FLAGS(0), bytes, None);
+        if len <= 0 {
+            return None;
+        }
+
+        let mut wide = vec![0u16; len as usize];
+        let len2 = MultiByteToWideChar(
+            CP_ACP,
+            MULTI_BYTE_TO_WIDE_CHAR_FLAGS(0),
+            bytes,
+            Some(&mut wide),
+        );
+        if len2 <= 0 {
+            return None;
+        }
+
+        wide.truncate(len2 as usize);
+        Some(String::from_utf16_lossy(&wide))
+    }
+}
+
+fn central_european_char_score(text: &str) -> usize {
+    text.chars()
+        .filter(|ch| {
+            matches!(
+                ch,
+                'ě' | 'š'
+                    | 'č'
+                    | 'ř'
+                    | 'ž'
+                    | 'ý'
+                    | 'á'
+                    | 'í'
+                    | 'é'
+                    | 'ů'
+                    | 'ú'
+                    | 'ň'
+                    | 'ď'
+                    | 'ť'
+                    | 'Ě'
+                    | 'Š'
+                    | 'Č'
+                    | 'Ř'
+                    | 'Ž'
+                    | 'Ý'
+                    | 'Á'
+                    | 'Í'
+                    | 'É'
+                    | 'Ů'
+                    | 'Ú'
+                    | 'Ň'
+                    | 'Ď'
+                    | 'Ť'
+                    | 'ą'
+                    | 'ć'
+                    | 'ę'
+                    | 'ł'
+                    | 'ń'
+                    | 'ó'
+                    | 'ś'
+                    | 'ź'
+                    | 'ż'
+                    | 'Ą'
+                    | 'Ć'
+                    | 'Ę'
+                    | 'Ł'
+                    | 'Ń'
+                    | 'Ó'
+                    | 'Ś'
+                    | 'Ź'
+                    | 'Ż'
+            )
+        })
+        .count()
+}
+
+fn decode_ansi_best_effort(bytes: &[u8], _language: Language) -> String {
+    let (cp1250_text, _, _) = WINDOWS_1250.decode(bytes);
+    let cp1250_text = cp1250_text.into_owned();
+    let cp1250_score = central_european_char_score(&cp1250_text);
+
+    if let Some(acp_text) = decode_ansi_with_acp(bytes) {
+        let acp_score = central_european_char_score(&acp_text);
+        if cp1250_score >= 2 && cp1250_score > acp_score {
+            return cp1250_text;
+        }
+        return acp_text;
+    }
+
+    if cp1250_score >= 2 {
+        return cp1250_text;
+    }
+
+    let (text, _, _) = WINDOWS_1252.decode(bytes);
+    text.into_owned()
+}
+
 pub fn decode_text_with_encoding(
     bytes: &[u8],
     encoding: TextEncoding,
@@ -195,10 +300,7 @@ pub fn decode_text_with_encoding(
             }
             Ok(String::from_utf16_lossy(&utf16))
         }
-        TextEncoding::Ansi => {
-            let (text, _, _) = WINDOWS_1252.decode(bytes);
-            Ok(text.into_owned())
-        }
+        TextEncoding::Ansi => Ok(decode_ansi_best_effort(bytes, language)),
     }
 }
 
@@ -243,8 +345,7 @@ pub fn decode_text(bytes: &[u8], language: Language) -> Result<(String, TextEnco
         return Ok((text, TextEncoding::Utf8));
     }
 
-    let (text, _, _) = WINDOWS_1252.decode(bytes);
-    Ok((text.into_owned(), TextEncoding::Ansi))
+    Ok((decode_ansi_best_effort(bytes, language), TextEncoding::Ansi))
 }
 
 pub fn encode_text(text: &str, encoding: TextEncoding) -> Vec<u8> {

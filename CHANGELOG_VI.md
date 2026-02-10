@@ -12,6 +12,7 @@ Sửa lỗi
 • Đã sửa trích xuất văn bản EPUB cho sách có chứa chú thích HTML inline (<!-- ... -->): văn bản chương giờ được phân tích đúng thay vì bị bỏ qua một phần hoặc toàn bộ.
 • Đã sửa từ điển Wiktionary tiếng Tây Ban Nha và cơ chế cache từ điển: các từ như "agua" giờ được tìm đúng, và các mục cache cũ kiểu "Không tìm thấy từ" sẽ không còn được tái sử dụng.
 • Đã sửa mã hóa khi nhập bài RSS cho một số nguồn tiếng Tây Ban Nha (ví dụ El Mundo): dấu tiếng Tây Ban Nha và ký tự "ñ" giờ được giữ đúng trong trình soạn thảo tạm.
+• Đã sửa giải mã ANSI cho các tệp Trung Âu (ví dụ tiếng Séc/tiếng Ba Lan): Sonarpad giờ phân biệt UTF-8 và ANSI tốt hơn và chọn đúng bảng mã (bao gồm Windows-1250), tránh lỗi vỡ dấu.
 • Đã sửa lỗi lưu nguồn RSS có tham số trong URL (ví dụ `rss.aspx?c=...`): các feed này giờ được lưu và khôi phục đúng sau khi khởi động lại Sonarpad.
 • Đã sửa lỗi mở các tệp con trỏ Google Drive (`.gdoc`, `.gsheet`, `.gslides`) từ menu ngữ cảnh Explorer: khi đọc trực tiếp bị lỗi “Incorrect function (os error 1)”, Sonarpad giờ dùng fallback shell-open để tài liệu vẫn mở đúng.
 • Đã sửa luồng thông báo lỗi chính tả: lỗi sẽ được đọc lại khi bạn rà soát văn bản sau đó, và cùng một lỗi sẽ được báo lại nếu bị xóa rồi gõ lại.

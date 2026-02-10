@@ -7446,21 +7446,24 @@ fn switch_audio_playlist_relative(hwnd: HWND, delta: i32) -> bool {
 }
 
 fn handle_audio_playlist_timer(hwnd: HWND) {
-    let should_advance = unsafe {
+    let (is_paused, should_advance) = unsafe {
         with_state(hwnd, |state| {
             let player = state.active_audiobook.as_ref()?;
             if player.is_paused {
-                return Some(false);
+                return Some((true, false));
             }
             let duration = audio_player::audiobook_duration_secs(&player.path)?;
             let current = audio_player::audiobook_position_secs(player)
                 .max(0.0)
                 .floor() as u64;
-            Some(current >= duration.saturating_add(1))
+            Some((false, current >= duration.saturating_add(1)))
         })
         .flatten()
-        .unwrap_or(false)
+        .unwrap_or((false, false))
     };
+    if is_paused {
+        return;
+    }
     let output_stopped = unsafe { audio_player::audiobook_output_stopped(hwnd) }.unwrap_or(false);
     if !should_advance && !output_stopped {
         return;

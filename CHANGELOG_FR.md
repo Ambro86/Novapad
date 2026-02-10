@@ -9,6 +9,7 @@ Améliorations
 • Ajout de la suppression d’articles RSS individuels et d’épisodes de podcast individuels (touche Suppr + menu contextuel avec confirmation), sans supprimer toute la source RSS/podcast.
 • Ajout de la traduction serbe grâce à Mila Kuran.
 • Ajout de l'ouverture multiple de fichiers média : en ouvrant plusieurs fichiers à la fois, une file de lecture est créée au lieu de remplacer le fichier en cours.
+• Ajout de raccourcis de déplacement variable pendant la lecture : avec une base de 1 minute, Gauche/Droite avance-recule de 60 s, Maj+Gauche/Droite de 20 s et Ctrl+Gauche/Droite de 3 minutes.
 • Ajout des raccourcis piste précédente/suivante dans le lecteur : Ctrl+PageUp et Ctrl+PageDown.
 • Ajout de l'option « Réinitialiser le volume » et regroupement des actions de réinitialisation dans un sous-menu dédié « Réinitialiser » dans Lecture, avec « Réinitialiser la vitesse » et « Réinitialiser la tonalité ».
 Corrections de bugs
@@ -26,6 +27,7 @@ Corrections de bugs
 • Amélioration de la couverture de localisation de l’installateur : setup.exe inclut désormais aussi le tchèque, le polonais, le français et le serbe, tandis que le MSI reste un paquet unique en-US pour éviter la confusion en release.
 • Correction du nettoyage à la désinstallation des entrées du menu contextuel : « Ouvrir avec Sonarpad » est maintenant supprimé de façon fiable, y compris dans des scénarios de registre legacy.
 • Correction de la fiabilité pause/reprise en SAPI5 : la pause avec F4 fonctionne désormais correctement et la reprise revient au point attendu au lieu de redémarrer depuis le début.
+• Correction du flux pause + recherche + reprise en lecture média : après une pause puis un déplacement avec Gauche/Droite, la touche Espace reprend désormais de manière fiable à la position courante au lieu de s'arrêter ou de repartir du début.
 
 Version 0.6.5 – 2026-02-07
 Améliorations
@@ -290,3 +292,4 @@ Améliorations
 
 ## 0.1.0 - 2025-12-25
 - Version initiale.
+

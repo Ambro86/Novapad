@@ -9,6 +9,7 @@ Cải tiến
 • Đã thêm khả năng xóa từng bài RSS và từng tập podcast riêng lẻ (phím Delete + menu ngữ cảnh có xác nhận), không cần xóa toàn bộ nguồn RSS/podcast.
 • Đã thêm bản dịch tiếng Serbia nhờ Mila Kuran.
 • Đã thêm mở nhiều tệp media cùng lúc: khi mở nhiều tệp sẽ tạo hàng đợi phát thay vì thay thế tệp hiện tại.
+• Đã thêm phím tắt tua biến thiên khi phát: với mức cơ bản 1 phút, Trái/Phải tua 60 giây, Shift+Trái/Phải tua 20 giây, và Ctrl+Trái/Phải tua 3 phút.
 • Đã thêm phím tắt chuyển bài trước/sau trong trình phát: Ctrl+PageUp và Ctrl+PageDown.
 • Đã thêm mục "Đặt lại âm lượng" và gom các thao tác đặt lại vào submenu riêng "Đặt lại" trong menu Phát lại, cùng với "Đặt lại tốc độ" và "Đặt lại cao độ".
 Sửa lỗi
@@ -26,6 +27,7 @@ Sửa lỗi
 • Đã cải thiện phạm vi bản địa hóa của trình cài đặt: setup.exe giờ bao gồm thêm tiếng Séc, Ba Lan, Pháp và Serbia, trong khi MSI được giữ thành một gói en-US duy nhất để tránh gây rối trong bản phát hành.
 • Đã sửa dọn dẹp khi gỡ cài đặt các mục menu ngữ cảnh: mục "Mở bằng Sonarpad" giờ được xóa ổn định, kể cả trong các kịch bản registry cũ.
 • Đã sửa độ ổn định của tạm dừng/tiếp tục với SAPI5: tạm dừng bằng F4 giờ hoạt động đúng và khi tiếp tục sẽ quay lại đúng vị trí mong đợi thay vì phát lại từ đầu.
+• Đã sửa luồng tạm dừng + tua + tiếp tục khi phát media: sau khi tạm dừng và tua bằng Trái/Phải, nhấn Space giờ sẽ tiếp tục ổn định tại vị trí hiện tại thay vì dừng hẳn hoặc phát lại từ đầu.
 
 Phiên bản 0.6.5 – 2026-02-07
 Cải tiến
@@ -297,3 +299,4 @@ Cải tiến
 
 ## 0.1.0 - 2025-12-25
 - Phiên bản phát hành đầu tiên: Cấu trúc dự án và tệp README.
+

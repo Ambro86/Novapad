@@ -9,6 +9,7 @@ Improvements
 • Added removal of individual RSS articles and podcast episodes (Delete key + context menu with confirmation), without removing the entire RSS/podcast source.
 • Added Serbian translation thanks to Mila Kuran.
 • Added multi-file media opening: selecting/opening multiple media files now builds a playback queue instead of replacing the current file.
+• Added variable seek shortcuts during playback: with a 1-minute base skip, Left/Right seeks 60s, Shift+Left/Right seeks 20s, and Ctrl+Left/Right seeks 3 minutes.
 • Added previous/next track navigation shortcuts in the player: Ctrl+PageUp and Ctrl+PageDown.
 • Added "Reset volume" and grouped reset actions into a dedicated "Reset" submenu in Playback, alongside "Reset speed" and "Reset pitch".
 Bug fixes
@@ -26,6 +27,7 @@ Bug fixes
 • Improved installer localization coverage: setup.exe now includes additional installer languages (Czech, Polish, French, Serbian), while MSI is kept as a single en-US package to avoid release confusion.
 • Fixed uninstall cleanup for context menu entries: "Open with Sonarpad" is now removed reliably, including legacy registry scenarios.
 • Fixed SAPI5 pause/resume reliability: F4 pause now works correctly and resume returns to the expected position instead of restarting from the beginning.
+• Fixed pause + seek + resume flow for media playback: after pausing and seeking with Left/Right, pressing Space now reliably resumes from the current position instead of stopping or restarting from the beginning.
 
 Version 0.6.5 – 2026-02-07
 Improvements
@@ -296,3 +298,4 @@ Improvements
 
 ## 0.1.0 - 2025-12-25
 - Initial release: project structure and README.
+

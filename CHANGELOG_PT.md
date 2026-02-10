@@ -9,6 +9,7 @@ Melhorias
 • Adicionada a remoção de artigos RSS individuais e episódios de podcast individuais (tecla Delete + menu de contexto com confirmação), sem remover toda a fonte RSS/podcast.
 • Adicionada a tradução sérvia graças a Mila Kuran.
 • Adicionada a abertura múltipla de ficheiros multimédia: ao abrir vários ficheiros de uma vez é criada uma fila de reprodução em vez de substituir o ficheiro atual.
+• Adicionados atalhos de avanço/retrocesso variável durante a reprodução: com base de 1 minuto, Esquerda/Direita avança 60s, Shift+Esquerda/Direita avança 20s e Ctrl+Esquerda/Direita avança 3 minutos.
 • Adicionados atalhos de faixa anterior/seguinte no leitor: Ctrl+PageUp e Ctrl+PageDown.
 • Adicionada a opção "Repor volume" e agrupadas as ações de reposição num submenu dedicado "Repor" em Reprodução, juntamente com "Repor velocidade" e "Repor tom".
 Correções de bugs
@@ -26,6 +27,7 @@ Correções de bugs
 • Melhorada a cobertura de localização do instalador: o setup.exe agora inclui também checo, polaco, francês e sérvio, enquanto o MSI permanece como um único pacote en-US para evitar confusão nas releases.
 • Corrigida a limpeza na desinstalação das entradas do menu de contexto: "Abrir com Sonarpad" agora é removido de forma confiável, inclusive em cenários legados de registo.
 • Corrigida a fiabilidade de pausar/retomar no SAPI5: a pausa com F4 agora funciona corretamente e, ao retomar, volta ao ponto esperado em vez de reiniciar do início.
+• Corrigido o fluxo pausar + procurar + retomar na reprodução multimédia: após pausar e avançar/recuar com Esquerda/Direita, ao premir Espaço a reprodução retoma de forma fiável na posição atual em vez de parar ou reiniciar do início.
 
 Versão 0.6.5 – 2026-02-07
 Melhorias
@@ -297,3 +299,4 @@ Melhorias
 
 ## 0.1.0 - 2025-12-25
 - Versao inicial: estrutura do projeto e README.
+

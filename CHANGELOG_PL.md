@@ -9,6 +9,7 @@ Ulepszenia
 • Dodano usuwanie pojedynczych artykułów RSS i pojedynczych odcinków podcastów (klawisz Delete + menu kontekstowe z potwierdzeniem), bez usuwania całego źródła RSS/podcastu.
 • Dodano tłumaczenie serbskie dzięki Mila Kuran.
 • Dodano otwieranie wielu plików multimedialnych naraz: po otwarciu kilku plików tworzona jest kolejka odtwarzania zamiast zastępowania bieżącego pliku.
+• Dodano skróty zmiennego przewijania podczas odtwarzania: przy bazie 1 minuty strzałka lewo/prawo przewija o 60 s, Shift+strzałka lewo/prawo o 20 s, a Ctrl+strzałka lewo/prawo o 3 minuty.
 • Dodano skróty do poprzedniego/następnego utworu w odtwarzaczu: Ctrl+PageUp i Ctrl+PageDown.
 • Dodano opcję „Reset głośności” i zgrupowano akcje resetu w dedykowanym podmenu „Reset” w Odtwarzaniu, razem z „Reset prędkości” i „Reset tonu”.
 Poprawki błędów
@@ -26,6 +27,7 @@ Poprawki błędów
 • Ulepszono pokrycie lokalizacji instalatora: setup.exe zawiera teraz także czeski, polski, francuski i serbski, a MSI pozostaje pojedynczym pakietem en-US, aby uniknąć zamieszania w wydaniach.
 • Naprawiono czyszczenie podczas deinstalacji wpisów menu kontekstowego: „Otwórz za pomocą Sonarpad” jest teraz usuwane niezawodnie, także w starszych scenariuszach rejestru.
 • Naprawiono niezawodność pauzy/wznawiania w SAPI5: pauza pod F4 działa teraz poprawnie, a wznowienie wraca do oczekiwanego miejsca zamiast startować od początku.
+• Naprawiono przepływ pauza + przewijanie + wznowienie w odtwarzaniu multimediów: po pauzie i przewinięciu Strzałka lewo/prawo naciśnięcie Spacji niezawodnie wznawia od bieżącej pozycji zamiast zatrzymywać odtwarzanie lub uruchamiać je od początku.
 
 Wersja 0.6.5 – 2026-02-07
 Ulepszenia
@@ -291,3 +293,4 @@ Improvements
 
 ## 0.1.0 - 2025-12-25
 - Initial release: project structure and README.
+

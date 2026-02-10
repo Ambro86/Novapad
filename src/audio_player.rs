@@ -58,12 +58,12 @@ pub struct AudiobookPlayer {
 }
 
 impl AudiobookPlayer {
-    fn play(&self) {
-        self.output.play();
+    fn play(&self) -> bool {
+        self.output.play()
     }
 
-    fn pause(&self) {
-        self.output.pause();
+    fn pause(&self) -> bool {
+        self.output.pause()
     }
 
     fn stop(&self) {
@@ -903,27 +903,70 @@ pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
 }
 
 pub unsafe fn toggle_audiobook_pause(hwnd: HWND) {
+    enum ToggleAction {
+        StartFromDocument {
+            path: PathBuf,
+            from_start: bool,
+        },
+        RestartFromPosition {
+            path: PathBuf,
+            seconds: u64,
+            speed: f32,
+            pitch: f32,
+            volume: f32,
+            muted: bool,
+            prev_volume: f32,
+            audio_track: Option<i32>,
+        },
+    }
+
     crate::log_debug("Audio player: toggle_audiobook_pause triggered");
-    let start_action = with_state(hwnd, |state| {
-        if let Some(player) = &mut state.active_audiobook {
+    let action = with_state(hwnd, |state| {
+        if let Some(mut player) = state.active_audiobook.take() {
             if player.is_paused {
                 crate::log_debug("Audio player: Resuming playback");
-                player.play();
+                let resumed = player.play();
+                if !resumed || player.output.is_stopped() {
+                    crate::log_debug(
+                        "Audio player: resume failed on current stream, restarting from pause position",
+                    );
+                    stop_shared_subtitle_speech(
+                        &player.subtitle_speech_cancel,
+                        &player.subtitle_speech_command,
+                        "resume_restart",
+                    );
+                    player.subtitle_cancel.store(true, Ordering::Relaxed);
+                    player.stop();
+                    return Some(ToggleAction::RestartFromPosition {
+                        path: player.path.clone(),
+                        seconds: player.accumulated_seconds,
+                        speed: player.speed,
+                        pitch: player.pitch,
+                        volume: player.volume,
+                        muted: player.muted,
+                        prev_volume: player.prev_volume,
+                        audio_track: state.selected_audio_track,
+                    });
+                }
                 player.is_paused = false;
                 player.start_instant = std::time::Instant::now();
             } else {
                 crate::log_debug("Audio player: Pausing playback");
-                player.pause();
+                let paused = player.pause();
+                if !paused || player.output.is_stopped() {
+                    crate::log_debug("Audio player: pause failed because stream is already stopped");
+                }
                 player.is_paused = true;
-                let pos = audiobook_position_secs(player);
+                let pos = audiobook_position_secs(&player);
                 player.accumulated_seconds = pos.floor() as u64;
             }
-            return None;
+            state.active_audiobook = Some(player);
+            return None::<ToggleAction>;
         }
 
         let doc = state.docs.get(state.current)?;
         if !matches!(doc.format, FileFormat::Audiobook) {
-            return None;
+            return None::<ToggleAction>;
         }
         let path = doc.path.clone()?;
         let from_start = state
@@ -934,15 +977,45 @@ pub unsafe fn toggle_audiobook_pause(hwnd: HWND) {
         if from_start {
             state.last_stopped_audiobook = None;
         }
-        Some((path, from_start))
+        Some(ToggleAction::StartFromDocument { path, from_start })
     })
     .flatten();
 
-    if let Some((path, from_start)) = start_action {
-        if from_start {
-            start_audiobook_at(hwnd, &path, 0);
-        } else {
-            start_audiobook_playback(hwnd, &path);
+    if let Some(action) = action {
+        match action {
+            ToggleAction::StartFromDocument { path, from_start } => {
+                if from_start {
+                    start_audiobook_at(hwnd, &path, 0);
+                } else {
+                    start_audiobook_playback(hwnd, &path);
+                }
+            }
+            ToggleAction::RestartFromPosition {
+                path,
+                seconds,
+                speed,
+                pitch,
+                volume,
+                muted,
+                prev_volume,
+                audio_track,
+            } => {
+                start_audiobook_at_with_options(
+                    hwnd,
+                    path,
+                    seconds,
+                    AudiobookPlaybackOptions {
+                        speed,
+                        pitch,
+                        paused: false,
+                        volume,
+                        muted,
+                        prev_volume,
+                        mix_export: false,
+                        audio_track,
+                    },
+                );
+            }
         }
     }
 }
@@ -963,19 +1036,17 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
     }
 
     let result = with_state(hwnd, |state| {
-        if let Some(player) = &mut state.active_audiobook {
+        if let Some(player) = state.active_audiobook.take() {
             stop_shared_subtitle_speech(
                 &player.subtitle_speech_cancel,
                 &player.subtitle_speech_command,
                 "seek",
             );
-            let current_pos = audiobook_position_secs(player);
-            if !player.is_paused {
-                player.start_instant = std::time::Instant::now();
-            }
+            let current_pos = audiobook_position_secs(&player);
             let new_pos = (current_pos as i64 + seconds).max(0);
-            // Output doesn't support direct seek, always restart
-            player.accumulated_seconds = new_pos as u64;
+            // Output doesn't support direct seek, always restart.
+            player.subtitle_cancel.store(true, Ordering::Relaxed);
+            player.stop();
             Some(SeekAction::Restart {
                 path: player.path.clone(),
                 current_pos: new_pos as u64,
@@ -1018,7 +1089,6 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
     }
 
     let audio_track = with_state(hwnd, |state| state.selected_audio_track).flatten();
-    stop_audiobook_playback(hwnd);
     start_audiobook_at_with_options(
         hwnd,
         path,
@@ -1763,7 +1833,9 @@ fn clear_subtitle_hold(hwnd: HWND, path: &Path) -> bool {
             player.subtitle_hold = false;
             player.is_paused = false;
             player.start_instant = std::time::Instant::now();
-            player.play();
+            if !player.play() {
+                return false;
+            }
             true
         })
         .unwrap_or(false)
@@ -1777,7 +1849,9 @@ fn pause_active_backend(hwnd: HWND, path: &Path) -> bool {
             if player.path.as_path() != path {
                 return None;
             }
-            player.pause();
+            if !player.pause() {
+                return Some(false);
+            }
             Some(true)
         })
         .flatten()
@@ -1792,7 +1866,9 @@ fn resume_active_backend(hwnd: HWND, path: &Path) -> bool {
             if player.path.as_path() != path {
                 return None;
             }
-            player.play();
+            if !player.play() {
+                return Some(false);
+            }
             Some(true)
         })
         .flatten()

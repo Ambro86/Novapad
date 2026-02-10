@@ -9,6 +9,7 @@ Miglioramenti
 • Aggiunta la rimozione dei singoli articoli RSS e dei singoli episodi podcast (tasto Canc + menu contestuale con conferma), senza eliminare l'intera fonte RSS/podcast.
 • Aggiunta la traduzione serba grazie a Mila Kuran.
 • Aggiunta l'apertura multipla dei file media: aprendo più file insieme viene creata una coda di riproduzione invece di sostituire il file corrente.
+• Aggiunte scorciatoie di seek variabile durante la riproduzione: con base di 1 minuto, Freccia sinistra/destra sposta di 60s, Shift+Freccia sinistra/destra di 20s e Ctrl+Freccia sinistra/destra di 3 minuti.
 • Aggiunte le scorciatoie per brano precedente/successivo nel player: Ctrl+Pagina su e Ctrl+Pagina giù.
 • Aggiunta la voce "Reset volume" e raggruppate le azioni di ripristino in un sottomenu dedicato "Reset" in Riproduci, insieme a "Reset speed" e "Reset pitch".
 Correzioni di bug
@@ -26,6 +27,7 @@ Correzioni di bug
 • Migliorata la copertura di localizzazione dell'installer: setup.exe ora include anche ceco, polacco, francese e serbo, mentre l'MSI resta un unico pacchetto en-US per evitare confusione nelle release.
 • Corretta la pulizia in disinstallazione delle voci del menu contestuale: "Apri con Sonarpad" ora viene rimosso in modo affidabile, anche in scenari legacy del registro.
 • Corretta l'affidabilità di pausa/riprendi con SAPI5: la pausa con F4 ora funziona correttamente e la ripresa torna al punto previsto invece di ripartire dall'inizio.
+• Corretto il flusso pausa + seek + riprendi nella riproduzione media: dopo pausa e spostamento con Freccia sinistra/destra, premendo Spazio la riproduzione riprende in modo affidabile dal punto corrente invece di fermarsi o ripartire dall'inizio.
 
 Versione 0.6.5 – 2026-02-07
 Miglioramenti
@@ -304,3 +306,4 @@ Miglioramenti
 ## 0.1.0 - 2025-12-25
 
 * Prima versione: struttura progetto e README iniziale.
+

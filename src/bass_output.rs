@@ -266,20 +266,24 @@ impl BassOutput {
         }))
     }
 
-    pub fn play(&self) {
+    pub fn play(&self) -> bool {
         let handle = *self.handle.lock().unwrap_or_else(|e| e.into_inner());
         let ok = unsafe { (self.api.channel_play)(handle, 0) };
         if ok == 0 {
             log_bass_error(self.api, "BASS_ChannelPlay");
+            return false;
         }
+        true
     }
 
-    pub fn pause(&self) {
+    pub fn pause(&self) -> bool {
         let handle = *self.handle.lock().unwrap_or_else(|e| e.into_inner());
         let ok = unsafe { (self.api.channel_pause)(handle) };
         if ok == 0 {
             log_bass_error(self.api, "BASS_ChannelPause");
+            return false;
         }
+        true
     }
 
     pub fn stop(&self) {

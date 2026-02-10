@@ -70,6 +70,16 @@ pub fn handle_player_keyboard(msg: &MSG, skip_seconds: u32) -> PlayerCommand {
         let alt_down = unsafe { (GetKeyState(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0 };
         let shift_down = unsafe { (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0 };
         let vk = msg.wParam.0 as u32;
+        let base_skip = skip_seconds.max(1) as i64;
+        let small_skip = (base_skip / 3).max(1);
+        let large_skip = base_skip.saturating_mul(3);
+        let seek_step = if ctrl_down {
+            large_skip
+        } else if shift_down {
+            small_skip
+        } else {
+            base_skip
+        };
 
         let cmd = match vk {
             vk if alt_down && shift_down && vk == 'P' as u32 => PlayerCommand::ChapterPrev,
@@ -86,8 +96,8 @@ pub fn handle_player_keyboard(msg: &MSG, skip_seconds: u32) -> PlayerCommand {
             }
             vk if ctrl_down && vk == 'I' as u32 => PlayerCommand::AnnounceTime,
             vk if vk == VK_SPACE.0 as u32 => PlayerCommand::TogglePause,
-            vk if vk == VK_LEFT.0 as u32 => PlayerCommand::Seek(-(skip_seconds as i64)),
-            vk if vk == VK_RIGHT.0 as u32 => PlayerCommand::Seek(skip_seconds as i64),
+            vk if vk == VK_LEFT.0 as u32 => PlayerCommand::Seek(-seek_step),
+            vk if vk == VK_RIGHT.0 as u32 => PlayerCommand::Seek(seek_step),
             vk if vk == VK_UP.0 as u32 => PlayerCommand::Volume(0.1),
             vk if vk == VK_DOWN.0 as u32 => PlayerCommand::Volume(-0.1),
             vk if vk == VK_OEM_PLUS.0 as u32 || vk == VK_ADD.0 as u32 => {

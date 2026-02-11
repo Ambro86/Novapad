@@ -84,6 +84,47 @@ impl CurlClient {
         result
     }
 
+    pub fn post_form_impersonated(
+        url: &str,
+        body: &str,
+        headers: &[&str],
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let mut easy = Easy::new();
+        easy.url(url)?;
+        easy.follow_location(true)?;
+        easy.timeout(Duration::from_secs(30))?;
+        easy.connect_timeout(Duration::from_secs(15))?;
+        easy.accept_encoding("gzip, deflate, br")?;
+        easy.cookie_file("")?;
+        easy.post(true)?;
+        easy.post_fields_copy(body.as_bytes())?;
+
+        let cacert_path = crate::embedded_deps::cacert_path();
+        if cacert_path.exists() {
+            easy.cainfo(cacert_path.to_string_lossy().as_ref())?;
+        } else {
+            easy.ssl_verify_peer(false)?;
+            easy.ssl_verify_host(false)?;
+        }
+
+        let mut list = List::new();
+        for header in headers {
+            list.append(header)?;
+        }
+        easy.http_headers(list)?;
+
+        let mut data = Vec::new();
+        {
+            let mut transfer = easy.transfer();
+            transfer.write_function(|new_data| {
+                data.extend_from_slice(new_data);
+                Ok(new_data.len())
+            })?;
+            transfer.perform()?;
+        }
+        Ok(data)
+    }
+
     fn fetch_iphone<F: FnMut(u32)>(
         url: &str,
         mut progress_cb: F,

@@ -3950,6 +3950,10 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                     next_tab_with_prompt(hwnd);
                     LRESULT(0)
                 }
+                IDM_WINDOW_OPEN_DOCUMENTS => {
+                    open_documents_popup(hwnd);
+                    LRESULT(0)
+                }
                 IDM_TOOLS_OPTIONS => {
                     log_debug("Menu: Options");
                     app_windows::options_window::open(hwnd);
@@ -7887,6 +7891,65 @@ unsafe fn next_tab_with_prompt(hwnd: HWND) {
     }
     let next = (current + 1) % count;
     select_tab(hwnd, next);
+}
+
+unsafe fn open_documents_popup(hwnd: HWND) {
+    let docs = with_state(hwnd, |state| {
+        state
+            .docs
+            .iter()
+            .enumerate()
+            .map(|(idx, doc)| (idx, doc.title.clone()))
+            .collect::<Vec<_>>()
+    })
+    .unwrap_or_default();
+    if docs.len() <= 1 {
+        return;
+    }
+
+    let menu = CreatePopupMenu().unwrap_or(HMENU(0));
+    if menu.0 == 0 {
+        return;
+    }
+
+    let mut ids = Vec::with_capacity(docs.len());
+    for (idx, title) in docs.iter().take(200) {
+        let id = 11_000u32 + *idx as u32;
+        ids.push((id, *idx));
+        let display = if title.trim().is_empty() {
+            format!("Documento {}", idx + 1)
+        } else {
+            title.clone()
+        };
+        let label = format!("&{} {}", idx + 1, display);
+        crate::log_if_err!(AppendMenuW(
+            menu,
+            MF_STRING,
+            id as usize,
+            PCWSTR(to_wide(&label).as_ptr()),
+        ));
+    }
+
+    let mut pt = POINT::default();
+    if GetCursorPos(&mut pt).is_err() {
+        return;
+    }
+    let command = TrackPopupMenu(
+        menu,
+        TPM_RIGHTBUTTON | TPM_RETURNCMD,
+        pt.x,
+        pt.y,
+        0,
+        hwnd,
+        None,
+    );
+    let selected = ids
+        .iter()
+        .find(|(id, _)| *id == command.0 as u32)
+        .map(|(_, idx)| *idx);
+    if let Some(index) = selected {
+        select_tab(hwnd, index);
+    }
 }
 
 fn now_ms() -> u64 {

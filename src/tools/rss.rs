@@ -61,6 +61,8 @@ pub struct RssSource {
     pub last_seen_guid: Option<String>,
     #[serde(default)]
     pub last_updated: Option<i64>,
+    #[serde(default)]
+    pub removed_item_keys: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -504,6 +506,24 @@ fn extract_google_news_tokens(html: &str) -> Option<(String, String)> {
     }
 }
 
+fn extract_google_news_direct_url_from_article_html(html: &str) -> Option<String> {
+    let candidate = extract_between(html, "data-n-au=\"", "\"")
+        .or_else(|| extract_between(html, "data-n-au='", "'"))
+        .map(str::trim)
+        .filter(|v| !v.is_empty())?;
+    let parsed = Url::parse(candidate).ok()?;
+    match parsed.scheme() {
+        "http" | "https" => {
+            if is_google_news_article_url(candidate) {
+                None
+            } else {
+                Some(candidate.to_string())
+            }
+        }
+        _ => None,
+    }
+}
+
 fn fetch_google_news_article_page_html(url: &str) -> Result<String, String> {
     let html = String::from_utf8_lossy(
         &crate::curl_client::CurlClient::fetch_url_impersonated(url).map_err(|e| e.to_string())?,
@@ -544,6 +564,50 @@ fn extract_decoded_google_news_url(response: &str) -> Option<String> {
     }
 }
 
+fn post_google_news_batchexecute_reqwest(body: &str) -> Result<String, String> {
+    reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(20))
+        .build()
+        .map_err(|e| e.to_string())?
+        .post("https://news.google.com/_/DotsSplashUi/data/batchexecute?rpcids=Fbv4je")
+        .header(
+            reqwest::header::CONTENT_TYPE,
+            "application/x-www-form-urlencoded;charset=UTF-8",
+        )
+        .header(
+            reqwest::header::USER_AGENT,
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        )
+        .header(reqwest::header::ACCEPT_LANGUAGE, "en-US,en;q=0.9")
+        .header(reqwest::header::REFERER, "https://news.google.com/")
+        .header(reqwest::header::ORIGIN, "https://news.google.com")
+        .header("X-Same-Domain", "1")
+        .body(body.to_string())
+        .send()
+        .and_then(|r| r.error_for_status())
+        .map_err(|e| e.to_string())?
+        .text()
+        .map_err(|e| e.to_string())
+}
+
+fn post_google_news_batchexecute_curl(body: &str) -> Result<String, String> {
+    let headers = [
+        "Content-Type: application/x-www-form-urlencoded;charset=UTF-8",
+        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "Accept-Language: en-US,en;q=0.9",
+        "Referer: https://news.google.com/",
+        "Origin: https://news.google.com",
+        "X-Same-Domain: 1",
+    ];
+    let bytes = crate::curl_client::CurlClient::post_form_impersonated(
+        "https://news.google.com/_/DotsSplashUi/data/batchexecute?rpcids=Fbv4je",
+        body,
+        &headers,
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(String::from_utf8_lossy(&bytes).to_string())
+}
+
 pub(crate) fn resolve_google_news_article_url_blocking(
     url: &str,
 ) -> Result<Option<String>, String> {
@@ -562,6 +626,13 @@ pub(crate) fn resolve_google_news_article_url_blocking(
     };
 
     let html = fetch_google_news_article_page_html(url)?;
+    if let Some(decoded) = extract_google_news_direct_url_from_article_html(&html) {
+        log_debug(&format!(
+            "google_news_decode ok(from_html) from=\"{}\" to=\"{}\"",
+            url, decoded
+        ));
+        return Ok(Some(decoded));
+    }
     let (signature, timestamp) = match extract_google_news_tokens(&html) {
         Some(tokens) => tokens,
         None => {
@@ -580,28 +651,36 @@ pub(crate) fn resolve_google_news_article_url_blocking(
     let f_req = format!(r#"[[["Fbv4je",{}]]]"#, req_inner_json);
     let body = format!("f.req={}", encode_form_value(&f_req));
 
-    let response = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(20))
-        .build()
-        .map_err(|e| e.to_string())?
-        .post("https://news.google.com/_/DotsSplashUi/data/batchexecute?rpcids=Fbv4je")
-        .header(
-            reqwest::header::CONTENT_TYPE,
-            "application/x-www-form-urlencoded;charset=UTF-8",
-        )
-        .header(
-            reqwest::header::USER_AGENT,
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        )
-        .header(reqwest::header::REFERER, "https://news.google.com/")
-        .header(reqwest::header::ORIGIN, "https://news.google.com")
-        .header("X-Same-Domain", "1")
-        .body(body)
-        .send()
-        .and_then(|r| r.error_for_status())
-        .map_err(|e| e.to_string())?
-        .text()
-        .map_err(|e| e.to_string())?;
+    let mut last_err = String::new();
+    let mut response: Option<String> = None;
+    for _attempt in 0..2 {
+        match post_google_news_batchexecute_reqwest(&body) {
+            Ok(text) => {
+                response = Some(text);
+                break;
+            }
+            Err(e) => {
+                last_err = e;
+            }
+        }
+        std::thread::sleep(Duration::from_millis(350));
+    }
+    if response.is_none() {
+        match post_google_news_batchexecute_curl(&body) {
+            Ok(text) => {
+                log_debug("google_news_decode: batchexecute resolved via curl fallback");
+                response = Some(text);
+            }
+            Err(err) => {
+                if !last_err.is_empty() {
+                    last_err = format!("{last_err} | curl_fallback: {err}");
+                } else {
+                    last_err = err;
+                }
+            }
+        }
+    }
+    let response = response.ok_or(last_err)?;
 
     let decoded = match extract_decoded_google_news_url(&response) {
         Some(v) => v,
@@ -1312,6 +1391,16 @@ mod tests {
 [["wrb.fr","Fbv4je","[\"garturlres\",\"https://example.com/article\",1]",null,null,null,""]]"#;
         let decoded = extract_decoded_google_news_url(payload);
         assert_eq!(decoded.as_deref(), Some("https://example.com/article"));
+    }
+
+    #[test]
+    fn extract_google_news_direct_url_from_html_parses_data_n_au() {
+        let html = r#"<div data-n-au="https://www.limesonline.com/rubrica/dollaro"></div>"#;
+        let decoded = extract_google_news_direct_url_from_article_html(html);
+        assert_eq!(
+            decoded.as_deref(),
+            Some("https://www.limesonline.com/rubrica/dollaro")
+        );
     }
 }
 

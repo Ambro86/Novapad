@@ -207,11 +207,95 @@ fn strip_templates(s: String) -> String {
     out
 }
 
+fn simplify_template_inner(inner: &str) -> String {
+    let parts: Vec<&str> = inner.split('|').collect();
+    if parts.len() <= 1 {
+        return String::new();
+    }
+
+    let mut last_nonempty = "";
+    let mut last_with_letters = "";
+    for arg in parts.iter().skip(1) {
+        let trimmed = arg.trim();
+        if trimmed.is_empty() || trimmed.contains('=') {
+            continue;
+        }
+        last_nonempty = trimmed;
+        if trimmed.chars().any(|c| c.is_alphabetic()) {
+            last_with_letters = trimmed;
+        }
+    }
+
+    if !last_with_letters.is_empty() {
+        last_with_letters.to_string()
+    } else {
+        last_nonempty.to_string()
+    }
+}
+
+fn simplify_templates(mut s: String) -> String {
+    while let Some(start) = s.find("{{") {
+        let mut depth = 0usize;
+        let mut end: Option<usize> = None;
+        let mut i = start;
+        while i + 1 < s.len() {
+            if s[i..].starts_with("{{") {
+                depth += 1;
+                i += 2;
+                continue;
+            }
+            if s[i..].starts_with("}}") {
+                if depth == 0 {
+                    break;
+                }
+                depth -= 1;
+                i += 2;
+                if depth == 0 {
+                    end = Some(i);
+                    break;
+                }
+                continue;
+            }
+            let ch = s[i..].chars().next().unwrap_or('\0');
+            i += ch.len_utf8().max(1);
+        }
+
+        let Some(end_idx) = end else {
+            break;
+        };
+
+        let inner = &s[start + 2..end_idx - 2];
+        let replacement = simplify_template_inner(inner);
+        s.replace_range(start..end_idx, &replacement);
+    }
+    s
+}
+
+fn strip_html_tags(s: String) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut in_tag = false;
+    for ch in s.chars() {
+        if ch == '<' {
+            in_tag = true;
+            continue;
+        }
+        if ch == '>' {
+            in_tag = false;
+            continue;
+        }
+        if !in_tag {
+            out.push(ch);
+        }
+    }
+    out
+}
+
 fn clean_wikitext_line(s: String) -> String {
     let mut x = strip_html_comments(s);
+    x = simplify_templates(x);
+    x = strip_html_tags(x);
     x = strip_links(x);
     x = strip_external_links(x);
-    x = strip_templates(x);
     x = x.replace("''", "");
     x.split_whitespace()
         .collect::<Vec<_>>()
@@ -225,11 +309,10 @@ fn extract_definitions_with_subpoints(
     max_main_defs: usize,
     max_total_lines: usize,
 ) -> Vec<String> {
-    let cleaned_text = strip_templates(wikitext.to_string());
     let mut out = Vec::new();
     let mut main_count = 0;
 
-    for line in cleaned_text.lines() {
+    for line in wikitext.lines() {
         if out.len() >= max_total_lines {
             break;
         }
@@ -245,17 +328,14 @@ fn extract_definitions_with_subpoints(
                 idx += 1;
             }
             if idx > 0 {
-                while idx < chars.len() && chars[idx].is_whitespace() {
-                    idx += 1;
-                }
-                if idx < chars.len() && chars[idx] == ':' {
-                    idx += 1;
-                }
-                while idx < chars.len() && chars[idx].is_whitespace() {
-                    idx += 1;
-                }
-                if idx < chars.len() {
-                    candidate = Some(rest[idx..].trim());
+                let after_number = rest[idx..].trim_start();
+                if let Some(colon_pos) = after_number.find(':') {
+                    let after_colon = after_number[colon_pos + 1..].trim();
+                    if !after_colon.is_empty() {
+                        candidate = Some(after_colon);
+                    }
+                } else if !after_number.is_empty() {
+                    candidate = Some(after_number);
                 }
             }
         }
@@ -266,7 +346,7 @@ fn extract_definitions_with_subpoints(
             }
             let cleaned = clean_wikitext_line(text.to_string());
             let truncated = cleaned.chars().take(MAX_CHARS_PER_DEF).collect::<String>();
-            if !truncated.is_empty() {
+            if !truncated.is_empty() && truncated.chars().any(|c| c.is_alphanumeric()) {
                 out.push(truncated);
                 main_count += 1;
             }
@@ -763,4 +843,35 @@ fn format_definition_lines(definitions: &[String]) -> Vec<String> {
         }
     }
     lines
+}
+
+#[cfg(test)]
+mod tests {
+    use super::extract_definitions_with_subpoints;
+
+    #[test]
+    fn spanish_hola_keeps_definition_text_inside_template() {
+        let wikitext = "==== {{interjección|es}} ====\n;1: {{impropia|Expresión de [[saludo]] utilizada entre dos o más personas}}.\n;2: {{impropia|Expresión de [[sorpresa]]}}.";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert!(defs.len() >= 2);
+        assert!(defs[0].contains("Expresión de saludo"));
+        assert!(defs[1].contains("Expresión de sorpresa"));
+    }
+
+    #[test]
+    fn spanish_casa_removes_ref_tags() {
+        let wikitext = ";5: {{plm|descendencia}} o [[linaje]] que tiene un mismo apellido.<ref name=\"dlc1914\"></ref>";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert_eq!(defs.len(), 1);
+        assert!(!defs[0].contains("dlc1914"));
+        assert!(!defs[0].contains("<ref"));
+    }
+
+    #[test]
+    fn spanish_agua_parses_semantic_label_before_colon() {
+        let wikitext = ";10 {{csem|astrología}}: Elemento que incluye los signos de [[Cáncer]], [[Escorpio]] y [[Piscis]].";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert_eq!(defs.len(), 1);
+        assert!(defs[0].starts_with("Elemento que incluye los signos"));
+    }
 }

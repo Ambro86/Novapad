@@ -15,6 +15,7 @@ Ulepszenia
 • Dodano skróty do poprzedniego/następnego utworu w odtwarzaczu: Ctrl+PageUp i Ctrl+PageDown.
 • Dodano opcję „Reset głośności” i zgrupowano akcje resetu w dedykowanym podmenu „Reset” w Odtwarzaniu, razem z „Reset prędkości” i „Reset tonu”.
 • Ulepszenia instalatora: setup.exe pozwala teraz wybrać między skojarzeniem wszystkich obsługiwanych typów plików a ręcznym wyborem rozszerzeń; MSI również udostępnia wybór per rozszerzenie w drzewie funkcji (domyślnie bez zmian: wszystko włączone).
+• Dodano nowe menu „Okno” z opcją „Otwarte dokumenty...”, aby szybko przełączać się między aktualnie otwartymi plikami.
 Poprawki błędów
 • Naprawiono wyodrębnianie tekstu EPUB dla książek zawierających komentarze HTML inline (<!-- ... -->): tekst rozdziałów jest teraz poprawnie parsowany zamiast być częściowo lub całkowicie pomijany.
 • Naprawiono słownik Wiktionary dla języka hiszpańskiego i obsługę cache słownika: słowa takie jak „agua” są teraz poprawnie znajdowane, a stare wpisy „nie znaleziono słowa” nie są już ponownie używane.
@@ -296,6 +297,7 @@ Improvements
 
 ## 0.1.0 - 2025-12-25
 - Initial release: project structure and README.
+
 
 
 

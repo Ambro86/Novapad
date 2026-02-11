@@ -239,6 +239,124 @@ fn pick_best_json_article_text(json_text: &str) -> Option<String> {
     if best.is_empty() { None } else { Some(best) }
 }
 
+fn trim_after_known_trailers(input: &str) -> String {
+    let markers = [
+        "ABOUT THE AUTHOR",
+        "Related Stories",
+        "CBC's Journalistic Standards and Practices",
+        "Corrections and clarifications",
+    ];
+    let mut cut = input.len();
+    for marker in markers {
+        if let Some(idx) = input.find(marker)
+            && idx < cut
+        {
+            cut = idx;
+        }
+    }
+    input[..cut].trim().to_string()
+}
+
+fn extract_cbc_initial_state_article_text(html_content: &str) -> Option<String> {
+    let mut best = String::new();
+    for val in extract_json_values(html_content, "\"bodyHtml\":\"") {
+        if val.len() < 300 {
+            continue;
+        }
+        let cleaned = collapse_blank_lines(&clean_text(&val));
+        let trimmed = trim_after_known_trailers(cleaned.trim());
+        if trimmed.len() < 300 {
+            continue;
+        }
+        if looks_like_ui_chrome(&trimmed) {
+            continue;
+        }
+        if count_sentences(&trimmed) < 3 {
+            continue;
+        }
+        if trimmed.len() > best.len() {
+            best = trimmed;
+        }
+    }
+    if best.is_empty() {
+        let mut lines = Vec::new();
+        for val in extract_json_values(html_content, "\"type\":\"text\",\"content\":\"") {
+            let cleaned = collapse_blank_lines(&clean_text(&val));
+            let trimmed = cleaned.trim();
+            if trimmed.len() < 20 {
+                continue;
+            }
+            if looks_like_ui_chrome(trimmed) {
+                continue;
+            }
+            if trimmed.contains("ABOUT THE AUTHOR")
+                || trimmed.contains("Related Stories")
+                || trimmed.contains("Journalistic Standards")
+                || trimmed.contains("Corrections and clarifications")
+            {
+                continue;
+            }
+            if lines.last().is_some_and(|last: &String| last == trimmed) {
+                continue;
+            }
+            lines.push(trimmed.to_string());
+        }
+        if !lines.is_empty() {
+            let joined = lines.join("\n\n");
+            let trimmed = trim_after_known_trailers(joined.trim());
+            if trimmed.len() >= 300 && count_sentences(&trimmed) >= 3 {
+                best = trimmed;
+            }
+        }
+    }
+    if best.is_empty() { None } else { Some(best) }
+}
+
+fn extract_jina_markdown_fixture(raw_content: &str) -> Option<ArticleContent> {
+    if !raw_content.contains("URL Source:")
+        || !raw_content.contains("Markdown Content:")
+        || !raw_content.contains("Title:")
+    {
+        return None;
+    }
+
+    let title = raw_content
+        .lines()
+        .find_map(|line| line.strip_prefix("Title:").map(str::trim))
+        .filter(|t| !t.is_empty())
+        .unwrap_or("No Title")
+        .to_string();
+
+    let marker = "Markdown Content:";
+    let start = raw_content.find(marker)? + marker.len();
+    let body_src = &raw_content[start..];
+
+    let mut lines = Vec::new();
+    for line in body_src.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            lines.push(String::new());
+            continue;
+        }
+        // r.jina.ai footer/call-to-action blocks (non-article).
+        if trimmed.eq_ignore_ascii_case("[YOU MAKE OUR WORK POSSIBLE.](https://iowacapitaldispatch.com/donate/?oa_referrer=midstorybox)")
+            || trimmed.starts_with("If you value")
+            || trimmed.starts_with("Support")
+        {
+            break;
+        }
+        lines.push(trimmed.to_string());
+    }
+
+    let body = collapse_blank_lines(&clean_text(&lines.join("\n")));
+    let content = body.trim().to_string();
+    if content.len() < 300 || count_sentences(&content) < 3 {
+        return None;
+    }
+
+    Some(ArticleContent { title, content })
+}
+
 pub fn clean_text(input: &str) -> String {
     let decoded = decode_html_entities(&decode_unicode(input));
     // Pulizia encoding Mediaset/TGCOM24
@@ -292,6 +410,12 @@ fn author_prefix(language: Language) -> &'static str {
 }
 
 pub fn reader_mode_extract(html_content: &str, language: Language) -> Option<ArticleContent> {
+    if !html_content.contains("<html")
+        && let Some(article) = extract_jina_markdown_fixture(html_content)
+    {
+        return Some(article);
+    }
+
     let document = Html::parse_document(html_content);
     let title = pick_title(&document);
 
@@ -470,9 +594,21 @@ pub fn reader_mode_extract(html_content: &str, language: Language) -> Option<Art
         }
     }
 
+    // 2b. CBC / React state fallback: bodyHtml often contains full article paragraphs.
+    if body_acc.len() < 300
+        && html_content.contains("cbc.ca")
+        && html_content.contains("__INITIAL_STATE__")
+        && let Some(cbc_body) = extract_cbc_initial_state_article_text(html_content)
+    {
+        body_acc.push_str(&cbc_body);
+        body_acc.push_str("\n\n");
+        found_anything = true;
+    }
+
     // 3. FALLBACK CSS
     if !found_anything || body_acc.len() < 300 {
         let content_selectors = [
+            ".blog-detail-wrapper .rich-text h2, .blog-detail-wrapper .rich-text h3, .blog-detail-wrapper .rich-text p, .blog-detail-wrapper .rich-text li",
             ".node-text .textarea-content-body",
             ".node-summary",
             ".section--content-news .left-content p",

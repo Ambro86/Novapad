@@ -406,6 +406,7 @@ unsafe fn import_sources_from_file(hwnd: HWND, path: &Path) {
                     cache: RssFeedCache::default(),
                     last_seen_guid: None,
                     last_updated: None,
+                    removed_item_keys: Vec::new(),
                 });
                 existing.insert(key);
                 added += 1;
@@ -457,6 +458,32 @@ fn rss_item_key(item: &RssItem) -> String {
         return item.link.trim().to_string();
     }
     item.title.trim().to_string()
+}
+
+unsafe fn source_removed_keys_for_tree_item(
+    hwnd: HWND,
+    hitem: windows::Win32::UI::Controls::HTREEITEM,
+) -> HashSet<String> {
+    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    if parent.0 == 0 {
+        return HashSet::new();
+    }
+    let source_index = with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
+        Some(NodeData::Source(idx)) => Some(*idx),
+        _ => None,
+    })
+    .flatten();
+    let Some(idx) = source_index else {
+        return HashSet::new();
+    };
+    with_state(parent, |ps| {
+        ps.settings
+            .rss_sources
+            .get(idx)
+            .map(|src| src.removed_item_keys.iter().cloned().collect())
+    })
+    .flatten()
+    .unwrap_or_default()
 }
 
 unsafe extern "system" fn rss_tree_compare(
@@ -811,6 +838,7 @@ fn apply_default_sources(
             cache: rss::RssFeedCache::default(),
             last_seen_guid: None,
             last_updated: None,
+            removed_item_keys: Vec::new(),
         });
         existing.insert(key.clone());
         changed = true;
@@ -1687,6 +1715,7 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                             cache: rss::RssFeedCache::default(),
                             last_seen_guid: None,
                             last_updated: None,
+                            removed_item_keys: Vec::new(),
                         });
                         crate::settings::save_settings(state.settings.clone());
                     });
@@ -2936,6 +2965,8 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
             let existing =
                 with_rss_state(hwnd, |s| s.source_items.contains_key(&hitem.0)).unwrap_or(false);
 
+            let removed_keys = source_removed_keys_for_tree_item(hwnd, hitem);
+
             if existing {
                 with_rss_state(hwnd, |s| {
                     let Some(state) = s.source_items.get_mut(&hitem.0) else {
@@ -2946,6 +2977,9 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                     let mut seen: HashSet<String> = state.items.iter().map(rss_item_key).collect();
                     for item in outcome.items {
                         let key = rss_item_key(&item);
+                        if removed_keys.contains(&key) {
+                            continue;
+                        }
                         if seen.insert(key) {
                             state.items.push(item);
                             appended += 1;
@@ -2983,13 +3017,13 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                 }
 
                 with_rss_state(hwnd, |s| {
-                    s.source_items.insert(
-                        hitem.0,
-                        SourceItemsState {
-                            items: outcome.items,
-                            loaded: 0,
-                        },
-                    );
+                    let items: Vec<RssItem> = outcome
+                        .items
+                        .into_iter()
+                        .filter(|item| !removed_keys.contains(&rss_item_key(item)))
+                        .collect();
+                    s.source_items
+                        .insert(hitem.0, SourceItemsState { items, loaded: 0 });
                 });
                 let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
                 let (initial_count, _next_count) = rss_page_sizes(parent);
@@ -3290,21 +3324,28 @@ unsafe fn handle_delete(hwnd: HWND) {
         let (title, url) = source_info.unwrap_or_default();
 
         // Localize message and title
-        let language = with_rss_state(hwnd, |s| {
-            with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
+        let (language, require_confirm) = with_rss_state(hwnd, |s| {
+            with_state(s.parent, |ps| {
+                (ps.settings.language, ps.settings.confirm_delete_rss_podcast)
+            })
+            .unwrap_or((crate::settings::Language::default(), true))
         })
-        .unwrap_or_default();
+        .unwrap_or((crate::settings::Language::default(), true));
         let msg_template = i18n::tr(language, "rss.delete_confirm");
         let msg_text = msg_template.replace("{title}", &title);
         let caption = i18n::tr(language, "rss.delete_title");
 
-        let ret = MessageBoxW(
-            hwnd,
-            PCWSTR(to_wide(&msg_text).as_ptr()),
-            PCWSTR(to_wide(&caption).as_ptr()),
-            MB_YESNO | MB_ICONQUESTION,
-        );
-        if ret == IDYES {
+        let confirmed = if require_confirm {
+            MessageBoxW(
+                hwnd,
+                PCWSTR(to_wide(&msg_text).as_ptr()),
+                PCWSTR(to_wide(&caption).as_ptr()),
+                MB_YESNO | MB_ICONQUESTION,
+            ) == IDYES
+        } else {
+            true
+        };
+        if confirmed {
             let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
             with_state(parent, |ps| {
                 if matches!(
@@ -3377,10 +3418,13 @@ unsafe fn handle_delete(hwnd: HWND) {
             reload_tree(hwnd);
         }
     } else if let Some(NodeData::Item(item)) = selected_node {
-        let language = with_rss_state(hwnd, |s| {
-            with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
+        let (language, require_confirm) = with_rss_state(hwnd, |s| {
+            with_state(s.parent, |ps| {
+                (ps.settings.language, ps.settings.confirm_delete_rss_podcast)
+            })
+            .unwrap_or((crate::settings::Language::default(), true))
         })
-        .unwrap_or_default();
+        .unwrap_or((crate::settings::Language::default(), true));
         let title = if item.title.trim().is_empty() {
             item.link.clone()
         } else {
@@ -3389,13 +3433,17 @@ unsafe fn handle_delete(hwnd: HWND) {
         let msg_template = i18n::tr(language, "rss.delete_confirm");
         let msg_text = msg_template.replace("{title}", &title);
         let caption = i18n::tr(language, "rss.delete_title");
-        let ret = MessageBoxW(
-            hwnd,
-            PCWSTR(to_wide(&msg_text).as_ptr()),
-            PCWSTR(to_wide(&caption).as_ptr()),
-            MB_YESNO | MB_ICONQUESTION,
-        );
-        if ret == IDYES {
+        let confirmed = if require_confirm {
+            MessageBoxW(
+                hwnd,
+                PCWSTR(to_wide(&msg_text).as_ptr()),
+                PCWSTR(to_wide(&caption).as_ptr()),
+                MB_YESNO | MB_ICONQUESTION,
+            ) == IDYES
+        } else {
+            true
+        };
+        if confirmed {
             let parent_item = windows::Win32::UI::Controls::HTREEITEM(
                 SendMessageW(
                     hwnd_tree,
@@ -3406,6 +3454,25 @@ unsafe fn handle_delete(hwnd: HWND) {
                 .0,
             );
             let key = rss_item_key(&item);
+            let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+            if parent.0 != 0 {
+                let source_index =
+                    with_rss_state(hwnd, |s| match s.node_data.get(&parent_item.0) {
+                        Some(NodeData::Source(idx)) => Some(*idx),
+                        _ => None,
+                    })
+                    .flatten();
+                if let Some(source_idx) = source_index {
+                    with_state(parent, |ps| {
+                        if let Some(src) = ps.settings.rss_sources.get_mut(source_idx)
+                            && !src.removed_item_keys.iter().any(|k| k == &key)
+                        {
+                            src.removed_item_keys.push(key.clone());
+                            crate::settings::save_settings(ps.settings.clone());
+                        }
+                    });
+                }
+            }
             with_rss_state(hwnd, |s| {
                 s.node_data.remove(&hitem.0);
                 if parent_item.0 != 0

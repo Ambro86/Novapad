@@ -15,6 +15,7 @@ Melhorias
 • Adicionados atalhos de faixa anterior/seguinte no leitor: Ctrl+PageUp e Ctrl+PageDown.
 • Adicionada a opção "Repor volume" e agrupadas as ações de reposição num submenu dedicado "Repor" em Reprodução, juntamente com "Repor velocidade" e "Repor tom".
 • Melhorias no instalador: o setup.exe agora permite escolher entre associar todos os tipos de ficheiro suportados ou selecionar manualmente as extensões; o MSI também passa a oferecer seleção por extensão na árvore de funcionalidades (o padrão mantém-se: tudo ativo).
+• Adicionado o novo menu "Janela" com a opção "Documentos abertos..." para alternar rapidamente para qualquer ficheiro atualmente aberto.
 Correções de bugs
 • Corrigida a extração de texto EPUB para livros com comentários HTML inline (<!-- ... -->): o texto dos capítulos agora é analisado corretamente em vez de ser parcialmente ou totalmente ignorado.
 • Corrigido o dicionário Wiktionary em espanhol e o cache do dicionário: palavras como "agua" agora são encontradas corretamente e entradas antigas de "Palavra não encontrada" não são mais reutilizadas.
@@ -302,6 +303,7 @@ Melhorias
 
 ## 0.1.0 - 2025-12-25
 - Versao inicial: estrutura do projeto e README.
+
 
 
 

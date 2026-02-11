@@ -15,6 +15,7 @@ Mejoras
 • Añadidos atajos para pista anterior/siguiente en el reproductor: Ctrl+PageUp y Ctrl+PageDown.
 • Añadida la opción "Restablecer volumen" y agrupadas las acciones de reinicio en un submenú dedicado "Restablecer" en Reproducción, junto con "Restablecer velocidad" y "Restablecer tono".
 • Mejoras del instalador: setup.exe ahora permite elegir entre asociar todos los tipos de archivo compatibles o seleccionar manualmente las extensiones; el MSI también ofrece selección por extensión en el árbol de características (el valor predeterminado se mantiene: todas activadas).
+• Añadido el nuevo menú "Ventana" con la opción "Documentos abiertos..." para cambiar rápidamente a cualquiera de los archivos abiertos.
 Correcciones de errores
 • Corregida la extracción de texto EPUB para libros con comentarios HTML inline (<!-- ... -->): ahora el texto de los capítulos se analiza correctamente en lugar de omitirse parcial o totalmente.
 • Corregido el diccionario Wiktionary en español y la caché del diccionario: palabras como "agua" ahora se encuentran correctamente y las entradas antiguas de "Palabra no encontrada" ya no se reutilizan.
@@ -296,6 +297,7 @@ Mejoras
 
 ## 0.1.0 - 2025-12-25
 - Version inicial: estructura del proyecto y README.
+
 
 
 

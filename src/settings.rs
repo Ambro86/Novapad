@@ -303,6 +303,8 @@ pub struct AppSettings {
     pub prompt_announce_lines: bool,
     pub interpreter_path: String,
     pub context_menu_open_with: bool,
+    #[serde(default = "default_true")]
+    pub confirm_delete_rss_podcast: bool,
     pub spellcheck_enabled: bool,
     pub spellcheck_language_mode: SpellcheckLanguageMode,
     pub spellcheck_fixed_language: String,
@@ -496,6 +498,7 @@ impl Default for AppSettings {
             prompt_announce_lines: true,
             interpreter_path: "python.exe".to_string(),
             context_menu_open_with: false,
+            confirm_delete_rss_podcast: true,
             spellcheck_enabled: false,
             spellcheck_language_mode: SpellcheckLanguageMode::FollowEditorLanguage,
             spellcheck_fixed_language: "en-US".to_string(),

@@ -342,6 +342,7 @@ fn import_podcast_sources_from_file(hwnd: HWND, path: &Path) -> Option<usize> {
                     cache: rss::RssFeedCache::default(),
                     last_seen_guid: None,
                     last_updated: None,
+                    removed_item_keys: Vec::new(),
                 });
                 existing.insert(key);
                 added += 1;
@@ -806,6 +807,29 @@ fn episode_key(item: &PodcastEpisode) -> String {
     item.title.trim().to_string()
 }
 
+unsafe fn source_removed_episode_keys(hwnd: HWND, hitem: HTREEITEM) -> HashSet<String> {
+    let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    if parent.0 == 0 {
+        return HashSet::new();
+    }
+    let source_index = with_podcast_state(hwnd, |s| match s.node_data.get(&hitem.0) {
+        Some(NodeData::Source(idx)) => Some(*idx),
+        _ => None,
+    })
+    .flatten();
+    let Some(idx) = source_index else {
+        return HashSet::new();
+    };
+    with_state(parent, |ps| {
+        ps.settings
+            .podcast_sources
+            .get(idx)
+            .map(|src| src.removed_item_keys.iter().cloned().collect())
+    })
+    .flatten()
+    .unwrap_or_default()
+}
+
 unsafe fn load_episode_children(hwnd: HWND, hitem: HTREEITEM, node: NodeData, force: bool) {
     let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     if hwnd_tree.0 == 0 {
@@ -1152,6 +1176,7 @@ unsafe fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<Podcast
         return 0;
     }
 
+    let removed_keys = source_removed_episode_keys(hwnd, hitem);
     let existing_keys: HashSet<String> = with_podcast_state(hwnd, |s| {
         s.source_items
             .get(&hitem.0)
@@ -1162,7 +1187,11 @@ unsafe fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<Podcast
 
     let mut new_items = Vec::new();
     for item in items {
-        if !existing_keys.contains(&episode_key(&item)) {
+        let key = episode_key(&item);
+        if removed_keys.contains(&key) {
+            continue;
+        }
+        if !existing_keys.contains(&key) {
             new_items.push(item);
         }
     }
@@ -1748,6 +1777,7 @@ unsafe fn add_podcast_source(parent: HWND, feed_url: &str, title: &str) -> Optio
             cache: rss::RssFeedCache::default(),
             last_seen_guid: None,
             last_updated: None,
+            removed_item_keys: Vec::new(),
         });
         settings::save_settings(ps.settings.clone());
         Some(ps.settings.podcast_sources.len() - 1)
@@ -3695,6 +3725,7 @@ unsafe fn show_selected_result_episodes(hwnd: HWND) {
                 cache: crate::tools::rss::RssFeedCache::default(),
                 last_seen_guid: None,
                 last_updated: None,
+                removed_item_keys: Vec::new(),
             });
             s.preview_sources.len() - 1
         })
@@ -4091,15 +4122,22 @@ unsafe fn handle_source_action(hwnd: HWND, verb: SourceAction) {
         }
         SourceAction::Remove => {
             let confirm = if parent.0 != 0 {
-                let language = with_state(parent, |s| s.settings.language).unwrap_or_default();
-                let title = confirm_title(language);
-                let msg = i18n::tr(language, "podcasts.remove_confirm");
-                MessageBoxW(
-                    hwnd,
-                    PCWSTR(to_wide(&msg).as_ptr()),
-                    PCWSTR(to_wide(&title).as_ptr()),
-                    MB_YESNO,
-                ) == IDYES
+                let (language, require_confirm) = with_state(parent, |s| {
+                    (s.settings.language, s.settings.confirm_delete_rss_podcast)
+                })
+                .unwrap_or((Language::default(), true));
+                if require_confirm {
+                    let title = confirm_title(language);
+                    let msg = i18n::tr(language, "podcasts.remove_confirm");
+                    MessageBoxW(
+                        hwnd,
+                        PCWSTR(to_wide(&msg).as_ptr()),
+                        PCWSTR(to_wide(&title).as_ptr()),
+                        MB_YESNO,
+                    ) == IDYES
+                } else {
+                    true
+                }
             } else {
                 true
             };
@@ -4240,8 +4278,10 @@ unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
             show_description_dialog(hwnd, &item.title, &final_content);
         }
         EpisodeAction::Remove => {
-            let language = with_state(parent, |s| s.settings.language).unwrap_or_default();
-            let caption = confirm_title(language);
+            let (language, require_confirm) = with_state(parent, |s| {
+                (s.settings.language, s.settings.confirm_delete_rss_podcast)
+            })
+            .unwrap_or((Language::default(), true));
             let remove_label = i18n::tr(language, "dictionary.remove");
             let title = if item.title.trim().is_empty() {
                 item.link.clone()
@@ -4249,12 +4289,17 @@ unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
                 item.title.clone()
             };
             let msg = format!("{remove_label}: \"{title}\"?");
-            let confirmed = MessageBoxW(
-                hwnd,
-                PCWSTR(to_wide(&msg).as_ptr()),
-                PCWSTR(to_wide(&caption).as_ptr()),
-                MB_YESNO | MB_ICONQUESTION,
-            ) == IDYES;
+            let confirmed = if require_confirm {
+                let caption = confirm_title(language);
+                MessageBoxW(
+                    hwnd,
+                    PCWSTR(to_wide(&msg).as_ptr()),
+                    PCWSTR(to_wide(&caption).as_ptr()),
+                    MB_YESNO | MB_ICONQUESTION,
+                ) == IDYES
+            } else {
+                true
+            };
             if !confirmed {
                 return;
             }
@@ -4274,6 +4319,24 @@ unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
                 .0,
             );
             let key = episode_key(&item);
+            if parent.0 != 0 {
+                let source_index =
+                    with_podcast_state(hwnd, |s| match s.node_data.get(&parent_item.0) {
+                        Some(NodeData::Source(idx)) => Some(*idx),
+                        _ => None,
+                    })
+                    .flatten();
+                if let Some(source_idx) = source_index {
+                    with_state(parent, |ps| {
+                        if let Some(src) = ps.settings.podcast_sources.get_mut(source_idx)
+                            && !src.removed_item_keys.iter().any(|k| k == &key)
+                        {
+                            src.removed_item_keys.push(key.clone());
+                            settings::save_settings(ps.settings.clone());
+                        }
+                    });
+                }
+            }
             with_podcast_state(hwnd, |s| {
                 s.node_data.remove(&hitem.0);
                 if parent_item.0 != 0

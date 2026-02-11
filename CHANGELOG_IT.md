@@ -15,6 +15,7 @@ Miglioramenti
 • Aggiunte le scorciatoie per brano precedente/successivo nel player: Ctrl+Pagina su e Ctrl+Pagina giù.
 • Aggiunta la voce "Reset volume" e raggruppate le azioni di ripristino in un sottomenu dedicato "Reset" in Riproduci, insieme a "Reset speed" e "Reset pitch".
 • Migliorato l'installer: setup.exe ora permette di scegliere tra associare tutti i tipi file supportati oppure selezionare manualmente le singole estensioni; anche MSI ora espone la scelta per estensione nell'albero funzionalità (default invariato: tutte attive).
+• Aggiunto il nuovo menu "Finestra" con la voce "Documenti aperti..." per passare rapidamente a uno dei file attualmente aperti.
 Correzioni di bug
 • Corretto il parsing del testo EPUB per i libri che contengono commenti HTML inline (<!-- ... -->): il testo dei capitoli ora viene estratto correttamente invece di essere saltato in parte o del tutto.
 • Corretto il dizionario Wiktionary in spagnolo e la gestione cache del dizionario: parole come "agua" ora vengono trovate correttamente e le vecchie cache "parola non trovata" non vengono più riutilizzate.
@@ -309,6 +310,7 @@ Miglioramenti
 ## 0.1.0 - 2025-12-25
 
 * Prima versione: struttura progetto e README iniziale.
+
 
 
 

@@ -15,6 +15,7 @@ Improvements
 • Added previous/next track navigation shortcuts in the player: Ctrl+PageUp and Ctrl+PageDown.
 • Added "Reset volume" and grouped reset actions into a dedicated "Reset" submenu in Playback, alongside "Reset speed" and "Reset pitch".
 • Installer improvements: setup.exe now lets users choose between associating all supported file types or selecting extensions manually; MSI now exposes per-extension file-association choices in the feature tree (default remains all enabled).
+• Added a new "Window" menu with "Open documents..." to quickly switch to any currently open file.
 Bug fixes
 • Fixed EPUB text extraction for books containing inline HTML comments (<!-- ... -->): chapter text is now parsed correctly instead of being partially or fully skipped.
 • Fixed Spanish Wiktionary lookups and dictionary cache handling: Spanish entries like "agua" now load correctly, and old "Word not found" cache entries are no longer reused.
@@ -301,6 +302,7 @@ Improvements
 
 ## 0.1.0 - 2025-12-25
 - Initial release: project structure and README.
+
 
 
 

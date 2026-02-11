@@ -15,6 +15,7 @@ Améliorations
 • Ajout des raccourcis piste précédente/suivante dans le lecteur : Ctrl+PageUp et Ctrl+PageDown.
 • Ajout de l'option « Réinitialiser le volume » et regroupement des actions de réinitialisation dans un sous-menu dédié « Réinitialiser » dans Lecture, avec « Réinitialiser la vitesse » et « Réinitialiser la tonalité ».
 • Amélioration de l'installateur : setup.exe permet désormais de choisir entre associer tous les types de fichiers pris en charge ou sélectionner manuellement les extensions ; le MSI propose aussi une sélection extension par extension dans l'arborescence des fonctionnalités (valeur par défaut inchangée : tout activé).
+• Ajout du nouveau menu « Fenêtre » avec l'option « Documents ouverts... » pour basculer rapidement vers n'importe quel fichier actuellement ouvert.
 Corrections de bugs
 • Correction de l’extraction de texte EPUB pour les livres contenant des commentaires HTML inline (<!-- ... -->) : le texte des chapitres est désormais correctement analysé au lieu d’être partiellement ou totalement ignoré.
 • Correction du dictionnaire Wiktionary en espagnol et de la gestion du cache : des mots comme « agua » sont maintenant trouvés correctement et les anciennes entrées « mot introuvable » ne sont plus réutilisées.
@@ -295,6 +296,7 @@ Améliorations
 
 ## 0.1.0 - 2025-12-25
 - Version initiale.
+
 
 
 

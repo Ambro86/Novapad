@@ -15,6 +15,7 @@ Cải tiến
 • Đã thêm phím tắt chuyển bài trước/sau trong trình phát: Ctrl+PageUp và Ctrl+PageDown.
 • Đã thêm mục "Đặt lại âm lượng" và gom các thao tác đặt lại vào submenu riêng "Đặt lại" trong menu Phát lại, cùng với "Đặt lại tốc độ" và "Đặt lại cao độ".
 • Cải tiến trình cài đặt: setup.exe giờ cho phép chọn giữa liên kết tất cả kiểu tệp được hỗ trợ hoặc tự chọn từng phần mở rộng; MSI cũng hỗ trợ chọn theo từng phần mở rộng trong cây tính năng (mặc định giữ nguyên: bật tất cả).
+• Đã thêm menu mới "Cửa sổ" với mục "Tài liệu đang mở..." để chuyển nhanh đến bất kỳ tệp nào đang mở.
 Sửa lỗi
 • Đã sửa trích xuất văn bản EPUB cho sách có chứa chú thích HTML inline (<!-- ... -->): văn bản chương giờ được phân tích đúng thay vì bị bỏ qua một phần hoặc toàn bộ.
 • Đã sửa từ điển Wiktionary tiếng Tây Ban Nha và cơ chế cache từ điển: các từ như "agua" giờ được tìm đúng, và các mục cache cũ kiểu "Không tìm thấy từ" sẽ không còn được tái sử dụng.
@@ -302,6 +303,7 @@ Cải tiến
 
 ## 0.1.0 - 2025-12-25
 - Phiên bản phát hành đầu tiên: Cấu trúc dự án và tệp README.
+
 
 
 

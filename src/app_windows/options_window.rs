@@ -97,6 +97,7 @@ const OPTIONS_ID_SPACE_WIDTH: usize = 6062;
 const OPTIONS_ID_CHECK_UPDATES: usize = 6015;
 const OPTIONS_ID_SEND_CRASH_REPORTS: usize = 6048;
 const OPTIONS_ID_USE_LEGACY_NAME: usize = 6057;
+const OPTIONS_ID_CONFIRM_DELETE_RSS_PODCAST: usize = 6066;
 const OPTIONS_ID_MANAGE_ASSOCIATIONS: usize = 6044;
 const OPTIONS_ID_PROMPT_PROGRAM: usize = 6019;
 const OPTIONS_ID_TABS: usize = 6024;
@@ -292,6 +293,7 @@ struct OptionsDialogState {
     checkbox_send_crash_reports: HWND,
     checkbox_use_legacy_name: HWND,
     checkbox_context_menu: HWND,
+    checkbox_confirm_delete_rss_podcast: HWND,
     label_file_associations: HWND,
     button_manage_associations: HWND,
     label_prompt_program: HWND,
@@ -350,6 +352,7 @@ struct OptionsLabels {
     label_send_crash_reports: String,
     label_use_legacy_name: String,
     label_context_menu: String,
+    label_confirm_delete_rss_podcast: String,
     label_file_associations: String,
     label_manage_associations: String,
     label_prompt_program: String,
@@ -470,6 +473,10 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_send_crash_reports: i18n::tr(language, "options.label.send_crash_reports"),
         label_use_legacy_name: i18n::tr(language, "options.label.legacy_name"),
         label_context_menu: i18n::tr(language, "options.label.context_menu"),
+        label_confirm_delete_rss_podcast: i18n::tr(
+            language,
+            "options.label.confirm_delete_rss_podcast",
+        ),
         label_file_associations: i18n::tr(language, "options.label.file_associations"),
         label_manage_associations: i18n::tr(language, "options.button.manage_associations"),
         label_prompt_program: i18n::tr(language, "options.label.prompt_program"),
@@ -2153,6 +2160,22 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
             );
             y += 28;
 
+            let checkbox_confirm_delete_rss_podcast = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_confirm_delete_rss_podcast).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                170,
+                y,
+                300,
+                20,
+                hwnd,
+                HMENU(OPTIONS_ID_CONFIRM_DELETE_RSS_PODCAST as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 28;
+
             let label_file_associations = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -2337,6 +2360,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 checkbox_send_crash_reports,
                 checkbox_use_legacy_name,
                 checkbox_context_menu,
+                checkbox_confirm_delete_rss_podcast,
                 label_file_associations,
                 button_manage_associations,
                 label_prompt_program,
@@ -2445,6 +2469,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 checkbox_send_crash_reports,
                 checkbox_use_legacy_name,
                 checkbox_context_menu,
+                checkbox_confirm_delete_rss_podcast,
                 label_file_associations,
                 button_manage_associations,
                 label_prompt_program,
@@ -2773,6 +2798,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         checkbox_send_crash_reports,
         checkbox_use_legacy_name,
         checkbox_context_menu,
+        checkbox_confirm_delete_rss_podcast,
         _label_prompt_program,
         combo_prompt_program,
     ) = match with_options_state(hwnd, |state| {
@@ -2848,6 +2874,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.checkbox_send_crash_reports,
             state.checkbox_use_legacy_name,
             state.checkbox_context_menu,
+            state.checkbox_confirm_delete_rss_podcast,
             state.label_prompt_program,
             state.combo_prompt_program,
         )
@@ -3599,6 +3626,16 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         checkbox_context_menu,
         BM_SETCHECK,
         WPARAM(if settings.context_menu_open_with {
+            BST_CHECKED.0 as usize
+        } else {
+            0
+        }),
+        LPARAM(0),
+    );
+    SendMessageW(
+        checkbox_confirm_delete_rss_podcast,
+        BM_SETCHECK,
+        WPARAM(if settings.confirm_delete_rss_podcast {
             BST_CHECKED.0 as usize
         } else {
             0
@@ -4528,6 +4565,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         checkbox_send_crash_reports,
         checkbox_use_legacy_name,
         checkbox_context_menu,
+        checkbox_confirm_delete_rss_podcast,
         combo_prompt_program,
     ) = match with_options_state(hwnd, |state| {
         (
@@ -4586,6 +4624,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.checkbox_send_crash_reports,
             state.checkbox_use_legacy_name,
             state.checkbox_context_menu,
+            state.checkbox_confirm_delete_rss_podcast,
             state.combo_prompt_program,
         )
     }) {
@@ -4919,6 +4958,14 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     settings.context_menu_open_with =
         SendMessageW(checkbox_context_menu, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
             == BST_CHECKED.0;
+    settings.confirm_delete_rss_podcast = SendMessageW(
+        checkbox_confirm_delete_rss_podcast,
+        BM_GETCHECK,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0 as u32
+        == BST_CHECKED.0;
 
     let prompt_sel = SendMessageW(combo_prompt_program, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     settings.prompt_program = match prompt_sel {
@@ -5447,6 +5494,11 @@ fn layout_general_tab(state: &OptionsDialogState) {
         y,
     );
     y = layout_checkbox("checkbox_context_menu", state.checkbox_context_menu, y);
+    y = layout_checkbox(
+        "checkbox_confirm_delete_rss_podcast",
+        state.checkbox_confirm_delete_rss_podcast,
+        y,
+    );
     y += OPTIONS_SECTION_GAP;
     layout_label_control(
         "label_file_associations",
@@ -5877,6 +5929,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.checkbox_send_crash_reports,
             state.checkbox_use_legacy_name,
             state.checkbox_context_menu,
+            state.checkbox_confirm_delete_rss_podcast,
             state.label_file_associations,
             state.button_manage_associations,
         ] {

@@ -312,10 +312,18 @@ Function PageLeaveReinstall
 FunctionEnd
 
 {{#if file_associations}}
+!ifndef LB_ADDSTRING
 !define LB_ADDSTRING 0x180
+!endif
+!ifndef LB_SETSEL
 !define LB_SETSEL 0x185
+!endif
+!ifndef LB_GETSEL
 !define LB_GETSEL 0x187
+!endif
+!ifndef LB_FINDSTRINGEXACT
 !define LB_FINDSTRINGEXACT 0x1A2
+!endif
 
 Function PageFileAssociations
   Call SkipIfPassive
@@ -488,7 +496,7 @@ LangString assocTitle ${LANG_SPANISH} "Asociaciones de archivos"
 LangString assocTitle ${LANG_PORTUGUESE} "Associações de arquivos"
 LangString assocTitle ${LANG_SWEDISH} "Filkopplingar"
 LangString assocTitle ${LANG_VIETNAMESE} "Liên kết tệp"
-LangString assocTitle ${LANG_CZECH} "Přidružení souborů"
+LangString assocTitle ${LANG_CZECH} "Asociace souborů"
 LangString assocTitle ${LANG_POLISH} "Skojarzenia plików"
 LangString assocTitle ${LANG_FRENCH} "Associations de fichiers"
 LangString assocTitle ${LANG_SERBIAN} "Povezivanje datoteka"
@@ -499,7 +507,7 @@ LangString assocSubtitle ${LANG_SPANISH} "Elija si desea asociar los tipos de ar
 LangString assocSubtitle ${LANG_PORTUGUESE} "Escolha se deseja associar os tipos de arquivos suportados ao ${PRODUCTNAME}."
 LangString assocSubtitle ${LANG_SWEDISH} "Välj om du vill koppla filtyper som stöds till ${PRODUCTNAME}."
 LangString assocSubtitle ${LANG_VIETNAMESE} "Chọn xem có liên kết các loại tệp được hỗ trợ với ${PRODUCTNAME} hay không."
-LangString assocSubtitle ${LANG_CZECH} "Zvolte, zda chcete přidružit podporované typy souborů k aplikaci ${PRODUCTNAME}."
+LangString assocSubtitle ${LANG_CZECH} "Zvolte, zda chcete asociovat podporované typy souborů s aplikací ${PRODUCTNAME}."
 LangString assocSubtitle ${LANG_POLISH} "Wybierz, czy skojarzyć obsługiwane typy plików z ${PRODUCTNAME}."
 LangString assocSubtitle ${LANG_FRENCH} "Choisissez si vous voulez associer les types de fichiers pris en charge a ${PRODUCTNAME}."
 LangString assocSubtitle ${LANG_SERBIAN} "Izaberite da li zelite da povezete podrzane tipove datoteka sa ${PRODUCTNAME}."
@@ -510,7 +518,7 @@ LangString assocCheckbox ${LANG_SPANISH} "Asociar tipos de archivo compatibles c
 LangString assocCheckbox ${LANG_PORTUGUESE} "Associar tipos de arquivos suportados ao ${PRODUCTNAME}"
 LangString assocCheckbox ${LANG_SWEDISH} "Koppla filtyper som stöds till ${PRODUCTNAME}"
 LangString assocCheckbox ${LANG_VIETNAMESE} "Liên kết các loại tệp được hỗ trợ với ${PRODUCTNAME}"
-LangString assocCheckbox ${LANG_CZECH} "Přidružit podporované typy souborů k aplikaci ${PRODUCTNAME}"
+LangString assocCheckbox ${LANG_CZECH} "Asociovat podporované typy souborů s aplikací ${PRODUCTNAME}"
 LangString assocCheckbox ${LANG_POLISH} "Skojarz obslugiwane typy plikow z ${PRODUCTNAME}"
 LangString assocCheckbox ${LANG_FRENCH} "Associer les types de fichiers pris en charge a ${PRODUCTNAME}"
 LangString assocCheckbox ${LANG_SERBIAN} "Povezi podrzane tipove datoteka sa ${PRODUCTNAME}"
@@ -576,7 +584,7 @@ LangString ctxMenuCheckbox ${LANG_SPANISH} "Añadir 'Abrir con ${PRODUCTNAME}' a
 LangString ctxMenuCheckbox ${LANG_PORTUGUESE} "Adicionar 'Abrir com ${PRODUCTNAME}' ao menu de contexto"
 LangString ctxMenuCheckbox ${LANG_SWEDISH} "Lägg till 'Öppna med ${PRODUCTNAME}' i snabbmenyn"
 LangString ctxMenuCheckbox ${LANG_VIETNAMESE} "Thêm 'Mở bằng ${PRODUCTNAME}' vào menu chuột phải"
-LangString ctxMenuCheckbox ${LANG_CZECH} "Přidat 'Otevřít v ${PRODUCTNAME}' do místní nabídky"
+LangString ctxMenuCheckbox ${LANG_CZECH} "Přidat 'Otevřít v ${PRODUCTNAME}' do kontextové nabídky"
 LangString ctxMenuCheckbox ${LANG_POLISH} "Dodaj 'Otworz za pomoca ${PRODUCTNAME}' do menu kontekstowego"
 LangString ctxMenuCheckbox ${LANG_FRENCH} "Ajouter 'Ouvrir avec ${PRODUCTNAME}' au menu contextuel"
 LangString ctxMenuCheckbox ${LANG_SERBIAN} "Dodaj 'Otvori pomocu ${PRODUCTNAME}' u kontekstni meni"

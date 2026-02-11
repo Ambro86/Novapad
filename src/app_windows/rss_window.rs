@@ -40,12 +40,12 @@ use windows::Win32::UI::WindowsAndMessaging::{
     EVENT_OBJECT_FOCUS, GWLP_USERDATA, GWLP_WNDPROC, GetCursorPos, GetDlgCtrlID, GetDlgItem,
     GetParent, GetWindowLongPtrW, GetWindowRect, HMENU, IDYES, KillTimer, MB_ICONINFORMATION,
     MB_ICONQUESTION, MB_OK, MB_YESNO, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MessageBoxW,
-    OBJID_CLIENT, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow,
-    SetWindowLongPtrW, SetWindowTextW, TrackPopupMenu, WINDOW_STYLE, WM_CLOSE, WM_COMMAND,
-    WM_CONTEXTMENU, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY,
-    WM_NULL, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SYSKEYDOWN, WM_TIMER, WM_USER, WNDCLASSW,
-    WNDPROC, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU,
-    WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    OBJID_CLIENT, PostMessageW, RegisterClassW, SW_HIDE, SendMessageW, SetForegroundWindow,
+    SetWindowLongPtrW, SetWindowTextW, ShowWindow, TrackPopupMenu, WINDOW_STYLE, WM_CLOSE,
+    WM_COMMAND, WM_CONTEXTMENU, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL,
+    WM_NOTIFY, WM_NULL, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SYSKEYDOWN, WM_TIMER, WM_USER,
+    WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_POPUP,
+    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -118,7 +118,9 @@ fn normalize_article_text(s: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::normalize_rss_url_key;
+    use super::{
+        decode_basic_html_entities, format_google_news_source_title, normalize_rss_url_key,
+    };
 
     #[test]
     fn normalize_rss_url_key_keeps_query_parameters() {
@@ -137,13 +139,104 @@ mod tests {
         let key = normalize_rss_url_key("HTTP://EXAMPLE.COM/Feed/");
         assert_eq!(key, "example.com/feed");
     }
+
+    #[test]
+    fn format_google_news_source_title_capitalizes_each_word() {
+        let title = format_google_news_source_title("elon musk");
+        assert_eq!(title, "Elon Musk");
+    }
+
+    #[test]
+    fn decode_basic_html_entities_decodes_common_italian_entities() {
+        let text = "cos&igrave; si &egrave; visto, &laquo;ok&raquo;";
+        let decoded = decode_basic_html_entities(text);
+        assert_eq!(decoded, "così si è visto, «ok»");
+    }
 }
 
 fn decode_basic_html_entities(s: &str) -> String {
-    let mut out = s.replace("&amp;", "&").replace("&amp", "&");
-    out = out.replace("&quot;", "\"").replace("&quot", "\"");
-    out = out.replace("&lt;", "<").replace("&lt", "<");
-    out = out.replace("&gt;", ">").replace("&gt", ">");
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c != '&' {
+            out.push(c);
+            continue;
+        }
+
+        let mut entity = String::new();
+        let mut ended_with_semicolon = false;
+        while let Some(&next) = chars.peek() {
+            chars.next();
+            if next == ';' {
+                ended_with_semicolon = true;
+                break;
+            }
+            // Keep entity names bounded to avoid eating large text chunks.
+            if entity.len() >= 16 {
+                entity.push(next);
+                break;
+            }
+            entity.push(next);
+        }
+
+        let decoded = if entity.starts_with("#x") || entity.starts_with("#X") {
+            u32::from_str_radix(&entity[2..], 16)
+                .ok()
+                .and_then(char::from_u32)
+        } else if let Some(num) = entity.strip_prefix('#') {
+            num.parse::<u32>().ok().and_then(char::from_u32)
+        } else {
+            match entity.as_str() {
+                "nbsp" => Some(' '),
+                "amp" => Some('&'),
+                "quot" => Some('"'),
+                "apos" => Some('\''),
+                "lt" => Some('<'),
+                "gt" => Some('>'),
+                "laquo" => Some('«'),
+                "raquo" => Some('»'),
+                "hellip" => Some('…'),
+                "ndash" => Some('–'),
+                "mdash" => Some('—'),
+                "rsquo" => Some('’'),
+                "lsquo" => Some('‘'),
+                "rdquo" => Some('”'),
+                "ldquo" => Some('“'),
+                // Latin entities commonly seen in Italian and other EU feeds.
+                "agrave" => Some('à'),
+                "egrave" => Some('è'),
+                "igrave" => Some('ì'),
+                "ograve" => Some('ò'),
+                "ugrave" => Some('ù'),
+                "aacute" => Some('á'),
+                "eacute" => Some('é'),
+                "iacute" => Some('í'),
+                "oacute" => Some('ó'),
+                "uacute" => Some('ú'),
+                "Agrave" => Some('À'),
+                "Egrave" => Some('È'),
+                "Igrave" => Some('Ì'),
+                "Ograve" => Some('Ò'),
+                "Ugrave" => Some('Ù'),
+                "Aacute" => Some('Á'),
+                "Eacute" => Some('É'),
+                "Iacute" => Some('Í'),
+                "Oacute" => Some('Ó'),
+                "Uacute" => Some('Ú'),
+                _ => None,
+            }
+        };
+
+        if let Some(ch) = decoded {
+            out.push(ch);
+        } else {
+            out.push('&');
+            out.push_str(&entity);
+            if ended_with_semicolon {
+                out.push(';');
+            }
+        }
+    }
     out
 }
 
@@ -221,6 +314,26 @@ fn build_google_news_rss_url(keyword: &str, language: crate::settings::Language)
         "https://news.google.com/rss/search?q={}&hl={}&gl={}&ceid={}",
         query, hl, gl, ceid
     )
+}
+
+fn format_google_news_source_title(keyword: &str) -> String {
+    keyword
+        .split_whitespace()
+        .map(|word| {
+            let mut chars = word.chars();
+            if let Some(first) = chars.next() {
+                let mut out = String::new();
+                out.extend(first.to_uppercase());
+                for ch in chars {
+                    out.extend(ch.to_lowercase());
+                }
+                out
+            } else {
+                String::new()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn parse_single_path(buffer: &[u16]) -> Option<PathBuf> {
@@ -1034,6 +1147,7 @@ struct AddDialogInit {
     parent: HWND,
     prefill_title: String,
     prefill_url: String,
+    hide_url_field: bool,
 }
 
 struct SearchDialogInit {
@@ -3347,7 +3461,7 @@ unsafe fn handle_delete(hwnd: HWND) {
         };
         if confirmed {
             let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-            with_state(parent, |ps| {
+            let focus_source_idx = with_state(parent, |ps| {
                 if matches!(
                     language,
                     crate::settings::Language::English
@@ -3414,8 +3528,35 @@ unsafe fn handle_delete(hwnd: HWND) {
                 }
                 ps.settings.rss_sources.remove(idx);
                 crate::settings::save_settings(ps.settings.clone());
+                if ps.settings.rss_sources.is_empty() {
+                    None
+                } else if idx > 0 {
+                    Some(idx - 1)
+                } else {
+                    Some(0)
+                }
             });
             reload_tree(hwnd);
+            if let Some(target_idx) = focus_source_idx.flatten() {
+                let target_hitem = with_rss_state(hwnd, |s| {
+                    s.node_data.iter().find_map(|(&h, node)| match node {
+                        NodeData::Source(i) if *i == target_idx => {
+                            Some(windows::Win32::UI::Controls::HTREEITEM(h))
+                        }
+                        _ => None,
+                    })
+                })
+                .flatten();
+                if let Some(target) = target_hitem {
+                    SendMessageW(
+                        hwnd_tree,
+                        TVM_SELECTITEM,
+                        WPARAM(TVGN_CARET as usize),
+                        LPARAM(target.0),
+                    );
+                    SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(target.0));
+                }
+            }
         }
     } else if let Some(NodeData::Item(item)) = selected_node {
         let (language, require_confirm) = with_rss_state(hwnd, |s| {
@@ -4365,8 +4506,8 @@ unsafe fn search_keyword_wndproc_inner(
                     return LRESULT(0);
                 }
                 let url = build_google_news_rss_url(&keyword, language);
-                let source_title = format!("Google News: {}", keyword);
-                show_add_dialog_with_prefill(parent, source_title, url);
+                let source_title = format_google_news_source_title(&keyword);
+                show_add_dialog_with_prefill_options(parent, source_title, url, true);
                 crate::log_if_err!(DestroyWindow(hwnd));
                 return LRESULT(0);
             }
@@ -4388,6 +4529,15 @@ unsafe fn search_keyword_wndproc_inner(
 }
 
 unsafe fn show_add_dialog_with_prefill(parent_hwnd: HWND, title: String, url: String) {
+    show_add_dialog_with_prefill_options(parent_hwnd, title, url, false);
+}
+
+unsafe fn show_add_dialog_with_prefill_options(
+    parent_hwnd: HWND,
+    title: String,
+    url: String,
+    hide_url_field: bool,
+) {
     let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
     let class_name = to_wide("SonarpadInput");
 
@@ -4414,6 +4564,7 @@ unsafe fn show_add_dialog_with_prefill(parent_hwnd: HWND, title: String, url: St
         parent: parent_hwnd,
         prefill_title: title,
         prefill_url: url,
+        hide_url_field,
     }));
     let hwnd = CreateWindowExW(
         WS_EX_DLGMODALFRAME,
@@ -4456,13 +4607,18 @@ unsafe fn input_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPAR
         WM_CREATE => {
             let cs = lparam.0 as *const CREATESTRUCTW;
             let init_ptr = (*cs).lpCreateParams as *mut AddDialogInit;
-            let (parent, prefill_title, prefill_url): (HWND, String, String) = if init_ptr.is_null()
-            {
-                (HWND(0), String::new(), String::new())
-            } else {
-                let init = unsafe { Box::from_raw(init_ptr) };
-                (init.parent, init.prefill_title, init.prefill_url)
-            };
+            let (parent, prefill_title, prefill_url, hide_url_field): (HWND, String, String, bool) =
+                if init_ptr.is_null() {
+                    (HWND(0), String::new(), String::new(), false)
+                } else {
+                    let init = unsafe { Box::from_raw(init_ptr) };
+                    (
+                        init.parent,
+                        init.prefill_title,
+                        init.prefill_url,
+                        init.hide_url_field,
+                    )
+                };
             // We need language. But we can't easily pass it.
             // We can get it from parent (rss_window) -> parent (main)
             let main_hwnd = with_rss_state(parent, |s| s.parent).unwrap_or(HWND(0));
@@ -4571,7 +4727,13 @@ unsafe fn input_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPAR
                     PCWSTR(to_wide(&prefill_title).as_ptr()),
                 )
             {}
-            SetFocus(GetDlgItem(hwnd, 101));
+            if hide_url_field {
+                ShowWindow(GetDlgItem(hwnd, 105), SW_HIDE);
+                ShowWindow(GetDlgItem(hwnd, 101), SW_HIDE);
+                SetFocus(GetDlgItem(hwnd, 104));
+            } else {
+                SetFocus(GetDlgItem(hwnd, 101));
+            }
             LRESULT(0)
         }
         WM_COMMAND => {

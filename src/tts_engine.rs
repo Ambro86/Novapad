@@ -948,9 +948,10 @@ fn tts_playback_inner(
 
         if all_edge {
             const WS_RETRY_MAX: usize = 10;
+            let mut next_index = 0usize;
             for attempt in 1..=WS_RETRY_MAX {
                 let ws_result = download_edge_chunks_ws(
-                    &chunks_downloader,
+                    &chunks_downloader[next_index..],
                     &voice_downloader,
                     rate,
                     pitch,
@@ -960,7 +961,19 @@ fn tts_playback_inner(
                 )
                 .await;
                 match ws_result {
-                    Ok(_) => return,
+                    Ok(sent_count) => {
+                        next_index = (next_index + sent_count).min(chunks_downloader.len());
+                        if next_index >= chunks_downloader.len() {
+                            return;
+                        }
+                        crate::log_debug(&format!(
+                            "Edge WS: partial progress sent={} remaining={} (attempt {}/{})",
+                            sent_count,
+                            chunks_downloader.len().saturating_sub(next_index),
+                            attempt,
+                            WS_RETRY_MAX
+                        ));
+                    }
                     Err(e) => {
                         if cancel_downloader.load(Ordering::SeqCst) {
                             return;
@@ -1467,7 +1480,7 @@ async fn download_edge_chunks_ws(
     tts_volume: i32,
     cancel: &AtomicBool,
     audio_tx: EdgeAudioTx<'_>,
-) -> Result<Vec<Vec<u8>>, String> {
+) -> Result<usize, String> {
     let first_audio_timeout = Duration::from_secs(60);
     const FIRST_AUDIO_RETRIES: usize = 1;
     let sec_ms_gec = generate_sec_ms_gec();
@@ -1525,7 +1538,6 @@ async fn download_edge_chunks_ws(
         .await
         .map_err(|e: tungstenite::Error| e.to_string())?;
 
-    let mut out = Vec::with_capacity(chunks.len());
     let mut sent_count = 0usize;
     for (idx, chunk) in chunks.iter().enumerate() {
         if cancel.load(Ordering::Relaxed) {
@@ -1614,17 +1626,20 @@ async fn download_edge_chunks_ws(
             read_edge_audio_turn(&mut read).await?
         };
         if audio.is_empty() {
-            crate::log_debug("Edge WS: received empty audio chunk.");
-            return Err("Edge WS: empty audio chunk".to_string());
+            crate::log_debug(&format!(
+                "Edge WS: received empty audio chunk, skipping chunk_index={}",
+                idx
+            ));
+            continue;
         }
         if let Some(tx) = audio_tx {
             let len = chunk.original_len;
             if tx.send(Ok((audio, len))).await.is_err() {
-                return Ok(out);
+                return Ok(sent_count);
             }
             sent_count = sent_count.saturating_add(1);
         } else {
-            out.push(audio);
+            sent_count = sent_count.saturating_add(1);
         }
     }
 
@@ -1633,7 +1648,7 @@ async fn download_edge_chunks_ws(
         return Err("Edge WS: no audio sent".to_string());
     }
 
-    Ok(out)
+    Ok(sent_count)
 }
 
 struct EdgeStreamOptions<'a> {
@@ -2918,11 +2933,20 @@ fn sanitize_edge_text(text: &str) -> String {
         }
     }
     flush_edge_punctuation_runs(&mut out, &mut dot_run, &mut bang_run, &mut question_run);
-    out
+    normalize_edge_terminal_punctuation(&out)
 }
 
 fn is_edge_text_usable(text: &str) -> bool {
     text.chars().any(|ch| ch.is_alphanumeric())
+}
+
+fn normalize_edge_terminal_punctuation(text: &str) -> String {
+    // Edge can fail on some terminal combinations coming from headlines, e.g. `...":`.
+    // Keep behavior minimal: only normalize dot + quote + colon sequences to a plain sentence end.
+    text.replace(".\":", ". ")
+        .replace(".':", ". ")
+        .replace(".”:", ". ")
+        .replace(".’:", ". ")
 }
 
 fn flush_edge_punctuation_runs(
@@ -3089,9 +3113,12 @@ fn split_sentences(text: &str) -> Vec<&str> {
             if next_is_space {
                 let end = idx + ch.len_utf8();
                 if end > start {
-                    out.push(&text[start..end]);
+                    let candidate = &text[start..end];
+                    if candidate.chars().any(|c| c.is_alphanumeric()) {
+                        out.push(candidate);
+                        start = end;
+                    }
                 }
-                start = end;
             }
         }
     }
@@ -3221,11 +3248,13 @@ pub fn split_into_tts_chunks(
             let edge_dot_run =
                 span_engine == TtsEngine::Edge && ch == '.' && matches!(next_ch, Some('.'));
             if is_terminal && !edge_dot_run {
-                if !current_sentence.trim().is_empty() {
+                let should_split = span_engine != TtsEngine::Edge
+                    || current_sentence.chars().any(|c| c.is_alphanumeric());
+                if should_split && !current_sentence.trim().is_empty() {
                     sentences.push((current_sentence.clone(), current_len));
+                    current_sentence.clear();
+                    current_len = 0;
                 }
-                current_sentence.clear();
-                current_len = 0;
             }
         }
         if !current_sentence.trim().is_empty() {
@@ -4475,6 +4504,39 @@ mod tests {
         assert_eq!(
             sanitize_edge_text("ciao\u{00A0}\u{200B}mondo\u{2409}!!!???"),
             "ciao mondo!?"
+        );
+    }
+
+    #[test]
+    fn edge_sanitize_normalizes_dot_quote_colon_sequences() {
+        let text = "\"Addio Juve, secondo me andrà...\": parla chi gli ha cambiato la vita";
+        let sanitized = sanitize_edge_text(text);
+        assert!(!sanitized.contains(".\":"));
+        assert!(sanitized.contains("andrà."));
+    }
+
+    #[test]
+    fn edge_split_does_not_emit_quote_colon_only_chunk_after_ellipsis() {
+        let chunks = split_into_tts_chunks(
+            "\"Vlahovic distrugge reti e lascia! Addio Juve, secondo me andrà...\": parla chi gli ha cambiato la vita",
+            true,
+            &[],
+            TtsEngine::Edge,
+        );
+        assert!(!chunks.is_empty());
+        let has_bad_chunk = chunks.iter().any(|c| {
+            let probe = c
+                .text_to_read
+                .replace("&quot;", "\"")
+                .replace("&apos;", "'")
+                .chars()
+                .filter(|ch| !ch.is_whitespace())
+                .collect::<String>();
+            !probe.chars().any(|ch| ch.is_alphanumeric())
+        });
+        assert!(
+            !has_bad_chunk,
+            "Edge chunk split produced punctuation-only chunk"
         );
     }
 

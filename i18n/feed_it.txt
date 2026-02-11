@@ -22,23 +22,13 @@ Aranzulla | https://www.aranzulla.it/feed/
 Il Meteo | https://www.ilmeteo.it/rss/
 Calcio e Finanza | https://www.calcioefinanza.it/feed/
 La Gazzetta dello Sport | https://www.gazzetta.it/dynamic-feed/rss/section/last.xml
-Corriere dello Sport | https://www.corrieredellosport.it/rss/home.xml
+Corriere dello Sport | https://www.corrieredellosport.it/rss/
 Motorsport Italia | https://www.motorsport.com/rss/f1/news/
 AlVolante | https://www.alvolante.it/rss.xml
 Motori.it | https://www.motori.it/rss/
-Money.it | https://www.money.it/rss
 StartMag | https://www.startmag.it/feed/
 Formiche | https://www.formiche.net/feed/
 Linkiesta | https://www.linkiesta.it/feed/
 Il Foglio | https://www.ilfoglio.it/rss.xml
 Il Giornale | https://www.ilgiornale.it/rss.xml
 Quotidiano.net | https://www.quotidiano.net/rss
-Today | https://www.today.it/rss/
-RomaToday | https://www.romatoday.it/rss/
-MilanoToday | https://www.milanotoday.it/rss/
-NapoliToday | https://www.napolitoday.it/rss/
-TorinoToday | https://www.torinotoday.it/rss/
-PalermoToday | https://www.palermotoday.it/rss/
-BolognaToday | https://www.bolognatoday.it/rss/
-FirenzeToday | https://www.firenzetoday.it/rss/
-GenovaToday | https://www.genovatoday.it/rss/

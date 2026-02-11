@@ -425,7 +425,9 @@ fn parse_feed_bytes(
                 .map(|t| t.content.clone())
                 .unwrap_or_else(|| "No Title".to_string());
             let link = select_entry_link(&entry);
-            let guid = if !entry.id.trim().is_empty() {
+            let guid = if let Some(stable_guid) = stable_google_news_guid(&entry.id, &link) {
+                stable_guid
+            } else if !entry.id.trim().is_empty() {
                 entry.id.clone()
             } else if !link.trim().is_empty() {
                 link.clone()
@@ -466,6 +468,24 @@ pub(crate) fn is_google_news_article_url(url: &str) -> bool {
         || path.contains("/articles/")
         || path.contains("/read/")
         || path.contains("/__i/rss/rd/articles/")
+}
+
+fn stable_google_news_guid(entry_id: &str, link: &str) -> Option<String> {
+    let id_from_link = if is_google_news_article_url(link) {
+        extract_google_news_article_id(link)
+    } else {
+        None
+    };
+    if let Some(id) = id_from_link {
+        return Some(format!("google-news:{id}"));
+    }
+
+    if is_google_news_article_url(entry_id)
+        && let Some(id) = extract_google_news_article_id(entry_id)
+    {
+        return Some(format!("google-news:{id}"));
+    }
+    None
 }
 
 fn extract_between<'a>(s: &'a str, start: &str, end: &str) -> Option<&'a str> {
@@ -1400,6 +1420,30 @@ mod tests {
         assert_eq!(
             decoded.as_deref(),
             Some("https://www.limesonline.com/rubrica/dollaro")
+        );
+    }
+
+    #[test]
+    fn stable_google_news_guid_prefers_article_id_from_link() {
+        let guid = stable_google_news_guid(
+            "tag:news.google.com,2005:cluster=527802233",
+            "https://news.google.com/rss/articles/CBMiQGh0dHBzOi8vZXhhbXBsZS5jb20v?hl=it&gl=IT&ceid=IT:it",
+        );
+        assert_eq!(
+            guid.as_deref(),
+            Some("google-news:CBMiQGh0dHBzOi8vZXhhbXBsZS5jb20v")
+        );
+    }
+
+    #[test]
+    fn stable_google_news_guid_uses_entry_id_when_it_is_google_link() {
+        let guid = stable_google_news_guid(
+            "https://news.google.com/rss/articles/CBMif2h0dHBzOi8vZXhhbXBsZS5vcmcvYXJ0aWNsZT9pZD0xMjPSAQA?oc=5",
+            "",
+        );
+        assert_eq!(
+            guid.as_deref(),
+            Some("google-news:CBMif2h0dHBzOi8vZXhhbXBsZS5vcmcvYXJ0aWNsZT9pZD0xMjPSAQA")
         );
     }
 }

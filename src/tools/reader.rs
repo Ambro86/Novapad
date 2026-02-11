@@ -568,6 +568,29 @@ pub fn reader_mode_extract(html_content: &str, language: Language) -> Option<Art
 
         // Fallback: vecchio metodo per altri siti (con extract_json_string)
         if !found_anything {
+            // Next.js payloads like Radioitalia store article paragraphs as
+            // "__typename":"Text","content":"...".
+            let mut seen_text_content = std::collections::HashSet::new();
+            for val in extract_json_values(&json_text, "\"__typename\":\"Text\",\"content\":\"") {
+                let cleaned = collapse_blank_lines(&clean_text(&val));
+                let trimmed = cleaned.trim();
+                if trimmed.len() < 30
+                    || trimmed.contains("http")
+                    || trimmed.contains('{')
+                    || trimmed.contains("categoryName")
+                    || looks_like_ui_chrome(trimmed)
+                {
+                    continue;
+                }
+                if seen_text_content.insert(trimmed.to_string()) {
+                    body_acc.push_str(trimmed);
+                    body_acc.push_str("\n\n");
+                    found_anything = true;
+                }
+            }
+        }
+
+        if !found_anything {
             let mut search_pos = 0;
             while let Some(text_start) = json_text[search_pos..].find("\"text\":\"") {
                 let abs_start = search_pos + text_start + 8;
@@ -619,6 +642,7 @@ pub fn reader_mode_extract(html_content: &str, language: Language) -> Option<Art
             ".ifq-post__content p",
             ".ifq-post__content",
             ".media-content.news-txt p, .media-content.news-txt figcaption, .media-content.news-txt .image-caption",
+            ".col-md-8.pb-5 .mt-4 p",
             "p[data-type='paragraph']", // WSJ modern
             "article [data-testid='article-body'] p",
             "article [data-testid='paragraph']",
@@ -715,11 +739,14 @@ fn is_known_js_noise_line(line: &str) -> bool {
         || lower.contains("datawrapper-height")
         || lower.contains("addeventlistener(\"message\"")
         || lower.contains("addeventlistener('message'")
+        // Radioitalia pages can leak a raw nav JSON blob into extracted text.
+        || (lower.starts_with("{\"type\":\"main\",\"entry\":[")
+            && lower.contains("\"categoryname\":\"undefined\""))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::author_prefix;
+    use super::{author_prefix, is_known_js_noise_line};
     use crate::settings::Language;
 
     #[test]
@@ -756,6 +783,15 @@ mod tests {
                 "empty author prefix for language {name}"
             );
         }
+    }
+
+    #[test]
+    fn known_js_noise_filters_radioitalia_nav_blob() {
+        let noise = r#"{"type":"main","entry":[{"enabled":"true","categoryName":"undefined","label":"NEWS"}]}"#;
+        assert!(is_known_js_noise_line(noise));
+        assert!(!is_known_js_noise_line(
+            "Gigi D'Alessio racconta le storie dietro le canzoni."
+        ));
     }
 }
 

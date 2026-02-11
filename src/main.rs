@@ -7547,7 +7547,26 @@ pub(crate) unsafe fn open_pdf_document_async(hwnd: HWND, path: &Path, from_copyd
 
     let hwnd_main = hwnd;
     std::thread::spawn(move || {
-        let result = read_pdf_text_with_status(&path_buf, language);
+        let result = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            read_pdf_text_with_status(&path_buf, language)
+        })) {
+            Ok(result) => result,
+            Err(panic) => {
+                let panic_msg = if let Some(s) = panic.downcast_ref::<&str>() {
+                    (*s).to_string()
+                } else if let Some(s) = panic.downcast_ref::<String>() {
+                    s.clone()
+                } else {
+                    "unknown panic payload".to_string()
+                };
+                crate::log_debug(&format!("PDF load thread panic caught: {}", panic_msg));
+                Err(crate::i18n::tr_f(
+                    language,
+                    "file_handler.pdf_read_error",
+                    &[("err", "PDF extraction crashed unexpectedly")],
+                ))
+            }
+        };
         let payload = Box::new(PdfLoadResult {
             hwnd_edit,
             path: path_buf,
@@ -7579,10 +7598,28 @@ unsafe fn start_ocr_for_pdf(
     start_pdf_loading_animation(hwnd, hwnd_edit, 0);
     let hwnd_main = hwnd;
     std::thread::spawn(move || {
-        let ocr_result = win_ocr::recognize_text_from_pdf(&path, language);
-        let final_result = match ocr_result {
-            Ok(text) => Ok(PdfTextResult::Text(text)),
-            Err(e) => Err(e),
+        let final_result = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            win_ocr::recognize_text_from_pdf(&path, language)
+        })) {
+            Ok(ocr_result) => match ocr_result {
+                Ok(text) => Ok(PdfTextResult::Text(text)),
+                Err(e) => Err(e),
+            },
+            Err(panic) => {
+                let panic_msg = if let Some(s) = panic.downcast_ref::<&str>() {
+                    (*s).to_string()
+                } else if let Some(s) = panic.downcast_ref::<String>() {
+                    s.clone()
+                } else {
+                    "unknown panic payload".to_string()
+                };
+                crate::log_debug(&format!("PDF OCR thread panic caught: {}", panic_msg));
+                Err(crate::i18n::tr_f(
+                    language,
+                    "file_handler.pdf_read_error",
+                    &[("err", "PDF OCR crashed unexpectedly")],
+                ))
+            }
         };
         let payload = Box::new(PdfLoadResult {
             hwnd_edit,

@@ -287,11 +287,8 @@ fn report_hang_to_sentry(elapsed_secs: u64) {
 
             // Recent logs (truncated to avoid huge payloads)
             if !ctx.recent_logs.is_empty() {
-                let logs_truncated = if ctx.recent_logs.len() > 8000 {
-                    format!(
-                        "...(truncated)...\n{}",
-                        &ctx.recent_logs[ctx.recent_logs.len() - 8000..]
-                    )
+                let logs_truncated = if ctx.recent_logs.chars().count() > 8000 {
+                    format!("...(truncated)...\n{}", tail_chars(&ctx.recent_logs, 8000))
                 } else {
                     ctx.recent_logs.clone()
                 };
@@ -320,6 +317,17 @@ fn report_hang_to_sentry(elapsed_secs: u64) {
     if let Some(client) = sentry::Hub::current().client() {
         client.flush(Some(Duration::from_secs(2)));
     }
+}
+
+fn tail_chars(text: &str, max_chars: usize) -> String {
+    if max_chars == 0 {
+        return String::new();
+    }
+    let total = text.chars().count();
+    if total <= max_chars {
+        return text.to_string();
+    }
+    text.chars().skip(total - max_chars).collect()
 }
 
 /// Salva report di hang su file

@@ -559,8 +559,33 @@ unsafe fn selected_line_block_from_selection(
         std::mem::swap(&mut selection.cpMin, &mut selection.cpMax);
     }
 
-    let start = selection.cpMin;
-    let end = selection.cpMax;
+    let text_len = SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as i32;
+    let mut start = selection.cpMin.clamp(0, text_len);
+    let end = selection.cpMax.clamp(0, text_len);
+    if start == end {
+        return None;
+    }
+
+    // If selection starts exactly on a line break, normalize to next line start.
+    if start < end {
+        let next = (start + 1).min(text_len);
+        let first = get_text_range_simple(hwnd_edit, start, next);
+        if first == "\r" {
+            let next2 = (start + 2).min(text_len);
+            let second = get_text_range_simple(hwnd_edit, next, next2);
+            start = if second == "\n" {
+                (start + 2).min(end)
+            } else {
+                next
+            };
+        } else if first == "\n" {
+            start = next;
+        }
+    }
+    if start == end {
+        return None;
+    }
+
     let start_line = SendMessageW(
         hwnd_edit,
         EM_LINEFROMCHAR,
@@ -568,6 +593,9 @@ unsafe fn selected_line_block_from_selection(
         LPARAM(0),
     )
     .0 as i32;
+
+    // Compute end line from cpMax and exclude the next line when cpMax is
+    // exactly at that line start (classic RichEdit full-line selection case).
     let mut end_line =
         SendMessageW(hwnd_edit, EM_LINEFROMCHAR, WPARAM(end as usize), LPARAM(0)).0 as i32;
     let end_line_start = SendMessageW(
@@ -599,10 +627,12 @@ unsafe fn selected_line_block_from_selection(
     )
     .0 as i32;
     if range_end < 0 {
-        range_end = byte_index_to_utf16(text, text.len());
+        range_end = SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as i32;
     }
+
     let selected = get_text_range_simple(hwnd_edit, range_start, range_end);
     let trailing = selected.ends_with('\n') || selected.ends_with('\r');
+    let _ = text;
     Some((range_start, range_end, selected, trailing))
 }
 
@@ -2076,10 +2106,7 @@ fn normalize_whitespace_block(text: &str, line_ending: &str) -> String {
 
 fn order_lines_block(text: &str, line_ending: &str, has_trailing_newline: bool) -> String {
     let (content, trailing_newline) = split_trailing_newline(text, has_trailing_newline);
-    let mut lines: Vec<String> = content
-        .split('\n')
-        .map(|raw_line| raw_line.strip_suffix('\r').unwrap_or(raw_line).to_string())
-        .collect();
+    let mut lines = split_lines_any_newline(content);
 
     let mut nonblank_indices = Vec::new();
     let mut nonblank_lines = Vec::new();
@@ -2110,15 +2137,14 @@ fn keep_unique_lines_block(text: &str, line_ending: &str, has_trailing_newline: 
     let mut seen: HashSet<String> = HashSet::new();
     let mut out_lines: Vec<String> = Vec::new();
 
-    for raw_line in content.split('\n') {
-        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
+    for line in split_lines_any_newline(content) {
         if line.trim().is_empty() {
-            out_lines.push(line.to_string());
+            out_lines.push(line);
             continue;
         }
         let key = line.to_ascii_lowercase();
         if seen.insert(key) {
-            out_lines.push(line.to_string());
+            out_lines.push(line);
         }
     }
 
@@ -2131,10 +2157,7 @@ fn keep_unique_lines_block(text: &str, line_ending: &str, has_trailing_newline: 
 
 fn reverse_lines_block(text: &str, line_ending: &str, has_trailing_newline: bool) -> String {
     let (content, trailing_newline) = split_trailing_newline(text, has_trailing_newline);
-    let mut lines: Vec<String> = content
-        .split('\n')
-        .map(|raw_line| raw_line.strip_suffix('\r').unwrap_or(raw_line).to_string())
-        .collect();
+    let mut lines = split_lines_any_newline(content);
 
     let mut nonblank_indices = Vec::new();
     let mut nonblank_lines = Vec::new();
@@ -2169,14 +2192,13 @@ fn quote_lines_block(
     let (content, trailing_newline) = split_trailing_newline(text, has_trailing_newline);
     let mut out_lines: Vec<String> = Vec::new();
 
-    for raw_line in content.split('\n') {
-        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
+    for line in split_lines_any_newline(content) {
         if line.trim().is_empty() {
-            out_lines.push(line.to_string());
+            out_lines.push(line);
         } else {
             let mut quoted = String::with_capacity(quote_prefix.len() + line.len());
             quoted.push_str(quote_prefix);
-            quoted.push_str(line);
+            quoted.push_str(&line);
             out_lines.push(quoted);
         }
     }
@@ -2197,14 +2219,13 @@ fn unquote_lines_block(
     let (content, trailing_newline) = split_trailing_newline(text, has_trailing_newline);
     let mut out_lines: Vec<String> = Vec::new();
 
-    for raw_line in content.split('\n') {
-        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
+    for line in split_lines_any_newline(content) {
         if line.trim().is_empty() {
-            out_lines.push(line.to_string());
+            out_lines.push(line);
         } else if let Some(rest) = line.strip_prefix(quote_prefix) {
             out_lines.push(rest.to_string());
         } else {
-            out_lines.push(line.to_string());
+            out_lines.push(line);
         }
     }
 
@@ -2220,13 +2241,12 @@ fn join_lines_block(text: &str, line_ending: &str, has_trailing_newline: bool) -
     let mut out = String::new();
     let mut has_content = false;
 
-    for raw_line in content.split('\n') {
-        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
+    for line in split_lines_any_newline(content) {
         if line.trim().is_empty() {
             continue;
         }
         if !has_content {
-            out.push_str(line);
+            out.push_str(&line);
             has_content = true;
             continue;
         }
@@ -2246,13 +2266,22 @@ fn join_lines_block(text: &str, line_ending: &str, has_trailing_newline: bool) -
                 out.push(' ');
             }
         }
-        out.push_str(line);
+        out.push_str(&line);
     }
 
     if trailing_newline {
         out.push_str(line_ending);
     }
     out
+}
+
+fn split_lines_any_newline(content: &str) -> Vec<String> {
+    content
+        .replace("\r\n", "\n")
+        .replace('\r', "\n")
+        .split('\n')
+        .map(ToString::to_string)
+        .collect()
 }
 
 fn clean_end_of_line_hyphens_block(
@@ -4031,5 +4060,19 @@ mod tests {
             clean_end_of_line_hyphens_block("Inter-\nNational", "\n", false),
             "InterNational"
         );
+    }
+
+    #[test]
+    fn quote_lines_block_handles_cr_only_newlines() {
+        let input = "linea1\rlinea2\rlinea3";
+        let out = quote_lines_block(input, "\r\n", false, "> ");
+        assert_eq!(out, "> linea1\r\n> linea2\r\n> linea3");
+    }
+
+    #[test]
+    fn unquote_lines_block_handles_cr_only_newlines() {
+        let input = "> linea1\r> linea2\r> linea3";
+        let out = unquote_lines_block(input, "\r\n", false, "> ");
+        assert_eq!(out, "linea1\r\nlinea2\r\nlinea3");
     }
 }

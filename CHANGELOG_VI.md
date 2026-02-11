@@ -25,6 +25,7 @@ Sửa lỗi
 • Đã sửa lỗi mở các tệp con trỏ Google Drive (`.gdoc`, `.gsheet`, `.gslides`) từ menu ngữ cảnh Explorer: khi đọc trực tiếp bị lỗi “Incorrect function (os error 1)”, Sonarpad giờ dùng fallback shell-open để tài liệu vẫn mở đúng.
 • Đã sửa luồng thông báo lỗi chính tả: lỗi sẽ được đọc lại khi bạn rà soát văn bản sau đó, và cùng một lỗi sẽ được báo lại nếu bị xóa rồi gõ lại.
 • Đã sửa các thao tác văn bản theo dòng (ví dụ Ctrl+Q / Ctrl+Shift+Q, sắp xếp/đảo/duy nhất/gộp dòng): khi chọn một dòng bằng Shift+Mũi tên xuống, các dòng liền kề không còn bị dính hoặc bị cắt.
+• Đã sửa xử lý chọn nhiều dòng cho các thao tác theo dòng (Ctrl+Q / Ctrl+Shift+Q và các công cụ liên quan): khi RichEdit trả về dấu xuống dòng dạng CR-only, Sonarpad giờ chuẩn hóa đúng để xử lý đủ tất cả dòng đã chọn mà không cắt mất ký tự đầu dòng.
 • Đã mở rộng chuẩn hóa đầu vào TTS cho các ký hiệu hiển thị của khoảng trắng/tab/xuống dòng (␠/U+2420, ␣/U+2423, ␉/U+2409, ␊/U+240A, ␍/U+240D, ␤/U+2424), vốn có thể gây lặp đoạn với giọng đa ngôn ngữ.
 • Đã tinh chỉnh bước làm sạch văn bản cho Edge TTS bằng một pipeline kiểm tra duy nhất: chuẩn hóa khoảng trắng lạ/vô hình, rút gọn các chuỗi dấu câu dài (như "...", "!!!", "???"), và bỏ qua các đoạn chỉ gồm dấu câu để tránh lặp vòng khi phát.
 • Đã sửa thông báo thời gian phát (Ctrl+I) cho luồng MP3/podcast: thời gian hiện tại giờ được giới hạn theo tổng thời lượng của track, và phát sẽ tự dừng nếu vị trí vượt quá điểm kết thúc.

@@ -95,6 +95,17 @@ fn sanitize_message(message: &str) -> String {
     }
 }
 
+fn tail_chars(text: &str, max_chars: usize) -> String {
+    if max_chars == 0 {
+        return String::new();
+    }
+    let total = text.chars().count();
+    if total <= max_chars {
+        return text.to_string();
+    }
+    text.chars().skip(total - max_chars).collect()
+}
+
 /// Inizializza Sentry se abilitato nelle impostazioni.
 /// Deve essere chiamato una sola volta all'avvio, prima di qualsiasi altra operazione.
 /// Il guard viene conservato per tutta la durata dell'applicazione.
@@ -565,11 +576,8 @@ pub fn install_panic_hook() {
 
                     // Recent logs (truncated to avoid huge payloads)
                     if !ctx.recent_logs.is_empty() {
-                        let logs_truncated = if ctx.recent_logs.len() > 8000 {
-                            format!(
-                                "...(truncated)...\n{}",
-                                &ctx.recent_logs[ctx.recent_logs.len() - 8000..]
-                            )
+                        let logs_truncated = if ctx.recent_logs.chars().count() > 8000 {
+                            format!("...(truncated)...\n{}", tail_chars(&ctx.recent_logs, 8000))
                         } else {
                             ctx.recent_logs.clone()
                         };

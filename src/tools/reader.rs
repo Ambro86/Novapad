@@ -147,6 +147,14 @@ fn decode_html_entities(input: &str) -> String {
     out
 }
 
+fn clamp_to_char_boundary(s: &str, idx: usize) -> usize {
+    let mut i = idx.min(s.len());
+    while i > 0 && !s.is_char_boundary(i) {
+        i -= 1;
+    }
+    i
+}
+
 fn looks_like_teaser(value: &str) -> bool {
     let v = value.trim();
     if v.len() < 120 {
@@ -485,8 +493,10 @@ pub fn reader_mode_extract(html_content: &str, language: Language) -> Option<Art
                     if abs_start < json.len() {
                         if let Some((val, end_pos)) = extract_json_string(&json[abs_start..]) {
                             if key == "\"description\":\"" {
-                                let window_start = key_pos.saturating_sub(400);
-                                let window = &json[window_start..key_pos];
+                                let window_start =
+                                    clamp_to_char_boundary(&json, key_pos.saturating_sub(400));
+                                let window_end = clamp_to_char_boundary(&json, key_pos);
+                                let window = &json[window_start..window_end];
                                 let is_person_or_org = window.contains("\"@type\":\"Person\"")
                                     || window.contains("\"@type\":\"Organization\"");
                                 let is_article = window.contains("\"@type\":\"Article\"")
@@ -746,7 +756,7 @@ fn is_known_js_noise_line(line: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{author_prefix, is_known_js_noise_line};
+    use super::{author_prefix, clamp_to_char_boundary, is_known_js_noise_line};
     use crate::settings::Language;
 
     #[test]
@@ -792,6 +802,15 @@ mod tests {
         assert!(!is_known_js_noise_line(
             "Gigi D'Alessio racconta le storie dietro le canzoni."
         ));
+    }
+
+    #[test]
+    fn clamp_to_char_boundary_handles_multibyte_indices() {
+        let s = "abcědef";
+        // byte index 4 is inside 'ě' (which starts at 3 and ends at 5)
+        assert_eq!(clamp_to_char_boundary(s, 4), 3);
+        assert_eq!(clamp_to_char_boundary(s, 5), 5);
+        assert_eq!(clamp_to_char_boundary(s, 999), s.len());
     }
 }
 

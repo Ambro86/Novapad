@@ -3,7 +3,9 @@
 Wersja 0.6.6 – 2026-02-08
 Ulepszenia
 • Dodano „Automatyczne formatowanie dla TTS” w menu Edycja, aby szybko przygotować tekst do odczytu (usuwa markdown/cudzysłowy i scala połamane linie).
+• Ulepszono wstawianie tagów głosu: gdy tekst jest zaznaczony, tagi są teraz poprawnie nakładane zarówno na pojedynczą linię, jak i na zaznaczenie wielowierszowe.
 • Dodano opcję w ustawieniach Audio, aby wybrać domyślny folder zapisu audiobooków (domyślnie: Dokumenty\\Sonarpad Audiobooks).
+• W oknie zapisu audiobooka, gdy aktywny jest podział na części, dodano nową opcję (włączoną domyślnie) tworzenia dedykowanego podfolderu dla wygenerowanych części.
 • Eksport audiobooków zapisuje teraz MP3 w stereo z bitrate wybranym przez użytkownika dla głosów Edge, SAPI5 i SAPI4.
 • Przeniesiono funkcje głosowe do dedykowanego menu „Głos i audio” oraz dodano/doprecyzowano opcję „Konwertuj audio”, która służy do konwersji dowolnego obsługiwanego pliku multimedialnego do MP3, AAC, OGG, Opus, FLAC, WAV i AIFF.
 • Dodano usuwanie pojedynczych artykułów RSS i pojedynczych odcinków podcastów (klawisz Delete + menu kontekstowe z potwierdzeniem), bez usuwania całego źródła RSS/podcastu.

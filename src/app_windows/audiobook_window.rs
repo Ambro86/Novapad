@@ -28,6 +28,7 @@ struct ProgressDialogState {
     hwnd_text: HWND,
     hwnd_cancel: HWND,
     total: usize,
+    current: usize,
     language: Language,
 }
 
@@ -90,6 +91,7 @@ pub unsafe fn open(parent: HWND, total: usize) -> HWND {
                 LPARAM((total as isize) << 16),
             );
             state.total = total;
+            state.current = 0;
         })
         .is_none()
         {
@@ -193,6 +195,7 @@ unsafe fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: L
                 hwnd_text: label,
                 hwnd_cancel,
                 total: 0,
+                current: 0,
                 language,
             });
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
@@ -223,11 +226,22 @@ unsafe fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: L
             }
         }
         WM_UPDATE_PROGRESS => {
-            let current = wparam.0;
+            let requested = wparam.0;
             if with_progress_state(hwnd, |state| {
+                let mut current = requested;
+                if state.total > 0 {
+                    current = current.min(state.total);
+                }
+                // Ignore stale/out-of-order progress messages that would move backwards.
+                if current < state.current {
+                    current = state.current;
+                } else {
+                    state.current = current;
+                }
+
                 SendMessageW(state.hwnd_pb, PBM_SETPOS, WPARAM(current), LPARAM(0));
                 if state.total > 0 {
-                    let pct = (current * 100) / state.total;
+                    let pct = ((current * 100) / state.total).min(100);
                     let text = progress_text(state.language, pct);
                     let wide = to_wide(&text);
                     if let Err(e) = SetWindowTextW(state.hwnd_text, PCWSTR(wide.as_ptr())) {
@@ -242,15 +256,19 @@ unsafe fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: L
             LRESULT(0)
         }
         WM_SET_PROGRESS_TOTAL => {
-            let total = wparam.0;
+            let total = wparam.0.max(1);
             if with_progress_state(hwnd, |state| {
-                state.total = total;
-                SendMessageW(
-                    state.hwnd_pb,
-                    PBM_SETRANGE,
-                    WPARAM(0),
-                    LPARAM((total as isize) << 16),
-                );
+                if state.total != total {
+                    state.total = total;
+                    state.current = 0;
+                    SendMessageW(
+                        state.hwnd_pb,
+                        PBM_SETRANGE,
+                        WPARAM(0),
+                        LPARAM((total as isize) << 16),
+                    );
+                    SendMessageW(state.hwnd_pb, PBM_SETPOS, WPARAM(0), LPARAM(0));
+                }
             })
             .is_none()
             {

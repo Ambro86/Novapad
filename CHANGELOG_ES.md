@@ -3,7 +3,9 @@
 Versión 0.6.6 – 2026-02-08
 Mejoras
 • Añadida "Formateo automático para TTS" en el menú Editar para preparar rápidamente el texto para voz (elimina markdown/comillas y recompone líneas partidas).
+• Mejorada la inserción de etiquetas de voz: cuando hay texto seleccionado, ahora las etiquetas se aplican correctamente tanto a una sola línea como a selecciones multilínea.
 • Añadida una opción en Configuración de audio para elegir la carpeta predeterminada de guardado de audiolibros (predeterminada: Documentos\\Sonarpad Audiobooks).
+• En el cuadro de guardado de audiolibro, cuando está activa la división en partes, se añadió una nueva opción (activada por defecto) para crear una subcarpeta dedicada a las partes generadas.
 • La exportación de audiolibros ahora guarda MP3 en estéreo con bitrate elegido por el usuario para voces Edge, SAPI5 y SAPI4.
 • Reorganizadas las funciones de voz en un menú dedicado "Voz y audio" y añadida/aclarada la opción "Convertir audio", útil para convertir cualquier archivo multimedia compatible a MP3, AAC, OGG, Opus, FLAC, WAV y AIFF.
 • Añadida la eliminación de artículos RSS individuales y episodios de podcast individuales (tecla Supr + menú contextual con confirmación), sin eliminar toda la fuente RSS/podcast.

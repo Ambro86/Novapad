@@ -109,7 +109,8 @@ use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
 use windows::Win32::UI::Shell::{
     DragAcceptFiles, DragFinish, DragQueryFileW, FileSaveDialog, HDROP, IFileDialog,
     IFileDialogControlEvents, IFileDialogControlEvents_Impl, IFileDialogCustomize,
-    IFileDialogEvents, IFileDialogEvents_Impl, IFileSaveDialog, IShellItem, ShellExecuteW,
+    IFileDialogEvents, IFileDialogEvents_Impl, IFileSaveDialog, IShellItem,
+    SHCreateItemFromParsingName, ShellExecuteW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     ACCEL, AllowSetForegroundWindow, AppendMenuW, BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX,
@@ -8169,10 +8170,16 @@ fn is_reserved_filename(name: &str) -> bool {
     )
 }
 
+pub(crate) struct SaveAudioDialogResult {
+    pub path: PathBuf,
+    pub create_parts_folder: bool,
+}
+
 pub(crate) unsafe fn save_audio_dialog(
     hwnd: HWND,
     suggested_name: Option<&str>,
-) -> Option<PathBuf> {
+    show_split_folder_option: bool,
+) -> Option<SaveAudioDialogResult> {
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
     let initial_dir_setting =
         with_state(hwnd, |state| state.settings.audiobook_save_folder.clone()).unwrap_or_default();
@@ -8208,13 +8215,23 @@ pub(crate) unsafe fn save_audio_dialog(
     ))
     .ok()?;
 
+    if !initial_dir.is_empty() {
+        let initial_dir_w = to_wide(&initial_dir);
+        if let Ok(shell_folder) =
+            SHCreateItemFromParsingName::<_, _, IShellItem>(PCWSTR(initial_dir_w.as_ptr()), None)
+        {
+            let _unused = pfd.SetDefaultFolder(&shell_folder);
+            let _unused = pfd.SetFolder(&shell_folder);
+        }
+    }
+
     if let Some(name) = suggested_name {
-        let default_name = if !initial_dir.is_empty() && Path::new(name).components().count() == 1 {
-            Path::new(&initial_dir).join(name)
-        } else {
-            PathBuf::from(name)
-        };
-        pfd.SetFileName(PCWSTR(to_wide(&default_name.to_string_lossy()).as_ptr()))
+        let default_name = Path::new(name)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .filter(|n| !n.trim().is_empty())
+            .unwrap_or(name);
+        pfd.SetFileName(PCWSTR(to_wide(default_name).as_ptr()))
             .ok()?;
     }
 
@@ -8229,12 +8246,21 @@ pub(crate) unsafe fn save_audio_dialog(
     let selected_bitrate = Arc::new(Mutex::new(initial_bitrate));
 
     const AUDIO_SAVE_BITRATE_BUTTON_ID: u32 = 201;
+    const AUDIO_SAVE_SPLIT_FOLDER_CHECKBOX_ID: u32 = 202;
     let pfdc: IFileDialogCustomize = pfd.cast().ok()?;
     pfdc.AddPushButton(
         AUDIO_SAVE_BITRATE_BUTTON_ID,
         PCWSTR(to_wide(&audiobook_bitrate_button_label(language, initial_bitrate)).as_ptr()),
     )
     .ok()?;
+    if show_split_folder_option {
+        pfdc.AddCheckButton(
+            AUDIO_SAVE_SPLIT_FOLDER_CHECKBOX_ID,
+            PCWSTR(to_wide(&i18n::tr(language, "dialog.save_audio_split_folder")).as_ptr()),
+            BOOL(1),
+        )
+        .ok()?;
+    }
 
     let handler: IFileDialogEvents = AudiobookBitrateDialogHandler {
         parent: hwnd,
@@ -8257,7 +8283,12 @@ pub(crate) unsafe fn save_audio_dialog(
         CoTaskMemFree(Some(path_ptr.0 as *const _));
 
         let mut path = PathBuf::from(path_str);
-        if path.extension().is_none() {
+        let has_valid_ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(str::trim)
+            .is_some_and(|e| !e.is_empty());
+        if !has_valid_ext {
             let filter_index = pfd.GetFileTypeIndex().ok().unwrap_or(1);
             if filter_index == 2 {
                 path.set_extension("m4b");
@@ -8283,7 +8314,18 @@ pub(crate) unsafe fn save_audio_dialog(
             log_debug("Failed to access settings for audiobook bitrate");
         }
 
-        Some(path)
+        let create_parts_folder = if show_split_folder_option {
+            pfdc.GetCheckButtonState(AUDIO_SAVE_SPLIT_FOLDER_CHECKBOX_ID)
+                .ok()
+                .is_none_or(|state| state.as_bool())
+        } else {
+            false
+        };
+
+        Some(SaveAudioDialogResult {
+            path,
+            create_parts_folder,
+        })
     } else {
         None
     }

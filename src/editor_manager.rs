@@ -737,6 +737,36 @@ pub fn insert_voice_tag_at_caret(
             end,
             text_len
         ));
+        if start != end {
+            let full_text = get_edit_text(hwnd_edit);
+            let selection = CHARRANGE {
+                cpMin: start as i32,
+                cpMax: end as i32,
+            };
+            if let Some((range_start, range_end, selected, _)) =
+                selected_line_block_from_selection(hwnd_edit, &full_text, selection)
+            {
+                let wrapped = wrap_voice_tag_block(&selected, &open, close);
+                let mut replace_range = CHARRANGE {
+                    cpMin: range_start,
+                    cpMax: range_end,
+                };
+                SendMessageW(
+                    hwnd_edit,
+                    EM_EXSETSEL,
+                    WPARAM(0),
+                    LPARAM(&mut replace_range as *mut _ as isize),
+                );
+                let wide = to_wide(&wrapped);
+                SendMessageW(
+                    hwnd_edit,
+                    EM_REPLACESEL,
+                    WPARAM(1),
+                    LPARAM(wide.as_ptr() as isize),
+                );
+                return;
+            }
+        }
         let full_text = get_edit_text(hwnd_edit);
         let lower = full_text.to_ascii_lowercase();
         let full_utf16: Vec<u16> = full_text.encode_utf16().collect();
@@ -925,6 +955,19 @@ pub fn insert_voice_tag_at_caret(
             new_start, new_end, new_text_len
         ));
     }
+}
+
+fn wrap_voice_tag_block(selected: &str, open: &str, close: &str) -> String {
+    if let Some(content) = selected.strip_suffix("\r\n") {
+        return format!("{open}{content}{close}\r\n");
+    }
+    if let Some(content) = selected.strip_suffix('\n') {
+        return format!("{open}{content}{close}\n");
+    }
+    if let Some(content) = selected.strip_suffix('\r') {
+        return format!("{open}{content}{close}\r");
+    }
+    format!("{open}{selected}{close}")
 }
 
 fn find_last_utf16_before(haystack: &[u16], needle: &[u16], before: usize) -> Option<usize> {

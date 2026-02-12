@@ -1851,9 +1851,33 @@ fn time_split_part_output(base: &Path, part_index: u32, start_number: u32) -> Pa
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("audiobook");
-    let ext = base.extension().and_then(|s| s.to_str()).unwrap_or("mp3");
+    let ext = base
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("mp3");
     let number = start_number.saturating_add(part_index);
     base.with_file_name(format!("{stem}_part{number:02}.{ext}"))
+}
+
+fn split_parts_output_in_subfolder(output: &Path) -> PathBuf {
+    let stem = output
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("audiobook");
+    let file_name = output
+        .file_name()
+        .map(|s| s.to_owned())
+        .unwrap_or_else(|| "audiobook.mp3".into());
+    let base_dir = output
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .map(Path::to_path_buf)
+        .unwrap_or_default();
+    base_dir.join(stem).join(file_name)
 }
 
 fn finish_time_split_part(
@@ -3345,15 +3369,8 @@ fn start_audiobook_with_text(
         return;
     }
 
-    let Some(output) = (unsafe { save_audio_dialog(hwnd, suggested_name.as_deref()) }) else {
-        return;
-    };
-    let voice = unsafe {
-        with_state(hwnd, |state| state.settings.tts_voice.clone())
-            .unwrap_or_else(|| "it-IT-IsabellaNeural".to_string())
-    };
-
     let (
+        voice,
         split_on_newline,
         audiobook_split,
         audiobook_split_by_text,
@@ -3372,6 +3389,7 @@ fn start_audiobook_with_text(
     ) = unsafe {
         with_state(hwnd, |state| {
             (
+                state.settings.tts_voice.clone(),
                 state.settings.split_on_newline,
                 state.settings.audiobook_split,
                 state.settings.audiobook_split_by_text,
@@ -3391,6 +3409,7 @@ fn start_audiobook_with_text(
         })
     }
     .unwrap_or((
+        "it-IT-IsabellaNeural".to_string(),
         true,
         0,
         false,
@@ -3407,6 +3426,17 @@ fn start_audiobook_with_text(
         0,
         100,
     ));
+    let split_option_visible = audiobook_split_by_time
+        || audiobook_split_by_text
+        || audiobook_split > 1
+        || (audiobook_split_by_epub_chapter && epub_chapters.as_ref().is_some());
+    let Some(save_result) =
+        (unsafe { save_audio_dialog(hwnd, suggested_name.as_deref(), split_option_visible) })
+    else {
+        return;
+    };
+    let mut output = save_result.path;
+    let create_parts_folder = save_result.create_parts_folder;
     crate::log_debug(&format!(
         "Audiobook: settings bitrate resolved to {} kbps for output {:?}",
         audiobook_m4b_bitrate, output
@@ -3558,6 +3588,44 @@ fn start_audiobook_with_text(
         };
     }
 
+    let expected_multi_file_split = if split_by_time {
+        true
+    } else if let Some(parts) = &marker_parts {
+        parts.iter().filter(|p| !p.is_empty()).count() > 1
+    } else if let Some(parts) = &mixed_marker_parts {
+        parts.iter().filter(|p| !p.is_empty()).count() > 1
+    } else if split_parts > 1 {
+        std::cmp::min(split_parts as usize, chunks.len()) > 1
+    } else {
+        false
+    };
+    let split_into_multiple_files = expected_multi_file_split;
+    crate::log_debug(&format!(
+        "Audiobook: split summary split_by_time={} split_parts={} chunks={} marker_parts={} mixed_marker_parts={} expected_multi_file_split={}",
+        split_by_time,
+        split_parts,
+        chunks.len(),
+        marker_parts.as_ref().map(|p| p.len()).unwrap_or(0),
+        mixed_marker_parts.as_ref().map(|p| p.len()).unwrap_or(0),
+        expected_multi_file_split
+    ));
+    if create_parts_folder && split_into_multiple_files {
+        let nested_output = split_parts_output_in_subfolder(&output);
+        if let Some(parent) = nested_output.parent()
+            && let Err(e) = std::fs::create_dir_all(parent)
+        {
+            unsafe {
+                show_error(
+                    hwnd,
+                    language,
+                    &i18n::tr_f(language, "app.error_save_file", &[("err", &e.to_string())]),
+                );
+            }
+            return;
+        }
+        output = nested_output;
+    }
+
     let chunks_len = if let Some(parts) = &mixed_marker_parts {
         parts.iter().map(|part| part.len()).sum()
     } else if let Some(parts) = &marker_parts {
@@ -3631,7 +3699,12 @@ fn start_audiobook_with_text(
                                 .file_stem()
                                 .and_then(|s| s.to_str())
                                 .unwrap_or("audiobook");
-                            let ext = output.extension().and_then(|s| s.to_str()).unwrap_or("mp3");
+                            let ext = output
+                                .extension()
+                                .and_then(|s| s.to_str())
+                                .map(str::trim)
+                                .filter(|s| !s.is_empty())
+                                .unwrap_or("mp3");
                             output.with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
                         } else {
                             output.to_path_buf()
@@ -3654,7 +3727,12 @@ fn start_audiobook_with_text(
                                 .file_stem()
                                 .and_then(|s| s.to_str())
                                 .unwrap_or("audiobook");
-                            let ext = output.extension().and_then(|s| s.to_str()).unwrap_or("mp3");
+                            let ext = output
+                                .extension()
+                                .and_then(|s| s.to_str())
+                                .map(str::trim)
+                                .filter(|s| !s.is_empty())
+                                .unwrap_or("mp3");
                             output.with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
                         } else {
                             output.to_path_buf()
@@ -3752,7 +3830,12 @@ fn start_audiobook_with_text(
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("audiobook");
-            let ext = output.extension().and_then(|s| s.to_str()).unwrap_or("mp3");
+            let ext = output
+                .extension()
+                .and_then(|s| s.to_str())
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .unwrap_or("mp3");
             let pattern = output.with_file_name(format!("{stem}_part%02d.{ext}"));
             let segment_seconds = split_minutes.saturating_mul(60);
             result = crate::ffmpeg_export::segment_audio_file(
@@ -3963,6 +4046,8 @@ fn run_split_audiobook(
                 .output
                 .extension()
                 .and_then(|s| s.to_str())
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
                 .unwrap_or("mp3");
             options
                 .output
@@ -4011,6 +4096,8 @@ fn run_marker_split_audiobook(
                 .output
                 .extension()
                 .and_then(|s| s.to_str())
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
                 .unwrap_or("mp3");
             options
                 .output
@@ -4076,6 +4163,8 @@ fn run_split_sapi4_audiobook(
                 .output
                 .extension()
                 .and_then(|s| s.to_str())
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
                 .unwrap_or("mp3");
             options
                 .output
@@ -4128,6 +4217,8 @@ fn run_marker_split_sapi4_audiobook(
                 .output
                 .extension()
                 .and_then(|s| s.to_str())
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
                 .unwrap_or("mp3");
             options
                 .output
@@ -4855,6 +4946,8 @@ fn run_split_sapi_audiobook(
                 .output
                 .extension()
                 .and_then(|s| s.to_str())
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
                 .unwrap_or("mp3");
             options
                 .output
@@ -4972,6 +5065,8 @@ fn run_marker_split_sapi_audiobook(
                 .output
                 .extension()
                 .and_then(|s| s.to_str())
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
                 .unwrap_or("mp3");
             options
                 .output

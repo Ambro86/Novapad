@@ -385,6 +385,90 @@ fn decode_html_bytes(bytes: &[u8]) -> String {
     decoded.into_owned()
 }
 
+fn decode_basic_html_entities(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c != '&' {
+            out.push(c);
+            continue;
+        }
+
+        let mut entity = String::new();
+        let mut ended_with_semicolon = false;
+        while let Some(&next) = chars.peek() {
+            chars.next();
+            if next == ';' {
+                ended_with_semicolon = true;
+                break;
+            }
+            if entity.len() >= 16 {
+                entity.push(next);
+                break;
+            }
+            entity.push(next);
+        }
+
+        let decoded = if entity.starts_with("#x") || entity.starts_with("#X") {
+            u32::from_str_radix(&entity[2..], 16)
+                .ok()
+                .and_then(char::from_u32)
+        } else if let Some(num) = entity.strip_prefix('#') {
+            num.parse::<u32>().ok().and_then(char::from_u32)
+        } else {
+            match entity.as_str() {
+                "nbsp" => Some(' '),
+                "amp" => Some('&'),
+                "quot" | "quote" => Some('"'),
+                "apos" => Some('\''),
+                "lt" => Some('<'),
+                "gt" => Some('>'),
+                "laquo" => Some('«'),
+                "raquo" => Some('»'),
+                "hellip" => Some('…'),
+                "ndash" => Some('–'),
+                "mdash" => Some('—'),
+                "rsquo" => Some('’'),
+                "lsquo" => Some('‘'),
+                "rdquo" => Some('”'),
+                "ldquo" => Some('“'),
+                "agrave" => Some('à'),
+                "egrave" => Some('è'),
+                "igrave" => Some('ì'),
+                "ograve" => Some('ò'),
+                "ugrave" => Some('ù'),
+                "aacute" => Some('á'),
+                "eacute" => Some('é'),
+                "iacute" => Some('í'),
+                "oacute" => Some('ó'),
+                "uacute" => Some('ú'),
+                "Agrave" => Some('À'),
+                "Egrave" => Some('È'),
+                "Igrave" => Some('Ì'),
+                "Ograve" => Some('Ò'),
+                "Ugrave" => Some('Ù'),
+                "Aacute" => Some('Á'),
+                "Eacute" => Some('É'),
+                "Iacute" => Some('Í'),
+                "Oacute" => Some('Ó'),
+                "Uacute" => Some('Ú'),
+                _ => None,
+            }
+        };
+
+        if let Some(ch) = decoded {
+            out.push(ch);
+        } else {
+            out.push('&');
+            out.push_str(&entity);
+            if ended_with_semicolon {
+                out.push(';');
+            }
+        }
+    }
+    out
+}
+
 fn now_unix() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -415,6 +499,7 @@ fn parse_feed_bytes(
         .title
         .map(|t| t.content)
         .unwrap_or_else(|| fallback_title.to_string());
+    let title = decode_basic_html_entities(&title);
     let items = feed
         .entries
         .into_iter()
@@ -424,6 +509,7 @@ fn parse_feed_bytes(
                 .as_ref()
                 .map(|t| t.content.clone())
                 .unwrap_or_else(|| "No Title".to_string());
+            let title = decode_basic_html_entities(&title);
             let link = select_entry_link(&entry);
             let guid = if let Some(stable_guid) = stable_google_news_guid(&entry.id, &link) {
                 stable_guid
@@ -439,6 +525,7 @@ fn parse_feed_bytes(
                 .as_ref()
                 .map(|s| s.content.clone())
                 .unwrap_or_default();
+            let description = decode_basic_html_entities(&description);
             let description = truncate_excerpt(&description, max_excerpt_chars);
             let pub_date = entry.published.or(entry.updated).map(|d| d.timestamp());
             RssItem {
@@ -742,6 +829,7 @@ fn parse_podcast_feed_bytes(
         .title
         .map(|t| t.content)
         .unwrap_or_else(|| fallback_title.to_string());
+    let title = decode_basic_html_entities(&title);
     let items = feed
         .entries
         .into_iter()
@@ -751,6 +839,7 @@ fn parse_podcast_feed_bytes(
                 .as_ref()
                 .map(|t| t.content.clone())
                 .unwrap_or_else(|| "No Title".to_string());
+            let title = decode_basic_html_entities(&title);
             let link = select_entry_link(&entry);
             let guid = if !entry.id.trim().is_empty() {
                 entry.id.clone()
@@ -765,6 +854,7 @@ fn parse_podcast_feed_bytes(
                 .map(|s| s.content.clone())
                 .or_else(|| entry.content.as_ref().and_then(|c| c.body.clone()))
                 .unwrap_or_default();
+            let description = decode_basic_html_entities(&description);
 
             let (enclosure_url, enclosure_type) = select_podcast_enclosure(&entry);
             let (chapters_url, chapters_type) = select_podcast_chapters_link(&entry);
@@ -1372,6 +1462,35 @@ mod tests {
         };
         assert!(!title.trim().is_empty(), "feed title is empty");
         assert!(!items.is_empty(), "feed has no items");
+    }
+
+    #[test]
+    fn parse_feed_bytes_decodes_html_entities_in_titles_and_descriptions() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>marca &amp; portada</title>
+    <item>
+      <title>Test &quot;ok&quot;</title>
+      <link>https://example.com/a</link>
+      <description>Desc &amp; details</description>
+      <guid>g1</guid>
+    </item>
+  </channel>
+</rss>"#;
+        let parsed = parse_feed_bytes(xml.as_bytes().to_vec(), "fallback", 512)
+            .expect("failed to parse inline rss fixture");
+        let (feed_title, items) = parsed;
+        assert_eq!(feed_title, "marca & portada");
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].title, "Test \"ok\"");
+        assert_eq!(items[0].description, "Desc & details");
+    }
+
+    #[test]
+    fn decode_basic_html_entities_handles_quote_alias() {
+        let decoded = decode_basic_html_entities("Test &quote;ok&quote; &amp; more");
+        assert_eq!(decoded, "Test \"ok\" & more");
     }
 
     #[test]

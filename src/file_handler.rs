@@ -226,25 +226,99 @@ fn central_european_char_score(text: &str) -> usize {
         .count()
 }
 
-fn decode_ansi_best_effort(bytes: &[u8], _language: Language) -> String {
+fn western_european_char_score(text: &str) -> usize {
+    text.chars()
+        .filter(|ch| {
+            matches!(
+                ch,
+                'à' | 'è'
+                    | 'ì'
+                    | 'ò'
+                    | 'ù'
+                    | 'À'
+                    | 'È'
+                    | 'Ì'
+                    | 'Ò'
+                    | 'Ù'
+                    | 'á'
+                    | 'é'
+                    | 'í'
+                    | 'ó'
+                    | 'ú'
+                    | 'Á'
+                    | 'É'
+                    | 'Í'
+                    | 'Ó'
+                    | 'Ú'
+                    | 'â'
+                    | 'ê'
+                    | 'î'
+                    | 'ô'
+                    | 'û'
+                    | 'Â'
+                    | 'Ê'
+                    | 'Î'
+                    | 'Ô'
+                    | 'Û'
+                    | 'ã'
+                    | 'õ'
+                    | 'Ã'
+                    | 'Õ'
+                    | 'ç'
+                    | 'Ç'
+                    | 'ñ'
+                    | 'Ñ'
+            )
+        })
+        .count()
+}
+
+fn prefer_cp1250_for_language(language: Language) -> bool {
+    matches!(language, Language::Czech | Language::Polish)
+}
+
+fn choose_ansi_decoding(
+    language: Language,
+    cp1250_text: &str,
+    cp1252_text: &str,
+    acp_text: Option<&str>,
+) -> String {
+    let cp1250_score = central_european_char_score(cp1250_text);
+
+    if let Some(acp_text) = acp_text {
+        let acp_ce_score = central_european_char_score(acp_text);
+        if prefer_cp1250_for_language(language) {
+            if cp1250_score >= 2 && cp1250_score > acp_ce_score {
+                return cp1250_text.to_string();
+            }
+            return acp_text.to_string();
+        }
+
+        // For non-central-European UI languages, prefer 1252 when it clearly carries
+        // western diacritics better than ACP (e.g. Italian cp1252 opened on cp1250 systems).
+        let acp_west_score = western_european_char_score(acp_text);
+        let cp1252_west_score = western_european_char_score(cp1252_text);
+        if cp1252_west_score > acp_west_score {
+            return cp1252_text.to_string();
+        }
+        return acp_text.to_string();
+    }
+
+    if prefer_cp1250_for_language(language) && cp1250_score >= 2 {
+        return cp1250_text.to_string();
+    }
+
+    cp1252_text.to_string()
+}
+
+fn decode_ansi_best_effort(bytes: &[u8], language: Language) -> String {
     let (cp1250_text, _, _) = WINDOWS_1250.decode(bytes);
     let cp1250_text = cp1250_text.into_owned();
-    let cp1250_score = central_european_char_score(&cp1250_text);
+    let (cp1252_text, _, _) = WINDOWS_1252.decode(bytes);
+    let cp1252_text = cp1252_text.into_owned();
+    let acp_text = decode_ansi_with_acp(bytes);
 
-    if let Some(acp_text) = decode_ansi_with_acp(bytes) {
-        let acp_score = central_european_char_score(&acp_text);
-        if cp1250_score >= 2 && cp1250_score > acp_score {
-            return cp1250_text;
-        }
-        return acp_text;
-    }
-
-    if cp1250_score >= 2 {
-        return cp1250_text;
-    }
-
-    let (text, _, _) = WINDOWS_1252.decode(bytes);
-    text.into_owned()
+    choose_ansi_decoding(language, &cp1250_text, &cp1252_text, acp_text.as_deref())
 }
 
 pub fn decode_text_with_encoding(
@@ -1051,7 +1125,7 @@ fn html_to_text(html: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::html_to_text;
+    use super::{Language, WINDOWS_1250, WINDOWS_1252, choose_ansi_decoding, html_to_text};
 
     #[test]
     fn html_to_text_keeps_text_after_inline_comment() {
@@ -1067,6 +1141,46 @@ mod tests {
         let out = html_to_text(html);
         assert!(out.contains("First"));
         assert!(out.contains("Second"));
+    }
+
+    #[test]
+    fn choose_ansi_prefers_cp1252_for_italian_when_acp_looks_cp1250() {
+        let source = "Luana si asciugò il sudore e arrivò all’altezza.";
+        let (encoded, _, _) = WINDOWS_1252.encode(source);
+        let bytes = encoded.into_owned();
+
+        let (cp1250_text, _, _) = WINDOWS_1250.decode(&bytes);
+        let (cp1252_text, _, _) = WINDOWS_1252.decode(&bytes);
+        let chosen = choose_ansi_decoding(
+            Language::Italian,
+            &cp1250_text,
+            &cp1252_text,
+            Some(&cp1250_text),
+        );
+
+        assert_eq!(chosen, cp1252_text);
+        assert!(chosen.contains("asciugò"));
+        assert!(chosen.contains("arrivò"));
+    }
+
+    #[test]
+    fn choose_ansi_prefers_cp1250_for_czech_when_cp1250_is_clear_winner() {
+        let source = "Příliš žluťoučký kůň úpěl ďábelské ódy.";
+        let (encoded, _, _) = WINDOWS_1250.encode(source);
+        let bytes = encoded.into_owned();
+
+        let (cp1250_text, _, _) = WINDOWS_1250.decode(&bytes);
+        let (cp1252_text, _, _) = WINDOWS_1252.decode(&bytes);
+        let chosen = choose_ansi_decoding(
+            Language::Czech,
+            &cp1250_text,
+            &cp1252_text,
+            Some(&cp1252_text),
+        );
+
+        assert_eq!(chosen, cp1250_text);
+        assert!(chosen.contains("Příliš"));
+        assert!(chosen.contains("kůň"));
     }
 }
 

@@ -7,6 +7,7 @@ Improvements
 • Added a default audiobook save folder option in Audio settings (default: Documents\\Sonarpad Audiobooks).
 • In the audiobook save dialog, when split mode is enabled, added a new default-on option to create a dedicated subfolder for split parts (for cleaner output organization).
 • Audiobook export now saves MP3 in stereo with user-selected bitrate for Edge, SAPI5, and SAPI4 voices.
+• Added support for 32-bit SAPI5 voices via bridge, so voices available only in 32-bit engines can also be used in Sonarpad.
 • Reorganized voice features into a dedicated "Voice and audio" menu and added/clarified "Convert Audio", useful for converting any supported media file to MP3, AAC, OGG, Opus, FLAC, WAV, and AIFF.
 • Added removal of individual RSS articles and podcast episodes (Delete key + context menu with confirmation), without removing the entire RSS/podcast source.
 • Added RSS feed export to OPML in the RSS window, so current RSS sources can be saved and re-imported easily.

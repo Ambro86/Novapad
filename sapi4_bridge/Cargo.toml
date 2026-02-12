@@ -8,5 +8,6 @@ widestring = "1.1.0"
 windows = { version = "0.54", features = [
   "Win32_Media_Audio",
   "Win32_Media_MediaFoundation",
+  "Win32_Media_Speech",
   "Win32_System_Com",
 ] }

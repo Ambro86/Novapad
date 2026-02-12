@@ -7,6 +7,7 @@ Melhorias
 • Adicionada uma opção nas Configurações de áudio para escolher a pasta padrão de gravação de audiolivros (padrão: Documentos\\Sonarpad Audiobooks).
 • Na janela de gravação de audiolivro, quando a divisão em partes está ativa, foi adicionada uma nova opção (ativada por padrão) para criar uma subpasta dedicada às partes geradas.
 • A exportação de audiolivros agora guarda MP3 em estéreo com bitrate escolhido pelo utilizador para vozes Edge, SAPI5 e SAPI4.
+• Adicionado suporte a vozes SAPI5 de 32 bits via bridge, para usar também vozes disponíveis apenas em motores de 32 bits.
 • Reorganizadas as funcionalidades de voz num menu dedicado "Voz e áudio" e adicionada/esclarecida a opção "Converter áudio", útil para converter qualquer ficheiro multimédia suportado para MP3, AAC, OGG, Opus, FLAC, WAV e AIFF.
 • Adicionada a remoção de artigos RSS individuais e episódios de podcast individuais (tecla Delete + menu de contexto com confirmação), sem remover toda a fonte RSS/podcast.
 • Adicionada a exportação de feeds RSS para OPML na janela RSS, para guardar e reimportar facilmente as fontes atuais.

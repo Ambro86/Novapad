@@ -7,6 +7,7 @@ Améliorations
 • Ajout d’une option dans les paramètres Audio pour choisir le dossier par défaut d’enregistrement des livres audio (par défaut : Documents\\Sonarpad Audiobooks).
 • Dans la fenêtre d’enregistrement du livre audio, lorsque le découpage est actif, ajout d’une nouvelle option (activée par défaut) pour créer un sous-dossier dédié aux parties générées.
 • L’export des livres audio enregistre désormais les MP3 en stéréo avec un bitrate choisi par l’utilisateur pour les voix Edge, SAPI5 et SAPI4.
+• Ajout de la prise en charge des voix SAPI5 32 bits via bridge, afin d’utiliser aussi les voix disponibles uniquement dans les moteurs 32 bits.
 • Réorganisation des fonctions vocales dans un menu dédié « Voix et audio » et ajout/clarification de l’option « Convertir l’audio », utile pour convertir tout média pris en charge en MP3, AAC, OGG, Opus, FLAC, WAV et AIFF.
 • Ajout de la suppression d’articles RSS individuels et d’épisodes de podcast individuels (touche Suppr + menu contextuel avec confirmation), sans supprimer toute la source RSS/podcast.
 • Ajout de l'export des flux RSS en OPML dans la fenêtre RSS, afin de sauvegarder et réimporter facilement les sources actuelles.

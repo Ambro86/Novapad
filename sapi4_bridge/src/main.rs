@@ -22,7 +22,8 @@ use winapi::um::winuser::{DispatchMessageW, PeekMessageW, TranslateMessage, MSG,
 
 use widestring::U16CString;
 
-use windows::core::PCWSTR;
+use windows::core::{Interface, PCWSTR};
+use windows::Win32::Foundation::VARIANT_BOOL;
 use windows::Win32::Media::MediaFoundation::{
     IMFMediaType, IMFSinkWriter, IMFSourceReader, MFAudioFormat_MP3, MFAudioFormat_PCM,
     MFCreateMediaType, MFCreateSinkWriterFromURL, MFCreateSourceReaderFromURL, MFMediaType_Audio,
@@ -30,6 +31,12 @@ use windows::Win32::Media::MediaFoundation::{
     MF_MT_AUDIO_BLOCK_ALIGNMENT, MF_MT_AUDIO_NUM_CHANNELS, MF_MT_AUDIO_SAMPLES_PER_SECOND,
     MF_MT_MAJOR_TYPE, MF_MT_SUBTYPE, MF_SOURCE_READERF_ENDOFSTREAM,
     MF_SOURCE_READER_FIRST_AUDIO_STREAM, MF_VERSION,
+};
+use windows::Win32::Media::Speech::{
+    ISpMMSysAudio, ISpObjectToken, ISpVoice, ISpeechFileStream, ISpeechObjectToken,
+    ISpeechObjectTokenCategory, ISpeechVoice, SpeechVoiceSpeakFlags, SSFMCreateForWrite,
+    SpFileStream, SpMMAudioOut, SpObjectTokenCategory, SpVoice, SPAS_PAUSE, SPAS_RUN, SPAS_STOP,
+    SPF_ASYNC, SPF_PURGEBEFORESPEAK,
 };
 
 // =========================
@@ -834,6 +841,291 @@ fn list_voices() -> Result<(), String> {
         idx = idx.saturating_add(1);
     }
 
+    Ok(())
+}
+
+fn list_sapi5_voices() -> Result<(), String> {
+    let _com = ComGuard::init_mta()?;
+    let voice: ISpeechVoice = unsafe {
+        windows::Win32::System::Com::CoCreateInstance(
+            &SpVoice,
+            None,
+            windows::Win32::System::Com::CLSCTX_ALL,
+        )
+        .map_err(|e| format!("CoCreateInstance(ISpeechVoice) failed: {}", e))?
+    };
+    let required = windows::core::BSTR::from("");
+    let optional = windows::core::BSTR::from("");
+    let tokens = unsafe { voice.GetVoices(&required, &optional) }
+        .map_err(|e| format!("ISpeechVoice.GetVoices failed: {}", e))?;
+    let count = unsafe { tokens.Count() }.map_err(|e| format!("tokens.Count failed: {}", e))?;
+    for i in 0..count {
+        if let Ok(token) = unsafe { tokens.Item(i) } {
+            let desc = match unsafe { token.GetDescription(0) } {
+                Ok(d) => d,
+                Err(_) => continue,
+            };
+            let name = desc.to_string();
+            if name.trim().is_empty() {
+                continue;
+            }
+            println!("SAPI5VOICE:{}", name);
+        }
+    }
+    Ok(())
+}
+
+fn find_sapi5_token_by_name(voice_name: &str) -> Option<ISpObjectToken> {
+    let categories = [
+        r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices",
+        r"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Speech\Voices",
+        r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech_OneCore\Voices",
+        r"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Speech_OneCore\Voices",
+    ];
+    for category_id in categories {
+        let category: ISpeechObjectTokenCategory = unsafe {
+            windows::Win32::System::Com::CoCreateInstance(
+                &SpObjectTokenCategory,
+                None,
+                windows::Win32::System::Com::CLSCTX_ALL,
+            )
+            .ok()?
+        };
+        let id = windows::core::BSTR::from(category_id);
+        if unsafe { category.SetId(&id, VARIANT_BOOL(0)) }.is_err() {
+            continue;
+        }
+        let required = windows::core::BSTR::from("");
+        let optional = windows::core::BSTR::from("");
+        let tokens = match unsafe { category.EnumerateTokens(&required, &optional) } {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
+        let count = match unsafe { tokens.Count() } {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        for i in 0..count {
+            let token: ISpeechObjectToken = match unsafe { tokens.Item(i) } {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+            let desc = match unsafe { token.GetDescription(0) } {
+                Ok(d) => d.to_string(),
+                Err(_) => String::new(),
+            };
+            if desc == voice_name {
+                if let Ok(sp_token) = token.cast::<ISpObjectToken>() {
+                    return Some(sp_token);
+                }
+            }
+        }
+    }
+    None
+}
+
+fn find_sapi5_speech_token_by_name(voice_name: &str) -> Option<ISpeechObjectToken> {
+    let voice: ISpeechVoice = unsafe {
+        windows::Win32::System::Com::CoCreateInstance(
+            &SpVoice,
+            None,
+            windows::Win32::System::Com::CLSCTX_ALL,
+        )
+        .ok()?
+    };
+    let required = windows::core::BSTR::from("");
+    let optional = windows::core::BSTR::from("");
+    let tokens = unsafe { voice.GetVoices(&required, &optional) }.ok()?;
+    let count = unsafe { tokens.Count() }.ok()?;
+    for i in 0..count {
+        let token = match unsafe { tokens.Item(i) } {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
+        let desc = unsafe { token.GetDescription(0) }
+            .map(|d| d.to_string())
+            .unwrap_or_default();
+        if desc == voice_name {
+            return Some(token);
+        }
+    }
+    None
+}
+
+fn map_sapi5_rate(rate_percent: i32) -> i32 {
+    (rate_percent / 10).clamp(-10, 10)
+}
+
+fn map_sapi5_volume(volume: i32) -> u16 {
+    volume.clamp(0, 100) as u16
+}
+
+fn configure_sapi5_voice(
+    voice: &ISpVoice,
+    voice_name: &str,
+    rate: Option<i32>,
+    volume: Option<i32>,
+) -> Result<(), String> {
+    if !voice_name.trim().is_empty() {
+        if let Some(token) = find_sapi5_token_by_name(voice_name) {
+            unsafe { voice.SetVoice(&token) }.map_err(|e| format!("SetVoice failed: {}", e))?;
+        } else {
+            return Err(format!(
+                "SAPI5 voice not found in 32-bit bridge: {}",
+                voice_name
+            ));
+        }
+    }
+    if let Some(r) = rate {
+        unsafe { voice.SetRate(map_sapi5_rate(r)) }
+            .map_err(|e| format!("SetRate failed: {}", e))?;
+    }
+    if let Some(v) = volume {
+        unsafe { voice.SetVolume(map_sapi5_volume(v)) }
+            .map_err(|e| format!("SetVolume failed: {}", e))?;
+    }
+    Ok(())
+}
+
+fn run_sapi5_server(
+    voice_name: &str,
+    rate: Option<i32>,
+    _pitch: Option<i32>,
+    volume: Option<i32>,
+) -> Result<(), String> {
+    let _com = ComGuard::init_mta()?;
+    let voice: ISpVoice = unsafe {
+        windows::Win32::System::Com::CoCreateInstance(
+            &SpVoice,
+            None,
+            windows::Win32::System::Com::CLSCTX_ALL,
+        )
+        .map_err(|e| format!("CoCreateInstance(ISpVoice) failed: {}", e))?
+    };
+    configure_sapi5_voice(&voice, voice_name, rate, volume)?;
+    let audio_output: Option<ISpMMSysAudio> = unsafe {
+        match windows::Win32::System::Com::CoCreateInstance(
+            &SpMMAudioOut,
+            None,
+            windows::Win32::System::Com::CLSCTX_ALL,
+        ) {
+            Ok(audio) => {
+                if let Err(e) = voice.SetOutput(&audio, true) {
+                    eprintln!("SAPI5 bridge audio output bind failed: {}", e);
+                    None
+                } else {
+                    Some(audio)
+                }
+            }
+            Err(e) => {
+                eprintln!("SAPI5 bridge audio output create failed: {}", e);
+                None
+            }
+        }
+    };
+    let rx = spawn_command_reader();
+    loop {
+        match rx.recv() {
+            Ok(ServerCommand::Speak(text)) => {
+                let wide = U16CString::from_str(text)
+                    .map_err(|e| format!("Invalid UTF-16 text: {}", e))?;
+                unsafe { voice.Speak(PCWSTR(wide.as_ptr()), SPF_ASYNC.0 as u32, None) }
+                    .map_err(|e| format!("Speak failed: {}", e))?;
+            }
+            Ok(ServerCommand::Pause) => {
+                if let Some(audio) = &audio_output {
+                    if let Err(e) = unsafe { audio.SetState(SPAS_PAUSE, 0) } {
+                        eprintln!("SAPI5 bridge audio pause failed: {}", e);
+                    }
+                } else if let Err(e) = unsafe { voice.Pause() } {
+                    eprintln!("SAPI5 bridge voice pause failed: {}", e);
+                }
+            }
+            Ok(ServerCommand::Resume) => {
+                if let Some(audio) = &audio_output {
+                    if let Err(e) = unsafe { audio.SetState(SPAS_RUN, 0) } {
+                        eprintln!("SAPI5 bridge audio resume failed: {}", e);
+                    }
+                } else if let Err(e) = unsafe { voice.Resume() } {
+                    eprintln!("SAPI5 bridge voice resume failed: {}", e);
+                }
+            }
+            Ok(ServerCommand::Stop) | Ok(ServerCommand::Quit) | Err(_) => {
+                if let Some(audio) = &audio_output {
+                    if let Err(e) = unsafe { audio.SetState(SPAS_STOP, 0) } {
+                        eprintln!("SAPI5 bridge audio stop failed: {}", e);
+                    }
+                }
+                if let Err(e) =
+                    unsafe { voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None) }
+                {
+                    eprintln!("SAPI5 bridge stop failed: {}", e);
+                }
+                break;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn speak_sapi5_to_file(
+    voice_name: &str,
+    out_path: &str,
+    rate: Option<i32>,
+    _pitch: Option<i32>,
+    volume: Option<i32>,
+) -> Result<(), String> {
+    let _com = ComGuard::init_mta()?;
+
+    let mut text = String::new();
+    io::stdin()
+        .read_to_string(&mut text)
+        .map_err(|e| format!("Failed to read stdin: {}", e))?;
+
+    let voice: ISpeechVoice = unsafe {
+        windows::Win32::System::Com::CoCreateInstance(
+            &SpVoice,
+            None,
+            windows::Win32::System::Com::CLSCTX_ALL,
+        )
+        .map_err(|e| format!("CoCreateInstance(ISpeechVoice) failed: {}", e))?
+    };
+    if !voice_name.trim().is_empty() {
+        let token = find_sapi5_speech_token_by_name(voice_name)
+            .ok_or_else(|| format!("SAPI5 voice not found in 32-bit bridge: {}", voice_name))?;
+        unsafe { voice.putref_Voice(&token) }.map_err(|e| format!("putref_Voice failed: {}", e))?;
+    }
+    if let Some(r) = rate {
+        unsafe { voice.SetRate(map_sapi5_rate(r)) }
+            .map_err(|e| format!("SetRate failed: {}", e))?;
+    }
+    if let Some(v) = volume {
+        unsafe { voice.SetVolume(v.clamp(0, 100)) }
+            .map_err(|e| format!("SetVolume failed: {}", e))?;
+    }
+
+    let stream: ISpeechFileStream = unsafe {
+        windows::Win32::System::Com::CoCreateInstance(
+            &SpFileStream,
+            None,
+            windows::Win32::System::Com::CLSCTX_ALL,
+        )
+        .map_err(|e| format!("CoCreateInstance(ISpeechFileStream) failed: {}", e))?
+    };
+    let path_bstr = windows::core::BSTR::from(out_path);
+    unsafe { stream.Open(&path_bstr, SSFMCreateForWrite, VARIANT_BOOL(0)) }
+        .map_err(|e| format!("ISpeechFileStream.Open failed: {}", e))?;
+    unsafe { voice.putref_AudioOutputStream(&stream) }
+        .map_err(|e| format!("putref_AudioOutputStream failed: {}", e))?;
+
+    if !text.trim().is_empty() {
+        let text_bstr = windows::core::BSTR::from(text);
+        unsafe { voice.Speak(&text_bstr, SpeechVoiceSpeakFlags(0)) }
+            .map_err(|e| format!("Speak failed: {}", e))?;
+        unsafe { voice.WaitUntilDone(i32::MAX) }
+            .map_err(|e| format!("WaitUntilDone failed: {}", e))?;
+    }
+    unsafe { stream.Close() }.map_err(|e| format!("Close stream failed: {}", e))?;
     Ok(())
 }
 
@@ -1838,13 +2130,25 @@ fn real_main() -> Result<(), String> {
     if arg_flag(&args, "--list") {
         return list_voices();
     }
+    if arg_flag(&args, "--sapi5-list") {
+        return list_sapi5_voices();
+    }
 
     let target_idx = arg_u32(&args, "--voice", 1);
+    let sapi5_voice_name = arg_value(&args, "--voice-name").unwrap_or_default();
 
     let rate = arg_i32_opt(&args, "--rate");
     let pitch = arg_i32_opt(&args, "--pitch");
     let volume = arg_i32_opt(&args, "--volume");
     let mp3_bitrate_kbps = arg_u32(&args, "--bitrate", 128);
+
+    if let Some(path) = arg_value(&args, "--sapi5-output") {
+        return speak_sapi5_to_file(&sapi5_voice_name, &path, rate, pitch, volume);
+    }
+
+    if arg_flag(&args, "--sapi5-server") {
+        return run_sapi5_server(&sapi5_voice_name, rate, pitch, volume);
+    }
 
     if let Some(path) = arg_value(&args, "--output") {
         return speak_to_file(target_idx, &path, rate, pitch, volume, mp3_bitrate_kbps);

@@ -5,20 +5,25 @@ use crate::settings::{Language, VoiceInfo};
 use crate::tts_engine::TtsCommand;
 use std::collections::HashSet;
 use std::collections::VecDeque;
+use std::io::Write;
+use std::os::windows::process::CommandExt;
 use std::path::Path;
+use std::path::PathBuf;
+use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::sync::mpsc;
+use windows::Win32::Foundation::VARIANT_BOOL;
 use windows::Win32::Media::Audio::{WAVE_FORMAT_PCM, WAVEFORMATEX};
 use windows::Win32::Media::Speech::{
-    IEnumSpObjectTokens, ISpEventSource, ISpMMSysAudio, ISpObjectToken, ISpObjectTokenCategory,
-    ISpStream, ISpVoice, SPAS_PAUSE, SPAS_RUN, SPAS_STOP, SPEI_WORD_BOUNDARY, SPEVENT, SPF_ASYNC,
-    SPF_IS_XML, SPF_PURGEBEFORESPEAK, SPFM_CREATE_ALWAYS, SPRS_DONE, SPVOICESTATUS, SpFileStream,
-    SpMMAudioOut, SpObjectTokenCategory, SpVoice,
+    ISpEventSource, ISpMMSysAudio, ISpObjectToken, ISpObjectTokenCategory, ISpStream, ISpVoice,
+    ISpeechObjectToken, ISpeechObjectTokenCategory, ISpeechVoice, SPAS_PAUSE, SPAS_RUN, SPAS_STOP,
+    SPEI_WORD_BOUNDARY, SPEVENT, SPF_ASYNC, SPF_IS_XML, SPF_PURGEBEFORESPEAK, SPFM_CREATE_ALWAYS,
+    SPRS_DONE, SPVOICESTATUS, SpFileStream, SpMMAudioOut, SpObjectTokenCategory, SpVoice,
 };
 use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
-use windows::core::{GUID, Interface, PCWSTR, w};
+use windows::core::{BSTR, GUID, Interface, PCWSTR, w};
 
 // SPDFID_WaveFormatEx: {C31ADBAE-527F-4ff5-A230-F62BB61FF70C}
 const SPDFID_WAVEFORMATEX: GUID = GUID::from_values(
@@ -30,6 +35,55 @@ const SPDFID_WAVEFORMATEX: GUID = GUID::from_values(
 const SAPI_VOICES_PATH: PCWSTR = w!(r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices");
 const ONECORE_VOICES_PATH: PCWSTR =
     w!(r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech_OneCore\Voices");
+const SAPI_VOICES_PATH_STR: &str = r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices";
+const ONECORE_VOICES_PATH_STR: &str =
+    r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech_OneCore\Voices";
+const SAPI_VOICES_PATH_HKCU_STR: &str = r"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Speech\Voices";
+const ONECORE_VOICES_PATH_HKCU_STR: &str =
+    r"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Speech_OneCore\Voices";
+
+fn select_sapi_bridge_exe() -> Result<PathBuf, String> {
+    let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
+    let dir = exe_path.parent().ok_or("Missing exe dir")?;
+    let settings_dir = crate::settings::settings_dir();
+    let candidates = [
+        settings_dir.join("sapi4_bridge_32.exe"),
+        settings_dir.join("sapi4_bridge_x86.exe"),
+        settings_dir.join("sapi4_bridge.exe"),
+        dir.join("sapi4_bridge_32.exe"),
+        dir.join("sapi4_bridge_x86.exe"),
+        dir.join("sapi4_bridge.exe"),
+    ];
+    for path in candidates {
+        if path.exists() {
+            return Ok(path);
+        }
+    }
+    Err("SAPI bridge executable not found".to_string())
+}
+
+fn collect_voice_descriptions_from_sapi5_bridge() -> Vec<String> {
+    let exe_path = match select_sapi_bridge_exe() {
+        Ok(path) => path,
+        Err(_) => return Vec::new(),
+    };
+    let out = match Command::new(exe_path)
+        .arg("--sapi5-list")
+        .creation_flags(0x08000000)
+        .output()
+    {
+        Ok(o) => o,
+        Err(_) => return Vec::new(),
+    };
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    stdout
+        .lines()
+        .filter_map(|line| line.strip_prefix("SAPI5VOICE:"))
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect()
+}
 
 fn pwstr_to_string(ptr: PCWSTR) -> String {
     if ptr.is_null() {
@@ -41,41 +95,133 @@ fn pwstr_to_string(ptr: PCWSTR) -> String {
     }
 }
 
-fn collect_voice_descriptions(category_id: PCWSTR) -> Result<Vec<String>, String> {
-    let _com = ComGuard::new_sta().map_err(|e| format!("CoInitializeEx failed: {}", e))?;
-
-    let category: ISpObjectTokenCategory = unsafe {
-        CoCreateInstance(&SpObjectTokenCategory, None, CLSCTX_ALL)
-            .map_err(|e| format!("CoCreateInstance(Category) failed: {}", e))?
-    };
-
-    unsafe { category.SetId(category_id, false) }.map_err(|e| format!("SetId failed: {}", e))?;
-
-    let enum_tokens: IEnumSpObjectTokens = unsafe { category.EnumTokens(None, None) }
-        .map_err(|e| format!("EnumTokens failed: {}", e))?;
-
-    let mut count = 0;
-    if unsafe { enum_tokens.GetCount(&mut count) }.is_err() {
-        return Ok(Vec::new());
+fn token_display_name(token: &ISpObjectToken) -> Option<String> {
+    if let Ok(value_ptr) = unsafe { token.GetStringValue(PCWSTR::null()) } {
+        let value = pwstr_to_string(PCWSTR(value_ptr.0));
+        unsafe {
+            CoTaskMemFree(Some(value_ptr.0 as *const _));
+        }
+        let trimmed = value.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
     }
 
+    if let Ok(name_ptr) = unsafe { token.GetStringValue(w!("Name")) } {
+        let name = pwstr_to_string(PCWSTR(name_ptr.0));
+        unsafe {
+            CoTaskMemFree(Some(name_ptr.0 as *const _));
+        }
+        let trimmed = name.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
+    }
+
+    None
+}
+
+fn speech_token_display_name(token: &ISpeechObjectToken) -> Option<String> {
+    if let Ok(desc) = unsafe { token.GetDescription(0) } {
+        let d = desc.to_string();
+        if !d.trim().is_empty() {
+            return Some(d);
+        }
+    }
+    if let Ok(id) = unsafe { token.Id() } {
+        let s = id.to_string();
+        if !s.trim().is_empty() {
+            return Some(s);
+        }
+    }
+    None
+}
+
+fn collect_voice_descriptions_from_speech_voice() -> Result<Vec<String>, String> {
+    let _com = ComGuard::new_sta().map_err(|e| format!("CoInitializeEx failed: {}", e))?;
+    let voice: ISpeechVoice = unsafe {
+        CoCreateInstance(&SpVoice, None, CLSCTX_ALL)
+            .map_err(|e| format!("CoCreateInstance(ISpeechVoice) failed: {}", e))?
+    };
+    let required = BSTR::from("");
+    let optional = BSTR::from("");
+    let tokens = unsafe { voice.GetVoices(&required, &optional) }
+        .map_err(|e| format!("ISpeechVoice.GetVoices failed: {}", e))?;
+    let count = unsafe { tokens.Count() }.map_err(|e| format!("tokens.Count failed: {}", e))?;
     let mut voices = Vec::new();
     for i in 0..count {
-        // Safe wrapper around token operations
-        if let Ok(token) = unsafe { enum_tokens.Item(i) }
-            && let Ok(desc_ptr) = unsafe { token.GetStringValue(PCWSTR::null()) }
+        if let Ok(token) = unsafe { tokens.Item(i) }
+            && let Some(name) = speech_token_display_name(&token)
         {
-            let description = pwstr_to_string(PCWSTR(desc_ptr.0));
-            unsafe {
-                CoTaskMemFree(Some(desc_ptr.0 as *const _));
-            }
-            voices.push(description);
+            voices.push(name);
         }
     }
     Ok(voices)
 }
 
+fn collect_voice_descriptions_from_speech_category(
+    category_id: &str,
+) -> Result<Vec<String>, String> {
+    let _com = ComGuard::new_sta().map_err(|e| format!("CoInitializeEx failed: {}", e))?;
+    let category: ISpeechObjectTokenCategory = unsafe {
+        CoCreateInstance(&SpObjectTokenCategory, None, CLSCTX_ALL)
+            .map_err(|e| format!("CoCreateInstance(ISpeechObjectTokenCategory) failed: {}", e))?
+    };
+    let category_id = BSTR::from(category_id);
+    unsafe { category.SetId(&category_id, VARIANT_BOOL(0)) }
+        .map_err(|e| format!("ISpeechObjectTokenCategory.SetId failed: {}", e))?;
+    let required = BSTR::from("");
+    let optional = BSTR::from("");
+    let tokens = unsafe { category.EnumerateTokens(&required, &optional) }
+        .map_err(|e| format!("ISpeechObjectTokenCategory.EnumerateTokens failed: {}", e))?;
+    let count = unsafe { tokens.Count() }.map_err(|e| format!("tokens.Count failed: {}", e))?;
+    let mut voices = Vec::new();
+    for i in 0..count {
+        if let Ok(token) = unsafe { tokens.Item(i) }
+            && let Some(name) = speech_token_display_name(&token)
+        {
+            voices.push(name);
+        }
+    }
+    Ok(voices)
+}
+
+fn find_voice_token_in_speech_category(
+    category_id: &str,
+    voice_name: &str,
+) -> Option<ISpObjectToken> {
+    let category: ISpeechObjectTokenCategory =
+        unsafe { CoCreateInstance(&SpObjectTokenCategory, None, CLSCTX_ALL).ok()? };
+    let category_id = BSTR::from(category_id);
+    unsafe { category.SetId(&category_id, VARIANT_BOOL(0)) }.ok()?;
+    let required = BSTR::from("");
+    let optional = BSTR::from("");
+    let tokens = unsafe { category.EnumerateTokens(&required, &optional) }.ok()?;
+    let count = unsafe { tokens.Count() }.ok()?;
+    for i in 0..count {
+        if let Ok(token) = unsafe { tokens.Item(i) }
+            && let Some(description) = speech_token_display_name(&token)
+            && description == voice_name
+            && let Ok(sp_token) = token.cast::<ISpObjectToken>()
+        {
+            return Some(sp_token);
+        }
+    }
+    None
+}
+
 fn find_voice_token(voice_name: &str) -> Option<ISpObjectToken> {
+    for category_id in [
+        SAPI_VOICES_PATH_STR,
+        SAPI_VOICES_PATH_HKCU_STR,
+        ONECORE_VOICES_PATH_STR,
+        ONECORE_VOICES_PATH_HKCU_STR,
+    ] {
+        if let Some(token) = find_voice_token_in_speech_category(category_id, voice_name) {
+            return Some(token);
+        }
+    }
+
     for category_id in [SAPI_VOICES_PATH, ONECORE_VOICES_PATH] {
         let category: windows::core::Result<ISpObjectTokenCategory> =
             unsafe { CoCreateInstance(&SpObjectTokenCategory, None, CLSCTX_ALL) };
@@ -88,15 +234,10 @@ fn find_voice_token(voice_name: &str) -> Option<ISpObjectToken> {
                 if unsafe { enum_tokens.GetCount(&mut count) }.is_ok() {
                     for i in 0..count {
                         if let Ok(tok) = unsafe { enum_tokens.Item(i) }
-                            && let Ok(desc_ptr) = unsafe { tok.GetStringValue(PCWSTR::null()) }
+                            && let Some(description) = token_display_name(&tok)
+                            && description == voice_name
                         {
-                            let description = pwstr_to_string(PCWSTR(desc_ptr.0));
-                            unsafe {
-                                CoTaskMemFree(Some(desc_ptr.0 as *const _));
-                            }
-                            if description == voice_name {
-                                return Some(tok);
-                            }
+                            return Some(tok);
                         }
                     }
                 }
@@ -106,16 +247,48 @@ fn find_voice_token(voice_name: &str) -> Option<ISpObjectToken> {
     None
 }
 
+fn has_sapi5_bridge_voice(voice_name: &str) -> bool {
+    collect_voice_descriptions_from_sapi5_bridge()
+        .iter()
+        .any(|name| name == voice_name)
+}
+
+fn has_native_sapi5_voice(voice_name: &str) -> bool {
+    let mut names = Vec::new();
+    if let Ok(list) = collect_voice_descriptions_from_speech_voice() {
+        names.extend(list);
+    }
+    for category_id in [
+        SAPI_VOICES_PATH_STR,
+        SAPI_VOICES_PATH_HKCU_STR,
+        ONECORE_VOICES_PATH_STR,
+        ONECORE_VOICES_PATH_HKCU_STR,
+    ] {
+        if let Ok(list) = collect_voice_descriptions_from_speech_category(category_id) {
+            names.extend(list);
+        }
+    }
+    names.into_iter().any(|n| n == voice_name)
+}
+
 pub fn list_sapi_voices() -> Result<Vec<VoiceInfo>, String> {
     let _com = ComGuard::new_sta().map_err(|e| format!("CoInitializeEx failed: {}", e))?;
 
     let mut names = Vec::new();
-    if let Ok(list) = collect_voice_descriptions(SAPI_VOICES_PATH) {
+    if let Ok(list) = collect_voice_descriptions_from_speech_voice() {
         names.extend(list);
     }
-    if let Ok(list) = collect_voice_descriptions(ONECORE_VOICES_PATH) {
-        names.extend(list);
+    for category_id in [
+        SAPI_VOICES_PATH_STR,
+        SAPI_VOICES_PATH_HKCU_STR,
+        ONECORE_VOICES_PATH_STR,
+        ONECORE_VOICES_PATH_HKCU_STR,
+    ] {
+        if let Ok(list) = collect_voice_descriptions_from_speech_category(category_id) {
+            names.extend(list);
+        }
     }
+    names.extend(collect_voice_descriptions_from_sapi5_bridge());
 
     let mut seen = HashSet::new();
     let mut voices = Vec::new();
@@ -131,6 +304,95 @@ pub fn list_sapi_voices() -> Result<Vec<VoiceInfo>, String> {
     Ok(voices)
 }
 
+fn send_bridge_line(stdin: &mut std::process::ChildStdin, line: &str) -> std::io::Result<()> {
+    stdin.write_all(line.as_bytes())?;
+    stdin.write_all(b"\n")?;
+    stdin.flush()
+}
+
+fn send_bridge_speak(stdin: &mut std::process::ChildStdin, text: &str) -> std::io::Result<()> {
+    let bytes = text.as_bytes();
+    stdin.write_all(format!("SPEAK {}\n", bytes.len()).as_bytes())?;
+    stdin.write_all(bytes)?;
+    stdin.flush()
+}
+
+fn play_sapi_via_bridge(
+    chunks: Vec<String>,
+    voice_name: String,
+    tts_rate: i32,
+    tts_pitch: i32,
+    tts_volume: i32,
+    cancel: Arc<AtomicBool>,
+    mut command_rx: mpsc::UnboundedReceiver<TtsCommand>,
+) -> Result<(), String> {
+    let exe_path = select_sapi_bridge_exe()?;
+    std::thread::spawn(move || {
+        let mut child = match Command::new(&exe_path)
+            .arg("--sapi5-server")
+            .arg("--voice-name")
+            .arg(&voice_name)
+            .arg("--rate")
+            .arg(tts_rate.to_string())
+            .arg("--pitch")
+            .arg(tts_pitch.to_string())
+            .arg("--volume")
+            .arg(tts_volume.to_string())
+            .stdin(Stdio::piped())
+            .creation_flags(0x08000000)
+            .spawn()
+        {
+            Ok(child) => child,
+            Err(err) => {
+                crate::log_debug(&format!("SAPI5 bridge spawn failed: {}", err));
+                return;
+            }
+        };
+        let mut stdin = match child.stdin.take() {
+            Some(stdin) => stdin,
+            None => {
+                crate::log_debug("SAPI5 bridge stdin unavailable");
+                crate::log_if_err!(child.wait());
+                return;
+            }
+        };
+        let text = chunks.join("\n");
+        if let Err(err) = send_bridge_speak(&mut stdin, &text) {
+            crate::log_debug(&format!("SAPI5 bridge SPEAK failed: {}", err));
+            crate::log_if_err!(child.wait());
+            return;
+        }
+
+        loop {
+            if cancel.load(Ordering::Relaxed) {
+                crate::log_if_err!(send_bridge_line(&mut stdin, "STOP"));
+                break;
+            }
+            match command_rx.try_recv() {
+                Ok(TtsCommand::Pause) => {
+                    crate::log_if_err!(send_bridge_line(&mut stdin, "PAUSE"));
+                }
+                Ok(TtsCommand::Resume) => {
+                    crate::log_if_err!(send_bridge_line(&mut stdin, "RESUME"));
+                }
+                Ok(TtsCommand::Stop) => {
+                    crate::log_if_err!(send_bridge_line(&mut stdin, "STOP"));
+                    break;
+                }
+                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+                Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => {
+                    crate::log_if_err!(send_bridge_line(&mut stdin, "STOP"));
+                    break;
+                }
+            }
+        }
+        crate::log_if_err!(child.wait());
+    });
+    Ok(())
+}
+
 pub fn play_sapi(
     chunks: Vec<String>,
     voice_name: String,
@@ -140,6 +402,16 @@ pub fn play_sapi(
     cancel: Arc<AtomicBool>,
     mut command_rx: mpsc::UnboundedReceiver<TtsCommand>,
 ) -> Result<(), String> {
+    if has_sapi5_bridge_voice(&voice_name) && !has_native_sapi5_voice(&voice_name) {
+        crate::log_debug(&format!(
+            "SAPI5: using 32-bit bridge voice fallback for '{}'",
+            voice_name
+        ));
+        return play_sapi_via_bridge(
+            chunks, voice_name, tts_rate, tts_pitch, tts_volume, cancel, command_rx,
+        );
+    }
+
     const COMMAND_POLL_MS: u32 = 5;
     const PAUSED_POLL_MS: u32 = 2;
     const HARD_PAUSE_IMMEDIATE: bool = false;
@@ -469,11 +741,70 @@ fn configure_sapi_voice(voice: &ISpVoice, options: &SapiExportOptions) -> Result
     Ok(())
 }
 
+fn speak_sapi5_to_file_via_bridge(
+    options: &SapiExportOptions,
+    mut progress_callback: impl FnMut(usize),
+) -> Result<(), String> {
+    let exe_path = select_sapi_bridge_exe()?;
+    let mut child = Command::new(exe_path)
+        .arg("--sapi5-output")
+        .arg(options.output_path)
+        .arg("--voice-name")
+        .arg(options.voice_name)
+        .arg("--rate")
+        .arg(options.rate.to_string())
+        .arg("--pitch")
+        .arg(options.pitch.to_string())
+        .arg("--volume")
+        .arg(options.volume.to_string())
+        .stdin(Stdio::piped())
+        .creation_flags(0x08000000)
+        .spawn()
+        .map_err(|e| format!("Failed to spawn SAPI5 bridge: {}", e))?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        let text = options.chunks.join("\n");
+        stdin
+            .write_all(text.as_bytes())
+            .map_err(|e| format!("Failed to send text to SAPI5 bridge: {}", e))?;
+    }
+
+    loop {
+        if options.cancel.load(Ordering::SeqCst) {
+            crate::log_if_err!(child.kill());
+            return Err("Cancelled".to_string());
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                if !status.success() {
+                    return Err(format!("SAPI5 bridge failed with status: {}", status));
+                }
+                break;
+            }
+            Ok(None) => std::thread::sleep(Duration::from_millis(25)),
+            Err(e) => return Err(format!("SAPI5 bridge wait failed: {}", e)),
+        }
+    }
+
+    for _ in options.chunks {
+        progress_callback(0);
+    }
+    Ok(())
+}
+
 fn speak_sapi_to_file_with_voice(
     voice: &ISpVoice,
     options: SapiExportOptions,
     mut progress_callback: impl FnMut(usize),
 ) -> Result<(), String> {
+    if has_sapi5_bridge_voice(options.voice_name) && !has_native_sapi5_voice(options.voice_name) {
+        crate::log_debug(&format!(
+            "SAPI5 export: using 32-bit bridge voice fallback for '{}'",
+            options.voice_name
+        ));
+        return speak_sapi5_to_file_via_bridge(&options, progress_callback);
+    }
+
     unsafe {
         let is_mp3 = options
             .output_path

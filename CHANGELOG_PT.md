@@ -9,7 +9,7 @@ Melhorias
 • A exportação de audiolivros agora guarda MP3 em estéreo com bitrate escolhido pelo utilizador para vozes Edge, SAPI5 e SAPI4.
 • Adicionado suporte a vozes SAPI5 de 32 bits via bridge, para usar também vozes disponíveis apenas em motores de 32 bits.
 • Reorganizadas as funcionalidades de voz num menu dedicado "Voz e áudio" e adicionada/esclarecida a opção "Converter áudio", útil para converter qualquer ficheiro multimédia suportado para MP3, AAC, OGG, Opus, FLAC, WAV e AIFF.
-• Adicionada a remoção de artigos RSS individuais e episódios de podcast individuais (tecla Delete + menu de contexto com confirmação), sem remover toda a fonte RSS/podcast.
+• Adicionada a remoção de artigos RSS individuais e episódios de podcast individuais (tecla Delete + menu de contexto com confirmação), sem remover toda a fonte RSS/podcast, com anulação da última remoção (artigo/episódio individual ou fonte RSS/podcast completa).
 • Adicionada a exportação de feeds RSS para OPML na janela RSS, para guardar e reimportar facilmente as fontes atuais.
 • Adicionada a função "Pesquisar RSS por palavra-chave" na janela RSS: ao inserir uma palavra-chave, o Sonarpad gera automaticamente o URL RSS do Google News e abre a janela de adicionar fonte já pré-preenchida, permitindo criar um feed temático num único passo.
 • Adicionada a tradução sérvia graças a Mila Kuran.

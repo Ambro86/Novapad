@@ -100,6 +100,7 @@ const ID_CTX_SORT_ASC: usize = 13010;
 const ID_CTX_SORT_DESC: usize = 13011;
 const ID_CTX_SORT_NEWEST: usize = 13012;
 const ID_CTX_SORT_OLDEST: usize = 13013;
+const ID_CTX_UNDO_DELETE: usize = 13014;
 
 const ID_CTX_PLAY: usize = 13101;
 const ID_CTX_OPEN_EPISODE: usize = 13102;
@@ -179,6 +180,22 @@ struct PodcastWindowState {
     last_selected: isize,
     pending_play: Option<String>,
     preview_sources: Vec<crate::tools::rss::RssSource>,
+    last_removed: Option<PodcastLastRemoved>,
+    suppress_tree_selection_events: bool,
+}
+
+#[derive(Clone)]
+enum PodcastLastRemoved {
+    Source {
+        index: usize,
+        source: RssSource,
+    },
+    Episode {
+        source_index: usize,
+        episode: PodcastEpisode,
+        key: String,
+        position: usize,
+    },
 }
 
 #[derive(Clone)]
@@ -3837,6 +3854,16 @@ unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool)
     }
     let node = with_podcast_state(hwnd, |s| s.node_data.get(&hitem.0).cloned()).flatten();
     let language = with_podcast_state(hwnd, |s| s.language).unwrap_or_default();
+    let undo_label = i18n::tr(language, "edit.undo")
+        .split('\t')
+        .next()
+        .unwrap_or_default()
+        .to_string();
+    let undo_flags = if with_podcast_state(hwnd, |s| s.last_removed.is_some()).unwrap_or(false) {
+        MF_STRING
+    } else {
+        MF_STRING | MF_GRAYED
+    };
     let menu = CreatePopupMenu().unwrap_or(HMENU(0));
     if menu.0 == 0 {
         return;
@@ -3868,6 +3895,12 @@ unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool)
                 MF_STRING,
                 ID_CTX_REMOVE,
                 PCWSTR(to_wide(&remove_label).as_ptr()),
+            ) {}
+            if let Err(_e) = AppendMenuW(
+                menu,
+                undo_flags,
+                ID_CTX_UNDO_DELETE,
+                PCWSTR(to_wide(&undo_label).as_ptr()),
             ) {}
             let total = with_podcast_state(hwnd, |s| {
                 with_state(s.parent, |ps| ps.settings.podcast_sources.len()).unwrap_or(0)
@@ -3983,6 +4016,12 @@ unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool)
                 ID_CTX_REMOVE,
                 PCWSTR(to_wide(&remove_label).as_ptr()),
             ) {}
+            if let Err(_e) = AppendMenuW(
+                menu,
+                undo_flags,
+                ID_CTX_UNDO_DELETE,
+                PCWSTR(to_wide(&undo_label).as_ptr()),
+            ) {}
             if let Err(_e) = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()) {}
             if let Err(_e) = AppendMenuW(
                 menu,
@@ -4048,6 +4087,12 @@ unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool)
                 ID_CTX_REMOVE_EPISODE,
                 PCWSTR(to_wide(&remove_label).as_ptr()),
             ) {}
+            if let Err(_e) = AppendMenuW(
+                menu,
+                undo_flags,
+                ID_CTX_UNDO_DELETE,
+                PCWSTR(to_wide(&undo_label).as_ptr()),
+            ) {}
         }
         None => {}
     }
@@ -4084,6 +4129,7 @@ unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool)
         ID_CTX_SORT_DESC => handle_sort_action(hwnd, crate::settings::SortOrder::TitleDesc),
         ID_CTX_SORT_NEWEST => handle_sort_action(hwnd, crate::settings::SortOrder::DateNewest),
         ID_CTX_SORT_OLDEST => handle_sort_action(hwnd, crate::settings::SortOrder::DateOldest),
+        ID_CTX_UNDO_DELETE => undo_last_delete(hwnd),
         ID_CTX_PLAY => handle_episode_action(hwnd, EpisodeAction::Play),
         ID_CTX_OPEN_EPISODE => handle_episode_action(hwnd, EpisodeAction::OpenEpisode),
         ID_CTX_COPY_AUDIO => handle_episode_action(hwnd, EpisodeAction::CopyAudio),
@@ -4149,6 +4195,10 @@ unsafe fn handle_source_action(hwnd: HWND, verb: SourceAction) {
                 update_delete_button_state(hwnd);
                 return;
             }
+            let removed_source = with_state(parent, |ps| {
+                ps.settings.podcast_sources.get(source_index).cloned()
+            })
+            .flatten();
             let removed = with_state(parent, |ps| {
                 if source_index < ps.settings.podcast_sources.len() {
                     ps.settings.podcast_sources.remove(source_index);
@@ -4160,6 +4210,14 @@ unsafe fn handle_source_action(hwnd: HWND, verb: SourceAction) {
             })
             .unwrap_or(false);
             if removed {
+                if let Some(source) = removed_source {
+                    with_podcast_state(hwnd, |s| {
+                        s.last_removed = Some(PodcastLastRemoved::Source {
+                            index: source_index,
+                            source,
+                        });
+                    });
+                }
                 let language = with_state(parent, |s| s.settings.language).unwrap_or_default();
                 announce_status(&i18n::tr(language, "podcasts.removed"));
                 reload_tree(hwnd);
@@ -4319,6 +4377,7 @@ unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
                 .0,
             );
             let key = episode_key(&item);
+            let mut source_idx_for_undo: Option<usize> = None;
             if parent.0 != 0 {
                 let source_index =
                     with_podcast_state(hwnd, |s| match s.node_data.get(&parent_item.0) {
@@ -4327,6 +4386,7 @@ unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
                     })
                     .flatten();
                 if let Some(source_idx) = source_index {
+                    source_idx_for_undo = Some(source_idx);
                     with_state(parent, |ps| {
                         if let Some(src) = ps.settings.podcast_sources.get_mut(source_idx)
                             && !src.removed_item_keys.iter().any(|k| k == &key)
@@ -4337,12 +4397,14 @@ unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
                     });
                 }
             }
+            let mut removed_position: Option<usize> = None;
             with_podcast_state(hwnd, |s| {
                 s.node_data.remove(&hitem.0);
                 if parent_item.0 != 0
                     && let Some(state) = s.source_items.get_mut(&parent_item.0)
                     && let Some(pos) = state.items.iter().position(|x| episode_key(x) == key)
                 {
+                    removed_position = Some(pos);
                     state.items.remove(pos);
                 }
             });
@@ -4354,6 +4416,208 @@ unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
                     WPARAM(TVGN_CARET as usize),
                     LPARAM(parent_item.0),
                 );
+            }
+            if let (Some(source_index), Some(position)) = (source_idx_for_undo, removed_position) {
+                with_podcast_state(hwnd, |s| {
+                    s.last_removed = Some(PodcastLastRemoved::Episode {
+                        source_index,
+                        episode: item.clone(),
+                        key,
+                        position,
+                    });
+                });
+            }
+        }
+    }
+}
+
+unsafe fn undo_last_delete(hwnd: HWND) {
+    let Some(last_removed) = with_podcast_state(hwnd, |s| s.last_removed.take()).flatten() else {
+        return;
+    };
+
+    match last_removed {
+        PodcastLastRemoved::Source { index, source } => {
+            let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+            if parent.0 == 0 {
+                return;
+            }
+            let restored_index = with_state(parent, |ps| {
+                let insert_at = index.min(ps.settings.podcast_sources.len());
+                ps.settings.podcast_sources.insert(insert_at, source);
+                settings::save_settings(ps.settings.clone());
+                insert_at
+            })
+            .unwrap_or(index);
+
+            with_podcast_state(hwnd, |s| s.suppress_tree_selection_events = true);
+            reload_tree(hwnd);
+            with_podcast_state(hwnd, |s| s.suppress_tree_selection_events = false);
+            let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+            if hwnd_tree.0 != 0 {
+                let target_hitem = with_podcast_state(hwnd, |s| {
+                    s.node_data.iter().find_map(|(&h, node)| match node {
+                        NodeData::Source(i) if *i == restored_index => Some(HTREEITEM(h)),
+                        _ => None,
+                    })
+                })
+                .flatten();
+                if let Some(target) = target_hitem {
+                    SendMessageW(
+                        hwnd_tree,
+                        TVM_SELECTITEM,
+                        WPARAM(TVGN_CARET as usize),
+                        LPARAM(target.0),
+                    );
+                    SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(target.0));
+                }
+                SetFocus(hwnd_tree);
+            }
+        }
+        PodcastLastRemoved::Episode {
+            source_index,
+            episode,
+            key,
+            position,
+        } => {
+            let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+            if parent.0 != 0 {
+                with_state(parent, |ps| {
+                    if let Some(src) = ps.settings.podcast_sources.get_mut(source_index) {
+                        src.removed_item_keys.retain(|k| k != &key);
+                        settings::save_settings(ps.settings.clone());
+                    }
+                });
+            }
+
+            let source_hitem = with_podcast_state(hwnd, |s| {
+                s.node_data.iter().find_map(|(&h, node)| match node {
+                    NodeData::Source(i) if *i == source_index => Some(HTREEITEM(h)),
+                    _ => None,
+                })
+            })
+            .flatten();
+
+            let Some(source_hitem) = source_hitem else {
+                return;
+            };
+
+            let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+            let mut show_in_tree = false;
+            with_podcast_state(hwnd, |s| {
+                if let Some(state) = s.source_items.get_mut(&source_hitem.0) {
+                    let insert_at = position.min(state.items.len());
+                    state.items.insert(insert_at, episode.clone());
+                    show_in_tree = true;
+                }
+            });
+
+            if show_in_tree && hwnd_tree.0 != 0 {
+                with_podcast_state(hwnd, |s| s.suppress_tree_selection_events = true);
+                // Rebuild source children to preserve original order after undo.
+                SendMessageW(
+                    hwnd_tree,
+                    windows::Win32::UI::WindowsAndMessaging::WM_SETREDRAW,
+                    WPARAM(0),
+                    LPARAM(0),
+                );
+                SendMessageW(
+                    hwnd_tree,
+                    TVM_SELECTITEM,
+                    WPARAM(TVGN_CARET as usize),
+                    LPARAM(source_hitem.0),
+                );
+                loop {
+                    let child = HTREEITEM(
+                        SendMessageW(
+                            hwnd_tree,
+                            TVM_GETNEXTITEM,
+                            WPARAM(TVGN_CHILD as usize),
+                            LPARAM(source_hitem.0),
+                        )
+                        .0,
+                    );
+                    if child.0 == 0 {
+                        break;
+                    }
+                    with_podcast_state(hwnd, |s| {
+                        s.node_data.remove(&child.0);
+                    });
+                    SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
+                }
+
+                let mut restored_hitem = HTREEITEM(0);
+                with_podcast_state(hwnd, |s| {
+                    if let Some(state) = s.source_items.get(&source_hitem.0) {
+                        for entry in &state.items {
+                            let text = to_wide(&entry.title);
+                            let mut tvis = TVINSERTSTRUCTW {
+                                hParent: source_hitem,
+                                hInsertAfter: windows::Win32::UI::Controls::TVI_LAST,
+                                Anonymous: windows::Win32::UI::Controls::TVINSERTSTRUCTW_0 {
+                                    item: TVITEMW {
+                                        mask: TVIF_TEXT,
+                                        pszText: windows::core::PWSTR(text.as_ptr() as *mut _),
+                                        ..Default::default()
+                                    },
+                                },
+                            };
+                            let hchild = HTREEITEM(
+                                SendMessageW(
+                                    hwnd_tree,
+                                    TVM_INSERTITEMW,
+                                    WPARAM(0),
+                                    LPARAM(&mut tvis as *mut _ as isize),
+                                )
+                                .0,
+                            );
+                            if hchild.0 != 0 {
+                                s.node_data
+                                    .insert(hchild.0, NodeData::Episode(Box::new(entry.clone())));
+                                if episode_key(entry) == key {
+                                    restored_hitem = hchild;
+                                }
+                            }
+                        }
+                    }
+                });
+                SendMessageW(
+                    hwnd_tree,
+                    windows::Win32::UI::WindowsAndMessaging::WM_SETREDRAW,
+                    WPARAM(1),
+                    LPARAM(0),
+                );
+                with_podcast_state(hwnd, |s| s.suppress_tree_selection_events = false);
+                if restored_hitem.0 != 0 {
+                    SendMessageW(
+                        hwnd_tree,
+                        TVM_SELECTITEM,
+                        WPARAM(TVGN_CARET as usize),
+                        LPARAM(restored_hitem.0),
+                    );
+                    SendMessageW(
+                        hwnd_tree,
+                        TVM_ENSUREVISIBLE,
+                        WPARAM(0),
+                        LPARAM(restored_hitem.0),
+                    );
+                } else {
+                    SendMessageW(
+                        hwnd_tree,
+                        TVM_SELECTITEM,
+                        WPARAM(TVGN_CARET as usize),
+                        LPARAM(source_hitem.0),
+                    );
+                }
+                SetFocus(hwnd_tree);
+            } else if hwnd_tree.0 != 0 {
+                SendMessageW(
+                    hwnd_tree,
+                    TVM_SELECTITEM,
+                    WPARAM(TVGN_CARET as usize),
+                    LPARAM(source_hitem.0),
+                );
+                SetFocus(hwnd_tree);
             }
         }
     }
@@ -5192,6 +5456,13 @@ unsafe fn podcast_tree_wndproc_inner(
                 return LRESULT(0);
             }
         }
+        if key == 'Z' as u32 && GetKeyState(VK_CONTROL.0 as i32) < 0 {
+            let parent = GetParent(hwnd);
+            if parent.0 != 0 {
+                undo_last_delete(parent);
+                return LRESULT(0);
+            }
+        }
         if key == VK_RIGHT.0 as u32 {
             let parent = GetParent(hwnd);
             if parent.0 != 0
@@ -5973,6 +6244,8 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 last_selected: 0,
                 pending_play: None,
                 preview_sources: Vec::new(),
+                last_removed: None,
+                suppress_tree_selection_events: false,
             });
             SetWindowLongPtrW(
                 hwnd,
@@ -6046,6 +6319,11 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                     }
                 }
                 if nmhdr.code == TVN_SELCHANGEDW {
+                    if with_podcast_state(hwnd, |s| s.suppress_tree_selection_events)
+                        .unwrap_or(false)
+                    {
+                        return LRESULT(0);
+                    }
                     let info = &*(lparam.0 as *const windows::Win32::UI::Controls::NMTREEVIEWW);
                     with_podcast_state(hwnd, |s| s.last_selected = info.itemNew.hItem.0);
                     update_delete_button_state(hwnd);
@@ -6137,6 +6415,10 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
             }
             if focus == hwnd_results && key == VK_RETURN.0 as u32 {
                 subscribe_selected_result(hwnd);
+                return LRESULT(0);
+            }
+            if focus == hwnd_tree && key == 'Z' as u32 && GetKeyState(VK_CONTROL.0 as i32) < 0 {
+                undo_last_delete(hwnd);
                 return LRESULT(0);
             }
             if focus == hwnd_tree && key == VK_RETURN.0 as u32 {

@@ -9,7 +9,7 @@ Cải tiến
 • Xuất sách nói giờ lưu MP3 stereo với bitrate do người dùng chọn cho giọng Edge, SAPI5 và SAPI4.
 • Đã thêm hỗ trợ giọng SAPI5 32-bit qua bridge, để dùng cả các giọng chỉ có trong engine 32-bit.
 • Đã tổ chức lại các tính năng giọng nói vào menu riêng "Giọng nói và âm thanh" và thêm/làm rõ mục "Chuyển đổi âm thanh", dùng để chuyển đổi mọi tệp đa phương tiện được hỗ trợ sang MP3, AAC, OGG, Opus, FLAC, WAV và AIFF.
-• Đã thêm khả năng xóa từng bài RSS và từng tập podcast riêng lẻ (phím Delete + menu ngữ cảnh có xác nhận), không cần xóa toàn bộ nguồn RSS/podcast.
+• Đã thêm khả năng xóa từng bài RSS và từng tập podcast riêng lẻ (phím Delete + menu ngữ cảnh có xác nhận), không cần xóa toàn bộ nguồn RSS/podcast, kèm hoàn tác lần xóa gần nhất (bài/tập đơn lẻ hoặc toàn bộ nguồn RSS/podcast).
 • Đã thêm chức năng xuất nguồn RSS sang OPML trong cửa sổ RSS, giúp lưu và nhập lại các nguồn hiện tại một cách dễ dàng.
 • Đã thêm tính năng "Tìm RSS theo từ khóa" trong cửa sổ RSS: khi nhập từ khóa, Sonarpad sẽ tự động tạo URL RSS Google News và mở hộp thoại thêm nguồn với thông tin đã điền sẵn, giúp tạo feed theo chủ đề chỉ trong một bước.
 • Đã thêm bản dịch tiếng Serbia nhờ Mila Kuran.

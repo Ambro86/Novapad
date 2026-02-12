@@ -9,7 +9,7 @@ Mejoras
 • La exportación de audiolibros ahora guarda MP3 en estéreo con bitrate elegido por el usuario para voces Edge, SAPI5 y SAPI4.
 • Añadido soporte para voces SAPI5 de 32 bits mediante bridge, para usar también voces disponibles solo en motores de 32 bits.
 • Reorganizadas las funciones de voz en un menú dedicado "Voz y audio" y añadida/aclarada la opción "Convertir audio", útil para convertir cualquier archivo multimedia compatible a MP3, AAC, OGG, Opus, FLAC, WAV y AIFF.
-• Añadida la eliminación de artículos RSS individuales y episodios de podcast individuales (tecla Supr + menú contextual con confirmación), sin eliminar toda la fuente RSS/podcast.
+• Añadida la eliminación de artículos RSS individuales y episodios de podcast individuales (tecla Supr + menú contextual con confirmación), sin eliminar toda la fuente RSS/podcast, con deshacer de la última eliminación (artículo/episodio individual o fuente RSS/podcast completa).
 • Añadida la exportación de feeds RSS a OPML en la ventana RSS, para guardar y reimportar fácilmente las fuentes actuales.
 • Añadida la función "Buscar RSS por palabra clave" en la ventana RSS: al introducir una palabra clave se genera automáticamente la URL RSS de Google News y se abre el diálogo de añadir fuente ya prellenado, para crear feeds temáticos en un solo paso.
 • Añadida la traducción serbia gracias a Mila Kuran.

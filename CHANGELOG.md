@@ -9,7 +9,7 @@ Improvements
 • Audiobook export now saves MP3 in stereo with user-selected bitrate for Edge, SAPI5, and SAPI4 voices.
 • Added support for 32-bit SAPI5 voices via bridge, so voices available only in 32-bit engines can also be used in Sonarpad.
 • Reorganized voice features into a dedicated "Voice and audio" menu and added/clarified "Convert Audio", useful for converting any supported media file to MP3, AAC, OGG, Opus, FLAC, WAV, and AIFF.
-• Added removal of individual RSS articles and podcast episodes (Delete key + context menu with confirmation), without removing the entire RSS/podcast source.
+• Added removal of individual RSS articles and podcast episodes (Delete key + context menu with confirmation), without removing the entire RSS/podcast source, plus undo for the last removal (single article/episode or entire RSS/podcast source).
 • Added RSS feed export to OPML in the RSS window, so current RSS sources can be saved and re-imported easily.
 • Added "Search RSS by keyword" in the RSS window: entering a keyword now generates a Google News RSS URL automatically and opens the add-source dialog prefilled, so keyword feeds can be created in one step.
 • Added Serbian translation thanks to Mila Kuran.

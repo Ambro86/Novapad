@@ -112,18 +112,18 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
 
 ; Installer pages, must be ordered as they appear
 ; 1. Welcome Page
-!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+!define /redef MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
 !insertmacro MUI_PAGE_WELCOME
 
 ; 2. License Page (if defined)
 !if "${LICENSE}" != ""
-  !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+  !define /redef MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
   !insertmacro MUI_PAGE_LICENSE "${LICENSE}"
 !endif
 
 ; 3. Install mode (if it is set to `both`)
 !if "${INSTALLMODE}" == "both"
-  !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+  !define /redef MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
   !insertmacro MULTIUSER_PAGE_INSTALLMODE
 !endif
 
@@ -417,21 +417,21 @@ FunctionEnd
 {{/if}}
 
 ; 5. Choose install directoy page
-!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+!define /redef MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
 !insertmacro MUI_PAGE_DIRECTORY
 
 ; 6. Start menu shortcut page
-!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+!define /redef MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
 Var AppStartMenuFolder
 !insertmacro MUI_PAGE_STARTMENU Application $AppStartMenuFolder
 
 {{#if file_associations}}
 ; 6b. File associations page
-!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+!define /redef MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
 Page custom PageFileAssociations PageLeaveFileAssociations
 
 ; 6c. Manual file association selection page
-!define MUI_PAGE_CUSTOMFUNCTION_PRE PrePageFileAssociationExtensions
+!define /redef MUI_PAGE_CUSTOMFUNCTION_PRE PrePageFileAssociationExtensions
 Page custom PageFileAssociationExtensions PageLeaveFileAssociationExtensions
 {{/if}}
 
@@ -449,7 +449,7 @@ Page custom PageFileAssociationExtensions PageLeaveFileAssociationExtensions
 !define MUI_FINISHPAGE_SHOWREADME_FUNCTION CreateDesktopShortcut
 ; Show run app after installation.
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${MAINBINARYNAME}.exe"
-!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+!define /redef MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
 !insertmacro MUI_PAGE_FINISH
 
 ; Uninstaller Pages
@@ -458,7 +458,7 @@ Page custom PageFileAssociationExtensions PageLeaveFileAssociationExtensions
 Var DeleteAppDataCheckbox
 Var DeleteAppDataCheckboxState
 !define /ifndef WS_EX_LAYOUTRTL         0x00400000
-!define MUI_PAGE_CUSTOMFUNCTION_SHOW un.ConfirmShow
+!define /redef MUI_PAGE_CUSTOMFUNCTION_SHOW un.ConfirmShow
 Function un.ConfirmShow
     FindWindow $1 "#32770" "" $HWNDPARENT ; Find inner dialog
     ${If} $(^RTL) == 1
@@ -470,7 +470,7 @@ Function un.ConfirmShow
     SendMessage $HWNDPARENT ${WM_GETFONT} 0 0 $1
     SendMessage $DeleteAppDataCheckbox ${WM_SETFONT} $1 1
 FunctionEnd
-!define MUI_PAGE_CUSTOMFUNCTION_LEAVE un.ConfirmLeave
+!define /redef MUI_PAGE_CUSTOMFUNCTION_LEAVE un.ConfirmLeave
 Function un.ConfirmLeave
     SendMessage $DeleteAppDataCheckbox ${BM_GETCHECK} 0 0 $DeleteAppDataCheckboxState
 FunctionEnd
@@ -1207,3 +1207,4 @@ Function CreateStartMenuShortcut
   CreateShortcut "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
   ApplicationID::Set "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk" "${IDENTIFIER}"
 FunctionEnd
+

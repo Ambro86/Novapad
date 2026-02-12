@@ -48,7 +48,11 @@ pub fn is_doc_path(path: &Path) -> bool {
 pub fn is_spreadsheet_path(path: &Path) -> bool {
     path.extension()
         .and_then(|s| s.to_str())
-        .map(|s| s.eq_ignore_ascii_case("xlsx") || s.eq_ignore_ascii_case("ods"))
+        .map(|s| {
+            s.eq_ignore_ascii_case("xls")
+                || s.eq_ignore_ascii_case("xlsx")
+                || s.eq_ignore_ascii_case("ods")
+        })
         .unwrap_or(false)
 }
 

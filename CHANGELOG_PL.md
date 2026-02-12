@@ -19,6 +19,7 @@ Ulepszenia
 • Dodano opcję „Reset głośności” i zgrupowano akcje resetu w dedykowanym podmenu „Reset” w Odtwarzaniu, razem z „Reset prędkości” i „Reset tonu”.
 • Ulepszenia instalatora: setup.exe pozwala teraz wybrać między skojarzeniem wszystkich obsługiwanych typów plików a ręcznym wyborem rozszerzeń; MSI również udostępnia wybór per rozszerzenie w drzewie funkcji (domyślnie bez zmian: wszystko włączone).
 • Dodano nowe menu „Okno” z opcją „Otwarte dokumenty...”, aby szybko przełączać się między aktualnie otwartymi plikami.
+• Zaktualizowano opcję Widok > Czcionka: pełny selektor został zastąpiony szybkim podmenu z popularnymi czcionkami (Arial, Calibri, Consolas, Segoe UI, Tahoma, Verdana, Times New Roman, Georgia), z zachowaniem aktualnego rozmiaru tekstu.
 Poprawki błędów
 • Naprawiono wyodrębnianie tekstu EPUB dla książek zawierających komentarze HTML inline (<!-- ... -->): tekst rozdziałów jest teraz poprawnie parsowany zamiast być częściowo lub całkowicie pomijany.
 • Naprawiono słownik Wiktionary dla języka hiszpańskiego i obsługę cache słownika: słowa takie jak „agua” są teraz poprawnie znajdowane, a stare wpisy „nie znaleziono słowa” nie są już ponownie używane.
@@ -26,6 +27,7 @@ Poprawki błędów
 • Naprawiono dekodowanie ANSI dla plików środkowoeuropejskich (np. czeski/polski): Sonarpad lepiej rozróżnia teraz UTF-8 i ANSI oraz wybiera właściwą stronę kodową (w tym Windows-1250), dzięki czemu znaki diakrytyczne nie są zniekształcone.
 • Naprawiono zapisywanie źródeł RSS z parametrami w URL (np. `rss.aspx?c=...`): takie feedy są teraz poprawnie zapisywane i przywracane po ponownym uruchomieniu Sonarpad.
 • Naprawiono otwieranie plików wskaźnikowych Google Drive (`.gdoc`, `.gsheet`, `.gslides`) z menu kontekstowego Eksploratora: gdy bezpośredni odczyt kończył się błędem „Incorrect function (os error 1)”, Sonarpad używa teraz fallbacku shell-open i dokument otwiera się poprawnie.
+• Naprawiono odczyt starszych plików Excel `.xls` (Excel 2010): stare pliki binarne są teraz poprawnie wykrywane i dekodowane zamiast pokazywać uszkodzony tekst (np. `ÐÏ_à¡±...`).
 • Naprawiono sposób ogłaszania błędów pisowni: błędy są teraz ponownie odczytywane podczas późniejszego przeglądania tekstu, a ten sam błąd jest znów zgłaszany po usunięciu i ponownym wpisaniu.
 • Naprawiono operacje tekstowe na liniach (np. Ctrl+Q / Ctrl+Shift+Q, sortowanie/odwracanie/unikalne/łączenie linii): po zaznaczeniu jednej linii przez Shift+Strzałka w dół sąsiednie linie nie są już łączone ani obcinane.
 • Naprawiono działanie wielowierszowe operacji liniowych (Ctrl+Q / Ctrl+Shift+Q i narzędzia pokrewne): gdy RichEdit zwraca separatory linii jako samo CR, są one teraz poprawnie normalizowane i przetwarzane są wszystkie zaznaczone linie bez ucinania pierwszego znaku.

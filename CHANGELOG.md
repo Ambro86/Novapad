@@ -19,6 +19,7 @@ Improvements
 • Added "Reset volume" and grouped reset actions into a dedicated "Reset" submenu in Playback, alongside "Reset speed" and "Reset pitch".
 • Installer improvements: setup.exe now lets users choose between associating all supported file types or selecting extensions manually; MSI now exposes per-extension file-association choices in the feature tree (default remains all enabled).
 • Added a new "Window" menu with "Open documents..." to quickly switch to any currently open file.
+• Updated View > Font: replaced the old chooser with a quick submenu of common fonts (Arial, Calibri, Consolas, Segoe UI, Tahoma, Verdana, Times New Roman, Georgia) while preserving the current text size.
 Bug fixes
 • Fixed EPUB text extraction for books containing inline HTML comments (<!-- ... -->): chapter text is now parsed correctly instead of being partially or fully skipped.
 • Fixed Spanish Wiktionary lookups and dictionary cache handling: Spanish entries like "agua" now load correctly, and old "Word not found" cache entries are no longer reused.
@@ -26,6 +27,7 @@ Bug fixes
 • Fixed ANSI text decoding for Central European files (e.g., Czech/Polish): Sonarpad now better distinguishes UTF-8 vs ANSI and chooses the correct code page (including Windows-1250) to prevent garbled diacritics.
 • Fixed RSS source persistence for feeds with URL query parameters (e.g., `rss.aspx?c=...`): these feeds are now saved and restored correctly after restarting Sonarpad.
 • Fixed opening Google Drive pointer files (`.gdoc`, `.gsheet`, `.gslides`) from Explorer context menu: when direct read fails with “Incorrect function (os error 1)”, Sonarpad now falls back to shell-open so the document still opens correctly.
+• Fixed legacy Excel 2010 `.xls` reading: old binary Excel files are now detected and decoded correctly instead of showing garbled text (e.g. `ÐÏ_à¡±...`).
 • Fixed spellcheck announcement flow: misspellings are now announced again when reviewing text later, and the same mistake is reported again if it is deleted and retyped.
 • Fixed line-based text actions (e.g. Ctrl+Q / Ctrl+Shift+Q, sort/reverse/unique/join lines): selecting a single line with Shift+Down no longer merges or truncates adjacent lines.
 • Fixed multi-line behavior for line-based text actions (Ctrl+Q / Ctrl+Shift+Q and related line tools): RichEdit selections using CR-only separators are now normalized correctly, so all selected lines are processed without cutting first characters.

@@ -19,6 +19,7 @@ Améliorations
 • Ajout de l'option « Réinitialiser le volume » et regroupement des actions de réinitialisation dans un sous-menu dédié « Réinitialiser » dans Lecture, avec « Réinitialiser la vitesse » et « Réinitialiser la tonalité ».
 • Amélioration de l'installateur : setup.exe permet désormais de choisir entre associer tous les types de fichiers pris en charge ou sélectionner manuellement les extensions ; le MSI propose aussi une sélection extension par extension dans l'arborescence des fonctionnalités (valeur par défaut inchangée : tout activé).
 • Ajout du nouveau menu « Fenêtre » avec l'option « Documents ouverts... » pour basculer rapidement vers n'importe quel fichier actuellement ouvert.
+• Mise à jour de l'option Affichage > Police : le sélecteur complet a été remplacé par un sous-menu rapide de polices courantes (Arial, Calibri, Consolas, Segoe UI, Tahoma, Verdana, Times New Roman, Georgia), tout en conservant la taille de texte actuelle.
 Corrections de bugs
 • Correction de l’extraction de texte EPUB pour les livres contenant des commentaires HTML inline (<!-- ... -->) : le texte des chapitres est désormais correctement analysé au lieu d’être partiellement ou totalement ignoré.
 • Correction du dictionnaire Wiktionary en espagnol et de la gestion du cache : des mots comme « agua » sont maintenant trouvés correctement et les anciennes entrées « mot introuvable » ne sont plus réutilisées.
@@ -26,6 +27,7 @@ Corrections de bugs
 • Correction du décodage ANSI des fichiers d’Europe centrale (ex. tchèque/polonais) : Sonarpad distingue désormais mieux UTF-8 et ANSI et choisit la bonne page de codes (y compris Windows-1250), évitant les diacritiques corrompus.
 • Correction de la persistance des sources RSS avec paramètres d’URL (ex. `rss.aspx?c=...`) : ces flux sont maintenant correctement sauvegardés et restaurés après redémarrage de Sonarpad.
 • Correction de l’ouverture des fichiers pointeurs Google Drive (`.gdoc`, `.gsheet`, `.gslides`) depuis le menu contextuel de l’Explorateur : si la lecture directe échoue avec « Incorrect function (os error 1) », Sonarpad utilise désormais un fallback shell-open et le document s’ouvre correctement.
+• Correction de la lecture des fichiers Excel legacy `.xls` (Excel 2010) : les anciens fichiers binaires sont maintenant détectés/décodés correctement au lieu d’afficher du texte corrompu (ex. `ÐÏ_à¡±...`).
 • Correction du flux d’annonce du correcteur orthographique : les fautes sont désormais réannoncées lors d’une relecture ultérieure du texte, et la même faute est de nouveau signalée si elle est supprimée puis retapée.
 • Correction des opérations de texte par ligne (ex. Ctrl+Q / Ctrl+Shift+Q, trier/inverser/lignes uniques/fusionner les lignes) : en sélectionnant une seule ligne avec Maj+Flèche bas, les lignes adjacentes ne sont plus fusionnées ni tronquées.
 • Correction du comportement multilignes des opérations de texte par ligne (Ctrl+Q / Ctrl+Shift+Q et outils associés) : lorsque RichEdit fournit des séparateurs de ligne en CR seul, ils sont désormais normalisés correctement et toutes les lignes sélectionnées sont traitées sans couper le premier caractère.

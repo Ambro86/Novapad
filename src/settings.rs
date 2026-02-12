@@ -292,6 +292,8 @@ pub struct AppSettings {
     pub tts_rate: i32,
     pub tts_pitch: i32,
     pub tts_volume: i32,
+    #[serde(default)]
+    pub editor_font_face: String,
     pub show_voice_panel: bool,
     pub show_favorite_panel: bool,
     pub check_updates_on_startup: bool,
@@ -487,6 +489,7 @@ impl Default for AppSettings {
             tts_rate: 0,
             tts_pitch: 0,
             tts_volume: 100,
+            editor_font_face: String::new(),
             show_voice_panel: false,
             show_favorite_panel: false,
             check_updates_on_startup: true,

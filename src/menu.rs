@@ -89,8 +89,17 @@ pub const IDM_MANAGE_BOOKMARKS: usize = 2102;
 pub const IDM_INSERT_CLEAR_BOOKMARKS: usize = 2103;
 pub const IDM_NEXT_TAB: usize = 3001;
 pub const IDM_WINDOW_OPEN_DOCUMENTS: usize = 3002;
+pub const IDM_WINDOW_CLOSE_ALL: usize = 3003;
 pub const IDM_VIEW_SHOW_VOICES: usize = 6101;
 pub const IDM_VIEW_SHOW_FAVORITES: usize = 6102;
+pub const IDM_VIEW_FONT_ARIAL: usize = 6401;
+pub const IDM_VIEW_FONT_CALIBRI: usize = 6402;
+pub const IDM_VIEW_FONT_CONSOLAS: usize = 6403;
+pub const IDM_VIEW_FONT_SEGOE_UI: usize = 6404;
+pub const IDM_VIEW_FONT_TAHOMA: usize = 6405;
+pub const IDM_VIEW_FONT_VERDANA: usize = 6406;
+pub const IDM_VIEW_FONT_TIMES_NEW_ROMAN: usize = 6407;
+pub const IDM_VIEW_FONT_GEORGIA: usize = 6408;
 pub const IDM_VIEW_TEXT_COLOR_BLACK: usize = 6201;
 pub const IDM_VIEW_TEXT_COLOR_DARK_BLUE: usize = 6202;
 pub const IDM_VIEW_TEXT_COLOR_DARK_GREEN: usize = 6203;
@@ -157,13 +166,13 @@ pub struct MenuLabels {
     pub view_text_size_xxlarge: String,
     pub view_show_voices: String,
     pub view_show_favorites: String,
+    pub view_font: String,
     pub file_new: String,
     pub file_open: String,
     pub file_save: String,
     pub file_save_as: String,
     pub file_save_all: String,
     pub file_close: String,
-    pub file_close_others: String,
     pub file_recent: String,
     file_read_start: String,
     file_execute: String,
@@ -205,6 +214,8 @@ pub struct MenuLabels {
     pub insert_clear_bookmarks: String,
     pub manage_bookmarks: String,
     pub window_open_documents: String,
+    pub window_close_others: String,
+    pub window_close_all: String,
     pub help_guide: String,
     pub help_changelog: String,
     pub help_export_diagnostics: String,
@@ -250,13 +261,13 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         view_text_size_xxlarge: i18n::tr(language, "view.text_size.xxlarge"),
         view_show_voices: i18n::tr(language, "view.show_voices"),
         view_show_favorites: i18n::tr(language, "view.show_favorites"),
+        view_font: i18n::tr(language, "view.font"),
         file_new: i18n::tr(language, "file.new"),
         file_open: i18n::tr(language, "file.open"),
         file_save: i18n::tr(language, "file.save"),
         file_save_as: i18n::tr(language, "file.save_as"),
         file_save_all: i18n::tr(language, "file.save_all"),
         file_close: i18n::tr(language, "file.close"),
-        file_close_others: i18n::tr(language, "file.close_others"),
         file_recent: i18n::tr(language, "file.recent"),
         file_read_start: i18n::tr(language, "file.read_start"),
         file_execute: i18n::tr(language, "file.execute"),
@@ -301,6 +312,8 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         insert_clear_bookmarks: i18n::tr(language, "insert.clear_bookmarks"),
         manage_bookmarks: i18n::tr(language, "insert.manage_bookmarks"),
         window_open_documents: i18n::tr(language, "window.open_documents"),
+        window_close_others: i18n::tr(language, "window.close_others"),
+        window_close_all: i18n::tr(language, "window.close_all"),
         help_guide: i18n::tr(language, "help.guide"),
         help_changelog: i18n::tr(language, "help.changelog"),
         help_export_diagnostics: i18n::tr(language, "help.export_diagnostics"),
@@ -590,6 +603,7 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
     let recent_menu = CreateMenu().unwrap_or(HMENU(0));
     let edit_menu = CreateMenu().unwrap_or(HMENU(0));
     let view_menu = CreateMenu().unwrap_or(HMENU(0));
+    let view_font_menu = CreateMenu().unwrap_or(HMENU(0));
     let view_color_menu = CreateMenu().unwrap_or(HMENU(0));
     let view_size_menu = CreateMenu().unwrap_or(HMENU(0));
     let insert_menu = CreateMenu().unwrap_or(HMENU(0));
@@ -611,12 +625,6 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         &labels.file_save_all,
     );
     append_menu_string(file_menu, MF_STRING, IDM_FILE_CLOSE, &labels.file_close);
-    append_menu_string(
-        file_menu,
-        MF_STRING,
-        IDM_FILE_CLOSE_OTHERS,
-        &labels.file_close_others,
-    );
     crate::log_if_err!(AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null()));
     append_menu_string(
         file_menu,
@@ -782,6 +790,35 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         IDM_VIEW_SHOW_FAVORITES,
         &labels.view_show_favorites,
     );
+    append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_ARIAL, "Arial");
+    append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_CALIBRI, "Calibri");
+    append_menu_string(
+        view_font_menu,
+        MF_STRING,
+        IDM_VIEW_FONT_CONSOLAS,
+        "Consolas",
+    );
+    append_menu_string(
+        view_font_menu,
+        MF_STRING,
+        IDM_VIEW_FONT_SEGOE_UI,
+        "Segoe UI",
+    );
+    append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_TAHOMA, "Tahoma");
+    append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_VERDANA, "Verdana");
+    append_menu_string(
+        view_font_menu,
+        MF_STRING,
+        IDM_VIEW_FONT_TIMES_NEW_ROMAN,
+        "Times New Roman",
+    );
+    append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_GEORGIA, "Georgia");
+    append_menu_string(
+        view_menu,
+        MF_POPUP,
+        view_font_menu.0 as usize,
+        &labels.view_font,
+    );
     crate::log_if_err!(AppendMenuW(view_menu, MF_SEPARATOR, 0, PCWSTR::null()));
     append_menu_string(
         view_color_menu,
@@ -907,8 +944,19 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         IDM_WINDOW_OPEN_DOCUMENTS,
         &labels.window_open_documents,
     );
-    append_menu_string(hmenu, MF_POPUP, window_menu.0 as usize, &labels.menu_window);
-
+    crate::log_if_err!(AppendMenuW(window_menu, MF_SEPARATOR, 0, PCWSTR::null()));
+    append_menu_string(
+        window_menu,
+        MF_STRING,
+        IDM_FILE_CLOSE_OTHERS,
+        &format!("{}\tCtrl+Shift+W", labels.window_close_others),
+    );
+    append_menu_string(
+        window_menu,
+        MF_STRING,
+        IDM_WINDOW_CLOSE_ALL,
+        &labels.window_close_all,
+    );
     append_menu_string(
         voice_audio_menu,
         MF_STRING,
@@ -1003,6 +1051,7 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         &labels.menu_import_youtube,
     );
     append_menu_string(hmenu, MF_POPUP, tools_menu.0 as usize, &labels.menu_tools);
+    append_menu_string(hmenu, MF_POPUP, window_menu.0 as usize, &labels.menu_window);
 
     append_menu_string(help_menu, MF_STRING, IDM_HELP_GUIDE, &labels.help_guide);
     append_menu_string(

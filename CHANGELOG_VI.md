@@ -19,6 +19,7 @@ Cải tiến
 • Đã thêm mục "Đặt lại âm lượng" và gom các thao tác đặt lại vào submenu riêng "Đặt lại" trong menu Phát lại, cùng với "Đặt lại tốc độ" và "Đặt lại cao độ".
 • Cải tiến trình cài đặt: setup.exe giờ cho phép chọn giữa liên kết tất cả kiểu tệp được hỗ trợ hoặc tự chọn từng phần mở rộng; MSI cũng hỗ trợ chọn theo từng phần mở rộng trong cây tính năng (mặc định giữ nguyên: bật tất cả).
 • Đã thêm menu mới "Cửa sổ" với mục "Tài liệu đang mở..." để chuyển nhanh đến bất kỳ tệp nào đang mở.
+• Đã cập nhật mục Xem > Phông chữ: thay bộ chọn đầy đủ bằng submenu nhanh với các phông phổ biến (Arial, Calibri, Consolas, Segoe UI, Tahoma, Verdana, Times New Roman, Georgia), đồng thời giữ nguyên cỡ chữ hiện tại.
 Sửa lỗi
 • Đã sửa trích xuất văn bản EPUB cho sách có chứa chú thích HTML inline (<!-- ... -->): văn bản chương giờ được phân tích đúng thay vì bị bỏ qua một phần hoặc toàn bộ.
 • Đã sửa từ điển Wiktionary tiếng Tây Ban Nha và cơ chế cache từ điển: các từ như "agua" giờ được tìm đúng, và các mục cache cũ kiểu "Không tìm thấy từ" sẽ không còn được tái sử dụng.
@@ -26,6 +27,7 @@ Sửa lỗi
 • Đã sửa giải mã ANSI cho các tệp Trung Âu (ví dụ tiếng Séc/tiếng Ba Lan): Sonarpad giờ phân biệt UTF-8 và ANSI tốt hơn và chọn đúng bảng mã (bao gồm Windows-1250), tránh lỗi vỡ dấu.
 • Đã sửa lỗi lưu nguồn RSS có tham số trong URL (ví dụ `rss.aspx?c=...`): các feed này giờ được lưu và khôi phục đúng sau khi khởi động lại Sonarpad.
 • Đã sửa lỗi mở các tệp con trỏ Google Drive (`.gdoc`, `.gsheet`, `.gslides`) từ menu ngữ cảnh Explorer: khi đọc trực tiếp bị lỗi “Incorrect function (os error 1)”, Sonarpad giờ dùng fallback shell-open để tài liệu vẫn mở đúng.
+• Đã sửa đọc tệp Excel legacy `.xls` (Excel 2010): các tệp nhị phân cũ giờ được nhận diện/giải mã đúng thay vì hiển thị văn bản lỗi (ví dụ `ÐÏ_à¡±...`).
 • Đã sửa luồng thông báo lỗi chính tả: lỗi sẽ được đọc lại khi bạn rà soát văn bản sau đó, và cùng một lỗi sẽ được báo lại nếu bị xóa rồi gõ lại.
 • Đã sửa các thao tác văn bản theo dòng (ví dụ Ctrl+Q / Ctrl+Shift+Q, sắp xếp/đảo/duy nhất/gộp dòng): khi chọn một dòng bằng Shift+Mũi tên xuống, các dòng liền kề không còn bị dính hoặc bị cắt.
 • Đã sửa xử lý chọn nhiều dòng cho các thao tác theo dòng (Ctrl+Q / Ctrl+Shift+Q và các công cụ liên quan): khi RichEdit trả về dấu xuống dòng dạng CR-only, Sonarpad giờ chuẩn hóa đúng để xử lý đủ tất cả dòng đã chọn mà không cắt mất ký tự đầu dòng.

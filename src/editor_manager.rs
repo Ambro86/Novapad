@@ -1252,6 +1252,19 @@ pub unsafe fn apply_text_appearance_to_all_edits(hwnd: HWND, text_color: u32, te
     }
 }
 
+pub unsafe fn apply_font_to_all_edits(hwnd: HWND, hfont: HFONT) {
+    let edits = with_state(hwnd, |state| {
+        state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>()
+    })
+    .unwrap_or_default();
+    for hwnd_edit in edits {
+        if hwnd_edit.0 == 0 {
+            continue;
+        }
+        SendMessageW(hwnd_edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+    }
+}
+
 fn apply_text_appearance(hwnd_edit: HWND, text_color: u32, text_size: i32) {
     let mut format = CHARFORMAT2W::default();
     format.Base.cbSize = std::mem::size_of::<CHARFORMAT2W>() as u32;
@@ -3819,6 +3832,16 @@ pub unsafe fn close_other_documents(hwnd: HWND) -> bool {
             return false;
         }
     }
+}
+
+pub unsafe fn close_all_documents(hwnd: HWND) -> bool {
+    let initial_total = with_state(hwnd, |state| state.docs.len()).unwrap_or(0);
+    for _ in 0..initial_total {
+        if !close_document_at(hwnd, 0) {
+            return false;
+        }
+    }
+    true
 }
 
 pub unsafe fn close_document_at(hwnd: HWND, index: usize) -> bool {

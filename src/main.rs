@@ -78,7 +78,8 @@ use windows::Win32::Foundation::{
     LPARAM, LRESULT, POINT, SetLastError, WIN32_ERROR, WPARAM,
 };
 use windows::Win32::Graphics::Gdi::{
-    COLOR_WINDOW, DEFAULT_GUI_FONT, GetStockObject, HBRUSH, HFONT, InvalidateRect, ScreenToClient,
+    COLOR_WINDOW, DEFAULT_GUI_FONT, DeleteObject, GetObjectW, GetStockObject, HBRUSH, HFONT,
+    InvalidateRect, LOGFONTW, ScreenToClient,
 };
 use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
 use windows::Win32::System::DataExchange::COPYDATASTRUCT;
@@ -1512,6 +1513,7 @@ pub(crate) struct AppState {
     current: usize,
     untitled_count: usize,
     hfont: HFONT,
+    hfont_custom: bool,
     hmenu_recent: HMENU,
     recent_files: Vec<PathBuf>,
     settings: AppSettings,
@@ -2388,9 +2390,10 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 None,
             );
 
-            let hfont = HFONT(GetStockObject(DEFAULT_GUI_FONT).0);
             let find_msg = RegisterWindowMessageW(w!("commdlg_FindReplace"));
             let settings = load_settings();
+            let hfont = create_ui_font(&settings.editor_font_face, None, settings.text_size)
+                .unwrap_or_else(|| HFONT(GetStockObject(DEFAULT_GUI_FONT).0));
             let bookmarks = load_bookmarks();
             let (_, recent_menu) = create_menus(hwnd, settings.language);
             let recent_files = load_recent_files();
@@ -2679,6 +2682,7 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 current: 0,
                 untitled_count: 0,
                 hfont,
+                hfont_custom: !settings.editor_font_face.trim().is_empty() && hfont.0 != 0,
                 hmenu_recent: recent_menu,
                 recent_files,
                 settings: settings.clone(),
@@ -3920,6 +3924,11 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                     toggle_favorites_panel(hwnd);
                     LRESULT(0)
                 }
+                cmd_id if font_face_from_menu_id(cmd_id).is_some() => {
+                    let face = font_face_from_menu_id(cmd_id).unwrap_or("Segoe UI");
+                    apply_ui_font(hwnd, face.to_string());
+                    LRESULT(0)
+                }
                 cmd_id if text_color_from_menu_id(cmd_id).is_some() => {
                     let color = text_color_from_menu_id(cmd_id);
                     update_text_preferences(hwnd, color, None);
@@ -3953,6 +3962,11 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 }
                 IDM_WINDOW_OPEN_DOCUMENTS => {
                     open_documents_popup(hwnd);
+                    LRESULT(0)
+                }
+                IDM_WINDOW_CLOSE_ALL => {
+                    log_debug("Menu: Close all documents");
+                    editor_manager::close_all_documents(hwnd);
                     LRESULT(0)
                 }
                 IDM_TOOLS_OPTIONS => {
@@ -4069,7 +4083,13 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
         WM_NCDESTROY => {
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut AppState;
             if !ptr.is_null() {
-                let _unused_box = unsafe { Box::from_raw(ptr) };
+                let state_box = unsafe { Box::from_raw(ptr) };
+                if state_box.hfont_custom
+                    && state_box.hfont.0 != 0
+                    && !DeleteObject(state_box.hfont).as_bool()
+                {
+                    log_debug("DeleteObject failed for AppState font on destroy");
+                }
             }
             LRESULT(0)
         }
@@ -4287,6 +4307,124 @@ fn text_size_from_menu_id(cmd_id: usize) -> Option<i32> {
         IDM_VIEW_TEXT_SIZE_XLARGE => Some(20),
         IDM_VIEW_TEXT_SIZE_XXLARGE => Some(24),
         _ => None,
+    }
+}
+
+fn font_face_from_menu_id(cmd_id: usize) -> Option<&'static str> {
+    match cmd_id {
+        IDM_VIEW_FONT_ARIAL => Some("Arial"),
+        IDM_VIEW_FONT_CALIBRI => Some("Calibri"),
+        IDM_VIEW_FONT_CONSOLAS => Some("Consolas"),
+        IDM_VIEW_FONT_SEGOE_UI => Some("Segoe UI"),
+        IDM_VIEW_FONT_TAHOMA => Some("Tahoma"),
+        IDM_VIEW_FONT_VERDANA => Some("Verdana"),
+        IDM_VIEW_FONT_TIMES_NEW_ROMAN => Some("Times New Roman"),
+        IDM_VIEW_FONT_GEORGIA => Some("Georgia"),
+        _ => None,
+    }
+}
+
+fn create_ui_font(
+    face_name: &str,
+    base_font: Option<HFONT>,
+    fallback_text_size: i32,
+) -> Option<HFONT> {
+    if face_name.trim().is_empty() {
+        return None;
+    }
+    let mut logfont = LOGFONTW::default();
+    if let Some(font) = base_font
+        && font.0 != 0
+    {
+        let copied = unsafe {
+            GetObjectW(
+                font,
+                size_of::<LOGFONTW>() as i32,
+                Some((&mut logfont as *mut LOGFONTW).cast()),
+            )
+        };
+        if copied == 0 {
+            log_debug("GetObjectW failed for base font; using fallback LOGFONT");
+        }
+    }
+    if logfont.lfHeight == 0 {
+        let points = fallback_text_size.max(1);
+        // LOGFONT height is in pixels; negative means character height.
+        logfont.lfHeight = -((points * 96 + 36) / 72);
+    }
+    logfont.lfFaceName.fill(0);
+    let face_wide = to_wide(face_name);
+    let mut i = 0usize;
+    while i + 1 < face_wide.len() && i < logfont.lfFaceName.len() {
+        logfont.lfFaceName[i] = face_wide[i];
+        i += 1;
+    }
+    let hfont = unsafe { windows::Win32::Graphics::Gdi::CreateFontIndirectW(&logfont) };
+    if hfont.0 == 0 { None } else { Some(hfont) }
+}
+
+unsafe fn apply_ui_font(hwnd: HWND, face_name: String) {
+    let (base_font, text_size) =
+        with_state(hwnd, |state| (state.hfont, state.settings.text_size)).unwrap_or((HFONT(0), 12));
+    let custom_font = create_ui_font(
+        &face_name,
+        if base_font.0 != 0 {
+            Some(base_font)
+        } else {
+            None
+        },
+        text_size,
+    );
+    let is_custom = custom_font.is_some() && !face_name.trim().is_empty();
+    let new_font_resolved =
+        custom_font.unwrap_or_else(|| HFONT(GetStockObject(DEFAULT_GUI_FONT).0));
+    let Some((new_font, old_font, old_custom)) = with_state(hwnd, |state| {
+        let old_font = state.hfont;
+        let old_custom = state.hfont_custom;
+        state.hfont = new_font_resolved;
+        state.hfont_custom = is_custom;
+        state.settings.editor_font_face = face_name.clone();
+        Some((new_font_resolved, old_font, old_custom))
+    })
+    .flatten() else {
+        return;
+    };
+
+    if old_custom && old_font.0 != 0 && old_font != new_font && !DeleteObject(old_font).as_bool() {
+        log_debug("DeleteObject failed for previous UI font");
+    }
+
+    let controls = with_state(hwnd, |state| {
+        vec![
+            state.hwnd_tab,
+            state.voice_label_engine,
+            state.voice_combo_engine,
+            state.voice_label_voice,
+            state.voice_combo_voice,
+            state.voice_button_insert_tag,
+            state.voice_label_speed,
+            state.voice_combo_speed,
+            state.voice_edit_speed,
+            state.voice_label_pitch,
+            state.voice_combo_pitch,
+            state.voice_edit_pitch,
+            state.voice_label_volume,
+            state.voice_combo_volume,
+            state.voice_edit_volume,
+            state.voice_checkbox_multilingual,
+            state.voice_label_favorites,
+            state.voice_combo_favorites,
+        ]
+    })
+    .unwrap_or_default();
+    for control in controls {
+        if control.0 != 0 {
+            SendMessageW(control, WM_SETFONT, WPARAM(new_font.0 as usize), LPARAM(1));
+        }
+    }
+    editor_manager::apply_font_to_all_edits(hwnd, new_font);
+    if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
+        save_settings(settings);
     }
 }
 

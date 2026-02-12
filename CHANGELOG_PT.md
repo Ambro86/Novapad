@@ -19,6 +19,7 @@ Melhorias
 • Adicionada a opção "Repor volume" e agrupadas as ações de reposição num submenu dedicado "Repor" em Reprodução, juntamente com "Repor velocidade" e "Repor tom".
 • Melhorias no instalador: o setup.exe agora permite escolher entre associar todos os tipos de ficheiro suportados ou selecionar manualmente as extensões; o MSI também passa a oferecer seleção por extensão na árvore de funcionalidades (o padrão mantém-se: tudo ativo).
 • Adicionado o novo menu "Janela" com a opção "Documentos abertos..." para alternar rapidamente para qualquer ficheiro atualmente aberto.
+• Atualizada a opção Ver > Fonte: o seletor completo foi substituído por um submenu rápido com fontes comuns (Arial, Calibri, Consolas, Segoe UI, Tahoma, Verdana, Times New Roman, Georgia), mantendo o tamanho de texto atual.
 Correções de bugs
 • Corrigida a extração de texto EPUB para livros com comentários HTML inline (<!-- ... -->): o texto dos capítulos agora é analisado corretamente em vez de ser parcialmente ou totalmente ignorado.
 • Corrigido o dicionário Wiktionary em espanhol e o cache do dicionário: palavras como "agua" agora são encontradas corretamente e entradas antigas de "Palavra não encontrada" não são mais reutilizadas.
@@ -26,6 +27,7 @@ Correções de bugs
 • Corrigida a descodificação ANSI de ficheiros da Europa Central (ex.: checo/polaco): o Sonarpad agora distingue melhor UTF-8 e ANSI e escolhe a code page correta (incluindo Windows-1250), evitando diacríticos corrompidos.
 • Corrigida a persistência de fontes RSS com parâmetros na URL (ex.: `rss.aspx?c=...`): esses feeds agora são guardados e restaurados corretamente após reiniciar o Sonarpad.
 • Corrigida a abertura de ficheiros ponteiro do Google Drive (`.gdoc`, `.gsheet`, `.gslides`) a partir do menu de contexto do Explorador: quando a leitura direta falha com “Incorrect function (os error 1)”, o Sonarpad agora usa fallback por shell-open e o documento abre corretamente.
+• Corrigida a leitura de ficheiros Excel legacy `.xls` (Excel 2010): ficheiros binários antigos são agora detetados/descodificados corretamente em vez de mostrar texto corrompido (ex.: `ÐÏ_à¡±...`).
 • Corrigido o fluxo de anúncio do corretor ortográfico: os erros voltam a ser anunciados ao rever o texto mais tarde, e o mesmo erro é novamente reportado se for apagado e reescrito.
 • Corrigidas as operações de texto por linha (ex.: Ctrl+Q / Ctrl+Shift+Q, ordenar/inverter/linhas únicas/unir linhas): ao selecionar apenas uma linha com Shift+Seta para baixo, as linhas adjacentes não são mais unidas nem truncadas.
 • Corrigido o comportamento em seleções multilinha nas operações por linha (Ctrl+Q / Ctrl+Shift+Q e ferramentas relacionadas): quando o RichEdit devolve separadores de linha apenas com CR, agora são normalizados corretamente e todas as linhas selecionadas são processadas sem cortar o primeiro carácter.

@@ -19,6 +19,7 @@ Mejoras
 • Añadida la opción "Restablecer volumen" y agrupadas las acciones de reinicio en un submenú dedicado "Restablecer" en Reproducción, junto con "Restablecer velocidad" y "Restablecer tono".
 • Mejoras del instalador: setup.exe ahora permite elegir entre asociar todos los tipos de archivo compatibles o seleccionar manualmente las extensiones; el MSI también ofrece selección por extensión en el árbol de características (el valor predeterminado se mantiene: todas activadas).
 • Añadido el nuevo menú "Ventana" con la opción "Documentos abiertos..." para cambiar rápidamente a cualquiera de los archivos abiertos.
+• Actualizada la opción Ver > Fuente: se reemplazó el selector completo por un submenú rápido con fuentes comunes (Arial, Calibri, Consolas, Segoe UI, Tahoma, Verdana, Times New Roman, Georgia), manteniendo el tamaño de texto actual.
 Correcciones de errores
 • Corregida la extracción de texto EPUB para libros con comentarios HTML inline (<!-- ... -->): ahora el texto de los capítulos se analiza correctamente en lugar de omitirse parcial o totalmente.
 • Corregido el diccionario Wiktionary en español y la caché del diccionario: palabras como "agua" ahora se encuentran correctamente y las entradas antiguas de "Palabra no encontrada" ya no se reutilizan.
@@ -26,6 +27,7 @@ Correcciones de errores
 • Corregida la decodificación ANSI de archivos centroeuropeos (p. ej., checo/polaco): Sonarpad ahora distingue mejor entre UTF-8 y ANSI y elige la página de códigos correcta (incluida Windows-1250), evitando diacríticos corruptos.
 • Corregida la persistencia de fuentes RSS con parámetros en la URL (p. ej., `rss.aspx?c=...`): estos feeds ahora se guardan y restauran correctamente tras reiniciar Sonarpad.
 • Corregida la apertura de archivos puntero de Google Drive (`.gdoc`, `.gsheet`, `.gslides`) desde el menú contextual del Explorador: si la lectura directa falla con “Incorrect function (os error 1)”, Sonarpad ahora usa un fallback por shell-open y el documento se abre correctamente.
+• Corregida la lectura de archivos Excel legacy `.xls` (Excel 2010): los archivos binarios antiguos ahora se detectan y decodifican correctamente en lugar de mostrar texto corrupto (p. ej. `ÐÏ_à¡±...`).
 • Corregido el flujo de anuncios del corrector ortográfico: los errores vuelven a anunciarse al revisar el texto más tarde, y el mismo error se informa de nuevo si se borra y se vuelve a escribir.
 • Corregidas las operaciones de texto por líneas (p. ej. Ctrl+Q / Ctrl+Shift+Q, ordenar/invertir/únicas/unir líneas): al seleccionar una sola línea con Mayús+Flecha abajo ya no se unen ni se truncan las líneas adyacentes.
 • Corregido el comportamiento multinea en operaciones de texto por líneas (Ctrl+Q / Ctrl+Shift+Q y herramientas relacionadas): cuando RichEdit entrega separadores de línea solo CR, ahora se normalizan correctamente y se procesan todas las líneas seleccionadas sin cortar el primer carácter.

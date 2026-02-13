@@ -14,14 +14,15 @@ use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetFocus, SetFocus, VK_ESCAPE, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
-    BS_DEFPUSHBUTTON, CHILDID_SELF, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
-    DestroyWindow, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_READONLY,
-    EVENT_OBJECT_VALUECHANGE, GWLP_USERDATA, GetDlgCtrlID, GetWindowLongPtrW, GetWindowTextLengthW,
-    GetWindowTextW, HMENU, IDC_ARROW, IsWindow, LoadCursorW, MSG, OBJID_CLIENT, PostMessageW,
-    RegisterClassW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP,
-    WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WNDCLASSW,
-    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP,
-    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_RESETCONTENT, CBS_DROPDOWN, CHILDID_SELF, CREATESTRUCTW,
+    CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow, ES_AUTOVSCROLL, ES_MULTILINE,
+    ES_READONLY, EVENT_OBJECT_VALUECHANGE, GW_CHILD, GWLP_USERDATA, GetDlgCtrlID, GetWindow,
+    GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, IsWindow,
+    LoadCursorW, MSG, OBJID_CLIENT, PostMessageW, RegisterClassW, SendMessageW,
+    SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP, WM_COMMAND,
+    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WNDCLASSW, WS_CAPTION, WS_CHILD,
+    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP,
+    WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -162,6 +163,19 @@ fn to_windows_newlines(text: &str) -> String {
     text.replace("\n", "\r\n")
 }
 
+unsafe fn refresh_history_combo(input: HWND, history: &[String]) {
+    SendMessageW(input, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    for item in history {
+        let wide = to_wide(item);
+        SendMessageW(
+            input,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(PCWSTR(wide.as_ptr()).0 as isize),
+        );
+    }
+}
+
 pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     handle_accessibility(hwnd, msg)
 }
@@ -269,18 +283,23 @@ unsafe fn wiktionary_wndproc_inner(
             );
             let input = CreateWindowExW(
                 WS_EX_CLIENTEDGE,
-                w!("EDIT"),
+                w!("COMBOBOX"),
                 PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWN as u32),
                 12,
                 34,
                 360,
-                24,
+                200,
                 hwnd,
                 HMENU(WIKTIONARY_INPUT_ID as isize),
                 hinstance,
                 None,
             );
+            let search_history = with_state(parent, |state| {
+                state.settings.dictionary_search_history.clone()
+            })
+            .unwrap_or_default();
+            refresh_history_combo(input, &search_history);
             let search = CreateWindowExW(
                 Default::default(),
                 w!("BUTTON"),
@@ -356,6 +375,15 @@ unsafe fn wiktionary_wndproc_inner(
                     proc_ptr as isize,
                 );
                 SetWindowLongPtrW(control, GWLP_USERDATA, prev);
+            }
+            let combo_edit = GetWindow(input, GW_CHILD);
+            if combo_edit.0 != 0 {
+                let prev = SetWindowLongPtrW(
+                    combo_edit,
+                    windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
+                    proc_ptr as isize,
+                );
+                SetWindowLongPtrW(combo_edit, GWLP_USERDATA, prev);
             }
             SetFocus(input);
             LRESULT(0)
@@ -450,20 +478,39 @@ unsafe fn wiktionary_wndproc_inner(
 }
 
 unsafe fn handle_enter_key(hwnd: HWND) -> bool {
-    let parent = windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd);
+    let mut control = hwnd;
+    let mut control_id = GetDlgCtrlID(control) as usize;
+    if control_id != WIKTIONARY_CLOSE_ID
+        && control_id != WIKTIONARY_SEARCH_ID
+        && control_id != WIKTIONARY_INPUT_ID
+    {
+        let parent_control = windows::Win32::UI::WindowsAndMessaging::GetParent(control);
+        if parent_control.0 == 0 {
+            return false;
+        }
+        let parent_id = GetDlgCtrlID(parent_control) as usize;
+        if parent_id != WIKTIONARY_CLOSE_ID
+            && parent_id != WIKTIONARY_SEARCH_ID
+            && parent_id != WIKTIONARY_INPUT_ID
+        {
+            return false;
+        }
+        control = parent_control;
+        control_id = parent_id;
+    }
+    let parent = windows::Win32::UI::WindowsAndMessaging::GetParent(control);
     if parent.0 == 0 {
         return false;
     }
-    let id = GetDlgCtrlID(hwnd) as usize;
-    if id == WIKTIONARY_CLOSE_ID {
+    if control_id == WIKTIONARY_CLOSE_ID {
         crate::log_if_err!(DestroyWindow(parent));
         return true;
     }
-    if id == WIKTIONARY_SEARCH_ID {
+    if control_id == WIKTIONARY_SEARCH_ID {
         run_lookup(parent);
         return true;
     }
-    if id == WIKTIONARY_INPUT_ID {
+    if control_id == WIKTIONARY_INPUT_ID {
         run_lookup(parent);
         return true;
     }
@@ -486,6 +533,13 @@ unsafe extern "system" fn tab_subclass_proc(
 unsafe fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if msg == WM_KEYDOWN {
         let key = wparam.0 as u16;
+        if key == windows::Win32::UI::Input::KeyboardAndMouse::VK_ESCAPE.0 {
+            let parent = windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd);
+            if parent.0 != 0 {
+                crate::log_if_err!(DestroyWindow(parent));
+                return LRESULT(0);
+            }
+        }
         if key == windows::Win32::UI::Input::KeyboardAndMouse::VK_TAB.0 {
             let shift_down = windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(
                 windows::Win32::UI::Input::KeyboardAndMouse::VK_SHIFT.0 as i32,
@@ -541,7 +595,16 @@ unsafe fn focus_next_control(parent: HWND, current: HWND, shift_down: bool) {
     if order.is_empty() {
         return;
     }
-    let Some(pos) = order.iter().position(|hwnd| *hwnd == current) else {
+    let mut current_ctrl = current;
+    let mut pos = order.iter().position(|hwnd| *hwnd == current_ctrl);
+    if pos.is_none() {
+        let maybe_parent = windows::Win32::UI::WindowsAndMessaging::GetParent(current_ctrl);
+        if maybe_parent.0 != 0 {
+            current_ctrl = maybe_parent;
+            pos = order.iter().position(|hwnd| *hwnd == current_ctrl);
+        }
+    }
+    let Some(pos) = pos else {
         return;
     };
     let next_index = if shift_down {
@@ -606,6 +669,21 @@ unsafe fn run_lookup(hwnd: HWND) {
     }
 
     SetFocus(output);
+
+    let history = with_state(parent, |state| {
+        let history = &mut state.settings.dictionary_search_history;
+        history.retain(|item| !item.eq_ignore_ascii_case(&trimmed));
+        history.insert(0, trimmed.clone());
+        if history.len() > 30 {
+            history.truncate(30);
+        }
+        history.clone()
+    })
+    .unwrap_or_default();
+    refresh_history_combo(input, &history);
+    if let Some(settings_clone) = with_state(parent, |state| state.settings.clone()) {
+        crate::settings::save_settings(settings_clone);
+    }
 
     let key = dictionary_cache_key(language, &pref, &trimmed);
     let cached_lines =

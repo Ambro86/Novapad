@@ -288,6 +288,8 @@ pub struct AppSettings {
     pub favorite_voices: Vec<FavoriteVoice>,
     pub dictionary: Vec<DictionaryEntry>,
     pub dictionary_translation_language: String,
+    #[serde(default)]
+    pub dictionary_search_history: Vec<String>,
     pub wikipedia_language: String,
     pub text_color: u32,
     pub text_size: i32,
@@ -487,6 +489,7 @@ impl Default for AppSettings {
             favorite_voices: Vec::new(),
             dictionary: Vec::new(),
             dictionary_translation_language: "auto".to_string(),
+            dictionary_search_history: Vec::new(),
             wikipedia_language: "auto".to_string(),
             text_color: 0x000000,
             text_size: 12,
@@ -1069,6 +1072,12 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     }
     if settings.dictionary_translation_language.trim().is_empty() {
         settings.dictionary_translation_language = "auto".to_string();
+    }
+    settings
+        .dictionary_search_history
+        .retain(|s| !s.trim().is_empty());
+    if settings.dictionary_search_history.len() > 30 {
+        settings.dictionary_search_history.truncate(30);
     }
     if settings.wikipedia_language.trim().is_empty() {
         settings.wikipedia_language = "auto".to_string();

@@ -679,6 +679,7 @@ unsafe fn restore_caret_after_line_op_if_no_selection(
     had_selection: bool,
     original_caret: i32,
     replace_start: i32,
+    original_text: &str,
     replaced_text: &str,
 ) {
     let new_caret = if had_selection {
@@ -692,7 +693,38 @@ unsafe fn restore_caret_after_line_op_if_no_selection(
     } else {
         let new_len = byte_index_to_utf16(replaced_text, replaced_text.len());
         let relative = original_caret.saturating_sub(replace_start).max(0);
-        replace_start.saturating_add(relative.min(new_len))
+        // Preserve caret near the same logical content when line ops add/remove a leading prefix
+        // (e.g. quote/unquote or similar commands that shift the line start).
+        let first_old_line = original_text
+            .split('\n')
+            .next()
+            .unwrap_or(original_text)
+            .trim_end_matches('\r');
+        let first_new_line = replaced_text
+            .split('\n')
+            .next()
+            .unwrap_or(replaced_text)
+            .trim_end_matches('\r');
+        let leading_delta =
+            if !first_old_line.is_empty() && first_new_line.ends_with(first_old_line) {
+                byte_index_to_utf16(
+                    first_new_line,
+                    first_new_line.len().saturating_sub(first_old_line.len()),
+                )
+            } else if !first_new_line.is_empty() && first_old_line.ends_with(first_new_line) {
+                -byte_index_to_utf16(
+                    first_old_line,
+                    first_old_line.len().saturating_sub(first_new_line.len()),
+                )
+            } else {
+                0
+            };
+        let shifted = if leading_delta >= 0 {
+            relative.saturating_add(leading_delta)
+        } else {
+            relative.saturating_sub(leading_delta.saturating_abs())
+        };
+        replace_start.saturating_add(shifted.min(new_len))
     };
     let mut caret_range = CHARRANGE {
         cpMin: new_caret,
@@ -1750,6 +1782,7 @@ pub unsafe fn hard_line_break_active_edit(hwnd: HWND) -> bool {
         had_selection,
         original_caret,
         replace_range.cpMin,
+        target,
         &reformatted,
     );
     mark_dirty_from_edit(hwnd, hwnd_edit);
@@ -1821,6 +1854,7 @@ pub unsafe fn order_items_active_edit(hwnd: HWND) -> bool {
         had_selection,
         original_caret,
         replace_start,
+        &affected,
         &ordered,
     );
     mark_dirty_from_edit(hwnd, hwnd_edit);
@@ -1892,6 +1926,7 @@ pub unsafe fn keep_unique_items_active_edit(hwnd: HWND) -> bool {
         had_selection,
         original_caret,
         replace_start,
+        &affected,
         &cleaned,
     );
     mark_dirty_from_edit(hwnd, hwnd_edit);
@@ -1963,6 +1998,7 @@ pub unsafe fn reverse_items_active_edit(hwnd: HWND) -> bool {
         had_selection,
         original_caret,
         replace_start,
+        &affected,
         &reversed,
     );
     mark_dirty_from_edit(hwnd, hwnd_edit);
@@ -2040,6 +2076,7 @@ pub unsafe fn quote_lines_active_edit(hwnd: HWND) -> bool {
         had_selection,
         original_caret,
         replace_start,
+        &affected,
         &quoted,
     );
     mark_dirty_from_edit(hwnd, hwnd_edit);
@@ -2117,6 +2154,7 @@ pub unsafe fn unquote_lines_active_edit(hwnd: HWND) -> bool {
         had_selection,
         original_caret,
         replace_start,
+        &affected,
         &unquoted,
     );
     mark_dirty_from_edit(hwnd, hwnd_edit);
@@ -2188,6 +2226,7 @@ pub unsafe fn join_lines_active_edit(hwnd: HWND) -> bool {
         had_selection,
         original_caret,
         replace_start,
+        &affected,
         &joined,
     );
     mark_dirty_from_edit(hwnd, hwnd_edit);

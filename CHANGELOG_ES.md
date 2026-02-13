@@ -13,6 +13,7 @@ Mejoras
 • Añadida la exportación de feeds RSS a OPML en la ventana RSS, para guardar y reimportar fácilmente las fuentes actuales.
 • Añadida la función "Buscar RSS por palabra clave" en la ventana RSS: al introducir una palabra clave se genera automáticamente la URL RSS de Google News y se abre el diálogo de añadir fuente ya prellenado, para crear feeds temáticos en un solo paso.
 • Añadida la traducción serbia gracias a Mila Kuran.
+• Añadida la traducción ucraniana gracias a Ivan Shtefuriak.
 • Añadida la apertura múltiple de archivos multimedia: al abrir varios archivos juntos se crea una cola de reproducción en lugar de sustituir el archivo actual.
 • Añadidos atajos de salto variable durante la reproducción: con base de 1 minuto, Izquierda/Derecha salta 60s, Shift+Izquierda/Derecha salta 20s y Ctrl+Izquierda/Derecha salta 3 minutos.
 • Añadidos atajos para pista anterior/siguiente en el reproductor: Ctrl+PageUp y Ctrl+PageDown.
@@ -20,6 +21,7 @@ Mejoras
 • Mejoras del instalador: setup.exe ahora permite elegir entre asociar todos los tipos de archivo compatibles o seleccionar manualmente las extensiones; el MSI también ofrece selección por extensión en el árbol de características (el valor predeterminado se mantiene: todas activadas).
 • Añadido el nuevo menú "Ventana" con la opción "Documentos abiertos..." para cambiar rápidamente a cualquiera de los archivos abiertos.
 • Actualizada la opción Ver > Fuente: se reemplazó el selector completo por un submenú rápido con fuentes comunes (Arial, Calibri, Consolas, Segoe UI, Tahoma, Verdana, Times New Roman, Georgia), manteniendo el tamaño de texto actual.
+• Mejorada la lectura de RSS y podcasts con dos avisos diferenciados: los nodos de fuente anuncian "nuevos elementos" cuando un feed/podcast tiene novedades, mientras que los artículos RSS y episodios de podcast individuales anuncian "no leído"/"no reproducido"; este comportamiento se puede desactivar desde Opciones.
 Correcciones de errores
 • Corregida la extracción de texto EPUB para libros con comentarios HTML inline (<!-- ... -->): ahora el texto de los capítulos se analiza correctamente en lugar de omitirse parcial o totalmente.
 • Corregido el diccionario Wiktionary en español y la caché del diccionario: palabras como "agua" ahora se encuentran correctamente y las entradas antiguas de "Palabra no encontrada" ya no se reutilizan.

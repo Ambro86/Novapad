@@ -547,6 +547,7 @@ fn dictionary_cache_key(language: Language, pref: &str, word: &str) -> String {
         Language::Polish => "pl",
         Language::French => "fr",
         Language::Serbian => "sr",
+        Language::Ukrainian => "uk",
     };
     format!(
         "{}|{}|{}",
@@ -3173,11 +3174,18 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 if let Some(current) = &state.tts_session
                     && current.id == session_id
                 {
-                    state.tts_last_offset = offset;
+                    let safe_offset = clamp_tts_chunk_offset(state.tts_last_offset, offset);
+                    if safe_offset != offset {
+                        log_debug(&format!(
+                            "TTS: normalized non-monotonic offset session={} prev={} new={} safe={}",
+                            session_id, state.tts_last_offset, offset, safe_offset
+                        ));
+                    }
+                    state.tts_last_offset = safe_offset;
                     if state.settings.move_cursor_during_reading
                         && let Some(doc) = state.docs.get(state.current)
                     {
-                        let new_pos = current.initial_caret_pos + offset;
+                        let new_pos = current.initial_caret_pos + safe_offset;
                         let mut cr = CHARRANGE {
                             cpMin: new_pos,
                             cpMax: new_pos,
@@ -4194,6 +4202,10 @@ const TTS_PITCH_MIN: i32 = -12;
 const TTS_PITCH_MAX: i32 = 12;
 const TTS_VOLUME_MIN: i32 = 25;
 const TTS_VOLUME_MAX: i32 = 200;
+
+fn clamp_tts_chunk_offset(previous: i32, incoming: i32) -> i32 {
+    previous.max(incoming.max(0))
+}
 
 fn init_tts_panel_combo(hwnd: HWND, items: &[(String, i32)]) {
     unsafe {
@@ -7453,7 +7465,7 @@ fn spawn_new_window_with_path(path: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::audio_bookmark_position_and_snippet;
+    use super::{audio_bookmark_position_and_snippet, clamp_tts_chunk_offset};
 
     #[test]
     fn audio_bookmark_position_rounds_down_and_formats() {
@@ -7474,6 +7486,19 @@ mod tests {
         let (pos, snippet) = audio_bookmark_position_and_snippet(3723.0);
         assert_eq!(pos, 3723);
         assert_eq!(snippet, "Posizione audio: 62:03");
+    }
+
+    #[test]
+    fn tts_chunk_offset_stays_monotonic() {
+        assert_eq!(clamp_tts_chunk_offset(120, 140), 140);
+        assert_eq!(clamp_tts_chunk_offset(120, 120), 120);
+        assert_eq!(clamp_tts_chunk_offset(120, 90), 120);
+    }
+
+    #[test]
+    fn tts_chunk_offset_clamps_negative_input() {
+        assert_eq!(clamp_tts_chunk_offset(0, -7), 0);
+        assert_eq!(clamp_tts_chunk_offset(25, -1), 25);
     }
 }
 

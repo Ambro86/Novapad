@@ -12,7 +12,7 @@ use crate::settings::Language;
 fn language_tag(language: Language) -> HSTRING {
     match language {
         Language::Italian => HSTRING::from("it-IT"),
-        Language::English => HSTRING::from("en-US"),
+        Language::Ukrainian | Language::English => HSTRING::from("en-US"),
         Language::Spanish => HSTRING::from("es-ES"),
         Language::Portuguese => HSTRING::from("pt-PT"),
         Language::Swedish => HSTRING::from("sv-SE"),

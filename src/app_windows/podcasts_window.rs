@@ -83,6 +83,8 @@ const WM_PODCAST_DOWNLOAD_PROGRESS: u32 = windows::Win32::UI::WindowsAndMessagin
 const WM_PODCAST_CATEGORIES_READY: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 315;
 const WM_PODCAST_BACKGROUND_CHECK_COMPLETE: u32 =
     windows::Win32::UI::WindowsAndMessaging::WM_USER + 316;
+const WM_PODCAST_MARK_EPISODE_PLAYED_UI: u32 =
+    windows::Win32::UI::WindowsAndMessaging::WM_USER + 317;
 
 const EM_SETSEL: u32 = 0x00B1;
 const EM_SCROLLCARET: u32 = 0x00B7;
@@ -207,6 +209,7 @@ enum NodeData {
 
 struct SourceItemsState {
     items: Vec<PodcastEpisode>,
+    read_item_keys: HashSet<String>,
 }
 
 fn parse_opml_sources(text: &str) -> Vec<(String, String)> {
@@ -293,13 +296,17 @@ fn normalize_podcast_key(url: &str) -> String {
     rss::normalize_url(url).to_ascii_lowercase()
 }
 
-fn podcast_source_display_title(source: &RssSource, language: crate::settings::Language) -> String {
+fn podcast_source_display_title(
+    source: &RssSource,
+    language: crate::settings::Language,
+    announce_unread: bool,
+) -> String {
     let base_title = if source.title.trim().is_empty() {
         source.url.clone()
     } else {
         source.title.clone()
     };
-    if source.unread {
+    if announce_unread && source.unread {
         format!(
             "{}{}",
             i18n::tr(language, "podcasts.unheard_prefix"),
@@ -308,6 +315,28 @@ fn podcast_source_display_title(source: &RssSource, language: crate::settings::L
     } else {
         base_title
     }
+}
+
+fn podcast_episode_display_title(
+    title: &str,
+    language: crate::settings::Language,
+    announce_unread: bool,
+    item_unplayed: bool,
+) -> String {
+    if announce_unread && item_unplayed {
+        format!(
+            "{}{}",
+            i18n::tr(language, "podcasts.item_unplayed_prefix"),
+            title
+        )
+    } else {
+        title.to_string()
+    }
+}
+
+struct MarkEpisodePlayedUiMessage {
+    hitem: isize,
+    item_key: String,
 }
 
 fn import_podcast_sources_from_file(hwnd: HWND, path: &Path) -> Option<usize> {
@@ -360,6 +389,7 @@ fn import_podcast_sources_from_file(hwnd: HWND, path: &Path) -> Option<usize> {
                     last_seen_guid: None,
                     last_updated: None,
                     removed_item_keys: Vec::new(),
+                    read_item_keys: Vec::new(),
                 });
                 existing.insert(key);
                 added += 1;
@@ -847,6 +877,62 @@ unsafe fn source_removed_episode_keys(hwnd: HWND, hitem: HTREEITEM) -> HashSet<S
     .unwrap_or_default()
 }
 
+unsafe fn source_read_episode_keys(hwnd: HWND, hitem: HTREEITEM) -> HashSet<String> {
+    let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    if parent.0 == 0 {
+        return HashSet::new();
+    }
+    let source_index = with_podcast_state(hwnd, |s| match s.node_data.get(&hitem.0) {
+        Some(NodeData::Source(idx)) => Some(*idx),
+        _ => None,
+    })
+    .flatten();
+    let Some(idx) = source_index else {
+        return HashSet::new();
+    };
+    with_state(parent, |ps| {
+        ps.settings
+            .podcast_sources
+            .get(idx)
+            .map(|src| src.read_item_keys.iter().cloned().collect())
+    })
+    .flatten()
+    .unwrap_or_default()
+}
+
+unsafe fn prune_persisted_played_keys_for_source(hwnd: HWND, hitem: HTREEITEM) {
+    let source_index = with_podcast_state(hwnd, |s| match s.node_data.get(&hitem.0) {
+        Some(NodeData::Source(idx)) => Some(*idx),
+        _ => None,
+    })
+    .flatten();
+    let Some(source_index) = source_index else {
+        return;
+    };
+
+    let current_item_keys: HashSet<String> = with_podcast_state(hwnd, |s| {
+        s.source_items
+            .get(&hitem.0)
+            .map(|state| state.items.iter().map(episode_key).collect())
+            .unwrap_or_default()
+    })
+    .unwrap_or_default();
+
+    let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    if parent.0 == 0 {
+        return;
+    }
+    with_state(parent, |ps| {
+        if let Some(src) = ps.settings.podcast_sources.get_mut(source_index) {
+            let before = src.read_item_keys.len();
+            src.read_item_keys.retain(|k| current_item_keys.contains(k));
+            if src.read_item_keys.len() != before {
+                settings::save_settings(ps.settings.clone());
+            }
+        }
+    });
+}
+
 unsafe fn load_episode_children(hwnd: HWND, hitem: HTREEITEM, node: NodeData, force: bool) {
     let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     if hwnd_tree.0 == 0 {
@@ -1171,7 +1257,11 @@ unsafe fn update_source_title(hwnd: HWND, hitem: HTREEITEM, source_index: usize,
             let looks_auto = src.title.trim().is_empty() || src.title == src.url;
             if !src.user_title && looks_auto {
                 src.title = title.to_string();
-                let display = podcast_source_display_title(src, language);
+                let display = podcast_source_display_title(
+                    src,
+                    language,
+                    ps.settings.announce_unread_rss_podcast_items,
+                );
                 settings::save_settings(ps.settings.clone());
                 updated = Some(display);
             }
@@ -1260,8 +1350,30 @@ unsafe fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<Podcast
         }
     }
 
+    let (language, announce_unread) = with_podcast_state(hwnd, |s| {
+        with_state(s.parent, |ps| {
+            (
+                ps.settings.language,
+                ps.settings.announce_unread_rss_podcast_items,
+            )
+        })
+        .unwrap_or((s.language, true))
+    })
+    .unwrap_or((Language::English, true));
+
+    let read_keys = with_podcast_state(hwnd, |s| {
+        s.source_items
+            .get(&hitem.0)
+            .map(|state| state.read_item_keys.clone())
+            .unwrap_or_else(|| source_read_episode_keys(hwnd, hitem))
+    })
+    .unwrap_or_default();
+
     for item in new_items.iter() {
-        let title = to_wide(&item.title);
+        let item_unplayed = !read_keys.contains(&episode_key(item));
+        let display_title =
+            podcast_episode_display_title(&item.title, language, announce_unread, item_unplayed);
+        let title = to_wide(&display_title);
         let mut tvis = TVINSERTSTRUCTW {
             hParent: hitem,
             hInsertAfter: windows::Win32::UI::Controls::TVI_LAST,
@@ -1293,10 +1405,11 @@ unsafe fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<Podcast
 
     let added = new_items.len();
     with_podcast_state(hwnd, |s| {
-        let state = s
-            .source_items
-            .entry(hitem.0)
-            .or_insert(SourceItemsState { items: Vec::new() });
+        let persisted_read = source_read_episode_keys(hwnd, hitem);
+        let state = s.source_items.entry(hitem.0).or_insert(SourceItemsState {
+            items: Vec::new(),
+            read_item_keys: persisted_read,
+        });
         state.items.extend(new_items);
     });
     added
@@ -1330,14 +1443,23 @@ unsafe fn create_tree_item(hwnd_tree: HWND, title: &str, index: usize) -> HTREEI
 }
 
 unsafe fn reload_tree(hwnd: HWND) {
-    let (hwnd_tree, sources, language) = with_podcast_state(hwnd, |s| {
-        let (sources, language) = with_state(s.parent, |ps| {
-            (ps.settings.podcast_sources.clone(), ps.settings.language)
+    let (hwnd_tree, sources, language, announce_unread) = with_podcast_state(hwnd, |s| {
+        let (sources, language, announce_unread) = with_state(s.parent, |ps| {
+            (
+                ps.settings.podcast_sources.clone(),
+                ps.settings.language,
+                ps.settings.announce_unread_rss_podcast_items,
+            )
         })
         .unwrap_or_default();
-        (s.hwnd_tree, sources, language)
+        (s.hwnd_tree, sources, language, announce_unread)
     })
-    .unwrap_or((HWND(0), Vec::new(), crate::settings::Language::English));
+    .unwrap_or((
+        HWND(0),
+        Vec::new(),
+        crate::settings::Language::English,
+        true,
+    ));
     if hwnd_tree.0 == 0 {
         return;
     }
@@ -1353,7 +1475,7 @@ unsafe fn reload_tree(hwnd: HWND) {
     });
 
     for (i, src) in sources.iter().enumerate() {
-        let title = podcast_source_display_title(src, language);
+        let title = podcast_source_display_title(src, language, announce_unread);
         let hitem = create_tree_item(hwnd_tree, &title, i);
         if hitem.0 != 0 {
             with_podcast_state(hwnd, |s| {
@@ -1381,6 +1503,99 @@ unsafe fn reload_tree(hwnd: HWND) {
     }
 }
 
+unsafe fn mark_episode_played_with_delayed_ui(hwnd: HWND, parent: HWND, episode_key_value: String) {
+    let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+    if hwnd_tree.0 == 0 {
+        return;
+    }
+    let mut episode_hitem = HTREEITEM(
+        SendMessageW(
+            hwnd_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_CARET as usize),
+            LPARAM(0),
+        )
+        .0,
+    );
+    let selected_matches = with_podcast_state(hwnd, |s| match s.node_data.get(&episode_hitem.0) {
+        Some(NodeData::Episode(item)) => episode_key(item) == episode_key_value,
+        _ => false,
+    })
+    .unwrap_or(false);
+    if !selected_matches {
+        episode_hitem = with_podcast_state(hwnd, |s| {
+            s.node_data.iter().find_map(|(h, node)| match node {
+                NodeData::Episode(item) if episode_key(item) == episode_key_value => {
+                    Some(HTREEITEM(*h))
+                }
+                _ => None,
+            })
+        })
+        .flatten()
+        .unwrap_or(HTREEITEM(0));
+    }
+    if episode_hitem.0 == 0 {
+        return;
+    }
+
+    let source_hitem = HTREEITEM(
+        SendMessageW(
+            hwnd_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_PARENT as usize),
+            LPARAM(episode_hitem.0),
+        )
+        .0,
+    );
+    if source_hitem.0 != 0 {
+        with_podcast_state(hwnd, |s| {
+            if let Some(state) = s.source_items.get_mut(&source_hitem.0) {
+                state.read_item_keys.insert(episode_key_value.clone());
+            }
+            if let Some(NodeData::Source(source_index)) = s.node_data.get(&source_hitem.0)
+                && parent.0 != 0
+            {
+                with_state(parent, |ps| {
+                    if let Some(src) = ps.settings.podcast_sources.get_mut(*source_index)
+                        && !src.read_item_keys.iter().any(|k| k == &episode_key_value)
+                    {
+                        src.read_item_keys.push(episode_key_value.clone());
+                        const MAX_PERSISTED_READ_KEYS: usize = 5000;
+                        if src.read_item_keys.len() > MAX_PERSISTED_READ_KEYS {
+                            let overflow = src.read_item_keys.len() - MAX_PERSISTED_READ_KEYS;
+                            src.read_item_keys.drain(0..overflow);
+                        }
+                        settings::save_settings(ps.settings.clone());
+                    }
+                });
+            }
+        });
+    }
+
+    let delayed_hitem = episode_hitem.0;
+    let delayed_key = episode_key_value;
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(2));
+        let payload = Box::new(MarkEpisodePlayedUiMessage {
+            hitem: delayed_hitem,
+            item_key: delayed_key,
+        });
+        let payload_ptr = Box::into_raw(payload);
+        if let Err(e) = PostMessageW(
+            hwnd,
+            WM_PODCAST_MARK_EPISODE_PLAYED_UI,
+            WPARAM(0),
+            LPARAM(payload_ptr as isize),
+        ) {
+            let _payload_owner = unsafe { Box::from_raw(payload_ptr) };
+            log_debug(&format!(
+                "Failed to post WM_PODCAST_MARK_EPISODE_PLAYED_UI: {}",
+                e
+            ));
+        }
+    });
+}
+
 unsafe fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpisode) {
     let Some(url) = episode.enclosure_url.as_ref() else {
         let language = with_state(parent, |s| s.settings.language).unwrap_or_default();
@@ -1388,6 +1603,7 @@ unsafe fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpis
         return;
     };
     let play_key = episode_key(episode);
+    mark_episode_played_with_delayed_ui(hwnd, parent, play_key.clone());
     let should_start = with_podcast_state(hwnd, |s| {
         if s.pending_play.as_deref() == Some(play_key.as_str()) {
             return false;
@@ -1750,7 +1966,11 @@ unsafe fn set_source_unheard(hwnd: HWND, hitem: HTREEITEM, unheard: bool) {
                     changed = true;
                 }
                 if changed {
-                    let title = podcast_source_display_title(src, language);
+                    let title = podcast_source_display_title(
+                        src,
+                        language,
+                        ps.settings.announce_unread_rss_podcast_items,
+                    );
                     settings::save_settings(ps.settings.clone());
                     return Some(title);
                 }
@@ -1795,6 +2015,7 @@ unsafe fn add_podcast_source(parent: HWND, feed_url: &str, title: &str) -> Optio
             last_seen_guid: None,
             last_updated: None,
             removed_item_keys: Vec::new(),
+            read_item_keys: Vec::new(),
         });
         settings::save_settings(ps.settings.clone());
         Some(ps.settings.podcast_sources.len() - 1)
@@ -3310,10 +3531,13 @@ unsafe fn subscribe_selected_result(hwnd: HWND) {
         let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
         if hwnd_tree.0 != 0 {
             let display = with_state(parent, |ps| {
-                ps.settings
-                    .podcast_sources
-                    .get(index)
-                    .map(|src| podcast_source_display_title(src, language))
+                ps.settings.podcast_sources.get(index).map(|src| {
+                    podcast_source_display_title(
+                        src,
+                        language,
+                        ps.settings.announce_unread_rss_podcast_items,
+                    )
+                })
             })
             .flatten()
             .unwrap_or_else(|| {
@@ -3743,6 +3967,7 @@ unsafe fn show_selected_result_episodes(hwnd: HWND) {
                 last_seen_guid: None,
                 last_updated: None,
                 removed_item_keys: Vec::new(),
+                read_item_keys: Vec::new(),
             });
             s.preview_sources.len() - 1
         })
@@ -4398,6 +4623,7 @@ unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
                 }
             }
             let mut removed_position: Option<usize> = None;
+            let mut focus_child_index: Option<usize> = None;
             with_podcast_state(hwnd, |s| {
                 s.node_data.remove(&hitem.0);
                 if parent_item.0 != 0
@@ -4406,16 +4632,52 @@ unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
                 {
                     removed_position = Some(pos);
                     state.items.remove(pos);
+                    if state.items.is_empty() {
+                        focus_child_index = None;
+                    } else {
+                        focus_child_index = Some(pos.min(state.items.len().saturating_sub(1)));
+                    }
                 }
             });
             SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(hitem.0));
-            if parent_item.0 != 0 {
+            let mut target = parent_item;
+            if parent_item.0 != 0
+                && let Some(target_index) = focus_child_index
+            {
+                let mut child = HTREEITEM(
+                    SendMessageW(
+                        hwnd_tree,
+                        TVM_GETNEXTITEM,
+                        WPARAM(TVGN_CHILD as usize),
+                        LPARAM(parent_item.0),
+                    )
+                    .0,
+                );
+                let mut idx = 0usize;
+                while child.0 != 0 && idx < target_index {
+                    child = HTREEITEM(
+                        SendMessageW(
+                            hwnd_tree,
+                            TVM_GETNEXTITEM,
+                            WPARAM(TVGN_NEXT as usize),
+                            LPARAM(child.0),
+                        )
+                        .0,
+                    );
+                    idx += 1;
+                }
+                if child.0 != 0 {
+                    target = child;
+                }
+            }
+            if target.0 != 0 {
                 SendMessageW(
                     hwnd_tree,
                     TVM_SELECTITEM,
                     WPARAM(TVGN_CARET as usize),
-                    LPARAM(parent_item.0),
+                    LPARAM(target.0),
                 );
+                SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(target.0));
             }
             if let (Some(source_index), Some(position)) = (source_idx_for_undo, removed_position) {
                 with_podcast_state(hwnd, |s| {
@@ -4426,6 +4688,11 @@ unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
                         position,
                     });
                 });
+            }
+            if hwnd_tree.0 != 0 {
+                SetForegroundWindow(hwnd);
+                SetFocus(hwnd_tree);
+                SendMessageW(hwnd_tree, WM_SETFOCUS, WPARAM(0), LPARAM(0));
             }
         }
     }
@@ -4547,10 +4814,27 @@ unsafe fn undo_last_delete(hwnd: HWND) {
                 }
 
                 let mut restored_hitem = HTREEITEM(0);
+                let (language, announce_unread) = with_podcast_state(hwnd, |s| {
+                    with_state(s.parent, |ps| {
+                        (
+                            ps.settings.language,
+                            ps.settings.announce_unread_rss_podcast_items,
+                        )
+                    })
+                    .unwrap_or((s.language, true))
+                })
+                .unwrap_or((Language::English, true));
                 with_podcast_state(hwnd, |s| {
                     if let Some(state) = s.source_items.get(&source_hitem.0) {
                         for entry in &state.items {
-                            let text = to_wide(&entry.title);
+                            let item_unplayed = !state.read_item_keys.contains(&episode_key(entry));
+                            let display_title = podcast_episode_display_title(
+                                &entry.title,
+                                language,
+                                announce_unread,
+                                item_unplayed,
+                            );
+                            let text = to_wide(&display_title);
                             let mut tvis = TVINSERTSTRUCTW {
                                 hParent: source_hitem,
                                 hInsertAfter: windows::Win32::UI::Controls::TVI_LAST,
@@ -6513,10 +6797,13 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                     let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
                     if hwnd_tree.0 != 0 {
                         let display = with_state(parent, |ps| {
-                            ps.settings
-                                .podcast_sources
-                                .get(index)
-                                .map(|src| podcast_source_display_title(src, language))
+                            ps.settings.podcast_sources.get(index).map(|src| {
+                                podcast_source_display_title(
+                                    src,
+                                    language,
+                                    ps.settings.announce_unread_rss_podcast_items,
+                                )
+                            })
                         })
                         .flatten()
                         .unwrap_or_else(|| url.clone());
@@ -6664,6 +6951,7 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                             set_source_unheard(hwnd, HTREEITEM(msg.hitem), false);
                         }
                     }
+                    prune_persisted_played_keys_for_source(hwnd, HTREEITEM(msg.hitem));
                 }
                 Err(_e) => {
                     let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
@@ -6692,6 +6980,53 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
             }
             let msg = unsafe { Box::from_raw(ptr) };
             process_background_check_result(hwnd, *msg);
+            LRESULT(0)
+        }
+        WM_PODCAST_MARK_EPISODE_PLAYED_UI => {
+            let ptr = lparam.0 as *mut MarkEpisodePlayedUiMessage;
+            if ptr.is_null() {
+                return LRESULT(0);
+            }
+            let msg = unsafe { Box::from_raw(ptr) };
+            let hitem = HTREEITEM(msg.hitem);
+            let episode = with_podcast_state(hwnd, |s| match s.node_data.get(&hitem.0) {
+                Some(NodeData::Episode(item)) => Some((**item).clone()),
+                _ => None,
+            })
+            .flatten();
+            if let Some(episode) = episode
+                && episode_key(&episode) == msg.item_key
+            {
+                let (language, announce_unread) = with_podcast_state(hwnd, |s| {
+                    with_state(s.parent, |ps| {
+                        (
+                            ps.settings.language,
+                            ps.settings.announce_unread_rss_podcast_items,
+                        )
+                    })
+                    .unwrap_or((Language::English, true))
+                })
+                .unwrap_or((Language::English, true));
+                let display_title =
+                    podcast_episode_display_title(&episode.title, language, announce_unread, false);
+                let text = to_wide(&display_title);
+                let mut tvis = TVITEMW {
+                    mask: TVIF_TEXT,
+                    hItem: hitem,
+                    pszText: windows::core::PWSTR(text.as_ptr() as *mut _),
+                    cchTextMax: text.len() as i32,
+                    ..Default::default()
+                };
+                let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+                if hwnd_tree.0 != 0 {
+                    SendMessageW(
+                        hwnd_tree,
+                        TVM_SETITEMW,
+                        WPARAM(0),
+                        LPARAM(&mut tvis as *mut _ as isize),
+                    );
+                }
+            }
             LRESULT(0)
         }
         WM_PODCAST_SEARCH_COMPLETE => {
@@ -6826,7 +7161,7 @@ const APPLE_LIMIT: u32 = 50;
 fn apple_country_for_language(language: Language) -> &'static str {
     match language {
         Language::Italian => "it",
-        Language::English => "us",
+        Language::Ukrainian | Language::English => "us",
         Language::Spanish => "es",
         Language::Portuguese => "pt",
         Language::Swedish => "se",
@@ -6841,7 +7176,7 @@ fn apple_country_for_language(language: Language) -> &'static str {
 fn podcastindex_language_code(language: Language) -> &'static str {
     match language {
         Language::Italian => "it",
-        Language::English => "en",
+        Language::Ukrainian | Language::English => "en",
         Language::Spanish => "es",
         Language::Portuguese => "pt",
         Language::Swedish => "sv",
@@ -6898,7 +7233,7 @@ fn apple_categories(language: Language) -> Vec<Category> {
             "True crime",
             "TV e film",
         ),
-        Language::English => (
+        Language::Ukrainian | Language::English => (
             "Arts",
             "Business",
             "Comedy",
@@ -7282,7 +7617,7 @@ fn apple_subcategories(language: Language) -> Vec<Category> {
             (1563, "Recensioni di film"),
             (1561, "Recensioni TV"),
         ],
-        Language::English => &[
+        Language::Ukrainian | Language::English => &[
             // Arts
             (1482, "Books"),
             (1402, "Design"),
@@ -8382,7 +8717,7 @@ fn podcastindex_categories(language: Language) -> Vec<Category> {
             (111, "Gioco di ruolo"),
             (112, "Cryptocurrency"),
         ],
-        Language::English => &[
+        Language::Ukrainian | Language::English => &[
             (1, "Arts"),
             (2, "Books"),
             (3, "Design"),

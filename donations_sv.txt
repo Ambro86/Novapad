@@ -1,4 +1,4 @@
-﻿Donationer
+Donationer
 
 Sonarpad är ett program som ursprungligen skapades för att möta personliga behov, men som med tiden har vuxit alltmer. Utvecklingen kräver ständigt arbete för att förbättra funktioner, åtgärda buggar, utforska nya idéer och noggrant testa varje del av programmet.
 Om du tycker att programmet är användbart och vill stödja dess utveckling kan du göra en donation.
@@ -20,3 +20,4 @@ För den vietnamesiska översättningen tack till Anh Đức Nguyễn.
 För den tjeckiska översättningen tack till Radek Žalud och Jiri Holzinger.
 För den spanska översättningen tack till Arturo Fernandez Rivas.
 För den serbiska översättningen tack till Mila Kuran.
+För den ukrainska översättningen tack till Ivan Shtefuriak.

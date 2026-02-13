@@ -61,7 +61,7 @@ fn wiktionary_labels(language: crate::settings::Language) -> WiktionaryLabels {
 fn dictionary_cache_key(language: Language, pref: &str, word: &str) -> String {
     let lang = match language {
         Language::Italian => "it",
-        Language::English => "en",
+        Language::Ukrainian | Language::English => "en",
         Language::Spanish => "es",
         Language::Portuguese => "pt",
         Language::Swedish => "sv",

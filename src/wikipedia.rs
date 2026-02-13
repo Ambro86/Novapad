@@ -154,7 +154,7 @@ fn http_client() -> Result<Client, WikipediaError> {
 pub fn language_to_code(language: Language) -> &'static str {
     match language {
         Language::Italian => "it",
-        Language::English => "en",
+        Language::Ukrainian | Language::English => "en",
         Language::Spanish => "es",
         Language::Portuguese => "pt",
         Language::Swedish => "sv",

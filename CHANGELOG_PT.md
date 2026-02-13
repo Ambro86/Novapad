@@ -13,6 +13,7 @@ Melhorias
 • Adicionada a exportação de feeds RSS para OPML na janela RSS, para guardar e reimportar facilmente as fontes atuais.
 • Adicionada a função "Pesquisar RSS por palavra-chave" na janela RSS: ao inserir uma palavra-chave, o Sonarpad gera automaticamente o URL RSS do Google News e abre a janela de adicionar fonte já pré-preenchida, permitindo criar um feed temático num único passo.
 • Adicionada a tradução sérvia graças a Mila Kuran.
+• Adicionada a tradução ucraniana graças a Ivan Shtefuriak.
 • Adicionada a abertura múltipla de ficheiros multimédia: ao abrir vários ficheiros de uma vez é criada uma fila de reprodução em vez de substituir o ficheiro atual.
 • Adicionados atalhos de avanço/retrocesso variável durante a reprodução: com base de 1 minuto, Esquerda/Direita avança 60s, Shift+Esquerda/Direita avança 20s e Ctrl+Esquerda/Direita avança 3 minutos.
 • Adicionados atalhos de faixa anterior/seguinte no leitor: Ctrl+PageUp e Ctrl+PageDown.
@@ -20,6 +21,7 @@ Melhorias
 • Melhorias no instalador: o setup.exe agora permite escolher entre associar todos os tipos de ficheiro suportados ou selecionar manualmente as extensões; o MSI também passa a oferecer seleção por extensão na árvore de funcionalidades (o padrão mantém-se: tudo ativo).
 • Adicionado o novo menu "Janela" com a opção "Documentos abertos..." para alternar rapidamente para qualquer ficheiro atualmente aberto.
 • Atualizada a opção Ver > Fonte: o seletor completo foi substituído por um submenu rápido com fontes comuns (Arial, Calibri, Consolas, Segoe UI, Tahoma, Verdana, Times New Roman, Georgia), mantendo o tamanho de texto atual.
+• Melhorada a leitura de RSS e podcasts com dois avisos distintos: os nós da fonte anunciam "novos itens" quando um feed/podcast tem novidades, enquanto artigos RSS e episódios de podcast individuais anunciam "não lido"/"não reproduzido"; este comportamento pode ser desativado nas Opções.
 Correções de bugs
 • Corrigida a extração de texto EPUB para livros com comentários HTML inline (<!-- ... -->): o texto dos capítulos agora é analisado corretamente em vez de ser parcialmente ou totalmente ignorado.
 • Corrigido o dicionário Wiktionary em espanhol e o cache do dicionário: palavras como "agua" agora são encontradas corretamente e entradas antigas de "Palavra não encontrada" não são mais reutilizadas.

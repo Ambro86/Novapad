@@ -13,6 +13,7 @@ Améliorations
 • Ajout de l'export des flux RSS en OPML dans la fenêtre RSS, afin de sauvegarder et réimporter facilement les sources actuelles.
 • Ajout de la fonction « Rechercher un flux RSS par mot-clé » dans la fenêtre RSS : en saisissant un mot-clé, l'URL RSS Google News est générée automatiquement et la fenêtre d'ajout de source s'ouvre préremplie, afin de créer un flux thématique en une seule étape.
 • Ajout de la traduction serbe grâce à Mila Kuran.
+• Ajout de la traduction ukrainienne grâce à Ivan Shtefuriak.
 • Ajout de l'ouverture multiple de fichiers média : en ouvrant plusieurs fichiers à la fois, une file de lecture est créée au lieu de remplacer le fichier en cours.
 • Ajout de raccourcis de déplacement variable pendant la lecture : avec une base de 1 minute, Gauche/Droite avance-recule de 60 s, Maj+Gauche/Droite de 20 s et Ctrl+Gauche/Droite de 3 minutes.
 • Ajout des raccourcis piste précédente/suivante dans le lecteur : Ctrl+PageUp et Ctrl+PageDown.
@@ -20,6 +21,7 @@ Améliorations
 • Amélioration de l'installateur : setup.exe permet désormais de choisir entre associer tous les types de fichiers pris en charge ou sélectionner manuellement les extensions ; le MSI propose aussi une sélection extension par extension dans l'arborescence des fonctionnalités (valeur par défaut inchangée : tout activé).
 • Ajout du nouveau menu « Fenêtre » avec l'option « Documents ouverts... » pour basculer rapidement vers n'importe quel fichier actuellement ouvert.
 • Mise à jour de l'option Affichage > Police : le sélecteur complet a été remplacé par un sous-menu rapide de polices courantes (Arial, Calibri, Consolas, Segoe UI, Tahoma, Verdana, Times New Roman, Georgia), tout en conservant la taille de texte actuelle.
+• Amélioration de la lecture RSS/podcasts avec deux annonces distinctes : les nœuds de source annoncent « nouveaux éléments » lorsqu’un flux/podcast a des nouveautés, tandis que les articles RSS et épisodes de podcast individuels annoncent « non lu »/« non joué » ; ce comportement peut être désactivé dans les Options.
 Corrections de bugs
 • Correction de l’extraction de texte EPUB pour les livres contenant des commentaires HTML inline (<!-- ... -->) : le texte des chapitres est désormais correctement analysé au lieu d’être partiellement ou totalement ignoré.
 • Correction du dictionnaire Wiktionary en espagnol et de la gestion du cache : des mots comme « agua » sont maintenant trouvés correctement et les anciennes entrées « mot introuvable » ne sont plus réutilisées.

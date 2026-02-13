@@ -304,6 +304,83 @@ fn clean_wikitext_line(s: String) -> String {
         .to_string()
 }
 
+fn is_language_code_token(token: &str) -> bool {
+    matches!(
+        token.to_ascii_lowercase().as_str(),
+        "en" | "it" | "es" | "pt" | "sv" | "vi" | "cs" | "pl" | "fr" | "sr" | "de"
+    )
+}
+
+fn is_wikidata_qid_token(token: &str) -> bool {
+    let t = token.trim();
+    if t.len() < 2 {
+        return false;
+    }
+    let mut chars = t.chars();
+    matches!(chars.next(), Some('Q' | 'q')) && chars.all(|c| c.is_ascii_digit())
+}
+
+fn normalize_definition_noise(s: &str) -> String {
+    let mut tokens: Vec<&str> = s.split_whitespace().collect();
+    if tokens.is_empty() {
+        return String::new();
+    }
+
+    // Some Wiktionary templates can leak one or more language codes at start (e.g. "it it ...").
+    while let Some(first) = tokens.first() {
+        if is_language_code_token(first) || is_wikidata_qid_token(first) {
+            tokens.remove(0);
+        } else {
+            break;
+        }
+    }
+
+    // Drop trailing single-letter lowercase noise fragments (e.g. "... i")
+    // and leaked Wikidata IDs (e.g. "... Q289").
+    while let Some(last) = tokens.last() {
+        if (last.chars().count() == 1 && last.chars().all(|c| c.is_ascii_lowercase()))
+            || is_wikidata_qid_token(last)
+        {
+            tokens.pop();
+        } else {
+            break;
+        }
+    }
+
+    let out = tokens.join(" ").trim().to_string();
+    if out.is_empty() || is_language_code_token(out.trim()) || is_wikidata_qid_token(out.trim()) {
+        String::new()
+    } else {
+        out
+    }
+}
+
+fn is_probably_leaked_related_lemma(definition: &str, from_subpoint: bool) -> bool {
+    if !from_subpoint {
+        return false;
+    }
+
+    let trimmed = definition.trim();
+    if !trimmed.ends_with('.') {
+        return false;
+    }
+
+    let base = trimmed.trim_end_matches('.').trim();
+    if base.is_empty() || base.split_whitespace().count() != 1 {
+        return false;
+    }
+
+    let Some(first) = base.chars().next() else {
+        return false;
+    };
+    if !first.is_ascii_lowercase() {
+        return false;
+    }
+
+    base.chars()
+        .all(|c| c.is_alphabetic() || c == '-' || c == '\'')
+}
+
 fn extract_definitions_with_subpoints(
     wikitext: &str,
     max_main_defs: usize,
@@ -318,9 +395,9 @@ fn extract_definitions_with_subpoints(
         }
         let l = line.trim_start();
 
-        let mut candidate: Option<&str> = None;
+        let mut candidate: Option<(&str, bool)> = None;
         if let Some(rest) = l.strip_prefix("# ") {
-            candidate = Some(rest.trim());
+            candidate = Some((rest.trim(), false));
         } else if let Some(rest) = l.strip_prefix(';') {
             let mut idx = 0usize;
             let chars: Vec<char> = rest.chars().collect();
@@ -332,20 +409,27 @@ fn extract_definitions_with_subpoints(
                 if let Some(colon_pos) = after_number.find(':') {
                     let after_colon = after_number[colon_pos + 1..].trim();
                     if !after_colon.is_empty() {
-                        candidate = Some(after_colon);
+                        candidate = Some((after_colon, true));
                     }
                 } else if !after_number.is_empty() {
-                    candidate = Some(after_number);
+                    candidate = Some((after_number, true));
                 }
             }
         }
 
-        if let Some(text) = candidate {
+        if let Some((text, from_subpoint)) = candidate {
             if main_count >= max_main_defs {
                 break;
             }
             let cleaned = clean_wikitext_line(text.to_string());
-            let truncated = cleaned.chars().take(MAX_CHARS_PER_DEF).collect::<String>();
+            let normalized = normalize_definition_noise(&cleaned);
+            let truncated = normalized
+                .chars()
+                .take(MAX_CHARS_PER_DEF)
+                .collect::<String>();
+            if is_probably_leaked_related_lemma(&truncated, from_subpoint) {
+                continue;
+            }
             if !truncated.is_empty() && truncated.chars().any(|c| c.is_alphanumeric()) {
                 out.push(truncated);
                 main_count += 1;
@@ -662,7 +746,7 @@ impl WiktionaryService {
 fn language_to_code(language: Language) -> &'static str {
     match language {
         Language::Italian => "it",
-        Language::English => "en",
+        Language::Ukrainian | Language::English => "en",
         Language::Spanish => "es",
         Language::Portuguese => "pt",
         Language::Swedish => "sv",
@@ -678,7 +762,7 @@ fn translation_target(language: Language, preference: &str) -> Option<String> {
     let pref = preference.trim().to_ascii_lowercase();
     if pref.is_empty() || pref == "auto" {
         return match language {
-            Language::English => None,
+            Language::Ukrainian | Language::English => None,
             _ => Some("en".to_string()),
         };
     }
@@ -697,7 +781,7 @@ fn translation_target(language: Language, preference: &str) -> Option<String> {
         "fr" => "fr",
         _ => {
             return match language {
-                Language::English => None,
+                Language::Ukrainian | Language::English => None,
                 _ => Some("en".to_string()),
             };
         }
@@ -873,5 +957,64 @@ mod tests {
         let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
         assert_eq!(defs.len(), 1);
         assert!(defs[0].starts_with("Elemento que incluye los signos"));
+    }
+
+    #[test]
+    fn strips_leading_language_code_noise_from_definition() {
+        let wikitext = "# {{term|it}} Definizione di prova";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert_eq!(defs, vec!["Definizione di prova".to_string()]);
+    }
+
+    #[test]
+    fn filters_definition_that_is_only_language_code() {
+        let wikitext = "# {{term|it}}";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert!(defs.is_empty());
+    }
+
+    #[test]
+    fn strips_repeated_leading_language_codes() {
+        let wikitext = "# it it liquido profumato";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert_eq!(defs, vec!["liquido profumato".to_string()]);
+    }
+
+    #[test]
+    fn strips_trailing_single_letter_noise() {
+        let wikitext = "# Non disponibile i";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert_eq!(defs, vec!["Non disponibile".to_string()]);
+    }
+
+    #[test]
+    fn strips_leading_wikidata_qid_noise() {
+        let wikitext = "# Q283 uncountable An inorganic compound found as a clear liquid.";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert_eq!(
+            defs,
+            vec!["uncountable An inorganic compound found as a clear liquid.".to_string()]
+        );
+    }
+
+    #[test]
+    fn filters_definition_that_is_only_wikidata_qid() {
+        let wikitext = "# Q289";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert!(defs.is_empty());
+    }
+
+    #[test]
+    fn strips_trailing_wikidata_qid_noise() {
+        let wikitext = "# Non disponibile Q289";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert_eq!(defs, vec!["Non disponibile".to_string()]);
+    }
+
+    #[test]
+    fn filters_single_related_lemma_from_subpoint() {
+        let wikitext = ";11: [[aguar]].";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert!(defs.is_empty());
     }
 }

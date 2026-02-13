@@ -13,6 +13,7 @@ Improvements
 • Added RSS feed export to OPML in the RSS window, so current RSS sources can be saved and re-imported easily.
 • Added "Search RSS by keyword" in the RSS window: entering a keyword now generates a Google News RSS URL automatically and opens the add-source dialog prefilled, so keyword feeds can be created in one step.
 • Added Serbian translation thanks to Mila Kuran.
+• Added Ukrainian translation thanks to Ivan Shtefuriak.
 • Added multi-file media opening: selecting/opening multiple media files now builds a playback queue instead of replacing the current file.
 • Added variable seek shortcuts during playback: with a 1-minute base skip, Left/Right seeks 60s, Shift+Left/Right seeks 20s, and Ctrl+Left/Right seeks 3 minutes.
 • Added previous/next track navigation shortcuts in the player: Ctrl+PageUp and Ctrl+PageDown.
@@ -20,6 +21,7 @@ Improvements
 • Installer improvements: setup.exe now lets users choose between associating all supported file types or selecting extensions manually; MSI now exposes per-extension file-association choices in the feature tree (default remains all enabled).
 • Added a new "Window" menu with "Open documents..." to quickly switch to any currently open file.
 • Updated View > Font: replaced the old chooser with a quick submenu of common fonts (Arial, Calibri, Consolas, Segoe UI, Tahoma, Verdana, Times New Roman, Georgia) while preserving the current text size.
+• Improved RSS/Podcast announcements with a dual status model: source nodes announce "new items" when a feed/podcast has updates, while individual RSS articles and podcast episodes announce "unread"/"unplayed"; this behavior can be disabled from Options.
 Bug fixes
 • Fixed EPUB text extraction for books containing inline HTML comments (<!-- ... -->): chapter text is now parsed correctly instead of being partially or fully skipped.
 • Fixed Spanish Wiktionary lookups and dictionary cache handling: Spanish entries like "agua" now load correctly, and old "Word not found" cache entries are no longer reused.

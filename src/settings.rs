@@ -130,6 +130,8 @@ pub enum Language {
     French,
     #[serde(rename = "sr")]
     Serbian,
+    #[serde(rename = "uk")]
+    Ukrainian,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -307,6 +309,8 @@ pub struct AppSettings {
     pub context_menu_open_with: bool,
     #[serde(default = "default_true")]
     pub confirm_delete_rss_podcast: bool,
+    #[serde(default = "default_true")]
+    pub announce_unread_rss_podcast_items: bool,
     pub spellcheck_enabled: bool,
     pub spellcheck_language_mode: SpellcheckLanguageMode,
     pub spellcheck_fixed_language: String,
@@ -502,6 +506,7 @@ impl Default for AppSettings {
             interpreter_path: "python.exe".to_string(),
             context_menu_open_with: false,
             confirm_delete_rss_podcast: true,
+            announce_unread_rss_podcast_items: true,
             spellcheck_enabled: false,
             spellcheck_language_mode: SpellcheckLanguageMode::FollowEditorLanguage,
             spellcheck_fixed_language: "en-US".to_string(),
@@ -864,6 +869,9 @@ fn system_language() -> Language {
         }
         if lower.starts_with("sr") {
             return Language::Serbian;
+        }
+        if lower.starts_with("uk") {
+            return Language::Ukrainian;
         }
         return Language::English;
     }

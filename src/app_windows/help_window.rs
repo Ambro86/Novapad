@@ -246,7 +246,9 @@ unsafe fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
             let content = match init.kind {
                 HelpWindowKind::Guide => match init.language {
                     Language::Italian => include_str!("../../guida.txt").to_string(),
-                    Language::English => include_str!("../../guida_en.txt").to_string(),
+                    Language::Ukrainian | Language::English => {
+                        include_str!("../../guida_en.txt").to_string()
+                    }
                     Language::Spanish => include_str!("../../guida_es.txt").to_string(),
                     Language::Portuguese => include_str!("../../guida_pt.txt").to_string(),
                     Language::Swedish => read_override_text("guida_sv.txt")
@@ -263,7 +265,9 @@ unsafe fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
                 },
                 HelpWindowKind::Changelog => match init.language {
                     Language::Italian => include_str!("../../CHANGELOG_IT.md").to_string(),
-                    Language::English => include_str!("../../CHANGELOG.md").to_string(),
+                    Language::Ukrainian | Language::English => {
+                        include_str!("../../CHANGELOG.md").to_string()
+                    }
                     Language::Spanish => include_str!("../../CHANGELOG_ES.md").to_string(),
                     Language::Portuguese => include_str!("../../CHANGELOG_PT.md").to_string(),
                     Language::Swedish => include_str!("../../CHANGELOG.md").to_string(),
@@ -401,7 +405,7 @@ fn help_title(language: Language, kind: HelpWindowKind) -> String {
 fn donations_content(language: Language) -> String {
     match language {
         Language::Italian => DONATIONS_IT.to_string(),
-        Language::English => DONATIONS_EN.to_string(),
+        Language::Ukrainian | Language::English => DONATIONS_EN.to_string(),
         Language::Spanish => DONATIONS_ES.to_string(),
         Language::Portuguese => DONATIONS_PT.to_string(),
         Language::Swedish => {

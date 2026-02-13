@@ -1,4 +1,4 @@
-﻿Donations
+Donations
 Sonarpad is a program created at first to meet personal needs, but over time it has grown more and more. Developing it requires constant work to improve features, fix bugs, search for new ideas, and carefully test all functions.
 If you find this program useful and want to support its development, you can make a donation.
 PayPal
@@ -16,3 +16,4 @@ For the Vietnamese translation, thanks to Anh Đức Nguyễn.
 For the Czech translation, thanks to Radek Žalud and Jiri Holzinger.
 For the Spanish translation, thanks to Arturo Fernandez Rivas.
 For the Serbian translation, thanks to Mila Kuran.
+For the Ukrainian translation, thanks to Ivan Shtefuriak.

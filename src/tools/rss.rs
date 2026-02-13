@@ -63,6 +63,8 @@ pub struct RssSource {
     pub last_updated: Option<i64>,
     #[serde(default)]
     pub removed_item_keys: Vec<String>,
+    #[serde(default)]
+    pub read_item_keys: Vec<String>,
 }
 
 #[derive(Debug, Clone)]

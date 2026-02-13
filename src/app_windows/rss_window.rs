@@ -81,6 +81,7 @@ const WM_CLEAR_ENTER_GUARD: u32 = WM_USER + 203;
 const WM_CLEAR_ADD_GUARD: u32 = WM_USER + 204;
 pub(crate) const WM_RSS_SHOW_CONTEXT: u32 = WM_USER + 205;
 const WM_RSS_BACKGROUND_CHECK_COMPLETE: u32 = WM_USER + 206;
+const WM_RSS_MARK_ITEM_READ_UI: u32 = WM_USER + 207;
 const ADD_GUARD_TIMER_ID: usize = 1;
 const EM_REPLACESEL: u32 = 0x00C2;
 const REORDER_EDIT_ID: usize = 1401;
@@ -265,16 +266,33 @@ fn normalize_rss_url_key(url: &str) -> String {
     s.to_ascii_lowercase()
 }
 
-fn rss_source_display_title(source: &RssSource, language: crate::settings::Language) -> String {
+fn rss_source_display_title(
+    source: &RssSource,
+    language: crate::settings::Language,
+    announce_unread: bool,
+) -> String {
     let base_title = if source.title.trim().is_empty() {
         source.url.clone()
     } else {
         source.title.clone()
     };
-    if source.unread {
+    if announce_unread && source.unread {
         format!("{}{}", i18n::tr(language, "rss.unread_prefix"), base_title)
     } else {
         base_title
+    }
+}
+
+fn rss_item_display_title(
+    title: &str,
+    language: crate::settings::Language,
+    announce_unread: bool,
+    item_unread: bool,
+) -> String {
+    if announce_unread && item_unread {
+        format!("{}{}", i18n::tr(language, "rss.item_unread_prefix"), title)
+    } else {
+        title.to_string()
     }
 }
 
@@ -304,7 +322,9 @@ fn google_news_params(
         crate::settings::Language::Polish => ("pl", "PL", "PL:pl"),
         crate::settings::Language::French => ("fr", "FR", "FR:fr"),
         crate::settings::Language::Serbian => ("sr", "RS", "RS:sr"),
-        crate::settings::Language::English => ("en", "US", "US:en"),
+        crate::settings::Language::Ukrainian | crate::settings::Language::English => {
+            ("en", "US", "US:en")
+        }
     }
 }
 
@@ -521,6 +541,7 @@ unsafe fn import_sources_from_file(hwnd: HWND, path: &Path) {
                     last_seen_guid: None,
                     last_updated: None,
                     removed_item_keys: Vec::new(),
+                    read_item_keys: Vec::new(),
                 });
                 existing.insert(key);
                 added += 1;
@@ -598,6 +619,43 @@ unsafe fn source_removed_keys_for_tree_item(
     })
     .flatten()
     .unwrap_or_default()
+}
+
+unsafe fn prune_persisted_read_keys_for_source(
+    hwnd: HWND,
+    hitem: windows::Win32::UI::Controls::HTREEITEM,
+) {
+    let source_index = with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
+        Some(NodeData::Source(idx)) => Some(*idx),
+        _ => None,
+    })
+    .flatten();
+    let Some(source_index) = source_index else {
+        return;
+    };
+
+    let current_item_keys: HashSet<String> = with_rss_state(hwnd, |s| {
+        s.source_items
+            .get(&hitem.0)
+            .map(|state| state.items.iter().map(rss_item_key).collect())
+            .unwrap_or_default()
+    })
+    .unwrap_or_default();
+
+    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    if parent.0 == 0 {
+        return;
+    }
+
+    with_state(parent, |ps| {
+        if let Some(src) = ps.settings.rss_sources.get_mut(source_index) {
+            let before = src.read_item_keys.len();
+            src.read_item_keys.retain(|k| current_item_keys.contains(k));
+            if src.read_item_keys.len() != before {
+                crate::settings::save_settings(ps.settings.clone());
+            }
+        }
+    });
 }
 
 unsafe extern "system" fn rss_tree_compare(
@@ -727,7 +785,7 @@ fn rss_fetch_config(parent: HWND) -> rss::RssFetchConfig {
 
 fn default_feed_path(language: crate::settings::Language) -> Option<PathBuf> {
     let file_name = match language {
-        crate::settings::Language::English => "feed_en.txt",
+        crate::settings::Language::Ukrainian | crate::settings::Language::English => "feed_en.txt",
         crate::settings::Language::Italian => "feed_it.txt",
         crate::settings::Language::Spanish => "feed_es.txt",
         crate::settings::Language::Portuguese => "feed_pt.txt",
@@ -753,7 +811,7 @@ fn default_feed_path(language: crate::settings::Language) -> Option<PathBuf> {
 
 fn embedded_default_feeds(language: crate::settings::Language) -> &'static str {
     match language {
-        crate::settings::Language::English => FEED_EN_DATA,
+        crate::settings::Language::Ukrainian | crate::settings::Language::English => FEED_EN_DATA,
         crate::settings::Language::Italian => FEED_IT_DATA,
         crate::settings::Language::Spanish => FEED_ES_DATA,
         crate::settings::Language::Portuguese => FEED_PT_DATA,
@@ -794,7 +852,7 @@ fn is_default_key(
     key: &str,
 ) -> bool {
     match language {
-        crate::settings::Language::English => settings
+        crate::settings::Language::Ukrainian | crate::settings::Language::English => settings
             .rss_default_en_keys
             .iter()
             .any(|k| normalize_rss_url_key(k) == key),
@@ -953,6 +1011,7 @@ fn apply_default_sources(
             last_seen_guid: None,
             last_updated: None,
             removed_item_keys: Vec::new(),
+            read_item_keys: Vec::new(),
         });
         existing.insert(key.clone());
         changed = true;
@@ -977,12 +1036,14 @@ unsafe fn ensure_default_sources(parent: HWND) {
     }
     with_state(parent, |s| {
         let changed = match language {
-            crate::settings::Language::English => apply_default_sources(
-                &mut s.settings.rss_sources,
-                &s.settings.rss_removed_default_en,
-                &mut s.settings.rss_default_en_keys,
-                &defaults,
-            ),
+            crate::settings::Language::Ukrainian | crate::settings::Language::English => {
+                apply_default_sources(
+                    &mut s.settings.rss_sources,
+                    &s.settings.rss_removed_default_en,
+                    &mut s.settings.rss_default_en_keys,
+                    &defaults,
+                )
+            }
             crate::settings::Language::Swedish => apply_default_sources(
                 &mut s.settings.rss_sources,
                 &s.settings.rss_removed_default_en,
@@ -1053,12 +1114,14 @@ pub(crate) fn sync_default_sources_for_settings(
         return false;
     }
     match language {
-        crate::settings::Language::English => apply_default_sources(
-            &mut settings.rss_sources,
-            &settings.rss_removed_default_en,
-            &mut settings.rss_default_en_keys,
-            &defaults,
-        ),
+        crate::settings::Language::Ukrainian | crate::settings::Language::English => {
+            apply_default_sources(
+                &mut settings.rss_sources,
+                &settings.rss_removed_default_en,
+                &mut settings.rss_default_en_keys,
+                &defaults,
+            )
+        }
         crate::settings::Language::Swedish => apply_default_sources(
             &mut settings.rss_sources,
             &settings.rss_removed_default_en,
@@ -1160,6 +1223,7 @@ enum NodeData {
 struct SourceItemsState {
     items: Vec<RssItem>,
     loaded: usize,
+    read_item_keys: HashSet<String>,
 }
 
 struct AddDialogInit {
@@ -1884,6 +1948,7 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                             last_seen_guid: None,
                             last_updated: None,
                             removed_item_keys: Vec::new(),
+                            read_item_keys: Vec::new(),
                         });
                         crate::settings::save_settings(state.settings.clone());
                     });
@@ -2072,6 +2137,50 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
             let ptr = lparam.0 as *mut BackgroundCheckResult;
             let res = *unsafe { Box::from_raw(ptr) };
             process_background_check_result(hwnd, res);
+            LRESULT(0)
+        }
+        WM_RSS_MARK_ITEM_READ_UI => {
+            let ptr = lparam.0 as *mut MarkItemReadUiMessage;
+            let msg_data = *unsafe { Box::from_raw(ptr) };
+            let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+            if hwnd_tree.0 == 0 {
+                return LRESULT(0);
+            }
+            let hitem = windows::Win32::UI::Controls::HTREEITEM(msg_data.hitem);
+            let item = with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
+                Some(NodeData::Item(item)) => Some(item.clone()),
+                _ => None,
+            })
+            .flatten();
+            if let Some(item) = item
+                && rss_item_key(&item) == msg_data.item_key
+            {
+                let (language, announce_unread) = with_rss_state(hwnd, |s| {
+                    with_state(s.parent, |ps| {
+                        (
+                            ps.settings.language,
+                            ps.settings.announce_unread_rss_podcast_items,
+                        )
+                    })
+                    .unwrap_or((crate::settings::Language::English, true))
+                })
+                .unwrap_or((crate::settings::Language::English, true));
+                let updated = rss_item_display_title(&item.title, language, announce_unread, false);
+                let text = to_wide(&updated);
+                let mut tv_item = TVITEMW {
+                    mask: TVIF_TEXT,
+                    hItem: hitem,
+                    pszText: windows::core::PWSTR(text.as_ptr() as *mut _),
+                    cchTextMax: text.len() as i32,
+                    ..Default::default()
+                };
+                SendMessageW(
+                    hwnd_tree,
+                    TVM_SETITEMW,
+                    WPARAM(0),
+                    LPARAM(&mut tv_item as *mut _ as isize),
+                );
+            }
             LRESULT(0)
         }
         WM_CLEAR_ENTER_GUARD => {
@@ -2574,14 +2683,17 @@ unsafe fn create_controls(hwnd: HWND) {
 }
 
 unsafe fn reload_tree(hwnd: HWND) {
-    let (hwnd_tree, sources, language) = match with_rss_state(hwnd, |s| {
+    let (hwnd_tree, sources, language, announce_unread) = match with_rss_state(hwnd, |s| {
         (
             s.hwnd_tree,
             with_state(s.parent, |ps| ps.settings.rss_sources.clone()),
             with_state(s.parent, |ps| ps.settings.language),
+            with_state(s.parent, |ps| ps.settings.announce_unread_rss_podcast_items),
         )
     }) {
-        Some((t, Some(src), Some(language))) => (t, src, language),
+        Some((t, Some(src), Some(language), Some(announce_unread))) => {
+            (t, src, language, announce_unread)
+        }
         _ => return,
     };
 
@@ -2593,7 +2705,11 @@ unsafe fn reload_tree(hwnd: HWND) {
     });
 
     for (i, source) in sources.into_iter().enumerate() {
-        let title = to_wide(&rss_source_display_title(&source, language));
+        let title = to_wide(&rss_source_display_title(
+            &source,
+            language,
+            announce_unread,
+        ));
         let mut tvis = TVINSERTSTRUCTW {
             hParent: TVI_ROOT,
             hInsertAfter: TVI_LAST,
@@ -2686,7 +2802,11 @@ unsafe fn set_source_unread(
                     changed = true;
                 }
                 if changed {
-                    let title = rss_source_display_title(src, language);
+                    let title = rss_source_display_title(
+                        src,
+                        language,
+                        ps.settings.announce_unread_rss_podcast_items,
+                    );
                     crate::settings::save_settings(ps.settings.clone());
                     return Some(title);
                 }
@@ -3059,7 +3179,11 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                             {
                                 src.title = outcome.title.clone();
                             }
-                            final_title = rss_source_display_title(src, lang);
+                            final_title = rss_source_display_title(
+                                src,
+                                lang,
+                                ps.settings.announce_unread_rss_podcast_items,
+                            );
                             if src.kind != outcome.kind {
                                 src.kind = outcome.kind;
                             }
@@ -3198,14 +3322,35 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                     SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
                 }
 
+                let saved_read_item_keys: HashSet<String> = with_rss_state(hwnd, |s| {
+                    let source_index = match s.node_data.get(&hitem.0) {
+                        Some(NodeData::Source(index)) => Some(*index),
+                        _ => None,
+                    };
+                    with_state(s.parent, |ps| {
+                        source_index
+                            .and_then(|index| ps.settings.rss_sources.get(index))
+                            .map(|src| src.read_item_keys.iter().cloned().collect())
+                    })
+                    .flatten()
+                    .unwrap_or_default()
+                })
+                .unwrap_or_default();
+
                 with_rss_state(hwnd, |s| {
                     let items: Vec<RssItem> = outcome
                         .items
                         .into_iter()
                         .filter(|item| !removed_keys.contains(&rss_item_key(item)))
                         .collect();
-                    s.source_items
-                        .insert(hitem.0, SourceItemsState { items, loaded: 0 });
+                    s.source_items.insert(
+                        hitem.0,
+                        SourceItemsState {
+                            items,
+                            loaded: 0,
+                            read_item_keys: saved_read_item_keys,
+                        },
+                    );
                 });
                 let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
                 let (initial_count, _next_count) = rss_page_sizes(parent);
@@ -3223,6 +3368,7 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                 // This updates last_seen_guid to the newest item
                 set_source_unread(hwnd, hitem, false);
             }
+            prune_persisted_read_keys_for_source(hwnd, hitem);
         }
         Err(e) => {
             let (message, cache) = match e {
@@ -3379,6 +3525,17 @@ unsafe fn load_more_items(
     if hwnd_tree.0 == 0 {
         return 0;
     }
+    let (language, announce_unread) = with_rss_state(hwnd, |s| {
+        with_state(s.parent, |ps| {
+            (
+                ps.settings.language,
+                ps.settings.announce_unread_rss_podcast_items,
+            )
+        })
+        .unwrap_or((crate::settings::Language::English, true))
+    })
+    .unwrap_or((crate::settings::Language::English, true));
+
     SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(0), LPARAM(0));
     let (inserted, loaded_after, total_after) = with_rss_state(hwnd, |s| {
         let Some(state) = s.source_items.get_mut(&hitem.0) else {
@@ -3395,7 +3552,10 @@ unsafe fn load_more_items(
             if item.title.trim().is_empty() {
                 continue;
             }
-            let text = to_wide(&item.title);
+            let item_unread = !state.read_item_keys.contains(&rss_item_key(item));
+            let display_title =
+                rss_item_display_title(&item.title, language, announce_unread, item_unread);
+            let text = to_wide(&display_title);
             let c_children = if item.is_folder { 1 } else { 0 };
             let mut tvis = TVINSERTSTRUCTW {
                 hParent: hitem,
@@ -3458,6 +3618,59 @@ unsafe fn handle_enter_action(hwnd: HWND, open_in_browser: bool) {
     .flatten();
 
     if let Some(item) = item_opt {
+        let item_key = rss_item_key(&item);
+        with_rss_state(hwnd, |s| {
+            let parent = windows::Win32::UI::Controls::HTREEITEM(
+                SendMessageW(
+                    s.hwnd_tree,
+                    TVM_GETNEXTITEM,
+                    WPARAM(TVGN_PARENT as usize),
+                    LPARAM(hitem.0),
+                )
+                .0,
+            );
+            if parent.0 != 0
+                && let Some(state) = s.source_items.get_mut(&parent.0)
+            {
+                state.read_item_keys.insert(item_key.clone());
+            }
+            if parent.0 != 0
+                && let Some(NodeData::Source(source_index)) = s.node_data.get(&parent.0)
+            {
+                with_state(s.parent, |ps| {
+                    if let Some(src) = ps.settings.rss_sources.get_mut(*source_index)
+                        && !src.read_item_keys.iter().any(|k| k == &item_key)
+                    {
+                        src.read_item_keys.push(item_key.clone());
+                        const MAX_PERSISTED_READ_KEYS: usize = 5000;
+                        if src.read_item_keys.len() > MAX_PERSISTED_READ_KEYS {
+                            let overflow = src.read_item_keys.len() - MAX_PERSISTED_READ_KEYS;
+                            src.read_item_keys.drain(0..overflow);
+                        }
+                        crate::settings::save_settings(ps.settings.clone());
+                    }
+                });
+            }
+        });
+        let delayed_key = rss_item_key(&item);
+        let delayed_hitem = hitem.0;
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_secs(2));
+            let payload = Box::new(MarkItemReadUiMessage {
+                hitem: delayed_hitem,
+                item_key: delayed_key,
+            });
+            let payload_ptr = Box::into_raw(payload);
+            if let Err(e) = PostMessageW(
+                hwnd,
+                WM_RSS_MARK_ITEM_READ_UI,
+                WPARAM(0),
+                LPARAM(payload_ptr as isize),
+            ) {
+                let _payload_owner = unsafe { Box::from_raw(payload_ptr) };
+                crate::log_debug(&format!("Failed to post WM_RSS_MARK_ITEM_READ_UI: {}", e));
+            }
+        });
         if open_in_browser {
             handle_article_action(hwnd, ArticleAction::OpenInBrowser);
         } else {
@@ -3553,7 +3766,8 @@ unsafe fn handle_delete(hwnd: HWND) {
                         let key = normalize_rss_url_key(&url);
                         if !key.is_empty() && default_keys.contains(&key) {
                             let removed_list = match language {
-                                crate::settings::Language::English => {
+                                crate::settings::Language::Ukrainian
+                                | crate::settings::Language::English => {
                                     &mut ps.settings.rss_removed_default_en
                                 }
                                 crate::settings::Language::Swedish => {
@@ -3671,6 +3885,24 @@ unsafe fn handle_delete(hwnd: HWND) {
                 )
                 .0,
             );
+            let next_sibling = windows::Win32::UI::Controls::HTREEITEM(
+                SendMessageW(
+                    hwnd_tree,
+                    TVM_GETNEXTITEM,
+                    WPARAM(windows::Win32::UI::Controls::TVGN_NEXT as usize),
+                    LPARAM(hitem.0),
+                )
+                .0,
+            );
+            let prev_sibling = windows::Win32::UI::Controls::HTREEITEM(
+                SendMessageW(
+                    hwnd_tree,
+                    TVM_GETNEXTITEM,
+                    WPARAM(windows::Win32::UI::Controls::TVGN_PREVIOUS as usize),
+                    LPARAM(hitem.0),
+                )
+                .0,
+            );
             let key = rss_item_key(&item);
             let mut source_idx_for_undo: Option<usize> = None;
             let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
@@ -3706,7 +3938,27 @@ unsafe fn handle_delete(hwnd: HWND) {
                 }
             });
             SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(hitem.0));
-            if parent_item.0 != 0 {
+            let next_exists = next_sibling.0 != 0
+                && with_rss_state(hwnd, |s| s.node_data.contains_key(&next_sibling.0))
+                    .unwrap_or(false);
+            let prev_exists = prev_sibling.0 != 0
+                && with_rss_state(hwnd, |s| s.node_data.contains_key(&prev_sibling.0))
+                    .unwrap_or(false);
+            if next_exists {
+                SendMessageW(
+                    hwnd_tree,
+                    TVM_SELECTITEM,
+                    WPARAM(TVGN_CARET as usize),
+                    LPARAM(next_sibling.0),
+                );
+            } else if prev_exists {
+                SendMessageW(
+                    hwnd_tree,
+                    TVM_SELECTITEM,
+                    WPARAM(TVGN_CARET as usize),
+                    LPARAM(prev_sibling.0),
+                );
+            } else if parent_item.0 != 0 {
                 SendMessageW(
                     hwnd_tree,
                     TVM_SELECTITEM,
@@ -3754,7 +4006,8 @@ unsafe fn undo_last_delete(hwnd: HWND) {
                 ps.settings.rss_sources.insert(insert_at, source);
                 if let Some(key) = default_removed_key_added {
                     let removed_list = match language {
-                        crate::settings::Language::English => {
+                        crate::settings::Language::Ukrainian
+                        | crate::settings::Language::English => {
                             &mut ps.settings.rss_removed_default_en
                         }
                         crate::settings::Language::Swedish => {
@@ -3889,13 +4142,30 @@ unsafe fn undo_last_delete(hwnd: HWND) {
                 }
 
                 let mut restored_hitem = windows::Win32::UI::Controls::HTREEITEM(0);
+                let (language, announce_unread) = with_rss_state(hwnd, |s| {
+                    with_state(s.parent, |ps| {
+                        (
+                            ps.settings.language,
+                            ps.settings.announce_unread_rss_podcast_items,
+                        )
+                    })
+                    .unwrap_or((crate::settings::Language::English, true))
+                })
+                .unwrap_or((crate::settings::Language::English, true));
                 with_rss_state(hwnd, |s| {
                     if let Some(state) = s.source_items.get(&source_hitem.0) {
                         for entry in state.items.iter().take(state.loaded) {
                             if entry.title.trim().is_empty() {
                                 continue;
                             }
-                            let text = to_wide(&entry.title);
+                            let item_unread = !state.read_item_keys.contains(&rss_item_key(entry));
+                            let display_title = rss_item_display_title(
+                                &entry.title,
+                                language,
+                                announce_unread,
+                                item_unread,
+                            );
+                            let text = to_wide(&display_title);
                             let mut tvis = TVINSERTSTRUCTW {
                                 hParent: source_hitem,
                                 hInsertAfter: TVI_LAST,
@@ -4462,6 +4732,11 @@ unsafe fn import_item(hwnd: HWND, item: RssItem) {
 
 struct ImportResult {
     text: String,
+}
+
+struct MarkItemReadUiMessage {
+    hitem: isize,
+    item_key: String,
 }
 
 /// Collapse multiple consecutive blank (or whitespace-only) lines into a single blank line.

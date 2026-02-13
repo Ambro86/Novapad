@@ -98,6 +98,7 @@ const OPTIONS_ID_CHECK_UPDATES: usize = 6015;
 const OPTIONS_ID_SEND_CRASH_REPORTS: usize = 6048;
 const OPTIONS_ID_USE_LEGACY_NAME: usize = 6057;
 const OPTIONS_ID_CONFIRM_DELETE_RSS_PODCAST: usize = 6066;
+const OPTIONS_ID_ANNOUNCE_UNREAD_RSS_PODCAST: usize = 6067;
 const OPTIONS_ID_MANAGE_ASSOCIATIONS: usize = 6044;
 const OPTIONS_ID_PROMPT_PROGRAM: usize = 6019;
 const OPTIONS_ID_TABS: usize = 6024;
@@ -243,6 +244,7 @@ struct OptionsDialogState {
     edit_subtitle_offset: HWND,
     label_podcast_cache_limit: HWND,
     edit_podcast_cache_limit: HWND,
+    checkbox_announce_unread_rss_podcast: HWND,
     label_podcastindex_key: HWND,
     edit_podcastindex_key: HWND,
     label_podcastindex_secret: HWND,
@@ -368,6 +370,7 @@ struct OptionsLabels {
     label_subtitle_ducking: String,
     label_subtitle_offset: String,
     label_podcast_cache_limit: String,
+    label_announce_unread_rss_podcast: String,
     label_podcastindex_key: String,
     label_podcastindex_secret: String,
     label_podcastindex_signup: String,
@@ -381,6 +384,7 @@ struct OptionsLabels {
     lang_pl: String,
     lang_fr: String,
     lang_sr: String,
+    lang_uk: String,
     marker_position_end: String,
     marker_position_beginning: String,
     open_new_tab: String,
@@ -501,6 +505,10 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_subtitle_ducking: i18n::tr(language, "options.label.subtitle_ducking"),
         label_subtitle_offset: i18n::tr(language, "options.label.subtitle_offset"),
         label_podcast_cache_limit: i18n::tr(language, "options.label.podcast_cache_limit"),
+        label_announce_unread_rss_podcast: i18n::tr(
+            language,
+            "options.label.announce_unread_rss_podcast",
+        ),
         label_podcastindex_key: i18n::tr(language, "options.label.podcastindex_key"),
         label_podcastindex_secret: i18n::tr(language, "options.label.podcastindex_secret"),
         label_podcastindex_signup: i18n::tr(language, "options.button.podcastindex_signup"),
@@ -517,6 +525,14 @@ fn options_labels(language: Language) -> OptionsLabels {
             let value = i18n::tr(language, "options.lang.sr");
             if value == "options.lang.sr" {
                 "Serbian".to_string()
+            } else {
+                value
+            }
+        },
+        lang_uk: {
+            let value = i18n::tr(language, "options.lang.uk");
+            if value == "options.lang.uk" {
+                "Ukrainian".to_string()
             } else {
                 value
             }
@@ -1609,6 +1625,22 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
             );
             y += 30;
 
+            let checkbox_announce_unread_rss_podcast = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_announce_unread_rss_podcast).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                170,
+                y,
+                360,
+                20,
+                hwnd,
+                HMENU(OPTIONS_ID_ANNOUNCE_UNREAD_RSS_PODCAST as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 28;
+
             let label_podcastindex_key = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -2308,6 +2340,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 edit_subtitle_offset,
                 label_podcast_cache_limit,
                 edit_podcast_cache_limit,
+                checkbox_announce_unread_rss_podcast,
                 label_podcastindex_key,
                 edit_podcastindex_key,
                 label_podcastindex_secret,
@@ -2419,6 +2452,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 edit_subtitle_offset,
                 label_podcast_cache_limit,
                 edit_podcast_cache_limit,
+                checkbox_announce_unread_rss_podcast,
                 label_podcastindex_key,
                 edit_podcastindex_key,
                 label_podcastindex_secret,
@@ -2753,6 +2787,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         checkbox_subtitle_ducking,
         _label_podcast_cache_limit,
         edit_podcast_cache_limit,
+        checkbox_announce_unread_rss_podcast,
         _label_podcastindex_key,
         edit_podcastindex_key,
         _label_podcastindex_secret,
@@ -2829,6 +2864,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.checkbox_subtitle_ducking,
             state.label_podcast_cache_limit,
             state.edit_podcast_cache_limit,
+            state.checkbox_announce_unread_rss_podcast,
             state.label_podcastindex_key,
             state.edit_podcastindex_key,
             state.label_podcastindex_secret,
@@ -2947,6 +2983,12 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         WPARAM(0),
         LPARAM(to_wide(&labels.lang_sr).as_ptr() as isize),
     );
+    SendMessageW(
+        combo_lang,
+        CB_ADDSTRING,
+        WPARAM(0),
+        LPARAM(to_wide(&labels.lang_uk).as_ptr() as isize),
+    );
 
     let lang_index = match settings.language {
         Language::Italian => 0,
@@ -2959,6 +3001,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         Language::Polish => 7,
         Language::French => 8,
         Language::Serbian => 9,
+        Language::Ukrainian => 10,
     };
     SendMessageW(combo_lang, CB_SETCURSEL, WPARAM(lang_index), LPARAM(0));
 
@@ -3399,6 +3442,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         (labels.lang_cs.clone(), "cs"),
         (labels.lang_pl.clone(), "pl"),
         (labels.lang_fr.clone(), "fr"),
+        (labels.lang_uk.clone(), "uk"),
     ];
     let current_dict_lang = settings
         .dictionary_translation_language
@@ -3440,6 +3484,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         (labels.lang_cs.clone(), "cs"),
         (labels.lang_pl.clone(), "pl"),
         (labels.lang_fr.clone(), "fr"),
+        (labels.lang_uk.clone(), "uk"),
     ];
     let current_wikipedia_lang = settings.wikipedia_language.trim().to_ascii_lowercase();
     let mut wiki_selected_idx = 0;
@@ -3636,6 +3681,16 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         checkbox_confirm_delete_rss_podcast,
         BM_SETCHECK,
         WPARAM(if settings.confirm_delete_rss_podcast {
+            BST_CHECKED.0 as usize
+        } else {
+            0
+        }),
+        LPARAM(0),
+    );
+    SendMessageW(
+        checkbox_announce_unread_rss_podcast,
+        BM_SETCHECK,
+        WPARAM(if settings.announce_unread_rss_podcast_items {
             BST_CHECKED.0 as usize
         } else {
             0
@@ -4532,6 +4587,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         checkbox_audio_split_epub_chapters,
         checkbox_subtitle_ducking,
         edit_podcast_cache_limit,
+        checkbox_announce_unread_rss_podcast,
         edit_podcastindex_key,
         edit_podcastindex_secret,
         checkbox_tts_manual,
@@ -4591,6 +4647,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.checkbox_audio_split_epub_chapters,
             state.checkbox_subtitle_ducking,
             state.edit_podcast_cache_limit,
+            state.checkbox_announce_unread_rss_podcast,
             state.edit_podcastindex_key,
             state.edit_podcastindex_secret,
             state.checkbox_tts_manual,
@@ -4699,6 +4756,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         7 => Language::Polish,
         8 => Language::French,
         9 => Language::Serbian,
+        10 => Language::Ukrainian,
         _ => Language::Italian,
     };
 
@@ -4960,6 +5018,14 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             == BST_CHECKED.0;
     settings.confirm_delete_rss_podcast = SendMessageW(
         checkbox_confirm_delete_rss_podcast,
+        BM_GETCHECK,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0 as u32
+        == BST_CHECKED.0;
+    settings.announce_unread_rss_podcast_items = SendMessageW(
+        checkbox_announce_unread_rss_podcast,
         BM_GETCHECK,
         WPARAM(0),
         LPARAM(0),
@@ -5868,6 +5934,11 @@ fn layout_audio_tab(state: &OptionsDialogState) {
         y,
         OPTIONS_EDIT_HEIGHT,
     );
+    y = layout_checkbox(
+        "checkbox_announce_unread_rss_podcast",
+        state.checkbox_announce_unread_rss_podcast,
+        y,
+    );
     y = layout_label_control(
         "label_podcastindex_key",
         state.label_podcastindex_key,
@@ -6022,6 +6093,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.edit_subtitle_offset,
             state.label_podcast_cache_limit,
             state.edit_podcast_cache_limit,
+            state.checkbox_announce_unread_rss_podcast,
             state.label_podcastindex_key,
             state.edit_podcastindex_key,
             state.label_podcastindex_secret,

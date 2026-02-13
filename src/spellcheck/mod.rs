@@ -192,7 +192,7 @@ impl SpellcheckManager {
 pub fn editor_language_tag(language: Language) -> &'static str {
     match language {
         Language::Italian => "it-IT",
-        Language::English => "en-US",
+        Language::Ukrainian | Language::English => "en-US",
         Language::Spanish => "es-ES",
         Language::Portuguese => "pt-PT",
         Language::Swedish => "sv-SE",

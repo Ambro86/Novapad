@@ -13,6 +13,7 @@ Ulepszenia
 • Dodano eksport źródeł RSS do OPML w oknie RSS, aby łatwo zapisać i ponownie zaimportować aktualne źródła.
 • Dodano funkcję „Wyszukaj RSS po słowie kluczowym” w oknie RSS: po wpisaniu słowa kluczowego Sonarpad automatycznie generuje adres RSS Google News i otwiera okno dodawania źródła z już uzupełnionymi polami, dzięki czemu feed tematyczny można utworzyć jednym krokiem.
 • Dodano tłumaczenie serbskie dzięki Mila Kuran.
+• Dodano tłumaczenie ukraińskie dzięki Ivan Shtefuriak.
 • Dodano otwieranie wielu plików multimedialnych naraz: po otwarciu kilku plików tworzona jest kolejka odtwarzania zamiast zastępowania bieżącego pliku.
 • Dodano skróty zmiennego przewijania podczas odtwarzania: przy bazie 1 minuty strzałka lewo/prawo przewija o 60 s, Shift+strzałka lewo/prawo o 20 s, a Ctrl+strzałka lewo/prawo o 3 minuty.
 • Dodano skróty do poprzedniego/następnego utworu w odtwarzaczu: Ctrl+PageUp i Ctrl+PageDown.
@@ -20,6 +21,7 @@ Ulepszenia
 • Ulepszenia instalatora: setup.exe pozwala teraz wybrać między skojarzeniem wszystkich obsługiwanych typów plików a ręcznym wyborem rozszerzeń; MSI również udostępnia wybór per rozszerzenie w drzewie funkcji (domyślnie bez zmian: wszystko włączone).
 • Dodano nowe menu „Okno” z opcją „Otwarte dokumenty...”, aby szybko przełączać się między aktualnie otwartymi plikami.
 • Zaktualizowano opcję Widok > Czcionka: pełny selektor został zastąpiony szybkim podmenu z popularnymi czcionkami (Arial, Calibri, Consolas, Segoe UI, Tahoma, Verdana, Times New Roman, Georgia), z zachowaniem aktualnego rozmiaru tekstu.
+• Ulepszono odczyt RSS i podcastów dzięki dwóm osobnym komunikatom: węzły źródeł ogłaszają „nowe elementy”, gdy feed/podcast ma nowości, a pojedyncze artykuły RSS i odcinki podcastów ogłaszają „nieprzeczytane”/„nieodtworzone”; to zachowanie można wyłączyć w Opcjach.
 Poprawki błędów
 • Naprawiono wyodrębnianie tekstu EPUB dla książek zawierających komentarze HTML inline (<!-- ... -->): tekst rozdziałów jest teraz poprawnie parsowany zamiast być częściowo lub całkowicie pomijany.
 • Naprawiono słownik Wiktionary dla języka hiszpańskiego i obsługę cache słownika: słowa takie jak „agua” są teraz poprawnie znajdowane, a stare wpisy „nie znaleziono słowa” nie są już ponownie używane.

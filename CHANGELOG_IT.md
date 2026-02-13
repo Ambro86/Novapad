@@ -13,6 +13,7 @@ Miglioramenti
 • Aggiunto l'export dei feed RSS in OPML nella finestra RSS, così le fonti correnti possono essere salvate e reimportate facilmente.
 • Aggiunta la funzione "Cerca RSS per parola chiave" nella finestra RSS: inserendo una parola chiave viene generato automaticamente l'URL RSS di Google News e si apre la finestra di aggiunta fonte già precompilata, così i feed tematici si creano in un solo passaggio.
 • Aggiunta la traduzione serba grazie a Mila Kuran.
+• Aggiunta la traduzione ucraina grazie a Ivan Shtefuriak.
 • Aggiunta l'apertura multipla dei file media: aprendo più file insieme viene creata una coda di riproduzione invece di sostituire il file corrente.
 • Aggiunte scorciatoie di seek variabile durante la riproduzione: con base di 1 minuto, Freccia sinistra/destra sposta di 60s, Shift+Freccia sinistra/destra di 20s e Ctrl+Freccia sinistra/destra di 3 minuti.
 • Aggiunte le scorciatoie per brano precedente/successivo nel player: Ctrl+Pagina su e Ctrl+Pagina giù.
@@ -20,6 +21,7 @@ Miglioramenti
 • Migliorato l'installer: setup.exe ora permette di scegliere tra associare tutti i tipi file supportati oppure selezionare manualmente le singole estensioni; anche MSI ora espone la scelta per estensione nell'albero funzionalità (default invariato: tutte attive).
 • Aggiunto il nuovo menu "Finestra" con la voce "Documenti aperti..." per passare rapidamente a uno dei file attualmente aperti.
 • Aggiornata la voce Visualizza > Carattere: al posto del selettore completo ora c'è un sottomenu rapido con font comuni (Arial, Calibri, Consolas, Segoe UI, Tahoma, Verdana, Times New Roman, Georgia), mantenendo la dimensione testo già impostata.
+• Migliorata la lettura di RSS e podcast con due annunci distinti: i nodi sorgente annunciano "nuovi elementi" quando il feed/podcast ha aggiornamenti, mentre i singoli articoli RSS e i singoli episodi podcast annunciano "non letto"/"non riprodotto"; il comportamento è disattivabile dalle Opzioni.
 Correzioni di bug
 • Corretto il parsing del testo EPUB per i libri che contengono commenti HTML inline (<!-- ... -->): il testo dei capitoli ora viene estratto correttamente invece di essere saltato in parte o del tutto.
 • Corretto il dizionario Wiktionary in spagnolo e la gestione cache del dizionario: parole come "agua" ora vengono trovate correttamente e le vecchie cache "parola non trovata" non vengono più riutilizzate.

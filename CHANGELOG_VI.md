@@ -13,6 +13,7 @@ Cải tiến
 • Đã thêm chức năng xuất nguồn RSS sang OPML trong cửa sổ RSS, giúp lưu và nhập lại các nguồn hiện tại một cách dễ dàng.
 • Đã thêm tính năng "Tìm RSS theo từ khóa" trong cửa sổ RSS: khi nhập từ khóa, Sonarpad sẽ tự động tạo URL RSS Google News và mở hộp thoại thêm nguồn với thông tin đã điền sẵn, giúp tạo feed theo chủ đề chỉ trong một bước.
 • Đã thêm bản dịch tiếng Serbia nhờ Mila Kuran.
+• Đã thêm bản dịch tiếng Ukraina nhờ Ivan Shtefuriak.
 • Đã thêm mở nhiều tệp media cùng lúc: khi mở nhiều tệp sẽ tạo hàng đợi phát thay vì thay thế tệp hiện tại.
 • Đã thêm phím tắt tua biến thiên khi phát: với mức cơ bản 1 phút, Trái/Phải tua 60 giây, Shift+Trái/Phải tua 20 giây, và Ctrl+Trái/Phải tua 3 phút.
 • Đã thêm phím tắt chuyển bài trước/sau trong trình phát: Ctrl+PageUp và Ctrl+PageDown.
@@ -20,6 +21,7 @@ Cải tiến
 • Cải tiến trình cài đặt: setup.exe giờ cho phép chọn giữa liên kết tất cả kiểu tệp được hỗ trợ hoặc tự chọn từng phần mở rộng; MSI cũng hỗ trợ chọn theo từng phần mở rộng trong cây tính năng (mặc định giữ nguyên: bật tất cả).
 • Đã thêm menu mới "Cửa sổ" với mục "Tài liệu đang mở..." để chuyển nhanh đến bất kỳ tệp nào đang mở.
 • Đã cập nhật mục Xem > Phông chữ: thay bộ chọn đầy đủ bằng submenu nhanh với các phông phổ biến (Arial, Calibri, Consolas, Segoe UI, Tahoma, Verdana, Times New Roman, Georgia), đồng thời giữ nguyên cỡ chữ hiện tại.
+• Đã cải thiện cách đọc RSS và podcast với hai kiểu thông báo tách biệt: nút nguồn sẽ báo "mục mới" khi feed/podcast có nội dung mới, còn từng bài RSS và từng tập podcast sẽ báo "chưa đọc"/"chưa phát"; có thể tắt hành vi này trong Tùy chọn.
 Sửa lỗi
 • Đã sửa trích xuất văn bản EPUB cho sách có chứa chú thích HTML inline (<!-- ... -->): văn bản chương giờ được phân tích đúng thay vì bị bỏ qua một phần hoặc toàn bộ.
 • Đã sửa từ điển Wiktionary tiếng Tây Ban Nha và cơ chế cache từ điển: các từ như "agua" giờ được tìm đúng, và các mục cache cũ kiểu "Không tìm thấy từ" sẽ không còn được tái sử dụng.

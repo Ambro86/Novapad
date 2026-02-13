@@ -950,6 +950,9 @@ fn tts_playback_inner(
             const WS_RETRY_MAX: usize = 10;
             let mut next_index = 0usize;
             for attempt in 1..=WS_RETRY_MAX {
+                if cancel_downloader.load(Ordering::SeqCst) {
+                    return;
+                }
                 let ws_result = download_edge_chunks_ws(
                     &chunks_downloader[next_index..],
                     &voice_downloader,
@@ -961,14 +964,21 @@ fn tts_playback_inner(
                 )
                 .await;
                 match ws_result {
-                    Ok(sent_count) => {
-                        next_index = (next_index + sent_count).min(chunks_downloader.len());
+                    Ok(processed_count) => {
+                        if processed_count == 0 {
+                            let msg = "Edge WS: no progress".to_string();
+                            if let Err(err) = audio_tx.send(Err(msg)).await {
+                                crate::log_debug(&format!("Failed to send audio error: {:?}", err));
+                            }
+                            return;
+                        }
+                        next_index = (next_index + processed_count).min(chunks_downloader.len());
                         if next_index >= chunks_downloader.len() {
                             return;
                         }
                         crate::log_debug(&format!(
-                            "Edge WS: partial progress sent={} remaining={} (attempt {}/{})",
-                            sent_count,
+                            "Edge WS: partial progress processed={} remaining={} (attempt {}/{})",
+                            processed_count,
                             chunks_downloader.len().saturating_sub(next_index),
                             attempt,
                             WS_RETRY_MAX
@@ -983,7 +993,9 @@ fn tts_playback_inner(
                             attempt, WS_RETRY_MAX, e
                         ));
                         if attempt == WS_RETRY_MAX {
-                            let _unused = audio_tx.send(Err(e)).await;
+                            if let Err(err) = audio_tx.send(Err(e)).await {
+                                crate::log_debug(&format!("Failed to send audio error: {:?}", err));
+                            }
                             return;
                         }
                         tokio::time::sleep(Duration::from_millis(500)).await;
@@ -1100,6 +1112,7 @@ fn tts_playback_inner(
         };
 
         if audio.is_empty() {
+            current_offset = current_offset.saturating_add(orig_len.max(1));
             continue;
         }
 
@@ -1159,7 +1172,7 @@ fn tts_playback_inner(
             end_reason = "cancelled";
             break;
         }
-        current_offset += orig_len;
+        current_offset = current_offset.saturating_add(orig_len.max(1));
     }
 
     if appended_any {
@@ -1345,29 +1358,16 @@ async fn download_audio_chunk_attempt(
                     break;
                 }
             }
-            Message::Binary(data) => {
-                if data.len() < 2 {
+            Message::Binary(data) => match parse_edge_binary_audio_payload(&data) {
+                Ok(Some(audio)) => {
+                    audio_data.extend_from_slice(&audio);
+                }
+                Ok(None) => continue,
+                Err(err) => {
+                    log_debug(&err);
                     continue;
                 }
-                let be_len = u16::from_be_bytes([data[0], data[1]]) as usize;
-                let le_len = u16::from_le_bytes([data[0], data[1]]) as usize;
-                let mut parsed = false;
-                for header_len in [be_len, le_len] {
-                    if header_len == 0 || data.len() < header_len + 2 {
-                        continue;
-                    }
-                    let headers_bytes = &data[2..2 + header_len];
-                    let headers_str = String::from_utf8_lossy(headers_bytes);
-                    if headers_str.contains("Path:audio") {
-                        audio_data.extend_from_slice(&data[2 + header_len..]);
-                        parsed = true;
-                        break;
-                    }
-                }
-                if parsed {
-                    continue;
-                }
-            }
+            },
             Message::Close(_) => break,
             _ => {}
         }
@@ -1391,29 +1391,16 @@ async fn read_edge_audio_turn(
                     break;
                 }
             }
-            Message::Binary(data) => {
-                if data.len() < 2 {
+            Message::Binary(data) => match parse_edge_binary_audio_payload(&data) {
+                Ok(Some(audio)) => {
+                    audio_data.extend_from_slice(&audio);
+                }
+                Ok(None) => continue,
+                Err(err) => {
+                    log_debug(&err);
                     continue;
                 }
-                let be_len = u16::from_be_bytes([data[0], data[1]]) as usize;
-                let le_len = u16::from_le_bytes([data[0], data[1]]) as usize;
-                let mut parsed = false;
-                for header_len in [be_len, le_len] {
-                    if header_len == 0 || data.len() < header_len + 2 {
-                        continue;
-                    }
-                    let headers_bytes = &data[2..2 + header_len];
-                    let headers_str = String::from_utf8_lossy(headers_bytes);
-                    if headers_str.contains("Path:audio") {
-                        audio_data.extend_from_slice(&data[2 + header_len..]);
-                        parsed = true;
-                        break;
-                    }
-                }
-                if parsed {
-                    continue;
-                }
-            }
+            },
             Message::Close(_) => break,
             _ => {}
         }
@@ -1438,33 +1425,17 @@ async fn read_edge_audio_turn_to_writer(
                     break;
                 }
             }
-            Message::Binary(data) => {
-                if data.len() < 2 {
+            Message::Binary(data) => match parse_edge_binary_audio_payload(&data) {
+                Ok(Some(audio)) => {
+                    buffer.extend_from_slice(&audio);
+                    audio_received = true;
+                }
+                Ok(None) => continue,
+                Err(err) => {
+                    log_debug(&err);
                     continue;
                 }
-                let be_len = u16::from_be_bytes([data[0], data[1]]) as usize;
-                let le_len = u16::from_le_bytes([data[0], data[1]]) as usize;
-                let mut parsed = false;
-                for header_len in [be_len, le_len] {
-                    if header_len == 0 || data.len() < header_len + 2 {
-                        continue;
-                    }
-                    let headers_bytes = &data[2..2 + header_len];
-                    let headers_str = String::from_utf8_lossy(headers_bytes);
-                    if headers_str.contains("Path:audio") {
-                        let audio = &data[2 + header_len..];
-                        if !audio.is_empty() {
-                            buffer.extend_from_slice(audio);
-                            audio_received = true;
-                        }
-                        parsed = true;
-                        break;
-                    }
-                }
-                if parsed {
-                    continue;
-                }
-            }
+            },
             Message::Close(_) => break,
             _ => {}
         }
@@ -1539,6 +1510,7 @@ async fn download_edge_chunks_ws(
         .map_err(|e: tungstenite::Error| e.to_string())?;
 
     let mut sent_count = 0usize;
+    let mut processed_count = 0usize;
     for (idx, chunk) in chunks.iter().enumerate() {
         if cancel.load(Ordering::Relaxed) {
             return Err("Cancelled".to_string());
@@ -1574,6 +1546,7 @@ async fn download_edge_chunks_ws(
                 "Edge WS: skipping unusable chunk {} text={:?}",
                 idx, &chunk.text_to_read
             ));
+            processed_count = processed_count.saturating_add(1);
             continue;
         }
         let ssml = mkssml(
@@ -1589,10 +1562,16 @@ async fn download_edge_chunks_ws(
             get_date_string(),
             ssml
         );
-        write
-            .send(Message::Text(ssml_msg.into()))
-            .await
-            .map_err(|e: tungstenite::Error| e.to_string())?;
+        if let Err(e) = write.send(Message::Text(ssml_msg.into())).await {
+            if processed_count > 0 {
+                crate::log_debug(&format!(
+                    "Edge WS: write failed after partial progress, processed={}: {}",
+                    processed_count, e
+                ));
+                return Ok(processed_count);
+            }
+            return Err(e.to_string());
+        }
         let audio = if sent_count == 0 {
             let mut audio = None;
             for attempt in 1..=FIRST_AUDIO_RETRIES {
@@ -1603,7 +1582,21 @@ async fn download_edge_chunks_ws(
                     .await
                 {
                     Ok(res) => {
-                        audio = Some(res?);
+                        match res {
+                            Ok(data) => {
+                                audio = Some(data);
+                            }
+                            Err(e) => {
+                                if processed_count > 0 {
+                                    crate::log_debug(&format!(
+                                        "Edge WS: read failed after partial progress, processed={}: {}",
+                                        processed_count, e
+                                    ));
+                                    return Ok(processed_count);
+                                }
+                                return Err(e);
+                            }
+                        }
                         break;
                     }
                     Err(_) => {
@@ -1623,32 +1616,40 @@ async fn download_edge_chunks_ws(
             }
             audio.ok_or_else(|| "Edge WS: first audio timeout".to_string())?
         } else {
-            read_edge_audio_turn(&mut read).await?
+            match read_edge_audio_turn(&mut read).await {
+                Ok(data) => data,
+                Err(e) => {
+                    if processed_count > 0 {
+                        crate::log_debug(&format!(
+                            "Edge WS: read failed after partial progress, processed={}: {}",
+                            processed_count, e
+                        ));
+                        return Ok(processed_count);
+                    }
+                    return Err(e);
+                }
+            }
         };
         if audio.is_empty() {
             crate::log_debug(&format!(
                 "Edge WS: received empty audio chunk, skipping chunk_index={}",
                 idx
             ));
+            processed_count = processed_count.saturating_add(1);
             continue;
         }
         if let Some(tx) = audio_tx {
             let len = chunk.original_len;
             if tx.send(Ok((audio, len))).await.is_err() {
-                return Ok(sent_count);
+                return Ok(processed_count);
             }
             sent_count = sent_count.saturating_add(1);
         } else {
             sent_count = sent_count.saturating_add(1);
         }
+        processed_count = processed_count.saturating_add(1);
     }
-
-    if audio_tx.is_some() && sent_count == 0 {
-        crate::log_debug("Edge WS: no audio sent to playback.");
-        return Err("Edge WS: no audio sent".to_string());
-    }
-
-    Ok(sent_count)
+    Ok(processed_count)
 }
 
 struct EdgeStreamOptions<'a> {
@@ -3007,42 +3008,52 @@ fn adjust_split_for_xml_entity(text: &str, mut split_at: usize) -> usize {
     split_at
 }
 
+fn find_last_newline_or_space_within_limit(text: &str, max_bytes: usize) -> usize {
+    let mut last_newline = 0usize;
+    let mut last_space = 0usize;
+    for (idx, ch) in text.char_indices() {
+        let end = idx + ch.len_utf8();
+        if end > max_bytes {
+            break;
+        }
+        if ch == '\n' {
+            last_newline = end;
+        } else if ch.is_whitespace() {
+            last_space = end;
+        }
+    }
+    if last_newline > 0 {
+        last_newline
+    } else {
+        last_space
+    }
+}
+
+fn find_safe_utf8_split_idx(text: &str, max_bytes: usize) -> usize {
+    let mut last_end = 0usize;
+    for (idx, ch) in text.char_indices() {
+        let end = idx + ch.len_utf8();
+        if end > max_bytes {
+            break;
+        }
+        last_end = end;
+    }
+    last_end
+}
+
 fn find_edge_split_idx(text: &str, max_bytes: usize) -> usize {
     let total_bytes = text.len();
     if total_bytes <= max_bytes {
         return text.len();
     }
 
-    let mut last_sentence = 0usize;
-    let mut last_space = 0usize;
-    let mut last_end = 0usize;
-
-    let mut iter = text.char_indices().peekable();
-    while let Some((idx, ch)) = iter.next() {
-        let end = idx + ch.len_utf8();
-        if end > max_bytes {
-            break;
-        }
-        last_end = end;
-
-        let next_is_space = iter.peek().map(|(_, c)| c.is_whitespace()).unwrap_or(true);
-        if matches!(ch, '.' | '!' | '?' | ';' | ':') && next_is_space {
-            last_sentence = end;
-        } else if ch.is_whitespace() {
-            last_space = end;
-        }
+    let mut split_at = find_last_newline_or_space_within_limit(text, max_bytes);
+    if split_at == 0 {
+        split_at = find_safe_utf8_split_idx(text, max_bytes);
     }
-
-    let mut split_at = if last_sentence > 0 {
-        last_sentence
-    } else if last_space > 0 {
-        last_space
-    } else {
-        last_end
-    };
     split_at = adjust_split_for_xml_entity(text, split_at);
     if split_at == 0 {
-        split_at = last_end;
+        split_at = find_safe_utf8_split_idx(text, max_bytes);
     }
     split_at
 }
@@ -3167,7 +3178,20 @@ fn split_long_sentence_edge_with_limit(text: &str, max_bytes: usize) -> Vec<Stri
     let mut remaining = text;
     while remaining.len() > max_bytes {
         let split_at = find_edge_split_idx(remaining, max_bytes);
-        if split_at == 0 || split_at >= remaining.len() {
+        if split_at == 0 {
+            // Guard against infinite loop on malformed input: consume at least one char.
+            if let Some(first_char) = remaining.chars().next() {
+                let advance = first_char.len_utf8();
+                let chunk = remaining[..advance].trim();
+                if !chunk.is_empty() {
+                    out.push(chunk.to_string());
+                }
+                remaining = &remaining[advance..];
+                continue;
+            }
+            break;
+        }
+        if split_at >= remaining.len() {
             break;
         }
         let (head, tail) = remaining.split_at(split_at);
@@ -3182,6 +3206,60 @@ fn split_long_sentence_edge_with_limit(text: &str, max_bytes: usize) -> Vec<Stri
         out.push(tail.to_string());
     }
     out
+}
+
+fn parse_edge_binary_audio_payload(data: &[u8]) -> Result<Option<Vec<u8>>, String> {
+    if data.len() < 2 {
+        return Err("Edge WS: binary frame missing header length".to_string());
+    }
+
+    let be_len = u16::from_be_bytes([data[0], data[1]]) as usize;
+    let le_len = u16::from_le_bytes([data[0], data[1]]) as usize;
+    let header_len = if be_len > 0 && data.len() >= be_len + 2 {
+        be_len
+    } else if le_len > 0 && data.len() >= le_len + 2 {
+        le_len
+    } else {
+        return Err("Edge WS: invalid binary header length".to_string());
+    };
+
+    let header_bytes = &data[2..2 + header_len];
+    let payload = &data[2 + header_len..];
+    let header_text = String::from_utf8_lossy(header_bytes);
+    let mut path: Option<&str> = None;
+    let mut content_type: Option<&str> = None;
+    for line in header_text.split("\r\n") {
+        if let Some((k, v)) = line.split_once(':') {
+            let key = k.trim();
+            let val = v.trim();
+            if key.eq_ignore_ascii_case("Path") {
+                path = Some(val);
+            } else if key.eq_ignore_ascii_case("Content-Type") {
+                content_type = Some(val);
+            }
+        }
+    }
+
+    if path != Some("audio") {
+        return Err("Edge WS: binary frame path is not audio".to_string());
+    }
+
+    match content_type {
+        Some(ct) if ct.eq_ignore_ascii_case("audio/mpeg") => {
+            if payload.is_empty() {
+                return Err("Edge WS: audio frame has empty payload".to_string());
+            }
+            Ok(Some(payload.to_vec()))
+        }
+        Some(_) => Err("Edge WS: unexpected binary content type".to_string()),
+        None => {
+            if payload.is_empty() {
+                Ok(None)
+            } else {
+                Err("Edge WS: missing content type with non-empty payload".to_string())
+            }
+        }
+    }
 }
 
 fn split_text_for_engine(text: &str, engine: TtsEngine) -> Vec<String> {
@@ -3328,6 +3406,7 @@ fn start_audiobook_with_text(
     text: String,
     suggested_name: Option<String>,
     epub_chapters: Option<Vec<String>>,
+    is_unsaved_doc: bool,
 ) {
     let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     if text.trim().is_empty() {
@@ -3394,21 +3473,10 @@ fn start_audiobook_with_text(
         0,
         100,
     ));
-    let split_option_visible = audiobook_split_by_time
+    let base_split_option_visible = audiobook_split_by_time
         || audiobook_split_by_text
         || audiobook_split > 1
         || (audiobook_split_by_epub_chapter && epub_chapters.as_ref().is_some());
-    let Some(save_result) =
-        (unsafe { save_audio_dialog(hwnd, suggested_name.as_deref(), split_option_visible) })
-    else {
-        return;
-    };
-    let mut output = save_result.path;
-    let create_parts_folder = save_result.create_parts_folder;
-    crate::log_debug(&format!(
-        "Audiobook: settings bitrate resolved to {} kbps for output {:?}",
-        audiobook_m4b_bitrate, output
-    ));
 
     let cleaned = strip_dashed_lines(&text);
     let mixed_needed = has_voice_tags(&cleaned);
@@ -3577,6 +3645,23 @@ fn start_audiobook_with_text(
         mixed_marker_parts.as_ref().map(|p| p.len()).unwrap_or(0),
         expected_multi_file_split
     ));
+    let split_option_visible = if is_unsaved_doc {
+        expected_multi_file_split
+    } else {
+        base_split_option_visible
+    };
+    let Some(save_result) =
+        (unsafe { save_audio_dialog(hwnd, suggested_name.as_deref(), split_option_visible) })
+    else {
+        return;
+    };
+    let mut output = save_result.path;
+    let create_parts_folder = save_result.create_parts_folder;
+    crate::log_debug(&format!(
+        "Audiobook: settings bitrate resolved to {} kbps for output {:?}",
+        audiobook_m4b_bitrate, output
+    ));
+
     if create_parts_folder && split_into_multiple_files {
         let nested_output = split_parts_output_in_subfolder(&output);
         if let Some(parent) = nested_output.parent()
@@ -3887,7 +3972,7 @@ pub fn start_audiobook(hwnd: HWND) {
         return;
     };
     let text = unsafe { get_edit_text(hwnd_edit) };
-    let (suggested_name, doc_path, split_epub, language) = unsafe {
+    let (suggested_name, doc_path, split_epub, language, is_unsaved_doc) = unsafe {
         with_state(hwnd, |state| {
             state.docs.get(state.current).map(|doc| {
                 let p = Path::new(&doc.title);
@@ -3899,12 +3984,13 @@ pub fn start_audiobook(hwnd: HWND) {
                     doc.path.clone(),
                     state.settings.audiobook_split_by_epub_chapter,
                     state.settings.language,
+                    doc.path.is_none(),
                 )
             })
         })
     }
     .flatten()
-    .unwrap_or((String::new(), None, false, Language::Italian));
+    .unwrap_or((String::new(), None, false, Language::Italian, true));
 
     let mut epub_chapters = None;
     if split_epub
@@ -3929,7 +4015,7 @@ pub fn start_audiobook(hwnd: HWND) {
     } else {
         Some(suggested_name)
     };
-    start_audiobook_with_text(hwnd, text, suggested_name, epub_chapters);
+    start_audiobook_with_text(hwnd, text, suggested_name, epub_chapters, is_unsaved_doc);
 }
 
 pub fn start_audiobook_from_selection(hwnd: HWND) {
@@ -3949,15 +4035,21 @@ pub fn start_audiobook_from_selection(hwnd: HWND) {
         with_state(hwnd, |state| {
             state.docs.get(state.current).map(|doc| {
                 let p = Path::new(&doc.title);
-                p.file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or(&doc.title)
-                    .to_string()
+                (
+                    p.file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or(&doc.title)
+                        .to_string(),
+                    doc.path.is_none(),
+                )
             })
         })
     }
     .flatten();
-    start_audiobook_with_text(hwnd, text, suggested_name, None);
+    let (suggested_name, is_unsaved_doc) = suggested_name
+        .map(|(name, unsaved)| (Some(name), unsaved))
+        .unwrap_or((None, true));
+    start_audiobook_with_text(hwnd, text, suggested_name, None, is_unsaved_doc);
 }
 
 fn parse_sapi4_voice_index(voice: &str) -> i32 {
@@ -4464,9 +4556,10 @@ fn merge_and_finalize_sapi4_mp3(
 #[cfg(test)]
 mod tests {
     use super::{
-        TtsEngine, build_audiobook_parts_by_positions, collect_marker_entries, is_edge_text_usable,
-        normalize_for_tts, parse_sapi4_part_index, sanitize_edge_text, split_into_tts_chunks,
-        strip_dashed_lines,
+        TtsEngine, build_audiobook_parts_by_positions, collect_marker_entries, find_edge_split_idx,
+        is_edge_text_usable, normalize_for_tts, parse_edge_binary_audio_payload,
+        parse_sapi4_part_index, sanitize_edge_text, split_into_tts_chunks,
+        split_long_sentence_edge_with_limit, strip_dashed_lines,
     };
 
     #[test]
@@ -4615,6 +4708,47 @@ mod tests {
         );
         assert!(!chunks.is_empty());
         assert!(chunks.iter().all(|c| c.text_to_read.trim() != "."));
+    }
+
+    #[test]
+    fn edge_split_idx_prefers_newline_or_space_and_stays_utf8_safe() {
+        let text = "uno due\ntre quattro cinque";
+        let split = find_edge_split_idx(text, 10);
+        assert!(split > 0 && split <= 10);
+        assert!(text.is_char_boundary(split));
+    }
+
+    #[test]
+    fn edge_split_long_sentence_never_loops_and_preserves_order() {
+        let text = "áááááááááááááááááááá";
+        let parts = split_long_sentence_edge_with_limit(text, 3);
+        assert!(!parts.is_empty());
+        let joined: String = parts.join("");
+        assert_eq!(joined, text);
+    }
+
+    #[test]
+    fn edge_binary_audio_payload_parses_valid_audio_frame() {
+        let header = b"Path:audio\r\nContent-Type:audio/mpeg";
+        let payload = b"\x01\x02\x03";
+        let mut frame = Vec::new();
+        frame.extend_from_slice(&(header.len() as u16).to_be_bytes());
+        frame.extend_from_slice(header);
+        frame.extend_from_slice(payload);
+        let out = parse_edge_binary_audio_payload(&frame).expect("valid frame should parse");
+        assert_eq!(out, Some(payload.to_vec()));
+    }
+
+    #[test]
+    fn edge_binary_audio_payload_rejects_non_audio_path() {
+        let header = b"Path:turn.end\r\nContent-Type:audio/mpeg";
+        let payload = b"\x01";
+        let mut frame = Vec::new();
+        frame.extend_from_slice(&(header.len() as u16).to_be_bytes());
+        frame.extend_from_slice(header);
+        frame.extend_from_slice(payload);
+        let err = parse_edge_binary_audio_payload(&frame).expect_err("non-audio path must fail");
+        assert!(err.contains("path is not audio"));
     }
 
     #[test]

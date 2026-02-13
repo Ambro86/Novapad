@@ -82,7 +82,7 @@ use windows::Win32::Graphics::Gdi::{
     InvalidateRect, LOGFONTW, ScreenToClient,
 };
 use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
-use windows::Win32::System::DataExchange::COPYDATASTRUCT;
+use windows::Win32::System::DataExchange::{COPYDATASTRUCT, IsClipboardFormatAvailable};
 use windows::Win32::System::Diagnostics::Debug::MessageBeep;
 use windows::Win32::System::LibraryLoader::{GetModuleHandleW, LoadLibraryW};
 use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
@@ -3320,6 +3320,20 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                         MF_BYCOMMAND | MF_GRAYED
                     };
                     let _enabled = EnableMenuItem(hmenu, IDM_EDIT_UNDO as u32, flags);
+                    let can_cut_copy = has_active_text_selection(hwnd);
+                    let cut_copy_flags = if can_cut_copy {
+                        MF_BYCOMMAND | MF_ENABLED
+                    } else {
+                        MF_BYCOMMAND | MF_GRAYED
+                    };
+                    let _enabled = EnableMenuItem(hmenu, IDM_EDIT_CUT as u32, cut_copy_flags);
+                    let _enabled = EnableMenuItem(hmenu, IDM_EDIT_COPY as u32, cut_copy_flags);
+                    let paste_flags = if can_paste_now(hwnd) {
+                        MF_BYCOMMAND | MF_ENABLED
+                    } else {
+                        MF_BYCOMMAND | MF_GRAYED
+                    };
+                    let _enabled = EnableMenuItem(hmenu, IDM_EDIT_PASTE as u32, paste_flags);
                 }
             }
             let ctx = with_state(hwnd, |state| {
@@ -6370,6 +6384,16 @@ pub(crate) unsafe fn show_editor_context_menu(hwnd: HWND, hwnd_edit: HWND, lpara
     } else {
         MF_STRING | MF_GRAYED
     };
+    let cut_copy_flags = if has_selection {
+        MF_STRING
+    } else {
+        MF_STRING | MF_GRAYED
+    };
+    let paste_flags = if can_paste_now(hwnd) {
+        MF_STRING
+    } else {
+        MF_STRING | MF_GRAYED
+    };
     crate::log_if_err!(AppendMenuW(
         menu,
         undo_flags,
@@ -6379,19 +6403,19 @@ pub(crate) unsafe fn show_editor_context_menu(hwnd: HWND, hwnd_edit: HWND, lpara
     crate::log_if_err!(AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()));
     crate::log_if_err!(AppendMenuW(
         menu,
-        MF_STRING,
+        cut_copy_flags,
         IDM_EDIT_CUT,
         PCWSTR(to_wide(&labels.edit_cut).as_ptr()),
     ));
     crate::log_if_err!(AppendMenuW(
         menu,
-        MF_STRING,
+        cut_copy_flags,
         IDM_EDIT_COPY,
         PCWSTR(to_wide(&labels.edit_copy).as_ptr()),
     ));
     crate::log_if_err!(AppendMenuW(
         menu,
-        MF_STRING,
+        paste_flags,
         IDM_EDIT_PASTE,
         PCWSTR(to_wide(&labels.edit_paste).as_ptr()),
     ));
@@ -6437,6 +6461,28 @@ unsafe fn can_undo_now(hwnd: HWND) -> bool {
         return false;
     };
     SendMessageW(hwnd_edit, EM_CANUNDO, WPARAM(0), LPARAM(0)).0 != 0
+}
+
+unsafe fn has_active_text_selection(hwnd: HWND) -> bool {
+    let Some(hwnd_edit) = get_active_edit(hwnd) else {
+        return false;
+    };
+    let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
+    SendMessageW(
+        hwnd_edit,
+        EM_EXGETSEL,
+        WPARAM(0),
+        LPARAM(&mut selection as *mut _ as isize),
+    );
+    selection.cpMin != selection.cpMax
+}
+
+unsafe fn can_paste_now(hwnd: HWND) -> bool {
+    if get_active_edit(hwnd).is_none() {
+        return false;
+    }
+    // CF_UNICODETEXT = 13
+    IsClipboardFormatAvailable(13).is_ok()
 }
 
 unsafe fn show_voice_context_menu(hwnd: HWND, target: HWND, lparam: LPARAM) {

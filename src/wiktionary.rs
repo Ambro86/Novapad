@@ -640,6 +640,34 @@ fn extract_synonyms(wikitext: &str, max_syns: usize) -> Vec<String> {
     out
 }
 
+fn is_spanish_infinitive(token: &str) -> bool {
+    let t = token.trim();
+    if t.len() < 3 || !t.chars().all(|c| c.is_alphabetic() || c == '-') {
+        return false;
+    }
+    let lower = t.to_ascii_lowercase();
+    lower.ends_with("ar") || lower.ends_with("er") || lower.ends_with("ir")
+}
+
+fn strip_trailing_definition_punctuation(s: &str) -> &str {
+    s.trim().trim_end_matches(|c: char| {
+        c.is_whitespace() || c == '.' || c == ',' || c == ';' || c == ':'
+    })
+}
+
+fn remove_spanish_infinitive_noise_when_contextual(defs: &mut Vec<String>) {
+    if defs.len() <= 1 {
+        return;
+    }
+    defs.retain(|d| {
+        let base = strip_trailing_definition_punctuation(d);
+        if base.is_empty() || base.split_whitespace().count() != 1 {
+            return true;
+        }
+        !is_spanish_infinitive(base)
+    });
+}
+
 pub struct WiktionaryService {
     client: Client,
 }
@@ -872,8 +900,11 @@ impl WiktionaryService {
         target_lang: Option<&str>,
         word: &str,
     ) -> Result<DictionaryAndTranslation, LookupError> {
-        let dict = self.dictionary_lookup(dictionary_lang, word)?;
-        let translation = match target_lang {
+        let mut dict = self.dictionary_lookup(dictionary_lang, word)?;
+        if dictionary_lang.eq_ignore_ascii_case("es") {
+            remove_spanish_infinitive_noise_when_contextual(&mut dict.definitions);
+        }
+        let mut translation = match target_lang {
             None => None,
             Some(t) if t.eq_ignore_ascii_case(dictionary_lang) => None,
             Some(t) => match self.translate_word(t, word) {
@@ -882,6 +913,14 @@ impl WiktionaryService {
                 Err(err) => return Err(err),
             },
         };
+        if dictionary_lang.eq_ignore_ascii_case("es")
+            && let Some(t) = translation.as_mut()
+        {
+            remove_spanish_infinitive_noise_when_contextual(&mut t.definitions);
+            if t.definitions.is_empty() {
+                translation = None;
+            }
+        }
         Ok(DictionaryAndTranslation {
             dictionary: dict,
             translation,
@@ -894,8 +933,11 @@ impl WiktionaryService {
         target_lang: Option<&str>,
         word: &str,
     ) -> Result<(DictionaryAndTranslation, bool), LookupError> {
-        let (dict, length) = self.dictionary_lookup_with_length(dictionary_lang, word)?;
-        let translation = match target_lang {
+        let (mut dict, length) = self.dictionary_lookup_with_length(dictionary_lang, word)?;
+        if dictionary_lang.eq_ignore_ascii_case("es") {
+            remove_spanish_infinitive_noise_when_contextual(&mut dict.definitions);
+        }
+        let mut translation = match target_lang {
             None => None,
             Some(t) if t.eq_ignore_ascii_case(dictionary_lang) => None,
             Some(t) => match self.translate_word(t, word) {
@@ -904,6 +946,14 @@ impl WiktionaryService {
                 Err(err) => return Err(err),
             },
         };
+        if dictionary_lang.eq_ignore_ascii_case("es")
+            && let Some(t) = translation.as_mut()
+        {
+            remove_spanish_infinitive_noise_when_contextual(&mut t.definitions);
+            if t.definitions.is_empty() {
+                translation = None;
+            }
+        }
         Ok((
             DictionaryAndTranslation {
                 dictionary: dict,
@@ -1253,5 +1303,18 @@ mod tests {
         let wikitext = "# ing-form";
         let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
         assert!(defs.is_empty());
+    }
+
+    #[test]
+    fn removes_spanish_infinitive_noise_when_other_definitions_exist() {
+        let mut defs = vec![
+            "saludar".to_string(),
+            "Fórmula social de comienzo de una conversación.".to_string(),
+        ];
+        super::remove_spanish_infinitive_noise_when_contextual(&mut defs);
+        assert_eq!(
+            defs,
+            vec!["Fórmula social de comienzo de una conversación.".to_string()]
+        );
     }
 }

@@ -19,7 +19,6 @@ Tom’s Hardware Italia | https://www.tomshw.it/feed/
 Everyeye | https://www.everyeye.it/rss/news/
 GameSource | https://www.gamesource.it/feed/
 Aranzulla | https://www.aranzulla.it/feed/
-Il Meteo | https://www.ilmeteo.it/rss/
 Calcio e Finanza | https://www.calcioefinanza.it/feed/
 La Gazzetta dello Sport | https://www.gazzetta.it/dynamic-feed/rss/section/last.xml
 Corriere dello Sport | https://www.corrieredellosport.it/rss/

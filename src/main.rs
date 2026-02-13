@@ -7291,6 +7291,7 @@ unsafe fn insert_bookmark(hwnd: HWND) {
                 app_windows::bookmarks_window::refresh_bookmarks_list(bookmarks_window);
             }
         }
+        confirm_menu_action(hwnd, "insert.bookmark");
         return;
     }
 
@@ -7385,6 +7386,7 @@ unsafe fn insert_bookmark(hwnd: HWND) {
             app_windows::bookmarks_window::refresh_bookmarks_list(bookmarks_window);
         }
     }
+    confirm_menu_action(hwnd, "insert.bookmark");
 }
 
 fn audio_bookmark_position_and_snippet(position_secs: f64) -> (i32, String) {

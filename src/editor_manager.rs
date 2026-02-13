@@ -673,6 +673,38 @@ unsafe fn current_line_block_from_caret(
     Some((range_start, range_end, selected, trailing))
 }
 
+unsafe fn restore_caret_after_line_op_if_no_selection(
+    hwnd_edit: HWND,
+    had_selection: bool,
+    original_caret: i32,
+    replace_start: i32,
+    replaced_text: &str,
+) {
+    let new_caret = if had_selection {
+        // Keep caret at the start of the last selected line.
+        // If the block ends with a newline, ignore trailing line breaks first,
+        // otherwise caret can land on the next line outside the selection.
+        let trimmed = replaced_text.trim_end_matches(['\r', '\n']);
+        let last_line_start = trimmed.rfind('\n').map(|idx| idx + 1).unwrap_or(0);
+        let line_start_in_block = byte_index_to_utf16(trimmed, last_line_start);
+        replace_start.saturating_add(line_start_in_block)
+    } else {
+        let new_len = byte_index_to_utf16(replaced_text, replaced_text.len());
+        let relative = original_caret.saturating_sub(replace_start).max(0);
+        replace_start.saturating_add(relative.min(new_len))
+    };
+    let mut caret_range = CHARRANGE {
+        cpMin: new_caret,
+        cpMax: new_caret,
+    };
+    SendMessageW(
+        hwnd_edit,
+        EM_EXSETSEL,
+        WPARAM(0),
+        LPARAM(&mut caret_range as *mut _ as isize),
+    );
+}
+
 fn apply_indent_settings_to_edit(hwnd_edit: HWND, settings: &AppSettings) {
     let width = match settings.indentation_mode {
         IndentationMode::Spaces => settings.indent_space_width,
@@ -1663,6 +1695,8 @@ pub unsafe fn hard_line_break_active_edit(hwnd: HWND) -> bool {
         WPARAM(0),
         LPARAM(&mut selection as *mut _ as isize),
     );
+    let had_selection = selection.cpMin != selection.cpMax;
+    let original_caret = selection.cpMin;
 
     let (range_start, range_end, has_trailing_newline) = if selection.cpMin != selection.cpMax {
         let start = utf16_index_to_byte(&text, selection.cpMin);
@@ -1706,6 +1740,13 @@ pub unsafe fn hard_line_break_active_edit(hwnd: HWND) -> bool {
         LPARAM(replace_wide.as_ptr() as isize),
     );
     end_single_undo_action(hwnd_edit);
+    restore_caret_after_line_op_if_no_selection(
+        hwnd_edit,
+        had_selection,
+        original_caret,
+        replace_range.cpMin,
+        &reformatted,
+    );
     mark_dirty_from_edit(hwnd, hwnd_edit);
     SetFocus(hwnd_edit);
     true
@@ -1728,6 +1769,8 @@ pub unsafe fn order_items_active_edit(hwnd: HWND) -> bool {
         WPARAM(0),
         LPARAM(&mut selection as *mut _ as isize),
     );
+    let had_selection = selection.cpMin != selection.cpMax;
+    let original_caret = selection.cpMin;
 
     let (replace_start, replace_end, affected, has_trailing_newline) =
         if let Some((start, end, selected, trailing)) =
@@ -1768,6 +1811,13 @@ pub unsafe fn order_items_active_edit(hwnd: HWND) -> bool {
         LPARAM(replace_wide.as_ptr() as isize),
     );
     end_single_undo_action(hwnd_edit);
+    restore_caret_after_line_op_if_no_selection(
+        hwnd_edit,
+        had_selection,
+        original_caret,
+        replace_start,
+        &ordered,
+    );
     mark_dirty_from_edit(hwnd, hwnd_edit);
     SetFocus(hwnd_edit);
     true
@@ -1790,6 +1840,8 @@ pub unsafe fn keep_unique_items_active_edit(hwnd: HWND) -> bool {
         WPARAM(0),
         LPARAM(&mut selection as *mut _ as isize),
     );
+    let had_selection = selection.cpMin != selection.cpMax;
+    let original_caret = selection.cpMin;
 
     let (replace_start, replace_end, affected, has_trailing_newline) =
         if let Some((start, end, selected, trailing)) =
@@ -1830,6 +1882,13 @@ pub unsafe fn keep_unique_items_active_edit(hwnd: HWND) -> bool {
         LPARAM(replace_wide.as_ptr() as isize),
     );
     end_single_undo_action(hwnd_edit);
+    restore_caret_after_line_op_if_no_selection(
+        hwnd_edit,
+        had_selection,
+        original_caret,
+        replace_start,
+        &cleaned,
+    );
     mark_dirty_from_edit(hwnd, hwnd_edit);
     SetFocus(hwnd_edit);
     true
@@ -1852,6 +1911,8 @@ pub unsafe fn reverse_items_active_edit(hwnd: HWND) -> bool {
         WPARAM(0),
         LPARAM(&mut selection as *mut _ as isize),
     );
+    let had_selection = selection.cpMin != selection.cpMax;
+    let original_caret = selection.cpMin;
 
     let (replace_start, replace_end, affected, has_trailing_newline) =
         if let Some((start, end, selected, trailing)) =
@@ -1892,6 +1953,13 @@ pub unsafe fn reverse_items_active_edit(hwnd: HWND) -> bool {
         LPARAM(replace_wide.as_ptr() as isize),
     );
     end_single_undo_action(hwnd_edit);
+    restore_caret_after_line_op_if_no_selection(
+        hwnd_edit,
+        had_selection,
+        original_caret,
+        replace_start,
+        &reversed,
+    );
     mark_dirty_from_edit(hwnd, hwnd_edit);
     SetFocus(hwnd_edit);
     true
@@ -1920,6 +1988,8 @@ pub unsafe fn quote_lines_active_edit(hwnd: HWND) -> bool {
         WPARAM(0),
         LPARAM(&mut selection as *mut _ as isize),
     );
+    let had_selection = selection.cpMin != selection.cpMax;
+    let original_caret = selection.cpMin;
 
     let (replace_start, replace_end, affected, has_trailing_newline) =
         if let Some((start, end, selected, trailing)) =
@@ -1960,6 +2030,13 @@ pub unsafe fn quote_lines_active_edit(hwnd: HWND) -> bool {
         LPARAM(replace_wide.as_ptr() as isize),
     );
     end_single_undo_action(hwnd_edit);
+    restore_caret_after_line_op_if_no_selection(
+        hwnd_edit,
+        had_selection,
+        original_caret,
+        replace_start,
+        &quoted,
+    );
     mark_dirty_from_edit(hwnd, hwnd_edit);
     SetFocus(hwnd_edit);
     true
@@ -1988,6 +2065,8 @@ pub unsafe fn unquote_lines_active_edit(hwnd: HWND) -> bool {
         WPARAM(0),
         LPARAM(&mut selection as *mut _ as isize),
     );
+    let had_selection = selection.cpMin != selection.cpMax;
+    let original_caret = selection.cpMin;
 
     let (replace_start, replace_end, affected, has_trailing_newline) =
         if let Some((start, end, selected, trailing)) =
@@ -2028,6 +2107,13 @@ pub unsafe fn unquote_lines_active_edit(hwnd: HWND) -> bool {
         LPARAM(replace_wide.as_ptr() as isize),
     );
     end_single_undo_action(hwnd_edit);
+    restore_caret_after_line_op_if_no_selection(
+        hwnd_edit,
+        had_selection,
+        original_caret,
+        replace_start,
+        &unquoted,
+    );
     mark_dirty_from_edit(hwnd, hwnd_edit);
     SetFocus(hwnd_edit);
     true
@@ -2050,6 +2136,8 @@ pub unsafe fn join_lines_active_edit(hwnd: HWND) -> bool {
         WPARAM(0),
         LPARAM(&mut selection as *mut _ as isize),
     );
+    let had_selection = selection.cpMin != selection.cpMax;
+    let original_caret = selection.cpMin;
 
     let (replace_start, replace_end, affected, has_trailing_newline) =
         if let Some((start, end, selected, trailing)) =
@@ -2090,6 +2178,13 @@ pub unsafe fn join_lines_active_edit(hwnd: HWND) -> bool {
         LPARAM(replace_wide.as_ptr() as isize),
     );
     end_single_undo_action(hwnd_edit);
+    restore_caret_after_line_op_if_no_selection(
+        hwnd_edit,
+        had_selection,
+        original_caret,
+        replace_start,
+        &joined,
+    );
     mark_dirty_from_edit(hwnd, hwnd_edit);
     SetFocus(hwnd_edit);
     true

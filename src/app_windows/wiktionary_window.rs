@@ -19,9 +19,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     EVENT_OBJECT_VALUECHANGE, GWLP_USERDATA, GetDlgCtrlID, GetWindowLongPtrW, GetWindowTextLengthW,
     GetWindowTextW, HMENU, IDC_ARROW, IsWindow, LoadCursorW, MSG, OBJID_CLIENT, PostMessageW,
     RegisterClassW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP,
-    WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WNDCLASSW, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP,
-    WS_VISIBLE, WS_VSCROLL,
+    WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WNDCLASSW,
+    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP,
+    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -394,6 +394,14 @@ unsafe fn wiktionary_wndproc_inner(
                 return LRESULT(0);
             }
             DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
+        WM_SETFOCUS => {
+            if let Some(input) = with_window_state(hwnd, |state| state.input)
+                && input.0 != 0
+            {
+                SetFocus(input);
+            }
+            LRESULT(0)
         }
         WM_LOOKUP_DONE => {
             let generation = wparam.0;

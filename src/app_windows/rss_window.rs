@@ -2994,16 +2994,29 @@ unsafe fn start_background_unread_check(hwnd: HWND) {
         return;
     }
 
-    let sources: Vec<(usize, String, rss::RssSourceType, rss::RssFeedCache)> =
-        with_state(parent, |ps| {
-            ps.settings
-                .rss_sources
-                .iter()
-                .enumerate()
-                .map(|(i, src)| (i, src.url.clone(), src.kind.clone(), src.cache.clone()))
-                .collect()
-        })
-        .unwrap_or_default();
+    let sources: Vec<(
+        usize,
+        String,
+        rss::RssSourceType,
+        rss::RssFeedCache,
+        HashSet<String>,
+    )> = with_state(parent, |ps| {
+        ps.settings
+            .rss_sources
+            .iter()
+            .enumerate()
+            .map(|(i, src)| {
+                (
+                    i,
+                    src.url.clone(),
+                    src.kind.clone(),
+                    src.cache.clone(),
+                    src.removed_item_keys.iter().cloned().collect(),
+                )
+            })
+            .collect()
+    })
+    .unwrap_or_default();
 
     if sources.is_empty() {
         return;
@@ -3030,7 +3043,7 @@ unsafe fn start_background_unread_check(hwnd: HWND) {
             let semaphore = std::sync::Arc::new(tokio::sync::Semaphore::new(4));
             let mut handles = Vec::new();
 
-            for (idx, url, kind, cache) in sources {
+            for (idx, url, kind, cache, removed_keys) in sources {
                 let sem = semaphore.clone();
                 let cfg = fetch_config;
                 let hwnd_val = hwnd_raw;
@@ -3039,15 +3052,11 @@ unsafe fn start_background_unread_check(hwnd: HWND) {
                     let _permit = sem.acquire().await.ok()?;
                     let result = rss::fetch_and_parse(&url, kind, cache, cfg, false).await;
                     if let Ok(outcome) = result {
-                        let newest_key = outcome.items.first().map(|item| {
-                            if !item.guid.trim().is_empty() {
-                                item.guid.trim().to_string()
-                            } else if !item.link.trim().is_empty() {
-                                item.link.trim().to_string()
-                            } else {
-                                item.title.trim().to_string()
-                            }
-                        });
+                        let newest_key = outcome
+                            .items
+                            .iter()
+                            .map(rss_item_key)
+                            .find(|key| !removed_keys.contains(key));
                         let msg = Box::new(BackgroundCheckResult {
                             source_idx: idx,
                             newest_item_key: newest_key,

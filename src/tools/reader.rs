@@ -211,19 +211,63 @@ fn extract_json_values(json_text: &str, key: &str) -> Vec<String> {
     out
 }
 
+fn extract_json_values_loose(json_text: &str, key_name: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let token = format!("\"{key_name}\"");
+    let mut search_pos = 0usize;
+    while let Some(found) = json_text[search_pos..].find(&token) {
+        let mut i = search_pos + found + token.len();
+        while let Some(ch) = json_text[i..].chars().next() {
+            if ch.is_whitespace() {
+                i += ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+        if !json_text[i..].starts_with(':') {
+            search_pos = search_pos + found + token.len();
+            continue;
+        }
+        i += 1;
+        while let Some(ch) = json_text[i..].chars().next() {
+            if ch.is_whitespace() {
+                i += ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+        if !json_text[i..].starts_with('"') {
+            search_pos = search_pos + found + token.len();
+            continue;
+        }
+        i += 1;
+        if let Some((val, end_pos)) = extract_json_string(&json_text[i..]) {
+            out.push(val);
+            search_pos = i + end_pos;
+        } else {
+            break;
+        }
+    }
+    out
+}
+
 fn pick_best_json_article_text(json_text: &str) -> Option<String> {
     let keys = [
-        "\"articleBody\":\"",
-        "\"body\":\"",
-        "\"bodyHtml\":\"",
-        "\"content\":\"",
-        "\"contentHtml\":\"",
-        "\"full_text\":\"",
-        "\"text\":\"",
+        "articleBody",
+        "body",
+        "bodyHtml",
+        "content",
+        "contentHtml",
+        "full_text",
+        "text",
     ];
     let mut best = String::new();
     for key in keys {
-        for val in extract_json_values(json_text, key) {
+        let strict = format!("\"{key}\":\"");
+        for val in extract_json_values(json_text, &strict)
+            .into_iter()
+            .chain(extract_json_values_loose(json_text, key).into_iter())
+        {
             if val.len() < 80 {
                 continue;
             }
@@ -242,6 +286,22 @@ fn pick_best_json_article_text(json_text: &str) -> Option<String> {
             if trimmed.len() > best.len() {
                 best = trimmed.to_string();
             }
+        }
+    }
+    if best.is_empty() { None } else { Some(best) }
+}
+
+fn pick_teaser_json_article_text(json_text: &str) -> Option<String> {
+    let mut best = String::new();
+    let strict = "\"articleBody\":\"";
+    for val in extract_json_values(json_text, strict)
+        .into_iter()
+        .chain(extract_json_values_loose(json_text, "articleBody").into_iter())
+    {
+        let cleaned = collapse_blank_lines(&clean_text(&val));
+        let trimmed = cleaned.trim();
+        if trimmed.len() >= 40 && trimmed.len() > best.len() {
+            best = trimmed.to_string();
         }
     }
     if best.is_empty() { None } else { Some(best) }
@@ -646,6 +706,7 @@ pub fn reader_mode_extract(html_content: &str, language: Language) -> Option<Art
             ".node-summary",
             ".section--content-news .left-content p",
             ".section--content-news .title-quote-text p",
+            ".story__text p, .story__text h2, .story__text li",
             "#article-body .story__text",
             ".entry-content p",
             ".wp-block-post-content p",
@@ -686,6 +747,15 @@ pub fn reader_mode_extract(html_content: &str, language: Language) -> Option<Art
         if best_sel_acc.len() > 200 {
             body_acc.push_str(&best_sel_acc);
         }
+    }
+
+    // 3b. Last-resort teaser fallback for paywalled pages where only JSON-LD
+    // articleBody preview is present: prefer teaser over title-only output.
+    if body_acc.trim().len() < 40
+        && let Some(teaser) = pick_teaser_json_article_text(html_content)
+    {
+        body_acc.push_str(&teaser);
+        body_acc.push_str("\n\n");
     }
 
     let mut final_text = String::new();
@@ -756,7 +826,10 @@ fn is_known_js_noise_line(line: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{author_prefix, clamp_to_char_boundary, is_known_js_noise_line};
+    use super::{
+        author_prefix, clamp_to_char_boundary, extract_json_values_loose, is_known_js_noise_line,
+        pick_best_json_article_text,
+    };
     use crate::settings::Language;
 
     #[test]
@@ -811,6 +884,22 @@ mod tests {
         assert_eq!(clamp_to_char_boundary(s, 4), 3);
         assert_eq!(clamp_to_char_boundary(s, 5), 5);
         assert_eq!(clamp_to_char_boundary(s, 999), s.len());
+    }
+
+    #[test]
+    fn extract_json_values_loose_supports_spaces_around_colon() {
+        let json = r#"{"articleBody" : "Prima frase. Seconda frase."}"#;
+        let vals = extract_json_values_loose(json, "articleBody");
+        assert_eq!(vals.len(), 1);
+        assert!(vals[0].contains("Seconda frase"));
+    }
+
+    #[test]
+    fn pick_best_json_article_text_supports_spaced_article_body_key() {
+        let json = r#"{"articleBody" : "Questa e una prima frase abbastanza lunga per il parser e contiene diversi dettagli utili alla lettura. Questa e una seconda frase abbastanza lunga per superare i filtri e mantenere una struttura naturale del testo estratto. Questa e una terza frase con ulteriore contesto, dati e spiegazioni per simulare un articolo reale con contenuto corposo e leggibile. Questa e una quarta frase che completa il paragrafo e porta la lunghezza totale oltre la soglia minima prevista dai controlli."}"#;
+        let best = pick_best_json_article_text(json).expect("expected article text");
+        assert!(best.contains("prima frase"));
+        assert!(best.contains("seconda frase"));
     }
 }
 

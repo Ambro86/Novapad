@@ -69,7 +69,7 @@ Khi danh sách các mục hiển thị, nhấn phím Tab để di chuyển tiêu
 Từ danh sách giọng đọc yêu thích, bạn cũng có thể nhấn phím Applications để xóa các mục đã được thêm trước đó.
 Phím tắt bàn phím: bạn có thể nhấn F9 và F10 để chuyển đổi giữa các mục trong khi đọc, xoay vòng qua những mục đã thêm vào yêu thích.
 
-Chèn: 
+Dấu trang: 
 Chèn dấu trang: Lưu vị trí con trỏ hiện tại hoặc thời gian trong sách nói (Ctrl+B).
 Quản lý dấu trang: Xem, đi tới hoặc xóa các dấu trang đã lưu.
 Khi mở một tệp có dấu trang, con trỏ hoặc vị trí phát sẽ tự động tiếp tục từ dấu trang đầu tiên hiện có.
@@ -127,5 +127,6 @@ Hướng dẫn: Mở bản hướng dẫn này (F1).
 Kiểm tra bản cập nhật: Kiểm tra xem có bản cập nhật mới không (F2).
 Nhật ký thay đổi: Mở cửa sổ nhật ký thay đổi.
 Giới thiệu: Hiển thị thông tin chương trình.
+
 
 

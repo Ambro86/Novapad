@@ -66,7 +66,7 @@ Widok:
  Aby dodać lub usunąć wpis z ulubionych, użyj Tab, aby przejść do listy wpisów i dodaj lub usuń go za pomocą klawisza Aplikacji lub prawego przycisku myszy. Z listy ulubionych wpisów można również nacisnąć klawisz Aplikacji, aby usunąć już dodane wpisy.
  Skróty klawiszowe: można nacisnąć F9 i F10, aby przełączać się między wpisami podczas czytania, cyklicznie przechodząc przez te dodane do ulubionych.
 
-Wstaw:
+Zakładki:
 
  Wstaw zakładkę: Zapisz bieżącą pozycję kursora lub czas audiobooka (Ctrl+B).
  Zarządzaj zakładkami: Wyświetl, przejdź do lub usuń zapisane zakładki. Podczas otwierania pliku z zakładkami, kursor lub odtwarzanie automatycznie wznowi się od pierwszej dostępnej.
@@ -127,3 +127,4 @@ Pomoc:
  Sprawdź aktualizacje: Sprawdź, czy dostępne są aktualizacje (F2).
  Dziennik zmian: Otwórz okno dziennika zmian.
  O programie: Pokaż informacje o programie.
+

@@ -67,7 +67,7 @@ Menu Affichage :
  Pour ajouter ou supprimer un élément des favoris, utilisez Tab pour accéder à la liste des éléments et ajoutez-le ou supprimez-le à l'aide de la touche de menu contextuel ou du clic droit de la souris. Dans la liste des éléments favoris, vous pouvez également appuyer sur la touche Applications pour supprimer les éléments déjà ajoutés.
  Raccourcis clavier : pendant la lecture, il est possible d'appuyer sur F9 et F10 pour basculer entre les éléments, en parcourant ceux ajoutés aux favoris.
 
-Menu Insérer :
+Menu Signets :
 
  Insérer un signet : Enregistre la position actuelle du curseur ou le temps du livre audio (Ctrl+B).
  Gérer les signets : Affiche, accède à un signet spécifique ou supprime les signets enregistrés. Lors de l'ouverture d'un fichier avec des signets, le curseur ou la lecture reprendra automatiquement à partir du premier disponible.
@@ -120,5 +120,6 @@ Menu Aide :
  Vérifier les mises à jour : Vérifie si des mises à jour sont disponibles (F2).
  Journal des modifications : Ouvre la fenêtre avec la liste des changements.
  À propos du programme : Affiche des informations sur le programme.
+
 
 

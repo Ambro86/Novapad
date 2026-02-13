@@ -3558,6 +3558,10 @@ unsafe fn subscribe_selected_result(hwnd: HWND) {
                     WPARAM(TVGN_CARET as usize),
                     LPARAM(hitem.0),
                 );
+                SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(hitem.0));
+                SetForegroundWindow(hwnd);
+                SetFocus(hwnd_tree);
+                SendMessageW(hwnd_tree, WM_SETFOCUS, WPARAM(0), LPARAM(0));
                 load_episode_children(hwnd, hitem, NodeData::Source(index), false);
             }
         }
@@ -6818,6 +6822,10 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                                 WPARAM(TVGN_CARET as usize),
                                 LPARAM(hitem.0),
                             );
+                            SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(hitem.0));
+                            SetForegroundWindow(hwnd);
+                            SetFocus(hwnd_tree);
+                            SendMessageW(hwnd_tree, WM_SETFOCUS, WPARAM(0), LPARAM(0));
                             load_episode_children(hwnd, hitem, NodeData::Source(index), false);
                         }
                     }

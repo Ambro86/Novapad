@@ -33,6 +33,11 @@ impl CurlClient {
         Self::fetch_url_impersonated_with_progress(url, |_| {})
     }
 
+    pub fn fetch_url_iphone_impersonated(url: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        log_profile("IPHONE_SAFARI", url, "forced");
+        Self::fetch_iphone(url, |_| {})
+    }
+
     pub fn fetch_url_impersonated_with_progress<F: FnMut(u32)>(
         url: &str,
         mut progress_cb: F,

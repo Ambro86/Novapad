@@ -1,4 +1,4 @@
-use crate::accessibility::{handle_accessibility, to_wide};
+use crate::accessibility::{handle_accessibility, nvda_speak, to_wide};
 use crate::i18n;
 use crate::is_dictionary_not_found_cache_entry;
 use crate::log_debug;
@@ -11,15 +11,17 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetFocus, SetFocus, VK_ESCAPE, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
-    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow,
-    ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_READONLY, GWLP_USERDATA, GetDlgCtrlID,
-    GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, IsWindow,
-    LoadCursorW, MSG, PostMessageW, RegisterClassW, SetForegroundWindow, SetWindowLongPtrW,
-    SetWindowTextW, WINDOW_STYLE, WM_APP, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
-    WM_NCDESTROY, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
-    WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    BS_DEFPUSHBUTTON, CHILDID_SELF, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
+    DestroyWindow, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_READONLY,
+    EVENT_OBJECT_VALUECHANGE, GWLP_USERDATA, GetDlgCtrlID, GetWindowLongPtrW, GetWindowTextLengthW,
+    GetWindowTextW, HMENU, IDC_ARROW, IsWindow, LoadCursorW, MSG, OBJID_CLIENT, PostMessageW,
+    RegisterClassW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP,
+    WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WNDCLASSW, WS_CAPTION, WS_CHILD,
+    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP,
+    WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -407,6 +409,21 @@ unsafe fn wiktionary_wndproc_inner(
                     && let Err(_e) = SetWindowTextW(output, PCWSTR(to_wide(text).as_ptr()))
                 {
                     crate::log_debug(&format!("Error: {:?}", _e));
+                } else if let Some((parent, output)) =
+                    with_window_state(hwnd, |state| (state.parent, state.output))
+                {
+                    let language =
+                        with_state(parent, |state| state.settings.language).unwrap_or_default();
+                    let message = i18n::tr(language, "dictionary.lookup.results");
+                    if !nvda_speak(&message) {
+                        crate::log_debug("NVDA speak failed");
+                    }
+                    NotifyWinEvent(
+                        EVENT_OBJECT_VALUECHANGE,
+                        output,
+                        OBJID_CLIENT.0,
+                        CHILDID_SELF as i32,
+                    );
                 }
             }
             LRESULT(0)

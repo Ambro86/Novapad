@@ -67,7 +67,7 @@ Menu Zobrazit:
  Chcete-li přidat nebo odebrat položku z oblíbených, použijte Tab pro přechod na seznam položek a přidejte nebo odeberte ji pomocí klávesy pro kontextové menu nebo pravého tlačítka myši. Ze seznamu oblíbených položek můžete také stisknout klávesu Aplikace pro odstranění již přidaných položek.
  Klávesové zkratky: během čtení je možné stisknout F9 a F10 pro přepínání mezi položkami, procházením těch přidaných do oblíbených.
 
-Menu Vložit:
+Menu Záložky:
 
  Vložit záložku: Uloží aktuální pozici kurzoru nebo čas audioknihy (Ctrl+B).
  Spravovat záložky: Zobrazí, přejde na konkrétní záložku nebo odstraní uložené záložky. Při otevření souboru se záložkami bude kurzor nebo přehrávání automaticky pokračovat od první dostupné.
@@ -125,3 +125,4 @@ Příručka: Otevře tuto příručku (F1).
 Zkontrolovat aktualizace: Zkontroluje, zda jsou k dispozici aktualizace (F2).
 Seznam změn: Otevře okno se seznamem změn.
 O programu: Zobrazí informace o programu.
+

@@ -61,7 +61,7 @@ When the list of entries is visible, pressing Tab moves the focus between the ed
 To add or remove an entry from favorites, use Tab to move to the list of entries and add or remove it using the Applications key or the right mouse button. From the list of favorite entries, you can also press the Applications key to remove entries that have already been added.
 Keyboard shortcuts: it is possible to press F9 and F10 to switch between entries during reading, cycling through those added to favorites.
 
-Insert:
+Bookmarks:
 Insert Bookmark: Save the current cursor position or audiobook time (Ctrl+B).
 Manage Bookmarks: View, jump to, or delete saved bookmarks. When opening a file with bookmarks, the cursor or playback will automatically resume from the first available one.
 
@@ -108,4 +108,5 @@ Guide: Open this guide (F1).
 Check for updates: Check if updates are available (F2).
 Changelog: Open the changelog window.
 About: Show program information.
+
 

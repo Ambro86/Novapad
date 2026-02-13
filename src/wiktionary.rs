@@ -213,6 +213,13 @@ fn simplify_template_inner(inner: &str) -> String {
         return String::new();
     }
 
+    let template_name = parts[0].trim().to_ascii_lowercase();
+    // Grammar/meta templates like {{w|f|sing|case}} can leak noisy fragments
+    // into definitions; they are not semantic definition content.
+    if matches!(template_name.as_str(), "w") {
+        return String::new();
+    }
+
     let mut last_nonempty = "";
     let mut last_with_letters = "";
     for arg in parts.iter().skip(1) {
@@ -317,7 +324,19 @@ fn is_wikidata_qid_token(token: &str) -> bool {
         return false;
     }
     let mut chars = t.chars();
-    matches!(chars.next(), Some('Q' | 'q')) && chars.all(|c| c.is_ascii_digit())
+    if !matches!(chars.next(), Some('Q' | 'q')) {
+        return false;
+    }
+    let rest: Vec<char> = chars.collect();
+    if rest.is_empty() {
+        return false;
+    }
+    let digit_count = rest.iter().take_while(|c| c.is_ascii_digit()).count();
+    if digit_count == 0 {
+        return false;
+    }
+    let tail = &rest[digit_count..];
+    tail.is_empty() || (tail.len() == 1 && tail[0].is_ascii_alphabetic())
 }
 
 fn normalize_definition_noise(s: &str) -> String {
@@ -340,6 +359,7 @@ fn normalize_definition_noise(s: &str) -> String {
     while let Some(last) = tokens.last() {
         if (last.chars().count() == 1 && last.chars().all(|c| c.is_ascii_lowercase()))
             || is_wikidata_qid_token(last)
+            || is_hex_color_token(last)
         {
             tokens.pop();
         } else {
@@ -347,11 +367,108 @@ fn normalize_definition_noise(s: &str) -> String {
         }
     }
 
-    let out = tokens.join(" ").trim().to_string();
+    // Drop trailing date-like revision noise (e.g. "... 2012-9-05")
+    if let Some(last) = tokens.last() {
+        let parts: Vec<&str> = last.split('-').collect();
+        let looks_like_date = parts.len() == 3
+            && parts[0].len() == 4
+            && parts
+                .iter()
+                .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()));
+        if looks_like_date {
+            tokens.pop();
+        }
+    }
+
+    let mut out = tokens.join(" ").trim().to_string();
+    if let Some(stripped) = strip_trailing_revision_date(&out) {
+        out = stripped;
+    }
+    out = strip_compact_leading_qid(&out);
+    if is_grammar_noise_definition(&out) {
+        return String::new();
+    }
     if out.is_empty() || is_language_code_token(out.trim()) || is_wikidata_qid_token(out.trim()) {
         String::new()
     } else {
         out
+    }
+}
+
+fn is_hex_color_token(token: &str) -> bool {
+    let t = token.trim();
+    (t.len() == 6 || t.len() == 8) && t.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+fn strip_compact_leading_qid(s: &str) -> String {
+    let trimmed = s.trim();
+    let bytes = trimmed.as_bytes();
+    if bytes.len() < 3 || !(bytes[0] == b'Q' || bytes[0] == b'q') {
+        return trimmed.to_string();
+    }
+    let mut i = 1usize;
+    while i < bytes.len() && bytes[i].is_ascii_digit() {
+        i += 1;
+    }
+    if i <= 1 {
+        return trimmed.to_string();
+    }
+    if i < bytes.len() && bytes[i].is_ascii_alphabetic() {
+        // Optional Wikidata variant suffix (e.g. Q42569A), only when it is
+        // a standalone suffix and not the beginning of a normal word.
+        let next = i + 1;
+        let suffix_is_standalone = next >= bytes.len()
+            || bytes[next].is_ascii_whitespace()
+            || bytes[next].is_ascii_punctuation();
+        if suffix_is_standalone {
+            i += 1;
+        }
+    }
+    if i >= bytes.len() {
+        return String::new();
+    }
+    trimmed[i..].trim().to_string()
+}
+
+fn is_grammar_noise_definition(definition: &str) -> bool {
+    matches!(
+        definition.trim().to_ascii_lowercase().as_str(),
+        "ing-form" | "inflection of"
+    )
+}
+
+fn strip_trailing_revision_date(s: &str) -> Option<String> {
+    let mut end = s.len();
+    for (idx, ch) in s.char_indices().rev() {
+        if ch.is_ascii_digit() || ch == '-' {
+            end = idx;
+            continue;
+        }
+        break;
+    }
+
+    if end >= s.len() {
+        return None;
+    }
+
+    let suffix = &s[end..];
+    let parts: Vec<&str> = suffix.split('-').collect();
+    let looks_like_date = parts.len() == 3
+        && parts[0].len() == 4
+        && parts
+            .iter()
+            .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()));
+    if !looks_like_date {
+        return None;
+    }
+
+    let mut head = s[..end]
+        .trim_end_matches(|c: char| c.is_whitespace() || c == '.' || c == ',' || c == ';')
+        .to_string();
+    if head.is_empty() {
+        None
+    } else {
+        Some(std::mem::take(&mut head))
     }
 }
 
@@ -379,6 +496,54 @@ fn is_probably_leaked_related_lemma(definition: &str, from_subpoint: bool) -> bo
 
     base.chars()
         .all(|c| c.is_alphabetic() || c == '-' || c == '\'')
+}
+
+fn is_probably_single_lemma_noise(definition: &str) -> bool {
+    let trimmed = definition.trim();
+    if !trimmed.ends_with('.') {
+        return false;
+    }
+    let base = trimmed.trim_end_matches('.').trim();
+    if base.is_empty() || base.split_whitespace().count() != 1 {
+        return false;
+    }
+    let Some(first) = base.chars().next() else {
+        return false;
+    };
+    if !first.is_ascii_lowercase() {
+        return false;
+    }
+    base.len() >= 3
+        && base
+            .chars()
+            .all(|c| c.is_alphabetic() || c == '-' || c == '\'')
+}
+
+fn is_probably_bibliographic_noise(definition: &str, from_subpoint: bool) -> bool {
+    if !from_subpoint {
+        return false;
+    }
+
+    let normalized = definition
+        .trim_end_matches('.')
+        .split_whitespace()
+        .collect::<Vec<_>>();
+    if normalized.len() < 3 {
+        return false;
+    }
+
+    let head = normalized[0];
+    let marker = normalized[1].to_ascii_lowercase();
+    let page = normalized[2];
+
+    let head_is_simple_lemma = head
+        .chars()
+        .all(|c| c.is_alphabetic() || c == '-' || c == '\'')
+        && head.chars().next().is_some_and(|c| c.is_ascii_lowercase());
+    let marker_is_page = matches!(marker.as_str(), "pág." | "pág" | "pag." | "pag" | "p.");
+    let page_is_number = page.chars().all(|c| c.is_ascii_digit());
+
+    head_is_simple_lemma && marker_is_page && page_is_number
 }
 
 fn extract_definitions_with_subpoints(
@@ -428,6 +593,12 @@ fn extract_definitions_with_subpoints(
                 .take(MAX_CHARS_PER_DEF)
                 .collect::<String>();
             if is_probably_leaked_related_lemma(&truncated, from_subpoint) {
+                continue;
+            }
+            if is_probably_bibliographic_noise(&truncated, from_subpoint) {
+                continue;
+            }
+            if !from_subpoint && !out.is_empty() && is_probably_single_lemma_noise(&truncated) {
                 continue;
             }
             if !truncated.is_empty() && truncated.chars().any(|c| c.is_alphanumeric()) {
@@ -1012,8 +1183,74 @@ mod tests {
     }
 
     #[test]
+    fn strips_leading_wikidata_qid_with_suffix_noise() {
+        let wikitext = "# Q42569A South American mammal.";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert_eq!(defs, vec!["South American mammal.".to_string()]);
+    }
+
+    #[test]
     fn filters_single_related_lemma_from_subpoint() {
         let wikitext = ";11: [[aguar]].";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert!(defs.is_empty());
+    }
+
+    #[test]
+    fn filters_spanish_bibliographic_noise_from_subpoint() {
+        let wikitext = ";3: salva Pág. 775";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert!(defs.is_empty());
+    }
+
+    #[test]
+    fn strips_trailing_date_noise() {
+        let wikitext = "# definición útil 2012-9-05";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert_eq!(defs, vec!["definición útil".to_string()]);
+    }
+
+    #[test]
+    fn strips_trailing_date_noise_without_space() {
+        let wikitext = "# origen.2012-9-05";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert_eq!(defs, vec!["origen".to_string()]);
+    }
+
+    #[test]
+    fn filters_single_lemma_noise_after_valid_definition() {
+        let wikitext = "# Definición válida extensa.\n# lama.";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert_eq!(defs, vec!["Definición válida extensa.".to_string()]);
+    }
+
+    #[test]
+    fn drops_grammar_template_noise_from_definitions() {
+        let wikitext = "# {{w|f|sing|case}}\n# abitazione";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert_eq!(defs, vec!["abitazione".to_string()]);
+    }
+
+    #[test]
+    fn strips_compact_leading_qid_noise() {
+        let wikitext = "# Q235544The visible part of fire.";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert_eq!(defs, vec!["The visible part of fire.".to_string()]);
+    }
+
+    #[test]
+    fn strips_trailing_hex_color_noise() {
+        let wikitext = "# A brilliant reddish orange-gold fiery colour. E82D14";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert_eq!(
+            defs,
+            vec!["A brilliant reddish orange-gold fiery colour.".to_string()]
+        );
+    }
+
+    #[test]
+    fn filters_grammar_noise_entry() {
+        let wikitext = "# ing-form";
         let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
         assert!(defs.is_empty());
     }

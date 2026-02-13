@@ -61,7 +61,7 @@ Quando a lista de entradas estiver visivel, pressionar Tab alterna o foco entre 
 Para adicionar ou remover uma entrada de favoritos, use Tab para ir a lista de entradas e adicione ou remova usando a tecla Aplicacoes ou o botao direito do mouse. Na lista de favoritos, voce tambem pode usar a tecla Aplicacoes para remover entradas ja adicionadas.
 Atalhos de teclado: e possivel pressionar F9 e F10 para alternar entre entradas durante a leitura, percorrendo as adicionadas aos favoritos.
 
-Inserir:
+Marcadores:
 Inserir marcador: salvar a posicao atual do cursor ou o tempo do audiolivro (Ctrl+B).
 Gerenciar marcadores: ver, ir ou excluir marcadores salvos. Ao abrir um arquivo com marcadores, o cursor ou a reproducao retomara automaticamente no primeiro disponivel.
 
@@ -103,4 +103,5 @@ Guia: abrir este guia (F1).
 Verificar atualizacoes: verificar se ha atualizacoes (F2).
 Changelog: abrir a janela de alteracoes.
 Sobre: mostrar informacoes do programa.
+
 

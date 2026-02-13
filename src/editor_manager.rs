@@ -28,12 +28,13 @@ use windows::Win32::UI::WindowsAndMessaging::{
     ES_WANTRETURN, GWLP_USERDATA, GWLP_WNDPROC, GetClientRect, GetParent, GetWindowLongPtrW, HMENU,
     IDNO, IDYES, MB_ICONWARNING, MB_YESNOCANCEL, MessageBoxW, MoveWindow, PostMessageW, SW_HIDE,
     SW_SHOW, SendMessageW, SetWindowLongPtrW, SetWindowTextW, ShowWindow, WM_CHAR, WM_CONTEXTMENU,
-    WM_GETTEXTLENGTH, WM_KEYDOWN, WM_LBUTTONUP, WM_SETFONT, WS_CHILD, WS_CLIPCHILDREN,
+    WM_GETTEXTLENGTH, WM_KEYDOWN, WM_LBUTTONUP, WM_SETFONT, WM_UNDO, WS_CHILD, WS_CLIPCHILDREN,
     WS_EX_CLIENTEDGE, WS_GROUP, WS_HSCROLL, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR};
 
 const EM_LIMITTEXT: u32 = 0x00C5;
+const EM_CANUNDO: u32 = 0x00C6;
 const EM_SETSEL: u32 = 0x00B1;
 const EM_BEGINUNDOACTION: u32 = 0x0459;
 const EM_ENDUNDOACTION: u32 = 0x045A;
@@ -633,6 +634,42 @@ unsafe fn selected_line_block_from_selection(
     let selected = get_text_range_simple(hwnd_edit, range_start, range_end);
     let trailing = selected.ends_with('\n') || selected.ends_with('\r');
     let _ = text;
+    Some((range_start, range_end, selected, trailing))
+}
+
+unsafe fn current_line_block_from_caret(
+    hwnd_edit: HWND,
+    selection: CHARRANGE,
+) -> Option<(i32, i32, String, bool)> {
+    let text_len = SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as i32;
+    if text_len <= 0 {
+        return None;
+    }
+    let caret = selection.cpMin.clamp(0, text_len);
+    let line = SendMessageW(
+        hwnd_edit,
+        EM_LINEFROMCHAR,
+        WPARAM(caret as usize),
+        LPARAM(0),
+    )
+    .0 as i32;
+    let range_start =
+        SendMessageW(hwnd_edit, EM_LINEINDEX, WPARAM(line as usize), LPARAM(0)).0 as i32;
+    if range_start < 0 {
+        return None;
+    }
+    let mut range_end = SendMessageW(
+        hwnd_edit,
+        EM_LINEINDEX,
+        WPARAM((line + 1) as usize),
+        LPARAM(0),
+    )
+    .0 as i32;
+    if range_end < 0 {
+        range_end = text_len;
+    }
+    let selected = get_text_range_simple(hwnd_edit, range_start, range_end);
+    let trailing = selected.ends_with('\n') || selected.ends_with('\r');
     Some((range_start, range_end, selected, trailing))
 }
 
@@ -1312,7 +1349,6 @@ pub unsafe fn try_normalize_undo(hwnd: HWND) -> bool {
     let mut undo = None;
     if with_state(hwnd, |state| {
         undo = state.normalize_undo.clone();
-        state.normalize_undo = None;
     })
     .is_none()
     {
@@ -1322,8 +1358,24 @@ pub unsafe fn try_normalize_undo(hwnd: HWND) -> bool {
         return false;
     };
     if undo.hwnd_edit.0 == 0 {
+        let _ = with_state(hwnd, |state| state.normalize_undo = None);
         return false;
     }
+    let current_text = get_edit_text(undo.hwnd_edit);
+    if current_text == undo.text {
+        // Stale snapshot: do not consume Ctrl+Z, let normal editor undo run.
+        let _ = with_state(hwnd, |state| state.normalize_undo = None);
+        return false;
+    }
+
+    if with_state(hwnd, |state| {
+        state.normalize_undo = None;
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access editor state");
+    }
+
     set_edit_text(undo.hwnd_edit, &undo.text);
     let mut cr = CHARRANGE {
         cpMin: undo.sel_start,
@@ -1353,6 +1405,26 @@ pub unsafe fn try_normalize_undo(hwnd: HWND) -> bool {
     }
     SetFocus(undo.hwnd_edit);
     true
+}
+
+pub unsafe fn undo_active_edit_skip_navigation(hwnd: HWND) -> bool {
+    let Some(hwnd_edit) = crate::get_active_edit(hwnd) else {
+        return false;
+    };
+    let mut before = get_edit_text(hwnd_edit);
+    for _ in 0..4 {
+        let can_undo = SendMessageW(hwnd_edit, EM_CANUNDO, WPARAM(0), LPARAM(0)).0 != 0;
+        if !can_undo {
+            return false;
+        }
+        SendMessageW(hwnd_edit, WM_UNDO, WPARAM(0), LPARAM(0));
+        let after = get_edit_text(hwnd_edit);
+        if after != before {
+            return true;
+        }
+        before = after;
+    }
+    false
 }
 
 pub unsafe fn handle_normalize_edit_change(hwnd: HWND, hwnd_edit: HWND) {
@@ -1598,10 +1670,13 @@ pub unsafe fn hard_line_break_active_edit(hwnd: HWND) -> bool {
         let selected = &text[start..end];
         (start, end, selected.ends_with('\n'))
     } else {
-        let caret = utf16_index_to_byte(&text, selection.cpMin);
-        let Some((start, end, trailing)) = paragraph_range_bytes(&text, caret) else {
+        let Some((start_u16, end_u16, _selected, trailing)) =
+            current_line_block_from_caret(hwnd_edit, selection)
+        else {
             return false;
         };
+        let start = utf16_index_to_byte(&text, start_u16);
+        let end = utf16_index_to_byte(&text, end_u16);
         (start, end, trailing)
     };
 
@@ -1615,14 +1690,14 @@ pub unsafe fn hard_line_break_active_edit(hwnd: HWND) -> bool {
         cpMin: byte_index_to_utf16(&text, range_start),
         cpMax: byte_index_to_utf16(&text, range_end),
     };
+    // Single-undo guarantee.
+    begin_single_undo_action(hwnd_edit);
     SendMessageW(
         hwnd_edit,
         EM_EXSETSEL,
         WPARAM(0),
         LPARAM(&mut replace_range as *mut _ as isize),
     );
-    // Single-undo guarantee.
-    begin_single_undo_action(hwnd_edit);
     let replace_wide = to_wide(&reformatted);
     SendMessageW(
         hwnd_edit,
@@ -1660,14 +1735,12 @@ pub unsafe fn order_items_active_edit(hwnd: HWND) -> bool {
         {
             (start, end, selected, trailing)
         } else {
-            let caret = utf16_index_to_byte(&text, selection.cpMin);
-            let Some((start, end, trailing)) = paragraph_range_bytes(&text, caret) else {
+            let Some((start, end, selected, trailing)) =
+                current_line_block_from_caret(hwnd_edit, selection)
+            else {
                 return false;
             };
-            let replace_start = byte_index_to_utf16(&text, start);
-            let replace_end = byte_index_to_utf16(&text, end);
-            let selected = text[start..end].to_string();
-            (replace_start, replace_end, selected, trailing)
+            (start, end, selected, trailing)
         };
 
     let ordered = order_lines_block(&affected, line_ending, has_trailing_newline);
@@ -1679,14 +1752,14 @@ pub unsafe fn order_items_active_edit(hwnd: HWND) -> bool {
         cpMin: replace_start,
         cpMax: replace_end,
     };
+    // Single-undo guarantee.
+    begin_single_undo_action(hwnd_edit);
     SendMessageW(
         hwnd_edit,
         EM_EXSETSEL,
         WPARAM(0),
         LPARAM(&mut replace_range as *mut _ as isize),
     );
-    // Single-undo guarantee.
-    begin_single_undo_action(hwnd_edit);
     let replace_wide = to_wide(&ordered);
     SendMessageW(
         hwnd_edit,
@@ -1724,14 +1797,12 @@ pub unsafe fn keep_unique_items_active_edit(hwnd: HWND) -> bool {
         {
             (start, end, selected, trailing)
         } else {
-            let caret = utf16_index_to_byte(&text, selection.cpMin);
-            let Some((start, end, trailing)) = paragraph_range_bytes(&text, caret) else {
+            let Some((start, end, selected, trailing)) =
+                current_line_block_from_caret(hwnd_edit, selection)
+            else {
                 return false;
             };
-            let replace_start = byte_index_to_utf16(&text, start);
-            let replace_end = byte_index_to_utf16(&text, end);
-            let selected = text[start..end].to_string();
-            (replace_start, replace_end, selected, trailing)
+            (start, end, selected, trailing)
         };
 
     let cleaned = keep_unique_lines_block(&affected, line_ending, has_trailing_newline);
@@ -1743,14 +1814,14 @@ pub unsafe fn keep_unique_items_active_edit(hwnd: HWND) -> bool {
         cpMin: replace_start,
         cpMax: replace_end,
     };
+    // Single-undo guarantee.
+    begin_single_undo_action(hwnd_edit);
     SendMessageW(
         hwnd_edit,
         EM_EXSETSEL,
         WPARAM(0),
         LPARAM(&mut replace_range as *mut _ as isize),
     );
-    // Single-undo guarantee.
-    begin_single_undo_action(hwnd_edit);
     let replace_wide = to_wide(&cleaned);
     SendMessageW(
         hwnd_edit,
@@ -1788,14 +1859,12 @@ pub unsafe fn reverse_items_active_edit(hwnd: HWND) -> bool {
         {
             (start, end, selected, trailing)
         } else {
-            let caret = utf16_index_to_byte(&text, selection.cpMin);
-            let Some((start, end, trailing)) = paragraph_range_bytes(&text, caret) else {
+            let Some((start, end, selected, trailing)) =
+                current_line_block_from_caret(hwnd_edit, selection)
+            else {
                 return false;
             };
-            let replace_start = byte_index_to_utf16(&text, start);
-            let replace_end = byte_index_to_utf16(&text, end);
-            let selected = text[start..end].to_string();
-            (replace_start, replace_end, selected, trailing)
+            (start, end, selected, trailing)
         };
 
     let reversed = reverse_lines_block(&affected, line_ending, has_trailing_newline);
@@ -1807,14 +1876,14 @@ pub unsafe fn reverse_items_active_edit(hwnd: HWND) -> bool {
         cpMin: replace_start,
         cpMax: replace_end,
     };
+    // Single-undo guarantee.
+    begin_single_undo_action(hwnd_edit);
     SendMessageW(
         hwnd_edit,
         EM_EXSETSEL,
         WPARAM(0),
         LPARAM(&mut replace_range as *mut _ as isize),
     );
-    // Single-undo guarantee.
-    begin_single_undo_action(hwnd_edit);
     let replace_wide = to_wide(&reversed);
     SendMessageW(
         hwnd_edit,
@@ -1858,14 +1927,12 @@ pub unsafe fn quote_lines_active_edit(hwnd: HWND) -> bool {
         {
             (start, end, selected, trailing)
         } else {
-            let caret = utf16_index_to_byte(&text, selection.cpMin);
-            let Some((start, end, trailing)) = paragraph_range_bytes(&text, caret) else {
+            let Some((start, end, selected, trailing)) =
+                current_line_block_from_caret(hwnd_edit, selection)
+            else {
                 return false;
             };
-            let replace_start = byte_index_to_utf16(&text, start);
-            let replace_end = byte_index_to_utf16(&text, end);
-            let selected = text[start..end].to_string();
-            (replace_start, replace_end, selected, trailing)
+            (start, end, selected, trailing)
         };
 
     let quoted = quote_lines_block(&affected, line_ending, has_trailing_newline, &quote_prefix);
@@ -1877,14 +1944,14 @@ pub unsafe fn quote_lines_active_edit(hwnd: HWND) -> bool {
         cpMin: replace_start,
         cpMax: replace_end,
     };
+    // Single-undo guarantee.
+    begin_single_undo_action(hwnd_edit);
     SendMessageW(
         hwnd_edit,
         EM_EXSETSEL,
         WPARAM(0),
         LPARAM(&mut replace_range as *mut _ as isize),
     );
-    // Single-undo guarantee.
-    begin_single_undo_action(hwnd_edit);
     let replace_wide = to_wide(&quoted);
     SendMessageW(
         hwnd_edit,
@@ -1928,14 +1995,12 @@ pub unsafe fn unquote_lines_active_edit(hwnd: HWND) -> bool {
         {
             (start, end, selected, trailing)
         } else {
-            let caret = utf16_index_to_byte(&text, selection.cpMin);
-            let Some((start, end, trailing)) = paragraph_range_bytes(&text, caret) else {
+            let Some((start, end, selected, trailing)) =
+                current_line_block_from_caret(hwnd_edit, selection)
+            else {
                 return false;
             };
-            let replace_start = byte_index_to_utf16(&text, start);
-            let replace_end = byte_index_to_utf16(&text, end);
-            let selected = text[start..end].to_string();
-            (replace_start, replace_end, selected, trailing)
+            (start, end, selected, trailing)
         };
 
     let unquoted = unquote_lines_block(&affected, line_ending, has_trailing_newline, &quote_prefix);
@@ -1947,14 +2012,14 @@ pub unsafe fn unquote_lines_active_edit(hwnd: HWND) -> bool {
         cpMin: replace_start,
         cpMax: replace_end,
     };
+    // Single-undo guarantee.
+    begin_single_undo_action(hwnd_edit);
     SendMessageW(
         hwnd_edit,
         EM_EXSETSEL,
         WPARAM(0),
         LPARAM(&mut replace_range as *mut _ as isize),
     );
-    // Single-undo guarantee.
-    begin_single_undo_action(hwnd_edit);
     let replace_wide = to_wide(&unquoted);
     SendMessageW(
         hwnd_edit,
@@ -1992,14 +2057,12 @@ pub unsafe fn join_lines_active_edit(hwnd: HWND) -> bool {
         {
             (start, end, selected, trailing)
         } else {
-            let caret = utf16_index_to_byte(&text, selection.cpMin);
-            let Some((start, end, trailing)) = paragraph_range_bytes(&text, caret) else {
+            let Some((start, end, selected, trailing)) =
+                current_line_block_from_caret(hwnd_edit, selection)
+            else {
                 return false;
             };
-            let replace_start = byte_index_to_utf16(&text, start);
-            let replace_end = byte_index_to_utf16(&text, end);
-            let selected = text[start..end].to_string();
-            (replace_start, replace_end, selected, trailing)
+            (start, end, selected, trailing)
         };
 
     let joined = join_lines_block(&affected, line_ending, has_trailing_newline);
@@ -2011,14 +2074,14 @@ pub unsafe fn join_lines_active_edit(hwnd: HWND) -> bool {
         cpMin: replace_start,
         cpMax: replace_end,
     };
+    // Single-undo guarantee.
+    begin_single_undo_action(hwnd_edit);
     SendMessageW(
         hwnd_edit,
         EM_EXSETSEL,
         WPARAM(0),
         LPARAM(&mut replace_range as *mut _ as isize),
     );
-    // Single-undo guarantee.
-    begin_single_undo_action(hwnd_edit);
     let replace_wide = to_wide(&joined);
     SendMessageW(
         hwnd_edit,
@@ -2543,54 +2606,6 @@ where
         lines.push(current);
     }
     lines
-}
-
-fn paragraph_range_bytes(text: &str, caret: usize) -> Option<(usize, usize, bool)> {
-    if text.is_empty() {
-        return None;
-    }
-    let mut lines: Vec<(usize, usize, usize, bool)> = Vec::new();
-    let mut start = 0usize;
-    for (idx, byte) in text.as_bytes().iter().enumerate() {
-        if *byte == b'\n' {
-            let end = idx;
-            let line = &text[start..end];
-            let line = line.strip_suffix('\r').unwrap_or(line);
-            let is_blank = line.trim().is_empty();
-            lines.push((start, end, idx + 1, is_blank));
-            start = idx + 1;
-        }
-    }
-    if start <= text.len() {
-        let end = text.len();
-        let line = &text[start..end];
-        let line = line.strip_suffix('\r').unwrap_or(line);
-        let is_blank = line.trim().is_empty();
-        lines.push((start, end, end, is_blank));
-    }
-
-    let mut line_idx = lines.len().saturating_sub(1);
-    for (idx, line) in lines.iter().enumerate() {
-        if caret < line.2 {
-            line_idx = idx;
-            break;
-        }
-    }
-    if lines[line_idx].3 {
-        return None;
-    }
-    let mut start_idx = line_idx;
-    while start_idx > 0 && !lines[start_idx - 1].3 {
-        start_idx = start_idx.saturating_sub(1);
-    }
-    let mut end_idx = line_idx;
-    while end_idx + 1 < lines.len() && !lines[end_idx + 1].3 {
-        end_idx += 1;
-    }
-    let range_start = lines[start_idx].0;
-    let range_end = lines[end_idx].2;
-    let has_trailing_newline = lines[end_idx].2 > lines[end_idx].1;
-    Some((range_start, range_end, has_trailing_newline))
 }
 
 fn utf16_index_to_byte(text: &str, target: i32) -> usize {
@@ -3781,6 +3796,23 @@ pub unsafe fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> 
         }
 
         let hwnd_edit = state.docs[index].hwnd_edit;
+        let (old_bookmark_key, _) =
+            crate::bookmark_storage_key(state.docs[index].path.as_deref(), hwnd_edit);
+        let (new_bookmark_key, new_bookmark_persist) =
+            crate::bookmark_storage_key(Some(path.as_path()), hwnd_edit);
+        if old_bookmark_key != new_bookmark_key
+            && let Some(mut moved) = state.bookmarks.files.remove(&old_bookmark_key)
+        {
+            state
+                .bookmarks
+                .files
+                .entry(new_bookmark_key)
+                .or_default()
+                .append(&mut moved);
+            if new_bookmark_persist {
+                crate::bookmarks::save_bookmarks(&state.bookmarks);
+            }
+        }
         state.docs[index].path = Some(path.clone());
         state.docs[index].dirty = false;
         if force_dialog {

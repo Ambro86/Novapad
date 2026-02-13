@@ -62,7 +62,7 @@ När röstlistan är synlig flyttar Tab fokus mellan redigerare och kontroller, 
 För att lägga till eller ta bort en röst från favoriter, flytta med Tab till röstlistan och lägg till eller ta bort den med applikationstangenten eller högerklick. Från listan med favoritröster kan du också trycka på applikationstangenten för att ta bort röster som redan lagts till.
 Snabbtangenter: det är möjligt att trycka på tangenterna F9 och F10 för att byta röst under läsning bland de som lagts till i favoriter.
 
-Infoga:
+Bokmärken:
 Infoga bokmärke: sparar den aktuella markörpositionen eller ljudbokstiden (Ctrl+B).
 Hantera bokmärken: visa, hoppa till eller ta bort sparade bokmärken. När en fil med bokmärken öppnas startar markören eller uppspelningen automatiskt från det första tillgängliga.
 
@@ -110,3 +110,4 @@ Guide: öppnar denna guide (F1).
 Sök efter uppdateringar: kontrollerar om det finns uppdateringar (F2).
 Ändringslogg: visar ändringsloggen.
 Om programmet: visar information om programmet.
+

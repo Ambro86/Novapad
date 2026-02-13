@@ -133,9 +133,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
     WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES,
     WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE,
-    WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WM_UNDO, WNDCLASSW,
-    WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP,
-    WS_VISIBLE,
+    WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WNDPROC,
+    WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{HSTRING, Interface, PCWSTR, PWSTR, implement, w};
 
@@ -2008,7 +2007,7 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                     && GetFocus() == hwnd_edit
                 {
                     if !editor_manager::try_normalize_undo(hwnd) {
-                        SendMessageW(hwnd_edit, WM_UNDO, WPARAM(0), LPARAM(0));
+                        editor_manager::undo_active_edit_skip_navigation(hwnd);
                     }
                     continue;
                 }
@@ -3593,7 +3592,7 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 IDM_EDIT_UNDO => {
                     log_debug("Menu: Undo");
                     if !editor_manager::try_normalize_undo(hwnd) {
-                        editor_manager::send_to_active_edit(hwnd, WM_UNDO);
+                        editor_manager::undo_active_edit_skip_navigation(hwnd);
                     }
                     LRESULT(0)
                 }
@@ -7231,17 +7230,30 @@ pub(crate) unsafe fn get_active_edit(hwnd: HWND) -> Option<HWND> {
     .flatten()
 }
 
+const UNSAVED_BOOKMARK_PREFIX: &str = "__unsaved__:";
+
+fn bookmark_storage_key(path: Option<&Path>, hwnd_edit: HWND) -> (String, bool) {
+    if let Some(path) = path {
+        (path.to_string_lossy().to_string(), true)
+    } else {
+        (format!("{UNSAVED_BOOKMARK_PREFIX}{}", hwnd_edit.0), false)
+    }
+}
+
 unsafe fn insert_bookmark(hwnd: HWND) {
-    let (hwnd_edit, path, format): (HWND, std::path::PathBuf, FileFormat) =
-        match with_state(hwnd, |state| {
+    let (hwnd_edit, path, format): (HWND, Option<std::path::PathBuf>, FileFormat) =
+        with_state(hwnd, |state| {
             state
                 .docs
                 .get(state.current)
-                .and_then(|doc| doc.path.clone().map(|p| (doc.hwnd_edit, p, doc.format)))
-        }) {
-            Some(Some(values)) => values,
-            _ => return,
-        };
+                .map(|doc| (doc.hwnd_edit, doc.path.clone(), doc.format))
+        })
+        .flatten()
+        .unwrap_or((HWND(0), None, FileFormat::default()));
+    if hwnd_edit.0 == 0 {
+        return;
+    }
+    let (storage_key, persist_to_disk) = bookmark_storage_key(path.as_deref(), hwnd_edit);
 
     if matches!(format, FileFormat::Audiobook) {
         let (pos, snippet) = with_state(hwnd, |state| {
@@ -7260,11 +7272,16 @@ unsafe fn insert_bookmark(hwnd: HWND) {
             timestamp: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         };
 
-        let path_str = path.to_string_lossy().to_string();
         let bookmarks_window = with_state(hwnd, |state| {
-            let list = state.bookmarks.files.entry(path_str).or_default();
+            let list = state
+                .bookmarks
+                .files
+                .entry(storage_key.clone())
+                .or_default();
             list.push(bookmark);
-            save_bookmarks(&state.bookmarks);
+            if persist_to_disk {
+                save_bookmarks(&state.bookmarks);
+            }
             state.bookmarks_window
         })
         .unwrap_or(HWND(0));
@@ -7349,11 +7366,16 @@ unsafe fn insert_bookmark(hwnd: HWND) {
         timestamp: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
     };
 
-    let path_str = path.to_string_lossy().to_string();
     let bookmarks_window = with_state(hwnd, |state| {
-        let list = state.bookmarks.files.entry(path_str).or_default();
+        let list = state
+            .bookmarks
+            .files
+            .entry(storage_key.clone())
+            .or_default();
         list.push(bookmark);
-        save_bookmarks(&state.bookmarks);
+        if persist_to_disk {
+            save_bookmarks(&state.bookmarks);
+        }
         state.bookmarks_window
     })
     .unwrap_or(HWND(0));
@@ -7376,20 +7398,22 @@ fn audio_bookmark_position_and_snippet(position_secs: f64) -> (i32, String) {
 }
 
 unsafe fn clear_current_bookmarks(hwnd: HWND) -> bool {
-    let path: std::path::PathBuf = match with_state(hwnd, |state| {
+    let (path, hwnd_edit) = with_state(hwnd, |state| {
         state
             .docs
             .get(state.current)
-            .and_then(|doc| doc.path.clone())
-    }) {
-        Some(Some(path)) => path,
-        _ => return false,
-    };
+            .map(|doc| (doc.path.clone(), doc.hwnd_edit))
+    })
+    .flatten()
+    .unwrap_or((None, HWND(0)));
+    if hwnd_edit.0 == 0 {
+        return false;
+    }
+    let (storage_key, persist_to_disk) = bookmark_storage_key(path.as_deref(), hwnd_edit);
 
-    let path_str = path.to_string_lossy().to_string();
     let (removed, bookmarks_window) = with_state(hwnd, |state| {
-        let removed = state.bookmarks.files.remove(&path_str).is_some();
-        if removed {
+        let removed = state.bookmarks.files.remove(&storage_key).is_some();
+        if removed && persist_to_disk {
             save_bookmarks(&state.bookmarks);
         }
         (removed, state.bookmarks_window)

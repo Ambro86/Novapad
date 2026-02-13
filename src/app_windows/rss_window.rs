@@ -101,7 +101,6 @@ const FEED_PL_DATA: &str = include_str!("../../i18n/feed_pl.txt");
 const FEED_FR_DATA: &str = include_str!("../../i18n/feed_fr.txt");
 const FEED_SR_DATA: &str = include_str!("../../i18n/feed_sr HR.txt");
 const EM_SETSEL: u32 = 0x00B1;
-const EM_SCROLLCARET: u32 = 0x00B7;
 const EM_LIMITTEXT: u32 = 0x00C5;
 const INITIAL_LOAD_COUNT: usize = 5;
 const LOAD_MORE_COUNT: usize = 5;
@@ -4652,8 +4651,6 @@ unsafe fn force_focus_editor_on_parent(parent: HWND) {
     }
     if let Some(hwnd_edit) = crate::get_active_edit(parent) {
         SetFocus(hwnd_edit);
-        SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(0));
-        SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
         SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
         SendMessageW(
             parent,
@@ -4663,8 +4660,6 @@ unsafe fn force_focus_editor_on_parent(parent: HWND) {
         );
         // Re-assert focus after dialog navigation to help NVDA settle on the edit control.
         SetFocus(hwnd_edit);
-        SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(0));
-        SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
         SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
         NotifyWinEvent(
             EVENT_OBJECT_FOCUS,

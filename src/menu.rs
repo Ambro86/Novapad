@@ -624,7 +624,6 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         IDM_FILE_SAVE_ALL,
         &labels.file_save_all,
     );
-    append_menu_string(file_menu, MF_STRING, IDM_FILE_CLOSE, &labels.file_close);
     crate::log_if_err!(AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null()));
     append_menu_string(
         file_menu,
@@ -938,6 +937,7 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
     );
     append_menu_string(hmenu, MF_POPUP, insert_menu.0 as usize, &labels.menu_insert);
 
+    append_menu_string(window_menu, MF_STRING, IDM_FILE_CLOSE, &labels.file_close);
     append_menu_string(
         window_menu,
         MF_STRING,
@@ -1023,12 +1023,6 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
     append_menu_string(
         tools_menu,
         MF_STRING,
-        IDM_TOOLS_OPTIONS,
-        &labels.menu_options,
-    );
-    append_menu_string(
-        tools_menu,
-        MF_STRING,
         IDM_TOOLS_DICTIONARY,
         &labels.menu_dictionary,
     );
@@ -1049,6 +1043,12 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         MF_STRING,
         IDM_TOOLS_IMPORT_YOUTUBE,
         &labels.menu_import_youtube,
+    );
+    append_menu_string(
+        tools_menu,
+        MF_STRING,
+        IDM_TOOLS_OPTIONS,
+        &labels.menu_options,
     );
     append_menu_string(hmenu, MF_POPUP, tools_menu.0 as usize, &labels.menu_tools);
     append_menu_string(hmenu, MF_POPUP, window_menu.0 as usize, &labels.menu_window);

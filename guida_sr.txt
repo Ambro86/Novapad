@@ -62,7 +62,7 @@ Kad je lista stavki vidljiva, taster Tab premešta fokus između uređivača i k
 Da bi se stavka dodala u omiljene ili uklonila iz njih, koristi Tab da pređeš na listu stavki, pa je dodaj ili ukloni tasterom Applications ili desnim tasterom miša. Iz liste omiljenih stavki takođe možeš da pritisneš taster Applications da ukloniš stavke koje su već dodate.  
 Prečice na tastaturi: moguće je pritisnuti F9 i F10 da se prelazi između stavki tokom čitanja, kružno kroz one dodate u omiljene.
 
-Umetanje: 
+Obeleživači: 
 Ubaci obeleživač: Čuva trenutnu poziciju kursora ili vreme u audio‑knjizi (Ctrl+B). 
 Upravljaj obeleživačima: Pregled, skok na obeleživač ili brisanje sačuvanih obeleživača. Ako datoteka sadrži obeleživače, otvaranje automatski nastavlja od prvog dostupnog.
 
@@ -110,4 +110,5 @@ Vodič: Otvara ovaj vodič (F1).
 Proveri ažuriranja: Proverava dostupna ažuriranja (F2). 
 Lista izmena: Otvara prozor sa izmenama. 
 O programu: Prikazuje informacije o programu.
+
 

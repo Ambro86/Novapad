@@ -1406,10 +1406,43 @@ pub async fn fetch_article_text(
         }
     };
 
-    let article = reader::reader_mode_extract(&html, language).unwrap_or(reader::ArticleContent {
-        title: fallback_title.to_string(),
-        content: fallback_description.to_string(),
-    });
+    let mut article =
+        reader::reader_mode_extract(&html, language).unwrap_or(reader::ArticleContent {
+            title: fallback_title.to_string(),
+            content: fallback_description.to_string(),
+        });
+
+    let weak_extraction = article.content.trim().chars().count() < 80
+        || article.content.trim() == fallback_description.trim()
+        || article.content.trim().is_empty();
+    if weak_extraction {
+        log_debug(&format!(
+            "rss_article_fetch weak_extraction_retry_iphone url=\"{url_str}\" content_len={}",
+            article.content.trim().chars().count()
+        ));
+        let url_for_iphone = url_str.clone();
+        let iphone_bytes_res = tokio::task::spawn_blocking(move || {
+            crate::curl_client::CurlClient::fetch_url_iphone_impersonated(&url_for_iphone)
+                .map_err(|e| e.to_string())
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+
+        if let Ok(iphone_bytes) = iphone_bytes_res {
+            let iphone_html = decode_html_bytes(&iphone_bytes);
+            let iphone_article = reader::reader_mode_extract(&iphone_html, language).unwrap_or(
+                reader::ArticleContent {
+                    title: fallback_title.to_string(),
+                    content: fallback_description.to_string(),
+                },
+            );
+            if iphone_article.content.trim().chars().count()
+                > article.content.trim().chars().count()
+            {
+                article = iphone_article;
+            }
+        }
+    }
     log_debug(&format!(
         "rss_article_fetch_done ms={} url=\"{url_str}\"",
         start_total.elapsed().as_millis()

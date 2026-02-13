@@ -123,7 +123,8 @@ const OPTIONS_TAB_GENERAL: i32 = 0;
 const OPTIONS_TAB_VOICE: i32 = 1;
 const OPTIONS_TAB_EDITOR: i32 = 2;
 const OPTIONS_TAB_AUDIO: i32 = 3;
-const OPTIONS_TAB_COUNT: i32 = 4;
+const OPTIONS_TAB_RSS_PODCAST: i32 = 4;
+const OPTIONS_TAB_COUNT: i32 = 5;
 const OPTIONS_CONTENT_TOP: i32 = 50;
 const OPTIONS_MARGIN_X: i32 = 20;
 const OPTIONS_LABEL_WIDTH: i32 = 235;
@@ -310,6 +311,7 @@ struct OptionsLabels {
     tab_voice: String,
     tab_editor: String,
     tab_audio: String,
+    tab_rss_podcast: String,
     label_language: String,
     label_modified_marker_position: String,
     label_open: String,
@@ -427,6 +429,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         tab_voice: i18n::tr(language, "options.tab.voice"),
         tab_editor: i18n::tr(language, "options.tab.editor"),
         tab_audio: i18n::tr(language, "options.tab.audio"),
+        tab_rss_podcast: i18n::tr(language, "options.tab.rss_podcast"),
         label_language: i18n::tr(language, "options.label.language"),
         label_modified_marker_position: i18n::tr(
             language,
@@ -763,6 +766,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 labels.tab_voice.clone(),
                 labels.tab_editor.clone(),
                 labels.tab_audio.clone(),
+                labels.tab_rss_podcast.clone(),
             ];
             for (index, label) in tab_labels.iter().enumerate() {
                 let mut text = to_wide(label);
@@ -5917,13 +5921,27 @@ fn layout_audio_tab(state: &OptionsDialogState) {
         y,
         OPTIONS_COMBO_HEIGHT,
     );
-    y = layout_label_control(
+    layout_label_control(
         "label_subtitle_offset",
         state.label_subtitle_offset,
         "edit_subtitle_offset",
         state.edit_subtitle_offset,
         y,
         OPTIONS_EDIT_HEIGHT,
+    );
+}
+
+fn layout_rss_podcast_tab(state: &OptionsDialogState) {
+    let mut y = OPTIONS_CONTENT_TOP;
+    y = layout_checkbox(
+        "checkbox_confirm_delete_rss_podcast",
+        state.checkbox_confirm_delete_rss_podcast,
+        y,
+    );
+    y = layout_checkbox(
+        "checkbox_announce_unread_rss_podcast",
+        state.checkbox_announce_unread_rss_podcast,
+        y,
     );
     y += OPTIONS_SECTION_GAP;
     y = layout_label_control(
@@ -5933,11 +5951,6 @@ fn layout_audio_tab(state: &OptionsDialogState) {
         state.edit_podcast_cache_limit,
         y,
         OPTIONS_EDIT_HEIGHT,
-    );
-    y = layout_checkbox(
-        "checkbox_announce_unread_rss_podcast",
-        state.checkbox_announce_unread_rss_podcast,
-        y,
     );
     y = layout_label_control(
         "label_podcastindex_key",
@@ -5977,12 +5990,14 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
         let show_voice = index == OPTIONS_TAB_VOICE;
         let show_editor = index == OPTIONS_TAB_EDITOR;
         let show_audio = index == OPTIONS_TAB_AUDIO;
+        let show_rss_podcast = index == OPTIONS_TAB_RSS_PODCAST;
 
         match index {
             OPTIONS_TAB_GENERAL => layout_general_tab(state),
             OPTIONS_TAB_VOICE => layout_voice_tab(state),
             OPTIONS_TAB_EDITOR => layout_editor_tab(state),
             OPTIONS_TAB_AUDIO => layout_audio_tab(state),
+            OPTIONS_TAB_RSS_PODCAST => layout_rss_podcast_tab(state),
             _ => {}
         }
         layout_dialog_buttons(hwnd, state.ok_button, state.cancel_button);
@@ -6000,7 +6015,6 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.checkbox_send_crash_reports,
             state.checkbox_use_legacy_name,
             state.checkbox_context_menu,
-            state.checkbox_confirm_delete_rss_podcast,
             state.label_file_associations,
             state.button_manage_associations,
         ] {
@@ -6091,6 +6105,12 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.combo_subtitle_mode,
             state.label_subtitle_offset,
             state.edit_subtitle_offset,
+        ] {
+            ShowWindow(control, if show_audio { SW_SHOW } else { SW_HIDE });
+        }
+
+        for control in [
+            state.checkbox_confirm_delete_rss_podcast,
             state.label_podcast_cache_limit,
             state.edit_podcast_cache_limit,
             state.checkbox_announce_unread_rss_podcast,
@@ -6100,7 +6120,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.edit_podcastindex_secret,
             state.button_podcastindex_signup,
         ] {
-            ShowWindow(control, if show_audio { SW_SHOW } else { SW_HIDE });
+            ShowWindow(control, if show_rss_podcast { SW_SHOW } else { SW_HIDE });
         }
     })
     .is_none()
@@ -6159,6 +6179,7 @@ unsafe fn focus_tab_first(hwnd: HWND, index: i32) {
         OPTIONS_TAB_VOICE => state.combo_tts_engine,
         OPTIONS_TAB_EDITOR => state.checkbox_word_wrap,
         OPTIONS_TAB_AUDIO => state.combo_audio_skip,
+        OPTIONS_TAB_RSS_PODCAST => state.checkbox_confirm_delete_rss_podcast,
         _ => HWND(0),
     })
     .unwrap_or(HWND(0));

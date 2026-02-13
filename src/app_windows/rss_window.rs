@@ -92,6 +92,7 @@ const SEARCH_OK_ID: usize = 1502;
 const SEARCH_CANCEL_ID: usize = 1503;
 
 const FEED_EN_DATA: &str = include_str!("../../i18n/feed_en.txt");
+const FEED_UK_DATA: &str = include_str!("../../i18n/feed_uk.txt");
 const FEED_IT_DATA: &str = include_str!("../../i18n/feed_it.txt");
 const FEED_ES_DATA: &str = include_str!("../../i18n/feed_es.txt");
 const FEED_PT_DATA: &str = include_str!("../../i18n/feed_pt.txt");
@@ -784,7 +785,8 @@ fn rss_fetch_config(parent: HWND) -> rss::RssFetchConfig {
 
 fn default_feed_path(language: crate::settings::Language) -> Option<PathBuf> {
     let file_name = match language {
-        crate::settings::Language::Ukrainian | crate::settings::Language::English => "feed_en.txt",
+        crate::settings::Language::Ukrainian => "feed_uk.txt",
+        crate::settings::Language::English => "feed_en.txt",
         crate::settings::Language::Italian => "feed_it.txt",
         crate::settings::Language::Spanish => "feed_es.txt",
         crate::settings::Language::Portuguese => "feed_pt.txt",
@@ -810,7 +812,8 @@ fn default_feed_path(language: crate::settings::Language) -> Option<PathBuf> {
 
 fn embedded_default_feeds(language: crate::settings::Language) -> &'static str {
     match language {
-        crate::settings::Language::Ukrainian | crate::settings::Language::English => FEED_EN_DATA,
+        crate::settings::Language::Ukrainian => FEED_UK_DATA,
+        crate::settings::Language::English => FEED_EN_DATA,
         crate::settings::Language::Italian => FEED_IT_DATA,
         crate::settings::Language::Spanish => FEED_ES_DATA,
         crate::settings::Language::Portuguese => FEED_PT_DATA,

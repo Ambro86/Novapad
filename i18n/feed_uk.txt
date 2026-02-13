@@ -1,0 +1,19 @@
+Укрінформ | https://www.ukrinform.ua/rss
+Українська правда | https://www.pravda.com.ua/rss/
+УНІАН | https://rss.unian.net/site/news_ukr.rss
+Цензор.НЕТ | https://censor.net/ua/rss/news
+NV (Новое Время) | https://nv.ua/ukr/rss/all.xml
+Дзеркало тижня (ZN.UA) | https://zn.ua/ukr/rss/full.xml
+Економічна правда | https://www.epravda.com.ua/rss/
+ТСН | https://tsn.ua/rss/full.xml
+BBC Україна | https://www.bbc.com/ukrainian/index.xml
+Радіо Свобода | https://www.radiosvoboda.org/api/zqy-ite_iq
+DOU (Статті) | https://dou.ua/feed/
+ITC.ua | https://itc.ua/ua/rss
+Root Nation | https://root-nation.com/ua/feed/
+Gagadget | https://gagadget.com/uk/rss/
+Speka.Media | https://speka.media/rss
+Mezha.Media | https://mezha.media/feed/
+Sport.ua | https://sport.ua/uk/rss/all
+Football.ua | https://football.ua/rss.xml
+Слово про слово | https://slovoproslovo.info/feed/

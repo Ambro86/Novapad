@@ -119,22 +119,23 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CB_SETCURSEL, CB_SETITEMDATA, CBN_SELCHANGE, CBS_DROPDOWNLIST, CHILDID_SELF, CREATESTRUCTW,
     CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, CallWindowProcW, CheckMenuItem, CreateAcceleratorTableW,
     CreatePopupMenu, CreateWindowExW, DefWindowProcW, DeleteMenu, DestroyWindow, DispatchMessageW,
-    DrawMenuBar, EN_CHANGE, EN_KILLFOCUS, ES_AUTOHSCROLL, EVENT_OBJECT_FOCUS, EnumWindows, FALT,
-    FCONTROL, FSHIFT, FVIRTKEY, FindWindowW, GWLP_USERDATA, GWLP_WNDPROC, GetClassNameW,
-    GetCursorPos, GetForegroundWindow, GetMenu, GetMenuItemCount, GetMessageW, GetParent,
-    GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, HACCEL,
-    HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, IsChild, IsIconic, IsWindow, KillTimer,
-    LoadCursorW, LoadIconW, MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_OK,
-    MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_GRAYED,
-    MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW,
-    PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW,
-    SW_SHOWMAXIMIZED, SW_SHOWNORMAL, SendMessageW, SetForegroundWindow, SetTimer,
-    SetWindowLongPtrW, SetWindowTextW, ShowWindow, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu,
-    TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
-    WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES,
-    WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE,
-    WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WNDPROC,
-    WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
+    DrawMenuBar, EN_CHANGE, EN_KILLFOCUS, ES_AUTOHSCROLL, EVENT_OBJECT_FOCUS, EnableMenuItem,
+    EnumWindows, FALT, FCONTROL, FSHIFT, FVIRTKEY, FindWindowW, GWLP_USERDATA, GWLP_WNDPROC,
+    GetClassNameW, GetCursorPos, GetForegroundWindow, GetMenu, GetMenuItemCount, GetMessageW,
+    GetParent, GetSubMenu, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW,
+    GetWindowThreadProcessId, HACCEL, HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, IsChild,
+    IsIconic, IsWindow, KillTimer, LoadCursorW, LoadIconW, MB_ICONASTERISK, MB_ICONERROR,
+    MB_ICONINFORMATION, MB_OK, MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION,
+    MF_CHECKED, MF_ENABLED, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG,
+    MessageBoxW, OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW,
+    RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED, SW_SHOWNORMAL,
+    SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
+    TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage,
+    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE,
+    WM_CUT, WM_DESTROY, WM_DROPFILES, WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL,
+    WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSKEYDOWN,
+    WM_TIMER, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW,
+    WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{HSTRING, Interface, PCWSTR, PWSTR, implement, w};
 
@@ -144,6 +145,7 @@ const EM_LINEFROMCHAR: u32 = 0x00C9;
 const EM_LINEINDEX: u32 = 0x00BB;
 const EM_LINELENGTH: u32 = 0x00C1;
 const EM_SETSEL: u32 = 0x00B1;
+const EM_CANUNDO: u32 = 0x00C6;
 
 use crate::app_windows::find_in_files_window::{
     FindInFilesCache, apply_find_in_files_selection, focus_find_in_files_results,
@@ -3308,6 +3310,18 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
         }
         WM_INITMENUPOPUP => {
             let hmenu = HMENU(wparam.0 as isize);
+            let main_menu = GetMenu(hwnd);
+            if main_menu.0 != 0 {
+                let edit_menu = GetSubMenu(main_menu, 1);
+                if edit_menu == hmenu {
+                    let flags = if can_undo_now(hwnd) {
+                        MF_BYCOMMAND | MF_ENABLED
+                    } else {
+                        MF_BYCOMMAND | MF_GRAYED
+                    };
+                    let _enabled = EnableMenuItem(hmenu, IDM_EDIT_UNDO as u32, flags);
+                }
+            }
             let ctx = with_state(hwnd, |state| {
                 if state.dictionary_context_menu != hmenu || state.dictionary_context_loaded {
                     return None;
@@ -6351,9 +6365,14 @@ pub(crate) unsafe fn show_editor_context_menu(hwnd: HWND, hwnd_edit: HWND, lpara
         crate::log_if_err!(AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()));
     }
 
+    let undo_flags = if can_undo_now(hwnd) {
+        MF_STRING
+    } else {
+        MF_STRING | MF_GRAYED
+    };
     crate::log_if_err!(AppendMenuW(
         menu,
-        MF_STRING,
+        undo_flags,
         IDM_EDIT_UNDO,
         PCWSTR(to_wide(&labels.edit_undo).as_ptr()),
     ));
@@ -6408,6 +6427,16 @@ pub(crate) unsafe fn show_editor_context_menu(hwnd: HWND, hwnd_edit: HWND, lpara
 
 unsafe fn open_dictionary_lookup(hwnd: HWND) {
     app_windows::wiktionary_window::open(hwnd);
+}
+
+unsafe fn can_undo_now(hwnd: HWND) -> bool {
+    if with_state(hwnd, |state| state.normalize_undo.is_some()).unwrap_or(false) {
+        return true;
+    }
+    let Some(hwnd_edit) = get_active_edit(hwnd) else {
+        return false;
+    };
+    SendMessageW(hwnd_edit, EM_CANUNDO, WPARAM(0), LPARAM(0)).0 != 0
 }
 
 unsafe fn show_voice_context_menu(hwnd: HWND, target: HWND, lparam: LPARAM) {

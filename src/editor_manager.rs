@@ -35,6 +35,7 @@ use windows::core::{PCWSTR, PWSTR};
 
 const EM_LIMITTEXT: u32 = 0x00C5;
 const EM_CANUNDO: u32 = 0x00C6;
+const EM_EMPTYUNDOBUFFER: u32 = 0x00CD;
 const EM_SETSEL: u32 = 0x00B1;
 const EM_BEGINUNDOACTION: u32 = 0x0459;
 const EM_ENDUNDOACTION: u32 = 0x045A;
@@ -1121,6 +1122,8 @@ pub unsafe fn set_edit_text(hwnd_edit: HWND, text: &str) {
     }
     if hwnd_edit.0 != 0 {
         SendMessageW(hwnd_edit, EM_SETMODIFY, WPARAM(0), LPARAM(0));
+        // Programmatic loads must not leave stale undo history.
+        SendMessageW(hwnd_edit, EM_EMPTYUNDOBUFFER, WPARAM(0), LPARAM(0));
         SendMessageW(
             hwnd_edit,
             EM_SETEVENTMASK,
@@ -1444,7 +1447,9 @@ pub unsafe fn undo_active_edit_skip_navigation(hwnd: HWND) -> bool {
         return false;
     };
     let mut before = get_edit_text(hwnd_edit);
-    for _ in 0..4 {
+    // Some operations can leave multiple non-text undo records (caret/selection moves).
+    // Keep skipping those until we hit an actual text change.
+    for _ in 0..32 {
         let can_undo = SendMessageW(hwnd_edit, EM_CANUNDO, WPARAM(0), LPARAM(0)).0 != 0;
         if !can_undo {
             return false;
@@ -3705,6 +3710,8 @@ pub unsafe fn create_edit(
             apply_indent_settings_to_edit(hwnd_edit, &settings);
         }
         SendMessageW(hwnd_edit, EM_SETMODIFY, WPARAM(0), LPARAM(0));
+        // Fresh editor instance starts with empty undo stack.
+        SendMessageW(hwnd_edit, EM_EMPTYUNDOBUFFER, WPARAM(0), LPARAM(0));
         SendMessageW(
             hwnd_edit,
             EM_SETEVENTMASK,

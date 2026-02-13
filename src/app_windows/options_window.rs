@@ -5843,8 +5843,9 @@ fn layout_audio_tab(state: &OptionsDialogState) {
         y,
         OPTIONS_EDIT_HEIGHT,
     );
-    let browse_width = 88;
-    let edit_width = (OPTIONS_CONTROL_WIDTH - browse_width - 8).max(80);
+    let browse_width = 72;
+    let spacing = 6;
+    let edit_width = (OPTIONS_CONTROL_WIDTH - browse_width - spacing).max(80);
     move_control_best_effort(
         "edit_audiobook_save_folder",
         state.edit_audiobook_save_folder,
@@ -5856,7 +5857,7 @@ fn layout_audio_tab(state: &OptionsDialogState) {
     move_control_best_effort(
         "button_audiobook_save_folder_browse",
         state.button_audiobook_save_folder_browse,
-        OPTIONS_CONTROL_X + edit_width + 8,
+        OPTIONS_CONTROL_X + edit_width + spacing,
         y - OPTIONS_ROW_HEIGHT - 2,
         browse_width,
         OPTIONS_BUTTON_HEIGHT,

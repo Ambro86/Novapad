@@ -1,6 +1,6 @@
 # Nhật ký thay đổi
 
-Phiên bản 0.6.6 – 2026-02-08
+Phiên bản 0.6.6 – 2026-02-13
 Cải tiến
 • Đã thêm "Định dạng tự động cho TTS" trong menu Chỉnh sửa để chuẩn bị nhanh văn bản cho đọc giọng nói (xóa markdown/dấu ngoặc kép và ghép lại các dòng bị ngắt).
 • Đã cải thiện chèn thẻ giọng nói: khi có văn bản được chọn, thẻ giờ được áp dụng đúng cho cả một dòng đơn và vùng chọn nhiều dòng.

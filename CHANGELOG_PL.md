@@ -1,6 +1,6 @@
 # Dziennik zmian
 
-Wersja 0.6.6 – 2026-02-08
+Wersja 0.6.6 – 2026-02-13
 Ulepszenia
 • Dodano „Automatyczne formatowanie dla TTS” w menu Edycja, aby szybko przygotować tekst do odczytu (usuwa markdown/cudzysłowy i scala połamane linie).
 • Ulepszono wstawianie tagów głosu: gdy tekst jest zaznaczony, tagi są teraz poprawnie nakładane zarówno na pojedynczą linię, jak i na zaznaczenie wielowierszowe.

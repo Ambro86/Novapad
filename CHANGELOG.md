@@ -1,6 +1,6 @@
 # Changelog
 
-Version 0.6.6 – 2026-02-08
+Version 0.6.6 – 2026-02-13
 Improvements
 • Added "Auto format for TTS" in the Edit menu to quickly prepare text for speech (removes markdown/quotes and reflows wrapped lines).
 • Improved voice-tag insertion: when text is selected, tags are now applied correctly to both single-line and multi-line selections.

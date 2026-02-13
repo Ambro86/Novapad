@@ -1,6 +1,6 @@
 # Journal des modifications
 
-Version 0.6.6 – 2026-02-08
+Version 0.6.6 – 2026-02-13
 Améliorations
 • Ajout de « Formatage automatique pour TTS » dans le menu Édition pour préparer rapidement le texte à la lecture vocale (suppression markdown/guillemets et recomposition des lignes coupées).
 • Amélioration de l’insertion des balises de voix : lorsqu’un texte est sélectionné, les balises sont désormais appliquées correctement aussi bien sur une seule ligne que sur une sélection multiligne.

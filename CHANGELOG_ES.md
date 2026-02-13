@@ -1,6 +1,6 @@
 # Changelog
 
-Versión 0.6.6 – 2026-02-08
+Versión 0.6.6 – 2026-02-13
 Mejoras
 • Añadida "Formateo automático para TTS" en el menú Editar para preparar rápidamente el texto para voz (elimina markdown/comillas y recompone líneas partidas).
 • Mejorada la inserción de etiquetas de voz: cuando hay texto seleccionado, ahora las etiquetas se aplican correctamente tanto a una sola línea como a selecciones multilínea.

@@ -1,6 +1,6 @@
 # Changelog
 
-Versione 0.6.6 – 2026-02-08
+Versione 0.6.6 – 2026-02-13
 Miglioramenti
 • Aggiunta "Formattazione automatica per TTS" nel menu Modifica per preparare rapidamente il testo alla lettura vocale (rimuove markdown/virgolette e ricompone le righe spezzate).
 • Migliorato l'inserimento dei tag voce: ora, se è presente una selezione, i tag vengono applicati correttamente sia a una singola riga sia a più righe selezionate.

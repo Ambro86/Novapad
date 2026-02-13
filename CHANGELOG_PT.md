@@ -1,6 +1,6 @@
 # Changelog
 
-Versão 0.6.6 – 2026-02-08
+Versão 0.6.6 – 2026-02-13
 Melhorias
 • Adicionada "Formatação automática para TTS" no menu Editar para preparar rapidamente o texto para voz (remove markdown/aspas e recompõe linhas quebradas).
 • Melhorada a inserção de tags de voz: quando há texto selecionado, as tags passam a ser aplicadas corretamente tanto em uma única linha quanto em seleção multilinha.

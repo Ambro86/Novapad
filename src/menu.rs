@@ -87,11 +87,14 @@ pub const IDM_PLAYBACK_AUDIO_TRACK_MAX: usize = 20;
 pub const IDM_INSERT_BOOKMARK: usize = 2101;
 pub const IDM_MANAGE_BOOKMARKS: usize = 2102;
 pub const IDM_INSERT_CLEAR_BOOKMARKS: usize = 2103;
+pub const IDM_GOTO_NEXT_BOOKMARK: usize = 2104;
+pub const IDM_GOTO_PREV_BOOKMARK: usize = 2105;
 pub const IDM_NEXT_TAB: usize = 3001;
 pub const IDM_WINDOW_OPEN_DOCUMENTS: usize = 3002;
 pub const IDM_WINDOW_CLOSE_ALL: usize = 3003;
 pub const IDM_VIEW_SHOW_VOICES: usize = 6101;
 pub const IDM_VIEW_SHOW_FAVORITES: usize = 6102;
+pub const IDM_VIEW_READ_ONLY: usize = 6103;
 pub const IDM_VIEW_FONT_ARIAL: usize = 6401;
 pub const IDM_VIEW_FONT_CALIBRI: usize = 6402;
 pub const IDM_VIEW_FONT_CONSOLAS: usize = 6403;
@@ -166,6 +169,7 @@ pub struct MenuLabels {
     pub view_text_size_xxlarge: String,
     pub view_show_voices: String,
     pub view_show_favorites: String,
+    pub view_read_only: String,
     pub view_font: String,
     pub file_new: String,
     pub file_open: String,
@@ -211,6 +215,8 @@ pub struct MenuLabels {
     pub edit_remove_duplicate_lines: String,
     pub edit_remove_duplicate_consecutive_lines: String,
     pub insert_bookmark: String,
+    pub insert_goto_next_bookmark: String,
+    pub insert_goto_prev_bookmark: String,
     pub insert_clear_bookmarks: String,
     pub manage_bookmarks: String,
     pub window_open_documents: String,
@@ -261,6 +267,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         view_text_size_xxlarge: i18n::tr(language, "view.text_size.xxlarge"),
         view_show_voices: i18n::tr(language, "view.show_voices"),
         view_show_favorites: i18n::tr(language, "view.show_favorites"),
+        view_read_only: i18n::tr(language, "view.read_only"),
         view_font: i18n::tr(language, "view.font"),
         file_new: i18n::tr(language, "file.new"),
         file_open: i18n::tr(language, "file.open"),
@@ -309,6 +316,8 @@ pub fn menu_labels(language: Language) -> MenuLabels {
             "edit.remove_duplicate_consecutive_lines",
         ),
         insert_bookmark: i18n::tr(language, "insert.bookmark"),
+        insert_goto_next_bookmark: i18n::tr(language, "insert.goto_next_bookmark"),
+        insert_goto_prev_bookmark: i18n::tr(language, "insert.goto_prev_bookmark"),
         insert_clear_bookmarks: i18n::tr(language, "insert.clear_bookmarks"),
         manage_bookmarks: i18n::tr(language, "insert.manage_bookmarks"),
         window_open_documents: i18n::tr(language, "window.open_documents"),
@@ -789,6 +798,13 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         IDM_VIEW_SHOW_FAVORITES,
         &labels.view_show_favorites,
     );
+    append_menu_string(
+        view_menu,
+        MF_STRING,
+        IDM_VIEW_READ_ONLY,
+        &labels.view_read_only,
+    );
+    crate::log_if_err!(AppendMenuW(view_menu, MF_SEPARATOR, 0, PCWSTR::null()));
     append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_ARIAL, "Arial");
     append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_CALIBRI, "Calibri");
     append_menu_string(
@@ -922,6 +938,18 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         MF_STRING,
         IDM_INSERT_BOOKMARK,
         &labels.insert_bookmark,
+    );
+    append_menu_string(
+        insert_menu,
+        MF_STRING,
+        IDM_GOTO_NEXT_BOOKMARK,
+        &labels.insert_goto_next_bookmark,
+    );
+    append_menu_string(
+        insert_menu,
+        MF_STRING,
+        IDM_GOTO_PREV_BOOKMARK,
+        &labels.insert_goto_prev_bookmark,
     );
     append_menu_string(
         insert_menu,

@@ -1,5 +1,9 @@
 # Changelog
 
+Versão 0.6.7 – 2026-02-13
+Melhorias
+• Adicionado o novo modo Ver > Somente leitura para bloquear edições acidentais no texto, mantendo leitura e navegação completas dos documentos.
+
 Versão 0.6.6 – 2026-02-13
 Melhorias
 • Adicionada "Formatação automática para TTS" no menu Editar para preparar rapidamente o texto para voz (remove markdown/aspas e recompõe linhas quebradas).
@@ -311,6 +315,7 @@ Melhorias
 
 ## 0.1.0 - 2025-12-25
 - Versao inicial: estrutura do projeto e README.
+
 
 
 

@@ -1,5 +1,9 @@
 # Changelog
 
+Version 0.6.7 – 2026-02-13
+Improvements
+• Added a new View > Read-only mode to lock editor text from accidental edits while keeping documents fully readable and navigable.
+
 Version 0.6.6 – 2026-02-13
 Improvements
 • Added "Auto format for TTS" in the Edit menu to quickly prepare text for speech (removes markdown/quotes and reflows wrapped lines).
@@ -310,6 +314,7 @@ Improvements
 
 ## 0.1.0 - 2025-12-25
 - Initial release: project structure and README.
+
 
 
 

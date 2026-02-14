@@ -1,5 +1,9 @@
 # Dziennik zmian
 
+Wersja 0.6.7 – 2026-02-13
+Ulepszenia
+• Dodano nowy tryb Widok > Tylko do odczytu, aby blokować przypadkowe edycje tekstu przy zachowaniu pełnego odczytu i nawigacji po dokumentach.
+
 Wersja 0.6.6 – 2026-02-13
 Ulepszenia
 • Dodano „Automatyczne formatowanie dla TTS” w menu Edycja, aby szybko przygotować tekst do odczytu (usuwa markdown/cudzysłowy i scala połamane linie).
@@ -305,6 +309,7 @@ Improvements
 
 ## 0.1.0 - 2025-12-25
 - Initial release: project structure and README.
+
 
 
 

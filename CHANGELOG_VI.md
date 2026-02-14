@@ -1,5 +1,9 @@
 # Nhật ký thay đổi
 
+Phiên bản 0.6.7 – 2026-02-13
+Cải tiến
+• Đã thêm chế độ mới Xem > Chỉ đọc để ngăn chỉnh sửa nhầm văn bản, đồng thời vẫn giữ khả năng đọc và điều hướng đầy đủ tài liệu.
+
 Phiên bản 0.6.6 – 2026-02-13
 Cải tiến
 • Đã thêm "Định dạng tự động cho TTS" trong menu Chỉnh sửa để chuẩn bị nhanh văn bản cho đọc giọng nói (xóa markdown/dấu ngoặc kép và ghép lại các dòng bị ngắt).
@@ -311,6 +315,7 @@ Cải tiến
 
 ## 0.1.0 - 2025-12-25
 - Phiên bản phát hành đầu tiên: Cấu trúc dự án và tệp README.
+
 
 
 

@@ -3959,6 +3959,19 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                     toggle_favorites_panel(hwnd);
                     LRESULT(0)
                 }
+                IDM_VIEW_READ_ONLY => {
+                    let new_read_only = with_state(hwnd, |state| {
+                        state.settings.editor_read_only = !state.settings.editor_read_only;
+                        state.settings.editor_read_only
+                    })
+                    .unwrap_or(false);
+                    editor_manager::apply_read_only_to_all_edits(hwnd, new_read_only);
+                    if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
+                        save_settings(settings);
+                    }
+                    update_voice_panel_menu_check(hwnd);
+                    LRESULT(0)
+                }
                 cmd_id if font_face_from_menu_id(cmd_id).is_some() => {
                     let face = font_face_from_menu_id(cmd_id).unwrap_or("Segoe UI");
                     apply_ui_font(hwnd, face.to_string());
@@ -3977,6 +3990,16 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 IDM_INSERT_BOOKMARK => {
                     log_debug("Menu: Insert Bookmark");
                     insert_bookmark(hwnd);
+                    LRESULT(0)
+                }
+                IDM_GOTO_NEXT_BOOKMARK => {
+                    log_debug("Menu: Go to next bookmark");
+                    goto_relative_bookmark(hwnd, true);
+                    LRESULT(0)
+                }
+                IDM_GOTO_PREV_BOOKMARK => {
+                    log_debug("Menu: Go to previous bookmark");
+                    goto_relative_bookmark(hwnd, false);
                     LRESULT(0)
                 }
                 IDM_INSERT_CLEAR_BOOKMARKS => {
@@ -4504,15 +4527,17 @@ unsafe fn update_text_preferences(hwnd: HWND, text_color: Option<u32>, text_size
 }
 
 unsafe fn update_voice_panel_menu_check(hwnd: HWND) {
-    let (visible, favorites_visible, text_color, text_size) = with_state(hwnd, |state| {
-        (
-            state.voice_panel_visible,
-            state.voice_favorites_visible,
-            state.settings.text_color,
-            state.settings.text_size,
-        )
-    })
-    .unwrap_or((false, false, 0x000000, 12));
+    let (visible, favorites_visible, text_color, text_size, read_only) =
+        with_state(hwnd, |state| {
+            (
+                state.voice_panel_visible,
+                state.voice_favorites_visible,
+                state.settings.text_color,
+                state.settings.text_size,
+                state.settings.editor_read_only,
+            )
+        })
+        .unwrap_or((false, false, 0x000000, 12, false));
     let hmenu = GetMenu(hwnd);
     if hmenu.0 == 0 {
         return;
@@ -4530,6 +4555,12 @@ unsafe fn update_voice_panel_menu_check(hwnd: HWND) {
         hmenu,
         IDM_VIEW_SHOW_FAVORITES as u32,
         (MF_BYCOMMAND | fav_flags).0,
+    );
+    let read_only_flags = if read_only { MF_CHECKED } else { MF_UNCHECKED };
+    CheckMenuItem(
+        hmenu,
+        IDM_VIEW_READ_ONLY as u32,
+        (MF_BYCOMMAND | read_only_flags).0,
     );
 
     let color_items = [
@@ -7029,6 +7060,7 @@ unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
 unsafe fn create_accelerators() -> HACCEL {
     let virt = FCONTROL | FVIRTKEY;
     let virt_shift = FCONTROL | FSHIFT | FVIRTKEY;
+    let virt_shift_only = FSHIFT | FVIRTKEY;
     let virt_alt = FALT | FVIRTKEY;
     let virt_alt_shift = FALT | FSHIFT | FVIRTKEY;
     let accels = [
@@ -7181,6 +7213,16 @@ unsafe fn create_accelerators() -> HACCEL {
             fVirt: virt,
             key: VK_NEXT.0,
             cmd: IDM_PLAYBACK_TRACK_NEXT as u16,
+        },
+        ACCEL {
+            fVirt: virt_shift_only,
+            key: VK_NEXT.0,
+            cmd: IDM_GOTO_NEXT_BOOKMARK as u16,
+        },
+        ACCEL {
+            fVirt: virt_shift_only,
+            key: VK_PRIOR.0,
+            cmd: IDM_GOTO_PREV_BOOKMARK as u16,
         },
         ACCEL {
             fVirt: FVIRTKEY,
@@ -7472,6 +7514,149 @@ fn audio_bookmark_position_and_snippet(position_secs: f64) -> (i32, String) {
         current_total as i32,
         format!("Posizione audio: {:02}:{:02}", mins, secs),
     )
+}
+
+unsafe fn goto_relative_bookmark(hwnd: HWND, forward: bool) -> bool {
+    let (path, hwnd_edit, format): (Option<std::path::PathBuf>, HWND, FileFormat) =
+        with_state(hwnd, |state| {
+            state
+                .docs
+                .get(state.current)
+                .map(|doc| (doc.path.clone(), doc.hwnd_edit, doc.format))
+        })
+        .flatten()
+        .unwrap_or((None, HWND(0), FileFormat::default()));
+    if hwnd_edit.0 == 0 {
+        return false;
+    }
+
+    let (storage_key, _) = bookmark_storage_key(path.as_deref(), hwnd_edit);
+    let Some(bookmarks) = with_state(hwnd, |state| {
+        state.bookmarks.files.get(&storage_key).cloned()
+    })
+    .flatten() else {
+        return false;
+    };
+    if bookmarks.is_empty() {
+        return false;
+    }
+
+    let current_pos = if matches!(format, FileFormat::Audiobook) {
+        with_state(hwnd, |state| {
+            let active = state.active_audiobook.as_ref()?;
+            let current_path = path.as_ref()?;
+            if active.path != *current_path {
+                return Some(0);
+            }
+            Some(crate::audio_player::audiobook_position_secs(active).floor() as i32)
+        })
+        .flatten()
+        .unwrap_or(0)
+    } else {
+        let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut cr as *mut _ as isize),
+        );
+        if forward { cr.cpMax } else { cr.cpMin }
+    };
+
+    let target = if forward {
+        bookmarks.iter().find(|bm| bm.position > current_pos)
+    } else {
+        bookmarks.iter().rev().find(|bm| bm.position < current_pos)
+    };
+    let Some(target) = target else {
+        return false;
+    };
+    let target_position = target.position;
+    let target_snippet = target.snippet.trim().to_string();
+
+    if matches!(format, FileFormat::Audiobook) {
+        let Some(path) = path.as_ref() else {
+            return false;
+        };
+        crate::audio_player::start_audiobook_at(hwnd, path, target_position.max(0) as u64);
+        if !target_snippet.is_empty() {
+            crate::accessibility::screen_reader_speak(&target_snippet);
+        }
+        return true;
+    }
+
+    let mut cr = CHARRANGE {
+        cpMin: target_position,
+        cpMax: target_position,
+    };
+    SendMessageW(
+        hwnd_edit,
+        EM_EXSETSEL,
+        WPARAM(0),
+        LPARAM(&mut cr as *mut _ as isize),
+    );
+    SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+    SetFocus(hwnd_edit);
+    announce_bookmark_target_line(hwnd_edit, target_position, &target_snippet);
+    true
+}
+
+unsafe fn announce_bookmark_target_line(hwnd_edit: HWND, position: i32, fallback: &str) {
+    let line = SendMessageW(
+        hwnd_edit,
+        EM_LINEFROMCHAR,
+        WPARAM(position.max(0) as usize),
+        LPARAM(0),
+    )
+    .0 as i32;
+    if line < 0 {
+        if !fallback.is_empty() {
+            crate::accessibility::screen_reader_speak(fallback);
+        }
+        return;
+    }
+    let line_start =
+        SendMessageW(hwnd_edit, EM_LINEINDEX, WPARAM(line as usize), LPARAM(0)).0 as i32;
+    if line_start < 0 {
+        if !fallback.is_empty() {
+            crate::accessibility::screen_reader_speak(fallback);
+        }
+        return;
+    }
+    let line_len = SendMessageW(
+        hwnd_edit,
+        EM_LINELENGTH,
+        WPARAM(line_start.max(0) as usize),
+        LPARAM(0),
+    )
+    .0 as i32;
+    if line_len <= 0 {
+        if !fallback.is_empty() {
+            crate::accessibility::screen_reader_speak(fallback);
+        }
+        return;
+    }
+    let mut buf = vec![0u16; (line_len + 1) as usize];
+    let mut range = TEXTRANGEW {
+        chrg: CHARRANGE {
+            cpMin: line_start,
+            cpMax: line_start + line_len,
+        },
+        lpstrText: PWSTR(buf.as_mut_ptr()),
+    };
+    SendMessageW(
+        hwnd_edit,
+        EM_GETTEXTRANGE,
+        WPARAM(0),
+        LPARAM(&mut range as *mut _ as isize),
+    );
+    let text = String::from_utf16_lossy(&buf[..line_len as usize]);
+    let trimmed = text.trim();
+    if !trimmed.is_empty() {
+        crate::accessibility::screen_reader_speak(trimmed);
+    } else if !fallback.is_empty() {
+        crate::accessibility::screen_reader_speak(fallback);
+    }
 }
 
 unsafe fn clear_current_bookmarks(hwnd: HWND) -> bool {

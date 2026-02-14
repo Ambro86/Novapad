@@ -1369,6 +1369,31 @@ pub unsafe fn apply_font_to_all_edits(hwnd: HWND, hfont: HFONT) {
     }
 }
 
+pub unsafe fn apply_read_only_to_all_edits(hwnd: HWND, read_only: bool) {
+    let edit_targets = with_state(hwnd, |state| {
+        state
+            .docs
+            .iter()
+            .map(|doc| {
+                let force_read_only = matches!(doc.format, FileFormat::Audiobook);
+                (doc.hwnd_edit, read_only || force_read_only)
+            })
+            .collect::<Vec<_>>()
+    })
+    .unwrap_or_default();
+
+    for (hwnd_edit, should_read_only) in edit_targets {
+        if hwnd_edit.0 != 0 {
+            SendMessageW(
+                hwnd_edit,
+                EM_SETREADONLY,
+                WPARAM(if should_read_only { 1 } else { 0 }),
+                LPARAM(0),
+            );
+        }
+    }
+}
+
 fn apply_text_appearance(hwnd_edit: HWND, text_color: u32, text_size: i32) {
     let mut format = CHARFORMAT2W::default();
     format.Base.cbSize = std::mem::size_of::<CHARFORMAT2W>() as u32;
@@ -3747,6 +3772,12 @@ pub unsafe fn create_edit(
         apply_text_appearance(hwnd_edit, text_color, text_size);
         if let Some(settings) = with_state(parent, |state| state.settings.clone()) {
             apply_indent_settings_to_edit(hwnd_edit, &settings);
+            SendMessageW(
+                hwnd_edit,
+                EM_SETREADONLY,
+                WPARAM(if settings.editor_read_only { 1 } else { 0 }),
+                LPARAM(0),
+            );
         }
         SendMessageW(hwnd_edit, EM_SETMODIFY, WPARAM(0), LPARAM(0));
         // Fresh editor instance starts with empty undo stack.

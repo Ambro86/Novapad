@@ -1,5 +1,9 @@
 # Journal des modifications
 
+Version 0.6.7 – 2026-02-13
+Améliorations
+• Ajout du nouveau mode Affichage > Lecture seule pour éviter les modifications accidentelles tout en conservant une lecture et une navigation complètes des documents.
+
 Version 0.6.6 – 2026-02-13
 Améliorations
 • Ajout de « Formatage automatique pour TTS » dans le menu Édition pour préparer rapidement le texte à la lecture vocale (suppression markdown/guillemets et recomposition des lignes coupées).
@@ -304,6 +308,7 @@ Améliorations
 
 ## 0.1.0 - 2025-12-25
 - Version initiale.
+
 
 
 

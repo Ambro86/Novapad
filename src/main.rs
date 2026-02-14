@@ -127,7 +127,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     IsIconic, IsWindow, KillTimer, LoadCursorW, LoadIconW, MB_ICONASTERISK, MB_ICONERROR,
     MB_ICONINFORMATION, MB_OK, MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION,
     MF_CHECKED, MF_ENABLED, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG,
-    MessageBoxW, OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW,
+    MessageBoxW, ModifyMenuW, OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW,
     RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED, SW_SHOWNORMAL,
     SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
     TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage,
@@ -529,6 +529,13 @@ fn confirm_menu_action(hwnd: HWND, key: &str) {
     let label = i18n::tr(language, key);
     let cleaned = clean_menu_label(&label);
     if !cleaned.is_empty() {
+        if key.starts_with("edit.") {
+            unsafe {
+                with_state(hwnd, |state| {
+                    state.undo_action_label = Some(cleaned.clone())
+                });
+            }
+        }
         let message = i18n::tr_f(language, "app.action_completed", &[("action", &cleaned)]);
         unsafe {
             show_info(hwnd, language, &message);
@@ -1617,6 +1624,7 @@ pub(crate) struct AppState {
     find_in_files_cache: Option<FindInFilesCache>,
     pending_find_in_files: Option<PendingFindInFilesSelection>,
     normalize_undo: Option<NormalizeUndo>,
+    undo_action_label: Option<String>,
     normalize_skip_change: bool,
     spellcheck_manager: spellcheck::SpellcheckManager,
     spellcheck_last_announce: Option<SpellcheckAnnounceKey>,
@@ -2791,6 +2799,7 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 find_in_files_cache: None,
                 pending_find_in_files: None,
                 normalize_undo: None,
+                undo_action_label: None,
                 normalize_skip_change: false,
                 spellcheck_manager: spellcheck::SpellcheckManager::default(),
                 spellcheck_last_announce: None,
@@ -2887,6 +2896,13 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
             }
             if hdr.code == EN_CHANGE {
                 editor_manager::mark_dirty_from_edit(hwnd, hdr.hwndFrom);
+                let active_edit = get_active_edit(hwnd).unwrap_or(HWND(0));
+                if active_edit == hdr.hwndFrom {
+                    let language =
+                        with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+                    let label = i18n::tr(language, "undo.action.text");
+                    with_state(hwnd, |state| state.undo_action_label = Some(label));
+                }
                 return LRESULT(0);
             }
             if hdr.code == EN_SELCHANGE {
@@ -3328,12 +3344,28 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
             if main_menu.0 != 0 {
                 let edit_menu = GetSubMenu(main_menu, 1);
                 if edit_menu == hmenu {
-                    let flags = if can_undo_now(hwnd) {
+                    let can_undo = can_undo_now(hwnd);
+                    let flags = if can_undo {
                         MF_BYCOMMAND | MF_ENABLED
                     } else {
                         MF_BYCOMMAND | MF_GRAYED
                     };
                     let _enabled = EnableMenuItem(hmenu, IDM_EDIT_UNDO as u32, flags);
+                    let language =
+                        with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+                    let undo_label = build_undo_menu_label(hwnd, language);
+                    let menu_flags = if can_undo {
+                        MF_BYCOMMAND | MF_STRING | MF_ENABLED
+                    } else {
+                        MF_BYCOMMAND | MF_STRING | MF_GRAYED
+                    };
+                    let _modified = ModifyMenuW(
+                        hmenu,
+                        IDM_EDIT_UNDO as u32,
+                        menu_flags,
+                        IDM_EDIT_UNDO,
+                        PCWSTR(to_wide(&undo_label).as_ptr()),
+                    );
                     let can_cut_copy = has_active_text_selection(hwnd);
                     let cut_copy_flags = if can_cut_copy {
                         MF_BYCOMMAND | MF_ENABLED
@@ -3449,6 +3481,13 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 }
                 editor_manager::handle_normalize_edit_change(hwnd, HWND(lparam.0));
                 mark_dirty_from_edit(hwnd, HWND(lparam.0));
+                let active_edit = get_active_edit(hwnd).unwrap_or(HWND(0));
+                if active_edit == HWND(lparam.0) {
+                    let language =
+                        with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+                    let label = i18n::tr(language, "undo.action.text");
+                    with_state(hwnd, |state| state.undo_action_label = Some(label));
+                }
                 return LRESULT(0);
             }
             if cmd_id == VOICE_PANEL_ID_ENGINE && u32::from(notification) == CBN_SELCHANGE {
@@ -3636,6 +3675,7 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                     if !editor_manager::try_normalize_undo(hwnd) {
                         editor_manager::undo_active_edit_skip_navigation(hwnd);
                     }
+                    with_state(hwnd, |state| state.undo_action_label = None);
                     LRESULT(0)
                 }
                 IDM_EDIT_CUT => {
@@ -5402,6 +5442,11 @@ unsafe fn insert_voice_tag_from_voice_panel(hwnd: HWND) {
         pitch,
         volume,
     );
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let label = clean_menu_label(&i18n::tr(language, "options.label.insert_voice_tag"));
+    if !label.is_empty() {
+        with_state(hwnd, |state| state.undo_action_label = Some(label));
+    }
 }
 
 unsafe fn is_voice_panel_tuning_edit(hwnd: HWND, target: HWND) -> bool {
@@ -6470,11 +6515,12 @@ pub(crate) unsafe fn show_editor_context_menu(hwnd: HWND, hwnd_edit: HWND, lpara
     } else {
         MF_STRING | MF_GRAYED
     };
+    let undo_label = build_undo_menu_label(hwnd, language_ui);
     crate::log_if_err!(AppendMenuW(
         menu,
         undo_flags,
         IDM_EDIT_UNDO,
-        PCWSTR(to_wide(&labels.edit_undo).as_ptr()),
+        PCWSTR(to_wide(&undo_label).as_ptr()),
     ));
     crate::log_if_err!(AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()));
     crate::log_if_err!(AppendMenuW(
@@ -6537,6 +6583,28 @@ unsafe fn can_undo_now(hwnd: HWND) -> bool {
         return false;
     };
     SendMessageW(hwnd_edit, EM_CANUNDO, WPARAM(0), LPARAM(0)).0 != 0
+}
+
+fn build_undo_menu_label(hwnd: HWND, language: Language) -> String {
+    let base = i18n::tr(language, "edit.undo");
+    let action = unsafe { with_state(hwnd, |state| state.undo_action_label.clone()).flatten() };
+    let Some(action) = action else {
+        return base;
+    };
+    let action = action.trim();
+    if action.is_empty() {
+        return base;
+    }
+    let mut split = base.splitn(2, '\t');
+    let caption = split.next().unwrap_or("").trim();
+    let accel = split.next();
+    if caption.is_empty() {
+        return base;
+    }
+    match accel {
+        Some(accel) if !accel.is_empty() => format!("{}: {}\t{}", caption, action, accel),
+        _ => format!("{}: {}", caption, action),
+    }
 }
 
 unsafe fn has_active_text_selection(hwnd: HWND) -> bool {

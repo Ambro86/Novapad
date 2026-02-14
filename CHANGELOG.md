@@ -13,6 +13,7 @@ Improvements
 • Pressing Ctrl+A now announces completion for clearer screen-reader feedback.
 • Improved replace feedback messages with proper singular/plural forms (e.g. “1 replacement made” vs “2 replacements made”).
 • Added dictionary lookup language selection in the dictionary window, with default Auto (interface language) and optional manual override.
+• Improved Undo labeling: the Edit > Undo entry now shows what action will be undone (for example, text edits, quote/unquote lines, or voice-tag insertion), while remaining disabled when no undo is available.
 Bug fixes
 • Fixed Google News RSS item ordering: articles are now shown in descending publish date (newest first) when dates are available.
 • Fixed NVDA label association in the dictionary window: search field and language combo now announce the correct labels.

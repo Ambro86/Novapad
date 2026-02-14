@@ -6,6 +6,7 @@ Cải tiến
 • Đã thêm trong Chỉnh sửa > Văn bản các thao tác tăng/giảm thụt lề, với phím tắt Ctrl+Alt+Mũi tên phải (thụt vào) và Ctrl+Alt+Mũi tên trái (thụt ra), vì khi bật “Hiển thị giọng nói trong trình soạn thảo” thì phím Tab được dành cho việc điều hướng bảng giọng nói.
 • Đã thêm hiển thị ngày/giờ theo ngôn ngữ cho bài RSS và tập podcast, với định dạng tự điều chỉnh theo ngôn ngữ giao diện.
 • Đã thêm thao tác mới trong menu ngữ cảnh RSS để chia sẻ bài đã chọn qua email.
+• Đã thêm tùy chọn xác nhận xóa chi tiết trong Tùy chọn > RSS và podcast: với RSS (nguồn/bài/cả hai/không) và với podcast (podcast/tập/cả hai/không).
 • Khi nhấn Ctrl+A, chương trình giờ sẽ thông báo hoàn tất thao tác để phản hồi rõ ràng hơn cho trình đọc màn hình.
 • Đã cải thiện thông báo thay thế với dạng số ít/số nhiều chính xác (ví dụ: “1 mục đã thay thế” và “2 mục đã thay thế”).
 • Đã thêm trong cửa sổ từ điển tùy chọn chọn ngôn ngữ tra cứu, mặc định là Auto (ngôn ngữ giao diện) và có thể chọn thủ công.
@@ -14,6 +15,8 @@ Sửa lỗi
 • Đã sửa gán nhãn cho NVDA trong cửa sổ từ điển: ô tìm kiếm và combobox ngôn ngữ giờ đọc đúng nhãn.
 • Đã sửa điều hướng bàn phím trong cửa sổ Thuộc tính RSS/Podcast: Tab/Shift+Tab giờ đi tới nút OK, Enter kích hoạt OK, Esc đóng an toàn và tiêu điểm quay lại đúng danh sách RSS/Podcast.
 • Đã sửa lịch sử hoàn tác trong RSS/Podcast: Ctrl+Z giờ hỗ trợ hoàn tác nhiều cấp cho thao tác xóa (bài/tập và nguồn), không chỉ thao tác gần nhất.
+• Đã cải thiện thông báo khi xóa trong RSS/Podcast với thông điệp rõ ràng (đã xóa RSS, đã xóa bài RSS, đã xóa tập podcast).
+• Đã cải thiện xử lý tiêu điểm sau khi xóa/hoàn tác trong RSS/Podcast: với RSS, mục nguồn đầu tiên được chọn lại ổn định khi cần, đồng thời giảm lặp thông báo của trình đọc màn hình trong quá trình chọn lại có độ trễ.
 
 Phiên bản 0.6.6 – 2026-02-13
 Cải tiến

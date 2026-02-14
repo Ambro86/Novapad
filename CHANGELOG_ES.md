@@ -6,6 +6,7 @@ Mejoras
 • Añadidas en Editar > Texto nuevas acciones para aumentar/reducir sangría, con atajos Ctrl+Alt+Flecha derecha (indentar) y Ctrl+Alt+Flecha izquierda (desindentar), porque cuando “Mostrar voces en el editor” está activo la tecla Tab queda reservada para navegar el panel de voces.
 • Añadida la visualización localizada de fecha y hora en artículos RSS y episodios de podcast, con formato adaptado al idioma de la interfaz.
 • Añadida en el menú contextual RSS una nueva acción para compartir por correo electrónico el artículo seleccionado.
+• Añadidas opciones granulares de confirmación de borrado en Opciones > RSS y podcast: para RSS (feed/artículo/ambos/ninguno) y para Podcasts (podcast/episodio/ambos/ninguno).
 • Al pulsar Ctrl+A ahora se anuncia la finalización de la acción para ofrecer una respuesta más clara en lectores de pantalla.
 • Mejorado el mensaje de reemplazo con singular/plural correcto (por ejemplo, “1 reemplazo realizado” frente a “2 reemplazos realizados”).
 • Añadida en la ventana del diccionario la selección de idioma de búsqueda, con valor predeterminado Auto (idioma de la interfaz) y opción de ajuste manual.
@@ -14,6 +15,8 @@ Correcciones de errores
 • Corregida la asociación de etiquetas en NVDA en la ventana del diccionario: el campo de búsqueda y el combo de idioma ahora anuncian la etiqueta correcta.
 • Corregida la navegación de teclado en la ventana Propiedades de RSS/Podcast: Tab/Shift+Tab ahora llegan al botón Aceptar, Enter activa Aceptar, Esc cierra de forma segura y el foco vuelve correctamente a la lista RSS/Podcast.
 • Corregido el historial de deshacer en RSS/Podcast: Ctrl+Z ahora admite deshacer multinivel para eliminaciones (artículos/episodios y fuentes), no solo la última acción.
+• Mejorados los avisos de eliminación en RSS/Podcast con mensajes explícitos (RSS eliminado, artículo RSS eliminado, episodio de podcast eliminado).
+• Mejorado el foco tras eliminar/deshacer en RSS/Podcast: en RSS se selecciona de forma fiable el primer feed cuando hace falta y se reducen repeticiones de anuncios del lector de pantalla durante la reselección diferida.
 
 Versión 0.6.6 – 2026-02-13
 Mejoras

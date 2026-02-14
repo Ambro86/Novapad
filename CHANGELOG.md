@@ -6,6 +6,7 @@ Improvements
 • Added new Edit > Text actions for indent/outdent, with shortcuts Ctrl+Alt+Right (indent) and Ctrl+Alt+Left (outdent), because when “Show voices in editor” is enabled the Tab key is reserved for voice-panel navigation.
 • Added localized date/time in RSS articles and podcast episodes, with formatting adapted to the current interface language.
 • Added a new RSS context-menu action to share the selected article by email.
+• Added granular delete-confirmation options for RSS/Podcast in Options > RSS and podcast: RSS (feed/article/both/none) and Podcasts (podcast/episode/both/none).
 • Pressing Ctrl+A now announces completion for clearer screen-reader feedback.
 • Improved replace feedback messages with proper singular/plural forms (e.g. “1 replacement made” vs “2 replacements made”).
 • Added dictionary lookup language selection in the dictionary window, with default Auto (interface language) and optional manual override.
@@ -14,6 +15,8 @@ Bug fixes
 • Fixed NVDA label association in the dictionary window: search field and language combo now announce the correct labels.
 • Fixed RSS/Podcast Properties window keyboard handling: Tab/Shift+Tab now reaches the OK button, Enter activates OK, Esc closes safely, and focus correctly returns to the RSS/Podcast list.
 • Fixed RSS/Podcast undo history: Ctrl+Z now supports multi-level undo for removals (articles/episodes and sources), not just the last action.
+• Improved RSS/Podcast removal feedback with explicit status announcements (RSS removed, RSS article removed, podcast episode removed).
+• Improved RSS/Podcast focus behavior after delete/undo: RSS now reliably focuses the first feed when needed and avoids repeated screen-reader announcements during delayed reselection.
 
 Version 0.6.6 – 2026-02-13
 Improvements

@@ -6,6 +6,7 @@ Améliorations
 • Ajout, dans Édition > Texte, de nouvelles actions pour augmenter/réduire le retrait, avec les raccourcis Ctrl+Alt+Flèche droite (indenter) et Ctrl+Alt+Flèche gauche (désindenter), car lorsque « Afficher les voix dans l’éditeur » est activé, la touche Tab est réservée à la navigation du panneau des voix.
 • Ajout de l'affichage localisé de la date et de l'heure dans les articles RSS et les épisodes de podcast, avec un format adapté à la langue de l'interface.
 • Ajout d'une nouvelle action dans le menu contextuel RSS pour partager l'article sélectionné par e-mail.
+• Ajout d'options granulaires de confirmation de suppression dans Options > RSS et podcast : pour RSS (flux/article/les deux/aucun) et pour Podcasts (podcast/épisode/les deux/aucun).
 • Un appui sur Ctrl+A annonce désormais la fin de l'action pour un retour plus clair avec les lecteurs d'écran.
 • Amélioration du message de remplacement avec une gestion correcte du singulier/pluriel (par ex. « 1 remplacement effectué » vs « 2 remplacements effectués »).
 • Ajout dans la fenêtre du dictionnaire d'une sélection de langue de recherche, avec Auto (langue de l'interface) par défaut et possibilité de choix manuel.
@@ -14,6 +15,8 @@ Corrections de bugs
 • Correction de l'association des étiquettes NVDA dans la fenêtre du dictionnaire : le champ de recherche et la liste de langue annoncent désormais la bonne étiquette.
 • Correction de la navigation clavier dans la fenêtre Propriétés RSS/Podcast : Tab/Maj+Tab atteignent désormais le bouton OK, Entrée active OK, Échap ferme la fenêtre en toute sécurité et le focus revient correctement à la liste RSS/Podcast.
 • Correction de l'historique d'annulation RSS/Podcast : Ctrl+Z prend désormais en charge une annulation multi-niveaux pour les suppressions (articles/épisodes et sources), et plus seulement la dernière action.
+• Amélioration des annonces de suppression RSS/Podcast avec des messages explicites (flux RSS supprimé, article RSS supprimé, épisode de podcast supprimé).
+• Amélioration du focus après suppression/annulation dans RSS/Podcast : en RSS, le premier flux est sélectionné de manière fiable si nécessaire, et les répétitions d'annonces du lecteur d'écran ont été réduites pendant la resélection différée.
 
 Version 0.6.6 – 2026-02-13
 Améliorations

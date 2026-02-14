@@ -6,6 +6,7 @@ Ulepszenia
 • Dodano w Edycja > Tekst nowe akcje zwiększania/zmniejszania wcięcia ze skrótami Ctrl+Alt+Strzałka w prawo (wcięcie) i Ctrl+Alt+Strzałka w lewo (usuń wcięcie), ponieważ gdy włączone jest „Pokaż głosy w edytorze”, klawisz Tab jest zarezerwowany do nawigacji w panelu głosów.
 • Dodano lokalizowane wyświetlanie daty i godziny w artykułach RSS oraz odcinkach podcastów, z formatem dopasowanym do języka interfejsu.
 • Dodano nową akcję w menu kontekstowym RSS do udostępniania wybranego artykułu przez e-mail.
+• Dodano szczegółowe opcje potwierdzania usuwania w Opcje > RSS i podcasty: dla RSS (kanał/artykuł/oba/brak) i dla podcastów (podcast/odcinek/oba/brak).
 • Po naciśnięciu Ctrl+A program ogłasza teraz zakończenie akcji, co daje czytelniejszą informację zwrotną dla czytników ekranu.
 • Ulepszono komunikat po zamianie, dodając poprawne formy liczby pojedynczej i mnogiej (np. „1 zamianę” vs „2 zamiany”).
 • Dodano w oknie słownika wybór języka wyszukiwania, z domyślną opcją Auto (język interfejsu) oraz możliwością ręcznego wyboru.
@@ -14,6 +15,8 @@ Poprawki błędów
 • Poprawiono powiązanie etykiet NVDA w oknie słownika: pole wyszukiwania i lista języka ogłaszają teraz właściwe etykiety.
 • Poprawiono obsługę klawiatury w oknie Właściwości RSS/Podcast: Tab/Shift+Tab przechodzą teraz do przycisku OK, Enter aktywuje OK, Esc bezpiecznie zamyka okno, a fokus poprawnie wraca do listy RSS/Podcast.
 • Poprawiono historię cofania w RSS/Podcast: Ctrl+Z obsługuje teraz wielopoziomowe cofanie usunięć (artykułów/odcinków i źródeł), a nie tylko ostatniej akcji.
+• Ulepszono komunikaty usuwania w RSS/Podcast dzięki jawnym ogłoszeniom (usunięto RSS, usunięto artykuł RSS, usunięto odcinek podcastu).
+• Ulepszono zachowanie fokusu po usunięciu/cofnięciu w RSS/Podcast: w RSS w razie potrzeby niezawodnie wybierany jest pierwszy kanał, a powtarzanie komunikatów czytnika ekranu podczas opóźnionej ponownej selekcji zostało ograniczone.
 
 Wersja 0.6.6 – 2026-02-13
 Ulepszenia

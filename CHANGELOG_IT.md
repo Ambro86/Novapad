@@ -6,6 +6,7 @@ Miglioramenti
 • Aggiunte nel menu Modifica > Testo le nuove azioni per aumentare/ridurre il rientro, con scorciatoie Ctrl+Alt+Freccia destra (indent) e Ctrl+Alt+Freccia sinistra (de-indent), perché quando “Mostra voci nell’editor” è attivo il tasto Tab è riservato alla navigazione del pannello voci.
 • Aggiunta la visualizzazione localizzata di data e ora per articoli RSS ed episodi podcast, con formato adattato alla lingua dell'interfaccia.
 • Aggiunta nel menu contestuale RSS una nuova voce per condividere via email l'articolo selezionato.
+• Aggiunte opzioni granulari di conferma eliminazione in Opzioni > RSS e podcast: per RSS (feed/articolo/entrambi/nessuno) e per Podcast (podcast/episodio/entrambi/nessuno).
 • Premendo Ctrl+A ora viene annunciato il completamento dell'azione per un feedback più chiaro con gli screen reader.
 • Migliorato il messaggio di conferma delle sostituzioni con gestione corretta di singolare/plurale (es. “1 sostituzione” vs “2 sostituzioni”).
 • Aggiunta nella finestra Dizionario la selezione della lingua di ricerca, con predefinito Auto (lingua interfaccia) e possibilità di override manuale.
@@ -14,6 +15,8 @@ Correzioni di bug
 • Corretta l'associazione etichette NVDA nella finestra Dizionario: campo ricerca e combobox lingua ora annunciano l'etichetta giusta.
 • Corretta la gestione tastiera nella finestra Proprietà di RSS/Podcast: Tab/Shift+Tab raggiungono il pulsante OK, Invio attiva OK, Esc chiude in modo sicuro e il focus torna correttamente all'elenco RSS/Podcast.
 • Corretto lo storico annullamento in RSS/Podcast: Ctrl+Z ora supporta annullamento multi-livello per rimozioni (articoli/episodi e fonti), non solo l'ultima azione.
+• Migliorati gli annunci di rimozione in RSS/Podcast con messaggi espliciti (RSS rimosso, articolo RSS rimosso, episodio podcast rimosso).
+• Migliorata la gestione del focus dopo elimina/annulla in RSS/Podcast: negli RSS viene selezionato in modo affidabile il primo feed quando necessario e sono state ridotte le ripetizioni degli annunci screen reader durante la riselezione ritardata.
 
 Versione 0.6.6 – 2026-02-13
 Miglioramenti

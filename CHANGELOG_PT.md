@@ -6,6 +6,7 @@ Melhorias
 • Adicionadas em Editar > Texto novas ações para aumentar/reduzir recuo, com atalhos Ctrl+Alt+Seta para a direita (indentar) e Ctrl+Alt+Seta para a esquerda (desindentar), porque quando “Mostrar vozes no editor” está ativo a tecla Tab fica reservada para a navegação do painel de vozes.
 • Adicionada a exibição localizada de data e hora em artigos RSS e episódios de podcast, com formato adaptado ao idioma da interface.
 • Adicionada no menu de contexto RSS uma nova ação para partilhar por e-mail o artigo selecionado.
+• Adicionadas opções granulares de confirmação de remoção em Opções > RSS e podcast: para RSS (feed/artigo/ambos/nenhum) e para Podcasts (podcast/episódio/ambos/nenhum).
 • Ao premir Ctrl+A, o programa agora anuncia a conclusão da ação para um feedback mais claro em leitores de ecrã.
 • Melhorada a mensagem de substituição com singular/plural corretos (por exemplo, “1 substituição realizada” vs “2 substituições realizadas”).
 • Adicionada na janela do dicionário a seleção de idioma de pesquisa, com Auto (idioma da interface) por padrão e possibilidade de escolha manual.
@@ -14,6 +15,8 @@ Correções de bugs
 • Corrigida a associação de etiquetas no NVDA na janela do dicionário: o campo de pesquisa e a lista de idioma agora anunciam a etiqueta correta.
 • Corrigida a navegação por teclado na janela Propriedades de RSS/Podcast: Tab/Shift+Tab agora alcançam o botão OK, Enter ativa o OK, Esc fecha com segurança e o foco volta corretamente à lista RSS/Podcast.
 • Corrigido o histórico de desfazer em RSS/Podcast: o Ctrl+Z agora suporta desfazer em múltiplos níveis para remoções (artigos/episódios e fontes), e não apenas a última ação.
+• Melhorados os anúncios de remoção em RSS/Podcast com mensagens explícitas (RSS removido, artigo RSS removido, episódio de podcast removido).
+• Melhorado o comportamento de foco após remover/desfazer em RSS/Podcast: no RSS, o primeiro feed volta a ser selecionado de forma fiável quando necessário, e foram reduzidas repetições de anúncios do leitor de ecrã durante a re-seleção atrasada.
 
 Versão 0.6.6 – 2026-02-13
 Melhorias

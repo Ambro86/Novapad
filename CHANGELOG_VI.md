@@ -3,6 +3,11 @@
 Phiên bản 0.6.7 – 2026-02-13
 Cải tiến
 • Đã thêm chế độ mới Xem > Chỉ đọc để ngăn chỉnh sửa nhầm văn bản, đồng thời vẫn giữ khả năng đọc và điều hướng đầy đủ tài liệu.
+• Đã thêm hiển thị ngày/giờ theo ngôn ngữ cho bài RSS và tập podcast, với định dạng tự điều chỉnh theo ngôn ngữ giao diện.
+• Đã thêm thao tác mới trong menu ngữ cảnh RSS để chia sẻ bài đã chọn qua email.
+• Khi nhấn Ctrl+A, chương trình giờ sẽ thông báo hoàn tất thao tác để phản hồi rõ ràng hơn cho trình đọc màn hình.
+Sửa lỗi
+• Đã sửa thứ tự bài RSS từ Google News: khi có ngày xuất bản, bài viết giờ được hiển thị từ mới nhất đến cũ nhất.
 
 Phiên bản 0.6.6 – 2026-02-13
 Cải tiến

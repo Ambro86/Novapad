@@ -5,6 +5,7 @@ use crate::i18n;
 use crate::log_debug;
 use crate::tools::rss::{self, RssFeedCache, RssItem, RssSource, RssSourceType};
 use crate::with_state;
+use chrono::{Local, TimeZone};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use std::collections::{HashMap, HashSet};
@@ -73,6 +74,7 @@ const ID_CTX_OPEN_BROWSER: usize = 1201;
 const ID_CTX_SHARE_FACEBOOK: usize = 1202;
 const ID_CTX_SHARE_TWITTER: usize = 1203;
 const ID_CTX_SHARE_WHATSAPP: usize = 1204;
+const ID_CTX_SHARE_EMAIL: usize = 1205;
 
 const WM_RSS_FETCH_COMPLETE: u32 = WM_USER + 200;
 const WM_RSS_IMPORT_COMPLETE: u32 = WM_USER + 201;
@@ -288,12 +290,43 @@ fn rss_item_display_title(
     language: crate::settings::Language,
     announce_unread: bool,
     item_unread: bool,
+    pub_date: Option<i64>,
 ) -> String {
+    let ts_suffix = format_timestamp_for_language(pub_date, language)
+        .map(|ts| format!(". {ts}"))
+        .unwrap_or_default();
     if announce_unread && item_unread {
-        format!("{}{}", i18n::tr(language, "rss.item_unread_prefix"), title)
+        format!(
+            "{}{}{}",
+            i18n::tr(language, "rss.item_unread_prefix"),
+            title,
+            ts_suffix
+        )
     } else {
-        title.to_string()
+        format!("{title}{ts_suffix}")
     }
+}
+
+fn format_timestamp_for_language(
+    timestamp: Option<i64>,
+    language: crate::settings::Language,
+) -> Option<String> {
+    let ts = timestamp?;
+    let dt = Local.timestamp_opt(ts, 0).single()?;
+    let pattern = match language {
+        crate::settings::Language::English => "%m/%d/%Y %I:%M %p",
+        crate::settings::Language::Italian => "%d/%m/%Y %H:%M",
+        crate::settings::Language::Spanish => "%d/%m/%Y %H:%M",
+        crate::settings::Language::Portuguese => "%d/%m/%Y %H:%M",
+        crate::settings::Language::Swedish => "%Y-%m-%d %H:%M",
+        crate::settings::Language::Vietnamese => "%d/%m/%Y %H:%M",
+        crate::settings::Language::Czech => "%d.%m.%Y %H:%M",
+        crate::settings::Language::Polish => "%d.%m.%Y %H:%M",
+        crate::settings::Language::French => "%d/%m/%Y %H:%M",
+        crate::settings::Language::Serbian => "%d.%m.%Y %H:%M",
+        crate::settings::Language::Ukrainian => "%d.%m.%Y %H:%M",
+    };
+    Some(dt.format(pattern).to_string())
 }
 
 fn percent_encode(input: &str) -> String {
@@ -619,6 +652,35 @@ unsafe fn source_removed_keys_for_tree_item(
     })
     .flatten()
     .unwrap_or_default()
+}
+
+fn sort_google_news_items_by_date_desc(items: &mut [RssItem]) {
+    let mut indexed: Vec<(usize, RssItem)> = items.iter().cloned().enumerate().collect();
+    indexed.sort_by(|(ia, a), (ib, b)| match (a.pub_date, b.pub_date) {
+        (Some(ad), Some(bd)) => bd.cmp(&ad).then_with(|| ia.cmp(ib)),
+        _ => ia.cmp(ib),
+    });
+    for (dst, (_, item)) in indexed.into_iter().enumerate() {
+        items[dst] = item;
+    }
+}
+
+unsafe fn is_google_news_source_tree_item(
+    hwnd: HWND,
+    hitem: windows::Win32::UI::Controls::HTREEITEM,
+) -> bool {
+    with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
+        Some(NodeData::Source(source_index)) => with_state(s.parent, |ps| {
+            ps.settings
+                .rss_sources
+                .get(*source_index)
+                .map(|src| src.url.contains("news.google.") && src.url.contains("/rss/"))
+                .unwrap_or(false)
+        })
+        .unwrap_or(false),
+        _ => false,
+    })
+    .unwrap_or(false)
 }
 
 unsafe fn prune_persisted_read_keys_for_source(
@@ -1401,6 +1463,7 @@ unsafe fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) 
     let facebook_label = i18n::tr(language, "rss.context.share_facebook");
     let twitter_label = i18n::tr(language, "rss.context.share_twitter");
     let whatsapp_label = i18n::tr(language, "rss.context.share_whatsapp");
+    let email_label = i18n::tr(language, "rss.context.share_email");
     let undo_label = i18n::tr(language, "edit.undo")
         .split('\t')
         .next()
@@ -1557,6 +1620,12 @@ unsafe fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) 
                 flags,
                 ID_CTX_SHARE_WHATSAPP,
                 PCWSTR(to_wide(&whatsapp_label).as_ptr()),
+            ) {}
+            if let Err(_e) = AppendMenuW(
+                menu,
+                flags,
+                ID_CTX_SHARE_EMAIL,
+                PCWSTR(to_wide(&email_label).as_ptr()),
             ) {}
             if let Err(_e) = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()) {}
             if let Err(_e) = AppendMenuW(
@@ -1899,6 +1968,10 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                     handle_article_action(hwnd, ArticleAction::ShareWhatsApp);
                     LRESULT(0)
                 }
+                ID_CTX_SHARE_EMAIL => {
+                    handle_article_action(hwnd, ArticleAction::ShareEmail);
+                    LRESULT(0)
+                }
                 _ => DefWindowProcW(hwnd, msg, wparam, lparam),
             }
         }
@@ -2167,7 +2240,13 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                     .unwrap_or((crate::settings::Language::English, true))
                 })
                 .unwrap_or((crate::settings::Language::English, true));
-                let updated = rss_item_display_title(&item.title, language, announce_unread, false);
+                let updated = rss_item_display_title(
+                    &item.title,
+                    language,
+                    announce_unread,
+                    false,
+                    item.pub_date,
+                );
                 let text = to_wide(&updated);
                 let mut tv_item = TVITEMW {
                     mask: TVIF_TEXT,
@@ -3137,6 +3216,7 @@ unsafe fn process_background_check_result(hwnd: HWND, res: BackgroundCheckResult
 unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
     let hitem = windows::Win32::UI::Controls::HTREEITEM(res.hitem);
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+    let is_google_news_source = is_google_news_source_tree_item(hwnd, hitem);
 
     let caret = windows::Win32::UI::Controls::HTREEITEM(
         SendMessageW(
@@ -3302,6 +3382,9 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                             appended += 1;
                         }
                     }
+                    if is_google_news_source {
+                        sort_google_news_items_by_date_desc(&mut state.items);
+                    }
                 });
                 if appended > 0 {
                     log_debug(&format!(
@@ -3349,11 +3432,14 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                 .unwrap_or_default();
 
                 with_rss_state(hwnd, |s| {
-                    let items: Vec<RssItem> = outcome
+                    let mut items: Vec<RssItem> = outcome
                         .items
                         .into_iter()
                         .filter(|item| !removed_keys.contains(&rss_item_key(item)))
                         .collect();
+                    if is_google_news_source {
+                        sort_google_news_items_by_date_desc(&mut items);
+                    }
                     s.source_items.insert(
                         hitem.0,
                         SourceItemsState {
@@ -3564,8 +3650,13 @@ unsafe fn load_more_items(
                 continue;
             }
             let item_unread = !state.read_item_keys.contains(&rss_item_key(item));
-            let display_title =
-                rss_item_display_title(&item.title, language, announce_unread, item_unread);
+            let display_title = rss_item_display_title(
+                &item.title,
+                language,
+                announce_unread,
+                item_unread,
+                item.pub_date,
+            );
             let text = to_wide(&display_title);
             let c_children = if item.is_folder { 1 } else { 0 };
             let mut tvis = TVINSERTSTRUCTW {
@@ -4175,6 +4266,7 @@ unsafe fn undo_last_delete(hwnd: HWND) {
                                 language,
                                 announce_unread,
                                 item_unread,
+                                entry.pub_date,
                             );
                             let text = to_wide(&display_title);
                             let mut tvis = TVINSERTSTRUCTW {
@@ -4530,6 +4622,7 @@ enum ArticleAction {
     ShareFacebook,
     ShareTwitter,
     ShareWhatsApp,
+    ShareEmail,
 }
 
 unsafe fn selected_article_item(hwnd: HWND) -> Option<RssItem> {
@@ -4636,6 +4729,22 @@ unsafe fn handle_article_action(hwnd: HWND, action: ArticleAction) {
                 format!("{}\n{}", title, url)
             };
             format!("https://wa.me/?text={}", percent_encode(&text))
+        }
+        ArticleAction::ShareEmail => {
+            log_debug(&format!(
+                "rss_action kind=article action=share_email url=\"{}\"",
+                url
+            ));
+            let subject = if title.is_empty() {
+                "RSS article".to_string()
+            } else {
+                title.clone()
+            };
+            format!(
+                "mailto:?subject={}&body={}",
+                percent_encode(&subject),
+                percent_encode(&url)
+            )
         }
     };
     if let Err(err) = crate::audio_utils::open_url_in_browser(&share_url) {

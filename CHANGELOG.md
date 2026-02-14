@@ -3,6 +3,11 @@
 Version 0.6.7 – 2026-02-13
 Improvements
 • Added a new View > Read-only mode to lock editor text from accidental edits while keeping documents fully readable and navigable.
+• Added localized date/time in RSS articles and podcast episodes, with formatting adapted to the current interface language.
+• Added a new RSS context-menu action to share the selected article by email.
+• Pressing Ctrl+A now announces completion for clearer screen-reader feedback.
+Bug fixes
+• Fixed Google News RSS item ordering: articles are now shown in descending publish date (newest first) when dates are available.
 
 Version 0.6.6 – 2026-02-13
 Improvements

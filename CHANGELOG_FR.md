@@ -3,6 +3,11 @@
 Version 0.6.7 – 2026-02-13
 Améliorations
 • Ajout du nouveau mode Affichage > Lecture seule pour éviter les modifications accidentelles tout en conservant une lecture et une navigation complètes des documents.
+• Ajout de l'affichage localisé de la date et de l'heure dans les articles RSS et les épisodes de podcast, avec un format adapté à la langue de l'interface.
+• Ajout d'une nouvelle action dans le menu contextuel RSS pour partager l'article sélectionné par e-mail.
+• Un appui sur Ctrl+A annonce désormais la fin de l'action pour un retour plus clair avec les lecteurs d'écran.
+Corrections de bugs
+• Correction de l'ordre des articles RSS Google News : lorsque la date est disponible, les articles sont désormais affichés du plus récent au plus ancien.
 
 Version 0.6.6 – 2026-02-13
 Améliorations

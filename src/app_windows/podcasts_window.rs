@@ -4,6 +4,7 @@ use crate::i18n;
 use crate::settings::{self, Language, confirm_title};
 use crate::tools::rss::{self, PodcastEpisode, RssSource, RssSourceType};
 use crate::{log_debug, with_state};
+use chrono::{Local, TimeZone};
 use quick_xml::{Reader, events::Event};
 use sha1::{Digest as Sha1Digest, Sha1};
 use std::collections::{HashMap, HashSet};
@@ -322,16 +323,43 @@ fn podcast_episode_display_title(
     language: crate::settings::Language,
     announce_unread: bool,
     item_unplayed: bool,
+    pub_date: Option<i64>,
 ) -> String {
+    let ts_suffix = format_timestamp_for_language(pub_date, language)
+        .map(|ts| format!(". {ts}"))
+        .unwrap_or_default();
     if announce_unread && item_unplayed {
         format!(
-            "{}{}",
+            "{}{}{}",
             i18n::tr(language, "podcasts.item_unplayed_prefix"),
-            title
+            title,
+            ts_suffix
         )
     } else {
-        title.to_string()
+        format!("{title}{ts_suffix}")
     }
+}
+
+fn format_timestamp_for_language(
+    timestamp: Option<i64>,
+    language: crate::settings::Language,
+) -> Option<String> {
+    let ts = timestamp?;
+    let dt = Local.timestamp_opt(ts, 0).single()?;
+    let pattern = match language {
+        crate::settings::Language::English => "%m/%d/%Y %I:%M %p",
+        crate::settings::Language::Italian => "%d/%m/%Y %H:%M",
+        crate::settings::Language::Spanish => "%d/%m/%Y %H:%M",
+        crate::settings::Language::Portuguese => "%d/%m/%Y %H:%M",
+        crate::settings::Language::Swedish => "%Y-%m-%d %H:%M",
+        crate::settings::Language::Vietnamese => "%d/%m/%Y %H:%M",
+        crate::settings::Language::Czech => "%d.%m.%Y %H:%M",
+        crate::settings::Language::Polish => "%d.%m.%Y %H:%M",
+        crate::settings::Language::French => "%d/%m/%Y %H:%M",
+        crate::settings::Language::Serbian => "%d.%m.%Y %H:%M",
+        crate::settings::Language::Ukrainian => "%d.%m.%Y %H:%M",
+    };
+    Some(dt.format(pattern).to_string())
 }
 
 struct MarkEpisodePlayedUiMessage {
@@ -1371,8 +1399,13 @@ unsafe fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<Podcast
 
     for item in new_items.iter() {
         let item_unplayed = !read_keys.contains(&episode_key(item));
-        let display_title =
-            podcast_episode_display_title(&item.title, language, announce_unread, item_unplayed);
+        let display_title = podcast_episode_display_title(
+            &item.title,
+            language,
+            announce_unread,
+            item_unplayed,
+            item.pub_date,
+        );
         let title = to_wide(&display_title);
         let mut tvis = TVINSERTSTRUCTW {
             hParent: hitem,
@@ -4837,6 +4870,7 @@ unsafe fn undo_last_delete(hwnd: HWND) {
                                 language,
                                 announce_unread,
                                 item_unplayed,
+                                entry.pub_date,
                             );
                             let text = to_wide(&display_title);
                             let mut tvis = TVINSERTSTRUCTW {
@@ -7015,8 +7049,13 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                     .unwrap_or((Language::English, true))
                 })
                 .unwrap_or((Language::English, true));
-                let display_title =
-                    podcast_episode_display_title(&episode.title, language, announce_unread, false);
+                let display_title = podcast_episode_display_title(
+                    &episode.title,
+                    language,
+                    announce_unread,
+                    false,
+                    episode.pub_date,
+                );
                 let text = to_wide(&display_title);
                 let mut tvis = TVITEMW {
                     mask: TVIF_TEXT,

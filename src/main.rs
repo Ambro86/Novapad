@@ -3642,6 +3642,7 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 IDM_EDIT_SELECT_ALL => {
                     log_debug("Menu: Select All");
                     editor_manager::select_all_active_edit(hwnd);
+                    confirm_menu_action(hwnd, "edit.select_all");
                     LRESULT(0)
                 }
                 IDM_EDIT_FIND => {

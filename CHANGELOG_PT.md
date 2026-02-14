@@ -3,6 +3,11 @@
 Versão 0.6.7 – 2026-02-13
 Melhorias
 • Adicionado o novo modo Ver > Somente leitura para bloquear edições acidentais no texto, mantendo leitura e navegação completas dos documentos.
+• Adicionada a exibição localizada de data e hora em artigos RSS e episódios de podcast, com formato adaptado ao idioma da interface.
+• Adicionada no menu de contexto RSS uma nova ação para partilhar por e-mail o artigo selecionado.
+• Ao premir Ctrl+A, o programa agora anuncia a conclusão da ação para um feedback mais claro em leitores de ecrã.
+Correções de bugs
+• Corrigida a ordenação dos artigos RSS do Google News: quando a data está disponível, os artigos agora são mostrados do mais recente para o mais antigo.
 
 Versão 0.6.6 – 2026-02-13
 Melhorias

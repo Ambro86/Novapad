@@ -2926,28 +2926,12 @@ unsafe fn create_controls(hwnd: HWND) {
         None,
     );
 
-    let search_label = tr_or(language, "rss.tree.search_keyword", "Search RSS...");
-    let hwnd_search = CreateWindowExW(
-        Default::default(),
-        WC_BUTTON,
-        PCWSTR(to_wide(&search_label).as_ptr()),
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-        105,
-        520,
-        90,
-        30,
-        hwnd,
-        HMENU(ID_BTN_SEARCH as isize),
-        hinstance,
-        None,
-    );
-
     let hwnd_import = CreateWindowExW(
         Default::default(),
         WC_BUTTON,
         PCWSTR(to_wide(&i18n::tr(language, "rss.tree.import_txt")).as_ptr()),
         WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-        200,
+        105,
         520,
         90,
         30,
@@ -2968,7 +2952,7 @@ unsafe fn create_controls(hwnd: HWND) {
         WC_BUTTON,
         PCWSTR(to_wide(&export_label).as_ptr()),
         WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-        295,
+        200,
         520,
         90,
         30,
@@ -2983,7 +2967,7 @@ unsafe fn create_controls(hwnd: HWND) {
         WC_BUTTON,
         PCWSTR(to_wide(&i18n::tr(language, "rss.tree.close")).as_ptr()),
         WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-        390,
+        295,
         520,
         80,
         30,
@@ -3006,7 +2990,6 @@ unsafe fn create_controls(hwnd: HWND) {
     if hfont.0 != 0 {
         SendMessageW(hwnd_tree, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
         SendMessageW(hwnd_add, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-        SendMessageW(hwnd_search, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
         SendMessageW(hwnd_import, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
         SendMessageW(hwnd_export, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
         SendMessageW(hwnd_close, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
@@ -5963,8 +5946,22 @@ unsafe fn input_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPAR
 
                     if !url.trim().is_empty() {
                         let parent = windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd);
+                        let main_hwnd = with_rss_state(parent, |s| s.parent).unwrap_or(HWND(0));
+                        let language =
+                            with_state(main_hwnd, |s| s.settings.language).unwrap_or_default();
+                        let mut source_url = url.trim().to_string();
+                        let mut source_title = title.trim().to_string();
+                        if !is_valid_article_url(&source_url) {
+                            source_url = build_google_news_rss_url(&source_url, language);
+                            if source_title.is_empty() {
+                                source_title = format_google_news_source_title(url.trim());
+                            }
+                        }
+                        if source_title.is_empty() {
+                            source_title = source_url.clone();
+                        }
 
-                        let payload = format!("{}\n{}", title.trim(), url.trim());
+                        let payload = format!("{}\n{}", source_title, source_url);
                         let url_wide = to_wide(&payload);
                         let cds = COPYDATASTRUCT {
                             dwData: 0x52535331,

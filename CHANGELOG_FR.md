@@ -9,6 +9,7 @@ Améliorations
 • Ajout d'une nouvelle action dans le menu contextuel RSS pour partager l'article sélectionné par e-mail.
 • Ajout d'options granulaires de confirmation de suppression dans Options > RSS et podcast : pour RSS (flux/article/les deux/aucun) et pour Podcasts (podcast/épisode/les deux/aucun).
 • Ajout d'une copie rapide RSS configurable avec Ctrl+C (Options > RSS et podcast) : copier le titre, l'URL, le contenu de l'article ou l'ensemble.
+• Unification du flux RSS : « Ajouter une source » accepte désormais à la fois les URL de flux et les mots-clés (avec génération automatique d'un flux Google News), sans recherche séparée.
 • Un appui sur Ctrl+A annonce désormais la fin de l'action pour un retour plus clair avec les lecteurs d'écran.
 • Amélioration du message de remplacement avec une gestion correcte du singulier/pluriel (par ex. « 1 remplacement effectué » vs « 2 remplacements effectués »).
 • Ajout dans la fenêtre du dictionnaire d'une sélection de langue de recherche, avec Auto (langue de l'interface) par défaut et possibilité de choix manuel.

@@ -9,6 +9,7 @@ Miglioramenti
 • Aggiunta nel menu contestuale RSS una nuova voce per condividere via email l'articolo selezionato.
 • Aggiunte opzioni granulari di conferma eliminazione in Opzioni > RSS e podcast: per RSS (feed/articolo/entrambi/nessuno) e per Podcast (podcast/episodio/entrambi/nessuno).
 • Aggiunta la copia rapida RSS configurabile con Ctrl+C (Opzioni > RSS e podcast): copia titolo, URL, contenuto articolo oppure tutto insieme.
+• Unificato il flusso RSS: “Aggiungi Fonte” ora accetta sia URL feed sia parole chiave (con generazione automatica del feed Google News), senza necessità di una ricerca separata.
 • Premendo Ctrl+A ora viene annunciato il completamento dell'azione per un feedback più chiaro con gli screen reader.
 • Migliorato il messaggio di conferma delle sostituzioni con gestione corretta di singolare/plurale (es. “1 sostituzione” vs “2 sostituzioni”).
 • Aggiunta nella finestra Dizionario la selezione della lingua di ricerca, con predefinito Auto (lingua interfaccia) e possibilità di override manuale.

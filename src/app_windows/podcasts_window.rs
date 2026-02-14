@@ -185,7 +185,7 @@ struct PodcastWindowState {
     last_selected: isize,
     pending_play: Option<String>,
     preview_sources: Vec<crate::tools::rss::RssSource>,
-    last_removed: Option<PodcastLastRemoved>,
+    removed_history: Vec<PodcastLastRemoved>,
     suppress_tree_selection_events: bool,
 }
 
@@ -4259,7 +4259,8 @@ unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool)
         .next()
         .unwrap_or_default()
         .to_string();
-    let undo_flags = if with_podcast_state(hwnd, |s| s.last_removed.is_some()).unwrap_or(false) {
+    let undo_flags = if with_podcast_state(hwnd, |s| !s.removed_history.is_empty()).unwrap_or(false)
+    {
         MF_STRING
     } else {
         MF_STRING | MF_GRAYED
@@ -4631,7 +4632,7 @@ unsafe fn handle_source_action(hwnd: HWND, verb: SourceAction) {
             if removed {
                 if let Some(source) = removed_source {
                     with_podcast_state(hwnd, |s| {
-                        s.last_removed = Some(PodcastLastRemoved::Source {
+                        s.removed_history.push(PodcastLastRemoved::Source {
                             index: source_index,
                             source,
                         });
@@ -4875,7 +4876,7 @@ unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
             }
             if let (Some(source_index), Some(position)) = (source_idx_for_undo, removed_position) {
                 with_podcast_state(hwnd, |s| {
-                    s.last_removed = Some(PodcastLastRemoved::Episode {
+                    s.removed_history.push(PodcastLastRemoved::Episode {
                         source_index,
                         episode: item.clone(),
                         key,
@@ -4893,7 +4894,7 @@ unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
 }
 
 unsafe fn undo_last_delete(hwnd: HWND) {
-    let Some(last_removed) = with_podcast_state(hwnd, |s| s.last_removed.take()).flatten() else {
+    let Some(last_removed) = with_podcast_state(hwnd, |s| s.removed_history.pop()).flatten() else {
         return;
     };
 
@@ -6727,7 +6728,7 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 last_selected: 0,
                 pending_play: None,
                 preview_sources: Vec::new(),
-                last_removed: None,
+                removed_history: Vec::new(),
                 suppress_tree_selection_events: false,
             });
             SetWindowLongPtrW(

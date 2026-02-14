@@ -13,6 +13,7 @@ Sửa lỗi
 • Đã sửa thứ tự bài RSS từ Google News: khi có ngày xuất bản, bài viết giờ được hiển thị từ mới nhất đến cũ nhất.
 • Đã sửa gán nhãn cho NVDA trong cửa sổ từ điển: ô tìm kiếm và combobox ngôn ngữ giờ đọc đúng nhãn.
 • Đã sửa điều hướng bàn phím trong cửa sổ Thuộc tính RSS/Podcast: Tab/Shift+Tab giờ đi tới nút OK, Enter kích hoạt OK, Esc đóng an toàn và tiêu điểm quay lại đúng danh sách RSS/Podcast.
+• Đã sửa lịch sử hoàn tác trong RSS/Podcast: Ctrl+Z giờ hỗ trợ hoàn tác nhiều cấp cho thao tác xóa (bài/tập và nguồn), không chỉ thao tác gần nhất.
 
 Phiên bản 0.6.6 – 2026-02-13
 Cải tiến

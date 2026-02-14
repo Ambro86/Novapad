@@ -1403,7 +1403,7 @@ struct RssWindowState {
     pending_edit: Option<usize>,
     tree_proc: WNDPROC,
     last_selected: isize,
-    last_removed: Option<RssLastRemoved>,
+    removed_history: Vec<RssLastRemoved>,
     suppress_tree_selection_events: bool,
 }
 
@@ -1615,7 +1615,7 @@ unsafe fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) 
         .next()
         .unwrap_or_default()
         .to_string();
-    let has_undo = with_rss_state(hwnd, |s| s.last_removed.is_some()).unwrap_or(false);
+    let has_undo = with_rss_state(hwnd, |s| !s.removed_history.is_empty()).unwrap_or(false);
 
     if let Ok(menu) = CreatePopupMenu()
         && menu.0 != 0
@@ -1859,7 +1859,7 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                 pending_edit: None,
                 tree_proc: None,
                 last_selected: 0,
-                last_removed: None,
+                removed_history: Vec::new(),
                 suppress_tree_selection_events: false,
             });
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
@@ -4119,7 +4119,7 @@ unsafe fn handle_delete(hwnd: HWND) {
             }
             if let Some(source) = source_info {
                 with_rss_state(hwnd, |s| {
-                    s.last_removed = Some(RssLastRemoved::Source {
+                    s.removed_history.push(RssLastRemoved::Source {
                         index: idx,
                         source,
                         language,
@@ -4247,7 +4247,7 @@ unsafe fn handle_delete(hwnd: HWND) {
             }
             if let (Some(source_index), Some(position)) = (source_idx_for_undo, removed_position) {
                 with_rss_state(hwnd, |s| {
-                    s.last_removed = Some(RssLastRemoved::Item {
+                    s.removed_history.push(RssLastRemoved::Item {
                         source_index,
                         item,
                         key,
@@ -4265,7 +4265,7 @@ unsafe fn handle_delete(hwnd: HWND) {
 }
 
 unsafe fn undo_last_delete(hwnd: HWND) {
-    let Some(last_removed) = with_rss_state(hwnd, |s| s.last_removed.take()).flatten() else {
+    let Some(last_removed) = with_rss_state(hwnd, |s| s.removed_history.pop()).flatten() else {
         return;
     };
 

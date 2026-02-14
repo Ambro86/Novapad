@@ -13,6 +13,7 @@ Correzioni di bug
 • Corretto l'ordinamento degli articoli RSS di Google News: quando la data è disponibile, gli articoli vengono ora mostrati dal più recente al meno recente.
 • Corretta l'associazione etichette NVDA nella finestra Dizionario: campo ricerca e combobox lingua ora annunciano l'etichetta giusta.
 • Corretta la gestione tastiera nella finestra Proprietà di RSS/Podcast: Tab/Shift+Tab raggiungono il pulsante OK, Invio attiva OK, Esc chiude in modo sicuro e il focus torna correttamente all'elenco RSS/Podcast.
+• Corretto lo storico annullamento in RSS/Podcast: Ctrl+Z ora supporta annullamento multi-livello per rimozioni (articoli/episodi e fonti), non solo l'ultima azione.
 
 Versione 0.6.6 – 2026-02-13
 Miglioramenti

@@ -536,6 +536,16 @@ fn confirm_menu_action(hwnd: HWND, key: &str) {
     }
 }
 
+fn announce_menu_action_screen_reader(hwnd: HWND, key: &str) {
+    let language = unsafe { with_state(hwnd, |state| state.settings.language).unwrap_or_default() };
+    let label = i18n::tr(language, key);
+    let cleaned = clean_menu_label(&label);
+    if !cleaned.is_empty() {
+        let message = i18n::tr_f(language, "app.action_completed", &[("action", &cleaned)]);
+        crate::accessibility::screen_reader_speak(&message);
+    }
+}
+
 fn dictionary_cache_key(language: Language, pref: &str, word: &str) -> String {
     let lang = match language {
         Language::Italian => "it",
@@ -3642,7 +3652,7 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 IDM_EDIT_SELECT_ALL => {
                     log_debug("Menu: Select All");
                     editor_manager::select_all_active_edit(hwnd);
-                    confirm_menu_action(hwnd, "edit.select_all");
+                    announce_menu_action_screen_reader(hwnd, "edit.select_all");
                     LRESULT(0)
                 }
                 IDM_EDIT_FIND => {

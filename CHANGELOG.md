@@ -6,6 +6,7 @@ Improvements
 • Added localized date/time in RSS articles and podcast episodes, with formatting adapted to the current interface language.
 • Added a new RSS context-menu action to share the selected article by email.
 • Pressing Ctrl+A now announces completion for clearer screen-reader feedback.
+• Improved replace feedback messages with proper singular/plural forms (e.g. “1 replacement made” vs “2 replacements made”).
 Bug fixes
 • Fixed Google News RSS item ordering: articles are now shown in descending publish date (newest first) when dates are available.
 

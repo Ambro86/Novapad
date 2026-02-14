@@ -6,6 +6,7 @@ Cải tiến
 • Đã thêm hiển thị ngày/giờ theo ngôn ngữ cho bài RSS và tập podcast, với định dạng tự điều chỉnh theo ngôn ngữ giao diện.
 • Đã thêm thao tác mới trong menu ngữ cảnh RSS để chia sẻ bài đã chọn qua email.
 • Khi nhấn Ctrl+A, chương trình giờ sẽ thông báo hoàn tất thao tác để phản hồi rõ ràng hơn cho trình đọc màn hình.
+• Đã cải thiện thông báo thay thế với dạng số ít/số nhiều chính xác (ví dụ: “1 mục đã thay thế” và “2 mục đã thay thế”).
 Sửa lỗi
 • Đã sửa thứ tự bài RSS từ Google News: khi có ngày xuất bản, bài viết giờ được hiển thị từ mới nhất đến cũ nhất.
 

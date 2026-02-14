@@ -263,6 +263,15 @@ fn extract_find_flags(flags: FINDREPLACE_FLAGS, options: &FindOptions) -> FINDRE
     out
 }
 
+fn replaced_count_message(language: Language, count: usize) -> String {
+    let key = if count == 1 {
+        "find.replaced_count_one"
+    } else {
+        "find.replaced_count_many"
+    };
+    i18n::tr_f(language, key, &[("count", &count.to_string())])
+}
+
 pub unsafe fn find_next(
     hwnd: HWND,
     hwnd_edit: HWND,
@@ -477,11 +486,7 @@ pub unsafe fn replace_all(
             MB_OK | MB_ICONWARNING,
         );
     } else {
-        let message = i18n::tr_f(
-            language,
-            "find.replaced_count",
-            &[("count", &count.to_string())],
-        );
+        let message = replaced_count_message(language, count);
         show_info(hwnd, language, &message);
     }
 }
@@ -1064,11 +1069,7 @@ unsafe fn replace_all_regex(
             MB_OK | MB_ICONWARNING,
         );
     } else {
-        let message = i18n::tr_f(
-            language,
-            "find.replaced_count",
-            &[("count", &total_count.to_string())],
-        );
+        let message = replaced_count_message(language, total_count);
         show_info(hwnd, language, &message);
     }
 }
@@ -1102,11 +1103,7 @@ unsafe fn replace_all_in_all_docs(
             MB_OK | MB_ICONWARNING,
         );
     } else {
-        let message = i18n::tr_f(
-            language,
-            "find.replaced_count",
-            &[("count", &total_count.to_string())],
-        );
+        let message = replaced_count_message(language, total_count);
         show_info(hwnd, language, &message);
     }
 }
@@ -1140,11 +1137,7 @@ unsafe fn replace_all_in_selection(
             MB_OK | MB_ICONWARNING,
         );
     } else {
-        let message = i18n::tr_f(
-            language,
-            "find.replaced_count",
-            &[("count", &count.to_string())],
-        );
+        let message = replaced_count_message(language, count);
         show_info(hwnd, language, &message);
     }
 }

@@ -97,6 +97,7 @@ pub const IDM_WINDOW_CLOSE_ALL: usize = 3003;
 pub const IDM_VIEW_SHOW_VOICES: usize = 6101;
 pub const IDM_VIEW_SHOW_FAVORITES: usize = 6102;
 pub const IDM_VIEW_READ_ONLY: usize = 6103;
+pub const IDM_VIEW_WORD_WRAP: usize = 6104;
 pub const IDM_VIEW_FONT_ARIAL: usize = 6401;
 pub const IDM_VIEW_FONT_CALIBRI: usize = 6402;
 pub const IDM_VIEW_FONT_CONSOLAS: usize = 6403;
@@ -172,6 +173,7 @@ pub struct MenuLabels {
     pub view_show_voices: String,
     pub view_show_favorites: String,
     pub view_read_only: String,
+    pub view_word_wrap: String,
     pub view_font: String,
     pub file_new: String,
     pub file_open: String,
@@ -272,6 +274,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         view_show_voices: i18n::tr(language, "view.show_voices"),
         view_show_favorites: i18n::tr(language, "view.show_favorites"),
         view_read_only: i18n::tr(language, "view.read_only"),
+        view_word_wrap: i18n::tr(language, "view.word_wrap"),
         view_font: i18n::tr(language, "view.font"),
         file_new: i18n::tr(language, "file.new"),
         file_open: i18n::tr(language, "file.open"),
@@ -811,6 +814,12 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         MF_STRING,
         IDM_VIEW_READ_ONLY,
         &labels.view_read_only,
+    );
+    append_menu_string(
+        view_menu,
+        MF_STRING,
+        IDM_VIEW_WORD_WRAP,
+        &labels.view_word_wrap,
     );
     crate::log_if_err!(AppendMenuW(view_menu, MF_SEPARATOR, 0, PCWSTR::null()));
     append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_ARIAL, "Arial");

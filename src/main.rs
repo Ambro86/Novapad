@@ -3997,6 +3997,19 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                     update_voice_panel_menu_check(hwnd);
                     LRESULT(0)
                 }
+                IDM_VIEW_WORD_WRAP => {
+                    let new_word_wrap = with_state(hwnd, |state| {
+                        state.settings.word_wrap = !state.settings.word_wrap;
+                        state.settings.word_wrap
+                    })
+                    .unwrap_or(true);
+                    editor_manager::apply_word_wrap_to_all_edits(hwnd, new_word_wrap);
+                    if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
+                        save_settings(settings);
+                    }
+                    update_voice_panel_menu_check(hwnd);
+                    LRESULT(0)
+                }
                 cmd_id if font_face_from_menu_id(cmd_id).is_some() => {
                     let face = font_face_from_menu_id(cmd_id).unwrap_or("Segoe UI");
                     apply_ui_font(hwnd, face.to_string());
@@ -4552,7 +4565,7 @@ unsafe fn update_text_preferences(hwnd: HWND, text_color: Option<u32>, text_size
 }
 
 unsafe fn update_voice_panel_menu_check(hwnd: HWND) {
-    let (visible, favorites_visible, text_color, text_size, read_only) =
+    let (visible, favorites_visible, text_color, text_size, read_only, word_wrap) =
         with_state(hwnd, |state| {
             (
                 state.voice_panel_visible,
@@ -4560,9 +4573,10 @@ unsafe fn update_voice_panel_menu_check(hwnd: HWND) {
                 state.settings.text_color,
                 state.settings.text_size,
                 state.settings.editor_read_only,
+                state.settings.word_wrap,
             )
         })
-        .unwrap_or((false, false, 0x000000, 12, false));
+        .unwrap_or((false, false, 0x000000, 12, false, true));
     let hmenu = GetMenu(hwnd);
     if hmenu.0 == 0 {
         return;
@@ -4586,6 +4600,12 @@ unsafe fn update_voice_panel_menu_check(hwnd: HWND) {
         hmenu,
         IDM_VIEW_READ_ONLY as u32,
         (MF_BYCOMMAND | read_only_flags).0,
+    );
+    let wrap_flags = if word_wrap { MF_CHECKED } else { MF_UNCHECKED };
+    CheckMenuItem(
+        hmenu,
+        IDM_VIEW_WORD_WRAP as u32,
+        (MF_BYCOMMAND | wrap_flags).0,
     );
 
     let color_items = [

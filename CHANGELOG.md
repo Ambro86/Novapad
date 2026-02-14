@@ -3,6 +3,7 @@
 Version 0.6.7 – 2026-02-13
 Improvements
 • Added a new View > Read-only mode to lock editor text from accidental edits while keeping documents fully readable and navigable.
+• Added a new View menu toggle for Word wrap, so line wrapping can be switched quickly without opening Options.
 • Added new Edit > Text actions for indent/outdent, with shortcuts Ctrl+Alt+Right (indent) and Ctrl+Alt+Left (outdent), because when “Show voices in editor” is enabled the Tab key is reserved for voice-panel navigation.
 • Added localized date/time in RSS articles and podcast episodes, with formatting adapted to the current interface language.
 • Added a new RSS context-menu action to share the selected article by email.

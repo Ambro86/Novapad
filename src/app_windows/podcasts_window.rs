@@ -5943,6 +5943,9 @@ unsafe fn podcast_tree_wndproc_inner(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    if msg == WM_CHAR && wparam.0 as u32 == 26 && GetKeyState(VK_CONTROL.0 as i32) < 0 {
+        return LRESULT(0);
+    }
     if msg == WM_KEYDOWN
         || msg == windows::Win32::UI::WindowsAndMessaging::WM_SYSKEYDOWN
         || msg == WM_CHAR

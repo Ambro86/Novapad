@@ -503,6 +503,13 @@ unsafe fn wiktionary_wndproc_inner(
             }
             DefWindowProcW(hwnd, msg, wparam, lparam)
         }
+        windows::Win32::UI::WindowsAndMessaging::WM_CHAR => {
+            if wparam.0 as u32 == 27 {
+                crate::log_if_err!(DestroyWindow(hwnd));
+                return LRESULT(0);
+            }
+            DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
         WM_COMMAND => {
             let id = wparam.0 & 0xffff;
             if id == WIKTIONARY_CLOSE_ID || id == 2 {
@@ -651,6 +658,13 @@ unsafe fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         }
         if key == windows::Win32::UI::Input::KeyboardAndMouse::VK_RETURN.0 && handle_enter_key(hwnd)
         {
+            return LRESULT(0);
+        }
+    }
+    if msg == windows::Win32::UI::WindowsAndMessaging::WM_CHAR && wparam.0 == 27 {
+        let parent = windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd);
+        if parent.0 != 0 {
+            crate::log_if_err!(DestroyWindow(parent));
             return LRESULT(0);
         }
     }

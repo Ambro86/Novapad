@@ -5100,11 +5100,13 @@ unsafe fn handle_rss_quick_copy(hwnd: HWND) -> bool {
     };
     let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
     let mode = with_state(parent, |ps| ps.settings.rss_quick_copy_mode).unwrap_or_default();
+    let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
     let text = rss_quick_copy_text(parent, &item, mode);
     if text.trim().is_empty() {
         return false;
     }
     copy_text_to_clipboard(hwnd, &text);
+    announce_rss_status(&i18n::tr(language, "rss.copied"));
     true
 }
 

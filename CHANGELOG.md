@@ -12,6 +12,7 @@ Improvements
 Bug fixes
 • Fixed Google News RSS item ordering: articles are now shown in descending publish date (newest first) when dates are available.
 • Fixed NVDA label association in the dictionary window: search field and language combo now announce the correct labels.
+• Fixed RSS/Podcast Properties window keyboard handling: Tab/Shift+Tab now reaches the OK button, Enter activates OK, Esc closes safely, and focus correctly returns to the RSS/Podcast list.
 
 Version 0.6.6 – 2026-02-13
 Improvements

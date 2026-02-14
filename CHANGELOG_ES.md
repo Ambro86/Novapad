@@ -12,6 +12,7 @@ Mejoras
 Correcciones de errores
 • Corregido el orden de artículos RSS de Google News: cuando hay fecha disponible, los artículos ahora se muestran del más reciente al más antiguo.
 • Corregida la asociación de etiquetas en NVDA en la ventana del diccionario: el campo de búsqueda y el combo de idioma ahora anuncian la etiqueta correcta.
+• Corregida la navegación de teclado en la ventana Propiedades de RSS/Podcast: Tab/Shift+Tab ahora llegan al botón Aceptar, Enter activa Aceptar, Esc cierra de forma segura y el foco vuelve correctamente a la lista RSS/Podcast.
 
 Versión 0.6.6 – 2026-02-13
 Mejoras

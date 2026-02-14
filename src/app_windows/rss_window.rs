@@ -1,4 +1,5 @@
 use crate::accessibility::{nvda_speak, to_wide};
+use crate::app_windows::help_window;
 
 use crate::editor_manager;
 use crate::i18n;
@@ -33,7 +34,7 @@ use windows::Win32::UI::Controls::{
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_APPS, VK_CONTROL, VK_ESCAPE, VK_F10,
-    VK_RETURN, VK_SHIFT, VK_TAB,
+    VK_MENU, VK_RETURN, VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, BS_DEFPUSHBUTTON, CHILDID_SELF, CREATESTRUCTW, CW_USEDEFAULT, CallWindowProcW,
@@ -75,6 +76,7 @@ const ID_CTX_SHARE_FACEBOOK: usize = 1202;
 const ID_CTX_SHARE_TWITTER: usize = 1203;
 const ID_CTX_SHARE_WHATSAPP: usize = 1204;
 const ID_CTX_SHARE_EMAIL: usize = 1205;
+const ID_CTX_PROPERTIES: usize = 1206;
 
 const WM_RSS_FETCH_COMPLETE: u32 = WM_USER + 200;
 const WM_RSS_IMPORT_COMPLETE: u32 = WM_USER + 201;
@@ -327,6 +329,149 @@ fn format_timestamp_for_language(
         crate::settings::Language::Ukrainian => "%d.%m.%Y %H:%M",
     };
     Some(dt.format(pattern).to_string())
+}
+
+unsafe fn show_selected_properties(hwnd: HWND) {
+    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+    if hwnd_tree.0 == 0 {
+        return;
+    }
+    let hitem = windows::Win32::UI::Controls::HTREEITEM(
+        SendMessageW(
+            hwnd_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_CARET as usize),
+            LPARAM(0),
+        )
+        .0,
+    );
+    if hitem.0 == 0 {
+        return;
+    }
+
+    let language = with_rss_state(hwnd, |s| {
+        with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
+    })
+    .unwrap_or_default();
+
+    let (node, source, item_unread) = with_rss_state(hwnd, |s| {
+        let node = s.node_data.get(&hitem.0).cloned();
+        let source = match &node {
+            Some(NodeData::Source(idx)) => {
+                with_state(s.parent, |ps| ps.settings.rss_sources.get(*idx).cloned()).flatten()
+            }
+            _ => None,
+        };
+        let item_unread = match &node {
+            Some(NodeData::Item(item)) => {
+                let key = rss_item_key(item);
+                let parent_item = windows::Win32::UI::Controls::HTREEITEM(
+                    SendMessageW(
+                        s.hwnd_tree,
+                        TVM_GETNEXTITEM,
+                        WPARAM(TVGN_PARENT as usize),
+                        LPARAM(hitem.0),
+                    )
+                    .0,
+                );
+                let unread = s
+                    .source_items
+                    .get(&parent_item.0)
+                    .map(|state| !state.read_item_keys.contains(&key))
+                    .unwrap_or(true);
+                Some(unread)
+            }
+            _ => None,
+        };
+        (node, source, item_unread)
+    })
+    .unwrap_or((None, None, None));
+
+    let mut lines: Vec<String> = Vec::new();
+    match node {
+        Some(NodeData::Source(_)) => {
+            if let Some(src) = source {
+                let source_type = match src.kind {
+                    RssSourceType::Feed => i18n::tr(language, "properties.feed"),
+                    RssSourceType::Site => i18n::tr(language, "properties.site"),
+                    RssSourceType::Article => i18n::tr(language, "properties.article"),
+                };
+                let title_value = if src.title.trim().is_empty() {
+                    src.url.clone()
+                } else {
+                    src.title
+                };
+                let status_value = if src.unread {
+                    i18n::tr(language, "properties.new_items")
+                } else {
+                    i18n::tr(language, "properties.no_new_items")
+                };
+                lines.push(format!(
+                    "{}: {}",
+                    i18n::tr(language, "properties.type"),
+                    i18n::tr(language, "properties.source")
+                ));
+                lines.push(format!(
+                    "{}: {}",
+                    i18n::tr(language, "properties.title"),
+                    title_value
+                ));
+                lines.push(format!(
+                    "{}: {}",
+                    i18n::tr(language, "properties.kind"),
+                    source_type
+                ));
+                lines.push(format!(
+                    "{}: {}",
+                    i18n::tr(language, "properties.url"),
+                    src.url
+                ));
+                lines.push(format!(
+                    "{}: {}",
+                    i18n::tr(language, "properties.status"),
+                    status_value
+                ));
+            }
+        }
+        Some(NodeData::Item(item)) => {
+            let status_value = if item_unread.unwrap_or(true) {
+                i18n::tr(language, "properties.unread")
+            } else {
+                i18n::tr(language, "properties.read")
+            };
+            let date_value = format_timestamp_for_language(item.pub_date, language)
+                .unwrap_or_else(|| i18n::tr(language, "properties.not_available"));
+            lines.push(format!(
+                "{}: {}",
+                i18n::tr(language, "properties.type"),
+                i18n::tr(language, "properties.article")
+            ));
+            lines.push(format!(
+                "{}: {}",
+                i18n::tr(language, "properties.title"),
+                item.title
+            ));
+            lines.push(format!(
+                "{}: {}",
+                i18n::tr(language, "properties.url"),
+                item.link
+            ));
+            lines.push(format!(
+                "{}: {}",
+                i18n::tr(language, "properties.date"),
+                date_value
+            ));
+            lines.push(format!(
+                "{}: {}",
+                i18n::tr(language, "properties.status"),
+                status_value
+            ));
+        }
+        None => return,
+    }
+
+    let body = lines.join("\r\n");
+    help_window::open_readonly_text(hwnd, &i18n::tr(language, "properties.title_window"), &body);
 }
 
 fn percent_encode(input: &str) -> String {
@@ -1464,6 +1609,7 @@ unsafe fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) 
     let twitter_label = i18n::tr(language, "rss.context.share_twitter");
     let whatsapp_label = i18n::tr(language, "rss.context.share_whatsapp");
     let email_label = i18n::tr(language, "rss.context.share_email");
+    let properties_label = i18n::tr(language, "context.properties");
     let undo_label = i18n::tr(language, "edit.undo")
         .split('\t')
         .next()
@@ -1492,6 +1638,12 @@ unsafe fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) 
                 MF_STRING,
                 ID_CTX_RETRY,
                 PCWSTR(to_wide(&retry_label).as_ptr()),
+            ) {}
+            if let Err(_e) = AppendMenuW(
+                menu,
+                MF_STRING,
+                ID_CTX_PROPERTIES,
+                PCWSTR(to_wide(&properties_label).as_ptr()),
             ) {}
             if let Err(_e) = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()) {}
             let undo_flags = if has_undo {
@@ -1626,6 +1778,12 @@ unsafe fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) 
                 flags,
                 ID_CTX_SHARE_EMAIL,
                 PCWSTR(to_wide(&email_label).as_ptr()),
+            ) {}
+            if let Err(_e) = AppendMenuW(
+                menu,
+                MF_STRING,
+                ID_CTX_PROPERTIES,
+                PCWSTR(to_wide(&properties_label).as_ptr()),
             ) {}
             if let Err(_e) = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()) {}
             if let Err(_e) = AppendMenuW(
@@ -1972,6 +2130,10 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                     handle_article_action(hwnd, ArticleAction::ShareEmail);
                     LRESULT(0)
                 }
+                ID_CTX_PROPERTIES => {
+                    show_selected_properties(hwnd);
+                    LRESULT(0)
+                }
                 _ => DefWindowProcW(hwnd, msg, wparam, lparam),
             }
         }
@@ -2093,6 +2255,10 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                         if (*ptvkd).wVKey
                             == windows::Win32::UI::Input::KeyboardAndMouse::VK_RETURN.0
                         {
+                            if GetKeyState(VK_MENU.0 as i32) < 0 {
+                                show_selected_properties(hwnd);
+                                return LRESULT(1);
+                            }
                             let shift_down = GetKeyState(VK_SHIFT.0 as i32) & 0x8000u16 as i16 != 0;
                             with_rss_state(hwnd, |s| s.enter_guard = true);
                             if let Err(_e) =
@@ -2181,6 +2347,10 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
             }
             if key == 'Z' as u32 && GetKeyState(VK_CONTROL.0 as i32) < 0 {
                 undo_last_delete(hwnd);
+                return LRESULT(0);
+            }
+            if key == u32::from(VK_RETURN.0) && GetKeyState(VK_MENU.0 as i32) < 0 {
+                show_selected_properties(hwnd);
                 return LRESULT(0);
             }
             if key == u32::from(VK_ESCAPE.0) {
@@ -2592,6 +2762,13 @@ unsafe extern "system" fn rss_tree_wndproc(
 unsafe fn rss_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN {
         let key = wparam.0 as u32;
+        if key == u32::from(VK_RETURN.0) && GetKeyState(VK_MENU.0 as i32) < 0 {
+            let parent = GetParent(hwnd);
+            if parent.0 != 0 {
+                show_selected_properties(parent);
+                return LRESULT(0);
+            }
+        }
         if key == u32::from(VK_APPS.0)
             || (key == u32::from(VK_F10.0) && GetKeyState(VK_SHIFT.0 as i32) < 0)
         {

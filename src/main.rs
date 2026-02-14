@@ -2147,6 +2147,10 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                     handled = true;
                     return;
                 }
+                if app_windows::help_window::handle_readonly_navigation(&msg) {
+                    handled = true;
+                    return;
+                }
 
                 if state.help_window.0 != 0 {
                     // Manual TAB handling for Help window

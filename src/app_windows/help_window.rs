@@ -2,15 +2,18 @@ use crate::accessibility::{normalize_to_crlf, to_wide};
 use crate::i18n;
 use crate::settings::Language;
 use crate::with_state;
+use std::sync::{Mutex, OnceLock};
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::WC_BUTTON;
-use windows::Win32::UI::Input::KeyboardAndMouse::{GetFocus, SetFocus, VK_RETURN};
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    GetFocus, GetKeyState, SetFocus, VK_ESCAPE, VK_RETURN, VK_SHIFT, VK_TAB,
+};
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow,
     ES_AUTOVSCROLL, ES_MULTILINE, ES_WANTRETURN, GWLP_USERDATA, GetWindowLongPtrW, HMENU,
-    IDC_ARROW, IDCANCEL, LoadCursorW, MoveWindow, RegisterClassW, SendMessageW,
+    IDC_ARROW, IDCANCEL, IsChild, LoadCursorW, MSG, MoveWindow, RegisterClassW, SendMessageW,
     SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_CLOSE, WM_COMMAND,
     WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT, WM_SIZE, WNDCLASSW,
     WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
@@ -20,6 +23,8 @@ use windows::core::{PCWSTR, w};
 
 const HELP_CLASS_NAME: &str = "SonarpadHelp";
 const HELP_ID_OK: usize = 7003;
+const READONLY_TEXT_CLASS_NAME: &str = "SonarpadReadonlyText";
+const READONLY_TEXT_ID_OK: usize = 7013;
 const DONATIONS_IT: &str = include_str!("../../donations_it.txt");
 const DONATIONS_EN: &str = include_str!("../../donations_en.txt");
 const DONATIONS_ES: &str = include_str!("../../donations_es.txt");
@@ -77,6 +82,98 @@ struct HelpWindowState {
     kind: HelpWindowKind,
 }
 
+struct ReadonlyTextInit {
+    content: String,
+}
+
+struct ReadonlyTextState {
+    parent: HWND,
+    edit: HWND,
+    ok_button: HWND,
+}
+
+static READONLY_TEXT_WINDOWS: OnceLock<Mutex<Vec<HWND>>> = OnceLock::new();
+
+fn readonly_text_windows() -> &'static Mutex<Vec<HWND>> {
+    READONLY_TEXT_WINDOWS.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+fn register_readonly_text_window(hwnd: HWND) {
+    match readonly_text_windows().lock() {
+        Ok(mut windows) => windows.push(hwnd),
+        Err(_e) => crate::log_debug("Failed to lock readonly text windows"),
+    }
+}
+
+fn unregister_readonly_text_window(hwnd: HWND) {
+    match readonly_text_windows().lock() {
+        Ok(mut windows) => windows.retain(|w| *w != hwnd),
+        Err(_e) => crate::log_debug("Failed to lock readonly text windows"),
+    }
+}
+
+pub unsafe fn handle_readonly_navigation(msg: &MSG) -> bool {
+    if msg.message != WM_KEYDOWN {
+        return false;
+    }
+    let windows: Vec<HWND> = match readonly_text_windows().lock() {
+        Ok(windows) => windows.clone(),
+        Err(_e) => {
+            crate::log_debug("Failed to lock readonly text windows");
+            return false;
+        }
+    };
+    let target = windows
+        .into_iter()
+        .find(|hwnd| msg.hwnd == *hwnd || IsChild(*hwnd, msg.hwnd).as_bool());
+    let Some(hwnd) = target else {
+        return false;
+    };
+    let key = msg.wParam.0 as u32;
+    if key == VK_TAB.0 as u32 {
+        let shift_down = GetKeyState(VK_SHIFT.0 as i32) < 0;
+        if with_readonly_text_state(hwnd, |state| {
+            if shift_down {
+                if GetFocus() == state.ok_button {
+                    SetFocus(state.edit);
+                } else {
+                    SetFocus(state.ok_button);
+                }
+            } else if GetFocus() == state.edit {
+                SetFocus(state.ok_button);
+            } else {
+                SetFocus(state.edit);
+            }
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access readonly text state");
+        }
+        return true;
+    }
+    if key == VK_ESCAPE.0 as u32 {
+        crate::log_if_err!(DestroyWindow(hwnd));
+        return true;
+    }
+    if key == VK_RETURN.0 as u32 {
+        let mut handled = false;
+        if with_readonly_text_state(hwnd, |state| {
+            if GetFocus() == state.ok_button {
+                crate::log_if_err!(DestroyWindow(hwnd));
+                handled = true;
+            }
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access readonly text state");
+        }
+        if handled {
+            return true;
+        }
+    }
+    false
+}
+
 pub unsafe fn open(parent: HWND) {
     open_window(parent, HelpWindowKind::Guide);
 }
@@ -87,6 +184,48 @@ pub unsafe fn open_changelog(parent: HWND) {
 
 pub unsafe fn open_donations(parent: HWND) {
     open_window(parent, HelpWindowKind::Donations);
+}
+
+pub unsafe fn open_readonly_text(parent: HWND, title: &str, content: &str) {
+    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+    let class_name = to_wide(READONLY_TEXT_CLASS_NAME);
+    let wc = WNDCLASSW {
+        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+            LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
+        ),
+        hInstance: hinstance,
+        lpszClassName: PCWSTR(class_name.as_ptr()),
+        lpfnWndProc: Some(readonly_text_wndproc),
+        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+        ..Default::default()
+    };
+    RegisterClassW(&wc);
+
+    let init = Box::new(ReadonlyTextInit {
+        content: normalize_to_crlf(content),
+    });
+    let init_ptr = Box::into_raw(init);
+    let title_wide = to_wide(title);
+    let hwnd = CreateWindowExW(
+        WS_EX_CONTROLPARENT,
+        PCWSTR(class_name.as_ptr()),
+        PCWSTR(title_wide.as_ptr()),
+        WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+        CW_USEDEFAULT,
+        CW_USEDEFAULT,
+        640,
+        480,
+        parent,
+        None,
+        hinstance,
+        Some(init_ptr as *const std::ffi::c_void),
+    );
+    if hwnd.0 != 0 {
+        register_readonly_text_window(hwnd);
+        SetForegroundWindow(hwnd);
+    } else if !init_ptr.is_null() {
+        let _unused_box = Box::from_raw(init_ptr);
+    }
 }
 
 unsafe fn open_window(parent: HWND, kind: HelpWindowKind) {
@@ -424,5 +563,173 @@ fn donations_content(language: Language) -> String {
         Language::Serbian => {
             read_override_text("donations_sr.txt").unwrap_or_else(|| DONATIONS_SR.to_string())
         }
+    }
+}
+
+unsafe extern "system" fn readonly_text_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    crate::panic_guard::guard(
+        "readonly_text_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { readonly_text_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn readonly_text_wndproc_inner(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    match msg {
+        WM_CREATE => {
+            let create_struct = lparam.0 as *const CREATESTRUCTW;
+            let init_ptr = (*create_struct).lpCreateParams as *mut ReadonlyTextInit;
+            if init_ptr.is_null() {
+                return LRESULT(0);
+            }
+            let init = Box::from_raw(init_ptr);
+
+            let edit = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD
+                    | WS_VISIBLE
+                    | WS_VSCROLL
+                    | WINDOW_STYLE(ES_MULTILINE as u32)
+                    | WINDOW_STYLE(ES_AUTOVSCROLL as u32)
+                    | WINDOW_STYLE(ES_WANTRETURN as u32)
+                    | WS_TABSTOP,
+                0,
+                0,
+                0,
+                0,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            SendMessageW(
+                edit,
+                windows::Win32::UI::Controls::EM_SETREADONLY,
+                WPARAM(1),
+                LPARAM(0),
+            );
+
+            let ok_button = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                w!("OK"),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                0,
+                0,
+                0,
+                0,
+                hwnd,
+                HMENU(READONLY_TEXT_ID_OK as isize),
+                HINSTANCE(0),
+                None,
+            );
+
+            let content_wide = to_wide(&init.content);
+            let _res = SetWindowTextW(edit, PCWSTR(content_wide.as_ptr()));
+            SetFocus(edit);
+
+            let state = Box::new(ReadonlyTextState {
+                parent: (*create_struct).hwndParent,
+                edit,
+                ok_button,
+            });
+            SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+            LRESULT(0)
+        }
+        WM_SETFOCUS => {
+            if with_readonly_text_state(hwnd, |state| SetFocus(state.edit)).is_none() {
+                crate::log_debug("Failed to access readonly text state");
+            }
+            LRESULT(0)
+        }
+        WM_COMMAND => {
+            let cmd_id = wparam.0 & 0xffff;
+            if cmd_id == READONLY_TEXT_ID_OK || cmd_id == IDCANCEL.0 as usize {
+                crate::log_if_err!(DestroyWindow(hwnd));
+                return LRESULT(0);
+            }
+            DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
+        WM_SIZE => {
+            let width = (lparam.0 & 0xffff) as i32;
+            let height = ((lparam.0 >> 16) & 0xffff) as i32;
+            if with_readonly_text_state(hwnd, |state| {
+                let button_width = 90;
+                let button_height = 28;
+                let margin = 12;
+                let edit_height = (height - button_height - (margin * 2)).max(0);
+                crate::log_if_err!(MoveWindow(state.edit, 0, 0, width, edit_height, true));
+                crate::log_if_err!(MoveWindow(
+                    state.ok_button,
+                    width - button_width - margin,
+                    edit_height + margin,
+                    button_width,
+                    button_height,
+                    true,
+                ));
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access readonly text state");
+            }
+            LRESULT(0)
+        }
+        WM_NCDESTROY => {
+            unregister_readonly_text_window(hwnd);
+            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ReadonlyTextState;
+            if !ptr.is_null() {
+                let state = Box::from_raw(ptr);
+                if state.parent.0 != 0 {
+                    SetForegroundWindow(state.parent);
+                    crate::app_windows::podcasts_window::focus_library(state.parent);
+                    crate::app_windows::rss_window::focus_library(state.parent);
+                }
+            }
+            LRESULT(0)
+        }
+        WM_CLOSE => {
+            crate::log_if_err!(DestroyWindow(hwnd));
+            LRESULT(0)
+        }
+        WM_KEYDOWN => {
+            if wparam.0 as u32 == VK_RETURN.0 as u32 {
+                if with_readonly_text_state(hwnd, |state| {
+                    if GetFocus() == state.ok_button {
+                        crate::log_if_err!(DestroyWindow(hwnd));
+                    }
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access readonly text state");
+                }
+                return LRESULT(0);
+            }
+            DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
+        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+    }
+}
+
+unsafe fn with_readonly_text_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+where
+    F: FnOnce(&mut ReadonlyTextState) -> R,
+{
+    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ReadonlyTextState;
+    if ptr.is_null() {
+        None
+    } else {
+        Some(f(&mut *ptr))
     }
 }

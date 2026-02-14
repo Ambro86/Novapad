@@ -7,8 +7,10 @@ Améliorations
 • Ajout d'une nouvelle action dans le menu contextuel RSS pour partager l'article sélectionné par e-mail.
 • Un appui sur Ctrl+A annonce désormais la fin de l'action pour un retour plus clair avec les lecteurs d'écran.
 • Amélioration du message de remplacement avec une gestion correcte du singulier/pluriel (par ex. « 1 remplacement effectué » vs « 2 remplacements effectués »).
+• Ajout dans la fenêtre du dictionnaire d'une sélection de langue de recherche, avec Auto (langue de l'interface) par défaut et possibilité de choix manuel.
 Corrections de bugs
 • Correction de l'ordre des articles RSS Google News : lorsque la date est disponible, les articles sont désormais affichés du plus récent au plus ancien.
+• Correction de l'association des étiquettes NVDA dans la fenêtre du dictionnaire : le champ de recherche et la liste de langue annoncent désormais la bonne étiquette.
 
 Version 0.6.6 – 2026-02-13
 Améliorations

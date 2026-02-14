@@ -14,15 +14,15 @@ use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetFocus, SetFocus, VK_ESCAPE, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
-    BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_RESETCONTENT, CBS_DROPDOWN, CHILDID_SELF, CREATESTRUCTW,
-    CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow, ES_AUTOVSCROLL, ES_MULTILINE,
-    ES_READONLY, EVENT_OBJECT_VALUECHANGE, GW_CHILD, GWLP_USERDATA, GetDlgCtrlID, GetWindow,
-    GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, IsWindow,
-    LoadCursorW, MSG, OBJID_CLIENT, PostMessageW, RegisterClassW, SendMessageW,
-    SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP, WM_COMMAND,
-    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WNDCLASSW, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP,
-    WS_VISIBLE, WS_VSCROLL,
+    BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CBS_DROPDOWN,
+    CBS_DROPDOWNLIST, CHILDID_SELF, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
+    DestroyWindow, ES_AUTOVSCROLL, ES_MULTILINE, ES_READONLY, EVENT_OBJECT_VALUECHANGE, GW_CHILD,
+    GWLP_USERDATA, GetDlgCtrlID, GetWindow, GetWindowLongPtrW, GetWindowTextLengthW,
+    GetWindowTextW, HMENU, IDC_ARROW, IsWindow, LoadCursorW, MSG, OBJID_CLIENT, PostMessageW,
+    RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW,
+    WINDOW_STYLE, WM_APP, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS,
+    WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME,
+    WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -31,6 +31,7 @@ const WIKTIONARY_INPUT_ID: usize = 9401;
 const WIKTIONARY_SEARCH_ID: usize = 9402;
 const WIKTIONARY_OUTPUT_ID: usize = 9403;
 const WIKTIONARY_CLOSE_ID: usize = 9404;
+const WIKTIONARY_LANGUAGE_ID: usize = 9405;
 
 const WM_LOOKUP_DONE: u32 = WM_APP + 100;
 static LOOKUP_GENERATION: AtomicUsize = AtomicUsize::new(0);
@@ -38,6 +39,7 @@ static LOOKUP_GENERATION: AtomicUsize = AtomicUsize::new(0);
 struct WiktionaryWindowState {
     parent: HWND,
     input: HWND,
+    language_combo: HWND,
     output: HWND,
     search: HWND,
     close: HWND,
@@ -46,6 +48,8 @@ struct WiktionaryWindowState {
 struct WiktionaryLabels {
     title: String,
     word: String,
+    language: String,
+    language_auto: String,
     search: String,
     results: String,
     close: String,
@@ -55,6 +59,8 @@ fn wiktionary_labels(language: crate::settings::Language) -> WiktionaryLabels {
     WiktionaryLabels {
         title: i18n::tr(language, "dictionary.lookup.title"),
         word: i18n::tr(language, "dictionary.lookup.word"),
+        language: i18n::tr(language, "dictionary.lookup.language"),
+        language_auto: i18n::tr(language, "dictionary.lookup.language.auto"),
         search: i18n::tr(language, "dictionary.lookup.search"),
         results: i18n::tr(language, "dictionary.lookup.results"),
         close: i18n::tr(language, "dictionary.lookup.close"),
@@ -176,6 +182,23 @@ unsafe fn refresh_history_combo(input: HWND, history: &[String]) {
     }
 }
 
+fn language_from_code(code: &str, fallback: Language) -> Language {
+    match code.trim().to_ascii_lowercase().as_str() {
+        "it" => Language::Italian,
+        "en" => Language::English,
+        "es" => Language::Spanish,
+        "pt" => Language::Portuguese,
+        "sv" => Language::Swedish,
+        "vi" => Language::Vietnamese,
+        "cs" => Language::Czech,
+        "pl" => Language::Polish,
+        "fr" => Language::French,
+        "sr" => Language::Serbian,
+        "uk" => Language::Ukrainian,
+        _ => fallback,
+    }
+}
+
 pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     handle_accessibility(hwnd, msg)
 }
@@ -208,6 +231,7 @@ pub unsafe fn open(parent: HWND) {
     let state = Box::new(WiktionaryWindowState {
         parent,
         input: HWND(0),
+        language_combo: HWND(0),
         output: HWND(0),
         search: HWND(0),
         close: HWND(0),
@@ -295,11 +319,78 @@ unsafe fn wiktionary_wndproc_inner(
                 hinstance,
                 None,
             );
+            CreateWindowExW(
+                Default::default(),
+                w!("STATIC"),
+                PCWSTR(to_wide(&labels.language).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                12,
+                68,
+                120,
+                18,
+                hwnd,
+                HMENU(3),
+                hinstance,
+                None,
+            );
+            let language_combo = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("COMBOBOX"),
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                12,
+                88,
+                220,
+                240,
+                hwnd,
+                HMENU(WIKTIONARY_LANGUAGE_ID as isize),
+                hinstance,
+                None,
+            );
             let search_history = with_state(parent, |state| {
                 state.settings.dictionary_search_history.clone()
             })
             .unwrap_or_default();
             refresh_history_combo(input, &search_history);
+            let language_options = [
+                (labels.language_auto.clone(), "auto"),
+                (i18n::tr(language, "options.lang.it"), "it"),
+                (i18n::tr(language, "options.lang.en"), "en"),
+                (i18n::tr(language, "options.lang.es"), "es"),
+                (i18n::tr(language, "options.lang.pt"), "pt"),
+                (i18n::tr(language, "options.lang.sv"), "sv"),
+                (i18n::tr(language, "options.lang.vi"), "vi"),
+                (i18n::tr(language, "options.lang.cs"), "cs"),
+                (i18n::tr(language, "options.lang.pl"), "pl"),
+                (i18n::tr(language, "options.lang.fr"), "fr"),
+                (i18n::tr(language, "options.lang.sr"), "sr"),
+                (i18n::tr(language, "options.lang.uk"), "uk"),
+            ];
+            let saved_lookup_pref = with_state(parent, |state| {
+                state.settings.dictionary_lookup_language.clone()
+            })
+            .unwrap_or_else(|| "auto".to_string())
+            .trim()
+            .to_ascii_lowercase();
+            let mut selected_lang_index = 0usize;
+            for (idx, (label, value)) in language_options.iter().enumerate() {
+                let wide = to_wide(label);
+                SendMessageW(
+                    language_combo,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(PCWSTR(wide.as_ptr()).0 as isize),
+                );
+                if saved_lookup_pref == *value {
+                    selected_lang_index = idx;
+                }
+            }
+            SendMessageW(
+                language_combo,
+                CB_SETCURSEL,
+                WPARAM(selected_lang_index),
+                LPARAM(0),
+            );
             let search = CreateWindowExW(
                 Default::default(),
                 w!("BUTTON"),
@@ -320,7 +411,7 @@ unsafe fn wiktionary_wndproc_inner(
                 PCWSTR(to_wide(&labels.results).as_ptr()),
                 WS_CHILD | WS_VISIBLE,
                 12,
-                68,
+                122,
                 120,
                 18,
                 hwnd,
@@ -340,9 +431,9 @@ unsafe fn wiktionary_wndproc_inner(
                     | WINDOW_STYLE(ES_AUTOVSCROLL as u32)
                     | WINDOW_STYLE(ES_READONLY as u32),
                 12,
-                88,
+                142,
                 480,
-                260,
+                206,
                 hwnd,
                 HMENU(WIKTIONARY_OUTPUT_ID as isize),
                 hinstance,
@@ -364,11 +455,12 @@ unsafe fn wiktionary_wndproc_inner(
             );
 
             (*init_ptr).input = input;
+            (*init_ptr).language_combo = language_combo;
             (*init_ptr).output = output;
             (*init_ptr).search = search;
             (*init_ptr).close = close;
             let proc_ptr = tab_subclass_proc as *const () as usize;
-            for control in [input, search, output, close] {
+            for control in [input, language_combo, search, output, close] {
                 let prev = SetWindowLongPtrW(
                     control,
                     windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
@@ -483,6 +575,7 @@ unsafe fn handle_enter_key(hwnd: HWND) -> bool {
     if control_id != WIKTIONARY_CLOSE_ID
         && control_id != WIKTIONARY_SEARCH_ID
         && control_id != WIKTIONARY_INPUT_ID
+        && control_id != WIKTIONARY_LANGUAGE_ID
     {
         let parent_control = windows::Win32::UI::WindowsAndMessaging::GetParent(control);
         if parent_control.0 == 0 {
@@ -492,6 +585,7 @@ unsafe fn handle_enter_key(hwnd: HWND) -> bool {
         if parent_id != WIKTIONARY_CLOSE_ID
             && parent_id != WIKTIONARY_SEARCH_ID
             && parent_id != WIKTIONARY_INPUT_ID
+            && parent_id != WIKTIONARY_LANGUAGE_ID
         {
             return false;
         }
@@ -511,6 +605,10 @@ unsafe fn handle_enter_key(hwnd: HWND) -> bool {
         return true;
     }
     if control_id == WIKTIONARY_INPUT_ID {
+        run_lookup(parent);
+        return true;
+    }
+    if control_id == WIKTIONARY_LANGUAGE_ID {
         run_lookup(parent);
         return true;
     }
@@ -589,7 +687,13 @@ unsafe fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
 
 unsafe fn focus_next_control(parent: HWND, current: HWND, shift_down: bool) {
     let order = with_window_state(parent, |state| {
-        vec![state.input, state.search, state.output, state.close]
+        vec![
+            state.input,
+            state.language_combo,
+            state.search,
+            state.output,
+            state.close,
+        ]
     })
     .unwrap_or_default();
     if order.is_empty() {
@@ -633,20 +737,48 @@ where
 }
 
 unsafe fn run_lookup(hwnd: HWND) {
-    let Some((parent, input, output)) =
-        with_window_state(hwnd, |state| (state.parent, state.input, state.output))
-    else {
+    let Some((parent, input, language_combo, output)) = with_window_state(hwnd, |state| {
+        (
+            state.parent,
+            state.input,
+            state.language_combo,
+            state.output,
+        )
+    }) else {
         return;
     };
-    let language = with_state(parent, |s| s.settings.language).unwrap_or_default();
+    let ui_language = with_state(parent, |s| s.settings.language).unwrap_or_default();
     let pref = with_state(parent, |s| {
         s.settings.dictionary_translation_language.clone()
     })
     .unwrap_or_else(|| "auto".to_string());
+    let lookup_pref = {
+        let sel = SendMessageW(language_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+        match sel {
+            1 => "it",
+            2 => "en",
+            3 => "es",
+            4 => "pt",
+            5 => "sv",
+            6 => "vi",
+            7 => "cs",
+            8 => "pl",
+            9 => "fr",
+            10 => "sr",
+            11 => "uk",
+            _ => "auto",
+        }
+        .to_string()
+    };
+    let lookup_language = if lookup_pref == "auto" {
+        ui_language
+    } else {
+        language_from_code(&lookup_pref, ui_language)
+    };
 
     let len = GetWindowTextLengthW(input);
     if len <= 0 {
-        let msg = i18n::tr(language, "dictionary.no_word");
+        let msg = i18n::tr(ui_language, "dictionary.no_word");
         if let Err(_e) =
             SetWindowTextW(output, PCWSTR(to_wide(&to_windows_newlines(&msg)).as_ptr()))
         {
@@ -659,7 +791,7 @@ unsafe fn run_lookup(hwnd: HWND) {
     let word = String::from_utf16_lossy(&buf[..len as usize]);
     let trimmed = word.trim().to_string();
     if trimmed.is_empty() {
-        let msg = i18n::tr(language, "dictionary.no_word");
+        let msg = i18n::tr(ui_language, "dictionary.no_word");
         if let Err(_e) =
             SetWindowTextW(output, PCWSTR(to_wide(&to_windows_newlines(&msg)).as_ptr()))
         {
@@ -677,6 +809,7 @@ unsafe fn run_lookup(hwnd: HWND) {
         if history.len() > 30 {
             history.truncate(30);
         }
+        state.settings.dictionary_lookup_language = lookup_pref.clone();
         history.clone()
     })
     .unwrap_or_default();
@@ -685,14 +818,14 @@ unsafe fn run_lookup(hwnd: HWND) {
         crate::settings::save_settings(settings_clone);
     }
 
-    let key = dictionary_cache_key(language, &pref, &trimmed);
+    let key = dictionary_cache_key(lookup_language, &pref, &trimmed);
     let cached_lines =
         with_state(parent, |state| state.dictionary_cache.get(&key).cloned()).unwrap_or(None);
     if let Some(lines) = cached_lines {
-        if is_dictionary_not_found_cache_entry(language, &lines) {
+        if is_dictionary_not_found_cache_entry(lookup_language, &lines) {
             remove_dictionary_cache(parent, &key);
         } else {
-            let text = format_cached_output(language, &lines);
+            let text = format_cached_output(lookup_language, &lines);
             if let Err(_e) = SetWindowTextW(
                 output,
                 PCWSTR(to_wide(&to_windows_newlines(&text)).as_ptr()),
@@ -706,7 +839,7 @@ unsafe fn run_lookup(hwnd: HWND) {
         .wrapping_add(1);
     LOOKUP_GENERATION.store(generation, Ordering::SeqCst);
 
-    let loading_msg = i18n::tr(language, "dictionary.loading");
+    let loading_msg = i18n::tr(ui_language, "dictionary.loading");
     if let Err(_e) = SetWindowTextW(
         output,
         PCWSTR(to_wide(&to_windows_newlines(&loading_msg)).as_ptr()),
@@ -716,19 +849,19 @@ unsafe fn run_lookup(hwnd: HWND) {
     let parent_hwnd = parent;
     let cache_key = key.clone();
     std::thread::spawn(move || {
-        let result = wiktionary::lookup_for_language_with_meta(&trimmed, language, &pref);
+        let result = wiktionary::lookup_for_language_with_meta(&trimmed, lookup_language, &pref);
         let text = match result {
             Ok((entry, _is_large)) => {
-                let lines = wiktionary::format_menu_lines(language, &entry);
+                let lines = wiktionary::format_menu_lines(lookup_language, &entry);
                 update_dictionary_cache(parent_hwnd, cache_key.clone(), lines.clone());
-                wiktionary::format_output_text(language, &entry)
+                wiktionary::format_output_text(lookup_language, &entry)
             }
             Err(wiktionary::LookupError::NotFound { .. }) => {
-                i18n::tr(language, "dictionary.not_found")
+                i18n::tr(lookup_language, "dictionary.not_found")
             }
             Err(err) => {
                 log_debug(&format!("Dictionary lookup failed: {err}"));
-                i18n::tr(language, "dictionary.not_found")
+                i18n::tr(lookup_language, "dictionary.not_found")
             }
         };
         let text = to_windows_newlines(&text);

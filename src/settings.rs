@@ -288,6 +288,8 @@ pub struct AppSettings {
     pub favorite_voices: Vec<FavoriteVoice>,
     pub dictionary: Vec<DictionaryEntry>,
     pub dictionary_translation_language: String,
+    #[serde(default = "default_dictionary_lookup_language")]
+    pub dictionary_lookup_language: String,
     #[serde(default)]
     pub dictionary_search_history: Vec<String>,
     pub wikipedia_language: String,
@@ -428,6 +430,10 @@ fn default_audiobook_split_start_number() -> u32 {
     1
 }
 
+fn default_dictionary_lookup_language() -> String {
+    "auto".to_string()
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         AppSettings {
@@ -491,6 +497,7 @@ impl Default for AppSettings {
             favorite_voices: Vec::new(),
             dictionary: Vec::new(),
             dictionary_translation_language: "auto".to_string(),
+            dictionary_lookup_language: default_dictionary_lookup_language(),
             dictionary_search_history: Vec::new(),
             wikipedia_language: "auto".to_string(),
             text_color: 0x000000,
@@ -1075,6 +1082,9 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     }
     if settings.dictionary_translation_language.trim().is_empty() {
         settings.dictionary_translation_language = "auto".to_string();
+    }
+    if settings.dictionary_lookup_language.trim().is_empty() {
+        settings.dictionary_lookup_language = default_dictionary_lookup_language();
     }
     settings
         .dictionary_search_history

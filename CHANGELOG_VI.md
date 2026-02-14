@@ -7,8 +7,10 @@ Cải tiến
 • Đã thêm thao tác mới trong menu ngữ cảnh RSS để chia sẻ bài đã chọn qua email.
 • Khi nhấn Ctrl+A, chương trình giờ sẽ thông báo hoàn tất thao tác để phản hồi rõ ràng hơn cho trình đọc màn hình.
 • Đã cải thiện thông báo thay thế với dạng số ít/số nhiều chính xác (ví dụ: “1 mục đã thay thế” và “2 mục đã thay thế”).
+• Đã thêm trong cửa sổ từ điển tùy chọn chọn ngôn ngữ tra cứu, mặc định là Auto (ngôn ngữ giao diện) và có thể chọn thủ công.
 Sửa lỗi
 • Đã sửa thứ tự bài RSS từ Google News: khi có ngày xuất bản, bài viết giờ được hiển thị từ mới nhất đến cũ nhất.
+• Đã sửa gán nhãn cho NVDA trong cửa sổ từ điển: ô tìm kiếm và combobox ngôn ngữ giờ đọc đúng nhãn.
 
 Phiên bản 0.6.6 – 2026-02-13
 Cải tiến

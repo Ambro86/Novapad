@@ -1,0 +1,235 @@
+== {{lengua|es}} ==
+{{pron-graf}}
+
+=== Etimología 1 ===
+{{etimología|la|liber|diacrítico=librum}}.
+[[Archivo:Libros peruanos.jpg|thumb|[1]]]
+
+==== {{sustantivo masculino|es}} ====
+{{es.sust}}
+
+;1: Conjunto de [[hoja]]s de [[papel]] unidas por un borde formando un [[volumen]].
+{{ejemplo|«En [[emocionante]] [[ceremonia]] realizada [[en]] el Club Social, [[hacer|se hace]] entrega [[oficial]] de diez ''[[libro|libros]]'' a la Biblioteca de San Sebastián […]».|autor=Goldemberg Isaac|título=El nombre del padre|fecha=2001|editorial=Alfaguara|c=libro}}
+{{sinónimo|códice|tomo|volumen}}.
+{{relacionado|texto|obra|folleto|revista|volante|impreso|legajo|mamotreto|libreto|librillo|librito|libreta|librero|librería|libresco}}.
+;2: {{plm|obra}} [[escrito|escrita]] de la suficiente [[entidad]] para [[publicar]]se por separado.
+;3: {{plm|división}} de un libro<sub>2</sub> de gran [[extensión]], a su vez habitualmente subdividida en [[capítulo]]s.
+;4: {{plm|texto}} de una [[obra]] [[teatral]] u [[operístico|operística]].
+{{sinónimo|libreto}}.
+;5: Figuradamente, cualquier [[compendio]] de la que se puede [[extraer]] [[instrucción]].
+;6 {{csem|zoología}}: Tercera [[cavidad]] del [[estómago]] de los [[rumiante]]s.
+{{sinónimo|librillo|omaso}}.
+{{relacionado|rumen|panza|redecilla|retículo|bonete|abomaso|cuajo}}
+;7: {{plm|tributo}} que [[recaudar|recauda]] el [[estado]] para [[financiar]] sus [[gasto]]s.
+
+==== Locuciones ====
+{{trad-arriba|locuciones}}
+*[[libro amarillo]]
+*[[libro antifonal]]
+*[[libro antifonario]]
+*[[libro azul]]
+*[[libro blanco]]
+*[[libro borrador]]
+*[[libro de acuerdos]]
+*[[libro de asiento]]
+*[[libro de becerro]]
+*[[libro de bolsillo]]
+*[[libro de caballerías]]
+*[[libro de cabecera]]
+*[[libro de caja]]
+*[[libro de cocina]]
+*[[libro de coro]]
+*[[libro de coros]]
+*[[libro de cuentas ajustadas]]
+*[[libro de las cuarenta hojas]]
+*[[libro de la vida]]
+*[[libro de escolaridad]]
+*[[libro de estilo]]
+*[[libro de familia]]
+*[[libro de fondo]]
+*[[libro de horas]]
+*[[libro de inventarios]]
+*[[libro del Apocalipsis]]
+*[[libro del Génesis]]
+*[[libro de mano]]
+*[[libro de matrícula]]
+*[[libro de memoria]]
+*[[libro de misa]]
+*[[libro de música]]
+*[[libro de oro]]
+*[[libro de recetas]]
+*[[libro de lo salvado]]
+*[[libro de surtido]]
+*[[libro de texto]]
+*[[libro diario]]
+*[[libro en blanco]]
+*[[libro entonatorio]]
+*[[libro escolar]]
+*[[libro infantil]]
+*[[libro ilustrado]]
+*[[libro juvenil]]
+*[[libro maestro]]
+*[[libro mayor]]
+*[[libro moral]]
+*[[libro negro]]
+*[[libro para recortar]]
+*[[libro penador]]
+*[[libro procesionario]]
+*[[libro ritual]]
+*[[libro rojo]]
+*[[libro sapiencial]]
+*[[libros sagrados]]
+*[[libro talonario]]
+*[[libro usado]]
+*[[libro verde]]
+*[[gran libro]]
+*[[punto de libro]]
+*[[tenedor de libros]]
+*[[teneduría de libros]]
+*[[ahorcar los libros]]
+*[[cantar a libro abierto]]
+*[[colgar los libros]]
+*[[como un libro abierto]]
+*[[de libro]]
+*[[hablar como un libro]]
+*[[hacer libro nuevo]]
+*[[meterse en libros de caballería]]
+*[[no haber necesidad de abrir o cerrar ningún libro]]
+*[[no estar en los libros]]
+*[[no está en mis libros]]
+*[[quemar sus libros]]
+*[[un libro abierto]]
+{{trad-abajo}}
+
+==== Información adicional ====
+{{derivad|audiolibro|libracho|libraco|librazo|librejo|librera|libreril|librero|librería|libresco|libreta|librete|libretista|libreto|librillo}}
+*'''Análisis''': Sustantivo, común, contable, concreto, individual, masculino, singular.
+
+==== Véase también ====
+{{Wikiquote}}
+{{w}}
+
+==== Traducciones ====
+{{trad-arriba}}
+{{t|af|a1=1|t1=boek}}
+{{t|ay|a1=1|t1=panka liwru}}
+{{t|de|a1=1|t1=Buch|g1=n}}
+{{t|sh|a1=1|t1=knjiga књига|g1=f}}
+{{t|sq|a1=1|t1=libër|g1=m}}
+{{t|pdc|a1=1|t1=buch}}
+{{t|ar|a1=1|t1=كتاب}}
+{{t|arz|a1=1|t1=كتاب}}
+{{t|an|a1=1|t1=libro}}
+{{t|ast|t1=llibru|g1=m}}
+{{t|az|a1=1|t1=kitab}}
+{{t|nds-de|a1=1|t1=book}}
+{{t|bm|a1=1|t1=gafɛ}}
+{{t|bn|a1=1|t1=বই}}
+{{t|be|a1=1|t1=кніга}}
+{{t|my|a1=1|t1=စာအုပ်|tl1=caup}}
+{{t|br|a1=1|t1=levr}}
+{{t|bg|a1=1|t1=книга}}
+{{t|kab|a1=1|t1=adlis}}
+{{t|yue|a1=1|t1=書}}
+{{t|ca|a1=1|t1=llibre|g1=m}}
+{{t|cs|a1=1|t1=kniha|g1=f}}
+{{t|chr|a1=1|t1=ᎪᏪᎵ}}
+{{t|za|a1=1,2|t1=saw}}
+{{t|cv|a1=1|t1=кĕнеке}}
+{{t|ko|a1=1|t1=책}}
+{{t|ht|a1=1|t1=liv}}
+{{t|da|a1=1|t1=bog}}
+{{t|sco|a1=1|t1=beuk}}
+{{t|sk|a1=1|t1=kniha}}
+{{t|sl|a1=1|t1=knjiga}}
+{{t|eo|a1=1|t1=libro}}
+{{t|et|a1=1|t1=raamat}}
+{{t|eu|a1=1|t1=liburu}}
+{{t|fo|a1=1|t1=bók}}
+{{t|fi|a1=1|t1=kirja|g1=m}}
+{{t|fr|a1=1|t1=livre|g1=m|a2=1|t2=bouquin|a3=6|t3=feuillet|g3=m}}
+{{t|cy|a1=1|t1=llyfr}}
+{{t|gl|a1=1|t1=libro}}
+{{t|gan|a1=1|t1=書}}
+{{t|el|a1=1|t1=βιβλίο}}
+{{t|gn|a1=1|t1=kuatiañeʼẽ}}
+{{t|he|a1=1|t1=ספר}}
+{{t|hu|a1=1|t1=könyv}}
+{{t|yi|a1=1|t1=ספר}}
+{{t|io|a1=1|t1=libro}}
+{{t|id|a1=1|t1=buku}}
+{{t|en|a1=1|t1=book|a2=6|t2=omasum|a3=6|t3=psalterium|a4=6|t4=third stomach}}
+{{t|ia|a1=1|t1=libro}}
+{{t|iu|a1=1|t1=ᕿᒥᕐᕈᐊᑦ}}
+{{t|ga|a1=1|t1=leabhar}}
+{{t|is|a1=1|t1=bók}}
+{{t|it|a1=1|t1=libro|g1=m}}
+{{t|ja|a1=1|t1=本}}
+{{t|ja|t1=ほん|a1=1}}
+{{t|jv|a1=1|t1=buku}}
+{{t|km|a1=1|t1=សៀវភៅ|tl1=siəw phɨw}}
+{{t|kv|a1=1|t1=небӧг}}
+{{t|ku|a1=1|t1=pirtûk}}
+{{t|la|a1=1|t1=liber}}
+{{t|lv|a1=1|t1=grāmata}}
+{{t|lt|a1=1|t1=knyga|g1=f}}
+{{t|lut|a1=1|t1=dxʷtulalikʷ}}
+{{t|lb|a1=1|t1=Buch|g1=n}}
+{{t|mk|a1=1|t1=книга}}
+{{t|ml|a1=1|t1=പുസ്തകം}}
+{{t|ms|a1=1|t1=buku}}
+{{t|zh|a1=1|t1=書}}
+{{t|zh|t1=书}}
+{{t|arn|a1=1|t1=chillka|t2=lifro}}
+{{t|mr|a1=1|t1=पुस्तक}}
+{{t|yua|a1=1|t1=ju'un}}
+{{t|nan|a1=1|t1=chheh}}
+{{t|mwl|a1=1|t1=libro}}
+{{t|mn|a1=1|t1=ном}}
+{{t|nci|a1=1|t1=amoxtli āmoxtli}}
+{{t|nap|a1=1|t1=libbro}}
+{{t|nl|a1=1|t1=boek|g1=n}}
+{{t|ne|a1=1|t1=पुस्तक}}
+{{t|new|a1=1|t1=सफू}}
+{{t|no|t1=bok|g1=m}}
+{{t|nn|a1=1|t1=bok}}
+{{t|oc|a1=1|t1=libre}}
+{{t|os|a1=1|t1=чиныг}}
+{{t|fa|a1=1|t1=کتاب}}
+{{t|pl|a1=1|t1=książka}}
+{{t|pt|a1=1|t1=livro|g1=m}}
+{{t|quz|a1=1|t1=qillqasqa panka|t2=pankara|t3=liwru}}
+{{t|ro|a1=1|t1=carte}}
+{{t|ru|a1=1|t1=книга}}
+{{t|sgs|a1=1|t1=kninga}}
+{{t|sa|a1=1|t1=पुस्तक}}
+{{t|sh|a1=1|t1=knjiga}}
+{{t|scn|a1=1|t1=libbru}}
+{{t|sv|a1=1|t1=bok}}
+{{t|sw|a1=1|t1=kitabu}}
+{{t|ss|a1=1|t1=íncwadzí}}
+{{t|tl|a1=1|t1=aklát|t2=libro}}
+{{t|th|a1=1|t1=หนังสือ|tl1=nǎng-sʉ̌ʉ}}
+{{t|ta|a1=1|t1=நூல்}}
+{{t|tt|a1=1|t1=китап}}
+{{t|tg|a1=1|t1=китоб}}
+{{t|te|a1=1|t1=పుస్తకము}}
+{{t|tpi|a1=1|t1=buk}}
+{{t|tr|a1=1|t1=kitap}}
+{{t|tk|a1=1|t1=kitap}}
+{{t|uk|a1=1|t1=книга}}
+{{t|ur|a1=1|t1=کتاب}}
+{{t|uz|a1=1|t1=kitob}}
+{{t|wa|a1=1|t1=live}}
+{{t|vi|a1=1|t1=sách}}
+{{t|vo|a1=1|t1=buk}}
+{{t|war|a1=1|t1=basahon}}
+{{t|xh|a1=1|t1=incwadi}}
+{{t|sah|a1=1|t1=кинигэ}}
+{{t|yo|a1=1|t1=ìwé}}
+{{t|zu|a1=1|t1=incwadi}}
+{{trad-abajo}}
+
+=== Forma flexiva ===
+==== Forma verbal ====
+;1: {{forma verbo|librar|p=1s|t=presente|m=indicativo}}.

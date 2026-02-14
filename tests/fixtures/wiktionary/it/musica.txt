@@ -1,0 +1,84 @@
+== {{-it-}} ==
+{{-sost-|it}}
+{{Pn|w}} ''f sing'' {{Linkp|musiche}}
+    
+# {{Term|arte|it}} arte e [[tecnica]] di [[comporre]] [[sequenze]] di [[voce]] e [[suoni]], in [[cambio]] o [[meno]] di [[compenso]], in [[grado]] di [[evocare]] [[emozioni]] e [[sentimenti]] di [[chi]] [[le]] ascolta
+#* ''quella {{Pn}} ha [[commosso]] il [[grande]] [[pubblico]]''
+# [[brano]] [[musicale]]
+# {{Fig}} [[suono]] [[piacevole]] e [[armonioso]]
+#* ''la tua voce è '''musica''' per le mie orecchie'' 
+
+{{-verb form-|it}}
+{{Pn}}
+#terza  persona singolare dell'indicativo presente di [[musicare]]
+#seconda  persona singolare dell'imperativo presente di [[musicare]]
+
+{{-sill-}}
+; mù | si | ca
+
+{{-pron-}}
+*{{IPA|/ˈmuzika/}}
+*{{Audio|it-la musica.ogg}}
+
+{{-etim-}}
+*''(sostantivo)'' dal latino ''[[musica|musĭca]]'', che deriva dal [[greco]] ''[[μουσική]]'' [[arte]] delle [[muse]]
+*''(voce verbale)'' {{Etim-link|musicare}}
+
+{{-quote-}}
+{{Quote
+|Senza musica la vita sarebbe un errore
+|[[q:Nietzsche|Nietzsche]]}}
+{{Quote
+|La musica… non si fa con l’odio. E devono imparare questo!
+|[[w:Daniel Barenboim|Daniel Barenboim]]}}
+
+{{-sin-}}
+*arte dei suoni,  [[composizione]], [[concerto]],  [[pezzo]], [[sinfonia]], [[componimento]], [[brano]], [[suoni]], [[sonata]],
+*{{Est}}  [[armonia]], [[canto]], [[melodia]], [[suono]]
+* {{Est}} [[banda]], [[fanfara]]
+* {{Term|ironico|it}} [[caciara]], [[confusione]], [[fracasso]], [[frastuono]], rumore sgradevole
+* {{Est}} [[tiritera]], [[solfa]], [[storia]], [[minestra]], [[cantilena]]
+ 
+{{-ant-}}
+* {{Fig}} [[rumore]], [[frastuono]], [[fracasso]]
+
+{{-der-}}
+* [[capomusica]], [[etnomusica]],  [[musicale]], [[musicante]], [[musicare]], [[musicarello]], [[musicassetta]], [[musichiere]], [[musicista]], [[musico]], [[musicologia]], [[music-hall]], [[portamusica]]
+
+{{-prov-}}
+* ''sempre la stessa {{Pn}}'': ciò che si ripete monotonamente
+
+{{-trad-}}
+{{Trad1|espressione artistica}}
+:*{{cs}}: [[hudba]]
+:*{{hr}}: [[glazba]]
+:*{{fr}}: [[musique]]  ''f''
+:*{{el}}: [[μουσική]] ''f''
+:*{{id}}: [[musik]]
+:*{{en}}: [[music]]
+:* {{la}}: [[musĭca]]
+{{mid}}
+:*{{jbo}}: [[zgike]]
+:*{{nl}}: [[muziek]]
+:*{{pl}}: [[muzyka]] ''f''
+:*{{ro}}: [[muzică]]  ''f''
+:*{{de}}: [[Musik]]
+:*{{yi}}: [[מוזיק]] ''f''
+{{Trad2}}
+
+{{Trad1|brano musicale}}
+:*{{en}}: [[piece of music]]
+:*{{de}}: [[Musik]] ''f''
+{{Trad2}}
+
+{{Trad1| {{Fig}} suono piacevole}}
+:*{{en}}: <!-- inserisci qui la/le traduzione/ni nelle altre lingue -->
+{{Trad2}}
+
+{{Trad1|terza  persona singolare dell'indicativo presente di [[musicare]]}}
+:*{{en}}: <!-- inserisci qui la/le traduzione/ni nelle altre lingue -->
+{{Trad2}}
+
+{{Trad1|seconda  persona singolare dell'imperativo presente di [[musicare]]}}
+:*{{en}}: <!-- inserisci qui la/le traduzione/ni nelle altre lingue -->
+{{Trad2}}

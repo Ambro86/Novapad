@@ -1,0 +1,90 @@
+== {{-it-}} ==
+[[File:San Francisco Bay Bridge Western Span at night.jpg|thumb|il ponte di San Francisco visto di notte]]
+[[File:Kölner Dom nachts 2013.jpg|thumb|la cattedrale di Colonia in Germania di notte]]
+[[File:BlackMarble20161km.jpg|thumb|la terra vista di notte]]
+[[File:Shimla night.jpg|thumb|una città vista di notte]]
+{{-sost-|it}}
+{{Pn|w}} ''f sing'' {{Linkp|notti}}
+# {{Term|astronomia|it}} periodo compreso tra il [[tramonto]] e l'[[alba]]
+#*''nella notte di Pasqua del 387 il vescovo [[w:Sant'Agostino|Ambrogio]] battezzò colui che diventerà  [[w:Agostino d'Ippona|Sant'Agostino]] 
+
+{{-sill-}}
+; nòt | te
+
+{{-pron-}}
+{{IPA|/ˈnɔtte/}}
+{{Audio|it-notte.ogg}}
+
+{{-etim-}}
+dal {{la}} ''[[nox|noctem]]''
+
+{{-quote-}}
+{{Quote
+|E Dio non farà forse giustizia ai suoi eletti, che gridano giorno e '''notte''' verso di lui? Li farà aspettare forse a lungo?}}
+[[w:Vangelo secondo Luca|Vangelo secondo Luca]] {{Passo biblico|Lc|18,7}}
+
+{{-sin-}}
+* [[nottata]], ore notturne, tarda serata
+* {{Est}} [[buio]], [[oscurità]], [[tenebre]]
+* {{Fig}} [[barbarie]], [[ignoranza]], [[rozzezza]]
+* {{Fig}}    [[cecità]], [[crepuscolo]], [[decadenza]],  
+
+{{-ant-}}
+* [[giornata]], [[giorno]], ore diurne
+* {{Est}} [[chiarore]], [[luce]], [[luminosità]], [[splendore]]
+* {{Fig}} [[civiltà]], [[cultura]], [[sapienza]]
+
+{{-der-}}
+* [[annottare]], [[bella di notte]], [[metronotte]], [[mezzanotte]], [[nottambulo]], [[nottata]], [[nottetempo]], [[nottolone]], [[nottilabio]], [[nottovisore]], [[nottilucente]]
+
+{{-prov-}}
+* ''[[fare notte]]'': [[attardarsi]] in un lavoro  fino a notte
+* ''[[giorno e notte]]'': senza sosta
+*''in piena notte'':
+*''[[sul far della notte]]'': alle prime ore della [[notte]]
+*''[[passare la notte]]'': trascorrere la notte, particolarmente in un posto imprevisto
+* ''peggio che andar di notte'': di male in peggio
+
+{{-trad-}}
+{{Trad1|}}
+:*{{af}}: [[nag]]
+:*{{sq}}: [[natë]]
+:*{{ar}}: [[ليلة]]
+:*{{br}}: [[noz]] ''f''
+:*{{ca}}: [[nit]]
+:*{{cs}}: [[noc]]
+:*{{da}}: [[nat]]
+:*{{eo}}: [[nokto]]
+:*{{et}}: [[öö]]
+:*{{fi}}: [[yö]]
+:*{{fr}}: [[nuit]]
+:*{{fy}}: [[nacht]]
+:*{{io}}: [[nokto]]
+:*{{en}}: [[night]]
+:*{{la}}: [[nox]]
+{{mid}}
+:*{{no}}: [[natt]]
+:*{{nl}}: [[nacht]]
+:*{{pap}}: [[nochi]]
+:*{{pl}}: [[noc]]
+:*{{pt}}: [[noite]]
+:*{{rhg}}: [[rait]]
+:*{{ro}}: [[noapte]]
+:*{{es}}: [[noche]]
+:*{{sv}}: [[natt]]
+:*{{sw}}: [[usiku]]
+:*{{tl}}: [[gabi]]
+:*{{de}}: [[Nacht]]
+:*{{tr}}: [[gece]]
+:*{{hu}}: [[éjszaka]]
+:*{{zu}}: [[ubusuku]]
+{{Trad2}}
+
+{{-ref-}}
+* {{Fonte|trec}}
+* {{Fonte|dem}}
+* {{Fonte|dizit}}
+* {{Fonte|sabco}}
+* {{Fonte|sin-co}}
+*AA.VV., ''Dizionario sinonimi e contrari'', Mariotti, 2006, pagina 361
+* {{Fonte|itfd}}

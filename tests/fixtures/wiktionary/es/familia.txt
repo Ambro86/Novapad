@@ -1,0 +1,109 @@
+== {{lengua|es}} ==
+{{pron-graf|fone=faˈmi.lja}}
+
+=== Etimología ===
+{{etimología|la|familia|significado=no}}, "[[patrimonio]] [[doméstico]]", a su vez de {{l+|la|famulus}}, "[[sirviente]], [[esclavo]]", de origen incierto, con toda probabilidad cognado del osco {{l+|osc|famelo}}, el peligno {{l+|pgn|famel}} y el umbro {{l+|xum|famel}}, que sugieren una raíz itálica {{l+|itc-pro|*fame-lo-}}<ref>Miller, D. Gary (2006) ''Latin Suffixal Derivatives in English and their Indo-European Ancestry''. Oxford: Oxford University Press, p. 136. ISBN 978-0-19-928505-1</ref>, quizás del protoindoeuropeo {{l+|ine-pro|*dʰeh₁-m-elo-}}, de la raíz {{l+|ine-pro|*dʰeh₁-}}, "[[poner]], [[fijar]]"<ref>Stuart-Smith, Jane (2004) ''Phonetics and Philology: Sound Change in Italic''. Oxford: Oxford University Press, p. 119. ISBN 0-19-9257736</ref>. Compárese el alemán {{l+|de|Familie}}, el arumano {{l+|rup|fumeal'e}}, el catalán {{l+|ca|família}}, el danés {{l+|da|familie}}, el escocés {{l+|sco|faimlie}}, el francés {{l+|fr|famille}}, el gallego {{l+|gl|familia}}, el inglés {{l+|en|family}}, el italiano {{l+|it|famiglia}}, el neerlandés {{l+|nl|familie}}, el occitano {{l+|oc|familha}}, el portugués {{l+|pt|família}}, el romanche {{l+|rm|famiglia}}, el romaní {{l+|rom|familija}}, el rumano {{l+|ro|familie}}, {{l+|ro|femie}}, el siciliano {{l+|scn|famigghia}} o el sueco {{l+|sv|familj}}.
+
+=== {{sustantivo femenino|es}} ===
+[[Categoría:ES:Parentesco]]
+{{es.sust}}
+
+;1: {{plm|conjunto}} de [[persona]]s, unidas por [[descendencia]], [[matrimonio]] u otras [[relación|relaciones]] —incluyendo, según las [[cultura]]s, la [[adopción]] y aún la [[propiedad]]— que conforman una [[unidad]] [[doméstico|doméstica]], compartiendo [[residencia]] y cooperando económicamente
+{{sinónimo|hogar|ayllu}}.
+;2: Conjunto de personas, más amplio que el anterior, que se identifica con un [[linaje]] común por descendencia, adopción o [[adscripción]]
+{{sinónimo|parentela|clan}}.
+;3: En general, conjunto de [[elemento]]s que tienen [[rasgo]]s [[común|comunes]], en especial si mantienen relaciones de [[derivación]]
+;4 {{csem|biología}}: {{plm|rango}} [[taxonómico]] entre el [[orden]] y el [[género]]
+;5 {{csem|física|química}}: {{plm|columna}} de la [[tabla periódica]], que se corresponde {{l+|la|grosso modo}} a una [[serie química]]
+;6 {{csem|lingüística}}: {{plm|unidad}} [[filogénetico|filogenética]] que nuclea las [[lengua]]s [[ininteligible]]s entre sí que derivan de un [[ancestro]] [[común]]
+;7: {{plm|colonia}} de [[abeja]]s.
+{{sinónimo|colmena|enjambre}}
+
+=== Locuciones ===
+{{trad-arriba|Locuciones con «familia»}}
+* [[derecho de familia]]
+* [[en familia]]: entre [[íntimo]]s
+* [[familia Miranda]]
+* [[libro de familia]]: documento proporcionado por el Registro Civil, en que se detalla la filiación de un grupo familiar legalmente reconocido
+* [[médico de familia]]: aquel que presta sus servicios a todo un grupo doméstico, por lo general por un período extenso
+* [[padre de familia]]: cabeza de un hogar
+{{trad-abajo}}
+
+=== Refranes ===
+* [[con la familia comer y beber, pero no comprar ni vender]]
+* [[familia que reza unida, permanece unida]]
+* [[de la familia y del sol, entre mas lejos mejor]]
+* [[pasa en las mejores familias]]
+* [[cada familia es un mundo]]
+* [[los favores de familia no se pagan en toda la vida]]
+* [[martes, ni te cases ni te embarques, ni de tu familia te apartes]]
+* [[nada mejor en la vida que una familia unida]]
+* [[casa sin madre, río sin cauce]]
+
+=== Véase también ===
+{{w}}
+
+=== Traducciones ===
+{{trad-arriba}}
+{{t|sh|a1=1|a2=1|t1=porodica|t2=породица|tl2=poroditsa}}
+{{t|sq|a1=1|t1=familja}}
+{{t|de|a1=1|g1=f|t1=Familie}}
+{{t|ar|a1=1|t1=أسرة|tl1=ʿā'ilâ}}
+{{t|hy|a1=1|t1=ընտանիք|tl1=əntanikʿ}}
+{{t|ast|a1=1|t1=familia}}
+{{t|bm|a1=1|t1=somɔgɔw}}
+{{t|bn|a1=1|t1=পরবর}}
+{{t|my|a1=1|t1=မိသားစု|tl1=mi.sa:cu.}}
+{{t|br|a1=1|t1=familh}}
+{{t|bg|a1=1|t1=семейство}}
+{{t|km|a1=1|t1=គ្រួសារ|tl1=kruəsaa}}
+{{t|ca|a1=1|t1=família}}
+{{t|cs|a1=1|t1=rodina}}
+{{t|zh|a1=1|t1=家庭}}
+{{t|da|a1=1|t1=familie}}
+{{t|sco|a1=1|t1=faimlie}}
+{{t|sk|a1=1|t1=rodina}}
+{{t|sl|a1=1|t1=družina}}
+{{t|eo|a1=1|t1=familio}}
+{{t|et|a1=1|t1=perekond}}
+{{t|fr|a1=1|t1=famille}}
+{{t|fur|a1=1|t1=famee}}
+{{t|ka|a1=1|t1=ოჯახი|tl1=oǯaxi}}
+{{t|got|a1=1|g1=f|t1=𐍆𐌰𐌳𐍂𐌴𐌹𐌽𐍃|tl1=fadreins}}
+{{t|ha|a1=1|t1=iyali}}
+{{t|haw|t1=ʻohana}}
+{{t|he|a1=1|t1=משפחה|tl1=mishpajah}}
+{{t|hu|a1=1|t1=család}}
+{{t|io|a1=1|t1=familio}}
+{{t|en|a1=1|t1=family}}
+{{t|ga|a1=1|t1=teaghlach}}
+{{t|is|a1=1|t1=fjölskylda}}
+{{t|it|a1=1|t1=famiglia}}
+{{t|ja|a1=1|t1=家族}}
+{{t|lo|a1=1|t1=ຄອບຄົວ|tl1=khǭp khūa}}
+{{t|lt|a1=1|t1=šeima}}
+{{t|jbo|a1=1|t1=lanzu}}
+{{t|lb|a1=1|t1=Famill}}
+{{t|ms|a1=1|t1=keluarga}}
+{{t|nl|a1=1|t1=familie}}
+{{t|no|a1=1|t1=familie}}
+{{t|nn|a1=1|t1=familie}}
+{{t|fa|a1=1|t1=خویشاوندی}}
+{{t|pl|a1=1|t1=rodzina}}
+{{t|pt|a1=1|t1=família}}
+{{t|quz|a1=1|t1=ayllu}}
+{{t|ro|a1=1|t1=familie}}
+{{t|ru|a1=1|t1=семья|tl1=sem'ya}}
+{{t|smn|a1=1|t1=peerâ}}
+{{t|se|a1=1|t1=bearaš}}
+{{t|so|a1=1|t1=xaas}}
+{{t|sv|a1=1|t1=familj}}
+{{t|tl|a1=1|t1=pamilya}}
+{{t|th|a1=1|t1=ครอบครัว|tl1=krɔ̂ɔp-kruua}}
+{{t|tr|a1=1|t1=aile|t2=kodak|t3=odbaşı}}
+{{t|vi|a1=1|t1=gia đình}}
+{{t|uk|a1=1|t1=сім'я}}
+{{t|vo|a1=1|t1=famül}}
+{{t|sah|a1=1|t1=кэргэн|tl1=kergen}}
+{{t|yi|a1=1|t1=פאמיליע|tl1=familie}}
+{{trad-abajo}}

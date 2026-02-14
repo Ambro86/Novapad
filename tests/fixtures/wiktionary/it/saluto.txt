@@ -1,0 +1,71 @@
+== {{-it-}} ==
+{{-sost-|it}}
+{{Pn |w}} ''m sing'' {{Linkp|saluti}}
+# {{Nodef|it}}
+[[File:A woman greets me in Kitgum.jpg|thumb|un saluto con la mano]]
+[[File:Wojtyla Cup saluto.jpg|thumb|due calciatori si salutano con le nocche delle dita]]
+{{-verb form-|it}}
+{{Pn}}
+
+# prima persona singolare del presente di [[salutare]]
+{{-sill-}}
+
+; sa | lù | to
+
+{{-pron-}}
+{{IPA|/saˈluto/}}
+
+{{-etim-}}
+deverbale dall'italiano [[salutare]] 
+
+{{-quote-}}
+{{Quote
+|Con l'azione del salutare mostriamo di voler bene a qualcuno, o, quanto meno, di non volergli male
+|[[q:Desmond Morris|Desmond Morris]]}}
+
+{{-sin-}}
+* [[accoglienza]], [[benvenuto]], [[buongiorno]], [[buonasera]], [[addio]], [[arrivederci]], stretta di mano, cenno del capo, gesto della mano, [[inchino]], [[riverenza]], [[congedo]], [[commiato]], [[baciamano]], [[cerimonia]], [[scappellata]]
+* [[acclamazione]]
+* {{Fig}} [[visita]], [[scappata]], [[salto]]
+
+  
+
+{{-der-}}
+* [[salutare]]
+
+{{-rel-}}
+* [[omaggio]]
+
+{{-trad-}}
+{{Trad1|atto o risultato del salutare}}
+:*{{en}}: [[greeting]]
+{{Trad2}}
+
+{{Trad1|manifesatazione di rispetto}}
+:* {{en}}:[[salute]]
+{{Trad2}}
+
+{{Trad1|chiusura di un lettera}}
+:* {{en}}: closing salutation
+{{Trad2}}
+
+{{Trad1|discorso di omaggio}}
+:* {{en}}: [[address]], [[pledge]], [[praise]], [[toast]]
+{{Trad2}}
+
+{{Trad1|prima persona singolare dell'indicativo presente di salutare}}
+:* {{en}}
+{{Trad2}}
+ 
+
+{{-ref-}}
+* {{Fonte|trec}}
+* {{Fonte|dizit}}
+* {{Fonte|hoep}}
+* {{Fonte|sape}}
+* {{Fonte|gar}}
+* {{Fonte|sabco}}
+*{{Fonte|sin-co}}
+*Devoto/Oli, ''Il dizionario della lingua italiana'', edizione cartacea 2000-2001, Le Monnier, pagina 1826 
+* {{Fonte|writen}}
+* {{Fonte|itfd}}

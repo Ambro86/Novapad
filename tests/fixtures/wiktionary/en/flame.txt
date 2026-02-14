@@ -1,0 +1,427 @@
+==English==
+{{wp}}
+
+===Pronunciation===
+* {{enPR|flām}}, {{IPA|en|/fleɪm/}}
+* {{audio|en|en-us-flame.ogg|a=US}}
+* {{rhymes|en|eɪm|s=1}}
+
+===Etymology 1===
+From {{inh|en|enm|flawme}}, blend of {{der|en|fro|flame}} and {{m|fro|flambe}}, {{m|fro|flamble}}, the first from {{der|en|la|flamma}}, the second from {{der|en|la|flammula|}}, diminutive of {{m|la|flamma}}, both from pre-Latin *''fladma''; {{der|en|itc-pro|*flagmā}}, ultimately from {{der|en|ine-pro|*bʰel-||to shimmer, gleam, shine}}. Displaced native {{ncog|ang|līeġ}}.
+
+====Noun====
+[[Image:Flame.JPG|right|thumb|100px]]
+{{en-noun|~}}
+
+# {{senseid|en|Q235544}}The visible part of [[fire]]; a [[stream]] of [[burning]] [[vapor|vapour]] or [[gas]], emitting [[light]] and [[heat]].
+#* {{RQ:Chambers Younger Set|III|passage=Long after his cigar burnt bitter, he sat with eyes fixed on the blaze. When the '''flames''' at last began to flicker and subside, his lids fluttered, then drooped; but he had lost all reckoning of time when he opened them again to find Miss Erroll in furs and ball-gown kneeling on the hearth{{nb...}}.}}
+#* {{quote-journal|en|date=2012-08-21|title=Paralympic flames light up countdown to biggest Games in history|author=Alexandra Topping|journal=w:The Guardian|url=https://www.theguardian.com/sport/2012/aug/21/paralympic-flames-countdown-biggest-games
+|passage=The '''flames''' will then be joined together next week at Stoke Mandeville in Buckinghamshire, the home of the Paralympics, and the united '''flame''' will make its final journey to London for the opening of the 14th Paralympic Games next Wednesday.}}
+#* {{quote-journal|en|year=2013|month=July-August|author=w:Henry Petroski
+|url=http://www.americanscientist.org/issues/pub/2013/4/geothermal-energy|title=Geothermal Energy
+|volume=101|issue=4|magazine=w:American Scientist
+|passage=Energy has seldom been found where we need it when we want it. Ancient nomads, wishing to ward off the evening chill and enjoy a meal around a campfire, had to collect wood and then spend time and effort coaxing the heat of friction out from between sticks to kindle a '''flame'''.}}
+# A [[romantic]] [[partner]] or [[lover]] in a usually short-lived but [[passionate]] [[affair]].
+#: {{syn|en|Thesaurus:lover}}
+#* {{RQ:Thackeray Barry Lyndon|chapter=XIX|passage=I could copy out yards of rhapsody to Lord George Poynings, her old '''flame''', in which she addressed him by the most affectionate names.}}
+# {{lb|en|Internet|somewhat|dated}} An aggressively insulting criticism or remark.
+#* {{quote-book|en|author=Paul McFedries|title=The Complete Idiot's Guide to USENET Newsgroups|year=1995|publisher=Alpha Books|page=39|pageurl=https://books.google.com/books?id=ulAPAQAAMAAJ&q=%22flame%22+newgroup&dq=%22flame%22+newgroup&hl=&cd=5&source=gbs_api|isbn=978-1-56761-592-0|passage='''Flames''' are, unfortunately, a fact of USENET life. It's a rare USENET regular who hasn't been shaken to the foundations with anger at something some jerk has posted.}}
+# A brilliant reddish orange-gold fiery colour. {{color panel|E82D14}}
+#* {{quote-book|1=en|year=1897|author=w:Bram Stoker|title=Dracula|year_published=1993|page=73|passage=[M]arked by myriad clouds of every sunset-colour - '''flame''', purple, pink, green, violet, and all the tints of gold.}}
+# {{lb|en|music|chiefly|lutherie}} The contrasting light and dark figure seen in wood used for stringed instrument making; the [[curl]].
+#: {{ux|en|The cello has a two-piece back with a beautiful narrow '''flame'''.}}
+# Burning [[zeal]], [[passion]], [[imagination]], [[excitement]], or [[anger]].
+#* {{RQ:Milton Paradise Lost|book=5|passage=in a '''flame''' of zeal severe|year=1873}}
+#* {{RQ:Pope Works|title=Eloisa to Abelard|passage=where '''flames''' refin'd in breasts seraphic glow}}
+#* {{quote-text|en|year=1834|author=w:Samuel Taylor Coleridge|title=Julia
+|passage=Till charming Florio, born to conquer, came <br>And touch'd the fair one with an equal '''flame'''}}
+# {{lb|en|obsolete|botany}} A [[variety]] of [[carnation]].
+#* {{quote-book|en|year=1718|author={{w|Richard Bradley (botanist)|Richard Bradley}}|chapter=Part II. Chapter II: ''Of'' Perannual Flowers, ''the talleſt Blowers''. Sect IX. ''Of the'' Carnation ''or'' July-Flower {{...}}|title=New Improvements of Planting and Gardening, Both Philoſophical and Practical {{...}}|edition=2nd|location=London|publisher=W. Mears|page={{gbooks|BegAp4WSmtEC|RA1-PA82|altpg=82|Picketees}}|passage=The Gardeners divide it into Five Claſſes, which they diſtinguiſh by the Name of ''Picketees'', ''Painted Ladies'', ''Beazarts'', ''Flakes'', and '''''Flames''''': {{...}} the '''''Flames''''' have a red Ground always ſtrip’d with black or very dark Colours.}}
+#* {{quote-book|en|year=1812|author=Peter Forbes|chapter=On going to see a nobleman’s gardener in the neighbourhood|title=Poems, Chiefly in the Scottish Dialect|location=Edinburgh|publisher=R. Menzies|page={{gbooks|uLVEisLhxGgC|89|flames}}|passage=Sic flow’rs o’ sorts ane seldom sees, / Flecks, '''flames''', bussards an’ picketees, / Wi’ strong carnations, like young trees, / To face the entry; {{...}}}}
+
+=====Derived terms=====
+{{col4|en|title=Terms derived from the noun ''flame''|add fuel to the flame
+|aflame
+|antiflame|Red Flames
+|burst into flame|flame lily
+|candleflame
+|cool flame
+|counterflame
+|dragonflame
+|fan the flame
+|flamage
+|flameable
+|flameage
+|flame-arc lamp
+|flame aura|keeper of the flame
+|flameback
+|flame bait,flamebait
+|flame birch
+|flame carbon
+|flame cell
+|flamecrest
+|flamefest
+|flameflower
+|flameful
+|flame graph
+|flame gun
+|flamekeeper
+|flame lamp
+|flameless
+|flamelet
+|flamelight|flame trench
+|flamelike
+|flamemail
+|flame nettle
+|flame of the forest
+|flame-of-the-woods
+|flame out
+|flame-out,flameout
+|flame photometry
+|flameproof
+|flame-retardant
+|flame retardant
+|flame spread
+|flamestrike
+|flame structure
+|flame test
+|flame thrower,flame-thrower,flamethrower
+|flamethrowing
+|flame tree
+|flame up
+|flame violet
+|flame war,flamewar
+|flamework
+|flameworker
+|flameworthy
+|flammation
+|flamy
+|go down in flames
+|go up in flames
+|hearthflame
+|inflame
+|like a moth to a flame
+|like a moth to flame
+|like a moth to the flame
+|midflame
+|old flame
+|Olympic flame
+|outflame
+|oxidizing flame
+|pillar of flame
+|pilot flame
+|postflame
+|preflame
+|reducing flame
+|reflame
+|singing flame
+|Taiwan flamecrest
+|twin flame
+|upflame
+}}
+
+=====Related terms=====
+{{col|en|title=Terms related to the noun ''flame''
+|flamboyant<!--from French "flamboyant", meaning "flaming"-->
+|flamingo
+|flammable<!--from Latin-->
+|oriflamme<!--from Old French-->
+|phlegm
+|phlogiston
+|phlogopite
+|phlox
+}}
+<!--not etymologically related
+
+=====Related terms=====
+{{top3}}
+* {{l|en|blaze}}
+* {{l|en|chamiso}}
+* {{l|en|coleus}}
+* {{l|en|combustion}}
+* {{l|en|fire}}
+{{mid3}}
+* {{l|en|flare}}
+* {{l|en|incendiary}}
+{{mid3}}
+{{bottom}}
+-->
+
+=====Translations=====
+{{trans-top|visible part of fire}}
+* Afrikaans: {{t+|af|vlam}}
+* Albanian: {{t+|sq|flakë|f}}
+* Arabic: {{t|ar|لَهَب|m}}, {{t|ar|شُعْلَة|f}}
+* Aragonese: {{t|an|flama}}
+* Armenian: {{t+|hy|բոց}}, {{t+|hy|հուր}}
+* Aromanian: {{t|rup|fleamã|f}}, {{t|rup|pirã|f}}
+* Asturian: {{t+|ast|llama|f}}
+* Azerbaijani: {{t+|az|alov}}
+* Bashkir: {{t|ba|ялҡын}}
+* Basque: {{t+|eu|kar}}, {{t+|eu|gar}}, {{t+|eu|sugar}}, {{t+|eu|lama}}
+* Belarusian: {{t|be|по́лымя|n}}
+* Bengali: {{t+|bn|শিখা}}, {{t+|bn|জ্বালা}}
+* Bhojpuri: {{t|bho|लौ}}
+* Breton: {{t+|br|flamm|m}}
+* Bulgarian: {{t+|bg|пла́мък|m}}
+* Burmese: {{t+|my|တန်ဆောင်}}
+* Catalan: {{t+|ca|flama|f}}
+* Chechen: {{t|ce|алу}}
+* Chichewa: {{t|ny|lawi}}
+* Chinese:
+*: Dungan: {{t|dng|хуәщир}}
+*: Mandarin: {{t+|cmn|火焰|tr=huǒyàn}}
+* Czech: {{t+|cs|plamen|m}}
+* Danish: {{t+|da|flamme|c}}, {{t|da|lue|c}}
+* Dutch: {{t+|nl|vlam|f}}, {{t+|nl|laai|f}}
+* Egyptian: {{t-egy|tkꜣw|h=t:kA-A-w-Q7}}
+* Esperanto: {{t+|eo|flamo}}
+* Estonian: {{t+|et|leek}}
+* Extremaduran: {{t|ext|flama|f}}
+* Finnish: {{t+|fi|liekki}}
+* French: {{t+|fr|flamme|f}}
+*: Old French: {{t|fro|flamme|f}}
+*: Old French: {{t|fro|flamme|f}}
+* Frisian:
+*: West Frisian: {{t|fy|flam}}
+* Friulian: {{t|fur|flame|f}}
+* Galician: {{t+|gl|chama|f}}
+* Georgian: {{t+|ka|ალი}}
+* German: {{t+|de|Flamme|f}}, {{q|archaic, poetic}} {{t+|de|Lohe|f}}
+* Greek: {{t+|el|φλόγα|f}}
+*: Ancient Greek: {{t|grc|φλόξ|f}}
+* Paraguayan Guarani: {{t-check|gug|[[tata]][[rendy]]}}
+* Haitian Creole: {{t|ht|flanm}}
+* Hebrew: {{t+|he|לֶהָבָה|tr=lehavá|f}}, {{t+|he|אֵשׁ|f|tr=esh}}
+* Higaonon: {{t|mba|hapoy}}
+* Hindi: {{t+|hi|लौ|f}}, {{t+|hi|ज्वाला|f}}, {{t+|hi|शोला|m}}, {{t+|hi|लपट|f}}
+* Hungarian: {{t+|hu|láng}}
+* Icelandic: {{t+|is|logi|m}}
+* Indonesian: {{t+|id|nyala}}
+* Ingush: {{t|inh|ала}}
+* Interlingua: {{t|ia|flamma}}
+* Irish: {{t+|ga|lasair|f}}
+* Italian: {{t+|it|fiamma|f}}
+* Japanese: {{t+|ja|炎|tr=ほのお, honō}}, {{t+|ja|火炎|tr=かえん, kaen}}
+*: Old Japanese: {{t|ojp|炎|tr=ほのほ, pono<sub>2</sub>po}}
+* Javanese: {{t|jv|urup}}
+*: Old Javanese: {{t|kaw|urub}}
+* Kazakh: {{t+|kk|жалын}}
+* Khmer: {{t+|km|សិខិន}}, {{t+|km|សុស្ម័ន}}
+* Korean: {{t+|ko|불꽃}}, {{t+|ko|불길}}
+* Kyrgyz: {{t+|ky|жалын}}
+* Lao: {{t|lo|ຊະວາລະ}}, {{t|lo|ແປວໄຟ}}
+* Latgalian: {{t|ltg|līsme}}
+* Latin: {{t+|la|flamma|f}}
+* Latvian: {{t+|lv|liesma|f}}, {{t+|lv|guns|f}} {{qualifier|poetism}}
+* Lithuanian: {{t+|lt|liepsna|f}}
+* Macedonian: {{t|mk|пламен|m}}
+* Malagasy: {{t+|mg|lelàfo}}
+* Malay: {{t+|ms|api}}, {{t+|ms|nyala}}
+* Maltese: {{t|mt|fjamma|f}}
+* Māori: {{t|mi|mura}}
+* Mongolian:
+*: Cyrillic: {{t+|mn|дөл}}
+*: Mongolian script: {{t|mn|ᠳᠥᠯᠦ}}
+* Nahuatl: {{t|nah|cuezaltol}}
+* Navajo: {{t|nv|kǫʼ}}
+* Nogai: {{t|nog|ялын}}
+* Norwegian:
+*: Bokmål: {{t+|nb|flamme}}, {{t+|nb|lue}}
+*: Nynorsk: {{t|nn|flamme}}, {{t|nn|lue}}
+* Occitan: {{t+|oc|flamba|f}}
+* Old Church Slavonic:
+*: Cyrillic: {{t|cu|пламꙑ|m}}
+* Old English: {{t|ang|līeġ|m}}
+* Persian: {{t+|fa|شعله|tr=šo'le}}, {{t+|fa|علو|tr=alow}}
+* Plautdietsch: {{t|pdt|Flaum|f}}
+* Polish: {{t+|pl|płomień|m}}
+* Portuguese: {{t+|pt|chama|f}}, {{t+|pt|flama|f}}
+* Romanian: {{t+|ro|flacără|f}}, {{t+|ro|pară|f}}, {{t+|ro|văpaie|f}}
+* Russian: {{t+|ru|пла́мя|n}}, {{qualifier|dated, poetic}} {{t+|ru|по́лы́мя|n}}, {{qualifier|poetic}} {{t+|ru|пла́мень|m}}
+* Sardinian: {{t|sc|fiama|f}}, {{t|sc|fiamma|f}}
+* Scottish Gaelic: {{t|gd|lasair|f}}
+* Serbo-Croatian:
+*: Cyrillic: {{t|sh|пла̏ме̄н|m}}
+*: Latin: {{t+|sh|plȁmēn|m}}
+* Sicilian: {{t|scn|çamma|f}}, {{qualifier|italianate}} {{t+|scn|ciamma|f}}
+* Sinhalese: {{t-needed|si}}
+* Slovak: {{t|sk|plameň|m}}
+* Slovene: {{t+|sl|plamen|m}}
+* Somali: {{t+|so|olol}}
+* Spanish: {{t+|es|flama|f}}, {{t+|es|llama|f}}, {{t|es|fogarada|f}} {{qualifier|strong}}, {{t+|es|llamarada|f}} {{qualifier|short-lived}}, {{t+|es|fogonazo|m}} {{qualifier|instant}}, {{t|es|chamarada|f}} {{qualifier|short-lived}}
+* Swahili: {{t|sw|mwale}}
+* Swedish: {{t+|sv|flamma|c}}, {{t+|sv|låga|c}}
+* Tabasaran: {{t|tab|ялав}}
+* Tajik: {{t|tg|шӯъла}}, {{t|tg|аланга}}, {{t|tg|алов}}
+* Tamil: {{t+|ta|பிழம்பு}}
+* Tarifit: {{t|rif|timessi|f}}, {{t|rif|aḥeddiq|m}}
+* Telugu: {{t+|te|మంట}}
+* Tetum: {{t|tet|lakan}}
+* Thai: {{t|th|เปลวไฟ}}, {{t|th|อัคนิคณะ}}
+* Tocharian B: {{t|txb|sleme}}
+* Tok Pisin: {{t+|tpi|paia}}
+* Tonga (Zambia): {{t|toi|ibbibi}}
+* Tongan: {{t|to|ulo}}
+* Tupinambá: {{t|tpn|ataendy}} (t-)
+* Turkish: {{t+|tr|alev}}, {{t+|tr|yalın}}
+* Turkmen: {{t|tk|ýalyn}}
+* Ukrainian: {{t+|uk|по́лум'я|n}}
+* Urdu: {{t|ur|شعلہ|m|tr=śolā}}, {{t|ur|لو|f|tr=lau}}
+* Uzbek: {{t+|uz|olov}}, {{t+|uz|alanga}}
+* Vietnamese: {{t|vi|ngọn lửa}}
+* Walloon: {{t+|wa|blame|f}}, {{t+|wa|flame|f}}
+* Welsh: {{t+|cy|fflam|f}}, {{t|cy|ffagl|f}}
+* Yámana: {{t|yag|šola}}
+* Yiddish: {{t|yi|פֿלאַם|m}}, {{t|yi|פֿײַערצונג|f}}
+{{trans-bottom}}
+
+{{trans-top|romantic partner}}
+* Bulgarian: {{t+|bg|страст|f}}
+* Chinese:
+*: Mandarin: {{t+|cmn|戀人|tr=liànrén}}
+* Czech: {{t+|cs|milenec|m}}, {{t+|cs|milenka|f}}
+* Danish: {{t+|da|flamme|c}}
+* Finnish: {{t+|fi|heila}}
+* German: {{t+|de|Flamme|f}}
+* Greek: {{t+|el|έρωτας|m}}, {{t+|el|αίσθημα|n}}
+* Italian: {{t+|it|fiamma|f}}
+* Japanese: {{t+|ja|恋人|tr=こいびと, koibito}}, {{t+|ja|彼|tr=かれ, kare}} {{q|male}}, {{t+|ja|彼女|tr=かのじょ, kanojo}} {{q|female}}
+* Korean: {{t+|ko|연인(戀人)}}, {{t|ko|련인(戀人)}} {{qualifier|North Korea}}, {{t+|ko|애인(愛人)}}
+* Polish: {{t+|pl|kochanka|f}}, {{t+|pl|kochanek|m}}
+* Romanian: {{t+|ro|iubit|m}}, {{t+|ro|iubită|f}}
+* Russian: {{t+|ru|страсть|f}}, {{t|ru|[[предме́т]] [[любовь|любви́]]|m}}
+* Swedish: {{t+|sv|flamma|c}}
+{{trans-bottom}}
+
+{{trans-top|criticism}}
+* Bulgarian: {{t-needed|bg}}
+* Chinese:
+*: Mandarin: {{t+|cmn|火藥味|tr=huǒyàowèi}}
+* Estonian: {{t+|et|leim}}
+* Finnish: {{t+|fi|trollaus}}
+* French: {{t+|fr|polémique|f}}
+* Italian: {{t+|it|flame|m}}
+* Japanese: {{t+|ja|フレーム|tr=furēmu}}
+* Polish: {{t|pl|krytycyzm|m}}
+* Russian: {{t+|ru|флейм|m}}
+{{trans-bottom}}
+
+{{trans-top|colour}}
+* Bulgarian: {{t+|bg|огненочервен|m}}
+* Chinese:
+*: Mandarin: {{t|cmn|鮮紅色|tr=xiānhóngsè}}
+* Finnish: {{t+|fi|tulipunainen}}
+* Japanese: {{t+|ja|炎色|tr=えんしょく, enshoku}}
+* Polish: {{t|pl|[[ognista]] [[czerwień]]}}
+* Swedish: {{t+|sv|brandgul}}
+* Turkish: {{t|tr|ateş kırmızısı}}
+{{trans-bottom}}
+
+{{trans-top|contrasting light and dark figure seen in wood}}
+* Bulgarian: {{t-needed|bg}}
+* Chinese:
+*: Mandarin: {{t-needed|cmn}}
+* Finnish: {{t|fi|loimukuvio}}
+{{trans-bottom}}
+
+{{trans-top|burning sentiment}}
+* Bulgarian: {{t+|bg|пламък|m}}, {{t+|bg|плам|m}} {{q|poetic}}
+* Chinese:
+*: Mandarin: {{t+|cmn|激情|tr=jīqíng}}
+* Finnish: {{t+|fi|polte}}
+{{trans-bottom}}
+
+====Adjective====
+{{en-adj|-}}
+
+# Of a [[brilliant]] [[reddish]] [[orange]]-[[gold]] colour, like that of a flame.
+
+=====Translations=====
+{{trans-top|colour}}
+* Bulgarian: {{t+|bg|огненочервен}}
+* Finnish: {{t+|fi|tulipunainen}}
+* Hungarian: {{t+|hu|lángvörös}}
+* Polish: {{t+|pl|ognistoczerwony|m}}
+{{trans-bottom}}
+
+====See also====
+{{list:reds/en}}
+
+===Etymology 2===
+From {{inh|en|enm|flawmen}}, from {{der|en|fro|flamber}}, {{m|fro|flammer}}.
+
+====Verb====
+{{en-verb}}
+
+# To produce flames; to burn with a flame or blaze.
+#* {{RQ:Shakespeare Coriolanus|IV|iii|passage=The main blaze of it is past, but a small thing would make it '''flame''' again.}}
+# To burst forth like flame; to break out in violence of passion; to be kindled with zeal or ardour.
+#* {{RQ:Macaulay History of England|chapter=2|passage=He '''flamed''' with indignation.}}
+# {{lb|en|Internet|ambitransitive}} To [[post]] a [[destructively]] [[critical]] or [[abusive]] [[message]] (to somebody).
+#: {{syn|en|abuse|vitriol|vituperate|Thesaurus:revile}}
+#: {{ux|en|I '''flamed''' him for spamming in my favourite newsgroup.}}
+#* {{quote-newsgroup|en|date=1983-10-20|author=Joe Ziegler|newsgroup=net.motss|url=https://groups.google.com/g/net.motss/c/2hezatAfgs0/m/0VvdQX4E0j8J|text= I wish you had the nerve to put your own name on that article, rather than logging into a public account to do it. I would have prefered{{sic}} to respond to you personally, rather than burden the net with my '''flaming''', particularly since opinions like yours are best left ignored. But I feel I must respond to this one.}}
+#* {{quote-newsgroup|en|date=1989-06-29|author=Neil McAvoy [Wing Attack Plan R]|newsgroup=rec.music.gdead|url=https://groups.google.com/g/rec.music.gdead/c/BszWjk8mZkk/m/BnG7nCxgVCoJ|text= This was one of the highest points of the show for me. Playin' followed, with a nice jam afterwards. After that, Jerry wandered into Crazy Fingers. (I had been hoping for Terrapin...oh well. Crazy Fingers seems to highlight Jerry's ability to come in late and tentative on lyrics. I'm sure I'll get '''flamed''', since lots of folks seem to worship CF.)}}
+#* {{quote-text|en|year=2001|author=Jonathan Franzen|authorlink=Jonathan Franzen|title=The Corrections
+|passage=If he got '''flamed''' for his lies or his ignorance, he simply moved to another chat room.}}
+#* {{quote-text|en|year=2019|author=Steven McCornack; Kelly Morrison|title=Reflect & Relate|edition=5th
+|passage=Because online communication makes it easy to '''flame''', many of us impetuously fire off messages that we later regret.}}
+
+=====Derived terms=====
+* {{l|en|flamer}}
+* {{l|en|flaming}}
+
+=====Related terms=====
+* {{l|en|flambé}}<!--from French-->
+
+=====Translations=====
+{{trans-top|to produce flames}}
+* Bulgarian: {{t+|bg|пламвам}}, {{t+|bg|пламтя}}
+* Catalan: {{t+|ca|flamejar}}
+* Danish: {{t+|da|flamme}}
+* Dutch: {{t+|nl|vlammen}}, {{t+|nl|laaien}}
+* Finnish: {{t|fi|leimuta}}, {{t+|fi|loimuta}}, {{t|fi|[[olla]] [[liekeissä]]}}
+* Greek: {{t+|el|φλέγομαι}}
+* Hindi: {{t+|hi|जलाना}}
+* Ingrian: {{t|izh|lekkaa}}
+* Interlingua: {{t|ia|flammar}}
+* Italian: {{t|it|fiammeggiare}}, {{t+|it|infiammare}}
+* Japanese: {{t|ja|[[炎]]を[[出す]]|tr=ほのおをだす, honō o dasu}}, {{t+|ja|燃える|tr=[[もえる]], moeru}}, {{t|ja|燃え上がる|tr=もえあがる, moeagaru}}
+* Kurdish:
+*: Central Kurdish: {{t|ckb|گِڕگِرتِن}}
+* Latvian: {{t+|lv|liesmot}}, {{t+|lv|liesmot}}
+* Polish: {{t+|pl|rozpalić|impf}}, {{t+|pl|rozpalać|pf}}, {{t|pl|rozniecić|impf}}, {{t+|pl|rozniecać|pf}}
+* Portuguese: {{t+|pt|inflamar}}
+* Romanian: {{t+|ro|înflăcăra}}
+* Russian: {{t+|ru|пыла́ть}}
+* Spanish: {{t+|es|flamear}}
+* Swedish: {{t+|sv|flamma}}, {{t|sv|flamma upp}}
+{{trans-bottom}}
+
+{{trans-top|to burst forth like flame}}
+* Bulgarian: {{t+|bg|пламвам|impf}}, {{t+|bg|пламна|pf}}, {{t+|bg|пламтя}}, {{t|bg|паля се}}
+* Finnish: {{t+|fi|leimahtaa}}
+{{trans-bottom}}
+
+{{trans-top|to post a critical or abusive message on the Internet}}
+* Bulgarian: {{t-needed|bg}}
+* Danish: {{t|da|blusse}}
+* Finnish: {{t+|fi|herjata}}, {{t+|fi|trollata}}
+* German: {{t+|de|anmachen}}
+* Italian: {{t|it|flammare}}
+* Japanese: {{t+|ja|叩く|tr=たたく, tataku}}
+* Russian: {{t|ru|фле́ймить}}
+* Turkish: {{t|tr|flame atmak}}, {{t|tr|flamelemek}}, {{t|tr|flame yapmak}}
+{{trans-bottom}}
+
+{{checktrans-top}}
+* Esperanto: {{t-check|eo|flami}}
+{{trans-bottom}}
+
+===Anagrams===
+* {{anagrams|en|a=aeflm|femal|fleam}}
+
+{{C|en|Fire|Reds}}
+{{cln|en|terms derived from the Proto-Indo-European root *bʰel- (shiny)}}
+{{C|en|Carnation family plants}}

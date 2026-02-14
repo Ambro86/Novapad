@@ -1,0 +1,23 @@
+== {{lengua|es}} ==
+{{pron-graf|fone=saˈlu.ðo}}
+
+=== Etimología ===
+{{etimología}}
+
+=== {{sustantivo masculino|es}} ===
+{{es.sust}}
+
+;1: {{sustantivo de verbo|saludar}}
+;2: Fórmula social de comienzo de una conversación.
+;3: {{plm|salva}}<ref name="novísimo">{{Labernia1866}} Pág. 775</ref>
+
+=== Locuciones ===
+* [[saludo a la bandera]]
+
+=== Véase también ===
+{{w}}
+
+=== Traducciones ===
+{{trad-arriba}}
+{{t|de|a1=1,2|t1=Gruß|g1=m}}
+{{trad-abajo}}

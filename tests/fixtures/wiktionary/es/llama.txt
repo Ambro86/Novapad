@@ -1,0 +1,69 @@
+== {{lengua|es}} ==
+{{pron-graf|1audio1=LL-Q1321 (spa)-MiguelAlanCS-llama.wav|1aunota1=Perú}}
+[[Image:Flame.JPG|thumb|140px|[1] ''Llama'' de una vela]]
+
+=== Etimología 1 ===
+{{etimología|la|flamma}} ("[[llama]]", "[[fuego]]"),<ref name=drae/> a su vez  {{etim|grc|φλέγμα}} ("[[llama]]", "[[inflamación]]"). De allí también {{l+|es|flema}}.
+[[File:A Quechua girl and her Llama.jpg|thumb|[1] ''Llama'' y su pastora]]
+
+==== {{sustantivo femenino|es}} ====
+{{es.sust}}
+;1: {{plm|luz}} emitida por los [[electrón|electrones]] excitados con la [[energía]] liberada en los procesos de [[combustión]] dentro de [[atmósfera]]s ricas en [[oxígeno]].
+{{sinónimo|flama}}.
+;2: {{plm|intensidad}} de una [[emoción]], [[pasión]] o [[deseo]].<ref name=drae>{{DRAE}}</ref>
+{{uso|figurado}}.
+
+==== Información adicional ====
+{{cognados|flama}}
+{{derivad|llamarada|llamarón|llamear|llameante}}.
+
+==== Véase también ====
+{{w|Llama (química)|llama}}
+
+==== Traducciones ====
+{{trad-arriba}}
+{{t|de|a1=1|t1=Flamme|g1=f}}
+{{t|fr|a1=1|t1=flamme}}
+{{t|gl|a1=1|t1=chama}}
+{{t|en|a1=1-2|t1=flame}}
+{{t|nl|a1=1|t1=vlam}}
+{{t|pl|a1=1|t1=płomień|g1=m}}
+{{t|pt|a1=1|t1=chama}}
+{{trad-abajo}}
+
+=== Etimología 2 ===
+{{etimología|qu|llama}}.
+
+==== {{sustantivo femenino|es}} ====
+{{es.sust}}
+;1 {{csem|mamíferos|leng=es}}: (''Lama glama'') {{ucf|mamífero}} [[artiodáctilo]] doméstico de la familia Camelidae, abundante en la Puna o Altiplano de [[Los Andes]] de [[Argentina]], [[Bolivia]], [[Chile]], [[Ecuador]] y [[Perú]]. Fue creado por los pueblos andinos nativos mediante selección artificial a partir de [[guanaco]]s salvajes que fueron domesticados. Fue utilizado como animal para sacrificios, se obtenía carne y lana de él, y era aprovechado como animal de carga.
+;2: Una persona de ascendencia indígena.
+:{{ámbito|Perú}}
+:{{uso|coloquial|despectivo}}
+{{sinónimo|cholo}}
+
+==== Véase también ====
+{{w|Lama glama|llama}}
+
+==== Traducciones ====
+{{trad-arriba}}
+{{t|de|a1=1|t1=Lama|g1=f}}
+{{t|ay|a1=1|t1=qawra|a2=1|t2=qarwa}}
+{{t|sai-all|a1=1|t1=yalap|a2=1|t2=yelap}}
+{{t|ast|a1=1|t1=llama}}
+{{t|cap|a1=1|t1=hala|a2=1|t2=hwala}}
+{{t|fr|a1=1|t1=lama}}
+{{t|gl|a1=1|t1=llama}}
+{{t|en|a1=1|t1=llama}}
+{{t|kuz|a1=1|t1=sil-la}}
+{{t|arn|a1=1|t1=weke}}
+{{t|nci|t1=pelonichcatl}}
+{{t|nl|a1=1|t1=lama}}
+{{t|quh|a1=1|t1=llama}}
+{{t|quz|a1=1|t1=llama}}
+{{trad-abajo}}
+
+=== Forma flexiva ===
+==== Forma verbal ====
+;1: {{forma verbo|llamar|p=3s|t=presente|m=indicativo}}.
+;2: {{forma verbo|llamar|p=2s|t=imperativo|afirmativo=sí}}.

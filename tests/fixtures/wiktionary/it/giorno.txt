@@ -1,0 +1,162 @@
+== {{-it-}} ==
+{{-sost-|it}}
+{{Pn|w}} ''m sing''  {{Linkp|giorni}}
+# {{Term|astronomia|it}} periodo compreso tra l'[[alba]] e il [[tramonto]]
+# {{Term|astronomia|it}}  il periodo di tempo che occorre alla [[Terra]] per effettuare una [[rotazione]] attorno al proprio asse
+# {{Term|astronomia|it}}  il periodo di tempo che un qualsiasi corpo celeste impiega per effettuare una [[rotazione]] attorno al suo asse ([[tempo]] variabile da astro ad astro)
+# [[periodo]] di tempo di 24 [[ore]]
+# {{Pn}} '''civile''':[[periodo]] di tempo che va dalla mezzanotte del giorno precedente alla mezzanotte del giorno successivo
+# [[periodo]] del giorno illuminato dal [[sole]]
+
+# {{Fig}} [[distanza]] di viaggio percorribile nelle 24 ore
+#* '' essere a 3 '''giorni''' di viaggio dalla destinazione'' (la distanza può variare a seconda del tipo di viaggio o del mezzo modo di trasporto usato: giorni di cammino, di marcia, di navigazione ecc...)
+# [[periodo]] di 24 ore dedicato alla [[ricorrenza]] o alla [[commemorazione]] di un [[evento]] o [[festività]]
+#* ''Il '''giorno''' della memoria''
+# {{Term|gergale|it}} abbreviazione del saluto [[buongiorno]]
+# {{Term|letterario|it}} la [[luce]] del sole o il sole stesso
+#* '' Da tutte le parti saettava il '''giorno''''' Dante Purg.II, 55,56
+# {{Fig}} [[chiaro]], [[palese]], [[evidente]].
+#* '' (domanda) Ti è chiaro il concetto? (risposta) come il '''giorno'''
+# {{Term|gergale|it}} [[urgente]] o che richiede poco  tempo
+#* '' cerchiamo di finire questo lavoro "di '''giorno'''"'' (cioè in fretta, entro  breve tempo)
+
+{{-sill-}}
+; giór | no
+
+{{-pron-}}
+{{IPA|/ˈd͡ʒorno/}}
+{{Audio|it-giorno.ogg}}
+{{Audio|it-giorno.oga}}
+{{Audio|it-un giorno.ogg}}
+
+{{-etim-}}
+dal [[latino]] tardo ''diŭrnum (tempus)'', che deriva  da ''[[diurnus]]'' cioè "[[«giornaliero»]]"
+
+{{-quote-}}
+{{Quote
+|E Dio non farà forse giustizia ai suoi eletti, che gridano '''giorno''' e notte verso di lui? Li farà aspettare forse a lungo ?}}
+[[w:Vangelo secondo Luca|Vangelo secondo Luca]] {{Passo biblico|Lc|18,7}}
+
+{{Quote
+|Mentre stiamo parlando il tempo invidioso sarà già fuggito. Cogli il giorno presente confidando il meno possibile nel futuro
+|[[q:Quinto Orazio Flacco|Quinto Orazio Flacco]]}}
+
+{{Quote
+|il giorno in cui i contadini saranno educati nel vero, i tiranni e gli schiavi saranno impossibili sulla terra.„
+|[[q:Giuseppe Garibaldi|Giuseppe Garibaldi]]}}
+
+{{-sin-}}
+* [[ventiquattrore]]
+* [[giornata]], [[dì]]
+* [[festa]], [[ricorrenza]], [[celebrazione]], [[anniversario]], [[festività]], [[solennità]]
+* [[periodo]], [[tempo]], [[epoca]]
+
+{{-ant-}}
+* [[notte]]
+
+{{-der-}}
+* [[aggiornare]], [[aggiornato]],  [[giornaliero]], [[giornale]], [[giornata]],  [[soggiornare]], [[perdigiorno]]
+
+{{-rel-}}
+* [[oggi]], [[alba]], [[mattina]], [[pomeriggio]], [[tramonto]], [[crepuscolo]], [[sera]]
+
+{{-prov-}}
+*''in pieno giorno''
+*''pieno di sé''
+*''in pieno'' 
+*''giorno supremo''
+*''a giorno''
+*''giorno e notte'':  senza sosta
+*''al giorno''
+*''da un giorno all'altro''
+*''di giorno in giorno''
+*''del giorno''
+*''per giorno''
+*''un bel giorno, un giorno o l'altro''
+* ''A far la barba  si sta bene un {{Pn}}, a prender moglie si sta bene un mese, ad ammazzare il maiale si sta bene un anno''
+* ''Roma non fu fatta in un {{Pn}}''
+* ''Ad ogni giorno la sua [[pena]]''
+* ''Dal [[mattino]] si conosce il giorno/Il buon giorno si vede dal [[mattino]]''
+* ''Di giorno tingi e di [[notte]] fingi''
+* ''Il giorno che si fa [[debito]] non si va in [[prigione]]''
+* ''Si disfa di giorno quel che è [[fatto]] di [[notte]]''
+* ''Di notte leoni, di giorno coglioni''
+* ''con la pioggia e con il sereno anche oggi un  '''  giorno ''' in meno'':conteggio dei giorni mancanti al congedo di un militare di leva
+* ''[[sul far del giorno]]'': alla  prima luce del [[mattino]]
+
+{{-trad-}}
+{{Trad1|astronomia}}
+:*{{af}}:  [[dag]]
+:*{{sq}}:  [[ditë]] (mv)
+:*{{ar}}:  [[يَوم]] (yaum)
+:*{{nds}}:  [[Dag]] ''m''
+:*{{bs}}:  [[dan]] ''m''
+:*{{br}}:  [[deiz]] ''m''
+:*{{bg}}:  [[ден]] ''m''
+:*{{ca}}:  [[dia]] ''m'', [[jorn]] ''m''
+:*{{cs}}:  [[den]] ''m''
+:*{{zh}}:  [[天]] (tiān), [[日]] (rì)
+:*{{hr}}:  [[dan]] ''m''
+:*{{da}}:  [[døgn]], [[dag]]
+:*{{he}}:  [[יום]] (yom)
+:*{{el}}:  [[μέρα]], [[ημέρα]] ''f''
+:*{{eo}}:  [[tago]]
+:*{{et}}:  [[päev]]
+:*{{fi}}:  [[päivä]], [[vuorokausi]]
+:*{{fr}}:  [[jour]], [[journée]] ''m''
+:*{{fy}}:  [[dei]]
+:*{{gd}}:  [[latha]]
+:*{{cy}}:  [[dydd]]
+:*{{ja}}:  [[日]] (ひ, hi, にち, nichi), [[曜日]] (ようび, yōbi)
+:*{{gn}}:  [[ára]]
+:*{{id}}:  [[hari]]
+:*{{en}}:  [[day]]
+:*{{ia}}:  [[die]]
+:*{{ga}}:  [[lá]]
+{{mid}}
+:*{{is}}:  [[dagur]]
+:*{{la}}:  [[lux]], [[dies]]
+:*{{lt}}:  [[diena]]
+:*{{jbo}}:  [[djedi]], [[donri]]
+:*{{ms}}:  [[hari]]
+:*{{nap}}:  [[juórno]], [['o juorno]]
+:*{{no}}:  [[dag]] ''m''
+:*{{nl}}:  [[dag]] ''m'', [[etmaal]] ''n''
+:*{{fa}}:  [[روز]] (ruz)
+:*{{pl}}:  [[dzień]] ''m'', [[doba]] ''f''
+:*{{pt}}:  [[dia]] ''m''
+:*{{ro}}:  [[zi]] ''f''
+:*{{ru}}:  [[день]]
+:*{{sr}}:  [[дан]] ''m''
+:*{{src}}: [[die#Sardo|die]]
+:*{{sro}}: [[dì#Sardo|dì]]
+:*{{scn}}: [[jornu]]
+:*{{sk}}:  [[deň]] ''m''
+:*{{sl}}:  [[dan]] ''m''
+:*{{es}}:  [[día]] ''m'', [[jornada]]
+:*{{sv}}:  [[dag]] ''c'', [[dygn]] ''n''
+:*{{de}}:  [[Tag]] ''m''
+:*{{tpi}}:  [[de]]
+:*{{tpn}}:  [['ara]]
+:*{{tr}}:  [[gün]], [[yirmi dört saat]] [-ti]
+:*{{hu}}:  [[nap]]
+:*{{wo}}:  [[bés]]
+:*{{yi}}:  [[טאָג]] (tug)
+{{Trad2}}
+
+{{-ref-}}
+*italiano
+** {{Fonte|hoep}}
+** {{Fonte|sabco}}
+** {{Fonte|sin-co}}
+** {{Fonte|dizit}}
+** {{Fonte|eti}}
+** {{Fonte|gar}}
+** {{Fonte|sape}}
+** {{Fonte|trec}}
+** {{Fonte|zin|768|1997}}
+** La Rizzoli Larousse, ''[http://enciclopedia.corriere.it/giorno Enciclopedia Universale]'', edizione on-line
+**AA.VV.,''Dizionario etimologico'', edizione 2004, ristampa 2008, RusconiLibri, p.&nbsp;439
+**Devoto/Oli,''Il dizionario della lingua italiana'' edizione cartacea 2000-2001, Le Monnier, p.&nbsp;912
+** {{Fonte|dizla}}
+** {{Fonte|itfd}}

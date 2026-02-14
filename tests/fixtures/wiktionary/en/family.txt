@@ -1,0 +1,825 @@
+==English==
+{{wp}}
+{{wikiquote}}
+
+===Etymology===
+[[File:Russian_Imperial_Family_1913.jpg|thumb|The Russian Imperial family in 1913]]
+
+{{root|en|ine-pro|*dʰeh₁-}} {{dercat|en|itc-pro|ine-pro}}
+From Late {{inh|en|enm|famylye}}, from {{der|en|la|familia||a household}}. Displaced native {{noncog|ang|hīred}}. {{dbt|en|familia}}.
+
+===Pronunciation===
+* {{enPR|fămĭli|fămli}}
+* {{IPA|en|/ˈfæ.m(ɪ.)li/|a=RP}}
+** {{audio|en|en-uk-family.ogg|a=UK}}
+* {{IPA|en|/ˈfæ.m(ə.)li/|/ˈfæ.mɪ.li/|a=GA}}
+** {{audio|en|en-us-family.ogg|a=US}}
+* {{IPA|en|/ˈfɛ.m(ɘ.)li/|a=NZ}}
+* {{rhymes|en|æmɪli|s=3}}
+* {{hyph|en|fa|mi|ly}}, {{hyph|en|nocaption=1|fam|ily}}
+
+===Noun===
+{{en-noun|~}}
+
+# {{senseid|en|Q8436}} A group of people who are closely related to one another (by [[blood]], [[marriage]] or [[adoption]]); [[kin]]; in particular, a set of parents and their children; an [[immediate family]].
+#: {{ux|en|Our '''family''' lives in town.}}
+#* {{RQ:Austen Pride and Prejudice|volume=III|chapter=XI|page=200|passage=To Jane, he could be only a man whose proposals she had refused, and whose merit she had undervalued; but to her own more extensive information, he was the person, to whom the whole '''family''' were indebted for the first of benefits, and whom she regarded herself with an interest, if not quite so tender, at least as reasonable and just, as what Jane felt for Bingley.}}
+#* {{RQ:Besant Ivory Gate|chapter=Prologue|passage=Such a [[scandal]] as the prosecution of a [[brother]] for forgery—with a verdict of guilty—is a most truly horrible, deplorable, fatal thing. It takes the respectability out of a '''family''' perhaps at a critical [[moment]], when the '''family''' is just assuming the robes of respectability:{{...}}it is a black spot which all the soaps ever advertised could never wash off.}}
+#* {{quote-journal|en|title=Towards the end of poverty| date=2013-06-01| volume=407| issue=8838| page=11| magazine=w:The Economist| url=http://www.economist.com/news/leaders/21578665-nearly-1-billion-people-have-been-taken-out-extreme-poverty-20-years-world-should-aim| passage=America’s poverty line is $63 a day for a '''family''' of four. In the richer parts of the emerging world $4 a day is the poverty barrier. But poverty’s scourge is fiercest below $1.25 ([&hellip;]): people below that level live lives that are poor, nasty, brutish and short.|archiveurl=https://archive.ph/HjLZ6|archivedate=2024-09-05}}
+#* {{quote-journal|en|author=Kat Kinsman|title=Something borrowed: Wedding traditions from around the world|magazine=w:CNN|url=https://www.cnn.com/2013/08/30/living/matrimony-global-traditions|date=2013-08-30|passage=Both brides and grooms in native Hawaiian tradition wear flower garlands as a physical manifestation of their love for one another, and to some, the twining of the stems is reflective of two '''families''' now becoming one. A more tourist-friendly version established in the past couple of decades involves winding the leis around the couple’s hands to bind them together.}}
+#* {{quote-av|en|date=May 6 2018|actor=w:John Oliver|title=w:Last Week Tonight with John Oliver|season= 5|number=10| episode=Rudy Giuliani| network=HBO|text= They’re both New Yorkers coasting on their reputations, they’ve both had three marriages, neither of them can shut up when in front of a camera, and perhaps most importantly, they both want to fuck Ivanka, which-which is weird for Trump because Ivanka is in his '''family''', and it’s weird for Giuliani because she isn’t.}}
+# An [[extended family]]: a group of people who are related to one another by blood or marriage.
+#* {{quote-text|en|year=1915|author=William T. Groves|title=A History and Genealogy of the Groves '''Family''' in America}}
+# A [[nuclear family]]: a mother and father who are married and cohabiting and their child or children.
+#: {{ux|en|The cultural struggle is for the survival of '''family''' values against all manner of atheistic amorality.}}
+#: {{ux|en|We must preserve the '''family''' unit if we want to save civilisation!}}
+# {{lb|en|uncountable}} Members of one's family collectively.
+#: {{ux|en|I have a lot of '''family''' in Australia.}}
+#: {{ux|en|He has a sister, but no other '''family'''.}}
+# A (close-knit) [[group]] of [[people]] related by [[blood]], friendship, [[marriage]], law, or custom, especially if they live or work together.
+#: {{ux|en|crime '''family''''', ''Mafia '''family'''}}<!--move to its own sense if needed, but for now, I'll account for this usage by this usex here-->
+#: {{ux|en|This is my fraternity '''family''' at the university.}}
+#: {{ux|en|Our company is one big happy '''family'''.}}
+## {{lb|en|uncountable|gay slang}} The [[gay]] [[community]].
+##* {{quote-journal|en|author=Gloria Godqueen|work=w:Bay Area Reporter|volume=12|number=28|date=July 15, 1982|title=What's in a card|page=7|pageurl=https://archive.org/details/BAR_19820715/page/n6/mode/1up|passage={{...}}This is not your hallmark im Ames, Iowa. And there is “'''family'''” working there . . . no radar like gaydar, I always say.}}
+# {{lb|en|uncountable}} [[lineage|Lineage]], especially honorable or [[noble]] lineage.
+#* {{RQ:Dickens Bleak House|text=Indeed, he married her for love. A whisper still goes about that she had not even ''''family''''; howbeit, Sir Leicester had so much '''family''' that perhaps he had enough and could dispense with any more.|2}}
+# Any [[group]] or aggregation of [[things]] classed together as [[kindred]] or related from possessing in [[common]] [[characteristics]] which distinguish them from other things of the same [[order]].
+#: {{ux|en|Doliracetam is a drug from the racetam '''family'''.}}
+#* {{quote-book|en|year=2001|author=Scott Mueller; Mark Edward Soper|title=Upgrading and Repairing PCs: Technician's Portable Reference|publisher=Que Publishing|isbn=9780789724540|page=115|pageurl=https://books.google.com/books?id=7M5qK8Y-Ip4C&q=%22connector%22&dq=%22connector%22&hl=&cd=53&source=gbs_api|text=Because SCSI is actually a '''family''' of standards, each with its own cable and connector, matching cables and connectors to the appropriate SCSI “family member” is important.}}
+#* {{quote-book|en|year=2010|author=Gary Shelly; Jennifer Campbell; Ollie Rivers|title=Microsoft Expression Web 3: Complete|page=262|passage=When creating a font '''family''', first decide whether to use all serif or all sans-serif fonts, then choose two or three fonts of that type {{...}}}}
+## {{senseid|en|taxonomy}} {{lb|en|biology|taxonomy}} A [[category]] in the [[classification]] of [[organism]]s, ranking below [[order]] and above [[genus]]; a [[taxon]] at that rank.
+##: {{syn|en|familia}}
+##: {{ux|en|Magnolias belong to the '''family''' Magnoliaceae.}}
+##* {{RQ:Schuster Hepaticae|volume=V|page=4|text=The closest affinities of the Jubulaceae are with the Lejeuneaceae. The two '''families''' share in common: ''a'' elaters usually 1-spiral, trumpet-shaped and fixed to the capsule valves, distally{{nb...}}.}}
+## {{lb|en|set theory|countable}} A collection of [[set]]s, especially of [[subset]]s of a given set.
+##: {{ux|en|Let <math>\mathcal F</math> be a '''family''' of subsets over <math>S</math>.}}
+## {{lb|en|music}} A group of instruments having the same basic method of tone production.
+##: {{ux|en|the brass '''family''';&emsp; the violin '''family'''}}
+## {{lb|en|linguistics}} A group of languages believed to have [[descended]] from the same [[ancestral]] language.
+##: {{syn|en|language family}}
+##: {{coi|en|the Indo-European '''family'''}}
+##: {{coi|en|the Afroasiatic '''family'''}}
+#* {{RQ:Withycombe Christian Names|edition=1st|chapter=Introduction|page=xi|passage=Of the great Indo-European '''family''' of languages the general principal was also that of one name for each individual{{...|, the majority of names being compounded of two elements chosen from a stock of special name-words.}}}}
+
+====Usage notes====
+{{tea room|en|m=April|y=2025}}
+* In some dialects, for a family of humans (relatives, parents, children, etc), [[w:notional agreement|notional agreement]] is the norm and [[w:formal agreement|formal agreement]] is uncommon. Thus ''the family '''are''' coming for a holiday dinner'' rather than ''the family '''is''' coming for a holiday dinner''.
+
+====Synonyms====
+* {{sense|relatives}} {{l|en|flesh and blood}}, {{l|en|kin}}, {{l|en|kinfolk}}, {{l|en|fam}}, {{see thesaurus|en|family}}
+* {{sense|class}} [[Thesaurus:class]]
+
+====Hyponyms====
+* {{sense|relatives}} {{l|en|nuclear family}}, {{l|en|immediate family}}, {{l|en|extended family}}
+* {{sense|computing}} {{l|en|C family}}
+
+====Derived terms====
+{{col|en|all in the family|antifamily|Batfamily|befamilied|biofamily|birthfamily|epifamily|familect|familied|familiocracy|familist|familyhood|familyish|familyism|familyist|familyless|familylike|familymoon|familywise|fampool|godfamily|ichnofamily|infrafamily|interfamily|intrafamily|macrofamily|merfamily|multifamily|nonfamily|oofamily|polyfamily|profamily|retrofamily|stepfamily|suprafamily|underfamily|unfamilied|Batfamily
+|ERM protein family|family bed|family newspaper
+|Ewing family|second family
+|Family Day
+|Helly family
+|Holy Family|family-style
+|Sperner family
+|Wood family
+|aluminium family
+|antifamily|family office
+|baby of the family|family annihilation
+|befamilied
+|biofamily
+|birthfamily
+|blended family
+|chosen family
+|county family
+|epifamily 
+|extended family
+|fam
+|familect
+|familied
+|familiocracy
+|familist
+|family Bible
+|family affair
+|family allowance
+|family annihilator
+|family business
+|family car
+|family celebrant
+|family circle
+|family court
+|family dissident
+|family doctor
+|family friend
+|family ganging
+|family grouping
+|family guy
+|family heirloom
+|family historian
+|family history
+|family home evening
+|family jewels
+|family law
+|family leave
+|family man
+|family meal
+|family medicine
+|family member
+|family name
+|family of curves<q:mathematics>
+|family of orientation
+|family of procreation
+|family of sets<q:set theory>
+|family of subsets<q:set theory>
+|family pajamas
+|family physician
+|family planning
+|family pole
+|family rebel
+|family rebellion
+|family resemblance
+|family restaurant
+|family reunification
+|family reunion
+|family romance
+|family roof
+|family room
+|family size
+|family tree
+|family unit
+|family valuer
+|family values
+|family wage
+|family woman
+|family-friendliness
+|family-friendly
+|family-run
+|family-sized
+|family-valuer
+|familyhood
+|familyhood
+|familyish
+|familyism
+|familyist
+|familyless
+|familylike
+|familymoon
+|familywise
+|fampool
+|first family
+|foster family
+|found family
+|framily
+|gene family
+|glitter family
+|godfamily
+|godfamily
+|gold star family
+|hamily
+|host family
+|ichnofamily
+|immediate family
+|in a family way
+|in the family way
+|infrafamily
+|interfamily
+|intrafamily
+|joint family
+|keep it in the family
+|language family
+|live with one's wife's family
+|macrofamily
+|merfamily
+|multifamily
+|multigene family
+|natural family planning
+|nonfamily
+|nuclear family
+|nuke family
+|one big happy family
+|oofamily
+|pearly family
+|polyfamily
+|profamily
+|rainbow family
+|retrofamily
+|royal family
+|run in the family
+|sell the family silver
+|single-parent family
+|start a family
+|stem family
+|stepfamily
+|suprafamily
+|the family that lays together stays together
+|the family that prays together stays together
+|the family that sleeps together keeps together
+|underfamily
+|unfamilied
+|word family
+|working family
+}}
+
+====Related terms====
+{{col3|en
+|familial
+|familiar,familiarity
+|familicide
+}}
+
+====Descendants====
+* {{desc|jam|faambli|fambili}}
+* {{desc|tpi|famili}}
+* {{desc|srn|famiri}}
+* {{desc|bor=1|chk|famini}}
+* {{desc|bor=1|ms|famili}}
+* {{desc|bor=1|mi|whāmere}}
+
+====Translations====
+{{trans-top|immediate family [as a group], e.g. parents and their children}}
+{{multitrans|data=
+* Abkhaz: {{tt|ab|аҭаацәа}}
+* Acehnese: {{t-needed|ace}}
+* Adyghe: {{t|ady|бын}}, {{t|ady|унагъо}}
+* Afrikaans: {{tt+|af|familie}}
+* Akkadian: {{tt|akk|𒆜𒆳|ts=illatu}}, {{tt|akk|𒅎𒊑𒀀|ts=imrû}}, {{tt|akk|𒁶𒌈|ts=kimtu}}, {{tt|akk|𒇷𒈬|ts=līmu}}, {{tt|akk|𒊓𒆷𒌈|ts=salātu}}
+* Albanian: {{tt+|sq|familje|f}}, {{tt+|sq|tym|m}} (archaic)
+* Altai:
+*: Southern Altai: {{tt|alt|биле}}
+* American Sign Language: {{tt|ase|9@RadialHand-PalmForward-9@CenterChesthigh-PalmForward RoundHoriz-RoundHoriz 9@UlnarHand-PalmBack-9@CenterChesthigh-PalmBack|alt=''FAMILY''}}
+* Amharic: {{tt|am|ቤተሰብ}}, {{tt|am|ቤተሰቦች}}, {{tt|am|ዘመድ አዝማድ}}
+* Ao: {{t|njo|kibong}} {{q|Chungli}}
+* Arabic: {{tt+|ar|عَائِلَة|f}}, {{tt+|ar|أُسْرَة|f}}, {{tt|ar|أَهْل|m}}
+*: Egyptian Arabic: {{tt|arz|عيلة|f|tr=ʕēla}}
+*: Hijazi Arabic: {{tt|acw|عيلة|f|tr=ʕēla}}, {{tt|acw|أَهِل|m|tr=ʔahil}}
+*: South Levantine Arabic: {{t|ajp|عيلة|f|tr=ʕēle}}
+* Aragonese: {{tt|an|familha|f}}, {{t|an|familia|f}}
+* Armenian: {{tt+|hy|ընտանիք}}
+* Aromanian: {{tt|rup|fumealji|f}}, {{tt|rup|fumealje|f}}
+* Assamese: {{tt|as|পৰিয়াল}}
+* Asturian: {{tt+|ast|familia|f}}
+* Avar: {{t|av|хъизан}}
+* Azerbaijani: {{tt+|az|ailə}}, {{t|az|külfət}}, {{t|az|əyal}} {{qualifier|archaic}}
+* Bashkir: {{tt|ba|ғаилә}}
+* Basque: {{tt+|eu|familia}}
+* Belarusian: {{tt|be|сям'я́|f}}, {{tt|be|радзі́на|f}}, {{t|be|сяме́йства|n}}
+* Bengali: {{tt+|bn|পরিবার}}, {{tt+|bn|খানদান}}, {{t+|bn|গোষ্ঠী}}
+* Breton: {{tt+|br|familh|f}}, {{tt+|br|tiegezh|m}}
+* Bulgarian: {{tt+|bg|семе́йство|n}}, {{t+|bg|фами́лия|f}}
+* Burmese: {{tt+|my|မိသားစု}}
+* Carpathian Rusyn: {{tt|rue|фами́лія|f}}, {{tt|rue|роди́на|f}}, {{t|rue|фамі́лія|f}}
+* Catalan: {{tt+|ca|família|f}}
+* Chamorro: {{t-needed|ch}}
+* Chechen: {{tt|ce|доьзал}}
+* Cherokee: {{tt|chr|ᏏᏓᏁᎸᎯ}}, {{tt|chr|ᏥᏓᎾᎷ}}
+* Chichewa: {{tt|ny|banja}}
+* Chinese:
+*: Cantonese: {{t+|yue|家|tr=gaa1}}, {{t|yue|家庭}}
+*: Dungan: {{t|dng|җящя}}, {{t|dng|җя}}
+*: Eastern Min: {{t|cdo|家庭}}
+*: Hakka: {{t|hak|家庭|tr=kâ-thìn}}
+*: Hokkien: {{t+|nan-hbl|家族|tr=ka-cho̍k}}, {{t+|nan-hbl|家庭|tr=ka-têng}}
+*: Mandarin: {{tt+|cmn|家|tr=jiā}}, {{tt+|cmn|家庭}}
+*: Wu: {{t|wuu|家庭}}, {{t|wuu|家|tr=1cia}}
+* Chuukese: {{tt|chk|famini}}
+* Comorian:
+*: Maore Comorian: {{tt|swb|mudjema|c6|alt=wadjema}}
+* Coptic: {{tt|cop|ⲙⲉⲧⲓⲱⲧ|f}}, {{tt|cop|ⲥⲩⲅⲅⲉⲛⲉⲓⲁ|f}}
+* Cornish: {{tt|kw|teylu|m}}
+* Corsican: {{tt|co|famiglia|f}}
+* Crimean Tatar: {{t|crh|aile}}, {{t|crh|qoranta}}
+* Czech: {{tt+|cs|rodina|f}}
+* Dalmatian: {{tt|dlm|famalja|f}}
+* Danish: {{tt+|da|familie|c}}
+* Dhivehi: {{tt|dv|އާއިލާ}}
+* Dusun:
+*: Central Dusun: {{t|dtp|paganakan}}
+* Dutch: {{tt+|nl|gezin|n}}, {{t+|nl|familie|f}}
+* Elfdalian: {{tt|ovd|familj|m}}
+* Erzya: {{t|myv|кудораське}}, {{t|myv|семия}}
+* Esperanto: {{tt+|eo|familio}}
+* Estonian: {{tt+|et|pere}}, {{tt+|et|perekond}}
+* Ewe: {{tt|ee|ƒome}}
+* Extremaduran: {{t-needed|ext}}
+* Faroese: {{tt|fo|familja|f}}
+* Finnish: {{tt+|fi|perhe}}
+* French: {{tt+|fr|famille|f}}
+* Frisian:
+*: West Frisian: {{tt+|fy|famylje}}
+* Friulian: {{tt|fur|famee|f}}
+* Galician: {{tt+|gl|familia|f}}
+* Georgian: {{tt+|ka|ოჯახი}}
+* German: {{tt+|de|Familie|f}}, {{t+|de|Sippe|f}} {{qualifier|colloquial}}
+* Gothic: {{t|got|𐌺𐌿𐌽𐌹|n}}
+* Greek: {{tt+|el|οικογένεια|f}}
+* Greenlandic: {{tt|kl|ilaqutakka}}
+* Guarani:
+*: Paraguayan Guarani: {{tt-check|gug|ogaygua}}
+* Gujarati: {{t|gu|કુટુંબ|n}} {{q|most common}}, {{tt|gu|પરિવાર|m}}, {{t|gu|ખાનદાન|n}}, {{t|gu|ઘરબાર|n}}
+* Haitian Creole: {{tt|ht|fanmi}}
+* Hausa: {{tt+|ha|Iyali|m}}
+* Hawaiian: {{tt|haw|ʻohana}}
+* Hebrew: {{tt+|he|מִשְׁפָּחָה|f|tr=mishpakhá}}
+* Hindi: {{tt+|hi|परिवार|m}}, {{t+|hi|कुटुंब|m}}, {{t+|hi|वंश|m}}, {{t+|hi|कुल|m}}, {{t+|hi|गृहस्थी|f}}
+* Hittite: {{tt|hit|𒉺𒀭𒆪𒍑|tr=pa-an-ku-uš}}
+* Hmong:
+*: White Hmong: {{tt|mww|tsev neeg}}
+* Hungarian: {{tt+|hu|család}}, {{t+|hu|família}}
+* Icelandic: {{tt+|is|fjölskylda|f}}
+* Ido: {{tt+|io|familio}}
+* Indonesian: {{tt+|id|keluarga}}, {{tt+|id|famili}}
+* Ingrian: {{t|izh|pere}}
+* Ingush: {{tt|inh|дезал}}
+* Interlingua: {{tt|ia|familia}}
+* Irish: {{tt|ga|teaghlach|m}}, {{tt|ga|muirear|m}}, {{t|ga|muirín|f}}
+* Istriot: {{tt|ist|fameîa}}
+* Italian: {{tt+|it|famiglia|f}}
+* Japanese: {{tt+|ja|家族|tr=かぞく, kazoku}}, {{qualifier|honorific}} {{tt+|ja|家族|tr=ごかぞく, gokazoku|alt=ご家族}}, {{tt+|ja|家庭|tr=かてい, katei}}
+* Javanese: {{tt+|jv|brayat}}
+* Kaingang: {{t|kgp|kanhkã}}
+* Kaitag: {{t|xdq|кулпе́т}}
+* Kannada: {{tt+|kn|ಆವಳಿ}}p
+* Karelian: {{t|krl|pereh}}
+* Kashubian: {{t|csb|familëjô|f}}
+* Kazakh: {{tt|kk|от басы}}, {{tt|kk|әулет}}, {{tt|kk|семья}}
+* Khmer: {{tt+|km|គ្រួសារ}}
+* Khoekhoe: {{tt|naq|ǀkhao-khoen}}
+* Komi:
+*: Komi-Permyak: {{t|koi|семья}}
+* Korean: {{tt+|ko|가족(家族)}}, {{tt+|ko|가정(家庭)}}
+* Krio: {{t|kri|fambul}}, {{t|kri|famili}}
+* Kurdish:
+*: Northern Kurdish: {{t+|kmr|malbat}}, {{t+|kmr|ayle}}
+* Kyrgyz: {{tt+|ky|үй-бүлө}}, {{tt+|ky|бүлө}}, {{t|ky|кодок}}
+* Laboya: {{tt|lmy|ela}}, {{tt|lmy|ole dadi}}
+* Lao: {{tt+|lo|ຄອບຄົວ}}
+* Latgalian: {{tt|ltg|saime|f}}
+* Latin: {{tt+|la|familia|f}}, {{tt+|la|gēns|f}}
+* Latvian: {{tt+|lv|ģimene|f}}, {{tt+|lv|saime|f}}
+* Lingala: {{t|ln|libota}}
+* Lisu: {{t|lis|ꓦꓲꓻ}}, {{t|lis|ꓩꓴꓺ ꓞꓲꓺ}}
+* Lithuanian: {{tt+|lt|šeima|f}}, {{tt|lt|šeimyna|f}}
+* Low German: {{tt|nds|[[Familige]], [[Familge]]|f}} {{q|Paderbornisch}}
+* Lü: {{t|khb|ᦅᦳᧃᦵᦣᦲᧃ}}, {{t|khb|ᦺᦑᦵᦣᦲᧃ}}
+* Luganda: {{tt|lg|amaka}}
+* Luxembourgish: {{tt|lb|Famill|f}}
+* Macedonian: {{tt|mk|семејство|n}}, {{tt|mk|фамилија|f}}
+* Malay: {{tt+|ms|keluarga}}, {{tt|ms|famili}}
+* Malayalam: {{t+|ml|കുടുംബം}}
+* Maltese: {{tt|mt|familja|f}}
+* Mansi:
+*: Northern Mansi: {{t|mns-nor|колта̄гыл}}
+* Manx: {{tt|gv|lught thie|m}}, {{tt|gv|mooinjer|f}}
+* Māori: {{tt+|mi|whānau}} {{qualifier|traditional extended}}, {{tt|mi|whāmere}} {{qualifier|modern nuclear}}
+* Marathi: {{tt|mr|कुटुंब|n}}
+* Mari:
+*: Eastern Mari: {{t-needed|mhr}}
+*: Western Mari: {{tt|mrj|йиш}}
+* Middle English: {{t|enm|houshold}}, {{t|enm|hird}}
+* Mingrelian: {{tt|xmf|თი}}
+* Mirandese: {{tt|mwl|família|f}}
+* Mòcheno: {{tt|mhn|familia|f}}
+* Mongolian:
+*: Cyrillic: {{tt+|mn|айл}}, {{tt+|mn|овог}}, {{tt+|mn|гэр бүл}}
+* Navajo: {{tt|nv|hooghan hazʼą́}}, {{tt|nv|bił kééhashtʼíinii}}
+* Nepali: {{tt|ne|परिबार}}
+* Nheengatu: {{t|yrl|anama}}
+* Norwegian:
+*: Bokmål: {{tt+|nb|familie|m}}
+* Nuosu: {{tt|ii|ꏤ}}
+* Occitan: {{tt+|oc|familha|f}}
+* Odia: {{tt+|or|ପରିବାର}}
+* Ohlone:
+*: Northern Ohlone: {{tt|cst|suyyakma}}
+* Old Church Slavonic:
+*: Cyrillic: {{t|cu|сѣмьꙗ|f}}
+* Old East Slavic: {{t|orv|сѣмиꙗ|f}}, {{t|orv|родина|f}}
+* Old English: {{tt|ang|hīred|m}}
+* Oromo: {{tt|om|maatii}}
+* Ossetian: {{tt|os|бинонтӕ}}
+* Pannonian Rusyn: {{t|rsk|семейство|n}}, {{t|rsk|фамелия|f}}, {{t|rsk|родзина|f}}
+* Papiamentu: {{t|pap|famia}}
+* Pashto: {{tt|ps|کورنۍ|f|tr=koranëy}}, {{t+|ps|عايله|f|tr='āyela}}, {{t+|ps|خاندان|m|tr=xānadān}}, {{t+|ps|فاميل|m|tr=fāmil}}
+* Pennsylvania German: {{tt|pdc|Familye|f}}
+* Persian:
+*: Classical Persian: {{t|fa-cls|خَانَوَادَه}}, {{t|fa-cls|خَانْدَان}}, {{t|fa-cls|عَائِلَه}}
+*: Iranian Persian: {{t|fa-ira|خانِوادِه}}, {{t|fa-ira|خانْدان}}, {{t+|fa-ira|فامیل}}, {{t|fa-ira|عائِلِه}}
+* Plautdietsch: {{tt|pdt|Famielje|f}}
+* Polish: {{tt+|pl|rodzina|f}}
+* Portuguese: {{tt+|pt|família|f}}
+* Punjabi:
+*: Gurmukhi: {{tt+|pa|ਟੱਬਰ|m}}, {{tt|pa|ਪਰਿਵਾਰ|m}}, {{tt|pa|ਖ਼ਾਨਦਾਨ|m}}
+*: Shahmukhi: {{tt|pa|ٹَبَّر|m}}, {{tt|pa|پَرِوار|m}}, {{tt|pa|خانْدان|m}}
+* Rapa Nui: {{t|rap|hare}}
+* Romani: {{tt|rom|famìlija|f}}
+* Romanian: {{tt+|ro|familie|f}}
+* Romansh: {{tt|rm|famiglia|f}}
+* Russian: {{tt+|ru|семья́|f|}}, {{tt+|ru|семе́йство|n}}, {{tt+|ru|фами́лия|f}} {{qualifier|archaic or stilted, usually means "surname"}}
+* Sami:
+*: Kildin Sami: {{tt|sjd|пӣрас}}, {{tt|sjd|петенҍе}}
+*: Northern Sami: {{tt|se|bearaš}}
+* Samoan: {{t-needed|sm}}
+* Sanskrit: {{tt+|sa|कुल|n}}
+* Scots: {{tt|sco|faimlie}}, {{tt|sco|faimily}}
+* Scottish Gaelic: {{tt|gd|teaghlach|m}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt|sh|по̀родица|f}}, {{tt|sh|оби́тељ|f}}, {{tt|sh|фа̀мӣлија|f}}
+*: Latin: {{tt+|sh|pòrodica|f}}, {{tt+|sh|obítelj|f}}, {{tt+|sh|fàmīlija|f}}
+* Shan: {{t+|shn|ၼႃႈႁိူၼ်း}}
+* Sicilian: {{tt+|scn|famigghia|f}}
+* Silesian: {{t|szl|familijŏ|f}}, {{t|szl|rodzina|f}}
+* Sindhi: {{tt+|sd|خاندان|tr=xândân}}
+* Sinhalese: {{tt+|si|පවුල}}
+* Slovak: {{tt+|sk|rodina|f}}
+* Slovene: {{tt+|sl|družina|f}}, {{tt|sl|familija|f}}
+* Somali: {{t+|so|xaas}}
+* Sorbian:
+*: Lower Sorbian: {{tt|dsb|familija|f}}, {{t|dsb|swójźba|f}}
+*: Upper Sorbian: {{t|hsb|swójba|f}}
+* Spanish: {{tt+|es|familia|f}}
+* Swahili: {{tt+|sw|familia|cn}}
+* Swedish: {{tt+|sv|familj|c}}, {{tt+|sv|hushåll|n}}
+* Tabasaran: {{t|tab|хизан}}
+* Tagalog: {{tt+|tl|pamilya}}, {{tt|tl|mag-anak}}
+* Tajik: {{tt+|tg|оила}}, {{tt+|tg|хонавода}}, {{tt|tg|хонадон}}
+* Tamil: {{tt+|ta|குடும்பம்}}
+* Taos: {{tt|twf|ȕʼúnemą}}
+* Tarantino: {{t|roa-tar|famigghie|f}}
+* Tashelhit: {{tt|shi|takat|f}}
+* Tatar: {{tt+|tt|гаилә}}, {{tt|tt|семья}}
+* Telugu: {{tt+|te|కుటుంబము}}
+* Thai: {{tt+|th|ครอบครัว}}
+* Tibetan: {{tt|bo|ཁྱིམ་ཚང}}, {{tt|bo|མི་ཚང}}
+* Tigrinya: {{t|ti|ስድራ}}
+* Turkish: {{tt+|tr|aile}}, {{tt+|tr|ocak}}, {{tt|tr|kodak}}
+*: Ottoman Turkish: {{tt|ota|عائله|tr=‘a’ile}}
+* Turkmen: {{tt|tk|maşgala}}
+* Tuvan: {{tt|tyv|өг-бүле}}, {{tt|tyv|өг-ишти}}
+* Ugaritic: {{tt|uga|𐎌𐎔𐎃}}
+* Ukrainian: {{tt|uk|сім'я́|f}}, {{tt+|uk|роди́на|f}}, {{t|uk|сіме́йство|n}}
+* Urdu: {{t|ur|خانْدان|m}}, {{t|ur|عائِلَہ|m}}, {{t|ur|کُنْبَہ|m}}, {{tt|ur|پَرِوار|m}}, {{t|ur|اَہْل و عَیال|m}}, {{t|ur|گَھر بار|m}}, {{t|ur|اَہْلِ خانَہ|m}}, {{t|ur|گَھرَانَا|m}}, {{t|ur|خانْوادَہ|m}}, {{t|ur|بال بَچّے|m-p}}
+* Uyghur: {{tt+|ug|ئائىلە}}
+* Uzbek: {{tt+|uz|oila}}, {{tt+|uz|xonadon}}
+* Venetan: {{tt|vec|faméja|f}}, {{tt+|vec|fameja}}
+* Vietnamese: {{tt+|vi|gia đình}} ({{tt+|vi|家庭}})
+* Volapük: {{tt+|vo|famül}}
+* Walloon: {{tt+|wa|famile|f}}
+* Welsh: {{tt+|cy|teulu}}, {{tt+|cy|teuluoedd|m-p}}
+* Xhosa: {{tt|xh|umndeni|c3|c4}}
+* Yakut: {{t|sah|кэргэн}}
+* Yapese: {{tt|yap|tabinaw}}
+* Yiddish: {{tt+|yi|משפּחה|f|tr=mishpokhe}}, {{tt|yi|געזינד|n}}
+* Yucatec Maya: {{tt|yua|ch’i’ibalil}}
+* Zhuang: {{tt|za|ranz}}
+* Zulu: {{tt|zu|umndeni|c3|c4}}
+{{trans-bottom}}
+
+{{trans-top|group of people related by blood, marriage, law, or custom}}
+* Arabic: {{tt+|ar|عَائِلَة|f}}, {{tt+|ar|أُسْرَة|f}}, {{tt|ar|أَقَارِب|p}}, {{tt|ar|أَهْل|m}}
+* Armenian: {{tt+|hy|ընտանիք}}
+* Aromanian: {{tt|rup|fumealji|f}}, {{tt|rup|fumealje|f}}
+* Asturian: {{t+|ast|familia}}
+* Azerbaijani: {{tt|az|qohum-əqrəba}}, {{t|az|külfət}}
+* Belarusian: {{tt|be|сям'я́|f}}, {{t|be|род|m}}
+* Bengali: {{tt+|bn|বংশ}}, {{tt+|bn|খানদান}}, {{t+|bn|গোষ্ঠী}}
+* Breton: {{tt+|br|familh|f}}, {{tt|br|kerentiezh|f}}
+* Bulgarian: {{tt+|bg|рода́|f}}
+* Catalan: {{tt+|ca|família|f}}
+* Chechen: {{tt|ce|доьзал}}, {{tt|ce|гаьргара нах}}
+* Chinese:
+*: Cantonese: {{t+|yue|家族}}
+*: Eastern Min: {{t|cdo|家族}}
+*: Hakka: {{t|hak|家族|tr=kâ-chhu̍k}}
+*: Hokkien: {{t+|nan-hbl|家族|tr=ka-cho̍k}}
+*: Mandarin: {{tt+|cmn|家族}}
+*: Wu: {{t|wuu|家族}}
+* Czech: {{tt+|cs|rodina}}
+* Danish: {{tt+|da|familie|c}}
+* Dutch: {{tt+|nl|familie|f}}
+* Esperanto: {{tt+|eo|familio}}
+* Ewe: {{tt|ee|ƒome}}
+* Faroese: {{tt|fo|ætt|f}}
+* Finnish: {{tt+|fi|suku}}
+* French: {{tt+|fr|famille|f}}
+* Galician: {{tt+|gl|familia|f}}
+* German: {{tt+|de|Familie|f}}
+* Gothic: {{t|got|𐌺𐌿𐌽𐌹|n}}
+* Greek: {{tt+|el|οικογένεια|f}}
+* Hebrew: {{tt+|he|מִשְׁפָּחָה|f|tr=mishpakhá}}
+* Hindi: {{tt+|hi|परिवार|m}}, {{tt|hi|ख़ानदान|m}}, {{t+|hi|कुटुंब|m}}, {{t+|hi|कुल|m}}, {{t+|hi|वंश|m}}, {{t+|hi|घराना|m}}
+* Hungarian: {{tt+|hu|család}}
+* Icelandic: {{tt+|is|fjölskylda|f}}, {{tt+|is|afkvæmi|n}}, {{tt+|is|ættingi|n}}, {{tt|is|ættingjar|n-p}}, {{tt|is|skyldmenni|n-p}}
+* Ido: {{tt+|io|familio}}
+* Indonesian: {{tt+|id|kerabat}}
+* Ingrian: {{t|izh|suku}}
+* Interlingua: {{tt|ia|familia}}
+* Irish: {{tt|ga|muintir|f}}, {{tt+|ga|dream|m}}
+* Italian: {{tt+|it|famiglia|f}}
+* Japanese: {{tt+|ja|親戚|tr=しんせき, shinseki}}, {{tt+|ja|親類|tr=しんるい, shinrui}}, {{tt+|ja|親族|tr=しんぞく, shinzoku}}, {{tt+|ja|家庭|tr=かてい, katei}}
+* Korean: {{tt+|ko|친척(親戚)}}, {{t+|ko|친족(親族)}}, {{t+|ko|가정(家庭)}}
+* Kyrgyz: {{t|ky|кодок}}
+* Latgalian: {{tt|ltg|ciļts}}, {{tt|ltg|dzymums}}
+* Latin: {{tt+|la|familia|f}}, {{tt+|la|gēns|f}}
+* Latvian: {{tt+|lv|ģimene}}, {{tt+|lv|dzimta}}, {{tt|lv|radinieki}}
+* Lisu: {{t|lis|ꓚꓬꓸ}}
+* Lithuanian: {{tt+|lt|giminė|f}}, {{tt|lt|šeimyna|f}}
+* Louisiana Creole: {{t|lou|famiy}}
+* Macedonian: {{tt|mk|семејство|n}}, {{tt|mk|фамилија|f}}, {{tt+|mk|род|m}}
+* Malay: {{tt+|ms|keluarga}}, {{tt|ms|famili}}
+* Malayalam: {{t+|ml|കുടുംബം}}, {{t+|ml|കുലം}}
+* Māori: {{tt+|mi|whānau}}
+* Middle English: {{t|enm|kyn}}, {{t|enm|kynrede}}
+* Navajo: {{tt|nv|hakʼéí}}
+* Old English: {{tt|ang|hīred|m}}
+* Persian:
+*: Iranian Persian: {{t|fa-ira|خانْدان}}, {{t+|fa-ira|خویشان|tr=xišân}}, {{t|fa-ira|نَزْدیکان}}
+* Polish: {{tt+|pl|rodzina|f}}, {{tt+|pl|ród|m}}
+* Portuguese: {{tt+|pt|família|f}}
+* Romani: {{tt|rom|familija|f}}
+* Romanian: {{tt+|ro|familie|f}}
+* Russian: {{tt+|ru|семья́|f}}, {{tt+|ru|семе́йство|n}}, {{tt+|ru|род|m}}
+* Sami:
+*: Kildin Sami: {{tt|sjd|гоанҍц}}
+* Sanskrit: {{tt+|sa|कुल|n}}
+* Scots: {{tt|sco|faimlie}}, {{tt|sco|faimily}}
+* Scottish Gaelic: {{tt|gd|teaghlach|m}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt|sh|по̀родица|f}}, {{tt|sh|оби́тељ|f}}
+*: Latin: {{tt+|sh|pòrodica|f}}, {{tt+|sh|obítelj|f}}
+* Sicilian: {{tt+|scn|famigghia|f}}
+* Slovak: {{tt+|sk|rodina}}, {{tt+|sk|rod}}
+* Slovene: {{tt+|sl|družina|f}}
+* Sorbian:
+*: Lower Sorbian: {{tt|dsb|swójźba|f}}
+* Spanish: {{tt+|es|familia|f}}
+* Swahili: {{t+|sw|familia}}
+* Swedish: {{tt+|sv|börd}}
+* Tagalog: {{tt|tl|kamag-anakan}}
+* Tashelhit: {{tt|shi|tagffut|f}}
+* Telugu: {{tt|te|వంశ పరంపర}}
+* Thai: {{tt+|th|ตระกูล}}
+* Tocharian B: {{tt|txb|kottär}}
+* Turkish: {{tt+|tr|aile}}, {{tt|tr|kodak}}
+* Ugaritic: {{tt|uga|𐎌𐎔𐎃}}
+* Ukrainian: {{tt+|uk|роди́на|f}}, {{tt|uk|сім'я́|f}}, {{tt|uk|рід|m}}
+* Urdu: {{tt|ur|خانْدان|m}}, {{tt|ur|پَرِوار|m}}, {{t|ur|دُودْمان|m}}, {{t|ur|اَقارِب|m}}, {{t|ur|اَہْل}}, {{t+|ur|آل}}
+* Uzbek: {{t+|uz|oila}}
+* Vietnamese: {{t+|vi|gia tộc}}
+* Yiddish: {{t+|yi|משפּחה|f|tr=mishpokhe}}
+* Zulu: {{tt|zu|umndeni|c3|c4}}
+{{trans-bottom}}
+
+{{trans-top|rank in a taxonomic classification, above both genus and species}}
+* Afrikaans: {{tt+|af|familie}}
+* Arabic: {{t+|ar|فَصِيلَة|f}}
+* Armenian: {{tt+|hy|ընտանիք}}
+* Azerbaijani: {{tt|az|fəsilə}}
+* Belarusian: {{t|be|сяме́йства|n}}, {{t|be|сям'я́|f}}
+* Bengali: {{t+|bn|পরিবার}}
+* Breton: {{tt+|br|kerentiad|m}}
+* Bulgarian: {{tt+|bg|семе́йство|n}}
+* Burmese: {{t+|my|မျိုးရင်း}}
+* Catalan: {{tt+|ca|família|f}}
+* Chinese:
+*: Cantonese: {{tt|yue|科|tr=fo1}}
+*: Hokkien: {{tt+|nan-hbl|科|tr=kho}}
+*: Mandarin: {{tt+|cmn|科|tr=kē}}
+* Czech: {{tt+|cs|čeleď|f}}
+* Danish: {{tt+|da|familie|c}}
+* Dutch: {{tt+|nl|familie|f}}
+* Esperanto: {{tt+|eo|familio}}
+* Estonian: {{t|et|sugukond}}
+* Finnish: {{tt+|fi|heimo}}
+* French: {{tt+|fr|famille|f}}
+* Galician: {{tt+|gl|familia|f}}
+* Georgian: {{t+|ka|ოჯახი}}
+* German: {{tt+|de|Familie|f}}
+* Greek: {{tt+|el|οικογένεια|f}}
+* Hebrew: {{tt+|he|מִשְׁפָּחָה|f|tr=mishpakhá}}
+* Hindi: {{t+|hi|कुल|m}}
+* Hungarian: {{tt+|hu|család}}
+* Icelandic: {{tt+|is|ætt|f}}
+* Interlingua: {{tt|ia|familia}}
+* Irish: {{tt|ga|fine|f}}
+* Italian: {{tt+|it|famiglia|f}}
+* Japanese: {{tt+|ja|科|tr=か, ka}}
+* Kazakh: {{t|kk|тұқымдас}}
+* Khmer: {{tt+|km|អំបូរ|tr=am bo}}
+* Korean: {{t+|ko|과(科)}}
+* Kurdish:
+*: Northern Kurdish: {{t+|kmr|xêzan|f}}
+* Kyrgyz: {{t+|ky|тукум}}
+* Latgalian: {{tt|ltg|saime}}
+* Latvian: {{tt+|lv|dzimta|f}}
+* Lithuanian: {{tt+|lt|šeima|f}}
+* Low German: {{tt+|nds|Familie|f}}
+* Macedonian: {{tt|mk|семејство|n}}, {{tt|mk|фамилија|f}}
+* Malay: {{tt+|ms|keluarga}}, {{tt|ms|famili}}
+* Malayalam: {{t+|ml|കുടുംബം}}
+* Persian:
+*: Iranian Persian: {{t|fa-ira|خانِوادِه}}, {{t|fa-ira|تیرِه}}
+* Polish: {{tt+|pl|rodzina|f}}
+* Portuguese: {{tt+|pt|família|f}}
+* Romani: {{tt|rom|familija|f}}
+* Romanian: {{tt+|ro|familie|f}}
+* Russian: {{tt+|ru|семе́йство|n}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt|sh|по̀родица|f}}
+*: Latin: {{tt+|sh|pòrodica|f}}
+* Slovak: {{tt+|sk|čeľaď|f}}
+* Slovene: {{tt+|sl|družina|f}}
+* Spanish: {{tt+|es|familia|f}}
+* Swahili: {{tt+|sw|familia}}
+* Swedish: {{tt+|sv|familj|c}}
+* Tagalog: {{tt|tl|angkanhay}}
+* Tajik: {{t+|tg|оила}}, {{t|tg|тира}}, {{t+|tg|хонавода}}
+* Telugu: {{tt+|te|కుటుంబము}}
+* Thai: {{tt+|th|วงศ์}}
+* Turkish: {{tt+|tr|familya}}, {{tt+|tr|aile}}, {{t+|tr|fasile}}
+*: Ottoman Turkish: {{t|ota|فصیله|tr=fasile}}
+* Ukrainian: {{tt+|uk|роди́на|f}}, {{t|uk|сіме́йство|n}}
+* Urdu: {{t|ur|خانْدان|m}}
+* Uzbek: {{t+|uz|oila}}
+* Vietnamese: {{t+|vi|họ}}
+* Volapük: {{tt+|vo|famül}}, {{tt|vo|familia}}
+{{trans-bottom}}
+
+{{trans-top|music: a group of instruments having the same basic method of tone production}}
+* Armenian: {{tt+|hy|ընտանիք}}
+* Bulgarian: {{tt+|bg|гру́па|f}}
+* Catalan: {{tt+|ca|família|f}}
+* Finnish: {{tt|fi|-[[soitin|soittimet]]}} {{q|e.g. torvisoittimet}}
+* Galician: {{tt+|gl|familia|f}}
+* German: {{tt+|de|Familie|f}}
+* Greek: {{tt+|el|οικογένεια|f}}
+* Hebrew: {{tt+|he|מִשְׁפָּחָה|f|tr=mishpakhá}}
+* Icelandic: {{tt+|is|fjölskylda|f}}
+* Macedonian: {{tt|mk|семејство|n}}
+* Persian:
+*: Iranian Persian: {{t|fa-ira|هَمْنَوا}}
+* Portuguese: {{tt+|pt|família|f}}
+* Romanian: {{tt+|ro|familie|f}}
+* Slovene: {{tt+|sl|družina|f}}
+* Spanish: {{tt+|es|familia|f}}
+{{trans-bottom}}
+
+{{trans-top|linguistics: a group of languages believed to have descended from the same ancestral language}}
+* Arabic: {{t+|ar|أُسْرَة|f}}
+* Armenian: {{tt+|hy|ընտանիք}}
+* Belarusian: {{t|be|сям'я́|f}}
+* Breton: {{t+|br|kerentiad|m}}
+* Bulgarian: {{tt+|bg|семе́йство|n}}
+* Catalan: {{tt+|ca|família|f}}
+* Chinese:
+*: Mandarin: {{tt+|cmn|語系|tr=yǔxì}}
+* Czech: {{t+|cs|rodina|f}}
+* Danish: {{tt|da|æt|c}}
+* Dutch: {{tt+|nl|familie|f}}
+* Faroese: {{tt|fo|ætt|f}}
+* Finnish: {{tt+|fi|kieliryhmä}}, {{tt+|fi|kielikunta}}, {{tt+|fi|kieliperhe}}
+* Galician: {{tt+|gl|familia|f}}
+* German: {{tt+|de|Familie|f}}
+* Hebrew: {{tt+|he|מִשְׁפָּחָה|f|tr=mishpakhá}}
+* Irish: {{tt|ga|fine|f}}
+* Japanese: {{t+|ja|語族|tr=ご​ぞく, gozoku}}
+* Korean: {{tt+|ko|어족(語族)}}
+* Latvian: {{tt+|lv|saime|f}}
+* Macedonian: {{t|mk|семејство|n}}
+* Malay: {{tt|ms|rumpun}}
+* Malayalam: {{t|ml|ഭാഷാകുടുംബം}}, {{t|ml|ഭാഷാഗോത്രം}}
+* Persian:
+*: Iranian Persian: {{t|fa-ira|خانِوادِه}}
+* Polish: {{tt+|pl|rodzina|f}}
+* Portuguese: {{tt+|pt|família|f}}
+* Romanian: {{tt+|ro|familie|f}}
+* Russian: {{tt+|ru|семья́|f}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt|sh|по̀родица|f}}
+*: Latin: {{tt+|sh|pòrodica|f}}
+* Slovak: {{t+|sk|rodina|f}}
+* Slovene: {{tt+|sl|družina|f}}
+* Spanish: {{tt+|es|familia|f}}
+* Tajik: {{t+|tg|оила}}
+* Thai: {{tt+|th|ตระกูลภาษา}}
+* Turkish: {{tt+|tr|aile}}
+* Ukrainian: {{t|uk|сім'я́|f}}
+* Welsh: {{tt+|cy|teulu|m}}
+{{trans-bottom}}
+
+{{trans-top|(used attributively)}}
+* Azerbaijani: {{tt|az|ailəvi}}
+* Breton: {{tt+|br|familh}}
+* Bulgarian: {{tt+|bg|семе́ен}}
+* Catalan: {{tt+|ca|familiar}}
+* Czech: {{tt+|cs|rodinný}}
+* Danish: {{tt|da|familie-}}
+* Esperanto: {{tt+|eo|familia}}
+* Finnish: {{tt|fi|[[perhe]]-}}, {{tt|fi|[[suku]]-}}
+* Galician: {{tt+|gl|familiar|f}}
+* Greek: {{tt+|el|οικογένεια|f}}
+* Hebrew: {{tt+|he|משפחתי|tr=mishpakhtí}}
+* Hungarian: {{tt+|hu|családi}}, {{tt+|hu|házi}}
+* Interlingua: {{tt|ia|familiar}}
+* Kurdish:
+*: Northern Kurdish: {{tt+|kmr|malbatî}}
+* Macedonian: {{tt|mk|семеен}}, {{tt|mk|фамилија́рен}}
+* Polish: {{tt+|pl|rodzinny}}
+* Portuguese: {{tt+|pt|familiar}}
+* Romanian: {{tt+|ro|familiar}}
+* Russian: {{tt+|ru|семе́йный}}
+* Slovak: {{tt|sk|rodinný}}
+* Slovene: {{tt|sl|družinski}}
+* Spanish: {{tt+|es|familiar}}
+* Welsh: {{tt+|cy|teulu|m}}
+}}<!-- close {{multitrans}} -->
+{{trans-bottom}}
+
+{{checktrans-top}}
+* Afar: {{t-check|aa|buxa}}, {{t-check|aa|daala}}
+* Ainu: {{t-check|ain|ツ゚ヨ}}
+* Alabama: {{t-check|akz|imalahkaha}}
+* Archi: {{t-check|aqc|ха́ли}}
+* Avar: {{t-check|av|очахъ}}, {{t-check|av|хъизан}}
+* Aymara: {{t-check|ay|utakuña}}, {{t-check|ay|utapacha}}
+* Danish: {{t-check|da|bofællesskab}}, {{t-check|da|kollektiv}}, {{t+check|da|familie}}
+* German:
+*: Alemannic German: {{t-check|gsw|Fàmelia}}, {{t-check|gsw|Verwàntschàft}}
+* Indonesian: {{t+check|id|keluarga}}, {{t+check|id|famili}}
+* Italian: {{t+check|it|famiglia}}
+* Japanese: {{t+check|ja|仲間|tr=nakama}}
+* Kurdish:
+*: Northern Kurdish: {{t+check|kmr|malbat|f}}
+* Latin: {{t+check|la|familia|f}}
+* Lithuanian: {{t+check|lt|šeima|f}}
+* Persian: {{t-check|fa|همنژادان|tr=hamnažâdân}}, {{t-check|fa|هموندان|tr=hamvandân}}, {{t+check|fa|اعضا|tr=a'zâ}}
+* Swedish: {{t+check|sv|släkt}}, {{t+check|sv|släktskap}}, {{t+check|sv|ätt}}
+* Telugu: {{t+check|te|కుటుంబం}}, {{t-check|te|సహజీనవం}}, {{t-check|te|ఒకే జాతి}}, {{t+check|te|సంఘము}}
+* Thai: {{t+check|th|ครอบครัว}}, {{t+check|th|ญาติ}}, {{t+check|th|พี่น้อง}}
+* Turkish: {{t+check|tr|aile}}, {{t+check|tr|akraba}}
+* Woiwurrung: {{t-check|wyi|booboop narrkwarren}}, {{t-check|wyi|kerr-up-inon}}
+{{trans-bottom}}
+
+===Adjective===
+{{en-adj|-}}
+
+# Suitable for children and adults.
+#: {{ux|en|It's not good for a date, it's a '''family''' restaurant.}}
+#: {{ux|en|Some animated movies are not just for kids, they are '''family''' movies.}}
+#: {{ux|en|This is a '''family''' restaurant, stop making out!}}
+# {{lb|en|gay slang}} [[homosexual|Homosexual]].
+#: {{ux|en|I knew he was '''family''' when I first met him.}}
+
+====Translations====
+{{trans-top|suitable for children and adults}}
+{{multitrans|data=
+* Bulgarian: {{tt+|bg|семе́ен}}
+* Finnish: {{tt|fi|[[perhe]]-}}
+* German: {{tt|de|Familien-}}
+* Maltese: {{tt|mt|familja|f}}, {{tt|mt|familji|p}}
+* Polish: {{tt+|pl|rodzinny|m}}, {{qualifier|family movie}} {{tt+|pl|familijny|m}}
+* Portuguese: {{tt+|pt|de família}}
+* Russian: {{tt+|ru|семейный}}
+* Slovak: {{tt|sk|rodinný}}
+{{trans-bottom}}
+
+{{trans-top|(slang) homosexual}}
+* Catalan: {{tt+|ca|marieta|m}}
+* Finnish: {{tt+|fi|homppeli}} {{q|informal}}, {{tt+|fi|fägäri}} {{q|slang}}
+* German: {{tt|de|vom anderen Ufer}}
+* Norwegian: {{tt+|no|skeiv}}
+* Swedish: {{tt+|sv|bög}}
+}}<!-- close {{multitrans}} -->
+{{trans-bottom}}
+
+===See also===
+* [[:Category:Family]]
+* {{sense|taxonomy, rank}}
+:* {{l|en|domain}}
+:* {{l|en|kingdom}}
+:* {{l|en|phylum}}/{{l|en|division}}
+:* {{l|en|class}}
+:* {{l|en|order}}
+:* {{l|en|superfamily}}
+:* '''family'''
+:** {{l|en|subfamily}}, {{l|en|tribe}}
+:* {{l|en|genus}}
+:* {{l|en|species}}
+
+===References===
+* {{R:OneLook}}
+* {{R:Merriam-Webster Online}}
+* {{R:Dictionary.com}}
+* {{R:Keywords 21st}}
+* {{R:Keywords|page=1}}
+* {{R:Century 1911}}
+* {{R:Webster 1913}}
+
+===Further reading===
+* {{pedia}}
+* {{pedia|Family (disambiguation)}}
+* {{pedia|Family of sets}}
+* {{pedia|Family (biology)}}
+* {{R:Greens|id=h5wwtha|sense=1|pos=n}}
+
+{{cln|en|2-syllable words|collective nouns}}
+{{C|en|Collectives|Family|Family members|LGBTQ}}

@@ -1,0 +1,85 @@
+== {{lengua|es}} ==
+{{pron-graf|1audio1=LL-Q1321 (spa)-Rodelar-tierra.wav}}
+
+=== Etimología 1 ===
+{{etimología|osp|tierra|tierra}}, y esta {{etim|la|terra}} (en sus sentidos 1, 2 y 3).
+
+==== {{sustantivo femenino|es}} ====
+{{es.sust}}
+;1: Superficie del planeta [[Tierra]] que no se encuentra cubierta por [[agua]].
+;2: {{plm|material}} granuloso y oscuro que compone el suelo.
+{{ejemplo|Los niños juegan con ''tierra''.}}
+;3: {{plm|suelo}}.
+{{sinónimos|piso}}.
+;4: {{plm|país}}, [[región]], [[territorio]] o porción de terreno.
+{{ejemplo|Recuerda su ''tierra'' con [[nostalgia]].}}
+;5 {{csem|electricidad}}: {{plm|puesta a tierra}}.
+;6 {{csem|electrónica}}: En un circuito, nodo arbitrario al que por convención se le asigna una tensión de cero voltios.
+;7: {{plm|polvo}} doméstico.
+{{ámbito|Venezuela}}
+
+==== Locuciones ====
+{{trad-arriba|Locuciones con «tierra»}}
+* [[bajar a tierra]]: poner en limpio las ideas, esclarecerlas.
+* [[echar tierra a]] un asunto, negocio: Dejarlo de lado y olvidarlo.
+* [[echar por tierra]]: destruir, acabar con, en sentido figurado (ilusiones, esfuerzo, etc).
+* [[poner los pies en la tierra]]: ser realista, no hacerse expectativas ilusas (Venezuela, en sentido figurado).
+* [[tierra batida]]: Superficie para la práctica del tenis también conocida como polvo de ladrillo.
+* [[tierra de nadie]]
+* [[tierra firme]]
+* [[tierra prometida]]
+* [[tierras raras]]
+* [[tierra virtual]]
+* [[trágame tierra]] o [[tierra trágame]]
+{{trad-abajo}}
+
+==== Refranes ====
+* [[al hombre viejo, múdale de tierra y dará el pellejo]]
+* [[del mar, el mero; de la tierra, el cordero]]
+* [[en cada tierra su uso]]
+* [[en octubre, la tierra estercola y cubre]]
+* [[en tierra ajena, la vaca al buey acornea]]
+* [[gaviotas en tierra anuncian temporal fuera]]
+* [[golondrina que con el ala roza la tierra, lluvia recela]]
+* [[nadie es profeta en su tierra]]
+* [[quien de lejanas tierras viene, miente como quiere]]
+* [[quien ruin es en su tierra, ruin es fuera de ella]]
+
+==== Información adicional ====
+{{derivad|Tierra|terrado|terrada|terrestre|extraterrestre|terráqueo|terrícola|terreno|terrenidad|todoterreno|terrenal|extraterrenal|extraterreno|supraterrenal|territorio|territorial|territorialidad|territorialismo|extraterritorial|supraterritorial|terral|terrero|terrera|terrería|terregal|terregoso|terrazgo|terrazguero|terraje|terrajero|terroso|terrosidad|terrígeno|terrón|terronazo|terromontero|terrazo|terraza|terrizo|terrino|terrina|terrario|terruño|terruñero|terrateniente|terracota|terrear|aterrizar|aterrizaje|soterrar|soterramiento|enterrar|entierro|enterramiento|enterrador|desenterrar|desterrar|destierro|aterrar|terraplén|terrapleno|terraplenar|terremoto|subterráneo|subte|Terranova}}.
+.
+
+==== Véase también ====
+{{Wikiquote}}
+{{w}}
+
+==== Traducciones ====
+{{trad-arriba}}
+{{t|af|i1=s|t1=aarde}}
+{{t|de|a1=1,2,3,4,6|t1=Erde|a2=5|t2=Erdung}}
+{{t|ast|i1=s|t1=tierra}}
+{{t|bg|i1=s|t1=земя|t2=суша|t3=пръст|t4=почва}}
+{{t|ca|i1=s|t1=terra}}
+{{t|cak|i1=s|t1=ulew}}
+{{t|zh|i1=s|t1=地|t2=土}}
+{{t|da|i1=s|t1=jorden}}
+{{t|sl|a1=1,2,3,4|t1=zemlja|a2=1|t2=kopno|a3=2|t3=prst|a4=3|t4=tla|a5=4|t5=dežela|a6=5|t6=ozemljitev|a7=6|t7=Zemlja}}
+{{t|eo|i1=s|t1=tero}}
+{{t|eu|i1=s|t1=lur}}
+{{t|fr|a1=1-4|t1=terre|a2=1|t2=Terre}}
+{{t|hu|i1=s|t1=föld}}
+{{t|en|i1=s|t1=earth|a2=3|t2=ground|a3=1,4|t3=land|a4=2|t4=soil}}
+{{t|gl|i1=s|t1=terra}}
+{{t|is|a1=1,2,3,4|t1=jörð|a2=6|t2=Jörð}}
+{{t|it|a1=1-4|t1=terra|g1=f|a2=3|t2=pavimento|g2=m}}
+{{t|la|i1=s|t1=terra}}
+{{t|yua|i1=s|t1=luʼum}}
+{{t|nci|t1=tlalli}}
+{{t|nch|t1=tlali}}
+{{t|nl|i1=s|t1=aarde}}
+{{t|no|i1=s|t1=jorda}}
+{{t|pl|a1=1-4|t1=ziemia|g1=f|a2=5|t2=uziemienie|g2=n}}
+{{t|pt|i1=s|t1=terra}}
+{{t|ine-pro|a1=2|t1=*dʰéǵʰōm|g1=f|a2=5|t2=*pl̥th̥₂wíh₂|g2=f}}
+{{t|sv|i1=s|t1=jord}}
+{{trad-abajo}}

@@ -1,0 +1,749 @@
+==English==
+
+===Pronunciation===
+* {{enPR|sko͞ol}} 
+* {{IPA|en|/skuːl/|[skuːɫ]|a=RP}}
+** {{audio|en|En-uk-school.ogg|a=RP}}
+* {{IPA|en|/skul/|[skuɫ]|a=GA}}
+** {{audio|en|LL-Q1860 (eng)-Qwertygiy-school.wav|a=US}}
+* {{IPA|en|/skʉːl/|[skʉːɫ]|a=AU,NZ}}
+* {{IPA|en|/skʉl/|a=Scotland,Northern Ireland,pull-pool}}
+* {{IPA|en|/skɪʉːl/|a=Local Dublin}}
+* {{IPA|en|/(ɪ)sk(h)uːl/|a=Indic}}
+* {{rhymes|en|uːl|s=1}}
+
+===Etymology 1===
+{{root|en|ine-pro|*seǵʰ-}}
+[[Image:Moye Elementary School.JPG|thumb|Elementary school]]
+From {{inh|en|enm|scole}}, from {{inh|en|ang|scōl|t=place of education}}, from {{inh|en|gmw-pro|*skōlu}}, from {{der|en|la-lat|schola}}, {{m|la|scola|t=learned discussion or dissertation, lecture, school}}, from {{der|en|grc|σχολή|t=spare time, leisure}}, from {{der|en|ine-pro|*seǵʰ-|t=to hold, have, possess}}. {{doublet|en|schola|shul}}.
+
+Compare {{cog|ofs|skūle}}, {{m|ofs|schūle|t=school}} ({{cog|fy|skoalle}}, {{cog|stq|Skoule}}), {{cog|nl|school|t=school}}, {{cog|nds-de|School|t=school}}, {{cog|goh|scuola|t=school}}, {{cog|de|Schule|t=school}}, {{cog|non|skóli|t=school}}.
+
+Influenced in some senses by {{m+|enm|schole||group of persons, host, company}}, from {{cog|dum|scole||multitude, troop, band}}. See {{m|en|school||group|id=group}}. Related also to {{cog|goh|sigi|t=victory|tr={{cog|de|Sieg}}}}, {{cog|ang|siġe}}, {{m|ang|sigor|t=victory}}.
+
+====Alternative forms====
+* {{alter|en|schole||obsolete}}
+
+====Noun====
+{{en-noun|~}}
+
+# {{lb|en|India|North America}} An [[institution]] dedicated to [[teaching]] and [[learning]]; an [[educational]] institution.
+#: {{syn|en|academy|college|university}}
+#: {{ux|en|Our children attend a public '''school''' in our neighborhood.}}
+#: {{ux|en|Harvard University is a famous American postsecondary '''school'''.}}
+# {{lb|en|British}} An [[educational institution]] providing [[primary education|primary]] and [[secondary education]], prior to [[tertiary education]] ([[college]] or [[university]]).
+#* {{quote-journal|en|date=2013-07-19| author=[http://www.theguardian.com/profile/marktran Mark Tran]| volume=189| issue=6| page=1| magazine=w:The Guardian Weekly| title=[http://www.theguardian.com/global-development/2013/jul/12/war-denying-children-education Denied an education by war]| passage=One particularly damaging, but often ignored, effect of conflict on education is the proliferation of attacks on '''schools'''{{...}}as children, teachers or '''school''' buildings become the targets of attacks. Parents fear sending their children to '''school'''. Girls are particularly vulnerable to sexual violence.}}
+# {{lb|en|UK}} At {{w|Eton College}}, a [[period]] or session of teaching.
+#: {{ux|en|Divinity, history and geography are studied for two '''schools''' per week.}}
+# Within a larger educational institution, an organizational unit, such as a [[department]] or [[institute]], which is dedicated to a specific subject area.
+#: {{syn|en|college|department|faculty|institute}}
+#: {{ux|en|We are enrolled in the same university, but I attend the '''School''' of Economics and my brother is in the '''School''' of Music.}}
+# An [[art movement]], a community of artists.
+#: {{ux|en|The Barbizon '''school''' of painters were part of an art movement towards Realism in art, which arose in the context of the dominant Romantic movement of the time.}}
+# {{qualifier|considered collectively}} The followers of a particular doctrine; a particular way of thinking or particular doctrine; a [[school of thought]].
+#: {{ux|en|These economists belong to the monetarist '''school'''.}}
+#* {{RQ:Taylor Worthy Communicant|year=1661|pages=90–91|pageref=91|passage=Let no man be leſſe confident in his holy faith {{...}} by reason of any difference of judgement vvhich is in the ſeveral '''Schools''' of Chriſtians concerning the effects and conſequent bleſſings of this Sacrament.}}
+#* {{RQ:Allingham China Governess|chapter=3|passage=Here the stripped panelling was warmly gold and the pictures, mostly of the English '''school''', were mellow and gentle in the afternoon light.}}
+# The time during which classes are attended or in session in an educational institution.
+#: {{ux|en|I’ll see you after '''school'''.}}
+# <!--outdated?-->The room or hall in English universities where the examinations for degrees and honours are held.
+# The canons, precepts, or body of opinion or practice, sanctioned by the authority of a particular class or age.
+#: {{ux|en|He was a gentleman of the old '''school'''.}}
+#* {{quote-text|en|year=1883|author=w:Arthur Sherburne Hardy|title=But Yet a Woman|passage=His face pale but striking, though not handsome after the '''schools'''.}}
+# An establishment offering specialized instruction, as for driving, cooking, typing, coding, etc.
+
+=====Hyponyms=====
+* See also [[Thesaurus:school]]
+
+=====Coordinate terms=====
+* {{sense|institution providing primary and secondary education}} [[nursery school]], [[kindergarten]], [[college]], [[polytechnic]], [[university]]
+
+=====Derived terms=====
+{{col3|en|freedom school|last mile school|Frankfurt School|Chicago school|alternative school|boarding school|comprehensive school|church school|parish school|school port|smile school|cram school|elementary school|grade school|grammar school|high school|home school|infant school|junior high school|junior school|lower school|magnet school|middle school|new school|non-school,nonschool|nursery school|old school|prep school|primary school|free school movement|Latin grammar school|Latin school|little school|out-of-school learning
+|private school|public school|real school|school age|schoolbag|school band
+|schoolbook|schoolboy|schoolchild|schoolday,school day
+|schoolfellow|schoolfriend|schoolgirl|schoolground|school holidays|schoolkid
+|schoolma'am|schoolmaster|schoolmistress|school night|school's out|schoolteacher|school trip
+|schoolwork|school year,schoolyear|secondary modern school|secondary school
+|skoo'|state school|Sunday school|tell tales out of school|school of thought|upper school|in school|school zone
+|academy school|after school special|after-school|after-school special|all-through school|approved school|art school|at school|B-school|b-school|school committee|secondary technical school|back-to-school|back-to-school night|beacon school|beauty school|big school|board school|business school|charm school|charter school|choir school|combined school|continuation school|convent school|dame school|dance school|day school|driving school|dancing school|dual school|escalator school|every day is a school day|feeder school|film school|finishing school|first school|flying school|grad school|graduate school|hedge school|home school|in-school suspension|industrial school|intermediate school|J-school|library school|national-type school|john school|ladder school|Lake school|language school|law school|life school|med school|medical school|military school|mission school|music school|national school|new school|night school|normal school|old-school|out-of-school suspension|parochial school|skip school|party school|postsecondary school|pre-school|pregnancy school|primary school student|public-school|pushing school|pushing-school|ragged school|reform school|residential school|rule the school|Sabbath school|safety school|school board|school book|school bus|school class|school counselor|school crossing attendant|school dinner|school dinner lady|school district|school division|school life|school mate|school meal|school of hard knocks|school of the air|school pence|school psychologist|school refusal|school resource officer|school run|school shark|school shooter|school shooting|school sores|school teacher|school tie|school uniform|school voucher|school-age|school-aged|school-goer|school-leaver|school-marm|school-point|school-time|school-wide|selective school|semester school|semi-boarding school|senior high school|senior school|separate school|ski school|southern school whiting|special school|summer school|talk out of school|teach school|technical school|therapeutic boarding school|titan primary school|too cool for school|umbrella school|union high school|vaulting school|vaulting-school|vernacular school|vested school|vestibule school|vocational school|voluntary aided school|voluntary controlled school|Waldorf school|aided school|blab school|e-school|evening school|forest school|international school|moonlight school|national school bus chrome|new-school|preparatory school|sainik school|school captain|school glue|school holiday|school-butter|school-dinner lady|school-house|school-ready|school-room|trade school|training school| Bible school|divinity school|integrated school|riding school|school inspector|school marm|truant school|samba school|Vacation Bible School|free school}}
+
+=====Descendants=====
+{{top2}}
+* {{desc|rop|skul}}
+* {{desc|bi|skul}}
+* {{desc|pcm|skul}}
+* {{desc|tpi|skul|alts=1}}
+* {{desc|pis|skul}}
+* {{→}} Hindustani:
+*: {{desc|hi|स्कूल}}
+*: {{desctree|ur|اِسْکُول}}
+* {{desc|bor=1|mi|kura}}
+* {{desc|bor=1|pau|skuul}}
+* {{desc|bor=1|sw|skule|skuli}}
+* {{desc|unm|shkul|bor=1}}
+{{bottom}}
+
+=====Translations=====
+{{trans-top|an institution dedicated to teaching and learning}}
+{{multitrans|data=
+* Abkhaz: {{tt|ab|апхьарта}}
+* Adyghe: {{tt|ady|еджапӏэ}}
+* Afrikaans: {{tt+|af|skool}}
+* Albanian: {{tt+|sq|mësonjëtore|f}}, {{tt+|sq|shkollë|f}}
+* Ambonese Malay: {{tt|abs|iskola}}, {{tt|abs|skola}}
+* American Sign Language: {{tt|ase|OpenB@Palm-PalmDown-OpenB@CenterChesthigh-PalmUp Contact Contact}}
+* Amharic: {{tt|am|[[ትምህርት]] [[ቤት]]|tr=təmhrtə bet}}
+* Arabic: {{tt+|ar|مَدْرَسَة|f}}, {{tt+|ar|مَكْتَب|m}} {{qualifier|historical}}
+*: Chadian Arabic: {{t|shu|لكول|m|tr=lekkōl}}
+*: Egyptian Arabic: {{tt|arz|مدرسة|f|tr=madrasa}}
+*: Gulf Arabic: {{t|afb|مدرسة|f|tr=madrisa}}
+*: Hijazi Arabic: {{t|acw|مدرسة|f|tr=madrasa}}
+*: South Levantine Arabic: {{t|ajp|مدرسة|f|tr=madrase}}
+* Aramaic:
+*: Syriac: {{tt|syc|ܡܕܪܫܬܐ|f|tr=maḏreštāʾ}}
+* Armenian: {{tt+|hy|դպրոց}}
+* Aromanian: {{tt|rup|sculii|f}}, {{tt|rup|sculie|f}}
+* Assamese: {{tt|as|পঢ়াশালি}}, {{tt|as|স্কুল}}, {{tt|as|বিদ্যালয়|tr=biddaloy}}, {{tt|as|ছাতৰশালি}}
+* Asturian: {{tt+|ast|escuela|f}}
+* Atong (India): {{t|aot|skul}}
+* Avar: {{t|av|школа}}
+* Azerbaijani: {{tt+|az|məktəb}}, {{tt+|az|mədrəsə}} {{qualifier|Islamic or South Azerbaijani}}
+* Baluchi: {{tt|bal|وانگ جاہ|tr=wánag jáh}}, {{qualifier|rare}} {{tt|bal|وانتجاہ|tr=wántjáh}}
+* Bangi: {{t|bni|sukulu}}
+* Bashkir: {{tt|ba|мәктәп}}, {{tt|ba|мәҙрәсә}} {{qualifier|Islamic}}
+* Basque: {{tt+|eu|eskola}}, {{tt+|eu|ikastola}}, {{tt+|eu|ikastetxe}}
+* Belarusian: {{tt|be|шко́ла|f}}, {{tt|be|вучы́лішча|n}}
+* Bella Coola: {{tt|blc|acwsalcta}}
+* Bengali: {{tt+|bn|বিদ্যালয়}}, {{tt+|bn|মকতব}} {{qualifier|Islamic}}, {{tt+|bn|মাদ্রাসা}} {{qualifier|Islamic}}, {{tt+|bn|পাঠশালা}}, {{t+|bn|স্কুল}}, {{t+|bn|ইস্কুল}}
+* Breton: {{tt+|br|skol|f}}
+* Brunei Bisaya: {{tt|bsb|sakulah}}
+* Bulgarian: {{tt+|bg|учи́лище|n}}, {{tt+|bg|шко́ла|f}}{{qualifier|specialised, e.g. music, language school}}
+* Burmese: {{tt+|my|ကျောင်း}}
+* Buryat: {{t|bua|һургуули}}
+* Carpathian Rusyn: {{tt|rue|шко́ла|f}}
+* Catalan: {{tt+|ca|escola|f}}
+* Cebuano: {{t|ceb|eskuwela}}, {{t|ceb|eskuwelahan}}
+* Chechen: {{tt|ce|школа}}, {{t|ce|ишкол}}
+* Chinese:
+*: Cantonese: {{tt|yue|學校}}, {{t|yue|書館}} {{qualifier|dated or dialectal}}
+*: Dungan: {{tt|dng|щүәщё}}, {{tt|dng|щүәтон}}
+*: Eastern Min: {{tt|cdo|學校|tr=hŏk-hâu}}, {{t|cdo|學堂}}
+*: Gan: {{t|gan|學堂}}
+*: Hakka: {{tt|hak|學校|tr=ho̍k-káu}}, {{t|hak|學堂|tr=ho̍k-thòng}}
+*: Hokkien: {{tt+|nan-hbl|學校|tr=ha̍k-hāu}}
+*: Jin: {{t|cjy|學校}}, {{t|cjy|學堂}}
+*: Mandarin: {{tt+|cmn|學校}}, {{tt+|cmn|學堂}} {{qualifier|dialectal}}
+*: Northern Min: {{t|mnp|學堂}}
+*: Wu: {{t|wuu|學校}}, {{t|wuu|學堂}}
+*: Xiang: {{t|hsn|學校}}, {{t|hsn|學堂}}
+* Choctaw: {{t|cho|holisso apisa}}
+* Chukchi: {{tt|ckt|каԓеткоран|tr=kaḷetkoran}}
+* Chuvash: {{tt|cv|шкул}}
+* Coptic: {{tt|cop|ⲁⲛⲥⲏⲃⲉ}} {{qualifier|Sahidic}}, {{tt|cop|ⲁⲛⲍⲏⲃ}} {{qualifier|Bohairic}}
+* Crimean Tatar: {{tt|crh|mektep}}
+* Czech: {{tt+|cs|škola|f}}
+* Danish: {{tt+|da|skole|c}}
+* Dargwa: {{tt|dar|ушкул}}
+* Dhivehi: {{tt|dv|ސްކޫލު}}
+* Dusun:
+*: Central Dusun: {{tt|dtp|sikul}}
+* Dutch: {{tt+|nl|school|f}}
+* Ede:
+*: Ifè: {{t|ife|sùkúrù}}, {{t|ife|ilé-ìwé}}
+* Edo: {{t|bin|òwébè}}, {{t|bin|èsùkú}}
+* Egyptian: {{t-egy|ꜥt-sbꜣw|h=a:t*pr-s-b-N14-A-A24}}
+* Elfdalian: {{tt|ovd|skaule|m}}
+* Erzya: {{tt|myv|школа}}, {{tt|myv|тонавтнема кудо}}
+* Esperanto: {{tt+|eo|lernejo}}
+* Estonian: {{tt+|et|kool}}
+* Ewe: {{tt|ee|suku}}
+* Faroese: {{tt+|fo|skúli|m}}
+* Finnish: {{tt+|fi|koulu}}
+* French: {{tt+|fr|école|f}}, {{tt+|fr|collège|m}}
+* Frisian:
+*: North Frisian: {{tt|frr|Skuul|c}}
+*: Saterland Frisian: {{tt|stq|Skoule|f}}
+* Friulian: {{tt|fur|scuele|f}}
+* Fula:
+*: Adlam: {{tt|ff|𞤶𞤢𞤲𞥆𞤺𞤪𞤣𞤫}}, {{tt|ff|𞤣𞤵𞤯𞤢𞤤}}
+*: Latin: {{tt|ff|janngirde}}, {{tt|ff|duɗal}}
+* Galician: {{tt+|gl|escola|f}}, {{tt+|gl|colexio|m}}
+* Gamilaraay: {{tt|kld|dhiirrabaa}}
+* Georgian: {{tt+|ka|სკოლა}}
+* German: {{tt+|de|Schule|f}}
+* Greek: {{tt+|el|σχολείο|n}}
+*: Ancient Greek: {{tt|grc|διδασκαλεῖον|n}}
+* Greenlandic: {{tt|kl|atuarfik}}
+* Gujarati: {{tt|gu|નિશાળ|f}}, {{tt|gu|વિદ્યાલય}}, {{t|gu|સ્કૂલ|f}}
+* Haitian Creole: {{tt|ht|lekòl}}
+* Hanunoo: {{t|hnn|aradalan}}
+* Hausa: {{t+|ha|makar̃antā}}
+* Hawaiian: {{t|haw|kula}}
+* Hebrew: {{tt+|he|בֵּית סֵפֶר|m|tr=bet séfer}}
+* Hiligaynon: {{t|hil|eskuwela}}
+* Hindi: {{tt+|hi|विद्यालय|m}}, {{tt+|hi|पाठशाला|f}}, {{tt+|hi|गुरुकुल|m}}, {{tt+|hi|स्कूल|m}}
+* Hungarian: {{tt+|hu|iskola}}
+* Hunsrik: {{tt|hrx|Schul|f}}, {{tt|hrx|xuul|f}}
+* Iban: {{tt|iba|sekula}}
+* Icelandic: {{tt+|is|skóli|m}}
+* Ido: {{tt+|io|skolo}}
+* Igala: {{t|igl|ìchèkpúlù}}
+* Igbo: {{t|ig|ụlọ̀ akwụkwọ}}
+* Ilocano: {{t|ilo|eskuela}}
+* Indonesian: {{tt+|id|sekolah}}
+* Ingrian: {{tt|izh|škoulu}}, {{t|izh|oppi}}
+* Interlingua: {{tt+|ia|schola}}
+* Irish: {{tt+|ga|scoil|f}}
+*: Old Irish: {{tt|sga|scol|f}}
+* Italian: {{tt+|it|scuola|f}}
+* Izon: {{t|ijc|funtolumọwarị|alt=fúntolumọwarị}}, {{t|ijc|sukulu|alt=sukúlù}}
+* Japanese: {{tt+|ja|学校|tr=がっこう, gakkō}}, {{tt|ja|学び舎|tr=まなびや, manabiya}}
+* Javanese: {{tt+|jv|ꦱꦼꦏꦺꦴꦭꦃ|tr=sêkolah}}
+* Jeju: {{t|jje|ᄒᆞᆨ교}}
+* Judeo-Italian: {{t|itk|scuola}}, {{t|itk|סשוולא}}
+* Kalmyk: {{tt|xal|школ}}
+* Kanakanabu: {{t|xnb|tarisinata}}
+* Kannada: {{tt+|kn|ಶಾಲೆ}}, {{tt+|kn|ವಿದ್ಯಾಲಯ}}
+* Kapampangan: {{t|pam|pipágarálan}}, {{t|pam|iskuela}}
+* Karen:
+*: S'gaw Karen: {{t|ksw|ကၠိ}}
+* Kashubian: {{t|csb|szkòła|f}}
+* Kazakh: {{tt+|kk|мектеп}}, {{tt|kk|медресе}} {{qualifier|Islamic}}, {{t|kk|оқыл}}
+* Khmer: {{tt+|km|សាលារៀន}}, {{t+|km|សាលា}}
+* Korean: {{tt+|ko|학교(學校)}}
+* Kurdish:
+*: Central Kurdish: {{tt|ckb|مه‌کته‌ب}}, {{tt|ckb|قوتابخانه‌}}
+*: Northern Kurdish: {{tt+|kmr|dibistan|f}}, {{tt+|kmr|fêrgeh|f}}, {{tt+|kmr|xwendingeh|f}}, {{tt+|kmr|qutabxane|f}}, {{tt+|kmr|medrese|f}}, {{tt+|kmr|mekteb|f}}, {{tt+|kmr|perwerdegeh|f}}
+* Kyrgyz: {{tt+|ky|мектеп}}, {{tt|ky|медресе}} {{qualifier|Islamic}}, {{t|ky|окул}}
+* Ladin: {{tt|lld|scola|f}}
+* Ladino: {{tt|lad|skola|f}}, {{tt|lad|סקולה|f}}
+* Lao: {{tt+|lo|ໂຮງຮຽນ}}
+* Latin: {{tt|la|collēgium|n}}, {{tt+|la|lūdus|m}}, {{tt|la|schola|f}}, {{tt|la|audītōrium|n}}
+* Latvian: {{tt+|lv|skola|f}}
+* Lingala: {{t|ln|sukulu}}
+* Lithuanian: {{tt+|lt|mokykla|f}}
+* Lombard: {{t+|lmo|scola|f}}, {{t|lmo|scöla|f}}, {{t|lmo|scöra|f}}
+* Louisiana Creole: {{t|lou|lékòl}}
+* Lü: {{tt|khb|ᦷᦣᧂᦵᦣᧃ}}, {{tt|khb|ᦷᦣᧂᦉᦸᧃ}}
+* Lucumí: {{t|luq|ilé igué}}, {{t|luq|ilé iwé}}, {{t|luq|lewé}}
+* Lushootseed: {{tt|lut|ʔugʷusaɬalʔtxʷ}}
+* Luxembourgish: {{tt+|lb|Schoul|f}}
+* Macedonian: {{tt+|mk|училиште|n}}, {{tt+|mk|школа|f}}, {{tt|mk|школо|n}}
+* Malagasy: {{tt+|mg|sekoly}}
+* Malay: {{tt+|ms|sekolah}}, {{tt|ms|maktab}}, {{tt+|ms|madrasah}} {{qualifier|Islamic}}
+*: Brunei Malay: {{tt|kxd|sikulah}}
+* Malayalam: {{tt+|ml|വിദ്യാലയം}}
+* Maltese: {{tt+|mt|skola}}
+* Manchu: {{tt|mnc|ᡨᠠᠴᡳᡴᡡ}}
+* Manx: {{tt|gv|scoill|m}}
+* Māori: {{tt+|mi|kura}}, {{tt|mi|wharekura}}
+* Marathi: {{tt|mr|शाळा|f}}
+* Melanau:
+*: Central Melanau: {{tt|mel|sekul}}
+* Middle English: {{t|enm|scole}}
+* Mòcheno: {{tt|mhn|schual|f}}
+* Mongolian:
+*: Cyrillic: {{tt+|mn|сургууль}}
+*: Mongolian script: {{tt|mn|ᠰᠤᠷᠭᠠᠭᠤᠯᠢ}}
+* Navajo: {{tt|nv|óltaʼ}}, {{t|nv|ʼóltaʼígíí}}
+* Neapolitan: {{tt|nap|scola|f}}
+* Nepali: {{tt|ne|इस्कुल}}
+* Norman: {{tt|nrf|êcole|f}} {{qualifier|Jersey}}
+* Norwegian:
+*: Bokmål: {{tt+|nb|skole|m}}
+*: Nynorsk: {{tt|nn|skule|m}},  {{tt|nn|skole|m}}
+* Nupe: {{t|nup|mankan̄ta}}, {{t|nup|mákáńtá}}
+* Nǀuu: {{t|ngh|skualsi}}, {{t|ngh|skoolsi}}
+* Occitan: {{tt+|oc|escòla|f}}
+* Odia: {{tt+|or|ବିଦ୍ୟାଳୟ}}
+* Okinawan: {{t|ryu|学校|tr=がっこー, gakkō}}
+* Old English: {{tt|ang|scōl|f}}
+* Old Prussian: {{tt|prg|skūli|f}}
+* Oromo: {{t|om|[[mana barumsaa]]}}
+* Ossetian: {{tt|os|скъола}}
+* Pannonian Rusyn: {{tt|rsk|школа|f}}
+* Papiamentu: {{t|pap|skol}}
+* Pashto: {{tt+|ps|ښوونځی|m|tr=xowanjai}}, {{tt|ps|مدرسه|f|tr=madrasa}}, {{t|ps|مکتب|m|tr=maktáb}}
+* Persian:
+*: Dari: {{tt+|prs|مَدْرَسَه}}, {{tt+|prs|مَکْتَب}}, {{tt+|prs|دَبِسْتَان}} {{qualifier|primary}}
+*: Iranian Persian: {{tt+|fa-ira|مَدْرِسِه}}, {{tt+|fa-ira|مَکْتَب}}, {{tt+|fa-ira|دَبِسْتان}} {{qualifier|primary}}
+* Piedmontese: {{t|pms|scòla|f}}
+* Plautdietsch: {{tt|pdt|School|f}}
+* Polish: {{tt+|pl|szkoła|f}}, {{tt+|pl|buda|f}} {{qualifier|colloquial}}
+* Portuguese: {{tt+|pt|escola|f}}, {{tt+|pt|colégio|m}}
+* Punjabi:
+*: Gurmukhi: {{tt|pa|ਮਦਰੱਸਾ|m|tr=madrasā}}, {{tt+|pa|ਸਕੂਲ|m}}
+*: Western Punjabi: {{tt+|pnb|سکول|m}}
+* Quechua: {{tt|qu|yachay wasi}}
+* Romagnol: {{t|rgn|scöla|f}}
+* Romanian: {{tt+|ro|școală|f}}
+* Romansh: {{tt|rm|scola|f}}, {{tt|rm|scoula|f}}
+* Russian: {{tt+|ru|шко́ла|f}}, {{tt+|ru|учи́лище|n}} {{qualifier|specialized school, college}}
+* Sami:
+*: Northern Sami: {{tt|se|skuvla}}
+*: Pite Sami: {{tt|sje|skåvvlå}}
+*: Skolt Sami: {{tt|sms|škooul}}
+* Samogitian: {{tt|sgs|muokīkla|f}}
+* Sanskrit: {{tt+|sa|विद्यालय|m}}
+* Santali: {{tt|sat|ᱵᱤᱨᱫᱟᱹᱜᱟᱲ}}
+* Sardinian: {{tt|sc|isciola|f}}, {{tt|sc|iscola|f}}, {{tt|sc|scola|f}}
+* Scots: {{tt|sco|skuil}}, {{tt|sco|schuil}}
+* Scottish Gaelic: {{tt|gd|sgoil|f}}
+* Semai: {{tt|sea|sekulah}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt+|sh|шко̑ла|f}}, {{tt|sh|медрѐса|f}} {{qualifier|Islamic}}
+*: Latin: {{tt+|sh|škȏla|f}}, {{tt+|sh|medrèsa|f}} {{qualifier|Islamic}}
+* Sicilian: {{tt+|scn|scola|f}}
+* Sindhi: {{tt|sd|اِسڪوُلُ|tr=iskūlu}}
+* Sinhalese: {{tt+|si|ඉස්කෝලය}}, {{tt|si|පාසැල}}
+* Slovak: {{tt+|sk|škola|f}}
+* Slovene: {{tt+|sl|šola|f}}
+* Somali: {{tt+|so|duqsi}}, {{tt|so|iskuul}}
+* Sorbian:
+*: Lower Sorbian: {{tt|dsb|šula|f}}
+*: Upper Sorbian: {{t|hsb|šula|f}}
+* Sotho: {{tt+|st|sekolo}}
+* Spanish: {{tt+|es|escuela|f}}, {{tt+|es|colegio|m}}
+* Sumerian: {{t|sux|𒂍𒁾𒁀𒀀|tr=edubak}}
+* Swahili: {{tt+|sw|shule|cIX}}
+* Swedish: {{tt+|sv|skola|c}}
+* Sylheti: {{tt|syl|ꠁꠍ꠆ꠇꠥꠟ|tr=iskul}}
+* Tabasaran: {{t|tab|мектеб}}
+* Tagalog: {{tt|tl|eskuwelahan}}, {{tt+|tl|paaralan|n}}
+* Tajik: {{tt+|tg|мактаб}}, {{tt+|tg|мадраса}}
+* Tamil: {{tt+|ta|பள்ளி}}, {{tt+|ta|பாடசாலை}}
+* Tatar: {{tt+|tt|мәктәп}}, {{tt+|tt|мәдрәсә}} {{qualifier|Islamic}}
+* Telugu: {{tt+|te|బడి}}, {{tt+|te|పాఠశాల}}, {{tt+|te|విద్యాలయం}}
+* Tetum: {{tt|tet|eskola}}
+* Thai: {{tt+|th|โรงเรียน}}
+* Tibetan: {{tt|bo|སློབ་གྲྭ}}
+* Tigrinya: {{tt|ti|ቤት-ትምህርቲ}}
+* Tok Pisin: {{tt|tpi|skul}}
+* Tonga (Zambia): {{t|toi|cikolo}}
+* Turkish: {{tt+|tr|okul}}
+* Turkmen: {{tt|tk|mekdep}}, {{tt|tk|uçilişşe}}, {{tt|tk|medrese}} {{qualifier|Islamic}}
+* Tutong: {{tt|ttg|sekula}}
+* Ukrainian: {{tt+|uk|шко́ла|f}}, {{tt|uk|учи́лище|n}}
+* Urdu: {{tt|ur|اِسْکُول|m}}, {{tt|ur|مَدْرَسَہ|m}}, {{t|ur|مَکْتَب|m}}, {{t|ur|دَرْس گاہ|m}}, {{t|ur|تَعْلِیم گاہ|m}}, {{t|ur|دَبِسْتان|m}}, {{tt|ur|تَعْلِیمی اِدارَہ|m}}
+* Uyghur: {{tt|ug|مەكتەپ}}
+* Uzbek: {{tt|uz|shkola}}, {{tt+|uz|maktab}}, {{tt+|uz|madrasa}} {{qualifier|Islamic}}, {{t|uz|oʻqil}}
+* Venetan: {{tt|vec|scoła|f}}
+* Vietnamese: {{tt+|vi|trường}} ({{tt+|vi|場}}), {{tt+|vi|trường học}} ({{tt|vi|場學}})
+* Vilamovian: {{t|wym|śül}}
+* Volapük: {{tt+|vo|jul}}, {{qualifier|lower (primary)}} {{tt|vo|donajul}}
+* Walloon: {{tt+|wa|scole|f}}
+* Waray-Waray: {{t|war|eskuwela}}
+* Welsh: {{tt+|cy|ysgol|f}}
+* Wutunhua: {{t|wuh|xaitang}}
+* Yaghnobi: {{tt|yai|мактаб}}
+* Yakut: {{tt|sah|оскуола}}
+* Yiddish: {{tt|yi|שולע|f}}, {{tt|yi|שול|f}}
+* Yoruba: {{t|yo|ilé-ìwé}}
+* Yup'ik: {{tt|esu|eskuulaq}}, {{tt|esu|elitnaurvik}}
+* Zazaki: {{tt+|zza|mektev}}
+* Zhuang: {{tt|za|yozyau}}, {{tt|za|hagdangz}}, {{tt|za|ranzhag}}, {{tt|za|sawfuengz}}
+{{trans-bottom}}
+
+{{trans-top|an institution dedicated to teaching and learning before college or university}}
+* American Sign Language: {{tt|ase|OpenB@Palm-PalmDown-OpenB@CenterChesthigh-PalmUp Contact Contact}}
+* Arabic: {{t+|ar|مَدْرَسَة|f}}
+* Armenian: {{tt+|hy|դպրոց}}
+* Assamese: {{tt|as|পঢ়াশালি}}, {{tt|as|স্কুল}}, {{tt|as|বিদ্যালয়|tr=biddaloy}}, {{tt|as|ছাতৰশালি}}
+* Bashkir: {{tt|ba|мәктәп}}
+* Belarusian: {{t|be|шко́ла|f}}
+* Bulgarian: {{t+|bg|учи́лище|n}}
+* Carpathian Rusyn: {{t|rue|шко́ла|f}}
+* Chinese:
+*: Cantonese: {{tt|yue|學校}}
+*: Dungan: {{tt|dng|щүәщё}}
+*: Eastern Min: {{tt|cdo|學校|tr=hŏk-hâu}}
+*: Hakka: {{tt|hak|學校|tr=ho̍k-káu}}
+*: Mandarin: {{tt+|cmn|學校}}
+* Czech: {{t+|cs|škola|f}}
+* Dutch: {{tt+|nl|school}}
+* Finnish: {{tt+|fi|koulu}}
+* French: {{t+|fr|école|f}}
+* Galician: {{t+|gl|colexio|m}}, {{t+|gl|escola|f}}
+* German: {{t+|de|Schule|f}}
+* Greek: {{tt+|el|σχολείο|n}}
+* Hindi: {{t+|hi|विद्यालय|m}}, {{t+|hi|पाठशाला|f}}, {{t+|hi|गुरुकुल|m}}
+* Indonesian: {{tt+|id|sekolah}}
+* Ingrian: {{t|izh|škoulu}}, {{t|izh|oppi}}
+* Japanese: {{tt+|ja|学校|tr=がっこう, gakkō}}
+* Javanese: {{tt+|jv|ꦱꦼꦏꦺꦴꦭꦃ|tr=sêkolah}}
+* Khmer: {{tt+|km|សាលារៀន|tr=sala rean}}
+* Korean: {{tt|ko|[[중등]][[학교]](中等學校)}}
+* Lao: {{tt+|lo|ໂຮງຮຽນ}}
+* Latvian: {{tt+|lv|skola|f}}
+* Macedonian: {{t+|mk|училиште|n}}, {{t+|mk|школа|f}}
+* Malay: {{tt+|ms|sekolah}}
+* Malayalam: {{t+|ml|പള്ളിക്കൂടം}}, {{t+|ml|വിദ്യാലയം}}, {{t+|ml|സ്കൂൾ}}
+* Māori: {{tt+|mi|kura}}
+* Marathi: {{tt|mr|शाळा|f}}
+* Pannonian Rusyn: {{t|rsk|школа|f}}
+* Pashto: {{tt+|ps|ښوونځی|m|tr=xowanjai}}
+* Persian:
+*: Dari: {{tt|prs|مَدْرَسَه}}
+*: Iranian Persian: {{tt|fa-ira|مَدْرِسِه}}
+* Polish: {{t+|pl|szkoła|f}}
+* Portuguese: {{tt+|pt|escola|f}}
+* Quechua: {{tt|qu|yachay wasi}}
+* Romanian: {{tt+|ro|școală medie|f}}, {{tt+|ro|gimnaziu}}
+* Russian: {{tt+|ru|шко́ла|f}}
+* Santali: {{tt|sat|ᱵᱤᱨᱫᱟᱹᱜᱟᱲ}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt+|sh|шко̑ла|f}}
+*: Latin: {{tt+|sh|škȏla|f}}
+* Sindhi: {{tt|sd|اسڪول|tr=iskūlu}}
+* Slovak: {{t+|sk|škola|f}}
+* Slovene: {{t+|sl|šola|f}}
+* Spanish: {{tt+|es|escuela|f}}
+* Swahili: {{tt+|sw|shule}}
+* Swedish: {{tt+|sv|skola|c}}
+* Tagalog: {{t|tl|eskuwelahan}}, {{t+|tl|paaralan}}
+* Turkish: {{tt+|tr|okul}}
+* Ukrainian: {{tt+|uk|шко́ла|f}}
+* Urdu: {{t|ur|مَکْتَب|m}}
+* Yup'ik: {{tt|esu|eskuulaq}}
+{{trans-bottom}}
+
+{{trans-top|college or university}}
+* Afrikaans: {{tt|af|kollege}}, {{tt+|af|universiteit}}
+* American Sign Language: {{tt|ase|OpenB@Palm-PalmDown-OpenB@CenterChesthigh-PalmUp CirclesVert OpenB@CenterSternumHigh-PalmDown-OpenB@CenterChesthigh-PalmUp}}
+* Arabic: {{tt+|ar|كُلِّيَّة|f}}, {{tt+|ar|جَامِعَة|f}}
+* Armenian: {{tt+|hy|բուհ}}
+* Breton: {{tt+|br|skol-veur|f}}
+* Bulgarian: {{tt+|bg|коле́ж|m}}, {{tt|bg|университе́т|m}}
+* Burmese: {{tt+|my|တက္ကသိုလ်}}
+* Catalan: {{tt+|ca|escola|f}}
+* Chinese:
+*: Cantonese: {{tt+|yue|大學}}
+*: Dungan: {{tt|dng|дащүә}}
+*: Eastern Min: {{tt|cdo|大學|tr=dâi-hŏk}}
+*: Hokkien: {{tt+|nan-hbl|大學|tr=tāi-ha̍k}}
+*: Mandarin: {{tt+|cmn|學校}}, {{tt+|cmn|大學}}
+* Czech: {{tt+|cs|škola|f}}
+* Danish: {{tt+|da|skole|c}}
+* Dutch: {{tt+|nl|school|f}}, {{tt+|nl|universiteit|f}}
+* Estonian: {{tt+|et|kool}}
+* Finnish: {{tt+|fi|yliopisto}}
+* French: {{tt+|fr|collège|m}}, {{tt+|fr|université|f}}, {{tt+|fr|faculté}}
+* Galician: {{t+|gl|universidade|f}}, {{t+|gl|faculdade|f}}, {{t+|gl|colexio universitario|m}}
+* German: {{tt+|de|Universität|f}}, {{tt+|de|Hochschule|f}}
+* Greek: {{tt+|el|πανεπιστήμιο|n}}
+* Hebrew: {{tt+|he|אוּנִיבֶרְסִיטָה|f|tr=univérsita}}, {{tt+|he|מִכְלָלָה|f|tr=mikhlalá}}
+* Hindi: {{t+|hi|महाविद्यालय|m}} {{qualifier|college }}, {{t+|hi|विश्वविद्यालय|m}} {{qualifier|university}}
+* Hungarian: {{tt+|hu|egyetem}} {{qualifier|university}}, {{tt+|hu|főiskola}} {{qualifier|college}}
+* Ido: {{tt+|io|skolo}}
+* Indonesian: {{tt+|id|universitas}}
+* Interlingua: {{tt+|ia|schola}}
+* Irish: {{tt+|ga|scoil}}
+* Italian: {{tt+|it|università|f}}, {{tt+|it|facoltà}}
+* Japanese: {{tt+|ja|大学|tr=だいがく, daigaku}}, {{tt+|ja|学校|tr=がっこう, gakkō}}
+* Korean: {{qualifier|College}} {{tt+|ko|대학(大學)}}, {{qualifier|University}} {{tt+|ko|대학교(大學校)}}
+* Latin: {{tt|la|collēgium|n}}, {{tt|la|ūniversitās|f}}
+* Lithuanian: {{tt+|lt|mokykla|f}}
+* Malay: {{tt+|ms|kolej}}, {{tt+|ms|universiti}}
+* Maltese: {{tt+|mt|università}}, {{tt|mt|istitut}}, {{tt|mt|kulleġġ}}
+* Marathi: {{tt+|mr|महाविद्यालय|n}}
+* Middle English: {{t|enm|scole}}
+* Polish: {{tt+|pl|uczelnia|f}}, {{tt+|pl|szkoła|f}}
+* Portuguese: {{tt+|pt|universidade|f}}, {{tt+|pt|faculdade}}
+* Punjabi:
+*: Western Punjabi: {{tt+|pnb|یونیورسٹی}}
+* Romanian: {{tt|ro|școală superiară|f}}, {{tt+|ro|universitate|f}}, {{tt+|ro|facultate|f}}, {{tt+|ro|colegiu|n}}
+* Russian: {{tt+|ru|вы́сшая шко́ла|f}}, {{tt+|ru|вы́сшее уче́бное заведе́ние|n}}, {{tt+|ru|университе́т|m}}, {{tt+|ru|акаде́мия|f}}, {{tt+|ru|институ́т|m}}, {{tt+|ru|консервато́рия|f}}, {{tt+|ru|колле́дж|m}}, {{tt+|ru|те́хникум|m}}, {{tt+|ru|учи́лище|n}}
+* Sami:
+*: Northern Sami: {{tt|se|allaskuvla}}
+* Scottish Gaelic: {{tt|gd|sgoil}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt|sh|факу̀лте̄т|m}}, {{tt|sh|академија|f}}, {{tt|sh|колеџ|m}} {{qualifier|college}}, {{tt|sh|универзитет|m}} {{qualifier|university}}, {{tt|sh|свеу̀чилӣште}}
+*: Latin: {{tt+|sh|fakùltēt|m}}, {{tt+|sh|akademija|f}}, {{tt+|sh|koledž|m}} {{qualifier|college}}, {{tt+|sh|univerzitet|m}} {{qualifier|university}}, {{tt+|sh|sveùčilīšte|n}}
+* Sindhi: {{tt|sd|ڪاليج}}
+* Slovak: {{tt+|sk|škola|f}}
+* Spanish: {{tt+|es|universidad|f}}, {{tt+|es|facultad|f}}
+* Swahili: {{tt+|sw|shule}}
+* Swedish: {{tt+|sv|högskola}} {{q|college}}, {{tt+|sv|universitet}} {{q|university}}, {{tt+|sv|lärosäte}}
+* Tagalog: {{tt+|tl|pamantasan|n}}
+* Telugu: {{tt+|te|పాఠశాల}}, {{tt+|te|విద్యాలయం}}
+* Thai: {{tt+|th|วิทยาลัย}}
+* Turkish: {{tt+|tr|üniversite}}
+* Ukrainian: {{tt|uk|ви́ща шко́ла|f}}, {{tt|uk|ви́щий навча́льний за́клад|m}}, {{tt+|uk|університе́т|m}}, {{tt+|uk|акаде́мія|f}}, {{tt|uk|інститу́т|m}}, {{tt|uk|консервато́рія|f}}, {{tt+|uk|коле́дж|m}}, {{tt|uk|те́хнікум|m}}, {{tt|uk|учи́лище|n}}
+* Vietnamese: {{tt+|vi|trường}} ({{tt+|vi|場}}), {{tt+|vi|đại học}} ({{tt+|vi|大學}}), {{tt|vi|[[trường]] [[đại học]]}}
+* Welsh: {{tt+|cy|ysgol|f}}
+{{trans-bottom}}
+
+{{trans-top|a department/institute at a college or university}}
+* Afrikaans: {{tt+|af|departement}}
+* Arabic: {{tt|ar|قِسِم|m}}
+* Armenian: {{tt+|hy|ֆակուլտետ}}
+* Breton: {{tt|br|kevrenn|f}}
+* Bulgarian: {{tt+|bg|факулте́т|m}}
+* Catalan: {{tt+|ca|escola|f}}
+* Chinese:
+*: Mandarin: {{tt+|cmn|學校}}
+* Czech: {{tt+|cs|škola|f}}
+* Danish: {{tt+|da|skole|c}}
+* Dutch: {{tt+|nl|school|f}}
+* Estonian: {{tt+|et|kool}}
+* Finnish: {{tt+|fi|koulu}}
+* French: {{tt+|fr|école|f}}
+* Galician: {{t+|gl|faculdade|f}}
+* German: {{tt+|de|Schule|f}}, {{tt+|de|Fakultät}}
+* Greek: {{tt+|el|σχολή|f}}
+* Hebrew: {{tt+|he|בֵּית סֵפֶר|m|tr=bet séfer}}, {{tt+|he|פָקוּלְטָה|f|tr=fakúlta}}
+* Hindi: {{t+|hi|विभाग|m}}
+* Hungarian: {{tt+|hu|kar}}, {{tt+|hu|intézet}}, {{tt+|hu|fakultás}}
+* Ido: {{tt+|io|skolo}}
+* Indonesian: {{tt+|id|fakultas}}, {{t+|id|sekolah}}, {{t+|id|departemen}}
+* Interlingua: {{tt+|ia|schola}}
+* Irish: {{tt+|ga|scoil}}
+* Italian: {{tt+|it|facoltà|f}}
+* Japanese: {{tt+|ja|大学|tr=だいがく, daigaku}}, {{tt+|ja|学校|tr=がっこう, gakkō}}
+* Korean: {{tt+|ko|학과(學科)}}
+* Lithuanian: {{tt+|lt|mokykla|f}}
+* Malay: {{tt|ms|fakulti}}, {{t|ms|pusat pengajian}}
+* Middle English: {{t|enm|scole}}
+* Norwegian:
+*: Bokmål: {{tt|nb|fakultet|n}}
+* Polish: {{tt+|pl|szkoła|f}}
+* Portuguese: {{tt+|pt|faculdade|f}}
+* Romanian: {{tt+|ro|școală|f}}
+* Russian: {{tt+|ru|ка́федра|f}}, {{tt+|ru|факульте́т|m}}
+* Scottish Gaelic: {{tt|gd|sgoil}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt|sh|ка̀те̄дра|f}}, {{tt|sh|факу̀лте̄т|m}}, {{tt+|sh|шко̑ла|f}}
+*: Latin: {{tt+|sh|kàtēdra|f}}, {{tt+|sh|fakùltēt|m}}, {{tt+|sh|škȏla|f}}
+* Slovak: {{tt+|sk|škola|f}}
+* Spanish: {{tt+|es|facultad|f}}
+* Swahili: {{tt+|sw|shule}}
+* Swedish: {{tt+|sv|fakultet}}, {{tt+|sv|institution}}
+* Tagalog: {{tt|tl|pakultad}}, {{tt|tl|departamento}}, {{tt|tl|sangay}}, {{tt|tl|institusyon}}, {{tt+|tl|kagawaran}}
+* Thai: {{t+|th|วิทยาลัย}}
+* Turkish: {{tt+|tr|fakülte}}
+* Ukrainian: {{tt|uk|факульте́т|m}}, {{tt|uk|відді́лення|f}}
+* Vietnamese: {{tt+|vi|phân khoa}} ({{tt+|vi|分}}{{tt+|vi|科}}), {{tt|vi|[[phân khoa]] [[đại học]]}} ({{tt|vi|[[分]][[科]][[大學]]}})
+* Welsh: {{tt+|cy|ysgol|f}}
+{{trans-bottom}}
+
+{{trans-top|an art movement}}
+* Bulgarian: {{t+|bg|шко́ла|f}}
+* Dutch: {{tt+|nl|school|f}}
+* Finnish: {{tt+|fi|koulukunta}}
+* French: {{tt+|fr|école|f}}
+* German: {{tt+|de|Schule|f}}
+* Hungarian: {{tt+|hu|iskola}}, {{tt+|hu|irányzat}}
+* Italian: {{tt+|it|scuola|f}}
+* Polish: {{t+|pl|szkoła|f}}, {{t+|pl|nurt}}
+* Spanish: {{tt+|es|escuela}}
+* Swedish: {{tt+|sv|skola|c}}
+* Vietnamese: {{tt+|vi|trường phái}} ({{tt+|vi|場}}{{tt+|vi|派}})
+{{trans-bottom}}
+
+{{trans-top|(collectively) the followers of a particular doctrine}}
+* Afrikaans: {{tt+|af|leer}}, {{tt+|af|skool}}
+* Arabic: {{tt+|ar|مَدْرَسَة|f}}
+* Armenian: {{tt+|hy|դպրոց}}
+* Breton: {{tt+|br|skol|f}}, {{tt+|br|skolioù|p}}
+* Bulgarian: {{tt+|bg|шко́ла|f}}
+* Catalan: {{tt+|ca|escola|f}}
+* Chinese:
+*: Mandarin: {{tt+|cmn|學派}}
+* Czech: {{tt+|cs|škola|f}}
+* Danish: {{tt+|da|skole}}
+* Dutch: {{tt+|nl|school|f}}
+* Esperanto: {{tt+|eo|skolo}}
+* Estonian: {{tt+|et|kool}}, {{t|et|koolkond}}
+* Finnish: {{tt+|fi|koulukunta}}
+* French: {{tt+|fr|école|f}}
+* German: {{tt+|de|Schule|f}}
+* Greek: {{tt+|el|σχολή|f}}
+*: Ancient Greek: {{tt|grc|αἵρεσις|f}}
+* Hebrew: {{tt+|he|אסכולה|f|tr=askola}}
+* Hindi: {{t+|hi|संप्रदाय|m}}
+* Hungarian: {{tt+|hu|iskola}}
+* Ido: {{tt+|io|skolo}}
+* Interlingua: {{tt+|ia|schola}}
+* Irish: {{tt+|ga|scoil}}
+* Italian: {{tt+|it|scuola|f}}
+* Japanese: {{tt+|ja|学派|tr=がくは, gakuha}}
+* Korean: {{tt+|ko|학파(學派)}}
+* Latin: {{tt|la|secta|f}}
+* Latvian: {{tt+|lv|skola|f}}
+* Lithuanian: {{tt+|lt|mokykla|f}}
+* Middle English: {{t|enm|scole}}
+* Norwegian:
+*: Bokmål: {{tt+|nb|skole|m}}
+* Polish: {{tt+|pl|szkoła|f}}
+* Portuguese: {{tt+|pt|escola|f}}, {{tt+|pt|doutrina|f}}
+* Romanian: {{tt+|ro|școală|f}}
+* Russian: {{tt+|ru|уче́ние|n}}, {{tt+|ru|шко́ла|f}}
+* Scottish Gaelic: {{tt|gd|sgoil}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt+|sh|шко̑ла|f}}
+*: Latin: {{tt+|sh|škȏla|f}}
+* Slovak: {{tt+|sk|škola|f}}
+* Spanish: {{tt+|es|escuela|f}}
+* Swahili: {{tt+|sw|shule}}
+* Swedish: {{tt+|sv|skola}}, {{tt+|sv|lära}}, {{tt|sv|skolbildning|c}}
+* Tagalog: {{tt|tl|aktitud}}, {{tt+|tl|aral}}, {{tt+|tl|turo}}
+* Turkish: {{tt+|tr|ekol}}
+* Ukrainian: {{tt+|uk|шко́ла|f}}
+* Vietnamese: {{tt+|vi|trường phái}} ({{tt+|vi|場}}{{tt+|vi|派}})
+* Welsh: {{tt+|cy|ysgol|f}}
+{{trans-bottom}}
+
+{{trans-top|an establishment offering specialized instruction (driving etc.)}}
+* Bulgarian: {{tt+|bg|шко́ла|f}}
+* Hungarian: {{tt+|hu|iskola}}, {{q|in compounds}} {{tt+|hu|képző}}
+* Korean: {{tt+|ko|학원(學院)}}
+* Middle English: {{t|enm|scole}}
+* Polish: {{tt+|pl|szkoła|f}}
+* Russian: {{tt+|ru|шко́ла|f}}
+}}<!-- close {{multitrans}} -->
+{{trans-bottom}}
+
+====Verb====
+{{en-verb}}
+
+# {{lb|en|transitive}} To [[educate]], [[teach]], or [[train]] (often, but not necessarily, in a school).
+#: {{ux|en|Many future prime ministers were '''schooled''' in Eton.}}
+#* {{RQ:Dekker Dreame|page=35|passage=''I tooke delights'' / ''In plucking Apples from'' t’Heſperian Trees, / ''Which'' Eating, ''I grew'' Learn’d: ''adde to'' All theſe / ''My'' Priuate Readings, ''which more'' '''School’d''' ''my'' Soule, / ''Then'' Tutors, ''when they ſternliest did'' Controll / ''With'' Frownes ''or'' Rods'':'' {{...}}}}
+# {{lb|en|transitive}} To [[defeat]] [[emphatically]], to teach an [[opponent]] a [[harsh]] [[lesson]].
+#* {{quote-journal |en |date=April 13, 1998 |author=Leigh Jones |title=National Bar Exam Methods Win in ADA Regulation Test |journal=w:The Journal Record |passage=A blind law graduate who put the National Conference of Bar Examiners to the test got '''schooled''' in federal court.}}
+#* {{quote-book|en|year=2006|author=Steve Smith|title=Forever Red: Confessions of a Cornhusker Football Fan|page=67
+|passage=Two weeks later, the Cornhuskers put on their road whites again and promptly got '''schooled''' by miserable Iowa State in Ames. After the shocking loss {{...}}}}
+#* {{quote-book|en|year=2007|author=Peter David; Alvin Sargent|title=Spider-Man 3|pageurl=http://books.google.com/books?id=lQi3QO6h9UoC&pg=PA216&dq=%22gonna+school+you%22&lr=&sig=dpEAXzEMHzrxZQAgCEA0GaPEQDY|page=216|publisher=Simon and Schuster|isbn=1416527214
+|passage="You again?" Sandman demanded. "I guess you didn't learn your lesson."<br>"This time I'm gonna '''school''' you."}}
+#* {{quote-journal|en|author=David Yaffe-Bellany|title=Ben McKenzie Would Like a Word With the Crypto Bros|work=The New York Times|date=2022-03-31|url=https://www.nytimes.com/2022/03/31/style/ben-mckenzie-crypto.html|issn=0362-4331|passage=Mr. Harris said he was confident he could go toe to toe with any skeptic; he bragged that he’d recently '''schooled''' some crypto haters from Vice News.}}
+#* {{quote-journal|en-GB|author=Julian Borger|title=Trump’s rambling Davos speech rehashes warped ideas of US supremacy|work=The Guardian|date=2026-01-21|url=https://www.theguardian.com/us-news/2026/jan/21/trumps-rambling-davos-speech-rehashes-warped-ideas-of-us-supremacy|issn=0261-3077|passage=The speech dwindled to a halt and there was a smattering of applause from a gathering that was glad just to have been '''schooled''' for admitting migrants into their country and backing renewable energy, rather than witnessing a full-on declaration of war on the stage in front of them.}}
+# {{lb|en|transitive}} To control, or compose, one’s expression.
+#: {{ux|en|She took care to '''school''' her expression, not giving away any of her feelings.}}
+
+=====Derived terms=====
+* [[schooling]]
+
+=====Translations=====
+{{trans-top|to educate, teach, or train}}
+{{multitrans|data=
+* Afrikaans: {{tt+|af|skool}}
+* Breton: {{tt+|br|skoliata}}, {{tt+|br|kelenn}}
+* Bulgarian: {{tt+|bg|обучавам}}
+* Chinese:
+*: Mandarin: {{tt+|cmn|教育|tr=jiàoyù}}, {{tt+|cmn|訓練|tr=xùnliàn}}
+* Dutch: {{tt+|nl|scholen}}
+* Finnish: {{tt+|fi|kouluttaa}}
+* German: {{tt+|de|unterrichten}}, {{tt+|de|schulen}}
+* Greek: {{tt+|el|εκπαιδεύω}}, {{tt+|el|διαπαιδαγωγώ}}, {{tt+|el|διδάσκω}}
+* Hebrew: {{tt|he|לימד|tr=liméd}}
+* Hindi: {{t+|hi|शिक्षण|m}}
+* Interlingua: {{tt|ia|educar}}, {{tt|ia|instruer}}, {{tt|ia|inseniar}}
+* Malay: {{tt|ms|mendidik}}
+* Norwegian: {{tt+|no|skole}}, {{tt|no|skolere}}, {{tt|no|lære opp}}, {{tt+|no|utdanne}}
+* Portuguese: {{tt+|pt|educar}}, {{tt+|pt|instruir}}, {{tt+|pt|ensinar}}, {{tt|pt|escolarizar}}
+* Romanian: {{tt+|ro|învăța}}, {{tt+|ro|educa}}, {{tt+|ro|instrui}}, {{tt+|ro|școlariza}}, {{tt+|ro|antrena}}
+* Russian: {{tt+|ru|учи́ть}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt|sh|шко̏ловати}}, {{tt|sh|шко̑лати}}, {{tt|sh|обуча́вати}}
+*: Latin: {{tt+|sh|škȍlovati}}, {{tt+|sh|škȏlati}}, {{tt+|sh|obučávati}}
+* Slovene: {{tt+|sl|učiti}}
+* Spanish: {{tt+|es|educar}}, {{tt+|es|escolarizar}}
+* Swahili: {{tt+|sw|shule}}
+* Swedish: {{tt+|sv|skola}}, {{tt+|sv|lära}}
+* Tagalog: {{tt|tl|magturo}}, {{tt|tl|turuan}}, {{tt|tl|sanayin}}
+* Turkish: {{t|tr|eğitim vermek}}
+* Ukrainian: {{tt|uk|навча́ти}}
+}}<!-- close {{multitrans}} -->
+{{trans-bottom}}
+
+{{trans-see|to defeat emphatically, to teach an opponent a harsh lesson|humiliate}}
+
+===Etymology 2===
+{{etymid|en|group}}
+From {{inh|en|enm|scole}}, {{m|enm|schole||group of persons, multitude, host, school of fish}}, from {{der|en|dum|scole||multitude, troop of people, swarm of animals}}, from {{der|en|odt|*scola}}, {{m|odt|*skola||troop, multitude}}, from {{der|en|frk|*skolu}}, from {{der|en|gem-pro|*skulō||crowd}}, from {{der|en|ine-pro|*(s)kʷel-||crowd, people}}.
+
+Cognate with {{cog|gml|schōle||multitude, troop}}, {{cog|ang|scolu||troop or band of people, host, multitude, school of fish}}. {{doublet|en|shoal|id1=fish}}.
+
+====Alternative forms====
+* [[skull]] {{qualifier|obsolete}}
+
+====Noun====
+[[File:Sixfinger threadfin school.jpg|thumb|A school ({{senseno|en|group-of-fish}}) of [[fish]]]]
+{{en-noun}}
+
+# {{senseid|en|group-of-fish}} {{cln|en|collective nouns}} {{lb|en|collective}} A group of [[fish]] or a group of [[marine]] [[mammals]] such as [[porpoise]]s, [[dolphin]]s, or [[whale]]s.
+#: {{syn|en|shoal}}
+#: {{ux|en|The divers encountered a huge '''school''' of mackerel.}}
+# A [[multitude]].
+
+=====Translations=====
+{{trans-top|a group of fish}}
+{{multitrans|data=
+* Armenian: {{tt+|hy|վտառ}}
+* Asturian: {{tt|ast|cardume|m}}
+* Belarusian: {{tt|be|кася́к|m}}, {{tt|be|згра́я|f}}
+* Breton: {{tt+|br|moudenn|f}}
+* Bulgarian: {{tt+|bg|паса́ж|m}}, {{t+|bg|я́то|n}}
+* Catalan: {{tt+|ca|banc|m}}, {{tt|ca|mola de peix|f}}
+* Chinese:
+*: Mandarin: {{tt|cmn|[[一群]][[魚]]|tr=yīqún yú}}, {{tt+|cmn|魚群|tr=yúqún}}
+* Czech: {{tt+|cs|hejno|n}}
+* Danish: {{tt|da|stime|c}}
+* Dutch: {{tt+|nl|school|f}}
+* Esperanto: {{t|eo|fiŝaro}}
+* Estonian: {{t|et|kalaparv}}
+* Faroese: {{tt|fo|torva|f}}, {{tt|fo|vað|n}}
+* Finnish: {{tt+|fi|parvi}}, {{tt+|fi|kalaparvi}}
+* French: {{tt+|fr|banc|m}}
+* Galician: {{tt+|gl|banco|m}}, {{tt+|gl|manda|f}}, {{tt+|gl|cardume|f}}, {{tt|gl|fieiro|m}}
+* German: {{tt+|de|Schwarm|m}}
+* Greek: {{tt+|el|κοπάδι|n}}
+* Hebrew: {{tt|he|לַהֲקַת דָּגִים|f|tr=lahakat dagim}}, {{tt|he|עֲדַת דַּגִים|f|tr='adat dagim}}
+* Hungarian: {{tt+|hu|raj}}
+* Icelandic: {{tt+|is|vaða|f}}, {{tt|is|torfa|f}}
+* Indonesian: {{tt+|id|kawanan}}
+* Interlingua: {{tt+|ia|banco}}
+* Irish: {{tt+|ga|scoil|f}}, {{tt|ga|báire|m}}, {{tt|ga|ráth|f}}
+* Italian: {{tt+|it|banco|m}}
+* Japanese: {{tt+|ja|群れ|tr=むれ, mure}}, {{tt+|ja|魚群|tr=ぎょぐん, gyogun}}
+* Khmer: {{tt+|km|ហ្វូង}}
+* Latin: {{t+|la|grex|m}}
+* Macedonian: {{tt|mk|јато|n}}
+* Malay: {{t+|ms|kawanan}}
+* Māori: {{tt|mi|matatuhi}}, {{t|mi|rāngai}}, {{t|mi|ranga}}
+* Maranao: {{tt|mrw|boreng}}, {{tt|mrw|gasang}}
+* Norwegian:
+*: Bokmål: {{tt+|nb|stim|m}}, {{tt+|nb|flokk|m}} {{qualifier|e.g. of dolphins}}
+*: Nynorsk: {{tt|nn|stim|m}}, {{tt|nn|flokk|m}} {{qualifier|e.g. of dolphins}}
+* Polish: {{tt+|pl|ławica}}
+* Portuguese: {{tt+|pt|cardume|m}}
+* Russian: {{tt+|ru|кося́к|m}}, {{tt+|ru|ста́я|f}}
+* Scottish Gaelic: {{tt|gd|cliath|f}}, {{tt|gd|sgaoth|m}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt|sh|ја̏то|n}}, {{tt|sh|пло́ва|f}}
+*: Latin: {{tt+|sh|jȁto}}, {{tt+|sh|plóva|f}}
+* Spanish: {{tt+|es|cardumen|m}}, {{tt+|es|banco|m}}
+* Swahili: {{tt+|sw|shule}}
+* Swedish: {{tt+|sv|stim|n}}
+* Tagalog: {{tt|tl|kulisaw}}
+* Turkish: {{t+|tr|sürü}}
+*: Ottoman Turkish: {{t|ota|سوری|tr=sürü}}
+* Ukrainian: {{tt+|uk|згра́я|f}}
+}}<!-- close {{multitrans}} -->
+{{trans-bottom}}
+
+====Verb====
+{{en-verb}}
+
+# {{lb|en|intransitive|of [[fish]]}} To [[form]] into, or [[travel]] in, a school.
+
+===Further reading===
+* {{pedia}}
+* {{pedia|Shoaling and schooling|school (fish)}}
+* {{pedia|school (disambiguation)}}
+
+===Anagrams===
+* {{anagrams|en|a=chloos|cholos}}
+
+{{C|en|Buildings|Collectives|Organizations|Schools}}

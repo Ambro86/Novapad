@@ -1,0 +1,19 @@
+== {{lengua|ca}} ==
+{{pron-graf|leng=ca}}
+
+=== Etimología ===
+{{etimología|leng=ca|la|dies}}.
+
+=== {{sustantivo|ca|masculino}} ===
+{{ca.sust|m}}
+;1 {{csem|leng=ca|tiempo}}: {{plm|día}} (24 horas).
+{{relacionado|leng=ca|diari|jornada}}
+;2 {{csem|leng=ca|tiempo}}: {{plm|día}} (período entre el amanecer y el ocaso).
+{{antónimo|leng=ca|nit}}
+{{relacionado|leng=ca|diürn|eclipsi|jornada}}
+
+=== Refranes ===
+* {{l|ca|Roma no es pogué fer en un dia}}
+
+=== Véase también ===
+{{w|leng=ca}}

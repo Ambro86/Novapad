@@ -1,0 +1,1122 @@
+==English==
+{{wp}}
+
+===Alternative forms===
+* {{alt|en|nite||informal spelling}}
+* {{alt|en|neet||Yorkshire|archaic}}
+
+===Etymology===
+{{word|en|ine|nókʷts}}
+From {{inh|en|enm|nighte}}, {{m|enm|night}}, {{m|enm|nyght}}, {{m|enm|niȝt}}, {{m|enm|naht}}, from {{inh|en|ang|niht}}, from {{inh|en|gmw-pro|*naht|t=night}}, from {{inh|en|gem-pro|*nahts|t=night}}, from {{inh|en|ine-pro|*nókʷts|t=night}}.
+{{col-top|2|cog}}
+Cognate with {{cog|sco|nicht|t=night}}, {{cog|yol|neeght}}, {{m|yol|nieght}}, {{m|yol|nyeght|t=night}}, {{cog|frr|naacht}}, {{m|frr|Nacht}}, {{m|frr|noach}}, {{m|frr|nåcht|t=night}}, {{cog|stq|Noacht|t=night}}, {{cog|fy|nacht|t=night}}, {{cog|cim|-}}, {{cog|nl|nacht|t=night}}, {{cog|de|-}}, {{cog|nds|Nacht|t=night}}, {{cog|lb|Nuecht|t=night}}, {{cog|mhn|nòcht|t=night}}, {{cog|wym|naocht|t=night}}, {{cog|yi|נאַכט|t=night}}, {{cog|da|nat|t=night}}, {{cog|fo|nátt|t=night}}, {{cog|is|nátt}}, {{m|is|nótt|t=night}}, {{cog|nb|-}}, {{cog|nn|-}} and {{cog|sv|natt|t=night}}, {{cog|gmq-scy|nøtt|t=night}}, {{cog|got|𐌽𐌰𐌷𐍄𐍃|t=night}}; also {{cog|br|noz|t=night}}, {{cog|kw,cy|nos|t=night}}, {{cog|ga|anocht|t=tonight}}, {{cog|gv|noght|t=tonight}}, {{cog|gd|a-nochd}}, {{m|gd|an nochd|t=tonight}}, {{cog|la|nox|t=night}} (whence English {{doublet|en|nox|notext=1}}, a {{glossary|doublet}}), {{cog|el|νύχτα|t=night}}, {{cog|sq|natë|t=night}}, {{cog|ltg,lv|nakts|t=night}}, {{cog|lt|naktis|t=night}}, {{cog|be|ноч|t=night}}, {{cog|bg|нощ|t=night}}, {{cog|cs,pl,sk|noc|t=night}}, {{cog|mk|ноќ|t=night}}, {{cog|ru|ночь|t=night}}, {{cog|sh|ноћ}}, {{m|sh|noć|t=night}}, {{cog|sl|noč|t=night}}, {{cog|uk|ніч|t=night}}, {{cog|xto|nakcu|t=last night; at night}}, {{cog|txb|nekcīye|t=last night; at night}}, {{cog|hit|𒉈𒆪𒊻|tr=nekuz|t=evening, nightfall; dawn, twilight}}, {{cog|sa|नक्त्|tr=nákt}}.
+{{col-bottom}}
+
+===Pronunciation===
+* {{enPR|nīt|a=US,UK}}, {{IPA|en|/naɪt/}}
+** {{audio|en|en-us-night.ogg|a=US}}
+* {{IPA|en|/nʌɪt/|a=UK,Scottish,CA}}
+** {{audio|en|LL-Q1860 (eng)-Back ache-night.wav|a=UK}}
+* {{IPA|en|/niːt/|a=Northumbria}}
+* {{rhymes|en|aɪt|s=1}}
+* {{homophones|en|knight|nite}}
+
+===Noun===
+{{en-noun|~}}
+
+# {{senseid|en|Q575}}{{lb|en|countable}} The time when the Sun is below the [[horizon]] when the sky is dark.
+#: {{ux|en|Most animals are awake at day and sleep at '''night'''.}}
+#* {{RQ:Rinehart Hopwood Bat|I|01|passage=The Bat—they called him the Bat. Like a bat he chose the '''night''' hours for his work of rapine; like a bat he struck and vanished, pouncingly, noiselessly; like a bat he never showed himself to the face of the day.}}
+#* {{quote-journal|en|date=2013-07-19|author=[http://www.theguardian.com/profile/iansample Ian Sample]
+|volume=189|issue=6|page=34|magazine=w:The Guardian Weekly
+|title=[http://www.theguardian.com/lifeandstyle/2013/jul/08/irregular-bedtimes-affect-childrens-brains Irregular bedtimes may affect children's brains]
+|passage=Irregular bedtimes may disrupt healthy brain development in young children, according to a study of intelligence and sleeping habits.&nbsp; &para;&nbsp;Going to bed at a different time each '''night''' affected girls more than boys, but both fared worse on mental tasks than children who had a set bedtime, researchers found.}}
+# {{lb|en|astronomy|countable}} The period of darkness beginning at the end of evening [[astronomical twilight]] when the sun is 18 degrees below the horizon, and ending at the beginning of morning astronomical twilight.
+# {{lb|en|legal|countable}} A period of time often defined in the legal system as beginning 30 minutes after sunset, and ending 30 minutes before sunrise.
+# {{lb|en|countable}} An evening or night spent at a particular activity.
+#: {{ux|en|a '''night''' on the town}}
+#* {{quote-journal|en|date=2013-06-08|volume=407|issue=8839|page=52|magazine=w:The Economist
+|title=[http://www.economist.com/news/international/21579039-chinas-growing-empire-ports-abroad-mainly-about-trade-not-aggression-new-masters The new masters and commanders]
+|passage=From the ground, Colombo’s port does not look like much. Those entering it are greeted by wire fences, walls dating back to colonial times and security posts. For mariners leaving the port after lonely '''nights''' on the high seas, the delights of the B52 Night Club and Stallion Pub lie a stumble away.}}
+# {{lb|en|countable}} A day, or at least a night.
+#: {{ux|en|I stayed my friend's house for three '''nights'''.}}
+# {{lb|en|uncountable}} [[nightfall|Nightfall]].
+#: {{ux|en|from noon till '''night'''}}
+# {{lb|en|uncountable}} [[darkness|Darkness]] (due to it being [[nighttime]]).
+#: {{ux|en|The cat disappeared into the '''night'''.}}
+# {{lb|en|uncountable}} A dark [[blue]] colour, [[midnight blue]].
+#: {{color panel|002266}}
+# {{lb|en|sports|colloquial}} A night's worth of competitions, generally one game.
+
+====Quotations====
+* {{see citations|en}}
+
+====Synonyms====
+* {{sense|evening or night spent at a particular activity}} {{l|en|evening}}; see also [[Thesaurus:nighttime]] or [[Thesaurus:evening]]
+* {{sense|quality of sleep}} {{l|en|sleep}}
+* {{sense|nightfall}} {{l|en|dark}}, {{l|en|dusk}}, {{l|en|nightfall}}, {{l|en|sundown}}, {{l|en|sunset}}; see also [[Thesaurus:dusk]]
+* {{sense|darkness}} {{l|en|blackness}}, {{l|en|darkness}}, {{l|en|gloom}}, {{l|en|obscurity}}, {{l|en|shadow}}
+
+====Antonyms====
+* {{antsense|period between sunset and sunrise}} {{l|en|day}}; see also [[Thesaurus:daytime]]
+* {{antsense|darkness}} {{l|en|brightness}}, {{l|en|daylight}}, {{l|en|light}}
+
+====Hypernyms====
+* {{l|en|24-hour day}}
+
+====Hyponyms====
+{{col4|en|first night
+|last night
+|midnight
+|tonight
+|tomorrow night
+|Twelfth Night
+|yesterday night<qq:rare compared to ''[[last night]]''>
+}}
+
+====Derived terms====
+{{col|en|nightfish|nightfowl|nightgloom|nightworker|all cats are gray at night,all cats are grey at night,all cats are grey by night
+|all night
+|all-night
+|all-nighter,allnighter
+|all-night-man
+|alnight
+|amateur night
+|American night heron
+|anight
+|at night
+|Azara's night monkey
+|back-to-school night
+|bank night
+|barnight
+|because you touch yourself at night
+|benight
+|be on nights
+|bin night
+|birthnight
+|black as night
+|black-crowned night heron
+|born at night but not last night
+|buck's night
+|Burns night
+|Burns Night|night blue|night-ape|night-blooming cereus
+|by night
+|call it an early night
+|call it a night
+|club night
+|clubnight
+|Cracker Night
+|creature of the night
+|dark night
+|dark night of the soul
+|date night
+|day and night,day-and-night
+|day for night
+|day-night
+|day-night cycle
+|day or night
+|day-to-night
+|dead of night
+|deepnight
+|early night
+|election night
+|Eleventh Night
+|evennight
+|everynight
+|field night
+|fireworks night
+|fly-by-night
+|forenight
+|fortnight
+|fortnightly
+|Friday night lights
+|girls' night out
+|go gentle into that good night
+|go night-night
+|good-night
+|goodnight
+|gray night
+|grey night
+|guest night
+|guinea pig night
+|half-night stand
+|have a night of it
+|hell night
+|hen night
+|hens' night
+|holinight
+|how can you sleep at night
+|how do you sleep at night
+|internight
+|intranight
+|it'll be all right on the night
+|Japanese night heron
+|keep someone up at night
+|ladies' night
+|lady of the night
+|late-night
+|late night
+|like night and day
+|long night moon
+|make a night of it
+|Malayan night heron
+|midnight
+|morning after the night before
+|morning-noon-and-night
+|multinight
+|night adder
+|night after night
+|night air
+|night and day
+|night-and-day
+|night auditor
+|night-bat
+|night bird
+|night-biter
+|night biter
+|night-blind
+|night blind
+|night blindness
+|night-blooming jasmine
+|nightbreak
+|nightbreeze
+|night-bright
+|night-cap
+|nightcap
+|night cap
+|night-cart
+|night cart
+|night-cellar
+|night chair
+|nightchurr
+|night class
+|nightcloth
+|nightclothes
+|nightclub
+|night club
+|nightclubbing
+|nightcore
+|night court
+|night courting
+|nightcrawler
+|night crawler
+|night crawling
+|night cream
+|night diaper
+|nightdream
+|nightdreaming
+|nightdress
+|night-dress
+|night eating syndrome
+|night emission
+|nighten
+|nighter
+|nightery
+|night eye
+|night-fall
+|nightfall
+|nightfaring
+|night-fear
+|nightfear
+|night fear
+|night fighter
+|nightfire
+|night-flowering jasmine
+|night fly
+|nightfright
+|night frog
+|nightful
+|night game
+|nightgear
+|night glass
+|night-glass
+|nightglow
+|nightgown
+|night-gown
+|night green
+|nightguard
+|night hag
+|night-hag
+|nighthawk
+|night hawk
+|night heron
+|night-heron
+|night house
+|night-house
+|night hunter
+|night hunting
+|nightie
+|nightingale
+|nightish
+|night-jar
+|nightjar
+|night jasmine
+|night job
+|nightlamp
+|nightless
+|night letter
+|nightlife
+|night-lifer
+|night light
+|nightlight
+|nightlike
+|nightline
+|night lizard
+|nightlong
+|nightly
+|nightman
+|night man
+|night-man
+|nightmarcher
+|nightmare
+|nightmarish
+|night market
+|night meal
+|night mode
+|night monkey
+|night moth
+|night nappy
+|night night
+|night-night
+|Night of Broken Glass
+|night of long knives
+|Night of Sevens
+|night of the long knives
+|night out
+|night-owl
+|night owl
+|night palsy
+|night parrot
+|night person
+|nightpiece
+|night-rail
+|night-raven
+|nightrider
+|night rider
+|night-riding
+|nightrobe
+|night safe
+|nightscape
+|night school
+|nightscope
+|nightshade
+|night shelter
+|night shift
+|nightshining
+|nightshirt
+|nightside
+|night sky
+|night-sky
+|night snake
+|night soil
+|night-soil
+|night soil man
+|night spot
+|nightspot
+|nightstand
+|night-stalker
+|night start
+|night stick
+|nightstick
+|nightstool
+|nightsuit
+|night sweats
+|nightswimming
+|night table
+|night terror
+|nighttide
+|night time
+|nighttime,night-time
+|night tremor
+|night-tripping
+|night vision
+|nightwalker
+|nightwalking
+|nightward
+|nightwards
+|nightwatch
+|night watch
+|night-watch
+|night-watchman
+|nightwatchman
+|night watchman
+|night watchman state
+|night-watchman state
+|nightwear
+|night wind
+|nightwork
+|night work
+|night writing
+|nighty
+|nighty-night
+|nighty night
+|nine night
+|noon of night
+|one-dog night
+|one-night stand
+|opening night
+|outnight
+|overnight
+|over night
+|paynight
+|polar night
+|pretty-by-night
+|Punkie Night
+|queen of the night
+|Rodrigues night heron
+|Saturday night palsy
+|Saturday-night special
+|Saturday night special
+|school night
+|sennight
+|sevennight
+|seven-night
+|ships in the night
+|ships passing in the night
+|ships that passed in the night
+|ships that pass in the night
+|soap night
+|stag night
+|stay the night
+|stranger in the night
+|the freaks come out at night
+|the night before last
+|the night is young
+|thief in the night
+|things that go bump in the night
+|three dog night
+|three-dog night
+|time of night
+|Tobias night
+|tonight
+|to-night
+|Trafalgar Night dinner
+|Twelfth Night pie
+|twi-night
+|twinight
+|under cover of night
+|Walpurgis night
+|watch-night
+|watch night
+|watchnight
+|watch of the night
+|wedding night
+|weeknight
+|whatever helps you sleep at night
+|white night
+|Whitsun-night
+|woman of the night
+|worknight
+|work nights
+|yesternight
+}}
+
+====Descendants====
+* {{desc|wes|nét|náyt}}
+* {{desc|gyn|nɛt|nait}}
+* {{desc|jam|nait}}
+* {{desc|kri|nɛt}}
+* {{desc|crp-mar|net}}
+* {{desc|fpe|net|nait}}
+* {{desc|pis|naet}}
+* {{desctree|srn|neti}}
+* {{desc|tpi|nait}}
+* {{desc|ko|나이트|bor=1}}
+
+====Translations====
+{{trans-top|period between sunset and sunrise}}
+{{multitrans|data=
+* Abinomn: {{t|bsa|siwi}}
+* Abkhaz: {{tt|ab|аҵх}}, {{tt|ab|аҵых}}
+* Acehnese: {{t|ace|malam}}
+* Adyghe: {{tt|ady|чэщы}}; {{tt|ady|чэщ}} {{qualifier|Shapsug}}
+* Afar: {{t|aa|bar}}
+* Afrikaans: {{tt+|af|nag}}
+* Ahom: {{tt|aho|𑜁𑜢𑜤𑜃𑜫}}
+* Ahtna: {{t|aht|tets}}
+* Ainu: {{tt|ain|アンチカㇻ|tr=ancikar}}
+* Aiton: {{t-needed|aio}}
+* Akkadian: {{tt|akk|𒆥𒋝|tr=liliātu}}
+* Albanian: {{tt+|sq|natë|f}} {{qualifier|indefinite}}, {{t|sq|nata|f}} {{qualifier|definite}}
+* Altai:
+*: Southern Altai: {{tt|alt|тӱн|tr=tün}}
+* American Sign Language: {{tt|ase|BentB@BackHand-PalmDown-FlatB@CenterChesthigh-PalmDown Contact}}
+* Amharic: {{tt|am|ሌት}}, {{t|am|ሌሊት}}
+* Ao: {{t|njo|aonung}} {{q|Chungli}}
+* Arabic: {{tt|ar|لَيْلَة|f}}, {{tt+|ar|لَيْل}}
+*: Egyptian Arabic: {{tt|arz|ليل|m|tr=lēl}} {{q|collective}}, {{tt|arz|ليلة|f|tr=lēla}}
+*: Gulf Arabic: {{tt|afb|بليل}}
+*: Hijazi Arabic: {{t|acw|ليلة|f|tr=lēla}}, {{t|acw|ليل|m|tr=lēl}}
+* Aragonese: {{tt|an|nueit|f}}, {{tt|an|nuei|f}}
+* Aramaic:
+*: Assyrian Neo-Aramaic: {{tt|aii|ܠܲܝܠܹܐ|m|tr=layle}}
+*: Classical Syriac: {{tt|syc|ܠܠܝܐ|m|tr=lilyā’}}
+*: Hebrew script: {{tt|arc|לליא|m|tr=lilyā’}}
+* Archi: {{t|aqc|иш}}
+* Armenian: {{tt+|hy|գիշեր}}
+* Aromanian: {{tt|rup|noapti|f}}, {{tt|rup|noapte|f}}, {{t|rup|nopti|f}}
+* Arrernte:
+*: Eastern Arrernte: {{t|aer|ingwe}}
+* Assamese: {{tt|as|ৰাতি|tr=rati}}
+* Asturian: {{tt+|ast|nueche|f}}
+* Atayal: {{tt|tay|gbyan}}
+* Avar: {{t|av|сордо}}
+* Avestan: {{tt|ae|𐬑𐬴𐬀𐬞𐬀𐬥|f}}
+* Aymara: {{tt+|ay|aruma}}
+* Azerbaijani: {{tt+|az|gecə}}
+* Bactrian: {{t|xbc|χαβ}}
+* Bakhtiari: {{tt|bqi|شو|tr=šaw}}
+* Baluchi: {{tt|bal|شپ|tr=šap}}
+* Bangi: {{t|bni|mokolo}}
+* Bashkir: {{tt|ba|төн}}
+* Basque: {{tt+|eu|gau}}
+* Belarusian: {{tt+|be|ноч|f}}
+* Bengali: {{tt+|bn|রাত}}
+* Bhojpuri: {{t|bho|𑂩𑂰𑂞𑂱}}, {{t|bho|राति}}, {{t|bho|रात}}
+* Big Nambas: {{t|nmb|lihat}}
+* Bikol:
+*: Central Bikol: {{t+|bcl|banggi}}
+* Boloki: {{t|bkt|butú}}
+* Bontoc:
+*: Eastern Bontoc: {{tt|ebk|lafi}}
+* Breton: {{tt+|br|noz}}
+* Buginese: {{t|bug|wenni}}
+* Bulgarian: {{tt+|bg|нощ|f}}
+* Burmese: {{tt+|my|ည}}
+* Buryat: {{tt|bua|һүни}}
+* Carpathian Rusyn: {{tt|rue|нуч|f}}
+* Catalan: {{tt+|ca|nit|f}}
+* Catawba: {{tt|chc|witchawa}}
+* Cebuano: {{t|ceb|gabii}}
+* Central Atlas Tamazight: {{tt|tzm|ⵉⴹ|tr=iḍ}}
+* Chakma: {{t-needed|ccp}}
+* Cham:
+*: Eastern Cham: {{t-needed|cjm}}
+*: Western Cham: {{t-needed|cja}}
+* Chamicuro: {{tt|ccc|chpolyaye}}
+* Chamorro: {{tt|ch|puengi}}
+* Chechen: {{tt|ce|буьйса}}
+* Cherokee: {{tt|chr|ᏒᎠᏱ|tr=svayi}}
+* Cheyenne: {{t|chy|táa'e}}
+* Chickasaw: {{tt|cic|oklhili}}
+* Chinese:
+*: Cantonese: {{tt|yue|夜晚|tr=je6 maan5}}
+*: Dungan: {{tt|dng|е}}, {{tt|dng|еван}}, {{tt|dng|ванщи}}
+*: Hokkien: {{tt+|nan-hbl|暗暝|tr=àm-mê, àm-mî}}, {{tt|nan-hbl|暗頭|tr=àm-thâu}}, {{tt+|nan-hbl|暝時|tr=mê-sî, mî-sî}}, {{tt+|nan-hbl|暗時|tr=àm-sî}}
+*: Mandarin: {{tt+|cmn|夜晚|tr=yèwǎn}}, {{tt+|cmn|夜|tr=yè}}, {{tt+|cmn|宵|tr=xiāo}}
+*: Wu: {{tt|wuu|夜到}}
+* Chukchi: {{tt|ckt|ныкирит|tr=nykirit}}
+* Chuvash: {{tt|cv|ҫӗр}}
+* Comorian:
+*: Maore Comorian: {{tt|swb|uku|c11|c6}}
+*: Ngazidja Comorian: {{tt|zdj|masihu|c6}}
+* Coptic:
+*: Bohairic Coptic: {{tt|cop|ⲉϫⲱⲣϩ}}
+*: Sahidic Coptic: {{tt|cop|ⲟⲩϣⲏ}}
+* Cornish: {{tt|kw|nos|f}}
+* Crimean Tatar: {{t|crh|gece}}
+* Czech: {{tt+|cs|noc|f}}
+* Dalmatian: {{tt|dlm|nuat}}
+* Danish: {{tt+|da|nat|c}}
+* Dargwa: {{t|dar|дуги}}
+* Dhivehi: {{t|dv|ރޭ}}
+* Dolgan: {{tt|dlg|түүн|tr=tüün}}
+* Dusun:
+*: Central Dusun: {{tt|dtp|doungotuong}}
+* Dutch: {{tt+|nl|nacht|m}}
+* Dzongkha: {{t|dz|ཕྱི༌རུ༌}}
+* Efate:
+*: South Efate: {{t|erk|p̃og}}
+* Egyptian: {{t-egy|grḥ|m|h=g:r-H-N2}}
+* Emilian: {{tt|egl|nôt|f}}
+* Erzya: {{tt|myv|ве|tr=ve}}
+* Eshtehardi: {{tt|esh|شو|tr=šow}}
+* Esperanto: {{tt+|eo|nokto}}
+* Estonian: {{tt+|et|öö}}
+* Even: {{t|eve|долбани}}
+* Evenki: {{t|evn|долбони}}
+* Ewe: {{tt|ee|zã}}
+* Extremaduran: {{tt|ext|nochi|f}}
+* Faroese: {{tt+|fo|nátt|f}}
+* Finnish: {{tt+|fi|yö}}
+* French: {{tt+|fr|nuit|f}}
+*: Middle French: {{tt|frm|nuyt}}
+*: Old French: {{tt|fro|nuit|f}}, {{tt|fro|noit|f}}
+* Frisian:
+*: Saterland Frisian: {{tt|stq|Noacht|f}}
+*: West Frisian: {{tt+|fy|nacht|c}}
+* Friulian: {{tt|fur|gnot|f}}
+* Gagauz: {{tt|gag|gecä}}
+* Galician: {{tt+|gl|noite|f}}, {{t+|gl|madrugada|f}} {{qualifier|after midnight}}
+* Ge'ez: {{tt|gez|ሌሊት}}
+* Georgian: {{tt+|ka|ღამე}}
+* German: {{tt+|de|Nacht|f}}
+*: Bavarian: {{tt|bar|Nocht}}
+*: Middle High German: {{tt|gmh|naht|f}}
+* Gilbertese: {{tt|gil|bong}}
+* Gothic: {{tt|got|𐌽𐌰𐌷𐍄𐍃|f}}
+* Greek: {{tt+|el|νύχτα|f}}
+*: Ancient Greek: {{tt|grc|νύξ|f}}
+* Greenlandic: {{t|kl|unnuk}}
+* Guarani:
+*: Mbya Guarani: {{t|gun|pytũ}}
+*: Paraguayan Guarani: {{tt-check|gug|pyhare}}
+* Gujarati: {{tt|gu|રાત|f}}, {{tt+|gu|રાત્રી|f}}
+* Haitian Creole: {{tt|ht|lannuit}}
+* Hawaiian: {{tt|haw|pō}}
+* Hebrew: {{tt+|he|לַיְלָה|m|tr=láyla}}
+* Higaonon: {{t|mba|daluman}}
+* Hindi: {{tt+|hi|रात|f}}, {{tt+|hi|रात्रि|f}}, {{tt+|hi|रात्र|f}}, {{tt+|hi|राति|f}}, {{t+|hi|निशा|f}}
+* Hittite: {{tt|hit|𒅖𒉺𒀭𒍝|tr=išpanz|c}}
+* Hmong:
+*: White Hmong: {{tt|mww|hmos}}
+* Hungarian: {{tt+|hu|éjszaka}}, {{tt+|hu|éjjel}}, {{tt+|hu|éj}}
+* Hunsrik: {{tt|hrx|Nacht|f}}, {{tt|hrx|naacht|f}}
+* Iban: {{tt|iba|malam}}
+* Icelandic: {{tt+|is|nótt|f}}, {{qualifier|archaic}} {{tt+|is|nátt|f}}, {{qualifier|skaldic}} {{tt+|is|njóla|f}}
+* Ido: {{tt+|io|nokto}}
+* Igala: {{t-check|igl|òdu}}
+* Ilocano: {{tt|ilo|rabii}}
+* Indonesian: {{tt+|id|malam}}
+* Ingrian: {{tt|izh|öö}}, {{t|izh|öökaus}} {{qualifier|rare}}
+* Ingush: {{tt|inh|бийса}}
+* Iranun: {{t|ill|magabi}}
+* Irish: {{tt+|ga|oíche|f}}
+*: Old Irish: {{tt|sga|adaig|f}}
+* Isnag: {{t|isd|xabi}}
+* Istriot: {{tt|ist|nuoto}}
+* Istro-Romanian: {{tt|ruo|nopte|f}}
+* Italian: {{tt+|it|notte|f}}
+* Japanese: {{tt+|ja|夜|tr=よる, yoru, よ, yo}}
+* Javanese: {{t|jv|wengi}}
+*: Old Javanese: {{t|kaw|wĕṅi}}
+* Jeju: {{t|jje|밤}}
+* Kabardian: {{tt+|kbd|жэщ}}
+* Kalasha: {{tt|kls|rat}}
+* Kalinga:
+*: Lubuagan Kalinga: {{tt|knb|labi}}
+*: Southern Kalinga: {{tt|ksc|lafi}}
+* Kalmyk: {{tt|xal|сө}}
+* Kannada: {{tt+|kn|ಇರುಳು}}, {{tt+|kn|ರಾತ್ರಿ}}
+* Kanuri: {{t|kr|búne}}
+* Kapampangan: {{tt|pam|bengi}}
+* Karachay-Balkar: {{tt|krc|кече|tr=keçe}}
+* Karakalpak: {{tt|kaa|tún}}
+* Kashmiri: {{t+|ks|راتھ|f|tr=rāth}}
+* Kashubian: {{tt+|csb|noc|f}}
+* Kazakh: {{tt|kk|түн}}
+* Ket: {{tt|ket|си}}
+* Khakas: {{tt|kjh|тӱн}}
+* Khmer: {{tt+|km|យប់}}, {{tt+|km|រាត្រី}}
+* Khowar: {{tt|khw|چُھوئی|tr=čhuí}}
+* Kituba: {{t|ktu|mpimpa}}
+* Komi:
+*: Komi-Permyak: {{tt|koi|вой}}
+* Kongo: {{t|kg|mpimpa}}
+* Korean: {{tt+|ko|밤}}
+* Koryak: {{tt|kpy|ныкинык|tr=nəkinək}}
+* Kumyk: {{tt|kum|гече|tr=geçe}}
+* Kurdish:
+*: Central Kurdish: {{tt+|ckb|شەو|tr=şew}}
+*: Northern Kurdish: {{tt+|kmr|şev|f}}
+* Kyrgyz: {{tt+|ky|түн}}
+* Ladino: {{tt|lad|noche|f}}
+* Lak: {{t|lbe|хьхьу}}
+* Lakota: {{t|lkt|haŋhépi}}
+* Lao: {{tt|lo|ຄືນ}}
+* Latgalian: {{tt|ltg|nakts|f}}
+* Latin: {{tt+|la|nox|f}}
+* Latvian: {{tt+|lv|nakts|f}}
+* Laz: {{t|lzz|სერი}}
+* Lezgi: {{t|lez|йиф}}
+* Ligurian: {{tt|lij|néutte|f}}
+* Lingala: {{tt|ln|butú}}, {{t|ln|butu}}
+* Lithuanian: {{tt+|lt|naktis|f}}, {{t+check|lt|šiaurė}}
+* Livonian: {{tt|liv|īe}}
+* Lombard: {{t|lmo|nott|f}}
+* Lower Tanana: {{t|taa|tetth}}
+* Luba-Kasai: {{t|lua|bufuku}}
+* Luba-Katanga: {{t|lu|bufuku}}
+* Lutuv: {{t|clt|zuo}}
+* Luxembourgish: {{tt+|lb|Nuecht|f}}, {{tt|lb|Nuet|f}}
+* Macedonian: {{tt|mk|ноќ|f}}
+* Magahi: {{t|mag|𑂩𑂰𑂞𑂱|tr=rāti}}
+* Maguindanao: {{t|mdh|magabi}}
+* Maithili: {{t|mai|राति|tr=rāit}}
+* Makasae: {{t|mkz|gamu}}
+* Makasar: {{t|mak|bangi}}
+* Malagasy: {{t+|mg|alina}}
+* Malay: {{tt+|ms|malam}}, {{tt|ms|lailah}}
+* Malayalam: {{tt+|ml|രാത്രി}}
+* Maltese: {{tt|mt|lejl|m}}
+* Manchu: {{tt|mnc|ᡩᠣᠪᠣᡵᡳ|tr=dobori}}
+* Sougb: {{t|mnx|loba}}
+* Manobo:
+*: Western Bukidnon Manobo: {{t|mbb|dukilem}}
+* Mansaka: {{t|msk|gabi}}
+* Manx: {{tt|gv|oie|f}}
+* Māori: {{tt+|mi|pō}}
+* Maranao: {{t|mrw|gagawi'i}}
+* Marathi: {{tt+|mr|रात्र}}
+* Mari:
+*: Eastern Mari: {{t|mhr|йӱд|tr=jüd|}}
+*: Western Mari: {{t|mrj|йыд}}
+* Mazahua:
+*: Central Mazahua: {{tt|maz|xomu̷}}
+* Mazanderani: {{tt|mzn|شو|tr=šo}}
+* Middle English: {{t|enm|nyght}}
+* Mingrelian: {{t|xmf|სერი}}
+* Mirandese: {{tt|mwl|nuite|f}}
+* Miwok:
+*: Central Sierra Miwok: {{tt|csm|kawý·ly-}}
+* Mòcheno: {{tt|mhn|nòcht|f}}
+* Moksha: {{tt|mdf|ве|tr=ve}}
+* Mon: {{tt|mnw|ဗ္တံ|tr=hətɔm}}
+* Mongolian:
+*: Cyrillic: {{tt+|mn|шөнө}}
+*: Mongolian script: {{tt|mn|ᠰᠥᠨᠢ}}
+* Mpade: {{t|mpi|faɗe}}
+* Mwani: {{t|wmw|usiku}}
+* Naga:
+*: Khiamniungan Naga: {{t|kix|āshēuh}}
+* Nahuatl:
+*: Classical Nahuatl: {{tt|nci|yohualli}}
+*: Guerrero Nahuatl: {{tt|ngu|yewajli}}
+*: Highland Puebla Nahuatl: {{tt|azz|yohual}}
+*: Mecayapan Nahuatl: {{tt|nhx|yóhual}}
+*: Northern Puebla Nahuatl: {{tt|ncj|yohuali}}
+*: Tetelcingo Nahuatl: {{tt|nhg|yohuali̱}}
+*: Tlamacazapa Nahuatl: {{tt|nuz|yowali}}
+* Nanai: {{t|gld|долбо}}
+* Nandi: {{t|niq|kemboi}}
+* Nauruan: {{tt+|na|anubumin}}
+* Navajo: {{tt|nv|tłʼééʼ}}
+* Neapolitan: {{tt|nap|notte|f}}
+* Nepali: {{tt|ne|रात|tr=rāt}}
+* Nivkh: {{t|niv|урк}}
+* Nogai: {{tt|nog|туьн}}
+* Norman: {{tt|nrf|niet|f}} {{qualifier|Jersey|Guernsey}}, {{tt|nrf|nyit|f}} {{qualifier|continental Normandy}}
+* Norwegian:
+*: Bokmål: {{tt+|nb|natt|f|m}}
+*: Nynorsk: {{tt|nn|natt|f}}
+* Occitan: {{tt+|oc|nuèch|f}}, {{tt+|oc|nuèit|f}}
+*: Old Occitan: {{tt|pro|noit}}
+* Odia: {{tt+|or|ରାତି}}
+* Ohlone:
+*: Northern Ohlone: {{tt|cst|múr}}
+* Okinawan: {{tt|ryu|夜|tr=ゆる, yuru; ゆー, yū}}
+* Okinoerabu: {{tt|okn|夜|tr=いぃーる, yīru}}
+* Old Church Slavonic:
+*: Cyrillic: {{tt|cu|нощь|f}}
+*: Glagolitic: {{tt|cu|ⱀⱁⱋⱐ|f}}
+* Old East Slavic: {{tt|orv|ночь|f}}
+* Old English: {{tt|ang|niht|f}}
+* Old Norse: {{tt|non|nátt|f}}, {{tt|non|njóla|f}}
+* Oromo: {{t|om|halkan}}
+* Ossetian: {{tt|os|ӕхсӕв}}
+* Pali: {{t|pi|ratti|f}}, {{t|pi|natta|n}}, {{t|pi|nisā|f}}
+* Pannonian Rusyn: {{t|rsk|ноц|f}}
+* Papiamentu: {{t|pap|nochi}}
+* Pashto: {{tt+|ps|شپه|f|tr=špa}}
+* Pennsylvania German: {{tt|pdc|Nacht|f}}
+* Persian:
+*: Dari: {{tt|prs|شَب}}, {{tt|prs|شَو}} {{q|colloquial}}
+*: Iranian Persian: {{tt|fa-ira|شَب}}, {{t|fa-ira|شُو}} {{qualifier|colloquial}}
+*: Middle Persian: {{tt|pal|LYLYA|tr=šab}}
+*: Old Persian: {{tt|peo||tr=xšap}}
+* Phake: {{t-needed|phk}}
+* Phoenician: {{tt|phn|𐤋𐤋|tr=ll}}
+* Piedmontese: {{tt|pms|neuit|f}}
+* Pijin: {{t|pis|naet}}
+* Pipil: {{tt|ppl|tayua}}
+* Pitjantjatjara: {{tt|pjt|munga}}
+* Polabian: {{tt|pox|nüc|f}}
+* Polish: {{tt+|pl|noc|f}}
+* Portuguese: {{tt+|pt|noite|f}}
+* Punjabi: {{tt|pa|ਰਾਤ}}
+*: Western Punjabi: {{tt+|pnb|رات|f}}
+* Quechua: {{tt+|qu|tuta}}, {{tt|qu|pagas}}, {{tt|qu|ch'isi}}
+* Rendille: {{t|rel|iben}}
+* Rohingya: {{tt|rhg|rait}}
+* Romagnol: {{t|rgn|nòt|f}}, {{t|rgn|nòta|f}}
+* Romani: {{tt|rom|rat|f}}
+* Romanian: {{tt+|ro|noapte|f}}
+* Romansh: {{tt|rm|notg|f}}, {{tt|rm|not|f}}
+* Russian: {{tt+|ru|ночь|f}}
+* Saho: {{t|ssy|bar}}
+* Sami:
+*: Inari Sami: {{tt|smn|ijjâ}}
+*: Kildin Sami: {{tt|sjd|ыйй}}
+*: Lule Sami: {{tt|smj|idja}}
+*: Northern Sami: {{tt|se|idja}}
+*: Northern Sami: {{tt|se|idja}}
+*: Pite Sami: {{tt|sje|ijja}}
+*: Southern Sami: {{tt|sma|jïjje}}
+*: Ter Sami: {{tt|sjt|jɨjj}}
+*: Ume Sami: {{tt|sju|jïjja}}
+* Samoan: {{tt|sm|valuapo}}, {{tt|sm|po}}
+* Sanskrit: {{tt+|sa|रात्रि}}, {{tt+|sa|क्षप्|f|tr=kṣáp}}, {{tt+|sa|नक्त्|tr=nákt|f}}
+* Sardinian: {{tt|sc|noti|f}}, {{tt|sc|notti|f}}
+* Sarikoli: {{t|srh|x̌eb|m}}
+* Scots: {{tt|sco|nicht}}
+* Scottish Gaelic: {{tt|gd|oidhche|f}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt|sh|ноћ|f}}
+*: Latin: {{tt|sh|noć|f}}
+* Shan: {{tt+|shn|ၶိုၼ်}}
+* Shona: {{tt|sn|husiku}}
+* Shor: {{tt|cjs|тӱн|tr=tün}}, {{tt|cjs|қара|tr=qara}}
+* Shughni: {{t|sgh|ах̌ӣб|m}}
+* Sicilian: {{tt+|scn|notti}}
+* Sidamo: {{t|sid|hashsha}}
+* Sindhi: {{tt+|sd|رات|f|tr=rāt}}
+* Sinhalese: {{tt|si|රැය}}
+* Slovak: {{tt+|sk|noc|f}}
+* Slovene: {{tt+|sl|noč|f}}
+* Somali: {{tt+|so|habeen|f}}
+* Sorbian:
+*: Lower Sorbian: {{tt|dsb|noc|f}}
+*: Upper Sorbian: {{tt|hsb|nóc|f}}
+* Sotho: {{tt|st|hosiu}}
+* Spanish: {{tt+|es|noche|f}}, {{t|es|cheno|m}} {{qualifier|Argentina}}, {{t+|es|sorna|f}}
+* Sundanese: {{tt+|su|peuting}}, {{tt+|su|wengi}}
+* Svan: {{t|sva|ლე̄თ}}
+* Swahili: {{tt+|sw|usiku}}
+* Swedish: {{tt+|sv|natt|c}}
+* Sylheti: {{tt|syl|ꠞꠣꠁꠔ|tr=rait}}
+* Tabasaran: {{t|tab|йишв}}
+* Tagalog: {{tt+|tl|gabi}}
+* Tahitian: {{tt|ty|pō}}
+* Tajik: {{tt+|tg|шаб}}
+* Talysh: {{t|tly|şəv}}
+*: Asalemi: {{tt|tly|شو|tr=šav}}
+* Tamil: {{tt+|ta|இரவு}}
+* Tat: {{t|ttt|şö}}
+* Tatar: {{tt+|tt|төн}}, {{tt+|tt|төнгелек}}
+* Tausug: {{t|tsg|dūm}}
+* Telugu: {{tt+|te|రాత్రి}}
+* Ternate: {{t|tft|futu}}
+* Tetum: {{t|tet|kalan}}
+* Thai: {{tt+|th|กลางคืน}}, {{tt+|th|คืน}}, {{tt+|th|ราตรี}}
+*: Northern Thai: {{t-needed|nod}}
+* Tibetan: {{tt|bo|མཚན་མོ}}, {{tt|bo|དགོང་མོ}}
+* Tigrinya: {{tt|ti|ለይቲ}}
+* Tocharian B: {{tt|txb|yṣīye}}
+* Tok Pisin: {{tt+|tpi|nait}}
+* Tongan: {{t|to|poʻuli}}
+* Tsakhur: {{t|tkr|хамде}}
+* Tumbuka: {{t|tum|usiku}}
+* Turkish: {{tt+|tr|gece}}
+*: Ottoman Turkish: {{tt|ota|كیجه|tr=gece}}
+* Turkmen: {{tt|tk|gije}}
+* Tuvan: {{tt|tyv|дүн}}
+* Udi: {{t|udi|шу}}
+* Udmurt: {{tt|udm|уй}}
+* Ugaritic: {{tt|uga|𐎍𐎍|tr=ll}}
+* Ukrainian: {{tt+|uk|ніч|f}}
+* Urdu: {{tt+|ur|رات|f}}, {{tt+|ur|شَب|f}}
+* Uyghur: {{tt|ug|تۈن}}, {{tt|ug|كېچە}}
+* Uzbek: {{tt+|uz|tun}}, {{tt+|uz|kecha}}
+* Venetan: {{tt|vec|note|f}}
+* Veps: {{tt|vep|ö}}
+* Vietnamese: {{tt+|vi|đêm}}, {{tt+|vi|tối}}, {{tt+|vi|ban đêm}}, {{tt+|vi|khuya}} {{qualifier|late night}}
+* Vilamovian: {{tt|wym|nocht|f}}, {{tt|wym|naocht|f}}
+* Volapük: {{tt+|vo|neit}}
+* Võro: {{tt|vro|üü}}
+* Votic: {{tt|vot|üü}}
+* Wakhi: {{tt|wbl|naγd}}
+* Walloon: {{tt+|wa|nute|f}}, {{tt+|wa|niût|m|f}}
+* Warlpiri: {{tt|wbp|munga}}
+* Welsh: {{tt+|cy|nos|f}}
+* Winnebago: {{tt|win|hąąhe}}
+* Wolof: {{tt+|wo|guddi}}
+* Yaghnobi: {{tt|yai|хишап}}
+* Yakan: {{t|yka|sangem}}
+* Yakut: {{tt|sah|түүн}}
+* Yao (Africa): {{tt|yao|cilo}}
+* Yiddish: {{tt+|yi|נאַכט|f}}
+* Yonaguni: {{tt|yoi|夜|tr=どぅる, duru}}
+* Yoruba: {{tt|yo|òru}}
+* Yucatec Maya: {{tt|yua|áak'ab}}
+* Zazaki: {{tt|zza|şew}}
+* Zealandic: {{tt|zea|nacht|m}}
+* Zhuang: {{tt|za|hwnz}}, {{tt|za|ngwnz}}
+* Zulu: {{tt+|zu|ubusuku|c14}}
+{{trans-bottom}}
+
+{{trans-top|evening or night spent at a particular activity}}
+* Arabic:
+*: Moroccan Arabic: {{tt|ary|عشية|f|tr=ʕešeya}}, {{tt|ary|ليلة|f|tr=lila}}
+* Armenian: {{tt+|hy|գիշեր}}
+* Belarusian: {{t+|be|ве́чар|m}}
+* Catalan: {{tt+|ca|vetllada|f}}, {{tt+|ca|vespre|m}}
+* Czech: {{tt+|cs|večer|m}}
+* Danish: {{tt+|da|aften|c}}
+* Dutch: {{tt+|nl|avondje|n}}, {{tt+|nl|nachtje|n}}
+* Eshtehardi: {{tt|esh|شو|tr=šow}}
+* Estonian: {{tt+|et|õhtu}}
+* Faroese: {{tt+|fo|kvøld|n}}
+* Finnish: {{tt+|fi|ilta}}, {{tt+|fi|yö}}
+* French: {{tt+|fr|soirée|f}}, {{tt+|fr|nuit|f}}
+* German: {{tt+|de|Abend|m}}, {{qualifier|in bed}} {{tt+|de|Nacht|f}}
+*: Bavarian: {{tt|bar|Nocht}}
+* Hebrew: {{tt+|he|לַיְלָה|m|tr=láyla}}
+* Hungarian: {{tt+|hu|éjszaka}}, {{tt+|hu|éjszakázás}}
+* Icelandic: {{tt+|is|nótt|f}}
+* Japanese: {{tt+|ja|一晩|tr=ひとばん, hitoban}}
+* Kurdish:
+*: Central Kurdish: {{tt+|ckb|شەو|tr=shaw}}
+*: Northern Kurdish: {{tt+|kmr|şev|f}}
+* Latin: {{tt+|la|nox|f}}
+* Luxembourgish: {{tt|lb|Owend|m}}, {{tt+|lb|Nuecht|f}}, {{tt|lb|Nuet|f}}, {{tt|lb|Soirée|f}}
+* Malay: {{tt+|ms|bermalam}}
+* Maltese: {{tt|mt|lejla|f}}
+* Norwegian:
+*: Bokmål: {{tt+|nb|kveld|m}}, {{tt+|nb|aften|m}}
+*: Nynorsk: {{tt|nn|kveld|m}}, {{tt|nn|aftan|m}}
+* Persian:
+*: Iranian Persian: {{tt|fa-ira|شامْگاه}}
+* Portuguese: {{tt+|pt|noitada|f}}, {{tt+|pt|noite|f}}
+* Romanian: {{tt+|ro|noapte}}
+* Russian: {{tt+|ru|ве́чер|m}}
+* Scottish Gaelic: {{tt|gd|oidhche|f}}
+* Sindhi: {{tt|sd|شام|tr=shāma}}
+* Slovak: {{tt|sk|večer|m}}
+* Slovene: {{tt+|sl|večer|m}}
+* Spanish: {{tt+|es|tarde|f}}
+* Swahili: {{tt+|sw|usiku}}
+* Telugu: {{tt|te|రాత్రి గడుపుట}}
+* Thai: {{tt+|th|คืน}}
+* Ukrainian: {{t+|uk|ве́чір|m}}
+* Vietnamese: {{tt+|vi|đêm}}
+* Walloon: {{tt+|wa|shijhe|f}}, {{tt+|wa|swerêye|f}}, {{tt+|wa|nute|f}}
+{{trans-bottom}}
+
+{{trans-top|night spent away from home}}
+* Armenian: {{tt+|hy|գիշեր}}
+* Belarusian: {{t|be|начо́ўка|f}}, {{t+|be|ноч|f}}
+* Bulgarian: {{tt|bg|нощу́вка|f}}
+* Catalan: {{tt+|ca|nit|f}}
+* Czech: {{tt+|cs|noc|f}}
+* Danish: {{tt+|da|overnatning|c}}
+* Dutch: {{tt+|nl|overnachting|f}}, {{tt+|nl|nacht|m}}
+* Estonian: {{tt+|et|öö}}
+* Ewe: {{tt|ee|zã|n}}
+* Finnish: {{tt+|fi|yö}}, {{tt+|fi|yöpyminen}}
+* French: {{tt+|fr|nuit|f}}, {{tt+|fr|nuitée|f}}
+* German: {{tt+|de|Übernachtung|f}}, {{tt+|de|Nacht|f}}
+*: Bavarian: {{tt|bar|Nocht}}
+* Hebrew: {{tt+|he|לַיְלָה⁩|m|tr=láyla}}
+* Hungarian: {{tt+|hu|éjszaka}}, {{tt+|hu|éjszakázás}}
+* Icelandic: {{tt+|is|nótt|f}}
+* Ido: {{tt+|io|nokto}}
+* Japanese: {{tt+|ja|一泊|tr=いっぱく, ippaku}}
+* Korean: {{t+|ko|박(泊)}}
+* Kurdish:
+*: Central Kurdish: {{tt+|ckb|شەو|tr=shaw}}
+*: Northern Kurdish: {{tt+|kmr|şev|f}}
+* Latin: {{tt+|la|nox|f}}
+* Malay: {{tt+|ms|malam}}
+* Maltese: {{tt|mt|lejl|m}}
+* Norwegian:
+*: Bokmål: {{tt|nb|overnatting|m|f}}
+*: Nynorsk: {{tt|nn|overnatting|f}}
+* Portuguese: {{tt+|pt|pernoite|m}}, {{tt|pt|pernoitada|f}}
+* Romanian: {{tt+|ro|noapte}}
+* Russian: {{tt+|ru|ночёвка|f}}, {{tt+|ru|ночь|f}}
+* Scottish Gaelic: {{tt|gd|oidhche|f}}
+* Slovak: {{tt+|sk|noc|f}}
+* Slovene: {{tt|sl|nočitev|f}}
+* Swahili: {{tt+|sw|usiku}}
+* Swedish: {{tt+|sv|övernattning}}
+* Thai: {{tt+|th|คืน}}
+* Tok Pisin: {{tt+|tpi|nait}}
+* Ukrainian: {{t|uk|ночі́вля|f}}, {{t+|uk|ніч|f}}
+* Vietnamese: {{tt+|vi|đêm}}
+{{trans-bottom}}
+
+{{trans-top|quality of sleep obtained during a night}}
+* Armenian: {{tt+|hy|գիշեր}}
+* Burmese: {{tt|my|အိပ်ရေး}}
+* Catalan: {{tt+|ca|nit|f}}
+* Danish: {{tt|da|nattesøvn|c}}
+* Dutch: {{tt+|nl|nachtrust|m}}
+* Finnish: {{tt+|fi|yöuni}}, {{tt+|fi|yö}}
+* French: {{tt+|fr|nuit|f}}
+* German: {{tt+|de|Nacht|f}}
+*: Bavarian: {{tt|bar|Nocht}}
+* Hindi: {{tt+|hi|निद्रा|f}}
+* Hungarian: {{tt+|hu|éjszaka}}
+* Kurdish:
+*: Central Kurdish: {{tt+|ckb|شەو|tr=shaw}}
+*: Northern Kurdish: {{tt+|kmr|şev|f}}
+* Latin: {{tt+|la|nox|f}}
+* Malay: {{tt+|ms|malam}}
+* Norwegian:
+*: Bokmål: {{tt|nb|nattesøvn|m}}
+*: Nynorsk: {{tt|nn|nattesøvn|m}}, {{tt|nn|nattesvevn|m}}
+* Portuguese: {{tt+|pt|sono|m}}
+* Scottish Gaelic: {{tt|gd|oidhche|f}}
+* Swahili: {{tt+|sw|usiku}}
+* Telugu: {{tt|te|గాఢనిద్ర}}
+* Vietnamese: {{tt+|vi|đêm}}, {{tt|vi|đêm ngủ}}
+{{trans-bottom}}
+
+{{trans-top|nightfall}}
+* American Sign Language: {{tt|ase|BentB@BackHand-PalmDown-FlatB@CenterChesthigh-PalmDown Contact}}
+* Arabic: {{tt+|ar|مَغْرِب|m}}
+*: Moroccan Arabic: {{tt|ary|مغْرب|m|tr=meḡreb}}
+* Armenian: {{tt+|hy|գիշեր}}
+* Belarusian: {{t|be|змрок|m}}
+* Bulgarian: {{tt|bg|смрача́ване|n}}, {{t+|bg|су́мрак|m}}
+* Catalan: {{tt+|ca|vesprada|f}}, {{tt|ca|foscant|m}}
+* Chinese:
+*: Mandarin: {{tt+|cmn|黄昏|tr=huánghūn}}
+* Danish: {{tt+|da|aften|c}}, {{tt+|da|skumring|c}}
+* Estonian: {{tt|et|öö saabumine}}
+* Ewe: {{tt|ee|zã|n}}
+* Finnish: {{tt+|fi|ilta}}
+* French: {{tt+|fr|soir|m}}
+* Hindi: {{tt+|hi|साँझ|f}}, {{t|hi|संध्या|f}}
+* Hungarian: {{tt+|hu|este}}, {{tt+|hu|alkonyat}}, {{tt+|hu|alkony}}, {{tt+|hu|szürkület}}, {{tt+|hu|napnyugta}}, {{tt+|hu|napszállta}}
+* Icelandic: {{tt+|is|nótt|f}}
+* Irish: {{tt|ga|titim na hoíche|f}}, {{tt|ga|teacht na hoíche|m}}
+* Japanese: {{tt+|ja|日暮れ|tr=ひぐれ, higure}}, {{t+|ja|黄昏|tr=たそがれ, tasogare}}
+* Korean: {{tt+|ko|황혼(黃昏)}}
+* Kurdish:
+*: Central Kurdish: {{tt+|ckb|شەو}}
+*: Northern Kurdish: {{tt+|kmr|şev|f}}
+* Lithuanian: {{tt+|lt|vakaras}}
+* Navajo: {{tt|nv|tłʼééʼ}}
+* Norwegian:
+*: Bokmål: {{tt+|nb|skumring|m|f}}
+*: Nynorsk: {{tt|nn|skumring|f}}
+* Portuguese: {{tt+|pt|anoitecer|m}}
+* Romanian: {{tt+|ro|noapte|f}}, {{tt+|ro|înserare|f}}
+* Russian: {{t+|ru|су́мерки|f-p}}, {{t+|ru|су́мрак|m}}
+* Scottish Gaelic: {{tt|gd|oidhche|f}}
+* Sindhi: {{tt|sd|ِسنجھا|f|tr=sanjhā}}
+* Swahili: {{tt+|sw|jioni}}
+* Swedish: {{tt+|sv|skymning}}
+* Telugu: {{tt|te|చీకటి పడుట}}
+* Thai: {{tt+|th|ค่ำ}}
+* Ukrainian: {{t|uk|су́тінки|m-p}}
+* Vietnamese: {{tt+|vi|tối}}
+* Walloon: {{tt+|wa|nute|f}}, {{tt+|wa|niût|m|f}}, {{tt+|wa|anuti|m}}
+{{trans-bottom}}
+
+{{trans-top|darkness}}
+* Armenian: {{tt+|hy|աղջամուղջ}}, {{tt+|hy|գիշեր}}
+* Bashkir: {{tt|ba|ҡараңғы}}
+* Bulgarian: {{tt+|bg|мрак|m}}
+* Catalan: {{tt+|ca|nit|f}}, {{tt+|ca|fosca|f}}, {{tt+|ca|obscuritat|f}}
+* Czech: {{tt+|cs|noc|f}}
+* Danish: {{tt+|da|nat|c}}, {{tt+|da|mørke|n}}
+* Dutch: {{tt|nl|nachtelijke duisternis|f}}
+* Estonian: {{tt|et|pimedus}}
+* Finnish: {{tt+|fi|pimeys}}, {{tt+|fi|pimeä}}, {{tt+|fi|yö}}
+* French: {{tt+|fr|nuit|f}}, {{tt+|fr|noirceur|f}}, {{tt+|fr|obscurité|f}}
+* German: {{tt+|de|Nacht|f}}, {{tt+|de|Dunkelheit|f}}
+*: Bavarian: {{tt|bar|Nocht}}
+* Hawaiian: {{tt|haw|pō}}
+* Hindi: {{t+|hi|अँधेरा}}, {{t+|hi|अंधकार|m}}
+* Hungarian: {{tt+|hu|éjszaka}}, {{tt+|hu|sötétség}}, {{tt+|hu|sötét}}
+* Ido: {{tt+|io|obskureso}}
+* Irish: {{tt+|ga|dorchadas|m}}
+* Japanese: {{tt+|ja|闇|tr=やみ, yami}}
+* Kurdish:
+*: Central Kurdish: {{tt|ckb|تاریکی|tr=tAreekee}}
+*: Northern Kurdish: {{tt+|kmr|şev|f}}
+* Latin: {{tt+|la|nox|f}}, {{tt+|la|tenebrae|f-p}}, {{tt|la|nocturna tempora|n-p}}, {{tt|la|caligo|f}}
+* Malay: {{tt+|ms|malam}}
+* Navajo: {{tt|nv|chahałheeł}}
+* Norwegian:
+*: Bokmål: {{tt|nb|mørke|n}}
+*: Nynorsk: {{tt|nn|mørker|n}}
+* Pashto: {{t|ps|تیاره|f|tr=tyārë }}
+* Persian:
+*: Iranian Persian: {{tt+|fa-ira|تاریکی}}
+* Portuguese: {{tt+|pt|escuridão|m}}, {{tt+|pt|noite|f}}, {{tt+|pt|trevas|f}}
+* Romanian: {{tt+|ro|întuneric}}
+* Russian: {{tt+|ru|тьма|f}}, {{tt+|ru|темнота́|f}}
+* Scottish Gaelic: {{tt|gd|oidhche|f}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt|sh|тама|f}}
+*: Latin: {{tt+|sh|tama|f}}
+* Slovene: {{tt+|sl|tema|f}}
+* Spanish: {{tt+|es|oscuridad|f}}
+* Swahili: {{tt+|sw|usiku}}
+* Swedish: {{tt+|sv|mörker}}
+* Tagalog: {{tt|tl|kadiliman}}
+* Telugu: {{tt+|te|చీకటి}}
+* Thai: {{tt+|th|ความมืด}}
+* Tok Pisin: {{tt+|tpi|tudak}}
+* Vietnamese: {{tt+|vi|tối}}
+}}<!-- close {{multitrans}} -->
+{{trans-bottom}}
+
+{{checktrans-top}}
+* Afrikaans: {{t+check|af|nag}}
+* Breton: {{t+check|br|nozvezh|f}} (1), [[noz]] {{g|f}} (1,2)
+* Ido: {{t+check|io|nokto}}
+* Indonesian: {{t+check|id|malam}}, {{t-check|id|malam hari}}
+* Kannada: {{t+check|kn|ರಾತ್ರಿ}}, {{t+check|kn|ಇರುಳು}}
+* Khmer: {{t+check|km|យប់}}
+* Luxembourgish: {{t+check|lb|Nuecht|f}}, {{t-check|lb|Nuet|f}}
+* Maltese: {{t-check|mt|lejl|m}}
+* Norman: {{t-check|nrf|niet|f}} {{qualifier|Jersey}}
+* Occitan: {{t+check|oc|nuèit}}
+* Romanian: {{t+check|ro|noapte|f}}
+* Swahili: {{t+check|sw|usiku|c5}}
+* Tamil: {{t+check|ta|இரவு}}
+* Turkish: {{t+check|tr|gece}}
+* Ubykh: {{t-check|uby|ŝʷəwa}}
+* Welsh: {{t+check|cy|nos|f}}, {{t-check|cy|noson|f}}, {{t+check|cy|noswaith|f}}
+* Woiwurrung: {{t-check|wyi|booreen}}
+* Xhosa: {{t-check|xh|ubusuku}} ''(nc 7)''
+* Yiddish: {{t+check|yi|נאַכט|f}}
+* Zulu: {{t+check|zu|ubusuku}} ''(nc 7)''
+{{trans-bottom}}
+
+====See also====
+{{list:times of day/en}}
+
+===Interjection===
+{{en-intj}}
+
+# {{ellipsis of|en|good night}}.
+#: {{ux|en|'''Night''', y'all! Thanks for a great evening!}}
+
+====Translations====
+<!-- This is for shortened expressions. There's a separate entry for ordinary good night's wishes -->
+{{trans-top|Short for good night}}
+{{multitrans|data=
+* Bengali: {{tt+|bn|রাত্রি}}
+* Dutch: {{tt+|nl|nacht|c}}
+* Finnish: {{tt+|fi|öitä!}}
+* Frisian:
+*: West Frisian: {{tt+|fy|nacht}}
+* German: {{tt+|de|Nacht!}}
+* Hindi: {{tt+|hi|रात्रि}}
+* Irish: {{tt|ga|oíche mhaith}}
+* Malay: {{tt+|ms|malam}}
+* Swahili: {{tt+|sw|usiku}}
+* Swedish: {{tt|sv|gonatt}}
+* Telugu: {{tt|te|నిద్ర లేమి}}
+* Vietnamese: {{tt|vi|[[chúc]] [[ngủ]] [[ngon]]}}, {{tt+|vi|tạm biệt}}
+}}<!-- close {{multitrans}} -->
+{{trans-bottom}}
+
+===Verb===
+{{en-verb}}
+
+# {{lb|en|intransitive}} To [[spend]] a night (in a place), to [[overnight]].
+#* {{quote-book|1=en|year=1885|author=[[w:Richard Francis Burton|Richard F. Burton]]|title=Arabian Nights, in 16 volumes|year_published=2008|page=284|passage=So I took seat and ate somewhat of my vivers, my horse also feeding upon his fodder, and we '''nighted''' in that spot and next morning I set out[.]}}
+
+===References===
+* {{R:OneLook}}
+
+===Anagrams===
+* {{anagrams|en|a=ghint|Thing|thing}}
+
+{{topics|en|Night|Time|Times of day}}

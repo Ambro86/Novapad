@@ -1,0 +1,128 @@
+== {{-it-}} ==
+[[File:Otvorena knjiga.JPG|thumb|un libro aperto]]
+[[File:Luis Alvaz participante del libro WikiEducación.jpg|thumb|un [[uomo]] mentre mostra un libro con la [[copertina]] verde]]
+[[File:Photocopy right.jpg|thumb|[[un]] libro [[aperto]] [[capovolto]] [[pronto]] [[per]] [[la]] [[fotocopia]] [[di]] [[una]] [[sua]] [[pagina]]]]
+[[File:Lueger.jpg|280px|thumb|una [[fila]] di [[otto]] libri [[allineati]] in [[successione]] [[numerica]] di una [[stessa]] [[casa]] [[editrice]]]]
+{{-sost-|it}}
+{{Pn|w}} ''m sing'' {{Linkp|libri}}
+# {{Term|tipografia|it}} {{Term|letteratura|it}} [[oggetto]] [[costituito]] [[da]] [[una]] [[pila]] di [[fogli]], [[generalmente]] [[cartacei]] e di ugual [[misura]], [[rilegati]] tra loro su un solo [[lato]] [[mediante]] [[cucitura]] o [[incollaggio]] che [[prende]] il [[nome]] di [[rilegatura]] e contenenti delle [[informazioni]]. Si [[possono]] [[suddividere]] [[principalmente]]:
+#* in base al [[metodo]] di scrittura: ''{{Pn}} a stampa, {{Pn}} manoscritto''
+#* in base al numero delle pagine: ''{{Pn}} sottile, {{Pn}} grosso''
+#* in base al formato: ''{{Pn}} in quarto, {{Pn}} in ottavo, {{Pn}} tascabile''
+#* in base al metodo di [[rilegatura]]: ''{{Pn}} sciolto, {{Pn}} in brochure''
+#* in base alla stampa: ''{{Pn}} illustrato, {{Pn}} in caratteri latini''
+#* in base alle sue condizioni esteriori: ''{{Pn}} nuovo, {{Pn}} usato''
+#* in base al periodo di pubblicazione: ''{{Pn}} antico, {{Pn}} nuovo''
+#* in base al contenuto: ''{{Pn}} scientifico, {{Pn}} di storia''
+#* in base allo scopo: ''{{Pn}} da messa, {{Pn}} di lettura''
+# [[parti]] nella quale vengono [[suddivise]] oggi le [[composizioni]] [[classiche]]
+#* ''Orazio compose quattro libri di odi''
+# [[registro]] mantenuto dalla pubblica [[amministrazione]], [[imprese]], [[associazioni]], ove [[annotare]] quello che interessa la loro [[attività]]
+#* ''{{Pn}} contabile, {{Pn}} mastro''
+# {{Term|botanica|it}} serie di elementi facenti parte di [[tessuti]] [[organici]] diversi [[rinvenibile]] in [[fusti]], [[rami]] e [[radici]] delle [[piante]] [[vascolari]]
+#* ''{{Pn}} primario, {{Pn}} secondario''
+# {{Term|zoologia|it}} terza [[cavità]] dello [[stomaco]] dei [[ruminanti]], costituita da lunghe pieghe della [[mucosa]] che assomigliano alle [[pagine]] di un libro
+# {{Fig}} insieme dei fenomeni che avvengono in [[natura]]
+#* ''il {{Pn}} dell'universo''
+# {{Term|araldica|it}} [[simbolo]] di [[erudizione]], [[rispetto]] della [[legge]] e [[scienza]]
+
+{{-verb form-|it}}
+{{Pn}}
+# prima persona singolare dell'indicativo presente di [[librare]]
+
+{{-sill-}}
+; lì | bro
+
+{{-pron-}}
+{{IPA|/ˈlibro/}}
+{{Audio|it-libro.ogg}}
+
+{{-etim-}}
+* ''(sostantivo)'' dal {{la}} ''[[liber]]'', libro (pellicola tra la [[corteccia]] ed il [[legno]] dell'[[albero]], che serviva a [[scrivere]])
+* ''(voce verbale)'' {{Etim-link|librare}}
+
+{{-quote-}}
+{{Quote
+|È quasi uguale uccidere un uomo che uccidere un buon libro. Chi uccide un uomo uccide una creatura ragionevole, immagine di Dio; ma chi distrugge un buon libro uccide la ragione stessa.
+|[[q:John Milton|John Milton]]}}
+
+{{Quote
+|L'uomo che pratica una sola classe sociale, è come lo studioso che non legge altro che un libro
+|[[q:Edmondo De Amicis|Edmondo De Amicis]]}}
+
+{{Quote
+| Il mondo è un bel libro, ma poco serve a chi non lo sa leggere. |[[q:Carlo Goldoni|Carlo Goldoni]]}}
+
+{{Quote
+|Si entra in un libro come in un treno, con qualche occhiatina dietro, con qualche esitazione e con la noia di cambiare luogo e idee. Come andrà il viaggio? Come sarà il libro?
+|[[q:Jules Renard|Jules Renard]]}}
+
+{{Quote|Galeotto fu'l libro e chi lo scrisse
+|[[q:Dante Alighieri|Dante Alighieri]], ''[[w:Inferno (Divina Commedia)|Inferno]] - [[w:Inferno - Canto quinto|Canto quinto]], verso 137[http://www.segnalidivita.com/la_divina_commedia/inferno_canto_V.htm]''}}
+
+{{-sin-}}
+*'' (oggetto costituito da una pila)'' [[opera]], [[titolo]], [[pubblicazione]], [[testo]], [[tomo]], [[volume]]
+*{{Term|uso letterario|it}} [[sezione]], [[parte]], [[canto]], [[capitolo]]
+*''(burocrazia)'' [[registro]]
+* ''(botanica)'' [[floema]]
+* ''(zoologia)'' [[millefoglio]], [[omaso]], [[salterio]]
+* {{Fig}} [[computo]]
+
+{{-der-}}
+* [[audiolibro]], [[autobiblioteca]], [[autolibro]],  [[cyberlibro]], [[libreria]], [[librocassetta]], [[libro verde]], [[libro-mosaico]], [[libro-intervista]], [[libro-confessione]], [[libro-culto]], [[libro parlato]], [[libro-verità]], [[libro-denuncia]], [[libro-game]], [[libro digitale]], [[libro elettronico]], [[libro parlante]], [[libro-documenti]], [[reggilibro]], [[sputalibri]]  [[a libro]], [[libri sibillini]], [[libri sociali]], [[libro bianco]], [[libro contabile]], [[libro da messa]], [[libro dei morti]], [[libro dei sogni]], [[libro delle firme]], [[libro del rifugio]], [[libro di biccherna]], [[libro di bordo]], [[libro di carico]], [[libro di cassa]], [[libro di devozione]], [[libro di lettura]], [[libro di navigazione]], [[libro di stato]], [[libro di testo]], [[libro di vetta]], [[libro d'ore]], [[libro d'oro]], [[libro giornale]], [[libro liturgico]], [[libro mastro]], [[libro nero]], [[libro paga]], [[libro parrocchiale]], [[libro pontificale]], [[libro proibito]], [[libro sacro]], [[libro strenna]], [[libro tascabile]], [[segnalibro]]
+
+{{-rel-}}
+* [[e-book]], [[recensione]], [[almanacco]], [[dorso]], [[editoria]], [[floema]], [[formato]], [[frontespizio]], [[fusto]], [[illustrazione]], [[legatura]], [[manoscritto]], [[pagina]], [[stampato]]
+
+{{-alter-}}
+* {{Dim}} [[libretto]], [[librino]], [[libriccino]], [[librettino]]
+* {{Dim}} {{Spreg}} [[libruccio]], [[librettuccio]], [[libricciolo]]
+* {{Spreg}} [[libriciattolo]]
+* {{Term|letterario|it}} [[librattolo]]
+* {{Accr}} [[librone]]
+* {{Pegg}} [[libraccio]], [[libercolo]]
+
+{{-ipon-}}
+*''(oggetto costituito da una pila...)'' [[studio]], [[romanzo]], [[trattato]], [[manuale]], [[prontuario]], [[repertorio]], [[saggio]]
+
+{{-prov-}}
+*''[[libro di testo]] '': manuale
+*''[[parlare come un libro stampato]]'': {{Term|scherzoso|it}} parlare con esattezza
+* ''nessun veliero equivale a un '''libro''' per trasportare in terre lontane'': per ribadire quanto è importante la lettura dei libri e non il viaggiare per conoscere il mondo (Emily Dickinson)
+
+{{-trad-}}
+{{Trad1|insieme di pagine che contengono testi scritti}}
+:*{{ar}}: [[كتاب|كِتَاب]] ''m''
+:*{{az}}: [[kitab]]
+:*{{br}}: [[levr]] ''m''
+:*{{ca}}: [[llibre]] ''m''
+:*{{cs}}: [[kniha]] ''f''
+:* {{zh}}: {{zh-tradsem|[[書]]|[[书]]}} (''shū'')
+:*{{hr}}: [[knjiga]] ''f'' 
+:*{{da}}: [[bog]]
+:*{{he}}: [[ספר]]
+:*{{fi}}: [[kirja]] 
+:*{{fr}}: [[livre]] ''m''
+:* {{ja}}: [[本]] ([[ほん]], ''hon''), [[書籍]] ([[しょせき]], ''shoseki'')
+:*{{el}}: [[βιβλίο]] (vivlío) ''n''
+:*{{grc}}: [[βιβλίον]] (biblíon) ''n''
+{{mid}}
+:*{{en}}: [[book]]
+:*{{la}}: [[liber]] ''m''
+:*{{no}}: [[bok]]
+:*{{nl}}: [[boek]]
+:*{{pl}}: [[książka]] ''f''
+:*{{pt}}: [[livro]] 
+:*{{ru}}: [[книга]]
+:*{{sr}}: [[knjiga]] / [[књига]] ''f''
+:*{{scn}}: [[libbru]]
+:*{{sl}}: [[knjiga]]
+:*{{es}}: [[#Spagnolo|libro]] ''m''
+:*{{sv}}: [[bok]]
+:*{{de}}: [[Buch]] ''n''
+:*{{hu}}: [[könyv]] 
+{{Trad2}}
+
+{{Trad1|{{Term|botanica|it}} tipo di tessuto delle piante vascolari}}
+:* {{en}}: [[phloem]]
+{{Trad2}}

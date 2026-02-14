@@ -1,0 +1,116 @@
+== {{-it-}} ==
+[[File:Mer mediterranee.JPG|thumb|{{Pn}} Mediterraneo]]
+[[File:2014 Baroña. Castro de Baroña. Porto do Son-2.jpg|thumb|il mare e  la costa]]
+{{-sost-|it}}
+{{Pn |w}} ''m sing'' {{Linkp|mari}}
+# {{Term|geografia|it}} [[distesa]]  di [[acqua]] [[salato|salata]] che [[circondare|circonda]] la [[terra]] emersa
+#{{Term|raro|it}} qualifica di un [[luogo]] [[portuale]] o comunque con un’[[economia]] che “[[gira]] anche grazie al [[commercio]] [[marittimo]]” persino per il [[turismo]] o altro
+#* ''è una città di {{Pn}}''
+#{{Est}} fa riferimento a [[giornate]], ai [[soggiorni]] o alle [[vacanze]] in [[luoghi]] con [[spiagge]] e in [[residenze]] [[balneari]], [[città]] sul ''mare'', ecc
+#* ''“Mamma, andiamo al {{Pn}} [[oggi]]?”''
+# {{Fig}}  grande [[quantità]]
+#* ''ho un {{Pn}} di lavoro da fare''
+# {{Term|gergale|it}} riferimento alla [[passione]] appunto per le [[imbarcazioni]] e per il [[mare]]
+# {{Term|familiare|it}} secondo le [[regole]] [[navali]], si intendono le [[differenti]] [[manovre]], le [[missioni]] [[varie]], il [[codice]] [[precipuo]], ecc
+#* ''il [[soccorso]] in {{Pn}} è un [[dovere]] [[imprescindibile]]''
+
+{{-sill-}}
+; mà | re
+
+{{-pron-}}
+{{IPA|/ˈmare/}}
+{{Audio|it-mare.ogg}}
+
+{{-etim-}}  
+dal {{la}} ''[[#Latino|mare]]'', con lo stesso significato
+
+{{-quote-}}
+{{Quote
+|Io, Giovanni, vidi salire dall'oriente' un altro angelo, con il sigillo del Dio vivente. E gridò a gran voce ai quattro angeli, ai quali era stato concesso di devastare la terra e il '''mare''' 
+|[[w:Apocalisse di Giovanni|Apocalisse di Giovanni]]  {{Passo biblico|Ap|7,2}}, testo CEI 2008}}
+
+{{Quote
+|La sabbia del '''mare''', le gocce della pioggia e i giorni del mondo chi potrà contarli?
+|[[w:Siracide|Siracide]], {{Passo biblico|Sir|1,2}}}} 
+
+{{-sin-}}
+* [[acqua]], [[acque]], [[abissi]], [[oceano]]
+* [[costa]], [[litorale]], [[riva]], [[spiaggia]] 
+*{{Term|uso letterario|it}} [[pelago]]
+* {{Fig}} [[abbondanza]], [[alluvione]], [[caterva]], [[distesa]], [[estensione]], [[fiume]], [[immensità]], [[infinità]],  [[marea]],  [[miriade]], [[pioggia]],  [[profluvio]], [[quantità]], [[subisso]], [[vastità]]
+
+{{-ant-}}
+* [[terra]]
+
+{{-der-}}
+* [[lungomare]], [[ammaraggio]], [[ammarare]],  [[marea]],  [[mareale]], [[mareggiare]], [[mareggiata]],  [[maremoto]],  [[maremotrice]],  [[maretta]],  [[marina]],  [[marinaio]], [[marinara]],  [[marino]],  [[marittimo]],  [[maroso]], [[oltremare]], [[sottomarino]], [[mare magnum]]
+
+{{-rel-}}
+* [[baia]],  [[costa]],  [[fondale]],  [[isola]],  [[naufragare]],  [[nave]],  [[navigare]],  [[oceano]],  [[onda]],  [[rotta]],  [[scoglio]],  [[spiaggia]],  [[tsunami]]
+
+{{-prov-}}
+*''[[arare il mare]]'':  {{Fig}} {{Term|scherzoso|it}}  fare qualcosa di inconcludente
+*''[[buttare a mare]]'': [[sbarazzarsi]] di qualcosa o  qualcuno
+* ''col fuoco, con la  donna  e con il {{Pn}}, c'è poco da scherzare''
+* ''[[frutto di mare]]'': [[mollusco]] o altro animale di mare  senza vertebre che si mangia  come [[cozza]], [[vongola]], [[dattero di mare]], [[riccio di mare]]
+*''[[in alto mare]]'': distante dalla dalla soluzione di una questione
+* ''mare mosso'': quando il {{Pn}} è agitato, mosso da forte vento che provoca onde notevoli
+*''per terra e per mare''
+* ''[[prendere il mare]]'': intraprendere un viaggio (anche breve) in {{Pn}}
+* ''[[promettere mari e monti]]'': promettere cose spropositate o impossibili
+* ''vento fresco vento crespo''
+* ''vecchio lupo di mare'': proprio perché di solito chi naviga è molto esperto ed indipendente, fa riferimento in modo amichevole a chi “la sa lunga”, cioè a qualcuno che sa molto di un argomento in particolare o di qualcosa di specifico oppure che sa destreggiarsi in molte situazioni senza difficoltà alcuna
+
+{{-trad-}}
+{{Trad1|distesa d'acqua}}
+:*{{af}}: [[see]]
+:*{{sq}}: [[det]]
+:*{{ar}}: [[بحر]] (baḥr)
+:*{{eu}}: [[itsaso]]
+:*{{br}}: [[mor]] ''m''
+:*{{bg}}: [[море]] (more) ''n''
+:*{{ca}}: [[mar]] ''m''
+:*{{cs}}: [[moře]] ''n''
+:*{{zh}}: [[海]] (hǎi)
+:*{{ko}}: [[바다]] (bada)
+:*{{hr}}: [[more]] ''n''
+:*{{da}}: [[hav]], [[sø]]
+:*{{he}}: [[ים]] (yam)
+:*{{et}}: [[meri]]
+:*{{fi}}: [[meri]]
+:*{{fr}}: [[mer]] ''f''
+:*{{fy}}: [[see]]
+:*{{gd}}: [[muir]]
+:*{{cy}}: [[môr]]
+:*{{ja}}: [[海]] ([[うみ]], umi)
+:*{{el}}: [[θάλασσα]] (thálassa) ''f''
+:*{{en}}: [[sea]]
+{{mid}}
+:*{{ga}}: [[muir]] ''f''
+:*{{is}}: [[haf]] ''n''
+:*{{la}}: [[mare#Latino|mare]] ''n'', [[pontus]] ''m'', [[aequor]] ''n''
+:*{{lv}}: [[jūra]] ''f''
+:*{{lt}}: [[jūra]] ''f''
+:*{{no}}: [[hav]] ''n'', [[sjø]] ''m''
+:*{{nl}}: [[zee]]
+:*{{fa}}: [[دریا]] (daryâ)
+:*{{pl}}: [[morze]] ''m''
+:*{{pt}}: [[mar]] ''m''
+:*{{ro}}: [[mare#Rumeno|mare]] ''f''
+:*{{ru}}: [[море]] (more) ''n''
+:*{{sr}}: [[море]] (more) ''n''
+:*{{sk}}: [[more]] ''n''
+:*{{sl}}: [[morje]] ''n''
+:*{{es}}: [[mar]] ''m''
+:*{{sv}}: [[hav]], [[sjö]]
+:*{{de}}: [[Meer]] ''n'', [[See]] ''m''
+:*{{tr}}: [[deniz]]
+:*{{uk}}: [[море]] (more) ''n''
+:*{{hu}}: [[tenger]]
+:*{{yi}}: [[ים]]
+{{Trad2}}
+
+{{Trad1| {{Fig}} molto}}
+:*{{br}}:  [[mor]] ''m''
+:*{{fr}}:  [[tas]] ''m''
+{{Trad2}}

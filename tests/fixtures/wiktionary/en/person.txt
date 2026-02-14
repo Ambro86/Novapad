@@ -1,0 +1,802 @@
+==English==
+{{wp|<dab!>}}
+
+===Etymology===
+From {{inh|en|enm|persoun}}, {{m|enm|personne}} et al., from {{der|en|xno|parsone}}, {{m|fro|persoun}} et al. ({{cog|fro|persone|t=human being}}, {{cog|fr|personne}}), and its source {{der|en|la|persōna|t=mask used by actor; role, part, character}}, perhaps a loanword from {{der|en|ett|𐌘𐌄𐌓𐌔𐌖|t=mask}}. In this sense, displaced native {{m|en|man}}, which came to mean primarily "adult male" in Middle English; see {{ncog|ang|mann}}. {{doublet|en|parson|persona}}.
+
+===Pronunciation===
+* {{IPA|en|a=RP|/ˈpɜː.sən/|[ˈpʰɜːsn̩]}}
+** {{audio|en|En-uk-person.ogg}}
+* {{IPA|en|a=GA|/ˈpɜɹ.sən/|[ˈpʰɝsn̩]}}
+** {{audio|en|En-us-person.ogg}}
+* {{IPA|en|/ˈpɑ.sən/|a=New England,obsolete|ref={{R:Bingham IP|76}}}}
+* {{IPA|en|/ˈpər.sən/|/-zən/|[ˈpɜː-]<a:non-rhotic>|a=Indic}}
+* {{hyphenation|en|per|son}}
+* {{rhymes|en|ɜː(ɹ)sən|ɜː(ɹ)zən<a:Indic><q:also>|s=2}}
+
+===Noun===
+{{en-noun|people|+}}
+
+# An [[individual]] who has been granted [[personhood]]; usually a [[human being]]. {{defdate|from 13th c.}}
+#* '''1784''', William Jones, ''The Description and Use of a New Portable Orrery, &c.'', [http://www.google.co.uk/books?id=4SoIAAAAIAAJ&pg=PA1&dq=ph%C3%A6nomena#PPA1,M1 P<small>REFACE</small>]
+#*: T<small>HE</small> favourable reception the Orrery has met with from '''Perſons''' of the firſt diſtinction, and from Gentlemen and Ladies in general, has induced me to add to it ſeveral new improvements in order to give it a degree of Perfection; and diſtinguiſh it from others; which by Piracy, or Imitation, may be introduced to the Public.
+#* {{RQ:Maxwell Mirror and the Lamp|XII|85|“A very welcome, kind, useful present, that means to the parish. By the way, Hopkins, let this go no further. We don't want the tale running round that a rich '''person''' has arrived. Churchill, my dear fellow, we have such greedy sharks, and wolves in lamb's clothing.{{nb...}}”}}
+#: {{ux|en|Each '''person''' is unique, both mentally and physically.}}
+## A character or part, as in a play; a specific kind or manifestation of individual character, whether in real life, or in literary or dramatic representation; an assumed character.
+##* {{RQ:Bacon Henry 7|186|{{...}}his firſt appearance vpon the ''Stage'', in his new '''perſon''' of a ''Sycophant'' or ''Iugler''{{...}}}}
+##* {{quote-text|en|year=1664|author=w:Robert South|title=Of the Love of Christ to his Disciples
+|passage=How different {{...}}is the same man from himself, as he sustains the '''person''' of a magistrate, and {{...}}that of a friend!}}
+##* {{RQ:Milton Paradise Lost|book=IX|page=269|lines=155–156|passage={{...}}to beare rule, which was thy part / And '''perſon''', had’ſt thou known thy ſelf aright.|year=1873}}
+##* {{RQ:Taylor Eniautos|passage=No man can long put on a '''person''' and act a part.}}
+## {{lb|en|Christianity}} Any one of the three [[hypostasis|hypostases]] of the Holy [[Trinity]]: the [[Father]], [[Son]], or [[Holy Spirit]].
+##* {{quote-text|en|year=1892|author=w:Book of Common Prayer|title=[[s:Book of Common Prayer (1892)/The Litanie|The Litanie]]
+|passage=three '''persons''' and one God}}
+## Any [[sapient]] or [[socially]] [[intelligent]] being.
+## {{lb|en|in a compound noun or noun phrase}} Someone who [[like]]s or has an affinity for (a specified thing). {{defdate|from 20th c.}}
+##: {{ux|en|Jack's always been a dog '''person''', but I prefer cats.}}<!--'likes', noun phrase-->
+## {{lb|en|in a compound noun or noun phrase}} A human of unspecified [[gender]] (in terms usually constructed with ''man'' or ''woman'').
+## {{lb|en|in a compound noun or noun phrase}} A worker in a specified function or specialty.
+##: {{ux|en|I was able to speak to a technical support '''person''' and get the problem solved.}}
+# The physical [[body]] of a being seen as distinct from the [[mind]], [[character]], etc. {{defdate|from 14th c.}}
+#* {{RQ:Burton Melancholy|edition=2nd|part=3|section=1|member=2|subsection=3|page=347|pageref=428|passage={{...}}when the young Ladies laughed at her for it, ſhe replied that it was not his '''perſon''' that ſhe did embrace and reverence, but the divine beauty of his Soule.}}
+#* {{RQ:James Maisie|XVI|188|The Captain, inclining his military '''person''', sat sideways to be closer and kinder{{nb...}}.}}
+#* '''1978''', {{w|Lawrence Durrell}}, ''Livia'', Faber & Faber 1992 {{qualifier|Avignon Quintet}}, page 418:
+#*: At first blush it seemed that what was striking about him rested on the fact that his dress was exotic, his '''person''' foreign.
+# {{lb|en|law}} Any individual or formal organization with [[standing]] before the courts. {{defdate|from 14th c.}}
+#: {{ux|en|At common law a corporation or a trust is legally a '''person'''.}}
+# {{lb|en|law|euphemism}} The human [[genitalia]]; specifically, the [[penis]].
+#* '''1824''', {{w|Vagrancy Act 1824}} ([http://www.legislation.gov.uk/ukpga/1824/83/pdfs/ukpga_18240083_en.pdf 5 Geo. 4. c.&nbsp;83], United Kingdom), section 4:
+#*: [E]very Person wilfully, openly, lewdly, and obscenely exposing his '''Person''' in any Street, Road, or public Highway, or in the View thereof, or in any Place of public Resort, with Intent to insult any Female&nbsp;... and being subsequently convicted of the Offence for which he or she shall have been so apprehended, shall be deemed a Rogue and Vagabond, within the true Intent and Meaning of this Act&nbsp;...
+# {{lb|en|grammar}} A [[linguistic]] category used to [[distinguish]] between the [[speaker]] of an [[utterance]] and those to whom or about whom they are [[speaking]]. See [[grammatical person]]. {{defdate|from 14th c.}}
+# {{lb|en|biology}} A [[shoot]] or [[bud]] of a [[plant]]; a [[polyp]] or [[zooid]] of the compound {{taxfmt|Hydrozoa|class}}, [[Anthozoa]], etc.; also, an individual, in the narrowest sense, among the higher animals. {{defdate|from 19th c.}}
+#* {{quote-text|en|year=1884|author=w:Patrick Geddes|chapter=Morphology|title=w:Encyclopædia Britannica|volume=16
+|passage=True corms, composed of united personae {{...}} usually arise by gemmation, {{...}} yet in sponges and corals occasionally by fusion of several originally distinct '''persons'''.}}
+# A [[soulmate]]; someone, especially a romantic partner, with whom one is exceptionally compatible and connected.
+#* {{quote-book|en|date=2022-01-25|author=Emily Forbes|title=The Perfect Mother for His Son|publisher=Harlequin|isbn=9780369712523
+|text='I still miss her. Every day,' she said. 'She was my '''person'''. {{...}} [And when she died,] I'd lost my '''person'''. I was eight years old and I'd lost my '''person'''. Willow and I even had our own language, as lots of twins do, but I stopped talking after she died.'}}
+#* {{quote-book|en|date=2022-08-23|author=Chris Brinkley|title=My Story of Us: Thomas|publisher=Smartypants Romance|isbn=9781949202984
+|text=Standing in the rain, she looked at me and said, "I have lost my '''person'''. Cal was my '''person'''. What am I going to do? I lost my '''person'''." The words didn't make sense to me. {{...|I thought she was probably in shock, or processing so much grief that her brain wasn't forming the right words.}} She lost her person? What does that even mean? Cal was more than a person. He was this great man and legendary basketball coach. I get if you have lost your dog or cat [...] But ''I lost my person''? {{...}} I finally understood [...] Because I realized that ''you'' are ''my'' person. It means that in a world of eight billion people, if I lost you, there would still be seven billion, nine-hundred and ninety-nine million, nine-hundred and ninety-nine thousand, nine-hundred and ninety-nine people [...] But none of those people matter. None of them are you.}}
+
+====Usage notes====
+* In senses 1.1, 1.3, and 1.4, the plural is most commonly ''people''. In senses 1.2, 2, 3, and 5, ''persons'' is the only plural.
+* Traditionally a distinction was often made in formal language whereby ''people'' was used of human beings in general and of larger, more anonymous groups, while ''persons'' described a finite, known number of individuals. To the degree that speakers still use the plural ''persons'', it is indeed often restricted to this latter context. However, Garner considers the distinction pedantic and most style guides (including e.g. the Associated Press and New York Times) now recommend ''people''. ''Persons'' is still generally used in technical and legal contexts.
+* Referring to an individual as a “person” (rather than a gentleman, lady, etc.) was formerly perceived as a slight:
+: '''1836''', {{w|William IV of the United Kingdom|King William IV}}, quoted in Clare Jerrold, ''[https://archive.org/stream/earlycourtofquee00jerruoft/earlycourtofquee00jerruoft_djvu.txt The Early Court of Queen Victoria]'' (New York: Putnam, 1912), at p. 97:
+:: I trust in God that my life may be spared for nine months longer, after which period, in the event of my death, no Regency would take place. I should then have the satisfaction of leaving the Royal authority to the personal exercise of that young lady [the future Queen Victoria], the heiress presumptive to the Crown, and not in the hands of a '''person''' now near me [Victoria's mother], who is surrounded by evil advisers and who is herself incompetent to act with propriety in the station in which she would be placed. I have no hesitation in saying that I have been insulted, grossly insulted by that '''person,''' but I am determined to endure no longer a course of behaviour so disrespectful to me.
+
+====Synonyms====
+* See also [[Thesaurus:person]]
+
+====Hyponyms====
+{{col4
+|en|advance person
+|businessperson
+|cameraperson
+|chairperson|dead person walking|person deprived of liberty|physical person
+|congressperson
+|draftsperson|Earth Surface Person
+|first person
+|foreperson
+|houseperson
+|layperson
+|newsperson
+|nonperson
+|ombudsperson
+|people person
+|person of interest
+|repairperson
+|salesperson
+|second person
+|stuntperson
+|spokesperson
+|tadpole person
+|third person
+|unperson
+|VIP|bald person|stateless person
+}}
+
+====Derived terms====
+{{col|en|Chinaperson|depersonate|about one's person
+|ape-person
+|artificial person|as the next person
+|battered person syndrome
+|boat person
+|cis person
+|computer person
+|deaf person
+|displaced person|blind person
+|first-person
+|fourth person
+|genderbread person
+|go-to person
+|highly sensitive person
+|in person,in-person|birthing person
+|in the person of
+|internally displaced person
+|juridical person
+|juristic person
+|key person insurance
+|key person risk
+|lay person
+|legal person
+|litigant in person
+|little person
+|minor attracted person,minor-attracted person
+|missing person
+|morning person
+|natural person
+|night person
+|on one's person
+|one-person
+|party person
+|person-to-person
+|person-hour
+|person-year
+|personable
+|personal
+|personate
+|personification
+|personify
+|personlike
+|personly
+|personnel
+|person from Porlock
+|person having ordinary skill in the art
+|person of ordinary skill in the art
+|person under train
+|person unknown
+|person up
+|person-made
+|person-power
+|pod person
+|point person|person-day|two-person rule
+|real person fiction
+|reasonable person
+|stiff person syndrome
+|suppressive person
+|tadpole person
+|trans person
+|very important person|certain person|contact person|named person|person in the street|person-month|real-person fiction|stiff-person syndrome|yacht person|adperson|ambulanceperson|anchorperson|antiperson|Antperson|assemblyperson|barperson|baseperson|bellperson|boatperson|bondsperson|bushperson|catperson|cattleperson|caveperson|churchperson|clansperson|clergyperson|committeeperson|conperson|corpsperson|councilperson|counterperson|countryperson|cowperson|craftsperson|crewperson|Cumberperson|cyberperson|deliveryperson|deperson|doorperson|dustperson|Dutchperson|Earthperson|Englishperson|fireperson|fisherperson|flagperson|floorperson|flyperson|freedperson|Frenchperson|freshperson|frontiersperson|garbageperson|greensperson|gunperson|handyperson|helmsperson|horseperson|huntsperson|infantryperson|interperson|intraperson|ironperson|jazzperson|journeyperson|juryperson|kinsperson|Klansperson|leatherperson|linesperson|lobsterperson|longshoreperson|madperson|mailperson|marksperson|mediaperson|merperson|microperson|militiaperson|milkperson|misperson|multiperson|newspaperperson|nurseryperson|overperson|patrolperson|personative|personhunt|personise|personish|personism|personist|personize|personkind|personless|personness|personocracy|personology|personpower|personship|pitchperson|plantsperson|ploughperson|pointsperson|policeperson|postperson|pressperson|roundsperson|Scotsperson|selectperson|serviceperson|showperson|sideperson|signalperson|slaughterperson|snowperson|soundperson|spinson|sportsperson|statesperson|steersperson|superperson|townsperson|trackperson|tradesperson|tribesperson|underperson|venireperson|vestryperson|waitperson|weatherperson|workperson|yardperson|Earth Surface Person|goods-to-person|G2P|government-to-person|thinking person's}}
+
+====Descendants====
+* {{desc|pcm|pesin}}
+
+====Translations====
+{{trans-top-see|individual}}
+{{multitrans|data=
+* Acehnese: {{t|ace|ureuëng}}
+* Adyghe: {{t|ady|цӏыфы}}
+* Afrikaans: {{t+|af|persoon}}
+* Ahom: {{tt|aho|𑜀𑜤𑜃𑜫}}
+* Ainu: {{tt|ain|アイヌ|tr='aynu}}
+* Aklanon: {{tt|akl|tawo}}
+* Alabama: {{tt|akz|aati}}
+* Albanian: {{tt+|sq|njeri|m}}
+* Altai:
+*: Southern Altai: {{t|alt|кижи}}
+* Amami Ōshima:
+*: Southern Amami Ōshima: {{tt|ams|むん|tr=mun}}
+* Amis: {{tt|ami|tamdaw}}
+* Apache:
+*: Chiricahua: {{tt|apm|ndé}}
+* Arabic: {{tt+|ar|شَخْص|m}}, {{tt+|ar|مَرْء|m}}, {{tt+|ar|فَرْد|m}}
+*: Egyptian Arabic: {{tt|arz|شخص|m|tr=šaḵṣ}}, {{tt|arz|حد|m|tr=ḥad}}
+*: South Levantine Arabic: {{tt|ajp|شخص|m|tr=šaḵṣ}}
+* Aramaic:
+*: Classical Syriac: {{tt|syc|ܐܦܐ|f|tr=ʔappe(ʔ)}}, {{tt|syc|ܦܪܨܘܦܐ|m|tr=parsˁofɑ(ʔ)}}, {{tt|syc|ܩܢܘܡܐ|m|tr=q(ə)nomɑ(ʔ)}}
+* Armenian: {{tt+|hy|անձ}}, {{tt+|hy|անձնավորություն}}
+*: Old Armenian: {{tt|xcl|անձն}}
+* Asturian: {{tt+|ast|persona|f}}
+* Avar: {{t|av|гӏадан}}
+* Azerbaijani: {{tt+|az|adam}}, {{tt+|az|fərd}}, {{tt|az|şəxsiyyət}}, {{tt+|az|şəxs}}
+* Bala: {{t|tuw-bal|纳莫|tr=namo}}
+* Bashkir: {{tt|ba|кеше}}, {{tt|ba|әҙәм}}
+* Basque: {{tt|eu|pertsona}}
+* Belarusian: {{tt+|be|чалаве́к|m}}, {{tt+|be|асо́ба|f}}
+* Bengali: {{tt+|bn|ব্যক্তি}}, {{tt+|bn|লোক}}
+* Bikol:
+*: Central Bikol: {{tt+|bcl|tawo}}
+*: Rinconada Bikol: {{tt|bto|[[tawo|tawō]]}}
+* Bontoc:
+*: Eastern Bontoc: {{tt|ebk|tako}}
+* Breton: {{tt+|br|den|m}}
+* Bulgarian: {{tt+|bg|чове́к|m}}, {{tt+|bg|персо́на|f}}, {{tt+|bg|ли́чност|f}}
+* Burmese: {{tt+|my|လူ}}, {{tt+|my|ပုဂ္ဂိုလ်}}, {{tt+|my|မနုဿ}}
+* Butuanon: {{t|btw|tao}}
+* Caijia: {{t|sit-cai|u³³tsʰo³³}}
+* Carpathian Rusyn: {{tt|rue|чолові́к|m}}
+* Catalan: {{tt+|ca|persona|f}}
+* Cebuano: {{tt|ceb|tawo}}
+* Chagatai: {{tt|chg|کِیشِی|tr=kīšī}}
+* Chamicuro: {{tt|ccc|klistyano}}
+* Chechen: {{t|ce|адам}}
+* Chichewa: {{tt|ny|munthu}}
+* Chickasaw: {{tt|cic|hattak}}
+* Chin:
+*: Khumi Chin: {{t|cnk|khimi}}
+*: Tedim Chin: {{t|ctd|mi}}
+* Chinese:
+*: Cantonese: {{tt+|yue|人|tr=jan4}}
+*: Dungan: {{tt|dng|жын}}
+*: Eastern Min: {{tt|cdo|儂|tr=nè̤ng}}
+*: Gan: {{tt|gan|人|tr=nyin4}}
+*: Hakka: {{tt|hak|人|tr=PFS: ngìn; Guangdong: ngin2}}
+*: Hokkien: {{tt+|nan-hbl|人|tr=lâng}}, {{tt+|nan-hbl|儂|tr=lâng}}
+*: Jin: {{tt|cjy|人|tr=reng1}}
+*: Mandarin: {{tt+|cmn|人|tr=rén}}
+*: Northern Min: {{tt|mnp|人|tr=nêng}}
+*: Wu: {{tt|wuu|人}}
+*: Xiang: {{tt|hsn|人|tr=ren2}}
+* Choctaw: {{tt|cho|hatak}}
+* Czech: {{tt+|cs|osoba|f}}, {{tt+|cs|člověk|m}}
+* Danish: {{tt+|da|person|c}}, {{t+|da|menneske|n}}
+* Dinka: {{tt|din|kɔc}}
+* Dogrib: {{tt|dgr|done}}
+* Dutch: {{tt+|nl|persoon|m|f}}
+* Erzya: {{t|myv|лиця}}
+* Esperanto: {{tt+|eo|persono}}
+* Estonian: {{tt+|et|isik}}
+* Fataluku: {{t|ddg|ma'ar}}
+* Finnish: {{tt+|fi|henkilö}}, {{tt+|fi|yksilö}}, {{tt+|fi|persoona}}
+* French: {{tt+|fr|personne|f}}
+* Frisian:
+*: West Frisian: {{tt+|fy|persoan|c}}
+* Gaddang: {{tt|gad|tolay}}
+* Galician: {{tt+|gl|persoa|f}}
+* Georgian: {{tt+|ka|ადამიანი}}, {{tt|ka|ინდივიდი}}, {{tt|ka|პიროვნება}}, {{tt|ka|პერსონა}}, {{tt+|ka|პირი}}
+* German: {{tt+|de|Person|f}}
+* Greek: {{tt+|el|άτομο|n}}
+*: Ancient Greek: {{tt|grc|ἄνθρωπος}}
+*: Mycenaean Greek: {{tt|gmy|𐀀𐀵𐀫𐀦}}
+* Greenlandic: {{tt|kl|inuk}}
+* Guarani:
+*: Paraguayan Guarani: {{tt+check|gug|ava}}
+* Haitian Creole: {{tt|ht|moun}}
+* Hausa: {{tt+|ha|mutun}}
+* Hawaiian: {{tt|haw|kanaka}}
+* Hebrew: {{tt+|he|בֶּן אָדָם|m|tr=ben ádam}} {{tt+|he|אָדָם|m|tr=ádam}}
+* Hiligaynon: {{tt|hil|tawo}}
+* Hindi: {{tt+|hi|मनुष्य|m}}, {{tt+|hi|जन|m}}, {{tt+|hi|व्यक्ति|m}}, {{tt+|hi|लोक|m}}, {{tt+|hi|मानव|m}}, {{tt+|hi|मानस|m}}
+* Hmong:
+*: White Hmong: {{tt|mww|tib neeg}}
+* Hungarian: {{tt+|hu|személy}}, {{tt+|hu|egyén}}
+* Ibanag: {{tt|ibg|tolay}}
+* Icelandic: {{tt+|is|manneskja|f}}, {{tt+|is|persóna|f}}
+* Ido: {{tt+|io|persono}}
+* Ifugao:
+*: Tuwali Ifugao: {{tt|ifk|tagu}}
+* Ilocano: {{tt|ilo|tao}}
+* Indonesian: {{tt+|id|orang}}
+* Ingrian: {{t|izh|henki}}
+* Interlingua: {{tt|ia|persona}}
+* Inuktitut: {{tt+|iu|ᐃᓄᒃ}}
+* Iranun: {{t|ill|tau}}
+* Irish: {{tt+|ga|duine|m}}, {{tt+|ga|daoine|p}}
+* Isoko: {{tt|iso|ohwo}}
+* Italian: {{tt+|it|persona|f}}
+* Ivatan: {{tt|ivv|tao}}
+* Japanese: {{tt+|ja|人|tr=ひと, hito}}, {{tt+|ja|者|tr=もの, mono}}, {{tt+|ja|方|tr=かた, kata}} {{qualifier|honorific}}, {{tt+|ja|人物|tr=じんぶつ, jinbutsu}}
+* Javanese: {{t+|jv|ꦮꦺꦴꦁ}}
+* Jeju: {{tt|jje|사름}}
+* Kalinga:
+*: Lubuagan Kalinga: {{tt|knb|tagu}}
+*: Southern Kalinga: {{tt|ksc|taku}}
+* Kamba: {{tt|kam|mundu}}
+* Kambera: {{tt|xbr|tau}}
+* Kankanaey: {{tt|kne|ipogaw}}
+* Kannada: {{tt+|kn|ವ್ಯಕ್ತಿ}}
+* Kapampangan: {{tt|pam|tau}}
+* Karelian: {{tt|krl|ihmini}}
+* Kashubian: {{t|csb|òsoba}}
+* Kaurna: {{tt|zku|miyu}}
+* Kazakh: {{tt+|kk|адам}}, {{tt|kk|кісі}}
+* Khmer: {{tt+|km|មនុស្ស}}
+* K'iche': {{tt|quc|winaq}}
+* Kikuyu: {{tt|ki|mũndũ|c1}}
+* Kinaray-a: {{tt|krj|tawo}}
+* Kis: {{tt|kis|omonto}}
+* Kituba: {{t|ktu|muntu}}
+* Klamath-Modoc: {{tt|kla|maqlaqs}}
+* Kom (Cameroon): {{tt|bkm|wul}}
+* Komi:
+*: Komi-Permyak: {{tt|koi|морт}}
+* Kongo: {{t|kg|muntu}}
+* Korean: {{tt+|ko|사람}}, {{tt+|ko|인(人)}} {{qualifier|suffix}}, {{tt+|ko|분}} {{qualifier|honorific}}
+* Kurdish:
+*: Central Kurdish: {{t|ckb|کەس}}
+*: Northern Kurdish: {{tt+|kmr|kes|mf}}, {{tt+|kmr|şexs|mf}}, {{tt+|kmr|mirov|mf}}
+* Kyakala: {{t|tuw-kkl|纳莫|tr=namo}}
+* Kyrgyz: {{tt+|ky|адам}}, {{tt+|ky|киши}}, {{tt|ky|персона}}, {{t+|ky|инсан}}
+* Lao: {{tt+|lo|ຄົນ}}
+* Latin: {{t+|la|homo|m|f}}
+* Latvian: {{tt+|lv|persona|f}}
+* Lingala: {{t|ln|moto}}, {{t|ln|motu}}
+* Lithuanian: {{tt+|lt|asmuo|m}}, {{tt+|lt|žmogus|m}}
+* Lü: {{tt|khb|ᦅᦳᧃ}}
+* Luba-Kasai: {{t|lua|muntu}}
+* Luhya: {{tt|luy|omundu}}
+* Luo: {{tt|luo|ng'ato}}
+* Lutuv: {{t|clt|cawsaapaa}}
+* Macedonian: {{tt|mk|личност|f}}, {{tt+|mk|човек|m}}
+* Makasae: {{t|mkz|anu}}
+* Malay: {{tt+|ms|orang}}
+* Maltese: {{t|mt|persuna|f}}
+* Manchu: {{t-check|mnc|ᠨᡳᠶᠠᠯᠮᠠ}}
+* Māori: {{tt+|mi|tangata}}, {{tt|mi|tuatangata}}
+* Mapudungun: {{tt|arn|che}}, {{tt|arn|ce}}
+* Maranao: {{tt|mrw|taw}}
+* Marathi: {{t+|mr|व्यक्ती|f}}
+* Maricopa: {{tt|mrc|piipaa}}
+* Mazanderani: {{tt|mzn|کس}}
+* Meriam: {{t|ulk|le}}
+* Meru: {{tt|mer|monto}}
+* Mirandese: {{tt|mwl|pessona}}
+* Miwok:
+*: Central Sierra Miwok: {{tt|csm|míw·y-}}
+* Mòcheno: {{tt|mhn|mènsch|m}}
+* Mongolian:
+*: Cyrillic: {{tt+|mn|хүн}}
+*: Mongolian script: {{tt|mn|ᠬᠦᠮᠦᠨ}}
+* Mori Bawah: {{t|xmz|mia}}
+* Mwani: {{tt|wmw|munu}}
+* Nahuatl:
+*: Classical Nahuatl: {{tt|nci|tlācatl}}
+* Nanai: {{t|gld|най}}
+* Navajo: {{tt|nv|diné}}
+* Norman: {{tt|nrf|pèrsonne|f}} {{q|Jersey}}
+* Norwegian:
+*: Bokmål: {{tt+|nb|person|m}}, {{tt+|nb|menneske|n}}
+*: Nynorsk: {{tt|nn|person|m}}, {{tt|nn|menneske|n}}
+* Nupe: {{t|nup|ezà}}, {{t|nup|zà}}
+* Nǀuu: {{t|ngh|nǁng ǃui}}, {{t|ngh|ǃui}}
+* Occitan: {{tt+|oc|persona|f}}
+*: Old Occitan: {{tt|pro|persona}}
+* Old English: {{tt|ang|mann|m}}
+* Palauan: {{t|pau|chad}}
+* Pali: {{tt|pi|manussa|m}}, {{tt|pi|purisa|m}}
+* Pangasinan: {{tt|pag|too}}
+* Pashto: {{tt|ps|کسه|tr=kəsə}}, {{tt+|ps|شخص|m|tr=šaxs}}, {{tt+|ps|فرد|m|tr=fard}}, {{tt|ps|آدم|m|tr=ādám}}
+* Persian:
+*: Iranian Persian: {{tt|fa-ira|شَخْص}}, {{tt+|fa-ira|کَس}}, {{tt|fa-ira|آدَم}}, {{t|fa-ira|فَرْد}}
+* Pipil: {{tt|ppl|takat}}
+* Pitjantjatjara: {{tt|pjt|aṉangu}}
+* Plautdietsch: {{tt+|pdt|Persoon|f}}, {{tt+|pdt|Mensch|m}}
+* Polish: {{tt+|pl|osoba|f}}, {{tt+|pl|persona|f}}, {{tt+|pl|człowiek|m}}
+* Portuguese: {{tt+|pt|pessoa|f}}
+* Punjabi: {{tt|pa|ਮਨੁੱਖ|m}}
+* Puyuma: {{tt|pyu|taw}}
+* Romanian: {{tt+|ro|persoană|f}}
+* Romansh: {{tt|rm|persuna|f}}
+* Russian: {{tt+|ru|челове́к|m}}, {{tt+|ru|ли́чность|f}}, {{tt+|ru|осо́ба|f}}, {{tt+|ru|персо́на|f}}, {{tt+|ru|индиви́дуум|m}}
+* Sanskrit: {{tt+|sa|पुरुष|m}}, {{tt+|sa|मनुष्य|m}}
+* Scots: {{tt|sco|person}}
+* Scottish Gaelic: {{tt|gd|pearsa|m}}, {{tt|gd|duine|m}}, {{tt|gd|neach|m}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt|sh|о̏соба|f}}, {{tt|sh|чо̏век|m}}, {{tt|sh|ли̏чно̄ст|f}}
+*: Latin: {{tt+|sh|ȍsoba|f}}, {{tt+|sh|čȍvek|m}}, {{tt+|sh|lȉčnōst|f}}
+* Shan: {{tt+|shn|ၵူၼ်း}}
+* Sicilian: {{tt+|scn|cristianu|m}}, {{tt|scn|cristiana|f}}
+* Sinhalese: {{t|si|පුද්ගලයා}}
+* Slovak: {{tt+|sk|osoba|f}}, {{tt+|sk|človek|m}}
+* Slovene: {{tt+|sl|oseba|f}}, {{tt+|sl|človek|m}}
+* Somali: {{t+|so|qof}}
+* Sorbian:
+*: Lower Sorbian: {{tt|dsb|wósoba|f}}
+*: Upper Sorbian: {{tt|hsb|wosoba|f}}
+* Spanish: {{tt+|es|persona|f}}, {{t+|es|chero|m}}
+* Sukuma: {{t|suk|mùùn̥ʊ̀}}
+* Swahili: {{tt+|sw|mtu}}
+* Swedish: {{tt+|sv|person|c}}
+* Tagalog: {{tt+|tl|tao}}
+* Tai Nüa: {{tt|tdd|ᥐᥨᥢᥰ}}
+* Tajik: {{tt+|tg|одам}}, {{tt|tg|фард}}, {{tt+|tg|шахс}}
+* Talysh: {{tt|tly|کس|tr=kas}}
+* Tamil: {{tt+|ta|ஆள்}}, {{tt+|ta|நபர்}}, {{tt+|ta|புருசன்}}, {{tt+|ta|மனிதன்}}
+* Taos: {{tt|twf|tʼóyna}}
+* Tatar: {{tt+|tt|кеше}}, {{tt+|tt|адәм}}
+* Tausug: {{tt|tsg|tau}}
+* Tboli: {{tt|tbl|tau}}
+* Telugu: {{tt+|te|వ్యక్తి}}, {{tt+|te|మానవుడు}}, {{tt+|te|మనిషి}}
+* Tetum: {{t|tet|ema}}
+* Thai: {{tt+|th|คน}}, {{tt+|th|บุคคล}} {{qualifier|formal, law}}
+*: Northern Thai: {{tt|nod|ᨤᩫ᩠ᨶ}}
+* Tibetan: {{tt|bo|མི}}
+* Tocharian B: {{tt|txb|onolme}}
+* Tok Pisin: {{tt|tpi|man}}, {{tt|tpi|meri}}, {{tt|tpi|manmeri}}
+* Tswana: {{tt+|tn|motho}} (1/2)
+* Tumbuka: {{t|tum|munthu|1}}
+* Tupinambá: {{tt|tpn|abá}}
+* Turkish: {{tt+|tr|kişi}}, {{tt+|tr|şahıs}}, {{tt+|tr|şahs}} {{i|dated}}
+*: Ottoman Turkish: {{tt|ota|شخص|tr=şahs}}, {{tt|ota|كیشی|tr=kişi}}
+* Turkmen: {{tt+|tk|adam}}, {{tt|tk|kişi}}
+* Tuvan: {{tt|tyv|кижи}}
+* Ukrainian: {{tt+|uk|осо́ба|f}}, {{tt|uk|персо́на|f}}, {{tt+|uk|люди́на|f}}, {{tt+|uk|чолові́к|m}} {{q|now only means male (man) or husband}}
+* Unami: {{tt|unm|awèn}}
+* Urdu: {{tt|ur|شَخْص|m}}
+* Uyghur: {{tt+|ug|ئادەم}}, {{tt|ug|كىشى}}
+* Uzbek: {{tt+|uz|odam}}, {{tt+|uz|shaxs}}, {{tt+|uz|kishi}}, {{tt+|uz|persona}}, {{t+|uz|fard}}
+*: Cyrillic: {{tt|uz|одам}}
+* Vietnamese: {{tt+|vi|người}}
+* Volapük: {{qualifier|♂♀}} {{tt+|vo|pösod}}, {{qualifier|♂}} {{tt|vo|hipösod}}, {{qualifier|♀}} {{tt+|vo|jipösod}}, {{qualifier|collective ♂♀}} {{tt+|vo|pösodef}}, {{qualifier|diminutive ♂♀}} {{tt|vo|pösodil}}, {{qualifier|diminutive ♂}} {{tt|vo|hipösodil}}, {{qualifier|diminutive ♀}} {{tt|vo|jipösodil}}, {{qualifier|♂♀}} {{tt+|vo|men}}, {{qualifier|♂}} {{tt|vo|himen}}, {{qualifier|♀}} {{tt|vo|jimen}}, {{qualifier|collective ♂♀}} {{tt+|vo|menef}}
+* Walloon: {{tt+|wa|djin|f}}, {{tt+|wa|sakî|f}}
+* Waray-Waray: {{tt|war|tawo}}
+* Welsh: {{tt+|cy|person|m}}
+* Wichita: {{tt|wic|ihaas}}
+* Wintu: {{tt|wnw|wintʰu·h}}
+* Wolof: {{tt+|wo|nit}}
+* Written Oirat: {{tt|xwo|ᡍᡉᡉᠨ}}, {{tt|xwo|ᡍᡉᡏᡉᠨ}}
+* Yaghnobi: {{tt|yai|одам}}
+* Yámana: {{tt|yag|yamana}}
+* Yami: {{tt|tao|tao}}
+* Yiddish: {{tt|yi|פּאַרשוין|m}}
+* Yogad: {{tt|yog|tolay}}
+* Yoruba: {{tt|yo|èniyàn}}, {{t|yo|ẹni}}
+* Yucatec Maya: {{tt|yua|may}}, {{tt|yua|wíinik}}
+* Yurok: {{t|yur|'oohl}}
+* Zande: {{t|zne|boro}}
+* Zazaki: {{tt+|zza|kes}}, {{tt+|zza|merdum}}
+*: Dimli: {{tt+|zza|merdım}}
+*: Kirmancki: {{tt|zza|mordım}}
+* Zhuang: {{tt|za|boux}}, {{tt|za|vunz}}
+* Zou: {{t|zom|mi}}
+* Zulu: {{tt+|zu|umuntu|c1|c2}}
+* ǃXóõ: {{tt|nmn|tâa}}
+{{trans-bottom}}
+
+{{trans-top-also|specifically a human being|human|human being|man}}
+* Adnyamathanha: {{t|adt|yura}}, {{t|adt|udnyu}}
+* Afrikaans: {{t+|af|persoon}}
+* Arabic: {{tt+|ar|إِنْسَان|m}}
+*: Chadian Arabic: {{t|shu|نادم|tr=nādum}}
+*: Moroccan Arabic: {{tt|ary|إنسان|m|tr=ʔinsān}}, {{tt|ary|بنادم|m|tr=bnādim, bnādam}}
+* Armenian: {{tt+|hy|անձնավորություն}}
+* Asturian: {{tt+|ast|persona|f}}
+* Azerbaijani: {{tt+|az|adam}}, {{tt+|az|insan}}, {{tt+|az|bəşər}}
+* Belarusian: {{tt+|be|чалаве́к|m}}
+* Boloki: {{t|bkt|moto}}
+* Bulgarian: {{tt+|bg|чове́к|m}}
+* Catalan: {{tt+|ca|persona|f}}
+* Chechen: {{t|ce|адам}}
+* Chichewa: {{tt|ny|munthu|1}}
+* Chickasaw: {{tt|cic|hattak}}
+* Chinese:
+*: Cantonese: {{tt+|yue|人|tr=jan4}}
+*: Mandarin: {{tt+|cmn|人|tr=rén}}
+* Czech: {{tt+|cs|osoba|f}}, {{tt+|cs|člověk|m}}
+* Danish: {{tt+|da|person|c}}
+* Dutch: {{tt+|nl|persoon|m|f}}
+* Egyptian: {{t-egy|rmṯ|h=r:T-A1}}
+* Faroese: {{tt|fo|persónur}}, {{tt|fo|einstaklingur|m}}
+* Finnish: {{tt+|fi|ihminen}}
+* French: {{tt+|fr|personne|f}}
+* Galician: {{tt+|gl|persoa|f}}
+* German: {{tt+|de|Person}}, {{t+|de|Mensch|m}}
+* Haitian Creole: {{tt|ht|moun}}
+* Hebrew: {{tt+|he|בֶּן אָדָם|m|tr=ben ádam}}
+* Higaonon: {{t|mba|utaw}}
+* Hindi: {{tt|hi|इंसान|m}}, {{tt+|hi|मनुष्य|m}}, {{tt+|hi|मानव|m}}, {{tt+|hi|जन|m}}
+* Hittite: {{tt|hit|𒀭𒌅𒉿𒀪𒄩𒀸|c}}
+* Hungarian: {{tt+|hu|ember}}
+* Interlingua: {{t|ia|persona}}
+* Irish: {{tt+|ga|duine|m}}
+* Isoko: {{tt|iso|ohwo}}
+* Italian: {{tt+|it|persona|f}}
+* Japanese: {{tt+|ja|人間|tr=にんげん, ningen}}
+* Javanese: {{t+|jv|ꦩꦤꦸꦁꦱ}}
+* Kabwa: {{t|cwa|omuntu|1}}
+* Kambaata: {{t|ktb|manchu}}
+* Kapampangan: {{t|pam|mitatau}}, {{t|pam|mitautau}}
+* Kaurna: {{t|zku|miyu}}
+* Kikuyu: {{t|ki|mũndũ|c1}}
+* Klamath-Modoc: {{tt|kla|maqlaqs}}
+* Komi:
+*: Komi-Permyak: {{tt|koi|морт}}
+* Korean: {{tt+|ko|사람}}
+* Kurdish:
+*: Central Kurdish: {{tt|ckb|کەسێک}}
+* Kyrgyz: {{t+|ky|киши}}
+* Laboya: {{tt|lmy|ata}}
+* Lambya: {{tt|lai|umuntu|1}}
+* Latin: {{tt+|la|homō|m}}
+* Lingala: {{tt|ln|mòto|c1|c2}}, {{tt|ln|moto|c1|c2}}
+* Lushootseed: {{t|lut|ʔaciɬtalbixʷ}}
+* Macedonian: {{tt+|mk|човек|m}}
+* Malay: {{tt+|ms|manusia}}, {{tt+|ms|insan}}
+* Manobo:
+*: Western Bukidnon Manobo: {{t|mbb|etew}}
+* Mongolian:
+*: Cyrillic: {{tt+|mn|хүн}}
+*: Mongolian script: {{tt|mn|ᠬᠦᠮᠦᠨ}}
+* Mpoto: {{tt|mpa|mundu|1}}
+* Mwani: {{tt|wmw|munu|1}}
+* Mwera: {{tt|mwe|mundu|1}}
+* Ndendeule: {{t|dne|mundo|1}}
+* Ngarrindjeri: {{t|nay|Nangga}}, {{t|nay|palpanggi}}
+* Nkoya: {{tt|nka|muntu|1}}
+* Norman: {{tt|nrf|pèrsonne|f}} {{q|Jersey}}
+* Norwegian:
+*: Bokmål: {{tt+|nb|person|m}}
+*: Nynorsk: {{tt|nn|person|m}}
+* Nsenga: {{t|nse|munthu|1}}
+* Nuer: {{t|nus|raan}}
+* Nukunu: {{t|nnv|thuṛa}}, {{t|nnv|thuṛa paarla}}
+* Nupe: {{t|nup|ezà}}, {{t|nup|zà}}
+* Nyakyusa: {{tt|nyy|umundu|1}}
+* Nyamwanga: {{tt|mwn|umuntu|1}}
+* Nyole (Uganda): {{tt|nuj|omuutu|1}}
+* Nyungwe: {{tt|nyu|munthu|1}}
+* Occitan: {{tt+|oc|persona|f}}
+* Old English: {{tt|ang|mann|m}}
+* Persian:
+*: Iranian Persian: {{tt|fa-ira|اِنْسان}}, {{tt|fa-ira|آدَم}}
+* Plautdietsch: {{tt+|pdt|Mensch|m}}
+* Polish: {{tt|pl|istota ludzka|f}}, {{tt+|pl|człowiek|m-pr}}
+* Portuguese: {{tt+|pt|pessoa|f}}
+* Romansh: {{tt|rm|persuna|f}}
+* Russian: {{tt+|ru|челове́к|m}}
+* Rwanda-Rundi: {{tt|rw|umuntu|c1|c2}}
+* Sanskrit: {{tt+|sa|मनुष्य}}, {{tt+|sa|मानव}}, {{tt+|sa|जन|m}}
+* Scots: {{tt|sco|bodie}}, {{qualifier|genus Homo}}, {{tt|sco|human}} {{qualifier|Homo sapiens}}
+* Scottish Gaelic: {{tt|gd|pearsa|m}}, {{tt|gd|duine|m}}, {{tt|gd|neach|m}}
+* Sena: {{tt|seh|munthu|1}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt|sh|о̏соба|f}}, {{tt|sh|чо̏век|m}}
+*: Latin: {{tt+|sh|ȍsoba|f}}, {{tt+|sh|čȍvek}}
+* Sidamo: {{t|sid|mancho}}
+* Slovak: {{tt+|sk|človek|m}}
+* Slovene: {{tt+|sl|oseba|f}}, {{tt+|sl|človek|m}}
+* Soga: {{tt|xog|omuntu|1}}
+* Spanish: {{t+|es|persona|f}}
+* Suba: {{tt|sxb|omuntu|1}}
+* Suba-Simbiti: {{tt|ssc|ömöntö|1}}
+* Swahili: {{tt+|sw|mtu|1}}
+* Swedish: {{tt+|sv|person}}
+* Tajik: {{t+|tg|инсон}}, {{t+|tg|одам}}
+* Tatar: {{tt+|tt|инсан}}, {{tt+|tt|адәм}}, {{tt+|tt|кеше}}
+* Tocharian B: {{tt|txb|śaumo}}
+* Tonga (Malawi): {{tt|tog|munthu|1}}
+* Tumbuka: {{tt|tum|munthu|1}}
+* Turkish: {{tt+|tr|birey}}
+* Ukrainian: {{tt+|uk|люди́на|f}}
+* Urdu: {{t+|ur|اِنْسان|m}}, {{t+|ur|آدْمی|m}}, {{t|ur|مَنُشیَہ|m}}, {{t|ur|مانَو|m}}
+* Uzbek: {{t+|uz|inson}}, {{t+|uz|odam}}, {{t+|uz|kishi}}, {{t+|uz|bashar}}
+* Vidunda: {{tt|vid|munhu|1}}
+* Volapük: {{qualifier|♂♀}} {{tt+|vo|pösod}}, {{qualifier|♂}} {{tt|vo|hipösod}}, {{qualifier|♀}} {{tt+|vo|jipösod}}
+* Walloon: {{tt+|wa|djin|f}}
+* Welsh: {{tt+|cy|person|m}}, {{tt+|cy|unigolyn|m}}
+* Wolof: {{tt+|wo|nit}}
+* Yakut: {{t|sah|киһи}}
+* Yao (Africa): {{t|yao|mundu|1}}
+* Yoruba: {{t|yo|ènìyàn}}, {{t|yo|ẹni}}
+* Yurok: {{t|yur|'oohl}}
+* Zemba: {{tt|dhm|omuntu|1}}
+* Zinza: {{tt|zin|omuuntu|1}}
+* Zulu: {{tt+|zu|umuntu|c1|c2}}
+{{trans-bottom}}
+
+{{trans-top|character or part, as in a play}}
+* Belarusian: {{tt|be|персана́ж|m}}, {{tt|be|геро́й|m}}, {{tt|be|гераі́ня|f}}, {{tt|be|дзе́ючая асо́ба|f}}
+* Bulgarian: {{tt|bg|персона́ж|m}}, {{tt|bg|де́йстващо лице́|n}}, {{t+|bg|геро́й|m}}
+* Chinese:
+*: Mandarin: {{tt+|cmn|人物|tr=rénwù}}, {{tt+|cmn|角色|tr=juésè, jiǎosè}}
+* Finnish: {{tt+|fi|henkilö}}, {{t+|fi|hahmo}}
+* Hindi: {{t+|hi|चरित्र|m}}, {{t+|hi|पात्र|m}}
+* Hungarian: {{q|part}} {{t+|hu|szerep}}, {{q|character}} {{t+|hu|szereplő}}, {{t+|hu|személy}}
+* Russian: {{tt+|ru|персона́ж|m}}, {{tt+|ru|геро́й|m}}, {{tt+|ru|герои́ня|f}}, {{tt|ru|де́йствующее лицо́|n}}
+* Ukrainian: {{tt+|uk|персона́ж|m}}, {{tt+|uk|геро́й|m}}, {{tt|uk|герої́ня|f}}, {{tt|uk|дійова́ осо́ба|f}}
+{{trans-bottom}}
+
+{{trans-top|Christianity: any one of the three hypostases of the God}}
+* Arabic: {{tt|ar|أُقْنُوم|m}}
+* Bulgarian: {{t+|bg|лице|n}}, {{t|bg|ипостас|f}}
+* Finnish: {{tt+|fi|persoona}}
+* Hebrew: {{tt+|he|פָּן|m|tr=pan}}, {{tt+|he|גּוּף|m|tr=guf}}, {{tt+|he|יֵשׁוּת|f|tr=yešút}}
+* Hungarian: {{t+|hu|személy}}
+* Latin: {{t|la|persōna|f}}
+* Old English: {{tt|ang|hād|m}}
+* Romansh: {{tt|rm|persuna|f}}
+* Swedish: {{t+|sv|person|c}}
+{{trans-bottom}}
+
+{{trans-top|science fiction: sentient or socially intelligent being}}
+* Bulgarian: {{t-needed|bg}}
+* Finnish: {{tt+|fi|olento}}
+* Hungarian: {{q|being, creature}} {{t+check|hu|lény}}
+* Polish: {{tt+|pl|indywidualność|f}}, {{tt+|pl|osobowość|f}}
+* Romansh: {{tt|rm|persuna|f}}
+* Scots: {{tt|sco|person}}
+{{trans-bottom}}
+
+{{trans-top|someone who likes or has an affinity for a specified thing}}
+* Bulgarian: {{t+|bg|любител|m}}, {{t|bg|фен|m}}
+* Finnish: {{tt+|fi|ihminen|alt=-ihminen}}
+* Hungarian: {{t+|hu|kedvelő|alt=-kedvelő}}, {{t+|hu|barát|alt=-barát}}
+* Polish: {{tt+|pl|zwolennik|m-pr}}, {{tt+|pl|miłośnik|m-pr}}
+{{trans-bottom}}
+
+{{trans-top|the physical body seen as distinct from the mind}}
+* Arabic: {{tt+|ar|فَرْد|m}}
+* Armenian: {{tt+|hy|մարմին}}
+* Asturian: {{tt+|ast|persona|f}}
+* Bulgarian: {{t+|bg|тяло|n}}
+* Burmese: {{tt+|my|လူသား}}
+* Chinese:
+*: Mandarin: {{tt+|cmn|個人|tr=gèrén}}
+* Czech: {{tt+|cs|osoba|f}}
+* Danish: {{tt+|da|legeme|n}}
+* Dutch: {{tt+|nl|persoon|m|f}}
+* Finnish: {{tt+|fi|ruumis}}
+* French: {{tt+|fr|personne|f}}
+* Galician: {{tt+|gl|persoa|f}}
+* German: {{tt+|de|Körper|m}}
+* Hindi: {{tt+|hi|तन|m}}
+* Hungarian: {{t+|hu|test}}, {{t+|hu|megjelenés}}, {{t+|hu|külső}}, {{t+|hu|kinézet}}
+* Italian: {{tt+|it|persona|f}}
+* Japanese: {{tt+|ja|個人|tr=こじん, kojin}}
+* Kapampangan: {{t|pam|pangakatau}}
+* Korean: {{tt+|ko|개인(個人)}}
+* Norman: {{tt|nrf|pèrsonne|f}} {{q|Jersey}}
+* Norwegian:
+*: Bokmål: {{tt+|nb|person|m}}
+*: Nynorsk: {{tt|nn|person|m}}
+* Occitan: {{tt+|oc|persona|f}}
+* Persian: {{tt+|fa|تن|tr=tan}}
+* Polish: {{tt+|pl|postać|f}}
+* Portuguese: {{tt+|pt|pessoa|m}}
+* Romansh: {{tt|rm|persuna|f}}
+* Russian: {{tt+|ru|индиви́дуум|m}}
+* Scots: {{tt|sco|bodie}}
+* Scottish Gaelic: {{tt|gd|pearsa|m}}, {{tt|gd|duine|m}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt|sh|тије̑ло|f}}
+*: Latin: {{tt+|sh|tijȇlo|f}}
+* Slovene: {{tt+|sl|oseba|f}}
+* Spanish: {{tt+|es|cuerpo|m}}
+* Swahili: {{tt+|sw|mtu}}
+* Turkish: {{tt+|tr|beden}}, {{tt+|tr|vücut}}
+* Ukrainian: {{tt+|uk|осо́ба|f}}
+{{trans-bottom}}
+
+{{trans-top|any individual or formal organization with standing before the courts}}
+* Armenian: {{tt+|hy|անձ}}
+* Bulgarian: {{tt|bg|юриди́ческо лице́|n}}, {{tt+|bg|лице́|n}}
+* Catalan: {{tt+|ca|persona|f}}
+* Chinese:
+*: Mandarin: {{tt+|cmn|法人|tr=fǎrén}}
+* Czech: {{tt+|cs|osoba|f}}
+* Danish: {{tt+|da|person|c}}
+* Dutch: {{tt+|nl|persoon|m|f}}
+* Finnish: {{tt+|fi|henkilö}}, {{tt+|fi|oikeushenkilö}}
+* French: {{tt+|fr|personne|f}}
+* Hungarian: {{t+|hu|személy}}
+* Italian: {{tt+|it|persona|f}}
+* Japanese: {{tt+|ja|法人|tr=ほうじん, hōjin}}
+* Korean: {{tt+|ko|법인(法人)}}
+* Norman: {{tt|nrf|pèrsonne|f}} {{q|Jersey}}
+* Norwegian:
+*: Bokmål: {{tt+|nb|person|m}}
+*: Nynorsk: {{tt|nn|person|m}}
+* Polish: {{tt+|pl|osobowość|f}}
+* Portuguese: {{tt+|pt|pessoa|f}}
+* Romansh: {{tt|rm|persuna|f}}
+* Russian: {{tt+|ru|лицо́|n}}, {{tt+|ru|юриди́ческое лицо́|n}}
+* Scots: {{tt|sco|person}}
+* Scottish Gaelic: {{tt|gd|pearsa|m}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt|sh|о̏соба|f}}
+*: Latin: {{tt+|sh|ȍsoba|f}}
+* Slovene: {{tt+|sl|oseba|f}}
+* Spanish: {{tt+|es|persona|f}}
+* Swahili: {{tt+|sw|mtu}}
+* Thai: {{tt+|th|บุคคล}}
+* Turkish: {{tt+|tr|kişi}}, {{tt+|tr|şahıs}}
+{{trans-bottom}}
+
+{{trans-top|law: human genitalia}}
+* Bulgarian: {{t|bg|полов член|m}}
+* Finnish: {{tt+|fi|sukupuolielin}}, {{tt+|fi|sukuelin}}
+{{trans-bottom}}
+
+{{trans-top|grammar: linguistic category}}
+* Armenian: {{tt+|hy|դեմք}}
+* Asturian: {{tt+|ast|persona|f}}
+* Belarusian: {{tt+|be|асо́ба|f}}
+* Bulgarian: {{tt+|bg|лице́|n}}
+* Catalan: {{tt+|ca|persona|f}}
+* Chinese:
+*: Mandarin: {{tt+|cmn|人稱|tr=rénchēng}}
+* Czech: {{tt+|cs|osoba|f}}
+* Danish: {{tt+|da|person|c}}
+* Dutch: {{tt+|nl|persoon|m|f}}
+* Esperanto: {{tt+|eo|persono}}
+* Finnish: {{tt+|fi|persoona}}
+* French: {{tt+|fr|personne|f}}
+* Frisian:
+*: West Frisian: {{tt+|fy|persoan}}
+* Galician: {{tt+|gl|persoa|f}}
+* German: {{tt+|de|Person|f}}
+* Hebrew: {{tt+|he|גוף|m}}
+* Hindi: {{t+|hi|व्यक्ति|m}}
+* Hungarian: {{tt+|hu|személy}}
+* Icelandic: {{tt+|is|persóna|f}}
+* Ingrian: {{t|izh|liitsa}}
+* Irish: {{tt|ga|pearsa|f}}
+* Italian: {{tt+|it|persona|f}}
+* Japanese: {{tt+|ja|人称|tr=にんしょう, ninshō}}
+* Kapampangan: {{t|pam|pantauan}}
+* Korean: {{tt+|ko|인칭(人稱)}}
+* Lithuanian: {{tt+|lt|asmuõ|m}}
+* Macedonian: {{tt+|mk|лице|n}}
+* Norman: {{tt|nrf|pèrsonne|f}} {{q|Jersey}}
+* Norwegian:
+*: Bokmål: {{tt+|nb|person|m}}
+*: Nynorsk: {{tt|nn|person|m}}
+* Old English: {{tt|ang|hād|m}}
+* Persian: {{t+check|fa|شخص|tr=šaxs}}
+* Polish: {{tt+|pl|osoba|f}}
+* Portuguese: {{tt+|pt|pessoa|f}}
+* Romansh: {{tt|rm|persuna|f}}
+* Russian: {{tt+|ru|лицо́|n}}
+* Scots: {{tt|sco|person}}
+* Scottish Gaelic: {{tt|gd|pearsa|m}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt|sh|о̏соба|f}}, {{tt|sh|ли́це|n}}
+*: Latin: {{tt+|sh|ȍsoba|f}}, {{tt+|sh|líce|n}}
+* Slovak: {{tt+|sk|osoba|f}}
+* Slovene: {{tt+|sl|oseba|f}}
+* Spanish: {{tt+|es|persona|f}}
+* Swahili: {{tt+|sw|mtu}}
+* Swedish: {{tt+|sv|person}}
+* Tagalog: {{tt|tl|panauhan}}
+* Turkish: {{tt+|tr|kişi}}, {{tt+|tr|şahıs}}
+* Ukrainian: {{tt+|uk|осо́ба|f}}
+* Vietnamese: {{tt+|vi|ngôi}}
+* Volapük: {{tt+|vo|pösod}}
+{{trans-bottom}}
+
+{{trans-top|biology: shoot or bud of a plant; individual, in the narrowest sense, among the higher animals}}
+* Bulgarian: {{t-needed|bg}}
+* Finnish: {{tt+|fi|yksilö}} {{q|individual}}
+{{trans-bottom}}
+
+{{checktrans-top}}
+* Albanian: {{t-check|sq|vetë|f}}
+* Belarusian: {{t-check|be|пэрсо́на|f}}, {{t+check|be|асо́ба|f}}
+* Esperanto: {{t+check|eo|homo}}
+* Lü: {{t-check|khb|ᦕᦴᧉ}}, {{t-check|khb|ᦅᦳᧃ}}
+* Persian: {{t+check|fa|نَفَر|tr=nafar}}
+* Rwanda-Rundi: {{t-check|rw|umuntu}}
+* Tetum: {{t-check|tet|ema}}
+* Warlpiri: {{t-check|wbp|yapa}}
+}}<!-- close {{multitrans}} -->
+{{trans-bottom}}
+
+===Verb===
+{{en-verb|+,++}}
+
+# {{lb|en|obsolete|transitive}} To [[represent]] as a person; to [[personify]]; to [[impersonate]].
+#* {{RQ:Milton Divorce|edition=2nd|chapter=That ''Beza''’s opinion of regulating sinne by a politick law, cannot be sound|page=59|passage=Or let us '''perſon''' him like ſome wretched itinerary Judge, {{...}}}}
+# {{lb|en|transitive|gender-neutral}} To [[man]], to supply with staff or crew.
+#* {{quote-book|en|author=[[w:John Nichols (writer)|John Nichols]]|chapter=Sunday|title=The Nirvana Blues|location=New York, N.Y.|publisher=w:Ballantine Books|year=1981|month_published=May|year_published=1983|page=89|pageurl=https://archive.org/details/nirvanabluesnove00nich/page/89/mode/1up|passage=“Okay. Soon as Natalie heard, and while she was flailing around trying to turn up a Valium, she decided she had better call Scott Harrison and ask his opinion on what sort of advice, re legal moves, she ought to call back to Iréné, or Rama, or Wilkerson, or whoever’s '''personning''' the fort back there.” / “Whoever’s ''what''ening the fort?” / “Please.{{nb...}}”}}
+#* {{quote-journal|en|author=Sharon Dezurick|title=Glen Park Community Festival a Success|editor=Kristin Nash|journal=Glen Park News|location=San Francisco, Calif.|publisher=Glen Park Association|month=fall/winter|year=1996|columns=1–2|oclc=43480258|passage=Thank you to the many who helped the festival succeed (and apologies to anyone omitted): {{...}} Kevin and Mary Jannsen, for tireless work including the initial survey, soliciting raffle donations, selling tickets, '''personning''' the raffle booth during the festival, etc.}}
+#* {{quote-journal|en|author=L.E. [Lady Exister] Leone [pseudonym; Dani Leone]|title=Ah, Sprrr-ing!|editor=Tim Redmond|journal=w:San Francisco Bay Guardian|volume=40|issue=25|location=San Francisco, Calif.|start_date=22 March 2006|date=28 March 2006|page=61|pageurl=https://archive.org/details/bayguardian40brug_25/page/61/mode/1up|column=1|issn=0036-4096|passage=And I sat at the counter and watched the cooker cat '''personning''' the griddle with one hand and the grill with the other.}}
+#* {{quote-book|en|year=2007|author=Brian R. Brenner|title=Don't Throw This Away!: The Civil Engineering Life|page=40|passage=We had hit the iceberg, and it was time to '''person''' the lifeboats.}}
+#* {{quote-book|en|author=w:Jess Lourey|chapter=21|title=August Moon: A Murder-By-Month Mystery|location=Woodbury, Minn.|publisher=Midnight Ink, [[w:Llewellyn Worldwide|Llewellyn Publications]]|year=2008|page=207|pageurl=https://archive.org/details/augustmoon00lour/page/207/mode/1up|isbn=978-0-7387-1325-0|passage=I was just mulling over the merits of working the fryer at McDonald’s versus '''personning''' the complaints desk at Wal-Mart when I took a right onto the dirt road leading to New Millennium Bible Camp.}}
+#* {{quote-book|en|year=2008|author=William Guy|title=Something Sensational|page=337|passage=We went so far as to stop in a hotel on the way out of Speyer — to ask for directions — but the teenaged girl '''personing''' the desk there seemed to be such an idiot{{...}}}}
+#* {{quote-book|en|author=Paul Bowers|chapter=The Wrasse and the Flatfish|title=The Panda Chronicles: A Mythology|edition=2nd|location=[Morrisiville, N.C.]|publisher=&#91;{{w|Lulu.com}}&#93;|month=September|year=2018|page=74|pageurl=https://books.google.com/books?id=aaR2DwAAQBAJ&pg=PA74|isbn=978-0-244-11850-1|passage=In fact, so inebriated were they that they could barely move, and, neither nest nor wheel being '''personned''', the ship was as usual careening wildly across the main.}}
+
+===References===
+<references/>
+
+===Further reading===
+* {{R:OneLook}}
+* {{R:Britannica Dictionary}}
+* {{R:Cambridge Collocations}}
+* {{R:Ozdic}}
+* {{R:WordReference Collocations}}
+
+===Anagrams===
+* {{anagrams|en|a=enoprs|Posner|nopers|preons|prones|spreon}}
+
+{{cln|en|suppletive nouns}}
+{{C|en|People}}

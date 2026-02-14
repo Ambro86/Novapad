@@ -1,0 +1,87 @@
+== {{lengua|es}} ==
+{{pron-graf|audio=LL-Q1321 (spa)-AdrianAbdulBaha-música.wav|aunota=Colombia}}
+
+
+=== Etimología ===
+{{etimología|la|musica|sig=no}}, y este del griego antiguo {{l+|grc|μουσική|tr=musiké}}, uso sustantivo de {{l+|grc|μουσικός|tr=musikós}}, "propio de o relativo a las musas", a su vez de {{l+|grc|Μοῦσα|tr=Mũsa}}, "[[musa]]", probablemente de una alteración de la raíz protoindoeuropea {{l+|ine-pro|*men-}}, "[[pensar]]"<ref>{{OED|muse}}</ref> (compárese el protoeslavo {{l+|sla-pro|*myslь}}, "[[pensamiento]]", del cual el polaco {{l+|pl|myśl}} y el ruso {{l+|ru|мысль|tr=mysl’}}).
+
+=== {{sustantivo femenino|es}} ===
+{{es.sust|s}}
+
+;1 {{csem|arte}}: {{plm|arte}} que emplea el [[sonido]] y el [[silencio]] de manera [[organizada]] para producir un [[efecto]] [[estético]] o [[anímico]].
+
+;2: {{plm|pieza}} producida mediante este arte.
+
+;3: Por extensión, sonido [[agradable]] o [[armonioso]].
+
+;4: Forma femenina de [[músico]].
+
+=== Locuciones ===
+{{trad-arriba|Locuciones con «música»}}
+* [[música clásica]]
+* [[música de las esferas]]: la que, de acuerdo a la astronomía tolemaica, se producía por el girar de las esferas de los astros; por extensión, armonía del conjunto del cosmos
+* [[música envasada]]
+* [[caja de música]] o [[cajita de música]]: pequeño estuche dotado de un muelle que, al abrirlo, hace sonar una melodía mediante un mecanismo de lengüetas o fuelles
+* [[ir la música por dentro]]: estar bajo el efecto de una profunda emoción que no se deja traslucir
+* [[irse con la música a otra parte]]: dejar de importunar o molestar a alguno
+{{trad-abajo}}
+
+=== Información adicional ===
+{{derivad|musicable|musical|musicalidad|musicalizar|musicalmente|musicante|musicastro|músico|musicografía|musicógrafo|musicología|musicólogo|musicomanía|musicoterapia|musicómano|musiquero|musiquilla}}
+
+=== Véase también ===
+{{Wikipedia}}
+* [[armonía]]
+* [[canto]]
+* [[melodía]]
+* [[ritmo]]
+
+=== Traducciones ===
+{{trad-arriba}}
+{{t|af|a1=1|t1=musiek}}
+{{t|ay|a1=1|t1=kirki}}
+{{t|sq|a1=1|t1=muzikë}}
+{{t|de|a1=1|t1=Musik|g1=f}}
+{{t|ar|a1=1|t1=موسيقى}}
+{{t|hy|a1=1|t1=երաժշտություն|tl1=eražštut‘yun}}
+{{t|bm|a1=1|t1=dongili}}
+{{t|ca|a1=1|t1=música}}
+{{t|cs|a1=1|t1=hudba}}
+{{t|chr|a1=1|t1=ꮧꭷꮓꭹꮫ|tl1=dikanogidv}}
+{{t|ko|a1=1|t1=음악}}
+{{t|da|a1=1|t1=musik}}
+{{t|fr|a1=1|t1=musique}}
+{{t|eo|a1=1|t1=muziko}}
+{{t|eu|a1=1|t1=musika}}
+{{t|fi|a1=1|t1=musiikki}}
+{{t|fy|a1=1|t1=muzyk}}
+{{t|fo|a1=1|t1=tónleikur}}
+{{t|cy|a1=1|t1=miwsig|t2=cerdd|t3=cerddoriarth|t4=peroriaeth}}
+{{t|gd|a1=1|t1=ceòl}}
+{{t|el|a1=1|t1=μουσική|tl1=mousiké}}
+{{t|haw|a1=1|t1=mele|t2=pila}}
+{{t|he|a1=1|t1=מוסיקה|tl1=muzika}}
+{{t|hu|a1=1|t1=zene}}
+{{t|ang|a1=1|t1=drēam}}
+{{t|en|a1=1|t1=music}}
+{{t|ga|a1=1|t1=ceòl}}
+{{t|ja|a1=1|t1=音楽}}
+{{t|ku|a1=1|t1=muzîk|g1=f}}
+{{t|la|a1=1|t1=cantus|t2=musica}}
+{{t|zh|a1=1|t1=音乐|tl1=yīnyuè|t2=乐|tl2=yuè|t3=曲子|tl3=qǔzi}}
+{{t|yua|a1=1|t1=k'aay|t2=paax}}
+{{t|nci|a1=1|t1=tlatzotzoniliztli}}
+{{t|nl|a1=1|t1=muziek}}
+{{t|no|a1=1|t1=musikk}}
+{{t|pap|a1=1|t1=músika}}
+{{t|pl|a1=1|t1=muzyka|g1=f}}
+{{t|pt|a1=1|t1=música}}
+{{t|ro|a1=1|t1=muzică}}
+{{t|ru|a1=1|t1=музыка}}
+{{t|sa|a1=1|t1=संगीत}}
+{{t|srn|a1=1|t1=poku}}
+{{t|sv|a1=1|t1=musik}}
+{{t|sw|a1=1|t1=muziki}}
+{{t|tl|a1=1|t1=tugtóg|t2=tugtúgin}}
+{{t|tr|a1=1|t1=müzik}}
+{{trad-abajo}}

@@ -1,0 +1,619 @@
+== {{lengua|es}} ==
+{{pron-graf|1audio1=Es-am-lat-agua.ogg|2audio1=LL-Q1321 (spa)-Rodelar-agua.wav}}
+
+=== Etimología 1 ===
+{{etimología|osp|agua|agua}} y este  {{etim|la|aqua}}, el protoitálico {{l+|itc-pro|*akwa}} y el protoindoeuropeo {{l+|ine-pro|*h₂ékʷeh₂}}. Compárense el catalán {{l+|ca|aigua}}, el francés {{l+|fr|eau}}, el italiano {{l+|it|acqua}} o el rumano {{l+|ro|apă}}.
+
+==== {{sustantivo femenino|es}} ====
+{{es.sust}}
+;1 {{csem|química|bebidas}}: {{plm|sustancia}} [[transparente]], inodora e [[insípida]], que se encuentra en estado [[líquido]] a [[temperatura]] y [[presión]] estándar, y cuya composición molecular es de dos átomos de hidrógeno por uno de oxígeno.
+{{ejemplo|«En la [[costa]] del [[Perú]] nos interesa, [[desde]] el [[punto de vista]] de [[sostenibilidad]], aliviar los [[problema]]s de [[salinidad]] y [[hacer]] el más [[eficiente]] uso del ''[[agua]]'' […]».|a=VV. AA|t=Desarrollo de la vitivinicultura en el Perú|f=1991|p=11|editorial=Fundación para el desarrollo del agro|c=libro}}
+
+;2 {{csem|bebidas}}: {{plm|licor}} [[concentrado]] obtenido por [[infusión]] de [[vegetal]]es para su uso como [[aderezo]] o [[medicamento]].
+;3 {{csem|bebidas}}: Por extensión, infusión cualquiera de [[hierba]]s consumida como [[bebida]].
+{{ámbito|Chile}}.
+{{sinónimo|agüita|infusión|mate|nota3=Bolivia|té}}.
+;4 {{csem|arquitectura}}: {{ucf|plano}} [[inclinado]] en el que se construye un [[tejado]] para que corra el agua<sub>1</sub> de [[lluvia]].
+{{sinónimo|vertiente}}.
+;5: Acción y efecto de [[llover]].
+;6: Acción y efecto de [[llorar]].
+;7 {{csem|náutica}}: {{plm|brecha}} en el [[casco]] de una [[embarcación]] por la que entra agua<sub>1</sub>.
+;8 {{csem|náutica}}: {{plm|alteración}} en el nivel de un cuerpo de agua<sub>1</sub> producida por la [[atracción]] de la [[luna]] y, en menor medida, del [[sol]].
+{{sinónimo|marea}}.
+;9: {{plm|corriente}} de agua<sub>1</sub> que discurre por [[tierra]] desde un [[manantial]], [[lago]] o masa helada, hasta desembocar en una mayor.
+{{uso|anticuado}}.
+{{sinónimo|río}}.
+;10 {{csem|astrología}}: Elemento que incluye los signos de [[Cáncer]], [[Escorpio]] y [[Piscis]].
+
+==== Locuciones ====
+{{trad-arriba|Locuciones con «agua»}}
+* [[agua acídula]]
+* [[agua agria]]
+* [[agua amoniacal]]
+* [[agua angélica]]
+* [[agua arriba]]
+* [[agua artesiana]]
+* [[agua bendita]]
+* [[agua blanca]]
+* [[agua blanda]]
+* [[agua caliente]]
+* [[agua clorada]]
+* [[agua corriente]]
+* [[agua cruda]]
+* [[agua de borrajas]]
+* [[agua de cangrejo]]
+* [[agua de cerrajas]]
+* [[agua de chirre]]
+* [[agua de churre]]
+* [[agua de coco]]
+* [[agua de Colonia]]
+* [[agua de cristalización]]
+* [[agua de Florida]]
+* [[agua de fuego]]
+* [[agua de herreros]]
+* [[agua de imbibición]]
+* [[agua de jeringa]]
+* [[agua de mesa]]
+* [[agua de nieve]]
+* [[agua de palo]]
+* [[agua de panela]]
+* [[agua de pie]]
+* [[agua de remedio]]
+* [[agua de rosas]]
+* [[agua de Seltz]]
+* [[agua de socorro]]
+* [[agua de ángeles]]
+* [[agua del amnios]]
+* [[agua del palo]]
+* [[agua delgada]]
+* [[agua dulce]]
+* [[agua dura]]
+* [[agua fenicada]]
+* [[agua ferruginosa]]
+* [[agua florida]]
+* [[agua fuerte]]
+* [[agua gaseosa]]
+* [[agua gasificada]]
+* [[agua gorda]]
+* [[agua herrada]]
+* [[agua jane]]
+* [[agua ligera]]
+* [[agua llovediza]]
+* [[agua lluvia]]
+* [[agua lustral]]
+* [[agua manantial]]
+* [[agua mansa]]
+* [[agua mineral]]
+* [[agua mineromedicinal]]
+* [[agua muerta]]
+* [[agua nieve]]
+* [[agua oxigenada]]
+* [[agua pasada]]
+* [[agua pesada]]
+* [[agua pluvial]]
+* [[agua regia]]
+* [[agua residual]]
+* [[agua roja]]
+* [[agua rosada]]
+* [[agua sal]]
+* [[agua salina]]
+* [[agua salobre]]
+* [[agua sosa]]
+* [[agua termal]]
+* [[agua tibia]]
+* [[agua tofana]]
+* [[agua tónica]]
+* [[agua va]]
+* [[agua vidriada]]
+* [[agua viento]]
+* [[agua viva]]
+* [[aguas abajo]]
+* [[aguas albañales]]
+* [[aguas alumbradas]]
+* [[aguas arriba]]
+* [[aguas blancas]]
+* [[aguas continentales]]
+* [[aguas de creciente]]
+* [[aguas de dominio privado]]
+* [[aguas de dominio público]]
+* [[aguas de menguante]]
+* [[aguas del pantoque]]
+* [[aguas del timón]]
+* [[aguas falsas]]
+* [[aguas firmes]]
+* [[aguas jurisdiccionales]]
+* [[aguas llenas]]
+* [[aguas madres]]
+* [[aguas mayores]]
+* [[aguas menores]]
+* [[aguas muertas]]
+* [[aguas negras]]
+* [[aguas servidas]]
+* [[aguas subálveas]]
+* [[aguas territoriales]]
+* [[aguas vertientes]]
+* [[aguas vivas]]
+* [[aire de agua]]
+* [[alcalde del agua]]
+* [[alguacil del agua]]
+* [[almacén de agua]]
+* [[altura viva del agua]]
+* [[aprovechamiento de aguas]]
+* [[araña de agua]]
+* [[arca de agua]]
+* [[arta de agua]]
+* [[azucena de agua]]
+* [[bajada de aguas]]
+* [[caballo de agua]]
+* [[cabeza de agua]]
+* [[cabo de agua]]
+* [[camelote de aguas]]
+* [[culebra de agua]]
+* [[culebrilla de agua]]
+* [[despidiente de agua]]
+* [[dureza del agua]]
+* [[escarnidor de agua]]
+* [[escribanillo del agua]]
+* [[escribano del agua]]
+* [[esquila de agua]]
+* [[gallina de agua]]
+* [[gato de agua]]
+* [[grabado al agua fuerte]]
+* [[grabado al agua tinta]]
+* [[hijo del agua]]
+* [[hila de agua]]
+* [[hila real de agua]]
+* [[huevo pasado por agua]]
+* [[lengua del agua]]
+* [[lenteja de agua]]
+* [[lirio de agua]]
+* [[llantén de agua]]
+* [[lumbre del agua]]
+* [[línea de agua]]
+* [[manga de agua]]
+* [[manzana de agua]]
+* [[marca de agua]]
+* [[media agua]]
+* [[melón de agua]]
+* [[merced de agua]]
+* [[napa de agua]]
+* [[nivel de agua]]
+* [[ojo de agua]]
+* [[paja de agua]]
+* [[palo de agua]]
+* [[pamplina de agua]]
+* [[pan y agua]]
+* [[pera de agua]]
+* [[perro de agua]]
+* [[perro de aguas]]
+* [[pipa de agua]]
+* [[plancha de agua]]
+* [[pluma de agua]]
+* [[polla de agua]]
+* [[pulga de agua]]
+* [[rata de agua]]
+* [[ratonera de agua]]
+* [[real de agua]]
+* [[registro de aprovechamientos de aguas]]
+* [[reloj de agua]]
+* [[salamanquesa de agua]]
+* [[salto de agua]]
+* [[tabla de agua]]
+* [[tordo de agua]]
+* [[tromba de agua]]
+* [[vena de agua]]
+* [[vía de agua]]
+* [[zapote de agua]]
+* [[agarrar un agua]]
+* [[agua abajo]]
+* [[aguantar aguas]]
+* [[ahogarse en poca agua]]
+* [[ahogarse en un vaso de agua]]
+* [[al agua, patos]]
+* [[alzarse el agua]]
+* [[arrollar agua un buque]]
+* [[bailar el agua]]
+* [[bañarse en agua rosada]]
+* [[beber agua]]
+* [[claro como el agua]]
+* [[coger agua en cesto]]
+* [[coger aguas]]
+* [[como agua de mayo]]
+* [[como agua para chocolate]]
+* [[como pez fuera del agua]]
+* [[convertirse en agua de cerrajas]]
+* [[correr el agua por donde solía]]
+* [[cortar las aguas]]
+* [[cubrir aguas]]
+* [[de agua fuerte]]
+* [[de agua y lana]]
+* [[descubrir el agua fría]]
+* [[echar agua en el mar]]
+* [[echar el agua]]
+* [[echar toda el agua al molino]]
+* [[echarse al agua]]
+* [[echarse al agua]] o [[tirarse al agua]]
+* [[embarcar agua un buque]]
+* [[entrarle agua al bote]]
+* [[entre dos aguas]]
+* [[escribir en el agua]]
+* [[estar con el agua al cuello]]
+* [[estar con el agua cortada]]
+* [[estar hecho un agua]]
+* [[estar tan seguro como agua en cesto]]
+* [[fuera del agua]]
+* [[ganar las aguas]]
+* [[hacer agua por las cacholas]]
+* [[hacer agua]]
+* [[hacer del agua lodo]]
+* [[hacerse agua la boca]]
+* [[hacerse un agua]]
+* [[hacérsele agua la boca]]
+* ¡[[hombre al agua]]!
+* [[ir debajo del agua]]
+* [[ir por encima del agua]]
+* [[irse al agua]]
+* [[jugar agua]]
+* [[llevar el agua a su molino]]
+* [[marearse el agua]]
+* [[meterse en agua]]
+* [[más claro hay que echarle agua]]
+* [[más claro que el agua]]
+* [[no alcanzar para agua]]
+* [[no callar ni debajo del agua]]
+* [[no hallar agua en la mar]]
+* [[no va por ahí el agua al molino]]
+* [[parecer que no enturbia el agua]]
+* [[pasar por agua tibia]]
+* [[paños de agua tibia]]
+* [[pedir el agua por señas]]
+* [[poner agua de por medio]]
+* [[poner agua en cedazo]]
+* [[ponerse el agua]]
+* [[quedarse entre dos aguas]]
+* [[romper aguas]]
+* [[sacar agua de las piedras]]
+* [[sin decir agua va]]
+* [[sin tomar agua bendita]]
+* [[tan claro como el agua]]
+* [[tener el agua a la boca]]
+* [[tener el agua al cuello]]
+* [[tomar de atrás el agua]]
+* [[tomar el agua]]
+* [[tomar las aguas]]
+* [[tomar un agua]]
+* [[ver debajo del agua]]
+* [[vieja del agua]]
+* [[volverse agua de cerrajas]]
+{{trad-abajo}}
+
+==== Información adicional ====
+* Aun cuando el sustantivo tiene género femenino el artículo en singular ha de ir con el artículo ''el'' para evitar la cacofonía de la doble "a": '''''un''' agua necesaria'', '''''el''' agua clara'', pero '''''las''' aguas turbulentas''.
+
+==== Véase también ====
+{{Wikiquote}}
+{{W}}
+* [[aguas]]
+
+==== Traducciones ====
+{{trad-arriba}}
+{{t|acv|a1=1|t1=as}}
+{{t|af|a1=1|t1=water}}
+{{t|ay|a1=1|t1=uma}}
+{{t|ain|a1=1|t1=ワッカ|t2=ホロ|tl2=hor}}
+{{t|aio|a1=1|t1=ꩫံ|tl1=nam}}
+{{t|akz|a1=1|t1=oki}}
+{{t|de|a1=1|t1=Wasser|g1=n}}
+{{t|sh|a1=1|t1=voda|a2=1|t2=вода|tl2=voda}}
+{{t|sq|a1=1|t1=ujë}}
+{{t|pdc|a1=1|t1=wasser}}
+{{t|gsw|a1=1|t1=Wasser|g1=n}}
+{{t|sai-all|a1=1|t1=caha}}
+{{t|am|a1=1|t1=ውኃ}}
+{{t|ar|a1=1|t1=ماء}}
+{{t|an|a1=1|t1=augua}}
+{{t|ast|a1=1|t1=agua}}
+{{t|hy|a1=1|t1=ջուր}}
+{{t|az|a1=1|t1=su}}
+{{t|nds-de|a1=1|t1=water}}
+{{t|bm|a1=1|t1=ji}}
+{{t|ba|a1=1|t1=һыу}}
+{{t|bar|a1=1|t1=Wossa|g1=n}}
+{{t|bn|a1=1|t1=পানি|t2=জল}}
+{{t|be|a1=1|t1=вада}}
+{{t|my|a1=1|t1=ရေ}}
+{{t|bi|a1=1|t1=water}}
+{{t|br|a1=1|t1=dour|g1=m}}
+{{t|bzd|a1=1|t1=di'}}
+{{t|bg|a1=1|t1=вода|tl1=voda|g1=f}}
+{{t|km|a1=1|t1=ទឹក}}
+{{t|cbs|a1=1|t1=unpax}}
+{{t|ca|a1=1|t1=aigua|g1=f|a2=1|t2=aygo|nota2=balear}}
+{{t|cak|a1=1|t1=ya'}}
+{{t|km|a1=1|t1=ទឹក}}
+{{t|ceb|a1=1|t1=túbig}}
+{{t|ch|a1=1|t1=aqua}}
+{{t|ce|a1=1|t1=хи}}
+{{t|sai-chr|a1=1|t1=hué}}
+{{t|cs|a1=1|t1=voda|g1=f}}
+{{t|ny|a1=1|t1=madzi}}
+{{t|chy|a1=1|t1=mahpe}}
+{{t|cap|a1=1|t1=qhaz|a2=1|t2=qhwaz}}
+{{t|tum|a1=1|t1=maji}}
+{{t|ckt|a1=1|t1=мимыл}}
+{{t|cv|a1=1|t1=шыв}}
+{{t|com|a1=1|t1=paa}}
+{{t|ko|a1=1|t1=물}}
+{{t|kw|a1=1|t1=dowr}}
+{{t|co|a1=1|t1=acqua}}
+{{t|cr|a1=1|t1=ᓃᐲᔾ|a2=1|t2=ᓂᐲ|tl2=nipii}}
+{{t|ht|a1=1|t1=dlo}}
+{{t|da|a1=1|t1=vand}}
+{{t|bin|a1=1|t1=amẹ}}
+{{t|eml|a1=1|t1=aqua}}
+{{t|myv|a1=1|t1=ведь}}
+{{t|sk|a1=1|t1=voda|g1=f}}
+{{t|sl|a1=1|t1=voda}}
+{{t|eo|a1=1|t1=akvo}}
+{{t|et|a1=1|t1=vesi}}
+{{t|eu|a1=1|t1=ur}}
+{{t|ext|a1=1|t1=augua|g1=f}}
+{{t|fo|a1=1|t1=vatn}}
+{{t|fi|a1=1|t1=vesi}}
+{{t|fj|a1=1|t1=wai}}
+{{t|vls|a1=1|t1=woater}}
+{{t|fr|a1=1|t1=eau|g1=f}}
+{{t|fy|a1=1|t1=wetter}}
+{{t|fur|a1=1|t1=aghe}}
+{{t|ff|a1=1|t1=ndiyam}}
+{{t|gd|a1=1|t1=uisge}}
+{{t|roa-gal|a1=1|t1=aèv|g1=f}}
+{{t|cy|a1=1|t1=dŵr}}
+{{t|gl|a1=1|t1=agua|g1=f|t2=auga|g2=f}}
+{{t|cab|a1=1|t1=duna}}
+{{t|ka|a1=1|t1=წყალი|tl1=[[ts'q'ali]]}}
+{{t|el|a1=1|t1=νερό|tl1=neró}}
+{{t|grc|a1=1|t1=ὕδωρ|tl1=hýdôr}}
+{{t|gmy|a1=1|t1=𐀄𐀈|tl1=u-do, hýdôr}}
+{{t|gn|a1=1|t1=y}}
+{{t|gu|a1=1|t1=પાણી}}
+{{t|gum|a1=1|t1=pi}}
+{{t|gwj|t1=tshasa}}
+{{t|ha|a1=1|t1=ruwa}}
+{{t|haw|a1=1|t1=wai}}
+{{t|he|a1=1|t1=מים|tl1=mayim}}
+{{t|hi|a1=1|t1=पानी}}
+{{t|hit|a1=1|t1=𒉿𒀀𒋻}}
+{{t|hop|a1=1|t1=kuuyi}}
+{{t|hus|a1=1|t1=jaʼ}}
+{{t|hu|a1=1|t1=víz}}
+{{t|io|a1=1|t1=aquo}}
+{{t|ig|a1=1|t1=mmịrị}}
+{{t|en|a1=1|t1=water}}
+{{t|ang|a1=1|t1=wæter}}
+{{t|ia|a1=1|t1=aqua}}
+{{t|ilo|a1=1|t1=danum}}
+{{t|ga|a1=1|t1=uisce}}
+{{t|is|t1=vatn|a1=1}}
+{{t|it|a1=1|t1=acqua}}
+{{t|ja|a1=1|t1=水|t2=みず|tl2=mizu}}
+{{t|jv|a1=1|t1=ꦧꦚꦸ|tl1=[[banyu]]|t2=ꦠꦺꦴꦪ|tl2=[[toya]]}}
+{{t|tsg|a1=1|t1=tubig}}
+{{t|lad|a1=1|t1=agua}}
+{{t|alc|a1=1|t1=akčólai}}
+{{t|ki|a1=1|t1=mai}}
+{{t|kn|a1=1|t1=ನೀರು}}
+{{t|kic|a1=1|t1=nepi}}
+{{t|klb|a1=1|t1='ja'}}
+{{t|kg|a1=1|t1=maza}}
+{{t|clm|t1=qʷúʔ}}
+{{t|kuz|a1=1|t1=puri}}
+{{t|ku|a1=1|c1=av}}
+{{t|lkt|a1=1|t1=miní}}
+{{t|lo|a1=1|t1=ນ້ຳ|tl1=nam}}
+{{t|la|a1=1|t1=aqua}}
+{{t|lv|a1=1|t1=ūdens}}
+{{t|li|a1=1|t1=water}}
+{{t|ln|a1=1|t1=mái}}
+{{t|lt|a1=1|t1=vanduo|g1=m}}
+{{t|jbo|a1=1|t1=djacu}}
+{{t|lmo|a1=1|t1=agua}}
+{{t|lb|a1=1|t1=Waasser|g1=n}}
+{{t|maz|a1=1|t1=reje}}
+{{t|mmc|a1=1|t1=ndeje}}
+{{t|mk|a1=1|t1=вода}}
+{{t|mdh|a1=1|t1=ig}}
+{{t|ml|a1=1|t1=ജലം}}
+{{t|mg|a1=1|t1=rano}}
+{{t|mt|a1=1|t1=ilma}}
+{{t|mnc|a1=1|t1=ᠮᡠᡴᡝ|tl1=muke}}
+{{t|zh|a1=1|t1=水|tl1=[[shuǐ]]}}
+{{t|gv|a1=1|t1=ushtey}}
+{{t|mi|a1=1|t1=wai}}
+{{t|arn|a1=1|t1=ko}}
+{{t|mrw|a1=1|t1=ig}}
+{{t|mr|a1=1|t1=पाणी|tl1=pāṇī}}
+{{t|mni|a1=1|t1=ꯏꯁꯤꯡ|t2=ইসিং|tl2=ising}}
+{{t|mh|a1=1|t1=ren}}
+{{t|mas|a1=1|t1=ɛnkárɛ́|a2=1|t2=enkare}}
+{{t|cdo|a1=1|t1=cūi}}
+{{t|mn|a1=1|t1=yc}}
+{{t|yua|a1=1|t1=jaʼ}}
+{{t|sai-mil|a1=1|t1=aca}}
+{{t|nan|a1=1|t1=chúi}}
+{{t|xtm|a1=1|t1=ndute}}
+{{t|xtl|a1=1|t1=ndute}}
+{{t|mpm|a1=1|t1=nducha}}
+{{t|mit|a1=1|t1=ndutè}}
+{{t|nhn|a1=1|t1=atl|t2=atzintli|nota2=Milpa Alta}}
+{{t|nci|a1=1|t1=atl|a2=2|t2=atzintli}}
+{{t|naz|a1=1|t1=atl}}
+{{t|azd|a1=1|t1=at}}
+{{t|ngu|a1=1|t1=atl}}
+{{t|nch|a1=1|t1=atl}}
+{{t|nhw|a1=1|t1=atl}}
+{{t|nhe|a1=1|t1=atl}}
+{{t|azz|a1=1|t1=at}}
+{{t|nsu|a1=1|t1=atl}}
+{{t|nhx|a1=1|t1=a̱ʼ}}
+{{t|ncl|a1=1|t1=al}}
+{{t|nhm|t1=atl}}
+{{t|azn|a1=1|t1=át}}
+{{t|nhy|a1=1|t1=atl}}
+{{t|nht|a1=1|c1=a|t1=at}}
+{{t|nhp|a1=1|t1=at}}
+{{t|ncx|a1=1|t1=atl}}
+{{t|nlv|a1=1|t1=atl}}
+{{t|nhc|a1=1|t1=a't}}
+{{t|nhg|a1=1|t1=ötl|a2=1|t2=ötzintli̱}}
+{{t|nhv|a1=1|t1=atl}}
+{{t|nuz|a1=1|t1=atl}}
+{{t|nhi|a1=1|t1=atl}}
+{{t|ncj|t1=atl|nota1=Acaxochitlán|t2=âtl}}
+{{t|na|a1=1|t1=ebok}}
+{{t|nv|a1=1|t1=tó}}
+{{t|nl|a1=1|t1=water|g1=n}}
+{{t|ne|a1=1|t1=पानी|tl1=pānī}}
+{{t|nrm|a1=1|t1=ieau}}
+{{t|no|a1=1|t1=vann|g1=n|t2=vatn|g2=n}}
+{{t|nn|a1=1|t1=vatn|g1=n}}
+{{t|oc|a1=1|t1=aiga|g1=f}}
+{{t|oj|a1=1|t1=nibi}}
+{{t|om|a1=1|t1=bishaan}}
+{{t|or|a1=1|t1=ଜଳ|nota1=jôḷô|t2=ପାଣି|nota2=paṇi}}
+{{t|osc|a1=1|t1=𐌀𐌀𐌐𐌀}}
+{{t|ots|a1=1|t1=deje}}
+{{t|ote|a1=1|t1=dehe}}
+{{t|pam|a1=1|t1=danúm}}
+{{t|pap|a1=1|t1=awa}}
+{{t|fa|a1=1|t1=آب|tl1=āb}}
+{{t|pms|a1=1|t1=eva}}
+{{t|ppl|a1=1|t1=at}}
+{{t|pl|a1=1|t1=woda|g1=f}}
+{{t|pt|a1=1|t1=água|g1=f}}
+{{t|pot|a1=1|t1=mbish}}
+{{t|pue|a1=1|t1=jagïp}}
+{{t|pua|a1=1|t1=itsï}}
+{{t|quy|a1=1|t1=yaku}}
+{{t|quh|a1=1|t1=yaku}}
+{{t|cqu|a1=1|t1=yaku}}
+{{t|quz|a1=1|t1=yaku}}
+{{t|qus|a1=1|t1=yaku}}
+{{t|quc|a1=1|t1=jaʼ}}
+{{t|qwh|a1=1|t1=yaku}}
+{{t|rap|a1=1|t1=vai}}
+{{t|rhg|a1=1|t1=faní}}
+{{t|rm|a1=1|t1=aua}}
+{{t|rmy|a1=1|t1=panì}}
+{{t|eml|a1=1|t1=acva}}
+{{t|ro|a1=1|t1=apă}}
+{{t|rw|a1=1|t1=zi|nota1=amazi}}
+{{t|ru|a1=1|t1=вода|tl1=voda|g1=f}}
+{{t|war|a1=1|t1=tubig}}
+{{t|se|a1=1|t1=čáhci}}
+{{t|sm|a1=1|t1=vai}}
+{{t|sa|a1=1|t1=जल|g1=n|tl1=jala|t2=अम्भस्|g2=n|tl2=ambhas|t3=तोज|g3=n|tl3=toja|t4=पानीय|g4=n|tl4=pānīya}}
+{{t|sc|a1=1|t1=aba}}
+{{t|scn|a1=1|t1=acqua}}
+{{t|so|a1=1|t1=biyo}}
+{{t|st|a1=1|t1=metsi}}
+{{t|tn|a1=1|t1=metsi}}
+{{t|su|a1=1|t1=ᮎᮄ}}
+{{t|srn|a1=1|t1=watra}}
+{{t|sv|a1=1|t1=vatten}}
+{{t|sw|a1=1|t1=maji}}
+{{t|tl|a1=1|t1=tubig}}
+{{t|blt|a1=1|t1=ꪙꪾ꫁}}
+{{t|th|a1=1|t1=น้ำ}}
+{{t|sou|a1=1|t1=หน่าม}}
+{{t|nod|a1=1|t1=ᨶ᩶ᩣᩴ}}
+{{t|ta|a1=1|t1=நீர்}}
+{{t|tar|a1=1|t1=ba'wí}}
+{{t|thh|a1=1|t1=ba'wí}}
+{{t|tt|a1=1|t1=su}}
+{{t|crh|a1=1|t1=suv}}
+{{t|tg|a1=1|t1=об}}
+{{t|bo|a1=1|t1=ཆུ}}
+{{t|ti|a1=1|t1=ማይ}}
+{{t|tpi|a1=1|t1=wara}}
+{{t|tok|a1=1|t1=telo}}
+{{t|to|a1=1|t1=vai}}
+{{t|tzh|a1=1|t1=jaʼ}}
+{{t|tzo|a1=1|t1=vo'}}
+{{t|tr|a1=1|t1=su}}
+{{t|tk|a1=1|t1=suw}}
+{{t|uk|a1=1|t1=вода|tl1=voda|g1=f}}
+{{t|udm|a1=1|t1=ву|tl1=vu}}
+{{t|ug|a1=1|t1=سۇ|tl1=su}}
+{{t|xum|a1=1|t1=𐌖𐌕𐌖𐌓|tl1=utur}}
+{{t|ur|a1=1|t1=آب|tl1=āb}}
+{{t|uz|a1=1|t1=suv}}
+{{t|wa|a1=1|t1=aiwe}}
+{{t|vec|a1=1|t1=aqua}}
+{{t|vi|a1=1|t1=nước}}
+{{t|vo|a1=1|t1=vat}}
+{{t|wo|a1=1|t1=ndox}}
+{{t|ts|a1=1|t1=metsi}}
+{{t|xh|a1=1|t1=amanzi}}
+{{t|yag|a1=1|t1=síma}}
+{{t|yi|a1=1|t1=וואסער|tl1=vasser}}
+{{t|yo|a1=1|t1=omi}}
+{{t|zro|a1=1|t1=múricha}}
+{{t|zat|a1=1|t1=nhis}}
+{{t|zpu|a1=1|t1=nis}}
+{{t|zai|a1=1|t1=nisa}}
+{{t|zu|a1=1|t1=amanzi}}
+{{trad-abajo}}
+
+=== Forma flexiva ===
+==== Forma verbal ====
+;1: {{f.v|aguar|p=3s|t=presente|m=indicativo}}.
+;2: {{f.v|aguar|p=2s|t=imperativo|afirmativo=sí}}.
+
+==== Refranes ====
+{{trad-arriba}}
+* [[a casa quemada, acudir con el agua]]
+* [[abril, aguas mil]]
+* [[agua blanda en piedra dura, tanto da que hace cavadura]]
+* [[agua buena sin olor; color ni sabor; y que la vea el sol]]
+* [[agua corriente no mata a la gente]]
+* [[agua de mayo, pan para todo el año]]
+* [[agua de por san juan, quita vino y no da pan]]
+* [[agua de pozo y mujer desnuda, echan al hombre a la sepultura]]
+* [[agua del cielo no quita riego]]
+* [[agua esperé y tarde sembré, sabe dios lo que recogeré]]
+* [[agua fina saca la espina]]
+* [[agua fría y pan caliente mata a la gente]]
+* [[agua fría y pan caliente, nunca hicieron buen vientre]]
+* [[agua mala, hervida y colada]]
+* [[agua mole em pedra dura, tanto bate até que fura!]]
+* [[agua no enferma, ni embeoda ni adeuda]]
+* [[agua pasada no mueve molino]]
+* [[agua que haya de beber, no la enturbiaré]]
+* [[agua que no has de beber, déjala correr]]
+* [[agua vertida, no toda cogida]]
+* [[agua, sol y basura, y menos libros de agricultura]]
+* [[ahogarse en un vaso de agua dar mucha importancia a algo que no la tiene]]
+* [[al cabo de los años mil, vuelve el agua a su cubil]]
+* [[al enfermo que es de vida, el agua le es medicina]]
+* [[algo tendrá el agua cuando la bendicen]]
+* [[bendita sea el agua por sana y por barata]]
+* [[botija nueva hace el agua fresca]]
+* [[cada uno quiere llevar el agua a su molino y dejar seco el del vecino]]
+* [[cielo borreguero, vendaval o agua del cielo]]
+* [[cuando el río suena, agua lleva]]
+* [[de agua mansa me libre Dios, que de la brava me guardaré yo]] o [[del agua mansa líbreme Dios, que de la brava me libraré yo]]
+* [[echar agua al vino dulcificar la actitud]]
+* [[en poca agua, poco se navega]]
+* [[estar con el agua al cuello estar en apuros]]
+* [[huerta sin agua, y mujer sin amor, no se que sera peor]]
+* [[la gota de agua cava la piedra]]
+* [[nadie se baña dos veces con el agua del mismo rio]]
+* [[ni bebas agua que no veas, ni firmes carta que no leas]]
+* [[nunca digas de esta agua no beberé]]
+* [[quien hace agravios, escribelos en el agua; quien los recibe, en el corazon los graba]]
+* [[si el río suena, es porque piedras trae]]
+* [[tanto da el agua en la piedra que la quiebra]]
+* [[tanto va el cantaro al agua que al fin se rompe]]
+* [[ya que el agua no va al molino, vaya el molino al agua]]
+{{trad-abajo}}

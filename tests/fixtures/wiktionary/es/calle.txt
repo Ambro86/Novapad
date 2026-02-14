@@ -1,0 +1,175 @@
+== {{lengua|es}} ==
+{{pron-graf}}
+
+=== Etimología 1 ===
+{{etimología|la|callis|vereda}}, y esta probablemente {{etim|ine-pro|*kel-}}, "[[cortar]]". Compárese el rumano {{l+|ro|cale}}.[[Archivo:EK Zwemmen 2006 100m vrij mannen.jpg|thumb|]]
+
+==== {{sustantivo femenino|es}} ====
+{{es.sust}}
+;1: {{plm|camino}} [[urbano]], especialmente el destinado al [[tránsito]] de [[vehículo]]s.
+{{sinónimo|rúa}}.
+{{hipónimo|alameda|angostillo|arteria|avenida|bajada|bulevar|calleja|callejón|callejuela|callizo|carrera|congostra|corredera|coso|costana|costanilla|cuesta|pasadizo|pasaje|paseo|paso|rambla|ronda|subida|travesía|zacatín}}.
+;2: Por extensión, [[espacio]] urbano [[abierto]] y no [[ajardinado]], por oposición al interior de los edificios.
+{{ejemplo|Ahora, en la esplendorosa Corte hay más de 1.700 'sin techo' y una tercera parte de ellos duerme en la ''calle''.|c=pagina|t=Memorial de pobres|f=2008-04-17|a=MANUEL ALCÁNTARA|u=http://www.diariovasco.com/20080417/gente/memorial-pobres-20080417.html}}
+;3: Por extensión, [[libertad]] de [[circular]] y [[mover]]se [[libre]]mente.
+{{antónimo|prisión}}.
+;4: Por metonimia, [[mayoría]] de la [[población]].
+{{sinónimo|gente|opinión pública|público|sociedad|vulgo}}.
+;5: Camino [[flanquear|flanqueado]] de [[hilera]]s de [[árbol]]es u otras cosas.
+{{sinónimo|almanta|entreliño|vial}}.
+;6: {{plm|serie}} de [[casilla]]s por las que una [[ficha]] puede [[desplazar]]se en ciertos [[juego]]s de [[tablero]].
+;7 {{csem|deporte}}: Cada una de las [[franja]]s [[longitudinal]]es en que se divide la pista y que corresponden respectivamente a cada [[competidor]] en las [[prueba]]s de [[velocidad]].
+{{sinónimo|andarivel}}.
+;8 {{csem|imprenta}}: {{plm|fila}} o [[hilera]] de [[espacio]]s en [[blanco]] que se [[formar|forma]] [[accidental]]mente en una [[página]] [[componer|compuesta]] y [[producir|produce]] un [[efecto]] [[visual]] [[desagradable]].
+;9: {{plm|tramo}} de una calle{{-sub|1}} entre una y otra [[esquina]].
+{{ámbito|Chile|España|México|Perú}}
+{{sinónimo|cuadra|manzana}}.
+;10 {{csem|política}}: {{plm|población}} que [[depender|depende]] [[administrativo|administrativamente]] de otra.
+{{uso|obsoleto}}
+;11: {{plm|experiencia}}, [[habilidad]] o [[pericia]] adquirida en la calle o también adquirida de modo práctico.
+{{ámbito|Argentina}}
+
+==== Locuciones ====
+{{trad-arriba|Locuciones con «calle»}}
+* [[calle de la amargura]]
+* [[calle de retablo]]
+* [[calle hita]]
+* [[calle mayor]]
+* [[calle peatonal]]
+* [[calle pública]]
+* [[chico de la calle]]
+* [[gente de la calle]]
+* [[llave de calle]]
+* [[niño de la calle]]
+* [[a calle hita]]
+* [[abrir calle]]
+* [[alborotar la calle]]
+* [[azotar calles]]
+* [[calle abajo]]
+* [[calle arriba]]
+* [[coger la calle]]
+* [[coger las calles]]
+* [[de calle]]
+* [[dejar en la calle]]
+* [[doblar la calle]]
+* [[echar a la calle]]
+* [[echar por la calle de en medio]]
+* [[echarse a la calle]]
+* [[faltar calle]]
+* [[hacer calle]]
+* [[hacer huir una calle de hombres]]
+* [[hacer la calle]]
+* [[ir desempedrando las calles]]
+* [[llevar de calle]]
+* [[llevarse una calle de hombres]]
+* [[pasear la calle]]
+* [[plantar en la calle]]
+* [[poner de patitas en la calle]]
+* [[poner en la calle]]
+* [[quedar en la calle]]
+* [[rondar la calle]]
+* [[tirar por la calle de en medio]]
+{{trad-abajo}}
+
+==== Información adicional ====
+{{derivad|calleja|callejero|callejear|callejón|callejuela}}.
+
+==== Véase también ====
+{{w}}
+
+==== Traducciones ====
+{{trad-arriba}}
+{{t|af|a1=1|t1=straat}}
+{{t|ay|a1=1|t1=thaki}}
+{{t|sh|a1=1|t1=ulica улица|g1=f|tl1=ulica}}
+{{t|sq|a1=1|t1=rrugë}}
+{{t|de|a1=1|t1=Straße|g1=f|a2=7|t2=Bahn|g2=f}}
+{{t|ar|a1=1|t1=شارع|tl1=šāriʿ}}
+{{t|ary|a1=1|t1=زنقة|tl1=zánqa}}
+{{t|an|a1=1|t1=carrera}}
+{{t|hy|a1=1|t1=փողոց|tl1=p'oġoc'}}
+{{t|ast|a1=1|t1=calle|t2=cai}}
+{{t|az|a1=1|t1=küçə}}
+{{t|nds-de|a1=1|t1=straat}}
+{{t|brg|a1=1|t1=kaye}}
+{{t|be|a1=1|t1=вуліца|tl1=vúlica|g1=f}}
+{{t|br|a1=1|t1=straed|g1=f|t2=ru|g2=f}}
+{{t|bg|a1=1|t1=улица|tl1=úlica|g1=f}}
+{{t|yue|a1=1|t1=街|tl1=gaai1}}
+{{t|ca|a1=1|t1=carrer|g1=m}}
+{{t|cs|a1=1|t1=ulice|g1=f}}
+{{t|ko|a1=1|t1=거리|tl1=geori}}
+{{t|da|a1=1|t1=gade|g1=n|t2=vej}}
+{{t|sk|a1=1|t1=ulica|g1=f}}
+{{t|sl|a1=1|t1=ulica|g1=f}}
+{{t|eo|a1=1|t1=strato}}
+{{t|et|a1=1|t1=tänav}}
+{{t|eu|a1=1|t1=kale}}
+{{t|ext|a1=1|t1=calli}}
+{{t|fo|a1=1|t1=tänav}}
+{{t|fi|a1=1|t1=katu}}
+{{t|fr|a1=1|t1=rue|g1=f}}
+{{t|fy|a1=1|t1=strjitte}}
+{{t|fur|a1=1|t1=strade}}
+{{t|gd|a1=1|t1=sràid|g1=f}}
+{{t|cy|a1=1|t1=heol|g1=f}}
+{{t|gl|a1=1|t1=rúa|g1=f}}
+{{t|el|a1=1|t1=οδός|tl1=odós|g1=f|t2=δρόμος|tl2=drómos|g2=m}}
+{{t|gn|a1=1|t1=ape|t2=guataha}}
+{{t|gu|a1=1|t1=સડક}}
+{{t|he|a1=1|t1=רחוב|tl1=rehov}}
+{{t|hi|a1=1|t1=गली|tl1=galī|g1=f|t2=सड़क|tl2=saṛak|g2=f}}
+{{t|hu|a1=1|t1=utca}}
+{{t|io|a1=1|t1=strado}}
+{{t|id|a1=1|t1=jalan}}
+{{t|en|a1=1|t1=street}}
+{{t|ia|a1=1|t1=strata}}
+{{t|ga|a1=1|t1=sráid|g1=f}}
+{{t|is|a1=1|t1=gata}}
+{{t|it|a1=1|t1=strada|g1=f|t2=via|g2=f}}
+{{t|ja|a1=1|t1=道|tl1=[[みち]], michi|t2=道路|tl2=[[どうろ]], dōro|t3=通り|tl3=とおり, tōri}}
+{{t|kv|a1=1|t1=улича|tl1=uliča}}
+{{t|cuk|a1=1|t1=igar}}
+{{t|ku|a1=1|t1=جاده|tl1=jAdda|t2=کۆڵان|tl2=koLAn|t3=شه‌قام|tl3=shaqAm}}
+{{t|la|a1=1|t1=via|t2=vicus}}
+{{t|lv|a1=1|t1=iela}}
+{{t|lt|a1=1|t1=gatvė|g1=f}}
+{{t|mk|a1=1|t1=улица|tl1=úlica|g1=f}}
+{{t|cmn|a1=1|t1=街|tl1=jiē}}
+{{t|zh|t1=路}}
+{{t|zh|t1=馬路}}
+{{t|zh|t1=马路}}
+{{t|nap|a1=1|t1=strata|g1=f}}
+{{t|nl|a1=1|t1=straat|a2=7|t2=baan}}
+{{t|no|a1=1|t1=gate}}
+{{t|oc|a1=1|t1=carrièra|g1=f}}
+{{t|pa|a1=1|t1=ਰਸਤਾ}}
+{{t|fa|a1=1|t1=خیابان|tl1=xiyâbân}}
+{{t|pl|a1=1|t1=ulica|g1=f}}
+{{t|pt|a1=1|t1=rua|g1=f}}
+{{t|quz|a1=1|t1=k'ikllu}}
+{{t|ro|a1=1|t1=stradă|g1=f}}
+{{t|ru|a1=1|t1=улица|tl1=úlitsa|g1=f}}
+{{t|se|a1=1|t1=gáhta}}
+{{t|sms|a1=1|t1=uu´lec}}
+{{t|sgs|a1=1|t1=ūlīčė}}
+{{t|sh|a1=1|t1=ulica|g1=f}}
+{{t|scn|a1=1|t1=strada|g1=f}}
+{{t|sv|a1=1|t1=gata}}
+{{t|sw|a1=1|t1=barabara}}
+{{t|tl|a1=1|t1=వీధి|tl1=veedhi}}
+{{t|th|a1=1|t1=ถนน|tl1=tanon}}
+{{t|tt|a1=1|t1=урам}}
+{{t|tg|a1=1|t1=кӯча}}
+{{t|tet|a1=1|t1=lurón}}
+{{t|twf|a1=1|t1=kàyi’ína}}
+{{t|tpn|a1=1|t1=apé}}
+{{t|tr|a1=1|t1=sokak|t2=yol}}
+{{t|uk|a1=1|t1=вулиця|tl1=vúlycja|g1=f}}
+{{t|ur|a1=1|t1=گلی|tl1=galī|g1=f|t2=سڑک|tl2=saṛak|g2=f}}
+{{t|wa|a1=1|t1=rowe}}
+{{t|vi|a1=1|t1=đường|t2=đường phố|t3=phố}}
+{{t|vo|a1=1|t1=süt}}
+{{t|wuu|a1=1|t1=街道}}
+{{t|yi|a1=1|t1=גאס}}
+{{trad-abajo}}

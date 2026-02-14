@@ -1,0 +1,170 @@
+== {{lengua|es}} ==
+{{pron-graf|h1=Luz}}
+
+=== Etimología 1 ===
+{{etimología|osp|luz}}, y este {{etim|la|lux}}.
+
+==== {{sustantivo femenino|es}} ====
+{{es.sust}}
+;1 {{csem|física|óptica}}: {{plm|radiación}} [[electromagnético|electromagnética]] [[visible]] al [[ojo]] [[humano]].
+;2: {{plm|fuente}} que emite, transmite o deja pasar una radiación tal.
+;3 {{csem|física}}: {{plm|corriente}} [[eléctrico|eléctrica]] que se suministra a [[domicilio]] en las [[área]]s urbanas.
+{{ámbito|Cuba|México|Venezuela}}
+{{sinónimo|electricidad|energía|nota2=Colombia}}.
+;4: {{plm|persona}} o cosa que alcanza [[fama]] y [[notoriedad]] en su [[carrera]].
+{{sinónimo|astro|estrella|luminaria}}.
+;5: {{plm|claridad}} que la luz<sub>1</sub> del [[sol]] provoca.
+{{sinónimo|día}}.
+;6: {{plm|sección}} [[interior]] de un [[cilindro]].
+;7 {{csem|arquitectura|ingeniería|construcción}}: Distancia, en proyección horizontal, existente entre las columnas que sostienen una viga o un arco.
+{{sinónimo|vano}}
+;8 {{csem|mecánica}}: Por extensión, espacio libre que queda en otras estructuras análogas a las columnas como por ejemplo el orificio de la matriz para embutir chapas en donde cabe el punzón.
+;9 {{csem|física}}: {{plm|radiación}} [[electromagnético|electromagnética]], sea cual sea su [[ancho de banda]].
+;10 {{csem|pintura}}: {{plm|punto}} de una [[imagen]] [[pictórico|pictórica]] del que parece [[emanar]] la [[claridad]] que la [[alumbrar|alumbra]].
+;11: {{plm|bien}} que se usa para el [[pago]] de otros [[bien]]es y [[servicio]]s y como [[unidad]] de [[medida]] de la [[riqueza]].
+{{ámbito|España|México}}
+{{uso|germanía|desusado}}
+{{wikisauro|dinero}}
+
+==== Locuciones ====
+{{trad-arriba|Locuciones con «luz»}}
+* [[año de luz]]
+* [[año luz]]
+* [[bichito de luz]]: [[luciérnaga]]
+* [[bicho de luz]]: [[luciérnaga]]
+* [[cono de luz]]
+* [[contraluz]]
+* [[crespa de luz]]
+* [[degradación de luz]]
+* [[disciplinante de luz]]
+* [[gusano de luz]]
+* [[hermano de luz]]
+* [[luz artificial]]
+* [[luz brillante]]
+* [[luz característica]]
+* [[luz cenicienta]]
+* [[luz cenital]]
+* [[luz cinérea]]
+* [[luz corta]]
+* [[luz de Bengala]]
+* [[luz de carretera]]
+* [[luz de cruce]]
+* [[luz de la razón]]
+* [[luz de luz]]
+* [[luz de mis ojos]]
+* [[luz de navegación]]
+* [[luz eléctrica]]
+* [[luz larga]]
+* [[luz mala]]
+* [[luz natural]]
+* [[luz negra]]
+* [[luz primaria]]
+* [[luz refleja]]
+* [[luz secundaria]]
+* [[luz solar]]
+* [[luz verde]]
+* [[luz zodiacal]]
+* [[media luz]]
+* [[mesa de luz]]: [[mesa de noche]], pequeña mesa que se coloca junto a la cama
+* [[pico de luz eterna]]
+* [[pistola de luz]]
+* [[primera luz]]
+* [[rayo de luz]]
+* [[sable de luz]]
+* [[segunda luz]]
+* [[segundo luz]]
+* [[servidumbre de luces]]
+* [[toque de luz]]
+* [[tragaluz]]
+* [[traje de luces]]
+* [[traslación de luz]]
+* [[tubo de luz fría]]
+* [[vara de luz]]
+* [[a buena luz]]
+* [[a la luz de]]
+* [[a primera luz]]
+* [[a todas luces]]
+* [[dar a luz]]
+* [[dar luces]]
+* [[dar luz]]
+* [[echar luz]]
+* [[entre dos luces]]
+* [[hacer dos luces]]
+* [[irse la luz]]: ocurrir un [[apagón]] (Venezuela)
+* [[rayar la luz de la razón]]
+* [[sacar a luz]]
+* [[salir a luz]]
+* [[ver la luz]]
+{{trad-abajo}}
+
+==== Refranes ====
+* [[a la luz de la tea, no hay mujer fea]]
+* [[a luz de la candela, toda rústica parece bella]]
+* [[como una luz de ligero]]
+* [[dar a luz rejuvenece, criar es lo que envejece]]
+* [[de la discusion surge la luz]]
+* [[del oriente, la luz; del occidente, la ley]]
+* [[dos ladrones tienes en casa tú, el teléfono y la luz]]
+* [[el último que apague la luz]]
+* [[la luz de adelante es la que alumbra]]
+* [[la sonrisa cuesta menos que la electricidad y da más luz]]
+* [[lo que a la sombra se urdiese, a la luz del día aparece]]
+
+==== Véase también ====
+{{Wikiquote}}
+{{Wikipedia}}
+* [[foto-]]
+* [[iluminación]], [[luminiscencia]]
+* [[candela]], [[lumen]], [[lux]]
+* [[bioluminiscencia]], [[luciérnaga]]
+
+==== Traducciones ====
+{{trad-arriba}}
+{{t|af|a1=1|t1=lig}}
+{{t|sq|a1=1|g1=f|t1=dritë}}
+{{t|de|a1=1|g1=n|t1=Licht}}
+{{t|ast|a1=1|g1=f|t1=lluz}}
+{{t|az|a1=1|t1=işıq}}
+{{t|my|a1=1|t1=အလင်းရောင်}}
+{{t|bg|a1=1|g1=f|t1=светлина}}
+{{t|ca|a1=1|t1=llum}}
+{{t|cs|a1=1|t1=světlo}}
+{{t|ko|a1=1|t1=ronahî}}
+{{t|da|a1=1|t1=lys}}
+{{t|sl|a1=1|a2=2|g1=f|g2=f|t1=svetloba|t2=luc}}
+{{t|eo|a1=1|t1=lumo}}
+{{t|eu|a1=1|t1=argi}}
+{{t|fi|a1=1|t1=valo}}
+{{t|fy|a1=1|t1=ljocht}}
+{{t|fo|a1=1|t1=ljós}}
+{{t|fr|a1=1|g1=f|t1=lumière}}
+{{t|gd|a1=1|t1=solus}}
+{{t|gl|a1=1|t1=luz}}
+{{t|el|a1=1|t1=φως}}
+{{t|he|g1=m|t1=אור}}
+{{t|hbo|a1=1|g1=m|g2=mf|t1=מאור|t2=אור}}
+{{t|hu|a1=1|t1=fény}}
+{{t|en|a1=1|t1=light}}
+{{t|ang|a1=1|t1=leoht}}
+{{t|is|a1=1|t1=ljós}}
+{{t|it|a1=1|g1=f|t1=luce}}
+{{t|ja|a1=1|t1=光}}
+{{t|la|a1=1|t1=lumen|t2=lux}}
+{{t|yua|a1=1|t1=saasil}}
+{{t|nci|t1=tlahuilli}}
+{{t|no|a1=1|t1=lys}}
+{{t|nl|a1=1|t1=licht|t2=schijn|t3=schijnsel}}
+{{t|pap|a1=1|t1=lus}}
+{{t|pl|a1=1|g1=n|t1=światło}}
+{{t|pt|a1=1|t1=luz}}
+{{t|ru|a1=1|t1=свет}}
+{{t|srn|a1=1|t1=leti}}
+{{t|sv|a1=1|t1=ljus}}
+{{t|sw|a1=1|t1=nuru}}
+{{t|tl|a1=1|a2=1|t1=liwanag|t2=ílaw}}
+{{t|ta|a1=1|t1=ஒளி|tl1=oḷi}}
+{{t|tok|a1=1|t1=suno}}
+{{t|tr|a1=1|t1=aydınlık|t2=ışık}}
+{{t|yo|a1=1|t1=ìmọ́lẹ̀}}
+{{t|zu|a1=1|t1=isibane}}
+{{trad-abajo}}

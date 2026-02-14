@@ -1,0 +1,138 @@
+== {{-it-}} ==
+{{-sost-|it}}
+[[File:Road Padum Zanskar Range Jun24 A7CR 00818.jpg|thumb|una strada]]
+[[File:Road_in_Norway.jpg|thumb|250px|una '''strada''' [[asfaltata]] a due carreggiate, divise da strisce discontinue di color [[giallo]] e  munita nella parte a [[valle]] anche di [[guard-rail]]<br />]]
+[[File:Kreta - Europastraße75 1.jpg|thumb|una strada extraurbana]]<br />
+[[File:African safari route noir.jpg|thumb|una strada sterrata in Africa]]
+{{Pn|w=Strada}} ''f sing'' {{Linkp|strade}}
+# {{Term|architettura|it}} [[striscia]] di [[terreno]], [[battuto]] o [[pavimentato]], [[tracciato]] per [[collegare]] [[luoghi]] [[diversi]] e [[percorsa]] da [[pedoni]] o [[veicoli]] 
+# {{Fig}} [[condotta]] [[seguita]] nella [[vita]] [[quotidiana]], [[modalità]] [[etiche]] e [[valoriali]] nonché di riferimento della [[propria]] [[esistenza]], [[perseguire]] una [[via]] [[possibilmente]] la [[più]] [[coerente]] con la [[verità]]
+
+{{-sill-}}
+; strà | da
+
+{{-pron-}}
+{{Audio|it-strada.ogg|/ˈstrada/}}
+
+{{-etim-}}
+dal latino tardo ''[[strata]]'', "[[via]]", femminile sostantivato di ''[[stratus]]'', participio passato di ''[[sternere|sternĕre]]'', "[[stendere]], [[selciare]]", nel senso generale di "via massicciata"
+
+{{-quote-}}
+{{Quote
+|Ci sarà un sentiero e una '''strada''' e la chiameranno via santa, nessun impuro la percorrerà e gli stolti non vi si aggireranno.
+|[[w:Libro di Isaia|Libro di Isaia]] {{Passo biblico|Is|35,8}}, testo CEI 2008}}
+{{Quote
+|Quanta '''strada''' faremo nella vita dipende dalla nostra tenerezza con i giovani, dalla nostra compassione per i vecchi, dalla nostra simpatia per chi lotta, e dalla nostra tolleranza per i deboli e per i forti, perché un giorno saremo stati tutto questo
+|[[q:George Washington Carver|George Washington Carver]]}}
+
+{{-sin-}}
+*[[carrozzabile]], [[corso]], [[mulattiera]], [[pista]],  [[sentiero]], [[tracciato]], [[via]], [[viale]], [[vicolo]],
+*  [[carreggiata]],  via di comunicazione
+*  [[tragitto]], [[cammino]]
+* [[calle]], [[viottolo]],   [[superstrada]], [[autostrada]]
+* {{Est}}  [[passaggio]], [[spazio]], [[uscita]],  [[varco]], [[apertura]], [[solco]]
+* [[direzione]] 
+* {{Fig}} [[cammino]], [[itinerario]], [[percorso]], [[viaggio]]
+* {{Fig}} [[espediente]], [[mezzo]], [[modo]], [[sistema]], [[tecnica]],  [[maniera]],   [[metodo]], [[soluzione]], [[possibilità]], [[alternativa]]
+* {{Fig}}  [[opportunità]]
+* {{Fig}} [[condotta]], [[comportamento]] 
+
+{{-der-}}
+* [[autostrada]], [[battistrada]], [[capostrada]], [[cibo di strada]], [[cucina di strada]], [[fuoristrada]], [[guardastrada]], [[instradamento]], [[instradare]], [[instradatore]], [[istradamento]], [[stradale]], [[stradare]], [[strada verde]], [[stradario]], [[stradiere]], [[superstrada]], [[tv di strada]]
+
+{{-alter-}}
+* {{Dim}} [[stradina]], [[stradetta]], [[stradettina]], [[stradicciola]]
+* {{Term|raro|it}} [[stradella]], [[stradellina]], [[stradellino]] ''m''
+* {{Vezz}} [[straduccia]]
+* {{Accr}} [[stradone]] ''m''
+* {{Pegg}} [[stradaccia]], [[straducola]]: strada scomoda, mal tenuta oppure pericolosa, mal frequentata
+
+{{-noconf-}}
+* ''(operaio)'' [[stradino]]
+
+{{-prov-}}
+*''essere fuori strada''
+*''[[essere sulla  buona strada]]'': comportarsi correttamente
+*''[[farsi strada]]''
+*''fare strada a qualcuno''
+*''[[mordere la strada]]'': {{Fig}} {{Term|ciclismo|it}} pedalare con il sedere  sopra la al [[sellino]]
+* ''[[pirata della strada]]'': persona che causa un grave incidente, spesso nemmeno soccorrendo; altrimenti indica chi illegalmente si comporta secondo "regole" improvvisate come se si trattasse di un gioco di fantasiose "pseudo-guerre" quindi non conformi alla legge effettiva, per esempio utilizzando frecce per indicare altre vetture nelle vicinanze e non per svoltare a destra o sinistra, facendo segno ad altri automobilisti di bloccarne altri ancora ostruendo appunto la normale corsa, "intasando" altre vetture a mo' di trappola talvolta persino convogliandole in direzioni non volute, ecc. ecc. ecc.
+*''[[tagliare la strada]]''
+*''[[uscire di strada]]'' 
+* ''[sei] sulla giusta/buona {{Pn}}'': incoraggiamento che sottolinea ravvedimento oppure per indicare che si sta trovando qualcosa
+* ''vita di/da {{Pn}}'': dai film e da vaghi modelli americani violenti, è motto di temerarietà
+* ''[[aprire la strada]]'': usando un termine desueto ma incisivo, significa essere rivoluzionari soprattutto nel settore industriale
+* ''[[strada  maestra]]''
+* ''trovare la propria {{Pn}}'': realizzarsi nella vita
+* '' prendere una cattiva strada'': diventare uno scapestrato, vagare senza obiettivi né buona volontà, non con propositi costruttivi, perdere tempo in cose inutili e fuorvianti
+
+{{Trad1|viabilità per i veicoli}}
+:*{{nds}}: [[Straat]] ''f''
+:*{{ca}}: [[carrer]]
+:*{{cs}}: [[ulice]]
+:*{{da}}: [[gade]]
+:*{{fr}}: [[route]] ''f'', [[rue]] ''f''
+:*{{la}}: [[via]], [[iter]]
+:*{{nl}}: [[straat]]
+:*{{no}}: [[gate]]
+{{mid}}
+:*{{pl}}: [[droga]], [[ulica]]
+:*{{sl}}: [[cesta]] ''f''
+:*{{es}}: [[carretera]], [[calle]]
+:*{{sv}}: [[gata]]
+:*{{de}}: [[Straße]] ''f''
+{{Trad2}}
+{{-trad-}}
+{{Trad1|in città}}
+:* {{la}}: [[vicus]]
+{{mid}}
+:*{{pt}}: [[rua]] ''f''
+{{Trad2}} 
+
+{{Trad1|fra i campi}}
+:* {{la}}: [[limes]]
+{{Trad2}}
+ 
+{{Trad1| tragitto}}
+:* {{en}}: [[street]], [[road]], [[way]], [[course]], [[route]] 
+{{mid}}
+:*{{pt}}: [[trajeto]] ''m'', [[caminho]] ''m''
+{{Trad2|}}
+
+{{Trad1|via di comunicazione}}
+:* {{en}}: [[avenue]], [[highway]], [[thoroughfare]]
+{{mid}}
+{{pt}}: [[(dentro de uma localidade) rua]] ''f'', [[(entre localidades) estrada]] ''f''
+{{Trad2}}
+
+{{Trad1|cammino di vita}}
+:* {{en}}: [[path]], [[direction]], [[life]]
+{{Trad2}}
+
+{{Trad1|passaggio, varco}}
+:* {{en}}: [[passage]], [[channel]]
+{{Trad2}} 
+{{Trad1|metodo, mezzo}}
+:* {{en}}: [[way]], [[method]], [[means]]
+{{Trad2}} 
+
+{{Trad1|cammino}}
+:*{{cs}}: [[cesta]]
+:*{{da}}: [[vej]]
+:*{{fr}}: [[voie]], [[chemin]] ''m''
+:*{{en}}: [[way]]
+:*{{nl}}: [[weg]]
+:*{{no}}: [[vei]]
+{{mid}}
+:*{{pl}}: [[droga]]
+:*{{pt}}: [[caminho]] ''m''
+:*{{es}}: [[camino]] ''m''
+:*{{sv}}: [[väg]]
+:*{{de}}: [[Weg]]
+{{Trad2}}
+
+{{-ref-}}
+* {{Fonte|dizit}}
+* {{Fonte|trec}}
+* {{Fonte|hoep}}
+*AA.VV.''Dizionario sinonimi e contrari'', Mariotti, 2006, pagina 562

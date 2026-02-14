@@ -1,0 +1,12 @@
+==Translingual==
+
+===Etymology===
+Most likely an {{abbrev|mul|nocap=1|en:'''Se'''m'''a'''i}}.
+
+===Symbol===
+{{mul-symbol}}
+
+# {{ISO 639|3}}
+
+===See also===
+* {{langcat}}

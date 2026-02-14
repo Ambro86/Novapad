@@ -1,0 +1,1637 @@
+==English==
+{{wp|<dab>}}
+[[File:Stilles Mineralwasser.jpg|thumb|A glass of '''water''' ({{senseno|en|Q283}})]]
+[[File:H2O 2D labelled.svg|thumb|A '''water''' molecule]]
+
+===Pronunciation===
+* {{a|en|GA}}
+** {{IPA|en|/ˈwɔ.təɹ/|[ˈwɔ.ɾɚ]|a=non-cot-caught}}, {{enPR|wô.tər}}
+*** {{audio|en|LL-Q1860 (eng)-Nail123Real-water.wav|a=US,non-cot-caught}}
+** {{IPA|en|/ˈwɑ.təɹ/|[ˈwɑ.ɾɚ]|a=cot-caught}}, {{enPR|wätər}}
+*** {{audio|en|En-us-water.ogg|a=US,cot-caught}}
+* {{IPA|en|/ˈwɔː.tə/|[wo̞ː.tʰə]|a=RP}}, {{enPR|wôˈ -tə}}
+** {{audio|en|En-uk-water.ogg|a=RP}}
+** {{audio|en|LL-Q1860 (eng)-Back ache-water.wav|a=UK}}
+* {{IPA|en|/ˈwoː.tə/|[ˈwoː.ɾə]|a=Australia,NZ}}
+* {{rhymes|en|ɔːtə(ɹ)|s=2}}
+* {{hyphenation|en|wa|ter}}
+
+{{col-top|2|Other accents and pronunciations}}
+* {{IPA|en|[ˈwoː.ʔɐ]|[ˈwoː.ʔə]|a=Estuary English}}
+* {{IPA|en|[ˈwoʊ.ʔə]|[ˈwɔo.ɾɐ]|a=Cockney}}
+* {{IPA|en|/wʊʔə/|/-ɑ/|a=MLE}}
+* {{IPA|en|/ˈwæ.tə/|a=Northern England,dated; obsolete elsewhere}}, {{IPAchar|[ˈwa.tə]|[ˈwa.ɾɚ]}}
+* {{IPA|en|/ˈwɔ.tər/|a=Scotland}}, {{IPAchar|[ˈwɔ.tər]}}
+* {{IPA|en|[ˈwɔə.ɾə]|[ˈwɔə.ɾɚ]|a=NYC}}
+* {{IPA|en|/ˈwʊ.təɹ/|[ˈwʊ.ɾɚ]|a=Philadelphia,Baltimore}}, {{enPR|wo͝otər}}
+* {{IPA|en|/ˈwɔɹ.təɹ/|[ˈwɔɹ.ɾɚ]|a=Western Pennsylvania}}, {{enPR|wôrtər}}
+* {{IPA|en|/ˈwɔː.təɹ/|[ˈwɒː.θ̠ɚ]|[ˈwɔːʔəɹ]|a=Ireland}}
+* {{IPA|en|[ˈwɔ.ʈə(r)]|[ˈʋɔ.ʈə(r)]|a=InE}}
+* {{IPA|en|[ˈʋaː.ʈər(ɯ)]|[ˈwaː.ʈər(ɯ)]|a=Tanglish}}
+* {{IPA|en|/ˈwoː.tə/|[ˈwɔː.tə]|a=South Africa}}
+* {{IPA|en|/ˈwɔ.tə/|a=SG,Malaysia}}
+* {{IPA|en|/ˈwɐː.t̪əɹ/|a=Philippines}}
+{{col-bottom}}
+
+===Etymology 1===
+{{root|en|ine-pro|*wed-}}
+{{etymon|en|id=liquid|:inh|enm:water<id:liquid>|tree=1}}
+From {{inh|en|enm|water}}, from {{inh|en|ang|wæter|t=water}}, from {{inh|en|gmw-pro|*watar}}, from {{inh|en|gem-pro|*watōr|t=water}}, from {{inh|en|ine-pro|*wódr̥|t=water}}.
+
+{{col-top|2|cog}}
+* {{cog|sco|watter|t=water}}
+* {{cog|yol|wadher,waudher|t=water}}
+* {{cog|frr|waar,weeder,weeter,woar,woor,wååder,wåår|t=water}}
+* {{cog|stq|Woater|t=water}}
+* {{cog|fy|wetter|t=water}}
+* {{cog|cim|bassar,bazzar|t=water}}
+* {{cog|nl|water|t=water}}
+* {{cog|nds-nl|water,wotter|t=water}}
+* {{cog|de|Wasser|t=water}}
+* {{cog|nds-de|Water,Woter|t=water}}
+* {{cog|gmw-gts|boßər,bàsser|t=water}}
+* {{cog|li|Waater,water|t=water}}
+* {{cog|lb|Waasser|t=water}}
+* {{cog|mhn|bòsser|t=water}}
+* {{cog|wym|woser|t=water}}
+* {{cog|vls|woater|t=water}}
+* {{cog|yi|וואַסער|t=water}}
+* {{cog|da|vand|t=water}}
+* {{cog|ovd|wattn|t=water}}
+* {{cog|fo|vatn|t=water}}
+* {{cog|is|vatn|t=water}}
+* {{cog|nn|vatn|t=water}}
+* {{cog|nb|vann|t=water}}
+* {{cog|sv|vatten|t=water}}
+* {{cog|got|𐍅𐌰𐍄𐍉|t=water}}
+* {{cog|sga|coin fodorne||otters|lit=water-dogs}}
+* {{cog|la|unda|t=wave}}
+* {{cog|lt|vanduõ|t=water}}
+* {{cog|ru|вода́|t=water}}
+* {{cog|sq|ujë|t=water}}
+* {{cog|grc|ὕδωρ|t=water}}
+* {{cog|hy|գետ|t=river}}
+* {{cog|sa|उदन्|tr=udán|t=wave, water}}
+* {{cog|hit|𒉿𒀀𒋻|tr=wa-a-tar|sc=Xsux|t=water}}
+{{col-bottom}}
+
+====Noun====
+{{wikidata lexeme|L3302}}
+{{en-noun|~}}
+
+# {{sid|en|Q283}} {{lb|en|uncountable}} An inorganic compound (of molecular formula {{chemf|H2O}}) found at [[room temperature]] and pressure as a clear [[liquid]]; it is present naturally as [[rain#Noun|rain]], and found in [[river]]s, [[lake]]s and [[sea]]s; its solid form is [[ice#Noun|ice]] and its gaseous form is [[steam#Noun|steam]].
+#: {{syn|en|Thesaurus:water}}
+#: {{hypo|en|ice|steam|water vapor//water vapour|;|light water|semi-heavy water|heavy water|super-heavy water}}
+#: {{mero|en|hydrogen|oxygen}}
+#: {{ux|en|By the action of electricity, the '''water''' was resolved into its two parts, oxygen and hydrogen.}}
+#* {{quote-journal|en|year=1805|month=December|author=Julius Griffiths|title=A Journey across the Desert|journal=The Monthly Mirror|page=362
+|passage=It is wholly out of the power of language to convey any idea of the blissful enjoyment of obtaining '''water''', after an almost total want of it, during eight and forty hours, in the scorching regions of an Arabian desert, in the month of July.}}
+#* {{quote-journal|en|year=2013|month=September-October|author=[http://www.americanscientist.org/authors/detail/katie-l-burke Katie L. Burke]| magazine=w:American Scientist| url=http://www.americanscientist.org/issues/pub/2013/5/in-the-news-47|title=In the News| passage=Oxygen levels on Earth skyrocketed 2.4 billion years ago, when cyanobacteria evolved photosynthesis: the ability to convert '''water''' and carbon dioxide into carbohydrates and waste oxygen using solar energy.|archiveurl=https://web.archive.org/web/20130903041000/https://www.americanscientist.org/issues/pub/2013/5/in-the-news-47}}
+## {{lb|en|uncountable|in particular}} The liquid form of this substance: liquid {{chemf|H2O}}.
+##: {{hyper|en|liquid|fluid}}
+##: {{hypo|en|drinkwater|freshwater|meltwater|mineral water|;|hard water|soft water}}
+##: {{cot|en|ice|steam|water vapor//water vapour}}
+##: {{ux|en|May I have a glass of '''water'''?}}
+##: {{ux|en|Your plants need more '''water'''.}}
+##* {{quote-text|en|year=1835|author=Sir {{w|John Ross (Arctic explorer)|John Ross}}; Sir {{w|James Clark Ross}}|title=[http://books.google.com.au/books?id=SdQBAAAAYAAJ Narrative of a Second Voyage in Search of a North-west Passage &hellip;, Volume 1]|pages=284–5
+|passage=Towards the following morning, the thermometer fell to 5°; and at daylight, there was not an atom of '''water''' to be seen in any direction.}}
+##* {{quote-book|en|year=2002|author=Arthur T. Hubbard|title=Encyclopedia of Surface and Colloid Science|isbn=0824707966|page=4895
+|passage=A '''water''' drop placed on the surface of ice can either spread or form a lens depending on the properties of the three phases involved in wetting, i.e., on the properties of the ice, '''water''', and gas phases.}}
+##* {{quote-journal|en|date=2013-05-11|volume=407|issue=8835|page=80|magazine=w:The Economist| url=http://www.economist.com/news/science-and-technology/21577341-worlds-third-largest-area-ice-about-undergo-systematic|title=The climate of Tibet: Pole-land| passage=Of all the transitions brought about on the Earth’s surface by temperature change, the melting of ice into '''water''' is the starkest. It is binary. And for the land beneath, the air above and the life around, it changes everything.|archiveurl=https://archive.ph/RCa6m|archivedate=2023-03-10}}
+##* {{see more citations|en}}
+## {{lb|en|countable}} A [[serving#Noun|serving]] of liquid water.
+##* {{quote-book|en|year=2006|author=Lori Foster; Erin McCarthy; Amy Garvey| title=Bad Boys of Summer| isbn=0758209347| page=91| passage=Joe bustled back and offered her a glass of wine but she shook her head. “Just a '''water''', please.”}}
+# {{lb|en|alchemy|philosophy}} The aforementioned liquid, considered one of the {{w|Classical elements}} or basic elements of alchemy.
+#: {{hyper|en|element}}
+#: {{cot|en|earth|air|~|wind|fire|;|wood|metal|;|void|~|ether}}
+#: {{ux|en|He showed me the river of living '''water''', sparkling like crystal, flowing from the throne of God.}}
+# {{lb|en|uncountable|or|in the plural}} Water in a body; an area of [[open#Adjective|open]] water.
+#* {{RQ:Shakespeare Love's Labour's Lost|V|i|138|2|''Roſa.'' O vain peticioner, beg a greater matter,<br>Thou now requeſts but Mooneſhine in the '''water'''.}}
+#* {{RQ:Lincoln Pratt's Patients|chapter=1|passage='Twas early June, the new grass was flourishing everywheres, the posies in the yard—peonies and such—in full bloom, the sun was shining, and the '''water''' of the bay was blue, with light green streaks where the shoal showed.}}
+#* {{RQ:NYT|author=Danny Hakim|authorlink=Danny Hakim|quotee=Kathleen B. Hogan|title=Two Misdemeanor Charges in Lake George Capsizing|archiveurl=https://web.archive.org/web/20221126041035/https://www.nytimes.com/2007/02/06/nyregion/06boat.html|date=6 February 2007|passage="If you foresee the event and you go forward, then you are criminally negligent," she said, adding, "This was a boat that navigated on the '''waters''' of Lake George since 1979. In terms of criminal negligence, there clearly wasn't the foreseeability that there may be in civil negligence."}}
+#* '''2019''', [https://web.archive.org/web/20190311070055/https://learningenglish.voanews.com/a/south-korea-proposes-rain-project-with-china-to-cut-pollution/4819207.html VOA Learning English] (public domain)
+#*: The president expressed hope that creating rain over '''waters''' between the countries would help reduce pollution.
+#: {{ux|en|And God said, Let the '''waters''' under the heaven be gathered together unto one place, and let the dry land appear: and it was so.}}
+#: {{ux|en|The boat was found within the territorial '''waters'''.}}
+#: {{ux|en|These seals are a common sight in the coastal '''waters''' of Chile.}}
+# {{lb|en|poetic|archaic|or|dialectal}} A [[body]] of water, almost always a [[river]], sometimes a [[lake]] or [[reservoir]], especially in the names given to such bodies.
+#* {{RQ:Tyndale NT|Acts|8|36|clxvi|And as they went on their waye <br> they cam vnto a certayne '''water''' <br> and the gelded man ſayde: Se here is water <br> what ſhall lett me to be baptiſed?}}
+#* {{RQ:Tennyson Poems 1842|II|Morte d’Arthur|4|On one side lay the Ocean, and on one<br>Lay a great '''water''', and the moon was full.}}
+#* {{quote-book|en|editor=William Allingham|year=1865| title=The Ballad Book: a selection of the choicest British ballads| section=William and May Margaret, or the Water of Clyde|passage=But ere he came to Clyde's '''water,''' fu' loud the wind did blaw.}}
+# A combination of water and other substance(s).
+## {{lb|en|sometimes|countable}} Mineral water.
+##: {{ux|en|Perrier is the most popular '''water''' in this restaurant.}}
+## {{lb|en|countable|often|in the plural}} [[spa|Spa]] water; [[hot spring]]s.
+##: {{ux|en|Many people visit Bath to [[take the waters|take the '''waters''']].}}
+##* {{quote-av|en|year=1942|author=w:Julius J. Epstein; w:Philip G. Epstein; {{w|Howard Koch (screenwriter)|Howard Koch}}|title={{w|Casablanca (film)|Casablanca}}|passage=Rick: My health. I came to Casablanca for the '''waters'''.<br/>Captain Renault: The '''waters'''? What '''waters'''? We're in the desert.<br/>Rick: I was misinformed.}}
+## {{lb|en|pharmacy}} A [[solution]] in water of a [[gaseous]] or readily [[volatile]] [[substance]].
+##: {{ux|en|ammonia '''water'''}}
+## A fluid in the body.
+### [[urine|Urine]]. {{defdate|from 15th c.}}
+###: {{syn|en|body fluid|bodily fluid|biofluid}}
+###: {{syn|en|Thesaurus:urine}}
+###* {{quote-book|en|year=1999|author=w:George R.R. Martin| title=A Clash of Kings| publisher=Bantam| year_published=2011| page=458| passage=Ser Dunaver's squire Jodge could not hold his '''water''' when he slept.}}
+### {{sid|en|amniotic fluid}} [[amniotic fluid|Amniotic fluid]] or the [[amniotic sac]] containing it. {{qual|Used only in the plural in the UK but often also in the singular in North America.}}
+###: {{syn|en|bag of waters}}
+###: {{ux|en|Before the child is born, the pregnant woman’s '''water''' breaks. {{qualifier|North America}}}}
+###: {{ux|en|Before your child is born, your '''water(s)''' will break. {{qualifier|North America}}}}
+###: {{ux|en|Before the child is born, the pregnant woman’s '''waters''' break. {{qualifier|UK}}}}
+### {{lb|en|colloquial|medicine}} A fluid that causes [[swelling]].
+###: {{ux|en|He suffers from '''water''' on the knee.}}
+# {{lb|en|business|often|attributive}} The water [[supply#Noun|supply]], as a [[service]] or [[utility]].
+#: {{cot|en|electricity|internet|phone#Noun|power#Noun|sewer}}
+#: {{ux|en|The city threatened to cut off our '''water''' after we went only a month without paying our bill.}}
+#: {{ux|en|Did you leave the '''water''' running again?}}
+# {{lb|en|figuratively|in the plural|or|in the singular}} A state of affairs; [[condition#Noun|condition]]s; usually with an [[adjective]] indicating an [[adverse]] condition.
+#: {{ux|en|The rough '''waters''' of change will bring about the calm after the storm.}}
+# {{lb|en|colloquial|figuratively}} A person's [[intuition]]. <!-- is this always in the plural?-->
+#: {{syn|en|bones}}
+#: {{ux|en|I know he'll succeed. I feel it in my '''waters'''.}}
+# {{lb|en|uncountable|dated|finance}} Excess [[valuation]] of [[securities]].
+#* {{quote-journal|en| title=Too Much '''Water''' to Suit Cummins| passage=Iowa Governor Will Fight Rock Island Reorganization. He Says That Under the New Plan Too Much '''Water''' Is Put Into the Stock&mdash;Believes Plan Is Out of Harmony with Iowa Laws.| work=The Atlanta Constitution| date=August 2, 1902}}
+#* {{quote-journal|en| title=Says Stock ''''Water'''' Didn't Affect Fare| work=New York Times| date=April 11, 1920| passage=the outstanding stock and bond obligations of the company were reduced from $34,000,000 to $24,000,000 by squeezing out the '''water'''.}}
+# {{lb|en|colloquial|figuratively}} Something which [[dilute]]s, or has the effect of [[water down|watering down]].
+#: {{ux|en|Thanks for the great video. No '''water''', 100% substance!}}
+# A particular [[quality]] or [[appearance]] suggestive of water:
+## The [[limpidity]] and [[lustre]] of a precious stone, especially a [[diamond]].
+##: {{ux|en|a diamond of the first '''water''' is perfectly pure and transparent}}
+##* {{RQ:Woolf Orlando|passage=And when she raised it to see what caused this agitation, she saw nothing—nothing but the vast solitary emerald which Queen Elizabeth had given her. And was that not enough? she asked. It was of the finest '''water'''.}}
+## A [[wavy]], [[lustrous]] pattern or decoration such as is imparted to [[linen]], [[silk]], [[metal]]s, etc.
+
+=====Alternative forms=====
+* {{alt|en|wahter|wahtuh||eye dialect}}
+
+=====Derived terms=====
+{{col|en
+|{{l|en|water mold}} ({{taxfmt|Oomycetes|class}})
+|above-water,above water|heavy-water reactor|softened water
+|abyssopelagic water
+|Agnes Water
+|Allan Water
+|American Water Spaniel
+|American water spaniel
+|ammonia water
+|angel water
+|anomalous water
+|antiwater
+|Apollinaris water
+|artesian water
+|Ashford-in-the-Water
+|Atwater
+|Australian water dragon
+|a yard of pump water|water protector
+|back water,back-water,backwater,Backwater
+|Barbados water
+|barley water,barley-water
+|bath water,bathwater
+|Bayswater
+|Bayswater North
+|beanwater
+|Berowra Waters
+|between wind and water
+|Biggera Waters
+|bilge water,bilgewater
+|black-backed water tyrant
+|black water,blackwater,Blackwater
+|black-water rafting
+|blood in the water
+|blood is thicker than water
+|blow out of the water
+|blow something out of the water
+|blow water
+|blue water,bluewater,blue-water,Bluewater
+|blue-water navy
+|Bluewater Park
+|body of water
+|bongwater
+|bore water
+|bottled water
+|Boundary Waters
+|bound water
+|Bourton-on-the-Water
+|Bowmont Water
+|brackishwater
+|brackish water
+|branch water,branch-water
+|bread and water
+|breakwater,Breakwater
+|break water
+|Breydon Water
+|bridge over troubled waters
+|Bridgewater
+|Bridgewater North
+|Bridgewater On Loddon
+|Brightwaters
+|Broadbeach Waters
+|Broadwater
+|bromine water
+|Brookwater
+|brown water
+|brown-water navy
+|bubble water
+|Burleigh Waters
+|burn the water
+|Bywater
+|Cairn Water
+|Cape Bridgewater
+|carbonated water
+|Carron Water
+|carry someone's water
+|carry water for
+|cast someone's water
+|casual water
+|catchwater
+|cat's water
+|cedar water
+|Ceduna Waters
+|Chinese water chestnut
+|Chinese water deer
+|Chinese water torture
+|chlorine water
+|chum in the water
+|Cincinnati water maze
+|city water
+|clary water
+|clear blue water
+|Clear Island Waters
+|clearwater
+|cloudwater
+|Clunie Water
+|coastal waters
+|coconut water
+|cold-water
+|cold water
+|coldwater
+|Cold Water Creek
+|coldwater flat
+|cold water flat
+|cold-water flat
+|Cologne water
+|come hell or high water
+|Coniston Water
+|couldn't pour water out of a boot
+|couldn't pour water out of a boot with the instructions on the heel
+|court holy water
+|crazy water
+|creekwater
+|creeping water bug
+|crispy water
+|Curlew Waters
+|Currumbin Waters
+|cutwater
+|Daly Waters
+|dead as ditch-water
+|dead in the water
+|dead water
+|deep water
+|deep-water
+|Deepwater
+|Deep Water
+|Deep Water Bay
+|deep water,Deep Water,deep-water,deepwater,Deepwater
+|deep-water solo
+|Derwent Water
+|Derwentwater,Derwent Water
+|deuterated water
+|dew water
+|dew water,dewwater
+|diamond-water paradox
+|dillwater
+|dill water
+|dip one's toe in the water
+|dishwater
+|distilled water
+|ditchwater
+|domestic hot water
+|doubly labeled water
+|Douglas Water
+|drinking water
+|Drinkwater
+|dripping water hollows a stone
+|dyewater
+|eastern water dragon
+|Edgewater
+|Egyptian water-lily
+|Eli Waters
+|Elter Water
+|Endrick Water
+|Ettrick Water
+|European water vole
+|every miller draws water to his own mill
+|eyewater
+|Eye Water
+|eye-watering
+|fairwater
+|feed water
+|feedwater,feed water
+|feeling in one's water
+|feel in one's water
+|firewater
+|first water
+|fish out of water
+|fish-out-of-water
+|fish water
+|fizzy water
+|flat water
+|flatwater
+|flood water
+|floodwater,flood water
+|Florida water
+|flower water
+|forewater
+|formation water
+|fossil water
+|fountain water
+|fountain water,fountainwater
+|fragrant water lily
+|free water
+|Freemans Waterhole
+|fresh-water
+|fresh water
+|freshwater,fresh-water,Freshwater
+|Freshwater Creek
+|Freshwater Point
+|Frisian water dog
+|functional water
+|Gala Water
+|gangly drink of water
+|gas water
+|get the dirty water off one's chest
+|giant water bug
+|giggle water
+|Gippsland water dragon
+|Glaisnock Water
+|glass water
+|Glazert Water
+|goat water
+|goat-water
+|go through fire and water
+|go to water
+|gray water
+|gray water,grey water,graywater,greywater
+|green water
+|green-water navy
+|grey water
+|gripe water
+|ground water
+|ground water,groundwater
+|gum water
+|gypwater
+|happy as a clam at high water
+|hard water
+|headwater
+|headwaters
+|heartwater
+|heavy-water
+|heavy water
+|hell or high water
+|Hermitage Water
+|hewers of wood and drawers of water
+|hexagonal water
+|high-water
+|high water
+|high water,highwater
+|high-water mark
+|hindwater
+|hold one's head above water
+|hold one's water
+|hold water
+|holy water
+|holy-water sprinkle
+|holy water sprinkler
+|hot water
+|hot water bag
+|hot water bottle
+|hot-water bottle
+|hot water bottle rash
+|hot water can
+|hot water heater
+|Hungary water
+|Hunza water
+|ice and water shield
+|iced water
+|ice ice water
+|ice water
+|international waters
+|Irish water spaniel
+|Jack-in-the-water
+|Javelle water
+|Javel water
+|jerk-water
+|jerk water
+|jerk water,jerk-water,jerkwater
+|jerk water town
+|jerkwater town
+|juvenile water
+|keep one's head above the water
+|keep one's head above water
+|Laffing Waters
+|lakewater
+|Lancashire over the water
+|large-headed water snake
+|laughing water
+|laurel water
+|lavender water
+|lemon water
+|Len Waters Estate
+|Liddel Water
+|Liffey water
+|light water
+|light-water
+|light water reactor
+|like a duck takes to water
+|like a duck to water
+|like water
+|like water off a duck's back
+|lilacwater
+|lime water
+|lime water,limewater
+|line drawn in water
+|line drawn on water
+|liquid water
+|lithia water
+|load water line
+|Lockyer Waters
+|long drink of water
+|low water
+|low-water mark
+|Luggie Water
+|Lunan Water
+|make foul water
+|make water
+|mannish water
+|Mediterranean Deep Water
+|Mediterranean water
+|meltwater
+|Mermaid Waters
+|meteoric water
+|micellar water
+|midwater
+|milk-and-water
+|mineral water
+|Minnie Water
+|mint water
+|miswater
+|mop water
+|mop water,mopwater
+|Morris water maze
+|Moscow Water Dog
+|mouth-watering
+|muddy the water
+|mud water
+|mud water,mudwater
+|napha water
+|Newcastle Waters
+|nonwater
+|northeastern water tick
+|northern water dragon
+|North Water
+|not have both oars in the water
+|oceanwater
+|off the water wagon
+|of the best water
+|of the finest water
+|of the first water
+|oil and water
+|oil and water don't mix
+|omum water
+|one's teeth water
+|on the water wagon
+|open water
+|orange blossom water
+|orange flower water
+|orthowater
+|overwater
+|palaeowater
+|paleowater
+|pass water
+|peach water
+|Pelican Waters
+|personal water-craft
+|personal water craft
+|phossy water
+|Piara Waters
+|pink water
+|piss-water
+|piss water
+|piss water,pisswater
+|plague water
+|plain water
+|plantain water
+|polywater
+|pomewater
+|pondwater
+|poolwater
+|poop water
+|porewater
+|pore water pressure
+|Portuguese Water Dog
+|potash water
+|pour cold water on
+|pour cold water over
+|pour oil on troubled waters
+|preach water and drink wine
+|precipitable water
+|pressurized water reactor
+|process hot water
+|produced water
+|puppy water
+|push water uphill
+|put one's toe in the water
+|quarry water
+|quarter water
+|quicksilver water
+|quickwater
+|quick water
+|quinine water
+|rainwater
+|rain water
+|raw water
+|red water
+|red water,redwater
+|reticulated water
+|rice water
+|riverwater
+|river-water
+|river water
+|rock water
+|rose water
+|rose water,rosewater,Rosewater
+|running water
+|Run-O-Waters
+|Rutland Water
+|saltwater,Saltwater
+|Saltwater River
+|salt water
+|salt-water
+|salt water aspiration syndrome
+|salt water taffy
+|Sapele water
+|scrawny drink of water
+|sea water
+|sea water,seawater
+|self-watering
+|seltzer water
+|semiheavy water
+|semi-heavy water
+|semi-heavy water,semiheavy water
+|semiwater
+|service water
+|Shallowater
+|Shallow Water
+|shearwater,sheerwater,Shearwater
+|Shee Water
+|Shoalwater
+|Silverwater
+|sinkwater
+|six-water grog
+|skinny drink of water
+|slack-water
+|slack water
+|slickwater
+|smell blood in the water
+|soda water
+|soft water
+|soft water,softwater
+|Southampton Water
+|Spanish Water Dog
+|sparkling water
+|spa water
+|spend money like water
+|spring water,spring-water,springwater
+|spunk-water
+|spurnwater
+|standing water
+|stickwater
+|still water
+|still water runs deep
+|storm in a glass of water
+|stormwater
+|streamwater
+|strong-water,strong water
+|stump-water
+|sugar water,sugarwater
+|superheavy water,super-heavy water,super heavy water
+|superwater
+|surface water
+|surfeit water
+|swamp water
+|Swanwater
+|Swanwater West
+|sweet water
+|Sweetwater
+|sweetwater,sweet water
+|Sydling Water
+|Sylvania Waters
+|table water
+|tailwater
+|take in water
+|take on water
+|take to something like a duck to water
+|take water
+|tall drink of water
+|tall glass of water
+|tap water
+|tar water
+|tea-water
+|Teeswater
+|territorial water
+|territorial waters
+|test the water
+|test the waters,test the water
+|The Freshwater
+|the mill cannot grind with water that is past
+|there must be something in the water
+|the seventh water after kissel
+|thin as a yard of pump water
+|throw cold water on
+|throw out the baby with the bath water
+|throw the baby out with the bath water
+|tidewater
+|tide water
+|Titicaca water frog
+|toast water
+|tobacco water
+|toilet water
+|tomato water
+|tonic water
+|too much water drowned the miller
+|topwater
+|treacle water
+|tread water
+|tritiated water
+|Tumbling Waters
+|Twin Waters
+|Two Waters
+|Ullswater
+|uncharted water
+|under water
+|under water,underwater
+|unholy water
+|unspoken water
+|unwatering
+|Van de Water
+|velvet water bug
+|Vichy water
+|Vienna Standard Mean Ocean Water
+|Virginia Water
+|walk on water
+|warmwater
+|warm-water port
+|washwater
+|waste-water
+|waste water
+|waste water,wastewater
+|Wast Water
+|waterable
+|water absorption
+|water adder
+|water aerobics
+|waterage
+|water allergy
+|water anole
+|water arum
+|water-arum
+|water ash
+|Water Baby
+|water baby syndrome
+|waterbag
+|water bag
+|water-bag
+|water bailage
+|water bailie
+|water bailiff
+|water balance
+|water ballast
+|water ballet
+|water balloon
+|Waterbank
+|Water Banquet
+|water bar
+|waterbar
+|water barometer
+|water-based
+|water-based,waterbased
+|water basin
+|water-basket
+|water basket
+|water-bath
+|water bath
+|water battery
+|water bead
+|water bear
+|Water Bearer
+|water bed
+|water-bed
+|water bed,water-bed,waterbed
+|water beech
+|water beetle
+|water-bellows
+|water bewitched
+|water bicycle
+|waterbike
+|water bike
+|water birch
+|water bird
+|waterbird
+|waterbirding
+|water birth
+|water birthing
+|water biscuit
+|water blink
+|water blinks
+|water blister
+|water-blob
+|water block
+|water bloom
+|water blossom pea
+|water boa
+|waterboard
+|waterboat
+|water boatman
+|water body
+|waterbody
+|water boiler
+|water boiler,waterboiler
+|waterbok
+|water bomb
+|waterbomb
+|water bomber
+|water bong
+|water-borne
+|waterborne
+|water bottle
+|water bottle flipping
+|water bottler
+|water bottle,waterbottle
+|water-bouget
+|waterbound,water-bound
+|water box
+|water boy
+|water boy,waterboy
+|water brash
+|waterbreak
+|water break
+|water-breaker
+|water breaker
+|water bridge
+|waterbuck
+|water buffalo
+|water buffalo calf
+|water bug
+|water bug,waterbug
+|water bus
+|water bus,waterbus
+|water-butt
+|water butt
+|water cabbage
+|water caltrop
+|water camper
+|water can
+|water cannon
+|water carriage
+|water carrier
+|water-carrier
+|Watercarrin
+|water-carrying
+|water cavy
+|Water Cay
+|water celery
+|water cell
+|water cement
+|water chestnut
+|water chicken
+|water chinquapin
+|watercise
+|watercleft
+|water clock
+|water clock,waterclock
+|water closet
+|watercloset
+|water clover
+|watercoaster
+|watercock
+|water coconut
+|watercolour,watercolor
+|water column
+|water conditioner
+|water content
+|water-cooled
+|water-cooler
+|water cooler
+|water-cooler effect
+|water cooler effect
+|water cooler,watercooler
+|water core
+|water couch
+|watercourse
+|water cracker
+|watercraft
+|water crane
+|water cremation
+|water-cress
+|watercress
+|water crouton
+|water crow
+|water-cure
+|water cure
+|water cycle
+|water deck
+|water deer
+|water devil
+|water diaper
+|water divide
+|water diviner
+|water divining
+|water-dock
+|waterdock
+|water doctor
+|water dog
+|waterdog
+|water down
+|water dragon
+|water drinker
+|waterdrome
+|waterdrop
+|water dropwort
+|water drum
+|water dumping
+|Water Eaton
+|watered
+|watered-down
+|watered stock
+|water elephant
+|water engine
+|water equivalent
+|waterer
+|water fairy
+|waterfall
+|Waterfall
+|Waterfall Gully
+|water-fast
+|waterfast
+|water fear
+|water-fear
+|water-fearing
+|water feature
+|water fern
+|water fight
+|water fight,waterfight
+|waterfilled
+|waterfilling
+|water filter
+|water finds its level
+|water finds its own level
+|water fire
+|waterfit
+|water fitness
+|water flag
+|water flea
+|waterflood
+|Waterford
+|water flow
+|waterflow
+|water fluoridation
+|waterfoot
+|water footprint
+|Waterford
+|Waterford Park
+|Waterford West
+|water for injection
+|water fountain
+|waterfowler
+|waterfowling
+|water fowl,waterfowl
+|water frame
+|water-free
+|waterfree,water-free
+|waterfright
+|waterfrog
+|water frog
+|waterfront
+|waterful
+|water-gall
+|water-gang
+|watergang
+|water gap
+|water garden
+|water gas
+|water gate
+|water gate,watergate
+|water gauge
+|water gilding
+|water girl
+|water glass
+|watergrass
+|water gruel
+|waterguard
+|water-gum
+|water gum
+|water gun
+|water gut
+|water hammer
+|water hardness
+|water haul
+|waterhead
+|water heater
+|Water Hemisphere
+|water hemlock
+|water hen
+|water hen,waterhen
+|water hike
+|water hog
+|water-hole
+|water hole
+|waterhole,water-hole,water hole
+|Waterholes
+|water horse
+|water horsetail
+|water horse,waterhorse
+|waterhouse
+|Waterhouse
+|water-hugging
+|water hyacinth
+|water hyssop
+|water ice
+|water icing
+|watering
+|watering call
+|watering can
+|watering hole
+|watering hole attack
+|watering house
+|watering place
+|watering pot
+|water injection
+|water intoxication
+|waterish
+|Water Island
+|water is wet
+|water jacket
+|water-jar
+|water jet
+|water joint
+|waterjug
+|water jug
+|water jump
+|waterkeeper
+|water key
+|water knot
+|water-laid
+|waterland
+|water landing
+|water law
+|water leader
+|waterleaf
+|water-leech
+|water lemon
+|water lens
+|water lentil
+|waterless
+|water-lettuce
+|water lettuce
+|water lettuce,water-lettuce
+|water level
+|waterlike
+|water-lily
+|water lily
+|water lily,waterlily
+|water-line
+|water line
+|water-line model
+|water line,waterline
+|waterling
+|water locust
+|water-log
+|waterlog
+|water log
+|waterlogged
+|Waterloo
+|Waterloo Corner
+|water lot
+|water louse
+|water-loving
+|waterly
+|water main
+|watermaker
+|Waterman
+|waterman
+|Watermans Bay
+|watermanship
+|water mantle
+|watermark
+|watermaster
+|watermaze
+|water maze
+|water-meadow
+|water meadow
+|water-meadow,water meadow
+|watermeal
+|water measurer
+|watermedia
+|water melon
+|watermelon
+|water memory
+|water meter
+|water milfoil
+|water milfoil,watermilfoil
+|watermill
+|water mill
+|watermiller
+|water millet
+|watermilling
+|water mill,watermill
+|water mint
+|water mite
+|water moccasin
+|water mold
+|watermole
+|water mole
+|watermonger
+|water monitor
+|water monkey
+|water monster
+|watermoss
+|water motor
+|water mouse
+|water mower
+|water nappy
+|waterness
+|water net
+|water nymph
+|water oak
+|water of crystallisation
+|water of crystallisation,water of crystallization
+|water of crystallization
+|water off a duck
+|water off a duck's back
+|water of hydration
+|water of life
+|waterologer
+|water on the brain
+|water on the chest
+|water on the knee
+|water opossum
+|water organ
+|water organist
+|Water Orton
+|water ousel
+|water-ousel
+|water ouzel
+|water over the dam
+|water parade
+|water park
+|water park,waterpark
+|water-parsnip
+|water parsnip
+|water parting
+|water penny
+|water pennywort
+|water pepper
+|water-permeable
+|waterphone
+|water pick
+|water pie
+|water pig
+|water pill
+|water pillar
+|water pimpernel
+|water pipe
+|water pipe,waterpipe
+|water pipit
+|water pistol
+|waterplane
+|water plant
+|water plantain
+|water-plantain
+|water plate
+|waterplay
+|water pocket
+|waterpoint
+|water poisoning
+|water police
+|water pollution
+|water polo
+|water polo player
+|water popping
+|water poppy
+|water-porridge
+|waterport
+|waterpot
+|water potential
+|water power
+|water-powered
+|water power,waterpower
+|water pox
+|water pressure
+|water primrose
+|water-primrose
+|water prince
+|water privilege
+|waterproof
+|water-proof
+|waterproofed
+|water pump
+|water pump pliers
+|water purifier
+|water purslane
+|water-purslane
+|water python
+|waterquake
+|water-race
+|water race
+|water rail
+|water ram
+|water rat
+|water-rat
+|water-rate
+|water-rent
+|water-repellent
+|water repellent
+|water-resistant
+|water ribbons
+|water right
+|water rite
+|Water-rock
+|water rocket
+|water roux
+|Waters
+|water-salamander
+|water sandwich
+|water sapphire
+|waterscape
+|water scavenger beetle
+|water scooter
+|water scorpion
+|water screw
+|water's edge
+|water seeks its level
+|water seeks its own level
+|water-shed
+|watershed,water-shed
+|watersheep
+|water shield
+|water-shield
+|watershoot
+|water shortage
+|water shrew
+|water sickness
+|waterside
+|water sign
+|water skater
+|water ski
+|waterskier
+|water-skier
+|water skiing
+|water-skiing
+|water skiing,water-skiing,waterskiing
+|waterskin
+|water skipper
+|water ski,water-ski,waterski
+|water sky
+|watersky
+|Watersleigh
+|water-slickened
+|water slide
+|waterslide,water slide
+|water-sliding
+|watersmeet
+|water smoke
+|water snail
+|water snake
+|water-soak
+|watersoaked
+|water-soaked
+|water softener
+|water softening
+|water soldier
+|water-soluble
+|water souchet
+|water souchy
+|water spaniel
+|water speedwell
+|water spider
+|water spinach
+|water-splash
+|water sport
+|water sport,watersport
+|water spot
+|water spout
+|waterspout
+|water sprite
+|watersprout
+|water sprout
+|waterstained
+|water starwort
+|waterstone
+|waterstop
+|water stop
+|Water Stratford
+|waterstream
+|water strider
+|waterstuff
+|water supply
+|water table
+|water tank
+|water tap
+|water taxi
+|water telescope
+|water tender
+|water thermometer
+|water-thief
+|waterthief
+|waterthrush
+|water thrush
+|waterthyme
+|water tick
+|water-tight
+|watertight
+|water to my mill
+|water to one's mill
+|water tower
+|Watertown
+|water toxemia
+|water tree
+|water treeing
+|water trough
+|water tube
+|water-tube boiler
+|water tunnel
+|water tupelo
+|water turbine
+|water turkey
+|water-twist
+|water under the bridge
+|Watervale
+|Water Valley
+|water vapor
+|water vapor pressure
+|water vapor,water-vapor
+|water vapour
+|water vascular system
+|water-vascular system
+|Waterview
+|Waterview Heights
+|Waterville
+|water violet
+|water vole
+|water wagon
+|water wagtail
+|waterwall
+|water wand
+|waterward
+|waterwards
+|water wart
+|waterway
+|Waterways
+|waterweed
+|water wheel
+|water-wheel
+|water wheel,waterwheel
+|water-white
+|water white
+|water willow
+|water wing
+|water wings
+|waterwise
+|water wisteria
+|water-witch
+|water witcher
+|water witching
+|waterwoman
+|waterwork
+|waterworker
+|water works
+|water-works
+|waterworks,water works
+|water world
+|waterworld
+|water-worn
+|waterworn
+|waterwort
+|waterworthy
+|watery
+|water yam
+|water year
+|waterzooi
+|watsu
+|weak as water
+|wellwater
+|white water
+|white-water
+|white water lily
+|white-water rafting
+|white water rafting
+|white water,whitewater
+|wirewater
+|witch's water
+|wood and water joey
+|yellow-flowered water hyssop
+|you can lead a horse to water but you can't make him drink
+|you can lead a horse to water, but you can't make it drink
+|you can lead horses to water, but you can't make them drink
+|you don't miss the water till the well runs dry
+|you never miss the water till the well runs dry
+|you never miss the water until the well runs dry
+|Ziegler's water rat
+|Ziegler's Water Rat
+|ziment water
+}}
+
+=====Descendants=====
+{{col-top|2|desc}}
+* {{desc|aig|wata}}
+* {{desc|djk|wataa}}
+* {{desc|rop|woda}}
+* {{desc|bzj|waata}}
+* {{desc|bi|wota}}
+* {{desc|wes|wata}}
+* {{desc|gcl|wata}}
+* {{desc|gul|wata}}
+* {{desc|icr|waata}}
+* {{desc|jam|wata}}
+* {{desc|kri|wata}}
+* {{desc|bzk|wáta}}
+* {{desc|fpe|wàtá}}
+* {{desc|pis|wata}}
+* {{desc|pih|worta}}
+* {{desc|srm|wáta}}
+* {{desc|srn|watra}}
+* {{desc|tpi|wara}}
+* {{desc|ase|6@Chin|bor=1}}
+* {{desc|ca|vàter|bor=1}}
+* {{desc|es|váter|bor=1}}
+{{col-bottom}}
+
+=====Translations=====
+{{see translation subpage|Noun}}
+
+===Etymology 2===
+From {{inh|en|enm|wateren}}, from {{inh|en|ang|wæterian}}, from {{inh|en|gem-pro|*watrōną}}, {{m|gem-pro|*watrijaną}}, from {{der|en|gem-pro|*watōr|t=water}}, from {{der|en|ine-pro|*wódr̥|t=water}}.
+
+{{col-top|2|cog}}
+Cognate with {{cog|sco|watter||water}}, {{cog|stq|woaterje|t=to water}}, {{cog|fy|wetterje|t=to water}}, {{cog|nl|wateren|t=to water}}, {{cog|nds-de|watern|t=to water}}, {{cog|de|wässern|t=to water}}, {{cog|da|vande|t=to water}}, {{cog|sv|vattna|t=to water}}, {{cog|is|vatna|t=to water}}.
+{{col-bottom}}
+
+====Verb====
+{{wikidata lexeme|L3303}}
+{{en-verb}}
+[[File:To water the coffee tree in dry season.jpg|thumb|right|A sprinkler '''watering''' ({{senseno|en|pour water onto plants}}) a garden]]
+
+# {{sid|en|pour water onto plants}} {{lb|en|transitive}} To pour water into the [[soil#Noun|soil]] surrounding (plants).
+#* {{quote-book|en|year=1900|author=L. Frank Baum|title=The Wonderful Wizard of Oz|chapter=24|passage=Aunt Em had just come out of the house to '''water''' the cabbages when she looked up and saw Dorothy running toward her.}}
+# {{lb|en|transitive}} To [[wet#Verb|wet]] or supply with water; to [[moisten]]; to overflow with water; to [[irrigate]].
+#* {{RQ:Milton Paradise Lost|book=9|passage=tears '''watering''' the ground|year=1873}}
+#* {{RQ:Longfellow Evangeline|I
+|passage=Men whose lives glided on like rivers that '''water''' the woodlands.}}
+# {{sid|en|to provide with water}} {{lb|en|transitive}} To provide (animals) with water for [[drink#Verb|drink]]ing.
+#: {{ux|en|I need to '''water''' the cattle.}}
+#* {{quote-book|en|year=2008| title=Mopus|author=Oisin Curran | page=34| passage=While they '''watered''' and washed their horses, I talked with a red-capped man, some kind of chief.}}
+# {{lb|en|intransitive}} To get or take in water.
+#: {{ux|en|The ship put into port to '''water'''.}}
+#* {{quote-journal|en|year=1944|month=January and February|author=W. McGowan Gradon|title=Forres as a Railway Centre|journal=Railway Magazine|page=23|text=After working the 1.30 p.m. through train from Forres to Aberdeen as far as Elgin, she returns tender first with a local passenger train and is then coaled and '''watered''' at Forres shed, and eventually works back to Perth on the 10.20 p.m. through freight.}}
+# {{lb|en|transitive|colloquial}} To [[urinate]] onto.
+#: {{syn|en|see [[Thesaurus:urinate]]}}
+#: {{ux|en|[[nature calls|Nature called]], so I stepped into the woods and '''watered''' a tree.}}
+# {{lb|en|transitive}} To [[dilute]].
+#: {{syn|en|water down}}
+#: {{ant|en|refine}}
+#: {{ux|en|Can you '''water''' the whisky, please?}}
+# {{lb|en|transitive|dated|finance}} To overvalue (securities), especially through deceptive accounting.
+#* {{quote-journal|en|title=Calls Rail Holding Companies Threat|work=The Sun| date=April 10, 1930| passage=such agencies would make it possible for the railroads to '''water''' stock and evade the law subjecting security issues to public regulation}}
+# {{lb|en|intransitive}} To fill with or secrete water or similar liquid.
+#: {{ux|en|Chopping onions makes my eyes '''water'''.}}
+#: {{ux|en|The smell of fried onions makes my mouth '''water'''.}}
+# {{lb|en|transitive}} To wet and [[calender]], as cloth, so as to impart to it a [[lustrous]] appearance in [[wavy]] lines; to [[diversify]] with wavelike lines.
+#: {{ux|en|to '''water''' silk}}
+
+=====Derived terms=====
+{{col|en
+|bewater
+|dewater
+|feed and water
+|overwater
+|overwatered
+|poop water
+|rewater
+|rewatered
+|underwater
+|underwatered
+|unwater
+|unwaterable
+|unwatered
+|waterable
+|water down
+|watered down
+|waterer
+|watering
+|watering can
+|watering hole
+|watering place
+|watering pot
+}}
+
+=====Translations=====
+{{trans-top|to pour water into the soil surrounding (plants)}}
+{{multitrans|data=
+* Arabic: {{tt|ar|سَقَى}}
+* Armenian: {{tt+|hy|ջրել}}, {{tt+|hy|ոռոգել}}
+* Azerbaijani: {{tt+|az|sulamaq}}, {{tt|az|suvarmaq}}
+* Bulgarian: {{t+|bg|поли́вам}}
+* Catalan: {{tt+|ca|regar}}
+* Chinese:
+*: Cantonese: {{tt|yue|淋水|tr=lam4 seoi2}}
+*: Mandarin: {{tt+|cmn|澆水|tr=jiāoshuǐ}}
+* Czech: {{tt+|cs|zalít}}, {{tt+|cs|zalévat}}
+* Danish: {{tt+|da|vande}}
+* Dutch: {{tt|nl|[[water]] [[geven]]}}, {{tt+|nl|sproeien}}, {{tt+|nl|begieten}}, {{t+|nl|wateren}}
+* Dzongkha: {{tt|dz|ཆུ}}
+* Esperanto: {{tt+|eo|akvumi}}
+* Estonian: {{tt+|et|kastma}}
+* Finnish: {{tt+|fi|kastella}}
+* French: {{tt+|fr|arroser}}
+*: Old French: {{tt|fro|arouser}}
+* Frisian:
+*: West Frisian: {{tt|fy|wetter jaan}}
+* Galician: {{tt+|gl|augar}}, {{tt+|gl|regar}}
+* German: {{tt+|de|gießen}}, {{tt+|de|bewässern}}
+* Greek: {{tt+|el|ποτίζω}}
+*: Ancient Greek: {{tt|grc|ἄρδω}}
+* Hebrew: {{tt+|he|הִשְׁקָה|tr=hishká}}
+* Hungarian: {{tt+|hu|öntöz}}, {{tt+|hu|locsol}}
+* Icelandic: {{tt|is|vökva}}
+* Ido: {{tt+|io|arozar}}
+* Indonesian: {{tt+|id|siram}}
+* Ingrian: {{t|izh|valella}}
+* Interlingua: {{tt|ia|aquar}}, {{t|ia|abiberar}}
+* Irish: {{tt|ga|uiscigh}}
+* Italian: {{tt+|it|annaffiare}}
+* Japanese: {{tt|ja|[[水]][[を]][[やる]]|tr=みずをやる, mizu o yaru}}
+* Kapampangan: {{t|pam|magtugtug}}, {{t|pam|tugtugan}}
+* Kurdish:
+*: Central Kurdish: {{tt|ckb|ئاودان|tr=awdan}}
+*: Northern Kurdish: {{tt+|kmr|avdan}}
+* Latin: {{tt|la|irrigō}}
+* Latvian: {{tt+|lv|laistīt}}
+* Macedonian: {{tt|mk|наводнува}}, {{tt|mk|полива}}, {{tt|mk|вади}}
+* Malay: {{t+|ms|siram}}
+* Mansaka: {{t|msk|tobig}}
+* Naga:
+*: Khiamniungan Naga: {{t|kix|khìam}}
+* Norman: {{tt|nrf|arrouôser}}
+* Norwegian:
+*: Bokmål: {{tt+|nb|vanne}}
+* Occitan: {{t+|oc|asaigar}}
+* Polish: {{tt+|pl|podlewać|impf}}, {{tt+|pl|podlać|pf}}
+* Portuguese: {{tt+|pt|regar}}, {{tt+|pt|aguar}}
+* Romanian: {{tt+|ro|uda}}, {{tt+|ro|iriga}}
+* Russian: {{tt+|ru|полива́ть|impf}}, {{tt+|ru|поли́ть|pf}}
+* Sardinian: {{t|sc|abbare}}
+* Serbo-Croatian:
+*: Latin: {{tt+|sh|zalivati}}, {{tt+|sh|zalijevati}}
+* Slovene: {{tt|sl|zalivati}}, {{tt|sl|zaliti}}
+* Spanish: {{tt+|es|regar}}, {{tt+|es|aguar}}
+* Swedish: {{tt+|sv|vattna}}, {{tt|sv|ge vatten}}
+* Tagalog: {{tt|tl|magdilig}}, {{t|tl|diligan}}
+* Tamil: {{t+|ta|பாய்ச்சு}}
+* Telugu: {{tt|te|నీరుపోయుట}}
+* Thai: {{tt+|th|รด}}
+* Turkish: {{tt+|tr|sulamak}}
+* Ukrainian: {{t|uk|поливати|impf}}
+* Volapük: {{tt+|vo|vatön}}
+* Welsh: {{tt|cy|dyfrio}}, {{tt+|cy|dyfrhau}}
+{{trans-bottom}}
+
+{{trans-top|to provide (animals) with water}}
+* Arabic: {{tt|ar|أَسْقَى}}, {{tt|ar|سَقَى}}
+* Armenian: {{tt|hy|ջուր տալ}}
+* Azerbaijani: {{tt+|az|sulamaq}}, {{tt|az|suvarmaq}}, {{t|az|[[su]] [[vermək]]}}
+* Bulgarian: {{t+|bg|поя}}
+* Catalan: {{tt+|ca|abeurar}}
+* Comorian:
+*: Ndzwani Comorian: {{tt|wni|nosa|alt=hunosa}}
+* Czech: {{tt|cs|napájet}}
+* Danish: {{tt+|da|vande}}
+* Dutch: {{tt|nl|water geven}}
+* Dzongkha: {{tt|dz|ཆུ}}
+* Esperanto: {{tt|eo|[[doni]] [[akvon]]}}
+* Estonian: {{tt|et|jootma}}
+* Finnish: {{tt+|fi|juottaa}}
+* French: {{tt+|fr|abreuver}}, {{tt+|fr|faire boire}}
+* Galician: {{tt+|gl|abeberar}}
+* German: {{tt+|de|tränken}}
+* Hebrew: {{tt+|he|הִשְׁקָה|tr=hishqá}}
+* Hungarian: {{tt+|hu|itat}}
+* Indonesian: {{tt|id|beri minum}}
+* Interlingua: {{t|ia|abiberar}}
+* Italian: {{tt+|it|abbeverare}}
+* Japanese: {{tt|ja|[[水]][[を]][[やる]]|tr=みずをやる, mizu o yaru}}
+* Latvian: {{tt|lv|dzirdīt}}
+* Macedonian: {{t|mk|по́и|impf}}, {{t|mk|на́пои|pf}}
+* Naga:
+*: Khiamniungan Naga: {{t|kix|khìam}}
+* Norwegian:
+*: Bokmål: {{tt+|nb|vanne}}
+* Polish: {{tt+|pl|poić|impf}}, {{tt+|pl|napoić|pf}}
+* Portuguese: {{tt|pt|[[dar]] [[água]] [[a]]}}
+* Romanian: {{tt+|ro|adăpa}}
+* Russian: {{tt+|ru|пои́ть|impf}}, {{tt+|ru|напои́ть|pf}}
+* Serbo-Croatian:
+*: Latin: {{tt+|sh|pojiti}}, {{tt+|sh|napajati}}
+* Slovene: {{tt|sl|pojiti}}, {{tt|sl|napajati}}
+* Spanish: {{tt|es|[[dar]] [[agua]] a}}, {{t+|es|abrevar}}, {{t+|es|aguar}}
+* Swedish: {{tt+|sv|vattna}}
+* Tagalog: {{tt|tl|magpainom}}, {{tt|tl|painumin}}
+* Telugu: {{tt|te|నీరుపెట్టుట}}
+* Turkish: {{tt+|tr|su vermek}}
+{{trans-bottom}}
+
+{{trans-top|colloquial: to urinate}}
+* Armenian: {{tt|hy|չիշիկ անել}}
+* Bulgarian: {{t+|bg|пикая}}
+* Chichonyi-Chidzihana-Chikauma: {{tt|coh|ku kodzola}}
+* Danish: {{tt+|da|vande}}
+* Dutch: {{tt+|nl|wateren}}, {{tt+|nl|plassen}}
+* Finnish: {{tt|fi|[[heittää]] [[vesi|vettä]]}}
+* German: {{tt|de|Harn lassen}}
+* Hebrew: {{tt+|he|הִשְׁתִּין|tr=hishtín}}
+* Indonesian: {{tt+|id|kencing}}, {{tt+|id|buang air kecil}}
+* Japanese: {{tt+|ja|おしっこ|alt=おしっこする|tr=oshikko suru}}, {{tt+|ja|小便|alt=小便する|tr=shōben suru}}
+* Latin: {{tt|la|mingo}}
+* Norwegian: {{tt+|no|tisse}}
+* Portuguese: {{tt+|pt|mijar}}
+* Russian: {{tt+|ru|пи́сать|impf}}, {{tt+|ru|попи́сать|pf}}
+* Spanish: {{tt+|es|hacer agua}}
+* Swedish: {{tt+|sv|kasta vatten}}
+* Tamil: {{t|ta|[[சிறுநீர்]] [[பாய்ச்சு]]}}
+* Telugu: {{tt+|te|మూత్రవిసర్జన}}
+* Turkish: {{tt+|tr|işemek}}, {{tt+|tr|çiş yapmak}}
+{{trans-bottom}}
+
+{{trans-top|dilute}}
+* Bulgarian: {{t+|bg|разреждам}}
+* Danish: {{tt|da|spæde ud}}
+* Finnish: {{tt+|fi|laimentaa}}
+* French: {{tt+|fr|mouiller}} (literally, to wet)
+* Hungarian: {{t+|hu|hígít}}, {{t+|hu|vizez}}
+* Japanese: {{tt|ja|[[水]][[で]][[割る]]|tr=mizu de waru}}, {{tt|ja|[[水]][[で]][[薄める]]|tr=mizu de usumeru}}
+* Russian: {{tt+|ru|разбавля́ть|impf}}, {{tt+|ru|разба́вить|pf}}
+* Spanish: {{t+|es|aguar}}
+* Swedish: {{tt|sv|späda ut}}
+* Tagalog: {{tt|tl|magbanto}}, {{tt+|tl|bantuan}}
+* Tamil: {{t+|ta|கல}}
+{{trans-bottom}}
+
+{{trans-top|to fill with or secrete water}}
+* Armenian: {{qualifier|eyes}} {{tt|hy|արտասվակալել}}
+* Danish: {{tt|da|fælde tårer}}, {{tt+|da|græde}}
+* Dutch: {{tt+|nl|wateren}}
+* Finnish: {{tt+|fi|vuotaa}}, {{tt+|fi|valua}}, {{tt+|fi|kastua}}, {{tt+|fi|kostua}}
+* French: {{tt+|fr|pleurer}}
+* German: {{tt+|de|tränen}}
+* Hungarian: {{tt+|hu|könnyezik}} {{qualifier|eyes}}, {{tt+|hu|nyáladzik}} {{qualifier|mouth}}
+* Indonesian: {{tt+|id|menangis}}
+* Japanese: {{tt+|ja|濡れる|tr=nureru}} {{qualifier|sexual: to get wet}}, {{tt|ja|[[分泌液]][[を]][[出す]]|tr=bunpitsueki o dasu}} {{qualifier|clinical: to secrete a liquid}}, {{tt|ja|[[水]][[を]][[積み込む]]|tr=mizu o tsumikomu}} {{qualifier|to take on (drinking) water, as a ship in resupply}}
+* Māori: {{tt|mi|pītoritoriwai}} {{qualifier|of the eyes due to irritation such as dryness}}, {{tt+|mi|koe}} {{qualifier|of the mouth}}, {{tt|mi|matatoua}} {{qualifier|Of the eyes}}, {{tt|mi|toriwai}} {{qualifier|of the eyes}}
+* Naga:
+*: Khiamniungan Naga: {{t|kix|khìam}}
+* Norwegian: {{tt+|no|gråte}}, {{tt|no|felle tårer}}
+* Polish: {{qualifier|eyes}} {{tt+|pl|łzawić}}
+* Portuguese: {{tt|pt|[[encher]] [[de]] [[água]]}}
+* Tagalog: {{tt|tl|magpaluha}}, {{tt|tl|magluha}}, {{tt|tl|lumuha}}, {{tt|tl|mapaluha}}, {{tt|tl|paluhain}} {{qualifier|eyes}}, {{tt|tl|magtubig}}, {{tt|tl|magkatubig}} {{qualifier|general}}, {{tt|tl|maglaway}}, {{tt|tl|papaglawayin}} {{qualifier|mouth}}
+* Tamil: {{t+|ta|ஊறு}}
+* Telugu: {{tt|te|పవిత్రజలము}}
+* Turkish: {{tt+|tr|sulanmak}}, {{tt+|tr|sulandırmak}}
+* Ukrainian: {{qualifier|очі}} {{tt|uk|сльози́тися}}
+}}<!-- close {{multitrans}} -->
+{{trans-bottom}}
+
+<!--Remove this section once all of the translations below have been moved into the tables above.-->
+{{checktrans-top}}
+* Breton: {{t+check|br|dourañ}}
+* Guarani:
+*: Paraguayan Guarani: {{t-check|gug|mbo'y}}
+* Hausa: {{t-check|ha|zamzam}}
+* Interlingua: {{t-check|ia|aquar}}, {{t-check|ia|rigar}}
+* Lithuanian: {{t-check|lt|laistyti}}
+{{trans-bottom}}
+
+===Further reading===
+* {{commons inline}}
+* {{wikibooks inline}}
+* {{wikiquote inline}}
+* {{wikiversity inline}}
+* {{R:Cambridge}}
+* {{R:Century 1911}}
+* {{R:Collins}}
+* {{R:Dictionary.com}}
+* {{R:MWO}}
+* {{R:OneLook}}
+* {{R:OED|pos=n|id=1136754417}}
+* {{R:OED|pos=v|id=1146727277}}
+* {{R:Webster 1913}}
+
+===Anagrams===
+* {{anagrams|en|a=aertw|Ewart|tawer}}
+
+{{C|en|Water}}

@@ -1,0 +1,142 @@
+== {{lengua|es}} ==
+{{pron-graf|2audio=LL-Q1321 (spa)-Rodelar-cielo.wav}}
+
+=== Etimología ===
+{{etimología|la|caelum|diacrítico=cælum}}.
+[[Imagen:Cielo con nubes2.jpg|thumb|(1)]]
+
+=== {{sustantivo masculino|es}} ===
+{{es.sust}}
+
+;1: Parte de la [[atmósfera]] y del [[espacio]] [[exterior]] visible desde la superficie de un cuerpo celeste.
+;2 {{csem|religión}}: {{plm|estado}} o [[lugar]] en que moran las [[deidad]]es y los [[humano]]s [[justo]]s tras su muerte, según diversas doctrinas religiosas.
+{{sinónimo|paraíso|edén|gloria}}
+{{antónimo|infierno}}
+{{ejemplo|El Albaicín se estremeció<br>Y con su sueño ella murió<br>Y ahora se buscan<br>Cada uno en su propio cielo y no se ven|a=Mägo de Oz|c=canción|f=2005|t=El paseo de los tristes}}
+;3: {{plm|gozo}} [[espiritual]] de los que allí moran.
+;4: Por extensión, estos mismos moradores, en especial los divinos.
+;5: {{plm|cielorraso}}.
+;6: Persona [[dulce]] y [[amable]].
+{{uso|Úsase también como vocativo}}
+{{sinónimo|encanto}}
+;7: Vocativo usado como apelativo afectivo para dirigirse hacia alguien.
+{{uso|coloquial}}
+;8 {{csem|danza}}: {{plm|cielito}} (danza).
+
+=== Locuciones ===
+{{trad-arriba|Locuciones con «cielo»}}
+* [[árbol del cielo]]
+* [[arco del cielo]]: arcoiris
+* [[cara de cielo|cara]], [[ojos de cielo|ojos]] o [[boca de cielo]]: pondera una cara extraordinariamente hermosa o unos ojos bellísimimos
+* [[cielorraso]] o [[cielo raso]]: en los cuartos, techo cuya superficie es igual
+* [[cielo volteado]]: El cielorraso cuando es cóncavo
+* [[medio cielo]]: el meridiano superior
+* [[rascacielos]]
+* [[reino de los cielos]]:
+* [[tocinillo del cielo]] o [[tocino de cielo]]: postre elaborado a base de yema de huevo caramelizada y azúcar, compacto y de color amarillo intenso
+* [[voz del cielo]]: inspiración que nos lleva a hacer lo bueno y correcto
+* [[a cielo descubierto]]: al descubierto
+* [[aunque se suba al cielo]]: expresión hiperbólica con que se asegura el vengarse de alguno aunque tome los medios mas exquisitos de ocultarse o ponerse en salvo
+* [[cerrarse el cielo]]: cubrirse de nubes
+* [[cielo de la boca]]: el paladar
+* [[cielo mío]]: Expresión de cariño
+* [[clamar al cielo]]: ser algo injusto
+* [[como llovido del cielo|como llovido]] o [[como caído del cielo]]: cuando más falta hace, en el momento más oportuno
+* [[comprar el cielo|comprar]], [[conquistar el cielo|conquistar]] o [[ganar el cielo]]: denota que el cielo se consigue con virtudes y buenas obras
+* [[desencapotarse el cielo]]: despejarse de nubes
+* [[desgajarse el cielo]]: Ser muy copiosa la lluvia o muy fuerte una tempestad
+* [[despejarse el cielo]]: aclararse, serenarse
+* [[en el séptimo cielo]]: en estado ideal, muy feliz
+* [[entoldarse el cielo]]: cubrirse de nubes
+* [[escupir al cielo]]: proceder contra alguno por medios que se convierten en propio daño
+* [[herir los cielos con lamentos]], [[herir los cielos con voces|voces]], etc: lamentarse en voz alta.
+* [[ganarse el cielo]] alguien: ser digno de admiración por sus sacrificios y abnegación
+* [[mover cielo y tierra]]: hacer lo imposible por conseguir algo
+* [[mudar cielo]] o [[mudar de cielos]]: [[mudar de aires]]
+* [[nublársele el cielo a alguno]]: acongojarse demasiado
+* [[orinal del cielo]]: lugar donde llueve muy a menudo
+* [[parece un cielo]] o [[está hecho un cielo]]: se usa para ponderar la magnificencia o suntuosidad de alguna cosa
+* [[por cielo y tierra]] o [[por cielo, mar y tierra]]: por todas partes, exhaustivamente
+* [[querer tocar el cielo con las manos]]: querer algo imposible
+* [[ser una bendición del cielo]]: ser alguien muy bueno
+* [[ser un cielo]] alguien: ser encantador
+* [[tocar el cielo]]: estar muy indignado
+* [[tomar el cielo con las manos]]: manifestar con demostraciones exteriores un gran enfado
+* [[vaya vm. al cielo]]: expresión con que alguno desprecia lo que otro dice
+* [[venirse el cielo abajo]]: expresión con que se pondera una tempestad ó lluvia grande . Suceder algún alboroto o ruido extraordinario
+* [[ver el cielo abierto|ver el cielo]] o [[ver los cielos abiertos|los cielos abiertos]]: ver la ocasión propicia para algo, la que se estaba esperando
+* [[ver el cielo por embudo]]: tener poco conocimiento del mundo
+* [[volar al cielo]] alguien: morir
+{{trad-abajo}}
+
+=== Refranes ===
+* [[cuando el sabio señala al cielo, el tonto mira la punta del dedo]]
+
+=== Véase también ===
+{{Wikiquote}}
+{{Wikipedia}}
+* [[celeste]], [[celestial]], [[etéreo]]
+* [[espacio]]
+* [[infierno]]
+
+=== Traducciones ===
+{{trad-arriba}}
+{{t|he|t1=שמיים}}
+{{t|af|t1=hemel}}
+{{t|de|t1=Himmel}}
+{{t|be|a1=1,2|g1=n|t1=неба}}
+{{t|br|a1=1|g1=m|t1=oabl}}
+{{t|bg|t1=небе}}
+{{t|ca|a1=1,2|t1=cel}}
+{{t|cs|t1=nebe}}
+{{t|da|t1=himmel|t2=himmerig}}
+{{t|eu|t1=zeru}}
+{{t|eo|t1=ĉielo}}
+{{t|fo|t1=himin|t2=himmal}}
+{{t|fi|t1=taivas}}
+{{t|fr|t1=ciel}}
+{{t|fy|t1=himel|t2=loft}}
+{{t|gd|t1=adhar|t2=iarmailt}}
+{{t|got|a1=1-2|g1=m|t1=𐌷𐌹𐌼𐌹𐌽𐍃}}
+{{t|haw|t1=lani}}
+{{t|hi|a1=1,2|g1=m|g2=m|g3=m|t1=आसमान|t2=आकाश|t3=गगन|tl2=ākāš|tl3=gagan}}
+{{t|hu|t1=ég|t2=égbolt}}
+{{t|en|a1=1|a2=2|t1=sky|t2=heaven}}
+{{t|ang|t1=hefon|t2=heofon|t3=wolcen}}
+{{t|is|t1=himinn}}
+{{t|it|t1=cielo}}
+{{t|ja|t1=空|t2=そら|t3=sora}}
+{{t|lo|t1=ຟ້າ|tl1=fā}}
+{{t|la|t1=aether|t2=aethra|t3=axis|t4=caelum}}
+{{t|mi|t1=rangi}}
+{{t|arn|a1=1|a2=2|t1=wenu|t2=Wenumapu}}
+{{t|sh|a1=1,2|g1=n|t1=nebo|t2=небо}}
+{{t|yua|t1=kaʼan}}
+{{t|mpm|t1=andɨvɨ}}
+{{t|xtl|t1=andivi}}
+{{t|nci|t1=ilhuicatl}}
+{{t|nch|t1=iluikatl}}
+{{t|nhe|t1=ilwikatl}}
+{{t|no|a1=1–2|t1=himmel}}
+{{t|nn|a1=1–2|t1=himmel}}
+{{t|nl|t1=hemel|t2=lucht}}
+{{t|pap|t1=shelo|t2=shelu}}
+{{t|pl|t1=niebo}}
+{{t|pt|t1=céu|t2=alturas|t3=olimpo}}
+{{t|ine-pro|t1=*dyḗws}}
+{{t|rap|t1=rangi}}
+{{t|ro|t1=cer}}
+{{t|rw|t1=juru}} (ijuru)
+{{t|ru|a1=1,2|a2=2|g1=n|t1=небо|t2=небеса|tl1=nebo|tl2=nebesa}}
+{{t|sm|t1=lagi}}
+{{t|sv|t1=himmel|t2=sky}}
+{{t|tl|t1=langit}}
+{{t|ty|t1=ra’i}}
+{{t|th|t1=ฟ้า|tl1=fáa}}
+{{t|nod|t1=ᨼ᩶ᩣ}}
+{{t|to|t1=langi}}
+{{t|uk|a1=1,2|a2=2|g1=n|t1=небо|t2=небеса|tl1=nebo|tl2=nebesa}}
+{{t|ur|a1=1,2|g1=m|t1=آسمان|t2=آکاش|tl2=ākāš}}
+{{t|vi|t1=trời}}
+{{t|zu|t1=ilizulu|t2=izulu}}
+{{trad-abajo}}

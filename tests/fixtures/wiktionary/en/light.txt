@@ -1,0 +1,1389 @@
+==English==
+{{wikiquote}}
+
+===Alternative forms===
+* {{alt|en|lite||informal|or|archaic}}; {{alt|en|lighte|lyght|lyghte||obsolete}}
+* {{alt|en|licht||Scotland}}
+
+===Pronunciation===
+* {{enPR|līt}}, {{IPA|en|/laɪt/}}
+** {{IPA|en|[laɪt]|a=RP}}
+** {{IPA|en|[lɑjt]|a=SSB}}
+** {{IPA|en|[ɫɐɪt]|a=GA}}
+** {{IPA|en|[ləjt]|a=CA,regional US}}
+** {{IPA|en|[lɑɪt]|a=AU}}
+* {{audio|en|en-uk-light.ogg|a=UK}}
+* {{audio|en|en-us-light.ogg|a=US}}
+* {{rhymes|en|aɪt|s=1}}
+* {{homophones|en|lite}}
+* {{hyphenation|en|light}}
+
+===Etymology 1===
+[[File:Emanation.png|thumb|Light]]
+{{root|en|ine-pro|*lewk-}}
+{{etymon|en|id=illumination|:inh|enm:light<id:illumination>|tree=1}}
+From {{inh|en|enm|light}}, {{m|enm|liht}}, {{m|enm|leoht}}, from {{inh|en|ang|lēoht}}, from {{inh|en|gmw-pro|*leuht}}, from {{inh|en|gem-pro|*leuhtą}}, from {{inh|en|ine-pro|*lewktom}}, from the root {{m|ine-pro|*lewk-||to shine}}.
+{{col-top|2|cog}}
+* {{cog|sco|licht||light}}
+* {{cog|stq|Ljoacht}}, {{m|stq|Lucht||light}}
+* {{cog|fy|ljocht||light}}
+* {{cog|nl|licht||light}}
+* {{cog|de|Licht||light}}
+* {{cog|nds-de|Licht||light}}
+* {{cog|li|Leech}}, {{m|li|Leet}}, {{m|li|Léït||light}}
+* {{cog|lb|Liicht||light}}
+* {{cog|wym|łicht||light}}
+* {{cog|yi|ליכט||light}}
+* {{cog|da|-}}, {{cog|nb|lys||light}}
+* {{cog|ovd|liuos||light}}
+* {{cog|fo|-}}, {{cog|is|ljós||light}}
+* {{cog|nn|ljos}}, {{m|nn|ljus}}, {{m|nn|lys||light}}
+* {{cog|sv|ljus||light}}
+* {{cog|la|lūx||light}}
+* {{cog|ru|луч||beam of light}}
+* {{cog|hy|լույս||light}}
+* {{cog|grc|λευκός||white}}
+* {{cog|fa|رُخش|tr=roxš}}.
+{{col-bottom}}
+
+====Noun====
+{{en-noun|~}}
+
+# {{senseid|en|Q76299}} {{lb|en|physics|uncountable}} [[electromagnetic radiation#Noun|Electromagnetic radiation]] in the [[wavelength#Noun|wavelength]] range [[visible#Adjective|visible]] to the human [[eye#Noun|eye]] (about 400–750 [[nanometer#Noun|nanometers]]): [[visible light#Noun|visible light]].
+#: {{ux|en|As you can see, this spacious dining-room gets a lot of '''light''' in the mornings.}}
+#* {{RQ:Churchill Celebrity|chapter=5|passage=Then came a maid with hand-bag and shawls, and after her a tall young lady. She stood for a moment holding her skirt above the grimy steps,{{...}}, and the '''light''' of the reflector fell full upon her.}}
+#* {{RQ:Allingham China Governess|chapter=3|passage=Here the stripped panelling was warmly gold and the pictures, mostly of the English school, were mellow and gentle in the afternoon '''light'''.}}
+#* {{quote-journal|en|date=2013-07-20|volume=408|issue=8845|magazine=w:The Economist
+|title=[http://www.economist.com/news/http://www.economist.com/news/asia/21582043-villagers-enjoy-sunlight-after-dark-out-gloom Out of the gloom]
+|passage=[Rural solar plant] schemes are of little help to industry or other heavy users of electricity. Nor is solar power yet as cheap as the grid. For all that, the rapid arrival of electric '''light''' to Indian villages is long overdue. When the national grid suffers its next huge outage, as it did in July 2012 when hundreds of millions were left in the dark, look for specks of '''light''' in the villages.}}
+#* '''2016''', [https://web.archive.org/web/20171030003034/https://learningenglish.voanews.com/a/lets-learn-english-lesson-8-are-you-busy/3253185.html VOA Learning English] (public domain)
+#*: When the studio '''light''' is on, I am recording my evening show.
+# {{senseid|en|Q9128}} {{lb|en|by extension}} [[electromagnetic radiation#Noun|Electromagnetic radiation]] in the [[wavelength#Noun|wavelength]] range [[visible#Adjective|visible]] to the human [[eye#Noun|eye]] or in nearby ranges ([[infrared#Adjective|infrared]] or [[ultraviolet#Adjective|ultraviolet]] radiation).
+#: {{ux|en|[[black light#Noun|black '''light''']]}}
+# {{senseid|en|Q12969754}} {{lb|en|by extension|less commonly}} [[electromagnetic radiation#Noun|Electromagnetic radiation]] of any wavelength.
+#* {{quote-book |en |year=2017 |last=Berman |first=Bob |authorlink=Bob Berman |title=Zapped: From Infrared to X-rays, the Curious History of Invisible Light |publisher=Little, Brown and Company |page=8-9 |isbn=978-0-316-31131-1 |passage=It’s everywhere. At this moment, as you sit quietly reading this book, you are awash in it. At work, it’s emanating from your electronic devices; step outside for lunch, and the sun bathes you in it. You may receive an extra dose of it when you visit your doctor, pass through security at the airport, or drive through city streets, but minuscule amounts of it are with you always. You cannot see, hear, smell, or feel it, but there is never a single second when it is not flying through your body. Too much of it will kill you, but without it you wouldn’t live a year. “Invisible '''light'''” seems like a contradiction. Like Simon and Garfunkel’s “The Sound of Silence,” it’s an oxymoron. We think of light, by definition, as something seen, something that enables our seeing, illuminating the darkness. Unlike dogs, who sniff in order to “get” what an object is, we depend on vision above all our other senses. We rely on light to tell us about our surroundings. But just as there are frequencies of sound audible to other animals that we cannot hear, there is a whole world of '''light''' outside our range of vision, a world that is humming with activity. Though we rarely think about this invisible world, our way of life depends on it. It’s because of invisible '''light''' that you can do things such as send a text message, use GPS to find your way to a friend’s house, listen to the radio, or microwave a frozen pizza. Invisible '''light''' shows us things we would never otherwise see, including our own skeletons and brains and the history of our universe. I was reminded of just how much we rely on invisible '''light''', and how mysterious it remains to us, during a visit from my sister and her family. It was a lazy summer afternoon, and we were sprawled across a few couches sharing a bowl of popcorn. My niece, her shoulders crimson after a day outdoors, was chatting on her cell phone, holding up a promising finger to her mother, who was scolding her for not using sunscreen. My brother-in-law, meanwhile, was asking my opinion on an article he’d read proposing that Wi-Fi be banned in schools because of its dangers. We were all depending on invisible '''light''' (for the microwave popcorn, the cell-phone service) while being concerned that it might harm us (sunburn, mysterious Wi-Fi health threats) and confused about what to do to protect ourselves. We need it, and it surrounds us, yet we remain uneasy about living with invisible '''light''', partly because we fear what is unknown. After all, most of us don’t know much about “all the '''light''' we cannot see.” This book aims to change that. My hope is to expose the hidden side of the spectrum, to make the invisible (at least temporarily) visible and vivid to you.}}
+# {{senseid|en|source of illumination}} {{lb|en|countable}} A [[source#Noun|source]] of [[illumination#Noun|illumination]].
+#: {{ux|en|Put that '''light''' out!}}
+#* {{RQ:King James Version|book=John|chapter=1|verse=5|passage=And the '''light''' ſhineth in darkneſſe, and the darkneſſe compꝛehended it not.}}
+#* {{RQ:Maxwell Mirror and the Lamp|chapter=5|passage=He was thinking; but the glory of the song, the swell from the great organ, the clustered '''lights''', {{...}}, the height and vastness of this noble fane, its antiquity and its strength—all these things seemed to have their part as causes of the thrilling emotion that accompanied his thoughts.}}
+## A [[lightbulb#Noun|lightbulb]] or similar light-emitting [[device#Noun|device]], regardless of whether it is lit.
+##: {{ux|en|We turned off all the '''lights''' and went to sleep.}}
+##* {{RQ:NYT|author=Jameson Rich|title=The Shirt Stays On|archiveurl=https://web.archive.org/web/20221125140513/http://www.nytimes.com/2016/08/07/fashion/modern-love-heart-surgery-scars.html|date=7 August 2016|passage=The ceiling '''lights''' were off, but I knew the narrow light spilling from the lamp on my bureau would be enough for her to see the pale red marks on my chest, which had been fading for so long they had gone back to being shiny again.}}
+## A [[traffic light#Noun|traffic light]], or {{lb|en|by extension}} an [[intersection#Noun|intersection]] controlled by traffic lights.
+##: {{ux|en|To get to our house, turn right at the third '''light'''.}}
+# {{senseid|en|enlightenment}} {{lb|en|figurative}} Spiritual or mental illumination; enlightenment, useful information.
+#: {{ux|en|Can you throw any '''light''' on this problem?}}
+#* {{RQ:Shakespeare Two Gentlemen of Verona|III|i|passage=He shall never know / That I had any '''light''' of this from thee.}}
+#* {{RQ:Mencken American Language|chapter=<!--Preface to the First Edition-->|passage=Greatly interested in these differences—some of them so great that they led me to seek exchanges of '''light''' with Englishmen—I looked for some work that would describe and account for them with a show of completeness, and perhaps depict the process of their origin.}}
+# {{lb|en|in the plural|now|rare}} Facts; pieces of information; [[idea]]s, [[concept]]s.
+#* {{RQ:Burton Melancholy|edition=2nd|passage=Now these notions are twofold, actions or habits{{nb...}}, which are durable '''lights''' and notions, which we may use when we will.}}
+#* {{quote-book|1=en|year=1950|author=Norman Lindsay|authorlink=Norman Lindsay|title={{w|Dust or Polish?}}|publisher=Angus and Robertson|location=Sydney|page=164|passage="Well, there's her statement of her case, and according to her '''lights''', it's a just one. She's got a slum-bred mind."}}
+# A notable person within a specific field or discipline.
+#: {{ux|en|Picasso was one of the leading '''lights''' of the cubist movement.}}
+#* {{RQ:Tennyson Poems 1842|poem=A Dream of Fair Women|passage=Joan of Arc, a '''light''' of ancient France}}
+# {{lb|en|painting}} The manner in which the light strikes a picture; that part of a picture which represents those objects upon which the light is supposed to fall; the more illuminated part of a landscape or other scene; opposed to ''[[shade]]''.
+# A point of view, or aspect from which a concept, person or thing is regarded.
+#: {{ux|en|I'm really seeing you in a different '''light''' today.}}
+#: {{ux|en|Magoon's governorship in Cuba was viewed in a negative '''light''' by many Cuban historians for years thereafter.}}
+#* {{RQ:South Twelve Sermons|chapter=Why Christ's Doctrine was Rejected by the Jews|passage=Frequent consideration of a thing {{...}} shows it in its several '''lights''' and various ways of appearance.}}
+#* {{RQ:Addison Cato|i|1|Thy ſteddy Temper, ''Portius'',<br>Can look on Guilt, Rebellion, Fraud, and ''Cæſar'',<br>In the calm '''Lights''' of mild Philoſophy; {{...}}}}
+#* {{RQ:Orwell Animal Farm|3
+|passage=Now if there was one thing that the animals were completely certain of, it was that they did not want Jones back. When it was put to them in this '''light''', they had no more to say.}}
+# A [[flame]] or something used to create fire.
+#* {{RQ:Doyle Poison Belt|passage="There will, I expect, be many such - possibly whole cities in flames - when we consider how many folk may have dropped with '''lights''' in their hands."}}
+## {{lb|en|slang}} A cigarette [[lighter]].
+##: {{ux|en|Hey, buddy, you got a '''light'''?}}
+# A [[firework]] made by filling a [[case]] with a substance which burns brilliantly with a white or coloured flame.
+#: {{ux|en|a [[Bengal light|Bengal '''light''']]}}
+# {{senseid|en|window}} A [[window]] in architecture, carriage design, or motor car design: either the opening itself or the window pane of glass that fills it, if any.
+#: {{hyponyms|en|backlight|sidelight|transom}}
+#: {{ux|en|This facade has eight south-facing '''lights'''.}}
+# {{lb|en|crosswording}} The [[series]] of [[square]]s reserved for the [[answer]] to a [[crossword]] [[clue]].
+#: {{ux|en|The average length of a '''light''' on a 15&times;15 grid is 7 or 8.}}
+# {{lb|en|informal}} A [[cross-light]] in a [[double acrostic]] or [[triple acrostic]].
+# Open view; a visible state or condition; public observation; publicity.
+#* {{RQ:Shakespeare Measure|III|ii|passage=The duke yet would have dark deeds darkly answered; he would never bring them to '''light'''.}}
+# {{senseid|en|sightedness or visual perception}} The power of perception by vision: [[eyesight]] ([[sightedness]]; [[vision]]<!--the state of having the visual sense; the visual sense itself-->).
+#* {{RQ:KJV|Psalms|38|10||My heart panteth, my strength faileth me: as for the '''light''' of mine eies, it also is gone from me.}}
+# The brightness of the eye or eyes.
+#* {{RQ:Shakespeare Hamlet|II|i|passage=He seemed to find his way without his eyes; / For out o'door he went without their helps, / And, to the last, bended their '''light''' on me.}}
+
+=====Synonyms=====
+* {{sense|electromagnetic wave perceived by the eye}} {{l|en|visible light}}
+* See also [[Thesaurus:light source]]
+
+=====Hypernyms=====
+* {{sense|physics}} {{l|en|electromagnetic radiation}}
+
+=====Hyponyms=====
+{{col4|en|title=forms of illumination ''(sense 2)''
+|afterlight
+|ancient lights
+|accidental light|amber light|anchor light|bad light|available light
+|big light
+|black light
+|blue light
+|booklight
+|brake light
+|Christmas light
+|cold light
+|earthlight
+|electric light
+|flashlight
+|fog light
+|footlight
+|floodlight
+|gaslight
+|ghost light
+|green light
+|hazard light
+|headlight
+|lamplight
+|limelight
+|moonlight
+|navigation light
+|neon light
+|nightlight
+|parking light
+|polar lights
+|red light
+|safelight
+|searchlight
+|skylight
+|slow light
+|spotlight
+|stack light
+|starlight
+|stoplight
+|streetlight
+|sunlight
+|taillight
+|top light
+|twilight
+|Very light
+|warning light
+|white light|stop-and-go light
+|Yehudi lights|running light
+|yellow light
+|zodiacal light|Bengal light|Bude light|calcium light|circular polarized light|circularly polarized light|coherent light|Coston light|courtesy light|dark light|dome light|drop light|Drummond light|dry light|dummy light|drop light|Drummond light|dry light|dummy light|Finsen light|fog light|grow light|hard light|hazard light|Hessdalen light|idiot light|isophase light|key light|klieg light|magnesium light|Marfa light|Min Min light|mood light|natural light|neon light|occulting light|owl light|oxycalcium light|oxyhydrogen light|park light|parking light|pendant light|pilot light|plane polarized light|pocket light|polarized light|quarry light|quick light|range light|riding light|ring light|roof light|sea-light|strobe light|swag light|synchrotron light|top light|track light|trouble light|ultraviolet light|Wood's light|X-light|yardlight|zircon light|zodiacal light|practical light|boob light|rear light|rough service light|tally light|cherry light|immeasurable light|bedlight|candlelight|catchlight|cocklight|crosslight|dashlight|dawnlight|daylight|downlight|dusklight|evenlight|extragalactic background light|firelight|flamelight|forelight|glowlight|guidelight|houselight|icelight|interlight|jacklight|lanternlight
+}}
+
+=====Derived terms=====
+{{col|en|aberration of light
+|antilight
+|antilights
+|arc light
+|bad light
+|batement light
+|Bengola light
+|betalight
+|better light
+|bili light
+|blue light bandit| elf-light
+|blue light disco|light grasp|light-collecting power|light-gathering power
+|blue-light special
+|borrowed light
+|bright lights
+|bright lights and cold steel
+|bring to light
+|by one's lights|faster-than-light particle
+|can light
+|cast light on
+|catch the light
+|city lights
+|cold steel and bright lights
+|colour light
+|colour light signal
+|come to light
+|cosmic light horizon
+|deadlight|shoot the lights out
+|density of light
+|electric light bug
+|enlight
+|enlighten
+|fairy lights
+|false light
+|fanlight
+|faster-than-light
+|faster than light
+|fill light
+|first light
+|floating light
+|floodlight
+|Friday night lights
+|give a light
+|go out like a light
+|guiding light
+|half-light
+|hard light
+|hide one's light under a bushel
+|hold a light
+|hyperlight
+|indicator light
+|in light of
+|in someone's light
+|in the cold light of day
+|in the light of
+|jump the lights
+|keep the lights on
+|kilolight
+|knock someone's lights out
+|leaded light
+|leading light
+|leadlight
+|let there be light
+|lidar
+|light at the end of the tunnel
+|light ball
+|lightbar
+|light barrel
+|light barrier
+|light-bearing
+|light bill
+|lightboard
+|lightboat
+|lightbox,light box
+|light bucket
+|lightbulb,light bulb
+|light buoy
+|light century
+|light characteristic
+|light clock
+|light cone
+|light curve
+|light day
+|light decade
+|light-dependent resistor
+|light due
+|light echo
+|light elf
+|light-emitting diode
+|light engineering
+|light eon
+|light equation
+|lightfast
+|light field
+|light fixture
+|lightfront
+|lightful
+|light gele
+|light globe
+|lightguide
+|light gun
+|lighthead
+|light hour
+|lighthouse
+|light intensity
+|light jockey
+|lightkeeper
+|lightless
+|lightlike
+|lightman
+|lightmans
+|lightmap
+|lightmapping
+|light meter
+|light microscope
+|light-mile
+|light mill
+|light millennium
+|light minute
+|light money
+|lightmonger
+|light month
+|light-nanosecond
+|light-off temperature
+|light of nature
+|light of one's eye
+|light-o'-love
+|light on the hill
+|light organ
+|light painting
+|light panel
+|lightpath
+|light pen
+|light pillar
+|light pipe
+|light-polluted
+|light pollution
+|light porter
+|lightpost
+|light probe
+|light profile
+|lightproof
+|lightray
+|light ray
+|lightroom
+|lightsaber
+|light sail
+|lights, camera, action
+|lightscape
+|light-scattering photometry
+|lightscot
+|light second
+|light sector
+|light-sensitive
+|lightshade
+|lightshift
+|lightship
+|light-shot
+|light show
+|light-skirts
+|light source
+|lights-out
+|lights out
+|light spectrum
+|lightspeed,light speed
+|lightstation,light station
+|lightstick
+|lightstrip
+|light-struck
+|light switch
+|light table
+|light therapy
+|light-tight
+|light time
+|light trespass
+|lightvessel
+|lightward
+|lightwards
+|light wave
+|light week
+|lightwell
+|lightwood
+|lightwork
+|lightworker
+|light year
+|livers and lights
+|looplight
+|lovelight
+|lowlight
+|luthern-light
+|make a light
+|marker light
+|marsh light
+|matchlight
+|microlight
+|midlight
+|more heat than light
+|multilight
+|nonlight
+|northern lights
+|offer the light
+|one-way light time
+|out like a light
+|overlight
+|peak of eternal light
+|penlight
+|pipe-light
+|pick-to-light
+|pocketlight
+|porchlight
+|portlight
+|punch someone's lights out
+|put on the red light
+|put someone's light out
+|put someone's lights out
+|quarterlight
+|quarter light
+|rainlight
+|Range of Light
+|ray of light
+|reading light
+|ringlight
+|running lights
+|rushlight
+|see light
+|see the light
+|see the light of day
+|set light
+|shed light on
+|shed light upon
+|shine a light on
+|shine light on
+|Shine the Light Law
+|skylight
+|snowlight
+|southern lights
+|spacelight
+|speedlight
+|speed of light
+|Spirit of Light
+|Spooklight
+|stand in one's own light
+|St. Elmo's light
+|stop the lights
+|straylight
+|strike a light
+|striplight
+|sub-light
+|super-light
+|sweetness and light
+|tealight
+|the lights are on but nobody's home
+|the lights are on but no one's home
+|throw light on
+|thunderlight
+|toplight
+|torchlight
+|trick of the light
+|tubelight
+|underlight
+|uplight
+|warlight
+|watchlight
+|waxlight
+|windowlight
+|yellow light of death
+}}
+
+=====Descendants=====
+* {{desc|afb|ليت|tr=lēt|bor=1}}
+* {{desc|gur|laatɩ|bor=1}}
+* {{desc|srn|leti}}
+
+=====Translations=====
+{{see translation subpage|Noun}}
+
+====References====
+* {{pedia}}
+
+===Etymology 2===
+From {{inh|en|enm|lighten}}, {{m|enm|lihten}}, from {{inh|en|ang|līehtan||to light, to shine}}, from {{inh|en|gem-pro|*liuhtijaną}}, from {{affix|gem-pro|*leuhtą|*-janą|nocat=1}}. Cognate with {{cog|de|leuchten|t=to shine}}.
+
+====Verb====
+{{en-verb|~s|~ing|lit,~ed<l:now,uncommon>,~<l:obsolete>}}
+
+# {{lb|en|transitive}} To [[start]] (a [[fire]]).
+#: {{syn|en|set}}
+#: {{ant|en|extinguish|put out|quench}}
+#: {{ux|en|We '''lit''' the fire to get some heat.}}
+# {{lb|en|transitive}} To [[set fire]] to; to set burning.
+#: {{syn|en|ignite|kindle|conflagrate|Thesaurus:kindle}}
+#: {{ant|en|extinguish|put out|quench}}
+#: {{ux|en|She '''lit''' her last match.}}
+#* {{RQ:Hakewill Apologie
+|passage=if a thousand candles be all '''lighted''' from one}}
+# {{lb|en|transitive}} To [[illuminate]]; to provide light for when it is dark.
+#: {{syn|en|illuminate|light up|Thesaurus:illuminate}}
+#: {{ux|en|I used my torch to '''light''' the way home through the woods in the night.}}
+#* ''19th century''', {{w|Frederic Harrison}}, ''The Fortnightly Review''
+#*: One hundred years ago, to have '''lit''' this theatre as brilliantly as it is now '''lighted''' would have cost, I suppose, fifty pounds.
+#* {{RQ:Dryden Fables|The Flower and the Leaf
+|passage=The Sun has set, and Vesper, to supply / His absent beams, had '''lighted''' up the sky.}}
+#* {{quote-book|1=en|year=1913|author={{w|Norman Lindsay}}|title={{w|A Curate in Bohemia (novel)|A Curate in Bohemia}}|publisher=N.S.W. Bookstall Co.|year_published=1932|location=Sydney|page=7|passage=It was '''lighted''' by a couple of windows, one of which favoured an intimate inspection of two chimney pots, and a diagonal section of the Town Hall clock.}}
+#* {{quote-book|1=en|year=1932|year_published=1965|author=w:Delos W. Lovelace|title=[[w:King Kong (1933 film)|King Kong]]|page=9|passage="Can I '''light''' you down to your cab?"}}
+# {{lb|en|intransitive}} To become ignited; to take fire.
+#: {{syn|en|catch fire|ignite|conflagrate|Thesaurus:combust}}
+#: {{ux|en|This soggy match will not '''light'''.}}
+# To attend or conduct with a light; to show the way to by means of a light.
+#* {{quote-text|en|year=1824|author=w:Walter Savage Landor|title={{w|Imaginary Conversations}}: Richard I and the Abbot of Boxley
+|passage=His bishops lead him forth, and '''light''' him on.}}
+# {{lb|en|transitive|pinball}} To make (a bonus) available to be collected by hitting a [[target]], and thus light up the [[feature light]] corresponding to that bonus to indicate its availability.
+#: {{ux|en|'''Light''' the extra ball by amassing 500 million points in the wizard mode.}}
+
+=====Derived terms=====
+{{col4|en
+|mislight|overlight|prelight|relight|uplight
+|highlight
+|lightable
+|light a fire under
+|light someone's fire
+|light the touch-paper|light off|light on
+|light up| chain-light
+|light upon
+|unlight
+|better to light a candle than to curse the darkness|better to light a single candle than to curse the darkness|better to light one candle than to curse the darkness|better to light one small candle than to curse the darkness|kick the tires and light the fires|light one's hair on fire|light up the tote|light-up
+}}
+
+=====Related terms=====
+{{col4|en
+|belight
+|inlight
+}}
+
+=====Translations=====
+{{trans-top|to start (a fire)}}
+{{multitrans|data=
+* Afrikaans: {{tt+|af|aansteek}}
+* Arabic: {{tt|ar|أَشْعَلَ}}, {{tt|ar|أَوْقَدَ}}
+* Aramaic:
+*: Assyrian Neo-Aramaic: {{t|aii|ܛܲܦܹܐ|tr=ṭāpe}}
+* Armenian: {{tt+|hy|վառել}}
+* Basque: {{tt+|eu|piztu}}, {{tt|eu|isiotu}}
+* Belarusian: {{tt|be|запа́льваць|impf}}, {{tt|be|запалі́ць|pf}}
+* Bulgarian: {{tt+|bg|запалвам}}, {{tt+|bg|паля}}
+* Burmese: {{tt+|my|မီးထွန်း}}
+* Catalan: {{tt+|ca|encendre}}
+* Chickasaw: {{tt|cic|ooti}}
+* Chinese:
+*: Hokkien: {{tt|nan-hbl|點火|tr=tiám-hóe, tiám-hé}}
+*: Mandarin: {{tt+|cmn|點火|tr=diǎnhuǒ}}, {{tt+|cmn|點燃|tr=diǎnrán}}
+* Comorian:
+*: Ngazidja Comorian: {{tt|zdj|patsa|alt=upatsa}}, {{tt|zdj|vuza|alt=uvuza}} ''(in order to cook)''
+* Czech: {{tt+|cs|zapálit}}
+* Danish: {{tt|da|antænde}}, {{tt+|da|tænde}}
+* Dutch: {{tt+|nl|aansteken}}
+* Esperanto: {{tt|eo|ekbruligi}}, {{tt|eo|fajrigi}}
+* Estonian: {{tt+|et|süütama}}, {{tt|et|läitma}}
+* Finnish: {{tt+|fi|sytyttää}}
+* French: {{tt+|fr|allumer}}
+* Galician: {{tt+|gl|prender}}, {{tt+|gl|acender}}
+* German: {{tt+|de|anzünden}}, {{tt+|de|anstecken}}, {{tt+|de|anmachen}}
+*: Middle High German: {{tt|gmh|enzünden}}
+* Greek: {{tt+|el|ανάβω}}
+*: Ancient Greek: {{tt|grc|ἅπτω}}, {{tt|grc|αἴθω}}
+* Hebrew: {{tt|he|הדליק|tr=hidlík}}, {{tt|he|הצית|tr=hitsít}}, {{tt|he|הבעיר|tr=hevʾír}}
+* Hindi: {{t+|hi|जलाना}}, {{t+|hi|प्रज्वलन}}
+* Hungarian: {{tt+|hu|gyújt}}, {{tt+|hu|meggyújt}}, {{tt+|hu|felgyújt}}
+* Icelandic: {{tt+|is|kveikja}}
+* Ido: {{tt+|io|acendar}}
+* Ingrian: {{t|izh|virittää}}, {{t|izh|syttää}}, {{t|izh|sytyttää}}
+* Irish: {{tt|ga|las}}
+* Italian: {{tt+|it|accendere}}
+* Japanese: {{tt+|ja|引火|tr=いんかする, inka-suru|alt=引火する}}, {{tt+|ja|点火|tr=てんかする, tenka-suru|alt=点火する}}
+* Khmer: {{tt|km|អុចភ្លើង|tr=oc pləəŋ}}
+* Korean: {{tt|ko|[[불]][[붙이다]]}}, {{tt|ko|[[불]][[-을]] [[지르다]]}}, {{tt|ko|점화(點火)하다}}, {{tt|ko|인화(引火)하다}}
+* Kurdish:
+*: Northern Kurdish: {{t-check|kmr|[[agir]] [[vêxistin]]}} <!-- was "{{tt+|kmr|agir}} {{tt+|kmr|vêxistin}}" - assumed sum-of-parts; if an idiom, remove the wikilinks to the individual words. see [[User:Kephir/gadgets/xte#Translation_fixing]] -->
+* Lao: {{tt|lo|ໄຕ້}}
+* Latgalian: {{tt|ltg|aizdegt}}
+* Latin: {{tt+|la|accendō}}, {{tt|la|incendeō}}
+* Latvian: {{tt|lv|aizdedzināt}}, {{tt|lv|aizdegt}}, {{tt|lv|iedegt}}, {{tt|lv|uzdegt}}
+* Lithuanian: {{tt|lt|uždegti}}
+* Malayalam: {{tt|ml|കത്തിയ്ക്കുക}}
+* Māori: {{tt|mi|raiti}}
+* Mizo: {{tt|lus|häl}}, {{tt|lus|tialh}}, {{tt|lus|ṭankai}}
+* Neapolitan: {{tt|nap|abbiccià}}
+* Norman: {{tt|nrf|alleunmer}}
+* Norwegian: {{tt+|no|tenne}}
+* Occitan: {{tt+|oc|alucar}}
+* Old English: {{tt|ang|ǣlan}}
+* Old Galician-Portuguese: {{tt|roa-opt|acender}}
+* Persian: {{tt+|fa|افروختن|tr=afrôxtan}}, {{tt+|fa|روشن کردن|tr=rowšan kardan}}, {{t|fa|درگیرانیدن|tr=dargirânidan}}
+* Polish: {{tt+|pl|rozpalić}}, {{tt+|pl|zapalić}}
+* Portuguese: {{tt+|pt|acender}}
+* Romanian: {{tt+|ro|aprinde}}
+* Russian: {{tt+|ru|зажига́ть|impf}}, {{tt+|ru|заже́чь|pf}}, {{tt+|ru|разжига́ть|impf}}, {{tt+|ru|разже́чь|pf}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt|sh|запалити}}, {{tt|sh|упалити}}
+*: Latin: {{tt+|sh|zapaliti}}, {{tt+|sh|upaliti}}
+* Slovak: {{tt|sk|zapáliť}}, {{tt|sk|zažať}}
+* Slovene: {{tt|sl|prižgati}}
+* Spanish: {{tt+|es|encender}}, {{t+|es|acender}} {{qualifier|obsolete}}, {{t+|es|fogarizar}}
+* Swedish: {{tt+|sv|tända}}
+* Tagalog: {{tt+|tl|liwanag}}, {{tt|tl|ilawan}}
+* Telugu: {{tt+|te|అంటించు}}
+* Thai: {{tt+|th|จุด}}
+* Tok Pisin: {{tt|tpi|lait}}, {{tt|tpi|kamapim}}
+* Turkish: {{tt+|tr|yakmak}}
+* Ukrainian: {{tt|uk|запа́лювати|impf}}, {{tt|uk|запали́ти|pf}}
+* Venetan: {{tt|vec|inpiẑar}}, {{tt+|vec|inpiar}}
+* Vietnamese: {{tt+|vi|đốt}}, {{tt+|vi|thắp}}, {{tt+|vi|châm}}, {{tt+|vi|nhóm}}
+* Walloon: {{tt+|wa|esprinde}}, {{tt+|wa|aloumer}}, {{tt+|wa|atoker}}
+* Welsh: {{tt+|cy|cynnau}}
+* Yiddish: {{tt|yi|צינדן}}, {{tt|yi|אָנצינדן}}
+* Zazaki: {{tt|zza|wekerden}}, {{tt|zza|rosn kerden}}
+* ǃXóõ: {{tt|nmn|ʘʻáa}}
+{{trans-bottom}}
+
+{{trans-top|to set fire to}}
+* Catalan: {{t+|ca|encendre}}
+* Esperanto: {{t|eo|ekbruligi}}
+* Finnish: {{tt+|fi|sytyttää}}
+* French: {{tt+|fr|allumer}}
+* German: {{tt+|de|anzünden}}
+* Hindi: {{t+|hi|जलाना}}
+* Hungarian: {{tt+|hu|meggyújt}}
+* Ingrian: {{t|izh|virittää}}
+* Italian: {{t+|it|dare fuoco}}, {{t+|it|accendere}}
+* Old English: {{tt|ang|ǣlan}}
+* Persian: {{t+|fa|افروزانیدن|tr=afruzânidan}}
+* Portuguese: {{t+|pt|acender}}
+* Spanish: {{t+|es|encender}}, {{t+|es|acender}} {{q|disused}}
+* Swahili: {{tt+|sw|washa|alt=kuwasha}}
+* Thai: {{tt+|th|เผา}}
+* Yiddish: {{tt|yi|אונטערצינדן}}
+{{trans-bottom}}
+
+{{trans-top|to illuminate}}
+* Afrikaans: {{tt|af|skyn}}, {{tt|af|belig}}
+* Arabic: {{tt|ar|أَضَاءَ}}
+* Aramaic:
+*: Assyrian Neo-Aramaic: {{t|aii|ܒܵܗܹܪ|tr=baher}}
+* Armenian: {{tt+|hy|լուսավորել}}
+* Aromanian: {{tt|rup|lunjinedz}}
+* Bangi: {{t|bni|bambola}}
+* Basque: {{tt|eu|argitu}}, {{tt|eu|argiztatu}}
+* Bulgarian: {{tt+|bg|осветявам}}
+* Catalan: {{tt+|ca|encendre}}, {{tt+|ca|il·luminar}}
+* Chinese:
+*: Mandarin: {{tt+|cmn|照明|tr=zhàomíng}}
+* Czech: {{tt|cs|osvětlit}}, {{tt|cs|osvítit}}
+* Dalmatian: {{tt|dlm|luminur}}
+* Danish: {{tt|da|belyse}}, {{tt+|da|oplyse}}
+* Dutch: {{tt+|nl|lichten}}, {{tt+|nl|bijlichten}}
+* Esperanto: {{t|eo|lumigi}}
+* Finnish: {{tt+|fi|valaista}}
+* French: {{tt+|fr|allumer}}, {{tt+|fr|illuminer}}
+* German: {{tt+|de|beleuchten}}, {{tt+|de|anstrahlen}}
+* Greek: {{tt+|el|φωτίζω}}
+*: Ancient Greek: {{tt|grc|φωτίζω}}
+* Hebrew: {{tt+|he|האיר|tr=he'ír}}
+* Hindi: {{t+|hi|प्रकाश|m}}, {{t+|hi|उजाला|m}}
+* Hungarian: {{tt+|hu|világít}}, {{tt+|hu|megvilágít}}, {{tt+|hu|bevilágít}}, {{q|fénnyel}} {{tt+|hu|eláraszt}} {{qualifier|poetic}}
+* Icelandic: {{tt|is|lýsa}}
+* Ido: {{tt+|io|lumizar}}
+* Igbo: {{tt|ig|cha}}
+* Irish: {{tt|ga|las}}
+* Italian: {{tt+|it|illuminare}}
+* Japanese: {{tt+|ja|照らす|tr=てらす, terasu}}
+* Korean: {{tt|ko|[[불]][[켜다]]}}, {{tt+|ko|밝히다}}, {{tt+|ko|비추다}}
+* Kurdish:
+*: Northern Kurdish: {{t-check|kmr|[[ron]] [[kirin]]}} <!-- was "{{tt+|kmr|ron}} kirin" - remove links if this is an [[WT:IDIOM]] -->
+* Latin: {{tt|la|illuminare}}
+* Latvian: {{tt|lv|apgaismot}}, {{tt|lv|izgaismot}}
+* Ligurian: {{tt|lij|illüminò}}
+* Lingala: {{t|ln|bambola}}
+* Lithuanian: {{tt|lt|apšviesti}}
+* Malayalam: {{tt|ml|പ്രകാശിയ്ക്കുക}}
+* Mirandese: {{tt|mwl|alhumbrar}}
+* Mizo: {{tt|lus|èn}}, {{tt|lus|tiëng}}
+* Norman: {{tt|nrf|alleunmer}}
+* Norwegian: {{tt+|no|opplyse}}
+* Old English: {{t|ang|līehtan}}
+* Persian: {{tt+|fa|افروختن|tr=afrôxtan}}, {{tt+|fa|روشن کردن|tr=rowšan kardan}}
+* Polish: {{tt+|pl|oświetlić}}, {{tt|pl|iluminować}}
+* Portuguese: {{tt+|pt|iluminar}}
+* Romanian: {{tt+|ro|lumina}}, {{tt+|ro|ilumina}}
+* Russian: {{tt+|ru|освеща́ть|impf}}, {{tt+|ru|освети́ть|pf}}
+* Serbo-Croatian: {{tt+|sh|osvijetliti}}
+* Slovak: {{tt|sk|svietiť}}
+* Slovene: {{tt|sl|osvetliti}}
+* Spanish: {{tt+|es|iluminar}}, {{t+|es|aluzar}}, {{t+|es|alumbrar}}
+* Swedish: {{tt+|sv|belysa}}, {{tt|sv|lysa upp}}
+* Telugu: {{tt+|te|ప్రకాశింపజేయు}}
+* Thai: {{tt+|th|ส่อง}}, {{tt+|th|เรือง}}
+* Turkish: {{tt+|tr|aydınlatmak}}
+* Vietnamese: {{t+check|vi|chiếu sáng}}, {{t-check|vi|[[rọi]] [[sáng]]}} <!-- was "[[rọi]] [[sáng]]" - assumed sum-of-parts; if an idiom, remove the wikilinks to the individual words. see [[User:Kephir/gadgets/xte#Translation_fixing]] -->, {{t+check|vi|soi sáng}}
+* Welsh: {{tt+|cy|goleuo}}
+* Zazaki: {{tt|zza|rosn kerden}}, {{tt|zza|rosn kerden}}
+{{trans-bottom}}
+
+{{trans-top|to become ignited}}
+* Bulgarian: {{tt|bg|паля се}}
+* Finnish: {{tt+|fi|syttyä}}
+* Hindi: {{t+|hi|प्रज्वलित}}
+* Hungarian: {{tt+|hu|meggyullad}}, {{tt+|hu|felgyullad}}
+{{trans-bottom}}
+
+{{trans-top|to show the way by light}}
+* Finnish: {{tt+|fi|valaista}}
+* French: {{tt+|fr|éclairer}}
+}}<!-- close {{multitrans}} -->
+{{trans-bottom}}
+
+{{checktrans-top}}
+* Esperanto: {{qualifier|to light}} {{t-check|eo|eklumigi}}
+* Guarani:
+*: Paraguayan Guarani: {{qualifier|1,2}} {{t-check|gug|myendy}}
+* Hindi: {{t-check|hi|tr=jalana}}
+* Ido: {{t+check|io|acendar}}
+* Indonesian: {{qualifier|1}} {{t+check|id|nyala|alt=menyalakan}} <!-- was "[[nyala|menyalakan]]" - assumed inflected form or vocalised spelling; please verify if linking is acceptable. see [[User:Kephir/gadgets/xte#Translation_fixing]] -->, {{qualifier|2}} {{t+check|id|terang|alt=menerangi}} <!-- was "[[terang|menerangi]]" - assumed inflected form or vocalised spelling; please verify if linking is acceptable. see [[User:Kephir/gadgets/xte#Translation_fixing]] -->
+* Interlingua: {{qualifier|1}} {{t-check|ia|accender}}, {{qualifier|2}} {{t-check|ia|illuminar}}
+* Romanian: {{qualifier|1}} {{t+check|ro|aprinde}}, {{qualifier|2}} {{t+check|ro|ilumina}}
+* Tagalog: {{t-check|tl|ilaw}}
+{{trans-bottom}}
+
+===Etymology 3===
+From {{inh|en|enm|light}}, {{m|enm|liht}}, {{m|enm|leoht}}, from {{inh|en|ang|lēoht||luminous, bright, light, clear, resplendent, renowned, beautiful}}, from {{inh|en|gem-pro|*leuhtaz||light}}, from {{der|en|ine-pro|*lewk-||light}}. Cognate with {{cog|stq|ljoacht||light}}, {{cog|nl|licht}}, {{cog|de|licht}}.
+
+====Adjective====
+{{en-adj|er}}
+[[File:Michael Ealy 2012 (cropped).jpg|thumb|A '''light'''-skinned [[black]] person.]]
+
+# Having light; [[bright]]; [[clear]]; not [[dark]] or [[obscure]].
+#: {{ux|en|The room is '''light''' when the Sun shines through the window.}}
+#* {{quote-journal|en|date=2023 March 22|author=Philip Haigh|title=Five configuration stages to boost Manchester rail capacity|journal=RAIL|issue=979|page=31|text=Historic England explained the listing: "The station's unique design employs a high level of sophistication and innovation through its use of conoid shells supported on a cruck-like frame, which not only create a dramatic aesthetic form, but endow the building with a '''light''' and spacious interior."}}
+# [[pale|Pale]] or [[whitish]] in [[color]]; highly [[luminous]] and more or less deficient in [[chroma]].
+#: {{ux|en|She had '''light''' skin.}}
+#* {{RQ:Lincoln Pratt's Patients|chapter=1|passage='Twas early June, the new grass was flourishing everywheres, the posies in the yard—peonies and such—in full bloom, the Sun was shining, and the water of the bay was blue, with '''light''' green streaks where the shoal showed.}}
+# {{lb|en|of coffee}} [[serve|Serve]]d with extra milk or cream.
+#: {{ux|en|I like my coffee '''light'''.}}
+
+=====Synonyms=====
+* {{sense|having light}} {{l|en|bright}}, {{l|en|lightful}}
+* {{sense|pale in colour}} {{l|en|pale}}
+* {{qualifier|coffee: served with extra milk or cream}}: [[white]], with [[milk]], with [[cream]]
+
+=====Derived terms=====
+{{col3|en|lightsome|lightwood|light-colored
+|light-haired|light orange|light plough
+|light-skinned
+|lightish
+|lightsome|light matter
+|lightsomely|Light Net|Light Web
+|lightsomeness|light brown apple moth
+|lightwood
+|light bread|light side of the Force|Light Alfs|light paper|lightface|lightfaced|lightie|lightskin|nonlight|noonlight|overlight
+}}
+
+=====Related terms=====
+{{col3|en
+|lightness
+|lighty
+}}
+
+=====Translations=====
+{{trans-top|having light}}
+{{multitrans|data=
+* Afrikaans: {{tt+|af|lig}}, {{tt+|af|helder}}
+* Arabic: {{tt|ar|مُنِيرٌ}}
+* Bashkir: {{tt|ba|яҡты}}
+* Belarusian: {{tt+|be|све́тлы}}
+* Bengali: {{t+|bn|রওশন}}
+* Bulgarian: {{tt+|bg|све́тъл}}
+* Chinese:
+*: Mandarin: {{tt+|cmn|明亮|tr=míngliàng de|alt=明亮的}}, {{tt+|cmn|光明|tr=guāngmíng de|alt=光明的}}
+* Czech: {{tt+|cs|světlý}}
+* Danish: {{tt+|da|lys}}, {{tt|da|belyst}}, {{tt+|da|oplyst}}
+* Dutch: {{tt+|nl|licht}}, {{tt+|nl|helder}}, {{tt+|nl|lichtend}}, {{tt+|nl|lichtgevend}}, {{tt+|nl|lichtend}}
+* Esperanto: {{tt|eo|luma}}
+* Finnish: {{tt+|fi|valoisa}}
+* French: {{tt+|fr|lumineux|m}}, {{tt+|fr|lumineuse|f}}
+* Galician: {{tt+|gl|claro}}, {{tt+|gl|luminoso}}
+* Georgian: {{t|ka|ნათელი}}
+* German: {{tt+|de|erleuchtet}}, {{tt+|de|hell}}
+* Greek: {{tt+|el|φωτεινός}}
+* Hebrew: {{tt|he|מואר|m|tr=mu`ár}}, {{tt|he|מוארת|f|tr=mu`éret}}
+* Hindi: {{t+|hi|उज्ज्वलित}}
+* Hungarian: {{tt+|hu|világos}}, {{tt+|hu|fényes}}
+* Icelandic: {{tt|is|bjart|n}}, {{tt+|is|bjartur|m}}, {{tt|is|björt|f}}
+* Japanese: {{tt+|ja|明るい|tr=あかるい, akarui}}
+* Kaitag: {{t|xdq|ша́ла}}
+* Khmer: {{tt+|km|ពន្លឺ|tr=pʊənlɨɨ}}
+* Korean: {{tt+|ko|밝다}}
+* Kurdish:
+*: Central Kurdish: {{tt|ckb|ڕوناک}}
+*: Northern Kurdish: {{tt+|kmr|ron}}, {{tt+|kmr|geş}}
+* Latin: {{tt+|la|clarus}}, {{tt|la|lucidus|m}}
+* Latvian: {{tt|lv|gaišs}}
+* Lithuanian: {{tt|lt|šviesus}}
+* Macedonian: {{tt|mk|светол}}
+* Mizo: {{tt|lus|ëng}}
+* Norwegian: {{tt+|no|lyst}}, {{tt+|no|opplyst}}, {{tt|no|belyst}}
+* Old Prussian: {{tt|prg|lāuks}}
+* Persian: {{tt+|fa|روشن|tr=rowšan}}
+* Polish: {{tt+|pl|widny|m}}, {{tt+|pl|jasny|m}}, {{tt+|pl|świetlny}}, {{tt+|pl|świetlisty}}
+* Portuguese: {{tt+|pt|iluminado}}
+* Quechua: {{tt|qu|achik}}
+* Russian: {{tt+|ru|све́тлый}}, {{tt+|ru|я́ркий}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt|sh|светао}}, {{tt|sh|свијетао}}
+*: Latin: {{tt+|sh|svetao}}, {{tt+|sh|svijetao}}
+* Slovak: {{tt|sk|svetlý}}
+* Slovene: {{tt+|sl|svetel}}
+* Spanish: {{tt+|es|luminoso}}, {{t+|es|claro}}, {{t+|es|lumínico}}
+* Swahili: {{tt+|sw|mwanga}}
+* Swedish: {{tt+|sv|belyst}}, {{tt+|sv|ljus}}
+* Tajik: {{tt|tg|равшан‍}}
+* Telugu: {{tt|te|కాంతి వంతము}}
+* Thai: {{tt+|th|สว่าง}}
+* Ukrainian: {{tt+|uk|сві́тлий}}
+* Vietnamese: {{tt+|vi|sáng}}, {{tt+|vi|sáng sủa}}
+* Welsh: {{tt+|cy|golau}}
+* Yiddish: {{tt|yi|ליכטיק}}
+{{trans-bottom}}
+
+{{trans-top|pale in colour}}
+* Afrikaans: {{t+check|af|lig}}, {{qualifier|pale face}} {{t-check|af|[[bleek]] [[gesig]]}} <!-- was "[[bleek]] gesig" -->, {{qualifier|light complexion, pale skin}} {{t-check|af|[[blas]] [[vel]]}} <!-- was "[[blas]] vel" - check if [[WT:IDIOM]], unlink if it is -->
+* Armenian: {{tt+|hy|բաց}}
+* Bulgarian: {{tt+|bg|светъл}}
+* Catalan: {{tt+|ca|clar}}
+* Chinese:
+*: Mandarin: {{tt+|cmn|浅色|tr=qiǎnsè}}
+* Czech: {{tt+|cs|světlý|m}}
+* Danish: {{tt+|da|lys}}, {{tt+|da|bleg}}
+* Dutch: {{tt+|nl|licht}}
+* Finnish: {{tt+|fi|vaalea}}
+* French: {{tt+|fr|clair}}, {{tt+|fr|pâle}}
+* Galician: {{tt+|gl|claro}}, {{tt+|gl|pálido}}
+* German: {{tt+|de|hell}}
+* Greek: {{tt+|el|αχνός}}, {{tt+|el|ανοιχτός}}
+* Hebrew: {{tt+|he|בהיר|m|tr=bahír}}, {{tt|he|בהירה|f|tr=behirá}}
+* Hindi: {{tt+|hi|हलका}}, {{t+|hi|गोरा|m}}, {{t+|hi|गोरी|f}}
+* Hungarian: {{tt+|hu|világos}}, {{tt+|hu|halvány}}, {{tt+|hu|halovány}} {{qualifier|literary/figurative}}, {{tt+|hu|fakó}}
+* Icelandic: {{tt+|is|fölur}}, {{tt+|is|ljós}}
+* Ido: {{tt+|io|klara}}, {{tt|io|desobskura}}
+* Irish: {{tt|ga|geal-}}, {{tt|ga|bán-}}, {{tt|ga|éadrom}}
+* Italian: {{t+check|it|chiaro|m|f}} [[chiara]]
+* Korean: {{tt+|ko|창백(蒼白)하다}}, {{tt+|ko|옅다}}, {{tt+|ko|밝다}}
+* Kurdish:
+*: Central Kurdish: {{tt+|ckb|کاڵ}}
+*: Northern Kurdish: {{t+check|kmr|geş}}, {{t-check|kmr|([[rengê]]) [[vebiye]]}}
+* Latvian: {{tt|lv|gaišs}}
+* Ligurian: {{tt|lij|ciæo}}
+* Lithuanian: {{tt|lt|šviesus}}
+* Mizo: {{tt|lus|ëng}}
+* Norwegian: {{tt+|no|lys}}, {{tt+|no|blek}}
+* Occitan: {{t+|oc|clar}}
+* Polish: {{tt+|pl|jasny}}
+* Portuguese: {{tt+|pt|clara|f}}, {{tt+|pt|claro|m}}
+* Romansh: {{qualifier|Rumantsch Grischun, Sutsilvan, Surmiran, Puter, Vallader}} {{tt|rm|cler}}, {{qualifier|Sursilvan}} {{tt|rm|clar}}
+* Russian: {{tt+|ru|бле́дный|m}}, {{tt+|ru|све́тлый}}
+* Slovene: {{tt+|sl|svetel}}
+* Spanish: {{tt+|es|claro}}, {{t+|es|pálido}}, {{t+|es|blanquecino}}, {{t|es|blanquinoso}}, {{t|es|blanquizco}}, {{t|es|desblanquecido}}, {{t+|es|blancuzco}}, {{t|es|desblanquiñado}}, {{t+|es|albarizo}}, {{t|es|blancazo}}, {{t|es|musha|f}} {{qualifier|noun|woman of light-colored eyes|Peru}}
+* Swahili: {{tt+|sw|mwanga}}
+* Swedish: {{tt+|sv|blek}}, {{tt+|sv|ljus}}
+* Telugu: {{tt+|te|పాలిపోవు}}
+* Thai: {{tt+|th|อ่อน}}
+* Turkish: {{tt+|tr|soluk}}, {{tt+|tr|açık}}
+* Ukrainian: {{t+|uk|сві́тлий}}
+* Vietnamese: {{tt+|vi|nhạt}}
+* Volapük: {{tt+|vo|klilik}}, {{tt+|vo|paelik}}
+* Welsh: {{tt+|cy|golau}}
+{{trans-bottom}}
+
+{{trans-top|coffee: served with extra milk or cream}}
+* Catalan: {{tt+|ca|tallat}}
+* Danish: {{tt|da|[[med]] [[mælk]]}}, {{tt|da|[[med]] [[fløde]]}}
+* Dutch: {{qualifier|only as idiom 'koffie verkeerd'}} {{tt+|nl|verkeerd}}
+* Finnish: {{tt|fi|maidolla|lit=with milk}}, {{tt|fi|[[maito]]-}} {{q|compounded: maitokahvi}}
+* French: {{t-check|fr|[[au]] [[lait]]}} <!-- was "[[au]] [[lait]]" - assumed sum-of-parts; if an idiom, remove the wikilinks to the individual words. see [[User:Kephir/gadgets/xte#Translation_fixing]] -->
+* Galician: {{tt+|gl|claro}}
+* Icelandic: {{t+check|is|með}} {{t+check|is|mjólk}}, {{t+check|is|hvítur|n|alt=hvítt}} <!-- was "[[hvítur|hvítt]]" - assumed inflected form or vocalised spelling; please verify if linking is acceptable. see [[User:Kephir/gadgets/xte#Translation_fixing]] -->, [[ljós|ljóst]] {{g|n}} {{qualifier|both {{t+check|is|hvítur}} and {{t+check|is|ljós}} are always neuter because the word "coffie" is neuter}}
+* Latvian: {{tt+|lv|balta|f}}
+* Portuguese: {{tt+|pt|pingado}}
+* Spanish: {{tt|es|[[con]] [[leche]]}}
+* Swahili: {{tt+|sw|mwanga}}
+* Swedish: med {{tt+|sv|grädde}}, med {{tt+|sv|mjölk}}
+* Telugu: {{tt|te|లైట్}}
+* Vietnamese: {{t+check|vi|nhẹ}}, {{qualifier|extra milk}} {{t-check|vi|[[nhiều]] [[sữa]]}} <!-- was "[[nhiều]] [[sữa]]" - assumed sum-of-parts; if an idiom, remove the wikilinks to the individual words. see [[User:Kephir/gadgets/xte#Translation_fixing]] -->, {{qualifier|extra cream}} {{t-check|vi|nhiều kem}}
+}}<!-- close {{multitrans}} -->
+{{trans-bottom}}
+
+===Etymology 4===
+From {{inh|en|enm|liȝt}}, {{m|enm|lyghte}}, from {{inh|en|ang|lēht}}, {{m|ang|lēoht}}, {{m|ang|līht}}, from {{inh|en|gmw-pro|*lį̄ht}}, from {{inh|en|gem-pro|*linhtaz}} or {{m|gem-pro|*līhtaz|t=light (in weight)}}, from {{der|en|ine-pro|*h₁lengʷʰ-|t=lightweight}}.
+{{col-top|2|cog}}
+Cognate with {{cog|nl|licht|t=light (not heavy)}}, {{cog|de|leicht|t=light (not heavy)}}, {{cog|lb|liicht|t=lightweight}}, {{cog|wym|łajcht|t=easy}}, {{cog|yi|לײַכט|t=light (of low weight)}}, {{cog|da|let|t=light (not heavy)}}, {{cog|fo|lættur|t=light (of weight); easy (to do)}}, {{cog|is|léttur|t=light (not weighing much); easy}}, {{cog|nb,nn|lett|t=light (not heavy); easy}}, {{cog|sv|lätt|t=light; of low weight}}, {{cog|got|𐌻𐌴𐌹𐌷𐍄𐍃|t=light (in weight)}}; also {{cog|ga|léim|t=jump, leap; obstacle to be jumped; chasm, promontory}}, {{cog|gd|leum}}, {{m|gd|lèim|t=bound, frisk, leap; jump}}, {{cog|cy|llai|t=smaller; fewer, less}}, {{cog|la|levis|t=light (not heavy)}}, {{cog|el|ελαφρός|t=lightweight; slight, thin, weak}}, {{cog|sq|lehtë|t=lightweight; easy}}, {{cog|lt|lengvas|t=light (not heavy); easy}}, {{cog|be|лёгкі|t=light (not heavy); easy}}, {{cog|bg,mk|лек|t=light (not heavy)}}, {{cog|cs|lehký|t=light (of low weight); easy}}, {{cog|pl|lekki}}, {{m|pl|lętki|t=light (having little physical weight); easy (not demanding much effort; not difficult)}}, {{cog|ru|лёгкий|t=lightweight; easy}}, {{cog|sh|ла̏к}}, {{m|sh|ла̏ган}}, {{m|sh|lȁk}}, {{m|sh|lȁgan|t=easy; light (not heavy)}}, {{cog|sk|ľahký|t=light (of low weight); easy}}, {{cog|sl|lahek|t=light (of low weight); easy}}, {{cog|uk|легки́й|t=lightweight}}, {{cog|hy|լանջ}}, {{m|hy|լանջք|t=breast; mountain slope}}, {{cog|fa|لاغر|tr=lâġar|t=lithe; skinny; slender; thin}}, {{cog|txb|lankᵤtse|t=light (not heavy)}}, {{cog|sa|लघु}}, {{m|sa|रघु|t=easy, light, not heavy or difficult}}.
+{{col-bottom}}
+
+====Adjective====
+{{en-adj|er}}
+
+# {{senseid|en|lightweight}} Having [[little]] or relatively little actual [[weight]]; not [[heavy]]; not [[cumbrous]] or [[unwieldy]].
+#: {{ux|en|a '''light''' load ; a '''lighter''' backpack after having removed the books ; '''light''' weapons}}
+#* {{RQ:Spectator|V|463|21 August 1712|passage=These weights did not exert their natural gravity {{...}} insomuch that I could not guess which was '''light''' or heavy whilst I held them in my hand.}}
+# Having little weight as compared with [[bulk]]; of little [[density]] or [[specific gravity]].
+#: {{ux|en|feathers and cork are '''light''' ; oil is '''lighter''' than water}}
+# Of [[short]] or [[insufficient]] weight; weighing less than the [[legal]], [[standard]]{{,}} or [[proper]] amount; [[clipped]] or [[diminished]].
+#: {{ux|en|to issue '''light''' coin}}
+# Lacking that which burdens or makes heavy.
+## Free from [[burden]] or [[impediment]]; [[unencumbered]].
+## Lightly built; typically designed for speed or small loads.
+##: {{ux|en|a '''light''' aircraft ; a '''light''' tank}}
+## {{lb|en|military}} Not heavily [[armed]]; armed with light [[weapon]]s.
+##: {{ux|en|'''light''' infantry; a troop of '''light''' horse}}
+## {{lb|en|nautical|of a [[ship]]}} [[ride|Riding]] high because of no [[cargo]]; {{n-g|by extension,}} pertaining to a ship which is light.
+##: {{ux|en|if a ship is '''light''' or partially loaded ; the '''light''' draft of a vessel, or its '''light''' displacement}}
+## {{lb|en|rail transport|of a [[locomotive]] or [[consist]] of locomotives}} Without any piece of equipment attached or attached only to a [[caboose]].
+##: {{ux|en|the '''light''' locomotives ; a locomotive may be moved '''light'''}}
+##* {{quote-journal|en|year=1951|month=January|author=R. A. H. Weight|title=A Railway Recorder in Essex and Hertfordshire|journal=Railway Magazine|page=44|text=On that August Thursday afternoon, there was little freight traffic; a large "K3" Mogul went down with a short, fast goods, and a W.D. 2-8-0 proceeded northward '''light'''.}}
+## With low [[viscosity]].
+# {{lb|en|cookery}} Not heavy or [[soggy]]; [[spongy]]; well [[raise]]d.
+#: {{ux|en|a '''light''' bread ; sponge cake is a '''light''' cake}}
+# [[low|Low]] in fat, calories, alcohol, salt, etc.
+#: {{ux|en|This '''light''' beer still gets you drunk if you have enough of it.}}
+# [[slight|Slight]], not forceful or intense; small in amount or intensity.
+#: {{ux|en|a '''light''' drizzle//a '''light''' rain was falling//a '''light''' snow set in}}
+# {{senseid|en|having little force or momentum}}Gentle; having little force or momentum.
+#: {{ux|en|This artist clearly had a '''light''', flowing touch.}}
+# Easy to endure or perform.
+#: {{ux|en|'''light''' duties around the house}}
+#* {{RQ:Dryden Virgil|Palamon and Arcite
+|passage='''Light''' sufferings give us leisure to complain.}}
+# Unimportant, [[trivial]], having little value or significance.
+#: {{ux|en|I made some '''light''' comment, and we moved on.}}
+#* {{quote-text|en|year=1902|author=John Buchan|title=The Outgoing of the Tide
+|passage=He had drunk more than was fit for him, and he was singing some '''light''' song, when he saw approaching, as he said, the pale horse mentioned in the Revelation, with Death seated as the rider.}}
+# {{lb|en|obsolete}} [[unchaste|Unchaste]], [[wanton]].
+#* {{RQ:Spenser Faerie Queene|I|i|passage=Long after lay he musing at her mood, / Much grieu'd to thinke that gentle Dame so '''light''', / For whose defence he was to shed his blood.}}
+#* {{RQ:Shakespeare Love's Labour's Lost|V|ii|passage=So do not you; for you are a '''light''' girl.}}
+#* {{RQ:Shakespeare Merchant of Venice|V|i|passage=A '''light''' wife doth make a heavy husband.}}
+# Not encumbered; unembarrassed; clear of impediments; hence, active; [[nimble]]; [[swift]].
+#* {{RQ:Bacon Essayes|chapter=Of Marriage and Single Life|passage=Unmarried men are best friends, best masters {{...}} but not always best subjects, for they are '''light''' to run away.}}
+# [[fast|Fast]]; [[nimble]].
+# {{lb|en|dated}} Easily influenced by trifling considerations; unsteady; unsettled; volatile.
+#: ''a '''light''', vain person; a '''light''' mind''
+#* {{quote-text|en|year=1633|author=w:John Tillotson|title=The Wisdom of being Religious
+|passage=There is no greater argument of a '''light''' and inconsiderate person than profanely to scoff at religion.}}
+# Indulging in, or inclined to, levity; lacking dignity or solemnity; frivolous; airy.
+#: {{ux|en|Ogden Nash was a writer of '''light''' verse.}}
+#* {{RQ:Shakespeare Hamlet|II|ii|passage=Seneca can not be too heavy, nor Plautus too '''light'''.}}
+#* {{quote-text|en|year=1851|author=w:Nathaniel Hawthorne|title=Old News
+|passage=specimens of New England humour laboriously '''light''' and lamentably mirthful}}
+# Not quite sound or normal; somewhat impaired or deranged; dizzy; giddy.
+#* {{RQ:Shakespeare Othello|IV|i|passage=Are his wits safe? Is he not '''light''' of brain?}}
+# Easily interrupted by stimulation.
+#: '''''light''' sleep; '''light''' anesthesia''
+# [[cheerful|Cheerful]].
+#* {{quote-song|1=en|lyricist=w:Yoko Narahashi|composer=w:Yukihide Takekawa|year=1980|artist=w:Godiego|authorlabel=no|title=ア・グッド・デイ|trans-title=A Good Day|url=|album=|text=I wish you a good day, and you'll find a way<br /> To make your spirits '''light''' & gay}}
+
+=====Synonyms=====
+* {{sense|of little weight}} [[unheavy]]
+* {{sense|lightly-built}} {{l|en|lightweight}}
+* {{sense|low in fat, calories, etc}} {{l|en|lite}}, {{l|en|lo-cal}} {{qualifier|low in calories}}, [[low-alcohol]] {{qualifier|low in alcohol}}
+* {{sense|having little force or momentum}} {{l|en|soft}}, {{l|en|gentle}}, {{l|en|delicate}}
+* {{sense|that moves fast}} {{l|en|rapid}}, {{l|en|nimble}}
+* {{sense|having little value or significance}} {{l|en|inconsequential}}, {{l|en|trivial}}, {{l|en|unimportant}}
+
+=====Antonyms=====
+* {{antsense|of little weight}} {{l|en|heavy}}, {{l|en|weighty}}, {{l|en|burdensome}}
+* {{antsense|lightly-built}} {{l|en|cumbersome}}, {{l|en|heavyweight}}, {{l|en|massive}}
+* {{antsense|low in fat, calories, etc}} {{l|en|calorific}} {{qualifier|high in calories}}, [[fatty]] {{qualifier|high in fat}}, [[strong]] {{qualifier|high in alcohol}}
+* {{antsense|having little force or momentum}} {{l|en|forceful}}, {{l|en|heavy}}, {{l|en|strong}}
+* {{antsense|having little value or significance}} {{l|en|crucial}}, {{l|en|important}}, {{l|en|weighty}}
+
+=====Derived terms=====
+{{col4|en|alighten|alt-light
+|feather-light|large light cruiser|light academia|light breeze|light entertainment|light meat|light opera|very light|light carrier|light icebreaker
+|lady of light virtue|light hydrogen
+|light air|light cruiser
+|light as a feather
+|light blue|light stepper
+|light bob
+|light cavalry|lightsome
+|light cream
+|light-duty
+|light engine
+|light-finger
+|light-fingered|Lightfoot|lightplane|nonlight|overlight|ultralight|very-light,verylight
+|light-fingeredness
+|lightfoot
+|light-footed
+|lightful
+|lightfulness
+|light green cell hormon
+|light-handed
+|light-headed|light corn syrup|light-mouthed
+|light-headedly
+|lightheadedness
+|lighthearted
+|light-heeled
+|light horse
+|light-horseman
+|light industry
+|light infantry
+|light in the loafers
+|light in the sneakers
+|light-legged
+|light line
+|lightliness
+|lightly
+|light machine gun
+|light-minded
+|light-mindedly
+|light-mindedness
+|lightness
+|light novel
+|light oil
+|light on one's feet
+|light rail
+|light railway
+|light roller
+|lightskirt
+|lightskirts
+|lightsome
+|lightsomely
+|lightsomeness
+|light-spirited
+|light vehicle
+|light verb
+|light water
+|light waterline
+|lightweight
+|light-winged
+|light-witted
+|make light work of
+|many hands make light work
+|Metropolis light transport
+|over light
+|trip the light fantastic
+}}
+
+=====Translations=====
+{{trans-top|of low weight}}
+{{multitrans|data=
+* Abkhaz: {{t|ab|алас}}
+* Ahom: {{tt|aho|𑜉𑜨𑜧}}
+* Arabic: {{tt|ar|خَفِيف}}
+*: Moroccan Arabic: {{tt|ary|خفيف|tr=ḵfīf}}
+*: South Levantine Arabic: {{tt|ajp|خفيف|tr=ḵafīf}}
+* Aragonese: {{t|an|lixero}}
+* Armenian: {{tt+|hy|թեթև}}
+* Aromanian: {{tt|rup|lishor}}, {{tt|rup|licshor}}, {{tt|rup|ljiushor}}
+* Assamese: {{tt|as|পাতল}}
+* Asturian: {{t|ast|llivianu}}
+* Avar: {{t|av|тӏадагьаб}}
+* Azerbaijani: {{tt+|az|yüngül}}
+* Belarusian: {{tt+|be|лёгкі}}
+* Breton: {{t+|br|skañv}}
+* Bulgarian: {{tt+|bg|лек}}
+* Catalan: {{tt+|ca|lleuger}}
+* Cebuano: {{t|ceb|gaan}}
+* Central Bikol: {{t|bcl|magian}} 
+* Chechen: {{t|ce|дай}}
+* Chepang: {{tt|cdm|खुय्‍ङःमै}}
+* Chinese:
+*: Cantonese: {{tt|yue|輕|tr=heng1}}
+*: Mandarin: {{tt+|cmn|輕|tr=qīng}}
+* Chinook Jargon: {{tt|chn|wik-tʰil}}
+* Cornish: {{t|kw|skav}}
+* Czech: {{tt+|cs|lehký}}
+* Danish: {{tt+|da|let}}
+* Dutch: {{tt+|nl|licht}}
+* Esperanto: {{tt+|eo|malpeza}}, {{t|eo|leĝera}}
+* Evenki: {{t|evn|энимкун}}
+* Faroese: {{tt|fo|lættur}}
+* Finnish: {{tt+|fi|kevyt}}
+* French: {{tt+|fr|léger}}
+* Friulian: {{tt|fur|lizêr}}
+* Galician: {{tt|gl|livián}}, {{tt+|gl|lixeiro}}
+* Georgian: {{tt+|ka|მსუბუქი}}, {{t|ka|მჩატე}}
+* German: {{tt+|de|leicht}}
+* Gothic: {{tt|got|𐌻𐌴𐌹𐌷𐍄𐍃}}
+* Greek: {{tt+|el|αβαρής}}, {{t+|el|ελαφρός}}, {{t+|el|ελαφρύς}}
+*: Ancient Greek: {{tt|grc|ἐλαφρός}}, {{tt|grc|κοῦφος}}, {{tt|grc|ἀβαρής}}
+* Hawaiian: {{t|haw|māmā}}
+* Hebrew: {{tt+|he|קל|m|tr=kál}}, {{tt+|he|קלה|f|tr=kaláh}}
+* Hindi: {{tt+|hi|हलका}}
+* Hmong:
+*: White Hmong: {{tt|mww|sib}}
+* Hungarian: {{tt+|hu|könnyű}}
+* Icelandic: {{tt+|is|léttur|m}}, {{tt|is|létt|f|n}}
+* Ido: {{tt+|io|lejera}}
+* Ilocano: {{t|ilo|nalag-an}}
+* Indonesian: {{t+|id|ringan}}
+* Ingush: {{t|inh|дай}}, {{t|inh|атта}}
+* Isan: {{t-needed|tts}}
+* Italian: {{tt+|it|leggero}}
+* Iu Mien: {{tt|ium|heng}}
+* Japanese: {{tt+|ja|軽い|tr=かるい, karui}}
+* Javanese: {{t+|jv|ènthèng}}
+* Kabuverdianu: {{tt|kea|lébi}}
+* Kaitag: {{t|xdq|кук}}
+* Kazakh: {{t|kk|жеңіл}}
+* Khmer: {{tt+|km|ស្រាល|tr=sraal}}
+* Korean: {{tt+|ko|가볍다}}, {{tt|ko|[[경량(輕量)]][[-의]]}}
+* Kurdish:
+*: Central Kurdish: {{tt|ckb|سووک}}
+*: Northern Kurdish: {{tt+|kmr|sivik}}
+* Ladin: {{tt|lld|lesier}}
+* Lao: {{tt|lo|ຍ່ອງ}}, {{tt|lo|ເບົາ}}
+* Latin: {{tt+|la|levis}}
+* Latvian: {{tt|lv|viegls}}
+* Lezgi: {{t|lez|кьезил}}
+* Lithuanian: {{tt+|lt|lengvas}}
+* Lombard: {{t|lmo|legger}}
+* Lü: {{tt|khb|ᦢᧁ}}
+* Macedonian: {{tt|mk|лесен}}
+* Malay: {{t+|ms|ringan}}
+* Maltese: {{tt+|mt|ħafif}}
+* Māori: {{t|mi|māmā}}
+* Mizo: {{tt|lus|zäng}}
+* Mongolian: {{t+|mn|хөнгөн}}
+* Muong: {{tt|mtq|nhẽl}}
+* Nanai: {{t|gld|хэню}}
+* Norman: {{tt|nrf|ligi}}
+* Norwegian: {{tt+|no|lett}}
+* Nuosu: {{tt|ii|ꀁꇖ}}
+* Occitan: {{tt+|oc|leugièr}}
+* Old Church Slavonic: {{tt|cu|льгъкъ}}
+* Old Prussian: {{tt|prg|lāngus|m}}
+* Old Tupi: {{t|tpw|bebuî}}
+* Ossetian: {{tt|os|рог}}
+* Pacoh: {{tt|pac|nghial}}
+* Papiamentu: {{t|pap|lihé}}
+* Persian: {{tt+|fa|سَبُک|tr=sabok}}
+* Polish: {{tt+|pl|lekki}}
+* Portuguese: {{tt+|pt|leve|m|f}}
+* Quechua: {{tt|qu|chhalla}}
+* Rarotongan: {{t|rar|māmā}}
+* Romanian: {{tt+|ro|ușor}}
+* Romansh: {{tt|rm|lev}}, {{tt|rm|liger}}
+* Russian: {{tt+|ru|лёгкий}}
+* Rwanda-Rundi: {{tt|rw|huhwa}}
+* Samoan: {{t|sm|māmā}}
+* Sanskrit: {{tt+|sa|लघु}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt|sh|лак}}
+*: Latin: {{tt+|sh|lak}}
+* Shan: {{tt+|shn|မဝ်}}
+* Sicilian: {{tt+|scn|liggeru}}
+* Slovak: {{tt|sk|ľahký}}
+* Slovene: {{tt+|sl|láhek}}
+* Sorbian:
+*: Lower Sorbian: {{tt|dsb|lažki}}
+* Spanish: {{tt+|es|ligero}}, {{tt+|es|liviano}} {{qualifier|formal}}
+* Swahili: {{tt|sw|epesi}}
+* Swedish: {{tt+|sv|lätt}}
+* Tagalog: {{tt|tl|magaan}}
+* Tahitian: {{t|ty|māmā}}
+* Tày: {{t|tyz|bâu}}, {{t|tyz|bau}}, {{t|tyz|nẩư}}
+* Telugu: {{tt+|te|తేలిక}}
+* Thai: {{tt+|th|เบา}}
+*: Northern Thai: {{t-needed|nod}}
+* Tibetan: {{tt|bo|ཡང་པོ}}
+* Tocharian B: {{tt|txb|lankᵤtse}}
+* Turkish: {{tt+|tr|yeğni}}, {{tt+|tr|hafif}}
+*: Ottoman Turkish: {{t|ota|خفیف|tr=hafif}}
+* Tuvan: {{tt|tyv|чиик}}
+* Ukrainian: {{tt|uk|ле́гкий}}
+* Uzbek: {{tt+|uz|yengil}}
+* Venetan: {{t|vec|lesiéro}}, {{tt|vec|ƚixièro}}, {{tt|vec|lixiero}}, {{tt+|vec|liđier}}
+* Vietnamese: {{tt+|vi|nhẹ}}, {{tt+|vi|nhẹ nhàng}}
+* Welsh: {{tt+|cy|ysgafn}}
+* Yakut: {{t|sah|чэпчэки}}
+* Yiddish: {{tt|yi|לײַכט}}
+* Zazaki: {{tt|zza|senık}}
+* Zhuang: {{tt|za|mbaeu}}
+{{trans-bottom}}
+
+{{trans-top|lightly-built}}
+* Finnish: {{tt+|fi|kevyt}}, {{tt|fi|kevytrakenteinen}}
+* French: {{tt+|fr|léger|m}}
+* Hebrew: {{tt+|he|קל|m|tr=kál}}
+* Hungarian: {{tt+|hu|könnyű}}
+* Norman: {{tt|nrf|ligi}}
+* Polish: {{tt+|pl|lekki|m}}
+* Swahili: {{tt+|sw|mwanga}}
+* Telugu: {{tt|te|తేలికైన నిర్మాణము}}
+* Vietnamese: {{tt+|vi|nhẹ}}, {{qualifier|indicates speed due to lightness}} {{tt+|vi|nhanh nhẹn}}
+{{trans-bottom}}
+
+{{trans-top|having little force or momentum}}
+* Bulgarian: {{tt+|bg|лек}}
+* Finnish: {{tt+|fi|kevyt}}
+* Hungarian: {{tt+|hu|könnyed}}, {{tt+|hu|finom}}
+* Māori: {{tt|mi|maiangi}} {{qualifier|of a breeze}}, {{tt|mi|areare}} {{qualifier|of rain}}
+* Polish: {{tt+|pl|lekki|m}}, {{tt+|pl|delikatny|m}}
+* Swahili: {{tt+|sw|mwanga}}
+* Telugu: {{tt|te|స్వల్ప సిబ్బంది}}
+{{trans-bottom}}
+
+{{trans-top|easy to endure or perform}}
+* Bulgarian: {{tt+|bg|лесен}}
+* Esperanto: {{t|eo|leĝera}}
+* Finnish: {{tt+|fi|kevyt}}
+* Hungarian: {{tt+|hu|könnyű}}
+* Yiddish: {{tt|yi|לײַכט}}
+{{trans-bottom}}
+
+{{trans-top|low in fat, calories, alcohol, salt, etc.}}
+* Catalan: {{tt+|ca|lleuger}}, {{tt+|ca|light}}
+* Czech: {{tt|cs|dietní}}
+* Danish: {{tt|da|kalorielet}}
+* Dutch: {{tt+|nl|licht}}
+* Finnish: {{qualifier|in compounds}} {{tt+|fi|kevyt|alt=kevyt-}}
+* French: {{tt+|fr|léger}}
+* German: {{tt+|de|leicht}}
+* Hawaiian: {{t|haw|māmā}}
+* Hebrew: {{tt|he|דיאטתי|m|tr=diatéti}}, {{tt|he|דיאטתית|f|tr=diatétit}}, {{tt+|he|קל|m|tr=kál}}, {{tt+|he|קלה|f|tr=kaláh}}
+* Hungarian: {{tt+|hu|könnyű}} {{qualifier|low-calorie or easily digestable foods}}, {{tt+|hu|könnyed}} {{qualifier|low-calorie or easily digestable foods}}, {{tt+|hu|light}} {{qualifier|in marketing}}, {{tt|hu|lájtos}} {{qualifier|slang}}
+* Icelandic: {{tt|is|fitulítill|m}}, {{tt|is|fituskertur|m}}, {{tt|is|fitusnauður|m}}
+* Italian: {{t+check|it|leggero|m}}, {{t+check|it|leggera|f}}
+* Korean: {{qualifier|prefix}} {{tt|ko|저(低)하다}}
+* Norman: {{tt|nrf|ligi}}
+* Norwegian: {{tt+|no|lett}}-
+* Persian: {{tt+|fa|سبک|tr=sabok}}
+* Polish: {{tt+|pl|lekki}}, {{t+|pl|lekkostrawny}}
+* Portuguese: {{tt+|pt|light}}, {{tt+|pt|leve}}
+* Sorbian:
+*: Lower Sorbian: {{tt|dsb|lažki}}
+* Spanish: {{tt+|es|ligero}}, {{t+|es|light}}
+* Swahili: {{tt+|sw|mwanga}}
+* Swedish: {{tt+|sv|lätt}}-
+* Turkish: {{tt+|tr|hafif}}
+* Vietnamese: {{qualifier|low in alcohol}} {{tt+|vi|nhẹ}}
+* Welsh: {{tt+|cy|ysgafn}}
+{{trans-bottom}}
+
+{{trans-top|of little significance}}
+* Bulgarian: {{tt+|bg|незначителен}}
+* Danish: {{tt|da|banal}}, {{tt+|da|triviel}}
+* Dutch: {{tt+|nl|onbelangrijk}}, {{tt+|nl|triviaal}}
+* Finnish: {{tt+|fi|kevyt}}
+* French: {{tt+|fr|léger}}, {{tt|fr|sans importance}}
+* Hungarian: {{tt+|hu|apró}}, {{tt+|hu|kis}}
+* Norwegian: {{tt+|no|banal}}, {{tt+|no|enkel}}
+* Polish: {{tt+|pl|błahy|m}}
+* Portuguese: {{tt+|pt|banal}}
+* Swahili: {{tt+|sw|mwanga}}
+* Telugu: {{tt|te|స్వల్ప సంకేతం}}
+* Vietnamese: {{tt+|vi|tầm thường}}
+* Welsh: {{tt+|cy|disylw}}, {{tt+|cy|dibwys}}, {{tt+|cy|ysgafn}}
+{{trans-bottom}}
+
+{{trans-top|of a locomotive: travelling with no carriages}}
+{{trans-bottom}}
+
+{{trans-top|unchaste, wanton}}
+* Finnish: {{tt+|fi|kevytmielinen}}
+{{trans-bottom}}
+
+{{trans-top|not heavily armed}}
+* Finnish: {{tt+|fi|kevyt}}
+* Hungarian: {{tt+|hu|könnyű}}
+{{trans-bottom}}
+
+{{trans-top|not encumbered; unembarrassed}}
+* Finnish: {{tt+|fi|huoleton}}, {{tt+|fi|kevytmielinen}}
+{{trans-bottom}}
+
+{{trans-top|easily influenced by trifling considerations}}
+* Bulgarian: {{tt+|bg|лекомислен}}
+* Finnish: {{tt+|fi|pinnallinen}}
+{{trans-bottom}}
+
+{{trans-top|lacking dignity or solemnity}}
+* Bulgarian: {{tt+|bg|несериозен}}
+* Finnish: {{tt+|fi|kevytmielinen}}
+* Spanish: {{t+|es|ligero}}, {{t+|es|liviano}}
+{{trans-bottom}}
+
+{{trans-top|not quite sound or normal}}
+* Finnish: {{tt+|fi|sekaisin}}
+{{trans-bottom}}
+
+{{trans-top|not of the legal weight}}
+* Finnish: {{tt+|fi|kevyt}}
+{{trans-bottom}}
+
+{{trans-top|easily interrupted}}
+* Finnish: {{tt+|fi|kevyt}}
+}}<!-- close {{multitrans}} -->
+{{trans-bottom}}
+
+{{checktrans-top}}
+* Guarani:
+*: Paraguayan Guarani: {{t+check|gug|vevúi}}
+* Ido: {{t+check|io|lejera}}
+* Indonesian: {{t+check|id|ringan}}
+* Interlingua: {{t-check|ia|leve}}, {{t-check|ia|legier}}
+* Javanese: {{t-check|jv|enteng}}
+* Lithuanian: {{qualifier|1}} {{t+check|lt|lengvas|m}}, {{qualifier|2}} {{t-check|lt|šviesus|m}}
+* Romanian: {{t+check|ro|ușor|m}}, {{t+check|ro|ușoară|f}}
+{{trans-bottom}}
+
+====Adverb====
+{{wikidata lexeme|L333822}}
+{{en-adv|er}}
+
+# Carrying little.
+#: {{ux|en|I prefer to travel '''light'''.}}
+
+=====Derived terms=====
+* {{l|en|travel light}}
+
+=====Related terms=====
+{{col4|en
+|lightliness
+|lightly
+}}
+
+=====Translations=====
+{{trans-top|carrying little}}
+* Bulgarian: {{t+|bg|леко}}
+* Finnish: {{t+|fi|kevyesti}}
+{{trans-bottom}}
+
+====Noun====
+{{en-noun}}
+
+# {{lb|en|curling}} A [[stone]] that is not thrown hard enough.
+# {{n-g|See {{m|en|lights||lungs}}.}}
+# {{lb|en|AU|uncountable}} A low-alcohol [[lager]].
+#* {{quote-book|1=en|year=2010|author=w:Peter Corris|title=Torn Apart|publisher=Allen and Unwin|page=117|text=We crossed to the pub on the corner of Carlisle Street and I ordered two schooners of old for him and one of '''light''' for me.}}
+# {{lb|en|military|historical}} A member of the [[light cavalry]].
+
+====Verb====
+{{en-verb}}
+
+# {{lb|en|nautical}} To [[unload]] a ship, or to [[jettison]] material to make it lighter
+# To lighten; to ease of a burden; to take off.
+#* {{RQ:Spenser Faerie Queene|passage=His mailèd habergeon she did undight, / And from his head his heavy burgonet did '''light'''.}}
+# {{lb|en|by extension}} To leave; to depart.
+
+=====Derived terms=====
+{{col4|en
+|light along
+|light down
+|lighter
+|light up
+}}
+
+=====Translations=====
+{{trans-top|to unload a ship}}
+* Finnish: {{t+|fi|purkaa}}, {{t+|fi|keventää}}
+* Italian: {{t|it|allegiare}}, {{t+|it|allibare}}
+* Norwegian: {{t|no|losse}}
+* Swahili: {{t+|sw|mwanga}}
+{{trans-bottom}}
+
+{{trans-top|to ease of a burden}}
+* Bulgarian: {{t+|bg|облекчавам}}
+* Finnish: {{t+|fi|keventää}}
+{{trans-bottom}}
+
+===Etymology 5===
+From {{inh|en|enm|lighten}}, from {{inh|en|ang|līhtan|t=to relieve}}, from {{inh|en|gmw-pro|*lį̄htijan}}, from {{inh|en|gem-pro|*linhtijaną}}, from {{m|gem-pro|*linhtaz|t=light}}.
+
+====Verb====
+{{en-verb|~s|~ing|lit,~ed,~<l:obsolete>}}
+
+# To find by [[chance]].
+#: {{ux|en|I '''lit''' upon a rare book in a second-hand bookseller's.}}
+# To [[stop]] upon {{gloss|of eyes or a glance}}; to [[notice]]
+#* {{RQ:London Call of the Wild|page=34|passage="Sacredam!" he cried, when his eyes '''lit''' upon Buck. "Dat one dam bully dog! Eh? How moch?"}}
+# {{senseid|en|alight}}{{lb|en|archaic}} To [[alight]]; to land or come down.
+#: {{ux|en|She fell out of the window but luckily '''lit''' on her feet.}}
+#* {{RQ:Defoe Crusoe|pages=356–357|pageref=356|passage=[W]e knew not what Courſe to take, but the Creatures [wolves] reſolv'd us ſoon, for they gather'd about us preſently, in Hopes of Prey, {{...}} I drew my little Troop in among thoſe Trees, and placing our ſelves in a Line, behind one long Tree, I advis'd them all to '''light''', and keeping that Tree before us, for a Breaſt-Work, to ſtand in a Triangle, or three Fronts, encloſing our Horſes in the Center.}}
+#* '''1769''', Benjamin Blayney (Ed.), ''King James Bible'' (Genesis 24:64)
+#*: And Rebekah lifted up her eyes, and when she saw Isaac, she '''lighted''' off the camel.
+#* {{quote-text|en|year=1885|author=w:Theodore Roosevelt|title=Hunting Trips of a Ranchman
+|passage=Some kinds of ducks in '''lighting''' strike the water with their tails first, and skitter along the surface for a few feet before settling down.}}
+#* '''1957''', {{w|Dr. Seuss}} (Theodor Geisel), ''{{w|The Cat in the Hat}}''
+#*: And our fish came down, too. He fell into a pot! He said, "Do I like this? Oh, no! I do not. This is not a good game," Said our fish as he '''lit'''.
+#* {{quote-journal|en|date=31 Dec 77|volume=4|number=26|journal=Gay Community News|page=10|author=Lisa Nussbaum|title=Jacqui Mac: Bringing Her Dreams Together|text=One cannot help but notice a teasingly elusive air about her, as if she were a butterfly that refused to '''light''' and fluttered just out of reach of its would-be captor.}}
+
+=====Synonyms=====
+* {{sense|find by chance}} {{l|en|chance upon}}, {{l|en|come upon}}, {{l|en|find}}, {{l|en|happen upon}}, {{l|en|hit upon}}
+* {{sense|alight}} {{l|en|alight}}, {{l|en|land}}
+
+=====Derived terms=====
+{{col4|en
+|light into
+|light out
+}}
+
+=====Translations=====
+{{trans-top|to find by chance}}
+* Bulgarian: {{t|bg|натъквам се}}
+* Danish: {{t|da|snuble over}}
+* Finnish: {{t|fi|[[löytää]] [[sattumalta]]}}, {{t+|fi|törmätä}}
+* Ido: {{t+|io|trovar}}
+* Swahili: {{t+|sw|mwanga}}
+* Vietnamese: {{t|vi|[[tình cờ]] [[gặp]]}}
+{{trans-bottom}}
+
+{{trans-top|alight}}
+* Bulgarian: {{t+|bg|слизам}}
+* Danish: {{t+|da|lande}}
+* Finnish: {{t+|fi|päätyä}}, {{t+|fi|laskeutua}}, {{t+|fi|pudota}}
+* Irish: {{t|ga|tuirling}}
+* Swahili: {{t+|sw|mwanga}}
+* Vietnamese: {{t+|vi|xuống}}
+{{trans-bottom}}
+
+{{cln|en|irregular verbs}}
+{{C|en|Energy|Light sources}}

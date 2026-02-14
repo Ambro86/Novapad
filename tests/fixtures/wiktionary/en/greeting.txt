@@ -1,0 +1,119 @@
+==English==
+
+===Etymology===
+{{surf|en|greet|-ing}}.
+
+===Pronunciation===
+* {{IPA|en|/ˈɡɹiːtɪŋ/}}
+* {{audio|en|LL-Q1860 (eng)-Vealhurl-greeting.wav|a=Southern England}}
+* {{rhymes|en|iːtɪŋ|s=2}}
+
+===Noun===
+{{en-noun|~}}
+
+# A [[conventional]] phrase used to start a [[letter]] or [[conversation]] or otherwise to acknowledge a person's [[arrival]] or [[presence]].
+#: {{ux|en|It's polite to begin a letter with a '''greeting''', but this practice is less common in email.}}
+# {{lb|en|uncountable}} The action of the verb ''to greet''.
+#* {{RQ:Churchill Celebrity|chapter=2|passage=I had occasion […] to make a somewhat long business trip to Chicago, and on my return […] I found Farrar awaiting me in the railway station. He smiled his wonted fraction by way of '''greeting''', […], and finally leading me to his buggy, turned and drove out of town.}}
+
+====Derived terms====
+{{col|en|greeting card
+|greetingless
+|greetingly
+|greetings card
+|nongreeting
+|season's greetings
+}}
+
+====Related terms====
+* {{l|en|greet}}
+
+====Translations====
+{{trans-top|acknowledgement of a persons presence or arrival}}
+* Albanian: {{t+|sq|përshëndetje|f}}
+* Arabic: {{t+|ar|تَحِيَّة|f}}
+* Armenian: {{t+|hy|բարև}}
+* Assamese: {{t|as|ওলগ}}
+* Azerbaijani: {{t+|az|təbrik}}, {{t+|az|salam}}
+* Belarusian: {{t|be|прывіта́нне|n}}, {{t+|be|віта́нне|n}}
+* Bengali: {{t+|bn|সালাম}}
+* Bulgarian: {{t+|bg|по́здрав|m}}, {{t+|bg|приве́тствие|n}}
+* Burmese: {{t|my|ပဋိသန္ဒါရစကား}}
+* Catalan: {{t+|ca|salut|m}}, {{t+|ca|salutació|f}}
+* Chinese:
+*: Mandarin: {{t+|cmn|迎接|tr=yíngjiē}}
+* Czech: {{t+|cs|pozdrav|m}}
+* Danish: {{t+|da|hilsen|c}}
+* Dutch: {{t+|nl|begroeting|f}}, {{t+|nl|groet|m}}
+* Egyptian: {{t-egy|njnj|h=n:y-n:y-A85}}
+* Esperanto: {{t+|eo|saluto}}
+* Estonian: {{t|et|tervitus}}
+* Faroese: {{t|fo|heilsa|f}}, {{t|fo|heilsan|f}}, {{t|fo|kvøða|f}}
+* Finnish: {{t+|fi|tervehdys}}
+* French: {{t+|fr|salutation|f}}, {{t+|fr|salut|m}}
+* Frisian:
+*: West Frisian: {{t|fy|begroeting|c}}
+* Georgian: {{t|ka|მისალმება}}
+* German: {{t+|de|Gruß|m}}, {{t+|de|Begrüßung|f}}
+* Greek: {{t+|el|χαιρετισμός|m}}
+*: Ancient Greek: {{t|grc|ἀσπασμός|m}}
+* Hindi: {{t+|hi|अभिवादन|m}}
+* Hungarian: {{t+|hu|üdvözlet}}, {{t+|hu|köszöntés}}
+* Icelandic: {{t+|is|kveðja|f}}
+* Ido: {{t+|io|saluto}}
+* Italian: {{t+|it|saluto|m}}, {{t+|it|benvenuto|m}}
+* Japanese: {{t+|ja|挨拶|tr=あいさつ, aisatsu}}
+* Kazakh: {{t|kk|сәлемдесу}}
+* Khmer: {{t|km|បច្ចុគ្គមន៍}}, {{t+|km|ស្វាគមន៍}}
+* Korean: {{t+|ko|인사(人事)}}
+* Kyrgyz: {{t+|ky|саламдашуу}}
+* Latin: {{t+|la|salūtātiō|f}}
+* Latvian: {{t|lv|sveiciens|m}}
+* Lithuanian: {{t|lt|pasveikinimas|m}}
+* Luganda: {{t|lg|okubuuza}}, {{t|lg|okulamusa}}
+* Luxembourgish: {{t|lb|Begréissung|f}}
+* Macedonian: {{t|mk|поздрав|m}}, {{t|mk|поздравување|n}}
+* Malay: {{t+|ms|ucapan}}
+* Māori: {{t|mi|waioha}}, {{t|mi|mānawa}}
+* Mongolian:
+*: Cyrillic: {{t+|mn|мэндчилгээ}}
+* Norwegian:
+*: Bokmål: {{t+|nb|hilsen|m}}
+*: Nynorsk: {{t+|nn|helsing}}
+* Persian: {{t+|fa|پیشواز|tr=pišvâz}}, {{t+|fa|تبریک|tr=tabrik}}, {{t+|fa|سلام|tr=salâm}}, {{t+|fa|احوال‌پرسی|tr=ahvâl-porsi}}
+* Plautdietsch: {{t|pdt|Gruss|m}}
+* Polish: {{t+|pl|pozdrowienie|n}}, {{t+|pl|powitanie|n}}
+* Portuguese: {{t+|pt|saudação|f}}
+* Romanian: {{t+|ro|salut|n}}, {{t+|ro|salutare|f}}
+* Russian: {{t+|ru|приве́тствие|n}}
+* Scottish Gaelic: {{t|gd|fàilte|f}}
+* Serbo-Croatian:
+*: Cyrillic: {{t|sh|по̏здра̄в|m}}
+*: Latin: {{t+|sh|pȍzdrāv|m}}
+* Slovak: {{t|sk|pozdrav|m}}
+* Slovene: {{t+|sl|pozdrav}}
+* Spanish: {{t+|es|saludo|m}}, {{t+|es|salutación|f}}, {{t+|es|saludación|f}} {{qualifier|rare}}
+* Swahili: {{t+|sw|salamu}}
+* Swedish: {{t+|sv|hälsning|c}}, {{t+|sv|hälsningsfras}}
+* Tagalog: {{t|tl|pagbati}}, {{t|tl|bati}}, {{t|tl|saludo}}, {{t|tl|pugay}}
+* Tajik: {{t|tg|табрик}}, {{t|tg|салом}}
+* Thai: {{t+|th|การทักทาย}}
+* Tibetan: {{t-needed|bo}}
+* Turkish: {{t+|tr|tebrik}}, {{t+|tr|selam}}
+* Ukrainian: {{t|uk|віта́ння|n}}, {{t|uk|привіта́ння|n}}
+* Uzbek: {{t+|uz|tabrik}}, {{t|uz|salomlashish}}
+* Vietnamese: {{t+|vi|chào|alt=lời chào}}
+* Volapük: {{t+|vo|glid}}
+* Welsh: {{t+|cy|cyfarchiad|m}}
+* Yiddish: {{t|yi|גרוס}}
+* Zazaki: {{t+|zza|selam}}
+{{trans-bottom}}
+
+====See also====
+* {{l|en|hello}}
+* {{l|en|salutation}}
+
+===Verb===
+{{head|en|verb form}}
+
+# {{infl of|en|greet||ing-form}}

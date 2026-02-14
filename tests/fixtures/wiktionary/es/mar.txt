@@ -1,0 +1,194 @@
+== {{lengua|es}} ==
+{{pron-graf|audio=LL-Q1321 (spa)-Rodelar-mar.wav}}
+[[Archivo:Sea of Chile.jpg|thumb|[1]]]
+=== Etimología ===
+{{etimología|la|mare}}, y este del protoindoeuropeo {{l+|ine-pro|*móri}}.
+=== {{sustantivo ambiguo|es}} ===
+{{es.sust}}
+;1: {{plm|cuerpo}} de [[agua]] [[salado|salada]] que rodea los [[continente]]s de la Tierra.
+;2 {{csem|geografía}}: Cada una de las divisiones que se hacen al mar{{-sub|1}}, frecuentemente en función de los accidentes geográficos.
+{{hipónimo|océano}}.
+;3 {{csem|geografía}}: División del mar{{-sub|1}} que por su extensión no alcanza la categoría de [[océano]].
+;4 {{csem|geografía}}: {{plm|lago}} [[grande]] y de agua salada.
+;5: Figuradamente, gran cantidad de algo.
+=== Locuciones ===
+{{trad-arriba|Locuciones con «mar»}}
+* [[mar ancha]]
+* [[mar arbolada]]
+* [[mar de fondo]]
+* [[mar gruesa]]
+* [[mar lunar]]
+* [[a mares]]
+* [[estar hecho un brazo de mar]]
+* [[hacerse a la mar]]
+* [[mala mar]]
+* [[mar adentro]]
+{{trad-abajo}}
+=== Refranes ===
+* [[de la mar el mero, de la tierra el cordero]]
+* [[gota a gota, el mar se agota]]
+=== Información adicional ===
+* '''Género:''' En el lenguaje formal predomina el género masculino, mientras que en el lenguaje marinero y el poético se usa más en femenino.
+{{derivad|marea|mareado|mareador|mareaje|mareal|mareamiento|mareante|marear|marejada|maremagno|maremoto|marengo|mareo|mareoso|marero|mareta|maretazo|mareógrafo|marina|marinaje|marinante|marinar|marine|marinear|marinera|marinerado|marinerazo|marinero|marinería|marinesco|marinista|marino|marítimo|amarar|amaraje|amarizar|amarizaje|amerizar|amerizaje}}
+
+=== Véase también ===
+{{Wikiquote}}
+{{Wikipedia}}
+* [[océano]]
+* [[marear]]
+* [[marejada]]
+* [[marino]]
+=== Traducciones ===
+{{trad-arriba}}
+{{t|af|a1=1|t1=see}}
+{{t|ain|a1=1|t1=エト゚ィ|t2=エツ゚ィ|t3=エトゥイ}}
+{{t|ay|a1=1|t1=lamara}}
+{{t|de|a1=1–4|g1=n|t1=Meer}}
+{{t|sq|a1=1|t1=deti}}
+{{t|sai-all|a1=1|t1=mar}}
+{{t|am|a1=1|t1=ባህር}}
+{{t|ar|i1=s|t1=بحر|tl1=[[baĥr]]}}
+{{t|arz|a1=1|t1=بحر}}
+{{t|arc|a1=1|t1=ܝܡܐ}}
+{{t|hy|a1=1|t1=ծով}}
+{{t|ast|a1=1|t1=mar}}
+{{t|av|a1=1|t1=ралъад}}
+{{t|az|a1=1|t1=dəniz}}
+{{t|nds-de|a1=1|t1=meer}}
+{{t|nds-nl|a1=1|t1=zee}}
+{{t|ba|a1=1|t1=диңгеҙ}}
+{{t|bar|a1=1|t1=meer}}
+{{t|bn|a1=1|t1=সাগর}}
+{{t|bcl|a1=1|t1=dagat}}
+{{t|be|a1=1|t1=мора|tl1=[[mora]]}}
+{{t|my|a1=1|t1=ပင်လယ်}}
+{{t|br|a1=1|t1=mor}}
+{{t|bg|i1=s|t1=море}}
+{{t|cak|t1=palow}}
+{{t|yue|a1=1|t1=海|tl1=hoi2}}
+{{t|ca|a1=1–5|g1=m|g2=f|t1=mar}}
+{{t|cs|a1=1|t1=moře}}
+{{t|ko|a1=1|t1=바다|tl1=bada}}
+{{t|ht|a1=1|t1=lamè}}
+{{t|da|a1=1|t1=hav}}
+{{t|eml|a1=1|t1=mèr}}
+{{t|sk|a1=1|t1=more}}
+{{t|sl|a1=1|t1=morje}}
+{{t|eo|a1=1|t1=maro}}
+{{t|et|a1=1|t1=meri}}
+{{t|ext|a1=1|t1=mari}}
+{{t|fo|a1=1|t1=sjógvur}}
+{{t|fi|a1=1|t1=meri}}
+{{t|vls|a1=1|t1=zêe}}
+{{t|fr|a1=1–4|g1=f|t1=mer}}
+{{t|fy|a1=1|t1=see}}
+{{t|stq|a1=1|t1=see}}
+{{t|fur|a1=1|t1=mâr}}
+{{t|gd|a1=1|t1=muir}}
+{{t|cy|a1=1|t1=môr}}
+{{t|gl|a1=1–5|g1=m|t1=mar}}
+{{t|gan|a1=1|t1=海|tl1=hai3}}
+{{t|ka|a1=1|t1=ზღვა}}
+{{t|got|g1=f|g2=m|i1=s|t1=𐌼𐌰𐍂𐌴𐌹|t2=𐍃𐌰𐌹𐍅𐍃|tl1=marei|tl2=saiws}}
+{{t|el|a1=1–3|t1=θάλασσα}}
+{{t|he|a1=1|t1=ים|tl1=yam}}
+{{t|hi|a1=1|t1=सागर}}
+{{t|hif|a1=1|t1=samundar}}
+{{t|hu|a1=1|t1=tenger}}
+{{t|yi|a1=1|t1=ים}}
+{{t|io|a1=1|t1=maro}}
+{{t|ilo|a1=1|t1=baybay}}
+{{t|id|a1=1|t1=laut}}
+{{t|en|a1=1–4|t1=sea}}
+{{t|ang|a1=1|t1=sǣ}}
+{{t|ia|a1=1|t1=mar}}
+{{t|ga|a1=1|t1=farraige}}
+{{t|is|a1=1|t1=sjór}}
+{{t|it|a1=1–5|g1=f|t1=mare}}
+{{t|ja|a1=1–5|t1=海|tl1=[[うみ]], [[umi]]}}
+{{t|jv|a1=1|t1=segara}}
+{{t|lad|a1=1|t1=mar}}
+{{t|kn|a1=1|t1=ಸಮುದ್ರ}}
+{{t|krc|a1=1|t1=тенгиз}}
+{{t|alc|a1=1|t1=čams}}
+{{t|kk|a1=1|t1=теңіз}}
+{{t|kg|a1=1|t1=kalunga}}
+{{t|kv|a1=1|t1=саридз}}
+{{t|avk|a1=1–4|t1=bira}}
+{{t|ku|a1=1|t1=derya}}
+{{t|ckb|a1=1|t1=زەریا}}
+{{t|lbe|a1=1|t1=хьхьири}}
+{{t|lo|a1=1|t1=ທະເລ}}
+{{t|la|a1=1|t1=mare}}
+{{t|lez|a1=1|t1=гьуьл}}
+{{t|lv|a1=1|t1=jūra}}
+{{t|li|a1=1|t1=zieë}}
+{{t|ln|a1=1|t1=lombú}}
+{{t|lt|a1=1|t1=jūra}}
+{{t|jbo|a1=1|t1=xamsi}}
+{{t|lmo|a1=1|t1=mar}}
+{{t|lb|a1=1|t1=mier}}
+{{t|mk|a1=1|t1=море}}
+{{t|gv|a1=1|t1=mooir}}
+{{t|ml|a1=1|t1=കടൽ}}
+{{t|ms|a1=1|t1=laut}}
+{{t|cmn|a1=1|t1=海|tl1=hǎi}}
+{{t|arn|a1=1|t1=ḻafkeṉ}}
+{{t|mr|a1=1|t1=समुद्र}}
+{{t|mrj|a1=1|t1=тангыж}}
+{{t|mhr|a1=1|t1=теҥыз}}
+{{t|yua|a1=1|t1=kʼáakʼnáab|a2=1|t2=kʼáaʼnáab}}
+{{t|mzn|a1=1|t1=دریو}}
+{{t|xmf|a1=1|t1=ზუღა}}
+{{t|nan|a1=1|t1=hái}}
+{{t|mwl|a1=1|t1=mar}}
+{{t|mn|a1=1|t1=тэнгис}}
+{{t|nhn|a1=1|t1=hueyatl}}
+{{t|nci|a1=1|t1=hueyatl}}
+{{t|nrm|a1=1|t1=mé}}
+{{t|nl|a1=1–3|t1=zee}}
+{{t|new|a1=1|t1=समुद्र}}
+{{t|no|a1=1–3|g1=n|t1=hav}}
+{{t|nn|a1=1|t1=hav}}
+{{t|oc|a1=1–5|t1=mar}}
+{{t|or|a1=1|t1=ସାଗର}}
+{{t|os|a1=1|t1=денджыз}}
+{{t|pnb|a1=1|t1=سمندر}}
+{{t|pap|a1=1|t1=laman}}
+{{t|fa|a1=1–5|t1=دریا}}
+{{t|pl|a1=1|t1=morze}}
+{{t|pt|a1=1–3|g1=m|t1=mar}}
+{{t|quz|a1=1|t1=hatun qucha}}
+{{t|rap|a1=1|t1=tai}}
+{{t|rm|i1=s|t1=mar}}
+{{t|ro|a1=1|t1=mare}}
+{{t|rue|a1=1|t1=море}}
+{{t|ru|a1=1|t1=море}}
+{{t|war|a1=1|t1=dagat}}
+{{t|sgs|a1=1|t1=jūra}}
+{{t|sh|a1=1|a2=1|t1=more|t2=more|t3=море}}
+{{t|scn|a1=1|t1=mari}}
+{{t|so|a1=1|t1=bad}}
+{{t|sv|a1=1|t1=hav}}
+{{t|su|a1=1|t1=sagara}}
+{{t|tl|a1=1|t1=dagat}}
+{{t|th|a1=1|t1=ทะเล}}
+{{t|ta|a1=1|t1=கடல்}}
+{{t|tt|a1=1|t1=диңгез}}
+{{t|tg|a1=1|t1=баҳр}}
+{{t|te|a1=1|t1=సముద్రం}}
+{{t|tr|a1=1|t1=deniz}}
+{{t|tk|a1=1|t1=deňiz}}
+{{t|uk|a1=1|t1=море}}
+{{t|ur|a1=1|t1=بحیرہ}}
+{{t|uz|a1=1|t1=dengiz}}
+{{t|wa|a1=1|t1=mer}}
+{{t|eu|a1=1–4|t1=itsaso}}
+{{t|vec|a1=1|t1=mar}}
+{{t|vi|a1=1|t1=biển}}
+{{t|vro|a1=1|t1=meri}}
+{{t|wo|a1=1|t1=géej}}
+{{t|sah|a1=1|t1=байҕал}}
+{{t|zea|a1=1|t1=zeê}}
+{{t|zu|a1=1|t1=ulwandle}}
+{{trad-abajo}}

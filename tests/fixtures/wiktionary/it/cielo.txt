@@ -1,0 +1,68 @@
+== {{-it-}} ==
+{{-sost-|it}}
+{{Pn|w}} ''m sing'' {{Linkp|cieli}}
+# {{Term|astronomia|it}} {{Term|meteorologia|it}} [[spazio]] visibile di vario colore  che sovrasta la terra 
+#* '' fu un bellisimo tramonto perché il cielo si tinse di [[rosso]]''
+#* ''l'aeroplano volava in un cielo [[azzurro]]''
+#* '' quella notte senza Luna e senza stelle il cielo apparve completamente [[nero]]'' 
+# [[metafora]] dell'[[aldilà]], della provvidenza o dell'insieme delle [[divinità]] nella loro residenza
+#* ''a quest'ora sarà in '''cielo''''' (detto di un probabile defunto)
+#* ''per tutti gli angeli del '''cielo'''''
+# {{Est}} riferimento allusivo a Dio
+
+{{-sill-}}
+; ciè | lo
+
+{{-pron-}} 
+{{IPA|/ˈtʃɛlo/}}
+
+{{-etim-}}
+dal [[latino]] ''[[caelum]]'' o meglio ancora da ''[[coelum]]'', ''cielo''. Passando per il {{el}} ''κοῖλος'' (''[[koilos]]'') che rende ancora meglio il significato che è quello di ''cavo'', ''concavo'', oppure tenendo conto dell'antico {{de}} ''hol'' da cui viene il termine {{en}} [[hole]] ([[buco]])
+
+{{-quote-}}
+{{Quote
+| Il Cielo non prende niente senza ripagare smisuratamente
+|[[q:Edith Stein|Edith Stein]]}}
+
+{{-sin-}}
+*{{Term|uso letterario|it}} [[etere]], [[etra]], [[firmamento]], [[spazio]], volta celeste,
+* ''(di stanza)'' [[soffitto]], [[volta]],
+* ''(luogo fisico)''  [[cupola]] [[troposfera]] 
+* {{Fig}} [[clima]], [[paesaggio]], [[paese]], [[regione]] 
+* {{Est}} [[Dio]], [[paradiso]], [[Provvidenza]]
+* {{Est}} {{Term|uso letterario|it}} [[empireo]]
+
+{{-ant-}}
+* ''(n base alla contrapposizione aldilà)'' [[terra]], mondo terreno
+* ''(in base alla contrapposizione al paradiso)'' [[inferno]], [[inferno]], inferi
+
+{{-der-}}
+* [[capocielo]], [[celeste]], [[celestiale]], [[cilestro]], [[grattacielo]]
+
+{{-rel-}}
+* [[aereo]], [[aria]], [[aperto]], [[azzurro]], [[blu]], [[luna]], [[nuvola]], [[sereno]], [[sole]], [[uccello]]
+
+{{-prov-}}
+*''grazie al cielo''
+* ''toccare il cielo con un dito'': essere felicissimo
+* ''gente allegra, il ciel l'aiuta'' : la sorte va incontro a coloro che sono spesso di buon umore, e prendono bene le cose della vita
+* ''santo cielo!'' : esclamazione di stupore, preoccupazione o costernazione
+* ''cielo, mio marito!'' : esclamazione stereotipata delle mogli in compagnia di un amante che sentono il marito rincasare o sopraggiungere; questa frase viene spesso citata ironicamente nei film o nei cabaret
+* ''un [[raglio]] d'asino non arriva in cielo'' : ciò che dicono gli stupidi o gli ignoranti ha poco effetto, non cambia il mondo e si può trascurare
+* ''non stare né in cielo né in terra '':
+ 
+{{-trad-}}
+{{Trad1|spazio che sovrasta la terra}}
+:*{{br}}: [[oabl]] ''m''
+:*{{ca}}: [[cel]]
+:*{{en}}: [[sky]]
+:*{{la}}: [[caelum]] 
+:*{{oc}}: [[cèl]]
+:*{{pl}}: [[niebo]]
+:*{{de}}: [[Himmel]]
+{{Trad2}}
+
+{{Trad1|{{Term|religione|it}}}}
+:*{{br}}: [[neñv]] ''m''
+:*{{en}}: [[heaven]], [[paradise]]
+{{Trad2}}

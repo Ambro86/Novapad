@@ -1,0 +1,238 @@
+== {{-it-}} ==
+[[File:Традиционална куќа во Мало Илино 49.jpg|thumb|una  [[vecchia]] casa]]
+[[File:RybnoeDistrict 06-13 Konstantinovo village 05.jpg|thumb|una casa [[recintata]] con attorno un [[prato]]]] [[File:Kohila vesiveski2.jpg|thumb|una casa in [[mezzo]] al [[verde]]]]
+[[File:Benslie cottages.JPG|thumb|una casa con un tetto [[innevato]] e un piccolo giardino antistante]]
+{{-sost-|it}}
+# {{Pn|w}} ''f sing'' {{Linkp|case}}
+#* {{Term|architettura|it}} [[edificio]] [[costruito]] [[per]] [[essere]] utilizzato [[come]] [[abitazione]] [[e]] [[composto]] da uno o più [[piani]], [[suddivisi]] in [[vani]] [[distinti]], [[ognuno]] per un [[uso]] [[specifico]] [[File:RUS-2016-Bolshoi Zayatsky Island-Stone House.jpg|thumb|una casa in pietra]] 
+#** ''un mio amico ha acquistato una bella casa in montagna'' 
+#* [[dimora]] di una [[persona]];  [[costruzione]] o [[struttura]] in cui uno vive; in [[particolare]] la casa in cui uno vive con la sua [[famiglia]]
+#** ''ti avviso che stasera torno a casa tardi dal lavoro''
+#** ''e, in quel [[momento]] solo, si recò in [[piazza]] per poi andare a casa e [[riprendere]] il lavoro''
+#* [[edificio]] che accoglie [[temporaneamente]], per [[motivi]] [[specifici]] di [[salute]] o altro, alcune [[categorie]] di [[persone]]
+#** ''ha dovuto ricoverare sua zia in una casa di riposo''
+#* {{Fig}} {{Term|industriale|it}} casa [[costruttrice]]
+#** ''ho portato il mio scooter dal meccanico per una riparazione, ma ho dovuto [[aspettare]] qualche giorno perché  il pezzo di [[ricambio]] era reperibile solo presso la casa costruttrice''
+#* {{Term|scacchi|it}} nel [[gioco]] degli [[scacchi]], è il nome tecnico della [[casella]] sulla [[scacchiera]]
+#* {{Term|astrologia|it}} [[ognuna]] di [[dodici]] [[parti]] in cui è [[suddiviso]] il [[cielo]] in un dato [[momento]]
+#** ''alla tua nascita Saturno si trovava nella settima {{Pn}}''
+#* {{Term|astrologia|it}} [[casa]] [[lunare]]: ognuna di [[ventotto]] parti in cui è [[suddiviso]] il cielo durante il [[moto]] di [[rivoluzione]] della [[Luna]]
+#** ''la Luna [[entrerà]] nella venticinquesima {{Pn}} lunare alle 16:31 di giovedì prossimo''
+# {{Pn|q}}
+{{Quote|Non pub restare nascosta una città collocata sopra un monte, né si accende una [[lucerna]] per metterla sotto il [[moggio]], ma sopra il [[lucerniere]] perché faccia luce a quelli che sono nella casa.|[[q:Vangelo secondo Matteo|Vangelo secondo Matteo]] {{Passo biblico|Mt|5,14-15}}}}
+{{Quote|''Questa è {{Pn}}, è fatta di noi / Non di mattoni, ma amore e fiducia. / Il tempo è arrivato e dobbiamo cambiare. / Siamo il cuore, non siamo la polvere. / Non lasceremo andare, andare, andare, andare, andare.''|[[q:Connie Talbot|Connie Talbot]], ''This Is Home''|This is home, it's made of us / Not of bricks, but love and trust. / Time has come and change we must. / We're the heart, we're not the dust. / We won't let go, go, go, go, go.|lingua=en}}
+
+{{-sill-}}
+; cà | sa
+
+{{-pron-}}
+* (''italiano settentrionale'') {{IPA|/ˈkaza/}}
+* (''italiano standard'') {{IPA|/ˈkasa/}}
+* {{Audio|it-casa.ogg|italiano settentrionale}}
+
+{{-etim-}}
+dal {{la}} ''[[casa#Latino|casa]]'', ossia "[[capanna]], casa rustica"
+
+{{-sin-}}
+* ''(casa in riferimento al materiale di cui è fatta: pietra, mattoni)'' [[costruzione]]
+* ''(casa in senso burocratico e legale)'' [[stabile]] 
+* ''(genericamente:casa adibita a vari scopi)'' [[edificio]], (per es. palazzo d'abitazione
+* ''(casa in cui si radunano gli studenti per apprendere sotto la direzione degli insegnanti)'' [[scuola]]
+* ''(casa pubblica in cui si possono consultare libri o prenderli a prestito)'' [[biblioteca]]
+* ''(casa in cui vengono curati i malati d una certa gravità)''  [[ospedale]]
+* ''(casa adibita al culto in cui i cristiani pregano)'' [[chiesa]]
+* ''(casa adibita al culto in cui gli ebrei pregano)'' [[sinagoga]]
+* ''(casa adibita al culto in cui i musulmani pregano)'' [[moschea]] 
+* ''(casa adibita al culto in cui i buddisti pregano)'' [[tempio]] 
+* ''(casa  in cui si recitano commedie)'' [[teatro]]
+* ''(casa in cui si proiettano film)'' [[cinema]]
+* ''(in maniera specifica: tipologia)'' [[fabbricato]] (per es. rurale, civile, industriale)
+* ''(casa in cui si abita in senso generico)'' [[abitazione]]
+* ''(casa in cui si risiede abitualmente)'' [[dimora]]
+* ''(casa in cui si abita in senso amministrativo)'' [[residenza]]
+* ''(casa dove si curano i propri interessi o si fanno affari)'' [[domicilio]]
+* ''(casa in comproprietà per più famiglie)'' [[condominio]]
+* ''(grande casa signorile o per uffici pubblici)'' [[palazzo]] (per es. il palazzo dell'INPS)
+* ''(casa signorile per più famiglie)'' [[palazzina]]
+* ''(casa per più famiglie abitata da ceti popolari)'' [[casamento]]
+* ''(parte di condominio abitata da una famiglia o da persone sole)'' [[appartamento]]
+* ''(casa ampia ed elegante con grande giardino, signorile)'' [[villa]]
+* {{Term|antico|it}}, {{Term|letterario|it}} ''(casa signorile)'' [[magione]]
+* ''(casa dei re o specialmente con valore iperbolico: casa magnifica)'' [[reggia]]
+* ''(piccola casa con giardino)'' [[villetta]]
+* ''(casa unifamiliare o bifamiliare con giardino)'' [[villino]]
+* ''(in campagna: casa isolata)'' [[casale]], [[casolare]]
+* ''(casa di campagna di pregio)'' [[cottage]]
+* ''(in alta montagna: casa in legno  utilizzata stagionalmente come ricovero)'' [[baita]]
+* ''(in montagna: casa di villeggiatura o per fare sport)'' [[chalet]]
+* ''(casa misera, povera)'' [[tugurio]], [[stamberga]], [[casupola]]
+* ''(casa misera e decrepita)'' [[catapecchia]]
+* ''(di animali selvatici)'' [[tana]], [[covo]]
+* ''(di animali: uccelli)'' [[nido]]
+* {{Fig}} ''(ambiente domestico)'' [[focolare]], [[tetto]], mura domestiche, [[nido]]
+* {{Est}} ''(casa in senso di discendenza)'' [[famiglia]], [[casato]], [[stirpe]]
+* ''(casa regnante appartenente alla stessa famiglia)'' [[dinastia]]
+* ''(casa in senso commerciale)'' [[impresa]], [[ditta]], [[azienda]]
+* ''(diritto: in riferimento ad un impresa commerciale)'' [[società]]
+* ''(casa di un'impresa)'' [[sede]]
+* ''(casa in cui lavorano gli operai)'' [[fabbrica]]
+* ''(casa dove si depositano le merci ed altro materiale)'' [[magazzino]]
+* ''(casa dove si vendono le merci al dettaglio)'' [[negozio]]
+* ''(giochi: scacchi)'' [[casella]]
+* ''(casa nel senso di fortificazione)'' [[mura]]
+* ''(insieme di case limitrofe ove risiedono generalmente persone dello stesso  ceto)'' [[quartiere]]: es. quartiere popolare
+* ''(casa per militari)'' [[quartiere]]
+* ''(casa dei propri padri nel senso di antenati)'' [[patria]], [[terra]]
+* ''(casa da cui ripararsi dalle intemperie o dai pericoli)'' [[ricovero]]
+* ''(casa dove si sta temporaneamente)'' [[alloggio]]
+* ''(casa per persone bisognose o per bambini in età prescolare)'' [[asilo]]
+* ''(casa per detenuti)'' [[carcere]]
+* ''(finta casa adibita a postazione da sparo per l'artiglieria)'' [[casamatta]]
+* ''(casa da gioco)'' [[casinò]]
+
+{{-der-}}
+* [[casabase]], [[casale]], [[casalina]], [[casalinga]], [[casalinghità]], [[casalinghitudine]], [[casalingo]], [[casalino]], [[casamatta]], [[casamento]], [[casamobile]], [[casareccio]], [[casata]], [[casatico]], [[casato]], [[casatorre]], [[caseggiato]], [[casella]], [[casellante]], [[casellario]], [[casellista]], [[casello]], [[casereccio]], [[casiere]], [[casigliano]], [[casinista]], [[casino]], [[casinò]],  [[casolare]], [[casone]], [[casotto]], [[casula]], [[rincasare]],  [[senzacasa]] 
+
+{{-alter-}}
+* {{Accr}}  [[casone]] (in particolare in riferimento a impianti come quelli delle funivie)
+* {{Dim}} [[casina]]
+* {{Vezz}} [[casetta]]
+
+{{-prov-}}
+*'' casa del diavolo'': inferno
+*''[[a casa del diavolo]]'': [[in capo al  mondo]] 
+*''[[casa di correzione]]'': [[riformatorio]]
+*''[[casa di pena]]'': [[prigione]], [[carcere]]
+*''[[casa di cura]]'': clinica in genere per malati  di mente
+*''casa del Signore'': [[chiesa]]
+*''questa casa è un accampamento''
+*''[[casa chiusa]], [[casa di tolleranza]], casa d'appuntamento'': [[bordello]]
+* '''''casa''' dolce '''casa'''''
+* '''''casa''' mia, '''casa''' mia, per piccina che tu sia, tu mi sembri una badia'': avere una casa propria significa avere più libertà
+* ''essere '''casa''' e chiesa'': essere una persona retta, a volte anche con accezione negativa
+* ''[[essere di casa]] '': essere frequentatore abituale di un certo ambiente;  {{Est}} (di fatti più o meno avversi) essere consueti
+* ''[[mettere su casa]] '': crearsi una famiglia
+* ''giocare in '''casa''''': agire in un ambiente conosciuto
+* ''tornare a '''casa''''': usato anche con significato più ampio, come tornare in patria o nella propria città
+* ''donne per '''casa''', una in figura, l'altra in pittura'': se si vuole la pace in casa deve esserci una sola donna
+* ''grosso come una '''casa''''': qualcosa di notevole, molto evidente
+** ''ha commesso un fallo grosso come una casa''
+** ''gli ha fatto un regalo grosso come una casa''
+* ''Due noci in un sacco e due donne in {{Pn}} fanno un bel fracasso''
+* ''aiutarli a '''casa''' loro'': slogan politico che rappresenta l'idea di poter ridurre l'emigrazione favorendo lo sviluppo dei Paesi di origine
+*''[[portare a  casa]]'': ottenere lavorando
+*[[portare a  casa la pelle]]'' riaversi dopo aver evitato un grave pericolo
+
+{{-trad-}}
+{{Trad1|edificio destinato all'abitazione}}
+:*{{af}}:     [[huis]]
+:*{{akz}}:    [[iisa]], [[chokka]]
+:*{{ar}}:     [[بَيْتٌ]], [[دَارٌ]]
+:*{{sq}}:     [[shtëpi]]
+:*{{nds}}: [[Huus]] ''n''
+:*{{be}}:     [[дом]] ''(dom)''
+:*{{br}}:     [[ti]] ''m''
+:*{{bg}}:     [[къща]] ''(kysha)''
+:*{{sro}}:    [[domu]]
+:*{{ca}}:     [[casa#Catalano|casa]] ''f''
+:*{{cs}}:     [[dům]] ''m''
+:*{{cic}}:     [[aboa]], [[chuk]]a
+:*{{hr}}:     [[kuća]]
+:*{{da}}: [[hus]] ''n''
+:*{{he}}:     [[בית]]
+:*{{fi}}:     [[talo]]
+:*{{fr}}:     [[maison]] ''f''
+:*{{fur}}:    [[cjase]] 
+:*{{ja}}:     [[家]] ([[いえ]], ie; nella lingua parlata [[うち]], uchi)
+:*{{el}}:     [[οίκος]] ''(oíkos)'', [[σπίτι]] ''(spíti)''
+:*{{grc}}:    [[οἶκος]] ''(hóikos)''
+:*{{hi}}:     [[घर]] ''m'',[[मकान]] ''m''
+:*{{id}}:     [[rumah]]
+{{mid}}
+:*{{en}}:     [[house]]
+:*{{ga}}:     [[teach]]
+:*{{la}}:     [[domus]] ''m''
+:*{{lv}}:     [[māja]]
+:*{{src}}:    [[domo]]
+:*{{no}}:     [[hus]] ''n''
+:*{{nl}}:     [[huis]] ''n''
+:*{{pl}}:     [[dom]] ''m''
+:*{{pt}}:     [[casa#Portoghese|casa]] ''f''
+:*{{ro}}:     [[casă]] ''f''
+:*{{ru}}:     [[дом]] ''(dom)'' ''m''
+:*{{sr}}:     [[кућа]]/[[kuća]] ''f''
+:*{{sk}}:     [[dom]] ''m''
+:*{{sl}}:     [[hiša]]
+:*{{es}}:     [[casa#Spagnolo|casa]] ''f''
+:*{{sv}}:     [[hus]]
+:*{{crh}}:    [[üy]]
+:*{{de}}:     [[Haus]] ''n'', [[Gebäude]] ''n''
+:*{{tr}}:     [[ev]]
+:*{{tvl}}:    [[fale]]
+:*{{uk}}:     [[дім]] ''(dim)''
+:*{{hu}}:     [[ház]]
+:*{{uz}}:     [[uy]]
+:*{{yi}}:     [[הויז]] ‎(''hoyz'')
+{{Trad2}}
+
+{{Trad1|domicilio}}
+:*{{bg}}:     [[дом]] ''(dom)''
+:*{{ca}}:     [[casa#Catalano|casa]] ''f''
+:*{{cs}}:     [[domov]] ''m''
+:*{{hr}}:     [[dom]]
+:*{{da}}:     [[hjem]]
+:*{{eo}}:     [[hejmo]]
+:*{{et}}:     [[kodu]]
+:*{{fi}}:     [[koti]]
+:*{{fr}}:     [[domicile]] ''f''
+:*{{fur}}:     [[cjase]] 
+:*{{cy}}:     [[cartref]]
+:*{{ja}}:     [[家]] ([[いえ]], ie; nella lingua parlata [[うち]], uchi)
+:*{{el}}:     [[κατοικία]] ''(katoikía)''
+:*{{grc}}:    [[οἰκία]] ''(oikía)''
+:*{{hi}}:     [[इमारत]] ''f'', [[भवन]] ''m''
+:*{{en}}:     [[home]]
+:*{{ga}}:     [[baile]]
+:*{{la}}:     [[domus]] ''m'', [[domicilium]] ''n''
+{{mid}}
+:*{{lv}}:     [[mājas]]
+:*{{no}}:     [[hjem]] ''n''
+:*{{nl}}:     [[huis]] ''n'', [[heem]] ''n''
+:*{{pl}}:     [[dom]] ''m''
+:*{{pt}}:     [[lar]] ''m''
+:*{{ro}}:     [[casă]] ''f''
+:*{{ru}}:     [[дом]] ''(dom)'' ''m''
+:*{{sk}}:     [[domov]] ''m''
+:*{{sl}}:     [[dóm]]
+:*{{es}}:     [[hogar]] ''m''
+:*{{sv}}:     [[hem]]
+:*{{crh}}:     [[üy]]
+:*{{de}}:     [[Heim]] ''n'', [[Wohnung]] ''f''
+:*{{uk}}:     [[будинок]] ''(budynok)'', [[дім]] ''(dim)''
+:*{{hu}}:     [[otthon]]
+:*{{uz}}:     [[uy]]
+:*{{yi}}:     [[הײם]]
+{{Trad2}}
+
+{{Trad1|edificio per l'accoglienza temporanea}}
+:*{{hr}}:     [[obitelj]]
+{{Trad2}}
+
+{{Trad1|azienda costruttrice}}
+:*{{hr}}:     [[tvrtka]]
+{{mid}}
+:*{{lt}}:     [[namas]] ''m''
+{{Trad2}}
+
+{{Trad1|{{Term|astrologia|it}} ognuna delle dodici suddivisioni del cielo}}
+:*{{af}}: [[huis]]
+:*{{hr}}: [[kuća]] ''f''
+:*{{fr}}: [[maison]] ''f''
+:*{{ja}}: [[ハウス]] ''(hausu)''
+:*{{el}}: [[οίκος]] ''(oíkos)''
+{{mid}}
+:*{{en}}: [[house]]
+:*{{nl}}: [[huis]] ''n''
+:*{{ru}}: [[дом]] ''(dom)'' ''m''
+:*{{es}}: [[casa#Spagnolo|casa]] ''f''
+{{Trad2}}

@@ -1,0 +1,920 @@
+==English==
+{{wp}}
+[[File:Earth-5-50.gif|thumb|A view of Earth from space]]
+
+===Alternative forms===
+* {{alter|en|airth||chiefly|Scotland}}
+* {{alter|en|erd||dialectal|rare}}
+* {{alter|en|yearth||obsolete}}
+
+===Etymology===
+{{root|en|ine-pro|*h₁er-|id=earth}}
+From {{inh|en|enm|erthe}}, from {{inh|en|ang|eorþe}}, from {{inh|en|gmw-pro|*erþu}}, from {{inh|en|gem-pro|*erþō||dirt, ground, earth}}, from {{inh|en|ine-pro|*h₁er-|*h₁érteh₂|earth|id=earth}}.
+{{col-top|2|cog}}
+Cognate with {{cog|sco|erd}}, {{m|sco|yerd}}, {{m|sco|yird}}, {{m|sco|yirth|t=earth, loam, mould, soil; ground}}, {{cog|yol|eard}}, {{m|yol|eart}}, {{m|yol|eord}}, {{m|yol|eorth}}, {{m|yol|erth|t=earth}}, {{cog|frr|eerd}}, {{m|frr|eerde}}, {{m|frr|iarde}}, {{m|frr|Iart}}, {{m|frr|iir}}, {{m|frr|jard}}, {{m|frr|örd}}, {{m|frr|Öört|t=earth; world}}, {{cog|stq|Idde}}, {{m|stq|Äid}}, {{m|stq|Äide|t=earth; soil; ground}}, {{cog|fy|ierde|t=earth; soil; ground}}, {{cog|gsw|Ëërde|t=earth}}, {{cog|bar|Erd}}, {{m|bar|Erdn|t=world; soil; ground}}, {{cog|gmw-cfr|Ääd|t=earth}}, {{cog|cim|èerda|t=earth}}, {{cog|nl|aard}}, {{m|nl|aarde|t=earth}}, {{cog|de|Erde|t=earth; soil; ground; world}}, {{cog|nds-de|Eer|t=earth}}, {{cog|li|eerd|t=earth}}, {{cog|lb|Äerd|t=earth; soil}}, {{cog|wym|Ād|t=earth}}, {{cog|yi|ערד|t=earth; soil}}, {{cog|da,nb,nn,sv|jord|t=earth}}, {{cog|fo|jørð|t=earth}}, {{cog|is|jörð|t=earth}}, {{cog|nrn|yurn|t=the earth}}, {{cog|got|𐌰𐌹𐍂𐌸𐌰|t=earth}}; also {{cog|la|ōra|t=border, edge, rim}}, {{cog|br|erv|t=ridge between furrows}}, {{cog|cy|erw|t=acre}}, {{cog|grc|ἔραζε|t=to the ground}}, {{cog|lt|erdvė|t=expanse, space}}, {{cog|sq|varr}}, {{m|sq|vorr|t=grave}}, {{cog|txb|āre|t=dust, loose earth}}, {{cog|sa|उर्वरा|t=fertile soil, field yielding crops}}, {{cog|hit|𒅕𒄩𒀸|tr=''er-ḫa-aš''|ts=erḫaš|t=border, boundary, line}}.
+
+Probably unrelated, but of unknown etymology, is {{noncog|xcl|երկիր|t=earth}}. Likewise, the phonologically similar {{cog|sem-pro|*ʔarṣ́-}}&nbsp;– whence {{noncog|ar|أَرْض}}, {{noncog|he|אֶרֶץ|tr=ʾereṣ}}&nbsp;– is probably unrelated.
+{{col-bottom}}
+
+===Pronunciation===
+* {{IPA|en|/ɜːθ/|a=RP}}
+** {{audio|en|En-uk-earth.ogg|a=UK}}
+* {{IPA|en|/ɝθ/|a=GA,CA}}
+** {{audio|en|en-us-earth.ogg|a=US}}
+* {{IPA|en|/ɵːθ/|a=NZ}}
+* {{IPA|en|/ɜθ/|/ɝθ/|a=Ghana}}
+* {{IPA|en|/ɛrθ/|/ɛːrθ/|a=Early Modern|ref1={{R:en:Dobson:1957|II|8|559|passage=Words which now have [əː] from early ModE ''ĕr'', such as ''earth'', ''earl'', ''earn'', and ''learn'', have usually ''ĕr'' in the orthoepists, as in Hart, Bullokar, Robinson, Gil, and Hodges.}}|ref2={{R:en:Dobson:1957|II|8|644|passage=''Earth'' has [Middle English] ''ę̄'' in Levins, Hart, and Gil.}}}}
+* {{rhymes|en|ɜː(ɹ)θ|s=1}}
+
+===Proper noun===
+{{en-proper noun}}
+
+# {{senseid|en|Q2}} {{alternative case form of|en|Earth}}; our [[planet]], [[third]] out from the [[Sun]].
+#: {{ux|en|The astronauts saw the '''earth''' from the porthole.}}
+#* {{RQ:Conrad Heart of Darkness|page=193|passage=We live in the flicker - may it last as long as the old '''earth''' keeps rolling!}}
+
+====Usage notes====
+* The names of celestial bodies are usually capitalized ({{m|en|Earth}}), even when used with {{m|en|the}}.
+
+====Translations====
+{{trans-see|id=Q2|our planet, third out from the Sun|Earth}}
+
+===Noun===
+[[File:BrownSoil.jpg|thumb|Earth or soil ({{senseno|en|soil}})]]
+{{en-noun|~}}
+
+# {{senseid|en|soil}} {{lb|en|uncountable}} [[soil|Soil]].
+#: {{ux|en|This is good '''earth''' for growing potatoes.}}
+# {{lb|en|uncountable}} Any general [[rock]]-based material.
+#: {{ux|en|She sighed when the plane's wheels finally touched '''earth'''.}}
+# The [[ground]], [[land]] (as opposed to the [[sky]] or [[sea]]).
+#: {{ux|en|Birds are of the sky, not of the '''earth'''.}}
+#* {{quote-journal|en|date=2013-06-07|author=David Simpson
+|volume=188|issue=26|page=36|magazine=w:The Guardian Weekly
+|title=[http://www.guardian.co.uk/books/2013/may/18/falling-upwards-richard-holmes-review Fantasy of navigation]
+|passage=Like most human activities, ballooning has sponsored heroes and hucksters and a good deal in between. For every dedicated scientist patiently recording atmospheric pressure and wind speed while shivering at high altitudes, there is a carnival barker with a bevy of pretty girls willing to dangle from a basket or parachute down to '''earth'''.}}
+# {{senseid|en|Q6501125}} {{lb|en|British}} A connection [[electrically]] to the ''earth'' ({{qualifier|US}} [[ground]]); on equipment: a terminal connected in that manner.
+# The [[lair]] or [[den]] (as a [[hole]] in the ground) of an animal such as a fox.
+# A [[region]] of the planet; a [[land]] or [[country]].
+# [[worldly|Worldly]] things, as against spiritual ones.
+# The [[world]] of our [[current]] [[life]] (as opposed to [[heaven]] or an [[afterlife]]).
+#* {{RQ:Keats Lamia|poem=Ode on a Grecian Urn|stanza=5|page=116|passage="Beauty is truth, truth beauty,"—that is all / Ye know on '''earth''', and all ye need to know.}}
+# {{lb|en|metonymically}} The [[people]] on the globe.
+#* {{RQ:King James Version|Genesis|11|1|page=87|column=2|passage=And the whole '''earth''' was of one language, and of one [[speach|ſpeach]].}}
+# Any [[planet]] similar to the [[Earth]] (our earth): an [[exoplanet]] viewed as another earth, or a potential one.
+#: {{ux|en|New space telescopes may accelerate the search for other '''earths''' that may be out there.}}
+# {{lb|en|archaic}} The [[human]] [[body]].{{anchor|en_noun_obschem}}
+# {{lb|en|alchemy|philosophy|and|Taoism}} The aforementioned soil- or rock-based material, considered one of the {{w|Classical element|four or five classical elements}}.
+# {{lb|en|chemistry|obsolete}} Any of certain substances now known to be [[oxide]]s of [[metal]], which were distinguished by being [[infusible]], and by [[insolubility]] in [[water]].
+#* {{quote-text|en|year=1846|author=unspecified |title=METALS, OXIDES, EARTHS AND ALKALIES|url=https://commons.wikimedia.org/w/index.php?title=File:Scientific_American_-_Series_1_-_Volume_002_-_Issue_13.pdf&page=6|passage=The term '''''Earths''''' was formerly, and is still, but in a modified sense, applied to several substances which compose all the various rocks, stones, gems, mountains, and soils covering the face of the globe.  They are tasteless, inodorous, dry, uninflamable, sparingly soluble, difficult of fusion, and of moderate specific gravity.}}
+
+====Derived terms====
+{{col4|en
+|Adamic earth,Adam's earth|alkaline earth,alkaline-earth|alkaline earth metal,alkaline-earth metal|anti-earth,antiearth
+|black earth|bog earth|bone earth|Blue Earth|Blue Earth County|Blue Earth River
+|Chian earth|Cologne earth|come down to earth|cost the earth|counter-earth
+|dark earth|dhobi's earth|diatomaceous earth|down-to-earth,down to earth
+|Eartha|[[earth almond]] ({{taxfmt|Cyperus esculentus|species}})|earth-apple,earthapple|earth art
+|earthbag|[[earthball]], [[earth ball]] ({{taxfmt|Scleroderma|genus}} spp.)|earthbank|earth bath|earth-bathing|earthberg|earthberry,earth-berry|earthboard|earthborn,earth-born|earthbred|earthbound,earth-bound
+|[[earth-chestnut]], [[earth chestnut]] ({{taxfmt|Bunium bulbocastanum|species}})|earth closet|[[earthcreeper]] ({{taxfmt|Furnariidae|family}} spp.)
+|Earth Day|earth divinity
+|earthdin|earth-diver|earth dog|earth-drake,earthdrake
+|[[eartheater]] ({{taxlink|Nyctibius grandis|species}})|earthen|earthenware|earther
+|earthfall|earthfast,earth-fast|earthflax|earth-floor,earth floor|earthflow|earthful
+|earthhog,earth-hog|earthhole|earthhood|earthhouse
+|earthish|earthism
+|earthless|earthlike|earthling|earthlore|earthly|earthly paradise
+|earth metal|earth mother|earth-motherly|earthen mound|earthmover|earth-moving,earth moving,earthmoving
+|earthness
+|earth oil
+|[[earth pea]], [[earthpea]] ({{taxlink|Vigna subterranea|species}})|[[earthpig]], [[earth pig]], [[earth-pig]] ({{taxfmt|Orycteropus afer|species}})|earth pillar|earth pitch|earth plate|earth pond|earth pyramid
+|earthquake
+|earthrise
+|earth science|earthscraper|earthset|earthshaker|earthshaking|earthshattering,earth-shattering|earth-shine|earth-ship|earthshock|earth sign|earthslide|earth smoke|earth snake|earthstar|earth station|earthstorm|earth-stopping
+|earth-tilth|earth to earth, ashes to ashes, dust to dust|earth tone|[[earth-tongue]]s, [[earth tongue]]s ({{taxfmt|Geoglossum|genus}} spp.)|earth tremor
+|earth up
+|earthward,earthwards|earthware|earthwax|earth wire|[[earthwolf]] ({{taxlink|Proteles cristatus|species}})|earthwork|[[earthworm]]s ({{taxfmt|Lumbricina|suborder}} spp.)
+|earthy
+|edge of the earth|ends of the earth
+|flat-earth|flat earther|follow someone to the ends of the earth|Fountains Earth|from the face of the earth|fuller's earth
+|[[gall-of-the-earth]] ({{taxlink|Nabalus trifoliolatus|species}})|go the way of all the earth|go to earth|go to the ends of the earth|God's green earth|green earth|green in earth
+|heavy earth|hell on earth|hollow earther
+|inearth
+|[[Japan earth]], [[Japanese earth]] ({{taxlink|Uncaria gambir|species}})
+|Kassel earth
+|Lemnian earth
+|main earth|[[man-of-the-earth]], [[man of the earth]] ({{taxlink|Ipomoea leptophylla|species}})|Middle-earth,middle earth,middle-earth|moot earth|Mother Earth|move heaven and earth
+|nap-of-the-earth|near-earth
+|off the face of the earth|old earth creationism,old-earth creationism|on earth|on God's green earth|on the face of the earth
+|paradise on earth|promise the earth
+|rammed earth|rare earth|rare earth element,rare-earth element|rare earth magnet|rare earth metal|rare earth mineral|red earth|run to earth
+|salt of the earth|salt the earth|Samian earth|scorched earth,scorched-earth|scorched earth policy,scorched-earth policy|scum of the earth|seat earth,seatearth|[[star-of-the-earth]] ({{taxfmt|Plantago coronopus|species}})
+|transearth
+|underearth|unearth
+|walker's earth,Walker's earth
+|yellow earth|Young Earth creationism
+}}
+
+====Related terms====
+*{{l|en|wychert}}
+*{{l|en|yedding}}
+
+====Translations====
+{{trans-top|soil}}
+{{multitrans|data=
+* Acehnese: {{t|ace|bumoe}}, {{t|ace|tanoh}}
+* Adyghe: {{t|ady|чӏыгу}}
+* Afar: {{t|aa|árdi}}
+* Afrikaans: {{tt+|af|aarde}}
+* Ahom: {{t|aho|𑜓𑜢𑜃𑜫}}, {{t|aho|𑜃𑜢𑜃𑜫}}
+* Albanian: {{tt+|sq|dhe|m}}
+* Altai:
+*: Southern Altai: {{t|alt|тобрак}}
+* Amami Ōshima:
+*: Northern Amami Ōshima: {{tt|ryn|みちﾟゃ|tr=mica}}
+*: Southern Amami Ōshima: {{tt|ams|みちゃ|tr=micha}}
+* Arabic: {{tt|ar|تُرْبَة|f}}, {{tt|ar|تُرَاب|p}}, {{tt+|ar|أَرْض|f}}
+*: Egyptian Arabic: {{tt|arz|أرض|f|tr=arḍ}}
+*: Hijazi Arabic: {{t|acw|تُربة|f|tr=turba}}, {{t|acw|أرض|f|tr=ʔarḍ}}
+* Aramaic:
+*: Classical Syriac: {{tt|syc|ܐܪܥܐ|f|tr=ʾarʿā}}, {{tt|syc|ܥܦܪܐ|m|tr=ʿap̄rā}}, {{tt|syc|ܡܕܪܐ|c|tr=meḏrā}}, {{tt|syc|ܐܕܡܬܐ|f|tr=ʾdmtʾ}}
+* Archi: {{t|aqc|накъв}}
+* Armenian: {{tt+|hy|հող}}
+* Ashkun: {{tt|ask|mič}}
+* Asturian: {{tt+|ast|tierra|f}}
+* Azerbaijani: {{tt+|az|torpaq}}
+* Baluchi: {{tt|bal|ہاک|tr=hák}}
+* Belarusian: {{tt|be|зямля́|f}}, {{t|be|грунт|m}}, {{t+|be|гле́ба|f}}
+* Bengali: {{tt+|bn|মাটি}}, {{tt+|bn|ভূমি}}
+* Buginese: {{t|bug|tana}}
+* Bulgarian: {{tt+|bg|земя́|f}}, {{tt+|bg|по́чва|f}}, {{tt+|bg|пръст|f}}
+* Burmese: {{tt+|my|မြေ}}
+* Carpathian Rusyn: {{tt|rue|земля́|f}}
+* Catalan: {{tt+|ca|terra|f}}, {{tt+|ca|sòl|m}}
+* Chamorro: {{t|ch|tano}}
+* Chechen: {{t|ce|латта}}
+* Chinese:
+*: Cantonese: {{t|yue|地|tr=dei6}}, {{t|yue|土壤}}
+*: Dungan: {{tt|dng|ди}}, {{tt|dng|тў}}
+*: Mandarin: {{tt+|cmn|地|tr=dì}}, {{tt+|cmn|土壤}}
+* Comorian:
+*: Ngazidja Comorian: {{tt|zdj|ipvanɗe sha ntsi|c7}}
+* Czech: {{tt+|cs|země|f}}, {{tt+|cs|hlína|f}}
+* Danish: {{tt+|da|jord|c}}
+* Dutch: {{tt+|nl|aarde|f}}, {{tt+|nl|grond|m}}
+* Esperanto: {{tt|eo|grundo}}
+* Estonian: {{tt+|et|maa}}
+* Etruscan: {{t|ett|𐌕𐌖𐌋𐌀𐌓|cin}}
+* Evenki: {{tt|evn|dunde}}, {{tt|evn|dunne}}, {{tt|evn|jerke}}, {{tt|evn|n'erke}}
+* Faroese: {{tt+|fo|jørð|f}}
+* Fataluku: {{t|ddg|mu'a}}
+* Fijian: {{tt+|fj|qele}}
+* Finnish: {{tt+|fi|maa}}
+* French: {{tt+|fr|terre|f}}, {{t+|fr|sol|m}}
+* Frisian:
+*: North Frisian: {{tt|frr|jard}}
+*: West Frisian: {{t+|fy|ierde|c}}
+* Friulian: {{tt|fur|tiere|f}}
+* Fula: {{tt|ff|leydi}}
+* Galician: {{tt+|gl|terra|f}}
+* Georgian: {{tt|ka|მიწა}}, {{tt|ka|ნიადაგი}}
+* German: {{tt+|de|Erde|f}}, {{tt+|de|Land|n}}
+*: Central Franconian: {{tt|gmw-cfr|Ääd}}
+*: East Central German: {{t|gmw-ecg|Ard|f}}
+* Greek: {{tt+|el|χώμα|n}}, {{tt+|el|γη|f}}
+*: Ancient Greek: {{tt|grc|γαῖα|f}}, {{tt|grc|γῆ|f}}, {{tt|grc|χούς|f}}
+* Guarani:
+*: Paraguayan Guarani: {{t+check|gug|yvy}}
+* Gujarati: {{t|gu|માટી}}
+* Haitian Creole: {{tt|ht|tè}}
+* Hebrew: {{tt+|he|אֲדָמָה|f|tr=adamá}}
+* Hindi: {{tt+|hi|धरती|f}}, {{tt+|hi|ज़मीन|f}}, {{tt+|hi|मिट्टी|f}}, {{tt+|hi|वसुधा|f}}, {{tt+|hi|वसुन्धरा|f}}
+* Hungarian: {{tt+|hu|talaj}}, {{tt+|hu|föld}}
+* Icelandic: {{tt+|is|jörð|f}}
+* Ido: {{tt+|io|tero}}, {{tt+|io|sulo}}
+* Ilocano: {{t|ilo|daga}}
+* Indonesian: {{tt+|id|tanah}}
+* Irish: {{t|ga|cré|f|id=clay}}, {{t|ga|créafóg|f}}, {{t|ga|ithir|f}}, {{t|ga|úir|f}}
+* Istriot: {{tt|ist|tiera|f}}
+* Italian: {{tt+|it|terra|f}}, {{t+|it|suolo|m}}
+* Japanese: {{tt+|ja|地|tr=ち, chi}}, {{tt+|ja|土|tr=つち, tsuchi}}, {{tt+|ja|土壌|tr=どじょう, dojō}}
+* Javanese: {{tt+|jv|lemah}} {{qualifier|ngoko}}, {{tt|jv|siti}} {{qualifier|krama}}
+* Kamkata-viri:
+*: Kamviri: {{tt|bsh|muři}}
+*: Kativiri: {{tt|bsh|mřai}}
+* Kankanaey: {{t|kne|daga}}
+* Kannada: {{t+|kn|ಮಣ್ಣು}}
+* Kashubian: {{t|csb|zemia|f}}
+* Kazakh: {{tt|kk|топырақ}}
+* Khanty:
+*: Northern Khanty: {{tt|kca-nor|мўв}} {{q|Kazym}}
+* Khinalug: {{tt|kjj|инччи́}}
+* Khmer: {{t+|km|ដី}}
+* K'iche': {{tt|quc|ulew}}
+* Kikai: {{tt|kzg|みちゃ|tr=micha}}
+* Komi:
+*: Komi-Zyrian: {{tt|kpv|му}}
+* Korean: {{tt+|ko|흙}}, {{tt+|ko|토양(土壤)}}
+* Kunigami: {{tt|xug|みちゃー|tr=michā}}
+* Kurdish:
+*: Central Kurdish: {{tt|ckb|خۆڵ}}
+*: Northern Kurdish: {{t+|kmr|ax|f}}
+* Kyrgyz: {{tt+|ky|топурак}}
+* Ladin: {{tt|lld|tera|f}}, {{tt|lld|tiera|f}}
+* Lao: {{tt+|lo|ດິນ}}
+* Latin: {{tt+|la|terra|f}}, {{tt+|la|humus|f}}
+* Latvian: {{tt+|lv|zeme|f}}, {{qualifier|soil}} {{tt+|lv|augsne|f}}
+* Lezgi: {{t|lez|накьв}}, {{t|lez|ччил}}
+* Lithuanian: {{tt+|lt|žemė|f}}, {{qualifier|soil}} {{tt|lt|dirva|f}}
+* Lombard: {{t|lmo|tèrra|f}}
+* Low German:
+*: German Low German: {{tt|nds-de|Eerd}}, {{tt+|nds-de|Eer}}
+* Lü: {{tt|khb|ᦡᦲᧃ}}
+* Lutuv: {{t|clt|alyi}}
+* Macedonian: {{tt+|mk|земја|f}}, {{tt|mk|почва|f}}
+* Makasae: {{t|mkz|mu'a}}
+* Makasar: {{t|mak|butta}}
+* Malay: {{tt+|ms|bumi}}
+*: Brunei Malay: {{tt|kxd|tanah}}
+* Malayalam: {{tt+|ml|ഭൂമി}}, {{tt+|ml|മണ്ണ്}}
+* Maltese: {{t|mt|ħamrija|f}}
+* Mansi:
+*: Northern Mansi: {{t-check|mns-nor|ма̄}} {{attention|mns-nor|check that this is Northern Mansi and not some other variety}}
+* Maranao: {{t|mrw|lopa'}}
+* Marathi: {{t|mr|जमीन}}, {{t|mr|माती}}
+* Minangkabau: {{t+|min|bumi}}
+* Miyako: {{tt|mvi|むた|tr=muta}}
+* Mongolian:
+*: Cyrillic: {{tt+|mn|хөрс}}, {{t+|mn|газар}}
+* Mwani: {{t|wmw|ardhi}}
+* Nahuatl: {{tt+|nah|tlalli}}
+* Navajo: {{tt|nv|łeezh}}
+* Nong Zhuang: {{t|zhn|ndin}}
+* Norman: {{tt|nrf|tèrre|f}}
+* Norwegian:
+*: Bokmål: {{tt+|nb|jord|m|f}}
+*: Nynorsk: {{tt|nn|jord|f}}
+* Okinawan: {{tt|ryu|んちゃ|tr=ncha}}
+* Okinoerabu: {{tt|okn|みちゃ|tr=micha}}
+* Old Church Slavonic:
+*: Cyrillic: {{tt|cu|землꙗ|f}}
+* Old East Slavic: {{tt|orv|землꙗ|f}}
+* Old English: {{tt|ang|eorþe|f}}
+* Old Tupi: {{t|tpw|yby}}
+* Oromo: {{t|om|dachee}}, {{t|om|lafa}}
+* Ossetian: {{t|os|зӕхх}}
+* Pannonian Rusyn: {{t|rsk|жем|f}}
+* Papiamentu: {{t|pap|tera}}
+* Pashto: {{t+|ps|خاوره|f|tr=xāwra}}
+* Persian:
+*: Dari: {{tt|prs|خَاک}}, {{tt|prs|زَمِین}}
+*: Iranian Persian: {{tt+|fa-ira|خاک}}, {{tt|fa-ira|زَمین}}
+* Pipil: {{tt|ppl|tal}}
+* Plautdietsch: {{tt|pdt|Ieed|f}}
+* Polish: {{tt+|pl|ziemia|f}}, {{t+|pl|gleba|f}}
+* Portuguese: {{tt+|pt|terra|f}}, {{tt+|pt|solo|m}}
+* Prasuni: {{tt|prn|mire}}
+* Punjabi: {{tt|pa|ਧਰਤ}}, {{tt|pa|ਖ਼ਾਕ}}, {{tt|pa|ਮਿੱਟੀ}}, {{tt|pa|ਜ਼ਮੀਨ}}
+* Quechua: {{tt+|qu|allpa}}
+* Romani: {{t|rom|phuv|f}}
+* Romanian: {{tt+|ro|pământ|n}}, {{tt+|ro|sol|n}}
+* Romansh: {{tt|rm|terra|f}}, {{tt|rm|tiara|f}}
+* Russian: {{tt+|ru|земля́|f}}, {{tt+|ru|по́чва|f}}, {{t+|ru|грунт|m}}
+* Saanich: {{tt|str|TEṈEW̱}}
+* Sanskrit: {{tt+|sa|धरित्री}}, {{tt+|sa|धरा}}, {{tt+|sa|भूमि|m}}, {{tt+|sa|वसुधा|f}}, {{tt+|sa|इला|f}}, {{tt+|sa|वसुन्धरा|f}}
+* Sardinian: {{tt|sc|terra|f}}
+* Scots: {{tt|sco|yerd}}, {{tt|sco|yird}}
+* Scottish Gaelic: {{tt|gd|talamh|c}}, {{tt|gd|ùir|f}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt|sh|зѐмља|f}}
+*: Latin: {{tt+|sh|zèmlja|f}}
+* Shan: {{tt+|shn|လိၼ်}}
+* Sicilian: {{tt+|scn|terra|f}}
+* Silesian: {{tt|szl|źymja|f}}
+* Sindhi: {{tt+|sd|ڌرتي|tr=dhartī}}
+* Slovak: {{tt+|sk|zem|f}}
+* Slovene: {{tt+|sl|zemlja|f}}, {{tt+|sl|prst|f}}
+* Sorbian:
+*: Lower Sorbian: {{t|dsb|zemja|f}}
+*: Upper Sorbian: {{t|hsb|zemja|f}}
+* Spanish: {{tt+|es|tierra|f}}, {{tt+|es|suelo|m}}
+* Sundanese: {{tt+|su|taneuh}}
+* Swahili: {{tt+|sw|udongo}}
+* Swedish: {{tt+|sv|jord|c}}
+* Tabasaran: {{t|tab|жил}}
+* Tagalog: {{tt+|tl|lupa}}
+* Tajik: {{tt+|tg|хок}}, {{t+|tg|замин}}
+* Talysh: {{t|tly|zəmin}}
+* Tamil: {{t+|ta|மண்}}
+* Taos: {{tt|twf|pǫ̀ʼóne}}
+* Tarantino: {{t|roa-tar|terre|f}}
+* Tarifit: {{t|rif|šar|m}}
+* Tashelhit: {{tt|shi|akal|m}}, {{tt|shi|ṛṛgg}}
+* Tat: {{t|ttt|xak}}
+* Tatar: {{tt+|tt|туфрак}}
+* Telugu: {{tt+|te|మట్టి}}
+* Thai: {{tt+|th|ดิน}}
+*: Northern Thai: {{tt|nod|ᨯᩥ᩠ᨶ|tr= din}}
+* Tibetan: {{tt|bo|ས}}
+* Tigrinya: {{tt|ti|መሬት}}
+* Tocharian A: {{tt|xto|tkaṃ}}
+* Tocharian B: {{tt|txb|keṃ}}
+* Tokunoshima: {{tt|tkn|ぃんちゃ|tr=ïncha}}
+* Turkish: {{tt+|tr|toprak}}
+*: Ottoman Turkish: {{t|ota|طوپراق|tr=toprak}}, {{t|ota|ارض|tr=arz}}, {{t|ota|تراب|tr=türâb}}
+* Turkmen: {{tt|tk|toprak}}
+* Udmurt: {{tt|udm|му}}
+* Ugaritic: {{tt|uga|𐎀𐎗𐎕}}
+* Ukrainian: {{tt+|uk|земля́|f}}, {{t+|uk|ґрунт|m}}
+* Urdu: {{tt+|ur|زَمِین|f}}, {{tt|ur|دَھرْتی|f}}, {{t|ur|مِٹِّی|f}}
+* Uyghur: {{tt|ug|تۇپراق}}
+* Uzbek: {{tt+|uz|tuproq}}
+* Venetan: {{tt|vec|tera|f}}
+* Vietnamese: {{tt+|vi|đất}}
+* Waigali: {{tt|wbk|muk}}
+* Yaeyama: {{tt|rys|んた|tr=nta}}
+* Yagara: {{tt|yxg|dar}}
+* Yakut: {{t|sah|сир}}
+* Yankunytjatjara: {{t|kdd|manta}}
+* Yiddish: {{tt|yi|ערד|f}}, {{t|yi|אַדמה|f|tr=adome}} {{qualifier|humorous}}
+* Yonaguni: {{tt|yoi|んた|tr=nta}}
+* Yoron: {{tt|yox|みちゃ|tr=micha}}
+* Yucatec Maya: {{tt|yua|lu’um}}, {{tt|yua|kaab}}
+* Zazaki: {{tt+|zza|erd}}
+* Zealandic: {{tt|zea|aerde|f}}
+* Zhuang: {{tt|za|doem}}, {{tt|za|namh}}
+* Zulu: {{tt|zu|inhlabathi|c9|c10}}, {{tt|zu|umhlabathi|c3|c4}}
+* ǃXóõ: {{tt|nmn|ǂkxʻûm}}
+{{trans-bottom}}
+
+{{trans-top|any general rock-based material}}
+* Afrikaans: {{tt+|af|aarde}}
+* Armenian: {{tt+|hy|հող}}
+* Baluchi: {{tt|bal|ہاک|tr=hák}}
+* Belarusian: {{t|be|зямля́|f}}
+* Bulgarian: {{tt+|bg|земя́|f}}
+* Burmese: {{tt+|my|မြေကြီး}}
+* Catalan: {{tt+|ca|terra|f}}
+* Chinese:
+*: Mandarin: {{tt+|cmn|泥土|tr=nítǔ}}
+* Czech: {{tt+|cs|země|f}}
+* Danish: {{tt|da|jordart|c}}, {{tt+|da|jord|c}}
+* Dutch: {{tt+|nl|aarde|f}}
+* Estonian: {{tt|et|maapind}}
+* Finnish: {{tt+|fi|maa}}
+* French: {{tt+|fr|terre|f}}
+* Frisian:
+*: West Frisian: {{tt+|fy|ierde}}
+* German: {{tt+|de|Erde|f}}, {{tt+|de|Grund|m}}
+*: Middle High German: {{tt|gmh|ërde}}
+*: Old High German: {{tt|goh|erda}}
+* Greek: {{tt+|el|χώμα|n}}
+* Hawaiian: {{tt|haw|lepo}}
+* Hebrew: {{tt+|he|אֲדָמָה|f|tr=adamá}}
+* Hindi: {{tt+|hi|भूमि|f}}, {{tt+|hi|खाक|f}}, {{tt+|hi|गर्द|f}}, {{tt|hi|ख़ाक|f}}
+* Icelandic: {{tt+|is|jörð|f}}
+* Ido: {{tt+|io|tero}}
+* Indonesian: {{tt+|id|bumi}}
+* Irish: {{tt|ga|cré|f|id=clay}}, {{tt|ga|úir|f}}
+* Italian: {{tt+|it|terra|f}}
+* Japanese: {{tt+|ja|土|tr=つち, tsuchi}}
+* Korean: {{tt+|ko|흙}}
+* Kurdish:
+*: Northern Kurdish: {{t+|kmr|ax|f}}
+* Latin: {{tt+|la|terra|f}}
+* Latvian: {{tt+|lv|zeme|f}}
+* Lithuanian: {{tt+|lt|žemė|f}}
+* Luxembourgish: {{tt+|lb|Äerd|f}}
+* Malay: {{tt+|ms|tanah}}
+* Malayalam: {{tt+|ml|ഭൂമി}}
+* Navajo: {{tt|nv|niʼ}}
+* Norman: {{tt|nrf|tèrre|f}}
+* Norwegian:
+*: Bokmål: {{tt+|nb|jord|m|f}}
+*: Nynorsk: {{tt|nn|jord|f}}
+* Old English: {{tt|ang|eorþe|f}}
+* Persian:
+*: Iranian Persian: {{tt+|fa-ira|خاک}}, {{tt|fa-ira|گَرْد}}
+* Polish: {{tt+|pl|ziemia|f}}
+* Portuguese: {{tt+|pt|terra|f}}
+* Russian: {{tt+|ru|земля́|f}}
+* Scots: {{tt|sco|yird}}
+* Scottish Gaelic: {{tt|gd|talamh|c}}, {{tt|gd|tìr|f}}, {{tt|gd|ùir|f}}
+* Slovak: {{tt+|sk|zem|f}}
+* Slovene: {{tt+|sl|zemlja|f}}
+* Spanish: {{tt+|es|tierra|f}}
+* Swahili: {{tt+|sw|udongo}}
+* Swedish: {{tt+|sv|jord|c}}
+* Turkish:
+*: Ottoman Turkish: {{t|ota|طوپراق|tr=toprak}}, {{t|ota|تراب|tr=türâb}}
+* Ukrainian: {{t+|uk|земля́|f}}
+* Volapük: {{tt+|vo|glun}}
+* Welsh: {{tt+|cy|daear|f}}
+* Zazaki: {{tt+|zza|erd}}
+* Zulu: {{tt|zu|inhlabathi|c9|c10}}, {{tt|zu|umhlabathi|c3|c4}}
+{{trans-bottom}}
+
+{{trans-top|the ground, land}}
+* Afar: {{t|aa|baaxo}}
+* Ainu: {{tt|ain|アィヌモシㇼ|tr=aynu-mosir}}
+* Aklanon: {{t|akl|eugta'}}
+* Amharic: {{t+|am|መሬት}}, {{t|am|ምድር|tr=mǝdǝr}}
+* Arabic: {{tt+|ar|أَرْض|f}}
+*: Egyptian Arabic: {{tt|arz|أرض|f|tr=arḍ}}
+* Aramaic:
+*: Classical Syriac: {{tt|syc|ܐܪܥܐ|f|tr=ʾarʿā}}
+* Argobba: {{t|agj|ምድር|tr=mǝdǝr}}
+* Armenian: {{tt+|hy|հող}}, {{tt+|hy|գետին}}
+* Aromanian: {{tt|rup|pimintu}}
+* Azerbaijani: {{tt+|az|yer}}
+* Bashkir: {{tt|ba|ер}}
+* Belarusian: {{t|be|зямля́|f}}, {{t|be|су́ша|f}}
+* Binukid: {{t|bkd|bugta}}
+* Boloki: {{t|bkt|nsé}}
+* Bulgarian: {{tt+|bg|земя́|f}}, {{tt+|bg|су́ша|f}}
+* Buryat: {{t|bua|газар}}
+* Catalan: {{tt+|ca|terra|f}}
+* Cebuano: {{t|ceb|yuta}}
+* Chamicuro: {{tt|ccc|c̈hijta}}
+* Cheyenne: {{t|chy|ho'e}}
+* Chinese:
+*: Cantonese: {{tt|yue|地}}, {{tt+|yue|地下}}
+*: Mandarin: {{tt+|cmn|陸地|tr=lùdì}}, {{tt+|cmn|地面}}
+* Comorian:
+*: Ngazidja Comorian: {{tt|zdj|ardhwi|c9}}, {{tt|zdj|ipvanɗe sha ntsi|c7}}
+* Czech: {{tt+|cs|země|f}}
+* Dalmatian: {{tt|dlm|tara|f}}, {{tt|dlm|tiara|f}}
+* Danish: {{tt+|da|jord}}
+* Dolgan: {{tt|dlg|һир|tr=hir}}
+* Dutch: {{tt+|nl|aarde}}, {{tt|nl|droge land|n}}, {{tt+|nl|land|n}}
+* Egyptian: {{t-egy|tꜣ|h=N16:N23*Z1}}
+* Erzya: {{t|myv|мастор}}, {{t|myv|мода}}
+* Esperanto: {{tt+|eo|tero}}
+* Estonian: {{tt+|et|maa}}
+* Even: {{t|eve|төр}}
+* Evenki: {{t|evn|дуннэ}}
+* Faroese: {{tt+|fo|jørð|f}}
+* Finnish: {{tt+|fi|maa}}
+* French: {{tt+|fr|terre|f}}
+* Friulian: {{tt|fur|tiere|f}}
+* Fula: {{tt|ff|leydi}}
+* Galician: {{tt+|gl|terra|f}}
+* Ge'ez: {{t|gez|ምድር}}
+* Georgian: {{tt|ka|მიწა}}, {{tt|ka|ნიადაგი}}
+* German: {{tt+|de|Grund|m}}, {{tt+|de|Erde|f}}, {{tt+|de|Land|n}}, {{tt+|de|Boden|m}}, {{tt+|de|Festland|n}}
+* Gothic: {{t|got|𐌰𐌹𐍂𐌸𐌰|f}}
+* Greek: {{tt+|el|γη|f}}, {{tt+|el|γαία|f}}
+*: Ancient Greek: {{tt|grc|γαῖα|f}}, {{tt|grc|γῆ|f}}
+* Haida: {{tt|hai|tllgaay}}
+* Haitian Creole: {{tt|ht|tè}}
+* Halkomelem: {{tt|hur|tém:éxw}}
+* Hawaiian: {{tt|haw|honua}}
+* Hebrew: {{tt+|he|אֶרֶץ|f|tr=éretz}}
+* Higaonon: {{t|mba|bogta}}
+* Hindi: {{tt+|hi|धरती|f}}, {{tt+|hi|ज़मीन|f}}, {{tt+|hi|सरजमीन|f}}
+* Hungarian: {{tt+|hu|szárazföld}}
+* Ido: {{tt+|io|sulo}}, {{tt+|io|tero}}
+* Ilocano: {{t|ilo|daga}}
+* Indonesian: {{tt+|id|darat}}
+* Irish: {{tt|ga|talamh}}
+* Istriot: {{tt|ist|tiera}}
+* Italian: {{tt+|it|terra|f}}
+* Japanese: {{tt+|ja|地面|tr=じめん, jimen}}, {{tt+|ja|大地|tr=だいち, daichi}}
+* Javanese: {{tt+|jv|lemah}} {{qualifier|ngoko}}, {{tt|jv|siti}} {{qualifier|krama}}
+*: Old Javanese: {{t|kaw|lĕmah}}
+* Kalmyk: {{t|xal|һазр}}
+* Kazakh: {{tt|kk|жер}}
+* Khakas: {{tt|kjh|чир}}
+* Korean: {{tt+|ko|땅}}, {{tt+|ko|대지(大地)}}, {{tt+|ko|육지(陸地)}}, {{tt+|ko|륙지(陸地)}} {{qualifier|North Korea}}
+* Kurdish:
+*: Central Kurdish: {{tt+|ckb|خاک}}, {{tt|ckb|زەمین}}, {{tt+|ckb|زەوی}}
+*: Northern Kurdish: {{t+|kmr|cih}}, {{t+|kmr|erd}}, {{t+|kmr|ax|f}}
+* Kwak'wala: {{tt|kwk|a̱wi'nak̕wa̱s}}
+* Kyrgyz: {{tt+|ky|жер}}
+* Ladin: {{tt|lld|tera}}
+* Latin: {{tt+|la|terra|f}}, {{tt+|la|solum|n}}
+* Latvian: {{tt+|lv|zeme|f}}
+* Lezgi: {{t|lez|ччил}}
+* Lingala: {{t|ln|nsé}}
+* Lithuanian: {{tt+|lt|žẽmė|f}}
+* Maasai: {{tt|mas|enkop|f}}
+* Makasar: {{t|mak|butta}}
+* Malay: {{tt+|ms|tanah}}
+* Malayalam: {{tt+|ml|മണ്ണ്}}
+* Manchu: {{tt|mnc|ᠨᠠ}}
+* Miwok:
+*: Central Sierra Miwok: {{tt|csm|wál·i-}}
+* Moksha: {{t|mdf|мастор}}, {{t|mdf|мода}}
+* Mongolian:
+*: Cyrillic: {{tt+|mn|газар}}
+*: Mongolian script: {{tt|mn|ᠭᠠᠵᠠᠷ}}
+* Nanai: {{t|gld|на}}
+* Navajo: {{tt|nv|niʼ}}
+* Nivkh: {{t|niv|миф}}
+* Nootka: {{tt|nuk|nism̓a}}
+* Norman: {{tt|nrf|tèrre|f}}
+* Norwegian:
+*: Bokmål: {{tt+|nb|jord|m|f}}
+*: Nynorsk: {{tt|nn|jord|f}}
+* Occitan: {{tt+|oc|tèrra}}
+*: Old Occitan: {{tt|pro|terra}}
+* Ojibwe: {{tt|oj|aki}}, {{tt|oj|ᐊᑭ}}
+* Old Tupi: {{t|tpw|yby}}
+* Orok: {{tt|oaa|на̄|tr=nā}}
+* Ottawa: {{tt|otw|ki}}
+* Persian:
+*: Iranian Persian: {{tt|fa-ira|زَمین}}, {{tt|fa-ira|سَرْزَمین}}
+* Portuguese: {{tt+|pt|terra|f}}, {{tt+|pt|chão|m}}
+* Punjabi: {{tt|pa|ਧਰਤ}}, {{tt+|pa|ਸਰਜ਼ਮੀਨ}}, {{tt|pa|ਜ਼ਮੀਨ}}
+* Purepecha: {{tt|pua|echeri}}
+* Romanian: {{tt+|ro|pământ}}
+* Romansh: {{tt|rm|terra}}, {{tt|rm|tiara}}
+* Russian: {{tt+|ru|земля́|f}}, {{tt+|ru|су́ша|f}}
+* Saanich: {{tt|str|TEṈEW̱}}
+* Saho: {{t|ssy|baarho}}
+* Sanskrit: {{tt+|sa|धरित्री|f}}
+* Sardinian: {{tt|sc|terra|f}}
+* Scots: {{tt|sco|yerd}}, {{tt|sco|yird}}
+* Scottish Gaelic: {{tt|gd|talamh|c}}, {{tt|gd|tìr|f}}, {{tt|gd|ùir|f}}
+* Sicilian: {{tt+|scn|terra}}
+* Sidamo: {{t|sid|uulla}}
+* Sinhalese: {{t+|si|පොළොව}}
+* Slovene: {{tt+|sl|zemlja|f}}
+* Somali: {{t+|so|dhul}}
+* Spanish: {{tt+|es|terreno|m}}, {{tt+|es|tierra|f}}
+* Sumerian: {{tt|sux|𒆠|ts=ki}}
+* Sundanese: {{tt|su|darat}}
+* Swahili: {{tt|sw|nchi kavu|c9}}
+* Swedish: {{tt+|sv|mark|c}}, {{tt+|sv|land|n}}
+* Tagalog: {{tt+|tl|lupa}}
+* Tajik: {{tt+|tg|замин}}
+* Tarifit: {{t|rif|šar|m}}, {{t|rif|tamurt|f}}
+* Tashelhit: {{t-check|shi|akal|m}}
+* Tatar: {{tt+|tt|җир}}
+* Tausug: {{t|tsg|lupa}}
+* Tetum: {{t|tet|rai}}
+* Tocharian A: {{tt|xto|tkaṃ}}
+* Tocharian B: {{tt|txb|keṃ}}
+* Tuareg: {{tt|tmh|ăkall}}
+* Turkish: {{tt+|tr|yer}}
+* Turkmen: {{tt|tk|ýer}}
+* Tuvan: {{tt|tyv|чер}}
+* Tzotzil: {{tt|tzo|balamil}} {{qualifier|Zinacantán}}, {{tt|tzo|balumil}} {{qualifier|San Andrés Larráinzar}}
+* Ugaritic: {{tt|uga|𐎀𐎗𐎕}}
+* Ukrainian: {{t+|uk|земля́|f}}, {{t|uk|су́ша|f}}, {{t+|uk|суході́л|m}}
+* Urdu: {{tt+|ur|زَمِین|f}}
+* Uyghur: {{tt+|ug|يەر}}
+* Uzbek: {{tt+|uz|yer}}
+* Venetan: {{tt|vec|tera}}
+* Vietnamese: {{tt+|vi|đất}}, {{tt+|vi|mặt đất}}, {{tt+|vi|đất liền}}
+* Yakut: {{tt|sah|сир}}
+* Yiddish: {{tt|yi|ערד}}
+* Yogad: {{t|yog|luta}}
+* Zazaki: {{tt+|zza|her}}, {{tt+|zza|erd|m}}
+* Zhuang: {{tt|za|deih}}
+* Zulu: {{tt|zu|umhlabathi|c3|c4}}
+{{trans-bottom}}
+
+{{trans-top|electrical connection}}
+* Armenian: {{tt+|hy|հող}}
+* Belarusian: {{t|be|зазямле́нне|n}}
+* Bulgarian: {{tt|bg|заземя́ване|n}}
+* Catalan: {{tt+|ca|terra|f}}, {{tt+|ca|massa|f}}
+* Chinese:
+*: Mandarin: {{tt+|cmn|地線|tr=dìxiàn}}, {{tt+|cmn|接地線|tr=jiēdìxiàn}}
+* Czech: {{tt|cs|uzemnění|n}}
+* Danish: {{tt|da|jordforbindelse|c}}, {{tt|da|jordet forbindelse|c}}
+* Dutch: {{tt+|nl|aarde|f}}
+* Esperanto: {{tt|eo|terkonekto}}
+* Estonian: {{tt|et|maandus}}
+* Finnish: {{tt+|fi|maadoitus}}, {{tt+|fi|maa}}
+* French: {{tt+|fr|terre|f}}
+* German: {{tt+|de|Erde|f}}
+* Greek: {{tt+|el|γείωση|f}}
+* Hindi: {{tt+|hi|ज़मीन|f}}
+* Hungarian: {{tt+|hu|földelés}}
+* Irish: {{tt|ga|talmhú|m}}
+* Italian: {{tt+|it|terra|f}}, {{tt+|it|massa|f}}
+* Japanese: {{tt+|ja|接地|tr=せっち, setchi}}, {{tt+|ja|アース|tr=āsu}}, {{tt+|ja|グランド|tr=gurando}}, {{tt+|ja|グラウンド|tr=guraundo}}, {{tt+|ja|地線|tr=ちせん, chisen}}
+* Korean: {{tt|ko|어어드}}, {{tt+|ko|접지선(接地線)}}
+* Kurdish:
+*: Northern Kurdish: {{t+|kmr|erd|f}}
+* Latvian: {{tt|lv|iezemējums|m}}
+* Lithuanian: {{tt|lt|įžeminimas|m}}
+* Navajo: {{tt|nv|niʼ}}
+* Norman: {{tt|nrf|tèrre|f}}
+* Persian:
+*: Iranian Persian: {{tt|fa-ira|زَمین}}, {{tt|fa-ira|اِرْت}}
+* Polish: {{tt+|pl|uziemienie|n}}
+* Portuguese: {{tt+|pt|terra}}
+* Russian: {{tt+|ru|заземле́ние|n}}, {{tt+|ru|земля́|f}} {{qualifier|colloquial}}
+* Slovene: {{tt+|sl|zemlja|f}}, {{tt|sl|ozemljitev|f}}
+* Spanish: {{tt+|es|tierra|f}}
+* Swedish: {{tt+|sv|jord|c}}
+* Turkish: {{tt+|tr|toprak}}
+* Ukrainian: {{t|uk|зазе́млення|n}}
+* Zazaki: {{tt+|zza|her|c}}
+{{trans-bottom}}
+
+{{trans-top|fox's lair}}
+* Belarusian: {{t|be|нара́|f}}
+* Bulgarian: {{tt+|bg|ду́пка|f}}
+* Danish: {{tt+|da|rævegrav|c}}
+* Finnish: {{tt+|fi|kolo}}, {{tt+|fi|pesä}}
+* French: {{tt+|fr|terrier}}
+* German: {{tt+|de|Erdloch|n}}, {{tt|de|Erdbau|m}}, {{tt+|de|Bau|m}}
+* Greek: {{tt+|el|φωλιά|f}}
+* Hungarian: {{tt+|hu|lyuk}}, {{tt+|hu|odú}}
+* Irish: {{t|ga|leaba dhearg|f}}
+* Italian: {{tt+|it|tana|f}}
+* Kurdish:
+*: Northern Kurdish: {{t+|kmr|kunc|f}}, {{t+|kmr|hêlîn|f}}
+* Manx: {{tt|gv|towl|m}}
+* Persian:
+*: Iranian Persian: {{tt|fa-ira|لانِه}}
+* Portuguese: {{tt+|pt|toca}}
+* Russian: {{t+|ru|нора́|f}}
+* Spanish: {{tt+|es|madriguera|f}}
+* Swahili: {{tt+|sw|dunia}}
+* Swedish: {{tt+|sv|lya|c}}, {{tt|sv|rävlya|c}}, {{tt+|sv|rävgryt|n}}
+* Ukrainian: {{tt+|uk|нора́|f}}
+* Zazaki: {{tt|zza|lan|f}}
+{{trans-bottom}}
+
+{{trans-top|world of our current life, as opposed to afterlife}}
+* Arabic: {{tt+|ar|أَرْض|f}}, {{tt+|ar|دُنْيَا|f}}
+* Belarusian: {{t|be|свет|m}}, {{t|be|сьвет|m}}
+* Bulgarian: {{tt+|bg|свят|m}}
+* Catalan: {{tt+|ca|terra|f}}
+* Comorian:
+*: Ngazidja Comorian: {{tt|zdj|dunia|c9}}
+* Finnish: {{tt+|fi|maa}}
+* French: {{tt+|fr|terre|f}}
+* Greek: {{tt+|el|γη|f}}
+*: Ancient Greek: {{tt|grc|γῆ|f}}
+* Hebrew: {{tt+|he|אֶרֶץ|f|tr=éretz}}
+* Hindi: {{tt+|hi|दुनिया|f}}, {{tt+|hi|जहान|m}}, {{tt+|hi|संसार|m}}
+* Ido: {{tt+|io|tero}}
+* Italian: {{t+|it|terra}}
+* Kurdish:
+*: Northern Kurdish: {{t+|kmr|dinya|f}}
+* Latin: {{tt|la|mundus|m}}, {{tt+|la|saeculum|n}}
+* Malay: {{t+|ms|dunia}}
+* Persian:
+*: Iranian Persian: {{tt+|fa-ira|گیتی}}, {{tt|fa-ira|جَهان}}, {{qualifier|religious}} {{tt|fa-ira|دُنْیا}}, {{qualifier|religious}} {{tt|fa-ira|مادِّه}}, {{qualifier|much-literally}} {{tt|fa-ira|گِیْهان}}
+* Piedmontese: {{tt|pms|mundo|m}}
+* Punjabi: {{tt|pa|ਦੁਨੀਆ}}, {{tt|pa|ਜਹਾਨ}}, {{tt+|pa|ਸੰਸਾਰ}}
+* Russian: {{t+|ru|мир|m}}, {{t+|ru|свет|m}}
+* Tagalog: {{tt+|tl|daigdig}}
+* Ukrainian: {{t+|uk|світ|m}}
+* Zazaki: {{tt+|zza|dınya}}
+* Zulu: {{tt+|zu|umhlaba|c3|c4}}
+{{trans-bottom}}
+
+{{trans-top|one of the four basic elements}}
+* Afrikaans: {{tt+|af|aarde}}
+* Baluchi: {{tt|bal|ہاک|tr=hák}}
+* Bulgarian: {{tt+|bg|земя́|f}}
+* Burmese: {{tt+|my|မြေ}}
+* Catalan: {{tt+|ca|terra|f}}
+* Chinese:
+*: Mandarin: {{tt+|cmn|泥土|tr=nítǔ}}
+* Czech: {{tt+|cs|země|f}}
+* Danish: {{tt+|da|jord}}
+* Dutch: {{tt+|nl|aarde|f}}
+* Estonian: {{tt+|et|maa}}
+* Finnish: {{tt+|fi|maa}}
+* French: {{tt+|fr|terre|f}}
+* Frisian:
+*: West Frisian: {{tt+|fy|ierde}}
+* Galician: {{tt+|gl|terra|f}}
+* German: {{tt+|de|Erde|f}}
+* Greek: {{tt+|el|γη|f}}
+*: Ancient Greek: {{tt|grc|γῆ|f}}
+* Hebrew: {{tt+|he|אֲדָמָה|f|tr=adamá}}
+* Hindi: {{tt+|hi|खाक|f}}, {{tt+|hi|मिट्टी|f}}, {{tt+|hi|भूमी|f}}, {{tt+|hi|भूमि|f}}, {{tt|hi|ख़ाक|f}}
+* Hungarian: {{tt+|hu|föld}}
+* Icelandic: {{tt+|is|jörð|f}}
+* Ido: {{tt+|io|tero}}
+* Irish: {{t|ga|talamh|m}}
+* Italian: {{tt+|it|terra|f}}
+* Japanese: {{tt+|ja|地|tr=ち, chi}}
+* Korean: {{tt+|ko|흙}}
+* Kurdish:
+*: Northern Kurdish: {{t+|kmr|ax|f}}
+* Latin: {{tt+|la|terra|f}}
+* Latvian: {{tt+|lv|zeme|f}}
+* Lithuanian: {{tt+|lt|žemė|f}}
+* Luxembourgish: {{tt+|lb|Äerd|f}}
+* Malayalam: {{tt+|ml|ഭൂമി}}
+* Norman: {{tt|nrf|tèrre|f}}
+* Norwegian:
+*: Bokmål: {{tt+|nb|jord|m|f}}
+*: Nynorsk: {{tt|nn|jord|f}}
+* Old English: {{tt|ang|eorþe|f}}
+* Persian:
+*: Iranian Persian: {{tt+|fa-ira|خاک}}
+* Polish: {{tt+|pl|ziemia|f}}
+* Portuguese: {{tt+|pt|terra|f}}
+* Punjabi: {{tt|pa|ਖ਼ਾਕ}}, {{tt|pa|ਮਿੱਟੀ}}
+* Russian: {{tt+|ru|земля́|f}}
+* Scots: {{tt|sco|yird}}
+* Scottish Gaelic: {{tt|gd|talamh|c}}, {{tt|gd|tìr|f}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt|sh|зѐмља|f}}
+*: Latin: {{tt+|sh|zèmlja|f}}
+* Slovak: {{tt+|sk|zem|f}}
+* Slovene: {{tt+|sl|zemlja|f}}
+* Spanish: {{tt+|es|tierra|f}}
+* Swahili: {{tt+|sw|dunia}}
+* Swedish: {{tt+|sv|jord}}
+* Turkish: {{tt+|tr|toprak}}
+* Ukrainian: {{t+|uk|земля́|f|tr=zemljá}}
+* Vietnamese: {{tt+|vi|đất}}
+* Zazaki: {{tt+|zza|her|c}}
+{{trans-bottom}}
+
+{{trans-top|one of the five basic elements}}
+* Afrikaans: {{tt+|af|aarde}}
+* Baluchi: {{tt|bal|ہاک|tr=hák}}
+* Bulgarian: {{tt+|bg|земя́|f}}
+* Burmese: {{tt+|my|မြေ}}
+* Catalan: {{tt+|ca|terra|f}}
+* Chinese:
+*: Mandarin: {{tt+|cmn|土}}
+* Czech: {{tt+|cs|země|f}}
+* Danish: {{tt+|da|jord}}
+* Dutch: {{tt+|nl|aarde|f}}
+* Estonian: {{tt+|et|maa}}
+* Finnish: {{tt+|fi|maa}}
+* French: {{tt+|fr|terre|f}}
+* Galician: {{tt+|gl|terra|f}}
+* Greek: {{tt+|el|γη|f}}
+* Hindi: {{tt+|hi|खाक|f}}, {{tt+|hi|मिट्टी|f}}, {{tt+|hi|भूमी|f}}, {{tt+|hi|भूमि|f}}, {{tt|hi|ख़ाक|f}}
+* Hungarian: {{tt+|hu|föld}}
+* Icelandic: {{tt+|is|jörð|f}}
+* Ido: {{tt+|io|tero}}
+* Irish: {{t|ga|talamh|m}}
+* Italian: {{tt+|it|terra|f}}
+* Japanese: {{tt+|ja|土|tr=つち, tsuchi}}
+* Kashubian: {{t|csb|zemia}}
+* Korean: {{tt+|ko|흙}}
+* Kurdish:
+*: Northern Kurdish: {{t+|kmr|ax|f}}
+* Latvian: {{tt+|lv|zeme|f}}
+* Lithuanian: {{tt+|lt|žemė|f}}
+* Malayalam: {{tt+|ml|ഭൂമി}}
+* Norwegian:
+*: Bokmål: {{tt+|nb|jord|m|f}}
+*: Nynorsk: {{tt|nn|jord|f}}
+* Old English: {{tt|ang|hrūse|f}}
+* Persian:
+*: Iranian Persian: {{tt+|fa-ira|خاک}}
+* Polish: {{tt+|pl|ziemia|f}}
+* Portuguese: {{tt+|pt|terra|f}}
+* Punjabi: {{tt|pa|ਖ਼ਾਕ}}, {{tt|pa|ਮਿੱਟੀ}}
+* Russian: {{tt+|ru|земля́|f}}
+* Scots: {{tt|sco|yird}}
+* Scottish Gaelic: {{tt|gd|talamh|c}}, {{tt|gd|tìr|f}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt|sh|зѐмља|f}}
+*: Latin: {{tt+|sh|zèmlja|f}}
+* Slovak: {{tt+|sk|zem|f}}
+* Slovene: {{tt+|sl|zemlja|f}}
+* Spanish: {{tt+|es|tierra|f}}
+* Swahili: {{tt+|sw|dunia}}
+* Swedish: {{tt+|sv|jord}}
+* Turkish: {{tt+|tr|toprak}}
+* Ukrainian: {{t+|uk|земля|f|tr=zemljá}}
+* Vietnamese: {{tt+|vi|thổ}}
+* Zazaki: {{tt+|zza|her|c}}
+}}<!-- close {{multitrans}} -->
+{{trans-bottom}}
+
+{{checktrans-top}}
+* Arabic: {{t+check|ar|أَرْض|f}}
+* Basque: {{t-check|eu|lur}}
+* Belarusian: {{t-check|be|зямля}}, {{t-check|be|земля}}
+* Cebuano: {{t-check|ceb|tuna}}, {{t-check|ceb|kalibutan}}, {{t-check|ceb|hagna}}, {{t-check|ceb|banika}}
+* Galician: {{t+check|gl|terra|f}}
+* Georgian: {{t-check|ka|დედამიწა}}
+* Gothic: {{t-check|got|𐌰𐌹𐍂𐌸𐌰|f}}
+* Guarani:
+*: Paraguayan Guarani: {{t+check|gug|yvy}}
+* Hindi: {{t+check|hi|स्थल}}, {{t+check|hi|पृथ्वी}}
+* Indonesian: {{t+check|id|bumi}}
+* Interlingua: {{t-check|ia|terra}}
+* Kannada: {{t+check|kn|ನೆಲ}}, {{t+check|kn|ಭೂಮಿ}}, {{t+check|kn|ಮಣು}}
+* Khmer: {{t+check|km|ដី|tr=dey}}, {{t-check|km|ផែនដ|tr=phaen-dey}}
+* Lydian: {{t|xld|κλιδας}}
+* Maltese: {{t+check|mt|dinja}}, {{t-check|mt|papa}}
+* Mapudungun: {{t-check|arn|mapu}}
+* Nahuatl: {{t-check|nah|coatlicue}}
+* Old Norse: {{t-check|non|midgard}}
+* Quechua: {{t-check|qu|pachamama}} <!-- link as t-SOP if non-idiomatic; put marked word in |alt=; see [[User:Kephir/gadgets/xte#Translation_fixing]] -->
+* Romanian: {{t+check|ro|pământ|n}}
+* Tagalog: {{t+check|tl|mundo}}
+* Thai: {{t+check|th|ดิน|tr=din}}, {{t+check|th|แผ่นดิน|tr=phaendin}}, {{t+check|th|โลก|tr=lok}}
+* Turkish: {{t+check|tr|dünya}}, {{t+check|tr|yer}}
+* Welsh: {{t+check|cy|daear}}
+* Woiwurrung: {{t-check|wyi|yéámen'eenbik}}, {{t-check|wyi|naRap}}, {{t-check|wyi|biik}}
+* Xhosa: {{t-check|xh|umhlaba}}
+* Yiddish: {{t-check|yi|ערד|f}}
+{{trans-bottom}}
+
+====See also====
+{{col|en
+|moon
+|sun
+|world
+|mul:🜨
+|mul:♁
+|Appendix:Planets
+}}
+
+===Verb===
+{{en-verb}}
+
+# {{lb|en|UK|transitive}} To connect [[electrically]] to the earth.
+#: {{syn|en|ground}}
+#: {{ux|en|That noise is because the amplifier is not properly '''earthed'''.}}
+# {{lb|en|transitive}} To [[bury]].
+#* {{RQ:Young Night-Thoughts|328|The Miſer '''earths''' his Treaſure; and the Thief, / Watching the Mole, half-beggars him ere Morn.}}
+# {{lb|en|transitive}} To [[hide]], or cause to hide, in the earth; to chase into a [[burrow]] or [[den]].
+#* {{RQ:Dryden Spanish Fryar|48|{{...}}the Fox is '''earth’d''',{{...}}}}
+#* {{quote-book|en|year=1819|author=John Mayer|title=The Sportsman's Directory, or Park and Gamekeeper's Companion|passage=This is the time that the horseman are flung out, not having the cry to lead them to the death. When quadruped animals of the venery or hunting kind are at rest, the stag is said to be harboured, the buck lodged, the fox kennelled, the badger '''earthed''', the otter vented or watched, the hare formed, and the rabbit set.}}
+# {{lb|en|intransitive}} To [[burrow]].
+#* {{quote-book|en|year=a. 1740|author=w:Thomas Tickell|title=Fragment on Hunting|passage=foxes '''earth'd'''}}
+
+====Derived terms====
+* {{l|en|earthing}}
+* {{l|en|unearth}}
+
+====Translations====
+{{trans-top|connect electrically to the earth}}
+{{multitrans|data=
+* Azerbaijani: {{t|az|torpaqlamaq}}
+* Bulgarian: {{tt|bg|заземявам}}
+* Czech: {{tt|cs|uzemnit}}
+* Danish: {{tt|da|jordforbinde}}, {{tt|da|jorde}}
+* Dutch: {{tt+|nl|aarden}}
+* Esperanto: {{tt|eo|terkonekti}}
+* Estonian: {{tt|et|maandama}}
+* Finnish: {{tt+|fi|maattaa}}, {{tt+|fi|maadoittaa}}
+* French: {{tt|fr|relier à la terre}}, {{tt|fr|mettre à la terre}}
+* Georgian: {{tt|ka|დამიწება}}
+* German: {{tt+|de|erden}}
+* Greek: {{tt+|el|γειώνω}}
+* Hungarian: {{t+|hu|leföldel}}, {{t+|hu|földel}}
+* Irish: {{tt|ga|talmhaigh}}
+* Italian: {{tt|it|mettere a terra}}, {{tt|it|collegare a terra}}
+* Japanese: {{tt|ja|接地する|tr=せっちする, setchisuru}}, {{tt|ja|アースする|tr=āsusuru}}, {{tt|ja|グランドする|tr=gurandosuru}}
+* Latvian: {{tt|lv|iezemēt}}
+* Lithuanian: {{tt|lt|įžeminti}}
+* Norwegian:
+*: Bokmål: {{tt+|nb|jorde}}
+* Persian: {{tt|fa|زمین کردن|tr=zamin kardan}}, {{qualifier|common}} {{tt|fa|ارت کردن|tr=ert kardan}}
+* Polish: {{tt+|pl|uziemić}}, {{t+|pl|uziemiać|impf}}
+* Portuguese: {{tt+|pt|aterrar}}
+* Russian: {{tt+|ru|заземля́ть|impf}}, {{tt+|ru|заземли́ть|pf}}
+* Slovene: {{tt|sl|ozemljiti}}
+* Spanish: {{t+check|es|aterrar}}, {{t|es|conectar a tierra}}, {{t|es|poner a tierra}}
+* Swahili: {{tt+|sw|dunia}}
+* Swedish: {{tt+|sv|jorda}}
+* Turkish: {{tt+|tr|topraklamak}}
+* Ukrainian: {{tt|uk|зазе́млювати|impf}}, {{tt|uk|заземля́ти|impf}}, {{tt|uk|заземли́ти|pf}}
+* Vietnamese: {{t-check|vi|đặt dây đất}}, {{t-check|vi|nối với đất}} <!-- link as t-SOP if non-idiomatic; put marked word in |alt=; see [[User:Kephir/gadgets/xte#Translation_fixing]] -->
+{{trans-bottom}}
+
+{{trans-top|to bury}}
+* Bulgarian: {{tt+|bg|заравям}}
+* Czech: {{tt+|cs|pochovat}}
+* Danish: {{tt|da|begrave}}
+* Dutch: {{tt+|nl|begraven}}
+* Estonian: {{tt|et|matma}}
+* Finnish: {{tt+|fi|haudata}}, {{tt|fi|[[kaivaa]] [[maahan]]}}
+* French: {{tt+|fr|enterrer}}
+* Georgian: {{tt|ka|დაფლობა}}
+* German: {{tt+|de|beerdigen}}
+* Greek: {{tt+|el|θάβω}}, {{tt+|el|ενταφιάζω}}
+* Hindi: {{tt|hi|दफ़न करना}}
+* Italian: {{tt+|it|interrare}}
+* Persian: {{tt+|fa|خاکسپاری}}, {{tt+|fa|خاک کردن|tr=xâk kardan}}, {{qualifier|religious}} {{tt+|fa|دفن کردن|tr=dafn kardan}}
+* Polish: {{tt+|pl|zakopać}}
+* Portuguese: {{tt+|pt|enterrar}}
+* Russian: {{tt+|ru|хорони́ть}}
+* Swahili: {{tt+|sw|dunia}}
+* Swedish: {{tt|sv|jordsätta}}, {{tt+|sv|begrava}}
+* Ukrainian: {{t|uk|ховáти|impf|tr=hovaty|lit=to bury}}, {{t|uk|поховáти|pf|tr=pohovaty}}
+* Vietnamese: {{t+check|vi|vun}}, {{t-check|vi|lấp đất}} <!-- link as t-SOP if non-idiomatic; put marked word in |alt=; see [[User:Kephir/gadgets/xte#Translation_fixing]] -->
+}}<!-- close {{multitrans}} -->
+{{trans-bottom}}
+
+===References===
+<references/>
+
+===Anagrams===
+* {{anagrams|en|a=aehrt|Erath|rehat|ather-|Herta|Harte|rathe|Rathe|heart|th'are|thare|hater|Heart|Herat|Taher|Terah|Thera}}
+
+{{cln|en|terms with optional capitalization}}
+{{C|en|Animal dwellings|Earth}}

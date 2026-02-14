@@ -1,0 +1,139 @@
+== {{lengua|es}} ==
+{{pron-graf|1audio1=es-amor.ogg}}
+
+=== Etimología 1 ===
+{{etimología|osp|amor|amor}}, y este {{etim|la|amor}}, derivado  {{etim|la|amo}}, a su vez {{etim|ine-pro|*am-}} ("[[madre]], [[tía]]").
+
+==== {{sustantivo masculino|es}} ====
+{{es.sust}}
+;1 {{csem|sentimientos}}: {{plm|sentimiento}} [[afectivo]] de [[atracción]], [[unión]] y [[afinidad]] que se experimenta hacia una persona, animal o cosa.
+{{wikisauro|amor}}
+{{antónimo|antipatía|aversión|desamor|detestación|odio}}
+{{ejemplo|Aunque sea el fin del '''amor'''<br>Yo he visto el fin del disfraz<br>Yo quiero el fin del dolor<br>Pero no hay fin, siempre hay más|a=Charly García|a2=Pedro Aznar|c=canción|f=1991|t=Tu amor}}
+;2: Sentimiento de [[desear]] el [[bien]] y de tratar con [[suavidad]] o [[esmero]].
+;3: Tratamiento para la persona amada ([[vocativo]]), y la persona amada misma.
+{{uso|con frecuencia va precedido del posesivo|se emplea también en plural}}
+{{ejemplo|Darme quiere Lisardo<br>por el mi manso un choto<br>para llevarlo en don a sus ''amores'':<br>yo para ti lo guardo|c=libro|p=499|t1=Tesoro del Parnaso español: poesías selectas castellanas|t2=Batilo|u=http://books.google.es/books?id=K6TqNsctYiUC&pg=PA499&dq=%22a+sus+amores%22}}
+;4: Deseo, atracción, [[apetito]] o intercambio de tipo [[sexual]].
+;5: {{plm|dedicación}}, [[cuidado]] y [[goce]] en una [[actividad]] u [[obra]].
+
+==== Locuciones ====
+{{trad-arriba|Locuciones con «amor»}}
+* [[amor al uso]]
+* [[amor de hortelano]]
+* [[amor de verano]]
+* [[amores secos]]
+* [[amor libre]]
+* [[amor platónico]]
+* [[amor propio]]
+* [[amor romántico]]
+* [[amor seco]]
+* [[al amor del agua]]
+* [[al amor de la lumbre]] o [[al amor del fuego]]
+* [[árbol del amor]]
+* [[a su amor]]
+* [[con mil amores]]
+* [[dar como por amor de Dios]]
+* [[de mil amores]]
+* [[en amor compaña]]
+* [[en amor y compaña]] o [[en amor y compañía]]
+* [[flor de amor]]
+* [[hacer el amor]]
+* [[por amor al arte]]
+* [[por amor de]]
+* [[por amor de Dios]]
+* [[requerir de amores]]
+* [[tratar amores]]
+* [[trompeta de amor]]
+{{trad-abajo}}
+
+==== Refranes ====
+* [[amor de lejos, amor de pendejos]]
+* [[amor de yerno, sol de invierno]]
+* [[obras son amores, que no buenas razones]]
+* [[para el amor y la muerte, no hay alma fuerte]]
+
+==== Información adicional ====
+{{derivad|amar|amabilidad|amable|amablemente|amación|amado|amador|amante|amatividad|amativo|amatorio|amorcillo|amorío|amormío|amorocharse|amorosamente|amoroso|desamar|desamor|desamador|desamable|desamoradamente|desamorado|desamoroso|desenamorar|enamorada|enamoradamente|enamoradizo|enamorado|enamorador|enamoramiento|enamorar|enamoricarse|enamoriscarse}}.
+* '''Análisis''': Sustantivo común, incontable, abstracto, individual, masculino, singular.
+
+==== Véase también ====
+{{W}}
+
+==== Traducciones ====
+{{trad-arriba|[1] sentimiento de atracción, afinidad o unión}}
+{{t|af|t1=liefde}}
+{{t|sh|t1=ljubav|t2=љубав}}
+{{t|sq|t1=dashuri}}
+{{t|de|g1=f|t1=Liebe}}
+{{t|ar|t1=حب}}
+{{t|an|t1=aimor}}
+{{t|rup|t1=agapi|t2=sivdã|t3=vreare|t4=vreari}}
+{{t|az|t1=məhəbbət|t2=sevgi}}
+{{t|br|t1=karantez}}
+{{t|bg|t1=любов}}
+{{t|ca|g1=m|t1=amor}}
+{{t|co|t1=amore|t2=amori}}
+{{t|cs|g1=f|t1=láska}}
+{{t|sk|g1=f|t1=láska}}
+{{t|sl|g1=f|t1=ljubezen}}
+{{t|ko|t1=사랑}}
+{{t|dlm|t1=amaur}}
+{{t|da|t1=kærlighed}}
+{{t|eo|t1=amo}}
+{{t|et|t1=armastus}}
+{{t|eu|t1=maitasun}}
+{{t|ext|g1=m|t1=amol}}
+{{t|fi|t1=rakkaus}}
+{{t|fr|g1=m|t1=amour}}
+{{t|cy|g1=m|t1=cariad}}
+{{t|gl|t1=amor}}
+{{t|sdn|t1=amóri}}
+{{t|el|t1=αγάπη|tl1=agápi}}
+{{t|haw|t1=aloha}}
+{{t|he|t1=אהבה}}
+{{t|hi|t1=आसक्ति}}
+{{t|hu|t1=szerelem}}
+{{t|io|t1=amo}}
+{{t|id|t1=cinta}}
+{{t|en|a1=1-3|t1=love}}
+{{t|ia|t1=amor|t2=charitas}}
+{{t|ga|g1=m|t1=grá}}
+{{t|is|g1=f|t1=ást}}
+{{t|is|t1=elska}}
+{{t|it|g1=m|t1=amore}}
+{{t|ja|t1=愛|t2=あい|tl2=ai}}
+{{t|nrf|t1=amour}}
+{{t|la|g1=m|t1=amor}}
+{{t|lv|g1=f|g3=f|t1=mīlestība|t2=mīla}}
+{{t|lij|t1=amù}}
+{{t|lt|t1=meilė}}
+{{t|lb|g1=f|t1=Léift}}
+{{t|mk|t1=љубов}}
+{{t|ms|t1=cinta}}
+{{t|zh|t1=喜爱}}
+{{t|arn|a1=1-3|t1=ayün}}
+{{t|yua|t1=yaabilaj|t2=yaakunaj|t3=yaamaj|t4=yaj}}
+{{t|mxi|a1=1|t1=amore}}
+{{t|nap|g1=m|t1=ammore}}
+{{t|nl|g1=f|t1=liefde}}
+{{t|no|g1=mf|t1=kjærlighet}}
+{{t|nn|g1=m|t1=kjærleik}}
+{{t|fa|t1=عشق}}
+{{t|pl|g1=n|g2=f|t1=kochanie|t2=miłość}}
+{{t|pt|g1=m|t1=amor}}
+{{t|rm|g1=f|t1=charezza}}
+{{t|ro|t1=adorație|t2=amor|t3=dragoste|t4=iubire}}
+{{t|ru|g1=f|t1=любовь|tl1=lyubóv'}}
+{{t|sm|t1=alofa}}
+{{t|sc|t1=amóri|t2=ameddu}}
+{{t|scn|t1=amuri}}
+{{t|sv|g1=c|t1=kärlek}}
+{{t|sw|t1=upendo}}
+{{t|tl|t1=pag-ibig}}
+{{t|th|t1=ความรัก}}
+{{t|tr|t1=aşk}}
+{{t|uk|t1=кохання}}
+{{t|yi|t1=ahave}}
+{{t|zu|t1=uthando}}
+{{trad-abajo}}

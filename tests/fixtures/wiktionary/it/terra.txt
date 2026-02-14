@@ -1,0 +1,126 @@
+== {{-it-}} ==
+{{-sost-|it}}
+{{Pn|w=Terra (disambigua)}} ''f sing'' {{Linkp|terre}}
+
+[[File:Ferretto1.jpg|thumb|200px|aspetto della '''terra''' (con il significato di suolo)]]
+# {{Term|astronomia|it}} {{Term|geografia|it}} {{Term|geologia|it}} il luogo in cui si svolge la [[vita]] dell'[[uomo]], in contrapposizione al [[cielo]]
+#* ''vivere su questa {{Pn}}''
+# [[agglomerato]] di [[particella|particelle]] silicee, argillose, scistose e simili, di natura prevalentemente [[minerale]], che si trova sul [[suolo]]
+#* ''...aveva le mani sporche di {{Pn}}...''
+# la parte asciutta del [[globo]], contrapposto al [[mare]]; [[terraferma]]
+#* ''la nave è giunta a {{Pn}}''
+# estensione di [[territorio]] con particolare riferimento a campi coltivati
+# {{Term|agraria|it}} [[terreno]] coltivabile, possedimento rurale
+#* ''lavorare la {{Pn}}''
+# [[paese]], luogo di [[nascita]] 
+#* ''la mia {{Pn}}''
+# {{Term|elettrotecnica|it}} [[conduttore]] [[elettrico]] al quale si attribuisce il potenziale zero
+#* ''presa di {{Pn}}''
+# {{Term|astrologia|it}} [[trigono]] che comprende i segni [[Toro]], [[Vergine]], [[Capricorno]].
+#* segni di '''Terra'''
+# {{Term|araldica|it}} figura araldica convenzionale che rappresenta il pianeta come un globo attraversato dall'equatore
+# {{Term|economia|it}} insieme di risorse naturali che contribuiscono a tutti i processi di produzione
+
+{{-sill-}}
+; tèr | ra
+
+{{-pron-}} 
+{{IPA|/ˈtɛrra/}}
+{{Audio|It-Terra.oga}}
+
+{{-etim-}}
+dal {{la}} ''[[tĕrra]]'', riconducibile alla radice indoeuropea ''[[tars-]]'' ("secco")
+
+{{-sin-}}
+* [[globo]], [[mondo]], [[orbe]], [[pianeta]] 
+*[[humus]], [[polvere]], [[terreno]], [[terriccio]]
+*[[crosta]], [[suolo]], [[superficie]], [[terraferma]]
+*[[campagna]], [[campo]], [[podere]], [[tenuta]], [[fondo]], [[appezzamento]]
+* [[argilla]], [[creta]]
+* {{Est}} [[contrada]], [[paese]], [[regione]], [[territorio]], [[zona]]
+* {{Fig}}  [[umanità]], esseri umani
+  
+ 
+
+{{-ant-}}
+* [[mare]]
+
+{{-der-}}
+*[[conterraneo]],   [[entroterra]], [[interrare]], [[rasoterra]], [[retroterra]], [[sopratterra]], [[sottoterra]], [[sterramento]] [[sterrare]], [[terraferma]], [[terraglia]],  [[terrapieno]], [[terra-terra]], [[terrestre]], [[terriero]], [[territorio]], [[terroso]], [[terraglia]], [[zappaterra]]
+
+{{-rel-}}
+* [[pavimento]]
+
+{{-prov-}}
+* ''avere i piedi per {{Pn}}'': essere concreto
+* ''avere il morale a {{Pn}}'': essere triste
+* ''essere a {{Pn}}'': essere giù di morale
+* ''che la {{Pn}} gli sia lieve'': in caso di decesso, è una delicata preghiera
+* ''[[con i piedi per terra]]'': che bada al sodo; in modo risolutamente ben piantato sulla realtà
+
+{{-noconf-}}
+* [[Terra]]
+
+{{-trad-}}
+{{Trad1|{{Term|astronomia|it}} [[pianeta]]}}
+:* {{en}}: [[Earth]]
+{{Trad2}}
+
+{{Trad1|}}
+:*{{als}}: [[Erde]]
+:*{{eu}}: [[lur]]
+:*{{bs}}: [[zemlja]]
+:*{{br}}: [[douar]] ''m''
+:*{{ca}}: [[terra]] ''f''
+:*{{cic}}: [[okla]]
+:*{{zh}}: [[土]] (tǔ)
+:*{{hr}}: [[zemlja]]
+:*{{da}}: [[jorden]]
+:*{{eo}}: [[tero]]
+:*{{et}}: [[maa]], [[maakera]]
+:*{{fi}}: [[maa]] [[maapallo]]
+:*{{fr}}: [[terre]] ''f''
+:*{{fy}}: [[ierde]]
+:*{{fur}}: [[tiare]] ''f''
+:*{{gl}}: [[terra]] ''f''
+:*{{ja}}: [[土]] (tsuchi)
+:*{{gn}}: [[yvy]]
+:*{{id}}: [[bumi]]
+:*{{en}}: [[soil]]
+:*{{ga}}: [[domhan]]
+{{mid}}
+:*{{la}}: [[terra]]
+:*{{lmo}}: [[tera]] ''f''
+:*{{lb}}: [[äero]]
+:*{{mt}}: [[dinja]]
+:*{{mi}}: [[papa]]
+:*{{nap}}: [[tèrra]] ''f''
+:*{{no}}: [[midgard]]
+:*{{pl}}: [[ziemia]] 
+:*{{pt}}: [[terra]]
+:*{{ru}}: [[земля]] (zemlya) ''f''
+:*{{scn}}: [[terra]] ''f''
+:*{{sk}}: [[zem]]
+:*{{sl}}: [[zemlja]]
+
+:*{{es}}: [[tierra]]
+:*{{sv}}: [[jord]]
+:*{{sw}}: [[dunia]]
+:*{{de}}: [[Erde]]
+:*{{hu}}: [[föld]]
+:*{{vi}}: [[đất]]
+:*{{zu}}: [[umhlabathi]]
+{{Trad2}}
+
+{{Trad1|proprietà agricola}}
+:* {{en}}: [[ager]], [[praedium]] 
+{{Trad2}}
+
+{{-ref-}}
+* {{Fonte|dem}}
+* {{Fonte|dizit}}
+* {{Fonte|trec}}
+* {{Fonte|sape}}
+* {{Fonte|gar}}
+*AA.VV., ''Dizionario sinonimi e contrari'', Mariotti, 2006, pagina 580
+* {{Term|araldica|it}} ''Dizionario araldico, di Piero Guelfi Camajani - edito a Milano nel 1940''

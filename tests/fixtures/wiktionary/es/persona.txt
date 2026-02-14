@@ -1,0 +1,78 @@
+== {{lengua|es}} ==
+{{pron-graf}}
+
+=== Etimología 1 ===
+{{etimología|la|persona}}.
+
+==== {{sustantivo femenino|es}} ====
+{{es.sust}}
+;1: Individuo perteneciente a la [[especie]] [[humana]].
+{{sinónimo|humano|individuo|sujeto|alma|cristiano|ser}}.
+;2: Individuo indeterminado o no identificado en el discurso.
+{{sinónimo|alguien}}.
+;3 {{csem|lingüística}}: Uno de los accidentes gramaticales que determinan la [[flexión]] de verbos y pronombres, según el sujeto que habla.
+;4: Cualquier animal que presente sentimientos y por tanto pueda tener [[personalidad]].
+
+==== Locuciones ====
+{{trad-arriba|Locuciones con «persona»}}
+{{sinónimo|personalmente}}
+* [[persona física]]
+* [[persona grata]]
+* [[persona jurídica]]
+* [[persona natural]]
+* [[persona non grata]]
+* [[por persona]]
+* [[primera persona]]
+* [[segunda persona]]
+* [[tercera persona]]
+{{trad-abajo}}
+
+==== Información adicional ====
+{{derivad|apersonar|personaje|personación|personado|personal|personalizar|personalización|personarse|personería|personera|personero|personificación|personificar|personificante|personilla|personudo}}.
+
+==== Véase también ====
+{{W}}
+
+==== Traducciones ====
+{{trad-arriba}}
+{{t|ain|t1=アィヌ}}
+{{t|de|g1=f|t1=Person}}
+{{t|ast|a1=1-3|t1=persona}}
+{{t|bg|t1=човек|t2=лице}}
+{{t|cak|t1=winäq}}
+{{t|ca|g1=f|t1=persona}}
+{{t|ch|t1=petsona}}
+{{t|sh|t1=osoba}}
+{{t|da|g1=c|t1=person}}
+{{t|sl|g1=f|t1=oseba}}
+{{t|eo|t1=persono}}
+{{t|ext|a1=1-3|t1=pressona}}
+{{t|eu|t1=pertsona}}
+{{t|fr|g1=f|t1=personne}}
+{{t|gl|g1=f|t1=persoa}}
+{{t|el|a1=1|g1=n|g2=n|t1=άτομο|t2=πρόσωπο}}
+{{t|grc|a1=1|g1=m|t1=ἄνθρωπος}}
+{{t|hz|a1=1|t1=omundu}}
+{{t|hi|g1=m|t1=व्यक्ति}}
+{{t|hi|a1=m|t1=आदमी}}
+{{t|en|t1=person}}
+{{t|it|g1=f|t1=persona}}
+{{t|arn|t1=che}}
+{{t|yua|t1=máak}}
+{{t|mit|t1=ñayívi}}
+{{t|moc|t1=qom}}
+{{t|mn|t1=хүн}}
+{{t|nci|a1=1|a2=2|t1=macehualli|t2=tlacatl}}
+{{t|nhw|a1=1|t1=maseuali}}
+{{t|nl|g1=m|t1=persoon}}
+{{t|no|g1=c|t1=person}}
+{{t|nn|g1=m|t1=person}}
+{{t|pl|t1=osoba}}
+{{t|pt|g1=f|t1=pessoa}}
+{{t|rap|t1=tangata}}
+{{t|sa|g1=f|t1=व्यक्ति}}
+{{t|sa|a1=m|t1=पुरुष}}
+{{t|sv|g1=c|t1=person}}
+{{t|tob|t1=qom}}
+{{t|tok|t1=jan}}
+{{trad-abajo}}

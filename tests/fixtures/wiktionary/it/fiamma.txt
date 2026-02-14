@@ -1,0 +1,85 @@
+== {{-it-}} ==
+{{-sost-|it}}
+{{Pn|w}} ''f sing'' {{Linkp|fiamme}}
+# {{Term|fisica|it}} {{Term|chimica|it}} [[fuoco]] vivo [[che]] si [[leva]] in alto, [[lingua]] di fuoco che [[vibra]], colonna di gas o [[vapori]] [[incandescenti]]
+# {{Fig}}  forte [[passione]]
+#* ''la fiamma della libertà''
+# {{Term|botanica|it}} piante [[parassite]] scolorite, con [[fusto]] sottilissimo che si attacca e si [[innesta]] ad altre piante facendole [[perire]] privandole dell'[[umore]]: hanno fiori piccoli in [[fascetti]]
+# {{Term|araldica|it}} figura araldica convenzionale che rappresenta una fiamma composta da tre lingue di fuoco ondeggianti in palo, generalmente di rosso, aventi la base comune
+
+{{-sill-}}
+; fiàm | ma
+
+{{-pron-}}
+{{IPA|/ˈfjamma/}}
+
+{{-etim-}}
+dal [[latino]] ''[[flamma]]'' , che deriva  da ''[[flagrare]]'' ossia "[[ardere]]"
+
+{{-sin-}}
+* [[vampa]], lingua di fuoco, [[vampata]], [[fiammata]], [[fuoco]]
+* {{Fig}} [[ideale]], [[aspirazione]], [[ardore]], [[entusiasmo]], [[fervore]]
+* passione amorosa, [[sentimento]]; [[amato]], [[amata]], [[amore]], [[innamorato]], [[innamorata]], [[amante]]
+* [[gagliardetto]], [[stendardo]]
+* {{Est}} rosso vivo, rosso acceso
+* '' (al plurale'') [[incendio]], [[rogo]]  
+* {{Fig}} [[ passione]], [[ sentimento]] 
+* {{Glossa|scherzoso}} [[amato]]; [[flirt]]
+
+{{-der-}}
+* [[fiammante]], [[fiammeggiante]], [[fiammeggiare]], [[fiammifero]], [[infiammare]], [[sfiammare]],  [[spegnifiamma]]
+
+{{-rel-}}
+* [[fiaccola]], [[fuoco]] 
+
+{{-alter-}}
+* {{Dim}}  [[fiammella]], [[fiammetta]]
+* {{Accr}} [[fiammona]]
+
+{{-prov-}}
+*''[[a fiamma bassa]]'' 
+* ''[[mettere a fuoco e fiamme]]'': [[sconvolgere]], [[rovinare]], [[mettere a ferro e fuoco]]
+* ''[[fare fuoco e fiamme]]'': [[agitarsi]], [[strepitare]]
+
+{{-trad-}}
+{{Trad1|}}
+:* {{en}}: [[flame]]
+{{Trad2}}
+
+{{Trad1|improvvisa, irregolare}}
+:* {{en}}: [[flare]]
+{{Trad2}}
+
+{{Trad1|molto viva}}
+:* {{en}}: [[blaze]]
+{{Trad2}}
+
+{{Trad1|del fornello}}
+:* {{en}}: [[gas]], [[flame]]
+{{Trad2}}
+
+{{Trad1|marina militare: bandiera}}
+:* {{en}}: [[pennant]], [[pennon]]
+{{Trad2}}
+
+{{Trad1|[[araldica]]}}
+:*{{fr}}:  [[flamme]] 
+:*{{en}}:  [[flame]]
+:*{{oc}}:  [[flama]] 
+{{Trad2}}
+
+{{-ref-}}
+* {{Fonte|sabco}}
+*{{Fonte|desan|F}}
+* {{Fonte|sin-co}}
+* {{Fonte|zin|516|1922}}
+* {{Fonte|trec}}
+*Enciclopedia [http://www.treccani.it/enciclopedia/ricerca/Fiamma/ Treccani]
+* {{Term|araldica|it}}  ''Dizionario araldico, di Piero Guelfi Camajani - edito a Milano nel 1940''
+* {{Term|araldica|it}} ''[http://www.archiviodistato.firenze.it/ceramellipapiani/static/figure.htm Glossario dell'Archivio di Stato di Firenze]''
+* {{Fonte|dizit}}
+* {{Fonte|dizla}}
+* {{Fonte|hoep}}
+* {{Fonte|sape}}
+* {{Fonte|gar}}
+* {{Fonte|dem}}

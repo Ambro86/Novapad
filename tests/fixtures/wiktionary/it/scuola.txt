@@ -1,0 +1,102 @@
+== {{-it-}} ==
+{{-sost-|it}}
+{{Pn|w}} ''f sing'' {{Linkp|scuole}}
+#[[insieme]] di [[istituzioni]], [[persone]] e [[risorse]] [[preposte]] all'[[insegnamento]] di [[nozioni]] e [[fondamenti]] del [[sapere]] [[relativi]] alla [[cultura]] di [[appartenenza]]
+#* '''scuola dell'obbligo''': scuola che dev'[[essere]] [[frequentata]] per [[legge]] da [[tutti]] i [[cittadini]], [[rappresentata]] dall'[[istruzione]] [[primaria]] e dal [[primo]] [[grado]] dell'[[istruzione secondaria]]
+#* '''scuola pubblica''': di [[proprietà]] dello [[stato]]
+#* '''scuola privata''': di proprietà di un [[ente]] al di [[fuori]] dello [[stato]]
+#* '''scuola serale''': [[lezioni]] per chi, ormai [[oltre]] la [[soglia]] d'[[età]] oppure con [[ulteriori]] [[impegni]], abbia avuto la [[volontà]] di [[proseguire]] gli [[studi]]
+# {{Term|scuola|it}} [[ente]] [[educativo]] gestito dallo [[Stato]] o dai [[privati]] con lo scopo di [[diffondere]] la [[cultura]] tramite degli [[insegnamenti]]
+# {{Term|scuola|it}} l'insieme di [[istituzioni]] [[scolastiche]] situate in un [[paese]]
+# {{Term|scuola|it}} insegnamento [[metodico]] con il compito di far [[apprendere]] una [[disciplina]] o un'[[arte]]
+# {{Term|scuola|it}} l'insieme degli [[studenti]] e del [[personale]] che partecipa all'attività scolastica
+# {{Term|scuola|it}} l'[[edificio]] nel quale si svolgono le attività [[didattiche]]
+# {{Term|scuola|it}} l'insieme dei [[partecipanti]] a un [[indirizzo]] comune
+# {{Term|scuola|it}} i [[discepoli]] o [[seguaci]] di una persona ritenuta importante
+
+{{-sill-}}
+; scuò | la
+
+{{-pron-}}
+{{IPA|/ˈskwɔla/}}
+
+{{Audio|it-scuola.oga}}
+
+{{-etim-}}
+dal [[latino]] ''[[schola#Latino|schŏla]]'', che deriva  dal {{grc}} ''[[σχολή]]'', ovvero "tempo libero da trascorrere piacevolmente" e poi "da dedicare alla [[conoscenza]] [[rigorosa]] e [[metodica]] di un [[argomento]]"
+
+{{-sin-}}
+*sede scolastica, edificio scolastico, [[istituto]], [[collegio]]
+*[[ammaestramento]], [[educazione]], [[formazione]], [[insegnamento]], [[istruzione]], [[studio]],  indirizzo di studi
+*[[esercizio]], [[addestramento]],  [[pratica]], [[tecnica]], [[esempio]], [[tirocinio]]
+*[[docenti]], [[insegnanti]], [[maestri]],  [[professori]]
+*[[allievi]], [[alunni]], [[corsisti]], [[discepoli]], [[scolaresca]], [[studenti]]
+*''(di arte, letteratura)'' [[corrente]], [[gruppo]], [[indirizzo]], [[linea]],  [[movimento]]
+* ''(di artisti, filosofi, ecc.)''  [[tendenza]],
+
+
+
+
+
+{{-der-}}
+* [[autoscuola]], [[caposcuola]], [[doposcuola]], [[scolaro]], [[scolastico]], [[scolopio]],  [[sottoscuola]]
+
+{{-rel-}}
+* [[educazione]], [[insegnante]], [[maestro]], [[preside]], [[professore]], [[studente]]
+* [[diploma]], [[laurea]], [[dottorato]], [[master]], [[stage]]
+* {{Est}} [[riconoscimento]]
+
+{{-ipon-}}
+* [[accademia]], [[college]], [[liceo]], [[università]]
+* [[asilo]]
+
+{{-iperon-}}
+* [[pubblica amministrazione]]
+
+{{-rel-}}
+* [[diritto amministrativo]]
+
+{{-prov-}}
+*''alla scuola di'':
+*''[[fare scuola]]'':
+*''[[scuola dell’obbligo]]'':
+*''[[scuola guida]]'':
+*''[[scuola serale]]'':
+ 
+{{-trad-}}
+{{Trad1|}}
+:*{{br}}:  [[skol]] ''f''
+:*{{ca}}:  [[escola]] ''f''
+:*{{cic}}:  [[holisso pisa chi]]
+:*{{hr}}:  [[škola]]
+:*{{fi}}:  [[koulu]]
+:*{{fr}}:  [[école]] ''f''
+:*{{en}}:  [[school]]
+:*{{ia}}:  [[schola]]
+:*{{ga}}:  [[scoil]]
+{{mid}}
+:*{{lt}}:  [[mokykla]] ''f''
+:*{{nap}}:  [[scòla]]
+:*{{nl}}:  [[school]] 
+:*{{pl}}:  [[szkoła]] ''f''
+:*{{pt}}:  [[escola]] ''f''
+:*{{sl}}:  [[šola]] ''f''
+:*{{es}}:  [[escuela]]
+:*{{sv}}:  [[skola]]
+:*{{de}}:  [[Schule]] ''f''
+{{Trad2}}
+
+{{-ref-}}
+* {{Fonte|dem}}
+* {{Fonte|dizit}}
+* {{Fonte|trec}}
+* {{Fonte|hoep}}
+* {{Fonte|sape}}
+* {{Fonte|gar}}
+* {{Fonte|zin|1629|1997}}
+* {{Fonte|eti}}
+* {{Fonte|sabco}}
+* {{Fonte|sin-co}}
+*Devoto/Oli, '' il dizionario della lingua italiana'', edizione cartacea 2000-2001,Le Monnier, pagina 1892
+* {{Fonte|itfd}}
+*AA.VV., ''Dizionario sinonimi e contrari'', Mariotti, 2006, pagina 512

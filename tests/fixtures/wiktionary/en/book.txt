@@ -1,0 +1,768 @@
+==English==
+{{wp}}
+
+===Pronunciation===
+* {{enPR|bo͝ok}}, {{IPA|en|/bʊk/}}
+** {{audio|en|En-uk-book.ogg|a=UK}}
+** {{audio|en|en-us-book.ogg|a=US}}
+* {{enPR|bo͞ok}} {{IPA|en|/buːk/|aa=some speakers from <<Northern England>> and <<Ireland>>}}
+* {{IPA|en|/bʉk/|a=Scotland,NI,MLE}}
+* {{homophones|en|buck|aa=<<non-foot-strut split>>, when pronounced /bʊk/}}
+* {{rhymes|en|ʊk|s=1}}
+
+===Etymology 1===
+{{etymon|en|id=Q571|:inh|enm:bok<id:book>|tree=1}}
+[[File:Pieni2.jpg|right|thumb|A hard-cover '''book''' ({{senseno|en|Q571}})]]
+From {{inh|en|enm|bok}}, {{m|enm|book}}, from {{inh|en|ang|bōc}}, from {{inh|en|gmw-pro|*bōk}}, from {{inh|en|gem-pro|*bōks}}. ''Bookmaker'' sense by {{clipping|en|nocap=1}}.
+{{col-top|2|cog}}
+Cognate with {{cog|sco|beuk}}, {{m|sco|buik}}, {{m|sco|buke|t=book}}, {{cog|yol|buke|t=book}}, {{cog|frr|Bok}}, {{m|frr|buk}}, {{m|frr|bök|t=book}}, {{cog|stq|Bouk|t=book}}, {{cog|fy|-}}, {{cog|nl|boek|t=book}}, {{cog|gsw|Buech|t=book}}, {{cog|bar|Buach|t=book}}, {{cog|gmw-cfr|Booch}}, {{m|gmw-cfr|Buch|t=book}}, {{cog|de|-}}, {{cog|lb|Buch|t=book}}, {{cog|nds-de|Book|t=book}}, {{cog|li|book}}, {{m|li|Bouk|t=book}}, {{cog|wym|büch|t=book}}, {{cog|yi|בוך|t=book}}, {{cog|da|bog|t=book}}, {{cog|ovd|buok|t=book}}, {{cog|fo|-}}, {{cog|is|bók|t=book}}, {{cog|nb|-}}, {{cog|nn|-}} and {{cog|sv|bok|t=book}}. 
+{{col-bottom}}
+
+====Alternative forms====
+* {{alt|en|boke||obsolete}}
+* {{alt|en|booke||archaic}}
+
+====Noun====
+{{en-noun}}
+
+# {{sid|en|Q571}} A collection of sheets of paper bound together to hinge at one edge, containing printed or written material, pictures, etc.
+#* {{RQ:Shakespeare Tempest|act=I|scene=ii|page=3|column=1|passage=Knowing I lou'd my '''bookes''', he furniſhd me / From mine owne Library, with volumes, that / I prize aboue my Dukedome.}}
+#* {{quote-text|en|year=1962|translator=James East Irby|author=w:Luis Borges|title=w:The Library of Babel
+|passage=I repeat: it suffices that a '''book''' be possible for it to exist. Only the impossible is excluded. For example: no '''book''' can be a ladder, although no doubt there are '''books''' which discuss and negate and demonstrate this possibility and others whose structure corresponds to that of a ladder.}}
+#* {{quote-text|en|year=1983|author=Steve Horelick; et al|title=w:Reading Rainbow
+|passage=I can be anything.<br>Take a look!<br>It's in a '''book''':<br>A reading rainbow.}}
+#* {{quote-text|en|year=1991|author=w:Stephen Fry|title=[[:w:The Liar (novel)|The Liar]]|page=51
+|passage=Trefusis's quarters could be described in one word. '''Books'''. '''Books''' and '''books''' and '''books'''. And then, just when an observer might be lured into thinking that that must be it, more '''books'''... Trefusis himself was highly dismissive of them. ‘Waste of trees,’ he had once said. ‘Stupid, ugly, clumsy, heavy things. The sooner technology comes up with a reliable alternative the better... The world is so fond of saying that '''books''' should be “treated with respect”. But when are we told that ''words'' should be treated with respect?’}}
+#: {{ux|en|She opened the '''book''' to page 37 and began to read aloud.}}
+#: {{ux|en|He was frustrated because he couldn't find anything about dinosaurs in the '''book'''.}}
+# A long work fit for [[publication]], typically [[prose]], such as a [[novel]] or [[textbook]], and typically published as such a bound collection of sheets, but now sometimes electronically as an [[e-book]].
+#: {{ux|en|I have three copies of his first '''book'''.}}
+#* {{quote-web|en|url=https://www.theatlantic.com/technology/archive/2022/12/chatgpt-ai-writing-college-student-essays/672371/|title=The College Essay Is Dead|date=2022-12-06|author=w:Stephen Marche|quotee=w:Sam Bankman-Fried|work=The Atlantic|passage= “I would never read a '''book''',” he once told an interviewer. “I don’t want to say no '''book''' is ever worth reading, but I actually do believe something pretty close to that.”}}
+#* {{RQ:Pacifik Wonderfool|Freethinker|passage=They read some '''books'''<br>Sharing their moods<br>They know everything<br>Whatever it can mean}}
+# A major division of a long work.
+#: {{syn|en|tome|volume}}
+#: {{ux|en|Genesis is the first '''book''' of the Bible.}}
+#: {{ux|en|Many readers find the first '''book''' of ''A Tale of Two Cities'' to be confusing.}}
+# {{senseid|en|gambling}} {{lb|en|gambling}} A record of betting (from the use of a notebook to record what each person has bet).
+#: {{ux|en|I'm running a '''book''' on who is going to win the race.}}
+# {{lb|en|informal}} A [[bookmaker]] (a person who takes bets on sporting events and similar); [[bookie]]; [[turf accountant]].
+# A convenient collection, in a form resembling a book, of small paper items for individual use.
+#: {{syn|en|booklet}}
+#: {{co|en|a '''book''' of stamps}}
+#: {{co|en|a '''book''' of raffle tickets}}
+#: {{co|en|a '''book''' of matches ([[matchbook]])}}
+# {{lb|en|theatre}} The script of a [[musical]] or [[opera]].
+#: {{syn|en|libretto}}
+#* {{quote-text|en|year=2010|author=David Baskerville; Tim Baskerville|title=Music Business Handbook and Career Guide|page=172
+|passage=The guild helps ensure that the ownership and control of the music, lyrics, and '''book''' of a show remain in the hands of its authors and composers—not the producers.}}
+# {{lb|en|usually|in the plural}} Records of the accounts of a business.
+#: {{syn|en|account|record}}
+# {{lb|en|legal|colloquial}} A [[book award]], a recognition for receiving the highest grade in a class (traditionally an actual book, but recently more likely a letter or certificate acknowledging the achievement).
+# {{lb|en|whist}} Six [[trick]]s taken by one side.
+# {{lb|en|poker slang}} [[four of a kind|Four of a kind]].<ref>Weisenberg, Michael (2000) ''[http://www.poker1.com/mcu/pokerdictionary/mculib_dictionary_info.asp The Official Dictionary of Poker].'' MGI/Mike Caro University. {{ISBN|978-1880069523}}</ref>
+# {{lb|en|sports}} A document, held by the referee, of the incidents that happened in a game.
+# {{lb|en|sports|by extension}} A list of all players who have been booked (received a warning) in a game.
+#* {{quote-web|en|date=March 2, 2011
+|author=Andy Campbell
+|title=Celtic 1 - 0 Rangers
+|work=BBC
+|url=http://news.bbc.co.uk/sport2/hi/football/9409758.stm
+|page=
+|passage=Celtic captain Scott Brown joined team-mate Majstorovic in the '''book''' and Rangers' John Fleck was also shown a yellow card as an ill-tempered half drew to a close.}}
+# {{lb|en|horse racing}} The list of [[mare]]s that a [[stallion]] will [[breed]] in a given season.
+# {{lb|en|horse racing}} A list of the [[race]]s that a [[jockey]] is scheduled to ride in.
+# {{lb|en|cartomancy}} The twenty-sixth [[Lenormand]] card.
+# {{lb|en|figurative}} Any source of instruction.
+# {{lb|en|with "the"}} The accumulated body of knowledge passed down among [[black]] [[pimp]]s.
+#* {{quote-text|en|year=1974|author=Adrienne Lanier Seward|title=The Black Pimp as a Folk Hero|page=11
+|passage='''The Book''' is an oral tradition of belief in The Life that has been passed down from player to player from generation to generation.}}
+#* {{quote-text|en|year=1994|title=Antiquarian Book Monthly|volume=21|page=36
+|passage=On the other hand '''The Book''' is an oral tradition containing the rules and principles to be adopted by a pimp who wishes to be a player.}}
+# {{lb|en|advertising|informal}} A [[portfolio]] of one's previous work in the industry.
+#* {{quote-text|en|year=2017|author=Nik Mahon|title=Basics Advertising 02: Art Direction|page=8
+|passage=Getting your '''book''' (portfolio) organised is the first step, and knowing both what to include, and what to leave out, is an essential step towards achieving that important agency placement.}}
+#* ''Idea Industry'' (page 27)
+#*: Your portfolio — your '''book''' — has to be killer.
+# {{lb|en|chess|uncountable}} The [[sum]] of [[chess]] [[knowledge]] in the [[opening]] or [[endgame]].
+#: {{ux|en|The {{w|Opposite-colored bishops endgame|opposite-colored bishops endgame}} is usually a '''book''' draw.}}
+#: {{co|en|A [[book move|'''book''' move]]}}
+#: {{co|en|[[out of book|out of '''book''']]}}
+#* {{quote-web|en|archiveurl=https://web.archive.org/web/20230112080030/https://www.theguardian.com/sport/2018/apr/06/schoolboy-vincent-keymer-wins-grenke-open|work=w:The Guardian|passage=White to move and win. How can he do it? The BK plans a march to h8, eating the f4 pawn en route, for a '''book''' draw.|title=Chess: Schoolboy Vincent Keymer secures shock triumph at Grenke Open|date=2018-04-06|author=w:Leonard Barden}}
+#* {{quote-book|en|title=How to Swindle in Chess|passage=This seems certain to simplify into a battle between White's king, rook and two pawns against Black's king and rook. In some cases a '''book''' draw is possible. But a '''book''' win is more likely.|year=2020|author=w:Andrew Soltis|isbn=9781849945639|publisher=w:Batsford Books}}
+# {{lb|en|historical}} A [[package]] of [[silk]].
+#* {{quote-journal|en|year=1867|author=John I. Knight|journal=Mechanics Magazine|page=52
+|passage=This machinery was provided with a rotary drum with received upon its periphery the "'''books'''" of silk to be operated upon and presented them to travelling, combing, or dressing surfaces. The '''books''' were clamped and released automatically by the aid of bars formed with wedges and put in operation by screws {{...}}}}
+
+=====Synonyms=====
+* ''See'' [[Thesaurus:book]]
+
+=====Hyponyms=====
+* ''See'' [[Thesaurus:book]]
+
+=====Derived terms=====
+{{col|en|book-end
+|book-holder
+|bookalike
+|book-match
+|book-stamp
+|book-table
+|book-wright|prompt book
+|emblem-book
+|tale-book
+|turnip for the book
+|Book of God
+|Book of the Living
+|book discussion group
+|book group
+|book sales club||magazine book
+|tunnel book
+|address book
+|muster-book
+|audiobook
+|back of the book|set book
+|Bread Book
+|beach book
+|book bowel
+|book bowel tendency
+|book nook
+|brand book|judge a book by its cover|poison book
+|crossover book
+|book account
+|book agent
+|book-answerer
+|book award
+|this is a book
+|book bag
+|book-bearer
+|book bowel
+|book reading
+|book-building
+|bookbinder
+|time book
+|bookboard
+|book-reader
+|book-reading
+|book stuffing
+|book-bosomed
+|book-bound
+|book-boy
+|antibook
+|artbook
+|bankbook
+|blook
+|bluebook
+|bookaholic
+|bookazine
+|bookbindery
+|bookbinding
+|bookbuild
+|bookbus
+|bookception
+|bookchest
+|bookcraft
+|bookcross
+|bookdealer
+|bookdom
+|booker
+|bookfell
+|bookflap
+|bookhoard
+|bookhound
+|bookhunter
+|bookland
+|Bookland
+|booklegger
+|booklegging
+|booklift
+|booklight
+|booklined
+|booklist
+|Booklr
+|bookmonger
+|booknap
+|bookness
+|bookrack
+|bookright
+|bookroll
+|bookrunner
+|bookrunning
+|bookscape
+|bookshelving
+|booksona
+|Bookstagram
+|bookstave
+|bookstop
+|booktastic
+|Bookternet
+|BookTok
+|BookTube
+|booktuber
+|bookware
+|bookwheel
+|bookwriting
+|callbook
+|chartbook
+|classbook
+|clipbook
+|codebook
+|cyberbook
+|databook
+|datebook
+|daybook
+|deathbook
+|deskbook
+|eBook
+|ebook
+|facebook
+|factbook
+|fairybook
+|flybook
+|formbook
+|gamebook
+|giftbook
+|herdbook
+|holobook
+|Holy Book
+|hymnbook
+|hyperbook
+|jestbook
+|landbook
+|lawbook
+|letterbook
+|lookbook
+|megabook
+|midbook
+|mook
+|multibook
+|namebook
+|needlebook
+|newsbook
+|nonbook
+|outbook
+|out-book
+|outclearing book
+|paybook
+|phonebook
+|photobook
+|pillowbook
+|pitchbook
+|playbook
+|prebook
+|promptbook
+|psalmbook
+|quizbook
+|quotebook
+|racebook
+|roadbook
+|rulebook
+|salesbook
+|schoolbook
+|scientibook
+|scorebook
+|scriptbook
+|shopbook
+|sketchbook
+|skybook
+|slambook
+|sourcebook
+|splatbook
+|sportsbook
+|stockbook
+|stylebook
+|tablebook
+|talebook
+|timebook
+|tunebook
+|ultrabook
+|videobook
+|viewbook
+|vook
+|wastebook
+|webbook
+|wishbook
+|book-burning
+|bookcase
+|book-cloth
+|book club
+|book canvasser
+|Book of Concord
+|book concern
+|book-crab
+|book credit
+|book-debt
+|book-edge gilder
+|book-edge marbler
+|book end
+|bookend
+|bookery
+|booketeria
+|book-farmer
+|book folder
+|book form
+|bookful
+|book-ghoul
+|book gill
+|book hand
+|bookholder
+|bookhood
+|bookhouse
+|book-hunt
+|bookie
+|bookish
+|bookism
+|bookist
+|bookjacket
+|bookkeeper
+|bookkeeping
+|book label
+|book-lare
+|book law
+|book-lear
+|book-learned
+|book-learning
+|book-length
+|bookless
+|booklet
+|booklike
+|bookling
+|booklore
+|booklouse
+|booklover
+|book lover
+|book lung
+|bookly
+|bookmaker
+|bookmaking
+|bookman
+|bookmark
+|bookmarker
+|bookmatch
+|bookmate
+|book-minded,book-mindedness
+|book mite
+|bookmobile
+|bookname
+|book-number
+|book oath
+|book of condolence
+|book of first entry
+|Book of God
+|book of lading
+|Book of Life
+|book of original entry
+|book of rates
+|book of reference
+|Book of the Dead
+|book of the film
+|Book of the Living
+|book of words
+|book packet
+|book piles
+|bookplate
+|book pocket
+|book post
+|book postage
+|bookpress
+|book price
+|book prop
+|book rate
+|book-read
+|bookrest
+|bookroom
+|book-scorpion
+|bookseller
+|bookselling
+|bookshelf
+|bookshop
+|book-shy
+|booksie
+|book-slide
+|book society
+|bookstack
+|bookstaff
+|bookstall
+|book stamp
+|bookstand
+|bookstore
+|book support
+|booksy
+|book table
+|book token
+|book trade
+|book-tray
+|book trough
+|book type
+|book value
+|bookwards
+|book-ways
+|bookwise
+|bookwork
+|book world
+|bookworm
+|bookwright
+|booky
+|bring to book
+|burn book
+|busy book
+|by-book
+|by the book
+|call someone every name in the book
+|casebook
+|cashbook
+|checkbook
+|chequebook
+|cheque book
+|closed book
+|close the books
+|coffee table book
+|coffee-table book
+|comic book
+|cookbook
+|cookery book
+|cook the books
+|copybook
+|coursebook
+|e-book
+|emblem book
+|exercise book
+|forebook
+|for the book
+|flick book
+|fuck book
+|Good Book
+|green book
+|guest book
+|guidebook
+|handbook
+|hold the book
+|hollow book
+|hornbook
+|hymn book
+|in anyone's book
+|in my book
+|in someone's bad books
+|in someone's good books
+|in the books
+|keep the book
+|know like a book
+|logbook
+|make book
+|matchbook
+|notebook
+|off the books
+|on book
+|on the book
+|on the books
+|open book
+|passbook
+|pattern book
+|pension book
+|phrasebook
+|pocketbook
+|prayer book
+|ration book
+|read like a book
+|reading book
+|record book
+|reference book
+|rough book
+|runbook
+|rune book
+|said-bookism
+|scrapbook
+|sketch book
+|spellbook
+|songbook
+|storybook
+|suit one's book
+|take a leaf out of someone's book
+|talk like a book
+|textbook
+|throw the book at
+|visitors' book
+|without book
+|Wizard Book
+|wordbook
+|workbook
+|yearbook
+|ABC book
+|absey book
+|absey-book
+|account book
+|activity book
+|airport book
+|alphabet book
+|American comic book
+|audio book
+|audio-book
+|autograph book
+|baby book
+|bath book
+|birthday book
+|block book
+|blot one's copy book
+|blue book
+|blue book exam
+|board book
+|book bin
+|book burning
+|book deal
+|book debt
+|book drop
+|book dumping
+|book entry
+|book fair
+|book keeping
+|book knowledge
+|book learning
+|book lore
+|book muslin
+|book number
+|book of business
+|book of hours
+|book of nature
+|book of prime entry
+|book of shadows
+|book report
+|book return
+|book scorpion
+|book shop
+|book signing
+|book smart
+|book steak
+|book store
+|book tour
+|book word
+|book worm
+|book-burner
+|book-keep
+|book-keeper
+|book-keeping
+|book-knowledge
+|book-lore
+|book-lung
+|book-ridden
+|book-signing
+|book-smart
+|book-teaching
+|book-token
+|book-wise
+|book-word
+|brag book
+|by-the-book
+|case book
+|case-book
+|chapter book
+|close the book on
+|closed-book
+|coloring book
+|colouring book
+|commonplace book
+|commonplace-book
+|composition book
+|cook book
+|cost-book
+|crack a book
+|day book
+|death book
+|don't judge a book by its cover
+|Dutch book
+|e-book reader
+|edited book
+|electronic book
+|every trick in the book
+|fake book
+|field book
+|field-book
+|flip book
+|form book
+|friendship book
+|funny book
+|good book
+|guard book
+|guide book
+|have more chins than a Chinese phone book
+|history book
+|hymn-book
+|in one's book
+|joke book
+|kiss the book
+|know every trick in the book
+|little black book
+|log book
+|log-book
+|look book
+|look-out book
+|mag book
+|make a book
+|mug book
+|murder book
+|never judge a book by its cover
+|note book
+|off book
+|off-book
+|open book decomposition
+|open-book
+|open-book contract
+|order book
+|out of book
+|paper book
+|phone book
+|phrase book
+|phrase-book
+|picture book
+|pocket book
+|pocket-book
+|poll book
+|rag book
+|read like an open book
+|recipe book
+|red book
+|regie-book
+|rhyme book
+|rime book
+|rip a page out of someone's book
+|rough-book
+|rule book
+|rule-book
+|run book
+|school book
+|scrap book
+|slam book
+|song book
+|splat book
+|squawk book
+|statute book
+|sticker book
+|stroke book
+|stud book
+|stud-book
+|take a page out of someone's book
+|talking book
+|telephone book
+|text-book
+|the oldest trick in the book
+|time-book
+|toilet book
+|trade book
+|travel book
+|turn up for the book
+|turn-up for the book
+|visitor's book
+|why buy a book when you can join a library
+|why buy a book when you can join the library
+|winter book
+|write the book
+|yardage book
+|year-book
+|you can't judge a book by its cover
+|you can't tell a book by its cover
+|book talk
+|book town
+|courtesy book
+|dope book
+|in book
+|Jo-Jo book
+|opening book
+|pop-up book
+|service book
+|speak like a book
+|Tillie and Mac book
+|truth book}}
+
+=====Descendants=====
+{{top2}}
+* {{desc|srn|buku}}
+* {{desctree|tpi|buk}}
+* {{desc|ny|buku|bor=1}}
+* {{desc|chn|buk|bor=1}}
+* {{desc|haw|puke|bor=1}}
+* {{desc|ln|búku|bor=1}}
+* {{desc|mg|boky|bor=1}}
+* {{desc|ml|ബുക്ക്|bor=1}}
+* {{desc|mi|pukapuka|bor=1}} {{i|with [[w:reduplication|reduplication]]}}
+* {{desc|mh|bok|bor=1}}
+* {{desc|meu|buka|bor=1}}
+* {{desc|sn|bhuku|bor=1}}
+* {{desc|so|buugga|buug||bor=1}}
+* {{desc|st|buka|bor=1}} {{i|possibly also from Afrikaans {{m|af|boek}}}}
+* {{desc|zu|ibhuku|bor=1}} {{i|possibly also from Afrikaans {{m|af|boek}}}}
+{{bottom}}
+
+=====Translations=====
+{{see translation subpage|Noun}}
+
+=====See also=====
+{{col|en
+|mul:📚
+|incunable
+|scroll
+|tome
+|volume
+}}
+
+===Etymology 2===
+From {{inh|en|enm|booken}}, {{m|enm|boken}}, from {{inh|en|ang|bōcian}}, {{m|ang|ġebōcian}}, from the noun (see above).
+
+====Verb====
+{{en-verb}}
+
+# {{senseid|en|reserve}} {{lb|en|transitive}} To [[reserve]] (something) for future use.
+#: {{syn|en|reserve}}
+#: {{ux|en|I want to '''book''' a hotel room for tomorrow night.}}
+#: {{ux|en|I can '''book''' tickets for the concert next week.}}
+#* {{quote-journal|en|date=2020 December 2|author=Paul Bigland|title=My weirdest and wackiest Rover yet|journal=Rail|page=68|text=I haven't '''booked''', so I don't have a clue as to whether the service will be busy or not. Supposedly, reservations are compulsory, but I want to find out what would happen if you just turn up.}}
+# {{lb|en|transitive}} To [[write down]], to [[register]] or [[record]] in a book or as in a book.
+#: {{syn|en|[[make]] a [[note]] of|[[note]] [[down]]|record|write down}}
+#: {{ux|en|They '''booked''' that message from the hill.}}
+# {{lb|en|transitive}} To add a [[name]] to the [[list]] of people who are [[participating]] in something.
+#: {{syn|en|sign up|register|reserve|schedule|enroll}}
+#: {{ux|en|I '''booked''' a flight to New York.}}
+# {{lb|en|law enforcement|transitive}} To [[record]] the name and other details of a suspected offender and the offence for later judicial action.
+#: {{ux|en|The police '''booked''' him for driving too fast.}}
+# {{lb|en|sports}} To issue a [[caution]] to, usually a [[yellow card]], or a [[red card]] if a yellow card has already been issued.
+# {{lb|en|intransitive|slang}} To travel very fast.
+#: {{syn|en|bomb|hurtle|rocket|speed|shoot|whiz}}
+#: {{ux|en|He was really '''booking''' until he passed the speed trap.}}
+# To record [[bet|bets]] as [[bookmaker]].
+# {{lb|en|transitive|law student slang}} To receive the highest [[grade]] in a class.
+#: {{ux|en|The top three students had a bet on which one was going to '''book''' their intellectual property class.}}
+# {{lb|en|intransitive|slang}} To [[move]] or [[leave]], often hurriedly and abruptly.
+#: {{ux|en|He was here earlier, but he '''booked'''.}}
+
+=====Derived terms=====
+{{col3|en|title=Terms derived from the verb “book”
+|block-book|book away
+|bookable
+|book in
+|book into
+|booking
+|book off
+|book on
+|book up
+|double-book
+|overbook
+|rebook
+|unbook
+|underbook
+}}
+
+=====Translations=====
+{{see translation subpage|Verb}}
+
+===Etymology 3===
+From {{inh|en|enm|book}}, {{m|enm|bok}}, from {{inh|en|ang|bōc}}, from {{inh|en|gem-pro|*bōk}}, first and third person singular indicative past tense of {{der|en|gem-pro|*bakaną|t=to bake}}.
+
+====Verb====
+{{head|en|verb form}}
+
+# {{senseid|en|baked}} {{lb|en|UK|_|dialectal|Northern England}} {{infl of|en|bake||spast}}
+
+===References===
+<references/>
+
+===Anagrams===
+* {{anagrams|en|a=bkoo|Boko|Koob|boko|bòkò|kobo}}
+
+{{cln|en|student slang}}
+{{topics|en|Textual division|Heraldic charges|Printing}}

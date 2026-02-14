@@ -1,0 +1,60 @@
+== {{lengua|es}} ==
+{{pron-graf|fone=esˈkwe.la}} 
+
+=== Etimología ===
+{{etimología|la|schola}} y éste a su vez del griego {{l+|grc|σχολή}}. 
+
+==== {{sustantivo femenino|es}} ====
+{{es.sust}} 
+
+;1 {{csem|educación}}: [[instituto|Instituto]] que ofrece [[enseñanza primaria]].
+;2: En general, cualquier [[institución]] que ofrezca [[enseñanza]].
+;3: [[edificio|Edificio]] donde está localizado dicho instituto o se imparte la enseñanza.
+
+==== Locuciones ====
+* [[escuela normal]]
+
+==== Información adicional ====
+{{derivad|escuela|escolar|escolaridad|escolarizar|escolarización|escolapio|escolástico|escolástica|escolasticismo|escolano|escolanía|escolariego|escolarino}}.
+
+==== Véase también ====
+{{w}},
+
+==== Traducciones ====
+{{trad-arriba}}
+{{t|ain|a1=1-3|t1=カッコ}}
+{{t|de|a1=1-3|g1=f|t1=Schule}}                    
+{{t|az|a1=1-3|t1=məktəb}}
+{{t|br|a1=1-3|g1=f|t1=skol}}
+{{t|ca|a1=1-3|g1=f|t1=escola}}
+{{t|cs|a1=1-3|g1=f|t1=škola}}
+{{t|da|a1=1-3|g1=c|t1=skole}}
+{{t|sk|a1=1-3|g1=f|t1=škola}}
+{{t|sl|a1=1-3|g1=f|t1=šola}}
+{{t|eo|a1=1-3|t1=lernejo}}
+{{t|eu|a1=1-3|a2=1-3|t1=eskola|t2=ikastetxe}}
+{{t|fi|a1=1-3|t1=koulu}}
+{{t|fr|a1=1-3|g1=f|t1=école}}
+{{t|io|a1=1-3|t1=skolo}}
+{{t|ia|a1=1-3|t1=schola}}
+{{t|is|a1=1-3|g1=m|t1=skóli}}
+{{t|hu|a1=1-3|t1=iskola}}
+{{t|en|a1=1-3|t1=school}}
+{{t|it|a1=1-3|g1=f|t1=scuola}}
+{{t|yua|a1=1-3|t1=najil xook}}
+{{t|mn|a1=1-3|t1=сургууль}}
+{{t|nl|a1=1-3|t1=school}}
+{{t|no|a1=1-3|g1=m|t1=skole}}
+{{t|nn|a1=1-3|g1=m|t1=skole}}
+{{t|pl|a1=1-3|g1=f|t1=szkoła}}
+{{t|pt|a1=1-3|g1=f|t1=escola}}
+{{t|ro|a1=1-3|g1=f|t1=școală}}
+{{t|ru|a1=1-3|g1=f|t1=школа}}
+{{t|sv|a1=1-3|g1=c|t1=skola}}
+{{t|tr|a1=1-3|t1=okul}}
+{{trad-abajo}}
+
+=== Forma flexiva ===
+==== Forma verbal ====
+;1: {{forma verbo|escolar|m=indicativo|p=3s|t=presente}}.
+;2: {{forma verbo|escolar|2s|imperativo|afirmativo=s}}.

@@ -1,0 +1,98 @@
+== {{lengua|es}} ==
+{{pron-graf}}
+{{ampliable}}
+
+=== Etimología 1 ===
+{{etimología|la|tempus|alt=tempus, temporis}}.
+
+==== {{sustantivo masculino|es}} ====
+{{es.sust}}
+;1 {{csem|física}}: {{plm|magnitud}} física básica que permite medir la duración de eventos o de procesos de cambio. Su unidad en el [[Sistema Internacional de Unidades]] es el segundo. El tiempo permite ordenar la sucesión de estados de cualquier proceso en un eje con un sentido no reversible del pasado al futuro.
+{{relacionado|eternidad|presente|pasado|futuro|espacio tiempo}}.
+{{ejemplo|¡Cómo pasa el ''tiempo''!}}
+;2: Cualquier parte o subdivisión de la sucesión de fenómenos que va irreversiblemente del pasado al futuro.
+{{ejemplo|La investigación ha durado mucho ''tiempo''.}}
+;3: Duración de las cosas o fenómenos que pueden cambiar.
+{{relacionado|segundo|instante}}.
+{{ejemplo|Pasa el ''tiempo'' sin hacer nada.}}
+;4: Periodo histórico relacionado con un hecho o personaje sobresaliente que lo caracteriza.
+{{uso|se emplea con frecuencia en plural con el mismo significado}}
+{{sinónimo|era}}.
+{{ejemplo|En ''tiempos'' de Isabel la Católica.}}
+;5: Duración que tiene un estado del clima durante una parte del año.
+{{sinónimo|estación}}.
+{{ejemplo|Hace mucho frío en este ''tiempo''.}}
+;6: Lo que dura algo desde que comenzó o nació.
+{{sinónimo|edad}}.
+{{ejemplo|Mi abuelo murió antes de ''tiempo''.}}
+;7: Momento, [[ocasión]] u oportunidad de hacer algo.
+{{ejemplo|Es ''tiempo'' de cosechar.}}
+;8: Conjunto de factores como la temperatura, humedad y viento, que caracterizan el estado de la atmósfera en un momento dado.
+{{relacionado|clima|meteoro}}.
+{{ejemplo|En invierno el ''tiempo'' es frío.}}
+;9: Parte de un encuentro deportivo que se separa de la parte siguiente por una pausa y, generalmente, un cambio de lado.
+{{ejemplo|Un partido de fútbol tiene dos ''tiempos'', y en ocasiones se juega un tiempo de alargue.}}
+;10: Secuencia de movimientos con que se ejecuta una acción.
+{{ejemplo|El arquero contuvo el remate en dos ''tiempos''.}}
+;11: Cada una de las divisiones que en la conjugación de los verbos indica cuando se verifica la [[acción]].
+{{ejemplo|''Tiempo'' pretérito imperfecto.}}
+;12 {{csem|música}}: Cada una de las divisiones de igual duración que tiene un compás.
+{{relacionado|tempo}}.
+{{ejemplo|Reduzca el ''tiempo''.}}
+;13: Cada una de las divisiones de una obra o composición musical.
+{{ejemplo|Hay que acelerar el ''tiempo'' de la canción.}}
+;14 {{csem|ajedrez}}: Periodo durante el cual se piensa una jugada.
+{{ejemplo|El reloj de ajedrez muestra el ''tiempo'' para cada jugador.}}
+
+==== Locuciones ====
+{{trad-arriba|Locuciones con «tiempo»}}
+* [[a tiempo]]: Antes de que sea tarde.
+* [[a un tiempo]]: Simultáneamente.
+* [[antes de tiempo]]: Prematuramente.
+* [[con tiempo]]: Anticipadamente.
+* [[de un tiempo acá]]; [[de un tiempo a esta parte]]: Recientemente, en el pasado próximo.
+* [[matar el tiempo]]: Ocuparse en algo para no aburrirse mientras se está a la espera de algo.
+* [[no tener tiempo]]: Estar copado de actividades.
+* [[perder el tiempo]]: malgastar el tiempo, esperar en vano.
+* [[sacar tiempo de donde no hay]]: buscar la manera de hacer algo dentro de una agenda copada de actividades.
+{{trad-abajo}}
+
+==== Refranes ====
+* [[en tiempo de melones, cortos los sermones]]
+
+==== Véase también ====
+{{w}}
+
+==== Traducciones ====
+{{trad-arriba}}
+{{t|de|a1=1-3|t1=Zeit|t2=Wetter|a2=8}}
+{{t|ar|t1=وقت|t2=طقس}}
+{{t|ast|a1=1-3,8|t1=tiempu}}
+{{t|br|t1=amzer|g1=m}}
+{{t|bg|t1=време}}
+{{t|ca|a1=1-3, 8|t1=temps}}
+{{t|chr|a1=1|t1=ꭲᏻꮹꭺꮧ|tl1=iyuwagodi}}
+{{t|eo|a1=1-3|t1=tempo|a2=8|t2=vetero}}
+{{t|eu|a1=1-3|t1=denbora|a2=8|t2=eguraldi|t3=denbora}}
+{{t|fi|a1=8|t1=sää}}
+{{t|fr|a1=1-3, 8|t1=temps}}
+{{t|gl|t1=tempo}}
+{{t|el|a1=1-3|t1=χρόνος|t2=καιρός|a2=8}}
+{{t|hi|t1=समय|g1=m|t2=वक़्त|a2=m}}
+{{t|id|a1=1-3|t1=waktu}}
+{{t|en|a1=1-3|t1=time|a2=8|t2=weather}}
+{{t|la|a1=1|t1=tempus}}
+{{t|it|a1=1-3, 8|t1=tempo}}
+{{t|ja|a1=8|t1=天気}}
+{{t|ln|a1=1-3|t1=ntángo}}
+{{t|nl|a1=1-3|t1=tijd|t2=weer|a2=8}}
+{{t|yua|a1=1-3|t1=k’iin}}
+{{t|fa|t1=هوا}}
+{{t|pt|a1=1-3|t1=tempo}}
+{{t|ro|a1=1|t1=timp}}
+{{t|ru|a1=1-3|t1=время|t2=погода|a2=8}}
+{{t|sv|a1=1-3|t1=tid|a2=4|t2=era|a3=5|t3=årstid|a4=6|t4=ålder|a5=7|t5=dags|a6=8|t6=väder|a7=9|t7=halvlek|a8=11|t8=tempus|a9=12|t9=tempo|a10=13|t10=sats}}
+{{t|sw|a1=1|t1=wakati}}
+{{t|tl|a1=1-3, 8|t1=panahon}}
+{{t|tr|a1=1-3|t1=zaman|a2=8|t2=hava}}
+{{trad-abajo}}

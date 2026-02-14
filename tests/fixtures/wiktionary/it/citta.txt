@@ -1,0 +1,89 @@
+== {{-it-}} ==
+[[File:1 toledo spain evening sunset 2014 DXR edit.jpg|thumb|la città di [[w:Toledo|Toledo]] in [[w:Spagna|Spagna]]]]
+[[File:Casco viejo de Dubrovnik, Croacia, 2014-04-14, DD 04.JPG|thumb|la città di Ragusa in Croazia]]
+[[File:Québec city at night, view from Lévis city.jpg|thumb|[[w:Quebec|Quebec]] vista di notte]]
+{{-sost-|it}}
+{{Pn | w}} ''f inv''
+# {{Term|geografia|it}} {{Term|architettura|it}} [[centro]]  abitato di grandi dimensioni dove si accentrano  [[attività]] amministrative, sociali, economiche, culturali e religiose
+#* ''un centro storico è come una {{Pn}} nella {{Pn}}''
+[[File:Formerly Piero della Francesca - Ideal City - Galleria Nazionale delle Marche Urbino 2.jpg|thumb|550px|''[[w:Città ideale (dipinto)|Città ideale]]'', tipico esempio di prospettiva [[rinascimentale]]]]
+
+{{-sill-}}
+; cit | tà
+
+{{-pron-}}
+{{IPA|/t͡ʃitˈta/}}
+{{Audio|it-città.ogg}}
+
+{{-etim-}}
+dal {{la}} ''[[civitas]]'', ''[[civitatis|-tatis]]'', derivazione di ''[[civis]]'' ossia "[[cittadino]]"
+
+{{-quote-}}
+{{Quote
+|Non può restare nascosta una '''città''' collocata sopra un monte, né si accende una lucerna per metterla sotto il moggio.
+|[[w:Vangelo secondo Matteo|Matteo]] {{Passo biblico|Mt|5,14-15}}}}
+
+{{Quote
+|Le città, come i sogni sono costruite, di desideri e di paure
+|[[q:Italo Calvino|Italo Calvino]]}}
+
+{{Quote
+|Io vestito male… perché io ho la fame: quella mia, di mio nonno e quella di mio padre. BADABUM - BADABUM - BADABUM Cha Cha! E la gente lo sa che il mondo fa schifo: vuole dimenticarlo… saper per chi fare il tifo: capisci di che parlo? …e me ne fotto anche se questo suono non va: BADABUM - BADABUM - BADABUM Cha Cha! ..mi senti Fra, quando arrivo in città!<ref>[https://www.youtube.com/watch?v=1C4pCVMIb_M&list=RD1C4pCVMIb_M&start_radio=1 “Marracash - Badabum Cha Cha” (“Marracash” Official Channel YouTube)]</ref>
+|[[w:Marracash|Marracash]], “[[w:Badabum Cha Cha|Badabum Cha Cha]]”}}
+{{-sin-}}
+*[[borgo]], [[capitale]], [[capoluogo]], [[centro]],  centro abitato, [[comune]], [[megalopoli]], [[metropoli]], [[provincia]],  territorio urbano
+*{{Term|uso letterario|it}} [[urbe]]
+*[[abitanti]], [[cittadinanza]], [[cittadini]], [[collettività]], [[comunità]], [[popolazione]], [[popolo]] 
+
+{{-ant-}}
+*[[campagna]]
+
+{{-der-}}
+* [[cittadella]], [[cittadino]], [[cittadinanza]], [[città-regione]], [[città-stato]], [[città multicentrica]]
+
+{{-rel-}}
+* [[civico]], [[civile]]
+
+{{-trad-}}
+{{Trad1|}}
+:*{{sq}}: [[qytet]] ''m''
+:*{{br}}: [[kêr]] ''f''
+:*{{cs}}: [[město]]
+:*{{eo}}: [[urbo]]
+:*{{fi}}: [[kaupunki]]
+:*{{fr}}: [[ville]] ''f''
+:*{{fur}}: [[citât]]
+:*{{grc}}: [[πόλις]]
+:*{{en}}: [[city]], [[town]]
+:*{{kk}}: [[қала]]
+:*{{kk-lat}}: [[qala]]
+:*{{la}}: [[civitas]], [[urbs]], [[oppidum]]<small>(se fortificata)</small>
+{{mid}}
+:*{{lv}}: [[pilsēta]] ''f''
+:*{{nl}}: [[stad]] ''m'' / ''f''
+:*{{pms}}: [[sità]]
+:*{{pl}}: [[miasto]] ''n''
+:*{{pt}}: [[cidade]] ''f''
+:*{{ro}}: [[oraș]]
+:*{{ru}}: [[город]]
+:*{{es}}: [[ciudad]] ''f''
+:*{{de}}: [[Stadt]] ''f''
+:*{{tr}}: [[şehir]]
+:*{{uk}}: [[місто]]
+:*{{hu}}: [[város]] 
+{{Trad2}}
+
+{{-ref-}}
+*italiano
+** {{Fonte|dizit}}
+** {{Fonte|hoep}}
+** {{Fonte|sabco}}
+**{{Fonte|sin-co}}
+** {{Fonte|trec}}
+**Devoto/Oli, " il dizionario della lingua italiana, edizione cartacea 2000-2001, pagina 430
+** {{Fonte|zin|367|1997}}
+** {{Fonte|eti}}
+** {{Fonte|sape}}
+** {{Fonte|itfd}}
+** {{Fonte|italwn}}
+** AA.VV., ''Dizionario sinonimi e contrari'', Mariotti, 2006, pagina 117

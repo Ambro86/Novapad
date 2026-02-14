@@ -1,0 +1,107 @@
+== {{-it-}} ==
+[[File:1970sfamily3.jpg|thumb|[1] una {{Pn}} (fotografata nel 1970) composta da [[padre]]. [[madre]],  [[figlio]] e [[figlia]]]]
+{{-sost-|it}}
+{{Pn|w}} ''f sing'' {{Linkp|famiglie}}
+#insieme di persone di [[base]] [[formata]] da [[individui]] [[tenuti]] [[insieme]] da [[vincoli]] di [[sangue]] e di [[affinità]], col [[fine]] di [[difendere]] le [[esigenze]] [[materiali]] e [[spirituali]] di [[chi]] ne [[fa]] [[parte]]
+#{{fig}} comunità che si caratterizza per i suoi tratti distintivi e per la solidarietà dei suoi membri
+# {{Term|biologia|it}} il [[complesso]] di [[piante]] o [[animali]] che appartengono a più generi simili
+#* ''le [[scimmie]] [[antropomorfe]] appartengono all'[[ordine]] dei [[primati]] ed al [[parvordine]] delle [[catarrine]], alla superfamiglia [[w:Hominoidea|Hominoidea]] ed alla famiglia [[w:Hominidae|Hominidae]], quest'ultima si suddivide nella sottofamiglia degli [[w:Homininae|Homininae]] e dei [[w:Ponginae|Ponginae]] ''
+#* '' il [[cane]], il [[dingo]], il [[lupo]]  e lo [[sciacallo]] fanno parte della famiglia dei [[Canidi]]'' 
+#* ''i [[Bovidi]] sono una famiglia di [[mammiferi]]'' 
+# {{Term|fisica|it}} {{Term|chimica|it}} gruppo di elementi chimici, compresi in un [[periodo]], con proprietà [[affini]] tra loro
+# {{Term|religione|it}} come in un [[nucleo]] [[familiare]] [[esistono]] [[ruoli]] e [[funzioni]] [[relativi]] a ciascun [[elemento]] del [[medesimo]], così una [[comunità]] [[religiosa]] presenta un [[leader]] o [[guida]] [[principale]], con i [[seguaci]] o [[vicini]] appunto secondo un [[ordine]] [[prestabilito]] e [[connaturato]] alla [[stessa]]
+#Esempi: 
+#* famiglia matriarcale,
+#* famiglia patriarcale, f. matrimoniale, f. monogamica, f. genealogica
+#* f. di fatto, f. poligamica, f. allargata, f. originaria, f. omogenitoriale, f. convivente, f. separata in casa 
+#* f. operaia, f. contadina, f. di medici/artisti, f. monoreddito, f. povera 
+#* f. nativa, f. adottiva, f. cristiana, f. islamica
+#* f. di ordine equestre, f. di ordine borghese, f. nobile, f. regale, f. imperiale, f. dinastica, f. primogenita, f. ereditaria, f. titolare, f. titolata
+#* f. religiosa, f. religiosa laica, f. sacerdotale, f. consacrata, 
+#* famiglia spirituale (paternità spirituale, maternità e filiazione spirituale), famiglia di preghiera e di carità, f. di militi
+#* f. vergine e casta, 
+#* cattolico: La Sacra Famiglia (Gesu' Cristo Verbo di Dio fatto carne, santa Maria Madre Vergine Immacolata Assunta Corredentrice, san Giuseppe Padre), 
+#* cristiano: La Famiglia Trinitaria, La Famiglia del Verbo (Dio Padre, Dio Figlio, Dio Spirito Santo)
+# {{Term|familiare|it}} [[gruppo]] di [[vetture]] di uno [[stesso]] [[marchio]] [[realizzate]] con [[motori]], [[particolari]] ed [[estetica]] [[simili]] per cui [[distinguersi|si distinguono]] in [[potenza]], [[sportività]], [[lusso]] ed [[avanguardia]]
+#* ''la [[w:BMW Serie 2|M2]] è la [[più]] [[piccola]] della {{Pn}} "M" di [[casa]] BMW''
+#* ''della {{Pn}} [[w:Mercedes-AMG|AMG]], la "[[w:Mercedes-Benz|Mercedes-Benz]] Vision Gran Turismo" è l'[[odierna]] [[versione]] [[più]] [[moderna]] dell'[[ormai]] [[antica]] "[[w:Mercedes-Benz_W198|Ali di gabbiano]]"
+
+{{-sill-}}
+; fa | mì | glia
+
+{{-pron-}}
+{{IPA|/faˈmiʎʎa/}}
+{{Audio|it-famiglia.ogg}}
+
+{{-etim-}}
+dal [[latino]] ''[[familia|famĭlia]]'', che deriva da ''[[famulus|famŭlus]]'' ossia  "[[servitore]], [[domestico]]"; letteralmente [[servitù]] perché in origine indicava chi aiutava genitori e figli nelle faccende di casa
+
+{{-quote-}}
+{{Quote
+|La famiglia è l'associazione istituita dalla natura per provvedere alle necessità dell'uomo
+|[[q:Aristotele|Aristotele]]}}
+
+{{-sin-}}
+*[[casa]], [[congiunti]], [[consanguinei]], [[famigliari]], nucleo familiare,  [[parentado]], [[parentela]], [[parenti]],
+*[[casato]],  [[discendenza]], [[genealogia]], [[lignaggio]], [[progenie]],  [[schiatta]],  [[stirpe]]
+* {{Est}} [[comunità]], [[gruppo]], [[insieme]],  [[razza]], [[serie]], [[tipo]],
+* ''(l'insieme di tutte le persone dello stesso sangue)'' [[casata]],  [[dinastia]], [[origine]], [[nascita]], [[natali]], [[gente]], [[sangue]], [[ramo]], [[ceppo]], [[clan]],  
+* {{Fig}}  [[categoria]], [[tipologia]], [[classe]], [[genere]], [[gamma]]; [[ordine]], [[congregazione]] 
+
+{{-der-}}
+* [[capofamiglia]], [[superfamiglia]]
+ 
+{{-alter-}}
+* {{Dim}}. [[famigliola]], [[famigliuola]], [[famiglina]]
+* {{Spreg}} [[famigliuccia]]
+* {{Accr}} [[famigliona]]
+* {{Pegg}}  [[famigliaccia]]
+
+{{-ipon-}}
+* [[sottofamiglia]], [[genere]] (es.[[w:Canis|Canis]], [[w:Alopex|Alopex]], [[w:Vulpes|Vulpes]]), [[sottogenere]], [[specie]], [[sottospecie]]
+
+{{-iperon-}}
+* [[regno]], [[phylum]], [[tipo]], [[sottotipo]],  [[classe]], [[sottoclasse]], [[ordine]], [[sottordine]], [[superfamiglia]]
+
+{{-prov-}}
+* ''[[di  buona famiglia]]'' di ottimo status sociale, di elevata condizione sociale
+* ''[[di famiglia]]'': ''(di individuo)'' che è ritenuto come un componente della famiglia, pur non avendo legami di [[parentela]]; ''(di qualcosa)'' solito o tipico  di una famiglia
+* ''farsi una famiglia'': [[sposarsi]]
+*''[[mettere su famiglia]]'': unirsi in [[matrimonio]]
+* ''tengo {{Pn}}'': frase a cui talvolta fa ricorso chi vuole giustificare un comportamento opportunistico o cercare di ottenere clemenza, col pretesto di reali o mentite esigenze e responsabilità familiari
+* ''famiglia tipo'': famiglia media
+
+{{-trad-}}
+{{Trad1|stile di vita privato}}
+:*{{ast}}: [[familia]] ''f''
+:*{{nds}}: [[Famielje]] ''f''
+:*{{fr}}:  [[famille]] ''f''
+:*{{el}}:  [[οικογένεια]] ''f''
+:*{{en}}:  [[family]]
+:*{{la}}: [[familia]]
+:*{{lv}}: [[ģimene]] ''f''
+:*{{lt}}: [[šeima]] ''f''
+{{mid}}
+:*{{nl}}:  [[gezin]] ''n''
+:*{{qu}}:  [[ayllu]]
+:*{{ru}}: [[семья]]
+:*{{es}}:  [[familia]] ''f''
+:*{{sv}}:  [[familj]]
+:*{{de}}:  [[Familie]] ''f''
+:*{{hu}}:  [[család]] 
+{{Trad2}}
+{{Trad1|comunità}}
+:*{{en}}:  [[family]]
+{{mid}}
+:*{{de}}:  [[Familie]] ''f''
+{{Trad2}}
+{{Trad1|stile}}
+:*{{en}}:  [[family]]
+{{mid}}
+:*{{de}}:  [[Familie]] ''f''
+{{Trad2}}
+
+{{-ref-}}
+* {{Fonte|dizit}}
+* {{Fonte|hoep}}
+* {{Fonte|trec}}

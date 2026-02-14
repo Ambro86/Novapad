@@ -1,0 +1,623 @@
+==English==
+{{wp}}
+[[File:Wallinger Avenue.jpg|thumb|Snowy road on Overwaitea Hill, Wallinger Avenue, Kimberley, BC.]]
+
+===Alternative forms===
+* {{alter|en|rade||obsolete}}
+
+===Etymology===
+From {{inh|en|enm|rode|id=ride}}, {{m|enm|rade|id=ride|t=ride, journey}}, from {{inh|en|ang|rād||riding, hostile incursion}}, from {{inh|en|gmw-pro|*raidu}}, from {{inh|en|gem-pro|*raidō||a ride}}, from {{der|en|ine-pro|*reydʰ-||to ride}}. {{doublet|en|raid}}, acquired from {{cog|sco|-}}. Cognates include West Frisian {{m|fy|reed}} (paved trail/road, driveway).
+
+The current primary meaning of "street, way for traveling"  originated relatively late — Shakespeare seemed to expect his audiences to find it unfamiliar — and probably arose through reinterpretation of {{m|en|roadway||a way for riding on}} as saying {{m|en|way}} twice, in other words as a [[tautological]] [[compound]].
+
+===Pronunciation===
+* {{enPR|rōd|a=non-toe-tow}}
+** {{IPA|en|/ɾoːɖ/|a=Indic}}
+** {{IPA|en|/rod/|a=Scotland}}
+** {{IPA|en|/ɹod/|a=GA}}
+
+* {{IPA|en|/ɹəʊd/|a=UK,toe-tow}}
+** {{rhymes|en|əʊd|s=1}}
+** {{audio|en|En-uk-a road.ogg|a=UK|text=a road}}
+** {{audio|en|LL-Q1860 (eng)-Back ache-road.wav|a=London}}
+* {{IPA|en|/ɹoʊd/|a=US,toe-tow}}
+** {{audio|en|en-us-road.ogg|a=US}}
+* {{homophones|en|Rhode|rode|rowed<a:toe-tow>}}
+
+===Noun===
+{{en-noun}}
+
+# {{senseid|en|Q34442}} A [[way]] used for [[travel]]ling between places, originally one wide enough to allow foot passengers and horses to travel, now (US) usually one [[surface]]d with [[asphalt]] or [[concrete]] and designed to accommodate many [[vehicle]]s travelling in both directions. In the UK both senses are heard: a country road is the same as a country [[lane]]. {{defdate|from 16th c.}}
+#* {{quote-book|en|year=1852|author=Mrs M.A. Thompson|chapter=The Tutor's Daughter|title=Graham's American Monthly Magazine of Literature, Art, and Fashion|page=266|url=http://books.google.com/books?id=hdcRAAAAYAAJ&pg=PA266
+|passage=In the lightness of my heart I sang catches of songs as my horse gayly bore me along the well-remembered '''road'''.}}
+#* {{RQ:Lincoln Pratt's Patients|chapter=1|passage=I stumbled along through the young pines and huckleberry bushes. Pretty soon I struck into a sort of path that, I cal'lated, might lead to the '''road''' I was hunting for.}}
+#* {{quote-song|1=en|year=2018|author=Bill Wurtz|title=Long Long Long Journey|url=https://www.youtube.com/watch?v=0jEm6owSKFU|text=And the '''road''' doesn't end / It's a long, long '''road''' and we follow it again and again / And the '''road''' don't pretend}}
+# {{lb|en|uncountable}} Roads in general as a means of travel, especially by [[motor vehicle]].
+#: {{ux|en|We travelled to the seaside by '''road'''.}}
+# {{lb|en|dated}} A physical way or route.
+#* {{RQ:Dickens Little Dorrit|passage=He stirred up his hair with his sprightliest expression, glanced at the little figure again, said ‘Good evening, ma ‘am; don’t come down, Mrs Affery, I know the '''road''' to the door,’ and steamed out.}}
+#* {{RQ:Lindsay Redheap|page=131|passage=Hetty and Mrs. Piper watched them with a lynx-eyed understanding and before the ancient was well upon his '''road''' his way was blocked by Hetty.}}
+# {{lb|en|figuratively}} A [[path]] chosen, as in [[life]] or [[career]]. {{defdate|from 17th c.}}
+#: {{ux|en|the '''road''' to happiness; the '''road''' to success.}}
+#* {{quote-text|en|year=1964|author=Ronald Reagan|title=A Time for Choosing
+|passage=Where, then, is the '''road''' to peace?}}
+#* {{quote-journal|en|date=September 7, 2012|author=Phil McNulty|work=BBC Sport
+|title=[http://www.bbc.co.uk/sport/0/football/19460608 Moldova 0-5 England]
+|passage=Hodgson may actually feel England could have scored even more but this was the perfect first step on the '''road''' to Rio in 2014 and the ideal platform for the second qualifier against Ukraine at Wembley on Tuesday.}}
+# An underground [[tunnel]] in a [[mine]]. {{defdate|from 18th c.}}
+# {{senseid|en|Q22667}} {{lb|en|US|railroads|archaic}} A [[railroad]].<!--[[railroad]] was usually viewed as hyponymous to [[road]] in the 19th century through the mid-20th, which is why railroads were often called roads in that era, but since then it usually is not-->
+# {{senseid|en|Q160342}} {{lb|en|US|UK|railroads}} A single [[railroad track]] ([[railway track]]). {{defdate|from 19th c.}}
+#* {{quote-journal|en|year=1959|month=November|title=L.T. and E.R. developments in East London|journal=Trains Illustrated|page=527|text=The new depot, on which work started in May, 1956, has three reception '''roads''' leading to 13 sidings capable of taking 25 trains, a 450 ft.-long car examination shed with nine '''roads''', a lifting shop with two '''roads''' and three permanent way sidings.}}
+# {{lb|en|obsolete}} The act of [[riding]] on [[horseback]]. {{defdate|9th|17th c.}}
+# {{lb|en|obsolete}} A [[hostile]] [[ride]] against a particular area; a [[raid]]. {{defdate|9th|19th c.}}
+# {{senseid|en|nautical}} {{lb|en|nautical|usually|in the plural}} A partly [[sheltered]] area of water near a shore in which [[vessel]]s may ride at [[anchor]]; a [[roadstead]]. {{defdate|from 14th c.}}
+#* {{RQ:Shakespeare Merchant of Venice|V|i|text={{smallcaps|Antonio}}: Sweet lady, you have given me life and living; / For here I read for certain that my ships / Are safely come to '''road'''.}}
+#* {{quote-book|en|year=1630|author={{w|John Smith (explorer)|John Smith}}|title=True Travels|publisher=Kupperman|year_published=1988|page=38
+|passage=There delivering their fraught, they went to Scandaroone; rather to view what ships was in the '''Roade''', than any thing else […].}}
+# {{lb|en|obsolete}} A journey, or stage of a journey.
+#* {{RQ:Shakespeare Henry 8|IV|ii|text=At last, with easy '''roads''', he came to Leicester; / Lodg'd in the abbey, where the reverend abbot, / With all his convent, honourably receiv'd him; {{...}}}}
+# {{lb|en|cricket}} A [[hard]], [[flat]] [[pitch]], typically favourable for [[batter]]s.
+
+====Usage notes====
+* Often used interchangeably with {{m|en|street}} or other similar words. When usage is distinguished, a road is a route between settlements (reflecting the etymological relation with {{m|en|ride}}), as in the {{w|Great North Road (Great Britain)|Great North Road}} from London to Edinburgh, while a street is a route within a settlement (city or town), strictly speaking, paved.
+
+====Hyponyms====
+* See also [[Thesaurus:road]]
+
+====Derived terms====
+{{col|en|roadfellow|roadlet|roadline|roadmap|roadwhore|wheelroad
+|2+1 road|road cycling|road-rail vehicle
+|2-1 road|national road|road moai
+|Abu Road|telpher road| road concurrency|road-goose|unmade road|unsealed road
+|access road|narrow road|road reclaimer|road recycler
+|all roads lead to Mecca
+|all roads lead to Rome
+|all roads lead to Sydney|road diet|green road
+|an old dog for a hard road
+|any road
+|any road up
+|A road,A-road| express road|whale's road
+|arterial road
+|back road|road spray
+|Basque Roads
+|Berkeley Road
+|B road
+|Builth Road|road tax|sail-road
+|bump in the road
+|bump on the road|asphalt road
+|Burma Road
+|burn up the road
+|byroad
+|cart road,cartroad
+|Cemmaes Road
+|Clarbeston Road|road horse|someone's driveway doesn't go all the way to the road|spine road
+|collector road
+|come down the road
+|concession road|antiroad|bikeroad|droveroad|fireroad|inroad|interroad|nanoroad|onroad|postroad|roadable|roadbook|roadbuilder|roadburner|roadcraft|roadcrew|roadcut|roaded|roadeo|roadful|roadgeek|roadgoing|roadholding|roading|roadish|roadkilled|roadlike|roadmaker|roadmaking|roadman|roadmaster|roadmender|roadmending|roadometer|roadscape|roadslope|roadstone|roadtest|roadwarrior|roadweed|roadwheel|roadwise|roadworker|roadworn|roval|superroad|tramroad
+|corduroy road
+|corpse road
+|country road
+|C road
+|crossroad,cross road
+|crossroads
+|dirt road
+|distributor road
+|down the road
+|driveway doesn't go all the way to the road
+|drove road
+|drover's road
+|drovers' road
+|dyke road
+|Eccles Road
+|end of the road
+|E-road
+|escape road
+|flavor of the road
+|fork in the road
+|frontage road
+|get the show on the road
+|get this show on the road
+|go down that road
+|go down the road
+|Grampound Road
+|granger road
+|gravel road
+|gravel road cop
+|Great North Road
+|Great Roads
+|grid road
+|Hampton Roads
+|Harling Road
+|haul road
+|Heads of the Valleys Road
+|highroad,high road
+|his driveway doesn't go all the way to the road
+|hit the road
+|hold the road
+|ice road
+|iron road
+|it's a long road that has no turning
+|jinny road
+|keep the show on the road
+|kick the can down the road
+|knight of the road
+|Lahaina Roads
+|let's get this circus on the road
+|long road to hoe
+|low road
+|Mackinnon Road
+|main road
+|make the road shorter
+|middle of the road,middle-of-the-road
+|middle-road
+|middle-roader
+|miles of bad road
+|Milwaukee Road
+|Morchard Road
+|New Roads
+|Nickel Plate Road
+|nonroad
+|no through road
+|offroad,off-road
+|off-road bike
+|Old Kent Road
+|one for the road
+|on-road
+|on the road
+|open-road
+|open road
+|over-the-road
+|pave the road to hell
+|pay-per-use road
+|Persian Royal Road
+|plank road
+|post-road
+|priority road
+|railroad
+|rd<id:Q34442>,rd.<id:Q34442>,Rd<id:Q34442>,Rd.<id:Q34442>
+|ridge road
+|ring road
+|roadability
+|road accident
+|road-agent
+|road agent
+|road allowance
+|road apple
+|roadbase
+|roadbed
+|road bicycle
+|road bike
+|roadblock
+|road block
+|road bowling
+|road bridge,roadbridge
+|roadbuilding
+|road burn
+|road captain
+|road car
+|road case
+|road company
+|road crew
+|road dawg
+|road dog
+|roader
+|road event
+|road export
+|road film
+|road fund licence
+|road furniture
+|road game
+|road gang
+|road grit
+|road harrow
+|road head
+|road hockey
+|road hog,road-hog
+|roadhouse
+|road hump
+|road hypnosis
+|road hypnotism
+|roadie
+|road iron
+|roadkill
+|roadless
+|road less traveled
+|road less travelled
+|road locomotive
+|road machine
+|road manager
+|road map
+|road metal
+|road movie
+|roadness
+|road picture
+|road pizza
+|road pricing
+|road race
+|road racing
+|road rage
+|road rager
+|road-raging
+|road-rail
+|road-railer
+|road rash
+|road roller
+|roadrunner
+|road salt
+|road scraper
+|road service
+|roadshow
+|road shower
+|roadside
+|road sign
+|road slug
+|road spikes
+|roadstead
+|road steamer
+|roadster
+|road switcher
+|road test
+|road-test
+|road to Damascus
+|road train
+|road transportation
+|road trip
+|road user
+|road warrior
+|roadway
+|road work
+|roadwork
+|roadworks
+|roadworthy
+|rocky road
+|Roman road
+|royal road
+|rule of the road
+|rules of the road
+|run out of road
+|service road
+|shell road
+|side road,sideroad
+|Silk Road
+|skid road
+|slip road,sliproad
+|spirit road
+|St Columb Road
+|stroad
+|Stroud Road
+|swan's road
+|take the high road
+|take to the road
+|Tapah Road
+|Texel Roads
+|the grass is always greener on the other side of the road
+|the road to hell is paved with good intentions
+|the rubber hits the road
+|the rubber meets the road
+|Tobacco Road
+|tobacco-roader
+|toll road
+|tote road
+|tough road to hoe
+|track-road
+|trunk road
+|two-forty on a plank road
+|unadopted road
+|whale-road
+|whale's road
+|what happens on the road stays on the road
+|where the rubber meets the road
+|wide place in the road
+|wide spot in the road
+|wind road
+|winter road
+|yellow-brick road
+|yellow brick road,Yellow Brick Road
+}}
+
+====Descendants====
+* {{desc|ml|റോഡ്|bor=1}}
+* {{desc|ta|ரோடு|bor=1}}
+* {{desc|te|రోడ్డు|bor=1}}
+
+====Translations====
+{{trans-top|a way for travel}}
+* Adyghe: {{t|ady|гъогу}}
+* Afar: {{t|aa|gita}}
+* Afrikaans: {{t+|af|pad}}, {{t+|af|straat}}, {{t+|af|weg}}
+* Ainu: {{t|ain|ル|tr=ru}}
+* Akan: {{t|ak|ɛkwan}}, {{t|ak|kwan}}
+* Aklanon: {{t|akl|daean}}
+* Albanian: {{t+|sq|udhë|f}}, {{t+|sq|rrugë|f}}
+* Amharic: {{t|am|መንገድ}}
+* Apache:
+*: Western Apache: {{t|apw|ʼintin}}
+* Arabic: {{t+|ar|طَرِيق|m|f}} ({{t+|ar|طُرُق|m-p}}), {{t|ar|سِكَّة|f}}
+*: Egyptian Arabic: {{t|arz|سكّة|m|tr=sekka}}
+*: Gulf Arabic: {{t|afb|طِريج|tr=ṭirīj}}
+*: Hijazi Arabic: {{t|acw|طَريق|m|tr=ṭarīg}}
+*: Iraqi Arabic: {{t|acm|درب|m|tr=darub}}
+*: Moroccan Arabic: {{t|ary|طْريق|f|tr=ṭrīq}}
+* Archi: {{t|aqc|декъӏ}}
+* Armenian: {{t+|hy|ճանապարհ}}, {{t+|hy|ճամփա}}
+* Aromanian: {{t+|rup|cali|f}}, {{t|rup|drum|n}}, {{t|rup|susachi}}
+* Assamese: {{t|as|বাট}}, {{t|as|আলি}}, {{t|as|ৰাস্তা}}
+* Asturian: {{t+|ast|camín|m}}
+* Avar: {{t|av|нух}}
+* Azerbaijani: {{t+|az|yol}}
+* Bangi: {{t|bni|nzela}}
+* Bashkir: {{t|ba|юл}}
+* Basque: {{t+|eu|bide}}, {{t|eu|errepide}}
+* Baure: {{t|brg|kaye}}
+* Belarusian: {{t|be|даро́га|f}}, {{t|be|шлях|m}}, {{t|be|пуць|m}}
+* Bengali: {{t+|bn|রাস্তা}}, {{t+|bn|সড়ক}}, {{t+|bn|পথ|tr=pôth}}
+* Bidayuh:
+*: Bau Bidayuh: {{t|sne|oran}}
+* Blackfoot: {{t|bla|mohsoko}}
+* Bouyei: {{t|pcc|vdonl}}
+* Breton: {{t+|br|hent|m}}
+* Bulgarian: {{t+|bg|път|m}}
+* Burmese: {{t+|my|လမ်း}}
+* Carpathian Rusyn: {{t|rue|доро́га|f}}
+* Catalan: {{t+|ca|carretera|f}}
+* Cebuano: {{t|ceb|dalan}}
+* Chamicuro: {{t|ccc|ajtini}}
+* Chechen: {{t|ce|некъ}}
+* Cherokee: {{t|chr|ᏅᏃᎯ}}
+* Chichewa: {{t|ny|msewu}}
+* Chinese:
+*: Cantonese: {{t|yue|路|tr=lou6}}, {{t|yue|道路}}
+*: Dungan: {{t|dng|лў}}, {{t|dng|лўдо}}
+*: Eastern Min: {{t|cdo|墿|tr=diô}}, {{t|cdo|道|tr=dô̤}}, {{t|cdo|路|tr=lô}}
+*: Hokkien: {{t+|nan-hbl|路|tr=lō͘}}, {{t+|nan-hbl|道路|tr=tō-lō͘}}
+*: Mandarin: {{t+|cmn|路|tr=lù}}, {{t+|cmn|道路}}, {{t+|cmn|馬路}}, {{t+|cmn|道|tr=dào}}
+*: Northern Min: {{t|mnp|墿|tr=diō̤}}
+*: Wu: {{t|wuu|路}}, {{t|wuu|道路}}
+* Comorian:
+*: Ngazidja Comorian: {{t|zdj|pare|c5|c6}}
+* Cornish: {{t|kw|fordh|f}}
+* Cree: {{t|cr|meskanaw}}
+* Crimean Tatar: {{t|crh|yol}}
+* Czech: {{t+|cs|cesta|f}}, {{t+|cs|silnice|f}}
+*: Old Czech: {{t|zlw-ocs|cěsta|f}}
+* Danish: {{t+|da|vej|c}}
+* Dutch: {{t+|nl|weg|m}}
+* Egyptian: {{t-egy|wꜣt|h=wA-A-t:N31|f}}
+* Erzya: {{t|myv|ки}}
+* Esperanto: {{t|eo|ŝoseo}}, {{t+|eo|vojo}}
+* Estonian: {{t+|et|tee}}, {{t|et|maantee}}
+* Even: {{t|eve|хотаран}}
+* Evenki: {{t|evn|хокто}}
+* Farefare: {{t|gur|sore}}
+* Faroese: {{t+|fo|vegur|m}}
+* Finnish: {{t+|fi|tie}}, {{t+|fi|maantie}}
+* French: {{t+|fr|route|f}}
+* Frisian:
+*: West Frisian: {{t|fy|wei|c}}
+* Galician: {{t+|gl|estrada|f}}
+* Gelao:
+*: Red Gelao: {{t|gir|xi⁴⁴}}
+* Georgian: {{t|ka|გზა}}
+* German: {{t+|de|Straße|f}}
+* Greek: {{t+|el|δρόμος|m}}
+*: Ancient Greek: {{t|grc|ὁδός|f}}, {{q|Epic}} {{t|grc|κέλευθος|f}}
+* Guarani:
+*: Paraguayan Guarani: {{t-check|gug|ape}}, {{t-check|gug|ape guasu}}, {{t-check|gug|apehũ}} ''(paved with asphalt, lit. "black road")''
+* Gujarati: {{t|gu|માર્ગ}}
+* Haitian Creole: {{t|ht|wout}}
+* Hebrew: {{t+|he|כְּבִישׁ|m|tr=k'vish}}
+* Higaonon: {{t|mba|dalan}}
+* Hiligaynon: {{t|hil|dalan}}
+* Hindi: {{t+|hi|सड़क|f}}, {{t+|hi|रास्ता|m}}, {{t+|hi|मार्ग|m}},  {{t+|hi|पथ|m}}
+* Hmong:
+*: White Hmong: {{t|mww|kev}}
+* Hungarian: {{t+|hu|út}}, {{t+|hu|közút}}
+* Iban: {{t|iba|jalai}}
+* Icelandic: {{t+|is|vegur|m}}
+* Ido: {{t+|io|choseo}}, {{t+|io|voyo}}
+* Indonesian: {{t+|id|jalan}}
+* Interlingua: {{t|ia|strata}}, {{t+|ia|via}}
+* Iranun: {{t|ill|lalan}}
+* Irish: {{t+|ga|bóthar|m}}, {{t|ga|slí|f}}
+* Isoko: {{t|iso|edhére}}
+* Istriot: {{t|ist|veîa|f}}
+* Italian: {{t+|it|strada|f}}
+* Japanese: {{t+|ja|道|tr=みち, michi}}, {{t+|ja|道路|tr=どうろ, dōro}}
+* Kanakanabu: {{t|xnb|cacaan}}
+* Kannada: {{t+|kn|ರಸ್ತೆ}}
+* Karelian: {{t|krl|tie}}
+* Kashubian: {{t|csb|darga|f}}
+* Kazakh: {{t+|kk|жол}}
+* Ket: {{t|ket|ӄо’т}}
+* Khmer: {{t+|km|ផ្លូវ}}, {{t+|km|ថ្នល់}}
+* Kongo: {{t|kg|nzila}}
+* Korean: {{t+|ko|길}}, {{t+|ko|도로(道路)}}
+* Kurdish:
+*: Central Kurdish: {{t|ckb|ڕێگە}}
+*: Northern Kurdish: {{t+|kmr|rê}}, {{t+|kmr|rêk}}
+* Kyrgyz: {{t+|ky|жол}}
+* Lakota: {{t|lkt|ocanku}}
+* Lao: {{t+|lo|ຫົນທາງ}}, {{t|lo|ທາງ}}, {{t+|lo|ຖະໜົນ}}, {{t|lo|ຖນົນ}}
+* Latgalian: {{t|ltg|ceļš}}, {{t|ltg|saša}}
+* Latin: {{t+|la|via|f}}, {{t+|la|iter|n}}
+* Latvian: {{t+|lv|ceļš|m}}, {{t|lv|šoseja|f}}
+* Lezgi: {{t|lez|рехъ}}
+* Lingala: {{t|ln|nzelá|c9|c10}}, {{t+|ln|balabala}}, {{t|ln|mofali}}
+* Lithuanian: {{t+|lt|kelias|m}}, {{t|lt|plentas|m}}
+* Low German: {{t+|nds|Straat|m}}
+* Lü: {{t|khb|ᦑᦱᧂ}}
+* Luhya: {{t|luy|engila}}
+* Lutuv: {{t|clt|luopuv}}
+* Macedonian: {{t+|mk|пат|m}}, {{t|mk|друм|m}}, {{t+|mk|улица|f}}
+* Maguindanao: {{t|mdh|lalan}}
+* Malay: {{t+|ms|jalan}}
+* Malayalam: {{t|ml|റോഡ്}}
+* Maltese: {{t+|mt|triq|f}}
+* Manchu: {{t|mnc|ᠵᡠᡤᡡᠨ}}, {{t|mnc|ᠣᠨ}}
+* Mansi:
+*: Northern Mansi: {{t-check|mns-nor|лё̄ӈх}} {{attention|mns-nor|check that this is Northern Mansi and not some other variety}}
+* Manx: {{t|gv|raad|m}}
+* Māori: {{t+|mi|rori|m}}
+* Maranao: {{t|mrw|lalan}}
+* Marathi: {{t|mr|रस्ता}}
+* Mehri: {{t|gdq|حورم}}
+* Melanau:
+*: Central Melanau: {{t|mel|jalan}}
+* Moksha: {{t|mdf|ки}}
+* Mongo: {{t|lol|mboka}}
+* Mongolian:
+*: Cyrillic: {{t|mn|зам харгуй}}, {{t+|mn|гудамж}}, {{t+|mn|зам}}
+* Moore: {{t|mos|sore}}
+* Nahuatl: {{t+|nah|ohtli}}
+* Nanai: {{t|gld|покто}}
+* Nepali: {{t|ne|सडक}}
+* Ngarrindjeri: {{t|nay|yarluke}}
+* Nivkh: {{t|niv|тиф}}
+* Norman: {{t|nrf|route|f}}
+* Norn: {{t|nrn|goda|f}}, {{t|nrn|gøda|f}}
+* Norwegian:
+*: Bokmål: {{t+|nb|vei|m}}
+*: Nynorsk: {{t|nn|veg|m}}
+* Occitan: {{t+|oc|rota|f}}
+* Odia: {{t+|or|ରାସ୍ତା}}
+* Ohlone:
+*: Northern Ohlone: {{t|cst|'ín̄u'}}
+* Ojibwe: {{t|oj|miikana}}, {{t|oj|miikanan|p}}
+* Old Church Slavonic:
+*: Cyrillic: {{t|cu|пѫть|m}}, {{t|cu|цѣста|f}}
+*: Glagolitic: {{t|cu|ⱂⱘⱅⱐ|m}}, {{t|cu|ⱌⱑⱄⱅⰰ|f}}
+* Old East Slavic: {{t|orv|дорога|f}}, {{t|orv|путь|m}}
+* Old English: {{t|ang|weġ|m}}
+* Old Turkic: {{t|otk|𐰖𐰆𐰞|ts=yol}}
+* Oromo: {{t|om|karaa}}
+* Pali: {{t|pi|magga|m}}, {{t|pi|patha|m}}
+* Pannonian Rusyn: {{t|rsk|драга|f}}
+* Pashto: {{t+|ps|واټ|m|tr=wāṭṭ}}
+* Persian:
+*: Iranian Persian: {{t+|fa-ira|راه}}, {{t|fa-ira|جادِّه}}, {{t|fa-ira|جادِه}}
+* Pitjantjatjara: {{t|pjt|iwara}}
+* Plautdietsch: {{t|pdt|Wajch|m}}, {{t|pdt|Gauss|f}}
+* Polish: {{t+|pl|droga|f}}, {{t+|pl|szosa|f}}, {{t+|pl|ulica|f}}
+* Portuguese: {{t+|pt|estrada|f}}, {{t+|pt|caminho|m}}, {{t+|pt|via|f}}
+* Powhatan: {{t|pim|mew}}
+* Punjabi: {{t+|pa|ਸੜਕ|f}}, {{t|pa|ਰਸਤਾ|m}}
+* Quechua: {{t|qu|ñan}}
+* Rapa Nui: {{t|rap|ara}}
+* Romani: {{t|rom|drom|m}}
+* Romanian: {{t+|ro|drum|n}}, {{t+|ro|cale|f}}
+* Russian: {{t+|ru|доро́га|f}}, {{t+|ru|путь|m}}
+* Sami:
+*: Northern Sami: {{t|se|geaidnu}}
+* Sanskrit: {{t+|sa|मार्ग|m}}, {{t+|sa|पथ|m}}
+* Scots: {{t|sco|gait}}, {{t|sco|gate}}, {{t|sco|ruid}}, {{t|sco|road}}
+* Scottish Gaelic: {{t|gd|rathad|m}}, {{t|gd|slighe|f}}
+* Serbo-Croatian:
+*: Cyrillic: {{t|sh|пу̑т|m}}, {{t|sh|дру̏м|m}}, {{t|sh|цѐста|f}}
+*: Latin: {{t+|sh|pȗt|m}}, {{t+|sh|drȕm|m}}, {{t+|sh|cèsta|f}}
+* Shan: {{t+|shn|သၢႆတၢင်း}}, {{t+|shn|တၢင်း}}
+* Sinhalese: {{t|si|පාර}}
+* Slovak: {{t+|sk|cesta|f}}, {{t+|sk|dráha|f}}
+* Slovene: {{t+|sl|cesta|f}}, {{t+|sl|pot|m}}
+* Sorbian:
+*: Lower Sorbian: {{t|dsb|droga|f}}
+*: Upper Sorbian: {{t|hsb|dróha|f}}
+* Sotho: {{t+|st|tsela}}, {{t|st|seterata}}
+* Spanish: {{t+|es|camino|m}}, {{t+|es|calle|f}}, {{t+|es|ruta|f}}, {{t+|es|carretera|f}}, {{t+|es|calzada}} {{qualifier|part of a street between sidewalks}}
+* Sranan Tongo: {{t|srn|pasi}}
+* Sundanese: {{t+|su|jalan}}
+* Swahili: {{t+|sw|njia|c9/10}}, {{t+check|sw|barabara}}
+* Swedish: {{t+|sv|väg|c}}
+* Sylheti: {{t|syl|ꠞꠣꠍ꠆ꠔꠣ}}, {{t|syl|ꠙꠕ}}
+* Tabasaran: {{t|tab|рякъ}}
+* Tachawit: {{t+|shy|abrid}}
+* Tagalog: {{t+|tl|daan}}, {{t|tl|kalsada}}, {{t|tl|kalye}}
+* Tajik: {{t+|tg|роҳ}}, {{t|tg|ҷода}}
+* Talysh: {{t|tly|ro}}
+* Tamil: {{t+|ta|சாலை}}, {{t+|ta|தெரு}}, {{t|ta|ரோடு}}
+* Taos: {{t|twf|pʼį́ęna}}
+* Tarantino: {{t|roa-tar|strade|f}}
+* Tarifit: {{t|rif|abrid|m}}
+* Tashelhit: {{t|shi|aɣaras|m}}
+* Tat: {{t|ttt|ra}}
+* Tatar: {{t+|tt|юл}}
+* Telugu: {{t+|te|రహదారి}}, {{t+|te|రోడ్డు}}
+* Tetum: {{t|tet|lurón}}
+* Thai: {{t+|th|ถนน}}, {{t+|th|ทาง}}, {{t+|th|หนทาง}}
+* Tibetan: {{t|bo|ལམ་ཀ}} {{q|colloquial}}, {{t|bo|ལམ}} {{q|literary}}
+* Tigrinya: {{t+|ti|መንገዲ}}
+* Tocharian A: {{t|xto|ytār}}
+* Tocharian B: {{t|txb|ytārye}}
+* Tok Pisin: {{t|tpi|rot}}
+* Tswana: {{t+|tn|tsela}}
+* Tupinambá: {{t|tpn|pé}}, {{t|tpn|apé}} (s-)
+* Turkish: {{t+|tr|yol}}
+*: Ottoman Turkish: {{t|ota|یول|tr=yol}}
+* Turkmen: {{t+|tk|ýol}}
+* Tuvan: {{t|tyv|орук}}
+* Ukrainian: {{t+|uk|доро́га|f}}, {{t+|uk|шлях|m}}, {{t|uk|путь|m}}
+* Urdu: {{t|ur|سَڑَک|f}}, {{t|ur|راسْتَہ|m}}, {{t|ur|جادَہ|m}}
+* Uyghur: {{t|ug|يول}}
+* Uzbek: {{t+|uz|yoʻl}}
+* Vietnamese: {{t+|vi|đường}}, {{t+|vi|đường bộ}}
+* Vilamovian: {{t|wym|wȧg}}
+* Walloon: {{t+|wa|voye}}
+* Welsh: {{t+|cy|ffordd|f}}
+* Xhosa: {{t|xh|lendlela}}
+* Yaghnobi: {{t|yai|рос}}
+* Yakut: {{t|sah|суол}}
+* Yapese: {{t|yap|woq}}
+* Yiddish: {{t|yi|וועג|m}}, {{t|yi|טראַקט}}
+* Zapotec:
+*: Isthmus Zapotec: {{t|zai|neza}}
+* Zazaki: {{t|zza|ray}}, {{t|zza|rah}}
+* Zealandic: {{t|zea|wegt|m}}, {{t|zea|pad|m}}
+* Zhuang: {{t|za|loh}}, {{t|za|roen}}
+* Zulu: {{t+|zu|umgwaqo|c3|c4}}
+{{trans-bottom}}
+
+{{trans-see|''nautical'': partially sheltered waters|roadstead}}
+
+{{trans-top|a path in life}}
+* Assamese: {{t|as|বাট}}
+* Catalan: {{t+|ca|camí}}
+* Finnish: {{t+|fi|tie}}, {{t+|fi|matkalla}} {{q|on the road}}
+* French: {{t+|fr|chemin|m}}, {{t+|fr|route|f}}
+* Galician: {{t+|gl|camiño|m}}
+* Hindi: {{t+|hi|रास्ता|m}}
+* Irish: {{t|ga|slí bheatha|f}}
+* Malay: {{t+|ms|jalan}}
+* Persian:
+*: Iranian Persian: {{t+|fa-ira|راه}}
+* Portuguese: {{t+|pt|caminho|m}}
+* Russian: {{t+|ru|путь|m}}
+* Spanish: {{t+|es|camino|m}}
+* Swahili: {{t+|sw|barabara}}
+* Turkish: {{t+|tr|yol}}
+*: Ottoman Turkish: {{t|ota|یول|tr=yol}}
+* Zazaki: {{t|zza|sop}}
+{{trans-bottom}}
+
+{{trans-top|way or route}}
+* Finnish: {{t+|fi|matkalla}} {{q|on the way/road}}, {{t+|fi|kulkureitti}}
+* Tamil: {{t+|ta|சாலை}}
+{{trans-bottom}}
+
+{{checktrans-top}}
+* Woiwurrung: {{t-check|wyi|parreng}}
+{{trans-bottom}}
+
+===Adjective===
+{{en-adj|-}}
+
+# {{lb|en|US|Canada|sports|chiefly|attributive}} At the [[venue]] of the [[opposing]] team or [[competitor]]; [[on the road]].
+# {{lb|en|cycling}} Of or pertaining to a [[road bike]].
+#: {{ux|en|'''road''' tires}}
+#: {{ux|en|'''road''' groupset}}
+
+====Synonyms====
+* {{sense|at the venue of the opposing team or competitor}} {{l|en|away}} {{qualifier|UK}}
+
+===Anagrams===
+* {{anagrams|en|a=ador|orad|A-Rod|Rado|orda|Dora|DORA}}
+
+{{C|en|Horses|Roads}}

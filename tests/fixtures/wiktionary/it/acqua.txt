@@ -1,0 +1,341 @@
+== {{-it-}} ==
+[[File:Drinking water.jpg|thumb|[1] {{Pn}} che [[esce]] da un [[rubinetto]]]]
+{{-sost-|it}}
+{{Pn|w}} ''f sing'' {{Linkp|acque}}
+# {{Term|chimica inorganica|it}} sostanza formata da [[molecole]] composte di due [[atomi]] di [[idrogeno]] e un [[atomo]] di [[ossigeno]], [[presente]] in [[natura]] allo [[stato]] [[liquido]], [[solido]] (''confronta con [[ghiaccio]]'') e [[gassoso]] (''confronta con [[vapore]]'')
+# {{Term|filosofia|it}} uno dei [[quattro]] [[elementi]] [[fondamentali]] della [[filosofia]] [[antica]], dell'[[alchimia]] e dell'[[astrologia]] (''confronta con [[Acqua]]'')
+#* ''[[w:Talete|Talete]] è il filosofo che riteneva che l'acqua fosse il [[principio]] della vita e del [[cosmo]]''
+#* ''[[Cancro]], [[Scorpione]] e [[Pesci]] sono i [[segni]] d'acqua''
+# {{Term|estensione|it}} [[pioggia]]
+#* ''abbiam preso tanta '''acqua'''''
+#* '''[[acqua piovana]]''': raccolta in un luogo apposito
+# {{Fig}} soprattutto in [[espressioni]] [[negative]], cosa [[comune]]
+#* ''la [[classe]] non è '''acqua'''''
+#* ''il [[sangue]] non è '''acqua'''''
+# [[liquido]] composto [[principalmente]] da '''acqua''' presente in [[natura]] in alcuni [[vegetali]] e ricco di [[nutrienti]]
+# {{Term|cosmesi|it}} {{Term|chimica|it}} {{Term|farmacologia|it}} [[liquido]] [[profumato]]
+#* '''''acqua''' di colonia''
+#* ''l''''acqua''' di Roma''
+#* ''le '''acque''' del Veneto''
+# {{Term|sport|it}} nel [[canottaggio]] è la [[corsia]] di gara
+#* ''la nostra [[squadra]] gareggia in '''acqua''' 4''
+#* '''[[numero d'acqua]]''': il [[numero]] che [[identifica]] la corsia
+# nei [[giochi]] infantili, indica la [[lontananza]] a un oggetto cercato e precedentemente nascosto (in contrapposizione a [[fuoco]], che ne indica la vicinanza)
+# per gli usi al plurale {{Vd|acque}}
+
+{{-sill-}}
+; àc | qua
+
+{{-pron-}}
+{{IPA|/ˈakkwa/}}
+{{Audio|it-acqua.ogg}}
+
+{{-etim-}}
+dal {{la}} ''[[aqua]]'', stesso significato, con [[raddoppiamento]] della "c"
+{{-quote-}}
+{{Quote
+|Appena battezzato, Gesù uscì dall''''acqua''': ed ecco si aprirono per lui i cieli ed egli vide lo Spirito di Dio discendere come una colomba e venire sopra di lui.|[[w:Vangelo secondo Matteo|Vangelo secondo Matteo]] {{Passo biblico|Mt|3,16}}, testo CEI 2008}}
+{{Quote
+|L''''acqua''' divide gli uomini; il vino li unisce.|[[q:Libero Bovio|Libero Bovio]]}}
+
+{{Quote
+|Ecco come bisogna essere! Bisogna essere come l''''acqua'''. Niente ostacoli – essa scorre. Trova una diga, allora si ferma. La diga si spezza, scorre di nuovo. In un recipiente quadrato, è quadrata. In uno tondo, è rotonda. Ecco perché è più indispensabile di ogni altra cosa. Niente esiste al mondo più adattabile dell''''acqua'''. E tuttavia quando cade sul suolo, persistendo, niente può essere più forte di lei.|[[q:Laozi|Laozi]]}}
+
+{{-sin-}}
+*''(acqua dolce)'' [[acquitrino]],  [[canale]], [[cascata]], [[fiume]], [[fonte]], [[lago]], [[palude]], [[polla]], [[pozza]], [[rivo]], [[ruscello]], [[sorgente]], [[stagno]], [[torrente]], [[allagamento]], [[inondazione]]
+*''(dal cielo)'' [[acquazzone]], [[diluvio]], [[pioggia]],[[precipitazione]], [[temporale]],  [[rovescio]]
+*''(acqua salata)'' [[cavallone]], [[flutto]],  [[mare]], [[maroso]],  [[oceano]], [[onda]], [[ondata]]
+*''(di cottura)'' [[bollitura]], [[brodo]], [[decotto]], [[infuso]], [[tisana]]
+*''(di rifiuto)''[[scarico]], [[sciacquatura]], [[scolo]]
+*''(religione)'' [[acquasanta]]
+*''(di umori)'' [[linfa]], [[secrezione]], [[succo]], [[sudore]]
+* {{Est}} [[liquido]]
+*''(in estensione)'' [[distesa]], [[specchio]], [[superficie]]
+  
+* [[umore]]
+* {{Term|familiare|it}} [[orina]], [[pipì]]
+* [[limpidezza]], [[luminosità]], [[trasparenza]], [[lucentezza]], [[riflesso]]
+
+{{-der-}}
+* [[acqua-aria]], [[acquacedrata]], [[acquaciclo]], [[acquacoltore]], [[acquacotta]], [[acquaforte]], [[acquafortista]], [[acquafragio]], [[acquafreddese]], [[acquagenico]], [[acquagym]], [[acquaio]], [[acquaiolo]], [[acquamanile]], [[acquamarina]], [[acquametria]], [[acquanauta]], [[acquapendente]], [[acquaplanista]], [[acquaplano]], [[acquaragia]], [[acquare]], [[acquarello]], [[acquario]], [[acquariofilia]], [[acquariofilo]], [[acquariologia]], [[acquasanta]], [[acquasantiera]], [[acquascivolo]], [[acquascooter]], [[acquastrino]], [[acquata]], [[acqua-terra]], [[acquaticità]], [[acquatico]], [[acquatile]], [[acquatinta]], [[acquavite]], [[acquazzone]], [[acquedotto]], [[acquemoto]], [[acqueo]], [[acquicolo]], [[acquicoltura]], [[acquidoso]], [[acquitrino]], [[acquosità]], [[acquoso]], [[annacquare]], [[innacquare]], [[portaacqua]], [[portacqua]], [[scaldacqua]], [[scaldaacqua]], [[sciacquare]]
+
+{{-var-}}
+* {{Term|antico|it}} [[aqua]], [[aigua]]
+
+{{-alter-}}
+* {{Dim}} [[acquerella]], [[acquetta]]
+* {{Pegg}} [[acquaccia]]
+
+{{-prov-}}
+*''[[a fior d'acqua]]'': sulla parte superiore dell'acqua
+*''[[a pane e acqua]]'': con poco cibo come castigo
+*''[[a pelo d'acqua]]''
+*''[[acqua alta]]'': {{Term|geografia|it}} sollevamento del mare sopra il livello abituale, a causa dell'alta marea tipico di Venezia
+*''[[acqua cheta]]'':
+*''[[acqua passata]]'': vecchio avvenimento da cessare di ricordare
+*''[[all'acqua di rose]]'': in modo poco [[approfondito]]
+*''[[buttare acqua sul fuoco]]''
+*''assomigliarsi come due gocce d'acqua''
+*''[[avere l'acqua alla gola]]'': essere in ristrettezze
+* ''[[acqua in bocca]]'': mantieni il segreto
+*''essere un pesce fuor d'acqua''
+*''perdersi in un bicchier d'acqua''
+*''[[fare un buco  nell'acqua]]'': non conseguire ciò a cui si aspirava
+*''tirare acqua al proprio mulino ''
+* ''{{Pn}} cheta che rompe i ponti'': non bisogna lasciarsi ingannare dall'apparente tranquillità di certe persone
+* ''{{Pn}} passata non macina più'': non bisogna guardare al passato ma al presente
+* ''trasparente come l'{{Pn}}'': molto sincero
+* ''dare {{Pn}} alle corde'': intervenire in modo tempestivo per risolvere un problema contingente
+* ''[[acqua potabile]]'': acqua che si può [[bere]]
+* ''[[acqua minerale]]'': acqua ricca di [[sali minerali]]
+* ''acqua distillata'': acqua [[pura]], ottenuta rimuovendo le sostanze disciolte tramite un [[processo]] di [[distillazione]]
+* ''fare acqua da tutte le parti '': non funzionare o essere pieno di difetti e incongruenze
+* ''essere con l'{{Pn}} alla gola'': essere sotto estrema pressione
+
+{{-trad-}}
+{{Trad1|la sostanza H2O allo stato liquido aggregato}}
+:*{{af}}: [[water]]
+:*{{sq}}: [[ujë]]
+:*{{gsw}}: [[Wasser]]
+:*{{alp}}: [['wele]]
+:*{{aie}}: [[eiki]]
+:*{{amk}}: [[mereha]]
+:*{{akg}}: [[wei]]
+:*{{ang}}: [[wæter]]
+:*{{ar}}: [[ماء]]
+:*{{an}}: [[aigua]]
+:*{{agf}}: [[wir]]
+:*{{hy}}: [[ջուր]]
+:*{{ast}}: [[agua]]
+:*{{aua}}: [[ñio]]
+:*{{tay}}: [[usiak]]
+:*{{kud}}: [[we'aha]]
+:*{{ay}}: [[uma]]
+:*{{az}}: [[su]], [[سو]]
+:*{{baa}}: [[mbisi]]
+:*{{bzg}}: [[to]]
+:*{{ban}}: [[yeh]]
+:*{{bm}}: [[ji]]
+:*{{bdg}}: [[beig]]
+:*{{bjn}}: [[banyu]]
+:*{{bcm}}: [[koromo]]
+:*{{bnq}}: [[ake]]
+:*{{eu}}: [[ur]], [[ura]]
+:*{{nds}}: [[water]]
+:*{{bbc}}: [[aek]]
+:*{{bar}}: [[Wassa]] ''n''
+:*{{bem}}: [[amenshi]]
+:*{{bn}}: [[জল]] (jol) ''m'' (per gli hindu), [[পানি]] (pani) ''m'' (per i musulmani)
+:*{{bhw}}: [[wār]]
+:*{{bhp}}: [[oi]]
+:*{{my}}: [[ရေ]]
+:*{{bi}}: [[water]]
+:*{{bty}}: [[way]], [[wai]]
+:*{{mhs}}: [[wae]]
+:*{{bla}}: [[aohkíí]]
+:*{{bcl}}: [[tubig]]
+:*{{be}}: [[вада]]
+:*{{bs}}: [[voda]]
+:*{{br}}: [[dour]] ''m''
+:*{{kxd}}: [[aying]]
+:*{{bvk}}: [[danum]]
+:*{{bzq}}: [[waya]]
+:*{{bg}}: [[вода]]
+:*{{bwd}}: [[dauda]]
+:*{{sro}}: [[àcua]]
+:*{{ca}}: [[aigua]] ''f''
+:*{{ceb}}: [[túbig]]
+:*{{che}}: [[khi]]
+:*{{cs}}: [[voda]] ''f'
+:*{{ch}}: [[aqua]], [[hanom]]
+:*{{chk}}: [[chaan]], [[kkónik]]
+:*{{ny}}: [[madzi]]
+:*{{zh}}: [[水]] (shuǐ)
+:*{{ko}}: [[물]] (mul)
+:*{{hr}}: [[voda]]
+:*{{kw}}: [[dowr]] ''m''
+:*{{co}}: acqua
+:*{{ckb}}: aw, [[ئاو]]
+:*{{hat}}: [[dlo]]
+:*{{ku}}: [[av]]
+:*{{da}}: [[vand]]
+:*{{diq}}: [[ab]]
+:*{{dob}}: [[boasi]]
+:*{{dhv}}: [[medrixadra]]
+:*{{he}}: [[מים]]
+:*{{mmw}}: [[vai]]
+:*{{eml}}: [[aqua]]
+:*{{eo}}: [[akvo]]
+:*{{et}}: [[vesi]]
+:*{{emb}}: [[danum]]
+:*{{fo}}: [[vatn]]
+:*{{fi}}: [[vesi]]
+:*{{fj}}: [[wai]]
+:*{{fr}}: [[eau]] ''f''
+:*{{fy}}: [[wetter]]
+:*{{fur}}: [[aghe]]
+:*{{fut}}: [[vai]]
+:*{{cy}}: [[dŵr]], [[dwfr]]
+:*{{gl}}: [[agua]] ''f'', [[auga]] ''f''
+:*[[gallo]]: [[aèv]]
+:*{{gzn}}: [[waya]]
+:*{{pwg}}: [[okoa]]
+:*{{ka}}: [[წყალი]]
+:*{{gay}}: [[wih]]
+:*{{gei}}: [[wa]]
+:*{{gdd}}: [[naz]]
+:*{{ges}}: [[ar]]
+:*{{gri}}: [[ko]]
+:*{{gor}}: [[taluhu]]
+:*{{ja}}: [[水]] ([[みず]], mizu)
+:*{{jv}}: [[banyu]], [[wway]], [[wwe]], [[bañu]]
+:*{{gil}}: [[ran]]
+:*{{el}}: [[νερό]] ''n''
+:*{{grc}}: [[ύδωρ]]
+:*{{gn}}: [[y]], [[î]]
+:*{{gu}}: [[પાણી]]
+:*{{lml}}: [[wai]]
+:*{{hnn}}: [[danúm]]
+:*{{haw}}: [[wai]]
+:*{{hi}}: [[पानी]]
+:*{{htu}}: [[wael]]
+:*{{hoa}}: [[kuma heleana]]
+:*{{hop}}: [[kuuyi]]
+:*{{hrx}}: [[Wasser]]
+:*{{ibg}}: [[danum]]
+{{mid}}
+:*{{io}}: [[aquo]]
+:*{{ilu}}: [[ēr]], [['e]]
+:*{{ilo}}: [[danum]]
+:*{{imr}}: [['weje]]
+:*{{id}}: [[air]]
+:*{{en}}: [[water]]
+:*{{ia}}: [[aqua]]
+:*{{iu}}: [[imiq]]
+:*{{irh}}: [[were]]
+:*{{ga}}: [[uisce]]
+:*{{is}}: [[vatn]]
+:*{{jaz}}: [[we]]
+:*{{kin}}: [[amazi]]
+:*{{tlh}}: [[bIQ]]
+:*{{kok}}: [[उदाक]]
+:*{{la}}: [[aqua]], [[liquor]]
+:*{{lv}}: [[ūdens]]
+:*{{li}}: [[water]]
+:*{{ln}}: [[mai]]
+:*{{lt}}: [[vanduo]] ''m''
+:*{{src}}: [[abba]]
+:*{{jbo}}: [[djacu]]
+:*{{se}}: [[čáhci]]
+:*{{hsb}}: [[woda]] ''f''
+:*{{lb}}: [[waasser]]
+:*{{mad}}: [[aeŋ]]
+:*{{ml}}: [[പയസ്സ്]]
+:*{{abs}}: [[air]]
+:*{{ms}}: [[air]]
+:*{{mg}}: [[rano]], [[siniben-drano]], [[ráno]]
+:*{{mt}}: [[ilma]]
+:*{{mnc}}: [[muke]]
+:*{{gv}}: [[ushtey]], [[ushtaghey]]
+:*{{mi}}: [[wai]], [[hane]]
+:*{{arn}}: [[ko]]
+:*{{mr}}: [[पाणी]], [[जल]]
+:*{{mh}}: [[ren]], [[aiboj]]
+:*{{mas}}: [[engare]]
+:*{{mxz}}: [['wei]]
+:*{{myn}}: [[haa]]
+:*{{yua}}: [[ha']]
+:*{{maz}}: [[réhé]]
+:*{{min}}: [[aie]]
+:*{{mwl}}: [[auga]]
+:*{{moh}}: [[ohnekanos]], [[ohneka]]
+:*{{mov}}: [['aha]]
+:*{{mn}}: [[ус]]
+:*{{nah}}: [[atl]]
+:*{{nap}}: acqua
+:*{{na}}: [[ebok]]
+:*{{no}}: [[vann]], [[vatn]]
+:*{{oc}}: [[aiga]]
+:*{{nl}}: [[water]]
+:*{{om}}: [[bishaan]], [[biye]]
+:*{{pau}}: [[ralm]], [[dáob]]
+:*{{plw}}: [[danum]], [[danúm]]
+:*{{pap}}: [[awa]]
+:*{{fa}}: [[آب]]
+:*{{pl}}: [[woda]]
+:*{{pt}}: [[água]] ''f''
+:*{{pa}}: [[ਪਾਣੀ]], [[ਜਲ]], [[ਆਬ]]
+:*{{qu}}: [[yaku]], [[unu]]
+:*{{rap}}: [[vai]]
+:*{{rhg}}: [[faní]]
+:*{{ra}}: [[aqua]] ''f''
+:*{{ro}}: [[apă]] ''f'
+:*{{rar}}: [[vai]]
+:*{{ru}}: [[вода]] ''f''
+:*{{sm}}: [[vai]]
+:*{{sa}}: [[जल]]
+:*{{sco}}: [[uisge]]
+:*{{sr}}: [[voda]], [[вода]]
+:*{{scn}}: acqua, [[occa]], [[vuvù]]
+:*{{si}}: [[wathura]]
+:*{{sk}}: [[voda]] ''f''
+:*{{sl}}: [[voda]]
+:*{{so}}: [[biyo]], [[waraabin]]
+:*{{sov}}: [[saru]], [[tati]]
+:*{{es}}: [[agua]] ''f''
+:*{{srn}}: [[watra]]
+:*{{su}}: [[cai]]
+:*{{sv}}: [[vatten]]
+:*{{sw}}: [[maji]]
+:*{{tl}}: [[túbig]]
+:*{{ta}}: [[தண்ணீர்]]
+:*{{trv}}: [[kasia]]
+:*{{tt}}: [[su]]
+:*{{de}}: [[Wasser]] ''n''
+:*{{th}}: [[น้ำ]]
+:*{{ti}}: [[mai]]
+:*{{tox}}: [[tat]], [[tati]], [[char]], [[taht]], [[tah'roo]]
+:*{{tpi}}: [[wara]]
+:*{{ts}}: [[Metsi]]
+:*{{tn}}: [[metsi]]
+:*{{tum}}: [[maji]]
+:*{{tpn}}: [['y]]
+:*{{tr}}: [[su]]
+:*{{tk}}: [[suw]]
+:*{{tvl}}: [[vai]]
+:*{{hu}}: [[víz]]
+:*{{ur}}: [[آب]]
+:*{{wa}}: [[aiwe]], [[êwe]]
+:*{{vec}}: [[aqua]], [[ensa]], [[lensa]]
+:*{{vi}}: [[nước]]
+:*{{vo}}: [[vat]]
+:*{{wo}}: [[ndoh]]
+:*{{xh}}: [[nzi|amanzi]]
+:*{{yap}}: [[rawn]], [[daay]]
+:*{{yi}}: [[װאַסער]]
+:*{{zu}}: [[nzi|amanzi]]
+{{Trad2}}
+
+{{Trad1|filosofia}} uno dei quattro elementi fondamentali della filosofia antica}}
+:*{{en}}:
+{{Trad2}}
+
+{{Trad1|{{Est}} pioggia}}
+:*{{en}}:
+{{Trad2}}
+
+{{Trad1|figurato, soprattutto in espressioni negative, cosa comune}}
+:*{{en}}:
+{{Trad2}}
+
+{{Trad1|liquido composto principalmente da '''acqua''' presente naturalmente in alcuni vegetali}}
+:*{{en}}:
+{{Trad2}}
+
+{{Trad1|cosmesi, chimica, farmacia, liquido profumato}}
+:*{{en}}:
+{{Trad2}}
+
+{{Trad1|{{Term|sport|it}} nel canottaggio è la corsia di gara}}
+:*{{en}}:
+{{Trad2}}

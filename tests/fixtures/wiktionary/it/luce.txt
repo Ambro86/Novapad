@@ -1,0 +1,120 @@
+== {{-it-}} ==
+[[File:Kirche Gröben Lichtspiel.JPG|280px|thumb|una [[vetrata]] da cui traspare la luce]]
+[[File:Apophysis 3D fractal ball.jpg|thumb|una luce]]
+{{-sost-|it}}
+{{Pn|w}} ''f sing'' {{Linkp|luci}}
+# {{Term|fisica|it}} parte di spettro elettromagnetico in grado di essere vista dall'occhio umano
+#* ''grazie ad [[w:Einstein|Einstein]], si è scoperto che anche la luce curva in presenza del sole''
+#* ''La '''luce''' passa attraverso le finestre''
+#* ''[[produrre]] '''luce'''''
+# {{Est}} l'effetto visivo prodotto
+#* ''Questa [[stanza]] ha bisogno di un po' più di '''luce'''''
+# {{Term|architettura|it}}  distanza fra i due piedritti di un [[arco]]
+# {{Term|giurisprudenza|it}}  [[apertura]] in una [[parete]] che consente il passaggio di luce e/o aria, ma non di vista e tantomeno affaccio (art. 900 c.c.)
+#* ''Le '''luci''' che si aprono sul fondo del vicino'' 
+# {{Term|familiare|it}} {{Term|raro|it}} [[chiarezza]] [[improvvisa]] in merito al [[pensiero]], alla [[coscienza]]
+# {{Est}} [[spirituale]], è quella dei [[primordi]] del [[creato]]
+#* ''la [[limpida]] [[percezione]] della [[libertà]] è come la [[dolce]] {{Pn}} nella [[notte]]''
+# {{Term|religione|it}} il [[cammino]] della [[verità]] [[quando]] [[non]] è [[celata]] [[dietro]] [[più]] [[veli]]
+#* ''[[anelare]] alla {{Pn}} di [[Dio]] [[riempie]] il [[cuore]] di [[gioia]]''
+# [[limpidezza]] delle [[pietre]] [[preziose]]
+# {{Est}} [[effetto]] del [[sole]], della [[luna]], delle [[stelle]] e dei [[pianeti]] [[visibile]] anche per l'[[umanità]] e per le [[creature]] [[viventi]]
+#* ''la luna [[riflette]] la {{Pn}} del sole''
+# {{Est}} [[luminescenza]] di [[lampadine]], [[lumi]], [[candele]], ecc
+#* ''la {{Pn}} di [[questo]] [[lampadario]] è [[molto]] [[calda]]''
+
+{{-sill-}}
+; lù | ce
+
+{{-pron-}}
+{{IPA|/ˈluːt͡ʃe/}}
+{{Audio|it-luce.ogg}}
+
+{{-etim-}}
+dal {{la}} ''[[lux]]'' ovvero "[[luce]]"
+
+{{-quote-}}
+{{Quote
+|Dove c'è molta luce, l'ombra è più nera
+|[[w:Johann Wolfgang von Goethe|Johann Wolfgang von Goethe]]}}
+{{Quote
+|Lampada per i miei passi è la tua Parola, '''luce''' sul mio cammino}} 
+[[w:Salmi|Salmo]] {{Passo biblico|Salmo|118,105}}
+{{Quote
+|Sei la mia nuova luce... sei tutto quello che ho
+|[[w:Francesco Renga|Francesco Renga]]-[[w:Nuova luce|Nuova luce]]}}
+
+{{Quote
+|Voi siete la luce del mondo; non può restare nascosta una città che sta sopra un monte, né si accende una lampada per metterla sotto il [[moggio]], ma sul candelabro, e così fa luce a tutti quelli che sono in casa}} 
+|[[w:Vangelo secondo Matteo|Vangelo secondo Matteo]] {{Passo biblico|Mt|5,14-15}}
+
+{{Quote
+|Dove c'è molta luce, l'ombra è più nera.„
+|[[w:Johann Wolfgang von Goethe| Johann Wolfgang von Goethe]]}}
+
+{{-sin-}}
+*[[chiaro]], [[chiarore]], [[luminosità]]
+* [[raggio]], [[sprazzo]],  [[baleno]], [[balenio]], [[brillio]], [[scintillio]], [[sfavillio]], [[sfolgorio]], [[barbaglio]], [[fulgore]],
+*[[bagliore]], [[barlume]], [[brillantezza]], [[lampo]], [[lucentezza]], [[nitore]], [[splendore]]
+*''(architettura)'' [[luce]]
+*''(di arco)'' [[arcata]]
+*''(di mobile)'' [[anta]], [[scomparto]], [[sportello]]
+* ''(di porta, finestra)''  [[apertura]], [[vano]]
+*[[finestra]], [[passaggio]], [[rettangolo]], [[specchio]], [[vetrina]]
+* {{Est}} [[fanale]], [[faro]], [[fiaccola]], [[illuminazione]],[[lampada]], [[lume]], [[luminaria]],   [[lucerna]], [[fanale]], [[fanalino]],  segnale luminoso, [[indicatore]]
+* ''(fisica)'' radiazione luminosa, energia elettrica
+* [[riverbero]], [[albore]]
+*[[giorno]], [[vita]], esistenza umana, [[Dio]],
+*[[esempio]], [[gloria]], [[grandezza]], [[guida]], [[lustro]], [[modello]], [[orma]], [[potenza]], [[traccia]]
+*{{Term|uso letterario|it}} [[occhi]], [[sguardo]]
+* {{Fig}} [[fede]], [[illuminazione]],  [[grazia]],[[redenzione]]
+* ''(di pietra preziosa)'' [[lucentezza]], [[brillantezza]], [[fosforescenza]], [[iridescenza]]; [[colore]], [[riflesso]]
+* ''(di condotto)'' [[bocca]], apertura di efflusso.
+* [[luminosità]], [[chiarore]], [[raggio]], [[bagliore]], [[vano]], [[apertura]]
+
+
+{{-ant-}}
+* [[buio]], [[oscurità]], [[notte]], [[tenebre]], [[ombra]], [[controluce]] 
+* {{Fig}} [[abisso]]
+
+{{-der-}}
+*[[antelucano]],  [[anno luce]], [[controluce]], [[paraluce]], [[sopraluce]], [[lucido]]
+
+{{-prov-}}
+*''[[alla luce del giorno]]'' 
+*''[[alla luce del sole]]'':
+* ''[[alla luce di]]'':
+* ''[[aprire gli occhi alla luce]]''
+* ''[[brillare di luce riflessa]]'':
+*''[[chiudere gli occhi alla luce]]'':
+* ''[[dare alla luce]]''
+* ''[[fare luce]]'': [[tentare]] di [[comprendere]] qualcosa
+* ''[[mettere in buona luce]]'': evidenziare, sottolineare qualcosa affinché possa essere considerato ed approfondito
+*''[[mettere in cattiva luce]]'': 
+*''[[porre in luce]]'': 
+*''[[portare alla luce]]''
+*''[[vedere la luce]]''
+*''[[venire  alla luce]]''
+
+{{-trad-}}
+{{Trad1|{{Term|fisica|it}}}}
+:*{{sro}} [[luxi]]
+:*{{fr}}: [[lumière]] ''f''
+:*{{ja}}: [[光]] ([[ひかり]], [[hikari]])
+:*{{src}} [[lughe]]
+:*{{en}}: [[light]]
+{{mid}}
+:*{{nl}}: [[licht]] ''n''
+:*{{pl}}: [[światło]] ''n''
+:* {{ru}}: [[свет]]
+:*{{sk}}: [[svetlo]] ''n''
+:*{{es}}: [[luz]]
+:*{{wa}}: [[loumire]] ''f''
+{{Trad2}}
+
+{{-ref-}}
+* {{Fonte|gar}}
+* {{Fonte|trec}}
+* {{Fonte|dizit}}
+* {{Fonte|sin-co}}
+*AA.VV., ''Dizionario sinonimi e contrari'', Mariotti, 2006, pagina 318

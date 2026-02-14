@@ -1,0 +1,329 @@
+== {{lengua|es}} ==
+{{pron-graf|1audio1=Es-am-lat-casa.ogg|1audio2=Es-bo-casa.oga|1aunota1=América|1aunota2=La Paz, Bolivia}}
+
+=== Etimología 1 ===
+{{etimología|la|casa|choza}}.
+[[Archivo:PeraltaAdobe-cropped.jpg|thumb|[1]]]
+
+==== {{sustantivo femenino|es}} ====
+{{es.sust}}
+;1 {{csem|vivienda}}: {{plm|edificación}} destinada a [[vivienda]].
+;2: {{plm|domicilio}}.
+{{uso|cuando «casa» se refiere al lugar en el que habitualmente habitan uno o más individuos|no se utiliza artículo ni posesivo|a menos que este sea necesario|después de la preposición|el posesivo es necesario para distinguir que la acción del sujeto se refiere a la casa de este y no a la de quien enuncia la oración: «juanito se enojó y se fue a su casa»}}
+{{sinónimo|domicilio|hogar|lar|morada|residencia|vivienda}}
+;3: {{plm|piso}}, departamento o local que, aunque no constituya una edificación entera, tiene las dependencias mínimas para que lo habite una [[familia]], un grupo de [[persona]]s o una persona sola.
+;4: Cualquier tipo de [[alojamiento]], sea obra de albañilería, choza o cabaña, que se destina a ese fin.
+;5: {{plm|descendencia}} o [[linaje]] que tiene un mismo apellido, y viene del mismo origen.<ref name="dlc1914">{{DLC1914|211||2012-9-05}}</ref>
+{{sinónimo|casta|familia|linaje}}
+;6: Conjunto de [[hijo]]s y [[doméstico]]s que componen una [[familia]].<ref name="dlc1914" />
+;7: Establecimiento [[comercial]] o cualquiera de sus sucursales.
+{{sinónimo|compañía|empresa}}
+;8 {{csem|astrología}}: Cada una de las 12 divisiones de la esfera celeste tomando como base la línea del horizonte, y que representan un aspecto de un signo zodiacal.
+;9: Estados y [[renta]]s de un señor.<ref name="dlc1914" />
+;10 {{csem|juegos}}: En el juego del [[ajedrez]], en el de las [[damas]] y en otros, cada uno de los [[cuadro]]s en que está dividido el tablero.<ref name="dlc1914" />
+;11 {{csem|juegos}}: En el juego de [[tablas reales]], cada uno de los [[semicírculo]]s cortados en la misma madera a los dos lados del tablero, en donde se van colocando las piezas para ocupar las casas según la suerte de los [[dado]]s.<ref name="dlc1914" />
+;12 {{csem|billar}}: espacio dividido por una raya a la cabecera de la mesa, desde el cual juega el que tiene bola en mano.<ref name="dlc1914" />
+{{sinónimo|cabaña}}
+;13: {{plm|lugar}}, [[casería]].<ref name="novísimo">{{Labernia1866}} Pág. 570</ref>
+;14 {{csem|heráldica}}: Símbolo de [[hospitalidad]], en heráldica, pintada de frente o de perfil.<ref name="novísimo" />
+;15: {{plm|convento}}.<ref name="novísimo" />
+
+==== Locuciones ====
+{{trad-arriba|Locuciones con ''casa''}}
+* [[a casa hita]]: Casa por casa.
+* [[afumar casa]]: (Anticuado) Tener casa abierta, sostenerla.<ref name="dlc1914"/>
+* ¡[[ah de casa]]!: Expresión familiar para llamar gente en casa ajena.<ref name="dlc1914"/>
+* [[alcalde de casa y corte]]
+* [[amo de casa]]: Encargado de la casa en ausencia del resto de ocupantes; persona que no trabaja fuera de casa.
+* [[andar con la casa a cuestas]]
+* [[andar como Pedro por su casa]]
+* [[apartar casa]]: Separarse los que vivían juntos, poniendo cada uno su casa aparte.<ref name="dlc1914"/>
+* [[aposentador de casa y corte]]
+* [[aposentador mayor de casa y corte]]
+* [[arderse la casa]]: Haber en ella mucho alboroto por cuestión o riña.<ref name="dlc1914"/>
+* [[armar una casa]]: Hacer de madera la armazón de ella, para vestirla después de fábrica.<ref name="dlc1914"/>
+* [[arrancar la casa]]: Levantar la casa.<ref name="dlc1914"/>
+* [[asentar casa]] uno: Tener casa de por sí; ponerla de nuevo y de asiento.<ref name="dlc1914"/>
+* [[barrer para casa]]: Barrer hacia dentro.
+* [[botar la casa]] una vaca: Expulsar la placenta.
+* [[cabeza de casa]]
+* [[cabo de casa]]
+* [[caérsele a uno la casa a cuestas]] o [[caérsele la casa encima]]: Sobrevenirle grave conflicto o contratiempo.<ref name="dlc1914"/>
+* [[casa abierta]]: Domicilio, estudio o despacho de quien ejerce profesión, arte o industria para la cual esti matriculado y paga subsidio.|| Tienda a puerta de calle.<ref name="dlc1914"/>
+* [[casa a la malicia]]: La antiguamente edificada en la corte, sólo con piso bajo, para librarse de la carga de aposento.<ref name="dlc1914"/>
+* [[casa asilo de cabo de armería]]: En el reino de Navarra, casa solariega de cualquier noble que es pariente mayor y cabeza de su linaje.<ref name="dlc1914"/>
+* [[casa cabeza de armería]]: Casa de cabo de armería.<ref name="dlc1914"/>
+* [[casa cáñama]]: Caza dezmera, o excusada.<ref name="dlc1914"/>
+* [[casa celeste]]: (Astrología) Cada una de las doce partes en que se considera dividido el cielo por círculos de longitud o por los del [[atacir]].<ref name="dlc1914"/>
+* [[casa civil]]
+* [[casa consistorial]]: Casa de la villa o ciudad, adonde concurren los [[capitular]]es de su ayuntamiento a celebrar sus juntas. Úsase también en plural.<ref name="dlc1914"/>
+* [[casa cuartel]]
+* [[casa cuna]]: Orfanato.|| Sala cuna, guardería infantil.
+* [[casa cural]]
+* [[casa de altos]]
+* [[casa de apero]]
+* [[casa de aposento]]: Servicio que la villa de Madrid lucía al rey, dando una parte de todas las casas para el aposento de la corte.|| Vivienda que se repartía a los que gozaban de tal privilegio.|| Renta que se cobraba, por este derecho, de las casas cuyos dueños se habían obligado, mediante composición de aposento, a pagar este servicio en dinero.<ref name="dlc1914"/>
+* [[casa de balcón]]
+* [[casa de banca]]: Casa de comercio que se dedica al género de operaciones llamado banca.<ref name="dlc1914"/>
+* [[casa de baños]]: Establecimiento en que se tienen baños en cuartos independientes unos de otros, para el servicio público.<ref name="dlc1914"/>
+* [[casa de beneficencia]]: Asilo oficial donde se recoge y sustenta a los desvalidos y menesterosos.<ref name="dlc1914"/>
+* [[casa de cabo de armería]]: Casa cabeza de armería.
+* [[casa de calderas]]
+* [[casa de camas]]: Casa pública de mujeres mundanas, [[mancebía]].<ref name="dlc1914"/>
+* [[casa de campo]]: Casa fabricada fuera de poblado, y en la cual se habita, bien para cuidar del cultivo de las tierras circunvecinas, bien para recrearse, o con uno y otro objeto.<ref name="dlc1914"/>
+* [[casa de citas]]: [[burdel]]
+* [[casa de colma]]: (Anticuado) Casa de juego.<ref name="dlc1914"/>
+* [[casa de comidas]]: {{plm|figón}}.<ref name="dlc1914"/>
+* [[casa de compromiso]] o compromisos
+* [[casa de contratación de las Indias]]: Tribunal cuyo instituto era conocer y determinar los negocios pertenecientes al comercio y tráfico de las Indias: se componía de un presidente y varios ministros, unos togados y otros de capa y espada, y un fiscal togado. Antiguamente estuvo en Sevilla, hasta que se trasladó a Cádiz.<ref name="dlc1914"/>
+* [[casa de conversación]]
+* [[casa de devoción]]: Templo o santuario donde se venera alguna imagen a la que se tiene especial devoción.<ref name="dlc1914"/>
+* [[casa de Dios]]: Templo o iglesia.<ref name="dlc1914"/>
+* [[casa de dormir]]: Aquella en que se da hospedaje sólo para pasar la noche.<ref name="dlc1914"/>
+* [[casa de empeños]]: Establecimiento que presta dinero contra el depósito de una prenda.
+* [[casa de esgrimidores]]
+* [[casa de estado]]: (Anticuado) Hostería.<ref name="dlc1914"/>
+* [[casa de expósitos]]: {{plm|inclusa}}, casa en donde se recogen y crían los niños expósitos.<ref name="dlc1914"/>
+* [[casa de fieras]]
+* [[casa de huéspedes]]: Aquella en que, mediante cierto precio, se da estancia y comida, o sólo alojamiento, a algunas personas.<ref name="dlc1914"/>
+* [[casa de juego]]: La destinada a juegos prohibidos.<ref name="dlc1914"/>
+* [[casa de labor]] o [[casa de labranza|de labranza]]: Aquella en que habitan los labradores y en que tienen sus ganados y aperos.<ref name="dlc1914"/>
+* [[casa de lenocinio]]
+* [[casa de locos]]: La destinada para recoger y curar a los que padecen locura.|| Aquella en que hay mucho bullicio, inquietud y falta de gobierno.<ref name="dlc1914"/>
+* [[casa del rey]]: Casa real.<ref name="dlc1914"/>
+* [[casa del Señor]]: Casa de Dios.<ref name="dlc1914"/>
+* [[casa de malicia]]: Casa a la malicia.<ref name="dlc1914"/>
+* [[casa de mancebía]]: {{plm|mancebía}}, casa pública de mujeres mundanas.<ref name="dlc1914"/>
+* [[casa de maternidad]]: Hospital destinado a la asistencia de [[parturiente]]s.<ref name="dlc1914"/>
+* [[casa de moneda]]: La designada públicamente para fundir, fabricar y acuñar moneda.<ref name="dlc1914"/>
+* [[casa de moradores]]: Casa de vecindad. (Murcia, España)<ref name="dlc1914"/>
+* [[casa de muñecas]]: Juguete que representa un edificio.
+* [[casa de oración]]: Casa de Dios.<ref name="dlc1914"/>
+* [[casa de orates]]: Casa de locos.<ref name="dlc1914"/>
+* [[casa de pailas]]
+* [[casa de placer]]: Casa de recreo en el campo.<ref name="dlc1914"/>
+* [[casa de poco trigo]]: Cárcel.<ref name="novísimo"/>
+* [[casa de posada]] o [[casa de posadas|posadas]]: Casa de huéspedes.<ref name="dlc1914"/>
+* [[casa de postas]]: Parada donde toman caballos de refresco los correos o los que viajan en posta.<ref name="dlc1914"/>
+* [[casa de préstamos]]: Casa de empeños.<ref name="dlc1914"/>
+* [[casa de prostitución]]
+* [[casa de pupilos]]: Casa de huéspedes.<ref name="dlc1914"/>
+* [[casa de putas]]: {{plm|burdel}}.
+* [[casa de recreo]]
+* [[casa de socorro]]: Establecimiento benéfico donde se prestan los primeros auxilios facultativos a heridos o a atacados de cualquier repentino accidente.<ref name="dlc1914"/>
+* [[casa de tía]]: {{plm|cárcel}}, edificio o local destinado para la custodia y seguridad de los presos.<ref name="dlc1914"/>
+* [[casa de tócame Roque]]: Aquella en que vive mucha gente y hay mala dirección y el consiguiente desorden. Dícese aludiendo a la casa de vecindad de este nombre que hubo en la calle del Barquillo de Madrid, y que hizo famosa un saínete de D. Ramón de la Cruz.<ref name="dlc1914"/>
+* [[casa de tolerancia]]
+* [[casa de trato]]: {{plm|mancebía}}, casa pública de mujeres mundanas.<ref name="dlc1914"/>
+* [[casa de trueno]]: Aquella en que habitualmente se falta a las reglas de buena crianza, y aun a los principios de sana moral.<ref name="dlc1914"/>
+* [[casa de vacas]]: Establecimiento donde se tienen vacas, para vender su leche.<ref name="dlc1914"/>
+* [[casa de vecindad]]: La que contiene muchos cuartos reducidos, por lo común con acceso a patios y corredores, en que viven distintas familias poco acomodadas.<ref name="dlc1914"/>
+* [[casa dezmera]] o [[casa excusada|excusada]]: La del vecino hacendado que se elegía para percibir por algún privilegio los diezmos de todos los frutos y ganados.<ref name="dlc1914"/>
+* [[casa fuerte]]: La que se fabrica en forma de casa, para habitar en ella, con fortalezas y reparos para defenderse de los enemigos.|| La muy acaudalada.<ref name="dlc1914"/>
+* [[casa grande]]: (Anticuado) Entre jugadores es un nombre con qe designaban los reyes de la baraja.<ref name="dlc1914"/>
+* [[casa hita]]: Casa por casa.<ref name="dlc1914"/>
+* [[casa llana]]: (Anticuado) Casa en el campo, sin fortificación ni defensa.<ref name="dlc1914"/>
+* [[casamiento en casa]]: El autorizado por uno de los cónyuges al otro, sea por testamento con la frase "dejo casamiento en casa", o por los testamentaríos fideicomisarios, para que, contraído nuevo matrimonio por el sobreviviente, siga la casa en poder de este, que pasa a ser dueño de los bienes del [[premuerto]]. Los hijos del nuevo matrimonio, si los hubiere, tienen los mismos derechos a los bienes que los del premuerto.<ref name="dlc1914"/>
+* [[casa militar]]
+* [[casa mortuoria]]: Casa donde recientemente ha muerto una persona.<ref name="dlc1914"/>
+* [[casa parroquial]]
+* [[casa paterna]]: Domicilio de los padres.<ref name="dlc1914"/>
+* [[casa principal]]: La que es grande respecto de las demás del pueblo.|| Casa noble, ilustre, esclarecida.|| Familia de elevada alcurnia, muy rica y poderosa.<ref name="novísimo"/>
+* [[casa profesa]]
+* [[casa pública]]: {{plm|mancebía}}, casa pública de mujeres mundanas.<ref name="dlc1914"/>
+* [[casa real]]: {{plm|palacio}}, casa destinada para residencia de los reyes.|| Personas reales y conjunto de sus familias.<ref name="dlc1914"/>
+* [[casa rectoral]]
+* [[casa robada]]: La que está sin el moblaje más preciso.<ref name="dlc1914"/>
+* [[casa santa]]: Por antonomasia, la de Jerusalén, en que está el santo sepulcro de Cristo Nuestro Señor.<ref name="dlc1914"/>
+* [[casa solar]] o [[casa solariega|solariega]]: La muy antigua y noble de una familia.<ref name="dlc1914"/>
+* [[casco de casa]]
+* [[como una casa]]: Enorme, muy grande.
+* [[composición de casa]]
+* [[cuerpo de casa]]
+* [[de entre casa]]: De trapillo. (Argentina, Perú, Uruguay)
+* [[deshacerse una casa]]: Venir a menos, parar en la pobreza una familia rica.<ref name="dlc1914"/>
+* [[de la casa]]: Comida o bebida especialidad del restaurante, bar u otro establecimiento que expende comestibles y bebestibles.
+* [[de su casa]]: De propio ingenio o invención, sin haberlo tomado de otro.<ref name="dlc1914"/>
+* [[echar la casa por la ventana|echar]], [[botar la casa por la ventana|botar]] o [[tirar la casa por la ventana]]: Derrochar, [[malgastar]] los recursos, ser [[pródigo]].<ref name="dlc1914"/>
+* [[en casa]]: En el domicilio o casa propia.
+* [[entrar una cosa como por su casa]]: Venir ancha y muy holgada; meterse con demasiada facilidad en otra; como el zapato, calzón, etc.<ref name="dlc1914"/>
+* [[estar como en casa]]
+* [[estar de casa]]: Estar de llaneza.<ref name="dlc1914"/>
+* [[estar la casa como un mesón]]: Estar desarreglada.<ref name="novísimo"/>
+* [[franquear a uno la casa]]: Darle entrada o permiso para que venga a ella siempre que guste.<ref name="dlc1914"/>
+* [[gentilhombre de la casa]]
+* [[guardar la casa]]: Estar por necesidad sin salir de ella.<ref name="dlc1914"/>
+* [[ir a las casitas]]
+* [[irse de casa]]
+* [[justicia mayor de la casa del rey]]
+* [[las casas]]: En el campo, estancias o fundos, la casa o edificación principal. (Cono Sur)
+* [[levantar la casa]]: Mudarse con su familia de un lugar a otro para residir en él.<ref name="dlc1914"/>
+* [[llovérsele la casa]]: Empezar a venir a menos.<ref name="dlc1914"/>
+* [[mujer de su casa]]
+* [[no caber en toda la casa]]: Estar muy enojado el señor de ella, y alborotarse con todos.<ref name="dlc1914"/>
+* [[no hará casa con azulejos]]: Expresión figurada con que se moteja al que gasta con mucho exceso.<ref name="dlc1914"/>
+* [[no parar en casa]] o [[no parar en su casa|en su casa]]: Pasar voluntaria o involuntariamente la mayor parte del tiempo fuera de ella.<ref name="dlc1914"/>
+* [[no tener casa ni hogar]]: Ser sumamente pobre.<ref name="dlc1914"/>
+* [[oler la casa a hombre]]: Da a entender que alguno quiere hacerse obedecer en su casa. Dícese, por lo regular, del que afecta ser hombre de bríos, y quiere parecerlo, no siéndolo.<ref name="dlc1914"/>
+* [[para andar por casa]]: De poco valor, rigor o merecimiento.
+* [[poner casa]]: Tomar casa el que antes no la tenía, haciéndose cabeza de familia.<ref name="dlc1914"/>
+* [[poner la casa]] a uno: Alhajársela para que pueda habitar en ella.<ref name="dlc1914"/>
+* [[ser como de la casa]], o [[ser de la casa]]: Muy amigo de los dueños de casa.
+* [[ser de buena casa]]
+* [[ser de mala casa]]
+* [[ser muy de casa]]: Tener mucha confianza en alguna casa.<ref name="dlc1914"/>
+* [[tener casa abierta]]: Estar habitando una casa de la cual es cabeza principal.<ref name="dlc1914"/>
+* [[tener casa y tinelo]]: (Anticuado) Dar de comer a todo el que quiera ir, tener mesa franca.<ref name="dlc1914"/>
+* [[tener la casa como una colmena]]: Tenerla llena y abastecida de lo necesario.<ref name="dlc1914"/>
+* [[tirar la casa por la ventana]]
+* [[vivir una casa]]: Habitar en ella.<ref name="dlc1914"/>
+{{trad-abajo}}
+
+==== Refranes ====
+{{trad-arriba|Dichos o refranes con ''casa''}}
+* [[a "idos de mi casa", y "¿qué queréis con mi mujer?", no hay que responder]]: Refrán con que se significa que al que manda o reconviene con autoridad y evidente derecho, no se le puede replicar.<ref name="dlc1914"/>
+* [[a mal decir no hay casa fuerte]]: Refrán que enseña que cuando la fortuna se declara contra alguno, de nada sirven el poder ni las riquezas para resistirla.<ref name="dlc1914"/>
+* [[cada uno en su casa y Dios en la de todos]]: Refrán de que se usa para significar que conviene que las familias vivan separadas, para evitar disensiones.<ref name="dlc1914"/>
+* [[casa con dos puertas mala es de guardar]]: Refrán que sólo se emplea en sentido recto.<ref name="dlc1914"/>
+* [[casa, en la que vivas; viña, de la que bebas, y tierras, cuando veas]]: Refrán que enseña la mayor seguridad que dan las tierras sobre los demás bienes.<ref name="dlc1914"/>
+* [[casa hecha, sepultura abierta]]: Refrán que se dice con ocasión de morir una persona cuando acababa de hacerse construir una casa.<ref name="dlc1914"/>
+* [[casa hospedada, comida y denostada]]: Refrán que reprende a los que pagan los beneficios con ingratitud.<ref name="dlc1914"/>
+* [[casa negra, candela accensa]]: Refrán que advierte que en las casas obscuras se necesita luz artificial.<ref name="dlc1914"/>
+* [[casa reñida, casa regida]]: Refrán que enseña la necesidad de ser hasta severo en las ocasiones, para que en el hogar doméstico haya regularidad y concierto.<ref name="dlc1914"/>
+* [[cuando fueres a casa ajena, llama de fuera]]: Refrán que reprende la mala crianza de aquellos que se entran en el interior de una casa o habitación sin llamar.<ref name="dlc1914"/>
+* [[de buena casa, buena brasa]]: Refrán que denota que de las casas o personas ricas aun los desperdicios son buenos.<ref name="dlc1914"/>
+* [[de fuera vendrá quien de casa nos echará]]: Refrán con que se reprende al que se mete a mandar en casa ajena.<ref name="dlc1914"/>
+* [[el casado, casa quiere]]: Alude a que las personas que se casan o se deciden vivir en pareja deben buscar la manera de hacer su vida e independizarse de sus padres.
+* [[el que en gastos va muy lejos, no hará casa con azulejos]]: Refrán que advierte que los que todo lo gastan, no tendrán considerables fondos de reserva.<ref name="novísimo"/>
+* [[en cada casa cuecen habas, y en la nuestra a calderadas]]: Refrán que denota que en todas partes se hallan trabajos, y que cada uno tiene los suyos por mayores.<ref name="dlc1914"/>
+* [[en casa de Gonzalo, más puede la gallina que el gallo]]: Refrán que denota que en algunas partes suele tener más dominio que el marido.<ref name="dlc1914"/>
+* [[en casa del abad, comer y llevar]]: Refrán con que se pondera la abundancia que suele haber en las casas de los abades y otros eclesiásticos ricos.<ref name="dlc1914"/>
+* [[en casa del ahorcado, no hay que mentar la soga|en casa del ahorcado, no hay que,]] o [[en casa del ahorcado, no se ha de mentar la soga|, no se ha de, mentar la soga]]: No se debe hacer comentarios acerca de lo que le causó una desgracia a una persona para que no le traiga malos recuerdos.<ref name="dlc1914"/>
+* [[en casa del alboguero todos son albogueros]]: Refrán. En casa del gaitero todos son danzantes.<ref name="dlc1914"/>
+* [[en casa del bueno, el ruin cabe el fuego]]: Refrán que da a entender que el que es bueno da el mejor lugar de su casa aun al más infeliz.<ref name="dlc1914"/>
+* [[en casa del gaitero todos son danzantes]]: Refrán con que se advierte que conforme a las costumbres del padre de familia, suelen ser las de las personas que están a su cargo.<ref name="dlc1914"/>
+* [[en casa del herrero cuchillo de palo]], o [[en casa del herrero cuchillo mangorrero|cuchillo mangorrero]]: Refrán que denota que donde hay la proporción y facilidad de hacer y conseguir alguna cosa, suele descubrirse o verificarse la falta de ella.<ref name="dlc1914"/>
+* [[en casa del jabonero el que no cae resbala]]
+* [[en casa del mezquino, más manda la mujer que el marido]]: Refrán. En casa del ruin, la mujer es alguacil.<ref name="dlc1914"/>
+* [[en casa del oficial, asoma el hambre, más no osa entrar]]: Refrán que enseña que al que sabe un oficio o arte y se aplica a su ejercicio, con dificultad le faltará lo necesario para su mantenimiento.<ref name="dlc1914"/>
+* [[en casa del ruin, la mujer es alguacil]]: Refrán que denota que cuando el marido es flojo y de poco ánimo, la mujer se levanta con el mando y hace lo que quiere.<ref name="dlc1914"/>
+* [[en casa del tamborilero todos son danzantes]]: Refrán. En casa del gaitero todos son danzantes.<ref name="dlc1914"/>
+* [[en casa de mujer rica, ella manda y ella grita]]: Refrán que explica la soberbia que comunican los haberes, a las mujeres especialmente.<ref name="dlc1914"/>
+* [[en casa de tía, más no cada día]]: Refrán que advierte que no se debe abusar del favor o confianza de otro, aunque sea pariente o amigo.<ref name="dlc1914"/>
+* [[en casa llena, presto se guisa la cena]]: Refrán con que se denota que donde hay abundancia de medios, se sale con facilidad de cualquier empeño.<ref name="dlc1914"/>
+* [[en la casa donde no hay harina, todo es mohína]]: [[donde no hay harina, todo es mohína]], refrán con que se da a entender que la pobreza y miseria suelen ocasionar disgustos y desazones entre las familias.<ref name="dlc1914"/>
+* [[en la casa donde no hay harina, todo se vuelve mohína]] o [[en la casa donde no hay harina, todo se vuelve tremolina|tremolina]]: En la casa donde no hay harina, todo es mohína.
+* [[en la casa donde no hay pachón, todos riñen y todos tienen razón]]: Refrán. Donde no hay harina, todo es mohína.<ref name="dlc1914"/>
+* [[hoy me iré, cras mi iré, mal la casa mantendré]]: Refrán que reprende a los perezosos y flojos, que por diferir el trabajo de un día para otro, no medran ni tienen lo necesario para mantener su casa.<ref name="dlc1914"/>
+* [[la casa hecha y el huerco a la puerta]]: Refrán. Casa hecha, sepultura abierta.
+* [[la casa es chica pero el corazón es grande]]
+* [[la casa quemada, acudir con el agua]]: Refrán que moteja a los que dan el socorro fuera de tiempo.<ref name="dlc1914"/>
+* [[mi casa y mi hogar cien doblas val]]: Refrán que denota el grande aprecio que se hace de la casa propia.<ref name="dlc1914"/>
+* [[mientras en mi casa estoy, rey soy]]: Refrán que indica que quien está contento con su suerte, no solicita favores ajenos.<ref name="dlc1914"/>
+* [[misar y rezar, y casa guardar]]: Refrán que enseña que no se desatienda la obligación por la devoción.<ref name="dlc1914"/>
+* [[ni por casa ni por viña, no tomes mujer jimia]]: Refrán que amonesta que por razón de intereses no hay que casarse nunca con mujer casquivana o lasciva.<ref name="dlc1914"/>
+* [[pues la casa se quema, calentémonos a ella]] o [[pues la casa se quema, calentémonos todos|, calentémonos todos]]: Refrán que se dice de los que procuran aprovecharse de los desperdicios propios o ajenos.<ref name="dlc1914"/>
+* [[quémese la casa y no salga humo]]: Refrán que reprende a los poco cautelosos en el modo de obrar, y enseña que las culpas de los domésticos se han de corregir con silencio y sin escándalo.<ref name="dlc1914"/>
+* [[tal queda la casa de la dueña, ido el escudero, como fuego sin trashoguero]]: Refrán con que se encarece la necesidad de que en la casa haya un hombre que la defienda.<ref name="dlc1914"/>
+* [[toma casa con hogar, y mujer que sepa hilar]]: Refrán con que se advierte que en los matrimonios, además de las conveniencias, se ha de buscar mujer virtuosa y trabajadora.<ref name="dlc1914"/>
+* [[tres cosas echan al hombre de su casa: el humo, la gotera y la mujer vocinglera]]: Refrán que denota cuan molestas son estas tres cosas.<ref name="novísimo"/>
+* [[triste está la casa donde la gallina canta y el gallo calla]]: Refrán que denota que regularmente no está bien gobernada la casa donde manda la mujer.<ref name="dlc1914"/>
+{{trad-abajo}}
+
+==== Información adicional ====
+{{derivad|casera|caserón|caserío|casemita|caseta|casero|casita|casona|casucha}}.
+
+==== Véase también ====
+{{w}}
+* [[caseta]]
+
+==== Traducciones ====
+{{trad-arriba}}
+{{t|ain|i1=s|t1=チセ|t2=チシェ}}
+{{t|af|a1=1|t1=huis}}
+{{t|sh|a1=1|g1=f|t1=kuća}}
+{{t|sq|a1=1|g1=f|t1=shtëpi}}
+{{t|de|a1=1|g1=n|g2=f|t1=Haus|t2=Wohnung}}
+{{t|az|a1=1|t1=ev}}
+{{t|ar|a1=1|t1=بيت}}
+{{t|ar|t1=دار}}
+{{t|hy|a1=1|t1=տուն}}
+{{t|ast|a1=1|g1=f|t1=casa}}
+{{t|br|a1=1|t1=ti}}
+{{t|bg|a1=1|t1=къща}}
+{{t|ca|a1=1|g1=f|n2=p|t1=casa|t2=cases}}
+{{t|cak|a1=1|t1=jay}}
+{{t|cs|a1=1|g1=m|t1=dům}}
+{{t|chr|a1=1|t1=ꭶꮅꮶꮥ}}
+{{t|ckt|a1=1|t1=jarat}}
+{{t|ko|a1=1|t1=집}}
+{{t|da|a1=1|t1=hus}}
+{{t|sl|a1=1|t1=dom}}
+{{t|sl|t1=hiša}}
+{{t|sl|t1=stanovanje}}
+{{t|eo|a1=1|t1=domo}}
+{{t|eu|a1=1|t1=etxe}}
+{{t|fi|a1=1|t1=talo}}
+{{t|fr|a1=1|g1=f|t1=maison}}
+{{t|fy|a1=1|g1=n|t1=hûs}}
+{{t|cy|i1=s|t1=tŷ|t2=annedd}}
+{{t|gl|a1=1|t1=casa}}
+{{t|el|i1=s|t1=σπίτι}}
+{{t|haw|i1=s|t1=hale}}
+{{t|he|t1=בית}}
+{{t|hi|i1=s|t1=घर}}
+{{t|hi|t1=मकान}}
+{{t|hi|t1=गृह}}
+{{t|hu|a1=1|t1=ház}}
+{{t|en|a1=1|t1=home|t2=house}}
+{{t|ga|i1=s|t1=tigh}}
+{{t|io|i1=s|t1=domo}}
+{{t|is|i1=s|t1=hús|t2=heimili}}
+{{t|it|a1=1|g1=f|t1=casa}}
+{{t|ja|i1=s|t1=家|t2=いえ}}
+{{t|ja|t1=建物}}
+{{t|ja|t1=たてもの}}
+{{t|ja|t1=うち}}
+{{t|la|a1=1|g1=m|t1=domus}}
+{{t|mni|t1=ꯁꯡ}}
+{{t|mi|a1=1|t1=whare}}
+{{t|arn|a1=1-2|t1=ruka}}
+{{t|yua|a1=1|a2=2|t1=naj|t2=otoch}}
+{{t|mit|a1=1-2|t1=ve’e}}
+{{t|mpm|a1=1-2|t1=ve’e}}
+{{t|mn|i1=s|t1=байшин|t2=гэр}}
+{{t|nhn|a1=1|a2=2|t1=calli|t2=chantli}}
+{{t|nci|a1=1|a2=2|t1=calli|t2=chantli}}
+{{t|ngu|t1=kajli}}
+{{t|nch|t1=kali}}
+{{t|nhw|t1=kali}}
+{{t|nhe|t1=kalli}}
+{{t|nl|a1=1|t1=huis}}
+{{t|no|g1=n|i1=s|t1=hus}}
+{{t|pl|a1=1|t1=dom}}
+{{t|pap|i1=s|t1=cas}}
+{{t|pt|a1=1|g1=f|t1=casa}}
+{{t|ine-pro|a1=1|g1=f|t1=*dṓm}}
+{{t|rap|i1=s|t1=hare}}
+{{t|ru|i1=s|t1=дом}}
+{{t|sa|a1=1-4|t1=गृह}}
+{{t|sv|g1=n|i1=s|t1=hus}}
+{{t|sw|i1=s|t1=nyumba}}
+{{t|ty|i1=s|t1=fare}}
+{{t|th|i1=s|t1=บ้าน}}
+{{t|tl|i1=s|t1=bahay}}
+{{t|ta|i1=s|t1=வீடு}}
+{{t|crh|i1=s|t1=üy}}
+{{t|te|i1=s|t1=ఇల్లు}}
+{{t|tr|i1=s|t1=ev}}
+{{t|wo|i1=s|t1=neeg}}
+{{t|yo|i1=s|t1=ilé}}
+{{t|zad|a1=1|t1=yoo}}
+{{t|zat|a1=1|t1=yo'o}}
+{{trad-abajo}}
+
+=== Forma flexiva ===
+==== Forma verbal ====
+;1: {{f.v|casar|3s|pres|ind}}.
+;2: {{f.v|casar|2s|imperativo|af=s}}.
+{{relacionado|cásate}}

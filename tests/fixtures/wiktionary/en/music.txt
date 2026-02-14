@@ -1,0 +1,547 @@
+==English==
+{{examples|{{listen|Pyotr Ilyich Tchaikovsky - romeo and juliet- overture-fantasy.ogg|a piece of '''music''' ({{w|Tchaikovsky}}'s ''Romeo and Juliet Overture'', performed by the Skidmore College Orchestra)}}}}
+{{wp}}
+{{wikiquote}}
+
+===Alternative forms===
+* {{alter|en|musick|musicke|musique|musike}} (obsolete)
+
+===Etymology===
+{{root|en|ine-pro|*men- (think)}}
+From {{inh|en|enm|musik}}, {{m|enm|musike}}, borrowed from {{der|en|xno|musik}}, {{m|fro|musike}}, {{der|en|fro|musique}}, and their source {{der|en|la|mūsica}}, from {{der|en|grc|μουσική}}, from {{der|en|grc|Μοῦσα||Muse}}, an Ancient Greek deity of the arts. {{surf|en|muse|-ic|t2=pertaining to}}. In this sense, displaced native {{cog|ang|drēam||music}}, whence {{w|Modern English}} {{m|en|dream}}.
+
+===Pronunciation===
+* {{enPR|myo͞oʹzĭk|a=RP}} {{IPA|en|/ˈmjuːzɪk/}}
+* {{audio|en|En-uk-music.ogg|a=RP}}
+* {{IPA|en|/ˈmjuzɪk/|a=GA}}
+* {{audio|en|En-us-music.ogg|a=GA}}
+* {{hyphenation|en|mus|ic}}
+* {{rhymes|en|uːzɪk|s=2}}
+
+===Noun===
+{{en-noun|-|s}}
+
+# A [[series]] of [[sound#Noun|sounds]] [[organize]]d in [[time#Noun|time]], usually [[employ#Verb|employing]] some [[combination]] of [[harmony]], [[melody]], [[rhythm]], [[tempo]], etc., often to [[convey]] a [[mood]].
+#: {{ux|en|I keep listening to this '''music''' because it’s a masterpiece.}}
+#* {{RQ:Congreve Mourning Bride|page=1|passage='''Muſick''' has Charms to ſooth a ſavage Breaſt, / To ſoften Rocks, or bend a knotted Oak.}}
+#* {{quote-journal|en|date=2013-11-22|author=Ian Sample|volume=189|issue=24|page=32|magazine=The Guardian Weekly|title=Music lessons in early childhood may improve brain's performance|url=http://www.theguardian.com/science/2013/nov/12/music-lessons-early-childhood-brain-performance|passage='''Music''' lessons in early childhood lead to changes in the brain that could improve its performance far into adulthood, researchers say.}}
+# {{lb|en|figuratively}} Any [[interesting#Adjective|interesting]] or [[pleasing#Adjective|pleasing]] sounds.
+#* {{quote-book|en|year=1856|author=John Esten Cooke|title=The Virginia Comedians|url=http://www.worldcat.org/title/virginia-comedians-or-old-days-in-the-old-dominion-edited-from-the-mss-of-c-effingham-esq-or-rather-written-by-john-esten-cooke/oclc/559686172|page=247|text=“Oh! this was very kind,” she said, with that simplicity and tenderness, which at times made her voice pure '''music''', “I could not have expected you so soon.”}}
+#* {{quote-journal|en|date=19 Aug 78|volume=6|number=5|journal=Gay Community News|page=15|author=Kevin Warren|title=A Flawless Production|text=Wilson's definite genius for rapid, witty dialogue which becomes a kind of conversational '''music''' at times.}}
+# {{senseid|en|Q638}}An [[art form]], [[create]]d by organizing [[pitch#Noun|pitch]], rhythm, and sounds made using [[musical instrument]]s and/or [[singing#Noun|singing]].
+# A [[guide#Noun|guide]] to [[play#Verb|playing]] or [[sing#Verb|singing]] a particular [[tune#Noun|tune]]; [[sheet music]].
+# {{lb|en|military|slang}} [[electronic|Electronic]] [[signal#Noun|signal]] [[jamming#Noun|jamming]].
+# {{lb|en|US|slang|dated}} [[heated#Adjective|Heated]] [[argument#Noun|argument]].
+# {{lb|en|US|slang|dated}} [[fun|Fun]]; [[amusement]].
+
+====Synonyms====
+* {{l|en|melody}}
+* {{l|en|vibe}}
+
+====Derived terms====
+{{col4|en|absolute music
+|abstract music|functional music|music cassette
+|alternative music
+|ambient music| Music City
+|antimusic
+|art music
+|background music
+|ballet music
+|banku music
+|beautiful music
+|biomusic
+|bumper music
+|Caribbean dance music|music desk
+|Celtic music
+|chamber music
+|champagne music
+|chart music
+|chin music
+|chipmusic
+|classical music
+|club music
+|cocktail music
+|concrete music
+|country music
+|country-western music
+|coworker music
+|dance music
+|danger music| drone music|old-time music
+|day the music died
+|devil in music
+|director of music
+|disco music
+|doujin music
+|electronic body music
+|electronic dance music
+|electronic music
+|elevator music
+|ethnic music
+|ethnomusic
+|eye music
+|face the music
+|fast food music
+|field music
+|fill music
+|folk music
+|found music
+|furniture music
+|gospel music
+|hate music
+|have Van Gogh's ear for music
+|hillbilly music
+|house music
+|incidental music
+|industrial music
+|intelligent dance music
+|janissary music
+|lift music
+|light music
+|lounge music
+|make beautiful music together
+|make music
+|marching music
+|march music
+|micromusic
+|mood music
+|mouth music
+|musicaholic
+|musical
+|musicality
+|musically
+|musicassette
+|musicaster
+|music box
+|music bread
+|music center
+|music centre
+|music chart
+|music demy
+|musicdisk
+|music frog
+|music game
+|music group
+|music hall
+|music house
+|musician,muso
+|musicing
+|musicker
+|musicless
+|musiclike
+|musicmaking
+|musicmonger
+|musicness
+|music notation
+|music of the spheres
+|musicography
+|musicologic
+|musicologist
+|musicology
+|musicon
+|musicophile
+|music paper
+|music pen
+|music room
+|musicscape
+|music school
+|music shell
+|music shop
+|music stand
+|music-stick
+|musicstick
+|music theory
+|music therapy
+|music to someone's ears
+|music video
+|music video game
+|music volute
+|musiczine
+|musivisual
+|New Age music
+|nonmusic
+|Original Pilipino Music
+|outsider music
+|piped music
+|pop music
+|popular music
+|production music
+|programme music
+|program music
+|punk music
+|race music
+|rap music
+|rock music
+|roots music
+|rough music
+|salon music
+|serial music
+|set to music
+|sewing-machine music
+|sheet music
+|snap music
+|soul music
+|studio music
+|techno music
+|theory of music
+|township music
+|trance music
+|trap music
+|what kind of music do you like
+|word music
+|world music
+}}
+
+====Descendants====
+* {{desc|jam|myuuzik}}
+* {{desc|pih|myuusik}}
+* {{desc|tpi|musik}}
+* {{desc|dv|މިއުޒިކް|bor=1}}
+* {{desc|ja|ミュージック|tr=myūjikku|bor=1}}
+* {{desc|ms|muzik|bor=1}}
+* {{desc|sw|muziki|bor=1}}
+* {{desc|cy|miwsig|bor=1}}
+
+====Translations====
+{{trans-top|sound, organized in time in a melodious way}}{{multitrans|data=
+* Abkhaz: {{tt|ab|амузика}}
+* Acehnese: {{tt|ace|musik}}
+* Afrikaans: {{tt+|af|musiek|f}}
+* Albanian: {{tt+|sq|muzikë|f}}, {{tt|sq|mëzikë|f}}
+* Altai:
+*: Southern Altai: {{t|alt|музыка}}, {{t|alt|кӱӱ}}
+* Amharic: {{tt|am|ሙዚቃ|?}}
+* Antillean Creole: {{t|gcf|mizik|f}}
+* Arabic: {{tt+|ar|مُوسِيقَى|f}} or {{tt+|ar|مُوسِيقَا|f}}, {{tt+|ar|طَرَب|m}}
+*: Egyptian Arabic: {{tt|arz|مزّيكا|f|tr=mazzīka}}
+*: Hijazi Arabic: {{tt|acw|موسيقى|f|tr=musīga}}
+* Aragonese: {{tt+|an|musica|f}}, {{tt+|an|mosica|f}}
+* Aramaic:
+*: Classical Syriac: {{tt|syc|ܙܡܪܐ|tr=zmārā}}
+* Armenian: {{tt+|hy|երաժշտություն}}
+* Aromanian: {{tt|rup|muzicã|f}}
+* Assamese: {{tt|as|সংগীত}}
+* Asturian: {{tt+|ast|música|f}}
+* Azerbaijani: {{tt+|az|musiqi}}
+* Balinese: {{tt|ban|musik}}
+* Bashkir: {{tt|ba|музыка}}
+* Basque: {{tt|eu|musika}}
+* Belarusian: {{tt|be|му́зыка|f}}
+* Bengali: {{tt+|bn|সঙ্গীত}}, {{tt+|bn|গান}}
+* Breton: {{tt|br|sonerezh|m}}
+* Bulgarian: {{tt+|bg|му́зика|f}}
+* Burmese: {{tt+|my|ဂီတ}}
+* Buryat: {{tt|bua|хүгжэм}}
+* Carpathian Rusyn: {{tt|rue|музика|f}}
+* Catalan: {{tt+|ca|música|f}}
+*: Old Catalan: {{tt|roa-oca|musica|f}}
+* Chechen: {{tt|ce|музыка}}, {{tt|ce|эшар}}
+* Cherokee: {{tt|chr|ᏗᎧᏃᎩᏛ}}
+* Chinese:
+*: Cantonese: {{tt|yue|音樂}}
+*: Dungan: {{tt|dng|йинйүә}}
+*: Eastern Min: {{tt|cdo|音樂}}
+*: Hakka: {{tt|hak|音樂|tr=yîm-ngo̍k}}
+*: Hokkien: {{tt+|nan-hbl|音樂|tr=im-ga̍k}}
+*: Mandarin: {{tt+|cmn|音樂}}
+*: Wu: {{tt|wuu|音樂}}
+* Chuvash: {{tt|cv|кӗвӗ}}, {{tt|cv|мусӑк}}
+* Coptic: {{tt|cop|ⲟⲩⲗⲗⲉ|?}}
+* Cornish: {{tt|kw|musik|f}}, {{tt|kw|ilow|f}}
+* Corsican: {{tt+|co|musica|f}}
+* Czech: {{tt+|cs|hudba|f}}, {{tt+|cs|muzika|f}}
+* Danish: {{tt+|da|musik|c}}
+* Dhivehi: {{tt|dv|މިއުޒިކް}}
+* Dutch: {{tt+|nl|muziek|f}}
+* Elfdalian: {{tt|ovd|musik|m}}
+* Erzya: {{tt|myv|музыка}}, {{tt|myv|седямо}}
+* Esperanto: {{tt+|eo|muziko}}
+* Estonian: {{tt+|et|muusika}}
+* Farefare: {{tt|gur|yʋʋmʋm}}
+* Faroese: {{tt|fo|tónleikur|m}}
+* Finnish: {{tt+|fi|musiikki}}
+* French: {{tt+|fr|musique|f}}
+*: Middle French: {{tt|frm|musique|f}}
+*: Old French: {{tt|fro|musique|f}}, {{tt|fro|musike|f}}
+* Frisian:
+*: West Frisian: {{tt+|fy|muzyk|f}}
+* Friulian: {{tt|fur|musiche|f}}
+* Galician: {{tt+|gl|música|f}}
+* Georgian: {{tt+|ka|მუსიკა}}
+* German: {{qualifier|sound, composition}} {{tt+|de|Musikstück}}, {{tt+|de|Musik}}; {{qualifier|art}} {{tt+|de|Musik|f}}, {{tt+|de|Tonkunst|f}}
+*: Bavarian: {{tt|bar|Musi|f}}
+* Greek: {{tt+|el|μουσική|f}}
+*: Ancient Greek: {{tt|grc|μουσική|f}}
+* Greenlandic: {{tt|kl|nipilersorneq}}
+* Gujarati: {{tt|gu|સંગીત|n}}
+* Haitian Creole: {{tt|ht|mizik}}
+* Hawaiian: {{tt|haw|mele}} {{qualifier|vocal}}, {{tt|haw|pila hoʻokani}} {{qualifier|instrumental}}
+* Hebrew: {{tt+|he|מוּזִיקָה|f|tr=múzika}}
+* Hiligaynon: {{tt|hil|musika}}
+* Hindi: {{tt+|hi|संगीत|m}}, {{t|hi|मूसीक़ी|f}}
+* Hungarian: {{tt+|hu|zene}}, {{tt+|hu|muzsika}}
+* Icelandic: {{tt+|is|tónlist|f}}, {{tt+|is|hljómlist|f}}, {{t+|is|músík|f}}
+* Ido: {{tt+|io|muziko}}
+* Indonesian: {{tt+|id|musik}}
+* Ingrian: {{t|izh|muuzьkka}}
+* Irish: {{tt+|ga|ceol|m}}
+*: Old Irish: {{tt|sga|ceól|n}}
+* Italian: {{tt+|it|musica|f}}
+* Japanese: {{tt+|ja|音楽|tr=おんがく, ongaku}}, {{tt+|ja|ミュージック|tr=myūjikku}}
+* Javanese: {{tt|jv|musik}}
+* Kabuverdianu: {{t|kea|múzika|f}}
+* Kalmyk: {{tt|xal|көгҗм}}
+* Kannada: {{tt+|kn|ಸಂಗೀತ}}
+* Kashmiri: {{tt|ks|موسیٖقی|?}}
+* Kashubian: {{tt|csb|mùzyka|f}}
+* Kazakh: {{tt+|kk|музыка}}, {{tt|kk|саз}}
+* Khmer: {{tt+|km|ភ្លេង}}, {{tt|km|តន្ត្រី}}
+* Kituba: {{t|ktu|miziki}}
+* Korean: {{tt+|ko|음악(音樂)}}
+* Kurdish:
+*: Central Kurdish: {{tt|ckb|موسیقی}}, {{tt|ckb|موسیقا}}, {{tt|ckb|مووزیک}}
+*: Northern Kurdish: {{tt+|kmr|muzîk}}
+* Kyrgyz: {{tt+|ky|музыка}}
+* Ladin: {{t-needed|lld}}
+* Ladino: {{tt|lad|muzika|f}}, {{tt|lad|מוזיקה|f}}
+* Lao: {{tt+|lo|ດົນຕີ}}, {{tt|lo|ເພງ}}
+* Latin: {{qualifier|art}} {{tt|la|mūsica|f}}, {{tt|la|mūsicē|f}}
+* Latvian: {{tt|lv|mūzika|f}}
+* Ligurian: {{t|lij|mûxica|f}}
+* Lingala: {{t|ln|miziki}}
+* Lithuanian: {{tt+|lt|muzika|f}}
+* Lombard: {{t+|lmo|musica|f}}
+* Louisiana Creole: {{t|lou|mizik|f}}
+* Low German:
+*: Dutch Low Saxon: {{tt|nds-nl|meziek|?}}
+*: German Low German: {{tt|nds-de|Musik|?}}
+* Luxembourgish: {{tt+|lb|Musek|f}}
+* Macedonian: {{tt+|mk|музика|f}}
+* Maguindanao: {{t|mdh|gunigunien}}
+* Malay: {{tt+|ms|muzik}}, {{tt|ms|gita}} {{qualifier|archaic, now obsolete}}, {{tt+|ms|bunyi-bunyian}}
+* Malayalam: {{tt+|ml|സംഗീതം}}
+* Maltese: {{tt|mt|mużika|f}}
+* Manchu: {{tt|mnc|ᡴᡠᠮᡠᠨ}}
+* Manx: {{tt|gv|bingys|m}}, {{tt|gv|kiaull|m}}
+* Maranao: {{t|mrw|bonibonian}}
+* Marathi: {{tt|mr|संगीत|n}}
+* Mauritian Creole: {{t|mfe|mizik|f}}
+* Middle English: {{tt|enm|musike}}, {{tt|enm|drem}}, {{tt|enm|song}}
+* Minangkabau: {{tt+|min|musik}}
+* Mixtec:
+*: Chayuco Mixtec: {{t|mih|mazica}}
+* Mizo: {{t|lus|rimawi}}
+* Mòcheno: {{tt|mhn|musik|f}}
+* Mongolian:
+*: Cyrillic: {{tt+|mn|хөгжим}}
+*: Mongolian script: {{t|mn|ᠬᠥᠭᠵᠢᠮ}}
+* Mwani: {{t|wmw|ngoma}}
+* Nahuatl: {{t|nah|tlatzotzontli}}
+* Neapolitan: {{t|nap|museca|f}}
+* Nepali: {{tt|ne|संगीत}}
+* Norman: {{tt|nrf|musique|f}} {{qualifier|continental Normandy}}, {{tt|nrf|mûsique|f}} {{qualifier|Jersey}}
+* Norwegian:
+*: Bokmål: {{tt+|nb|musikk|m}}
+* Occitan: {{tt+|oc|musica|f}}
+*: Old Occitan: {{tt|pro|muzica|f}}
+* Odia: {{tt+|or|ସଂଗୀତ}}
+* Okinawan: {{tt|ryu|音楽|tr=うんがく, ungaku}}
+* Old English: {{tt|ang|drēam|m}}
+* Old Galician-Portuguese: {{tt|roa-opt|musica|f}}
+* Ossetian: {{tt|os|музыкӕ}}
+* Pannonian Rusyn: {{t|rsk|музика|f}}
+* Pashto: {{tt|ps|موسيقي|f|tr=musiqi}}
+* Persian:
+*: Classical Persian: {{tt|fa-cls|مُوسِیقِی}}
+*: Dari: {{tt|prs|مُوسِیقِی}}
+*: Iranian Persian: {{tt+|fa-ira|موسیقی}}, {{tt+|fa-ira|موزیک}}
+* Picard: {{tt|pcd|musique|f}}
+* Piedmontese: {{tt|pms|mùsica|f}}
+* Polish: {{tt+|pl|muzyka|f}}, {{t+|pl|gędźba}} {{qualifier||obsolete}}
+*: Old Polish: {{tt|zlw-opl|gędźba|f}}
+* Portuguese: {{tt+|pt|música|f}}
+* Punjabi: {{tt+|pa|ਸੰਗੀਤ|m}}
+*: Western Punjabi: {{tt|pnb|موسیقی|?}}
+* Réunion Creole French: {{t|rcf|mizik|f}}
+* Rohingya: {{t|rhg|gan}}, {{t|rhg|tal}}
+* Romagnol: {{tt|rgn|mùșica|f}}
+* Romanian: {{tt+|ro|muzică|f}}
+* Romansh: {{tt|rm|musica|f}}
+* Russian: {{tt+|ru|му́зыка|f}}
+* Sami:
+*: Northern Sami: {{tt|se|musihkka}}
+* Sanskrit: {{tt+|sa|सङ्गीत|n}}
+* Sardinian: {{tt|sc|mùsica|f}}, {{tt|sc|mùsiga|f}}
+* Scots: {{tt|sco|muisic}}
+* Scottish Gaelic: {{tt|gd|ceòl|m}}
+* Serbo-Croatian:
+*: Cyrillic: {{tt|sh|му̀зика|f}}, {{tt|sh|гла̀зба|f}}
+*: Latin: {{tt+|sh|mùzika|f}}, {{tt+|sh|glàzba|f}}
+* Shan: {{t|shn|ၵႂၢမ်းႁႆႇ}}
+* Sicilian: {{tt+|scn|mùsica|f}}
+* Sindhi: {{tt|sd|ميوزڪ|?}}
+* Sinhalese: {{tt|si|සංගීතය|?}}
+* Slovak: {{tt+|sk|hudba|f}}, {{tt|sk|muzika|f}}
+* Slovene: {{tt+|sl|glasba|f}}
+* Sorbian:
+*: Lower Sorbian: {{tt|dsb|muzika|f}}
+*: Upper Sorbian: {{tt|hsb|hudźba|f}}
+* Sotho: {{t|st|mmino}}
+* Spanish: {{tt+|es|música|f}}
+*: Old Spanish: {{tt|osp|musica}}
+* Sranan Tongo: {{tt|srn|poku}}
+* Swahili: {{tt+|sw|muziki|c3}}
+* Swedish: {{tt+|sv|musik|c}}
+* Sylheti: {{t-needed|syl}}
+* Tagalog: {{tt+|tl|musika}}, {{tt|tl|palalinigan}}
+* Tajik: {{tt+|tg|мусиқӣ}}
+* Tamil: {{tt+|ta|சங்கீதம்}}, {{tt+|ta|இசை}}
+* Tatar: {{tt|tt|музыка}}
+* Tausug: {{t-needed|tsg}}
+* Telugu: {{tt+|te|సంగీతము}}
+* Thai: {{tt+|th|ดนตรี}}, {{tt+|th|เพลง}}
+* Tibetan: {{tt|bo|རོལ་གཞས}}, {{tt|bo|རོལ་དབྱངས}}, {{tt|bo|རོལ་མོ}}
+* Tigrinya: {{tt|ti|ሙዚቃ}}
+* Tofa: {{tt|kim|һобус}}
+* Tongan: {{t|to|musika}}
+* Turkish: {{tt+|tr|müzik}}, {{tt+|tr|ezgi}}, {{tt+|tr|musiki}}
+*: Ottoman Turkish: {{tt|ota|موسیقی|tr=musiki}}, {{t|ota|رامش|tr=râmiş}}
+* Turkmen: {{tt|tk|saz}}
+* Tuvan: {{tt|tyv|хөгжүм}}, {{tt|tyv|музыка}}, {{tt|tyv|аялга}}
+* Ukrainian: {{tt+|uk|му́зика|f}}
+* Urdu: {{tt|ur|سَن٘گِیت|m}}, {{tt|ur|مُوسِیقِی|f}}
+* Uyghur: {{tt|ug|مۇزىكا}}
+* Uzbek: {{tt+|uz|musiqa}}, {{tt+|uz|muzika}}
+* Venetan: {{tt|vec|mùxega|f}}
+* Vietnamese: {{tt+|vi|âm nhạc}} ({{tt|vi|音樂}})
+* Volapük: {{tt+|vo|musig}}
+* Walloon: {{tt+|wa|muzike|f}}
+* Welsh: {{tt+|cy|cerddoriaeth|f}}, {{tt+|cy|miwsig|m}}
+* West Flemish: {{t|vls|muziek|f}}
+* Yakut: {{tt|sah|музыка}}, {{tt|sah|муусука}}
+* Yiddish: {{tt|yi|מוזיק|f}}
+* Yoruba: {{tt|yo|orin}}
+* Yucatec Maya: {{t|yua|paax}}
+* Zhuang: {{tt|za|yinhyoz}}
+{{trans-bottom}}
+
+{{trans-top|any pleasing or interesting sounds}}
+* Armenian: {{tt+|hy|երաժշտություն}}
+* Bengali: {{t+check|bn|গান}}, {{tt+|bn|সুর}}
+* Catalan: {{tt+|ca|música|f}}
+* Czech: {{tt+|cs|hudba|f}}
+* Danish: {{tt+|da|musik|c}}
+* Dutch: {{tt+|nl|muziek|f}}
+* Estonian: {{tt+|et|muusika}}
+* Finnish: {{tt+|fi|musiikki}}
+* Frisian:
+*: West Frisian: {{tt+|fy|muzyk|?}}
+* German: {{tt+|de|Musik|f}}
+* Greek: {{tt+|el|μουσική|f}}
+* Hungarian: {{tt+|hu|zene}}, {{tt+|hu|muzsika}}
+* Irish: {{tt+|ga|ceol|m}}
+* Japanese: {{tt+|ja|音楽|tr=おんがく, ongaku}}
+* Korean: {{tt+|ko|음악(音樂)}}
+* Macedonian: {{tt+|mk|му́зика|f}}
+* Norwegian:
+*: Bokmål: {{tt+|nb|musikk|m}}
+* Portuguese: {{tt+|pt|música|f}}
+* Romanian: {{tt+|ro|muzică|f}}, {{tt+|ro|melodie|f}}
+* Russian: {{tt+|ru|му́зыка|f}}
+* Scottish Gaelic: {{tt|gd|ceòl|m}}
+* Slovene: {{tt+|sl|glasba|f}}
+* Spanish: {{tt+|es|música|f}}
+* Swahili: {{tt+|sw|muziki|c3}}
+* Swedish: {{tt+|sv|musik|c}}
+* Telugu: {{tt|te|మృదుధ్వని}}
+{{trans-bottom}}
+
+{{trans-top|sheet music}}
+* Bulgarian: {{tt+|bg|но́ти|f-p}}
+* Chinese:
+*: Mandarin: {{tt+|cmn|樂譜}}
+* Czech: {{tt|cs|notace|f}}, {{tt|cs|partitura|f}}
+* Danish: {{tt|da|node|p|alt=noder}}
+* Dutch: {{tt+|nl|bladmuziek|f}}, {{tt+|nl|partituur|f}}
+* Estonian: {{tt|et|noodipaber}}
+* Finnish: {{tt+|fi|nuotti|p|alt=nuotit}}
+* French: {{tt+|fr|partition|f}}
+* German: {{tt+|de|Noten|f-p}}
+* Greek: {{tt+|el|παρτιτούρα|f}}, {{tt+|el|νότες|f-p}}
+* Hungarian: {{tt+|hu|kotta}}
+* Italian: {{tt+|it|spartito|m}}, {{tt+|it|partitura|f}}
+* Japanese: {{tt+|ja|楽譜|tr=がくふ, gakufu}}
+* Korean: {{tt+|ko|악보(樂譜)}}
+* Macedonian: {{tt|mk|ноти|f-p}}, {{tt|mk|партиту́ра|f}} {{qualifier|continental Normandy}}
+* Norwegian:
+*: Bokmål: {{tt|nb|noter|p}}
+* Portuguese: {{tt+|pt|partitura|f}}
+* Romanian: {{tt+|ro|partitură|f}}
+* Russian: {{tt+|ru|но́ты|f-p}}, {{tt+|ru|партиту́ра|f}}c
+* Scottish Gaelic: {{tt|gd|ceòl|m}}
+* Slovak: {{tt|sk|noty|f-p}}, {{tt|sk|hudobnina|f}}
+* Spanish: {{tt+|es|música|f}}
+}}
+{{trans-bottom}}
+
+{{checktrans-top}}
+* Alabama: {{t-check|akz|olaachi}}
+* Azerbaijani: {{t+check|az|not}}, {{t+check|az|musiqi}}
+* Bengali: {{t+check|bn|বাজনা}}
+* Breton: {{t-check|br|sonerezh|m}}, {{t-check|br|muzik|m}}
+* Chamorro: {{t-check|ch|música}}, {{t-check|ch|dandan}}
+* Gilbertese: {{t-check|gil|te katangitang}}
+* Haitian Creole: {{t-check|ht|mizik}}
+* Hiligaynon: {{t-check|hil|lanton}}
+* Hindi: {{t-check|hi|संगीत विद्या|m}}, {{t+check|hi|संगीत|m}}, {{t+check|hi|राग|m}}, {{t+check|hi|लय|f}}, {{t+check|hi|ताल|m}}, {{t+check|hi|सुर|m}}, {{t+check|hi|सुस्वर|?}}, {{t-check|hi|तालैक्य|?}}
+* Icelandic: {{t+check|is|tónlist}}
+* Interlingua: {{t-check|ia|musica}}
+* Latin: {{t-check|la|mūsica|f}}
+* Latvian: {{t-check|lv|mūzika|f}}
+* Low German:
+*: Dutch Low Saxon: {{t-check|nds-nl|meziek|?}}
+* Luganda: {{t-check|lg|ennyimba|c9|c10}}
+* Macedonian: {{t+check|mk|музика|f}}
+* Malagasy: {{t+check|mg|mozika}}
+* Malay: {{t+check|ms|dendang}}
+* Malayalam: {{t+check|ml|സംഗീതം}}
+* Maltese: {{t-check|mt|mużika|f}}
+* Marathi: {{t-check|mr|संगीत|?}}
+* Old English: {{t-check|ang|drēam|m}} {{attention|ang|2=was "[[dream#Old English|drēam]]" - assumed inflected form or vocalised spelling; please verify if linking is acceptable. see [[User:Kephir/gadgets/xte#Translation_fixing]]}}
+* Persian: {{t-check|fa|آهنگ|tr=âhang}}, {{t+check|fa|خنیا|tr=xoniyâ}}
+* Serbo-Croatian:
+*: Cyrillic: {{t-check|sh|гла̀зба|f}}, {{t-check|sh|му̀зика|f}}
+*: Latin: {{t+check|sh|glàzba|f}}, {{t+check|sh|mùzika|f}}
+* Telugu: {{t+check|te|సంగీతం}}
+* Thai: {{t+check|th|ดนตรี|tr=dondtree}}
+* Turkish: {{t+check|tr|müzik}}
+* Yiddish: {{t-check|yi|מוזיק|f}}
+{{trans-bottom}}
+
+===Verb===
+{{en-verb|~s|~king|~ked}}
+
+# {{lb|en|transitive}} To [[seduce]] or [[entice]] with music.
+
+===Adjective===
+{{en-adj}}
+
+# {{lb|en|rare}} [[musical|Musical]].<ref>{{R:OED Online|entry=music|pos=''n.'' and ''adj.''|noformat=1|id=7569208909}}</ref>
+#* {{quote-book|en|author=[[w:Theophilus Gale|T[heophilus] G[ale]]]|title=The Court of the Gentiles: or A Discourse Touching the Original of Human Literature, Both Philologie and Philosophie, from the Scriptures, and Jewish Church in Order to a Demonstration,{{nb...|of 1. The Perfection of Gods VVord, and Church Light. 2: The Imperfection of Natures Light, and Mischief of Vain Philosophie. 3. The Right Use of Human Learning, and Especially Sound Philosophie.}}|volume_plain=part I (Of Philologie)|location=Oxon [Oxford]|publisher={{...|Printed by}} Hen[ry] Hall for Tho[mas] Gilbert|year=1669|pages=136–137|pageurl=https://archive.org/details/bim_early-english-books-1641-1700_the-court-of-the-gentile_gale-theophilus_1669/page/137/mode/1up|passage=Again, ''Moſes'' was the firſt that brought in ''ſacred Muſick'': thus in like manner ''Strabo lib''. 10. 453. informes us, that the ''Bacchick Muſick'' was famous throughout ''Aſia''; and that many '''''muſick''' Inſtruments'' had obteined a ''Barbarick name'', as ''Jambla'', ''Sambuke'', ''Barbitos'', ''Magades'', &c. which ſeem all to be of ''Hebrew origination''.}}
+#* {{quote-book|en|author=w:Jones Very|chapter=The Unrevealed|editor=Helen R. Deese|title=Jones Very: The Complete Poems|location=Athens, Ga.|publisher=w:University of Georgia Press|start_month=fall|start_year=1838|month=summer|year=1839|year_published=1993|page=159|pageurl=https://archive.org/details/jonesverycomplet0000very/page/159/mode/1up|lines=4–9|isbn=0-8203-1481-1|passage=Loosened / Thy tongue shall with sweet-flowing sounds surprize / The ear of sense; another than thyself / Will be seen within to have come, and bringing / '''Music''' tones from other spheres to have made / Thee ever the harp of hidden minstrelsy.}}
+#* {{quote-book|en|author=[[w:William Ellery Channing (poet)|William Ellery Channing]]|chapter=The Desert|title=Poems|volume_plain=second series|location=Boston, Mass.|publisher=James Munroe and Company|year=1847|page=59|pageurl=https://archive.org/details/poems00chan/page/59/mode/1up|passage=So should she drape the World’s wide round, / With sunny robes, and fresh Spring weather / And consecrate the loneliest ground, / While we went wandering linked together, / Her '''music''' voice, her beaming eyes, / Give to the Silence, glad replies.}}
+#* {{quote-journal|en|author=[[w:Sarah Josepha Hale|Sarah J[osepha] Hale]]|title=The Judge; a Drama of American Life|editor=Sarah J[osepha] Hale|journal=[[w:Godey's Lady's Book|Godey’s Lady’s Book]]|volume=XLII|location=Philadelphia, Pa.|publisher=[[w:Louis Antoine Godey|L[ouis] A[ntoine] Godey]]|month=January|year=1851|section=act I, scene III|page=26|pageurl=https://archive.org/details/GodeySMagazine1851/page/n46/mode/1up|column=2|passage=And therefore, prisoner, you are doomed for life / To solitary toil. Alone! alone! alone! / Love’s '''music''' voice will never greet your ear; / Affection’s eye will never meet your gaze; / Nor heart-warm hand of friend return your grasp; / But morn, and noon, and night, days, months, and years, / Will all be told in this one word—alone!}}
+
+===See also===
+* {{pedia|Definition of music}}
+* [https://web.archive.org/web/20050903200746/http://www.musicnovatory.com/ MusicNovatory: the science of music encyclopedia]
+* [[:Category:Music]]
+
+===References===
+* {{R:Century 1911}}
+* {{R:OneLook}}
+<references/>
+
+===Anagrams===
+* {{anagrams|en|a=cimsu|MICUs}}
+
+{{C|en|Music}}

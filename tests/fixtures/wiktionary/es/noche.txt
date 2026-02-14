@@ -1,0 +1,133 @@
+== {{lengua|es}} ==
+{{pron-graf|ˈno.t͡ʃe|2fone=ˈno.t͡ʃ(e)|2pron=México|audio=LL-Q1321 (spa)-Rodelar-noche.wav}}
+
+=== Etimología ===
+{{etimología|osp|noche}}, {{l+|osp|nueche}}, {{l+|osp|noch}}, del latín {{l+|la|nox|noctem|glosa=noche}}, y este del protoindoeuropeo [[*nókʷts]]. Compárense el gallego {{l+|gl|noite}}, el catalán {{l+|ca|nit}}, el occitano {{l+|oc|nueit}}, el italiano {{l+|it|notte}} o el rumano {{l+|ro|noapte}}.
+
+=== {{sustantivo femenino|es}} ===
+[[Archivo:לילה מטאורים.jpg|thumb|noche (1)]]
+{{es.sust}}
+
+;1: {{plm|tiempo}} entre dos [[día]]s que coincide con el momento durante el cual el [[sol]] no da su [[luz]]
+;2: {{plm|tiempo}} o [[clima]] que hace durante ese momento. ''Hacer buena o mala noche''
+;3: {{plm|desconcierto}}, [[oscuridad]] o [[pena]].
+
+=== Locuciones ===
+{{trad-arriba|Locuciones con «noche»}}
+* [[buena noche]]
+* [[la noche de los tiempos]]
+* [[mala noche]]
+* [[media noche]]
+* [[Noche Buena]]
+* [[noche cerrada]]
+* [[noche de bodas]]
+* [[noche de perros]]
+* [[noche de verbena]]
+* [[noche toledana]]
+* [[noche vieja]]
+* [[primera noche]]
+* [[a buenas noches]]
+* [[a prima noche]]
+* [[ayer noche]]
+* [[buenas noches]]
+* [[cerrar la noche]]
+* [[como de la noche al día]]: se usa para indicar que hay gran diferencia entre dos cosas
+* [[de la noche a la mañana]]: súbitamente
+* [[de noche]]
+* [[hacer alguien noche]] [[hacer noche algo]]
+* [[hacer noche]]
+* [[hacerse de noche]]
+* [[hacerse noche]]
+* [[noche y día]]
+* [[pasar en claro la noche]]
+* [[pasar la noche en blanco]]
+* [[romper la noche]]
+* [[temprano es noche]]
+{{trad-abajo}}
+
+=== Véase también ===
+{{w}}
+{{Wikiquote}}
+{{Commonscat|Night}}
+
+=== Traducciones ===
+{{trad-arriba}}
+{{t|af|t1=nag}}
+{{t|ay|t1=arama}}
+{{t|sq|g1=f|t1=natë}}
+{{t|de|g1=f|t1=Nacht}}
+{{t|am|t1=ማታ|tl=mata}}
+{{t|ar|g1=m|g2=f|t1=ليل|t2=ليلة|tl1=layl|tl2=laylâ}}
+{{t|an|t1=nueit}}
+{{t|ast|t1=nueche}}
+{{t|bm|t1=su}}
+{{t|br|g1=f|g2=f|t1=nozvezh|t2=noz}}
+{{t|bg|g1=f|t1=нощ}}
+{{t|osp|g1=f|t1=noche}}
+{{t|ca|g1=f|t1=nit}}
+{{t|cs|g1=f|t1=noc}}
+{{t|cap|t1=ween}}
+{{t|kw|g1=f|t1=nos}}
+{{t|da|t1=nat}}
+{{t|sk|g1=f|t1=noc}}
+{{t|sl|g1=f|g2=f|t1=noč|t2=tema}}
+{{t|eo|t1=nokto}}
+{{t|et|t1=öö}}
+{{t|fo|t1=nátt}}
+{{t|fi|t1=yö}}
+{{t|fr|g1=f|t1=nuit}}
+{{t|fy|t1=nacht}}
+{{t|ga|g1=f|t1=oidhche}}
+{{t|gd|g1=f|t1=oíche}}
+{{t|cy|g1=f|t1=nos}}
+{{t|gl|g1=f|t1=noite}}
+{{t|el|g1=f|g2=f|g3=n|t1=νύχτα|t2=νύκτα|t3=βράδυ}}
+{{t|grc|g1=f|t1=νύξ|tl1=nux}}
+{{t|gn|t1=pyhare}}
+{{t|ha|t1=dare}}
+{{t|haw|t1=pō}}
+{{t|he|t1=לילה|tl1=laylah}}
+{{t|hu|t1=éjszaka}}
+{{t|id|t1=malam}}
+{{t|en|t1=night|t2=nighttime}}
+{{t|ang|t1=niht}}
+{{t|ga|t1=oíche}}
+{{t|is|t1=nótt}}
+{{t|it|g1=f|t1=notte}}
+{{t|ja|t1=夜|tl1=yoru}}
+{{t|lad|g1=f|t1=noche}}
+{{t|alc|t1=ak’éwe}}
+{{t|la|g1=f|t1=nox}}
+{{t|ms|t1=malam}}
+{{t|mt|g1=m|t1=lejl}}
+{{t|gv|g1=f|t1=oie}}
+{{t|cmn|t1=夜|t2=夜晚|tl1=yè|tl2=yèwǎn}} 
+{{t|arn|t1=puṉ}}
+{{t|yua|t1=áakʼab}}
+{{t|nci|t1=yohualli}}
+{{t|ne|t1=रात|tl1=rāt}}
+{{t|no|t1=natt}}
+{{t|nl|g1=m|t1=nacht}}
+{{t|oc|g1=f|t1=nueit}}
+{{t|pap|t1=nochi}}
+{{t|fa|t1=شب|tl1=shab}}
+{{t|tpi|t1=nait}}
+{{t|pl|g1=f|t1=noc}}
+{{t|pt|g1=f|t1=noite}}
+{{t|quz|t1=tuta}}
+{{t|rm|g1=f|t1=not}}
+{{t|ro|g1=f|t1=noapte}}
+{{t|ru|g1=f|t1=ночь|tl1=nočʹ}}
+{{t|sh|g1=f|t1=noć}}
+{{t|so|t1=habeen}}
+{{t|srn|t1=neti}}
+{{t|sw|t1=usiku}}
+{{t|sv|t1=natt|t2=afton|t3=kväll}}
+{{t|tl|t1=gabí}}
+{{t|tr|t1=gece}}
+{{t|eu|t1=gau}}
+{{t|vo|t1=neit}}
+{{t|yag|a1=1|a2=1|t1=lákax|t2=lökux}}
+{{t|yo|t1=òru}}
+{{t|zu|t1=ubusuku}}
+{{trad-abajo}}

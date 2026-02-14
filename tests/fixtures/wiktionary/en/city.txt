@@ -1,0 +1,872 @@
+==English==
+{{wp}}
+
+===Alternative forms===
+* {{alt|en|citie|cittie|cyte|cytee||obsolete}}
+
+===Etymology===
+{{inh+|en|enm|cite}}, {{der+|en|fro|citet|cite|nocap=1}}, {{der+|en|la-lat|civitas|cīvitātem|city|nocap=1}}, in {{der|en|la-cla|-}} "citizenry", derived from {{m|la|cīvis|t=fellow-citizen}}, ultimately from {{der|en|ine-pro|*ḱey-|t=lie down; settle}}. Cognate with {{cog|ang|hīwan|g=p|t=members of one's household, servants}}. See {{m|en|hewe}}. {{doublet|en|civitas}}. Mostly displaced native {{ncog|ang|burg}}, whence {{w|Modern English}} {{m|en|borough}}.
+
+===Pronunciation===
+* {{enPR|sĭt'''′'''ē}}
+* {{IPA|en|/ˈsɪt.i/}}
+** {{IPA|en|[ˈsɪtʰiː]|a=RP}}
+** {{audio|en|En-uk-city.ogg|a=UK}}
+** {{IPA|en|/sɪtɪ/|a=Northern England,Conservative RP}}
+** {{IPA|en|/ˈsɪt.i/|[ˈsɪɾ.i]|a=US}}
+** {{audio|en|en-us-city.ogg|a=US}}
+** {{IPA|en|/ˈsɪt.i/|[ˈsɪɾ.iː]|a=AU}}
+** {{audio|en|EN-AU ck1 city.ogg|a=AU}}
+* {{hyph|en|cit|y}}
+* {{rhymes|en|ɪti|s=2}}
+
+===Noun===
+{{en-noun}}
+[[File:Empire State Building Aerial.JPG|thumb|Part of New York City, a large '''city''' with many tall buildings.]]
+[[File:Aerial view of Wells.jpg|thumb|Despite its small size, Wells is a '''city''' because of its cathedral.]]
+
+# {{senseid|en|Q515}}A large [[settlement]], bigger than a [[town]]; sometimes with a specific legal definition, depending on the place.
+#: {{ux|en|São Paulo is the largest '''city''' in South America.}}
+#* {{RQ:Shakespeare Henry 6-3|act=I|scene=i|page=147|column=2|passage=Ah, knovv you not the '''Citie''' fauours them, / And they haue troupes of Souldiers at their beck?}}
+#* {{RQ:Ferguson Zollenstein|IV|passage=So this was my future home, I thought!{{...}}Backed by towering hills, the but faintly discernible purple line of the French boundary off to the southwest, a sky of palest Gobelin flecked with fat, fleecy little clouds, it in truth looked a dear little '''city'''; the '''city''' of one's dreams.}}
+#* {{quote-journal|en|date=2013-09-07|volume=408|issue=8852|magazine=w:The Economist
+|title=[http://www.economist.com/news/briefing/21585002-enthusiasts-think-data-services-can-change-cities-century-much-electricity The multiplexed metropolis]
+|passage=But clever '''cities''' will not necessarily be better ones.}}
+#* {{quote-journal|en|date=2014-06-14|volume=411|issue=8891|magazine=w:The Economist
+|title=[http://www.economist.com/news/science-and-technology/21604091-it-possible-sniff-out-problems-sewer-pipes-they-happen-its-gas It's a gas]
+|passage=One of the hidden glories of Victorian engineering is proper drains. Isolating a '''city'''’s effluent and shipping it away in underground sewers has probably saved more lives than any medical procedure except vaccination.}}
+#* {{quote-journal|en|date=2020-07-15|author=Mike Brown talks to Paul Clifton|title=Leading London's "hidden heroes"|journal=Rail|page=42|text=All our stations have changed. We have to constrain numbers. We have to mandate face coverings. These are massive changes in what is a public transport '''city'''. This is not a car '''city'''.}}
+#* {{quote-journal|en|author=Ivana Kottasová|title=‘Kamikaze’ drones are the latest threat for Ukraine. Here’s what we know|magazine=w:CNN|url=https://www.cnn.com/2022/10/17/europe/kamikaze-drones-explained-update-intl|date=2022-10-17|passage=The Ukrainian government says Kyiv, Vinnytsia, Odesa, Zaporizhzhia and other '''cities''' have suffered a barrage of drone attacks, and pleaded with Western countries to step up their assistance in the face of the new challenge. {{...}} But Ukraine claimed its forces had shot down one of these drones for the first time last month near the '''city''' of Kupyansk in Kharkiv.}}
+# {{lb|en|UK|historical|_|in|_|Ireland|and|Commonwealth}} A settlement granted special status by royal charter or [[letters patent]]; traditionally, a settlement with a [[cathedral]] regardless of size.
+#* {{quote-book|en|year=1976|author=Cornelius P. Darcy|title=The Encouragement of the Fine Arts in Lancashire, 1760-1860|publisher=Manchester University Press|isbn=9780719013300|page=20
+|passage=Manchester, incorporated in 1838, was made the centre of a bishopric in 1847 and became a '''city''' in 1853. Liverpool was transformed into a '''city''' by Royal Charter when the new diocese of Liverpool was created in 1880.}}
+#* {{quote-book|en|year=2014|author=Graham Rutt|title=Cycling Britain's Cathedrals Volume 1|publisher=Lulu.com|isbn=9781326056049|page=307
+|passage=St Davids itself is the smallest '''city''' in Great Britain, with a population of less than 2,000.}}
+# {{lb|en|Australia}} The [[central business district]]; [[downtown]].
+#: {{ux|en|I'm going into the '''city''' today to do some shopping.}}
+# {{lb|en|slang}} A large amount of something {{q|used after the noun}}.
+#: {{ux|en|It’s video game '''city''' in here!}}
+
+====Hypernyms====
+* {{l|en|settlement}}
+
+====Hyponyms====
+{{col4|en
+|15-minute city
+|agrocity
+|agropolis
+|capital
+|capital city
+|closed city
+|cathedral city
+|city on a hill
+|city upon a hill
+|garden city
+|global city
+|Hanseatic city
+|host city
+|megacity
+|metropolis
+|metropolitan city
+|open city
+|prefecture-level city
+|province-level city
+|state-level city
+|sister city
+|twin city
+}}
+
+====Derived terms====
+{{col4|en
+|15-minute city
+|agrocity
+|alpha city
+|Angel City
+|Angeles City
+|anticity
+|beta city
+|capital city
+|caravan city
+|cardboard city
+|cathedral city
+|Cavite City
+|central city
+|Chocolate City
+|chocolate city
+|cidiot
+|citaye
+|citied
+|citification
+|citizen
+|city administrator
+|city and county
+|city banker
+|city block
+|citybound
+|city boy
+|city break
+|city-builder
+|city-building game
+|citybus
+|city bus
+|city center
+|city centre
+|citycentric
+|city chicken
+|city clerk
+|city council
+|city desk
+|city district|city killer
+|city-dweller,city dweller
+|city father
+|cityful
+|city gent
+|city girl
+|city hall
+|cityhood
+|cityish
+|cityite
+|cityless
+|city lights
+|citylike|city block distance
+|[[city limit]](s)
+|city line
+|cityman
+|city man
+|city manager
+|city map
+|citymate
+|city mouse
+|cityness
+|City of Kilgore
+|City of London
+|City of Los Angeles
+|city of refuge
+|city of seven hills
+|City of Westminster
+|city on a hill
+|city plan
+|city planning
+|city pop
+|city proper
+|city room
+|cityscape
+|city's finest
+|cityship
+|cityside
+|city sim
+|city simulator
+|city slicker
+|city-state
+|city state
+|city symphony
+|city technology college
+|City Terrace
+|city titty
+|city upon a hill
+|city wall
+|cityward
+|citywards
+|city water
+|citywear
+|citywide
+|closed city
+|control city
+|core city
+|cosmological city
+|Cotabato City
+|countercity
+|county-level city
+|cross-city
+|cybercity
+|donut city
+|doughnut city
+|eco-city
+|ecocity
+|edge city
+|Egg Harbor City
+|fat city
+|federal city
+|first city
+|free city
+|freedom of the city
+|free imperial city
+|free of the city
+|gamma city
+|garden city
+|GeoCity
+|gigabit city
+|gigacity
+|Global City
+|Hanseatic city
+|hero city
+|hidden city
+|holy city
+|host city
+|Hub City
+|independent city
+|inner city,inner-city
+|intercity
+|intracity
+|Isabela City
+|Jade City
+|key to the city
+|Koto City
+|lagoon city
+|Lapu-Lapu City
+|London City
+|megacity
+|metropolitan city
+|microcity
+|Mid City
+|million city
+|minicity
+|monocity
+|mother city
+|Music City
+|noncity
+|Oaxaca City
+|Old City
+|open city
+|port city
+|prefecture-level city
+|primate city
+|principal city
+|province-level city
+|pseudo-city code
+|Radio City
+|Railroad City
+|Redland City
+|Rose City
+|Roxas City
+|sanctuary city
+|satellite city
+|second city
+|sister city
+|smart city
+|Soda City
+|sponge city
+|star-city
+|star city
+|state-level city
+|subcity
+|supercity
+|Surigao City
+|Swea City
+|the city
+|the city of a thousand windows
+|treasure city
+|Tricity
+|twin city
+|uncity
+|undercity
+}}
+
+{{col4|en|title=Place names containing ''City''
+|Adams City
+|Alabama City
+|Aladdin City
+|Alberta City
+|Alexander City
+|Amador City
+|Amelia City
+|Archer City
+|Arkansas City
+|Ashland City
+|Atlantic City
+|Bay City
+|Beaver City
+|Belize City
+|Bibb City
+|Big Bear City
+|Bluff City
+|Boise City
+|Border City
+|Bow City
+|Bradshaw City
+|Brandy City
+|Branson City
+|Brigham City
+|Buffalo City
+|Bullhead City
+|Butte City
+|Cactus City
+|California City
+|Cañon City
+|Canyon City
+|Capitol City
+|Cascade City
+|Cathedral City
+|Cave City
+|Celestial City
+|Center City
+|Central City
+|Charles City
+|Cherokee City
+|Circle City
+|City of Industry
+|Clair-Mel City
+|Clay City
+|Coal City
+|Cole City
+|Coleman City
+|College City
+|Colorado City
+|Columbia City
+|Commerce City
+|Connected City
+|Contention City
+|Cooper City
+|Copper City
+|Crescent City
+|Cross City
+|Crystal City
+|Culver City
+|Dade City
+|Dain City
+|Dakota City
+|Dallas City
+|Daly City
+|Date City
+|David City
+|Dawson City
+|Deem City
+|Delaware City
+|Diamond City
+|Dickerson City
+|Dodge City
+|Dominion City
+|Douglas City
+|Duke City
+|Duncan City
+|Elk City
+|Ellicott City
+|Emory City
+|Everglades City
+|Farmer City
+|Floral City
+|Florida City
+|Forbidden City
+|Ford City
+|Forest City
+|Forrest City
+|Foster City
+|Free City of Tri-Insula
+|Frisco City
+|Frog City
+|Garden City
+|Gary City
+|Gibson City
+|GIFT City
+|Gila City
+|Gin City
+|Granite City
+|Grove City
+|Haines City
+|Hall City
+|Haltom City
+|Hamilton City
+|Harbor City
+|Harris City
+|Hartford City
+|Highland City
+|Highway City
+|Hill City
+|Hobson City
+|Holy City
+|Holy Cross City
+|Huachuca City
+|Ice City
+|Iloilo City
+|Intercession City
+|Iowa City
+|Iretaba City
+|Iron City
+|Ivy City
+|Jacob City
+|Jaeger City
+|Jefferson City
+|Jersey City
+|Jewett City
+|Johnson City
+|Joseph City
+|Junction City
+|Kansas City
+|Kaw City
+|Kenneth City
+|Kerr City
+|Kettleman City
+|King City
+|Knox City
+|Labrador City
+|Lagoon City
+|Lake City
+|Lake Havasu City
+|Lardeau City
+|Leisure City
+|Lincoln City
+|Little Lake City
+|Long Island City
+|Lost City
+|Loup City
+|Lumber City
+|Luxembourg City
+|Marin City
+|Mexico City
+|Midland City
+|Midway City
+|Miles City
+|Minto City
+|Mission City
+|Missouri City
+|Mojave City
+|Mokelumne City
+|Mono City
+|Montgomery City
+|Morgan City
+|Motor City
+|Mound City
+|Mountain City
+|Moyie City
+|Muck City
+|Myakka City
+|National City
+|Nebraska City
+|Ness City
+|Nevada City
+|New York City
+|Nitrate City
+|Ocean City
+|Ohio City
+|Oklahoma City
+|Olive City
+|Omineca City
+|Orange City
+|Orchard City
+|Oregon City
+|Oro City
+|Osage City
+|Palm City
+|Panama City
+|Panamint City
+|Panorama City
+|Pawnee City
+|Peachtree City
+|Pebble City
+|Pecan City
+|Pell City
+|Phenix City
+|Pinal City
+|Pincher City
+|Pine City
+|Plant City
+|Plaster City
+|Polk City
+|Ponca City
+|Poudre City
+|Quebec City
+|Queen City
+|Quezon City
+|Rainbow City
+|Raisin City
+|Rapid City
+|Ray City
+|Redwood City
+|Reece City
+|Reed City
+|Rio Grande City
+|Rockwell City
+|Rogers City
+|Sac City
+|Sale City
+|Salt Lake City
+|Salton City
+|Sampson City
+|Sand City
+|San Joaquin City
+|Sardis City
+|Scant City
+|Scott City
+|Shake City
+|Sierra City
+|Silver City
+|Similkameen City
+|Sioux City
+|Slab City
+|Spar City
+|Sparkle City
+|Spicer City
+|Star City
+|Stirling City
+|St. James City
+|Strong City
+|Studio City
+|Sugar City
+|Suisun City
+|Sulphur City
+|Sun City
+|Surf City
+|Tahoe City
+|Tarlac City
+|Tate City
+|Tawas City
+|Telegraph City
+|Tell City
+|Temple City
+|Texas City
+|Tin City
+|Tipp City
+|Traverse City
+|Tuba City
+|Tunnel City
+|Twin City
+|Union City
+|University City
+|Uranium City
+|Valley City
+|Vatican City
+|Villa City
+|Volcanic City
+|Vulture City
+|Webster City
+|West Valley City
+|White City
+|Wolfe City
+|Yazoo City
+|Y City
+|Yuba City
+|Zama City
+|Zamboanga City
+|Zip City
+}}
+
+{{lookfrom|en|city}}
+
+====Related terms====
+{{col4|en
+|civic
+|civil
+}}
+
+====Descendants====
+* {{desc|fr|City|bor=1}}
+* {{desc|de|City|bor=1}}
+* {{desc|it|city|bor=1}}
+* {{desc|sv|city|bor=1}}
+* {{desc|ru|си́ти|bor=1}}
+
+====Translations====
+{{trans-top|large settlement}}
+* Abkhaz: {{t|ab|ақалақь}}
+* Adyghe: {{t|ady|къалэ}}
+* Afrikaans: {{t+|af|stad}}
+* Ahom: {{t|aho|𑜋𑜦𑜧}}
+* Akkadian: {{t|akk|𒌷|tr=âlu}}
+* Albanian: {{t+|sq|qytet}}
+* Altai:
+*: Southern Altai: {{t|alt|кала}}, {{t|alt|тура}}
+* Ambonese Malay: {{t|abs|kota}}
+* Amharic: {{t+|am|ከተማ}}
+* Arabic: {{t+|ar|مَدِينَة|f}}, {{t+|ar|بَلَد|m}}
+*: Egyptian Arabic: {{t|arz|بَلَد|tr=balad}}
+*: Gulf Arabic: {{t|afb|مَدينَة|f|tr=mədina}}
+*: Juba Arabic: {{t|pga|mediina}}
+*: Moroccan Arabic: {{t|ary|مدِينَة|tr=mdīna}}
+* Aragonese: {{t|an|ziudá|f}}
+* Aramaic:
+*: Hebrew script: {{t|arc|מְדִינְתָּא|f|tr=məḏīntā}}, {{t|arc|כַּרְכָּא|m|tr=karkā}}
+*: Syriac: {{t|arc|ܡܕܼܝܼܢܬܿܵܐ|f|tr=məḏīttā}}, {{t|arc|ܟܿܲܪܟܿܵܐ|m|tr=karkā}}
+* Argobba: {{t|agj|ኸተም|tr=xatame}}
+* Armenian: {{t+|hy|քաղաք}}
+* Aromanian: {{t+|rup|cãsãbã|f}}
+* Assamese: {{t|as|নগৰ}}, {{t|as|চহৰ}}
+* Asturian: {{t+|ast|ciudá|f}}
+* Avar: {{t|av|шагьар}}
+* Azerbaijani: {{t+|az|şəhər}}
+* Bashkir: {{t|ba|ҡала}}
+* Basque: {{t+|eu|hiri}}
+* Belarusian: {{t|be|го́рад|m}}, {{t|be|ме́ста|n}}
+* Bengali: {{t+|bn|শহর}}, {{t+|bn|নগর}}
+* Betawi: {{t|bew|kota}}
+* Bhojpuri: {{t|bho|शहर}}
+* Breton: {{t|br|keoded|f}}, {{t|br|keodedoù|p}}, {{t+|br|kêr|f}}, {{t+|br|kêrioù|p}}
+* Bulgarian: {{t+|bg|град|m}}
+* Burmese: {{t+|my|မြို့}}
+* Buryat: {{t|bua|хото}}
+* Carpathian Rusyn: {{t|rue|мі́сто|n}}
+* Catalan: {{t+|ca|ciutat|f}}
+* Cebuano: {{t|ceb|dakbayan}}, {{t|ceb|siyudad}}
+* Chagatai: {{t|chg|آباد}}
+* Chamicuro: {{t|ccc|chi'nashtalichi}}
+* Chechen: {{t|ce|гӏала}}
+* Chichewa: {{t|ny|mzinda}}
+* Chinese:
+*: Cantonese: {{t|yue|城市}}
+*: Dungan: {{t|dng|чыншы}}, {{t|dng|чын}}, {{t|dng|шы}}, {{t|dng|чынпу}}
+*: Eastern Min: {{t|cdo|城市}}
+*: Hakka: {{t|hak|城市|tr=sàng-sṳ}}
+*: Hokkien: {{t+|nan-hbl|城市|tr=siâⁿ-chhī / siâⁿ-chhǐ}}, {{t+|nan-hbl|都市|tr=to·-chhī}}
+*: Mandarin: {{t+|cmn|城市}}, {{t+|cmn|都市}}, {{t+|cmn|城}}, {{t+|cmn|市}}
+*: Wu: {{t|wuu|城市}}
+* Chuvash: {{t|cv|хула}}
+* Coptic: {{t|cop|ⲃⲁⲕⲓ}}
+* Cornish: {{t|kw|cita}}
+* Corsican: {{t|co|cità}}
+* Crimean Tatar: {{t|crh|şeer}}
+* Czech: {{t+|cs|město|n}}, {{t+|cs|velkoměsto|n}}
+* Dalmatian: {{t|dlm|cituot|f}}
+* Danish: {{t+|da|by|c}}
+* Daur: {{t|dta|hotn}}, {{t|dta|giaabn}}
+* Dhivehi: {{t|dv|ޝަހަރު}}
+* Dolgan: {{t|dlg|гуорат|tr=guorat}}
+* Dongxiang: {{t|sce|baza}}
+* Dutch: {{t+|nl|stad|f}}
+* Egyptian: {{t-egy|nwt|h=niwt:t*Z1|f}}
+* Erzya: {{t|myv|ош}}
+* Esperanto: {{t+|eo|urbo}}, {{t+|eo|civito}}
+* Estonian: {{t+|et|linn}}
+* Evenki: {{t|evn|город}} (in Russia), {{t|evn|hɵtɵng}} (in China)
+* Extremaduran: {{t|ext|ciá|f}}, {{t|ext|cidá|f}}
+* Faroese: {{t+|fo|býur|m}}
+* Finnish: {{t+|fi|kaupunki}}
+* French: {{t+|fr|ville|f}}, {{t+|fr|cité|f}}, {{t|fr|grande-ville|f}}
+*: Old French: {{t|fro|cité|f}}
+* Frisian:
+*: North Frisian: {{qualifier|Föhr-Amrum}} {{t|frr|steed|n}}
+*: Saterland Frisian: {{t|stq|Stääd|f}}
+*: West Frisian: {{t+|fy|stêd|c}}
+* Friulian: {{t|fur|citât|f}}
+* Galician: {{t+|gl|cidade|f}}
+* Gallurese: {{t|sdn|cittai|f}}, {{t|sdn|zittai|f}}
+* Ge'ez: {{t|gez|ሀገር|f}}
+* Georgian: {{l|ka|დიდი}} {{t+|ka|ქალაქი}}
+* German: {{t+|de|Stadt|f}}, {{t+|de|Großstadt|f}}
+*: East Central German: {{t|gmw-ecg|Stoadt}} {{q|Silesian}}
+* Gothic: {{t|got|𐌱𐌰𐌿𐍂𐌲𐍃|f}}
+* Greek: {{t+|el|πόλη|f}}
+*: Ancient Greek: {{t|grc|πόλις|f}}, {{t|grc|ἄστυ|n}}
+*: Pontic Greek: {{t|pnt|πολιτεία|f}}
+* Guarani:
+*: Paraguayan Guarani: {{t+check|gug|táva}}
+* Gujarati: {{t+|gu|શહેર}}, {{t+|gu|નગર}}
+* Haitian Creole: {{t|ht|vil}}
+* Hausa: {{t+|ha|birni}}
+* Hawaiian: {{t|haw|kūlanakauhale}}
+* Hebrew: {{t+|he|עִיר|f|tr=ir}}
+* Hiligaynon: {{t|hil|dakbanwa}}
+* Hindi: {{t+|hi|शहर|m}}, {{t+|hi|नगर|m}}
+* Hungarian: {{t+|hu|város}}
+* Hunsrik: {{t|hrx|xtat}}
+* Icelandic: {{t+|is|borg|f}}
+* Ido: {{t+|io|urbo}}, {{t+|io|civito}}
+* Indonesian: {{t+|id|kota}}
+* Ingush: {{t|inh|пхье}}
+* Interlingua: {{t|ia|citate}}
+* Irish: {{t+|ga|cathair|f}}, {{t|ga|baile mór|m}}
+* Istriot: {{t|ist|sità|f}}
+* Italian: {{t+|it|città|f}}
+* Japanese: {{t+|ja|都市|tr=とし, toshi}}, {{t+|ja|都会|tr=とかい, tokai}}, {{t+|ja|町|tr=まち, machi}} (e.g. 町で - "in the city"), {{t+|ja|市|tr=し, shi}} {{qualifier|compound}}
+* Javanese: {{t+|jv|ꦏꦸꦛ|tr=kutha}}{{qualifier|ngoko}}, {{t+|jv|ꦏꦶꦛ|tr=kitha}}{{qualifier|krama}}
+* Kabardian: {{t+|kbd|къалэ}}
+* Kaitag: {{t|xdq|шагьар}}
+* Kalmyk: {{t|xal|балһсн}}
+* Kannada: {{t+|kn|ನಗರ}}
+* Kapampangan: {{t|pam|lakanbalen}}
+* Karachay-Balkar: {{t|krc|шахар}}
+* Karelian: {{t|krl|linna}}
+* Kashubian: {{t|csb|miasto|n}}
+* Kazakh: {{t+|kk|қала}}, {{t|kk|шаһар}} {{qualifier|literary}}
+* Khakas: {{t|kjh|саар}}, {{t|kjh|тура}}
+* Khmer: {{t|km|ទីក្រុង}}, {{t+|km|បុរី}}, {{t+|km|នគរ}}
+* Komi:
+*: Komi-Permyak: {{t|koi|кар}}
+*: Komi-Zyrian: {{t|kpv|кар}}
+* Konkani: {{t|kok|xar}}
+* Korean: {{t+|ko|도시(都市)}}, {{t+|ko|시내(市內)}}, {{t+|ko|시(市)}} {{qualifier|compound}}
+* Kumyk: {{t|kum|шагьар}}
+* Kurdish:
+*: Central Kurdish: {{t+|ckb|شار}}
+*: Northern Kurdish: {{t+|kmr|bajar|m}}, {{t+|kmr|şar|m}}
+* Kusunda: {{t|kgg|səhər}}
+* Kyrgyz: {{t+|ky|шаар}}, {{t+|ky|калаа}}, {{t+|ky|кен}}
+* Ladin: {{t|lld|zità|f}}
+* Lak: {{t-check|lbe|шагьру}}
+* Lao: {{t|lo|ຊຽງ}}, {{t|lo|ທານີ}}, {{t+|lo|ເມືອງ}}, {{t|lo|ນະຄອນ}}
+* Latin: {{t+|la|urbs|f}}, {{t+|la|civitas|f}}
+* Latvian: {{t+|lv|pilsēta|f}} (or {{t|lv|lielpilsēta|f}} if the distinction between ''city'' and ''town'' is important)
+* Leonese: {{t|roa-leo|ciudá|f}}
+* Lezgi: {{t|lez|шегьер}}
+* Ligurian: {{t|lij|çitæ}}, {{t|lij|çittæ}}
+* Lithuanian: {{t+|lt|miestas|m}}
+* Lü: {{t|khb|ᦵᦙᦲᧂ}}, {{t|khb|ᨾᩮᩥ᩠ᨦ}}, {{t|khb|ᦵᦞᦇ}}, {{t|khb|ᦵᦋᧂ}}
+* Luxembourgish: {{t+|lb|Stad}}
+* Macedonian: {{t+|mk|град|m}}
+* Malagasy: {{t+|mg|monina}}, {{t+|mg|tanambe}}
+* Malay: {{t+|ms|bandar raya}}, {{t+|ms|kota}}, {{t+|ms|bandar}}
+* Malayalam: {{t+|ml|നഗരം}}
+* Maltese: {{t+|mt|belt|f}}
+* Manchu: {{t|mnc|ᡥᠣᡨᠣᠨ}}, {{t|mnc|ᡥᡝᠴᡝᠨ}}
+* Manx: {{t|gv|ard-valley|m}}, {{t|gv|caayr|f}}
+* Māori: {{t+|mi|tāone}}, {{t|mi|tāone nui}}
+* Marathi: {{t+|mr|शहर}}, {{t|mr|नगर}}
+* Mari:
+*: Eastern Mari: {{t|mhr|ола}}
+*: Eastern Mari: {{t|mhr|ола}}
+*: Western Mari: {{t-check|mrj|хала}}
+* Maricopa: {{t|mrc|vakpaly}}
+* Mehri: {{t|gdq|رحبيت}}
+* Middle English: {{t|enm|cite}}
+* Moksha: {{t|mdf|ошсь}}
+* Mongolian: {{t|mn|ᠬᠣᠲᠠ}}
+*: Cyrillic: {{t+|mn|хот}}
+* Nahuatl: {{t+|nah|altepetl}}
+* Nanai: {{t|gld|хотон}}
+* Navajo: {{t|nv|kin nitsaago dah naazhjaaʼígíí}}, {{t|nv|kin haalʼá}}
+* Nepali: {{t+|ne|सहर}}
+* Nogai: {{t|nog|кала}}
+* Norwegian:
+*: Bokmål: {{t+|nb|by|m}}
+*: Nynorsk: {{t|nn|by|m}}
+* Nubian:
+*: Nobiin: {{t|fia|diffi}} (ⲇⲓⲫⲫⲓ, ديفي)
+*: Old Nubian: {{t|onw|ⲇⲡ̅ⲡ}}
+* Nuosu: {{t|ii|ꇓꈓ}}
+* Occitan: {{t+|oc|ciutat|f}}
+* Odia: {{t+|or|ନଗର}}, {{t|or|ମହାନଗର}}, {{t|or|ସହର}}
+* Ojibwe: {{t|oj|gichi-oodena}}
+* Old Church Slavonic:
+*: Cyrillic: {{t|cu|градъ|m}}, {{t|cu|мѣсто|n}}
+*: Glagolitic: {{t|cu|ⰳⱃⰰⰴⱏ|m}}, {{t|cu|ⰿⱑⱄⱅⱁ|n}}
+* Old East Slavic: {{t|orv|градъ|m}}, {{t|orv|мѣсто|n}}, {{t|orv|городъ|m}}
+* Old English: {{t|ang|burg|f}}
+* Old Galician-Portuguese: {{t|roa-opt|cidade|f}}
+* Old Norse: {{t|non|borg|f}}, {{t|non|staðr|m}}
+* Orok: {{t|oaa|хотто}}
+* Oromo: {{t|om|magaalaa}}
+* Oroqen: {{t|orh|kutuun}}
+* Ossetian: {{t|os|сахар}}, {{t|os|горӕт}}
+* Pali: {{t|pi|nagara|n}}
+* Pannonian Rusyn: {{t|rsk|варош|m}}, {{t|rsk|город|m}}
+* Papiamentu: {{t|pap|siudat}}
+* Pashto: {{t+|ps|ښار|m|tr=ẍâr}}
+* Pela: {{t|bxd|mjuʔ⁵⁵}}
+* Pennsylvania German: {{t|pdc|Schtadt}}, {{t|pdc|Schtedt}}
+* Persian:
+*: Classical Persian: {{t|fa-cls|شَهْر}}
+*: Dari: {{t|prs|شَهْر}}
+*: Iranian Persian: {{t|fa-ira|شَهْر}}
+* Phoenician: {{t|phn|𐤀𐤄𐤋}}
+* Piedmontese: {{t|pms|sità|f}}
+* Plautdietsch: {{t|pdt|Grootstaut|f}}, {{t|pdt|Staut|f}}
+* Polabian: {{t|pox|vaikă|f}}
+* Polish: {{t+|pl|miasto|n}}
+* Portuguese: {{t+|pt|cidade|f}}, {{t+|pt|urbe|f}}
+* Punjabi: {{t+|pa|ਸ਼ਹਿਰ}}
+*: Western Punjabi: {{t+|pnb|شہر}}, {{t+|pnb|نگر}}
+* Quechua: {{t+|qu|llaqta}}
+* Romagnol: {{t|rgn|zitê|f}}
+* Romanian: {{t+|ro|oraș|n}}, {{t+|ro|cetate|f}}, {{t+|ro|urbe|f}}, {{t+|ro|metropolă|f}}, {{t+|ro|municipiu|n}}
+* Romansh: {{t|rm|citad|f}}
+* Russian: {{t+|ru|го́род|m}}, {{t+|ru|град|m}} {{qualifier|archaic or poetic}}
+* Sami:
+*: Skolt Sami: {{t|sms|gåårad}}, {{t|sms|lâ´nn}}
+* Sanskrit: {{t+|sa|नगर|n}}
+* Sarikoli: {{t|srh|obod}}
+* Sassarese: {{t|sdc|ziddai|f}}
+* Scots: {{t|sco|ceity}}, {{t|sco|ceety}}
+* Scottish Gaelic: {{t|gd|baile mòr|m}}, {{t|gd|dùn|m}}
+* Serbo-Croatian:
+*: Cyrillic: {{t|sh|гра̑д|m}}
+*: Latin: {{t+|sh|grȃd|m}}
+* Shor: {{t|cjs|тура|tr=tura}}
+* Siberian Tatar: {{t|sty|тора|tr=tora}}
+* Sicilian: {{t+|scn|cità|f}}, {{t+|scn|citati}}
+* Silesian: {{t|szl|miasto|n}}
+* Sinhalese: {{t+|si|නගරය}}
+* Slovak: {{t+|sk|mesto|n}}
+* Slovene: {{t+|sl|mésto|n}}
+* Somali: {{t+|so|magaalo}}
+* Sorbian:
+*: Lower Sorbian: {{t|dsb|město|n}}
+*: Upper Sorbian: {{t+|hsb|město|n}}
+* Spanish: {{t+|es|ciudad|f}}, {{t+|es|urbe|f}}
+* Sranan Tongo: {{t|srn|foto}}
+* Sumerian: {{t|sux|𒌷|tr=URU}}
+* Sundanese: {{t|su|ᮊᮧᮒ|tr=kota}}
+* Swahili: {{t+|sw|mji}}
+* Swedish: {{t+|sv|stad|c}}
+* Sylheti: {{t|syl|ꠘꠉꠞ}}
+* Tagalog: {{t+|tl|lungsod}}, {{t|tl|syudad}}
+* Tajik: {{t+|tg|шаҳр}}, {{t|tg|обод}}
+* Talysh: {{t|tly|şəhr}}
+* Tamil: {{t+|ta|நகரம்}}
+* Taos: {{t|twf|plòsoʼóna}}
+* Tarifit: {{t|rif|tamdint|f}}, {{t|rif|tandint|f}}
+* Tatar: {{t+|tt|шәһәр}}, {{t+|tt|кала}}
+* Tausug: {{t|tsg|daira}}
+* Telugu: {{t+|te|నగరం}}
+* Tetum: {{t|tet|sidade}}
+* Thai: {{t+|th|เมือง}}, {{t+|th|นคร}}, {{t+|th|กรุง}}, {{t+|th|เชียง}}
+*: Northern Thai: {{t-needed|nod}}
+* Tibetan: {{t|bo|གྲོང་ཁྱེར}}, {{t|bo|རྒྱལ་ས}}
+* Tigrinya: {{t|ti|ከተማ}}
+* Tocharian B: {{t|txb|rīye}}
+* Tongan: {{t|to|kolo}}
+* Turkish: {{t+|tr|kent}}, {{t+|tr|şehir}}
+*: Ottoman Turkish: {{t|ota|كنت|tr=kent}}, {{t|ota|شهر|tr=şehir}}
+* Turkmen: {{t|tk|şäher}}
+* Tuvan: {{t|tyv|хоорай}}
+* Udihe: {{t|ude|хото|tr=hoto}}
+* Udmurt: {{t|udm|кар}}
+*: Beserman Udmurt: {{t|udm|кар}}
+* Ugaritic: {{t|uga|𐎓𐎗}}
+* Ukrainian: {{t+|uk|мі́сто|n}}, {{t+|uk|град|m}} {{qualifier|archaic or poetic}}
+* Ulch: {{t|ulc|хото|tr=hoto}}
+* Urdu: {{t|ur|شَہَر|m}}, {{t|ur|نَگَر|m}}
+* Uyghur: {{t|ug|شەھەر}}
+* Uzbek: {{t+|uz|shahar}}
+* Venetan: {{t+|vec|sità|f}}, {{t|vec|çità|f}}
+* Vietnamese: {{t+|vi|thành phố}} ({{t|vi|城埔}}), {{t+|vi|thành}} ({{t|vi|城}}), {{t+|vi|phố}}, {{t+|vi|đô thị}} ({{t+|vi|都市}})
+* Volapük: {{t+|vo|zif}}
+* Võro: {{t|vro|liin}}
+* Walloon: {{t+|wa|veye}}
+* Welsh: {{t+|cy|caer|f}}, {{t+|cy|dinas|f}}
+* Wolof: {{t+|wo|dëkk}}
+* Xhosa: {{t|xh|idolophu}}
+* Yaghnobi: {{t|yai|шаҳр}}
+* Yakut: {{t|sah|куорат}}, {{t|sah|хото}}
+* Yiddish: {{t|yi|שטאָט|f}}
+* Yoruba: {{t|yo|ìlú}}
+* Yukaghir:
+*: Northern Yukaghir: {{t|ykg|гуорат}}
+* Yup'ik: {{t|esu|nunarpak}}
+* Zazaki: {{t+|zza|bajar}}, {{t+|zza|suk}} {{qualifier|Southern Zazaki}}
+* Zhuang: {{t|za|si}}, {{t|za|hawsingz}}, {{t|za|singz}}
+* Zulu: {{t|zu|ithawini}}
+{{trans-bottom}}
+
+{{trans-top|settlement granted special status}}
+* Finnish: {{t+|fi|kaupunki}}
+{{trans-bottom}}
+
+{{trans-see|central business district, downtown|central business district|downtown}}
+
+{{trans-top|large amount of something}}
+* Finnish: {{t+|fi|keskittymä}}, {{t+|fi|keskus}}
+{{trans-bottom}}
+
+===See also===
+{{col4|en
+|metropolis
+|megalopolis
+|megacity
+|multicity
+}}
+
+===Further reading===
+* {{R:Keywords|page=55}}
+
+===Anagrams===
+* {{anagrams|en|a=city|ICTY}}
+
+{{C|en|Places|Cities}}

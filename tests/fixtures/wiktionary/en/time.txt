@@ -1,0 +1,2139 @@
+==English==
+{{wp}}
+
+===Alternative forms===
+* {{alt|en|tyme||obsolete}}
+
+===Etymology===
+{{etymon|en|id=main|:inh|enm:tyme}}
+From {{inh|en|enm|tyme}}, {{m|enm|time}}, from {{inh|en|ang|tīma|t=time, period, space of time, season, lifetime, fixed time, favorable time, opportunity}}, from {{inh|en|gmw-pro|*tīmō}}, from {{inh|en|gem-pro|*tīmô||time}}, from {{der|en|ine-pro|*deh₂imō}}, from {{der|en|ine-pro|*deh₂y-||to divide}}. Related to {{m|en|tide}}. Not related to {{noncog|la|tempus}}.
+{{col-top|2|cog}}
+* {{cog|sco|tym}}, {{m|sco|tyme||time}}
+* {{cog|gsw|Zimen}}, {{m|gsw|Zimmän|Zīmmän|time, time of the year, opportune time, opportunity}}
+* {{cog|da|time||hour, lesson}}
+* {{cog|ovd|taime||hour}}
+* {{cog|fo|tími||hour, lesson, time}}
+* {{cog|is|tími||time, season}}
+* {{cog|no|time||lesson, hour}}
+* {{cog|sv|timma}}, {{m|sv|timme||hour}}.
+{{col-bottom}}
+
+===Pronunciation===
+* {{enPR|tīm|a=RP,GA}}, {{IPA|en|/taɪm/|[tʰaɪ̯m]}}
+* {{audio|en|En-us-time.ogg|a=GA}}
+* {{IPA|en|/tɑɪm/|[tʰɑe̯m]|a=AU}}
+* {{IPA|en|/təɪm/|a=Local Dublin}}
+* {{IPA|en|/taɪm/|a=CA}}
+** {{IPA|en|/tʌɪm/|[təi̯m]|a=Dialectal}}
+* {{hmp|en|thyme|qq=most accents}}
+* {{rhyme|en|aɪm|s=1}}
+
+===Noun===
+{{en-noun|~}}
+
+# {{senseid|en|Q11471}} {{lb|en|uncountable}} The [[inevitable]] [[progression]] into the [[future]] with the passing of [[present]] and [[past]] events.
+#: {{syn|en|Thesaurus:time}}
+#: {{ux|en|'''Time''' stops for nobody.&nbsp;&nbsp; the ebb and flow of '''time'''}}
+#* {{quote-text|en|year=1937|author=w:Delmore Schwartz|url=http://www.americanpoems.com/poets/Delmore-Schwartz/3856|title=Calmly We Walk Through This April's Day
+|passage='''Time''' is the fire in which we burn.}}
+#* {{quote-av
+|en
+|date=May 26, 2023
+|author=w:Volodymyr Zelenskyy
+|title=Zelenskyy surprises the Johns Hopkins commencement ceremony
+|archiveurl=https://web.archive.org/web/20230526060203/https://www.youtube.com/watch?v=m8Fy5fQz9Rs
+|publisher=w:MSNBC
+|time=0:40
+|text=One of the most common truisms on Earth is the advice to value or at least not waste '''time'''. Why has it become so widespread? Every person eventually realizes that '''time''' is the most valuable resource on the planet. Not oil or uranium. Not lithium or anything else, but '''time'''. '''Time'''. The very flow of '''time''' convinces us of this. Some people realize this sooner, and these are the lucky ones. Others realize it too late when they lose someone or something. People cannot avoid it, this is just a matter of '''time'''. But there is a fundamental difference that comes down to the question of '''time'''. The '''time''' of your life is under your control. The '''time''' of life of our force on the front line, the '''time''' of life of all Ukrainians who are forced to live through this terrible Russian aggression unfortunately is subject to many factors that are not all in their control. I do not wish anyone to feel like they are in my shoes, and it's impossible to give a manual on how to go through life so as not to waste '''time'''. However, one piece of advice always works. You have to know exactly why you need today and how you want your tomorrows to look like.}}
+## {{lb|en|uncountable}} The feeling of the passage of events and their relative duration, as experienced by an individual.
+##: {{ux|en|'''Time''' flies when you're having fun.}}
+## {{lb|en|physics|usually|uncountable}} A dimension of [[spacetime]] with the opposite metric signature to [[space]] dimensions; the [[fourth dimension]].
+##: {{ux|en|Both science-fiction writers and physicists have written about travel through '''time'''.}}
+##* {{RQ:Wells Time Machine||31|So long as I travelled at a high velocity through '''time''', this scarcely mattered; I was, so to speak, attenuated&nbsp;– was slipping like a vapour through the interstices of intervening substances!}}
+##* {{quote-book|en|1999|w:Brian Greene|w:[[The Elegant Universe|The Elegant Universe: Superstrings, Hidden Dimensions, and the Quest for the Ultimate Theory]]|publisher=w:W. W. Norton & Company||isbn=9780393338102|204|year_published=2010|We all have a visceral understanding of what it means for the universe to have multiple space dimensions, since we live in a world in which we constantly deal with a plurality — three. But what would it mean to have multiple '''times'''? Would one align with '''time''' as we presently experience it psychologically while the other would somehow be "different"?}}
+## {{lb|en|physics|uncountable}} Change associated with the second law of [[thermodynamics]]; the physical and psychological result of increasing [[entropy]].
+##: {{ux|en|'''Time''' slows down when you approach the speed of light.}}
+##* {{quote-book|en|1992|w:Roger Highfield; w:Peter Coveney|Arrow of Time||179|Given the connection between increasing entropy and the arrow of '''time''', does the Big Crunch mean that '''time''' would run backwards as soon as collapse began?|publisher=w:Ballantine Books|isbn=0449907236}}
+##* {{quote-book|en|2012|Robert Zwilling|Natural Sciences and Human Thought|publisher=w:Springer Science+Business Media|isbn=9783642786853||80|Eventually '''time''' would also die because no processes would continue, no light would flow.}}
+## {{lb|en|physics|uncountable|reductionist definition}} The property of a system which allows it to have more than one distinct configuration.
+##: {{ux|en|An essential definition of '''time''' should entail neither speed nor direction, just change.}}
+# A [[duration]] of time.
+## {{lb|en|uncountable}} A quantity of availability of [[duration]].
+##: {{ux|en|More '''time''' is needed to complete the project.}}
+##: {{ux|en|You had plenty of '''time''', but you waited until the last minute.}}
+##: {{ux|en|Are you finished yet? '''Time'''’s up!}}
+##* {{quote-book|en|1661|w:[[John Fell (bishop)|John Fell]]|The Life of the most learned, reverend and pious Dr. H. Hammond|https://archive.org/details/bim_early-english-books-1641-1700_the-life-of-the-most-lea_fell-john-bishop_1661|7|During the whole '''time''' of his abode in the Univerſity he generally ſpent 13 hours of the day in Study&nbsp;;{{…}}|location=w:London}}
+##* {{quote-book|en|2021|w:[[Lisa Miller (psychologist)|Lisa Miller]]|The Awakened Brain|isbn=9781984855626|chapter=2||37|The teacher greeted us and moved methodically through the room, placing an object on each student's desk. It was a thin book―a spiral-bound planner. She strode to the front of the room. "If you want to succeed," she said, her syllables clear and careful, "you must learn to manage your '''time'''."}}
+## {{lb|en|countable}} A measurement of a quantity of time; a numerical or general indication of a length of progression.
+##: {{co|en|a long '''time'''}}
+##: {{ux|en|Record the individual '''times''' for the processes in each batch.}}
+##: {{ux|en|Only your best '''time''' is compared with the other competitors.}}
+##: {{ux|en|The algorithm runs in O(n<sup>2</sup>) '''time'''.}}
+##* {{RQ:Churchill Celebrity|1|1|I was about to say that I had known the Celebrity from the time he wore kilts. But I see I will have to amend that, because he was not a celebrity then, nor, indeed, did he achieve fame until some '''time''' after I left New York for the West.}}
+##* {{quote-book|en|1938|w:[[Richard Hughes (British writer)|Richard Hughes]]|In Hazard|https://archive.org/details/in.ernet.dli.2015.207695|248|publisher=w:Chatto & Windus|location=w:London|The shock of the water, of course, woke him, and he swam for quite a '''time'''.}}
+## {{lb|en|uncountable|slang}} The serving of a prison sentence.
+##: {{ux|en|The judge leniently granted a sentence with no hard '''time'''.}}
+##: {{ux|en|He is not living at home because he is doing '''time'''.}}
+##* {{quote-book|en|1994|Dana Stabenow|A Cold-Blooded Business||64|isbn=0425158497|Arrested on duty at Fort Richardson, both parents had worked hard at blaming the other for their son’s death, but Kate’s meticulous recording of the detail of the bruising found on the child’s body and the physical evidence surrounding the scene, plus patient, painstaking interviews with neighbors above and below stairs had resulted in '''time''' for both.}}
+##* {{RQ:Noire Thug-A-Licious|108|"Ain’t gone be no Rikers Island for you next time," I warned him. "You get tapped on another gun charge and you looking at some upstate '''time'''."}}
+## {{lb|en|countable}} An experience.
+##: {{ux|en|We had a wonderful '''time''' at the party.}}
+## {{senseid|en|era}} {{lb|en|countable}} An [[era]]; (articulated, sometimes in the plural) the current era, the current state of affairs.
+##: {{co|en|Roman '''times'''}}
+##: {{co|en|the '''time''' of the dinosaurs}}
+##: {{ux|en|That’s the way things were in those '''times'''.}}
+##* {{RQ:Shakespeare Hamlet|1|5|259|1|The '''time''' is out of ioynt: O curſed ſpight,<br>That euer I was borne to ſet it right.}}
+##* {{quote-video game|en|developer=w:BioWare|title=w:[[Mass Effect (video game)|Mass Effect]]|genre=science fiction|location=w:Redwood City|publisher=w:Electronic Arts|year=2008|system=PC|scene=Eden Prime|isbn=9780784546642|oclc=246633669|passage=Dr. Manuel: You're wasting your time. The age of humanity is over. Our extinction is inevitable.[...]<br>Shepard: I don't have time for this.<br>Dr. Manuel: Time? Our '''time''' is over.}}
+## {{lb|en|uncountable|with|possessive}} A person's youth or young adulthood, as opposed to the present day.
+##: {{ux|en|In my '''time''', we respected our elders.}}
+## {{lb|en|only in singular|sports|and|figuratively}} {{1|time out}}; temporary, limited suspension of play.
+# An [[instant]] of time.
+## {{lb|en|uncountable}} The duration of time of a given day that has passed; the moment, as indicated by a clock or similar device.
+##: {{ux|en|Excuse me, have you got the '''time'''?}}
+##: {{ux|en|What '''time''' is it, do you guess? Ten o’clock?}}
+##: {{ux|en|A computer keeps '''time''' using a clock battery.}}
+##: {{ux|en|They will be asleep by this '''time''', [[don'tcha]] think?}}
+##* {{quote-journal|en|date=2013-07-19||Ian Sample|Irregular bedtimes may affect children’s brains|w:The Guardian Weekly|volume=189|issue=6||34|articleurl=https://www.theguardian.com/lifeandstyle/2013/jul/08/irregular-bedtimes-affect-childrens-brains|Going to bed at a different '''time''' each night affected girls more than boys, but both fared worse on mental tasks than children who had a set bedtime, researchers found.}}
+## {{lb|en|countable}} A particular moment or hour; the appropriate moment or hour for something (especially with prepositional phrase or imperfect subjunctive).
+##: {{ux|en|it’s '''time''' for (you to go to) bed;&nbsp; it’s '''time''' to sleep;&nbsp; we must wait for the right '''time''';&nbsp; it's '''time''' we were going}}
+##* {{RQ:Churchill Celebrity|8||The humor of my proposition appealed more strongly to Miss Trevor than I had looked for, and from that '''time''' forward she became her old self again; for, even after she had conquered her love for the Celebrity, the mortification of having been jilted by him remained.}}
+##* {{quote-journal|en|date=2013-06-07||w:Joseph Stiglitz|Globalisation is about taxes too|w:The Guardian Weekly|volume=188|issue=26||19|articleurl=https://www.theguardian.com/commentisfree/2013/may/27/globalisation-is-about-taxes-too|It is '''time''' the international community faced the reality: we have an unmanageable, unfair, distortionary global tax regime.}}
+## {{lb|en|countable}} A numerical indication of a particular moment.
+##: {{ux|en|At what '''times''' do the trains arrive?}}
+##: {{ux|en|These '''times''' were erroneously converted between zones}}
+## {{senseid|en|occurrence}}{{lb|en|countable}} An [[instance]] or [[occurrence]].
+##: {{syn|en|instant|juncture|Thesaurus:point in time}}
+##: {{coi|en|one more '''time'''}}
+##: {{ux|en|When was the last '''time''' we went out? I don’t remember.}}
+##: {{ux|en|See you another '''time'''.}}
+##: {{ux|en|That’s three '''times''' he’s made the same mistake.}}
+##: {{ux|en|Okay, but this is the last '''time'''. No more after that!}}
+##* {{RQ:Churchill Celebrity|2|15|Sunning himself on the board steps, I saw for the first '''time''' Mr. Farquhar Fenelon Cooke. He was dressed out in broad gaiters and bright tweeds, like an English tourist, and his face might have belonged to Dagon, idol of the Philistines.}}
+## {{lb|en|UK|in public houses}} {{1|closing time}}.
+##: {{ux|en|Last call: it's almost '''time'''.}}
+## The hour of [[childbirth]].
+##* {{RQ:Clarendon History|VIII|370|{{…}}came well to ''Exeter''; where ſhe intended to ſtay, till ſhe was deliver’d; for ſhe was within little more than one Month of her '''time''';{{…}}}}
+## {{lb|en|with|possessives}} The end of someone’s life, [[conceive]]d by the speaker as having been [[predestine]]d.
+##: {{ux|en|It was '''his time'''.}}
+# {{lb|en|countable}} The [[measurement]] under some [[system]] of [[region]] of [[day]] or [[moment]].
+#: {{ux|en|Let's synchronize our watches so we're not on different '''time'''.}}
+# {{lb|en|countable}} A [[ratio]] of [[comparison]] (''see also usage notes and prepositional sense at '[[times]]''').
+#: {{ux|en|Your car runs three '''times''' faster than mine.}}
+#: {{ux|en|That is four '''times''' as heavy as this.}}
+#* {{quote-book
+|en
+|year=1980
+|author=James Chan
+|editors=C. K. Leung; Norton Ginsburg
+|chapter=Modern Manufacturing Industries in Kuangtung
+|title=China: Urbanization and National Development
+|url=https://archive.org/details/chinaurbanizatio0000unse/
+|ISBN=0-89065-103-5
+|LCCN=80-29142
+|OCLC=7175420
+|page=220
+|pageurl=https://archive.org/details/chinaurbanizatio0000unse/page/220/
+|text=Canton is the regional primate city of Kuangtung. Its population of three million is ten '''times''' that of the second largest city, Shant'ou.}}
+# {{lb|en|music|uncountable}} The [[measured]] [[duration]] of [[sound]]s.
+#: {{q|dated}} {{coi|en|dance '''time'''; &nbsp; march '''time'''}} {{q|see usage notes}}
+## {{senseid|en|tempo}} {{lb|en|uncountable}} {{1|tempo}}; a measured rate of movement.
+##: {{ux|en|The musician keeps good '''time'''.}}
+##* {{RQ:Beaumont Fletcher Comedies and Tragedies|The False One|1|2||some few lines set unto a solemn '''time'''}}
+## {{senseid|en|meter}} {{lb|en|uncountable}} [[rhythmical|Rhythmical]] [[division]], [[meter]].
+##: {{ux|en|common or triple '''time'''; &nbsp; [['''time''' signature]]}}
+## {{lb|en|jazz}} {{lb|en|uncountable}} A [[straight]] rhythmic [[pattern]], free from [[fill]]s, [[break]]s and other [[embellishment]]s.
+##: {{ux|en|After the introduction, the drummer is to play '''time'''.}}
+# {{lb|en|grammar|obsolete}} {{syn of|en|tense}}
+#: {{ux|en|the '''time''' of a verb}}
+#* {{quote-book|en|1823|Lindley Murray|Key to the Exercises Adapted to Murray’s English Grammar|publisher=Fortland||53f|Though we have, in the notes under the thirteenth rule of the Grammar, explained in general the principles, on which the '''time''' of a verb in the infinitive mood may be ascertained, and its form determined;{{…}}}}
+#* {{quote-book|en|1829|Benjamin A. Gould|Adam’s Latin Grammar||153|location=w:Boston|The participles of the future '''time''' active, and perfect passive, when joined with the verb ''esse'', were sometimes used as indeclinable;{{…}}}}
+# {{lb|en|slang|MLE}} {{clipping of|en|[[a]] [[long]] [[time]]}}.
+#* {{quote-song|en|date=2019-09-15|artist=w:Stormzy|album=Heavy Is The Head|track=12|title=Wiley Flow|url=https://genius.com/Stormzy-wiley-flow-lyrics|passage=I used to pay for things but that was '''time''' ago.}}
+#* {{quote-av|en|date=2022-03-18|director=Brady Hood|writer=Ronan Bennett; Gerry Jackson; Tyrone Rashard; Sagirah Gammon|actor=|role=girl called B|medium=TV|series=4|number=1|title={{w|Top Boy}}(Good Morals)|time=00:38:33|text=Ats' mum is looking for him, says he ain't been back in '''time'''}}
+#* {{quote-av|en|date=2023-01-15|director=Freddy Syborn|writer=Layton Williams|actor=Anthony J. Abraham|role=Inchez|medium=TV|series=4|number=3|title={{w|Bad Education}}(Prison)|time=12:51|text=INCHEZ:Man this is long! We've been in here for '''time'''!}}
+#: {{syn|en|ages|long}}
+
+====Usage notes====
+* For the number of occurrences and the ratio of comparison, ''[[once]]'' and ''[[twice]]'' are typically used instead of ''one time'' and ''two times''. ''[[thrice|Thrice]]'' is uncommon in American English and British English but is still common in Asian English, for example in India, Singapore, and Malaysia.<ref>James Lambert, 2012, 'Diachronic stability in Indian English lexis' ''World Englishes'' Vol. 31, issue 1, page 112-127. [https://doi.org/10.1111/weng.12072]</ref>
+* {{s|music}} The distinction between ''time'' as tempo ({{senseno|en|tempo}}) and ''time'' as meter ({{senseno|en|meter}}) is relatively modern. The dated expression "march time" refers equally to the tempo of a march as it does to the use of 2/4 or 4/4 meter.
+* Ratio usage with comparatives, such as "you earn three times more than me", though common, is strictly illogical. More correctly: "you earn three times as much as me".
+
+====Hyponyms====
+{{col4|en|title=Hyponyms of ''time'' (proper names)
+|African time
+|Alaska Standard Time
+|Alaska time
+|Alaska-Hawaii Time
+|Amsterdam Time
+|Apostolic Times
+|ASEAN Common Time
+|Atlantic Daylight Time
+|Atlantic Standard Time
+|Atlantic Time
+|Australian Central Daylight Time
+|Australian Eastern Daylight Time
+|Australian Eastern Standard Time
+|Barycentric Coordinate Time
+|Bering Time
+|Berlin Time
+|Bhutan Time
+|Bombay Time
+|Borneo Time
+|Buck Rogers time
+|Calcutta Time
+|Cape Verde Time
+|Caribbean time
+|Central Africa Time
+|Central Daylight Time
+|Central Europe Time
+|Central European Midsummer Time
+|Central European Time
+|Central Standard Time
+|Central Time
+|Chatham Daylight Time
+|Christmas time
+|Christmas-time
+|Colored People's Time
+|Coordinated Universal Time
+|CP Time
+|Dutch Time
+|East Africa Time
+|Eastern Daylight Time
+|Eastern European Time
+|Eastern Standard Time
+|Eastern Time
+|Father Time
+|First Happy Time
+|French Revolutionary Time
+|Geocentric Coordinate Time
+|Greenwich Mean Time
+|Greenwich Time
+|Hadean time
+|Happy Time
+|Hawaii Time
+|Hawaii-Aleutian Time
+|Hong Kong Time
+|Honolulu Time
+|Hubble time
+|International Atomic Time
+|International Time Bureau
+|Israel Daylight Time
+|Japan Standard Time
+|Joda-Time
+|Krasnoyarsk Time
+|Madras Time
+|Main Standard Time
+|Mauritius Time
+|Maxwell time
+|Maytime
+|Middle Eastern Time
+|Middle European Time
+|Moscow Time
+|Mountain Daylight Time
+|Mountain Standard Time
+|Mountain Time
+|Nepal Standard Time
+|New Zealand Daylight Time
+|Newtonian time
+|Novosibirsk Time
+|Old Father Time
+|Omsk Time
+|Operation Market Time
+|Ordinary Time
+|Pacific Daylight Time
+|Pacific Standard Time
+|Pacific Time
+|Philippine Time
+|POSIX time
+|Samoa Standard Time
+|Sandringham time
+|Second Happy Time
+|Seychelles Time
+|Spacecraft Event Time
+|Sri Lanka Standard Time
+|Standard Zone Time
+|Starving Time
+|Swatch Internet Time
+|Terrestrial Dynamical Time
+|Terrestrial Time
+|Tipper and See-Saw Time
+|Universal Time
+|Unix time
+|Uzbekistan Time
+|Washington Mean Time
+|Washington Meridian Time
+|West Africa Time
+|Western European Time
+|Yukon Time
+|Zulu time
+}}
+
+{{col4|en|title=Other hyponyms of ''time''
+|A-H conduction time
+|absolute time
+|access time
+|Achilles tendon reflex time
+|acquisition feeding time
+|acquisition time
+|activated clotting time
+|activated partial thromboplastin time
+|active braking time
+|actual flying time
+|added time
+|adjusted flow time
+|administrative lead time
+|advanced time
+|air time|lost to time
+|airtime
+|amortized constant time
+|APEX time
+|apparent time
+|APTIME
+|arrival time
+|assembly time
+|association time
+|astronomical time|facility time|old-time music
+|atomic time
+|attack time
+|average access time
+|average seek time
+|back time
+|background radiation equivalent time
+|bathtime
+|bedtime
+|binding time
+|biologic time
+|biological time
+|birth time
+|bit time
+|black people's time
+|bleeding time
+|blend time
+|blocktime
+|block time
+|blood circulation time
+|boot time
+|borrowed time
+|bottom time
+|bowel transit time
+|braking time
+|break-even time
+|breakfast-time
+|breaktime
+|breathing time
+|call time
+|chair time
+|characteristic time
+|check-in time
+|check-out time
+|chow time
+|chowtime
+|Christmas time
+|chromoscopy time
+|chucking-out time
+|circle time
+|circulation time
+|civil time
+|civilian time
+|clearance time
+|clock time
+|clocktime
+|close time
+|closed assembly time
+|closing time
+|clot retraction time
+|clotting time
+|coagulation time
+|cock-shut-time
+|coding time
+|coherence time
+|collision time
+|colonic transit time
+|command processing overhead time
+|common time
+|comp time
+|company time
+|personal time
+|compensatory time
+|compile time
+|compile-time
+|compound common time
+|compound time
+|computation time
+|concentration time
+|conditioning time
+|conduction time
+|confinement time
+|conformal time
+|connect time
+|constant time
+|contact time
+|continental time
+|contract time
+|controlled variable time
+|convective mixing time
+|cooking time
+|cooling time
+|coordinate time
+|core time
+|corner time
+|corrected time
+|cosmic time
+|CPU time
+|crossing time
+|crunch time
+|cubic time
+|cucumber time
+|cure time
+|curing time
+|curtain time
+|cut time
+|cut-off time
+|cycle time
+|dance-time
+|daylight-saving time
+|daylight-savings time
+|daytime
+|dead time
+|decay time
+|decimal reduction time
+|decimal time
+|decoherence time
+|decorrelation time
+|decree time
+|deep time
+|deferred time
+|delay time
+|departure time
+|detention time
+|dextrinization time
+|dextrinizing time
+|dial-in time
+|dilute Russell's viper venom time
+|dining time
+|dinner time
+|dinnertime
+|discrete-time signal
+|disinfectant time
+|disk access time
+|do time
+|docky time
+|down time
+|downtime
+|Dreamtime
+|drinking-up time
+|drive time
+|driving time
+|drying time
+|DTIME
+|duple time
+|dwell time
+|dynamical time
+|earliest anticipated launch time
+|early time
+|ecarin clotting time
+|elapsed flying time
+|elapsed time
+|energy confinement time
+|energy payback time
+|energy replacement time
+|engaged time
+|ephemeris time
+|equal time
+|equilibrium time
+|equinoctial time
+|estimated time of arrival
+|euglobulin clot lysis time
+|euglobulin lysis time
+|event time
+|execution time
+|exit time
+|expiration time
+|exponential time
+|exposure time
+|EXPTIME
+|extended playing time
+|extra time
+|face time
+|fade time|juking time
+|fading time
+|fall time
+|fence time
+|Fermat's principle of least time
+|final setting time
+|find time
+|first exit time
+|first hit time
+|first passage time
+|first return time
+|flash-to-bang time
+|flat time
+|flexible time
+|flexitime
+|flight time
+|floodtime|kaolin-cephalin clotting time
+|floortime
+|flushing time
+|forced expiratory time
+|forecast lead time
+|foretime
+|formation exposure time
+|four-four time
+|frame time
+|frame-alignment recovery time
+|free time
+|free-fall time
+|fringe time
+|fruit-time
+|full stroke seek time
+|full time
+|fully automatic time
+|functioning time
+|gain time
+|game time
+|garbage time
+|gate time
+|gelation time
+|generation time
+|geologic time
+|geological time
+|glide time
+|golden time
+|good time
+|grass time
+|green time
+|gust decay time
+|gust formation time
+|half-relaxation time
+|handling time
+|hang time
+|hard time
+|harvest time
+|haying time
+|heaking-time
+|heat time
+|hexadecimal time
+|high time
+|hitting time
+|hold time
+|holding time
+|holiday-time
+|HV conduction time
+|hydraulic retention time
+|hypertime
+|ice time
+|icetime
+|idle time
+|imaginary time
+|imperfect time
+|improper time
+|incubation time
+|initial setting time
+|injury time
+|instruction time
+|integration time
+|intermediate time
+|interval time
+|interval transit time
+|intra-atrial conduction time
+|intravaginal ejaculation latency time
+|isovolumic relaxation time
+|junk time
+|killing time
+|kipper time
+|lag time
+|lake retention time
+|land before time
+|laptime
+|last time
+|latency time
+|latent time
+|launch-time
+|laytime
+|lead time
+|principle of least time
+|left ventricular ejection time
+|leisure time
+|lethal time
+|lifetime
+|light time
+|lighting-up time
+|linear time
+|link time
+|live time
+|lived time
+|load time
+|local mean sidereal time
+|local sidereal time
+|local solar time
+|local time
+|lock time
+|longitudinal relaxation time
+|lookahead time
+|lookback time
+|lunchtime
+|lunch-time
+|magnetic local time
+|march-time
+|mark time
+|maximum holding time
+|maximum seek time
+|mealtime
+|mean free time
+|mean hitting time
+|mean sidereal time
+|mean solar time
+|mean survival time
+|median effective time
+|median lethal time
+|median survival time
+|metric time
+|midtime
+|military time
+|minimum connecting time
+|minimum seek time
+|missing time
+|mixing time
+|modern times
+|morning time
+|musical time
+|naptime
+|near real-time
+|needle time
+|network option time
+|Network Time Protocol
+|network time
+|NEXPTIME
+|next time
+|nick-time
+|night time
+|nighttime
+|non-Archimedean time
+|nondeterministic polynomial time
+|nonuniform polynomial time
+|noontime
+|normal time
+|NP time
+|NTIME
+|occurrence time
+|off time
+|offset time
+|ofttimes
+|old time
+|old tyme
+|olde tyme
+|olden time
+|olden times
+|one-stage prothrombin time
+|onetime
+|one-way light time
+|one-way time
+|open assembly time
+|open time
+|opening time
+|operating time
+|P-A conduction time
+|partial thromboplastin time
+|past-time
+|pastime
+|peacetime
+|peace-time
+|pea-time
+|perfect time
+|pessimistic time
+|P-H conduction time
+|physiological time
+|place-manner-time
+|playing time
+|playtime
+|please-time
+|Poincaré recurrence time
+|polarisation time
+|polarization time
+|polynomial time
+|POSIX time
+|post time
+|press time
+|pressed for time
+|primary time
+|prime time
+|pro time
+|process time
+|processing time
+|processor time
+|procurement lead time
+|propagation time
+|proper time
+|prothrombin time
+|pseudo-polynomial time
+|pseudotime
+|psychophysical time
+|pudding time
+|pulse decay time
+|pulse repetition time
+|pumping time
+|push time
+|quadratic time
+|quadruple time
+|quality time
+|Question Time
+|quick time
+|Quick's prothrombin time
+|quiesce time
+|quintuple time
+|quitting-time
+|ragtime
+|railway time
+|randomized polynomial time
+|reaction time
+|real time
+|realtime
+|real-world time
+|reap-time
+|reasonable time
+|receiving time
+|recalcification time
+|recoat time
+|recognition time
+|recovery time
+|recurrence time
+|recycle time
+|recycling time
+|redeem the time
+|reduced time
+|reference time
+|reframing time
+|regulation time
+|relative time
+|relaxation time
+|release time
+|released time
+|repetition time
+|reptilase time
+|residence time
+|response time
+|retarded time
+|retention time
+|return time
+|reverberation time
+|revisit time
+|riding time
+|ring-time
+|rise time
+|round-trip delay time
+|round-trip light time
+|round-trip time
+|running time
+|runtime
+|Russell's viper venom clotting time
+|Russell's viper venom time
+|rustle time
+|rutey time
+|sack time
+|sandwich time
+|schooltime
+|screen time
+|seating time
+|sedimentation time
+|seedtime
+|seek time
+|sensation time
+|setting time
+|settling time
+|setup time
+|shepster time
+|shop time
+|short time
+|short-time
+|shortening time
+|shortest remaining time
+|show time
+|shriving-time
+|sideral time
+|simple time
+|single time
+|sinoatrial conduction time
+|sinoatrial recovery time
+|slot time
+|slow time
+|slowing-down time
+|socially necessary labour time
+|sojourn time
+|solar time
+|some time
+|spare time
+|speech time
+|spin-lattice relaxation time
+|spin-spin relaxation time
+|split-time
+|springtime
+|spring-time
+|squeaky bum time
+|standard time
+|standby time
+|start time
+|starting time
+|startup time
+|stay time
+|step time
+|stimulus-response time
+|stoppage time
+|stopping time
+|stop-time
+|storage time
+|story time
+|straight time
+|Stypven time
+|subjective time
+|subquadratic time
+|sugartime
+|summer time
+|summertime
+|suppertime
+|survival time
+|synodic time
+|system time
+|T1 relaxation time
+|T2 relaxation time
+|tact time
+|talk time
+|tax time
+|teatime
+|tee time
+|tell time
+|thermal death time
+|thermal relaxation time
+|thickening time
+|think time
+|three-four time
+|three-quarter time
+|thrombin clotting time
+|thrombin time
+|till time
+|tissue thromboplastin inhibition time
+|total running time
+|total story time
+|track-to-track seek time
+|train time
+|transaction time
+|transition time
+|transmission time
+|transtime
+|transverse relaxation time
+|travel time
+|traveltime
+|triple time
+|true time
+|tunneling time
+|tunnelling time
+|turnaround time
+|turn-off time
+|turn-on time
+|two-four time
+|two-part time
+|two-time
+|two-way traveltime
+|undern-time
+|undertime
+|under-time
+|unproductive time
+|uptime
+|user time
+|utilisation time
+|utilization time
+|valid time
+|vampire time
+|vintage time
+|voice onset time
+|wait time
+|waiting time
+|waketime
+|wall time
+|wall-clock time
+|wartime
+|waste time
+|wet edge time
+|whole-blood coagulation time
+|wholetime
+|wikitime
+|windshield time
+|wintertime
+|winter-time
+|word time
+|working time
+|Z time
+|zone time
+|zonetime
+|bath time|benting time|between-time|chip time|classtime|coyote time|daylight saving time|daylight time|double summer time|echo time|Elon time|first time|first-passage time|gun time|half-time|insertion time|interrupting time|kaolin clotting time|loiter time|mean time|pairing time|parrot and monkey time|Planck time|positioning time|quarter time|quitting time|rack time|red time|rotation time|seat time|sexy time|sidereal time|simple quadruple time|station time|stick time|takt time|term time|that time of the month|time added on|time in|time of flight|time-reverse|time on|tummy time|time section|time cross section|jucking time|time under tension}}
+
+====Derived terms====
+{{col4|en|title=some of these may be hyponyms||about time|4/4 time|local mean time|stuck in time|time is short|time-tried|time and lime|time-phased|active time battle|estimated time of restoration|for a time|time flies like an arrow; fruit flies like a banana|waste no time
+|additional time| better luck next time|estimated time of departure|test-time compute
+|time-manner-place
+|time vampire
+|time reversal
+|time reversal invariance
+|time reversal mirror
+|time reversal signal processing
+|administration of the fulness of times
+|adverbial of time
+|aforetime
+|aftertime
+|against time
+|a-h conduction time
+|ahead of one's time
+|ahead of time
+|all in good time
+|all the time|handle time|knock someone out of time|U of T time|whirligig of time
+|all-time
+|a long time coming
+|ancient times
+|anight
+|a-nightertime
+|antitime
+|any time
+|anytime
+|any time now
+|any time soon
+|army time
+|arrow of time
+|as old as time itself
+|as time goes by
+|as times go|better one word in time than two afterwards|footprints on the sands of time|Latin time|time-bar
+|a stitch in time saves nine
+|at all times
+|at a time
+|at church every time the doors are open
+|at church every time the doors swing open
+|at no time|before the ink had time to dry
+|at odd times
+|at one time
+|at one time or another
+|at that time
+|at the best of times
+|at the same time
+|at the time
+|at this moment in time
+|at this point in time| time is on one's side
+|at times
+|at times and again
+|autumntime
+|backtime
+|bairn-time
+|beamtime
+|beat someone's time
+|beat time
+|before someone's time
+|beforetime
+|before times
+|behind its time
+|behind the times
+|behind time
+|betime
+|better to be late than be dead on time
+|between time
+|betweentimes
+|between times
+|bide one's time
+|bid one's time
+|big-time
+|big time
+|bigtime
+|birth time
+|birthtime
+|bleeding time test
+|blocktime
+|boomtime
+|boxing time
+|break time
+|broken time
+|brunchtime
+|bullet time
+|burning times
+|burn time
+|buy some time
+|buy time
+|by a time
+|by the time
+|bytime
+|childtime
+|Christmastime
+|closed time loop
+|close one's eyes for the last time
+|closing time effect
+|cockshut time
+|coffeetime
+|comedy equals tragedy plus time
+|come to time
+|Common-Civil-Calendar-and-Time Calendar
+|compile-time
+|concentration-time curve
+|continuous time
+|Copernican time principle
+|countertime
+|counter-time
+|cutoff time
+|dance-time
+|dancetime
+|date-time
+|datetime
+|dawn of time
+|dawntime
+|deadtime
+|deathtime
+|delivery time
+|desperate times call for desperate measures
+|desperate times require desperate measures
+|dining time
+|discrete-time
+|discrete time
+|discrete-time Markov chain
+|dispensation of the fulness of times
+|do one's own time
+|doper time
+|dope time
+|double time
+|doubletime
+|doubling time
+|downtime
+|drastic times call for drastic measures
+|drivetime
+|dusktime
+|Eastertime
+|eat an elephant one bite at a time
+|effluxion of time
+|eigentime
+|elapsed real time
+|endtime
+|end times
+|end-times
+|equation of time
+|equitime
+|every single time
+|every time
+|every time one farts
+|every time one turns around
+|evetime
+|fairtime
+|fall on hard times
+|fall-time
+|Fiji time
+|Filipino time
+|finish time
+|first-time
+|flexitime
+|flexi time
+|flex-time
+|floodtime
+|floortime
+|flowtime
+|flytime
+|for all time
+|foretime
+|formation exposure time
+|former times
+|for old time's sake
+|for so long a time
+|for some time
+|for the last time
+|for the longest time
+|for the time
+|for the time being
+|for time
+|fractal response time
+|from that time on
+|from this time on
+|from time to time
+|fruit-time
+|fullness of time
+|full-time
+|fulness of time
+|game-time decision
+|gay old time
+|get with the times
+|given time
+|give somebody time
+|give someone a hard time
+|give someone the time
+|give someone time
+|give the time of day
+|go back in time
+|good old times
+|good-time
+|good time coming
+|Greenwich Time Signal
+|gross time
+|hangtime
+|haole time
+|hard real-time
+|hard-times token
+|have a bad time of it
+|have a good time
+|have a good time of it
+|have a hard time
+|have a hard time of it
+|have a lot of time
+|have a lot of time for
+|have an easy time of it
+|have a poor time of it
+|have a rough time of it
+|have a thin time of it
+|have a time
+|have a time of it
+|have a whale of a time
+|have little time for
+|have no time for
+|have one more time
+|have the right time
+|have the time
+|have time
+|have time on one's hands
+|have time on one's side
+|have you got the time
+|Hawaiian time
+|haytime
+|heretoforetime
+|high old time
+|high-time
+|hit the big time
+|holiday time
+|holiday-time
+|hometime
+|I can't remember the last time
+|icetime
+|if I had a nickel for every time
+|in between times
+|in church every time the doors are open
+|Indian time
+|in due time
+|in good time
+|in jig time
+|in less than no time
+|in no time
+|in one's own good time
+|in one's own time
+|in one's time
+|in record time
+|in someone's time
+|interval of time
+|in the course of time
+|in the interest of time
+|in the nick of time
+|in the old times
+|in the right place at the right time
+|in the wrong place at the wrong time
+|in time
+|in times
+|into time
+|island time
+|is that the time
+|it's about time
+|it's a matter of time
+|it's a question of time
+|it's only a matter of time
+|it's only a question of time
+|jailtime
+|Jamaican time
+|Jewish Standard time
+|just in time
+|keep good time
+|keep time
+|keep up with the times
+|Kenyan time
+|kill time
+|kill-time
+|lagtime
+|last-time
+|last time I checked
+|launch time
+|lead time
+|leavetime
+|legend in one's own time
+|less than no time
+|let the good times roll
+|like the new time
+|linear time-invariant
+|linear time-varying
+|link time
+|lock time
+|lock-time
+|longtime
+|long-time
+|lose no time
+|lose time
+|lost in time
+|make a time
+|make good time
+|make time
+|make time with
+|make up for lost time
+|man versus time
+|many a time
+|many a time and oft
+|many a time and often
+|many a times
+|many at times
+|many time
+|many times
+|march-time
+|master of one's time
+|matter of time
+|may you live in interesting times
+|meantime
+|mean time to failure
+|metatime
+|Methods-Time Measurement
+|me-time
+|me time
+|Micronesian time
+|microtime
+|midtime
+|missing in time
+|mists of time
+|modern times
+|moontime
+|most of the time
+|motion and time study
+|move with the times
+|mzungu time
+|need more time in the oven
+|next time
+|next to no time
+|nick of time
+|nick-of-time
+|nick-time
+|Nigerian time
+|nine times out of ten
+|nontime
+|noon-time
+|not before time
+|no time
+|no-time
+|no time like the present
+|no time to lose
+|nut-cutting time
+|of all time
+|off-time
+|oftentime
+|oft-time
+|oft times
+|oft-times
+|old as time
+|old as time itself
+|old-time
+|old timer
+|old time used to be
+|on a time
+|once on a time
+|once upon a time
+|one at a time
+|one more time
+|one more time for the sweet souvenir
+|one step at a time
+|one's time is one's own
+|one time
+|one-time
+|one-time pad
+|only time will tell
+|on one's own time
+|on-time marker
+|on time,on-time
+|other times
+|othertimes
+|other-times
+|out of one's time
+|out-of-time
+|out of time
+|over time
+|Palauan time
+|part-time
+|part-time girlfriend
+|party time
+|Paschaltime
+|passage of time
+|pass a good time
+|passing of time
+|pass the time
+|pass the time of day
+|past-time
+|past time
+|peace for our time
+|peace in our time
+|peace-time
+|pea-time is past
+|perfumed terms of the time
+|period of time
+|piping times
+|piping times of peace
+|play for time
+|please-time
+|point in time
+|polynomial-time reduction
+|polytime
+|porridge time
+|presstime
+|primary time standard
+|primetime
+|procrastination is the thief of time
+|pro time
+|Puerto Rican time
+|pull time
+|put one's pants on one leg at a time
+|question of time
+|quick time event
+|quitting-time
+|race against time
+|rag-time
+|ready for prime time
+|real-time
+|reaping time
+|reap-time
+|reclaim one's time
+|recovery time objective
+|retarded time
+|ring time
+|risetime
+|run-time
+|run time
+|rutey time
+|rutting time
+|Samoan time
+|Samoa time
+|sands of time
+|seedtime
+|seed-time
+|sense of time
+|serial time-encoded amplified microscopy
+|serve one's time
+|serve the time
+|serve time
+|sexy times
+|Shapiro time delay
+|shiptime
+|show someone a good time
+|showtime
+|shriving-time
+|skytime
+|sleeptime
+|sleepytime
+|small time
+|smalltime
+|small-time
+|snacktime
+|snoozetime
+|snowtime
+|soft real-time
+|sometime
+|sometimes
+|some time yet
+|space-time
+|space-time crystal
+|space-time trade-off
+|spend time
+|spime
+|spin-up time
+|split-time
+|spring-time
+|stall for time
+|stand the test of time
+|stop-time
+|storytime
+|superposition in time
+|take one day at a time
+|take one's sweet little time
+|take one's sweet time
+|take one's time
+|take the time
+|take time
+|take time by the forelock
+|take time off
+|take time out
+|talk against time
+|tax-time
+|tell the time
+|temper of the times
+|temporal
+|tenor of the times
+|term-time
+|terrestrial time
+|test of time
+|the last of pea-time
+|there is a place and time for everything
+|there is a time and a place for everything
+|there is a time and place for everything
+|there's a first time for everything
+|there's a good time coming
+|there's a place and time for everything
+|there's a time and a place for everything
+|there's a time and place for everything
+|there's no time like the present
+|the time has come
+|they'll do it every time
+|third time is the charm
+|third time lucky
+|third time pays for all
+|this time
+|three-time loser
+|three times a charm
+|three times three
+|ticking time bomb
+|tide nor time tarrieth no man
+|time about
+|time account
+|time adverbial
+|time after bit
+|time after time
+|time agnosia
+|time agreement
+|time algorithm
+|time-aligned
+|time alignment
+|time alone will tell
+|time and again
+|time and a half
+|time and frequency transfer
+|time and material
+|time and materials
+|time and methods engineering
+|time and motion expert
+|time-and-motion expert
+|time and motion study
+|time-and-motion study
+|time and tide
+|time and tide stay for no man
+|time and tide tarry for no man
+|time and tide wait for no man
+|time and time again
+|time-assignment speech interpolation
+|time-attack
+|time attack
+|time-average
+|time average
+|time-average equation
+|time back
+|time ball
+|time-ball
+|timeband
+|time bandit
+|time-bandwidth product
+|timebank
+|time bank
+|time banking
+|time-banking
+|timebanking
+|time-bargain
+|time bargain
+|time-barred
+|time barrier
+|time base
+|timebase
+|time-based
+|time-based currency
+|time before time
+|time-beguiling
+|time being
+|time belt
+|time-bent
+|time-bettering
+|time-bewasted
+|time bill
+|timebill
+|time-bill
+|time bind
+|time binding
+|time-binding
+|time-blind
+|time-blindness
+|time-bomb
+|time bomb
+|timebook
+|time book
+|time-book
+|time-bound measure
+|time-bound program
+|timebound,time-bound
+|timebox
+|time box
+|timeboxing
+|time burglar
+|time candle
+|time capsule
+|time card
+|timecard
+|time-card
+|time catch
+|time-catcher
+|time-challenged
+|time change
+|time-change
+|time chart
+|time charter
+|time-charter
+|time check
+|time clause
+|time-clause
+|time clock
+|time code
+|timecode
+|time-compensated gain
+|time complexity
+|Time Complex Simulator
+|time compression
+|time-constant
+|time constant
+|time constraint
+|time-constructible function
+|time-consuming
+|time control
+|time cop
+|time copy
+|time-course
+|timecourse
+|time course
+|time crime
+|time-critical
+|time cross section
+|time crunch
+|time crystal
+|time curve
+|time cycle
+|time decay
+|time deixis
+|time delay
+|time-delay
+|time delay and integration clock
+|time-delayed
+|time-delay measuring instrument
+|time-delay measuring system
+|time-delay relay
+|time-delay spectrometry
+|time delay toxin activation
+|time-dependent
+|time deposit
+|time deposit account
+|time derivative
+|time-detector
+|time detector
+|time difference
+|time difference of arrival
+|time differential
+|time dilatation
+|time dilation
+|time disc
+|time discipline
+|time discount
+|time disk
+|time-distance
+|time diversification
+|time diversity
+|time division
+|time-division
+|time domain
+|time-domain analysis
+|time-domain averaging
+|time-domain electromagnetic method
+|time domain electromagnetics
+|time-domain reflectometer
+|time-domain reflectometry
+|time draft
+|time-eaten
+|time eater
+|time elapsed counter
+|time element
+|time element insurance
+|time enough
+|time evolution
+|time-expired
+|time-exposed
+|time-exposure
+|time exposure
+|time factor
+|time famine
+|time fault
+|time-fellow
+|time first
+|time flies
+|time flies when you're having fun
+|time forgot
+|time for print
+|time-frame
+|time frame
+|timeframe
+|time freight
+|time frequency adverbial
+|time-frequency analysis
+|time-frequency representation
+|time front
+|timeful
+|time fuse
+|time-fuse
+|timefuse
+|time fuze
+|time-gain compensation
+|timegate
+|time globe
+|time-globe
+|time-grapher
+|time grapher
+|time-gun
+|time gun
+|time hangs heavily
+|time hangs heavy
+|time heals
+|time heals all hurts
+|time heals all sorrows
+|time heals all things
+|time heals all wounds
+|time heals every wound
+|time hedge
+|time hierarchy theorem
+|time history
+|time-homogeneous Markovian type
+|time-honored
+|time-honoured
+|time-hopping
+|time hopping
+|time horizon
+|time immemorial
+|time in
+|time inconsistency
+|time-independent
+|time-independent Markovian type
+|time-independent Schrödinger equation
+|time integration
+|time-intensive
+|time interval
+|time in the sun
+|time in time again
+|time-invariance
+|time-invariant
+|time is a flat circle
+|time is a great healer
+|time is a great healer of all wounds
+|timeish
+|timeishness
+|time is money
+|time is of the essence
+|time is ripe
+|timeist
+|time is the great healer
+|time is ticking
+|time is up
+|time jump
+|time keep
+|timekeep
+|timekeeper
+|time-keeper
+|time-keeping
+|timekeeping
+|time killer
+|time-killer
+|time-killing
+|time lady
+|time lag
+|time-lag
+|time lamp
+|time lapse
+|time-lapse
+|timeless
+|time letter of credit
+|time-like
+|timelike
+|time-limit
+|time limit
+|time-limited
+|timeline
+|time-line
+|time line
+|timeling
+|time loan
+|time-lock
+|time lock
+|time loop
+|time-loop logic
+|timelord
+|timelore
+|timely
+|time machine
+|time management
+|time-marker
+|time marker
+|time marketing
+|time-memory trade-off
+|time migration
+|time money
+|time-motion study
+|time note
+|time of arrival
+|time-of-arrival technique
+|time of asking
+|time-of-check to time-of-use
+|time of concentration
+|time of day
+|time of death
+|time of delivery
+|time of departure
+|time off
+|time-off
+|time-of-flight
+|time-of-flight mass spectrometry
+|time offset
+|time of grace
+|time of life
+|time of memory
+|time of night
+|time of occurrence
+|time of one's life
+|time of origin
+|time of pericenter passage
+|time of pericentre passage
+|time of pitch
+|time of the end
+|time of the month
+|time of travel
+|Time of Troubles
+|time of useful consciousness
+|time-of-use meter
+|time-of-use rates
+|time of year
+|time on
+|time-on-device
+|time on device
+|time-one map
+|time-one mapping
+|time on ice
+|time opera
+|time optimal control problem
+|time order
+|time-ordered
+|time ordering
+|timeous
+|time-out
+|time out
+|timeout
+|time out of mind
+|time over
+|time parameter
+|time parameter space
+|timepass
+|time past
+|time patrol
+|time-payment
+|time pencil
+|time period
+|timepiece
+|time, place or manner restriction
+|time plan
+|time plane
+|timepleaser
+|time-pleaser
+|time-point
+|timepoint
+|time-point set
+|time police
+|time policy
+|time-policy
+|time-poor
+|time porn
+|time preference
+|time-preference theory of interest
+|time premium
+|time pressure
+|time projection chamber
+|timeproof
+|timequake
+|time quantum
+|time rate
+|time recorder
+|time-release
+|time-resolved
+|time reversal
+|time sampling
+|times and often
+|time's arrow
+|time-saver
+|timesaver
+|timesaving
+|time-saving
+|time-scale
+|time scale
+|timescale
+|timescaling
+|timescape
+|time scramble
+|time section
+|time sense
+|time-sensitive
+|time series
+|time-series animation
+|time series animation
+|time-served<pos:adjective>
+|time-served
+|time served<pos:noun>
+|time-server
+|timeserver
+|time-server,timeserver
+|time service
+|time-serving
+|timeserving
+|time-servingness
+|time-share
+|timeshare
+|time-sharer
+|time-sharing
+|timesheet
+|time-sheet
+|time sheet
+|timeshift
+|timeshift channel
+|time shifting,time-shifting,timeshifting
+|timeship
+|time shutter
+|time sight
+|time-signal,time signal
+|time-signature
+|time signature
+|times immemorial
+|Time Simulator
+|timesink,time sink,time-sink
+|timeskip
+|time slice
+|time slicing,time-slicing
+|timeslip
+|timeslot,time slot
+|timesome
+|times on base
+|times out of mind
+|time-space
+|time-space complexity
+|time-space compression
+|time-space convergence
+|time-space grid
+|timespan
+|time span
+|time-span reduction
+|times past
+|time spent laughing is time spent with the gods
+|time spent listening
+|time-spirit
+|time spirit
+|time spread
+|timestamp,time-stamp,time stamp
+|time-stamped
+|time standard
+|time stands still
+|time step
+|timestep
+|timestepping
+|times to be
+|times to come
+|time stop
+|time stream
+|timestream
+|time-stretch
+|time stretch analog-to-digital converter
+|time-stretched
+|time stretching
+|timestretching
+|time study
+|timesuck
+|time suck
+|time's up
+|time-switch
+|time switch
+|times without number
+|timetable
+|time-taker
+|time-taking
+|time tape,time-tape
+|time-taper
+|time term
+|time test
+|time-tested
+|time theft
+|time thief
+|time thrust,time-thrust
+|time to come
+|time-to-digital converter
+|time to expiry
+|time to kill
+|time to live
+|time to make the donuts
+|time-to-market
+|time to market
+|time to maturity
+|time to progression
+|time to time
+|time trace
+|time track
+|time-track
+|time-tracking
+|time tracking
+|time-tracking software
+|time trade
+|time train
+|time transfer
+|time travel
+|time-traveling
+|time-traveller
+|time triangle
+|time-white
+|time word
+|time trial
+|Time-Triggered Protocol
+|time trouble
+|time tunnel
+|time twin
+|time unit
+|Time Unit Box System
+|time until expiration
+|time use,time-use
+|time-use research
+|time-use survey
+|time-value,time value
+|time value of money
+|time value premium
+|Time Variance Authority
+|time-variant
+|time-varied gain
+|time-varied gain control
+|time-varying
+|time violation
+|time wage
+|time-waiter
+|timeward
+|time warp
+|time was
+|time-waste
+|timewaster
+|time-waster
+|time-wasting
+|timewasting
+|time-watch
+|time watch
+|timewave
+|timeweighted
+|time-weighted
+|timewheel
+|time will tell
+|time window
+|time window out
+|timewise
+|time work,timework,time-work
+|time-worker,timeworker
+|time-worn,timeworn
+|timeworthy
+|time you got a watch
+|time-zone,timezone,time zone
+|timish
+|timist
+|timous
+|toforetime
+|Tongan time
+|to the end of time
+|to time
+|tough times
+|two-time
+|two-time loser
+|two times
+|two-way traveltime
+|undern-time
+|unit of time
+|unity of time
+|until next time
+|until such time as
+|untime
+|unto time
+|upon a time
+|up to time
+|vacation time
+|waltz time
+|waste of time
+|waste-time
+|watchman's time detector
+|watchtime
+|whale of a time
+|what do you make the time
+|what in time
+|what is the time
+|what's the time
+|what time
+|what time do you make it
+|what time have you got
+|what time is it
+|wheel of time
+|when the time comes
+|White People's time
+|whiting-time
+|whole-time
+|why in time
+|window of time
+|winter time
+|winter-time
+|within the agreed time
+|with the passage of time
+|with the passing of time
+|with time
+|worktime,work time
+|yeartime
+|yestertime
+|yoretime
+|youthtime
+|zonetime
+|Zulu time
+}}
+
+====Collocations====
+Typical collocations with '''time''' or time expressions.
+* [[spend]] - To talk about the length of time of an activity.
+: - We '''spent''' a long '''time''' driving along the motorway.
+: - I've '''spent''' most of my life working here. (Time expression)
+* [[take]] - To talk about the length of time of an activity.
+: - It '''took''' a long '''time''' to get to the front of the queue. See also - [[take one's time]]
+: - It only '''takes''' five minutes to get to the shop from here. (Time expression)
+: - How long does it '''take''' to do that? (Time expression)
+* [[waste]] - see [[waste time]]
+
+====Descendants====
+* {{desc|bi|taem}}
+* {{desc|srn|ten}}
+* {{desc|pa|-|bor=1}} ṭāim, ṭaim, ṭāīm
+*: {{desc|pa|ਟਾਇਮ|ਟੈਮ|ਟਾਈਮ|tr1=-|tr2=-|tr3=-|sclang=1}}
+*: {{desc|pa|ٹائم|ٹیم|ٹائیم|tr1=-|tr2=-|tr3=-|sclang=1}}
+
+====Translations====
+{{see translation subpage|Noun}}
+
+===Verb===
+{{en-verb}}
+
+# {{lb|en|transitive}} To [[measure]] or [[record]] the time, [[duration]], or rate of something.
+#: {{ux|en|I used a stopwatch to '''time''' myself running around the block.}}
+# {{lb|en|transitive}} To [[choose]] when something [[commence]]s or its [[duration]].
+#: {{ux|en|The President '''timed''' his speech badly, coinciding with the Super Bowl.}}
+#: {{ux|en|The bomb was '''timed''' to explode at 9:20 p.m.}}
+#* {{RQ:Bacon Essayes|
+|passage=There is surely no greater wisdom than well to '''time''' the beginnings and onsets of things.}}
+#* {{quote-journal|en|journal=w:TIME|title=Your Bedroom Probably Isn't Dark Enough|date=Dec 9 2025|author=Veronique Greenwood
+|text=The human body uses light to correctly '''time''' myriad processes, ensuring that liver enzymes are made on schedule, hair cells divide at the right time, and blood pressure stays at a healthy level.
+|url=https://time.com/7339298/dark-bedroom-sleep-night-heart-health/}}
+# {{lb|en|obsolete}} To [[keep]] or [[beat]] time; to [[proceed]] or [[move]] in time.
+#* {{quote-text|en|year=1861|author=w:John Greenleaf Whittier|title=At Port Royal
+|passage=With oar strokes '''timing''' to their song.}}
+# {{lb|en|obsolete}} To pass time; to [[delay]].
+# To [[regulate]] as to time; to [[accompany]], or [[agree with]], in time of [[movement]].
+#* {{quote-text|en|year=1717|author=w:Joseph Addison|title=Metamorphoses
+|passage=Who overlooked the oars, and '''timed''' the stroke.}}
+#* {{RQ:Shakespeare Coriolanus|II|ii|passage=He was a thing of blood, whose every motion / Was '''timed''' with dying cries.}}
+# To [[measure]], as in [[music]] or [[harmony]].
+
+====Synonyms====
+* {{s|to measure time}} {{l|en|clock}}
+* {{s|to choose the time for}} {{l|en|set}}
+
+====Derived terms====
+<!--Terms derived from the VERB senses-->
+{{col4
+|en|mistime
+|overtime
+|over-time
+|retime
+|timeable
+|timed
+|time it out
+|time out
+|timer
+|timing
+}}
+
+====Descendants====
+{{top2}}
+* {{desc|da|time|bor=1}}
+* {{desc|nl|timen|bor=1}}
+* {{desc|de|timen|bor=1}}
+* {{desc|bor=1|sv|tajma|tima}}
+* {{desc|no|-|bor=1}}
+** {{desc|nb|time|taime}}
+** {{desc|nn|time|tima|taime|taima}}
+{{bottom}}
+
+====Translations====
+{{trans-top|to measure time}}
+* Bulgarian: {{t+|bg|засичам|impf}}, {{t|bg|засека|pf}}
+* Catalan: {{t+|ca|cronometrar}}
+* Chinese:
+*: Cantonese: {{t|yue|計時|tr=gai3 si4}}
+*: Mandarin: {{t+|cmn|計時|tr=jìshí}}
+* Danish: {{t|da|tage tid}}
+* Dutch: {{t+|nl|klokken}}, {{t+|nl|timen}}, {{t|nl|chronometreren}}
+* Estonian: {{t|et|aega võtma}}
+* Finnish: {{t|fi|ottaa aika}}, {{t+|fi|kellottaa}}
+* French: {{t+|fr|chronométrer}}
+* Georgian: {{t|ka|დროის ათვლა}}, {{t|ka|ჟამთაღრიცხვა}}
+* German: {{t|de|[[Zeit]] [[nehmen]]}}, {{t|de|[[Zeit]] [[stoppen]]}}, {{t|de|[[Zeit]] [[messen]]}}
+* Greek: {{t+|el|χρονομετρώ}}
+* Icelandic: {{t|is|mæla tímann á}}, {{t|is|tímamæla}}
+* Kurdish:
+*: Central Kurdish: {{t|ckb|وەخت گرتن}}
+* Latin: {{t-needed|la}}
+* Norwegian: {{t|no|ta tid}}
+* Persian: {{t|fa|زمان گرفتن|tr=zamân gereftan}}
+* Polish: {{t|pl|chronometrować}}
+* Portuguese: {{t+|pt|cronometrar}}
+* Russian: {{t+|ru|хронометрировать|impf}}, {{t|ru|засекать время|impf}}
+* Spanish: {{t+|es|cronometrar}}, {{t+|es|temporizar}}
+* Swedish: {{t|sv|[[ta]] [[tid]] [[på]]}}
+* Thai: {{t-check|th|จับเวลา|tr=jàp way-laa}}
+* Vietnamese: {{t|vi|tính giờ}}, {{t+|vi|bấm giờ}}
+{{trans-bottom}}
+
+{{trans-top|to choose the time for}}
+* Bulgarian: {{t-needed|bg}}
+* Catalan: {{t+|ca|programar}}
+* Czech: {{qualifier|human decision}} {{t|cs|načasovat}}, {{qualifier|of a device}} {{t+|cs|časovat}}
+* Danish: {{t+|da|time}} {{qualifier|human decision}}, {{t|da|tidsindstille}} {{qualifier|of a device}}
+* Estonian: {{t|et|ajastama}}
+* Finnish: {{qualifier|human decision}} {{t+|fi|ajoittaa}}, {{qualifier|of a device}} {{t+|fi|ajastaa}}
+* German: {{t|de|[[Zeitpunkt]] [[wählen]]}}, {{t|de|zeitlich planen}}, {{t+|de|terminieren}}, {{t+|de|timen}}
+* Icelandic: {{t+|is|tímasetja}} {{qualifier|human decision}}, {{t|is|tímastilla}} {{qualifier|of a device}}
+* Italian: {{t+|it|fissare}}, {{t+|it|programmare}}
+* Latin: {{t-needed|la}}
+* Portuguese: {{t+|pt|marcar}}, {{t+|pt|programar}}
+* Spanish: {{t+|es|programar}}
+* Swedish: {{t+|sv|tajma}} {{qualifier|human decision}}, {{t|sv|tidsinställa}} {{qualifier|of a device}}
+* Tagalog: {{t|tl|magsaoras}}, {{t|tl|isaoras}}
+* Vietnamese: {{t|vi|canh giờ}}, {{t|vi|tính giờ}}
+{{trans-bottom}}
+
+{{checktrans-top}}
+* Esperanto: {{t-check|eo|kronometri}}, {{t-check|eo|[[registri]] [[la]] [[daŭro]]n [[de]]}}
+* Interlingua: {{t-check|ia|chronometrar}}
+* Norman: {{t-check|nrf|minnuter}} {{qualifier|Jersey}}
+{{trans-bottom}}
+
+===Interjection===
+{{en-intj}}
+
+# {{lb|en|tennis}} {{ng|Reminder by the [[umpire]] for the players to continue playing after their pause.}}
+# The umpire's call in [[prizefight]]s, etc.
+# A call by a [[bartender]] to warn [[patron]]s that the establishment is closing and no more drinks will be served.
+#: {{ux|en|'''Time''' gentlemen please!}}
+
+===See also===
+* {{l|en|calendar}}
+* {{l|en|temporal}}<!--not etymologically related to "time"-->
+* {{l|en|Timese}}
+
+===References===
+<references/>
+* {{pedia}}
+
+===Further reading===
+* {{R:Britannica 1911|Time}}
+* {{pedia|Time (disambiguation)}}
+
+===Anagrams===
+* {{ana|en|a=eimt|item|METI|Item|EMT-I|it me|emit|Mite|mite}}
+
+{{C|en|Physical quantities}}
+{{cln|en|terms derived from the Proto-Indo-European root *deh₂-}}

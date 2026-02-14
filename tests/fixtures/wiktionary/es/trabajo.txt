@@ -1,0 +1,109 @@
+== {{lengua|es}} ==
+{{pron-graf}}
+
+=== Etimología ===
+{{etimología|endo|trabajar}}, y este del antiguo {{l+|osp|trebejare}}, del latín medieval {{l+|la|*trepaliare|glosa=zaherir}}, de {{l+|la|trepalium}}, cierto instrumento de tortura, sin duda de {{l+|la|tres}} y {{l+|la|palus|glosa=palo}}<ref>{{OED|travail}}</ref>. Compárese el catalán {{l+|ca|treball}}, el francés {{l+|fr|travail}}, el italiano {{l+|it|travaglio}}, el occitano {{l+|oc|trebalh}} o el portugués {{l+|pt|trabalho}}
+
+==== {{sustantivo masculino|es}} ====
+{{es.sust}}
+
+;1: {{sustantivo de verbo|trabajar}} (ocuparse en una actividad).
+{{sinónimo|labor}}
+
+;2: En particular, trabajo{{-sub|1}} que se desempeña regularmente, en especial si por una [[retribución]] o [[remuneración]].
+{{sinónimo|empleo|faena|labor|ocupación|oficio}}
+
+;3: {{ucf|cosa}} producida mediante el trabajo{{-sub|1}}.
+{{sinónimo|obra}}
+
+;4: {{ucf|lugar}} donde se desempeña el trabajo{{-sub|2}}.
+{{ejemplo|Hoy llegué temprano al trabajo.}}
+
+;5 {{csem|Economía}}: {{ucf|factor}} de la [[producción]] obtenido directamente del trabajo{{-sub|2}} [[humano]].
+{{antónimo|capital}}
+
+;6 {{csem|Física}}: {{ucf|magnitud}} [[escalar]] [[producto]] de la magnitud de una [[fuerza]] por la [[distancia]] que ella [[recorrer|recorre]].
+
+;7: {{ucf|situación}} [[difícil]] o [[apurado|apurada]].
+{{sinónimo|apuro|dificultad|trance}}
+
+;8: Situación [[penoso|penosa]] o [[infeliz]].
+{{sinónimo|estrechez|miseria|tribulación}}
+
+;9: {{ucf|fórmula}} o [[ritual]] con [[efecto]]s [[mágico]]s.
+{{ámbito|América}}
+{{sinónimo|conjuro|encantamiento|hechizo|embrujo}}
+
+;10: Por extensión, cualquier actividad [[remunerada]] o con fines de [[lucro]].
+
+;11: {{plm|informe}} escrito producto de la [[investigación]] acerca de un tema específico.
+{{hipónimo|monografía|tesis}}
+
+==== Locuciones ====
+{{trad-arriba|Locuciones con «trabajo»}}
+* {{l|es|trabajo asalariado}}
+* {{l|es|trabajo de campo}}
+* {{l|es|trabajo de chinos}}
+* {{l|es|trabajo de zapa}}
+* {{l|es|trabajo doméstico}}
+* {{l|es|trabajo en cadena}}
+* {{l|es|trabajo improductivo}}
+* {{l|es|trabajo mecánico}}
+* {{l|es|trabajo productivo}}
+* {{l|es|trabajo reproductivo}}
+* {{l|es|trabajo sucio}}
+* {{l|es|trabajos forzados}}: pena impuesta a un reo a ejercer labores manuales difíciles y sin remuneración.
+* {{l|es|accidente de trabajo}}
+* {{l|es|bolsa de trabajo}}
+* {{l|es|capital de trabajo}}
+* {{l|es|carga de trabajo}}
+* {{l|es|carta de trabajo}}
+* {{l|es|cercar a trabajo}}
+* {{l|es|con trabajo}}
+* {{l|es|costar trabajo}}: ser muy difícil una cosa
+* {{l|es|dar trabajo}}
+* {{l|es|de trabajo}}
+* {{l|es|dibujo de trabajo}}
+* {{l|es|división del trabajo}}
+* {{l|es|día de trabajo}}
+* {{l|es|esfuerzo de trabajo}}
+* {{l|es|fatiga de trabajo}}
+* {{l|es|hermano del trabajo}}
+* {{l|es|hipótesis de trabajo}}
+* {{l|es|jornada de trabajo}}
+* {{l|es|pasar trabajo}}: sufrir calamidades (Venezuela)
+* {{l|es|plano de trabajo}}
+* {{l|es|tomarse el trabajo}}
+{{trad-abajo}}
+{{trad-arriba|Refranes con «trabajo»}}
+* {{l|es|no hay atajo sin trabajo}}
+{{trad-abajo}}
+
+==== Véase también ====
+{{W}}
+{{Wikiquote}}
+
+====Traducciones====
+{{trad-arriba}}
+{{t|de|a1=1|t1=Arbeit|g1=f}}
+{{t|ast|a1=1|t1=trabayu|g1=m}}
+{{t|br|a1=1|t1=labour|g1=m}}
+{{t|bg|a1=1|t1=работа}}
+{{t|ca|a1=1|t1=treball|g1=m}}
+{{t|cs|a1=1|t1=práce}}
+{{t|ko|a1=1|t1=일|tl1=il}}
+{{t|sl|a1=1|t1=delo|g1=n}}
+{{t|fr|a1=1|t1=travail|g1=m}}
+{{t|en|a1=1|t1=work|a2=2|t2=job}}
+{{t|ga|a1=1|t1=post|g1=m|i2=s|t2=obair|g2=f}}
+{{t|is|a1=1|t1=atvinna}}
+{{t|it|a1=1|t1=lavoro|g1=m}}
+{{t|yua|a1=1|t1=meyaj}}
+{{t|nl|a1=1|t1=werk|g1=n}}
+{{t|pt|a1=1|t1=trabalho|g1=m}}
+{{t|eu|a1=1|t1=lan}}
+{{trad-abajo}}
+
+=== Forma flexiva ===
+==== Forma verbal ====
+;1: {{forma verbo|trabajar|p=1s|t=presente|m=indicativo}}.

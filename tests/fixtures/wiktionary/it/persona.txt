@@ -1,0 +1,69 @@
+== {{-it-}} ==
+{{-sost-|it}}
+{{Pn|w}} ''f sing'' {{Linkp|persone}}
+# {{Term|filosofia|it}} {{Term|antropologia|it}} [[essere]] [[umano]] in [[possesso]] di [[coscienza]] di [[sé]] e di [[propria]] [[identità]]
+#* '' il [[w:Taser|Taser]] è un'arma di dissuasione non letale, che produce una scarica elettrica non lieve che immobilizza la {{Pn}} per alcuni secondi''
+# '''persona fisica''', [[essere umano]] in [[possesso]] di [[diritti]] e [[doveri]], [[che]] ha [[respirato]] [[almeno]] una [[volta]]
+# '''persona giuridica''': [[entità]] [[individuale]] o [[collettiva]] in [[possesso]] di [[diritti]] e [[doveri]], [[che]] differisce dalla persona fisica per il [[fatto]] di [[non]] poter [[essere]] [[coinvolta]] in [[rapporti]] [[legislativi]] [[caratteristici]] di quest'[[ultima]]
+#{{Est}} [[rappresentante]] della [[specie]] [[umana]], [[senza]] [[distinzione]] di [[sesso]], [[età]] e [[condizione]] [[sociale]]
+# {{Term|linguistica|it|grammatica}} [[categoria]] [[grammaticale]] che [[indicare|indica]], [[secondo]] il [[contesto]], chi si [[esprimere|esprime]], colui o coloro a cui ci si [[rivolgere|rivolge]] o [[altro]]
+# '''[[prima persona]], [[seconda persona]], [[terza persona]]''': (''[[singolare]]'' o ''[[plurale]]'') [[pronomi]] per le [[voci]] [[verbali]] secondo [[tempi]] e [[modi]]
+#* ''"io" è la '''prima''' {{Pn}} singolare, mentre "tu" è la seconda''
+ 
+{{-sill-}}
+; per | só | na
+
+{{-pron-}}
+{{IPA|/perˈsona/}}
+{{Audio|it-persona.ogg}}
+
+{{-etim-}}
+Dal {{la}} ''persona'' ovvero "ciò che suona, che parla"
+
+{{-sin-}}
+* [[donna]], essere umano, [[individuo]], il [[singolo]], il [[prossimo]], [[qualcuno]], [[uomo]],  [[uno]],  uno [[sconosciuto]],un [[tale]], un [[tizio]]   
+*[[apparenza]], [[aspetto]] [[corporatura]], [[corpo]], [[figura]] umana, [[personale]], [[aspetto]], [[fisico]], [[statura]], [[forma]], [[linea]], [[fattezze]], [[complessione]]
+
+{{-ant-}}
+*[[cosa]],  [[oggetto]]
+*[[folla]], [[gruppo]],  [[società]] 
+*[[nessuno]], [[niente]] 
+
+{{-der-}}
+* [[impersonale]], [[impersonare]], [[personaggio]], [[personalismo]], [[personalista]], [[personalistico]], [[personalità]], [[personalizzare]], [[personalizzato]], [[personalizzazione]], [[personalmente]], [[personal computer]], [[personal numbering]], [[personal organizer]], [[personal trainer]], [[personeggiare]], [[personificare]], [[personificato]], [[personificazione]], [[semipersona]]
+
+{{-rel-}}
+* [[uomo]], [[donna]]
+
+{{-alter-}}
+* {{Dim}} [[personcina]]
+ 
+{{-prov-}}
+* ''[[a persona]]''
+* ''[[di persona]]'': direttamente
+* ''una certa qualità/caratteristica fatta {{Pn}}'' : si dice di qualcuno che rappresenta bene una certa qualità o caratteristica
+* ''{{Pn}} [[fidata]]''
+
+{{-trad-}}
+{{Trad1|}}
+:*{{akz}}:  [[aati]]
+:*{{cic}}:  [[hatuk]]
+:*{{zh}}: [[人]] (rén)
+:*{{ko}}:  [[사람]] (saram)
+:*{{fi}}:  [[henkilö]], [[ihminen]]
+:*{{fr}}:  [[personne]]
+:*{{ja}}:  [[人]] ([[ひと]] hito)
+:*{{en}}:  [[person]]
+:*{{id}}:  [[orang]]
+:*{{is}}:  [[pers&oacute;na]]
+{{mid}}
+:* {{la}}: [[homo]]
+:*{{nap}}:  [[perzona]]
+:*{{nl}}:  [[persoon]]
+:*{{pt}}:  [[pessoa]] [[:pt:pessoa]]
+:*{{ru}}:  [[человек]]
+:*{{es}}:  persona
+:*{{sv}}:  [[person]]
+:*{{de}}:  [[Person]] ''f'', [[Mensch]] ''m''
+:*{{hu}}:  [[személy]] [[:hu:személy]]
+{{Trad2}}

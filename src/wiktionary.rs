@@ -318,6 +318,41 @@ fn is_language_code_token(token: &str) -> bool {
     )
 }
 
+fn is_grammar_meta_token(token: &str) -> bool {
+    let normalized = token
+        .trim_matches(|c: char| !c.is_ascii_alphanumeric() && c != '-')
+        .to_ascii_lowercase();
+    matches!(
+        normalized.as_str(),
+        "w" | "m"
+            | "f"
+            | "n"
+            | "mf"
+            | "fm"
+            | "sg"
+            | "pl"
+            | "sing"
+            | "plural"
+            | "case"
+            | "nom"
+            | "gen"
+            | "dat"
+            | "acc"
+            | "voc"
+    )
+}
+
+fn is_pure_grammar_marker_definition(definition: &str) -> bool {
+    let tokens: Vec<&str> = definition
+        .split_whitespace()
+        .filter(|t| !t.trim().is_empty())
+        .collect();
+    if tokens.is_empty() {
+        return false;
+    }
+    tokens.iter().all(|t| is_grammar_meta_token(t))
+}
+
 fn is_wikidata_qid_token(token: &str) -> bool {
     let t = token.trim();
     if t.len() < 2 {
@@ -352,6 +387,20 @@ fn normalize_definition_noise(s: &str) -> String {
         } else {
             break;
         }
+    }
+
+    // Some entries leak raw grammar markers (e.g. "w f sing case").
+    // Remove only clear leading marker sequences, keeping normal prose intact.
+    let mut grammar_prefix_len = 0usize;
+    for token in &tokens {
+        if is_grammar_meta_token(token) {
+            grammar_prefix_len += 1;
+        } else {
+            break;
+        }
+    }
+    if grammar_prefix_len >= 2 && grammar_prefix_len < tokens.len() {
+        tokens.drain(0..grammar_prefix_len);
     }
 
     // Drop trailing single-letter lowercase noise fragments (e.g. "... i")
@@ -563,6 +612,11 @@ fn extract_definitions_with_subpoints(
         let mut candidate: Option<(&str, bool)> = None;
         if let Some(rest) = l.strip_prefix("# ") {
             candidate = Some((rest.trim(), false));
+        } else if let Some(rest) = l.strip_prefix("#*") {
+            // Italian Wiktionary often stores real senses as "#*" under a
+            // grammar header line (e.g. "casa"), so we treat these as
+            // definition-bearing subpoints.
+            candidate = Some((rest.trim(), true));
         } else if let Some(rest) = l.strip_prefix(';') {
             let mut idx = 0usize;
             let chars: Vec<char> = rest.chars().collect();
@@ -599,6 +653,9 @@ fn extract_definitions_with_subpoints(
                 continue;
             }
             if !from_subpoint && !out.is_empty() && is_probably_single_lemma_noise(&truncated) {
+                continue;
+            }
+            if is_pure_grammar_marker_definition(&truncated) {
                 continue;
             }
             if !truncated.is_empty() && truncated.chars().any(|c| c.is_alphanumeric()) {
@@ -1066,11 +1123,20 @@ pub fn format_output_text(language: Language, entry: &DictionaryAndTranslation) 
     out.push_str(&title);
     out.push_str("\n\n");
 
-    out.push_str(&i18n::tr(language, "dictionary.definitions"));
-    out.push_str(":\n");
-    for line in format_definition_lines(&entry.dictionary.definitions) {
-        out.push_str(&line);
-        out.push('\n');
+    let visible_defs: Vec<String> = entry
+        .dictionary
+        .definitions
+        .iter()
+        .filter(|def| !is_pure_grammar_marker_definition(def))
+        .cloned()
+        .collect();
+    if !visible_defs.is_empty() {
+        out.push_str(&i18n::tr(language, "dictionary.definitions"));
+        out.push_str(":\n");
+        for line in format_definition_lines(&visible_defs) {
+            out.push_str(&line);
+            out.push('\n');
+        }
     }
 
     if !entry.dictionary.synonyms.is_empty() {
@@ -1108,8 +1174,17 @@ pub fn format_menu_lines(language: Language, entry: &DictionaryAndTranslation) -
         "dictionary.word_label",
         &[("word", &entry.dictionary.word)],
     ));
-    lines.push(i18n::tr(language, "dictionary.definitions"));
-    push_definitions_menu(&mut lines, &entry.dictionary.definitions);
+    let visible_defs: Vec<String> = entry
+        .dictionary
+        .definitions
+        .iter()
+        .filter(|def| !is_pure_grammar_marker_definition(def))
+        .cloned()
+        .collect();
+    if !visible_defs.is_empty() {
+        lines.push(i18n::tr(language, "dictionary.definitions"));
+        push_definitions_menu(&mut lines, &visible_defs);
+    }
 
     if !entry.dictionary.synonyms.is_empty() {
         lines.push(i18n::tr(language, "dictionary.synonyms"));
@@ -1153,6 +1228,9 @@ fn format_definition_lines(definitions: &[String]) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::extract_definitions_with_subpoints;
+    use super::is_pure_grammar_marker_definition;
+    use std::fs;
+    use std::path::PathBuf;
 
     #[test]
     fn spanish_hola_keeps_definition_text_inside_template() {
@@ -1279,6 +1357,75 @@ mod tests {
         let wikitext = "# {{w|f|sing|case}}\n# abitazione";
         let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
         assert_eq!(defs, vec!["abitazione".to_string()]);
+    }
+
+    #[test]
+    fn drops_leading_raw_grammar_markers_before_definition() {
+        let wikitext = "# w f sing case abitazione";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert_eq!(defs, vec!["abitazione".to_string()]);
+    }
+
+    #[test]
+    fn filters_definition_when_only_raw_grammar_markers_are_available() {
+        let wikitext = "# w f sing case";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert!(defs.is_empty());
+    }
+
+    #[test]
+    fn recognizes_pure_grammar_marker_definition() {
+        assert!(is_pure_grammar_marker_definition("w f sing case"));
+    }
+
+    #[test]
+    fn does_not_treat_normal_definition_as_grammar_marker() {
+        assert!(!is_pure_grammar_marker_definition("abitazione"));
+    }
+
+    #[test]
+    fn italian_casa_extracts_real_definitions_from_hash_star_lines() {
+        let wikitext = "# {{Pn|w}} ''f sing'' {{Linkp|case}}\n#* {{Term|architettura|it}} [[edificio]] [[costruito]] [[per]] [[essere]] utilizzato [[come]] [[abitazione]]\n#* [[dimora]] di una [[persona]]";
+        let defs = extract_definitions_with_subpoints(wikitext, usize::MAX, usize::MAX);
+        assert_eq!(defs.len(), 2);
+        assert!(defs[0].contains("edificio"));
+        assert!(defs[1].contains("dimora"));
+    }
+
+    #[test]
+    fn real_wiktionary_fixtures_extract_definitions_word_by_word() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("fixtures")
+            .join("wiktionary");
+        let index = fs::read_to_string(root.join("index.csv"))
+            .expect("Unable to read tests/fixtures/wiktionary/index.csv");
+        let mut checked = 0usize;
+
+        for line in index.lines().skip(1) {
+            if line.trim().is_empty() {
+                continue;
+            }
+            let parts: Vec<&str> = line.split(',').collect();
+            assert!(parts.len() == 3, "Malformed fixture index row: {line}");
+            let lang = parts[0].trim();
+            let word = parts[1].trim();
+            let rel_file = parts[2].trim();
+            let wikitext = fs::read_to_string(root.join(rel_file))
+                .unwrap_or_else(|_| panic!("Missing fixture file for {lang}:{word} => {rel_file}"));
+            let defs = extract_definitions_with_subpoints(&wikitext, usize::MAX, usize::MAX);
+            assert!(
+                !defs.is_empty(),
+                "No definitions extracted for real fixture {lang}:{word}"
+            );
+            assert!(
+                defs.iter().any(|d| !is_pure_grammar_marker_definition(d)),
+                "Only grammar markers extracted for real fixture {lang}:{word}: {defs:?}"
+            );
+            checked += 1;
+        }
+
+        assert_eq!(checked, 60, "Expected 60 real dictionary fixtures");
     }
 
     #[test]

@@ -1,0 +1,578 @@
+==English==
+{{wp}}
+
+===Alternative forms===
+* {{alter|en|werke|worke||obsolete}}
+* {{alter|en|wuk||nonstandard, [[AAVE]]}}
+* {{alter|en|werk|werq||obsolete|_|except as LGBT slang}}
+
+===Pronunciation===
+* {{enPR|wûrk}}, {{IPA|en|/wɜː(ɹ)k/}}
+** {{IPA|en|/wɜːk/|[wəːk]|a=RP}}
+*** {{IPA|en|[wəːk]|[wœːk]|a=MLE}}
+*** {{IPA|en|[wɔːk]|a=Northumbria,Broad,_,Geordie}}
+*** {{IPA|en|[wɛːk]|a=Liverpool}}
+** {{IPA|en|/wɚːk/|a=IE}}
+*** {{IPA|en|[wʊːɹk]|a=Dublin}}
+** {{IPA|en|/wɝk/|[wɚk]|a=GenAm}}
+*** {{IPA|en|/wɜɪ̯k/|a=NYC,Southern US,dated}}
+** {{IPA|en|/wɵːk/|a=AU}}
+** {{IPA|en|/wøːk/|a=NZ}}
+** {{IPA|en|[wɚːk]|[wəɹk]|a=CA}}
+** {{IPA|en|a=Indic,rhotic|/ʋərk/|/(ʋ)ɵrk/<a:rounded>}}
+** {{IPA|en|/ʋɜk/|a=Indic,non-rhotic}}
+* {{audio|en|en-uk-work.ogg|a=RP}}
+* {{audio|en|LL-Q1860 (eng)-Vealhurl-work.wav|a=Southern England}}
+* {{audio|en|en-us-work.ogg|a=GA}}
+* {{rhymes|en|ɜː(ɹ)k|s=1}}
+
+===Etymology 1===
+{{etymon|en|id=employment|:inh|enm:werk<id:work>|tree=1}}
+{{root|en|ine-pro|*werǵ-}}
+From {{inh|en|enm|work}}, {{m|enm|werk}}, from {{inh|en|ang|weorc}}, from {{inh|en|gmw-pro|*werk}}, from {{inh|en|gem-pro|*werką|t=work}}, from {{inh|en|ine-pro|*wérǵom|t=work}}, from {{inh|en|ine-pro|*werǵ-|t=to make}}.
+{{col-top|2|cog}}
+Cognate with {{cog|sco|wark|t=work}}, {{cog|frr|werk|t=work}}, {{cog|stq|Wierk|t=work}}, {{cog|fy|wurk|t=work}}, {{cog|nl|werk|t=work}}, {{cog|de|Werk|t=work}}, {{cog|nds-de|Wark|t=work}}, {{cog|lb|Wierk|t=work}}, {{cog|da|værk|t=work}}, {{cog|fo,is,nb,nn,sv|verk|t=work}}; also {{cog|br|ober|t=to do, make}}, {{cog|kw|gul}}, {{m|kw|gwul|t=to do, make}}, {{cog|ga,gd|fearg|t=anger}}, {{cog|gv|ferg|t=anger}}, {{cog|xpi|ᚒᚏᚏᚐᚉᚈ|tr=urract|t=he made}}, {{cog|cy|gwneud}}, {{m|cy|neud|t=to do, make}}, {{cog|el|έργο|t=work}}, {{cog|sq|argëtim|t=entertainment; fun, pleasure}}, {{m|sq|argëtoj|t=to amuse, entertain}}, {{cog|lt|váržas|t=fish snaring net}}, {{cog|mk|врша|t=fish-trap}}, {{cog|pl|wiersza|t=fish-trap}}, {{cog|ru,uk|ве́рша|t=fish-trap}}, {{cog|sh|вр̑ша}}, {{m|sh|vȓša|t=fish-trap}}, {{cog|sk,sl|vrša|t=fish-trap}}, {{cog|xag|𐔱𐕒𐕙𐔵|t=labour, work}}, {{cog|hy|գործ|t=work}}, {{cog|kmr|werz|t=bed, field, patch; season}}, {{cog|ae|𐬬𐬆𐬭𐬆𐬰|t=to do, work}}, {{cog|fa|ورز|tr=varz|t=art, craft, trade}}, {{m|fa|ورزه|tr=varze|t=art, profession, trade}}, {{m|fa|ورزیدن|tr=varzidan|t=to exercise; to train; to work}}, {{cog|txb|warkṣäl|t=energy, power, strength}}. English cognates include {{m|en|bulwark}}, {{m|en|boulevard}}, {{m|en|energy}}, {{m|en|erg}}, {{m|en|georgic}}, {{m|en|liturgy}}, {{m|en|metallurgy}}, {{m|en|organ}}, {{m|en|surgeon}}, {{m|en|wright}}. {{doublet|en|erg|ergon}}.
+{{col-bottom}}
+
+====Noun====
+{{en-noun|~}}
+
+# {{lb|en|uncountable}} [[employment|Employment]].
+## [[labour|Labour]], [[occupation]], [[job]].
+##: {{syn|en|Thesaurus:occupation}}
+##: {{ux|en|My '''work''' involves a lot of travel.}}
+##* {{RQ:Shakespeare Merchant of Venice|III|iv|177|1|Come on ''Neriſſa'', I haue '''worke''' in hand / That you yet know not of; wee'll ſee our husbands / Before they thinke of vs?}}
+##* {{RQ:KJV|2 Chronicles|31|21||And in euery '''worke''' that he began{{...}}he did it with all his heart, and prospered.}}
+##* {{RQ:Maxwell Mirror and the Lamp|XXXIII|257|passage=Edward Churchill still attended to his '''work''' in a hopeless mechanical manner like a sleep-walker who walks safely on a well-known round. But his Roman collar galled him, his cossack stifled him, his biretta was as uncomfortable as a merry-andrew’s cap and bells.}}
+## The [[place]] where one is employed.
+##: {{ux|en|He hasn’t come home yet; he’s still at '''work'''.}}
+## {{lb|en|by extension}} One's employer.
+##: {{ux|en|I want to go to the reunion concert, but I'm not sure if my '''work''' will give me the time off.}}
+## {{lb|en|dated}} A [[factory]]; a [[works]].
+##* {{quote-text|en|year=1917|title=Platers' Guide|page=246
+|passage=In trials of a Martin furnace in a steel '''work''' at Remscheiden, Germany, a lining of zirconia was found in good condition after {{...}}}}
+# {{lb|en|uncountable}} [[effort|Effort]].
+## [[effort|Effort]] expended on a particular task.
+##: {{syn|en|Thesaurus:work}}
+##: {{ux|en|Holding a brick over your head is hard '''work'''. It takes a lot of '''work''' to write a dictionary.}}
+## Sustained [[effort]] to overcome [[obstacle]]s and achieve a [[result]].
+##: {{ux|en|We know what we must do. Let's go to '''work'''.}}
+##: {{ux|en|We don't have much time. Let's get to '''work''' piling up those sandbags.}}
+##* {{RQ:Rinehart Hopwood Bat|I|01|passage=The Bat—they called him the Bat. Like a bat he chose the night hours for his '''work''' of rapine; like a bat he struck and vanished, pouncingly, noiselessly; like a bat he never showed himself to the face of the day.}}
+## Something on which effort is expended.
+##: {{ux|en|There's lots of '''work''' waiting for me at the office.}}
+### {{senseid|en|Q3675172}} {{lb|en|euphemism}} {{1|cosmetic surgery}}.
+###: {{coi|en|has had a lot of '''work''' done}}
+###* {{quote-journal|en-GB|author=w:Marina Hyde|title=Was this a hen do or a humanitarian mission to liberate Paris? Either way, give Lauren Sánchez an award|work=The Guardian|date=2025-05-20|url=https://www.theguardian.com/commentisfree/2025/may/20/lauren-sanchez-hen-do-humanitarian-mission-paris-jeff-bezos|issn=0261-3077|passage=Luckily, our eyes have grown accustomed after decades of Botox, fillers and extreme “'''work'''” going mainstream, so we don’t notice the weirdness and read it instead as maximum hotness. Thank you, progress!}}
+### <!--{{lb|en|synecdoche}}--> {{lb|en|prison slang}} Prison gang violence.
+###: {{coi|en|has been putting in '''work'''}}
+<!--### [Note to editors: It is neither practical nor necessary to record every possible synecdochal meaning in a dictionary (so no need to listcruft them all); but some of them are salient enough in speech to be worth entering (for example, work as plastic surgery). Any such synecdoche whose referent is obvious within context (for example, "the plumber did some work last week" = plumbing work) and is irrelevant outside its context is a garden-variety one that needs no dict def. In contrast, ones like "work" as plastic surgery have more of an idiomatic "life of their own" (across contexts) than that.-->
+## {{senseid|en|Q42213}} {{lb|en|physics}} A measure of [[energy]] expended in moving an object; most commonly, [[force]] times [[distance]]. No work is done if the object does not [[move]].
+##: {{ux|en|'''Work''' is done against friction to drag a bag along the ground.}}
+## {{lb|en|physics|more generally}} A measure of energy that is [[usefully]] extracted from a process: [[apply|applied]] [[productive#Adjective|productive]]ly.
+##* {{quote-journal|en|year=2013|month=July-August|author=[http://www.americanscientist.org/authors/detail/lee-s-langston Lee S. Langston]| magazine=w:American Scientist| title=[http://www.americanscientist.org/issues/pub/2013/4/the-adaptable-gas-turbine The Adaptable Gas Turbine]| passage=Turbines have been around for a long time—windmills and water wheels are early examples. The name comes from the Latin ''turbo'', meaning "vortex", and thus the defining property of a turbine is that a fluid or gas turns the blades of a rotor, which is attached to a shaft that can perform useful '''work'''.}}
+# [[product|Product]]; the result of [[effort]].
+## {{lb|en|uncountable|often|in combination}} The result of a particular manner of production.
+##: {{ux|en|There's a lot of guess'''work''' involved.}}
+## {{lb|en|uncountable|often|in combination}} Something produced using the specified material or tool.
+##: {{ux|en|We've got some paper'''work''' to do before we can get started. The piece was decorated with intricate filigree '''work'''.}}
+## {{lb|en|countable}} A [[literary]], [[artistic]], or [[intellectual]] [[production]]; a [[creative work]].
+##: {{syn|en|Thesaurus:creative work}}
+##: {{ux|en|It is a '''work''' of art.}}
+##: {{ux|en|the poetic '''works''' of Alexander Pope}}
+##* {{RQ:Shakespeare Macbeth|III|i|140|2|To leaue no Rubs nor Botches in the '''Worke''':}}
+##* {{RQ:Milton Paradise Lost|book=1|lines=730–732|passage=The haſty multitude / Admiring enter'd, and the '''work''' ſome praiſe / And ſome the Architect:|year=1873}}
+##* {{RQ:Hough Purchase Price|chapter=I
+|passage=“[…] We are engaged in a great '''work''', a treatise on our river fortifications, perhaps? But since when did army officers afford the luxury of amanuenses in this simple republic?{{...}}”}}
+## {{lb|en|countable}} A [[fortification]].
+##: {{ux|en|William the Conqueror fortified many castles, throwing up new ramparts, bastions and all manner of '''works'''.}}
+# {{lb|en|uncountable|slang|professional wrestling}} The [[staging]] of events to appear as real.
+# {{lb|en|mining}} [[ore|Ore]] before it is [[dress]]ed.<ref>{{R:Raymond Glossary}}</ref>
+# {{lb|en|slang|plural only}} The equipment needed to inject a drug ([[syringe]]s, [[needle]]s, [[swab]]s etc.)
+#: {{ux|en|Tell me you're using clean '''works''' at least.}}
+#* {{RQ:William Burroughs Junkie|year=1977|pages=25–26|pageref=26|passage=He gave me a sour look. “All right is it? Well, you shoot some then.” I cooked up a grain and got out my '''works''' ready to take the shot.}}
+#* {{quote-book|en |title=The Essential AIDS Fact Book |page=25 |pageurl=https://books.google.com/books?id=-sPW0S6YILoC&pg=PA25 |publisher=Simon and Schuster |year=1996 |author=Paul Harding Douglas |coauthors=Laura Pinsky |isbn=0671552872 |text=If you buy new '''works''', clean them ''before'' using them. If you share '''works''', clean them before you or the next person uses them. Blood may be in your '''works''' even if you can't see it. Clean your '''works''' either with rubbing alcohol (available in drugstores), a household bleach solution (three tablespoons of bleach in a cup of water), or boiling water.}}
+#* {{quote-book|en|year=2009|author=Gillian G. Gaar|title=The Rough Guide to Nirvana|publisher=Rough Guides UK|url=https://books.google.com/books?id=i9mvU7iug9AC&pg=PT32&dq=%22bleach+your+works%22&hl=&cd=5&source=gbs_api#v=onepage&q=%22bleach%20your%20works%22&f=false|isbn=9781405381123|text=While in San Francisco, where the AIDS crisis was particularly devastating, they saw numerous public awareness signs reading “Bleach Your '''Works'''” posted around the city, urging IV drug users to clean their needles with bleach to help staunch the spread of the disease.}}
+# {{lb|en|LGBT slang}} The confident attitude of a [[drag queen]].
+#* {{quote-book|en|date=2018-04-17|author=madison moore|title=Fabulous: The Rise of the Beautiful Eccentric|publisher=Yale University Press|isbn=9780300235074|page=27
+|text=All told, '''werk''' is about creativity, virtuosity, and a certain kind of mastery.}}
+#* {{quote-book|en|date=2022-01-25|author=Monique Jenkinson|title=Faux Queen: A Life in Drag|publisher=Bywater Books|isbn=9781612942223
+|text=If the voice coming out of my body is legibly male, it complicates my presence. The '''work''' starts to approach that mysterious state of '''werq'''.}}
+
+=====Derived terms=====
+{{col4|en|a woman's work is never done|gingerbread work|work rule|aerial work platform|all in a day's work|all work and no play makes Jack a dull boy|attorney's work product|back-to-work order|Bantam work|bell work|Berlin work|blood work|buhl work|chamber-work|clincher-work|clinker-work|close enough for government work|cold work|collar-work|completed staff work|creative work|detached work|dimension work|earshell work|elevating work platform|equal pay for equal work|differential piece work|knowledge work|nice work if you can get it|work time|farm work|find work|functional work|get work done|gig work|go to work|good enough for government work|have work done|hot work|orphan work|orphaned work|outside work|picqué work|plain work|police work|primary work|proof of work|put to work|resist work|right to work|rubbed work|rustic-work|Sabrina work|sank work|secondary work|set to work|Sorrento work|space work|stencil work|stoop work|strike work|stroke of work| |summer-work|swash-work|tabernacle work|tap of work|the devil makes work for idle hands,idle hands make work for the Devil,idle hands make work for the devil,the Devil finds work for idle hands,the devil finds work for idle hands,the Devil makes work for idle hands|thirsty work|tongue-work|Tula work|tut-work|undeclared work|velvet work|voluntary work|war work|welfare-to-work|wet work|work bowl|work dog|work envelope|work of fiction|work of necessity|work order|work permit|work placement|work product|work rage|work release|work shadowing|work shift|work triangle|work unit|work zone|work-life balance
+|artwork|work farm|work front|work function|work hardening|work history|work-safe|work-study|work-to-rule|work-tool|yeoman's work|youth work
+|at work|do a lot of work|ghost work|hard at work|hard work|honeycomb work|put in the work|the Lord's work|work management|work-a-day|work-athon|workathon|work-table|work-up|peace work|peacework
+|basketwork
+|basket-work
+|basket work
+|beadwork
+|bitchwork|do the work|show one's work
+|blue-collar work|castle-work
+|body of work|work-brittle
+|bodywork
+|bookwork
+|boxwork|after-work
+|brainwork
+|brasswork
+|brassworks
+|breastwork,breast-work|crowd work
+|bridgework
+|brightwork
+|brushwork
+|busywork,busy-work,busy work
+|candleworks||mobile elevated work platform
+|canework
+|casework
+|chairwork
+|charmwork,charm-work,charm work
+|checkerwork
+|chequerwork|community work|trellis work|trellis-work
+|classwork
+|clockwork
+|coachwork
+|cobwork
+|coursework
+|course work
+|craftwork
+|crewelwork
+|cribwork
+|crownwork
+|cutwork
+|cut work
+|daywork
+|day-work
+|day work
+|desk work,deskwork
+|derivative work
+|detective work
+|dirty work
+|donkeywork
+|donkey-work
+|donkey work
+|dreamwork
+|ductwork
+|dyework
+|dyeworks
+|earthwork
+|facework
+|falsework
+|fancywork
+|fieldwork
+|field work
+|fingerwork
+|finger work
+|firework
+|fireworks
+|flatwork
+|flushwork
+|footwork
+|formwork
+|framework
+|fretwork
+|frostwork
+|gaswork
+|gasworks
+|glasswork
+|glassworks
+|glass-works
+|God's work
+|goldwork
+|good work
+|good works
+|grillework
+|grillwork
+|groundwork
+|groupwork
+|gruntwork
+|grunt work
+|guesswork
+|handiwork
+|hackwork
+|handwork
+|handywork
+|headwork
+|homework
+|hornwork
+|housework
+|inwork
+|ironwork
+|ironworks
+|keywork
+|lacework
+|laceworks
+|lacquerwork
+|lacwork
+|latticework
+|leafwork
+|leatherwork
+|leatherworks
+|legwork
+|leg work
+|lifework
+|maid-of-all-work
+|make-work
+|mask work
+|masterwork
+|mazework
+|meshwork
+|metalwork
+|metalworks
+|millwork
+|millworks
+|needlework
+|network
+|nightwork
+|night work
+|nonwork
+|non-work
+|openwork
+|open-work
+|out-of-work
+|out of work
+|outwork
+|overwork
+|paintwork
+|paperwork
+|partwork
+|passagework
+|patchwork
+|piece of work
+|piecework
+|piece-work
+|piece work
+|pilework
+|pink-collar work
+|pipework
+|plasterwork
+|pokerwork
+|proudwork
+|public works
+|reference work
+|remote work
+|roadwork
+|road work
+|rockwork
+|ropework
+|sale of work
+|saltwork
+|saltworks
+|scalework
+|schoolwork
+|scratchwork
+|scrollwork
+|scutwork
+|scut work
+|seatwork
+|sex work
+|shadow work
+|sheetwork
+|shellwork
+|shiftwork
+|shift work
+|shitwork
+|silverwork
+|smelting works
+|social work
+|soapworks
+|spadework
+|spatterwork
+|spellwork
+|spell-work
+|spell work
+|steelwork
+|steelworks
+|stockwork
+|stonework
+|strapwork
+|streamwork
+|stream-work
+|streamworks
+|stream-works
+|streetwork
+|stuccowork
+|stumpwork
+|tablework
+|taskwork
+|task-work
+|teamwork
+|telework
+|tertiary work
+|timberwork
+|timework
+|time-work
+|time work
+|trackwork
+|trelliswork
+|trenchwork
+|trimwork
+|trusswork
+|truss-work
+|trywork
+|try-work
+|try work
+|underwork
+|upperworks
+|wagework
+|wandwork
+|wand-work
+|wand work
+|waterwork
+|waterworks
+|water works
+|wattlework
+|waxwork
+|webwork
+|westwork
+|wheelwork
+|white-collar work
+|whitework
+|wickerwork
+|wicker-work
+|women's work
+|wonderwork
+|woodwork
+|woolwork
+|woolworks
+|workaround
+|workaday
+|workbasket
+|workbench
+|workboat
+|workbook
+|workbox
+|workcamp
+|work-camp
+|work camp
+|workday
+|work day
+|work environment
+|work ethic
+|work experience
+|workface
+|workfare
+|workflow
+|workforce
+|work force
+|workfree
+|workgang
+|workgirl
+|workgroup
+|workhome
+|workhorse
+|workhouse
+|work house
+|work husband
+|work in process
+|work-in-process
+|work in progress
+|work-in-progress
+|work-intensive
+|workiversary
+|work life
+|work-life
+|work of art
+|workless
+|worklist
+|workload
+|workly
+|workman
+|work marriage
+|workmaster
+|work-master
+|workmate
+|workmistress
+|work-mistress
+|workout
+|work party
+|workpeople
+|workperson
+|workpiece
+|workplace
+|work platform
+|workroom
+|works
+|worksheet
+|workshop
+|worksite
+|worksome
+|worksong
+|work song
+|workspace
+|work spouse
+|workstand
+|workstation
+|work station
+|workstead
+|workstone
+|work-stone
+|workstream
+|worktable
+|worktime
+|worktop
+|work train
+|workup
+|workweek
+|workwear
+|workwise
+|workwoman
+|work wife|have one's work cut out|have one's work cut out for one| inside work|job of work|lab work|life's work|line of work|lump work|make hard work of|make light work of|make quick work of|make short work of|manual work|many hands make light work|mobile elevating work platform|narrow work|nulled work|office work
+|adzework|allwork|antiwork|backwork|badgework|bagwork|bandwork|basswork|bedwork|benchwork|blackwork|bladework|blockwork|bloodwork|blotchwork|bobbinwork|bonework|borderwork|botchwork|Bowenwork|braidwork|branchwork|buhlwork|bushwork|bywork|cagework|carework|catchwork|chainwork|checkwork|chordwork|churchwork|codework|cofferwork|coldwork|colorwork|copperwork|cornicework|counterwork|crowdwork|deadwork|deedwork|diaperwork|drainwork|drudgework|earthenwork|earwork|edgework|enamelwork|endwork|fanwork|farmwork|featherwork|feltwork|figurework|filmwork|flamework|floorwork|fluework|flutework|frillwork|gardenwork|gatchwork|gearwork|gemwork|glovework|graphwork|gridwork|griefwork|grottowork|guitarwork|gunwork|gutterwork|hairwork|hatchwork|heelwork|Hellerwork|icework|inkwork|interwork|journeywork|knifework|knitwork|lampwork|lapwork|leadwork|lightwork|linework|lockwork|Looyenwork|mapwork|marblework|microwork|minework|mirrorwork|miswork|mousework|nearwork|neatwork|numberwork|padwork|pairwork|panelwork|peacework|pencilwork|penwork|playwork|plotwork|pointework|pointwork|policework|postwork|prework|punchwork|quickwork|quillwork|rackwork|ragwork|rangework|redwork|reedwork|ringwork|rootwork|rotework|roughwork|rubblework|runework|salework|sawnwork|scarletwork|screenwork|shopwork|sidework|siegework|silkwork|Sindhwork|sleuthwork|slopwork|smithwork|soundwork|sourcework|spearwork|speedwork|spindlework|splatterwork|splintwork|splitwork|spritework|spywork|stairwork|stepwork|stickwork|stitchwork|stop-work|studwork|stuntwork|swordwork|threadwork|tilework|tinwork|topwork|torchwork|tradework|trancework|trestlework|tubework|unwork|vasework|veinwork|voicework|weisure|wetwork|wifework|wirework|workability|workable|workaholic|workalcoholic|workalike|workamping|workathon|workbag|workboard|workboot|workcamper|workcation|workery|workfellow|workfolk|workful|workglove|workhand|workhour|workie|workish|worklet|worklike|workling|worklog|workloom|workname|worknight|workover|workpan|workpants|workpaper|workphobia|workphobic|workprint|workrate|workscreen|workseeker|workshare|workshed|workshift|workship|workshirt|workshoe|workshy|worksona|workstock|workstrand|workstyle|worksurface|worktext|worktool|workword|workworn|worky|workyard|wristwork|yardwork
+}}
+
+=====Descendants=====
+* {{desc|pis|waka}}
+
+=====Translations=====
+{{see translation subpage|Noun}}
+
+====See also====
+* {{sense|product (combining form)}} {{l|en|-ing}}<!-- compare piping/pipework -->
+
+===Etymology 2===
+{{etymid|en|to labour}}
+From {{inh|en|enm|werken}} and {{m|enm|worchen}}, from {{inh|en|ang|wyrċan}} and {{m|ang|wircan}} (Mercian), from {{inh|en|gem-pro|*wurkijaną||to work}}, from {{inh|en|ine-pro|*wr̥ǵyéti||to be working, to be at work}}, from the root {{m|ine-pro|*werǵ-}}. Cognate with {{cog|ofs|werka}}, {{m|ofs|wirka}}, {{cog|osx|wirkian}}, {{cog|nds|warken}}, {{cog|nl|werken}}, {{cog|goh|wurken}} ({{cog|de|wirken}}, {{m|de|werken}} and {{m|de|werkeln}}), {{cog|non|yrkja}} and {{m|non|orka}}, ({{cog|sv|yrka}} and {{m|sv|orka}}), {{cog|got|𐍅𐌰𐌿𐍂𐌺𐌾𐌰𐌽}}.
+
+====Verb====
+{{en-verb|+|+|+,wrought<l:rare,archaic>}}
+[[File:Farmer in potato field.jpg|thumb|A farmer '''working''' in a potato field]]
+
+# {{lb|en|intransitive}} To do a specific [[task]] by [[employ]]ing [[physical]] or [[mental]] [[power]]s.
+#: {{ux|en|He's '''working''' in a bar.}}
+#* {{quote-journal|en|author=Matt Falcus|title=16 new airports and terminals we can’t wait to fly into|magazine=w:CNN|url=https://www.cnn.com/travel/article/new-airports-and-terminals|date=2018-12-06|passage=The world’s favorite airport and Asian mega-hub, Singapore Changi, is eagerly '''working''' towards opening its new Jewel and Terminal 5.|archiveurl=https://web.archive.org/web/20250425152050/https://www.cnn.com/travel/article/new-airports-and-terminals/}}
+## Said of one's [[workplace]] (building), or one's department, or one's trade (sphere of business) {{+obj|en|:in/:at}}.
+##: {{ux|en|I '''work''' in a national park.}}
+##: {{ux|en|She '''works''' in the human resources department.}}
+##: {{ux|en|He mostly '''works''' in logging but sometimes '''works''' in carpentry too.}}
+## Said of one's [[job title]] {{+obj|en|:as}}.
+##* {{RQ:Maxwell Mirror and the Lamp|XXXVII|287|This time was most dreadful for Lilian. Thrown on her own resources and almost penniless, she maintained herself and paid the rent of a wretched room near the hospital by '''working''' as a charwoman, sempstress, anything.}}
+##: {{ux|en|I '''work''' as a cleaner.}}
+## Said of a company or individual who [[employ]]s {{+obj|en|:for}}.
+##: {{ux|en|She '''works''' for Microsoft.}}
+##: {{ux|en|He '''works''' for the President.}}
+## General use, said of either fellow [[employee]]s or [[instrument]]s or [[client]]s {{+obj|en|:with}}.
+##: {{ux|en|I '''work''' closely with my Canadian counterparts.}}
+##: {{ux|en|You '''work''' with computers, right?}}
+##: {{ux|en|She '''works''' with the homeless people from the suburbs.}}
+## {{lb|en|transitive}} To [[work]] or [[operate]] in a certain place, area, or [[speciality]].
+##: {{ux|en|She '''works''' the night clubs.}}
+##: {{ux|en|The salesman '''works''' the Midwest.}}
+## {{lb|en|transitive}} To [[work]] or [[operate]] in, through{{,}} or by means of.
+##: {{ux|en|She's '''working''' the phones.}}
+# {{lb|en|intransitive}} To [[function]] [[correctly]]; to [[act]] as [[intended]]; to [[achieve]] the goal [[design]]ed for.
+#: {{ux|en|He pointed at the car and asked, "Does it '''work'''"?}}
+#: {{ux|en|He looked at the bottle of pain pills, wondering if they would '''work'''.}}
+#: {{ux|en|My plan didn't '''work'''.}}
+#* {{RQ:Guardian|date=2013-06-21|author=w:Oliver Burkeman|title=The tao of tech|volume=189|issue=2|page=48|archiveurl=https://web.archive.org/web/20230608183226/https://www.theguardian.com/technology/2013/may/10/conscious-computing-twitter-facebook-google|passage=The dirty secret of the internet is that all this distraction and interruption is immensely profitable. Web companies like to boast about "creating compelling content", or offering services that let you "stay up to date with what your friends are doing", "share the things you love with the world" and so on. But the real way to build a successful online business is to be better than your rivals at undermining people's control of their own attention. Partly, this is a result of how online advertising has traditionally '''worked''': advertisers pay for clicks, and a click is a click, however it's obtained.}}
+#* {{quote-journal|en|date=2025 October 15|author='Mystery Shopper'|title=About Anglia... and high scores|journal=RAIL|issue=1046|page=54|text=Once again, the WiFi isn't willing to '''work'''. When the guard comes to check tickets, I ask him if it ever '''works'''. He rolls his eyes and tells me it rarely does. He says I'll be lucky if I get it to connect. I give up trying.}}
+# {{lb|en|transitive}} To cause to [[operate]], be [[productive]], [[behave]] a certain way{{,}} or [[happen]].
+## To [[set]] into [[action]].
+##: {{ux|en|He '''worked''' the levers.}}
+## {{senseid|en|exhaust}} To [[exhaust]], by working.
+##: {{ux|en|The mine was '''worked''' until the last scrap of ore had been extracted.}}
+##* {{quote-text|en|year=1774|author=w:Edward Long|title=The History of Jamaica. Or, General Survey of the Antient and Modern State of that Island|volume=2|chapter=11|page={{gbooks|xr0NAAAAQAAJ|240|worked}}
+|passage=They were told of a ſilver mine, that had been '''worked''' by the Spaniards, ſomewhere in the Healthſhire Hills, in St. Catharine; but they were not able to diſcover it.}}
+## To [[shape]], [[form]], or [[improve]] a [[material]].
+##: {{ux|en|He used pliers to '''work''' the wire into shape.}}
+## To [[provoke]] or [[excite]]; to [[influence]].
+##: {{ux|en|The rock musician '''worked''' the crowd of young girls into a frenzy.}}
+##* {{quote-book|1=en|year=1950|author=Norman Lindsay|authorlink=Norman Lindsay|title={{w|Dust or Polish?}}|publisher=Angus and Robertson|location=Sydney|page=17|passage="Still, boozers can be '''worked''' sometimes. Most people can, if you encourage their kink. One old woman staked me for three months because she got such a kick out of scandalmongering the neighbours to me."}}
+## To [[use]] or [[manipulate]] to one’s [[advantage]].
+##: {{ux|en|She knows how to '''work''' the system.}}
+## {{lb|en|law}} To cause to [[happen]] or to [[occur]] as a [[consequence]].
+##: {{ux|en|I cannot '''work''' a miracle.}}
+##* {{quote-text|en|year=2022|title=[https://file.sawnee.com/web-docs/library/Sawnee-EMC-Bylaws-08-19-2022.pdf Sawnee Electric Membership Corporation Bylaws]|section=Article III, Section 3.01
+|passage=Failure to hold the annual meeting, or to otherwise conduct the business of the annual meeting, shall not '''work''' a forfeiture or dissolution of the Cooperative.}}
+## To [[force]] to [[work]].
+##: {{ux|en|He is '''working''' his servants hard.}}
+# {{lb|en|intransitive}} To move or [[progress]] slowly or with difficulty; to [[proceed]] with [[effort]].
+#: {{co|en|to '''work''' into the earth}}
+#* {{quote-book|1=en|year=1951|author={{w|John Wyndham}}|title={{w|The Day of the Triffids}}|publisher=Penguin Books|year_published=1954|location=Harmondsworth|page=79|passage=We '''worked''' back again and picked up our intended route, but we did not find the clear run I had hoped for.}}
+## {{lb|en|transitive}} To move or progress slowly {{+obj|en|:one's way}}.
+##: {{ux|en|He '''worked''' his way through the crowd.}}
+##: {{ux|en|The dye '''worked''' its way through.}}
+# {{lb|en|transitive}} To cause to move slowly or with difficulty.
+#: {{ux|en|Using some tweezers, she '''worked''' the bee sting out of her hand.}}
+#* {{RQ:Addison Cato|IV|16|So the pure limpid Stream, when foul with Stains / Of ruſhing Torrents, and deſcending Rains, / '''Work’s''' it ſelf clear, and as it runs, refines; / ’Till by Degrees, the floating Mirrour ſhines, / {{...}}}}
+# {{lb|en|transitive}} To [[embroider]] with [[thread]].
+# {{lb|en|intransitive}} To [[ferment]].
+# {{lb|en|transitive}} To cause to [[ferment]].
+#* {{RQ:Bacon Sylva Sylvarum|X|para=992|255|For ''Inanimate Things'', you may trie the ''Force'' of ''Imagination'', vpon Staying the '''''Working''''' of ''Beere'', when the ''Barme'' is put in; Or vpon the ''Comming'' of ''Butter'', or ''Cheeſe'', after the ''Cherming'', or the ''Rennet'' bee put in.}}
+# {{lb|en|intransitive|figuratively}} To [[influence]].
+#: {{ux|en|They '''worked''' on her to join the group.}}
+# {{lb|en|intransitive}} To [[move]] in an [[agitated]] [[manner]].
+#: {{ux|en|His fingers '''worked''' with tension.}}
+#: {{ux|en|A ship '''works''' in a heavy sea.}}
+#* {{RQ:Addison Italy|Brescia, Verona, Padua|54|passage=Here vex’d with Winter Storms ''Benacus'' raves, / Confus’d with '''working''' Sands and rolling Waves; / Rough and tumultuous like a Sea it lyes, / So loud the Tempeſt roars, ſo high the Billows riſe.}}
+# {{lb|en|intransitive}} To [[behave]] in a certain way when [[handle]]d
+#: {{ux|en|This dough does not '''work''' easily.}}
+#: {{ux|en|The soft metal '''works''' well.}}
+# {{lb|en|ditransitive|poetic}} To [[cause]] (someone) to [[feel]] (something); to [[do]] unto somebody (something, whether good or bad).
+#* {{RQ:R. F. Burton Arabian Nights|VI|The Fifth Voyage of Sindbad the Seaman|night=557|pages=51–52|pageref=51|passage=And indeed I blamed myself and sore repented me of having taken compassion on him and continued in this condition, suffering fatigue not to be described, till I said to myself, “I '''wrought''' him a weal and he requited me with my ill; by Allah, never more will I do any man a service so long as I live!”}}
+#* {{RQ:Service Cheechako|poem=The Ballad of One-eyed Mike|stanza=12|pages=54–55|pageref=55|passage=So sad it seemed, and its cheek-bones gleamed, and its fingers flicked the shore; / And it lapped and lay in a weary way, and its hands met to implore; / That I gently said: "Poor, restless dead, I would never '''work''' you woe; / Though the wrong you rue you can ne'er undo, I forgave you long ago."}}
+# {{lb|en|obsolete|intransitive}} To [[hurt]]; to [[ache]].
+#* {{quote-text|en|year=1485|author=Sir {{w|Thomas Malory}}|title=w:Le Morte d'Arthur|section=Book XXI
+|passage=‘I wolde hit were so,’ seyde the Kynge, ‘but I may nat stonde, my hede '''worchys''' so—’}}
+# {{lb|en|slang|transitive}} To [[pull off]]; to wear, perform, etc. successfully or to advantage.
+#: {{ux|en|I would have never thought those pieces would go together, but she is '''working''' it like nobody's business.}}
+# {{lb|en|LGBT slang|intransitive}} To perform with a [[confident]] [[attitude]], particularly as a [[drag queen]].
+#* {{quote-book|en|date=2020-11-09|author=Shae Connor|title=Rough and Tumble|publisher=Entangled: Embrace|isbn=9781649370631
+|text=Plus, all that gym work means you've got muscles for days. You gotta werk it, babe." She puts a swish and swing into her next few steps before she bursts out laughing, and I have to join in.}}
+#* {{quote-book|en|date=2022-02-01|author=Lindsay Bryde|author2=Tommy Mayberry|title=RuPedagogies of Realness: Essays on Teaching and Learning with RuPaul's Drag Race|publisher=McFarland|isbn=9781476646060|page=41
+|text=Today, almost three decades later, the sentence, "You better '''work'''" from the song is used on a daily basis.}}
+
+=====Conjugation=====
+{{en-conj|old=1|past_old=wrought}}
+
+=====Derived terms=====
+{{col|en|title=phrasal verbs derived from ''work (verb)''
+|work at
+|work away
+|work back
+|work off
+|work on
+|work out
+|work over
+|work through
+|work together
+|work up
+}}
+{{col|en|title=other terms derived from the ''work (verb)''|work one's buns off|work one's fingers to the bone|work one's guts out|work one's magic|work one's passage|work one's tail off|work one's way|work one's way up|work the angles|work the hole|work the hyphens|work the oracle|work the refs|work the system|I just work here|I only work here|working hard or hardly working
+|bework|God works in mysterious ways|the Lord works in mysterious ways|only fools and horses work|so crazy it just might work|work into the ground
+|forework|crazy enough to work|where do you work
+|forwork
+|outwork|work the audience|work the bar|work the line
+|rework|work oneself to the bone
+|workaround
+|worker
+|working
+|work it
+|work like a beaver
+|work like a dog
+|work like a horse
+|work like a nigger
+|work like a Trojan|awork
+|work the crowd
+|work the room
+|work to rule
+|work like a dream|work like a mule|work like a nailer
+|work wonders
+|work someone's arse off|work someone's ass off|work someone's butt off|work someone's tail off|teamwork makes the dream work|work around|work backward|work both ends against the middle|work both sides against the middle|work double tides|work in|work nights|work round|wouldn't work in an iron lung|work with one's hands}}
+
+=====Descendants=====
+* {{desctree|srn|wroko}}
+* {{desc|yue|work|bor=1|pos=adjective}}
+
+=====Translations=====
+{{see translation subpage|Verb}}
+
+===Further reading===
+* {{R:Keywords|page=334}}
+
+===References===
+<references/>
+
+{{cln|en|irregular verbs|terms with /ʌ~ʊ/ for Old English /y/}}
+{{C|en|Work}}
+{{C|en|Physical quantities}}
+{{C|en|Mechanics}}

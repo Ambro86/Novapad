@@ -1,0 +1,85 @@
+== {{lengua|es}} ==
+{{pron-graf|2audio=Es-am-lat-ciudad.ogg|2aunota=Am. Lat.|2fone=sjuˈðað|2pron=seseo|alt2pron=Seseante|altpron=No seseante|fone=θjuˈðað|pron=seseo}}
+
+=== Etimología ===
+{{etimología|osp|cibdad}}, y este del latín {{l+|la|civitatem|cīvitātem}}, acusativo de {{l+|la|civitas|cīvitās|glosa=ciudadanía}}, derivado de {{l+|la|civis|cīvis|glosa=ciudadano}}, en última instancia del protoindoeuropeo {{l+|ine-pro|kei-|*ḱei-|glosa=asentarse}}. Compárese {{l+|es|cívico}}, {{l+|es|civil}}.
+
+=== {{sustantivo femenino|es}} ===
+{{es.sust}}
+[[Archivo:Tokyo aerial night.jpg|thumb|[1]]]
+;1 {{csem|geografía}}: {{plm|asentamiento}} de [[gran]] [[tamaño]] y [[actividad]] primariamente [[industrial]] o de [[servicio]], antes que [[agrícola]].
+{{sinónimos|urbe}}.
+;2: Por extensión, [[población]] de las ciudades{{-sub|1}}.
+;3: {{plm|institución}} que ejerce el [[gobierno]] de una ciudad{{-sub|1}}.
+{{sinónimos|ayuntamiento|alcaldía|consistorio}}.
+;4 {{csem|historia}}: Antiguamente, asentamiento que gozaba de especiales [[fuero]]s por [[gracia]] [[real]].
+{{uso|obsoleto}}.
+;5 {{csem|historia}}: {{plm|representante}} o [[apoderado]] de una ciudad{{-sub|4}}.
+{{uso|obsoleto}}.
+;6: {{plm|conjunto}} de [[instalaciones]] dedicadas a proveer todo lo [[necesario]] para la [[práctica]] de una [[actividad]].
+
+=== Locuciones ===
+{{trad-arriba|Locuciones con «ciudad»}}
+* {{l|es|Ciudad Acuña}}
+* {{l|es|Ciudad del Carmen}}
+* {{l|es|ciudad deportiva}}: Conjunto de habitaciones destinadas a deportistas
+* {{l|es|ciudad dormitorio}}: Población con viviendas de gente que, en su mayoría, trabaja en otro lugar o ciudad
+* {{l|es|Ciudad Juárez}}
+* [[ciudad universitaria]]: Conjunto de habitaciones y edificios destinados a los estudiantes y profesores
+* [[ciudad jardín]]: Conjunto de viviendas unifamiliares con jardines
+* [[ciudad lineal]]: La que está organizada en torno a una calle, avenida o carretera y se extiende a lo largo
+* [[ciudad obrera]]: Conjunto de viviendas destinadas a los obreros
+* [[ciudad sanitaria]]: Conjunto de edificios construidos para un hospital e instalaciones que lo circundan
+* [[ciudad satélite]]: Ciudad cercana a otra mayor, a la que está ligada en la mayor parte de sus actividades
+* [[la gran ciudad]]: Urbe de importancia.
+{{trad-abajo}}
+
+=== Información adicional ===
+{{derivad|ciudad|ciudadano|ciudadanía|conciudadano|ciudadela}}.
+
+=== Véase también ===
+{{Wikipedia}}
+{{Wikiquote}}
+* [[urbanización]]
+* [[comarca]]
+
+=== Traducciones ===
+{{trad-arriba}}
+{{t|de|a1=1|g1=f|t1=Stadt}}
+{{t|ar|a1=1|t1=مدينة|tl1=madīna}}
+{{t|an|a1=1|t1=ziudá}}
+{{t|ast|a1=1|t1=ciudá}}
+{{t|az|a1=1|t1=şəhər}}
+{{t|bg|a1=1|g1=m|t1=град|tl1=grad}}
+{{t|ca|a1=1|g1=f|t1=ciutat}}
+{{t|cs|a1=1|g1=n|t1=město}}
+{{t|da|a1=1|g1=c|t1=by}}
+{{t|sh|a1=1|g1=m|t1=grad}}
+{{t|sk|a1=1|g1=n|t1=mesto}}
+{{t|sl|a1=1|g1=n|t1=mesto}}
+{{t|eo|a1=1|t1=urbo}}
+{{t|eu|a1=1|t1=hiri}}
+{{t|ext|a1=1|t1=cidá|t2=ciá}}
+{{t|fr|a1=1-3|a2=1-3|g1=f|g2=f|t1=ville|t2=cité}}
+{{t|gl|a1=1|t1=cidade}}
+{{t|grc|a1=1|t1=πόλις}}
+{{t|hu|a1=1|t1=város}}
+{{t|io|a1=1|t1=urbo}}
+{{t|en|a1=1-3,6|t1=city|t2=town}}
+{{t|is|a1=1|g1=f|t1=borg}}
+{{t|it|a1=1-3,6|g1=f|t1=città}}
+{{t|ja|a1=1|t1=市}}
+{{t|la|a1=1|t1=urbs}}
+{{t|yua|a1=1|t1=noj kaaj}}
+{{t|nci|a1=1|t1=altepetl}}
+{{t|nch|a1=1|t1=altepetl}}
+{{t|nhe|a1=1|t1=altepetl}}
+{{t|nl|a1=1|g1=f|t1=stad}}
+{{t|no|a1=1|g1=m|t1=by}}
+{{t|nn|a1=1|g1=m|t1=by}}
+{{t|pt|a1=1|g1=f|t1=cidade}}
+{{t|ru|a1=1|g1=m|t1=город|tl1=górod}}
+{{t|sv|a1=1|t1=stad}}
+{{t|tl|a1=1|t1=lungsod}}
+{{t|tr|t1=şehir|t2=kent}}
+{{trad-abajo}}

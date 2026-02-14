@@ -1,0 +1,208 @@
+== {{-it-}} ==
+[[File:FeldschmiedeFeuer.jpg|thumb| un [[fabbro]] al {{Pn}}]]
+[[File:Banco da lavoro portatile.jpg|thumb|un [[banco]] da {{Pn}} [[portatile]]]]
+{{-sost-|it}}
+{{Pn|w}} '' m sing'' {{Linkp|lavori}} 
+# [[qualsiasi]] [[attività]] [[fisica]] o [[intellettuale]] compiuta per [[ottenere]] un [[bene]], un [[servizio]] o altro
+#* ''[[svuotare]] la [[cantina]] sarà un [[duro]] '''lavoro'''''
+#* ''[[opportunità]] di {{Pn}}''
+# l'[[opera]] ottenuta con lo svolgimento di tale attività
+#* ''ho [[pulito]] l'[[auto]], guarda che [[bel]] '''lavoro'''
+# {{Term|diritto|it}} {{Term|economia|it}} attività [[umana]] [[rigorosa]] e [[metodica]] con l'[[obiettivo]] di [[produrre]] e [[dispensare]] [[beni]] e [[servizi]], [[esplicata]] in [[cambio]] di [[compenso]] e [[disciplinata]] dalla [[legge]]
+#* ''se mi dovessero [[licenziare]] troverò un nuovo '''lavoro'''''
+#* ''non sa dove andare per [[trovare]] un {{Pn}}''
+# '''lavoro nero''': senza i [[contributi]] e/o quindi il [[pagamento]] delle [[tasse]] [[fiscali]]
+# {{Est}} [[impegno]] [[professionale]] che, spesso [[ottenuto]] grazie ad [[attitudini]] [[particolari]] e/o [[esperienza]], offre l'[[opportunità]] di un [[guadagno]] e quindi di un [[compenso]] in [[denaro]] e/o [[premi]]
+#* ''deve essere [[rispettato]] anche il {{Pn}} altrui, persino con [[ammirazione]]''
+# {{Est}} [[luogo]] dove si lavora
+#* ''pur essendo in [[ferie]] sono andato al '''lavoro''' a [[trovare]] i [[colleghi]]
+# {{Term|fisica|it}} {{Term|meccanica|it}} [[prodotto scalare]] tra [[forza]] e [[spostamento]] ([[anche]] tra [[massa]] e [[quadrato]] della [[velocità]])
+# l'opera degli [[agenti]] [[atmosferici]]
+# {{Est}} [[intento]] per [[espletare]] e [[realizzare]] qualcosa con [[compiutezza]]
+# [[impiego]] e/o [[compito]] [[lavorativi]]
+#* ''stava quasi per [[perdere]] il {{Pn}}''
+# {{Term|gergale|it}} {{Spreg}} indica [[vandalismo]], aver [[rovinato]] qualcosa in modo [[illecito]]
+#* ''avevi la moto nuova: guarda che {{Pn}} ti hanno fatto''
+# {{Fig}} [[miglioramento]] [[interiore]] e/o [[spirituale]] oppure il [[risultato]] di uno [[studio]] [[completo]] e [[profondo]]
+#* ''l'[[obiettivo]] [[richiede]] un {{Pn}} anche da parte nostra''
+#* ''"Bravo, ha fatto un buon {{Pn}}!"''
+# {{Term|familiare|it}} {{Term|medicina|it}} [[fase]] verso la [[guarigione]] grazie ad una [[corretta]] [[terapia]] [[medica]] ed all'impegno del [[paziente]]
+#* ''stiamo facendo un buon {{Pn}}''
+
+{{-verb form-|it}}
+{{Pn}} 
+# prima persona singolare dell'indicativo [[presente]] di [[lavorare]]
+
+{{-sill-}}
+; la | vó | ro
+
+{{-pron-}}
+{{IPA|/laˈvoro/}}
+{{Audio|it-lavoro.ogg}}
+
+{{-etim-}}
+* (''sostantivo'') dal [[latino]] ''[[labor]]''
+* (''voce verbale'') {{Etim-link|lavorare}}
+
+{{-quote-}}
+{{Quote
+|La mattina semina il tuo seme e la sera non dar riposo alle tue mani, perché non sai qual '''lavoro''' riuscirà, se questo o quello o se  saranno buoni tutt'e due
+|[[w:Qoelet|Qoelet]]  {{Passo biblico|Qo|11,6}}}}
+
+{{Quote
+|Mi piace il lavoro, mi affascina. Potrei stare per ore seduto ad osservarlo
+|[[q:Jerome Klapka| Jerome Klapka]]}}
+{{Quote
+|Ovunque l'uomo porti il suo lavoro, vi lascia anche qualche cosa del suo cuore.„
+|[[q:Henryk Sienkiewicz|Henryk Sienkiewicz]]}}
+
+{{-sin-}}
+* [[attività]], [[impiego]], [[mestiere]], [[occupazione]], [[professione]]
+*[[compito]], [[faccenda]], [[funzione]], [[incarico]], [[incombenza]], [[mansione]]
+* [[opera]], [[produzione]], [[realizzazione]]
+* {{Fig}}{{Term|ironico|it}} [[affare]], [[frutto]], [[guaio]], [[pasticcio]], [[risultato]], [[successo]]
+* {{Est}} } [[fatica]], [[impegno]], [[sforzo]],
+* [[esercizio]]  [[operazione]], [[responsabilità]],   
+*[[prestazione]],  [[professione]],   [[servizio]], 
+* elaborazione; opera d’arte
+*[[articolo]], [[manufatto]], [[prodotto]], [[oggetto]], 
+* {{Term|familiare|it}}  [[affaticamento]]
+* {{Term|familiare|it}} [[faccenda]] [[intricata]], [[imbroglio]], [[inganno]],  [[intrigo]], [[maneggio]], [[raggiro]], [[trama]],  [[truffa]] 
+*''(di agenti atmosferici, acque)'' [[azione]], [[lavorio]]
+*''(solo singolare)'' classe lavoratrice, [[lavoratori]]
+* [[produzione]]
+* {{Fig}} [[missione]]
+
+{{-ant-}}
+*[[disoccupazione]], [[hobby]], [[inattività]], [[ozio]], [[passatempo]], [[pigrizia]], [[riposo]],[[vacanza]]
+*   [[diletto]], [[divertimento]], [[festa]], [[piacere]],  [[svago]], 
+* [[senzalavoro]],  [[pensione]]
+
+{{-der-}}
+* [[capolavoro]], [[dopolavoro]], [[laborismo]], [[laburismo]], [[lavorare]], [[lavoratore]], [[senzalavoro]], [[superlavoro]], [[telelavoro]] 
+
+{{-rel-}}
+* [[sussistenza]], [[sopravvivenza]], [[sostentamento]]
+* [[volontariato]]
+* {{Est}} [[repubblica]], [[costituzione]]
+* {{Est}} [[esperienza]], [[interesse]]
+* [[iniziativa]]
+* {{Est}} [[emergente]]
+* {{Est}} [[ispirazione]]
+* [[conoscenza]], [[sapienza]]
+* {{Est}} [[crisi]]
+* {{Est}} [[professionalità]], [[serietà]]
+* [[guadagno]]
+* {{Est}} [[investimento]]
+* [[onestà]]
+
+{{-alter-}}
+* {{Dim}} [[lavoretto]], [[lavoruccio]]
+* {{Accr}} [[lavorone]]
+* {{Pegg}}  [[lavoraccio]] 
+
+{{-prov-}}
+* ''il {{Pn}} nobilita l'uomo'': riferimento alla [[dignità]], nonché alla [[serietà]] e/o [[professionalità]] delle persone operose
+* ''il [[frutto]] del proprio {{Pn}}'': fa riferimento alla soddisfazione per aver realizzato più cose proprio in ambito lavorativo
+* ''riprendere i '''lavori''''': in un [[summit]] ma generalmente riguardo ai compiti politici e/o diplomatici, significa continuare con ancora più convinzione
+
+{{-noconf-}}
+* [[professione]]: quest'ultima non è necessariamente retribuita perché implica una serie di capacità e di attitudini che il soggetto può svolgere solo con serietà e dimestichezza  
+
+{{-trad-}}
+{{Trad1|qualsiasi attività fisica o intellettuale}}
+:*{{af}}: [[werk]]
+:*{{sq}}: [[punë]]
+:*{{ar}}: [[عمل]], [[ʕámal]] ''m''
+:*{{an}}: [[triballo]]
+:*{{bm}}: [[baara]]
+:*{{eu}}: [[lan]]
+:*{{br}}: [[labour]] ''m'', [[oberenn]] ''f''
+:*{{bg}}: [[работа]] (rabota) ''f''
+:*{{ca}}: [[treball]] ''m'', [[feina]]
+:*{{cs}}: [[práce]] ''f'', [[zaměstnání]] ''n''
+:*{{zh}}: [[工作]] (gōngzuò)
+:*{{ko}}: [[일]] (il)
+:*{{co}}: [[lavoru]], 
+:*{{hr}}: [[rad]] ''m''
+:*{{ku}}: [[kar]] ''m'', [[îş]] ''m'', [[ked]] ''f'', [[şol]] ''m'', [[şuxl]] ''m'', [[xebat]] ''f'', [[çalakî]] ''f'', [[wezîfe]] ''f'', [[erk]] ''m'', [[vatinî]] ''f''
+:*{{he}}: [[עבודה]] (avodá) ''f'', [[מלאכה]] (melakhá) ''f''
+:*[[emiliano]] [[lavôr]]
+:*{{et}}: [[töö]]
+:*{{el}}: [[εργασία]] (ergasìa), [[δουλειά]] (douleiá)
+:*{{grc}}: [[ἔργον]] (ergon) ''n''
+:*{{fi}}: [[työ]]
+:*{{fr}}: [[travail]] ''m''
+:*{{fy}}: [[wurk]] ''n''
+:*{{fur}}: [[lavôr]]
+:*{{gl}}: [[traballo]]
+:*{{ja}}: [[仕事]] (しごと, shigoto), [[職業]] (しょくぎょう, shokugyō)
+:*{{hi}}: [[काम]] (kām), [[कार्य]] (kārya), [[कर्म]] (karma)
+:*{{en}}: [[work]], [[labour]] (lavoro fisico)
+:*{{ga}}: [[obair]] ''f''
+:*{{is}}: [[vinna]]
+:*{{la}}: [[labora]] ''f'', [[opus]] ''n''
+:*{{lv}}: [[darbs]]
+{{mid}}
+:*{{lij}}: [[laou]], [[travaggio]]
+:*{{lt}}: [[darbas]]
+:*{{lmo}}: [[lavô]]
+:*{{mr}}: [[काम]] (kām), [[कार्य]] (kārya), [[कर्म]] (karma)
+:*{{no}}: [[arbeid]] ''n''
+:*{{oc}}: [[trabalh]] ''f''
+:*{{nl}}: [[werk]], [[arbeid]] ''n''
+:*{{nap}}: [[fatica]]
+:*{{fa}}: [[کار]] (kār)
+:*{{pl}}: [[praca]] ''m'', [[dzieło]] ''n''
+:*{{pt}}: [[trabalho]] ''m''
+:*[[pugliese]] [[fatig]]
+:*[[romagnolo]] [[lavurir]]
+:*{{rm}}: [[lavur]] ''f''
+:*{{ro}}: [[muncă]] ''f'', [[treabă]] ''f'', [[operă]] ''f'',  [[lucrare]] ''f''
+
+:*{{rw}}: [[rimo]]
+:*{{ru}}: [[работа]] (rabóta) ''f'', [[труд]] (trud) ''n''
+:*{{sc}}: [[trabàdhu]]
+:*{{sco}}: [[wark]]
+:*{{sr}}: [[рад]] (rad)
+:*{{scn}}: [[travagghiu]]
+:*{{sk}}: [[robota]] ''f''
+:*{{sl}}: [[delo]] ''n''
+:*{{es}}: [[trabajo]] ''m'', [[labor]] ''f'', [[laburo]] ''m'' ([[Argentina]]/[[Uruguay]]), [[curro]] ''m'' ([[Spagna]]), [[chamba]] ''f'' ([[Messico]]/[[Ecuador]]/[[America|America Centrale]]), [[pega]] ''f'' ([[Bolivia]]/[[Colombia]]/[[Cuba]]/[[Ecuador]]/[[Perù]])
+:*{{sv}}: [[arbete]] ''n'', [[jobb]] ''n''
+:*{{sw}}: [[kazi]]
+:*{{de}}: [[Arbeit]] ''f'', [[Werk]] ''n'', [[Auftrag]] ''m''
+:*{{tr}}: [[çalişma]], [[iş]]
+:*{{uk}}: [[рoбота]] (robóta) ''f''
+:*{{hu}}: [[munka]]
+{{Trad2}}
+
+{{Trad1|attività per produrre reddito}}
+:*{{co}}: [[travagliu]], [[travaddu]]
+:*{{da}}: [[arbejde]] ''n''
+{{mid}}
+:*{{en}}: [[job]] (impiego)
+:*{{fr}}: [[travail]] ''m''
+:*{{es}}: [[trabajo]] ''m''
+{{Trad2}}
+
+{{Trad1| prima persona singolare dell'indicativo [[presente]] di [[lavorare]]}}
+:* {{en}}
+{{Trad2}}
+
+{{-ref-}}
+* {{Fonte|sape}}
+* {{Fonte|dem}}
+* {{Fonte|gar}}
+* {{Fonte|dizit}}
+* {{Fonte|trec}}
+*Enciclopedia [http://www.treccani.it/enciclopedia/ricerca/Lavoro/ Treccani]
+* {{Fonte|hoep}}
+* {{Fonte|sabco}}
+* {{Fonte|sin-co}}
+* {{Fonte|wrenit}}
+* {{Fonte|voc}}
+* {{Fonte|rep}}
+* {{Fonte|eti}}
+* {{Fonte|itfd}}
+*AA.VV.,'' Dizionario sinonimi e contrari'', Mariotti, 2006, pagina 307

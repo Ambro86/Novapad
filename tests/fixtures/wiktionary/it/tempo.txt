@@ -1,0 +1,138 @@
+== {{-it-}} ==
+{{-sost-|it}}
+{{Pn|w}} ''m sing'' {{Linkp|tempi}}
+# {{Term|filosofia|it}} {{Term|antropologia|it}} {{Term|fisica|it}} {{Term|astronomia|it}} dimensione in cui si concepisce e si misura il passare degli eventi
+#* ''fra i processi che, nell'uomo, col {{Pn}} invecchiano c'è anche la produzione di anticorpi''
+# {{Term|storia|it}} {{Term|archeologia|it}} [[epoca]], [[periodo]] [[storico]]
+#* ''a quel {{Pn}} le cose andavano meglio''
+#* ''in quel {{Pn}} sorgeva un'antica città sull'argine del fiume''
+# [[intervallo]] di {{Pn}} di [[proiezione]] di un [[film]] (di solito ce ne sono due)
+#* ''siamo arrivati al cinema all'inizio del secondo {{Pn}}''
+# {{Term|sport|it}} un [[intervallo]] di {{Pn}} di [[pausa]] che si può [[chiedere]] in alcuni [[sport]], come la [[pallavolo]]
+#* ''l'allenatore ha già chiesto due '''tempi'''''
+# {{Term|meccanica|it}} {{Term|tecnologia|it}} {{Term|ingegneria|it}} [[fase]] o [[parte]] del [[ciclo]] di un [[motore]] a [[combustione]] [[interna]]
+#* ''questo motore è un due '''tempi'''''
+# l'[[insieme]] delle [[possibili]] [[condizioni]] [[meteorologiche]]
+#* ''oggi c'è bel {{Pn}}''
+# '''tempo di reazione''': [[lasso]] temporale che trascorre dall'avvenimento di un fatto, di uno stimolo o di un'azione, alla [[risposta]] individuale, basata sui [[riflessi]]
+# {{Est}} "[[idea]]" dell'[[immediatezza]]
+# {{Fig}} [[cambiamento]] di qualcosa e/o qualcuno nella [[continuità]] della [[trasformazione]]
+#* ''il {{Pn}} lo [[aiuterà]]''
+# '''primo tempo''' e '''secondo tempo''': nello [[sport]] del [[calcio]] è la [[suddivisione]] della [[partita]] in [[due]] [[fasi]], talvolta in [[quattro]], ecc
+# '''percezione del tempo''': parziale o, in molti casi, relativa alla soggettività di ciascuno
+#{{Term|musica|it}} [[velocità]] di [[esecuzione]] di un [[brano]] [[musicale]]
+
+{{-sill-}}
+; tèm | po
+
+{{-pron-}}
+{{IPA|/ˈtɛmpo/}}
+{{Audio|it-tempo.ogg}}
+
+{{-etim-}}
+dal [[latino]] ''[[tĕmpus]]'', voce d’incerta origine, che aveva solo il sign. cronologico, mentre quello atmosferico  era significato da ''[[tempestas]]''
+
+{{-quote-}}
+{{Quote
+|"Cos'è dunque il tempo? Se nessuno m'interroga, lo so; se volessi spiegarlo a chi m'interroga, non lo so."
+|[[q:Agostino d'Ippona|Agostino d'Ippona]]}}
+{{Quote
+|C'è un '''tempo''' per nascere e un tempo per morire, un tempo per piantare e un tempo per sradicare le piante.
+|[[w:Qoelet|Qoelet]]  {{Passo biblico|Qo|3,2}}}}
+
+{{Quote
+|Figlio, se ti presenti per servire il Signore, preparati alla tentazione. Abbi un cuore retto e sii costante, non ti smarrire nel '''tempo''' della seduzione
+|[[w:Siracide|Siracide]], {{Passo biblico| Sir|2,1-2}}}}
+
+{{Quote
+|Quando sei in partiti difficili, o in cose che ti sono moleste, allunga e aspetta tempo quanto puoi, perché quello spesso ti illumina o ti libera.„
+|[[q:Francesco Guicciardini|Francesco Guicciardini]]}}
+{{Quote
+|'C'è solo un modo di dimenticare il tempo: impiegarlo.„
+|[[q:Charles Baudelaire|Charles Baudelaire]]}}
+
+{{-sin-}}
+* [[durata]],  [[epoca]], [[era]], [[estensione]], [[età]], [[evo]], [[intervallo]], [[periodo]], [[spazio]], [[tratto]]
+*  [[momento]], [[istante]], [[lasso]],
+*  [[secolo]],  [[stadio]], [[gradino]], [[data]], [[termine]]
+* [[ciclicità]], [[intermittenza]], [[sequenza]]
+*  circostanza favorevole, [[contingenza]], momento adatto,   [[occasione]], [[opportunità]], [[possibilità]],[[turno]], [[volta]]
+*''(di un’azione o di un processo)'' [[fase]]
+* {{Term|meccanica|it}} ''(di motore a scoppio)'' [[fase]]
+*''(di film, opera teatrale)''  [[atto]],  [[parte]],
+* {{Term|sport|it}} ''(di gioco, partita)'' [[fase]], [[parte]]
+* ''(della giovinezza, del successo)'' [[momento]],  [[ora]] 
+*''(meteorologia)'' [[clima]], condizione climatica, [[stagione]], condizioni atmosferiche
+* ''(musica)'' [[accentazione]], [[battuta]], [[cadenza]], [[movimento]],[[ritmo]],   velocità di esecuzione. 
+
+{{-der-}}
+* [[antitempo]], [[anzitempo]], [[contempo]], [[contrattempo]], [[extratemporale]], [[extratemporalità]], [[maltempo]],  [[nottetempo]], [[spaziotempo]], [[spazio-tempo]], [[tempesta]], [[tempismo]], [[tempistica]], [[temporale]], [[temporaneo]] 
+
+{{-alter-}}
+* {{Pegg}}, {{Term|meteorologico|it}} [[tempaccio]]
+
+{{-prov-}}
+*''[[a distanza di tempo]]'':
+*''[[a tempo]]'':
+* '' [[a tempo e luogo]]'': a momento propizio
+* ''andare a tempo'': con coordinazione, per esempio ballando in armonia con la musica
+*''[[in tempo]]''
+*''battere il tempo''
+* ''[[per tempo]]'': per esigenza, puntualmente
+*''prendere tempo'': [[attendere]]
+* ''il {{Pn}} è tiranno'': sentirsi "sotto-pressione" nel fare qualcosa e/o fare velocemente per elevata quantità di impegni
+* ''è una perdita di {{Pn}}'': con riferimento al tentato aiuto verso qualcuno che, per esempio, vi si oppone oppure ad una situazione vana, inutile e senza progettualità
+* ''ogni cosa a suo {{Pn}}'': riflessione in merito a qualcosa da dire o al momento adatto in cui agire oppure consapevolezza della puntualità per la comprensione di qualcosa d'importante, appunto proprio quando è giusto che questo venga capito
+* ''chi ha {{Pn}} non aspetti {{Pn}}'': invito a fare le cose il più presto possibile
+* ''in {{Pn}} di guerra...'': con un po' di rammarico è un'espressione per iniziare un discorso, in genere proferita da chi visse nel periodo della guerra mondiale
+* ''è dei nostri '''tempi''''': nostalgica ma fiera ed allegra affermazione con riferimento a qualcosa del passato che sussiste ancora e che ha avuto quindi molto successo, in genere per la musica, per la televisione, per il cinema ma anche per prodotti commerciali, ecc cioè per cose che ai tempi furono pressoché una novità sorprendente ma piacevole e che quindi sono ancora apprezzate
+* ''ai miei '''tempi'''...'': inizio di un discorso circa qualcosa della gioventù
+* ''è [solo] questione di {{Pn}}'': e si capirà, si farà, si dirà qualcosa o si guarirà presto
+*''ingannare il tempo'': stare in attesa 
+*''[[tempo da lupi]]'': bruttissimo tempo
+
+{{-trad-}}
+{{Trad1|cronologico}}
+:* {{ca}}: [[temps]] ''m''
+:* {{cs}}: [[čas]] ''m''
+:* {{da}}: [[tid]] ''c''
+:* {{fr}}: [[temps]] ''m''
+:* {{en}}: [[time]]
+:* {{no}}: [[tid]]
+:* {{nl}}: [[tijd]]
+{{mid}}
+:* {{pl}}: [[czas]] ''m''
+:* {{pt}}: [[tempo]] ''m''
+:* {{ru}}: [[ветер]]
+:* {{scn}}: [[tiempu]]
+:* {{es}}: [[tiempo]] ''m''
+:* {{sv}}: [[tid]] ''c''
+:* {{de}}: [[Zeit]] ''f''
+:* {{hu}}: [[idő]]
+{{Trad2}}
+
+{{Trad1|periodo storico}}
+:* {{cs}}: [[čas]] ''m''
+:* {{fr}}: [[temps]] ''m''
+:* {{en}}: [[time]], [[period]]
+:* {{nl}}: [[tijd]]
+{{mid}}
+:* {{pl}}: [[czas]] ''m''
+:* {{pt}}: [[tempo]] ''m''
+:* {{es}}: [[tiempo]] ''m''
+:* {{de}}: [[Zeit]] ''f''
+{{Trad2}}
+
+{{Trad1|meteorologia}}
+:* {{fr}}: [[temps]] ''m''
+:* {{en}}: [[weather]]
+{{mid}}
+:* {{pt}}: [[tempo]] ''m'', [[clima]] ''m''
+:* {{de}}: [[Wetter]] ''n''
+{{Trad2}}
+
+{{Trad1|in tempo}}
+:* {{en}}: [[in time]]
+{{mid}}
+:* {{pt}}: [[a tempo]]
+{{Trad2}}

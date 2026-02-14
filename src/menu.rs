@@ -54,6 +54,8 @@ pub const IDM_EDIT_NEXT_SPELLING_ERROR: usize = 2024;
 pub const IDM_EDIT_GO_TO_LINE: usize = 2025;
 pub const IDM_EDIT_AUDIOBOOK_SELECTION: usize = 2026;
 pub const IDM_EDIT_AUTO_FORMAT_TTS: usize = 2027;
+pub const IDM_EDIT_INDENT: usize = 2028;
+pub const IDM_EDIT_OUTDENT: usize = 2029;
 pub const IDM_SPELLCHECK_SUGGESTION_BASE: usize = 12000;
 pub const IDM_SPELLCHECK_SUGGESTION_MAX: usize = 10;
 pub const IDM_SPELLCHECK_ADD_TO_DICTIONARY: usize = 12100;
@@ -209,6 +211,8 @@ pub struct MenuLabels {
     pub edit_reverse_items: String,
     pub edit_quote_lines: String,
     pub edit_unquote_lines: String,
+    pub edit_indent: String,
+    pub edit_outdent: String,
     pub edit_text_stats: String,
     pub edit_join_lines: String,
     pub edit_clean_eol_hyphens: String,
@@ -307,6 +311,8 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         edit_reverse_items: i18n::tr(language, "edit.reverse_items"),
         edit_quote_lines: i18n::tr(language, "edit.quote_lines"),
         edit_unquote_lines: i18n::tr(language, "edit.unquote_lines"),
+        edit_indent: i18n::tr(language, "edit.indent"),
+        edit_outdent: i18n::tr(language, "edit.outdent"),
         edit_text_stats: i18n::tr(language, "edit.text_stats"),
         edit_join_lines: i18n::tr(language, "edit.join_lines"),
         edit_clean_eol_hyphens: i18n::tr(language, "edit.clean_eol_hyphens"),
@@ -759,6 +765,8 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         IDM_EDIT_UNQUOTE_LINES,
         &labels.edit_unquote_lines,
     );
+    append_menu_string(text_menu, MF_STRING, IDM_EDIT_INDENT, &labels.edit_indent);
+    append_menu_string(text_menu, MF_STRING, IDM_EDIT_OUTDENT, &labels.edit_outdent);
     append_menu_string(
         text_menu,
         MF_STRING,

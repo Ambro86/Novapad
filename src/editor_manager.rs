@@ -318,6 +318,21 @@ fn handle_indent_tab_key(
     true
 }
 
+pub unsafe fn indent_active_edit(hwnd: HWND, shift_down: bool) -> bool {
+    let Some(hwnd_edit) = crate::get_active_edit(hwnd) else {
+        return false;
+    };
+    let (mode, space_width, tab_width) = with_state(hwnd, |state| {
+        (
+            state.settings.indentation_mode,
+            state.settings.indent_space_width,
+            state.settings.indent_tab_width,
+        )
+    })
+    .unwrap_or((IndentationMode::Default, 4, 4));
+    handle_indent_tab_key(hwnd_edit, mode, space_width, tab_width, shift_down)
+}
+
 fn outdent_single_line(
     hwnd: HWND,
     caret_pos: i32,

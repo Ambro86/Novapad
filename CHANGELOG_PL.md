@@ -3,6 +3,7 @@
 Wersja 0.6.7 – 2026-02-13
 Ulepszenia
 • Dodano nowy tryb Widok > Tylko do odczytu, aby blokować przypadkowe edycje tekstu przy zachowaniu pełnego odczytu i nawigacji po dokumentach.
+• Dodano w Edycja > Tekst nowe akcje zwiększania/zmniejszania wcięcia ze skrótami Ctrl+Alt+Strzałka w prawo (wcięcie) i Ctrl+Alt+Strzałka w lewo (usuń wcięcie), ponieważ gdy włączone jest „Pokaż głosy w edytorze”, klawisz Tab jest zarezerwowany do nawigacji w panelu głosów.
 • Dodano lokalizowane wyświetlanie daty i godziny w artykułach RSS oraz odcinkach podcastów, z formatem dopasowanym do języka interfejsu.
 • Dodano nową akcję w menu kontekstowym RSS do udostępniania wybranego artykułu przez e-mail.
 • Po naciśnięciu Ctrl+A program ogłasza teraz zakończenie akcji, co daje czytelniejszą informację zwrotną dla czytników ekranu.

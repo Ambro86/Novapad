@@ -103,8 +103,8 @@ use windows::Win32::UI::Controls::{
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_APPS, VK_CONTROL, VK_ESCAPE,
-    VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_F10, VK_MENU, VK_NEXT,
-    VK_PRIOR, VK_RETURN, VK_SHIFT, VK_TAB,
+    VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_F10, VK_LEFT, VK_MENU,
+    VK_NEXT, VK_PRIOR, VK_RETURN, VK_RIGHT, VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
 use windows::Win32::UI::Shell::{
@@ -3780,6 +3780,16 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                     }
                     LRESULT(0)
                 }
+                IDM_EDIT_INDENT => {
+                    log_debug("Menu: Indent");
+                    editor_manager::indent_active_edit(hwnd, false);
+                    LRESULT(0)
+                }
+                IDM_EDIT_OUTDENT => {
+                    log_debug("Menu: Outdent");
+                    editor_manager::indent_active_edit(hwnd, true);
+                    LRESULT(0)
+                }
                 IDM_EDIT_TEXT_STATS => {
                     log_debug("Menu: Text stats");
                     editor_manager::text_stats_active_edit(hwnd);
@@ -7174,6 +7184,16 @@ unsafe fn create_accelerators() -> HACCEL {
             fVirt: virt_shift,
             key: 'Q' as u16,
             cmd: IDM_EDIT_UNQUOTE_LINES as u16,
+        },
+        ACCEL {
+            fVirt: virt_alt,
+            key: VK_RIGHT.0,
+            cmd: IDM_EDIT_INDENT as u16,
+        },
+        ACCEL {
+            fVirt: virt_alt,
+            key: VK_LEFT.0,
+            cmd: IDM_EDIT_OUTDENT as u16,
         },
         ACCEL {
             fVirt: virt_shift,

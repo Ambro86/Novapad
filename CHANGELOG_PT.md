@@ -3,6 +3,7 @@
 Versão 0.6.7 – 2026-02-13
 Melhorias
 • Adicionado o novo modo Ver > Somente leitura para bloquear edições acidentais no texto, mantendo leitura e navegação completas dos documentos.
+• Adicionadas em Editar > Texto novas ações para aumentar/reduzir recuo, com atalhos Ctrl+Alt+Seta para a direita (indentar) e Ctrl+Alt+Seta para a esquerda (desindentar), porque quando “Mostrar vozes no editor” está ativo a tecla Tab fica reservada para a navegação do painel de vozes.
 • Adicionada a exibição localizada de data e hora em artigos RSS e episódios de podcast, com formato adaptado ao idioma da interface.
 • Adicionada no menu de contexto RSS uma nova ação para partilhar por e-mail o artigo selecionado.
 • Ao premir Ctrl+A, o programa agora anuncia a conclusão da ação para um feedback mais claro em leitores de ecrã.

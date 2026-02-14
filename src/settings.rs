@@ -204,6 +204,32 @@ pub enum SubtitleReadMode {
     Record,
 }
 
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum RssDeleteConfirmMode {
+    #[serde(rename = "feed")]
+    Feed,
+    #[serde(rename = "article")]
+    Article,
+    #[serde(rename = "both")]
+    #[default]
+    Both,
+    #[serde(rename = "none")]
+    None,
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum PodcastDeleteConfirmMode {
+    #[serde(rename = "podcast")]
+    Podcast,
+    #[serde(rename = "episode")]
+    Episode,
+    #[serde(rename = "both")]
+    #[default]
+    Both,
+    #[serde(rename = "none")]
+    None,
+}
+
 pub const PODCAST_DEVICE_DEFAULT: &str = "default";
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -315,6 +341,10 @@ pub struct AppSettings {
     pub context_menu_open_with: bool,
     #[serde(default = "default_true")]
     pub confirm_delete_rss_podcast: bool,
+    #[serde(default)]
+    pub rss_delete_confirm_mode: RssDeleteConfirmMode,
+    #[serde(default)]
+    pub podcast_delete_confirm_mode: PodcastDeleteConfirmMode,
     #[serde(default = "default_true")]
     pub announce_unread_rss_podcast_items: bool,
     pub spellcheck_enabled: bool,
@@ -519,6 +549,8 @@ impl Default for AppSettings {
             interpreter_path: "python.exe".to_string(),
             context_menu_open_with: false,
             confirm_delete_rss_podcast: true,
+            rss_delete_confirm_mode: RssDeleteConfirmMode::Both,
+            podcast_delete_confirm_mode: PodcastDeleteConfirmMode::Both,
             announce_unread_rss_podcast_items: true,
             spellcheck_enabled: false,
             spellcheck_language_mode: SpellcheckLanguageMode::FollowEditorLanguage,
@@ -1045,6 +1077,20 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     settings.audiobook_m4b_bitrate = settings.audiobook_m4b_bitrate.clamp(64, 256);
     if settings.modified_marker_position == ModifiedMarkerPosition::Unknown {
         settings.modified_marker_position = ModifiedMarkerPosition::End;
+    }
+    if settings.confirm_delete_rss_podcast {
+        if matches!(settings.rss_delete_confirm_mode, RssDeleteConfirmMode::None) {
+            settings.rss_delete_confirm_mode = RssDeleteConfirmMode::Both;
+        }
+        if matches!(
+            settings.podcast_delete_confirm_mode,
+            PodcastDeleteConfirmMode::None
+        ) {
+            settings.podcast_delete_confirm_mode = PodcastDeleteConfirmMode::Both;
+        }
+    } else {
+        settings.rss_delete_confirm_mode = RssDeleteConfirmMode::None;
+        settings.podcast_delete_confirm_mode = PodcastDeleteConfirmMode::None;
     }
     if settings.rss_global_max_concurrency == 0 {
         settings.rss_global_max_concurrency = 8;

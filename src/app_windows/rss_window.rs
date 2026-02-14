@@ -86,6 +86,7 @@ const WM_CLEAR_ADD_GUARD: u32 = WM_USER + 204;
 pub(crate) const WM_RSS_SHOW_CONTEXT: u32 = WM_USER + 205;
 const WM_RSS_BACKGROUND_CHECK_COMPLETE: u32 = WM_USER + 206;
 const WM_RSS_MARK_ITEM_READ_UI: u32 = WM_USER + 207;
+const WM_RSS_SELECT_SOURCE_DELAYED: u32 = WM_USER + 208;
 const ADD_GUARD_TIMER_ID: usize = 1;
 const EM_REPLACESEL: u32 = 0x00C2;
 const REORDER_EDIT_ID: usize = 1401;
@@ -911,6 +912,43 @@ fn collect_root_items(hwnd_tree: HWND) -> Vec<windows::Win32::UI::Controls::HTRE
     items
 }
 
+unsafe fn select_first_root_if_needed(hwnd: HWND, hwnd_tree: HWND) {
+    if hwnd_tree.0 == 0 {
+        return;
+    }
+    let current = windows::Win32::UI::Controls::HTREEITEM(
+        SendMessageW(
+            hwnd_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_CARET as usize),
+            LPARAM(0),
+        )
+        .0,
+    );
+    if current.0 != 0 {
+        return;
+    }
+    let first = windows::Win32::UI::Controls::HTREEITEM(
+        SendMessageW(
+            hwnd_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_ROOT as usize),
+            LPARAM(0),
+        )
+        .0,
+    );
+    if first.0 != 0 {
+        SendMessageW(
+            hwnd_tree,
+            TVM_SELECTITEM,
+            WPARAM(TVGN_CARET as usize),
+            LPARAM(first.0),
+        );
+        SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(first.0));
+        with_rss_state(hwnd, |s| s.last_selected = first.0);
+    }
+}
+
 fn apply_root_order(
     hwnd: HWND,
     hwnd_tree: HWND,
@@ -1405,6 +1443,7 @@ struct RssWindowState {
     last_selected: isize,
     removed_history: Vec<RssLastRemoved>,
     suppress_tree_selection_events: bool,
+    suppress_focus_restore_once: bool,
 }
 
 #[derive(Clone)]
@@ -1512,6 +1551,7 @@ pub unsafe fn focus_library(hwnd: HWND) {
     SetForegroundWindow(hwnd);
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     if hwnd_tree.0 != 0 {
+        select_first_root_if_needed(hwnd, hwnd_tree);
         SetFocus(hwnd_tree);
     }
 }
@@ -1861,12 +1901,18 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                 last_selected: 0,
                 removed_history: Vec::new(),
                 suppress_tree_selection_events: false,
+                suppress_focus_restore_once: false,
             });
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
 
             create_controls(hwnd);
             ensure_default_sources(parent);
             reload_tree(hwnd);
+            let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+            if hwnd_tree.0 != 0 {
+                select_first_root_if_needed(hwnd, hwnd_tree);
+                SetFocus(hwnd_tree);
+            }
 
             // Start background check for new articles on all feeds
             start_background_unread_check(hwnd);
@@ -2434,6 +2480,10 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
             }
             LRESULT(0)
         }
+        WM_RSS_SELECT_SOURCE_DELAYED => {
+            select_source_by_index(hwnd, wparam.0);
+            LRESULT(0)
+        }
         WM_CLEAR_ENTER_GUARD => {
             with_rss_state(hwnd, |s| s.enter_guard = false);
             LRESULT(0)
@@ -2518,6 +2568,12 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
             let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
             if hwnd_tree.0 != 0 {
                 SetFocus(hwnd_tree);
+                let suppress_restore =
+                    with_rss_state(hwnd, |s| mem::take(&mut s.suppress_focus_restore_once))
+                        .unwrap_or(false);
+                if suppress_restore {
+                    return LRESULT(0);
+                }
                 let last = with_rss_state(hwnd, |s| s.last_selected).unwrap_or(0);
                 if last != 0 {
                     SendMessageW(
@@ -2991,6 +3047,54 @@ unsafe fn reload_tree(hwnd: HWND) {
         with_rss_state(hwnd, |s| {
             s.node_data.insert(hitem.0, NodeData::Source(i));
         });
+    }
+}
+
+fn schedule_delayed_source_select(hwnd: HWND, source_index: usize) {
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(2));
+        if let Err(e) = unsafe {
+            PostMessageW(
+                hwnd,
+                WM_RSS_SELECT_SOURCE_DELAYED,
+                WPARAM(source_index),
+                LPARAM(0),
+            )
+        } {
+            crate::log_debug(&format!(
+                "Failed to post delayed RSS source selection: {}",
+                e
+            ));
+        }
+    });
+}
+
+unsafe fn select_source_by_index(hwnd: HWND, source_index: usize) {
+    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+    if hwnd_tree.0 == 0 {
+        return;
+    }
+    let target_hitem = with_rss_state(hwnd, |s| {
+        s.node_data.iter().find_map(|(&h, node)| match node {
+            NodeData::Source(i) if *i == source_index => {
+                Some(windows::Win32::UI::Controls::HTREEITEM(h))
+            }
+            _ => None,
+        })
+    })
+    .flatten();
+    if let Some(target) = target_hitem {
+        SendMessageW(
+            hwnd_tree,
+            TVM_SELECTITEM,
+            WPARAM(TVGN_CARET as usize),
+            LPARAM(target.0),
+        );
+        SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(target.0));
+        if GetFocus() != hwnd_tree {
+            with_rss_state(hwnd, |s| s.suppress_focus_restore_once = true);
+            SetFocus(hwnd_tree);
+        }
     }
 }
 
@@ -3997,7 +4101,14 @@ unsafe fn handle_delete(hwnd: HWND) {
         // Localize message and title
         let (language, require_confirm) = with_rss_state(hwnd, |s| {
             with_state(s.parent, |ps| {
-                (ps.settings.language, ps.settings.confirm_delete_rss_podcast)
+                (
+                    ps.settings.language,
+                    matches!(
+                        ps.settings.rss_delete_confirm_mode,
+                        crate::settings::RssDeleteConfirmMode::Feed
+                            | crate::settings::RssDeleteConfirmMode::Both
+                    ),
+                )
             })
             .unwrap_or((crate::settings::Language::default(), true))
         })
@@ -4019,7 +4130,8 @@ unsafe fn handle_delete(hwnd: HWND) {
         if confirmed {
             let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
             let mut default_removed_key_added: Option<String> = None;
-            let focus_source_idx = with_state(parent, |ps| {
+            let mut delayed_target_source_idx: Option<usize> = None;
+            with_state(parent, |ps| {
                 if matches!(
                     language,
                     crate::settings::Language::English
@@ -4087,36 +4199,20 @@ unsafe fn handle_delete(hwnd: HWND) {
                     }
                 }
                 ps.settings.rss_sources.remove(idx);
-                crate::settings::save_settings(ps.settings.clone());
-                if ps.settings.rss_sources.is_empty() {
+                delayed_target_source_idx = if ps.settings.rss_sources.is_empty() {
                     None
                 } else if idx > 0 {
                     Some(idx - 1)
                 } else {
                     Some(0)
-                }
+                };
+                crate::settings::save_settings(ps.settings.clone());
             });
+            with_rss_state(hwnd, |s| s.suppress_tree_selection_events = true);
+            SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(0), LPARAM(0));
             reload_tree(hwnd);
-            if let Some(target_idx) = focus_source_idx.flatten() {
-                let target_hitem = with_rss_state(hwnd, |s| {
-                    s.node_data.iter().find_map(|(&h, node)| match node {
-                        NodeData::Source(i) if *i == target_idx => {
-                            Some(windows::Win32::UI::Controls::HTREEITEM(h))
-                        }
-                        _ => None,
-                    })
-                })
-                .flatten();
-                if let Some(target) = target_hitem {
-                    SendMessageW(
-                        hwnd_tree,
-                        TVM_SELECTITEM,
-                        WPARAM(TVGN_CARET as usize),
-                        LPARAM(target.0),
-                    );
-                    SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(target.0));
-                }
-            }
+            SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(1), LPARAM(0));
+            with_rss_state(hwnd, |s| s.suppress_tree_selection_events = false);
             if let Some(source) = source_info {
                 with_rss_state(hwnd, |s| {
                     s.removed_history.push(RssLastRemoved::Source {
@@ -4127,11 +4223,22 @@ unsafe fn handle_delete(hwnd: HWND) {
                     });
                 });
             }
+            announce_rss_status(&i18n::tr(language, "rss.removed"));
+            if let Some(target_idx) = delayed_target_source_idx {
+                schedule_delayed_source_select(hwnd, target_idx);
+            }
         }
     } else if let Some(NodeData::Item(item)) = selected_node {
         let (language, require_confirm) = with_rss_state(hwnd, |s| {
             with_state(s.parent, |ps| {
-                (ps.settings.language, ps.settings.confirm_delete_rss_podcast)
+                (
+                    ps.settings.language,
+                    matches!(
+                        ps.settings.rss_delete_confirm_mode,
+                        crate::settings::RssDeleteConfirmMode::Article
+                            | crate::settings::RssDeleteConfirmMode::Both
+                    ),
+                )
             })
             .unwrap_or((crate::settings::Language::default(), true))
         })
@@ -4255,12 +4362,12 @@ unsafe fn handle_delete(hwnd: HWND) {
                     });
                 });
             }
+            announce_rss_status(&i18n::tr(language, "rss.article_removed"));
         }
     }
-    if hwnd_tree.0 != 0 {
-        SetForegroundWindow(hwnd);
+    if hwnd_tree.0 != 0 && GetFocus() != hwnd_tree {
+        with_rss_state(hwnd, |s| s.suppress_focus_restore_once = true);
         SetFocus(hwnd_tree);
-        SendMessageW(hwnd_tree, WM_SETFOCUS, WPARAM(0), LPARAM(0));
     }
 }
 
@@ -4280,8 +4387,10 @@ unsafe fn undo_last_delete(hwnd: HWND) {
             if parent.0 == 0 {
                 return;
             }
-            let restored_index = with_state(parent, |ps| {
+            let mut restored_index = index;
+            with_state(parent, |ps| {
                 let insert_at = index.min(ps.settings.rss_sources.len());
+                restored_index = insert_at;
                 ps.settings.rss_sources.insert(insert_at, source);
                 if let Some(key) = default_removed_key_added {
                     let removed_list = match language {
@@ -4318,35 +4427,26 @@ unsafe fn undo_last_delete(hwnd: HWND) {
                     removed_list.retain(|u| normalize_rss_url_key(u) != key);
                 }
                 crate::settings::save_settings(ps.settings.clone());
-                insert_at
             })
-            .unwrap_or(index);
+            .unwrap_or(());
 
-            with_rss_state(hwnd, |s| s.suppress_tree_selection_events = true);
-            reload_tree(hwnd);
-            with_rss_state(hwnd, |s| s.suppress_tree_selection_events = false);
             let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+            with_rss_state(hwnd, |s| s.suppress_tree_selection_events = true);
             if hwnd_tree.0 != 0 {
-                let target_hitem = with_rss_state(hwnd, |s| {
-                    s.node_data.iter().find_map(|(&h, node)| match node {
-                        NodeData::Source(i) if *i == restored_index => {
-                            Some(windows::Win32::UI::Controls::HTREEITEM(h))
-                        }
-                        _ => None,
-                    })
-                })
-                .flatten();
-                if let Some(target) = target_hitem {
-                    SendMessageW(
-                        hwnd_tree,
-                        TVM_SELECTITEM,
-                        WPARAM(TVGN_CARET as usize),
-                        LPARAM(target.0),
-                    );
-                    SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(target.0));
-                }
-                SetFocus(hwnd_tree);
+                SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(0), LPARAM(0));
             }
+            reload_tree(hwnd);
+            if hwnd_tree.0 != 0 {
+                SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(1), LPARAM(0));
+                with_rss_state(hwnd, |s| s.suppress_tree_selection_events = false);
+                if GetFocus() != hwnd_tree {
+                    with_rss_state(hwnd, |s| s.suppress_focus_restore_once = true);
+                    SetFocus(hwnd_tree);
+                }
+            } else {
+                with_rss_state(hwnd, |s| s.suppress_tree_selection_events = false);
+            }
+            schedule_delayed_source_select(hwnd, restored_index);
         }
         RssLastRemoved::Item {
             source_index,
@@ -4506,7 +4606,10 @@ unsafe fn undo_last_delete(hwnd: HWND) {
                         LPARAM(source_hitem.0),
                     );
                 }
-                SetFocus(hwnd_tree);
+                if GetFocus() != hwnd_tree {
+                    with_rss_state(hwnd, |s| s.suppress_focus_restore_once = true);
+                    SetFocus(hwnd_tree);
+                }
             } else if hwnd_tree.0 != 0 {
                 SendMessageW(
                     hwnd_tree,
@@ -4514,7 +4617,10 @@ unsafe fn undo_last_delete(hwnd: HWND) {
                     WPARAM(TVGN_CARET as usize),
                     LPARAM(source_hitem.0),
                 );
-                SetFocus(hwnd_tree);
+                if GetFocus() != hwnd_tree {
+                    with_rss_state(hwnd, |s| s.suppress_focus_restore_once = true);
+                    SetFocus(hwnd_tree);
+                }
             }
         }
     }

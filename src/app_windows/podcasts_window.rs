@@ -4589,7 +4589,14 @@ unsafe fn handle_source_action(hwnd: HWND, verb: SourceAction) {
         SourceAction::Remove => {
             let confirm = if parent.0 != 0 {
                 let (language, require_confirm) = with_state(parent, |s| {
-                    (s.settings.language, s.settings.confirm_delete_rss_podcast)
+                    (
+                        s.settings.language,
+                        matches!(
+                            s.settings.podcast_delete_confirm_mode,
+                            crate::settings::PodcastDeleteConfirmMode::Podcast
+                                | crate::settings::PodcastDeleteConfirmMode::Both
+                        ),
+                    )
                 })
                 .unwrap_or((Language::default(), true));
                 if require_confirm {
@@ -4756,8 +4763,17 @@ unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
             show_description_dialog(hwnd, &item.title, &final_content);
         }
         EpisodeAction::Remove => {
+            let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+            let selected_hitem = selected_tree_item(hwnd);
             let (language, require_confirm) = with_state(parent, |s| {
-                (s.settings.language, s.settings.confirm_delete_rss_podcast)
+                (
+                    s.settings.language,
+                    matches!(
+                        s.settings.podcast_delete_confirm_mode,
+                        crate::settings::PodcastDeleteConfirmMode::Episode
+                            | crate::settings::PodcastDeleteConfirmMode::Both
+                    ),
+                )
             })
             .unwrap_or((Language::default(), true));
             let remove_label = i18n::tr(language, "dictionary.remove");
@@ -4779,11 +4795,29 @@ unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
                 true
             };
             if !confirmed {
+                if hwnd_tree.0 != 0 {
+                    if selected_hitem.0 != 0 {
+                        SendMessageW(
+                            hwnd_tree,
+                            TVM_SELECTITEM,
+                            WPARAM(TVGN_CARET as usize),
+                            LPARAM(selected_hitem.0),
+                        );
+                        SendMessageW(
+                            hwnd_tree,
+                            TVM_ENSUREVISIBLE,
+                            WPARAM(0),
+                            LPARAM(selected_hitem.0),
+                        );
+                    }
+                    if GetFocus() != hwnd_tree {
+                        SetFocus(hwnd_tree);
+                    }
+                }
                 return;
             }
 
-            let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-            let hitem = selected_tree_item(hwnd);
+            let hitem = selected_hitem;
             if hwnd_tree.0 == 0 || hitem.0 == 0 {
                 return;
             }
@@ -4884,10 +4918,9 @@ unsafe fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
                     });
                 });
             }
-            if hwnd_tree.0 != 0 {
-                SetForegroundWindow(hwnd);
+            announce_status(&i18n::tr(language, "podcasts.episode_removed"));
+            if hwnd_tree.0 != 0 && GetFocus() != hwnd_tree {
                 SetFocus(hwnd_tree);
-                SendMessageW(hwnd_tree, WM_SETFOCUS, WPARAM(0), LPARAM(0));
             }
         }
     }

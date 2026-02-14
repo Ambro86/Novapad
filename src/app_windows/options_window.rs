@@ -5,9 +5,9 @@ use crate::editor_manager::{
     update_window_title,
 };
 use crate::settings::{
-    Language, ModifiedMarkerPosition, OpenBehavior, SubtitleReadMode, TRUSTED_CLIENT_TOKEN,
-    TtsEngine, VOICE_LIST_URL, VoiceInfo, save_settings_with_default_copy, sync_context_menu,
-    sync_start_menu_shortcuts,
+    Language, ModifiedMarkerPosition, OpenBehavior, PodcastDeleteConfirmMode, RssDeleteConfirmMode,
+    SubtitleReadMode, TRUSTED_CLIENT_TOKEN, TtsEngine, VOICE_LIST_URL, VoiceInfo,
+    save_settings_with_default_copy, sync_context_menu, sync_start_menu_shortcuts,
 };
 use crate::{i18n, rebuild_menus, refresh_voice_panel, tts_engine, with_state};
 use std::process::Command;
@@ -97,8 +97,9 @@ const OPTIONS_ID_SPACE_WIDTH: usize = 6062;
 const OPTIONS_ID_CHECK_UPDATES: usize = 6015;
 const OPTIONS_ID_SEND_CRASH_REPORTS: usize = 6048;
 const OPTIONS_ID_USE_LEGACY_NAME: usize = 6057;
-const OPTIONS_ID_CONFIRM_DELETE_RSS_PODCAST: usize = 6066;
+const OPTIONS_ID_CONFIRM_DELETE_RSS_MODE: usize = 6066;
 const OPTIONS_ID_ANNOUNCE_UNREAD_RSS_PODCAST: usize = 6067;
+const OPTIONS_ID_CONFIRM_DELETE_PODCAST_MODE: usize = 6068;
 const OPTIONS_ID_MANAGE_ASSOCIATIONS: usize = 6044;
 const OPTIONS_ID_PROMPT_PROGRAM: usize = 6019;
 const OPTIONS_ID_TABS: usize = 6024;
@@ -296,7 +297,10 @@ struct OptionsDialogState {
     checkbox_send_crash_reports: HWND,
     checkbox_use_legacy_name: HWND,
     checkbox_context_menu: HWND,
-    checkbox_confirm_delete_rss_podcast: HWND,
+    label_confirm_delete_rss_mode: HWND,
+    combo_confirm_delete_rss_mode: HWND,
+    label_confirm_delete_podcast_mode: HWND,
+    combo_confirm_delete_podcast_mode: HWND,
     label_file_associations: HWND,
     button_manage_associations: HWND,
     label_prompt_program: HWND,
@@ -356,7 +360,8 @@ struct OptionsLabels {
     label_send_crash_reports: String,
     label_use_legacy_name: String,
     label_context_menu: String,
-    label_confirm_delete_rss_podcast: String,
+    label_confirm_delete_rss_mode: String,
+    label_confirm_delete_podcast_mode: String,
     label_file_associations: String,
     label_manage_associations: String,
     label_prompt_program: String,
@@ -417,6 +422,12 @@ struct OptionsLabels {
     prompt_cmd: String,
     prompt_powershell: String,
     prompt_codex: String,
+    confirm_delete_feed: String,
+    confirm_delete_article: String,
+    confirm_delete_podcast: String,
+    confirm_delete_episode: String,
+    confirm_delete_both: String,
+    confirm_delete_none: String,
     ok: String,
     cancel: String,
     voices_empty: String,
@@ -480,9 +491,10 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_send_crash_reports: i18n::tr(language, "options.label.send_crash_reports"),
         label_use_legacy_name: i18n::tr(language, "options.label.legacy_name"),
         label_context_menu: i18n::tr(language, "options.label.context_menu"),
-        label_confirm_delete_rss_podcast: i18n::tr(
+        label_confirm_delete_rss_mode: i18n::tr(language, "options.label.confirm_delete_rss_mode"),
+        label_confirm_delete_podcast_mode: i18n::tr(
             language,
-            "options.label.confirm_delete_rss_podcast",
+            "options.label.confirm_delete_podcast_mode",
         ),
         label_file_associations: i18n::tr(language, "options.label.file_associations"),
         label_manage_associations: i18n::tr(language, "options.button.manage_associations"),
@@ -570,6 +582,12 @@ fn options_labels(language: Language) -> OptionsLabels {
         prompt_cmd: i18n::tr(language, "options.prompt.cmd"),
         prompt_powershell: i18n::tr(language, "options.prompt.powershell"),
         prompt_codex: i18n::tr(language, "options.prompt.codex"),
+        confirm_delete_feed: i18n::tr(language, "options.confirm_delete.feed"),
+        confirm_delete_article: i18n::tr(language, "options.confirm_delete.article"),
+        confirm_delete_podcast: i18n::tr(language, "options.confirm_delete.podcast"),
+        confirm_delete_episode: i18n::tr(language, "options.confirm_delete.episode"),
+        confirm_delete_both: i18n::tr(language, "options.confirm_delete.both"),
+        confirm_delete_none: i18n::tr(language, "options.confirm_delete.none"),
         ok: i18n::tr(language, "options.ok"),
         cancel: i18n::tr(language, "options.cancel"),
         voices_empty: i18n::tr(language, "options.voices.empty"),
@@ -1599,6 +1617,66 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
             );
             y += 30;
 
+            let label_confirm_delete_rss_mode = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_confirm_delete_rss_mode).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_confirm_delete_rss_mode = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                180,
+                hwnd,
+                HMENU(OPTIONS_ID_CONFIRM_DELETE_RSS_MODE as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
+            let label_confirm_delete_podcast_mode = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_confirm_delete_podcast_mode).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_confirm_delete_podcast_mode = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                180,
+                hwnd,
+                HMENU(OPTIONS_ID_CONFIRM_DELETE_PODCAST_MODE as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
             let label_podcast_cache_limit = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -2196,22 +2274,6 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
             );
             y += 28;
 
-            let checkbox_confirm_delete_rss_podcast = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_confirm_delete_rss_podcast).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_CONFIRM_DELETE_RSS_PODCAST as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 28;
-
             let label_file_associations = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -2397,7 +2459,10 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 checkbox_send_crash_reports,
                 checkbox_use_legacy_name,
                 checkbox_context_menu,
-                checkbox_confirm_delete_rss_podcast,
+                label_confirm_delete_rss_mode,
+                combo_confirm_delete_rss_mode,
+                label_confirm_delete_podcast_mode,
+                combo_confirm_delete_podcast_mode,
                 label_file_associations,
                 button_manage_associations,
                 label_prompt_program,
@@ -2507,7 +2572,10 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 checkbox_send_crash_reports,
                 checkbox_use_legacy_name,
                 checkbox_context_menu,
-                checkbox_confirm_delete_rss_podcast,
+                label_confirm_delete_rss_mode,
+                combo_confirm_delete_rss_mode,
+                label_confirm_delete_podcast_mode,
+                combo_confirm_delete_podcast_mode,
                 label_file_associations,
                 button_manage_associations,
                 label_prompt_program,
@@ -2837,7 +2905,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         checkbox_send_crash_reports,
         checkbox_use_legacy_name,
         checkbox_context_menu,
-        checkbox_confirm_delete_rss_podcast,
+        combo_confirm_delete_rss_mode,
+        combo_confirm_delete_podcast_mode,
         _label_prompt_program,
         combo_prompt_program,
     ) = match with_options_state(hwnd, |state| {
@@ -2914,7 +2983,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.checkbox_send_crash_reports,
             state.checkbox_use_legacy_name,
             state.checkbox_context_menu,
-            state.checkbox_confirm_delete_rss_podcast,
+            state.combo_confirm_delete_rss_mode,
+            state.combo_confirm_delete_podcast_mode,
             state.label_prompt_program,
             state.combo_prompt_program,
         )
@@ -3682,13 +3752,65 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         LPARAM(0),
     );
     SendMessageW(
-        checkbox_confirm_delete_rss_podcast,
-        BM_SETCHECK,
-        WPARAM(if settings.confirm_delete_rss_podcast {
-            BST_CHECKED.0 as usize
-        } else {
-            0
-        }),
+        combo_confirm_delete_rss_mode,
+        CB_RESETCONTENT,
+        WPARAM(0),
+        LPARAM(0),
+    );
+    for option in [
+        labels.confirm_delete_feed.clone(),
+        labels.confirm_delete_article.clone(),
+        labels.confirm_delete_both.clone(),
+        labels.confirm_delete_none.clone(),
+    ] {
+        SendMessageW(
+            combo_confirm_delete_rss_mode,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&option).as_ptr() as isize),
+        );
+    }
+    let rss_confirm_idx = match settings.rss_delete_confirm_mode {
+        RssDeleteConfirmMode::Feed => 0,
+        RssDeleteConfirmMode::Article => 1,
+        RssDeleteConfirmMode::Both => 2,
+        RssDeleteConfirmMode::None => 3,
+    };
+    SendMessageW(
+        combo_confirm_delete_rss_mode,
+        CB_SETCURSEL,
+        WPARAM(rss_confirm_idx),
+        LPARAM(0),
+    );
+    SendMessageW(
+        combo_confirm_delete_podcast_mode,
+        CB_RESETCONTENT,
+        WPARAM(0),
+        LPARAM(0),
+    );
+    for option in [
+        labels.confirm_delete_podcast.clone(),
+        labels.confirm_delete_episode.clone(),
+        labels.confirm_delete_both.clone(),
+        labels.confirm_delete_none.clone(),
+    ] {
+        SendMessageW(
+            combo_confirm_delete_podcast_mode,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&option).as_ptr() as isize),
+        );
+    }
+    let podcast_confirm_idx = match settings.podcast_delete_confirm_mode {
+        PodcastDeleteConfirmMode::Podcast => 0,
+        PodcastDeleteConfirmMode::Episode => 1,
+        PodcastDeleteConfirmMode::Both => 2,
+        PodcastDeleteConfirmMode::None => 3,
+    };
+    SendMessageW(
+        combo_confirm_delete_podcast_mode,
+        CB_SETCURSEL,
+        WPARAM(podcast_confirm_idx),
         LPARAM(0),
     );
     SendMessageW(
@@ -4625,7 +4747,8 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         checkbox_send_crash_reports,
         checkbox_use_legacy_name,
         checkbox_context_menu,
-        checkbox_confirm_delete_rss_podcast,
+        combo_confirm_delete_rss_mode,
+        combo_confirm_delete_podcast_mode,
         combo_prompt_program,
     ) = match with_options_state(hwnd, |state| {
         (
@@ -4685,7 +4808,8 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.checkbox_send_crash_reports,
             state.checkbox_use_legacy_name,
             state.checkbox_context_menu,
-            state.checkbox_confirm_delete_rss_podcast,
+            state.combo_confirm_delete_rss_mode,
+            state.combo_confirm_delete_podcast_mode,
             state.combo_prompt_program,
         )
     }) {
@@ -5020,14 +5144,38 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     settings.context_menu_open_with =
         SendMessageW(checkbox_context_menu, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
             == BST_CHECKED.0;
-    settings.confirm_delete_rss_podcast = SendMessageW(
-        checkbox_confirm_delete_rss_podcast,
-        BM_GETCHECK,
+    let rss_confirm_sel = SendMessageW(
+        combo_confirm_delete_rss_mode,
+        CB_GETCURSEL,
         WPARAM(0),
         LPARAM(0),
     )
-    .0 as u32
-        == BST_CHECKED.0;
+    .0;
+    settings.rss_delete_confirm_mode = match rss_confirm_sel {
+        0 => RssDeleteConfirmMode::Feed,
+        1 => RssDeleteConfirmMode::Article,
+        3 => RssDeleteConfirmMode::None,
+        _ => RssDeleteConfirmMode::Both,
+    };
+    let podcast_confirm_sel = SendMessageW(
+        combo_confirm_delete_podcast_mode,
+        CB_GETCURSEL,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0;
+    settings.podcast_delete_confirm_mode = match podcast_confirm_sel {
+        0 => PodcastDeleteConfirmMode::Podcast,
+        1 => PodcastDeleteConfirmMode::Episode,
+        3 => PodcastDeleteConfirmMode::None,
+        _ => PodcastDeleteConfirmMode::Both,
+    };
+    settings.confirm_delete_rss_podcast =
+        !matches!(settings.rss_delete_confirm_mode, RssDeleteConfirmMode::None)
+            || !matches!(
+                settings.podcast_delete_confirm_mode,
+                PodcastDeleteConfirmMode::None
+            );
     settings.announce_unread_rss_podcast_items = SendMessageW(
         checkbox_announce_unread_rss_podcast,
         BM_GETCHECK,
@@ -5564,11 +5712,6 @@ fn layout_general_tab(state: &OptionsDialogState) {
         y,
     );
     y = layout_checkbox("checkbox_context_menu", state.checkbox_context_menu, y);
-    y = layout_checkbox(
-        "checkbox_confirm_delete_rss_podcast",
-        state.checkbox_confirm_delete_rss_podcast,
-        y,
-    );
     y += OPTIONS_SECTION_GAP;
     layout_label_control(
         "label_file_associations",
@@ -5934,10 +6077,21 @@ fn layout_audio_tab(state: &OptionsDialogState) {
 
 fn layout_rss_podcast_tab(state: &OptionsDialogState) {
     let mut y = OPTIONS_CONTENT_TOP;
-    y = layout_checkbox(
-        "checkbox_confirm_delete_rss_podcast",
-        state.checkbox_confirm_delete_rss_podcast,
+    y = layout_label_control(
+        "label_confirm_delete_rss_mode",
+        state.label_confirm_delete_rss_mode,
+        "combo_confirm_delete_rss_mode",
+        state.combo_confirm_delete_rss_mode,
         y,
+        OPTIONS_COMBO_HEIGHT,
+    );
+    y = layout_label_control(
+        "label_confirm_delete_podcast_mode",
+        state.label_confirm_delete_podcast_mode,
+        "combo_confirm_delete_podcast_mode",
+        state.combo_confirm_delete_podcast_mode,
+        y,
+        OPTIONS_COMBO_HEIGHT,
     );
     y = layout_checkbox(
         "checkbox_announce_unread_rss_podcast",
@@ -6111,7 +6265,10 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
         }
 
         for control in [
-            state.checkbox_confirm_delete_rss_podcast,
+            state.label_confirm_delete_rss_mode,
+            state.combo_confirm_delete_rss_mode,
+            state.label_confirm_delete_podcast_mode,
+            state.combo_confirm_delete_podcast_mode,
             state.label_podcast_cache_limit,
             state.edit_podcast_cache_limit,
             state.checkbox_announce_unread_rss_podcast,
@@ -6180,7 +6337,7 @@ unsafe fn focus_tab_first(hwnd: HWND, index: i32) {
         OPTIONS_TAB_VOICE => state.combo_tts_engine,
         OPTIONS_TAB_EDITOR => state.checkbox_word_wrap,
         OPTIONS_TAB_AUDIO => state.combo_audio_skip,
-        OPTIONS_TAB_RSS_PODCAST => state.checkbox_confirm_delete_rss_podcast,
+        OPTIONS_TAB_RSS_PODCAST => state.combo_confirm_delete_rss_mode,
         _ => HWND(0),
     })
     .unwrap_or(HWND(0));

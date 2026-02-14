@@ -17,7 +17,9 @@ use std::path::{Path, PathBuf};
 use url::Url;
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
-use windows::Win32::System::DataExchange::COPYDATASTRUCT;
+use windows::Win32::System::DataExchange::{
+    COPYDATASTRUCT, CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
+};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::Dialogs::{
@@ -2395,6 +2397,10 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                 undo_last_delete(hwnd);
                 return LRESULT(0);
             }
+            if key == 'C' as u32 && GetKeyState(VK_CONTROL.0 as i32) < 0 {
+                let _ = handle_rss_quick_copy(hwnd);
+                return LRESULT(0);
+            }
             if key == u32::from(VK_RETURN.0) && GetKeyState(VK_MENU.0 as i32) < 0 {
                 show_selected_properties(hwnd);
                 return LRESULT(0);
@@ -2816,8 +2822,21 @@ unsafe extern "system" fn rss_tree_wndproc(
 }
 
 unsafe fn rss_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    if msg == windows::Win32::UI::WindowsAndMessaging::WM_CHAR
+        && wparam.0 as u32 == 3
+        && GetKeyState(VK_CONTROL.0 as i32) < 0
+    {
+        return LRESULT(0);
+    }
     if msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN {
         let key = wparam.0 as u32;
+        if key == 'C' as u32 && GetKeyState(VK_CONTROL.0 as i32) < 0 {
+            let parent = GetParent(hwnd);
+            if parent.0 != 0 {
+                let _ = handle_rss_quick_copy(parent);
+                return LRESULT(0);
+            }
+        }
         if key == u32::from(VK_RETURN.0) && GetKeyState(VK_MENU.0 as i32) < 0 {
             let parent = GetParent(hwnd);
             if parent.0 != 0 {
@@ -4930,6 +4949,163 @@ unsafe fn selected_article_item(hwnd: HWND) -> Option<RssItem> {
         _ => None,
     })
     .flatten()
+}
+
+unsafe fn copy_text_to_clipboard(hwnd: HWND, text: &str) {
+    use windows::Win32::Foundation::HANDLE;
+    use windows::Win32::System::Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalUnlock};
+
+    const CF_UNICODETEXT: u32 = 13;
+
+    let content = to_wide(text);
+    if content.is_empty() {
+        return;
+    }
+    if OpenClipboard(hwnd).is_err() {
+        return;
+    }
+    if let Err(e) = EmptyClipboard() {
+        crate::log_debug(&format!("EmptyClipboard failed: {}", e));
+    }
+    let size = content.len() * std::mem::size_of::<u16>();
+    let handle = match GlobalAlloc(GMEM_MOVEABLE, size) {
+        Ok(handle) => handle,
+        Err(_) => {
+            if let Err(e) = CloseClipboard() {
+                crate::log_debug(&format!("CloseClipboard failed: {}", e));
+            }
+            return;
+        }
+    };
+    if handle.0.is_null() {
+        if let Err(e) = CloseClipboard() {
+            crate::log_debug(&format!("CloseClipboard failed: {}", e));
+        }
+        return;
+    }
+    let ptr = GlobalLock(handle) as *mut u16;
+    if ptr.is_null() {
+        if let Err(e) = CloseClipboard() {
+            crate::log_debug(&format!("CloseClipboard failed: {}", e));
+        }
+        return;
+    }
+    std::ptr::copy_nonoverlapping(content.as_ptr(), ptr, content.len());
+    crate::log_if_err!(GlobalUnlock(handle));
+    if let Err(e) = SetClipboardData(CF_UNICODETEXT, HANDLE(handle.0 as isize)) {
+        crate::log_debug(&format!("SetClipboardData failed: {}", e));
+    }
+    if let Err(e) = CloseClipboard() {
+        crate::log_debug(&format!("CloseClipboard failed: {}", e));
+    }
+}
+
+unsafe fn fetch_full_article_text_for_quick_copy(parent: HWND, item: &RssItem) -> String {
+    if parent.0 == 0 {
+        return clean_html_for_quick_copy(&item.description);
+    }
+    ensure_rss_http(parent);
+    let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
+    let rt = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(rt) => rt,
+        Err(_) => return clean_html_for_quick_copy(&item.description),
+    };
+    let text = match rt.block_on(crate::tools::rss::fetch_article_text(
+        &item.link,
+        &item.title,
+        &item.description,
+        language,
+    )) {
+        Ok(res) => res,
+        Err(_) => item.description.clone(),
+    };
+    let normalized = normalize_article_text(&text);
+    if normalized.trim().is_empty() {
+        clean_html_for_quick_copy(&item.description)
+    } else {
+        normalized
+    }
+}
+
+unsafe fn rss_quick_copy_text(
+    parent: HWND,
+    item: &RssItem,
+    mode: crate::settings::RssQuickCopyMode,
+) -> String {
+    let title = item.title.trim();
+    let url = item.link.trim();
+    match mode {
+        crate::settings::RssQuickCopyMode::Title => title.to_string(),
+        crate::settings::RssQuickCopyMode::Url => url.to_string(),
+        crate::settings::RssQuickCopyMode::Content => {
+            fetch_full_article_text_for_quick_copy(parent, item)
+        }
+        crate::settings::RssQuickCopyMode::All => {
+            let content = fetch_full_article_text_for_quick_copy(parent, item);
+            let mut parts = Vec::new();
+            if !title.is_empty() {
+                parts.push(title.to_string());
+            }
+            if !url.is_empty() {
+                parts.push(url.to_string());
+            }
+            if !content.is_empty() {
+                parts.push(content);
+            }
+            parts.join("\r\n")
+        }
+    }
+}
+
+fn clean_html_for_quick_copy(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut in_tag = false;
+    let mut prev_space = false;
+
+    for ch in input.chars() {
+        match ch {
+            '<' => {
+                in_tag = true;
+            }
+            '>' => {
+                in_tag = false;
+                if !prev_space {
+                    out.push(' ');
+                    prev_space = true;
+                }
+            }
+            _ if in_tag => {}
+            '\r' | '\n' | '\t' => {
+                if !prev_space {
+                    out.push(' ');
+                    prev_space = true;
+                }
+            }
+            _ => {
+                out.push(ch);
+                prev_space = ch.is_whitespace();
+            }
+        }
+    }
+
+    normalize_article_text(out.trim())
+}
+
+unsafe fn handle_rss_quick_copy(hwnd: HWND) -> bool {
+    let Some(item) = selected_article_item(hwnd) else {
+        return false;
+    };
+    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    let mode = with_state(parent, |ps| ps.settings.rss_quick_copy_mode).unwrap_or_default();
+    let text = rss_quick_copy_text(parent, &item, mode);
+    if text.trim().is_empty() {
+        return false;
+    }
+    copy_text_to_clipboard(hwnd, &text);
+    true
 }
 
 unsafe fn handle_article_action(hwnd: HWND, action: ArticleAction) {

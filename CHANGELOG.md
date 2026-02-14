@@ -7,6 +7,7 @@ Improvements
 • Added localized date/time in RSS articles and podcast episodes, with formatting adapted to the current interface language.
 • Added a new RSS context-menu action to share the selected article by email.
 • Added granular delete-confirmation options for RSS/Podcast in Options > RSS and podcast: RSS (feed/article/both/none) and Podcasts (podcast/episode/both/none).
+• Added configurable quick RSS copy with Ctrl+C (Options > RSS and podcast): copy title, URL, article content, or all combined.
 • Pressing Ctrl+A now announces completion for clearer screen-reader feedback.
 • Improved replace feedback messages with proper singular/plural forms (e.g. “1 replacement made” vs “2 replacements made”).
 • Added dictionary lookup language selection in the dictionary window, with default Auto (interface language) and optional manual override.

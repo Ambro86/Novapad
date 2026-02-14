@@ -100,6 +100,7 @@ const OPTIONS_ID_USE_LEGACY_NAME: usize = 6057;
 const OPTIONS_ID_CONFIRM_DELETE_RSS_MODE: usize = 6066;
 const OPTIONS_ID_ANNOUNCE_UNREAD_RSS_PODCAST: usize = 6067;
 const OPTIONS_ID_CONFIRM_DELETE_PODCAST_MODE: usize = 6068;
+const OPTIONS_ID_RSS_QUICK_COPY_MODE: usize = 6069;
 const OPTIONS_ID_MANAGE_ASSOCIATIONS: usize = 6044;
 const OPTIONS_ID_PROMPT_PROGRAM: usize = 6019;
 const OPTIONS_ID_TABS: usize = 6024;
@@ -301,6 +302,8 @@ struct OptionsDialogState {
     combo_confirm_delete_rss_mode: HWND,
     label_confirm_delete_podcast_mode: HWND,
     combo_confirm_delete_podcast_mode: HWND,
+    label_rss_quick_copy_mode: HWND,
+    combo_rss_quick_copy_mode: HWND,
     label_file_associations: HWND,
     button_manage_associations: HWND,
     label_prompt_program: HWND,
@@ -362,6 +365,7 @@ struct OptionsLabels {
     label_context_menu: String,
     label_confirm_delete_rss_mode: String,
     label_confirm_delete_podcast_mode: String,
+    label_rss_quick_copy_mode: String,
     label_file_associations: String,
     label_manage_associations: String,
     label_prompt_program: String,
@@ -428,6 +432,10 @@ struct OptionsLabels {
     confirm_delete_episode: String,
     confirm_delete_both: String,
     confirm_delete_none: String,
+    rss_quick_copy_title: String,
+    rss_quick_copy_url: String,
+    rss_quick_copy_content: String,
+    rss_quick_copy_all: String,
     ok: String,
     cancel: String,
     voices_empty: String,
@@ -496,6 +504,7 @@ fn options_labels(language: Language) -> OptionsLabels {
             language,
             "options.label.confirm_delete_podcast_mode",
         ),
+        label_rss_quick_copy_mode: i18n::tr(language, "options.label.rss_quick_copy_mode"),
         label_file_associations: i18n::tr(language, "options.label.file_associations"),
         label_manage_associations: i18n::tr(language, "options.button.manage_associations"),
         label_prompt_program: i18n::tr(language, "options.label.prompt_program"),
@@ -588,6 +597,10 @@ fn options_labels(language: Language) -> OptionsLabels {
         confirm_delete_episode: i18n::tr(language, "options.confirm_delete.episode"),
         confirm_delete_both: i18n::tr(language, "options.confirm_delete.both"),
         confirm_delete_none: i18n::tr(language, "options.confirm_delete.none"),
+        rss_quick_copy_title: i18n::tr(language, "options.rss_quick_copy.title"),
+        rss_quick_copy_url: i18n::tr(language, "options.rss_quick_copy.url"),
+        rss_quick_copy_content: i18n::tr(language, "options.rss_quick_copy.content"),
+        rss_quick_copy_all: i18n::tr(language, "options.rss_quick_copy.all"),
         ok: i18n::tr(language, "options.ok"),
         cancel: i18n::tr(language, "options.cancel"),
         voices_empty: i18n::tr(language, "options.voices.empty"),
@@ -1677,6 +1690,36 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
             );
             y += 30;
 
+            let label_rss_quick_copy_mode = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_rss_quick_copy_mode).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_rss_quick_copy_mode = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                180,
+                hwnd,
+                HMENU(OPTIONS_ID_RSS_QUICK_COPY_MODE as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
             let label_podcast_cache_limit = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -2463,6 +2506,8 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 combo_confirm_delete_rss_mode,
                 label_confirm_delete_podcast_mode,
                 combo_confirm_delete_podcast_mode,
+                label_rss_quick_copy_mode,
+                combo_rss_quick_copy_mode,
                 label_file_associations,
                 button_manage_associations,
                 label_prompt_program,
@@ -2576,6 +2621,8 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 combo_confirm_delete_rss_mode,
                 label_confirm_delete_podcast_mode,
                 combo_confirm_delete_podcast_mode,
+                label_rss_quick_copy_mode,
+                combo_rss_quick_copy_mode,
                 label_file_associations,
                 button_manage_associations,
                 label_prompt_program,
@@ -2907,6 +2954,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         checkbox_context_menu,
         combo_confirm_delete_rss_mode,
         combo_confirm_delete_podcast_mode,
+        combo_rss_quick_copy_mode,
         _label_prompt_program,
         combo_prompt_program,
     ) = match with_options_state(hwnd, |state| {
@@ -2985,6 +3033,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.checkbox_context_menu,
             state.combo_confirm_delete_rss_mode,
             state.combo_confirm_delete_podcast_mode,
+            state.combo_rss_quick_copy_mode,
             state.label_prompt_program,
             state.combo_prompt_program,
         )
@@ -3811,6 +3860,37 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         combo_confirm_delete_podcast_mode,
         CB_SETCURSEL,
         WPARAM(podcast_confirm_idx),
+        LPARAM(0),
+    );
+    SendMessageW(
+        combo_rss_quick_copy_mode,
+        CB_RESETCONTENT,
+        WPARAM(0),
+        LPARAM(0),
+    );
+    for option in [
+        labels.rss_quick_copy_title.clone(),
+        labels.rss_quick_copy_url.clone(),
+        labels.rss_quick_copy_content.clone(),
+        labels.rss_quick_copy_all.clone(),
+    ] {
+        SendMessageW(
+            combo_rss_quick_copy_mode,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&option).as_ptr() as isize),
+        );
+    }
+    let rss_quick_copy_idx = match settings.rss_quick_copy_mode {
+        crate::settings::RssQuickCopyMode::Title => 0,
+        crate::settings::RssQuickCopyMode::Url => 1,
+        crate::settings::RssQuickCopyMode::Content => 2,
+        crate::settings::RssQuickCopyMode::All => 3,
+    };
+    SendMessageW(
+        combo_rss_quick_copy_mode,
+        CB_SETCURSEL,
+        WPARAM(rss_quick_copy_idx),
         LPARAM(0),
     );
     SendMessageW(
@@ -4749,6 +4829,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         checkbox_context_menu,
         combo_confirm_delete_rss_mode,
         combo_confirm_delete_podcast_mode,
+        combo_rss_quick_copy_mode,
         combo_prompt_program,
     ) = match with_options_state(hwnd, |state| {
         (
@@ -4810,6 +4891,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.checkbox_context_menu,
             state.combo_confirm_delete_rss_mode,
             state.combo_confirm_delete_podcast_mode,
+            state.combo_rss_quick_copy_mode,
             state.combo_prompt_program,
         )
     }) {
@@ -5169,6 +5251,19 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         1 => PodcastDeleteConfirmMode::Episode,
         3 => PodcastDeleteConfirmMode::None,
         _ => PodcastDeleteConfirmMode::Both,
+    };
+    let rss_quick_copy_sel = SendMessageW(
+        combo_rss_quick_copy_mode,
+        CB_GETCURSEL,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0;
+    settings.rss_quick_copy_mode = match rss_quick_copy_sel {
+        1 => crate::settings::RssQuickCopyMode::Url,
+        2 => crate::settings::RssQuickCopyMode::Content,
+        3 => crate::settings::RssQuickCopyMode::All,
+        _ => crate::settings::RssQuickCopyMode::Title,
     };
     settings.confirm_delete_rss_podcast =
         !matches!(settings.rss_delete_confirm_mode, RssDeleteConfirmMode::None)
@@ -6093,6 +6188,14 @@ fn layout_rss_podcast_tab(state: &OptionsDialogState) {
         y,
         OPTIONS_COMBO_HEIGHT,
     );
+    y = layout_label_control(
+        "label_rss_quick_copy_mode",
+        state.label_rss_quick_copy_mode,
+        "combo_rss_quick_copy_mode",
+        state.combo_rss_quick_copy_mode,
+        y,
+        OPTIONS_COMBO_HEIGHT,
+    );
     y = layout_checkbox(
         "checkbox_announce_unread_rss_podcast",
         state.checkbox_announce_unread_rss_podcast,
@@ -6269,6 +6372,8 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.combo_confirm_delete_rss_mode,
             state.label_confirm_delete_podcast_mode,
             state.combo_confirm_delete_podcast_mode,
+            state.label_rss_quick_copy_mode,
+            state.combo_rss_quick_copy_mode,
             state.label_podcast_cache_limit,
             state.edit_podcast_cache_limit,
             state.checkbox_announce_unread_rss_podcast,

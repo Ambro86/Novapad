@@ -230,6 +230,19 @@ pub enum PodcastDeleteConfirmMode {
     None,
 }
 
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum RssQuickCopyMode {
+    #[serde(rename = "title")]
+    #[default]
+    Title,
+    #[serde(rename = "url")]
+    Url,
+    #[serde(rename = "content")]
+    Content,
+    #[serde(rename = "all")]
+    All,
+}
+
 pub const PODCAST_DEVICE_DEFAULT: &str = "default";
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -345,6 +358,8 @@ pub struct AppSettings {
     pub rss_delete_confirm_mode: RssDeleteConfirmMode,
     #[serde(default)]
     pub podcast_delete_confirm_mode: PodcastDeleteConfirmMode,
+    #[serde(default)]
+    pub rss_quick_copy_mode: RssQuickCopyMode,
     #[serde(default = "default_true")]
     pub announce_unread_rss_podcast_items: bool,
     pub spellcheck_enabled: bool,
@@ -551,6 +566,7 @@ impl Default for AppSettings {
             confirm_delete_rss_podcast: true,
             rss_delete_confirm_mode: RssDeleteConfirmMode::Both,
             podcast_delete_confirm_mode: PodcastDeleteConfirmMode::Both,
+            rss_quick_copy_mode: RssQuickCopyMode::Title,
             announce_unread_rss_podcast_items: true,
             spellcheck_enabled: false,
             spellcheck_language_mode: SpellcheckLanguageMode::FollowEditorLanguage,

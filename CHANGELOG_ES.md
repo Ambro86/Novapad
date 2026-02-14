@@ -7,6 +7,7 @@ Mejoras
 • Añadida la visualización localizada de fecha y hora en artículos RSS y episodios de podcast, con formato adaptado al idioma de la interfaz.
 • Añadida en el menú contextual RSS una nueva acción para compartir por correo electrónico el artículo seleccionado.
 • Añadidas opciones granulares de confirmación de borrado en Opciones > RSS y podcast: para RSS (feed/artículo/ambos/ninguno) y para Podcasts (podcast/episodio/ambos/ninguno).
+• Añadida copia rápida RSS configurable con Ctrl+C (Opciones > RSS y podcast): copiar titular, URL, contenido del artículo o todo junto.
 • Al pulsar Ctrl+A ahora se anuncia la finalización de la acción para ofrecer una respuesta más clara en lectores de pantalla.
 • Mejorado el mensaje de reemplazo con singular/plural correcto (por ejemplo, “1 reemplazo realizado” frente a “2 reemplazos realizados”).
 • Añadida en la ventana del diccionario la selección de idioma de búsqueda, con valor predeterminado Auto (idioma de la interfaz) y opción de ajuste manual.

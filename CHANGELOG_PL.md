@@ -7,6 +7,7 @@ Ulepszenia
 • Dodano lokalizowane wyświetlanie daty i godziny w artykułach RSS oraz odcinkach podcastów, z formatem dopasowanym do języka interfejsu.
 • Dodano nową akcję w menu kontekstowym RSS do udostępniania wybranego artykułu przez e-mail.
 • Dodano szczegółowe opcje potwierdzania usuwania w Opcje > RSS i podcasty: dla RSS (kanał/artykuł/oba/brak) i dla podcastów (podcast/odcinek/oba/brak).
+• Dodano konfigurowalne szybkie kopiowanie RSS skrótem Ctrl+C (Opcje > RSS i podcasty): kopiowanie tytułu, URL, treści artykułu albo wszystkiego razem.
 • Po naciśnięciu Ctrl+A program ogłasza teraz zakończenie akcji, co daje czytelniejszą informację zwrotną dla czytników ekranu.
 • Ulepszono komunikat po zamianie, dodając poprawne formy liczby pojedynczej i mnogiej (np. „1 zamianę” vs „2 zamiany”).
 • Dodano w oknie słownika wybór języka wyszukiwania, z domyślną opcją Auto (język interfejsu) oraz możliwością ręcznego wyboru.

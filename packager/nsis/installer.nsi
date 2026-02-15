@@ -359,6 +359,7 @@ Page custom PageFileAssociations PageLeaveFileAssociations
 !define MUI_FINISHPAGE_SHOWREADME_FUNCTION CreateDesktopShortcut
 ; Show run app after installation.
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${MAINBINARYNAME}.exe"
+!define MUI_FINISHPAGE_RUN_FUNCTION RunInstalledApp
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
 !insertmacro MUI_PAGE_FINISH
 
@@ -794,8 +795,20 @@ Function .onInstSuccess
   check_r_flag:
     ${GetOptions} $CMDLINE "/R" $R0
     IfErrors run_done 0
-      Exec '"$INSTDIR\${MAINBINARYNAME}.exe"'
+      Call RunInstalledApp
   run_done:
+FunctionEnd
+
+Function RunInstalledApp
+  ; Ensure we start the newly installed copy, not an already-running old instance.
+  nsis_tauri_utils::FindProcess "${MAINBINARYNAME}.exe"
+  Pop $R0
+  ${If} $R0 = 0
+    nsis_tauri_utils::KillProcess "${MAINBINARYNAME}.exe"
+    Pop $R0
+    Sleep 500
+  ${EndIf}
+  Exec '"$INSTDIR\${MAINBINARYNAME}.exe"'
 FunctionEnd
 
 Function un.onInit
@@ -845,9 +858,16 @@ Section Uninstall
     {{#each file_associations as |association| ~}}
       {{#each association.extensions as |ext| ~}}
         DeleteRegKey SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad"
+        DeleteRegKey HKCU "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad"
+        DeleteRegKey HKLM "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad"
       {{/each}}
     {{/each}}
+    DeleteRegKey SHCTX "Software\Classes\*\shell\OpenWithSonarpad"
+    DeleteRegKey HKCU "Software\Classes\*\shell\OpenWithSonarpad"
+    DeleteRegKey HKLM "Software\Classes\*\shell\OpenWithSonarpad"
     DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "ContextMenu"
+    DeleteRegValue HKCU "${MANUPRODUCTKEY}" "ContextMenu"
+    DeleteRegValue HKLM "${MANUPRODUCTKEY}" "ContextMenu"
   ${EndIf}
   {{/if}}
 

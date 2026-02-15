@@ -3,6 +3,7 @@
 Versión 0.6.7 – 2026-02-13
 Mejoras
 • Añadido el nuevo modo Ver > Solo lectura para bloquear ediciones accidentales del texto manteniendo la lectura y navegación completas de los documentos.
+• Añadida una barra de progreso accesible durante las actualizaciones del programa, para que los lectores de pantalla puedan seguir en tiempo real el avance de la descarga.
 • Añadida una nueva opción en el menú Ver para Ajuste de línea, que permite activar o desactivar rápidamente el ajuste sin abrir Opciones.
 • Añadidas en Editar > Texto nuevas acciones para aumentar/reducir sangría, con atajos Ctrl+Alt+Flecha derecha (indentar) y Ctrl+Alt+Flecha izquierda (desindentar), porque cuando “Mostrar voces en el editor” está activo la tecla Tab queda reservada para navegar el panel de voces.
 • Añadida la visualización localizada de fecha y hora en artículos RSS y episodios de podcast, con formato adaptado al idioma de la interfaz.

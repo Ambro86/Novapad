@@ -3,6 +3,7 @@
 Version 0.6.7 – 2026-02-13
 Améliorations
 • Ajout du nouveau mode Affichage > Lecture seule pour éviter les modifications accidentelles tout en conservant une lecture et une navigation complètes des documents.
+• Ajout d’une barre de progression accessible pendant les mises à jour du programme, afin que les lecteurs d’écran puissent suivre en temps réel l’avancement du téléchargement.
 • Ajout d’une nouvelle option dans le menu Affichage pour le retour à la ligne, afin d’activer ou désactiver rapidement l’habillage sans ouvrir les Options.
 • Ajout, dans Édition > Texte, de nouvelles actions pour augmenter/réduire le retrait, avec les raccourcis Ctrl+Alt+Flèche droite (indenter) et Ctrl+Alt+Flèche gauche (désindenter), car lorsque « Afficher les voix dans l’éditeur » est activé, la touche Tab est réservée à la navigation du panneau des voix.
 • Ajout de l'affichage localisé de la date et de l'heure dans les articles RSS et les épisodes de podcast, avec un format adapté à la langue de l'interface.

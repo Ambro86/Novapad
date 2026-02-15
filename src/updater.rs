@@ -2,6 +2,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
 use std::thread;
 
 use serde::Deserialize;
@@ -353,13 +354,18 @@ fn download_and_update(
 ) -> Result<UpdateAction, String> {
     let current_exe = std::env::current_exe().map_err(|err| err.to_string())?;
     let temp_path = temp_update_path(&current_exe)?;
+    let progress_guard = UpdateProgressGuard::open(hwnd, language);
 
     log_debug(&format!(
         "Download start: url={} temp={} expected_size={expected_size}",
         url,
         temp_path.display()
     ));
-    download_file(url, &temp_path).map_err(|err| {
+    let download_result = download_file(url, &temp_path, |pct| {
+        progress_guard.update(pct);
+    });
+    progress_guard.close();
+    download_result.map_err(|err| {
         log_debug(&format!("Download failed: {err}"));
         err
     })?;
@@ -610,7 +616,11 @@ fn read_update_metadata(update_path: &Path) -> (Option<u64>, Option<String>) {
     (size, hash)
 }
 
-fn download_file(url: &str, target: &Path) -> Result<(), String> {
+fn download_file<F: FnMut(u32)>(
+    url: &str,
+    target: &Path,
+    mut progress_cb: F,
+) -> Result<(), String> {
     let client = reqwest::blocking::Client::builder()
         .user_agent(USER_AGENT)
         .timeout(std::time::Duration::from_secs(300))
@@ -621,8 +631,31 @@ fn download_file(url: &str, target: &Path) -> Result<(), String> {
     let expected_len = resp.content_length();
 
     let mut file = File::create(target).map_err(|err| err.to_string())?;
-    let written = io::copy(&mut resp, &mut file).map_err(|err| err.to_string())?;
+    let mut written = 0u64;
+    let mut buf = [0u8; 64 * 1024];
+    let mut last_reported = 0u32;
+    loop {
+        let read = resp.read(&mut buf).map_err(|err| err.to_string())?;
+        if read == 0 {
+            break;
+        }
+        file.write_all(&buf[..read])
+            .map_err(|err| err.to_string())?;
+        written = written.saturating_add(read as u64);
+        if let Some(expected) = expected_len
+            && expected > 0
+        {
+            let pct = ((written.saturating_mul(100)) / expected).min(100) as u32;
+            if pct > last_reported {
+                last_reported = pct;
+                progress_cb(pct);
+            }
+        }
+    }
     file.flush().map_err(|err| err.to_string())?;
+    if last_reported < 100 {
+        progress_cb(100);
+    }
     if let Some(expected) = expected_len
         && written != expected
     {
@@ -671,7 +704,7 @@ fn parse_sha256_file(content: &str, target_name: &str) -> Option<String> {
 fn download_sha256_optional(url: &str, target_name: &str) -> Option<String> {
     let mut temp = std::env::temp_dir();
     temp.push(format!("sonarpad_sha256_{}.tmp", std::process::id()));
-    match download_file(url, &temp) {
+    match download_file(url, &temp, |_pct| {}) {
         Ok(()) => {
             let content = std::fs::read_to_string(&temp).ok();
             crate::log_if_err!(std::fs::remove_file(&temp));
@@ -1766,4 +1799,72 @@ fn show_update_message(
         });
     log_debug(&format!("Updater: Received response: {}", response));
     windows::Win32::UI::WindowsAndMessaging::MESSAGEBOX_RESULT(response)
+}
+
+struct UpdateProgressGuard {
+    owner: HWND,
+    active: bool,
+}
+
+impl UpdateProgressGuard {
+    fn open(owner: HWND, language: Language) -> Self {
+        let mut guard = Self {
+            owner,
+            active: false,
+        };
+        if owner.0 == 0 {
+            return guard;
+        }
+        let (tx, rx) = mpsc::channel();
+        let req = Box::new(crate::UpdateProgressOpenRequest {
+            language,
+            response_tx: tx,
+        });
+        let ptr = Box::into_raw(req);
+        unsafe {
+            if let Err(err) = PostMessageW(
+                owner,
+                crate::WM_UPDATE_PROGRESS_OPEN,
+                WPARAM(0),
+                LPARAM(ptr as isize),
+            ) {
+                log_debug(&format!("Updater progress open failed: {}", err));
+                let _unused_box = Box::from_raw(ptr);
+                return guard;
+            }
+        }
+        let dialog_hwnd = rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .unwrap_or_default();
+        guard.active = dialog_hwnd != 0;
+        guard
+    }
+
+    fn update(&self, pct: u32) {
+        if !self.active || self.owner.0 == 0 {
+            return;
+        }
+        unsafe {
+            crate::log_if_err!(PostMessageW(
+                self.owner,
+                crate::WM_UPDATE_PROGRESS_SET,
+                WPARAM(pct as usize),
+                LPARAM(0)
+            ));
+        }
+    }
+
+    fn close(&self) {
+        if !self.active || self.owner.0 == 0 {
+            return;
+        }
+        unsafe {
+            crate::log_if_err!(PostMessageW(
+                self.owner,
+                crate::WM_UPDATE_PROGRESS_CLOSE,
+                WPARAM(0),
+                LPARAM(0)
+            ));
+        }
+    }
 }

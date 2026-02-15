@@ -164,6 +164,9 @@ const WM_TTS_START: u32 = WM_APP + 10;
 
 pub const WM_FOCUS_EDITOR: u32 = WM_APP + 30;
 pub const WM_UPDATE_DIALOG: u32 = WM_APP + 80;
+pub const WM_UPDATE_PROGRESS_OPEN: u32 = WM_APP + 84;
+pub const WM_UPDATE_PROGRESS_SET: u32 = WM_APP + 85;
+pub const WM_UPDATE_PROGRESS_CLOSE: u32 = WM_APP + 86;
 const WM_AUTO_UPDATE_CHECK: u32 = WM_APP + 81;
 const WM_CHECK_PENDING_UPDATE: u32 = WM_APP + 82;
 const WM_SHOW_CHANGELOG: u32 = WM_APP + 83;
@@ -338,6 +341,11 @@ pub struct UpdateDialogRequest {
     pub title: String,
     pub flags: MESSAGEBOX_STYLE,
     pub response_tx: mpsc::Sender<i32>,
+}
+
+pub struct UpdateProgressOpenRequest {
+    pub language: Language,
+    pub response_tx: mpsc::Sender<isize>,
 }
 
 struct PdfLoadingState {
@@ -1510,6 +1518,7 @@ fn has_secondary_window_open(hwnd: HWND) -> bool {
                 || state.prompt_window.0 != 0
                 || state.podcast_window.0 != 0
                 || state.podcast_save_window.0 != 0
+                || state.update_progress_window.0 != 0
                 || state.batch_audiobooks_window.0 != 0
                 || state.convert_audio_window.0 != 0
                 || state.podcasts_window.0 != 0
@@ -1551,6 +1560,7 @@ pub(crate) struct AppState {
     prompt_window: HWND,
     podcast_window: HWND,
     podcast_save_window: HWND,
+    update_progress_window: HWND,
     batch_audiobooks_window: HWND,
     convert_audio_window: HWND,
     podcasts_window: HWND,
@@ -1993,6 +2003,17 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                     crate::log_if_err!(PostMessageW(save_hwnd, WM_COMMAND, WPARAM(2), LPARAM(0)));
                     continue;
                 }
+                let update_progress_hwnd =
+                    with_state(hwnd, |state| state.update_progress_window).unwrap_or(HWND(0));
+                if update_progress_hwnd.0 != 0 {
+                    crate::log_if_err!(PostMessageW(
+                        update_progress_hwnd,
+                        WM_COMMAND,
+                        WPARAM(2),
+                        LPARAM(0)
+                    ));
+                    continue;
+                }
                 if let Some(hwnd_edit) = get_active_edit(hwnd)
                     && GetFocus() == hwnd_edit
                     && focus_find_in_files_results()
@@ -2215,6 +2236,15 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                 if state.podcast_save_window.0 != 0
                     && app_windows::podcast_save_window::handle_navigation(
                         state.podcast_save_window,
+                        &msg,
+                    )
+                {
+                    handled = true;
+                    return;
+                }
+                if state.update_progress_window.0 != 0
+                    && app_windows::podcast_save_window::handle_navigation(
+                        state.update_progress_window,
                         &msg,
                     )
                 {
@@ -2733,6 +2763,7 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 go_to_time_dialog: HWND(0),
                 playback_menu: HMENU(0),
                 podcast_save_window: HWND(0),
+                update_progress_window: HWND(0),
                 batch_audiobooks_window: HWND(0),
                 convert_audio_window: HWND(0),
 
@@ -3105,6 +3136,69 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
             } else {
                 crate::log_debug("UI: Response sent to channel successfully");
             }
+            LRESULT(0)
+        }
+        WM_UPDATE_PROGRESS_OPEN => {
+            if lparam.0 == 0 {
+                return LRESULT(0);
+            }
+            let req = unsafe { Box::from_raw(lparam.0 as *mut UpdateProgressOpenRequest) };
+            let labels = app_windows::podcast_save_window::SaveDialogLabels {
+                title: i18n::tr(req.language, "updater.title"),
+                in_progress: i18n::tr(req.language, "podcast.save.in_progress"),
+                cancel: i18n::tr(req.language, "podcast.save.cancel"),
+            };
+            let dialog = unsafe {
+                app_windows::podcast_save_window::open_with_labels(
+                    hwnd,
+                    req.language,
+                    labels,
+                    false,
+                )
+            };
+            with_state(hwnd, |state| {
+                state.update_progress_window = dialog;
+            });
+            if let Err(e) = req.response_tx.send(dialog.0) {
+                crate::log_debug(&format!(
+                    "UI: Failed to send update progress dialog handle: {}",
+                    e
+                ));
+            }
+            LRESULT(0)
+        }
+        WM_UPDATE_PROGRESS_SET => {
+            let pct = wparam.0.min(100);
+            let dialog = with_state(hwnd, |state| state.update_progress_window).unwrap_or(HWND(0));
+            if dialog.0 != 0 {
+                crate::log_if_err!(PostMessageW(
+                    dialog,
+                    app_windows::podcast_save_window::WM_PODCAST_SAVE_PROGRESS,
+                    WPARAM(pct),
+                    LPARAM(0)
+                ));
+            }
+            LRESULT(0)
+        }
+        WM_UPDATE_PROGRESS_CLOSE => {
+            let dialog = with_state(hwnd, |state| state.update_progress_window).unwrap_or(HWND(0));
+            if dialog.0 != 0 {
+                crate::log_if_err!(PostMessageW(
+                    dialog,
+                    app_windows::podcast_save_window::WM_PODCAST_SAVE_DONE,
+                    WPARAM(0),
+                    LPARAM(0)
+                ));
+                with_state(hwnd, |state| {
+                    state.update_progress_window = HWND(0);
+                });
+            }
+            LRESULT(0)
+        }
+        app_windows::podcast_save_window::WM_PODCAST_SAVE_CLOSED => {
+            with_state(hwnd, |state| {
+                state.update_progress_window = HWND(0);
+            });
             LRESULT(0)
         }
         WM_AUTO_UPDATE_CHECK => {

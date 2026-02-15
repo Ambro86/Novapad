@@ -110,14 +110,11 @@ path = "sonarpad"
 main = true
 
 [package.metadata.packager.nsis]
-languages = ["English", "Italian", "Spanish", "Portuguese", "Swedish", "Vietnamese", "Czech", "Polish", "French", "Serbian"]
+languages = ["English", "Italian", "Spanish", "Portuguese", "Swedish", "Vietnamese"]
 template = "packager/nsis/installer.nsi"
 
 [package.metadata.packager.wix]
 template = "packager/wix/main.wxs"
-languages = [
-  { identifier = "en-US", path = "packager/wix/locales/en-US.wxl" },
-]
 
 [dependencies]
 windows = { version = "0.54", features = [

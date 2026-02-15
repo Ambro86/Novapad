@@ -112,18 +112,18 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
 
 ; Installer pages, must be ordered as they appear
 ; 1. Welcome Page
-!define /redef MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
 !insertmacro MUI_PAGE_WELCOME
 
 ; 2. License Page (if defined)
 !if "${LICENSE}" != ""
-  !define /redef MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+  !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
   !insertmacro MUI_PAGE_LICENSE "${LICENSE}"
 !endif
 
 ; 3. Install mode (if it is set to `both`)
 !if "${INSTALLMODE}" == "both"
-  !define /redef MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+  !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
   !insertmacro MULTIUSER_PAGE_INSTALLMODE
 !endif
 
@@ -134,17 +134,8 @@ Var ReinstallPageCheck
 {{#if file_associations}}
 Var AssociateFilesCheckbox
 Var AssociateFilesCheckboxState
-Var AssociateFilesModeAllRadio
-Var AssociateFilesModeManualRadio
-Var AssociateFilesModeManualState
-Var AssociateExtensionsList
 Var ContextMenuCheckbox
 Var ContextMenuCheckboxState
-{{#each file_associations as |association| ~}}
-{{#each association.extensions as |ext| ~}}
-Var AssocExtState_{{ext}}
-{{/each~}}
-{{/each~}}
 {{/if}}
 Page custom PageReinstall PageLeaveReinstall
 Function PageReinstall
@@ -312,19 +303,6 @@ Function PageLeaveReinstall
 FunctionEnd
 
 {{#if file_associations}}
-!ifndef LB_ADDSTRING
-!define LB_ADDSTRING 0x180
-!endif
-!ifndef LB_SETSEL
-!define LB_SETSEL 0x185
-!endif
-!ifndef LB_GETSEL
-!define LB_GETSEL 0x187
-!endif
-!ifndef LB_FINDSTRINGEXACT
-!define LB_FINDSTRINGEXACT 0x1A2
-!endif
-
 Function PageFileAssociations
   Call SkipIfPassive
   nsDialogs::Create 1018
@@ -338,17 +316,7 @@ Function PageFileAssociations
     ${NSD_Check} $AssociateFilesCheckbox
   ${EndIf}
 
-  ${NSD_CreateRadioButton} 12u 38u 100% 10u "$(assocModeAll)"
-  Pop $AssociateFilesModeAllRadio
-  ${NSD_CreateRadioButton} 12u 50u 100% 10u "$(assocModeManual)"
-  Pop $AssociateFilesModeManualRadio
-  ${If} $AssociateFilesModeManualState == 1
-    ${NSD_Check} $AssociateFilesModeManualRadio
-  ${Else}
-    ${NSD_Check} $AssociateFilesModeAllRadio
-  ${EndIf}
-
-  ${NSD_CreateCheckbox} 0 70u 100% 12u "$(ctxMenuCheckbox)"
+  ${NSD_CreateCheckbox} 0 36u 100% 12u "$(ctxMenuCheckbox)"
   Pop $ContextMenuCheckbox
   ${If} $ContextMenuCheckboxState == 1
     ${NSD_Check} $ContextMenuCheckbox
@@ -358,81 +326,23 @@ FunctionEnd
 
 Function PageLeaveFileAssociations
   ${NSD_GetState} $AssociateFilesCheckbox $AssociateFilesCheckboxState
-  ${NSD_GetState} $AssociateFilesModeManualRadio $AssociateFilesModeManualState
   ${NSD_GetState} $ContextMenuCheckbox $ContextMenuCheckboxState
-FunctionEnd
-
-Function PrePageFileAssociationExtensions
-  Call SkipIfPassive
-  ${If} $AssociateFilesCheckboxState != 1
-    Abort
-  ${EndIf}
-  ${If} $AssociateFilesModeManualState != 1
-    Abort
-  ${EndIf}
-FunctionEnd
-
-Function PageFileAssociationExtensions
-  Call SkipIfPassive
-  nsDialogs::Create 1018
-  Pop $R0
-  ${IfThen} $R0 == error ${|} Abort ${|}
-
-  !insertmacro MUI_HEADER_TEXT "$(assocExtTitle)" "$(assocExtSubtitle)"
-
-  ${NSD_CreateLabel} 0 18u 100% 12u "$(assocExtListLabel)"
-  Pop $R1
-  ${NSD_CreateListBox} 0 32u 100% 120u ""
-  Pop $AssociateExtensionsList
-
-  {{#each file_associations as |association| ~}}
-  {{#each association.extensions as |ext| ~}}
-    SendMessage $AssociateExtensionsList ${LB_ADDSTRING} 0 "STR:.{{ext}}" $R0
-    ${If} $AssocExtState_{{ext}} == 1
-      SendMessage $AssociateExtensionsList ${LB_SETSEL} 1 $R0
-    ${EndIf}
-  {{/each~}}
-  {{/each~}}
-
-  nsDialogs::Show
-FunctionEnd
-
-Function PageLeaveFileAssociationExtensions
-  {{#each file_associations as |association| ~}}
-  {{#each association.extensions as |ext| ~}}
-    SendMessage $AssociateExtensionsList ${LB_FINDSTRINGEXACT} -1 "STR:.{{ext}}" $R0
-    ${If} $R0 >= 0
-      SendMessage $AssociateExtensionsList ${LB_GETSEL} $R0 0 $R1
-      ${If} $R1 == 1
-        StrCpy $AssocExtState_{{ext}} 1
-      ${Else}
-        StrCpy $AssocExtState_{{ext}} 0
-      ${EndIf}
-    ${Else}
-      StrCpy $AssocExtState_{{ext}} 0
-    ${EndIf}
-  {{/each~}}
-  {{/each~}}
 FunctionEnd
 {{/if}}
 
 ; 5. Choose install directoy page
-!define /redef MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
 !insertmacro MUI_PAGE_DIRECTORY
 
 ; 6. Start menu shortcut page
-!define /redef MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
 Var AppStartMenuFolder
 !insertmacro MUI_PAGE_STARTMENU Application $AppStartMenuFolder
 
 {{#if file_associations}}
 ; 6b. File associations page
-!define /redef MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
 Page custom PageFileAssociations PageLeaveFileAssociations
-
-; 6c. Manual file association selection page
-!define /redef MUI_PAGE_CUSTOMFUNCTION_PRE PrePageFileAssociationExtensions
-Page custom PageFileAssociationExtensions PageLeaveFileAssociationExtensions
 {{/if}}
 
 ; 7. Installation page
@@ -449,7 +359,7 @@ Page custom PageFileAssociationExtensions PageLeaveFileAssociationExtensions
 !define MUI_FINISHPAGE_SHOWREADME_FUNCTION CreateDesktopShortcut
 ; Show run app after installation.
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${MAINBINARYNAME}.exe"
-!define /redef MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
 !insertmacro MUI_PAGE_FINISH
 
 ; Uninstaller Pages
@@ -458,7 +368,7 @@ Page custom PageFileAssociationExtensions PageLeaveFileAssociationExtensions
 Var DeleteAppDataCheckbox
 Var DeleteAppDataCheckboxState
 !define /ifndef WS_EX_LAYOUTRTL         0x00400000
-!define /redef MUI_PAGE_CUSTOMFUNCTION_SHOW un.ConfirmShow
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW un.ConfirmShow
 Function un.ConfirmShow
     FindWindow $1 "#32770" "" $HWNDPARENT ; Find inner dialog
     ${If} $(^RTL) == 1
@@ -470,7 +380,7 @@ Function un.ConfirmShow
     SendMessage $HWNDPARENT ${WM_GETFONT} 0 0 $1
     SendMessage $DeleteAppDataCheckbox ${WM_SETFONT} $1 1
 FunctionEnd
-!define /redef MUI_PAGE_CUSTOMFUNCTION_LEAVE un.ConfirmLeave
+!define MUI_PAGE_CUSTOMFUNCTION_LEAVE un.ConfirmLeave
 Function un.ConfirmLeave
     SendMessage $DeleteAppDataCheckbox ${BM_GETCHECK} 0 0 $DeleteAppDataCheckboxState
 FunctionEnd
@@ -496,10 +406,6 @@ LangString assocTitle ${LANG_SPANISH} "Asociaciones de archivos"
 LangString assocTitle ${LANG_PORTUGUESE} "Associações de arquivos"
 LangString assocTitle ${LANG_SWEDISH} "Filkopplingar"
 LangString assocTitle ${LANG_VIETNAMESE} "Liên kết tệp"
-LangString assocTitle ${LANG_CZECH} "Asociace souborů"
-LangString assocTitle ${LANG_POLISH} "Skojarzenia plików"
-LangString assocTitle ${LANG_FRENCH} "Associations de fichiers"
-LangString assocTitle ${LANG_SERBIAN} "Povezivanje datoteka"
 
 LangString assocSubtitle ${LANG_ENGLISH} "Choose whether to associate supported file types with ${PRODUCTNAME}."
 LangString assocSubtitle ${LANG_ITALIAN} "Scegli se associare i file supportati a ${PRODUCTNAME}."
@@ -507,10 +413,6 @@ LangString assocSubtitle ${LANG_SPANISH} "Elija si desea asociar los tipos de ar
 LangString assocSubtitle ${LANG_PORTUGUESE} "Escolha se deseja associar os tipos de arquivos suportados ao ${PRODUCTNAME}."
 LangString assocSubtitle ${LANG_SWEDISH} "Välj om du vill koppla filtyper som stöds till ${PRODUCTNAME}."
 LangString assocSubtitle ${LANG_VIETNAMESE} "Chọn xem có liên kết các loại tệp được hỗ trợ với ${PRODUCTNAME} hay không."
-LangString assocSubtitle ${LANG_CZECH} "Zvolte, zda chcete asociovat podporované typy souborů s aplikací ${PRODUCTNAME}."
-LangString assocSubtitle ${LANG_POLISH} "Wybierz, czy skojarzyć obsługiwane typy plików z ${PRODUCTNAME}."
-LangString assocSubtitle ${LANG_FRENCH} "Choisissez si vous voulez associer les types de fichiers pris en charge a ${PRODUCTNAME}."
-LangString assocSubtitle ${LANG_SERBIAN} "Izaberite da li zelite da povezete podrzane tipove datoteka sa ${PRODUCTNAME}."
 
 LangString assocCheckbox ${LANG_ENGLISH} "Associate supported file types with ${PRODUCTNAME}"
 LangString assocCheckbox ${LANG_ITALIAN} "Associa i file supportati a ${PRODUCTNAME}"
@@ -518,65 +420,6 @@ LangString assocCheckbox ${LANG_SPANISH} "Asociar tipos de archivo compatibles c
 LangString assocCheckbox ${LANG_PORTUGUESE} "Associar tipos de arquivos suportados ao ${PRODUCTNAME}"
 LangString assocCheckbox ${LANG_SWEDISH} "Koppla filtyper som stöds till ${PRODUCTNAME}"
 LangString assocCheckbox ${LANG_VIETNAMESE} "Liên kết các loại tệp được hỗ trợ với ${PRODUCTNAME}"
-LangString assocCheckbox ${LANG_CZECH} "Asociovat podporované typy souborů s aplikací ${PRODUCTNAME}"
-LangString assocCheckbox ${LANG_POLISH} "Skojarz obslugiwane typy plikow z ${PRODUCTNAME}"
-LangString assocCheckbox ${LANG_FRENCH} "Associer les types de fichiers pris en charge a ${PRODUCTNAME}"
-LangString assocCheckbox ${LANG_SERBIAN} "Povezi podrzane tipove datoteka sa ${PRODUCTNAME}"
-
-LangString assocModeAll ${LANG_ENGLISH} "Associate all supported file extensions"
-LangString assocModeAll ${LANG_ITALIAN} "Associa tutte le estensioni supportate"
-LangString assocModeAll ${LANG_SPANISH} "Asociar todas las extensiones compatibles"
-LangString assocModeAll ${LANG_PORTUGUESE} "Associar todas as extensoes suportadas"
-LangString assocModeAll ${LANG_SWEDISH} "Associera alla filandelser som stöds"
-LangString assocModeAll ${LANG_VIETNAMESE} "Lien ket tat ca phan mo rong tep duoc ho tro"
-LangString assocModeAll ${LANG_CZECH} "Pridruzit vsechny podporovane pripony souboru"
-LangString assocModeAll ${LANG_POLISH} "Skojarz wszystkie obslugiwane rozszerzenia plikow"
-LangString assocModeAll ${LANG_FRENCH} "Associer toutes les extensions prises en charge"
-LangString assocModeAll ${LANG_SERBIAN} "Povezi sve podrzane ekstenzije datoteka"
-
-LangString assocModeManual ${LANG_ENGLISH} "Choose file extensions manually"
-LangString assocModeManual ${LANG_ITALIAN} "Scegli manualmente le estensioni file"
-LangString assocModeManual ${LANG_SPANISH} "Elegir manualmente las extensiones de archivo"
-LangString assocModeManual ${LANG_PORTUGUESE} "Escolher manualmente as extensoes de ficheiro"
-LangString assocModeManual ${LANG_SWEDISH} "Valj filandelser manuellt"
-LangString assocModeManual ${LANG_VIETNAMESE} "Chon thu cong cac phan mo rong tep"
-LangString assocModeManual ${LANG_CZECH} "Rucne vybrat pripony souboru"
-LangString assocModeManual ${LANG_POLISH} "Wybierz recznie rozszerzenia plikow"
-LangString assocModeManual ${LANG_FRENCH} "Choisir manuellement les extensions de fichier"
-LangString assocModeManual ${LANG_SERBIAN} "Rucno izaberi ekstenzije datoteka"
-
-LangString assocExtTitle ${LANG_ENGLISH} "Manual file association selection"
-LangString assocExtTitle ${LANG_ITALIAN} "Selezione manuale associazioni file"
-LangString assocExtTitle ${LANG_SPANISH} "Seleccion manual de asociaciones de archivos"
-LangString assocExtTitle ${LANG_PORTUGUESE} "Selecao manual de associacoes de ficheiros"
-LangString assocExtTitle ${LANG_SWEDISH} "Manuellt val av filkopplingar"
-LangString assocExtTitle ${LANG_VIETNAMESE} "Chon lien ket tep thu cong"
-LangString assocExtTitle ${LANG_CZECH} "Rucni vyber prirazeni souboru"
-LangString assocExtTitle ${LANG_POLISH} "Reczny wybor skojarzen plikow"
-LangString assocExtTitle ${LANG_FRENCH} "Selection manuelle des associations de fichiers"
-LangString assocExtTitle ${LANG_SERBIAN} "Rucni izbor povezivanja datoteka"
-
-LangString assocExtSubtitle ${LANG_ENGLISH} "Select the extensions to associate with ${PRODUCTNAME}."
-LangString assocExtSubtitle ${LANG_ITALIAN} "Seleziona le estensioni da associare a ${PRODUCTNAME}."
-LangString assocExtSubtitle ${LANG_SPANISH} "Seleccione las extensiones que desea asociar con ${PRODUCTNAME}."
-LangString assocExtSubtitle ${LANG_PORTUGUESE} "Selecione as extensoes a associar ao ${PRODUCTNAME}."
-LangString assocExtSubtitle ${LANG_SWEDISH} "Valj vilka filandelser som ska kopplas till ${PRODUCTNAME}."
-LangString assocExtSubtitle ${LANG_VIETNAMESE} "Chon cac phan mo rong can lien ket voi ${PRODUCTNAME}."
-LangString assocExtSubtitle ${LANG_CZECH} "Vyberte pripony, ktere chcete priradit k aplikaci ${PRODUCTNAME}."
-LangString assocExtSubtitle ${LANG_POLISH} "Wybierz rozszerzenia, ktore chcesz skojarzyc z ${PRODUCTNAME}."
-LangString assocExtSubtitle ${LANG_FRENCH} "Selectionnez les extensions a associer a ${PRODUCTNAME}."
-LangString assocExtSubtitle ${LANG_SERBIAN} "Izaberite ekstenzije koje zelite da povezete sa ${PRODUCTNAME}."
-
-LangString assocExtListLabel ${LANG_ENGLISH} "Extensions:"
-LangString assocExtListLabel ${LANG_ITALIAN} "Estensioni:"
-LangString assocExtListLabel ${LANG_SPANISH} "Extensiones:"
-LangString assocExtListLabel ${LANG_PORTUGUESE} "Extensoes:"
-LangString assocExtListLabel ${LANG_SWEDISH} "Filandelser:"
-LangString assocExtListLabel ${LANG_VIETNAMESE} "Phan mo rong:"
-LangString assocExtListLabel ${LANG_CZECH} "Pripony:"
-LangString assocExtListLabel ${LANG_POLISH} "Rozszerzenia:"
-LangString assocExtListLabel ${LANG_FRENCH} "Extensions :"
-LangString assocExtListLabel ${LANG_SERBIAN} "Ekstenzije:"
 
 LangString ctxMenuCheckbox ${LANG_ENGLISH} "Add 'Open with ${PRODUCTNAME}' to the context menu"
 LangString ctxMenuCheckbox ${LANG_ITALIAN} "Aggiungi $\"Apri con ${PRODUCTNAME}$\" al menu contestuale"
@@ -584,10 +427,6 @@ LangString ctxMenuCheckbox ${LANG_SPANISH} "Añadir 'Abrir con ${PRODUCTNAME}' a
 LangString ctxMenuCheckbox ${LANG_PORTUGUESE} "Adicionar 'Abrir com ${PRODUCTNAME}' ao menu de contexto"
 LangString ctxMenuCheckbox ${LANG_SWEDISH} "Lägg till 'Öppna med ${PRODUCTNAME}' i snabbmenyn"
 LangString ctxMenuCheckbox ${LANG_VIETNAMESE} "Thêm 'Mở bằng ${PRODUCTNAME}' vào menu chuột phải"
-LangString ctxMenuCheckbox ${LANG_CZECH} "Přidat 'Otevřít v ${PRODUCTNAME}' do kontextové nabídky"
-LangString ctxMenuCheckbox ${LANG_POLISH} "Dodaj 'Otworz za pomoca ${PRODUCTNAME}' do menu kontekstowego"
-LangString ctxMenuCheckbox ${LANG_FRENCH} "Ajouter 'Ouvrir avec ${PRODUCTNAME}' au menu contextuel"
-LangString ctxMenuCheckbox ${LANG_SERBIAN} "Dodaj 'Otvori pomocu ${PRODUCTNAME}' u kontekstni meni"
 
 LangString ctxMenuLabel ${LANG_ENGLISH} "Open with ${PRODUCTNAME}"
 LangString ctxMenuLabel ${LANG_ITALIAN} "Apri con ${PRODUCTNAME}"
@@ -595,10 +434,6 @@ LangString ctxMenuLabel ${LANG_SPANISH} "Abrir con ${PRODUCTNAME}"
 LangString ctxMenuLabel ${LANG_PORTUGUESE} "Abrir com ${PRODUCTNAME}"
 LangString ctxMenuLabel ${LANG_SWEDISH} "Öppna med ${PRODUCTNAME}"
 LangString ctxMenuLabel ${LANG_VIETNAMESE} "Mở bằng ${PRODUCTNAME}"
-LangString ctxMenuLabel ${LANG_CZECH} "Otevřít v ${PRODUCTNAME}"
-LangString ctxMenuLabel ${LANG_POLISH} "Otworz za pomoca ${PRODUCTNAME}"
-LangString ctxMenuLabel ${LANG_FRENCH} "Ouvrir avec ${PRODUCTNAME}"
-LangString ctxMenuLabel ${LANG_SERBIAN} "Otvori pomocu ${PRODUCTNAME}"
 
 LangString older ${LANG_ENGLISH} "older"
 LangString older ${LANG_ITALIAN} "piu vecchia"
@@ -606,10 +441,6 @@ LangString older ${LANG_SPANISH} "más antigua"
 LangString older ${LANG_PORTUGUESE} "mais antiga"
 LangString older ${LANG_SWEDISH} "äldre"
 LangString older ${LANG_VIETNAMESE} "cũ hơn"
-LangString older ${LANG_CZECH} "starší"
-LangString older ${LANG_POLISH} "starsza"
-LangString older ${LANG_FRENCH} "plus ancienne"
-LangString older ${LANG_SERBIAN} "starija"
 
 LangString unknown ${LANG_ENGLISH} "unknown"
 LangString unknown ${LANG_ITALIAN} "sconosciuta"
@@ -617,10 +448,6 @@ LangString unknown ${LANG_SPANISH} "desconocida"
 LangString unknown ${LANG_PORTUGUESE} "desconhecida"
 LangString unknown ${LANG_SWEDISH} "okänd"
 LangString unknown ${LANG_VIETNAMESE} "không xác định"
-LangString unknown ${LANG_CZECH} "neznámá"
-LangString unknown ${LANG_POLISH} "nieznana"
-LangString unknown ${LANG_FRENCH} "inconnue"
-LangString unknown ${LANG_SERBIAN} "nepoznata"
 
 LangString alreadyInstalledLong ${LANG_ENGLISH} "${PRODUCTNAME} is already installed. Choose the operation to perform."
 LangString alreadyInstalledLong ${LANG_ITALIAN} "${PRODUCTNAME} e gia installato. Scegli l'operazione da eseguire."
@@ -628,10 +455,6 @@ LangString alreadyInstalledLong ${LANG_SPANISH} "${PRODUCTNAME} ya está instala
 LangString alreadyInstalledLong ${LANG_PORTUGUESE} "O ${PRODUCTNAME} já está instalado. Escolha a operação a realizar."
 LangString alreadyInstalledLong ${LANG_SWEDISH} "${PRODUCTNAME} är redan installerat. Välj den åtgärd du vill utföra."
 LangString alreadyInstalledLong ${LANG_VIETNAMESE} "${PRODUCTNAME} đã được cài đặt. Chọn thao tác muốn thực hiện."
-LangString alreadyInstalledLong ${LANG_CZECH} "${PRODUCTNAME} je již nainstalován. Vyberte operaci, kterou chcete provést."
-LangString alreadyInstalledLong ${LANG_POLISH} "${PRODUCTNAME} jest juz zainstalowany. Wybierz operacje do wykonania."
-LangString alreadyInstalledLong ${LANG_FRENCH} "${PRODUCTNAME} est deja installe. Choisissez l'operation a effectuer."
-LangString alreadyInstalledLong ${LANG_SERBIAN} "${PRODUCTNAME} je vec instaliran. Izaberite operaciju koju zelite da izvrsite."
 
 LangString addOrReinstall ${LANG_ENGLISH} "Repair or reinstall ${PRODUCTNAME}"
 LangString addOrReinstall ${LANG_ITALIAN} "Ripara o reinstalla ${PRODUCTNAME}"
@@ -639,10 +462,6 @@ LangString addOrReinstall ${LANG_SPANISH} "Reparar o reinstalar ${PRODUCTNAME}"
 LangString addOrReinstall ${LANG_PORTUGUESE} "Reparar ou reinstalar o ${PRODUCTNAME}"
 LangString addOrReinstall ${LANG_SWEDISH} "Reparera eller installera om ${PRODUCTNAME}"
 LangString addOrReinstall ${LANG_VIETNAMESE} "Sửa chữa hoặc cài đặt lại ${PRODUCTNAME}"
-LangString addOrReinstall ${LANG_CZECH} "Opravit nebo přeinstalovat ${PRODUCTNAME}"
-LangString addOrReinstall ${LANG_POLISH} "Napraw lub zainstaluj ponownie ${PRODUCTNAME}"
-LangString addOrReinstall ${LANG_FRENCH} "Reparer ou reinstaller ${PRODUCTNAME}"
-LangString addOrReinstall ${LANG_SERBIAN} "Popravi ili ponovo instaliraj ${PRODUCTNAME}"
 
 LangString uninstallApp ${LANG_ENGLISH} "Uninstall ${PRODUCTNAME}"
 LangString uninstallApp ${LANG_ITALIAN} "Disinstalla ${PRODUCTNAME}"
@@ -650,10 +469,6 @@ LangString uninstallApp ${LANG_SPANISH} "Desinstalar ${PRODUCTNAME}"
 LangString uninstallApp ${LANG_PORTUGUESE} "Desinstalar o ${PRODUCTNAME}"
 LangString uninstallApp ${LANG_SWEDISH} "Avinstallera ${PRODUCTNAME}"
 LangString uninstallApp ${LANG_VIETNAMESE} "Gỡ cài đặt ${PRODUCTNAME}"
-LangString uninstallApp ${LANG_CZECH} "Odinstalovat ${PRODUCTNAME}"
-LangString uninstallApp ${LANG_POLISH} "Odinstaluj ${PRODUCTNAME}"
-LangString uninstallApp ${LANG_FRENCH} "Desinstaller ${PRODUCTNAME}"
-LangString uninstallApp ${LANG_SERBIAN} "Deinstaliraj ${PRODUCTNAME}"
 
 LangString alreadyInstalled ${LANG_ENGLISH} "Application already installed"
 LangString alreadyInstalled ${LANG_ITALIAN} "Applicazione gia installata"
@@ -661,10 +476,6 @@ LangString alreadyInstalled ${LANG_SPANISH} "Aplicación ya instalada"
 LangString alreadyInstalled ${LANG_PORTUGUESE} "Aplicação já instalada"
 LangString alreadyInstalled ${LANG_SWEDISH} "Applikationen är redan installerad"
 LangString alreadyInstalled ${LANG_VIETNAMESE} "Ứng dụng đã được cài đặt"
-LangString alreadyInstalled ${LANG_CZECH} "Aplikace je již nainstalována"
-LangString alreadyInstalled ${LANG_POLISH} "Aplikacja jest juz zainstalowana"
-LangString alreadyInstalled ${LANG_FRENCH} "Application deja installee"
-LangString alreadyInstalled ${LANG_SERBIAN} "Aplikacija je vec instalirana"
 
 LangString chooseMaintenanceOption ${LANG_ENGLISH} "Choose the maintenance option you want."
 LangString chooseMaintenanceOption ${LANG_ITALIAN} "Scegli l'opzione di manutenzione."
@@ -672,10 +483,6 @@ LangString chooseMaintenanceOption ${LANG_SPANISH} "Elija la opción de mantenim
 LangString chooseMaintenanceOption ${LANG_PORTUGUESE} "Escolha a opção de manutenção desejada."
 LangString chooseMaintenanceOption ${LANG_SWEDISH} "Välj det underhållsalternativ du vill ha."
 LangString chooseMaintenanceOption ${LANG_VIETNAMESE} "Chọn tùy chọn bảo trì bạn muốn."
-LangString chooseMaintenanceOption ${LANG_CZECH} "Vyberte požadovanou možnost údržby."
-LangString chooseMaintenanceOption ${LANG_POLISH} "Wybierz zadana opcje konserwacji."
-LangString chooseMaintenanceOption ${LANG_FRENCH} "Choisissez l'option de maintenance souhaitee."
-LangString chooseMaintenanceOption ${LANG_SERBIAN} "Izaberite zeljenu opciju odrzavanja."
 
 LangString olderOrUnknownVersionInstalled ${LANG_ENGLISH} "An older or unknown version of ${PRODUCTNAME} is installed."
 LangString olderOrUnknownVersionInstalled ${LANG_ITALIAN} "E installata una versione piu vecchia o sconosciuta di ${PRODUCTNAME}."
@@ -683,10 +490,6 @@ LangString olderOrUnknownVersionInstalled ${LANG_SPANISH} "Una versión más ant
 LangString olderOrUnknownVersionInstalled ${LANG_PORTUGUESE} "Uma versão mais antiga ou desconhecida do ${PRODUCTNAME} está instalada."
 LangString olderOrUnknownVersionInstalled ${LANG_SWEDISH} "En äldre eller okänd version av ${PRODUCTNAME} är installerad."
 LangString olderOrUnknownVersionInstalled ${LANG_VIETNAMESE} "Một phiên bản cũ hơn hoặc không xác định của ${PRODUCTNAME} đã được cài đặt."
-LangString olderOrUnknownVersionInstalled ${LANG_CZECH} "Je nainstalována starší nebo neznámá verze ${PRODUCTNAME}."
-LangString olderOrUnknownVersionInstalled ${LANG_POLISH} "Zainstalowano starsza lub nieznana wersje ${PRODUCTNAME}."
-LangString olderOrUnknownVersionInstalled ${LANG_FRENCH} "Une version plus ancienne ou inconnue de ${PRODUCTNAME} est installee."
-LangString olderOrUnknownVersionInstalled ${LANG_SERBIAN} "Instalirana je starija ili nepoznata verzija ${PRODUCTNAME}."
 
 LangString uninstallBeforeInstalling ${LANG_ENGLISH} "Uninstall it before installing this version."
 LangString uninstallBeforeInstalling ${LANG_ITALIAN} "Disinstallala prima di installare questa versione."
@@ -694,10 +497,6 @@ LangString uninstallBeforeInstalling ${LANG_SPANISH} "Desinstálela antes de ins
 LangString uninstallBeforeInstalling ${LANG_PORTUGUESE} "Desinstale-a antes de instalar esta versão."
 LangString uninstallBeforeInstalling ${LANG_SWEDISH} "Avinstallera den innan du installerar denna version."
 LangString uninstallBeforeInstalling ${LANG_VIETNAMESE} "Gỡ cài đặt trước khi cài đặt phiên bản này."
-LangString uninstallBeforeInstalling ${LANG_CZECH} "Před instalací této verze ji odinstalujte."
-LangString uninstallBeforeInstalling ${LANG_POLISH} "Odinstaluj ja przed instalacja tej wersji."
-LangString uninstallBeforeInstalling ${LANG_FRENCH} "Desinstallez-la avant d'installer cette version."
-LangString uninstallBeforeInstalling ${LANG_SERBIAN} "Deinstalirajte je pre instalacije ove verzije."
 
 LangString dontUninstall ${LANG_ENGLISH} "Do not uninstall"
 LangString dontUninstall ${LANG_ITALIAN} "Non disinstallare"
@@ -705,10 +504,6 @@ LangString dontUninstall ${LANG_SPANISH} "No desinstalar"
 LangString dontUninstall ${LANG_PORTUGUESE} "Não desinstalar"
 LangString dontUninstall ${LANG_SWEDISH} "Avinstallera inte"
 LangString dontUninstall ${LANG_VIETNAMESE} "Không gỡ cài đặt"
-LangString dontUninstall ${LANG_CZECH} "Neodinstalovávat"
-LangString dontUninstall ${LANG_POLISH} "Nie odinstalowuj"
-LangString dontUninstall ${LANG_FRENCH} "Ne pas desinstaller"
-LangString dontUninstall ${LANG_SERBIAN} "Ne deinstaliraj"
 
 LangString choowHowToInstall ${LANG_ENGLISH} "Choose how you want to install."
 LangString choowHowToInstall ${LANG_ITALIAN} "Scegli come vuoi installare."
@@ -716,10 +511,6 @@ LangString choowHowToInstall ${LANG_SPANISH} "Elija cómo desea instalar."
 LangString choowHowToInstall ${LANG_PORTUGUESE} "Escolha como deseja instalar."
 LangString choowHowToInstall ${LANG_SWEDISH} "Välj hur du vill installera."
 LangString choowHowToInstall ${LANG_VIETNAMESE} "Chọn cách bạn muốn cài đặt."
-LangString choowHowToInstall ${LANG_CZECH} "Zvolte způsob instalace."
-LangString choowHowToInstall ${LANG_POLISH} "Wybierz sposob instalacji."
-LangString choowHowToInstall ${LANG_FRENCH} "Choisissez comment vous voulez installer."
-LangString choowHowToInstall ${LANG_SERBIAN} "Izaberite nacin instalacije."
 
 LangString newerVersionInstalled ${LANG_ENGLISH} "A newer version of ${PRODUCTNAME} is already installed."
 LangString newerVersionInstalled ${LANG_ITALIAN} "E gia installata una versione piu recente di ${PRODUCTNAME}."
@@ -727,10 +518,6 @@ LangString newerVersionInstalled ${LANG_SPANISH} "Ya hay una versión más recie
 LangString newerVersionInstalled ${LANG_PORTUGUESE} "Já existe uma versão mais recente do ${PRODUCTNAME} instalada."
 LangString newerVersionInstalled ${LANG_SWEDISH} "En nyare version av ${PRODUCTNAME} är redan installerad."
 LangString newerVersionInstalled ${LANG_VIETNAMESE} "Một phiên bản mới hơn của ${PRODUCTNAME} đã được cài đặt."
-LangString newerVersionInstalled ${LANG_CZECH} "Je již nainstalována novější verze ${PRODUCTNAME}."
-LangString newerVersionInstalled ${LANG_POLISH} "Nowsza wersja ${PRODUCTNAME} jest juz zainstalowana."
-LangString newerVersionInstalled ${LANG_FRENCH} "Une version plus recente de ${PRODUCTNAME} est deja installee."
-LangString newerVersionInstalled ${LANG_SERBIAN} "Novija verzija ${PRODUCTNAME} je vec instalirana."
 
 LangString dontUninstallDowngrade ${LANG_ENGLISH} "Do not uninstall (cancel)"
 LangString dontUninstallDowngrade ${LANG_ITALIAN} "Non disinstallare (annulla)"
@@ -738,10 +525,6 @@ LangString dontUninstallDowngrade ${LANG_SPANISH} "No desinstalar (cancelar)"
 LangString dontUninstallDowngrade ${LANG_PORTUGUESE} "Não desinstalar (cancelar)"
 LangString dontUninstallDowngrade ${LANG_SWEDISH} "Avinstallera inte (avbryt)"
 LangString dontUninstallDowngrade ${LANG_VIETNAMESE} "Không gỡ cài đặt (hủy)"
-LangString dontUninstallDowngrade ${LANG_CZECH} "Neodinstalovávat (zrušit)"
-LangString dontUninstallDowngrade ${LANG_POLISH} "Nie odinstalowuj (anuluj)"
-LangString dontUninstallDowngrade ${LANG_FRENCH} "Ne pas desinstaller (annuler)"
-LangString dontUninstallDowngrade ${LANG_SERBIAN} "Ne deinstaliraj (otkazi)"
 
 LangString unableToUninstall ${LANG_ENGLISH} "Unable to uninstall. Please close ${PRODUCTNAME} and try again."
 LangString unableToUninstall ${LANG_ITALIAN} "Impossibile disinstallare. Chiudi ${PRODUCTNAME} e riprova."
@@ -749,10 +532,6 @@ LangString unableToUninstall ${LANG_SPANISH} "No se puede desinstalar. Por favor
 LangString unableToUninstall ${LANG_PORTUGUESE} "Não foi possível desinstalar. Por favor, feche o ${PRODUCTNAME} e tente novamente."
 LangString unableToUninstall ${LANG_SWEDISH} "Kunde inte avinstallera. Stäng ${PRODUCTNAME} och försök igen."
 LangString unableToUninstall ${LANG_VIETNAMESE} "Không thể gỡ cài đặt. Vui lòng đóng ${PRODUCTNAME} và thử lại."
-LangString unableToUninstall ${LANG_CZECH} "Odinstalaci se nepodařilo provést. Zavřete ${PRODUCTNAME} a zkuste to znovu."
-LangString unableToUninstall ${LANG_POLISH} "Nie mozna odinstalowac. Zamknij ${PRODUCTNAME} i sproboj ponownie."
-LangString unableToUninstall ${LANG_FRENCH} "Impossible de desinstaller. Fermez ${PRODUCTNAME} et reessayez."
-LangString unableToUninstall ${LANG_SERBIAN} "Nije moguce deinstalirati. Zatvorite ${PRODUCTNAME} i pokusajte ponovo."
 
 LangString createDesktop ${LANG_ENGLISH} "Create a desktop shortcut"
 LangString createDesktop ${LANG_ITALIAN} "Crea un collegamento sul desktop"
@@ -760,10 +539,6 @@ LangString createDesktop ${LANG_SPANISH} "Crear un acceso directo en el escritor
 LangString createDesktop ${LANG_PORTUGUESE} "Criar um atalho na área de trabalho"
 LangString createDesktop ${LANG_SWEDISH} "Skapa en skrivbordsgenväg"
 LangString createDesktop ${LANG_VIETNAMESE} "Tạo phím tắt trên màn hình nền"
-LangString createDesktop ${LANG_CZECH} "Vytvořit zástupce na ploše"
-LangString createDesktop ${LANG_POLISH} "Utworz skrot na pulpicie"
-LangString createDesktop ${LANG_FRENCH} "Creer un raccourci sur le bureau"
-LangString createDesktop ${LANG_SERBIAN} "Napravi precicu na radnoj povrsini"
 
 LangString appRunningOkKill ${LANG_ENGLISH} "${PRODUCTNAME} is running. Close it now?"
 LangString appRunningOkKill ${LANG_ITALIAN} "${PRODUCTNAME} e in esecuzione. Chiuderla ora?"
@@ -771,10 +546,6 @@ LangString appRunningOkKill ${LANG_SPANISH} "${PRODUCTNAME} se está ejecutando.
 LangString appRunningOkKill ${LANG_PORTUGUESE} "O ${PRODUCTNAME} está em execução. Fechá-lo agora?"
 LangString appRunningOkKill ${LANG_SWEDISH} "${PRODUCTNAME} körs. Stäng nu?"
 LangString appRunningOkKill ${LANG_VIETNAMESE} "${PRODUCTNAME} đang chạy. Đóng nó ngay bây giờ?"
-LangString appRunningOkKill ${LANG_CZECH} "${PRODUCTNAME} právě běží. Chcete jej nyní zavřít?"
-LangString appRunningOkKill ${LANG_POLISH} "${PRODUCTNAME} jest uruchomiony. Zamknac teraz?"
-LangString appRunningOkKill ${LANG_FRENCH} "${PRODUCTNAME} est en cours d'execution. Le fermer maintenant ?"
-LangString appRunningOkKill ${LANG_SERBIAN} "${PRODUCTNAME} je pokrenut. Zatvoriti sada?"
 
 LangString appRunning ${LANG_ENGLISH} "${PRODUCTNAME} is running."
 LangString appRunning ${LANG_ITALIAN} "${PRODUCTNAME} e in esecuzione."
@@ -782,10 +553,6 @@ LangString appRunning ${LANG_SPANISH} "${PRODUCTNAME} se está ejecutando."
 LangString appRunning ${LANG_PORTUGUESE} "O ${PRODUCTNAME} está em execução."
 LangString appRunning ${LANG_SWEDISH} "${PRODUCTNAME} körs."
 LangString appRunning ${LANG_VIETNAMESE} "${PRODUCTNAME} đang chạy."
-LangString appRunning ${LANG_CZECH} "${PRODUCTNAME} právě běží."
-LangString appRunning ${LANG_POLISH} "${PRODUCTNAME} jest uruchomiony."
-LangString appRunning ${LANG_FRENCH} "${PRODUCTNAME} est en cours d'execution."
-LangString appRunning ${LANG_SERBIAN} "${PRODUCTNAME} je pokrenut."
 
 LangString failedToKillApp ${LANG_ENGLISH} "Failed to close ${PRODUCTNAME}."
 LangString failedToKillApp ${LANG_ITALIAN} "Impossibile chiudere ${PRODUCTNAME}."
@@ -793,10 +560,6 @@ LangString failedToKillApp ${LANG_SPANISH} "Error al cerrar ${PRODUCTNAME}."
 LangString failedToKillApp ${LANG_PORTUGUESE} "Falha ao fechar o ${PRODUCTNAME}."
 LangString failedToKillApp ${LANG_SWEDISH} "Misslyckades med att stänga ${PRODUCTNAME}."
 LangString failedToKillApp ${LANG_VIETNAMESE} "Không thể đóng ${PRODUCTNAME}."
-LangString failedToKillApp ${LANG_CZECH} "Nepodařilo se zavřít ${PRODUCTNAME}."
-LangString failedToKillApp ${LANG_POLISH} "Nie udalo sie zamknac ${PRODUCTNAME}."
-LangString failedToKillApp ${LANG_FRENCH} "Echec de la fermeture de ${PRODUCTNAME}."
-LangString failedToKillApp ${LANG_SERBIAN} "Nije uspelo zatvaranje ${PRODUCTNAME}."
 {{/if}}
 
 !macro SetContext
@@ -825,13 +588,7 @@ Function .onInit
 
 {{#if file_associations}}
   StrCpy $AssociateFilesCheckboxState 1
-  StrCpy $AssociateFilesModeManualState 0
   StrCpy $ContextMenuCheckboxState 1
-  {{#each file_associations as |association| ~}}
-  {{#each association.extensions as |ext| ~}}
-  StrCpy $AssocExtState_{{ext}} 1
-  {{/each~}}
-  {{/each~}}
 {{/if}}
 
   !if "${DISPLAYLANGUAGESELECTOR}" == "true"
@@ -948,71 +705,30 @@ Section Install
   ; Create file associations
   {{#if file_associations}}
   ${If} $AssociateFilesCheckboxState == 1
-    ${If} $AssociateFilesModeManualState == 1
-      {{#each file_associations as |association| ~}}
-        {{#each association.extensions as |ext| ~}}
-          ${If} $AssocExtState_{{ext}} == 1
-            !insertmacro APP_ASSOCIATE "{{ext}}" "{{or association.name ext}}" "{{association-description association.description ext}}" "$INSTDIR\${MAINBINARYNAME}.exe,0" "Open with ${PRODUCTNAME}" "$INSTDIR\${MAINBINARYNAME}.exe $\"%1$\""
-            WriteRegStr SHCTX "${MANUPRODUCTKEY}" "Assoc_{{ext}}" "1"
-          ${Else}
-            DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "Assoc_{{ext}}"
-          ${EndIf}
-        {{/each}}
+    {{#each file_associations as |association| ~}}
+      {{#each association.extensions as |ext| ~}}
+        !insertmacro APP_ASSOCIATE "{{ext}}" "{{or association.name ext}}" "{{association-description association.description ext}}" "$INSTDIR\${MAINBINARYNAME}.exe,0" "Open with ${PRODUCTNAME}" "$INSTDIR\${MAINBINARYNAME}.exe $\"%1$\""
       {{/each}}
-    ${Else}
-      {{#each file_associations as |association| ~}}
-        {{#each association.extensions as |ext| ~}}
-          !insertmacro APP_ASSOCIATE "{{ext}}" "{{or association.name ext}}" "{{association-description association.description ext}}" "$INSTDIR\${MAINBINARYNAME}.exe,0" "Open with ${PRODUCTNAME}" "$INSTDIR\${MAINBINARYNAME}.exe $\"%1$\""
-          WriteRegStr SHCTX "${MANUPRODUCTKEY}" "Assoc_{{ext}}" "1"
-        {{/each}}
-      {{/each}}
-    ${EndIf}
+    {{/each}}
     WriteRegStr SHCTX "${MANUPRODUCTKEY}" "FileAssociations" "1"
   ${Else}
     DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "FileAssociations"
-    {{#each file_associations as |association| ~}}
-      {{#each association.extensions as |ext| ~}}
-        DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "Assoc_{{ext}}"
-      {{/each}}
-    {{/each}}
   ${EndIf}
   {{/if}}
 
   ; Create context menu entries
   {{#if file_associations}}
   ${If} $ContextMenuCheckboxState == 1
-    ${If} $AssociateFilesCheckboxState == 1
-    ${AndIf} $AssociateFilesModeManualState == 1
-      {{#each file_associations as |association| ~}}
-        {{#each association.extensions as |ext| ~}}
-          ${If} $AssocExtState_{{ext}} == 1
-            WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad" "" "$(ctxMenuLabel)"
-            WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad\DefaultIcon" "" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\",0"
-            WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad\command" "" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\" $\"%1$\""
-          ${EndIf}
-        {{/each}}
-      {{/each}}
-    ${Else}
-      {{#each file_associations as |association| ~}}
-        {{#each association.extensions as |ext| ~}}
-          WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad" "" "$(ctxMenuLabel)"
-          WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad\DefaultIcon" "" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\",0"
-          WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad\command" "" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\" $\"%1$\""
-        {{/each}}
-      {{/each}}
-    ${EndIf}
-    WriteRegStr SHCTX "${MANUPRODUCTKEY}" "ContextMenu" "1"
-  ${Else}
     {{#each file_associations as |association| ~}}
       {{#each association.extensions as |ext| ~}}
-        DeleteRegKey SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad"
-        DeleteRegKey HKCU "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad"
-        DeleteRegKey HKLM "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad"
+        WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad" "" "$(ctxMenuLabel)"
+        WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad\DefaultIcon" "" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\",0"
+        WriteRegStr SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad\command" "" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\" $\"%1$\""
       {{/each}}
     {{/each}}
+    WriteRegStr SHCTX "${MANUPRODUCTKEY}" "ContextMenu" "1"
+  ${Else}
     DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "ContextMenu"
-    DeleteRegValue HKCU "${MANUPRODUCTKEY}" "ContextMenu"
-    DeleteRegValue HKLM "${MANUPRODUCTKEY}" "ContextMenu"
   ${EndIf}
   {{/if}}
 
@@ -1111,30 +827,28 @@ Section Uninstall
 
   ; Delete app associations
   {{#if file_associations}}
-  {{#each file_associations as |association| ~}}
-    {{#each association.extensions as |ext| ~}}
-      ReadRegStr $R0 SHCTX "${MANUPRODUCTKEY}" "Assoc_{{ext}}"
-      ${If} $R0 == "1"
+  ReadRegStr $R0 SHCTX "${MANUPRODUCTKEY}" "FileAssociations"
+  ${If} $R0 == "1"
+    {{#each file_associations as |association| ~}}
+      {{#each association.extensions as |ext| ~}}
         !insertmacro APP_UNASSOCIATE "{{ext}}" "{{or association.name ext}}"
-      ${EndIf}
-      DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "Assoc_{{ext}}"
+      {{/each}}
     {{/each}}
-  {{/each}}
-  DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "FileAssociations"
+    DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "FileAssociations"
+  ${EndIf}
   {{/if}}
 
   ; Delete context menu entries
   {{#if file_associations}}
-  {{#each file_associations as |association| ~}}
-    {{#each association.extensions as |ext| ~}}
-      DeleteRegKey SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad"
-      DeleteRegKey HKCU "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad"
-      DeleteRegKey HKLM "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad"
+  ReadRegStr $R0 SHCTX "${MANUPRODUCTKEY}" "ContextMenu"
+  ${If} $R0 == "1"
+    {{#each file_associations as |association| ~}}
+      {{#each association.extensions as |ext| ~}}
+        DeleteRegKey SHCTX "Software\Classes\SystemFileAssociations\.{{ext}}\shell\OpenWithSonarpad"
+      {{/each}}
     {{/each}}
-  {{/each}}
-  DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "ContextMenu"
-  DeleteRegValue HKCU "${MANUPRODUCTKEY}" "ContextMenu"
-  DeleteRegValue HKLM "${MANUPRODUCTKEY}" "ContextMenu"
+    DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "ContextMenu"
+  ${EndIf}
   {{/if}}
 
   ; Delete deep links
@@ -1207,4 +921,3 @@ Function CreateStartMenuShortcut
   CreateShortcut "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
   ApplicationID::Set "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk" "${IDENTIFIER}"
 FunctionEnd
-

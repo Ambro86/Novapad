@@ -148,7 +148,7 @@ const OPTIONS_COMBO_HEIGHT: i32 = 28;
 const OPTIONS_EDIT_HEIGHT: i32 = 24;
 const OPTIONS_SECTION_GAP: i32 = 8;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum ShortcutAction {
     ReadPauseResume,
     ReadStart,
@@ -313,6 +313,16 @@ fn set_shortcut_binding_for_action(
     }
 }
 
+fn find_shortcut_conflict(
+    settings: &ShortcutSettings,
+    current_action: ShortcutAction,
+    candidate: ShortcutBinding,
+) -> Option<ShortcutAction> {
+    ShortcutAction::ALL.iter().copied().find(|action| {
+        *action != current_action && shortcut_binding_for_action(settings, *action) == candidate
+    })
+}
+
 fn is_modifier_vk(key: u16) -> bool {
     matches!(key, 0x10 | 0x11 | 0x12 | 0xA0..=0xA5)
 }
@@ -391,12 +401,33 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
         ]);
         let shift = modifier_down_any(&[VK_SHIFT.0 as i32, VK_LSHIFT.0 as i32, VK_RSHIFT.0 as i32]);
         let alt = modifier_down_any(&[VK_MENU.0 as i32, VK_LMENU.0 as i32, VK_RMENU.0 as i32]);
+        let candidate = ShortcutBinding::new(ctrl, shift, alt, normalized_key);
+
+        let conflict = with_options_state(hwnd, |state| {
+            find_shortcut_conflict(&state.shortcut_draft, action, candidate).map(
+                |conflict_action| {
+                    let language =
+                        with_state(state.parent, |app| app.settings.language).unwrap_or_default();
+                    let shortcut = format_shortcut(candidate);
+                    let conflict_label = shortcut_action_label(language, conflict_action);
+                    let message = i18n::tr_f(
+                        language,
+                        "options.shortcuts.duplicate_error",
+                        &[("shortcut", &shortcut), ("action", conflict_label)],
+                    );
+                    (language, message)
+                },
+            )
+        })
+        .flatten();
+        if let Some((language, message)) = conflict {
+            crate::show_error(hwnd, language, &message);
+            update_shortcut_binding_text(hwnd);
+            return true;
+        }
+
         if with_options_state(hwnd, |state| {
-            set_shortcut_binding_for_action(
-                &mut state.shortcut_draft,
-                action,
-                ShortcutBinding::new(ctrl, shift, alt, normalized_key),
-            );
+            set_shortcut_binding_for_action(&mut state.shortcut_draft, action, candidate);
             state.shortcut_capture_pending = false;
         })
         .is_none()

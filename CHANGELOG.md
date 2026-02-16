@@ -14,6 +14,7 @@ Improvements
 • Pressing Ctrl+A now announces completion for clearer screen-reader feedback.
 • Improved replace feedback messages with proper singular/plural forms (e.g. “1 replacement made” vs “2 replacements made”).
 • Added dictionary lookup language selection in the dictionary window, with default Auto (interface language) and optional manual override.
+• Added a new Shortcuts tab in Options to customize key bindings, with conflict detection that warns when a shortcut is already assigned to another action.
 • Improved Undo labeling: the Edit > Undo entry now shows what action will be undone (for example, text edits, quote/unquote lines, or voice-tag insertion), while remaining disabled when no undo is available.
 Bug fixes
 • Fixed Google News RSS item ordering: articles are now shown in descending publish date (newest first) when dates are available.

@@ -3349,6 +3349,7 @@ pub unsafe fn select_tab(hwnd: HWND, index: usize) {
     update_window_title(hwnd);
     crate::menu::update_playback_menu(hwnd, is_audiobook);
     layout_children(hwnd);
+    crate::update_main_status_bar(hwnd);
 }
 
 pub unsafe fn insert_tab(hwnd_tab: HWND, title: &str, index: i32) {
@@ -3444,6 +3445,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
     let state_data = with_state(hwnd, |state| {
         (
             state.hwnd_tab,
+            state.hwnd_status,
             state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>(),
             state.voice_panel_visible,
             state.voice_favorites_visible,
@@ -3474,6 +3476,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
 
     let Some((
         hwnd_tab,
+        hwnd_status,
         edit_handles,
         voice_panel_visible,
         favorites_visible,
@@ -3507,8 +3510,20 @@ pub unsafe fn layout_children(hwnd: HWND) {
 
     let width = rc.right - rc.left;
     let height = rc.bottom - rc.top;
+    let status_height = if hwnd_status.0 != 0 { 22 } else { 0 };
+    let tab_height = (height - status_height).max(0);
 
-    crate::log_if_err!(MoveWindow(hwnd_tab, 0, 0, width, height, true));
+    crate::log_if_err!(MoveWindow(hwnd_tab, 0, 0, width, tab_height, true));
+    if hwnd_status.0 != 0 {
+        crate::log_if_err!(MoveWindow(
+            hwnd_status,
+            0,
+            tab_height,
+            width,
+            status_height,
+            true
+        ));
+    }
 
     let mut tab_rc = rc;
     SendMessageW(

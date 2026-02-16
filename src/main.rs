@@ -193,6 +193,7 @@ const VOICE_PANEL_ID_SPEED_EDIT: usize = 21008;
 const VOICE_PANEL_ID_PITCH_EDIT: usize = 21009;
 const VOICE_PANEL_ID_VOLUME_EDIT: usize = 21010;
 const VOICE_PANEL_ID_INSERT_TAG: usize = 21011;
+const MAIN_STATUS_ID: usize = 22001;
 const VOICE_MENU_ID_ADD_FAVORITE: u32 = 9001;
 const VOICE_MENU_ID_REMOVE_FAVORITE: u32 = 9002;
 
@@ -1537,6 +1538,7 @@ fn has_secondary_window_open(hwnd: HWND) -> bool {
 #[derive(Default)]
 pub(crate) struct AppState {
     hwnd_tab: HWND,
+    hwnd_status: HWND,
     docs: Vec<Document>,
     current: usize,
     untitled_count: usize,
@@ -2451,6 +2453,20 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 HINSTANCE(0),
                 None,
             );
+            let hwnd_status = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_STATIC,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE,
+                0,
+                0,
+                0,
+                0,
+                hwnd,
+                HMENU(MAIN_STATUS_ID as isize),
+                HINSTANCE(0),
+                None,
+            );
 
             let find_msg = RegisterWindowMessageW(w!("commdlg_FindReplace"));
             let settings = load_settings();
@@ -2740,6 +2756,7 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
             }
             let state = Box::new(AppState {
                 hwnd_tab,
+                hwnd_status,
                 docs: Vec::new(),
                 current: 0,
                 untitled_count: 0,
@@ -2894,6 +2911,7 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
 
             editor_manager::layout_children(hwnd);
             editor_manager::apply_text_limit_to_all_edits(hwnd);
+            update_main_status_bar(hwnd);
             DragAcceptFiles(hwnd, true);
             LRESULT(0)
         }
@@ -2941,6 +2959,7 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                         with_state(hwnd, |state| state.settings.language).unwrap_or_default();
                     let label = i18n::tr(language, "undo.action.text");
                     with_state(hwnd, |state| state.undo_action_label = Some(label));
+                    update_main_status_bar(hwnd);
                 }
                 return LRESULT(0);
             }
@@ -2950,6 +2969,7 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                     handle_spellcheck_selection_change(hwnd, hdr.hwndFrom);
                     prefetch_dictionary_for_selection(hwnd, hdr.hwndFrom);
                     trigger_spellcheck_highlight(hwnd, hdr.hwndFrom);
+                    update_main_status_bar(hwnd);
                 }
                 return LRESULT(0);
             }
@@ -3589,6 +3609,7 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                         with_state(hwnd, |state| state.settings.language).unwrap_or_default();
                     let label = i18n::tr(language, "undo.action.text");
                     with_state(hwnd, |state| state.undo_action_label = Some(label));
+                    update_main_status_bar(hwnd);
                 }
                 return LRESULT(0);
             }
@@ -6685,6 +6706,64 @@ unsafe fn can_undo_now(hwnd: HWND) -> bool {
         return false;
     };
     SendMessageW(hwnd_edit, EM_CANUNDO, WPARAM(0), LPARAM(0)).0 != 0
+}
+
+pub(crate) unsafe fn update_main_status_bar(hwnd: HWND) {
+    let (hwnd_status, language) =
+        with_state(hwnd, |state| (state.hwnd_status, state.settings.language))
+            .unwrap_or((HWND(0), Language::default()));
+    if hwnd_status.0 == 0 {
+        return;
+    }
+    let (chars, words, line, col) = if let Some(hwnd_edit) = get_active_edit(hwnd) {
+        let text = editor_manager::get_edit_text(hwnd_edit);
+        let chars = text.chars().count();
+        let words = text.split_whitespace().count();
+        let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut selection as *mut _ as isize),
+        );
+        let caret = selection.cpMax.max(0);
+        let line_idx = SendMessageW(
+            hwnd_edit,
+            EM_LINEFROMCHAR,
+            WPARAM(caret as usize),
+            LPARAM(0),
+        )
+        .0 as i32;
+        let line_start = SendMessageW(
+            hwnd_edit,
+            EM_LINEINDEX,
+            WPARAM(line_idx.max(0) as usize),
+            LPARAM(0),
+        )
+        .0 as i32;
+        let col = (caret - line_start).max(0) + 1;
+        (chars, words, line_idx.max(0) + 1, col)
+    } else {
+        (0, 0, 1, 1)
+    };
+    let chars_str = chars.to_string();
+    let words_str = words.to_string();
+    let chars_label = i18n::tr_f(
+        language,
+        "text_stats.characters_with_spaces",
+        &[("count", &chars_str)],
+    );
+    let words_label = i18n::tr_f(language, "text_stats.words", &[("count", &words_str)]);
+    let chars_label = chars_label.trim_end_matches('.');
+    let words_label = words_label.trim_end_matches('.');
+    let label = format!(
+        "{}. | {}. | Ln {}, Col {}",
+        chars_label, words_label, line, col
+    );
+    crate::log_if_err!(SetWindowTextW(
+        hwnd_status,
+        PCWSTR(to_wide(&label).as_ptr())
+    ));
 }
 
 fn build_undo_menu_label(hwnd: HWND, language: Language) -> String {

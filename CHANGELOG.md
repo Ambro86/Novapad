@@ -4,6 +4,7 @@ Version 0.6.7 – 2026-02-13
 Improvements
 • Added a new View > Read-only mode to lock editor text from accidental edits while keeping documents fully readable and navigable.
 • Added an accessible progress bar during program updates, so screen readers can track download progress in real time.
+• Added a new quiet status bar in the main window showing characters, words, and line/column (for example: "Characters (with spaces): 11. | Words: 2. | Ln 1, Col 12") without disturbing NVDA focus.
 • Added a new View menu toggle for Word wrap, so line wrapping can be switched quickly without opening Options.
 • Added new Edit > Text actions for indent/outdent, with shortcuts Ctrl+Tab (indent) and Ctrl+Shift+Tab (outdent), because when “Show voices in editor” is enabled the Tab key is reserved for voice-panel navigation.
 • Added localized date/time in RSS articles and podcast episodes, with formatting adapted to the current interface language.

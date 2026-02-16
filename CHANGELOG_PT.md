@@ -4,6 +4,7 @@ Versão 0.6.7 – 2026-02-13
 Melhorias
 • Adicionado o novo modo Ver > Somente leitura para bloquear edições acidentais no texto, mantendo leitura e navegação completas dos documentos.
 • Adicionada uma barra de progresso acessível durante as atualizações do programa, para que leitores de ecrã possam acompanhar em tempo real o progresso da transferência.
+• Adicionada uma nova barra de estado discreta na janela principal com contagem de caracteres, palavras e posição linha/coluna (por exemplo: "Caracteres (com espaços): 11. | Palavras: 2. | Ln 1, Col 12"), sem interferir com o foco do NVDA.
 • Adicionada uma nova opção no menu Ver para quebra automática de linha, permitindo ativar/desativar rapidamente sem abrir as Opções.
 • Adicionadas em Editar > Texto novas ações para aumentar/reduzir recuo, com atalhos Ctrl+Tab (indentar) e Ctrl+Shift+Tab (desindentar), porque quando “Mostrar vozes no editor” está ativo a tecla Tab fica reservada para a navegação do painel de vozes.
 • Adicionada a exibição localizada de data e hora em artigos RSS e episódios de podcast, com formato adaptado ao idioma da interface.

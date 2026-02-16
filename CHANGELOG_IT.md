@@ -4,6 +4,7 @@ Versione 0.6.7 – 2026-02-13
 Miglioramenti
 • Aggiunta la nuova modalità Visualizza > Sola lettura per bloccare modifiche accidentali nel testo mantenendo piena lettura e navigazione dei documenti.
 • Aggiunta una barra di progresso accessibile durante gli aggiornamenti del programma, così i lettori di schermo possono seguire in tempo reale l’avanzamento del download.
+• Aggiunta una nuova barra di stato discreta nella finestra principale con conteggio caratteri, parole e posizione riga/colonna (esempio: "Caratteri (con spazi): 11. | Parole: 2. | Ln 1, Col 12"), senza interferire con il focus di NVDA.
 • Aggiunta nel menu Visualizza la nuova voce A capo automatico, per attivare/disattivare rapidamente il wrapping delle righe senza aprire Opzioni.
 • Aggiunte nel menu Modifica > Testo le nuove azioni per aumentare/ridurre il rientro, con scorciatoie Ctrl+Tab (indent) e Ctrl+Shift+Tab (de-indent), perché quando “Mostra voci nell’editor” è attivo il tasto Tab è riservato alla navigazione del pannello voci.
 • Aggiunta la visualizzazione localizzata di data e ora per articoli RSS ed episodi podcast, con formato adattato alla lingua dell'interfaccia.

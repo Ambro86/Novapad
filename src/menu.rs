@@ -1,6 +1,6 @@
 use crate::accessibility::to_wide;
 use crate::i18n;
-use crate::settings::Language;
+use crate::settings::{Language, ShortcutBinding, ShortcutSettings, format_shortcut};
 use crate::with_state;
 use std::path::Path;
 use windows::Win32::Foundation::HWND;
@@ -342,6 +342,21 @@ pub fn menu_labels(language: Language) -> MenuLabels {
     }
 }
 
+fn strip_menu_shortcut(label: &str) -> &str {
+    match label.split_once('\t') {
+        Some((left, _)) => left,
+        None => label,
+    }
+}
+
+fn label_with_shortcut(label: &str, binding: ShortcutBinding) -> String {
+    format!(
+        "{}\t{}",
+        strip_menu_shortcut(label),
+        format_shortcut(binding)
+    )
+}
+
 pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
     let hmenu = GetMenu(hwnd);
     if hmenu.0 == 0 {
@@ -371,8 +386,16 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
         let stop = i18n::tr(language, "playback.stop");
         let seek_forward = i18n::tr(language, "playback.seek_forward");
         let seek_backward = i18n::tr(language, "playback.seek_backward");
-        let track_prev = i18n::tr(language, "playback.track_prev");
-        let track_next = i18n::tr(language, "playback.track_next");
+        let shortcuts = with_state(hwnd, |state| state.settings.shortcuts.clone())
+            .unwrap_or_else(ShortcutSettings::default);
+        let track_prev = label_with_shortcut(
+            &i18n::tr(language, "playback.track_prev"),
+            shortcuts.media_prev,
+        );
+        let track_next = label_with_shortcut(
+            &i18n::tr(language, "playback.track_next"),
+            shortcuts.media_next,
+        );
         let go_to_time = i18n::tr(language, "playback.go_to_time");
         let announce_time = i18n::tr(language, "playback.announce_time");
         let volume_up = i18n::tr(language, "playback.volume_up");
@@ -630,7 +653,34 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
     let tools_menu = CreateMenu().unwrap_or(HMENU(0));
     let help_menu = CreateMenu().unwrap_or(HMENU(0));
 
-    let labels = menu_labels(language);
+    let mut labels = menu_labels(language);
+    let shortcuts = with_state(hwnd, |state| state.settings.shortcuts.clone())
+        .unwrap_or_else(ShortcutSettings::default);
+    labels.file_read_start = label_with_shortcut(&labels.file_read_start, shortcuts.read_start);
+    labels.file_read_pause =
+        label_with_shortcut(&labels.file_read_pause, shortcuts.read_pause_resume);
+    labels.file_read_stop = label_with_shortcut(&labels.file_read_stop, shortcuts.read_stop);
+    labels.file_execute = label_with_shortcut(&labels.file_execute, shortcuts.execute_file);
+    labels.file_audiobook = label_with_shortcut(&labels.file_audiobook, shortcuts.audiobook);
+    labels.file_batch_audiobooks =
+        label_with_shortcut(&labels.file_batch_audiobooks, shortcuts.batch_audiobooks);
+    labels.file_podcast = label_with_shortcut(&labels.file_podcast, shortcuts.record_podcast);
+    labels.file_convert_audio =
+        label_with_shortcut(&labels.file_convert_audio, shortcuts.convert_audio);
+    labels.menu_rss = label_with_shortcut(&labels.menu_rss, shortcuts.open_rss);
+    labels.menu_podcasts = label_with_shortcut(&labels.menu_podcasts, shortcuts.open_podcasts);
+    labels.menu_dictionary =
+        label_with_shortcut(&labels.menu_dictionary, shortcuts.open_dictionary);
+    labels.menu_options = label_with_shortcut(&labels.menu_options, shortcuts.open_options);
+    labels.menu_prompt = label_with_shortcut(&labels.menu_prompt, shortcuts.open_terminal);
+    labels.menu_wikipedia_import =
+        label_with_shortcut(&labels.menu_wikipedia_import, shortcuts.import_wikipedia);
+    labels.menu_import_youtube =
+        label_with_shortcut(&labels.menu_import_youtube, shortcuts.import_youtube);
+    labels.edit_find = label_with_shortcut(&labels.edit_find, shortcuts.find);
+    labels.edit_quote_lines = label_with_shortcut(&labels.edit_quote_lines, shortcuts.quote_lines);
+    labels.edit_unquote_lines =
+        label_with_shortcut(&labels.edit_unquote_lines, shortcuts.unquote_lines);
 
     append_menu_string(file_menu, MF_STRING, IDM_FILE_NEW, &labels.file_new);
     append_menu_string(file_menu, MF_STRING, IDM_FILE_OPEN, &labels.file_open);

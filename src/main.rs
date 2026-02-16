@@ -103,8 +103,8 @@ use windows::Win32::UI::Controls::{
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_APPS, VK_CONTROL, VK_ESCAPE,
-    VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F7, VK_F8, VK_F9, VK_F10, VK_LEFT, VK_MENU, VK_NEXT,
-    VK_PRIOR, VK_RETURN, VK_RIGHT, VK_SHIFT, VK_TAB,
+    VK_F1, VK_F2, VK_F3, VK_F4, VK_F7, VK_F8, VK_F9, VK_F10, VK_LEFT, VK_MENU, VK_NEXT, VK_PRIOR,
+    VK_RETURN, VK_RIGHT, VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
 use windows::Win32::UI::Shell::{
@@ -7318,12 +7318,52 @@ unsafe fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
         dispatch_shortcut_command(hwnd, IDM_FILE_READ_STOP);
         return true;
     }
+    if shortcut_matches_message(shortcuts.execute_file, msg) {
+        dispatch_shortcut_command(hwnd, IDM_FILE_EXECUTE);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.audiobook, msg) {
+        dispatch_shortcut_command(hwnd, IDM_FILE_AUDIOBOOK);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.batch_audiobooks, msg) {
+        dispatch_shortcut_command(hwnd, IDM_FILE_BATCH_AUDIOBOOK);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.record_podcast, msg) {
+        dispatch_shortcut_command(hwnd, IDM_FILE_PODCAST);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.convert_audio, msg) {
+        dispatch_shortcut_command(hwnd, IDM_FILE_CONVERT_AUDIO);
+        return true;
+    }
     if shortcut_matches_message(shortcuts.open_rss, msg) {
         dispatch_shortcut_command(hwnd, IDM_TOOLS_RSS);
         return true;
     }
     if shortcut_matches_message(shortcuts.open_podcasts, msg) {
         dispatch_shortcut_command(hwnd, IDM_TOOLS_PODCASTS);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.open_dictionary, msg) {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_DICTIONARY);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.open_options, msg) {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_OPTIONS);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.open_terminal, msg) {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_PROMPT);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.import_wikipedia, msg) {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_WIKIPEDIA_IMPORT);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.import_youtube, msg) {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_IMPORT_YOUTUBE);
         return true;
     }
     if shortcut_matches_message(shortcuts.find, msg) {
@@ -7482,11 +7522,6 @@ unsafe fn create_accelerators() -> HACCEL {
             cmd: IDM_TOOLS_DICTIONARY_LOOKUP as u16,
         },
         ACCEL {
-            fVirt: virt_alt_shift,
-            key: 'W' as u16,
-            cmd: IDM_TOOLS_WIKIPEDIA_IMPORT as u16,
-        },
-        ACCEL {
             fVirt: virt,
             key: VK_TAB.0,
             cmd: IDM_NEXT_TAB as u16,
@@ -7500,51 +7535,6 @@ unsafe fn create_accelerators() -> HACCEL {
             fVirt: virt_shift_only,
             key: VK_PRIOR.0,
             cmd: IDM_GOTO_PREV_BOOKMARK as u16,
-        },
-        ACCEL {
-            fVirt: FSHIFT | FVIRTKEY,
-            key: VK_F5.0,
-            cmd: IDM_FILE_EXECUTE as u16,
-        },
-        ACCEL {
-            fVirt: virt,
-            key: 'R' as u16,
-            cmd: IDM_FILE_AUDIOBOOK as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift,
-            key: 'B' as u16,
-            cmd: IDM_FILE_BATCH_AUDIOBOOK as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift,
-            key: 'R' as u16,
-            cmd: IDM_FILE_PODCAST as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift,
-            key: 'A' as u16,
-            cmd: IDM_FILE_CONVERT_AUDIO as u16,
-        },
-        ACCEL {
-            fVirt: virt,
-            key: 'Y' as u16,
-            cmd: IDM_TOOLS_IMPORT_YOUTUBE as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift,
-            key: 'T' as u16,
-            cmd: IDM_TOOLS_PROMPT as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift,
-            key: 'O' as u16,
-            cmd: IDM_TOOLS_OPTIONS as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift,
-            key: 'D' as u16,
-            cmd: IDM_TOOLS_DICTIONARY as u16,
         },
         ACCEL {
             fVirt: virt_shift,

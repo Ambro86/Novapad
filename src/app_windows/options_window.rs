@@ -119,6 +119,7 @@ const OPTIONS_ID_SHORTCUT_ACTION: usize = 6070;
 const OPTIONS_ID_SHORTCUT_VALUE: usize = 6071;
 const OPTIONS_ID_SHORTCUT_CHANGE: usize = 6072;
 const OPTIONS_ID_SHORTCUT_RESET: usize = 6073;
+const OPTIONS_ID_SHORTCUT_RESET_ALL: usize = 6074;
 
 const OPTIONS_ID_OK: usize = 6005;
 const OPTIONS_ID_CANCEL: usize = 6006;
@@ -153,8 +154,18 @@ enum ShortcutAction {
     ReadPauseResume,
     ReadStart,
     ReadStop,
+    ExecuteFile,
+    Audiobook,
+    BatchAudiobooks,
+    RecordPodcast,
+    ConvertAudio,
     OpenRss,
     OpenPodcasts,
+    OpenDictionary,
+    OpenOptions,
+    OpenTerminal,
+    ImportWikipedia,
+    ImportYoutube,
     Find,
     QuoteLines,
     UnquoteLines,
@@ -163,12 +174,22 @@ enum ShortcutAction {
 }
 
 impl ShortcutAction {
-    const ALL: [ShortcutAction; 10] = [
+    const ALL: [ShortcutAction; 20] = [
         ShortcutAction::ReadPauseResume,
         ShortcutAction::ReadStart,
         ShortcutAction::ReadStop,
+        ShortcutAction::ExecuteFile,
+        ShortcutAction::Audiobook,
+        ShortcutAction::BatchAudiobooks,
+        ShortcutAction::RecordPodcast,
+        ShortcutAction::ConvertAudio,
         ShortcutAction::OpenRss,
         ShortcutAction::OpenPodcasts,
+        ShortcutAction::OpenDictionary,
+        ShortcutAction::OpenOptions,
+        ShortcutAction::OpenTerminal,
+        ShortcutAction::ImportWikipedia,
+        ShortcutAction::ImportYoutube,
         ShortcutAction::Find,
         ShortcutAction::QuoteLines,
         ShortcutAction::UnquoteLines,
@@ -183,8 +204,18 @@ fn shortcut_action_label(language: Language, action: ShortcutAction) -> &'static
             ShortcutAction::ReadPauseResume => "Pausa/riprendi lettura",
             ShortcutAction::ReadStart => "Avvia lettura",
             ShortcutAction::ReadStop => "Ferma lettura",
+            ShortcutAction::ExecuteFile => "Esegui file",
+            ShortcutAction::Audiobook => "Registra audiolibro",
+            ShortcutAction::BatchAudiobooks => "Registra audiolibri batch",
+            ShortcutAction::RecordPodcast => "Registra podcast",
+            ShortcutAction::ConvertAudio => "Converti audio",
             ShortcutAction::OpenRss => "Apri RSS",
             ShortcutAction::OpenPodcasts => "Apri podcast",
+            ShortcutAction::OpenDictionary => "Apri dizionario",
+            ShortcutAction::OpenOptions => "Apri opzioni",
+            ShortcutAction::OpenTerminal => "Apri terminale",
+            ShortcutAction::ImportWikipedia => "Cerca e importa da Wikipedia",
+            ShortcutAction::ImportYoutube => "Importa trascrizione YouTube",
             ShortcutAction::Find => "Trova",
             ShortcutAction::QuoteLines => "Commenta righe",
             ShortcutAction::UnquoteLines => "Decommenta righe",
@@ -195,8 +226,18 @@ fn shortcut_action_label(language: Language, action: ShortcutAction) -> &'static
             ShortcutAction::ReadPauseResume => "Pause/resume reading",
             ShortcutAction::ReadStart => "Start reading",
             ShortcutAction::ReadStop => "Stop reading",
+            ShortcutAction::ExecuteFile => "Execute file",
+            ShortcutAction::Audiobook => "Record audiobook",
+            ShortcutAction::BatchAudiobooks => "Batch audiobooks",
+            ShortcutAction::RecordPodcast => "Record podcast",
+            ShortcutAction::ConvertAudio => "Convert audio",
             ShortcutAction::OpenRss => "Open RSS",
             ShortcutAction::OpenPodcasts => "Open podcasts",
+            ShortcutAction::OpenDictionary => "Open dictionary",
+            ShortcutAction::OpenOptions => "Open options",
+            ShortcutAction::OpenTerminal => "Open terminal",
+            ShortcutAction::ImportWikipedia => "Search and import from Wikipedia",
+            ShortcutAction::ImportYoutube => "Import YouTube transcript",
             ShortcutAction::Find => "Find",
             ShortcutAction::QuoteLines => "Quote lines",
             ShortcutAction::UnquoteLines => "Unquote lines",
@@ -276,6 +317,20 @@ fn shortcuts_reset_label(language: Language) -> &'static str {
     }
 }
 
+fn shortcuts_reset_all_label(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "Reimposta tutte",
+        Language::Spanish => "Restablecer todo",
+        Language::Portuguese => "Repor tudo",
+        Language::French => "Tout reinitialiser",
+        Language::Czech => "Obnovit vse",
+        Language::Polish => "Resetuj wszystko",
+        Language::Serbian => "Vrati sve",
+        Language::Ukrainian => "Sknuty vse",
+        _ => "Reset all",
+    }
+}
+
 fn shortcut_binding_for_action(
     settings: &ShortcutSettings,
     action: ShortcutAction,
@@ -284,8 +339,18 @@ fn shortcut_binding_for_action(
         ShortcutAction::ReadPauseResume => settings.read_pause_resume,
         ShortcutAction::ReadStart => settings.read_start,
         ShortcutAction::ReadStop => settings.read_stop,
+        ShortcutAction::ExecuteFile => settings.execute_file,
+        ShortcutAction::Audiobook => settings.audiobook,
+        ShortcutAction::BatchAudiobooks => settings.batch_audiobooks,
+        ShortcutAction::RecordPodcast => settings.record_podcast,
+        ShortcutAction::ConvertAudio => settings.convert_audio,
         ShortcutAction::OpenRss => settings.open_rss,
         ShortcutAction::OpenPodcasts => settings.open_podcasts,
+        ShortcutAction::OpenDictionary => settings.open_dictionary,
+        ShortcutAction::OpenOptions => settings.open_options,
+        ShortcutAction::OpenTerminal => settings.open_terminal,
+        ShortcutAction::ImportWikipedia => settings.import_wikipedia,
+        ShortcutAction::ImportYoutube => settings.import_youtube,
         ShortcutAction::Find => settings.find,
         ShortcutAction::QuoteLines => settings.quote_lines,
         ShortcutAction::UnquoteLines => settings.unquote_lines,
@@ -303,8 +368,18 @@ fn set_shortcut_binding_for_action(
         ShortcutAction::ReadPauseResume => settings.read_pause_resume = binding,
         ShortcutAction::ReadStart => settings.read_start = binding,
         ShortcutAction::ReadStop => settings.read_stop = binding,
+        ShortcutAction::ExecuteFile => settings.execute_file = binding,
+        ShortcutAction::Audiobook => settings.audiobook = binding,
+        ShortcutAction::BatchAudiobooks => settings.batch_audiobooks = binding,
+        ShortcutAction::RecordPodcast => settings.record_podcast = binding,
+        ShortcutAction::ConvertAudio => settings.convert_audio = binding,
         ShortcutAction::OpenRss => settings.open_rss = binding,
         ShortcutAction::OpenPodcasts => settings.open_podcasts = binding,
+        ShortcutAction::OpenDictionary => settings.open_dictionary = binding,
+        ShortcutAction::OpenOptions => settings.open_options = binding,
+        ShortcutAction::OpenTerminal => settings.open_terminal = binding,
+        ShortcutAction::ImportWikipedia => settings.import_wikipedia = binding,
+        ShortcutAction::ImportYoutube => settings.import_youtube = binding,
         ShortcutAction::Find => settings.find = binding,
         ShortcutAction::QuoteLines => settings.quote_lines = binding,
         ShortcutAction::UnquoteLines => settings.unquote_lines = binding,
@@ -611,6 +686,7 @@ struct OptionsDialogState {
     edit_shortcut_value: HWND,
     button_shortcut_change: HWND,
     button_shortcut_reset: HWND,
+    button_shortcut_reset_all: HWND,
     shortcut_draft: ShortcutSettings,
     shortcut_capture_pending: bool,
     ok_button: HWND,
@@ -679,6 +755,7 @@ struct OptionsLabels {
     label_shortcut_value: String,
     label_shortcut_change: String,
     label_shortcut_reset: String,
+    label_shortcut_reset_all: String,
     label_audio_skip: String,
     label_audiobook_save_folder: String,
     label_audiobook_save_folder_browse: String,
@@ -823,6 +900,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_shortcut_value: shortcuts_label_value(language).to_string(),
         label_shortcut_change: shortcuts_change_label(language).to_string(),
         label_shortcut_reset: shortcuts_reset_label(language).to_string(),
+        label_shortcut_reset_all: shortcuts_reset_all_label(language).to_string(),
         label_audio_skip: i18n::tr(language, "options.label.audio_skip"),
         label_audiobook_save_folder: i18n::tr(language, "options.label.audiobook_save_folder"),
         label_audiobook_save_folder_browse: i18n::tr(language, "options.button.browse"),
@@ -2783,6 +2861,20 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 HINSTANCE(0),
                 None,
             );
+            let button_shortcut_reset_all = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_shortcut_reset_all).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                170,
+                y + 30,
+                300,
+                26,
+                hwnd,
+                HMENU(OPTIONS_ID_SHORTCUT_RESET_ALL as isize),
+                HINSTANCE(0),
+                None,
+            );
             y += 40;
 
             let ok_button = CreateWindowExW(
@@ -2926,6 +3018,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 edit_shortcut_value,
                 button_shortcut_change,
                 button_shortcut_reset,
+                button_shortcut_reset_all,
                 ok_button,
                 cancel_button,
             ] {
@@ -3047,6 +3140,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 edit_shortcut_value,
                 button_shortcut_change,
                 button_shortcut_reset,
+                button_shortcut_reset_all,
                 shortcut_draft: ShortcutSettings::default(),
                 shortcut_capture_pending: false,
                 ok_button,
@@ -3231,9 +3325,49 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 OPTIONS_ID_SHORTCUT_RESET => {
                     let action = selected_shortcut_action(hwnd);
                     let defaults = ShortcutSettings::default();
+                    let default_binding = shortcut_binding_for_action(&defaults, action);
+                    let conflict = with_options_state(hwnd, |state| {
+                        find_shortcut_conflict(&state.shortcut_draft, action, default_binding).map(
+                            |conflict_action| {
+                                let language =
+                                    with_state(state.parent, |app| app.settings.language)
+                                        .unwrap_or_default();
+                                let shortcut = format_shortcut(default_binding);
+                                let conflict_label =
+                                    shortcut_action_label(language, conflict_action);
+                                let message = i18n::tr_f(
+                                    language,
+                                    "options.shortcuts.duplicate_error",
+                                    &[("shortcut", &shortcut), ("action", conflict_label)],
+                                );
+                                (language, message)
+                            },
+                        )
+                    })
+                    .flatten();
+                    if let Some((language, message)) = conflict {
+                        crate::show_error(hwnd, language, &message);
+                        update_shortcut_binding_text(hwnd);
+                        return LRESULT(0);
+                    }
                     if with_options_state(hwnd, |state| {
-                        let binding = shortcut_binding_for_action(&defaults, action);
-                        set_shortcut_binding_for_action(&mut state.shortcut_draft, action, binding);
+                        set_shortcut_binding_for_action(
+                            &mut state.shortcut_draft,
+                            action,
+                            default_binding,
+                        );
+                        state.shortcut_capture_pending = false;
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access state in options_window");
+                    }
+                    update_shortcut_binding_text(hwnd);
+                    LRESULT(0)
+                }
+                OPTIONS_ID_SHORTCUT_RESET_ALL => {
+                    if with_options_state(hwnd, |state| {
+                        state.shortcut_draft = ShortcutSettings::default();
                         state.shortcut_capture_pending = false;
                     })
                     .is_none()
@@ -6811,6 +6945,11 @@ fn layout_shortcuts_tab(state: &OptionsDialogState) {
             true,
         ));
     }
+    layout_button(
+        "button_shortcut_reset_all",
+        state.button_shortcut_reset_all,
+        y + OPTIONS_ROW_HEIGHT,
+    );
 }
 
 unsafe fn set_active_tab(hwnd: HWND, index: i32) {
@@ -6975,6 +7114,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.edit_shortcut_value,
             state.button_shortcut_change,
             state.button_shortcut_reset,
+            state.button_shortcut_reset_all,
         ] {
             ShowWindow(control, if show_shortcuts { SW_SHOW } else { SW_HIDE });
         }

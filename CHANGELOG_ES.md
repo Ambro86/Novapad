@@ -5,7 +5,7 @@ Mejoras
 • Añadido el nuevo modo Ver > Solo lectura para bloquear ediciones accidentales del texto manteniendo la lectura y navegación completas de los documentos.
 • Añadida una barra de progreso accesible durante las actualizaciones del programa, para que los lectores de pantalla puedan seguir en tiempo real el avance de la descarga.
 • Añadida una nueva opción en el menú Ver para Ajuste de línea, que permite activar o desactivar rápidamente el ajuste sin abrir Opciones.
-• Añadidas en Editar > Texto nuevas acciones para aumentar/reducir sangría, con atajos Ctrl+Alt+Flecha derecha (indentar) y Ctrl+Alt+Flecha izquierda (desindentar), porque cuando “Mostrar voces en el editor” está activo la tecla Tab queda reservada para navegar el panel de voces.
+• Añadidas en Editar > Texto nuevas acciones para aumentar/reducir sangría, con atajos Ctrl+Tab (indentar) y Ctrl+Shift+Tab (desindentar), porque cuando “Mostrar voces en el editor” está activo la tecla Tab queda reservada para navegar el panel de voces.
 • Añadida la visualización localizada de fecha y hora en artículos RSS y episodios de podcast, con formato adaptado al idioma de la interfaz.
 • Añadida en el menú contextual RSS una nueva acción para compartir por correo electrónico el artículo seleccionado.
 • Añadidas opciones granulares de confirmación de borrado en Opciones > RSS y podcast: para RSS (feed/artículo/ambos/ninguno) y para Podcasts (podcast/episodio/ambos/ninguno).

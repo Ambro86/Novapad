@@ -5,7 +5,7 @@ Melhorias
 • Adicionado o novo modo Ver > Somente leitura para bloquear edições acidentais no texto, mantendo leitura e navegação completas dos documentos.
 • Adicionada uma barra de progresso acessível durante as atualizações do programa, para que leitores de ecrã possam acompanhar em tempo real o progresso da transferência.
 • Adicionada uma nova opção no menu Ver para quebra automática de linha, permitindo ativar/desativar rapidamente sem abrir as Opções.
-• Adicionadas em Editar > Texto novas ações para aumentar/reduzir recuo, com atalhos Ctrl+Alt+Seta para a direita (indentar) e Ctrl+Alt+Seta para a esquerda (desindentar), porque quando “Mostrar vozes no editor” está ativo a tecla Tab fica reservada para a navegação do painel de vozes.
+• Adicionadas em Editar > Texto novas ações para aumentar/reduzir recuo, com atalhos Ctrl+Tab (indentar) e Ctrl+Shift+Tab (desindentar), porque quando “Mostrar vozes no editor” está ativo a tecla Tab fica reservada para a navegação do painel de vozes.
 • Adicionada a exibição localizada de data e hora em artigos RSS e episódios de podcast, com formato adaptado ao idioma da interface.
 • Adicionada no menu de contexto RSS uma nova ação para partilhar por e-mail o artigo selecionado.
 • Adicionadas opções granulares de confirmação de remoção em Opções > RSS e podcast: para RSS (feed/artigo/ambos/nenhum) e para Podcasts (podcast/episódio/ambos/nenhum).

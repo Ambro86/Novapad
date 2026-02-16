@@ -5,7 +5,7 @@ Cải tiến
 • Đã thêm chế độ mới Xem > Chỉ đọc để ngăn chỉnh sửa nhầm văn bản, đồng thời vẫn giữ khả năng đọc và điều hướng đầy đủ tài liệu.
 • Đã thêm thanh tiến trình có thể truy cập trong quá trình cập nhật chương trình, giúp trình đọc màn hình theo dõi tiến độ tải xuống theo thời gian thực.
 • Đã thêm tùy chọn mới trong menu Xem cho tự động xuống dòng, giúp bật/tắt nhanh chế độ xuống dòng mà không cần mở Tùy chọn.
-• Đã thêm trong Chỉnh sửa > Văn bản các thao tác tăng/giảm thụt lề, với phím tắt Ctrl+Alt+Mũi tên phải (thụt vào) và Ctrl+Alt+Mũi tên trái (thụt ra), vì khi bật “Hiển thị giọng nói trong trình soạn thảo” thì phím Tab được dành cho việc điều hướng bảng giọng nói.
+• Đã thêm trong Chỉnh sửa > Văn bản các thao tác tăng/giảm thụt lề, với phím tắt Ctrl+Tab (thụt vào) và Ctrl+Shift+Tab (thụt ra), vì khi bật “Hiển thị giọng nói trong trình soạn thảo” thì phím Tab được dành cho việc điều hướng bảng giọng nói.
 • Đã thêm hiển thị ngày/giờ theo ngôn ngữ cho bài RSS và tập podcast, với định dạng tự điều chỉnh theo ngôn ngữ giao diện.
 • Đã thêm thao tác mới trong menu ngữ cảnh RSS để chia sẻ bài đã chọn qua email.
 • Đã thêm tùy chọn xác nhận xóa chi tiết trong Tùy chọn > RSS và podcast: với RSS (nguồn/bài/cả hai/không) và với podcast (podcast/tập/cả hai/không).

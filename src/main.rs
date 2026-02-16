@@ -103,8 +103,8 @@ use windows::Win32::UI::Controls::{
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_APPS, VK_CONTROL, VK_ESCAPE,
-    VK_F1, VK_F2, VK_F3, VK_F4, VK_F7, VK_F8, VK_F9, VK_F10, VK_LEFT, VK_MENU, VK_NEXT, VK_PRIOR,
-    VK_RETURN, VK_RIGHT, VK_SHIFT, VK_TAB,
+    VK_F1, VK_F2, VK_F3, VK_F4, VK_F7, VK_F8, VK_F9, VK_F10, VK_MENU, VK_NEXT, VK_PRIOR, VK_RETURN,
+    VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
 use windows::Win32::UI::Shell::{
@@ -1872,6 +1872,11 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                     if app_windows::options_window::handle_navigation(options_hwnd, &msg) {
                         continue;
                     }
+                } else if let Some(hwnd_edit) = get_active_edit(hwnd)
+                    && GetFocus() == hwnd_edit
+                {
+                    // In editor, allow accelerator table to handle Ctrl+Tab / Ctrl+Shift+Tab
+                    // for indent / outdent.
                 } else {
                     // Switch tabs in main window
                     let tab_hwnd = with_state(hwnd, |state| state.hwnd_tab).unwrap_or(HWND(0));
@@ -1903,8 +1908,8 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                             editor_manager::select_tab(hwnd, next as usize);
                         }
                     }
+                    continue;
                 }
-                continue;
             }
             if msg.message == WM_CONTEXTMENU && msg.lParam.0 == -1 {
                 let rss_hwnd = with_state(hwnd, |state| state.rss_window).unwrap_or(HWND(0));
@@ -7482,13 +7487,13 @@ unsafe fn create_accelerators() -> HACCEL {
             cmd: IDM_EDIT_SELECT_ALL as u16,
         },
         ACCEL {
-            fVirt: virt_alt,
-            key: VK_RIGHT.0,
+            fVirt: virt,
+            key: VK_TAB.0,
             cmd: IDM_EDIT_INDENT as u16,
         },
         ACCEL {
-            fVirt: virt_alt,
-            key: VK_LEFT.0,
+            fVirt: virt_shift,
+            key: VK_TAB.0,
             cmd: IDM_EDIT_OUTDENT as u16,
         },
         ACCEL {

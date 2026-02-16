@@ -103,8 +103,8 @@ use windows::Win32::UI::Controls::{
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_APPS, VK_CONTROL, VK_ESCAPE,
-    VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_F10, VK_LEFT, VK_MENU,
-    VK_NEXT, VK_PRIOR, VK_RETURN, VK_RIGHT, VK_SHIFT, VK_TAB,
+    VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F7, VK_F8, VK_F9, VK_F10, VK_LEFT, VK_MENU, VK_NEXT,
+    VK_PRIOR, VK_RETURN, VK_RIGHT, VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
 use windows::Win32::UI::Shell::{
@@ -2389,6 +2389,9 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                 }
             });
             if handled {
+                continue;
+            }
+            if handle_custom_shortcuts(hwnd, &msg) {
                 continue;
             }
             if accel.0 != 0 && TranslateAcceleratorW(hwnd, accel, &msg) != 0 {
@@ -7264,6 +7267,88 @@ unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
     false
 }
 
+fn is_modifier_vk(key: u16) -> bool {
+    matches!(key, 0x10 | 0x11 | 0x12 | 0xA0..=0xA5)
+}
+
+unsafe fn shortcut_matches_message(binding: ShortcutBinding, msg: &MSG) -> bool {
+    if msg.message != WM_KEYDOWN && msg.message != WM_SYSKEYDOWN {
+        return false;
+    }
+    let key = msg.wParam.0 as u16;
+    if is_modifier_vk(key) {
+        return false;
+    }
+    let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
+    let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+    let alt_down = (GetKeyState(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
+    key == binding.key
+        && ctrl_down == binding.ctrl
+        && shift_down == binding.shift
+        && alt_down == binding.alt
+}
+
+unsafe fn dispatch_shortcut_command(hwnd: HWND, cmd: usize) {
+    crate::log_if_err!(PostMessageW(hwnd, WM_COMMAND, WPARAM(cmd), LPARAM(0)));
+}
+
+unsafe fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
+    if msg.message != WM_KEYDOWN && msg.message != WM_SYSKEYDOWN {
+        return false;
+    }
+    let options_hwnd = with_state(hwnd, |state| state.options_dialog).unwrap_or(HWND(0));
+    if options_hwnd.0 != 0
+        && (msg.hwnd == options_hwnd || IsChild(options_hwnd, msg.hwnd).as_bool())
+    {
+        return false;
+    }
+
+    let shortcuts = with_state(hwnd, |state| state.settings.shortcuts.clone())
+        .unwrap_or_else(ShortcutSettings::default);
+
+    if shortcut_matches_message(shortcuts.read_pause_resume, msg) {
+        dispatch_shortcut_command(hwnd, IDM_FILE_READ_PAUSE);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.read_start, msg) {
+        dispatch_shortcut_command(hwnd, IDM_FILE_READ_START);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.read_stop, msg) {
+        dispatch_shortcut_command(hwnd, IDM_FILE_READ_STOP);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.open_rss, msg) {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_RSS);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.open_podcasts, msg) {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_PODCASTS);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.find, msg) {
+        dispatch_shortcut_command(hwnd, IDM_EDIT_FIND);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.quote_lines, msg) {
+        dispatch_shortcut_command(hwnd, IDM_EDIT_QUOTE_LINES);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.unquote_lines, msg) {
+        dispatch_shortcut_command(hwnd, IDM_EDIT_UNQUOTE_LINES);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.media_prev, msg) {
+        dispatch_shortcut_command(hwnd, IDM_PLAYBACK_TRACK_PREV);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.media_next, msg) {
+        dispatch_shortcut_command(hwnd, IDM_PLAYBACK_TRACK_NEXT);
+        return true;
+    }
+    false
+}
+
 unsafe fn create_accelerators() -> HACCEL {
     let virt = FCONTROL | FVIRTKEY;
     let virt_shift = FCONTROL | FSHIFT | FVIRTKEY;
@@ -7300,11 +7385,6 @@ unsafe fn create_accelerators() -> HACCEL {
             fVirt: virt_shift,
             key: 'W' as u16,
             cmd: IDM_FILE_CLOSE_OTHERS as u16,
-        },
-        ACCEL {
-            fVirt: virt,
-            key: 'F' as u16,
-            cmd: IDM_EDIT_FIND as u16,
         },
         ACCEL {
             fVirt: virt_shift,
@@ -7362,16 +7442,6 @@ unsafe fn create_accelerators() -> HACCEL {
             cmd: IDM_EDIT_SELECT_ALL as u16,
         },
         ACCEL {
-            fVirt: virt,
-            key: 'Q' as u16,
-            cmd: IDM_EDIT_QUOTE_LINES as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift,
-            key: 'Q' as u16,
-            cmd: IDM_EDIT_UNQUOTE_LINES as u16,
-        },
-        ACCEL {
             fVirt: virt_alt,
             key: VK_RIGHT.0,
             cmd: IDM_EDIT_INDENT as u16,
@@ -7422,16 +7492,6 @@ unsafe fn create_accelerators() -> HACCEL {
             cmd: IDM_NEXT_TAB as u16,
         },
         ACCEL {
-            fVirt: virt,
-            key: VK_PRIOR.0,
-            cmd: IDM_PLAYBACK_TRACK_PREV as u16,
-        },
-        ACCEL {
-            fVirt: virt,
-            key: VK_NEXT.0,
-            cmd: IDM_PLAYBACK_TRACK_NEXT as u16,
-        },
-        ACCEL {
             fVirt: virt_shift_only,
             key: VK_NEXT.0,
             cmd: IDM_GOTO_NEXT_BOOKMARK as u16,
@@ -7442,24 +7502,9 @@ unsafe fn create_accelerators() -> HACCEL {
             cmd: IDM_GOTO_PREV_BOOKMARK as u16,
         },
         ACCEL {
-            fVirt: FVIRTKEY,
-            key: VK_F4.0,
-            cmd: IDM_FILE_READ_PAUSE as u16,
-        },
-        ACCEL {
-            fVirt: FVIRTKEY,
-            key: VK_F5.0,
-            cmd: IDM_FILE_READ_START as u16,
-        },
-        ACCEL {
             fVirt: FSHIFT | FVIRTKEY,
             key: VK_F5.0,
             cmd: IDM_FILE_EXECUTE as u16,
-        },
-        ACCEL {
-            fVirt: FVIRTKEY,
-            key: VK_F6.0,
-            cmd: IDM_FILE_READ_STOP as u16,
         },
         ACCEL {
             fVirt: virt,
@@ -7500,16 +7545,6 @@ unsafe fn create_accelerators() -> HACCEL {
             fVirt: virt_shift,
             key: 'D' as u16,
             cmd: IDM_TOOLS_DICTIONARY as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift,
-            key: 'U' as u16,
-            cmd: IDM_TOOLS_RSS as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift,
-            key: 'P' as u16,
-            cmd: IDM_TOOLS_PODCASTS as u16,
         },
         ACCEL {
             fVirt: virt_shift,

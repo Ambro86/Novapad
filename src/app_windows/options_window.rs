@@ -6,8 +6,9 @@ use crate::editor_manager::{
 };
 use crate::settings::{
     Language, ModifiedMarkerPosition, OpenBehavior, PodcastDeleteConfirmMode, RssDeleteConfirmMode,
-    SubtitleReadMode, TRUSTED_CLIENT_TOKEN, TtsEngine, VOICE_LIST_URL, VoiceInfo,
-    save_settings_with_default_copy, sync_context_menu, sync_start_menu_shortcuts,
+    ShortcutBinding, ShortcutSettings, SubtitleReadMode, TRUSTED_CLIENT_TOKEN, TtsEngine,
+    VOICE_LIST_URL, VoiceInfo, format_shortcut, save_settings_with_default_copy, sync_context_menu,
+    sync_start_menu_shortcuts,
 };
 use crate::{i18n, rebuild_menus, refresh_voice_panel, tts_engine, with_state};
 use std::process::Command;
@@ -24,24 +25,26 @@ use windows::Win32::UI::Controls::Dialogs::{
 };
 use windows::Win32::UI::Controls::{
     BST_CHECKED, NMHDR, TCIF_TEXT, TCITEMW, TCM_GETCURSEL, TCM_INSERTITEMW, TCM_SETCURSEL,
-    TCN_SELCHANGE, WC_BUTTON, WC_COMBOBOXW, WC_STATIC, WC_TABCONTROLW,
+    TCN_SELCHANGE, WC_BUTTON, WC_COMBOBOXW, WC_EDIT, WC_STATIC, WC_TABCONTROLW,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    EnableWindow, GetFocus, GetKeyState, SetFocus, VK_CONTROL, VK_ESCAPE, VK_RETURN, VK_SHIFT,
-    VK_TAB,
+    EnableWindow, GetAsyncKeyState, GetFocus, GetKeyState, SetFocus, VK_CONTROL, VK_ESCAPE,
+    VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_MENU, VK_RCONTROL, VK_RETURN, VK_RMENU, VK_RSHIFT,
+    VK_SHIFT, VK_SPACE, VK_TAB,
 };
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::{
     BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCOUNT,
     CB_GETCURSEL, CB_GETDROPPEDSTATE, CB_GETITEMDATA, CB_RESETCONTENT, CB_SETCURSEL,
     CB_SETITEMDATA, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW,
-    DefWindowProcW, DestroyWindow, ES_AUTOHSCROLL, ES_PASSWORD, GWLP_USERDATA, GetClientRect,
-    GetParent, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW,
-    LoadCursorW, MSG, MoveWindow, PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW, SW_SHOWNORMAL,
-    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, ShowWindow, WINDOW_STYLE,
-    WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL,
-    WM_NOTIFY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
-    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    DefWindowProcW, DestroyWindow, ES_AUTOHSCROLL, ES_PASSWORD, ES_READONLY, GWLP_USERDATA,
+    GetClientRect, GetNextDlgTabItem, GetParent, GetWindowLongPtrW, GetWindowTextLengthW,
+    GetWindowTextW, HMENU, IDC_ARROW, LoadCursorW, MSG, MoveWindow, PostMessageW, RegisterClassW,
+    SW_HIDE, SW_SHOW, SW_SHOWNORMAL, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
+    SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY,
+    WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_SETFONT, WNDCLASSW, WS_CAPTION,
+    WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP,
+    WS_VISIBLE,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -112,6 +115,10 @@ const OPTIONS_ID_DIALOGUE_VOICE_PITCH: usize = 6053;
 const OPTIONS_ID_DIALOGUE_VOICE_VOLUME: usize = 6054;
 const OPTIONS_ID_DIALOGUE_TTS_ENGINE: usize = 6055;
 const OPTIONS_ID_TTS_INSERT_TAG: usize = 6056;
+const OPTIONS_ID_SHORTCUT_ACTION: usize = 6070;
+const OPTIONS_ID_SHORTCUT_VALUE: usize = 6071;
+const OPTIONS_ID_SHORTCUT_CHANGE: usize = 6072;
+const OPTIONS_ID_SHORTCUT_RESET: usize = 6073;
 
 const OPTIONS_ID_OK: usize = 6005;
 const OPTIONS_ID_CANCEL: usize = 6006;
@@ -126,7 +133,8 @@ const OPTIONS_TAB_VOICE: i32 = 1;
 const OPTIONS_TAB_EDITOR: i32 = 2;
 const OPTIONS_TAB_AUDIO: i32 = 3;
 const OPTIONS_TAB_RSS_PODCAST: i32 = 4;
-const OPTIONS_TAB_COUNT: i32 = 5;
+const OPTIONS_TAB_SHORTCUTS: i32 = 5;
+const OPTIONS_TAB_COUNT: i32 = 6;
 const OPTIONS_CONTENT_TOP: i32 = 50;
 const OPTIONS_MARGIN_X: i32 = 20;
 const OPTIONS_LABEL_WIDTH: i32 = 235;
@@ -140,7 +148,265 @@ const OPTIONS_COMBO_HEIGHT: i32 = 28;
 const OPTIONS_EDIT_HEIGHT: i32 = 24;
 const OPTIONS_SECTION_GAP: i32 = 8;
 
+#[derive(Clone, Copy)]
+enum ShortcutAction {
+    ReadPauseResume,
+    ReadStart,
+    ReadStop,
+    OpenRss,
+    OpenPodcasts,
+    Find,
+    QuoteLines,
+    UnquoteLines,
+    MediaPrev,
+    MediaNext,
+}
+
+impl ShortcutAction {
+    const ALL: [ShortcutAction; 10] = [
+        ShortcutAction::ReadPauseResume,
+        ShortcutAction::ReadStart,
+        ShortcutAction::ReadStop,
+        ShortcutAction::OpenRss,
+        ShortcutAction::OpenPodcasts,
+        ShortcutAction::Find,
+        ShortcutAction::QuoteLines,
+        ShortcutAction::UnquoteLines,
+        ShortcutAction::MediaPrev,
+        ShortcutAction::MediaNext,
+    ];
+}
+
+fn shortcut_action_label(language: Language, action: ShortcutAction) -> &'static str {
+    match language {
+        Language::Italian => match action {
+            ShortcutAction::ReadPauseResume => "Pausa/riprendi lettura",
+            ShortcutAction::ReadStart => "Avvia lettura",
+            ShortcutAction::ReadStop => "Ferma lettura",
+            ShortcutAction::OpenRss => "Apri RSS",
+            ShortcutAction::OpenPodcasts => "Apri podcast",
+            ShortcutAction::Find => "Trova",
+            ShortcutAction::QuoteLines => "Commenta righe",
+            ShortcutAction::UnquoteLines => "Decommenta righe",
+            ShortcutAction::MediaPrev => "Brano precedente",
+            ShortcutAction::MediaNext => "Brano successivo",
+        },
+        _ => match action {
+            ShortcutAction::ReadPauseResume => "Pause/resume reading",
+            ShortcutAction::ReadStart => "Start reading",
+            ShortcutAction::ReadStop => "Stop reading",
+            ShortcutAction::OpenRss => "Open RSS",
+            ShortcutAction::OpenPodcasts => "Open podcasts",
+            ShortcutAction::Find => "Find",
+            ShortcutAction::QuoteLines => "Quote lines",
+            ShortcutAction::UnquoteLines => "Unquote lines",
+            ShortcutAction::MediaPrev => "Previous track",
+            ShortcutAction::MediaNext => "Next track",
+        },
+    }
+}
+
+fn shortcut_tab_title(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "Scorciatoie",
+        Language::Spanish => "Atajos",
+        Language::Portuguese => "Atalhos",
+        Language::French => "Raccourcis",
+        Language::Czech => "Klavesove zkratky",
+        Language::Polish => "Skroty",
+        Language::Serbian => "Precice",
+        Language::Ukrainian => "Gariachi klavishi",
+        _ => "Shortcuts",
+    }
+}
+
+fn shortcuts_label_action(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "Azione:",
+        Language::Spanish => "Accion:",
+        Language::Portuguese => "Acao:",
+        Language::French => "Action :",
+        Language::Czech => "Akce:",
+        Language::Polish => "Akcja:",
+        Language::Serbian => "Radnja:",
+        Language::Ukrainian => "Diia:",
+        _ => "Action:",
+    }
+}
+
+fn shortcuts_label_value(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "Combinazione:",
+        Language::Spanish => "Combinacion:",
+        Language::Portuguese => "Combinacao:",
+        Language::French => "Combinaison :",
+        Language::Czech => "Kombinace:",
+        Language::Polish => "Kombinacja:",
+        Language::Serbian => "Kombinacija:",
+        Language::Ukrainian => "Kombinatsiia:",
+        _ => "Combination:",
+    }
+}
+
+fn shortcuts_change_label(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "Cambia...",
+        Language::Spanish => "Cambiar...",
+        Language::Portuguese => "Alterar...",
+        Language::French => "Modifier...",
+        Language::Czech => "Zmenit...",
+        Language::Polish => "Zmien...",
+        Language::Serbian => "Promeni...",
+        Language::Ukrainian => "Zminyty...",
+        _ => "Change...",
+    }
+}
+
+fn shortcuts_reset_label(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "Predefinito",
+        Language::Spanish => "Predeterminado",
+        Language::Portuguese => "Padrao",
+        Language::French => "Par defaut",
+        Language::Czech => "Vychozi",
+        Language::Polish => "Domyslne",
+        Language::Serbian => "Podrazumevano",
+        Language::Ukrainian => "Typovo",
+        _ => "Default",
+    }
+}
+
+fn shortcut_binding_for_action(
+    settings: &ShortcutSettings,
+    action: ShortcutAction,
+) -> ShortcutBinding {
+    match action {
+        ShortcutAction::ReadPauseResume => settings.read_pause_resume,
+        ShortcutAction::ReadStart => settings.read_start,
+        ShortcutAction::ReadStop => settings.read_stop,
+        ShortcutAction::OpenRss => settings.open_rss,
+        ShortcutAction::OpenPodcasts => settings.open_podcasts,
+        ShortcutAction::Find => settings.find,
+        ShortcutAction::QuoteLines => settings.quote_lines,
+        ShortcutAction::UnquoteLines => settings.unquote_lines,
+        ShortcutAction::MediaPrev => settings.media_prev,
+        ShortcutAction::MediaNext => settings.media_next,
+    }
+}
+
+fn set_shortcut_binding_for_action(
+    settings: &mut ShortcutSettings,
+    action: ShortcutAction,
+    binding: ShortcutBinding,
+) {
+    match action {
+        ShortcutAction::ReadPauseResume => settings.read_pause_resume = binding,
+        ShortcutAction::ReadStart => settings.read_start = binding,
+        ShortcutAction::ReadStop => settings.read_stop = binding,
+        ShortcutAction::OpenRss => settings.open_rss = binding,
+        ShortcutAction::OpenPodcasts => settings.open_podcasts = binding,
+        ShortcutAction::Find => settings.find = binding,
+        ShortcutAction::QuoteLines => settings.quote_lines = binding,
+        ShortcutAction::UnquoteLines => settings.unquote_lines = binding,
+        ShortcutAction::MediaPrev => settings.media_prev = binding,
+        ShortcutAction::MediaNext => settings.media_next = binding,
+    }
+}
+
+fn is_modifier_vk(key: u16) -> bool {
+    matches!(key, 0x10 | 0x11 | 0x12 | 0xA0..=0xA5)
+}
+
+fn modifier_down(vk: i32) -> bool {
+    ((unsafe { GetKeyState(vk) } & (0x8000u16 as i16)) != 0)
+        || ((unsafe { GetAsyncKeyState(vk) } & (0x8000u16 as i16)) != 0)
+}
+
+fn modifier_down_any(vks: &[i32]) -> bool {
+    vks.iter().copied().any(modifier_down)
+}
+
+unsafe fn move_options_focus_tab(hwnd: HWND, backwards: bool) {
+    let current = GetFocus();
+    let next = GetNextDlgTabItem(hwnd, current, backwards);
+    if next.0 != 0 {
+        SetFocus(next);
+    }
+}
+
 pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
+    if (msg.message == WM_KEYDOWN
+        || msg.message == windows::Win32::UI::WindowsAndMessaging::WM_SYSKEYDOWN)
+        && with_options_state(hwnd, |state| state.shortcut_capture_pending).unwrap_or(false)
+    {
+        let edit_shortcut_value =
+            with_options_state(hwnd, |state| state.edit_shortcut_value).unwrap_or(HWND(0));
+        if edit_shortcut_value.0 == 0 {
+            return false;
+        }
+
+        let key = msg.wParam.0 as u16;
+        if key == VK_ESCAPE.0 {
+            if with_options_state(hwnd, |state| {
+                state.shortcut_capture_pending = false;
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access state in options_window");
+            }
+            update_shortcut_binding_text(hwnd);
+            return true;
+        }
+        if key == VK_TAB.0 {
+            if with_options_state(hwnd, |state| {
+                state.shortcut_capture_pending = false;
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access state in options_window");
+            }
+            update_shortcut_binding_text(hwnd);
+            let shift_down =
+                modifier_down_any(&[VK_SHIFT.0 as i32, VK_LSHIFT.0 as i32, VK_RSHIFT.0 as i32]);
+            move_options_focus_tab(hwnd, shift_down);
+            return true;
+        }
+        if key == VK_RETURN.0 || key == VK_SPACE.0 {
+            return true;
+        }
+        if is_modifier_vk(key) {
+            return true;
+        }
+
+        let normalized_key = if (b'a' as u16..=b'z' as u16).contains(&key) {
+            key - 32
+        } else {
+            key
+        };
+        let action = selected_shortcut_action(hwnd);
+        let ctrl = modifier_down_any(&[
+            VK_CONTROL.0 as i32,
+            VK_LCONTROL.0 as i32,
+            VK_RCONTROL.0 as i32,
+        ]);
+        let shift = modifier_down_any(&[VK_SHIFT.0 as i32, VK_LSHIFT.0 as i32, VK_RSHIFT.0 as i32]);
+        let alt = modifier_down_any(&[VK_MENU.0 as i32, VK_LMENU.0 as i32, VK_RMENU.0 as i32]);
+        if with_options_state(hwnd, |state| {
+            set_shortcut_binding_for_action(
+                &mut state.shortcut_draft,
+                action,
+                ShortcutBinding::new(ctrl, shift, alt, normalized_key),
+            );
+            state.shortcut_capture_pending = false;
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access state in options_window");
+        }
+        update_shortcut_binding_text(hwnd);
+        return true;
+    }
+
     if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_TAB.0 as u32 {
         let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
         if ctrl_down {
@@ -308,6 +574,14 @@ struct OptionsDialogState {
     button_manage_associations: HWND,
     label_prompt_program: HWND,
     combo_prompt_program: HWND,
+    label_shortcut_action: HWND,
+    combo_shortcut_action: HWND,
+    label_shortcut_value: HWND,
+    edit_shortcut_value: HWND,
+    button_shortcut_change: HWND,
+    button_shortcut_reset: HWND,
+    shortcut_draft: ShortcutSettings,
+    shortcut_capture_pending: bool,
     ok_button: HWND,
     cancel_button: HWND,
 }
@@ -319,6 +593,7 @@ struct OptionsLabels {
     tab_editor: String,
     tab_audio: String,
     tab_rss_podcast: String,
+    tab_shortcuts: String,
     label_language: String,
     label_modified_marker_position: String,
     label_open: String,
@@ -369,6 +644,10 @@ struct OptionsLabels {
     label_file_associations: String,
     label_manage_associations: String,
     label_prompt_program: String,
+    label_shortcut_action: String,
+    label_shortcut_value: String,
+    label_shortcut_change: String,
+    label_shortcut_reset: String,
     label_audio_skip: String,
     label_audiobook_save_folder: String,
     label_audiobook_save_folder_browse: String,
@@ -449,6 +728,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         tab_editor: i18n::tr(language, "options.tab.editor"),
         tab_audio: i18n::tr(language, "options.tab.audio"),
         tab_rss_podcast: i18n::tr(language, "options.tab.rss_podcast"),
+        tab_shortcuts: shortcut_tab_title(language).to_string(),
         label_language: i18n::tr(language, "options.label.language"),
         label_modified_marker_position: i18n::tr(
             language,
@@ -508,6 +788,10 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_file_associations: i18n::tr(language, "options.label.file_associations"),
         label_manage_associations: i18n::tr(language, "options.button.manage_associations"),
         label_prompt_program: i18n::tr(language, "options.label.prompt_program"),
+        label_shortcut_action: shortcuts_label_action(language).to_string(),
+        label_shortcut_value: shortcuts_label_value(language).to_string(),
+        label_shortcut_change: shortcuts_change_label(language).to_string(),
+        label_shortcut_reset: shortcuts_reset_label(language).to_string(),
         label_audio_skip: i18n::tr(language, "options.label.audio_skip"),
         label_audiobook_save_folder: i18n::tr(language, "options.label.audiobook_save_folder"),
         label_audiobook_save_folder_browse: i18n::tr(language, "options.button.browse"),
@@ -798,6 +1082,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 labels.tab_editor.clone(),
                 labels.tab_audio.clone(),
                 labels.tab_rss_podcast.clone(),
+                labels.tab_shortcuts.clone(),
             ];
             for (index, label) in tab_labels.iter().enumerate() {
                 let mut text = to_wide(label);
@@ -2377,6 +2662,98 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
             );
             y += 40;
 
+            let label_shortcut_action = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_shortcut_action).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_shortcut_action = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                200,
+                hwnd,
+                HMENU(OPTIONS_ID_SHORTCUT_ACTION as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 34;
+            let label_shortcut_value = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_shortcut_value).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let edit_shortcut_value = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_EDIT,
+                PCWSTR::null(),
+                WS_CHILD
+                    | WS_VISIBLE
+                    | WS_TABSTOP
+                    | WINDOW_STYLE(ES_AUTOHSCROLL as u32)
+                    | WINDOW_STYLE(ES_READONLY as u32),
+                170,
+                y - 2,
+                300,
+                24,
+                hwnd,
+                HMENU(OPTIONS_ID_SHORTCUT_VALUE as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 34;
+            let button_shortcut_change = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_shortcut_change).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                170,
+                y - 2,
+                146,
+                26,
+                hwnd,
+                HMENU(OPTIONS_ID_SHORTCUT_CHANGE as isize),
+                HINSTANCE(0),
+                None,
+            );
+            let button_shortcut_reset = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_shortcut_reset).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                324,
+                y - 2,
+                146,
+                26,
+                hwnd,
+                HMENU(OPTIONS_ID_SHORTCUT_RESET as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 40;
+
             let ok_button = CreateWindowExW(
                 Default::default(),
                 WC_BUTTON,
@@ -2512,6 +2889,12 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 button_manage_associations,
                 label_prompt_program,
                 combo_prompt_program,
+                label_shortcut_action,
+                combo_shortcut_action,
+                label_shortcut_value,
+                edit_shortcut_value,
+                button_shortcut_change,
+                button_shortcut_reset,
                 ok_button,
                 cancel_button,
             ] {
@@ -2627,6 +3010,14 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 button_manage_associations,
                 label_prompt_program,
                 combo_prompt_program,
+                label_shortcut_action,
+                combo_shortcut_action,
+                label_shortcut_value,
+                edit_shortcut_value,
+                button_shortcut_change,
+                button_shortcut_reset,
+                shortcut_draft: ShortcutSettings::default(),
+                shortcut_capture_pending: false,
                 ok_button,
                 cancel_button,
             });
@@ -2775,6 +3166,50 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                             SW_SHOWNORMAL,
                         );
                     }
+                    LRESULT(0)
+                }
+                OPTIONS_ID_SHORTCUT_ACTION => {
+                    if code == CBN_SELCHANGE {
+                        if with_options_state(hwnd, |state| {
+                            state.shortcut_capture_pending = false;
+                        })
+                        .is_none()
+                        {
+                            crate::log_debug("Failed to access state in options_window");
+                        }
+                        update_shortcut_binding_text(hwnd);
+                    }
+                    LRESULT(0)
+                }
+                OPTIONS_ID_SHORTCUT_CHANGE => {
+                    if with_options_state(hwnd, |state| {
+                        state.shortcut_capture_pending = true;
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access state in options_window");
+                    }
+                    update_shortcut_binding_text(hwnd);
+                    if let Some(control) =
+                        with_options_state(hwnd, |state| state.edit_shortcut_value)
+                    {
+                        SetFocus(control);
+                    }
+                    LRESULT(0)
+                }
+                OPTIONS_ID_SHORTCUT_RESET => {
+                    let action = selected_shortcut_action(hwnd);
+                    let defaults = ShortcutSettings::default();
+                    if with_options_state(hwnd, |state| {
+                        let binding = shortcut_binding_for_action(&defaults, action);
+                        set_shortcut_binding_for_action(&mut state.shortcut_draft, action, binding);
+                        state.shortcut_capture_pending = false;
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access state in options_window");
+                    }
+                    update_shortcut_binding_text(hwnd);
                     LRESULT(0)
                 }
                 _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -2957,6 +3392,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         combo_rss_quick_copy_mode,
         _label_prompt_program,
         combo_prompt_program,
+        combo_shortcut_action,
+        _edit_shortcut_value,
     ) = match with_options_state(hwnd, |state| {
         (
             state.parent,
@@ -3036,6 +3473,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.combo_rss_quick_copy_mode,
             state.label_prompt_program,
             state.combo_prompt_program,
+            state.combo_shortcut_action,
+            state.edit_shortcut_value,
         )
     }) {
         Some(values) => values,
@@ -3932,6 +4371,25 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         WPARAM(program_idx),
         LPARAM(0),
     );
+    if with_options_state(hwnd, |state| {
+        state.shortcut_draft = settings.shortcuts.clone();
+        state.shortcut_capture_pending = false;
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access state in options_window");
+    }
+    SendMessageW(combo_shortcut_action, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    for action in ShortcutAction::ALL {
+        SendMessageW(
+            combo_shortcut_action,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(shortcut_action_label(settings.language, action)).as_ptr() as isize),
+        );
+    }
+    SendMessageW(combo_shortcut_action, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+    update_shortcut_binding_text(hwnd);
 
     SendMessageW(combo_audio_skip, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
     let skip_options = [
@@ -4204,6 +4662,54 @@ fn combo_value(hwnd: HWND) -> i32 {
         }
         SendMessageW(hwnd, CB_GETITEMDATA, WPARAM(sel as usize), LPARAM(0)).0 as i32
     }
+}
+
+fn selected_shortcut_action(hwnd: HWND) -> ShortcutAction {
+    let sel = unsafe {
+        with_options_state(hwnd, |state| {
+            SendMessageW(
+                state.combo_shortcut_action,
+                CB_GETCURSEL,
+                WPARAM(0),
+                LPARAM(0),
+            )
+            .0
+        })
+        .unwrap_or(0)
+    };
+    let idx = if sel < 0 { 0usize } else { sel as usize };
+    ShortcutAction::ALL
+        .get(idx)
+        .copied()
+        .unwrap_or(ShortcutAction::ReadPauseResume)
+}
+
+unsafe fn update_shortcut_binding_text(hwnd: HWND) {
+    let action = selected_shortcut_action(hwnd);
+    let (edit, binding, waiting, language) = with_options_state(hwnd, |state| {
+        let language = with_state(state.parent, |app| app.settings.language).unwrap_or_default();
+        (
+            state.edit_shortcut_value,
+            shortcut_binding_for_action(&state.shortcut_draft, action),
+            state.shortcut_capture_pending,
+            language,
+        )
+    })
+    .unwrap_or((
+        HWND(0),
+        ShortcutBinding::new(false, false, false, 0),
+        false,
+        Language::English,
+    ));
+    if edit.0 == 0 {
+        return;
+    }
+    let text = if waiting {
+        i18n::tr(language, "options.shortcuts.capture_hint")
+    } else {
+        format_shortcut(binding)
+    };
+    crate::log_if_err!(SetWindowTextW(edit, PCWSTR(to_wide(&text).as_ptr())));
 }
 
 const TTS_RATE_MIN: i32 = -100;
@@ -4911,6 +5417,8 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     let old_spellcheck_enabled = settings.spellcheck_enabled;
     let old_spellcheck_mode = settings.spellcheck_language_mode;
     let old_spellcheck_fixed_language = settings.spellcheck_fixed_language.clone();
+    settings.shortcuts = with_options_state(hwnd, |state| state.shortcut_draft.clone())
+        .unwrap_or_else(ShortcutSettings::default);
     let res = with_state(parent, |state| {
         (
             state.settings.tts_engine,
@@ -6233,6 +6741,47 @@ fn layout_rss_podcast_tab(state: &OptionsDialogState) {
     );
 }
 
+fn layout_shortcuts_tab(state: &OptionsDialogState) {
+    let mut y = OPTIONS_CONTENT_TOP;
+    y = layout_label_control(
+        "label_shortcut_action",
+        state.label_shortcut_action,
+        "combo_shortcut_action",
+        state.combo_shortcut_action,
+        y,
+        OPTIONS_COMBO_HEIGHT,
+    );
+    y = layout_label_control(
+        "label_shortcut_value",
+        state.label_shortcut_value,
+        "edit_shortcut_value",
+        state.edit_shortcut_value,
+        y,
+        OPTIONS_EDIT_HEIGHT,
+    );
+
+    layout_button("button_shortcut_change", state.button_shortcut_change, y);
+    layout_button("button_shortcut_reset", state.button_shortcut_reset, y);
+    unsafe {
+        crate::log_if_err!(MoveWindow(
+            state.button_shortcut_change,
+            OPTIONS_CONTROL_X,
+            y,
+            (OPTIONS_CONTROL_WIDTH / 2) - 4,
+            OPTIONS_BUTTON_HEIGHT,
+            true,
+        ));
+        crate::log_if_err!(MoveWindow(
+            state.button_shortcut_reset,
+            OPTIONS_CONTROL_X + (OPTIONS_CONTROL_WIDTH / 2) + 4,
+            y,
+            (OPTIONS_CONTROL_WIDTH / 2) - 4,
+            OPTIONS_BUTTON_HEIGHT,
+            true,
+        ));
+    }
+}
+
 unsafe fn set_active_tab(hwnd: HWND, index: i32) {
     let focus_first = with_options_state(hwnd, |state| {
         if state.focus_initialized {
@@ -6249,6 +6798,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
         let show_editor = index == OPTIONS_TAB_EDITOR;
         let show_audio = index == OPTIONS_TAB_AUDIO;
         let show_rss_podcast = index == OPTIONS_TAB_RSS_PODCAST;
+        let show_shortcuts = index == OPTIONS_TAB_SHORTCUTS;
 
         match index {
             OPTIONS_TAB_GENERAL => layout_general_tab(state),
@@ -6256,6 +6806,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             OPTIONS_TAB_EDITOR => layout_editor_tab(state),
             OPTIONS_TAB_AUDIO => layout_audio_tab(state),
             OPTIONS_TAB_RSS_PODCAST => layout_rss_podcast_tab(state),
+            OPTIONS_TAB_SHORTCUTS => layout_shortcuts_tab(state),
             _ => {}
         }
         layout_dialog_buttons(hwnd, state.ok_button, state.cancel_button);
@@ -6385,6 +6936,17 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
         ] {
             ShowWindow(control, if show_rss_podcast { SW_SHOW } else { SW_HIDE });
         }
+
+        for control in [
+            state.label_shortcut_action,
+            state.combo_shortcut_action,
+            state.label_shortcut_value,
+            state.edit_shortcut_value,
+            state.button_shortcut_change,
+            state.button_shortcut_reset,
+        ] {
+            ShowWindow(control, if show_shortcuts { SW_SHOW } else { SW_HIDE });
+        }
     })
     .is_none()
     {
@@ -6399,6 +6961,8 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
         update_dialogue_voice_visibility(hwnd);
     } else if index == OPTIONS_TAB_EDITOR {
         update_indentation_visibility(hwnd);
+    } else if index == OPTIONS_TAB_SHORTCUTS {
+        update_shortcut_binding_text(hwnd);
     } else if let Some((
         label_text,
         edit_text,
@@ -6443,6 +7007,7 @@ unsafe fn focus_tab_first(hwnd: HWND, index: i32) {
         OPTIONS_TAB_EDITOR => state.checkbox_word_wrap,
         OPTIONS_TAB_AUDIO => state.combo_audio_skip,
         OPTIONS_TAB_RSS_PODCAST => state.combo_confirm_delete_rss_mode,
+        OPTIONS_TAB_SHORTCUTS => state.combo_shortcut_action,
         _ => HWND(0),
     })
     .unwrap_or(HWND(0));

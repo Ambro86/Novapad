@@ -20,6 +20,7 @@ use windows::Win32::System::Registry::{
     HKEY_CURRENT_USER, KEY_SET_VALUE, REG_OPTION_NON_VOLATILE, REG_SZ, RegCloseKey,
     RegCreateKeyExW, RegDeleteTreeW, RegSetValueExW,
 };
+use windows::Win32::UI::Input::KeyboardAndMouse::{VK_F4, VK_F5, VK_F6, VK_NEXT, VK_PRIOR};
 use windows::Win32::UI::Shell::{FOLDERID_Documents, SHGetKnownFolderPath};
 use windows::core::PCWSTR;
 
@@ -243,6 +244,150 @@ pub enum RssQuickCopyMode {
     All,
 }
 
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ShortcutBinding {
+    pub ctrl: bool,
+    pub shift: bool,
+    pub alt: bool,
+    pub key: u16,
+}
+
+impl ShortcutBinding {
+    pub const fn new(ctrl: bool, shift: bool, alt: bool, key: u16) -> Self {
+        Self {
+            ctrl,
+            shift,
+            alt,
+            key,
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct ShortcutSettings {
+    pub read_pause_resume: ShortcutBinding,
+    pub read_start: ShortcutBinding,
+    pub read_stop: ShortcutBinding,
+    pub open_rss: ShortcutBinding,
+    pub open_podcasts: ShortcutBinding,
+    pub find: ShortcutBinding,
+    pub quote_lines: ShortcutBinding,
+    pub unquote_lines: ShortcutBinding,
+    pub media_prev: ShortcutBinding,
+    pub media_next: ShortcutBinding,
+}
+
+impl Default for ShortcutSettings {
+    fn default() -> Self {
+        Self {
+            read_pause_resume: ShortcutBinding::new(false, false, false, VK_F4.0),
+            read_start: ShortcutBinding::new(false, false, false, VK_F5.0),
+            read_stop: ShortcutBinding::new(false, false, false, VK_F6.0),
+            open_rss: ShortcutBinding::new(true, true, false, 'U' as u16),
+            open_podcasts: ShortcutBinding::new(true, true, false, 'P' as u16),
+            find: ShortcutBinding::new(true, false, false, 'F' as u16),
+            quote_lines: ShortcutBinding::new(true, false, false, 'Q' as u16),
+            unquote_lines: ShortcutBinding::new(true, true, false, 'Q' as u16),
+            media_prev: ShortcutBinding::new(true, false, false, VK_PRIOR.0),
+            media_next: ShortcutBinding::new(true, false, false, VK_NEXT.0),
+        }
+    }
+}
+
+pub fn format_shortcut(binding: ShortcutBinding) -> String {
+    let mut parts: Vec<&str> = Vec::new();
+    if binding.ctrl {
+        parts.push("Ctrl");
+    }
+    if binding.shift {
+        parts.push("Shift");
+    }
+    if binding.alt {
+        parts.push("Alt");
+    }
+    parts.push(shortcut_key_name(binding.key));
+    parts.join("+")
+}
+
+fn shortcut_key_name(key: u16) -> &'static str {
+    match key {
+        0x08 => "Backspace",
+        0x09 => "Tab",
+        0x0D => "Enter",
+        0x1B => "Esc",
+        0x20 => "Space",
+        0x21 => "PageUp",
+        0x22 => "PageDown",
+        0x23 => "End",
+        0x24 => "Home",
+        0x25 => "Left",
+        0x26 => "Up",
+        0x27 => "Right",
+        0x28 => "Down",
+        0x2D => "Insert",
+        0x2E => "Delete",
+        0x70 => "F1",
+        0x71 => "F2",
+        0x72 => "F3",
+        0x73 => "F4",
+        0x74 => "F5",
+        0x75 => "F6",
+        0x76 => "F7",
+        0x77 => "F8",
+        0x78 => "F9",
+        0x79 => "F10",
+        0x7A => "F11",
+        0x7B => "F12",
+        _ => {
+            if (b'0' as u16..=b'9' as u16).contains(&key)
+                || (b'A' as u16..=b'Z' as u16).contains(&key)
+            {
+                return match key as u8 as char {
+                    '0' => "0",
+                    '1' => "1",
+                    '2' => "2",
+                    '3' => "3",
+                    '4' => "4",
+                    '5' => "5",
+                    '6' => "6",
+                    '7' => "7",
+                    '8' => "8",
+                    '9' => "9",
+                    'A' => "A",
+                    'B' => "B",
+                    'C' => "C",
+                    'D' => "D",
+                    'E' => "E",
+                    'F' => "F",
+                    'G' => "G",
+                    'H' => "H",
+                    'I' => "I",
+                    'J' => "J",
+                    'K' => "K",
+                    'L' => "L",
+                    'M' => "M",
+                    'N' => "N",
+                    'O' => "O",
+                    'P' => "P",
+                    'Q' => "Q",
+                    'R' => "R",
+                    'S' => "S",
+                    'T' => "T",
+                    'U' => "U",
+                    'V' => "V",
+                    'W' => "W",
+                    'X' => "X",
+                    'Y' => "Y",
+                    'Z' => "Z",
+                    _ => "Key",
+                };
+            }
+            "Key"
+        }
+    }
+}
+
 pub const PODCAST_DEVICE_DEFAULT: &str = "default";
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -362,6 +507,8 @@ pub struct AppSettings {
     pub rss_quick_copy_mode: RssQuickCopyMode,
     #[serde(default = "default_true")]
     pub announce_unread_rss_podcast_items: bool,
+    #[serde(default)]
+    pub shortcuts: ShortcutSettings,
     pub spellcheck_enabled: bool,
     pub spellcheck_language_mode: SpellcheckLanguageMode,
     pub spellcheck_fixed_language: String,
@@ -568,6 +715,7 @@ impl Default for AppSettings {
             podcast_delete_confirm_mode: PodcastDeleteConfirmMode::Both,
             rss_quick_copy_mode: RssQuickCopyMode::Title,
             announce_unread_rss_podcast_items: true,
+            shortcuts: ShortcutSettings::default(),
             spellcheck_enabled: false,
             spellcheck_language_mode: SpellcheckLanguageMode::FollowEditorLanguage,
             spellcheck_fixed_language: "en-US".to_string(),

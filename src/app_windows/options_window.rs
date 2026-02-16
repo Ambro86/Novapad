@@ -5582,6 +5582,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     let old_spellcheck_enabled = settings.spellcheck_enabled;
     let old_spellcheck_mode = settings.spellcheck_language_mode;
     let old_spellcheck_fixed_language = settings.spellcheck_fixed_language.clone();
+    let old_shortcuts = settings.shortcuts.clone();
     settings.shortcuts = with_options_state(hwnd, |state| state.shortcut_draft.clone())
         .unwrap_or_else(ShortcutSettings::default);
     let res = with_state(parent, |state| {
@@ -6160,7 +6161,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         update_window_title(parent);
     }
 
-    if old_language != new_language {
+    if old_language != new_language || old_shortcuts != settings.shortcuts {
         rebuild_menus(parent);
     }
     if old_marker_position != settings.modified_marker_position {

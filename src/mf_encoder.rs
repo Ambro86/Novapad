@@ -246,6 +246,8 @@ impl Mp3StreamWriter {
     }
 }
 
+// Kept for compatibility fallback paths; may be unused when MP3 always uses FFmpeg.
+#[allow(dead_code)]
 fn read_wav_data_info(path: &Path) -> Result<(u64, u32, i16), String> {
     let mut file = File::open(path).map_err(|e| e.to_string())?;
     let mut riff_header = [0u8; 12];
@@ -277,6 +279,8 @@ fn read_wav_data_info(path: &Path) -> Result<(u64, u32, i16), String> {
     Err("WAV data chunk not found".to_string())
 }
 
+// Kept for compatibility fallback paths; may be unused when MP3 always uses FFmpeg.
+#[allow(dead_code)]
 pub fn encode_wav_to_mp3<F>(
     wav_path: &Path,
     mp3_path: &Path,
@@ -314,6 +318,8 @@ where
     )
 }
 
+// Kept for compatibility fallback paths; may be unused when MP3 always uses FFmpeg.
+#[allow(dead_code)]
 pub fn encode_wav_to_audio<F>(
     wav_path: &Path,
     output_path: &Path,
@@ -326,6 +332,8 @@ where
     encode_wav_to_audio_progress(wav_path, output_path, bitrate_kbps, progress, None)
 }
 
+// Kept for compatibility fallback paths; may be unused when MP3 always uses FFmpeg.
+#[allow(dead_code)]
 pub fn encode_wav_to_audio_progress<F>(
     wav_path: &Path,
     output_path: &Path,

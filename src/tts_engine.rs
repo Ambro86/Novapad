@@ -1902,11 +1902,19 @@ fn finish_time_split_part(
             |_| {},
         )
     } else {
-        crate::mf_encoder::encode_wav_to_mp3(
+        let settings = crate::ffmpeg_export::ConvertAudioSettings {
+            format: crate::ffmpeg_export::ConvertAudioFormat::Mp3,
+            quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(
+                options.audiobook_bitrate_kbps,
+            ),
+        };
+        let mut progress = |_p: u32| {};
+        crate::ffmpeg_export::convert_audio_file(
             &wav_path,
             part_output,
-            options.audiobook_bitrate_kbps,
-            |_| {},
+            &settings,
+            None,
+            Some(&mut progress),
         )
     };
     if let Err(e) = std::fs::remove_file(&wav_path) {
@@ -1915,13 +1923,13 @@ fn finish_time_split_part(
             e
         ));
     }
-    res.map_err(|e| {
-        if e.contains("Media Foundation") {
-            i18n::tr(options.language, "sapi5.mf_not_available")
-        } else {
-            i18n::tr_f(options.language, "sapi5.mf_error", &[("err", &e)])
-        }
-    })?;
+    if let Err(e) = res {
+        return Err(i18n::tr_f(
+            options.language,
+            "sapi5.mf_error",
+            &[("err", &e)],
+        ));
+    }
     Ok(())
 }
 
@@ -4430,12 +4438,19 @@ fn run_sapi4_parallel_part(
                     // AAC/M4B must be joined as WAV first and then encoded as a whole.
                     if is_mp3 {
                         let encoded_sub = sub_output.with_extension("mp3");
-                        let _com_guard = crate::com_guard::ComGuard::new_mta();
-                        if let Err(e) = crate::mf_encoder::encode_wav_to_audio(
+                        let ff_settings = crate::ffmpeg_export::ConvertAudioSettings {
+                            format: crate::ffmpeg_export::ConvertAudioFormat::Mp3,
+                            quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(
+                                mp3_bitrate_kbps,
+                            ),
+                        };
+                        let mut ff_progress = |_p: u32| {};
+                        if let Err(e) = crate::ffmpeg_export::convert_audio_file(
                             &sub_output,
                             &encoded_sub,
-                            mp3_bitrate_kbps,
-                            |_| {},
+                            &ff_settings,
+                            None,
+                            Some(&mut ff_progress),
                         ) {
                             std::fs::remove_file(&sub_output).ok();
                             tx.send(Err(format!("Parallel audio encode failed: {}", e)))
@@ -4958,22 +4973,242 @@ fn merge_and_finalize_sapi4_audio(
                 |_| {},
             )
         } else {
-            crate::mf_encoder::encode_wav_to_mp3(
+            let settings = crate::ffmpeg_export::ConvertAudioSettings {
+                format: crate::ffmpeg_export::ConvertAudioFormat::Mp3,
+                quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(
+                    options.audiobook_bitrate_kbps,
+                ),
+            };
+            let mut progress = |_p: u32| {};
+            crate::ffmpeg_export::convert_audio_file(
                 &final_wav,
                 output,
-                options.audiobook_bitrate_kbps,
-                |_| {},
+                &settings,
+                None,
+                Some(&mut progress),
             )
         };
         std::fs::remove_file(&final_wav).ok();
-        res.map_err(|e| {
-            if e.contains("Media Foundation") {
-                i18n::tr(language, "sapi5.mf_not_available")
-            } else {
-                i18n::tr_f(language, "sapi5.mf_error", &[("err", &e)])
-            }
-        })?;
+        if let Err(e) = res {
+            return Err(i18n::tr_f(language, "sapi5.mf_error", &[("err", &e)]));
+        }
     }
+    Ok(())
+}
+
+fn run_sapi5_parallel_part(
+    chunks: &[String],
+    global_progress: &mut usize,
+    options: &AudiobookCommonOptions,
+) -> Result<(), String> {
+    if chunks.is_empty() {
+        return Ok(());
+    }
+
+    let extension = options
+        .output
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    if extension != "mp3" {
+        return Err("SAPI5 parallel mode supports MP3 output only".to_string());
+    }
+
+    let temp_dir = options
+        .output
+        .parent()
+        .unwrap_or(Path::new("."))
+        .join(format!(
+            "sapi5_tmp_{}",
+            options
+                .output
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("part")
+        ));
+    std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
+
+    let chunks_count = chunks.len();
+    let worker_count = chunks_count.min(
+        std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4)
+            .clamp(2, 12),
+    );
+    let chunks_per_sub = chunks_count.div_ceil(worker_count.max(1));
+
+    // Important: we split by chunk boundaries only; chunks are already sentence-safe upstream.
+    let mut internal_parts: Vec<(Vec<String>, PathBuf)> = Vec::new();
+    for i in 0..worker_count {
+        let s = i * chunks_per_sub;
+        let e = std::cmp::min(s + chunks_per_sub, chunks_count);
+        if s >= e {
+            break;
+        }
+        let sub_chunks = chunks[s..e].to_vec();
+        let sub_output = temp_dir.join(format!("sub_{}.mp3", i));
+        internal_parts.push((sub_chunks, sub_output));
+    }
+    let expected_parts = internal_parts.len();
+
+    let progress_counter = Arc::new(std::sync::atomic::AtomicUsize::new(*global_progress));
+    let (tx, rx) = std::sync::mpsc::channel::<Result<PathBuf, String>>();
+    let parts_shared = Arc::new(Mutex::new(internal_parts.into_iter()));
+    let mut handles = Vec::new();
+
+    for _ in 0..worker_count {
+        let tx = tx.clone();
+        let parts_shared = parts_shared.clone();
+        let progress_counter = progress_counter.clone();
+        let cancel_token = options.cancel.clone();
+        let progress_hwnd = options.progress_hwnd;
+        let voice = options.voice.to_string();
+        let language = options.language;
+        let rate = options.rate;
+        let pitch = options.pitch;
+        let volume = options.volume;
+        let bitrate = options.audiobook_bitrate_kbps;
+
+        let handle = std::thread::spawn(move || {
+            loop {
+                let part = {
+                    let mut guard = parts_shared.lock().unwrap_or_else(|e| e.into_inner());
+                    guard.next()
+                };
+                let Some((sub_chunks, sub_output)) = part else {
+                    break;
+                };
+
+                if cancel_token.load(Ordering::Relaxed) {
+                    let _ignored = tx.send(Err("Cancelled".to_string()));
+                    break;
+                }
+
+                let res = crate::sapi5_engine::speak_sapi_to_file(
+                    crate::sapi5_engine::SapiExportOptions {
+                        chunks: &sub_chunks,
+                        voice_name: &voice,
+                        output_path: &sub_output,
+                        language,
+                        rate,
+                        pitch,
+                        volume,
+                        audiobook_bitrate_kbps: bitrate,
+                        cancel: cancel_token.clone(),
+                    },
+                    |_| {
+                        let current = progress_counter.fetch_add(1, Ordering::SeqCst) + 1;
+                        if progress_hwnd.0 != 0 {
+                            unsafe {
+                                if let Err(e) = PostMessageW(
+                                    progress_hwnd,
+                                    crate::WM_UPDATE_PROGRESS,
+                                    WPARAM(current),
+                                    LPARAM(0),
+                                ) {
+                                    crate::log_debug(&format!(
+                                        "Failed to post WM_UPDATE_PROGRESS: {}",
+                                        e
+                                    ));
+                                }
+                            }
+                        }
+                    },
+                );
+
+                match res {
+                    Ok(()) => {
+                        let _ignored = tx.send(Ok(sub_output));
+                    }
+                    Err(e) => {
+                        if let Err(rem_err) = std::fs::remove_file(&sub_output) {
+                            crate::log_debug(&format!(
+                                "Failed to remove SAPI5 subpart after error: {}",
+                                rem_err
+                            ));
+                        }
+                        let _ignored = tx.send(Err(e));
+                        break;
+                    }
+                }
+            }
+        });
+        handles.push(handle);
+    }
+
+    {
+        let _tx = tx;
+    }
+
+    let mut produced_files: Vec<PathBuf> = Vec::new();
+    let mut error: Option<String> = None;
+    for res in rx {
+        match res {
+            Ok(path) => produced_files.push(path),
+            Err(e) => {
+                if error.is_none() {
+                    error = Some(e);
+                }
+            }
+        }
+    }
+    for h in handles {
+        if let Err(e) = h.join() {
+            crate::log_debug(&format!("SAPI5 parallel worker join error: {:?}", e));
+        }
+    }
+
+    if error.is_some() || options.cancel.load(Ordering::Relaxed) {
+        if let Err(e) = std::fs::remove_dir_all(&temp_dir) {
+            crate::log_debug(&format!("Failed to remove SAPI5 temp dir: {}", e));
+        }
+        let msg = if let Some(e) = error {
+            e
+        } else {
+            "Cancelled".to_string()
+        };
+        return Err(if msg == "Cancelled" {
+            cancelled_message(options.language)
+        } else {
+            msg
+        });
+    }
+
+    if produced_files.len() != expected_parts {
+        if let Err(e) = std::fs::remove_dir_all(&temp_dir) {
+            crate::log_debug(&format!("Failed to remove SAPI5 temp dir: {}", e));
+        }
+        return Err(format!(
+            "SAPI5 parallel integrity check failed: expected {} parts, got {}",
+            expected_parts,
+            produced_files.len()
+        ));
+    }
+
+    produced_files.sort_by_key(|p: &PathBuf| {
+        let name = p.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+        parse_sapi4_part_index(name)
+    });
+
+    for file in &produced_files {
+        let size = std::fs::metadata(file).map_err(|e| e.to_string())?.len();
+        if size == 0 {
+            if let Err(e) = std::fs::remove_dir_all(&temp_dir) {
+                crate::log_debug(&format!("Failed to remove SAPI5 temp dir: {}", e));
+            }
+            return Err(format!(
+                "SAPI5 parallel integrity check failed: empty chunk output {:?}",
+                file
+            ));
+        }
+    }
+
+    merge_and_finalize_sapi4_mp3(&produced_files, options.output, options.language)?;
+    if let Err(e) = std::fs::remove_dir_all(&temp_dir) {
+        crate::log_debug(&format!("Failed to remove SAPI5 temp dir: {}", e));
+    }
+    *global_progress = progress_counter.load(Ordering::SeqCst);
     Ok(())
 }
 
@@ -5031,6 +5266,22 @@ fn run_split_sapi_audiobook(
             .unwrap_or("")
             .to_lowercase();
         let is_aac = extension == "m4b" || extension == "m4a" || extension == "mp4";
+        if extension == "mp3" {
+            let part_options = AudiobookCommonOptions {
+                voice: options.voice,
+                output: &part_output,
+                progress_hwnd: options.progress_hwnd,
+                cancel: options.cancel.clone(),
+                language: options.language,
+                audiobook_bitrate_kbps: options.audiobook_bitrate_kbps,
+                rate: options.rate,
+                pitch: options.pitch,
+                volume: options.volume,
+                sapi4_threads: options.sapi4_threads,
+            };
+            run_sapi5_parallel_part(part_chunks, &mut current_global_progress, &part_options)?;
+            continue;
+        }
         let actual_output = if is_aac {
             part_output.with_extension("wav.tmp")
         } else {
@@ -5129,6 +5380,22 @@ fn run_marker_split_sapi_audiobook(
             .unwrap_or("")
             .to_lowercase();
         let is_aac = extension == "m4b" || extension == "m4a" || extension == "mp4";
+        if extension == "mp3" {
+            let part_options = AudiobookCommonOptions {
+                voice: options.voice,
+                output: &part_output,
+                progress_hwnd: options.progress_hwnd,
+                cancel: options.cancel.clone(),
+                language: options.language,
+                audiobook_bitrate_kbps: options.audiobook_bitrate_kbps,
+                rate: options.rate,
+                pitch: options.pitch,
+                volume: options.volume,
+                sapi4_threads: options.sapi4_threads,
+            };
+            run_sapi5_parallel_part(part_chunks, &mut current_global_progress, &part_options)?;
+            continue;
+        }
         let actual_output = if is_aac {
             part_output.with_extension("wav.tmp")
         } else {
@@ -5346,7 +5613,13 @@ pub(crate) fn run_tts_audiobook_part(
                 options.audiobook_bitrate_kbps,
             ),
         };
-        let mut ffmpeg_progress = |_p: u32| {};
+        let mut last_convert_pct = u32::MAX;
+        let mut ffmpeg_progress = |p: u32| {
+            let pct = (p / 100).min(100);
+            if pct != last_convert_pct {
+                last_convert_pct = pct;
+            }
+        };
         let reencode_result = crate::ffmpeg_export::convert_audio_file(
             &source_wav,
             options.output,
@@ -5493,11 +5766,19 @@ pub(crate) fn render_mixed_audiobook_part(
         std::fs::remove_file(&actual_output).ok();
         res?;
     } else if is_mp3 {
-        let res = crate::mf_encoder::encode_wav_to_mp3(
+        let settings = crate::ffmpeg_export::ConvertAudioSettings {
+            format: crate::ffmpeg_export::ConvertAudioFormat::Mp3,
+            quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(
+                options.audiobook_bitrate_kbps,
+            ),
+        };
+        let mut progress = |_p: u32| {};
+        let res = crate::ffmpeg_export::convert_audio_file(
             &actual_output,
             output,
-            options.audiobook_bitrate_kbps,
-            |_| {},
+            &settings,
+            None,
+            Some(&mut progress),
         );
         std::fs::remove_file(&actual_output).ok();
         res?;

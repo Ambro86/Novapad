@@ -128,23 +128,6 @@ impl WavWriter {
         Ok(())
     }
 
-    pub fn write_silence_ms(&mut self, duration_ms: u32) -> Result<(), AudioError> {
-        let bytes_per_sample = (self.bits_per_sample / 8) as u32;
-        let samples = self.sample_rate.saturating_mul(duration_ms) / 1000;
-        let total_samples = samples.saturating_mul(self.channels as u32);
-        let byte_count = total_samples.saturating_mul(bytes_per_sample);
-
-        let zeros = vec![0u8; 4096];
-        let mut remaining = byte_count as usize;
-        while remaining > 0 {
-            let chunk = remaining.min(zeros.len());
-            self.file.write_all(&zeros[..chunk])?;
-            remaining -= chunk;
-        }
-        self.data_size = self.data_size.saturating_add(byte_count);
-        Ok(())
-    }
-
     pub fn finalize(&mut self) -> Result<(), AudioError> {
         let riff_size = 36u32.saturating_add(self.data_size);
 
@@ -191,20 +174,6 @@ pub fn get_wav_data_size(path: &Path) -> Result<u32, AudioError> {
     Err(AudioError::InvalidFormat(
         "WAV data chunk not found".to_string(),
     ))
-}
-
-/// Write a simple silence WAV file (utility function)
-pub fn write_silence_file(
-    path: &Path,
-    sample_rate: u32,
-    channels: u16,
-    bits_per_sample: u16,
-    duration_ms: u32,
-) -> Result<(), AudioError> {
-    let mut writer = WavWriter::create(path, sample_rate, channels, bits_per_sample)?;
-    writer.write_silence_ms(duration_ms)?;
-    writer.finalize()?;
-    Ok(())
 }
 
 /// Joins multiple WAV files into a single one

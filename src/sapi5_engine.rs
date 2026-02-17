@@ -5,7 +5,7 @@ use crate::settings::{Language, VoiceInfo};
 use crate::tts_engine::TtsCommand;
 use std::collections::HashSet;
 use std::collections::VecDeque;
-use std::io::Write;
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::path::PathBuf;
@@ -41,6 +41,44 @@ const ONECORE_VOICES_PATH_STR: &str =
 const SAPI_VOICES_PATH_HKCU_STR: &str = r"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Speech\Voices";
 const ONECORE_VOICES_PATH_HKCU_STR: &str =
     r"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Speech_OneCore\Voices";
+static SAPI5_TMP_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
+fn repair_wav_header_sizes_if_needed(path: &Path) -> Result<bool, String> {
+    let file_size = std::fs::metadata(path).map_err(|e| e.to_string())?.len();
+    if file_size < 44 {
+        return Ok(false);
+    }
+
+    let mut file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(path)
+        .map_err(|e| e.to_string())?;
+    let mut header = [0u8; 44];
+    file.read_exact(&mut header).map_err(|e| e.to_string())?;
+
+    // Keep this repair strictly for canonical PCM WAV header layout.
+    if &header[0..4] != b"RIFF" || &header[8..12] != b"WAVE" || &header[36..40] != b"data" {
+        return Ok(false);
+    }
+
+    let data_size = u32::from_le_bytes([header[40], header[41], header[42], header[43]]);
+    if data_size != 0 {
+        return Ok(false);
+    }
+
+    let data_size_u32 = file_size.saturating_sub(44).min(u32::MAX as u64) as u32;
+    let riff_size_u32 = file_size.saturating_sub(8).min(u32::MAX as u64) as u32;
+
+    file.seek(SeekFrom::Start(4)).map_err(|e| e.to_string())?;
+    file.write_all(&riff_size_u32.to_le_bytes())
+        .map_err(|e| e.to_string())?;
+    file.seek(SeekFrom::Start(40)).map_err(|e| e.to_string())?;
+    file.write_all(&data_size_u32.to_le_bytes())
+        .map_err(|e| e.to_string())?;
+    file.flush().map_err(|e| e.to_string())?;
+    Ok(true)
+}
 
 fn select_sapi_bridge_exe() -> Result<PathBuf, String> {
     let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
@@ -814,19 +852,7 @@ fn speak_sapi_to_file_with_voice(
             "SAPI: is_mp3={}, output_path={:?}",
             is_mp3, options.output_path
         ));
-        let wav_path = if is_mp3 {
-            options.output_path.with_extension("wav.tmp")
-        } else {
-            options.output_path.to_path_buf()
-        };
-        crate::log_debug(&format!("SAPI: Target wav_path={:?}", wav_path));
-
         configure_sapi_voice(voice, &options)?;
-
-        let stream: ISpStream = CoCreateInstance(&SpFileStream, None, CLSCTX_ALL)
-            .map_err(|e| format!("Failed to create SpFileStream: {}", e))?;
-
-        let path_wide = to_wide(wav_path.to_str().ok_or("Invalid path")?);
 
         let mut wfx = WAVEFORMATEX::default();
         wfx.wFormatTag = WAVE_FORMAT_PCM as u16;
@@ -837,122 +863,245 @@ fn speak_sapi_to_file_with_voice(
         wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * (wfx.nBlockAlign as u32);
         wfx.cbSize = 0;
 
-        stream
-            .BindToFile(
-                PCWSTR(path_wide.as_ptr()),
-                SPFM_CREATE_ALWAYS,
-                Some(&SPDFID_WAVEFORMATEX),
-                Some(&wfx),
-                0,
-            )
-            .map_err(|e| format!("BindToFile failed: {}", e))?;
-        crate::log_debug("SAPI: bound output file stream.");
+        if is_mp3 {
+            let non_empty_chunks: Vec<(usize, &String)> = options
+                .chunks
+                .iter()
+                .enumerate()
+                .filter(|(_, c)| !c.trim().is_empty())
+                .collect();
 
-        crate::log_debug("SAPI: SetOutput begin.");
-        voice
-            .SetOutput(&stream, true)
-            .map_err(|e| format!("SetOutput failed: {}", e))?;
-        crate::log_debug("SAPI: SetOutput ok.");
+            if non_empty_chunks.is_empty() {
+                let _unused_file =
+                    std::fs::File::create(options.output_path).map_err(|e| e.to_string())?;
+                return Ok(());
+            }
 
-        crate::log_debug(&format!(
-            "SAPI: entering chunk loop. chunks={}",
-            options.chunks.len()
-        ));
-        for (i, chunk) in options.chunks.iter().enumerate() {
-            if options.cancel.load(Ordering::Relaxed) {
+            let temp_root = std::env::temp_dir().join(format!(
+                "sonarpad_sapi5_mp3_{}_{}_{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_millis())
+                    .unwrap_or(0),
+                SAPI5_TMP_SEQ.fetch_add(1, Ordering::Relaxed)
+            ));
+            std::fs::create_dir_all(&temp_root).map_err(|e| e.to_string())?;
+
+            let ff_settings = crate::ffmpeg_export::ConvertAudioSettings {
+                format: crate::ffmpeg_export::ConvertAudioFormat::Mp3,
+                quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(
+                    options.audiobook_bitrate_kbps,
+                ),
+            };
+            let total_parts = non_empty_chunks.len() as u32;
+            let mut converted_parts: Vec<PathBuf> = Vec::with_capacity(non_empty_chunks.len());
+            let mut last_convert_pct = u32::MAX;
+
+            for (part_idx, (chunk_idx, chunk)) in non_empty_chunks.iter().enumerate() {
+                if options.cancel.load(Ordering::Relaxed) {
+                    for p in &converted_parts {
+                        if let Err(e) = std::fs::remove_file(p) {
+                            crate::log_debug(&format!("Failed to remove temp MP3 part: {}", e));
+                        }
+                    }
+                    if let Err(e) = std::fs::remove_dir_all(&temp_root) {
+                        crate::log_debug(&format!("Failed to remove temp SAPI5 folder: {}", e));
+                    }
+                    return Err("Cancelled".to_string());
+                }
+
+                let part_no = part_idx + 1;
+                let part_wav = temp_root.join(format!("part_{:06}.wav", part_no));
+                let part_mp3 = temp_root.join(format!("part_{:06}.mp3", part_no));
+
+                let stream: ISpStream = CoCreateInstance(&SpFileStream, None, CLSCTX_ALL)
+                    .map_err(|e| format!("Failed to create SpFileStream: {}", e))?;
+                let path_wide = to_wide(part_wav.to_str().ok_or("Invalid path")?);
+                let mut bind_ok = false;
+                let mut bind_err = String::new();
+                for attempt in 1..=3 {
+                    match stream.BindToFile(
+                        PCWSTR(path_wide.as_ptr()),
+                        SPFM_CREATE_ALWAYS,
+                        Some(&SPDFID_WAVEFORMATEX),
+                        Some(&wfx),
+                        0,
+                    ) {
+                        Ok(()) => {
+                            bind_ok = true;
+                            break;
+                        }
+                        Err(e) => {
+                            bind_err = e.to_string();
+                            crate::log_debug(&format!(
+                                "SAPI: BindToFile retry {}/3 failed: {}",
+                                attempt, bind_err
+                            ));
+                            std::thread::sleep(Duration::from_millis(25));
+                        }
+                    }
+                }
+                if !bind_ok {
+                    return Err(format!("BindToFile failed: {}", bind_err));
+                }
+
+                voice
+                    .SetOutput(&stream, true)
+                    .map_err(|e| format!("SetOutput failed: {}", e))?;
+
+                crate::log_debug(&format!(
+                    "SAPI: chunk start. idx={} len={}",
+                    *chunk_idx + 1,
+                    chunk.len()
+                ));
+                let ssml = mk_sapi_ssml(chunk, options.rate, options.pitch, options.volume);
+                let chunk_wide = to_wide(&ssml);
+                voice
+                    .Speak(PCWSTR(chunk_wide.as_ptr()), SPF_IS_XML.0 as u32, None)
+                    .map_err(|e| format!("Speak failed: {}", e))?;
+                if let Err(e) = voice.WaitUntilDone(u32::MAX) {
+                    crate::log_debug(&format!("Failed to wait for SAPI5: {}", e));
+                }
                 if let Err(e) = stream.Close() {
                     crate::log_debug(&format!("Failed to close SAPI5 stream: {}", e));
                 }
-                if let Err(e) = std::fs::remove_file(&wav_path) {
-                    crate::log_debug(&format!("Failed to remove SAPI5 temp WAV: {}", e));
-                }
-                return Err("Cancelled".to_string());
-            }
+                crate::log_debug(&format!("SAPI: chunk done. idx={}", *chunk_idx + 1));
 
-            if chunk.trim().is_empty() {
-                continue;
-            }
-            crate::log_debug(&format!(
-                "SAPI: chunk start. idx={} len={}",
-                i + 1,
-                chunk.len()
-            ));
-            let ssml = mk_sapi_ssml(chunk, options.rate, options.pitch, options.volume);
-            let chunk_wide = to_wide(&ssml);
-            voice
-                .Speak(PCWSTR(chunk_wide.as_ptr()), SPF_IS_XML.0 as u32, None)
-                .map_err(|e| format!("Speak failed: {}", e))?;
-            crate::log_debug(&format!("SAPI: chunk done. idx={}", i + 1));
-
-            progress_callback(i + 1);
-        }
-
-        if let Err(e) = voice.WaitUntilDone(u32::MAX) {
-            crate::log_debug(&format!("Failed to wait for SAPI5: {}", e));
-        }
-        crate::log_debug("SAPI: WaitUntilDone ok.");
-        crate::log_debug("SAPI: skipping SetOutput(None) to avoid COM hang.");
-        if let Err(e) = stream.Close() {
-            crate::log_debug(&format!("Failed to close SAPI5 stream: {}", e));
-        }
-        crate::log_debug("SAPI: stream Close ok.");
-        if let Ok(size) = std::fs::metadata(&wav_path).map(|m| m.len()) {
-            crate::log_debug(&format!("SAPI: wav written. size={}", size));
-        }
-
-        if is_mp3 {
-            if let Ok(data_size) = crate::audio_utils::get_wav_data_size(&wav_path)
-                && data_size == 0
-            {
-                crate::log_debug("SAPI: WAV data size is 0, writing silence.");
-                let sample_rate = 44100u32;
-                let channels = 1u16;
-                let bits_per_sample = 16u16;
-                if let Err(e) = crate::audio_utils::write_silence_file(
-                    &wav_path,
-                    sample_rate,
-                    channels,
-                    bits_per_sample,
-                    50,
-                ) {
-                    crate::log_debug(&format!("Failed to write silence file: {}", e));
-                }
-            }
-            if let Ok(size) = std::fs::metadata(&wav_path).map(|m| m.len()) {
-                crate::log_debug(&format!("SAPI: starting MF encode. wav_size={}", size));
-            } else {
-                crate::log_debug("SAPI: starting MF encode.");
-            }
-            match crate::mf_encoder::encode_wav_to_mp3(
-                &wav_path,
-                options.output_path,
-                options.audiobook_bitrate_kbps,
-                |_| {},
-            ) {
-                Ok(()) => {
-                    if let Err(e) = std::fs::remove_file(&wav_path) {
-                        crate::log_debug(&format!("Failed to remove SAPI5 temp WAV: {}", e));
-                    } else {
-                        crate::log_debug("SAPI: temp WAV removed.");
+                match crate::audio_utils::get_wav_data_size(&part_wav) {
+                    Ok(0) => {
+                        crate::log_debug("SAPI: WAV data size is 0, repairing WAV header sizes.");
+                        match repair_wav_header_sizes_if_needed(&part_wav) {
+                            Ok(true) => crate::log_debug("SAPI: WAV header repaired."),
+                            Ok(false) => crate::log_debug(
+                                "SAPI: WAV header repair skipped (layout mismatch).",
+                            ),
+                            Err(e) => {
+                                crate::log_debug(&format!("SAPI: WAV header repair failed: {}", e))
+                            }
+                        }
                     }
+                    Ok(_) => {}
+                    Err(e) => crate::log_debug(&format!("SAPI: get_wav_data_size failed: {}", e)),
                 }
-                Err(e) => {
+
+                let mut ff_progress = |p: u32| {
+                    let base = (part_idx as u32).saturating_mul(10000);
+                    let overall_10000 = (base.saturating_add(p)).saturating_div(total_parts.max(1));
+                    let pct = (overall_10000 / 100).min(100);
+                    if pct != last_convert_pct {
+                        last_convert_pct = pct;
+                    }
+                };
+
+                if let Err(e) = crate::ffmpeg_export::convert_audio_file(
+                    &part_wav,
+                    &part_mp3,
+                    &ff_settings,
+                    None,
+                    Some(&mut ff_progress),
+                ) {
                     let dest_wav = options.output_path.with_extension("wav");
-                    if let Err(e) = std::fs::rename(&wav_path, &dest_wav) {
-                        crate::log_debug(&format!("Failed to rename SAPI5 output: {}", e));
-                    } else {
+                    if let Err(rename_err) = std::fs::rename(&part_wav, &dest_wav) {
                         crate::log_debug(&format!(
-                            "SAPI: MF encode failed, preserved WAV at {:?}",
-                            dest_wav
+                            "Failed to preserve SAPI5 WAV part: {}",
+                            rename_err
                         ));
                     }
-                    let msg = if e.contains("Media Foundation not available") {
-                        mf_not_available_message(options.language)
-                    } else {
-                        mf_error_message(options.language, &e)
-                    };
-                    return Err(msg);
+                    for p in &converted_parts {
+                        if let Err(rem_err) = std::fs::remove_file(p) {
+                            crate::log_debug(&format!(
+                                "Failed to remove temp MP3 part: {}",
+                                rem_err
+                            ));
+                        }
+                    }
+                    if let Err(rem_err) = std::fs::remove_dir_all(&temp_root) {
+                        crate::log_debug(&format!(
+                            "Failed to remove temp SAPI5 folder: {}",
+                            rem_err
+                        ));
+                    }
+                    return Err(mf_error_message(options.language, &e));
                 }
+
+                if let Err(e) = std::fs::remove_file(&part_wav) {
+                    crate::log_debug(&format!("Failed to remove SAPI5 temp WAV: {}", e));
+                }
+
+                converted_parts.push(part_mp3);
+                progress_callback(*chunk_idx + 1);
+            }
+
+            let mut out_file =
+                std::fs::File::create(options.output_path).map_err(|e| e.to_string())?;
+            for path in &converted_parts {
+                let mut in_file = std::fs::File::open(path).map_err(|e| e.to_string())?;
+                std::io::copy(&mut in_file, &mut out_file).map_err(|e| e.to_string())?;
+            }
+
+            for p in &converted_parts {
+                if let Err(e) = std::fs::remove_file(p) {
+                    crate::log_debug(&format!("Failed to remove temp MP3 part: {}", e));
+                }
+            }
+            if let Err(e) = std::fs::remove_dir_all(&temp_root) {
+                crate::log_debug(&format!("Failed to remove temp SAPI5 folder: {}", e));
+            }
+        } else {
+            let wav_path = options.output_path.to_path_buf();
+            crate::log_debug(&format!("SAPI: Target wav_path={:?}", wav_path));
+            let stream: ISpStream = CoCreateInstance(&SpFileStream, None, CLSCTX_ALL)
+                .map_err(|e| format!("Failed to create SpFileStream: {}", e))?;
+            let path_wide = to_wide(wav_path.to_str().ok_or("Invalid path")?);
+            stream
+                .BindToFile(
+                    PCWSTR(path_wide.as_ptr()),
+                    SPFM_CREATE_ALWAYS,
+                    Some(&SPDFID_WAVEFORMATEX),
+                    Some(&wfx),
+                    0,
+                )
+                .map_err(|e| format!("BindToFile failed: {}", e))?;
+            voice
+                .SetOutput(&stream, true)
+                .map_err(|e| format!("SetOutput failed: {}", e))?;
+
+            crate::log_debug(&format!(
+                "SAPI: entering chunk loop. chunks={}",
+                options.chunks.len()
+            ));
+            for (i, chunk) in options.chunks.iter().enumerate() {
+                if options.cancel.load(Ordering::Relaxed) {
+                    if let Err(e) = stream.Close() {
+                        crate::log_debug(&format!("Failed to close SAPI5 stream: {}", e));
+                    }
+                    if let Err(e) = std::fs::remove_file(&wav_path) {
+                        crate::log_debug(&format!("Failed to remove SAPI5 temp WAV: {}", e));
+                    }
+                    return Err("Cancelled".to_string());
+                }
+                if chunk.trim().is_empty() {
+                    continue;
+                }
+                crate::log_debug(&format!(
+                    "SAPI: chunk start. idx={} len={}",
+                    i + 1,
+                    chunk.len()
+                ));
+                let ssml = mk_sapi_ssml(chunk, options.rate, options.pitch, options.volume);
+                let chunk_wide = to_wide(&ssml);
+                voice
+                    .Speak(PCWSTR(chunk_wide.as_ptr()), SPF_IS_XML.0 as u32, None)
+                    .map_err(|e| format!("Speak failed: {}", e))?;
+                crate::log_debug(&format!("SAPI: chunk done. idx={}", i + 1));
+                progress_callback(i + 1);
+            }
+            if let Err(e) = voice.WaitUntilDone(u32::MAX) {
+                crate::log_debug(&format!("Failed to wait for SAPI5: {}", e));
+            }
+            if let Err(e) = stream.Close() {
+                crate::log_debug(&format!("Failed to close SAPI5 stream: {}", e));
             }
         }
 
@@ -986,10 +1135,6 @@ pub fn speak_sapi_to_file_with_sapi_voice(
     progress_callback: impl FnMut(usize),
 ) -> Result<(), String> {
     speak_sapi_to_file_with_voice(&voice.voice, options, progress_callback)
-}
-
-fn mf_not_available_message(language: Language) -> String {
-    i18n::tr(language, "sapi5.mf_not_available")
 }
 
 fn mf_error_message(language: Language, err: &str) -> String {

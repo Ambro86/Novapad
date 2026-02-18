@@ -97,9 +97,9 @@ use windows::Win32::UI::Controls::RichEdit::{
     SCF_SELECTION, TEXTRANGEW,
 };
 use windows::Win32::UI::Controls::{
-    BST_CHECKED, EM_GETMODIFY, EM_SETMODIFY, ICC_TAB_CLASSES, INITCOMMONCONTROLSEX,
-    InitCommonControlsEx, NMHDR, TCM_GETCURSEL, TCN_SELCHANGE, WC_BUTTON, WC_COMBOBOXW, WC_STATIC,
-    WC_TABCONTROLW,
+    BST_CHECKED, EM_GETMODIFY, EM_SETMODIFY, ICC_BAR_CLASSES, ICC_TAB_CLASSES,
+    INITCOMMONCONTROLSEX, InitCommonControlsEx, NMHDR, SB_SETTEXTW, STATUSCLASSNAMEW,
+    TCM_GETCURSEL, TCN_SELCHANGE, WC_BUTTON, WC_COMBOBOXW, WC_STATIC, WC_TABCONTROLW,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_APPS, VK_CONTROL, VK_ESCAPE,
@@ -2438,7 +2438,7 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
         WM_CREATE => {
             let icc = INITCOMMONCONTROLSEX {
                 dwSize: size_of::<INITCOMMONCONTROLSEX>() as u32,
-                dwICC: ICC_TAB_CLASSES,
+                dwICC: ICC_TAB_CLASSES | ICC_BAR_CLASSES,
             };
             InitCommonControlsEx(&icc);
 
@@ -2457,8 +2457,8 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 None,
             );
             let hwnd_status = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_STATIC,
+                Default::default(),
+                STATUSCLASSNAMEW,
                 PCWSTR::null(),
                 WS_CHILD | WS_VISIBLE,
                 0,
@@ -7065,10 +7065,13 @@ pub(crate) unsafe fn update_main_status_bar(hwnd: HWND) {
         "{}. | {}. | Ln {}, Col {}",
         chars_label, words_label, line, col
     );
-    crate::log_if_err!(SetWindowTextW(
+    let label_wide = to_wide(&label);
+    SendMessageW(
         hwnd_status,
-        PCWSTR(to_wide(&label).as_ptr())
-    ));
+        SB_SETTEXTW,
+        WPARAM(0),
+        LPARAM(label_wide.as_ptr() as isize),
+    );
 }
 
 fn build_undo_menu_label(hwnd: HWND, language: Language) -> String {

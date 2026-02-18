@@ -20,7 +20,8 @@ use windows::Win32::System::Threading::{
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::{
     FindWindowW, IDYES, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK, MB_SETFOREGROUND,
-    MB_YESNO, MESSAGEBOX_STYLE, MessageBoxW, PostMessageW, SW_SHOW, WM_CLOSE,
+    MB_YESNO, MESSAGEBOX_STYLE, MessageBoxW, PostMessageW, SW_SHOW, SetForegroundWindow,
+    ShowWindow, WM_CLOSE,
 };
 use windows::core::{HSTRING, PCWSTR};
 
@@ -1129,7 +1130,16 @@ pub(crate) fn run_self_update(args: &[String]) -> Result<i32, String> {
             .current_dir(dir)
             .spawn()
         {
-            Ok(_) => show_update_info(language, UpdateInfo::Completed),
+            Ok(_) => {
+                let owner = wait_for_main_window(std::time::Duration::from_secs(8));
+                if owner.0 != 0 {
+                    unsafe {
+                        ShowWindow(owner, SW_SHOW);
+                        let _ignored = SetForegroundWindow(owner);
+                    }
+                }
+                show_update_info_for_owner(language, UpdateInfo::Completed, owner);
+            }
             Err(err) => {
                 crate::log_if_err!(restore_backup(&current));
                 crate::log_if_err!(remove_update_lock(&current));
@@ -1729,6 +1739,10 @@ pub(crate) fn cleanup_update_temp_on_start() {
 }
 
 fn show_update_info(language: Language, info: UpdateInfo) {
+    show_update_info_for_owner(language, info, HWND(0));
+}
+
+fn show_update_info_for_owner(language: Language, info: UpdateInfo, owner: HWND) {
     let text_key = match info {
         UpdateInfo::NoUpdate => "updater.info.no_update",
         UpdateInfo::NoPending => "updater.info.no_pending",
@@ -1738,11 +1752,24 @@ fn show_update_info(language: Language, info: UpdateInfo) {
     let text = i18n::tr(language, text_key);
     let title = i18n::tr(language, "updater.title");
     show_update_message(
-        HWND(0),
+        owner,
         &text,
         &title,
         MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND,
     );
+}
+
+fn wait_for_main_window(timeout: std::time::Duration) -> HWND {
+    let deadline = std::time::Instant::now() + timeout;
+    while std::time::Instant::now() < deadline {
+        let class_name = to_wide("SonarpadWin32");
+        let hwnd = unsafe { FindWindowW(PCWSTR(class_name.as_ptr()), PCWSTR::null()) };
+        if hwnd.0 != 0 {
+            return hwnd;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    HWND(0)
 }
 
 fn show_update_message(

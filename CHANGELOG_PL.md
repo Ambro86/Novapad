@@ -6,7 +6,7 @@ Ulepszenia
 • Dodano dostępny pasek postępu podczas aktualizacji programu, aby czytniki ekranu mogły na bieżąco śledzić postęp pobierania.
 • Dodano nowy, dyskretny pasek stanu w głównym oknie z liczbą znaków, słów oraz pozycją wiersz/kolumna (np. "Znaki (ze spacjami): 11. | Słowa: 2. | Ln 1, Col 12"), bez zakłócania fokusu NVDA.
 • Dodano nową opcję w menu Widok dla zawijania wierszy, aby można było szybko włączać/wyłączać zawijanie bez otwierania Opcji.
-• Dodano w Edycja > Tekst nowe akcje zwiększania/zmniejszania wcięcia ze skrótami Ctrl+Tab (wcięcie) i Ctrl+Shift+Tab (usuń wcięcie), ponieważ gdy włączone jest „Pokaż głosy w edytorze”, klawisz Tab jest zarezerwowany do nawigacji w panelu głosów.
+• Dodano w Edycja > Tekst nowe akcje zwiększania/zmniejszania wcięcia ze skrótami Ctrl+Shift+. (wcięcie) i Ctrl+Shift+, (usuń wcięcie), ponieważ gdy włączone jest „Pokaż głosy w edytorze”, klawisz Tab jest zarezerwowany do nawigacji w panelu głosów.
 • Dodano lokalizowane wyświetlanie daty i godziny w artykułach RSS oraz odcinkach podcastów, z formatem dopasowanym do języka interfejsu.
 • Dodano nową akcję w menu kontekstowym RSS do udostępniania wybranego artykułu przez e-mail.
 • Dodano szczegółowe opcje potwierdzania usuwania w Opcje > RSS i podcasty: dla RSS (kanał/artykuł/oba/brak) i dla podcastów (podcast/odcinek/oba/brak).

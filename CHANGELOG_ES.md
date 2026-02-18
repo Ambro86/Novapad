@@ -6,7 +6,7 @@ Mejoras
 • Añadida una barra de progreso accesible durante las actualizaciones del programa, para que los lectores de pantalla puedan seguir en tiempo real el avance de la descarga.
 • Añadida una nueva barra de estado discreta en la ventana principal con recuento de caracteres, palabras y posición línea/columna (por ejemplo: "Caracteres (con espacios): 11. | Palabras: 2. | Ln 1, Col 12"), sin interferir con el foco de NVDA.
 • Añadida una nueva opción en el menú Ver para Ajuste de línea, que permite activar o desactivar rápidamente el ajuste sin abrir Opciones.
-• Añadidas en Editar > Texto nuevas acciones para aumentar/reducir sangría, con atajos Ctrl+Tab (indentar) y Ctrl+Shift+Tab (desindentar), porque cuando “Mostrar voces en el editor” está activo la tecla Tab queda reservada para navegar el panel de voces.
+• Añadidas en Editar > Texto nuevas acciones para aumentar/reducir sangría, con atajos Ctrl+Shift+. (indentar) y Ctrl+Shift+, (desindentar), porque cuando “Mostrar voces en el editor” está activo la tecla Tab queda reservada para navegar el panel de voces.
 • Añadida la visualización localizada de fecha y hora en artículos RSS y episodios de podcast, con formato adaptado al idioma de la interfaz.
 • Añadida en el menú contextual RSS una nueva acción para compartir por correo electrónico el artículo seleccionado.
 • Añadidas opciones granulares de confirmación de borrado en Opciones > RSS y podcast: para RSS (feed/artículo/ambos/ninguno) y para Podcasts (podcast/episodio/ambos/ninguno).

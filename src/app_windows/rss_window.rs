@@ -3728,6 +3728,10 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                         hitem.0, appended
                     ));
                     set_source_unread(hwnd, hitem, true);
+                } else {
+                    // Feed opened/refreshed with no newly appended items: clear "new items" flag.
+                    // This keeps source-level status aligned with real incoming updates.
+                    set_source_unread(hwnd, hitem, false);
                 }
             } else {
                 loop {

@@ -32,8 +32,8 @@ use windows::Win32::UI::Controls::{
     TVN_SELCHANGEDW, TVSORTCB,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    EnableWindow, GetFocus, GetKeyState, SetFocus, VK_APPS, VK_CONTROL, VK_DELETE, VK_ESCAPE,
-    VK_F10, VK_LEFT, VK_MENU, VK_RETURN, VK_RIGHT, VK_SHIFT, VK_TAB,
+    EnableWindow, GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_APPS, VK_CONTROL, VK_DELETE,
+    VK_ESCAPE, VK_F10, VK_LEFT, VK_MENU, VK_RETURN, VK_RIGHT, VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, CBS_DROPDOWNLIST, CHILDID_SELF,
@@ -89,7 +89,6 @@ const WM_PODCAST_MARK_EPISODE_PLAYED_UI: u32 =
     windows::Win32::UI::WindowsAndMessaging::WM_USER + 317;
 
 const EM_SETSEL: u32 = 0x00B1;
-const EM_SCROLLCARET: u32 = 0x00B7;
 
 const ID_CTX_UPDATE: usize = 13001;
 const ID_CTX_REMOVE: usize = 13002;
@@ -4003,6 +4002,7 @@ unsafe fn force_focus_editor_on_parent(parent: HWND) {
         return;
     }
     SetForegroundWindow(parent);
+    SetActiveWindow(parent);
     SendMessageW(parent, WM_SETFOCUS, WPARAM(0), LPARAM(0));
     if crate::get_active_edit(parent).is_none() {
         SendMessageW(
@@ -4014,8 +4014,6 @@ unsafe fn force_focus_editor_on_parent(parent: HWND) {
     }
     if let Some(hwnd_edit) = crate::get_active_edit(parent) {
         SetFocus(hwnd_edit);
-        SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(0));
-        SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
         SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
         SendMessageW(
             parent,
@@ -4023,9 +4021,8 @@ unsafe fn force_focus_editor_on_parent(parent: HWND) {
             WPARAM(hwnd_edit.0 as usize),
             LPARAM(1),
         );
+        // Re-assert focus after dialog navigation to help screen readers settle on the edit control.
         SetFocus(hwnd_edit);
-        SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(0));
-        SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
         SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
         NotifyWinEvent(
             EVENT_OBJECT_FOCUS,

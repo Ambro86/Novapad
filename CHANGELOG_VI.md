@@ -13,6 +13,7 @@ Cải tiến
 • Đã thêm sao chép nhanh RSS có thể cấu hình bằng Ctrl+C (Tùy chọn > RSS và podcast): sao chép tiêu đề, URL, nội dung bài viết hoặc tất cả.
 • Đã hợp nhất luồng RSS: “Thêm nguồn” giờ chấp nhận cả URL feed và từ khóa (tự động tạo feed Google News), không cần chức năng tìm kiếm riêng.
 • Khi nhấn Ctrl+A, chương trình giờ sẽ thông báo hoàn tất thao tác để phản hồi rõ ràng hơn cho trình đọc màn hình.
+• Đã thêm Shift+F3 cho "Tìm trước đó" trong menu Chỉnh sửa, bổ sung cho F3 "Tìm tiếp theo".
 • Đã cải thiện thông báo thay thế với dạng số ít/số nhiều chính xác (ví dụ: “1 mục đã thay thế” và “2 mục đã thay thế”).
 • Đã thêm trong cửa sổ từ điển tùy chọn chọn ngôn ngữ tra cứu, mặc định là Auto (ngôn ngữ giao diện) và có thể chọn thủ công.
 • Đã thêm tab Phím tắt mới trong Tùy chọn để tùy chỉnh tổ hợp phím, kèm phát hiện xung đột và cảnh báo khi một phím tắt đã được gán cho hành động khác.

@@ -13,6 +13,7 @@ Miglioramenti
 • Aggiunta la copia rapida RSS configurabile con Ctrl+C (Opzioni > RSS e podcast): copia titolo, URL, contenuto articolo oppure tutto insieme.
 • Unificato il flusso RSS: “Aggiungi Fonte” ora accetta sia URL feed sia parole chiave (con generazione automatica del feed Google News), senza necessità di una ricerca separata.
 • Premendo Ctrl+A ora viene annunciato il completamento dell'azione per un feedback più chiaro con gli screen reader.
+• Aggiunta la scorciatoia Shift+F3 per "Trova precedente" nel menu Modifica, in aggiunta a F3 "Trova successivo".
 • Migliorato il messaggio di conferma delle sostituzioni con gestione corretta di singolare/plurale (es. “1 sostituzione” vs “2 sostituzioni”).
 • Aggiunta nella finestra Dizionario la selezione della lingua di ricerca, con predefinito Auto (lingua interfaccia) e possibilità di override manuale.
 • Aggiunta una nuova scheda Scorciatoie nelle Opzioni per personalizzare i tasti rapidi, con rilevamento dei conflitti e avviso quando una combinazione è già assegnata a un'altra azione.

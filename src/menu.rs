@@ -56,6 +56,7 @@ pub const IDM_EDIT_AUDIOBOOK_SELECTION: usize = 2026;
 pub const IDM_EDIT_AUTO_FORMAT_TTS: usize = 2027;
 pub const IDM_EDIT_INDENT: usize = 2028;
 pub const IDM_EDIT_OUTDENT: usize = 2029;
+pub const IDM_EDIT_FIND_PREVIOUS: usize = 2030;
 pub const IDM_SPELLCHECK_SUGGESTION_BASE: usize = 12000;
 pub const IDM_SPELLCHECK_SUGGESTION_MAX: usize = 10;
 pub const IDM_SPELLCHECK_ADD_TO_DICTIONARY: usize = 12100;
@@ -198,6 +199,7 @@ pub struct MenuLabels {
     pub edit_select_all: String,
     pub edit_find: String,
     pub edit_find_next: String,
+    pub edit_find_previous: String,
     pub edit_replace: String,
     pub edit_find_in_files: String,
     pub edit_prev_spelling_error: String,
@@ -299,6 +301,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         edit_select_all: i18n::tr(language, "edit.select_all"),
         edit_find: i18n::tr(language, "edit.find"),
         edit_find_next: i18n::tr(language, "edit.find_next"),
+        edit_find_previous: i18n::tr(language, "edit.find_previous"),
         edit_replace: i18n::tr(language, "edit.replace"),
         edit_find_in_files: i18n::tr(language, "edit.find_in_files"),
         edit_prev_spelling_error: i18n::tr(language, "edit.prev_spelling_error"),
@@ -729,6 +732,12 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         MF_STRING,
         IDM_EDIT_FIND_NEXT,
         &labels.edit_find_next,
+    );
+    append_menu_string(
+        edit_menu,
+        MF_STRING,
+        IDM_EDIT_FIND_PREVIOUS,
+        &labels.edit_find_previous,
     );
     append_menu_string(edit_menu, MF_STRING, IDM_EDIT_REPLACE, &labels.edit_replace);
     append_menu_string(

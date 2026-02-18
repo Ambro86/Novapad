@@ -3881,6 +3881,11 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                     search::find_next_from_state(hwnd);
                     LRESULT(0)
                 }
+                IDM_EDIT_FIND_PREVIOUS => {
+                    log_debug("Menu: Find previous");
+                    search::find_previous_from_state(hwnd);
+                    LRESULT(0)
+                }
                 IDM_EDIT_REPLACE => {
                     log_debug("Menu: Replace");
                     search::open_replace_dialog(hwnd);
@@ -7861,6 +7866,11 @@ unsafe fn create_accelerators() -> HACCEL {
             fVirt: FVIRTKEY,
             key: VK_F3.0,
             cmd: IDM_EDIT_FIND_NEXT as u16,
+        },
+        ACCEL {
+            fVirt: virt_shift_only,
+            key: VK_F3.0,
+            cmd: IDM_EDIT_FIND_PREVIOUS as u16,
         },
         ACCEL {
             fVirt: virt,

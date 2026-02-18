@@ -13,6 +13,7 @@ Mejoras
 • Añadida copia rápida RSS configurable con Ctrl+C (Opciones > RSS y podcast): copiar titular, URL, contenido del artículo o todo junto.
 • Unificado el flujo de RSS: “Añadir fuente” ahora acepta tanto URL de feed como palabras clave (generando automáticamente el feed de Google News), sin necesidad de una búsqueda separada.
 • Al pulsar Ctrl+A ahora se anuncia la finalización de la acción para ofrecer una respuesta más clara en lectores de pantalla.
+• Añadido Shift+F3 para "Buscar anterior" en el menú Editar, junto a F3 "Buscar siguiente".
 • Mejorado el mensaje de reemplazo con singular/plural correcto (por ejemplo, “1 reemplazo realizado” frente a “2 reemplazos realizados”).
 • Añadida en la ventana del diccionario la selección de idioma de búsqueda, con valor predeterminado Auto (idioma de la interfaz) y opción de ajuste manual.
 • Añadida una nueva pestaña de Atajos en Opciones para personalizar combinaciones de teclas, con detección de conflictos y aviso cuando un atajo ya está asignado a otra acción.

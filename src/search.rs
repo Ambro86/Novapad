@@ -249,6 +249,46 @@ pub unsafe fn find_next_from_state(hwnd: HWND) {
     }
 }
 
+pub unsafe fn find_previous_from_state(hwnd: HWND) {
+    let (search, mut flags, language): (String, FINDREPLACE_FLAGS, Language) =
+        with_state(hwnd, |state| {
+            let len = state
+                .find_text
+                .iter()
+                .position(|&c| c == 0)
+                .unwrap_or(state.find_text.len());
+            let search = String::from_utf16_lossy(&state.find_text[..len]);
+            (search, state.last_find_flags, state.settings.language)
+        })
+        .unwrap_or((String::new(), FINDREPLACE_FLAGS(0), Language::default()));
+    if search.is_empty() {
+        open_find_dialog(hwnd);
+        return;
+    }
+    let Some(hwnd_edit) = get_active_edit(hwnd) else {
+        return;
+    };
+    flags &= !FR_DOWN;
+    let options = get_find_options(hwnd);
+    if !find_next(
+        hwnd,
+        hwnd_edit,
+        &search,
+        flags,
+        options.wrap_around,
+        &options,
+    ) {
+        let message = to_wide(&text_not_found_message(language));
+        let title = to_wide(&find_title(language));
+        crate::message_box_modal(
+            hwnd,
+            PCWSTR(message.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            MB_OK | MB_ICONWARNING,
+        );
+    }
+}
+
 fn extract_find_flags(flags: FINDREPLACE_FLAGS, options: &FindOptions) -> FINDREPLACE_FLAGS {
     let mut out = FINDREPLACE_FLAGS(0);
     if options.match_case {

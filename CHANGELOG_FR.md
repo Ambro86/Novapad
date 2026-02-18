@@ -13,6 +13,7 @@ Améliorations
 • Ajout d'une copie rapide RSS configurable avec Ctrl+C (Options > RSS et podcast) : copier le titre, l'URL, le contenu de l'article ou l'ensemble.
 • Unification du flux RSS : « Ajouter une source » accepte désormais à la fois les URL de flux et les mots-clés (avec génération automatique d'un flux Google News), sans recherche séparée.
 • Un appui sur Ctrl+A annonce désormais la fin de l'action pour un retour plus clair avec les lecteurs d'écran.
+• Ajout de Shift+F3 pour "Rechercher le précédent" dans le menu Édition, en complément de F3 "Rechercher le suivant".
 • Amélioration du message de remplacement avec une gestion correcte du singulier/pluriel (par ex. « 1 remplacement effectué » vs « 2 remplacements effectués »).
 • Ajout dans la fenêtre du dictionnaire d'une sélection de langue de recherche, avec Auto (langue de l'interface) par défaut et possibilité de choix manuel.
 • Ajout d'un nouvel onglet Raccourcis dans les Options pour personnaliser les combinaisons de touches, avec détection des conflits et avertissement lorsqu'un raccourci est déjà attribué à une autre action.

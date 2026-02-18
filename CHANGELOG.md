@@ -13,6 +13,7 @@ Improvements
 • Added configurable quick RSS copy with Ctrl+C (Options > RSS and podcast): copy title, URL, article content, or all combined.
 • Unified RSS source creation: “Add source” now accepts both direct feed URLs and keyword input (auto-generating Google News RSS), replacing the need for a separate keyword-search action.
 • Pressing Ctrl+A now announces completion for clearer screen-reader feedback.
+• Added Shift+F3 for "Find previous" in the Edit menu, complementing F3 "Find next".
 • Improved replace feedback messages with proper singular/plural forms (e.g. “1 replacement made” vs “2 replacements made”).
 • Added dictionary lookup language selection in the dictionary window, with default Auto (interface language) and optional manual override.
 • Added a new Shortcuts tab in Options to customize key bindings, with conflict detection that warns when a shortcut is already assigned to another action.

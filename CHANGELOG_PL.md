@@ -13,6 +13,7 @@ Ulepszenia
 • Dodano konfigurowalne szybkie kopiowanie RSS skrótem Ctrl+C (Opcje > RSS i podcasty): kopiowanie tytułu, URL, treści artykułu albo wszystkiego razem.
 • Ujednolicono przepływ RSS: „Dodaj źródło” obsługuje teraz zarówno adresy URL feedów, jak i słowa kluczowe (z automatycznym generowaniem feedu Google News), bez osobnej funkcji wyszukiwania.
 • Po naciśnięciu Ctrl+A program ogłasza teraz zakończenie akcji, co daje czytelniejszą informację zwrotną dla czytników ekranu.
+• Dodano Shift+F3 dla „Znajdź poprzedni” w menu Edycja, jako uzupełnienie F3 „Znajdź następny”.
 • Ulepszono komunikat po zamianie, dodając poprawne formy liczby pojedynczej i mnogiej (np. „1 zamianę” vs „2 zamiany”).
 • Dodano w oknie słownika wybór języka wyszukiwania, z domyślną opcją Auto (język interfejsu) oraz możliwością ręcznego wyboru.
 • Dodano nową kartę Skróty w Opcjach do personalizacji skrótów klawiaturowych, z wykrywaniem konfliktów i ostrzeżeniem, gdy skrót jest już przypisany do innej akcji.

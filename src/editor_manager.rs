@@ -3450,8 +3450,11 @@ pub unsafe fn layout_children(hwnd: HWND) {
             state.voice_panel_visible,
             state.voice_favorites_visible,
             state.settings.tts_engine,
+            state.settings.tts_only_multilingual,
             state.voice_label_engine,
             state.voice_combo_engine,
+            state.voice_label_language,
+            state.voice_combo_language,
             state.voice_label_voice,
             state.voice_combo_voice,
             state.voice_button_insert_tag,
@@ -3481,8 +3484,11 @@ pub unsafe fn layout_children(hwnd: HWND) {
         voice_panel_visible,
         favorites_visible,
         tts_engine,
+        tts_only_multilingual,
         label_engine,
         combo_engine,
+        label_language,
+        combo_language,
         label_voice,
         combo_voice,
         button_insert_tag,
@@ -3538,10 +3544,16 @@ pub unsafe fn layout_children(hwnd: HWND) {
     if panel_visible {
         let show_multilingual =
             voice_panel_visible && matches!(tts_engine, crate::settings::TtsEngine::Edge);
+        let show_language = voice_panel_visible
+            && matches!(tts_engine, crate::settings::TtsEngine::Edge)
+            && !tts_only_multilingual;
         let mut rows = 0;
         if voice_panel_visible {
             rows += 5;
             if show_multilingual {
+                rows += 1;
+            }
+            if show_language {
                 rows += 1;
             }
         }
@@ -3565,6 +3577,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
         let row5_top = row4_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
         let row6_top = row5_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
         let row7_top = row6_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
+        let row8_top = row7_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
 
         if voice_panel_visible {
             crate::log_if_err!(MoveWindow(
@@ -3584,9 +3597,25 @@ pub unsafe fn layout_children(hwnd: HWND) {
                 true,
             ));
             crate::log_if_err!(MoveWindow(
-                label_voice,
+                label_language,
                 label_x,
                 row2_top,
+                VOICE_PANEL_LABEL_WIDTH,
+                VOICE_PANEL_ROW_HEIGHT,
+                true,
+            ));
+            crate::log_if_err!(MoveWindow(
+                combo_language,
+                combo_x,
+                row2_top - 2,
+                combo_width,
+                VOICE_PANEL_COMBO_HEIGHT,
+                true,
+            ));
+            crate::log_if_err!(MoveWindow(
+                label_voice,
+                label_x,
+                if show_language { row3_top } else { row2_top },
                 VOICE_PANEL_LABEL_WIDTH,
                 VOICE_PANEL_ROW_HEIGHT,
                 true,
@@ -3594,7 +3623,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
             crate::log_if_err!(MoveWindow(
                 combo_voice,
                 combo_x,
-                row2_top - 2,
+                (if show_language { row3_top } else { row2_top }) - 2,
                 combo_voice_width,
                 VOICE_PANEL_COMBO_HEIGHT,
                 true,
@@ -3602,7 +3631,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
             crate::log_if_err!(MoveWindow(
                 button_insert_tag,
                 button_voice_x,
-                row2_top,
+                if show_language { row3_top } else { row2_top },
                 VOICE_PANEL_BUTTON_WIDTH,
                 VOICE_PANEL_ROW_HEIGHT,
                 true,
@@ -3610,7 +3639,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
             crate::log_if_err!(MoveWindow(
                 label_speed,
                 label_x,
-                row3_top,
+                if show_language { row4_top } else { row3_top },
                 VOICE_PANEL_LABEL_WIDTH,
                 VOICE_PANEL_ROW_HEIGHT,
                 true,
@@ -3618,7 +3647,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
             crate::log_if_err!(MoveWindow(
                 combo_speed,
                 combo_x,
-                row3_top - 2,
+                (if show_language { row4_top } else { row3_top }) - 2,
                 combo_width,
                 VOICE_PANEL_COMBO_HEIGHT,
                 true,
@@ -3626,7 +3655,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
             crate::log_if_err!(MoveWindow(
                 edit_speed,
                 combo_x,
-                row3_top - 2,
+                (if show_language { row4_top } else { row3_top }) - 2,
                 combo_width,
                 VOICE_PANEL_COMBO_HEIGHT,
                 true,
@@ -3634,7 +3663,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
             crate::log_if_err!(MoveWindow(
                 label_pitch,
                 label_x,
-                row4_top,
+                if show_language { row5_top } else { row4_top },
                 VOICE_PANEL_LABEL_WIDTH,
                 VOICE_PANEL_ROW_HEIGHT,
                 true,
@@ -3642,7 +3671,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
             crate::log_if_err!(MoveWindow(
                 combo_pitch,
                 combo_x,
-                row4_top - 2,
+                (if show_language { row5_top } else { row4_top }) - 2,
                 combo_width,
                 VOICE_PANEL_COMBO_HEIGHT,
                 true,
@@ -3650,7 +3679,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
             crate::log_if_err!(MoveWindow(
                 edit_pitch,
                 combo_x,
-                row4_top - 2,
+                (if show_language { row5_top } else { row4_top }) - 2,
                 combo_width,
                 VOICE_PANEL_COMBO_HEIGHT,
                 true,
@@ -3658,7 +3687,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
             crate::log_if_err!(MoveWindow(
                 label_volume,
                 label_x,
-                row5_top,
+                if show_language { row6_top } else { row5_top },
                 VOICE_PANEL_LABEL_WIDTH,
                 VOICE_PANEL_ROW_HEIGHT,
                 true,
@@ -3666,7 +3695,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
             crate::log_if_err!(MoveWindow(
                 combo_volume,
                 combo_x,
-                row5_top - 2,
+                (if show_language { row6_top } else { row5_top }) - 2,
                 combo_width,
                 VOICE_PANEL_COMBO_HEIGHT,
                 true,
@@ -3674,25 +3703,27 @@ pub unsafe fn layout_children(hwnd: HWND) {
             crate::log_if_err!(MoveWindow(
                 edit_volume,
                 combo_x,
-                row5_top - 2,
+                (if show_language { row6_top } else { row5_top }) - 2,
                 combo_width,
                 VOICE_PANEL_COMBO_HEIGHT,
                 true,
             ));
             if show_multilingual {
+                let checkbox_row = if show_language { row7_top } else { row6_top };
                 crate::log_if_err!(MoveWindow(
                     checkbox_multilingual,
                     label_x,
-                    row6_top,
+                    checkbox_row,
                     combo_width + VOICE_PANEL_LABEL_WIDTH + VOICE_PANEL_PADDING,
                     VOICE_PANEL_ROW_HEIGHT,
                     true,
                 ));
                 if favorites_visible {
+                    let favorites_row = if show_language { row8_top } else { row7_top };
                     crate::log_if_err!(MoveWindow(
                         label_favorites,
                         label_x,
-                        row7_top,
+                        favorites_row,
                         VOICE_PANEL_LABEL_WIDTH,
                         VOICE_PANEL_ROW_HEIGHT,
                         true,
@@ -3700,7 +3731,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
                     crate::log_if_err!(MoveWindow(
                         combo_favorites,
                         combo_x,
-                        row7_top - 2,
+                        favorites_row - 2,
                         combo_width,
                         VOICE_PANEL_COMBO_HEIGHT,
                         true,

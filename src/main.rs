@@ -183,6 +183,7 @@ const SPELLCHECK_HIGHLIGHT_DEBOUNCE_MS: u32 = 100;
 const PDF_OCR_PROMPT_TIMEOUT_COPYDATA_SECS: u64 = 30;
 const COPYDATA_OPEN_FILE: usize = 1;
 const VOICE_PANEL_ID_ENGINE: usize = 21001;
+const VOICE_PANEL_ID_LANGUAGE: usize = 21012;
 const VOICE_PANEL_ID_VOICE: usize = 21002;
 const VOICE_PANEL_ID_MULTILINGUAL: usize = 21003;
 const VOICE_PANEL_ID_FAVORITES: usize = 21004;
@@ -1614,6 +1615,9 @@ pub(crate) struct AppState {
     voice_panel_visible: bool,
     voice_label_engine: HWND,
     voice_combo_engine: HWND,
+    voice_label_language: HWND,
+    voice_combo_language: HWND,
+    voice_language_codes: Vec<String>,
     voice_label_voice: HWND,
     voice_combo_voice: HWND,
     voice_button_insert_tag: HWND,
@@ -2506,6 +2510,34 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 HINSTANCE(0),
                 None,
             );
+            let label_language = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(empty_label.as_ptr()),
+                WS_CHILD,
+                0,
+                0,
+                0,
+                0,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_language = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                0,
+                0,
+                0,
+                140,
+                hwnd,
+                HMENU(VOICE_PANEL_ID_LANGUAGE as isize),
+                HINSTANCE(0),
+                None,
+            );
             let label_voice = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -2733,6 +2765,8 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
             for control in [
                 label_engine,
                 combo_engine,
+                label_language,
+                combo_language,
                 label_voice,
                 combo_voice,
                 button_insert_tag,
@@ -2833,6 +2867,9 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 voice_panel_visible: false,
                 voice_label_engine: label_engine,
                 voice_combo_engine: combo_engine,
+                voice_label_language: label_language,
+                voice_combo_language: combo_language,
+                voice_language_codes: Vec::new(),
                 voice_label_voice: label_voice,
                 voice_combo_voice: combo_voice,
                 voice_button_insert_tag: button_insert_tag,
@@ -3615,6 +3652,10 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
             }
             if cmd_id == VOICE_PANEL_ID_ENGINE && u32::from(notification) == CBN_SELCHANGE {
                 handle_voice_panel_engine_change(hwnd);
+                return LRESULT(0);
+            }
+            if cmd_id == VOICE_PANEL_ID_LANGUAGE && u32::from(notification) == CBN_SELCHANGE {
+                refresh_voice_panel_voice_list(hwnd);
                 return LRESULT(0);
             }
             if cmd_id == VOICE_PANEL_ID_VOICE && u32::from(notification) == CBN_SELCHANGE {
@@ -4411,6 +4452,7 @@ unsafe fn is_tts_active(hwnd: HWND) -> bool {
 
 struct VoicePanelLabels {
     label_engine: String,
+    label_language: String,
     label_voice: String,
     label_speed: String,
     label_pitch: String,
@@ -4430,6 +4472,7 @@ struct VoicePanelLabels {
 fn voice_panel_labels(language: Language) -> VoicePanelLabels {
     VoicePanelLabels {
         label_engine: i18n::tr(language, "voice_panel.label_engine"),
+        label_language: i18n::tr(language, "voice_panel.label_language"),
         label_voice: i18n::tr(language, "voice_panel.label_voice"),
         label_speed: i18n::tr(language, "tts_tuning.label_speed"),
         label_pitch: i18n::tr(language, "tts_tuning.label_pitch"),
@@ -4445,6 +4488,68 @@ fn voice_panel_labels(language: Language) -> VoicePanelLabels {
         add_favorite: i18n::tr(language, "voice_panel.add_favorite"),
         remove_favorite: i18n::tr(language, "voice_panel.remove_favorite"),
     }
+}
+
+fn voice_locale_language_code(locale: &str) -> Option<String> {
+    let base = locale.split(['-', '_']).next()?.trim();
+    if base.is_empty() {
+        return None;
+    }
+    Some(base.to_ascii_lowercase())
+}
+
+fn localized_voice_language_name(language: Language, code: &str) -> String {
+    let key = format!("voice.lang.{}", code);
+    let localized = i18n::tr(language, &key);
+    if localized != key {
+        return localized;
+    }
+    let from_i18n = |key: &str| i18n::tr(language, key);
+    match code {
+        "it" => from_i18n("options.lang.it"),
+        "en" => from_i18n("options.lang.en"),
+        "es" => from_i18n("options.lang.es"),
+        "pt" => from_i18n("options.lang.pt"),
+        "sv" => from_i18n("options.lang.sv"),
+        "vi" => from_i18n("options.lang.vi"),
+        "cs" => from_i18n("options.lang.cs"),
+        "pl" => from_i18n("options.lang.pl"),
+        "fr" => from_i18n("options.lang.fr"),
+        "sr" => {
+            let value = from_i18n("options.lang.sr");
+            if value == "options.lang.sr" {
+                "Serbian".to_string()
+            } else {
+                value
+            }
+        }
+        "uk" => {
+            let value = from_i18n("options.lang.uk");
+            if value == "options.lang.uk" {
+                "Ukrainian".to_string()
+            } else {
+                value
+            }
+        }
+        "de" => match language {
+            Language::Italian => "Tedesco".to_string(),
+            Language::Spanish => "Aleman".to_string(),
+            Language::Portuguese => "Alemao".to_string(),
+            Language::French => "Allemand".to_string(),
+            _ => "German".to_string(),
+        },
+        _ => code.to_ascii_uppercase(),
+    }
+}
+
+fn collect_voice_language_codes(voices: &[VoiceInfo]) -> Vec<String> {
+    let mut codes: Vec<String> = voices
+        .iter()
+        .filter_map(|v| voice_locale_language_code(&v.locale))
+        .collect();
+    codes.sort();
+    codes.dedup();
+    codes
 }
 
 const TTS_RATE_MIN: i32 = -100;
@@ -4662,6 +4767,8 @@ unsafe fn apply_ui_font(hwnd: HWND, face_name: String) {
             state.hwnd_tab,
             state.voice_label_engine,
             state.voice_combo_engine,
+            state.voice_label_language,
+            state.voice_combo_language,
             state.voice_label_voice,
             state.voice_combo_voice,
             state.voice_button_insert_tag,
@@ -4827,6 +4934,8 @@ unsafe fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: b
     let (
         label_engine,
         combo_engine,
+        label_language,
+        combo_language,
         label_voice,
         combo_voice,
         button_insert_tag,
@@ -4848,6 +4957,8 @@ unsafe fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: b
         (
             state.voice_label_engine,
             state.voice_combo_engine,
+            state.voice_label_language,
+            state.voice_combo_language,
             state.voice_label_voice,
             state.voice_combo_voice,
             state.voice_button_insert_tag,
@@ -4872,6 +4983,8 @@ unsafe fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: b
     for control in [
         label_engine,
         combo_engine,
+        label_language,
+        combo_language,
         label_voice,
         combo_voice,
         button_insert_tag,
@@ -4956,6 +5069,8 @@ pub(crate) unsafe fn refresh_voice_panel(hwnd: HWND) {
         voice_visible,
         label_engine,
         combo_engine,
+        label_language,
+        combo_language,
         label_voice,
         combo_voice,
         button_insert_tag,
@@ -4977,6 +5092,8 @@ pub(crate) unsafe fn refresh_voice_panel(hwnd: HWND) {
             state.voice_panel_visible,
             state.voice_label_engine,
             state.voice_combo_engine,
+            state.voice_label_language,
+            state.voice_combo_language,
             state.voice_label_voice,
             state.voice_combo_voice,
             state.voice_button_insert_tag,
@@ -5006,6 +5123,7 @@ pub(crate) unsafe fn refresh_voice_panel(hwnd: HWND) {
     let labels = voice_panel_labels(settings.language);
     if voice_visible {
         let label_engine_wide = to_wide(&labels.label_engine);
+        let label_language_wide = to_wide(&labels.label_language);
         let label_voice_wide = to_wide(&labels.label_voice);
         let label_speed_wide = to_wide(&labels.label_speed);
         let label_pitch_wide = to_wide(&labels.label_pitch);
@@ -5013,6 +5131,10 @@ pub(crate) unsafe fn refresh_voice_panel(hwnd: HWND) {
         crate::log_if_err!(SetWindowTextW(
             label_engine,
             PCWSTR(label_engine_wide.as_ptr())
+        ));
+        crate::log_if_err!(SetWindowTextW(
+            label_language,
+            PCWSTR(label_language_wide.as_ptr())
         ));
         crate::log_if_err!(SetWindowTextW(
             label_voice,
@@ -5089,6 +5211,24 @@ pub(crate) unsafe fn refresh_voice_panel(hwnd: HWND) {
         EnableWindow(checkbox_multilingual, is_edge);
         let multi_show = if is_edge { SW_SHOW } else { SW_HIDE };
         ShowWindow(checkbox_multilingual, multi_show);
+        let show_language_combo = is_edge && !settings.tts_only_multilingual;
+        ShowWindow(
+            label_language,
+            if show_language_combo {
+                SW_SHOW
+            } else {
+                SW_HIDE
+            },
+        );
+        ShowWindow(
+            combo_language,
+            if show_language_combo {
+                SW_SHOW
+            } else {
+                SW_HIDE
+            },
+        );
+        EnableWindow(combo_language, show_language_combo);
     }
 
     if voice_visible {
@@ -5245,11 +5385,71 @@ pub(crate) unsafe fn refresh_voice_panel(hwnd: HWND) {
                 TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
             })
             .unwrap_or_default();
+        let mut language_filter: Option<String> = None;
+        let show_language_combo =
+            matches!(settings.tts_engine, TtsEngine::Edge) && !settings.tts_only_multilingual;
+        if show_language_combo {
+            let previous_selection = with_state(hwnd, |state| {
+                let sel = SendMessageW(combo_language, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+                if sel >= 0 {
+                    state.voice_language_codes.get(sel as usize).cloned()
+                } else {
+                    None
+                }
+            })
+            .flatten();
+            let mut codes = collect_voice_language_codes(&voices);
+            if !codes.is_empty() {
+                let selected_from_voice = voices
+                    .iter()
+                    .find(|v| v.short_name == settings.tts_voice)
+                    .and_then(|v| voice_locale_language_code(&v.locale));
+                let selected_code = previous_selection
+                    .filter(|code| codes.contains(code))
+                    .or(selected_from_voice.filter(|code| codes.contains(code)))
+                    .unwrap_or_else(|| codes[0].clone());
+                SendMessageW(combo_language, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+                let mut selected_index: Option<usize> = None;
+                for (idx, code) in codes.iter().enumerate() {
+                    let label = localized_voice_language_name(settings.language, code);
+                    let added = SendMessageW(
+                        combo_language,
+                        CB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(to_wide(&label).as_ptr() as isize),
+                    )
+                    .0;
+                    if added >= 0 && *code == selected_code {
+                        selected_index = Some(idx);
+                    }
+                }
+                SendMessageW(
+                    combo_language,
+                    CB_SETCURSEL,
+                    WPARAM(selected_index.unwrap_or(0)),
+                    LPARAM(0),
+                );
+                language_filter = Some(selected_code);
+            }
+            if with_state(hwnd, |state| {
+                state.voice_language_codes = std::mem::take(&mut codes);
+            })
+            .is_none()
+            {
+                log_debug("Failed to update voice language codes");
+            }
+        } else {
+            SendMessageW(combo_language, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+            if with_state(hwnd, |state| state.voice_language_codes.clear()).is_none() {
+                log_debug("Failed to clear voice language codes");
+            }
+        }
         populate_voice_panel_combo(
             combo_voice,
             &voices,
             &settings.tts_voice,
             settings.tts_only_multilingual,
+            language_filter.as_deref(),
             &labels.voices_empty,
         );
     }
@@ -5265,16 +5465,19 @@ pub(crate) unsafe fn refresh_voice_panel(hwnd: HWND) {
 }
 
 unsafe fn refresh_voice_panel_voice_list(hwnd: HWND) {
-    let (voice_visible, combo_voice, checkbox_multilingual) = match with_state(hwnd, |state| {
-        (
-            state.voice_panel_visible,
-            state.voice_combo_voice,
-            state.voice_checkbox_multilingual,
-        )
-    }) {
-        Some(values) => values,
-        None => return,
-    };
+    let (voice_visible, combo_voice, checkbox_multilingual, label_language, combo_language) =
+        match with_state(hwnd, |state| {
+            (
+                state.voice_panel_visible,
+                state.voice_combo_voice,
+                state.voice_checkbox_multilingual,
+                state.voice_label_language,
+                state.voice_combo_language,
+            )
+        }) {
+            Some(values) => values,
+            None => return,
+        };
     if !voice_visible || combo_voice.0 == 0 {
         return;
     }
@@ -5295,6 +5498,24 @@ unsafe fn refresh_voice_panel_voice_list(hwnd: HWND) {
     EnableWindow(checkbox_multilingual, is_edge);
     let multi_show = if is_edge { SW_SHOW } else { SW_HIDE };
     ShowWindow(checkbox_multilingual, multi_show);
+    let show_language_combo = is_edge && !settings.tts_only_multilingual;
+    ShowWindow(
+        label_language,
+        if show_language_combo {
+            SW_SHOW
+        } else {
+            SW_HIDE
+        },
+    );
+    ShowWindow(
+        combo_language,
+        if show_language_combo {
+            SW_SHOW
+        } else {
+            SW_HIDE
+        },
+    );
+    EnableWindow(combo_language, show_language_combo);
 
     let voices: Vec<crate::settings::VoiceInfo> =
         with_state(hwnd, |state| match settings.tts_engine {
@@ -5303,11 +5524,69 @@ unsafe fn refresh_voice_panel_voice_list(hwnd: HWND) {
             TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
         })
         .unwrap_or_default();
+    let mut language_filter: Option<String> = None;
+    if show_language_combo {
+        let previous_selection = with_state(hwnd, |state| {
+            let sel = SendMessageW(combo_language, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+            if sel >= 0 {
+                state.voice_language_codes.get(sel as usize).cloned()
+            } else {
+                None
+            }
+        })
+        .flatten();
+        let mut codes = collect_voice_language_codes(&voices);
+        if !codes.is_empty() {
+            let selected_from_voice = voices
+                .iter()
+                .find(|v| v.short_name == settings.tts_voice)
+                .and_then(|v| voice_locale_language_code(&v.locale));
+            let selected_code = previous_selection
+                .filter(|code| codes.contains(code))
+                .or(selected_from_voice.filter(|code| codes.contains(code)))
+                .unwrap_or_else(|| codes[0].clone());
+            SendMessageW(combo_language, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+            let mut selected_index: Option<usize> = None;
+            for (idx, code) in codes.iter().enumerate() {
+                let label = localized_voice_language_name(settings.language, code);
+                let added = SendMessageW(
+                    combo_language,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(to_wide(&label).as_ptr() as isize),
+                )
+                .0;
+                if added >= 0 && *code == selected_code {
+                    selected_index = Some(idx);
+                }
+            }
+            SendMessageW(
+                combo_language,
+                CB_SETCURSEL,
+                WPARAM(selected_index.unwrap_or(0)),
+                LPARAM(0),
+            );
+            language_filter = Some(selected_code);
+        }
+        if with_state(hwnd, |state| {
+            state.voice_language_codes = std::mem::take(&mut codes);
+        })
+        .is_none()
+        {
+            log_debug("Failed to update voice language codes");
+        }
+    } else {
+        SendMessageW(combo_language, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        if with_state(hwnd, |state| state.voice_language_codes.clear()).is_none() {
+            log_debug("Failed to clear voice language codes");
+        }
+    }
     populate_voice_panel_combo(
         combo_voice,
         &voices,
         &settings.tts_voice,
         settings.tts_only_multilingual,
+        language_filter.as_deref(),
         &labels.voices_empty,
     );
 }
@@ -5317,6 +5596,7 @@ unsafe fn clear_voice_labels_if_hidden(hwnd: HWND) {
         voice_visible,
         favorites_visible,
         label_engine,
+        label_language,
         label_voice,
         label_speed,
         label_pitch,
@@ -5328,6 +5608,7 @@ unsafe fn clear_voice_labels_if_hidden(hwnd: HWND) {
             state.voice_panel_visible,
             state.voice_favorites_visible,
             state.voice_label_engine,
+            state.voice_label_language,
             state.voice_label_voice,
             state.voice_label_speed,
             state.voice_label_pitch,
@@ -5344,6 +5625,7 @@ unsafe fn clear_voice_labels_if_hidden(hwnd: HWND) {
     }
     let empty = to_wide("");
     crate::log_if_err!(SetWindowTextW(label_engine, PCWSTR(empty.as_ptr())));
+    crate::log_if_err!(SetWindowTextW(label_language, PCWSTR(empty.as_ptr())));
     crate::log_if_err!(SetWindowTextW(label_voice, PCWSTR(empty.as_ptr())));
     crate::log_if_err!(SetWindowTextW(label_speed, PCWSTR(empty.as_ptr())));
     crate::log_if_err!(SetWindowTextW(label_pitch, PCWSTR(empty.as_ptr())));
@@ -5360,6 +5642,7 @@ unsafe fn populate_voice_panel_combo(
     voices: &[VoiceInfo],
     selected: &str,
     only_multilingual: bool,
+    language_filter: Option<&str>,
     empty_label: &str,
 ) {
     SendMessageW(combo_voice, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
@@ -5379,6 +5662,14 @@ unsafe fn populate_voice_panel_combo(
     for (voice_index, voice) in voices.iter().enumerate() {
         if only_multilingual && !voice.is_multilingual {
             continue;
+        }
+        if let Some(filter) = language_filter {
+            let Some(code) = voice_locale_language_code(&voice.locale) else {
+                continue;
+            };
+            if code != filter {
+                continue;
+            }
         }
         let label = format!("{} ({})", voice.short_name, voice.locale);
         let idx = SendMessageW(
@@ -7157,6 +7448,7 @@ unsafe fn is_focus_in_voice_panel(hwnd: HWND) -> bool {
         let is_match =
             |ctrl: HWND| ctrl.0 != 0 && (focus == ctrl || IsChild(ctrl, focus).as_bool());
         is_match(state.voice_combo_engine)
+            || is_match(state.voice_combo_language)
             || is_match(state.voice_combo_voice)
             || is_match(state.voice_button_insert_tag)
             || is_match(state.voice_combo_speed)
@@ -7175,6 +7467,7 @@ unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
     let (
         visible,
         combo_engine,
+        combo_language,
         combo_voice,
         button_insert_tag,
         combo_speed,
@@ -7187,12 +7480,14 @@ unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
         combo_favorites,
         favorites_visible,
         is_edge,
+        only_multilingual,
         manual_tuning,
         hwnd_tab,
     ) = match with_state(hwnd, |state| {
         (
             state.voice_panel_visible,
             state.voice_combo_engine,
+            state.voice_combo_language,
             state.voice_combo_voice,
             state.voice_button_insert_tag,
             state.voice_combo_speed,
@@ -7205,6 +7500,7 @@ unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
             state.voice_combo_favorites,
             state.voice_favorites_visible,
             matches!(state.settings.tts_engine, TtsEngine::Edge),
+            state.settings.tts_only_multilingual,
             state.settings.tts_manual_tuning,
             state.hwnd_tab,
         )
@@ -7221,6 +7517,8 @@ unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
     }
     let focus = if raw_focus == combo_engine || IsChild(combo_engine, raw_focus).as_bool() {
         combo_engine
+    } else if raw_focus == combo_language || IsChild(combo_language, raw_focus).as_bool() {
+        combo_language
     } else if raw_focus == combo_voice || IsChild(combo_voice, raw_focus).as_bool() {
         combo_voice
     } else if raw_focus == button_insert_tag || IsChild(button_insert_tag, raw_focus).as_bool() {
@@ -7237,6 +7535,7 @@ unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
         raw_focus
     };
     let is_combo_focus = focus == combo_engine
+        || (is_edge && !only_multilingual && focus == combo_language)
         || focus == combo_voice
         || focus == button_insert_tag
         || (!manual_tuning && focus == combo_speed)
@@ -7278,6 +7577,7 @@ unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
     };
     if focus != hwnd_edit
         && focus != combo_engine
+        && focus != combo_language
         && focus != combo_voice
         && focus != button_insert_tag
         && focus != speed_control
@@ -7306,6 +7606,9 @@ unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
     let mut order = Vec::new();
     if visible {
         order.push(combo_engine);
+        if is_edge && !only_multilingual {
+            order.push(combo_language);
+        }
         order.push(combo_voice);
         order.push(button_insert_tag);
         order.push(speed_control);

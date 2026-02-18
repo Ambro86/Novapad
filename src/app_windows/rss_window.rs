@@ -481,6 +481,30 @@ fn percent_encode(input: &str) -> String {
     url::form_urlencoded::byte_serialize(input.as_bytes()).collect()
 }
 
+fn decode_mail_text_component(input: &str) -> String {
+    let bytes = input.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0usize;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let h1 = bytes[i + 1];
+            let h2 = bytes[i + 2];
+            let v1 = (h1 as char).to_digit(16);
+            let v2 = (h2 as char).to_digit(16);
+            if let (Some(a), Some(b)) = (v1, v2) {
+                out.push(((a << 4) | b) as u8);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(if bytes[i] == b'+' { b' ' } else { bytes[i] });
+        i += 1;
+    }
+    decode_basic_html_entities(&String::from_utf8_lossy(&out))
+        .trim()
+        .to_string()
+}
+
 fn tr_or(language: crate::settings::Language, key: &str, fallback: &str) -> String {
     let translated = i18n::tr(language, key);
     if translated == key {
@@ -5129,6 +5153,10 @@ unsafe fn handle_article_action(hwnd: HWND, action: ArticleAction) {
         return;
     }
     let title = item.title.trim().to_string();
+    let language = with_rss_state(hwnd, |s| {
+        with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
+    })
+    .unwrap_or_default();
     let share_url = match action {
         ArticleAction::OpenInBrowser => {
             log_debug(&format!(
@@ -5179,15 +5207,18 @@ unsafe fn handle_article_action(hwnd: HWND, action: ArticleAction) {
                 "rss_action kind=article action=share_email url=\"{}\"",
                 url
             ));
-            let subject = if title.is_empty() {
-                "RSS article".to_string()
+            let subject_raw = if title.is_empty() {
+                i18n::tr(language, "rss.email.default_subject")
             } else {
                 title.clone()
             };
+            let subject = decode_mail_text_component(&subject_raw);
+            let intro = i18n::tr(language, "rss.email.body_intro");
+            let body = format!("\r\n{}\r\n{}\r\n", intro, url);
             format!(
                 "mailto:?subject={}&body={}",
                 percent_encode(&subject),
-                percent_encode(&url)
+                percent_encode(&body)
             )
         }
     };

@@ -284,7 +284,7 @@ fn rss_source_display_title(
         source.title.clone()
     };
     if announce_unread && source.unread {
-        format!("{}{}", i18n::tr(language, "rss.unread_prefix"), base_title)
+        format!("{base_title}{}", i18n::tr(language, "rss.unread_suffix"))
     } else {
         base_title
     }
@@ -297,19 +297,16 @@ fn rss_item_display_title(
     item_unread: bool,
     pub_date: Option<i64>,
 ) -> String {
-    let ts_suffix = format_timestamp_for_language(pub_date, language)
-        .map(|ts| format!(". {ts}"))
-        .unwrap_or_default();
+    let mut out = format!(
+        "{title}{}",
+        format_timestamp_for_language(pub_date, language)
+            .map(|ts| format!(". {ts}"))
+            .unwrap_or_default()
+    );
     if announce_unread && item_unread {
-        format!(
-            "{}{}{}",
-            i18n::tr(language, "rss.item_unread_prefix"),
-            title,
-            ts_suffix
-        )
-    } else {
-        format!("{title}{ts_suffix}")
+        out.push_str(&i18n::tr(language, "rss.item_unread_suffix"));
     }
+    out
 }
 
 fn format_timestamp_for_language(

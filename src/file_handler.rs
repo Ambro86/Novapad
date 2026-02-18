@@ -950,7 +950,10 @@ pub fn read_epub_text(path: &Path, language: Language) -> Result<String, String>
             let cleaned = html_to_text(&text);
             for line in cleaned.lines() {
                 let trimmed = line.trim();
-                if trimmed.is_empty() || (trimmed.starts_with("part") && trimmed.len() <= 12) {
+                if trimmed.is_empty()
+                    || is_epub_metadata_noise_line(trimmed)
+                    || (trimmed.starts_with("part") && trimmed.len() <= 12)
+                {
                     continue;
                 }
                 full_text.push_str(trimmed);
@@ -990,7 +993,10 @@ pub fn read_epub_chapters(path: &Path, language: Language) -> Result<Vec<String>
             let mut lines: Vec<String> = Vec::new();
             for line in cleaned.lines() {
                 let trimmed = line.trim();
-                if trimmed.is_empty() || (trimmed.starts_with("part") && trimmed.len() <= 12) {
+                if trimmed.is_empty()
+                    || is_epub_metadata_noise_line(trimmed)
+                    || (trimmed.starts_with("part") && trimmed.len() <= 12)
+                {
                     continue;
                 }
                 lines.push(trimmed.to_string());
@@ -1017,6 +1023,12 @@ pub fn read_epub_chapters(path: &Path, language: Language) -> Result<Vec<String>
     }
 
     Ok(chapters)
+}
+
+fn is_epub_metadata_noise_line(line: &str) -> bool {
+    let normalized = line.split_whitespace().collect::<Vec<_>>().join(" ");
+    normalized.eq_ignore_ascii_case("epub r1.0")
+        || normalized.eq_ignore_ascii_case("epub base r2.1")
 }
 
 pub fn read_html_text(path: &Path, language: Language) -> Result<(String, TextEncoding), String> {
@@ -1129,7 +1141,10 @@ fn html_to_text(html: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{Language, WINDOWS_1250, WINDOWS_1252, choose_ansi_decoding, html_to_text};
+    use super::{
+        Language, WINDOWS_1250, WINDOWS_1252, choose_ansi_decoding, html_to_text,
+        is_epub_metadata_noise_line,
+    };
 
     #[test]
     fn html_to_text_keeps_text_after_inline_comment() {
@@ -1145,6 +1160,15 @@ mod tests {
         let out = html_to_text(html);
         assert!(out.contains("First"));
         assert!(out.contains("Second"));
+    }
+
+    #[test]
+    fn epub_metadata_noise_lines_are_detected() {
+        assert!(is_epub_metadata_noise_line("ePub r1.0"));
+        assert!(is_epub_metadata_noise_line("ePub base r2.1"));
+        assert!(is_epub_metadata_noise_line("  EPUB   BASE   R2.1  "));
+        assert!(!is_epub_metadata_noise_line("ePub base r2.2"));
+        assert!(!is_epub_metadata_noise_line("Capitolo 1"));
     }
 
     #[test]

@@ -20,6 +20,7 @@ Cải tiến
 • Đã cải thiện chọn giọng Microsoft trong cả Tùy chọn > Giọng nói và bảng giọng nói của trình soạn thảo: thêm combobox ngôn ngữ đã bản địa hóa để lọc giọng theo ngôn ngữ, đồng thời vẫn giữ chế độ “chỉ giọng đa ngôn ngữ” là một danh sách duy nhất không chia theo ngôn ngữ (ẩn combobox ngôn ngữ khi chế độ này bật).
 • Đã cải thiện nhãn Hoàn tác: mục Chỉnh sửa > Hoàn tác giờ hiển thị hành động sẽ được hoàn tác (ví dụ chỉnh sửa văn bản, thêm/bỏ comment dòng hoặc chèn thẻ giọng nói), đồng thời vẫn bị vô hiệu khi không có gì để hoàn tác.
 Sửa lỗi
+• Đã sửa "Lưu tất cả" (Ctrl+Shift+S): giờ đây tất cả tài liệu đang mở đã chỉnh sửa đều được phát hiện ổn định (kể cả tab mới/chưa lưu), và Lưu tất cả sẽ lưu đúng từng tài liệu, mở "Lưu thành" khi cần.
 • Đã sửa thứ tự bài RSS từ Google News: khi có ngày xuất bản, bài viết giờ được hiển thị từ mới nhất đến cũ nhất.
 • Đã sửa gán nhãn cho NVDA trong cửa sổ từ điển: ô tìm kiếm và combobox ngôn ngữ giờ đọc đúng nhãn.
 • Đã sửa điều hướng bàn phím trong cửa sổ Thuộc tính RSS/Podcast: Tab/Shift+Tab giờ đi tới nút OK, Enter kích hoạt OK, Esc đóng an toàn và tiêu điểm quay lại đúng danh sách RSS/Podcast.

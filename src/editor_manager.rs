@@ -3866,15 +3866,13 @@ pub unsafe fn save_current_document_as(hwnd: HWND) -> bool {
 }
 
 pub unsafe fn save_all_documents(hwnd: HWND) -> bool {
-    let dirty_indices = with_state(hwnd, |state| {
-        state
-            .docs
-            .iter()
-            .enumerate()
-            .filter_map(|(i, doc)| if doc.dirty { Some(i) } else { None })
-            .collect::<Vec<_>>()
-    })
-    .unwrap_or_default();
+    let doc_count = with_state(hwnd, |state| state.docs.len()).unwrap_or(0);
+    let mut dirty_indices = Vec::new();
+    for index in 0..doc_count {
+        if sync_dirty_from_edit(hwnd, index) {
+            dirty_indices.push(index);
+        }
+    }
     for index in dirty_indices {
         if !save_document_at(hwnd, index, false) {
             return false;

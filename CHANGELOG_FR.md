@@ -20,6 +20,7 @@ Améliorations
 • Amélioration de la sélection des voix Microsoft dans Options > Voix et dans le panneau des voix de l’éditeur : ajout d’une liste de langue localisée pour filtrer les voix par langue, tout en conservant le mode « voix multilingues uniquement » comme une liste unique non séparée par langue (liste de langue masquée lorsqu’il est activé).
 • Amélioration de l'étiquette Annuler : l'entrée Édition > Annuler affiche désormais l'action qui sera annulée (par exemple édition de texte, commenter/décommenter des lignes ou insertion de balise de voix), tout en restant indisponible lorsqu'il n'y a rien à annuler.
 Corrections de bugs
+• Correction de « Enregistrer tout » (Ctrl+Shift+S) : tous les documents ouverts modifiés sont désormais détectés de façon fiable (y compris les onglets nouveaux/non enregistrés) et l’enregistrement global fonctionne correctement pour chacun, avec « Enregistrer sous » lorsque nécessaire.
 • Correction de l'ordre des articles RSS Google News : lorsque la date est disponible, les articles sont désormais affichés du plus récent au plus ancien.
 • Correction de l'association des étiquettes NVDA dans la fenêtre du dictionnaire : le champ de recherche et la liste de langue annoncent désormais la bonne étiquette.
 • Correction de la navigation clavier dans la fenêtre Propriétés RSS/Podcast : Tab/Maj+Tab atteignent désormais le bouton OK, Entrée active OK, Échap ferme la fenêtre en toute sécurité et le focus revient correctement à la liste RSS/Podcast.

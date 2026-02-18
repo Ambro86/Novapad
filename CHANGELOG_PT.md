@@ -20,6 +20,7 @@ Melhorias
 • Melhorada a seleção de vozes Microsoft em Opções > Voz e no painel de vozes do editor: foi adicionada uma combobox de idioma localizada para filtrar vozes por idioma, mantendo o modo “apenas vozes multilíngues” como lista única sem divisão por idioma (com a combobox de idioma oculta quando ativa).
 • Melhorada a etiqueta de Desfazer: a opção Editar > Desfazer agora mostra qual ação será desfeita (por exemplo, edição de texto, comentar/descomentar linhas ou inserção de tag de voz), mantendo-se indisponível quando não há nada para desfazer.
 Correções de bugs
+• Corrigido "Guardar tudo" (Ctrl+Shift+S): agora todos os documentos abertos modificados são detetados de forma fiável (incluindo separadores novos/sem guardar) e o Guardar tudo grava cada um corretamente, abrindo "Guardar como" quando necessário.
 • Corrigida a ordenação dos artigos RSS do Google News: quando a data está disponível, os artigos agora são mostrados do mais recente para o mais antigo.
 • Corrigida a associação de etiquetas no NVDA na janela do dicionário: o campo de pesquisa e a lista de idioma agora anunciam a etiqueta correta.
 • Corrigida a navegação por teclado na janela Propriedades de RSS/Podcast: Tab/Shift+Tab agora alcançam o botão OK, Enter ativa o OK, Esc fecha com segurança e o foco volta corretamente à lista RSS/Podcast.

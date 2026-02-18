@@ -20,6 +20,7 @@ Improvements
 • Improved Microsoft voices selection in both Options > Voice and the in-editor Voice panel: added a localized language combo to filter voices by language, while keeping multilingual-only mode as a single ungrouped voice list (language combo hidden when enabled).
 • Improved Undo labeling: the Edit > Undo entry now shows what action will be undone (for example, text edits, quote/unquote lines, or voice-tag insertion), while remaining disabled when no undo is available.
 Bug fixes
+• Fixed Save All (Ctrl+Shift+S): all open modified documents are now detected reliably (including unsaved/new tabs), and Save All correctly saves each one or opens Save As where needed.
 • Fixed Google News RSS item ordering: articles are now shown in descending publish date (newest first) when dates are available.
 • Fixed NVDA label association in the dictionary window: search field and language combo now announce the correct labels.
 • Fixed RSS/Podcast Properties window keyboard handling: Tab/Shift+Tab now reaches the OK button, Enter activates OK, Esc closes safely, and focus correctly returns to the RSS/Podcast list.

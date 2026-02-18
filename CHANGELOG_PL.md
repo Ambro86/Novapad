@@ -20,6 +20,7 @@ Ulepszenia
 • Ulepszono wybór głosów Microsoft zarówno w Opcje > Głos, jak i w panelu głosów edytora: dodano zlokalizowaną listę języków do filtrowania głosów po języku, a tryb „tylko głosy wielojęzyczne” pozostał pojedynczą listą bez podziału na języki (lista języków jest wtedy ukrywana).
 • Ulepszono etykietę Cofnij: pozycja Edycja > Cofnij pokazuje teraz, co zostanie cofnięte (np. edycja tekstu, cytowanie/odcytowanie linii lub wstawienie tagu głosu), pozostając niedostępna, gdy nie ma czego cofać.
 Poprawki błędów
+• Naprawiono „Zapisz wszystko” (Ctrl+Shift+S): wszystkie otwarte zmodyfikowane dokumenty są teraz wykrywane niezawodnie (także nowe/niezapisane karty), a zapis wszystkich działa poprawnie dla każdego pliku, otwierając „Zapisz jako”, gdy to potrzebne.
 • Poprawiono kolejność artykułów RSS z Google News: gdy data publikacji jest dostępna, artykuły są teraz wyświetlane od najnowszego do najstarszego.
 • Poprawiono powiązanie etykiet NVDA w oknie słownika: pole wyszukiwania i lista języka ogłaszają teraz właściwe etykiety.
 • Poprawiono obsługę klawiatury w oknie Właściwości RSS/Podcast: Tab/Shift+Tab przechodzą teraz do przycisku OK, Enter aktywuje OK, Esc bezpiecznie zamyka okno, a fokus poprawnie wraca do listy RSS/Podcast.

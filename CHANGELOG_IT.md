@@ -20,6 +20,7 @@ Miglioramenti
 • Migliorata la selezione delle voci Microsoft sia in Opzioni > Voce sia nel pannello voci dell’editor: aggiunta una casella combinata lingua localizzata per filtrare le voci per lingua, mantenendo la modalità “solo voci multilingua” come elenco unico non diviso per lingua (con combo lingua nascosta quando attiva).
 • Migliorata l’etichetta di Annulla: la voce Modifica > Annulla ora mostra l’azione che verrà annullata (ad esempio modifica testo, commenta/decommenta righe o inserimento tag voce), restando non disponibile quando non esiste nulla da annullare.
 Correzioni di bug
+• Corretto "Salva tutto" (Ctrl+Shift+S): ora tutti i documenti aperti modificati vengono rilevati in modo affidabile (inclusi tab nuovi/non salvati) e il salvataggio procede correttamente su ciascun file, aprendo "Salva con nome" quando necessario.
 • Corretto l'ordinamento degli articoli RSS di Google News: quando la data è disponibile, gli articoli vengono ora mostrati dal più recente al meno recente.
 • Corretta l'associazione etichette NVDA nella finestra Dizionario: campo ricerca e combobox lingua ora annunciano l'etichetta giusta.
 • Corretta la gestione tastiera nella finestra Proprietà di RSS/Podcast: Tab/Shift+Tab raggiungono il pulsante OK, Invio attiva OK, Esc chiude in modo sicuro e il focus torna correttamente all'elenco RSS/Podcast.

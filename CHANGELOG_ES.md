@@ -20,6 +20,7 @@ Mejoras
 • Mejorada la selección de voces Microsoft tanto en Opciones > Voz como en el panel de voces del editor: se añadió un combobox de idioma localizado para filtrar voces por idioma, manteniendo el modo “solo voces multilingües” como una lista única sin división por idioma (con el combobox de idioma oculto cuando está activo).
 • Mejorada la etiqueta de Deshacer: la opción Editar > Deshacer ahora muestra qué acción se va a deshacer (por ejemplo, edición de texto, comentar/descomentar líneas o inserción de etiqueta de voz), manteniéndose no disponible cuando no hay nada que deshacer.
 Correcciones de errores
+• Corregido "Guardar todo" (Ctrl+Shift+S): ahora se detectan de forma fiable todos los documentos abiertos modificados (incluidas pestañas nuevas/sin guardar) y Guardar todo guarda cada uno correctamente, abriendo "Guardar como" cuando hace falta.
 • Corregido el orden de artículos RSS de Google News: cuando hay fecha disponible, los artículos ahora se muestran del más reciente al más antiguo.
 • Corregida la asociación de etiquetas en NVDA en la ventana del diccionario: el campo de búsqueda y el combo de idioma ahora anuncian la etiqueta correcta.
 • Corregida la navegación de teclado en la ventana Propiedades de RSS/Podcast: Tab/Shift+Tab ahora llegan al botón Aceptar, Enter activa Aceptar, Esc cierra de forma segura y el foco vuelve correctamente a la lista RSS/Podcast.

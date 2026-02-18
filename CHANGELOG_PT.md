@@ -2,6 +2,7 @@
 
 Versão 0.6.7 – 2026-02-13
 Melhorias
+• Ampliadas as opções de bitrate na conversão de áudio e na gravação de podcast: adicionados valores mais baixos (64/96 kbps) e MP3 estendido até 320 kbps, com validação e tratamento do encoder alinhados.
 • Adicionado o novo modo Ver > Somente leitura para bloquear edições acidentais no texto, mantendo leitura e navegação completas dos documentos.
 • Adicionada uma barra de progresso acessível durante as atualizações do programa, para que leitores de ecrã possam acompanhar em tempo real o progresso da transferência.
 • Adicionada uma nova barra de estado discreta na janela principal com contagem de caracteres, palavras e posição linha/coluna (por exemplo: "Caracteres (com espaços): 11. | Palavras: 2. | Ln 1, Col 12"), sem interferir com o foco do NVDA.
@@ -20,6 +21,7 @@ Melhorias
 • Melhorada a seleção de vozes Microsoft em Opções > Voz e no painel de vozes do editor: foi adicionada uma combobox de idioma localizada para filtrar vozes por idioma, mantendo o modo “apenas vozes multilíngues” como lista única sem divisão por idioma (com a combobox de idioma oculta quando ativa).
 • Melhorada a etiqueta de Desfazer: a opção Editar > Desfazer agora mostra qual ação será desfeita (por exemplo, edição de texto, comentar/descomentar linhas ou inserção de tag de voz), mantendo-se indisponível quando não há nada para desfazer.
 Correções de bugs
+• Corrigida a interface de bitrate na janela de gravação de audiolivro: removidos textos hardcoded em italiano e adicionada a opção 64 kbps entre os bitrates selecionáveis.
 • Corrigido "Guardar tudo" (Ctrl+Shift+S): agora todos os documentos abertos modificados são detetados de forma fiável (incluindo separadores novos/sem guardar) e o Guardar tudo grava cada um corretamente, abrindo "Guardar como" quando necessário.
 • Corrigida a ordenação dos artigos RSS do Google News: quando a data está disponível, os artigos agora são mostrados do mais recente para o mais antigo.
 • Corrigida a associação de etiquetas no NVDA na janela do dicionário: o campo de pesquisa e a lista de idioma agora anunciam a etiqueta correta.

@@ -2,6 +2,7 @@
 
 Versión 0.6.7 – 2026-02-13
 Mejoras
+• Ampliadas las opciones de bitrate en la conversión de audio y en la grabación de podcast: añadidos valores más bajos (64/96 kbps) y ampliado MP3 hasta 320 kbps, con validación y manejo del codificador alineados.
 • Añadido el nuevo modo Ver > Solo lectura para bloquear ediciones accidentales del texto manteniendo la lectura y navegación completas de los documentos.
 • Añadida una barra de progreso accesible durante las actualizaciones del programa, para que los lectores de pantalla puedan seguir en tiempo real el avance de la descarga.
 • Añadida una nueva barra de estado discreta en la ventana principal con recuento de caracteres, palabras y posición línea/columna (por ejemplo: "Caracteres (con espacios): 11. | Palabras: 2. | Ln 1, Col 12"), sin interferir con el foco de NVDA.
@@ -20,6 +21,7 @@ Mejoras
 • Mejorada la selección de voces Microsoft tanto en Opciones > Voz como en el panel de voces del editor: se añadió un combobox de idioma localizado para filtrar voces por idioma, manteniendo el modo “solo voces multilingües” como una lista única sin división por idioma (con el combobox de idioma oculto cuando está activo).
 • Mejorada la etiqueta de Deshacer: la opción Editar > Deshacer ahora muestra qué acción se va a deshacer (por ejemplo, edición de texto, comentar/descomentar líneas o inserción de etiqueta de voz), manteniéndose no disponible cuando no hay nada que deshacer.
 Correcciones de errores
+• Corregida la interfaz de bitrate en la ventana de guardado de audiolibros: se eliminaron textos hardcoded en italiano y se añadió 64 kbps entre los bitrates seleccionables.
 • Corregido "Guardar todo" (Ctrl+Shift+S): ahora se detectan de forma fiable todos los documentos abiertos modificados (incluidas pestañas nuevas/sin guardar) y Guardar todo guarda cada uno correctamente, abriendo "Guardar como" cuando hace falta.
 • Corregido el orden de artículos RSS de Google News: cuando hay fecha disponible, los artículos ahora se muestran del más reciente al más antiguo.
 • Corregida la asociación de etiquetas en NVDA en la ventana del diccionario: el campo de búsqueda y el combo de idioma ahora anuncian la etiqueta correcta.

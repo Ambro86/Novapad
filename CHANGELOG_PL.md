@@ -2,6 +2,7 @@
 
 Wersja 0.6.7 – 2026-02-13
 Ulepszenia
+• Rozszerzono opcje bitrate w konwersji audio i ustawieniach nagrywania podcastu: dodano niższe wartości (64/96 kbps) oraz zwiększono MP3 do 320 kbps, z ujednoliconą walidacją i obsługą enkodera.
 • Dodano nowy tryb Widok > Tylko do odczytu, aby blokować przypadkowe edycje tekstu przy zachowaniu pełnego odczytu i nawigacji po dokumentach.
 • Dodano dostępny pasek postępu podczas aktualizacji programu, aby czytniki ekranu mogły na bieżąco śledzić postęp pobierania.
 • Dodano nowy, dyskretny pasek stanu w głównym oknie z liczbą znaków, słów oraz pozycją wiersz/kolumna (np. "Znaki (ze spacjami): 11. | Słowa: 2. | Ln 1, Col 12"), bez zakłócania fokusu NVDA.
@@ -20,6 +21,7 @@ Ulepszenia
 • Ulepszono wybór głosów Microsoft zarówno w Opcje > Głos, jak i w panelu głosów edytora: dodano zlokalizowaną listę języków do filtrowania głosów po języku, a tryb „tylko głosy wielojęzyczne” pozostał pojedynczą listą bez podziału na języki (lista języków jest wtedy ukrywana).
 • Ulepszono etykietę Cofnij: pozycja Edycja > Cofnij pokazuje teraz, co zostanie cofnięte (np. edycja tekstu, cytowanie/odcytowanie linii lub wstawienie tagu głosu), pozostając niedostępna, gdy nie ma czego cofać.
 Poprawki błędów
+• Naprawiono interfejs bitrate w oknie zapisu audiobooka: usunięto teksty zakodowane na stałe po włosku i dodano 64 kbps do listy wybieralnych bitrate.
 • Naprawiono „Zapisz wszystko” (Ctrl+Shift+S): wszystkie otwarte zmodyfikowane dokumenty są teraz wykrywane niezawodnie (także nowe/niezapisane karty), a zapis wszystkich działa poprawnie dla każdego pliku, otwierając „Zapisz jako”, gdy to potrzebne.
 • Poprawiono kolejność artykułów RSS z Google News: gdy data publikacji jest dostępna, artykuły są teraz wyświetlane od najnowszego do najstarszego.
 • Poprawiono powiązanie etykiet NVDA w oknie słownika: pole wyszukiwania i lista języka ogłaszają teraz właściwe etykiety.

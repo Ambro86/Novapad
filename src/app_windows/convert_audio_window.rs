@@ -1006,7 +1006,9 @@ fn update_quality_controls(
     if show_edit {
         set_combo_items(
             state.quality_edit_combo,
-            &["128", "150", "160", "192", "224", "256", "320"],
+            &[
+                "64", "80", "96", "112", "128", "160", "192", "224", "256", "320",
+            ],
         );
         if get_combo_text(state.quality_edit_combo).is_empty() {
             set_combo_text(state.quality_edit_combo, "192");
@@ -1014,7 +1016,9 @@ fn update_quality_controls(
     }
     if show_combo {
         let items: Vec<&str> = match format {
-            AudioFormat::Aac => vec!["96", "128", "192", "256"],
+            AudioFormat::Aac => vec![
+                "64", "80", "96", "112", "128", "160", "192", "224", "256", "320",
+            ],
             AudioFormat::Opus => vec!["64", "96", "128", "160"],
             AudioFormat::Ogg => vec!["q3", "q4", "q5", "q6", "q7", "q8"],
             AudioFormat::Flac => vec!["0", "1", "2", "3", "4", "5", "6", "7", "8"],
@@ -1022,7 +1026,7 @@ fn update_quality_controls(
         };
         set_combo_items(state.quality_combo, &items);
         let default_index = match format {
-            AudioFormat::Aac => 1,
+            AudioFormat::Aac => 4,
             AudioFormat::Opus => 2,
             AudioFormat::Ogg => 2,
             AudioFormat::Flac => 5,
@@ -1091,7 +1095,7 @@ fn set_edit_text(hwnd: HWND, path: &Path) {
 
 fn open_input_dialog(parent: HWND, language: Language, labels: &ConvertLabels) -> Option<PathBuf> {
     unsafe {
-        let filter_raw = i18n::tr(language, "dialog.open_filter");
+        let filter_raw = i18n::tr(language, "podcasts.download_filter");
         let filter = to_wide(&filter_raw.replace("\\0", "\0"));
         let title = to_wide(&labels.open_title);
         let mut buffer = [0u16; 1024];

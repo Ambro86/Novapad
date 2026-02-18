@@ -9385,7 +9385,7 @@ pub(crate) unsafe fn save_audio_dialog(
 
     let current_bitrate =
         with_state(hwnd, |state| state.settings.audiobook_m4b_bitrate).unwrap_or(128);
-    let bitrate_options = [80u32, 96, 128, 160, 192, 256];
+    let bitrate_options = [64u32, 80, 96, 128, 160, 192, 256];
     let initial_bitrate = if bitrate_options.contains(&current_bitrate) {
         current_bitrate
     } else {
@@ -9481,7 +9481,7 @@ pub(crate) unsafe fn save_audio_dialog(
 
 fn audiobook_bitrate_button_label(language: Language, bitrate_kbps: u32) -> String {
     let bitrate_label = i18n::tr(language, "podcast.bitrate");
-    format!("Seleziona {bitrate_label} (attuale: {bitrate_kbps} kbps)")
+    format!("{bitrate_label} ({bitrate_kbps} kbps)")
 }
 
 #[implement(IFileDialogEvents, IFileDialogControlEvents)]
@@ -9562,7 +9562,7 @@ impl IFileDialogControlEvents_Impl for AudiobookBitrateDialogHandler {
             let id = 10_000u32 + i as u32;
             ids.push((id, *bitrate));
             let text = if *bitrate == current {
-                format!("{bitrate} kbps (attuale)")
+                format!("* {bitrate} kbps")
             } else {
                 format!("{bitrate} kbps")
             };

@@ -2,6 +2,7 @@
 
 Version 0.6.7 – 2026-02-13
 Améliorations
+• Extension des options de débit binaire dans Convertir l’audio et dans les paramètres d’enregistrement de podcast : ajout de valeurs plus basses (64/96 kbps) et extension du MP3 jusqu’à 320 kbps, avec validation et gestion de l’encodeur harmonisées.
 • Ajout du nouveau mode Affichage > Lecture seule pour éviter les modifications accidentelles tout en conservant une lecture et une navigation complètes des documents.
 • Ajout d’une barre de progression accessible pendant les mises à jour du programme, afin que les lecteurs d’écran puissent suivre en temps réel l’avancement du téléchargement.
 • Ajout d’une nouvelle barre d’état discrète dans la fenêtre principale avec le nombre de caractères, de mots et la position ligne/colonne (par exemple : "Caractères (avec espaces) : 11. | Mots : 2. | Ln 1, Col 12"), sans perturber le focus NVDA.
@@ -20,6 +21,7 @@ Améliorations
 • Amélioration de la sélection des voix Microsoft dans Options > Voix et dans le panneau des voix de l’éditeur : ajout d’une liste de langue localisée pour filtrer les voix par langue, tout en conservant le mode « voix multilingues uniquement » comme une liste unique non séparée par langue (liste de langue masquée lorsqu’il est activé).
 • Amélioration de l'étiquette Annuler : l'entrée Édition > Annuler affiche désormais l'action qui sera annulée (par exemple édition de texte, commenter/décommenter des lignes ou insertion de balise de voix), tout en restant indisponible lorsqu'il n'y a rien à annuler.
 Corrections de bugs
+• Correction de l’interface bitrate dans la fenêtre d’enregistrement de livre audio : suppression des libellés italiens codés en dur et ajout de 64 kbps dans les débits sélectionnables.
 • Correction de « Enregistrer tout » (Ctrl+Shift+S) : tous les documents ouverts modifiés sont désormais détectés de façon fiable (y compris les onglets nouveaux/non enregistrés) et l’enregistrement global fonctionne correctement pour chacun, avec « Enregistrer sous » lorsque nécessaire.
 • Correction de l'ordre des articles RSS Google News : lorsque la date est disponible, les articles sont désormais affichés du plus récent au plus ancien.
 • Correction de l'association des étiquettes NVDA dans la fenêtre du dictionnaire : le champ de recherche et la liste de langue annoncent désormais la bonne étiquette.

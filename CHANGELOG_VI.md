@@ -2,6 +2,7 @@
 
 Phiên bản 0.6.7 – 2026-02-13
 Cải tiến
+• Đã mở rộng tùy chọn bitrate trong Chuyển đổi âm thanh và cài đặt ghi podcast: thêm mức thấp hơn (64/96 kbps) và nâng MP3 lên tối đa 320 kbps, đồng bộ cả kiểm tra hợp lệ và xử lý bộ mã hóa.
 • Đã thêm chế độ mới Xem > Chỉ đọc để ngăn chỉnh sửa nhầm văn bản, đồng thời vẫn giữ khả năng đọc và điều hướng đầy đủ tài liệu.
 • Đã thêm thanh tiến trình có thể truy cập trong quá trình cập nhật chương trình, giúp trình đọc màn hình theo dõi tiến độ tải xuống theo thời gian thực.
 • Đã thêm thanh trạng thái mới dạng yên lặng ở cửa sổ chính với số ký tự, số từ và vị trí dòng/cột (ví dụ: "Ký tự (kể cả khoảng trắng): 11. | Từ: 2. | Ln 1, Col 12"), không làm ảnh hưởng tiêu điểm của NVDA.
@@ -20,6 +21,7 @@ Cải tiến
 • Đã cải thiện chọn giọng Microsoft trong cả Tùy chọn > Giọng nói và bảng giọng nói của trình soạn thảo: thêm combobox ngôn ngữ đã bản địa hóa để lọc giọng theo ngôn ngữ, đồng thời vẫn giữ chế độ “chỉ giọng đa ngôn ngữ” là một danh sách duy nhất không chia theo ngôn ngữ (ẩn combobox ngôn ngữ khi chế độ này bật).
 • Đã cải thiện nhãn Hoàn tác: mục Chỉnh sửa > Hoàn tác giờ hiển thị hành động sẽ được hoàn tác (ví dụ chỉnh sửa văn bản, thêm/bỏ comment dòng hoặc chèn thẻ giọng nói), đồng thời vẫn bị vô hiệu khi không có gì để hoàn tác.
 Sửa lỗi
+• Đã sửa giao diện bitrate trong cửa sổ lưu sách nói: đã bỏ các nhãn hardcoded bằng tiếng Ý và thêm tùy chọn 64 kbps vào danh sách bitrate có thể chọn.
 • Đã sửa "Lưu tất cả" (Ctrl+Shift+S): giờ đây tất cả tài liệu đang mở đã chỉnh sửa đều được phát hiện ổn định (kể cả tab mới/chưa lưu), và Lưu tất cả sẽ lưu đúng từng tài liệu, mở "Lưu thành" khi cần.
 • Đã sửa thứ tự bài RSS từ Google News: khi có ngày xuất bản, bài viết giờ được hiển thị từ mới nhất đến cũ nhất.
 • Đã sửa gán nhãn cho NVDA trong cửa sổ từ điển: ô tìm kiếm và combobox ngôn ngữ giờ đọc đúng nhãn.

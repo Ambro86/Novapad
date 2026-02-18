@@ -39,6 +39,7 @@ use windows::core::PCWSTR;
 
 const PODCAST_CLASS_NAME: &str = "SonarpadPodcast";
 const PODCAST_TIMER_ID: usize = 1;
+const PODCAST_MP3_BITRATES: &[u32] = &[64, 96, 128, 160, 192, 224, 256, 320];
 
 const PODCAST_ID_INCLUDE_MIC: usize = 11001;
 const PODCAST_ID_MIC_DEVICE: usize = 11002;
@@ -1377,8 +1378,8 @@ fn populate_combos(
         );
 
         SendMessageW(bitrate_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-        for bitrate in ["128 kbps", "192 kbps", "256 kbps"] {
-            let text = to_wide(bitrate);
+        for bitrate in PODCAST_MP3_BITRATES {
+            let text = to_wide(&format!("{bitrate} kbps"));
             SendMessageW(
                 bitrate_combo,
                 CB_ADDSTRING,
@@ -1537,11 +1538,10 @@ fn apply_settings_to_ui(state: &mut PodcastState, settings: &AppSettings) {
             LPARAM(0),
         );
 
-        let bitrate_index = match settings.podcast_mp3_bitrate {
-            192 => 1,
-            256 => 2,
-            _ => 0,
-        };
+        let bitrate_index = PODCAST_MP3_BITRATES
+            .iter()
+            .position(|&b| b == settings.podcast_mp3_bitrate)
+            .unwrap_or(2);
         SendMessageW(
             state.bitrate_combo,
             CB_SETCURSEL,
@@ -2026,11 +2026,10 @@ fn selected_format(state: &PodcastState) -> PodcastFormat {
 
 fn selected_bitrate(state: &PodcastState) -> u32 {
     let sel = unsafe { SendMessageW(state.bitrate_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
-    match sel {
-        1 => 192,
-        2 => 256,
-        _ => 128,
-    }
+    PODCAST_MP3_BITRATES
+        .get(sel.max(0) as usize)
+        .copied()
+        .unwrap_or(128)
 }
 
 fn selected_mic_gain(state: &PodcastState) -> f32 {

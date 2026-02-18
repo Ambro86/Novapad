@@ -96,6 +96,7 @@ impl Mp3StreamWriter {
                 192 => 192,
                 224 => 224,
                 256 => 256,
+                320 => 320,
                 _ => 128,
             };
             crate::log_debug(&format!(
@@ -362,6 +363,7 @@ where
             192 => 192,
             224 => 224,
             256 => 256,
+            320 => 320,
             _ => 128,
         };
         crate::log_debug(&format!(

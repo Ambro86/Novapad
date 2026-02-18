@@ -1422,10 +1422,10 @@ pub fn build_ffmpeg_args(settings: &ConvertAudioSettings) -> Vec<String> {
 }
 
 pub fn validate_mp3_bitrate(value: i32) -> Result<u32, String> {
-    if (96..=320).contains(&value) {
+    if (64..=320).contains(&value) {
         Ok(value as u32)
     } else {
-        Err("MP3 bitrate must be between 96 and 320 kbps".to_string())
+        Err("MP3 bitrate must be between 64 and 320 kbps".to_string())
     }
 }
 
@@ -1995,8 +1995,8 @@ mod convert_tests {
 
     #[test]
     fn test_validate_mp3_bitrate() {
-        assert!(validate_mp3_bitrate(95).is_err());
-        assert_eq!(validate_mp3_bitrate(96).unwrap(), 96);
+        assert!(validate_mp3_bitrate(63).is_err());
+        assert_eq!(validate_mp3_bitrate(64).unwrap(), 64);
         assert_eq!(validate_mp3_bitrate(320).unwrap(), 320);
         assert!(validate_mp3_bitrate(321).is_err());
     }

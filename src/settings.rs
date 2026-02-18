@@ -1255,6 +1255,7 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     if settings.podcast_mp3_bitrate == 0 {
         settings.podcast_mp3_bitrate = 128;
     }
+    settings.podcast_mp3_bitrate = settings.podcast_mp3_bitrate.clamp(64, 320);
     if settings.audiobook_m4b_bitrate == 0 {
         settings.audiobook_m4b_bitrate = 128;
     }

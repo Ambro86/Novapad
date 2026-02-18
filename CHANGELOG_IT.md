@@ -2,6 +2,7 @@
 
 Versione 0.6.7 – 2026-02-13
 Miglioramenti
+• Ampliate le opzioni di bitrate nella conversione audio e nella registrazione podcast: aggiunti valori più bassi (64/96 kbps) ed esteso MP3 fino a 320 kbps, con validazione e gestione encoder allineate.
 • Aggiunta la nuova modalità Visualizza > Sola lettura per bloccare modifiche accidentali nel testo mantenendo piena lettura e navigazione dei documenti.
 • Aggiunta una barra di progresso accessibile durante gli aggiornamenti del programma, così i lettori di schermo possono seguire in tempo reale l’avanzamento del download.
 • Aggiunta una nuova barra di stato discreta nella finestra principale con conteggio caratteri, parole e posizione riga/colonna (esempio: "Caratteri (con spazi): 11. | Parole: 2. | Ln 1, Col 12"), senza interferire con il focus di NVDA.
@@ -20,6 +21,7 @@ Miglioramenti
 • Migliorata la selezione delle voci Microsoft sia in Opzioni > Voce sia nel pannello voci dell’editor: aggiunta una casella combinata lingua localizzata per filtrare le voci per lingua, mantenendo la modalità “solo voci multilingua” come elenco unico non diviso per lingua (con combo lingua nascosta quando attiva).
 • Migliorata l’etichetta di Annulla: la voce Modifica > Annulla ora mostra l’azione che verrà annullata (ad esempio modifica testo, commenta/decommenta righe o inserimento tag voce), restando non disponibile quando non esiste nulla da annullare.
 Correzioni di bug
+• Corretta l'interfaccia bitrate nella finestra di salvataggio audiolibro: rimossi i testi hardcoded in italiano e aggiunta l'opzione 64 kbps tra i bitrate selezionabili.
 • Corretto "Salva tutto" (Ctrl+Shift+S): ora tutti i documenti aperti modificati vengono rilevati in modo affidabile (inclusi tab nuovi/non salvati) e il salvataggio procede correttamente su ciascun file, aprendo "Salva con nome" quando necessario.
 • Corretto l'ordinamento degli articoli RSS di Google News: quando la data è disponibile, gli articoli vengono ora mostrati dal più recente al meno recente.
 • Corretta l'associazione etichette NVDA nella finestra Dizionario: campo ricerca e combobox lingua ora annunciano l'etichetta giusta.

@@ -2,6 +2,7 @@
 
 Version 0.6.7 – 2026-02-13
 Improvements
+• Expanded audio bitrate options in Convert Audio and podcast recording settings: added lower values (64/96 kbps) and extended MP3 up to 320 kbps, with aligned validation and encoder handling.
 • Added a new View > Read-only mode to lock editor text from accidental edits while keeping documents fully readable and navigable.
 • Added an accessible progress bar during program updates, so screen readers can track download progress in real time.
 • Added a new quiet status bar in the main window showing characters, words, and line/column (for example: "Characters (with spaces): 11. | Words: 2. | Ln 1, Col 12") without disturbing NVDA focus.
@@ -20,6 +21,7 @@ Improvements
 • Improved Microsoft voices selection in both Options > Voice and the in-editor Voice panel: added a localized language combo to filter voices by language, while keeping multilingual-only mode as a single ungrouped voice list (language combo hidden when enabled).
 • Improved Undo labeling: the Edit > Undo entry now shows what action will be undone (for example, text edits, quote/unquote lines, or voice-tag insertion), while remaining disabled when no undo is available.
 Bug fixes
+• Fixed audiobook save dialog bitrate UI: removed hardcoded Italian labels and added 64 kbps to selectable bitrate options.
 • Fixed Save All (Ctrl+Shift+S): all open modified documents are now detected reliably (including unsaved/new tabs), and Save All correctly saves each one or opens Save As where needed.
 • Fixed Google News RSS item ordering: articles are now shown in descending publish date (newest first) when dates are available.
 • Fixed NVDA label association in the dictionary window: search field and language combo now announce the correct labels.

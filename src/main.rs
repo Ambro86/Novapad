@@ -197,6 +197,10 @@ const VOICE_PANEL_ID_INSERT_TAG: usize = 21011;
 const MAIN_STATUS_ID: usize = 22001;
 const VOICE_MENU_ID_ADD_FAVORITE: u32 = 9001;
 const VOICE_MENU_ID_REMOVE_FAVORITE: u32 = 9002;
+const WINDOW_MENU_INDEX: i32 = 6;
+const WINDOW_DOC_MENU_BASE: usize = 11_000;
+const WINDOW_DOC_MENU_MAX: usize = 200;
+const WINDOW_DOC_MENU_SEPARATOR_ID: usize = 10_999;
 
 fn bring_window_to_foreground(hwnd: HWND) {
     unsafe {
@@ -3535,6 +3539,10 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                     };
                     let _enabled = EnableMenuItem(hmenu, IDM_EDIT_PASTE as u32, paste_flags);
                 }
+                let window_menu = GetSubMenu(main_menu, WINDOW_MENU_INDEX);
+                if window_menu == hmenu {
+                    refresh_window_open_documents_menu(hwnd, hmenu);
+                }
             }
             let ctx = with_state(hwnd, |state| {
                 if state.dictionary_context_menu != hmenu || state.dictionary_context_loaded {
@@ -4257,6 +4265,12 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 }
                 IDM_WINDOW_OPEN_DOCUMENTS => {
                     open_documents_popup(hwnd);
+                    LRESULT(0)
+                }
+                cmd_id if window_doc_menu_index_from_command(cmd_id).is_some() => {
+                    if let Some(index) = window_doc_menu_index_from_command(cmd_id) {
+                        select_tab(hwnd, index);
+                    }
                     LRESULT(0)
                 }
                 IDM_WINDOW_CLOSE_ALL => {
@@ -9023,10 +9037,8 @@ unsafe fn open_documents_popup(hwnd: HWND) {
         return;
     }
 
-    let mut ids = Vec::with_capacity(docs.len());
     for (idx, title) in docs.iter().take(200) {
-        let id = 11_000u32 + *idx as u32;
-        ids.push((id, *idx));
+        let id = (WINDOW_DOC_MENU_BASE + *idx) as u32;
         let display = if title.trim().is_empty() {
             format!("Documento {}", idx + 1)
         } else {
@@ -9054,12 +9066,62 @@ unsafe fn open_documents_popup(hwnd: HWND) {
         hwnd,
         None,
     );
-    let selected = ids
-        .iter()
-        .find(|(id, _)| *id == command.0 as u32)
-        .map(|(_, idx)| *idx);
-    if let Some(index) = selected {
+    if let Some(index) = window_doc_menu_index_from_command(command.0 as usize) {
         select_tab(hwnd, index);
+    }
+}
+
+fn window_doc_menu_index_from_command(cmd_id: usize) -> Option<usize> {
+    if (WINDOW_DOC_MENU_BASE..(WINDOW_DOC_MENU_BASE + WINDOW_DOC_MENU_MAX)).contains(&cmd_id) {
+        Some(cmd_id - WINDOW_DOC_MENU_BASE)
+    } else {
+        None
+    }
+}
+
+unsafe fn refresh_window_open_documents_menu(hwnd: HWND, window_menu: HMENU) {
+    crate::log_if_err!(DeleteMenu(
+        window_menu,
+        WINDOW_DOC_MENU_SEPARATOR_ID as u32,
+        MF_BYCOMMAND
+    ));
+    for idx in 0..WINDOW_DOC_MENU_MAX {
+        let cmd_id = (WINDOW_DOC_MENU_BASE + idx) as u32;
+        crate::log_if_err!(DeleteMenu(window_menu, cmd_id, MF_BYCOMMAND));
+    }
+
+    let docs = with_state(hwnd, |state| {
+        state
+            .docs
+            .iter()
+            .enumerate()
+            .map(|(idx, doc)| (idx, doc.title.clone()))
+            .collect::<Vec<_>>()
+    })
+    .unwrap_or_default();
+    if docs.len() <= 1 {
+        return;
+    }
+
+    crate::log_if_err!(AppendMenuW(
+        window_menu,
+        MF_SEPARATOR,
+        WINDOW_DOC_MENU_SEPARATOR_ID,
+        PCWSTR::null()
+    ));
+    for (idx, title) in docs.iter().take(WINDOW_DOC_MENU_MAX) {
+        let display = if title.trim().is_empty() {
+            format!("Documento {}", idx + 1)
+        } else {
+            title.clone()
+        };
+        let label = format!("&{} {}", idx + 1, display);
+        crate::log_if_err!(AppendMenuW(
+            window_menu,
+            MF_STRING,
+            WINDOW_DOC_MENU_BASE + idx,
+            PCWSTR(to_wide(&label).as_ptr()),
+        ));
     }
 }
 

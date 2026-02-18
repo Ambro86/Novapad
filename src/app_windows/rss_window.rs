@@ -315,20 +315,43 @@ fn format_timestamp_for_language(
 ) -> Option<String> {
     let ts = timestamp?;
     let dt = Local.timestamp_opt(ts, 0).single()?;
-    let pattern = match language {
-        crate::settings::Language::English => "%m/%d/%Y %I:%M %p",
-        crate::settings::Language::Italian => "%d/%m/%Y %H:%M",
-        crate::settings::Language::Spanish => "%d/%m/%Y %H:%M",
-        crate::settings::Language::Portuguese => "%d/%m/%Y %H:%M",
-        crate::settings::Language::Swedish => "%Y-%m-%d %H:%M",
-        crate::settings::Language::Vietnamese => "%d/%m/%Y %H:%M",
-        crate::settings::Language::Czech => "%d.%m.%Y %H:%M",
-        crate::settings::Language::Polish => "%d.%m.%Y %H:%M",
-        crate::settings::Language::French => "%d/%m/%Y %H:%M",
-        crate::settings::Language::Serbian => "%d.%m.%Y %H:%M",
-        crate::settings::Language::Ukrainian => "%d.%m.%Y %H:%M",
+    let (date_pattern, time_pattern) = match language {
+        crate::settings::Language::English => ("%m/%d/%Y", "%I:%M %p"),
+        crate::settings::Language::Italian => ("%d/%m/%Y", "%H:%M"),
+        crate::settings::Language::Spanish => ("%d/%m/%Y", "%H:%M"),
+        crate::settings::Language::Portuguese => ("%d/%m/%Y", "%H:%M"),
+        crate::settings::Language::Swedish => ("%Y-%m-%d", "%H:%M"),
+        crate::settings::Language::Vietnamese => ("%d/%m/%Y", "%H:%M"),
+        crate::settings::Language::Czech => ("%d.%m.%Y", "%H:%M"),
+        crate::settings::Language::Polish => ("%d.%m.%Y", "%H:%M"),
+        crate::settings::Language::French => ("%d/%m/%Y", "%H:%M"),
+        crate::settings::Language::Serbian => ("%d.%m.%Y", "%H:%M"),
+        crate::settings::Language::Ukrainian => ("%d.%m.%Y", "%H:%M"),
     };
-    Some(dt.format(pattern).to_string())
+    let now = Local::now().date_naive();
+    let item_day = dt.date_naive();
+    let day_diff = (now - item_day).num_days();
+    let time_text = dt.format(time_pattern).to_string();
+    if day_diff == 0 {
+        return Some(format!(
+            "{} {time_text}",
+            i18n::tr(language, "rss.date.today")
+        ));
+    }
+    if day_diff == 1 {
+        return Some(format!(
+            "{} {time_text}",
+            i18n::tr(language, "rss.date.yesterday")
+        ));
+    }
+    if day_diff == 2 {
+        return Some(format!(
+            "{} {time_text}",
+            i18n::tr(language, "rss.date.day_before_yesterday")
+        ));
+    }
+    let full_pattern = format!("{date_pattern} {time_pattern}");
+    Some(dt.format(&full_pattern).to_string())
 }
 
 unsafe fn show_selected_properties(hwnd: HWND) {

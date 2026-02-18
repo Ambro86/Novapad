@@ -20,7 +20,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU,
     WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
-use windows::core::{PCWSTR, w};
+use windows::core::PCWSTR;
 
 const BOOKMARKS_CLASS_NAME: &str = "SonarpadBookmarks";
 const BOOKMARKS_ID_LIST: usize = 9001;
@@ -207,10 +207,11 @@ unsafe fn bookmarks_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 None,
             );
 
+            let btn_ok_text = i18n::tr(language, "options.ok");
             let hwnd_ok = CreateWindowExW(
                 Default::default(),
                 WC_BUTTON,
-                w!("OK"),
+                PCWSTR(to_wide(&btn_ok_text).as_ptr()),
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                 250,
                 320,

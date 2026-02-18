@@ -364,10 +364,11 @@ unsafe fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
                 SendMessageW(edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
             }
 
+            let ok_text = i18n::tr(init.language, "options.ok");
             let ok_button = CreateWindowExW(
                 Default::default(),
                 WC_BUTTON,
-                w!("OK"),
+                PCWSTR(to_wide(&ok_text).as_ptr()),
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
                 0,
                 0,

@@ -9640,7 +9640,12 @@ unsafe fn export_diagnostics_dialog(hwnd: HWND) {
     let mut default_wide = to_wide(&default_name);
     default_wide.resize(260, 0);
 
-    let filter = to_wide("ZIP Archive (*.zip)\0*.zip\0All Files (*.*)\0*.*\0\0");
+    let zip_archive_label = i18n::tr(language, "dialog.zip_archive");
+    let all_files_label = i18n::tr(language, "dialog.all_files");
+    let filter = to_wide(&format!(
+        "{} (*.zip)\0*.zip\0{} (*.*)\0*.*\0\0",
+        zip_archive_label, all_files_label
+    ));
     let title = to_wide(&i18n::tr(language, "dialog.export_diagnostics_title"));
 
     let mut ofn = OPENFILENAMEW {

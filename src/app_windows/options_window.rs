@@ -7506,7 +7506,13 @@ fn fetch_voice_list() -> Result<Vec<VoiceInfo>, String> {
 
 unsafe fn browse_for_interpreter(hwnd: HWND) {
     let mut buffer = [0u16; 1024];
-    let filter = to_wide("Executables (*.exe)\0*.exe\0All files (*.*)\0*.*\0\0");
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let executables_label = i18n::tr(language, "dialog.executables");
+    let all_files_label = i18n::tr(language, "dialog.all_files");
+    let filter = to_wide(&format!(
+        "{} (*.exe)\0*.exe\0{} (*.*)\0*.*\0\0",
+        executables_label, all_files_label
+    ));
     let mut ofn = OPENFILENAMEW {
         lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
         hwndOwner: hwnd,

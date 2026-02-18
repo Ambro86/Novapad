@@ -1372,7 +1372,8 @@ fn start_prompt_session(
             unsafe {
                 let language =
                     with_state(state.parent, |state| state.settings.language).unwrap_or_default();
-                show_error(hwnd, language, &format!("Prompt error: {err}"));
+                let err_text = i18n::tr_f(language, "prompt.error", &[("err", &err.to_string())]);
+                show_error(hwnd, language, &err_text);
             }
             None
         }

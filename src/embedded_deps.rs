@@ -135,5 +135,10 @@ pub fn cacert_path() -> PathBuf {
     get_dep_path("cacert.pem")
 }
 
+/// Ritorna il bundle CA embedded (PEM).
+pub fn cacert_bytes() -> &'static [u8] {
+    CACERT_PEM
+}
+
 // SAPI4 bridge: helper 32-bit per salvataggio su file.
 const SAPI4_BRIDGE_32_EXE: &[u8] = include_bytes!("../dll/sapi4_bridge_32.exe");

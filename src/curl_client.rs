@@ -28,6 +28,40 @@ pub const CURLOPT_TLS_EXTENSION_ORDER: i32 = 1012;
 
 pub struct CurlClient;
 
+fn apply_tls_ca(easy: &mut Easy) -> anyhow::Result<()> {
+    // Prima scelta: CA bundle embedded in memoria (evita problemi di path Unicode/permessi su cacert.pem).
+    let (blob_applied, blob_rc) = unsafe {
+        let handle = easy.raw();
+        let cacert = crate::embedded_deps::cacert_bytes();
+        let mut blob = curl_sys::curl_blob {
+            data: cacert.as_ptr() as *mut _,
+            len: cacert.len(),
+            flags: curl_sys::CURL_BLOB_COPY,
+        };
+        let rc = curl_sys::curl_easy_setopt(handle, curl_sys::CURLOPT_CAINFO_BLOB, &mut blob);
+        (rc == curl_sys::CURLE_OK, rc)
+    };
+    if blob_applied {
+        return Ok(());
+    }
+
+    crate::log_debug(&format!(
+        "Curl: CURLOPT_CAINFO_BLOB unavailable/failed (rc={:?}), falling back to cacert.pem path",
+        blob_rc
+    ));
+
+    // Fallback legacy: file CA in AppData.
+    let cacert_path = crate::embedded_deps::cacert_path();
+    if cacert_path.exists() {
+        easy.cainfo(cacert_path.to_string_lossy().as_ref())?;
+    } else {
+        // Ultimo fallback compatibilità: disabilita verify come già faceva il codice precedente.
+        easy.ssl_verify_peer(false)?;
+        easy.ssl_verify_host(false)?;
+    }
+    Ok(())
+}
+
 impl CurlClient {
     pub fn fetch_url_impersonated(url: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         Self::fetch_url_impersonated_with_progress(url, |_| {})
@@ -104,13 +138,7 @@ impl CurlClient {
         easy.post(true)?;
         easy.post_fields_copy(body.as_bytes())?;
 
-        let cacert_path = crate::embedded_deps::cacert_path();
-        if cacert_path.exists() {
-            easy.cainfo(cacert_path.to_string_lossy().as_ref())?;
-        } else {
-            easy.ssl_verify_peer(false)?;
-            easy.ssl_verify_host(false)?;
-        }
+        apply_tls_ca(&mut easy)?;
 
         let mut list = List::new();
         for header in headers {
@@ -145,14 +173,7 @@ impl CurlClient {
         easy.cookie_file("")?;
         easy.progress(true)?;
 
-        // Verifica certificati CA da APPDATA (estratti da embedded_deps)
-        let cacert_path = crate::embedded_deps::cacert_path();
-        if cacert_path.exists() {
-            easy.cainfo(cacert_path.to_string_lossy().as_ref())?;
-        } else {
-            easy.ssl_verify_peer(false)?;
-            easy.ssl_verify_host(false)?;
-        }
+        apply_tls_ca(&mut easy)?;
 
         // Cipher list compatibile con curl/OpenSSL
         easy.ssl_cipher_list("ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305")?;
@@ -220,14 +241,7 @@ fn fetch_url_chrome_advanced<F: FnMut(u32)>(
     easy.timeout(std::time::Duration::from_secs(600))?; // 10m per file grandi
     easy.progress(true)?;
 
-    // Verifica certificati CA da APPDATA (estratti da embedded_deps)
-    let cacert_path = crate::embedded_deps::cacert_path();
-    if cacert_path.exists() {
-        easy.cainfo(cacert_path.to_string_lossy().as_ref())?;
-    } else {
-        easy.ssl_verify_peer(false)?;
-        easy.ssl_verify_host(false)?;
-    }
+    apply_tls_ca(&mut easy)?;
 
     unsafe {
         let handle = easy.raw();

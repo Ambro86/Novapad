@@ -18,6 +18,7 @@ Miglioramenti
 • Migliorato il messaggio di conferma delle sostituzioni con gestione corretta di singolare/plurale (es. “1 sostituzione” vs “2 sostituzioni”).
 • Aggiunta nella finestra Dizionario la selezione della lingua di ricerca, con predefinito Auto (lingua interfaccia) e possibilità di override manuale.
 • Aggiunta una nuova scheda Scorciatoie nelle Opzioni per personalizzare i tasti rapidi, con rilevamento dei conflitti e avviso quando una combinazione è già assegnata a un'altra azione.
+• Resa più chiara la regolazione manuale di velocità e tono: i campi ora usano una scala centrata su 100, dove 100 corrisponde al valore normale.
 • Migliorata la selezione delle voci Microsoft sia in Opzioni > Voce sia nel pannello voci dell’editor: aggiunta una casella combinata lingua localizzata per filtrare le voci per lingua, mantenendo la modalità “solo voci multilingua” come elenco unico non diviso per lingua (con combo lingua nascosta quando attiva).
 • Migliorata l’etichetta di Annulla: la voce Modifica > Annulla ora mostra l’azione che verrà annullata (ad esempio modifica testo, commenta/decommenta righe o inserimento tag voce), restando non disponibile quando non esiste nulla da annullare.
 Correzioni di bug

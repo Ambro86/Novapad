@@ -4175,13 +4175,13 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
     select_combo_value(combo_dialogue_voice_volume, settings.dialogue_voice_volume);
     if let Err(_e) = SetWindowTextW(
         edit_tts_speed,
-        PCWSTR(to_wide(&settings.tts_rate.to_string()).as_ptr()),
+        PCWSTR(to_wide(&tts_ui_value_from_internal(settings.tts_rate).to_string()).as_ptr()),
     ) {
         crate::log_debug(&format!("Failed to set speed text: {:?}", _e));
     }
     if let Err(_e) = SetWindowTextW(
         edit_tts_pitch,
-        PCWSTR(to_wide(&settings.tts_pitch.to_string()).as_ptr()),
+        PCWSTR(to_wide(&tts_ui_value_from_internal(settings.tts_pitch).to_string()).as_ptr()),
     ) {
         crate::log_debug(&format!("Failed to set pitch text: {:?}", _e));
     }
@@ -5093,6 +5093,7 @@ const TTS_PITCH_MIN: i32 = -12;
 const TTS_PITCH_MAX: i32 = 12;
 const TTS_VOLUME_MIN: i32 = 25;
 const TTS_VOLUME_MAX: i32 = 200;
+const TTS_UI_OFFSET: i32 = 100;
 
 fn read_tts_edit_value(edit: HWND, fallback: i32, min: i32, max: i32) -> i32 {
     unsafe {
@@ -5109,6 +5110,18 @@ fn read_tts_edit_value(edit: HWND, fallback: i32, min: i32, max: i32) -> i32 {
             fallback
         }
     }
+}
+
+fn tts_ui_value_from_internal(value: i32) -> i32 {
+    value + TTS_UI_OFFSET
+}
+
+fn read_tts_tuning_edit_value(edit: HWND, fallback_internal: i32, min: i32, max: i32) -> i32 {
+    let ui_min = min + TTS_UI_OFFSET;
+    let ui_max = max + TTS_UI_OFFSET;
+    let ui_fallback = tts_ui_value_from_internal(fallback_internal).clamp(ui_min, ui_max);
+    let ui_value = read_tts_edit_value(edit, ui_fallback, ui_min, ui_max);
+    (ui_value - TTS_UI_OFFSET).clamp(min, max)
 }
 
 fn select_combo_nearest_value(hwnd: HWND, value: i32) {
@@ -5153,10 +5166,16 @@ unsafe fn update_tts_manual_visibility(hwnd: HWND) {
         let rate = combo_value(combo_speed);
         let pitch = combo_value(combo_pitch);
         let volume = combo_value(combo_volume);
-        if let Err(_e) = SetWindowTextW(edit_speed, PCWSTR(to_wide(&rate.to_string()).as_ptr())) {
+        if let Err(_e) = SetWindowTextW(
+            edit_speed,
+            PCWSTR(to_wide(&tts_ui_value_from_internal(rate).to_string()).as_ptr()),
+        ) {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
-        if let Err(_e) = SetWindowTextW(edit_pitch, PCWSTR(to_wide(&pitch.to_string()).as_ptr())) {
+        if let Err(_e) = SetWindowTextW(
+            edit_pitch,
+            PCWSTR(to_wide(&tts_ui_value_from_internal(pitch).to_string()).as_ptr()),
+        ) {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
         if let Err(_e) = SetWindowTextW(edit_volume, PCWSTR(to_wide(&volume.to_string()).as_ptr()))
@@ -5164,8 +5183,8 @@ unsafe fn update_tts_manual_visibility(hwnd: HWND) {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
     } else {
-        let rate = read_tts_edit_value(edit_speed, 0, TTS_RATE_MIN, TTS_RATE_MAX);
-        let pitch = read_tts_edit_value(edit_pitch, 0, TTS_PITCH_MIN, TTS_PITCH_MAX);
+        let rate = read_tts_tuning_edit_value(edit_speed, 0, TTS_RATE_MIN, TTS_RATE_MAX);
+        let pitch = read_tts_tuning_edit_value(edit_pitch, 0, TTS_PITCH_MIN, TTS_PITCH_MAX);
         let volume = read_tts_edit_value(edit_volume, 100, TTS_VOLUME_MIN, TTS_VOLUME_MAX);
         select_combo_nearest_value(combo_speed, rate);
         select_combo_nearest_value(combo_pitch, pitch);
@@ -5328,12 +5347,12 @@ unsafe fn preview_voice(hwnd: HWND) {
     let manual = SendMessageW(checkbox_tts_manual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
         == BST_CHECKED.0;
     let rate = if manual {
-        read_tts_edit_value(edit_tts_speed, 0, TTS_RATE_MIN, TTS_RATE_MAX)
+        read_tts_tuning_edit_value(edit_tts_speed, 0, TTS_RATE_MIN, TTS_RATE_MAX)
     } else {
         combo_value(combo_tts_speed)
     };
     let pitch = if manual {
-        read_tts_edit_value(edit_tts_pitch, 0, TTS_PITCH_MIN, TTS_PITCH_MAX)
+        read_tts_tuning_edit_value(edit_tts_pitch, 0, TTS_PITCH_MIN, TTS_PITCH_MAX)
     } else {
         combo_value(combo_tts_pitch)
     };
@@ -5489,12 +5508,12 @@ unsafe fn insert_voice_tag_from_options(hwnd: HWND) {
     let manual =
         SendMessageW(checkbox_manual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 == BST_CHECKED.0;
     let rate = if manual {
-        read_tts_edit_value(edit_speed, 0, TTS_RATE_MIN, TTS_RATE_MAX)
+        read_tts_tuning_edit_value(edit_speed, 0, TTS_RATE_MIN, TTS_RATE_MAX)
     } else {
         combo_value(combo_speed)
     };
     let pitch = if manual {
-        read_tts_edit_value(edit_pitch, 0, TTS_PITCH_MIN, TTS_PITCH_MAX)
+        read_tts_tuning_edit_value(edit_pitch, 0, TTS_PITCH_MIN, TTS_PITCH_MAX)
     } else {
         combo_value(combo_pitch)
     };
@@ -5894,13 +5913,13 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         SendMessageW(checkbox_tts_manual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
             == BST_CHECKED.0;
     if settings.tts_manual_tuning {
-        settings.tts_rate = read_tts_edit_value(
+        settings.tts_rate = read_tts_tuning_edit_value(
             edit_tts_speed,
             settings.tts_rate,
             TTS_RATE_MIN,
             TTS_RATE_MAX,
         );
-        settings.tts_pitch = read_tts_edit_value(
+        settings.tts_pitch = read_tts_tuning_edit_value(
             edit_tts_pitch,
             settings.tts_pitch,
             TTS_PITCH_MIN,

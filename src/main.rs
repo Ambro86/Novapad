@@ -4572,6 +4572,7 @@ const TTS_PITCH_MIN: i32 = -12;
 const TTS_PITCH_MAX: i32 = 12;
 const TTS_VOLUME_MIN: i32 = 25;
 const TTS_VOLUME_MAX: i32 = 200;
+const TTS_UI_OFFSET: i32 = 100;
 
 fn clamp_tts_chunk_offset(previous: i32, incoming: i32) -> i32 {
     previous.max(incoming.max(0))
@@ -4638,6 +4639,18 @@ fn read_tts_edit_value(edit: HWND, fallback: i32, min: i32, max: i32) -> i32 {
             fallback
         }
     }
+}
+
+fn tts_ui_value_from_internal(value: i32) -> i32 {
+    value + TTS_UI_OFFSET
+}
+
+fn read_tts_tuning_edit_value(edit: HWND, fallback_internal: i32, min: i32, max: i32) -> i32 {
+    let ui_min = min + TTS_UI_OFFSET;
+    let ui_max = max + TTS_UI_OFFSET;
+    let ui_fallback = tts_ui_value_from_internal(fallback_internal).clamp(ui_min, ui_max);
+    let ui_value = read_tts_edit_value(edit, ui_fallback, ui_min, ui_max);
+    (ui_value - TTS_UI_OFFSET).clamp(min, max)
 }
 
 fn text_color_menu_id(text_color: u32) -> usize {
@@ -5369,11 +5382,11 @@ pub(crate) unsafe fn refresh_voice_panel(hwnd: HWND) {
         select_combo_nearest_value(combo_volume, settings.tts_volume);
         crate::log_if_err!(SetWindowTextW(
             edit_speed,
-            PCWSTR(to_wide(&settings.tts_rate.to_string()).as_ptr()),
+            PCWSTR(to_wide(&tts_ui_value_from_internal(settings.tts_rate).to_string()).as_ptr()),
         ));
         crate::log_if_err!(SetWindowTextW(
             edit_pitch,
-            PCWSTR(to_wide(&settings.tts_pitch.to_string()).as_ptr()),
+            PCWSTR(to_wide(&tts_ui_value_from_internal(settings.tts_pitch).to_string()).as_ptr()),
         ));
         crate::log_if_err!(SetWindowTextW(
             edit_volume,
@@ -5950,8 +5963,8 @@ unsafe fn handle_voice_panel_tuning_edit_change(hwnd: HWND) {
     if edit_speed.0 == 0 || edit_pitch.0 == 0 || edit_volume.0 == 0 {
         return;
     }
-    let rate = read_tts_edit_value(edit_speed, old_rate, TTS_RATE_MIN, TTS_RATE_MAX);
-    let pitch = read_tts_edit_value(edit_pitch, old_pitch, TTS_PITCH_MIN, TTS_PITCH_MAX);
+    let rate = read_tts_tuning_edit_value(edit_speed, old_rate, TTS_RATE_MIN, TTS_RATE_MAX);
+    let pitch = read_tts_tuning_edit_value(edit_pitch, old_pitch, TTS_PITCH_MIN, TTS_PITCH_MAX);
     let volume = read_tts_edit_value(edit_volume, old_volume, TTS_VOLUME_MIN, TTS_VOLUME_MAX);
     let changed = with_state(hwnd, |state| {
         if state.settings.tts_rate != rate

@@ -1335,7 +1335,8 @@ async fn download_audio_chunk_attempt(
 
     let sanitized_text = sanitize_edge_text(text);
     if !is_edge_text_usable(&sanitized_text) {
-        return Err("Edge WS: empty text after sanitization".to_string());
+        crate::log_debug("Edge WS: skipping empty chunk after sanitization (HTTP fallback path).");
+        return Ok(Vec::new());
     }
     let ssml = mkssml(&sanitized_text, voice, tts_rate, tts_pitch, tts_volume);
     let ssml_msg = format!(
@@ -1740,7 +1741,11 @@ async fn download_edge_chunk_ws(
     let req_id = Uuid::new_v4().simple().to_string();
     let sanitized_text = sanitize_edge_text(&chunk.text_to_read);
     if !is_edge_text_usable(&sanitized_text) {
-        return Err("Edge WS: empty text after sanitization".to_string());
+        crate::log_debug(&format!(
+            "Edge WS: skipping empty chunk after sanitization (chunk_index={}).",
+            idx
+        ));
+        return Ok(Vec::new());
     }
     let ssml = mkssml(
         &sanitized_text,
@@ -2085,10 +2090,31 @@ fn run_split_audiobook_by_time_edge(
             let audio = res?;
             pending.insert(idx, audio);
 
-            while let Some(data) = pending.remove(&next_to_write) {
-                if options.cancel.load(Ordering::Relaxed) {
-                    return Err(cancelled_message(options.language));
+        while let Some(data) = pending.remove(&next_to_write) {
+            if data.is_empty() {
+                crate::log_debug(&format!(
+                    "Edge WS: skipping empty audio payload after sanitization (chunk_index={}).",
+                    next_to_write
+                ));
+                current_global_progress = current_global_progress.saturating_add(1);
+                if options.progress_hwnd.0 != 0 {
+                    unsafe {
+                        if let Err(e) = PostMessageW(
+                            options.progress_hwnd,
+                            crate::WM_UPDATE_PROGRESS,
+                            WPARAM(current_global_progress),
+                            LPARAM(0),
+                        ) {
+                            crate::log_debug(&format!("Failed to post WM_UPDATE_PROGRESS: {}", e));
+                        }
+                    }
                 }
+                next_to_write = next_to_write.saturating_add(1);
+                continue;
+            }
+            if options.cancel.load(Ordering::Relaxed) {
+                return Err(cancelled_message(options.language));
+            }
 
                 let (samples, src_rate, src_channels) =
                     decode_mp3_to_pcm(&data).map_err(|e| e.to_string())?;
@@ -2362,6 +2388,27 @@ async fn download_edge_chunks_ws_parallel_to_writer(
         pending.insert(idx, audio);
 
         while let Some(data) = pending.remove(&next_to_write) {
+            if data.is_empty() {
+                crate::log_debug(&format!(
+                    "Edge WS: skipping empty audio payload after sanitization (chunk_index={}).",
+                    next_to_write
+                ));
+                *current_global_progress += 1;
+                if options.progress_hwnd.0 != 0 {
+                    unsafe {
+                        if let Err(e) = PostMessageW(
+                            options.progress_hwnd,
+                            crate::WM_UPDATE_PROGRESS,
+                            WPARAM(*current_global_progress),
+                            LPARAM(0),
+                        ) {
+                            crate::log_debug(&format!("Failed to post WM_UPDATE_PROGRESS: {}", e));
+                        }
+                    }
+                }
+                next_to_write = next_to_write.saturating_add(1);
+                continue;
+            }
             writer.write_all(&data).map_err(|err| err.to_string())?;
             writer.flush().map_err(|err| err.to_string())?;
 

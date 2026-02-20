@@ -1616,6 +1616,7 @@ pub(crate) struct AppState {
     selected_audio_track: Option<i32>,
     audio_playlist: Vec<PathBuf>,
     audio_playlist_index: Option<usize>,
+    audio_ffmpeg_retry_for: Option<PathBuf>,
     voice_panel_visible: bool,
     voice_label_engine: HWND,
     voice_combo_engine: HWND,
@@ -2863,6 +2864,7 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 selected_audio_track: None,
                 audio_playlist: Vec::new(),
                 audio_playlist_index: None,
+                audio_ffmpeg_retry_for: None,
                 voice_panel_visible: false,
                 voice_label_engine: label_engine,
                 voice_combo_engine: combo_engine,
@@ -8468,6 +8470,7 @@ fn play_audio_playlist_item(hwnd: HWND, index: usize) {
                 return None;
             }
             state.audio_playlist_index = Some(index);
+            state.audio_ffmpeg_retry_for = None;
             Some(state.audio_playlist[index].clone())
         })
         .flatten()
@@ -8564,26 +8567,41 @@ fn switch_audio_playlist_relative(hwnd: HWND, delta: i32) -> bool {
 }
 
 fn handle_audio_playlist_timer(hwnd: HWND) {
-    let (is_paused, should_advance) = unsafe {
+    let (is_paused, should_advance, current_seconds, elapsed_since_start) = unsafe {
         with_state(hwnd, |state| {
             let player = state.active_audiobook.as_ref()?;
             if player.is_paused {
-                return Some((true, false));
+                return Some((true, false, 0_u64, std::time::Duration::from_secs(0)));
             }
             let duration = audio_player::audiobook_duration_secs(&player.path)?;
             let current = audio_player::audiobook_position_secs(player)
                 .max(0.0)
                 .floor() as u64;
-            Some((false, current >= duration.saturating_add(1)))
+            Some((
+                false,
+                current >= duration.saturating_add(1),
+                current,
+                player.start_instant.elapsed(),
+            ))
         })
         .flatten()
-        .unwrap_or((false, false))
+        .unwrap_or((false, false, 0_u64, std::time::Duration::from_secs(0)))
     };
     if is_paused {
         return;
     }
     let output_stopped = unsafe { audio_player::audiobook_output_stopped(hwnd) }.unwrap_or(false);
     if !should_advance && !output_stopped {
+        return;
+    }
+    // Retry with forced FFmpeg streaming only in the startup window.
+    // This avoids collisions with manual seeks/skips during normal playback.
+    if !should_advance
+        && output_stopped
+        && current_seconds == 0
+        && elapsed_since_start.as_secs() <= 5
+        && unsafe { audio_player::retry_current_with_ffmpeg_stream(hwnd) }
+    {
         return;
     }
     if !switch_audio_playlist_relative(hwnd, 1) {

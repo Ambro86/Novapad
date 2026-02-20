@@ -118,6 +118,7 @@ pub unsafe fn set_audiobook_subtitle_override(
                 prev_volume: player.prev_volume,
                 mix_export: false,
                 audio_track: None,
+                force_ffmpeg_stream: false,
             };
             resume_info = Some((player.path.clone(), seconds, options));
             current_media = Some(player.path.clone());
@@ -572,6 +573,7 @@ struct AudiobookPlaybackOptions {
     prev_volume: f32,
     mix_export: bool,
     audio_track: Option<i32>,
+    force_ffmpeg_stream: bool,
 }
 
 fn start_audiobook_at_with_options(
@@ -700,63 +702,100 @@ fn start_audiobook_at_with_options(
             }
         }
 
+        let mut force_ffmpeg_stream = options.force_ffmpeg_stream;
+        if !force_ffmpeg_stream {
+            force_ffmpeg_stream = unsafe {
+                with_state(hwnd_main, |state| {
+                    state
+                        .audio_ffmpeg_retry_for
+                        .as_ref()
+                        .is_some_and(|p| p == &final_path)
+                })
+                .unwrap_or(false)
+            };
+        }
+
         log_debug("Audio player: Opening with BASS...");
         let initial_volume = if options.muted { 0.0 } else { options.volume };
-        let output = match BassOutput::start(
-            &final_path,
-            seconds,
-            effective_speed,
-            options.pitch,
-            initial_volume,
-            effective_paused,
-        ) {
-            Ok(output) => output,
-            Err(err) => {
-                log_debug(&format!("Audio player: BASS open failed: {}", err));
-                // Try FFmpeg streaming first (instant playback)
-                match BassOutput::start_with_ffmpeg(
-                    &final_path,
-                    seconds,
-                    effective_speed,
-                    options.pitch,
-                    initial_volume,
-                    effective_paused,
-                    options.audio_track,
-                ) {
-                    Ok(output) => {
-                        log_debug("Audio player: using FFmpeg streaming");
-                        output
-                    }
-                    Err(stream_err) => {
-                        log_debug(&format!(
-                            "Audio player: FFmpeg streaming failed: {}",
-                            stream_err
-                        ));
-                        // Fallback to WAV decode (slower but reliable)
-                        match decode_ffmpeg_to_wav(&final_path, options.audio_track) {
-                            Ok(wav_path) => match BassOutput::start(
-                                &wav_path,
-                                seconds,
-                                effective_speed,
-                                options.pitch,
-                                initial_volume,
-                                effective_paused,
-                            ) {
-                                Ok(output) => output,
+        let output = if force_ffmpeg_stream {
+            match BassOutput::start_with_ffmpeg(
+                &final_path,
+                seconds,
+                effective_speed,
+                options.pitch,
+                initial_volume,
+                effective_paused,
+                options.audio_track,
+            ) {
+                Ok(output) => {
+                    log_debug("Audio player: using forced FFmpeg streaming");
+                    output
+                }
+                Err(stream_err) => {
+                    log_debug(&format!(
+                        "Audio player: forced FFmpeg streaming failed: {}",
+                        stream_err
+                    ));
+                    return;
+                }
+            }
+        } else {
+            match BassOutput::start(
+                &final_path,
+                seconds,
+                effective_speed,
+                options.pitch,
+                initial_volume,
+                effective_paused,
+            ) {
+                Ok(output) => output,
+                Err(err) => {
+                    log_debug(&format!("Audio player: BASS open failed: {}", err));
+                    // Try FFmpeg streaming first (instant playback)
+                    match BassOutput::start_with_ffmpeg(
+                        &final_path,
+                        seconds,
+                        effective_speed,
+                        options.pitch,
+                        initial_volume,
+                        effective_paused,
+                        options.audio_track,
+                    ) {
+                        Ok(output) => {
+                            log_debug("Audio player: using FFmpeg streaming");
+                            output
+                        }
+                        Err(stream_err) => {
+                            log_debug(&format!(
+                                "Audio player: FFmpeg streaming failed: {}",
+                                stream_err
+                            ));
+                            // Fallback to WAV decode (slower but reliable)
+                            match decode_ffmpeg_to_wav(&final_path, options.audio_track) {
+                                Ok(wav_path) => match BassOutput::start(
+                                    &wav_path,
+                                    seconds,
+                                    effective_speed,
+                                    options.pitch,
+                                    initial_volume,
+                                    effective_paused,
+                                ) {
+                                    Ok(output) => output,
+                                    Err(err) => {
+                                        log_debug(&format!(
+                                            "Audio player: BASS fallback failed: {}",
+                                            err
+                                        ));
+                                        return;
+                                    }
+                                },
                                 Err(err) => {
                                     log_debug(&format!(
-                                        "Audio player: BASS fallback failed: {}",
+                                        "Audio player: FFmpeg fallback failed: {}",
                                         err
                                     ));
                                     return;
                                 }
-                            },
-                            Err(err) => {
-                                log_debug(&format!(
-                                    "Audio player: FFmpeg fallback failed: {}",
-                                    err
-                                ));
-                                return;
                             }
                         }
                     }
@@ -898,6 +937,7 @@ pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
             prev_volume: volume,
             mix_export,
             audio_track: None,
+            force_ffmpeg_stream: false,
         },
     );
 }
@@ -1013,6 +1053,7 @@ pub unsafe fn toggle_audiobook_pause(hwnd: HWND) {
                         prev_volume,
                         mix_export: false,
                         audio_track,
+                        force_ffmpeg_stream: false,
                     },
                 );
             }
@@ -1102,6 +1143,7 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
             prev_volume,
             mix_export: false,
             audio_track,
+            force_ffmpeg_stream: false,
         },
     );
 }
@@ -1159,6 +1201,71 @@ pub unsafe fn stop_audiobook_playback(hwnd: HWND) {
     }
 }
 
+pub unsafe fn retry_current_with_ffmpeg_stream(hwnd: HWND) -> bool {
+    let restart = with_state(hwnd, |state| {
+        let player = state.active_audiobook.take()?;
+        let path = player.path.clone();
+        if state
+            .audio_ffmpeg_retry_for
+            .as_ref()
+            .is_some_and(|p| p == &path)
+        {
+            state.active_audiobook = Some(player);
+            return None;
+        }
+        state.audio_ffmpeg_retry_for = Some(path.clone());
+        let current = audiobook_position_secs(&player).max(0.0).floor() as u64;
+        let audio_track = state.selected_audio_track;
+        stop_shared_subtitle_speech(
+            &player.subtitle_speech_cancel,
+            &player.subtitle_speech_command,
+            "ffmpeg_retry",
+        );
+        player.subtitle_cancel.store(true, Ordering::Relaxed);
+        player.stop();
+        Some((
+            path,
+            current,
+            player.speed,
+            player.pitch,
+            player.is_paused,
+            player.volume,
+            player.muted,
+            player.prev_volume,
+            audio_track,
+        ))
+    })
+    .flatten();
+
+    let Some((path, current, speed, pitch, paused, volume, muted, prev_volume, audio_track)) =
+        restart
+    else {
+        return false;
+    };
+
+    log_debug(&format!(
+        "Audio player: retrying with forced FFmpeg streaming for {}",
+        path.display()
+    ));
+    start_audiobook_at_with_options(
+        hwnd,
+        path,
+        current,
+        AudiobookPlaybackOptions {
+            speed,
+            pitch,
+            paused,
+            volume,
+            muted,
+            prev_volume,
+            mix_export: false,
+            audio_track,
+            force_ffmpeg_stream: true,
+        },
+    );
+    true
+}
+
 pub unsafe fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
     crate::log_debug(&format!(
         "Audio player: start_audiobook_at called for {} at {}s",
@@ -1196,6 +1303,7 @@ pub unsafe fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
             prev_volume,
             mix_export: false,
             audio_track,
+            force_ffmpeg_stream: false,
         },
     );
 }
@@ -1293,6 +1401,7 @@ pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
             prev_volume,
             mix_export: false,
             audio_track,
+            force_ffmpeg_stream: false,
         },
     );
 
@@ -1348,6 +1457,7 @@ pub unsafe fn change_audiobook_pitch(hwnd: HWND, delta: f32) -> Option<f32> {
             prev_volume,
             mix_export: false,
             audio_track,
+            force_ffmpeg_stream: false,
         },
     );
 
@@ -1402,6 +1512,7 @@ pub unsafe fn reset_audiobook_speed(hwnd: HWND) -> Option<f32> {
             prev_volume,
             mix_export: false,
             audio_track,
+            force_ffmpeg_stream: false,
         },
     );
 
@@ -1456,6 +1567,7 @@ pub unsafe fn reset_audiobook_pitch(hwnd: HWND) -> Option<f32> {
             prev_volume,
             mix_export: false,
             audio_track,
+            force_ffmpeg_stream: false,
         },
     );
 
@@ -1546,6 +1658,7 @@ pub unsafe fn switch_audio_track(hwnd: HWND, track_index: i32) {
             prev_volume,
             mix_export: false,
             audio_track: Some(track_index),
+            force_ffmpeg_stream: false,
         },
     );
 

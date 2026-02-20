@@ -196,7 +196,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 futures-util = "0.3"
 hex = "0.4"
 rand = { version = "0.8", default-features = false, features = ["std", "std_rng"] }
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "cookies", "gzip", "brotli", "blocking", "json"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "cookies", "gzip", "brotli", "blocking", "json", "socks"] }
 curl = "0.4"
 curl-sys = "0.4"
 rodio = { version = "0.21", features = ["symphonia-aac", "symphonia-isomp4", "symphonia-mkv"] }

@@ -2,6 +2,7 @@
 
 Phiên bản 0.6.7 – 2026-02-13
 Cải tiến
+• Da bo sung ho tro proxy mang toan cuc (HTTP/HTTPS va SOCKS5/SOCKS5H) cho cac tinh nang truc tuyen, kem kiem tra khi luu Tuy chon: proxy khong hop le se duoc canh bao va xoa tu dong.
 • Đã mở rộng tùy chọn bitrate trong Chuyển đổi âm thanh và cài đặt ghi podcast: thêm mức thấp hơn (64/96 kbps) và nâng MP3 lên tối đa 320 kbps, đồng bộ cả kiểm tra hợp lệ và xử lý bộ mã hóa.
 • Đã thêm chế độ mới Xem > Chỉ đọc để ngăn chỉnh sửa nhầm văn bản, đồng thời vẫn giữ khả năng đọc và điều hướng đầy đủ tài liệu.
 • Đã thêm thanh tiến trình có thể truy cập trong quá trình cập nhật chương trình, giúp trình đọc màn hình theo dõi tiến độ tải xuống theo thời gian thực.

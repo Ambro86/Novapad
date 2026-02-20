@@ -11,10 +11,13 @@ use crate::settings::{
     sync_start_menu_shortcuts,
 };
 use crate::{i18n, rebuild_menus, refresh_voice_panel, tts_engine, with_state};
+use reqwest::blocking::Client;
+use reqwest::header::USER_AGENT;
 use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::thread;
+use std::time::Duration;
 use tokio::sync::mpsc;
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
@@ -39,12 +42,12 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CB_SETITEMDATA, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW,
     DefWindowProcW, DestroyWindow, ES_AUTOHSCROLL, ES_PASSWORD, ES_READONLY, GWLP_USERDATA,
     GetClientRect, GetNextDlgTabItem, GetParent, GetWindowLongPtrW, GetWindowTextLengthW,
-    GetWindowTextW, HMENU, IDC_ARROW, LoadCursorW, MSG, MoveWindow, PostMessageW, RegisterClassW,
-    SW_HIDE, SW_SHOW, SW_SHOWNORMAL, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
-    SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY,
-    WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_SETFONT, WNDCLASSW, WS_CAPTION,
-    WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP,
-    WS_VISIBLE,
+    GetWindowTextW, HMENU, IDC_ARROW, LoadCursorW, MB_ICONWARNING, MB_OK, MSG, MessageBoxW,
+    MoveWindow, PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW, SW_SHOWNORMAL, SendMessageW,
+    SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_APP,
+    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL,
+    WM_NOTIFY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -107,6 +110,9 @@ const OPTIONS_ID_CONFIRM_DELETE_PODCAST_MODE: usize = 6068;
 const OPTIONS_ID_RSS_QUICK_COPY_MODE: usize = 6069;
 const OPTIONS_ID_MANAGE_ASSOCIATIONS: usize = 6044;
 const OPTIONS_ID_PROMPT_PROGRAM: usize = 6019;
+const OPTIONS_ID_NETWORK_PROXY: usize = 6075;
+const OPTIONS_ID_NETWORK_PROXY_USERNAME: usize = 6076;
+const OPTIONS_ID_NETWORK_PROXY_PASSWORD: usize = 6077;
 const OPTIONS_ID_TABS: usize = 6024;
 const OPTIONS_ID_USE_DIALOGUE_VOICE: usize = 6049;
 const OPTIONS_ID_DIALOGUE_VOICE: usize = 6050;
@@ -149,6 +155,32 @@ const OPTIONS_BUTTON_HEIGHT: i32 = 28;
 const OPTIONS_COMBO_HEIGHT: i32 = 28;
 const OPTIONS_EDIT_HEIGHT: i32 = 24;
 const OPTIONS_SECTION_GAP: i32 = 8;
+
+fn proxy_is_valid(proxy_url: &str, username: &str, password: &str) -> Result<(), String> {
+    let mut proxy = reqwest::Proxy::all(proxy_url).map_err(|e| e.to_string())?;
+    if !username.trim().is_empty() {
+        proxy = proxy.basic_auth(username.trim(), password.trim());
+    }
+    let client = Client::builder()
+        .proxy(proxy)
+        .connect_timeout(Duration::from_secs(8))
+        .timeout(Duration::from_secs(15))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let response = client
+        .get("https://it.wikipedia.org/w/api.php?action=query&meta=siteinfo&format=json")
+        .header(
+            USER_AGENT,
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Sonarpad",
+        )
+        .send()
+        .map_err(|e| e.to_string())?;
+    if response.status().is_success() {
+        Ok(())
+    } else {
+        Err(format!("HTTP {}", response.status()))
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ShortcutAction {
@@ -683,6 +715,12 @@ struct OptionsDialogState {
     button_manage_associations: HWND,
     label_prompt_program: HWND,
     combo_prompt_program: HWND,
+    label_network_proxy: HWND,
+    edit_network_proxy: HWND,
+    label_network_proxy_username: HWND,
+    edit_network_proxy_username: HWND,
+    label_network_proxy_password: HWND,
+    edit_network_proxy_password: HWND,
     label_shortcut_action: HWND,
     combo_shortcut_action: HWND,
     label_shortcut_value: HWND,
@@ -756,6 +794,9 @@ struct OptionsLabels {
     label_file_associations: String,
     label_manage_associations: String,
     label_prompt_program: String,
+    label_network_proxy: String,
+    label_network_proxy_username: String,
+    label_network_proxy_password: String,
     label_shortcut_action: String,
     label_shortcut_value: String,
     label_shortcut_change: String,
@@ -902,6 +943,9 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_file_associations: i18n::tr(language, "options.label.file_associations"),
         label_manage_associations: i18n::tr(language, "options.button.manage_associations"),
         label_prompt_program: i18n::tr(language, "options.label.prompt_program"),
+        label_network_proxy: i18n::tr(language, "options.label.network_proxy"),
+        label_network_proxy_username: i18n::tr(language, "options.label.network_proxy_username"),
+        label_network_proxy_password: i18n::tr(language, "options.label.network_proxy_password"),
         label_shortcut_action: shortcuts_label_action(language).to_string(),
         label_shortcut_value: shortcuts_label_value(language).to_string(),
         label_shortcut_change: shortcuts_change_label(language).to_string(),
@@ -2956,6 +3000,99 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 HINSTANCE(0),
                 None,
             );
+            y += 30;
+
+            let label_network_proxy = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_network_proxy).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let edit_network_proxy = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                170,
+                y - 2,
+                300,
+                22,
+                hwnd,
+                HMENU(OPTIONS_ID_NETWORK_PROXY as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
+            let label_network_proxy_username = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_network_proxy_username).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let edit_network_proxy_username = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                170,
+                y - 2,
+                300,
+                22,
+                hwnd,
+                HMENU(OPTIONS_ID_NETWORK_PROXY_USERNAME as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
+            let label_network_proxy_password = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_network_proxy_password).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let edit_network_proxy_password = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD
+                    | WS_VISIBLE
+                    | WS_TABSTOP
+                    | WINDOW_STYLE((ES_AUTOHSCROLL | ES_PASSWORD) as u32),
+                170,
+                y - 2,
+                300,
+                22,
+                hwnd,
+                HMENU(OPTIONS_ID_NETWORK_PROXY_PASSWORD as isize),
+                HINSTANCE(0),
+                None,
+            );
             y += 40;
 
             let label_shortcut_action = CreateWindowExW(
@@ -3201,6 +3338,12 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 button_manage_associations,
                 label_prompt_program,
                 combo_prompt_program,
+                label_network_proxy,
+                edit_network_proxy,
+                label_network_proxy_username,
+                edit_network_proxy_username,
+                label_network_proxy_password,
+                edit_network_proxy_password,
                 label_shortcut_action,
                 combo_shortcut_action,
                 label_shortcut_value,
@@ -3325,6 +3468,12 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 button_manage_associations,
                 label_prompt_program,
                 combo_prompt_program,
+                label_network_proxy,
+                edit_network_proxy,
+                label_network_proxy_username,
+                edit_network_proxy_username,
+                label_network_proxy_password,
+                edit_network_proxy_password,
                 label_shortcut_action,
                 combo_shortcut_action,
                 label_shortcut_value,
@@ -3757,6 +3906,12 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         combo_rss_quick_copy_mode,
         _label_prompt_program,
         combo_prompt_program,
+        _label_network_proxy,
+        edit_network_proxy,
+        _label_network_proxy_username,
+        edit_network_proxy_username,
+        _label_network_proxy_password,
+        edit_network_proxy_password,
         combo_shortcut_action,
         _edit_shortcut_value,
     ) = match with_options_state(hwnd, |state| {
@@ -3839,6 +3994,12 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.combo_rss_quick_copy_mode,
             state.label_prompt_program,
             state.combo_prompt_program,
+            state.label_network_proxy,
+            state.edit_network_proxy,
+            state.label_network_proxy_username,
+            state.edit_network_proxy_username,
+            state.label_network_proxy_password,
+            state.edit_network_proxy_password,
             state.combo_shortcut_action,
             state.edit_shortcut_value,
         )
@@ -4737,6 +4898,30 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         WPARAM(program_idx),
         LPARAM(0),
     );
+    if let Err(_e) = SetWindowTextW(
+        edit_network_proxy,
+        PCWSTR(to_wide(&settings.network_proxy_url).as_ptr()),
+    ) {
+        crate::log_debug(&format!("Failed to set network proxy text: {:?}", _e));
+    }
+    if let Err(_e) = SetWindowTextW(
+        edit_network_proxy_username,
+        PCWSTR(to_wide(&settings.network_proxy_username).as_ptr()),
+    ) {
+        crate::log_debug(&format!(
+            "Failed to set network proxy username text: {:?}",
+            _e
+        ));
+    }
+    if let Err(_e) = SetWindowTextW(
+        edit_network_proxy_password,
+        PCWSTR(to_wide(&settings.network_proxy_password).as_ptr()),
+    ) {
+        crate::log_debug(&format!(
+            "Failed to set network proxy password text: {:?}",
+            _e
+        ));
+    }
     if with_options_state(hwnd, |state| {
         state.shortcut_draft = settings.shortcuts.clone();
         state.shortcut_capture_pending = false;
@@ -5731,6 +5916,9 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         combo_confirm_delete_podcast_mode,
         combo_rss_quick_copy_mode,
         combo_prompt_program,
+        edit_network_proxy,
+        edit_network_proxy_username,
+        edit_network_proxy_password,
     ) = match with_options_state(hwnd, |state| {
         (
             state.parent,
@@ -5793,6 +5981,9 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.combo_confirm_delete_podcast_mode,
             state.combo_rss_quick_copy_mode,
             state.combo_prompt_program,
+            state.edit_network_proxy,
+            state.edit_network_proxy_username,
+            state.edit_network_proxy_password,
         )
     }) {
         Some(values) => values,
@@ -6189,6 +6380,47 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         2 => "codex".to_string(),
         _ => "cmd.exe".to_string(),
     };
+    let proxy_len = GetWindowTextLengthW(edit_network_proxy);
+    if proxy_len >= 0 {
+        let mut buf = vec![0u16; (proxy_len + 1) as usize];
+        let read = GetWindowTextW(edit_network_proxy, &mut buf);
+        let text = String::from_utf16_lossy(&buf[..read as usize]);
+        settings.network_proxy_url = text.trim().to_string();
+    }
+    let proxy_user_len = GetWindowTextLengthW(edit_network_proxy_username);
+    if proxy_user_len >= 0 {
+        let mut buf = vec![0u16; (proxy_user_len + 1) as usize];
+        let read = GetWindowTextW(edit_network_proxy_username, &mut buf);
+        let text = String::from_utf16_lossy(&buf[..read as usize]);
+        settings.network_proxy_username = text.trim().to_string();
+    }
+    let proxy_password_len = GetWindowTextLengthW(edit_network_proxy_password);
+    if proxy_password_len >= 0 {
+        let mut buf = vec![0u16; (proxy_password_len + 1) as usize];
+        let read = GetWindowTextW(edit_network_proxy_password, &mut buf);
+        let text = String::from_utf16_lossy(&buf[..read as usize]);
+        settings.network_proxy_password = text.trim().to_string();
+    }
+    if !settings.network_proxy_url.is_empty()
+        && let Err(err) = proxy_is_valid(
+            &settings.network_proxy_url,
+            &settings.network_proxy_username,
+            &settings.network_proxy_password,
+        )
+    {
+        crate::log_debug(&format!("Invalid proxy removed: {}", err));
+        let warning = i18n::tr(settings.language, "options.proxy.invalid");
+        let title = i18n::tr(settings.language, "options.title");
+        MessageBoxW(
+            hwnd,
+            PCWSTR(to_wide(&warning).as_ptr()),
+            PCWSTR(to_wide(&title).as_ptr()),
+            MB_OK | MB_ICONWARNING,
+        );
+        settings.network_proxy_url.clear();
+        settings.network_proxy_username.clear();
+        settings.network_proxy_password.clear();
+    }
 
     let voices = with_state(parent, |state| match settings.tts_engine {
         TtsEngine::Edge => state.edge_voices.clone(),
@@ -6696,6 +6928,30 @@ fn layout_general_tab(state: &OptionsDialogState) {
         state.combo_prompt_program,
         y,
         OPTIONS_COMBO_HEIGHT,
+    );
+    y = layout_label_control(
+        "label_network_proxy",
+        state.label_network_proxy,
+        "edit_network_proxy",
+        state.edit_network_proxy,
+        y,
+        OPTIONS_EDIT_HEIGHT,
+    );
+    y = layout_label_control(
+        "label_network_proxy_username",
+        state.label_network_proxy_username,
+        "edit_network_proxy_username",
+        state.edit_network_proxy_username,
+        y,
+        OPTIONS_EDIT_HEIGHT,
+    );
+    y = layout_label_control(
+        "label_network_proxy_password",
+        state.label_network_proxy_password,
+        "edit_network_proxy_password",
+        state.edit_network_proxy_password,
+        y,
+        OPTIONS_EDIT_HEIGHT,
     );
     y += OPTIONS_SECTION_GAP;
     y = layout_checkbox("checkbox_check_updates", state.checkbox_check_updates, y);
@@ -7228,6 +7484,12 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.combo_open,
             state.label_prompt_program,
             state.combo_prompt_program,
+            state.label_network_proxy,
+            state.edit_network_proxy,
+            state.label_network_proxy_username,
+            state.edit_network_proxy_username,
+            state.label_network_proxy_password,
+            state.edit_network_proxy_password,
             state.checkbox_check_updates,
             state.checkbox_send_crash_reports,
             state.checkbox_use_legacy_name,

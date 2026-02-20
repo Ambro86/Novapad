@@ -2,6 +2,7 @@
 
 Versión 0.6.7 – 2026-02-13
 Mejoras
+• Añadido soporte global de proxy de red (HTTP/HTTPS y SOCKS5/SOCKS5H) para funciones en línea, con validación al guardar Opciones: los proxies no válidos se avisan y se eliminan automáticamente.
 • Ampliadas las opciones de bitrate en la conversión de audio y en la grabación de podcast: añadidos valores más bajos (64/96 kbps) y ampliado MP3 hasta 320 kbps, con validación y manejo del codificador alineados.
 • Añadido el nuevo modo Ver > Solo lectura para bloquear ediciones accidentales del texto manteniendo la lectura y navegación completas de los documentos.
 • Añadida una barra de progreso accesible durante las actualizaciones del programa, para que los lectores de pantalla puedan seguir en tiempo real el avance de la descarga.

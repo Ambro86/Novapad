@@ -132,7 +132,7 @@ impl CurlClient {
         easy.url(url)?;
         easy.follow_location(true)?;
         easy.timeout(Duration::from_secs(30))?;
-        easy.connect_timeout(Duration::from_secs(15))?;
+        easy.connect_timeout(Duration::from_secs(30))?;
         easy.accept_encoding("gzip, deflate, br")?;
         easy.cookie_file("")?;
         easy.post(true)?;
@@ -167,7 +167,7 @@ impl CurlClient {
         easy.url(url)?;
         easy.follow_location(true)?;
         easy.timeout(Duration::from_secs(600))?; // Aumentato a 10m per file grandi
-        easy.connect_timeout(Duration::from_secs(15))?;
+        easy.connect_timeout(Duration::from_secs(30))?;
         easy.accept_encoding("gzip, deflate, br")?;
         easy.pipewait(true)?;
         easy.cookie_file("")?;
@@ -237,7 +237,7 @@ fn fetch_url_chrome_advanced<F: FnMut(u32)>(
     easy.accept_encoding("")?;
     easy.follow_location(true)?;
     easy.max_redirections(10)?;
-    easy.connect_timeout(std::time::Duration::from_secs(10))?;
+    easy.connect_timeout(std::time::Duration::from_secs(30))?;
     easy.timeout(std::time::Duration::from_secs(600))?; // 10m per file grandi
     easy.progress(true)?;
 

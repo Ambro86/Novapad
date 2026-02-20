@@ -510,6 +510,12 @@ pub struct AppSettings {
     pub show_favorite_panel: bool,
     pub check_updates_on_startup: bool,
     pub prompt_program: String,
+    #[serde(default)]
+    pub network_proxy_url: String,
+    #[serde(default)]
+    pub network_proxy_username: String,
+    #[serde(default)]
+    pub network_proxy_password: String,
     pub prompt_auto_scroll: bool,
     pub prompt_strip_ansi: bool,
     pub prompt_beep_on_idle: bool,
@@ -723,6 +729,9 @@ impl Default for AppSettings {
             show_favorite_panel: false,
             check_updates_on_startup: true,
             prompt_program: "cmd.exe".to_string(),
+            network_proxy_url: String::new(),
+            network_proxy_username: String::new(),
+            network_proxy_password: String::new(),
             prompt_auto_scroll: true,
             prompt_strip_ansi: true,
             prompt_beep_on_idle: true,
@@ -1229,6 +1238,9 @@ pub fn load_settings() -> AppSettings {
 }
 
 fn normalize_settings(mut settings: AppSettings) -> AppSettings {
+    settings.network_proxy_url = settings.network_proxy_url.trim().to_string();
+    settings.network_proxy_username = settings.network_proxy_username.trim().to_string();
+    settings.network_proxy_password = settings.network_proxy_password.trim().to_string();
     let valid_indent = [2, 4, 6, 8];
     if !valid_indent.contains(&settings.indent_tab_width) {
         settings.indent_tab_width = default_indent_tab_width();
@@ -1407,6 +1419,7 @@ pub fn decrypt_podcast_index_secret(secret: &str) -> Option<String> {
 }
 
 pub fn save_settings(settings: AppSettings) {
+    apply_network_proxy_settings(&settings);
     let path = get_settings_path();
     if let Some(parent) = path.parent()
         && let Err(e) = std::fs::create_dir_all(parent)
@@ -1427,6 +1440,54 @@ pub fn save_settings(settings: AppSettings) {
             crate::log_debug(&format!("Failed to serialize settings: {}", e));
         }
     }
+}
+
+pub fn apply_network_proxy_settings(settings: &AppSettings) {
+    let proxy = settings.network_proxy_url.trim();
+    if proxy.is_empty() {
+        // Keep behavior explicit: no configured proxy means clear app-level overrides.
+        unsafe {
+            std::env::remove_var("HTTP_PROXY");
+            std::env::remove_var("HTTPS_PROXY");
+            std::env::remove_var("ALL_PROXY");
+            std::env::remove_var("http_proxy");
+            std::env::remove_var("https_proxy");
+            std::env::remove_var("all_proxy");
+        }
+        return;
+    }
+
+    let username = settings.network_proxy_username.trim();
+    let password = settings.network_proxy_password.trim();
+    let proxy_with_auth = if !username.is_empty() {
+        inject_proxy_credentials(proxy, username, password).unwrap_or_else(|| proxy.to_string())
+    } else {
+        proxy.to_string()
+    };
+
+    unsafe {
+        std::env::set_var("HTTP_PROXY", &proxy_with_auth);
+        std::env::set_var("HTTPS_PROXY", &proxy_with_auth);
+        std::env::set_var("ALL_PROXY", &proxy_with_auth);
+        std::env::set_var("http_proxy", &proxy_with_auth);
+        std::env::set_var("https_proxy", &proxy_with_auth);
+        std::env::set_var("all_proxy", &proxy_with_auth);
+    }
+}
+
+fn inject_proxy_credentials(proxy: &str, username: &str, password: &str) -> Option<String> {
+    let scheme_pos = proxy.find("://")?;
+    let scheme = &proxy[..scheme_pos + 3];
+    let rest = &proxy[scheme_pos + 3..];
+    if rest.is_empty() || rest.contains('@') {
+        return None;
+    }
+    let creds = if password.is_empty() {
+        username.to_string()
+    } else {
+        format!("{username}:{password}")
+    };
+    Some(format!("{scheme}{creds}@{rest}"))
 }
 
 pub fn save_settings_with_default_copy(settings: AppSettings, _keep_default_copy: bool) {

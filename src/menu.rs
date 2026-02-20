@@ -629,16 +629,20 @@ unsafe fn remove_playback_menu(hmenu: HMENU, playback_menu: HMENU) {
     if hmenu.0 == 0 || playback_menu.0 == 0 {
         return;
     }
+    let mut detached = false;
     let count = GetMenuItemCount(hmenu);
     if count > 0 {
         for index in 0..count {
             if GetSubMenu(hmenu, index) == playback_menu {
                 crate::log_if_err!(DeleteMenu(hmenu, index as u32, MF_BYPOSITION));
+                detached = true;
                 break;
             }
         }
     }
-    crate::log_if_err!(DestroyMenu(playback_menu));
+    if detached {
+        crate::log_if_err!(DestroyMenu(playback_menu));
+    }
 }
 
 pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {

@@ -709,7 +709,7 @@ fn start_audiobook_at_with_options(
                     state
                         .audio_ffmpeg_retry_for
                         .as_ref()
-                        .is_some_and(|p| p == &final_path)
+                        .is_some_and(|p| p == &final_path || p == &path)
                 })
                 .unwrap_or(false)
             };

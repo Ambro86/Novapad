@@ -1,8 +1,10 @@
 use std::cmp::Ordering as CmpOrdering;
+use std::collections::HashSet;
+use std::io::{BufRead, BufReader};
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
@@ -20,13 +22,14 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 use windows::Win32::UI::WindowsAndMessaging::{
     BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL,
     CB_RESETCONTENT, CB_SETCURSEL, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW,
-    DefWindowProcW, DestroyWindow, DispatchMessageW, EN_CHANGE, ES_MULTILINE, ES_READONLY,
-    GWLP_USERDATA, GetMessageW, GetWindowLongPtrW, HMENU, IDC_ARROW, IDYES, IsDialogMessageW,
-    IsWindow, LoadCursorW, MB_ICONQUESTION, MB_YESNO, MSG, MessageBoxW, PostMessageW,
-    RegisterClassW, SW_HIDE, SW_SHOW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
-    SetWindowTextW, ShowWindow, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
-    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    DefWindowProcW, DestroyWindow, DispatchMessageW, EN_CHANGE, ES_AUTOHSCROLL, ES_MULTILINE,
+    ES_READONLY, FindWindowExW, GWLP_USERDATA, GetMessageW, GetWindowLongPtrW, HMENU, IDC_ARROW,
+    IDYES, IsDialogMessageW, IsWindow, LoadCursorW, MB_ICONQUESTION, MB_YESNO, MSG, MessageBoxW,
+    PM_REMOVE, PeekMessageW, PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW, SendMessageW,
+    SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, ShowWindow, TranslateMessage,
+    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY,
+    WM_SETFONT, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME,
+    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, w};
 
@@ -45,6 +48,15 @@ const YT_ID_LANG: usize = 9303;
 const YT_ID_TIMESTAMP: usize = 9304;
 const YT_ID_OK: usize = 9305;
 const YT_ID_CANCEL: usize = 9306;
+const STREAM_ID_URL: usize = 9311;
+const STREAM_ID_FORMAT: usize = 9312;
+const STREAM_ID_OK: usize = 9313;
+const STREAM_ID_CANCEL: usize = 9314;
+const STREAM_TRACK_ID_COMBO: usize = 9321;
+const STREAM_TRACK_ID_OK: usize = 9322;
+const STREAM_TRACK_ID_CANCEL: usize = 9323;
+const STREAM_DIALOG_CLASS_NAME: &str = "SonarpadStreamAudio";
+const STREAM_TRACK_DIALOG_CLASS_NAME: &str = "SonarpadStreamAudioTrack";
 const WM_YT_LOAD_COMPLETE: u32 = WM_APP + 40;
 const WM_YT_TEXT_COMPLETE: u32 = WM_APP + 41;
 const WM_YT_LOAD_CANCEL: u32 = WM_APP + 42;
@@ -59,6 +71,9 @@ const YTDLP_DOWNLOAD_URL: &str =
 const YTDLP_LATEST_API_URL: &str = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest";
 const YTDLP_USER_AGENT: &str = "Sonarpad/yt-dlp";
 const YTDLP_SOCKET_TIMEOUT_SECS: &str = "10";
+const STREAM_DOWNLOAD_STALL_SECS: u64 = 180;
+const STREAM_POST_100_GRACE_SECS: u64 = 25;
+const STREAM_RETRY_TIMEOUT_SECS: u64 = 120;
 static YTDLP_UPDATE_CHECKED: AtomicBool = AtomicBool::new(false);
 
 // YouTube InnerTube API constants
@@ -149,6 +164,15 @@ fn ytdlp_command(path: &Path) -> Command {
     cmd.stdin(Stdio::null());
     cmd.creation_flags(CREATE_NO_WINDOW.0);
     cmd
+}
+
+fn ytdlp_debug_enabled() -> bool {
+    std::env::var("SONARPAD_YTDLP_DEBUG")
+        .map(|v| {
+            let v = v.trim().to_ascii_lowercase();
+            v == "1" || v == "true" || v == "yes" || v == "on"
+        })
+        .unwrap_or(false)
 }
 
 pub fn import_youtube_transcript(parent: HWND) {
@@ -290,6 +314,7 @@ fn show_import_dialog(
     }
 
     let mut msg = MSG::default();
+    crate::watchdog::enter_modal_dialog();
     loop {
         if !unsafe { IsWindow(hwnd).as_bool() } {
             break;
@@ -1362,13 +1387,1620 @@ fn normalize_youtube_input_for_download(input: &str) -> Option<String> {
     if trimmed.is_empty() {
         return None;
     }
-    if let Some(id) = extract_video_id(trimmed) {
+
+    // URL field: treat input as URL and strip hidden/newline whitespace that may split long links.
+    let compact: String = trimmed.chars().filter(|ch| !ch.is_whitespace()).collect();
+
+    let normalized = compact
+        .replace("&amp;", "&")
+        .replace("\\?", "?")
+        .replace("\\=", "=")
+        .trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .to_string();
+    if normalized.is_empty() {
+        return None;
+    }
+
+    // Unwrap common redirect/wrapper query params first (q=, url=, u=).
+    if let Ok(url) = Url::parse(&normalized) {
+        for (key, value) in url.query_pairs() {
+            let k = key.as_ref();
+            if k.eq_ignore_ascii_case("url")
+                || k.eq_ignore_ascii_case("u")
+                || k.eq_ignore_ascii_case("q")
+            {
+                let v = value.trim();
+                if v.starts_with("http://") || v.starts_with("https://") {
+                    if let Some(unwrapped) = normalize_youtube_input_for_download(v) {
+                        return Some(unwrapped);
+                    }
+                } else if v.starts_with('/') {
+                    // e.g. youtube attribution links: u=/watch?v=...
+                    let joined = format!("https://www.youtube.com{v}");
+                    if let Some(unwrapped) = normalize_youtube_input_for_download(&joined) {
+                        return Some(unwrapped);
+                    }
+                }
+            }
+        }
+    }
+
+    // Only normalize to watch?v= for actual YouTube hosts.
+    if let Ok(url) = Url::parse(&normalized)
+        && let Some(host) = url.host_str()
+        && (host.eq_ignore_ascii_case("youtu.be")
+            || host.eq_ignore_ascii_case("youtube.com")
+            || host.ends_with(".youtube.com"))
+        && let Some(id) = extract_video_id(&normalized)
+    {
         return Some(format!("https://www.youtube.com/watch?v={id}"));
     }
-    if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
-        Some(trimmed.to_string())
+    if normalized.starts_with("http://") || normalized.starts_with("https://") {
+        Some(normalized)
     } else {
-        Some(format!("https://{trimmed}"))
+        Some(format!("https://{normalized}"))
+    }
+}
+
+#[derive(Clone, Copy)]
+enum StreamOutputFormat {
+    Auto,
+    Mp3,
+    M4a,
+    Opus,
+    Ogg,
+    Wav,
+    Flac,
+    Mp4,
+}
+
+#[derive(Clone)]
+struct StreamDialogResult {
+    url: String,
+    format: StreamOutputFormat,
+}
+
+#[derive(Clone)]
+struct StreamAudioTrack {
+    format_id: String,
+    label: String,
+}
+
+struct StreamDialogInit {
+    parent: HWND,
+    language: Language,
+    result: Arc<Mutex<Option<StreamDialogResult>>>,
+}
+
+struct StreamDialogState {
+    parent: HWND,
+    language: Language,
+    url_edit: HWND,
+    format_combo: HWND,
+    ok_button: HWND,
+    result: Arc<Mutex<Option<StreamDialogResult>>>,
+}
+
+struct StreamTrackDialogInit {
+    parent: HWND,
+    language: Language,
+    tracks: Vec<StreamAudioTrack>,
+    result: Arc<Mutex<Option<Option<String>>>>,
+}
+
+struct StreamTrackDialogState {
+    parent: HWND,
+    combo: HWND,
+    ok_button: HWND,
+    tracks: Vec<StreamAudioTrack>,
+    result: Arc<Mutex<Option<Option<String>>>>,
+}
+
+impl StreamOutputFormat {
+    fn combo_items(language: Language) -> Vec<(String, StreamOutputFormat)> {
+        vec![
+            (
+                i18n::tr(language, "stream_audio.format.auto"),
+                StreamOutputFormat::Auto,
+            ),
+            ("mp4".to_string(), StreamOutputFormat::Mp4),
+            ("mp3".to_string(), StreamOutputFormat::Mp3),
+            ("m4a".to_string(), StreamOutputFormat::M4a),
+            ("opus".to_string(), StreamOutputFormat::Opus),
+            ("ogg".to_string(), StreamOutputFormat::Ogg),
+            ("wav".to_string(), StreamOutputFormat::Wav),
+            ("flac".to_string(), StreamOutputFormat::Flac),
+        ]
+    }
+
+    fn as_audio_convert_settings(self) -> Option<crate::ffmpeg_export::ConvertAudioSettings> {
+        use crate::ffmpeg_export::{
+            ConvertAudioFormat as F, ConvertAudioQuality as Q, ConvertAudioSettings,
+        };
+        match self {
+            StreamOutputFormat::Mp3 => Some(ConvertAudioSettings {
+                format: F::Mp3,
+                quality: Q::BitrateKbps(192),
+            }),
+            StreamOutputFormat::M4a => Some(ConvertAudioSettings {
+                format: F::Aac,
+                quality: Q::BitrateKbps(192),
+            }),
+            StreamOutputFormat::Opus => Some(ConvertAudioSettings {
+                format: F::Opus,
+                quality: Q::BitrateKbps(160),
+            }),
+            StreamOutputFormat::Ogg => Some(ConvertAudioSettings {
+                format: F::Ogg,
+                quality: Q::OggQuality(6),
+            }),
+            StreamOutputFormat::Flac => Some(ConvertAudioSettings {
+                format: F::Flac,
+                quality: Q::FlacCompression(5),
+            }),
+            StreamOutputFormat::Wav => Some(ConvertAudioSettings {
+                format: F::Wav,
+                quality: Q::None,
+            }),
+            StreamOutputFormat::Auto | StreamOutputFormat::Mp4 => None,
+        }
+    }
+
+    fn extension(self) -> Option<&'static str> {
+        match self {
+            StreamOutputFormat::Mp3 => Some("mp3"),
+            StreamOutputFormat::M4a => Some("m4a"),
+            StreamOutputFormat::Opus => Some("opus"),
+            StreamOutputFormat::Ogg => Some("ogg"),
+            StreamOutputFormat::Wav => Some("wav"),
+            StreamOutputFormat::Flac => Some("flac"),
+            StreamOutputFormat::Mp4 => Some("mp4"),
+            StreamOutputFormat::Auto => None,
+        }
+    }
+}
+
+unsafe fn with_stream_dialog_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+where
+    F: FnOnce(&mut StreamDialogState) -> R,
+{
+    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut StreamDialogState;
+    if ptr.is_null() {
+        None
+    } else {
+        Some(f(&mut *ptr))
+    }
+}
+
+unsafe fn with_stream_track_dialog_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+where
+    F: FnOnce(&mut StreamTrackDialogState) -> R,
+{
+    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut StreamTrackDialogState;
+    if ptr.is_null() {
+        None
+    } else {
+        Some(f(&mut *ptr))
+    }
+}
+
+unsafe extern "system" fn stream_dialog_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    crate::panic_guard::guard(
+        "stream_dialog_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { stream_dialog_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn stream_dialog_wndproc_inner(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    match msg {
+        WM_CREATE => {
+            let create_struct = lparam.0 as *const CREATESTRUCTW;
+            let init_ptr = (*create_struct).lpCreateParams as *mut StreamDialogInit;
+            if init_ptr.is_null() {
+                return LRESULT(0);
+            }
+            let init = Box::from_raw(init_ptr);
+            let hfont = with_state(init.parent, |state| state.hfont).unwrap_or(HFONT(0));
+
+            let url_label = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&i18n::tr(init.language, "stream_audio.url_label")).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                16,
+                18,
+                90,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let url_edit = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                110,
+                16,
+                330,
+                22,
+                hwnd,
+                HMENU(STREAM_ID_URL as isize),
+                HINSTANCE(0),
+                None,
+            );
+            let format_label = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&i18n::tr(init.language, "stream_audio.format_label")).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                16,
+                52,
+                90,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let format_combo = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                110,
+                50,
+                210,
+                180,
+                hwnd,
+                HMENU(STREAM_ID_FORMAT as isize),
+                HINSTANCE(0),
+                None,
+            );
+            let ok_button = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&i18n::tr(init.language, "youtube.ok")).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                350,
+                94,
+                90,
+                28,
+                hwnd,
+                HMENU(STREAM_ID_OK as isize),
+                HINSTANCE(0),
+                None,
+            );
+            let cancel_button = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&i18n::tr(init.language, "youtube.cancel")).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                350,
+                126,
+                90,
+                28,
+                hwnd,
+                HMENU(STREAM_ID_CANCEL as isize),
+                HINSTANCE(0),
+                None,
+            );
+
+            for control in [
+                url_label,
+                url_edit,
+                format_label,
+                format_combo,
+                ok_button,
+                cancel_button,
+            ] {
+                if control.0 != 0 && hfont.0 != 0 {
+                    SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                }
+            }
+
+            let items = StreamOutputFormat::combo_items(init.language);
+            for (label, _) in &items {
+                let wide = to_wide(label);
+                SendMessageW(
+                    format_combo,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(wide.as_ptr() as isize),
+                );
+            }
+            SendMessageW(format_combo, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+
+            let state = Box::new(StreamDialogState {
+                parent: init.parent,
+                language: init.language,
+                url_edit,
+                format_combo,
+                ok_button,
+                result: init.result.clone(),
+            });
+            SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+            SetFocus(url_edit);
+            LRESULT(0)
+        }
+        WM_COMMAND => {
+            let cmd_id = wparam.0 & 0xffff;
+            if cmd_id == STREAM_ID_OK {
+                if with_stream_dialog_state(hwnd, |state| {
+                    let url = read_edit_text(state.url_edit);
+                    let format_idx =
+                        SendMessageW(state.format_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+                    let format = StreamOutputFormat::combo_items(state.language)
+                        .get(format_idx.max(0) as usize)
+                        .map(|(_, f)| *f)
+                        .unwrap_or(StreamOutputFormat::Auto);
+                    *state.result.lock().unwrap_or_else(|e| e.into_inner()) =
+                        Some(StreamDialogResult { url, format });
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access stream dialog state");
+                }
+                crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
+                return LRESULT(0);
+            }
+            if cmd_id == STREAM_ID_CANCEL {
+                if with_stream_dialog_state(hwnd, |state| {
+                    *state.result.lock().unwrap_or_else(|e| e.into_inner()) = None;
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access stream dialog state");
+                }
+                crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
+                return LRESULT(0);
+            }
+            DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
+        WM_KEYDOWN => {
+            if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
+                crate::log_if_err!(PostMessageW(
+                    hwnd,
+                    WM_COMMAND,
+                    WPARAM(STREAM_ID_CANCEL),
+                    LPARAM(0)
+                ));
+                return LRESULT(0);
+            }
+            if wparam.0 as u32 == VK_RETURN.0 as u32 {
+                let ok = with_stream_dialog_state(hwnd, |state| state.ok_button).unwrap_or(HWND(0));
+                if GetFocus() == ok {
+                    crate::log_if_err!(PostMessageW(
+                        hwnd,
+                        WM_COMMAND,
+                        WPARAM(STREAM_ID_OK),
+                        LPARAM(0)
+                    ));
+                    return LRESULT(0);
+                }
+            }
+            DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
+        WM_CLOSE => {
+            crate::log_if_err!(DestroyWindow(hwnd));
+            LRESULT(0)
+        }
+        WM_DESTROY => {
+            if with_stream_dialog_state(hwnd, |state| {
+                EnableWindow(state.parent, true);
+                SetForegroundWindow(state.parent);
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access stream dialog state");
+            }
+            LRESULT(0)
+        }
+        WM_NCDESTROY => {
+            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut StreamDialogState;
+            if !ptr.is_null() {
+                let _unused = Box::from_raw(ptr);
+            }
+            LRESULT(0)
+        }
+        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+    }
+}
+
+fn show_stream_dialog(parent: HWND, language: Language) -> Option<StreamDialogResult> {
+    let hinstance = HINSTANCE(unsafe { GetModuleHandleW(None).unwrap_or_default().0 });
+    let class_name = to_wide(STREAM_DIALOG_CLASS_NAME);
+    let wc = windows::Win32::UI::WindowsAndMessaging::WNDCLASSW {
+        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(unsafe {
+            LoadCursorW(None, IDC_ARROW).unwrap_or_default().0
+        }),
+        hInstance: hinstance,
+        lpszClassName: PCWSTR(class_name.as_ptr()),
+        lpfnWndProc: Some(stream_dialog_wndproc),
+        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+        ..Default::default()
+    };
+    unsafe {
+        RegisterClassW(&wc);
+    }
+
+    let result = Arc::new(Mutex::new(None));
+    let init = Box::new(StreamDialogInit {
+        parent,
+        language,
+        result: Arc::clone(&result),
+    });
+    let title = to_wide(&i18n::tr(language, "stream_audio.prompt_title"));
+    let hwnd = unsafe {
+        CreateWindowExW(
+            WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            470,
+            200,
+            parent,
+            HMENU(0),
+            hinstance,
+            Some(Box::into_raw(init) as *const _),
+        )
+    };
+    if hwnd.0 == 0 {
+        return None;
+    }
+    unsafe {
+        EnableWindow(parent, false);
+        SetForegroundWindow(hwnd);
+    }
+
+    let mut msg = MSG::default();
+    loop {
+        if !unsafe { IsWindow(hwnd).as_bool() } {
+            break;
+        }
+        let res = unsafe { GetMessageW(&mut msg, HWND(0), 0, 0) };
+        if res.0 == 0 || res.0 == -1 {
+            break;
+        }
+        unsafe {
+            if IsDialogMessageW(hwnd, &msg).as_bool() {
+                continue;
+            }
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+    }
+    crate::watchdog::exit_modal_dialog();
+    unsafe {
+        EnableWindow(parent, true);
+        SetForegroundWindow(parent);
+    }
+    result.lock().unwrap_or_else(|e| e.into_inner()).clone()
+}
+
+fn open_progress_dialog(
+    parent: HWND,
+    language: Language,
+    title_key: &str,
+    status_key: &str,
+) -> HWND {
+    let labels = crate::app_windows::podcast_save_window::SaveDialogLabels {
+        title: i18n::tr(language, title_key),
+        in_progress: i18n::tr(language, status_key),
+        cancel: i18n::tr(language, "podcast.save.cancel"),
+    };
+    unsafe {
+        crate::app_windows::podcast_save_window::open_with_labels(parent, language, labels, false)
+    }
+}
+
+fn close_progress_dialog(dialog: HWND) {
+    if dialog.0 == 0 {
+        return;
+    }
+    unsafe {
+        SendMessageW(
+            dialog,
+            crate::app_windows::podcast_save_window::WM_PODCAST_SAVE_DONE,
+            WPARAM(0),
+            LPARAM(0),
+        );
+    }
+}
+
+fn report_progress(dialog: HWND, pct: u32) {
+    if dialog.0 == 0 {
+        return;
+    }
+    unsafe {
+        SendMessageW(
+            dialog,
+            crate::app_windows::podcast_save_window::WM_PODCAST_SAVE_PROGRESS,
+            WPARAM(pct.min(100) as usize),
+            LPARAM(0),
+        );
+    }
+}
+
+fn report_progress_status(dialog: HWND, text: &str) {
+    if dialog.0 == 0 {
+        return;
+    }
+    unsafe {
+        let label = FindWindowExW(dialog, HWND(0), w!("EDIT"), PCWSTR::null());
+        if label.0 != 0
+            && let Err(e) = SetWindowTextW(label, PCWSTR(to_wide(text).as_ptr()))
+        {
+            crate::log_debug(&format!(
+                "Failed to set streaming progress status text: {}",
+                e
+            ));
+        }
+    }
+}
+
+fn parse_ytdlp_progress_pct(line: &str) -> Option<u32> {
+    let marker = line.find('%')?;
+    let before = &line[..marker];
+    let mut start = before.len();
+    for (idx, ch) in before.char_indices().rev() {
+        if ch.is_ascii_digit() || ch == '.' {
+            start = idx;
+        } else {
+            break;
+        }
+    }
+    if start >= before.len() {
+        return None;
+    }
+    let value = before[start..].trim().parse::<f32>().ok()?;
+    Some(value.clamp(0.0, 100.0).round() as u32)
+}
+
+fn truncate_debug_text(text: &str, max_chars: usize) -> String {
+    let mut out = String::new();
+    for ch in text.chars().take(max_chars) {
+        out.push(ch);
+    }
+    if text.chars().count() > max_chars {
+        out.push_str("...(truncated)");
+    }
+    out
+}
+
+fn log_stream_cache_snapshot(cache_dir: &Path, prefix: &str, context: &str) {
+    let mut items: Vec<String> = Vec::new();
+    let Ok(entries) = std::fs::read_dir(cache_dir) else {
+        crate::log_debug(&format!(
+            "yt-dlp cache snapshot [{}]: read_dir failed for {}",
+            context,
+            cache_dir.to_string_lossy()
+        ));
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if !name.starts_with(prefix) {
+            continue;
+        }
+        let len = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+        items.push(format!("{name} ({len} bytes)"));
+    }
+    items.sort_unstable();
+    if items.is_empty() {
+        crate::log_debug(&format!(
+            "yt-dlp cache snapshot [{}]: no files for prefix={}",
+            context, prefix
+        ));
+    } else {
+        crate::log_debug(&format!(
+            "yt-dlp cache snapshot [{}]: {}",
+            context,
+            items.join(", ")
+        ));
+    }
+}
+
+fn find_latest_downloaded_stream_file(cache_dir: &Path, prefix: &str) -> Option<PathBuf> {
+    let mut best: Option<(std::time::SystemTime, PathBuf)> = None;
+    let entries = std::fs::read_dir(cache_dir).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if !name.starts_with(prefix) || name.ends_with(".part") || name.ends_with(".ytdl") {
+            continue;
+        }
+        let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
+            continue;
+        };
+        let ext = ext.to_ascii_lowercase();
+        if ext == "part" || ext == "ytdl" || ext == "tmp" || ext == "temp" {
+            continue;
+        }
+        if std::fs::metadata(&path)
+            .map(|m| m.len() == 0)
+            .unwrap_or(false)
+        {
+            continue;
+        }
+        let modified = std::fs::metadata(&path)
+            .and_then(|m| m.modified())
+            .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+        match &best {
+            Some((best_time, _)) if modified <= *best_time => {}
+            _ => best = Some((modified, path)),
+        }
+    }
+    best.map(|(_, p)| p)
+}
+
+fn plain_label(text: &str) -> String {
+    text.replace('&', "")
+}
+
+fn probe_stream_audio_tracks(
+    ytdlp_path: &Path,
+    url: &str,
+) -> Result<Vec<StreamAudioTrack>, String> {
+    let output = ytdlp_command(ytdlp_path)
+        .arg("--dump-single-json")
+        .arg("--no-playlist")
+        .arg("--no-warnings")
+        .arg("--force-ipv4")
+        .arg("--")
+        .arg(url)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if stderr.is_empty() {
+            "yt-dlp probe failed".to_string()
+        } else {
+            stderr
+        });
+    }
+    let json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).map_err(|e| e.to_string())?;
+    let mut seen = HashSet::new();
+    let mut tracks = Vec::new();
+    if let Some(formats) = json.get("formats").and_then(|v| v.as_array()) {
+        for fmt in formats {
+            let format_id = fmt
+                .get("format_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .trim();
+            if format_id.is_empty() || !seen.insert(format_id.to_string()) {
+                continue;
+            }
+            let acodec = fmt
+                .get("acodec")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .trim();
+            if acodec.is_empty() || acodec.eq_ignore_ascii_case("none") {
+                continue;
+            }
+            let vcodec = fmt
+                .get("vcodec")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .trim();
+            if !vcodec.is_empty() && !vcodec.eq_ignore_ascii_case("none") {
+                continue;
+            }
+            let lang = fmt
+                .get("language")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .trim();
+            let note = fmt
+                .get("format_note")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .trim();
+            let abr = fmt.get("abr").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let mut label = String::new();
+            if !lang.is_empty() {
+                label.push_str(lang);
+            } else if !note.is_empty() {
+                label.push_str(note);
+            } else {
+                label.push_str("audio");
+            }
+            if abr > 0.0 {
+                label.push_str(&format!(" {}k", abr.round() as i64));
+            }
+            label.push_str(&format!(" ({format_id})"));
+            tracks.push(StreamAudioTrack {
+                format_id: format_id.to_string(),
+                label,
+            });
+        }
+    }
+    Ok(tracks)
+}
+
+unsafe extern "system" fn stream_track_dialog_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    crate::panic_guard::guard(
+        "stream_track_dialog_wndproc",
+        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { stream_track_dialog_wndproc_inner(hwnd, msg, wparam, lparam) },
+    )
+}
+
+unsafe fn stream_track_dialog_wndproc_inner(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    match msg {
+        WM_CREATE => {
+            let create_struct = lparam.0 as *const CREATESTRUCTW;
+            let init_ptr = (*create_struct).lpCreateParams as *mut StreamTrackDialogInit;
+            if init_ptr.is_null() {
+                return LRESULT(0);
+            }
+            let init = Box::from_raw(init_ptr);
+            let hfont = with_state(init.parent, |state| state.hfont).unwrap_or(HFONT(0));
+
+            let label = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(
+                    to_wide(&plain_label(&i18n::tr(
+                        init.language,
+                        "playback.audio_track",
+                    )))
+                    .as_ptr(),
+                ),
+                WS_CHILD | WS_VISIBLE,
+                16,
+                18,
+                120,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                140,
+                16,
+                300,
+                220,
+                hwnd,
+                HMENU(STREAM_TRACK_ID_COMBO as isize),
+                HINSTANCE(0),
+                None,
+            );
+            let ok_button = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&i18n::tr(init.language, "youtube.ok")).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                260,
+                56,
+                88,
+                28,
+                hwnd,
+                HMENU(STREAM_TRACK_ID_OK as isize),
+                HINSTANCE(0),
+                None,
+            );
+            let cancel_button = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&i18n::tr(init.language, "youtube.cancel")).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                352,
+                56,
+                88,
+                28,
+                hwnd,
+                HMENU(STREAM_TRACK_ID_CANCEL as isize),
+                HINSTANCE(0),
+                None,
+            );
+
+            for control in [label, combo, ok_button, cancel_button] {
+                if control.0 != 0 && hfont.0 != 0 {
+                    SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                }
+            }
+
+            let auto_label = i18n::tr(init.language, "stream_audio.format.auto");
+            let auto_w = to_wide(&auto_label);
+            SendMessageW(
+                combo,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(auto_w.as_ptr() as isize),
+            );
+            for track in &init.tracks {
+                let w = to_wide(&track.label);
+                SendMessageW(combo, CB_ADDSTRING, WPARAM(0), LPARAM(w.as_ptr() as isize));
+            }
+            SendMessageW(combo, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+
+            let state = Box::new(StreamTrackDialogState {
+                parent: init.parent,
+                combo,
+                ok_button,
+                tracks: init.tracks,
+                result: init.result,
+            });
+            SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+            SetFocus(combo);
+            LRESULT(0)
+        }
+        WM_COMMAND => {
+            let cmd_id = wparam.0 & 0xffff;
+            if cmd_id == STREAM_TRACK_ID_OK {
+                if with_stream_track_dialog_state(hwnd, |state| {
+                    let idx = SendMessageW(state.combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+                    let selected: Option<Option<String>> = if idx <= 0 {
+                        Some(None)
+                    } else {
+                        state
+                            .tracks
+                            .get((idx - 1) as usize)
+                            .map(|t| Some(t.format_id.clone()))
+                    };
+                    *state.result.lock().unwrap_or_else(|e| e.into_inner()) = selected;
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access stream track dialog state");
+                }
+                crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
+                return LRESULT(0);
+            }
+            if cmd_id == STREAM_TRACK_ID_CANCEL {
+                if with_stream_track_dialog_state(hwnd, |state| {
+                    *state.result.lock().unwrap_or_else(|e| e.into_inner()) = None;
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access stream track dialog state");
+                }
+                crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
+                return LRESULT(0);
+            }
+            DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
+        WM_KEYDOWN => {
+            if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
+                crate::log_if_err!(PostMessageW(
+                    hwnd,
+                    WM_COMMAND,
+                    WPARAM(STREAM_TRACK_ID_CANCEL),
+                    LPARAM(0)
+                ));
+                return LRESULT(0);
+            }
+            if wparam.0 as u32 == VK_RETURN.0 as u32 {
+                let ok = with_stream_track_dialog_state(hwnd, |state| state.ok_button)
+                    .unwrap_or(HWND(0));
+                if GetFocus() == ok {
+                    crate::log_if_err!(PostMessageW(
+                        hwnd,
+                        WM_COMMAND,
+                        WPARAM(STREAM_TRACK_ID_OK),
+                        LPARAM(0)
+                    ));
+                    return LRESULT(0);
+                }
+            }
+            DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
+        WM_CLOSE => {
+            crate::log_if_err!(DestroyWindow(hwnd));
+            LRESULT(0)
+        }
+        WM_DESTROY => {
+            if with_stream_track_dialog_state(hwnd, |state| {
+                EnableWindow(state.parent, true);
+                SetForegroundWindow(state.parent);
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access stream track dialog state");
+            }
+            LRESULT(0)
+        }
+        WM_NCDESTROY => {
+            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut StreamTrackDialogState;
+            if !ptr.is_null() {
+                let _unused = Box::from_raw(ptr);
+            }
+            LRESULT(0)
+        }
+        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+    }
+}
+
+fn choose_stream_audio_track(
+    parent: HWND,
+    language: Language,
+    tracks: Vec<StreamAudioTrack>,
+) -> Option<Option<String>> {
+    let hinstance = HINSTANCE(unsafe { GetModuleHandleW(None).unwrap_or_default().0 });
+    let class_name = to_wide(STREAM_TRACK_DIALOG_CLASS_NAME);
+    let wc = windows::Win32::UI::WindowsAndMessaging::WNDCLASSW {
+        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(unsafe {
+            LoadCursorW(None, IDC_ARROW).unwrap_or_default().0
+        }),
+        hInstance: hinstance,
+        lpszClassName: PCWSTR(class_name.as_ptr()),
+        lpfnWndProc: Some(stream_track_dialog_wndproc),
+        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+        ..Default::default()
+    };
+    unsafe {
+        RegisterClassW(&wc);
+    }
+    let result = Arc::new(Mutex::new(None));
+    let init = Box::new(StreamTrackDialogInit {
+        parent,
+        language,
+        tracks,
+        result: Arc::clone(&result),
+    });
+    let title = to_wide(&plain_label(&i18n::tr(language, "playback.audio_track")));
+    let hwnd = unsafe {
+        CreateWindowExW(
+            WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            470,
+            140,
+            parent,
+            HMENU(0),
+            hinstance,
+            Some(Box::into_raw(init) as *const _),
+        )
+    };
+    if hwnd.0 == 0 {
+        return Some(None);
+    }
+    unsafe {
+        EnableWindow(parent, false);
+        SetForegroundWindow(hwnd);
+    }
+    let mut msg = MSG::default();
+    loop {
+        if !unsafe { IsWindow(hwnd).as_bool() } {
+            break;
+        }
+        let res = unsafe { GetMessageW(&mut msg, HWND(0), 0, 0) };
+        if res.0 == 0 || res.0 == -1 {
+            break;
+        }
+        unsafe {
+            if IsDialogMessageW(hwnd, &msg).as_bool() {
+                continue;
+            }
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+    }
+    unsafe {
+        EnableWindow(parent, true);
+        SetForegroundWindow(parent);
+    }
+    result.lock().unwrap_or_else(|e| e.into_inner()).clone()
+}
+
+pub fn play_streaming_audio_from_url(parent: HWND) {
+    let language =
+        unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
+    let Some(dialog_data) = show_stream_dialog(parent, language) else {
+        return;
+    };
+    let url: String = dialog_data
+        .url
+        .chars()
+        .filter(|ch| !ch.is_whitespace())
+        .collect();
+    if url.is_empty() {
+        unsafe {
+            show_error(
+                parent,
+                language,
+                &i18n::tr(language, "stream_audio.invalid_url"),
+            );
+        }
+        return;
+    }
+
+    let labels_data = labels(language);
+    let ytdlp_debug = ytdlp_debug_enabled();
+    if ytdlp_debug {
+        crate::log_debug("yt-dlp debug mode enabled for streaming (SONARPAD_YTDLP_DEBUG=1)");
+    }
+    let ytdlp_path = match ensure_ytdlp_available(parent, language, &labels_data) {
+        Ok(Some(path)) => path,
+        Ok(None) => return,
+        Err(err) => {
+            let message = i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)]);
+            unsafe {
+                show_error(parent, language, &message);
+            }
+            return;
+        }
+    };
+
+    let selected_audio_format = match probe_stream_audio_tracks(&ytdlp_path, &url) {
+        Ok(tracks) if tracks.len() > 1 => match choose_stream_audio_track(parent, language, tracks)
+        {
+            Some(chosen) => chosen,
+            None => return,
+        },
+        Ok(_) => None,
+        Err(err) => {
+            crate::log_debug(&format!("Stream audio track probe failed: {}", err));
+            None
+        }
+    };
+
+    let cache_dir = settings_dir().join("podcast cache");
+    if let Err(err) = std::fs::create_dir_all(&cache_dir) {
+        let message = i18n::tr_f(
+            language,
+            "stream_audio.download_failed",
+            &[("err", &err.to_string())],
+        );
+        unsafe {
+            show_error(parent, language, &message);
+        }
+        return;
+    }
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let prefix = format!("stream_{}_{}", std::process::id(), stamp);
+    let output_template = cache_dir.join(format!("{prefix}.%(ext)s"));
+    let progress = open_progress_dialog(
+        parent,
+        language,
+        "stream_audio.progress_title",
+        "stream_audio.progress_downloading",
+    );
+
+    let mut cmd = ytdlp_command(&ytdlp_path);
+    cmd.arg("--no-playlist")
+        .arg("--socket-timeout")
+        .arg(YTDLP_SOCKET_TIMEOUT_SECS)
+        .arg("--no-warnings")
+        .arg("--force-ipv4")
+        .arg("--newline")
+        .arg("--verbose");
+
+    if let Some(format_id) = selected_audio_format.as_ref() {
+        cmd.arg("-f").arg(format_id);
+    } else {
+        match dialog_data.format {
+            StreamOutputFormat::Mp4 => {
+                cmd.arg("-f").arg("best[ext=mp4]/best");
+            }
+            _ => {
+                cmd.arg("-f").arg("bestaudio/best");
+            }
+        }
+    }
+    cmd.arg("-o")
+        .arg(output_template.to_string_lossy().to_string())
+        .arg("--")
+        .arg(&url)
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped());
+    if ytdlp_debug {
+        let format_for_log = selected_audio_format.as_deref().map_or_else(
+            || match dialog_data.format {
+                StreamOutputFormat::Auto => i18n::tr(language, "stream_audio.format.auto"),
+                StreamOutputFormat::Mp3 => "mp3".to_string(),
+                StreamOutputFormat::M4a => "m4a".to_string(),
+                StreamOutputFormat::Opus => "opus".to_string(),
+                StreamOutputFormat::Ogg => "ogg".to_string(),
+                StreamOutputFormat::Wav => "wav".to_string(),
+                StreamOutputFormat::Flac => "flac".to_string(),
+                StreamOutputFormat::Mp4 => "mp4".to_string(),
+            },
+            |f| f.to_string(),
+        );
+        crate::log_debug(&format!(
+            "yt-dlp stream start: url={} output_template={} format={}",
+            url,
+            output_template.to_string_lossy(),
+            format_for_log
+        ));
+    }
+
+    let mut child = match cmd.spawn() {
+        Ok(c) => c,
+        Err(err) => {
+            close_progress_dialog(progress);
+            let message = i18n::tr_f(
+                language,
+                "stream_audio.download_failed",
+                &[("err", &err.to_string())],
+            );
+            unsafe {
+                show_error(parent, language, &message);
+            }
+            return;
+        }
+    };
+
+    let stderr_pipe = match child.stderr.take() {
+        Some(stderr) => stderr,
+        None => {
+            close_progress_dialog(progress);
+            unsafe {
+                show_error(
+                    parent,
+                    language,
+                    &i18n::tr_f(
+                        language,
+                        "stream_audio.download_failed",
+                        &[("err", "yt-dlp stderr unavailable")],
+                    ),
+                );
+            }
+            return;
+        }
+    };
+
+    let progress_shared = Arc::new(AtomicU32::new(0));
+    let activity_shared = Arc::new(AtomicU32::new(0));
+    let stderr_shared = Arc::new(Mutex::new(String::new()));
+    let progress_reader = Arc::clone(&progress_shared);
+    let activity_reader = Arc::clone(&activity_shared);
+    let stderr_reader = Arc::clone(&stderr_shared);
+    let reader_thread = std::thread::spawn(move || {
+        for line_result in BufReader::new(stderr_pipe).lines() {
+            let line = match line_result {
+                Ok(line) => line,
+                Err(err) => {
+                    crate::log_debug(&format!("yt-dlp stderr read failed: {}", err));
+                    continue;
+                }
+            };
+            if let Ok(mut captured) = stderr_reader.lock()
+                && captured.len() < 16_384
+            {
+                if !captured.is_empty() {
+                    captured.push('\n');
+                }
+                captured.push_str(&line);
+            }
+            if ytdlp_debug {
+                crate::log_debug(&format!("yt-dlp stderr: {}", line));
+            }
+            activity_reader.fetch_add(1, Ordering::Relaxed);
+            if let Some(pct) = parse_ytdlp_progress_pct(&line) {
+                progress_reader.fetch_max(pct, Ordering::Relaxed);
+            }
+        }
+    });
+
+    let mut last_pct = 0u32;
+    let mut ui_pct = 0u32;
+    let mut ui_target_pct = 0u32;
+    let mut last_activity = 0u32;
+    let mut stalled = false;
+    let mut last_progress_at = std::time::Instant::now();
+    let mut reached_100_at: Option<std::time::Instant> = None;
+    let _status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break Some(status),
+            Ok(None) => {
+                let pct = progress_shared.load(Ordering::Relaxed);
+                if pct > last_pct {
+                    last_pct = pct;
+                    last_progress_at = std::time::Instant::now();
+                    // Keep room for post-download finalization so 100% appears right before playback.
+                    ui_target_pct = pct.min(95);
+                    if last_pct >= 100 && reached_100_at.is_none() {
+                        reached_100_at = Some(std::time::Instant::now());
+                    }
+                }
+                if ui_pct < ui_target_pct {
+                    ui_pct = (ui_pct + 1).min(ui_target_pct);
+                    report_progress(progress, ui_pct);
+                }
+                if reached_100_at
+                    .map(|t| {
+                        t.elapsed() > std::time::Duration::from_secs(STREAM_POST_100_GRACE_SECS)
+                    })
+                    .unwrap_or(false)
+                    && find_latest_downloaded_stream_file(&cache_dir, &prefix).is_some()
+                {
+                    crate::log_debug(
+                        "Stream download reached 100% with output present: finalizing early",
+                    );
+                    if let Err(err) = child.kill() {
+                        crate::log_debug(&format!(
+                            "Failed to kill finalized yt-dlp process: {}",
+                            err
+                        ));
+                    }
+                    break None;
+                }
+                let activity = activity_shared.load(Ordering::Relaxed);
+                if activity != last_activity {
+                    last_activity = activity;
+                    last_progress_at = std::time::Instant::now();
+                }
+                if last_progress_at.elapsed()
+                    > std::time::Duration::from_secs(STREAM_DOWNLOAD_STALL_SECS)
+                {
+                    stalled = true;
+                    crate::log_debug("Stream download stalled: terminating yt-dlp process");
+                    if let Err(err) = child.kill() {
+                        crate::log_debug(&format!(
+                            "Failed to kill stalled yt-dlp process: {}",
+                            err
+                        ));
+                    }
+                    break None;
+                }
+                let mut msg = MSG::default();
+                unsafe {
+                    while PeekMessageW(&mut msg, HWND(0), 0, 0, PM_REMOVE).as_bool() {
+                        TranslateMessage(&msg);
+                        DispatchMessageW(&msg);
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_millis(30));
+            }
+            Err(err) => {
+                close_progress_dialog(progress);
+                unsafe {
+                    show_error(
+                        parent,
+                        language,
+                        &i18n::tr_f(
+                            language,
+                            "stream_audio.download_failed",
+                            &[("err", &err.to_string())],
+                        ),
+                    );
+                }
+                return;
+            }
+        }
+    };
+    if let Err(err) = reader_thread.join() {
+        crate::log_debug(&format!("yt-dlp stderr thread join failed: {:?}", err));
+    }
+    let stderr_capture = stderr_shared
+        .lock()
+        .map(|s| s.clone())
+        .unwrap_or_else(|_| String::new());
+    if ytdlp_debug && !stderr_capture.trim().is_empty() {
+        crate::log_debug(&format!(
+            "yt-dlp combined stderr: {}",
+            truncate_debug_text(stderr_capture.trim(), 5000)
+        ));
+    }
+
+    report_progress_status(progress, &i18n::tr(language, "podcasts.loading"));
+
+    report_progress(progress, 100);
+    close_progress_dialog(progress);
+    let primary_path = find_latest_downloaded_stream_file(&cache_dir, &prefix);
+    let downloaded_path = if primary_path.is_some() {
+        primary_path
+    } else {
+        let err = if stderr_capture.trim().is_empty() {
+            "yt-dlp failed".to_string()
+        } else {
+            stderr_capture.trim().to_string()
+        };
+        let err_lc = err.to_ascii_lowercase();
+        let should_retry = stalled
+            || err_lc.contains("downloaded file is empty")
+            || err_lc.contains("http error 404")
+            || err_lc.contains("unable to download video data")
+            || err_lc.contains("requested format is not available");
+        if ytdlp_debug {
+            crate::log_debug(&format!(
+                "yt-dlp primary output missing: stalled={} should_retry={} err={}",
+                stalled,
+                should_retry,
+                truncate_debug_text(&err, 1000)
+            ));
+            log_stream_cache_snapshot(&cache_dir, &prefix, "primary-missing");
+        }
+        if should_retry {
+            crate::log_debug("Stream download failed/stalled: retrying with fallback profiles");
+            let retry_progress = open_progress_dialog(
+                parent,
+                language,
+                "stream_audio.progress_title",
+                "podcasts.loading",
+            );
+            report_progress(retry_progress, 95);
+            let retry_profiles: [(&str, Option<&str>, bool); 4] = [
+                // Keep current behavior first.
+                ("audio-ipv4", Some("bestaudio/best"), true),
+                ("best-ipv4", Some("best"), true),
+                // More permissive fallbacks for sites that fail on IPv4-only.
+                ("audio-autoip", Some("bestaudio/best"), false),
+                ("auto-autoip", None, false),
+            ];
+            let mut retry_path: Option<PathBuf> = None;
+            let mut retry_error = String::new();
+            for (idx, (profile_name, profile, force_ipv4)) in retry_profiles.iter().enumerate() {
+                let retry_prefix = format!("{prefix}_retry{}", idx + 1);
+                let retry_template = cache_dir.join(format!("{retry_prefix}.%(ext)s"));
+                let mut retry = ytdlp_command(&ytdlp_path);
+                retry
+                    .arg("--no-playlist")
+                    .arg("--socket-timeout")
+                    .arg(YTDLP_SOCKET_TIMEOUT_SECS)
+                    .arg("--no-warnings")
+                    .arg("--verbose")
+                    .arg("--extractor-retries")
+                    .arg("3")
+                    .arg("--fragment-retries")
+                    .arg("3");
+                if *force_ipv4 {
+                    retry.arg("--force-ipv4");
+                }
+                if let Some(profile) = profile {
+                    retry.arg("-f").arg(profile);
+                }
+                retry
+                    .arg("-o")
+                    .arg(retry_template.to_string_lossy().to_string())
+                    .arg("--")
+                    .arg(&url)
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null());
+                if ytdlp_debug {
+                    crate::log_debug(&format!(
+                        "yt-dlp retry start: profile={} format={:?} force_ipv4={} output_template={}",
+                        profile_name,
+                        profile,
+                        force_ipv4,
+                        retry_template.to_string_lossy()
+                    ));
+                }
+                match retry.spawn() {
+                    Ok(mut retry_child) => {
+                        let retry_start = std::time::Instant::now();
+                        let mut status_opt = None;
+                        loop {
+                            match retry_child.try_wait() {
+                                Ok(Some(status)) => {
+                                    status_opt = Some(status);
+                                    break;
+                                }
+                                Ok(None) => {
+                                    if retry_start.elapsed()
+                                        > std::time::Duration::from_secs(STREAM_RETRY_TIMEOUT_SECS)
+                                    {
+                                        let _unused = retry_child.kill();
+                                        retry_error = format!(
+                                            "yt-dlp retry timeout (profile={}) after {}s",
+                                            profile_name, STREAM_RETRY_TIMEOUT_SECS
+                                        );
+                                        crate::log_debug(&retry_error);
+                                        break;
+                                    }
+                                    let mut msg = MSG::default();
+                                    unsafe {
+                                        while PeekMessageW(&mut msg, HWND(0), 0, 0, PM_REMOVE)
+                                            .as_bool()
+                                        {
+                                            TranslateMessage(&msg);
+                                            DispatchMessageW(&msg);
+                                        }
+                                    }
+                                    std::thread::sleep(std::time::Duration::from_millis(30));
+                                }
+                                Err(e) => {
+                                    retry_error = format!(
+                                        "yt-dlp retry wait error (profile={}): {}",
+                                        profile_name, e
+                                    );
+                                    crate::log_debug(&retry_error);
+                                    break;
+                                }
+                            }
+                        }
+                        let status = status_opt;
+                        if ytdlp_debug {
+                            crate::log_debug(&format!(
+                                "yt-dlp retry status: profile={} format={:?} success={} code={:?}",
+                                profile_name,
+                                profile,
+                                status.map(|s| s.success()).unwrap_or(false),
+                                status.and_then(|s| s.code())
+                            ));
+                        }
+                        if let Some(found) =
+                            find_latest_downloaded_stream_file(&cache_dir, &retry_prefix)
+                        {
+                            if ytdlp_debug {
+                                log_stream_cache_snapshot(&cache_dir, &retry_prefix, "retry-found");
+                            }
+                            retry_path = Some(found);
+                            break;
+                        }
+                        if let Some(status) = status
+                            && !status.success()
+                        {
+                            retry_error = format!(
+                                "yt-dlp retry failed (profile={}) exit_code={:?}",
+                                profile_name,
+                                status.code()
+                            );
+                            crate::log_debug(&retry_error);
+                        }
+                    }
+                    Err(e) => {
+                        crate::log_debug(&format!(
+                            "yt-dlp retry spawn/output error (profile={}): {}",
+                            profile_name, e
+                        ));
+                        if ytdlp_debug {
+                            crate::log_debug(&format!(
+                                "yt-dlp retry spawn/output error (profile={}): {}",
+                                profile_name, e
+                            ));
+                        }
+                        retry_error = e.to_string();
+                    }
+                }
+            }
+            close_progress_dialog(retry_progress);
+            if retry_path.is_none() {
+                if ytdlp_debug {
+                    log_stream_cache_snapshot(&cache_dir, &prefix, "retry-missing");
+                }
+                let msg = if retry_error.trim().is_empty() {
+                    err
+                } else {
+                    retry_error
+                };
+                let message =
+                    i18n::tr_f(language, "stream_audio.download_failed", &[("err", &msg)]);
+                unsafe {
+                    show_error(parent, language, &message);
+                }
+                return;
+            }
+            retry_path
+        } else {
+            let message = i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)]);
+            unsafe {
+                show_error(parent, language, &message);
+            }
+            return;
+        }
+    };
+
+    let Some(downloaded_path) = downloaded_path else {
+        unsafe {
+            show_error(
+                parent,
+                language,
+                &i18n::tr(language, "stream_audio.no_output"),
+            );
+        }
+        return;
+    };
+
+    let final_path = if let Some(convert_settings) = dialog_data.format.as_audio_convert_settings()
+    {
+        let target_ext = dialog_data.format.extension().unwrap_or("mp3");
+        if downloaded_path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.eq_ignore_ascii_case(target_ext))
+            .unwrap_or(false)
+        {
+            downloaded_path.clone()
+        } else {
+            let converted_path = downloaded_path.with_extension(target_ext);
+            let converting_progress = open_progress_dialog(
+                parent,
+                language,
+                "stream_audio.progress_title",
+                "stream_audio.progress_converting",
+            );
+            let mut progress_cb = |pct| report_progress(converting_progress, pct);
+            let convert_result = crate::ffmpeg_export::convert_audio_file(
+                &downloaded_path,
+                &converted_path,
+                &convert_settings,
+                None,
+                Some(&mut progress_cb),
+            );
+            report_progress(converting_progress, 100);
+            close_progress_dialog(converting_progress);
+            match convert_result {
+                Ok(()) => {
+                    crate::log_if_err!(std::fs::remove_file(&downloaded_path));
+                    converted_path
+                }
+                Err(err) => {
+                    unsafe {
+                        show_error(
+                            parent,
+                            language,
+                            &i18n::tr_f(language, "stream_audio.convert_failed", &[("err", &err)]),
+                        );
+                    }
+                    return;
+                }
+            }
+        }
+    } else {
+        downloaded_path
+    };
+
+    unsafe {
+        crate::queue_audio_files_and_play(parent, vec![final_path.clone()]);
+        crate::editor_manager::mark_current_document_from_rss(parent, true);
+        let episode_title = final_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_string());
+        crate::set_active_podcast_episode_info(
+            parent,
+            Some(url),
+            episode_title,
+            Some(final_path.clone()),
+        );
+        crate::menu::update_playback_menu(parent, true);
     }
 }
 
@@ -1395,7 +3027,15 @@ fn ensure_ytdlp_available(
     if response != IDYES {
         return Ok(None);
     }
-    match download_ytdlp(&path) {
+    let progress = open_progress_dialog(
+        hwnd,
+        language,
+        "stream_audio.ytdlp_progress_title",
+        "stream_audio.ytdlp_progress_downloading",
+    );
+    let download_result = download_ytdlp_with_progress(&path, |pct| report_progress(progress, pct));
+    close_progress_dialog(progress);
+    match download_result {
         Ok(()) => Ok(Some(path)),
         Err(err) => Err(err),
     }
@@ -1441,7 +3081,15 @@ fn check_ytdlp_update(hwnd: HWND, language: Language, labels: &Labels, path: &Pa
     if response != IDYES {
         return;
     }
-    if let Err(err) = download_ytdlp(path) {
+    let progress = open_progress_dialog(
+        hwnd,
+        language,
+        "stream_audio.ytdlp_progress_title",
+        "stream_audio.ytdlp_progress_downloading",
+    );
+    let result = download_ytdlp_with_progress(path, |pct| report_progress(progress, pct));
+    close_progress_dialog(progress);
+    if let Err(err) = result {
         crate::log_debug(&format!("yt-dlp update failed: {}", err));
         unsafe {
             show_error(hwnd, language, &labels.ytdlp_update_failed);
@@ -1514,7 +3162,10 @@ fn compare_versions(current: &str, latest: &str) -> Option<CmpOrdering> {
     Some(CmpOrdering::Equal)
 }
 
-fn download_ytdlp(target: &Path) -> Result<(), String> {
+fn download_ytdlp_with_progress<F: FnMut(u32)>(
+    target: &Path,
+    mut progress_cb: F,
+) -> Result<(), String> {
     if let Some(parent) = target.parent() {
         std::fs::create_dir_all(parent).map_err(|err| err.to_string())?;
     }
@@ -1531,8 +3182,30 @@ fn download_ytdlp(target: &Path) -> Result<(), String> {
     resp = resp.error_for_status().map_err(|err| err.to_string())?;
     let expected_len = resp.content_length();
     let mut file = std::fs::File::create(&temp_path).map_err(|err| err.to_string())?;
-    let written = std::io::copy(&mut resp, &mut file).map_err(|err| err.to_string())?;
+    let mut written = 0u64;
+    let mut buf = [0u8; 64 * 1024];
+    let mut last_reported = 0u32;
+    loop {
+        let read = std::io::Read::read(&mut resp, &mut buf).map_err(|err| err.to_string())?;
+        if read == 0 {
+            break;
+        }
+        std::io::Write::write_all(&mut file, &buf[..read]).map_err(|err| err.to_string())?;
+        written = written.saturating_add(read as u64);
+        if let Some(expected) = expected_len
+            && expected > 0
+        {
+            let pct = ((written.saturating_mul(100)) / expected).min(100) as u32;
+            if pct > last_reported {
+                last_reported = pct;
+                progress_cb(pct);
+            }
+        }
+    }
     file.sync_all().map_err(|err| err.to_string())?;
+    if last_reported < 100 {
+        progress_cb(100);
+    }
     if let Some(expected) = expected_len
         && written != expected
     {

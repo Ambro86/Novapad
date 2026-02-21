@@ -4310,6 +4310,11 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                     app_windows::youtube_transcript_window::import_youtube_transcript(hwnd);
                     LRESULT(0)
                 }
+                IDM_TOOLS_STREAM_AUDIO => {
+                    log_debug("Menu: Stream audio from URL");
+                    app_windows::youtube_transcript_window::play_streaming_audio_from_url(hwnd);
+                    LRESULT(0)
+                }
                 IDM_TOOLS_PROMPT => {
                     log_debug("Menu: Prompt");
                     app_windows::prompt_window::open(hwnd);

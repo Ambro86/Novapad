@@ -322,6 +322,18 @@ impl BassOutput {
         Some(bass_pos + self.start_offset_secs)
     }
 
+    pub fn seek_to_seconds(&self, absolute_seconds: f64) -> bool {
+        let handle = *self.handle.lock().unwrap_or_else(|e| e.into_inner());
+        let relative = (absolute_seconds - self.start_offset_secs).max(0.0);
+        let pos = unsafe { (self.api.channel_seconds2bytes)(handle, relative) };
+        let ok = unsafe { (self.api.channel_set_position)(handle, pos, BASS_POS_BYTE) };
+        if ok == 0 {
+            log_bass_error(self.api, "BASS_ChannelSetPosition");
+            return false;
+        }
+        true
+    }
+
     pub fn is_stopped(&self) -> bool {
         const BASS_ACTIVE_STOPPED: Dword = 0;
         let handle = *self.handle.lock().unwrap_or_else(|e| e.into_inner());

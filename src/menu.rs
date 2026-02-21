@@ -6,7 +6,7 @@ use std::path::Path;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreateMenu, DeleteMenu, DestroyMenu, DrawMenuBar, GetMenu, GetMenuItemCount,
-    GetSubMenu, HMENU, InsertMenuW, MENU_ITEM_FLAGS, MF_BYPOSITION, MF_CHECKED, MF_GRAYED,
+    GetSubMenu, HMENU, InsertMenuW, IsMenu, MENU_ITEM_FLAGS, MF_BYPOSITION, MF_CHECKED, MF_GRAYED,
     MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, SetMenu,
 };
 use windows::core::PCWSTR;
@@ -130,6 +130,7 @@ pub const IDM_TOOLS_RSS: usize = 5005;
 pub const IDM_TOOLS_PODCASTS: usize = 5006;
 pub const IDM_TOOLS_DICTIONARY_LOOKUP: usize = 5007;
 pub const IDM_TOOLS_WIKIPEDIA_IMPORT: usize = 5008;
+pub const IDM_TOOLS_STREAM_AUDIO: usize = 5009;
 pub const IDM_HELP_GUIDE: usize = 7001;
 pub const IDM_HELP_ABOUT: usize = 7002;
 pub const IDM_HELP_CHECK_UPDATES: usize = 7003;
@@ -152,6 +153,7 @@ pub struct MenuLabels {
     pub menu_dictionary_lookup: String,
     pub menu_wikipedia_import: String,
     pub menu_import_youtube: String,
+    pub menu_stream_audio: String,
     pub menu_prompt: String,
     pub menu_rss: String,
     pub menu_podcasts: String,
@@ -254,6 +256,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         menu_dictionary_lookup: i18n::tr(language, "menu.dictionary_lookup"),
         menu_wikipedia_import: i18n::tr(language, "menu.wikipedia_import"),
         menu_import_youtube: i18n::tr(language, "menu.import_youtube"),
+        menu_stream_audio: i18n::tr(language, "menu.stream_audio"),
         menu_prompt: i18n::tr(language, "menu.prompt"),
         menu_rss: i18n::tr(language, "menu.rss"),
         menu_podcasts: i18n::tr(language, "menu.podcasts"),
@@ -641,7 +644,11 @@ unsafe fn remove_playback_menu(hmenu: HMENU, playback_menu: HMENU) {
         }
     }
     if detached {
-        crate::log_if_err!(DestroyMenu(playback_menu));
+        if IsMenu(playback_menu).as_bool() {
+            crate::log_if_err!(DestroyMenu(playback_menu));
+        } else {
+            crate::log_debug("remove_playback_menu: playback menu handle already invalid");
+        }
     }
 }
 
@@ -1151,6 +1158,12 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         MF_STRING,
         IDM_TOOLS_IMPORT_YOUTUBE,
         &labels.menu_import_youtube,
+    );
+    append_menu_string(
+        tools_menu,
+        MF_STRING,
+        IDM_TOOLS_STREAM_AUDIO,
+        &labels.menu_stream_audio,
     );
     append_menu_string(
         tools_menu,

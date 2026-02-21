@@ -905,6 +905,7 @@ pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
         state.available_audio_tracks = audio_tracks;
         state.selected_audio_track = None;
     });
+    crate::menu::update_playback_menu(hwnd, true);
 
     let (bookmark_pos, speed, pitch, volume, mix_export) = with_state(hwnd, |state| {
         let pos = state
@@ -1063,6 +1064,7 @@ pub unsafe fn toggle_audiobook_pause(hwnd: HWND) {
 
 pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
     enum SeekAction {
+        Direct,
         Restart {
             path: PathBuf,
             current_pos: u64,
@@ -1085,7 +1087,13 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
             );
             let current_pos = audiobook_position_secs(&player);
             let new_pos = (current_pos as i64 + seconds).max(0);
-            // Output doesn't support direct seek, always restart.
+            if player.output.seek_to_seconds(new_pos as f64) {
+                let mut player = player;
+                player.accumulated_seconds = new_pos as u64;
+                player.start_instant = std::time::Instant::now();
+                state.active_audiobook = Some(player);
+                return Some(SeekAction::Direct);
+            }
             player.subtitle_cancel.store(true, Ordering::Relaxed);
             player.stop();
             Some(SeekAction::Restart {
@@ -1110,6 +1118,10 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
         None => return,
     };
 
+    if matches!(action, SeekAction::Direct) {
+        return;
+    }
+
     let SeekAction::Restart {
         path,
         current_pos,
@@ -1120,7 +1132,10 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
         volume,
         muted,
         prev_volume,
-    } = action;
+    } = action
+    else {
+        return;
+    };
 
     if let Some(duration) = duration
         && current_pos >= duration
@@ -1149,20 +1164,36 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
 }
 
 pub unsafe fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> {
-    let path = with_state(hwnd, |state| {
-        if let Some(player) = &state.active_audiobook {
+    enum SeekToAction {
+        Direct,
+        Restart(PathBuf),
+    }
+    let action = with_state(hwnd, |state| {
+        if let Some(player) = &mut state.active_audiobook {
             stop_shared_subtitle_speech(
                 &player.subtitle_speech_cancel,
                 &player.subtitle_speech_command,
                 "seek",
             );
-            Some(player.path.clone())
+            if player.output.seek_to_seconds(seconds as f64) {
+                player.accumulated_seconds = seconds;
+                player.start_instant = std::time::Instant::now();
+                return Some(SeekToAction::Direct);
+            }
+            Some(SeekToAction::Restart(player.path.clone()))
         } else {
             None
         }
     })
     .flatten()
     .ok_or_else(|| "No active audiobook".to_string())?;
+
+    if matches!(action, SeekToAction::Direct) {
+        return Ok(());
+    }
+    let SeekToAction::Restart(path) = action else {
+        return Ok(());
+    };
 
     if let Some(duration) = audiobook_duration_secs(&path)
         && seconds >= duration
@@ -1171,7 +1202,6 @@ pub unsafe fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> 
         return Ok(());
     }
 
-    // Output doesn't support direct seek, always restart
     start_audiobook_at(hwnd, &path, seconds);
     Ok(())
 }

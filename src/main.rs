@@ -3729,6 +3729,10 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 }
                 return LRESULT(0);
             }
+            if cmd_id == IDM_FILE_RECENT_CLEAR {
+                clear_recent_files(hwnd);
+                return LRESULT(0);
+            }
 
             match cmd_id {
                 IDM_FILE_NEW => {
@@ -8411,6 +8415,18 @@ pub(crate) unsafe fn push_recent_file(hwnd: HWND, path: &Path) {
     };
     update_recent_menu(hwnd, hmenu_recent);
     save_recent_files(&files);
+}
+
+pub(crate) unsafe fn clear_recent_files(hwnd: HWND) {
+    let hmenu_recent = with_state(hwnd, |state| {
+        state.recent_files.clear();
+        state.hmenu_recent
+    })
+    .unwrap_or(HMENU(0));
+    if hmenu_recent.0 != 0 {
+        update_recent_menu(hwnd, hmenu_recent);
+    }
+    save_recent_files(&[]);
 }
 
 fn spawn_new_window_with_path(path: &Path) -> bool {

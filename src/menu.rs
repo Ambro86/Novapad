@@ -122,6 +122,7 @@ pub const IDM_VIEW_TEXT_SIZE_LARGE: usize = 6303;
 pub const IDM_VIEW_TEXT_SIZE_XLARGE: usize = 6304;
 pub const IDM_VIEW_TEXT_SIZE_XXLARGE: usize = 6305;
 pub const IDM_FILE_RECENT_BASE: usize = 4000;
+pub const IDM_FILE_RECENT_CLEAR: usize = 4010;
 pub const IDM_TOOLS_OPTIONS: usize = 5001;
 pub const IDM_TOOLS_DICTIONARY: usize = 5002;
 pub const IDM_TOOLS_IMPORT_YOUTUBE: usize = 5003;
@@ -239,6 +240,7 @@ pub struct MenuLabels {
     pub help_check_updates: String,
     pub help_about: String,
     pub recent_empty: String,
+    pub recent_clear: String,
 }
 
 pub fn menu_labels(language: Language) -> MenuLabels {
@@ -345,6 +347,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         help_check_updates: i18n::tr(language, "help.check_updates"),
         help_about: i18n::tr(language, "help.about"),
         recent_empty: i18n::tr(language, "recent.empty"),
+        recent_clear: i18n::tr(language, "recent.clear"),
     }
 }
 
@@ -1222,6 +1225,7 @@ pub unsafe fn update_recent_menu(hwnd: HWND, hmenu_recent: HMENU) {
         let labels = menu_labels(language);
         append_menu_string(hmenu_recent, MF_STRING | MF_GRAYED, 0, &labels.recent_empty);
     } else {
+        let labels = menu_labels(language);
         for (i, path) in files.iter().enumerate() {
             let label = format!("&{} {}", i + 1, abbreviate_recent_label(path));
             let wide = to_wide(&label);
@@ -1232,6 +1236,13 @@ pub unsafe fn update_recent_menu(hwnd: HWND, hmenu_recent: HMENU) {
                 PCWSTR(wide.as_ptr()),
             ));
         }
+        crate::log_if_err!(AppendMenuW(hmenu_recent, MF_SEPARATOR, 0, PCWSTR::null()));
+        append_menu_string(
+            hmenu_recent,
+            MF_STRING,
+            IDM_FILE_RECENT_CLEAR,
+            &labels.recent_clear,
+        );
     }
     crate::log_if_err!(DrawMenuBar(hwnd));
 }

@@ -244,6 +244,15 @@ pub enum RssQuickCopyMode {
     All,
 }
 
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum RssPodcastUnreadLabelPosition {
+    #[serde(rename = "before")]
+    #[default]
+    Before,
+    #[serde(rename = "after")]
+    After,
+}
+
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ShortcutBinding {
     pub ctrl: bool,
@@ -534,6 +543,8 @@ pub struct AppSettings {
     #[serde(default = "default_true")]
     pub announce_unread_rss_podcast_items: bool,
     #[serde(default)]
+    pub rss_podcast_unread_label_position: RssPodcastUnreadLabelPosition,
+    #[serde(default)]
     pub shortcuts: ShortcutSettings,
     pub spellcheck_enabled: bool,
     pub spellcheck_language_mode: SpellcheckLanguageMode,
@@ -744,6 +755,7 @@ impl Default for AppSettings {
             podcast_delete_confirm_mode: PodcastDeleteConfirmMode::Both,
             rss_quick_copy_mode: RssQuickCopyMode::Title,
             announce_unread_rss_podcast_items: true,
+            rss_podcast_unread_label_position: RssPodcastUnreadLabelPosition::Before,
             shortcuts: ShortcutSettings::default(),
             spellcheck_enabled: false,
             spellcheck_language_mode: SpellcheckLanguageMode::FollowEditorLanguage,

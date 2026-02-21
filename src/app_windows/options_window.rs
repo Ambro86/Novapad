@@ -6,9 +6,9 @@ use crate::editor_manager::{
 };
 use crate::settings::{
     Language, ModifiedMarkerPosition, OpenBehavior, PodcastDeleteConfirmMode, RssDeleteConfirmMode,
-    ShortcutBinding, ShortcutSettings, SubtitleReadMode, TRUSTED_CLIENT_TOKEN, TtsEngine,
-    VOICE_LIST_URL, VoiceInfo, format_shortcut, save_settings_with_default_copy, sync_context_menu,
-    sync_start_menu_shortcuts,
+    RssPodcastUnreadLabelPosition, ShortcutBinding, ShortcutSettings, SubtitleReadMode,
+    TRUSTED_CLIENT_TOKEN, TtsEngine, VOICE_LIST_URL, VoiceInfo, format_shortcut,
+    save_settings_with_default_copy, sync_context_menu, sync_start_menu_shortcuts,
 };
 use crate::{i18n, rebuild_menus, refresh_voice_panel, tts_engine, with_state};
 use reqwest::blocking::Client;
@@ -106,6 +106,7 @@ const OPTIONS_ID_SEND_CRASH_REPORTS: usize = 6048;
 const OPTIONS_ID_USE_LEGACY_NAME: usize = 6057;
 const OPTIONS_ID_CONFIRM_DELETE_RSS_MODE: usize = 6066;
 const OPTIONS_ID_ANNOUNCE_UNREAD_RSS_PODCAST: usize = 6067;
+const OPTIONS_ID_UNREAD_LABEL_POSITION: usize = 6078;
 const OPTIONS_ID_CONFIRM_DELETE_PODCAST_MODE: usize = 6068;
 const OPTIONS_ID_RSS_QUICK_COPY_MODE: usize = 6069;
 const OPTIONS_ID_MANAGE_ASSOCIATIONS: usize = 6044;
@@ -655,6 +656,8 @@ struct OptionsDialogState {
     label_podcast_cache_limit: HWND,
     edit_podcast_cache_limit: HWND,
     checkbox_announce_unread_rss_podcast: HWND,
+    label_unread_label_position: HWND,
+    combo_unread_label_position: HWND,
     label_podcastindex_key: HWND,
     edit_podcastindex_key: HWND,
     label_podcastindex_secret: HWND,
@@ -815,6 +818,7 @@ struct OptionsLabels {
     label_subtitle_offset: String,
     label_podcast_cache_limit: String,
     label_announce_unread_rss_podcast: String,
+    label_unread_label_position: String,
     label_podcastindex_key: String,
     label_podcastindex_secret: String,
     label_podcastindex_signup: String,
@@ -869,6 +873,8 @@ struct OptionsLabels {
     rss_quick_copy_url: String,
     rss_quick_copy_content: String,
     rss_quick_copy_all: String,
+    unread_label_position_before: String,
+    unread_label_position_after: String,
     ok: String,
     cancel: String,
     voices_empty: String,
@@ -976,6 +982,7 @@ fn options_labels(language: Language) -> OptionsLabels {
             language,
             "options.label.announce_unread_rss_podcast",
         ),
+        label_unread_label_position: i18n::tr(language, "options.label.unread_label_position"),
         label_podcastindex_key: i18n::tr(language, "options.label.podcastindex_key"),
         label_podcastindex_secret: i18n::tr(language, "options.label.podcastindex_secret"),
         label_podcastindex_signup: i18n::tr(language, "options.button.podcastindex_signup"),
@@ -1044,6 +1051,8 @@ fn options_labels(language: Language) -> OptionsLabels {
         rss_quick_copy_url: i18n::tr(language, "options.rss_quick_copy.url"),
         rss_quick_copy_content: i18n::tr(language, "options.rss_quick_copy.content"),
         rss_quick_copy_all: i18n::tr(language, "options.rss_quick_copy.all"),
+        unread_label_position_before: i18n::tr(language, "options.unread_label_position.before"),
+        unread_label_position_after: i18n::tr(language, "options.unread_label_position.after"),
         ok: i18n::tr(language, "options.ok"),
         cancel: i18n::tr(language, "options.cancel"),
         voices_empty: i18n::tr(language, "options.voices.empty"),
@@ -2391,6 +2400,36 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
             );
             y += 28;
 
+            let label_unread_label_position = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_unread_label_position).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_unread_label_position = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                180,
+                hwnd,
+                HMENU(OPTIONS_ID_UNREAD_LABEL_POSITION as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
             let label_podcastindex_key = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -3276,6 +3315,8 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 label_podcast_cache_limit,
                 edit_podcast_cache_limit,
                 checkbox_announce_unread_rss_podcast,
+                label_unread_label_position,
+                combo_unread_label_position,
                 label_podcastindex_key,
                 edit_podcastindex_key,
                 label_podcastindex_secret,
@@ -3408,6 +3449,8 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 label_podcast_cache_limit,
                 edit_podcast_cache_limit,
                 checkbox_announce_unread_rss_podcast,
+                label_unread_label_position,
+                combo_unread_label_position,
                 label_podcastindex_key,
                 edit_podcastindex_key,
                 label_podcastindex_secret,
@@ -3856,6 +3899,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         _label_podcast_cache_limit,
         edit_podcast_cache_limit,
         checkbox_announce_unread_rss_podcast,
+        _label_unread_label_position,
+        combo_unread_label_position,
         _label_podcastindex_key,
         edit_podcastindex_key,
         _label_podcastindex_secret,
@@ -3944,6 +3989,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.label_podcast_cache_limit,
             state.edit_podcast_cache_limit,
             state.checkbox_announce_unread_rss_podcast,
+            state.label_unread_label_position,
+            state.combo_unread_label_position,
             state.label_podcastindex_key,
             state.edit_podcastindex_key,
             state.label_podcastindex_secret,
@@ -4867,6 +4914,33 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         } else {
             0
         }),
+        LPARAM(0),
+    );
+    SendMessageW(
+        combo_unread_label_position,
+        CB_RESETCONTENT,
+        WPARAM(0),
+        LPARAM(0),
+    );
+    for option in [
+        labels.unread_label_position_before.clone(),
+        labels.unread_label_position_after.clone(),
+    ] {
+        SendMessageW(
+            combo_unread_label_position,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&option).as_ptr() as isize),
+        );
+    }
+    let unread_label_idx = match settings.rss_podcast_unread_label_position {
+        RssPodcastUnreadLabelPosition::Before => 0,
+        RssPodcastUnreadLabelPosition::After => 1,
+    };
+    SendMessageW(
+        combo_unread_label_position,
+        CB_SETCURSEL,
+        WPARAM(unread_label_idx),
         LPARAM(0),
     );
 
@@ -5879,6 +5953,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         checkbox_subtitle_ducking,
         edit_podcast_cache_limit,
         checkbox_announce_unread_rss_podcast,
+        combo_unread_label_position,
         edit_podcastindex_key,
         edit_podcastindex_secret,
         checkbox_tts_manual,
@@ -5944,6 +6019,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.checkbox_subtitle_ducking,
             state.edit_podcast_cache_limit,
             state.checkbox_announce_unread_rss_podcast,
+            state.combo_unread_label_position,
             state.edit_podcastindex_key,
             state.edit_podcastindex_secret,
             state.checkbox_tts_manual,
@@ -6373,6 +6449,18 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     )
     .0 as u32
         == BST_CHECKED.0;
+    let unread_label_position_sel = SendMessageW(
+        combo_unread_label_position,
+        CB_GETCURSEL,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0;
+    settings.rss_podcast_unread_label_position = if unread_label_position_sel == 1 {
+        RssPodcastUnreadLabelPosition::After
+    } else {
+        RssPodcastUnreadLabelPosition::Before
+    };
 
     let prompt_sel = SendMessageW(combo_prompt_program, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     settings.prompt_program = match prompt_sel {
@@ -7368,6 +7456,14 @@ fn layout_rss_podcast_tab(state: &OptionsDialogState) {
         state.checkbox_announce_unread_rss_podcast,
         y,
     );
+    y = layout_label_control(
+        "label_unread_label_position",
+        state.label_unread_label_position,
+        "combo_unread_label_position",
+        state.combo_unread_label_position,
+        y,
+        OPTIONS_COMBO_HEIGHT,
+    );
     y += OPTIONS_SECTION_GAP;
     y = layout_label_control(
         "label_podcast_cache_limit",
@@ -7600,6 +7696,8 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.label_podcast_cache_limit,
             state.edit_podcast_cache_limit,
             state.checkbox_announce_unread_rss_podcast,
+            state.label_unread_label_position,
+            state.combo_unread_label_position,
             state.label_podcastindex_key,
             state.edit_podcastindex_key,
             state.label_podcastindex_secret,

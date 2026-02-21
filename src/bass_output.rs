@@ -156,7 +156,7 @@ impl BassOutput {
             source
         };
 
-        let volume = volume.clamp(0.0, 6.0);
+        let volume = volume.clamp(0.0, 3.0);
         let set_ok = unsafe { (api.channel_set_attribute)(handle, BASS_ATTRIB_VOL, volume) };
         if set_ok == 0 {
             log_bass_error(api, "BASS_ChannelSetAttribute volume");
@@ -244,7 +244,7 @@ impl BassOutput {
             source_handle
         };
 
-        let volume = volume.clamp(0.0, 6.0);
+        let volume = volume.clamp(0.0, 3.0);
         let set_ok = unsafe { (api.channel_set_attribute)(handle, BASS_ATTRIB_VOL, volume) };
         if set_ok == 0 {
             log_bass_error(api, "BASS_ChannelSetAttribute volume (ffmpeg)");
@@ -300,7 +300,7 @@ impl BassOutput {
 
     pub fn set_volume(&self, volume: f32) {
         let handle = *self.handle.lock().unwrap_or_else(|e| e.into_inner());
-        let volume = volume.clamp(0.0, 6.0);
+        let volume = volume.clamp(0.0, 3.0);
         let ok = unsafe { (self.api.channel_set_attribute)(handle, BASS_ATTRIB_VOL, volume) };
         if ok == 0 {
             log_bass_error(self.api, "BASS_ChannelSetAttribute volume");

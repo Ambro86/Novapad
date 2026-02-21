@@ -576,6 +576,8 @@ struct AudiobookPlaybackOptions {
     force_ffmpeg_stream: bool,
 }
 
+const MAX_AUDIOBOOK_PLAYBACK_VOLUME: f32 = 3.0;
+
 fn start_audiobook_at_with_options(
     hwnd: HWND,
     path: PathBuf,
@@ -925,6 +927,7 @@ pub unsafe fn start_audiobook_playback(hwnd: HWND, path: &Path) {
     })
     .unwrap_or((0, 1.0, 0.0, 1.0, false));
 
+    let volume = volume.clamp(0.0, MAX_AUDIOBOOK_PLAYBACK_VOLUME);
     start_audiobook_at_with_options(
         hwnd,
         path_buf,
@@ -1342,10 +1345,11 @@ pub unsafe fn change_audiobook_volume(hwnd: HWND, delta: f32) {
     let new_volume = with_state(hwnd, |state| {
         if let Some(player) = &mut state.active_audiobook {
             if player.muted {
-                player.prev_volume = (player.prev_volume + delta).clamp(0.0, 6.0);
+                player.prev_volume =
+                    (player.prev_volume + delta).clamp(0.0, MAX_AUDIOBOOK_PLAYBACK_VOLUME);
                 return None;
             }
-            player.volume = (player.volume + delta).clamp(0.0, 6.0);
+            player.volume = (player.volume + delta).clamp(0.0, MAX_AUDIOBOOK_PLAYBACK_VOLUME);
             player.set_volume(player.volume);
             Some(player.volume)
         } else {
@@ -1704,7 +1708,8 @@ pub unsafe fn toggle_audiobook_mute(hwnd: HWND) {
                     player.prev_volume
                 } else {
                     1.0
-                };
+                }
+                .clamp(0.0, MAX_AUDIOBOOK_PLAYBACK_VOLUME);
                 player.volume = restored;
                 player.muted = false;
                 player.set_volume(player.volume);

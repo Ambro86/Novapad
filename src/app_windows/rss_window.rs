@@ -277,6 +277,7 @@ fn rss_source_display_title(
     source: &RssSource,
     language: crate::settings::Language,
     announce_unread: bool,
+    unread_label_position: crate::settings::RssPodcastUnreadLabelPosition,
 ) -> String {
     let base_title = if source.title.trim().is_empty() {
         source.url.clone()
@@ -284,7 +285,14 @@ fn rss_source_display_title(
         source.title.clone()
     };
     if announce_unread && source.unread {
-        format!("{base_title}{}", i18n::tr(language, "rss.unread_suffix"))
+        match unread_label_position {
+            crate::settings::RssPodcastUnreadLabelPosition::Before => {
+                format!("{}{}", i18n::tr(language, "rss.unread_prefix"), base_title)
+            }
+            crate::settings::RssPodcastUnreadLabelPosition::After => {
+                format!("{base_title}{}", i18n::tr(language, "rss.unread_suffix"))
+            }
+        }
     } else {
         base_title
     }
@@ -296,17 +304,25 @@ fn rss_item_display_title(
     announce_unread: bool,
     item_unread: bool,
     pub_date: Option<i64>,
+    unread_label_position: crate::settings::RssPodcastUnreadLabelPosition,
 ) -> String {
-    let mut out = format!(
+    let base = format!(
         "{title}{}",
         format_timestamp_for_language(pub_date, language)
             .map(|ts| format!(". {ts}"))
             .unwrap_or_default()
     );
     if announce_unread && item_unread {
-        out.push_str(&i18n::tr(language, "rss.item_unread_suffix"));
+        return match unread_label_position {
+            crate::settings::RssPodcastUnreadLabelPosition::Before => {
+                format!("{}{}", i18n::tr(language, "rss.item_unread_prefix"), base)
+            }
+            crate::settings::RssPodcastUnreadLabelPosition::After => {
+                format!("{base}{}", i18n::tr(language, "rss.item_unread_suffix"))
+            }
+        };
     }
-    out
+    base
 }
 
 fn format_timestamp_for_language(
@@ -2496,22 +2512,33 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
             if let Some(item) = item
                 && rss_item_key(&item) == msg_data.item_key
             {
-                let (language, announce_unread) = with_rss_state(hwnd, |s| {
-                    with_state(s.parent, |ps| {
-                        (
-                            ps.settings.language,
-                            ps.settings.announce_unread_rss_podcast_items,
-                        )
+                let (language, announce_unread, unread_label_position) =
+                    with_rss_state(hwnd, |s| {
+                        with_state(s.parent, |ps| {
+                            (
+                                ps.settings.language,
+                                ps.settings.announce_unread_rss_podcast_items,
+                                ps.settings.rss_podcast_unread_label_position,
+                            )
+                        })
+                        .unwrap_or((
+                            crate::settings::Language::English,
+                            true,
+                            crate::settings::RssPodcastUnreadLabelPosition::Before,
+                        ))
                     })
-                    .unwrap_or((crate::settings::Language::English, true))
-                })
-                .unwrap_or((crate::settings::Language::English, true));
+                    .unwrap_or((
+                        crate::settings::Language::English,
+                        true,
+                        crate::settings::RssPodcastUnreadLabelPosition::Before,
+                    ));
                 let updated = rss_item_display_title(
                     &item.title,
                     language,
                     announce_unread,
                     false,
                     item.pub_date,
+                    unread_label_position,
                 );
                 let text = to_wide(&updated);
                 let mut tv_item = TVITEMW {
@@ -3043,19 +3070,25 @@ unsafe fn create_controls(hwnd: HWND) {
 }
 
 unsafe fn reload_tree(hwnd: HWND) {
-    let (hwnd_tree, sources, language, announce_unread) = match with_rss_state(hwnd, |s| {
-        (
-            s.hwnd_tree,
-            with_state(s.parent, |ps| ps.settings.rss_sources.clone()),
-            with_state(s.parent, |ps| ps.settings.language),
-            with_state(s.parent, |ps| ps.settings.announce_unread_rss_podcast_items),
-        )
-    }) {
-        Some((t, Some(src), Some(language), Some(announce_unread))) => {
-            (t, src, language, announce_unread)
-        }
-        _ => return,
-    };
+    let (hwnd_tree, sources, language, announce_unread, unread_label_position) =
+        match with_rss_state(hwnd, |s| {
+            (
+                s.hwnd_tree,
+                with_state(s.parent, |ps| ps.settings.rss_sources.clone()),
+                with_state(s.parent, |ps| ps.settings.language),
+                with_state(s.parent, |ps| ps.settings.announce_unread_rss_podcast_items),
+                with_state(s.parent, |ps| ps.settings.rss_podcast_unread_label_position),
+            )
+        }) {
+            Some((
+                t,
+                Some(src),
+                Some(language),
+                Some(announce_unread),
+                Some(unread_label_position),
+            )) => (t, src, language, announce_unread, unread_label_position),
+            _ => return,
+        };
 
     SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(TVI_ROOT.0));
 
@@ -3069,6 +3102,7 @@ unsafe fn reload_tree(hwnd: HWND) {
             &source,
             language,
             announce_unread,
+            unread_label_position,
         ));
         let mut tvis = TVINSERTSTRUCTW {
             hParent: TVI_ROOT,
@@ -3214,6 +3248,7 @@ unsafe fn set_source_unread(
                         src,
                         language,
                         ps.settings.announce_unread_rss_podcast_items,
+                        ps.settings.rss_podcast_unread_label_position,
                     );
                     crate::settings::save_settings(ps.settings.clone());
                     return Some(title);
@@ -3601,6 +3636,7 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                                 src,
                                 lang,
                                 ps.settings.announce_unread_rss_podcast_items,
+                                ps.settings.rss_podcast_unread_label_position,
                             );
                             if src.kind != outcome.kind {
                                 src.kind = outcome.kind;
@@ -3953,16 +3989,25 @@ unsafe fn load_more_items(
     if hwnd_tree.0 == 0 {
         return 0;
     }
-    let (language, announce_unread) = with_rss_state(hwnd, |s| {
+    let (language, announce_unread, unread_label_position) = with_rss_state(hwnd, |s| {
         with_state(s.parent, |ps| {
             (
                 ps.settings.language,
                 ps.settings.announce_unread_rss_podcast_items,
+                ps.settings.rss_podcast_unread_label_position,
             )
         })
-        .unwrap_or((crate::settings::Language::English, true))
+        .unwrap_or((
+            crate::settings::Language::English,
+            true,
+            crate::settings::RssPodcastUnreadLabelPosition::Before,
+        ))
     })
-    .unwrap_or((crate::settings::Language::English, true));
+    .unwrap_or((
+        crate::settings::Language::English,
+        true,
+        crate::settings::RssPodcastUnreadLabelPosition::Before,
+    ));
 
     SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(0), LPARAM(0));
     let (inserted, loaded_after, total_after) = with_rss_state(hwnd, |s| {
@@ -3987,6 +4032,7 @@ unsafe fn load_more_items(
                 announce_unread,
                 item_unread,
                 item.pub_date,
+                unread_label_position,
             );
             let text = to_wide(&display_title);
             let c_children = if item.is_folder { 1 } else { 0 };
@@ -4571,16 +4617,26 @@ unsafe fn undo_last_delete(hwnd: HWND) {
                 }
 
                 let mut restored_hitem = windows::Win32::UI::Controls::HTREEITEM(0);
-                let (language, announce_unread) = with_rss_state(hwnd, |s| {
-                    with_state(s.parent, |ps| {
-                        (
-                            ps.settings.language,
-                            ps.settings.announce_unread_rss_podcast_items,
-                        )
+                let (language, announce_unread, unread_label_position) =
+                    with_rss_state(hwnd, |s| {
+                        with_state(s.parent, |ps| {
+                            (
+                                ps.settings.language,
+                                ps.settings.announce_unread_rss_podcast_items,
+                                ps.settings.rss_podcast_unread_label_position,
+                            )
+                        })
+                        .unwrap_or((
+                            crate::settings::Language::English,
+                            true,
+                            crate::settings::RssPodcastUnreadLabelPosition::Before,
+                        ))
                     })
-                    .unwrap_or((crate::settings::Language::English, true))
-                })
-                .unwrap_or((crate::settings::Language::English, true));
+                    .unwrap_or((
+                        crate::settings::Language::English,
+                        true,
+                        crate::settings::RssPodcastUnreadLabelPosition::Before,
+                    ));
                 with_rss_state(hwnd, |s| {
                     if let Some(state) = s.source_items.get(&source_hitem.0) {
                         for entry in state.items.iter().take(state.loaded) {
@@ -4594,6 +4650,7 @@ unsafe fn undo_last_delete(hwnd: HWND) {
                                 announce_unread,
                                 item_unread,
                                 entry.pub_date,
+                                unread_label_position,
                             );
                             let text = to_wide(&display_title);
                             let mut tvis = TVINSERTSTRUCTW {

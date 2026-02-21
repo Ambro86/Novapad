@@ -1330,7 +1330,7 @@ fn announce_player_volume(hwnd: HWND) {
     let Some(volume) = volume else {
         return;
     };
-    let percent = (volume * 100.0).round().clamp(0.0, 600.0) as u32;
+    let percent = (volume * 100.0).round().clamp(0.0, 300.0) as u32;
     let message = i18n::tr_f(
         language,
         "player.volume_announce",

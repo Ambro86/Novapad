@@ -33,7 +33,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{PCWSTR, w};
 
-use crate::accessibility::{EM_REPLACESEL, to_wide, to_wide_normalized};
+use crate::accessibility::{EM_REPLACESEL, screen_reader_speak, to_wide, to_wide_normalized};
 use crate::editor_manager::get_edit_text;
 use crate::i18n;
 use crate::settings::{Language, confirm_title, save_settings, settings_dir};
@@ -175,6 +175,14 @@ fn ytdlp_debug_enabled() -> bool {
         .unwrap_or(false)
 }
 
+fn post_focus_editor(parent: HWND) {
+    unsafe {
+        if let Err(e) = PostMessageW(parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) {
+            crate::log_debug(&format!("Failed to post WM_FOCUS_EDITOR: {}", e));
+        }
+    }
+}
+
 pub fn import_youtube_transcript(parent: HWND) {
     let (language, include_timestamps) = unsafe {
         with_state(parent, |state| {
@@ -186,11 +194,7 @@ pub fn import_youtube_transcript(parent: HWND) {
         .unwrap_or((Language::Italian, true))
     };
     let Some(result) = show_import_dialog(parent, language, include_timestamps) else {
-        unsafe {
-            if let Err(e) = PostMessageW(parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) {
-                crate::log_debug(&format!("Failed to post WM_FOCUS_EDITOR: {}", e));
-            }
-        }
+        post_focus_editor(parent);
         return;
     };
     unsafe {
@@ -209,9 +213,7 @@ pub fn import_youtube_transcript(parent: HWND) {
     unsafe {
         let Some(hwnd_edit) = get_active_edit(parent) else {
             show_error(parent, language, &labels(language).no_document);
-            if let Err(e) = PostMessageW(parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) {
-                crate::log_debug(&format!("Failed to post WM_FOCUS_EDITOR: {}", e));
-            }
+            post_focus_editor(parent);
             return;
         };
         SetFocus(hwnd_edit);
@@ -252,9 +254,7 @@ pub fn import_youtube_transcript(parent: HWND) {
             CHILDID_SELF,
         );
         NotifyWinEvent(EVENT_OBJECT_FOCUS, hwnd_edit, OBJID_CLIENT, CHILDID_SELF);
-        if let Err(e) = PostMessageW(parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) {
-            crate::log_debug(&format!("Error: {:?}", e));
-        }
+        post_focus_editor(parent);
     }
 }
 
@@ -1444,6 +1444,27 @@ fn normalize_youtube_input_for_download(input: &str) -> Option<String> {
     }
 }
 
+fn looks_like_valid_stream_url(input: &str) -> bool {
+    let Some(normalized) = normalize_youtube_input_for_download(input) else {
+        return false;
+    };
+    let Ok(url) = Url::parse(&normalized) else {
+        return false;
+    };
+    let scheme = url.scheme();
+    if scheme != "http" && scheme != "https" {
+        return false;
+    }
+    let Some(host) = url.host_str() else {
+        return false;
+    };
+    let host_lc = host.to_ascii_lowercase();
+    host_lc == "localhost"
+        || host_lc.contains('.')
+        || host_lc.chars().all(|c| c.is_ascii_digit() || c == '.')
+        || (host_lc.starts_with('[') && host_lc.ends_with(']'))
+}
+
 #[derive(Clone, Copy)]
 enum StreamOutputFormat {
     Auto,
@@ -1492,6 +1513,7 @@ struct StreamTrackDialogInit {
 
 struct StreamTrackDialogState {
     parent: HWND,
+    language: Language,
     combo: HWND,
     ok_button: HWND,
     tracks: Vec<StreamAudioTrack>,
@@ -1739,8 +1761,12 @@ unsafe fn stream_dialog_wndproc_inner(
         }
         WM_COMMAND => {
             let cmd_id = wparam.0 & 0xffff;
-            if cmd_id == STREAM_ID_OK {
+            if cmd_id == STREAM_ID_OK || cmd_id == 1 {
                 if with_stream_dialog_state(hwnd, |state| {
+                    let msg = i18n::tr(state.language, "stream_audio.progress_downloading");
+                    if !screen_reader_speak(&msg) {
+                        crate::log_debug("Screen reader speak failed");
+                    }
                     let url = read_edit_text(state.url_edit);
                     let format_idx =
                         SendMessageW(state.format_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
@@ -1758,7 +1784,7 @@ unsafe fn stream_dialog_wndproc_inner(
                 crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
                 return LRESULT(0);
             }
-            if cmd_id == STREAM_ID_CANCEL {
+            if cmd_id == STREAM_ID_CANCEL || cmd_id == 2 {
                 if with_stream_dialog_state(hwnd, |state| {
                     *state.result.lock().unwrap_or_else(|e| e.into_inner()) = None;
                 })
@@ -2291,6 +2317,7 @@ unsafe fn stream_track_dialog_wndproc_inner(
 
             let state = Box::new(StreamTrackDialogState {
                 parent: init.parent,
+                language: init.language,
                 combo,
                 ok_button,
                 tracks: init.tracks,
@@ -2302,8 +2329,12 @@ unsafe fn stream_track_dialog_wndproc_inner(
         }
         WM_COMMAND => {
             let cmd_id = wparam.0 & 0xffff;
-            if cmd_id == STREAM_TRACK_ID_OK {
+            if cmd_id == STREAM_TRACK_ID_OK || cmd_id == 1 {
                 if with_stream_track_dialog_state(hwnd, |state| {
+                    let msg = i18n::tr(state.language, "podcasts.loading");
+                    if !screen_reader_speak(&msg) {
+                        crate::log_debug("Screen reader speak failed");
+                    }
                     let idx = SendMessageW(state.combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
                     let selected: Option<Option<String>> = if idx <= 0 {
                         Some(None)
@@ -2322,7 +2353,7 @@ unsafe fn stream_track_dialog_wndproc_inner(
                 crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
                 return LRESULT(0);
             }
-            if cmd_id == STREAM_TRACK_ID_CANCEL {
+            if cmd_id == STREAM_TRACK_ID_CANCEL || cmd_id == 2 {
                 if with_stream_track_dialog_state(hwnd, |state| {
                     *state.result.lock().unwrap_or_else(|e| e.into_inner()) = None;
                 })
@@ -2465,6 +2496,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
     let language =
         unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
     let Some(dialog_data) = show_stream_dialog(parent, language) else {
+        post_focus_editor(parent);
         return;
     };
     let url: String = dialog_data
@@ -2482,6 +2514,16 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         }
         return;
     }
+    if !looks_like_valid_stream_url(&url) {
+        unsafe {
+            show_error(
+                parent,
+                language,
+                &i18n::tr(language, "stream_audio.invalid_url"),
+            );
+        }
+        return;
+    }
 
     let labels_data = labels(language);
     let ytdlp_debug = ytdlp_debug_enabled();
@@ -2490,7 +2532,10 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
     }
     let ytdlp_path = match ensure_ytdlp_available(parent, language, &labels_data) {
         Ok(Some(path)) => path,
-        Ok(None) => return,
+        Ok(None) => {
+            post_focus_editor(parent);
+            return;
+        }
         Err(err) => {
             let message = i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)]);
             unsafe {
@@ -2504,7 +2549,10 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         Ok(tracks) if tracks.len() > 1 => match choose_stream_audio_track(parent, language, tracks)
         {
             Some(chosen) => chosen,
-            None => return,
+            None => {
+                post_focus_editor(parent);
+                return;
+            }
         },
         Ok(_) => None,
         Err(err) => {

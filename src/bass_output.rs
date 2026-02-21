@@ -323,6 +323,12 @@ impl BassOutput {
     }
 
     pub fn seek_to_seconds(&self, absolute_seconds: f64) -> bool {
+        // FFmpeg streaming starts from `start_offset_secs`. If caller asks to seek
+        // before this offset, we must fail here so the caller can reopen at the
+        // real absolute position.
+        if self.start_offset_secs > 0.0 && absolute_seconds < self.start_offset_secs {
+            return false;
+        }
         let handle = *self.handle.lock().unwrap_or_else(|e| e.into_inner());
         let relative = (absolute_seconds - self.start_offset_secs).max(0.0);
         let pos = unsafe { (self.api.channel_seconds2bytes)(handle, relative) };

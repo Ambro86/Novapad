@@ -7,7 +7,7 @@ use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::{PBM_SETPOS, PBM_SETRANGE, WC_BUTTON};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    EnableWindow, GetFocus, SetFocus, VK_ESCAPE, VK_RETURN,
+    EnableWindow, GetFocus, GetKeyState, SetFocus, VK_ESCAPE, VK_RETURN, VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow,
@@ -369,6 +369,24 @@ unsafe fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
             if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
                 request_cancel(hwnd);
                 return LRESULT(0);
+            }
+            if wparam.0 as u32 == VK_TAB.0 as u32
+                && let Some((label, cancel, show_cancel)) = with_save_state(hwnd, |state| {
+                    (state.label, state.cancel_button, state.show_cancel)
+                })
+                && show_cancel
+                && cancel.0 != 0
+            {
+                let focus = GetFocus();
+                let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+                if !shift_down && focus != cancel {
+                    SetFocus(cancel);
+                    return LRESULT(0);
+                }
+                if shift_down && focus == cancel {
+                    SetFocus(label);
+                    return LRESULT(0);
+                }
             }
             if wparam.0 as u32 == VK_RETURN.0 as u32
                 && let Some(cancel) = with_save_state(hwnd, |state| state.cancel_button)

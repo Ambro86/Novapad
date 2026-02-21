@@ -1899,6 +1899,7 @@ fn open_progress_dialog(
     language: Language,
     title_key: &str,
     status_key: &str,
+    show_cancel: bool,
 ) -> HWND {
     let labels = crate::app_windows::podcast_save_window::SaveDialogLabels {
         title: i18n::tr(language, title_key),
@@ -1906,7 +1907,12 @@ fn open_progress_dialog(
         cancel: i18n::tr(language, "podcast.save.cancel"),
     };
     unsafe {
-        crate::app_windows::podcast_save_window::open_with_labels(parent, language, labels, false)
+        crate::app_windows::podcast_save_window::open_with_labels(
+            parent,
+            language,
+            labels,
+            show_cancel,
+        )
     }
 }
 
@@ -1953,6 +1959,27 @@ fn report_progress_status(dialog: HWND, text: &str) {
             ));
         }
     }
+}
+
+fn pump_messages_detect_stream_cancel(parent: HWND, dialog: HWND) -> bool {
+    let mut cancelled = false;
+    let mut msg = MSG::default();
+    unsafe {
+        while PeekMessageW(&mut msg, HWND(0), 0, 0, PM_REMOVE).as_bool() {
+            if msg.hwnd == parent
+                && msg.message == crate::app_windows::podcast_save_window::WM_PODCAST_SAVE_CANCEL
+            {
+                cancelled = true;
+                continue;
+            }
+            if dialog.0 != 0 && IsDialogMessageW(dialog, &msg).as_bool() {
+                continue;
+            }
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+    }
+    cancelled
 }
 
 fn parse_ytdlp_progress_pct(line: &str) -> Option<u32> {
@@ -2509,6 +2536,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         language,
         "stream_audio.progress_title",
         "stream_audio.progress_downloading",
+        true,
     );
 
     let mut cmd = ytdlp_command(&ytdlp_path);
@@ -2516,7 +2544,6 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         .arg("--socket-timeout")
         .arg(YTDLP_SOCKET_TIMEOUT_SECS)
         .arg("--no-warnings")
-        .arg("--force-ipv4")
         .arg("--newline")
         .arg("--verbose");
 
@@ -2639,6 +2666,16 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         match child.try_wait() {
             Ok(Some(status)) => break Some(status),
             Ok(None) => {
+                if pump_messages_detect_stream_cancel(parent, progress) {
+                    close_progress_dialog(progress);
+                    if let Err(err) = child.kill() {
+                        crate::log_debug(&format!(
+                            "Failed to kill cancelled yt-dlp process: {}",
+                            err
+                        ));
+                    }
+                    return;
+                }
                 let pct = progress_shared.load(Ordering::Relaxed);
                 if pct > last_pct {
                     last_pct = pct;
@@ -2689,13 +2726,6 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                     }
                     break None;
                 }
-                let mut msg = MSG::default();
-                unsafe {
-                    while PeekMessageW(&mut msg, HWND(0), 0, 0, PM_REMOVE).as_bool() {
-                        TranslateMessage(&msg);
-                        DispatchMessageW(&msg);
-                    }
-                }
                 std::thread::sleep(std::time::Duration::from_millis(30));
             }
             Err(err) => {
@@ -2730,9 +2760,6 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
     }
 
     report_progress_status(progress, &i18n::tr(language, "podcasts.loading"));
-
-    report_progress(progress, 100);
-    close_progress_dialog(progress);
     let primary_path = find_latest_downloaded_stream_file(&cache_dir, &prefix);
     let downloaded_path = if primary_path.is_some() {
         primary_path
@@ -2759,148 +2786,148 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         }
         if should_retry {
             crate::log_debug("Stream download failed/stalled: retrying with fallback profiles");
-            let retry_progress = open_progress_dialog(
-                parent,
-                language,
-                "stream_audio.progress_title",
-                "podcasts.loading",
-            );
-            report_progress(retry_progress, 95);
-            let retry_profiles: [(&str, Option<&str>, bool); 4] = [
-                // Keep current behavior first.
-                ("audio-ipv4", Some("bestaudio/best"), true),
-                ("best-ipv4", Some("best"), true),
-                // More permissive fallbacks for sites that fail on IPv4-only.
-                ("audio-autoip", Some("bestaudio/best"), false),
-                ("auto-autoip", None, false),
+            report_progress(progress, 95);
+            let retry_profiles: [(&str, Option<&str>); 2] = [
+                ("audio-autoip", Some("bestaudio/best")),
+                ("auto-autoip", None),
             ];
             let mut retry_path: Option<PathBuf> = None;
             let mut retry_error = String::new();
-            for (idx, (profile_name, profile, force_ipv4)) in retry_profiles.iter().enumerate() {
-                let retry_prefix = format!("{prefix}_retry{}", idx + 1);
-                let retry_template = cache_dir.join(format!("{retry_prefix}.%(ext)s"));
-                let mut retry = ytdlp_command(&ytdlp_path);
-                retry
-                    .arg("--no-playlist")
-                    .arg("--socket-timeout")
-                    .arg(YTDLP_SOCKET_TIMEOUT_SECS)
-                    .arg("--no-warnings")
-                    .arg("--verbose")
-                    .arg("--extractor-retries")
-                    .arg("3")
-                    .arg("--fragment-retries")
-                    .arg("3");
-                if *force_ipv4 {
-                    retry.arg("--force-ipv4");
-                }
-                if let Some(profile) = profile {
-                    retry.arg("-f").arg(profile);
-                }
-                retry
-                    .arg("-o")
-                    .arg(retry_template.to_string_lossy().to_string())
-                    .arg("--")
-                    .arg(&url)
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null());
-                if ytdlp_debug {
-                    crate::log_debug(&format!(
-                        "yt-dlp retry start: profile={} format={:?} force_ipv4={} output_template={}",
-                        profile_name,
-                        profile,
-                        force_ipv4,
-                        retry_template.to_string_lossy()
-                    ));
-                }
-                match retry.spawn() {
-                    Ok(mut retry_child) => {
-                        let retry_start = std::time::Instant::now();
-                        let mut status_opt = None;
-                        loop {
-                            match retry_child.try_wait() {
-                                Ok(Some(status)) => {
-                                    status_opt = Some(status);
-                                    break;
-                                }
-                                Ok(None) => {
-                                    if retry_start.elapsed()
-                                        > std::time::Duration::from_secs(STREAM_RETRY_TIMEOUT_SECS)
-                                    {
-                                        let _unused = retry_child.kill();
+            'retry_rounds: for round in 0..2 {
+                for (idx, (profile_name, profile)) in retry_profiles.iter().enumerate() {
+                    let retry_prefix = format!("{prefix}_retry{}_{}", round + 1, idx + 1);
+                    let retry_template = cache_dir.join(format!("{retry_prefix}.%(ext)s"));
+                    let mut retry = ytdlp_command(&ytdlp_path);
+                    retry
+                        .arg("--no-playlist")
+                        .arg("--socket-timeout")
+                        .arg(YTDLP_SOCKET_TIMEOUT_SECS)
+                        .arg("--no-warnings")
+                        .arg("--verbose")
+                        .arg("--extractor-retries")
+                        .arg("3")
+                        .arg("--fragment-retries")
+                        .arg("3");
+                    if let Some(profile) = profile {
+                        retry.arg("-f").arg(profile);
+                    }
+                    retry
+                        .arg("-o")
+                        .arg(retry_template.to_string_lossy().to_string())
+                        .arg("--")
+                        .arg(&url)
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null());
+                    if ytdlp_debug {
+                        crate::log_debug(&format!(
+                            "yt-dlp retry start: round={} profile={} format={:?} output_template={}",
+                            round + 1,
+                            profile_name,
+                            profile,
+                            retry_template.to_string_lossy()
+                        ));
+                    }
+                    match retry.spawn() {
+                        Ok(mut retry_child) => {
+                            let retry_start = std::time::Instant::now();
+                            let mut status_opt = None;
+                            loop {
+                                match retry_child.try_wait() {
+                                    Ok(Some(status)) => {
+                                        status_opt = Some(status);
+                                        break;
+                                    }
+                                    Ok(None) => {
+                                        if pump_messages_detect_stream_cancel(parent, progress) {
+                                            close_progress_dialog(progress);
+                                            let _unused = retry_child.kill();
+                                            return;
+                                        }
+                                        if retry_start.elapsed()
+                                            > std::time::Duration::from_secs(
+                                                STREAM_RETRY_TIMEOUT_SECS,
+                                            )
+                                        {
+                                            let _unused = retry_child.kill();
+                                            retry_error = format!(
+                                                "yt-dlp retry timeout (round={}, profile={}) after {}s",
+                                                round + 1,
+                                                profile_name,
+                                                STREAM_RETRY_TIMEOUT_SECS
+                                            );
+                                            crate::log_debug(&retry_error);
+                                            break;
+                                        }
+                                        std::thread::sleep(std::time::Duration::from_millis(30));
+                                    }
+                                    Err(e) => {
                                         retry_error = format!(
-                                            "yt-dlp retry timeout (profile={}) after {}s",
-                                            profile_name, STREAM_RETRY_TIMEOUT_SECS
+                                            "yt-dlp retry wait error (round={}, profile={}): {}",
+                                            round + 1,
+                                            profile_name,
+                                            e
                                         );
                                         crate::log_debug(&retry_error);
                                         break;
                                     }
-                                    let mut msg = MSG::default();
-                                    unsafe {
-                                        while PeekMessageW(&mut msg, HWND(0), 0, 0, PM_REMOVE)
-                                            .as_bool()
-                                        {
-                                            TranslateMessage(&msg);
-                                            DispatchMessageW(&msg);
-                                        }
-                                    }
-                                    std::thread::sleep(std::time::Duration::from_millis(30));
-                                }
-                                Err(e) => {
-                                    retry_error = format!(
-                                        "yt-dlp retry wait error (profile={}): {}",
-                                        profile_name, e
-                                    );
-                                    crate::log_debug(&retry_error);
-                                    break;
                                 }
                             }
-                        }
-                        let status = status_opt;
-                        if ytdlp_debug {
-                            crate::log_debug(&format!(
-                                "yt-dlp retry status: profile={} format={:?} success={} code={:?}",
-                                profile_name,
-                                profile,
-                                status.map(|s| s.success()).unwrap_or(false),
-                                status.and_then(|s| s.code())
-                            ));
-                        }
-                        if let Some(found) =
-                            find_latest_downloaded_stream_file(&cache_dir, &retry_prefix)
-                        {
+                            let status = status_opt;
                             if ytdlp_debug {
-                                log_stream_cache_snapshot(&cache_dir, &retry_prefix, "retry-found");
+                                crate::log_debug(&format!(
+                                    "yt-dlp retry status: round={} profile={} format={:?} success={} code={:?}",
+                                    round + 1,
+                                    profile_name,
+                                    profile,
+                                    status.map(|s| s.success()).unwrap_or(false),
+                                    status.and_then(|s| s.code())
+                                ));
                             }
-                            retry_path = Some(found);
-                            break;
+                            if let Some(found) =
+                                find_latest_downloaded_stream_file(&cache_dir, &retry_prefix)
+                            {
+                                if ytdlp_debug {
+                                    log_stream_cache_snapshot(
+                                        &cache_dir,
+                                        &retry_prefix,
+                                        "retry-found",
+                                    );
+                                }
+                                retry_path = Some(found);
+                                break 'retry_rounds;
+                            }
+                            if let Some(status) = status
+                                && !status.success()
+                            {
+                                retry_error = format!(
+                                    "yt-dlp retry failed (round={}, profile={}) exit_code={:?}",
+                                    round + 1,
+                                    profile_name,
+                                    status.code()
+                                );
+                                crate::log_debug(&retry_error);
+                            }
                         }
-                        if let Some(status) = status
-                            && !status.success()
-                        {
-                            retry_error = format!(
-                                "yt-dlp retry failed (profile={}) exit_code={:?}",
-                                profile_name,
-                                status.code()
-                            );
-                            crate::log_debug(&retry_error);
-                        }
-                    }
-                    Err(e) => {
-                        crate::log_debug(&format!(
-                            "yt-dlp retry spawn/output error (profile={}): {}",
-                            profile_name, e
-                        ));
-                        if ytdlp_debug {
+                        Err(e) => {
                             crate::log_debug(&format!(
-                                "yt-dlp retry spawn/output error (profile={}): {}",
-                                profile_name, e
+                                "yt-dlp retry spawn/output error (round={}, profile={}): {}",
+                                round + 1,
+                                profile_name,
+                                e
                             ));
+                            if ytdlp_debug {
+                                crate::log_debug(&format!(
+                                    "yt-dlp retry spawn/output error (round={}, profile={}): {}",
+                                    round + 1,
+                                    profile_name,
+                                    e
+                                ));
+                            }
+                            retry_error = e.to_string();
                         }
-                        retry_error = e.to_string();
                     }
                 }
             }
-            close_progress_dialog(retry_progress);
             if retry_path.is_none() {
                 if ytdlp_debug {
                     log_stream_cache_snapshot(&cache_dir, &prefix, "retry-missing");
@@ -2912,6 +2939,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 };
                 let message =
                     i18n::tr_f(language, "stream_audio.download_failed", &[("err", &msg)]);
+                close_progress_dialog(progress);
                 unsafe {
                     show_error(parent, language, &message);
                 }
@@ -2920,6 +2948,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             retry_path
         } else {
             let message = i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)]);
+            close_progress_dialog(progress);
             unsafe {
                 show_error(parent, language, &message);
             }
@@ -2928,6 +2957,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
     };
 
     let Some(downloaded_path) = downloaded_path else {
+        close_progress_dialog(progress);
         unsafe {
             show_error(
                 parent,
@@ -2937,6 +2967,8 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         }
         return;
     };
+    report_progress(progress, 100);
+    close_progress_dialog(progress);
 
     let final_path = if let Some(convert_settings) = dialog_data.format.as_audio_convert_settings()
     {
@@ -2955,6 +2987,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 language,
                 "stream_audio.progress_title",
                 "stream_audio.progress_converting",
+                false,
             );
             let mut progress_cb = |pct| report_progress(converting_progress, pct);
             let convert_result = crate::ffmpeg_export::convert_audio_file(
@@ -3032,6 +3065,7 @@ fn ensure_ytdlp_available(
         language,
         "stream_audio.ytdlp_progress_title",
         "stream_audio.ytdlp_progress_downloading",
+        false,
     );
     let download_result = download_ytdlp_with_progress(&path, |pct| report_progress(progress, pct));
     close_progress_dialog(progress);
@@ -3086,6 +3120,7 @@ fn check_ytdlp_update(hwnd: HWND, language: Language, labels: &Labels, path: &Pa
         language,
         "stream_audio.ytdlp_progress_title",
         "stream_audio.ytdlp_progress_downloading",
+        false,
     );
     let result = download_ytdlp_with_progress(path, |pct| report_progress(progress, pct));
     close_progress_dialog(progress);

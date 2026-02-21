@@ -1260,32 +1260,63 @@ fn extract_embedded_chapters_url(url: &str) -> Option<String> {
 fn announce_player_time(hwnd: HWND) {
     const END_STOP_TOLERANCE_SECS: u64 = 1;
 
-    let (current_raw, path, fallback_total, language) = unsafe {
+    let (current_raw, path, fallback_total, fallback_is_stopped_same_path, language) = unsafe {
         with_state(hwnd, |state| {
             let current = state
                 .active_audiobook
                 .as_ref()
                 .map(|player| audiobook_position_secs(player).max(0.0).floor() as u64);
-            let path = state
+            let active_path = state
                 .active_audiobook
                 .as_ref()
                 .map(|player| player.path.clone());
+            let doc_path = if active_path.is_none() {
+                state.docs.get(state.current).and_then(|doc| {
+                    if matches!(doc.format, FileFormat::Audiobook) {
+                        doc.path.clone()
+                    } else {
+                        None
+                    }
+                })
+            } else {
+                None
+            };
+            let path = active_path.or(doc_path);
             let fallback_total = state.active_audiobook.as_ref().and_then(|player| {
                 player
                     .duration_secs()
                     .map(|secs| secs.max(0.0).floor() as u64)
             });
-            (current, path, fallback_total, state.settings.language)
+            let fallback_is_stopped_same_path = path
+                .as_ref()
+                .zip(state.last_stopped_audiobook.as_ref())
+                .map(|(p, stopped)| p == stopped)
+                .unwrap_or(false);
+            (
+                current,
+                path,
+                fallback_total,
+                fallback_is_stopped_same_path,
+                state.settings.language,
+            )
         })
     }
-    .unwrap_or((None, None, None, Language::default()));
-    let Some(current_raw) = current_raw else {
+    .unwrap_or((None, None, None, false, Language::default()));
+    let Some(path) = path else {
         return;
     };
 
-    let total = path
-        .and_then(|p| audiobook_duration_secs(&p))
-        .or(fallback_total);
+    let total = audiobook_duration_secs(&path).or(fallback_total);
+    let Some(current_raw) = current_raw.or_else(|| {
+        if fallback_is_stopped_same_path {
+            // After reaching EOF and stopping, treat time as restarted from 0:00.
+            Some(0)
+        } else {
+            total.map(|_| 0)
+        }
+    }) else {
+        return;
+    };
     let (current, should_stop) = if let Some(total) = total {
         let overrun = current_raw > total;
         if overrun {
@@ -1441,6 +1472,43 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
         },
         PlayerCommand::Seek(amount) => unsafe {
             seek_audiobook(hwnd, amount);
+        },
+        PlayerCommand::SeekToStart => unsafe {
+            if let Err(err) = seek_audiobook_to(hwnd, 0) {
+                if err == "No active audiobook" {
+                    let restart_path = with_state(hwnd, |state| {
+                        let doc = state.docs.get(state.current)?;
+                        if matches!(doc.format, FileFormat::Audiobook) {
+                            doc.path.clone()
+                        } else {
+                            None
+                        }
+                    })
+                    .flatten();
+                    if let Some(path) = restart_path {
+                        start_audiobook_at(hwnd, &path, 0);
+                    }
+                } else {
+                    log_debug(&format!("Seek to start failed: {}", err));
+                }
+            }
+        },
+        PlayerCommand::SeekToEnd => unsafe {
+            if let Some(result) = with_state(hwnd, |state| {
+                let player = state.active_audiobook.as_ref()?;
+                let total = player
+                    .duration_secs()
+                    .map(|s| s.max(0.0).floor() as u64)
+                    .or_else(|| crate::audio_player::audiobook_duration_secs(&player.path))?;
+                // Seek just before the exact end to avoid immediate stop logic.
+                let target = total.saturating_sub(1);
+                Some(seek_audiobook_to(hwnd, target))
+            })
+            .flatten()
+                && let Err(err) = result
+            {
+                log_debug(&format!("Seek to end failed: {}", err));
+            }
         },
         PlayerCommand::Volume(delta) => {
             unsafe {
@@ -4072,6 +4140,14 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                         with_state(hwnd, |state| state.settings.audiobook_skip_seconds)
                             .unwrap_or(0);
                     handle_player_command(hwnd, PlayerCommand::Seek(-(skip_seconds as i64)));
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_SEEK_TO_START => {
+                    handle_player_command(hwnd, PlayerCommand::SeekToStart);
+                    LRESULT(0)
+                }
+                IDM_PLAYBACK_SEEK_TO_END => {
+                    handle_player_command(hwnd, PlayerCommand::SeekToEnd);
                     LRESULT(0)
                 }
                 IDM_PLAYBACK_TRACK_PREV => {
@@ -7740,6 +7816,17 @@ unsafe fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
 
     let shortcuts = with_state(hwnd, |state| state.settings.shortcuts.clone())
         .unwrap_or_else(ShortcutSettings::default);
+
+    // Dedicated shortcut requested for streaming audio.
+    // NOTE: this intentionally takes precedence over the accelerator table.
+    let key = msg.wParam.0 as u16;
+    let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
+    let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+    let alt_down = (GetKeyState(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
+    if key == 'S' as u16 && !ctrl_down && shift_down && alt_down {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_STREAM_AUDIO);
+        return true;
+    }
 
     if shortcut_matches_message(shortcuts.read_pause_resume, msg) {
         dispatch_shortcut_command(hwnd, IDM_FILE_READ_PAUSE);

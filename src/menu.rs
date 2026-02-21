@@ -79,6 +79,8 @@ pub const IDM_PLAYBACK_PITCH_DOWN: usize = 8018;
 pub const IDM_PLAYBACK_PITCH_RESET: usize = 8021;
 pub const IDM_PLAYBACK_TRACK_PREV: usize = 8022;
 pub const IDM_PLAYBACK_TRACK_NEXT: usize = 8023;
+pub const IDM_PLAYBACK_SEEK_TO_START: usize = 8025;
+pub const IDM_PLAYBACK_SEEK_TO_END: usize = 8026;
 pub const IDM_PLAYBACK_ADD_SUBTITLES: usize = 8019;
 pub const IDM_PLAYBACK_REMOVE_SUBTITLES: usize = 8020;
 pub const IDM_PLAYBACK_CHAPTER_PREV: usize = 8012;
@@ -395,6 +397,8 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
         let stop = i18n::tr(language, "playback.stop");
         let seek_forward = i18n::tr(language, "playback.seek_forward");
         let seek_backward = i18n::tr(language, "playback.seek_backward");
+        let seek_to_start = i18n::tr(language, "playback.seek_to_start");
+        let seek_to_end = i18n::tr(language, "playback.seek_to_end");
         let shortcuts = with_state(hwnd, |state| state.settings.shortcuts.clone())
             .unwrap_or_else(ShortcutSettings::default);
         let track_prev = label_with_shortcut(
@@ -452,6 +456,18 @@ pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
             MF_STRING,
             IDM_PLAYBACK_SEEK_BACKWARD,
             &seek_backward,
+        );
+        append_menu_string(
+            playback_menu,
+            MF_STRING,
+            IDM_PLAYBACK_SEEK_TO_START,
+            &seek_to_start,
+        );
+        append_menu_string(
+            playback_menu,
+            MF_STRING,
+            IDM_PLAYBACK_SEEK_TO_END,
+            &seek_to_end,
         );
         append_menu_string(
             playback_menu,

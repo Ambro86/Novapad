@@ -96,6 +96,12 @@ pub fn handle_player_keyboard(msg: &MSG, skip_seconds: u32) -> PlayerCommand {
             }
             vk if ctrl_down && vk == 'I' as u32 => PlayerCommand::AnnounceTime,
             vk if vk == VK_SPACE.0 as u32 => PlayerCommand::TogglePause,
+            vk if !ctrl_down && !alt_down && !shift_down && vk == VK_HOME.0 as u32 => {
+                PlayerCommand::SeekToStart
+            }
+            vk if !ctrl_down && !alt_down && !shift_down && vk == VK_END.0 as u32 => {
+                PlayerCommand::SeekToEnd
+            }
             vk if vk == VK_LEFT.0 as u32 => PlayerCommand::Seek(-seek_step),
             vk if vk == VK_RIGHT.0 as u32 => PlayerCommand::Seek(seek_step),
             vk if vk == VK_UP.0 as u32 => PlayerCommand::Volume(0.1),
@@ -118,11 +124,7 @@ pub fn handle_player_keyboard(msg: &MSG, skip_seconds: u32) -> PlayerCommand {
             vk if vk == VK_ESCAPE.0 as u32 => PlayerCommand::Stop,
             vk if vk == 'M' as u32 => PlayerCommand::MuteToggle,
             // Block navigation to prevent screen reader noise
-            vk if vk == VK_HOME.0 as u32
-                || vk == VK_END.0 as u32
-                || vk == VK_PRIOR.0 as u32
-                || vk == VK_NEXT.0 as u32 =>
-            {
+            vk if vk == VK_PRIOR.0 as u32 || vk == VK_NEXT.0 as u32 => {
                 PlayerCommand::BlockNavigation
             }
             _ => PlayerCommand::None,
@@ -154,6 +156,8 @@ pub enum PlayerCommand {
     MuteToggle,
     GoToTime,
     AnnounceTime,
+    SeekToStart,
+    SeekToEnd,
     ChapterPrev,
     ChapterNext,
     ChapterList,

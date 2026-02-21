@@ -3,6 +3,8 @@
 Wersja 0.6.7 – 2026-02-13
 Ulepszenia
 • Dodano globalną obsługę proxy sieciowego (HTTP/HTTPS oraz SOCKS5/SOCKS5H) dla funkcji online, z walidacją przy zapisie opcji: nieprawidłowe proxy jest sygnalizowane i usuwane automatycznie.
+• Dodano nową funkcję w menu Narzędzia: „Odtwórz dźwięk ze streamingu...”, która pozwala wkleić adres URL (YouTube lub bezpośredni link do mediów), wybrać format wyjściowy i odtworzyć materiał w odtwarzaczu Sonarpad.
+• Dodano nową pozycję w Plik > Ostatnie pliki: „Wyczyść ostatnie pliki”, aby szybko wyczyścić listę ostatnio używanych dokumentów.
 • Rozszerzono opcje bitrate w konwersji audio i ustawieniach nagrywania podcastu: dodano niższe wartości (64/96 kbps) oraz zwiększono MP3 do 320 kbps, z ujednoliconą walidacją i obsługą enkodera.
 • Dodano nowy tryb Widok > Tylko do odczytu, aby blokować przypadkowe edycje tekstu przy zachowaniu pełnego odczytu i nawigacji po dokumentach.
 • Dodano dostępny pasek postępu podczas aktualizacji programu, aby czytniki ekranu mogły na bieżąco śledzić postęp pobierania.

@@ -3,6 +3,8 @@
 Version 0.6.7 – 2026-02-13
 Improvements
 • Added global network proxy support (HTTP/HTTPS and SOCKS5/SOCKS5H) for online features, with proxy validation on Options save: invalid proxies are warned and automatically removed.
+• Added a new Tools action: "Play streaming audio...", allowing users to paste a URL (YouTube or direct media link), choose output format, and play it directly in Sonarpad’s audio player.
+• Added a new File > Recent Files entry: "Clear recent files" to quickly wipe the recent documents list.
 • Expanded audio bitrate options in Convert Audio and podcast recording settings: added lower values (64/96 kbps) and extended MP3 up to 320 kbps, with aligned validation and encoder handling.
 • Added a new View > Read-only mode to lock editor text from accidental edits while keeping documents fully readable and navigable.
 • Added an accessible progress bar during program updates, so screen readers can track download progress in real time.

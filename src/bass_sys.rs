@@ -52,6 +52,7 @@ type BassChannelPlay = unsafe extern "C" fn(handle: Dword, restart: Bool) -> Boo
 type BassChannelPause = unsafe extern "C" fn(handle: Dword) -> Bool;
 type BassChannelStop = unsafe extern "C" fn(handle: Dword) -> Bool;
 type BassChannelGetPosition = unsafe extern "C" fn(handle: Dword, mode: Dword) -> Qword;
+type BassChannelGetLength = unsafe extern "C" fn(handle: Dword, mode: Dword) -> Qword;
 type BassChannelSetPosition = unsafe extern "C" fn(handle: Dword, pos: Qword, mode: Dword) -> Bool;
 type BassChannelBytes2Seconds = unsafe extern "C" fn(handle: Dword, pos: Qword) -> f64;
 type BassChannelSeconds2Bytes = unsafe extern "C" fn(handle: Dword, pos: f64) -> Qword;
@@ -81,6 +82,7 @@ pub struct BassApi {
     pub channel_pause: BassChannelPause,
     pub channel_stop: BassChannelStop,
     pub channel_get_position: BassChannelGetPosition,
+    pub channel_get_length: BassChannelGetLength,
     pub channel_set_position: BassChannelSetPosition,
     pub channel_bytes2seconds: BassChannelBytes2Seconds,
     pub channel_seconds2bytes: BassChannelSeconds2Bytes,
@@ -119,6 +121,7 @@ fn load_bass_api(path: &Path) -> Result<BassApi, String> {
         channel_pause: load_symbol(&lib, b"BASS_ChannelPause\0")?,
         channel_stop: load_symbol(&lib, b"BASS_ChannelStop\0")?,
         channel_get_position: load_symbol(&lib, b"BASS_ChannelGetPosition\0")?,
+        channel_get_length: load_symbol(&lib, b"BASS_ChannelGetLength\0")?,
         channel_set_position: load_symbol(&lib, b"BASS_ChannelSetPosition\0")?,
         channel_bytes2seconds: load_symbol(&lib, b"BASS_ChannelBytes2Seconds\0")?,
         channel_seconds2bytes: load_symbol(&lib, b"BASS_ChannelSeconds2Bytes\0")?,

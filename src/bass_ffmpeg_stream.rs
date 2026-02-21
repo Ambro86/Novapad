@@ -29,6 +29,8 @@ struct StreamState {
     sample_rate: u32,
     /// Number of channels
     channels: u16,
+    /// Total media duration (seconds), when known from FFmpeg container metadata.
+    total_duration_secs: Option<f64>,
 }
 
 /// Handle for FFmpeg streaming through BASS
@@ -43,6 +45,7 @@ impl FfmpegBassStream {
         path: &Path,
         start_seconds: u64,
         stream_index: Option<i32>,
+        decode_only: bool,
     ) -> Result<(Self, Hstream), String> {
         let api = bass_api()?;
 
@@ -50,6 +53,7 @@ impl FfmpegBassStream {
         let source = FfmpegSource::try_new(path, start_seconds, None, stream_index)?;
         let sample_rate = source.sample_rate();
         let channels = source.channels();
+        let total_duration_secs = source.total_duration().map(|d| d.as_secs_f64());
 
         if sample_rate == 0 || channels == 0 {
             return Err("FFmpeg: invalid format".to_string());
@@ -70,7 +74,13 @@ impl FfmpegBassStream {
             stop: AtomicBool::new(false),
             sample_rate,
             channels,
+            total_duration_secs,
         });
+
+        let mut flags = BASS_SAMPLE_FLOAT;
+        if decode_only {
+            flags |= BASS_STREAM_DECODE;
+        }
 
         // Create BASS stream with callback
         let state_ptr = Arc::into_raw(state.clone()) as *mut c_void;
@@ -78,7 +88,7 @@ impl FfmpegBassStream {
             (api.stream_create)(
                 sample_rate,
                 channels as u32,
-                BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE,
+                flags,
                 stream_callback,
                 state_ptr,
             )
@@ -117,6 +127,10 @@ impl FfmpegBassStream {
         if let Some(thread) = self.decoder_thread.take() {
             crate::log_if_err!(thread.join());
         }
+    }
+
+    pub fn total_duration_secs(&self) -> Option<f64> {
+        self.state.total_duration_secs
     }
 }
 

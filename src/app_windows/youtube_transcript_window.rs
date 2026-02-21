@@ -2078,6 +2078,9 @@ fn log_stream_cache_snapshot(cache_dir: &Path, prefix: &str, context: &str) {
 
 fn find_latest_downloaded_stream_file(cache_dir: &Path, prefix: &str) -> Option<PathBuf> {
     let mut best: Option<(std::time::SystemTime, PathBuf)> = None;
+    const ALLOWED_EXTS: &[&str] = &[
+        "mp3", "m4a", "aac", "opus", "ogg", "wav", "flac", "mp4", "webm", "mkv", "ts",
+    ];
     let entries = std::fs::read_dir(cache_dir).ok()?;
     for entry in entries.flatten() {
         let path = entry.path();
@@ -2087,14 +2090,30 @@ fn find_latest_downloaded_stream_file(cache_dir: &Path, prefix: &str) -> Option<
         let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
             continue;
         };
-        if !name.starts_with(prefix) || name.ends_with(".part") || name.ends_with(".ytdl") {
+        if !name.starts_with(prefix) {
+            continue;
+        }
+        let name_lc = name.to_ascii_lowercase();
+        // Exclude temporary/fragment artifacts (e.g. .part, .ytdl, .part-FragNNN).
+        if name_lc.ends_with(".part")
+            || name_lc.ends_with(".ytdl")
+            || name_lc.contains(".part-")
+            || name_lc.contains(".ytdl-")
+            || name_lc.contains("-frag")
+            || name_lc.contains(".frag")
+        {
             continue;
         }
         let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
             continue;
         };
         let ext = ext.to_ascii_lowercase();
-        if ext == "part" || ext == "ytdl" || ext == "tmp" || ext == "temp" {
+        if !ALLOWED_EXTS.contains(&ext.as_str())
+            || ext == "part"
+            || ext == "ytdl"
+            || ext == "tmp"
+            || ext == "temp"
+        {
             continue;
         }
         if std::fs::metadata(&path)
@@ -2793,8 +2812,14 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             }
         }
     };
-    if let Err(err) = reader_thread.join() {
-        crate::log_debug(&format!("yt-dlp stderr thread join failed: {:?}", err));
+    if _status.is_some() {
+        if let Err(err) = reader_thread.join() {
+            crate::log_debug(&format!("yt-dlp stderr thread join failed: {:?}", err));
+        }
+    } else {
+        // Avoid UI hangs when yt-dlp is terminated early (finalization/stall paths).
+        // The stderr reader thread will exit on its own once pipes are closed.
+        crate::log_debug("Skipping yt-dlp stderr thread join after early termination");
     }
     let stderr_capture = stderr_shared
         .lock()

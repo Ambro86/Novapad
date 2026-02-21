@@ -199,11 +199,11 @@ impl BassOutput {
         let api = bass_api()?;
         let fx_api = bass_fx_api().ok();
 
-        // Create FFmpeg stream with BASS callback
-        let (ffmpeg_stream, source_handle) =
-            FfmpegBassStream::new(path, start_seconds, stream_index)?;
-
         let want_tempo = (speed != 1.0 || pitch != 0.0) && fx_api.is_some();
+        // Create FFmpeg stream with BASS callback.
+        // Use decode-only source only when we are going to wrap with BASS_FX tempo.
+        let (ffmpeg_stream, source_handle) =
+            FfmpegBassStream::new(path, start_seconds, stream_index, want_tempo)?;
         let handle = if want_tempo {
             if let Some(fx_api) = fx_api {
                 let tempo_handle = unsafe {
@@ -322,6 +322,30 @@ impl BassOutput {
         Some(bass_pos + self.start_offset_secs)
     }
 
+    pub fn duration_secs(&self) -> Option<f64> {
+        if let Some(ffmpeg_stream) = self._ffmpeg_stream.as_ref()
+            && let Some(total_secs) = ffmpeg_stream.total_duration_secs()
+        {
+            return Some(total_secs.max(0.0));
+        }
+
+        let handle = *self.handle.lock().unwrap_or_else(|e| e.into_inner());
+        let len = unsafe { (self.api.channel_get_length)(handle, BASS_POS_BYTE) };
+        if len == u64::MAX {
+            return None;
+        }
+        if len == 0 {
+            let err = bass_error(self.api);
+            if err != 0 {
+                log_debug(&format!("BASS: duration failed (error {})", err));
+                return None;
+            }
+        }
+        let bass_len = unsafe { (self.api.channel_bytes2seconds)(handle, len) }.max(0.0);
+        // Add start offset for FFmpeg streams started from a non-zero position.
+        Some(bass_len + self.start_offset_secs)
+    }
+
     pub fn seek_to_seconds(&self, absolute_seconds: f64) -> bool {
         // FFmpeg streaming starts from `start_offset_secs`. If caller asks to seek
         // before this offset, we must fail here so the caller can reopen at the
@@ -330,6 +354,17 @@ impl BassOutput {
             return false;
         }
         let handle = *self.handle.lock().unwrap_or_else(|e| e.into_inner());
+        if self._ffmpeg_stream.is_some() {
+            // For FFmpeg-backed streams (not directly seekable file handles),
+            // backward seeks via BASS can report success but not really rewind.
+            // Force reopen path for backward seeks to guarantee accurate behavior.
+            let pos_now = unsafe { (self.api.channel_get_position)(handle, BASS_POS_BYTE) };
+            let now_rel = unsafe { (self.api.channel_bytes2seconds)(handle, pos_now) }.max(0.0);
+            let now_abs = now_rel + self.start_offset_secs;
+            if absolute_seconds + 0.05 < now_abs {
+                return false;
+            }
+        }
         let relative = (absolute_seconds - self.start_offset_secs).max(0.0);
         let pos = unsafe { (self.api.channel_seconds2bytes)(handle, relative) };
         let ok = unsafe { (self.api.channel_set_position)(handle, pos, BASS_POS_BYTE) };

@@ -1260,7 +1260,7 @@ fn extract_embedded_chapters_url(url: &str) -> Option<String> {
 fn announce_player_time(hwnd: HWND) {
     const END_STOP_TOLERANCE_SECS: u64 = 1;
 
-    let (current_raw, path, language) = unsafe {
+    let (current_raw, path, fallback_total, language) = unsafe {
         with_state(hwnd, |state| {
             let current = state
                 .active_audiobook
@@ -1270,15 +1270,22 @@ fn announce_player_time(hwnd: HWND) {
                 .active_audiobook
                 .as_ref()
                 .map(|player| player.path.clone());
-            (current, path, state.settings.language)
+            let fallback_total = state.active_audiobook.as_ref().and_then(|player| {
+                player
+                    .duration_secs()
+                    .map(|secs| secs.max(0.0).floor() as u64)
+            });
+            (current, path, fallback_total, state.settings.language)
         })
     }
-    .unwrap_or((None, None, Language::default()));
+    .unwrap_or((None, None, None, Language::default()));
     let Some(current_raw) = current_raw else {
         return;
     };
 
-    let total = path.and_then(|p| audiobook_duration_secs(&p));
+    let total = path
+        .and_then(|p| audiobook_duration_secs(&p))
+        .or(fallback_total);
     let (current, should_stop) = if let Some(total) = total {
         let overrun = current_raw > total;
         if overrun {

@@ -77,6 +77,10 @@ impl AudiobookPlayer {
     pub(crate) fn position_secs(&self) -> Option<f64> {
         self.output.position_secs()
     }
+
+    pub(crate) fn duration_secs(&self) -> Option<f64> {
+        self.output.duration_secs()
+    }
 }
 
 pub unsafe fn set_audiobook_subtitle_override(
@@ -967,6 +971,29 @@ pub unsafe fn toggle_audiobook_pause(hwnd: HWND) {
     crate::log_debug("Audio player: toggle_audiobook_pause triggered");
     let action = with_state(hwnd, |state| {
         if let Some(mut player) = state.active_audiobook.take() {
+            if player.output.is_stopped() {
+                crate::log_debug(
+                    "Audio player: toggle on stopped stream, restarting from beginning",
+                );
+                stop_shared_subtitle_speech(
+                    &player.subtitle_speech_cancel,
+                    &player.subtitle_speech_command,
+                    "stopped_restart",
+                );
+                player.subtitle_cancel.store(true, Ordering::Relaxed);
+                player.stop();
+                return Some(ToggleAction::RestartFromPosition {
+                    path: player.path.clone(),
+                    seconds: 0,
+                    speed: player.speed,
+                    pitch: player.pitch,
+                    volume: player.volume,
+                    muted: player.muted,
+                    prev_volume: player.prev_volume,
+                    audio_track: state.selected_audio_track,
+                });
+            }
+
             if player.is_paused {
                 crate::log_debug("Audio player: Resuming playback");
                 let resumed = player.play();

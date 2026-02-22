@@ -169,77 +169,79 @@ pub fn open(parent: HWND) -> HWND {
     }
 }
 
-pub unsafe fn open_with_labels(
+pub fn open_with_labels(
     parent: HWND,
     language: Language,
     labels: SaveDialogLabels,
     show_cancel: bool,
 ) -> HWND {
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-    let class_name = to_wide(SAVE_CLASS_NAME);
-    let wc = WNDCLASSW {
-        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
-            LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
-        ),
-        hInstance: hinstance,
-        lpszClassName: PCWSTR(class_name.as_ptr()),
-        lpfnWndProc: Some(save_wndproc),
-        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
-        ..Default::default()
-    };
-    RegisterClassW(&wc);
+    unsafe {
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+        let class_name = to_wide(SAVE_CLASS_NAME);
+        let wc = WNDCLASSW {
+            hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+                LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
+            ),
+            hInstance: hinstance,
+            lpszClassName: PCWSTR(class_name.as_ptr()),
+            lpfnWndProc: Some(save_wndproc),
+            hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+            ..Default::default()
+        };
+        RegisterClassW(&wc);
 
-    let params = Box::new(SaveCreateParams {
-        parent,
-        language,
-        labels,
-        show_cancel,
-    });
-    let params_ptr = Box::into_raw(params);
-    let window = CreateWindowExW(
-        WS_EX_DLGMODALFRAME,
-        PCWSTR(class_name.as_ptr()),
-        PCWSTR::null(),
-        WS_POPUP | WS_CAPTION | WS_VISIBLE,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        300,
-        150,
-        parent,
-        HMENU(0),
-        hinstance,
-        Some(params_ptr as *const std::ffi::c_void),
-    );
-    if window.0 == 0 {
-        let _unused = Box::from_raw(params_ptr);
-        return window;
+        let params = Box::new(SaveCreateParams {
+            parent,
+            language,
+            labels,
+            show_cancel,
+        });
+        let params_ptr = Box::into_raw(params);
+        let window = CreateWindowExW(
+            WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR::null(),
+            WS_POPUP | WS_CAPTION | WS_VISIBLE,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            300,
+            150,
+            parent,
+            HMENU(0),
+            hinstance,
+            Some(params_ptr as *const std::ffi::c_void),
+        );
+        if window.0 == 0 {
+            let _unused = Box::from_raw(params_ptr);
+            return window;
+        }
+
+        EnableWindow(parent, false);
+        SetForegroundWindow(window);
+
+        let mut rc_parent = RECT::default();
+        let mut rc_dlg = RECT::default();
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::GetWindowRect(
+            parent,
+            &mut rc_parent
+        ));
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::GetWindowRect(
+            window,
+            &mut rc_dlg
+        ));
+        let dlg_w = rc_dlg.right - rc_dlg.left;
+        let dlg_h = rc_dlg.bottom - rc_dlg.top;
+        let parent_w = rc_parent.right - rc_parent.left;
+        let parent_h = rc_parent.bottom - rc_parent.top;
+        let x = rc_parent.left + (parent_w - dlg_w) / 2;
+        let y = rc_parent.top + (parent_h - dlg_h) / 2;
+        use windows::Win32::UI::WindowsAndMessaging::{HWND_TOP, SWP_SHOWWINDOW, SetWindowPos};
+        if let Err(e) = SetWindowPos(window, HWND_TOP, x, y, dlg_w, dlg_h, SWP_SHOWWINDOW) {
+            crate::log_debug(&format!("Failed to position save window: {}", e));
+        }
+
+        window
     }
-
-    EnableWindow(parent, false);
-    SetForegroundWindow(window);
-
-    let mut rc_parent = RECT::default();
-    let mut rc_dlg = RECT::default();
-    crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::GetWindowRect(
-        parent,
-        &mut rc_parent
-    ));
-    crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::GetWindowRect(
-        window,
-        &mut rc_dlg
-    ));
-    let dlg_w = rc_dlg.right - rc_dlg.left;
-    let dlg_h = rc_dlg.bottom - rc_dlg.top;
-    let parent_w = rc_parent.right - rc_parent.left;
-    let parent_h = rc_parent.bottom - rc_parent.top;
-    let x = rc_parent.left + (parent_w - dlg_w) / 2;
-    let y = rc_parent.top + (parent_h - dlg_h) / 2;
-    use windows::Win32::UI::WindowsAndMessaging::{HWND_TOP, SWP_SHOWWINDOW, SetWindowPos};
-    if let Err(e) = SetWindowPos(window, HWND_TOP, x, y, dlg_w, dlg_h, SWP_SHOWWINDOW) {
-        crate::log_debug(&format!("Failed to position save window: {}", e));
-    }
-
-    window
 }
 
 unsafe extern "system" fn save_wndproc(

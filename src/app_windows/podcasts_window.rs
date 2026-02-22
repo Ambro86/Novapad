@@ -4052,18 +4052,20 @@ struct PodcastIndexTrendingResponse {
     feeds: Option<Vec<PodcastIndexFeed>>,
 }
 
-pub unsafe fn show_context_menu_from_keyboard(hwnd: HWND) {
-    let mut pt = windows::Win32::Foundation::POINT::default();
-    crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::GetCursorPos(
-        &mut pt
-    ));
-    show_context_menu(hwnd, pt.x, pt.y, false);
+pub fn show_context_menu_from_keyboard(hwnd: HWND) {
+    unsafe {
+        let mut pt = windows::Win32::Foundation::POINT::default();
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::GetCursorPos(
+            &mut pt
+        ));
+        show_context_menu(hwnd, pt.x, pt.y, false);
+    }
 }
 
-pub unsafe fn focus_library(hwnd: HWND) {
-    let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+pub fn focus_library(hwnd: HWND) {
+    let hwnd_tree = unsafe { with_podcast_state(hwnd, |s| s.hwnd_tree) }.unwrap_or(HWND(0));
     if hwnd_tree.0 != 0 {
-        SetFocus(hwnd_tree);
+        unsafe { SetFocus(hwnd_tree) };
     }
 }
 
@@ -6748,53 +6750,55 @@ unsafe fn resize_controls(hwnd: HWND) {
     }
 }
 
-pub unsafe fn open(parent: HWND) {
-    let exists = with_state(parent, |s| s.podcasts_window).unwrap_or(HWND(0));
-    if exists.0 != 0 {
-        SetForegroundWindow(exists);
-        return;
-    }
-
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-    let class_name = to_wide(PODCASTS_WINDOW_CLASS);
-
-    let wc = WNDCLASSW {
-        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
-            windows::Win32::UI::WindowsAndMessaging::LoadCursorW(None, IDC_ARROW)
-                .unwrap_or_default()
-                .0,
-        ),
-        hInstance: hinstance,
-        lpszClassName: PCWSTR(class_name.as_ptr()),
-        lpfnWndProc: Some(podcast_wndproc),
-        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
-        ..Default::default()
-    };
-    RegisterClassW(&wc);
-
-    let language = with_state(parent, |s| s.settings.language).unwrap_or_default();
-    let title = to_wide(&i18n::tr(language, "podcasts.window.title"));
-
-    let hwnd = CreateWindowExW(
-        WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
-        PCWSTR(class_name.as_ptr()),
-        PCWSTR(title.as_ptr()),
-        WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
-        windows::Win32::UI::WindowsAndMessaging::CW_USEDEFAULT,
-        windows::Win32::UI::WindowsAndMessaging::CW_USEDEFAULT,
-        520,
-        560,
-        parent,
-        None,
-        hinstance,
-        Some(parent.0 as *const _),
-    );
-
-    if hwnd.0 != 0 {
-        if with_state(parent, |s| s.podcasts_window = hwnd).is_none() {
-            crate::log_debug("Failed to set podcasts_window state");
+pub fn open(parent: HWND) {
+    unsafe {
+        let exists = with_state(parent, |s| s.podcasts_window).unwrap_or(HWND(0));
+        if exists.0 != 0 {
+            SetForegroundWindow(exists);
+            return;
         }
-        SetForegroundWindow(hwnd);
+
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+        let class_name = to_wide(PODCASTS_WINDOW_CLASS);
+
+        let wc = WNDCLASSW {
+            hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+                windows::Win32::UI::WindowsAndMessaging::LoadCursorW(None, IDC_ARROW)
+                    .unwrap_or_default()
+                    .0,
+            ),
+            hInstance: hinstance,
+            lpszClassName: PCWSTR(class_name.as_ptr()),
+            lpfnWndProc: Some(podcast_wndproc),
+            hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+            ..Default::default()
+        };
+        RegisterClassW(&wc);
+
+        let language = with_state(parent, |s| s.settings.language).unwrap_or_default();
+        let title = to_wide(&i18n::tr(language, "podcasts.window.title"));
+
+        let hwnd = CreateWindowExW(
+            WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+            windows::Win32::UI::WindowsAndMessaging::CW_USEDEFAULT,
+            windows::Win32::UI::WindowsAndMessaging::CW_USEDEFAULT,
+            520,
+            560,
+            parent,
+            None,
+            hinstance,
+            Some(parent.0 as *const _),
+        );
+
+        if hwnd.0 != 0 {
+            if with_state(parent, |s| s.podcasts_window = hwnd).is_none() {
+                crate::log_debug("Failed to set podcasts_window state");
+            }
+            SetForegroundWindow(hwnd);
+        }
     }
 }
 

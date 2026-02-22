@@ -660,14 +660,12 @@ unsafe fn convert_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                             in_progress: labels.status_running.clone(),
                             cancel: i18n::tr(state.language, "podcast.save.cancel"),
                         };
-                        let dialog = unsafe {
-                            podcast_save_window::open_with_labels(
-                                state.hwnd,
-                                state.language,
-                                dialog_labels,
-                                true,
-                            )
-                        };
+                        let dialog = podcast_save_window::open_with_labels(
+                            state.hwnd,
+                            state.language,
+                            dialog_labels,
+                            true,
+                        );
                         if dialog.0 != 0 {
                             state.status_dialog = dialog;
                         }

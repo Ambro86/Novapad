@@ -1932,14 +1932,7 @@ fn open_progress_dialog(
         in_progress: i18n::tr(language, status_key),
         cancel: i18n::tr(language, "podcast.save.cancel"),
     };
-    unsafe {
-        crate::app_windows::podcast_save_window::open_with_labels(
-            parent,
-            language,
-            labels,
-            show_cancel,
-        )
-    }
+    crate::app_windows::podcast_save_window::open_with_labels(parent, language, labels, show_cancel)
 }
 
 fn close_progress_dialog(dialog: HWND) {

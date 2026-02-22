@@ -3293,14 +3293,12 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 in_progress: i18n::tr(req.language, "podcast.save.in_progress"),
                 cancel: i18n::tr(req.language, "podcast.save.cancel"),
             };
-            let dialog = unsafe {
-                app_windows::podcast_save_window::open_with_labels(
-                    hwnd,
-                    req.language,
-                    labels,
-                    false,
-                )
-            };
+            let dialog = app_windows::podcast_save_window::open_with_labels(
+                hwnd,
+                req.language,
+                labels,
+                false,
+            );
             with_state(hwnd, |state| {
                 state.update_progress_window = dialog;
             });

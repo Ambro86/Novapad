@@ -1202,47 +1202,49 @@ pub unsafe fn seek_audiobook(hwnd: HWND, seconds: i64) {
     );
 }
 
-pub unsafe fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> {
+pub fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> {
     enum SeekToAction {
         Direct,
         Restart(PathBuf),
     }
-    let action = with_state(hwnd, |state| {
-        if let Some(player) = &mut state.active_audiobook {
-            stop_shared_subtitle_speech(
-                &player.subtitle_speech_cancel,
-                &player.subtitle_speech_command,
-                "seek",
-            );
-            if player.output.seek_to_seconds(seconds as f64) {
-                player.accumulated_seconds = seconds;
-                player.start_instant = std::time::Instant::now();
-                return Some(SeekToAction::Direct);
+    unsafe {
+        let action = with_state(hwnd, |state| {
+            if let Some(player) = &mut state.active_audiobook {
+                stop_shared_subtitle_speech(
+                    &player.subtitle_speech_cancel,
+                    &player.subtitle_speech_command,
+                    "seek",
+                );
+                if player.output.seek_to_seconds(seconds as f64) {
+                    player.accumulated_seconds = seconds;
+                    player.start_instant = std::time::Instant::now();
+                    return Some(SeekToAction::Direct);
+                }
+                Some(SeekToAction::Restart(player.path.clone()))
+            } else {
+                None
             }
-            Some(SeekToAction::Restart(player.path.clone()))
-        } else {
-            None
+        })
+        .flatten()
+        .ok_or_else(|| "No active audiobook".to_string())?;
+
+        if matches!(action, SeekToAction::Direct) {
+            return Ok(());
         }
-    })
-    .flatten()
-    .ok_or_else(|| "No active audiobook".to_string())?;
+        let SeekToAction::Restart(path) = action else {
+            return Ok(());
+        };
 
-    if matches!(action, SeekToAction::Direct) {
-        return Ok(());
+        if let Some(duration) = audiobook_duration_secs(&path)
+            && seconds >= duration
+        {
+            stop_audiobook_playback(hwnd);
+            return Ok(());
+        }
+
+        start_audiobook_at(hwnd, &path, seconds);
+        Ok(())
     }
-    let SeekToAction::Restart(path) = action else {
-        return Ok(());
-    };
-
-    if let Some(duration) = audiobook_duration_secs(&path)
-        && seconds >= duration
-    {
-        stop_audiobook_playback(hwnd);
-        return Ok(());
-    }
-
-    start_audiobook_at(hwnd, &path, seconds);
-    Ok(())
 }
 
 #[track_caller]

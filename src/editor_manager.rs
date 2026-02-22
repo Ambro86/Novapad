@@ -3900,24 +3900,24 @@ pub unsafe fn create_edit(
     hwnd_edit
 }
 
-pub unsafe fn save_current_document(hwnd: HWND) -> bool {
-    save_document_at(hwnd, get_current_index(hwnd), false)
+pub fn save_current_document(hwnd: HWND) -> bool {
+    unsafe { save_document_at(hwnd, get_current_index(hwnd), false) }
 }
 
-pub unsafe fn save_current_document_as(hwnd: HWND) -> bool {
-    save_document_at(hwnd, get_current_index(hwnd), true)
+pub fn save_current_document_as(hwnd: HWND) -> bool {
+    unsafe { save_document_at(hwnd, get_current_index(hwnd), true) }
 }
 
-pub unsafe fn save_all_documents(hwnd: HWND) -> bool {
-    let doc_count = with_state(hwnd, |state| state.docs.len()).unwrap_or(0);
+pub fn save_all_documents(hwnd: HWND) -> bool {
+    let doc_count = unsafe { with_state(hwnd, |state| state.docs.len()) }.unwrap_or(0);
     let mut dirty_indices = Vec::new();
     for index in 0..doc_count {
-        if sync_dirty_from_edit(hwnd, index) {
+        if unsafe { sync_dirty_from_edit(hwnd, index) } {
             dirty_indices.push(index);
         }
     }
     for index in dirty_indices {
-        if !save_document_at(hwnd, index, false) {
+        if !unsafe { save_document_at(hwnd, index, false) } {
             return false;
         }
     }

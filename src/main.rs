@@ -1522,7 +1522,7 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
         PlayerCommand::Speed(delta) => {
             let language =
                 unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
-            let speed = unsafe { change_audiobook_speed(hwnd, delta) };
+            let speed = change_audiobook_speed(hwnd, delta);
             if let Some(speed) = speed {
                 announce_player_speed(language, speed);
             }
@@ -1530,7 +1530,7 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
         PlayerCommand::Pitch(delta) => {
             let language =
                 unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
-            let pitch = unsafe { change_audiobook_pitch(hwnd, delta) };
+            let pitch = change_audiobook_pitch(hwnd, delta);
             if let Some(pitch) = pitch {
                 announce_player_pitch(language, pitch);
             }

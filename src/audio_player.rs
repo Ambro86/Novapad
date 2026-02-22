@@ -1446,116 +1446,120 @@ pub fn reset_audiobook_volume(hwnd: HWND) -> Option<f32> {
     }
 }
 
-pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
-    // We allow speed change even with subtitles now, relying on BASS tempo.
-    let result = with_state(hwnd, |state| {
-        if let Some(player) = state.active_audiobook.take() {
-            let current = audiobook_position_secs(&player).floor() as u64;
-            let new_speed = (player.speed + delta).clamp(0.5, 3.0);
-            player.stop();
-            Some((
-                player.path,
-                current,
-                new_speed,
-                player.pitch,
-                player.is_paused,
-                player.volume,
-                player.muted,
-                player.prev_volume,
-            ))
-        } else {
-            None
+pub fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
+    unsafe {
+        // We allow speed change even with subtitles now, relying on BASS tempo.
+        let result = with_state(hwnd, |state| {
+            if let Some(player) = state.active_audiobook.take() {
+                let current = audiobook_position_secs(&player).floor() as u64;
+                let new_speed = (player.speed + delta).clamp(0.5, 3.0);
+                player.stop();
+                Some((
+                    player.path,
+                    current,
+                    new_speed,
+                    player.pitch,
+                    player.is_paused,
+                    player.volume,
+                    player.muted,
+                    player.prev_volume,
+                ))
+            } else {
+                None
+            }
+        })
+        .flatten();
+
+        let (path, current, speed, pitch, paused, volume, muted, prev_volume) = result?;
+        let audio_track = with_state(hwnd, |state| state.selected_audio_track).flatten();
+
+        start_audiobook_at_with_options(
+            hwnd,
+            path,
+            current,
+            AudiobookPlaybackOptions {
+                speed,
+                pitch,
+                paused,
+                volume,
+                muted,
+                prev_volume,
+                mix_export: false,
+                audio_track,
+                force_ffmpeg_stream: false,
+            },
+        );
+
+        // Save speed to settings
+        if with_state(hwnd, |state| {
+            state.settings.audiobook_playback_speed = speed;
+            crate::settings::save_settings(state.settings.clone());
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access audio player state");
         }
-    })
-    .flatten();
 
-    let (path, current, speed, pitch, paused, volume, muted, prev_volume) = result?;
-    let audio_track = with_state(hwnd, |state| state.selected_audio_track).flatten();
-
-    start_audiobook_at_with_options(
-        hwnd,
-        path,
-        current,
-        AudiobookPlaybackOptions {
-            speed,
-            pitch,
-            paused,
-            volume,
-            muted,
-            prev_volume,
-            mix_export: false,
-            audio_track,
-            force_ffmpeg_stream: false,
-        },
-    );
-
-    // Save speed to settings
-    if with_state(hwnd, |state| {
-        state.settings.audiobook_playback_speed = speed;
-        crate::settings::save_settings(state.settings.clone());
-    })
-    .is_none()
-    {
-        crate::log_debug("Failed to access audio player state");
+        Some(speed)
     }
-
-    Some(speed)
 }
 
-pub unsafe fn change_audiobook_pitch(hwnd: HWND, delta: f32) -> Option<f32> {
-    // Pitch change via BASS tempo
-    let result = with_state(hwnd, |state| {
-        if let Some(player) = state.active_audiobook.take() {
-            let current = audiobook_position_secs(&player).floor() as u64;
-            let new_pitch = (player.pitch + delta).clamp(-12.0, 12.0);
-            player.stop();
-            Some((
-                player.path,
-                current,
-                player.speed,
-                new_pitch,
-                player.is_paused,
-                player.volume,
-                player.muted,
-                player.prev_volume,
-            ))
-        } else {
-            None
+pub fn change_audiobook_pitch(hwnd: HWND, delta: f32) -> Option<f32> {
+    unsafe {
+        // Pitch change via BASS tempo
+        let result = with_state(hwnd, |state| {
+            if let Some(player) = state.active_audiobook.take() {
+                let current = audiobook_position_secs(&player).floor() as u64;
+                let new_pitch = (player.pitch + delta).clamp(-12.0, 12.0);
+                player.stop();
+                Some((
+                    player.path,
+                    current,
+                    player.speed,
+                    new_pitch,
+                    player.is_paused,
+                    player.volume,
+                    player.muted,
+                    player.prev_volume,
+                ))
+            } else {
+                None
+            }
+        })
+        .flatten();
+
+        let (path, current, speed, pitch, paused, volume, muted, prev_volume) = result?;
+        let audio_track = with_state(hwnd, |state| state.selected_audio_track).flatten();
+
+        start_audiobook_at_with_options(
+            hwnd,
+            path,
+            current,
+            AudiobookPlaybackOptions {
+                speed,
+                pitch,
+                paused,
+                volume,
+                muted,
+                prev_volume,
+                mix_export: false,
+                audio_track,
+                force_ffmpeg_stream: false,
+            },
+        );
+
+        // Save pitch to settings
+        if with_state(hwnd, |state| {
+            state.settings.audiobook_playback_pitch = pitch;
+            crate::settings::save_settings(state.settings.clone());
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access audio player state");
         }
-    })
-    .flatten();
 
-    let (path, current, speed, pitch, paused, volume, muted, prev_volume) = result?;
-    let audio_track = with_state(hwnd, |state| state.selected_audio_track).flatten();
-
-    start_audiobook_at_with_options(
-        hwnd,
-        path,
-        current,
-        AudiobookPlaybackOptions {
-            speed,
-            pitch,
-            paused,
-            volume,
-            muted,
-            prev_volume,
-            mix_export: false,
-            audio_track,
-            force_ffmpeg_stream: false,
-        },
-    );
-
-    // Save pitch to settings
-    if with_state(hwnd, |state| {
-        state.settings.audiobook_playback_pitch = pitch;
-        crate::settings::save_settings(state.settings.clone());
-    })
-    .is_none()
-    {
-        crate::log_debug("Failed to access audio player state");
+        Some(pitch)
     }
-
-    Some(pitch)
 }
 
 pub fn reset_audiobook_speed(hwnd: HWND) -> Option<f32> {

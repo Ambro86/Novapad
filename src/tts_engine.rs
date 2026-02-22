@@ -3602,9 +3602,9 @@ fn start_audiobook_with_text(
 
         let body = i18n::tr(language, "audiobook.sapi4_threads_body");
 
-        if let Some(val_str) = unsafe {
+        if let Some(val_str) =
             crate::app_windows::prompt_window::prompt_user(hwnd, &title, &body, "30", language)
-        } {
+        {
             if let Ok(val) = val_str.parse::<u32>() {
                 sapi4_threads = Some(val.clamp(1, 100));
             }

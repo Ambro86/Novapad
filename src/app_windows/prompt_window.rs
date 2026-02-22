@@ -232,72 +232,74 @@ fn prompt_labels(language: Language) -> PromptLabels {
     }
 }
 
-pub unsafe fn prompt_user(
+pub fn prompt_user(
     parent: HWND,
     title: &str,
     body: &str,
     default_val: &str,
     _language: Language,
 ) -> Option<String> {
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-    let class_name = to_wide("SonarpadSimplePrompt");
+    unsafe {
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+        let class_name = to_wide("SonarpadSimplePrompt");
 
-    static ONCE: std::sync::Once = std::sync::Once::new();
-    ONCE.call_once(|| {
-        let wc = WNDCLASSW {
-            hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
-                LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
-            ),
-            hInstance: hinstance,
-            lpszClassName: PCWSTR(class_name.as_ptr()),
-            lpfnWndProc: Some(simple_prompt_wndproc),
-            ..Default::default()
+        static ONCE: std::sync::Once = std::sync::Once::new();
+        ONCE.call_once(|| {
+            let wc = WNDCLASSW {
+                hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+                    LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
+                ),
+                hInstance: hinstance,
+                lpszClassName: PCWSTR(class_name.as_ptr()),
+                lpfnWndProc: Some(simple_prompt_wndproc),
+                ..Default::default()
+            };
+            RegisterClassW(&wc);
+        });
+
+        let mut data = SimplePromptData {
+            body: body.to_string(),
+            value: default_val.to_string(),
+            confirmed: false,
         };
-        RegisterClassW(&wc);
-    });
 
-    let mut data = SimplePromptData {
-        body: body.to_string(),
-        value: default_val.to_string(),
-        confirmed: false,
-    };
+        let hwnd = CreateWindowExW(
+            WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(to_wide(title).as_ptr()),
+            WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+            200,
+            200,
+            400,
+            220,
+            parent,
+            HMENU(0),
+            hinstance,
+            Some(&mut data as *mut _ as *const std::ffi::c_void),
+        );
 
-    let hwnd = CreateWindowExW(
-        WS_EX_DLGMODALFRAME,
-        PCWSTR(class_name.as_ptr()),
-        PCWSTR(to_wide(title).as_ptr()),
-        WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
-        200,
-        200,
-        400,
-        220,
-        parent,
-        HMENU(0),
-        hinstance,
-        Some(&mut data as *mut _ as *const std::ffi::c_void),
-    );
-
-    if hwnd.0 == 0 {
-        return None;
-    }
-
-    windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow(parent, false);
-
-    let mut msg = MSG::default();
-    while IsWindow(hwnd).as_bool() && GetMessageW(&mut msg, HWND(0), 0, 0).into() {
-        if unsafe { !IsDialogMessageW(hwnd, &msg).as_bool() } {
-            TranslateMessage(&msg);
-            DispatchMessageW(&msg);
+        if hwnd.0 == 0 {
+            return None;
         }
-    }
 
-    windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow(parent, true);
-    SetForegroundWindow(parent);
+        windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow(parent, false);
 
-    if data.confirmed {
-        Some(data.value)
-    } else {
-        None
+        let mut msg = MSG::default();
+        while IsWindow(hwnd).as_bool() && GetMessageW(&mut msg, HWND(0), 0, 0).into() {
+            if !IsDialogMessageW(hwnd, &msg).as_bool() {
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        }
+
+        windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow(parent, true);
+        SetForegroundWindow(parent);
+
+        if data.confirmed {
+            Some(data.value)
+        } else {
+            None
+        }
     }
 }
 
@@ -477,83 +479,83 @@ unsafe fn simple_prompt_wndproc_inner(
 }
 
 pub fn open(parent: HWND) {
-    unsafe { open_with_command(parent, None, None) };
+    open_with_command(parent, None, None);
 }
 
-pub unsafe fn open_with_command(
+pub fn open_with_command(
     parent: HWND,
     initial_command: Option<String>,
     working_dir: Option<PathBuf>,
 ) {
-    let existing = with_state(parent, |state| state.prompt_window).unwrap_or(HWND(0));
-    if existing.0 != 0 {
-        SetForegroundWindow(existing);
-        if let Some(cmd) = initial_command {
-            with_prompt_state(existing, |state| {
-                if let Some(session) = &state.session {
-                    let newline = if state.program_is_codex { "\n" } else { "\r\n" };
-                    let payload = format!("{}{}", cmd, newline);
-                    session.write_input(&payload);
-                }
-            });
+    unsafe {
+        let existing = with_state(parent, |state| state.prompt_window).unwrap_or(HWND(0));
+        if existing.0 != 0 {
+            SetForegroundWindow(existing);
+            if let Some(cmd) = initial_command {
+                with_prompt_state(existing, |state| {
+                    if let Some(session) = &state.session {
+                        let newline = if state.program_is_codex { "\n" } else { "\r\n" };
+                        let payload = format!("{}{}", cmd, newline);
+                        session.write_input(&payload);
+                    }
+                });
+            }
+            return;
         }
-        return;
-    }
 
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-    let class_name = to_wide(PROMPT_CLASS_NAME);
-    let wc = WNDCLASSW {
-        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
-            LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
-        ),
-        hInstance: hinstance,
-        lpszClassName: PCWSTR(class_name.as_ptr()),
-        lpfnWndProc: Some(prompt_wndproc),
-        ..Default::default()
-    };
-    RegisterClassW(&wc);
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+        let class_name = to_wide(PROMPT_CLASS_NAME);
+        let wc = WNDCLASSW {
+            hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+                LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
+            ),
+            hInstance: hinstance,
+            lpszClassName: PCWSTR(class_name.as_ptr()),
+            lpfnWndProc: Some(prompt_wndproc),
+            ..Default::default()
+        };
+        RegisterClassW(&wc);
 
-    let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
-    let labels = prompt_labels(language);
-    let title = to_wide(&labels.title);
+        let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
+        let labels = prompt_labels(language);
+        let title = to_wide(&labels.title);
 
-    let init = Box::new(PromptWindowInit {
-        parent,
-        initial_command,
-        working_dir,
-    });
-    let init_ptr: *mut PromptWindowInit = Box::into_raw(init);
+        let init = Box::new(PromptWindowInit {
+            parent,
+            initial_command,
+            working_dir,
+        });
+        let init_ptr: *mut PromptWindowInit = Box::into_raw(init);
 
-    let hwnd = CreateWindowExW(
-        WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
-        PCWSTR(class_name.as_ptr()),
-        PCWSTR(title.as_ptr()),
-        WS_CAPTION | WS_SYSMENU | WS_SIZEBOX | WS_VISIBLE,
-        140,
-        140,
-        720,
-        520,
-        None,
-        HMENU(0),
-        hinstance,
-        Some(init_ptr as *const std::ffi::c_void),
-    );
+        let hwnd = CreateWindowExW(
+            WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            WS_CAPTION | WS_SYSMENU | WS_SIZEBOX | WS_VISIBLE,
+            140,
+            140,
+            720,
+            520,
+            None,
+            HMENU(0),
+            hinstance,
+            Some(init_ptr as *const std::ffi::c_void),
+        );
 
-    if hwnd.0 == 0 {
-        if !init_ptr.is_null() {
-            unsafe {
+        if hwnd.0 == 0 {
+            if !init_ptr.is_null() {
                 let _unused_box = Box::from_raw(init_ptr);
             }
+            return;
         }
-        return;
-    }
 
-    if with_state(parent, |state| {
-        state.prompt_window = hwnd;
-    })
-    .is_none()
-    {
-        crate::log_debug("Failed to access prompt state");
+        if with_state(parent, |state| {
+            state.prompt_window = hwnd;
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access prompt state");
+        }
     }
 }
 

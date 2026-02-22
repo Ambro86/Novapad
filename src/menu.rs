@@ -1234,17 +1234,19 @@ pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
     (hmenu, recent_menu)
 }
 
-pub unsafe fn update_recent_menu(hwnd: HWND, hmenu_recent: HMENU) {
-    let count = GetMenuItemCount(hmenu_recent);
+pub fn update_recent_menu(hwnd: HWND, hmenu_recent: HMENU) {
+    let count = unsafe { GetMenuItemCount(hmenu_recent) };
     if count > 0 {
         for _ in 0..count {
-            crate::log_if_err!(DeleteMenu(hmenu_recent, 0, MF_BYPOSITION));
+            crate::log_if_err!(unsafe { DeleteMenu(hmenu_recent, 0, MF_BYPOSITION) });
         }
     }
 
-    let (files, language): (Vec<std::path::PathBuf>, Language) = with_state(hwnd, |state| {
-        (state.recent_files.clone(), state.settings.language)
-    })
+    let (files, language): (Vec<std::path::PathBuf>, Language) = unsafe {
+        with_state(hwnd, |state| {
+            (state.recent_files.clone(), state.settings.language)
+        })
+    }
     .unwrap_or_default();
     if files.is_empty() {
         let labels = menu_labels(language);
@@ -1254,14 +1256,16 @@ pub unsafe fn update_recent_menu(hwnd: HWND, hmenu_recent: HMENU) {
         for (i, path) in files.iter().enumerate() {
             let label = format!("&{} {}", i + 1, abbreviate_recent_label(path));
             let wide = to_wide(&label);
-            crate::log_if_err!(AppendMenuW(
-                hmenu_recent,
-                MF_STRING,
-                IDM_FILE_RECENT_BASE + i,
-                PCWSTR(wide.as_ptr()),
-            ));
+            crate::log_if_err!(unsafe {
+                AppendMenuW(
+                    hmenu_recent,
+                    MF_STRING,
+                    IDM_FILE_RECENT_BASE + i,
+                    PCWSTR(wide.as_ptr()),
+                )
+            });
         }
-        crate::log_if_err!(AppendMenuW(hmenu_recent, MF_SEPARATOR, 0, PCWSTR::null()));
+        crate::log_if_err!(unsafe { AppendMenuW(hmenu_recent, MF_SEPARATOR, 0, PCWSTR::null()) });
         append_menu_string(
             hmenu_recent,
             MF_STRING,
@@ -1269,7 +1273,7 @@ pub unsafe fn update_recent_menu(hwnd: HWND, hmenu_recent: HMENU) {
             &labels.recent_clear,
         );
     }
-    crate::log_if_err!(DrawMenuBar(hwnd));
+    crate::log_if_err!(unsafe { DrawMenuBar(hwnd) });
 }
 
 pub fn abbreviate_recent_label(path: &Path) -> String {
@@ -1288,7 +1292,7 @@ pub fn abbreviate_recent_label(path: &Path) -> String {
     format!("{filename} - {suffix}")
 }
 
-pub unsafe fn append_menu_string(menu: HMENU, flags: MENU_ITEM_FLAGS, id: usize, text: &str) {
+pub fn append_menu_string(menu: HMENU, flags: MENU_ITEM_FLAGS, id: usize, text: &str) {
     let wide = to_wide(text);
-    crate::log_if_err!(AppendMenuW(menu, flags, id, PCWSTR(wide.as_ptr())));
+    crate::log_if_err!(unsafe { AppendMenuW(menu, flags, id, PCWSTR(wide.as_ptr())) });
 }

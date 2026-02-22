@@ -318,19 +318,21 @@ fn handle_indent_tab_key(
     true
 }
 
-pub unsafe fn indent_active_edit(hwnd: HWND, shift_down: bool) -> bool {
-    let Some(hwnd_edit) = crate::get_active_edit(hwnd) else {
-        return false;
-    };
-    let (mode, space_width, tab_width) = with_state(hwnd, |state| {
-        (
-            state.settings.indentation_mode,
-            state.settings.indent_space_width,
-            state.settings.indent_tab_width,
-        )
-    })
-    .unwrap_or((IndentationMode::Default, 4, 4));
-    handle_indent_tab_key(hwnd_edit, mode, space_width, tab_width, shift_down)
+pub fn indent_active_edit(hwnd: HWND, shift_down: bool) -> bool {
+    unsafe {
+        let Some(hwnd_edit) = crate::get_active_edit(hwnd) else {
+            return false;
+        };
+        let (mode, space_width, tab_width) = with_state(hwnd, |state| {
+            (
+                state.settings.indentation_mode,
+                state.settings.indent_space_width,
+                state.settings.indent_tab_width,
+            )
+        })
+        .unwrap_or((IndentationMode::Default, 4, 4));
+        handle_indent_tab_key(hwnd_edit, mode, space_width, tab_width, shift_down)
+    }
 }
 
 fn outdent_single_line(
@@ -1800,153 +1802,157 @@ pub fn get_selected_text(hwnd_edit: HWND) -> Option<String> {
     Some(selected)
 }
 
-pub unsafe fn hard_line_break_active_edit(hwnd: HWND) -> bool {
-    let Some(hwnd_edit) = crate::get_active_edit(hwnd) else {
-        return false;
-    };
-    let text = get_edit_text(hwnd_edit);
-    if text.is_empty() {
-        return false;
-    }
-    let wrap_width = with_state(hwnd, |state| state.settings.wrap_width).unwrap_or(80);
-    let wrap_width = wrap_width.max(1) as usize;
-    let line_ending = if text.contains("\r\n") { "\r\n" } else { "\n" };
-
-    let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXGETSEL,
-        WPARAM(0),
-        LPARAM(&mut selection as *mut _ as isize),
-    );
-    let had_selection = selection.cpMin != selection.cpMax;
-    let original_caret = selection.cpMin;
-
-    let (range_start, range_end, has_trailing_newline) = if selection.cpMin != selection.cpMax {
-        let start = utf16_index_to_byte(&text, selection.cpMin);
-        let end = utf16_index_to_byte(&text, selection.cpMax);
-        let selected = &text[start..end];
-        (start, end, selected.ends_with('\n'))
-    } else {
-        let Some((start_u16, end_u16, _selected, trailing)) =
-            current_line_block_from_caret(hwnd_edit, selection)
-        else {
+pub fn hard_line_break_active_edit(hwnd: HWND) -> bool {
+    unsafe {
+        let Some(hwnd_edit) = crate::get_active_edit(hwnd) else {
             return false;
         };
-        let start = utf16_index_to_byte(&text, start_u16);
-        let end = utf16_index_to_byte(&text, end_u16);
-        (start, end, trailing)
-    };
+        let text = get_edit_text(hwnd_edit);
+        if text.is_empty() {
+            return false;
+        }
+        let wrap_width = with_state(hwnd, |state| state.settings.wrap_width).unwrap_or(80);
+        let wrap_width = wrap_width.max(1) as usize;
+        let line_ending = if text.contains("\r\n") { "\r\n" } else { "\n" };
 
-    let target = &text[range_start..range_end];
-    let reformatted = reflow_block_text(target, wrap_width, line_ending, has_trailing_newline);
-    if reformatted == target {
-        return false;
-    }
+        let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut selection as *mut _ as isize),
+        );
+        let had_selection = selection.cpMin != selection.cpMax;
+        let original_caret = selection.cpMin;
 
-    let mut replace_range = CHARRANGE {
-        cpMin: byte_index_to_utf16(&text, range_start),
-        cpMax: byte_index_to_utf16(&text, range_end),
-    };
-    // Single-undo guarantee.
-    begin_single_undo_action(hwnd_edit);
-    SendMessageW(
-        hwnd_edit,
-        EM_EXSETSEL,
-        WPARAM(0),
-        LPARAM(&mut replace_range as *mut _ as isize),
-    );
-    let replace_wide = to_wide(&reformatted);
-    SendMessageW(
-        hwnd_edit,
-        EM_REPLACESEL,
-        WPARAM(1),
-        LPARAM(replace_wide.as_ptr() as isize),
-    );
-    end_single_undo_action(hwnd_edit);
-    restore_caret_after_line_op_if_no_selection(
-        hwnd_edit,
-        had_selection,
-        original_caret,
-        replace_range.cpMin,
-        target,
-        &reformatted,
-    );
-    mark_dirty_from_edit(hwnd, hwnd_edit);
-    SetFocus(hwnd_edit);
-    true
-}
-
-pub unsafe fn order_items_active_edit(hwnd: HWND) -> bool {
-    let Some(hwnd_edit) = crate::get_active_edit(hwnd) else {
-        return false;
-    };
-    let text = get_edit_text(hwnd_edit);
-    if text.is_empty() {
-        return false;
-    }
-
-    let line_ending = if text.contains("\r\n") { "\r\n" } else { "\n" };
-    let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXGETSEL,
-        WPARAM(0),
-        LPARAM(&mut selection as *mut _ as isize),
-    );
-    let had_selection = selection.cpMin != selection.cpMax;
-    let original_caret = selection.cpMin;
-
-    let (replace_start, replace_end, affected, has_trailing_newline) =
-        if let Some((start, end, selected, trailing)) =
-            selected_line_block_from_selection(hwnd_edit, &text, selection)
-        {
-            (start, end, selected, trailing)
+        let (range_start, range_end, has_trailing_newline) = if selection.cpMin != selection.cpMax {
+            let start = utf16_index_to_byte(&text, selection.cpMin);
+            let end = utf16_index_to_byte(&text, selection.cpMax);
+            let selected = &text[start..end];
+            (start, end, selected.ends_with('\n'))
         } else {
-            let Some((start, end, selected, trailing)) =
+            let Some((start_u16, end_u16, _selected, trailing)) =
                 current_line_block_from_caret(hwnd_edit, selection)
             else {
                 return false;
             };
-            (start, end, selected, trailing)
+            let start = utf16_index_to_byte(&text, start_u16);
+            let end = utf16_index_to_byte(&text, end_u16);
+            (start, end, trailing)
         };
 
-    let ordered = order_lines_block(&affected, line_ending, has_trailing_newline);
-    if ordered == affected {
-        return false;
-    }
+        let target = &text[range_start..range_end];
+        let reformatted = reflow_block_text(target, wrap_width, line_ending, has_trailing_newline);
+        if reformatted == target {
+            return false;
+        }
 
-    let mut replace_range = CHARRANGE {
-        cpMin: replace_start,
-        cpMax: replace_end,
-    };
-    // Single-undo guarantee.
-    begin_single_undo_action(hwnd_edit);
-    SendMessageW(
-        hwnd_edit,
-        EM_EXSETSEL,
-        WPARAM(0),
-        LPARAM(&mut replace_range as *mut _ as isize),
-    );
-    let replace_wide = to_wide(&ordered);
-    SendMessageW(
-        hwnd_edit,
-        EM_REPLACESEL,
-        WPARAM(1),
-        LPARAM(replace_wide.as_ptr() as isize),
-    );
-    end_single_undo_action(hwnd_edit);
-    restore_caret_after_line_op_if_no_selection(
-        hwnd_edit,
-        had_selection,
-        original_caret,
-        replace_start,
-        &affected,
-        &ordered,
-    );
-    mark_dirty_from_edit(hwnd, hwnd_edit);
-    SetFocus(hwnd_edit);
-    true
+        let mut replace_range = CHARRANGE {
+            cpMin: byte_index_to_utf16(&text, range_start),
+            cpMax: byte_index_to_utf16(&text, range_end),
+        };
+        // Single-undo guarantee.
+        begin_single_undo_action(hwnd_edit);
+        SendMessageW(
+            hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut replace_range as *mut _ as isize),
+        );
+        let replace_wide = to_wide(&reformatted);
+        SendMessageW(
+            hwnd_edit,
+            EM_REPLACESEL,
+            WPARAM(1),
+            LPARAM(replace_wide.as_ptr() as isize),
+        );
+        end_single_undo_action(hwnd_edit);
+        restore_caret_after_line_op_if_no_selection(
+            hwnd_edit,
+            had_selection,
+            original_caret,
+            replace_range.cpMin,
+            target,
+            &reformatted,
+        );
+        mark_dirty_from_edit(hwnd, hwnd_edit);
+        SetFocus(hwnd_edit);
+        true
+    }
+}
+
+pub fn order_items_active_edit(hwnd: HWND) -> bool {
+    unsafe {
+        let Some(hwnd_edit) = crate::get_active_edit(hwnd) else {
+            return false;
+        };
+        let text = get_edit_text(hwnd_edit);
+        if text.is_empty() {
+            return false;
+        }
+
+        let line_ending = if text.contains("\r\n") { "\r\n" } else { "\n" };
+        let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut selection as *mut _ as isize),
+        );
+        let had_selection = selection.cpMin != selection.cpMax;
+        let original_caret = selection.cpMin;
+
+        let (replace_start, replace_end, affected, has_trailing_newline) =
+            if let Some((start, end, selected, trailing)) =
+                selected_line_block_from_selection(hwnd_edit, &text, selection)
+            {
+                (start, end, selected, trailing)
+            } else {
+                let Some((start, end, selected, trailing)) =
+                    current_line_block_from_caret(hwnd_edit, selection)
+                else {
+                    return false;
+                };
+                (start, end, selected, trailing)
+            };
+
+        let ordered = order_lines_block(&affected, line_ending, has_trailing_newline);
+        if ordered == affected {
+            return false;
+        }
+
+        let mut replace_range = CHARRANGE {
+            cpMin: replace_start,
+            cpMax: replace_end,
+        };
+        // Single-undo guarantee.
+        begin_single_undo_action(hwnd_edit);
+        SendMessageW(
+            hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut replace_range as *mut _ as isize),
+        );
+        let replace_wide = to_wide(&ordered);
+        SendMessageW(
+            hwnd_edit,
+            EM_REPLACESEL,
+            WPARAM(1),
+            LPARAM(replace_wide.as_ptr() as isize),
+        );
+        end_single_undo_action(hwnd_edit);
+        restore_caret_after_line_op_if_no_selection(
+            hwnd_edit,
+            had_selection,
+            original_caret,
+            replace_start,
+            &affected,
+            &ordered,
+        );
+        mark_dirty_from_edit(hwnd, hwnd_edit);
+        SetFocus(hwnd_edit);
+        true
+    }
 }
 
 pub unsafe fn keep_unique_items_active_edit(hwnd: HWND) -> bool {

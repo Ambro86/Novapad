@@ -1165,202 +1165,204 @@ pub fn open(parent: HWND) {
     }
 }
 
-pub unsafe fn refresh_voices(hwnd: HWND) {
-    let (
-        parent,
-        combo_voice,
-        combo_dialogue_voice,
-        combo_engine,
-        combo_dialogue_engine,
-        checkbox,
-        label_tts_voice_language,
-        combo_tts_voice_language,
-    ) = match with_options_state(hwnd, |state| {
-        (
-            state.parent,
-            state.combo_voice,
-            state.combo_dialogue_voice,
-            state.combo_tts_engine,
-            state.combo_dialogue_engine,
-            state.checkbox_multilingual,
-            state.label_tts_voice_language,
-            state.combo_tts_voice_language,
-        )
-    }) {
-        Some(values) => values,
-        None => return,
-    };
-    let settings = with_state(parent, |state| state.settings.clone()).unwrap_or_default();
-
-    // Determine current engine from combo if possible, otherwise settings
-    let engine_sel = SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-    let engine = if engine_sel >= 0 {
-        match engine_sel {
-            1 => TtsEngine::Sapi5,
-            2 => TtsEngine::Sapi4,
-
-            _ => TtsEngine::Edge,
-        }
-    } else {
-        settings.tts_engine
-    };
-
-    let voices = with_state(parent, |state| match engine {
-        TtsEngine::Edge => state.edge_voices.clone(),
-        TtsEngine::Sapi5 => state.sapi_voices.clone(),
-        TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
-    })
-    .unwrap_or_default();
-    let dialogue_engine_sel =
-        SendMessageW(combo_dialogue_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-    let dialogue_engine = if dialogue_engine_sel >= 0 {
-        match dialogue_engine_sel {
-            1 => TtsEngine::Sapi5,
-            2 => TtsEngine::Sapi4,
-            _ => TtsEngine::Edge,
-        }
-    } else {
-        settings.dialogue_tts_engine
-    };
-    let dialogue_voices = with_state(parent, |state| match dialogue_engine {
-        TtsEngine::Edge => state.edge_voices.clone(),
-        TtsEngine::Sapi5 => state.sapi_voices.clone(),
-        TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
-    })
-    .unwrap_or_default();
-
-    let labels = options_labels(settings.language);
-    let only_multilingual =
-        SendMessageW(checkbox, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 == BST_CHECKED.0;
-
-    // Multilingual checkbox only relevant for Edge voices?
-    // SAPI voices usually don't have "Multilingual" in name in the same way, but let's keep logic if applicable.
-    // Generally assume SAPI voices are local and we list all.
-    let filter_multilingual = engine == TtsEngine::Edge && only_multilingual;
-
-    // Disable multilingual checkbox for SAPI.
-    EnableWindow(checkbox, engine == TtsEngine::Edge);
-
-    let show_language_combo = engine == TtsEngine::Edge && !only_multilingual;
-    ShowWindow(
-        label_tts_voice_language,
-        if show_language_combo {
-            SW_SHOW
-        } else {
-            SW_HIDE
-        },
-    );
-    ShowWindow(
-        combo_tts_voice_language,
-        if show_language_combo {
-            SW_SHOW
-        } else {
-            SW_HIDE
-        },
-    );
-    EnableWindow(combo_tts_voice_language, show_language_combo);
-
-    let mut language_filter: Option<String> = None;
-    if show_language_combo {
-        let previous_selection = with_options_state(hwnd, |state| {
-            let sel = SendMessageW(
+pub fn refresh_voices(hwnd: HWND) {
+    unsafe {
+        let (
+            parent,
+            combo_voice,
+            combo_dialogue_voice,
+            combo_engine,
+            combo_dialogue_engine,
+            checkbox,
+            label_tts_voice_language,
+            combo_tts_voice_language,
+        ) = match with_options_state(hwnd, |state| {
+            (
+                state.parent,
+                state.combo_voice,
+                state.combo_dialogue_voice,
+                state.combo_tts_engine,
+                state.combo_dialogue_engine,
+                state.checkbox_multilingual,
+                state.label_tts_voice_language,
                 state.combo_tts_voice_language,
-                CB_GETCURSEL,
-                WPARAM(0),
-                LPARAM(0),
             )
-            .0;
-            if sel >= 0 {
-                state.tts_voice_language_codes.get(sel as usize).cloned()
-            } else {
-                None
-            }
-        })
-        .flatten();
+        }) {
+            Some(values) => values,
+            None => return,
+        };
+        let settings = with_state(parent, |state| state.settings.clone()).unwrap_or_default();
 
-        let mut codes = collect_voice_language_codes(&voices);
-        if !codes.is_empty() {
-            let selected_from_voice = voices
-                .iter()
-                .find(|v| v.short_name == settings.tts_voice)
-                .and_then(|v| voice_locale_language_code(&v.locale));
-            let selected_code = previous_selection
-                .filter(|code| codes.contains(code))
-                .or(selected_from_voice.filter(|code| codes.contains(code)))
-                .unwrap_or_else(|| codes[0].clone());
+        // Determine current engine from combo if possible, otherwise settings
+        let engine_sel = SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+        let engine = if engine_sel >= 0 {
+            match engine_sel {
+                1 => TtsEngine::Sapi5,
+                2 => TtsEngine::Sapi4,
+
+                _ => TtsEngine::Edge,
+            }
+        } else {
+            settings.tts_engine
+        };
+
+        let voices = with_state(parent, |state| match engine {
+            TtsEngine::Edge => state.edge_voices.clone(),
+            TtsEngine::Sapi5 => state.sapi_voices.clone(),
+            TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
+        })
+        .unwrap_or_default();
+        let dialogue_engine_sel =
+            SendMessageW(combo_dialogue_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+        let dialogue_engine = if dialogue_engine_sel >= 0 {
+            match dialogue_engine_sel {
+                1 => TtsEngine::Sapi5,
+                2 => TtsEngine::Sapi4,
+                _ => TtsEngine::Edge,
+            }
+        } else {
+            settings.dialogue_tts_engine
+        };
+        let dialogue_voices = with_state(parent, |state| match dialogue_engine {
+            TtsEngine::Edge => state.edge_voices.clone(),
+            TtsEngine::Sapi5 => state.sapi_voices.clone(),
+            TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
+        })
+        .unwrap_or_default();
+
+        let labels = options_labels(settings.language);
+        let only_multilingual =
+            SendMessageW(checkbox, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 == BST_CHECKED.0;
+
+        // Multilingual checkbox only relevant for Edge voices?
+        // SAPI voices usually don't have "Multilingual" in name in the same way, but let's keep logic if applicable.
+        // Generally assume SAPI voices are local and we list all.
+        let filter_multilingual = engine == TtsEngine::Edge && only_multilingual;
+
+        // Disable multilingual checkbox for SAPI.
+        EnableWindow(checkbox, engine == TtsEngine::Edge);
+
+        let show_language_combo = engine == TtsEngine::Edge && !only_multilingual;
+        ShowWindow(
+            label_tts_voice_language,
+            if show_language_combo {
+                SW_SHOW
+            } else {
+                SW_HIDE
+            },
+        );
+        ShowWindow(
+            combo_tts_voice_language,
+            if show_language_combo {
+                SW_SHOW
+            } else {
+                SW_HIDE
+            },
+        );
+        EnableWindow(combo_tts_voice_language, show_language_combo);
+
+        let mut language_filter: Option<String> = None;
+        if show_language_combo {
+            let previous_selection = with_options_state(hwnd, |state| {
+                let sel = SendMessageW(
+                    state.combo_tts_voice_language,
+                    CB_GETCURSEL,
+                    WPARAM(0),
+                    LPARAM(0),
+                )
+                .0;
+                if sel >= 0 {
+                    state.tts_voice_language_codes.get(sel as usize).cloned()
+                } else {
+                    None
+                }
+            })
+            .flatten();
+
+            let mut codes = collect_voice_language_codes(&voices);
+            if !codes.is_empty() {
+                let selected_from_voice = voices
+                    .iter()
+                    .find(|v| v.short_name == settings.tts_voice)
+                    .and_then(|v| voice_locale_language_code(&v.locale));
+                let selected_code = previous_selection
+                    .filter(|code| codes.contains(code))
+                    .or(selected_from_voice.filter(|code| codes.contains(code)))
+                    .unwrap_or_else(|| codes[0].clone());
+                SendMessageW(
+                    combo_tts_voice_language,
+                    CB_RESETCONTENT,
+                    WPARAM(0),
+                    LPARAM(0),
+                );
+                let mut selected_index: Option<usize> = None;
+                for (idx, code) in codes.iter().enumerate() {
+                    let label = localized_voice_language_name(settings.language, &labels, code);
+                    let added = SendMessageW(
+                        combo_tts_voice_language,
+                        CB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(to_wide(&label).as_ptr() as isize),
+                    )
+                    .0;
+                    if added >= 0 && *code == selected_code {
+                        selected_index = Some(idx);
+                    }
+                }
+                SendMessageW(
+                    combo_tts_voice_language,
+                    CB_SETCURSEL,
+                    WPARAM(selected_index.unwrap_or(0)),
+                    LPARAM(0),
+                );
+                language_filter = Some(selected_code);
+            }
+            if with_options_state(hwnd, |state| {
+                state.tts_voice_language_codes = std::mem::take(&mut codes);
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access state in options_window");
+            }
+        } else if with_options_state(hwnd, |state| {
+            state.tts_voice_language_codes.clear();
             SendMessageW(
-                combo_tts_voice_language,
+                state.combo_tts_voice_language,
                 CB_RESETCONTENT,
                 WPARAM(0),
                 LPARAM(0),
             );
-            let mut selected_index: Option<usize> = None;
-            for (idx, code) in codes.iter().enumerate() {
-                let label = localized_voice_language_name(settings.language, &labels, code);
-                let added = SendMessageW(
-                    combo_tts_voice_language,
-                    CB_ADDSTRING,
-                    WPARAM(0),
-                    LPARAM(to_wide(&label).as_ptr() as isize),
-                )
-                .0;
-                if added >= 0 && *code == selected_code {
-                    selected_index = Some(idx);
-                }
-            }
-            SendMessageW(
-                combo_tts_voice_language,
-                CB_SETCURSEL,
-                WPARAM(selected_index.unwrap_or(0)),
-                LPARAM(0),
-            );
-            language_filter = Some(selected_code);
-        }
-        if with_options_state(hwnd, |state| {
-            state.tts_voice_language_codes = std::mem::take(&mut codes);
         })
         .is_none()
         {
             crate::log_debug("Failed to access state in options_window");
         }
-    } else if with_options_state(hwnd, |state| {
-        state.tts_voice_language_codes.clear();
-        SendMessageW(
-            state.combo_tts_voice_language,
-            CB_RESETCONTENT,
-            WPARAM(0),
-            LPARAM(0),
+
+        // If switching engine, we might not have the correct "selected" voice in settings yet if we haven't saved.
+        // But we pass settings.tts_voice. If it's an ID from other engine, it won't match, so it selects default/first.
+        populate_voice_combo(
+            combo_voice,
+            &voices,
+            &settings.tts_voice,
+            filter_multilingual,
+            language_filter.as_deref(),
+            &labels,
         );
-    })
-    .is_none()
-    {
-        crate::log_debug("Failed to access state in options_window");
+
+        // Also populate dialogue voice combo
+        populate_voice_combo(
+            combo_dialogue_voice,
+            &dialogue_voices,
+            &settings.dialogue_voice,
+            if dialogue_engine == TtsEngine::Edge {
+                filter_multilingual
+            } else {
+                false
+            },
+            None,
+            &labels,
+        );
     }
-
-    // If switching engine, we might not have the correct "selected" voice in settings yet if we haven't saved.
-    // But we pass settings.tts_voice. If it's an ID from other engine, it won't match, so it selects default/first.
-    populate_voice_combo(
-        combo_voice,
-        &voices,
-        &settings.tts_voice,
-        filter_multilingual,
-        language_filter.as_deref(),
-        &labels,
-    );
-
-    // Also populate dialogue voice combo
-    populate_voice_combo(
-        combo_dialogue_voice,
-        &dialogue_voices,
-        &settings.dialogue_voice,
-        if dialogue_engine == TtsEngine::Edge {
-            filter_multilingual
-        } else {
-            false
-        },
-        None,
-        &labels,
-    );
 }
 
 unsafe extern "system" fn options_wndproc(

@@ -3951,7 +3951,7 @@ pub fn save_all_documents(hwnd: HWND) -> bool {
     let doc_count = unsafe { with_state(hwnd, |state| state.docs.len()) }.unwrap_or(0);
     let mut dirty_indices = Vec::new();
     for index in 0..doc_count {
-        if unsafe { sync_dirty_from_edit(hwnd, index) } {
+        if sync_dirty_from_edit(hwnd, index) {
             dirty_indices.push(index);
         }
     }
@@ -4305,99 +4305,105 @@ pub unsafe fn close_document_at(hwnd: HWND, index: usize) -> bool {
     true
 }
 
-pub unsafe fn try_close_app(hwnd: HWND) -> bool {
-    let result = with_state(hwnd, |state| {
-        state
-            .docs
-            .iter()
-            .enumerate()
-            .map(|(i, d)| (i, d.title.clone()))
-            .collect::<Vec<_>>()
-    });
-    if result.is_none() {
-        crate::log_debug("Failed to access editor state");
-    }
+pub fn try_close_app(hwnd: HWND) -> bool {
+    unsafe {
+        let result = with_state(hwnd, |state| {
+            state
+                .docs
+                .iter()
+                .enumerate()
+                .map(|(i, d)| (i, d.title.clone()))
+                .collect::<Vec<_>>()
+        });
+        if result.is_none() {
+            crate::log_debug("Failed to access editor state");
+        }
 
-    if let Some(entries) = result {
-        for (index, title) in entries {
-            if !confirm_save_if_dirty_entry(hwnd, index, &title) {
-                return false;
+        if let Some(entries) = result {
+            for (index, title) in entries {
+                if !confirm_save_if_dirty_entry(hwnd, index, &title) {
+                    return false;
+                }
             }
         }
+        let has_active_audiobook =
+            with_state(hwnd, |state| state.active_audiobook.is_some()).unwrap_or(false);
+        if has_active_audiobook {
+            crate::audio_player::stop_audiobook_playback(hwnd);
+        }
+        crate::clear_active_podcast_chapters(hwnd);
+        if let Err(e) = crate::ffmpeg_export::cleanup_tts_artifacts() {
+            crate::log_debug(&e);
+        }
+        crate::log_if_err!(DestroyWindow(hwnd));
+        true
     }
-    let has_active_audiobook =
-        with_state(hwnd, |state| state.active_audiobook.is_some()).unwrap_or(false);
-    if has_active_audiobook {
-        crate::audio_player::stop_audiobook_playback(hwnd);
-    }
-    crate::clear_active_podcast_chapters(hwnd);
-    if let Err(e) = crate::ffmpeg_export::cleanup_tts_artifacts() {
-        crate::log_debug(&e);
-    }
-    crate::log_if_err!(DestroyWindow(hwnd));
-    true
 }
 
-pub unsafe fn sync_dirty_from_edit(hwnd: HWND, index: usize) -> bool {
-    let mut hwnd_edit = HWND(0);
-    let mut is_dirty = false;
-    let mut is_current = false;
-    if with_state(hwnd, |state| {
-        if let Some(doc) = state.docs.get(index) {
-            hwnd_edit = doc.hwnd_edit;
-            is_dirty = doc.dirty;
-            is_current = state.current == index;
-        }
-    })
-    .is_none()
-    {
-        crate::log_debug("Failed to access editor state");
-    }
-
-    if hwnd_edit.0 == 0 {
-        return is_dirty;
-    }
-
-    let modified = SendMessageW(hwnd_edit, EM_GETMODIFY, WPARAM(0), LPARAM(0)).0 != 0;
-    if modified && !is_dirty {
+pub fn sync_dirty_from_edit(hwnd: HWND, index: usize) -> bool {
+    unsafe {
+        let mut hwnd_edit = HWND(0);
+        let mut is_dirty = false;
+        let mut is_current = false;
         if with_state(hwnd, |state| {
-            if let Some(doc) = state.docs.get_mut(index) {
-                doc.dirty = true;
-                update_tab_title(state.hwnd_tab, index, &doc.title, true);
-                if is_current {
-                    update_window_title(hwnd);
-                }
+            if let Some(doc) = state.docs.get(index) {
+                hwnd_edit = doc.hwnd_edit;
+                is_dirty = doc.dirty;
+                is_current = state.current == index;
             }
         })
         .is_none()
         {
             crate::log_debug("Failed to access editor state");
         }
-        return true;
+
+        if hwnd_edit.0 == 0 {
+            return is_dirty;
+        }
+
+        let modified = SendMessageW(hwnd_edit, EM_GETMODIFY, WPARAM(0), LPARAM(0)).0 != 0;
+        if modified && !is_dirty {
+            if with_state(hwnd, |state| {
+                if let Some(doc) = state.docs.get_mut(index) {
+                    doc.dirty = true;
+                    update_tab_title(state.hwnd_tab, index, &doc.title, true);
+                    if is_current {
+                        update_window_title(hwnd);
+                    }
+                }
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access editor state");
+            }
+            return true;
+        }
+        is_dirty
     }
-    is_dirty
 }
 
-pub unsafe fn confirm_save_if_dirty_entry(hwnd: HWND, index: usize, title: &str) -> bool {
-    if !sync_dirty_from_edit(hwnd, index) {
-        return true;
-    }
+pub fn confirm_save_if_dirty_entry(hwnd: HWND, index: usize, title: &str) -> bool {
+    unsafe {
+        if !sync_dirty_from_edit(hwnd, index) {
+            return true;
+        }
 
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    let msg = confirm_save_message(language, title);
-    let title_w = confirm_title(language);
+        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+        let msg = confirm_save_message(language, title);
+        let title_w = confirm_title(language);
 
-    let result = MessageBoxW(
-        hwnd,
-        PCWSTR(to_wide(&msg).as_ptr()),
-        PCWSTR(to_wide(&title_w).as_ptr()),
-        MB_YESNOCANCEL | MB_ICONWARNING,
-    );
+        let result = MessageBoxW(
+            hwnd,
+            PCWSTR(to_wide(&msg).as_ptr()),
+            PCWSTR(to_wide(&title_w).as_ptr()),
+            MB_YESNOCANCEL | MB_ICONWARNING,
+        );
 
-    match result {
-        IDYES => save_document_at(hwnd, index, false),
-        IDNO => true,
-        _ => false,
+        match result {
+            IDYES => save_document_at(hwnd, index, false),
+            IDNO => true,
+            _ => false,
+        }
     }
 }
 

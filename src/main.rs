@@ -8185,9 +8185,7 @@ unsafe fn insert_bookmark(hwnd: HWND) {
         .unwrap_or(HWND(0));
 
         if bookmarks_window.0 != 0 {
-            unsafe {
-                app_windows::bookmarks_window::refresh_bookmarks_list(bookmarks_window);
-            }
+            app_windows::bookmarks_window::refresh_bookmarks_list(bookmarks_window);
         }
         confirm_menu_action(hwnd, "insert.bookmark");
         return;
@@ -8280,9 +8278,7 @@ unsafe fn insert_bookmark(hwnd: HWND) {
     .unwrap_or(HWND(0));
 
     if bookmarks_window.0 != 0 {
-        unsafe {
-            app_windows::bookmarks_window::refresh_bookmarks_list(bookmarks_window);
-        }
+        app_windows::bookmarks_window::refresh_bookmarks_list(bookmarks_window);
     }
     confirm_menu_action(hwnd, "insert.bookmark");
 }

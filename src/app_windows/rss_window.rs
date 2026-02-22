@@ -1602,21 +1602,21 @@ pub fn open(parent: HWND) {
     }
 }
 
-pub unsafe fn show_context_menu_from_keyboard(hwnd: HWND) {
+pub fn show_context_menu_from_keyboard(hwnd: HWND) {
     let mut pt = POINT::default();
-    crate::log_if_err!(GetCursorPos(&mut pt));
-    show_rss_context_menu(hwnd, pt.x, pt.y, false);
+    crate::log_if_err!(unsafe { GetCursorPos(&mut pt) });
+    unsafe { show_rss_context_menu(hwnd, pt.x, pt.y, false) };
 }
 
-pub unsafe fn focus_library(hwnd: HWND) {
+pub fn focus_library(hwnd: HWND) {
     if hwnd.0 == 0 {
         return;
     }
-    SetForegroundWindow(hwnd);
-    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+    unsafe { SetForegroundWindow(hwnd) };
+    let hwnd_tree = unsafe { with_rss_state(hwnd, |s| s.hwnd_tree) }.unwrap_or(HWND(0));
     if hwnd_tree.0 != 0 {
-        select_first_root_if_needed(hwnd, hwnd_tree);
-        SetFocus(hwnd_tree);
+        unsafe { select_first_root_if_needed(hwnd, hwnd_tree) };
+        unsafe { SetFocus(hwnd_tree) };
     }
 }
 

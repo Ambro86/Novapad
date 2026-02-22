@@ -70,7 +70,7 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
         let (list, btn) = unsafe { with_bookmarks_state(hwnd, |s| (s.hwnd_list, s.hwnd_goto)) }
             .unwrap_or((HWND(0), HWND(0)));
         if focus == list || focus == btn {
-            unsafe { goto_selected(hwnd) };
+            goto_selected(hwnd);
             return true;
         }
     }
@@ -316,18 +316,21 @@ where
     }
 }
 
-pub unsafe fn refresh_bookmarks_list(hwnd: HWND) {
-    let (parent, hwnd_list) = match with_bookmarks_state(hwnd, |s| (s.parent, s.hwnd_list)) {
-        Some(v) => v,
-        None => return,
-    };
+pub fn refresh_bookmarks_list(hwnd: HWND) {
+    let (parent, hwnd_list) =
+        match unsafe { with_bookmarks_state(hwnd, |s| (s.parent, s.hwnd_list)) } {
+            Some(v) => v,
+            None => return,
+        };
 
-    let (path, hwnd_edit) = with_state(parent, |state| {
-        state
-            .docs
-            .get(state.current)
-            .map(|doc| (doc.path.clone(), doc.hwnd_edit))
-    })
+    let (path, hwnd_edit) = unsafe {
+        with_state(parent, |state| {
+            state
+                .docs
+                .get(state.current)
+                .map(|doc| (doc.path.clone(), doc.hwnd_edit))
+        })
+    }
     .flatten()
     .unwrap_or((None, HWND(0)));
     if hwnd_edit.0 == 0 {
@@ -335,74 +338,78 @@ pub unsafe fn refresh_bookmarks_list(hwnd: HWND) {
     }
     let (storage_key, _) = bookmark_storage_key(path.as_deref(), hwnd_edit);
 
-    SendMessageW(hwnd_list, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    unsafe { SendMessageW(hwnd_list, LB_RESETCONTENT, WPARAM(0), LPARAM(0)) };
 
-    if with_state(parent, |state| {
-        if let Some(list) = state.bookmarks.files.get(&storage_key) {
-            for bm in list {
-                let text = format!("[{}] {}", bm.timestamp, bm.snippet);
-                let wide = to_wide(&text);
-                SendMessageW(
-                    hwnd_list,
-                    LB_ADDSTRING,
-                    WPARAM(0),
-                    LPARAM(wide.as_ptr() as isize),
-                );
+    if unsafe {
+        with_state(parent, |state| {
+            if let Some(list) = state.bookmarks.files.get(&storage_key) {
+                for bm in list {
+                    let text = format!("[{}] {}", bm.timestamp, bm.snippet);
+                    let wide = to_wide(&text);
+                    SendMessageW(
+                        hwnd_list,
+                        LB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(wide.as_ptr() as isize),
+                    );
+                }
             }
-        }
-    })
+        })
+    }
     .is_none()
     {
         crate::log_debug("Failed to access bookmarks state");
     }
 
-    let count = SendMessageW(hwnd_list, LB_GETCOUNT, WPARAM(0), LPARAM(0)).0 as i32;
-    if count > 0 && SendMessageW(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32 == -1 {
-        SendMessageW(hwnd_list, LB_SETCURSEL, WPARAM(0), LPARAM(0));
+    let count = unsafe { SendMessageW(hwnd_list, LB_GETCOUNT, WPARAM(0), LPARAM(0)) }.0 as i32;
+    if count > 0
+        && unsafe { SendMessageW(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)) }.0 as i32 == -1
+    {
+        unsafe { SendMessageW(hwnd_list, LB_SETCURSEL, WPARAM(0), LPARAM(0)) };
     }
 }
 
-pub unsafe fn goto_selected(hwnd: HWND) {
-    let (parent, hwnd_list) = match with_bookmarks_state(hwnd, |s| (s.parent, s.hwnd_list)) {
-        Some(v) => v,
-        None => return,
-    };
+pub fn goto_selected(hwnd: HWND) {
+    let (parent, hwnd_list) =
+        match unsafe { with_bookmarks_state(hwnd, |s| (s.parent, s.hwnd_list)) } {
+            Some(v) => v,
+            None => return,
+        };
 
-    let sel = SendMessageW(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
+    let sel = unsafe { SendMessageW(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)) }.0 as i32;
     if sel < 0 {
         return;
     }
 
-    let (path, hwnd_edit, format): (Option<std::path::PathBuf>, HWND, FileFormat) =
+    let (path, hwnd_edit, format): (Option<std::path::PathBuf>, HWND, FileFormat) = unsafe {
         with_state(parent, |state| {
             state
                 .docs
                 .get(state.current)
                 .map(|doc| (doc.path.clone(), doc.hwnd_edit, doc.format))
         })
-        .flatten()
-        .unwrap_or((None, HWND(0), FileFormat::default()));
+    }
+    .flatten()
+    .unwrap_or((None, HWND(0), FileFormat::default()));
     if hwnd_edit.0 == 0 {
         return;
     }
     let (storage_key, _) = bookmark_storage_key(path.as_deref(), hwnd_edit);
 
-    if with_state(parent, |state| {
-        if let Some(list) = state.bookmarks.files.get(&storage_key)
-            && let Some(bm) = list.get(sel as usize)
-        {
-            if matches!(format, FileFormat::Audiobook) {
-                if let Some(path) = path.as_ref() {
-                    unsafe {
+    if unsafe {
+        with_state(parent, |state| {
+            if let Some(list) = state.bookmarks.files.get(&storage_key)
+                && let Some(bm) = list.get(sel as usize)
+            {
+                if matches!(format, FileFormat::Audiobook) {
+                    if let Some(path) = path.as_ref() {
                         start_audiobook_at(parent, path, bm.position as u64);
                     }
-                }
-            } else {
-                let mut cr = CHARRANGE {
-                    cpMin: bm.position,
-                    cpMax: bm.position,
-                };
-                unsafe {
+                } else {
+                    let mut cr = CHARRANGE {
+                        cpMin: bm.position,
+                        cpMax: bm.position,
+                    };
                     SendMessageW(
                         hwnd_edit,
                         crate::accessibility::EM_EXSETSEL,
@@ -411,34 +418,37 @@ pub unsafe fn goto_selected(hwnd: HWND) {
                     );
                     SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
                 }
+                force_focus_editor_on_parent(parent)
             }
-            unsafe { force_focus_editor_on_parent(parent) }
-        }
-    })
+        })
+    }
     .is_none()
     {
         crate::log_debug("Failed to access bookmarks state");
     }
-    crate::log_if_err!(DestroyWindow(hwnd));
+    crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
 }
 
-pub unsafe fn delete_selected(hwnd: HWND) {
-    let (parent, hwnd_list) = match with_bookmarks_state(hwnd, |s| (s.parent, s.hwnd_list)) {
-        Some(v) => v,
-        None => return,
-    };
+pub fn delete_selected(hwnd: HWND) {
+    let (parent, hwnd_list) =
+        match unsafe { with_bookmarks_state(hwnd, |s| (s.parent, s.hwnd_list)) } {
+            Some(v) => v,
+            None => return,
+        };
 
-    let sel = SendMessageW(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
+    let sel = unsafe { SendMessageW(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)) }.0 as i32;
     if sel < 0 {
         return;
     }
 
-    let (path, hwnd_edit) = with_state(parent, |state| {
-        state
-            .docs
-            .get(state.current)
-            .map(|doc| (doc.path.clone(), doc.hwnd_edit))
-    })
+    let (path, hwnd_edit) = unsafe {
+        with_state(parent, |state| {
+            state
+                .docs
+                .get(state.current)
+                .map(|doc| (doc.path.clone(), doc.hwnd_edit))
+        })
+    }
     .flatten()
     .unwrap_or((None, HWND(0)));
     if hwnd_edit.0 == 0 {
@@ -446,16 +456,18 @@ pub unsafe fn delete_selected(hwnd: HWND) {
     }
     let (storage_key, persist_to_disk) = bookmark_storage_key(path.as_deref(), hwnd_edit);
 
-    if with_state(parent, |state| {
-        if let Some(list) = state.bookmarks.files.get_mut(&storage_key)
-            && sel < list.len() as i32
-        {
-            list.remove(sel as usize);
-            if persist_to_disk {
-                crate::bookmarks::save_bookmarks(&state.bookmarks);
+    if unsafe {
+        with_state(parent, |state| {
+            if let Some(list) = state.bookmarks.files.get_mut(&storage_key)
+                && sel < list.len() as i32
+            {
+                list.remove(sel as usize);
+                if persist_to_disk {
+                    crate::bookmarks::save_bookmarks(&state.bookmarks);
+                }
             }
-        }
-    })
+        })
+    }
     .is_none()
     {
         crate::log_debug("Failed to access bookmarks state");

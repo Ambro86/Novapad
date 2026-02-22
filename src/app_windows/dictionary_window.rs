@@ -415,45 +415,51 @@ unsafe fn update_button_states(hwnd: HWND) {
     EnableWindow(hwnd_remove, has_selection);
 }
 
-pub unsafe fn refresh_dictionary_list(hwnd: HWND) {
-    let (parent, hwnd_list) = match with_dictionary_state(hwnd, |s| (s.parent, s.hwnd_list)) {
-        Some(values) => values,
-        None => return,
-    };
+pub fn refresh_dictionary_list(hwnd: HWND) {
+    let (parent, hwnd_list) =
+        match unsafe { with_dictionary_state(hwnd, |s| (s.parent, s.hwnd_list)) } {
+            Some(values) => values,
+            None => return,
+        };
 
-    let selected = SendMessageW(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-    SendMessageW(hwnd_list, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    let selected = unsafe { SendMessageW(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)) }.0;
+    unsafe { SendMessageW(hwnd_list, LB_RESETCONTENT, WPARAM(0), LPARAM(0)) };
 
-    let entries = with_state(parent, |state| state.settings.dictionary.clone()).unwrap_or_default();
+    let entries = unsafe { with_state(parent, |state| state.settings.dictionary.clone()) }
+        .unwrap_or_default();
     for (idx, entry) in entries.iter().enumerate() {
         let label = format!("{} -> {}", entry.original, entry.replacement);
-        let lb_idx = SendMessageW(
-            hwnd_list,
-            LB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(to_wide(&label).as_ptr() as isize),
-        )
-        .0;
-        if lb_idx >= 0 {
+        let lb_idx = unsafe {
             SendMessageW(
                 hwnd_list,
-                LB_SETITEMDATA,
-                WPARAM(lb_idx as usize),
-                LPARAM(idx as isize),
-            );
+                LB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&label).as_ptr() as isize),
+            )
+        }
+        .0;
+        if lb_idx >= 0 {
+            unsafe {
+                SendMessageW(
+                    hwnd_list,
+                    LB_SETITEMDATA,
+                    WPARAM(lb_idx as usize),
+                    LPARAM(idx as isize),
+                );
+            }
         }
     }
 
-    let count = SendMessageW(hwnd_list, LB_GETCOUNT, WPARAM(0), LPARAM(0)).0;
+    let count = unsafe { SendMessageW(hwnd_list, LB_GETCOUNT, WPARAM(0), LPARAM(0)) }.0;
     if count > 0 {
         let target = if selected >= 0 && selected < count {
             selected
         } else {
             0
         };
-        SendMessageW(hwnd_list, LB_SETCURSEL, WPARAM(target as usize), LPARAM(0));
+        unsafe { SendMessageW(hwnd_list, LB_SETCURSEL, WPARAM(target as usize), LPARAM(0)) };
     }
-    update_button_states(hwnd);
+    unsafe { update_button_states(hwnd) };
 }
 
 unsafe fn selected_dictionary_index(hwnd: HWND) -> Option<usize> {

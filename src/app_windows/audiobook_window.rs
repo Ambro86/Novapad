@@ -41,7 +41,7 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
         let focus = unsafe { GetFocus() };
         let cancel_btn = unsafe { with_progress_state(hwnd, |s| s.hwnd_cancel) }.unwrap_or(HWND(0));
         if focus == cancel_btn {
-            unsafe { request_cancel(hwnd) };
+            request_cancel(hwnd);
             return true;
         }
     }
@@ -301,50 +301,57 @@ unsafe fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: L
     }
 }
 
-pub unsafe fn request_cancel(hwnd: HWND) {
-    let parent = GetParent(hwnd);
+pub fn request_cancel(hwnd: HWND) {
+    let parent = unsafe { GetParent(hwnd) };
     if parent.0 == 0 {
         return;
     }
 
-    let already_cancelled = with_state(parent, |state| {
-        state
-            .audiobook_cancel
-            .as_ref()
-            .map(|c| c.load(Ordering::Relaxed))
-            .unwrap_or(false)
-    })
+    let already_cancelled = unsafe {
+        with_state(parent, |state| {
+            state
+                .audiobook_cancel
+                .as_ref()
+                .map(|c| c.load(Ordering::Relaxed))
+                .unwrap_or(false)
+        })
+    }
     .unwrap_or(false);
 
     if already_cancelled {
         return;
     }
 
-    let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
+    let language =
+        unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
     let msg = i18n::tr(language, "audiobook.cancel_confirm");
     let title = i18n::tr(language, "app.confirm_title");
 
     let msg_w = to_wide(&msg);
     let title_w = to_wide(&title);
 
-    if MessageBoxW(
-        hwnd,
-        PCWSTR(msg_w.as_ptr()),
-        PCWSTR(title_w.as_ptr()),
-        MB_YESNO | MB_ICONWARNING,
-    ) == IDYES
+    if unsafe {
+        MessageBoxW(
+            hwnd,
+            PCWSTR(msg_w.as_ptr()),
+            PCWSTR(title_w.as_ptr()),
+            MB_YESNO | MB_ICONWARNING,
+        )
+    } == IDYES
     {
-        if with_state(parent, |state| {
-            if let Some(cancel) = &state.audiobook_cancel {
-                cancel.store(true, Ordering::Relaxed);
-            }
-            state.audiobook_progress = HWND(0);
-        })
+        if unsafe {
+            with_state(parent, |state| {
+                if let Some(cancel) = &state.audiobook_cancel {
+                    cancel.store(true, Ordering::Relaxed);
+                }
+                state.audiobook_progress = HWND(0);
+            })
+        }
         .is_none()
         {
             crate::log_debug("Failed to access audiobook state");
         }
-        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::DestroyWindow(hwnd));
+        crate::log_if_err!(unsafe { windows::Win32::UI::WindowsAndMessaging::DestroyWindow(hwnd) });
     }
 }
 

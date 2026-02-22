@@ -8596,7 +8596,7 @@ fn play_audio_playlist_item(hwnd: HWND, index: usize) {
         return;
     };
 
-    let tab_index = unsafe { editor_manager::ensure_audio_document_tab(hwnd, &path) };
+    let tab_index = editor_manager::ensure_audio_document_tab(hwnd, &path);
     if let Some(tab_index) = tab_index {
         editor_manager::select_tab(hwnd, tab_index);
     }

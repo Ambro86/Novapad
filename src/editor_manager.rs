@@ -2992,75 +2992,77 @@ fn collect_bracket_text<I: Iterator<Item = char>>(
 
 // --- Document Management ---
 
-pub unsafe fn new_document(hwnd: HWND) {
-    let new_index = with_state(hwnd, |state| {
-        state.untitled_count += 1;
-        let language = state.settings.language;
-        let title = untitled_title(language, state.untitled_count);
-        let hwnd_edit = create_edit(
-            hwnd,
-            state.hfont,
-            state.settings.word_wrap,
-            state.settings.text_color,
-            state.settings.text_size,
-        );
-        let doc = Document {
-            title: title.clone(),
-            path: None,
-            hwnd_edit,
-            dirty: false,
-            format: FileFormat::Text(TextEncoding::Utf8),
-            opened_text_encoding: None,
-            current_save_text_encoding: None,
-            from_rss: false,
-            is_temporary: false,
-        };
-        state.docs.push(doc);
-        insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);
-        state.docs.len() - 1
-    })
-    .unwrap_or(0);
-    select_tab(hwnd, new_index);
+pub fn new_document(hwnd: HWND) {
+    unsafe {
+        let new_index = with_state(hwnd, |state| {
+            state.untitled_count += 1;
+            let language = state.settings.language;
+            let title = untitled_title(language, state.untitled_count);
+            let hwnd_edit = create_edit(
+                hwnd,
+                state.hfont,
+                state.settings.word_wrap,
+                state.settings.text_color,
+                state.settings.text_size,
+            );
+            let doc = Document {
+                title: title.clone(),
+                path: None,
+                hwnd_edit,
+                dirty: false,
+                format: FileFormat::Text(TextEncoding::Utf8),
+                opened_text_encoding: None,
+                current_save_text_encoding: None,
+                from_rss: false,
+                is_temporary: false,
+            };
+            state.docs.push(doc);
+            insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);
+            state.docs.len() - 1
+        })
+        .unwrap_or(0);
+        select_tab(hwnd, new_index);
+    }
 }
 
-pub unsafe fn ensure_audio_document_tab(hwnd: HWND, path: &Path) -> Option<usize> {
-    with_state(hwnd, |state| {
-        if let Some((index, _)) = state.docs.iter().enumerate().find(|(_, doc)| {
-            matches!(doc.format, FileFormat::Audiobook)
-                && doc.path.as_deref().map(|p| p == path).unwrap_or(false)
-        }) {
-            return index;
-        }
+pub fn ensure_audio_document_tab(hwnd: HWND, path: &Path) -> Option<usize> {
+    unsafe {
+        with_state(hwnd, |state| {
+            if let Some((index, _)) = state.docs.iter().enumerate().find(|(_, doc)| {
+                matches!(doc.format, FileFormat::Audiobook)
+                    && doc.path.as_deref().map(|p| p == path).unwrap_or(false)
+            }) {
+                return index;
+            }
 
-        let title = path.file_name().and_then(|s| s.to_str()).unwrap_or("File");
-        let hwnd_edit = create_edit(
-            hwnd,
-            state.hfont,
-            state.settings.word_wrap,
-            state.settings.text_color,
-            state.settings.text_size,
-        );
-        set_edit_text(hwnd_edit, "");
+            let title = path.file_name().and_then(|s| s.to_str()).unwrap_or("File");
+            let hwnd_edit = create_edit(
+                hwnd,
+                state.hfont,
+                state.settings.word_wrap,
+                state.settings.text_color,
+                state.settings.text_size,
+            );
+            set_edit_text(hwnd_edit, "");
 
-        let doc = Document {
-            title: title.to_string(),
-            path: Some(path.to_path_buf()),
-            hwnd_edit,
-            dirty: false,
-            format: FileFormat::Audiobook,
-            opened_text_encoding: None,
-            current_save_text_encoding: None,
-            from_rss: false,
-            is_temporary: false,
-        };
-        unsafe {
+            let doc = Document {
+                title: title.to_string(),
+                path: Some(path.to_path_buf()),
+                hwnd_edit,
+                dirty: false,
+                format: FileFormat::Audiobook,
+                opened_text_encoding: None,
+                current_save_text_encoding: None,
+                from_rss: false,
+                is_temporary: false,
+            };
             SendMessageW(hwnd_edit, EM_SETREADONLY, WPARAM(1), LPARAM(0));
             ShowWindow(hwnd_edit, SW_HIDE);
-        }
-        state.docs.push(doc);
-        insert_tab(state.hwnd_tab, title, (state.docs.len() - 1) as i32);
-        state.docs.len() - 1
-    })
+            state.docs.push(doc);
+            insert_tab(state.hwnd_tab, title, (state.docs.len() - 1) as i32);
+            state.docs.len() - 1
+        })
+    }
 }
 
 unsafe fn open_document_with_encoding_internal(
@@ -3319,41 +3321,43 @@ pub fn current_document_is_from_rss(hwnd: HWND) -> bool {
     }
 }
 
-pub unsafe fn get_or_create_rss_document(hwnd: HWND, title: &str) -> Option<HWND> {
-    let (index, hwnd_edit) = with_state(hwnd, |state| {
-        if let Some((idx, doc)) = state
-            .docs
-            .iter()
-            .enumerate()
-            .find(|(_i, doc)| doc.from_rss && doc.is_temporary)
-        {
-            return Some((idx, doc.hwnd_edit));
-        }
-        let hwnd_edit = create_edit(
-            hwnd,
-            state.hfont,
-            state.settings.word_wrap,
-            state.settings.text_color,
-            state.settings.text_size,
-        );
-        let doc = Document {
-            title: title.to_string(),
-            path: None,
-            hwnd_edit,
-            dirty: false,
-            format: FileFormat::Text(TextEncoding::Utf8),
-            opened_text_encoding: None,
-            current_save_text_encoding: None,
-            from_rss: true,
-            is_temporary: true,
-        };
-        state.docs.push(doc);
-        insert_tab(state.hwnd_tab, title, (state.docs.len() - 1) as i32);
-        Some((state.docs.len() - 1, hwnd_edit))
-    })
-    .flatten()?;
-    select_tab(hwnd, index);
-    Some(hwnd_edit)
+pub fn get_or_create_rss_document(hwnd: HWND, title: &str) -> Option<HWND> {
+    unsafe {
+        let (index, hwnd_edit) = with_state(hwnd, |state| {
+            if let Some((idx, doc)) = state
+                .docs
+                .iter()
+                .enumerate()
+                .find(|(_i, doc)| doc.from_rss && doc.is_temporary)
+            {
+                return Some((idx, doc.hwnd_edit));
+            }
+            let hwnd_edit = create_edit(
+                hwnd,
+                state.hfont,
+                state.settings.word_wrap,
+                state.settings.text_color,
+                state.settings.text_size,
+            );
+            let doc = Document {
+                title: title.to_string(),
+                path: None,
+                hwnd_edit,
+                dirty: false,
+                format: FileFormat::Text(TextEncoding::Utf8),
+                opened_text_encoding: None,
+                current_save_text_encoding: None,
+                from_rss: true,
+                is_temporary: true,
+            };
+            state.docs.push(doc);
+            insert_tab(state.hwnd_tab, title, (state.docs.len() - 1) as i32);
+            Some((state.docs.len() - 1, hwnd_edit))
+        })
+        .flatten()?;
+        select_tab(hwnd, index);
+        Some(hwnd_edit)
+    }
 }
 
 pub fn select_tab(hwnd: HWND, index: usize) {

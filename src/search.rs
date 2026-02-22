@@ -45,139 +45,207 @@ pub struct FindOptions {
     pub replace_in_all_docs: bool,
 }
 
-pub unsafe fn open_find_dialog(hwnd: HWND) {
-    let has_dialog = with_state(hwnd, |state| state.find_dialog.0 != 0).unwrap_or(false);
-    if has_dialog {
-        with_state(hwnd, |state| {
-            SetFocus(state.find_dialog);
-        });
-        return;
-    }
-
-    with_state(hwnd, |state| {
-        state.find_replace = Some(FINDREPLACEW {
-            lStructSize: std::mem::size_of::<FINDREPLACEW>() as u32,
-            hwndOwner: hwnd,
-            Flags: FR_DOWN | FR_ENABLEHOOK | FR_HIDEMATCHCASE | FR_HIDEWHOLEWORD,
-            lpstrFindWhat: PWSTR(state.find_text.as_mut_ptr()),
-            wFindWhatLen: state.find_text.len() as u16,
-            lCustData: LPARAM(FIND_DIALOG_ID),
-            lpfnHook: Some(find_replace_hook_proc),
-            ..Default::default()
-        });
-
-        if let Some(ref mut fr) = state.find_replace {
-            let dialog = FindTextW(fr);
-            state.find_dialog = dialog;
+pub fn open_find_dialog(hwnd: HWND) {
+    unsafe {
+        let has_dialog = with_state(hwnd, |state| state.find_dialog.0 != 0).unwrap_or(false);
+        if has_dialog {
+            with_state(hwnd, |state| {
+                SetFocus(state.find_dialog);
+            });
+            return;
         }
-    });
-}
 
-pub unsafe fn open_replace_dialog(hwnd: HWND) {
-    let has_dialog = with_state(hwnd, |state| state.replace_dialog.0 != 0).unwrap_or(false);
-    if has_dialog {
         with_state(hwnd, |state| {
-            SetFocus(state.replace_dialog);
-        });
-        return;
-    }
+            state.find_replace = Some(FINDREPLACEW {
+                lStructSize: std::mem::size_of::<FINDREPLACEW>() as u32,
+                hwndOwner: hwnd,
+                Flags: FR_DOWN | FR_ENABLEHOOK | FR_HIDEMATCHCASE | FR_HIDEWHOLEWORD,
+                lpstrFindWhat: PWSTR(state.find_text.as_mut_ptr()),
+                wFindWhatLen: state.find_text.len() as u16,
+                lCustData: LPARAM(FIND_DIALOG_ID),
+                lpfnHook: Some(find_replace_hook_proc),
+                ..Default::default()
+            });
 
-    with_state(hwnd, |state| {
-        state.replace_replace = Some(FINDREPLACEW {
-            lStructSize: std::mem::size_of::<FINDREPLACEW>() as u32,
-            hwndOwner: hwnd,
-            Flags: FR_DOWN | FR_ENABLEHOOK | FR_HIDEMATCHCASE | FR_HIDEWHOLEWORD,
-            lpstrFindWhat: PWSTR(state.find_text.as_mut_ptr()),
-            wFindWhatLen: state.find_text.len() as u16,
-            lpstrReplaceWith: PWSTR(state.replace_text.as_mut_ptr()),
-            wReplaceWithLen: state.replace_text.len() as u16,
-            lCustData: LPARAM(REPLACE_DIALOG_ID),
-            lpfnHook: Some(find_replace_hook_proc),
-            ..Default::default()
-        });
-
-        if let Some(ref mut fr) = state.replace_replace {
-            let dialog = ReplaceTextW(fr);
-            state.replace_dialog = dialog;
-        }
-    });
-}
-
-pub unsafe fn handle_find_message(hwnd: HWND, lparam: LPARAM) {
-    let fr = &*(lparam.0 as *const FINDREPLACEW);
-    if (fr.Flags & FR_DIALOGTERM) != FINDREPLACE_FLAGS(0) {
-        with_state(hwnd, |state| {
-            if fr.lCustData.0 == FIND_DIALOG_ID {
-                state.find_dialog = HWND(0);
-                state.find_replace = None;
-            } else if fr.lCustData.0 == REPLACE_DIALOG_ID {
-                state.replace_dialog = HWND(0);
-                state.replace_replace = None;
+            if let Some(ref mut fr) = state.find_replace {
+                let dialog = FindTextW(fr);
+                state.find_dialog = dialog;
             }
         });
-        return;
     }
+}
 
-    if (fr.Flags & (FR_FINDNEXT | FR_REPLACE | FR_REPLACEALL)) == FINDREPLACE_FLAGS(0) {
-        return;
+pub fn open_replace_dialog(hwnd: HWND) {
+    unsafe {
+        let has_dialog = with_state(hwnd, |state| state.replace_dialog.0 != 0).unwrap_or(false);
+        if has_dialog {
+            with_state(hwnd, |state| {
+                SetFocus(state.replace_dialog);
+            });
+            return;
+        }
+
+        with_state(hwnd, |state| {
+            state.replace_replace = Some(FINDREPLACEW {
+                lStructSize: std::mem::size_of::<FINDREPLACEW>() as u32,
+                hwndOwner: hwnd,
+                Flags: FR_DOWN | FR_ENABLEHOOK | FR_HIDEMATCHCASE | FR_HIDEWHOLEWORD,
+                lpstrFindWhat: PWSTR(state.find_text.as_mut_ptr()),
+                wFindWhatLen: state.find_text.len() as u16,
+                lpstrReplaceWith: PWSTR(state.replace_text.as_mut_ptr()),
+                wReplaceWithLen: state.replace_text.len() as u16,
+                lCustData: LPARAM(REPLACE_DIALOG_ID),
+                lpfnHook: Some(find_replace_hook_proc),
+                ..Default::default()
+            });
+
+            if let Some(ref mut fr) = state.replace_replace {
+                let dialog = ReplaceTextW(fr);
+                state.replace_dialog = dialog;
+            }
+        });
     }
+}
 
-    let search = {
-        let buf_len = fr.wFindWhatLen as usize;
-        let slice = std::slice::from_raw_parts(fr.lpstrFindWhat.0, buf_len);
-        let len = slice.iter().position(|&c| c == 0).unwrap_or(buf_len);
-        String::from_utf16_lossy(&slice[..len])
-    };
-    if search.is_empty() {
-        return;
-    }
+pub fn handle_find_message(hwnd: HWND, lparam: LPARAM) {
+    unsafe {
+        let fr = &*(lparam.0 as *const FINDREPLACEW);
+        if (fr.Flags & FR_DIALOGTERM) != FINDREPLACE_FLAGS(0) {
+            with_state(hwnd, |state| {
+                if fr.lCustData.0 == FIND_DIALOG_ID {
+                    state.find_dialog = HWND(0);
+                    state.find_replace = None;
+                } else if fr.lCustData.0 == REPLACE_DIALOG_ID {
+                    state.replace_dialog = HWND(0);
+                    state.replace_replace = None;
+                }
+            });
+            return;
+        }
 
-    let Some(hwnd_edit) = get_active_edit(hwnd) else {
-        return;
-    };
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+        if (fr.Flags & (FR_FINDNEXT | FR_REPLACE | FR_REPLACEALL)) == FINDREPLACE_FLAGS(0) {
+            return;
+        }
 
-    let options = get_find_options(hwnd);
-    let find_flags = extract_find_flags(fr.Flags, &options);
-    with_state(hwnd, |state| {
-        state.last_find_flags = find_flags;
-    });
+        let search = {
+            let buf_len = fr.wFindWhatLen as usize;
+            let slice = std::slice::from_raw_parts(fr.lpstrFindWhat.0, buf_len);
+            let len = slice.iter().position(|&c| c == 0).unwrap_or(buf_len);
+            String::from_utf16_lossy(&slice[..len])
+        };
+        if search.is_empty() {
+            return;
+        }
 
-    if (fr.Flags & FR_REPLACEALL) != FINDREPLACE_FLAGS(0) {
-        replace_all(
-            hwnd,
-            hwnd_edit,
-            &search,
-            &{
+        let Some(hwnd_edit) = get_active_edit(hwnd) else {
+            return;
+        };
+        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+
+        let options = get_find_options(hwnd);
+        let find_flags = extract_find_flags(fr.Flags, &options);
+        with_state(hwnd, |state| {
+            state.last_find_flags = find_flags;
+        });
+
+        if (fr.Flags & FR_REPLACEALL) != FINDREPLACE_FLAGS(0) {
+            replace_all(
+                hwnd,
+                hwnd_edit,
+                &search,
+                &{
+                    let buf_len = fr.wReplaceWithLen as usize;
+                    let slice = std::slice::from_raw_parts(fr.lpstrReplaceWith.0, buf_len);
+                    let len = slice.iter().position(|&c| c == 0).unwrap_or(buf_len);
+                    String::from_utf16_lossy(&slice[..len])
+                },
+                find_flags,
+                &options,
+            );
+            return;
+        }
+
+        if (fr.Flags & FR_REPLACE) != FINDREPLACE_FLAGS(0) {
+            let replace = {
                 let buf_len = fr.wReplaceWithLen as usize;
                 let slice = std::slice::from_raw_parts(fr.lpstrReplaceWith.0, buf_len);
                 let len = slice.iter().position(|&c| c == 0).unwrap_or(buf_len);
                 String::from_utf16_lossy(&slice[..len])
-            },
-            find_flags,
-            &options,
-        );
-        return;
-    }
+            };
+            let replaced = replace_selection_if_match(
+                hwnd, hwnd_edit, &search, &replace, find_flags, &options,
+            );
+            let found = find_next(
+                hwnd,
+                hwnd_edit,
+                &search,
+                find_flags,
+                options.wrap_around,
+                &options,
+            );
+            if !replaced && !found {
+                let message = to_wide(&text_not_found_message(language));
+                let title = to_wide(&find_title(language));
+                crate::message_box_modal(
+                    hwnd,
+                    PCWSTR(message.as_ptr()),
+                    PCWSTR(title.as_ptr()),
+                    MB_OK | MB_ICONWARNING,
+                );
+            }
+            return;
+        }
 
-    if (fr.Flags & FR_REPLACE) != FINDREPLACE_FLAGS(0) {
-        let replace = {
-            let buf_len = fr.wReplaceWithLen as usize;
-            let slice = std::slice::from_raw_parts(fr.lpstrReplaceWith.0, buf_len);
-            let len = slice.iter().position(|&c| c == 0).unwrap_or(buf_len);
-            String::from_utf16_lossy(&slice[..len])
-        };
-        let replaced =
-            replace_selection_if_match(hwnd, hwnd_edit, &search, &replace, find_flags, &options);
-        let found = find_next(
+        if find_next(
             hwnd,
             hwnd_edit,
             &search,
             find_flags,
             options.wrap_around,
             &options,
+        ) {
+            return;
+        }
+        let message = to_wide(&text_not_found_message(language));
+        let title = to_wide(&find_title(language));
+        crate::message_box_modal(
+            hwnd,
+            PCWSTR(message.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            MB_OK | MB_ICONWARNING,
         );
-        if !replaced && !found {
+    }
+}
+
+pub fn find_next_from_state(hwnd: HWND) {
+    unsafe {
+        let (search, flags, language): (String, FINDREPLACE_FLAGS, Language) =
+            with_state(hwnd, |state| {
+                let len = state
+                    .find_text
+                    .iter()
+                    .position(|&c| c == 0)
+                    .unwrap_or(state.find_text.len());
+                let search = String::from_utf16_lossy(&state.find_text[..len]);
+                (search, state.last_find_flags, state.settings.language)
+            })
+            .unwrap_or((String::new(), FINDREPLACE_FLAGS(0), Language::default()));
+        if search.is_empty() {
+            open_find_dialog(hwnd);
+            return;
+        }
+        let Some(hwnd_edit) = get_active_edit(hwnd) else {
+            return;
+        };
+        let options = get_find_options(hwnd);
+        if !find_next(
+            hwnd,
+            hwnd_edit,
+            &search,
+            flags,
+            options.wrap_around,
+            &options,
+        ) {
             let message = to_wide(&text_not_found_message(language));
             let title = to_wide(&find_title(language));
             crate::message_box_modal(
@@ -187,105 +255,48 @@ pub unsafe fn handle_find_message(hwnd: HWND, lparam: LPARAM) {
                 MB_OK | MB_ICONWARNING,
             );
         }
-        return;
-    }
-
-    if find_next(
-        hwnd,
-        hwnd_edit,
-        &search,
-        find_flags,
-        options.wrap_around,
-        &options,
-    ) {
-        return;
-    }
-    let message = to_wide(&text_not_found_message(language));
-    let title = to_wide(&find_title(language));
-    crate::message_box_modal(
-        hwnd,
-        PCWSTR(message.as_ptr()),
-        PCWSTR(title.as_ptr()),
-        MB_OK | MB_ICONWARNING,
-    );
-}
-
-pub unsafe fn find_next_from_state(hwnd: HWND) {
-    let (search, flags, language): (String, FINDREPLACE_FLAGS, Language) =
-        with_state(hwnd, |state| {
-            let len = state
-                .find_text
-                .iter()
-                .position(|&c| c == 0)
-                .unwrap_or(state.find_text.len());
-            let search = String::from_utf16_lossy(&state.find_text[..len]);
-            (search, state.last_find_flags, state.settings.language)
-        })
-        .unwrap_or((String::new(), FINDREPLACE_FLAGS(0), Language::default()));
-    if search.is_empty() {
-        open_find_dialog(hwnd);
-        return;
-    }
-    let Some(hwnd_edit) = get_active_edit(hwnd) else {
-        return;
-    };
-    let options = get_find_options(hwnd);
-    if !find_next(
-        hwnd,
-        hwnd_edit,
-        &search,
-        flags,
-        options.wrap_around,
-        &options,
-    ) {
-        let message = to_wide(&text_not_found_message(language));
-        let title = to_wide(&find_title(language));
-        crate::message_box_modal(
-            hwnd,
-            PCWSTR(message.as_ptr()),
-            PCWSTR(title.as_ptr()),
-            MB_OK | MB_ICONWARNING,
-        );
     }
 }
 
-pub unsafe fn find_previous_from_state(hwnd: HWND) {
-    let (search, mut flags, language): (String, FINDREPLACE_FLAGS, Language) =
-        with_state(hwnd, |state| {
-            let len = state
-                .find_text
-                .iter()
-                .position(|&c| c == 0)
-                .unwrap_or(state.find_text.len());
-            let search = String::from_utf16_lossy(&state.find_text[..len]);
-            (search, state.last_find_flags, state.settings.language)
-        })
-        .unwrap_or((String::new(), FINDREPLACE_FLAGS(0), Language::default()));
-    if search.is_empty() {
-        open_find_dialog(hwnd);
-        return;
-    }
-    let Some(hwnd_edit) = get_active_edit(hwnd) else {
-        return;
-    };
-    flags &= !FR_DOWN;
-    let options = get_find_options(hwnd);
-    if !find_next(
-        hwnd,
-        hwnd_edit,
-        &search,
-        flags,
-        options.wrap_around,
-        &options,
-    ) {
-        let message = to_wide(&text_not_found_message(language));
-        let title = to_wide(&find_title(language));
-        crate::message_box_modal(
+pub fn find_previous_from_state(hwnd: HWND) {
+    unsafe {
+        let (search, mut flags, language): (String, FINDREPLACE_FLAGS, Language) =
+            with_state(hwnd, |state| {
+                let len = state
+                    .find_text
+                    .iter()
+                    .position(|&c| c == 0)
+                    .unwrap_or(state.find_text.len());
+                let search = String::from_utf16_lossy(&state.find_text[..len]);
+                (search, state.last_find_flags, state.settings.language)
+            })
+            .unwrap_or((String::new(), FINDREPLACE_FLAGS(0), Language::default()));
+        if search.is_empty() {
+            open_find_dialog(hwnd);
+            return;
+        }
+        let Some(hwnd_edit) = get_active_edit(hwnd) else {
+            return;
+        };
+        flags &= !FR_DOWN;
+        let options = get_find_options(hwnd);
+        if !find_next(
             hwnd,
-            PCWSTR(message.as_ptr()),
-            PCWSTR(title.as_ptr()),
-            MB_OK | MB_ICONWARNING,
-        );
+            hwnd_edit,
+            &search,
+            flags,
+            options.wrap_around,
+            &options,
+        ) {
+            let message = to_wide(&text_not_found_message(language));
+            let title = to_wide(&find_title(language));
+            crate::message_box_modal(
+                hwnd,
+                PCWSTR(message.as_ptr()),
+                PCWSTR(title.as_ptr()),
+                MB_OK | MB_ICONWARNING,
+            );
+        }
     }
 }
 

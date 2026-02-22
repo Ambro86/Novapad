@@ -377,7 +377,7 @@ unsafe fn set_prop(store: &IPropertyStore, key: &PROPERTYKEY, value: &str) -> Re
     res.map_err(|e| format!("IPropertyStore::SetValue failed: {}", e))
 }
 
-pub unsafe fn write_rtf_text(path: &Path, hwnd_edit: HWND) -> Result<(), String> {
+pub fn write_rtf_text(path: &Path, hwnd_edit: HWND) -> Result<(), String> {
     let mut file = File::create(path).map_err(|e| e.to_string())?;
 
     unsafe extern "system" fn stream_out_callback(
@@ -409,12 +409,14 @@ pub unsafe fn write_rtf_text(path: &Path, hwnd_edit: HWND) -> Result<(), String>
         pfnCallback: Some(stream_out_callback),
     };
 
-    SendMessageW(
-        hwnd_edit,
-        EM_STREAMOUT,
-        WPARAM(SF_RTF as usize),
-        LPARAM(&mut es as *mut _ as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_STREAMOUT,
+            WPARAM(SF_RTF as usize),
+            LPARAM(&mut es as *mut _ as isize),
+        );
+    }
 
     if es.dwError != 0 {
         return Err(format!("RTF stream out failed: {}", es.dwError));

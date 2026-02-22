@@ -3998,7 +3998,7 @@ pub unsafe fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> 
             };
         } else if is_rtf {
             if let Err(message) =
-                unsafe { crate::audio_utils::write_rtf_text(&path, state.docs[index].hwnd_edit) }
+                crate::audio_utils::write_rtf_text(&path, state.docs[index].hwnd_edit)
             {
                 crate::show_error(hwnd, language, &message);
                 return None;

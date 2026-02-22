@@ -83,115 +83,92 @@ impl AudiobookPlayer {
     }
 }
 
-pub unsafe fn set_audiobook_subtitle_override(
-    hwnd: HWND,
-    subtitle_path: &Path,
-) -> Result<(), String> {
-    let ext_ok = subtitle_path
-        .extension()
-        .and_then(|s| s.to_str())
-        .map(|s| {
-            SUBTITLE_EXTENSIONS
-                .iter()
-                .any(|ext| s.eq_ignore_ascii_case(ext))
+pub fn set_audiobook_subtitle_override(hwnd: HWND, subtitle_path: &Path) -> Result<(), String> {
+    unsafe {
+        let ext_ok = subtitle_path
+            .extension()
+            .and_then(|s| s.to_str())
+            .map(|s| {
+                SUBTITLE_EXTENSIONS
+                    .iter()
+                    .any(|ext| s.eq_ignore_ascii_case(ext))
+            })
+            .unwrap_or(false);
+        if !ext_ok {
+            return Err("invalid_subtitle".to_string());
+        }
+
+        let mut active = None;
+        let mut current_media = None;
+        let mut new_cancel = None;
+        let mut old_cancel = None;
+        let mut speech_handles = None;
+        let mut subtitle_mode = SubtitleReadMode::Off;
+        let mut settings_snapshot = None;
+        let mut resume_info: Option<(PathBuf, u64, AudiobookPlaybackOptions)> = None;
+        let state_ok = with_state(hwnd, |state| {
+            subtitle_mode = state.settings.subtitle_read_mode;
+            settings_snapshot = Some(state.settings.clone());
+            if let Some(player) = &mut state.active_audiobook {
+                let seconds = audiobook_position_secs(player).max(0.0).floor() as u64;
+                let options = AudiobookPlaybackOptions {
+                    speed: player.speed,
+                    pitch: player.pitch,
+                    paused: player.is_paused,
+                    volume: player.volume,
+                    muted: player.muted,
+                    prev_volume: player.prev_volume,
+                    mix_export: false,
+                    audio_track: None,
+                    force_ffmpeg_stream: false,
+                };
+                resume_info = Some((player.path.clone(), seconds, options));
+                current_media = Some(player.path.clone());
+                old_cancel = Some(player.subtitle_cancel.clone());
+                let fresh_cancel = Arc::new(AtomicBool::new(false));
+                player.subtitle_cancel = fresh_cancel.clone();
+                new_cancel = Some(fresh_cancel);
+                speech_handles = Some((
+                    player.subtitle_speech_cancel.clone(),
+                    player.subtitle_speech_command.clone(),
+                ));
+                active = Some(player.path.clone());
+                return;
+            }
+            if let Some(doc) = state.docs.get(state.current)
+                && matches!(doc.format, FileFormat::Audiobook)
+            {
+                current_media = doc.path.clone();
+            }
         })
-        .unwrap_or(false);
-    if !ext_ok {
-        return Err("invalid_subtitle".to_string());
-    }
-
-    let mut active = None;
-    let mut current_media = None;
-    let mut new_cancel = None;
-    let mut old_cancel = None;
-    let mut speech_handles = None;
-    let mut subtitle_mode = SubtitleReadMode::Off;
-    let mut settings_snapshot = None;
-    let mut resume_info: Option<(PathBuf, u64, AudiobookPlaybackOptions)> = None;
-    let state_ok = with_state(hwnd, |state| {
-        subtitle_mode = state.settings.subtitle_read_mode;
-        settings_snapshot = Some(state.settings.clone());
-        if let Some(player) = &mut state.active_audiobook {
-            let seconds = audiobook_position_secs(player).max(0.0).floor() as u64;
-            let options = AudiobookPlaybackOptions {
-                speed: player.speed,
-                pitch: player.pitch,
-                paused: player.is_paused,
-                volume: player.volume,
-                muted: player.muted,
-                prev_volume: player.prev_volume,
-                mix_export: false,
-                audio_track: None,
-                force_ffmpeg_stream: false,
-            };
-            resume_info = Some((player.path.clone(), seconds, options));
-            current_media = Some(player.path.clone());
-            old_cancel = Some(player.subtitle_cancel.clone());
-            let fresh_cancel = Arc::new(AtomicBool::new(false));
-            player.subtitle_cancel = fresh_cancel.clone();
-            new_cancel = Some(fresh_cancel);
-            speech_handles = Some((
-                player.subtitle_speech_cancel.clone(),
-                player.subtitle_speech_command.clone(),
-            ));
-            active = Some(player.path.clone());
-            return;
+        .is_some();
+        if !state_ok {
+            return Err("state_unavailable".to_string());
         }
-        if let Some(doc) = state.docs.get(state.current)
-            && matches!(doc.format, FileFormat::Audiobook)
-        {
-            current_media = doc.path.clone();
+
+        let Some(media_path) = current_media else {
+            return Err("no_media".to_string());
+        };
+
+        set_subtitle_override(&media_path, subtitle_path.to_path_buf());
+
+        if let Some(cancel) = old_cancel {
+            cancel.store(true, Ordering::Relaxed);
         }
-    })
-    .is_some();
-    if !state_ok {
-        return Err("state_unavailable".to_string());
-    }
-
-    let Some(media_path) = current_media else {
-        return Err("no_media".to_string());
-    };
-
-    set_subtitle_override(&media_path, subtitle_path.to_path_buf());
-
-    if let Some(cancel) = old_cancel {
-        cancel.store(true, Ordering::Relaxed);
-    }
-    if let Some(handles) = speech_handles {
-        stop_shared_subtitle_speech(&handles.0, &handles.1, "subtitle_override");
-    }
-    if let (Some(active_path), Some(cancel)) = (active, new_cancel) {
-        if subtitle_mode == SubtitleReadMode::Record {
-            if let Some(settings) = settings_snapshot {
-                if resume_info.is_some() {
-                    stop_audiobook_playback(hwnd);
-                }
-                let path_clone = active_path.clone();
-                let resume_info = resume_info.clone();
-                std::thread::spawn(move || {
-                    if !confirm_edge_subtitle_download(hwnd, &path_clone, &settings) {
-                        log_debug("Subtitle: Edge download not confirmed for record mode.");
-                        if let Some((resume_path, seconds, options)) = resume_info {
-                            start_audiobook_at_with_options(hwnd, resume_path, seconds, options);
-                        }
-                        return;
+        if let Some(handles) = speech_handles {
+            stop_shared_subtitle_speech(&handles.0, &handles.1, "subtitle_override");
+        }
+        if let (Some(active_path), Some(cancel)) = (active, new_cancel) {
+            if subtitle_mode == SubtitleReadMode::Record {
+                if let Some(settings) = settings_snapshot {
+                    if resume_info.is_some() {
+                        stop_audiobook_playback(hwnd);
                     }
-                    let mix_opts = MixExportOptions {
-                        ducking: settings.subtitle_mix_ducking,
-                    };
-                    match export_mixed_media(&path_clone, &settings, &mix_opts) {
-                        Ok(out_path) => {
-                            log_debug(&format!(
-                                "Subtitle: mixed file created at {}",
-                                out_path.display()
-                            ));
-                            if let Some((_, seconds, mut options)) = resume_info {
-                                options.mix_export = false;
-                                start_audiobook_at_with_options(hwnd, out_path, seconds, options);
-                            }
-                        }
-                        Err(err) => {
-                            log_debug(&format!("Subtitle: mix export failed: {}", err));
+                    let path_clone = active_path.clone();
+                    let resume_info = resume_info.clone();
+                    std::thread::spawn(move || {
+                        if !confirm_edge_subtitle_download(hwnd, &path_clone, &settings) {
+                            log_debug("Subtitle: Edge download not confirmed for record mode.");
                             if let Some((resume_path, seconds, options)) = resume_info {
                                 start_audiobook_at_with_options(
                                     hwnd,
@@ -200,68 +177,99 @@ pub unsafe fn set_audiobook_subtitle_override(
                                     options,
                                 );
                             }
+                            return;
                         }
-                    }
-                });
+                        let mix_opts = MixExportOptions {
+                            ducking: settings.subtitle_mix_ducking,
+                        };
+                        match export_mixed_media(&path_clone, &settings, &mix_opts) {
+                            Ok(out_path) => {
+                                log_debug(&format!(
+                                    "Subtitle: mixed file created at {}",
+                                    out_path.display()
+                                ));
+                                if let Some((_, seconds, mut options)) = resume_info {
+                                    options.mix_export = false;
+                                    start_audiobook_at_with_options(
+                                        hwnd, out_path, seconds, options,
+                                    );
+                                }
+                            }
+                            Err(err) => {
+                                log_debug(&format!("Subtitle: mix export failed: {}", err));
+                                if let Some((resume_path, seconds, options)) = resume_info {
+                                    start_audiobook_at_with_options(
+                                        hwnd,
+                                        resume_path,
+                                        seconds,
+                                        options,
+                                    );
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    log_debug("Subtitle: settings unavailable for record mode.");
+                }
             } else {
-                log_debug("Subtitle: settings unavailable for record mode.");
+                start_subtitle_reader(hwnd, active_path, cancel, None);
             }
-        } else {
-            start_subtitle_reader(hwnd, active_path, cancel, None);
         }
-    }
 
-    Ok(())
+        Ok(())
+    }
 }
 
-pub unsafe fn clear_audiobook_subtitle_override(hwnd: HWND) -> Result<(), String> {
-    let mut active = None;
-    let mut current_media = None;
-    let mut new_cancel = None;
-    let mut old_cancel = None;
-    let mut speech_handles = None;
-    let state_ok = with_state(hwnd, |state| {
-        if let Some(player) = &mut state.active_audiobook {
-            current_media = Some(player.path.clone());
-            old_cancel = Some(player.subtitle_cancel.clone());
-            let fresh_cancel = Arc::new(AtomicBool::new(false));
-            player.subtitle_cancel = fresh_cancel.clone();
-            new_cancel = Some(fresh_cancel);
-            speech_handles = Some((
-                player.subtitle_speech_cancel.clone(),
-                player.subtitle_speech_command.clone(),
-            ));
-            active = Some(player.path.clone());
-            return;
+pub fn clear_audiobook_subtitle_override(hwnd: HWND) -> Result<(), String> {
+    unsafe {
+        let mut active = None;
+        let mut current_media = None;
+        let mut new_cancel = None;
+        let mut old_cancel = None;
+        let mut speech_handles = None;
+        let state_ok = with_state(hwnd, |state| {
+            if let Some(player) = &mut state.active_audiobook {
+                current_media = Some(player.path.clone());
+                old_cancel = Some(player.subtitle_cancel.clone());
+                let fresh_cancel = Arc::new(AtomicBool::new(false));
+                player.subtitle_cancel = fresh_cancel.clone();
+                new_cancel = Some(fresh_cancel);
+                speech_handles = Some((
+                    player.subtitle_speech_cancel.clone(),
+                    player.subtitle_speech_command.clone(),
+                ));
+                active = Some(player.path.clone());
+                return;
+            }
+            if let Some(doc) = state.docs.get(state.current)
+                && matches!(doc.format, FileFormat::Audiobook)
+            {
+                current_media = doc.path.clone();
+            }
+        })
+        .is_some();
+        if !state_ok {
+            return Err("state_unavailable".to_string());
         }
-        if let Some(doc) = state.docs.get(state.current)
-            && matches!(doc.format, FileFormat::Audiobook)
-        {
-            current_media = doc.path.clone();
+
+        let Some(media_path) = current_media else {
+            return Err("no_media".to_string());
+        };
+
+        clear_subtitle_override(&media_path);
+
+        if let Some(cancel) = old_cancel {
+            cancel.store(true, Ordering::Relaxed);
         }
-    })
-    .is_some();
-    if !state_ok {
-        return Err("state_unavailable".to_string());
-    }
+        if let Some(handles) = speech_handles {
+            stop_shared_subtitle_speech(&handles.0, &handles.1, "subtitle_override_clear");
+        }
+        if let (Some(active_path), Some(cancel)) = (active, new_cancel) {
+            start_subtitle_reader(hwnd, active_path, cancel, None);
+        }
 
-    let Some(media_path) = current_media else {
-        return Err("no_media".to_string());
-    };
-
-    clear_subtitle_override(&media_path);
-
-    if let Some(cancel) = old_cancel {
-        cancel.store(true, Ordering::Relaxed);
+        Ok(())
     }
-    if let Some(handles) = speech_handles {
-        stop_shared_subtitle_speech(&handles.0, &handles.1, "subtitle_override_clear");
-    }
-    if let (Some(active_path), Some(cancel)) = (active, new_cancel) {
-        start_subtitle_reader(hwnd, active_path, cancel, None);
-    }
-
-    Ok(())
 }
 
 fn codec_name(codec: symphonia::core::codecs::CodecType) -> &'static str {

@@ -1468,11 +1468,13 @@ fn end_single_undo_action(hwnd_edit: HWND) {
     }
 }
 
-pub unsafe fn try_normalize_undo(hwnd: HWND) -> bool {
+pub fn try_normalize_undo(hwnd: HWND) -> bool {
     let mut undo = None;
-    if with_state(hwnd, |state| {
-        undo = state.normalize_undo.clone();
-    })
+    if unsafe {
+        with_state(hwnd, |state| {
+            undo = state.normalize_undo.clone();
+        })
+    }
     .is_none()
     {
         crate::log_debug("Failed to access editor state");
@@ -1481,19 +1483,21 @@ pub unsafe fn try_normalize_undo(hwnd: HWND) -> bool {
         return false;
     };
     if undo.hwnd_edit.0 == 0 {
-        let _ = with_state(hwnd, |state| state.normalize_undo = None);
+        let _ = unsafe { with_state(hwnd, |state| state.normalize_undo = None) };
         return false;
     }
     let current_text = get_edit_text(undo.hwnd_edit);
     if current_text == undo.text {
         // Stale snapshot: do not consume Ctrl+Z, let normal editor undo run.
-        let _ = with_state(hwnd, |state| state.normalize_undo = None);
+        let _ = unsafe { with_state(hwnd, |state| state.normalize_undo = None) };
         return false;
     }
 
-    if with_state(hwnd, |state| {
-        state.normalize_undo = None;
-    })
+    if unsafe {
+        with_state(hwnd, |state| {
+            state.normalize_undo = None;
+        })
+    }
     .is_none()
     {
         crate::log_debug("Failed to access editor state");
@@ -1504,45 +1508,49 @@ pub unsafe fn try_normalize_undo(hwnd: HWND) -> bool {
         cpMin: undo.sel_start,
         cpMax: undo.sel_end,
     };
-    SendMessageW(
-        undo.hwnd_edit,
-        EM_EXSETSEL,
-        WPARAM(0),
-        LPARAM(&mut cr as *mut _ as isize),
-    );
-    if with_state(hwnd, |state| {
-        for (idx, doc) in state.docs.iter_mut().enumerate() {
-            if doc.hwnd_edit == undo.hwnd_edit {
-                doc.dirty = undo.was_dirty;
-                update_tab_title(state.hwnd_tab, idx, &doc.title, doc.dirty);
-                if state.current == idx {
-                    update_window_title(hwnd);
+    unsafe {
+        SendMessageW(
+            undo.hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut cr as *mut _ as isize),
+        );
+    }
+    if unsafe {
+        with_state(hwnd, |state| {
+            for (idx, doc) in state.docs.iter_mut().enumerate() {
+                if doc.hwnd_edit == undo.hwnd_edit {
+                    doc.dirty = undo.was_dirty;
+                    update_tab_title(state.hwnd_tab, idx, &doc.title, doc.dirty);
+                    if state.current == idx {
+                        update_window_title(hwnd);
+                    }
+                    break;
                 }
-                break;
             }
-        }
-    })
+        })
+    }
     .is_none()
     {
         crate::log_debug("Failed to access editor state");
     }
-    SetFocus(undo.hwnd_edit);
+    unsafe { SetFocus(undo.hwnd_edit) };
     true
 }
 
-pub unsafe fn undo_active_edit_skip_navigation(hwnd: HWND) -> bool {
-    let Some(hwnd_edit) = crate::get_active_edit(hwnd) else {
+pub fn undo_active_edit_skip_navigation(hwnd: HWND) -> bool {
+    let Some(hwnd_edit) = (unsafe { crate::get_active_edit(hwnd) }) else {
         return false;
     };
     let mut before = get_edit_text(hwnd_edit);
     // Some operations can leave multiple non-text undo records (caret/selection moves).
     // Keep skipping those until we hit an actual text change.
     for _ in 0..32 {
-        let can_undo = SendMessageW(hwnd_edit, EM_CANUNDO, WPARAM(0), LPARAM(0)).0 != 0;
+        let can_undo = unsafe { SendMessageW(hwnd_edit, EM_CANUNDO, WPARAM(0), LPARAM(0)) }.0 != 0;
         if !can_undo {
             return false;
         }
-        SendMessageW(hwnd_edit, WM_UNDO, WPARAM(0), LPARAM(0));
+        unsafe { SendMessageW(hwnd_edit, WM_UNDO, WPARAM(0), LPARAM(0)) };
         let after = get_edit_text(hwnd_edit);
         if after != before {
             return true;
@@ -1552,26 +1560,28 @@ pub unsafe fn undo_active_edit_skip_navigation(hwnd: HWND) -> bool {
     false
 }
 
-pub unsafe fn handle_normalize_edit_change(hwnd: HWND, hwnd_edit: HWND) {
-    if with_state(hwnd, |state| {
-        if state.normalize_skip_change {
-            state.normalize_skip_change = false;
-            return;
-        }
-        if let Some(pending) = &state.normalize_undo
-            && pending.hwnd_edit == hwnd_edit
-        {
-            state.normalize_undo = None;
-        }
-    })
+pub fn handle_normalize_edit_change(hwnd: HWND, hwnd_edit: HWND) {
+    if unsafe {
+        with_state(hwnd, |state| {
+            if state.normalize_skip_change {
+                state.normalize_skip_change = false;
+                return;
+            }
+            if let Some(pending) = &state.normalize_undo
+                && pending.hwnd_edit == hwnd_edit
+            {
+                state.normalize_undo = None;
+            }
+        })
+    }
     .is_none()
     {
         crate::log_debug("Failed to access editor state");
     }
 }
 
-pub unsafe fn strip_markdown_active_edit(hwnd: HWND) -> bool {
-    let Some(hwnd_edit) = crate::get_active_edit(hwnd) else {
+pub fn strip_markdown_active_edit(hwnd: HWND) -> bool {
+    let Some(hwnd_edit) = (unsafe { crate::get_active_edit(hwnd) }) else {
         return false;
     };
     let text = get_edit_text(hwnd_edit);
@@ -1579,7 +1589,8 @@ pub unsafe fn strip_markdown_active_edit(hwnd: HWND) -> bool {
         return false;
     }
     let keep_bullets =
-        with_state(hwnd, |state| state.settings.strip_markdown_keep_bullets).unwrap_or(false);
+        unsafe { with_state(hwnd, |state| state.settings.strip_markdown_keep_bullets) }
+            .unwrap_or(false);
     let cleaned = strip_markdown_text(&text, keep_bullets);
     if cleaned == text {
         return false;
@@ -1588,29 +1599,33 @@ pub unsafe fn strip_markdown_active_edit(hwnd: HWND) -> bool {
         cpMin: 0,
         cpMax: byte_index_to_utf16(&text, text.len()),
     };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXSETSEL,
-        WPARAM(0),
-        LPARAM(&mut replace_range as *mut _ as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut replace_range as *mut _ as isize),
+        );
+    }
     // Single-undo guarantee.
     begin_single_undo_action(hwnd_edit);
     let replace_wide = to_wide(&cleaned);
-    SendMessageW(
-        hwnd_edit,
-        EM_REPLACESEL,
-        WPARAM(1),
-        LPARAM(replace_wide.as_ptr() as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_REPLACESEL,
+            WPARAM(1),
+            LPARAM(replace_wide.as_ptr() as isize),
+        );
+    }
     end_single_undo_action(hwnd_edit);
-    mark_dirty_from_edit(hwnd, hwnd_edit);
-    SetFocus(hwnd_edit);
+    unsafe { mark_dirty_from_edit(hwnd, hwnd_edit) };
+    unsafe { SetFocus(hwnd_edit) };
     true
 }
 
-pub unsafe fn normalize_whitespace_active_edit(hwnd: HWND) -> bool {
-    let Some(hwnd_edit) = crate::get_active_edit(hwnd) else {
+pub fn normalize_whitespace_active_edit(hwnd: HWND) -> bool {
+    let Some(hwnd_edit) = (unsafe { crate::get_active_edit(hwnd) }) else {
         return false;
     };
     let text = get_edit_text(hwnd_edit);
@@ -1620,23 +1635,27 @@ pub unsafe fn normalize_whitespace_active_edit(hwnd: HWND) -> bool {
 
     let line_ending = if text.contains("\r\n") { "\r\n" } else { "\n" };
     let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXGETSEL,
-        WPARAM(0),
-        LPARAM(&mut selection as *mut _ as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut selection as *mut _ as isize),
+        );
+    }
 
     let mut length_info = GetTextLengthEx {
         flags: GTL_NUMCHARS,
         codepage: CP_UNICODE,
     };
-    let total_chars = SendMessageW(
-        hwnd_edit,
-        EM_GETTEXTLENGTHEX,
-        WPARAM(&mut length_info as *mut _ as usize),
-        LPARAM(0),
-    )
+    let total_chars = unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_GETTEXTLENGTHEX,
+            WPARAM(&mut length_info as *mut _ as usize),
+            LPARAM(0),
+        )
+    }
     .0 as i32;
     let mut sel_start = selection.cpMin;
     let mut sel_end = selection.cpMax;
@@ -1689,14 +1708,16 @@ pub unsafe fn normalize_whitespace_active_edit(hwnd: HWND) -> bool {
     if normalized == affected {
         return false;
     }
-    let was_dirty = with_state(hwnd, |state| {
-        state
-            .docs
-            .iter()
-            .find(|doc| doc.hwnd_edit == hwnd_edit)
-            .map(|doc| doc.dirty)
-            .unwrap_or(false)
-    })
+    let was_dirty = unsafe {
+        with_state(hwnd, |state| {
+            state
+                .docs
+                .iter()
+                .find(|doc| doc.hwnd_edit == hwnd_edit)
+                .map(|doc| doc.dirty)
+                .unwrap_or(false)
+        })
+    }
     .unwrap_or(false);
 
     let mut replace_range = if whole_doc_selected {
@@ -1710,24 +1731,28 @@ pub unsafe fn normalize_whitespace_active_edit(hwnd: HWND) -> bool {
             cpMax: byte_index_to_utf16(&text, affected_end),
         }
     };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXSETSEL,
-        WPARAM(0),
-        LPARAM(&mut replace_range as *mut _ as isize),
-    );
-    // Single-undo guarantee.
-    SendMessageW(hwnd_edit, EM_STOPGROUPTYPING, WPARAM(0), LPARAM(0));
-    let result = with_state(hwnd, |state| {
-        state.normalize_undo = Some(NormalizeUndo {
+    unsafe {
+        SendMessageW(
             hwnd_edit,
-            text: text.clone(),
-            sel_start,
-            sel_end,
-            was_dirty,
-        });
-        state.normalize_skip_change = true;
-    });
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut replace_range as *mut _ as isize),
+        );
+    }
+    // Single-undo guarantee.
+    unsafe { SendMessageW(hwnd_edit, EM_STOPGROUPTYPING, WPARAM(0), LPARAM(0)) };
+    let result = unsafe {
+        with_state(hwnd, |state| {
+            state.normalize_undo = Some(NormalizeUndo {
+                hwnd_edit,
+                text: text.clone(),
+                sel_start,
+                sel_end,
+                was_dirty,
+            });
+            state.normalize_skip_change = true;
+        })
+    };
     if result.is_none() {
         crate::log_debug("Failed to access editor state");
     }
@@ -1736,14 +1761,16 @@ pub unsafe fn normalize_whitespace_active_edit(hwnd: HWND) -> bool {
         codepage: CP_UNICODE,
     };
     let replace_wide = to_wide(&normalized);
-    SendMessageW(
-        hwnd_edit,
-        EM_SETTEXTEX,
-        WPARAM(&mut set_text as *mut _ as usize),
-        LPARAM(replace_wide.as_ptr() as isize),
-    );
-    mark_dirty_from_edit(hwnd, hwnd_edit);
-    SetFocus(hwnd_edit);
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_SETTEXTEX,
+            WPARAM(&mut set_text as *mut _ as usize),
+            LPARAM(replace_wide.as_ptr() as isize),
+        );
+    }
+    unsafe { mark_dirty_from_edit(hwnd, hwnd_edit) };
+    unsafe { SetFocus(hwnd_edit) };
     true
 }
 

@@ -1746,29 +1746,31 @@ pub unsafe fn switch_audio_track(hwnd: HWND, track_index: i32) {
     crate::menu::update_playback_menu(hwnd, true);
 }
 
-pub unsafe fn toggle_audiobook_mute(hwnd: HWND) {
-    if with_state(hwnd, |state| {
-        if let Some(player) = &mut state.active_audiobook {
-            if player.muted {
-                let restored = if player.prev_volume > 0.0 {
-                    player.prev_volume
+pub fn toggle_audiobook_mute(hwnd: HWND) {
+    if unsafe {
+        with_state(hwnd, |state| {
+            if let Some(player) = &mut state.active_audiobook {
+                if player.muted {
+                    let restored = if player.prev_volume > 0.0 {
+                        player.prev_volume
+                    } else {
+                        1.0
+                    }
+                    .clamp(0.0, MAX_AUDIOBOOK_PLAYBACK_VOLUME);
+                    player.volume = restored;
+                    player.muted = false;
+                    player.set_volume(player.volume);
                 } else {
-                    1.0
+                    if player.volume > 0.0 {
+                        player.prev_volume = player.volume;
+                    }
+                    player.volume = 0.0;
+                    player.muted = true;
+                    player.set_volume(0.0);
                 }
-                .clamp(0.0, MAX_AUDIOBOOK_PLAYBACK_VOLUME);
-                player.volume = restored;
-                player.muted = false;
-                player.set_volume(player.volume);
-            } else {
-                if player.volume > 0.0 {
-                    player.prev_volume = player.volume;
-                }
-                player.volume = 0.0;
-                player.muted = true;
-                player.set_volume(0.0);
             }
-        }
-    })
+        })
+    }
     .is_none()
     {
         crate::log_debug("Failed to access audio player state");

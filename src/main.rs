@@ -1555,9 +1555,9 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
                 announce_player_pitch(language, pitch);
             }
         }
-        PlayerCommand::MuteToggle => unsafe {
+        PlayerCommand::MuteToggle => {
             toggle_audiobook_mute(hwnd);
-        },
+        }
         PlayerCommand::GoToTime => {
             app_windows::go_to_time_window::open(hwnd);
         }

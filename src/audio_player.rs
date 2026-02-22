@@ -1387,59 +1387,63 @@ pub fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
     }
 }
 
-pub unsafe fn change_audiobook_volume(hwnd: HWND, delta: f32) {
-    let new_volume = with_state(hwnd, |state| {
-        if let Some(player) = &mut state.active_audiobook {
-            if player.muted {
-                player.prev_volume =
-                    (player.prev_volume + delta).clamp(0.0, MAX_AUDIOBOOK_PLAYBACK_VOLUME);
-                return None;
+pub fn change_audiobook_volume(hwnd: HWND, delta: f32) {
+    unsafe {
+        let new_volume = with_state(hwnd, |state| {
+            if let Some(player) = &mut state.active_audiobook {
+                if player.muted {
+                    player.prev_volume =
+                        (player.prev_volume + delta).clamp(0.0, MAX_AUDIOBOOK_PLAYBACK_VOLUME);
+                    return None;
+                }
+                player.volume = (player.volume + delta).clamp(0.0, MAX_AUDIOBOOK_PLAYBACK_VOLUME);
+                player.set_volume(player.volume);
+                Some(player.volume)
+            } else {
+                None
             }
-            player.volume = (player.volume + delta).clamp(0.0, MAX_AUDIOBOOK_PLAYBACK_VOLUME);
-            player.set_volume(player.volume);
-            Some(player.volume)
-        } else {
-            None
-        }
-    })
-    .flatten();
-
-    if let Some(volume) = new_volume
-        && with_state(hwnd, |state| {
-            state.settings.audiobook_playback_volume = volume;
-            crate::settings::save_settings(state.settings.clone());
         })
-        .is_none()
-    {
-        crate::log_debug("Failed to access audio player state");
+        .flatten();
+
+        if let Some(volume) = new_volume
+            && with_state(hwnd, |state| {
+                state.settings.audiobook_playback_volume = volume;
+                crate::settings::save_settings(state.settings.clone());
+            })
+            .is_none()
+        {
+            crate::log_debug("Failed to access audio player state");
+        }
     }
 }
 
-pub unsafe fn reset_audiobook_volume(hwnd: HWND) -> Option<f32> {
-    let new_volume = with_state(hwnd, |state| {
-        if let Some(player) = &mut state.active_audiobook {
-            player.volume = 1.0;
-            player.prev_volume = 1.0;
-            player.muted = false;
-            player.set_volume(1.0);
-            Some(player.volume)
-        } else {
-            None
-        }
-    })
-    .flatten();
-
-    if let Some(volume) = new_volume
-        && with_state(hwnd, |state| {
-            state.settings.audiobook_playback_volume = volume;
-            crate::settings::save_settings(state.settings.clone());
+pub fn reset_audiobook_volume(hwnd: HWND) -> Option<f32> {
+    unsafe {
+        let new_volume = with_state(hwnd, |state| {
+            if let Some(player) = &mut state.active_audiobook {
+                player.volume = 1.0;
+                player.prev_volume = 1.0;
+                player.muted = false;
+                player.set_volume(1.0);
+                Some(player.volume)
+            } else {
+                None
+            }
         })
-        .is_none()
-    {
-        crate::log_debug("Failed to access audio player state");
-    }
+        .flatten();
 
-    new_volume
+        if let Some(volume) = new_volume
+            && with_state(hwnd, |state| {
+                state.settings.audiobook_playback_volume = volume;
+                crate::settings::save_settings(state.settings.clone());
+            })
+            .is_none()
+        {
+            crate::log_debug("Failed to access audio player state");
+        }
+
+        new_volume
+    }
 }
 
 pub unsafe fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {

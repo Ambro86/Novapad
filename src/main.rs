@@ -1512,15 +1512,11 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
             }
         },
         PlayerCommand::Volume(delta) => {
-            unsafe {
-                change_audiobook_volume(hwnd, delta);
-            }
+            change_audiobook_volume(hwnd, delta);
             announce_player_volume(hwnd);
         }
         PlayerCommand::VolumeReset => {
-            unsafe {
-                reset_audiobook_volume(hwnd);
-            }
+            reset_audiobook_volume(hwnd);
             announce_player_volume(hwnd);
         }
         PlayerCommand::Speed(delta) => {

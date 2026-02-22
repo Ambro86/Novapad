@@ -3252,27 +3252,23 @@ fn load_document_content(
     }))
 }
 
-pub unsafe fn open_document_with_encoding(
+pub fn open_document_with_encoding(hwnd: HWND, path: &Path, user_encoding: Option<TextEncoding>) {
+    unsafe { open_document_with_encoding_internal(hwnd, path, user_encoding, false) };
+}
+
+pub fn open_document_with_encoding_from_copydata(
     hwnd: HWND,
     path: &Path,
     user_encoding: Option<TextEncoding>,
 ) {
-    open_document_with_encoding_internal(hwnd, path, user_encoding, false);
+    unsafe { open_document_with_encoding_internal(hwnd, path, user_encoding, true) };
 }
 
-pub unsafe fn open_document_with_encoding_from_copydata(
-    hwnd: HWND,
-    path: &Path,
-    user_encoding: Option<TextEncoding>,
-) {
-    open_document_with_encoding_internal(hwnd, path, user_encoding, true);
-}
-
-pub unsafe fn open_document(hwnd: HWND, path: &Path) {
+pub fn open_document(hwnd: HWND, path: &Path) {
     open_document_with_encoding(hwnd, path, None);
 }
 
-pub unsafe fn open_document_from_copydata(hwnd: HWND, path: &Path) {
+pub fn open_document_from_copydata(hwnd: HWND, path: &Path) {
     open_document_with_encoding_from_copydata(hwnd, path, None);
 }
 
@@ -3291,26 +3287,30 @@ pub fn is_current_audiobook(hwnd: HWND) -> bool {
     }
 }
 
-pub unsafe fn mark_current_document_from_rss(hwnd: HWND, from_rss: bool) {
-    let result = with_state(hwnd, |state| {
-        if let Some(doc) = state.docs.get_mut(state.current) {
-            doc.from_rss = from_rss;
-        }
-    });
+pub fn mark_current_document_from_rss(hwnd: HWND, from_rss: bool) {
+    let result = unsafe {
+        with_state(hwnd, |state| {
+            if let Some(doc) = state.docs.get_mut(state.current) {
+                doc.from_rss = from_rss;
+            }
+        })
+    };
     if result.is_none() {
         crate::log_debug("Failed to access editor state");
     }
 }
 
-pub unsafe fn current_document_is_from_rss(hwnd: HWND) -> bool {
-    with_state(hwnd, |state| {
-        state
-            .docs
-            .get(state.current)
-            .map(|doc| doc.from_rss)
-            .unwrap_or(false)
-    })
-    .unwrap_or(false)
+pub fn current_document_is_from_rss(hwnd: HWND) -> bool {
+    unsafe {
+        with_state(hwnd, |state| {
+            state
+                .docs
+                .get(state.current)
+                .map(|doc| doc.from_rss)
+                .unwrap_or(false)
+        })
+        .unwrap_or(false)
+    }
 }
 
 pub unsafe fn get_or_create_rss_document(hwnd: HWND, title: &str) -> Option<HWND> {

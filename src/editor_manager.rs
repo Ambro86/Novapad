@@ -4114,36 +4114,37 @@ pub unsafe fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> 
     }
 }
 
-pub unsafe fn close_current_document(hwnd: HWND) {
-    let index = match with_state(hwnd, |state| state.current) {
+pub fn close_current_document(hwnd: HWND) {
+    let index = match unsafe { with_state(hwnd, |state| state.current) } {
         Some(i) => i,
         None => return,
     };
-    if !close_document_at(hwnd, index) {
+    if !unsafe { close_document_at(hwnd, index) } {
         crate::log_debug("Failed to close document");
     }
 }
 
-pub unsafe fn close_other_documents(hwnd: HWND) -> bool {
+pub fn close_other_documents(hwnd: HWND) -> bool {
     loop {
-        let (current, total) = match with_state(hwnd, |state| (state.current, state.docs.len())) {
-            Some(values) => values,
-            None => return true,
-        };
+        let (current, total) =
+            match unsafe { with_state(hwnd, |state| (state.current, state.docs.len())) } {
+                Some(values) => values,
+                None => return true,
+            };
         if total <= 1 {
             return true;
         }
         let idx = if current == 0 { 1 } else { 0 };
-        if !close_document_at(hwnd, idx) {
+        if !unsafe { close_document_at(hwnd, idx) } {
             return false;
         }
     }
 }
 
-pub unsafe fn close_all_documents(hwnd: HWND) -> bool {
-    let initial_total = with_state(hwnd, |state| state.docs.len()).unwrap_or(0);
+pub fn close_all_documents(hwnd: HWND) -> bool {
+    let initial_total = unsafe { with_state(hwnd, |state| state.docs.len()) }.unwrap_or(0);
     for _ in 0..initial_total {
-        if !close_document_at(hwnd, 0) {
+        if !unsafe { close_document_at(hwnd, 0) } {
             return false;
         }
     }
@@ -4361,12 +4362,12 @@ pub unsafe fn confirm_save_if_dirty_entry(hwnd: HWND, index: usize, title: &str)
     }
 }
 
-pub unsafe fn get_current_index(hwnd: HWND) -> usize {
-    with_state(hwnd, |state| state.current).unwrap_or(0)
+pub fn get_current_index(hwnd: HWND) -> usize {
+    unsafe { with_state(hwnd, |state| state.current) }.unwrap_or(0)
 }
 
-pub unsafe fn get_tab(hwnd: HWND) -> HWND {
-    with_state(hwnd, |state| state.hwnd_tab).unwrap_or(HWND(0))
+pub fn get_tab(hwnd: HWND) -> HWND {
+    unsafe { with_state(hwnd, |state| state.hwnd_tab) }.unwrap_or(HWND(0))
 }
 
 #[cfg(test)]

@@ -1223,16 +1223,16 @@ pub fn select_all_active_edit(hwnd: HWND) {
     }
 }
 
-pub unsafe fn remove_duplicate_lines_active_edit(hwnd: HWND) -> bool {
-    apply_text_op_active_edit(hwnd, crate::text_ops::remove_duplicate_lines)
+pub fn remove_duplicate_lines_active_edit(hwnd: HWND) -> bool {
+    unsafe { apply_text_op_active_edit(hwnd, crate::text_ops::remove_duplicate_lines) }
 }
 
-pub unsafe fn remove_duplicate_consecutive_lines_active_edit(hwnd: HWND) -> bool {
-    apply_text_op_active_edit(hwnd, crate::text_ops::remove_duplicate_consecutive_lines)
+pub fn remove_duplicate_consecutive_lines_active_edit(hwnd: HWND) -> bool {
+    unsafe { apply_text_op_active_edit(hwnd, crate::text_ops::remove_duplicate_consecutive_lines) }
 }
 
-pub unsafe fn auto_format_tts_active_edit(hwnd: HWND) -> bool {
-    apply_text_op_active_edit(hwnd, auto_format_tts_block)
+pub fn auto_format_tts_active_edit(hwnd: HWND) -> bool {
+    unsafe { apply_text_op_active_edit(hwnd, auto_format_tts_block) }
 }
 
 unsafe fn apply_text_op_active_edit<F>(hwnd: HWND, op: F) -> bool
@@ -1345,10 +1345,12 @@ fn get_text_range(hwnd_edit: HWND, range: CHARRANGE) -> String {
     String::from_utf16_lossy(&buf[..used])
 }
 
-pub unsafe fn apply_word_wrap_to_all_edits(hwnd: HWND, word_wrap: bool) {
-    let edits = with_state(hwnd, |state| {
-        state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>()
-    })
+pub fn apply_word_wrap_to_all_edits(hwnd: HWND, word_wrap: bool) {
+    let edits = unsafe {
+        with_state(hwnd, |state| {
+            state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>()
+        })
+    }
     .unwrap_or_default();
 
     for hwnd_edit in edits {
@@ -1363,10 +1365,12 @@ pub unsafe fn apply_word_wrap_to_all_edits(hwnd: HWND, word_wrap: bool) {
     }
 }
 
-pub unsafe fn apply_text_appearance_to_all_edits(hwnd: HWND, text_color: u32, text_size: i32) {
-    let edits = with_state(hwnd, |state| {
-        state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>()
-    })
+pub fn apply_text_appearance_to_all_edits(hwnd: HWND, text_color: u32, text_size: i32) {
+    let edits = unsafe {
+        with_state(hwnd, |state| {
+            state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>()
+        })
+    }
     .unwrap_or_default();
 
     for hwnd_edit in edits {
@@ -1377,40 +1381,46 @@ pub unsafe fn apply_text_appearance_to_all_edits(hwnd: HWND, text_color: u32, te
     }
 }
 
-pub unsafe fn apply_font_to_all_edits(hwnd: HWND, hfont: HFONT) {
-    let edits = with_state(hwnd, |state| {
-        state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>()
-    })
+pub fn apply_font_to_all_edits(hwnd: HWND, hfont: HFONT) {
+    let edits = unsafe {
+        with_state(hwnd, |state| {
+            state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>()
+        })
+    }
     .unwrap_or_default();
     for hwnd_edit in edits {
         if hwnd_edit.0 == 0 {
             continue;
         }
-        SendMessageW(hwnd_edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+        unsafe { SendMessageW(hwnd_edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1)) };
     }
 }
 
-pub unsafe fn apply_read_only_to_all_edits(hwnd: HWND, read_only: bool) {
-    let edit_targets = with_state(hwnd, |state| {
-        state
-            .docs
-            .iter()
-            .map(|doc| {
-                let force_read_only = matches!(doc.format, FileFormat::Audiobook);
-                (doc.hwnd_edit, read_only || force_read_only)
-            })
-            .collect::<Vec<_>>()
-    })
+pub fn apply_read_only_to_all_edits(hwnd: HWND, read_only: bool) {
+    let edit_targets = unsafe {
+        with_state(hwnd, |state| {
+            state
+                .docs
+                .iter()
+                .map(|doc| {
+                    let force_read_only = matches!(doc.format, FileFormat::Audiobook);
+                    (doc.hwnd_edit, read_only || force_read_only)
+                })
+                .collect::<Vec<_>>()
+        })
+    }
     .unwrap_or_default();
 
     for (hwnd_edit, should_read_only) in edit_targets {
         if hwnd_edit.0 != 0 {
-            SendMessageW(
-                hwnd_edit,
-                EM_SETREADONLY,
-                WPARAM(if should_read_only { 1 } else { 0 }),
-                LPARAM(0),
-            );
+            unsafe {
+                SendMessageW(
+                    hwnd_edit,
+                    EM_SETREADONLY,
+                    WPARAM(if should_read_only { 1 } else { 0 }),
+                    LPARAM(0),
+                );
+            }
         }
     }
 }

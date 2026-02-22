@@ -2222,6 +2222,33 @@ fn probe_stream_audio_tracks(
     Ok(tracks)
 }
 
+fn probe_stream_audio_tracks_responsive(
+    parent: HWND,
+    language: Language,
+    ytdlp_path: &Path,
+    url: &str,
+) -> Result<Vec<StreamAudioTrack>, String> {
+    let progress = open_progress_dialog(
+        parent,
+        language,
+        "stream_audio.progress_title",
+        "podcasts.loading",
+        false,
+    );
+    let ytdlp = ytdlp_path.to_path_buf();
+    let url = url.to_string();
+    let worker = std::thread::spawn(move || probe_stream_audio_tracks(&ytdlp, &url));
+    while !worker.is_finished() {
+        let _ = pump_messages_detect_stream_cancel(parent, progress);
+        std::thread::sleep(std::time::Duration::from_millis(30));
+    }
+    close_progress_dialog(progress);
+    match worker.join() {
+        Ok(result) => result,
+        Err(_) => Err("yt-dlp track probe worker failed".to_string()),
+    }
+}
+
 unsafe extern "system" fn stream_track_dialog_wndproc(
     hwnd: HWND,
     msg: u32,
@@ -2564,21 +2591,23 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         }
     };
 
-    let selected_audio_format = match probe_stream_audio_tracks(&ytdlp_path, &url) {
-        Ok(tracks) if tracks.len() > 1 => match choose_stream_audio_track(parent, language, tracks)
-        {
-            Some(chosen) => chosen,
-            None => {
-                post_focus_editor(parent);
-                return;
+    let selected_audio_format =
+        match probe_stream_audio_tracks_responsive(parent, language, &ytdlp_path, &url) {
+            Ok(tracks) if tracks.len() > 1 => {
+                match choose_stream_audio_track(parent, language, tracks) {
+                    Some(chosen) => chosen,
+                    None => {
+                        post_focus_editor(parent);
+                        return;
+                    }
+                }
             }
-        },
-        Ok(_) => None,
-        Err(err) => {
-            crate::log_debug(&format!("Stream audio track probe failed: {}", err));
-            None
-        }
-    };
+            Ok(_) => None,
+            Err(err) => {
+                crate::log_debug(&format!("Stream audio track probe failed: {}", err));
+                None
+            }
+        };
 
     let cache_dir = settings_dir().join("podcast cache");
     if let Err(err) = std::fs::create_dir_all(&cache_dir) {
@@ -3062,7 +3091,15 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 "stream_audio.progress_converting",
                 false,
             );
-            let mut progress_cb = |pct| report_progress(converting_progress, pct);
+            let mut last_pump = std::time::Instant::now();
+            let mut progress_cb = |pct| {
+                report_progress(converting_progress, pct);
+                // Keep window responsive during in-process conversion on slower machines.
+                if last_pump.elapsed() >= std::time::Duration::from_millis(50) {
+                    let _ = pump_messages_detect_stream_cancel(parent, converting_progress);
+                    last_pump = std::time::Instant::now();
+                }
+            };
             let convert_result = crate::ffmpeg_export::convert_audio_file(
                 &downloaded_path,
                 &converted_path,

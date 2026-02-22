@@ -1236,9 +1236,15 @@ pub unsafe fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> 
     Ok(())
 }
 
+#[track_caller]
 pub unsafe fn stop_audiobook_playback(hwnd: HWND) {
     crate::telemetry::set_audio_playing(false);
-    crate::log_debug("Audio player: stop_audiobook_playback called");
+    let caller = std::panic::Location::caller();
+    crate::log_debug(&format!(
+        "Audio player: stop_audiobook_playback called (from {}:{})",
+        caller.file(),
+        caller.line()
+    ));
     if with_state(hwnd, |state| {
         if let Some(player) = state.active_audiobook.take() {
             crate::log_debug(&format!(

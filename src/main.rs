@@ -2231,13 +2231,16 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                             }
                             let is_stop = matches!(command, PlayerCommand::Stop);
                             let podcasts_window = state.podcasts_window;
-                            handle_player_command(hwnd, command);
                             if is_stop {
+                                // close_current_document() already stops audiobook playback
+                                // for audiobook tabs, so avoid duplicate stop work here.
                                 editor_manager::close_current_document(hwnd);
                                 if podcasts_window.0 != 0 {
                                     SetForegroundWindow(podcasts_window);
                                     app_windows::podcasts_window::focus_library(podcasts_window);
                                 }
+                            } else {
+                                handle_player_command(hwnd, command);
                             }
                             handled = true;
                             return;

@@ -4242,7 +4242,11 @@ pub unsafe fn try_close_app(hwnd: HWND) -> bool {
             }
         }
     }
-    crate::audio_player::stop_audiobook_playback(hwnd);
+    let has_active_audiobook =
+        with_state(hwnd, |state| state.active_audiobook.is_some()).unwrap_or(false);
+    if has_active_audiobook {
+        crate::audio_player::stop_audiobook_playback(hwnd);
+    }
     crate::clear_active_podcast_chapters(hwnd);
     if let Err(e) = crate::ffmpeg_export::cleanup_tts_artifacts() {
         crate::log_debug(&e);

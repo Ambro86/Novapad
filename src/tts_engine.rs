@@ -378,7 +378,14 @@ pub fn start_tts_from_caret(hwnd: HWND) {
             100,
         ));
 
-    let (text, initial_caret_pos) = unsafe { get_text_from_caret(hwnd_edit) };
+    let (mut text, initial_caret_pos) = unsafe { get_text_from_caret(hwnd_edit) };
+    let doc_path = unsafe {
+        with_state(hwnd, |state| {
+            state.docs.get(state.current).and_then(|d| d.path.clone())
+        })
+    }
+    .flatten();
+    text = crate::dialogue_voice::apply_dialogue_tags_from_sidecar(&text, doc_path.as_deref());
     if text.trim().is_empty() {
         unsafe {
             show_error(hwnd, language, &settings::tts_no_text_message(language));
@@ -3458,10 +3465,11 @@ fn split_tts_chunks_by_parts(chunks: &[TtsChunk], parts: usize) -> Vec<Vec<TtsCh
 
 fn start_audiobook_with_text(
     hwnd: HWND,
-    text: String,
+    mut text: String,
     suggested_name: Option<String>,
     epub_chapters: Option<Vec<String>>,
     is_unsaved_doc: bool,
+    doc_path: Option<&Path>,
 ) {
     let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     if text.trim().is_empty() {
@@ -3528,6 +3536,8 @@ fn start_audiobook_with_text(
         0,
         100,
     ));
+    text = crate::dialogue_voice::apply_dialogue_tags_from_sidecar(&text, doc_path);
+
     let base_split_option_visible = audiobook_split_by_time
         || audiobook_split_by_text
         || audiobook_split > 1
@@ -4049,10 +4059,10 @@ pub fn start_audiobook(hwnd: HWND) {
 
     let mut epub_chapters = None;
     if split_epub
-        && let Some(path) = doc_path
-        && is_epub_path(&path)
+        && let Some(ref path) = doc_path
+        && is_epub_path(path)
     {
-        match read_epub_chapters(&path, language) {
+        match read_epub_chapters(path, language) {
             Ok(chapters) => {
                 epub_chapters = Some(chapters);
             }
@@ -4070,7 +4080,14 @@ pub fn start_audiobook(hwnd: HWND) {
     } else {
         Some(suggested_name)
     };
-    start_audiobook_with_text(hwnd, text, suggested_name, epub_chapters, is_unsaved_doc);
+    start_audiobook_with_text(
+        hwnd,
+        text,
+        suggested_name,
+        epub_chapters,
+        is_unsaved_doc,
+        doc_path.as_deref(),
+    );
 }
 
 pub fn start_audiobook_from_selection(hwnd: HWND) {
@@ -4095,16 +4112,24 @@ pub fn start_audiobook_from_selection(hwnd: HWND) {
                         .and_then(|s| s.to_str())
                         .unwrap_or(&doc.title)
                         .to_string(),
+                    doc.path.clone(),
                     doc.path.is_none(),
                 )
             })
         })
     }
     .flatten();
-    let (suggested_name, is_unsaved_doc) = suggested_name
-        .map(|(name, unsaved)| (Some(name), unsaved))
-        .unwrap_or((None, true));
-    start_audiobook_with_text(hwnd, text, suggested_name, None, is_unsaved_doc);
+    let (suggested_name, doc_path, is_unsaved_doc) = suggested_name
+        .map(|(name, path, unsaved)| (Some(name), path, unsaved))
+        .unwrap_or((None, None, true));
+    start_audiobook_with_text(
+        hwnd,
+        text,
+        suggested_name,
+        None,
+        is_unsaved_doc,
+        doc_path.as_deref(),
+    );
 }
 
 fn parse_sapi4_voice_index(voice: &str) -> i32 {

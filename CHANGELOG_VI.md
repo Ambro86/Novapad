@@ -23,6 +23,7 @@ Cải tiến
 • Đã thêm tab Phím tắt mới trong Tùy chọn để tùy chỉnh tổ hợp phím, kèm phát hiện xung đột và cảnh báo khi một phím tắt đã được gán cho hành động khác.
 • Đã làm rõ hơn cách chỉnh tay tốc độ và cao độ: các ô chỉnh tay giờ dùng thang lấy 100 làm mốc, trong đó 100 tương ứng giá trị bình thường.
 • Đã cải thiện chọn giọng Microsoft trong cả Tùy chọn > Giọng nói và bảng giọng nói của trình soạn thảo: thêm combobox ngôn ngữ đã bản địa hóa để lọc giọng theo ngôn ngữ, đồng thời vẫn giữ chế độ “chỉ giọng đa ngôn ngữ” là một danh sách duy nhất không chia theo ngôn ngữ (ẩn combobox ngôn ngữ khi chế độ này bật).
+• Đã thêm cửa sổ mới Cong cu > "Ap dung giong cho hoi thoai..." voi dieu huong day du bang Tab, dung cung mo hinh giong cua giao dien chinh (engine, bo loc ngon ngu Edge, giong va toc do/cao do/am luong co nhan); quy tac hoi thoai duoc luu trong tep sidecar `.ini`, khong sua doi van ban tai lieu.
 • Đã cải thiện nhãn Hoàn tác: mục Chỉnh sửa > Hoàn tác giờ hiển thị hành động sẽ được hoàn tác (ví dụ chỉnh sửa văn bản, thêm/bỏ comment dòng hoặc chèn thẻ giọng nói), đồng thời vẫn bị vô hiệu khi không có gì để hoàn tác.
 Sửa lỗi
 • Đã sửa giao diện bitrate trong cửa sổ lưu sách nói: đã bỏ các nhãn hardcoded bằng tiếng Ý và thêm tùy chọn 64 kbps vào danh sách bitrate có thể chọn.

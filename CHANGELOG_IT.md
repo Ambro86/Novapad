@@ -23,6 +23,7 @@ Miglioramenti
 • Aggiunta una nuova scheda Scorciatoie nelle Opzioni per personalizzare i tasti rapidi, con rilevamento dei conflitti e avviso quando una combinazione è già assegnata a un'altra azione.
 • Resa più chiara la regolazione manuale di velocità e tono: i campi ora usano una scala centrata su 100, dove 100 corrisponde al valore normale.
 • Migliorata la selezione delle voci Microsoft sia in Opzioni > Voce sia nel pannello voci dell’editor: aggiunta una casella combinata lingua localizzata per filtrare le voci per lingua, mantenendo la modalità “solo voci multilingua” come elenco unico non diviso per lingua (con combo lingua nascosta quando attiva).
+• Aggiunta la nuova finestra Strumenti > "Applica la voce per i dialoghi..." con navigazione completa via Tab, usando lo stesso modello voci dell’interfaccia principale (sistema, filtro lingua Edge, voce e velocità/tono/volume con etichette); le regole dialoghi vengono salvate in un file sidecar `.ini`, senza modificare il testo del documento.
 • Migliorata l’etichetta di Annulla: la voce Modifica > Annulla ora mostra l’azione che verrà annullata (ad esempio modifica testo, commenta/decommenta righe o inserimento tag voce), restando non disponibile quando non esiste nulla da annullare.
 Correzioni di bug
 • Corretta l'interfaccia bitrate nella finestra di salvataggio audiolibro: rimossi i testi hardcoded in italiano e aggiunta l'opzione 64 kbps tra i bitrate selezionabili.

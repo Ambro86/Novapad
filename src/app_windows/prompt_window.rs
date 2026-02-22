@@ -476,8 +476,8 @@ unsafe fn simple_prompt_wndproc_inner(
     }
 }
 
-pub unsafe fn open(parent: HWND) {
-    open_with_command(parent, None, None);
+pub fn open(parent: HWND) {
+    unsafe { open_with_command(parent, None, None) };
 }
 
 pub unsafe fn open_with_command(

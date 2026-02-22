@@ -639,8 +639,8 @@ struct PlayReadyMsg {
     title: String,
 }
 
-pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
-    if msg.hwnd != hwnd && !IsChild(hwnd, msg.hwnd).as_bool() {
+pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
+    if msg.hwnd != hwnd && !unsafe { IsChild(hwnd, msg.hwnd) }.as_bool() {
         return false;
     }
     if msg.message == WM_CHAR {
@@ -649,28 +649,30 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message == WM_KEYDOWN {
         let key = msg.wParam.0 as u32;
         if key == VK_ESCAPE.0 as u32 {
-            SendMessageW(hwnd, WM_COMMAND, WPARAM(2), LPARAM(0));
+            unsafe {
+                SendMessageW(hwnd, WM_COMMAND, WPARAM(2), LPARAM(0));
+            }
             return true;
         }
         if key == VK_RETURN.0 as u32 {
             let (hwnd_tree, hwnd_results) =
-                with_podcast_state(hwnd, |s| (s.hwnd_tree, s.hwnd_results))
+                unsafe { with_podcast_state(hwnd, |s| (s.hwnd_tree, s.hwnd_results)) }
                     .unwrap_or((HWND(0), HWND(0)));
-            let focus = GetFocus();
+            let focus = unsafe { GetFocus() };
 
             // Handle Enter on search results list
             if hwnd_results.0 != 0 && focus == hwnd_results {
-                subscribe_selected_result(hwnd);
+                unsafe { subscribe_selected_result(hwnd) };
                 return true;
             }
 
             // Handle Enter on tree view
             if hwnd_tree.0 != 0
                 && focus == hwnd_tree
-                && let Some(item) = selected_episode(hwnd)
+                && let Some(item) = unsafe { selected_episode(hwnd) }
             {
-                let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-                open_episode_in_player(hwnd, parent, &item);
+                let parent = unsafe { with_podcast_state(hwnd, |s| s.parent) }.unwrap_or(HWND(0));
+                unsafe { open_episode_in_player(hwnd, parent, &item) };
                 return true;
             }
         }

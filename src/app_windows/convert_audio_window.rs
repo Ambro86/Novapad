@@ -141,12 +141,9 @@ fn labels(language: Language) -> ConvertLabels {
     }
 }
 
-pub unsafe fn handle_navigation(
-    hwnd: HWND,
-    msg: &windows::Win32::UI::WindowsAndMessaging::MSG,
-) -> bool {
+pub fn handle_navigation(hwnd: HWND, msg: &windows::Win32::UI::WindowsAndMessaging::MSG) -> bool {
     if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
-        if let Err(e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
+        if let Err(e) = unsafe { PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) } {
             crate::log_debug(&format!("Failed to post WM_CLOSE: {}", e));
         }
         return true;

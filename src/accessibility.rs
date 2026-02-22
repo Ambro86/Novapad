@@ -45,17 +45,17 @@ pub fn normalize_to_crlf(text: &str) -> String {
 /// function correctly across all dialogs and windows.
 ///
 /// Returns `true` if the message was handled and should be skipped by the main loop.
-pub unsafe fn handle_accessibility(hwnd: HWND, msg: &MSG) -> bool {
+pub fn handle_accessibility(hwnd: HWND, msg: &MSG) -> bool {
     // Only process messages that belong to this window or its children.
     // This prevents IsDialogMessageW from interfering with messages destined
     // for other windows (e.g., the main editor while a secondary window is open).
-    if msg.hwnd != hwnd && !IsChild(hwnd, msg.hwnd).as_bool() {
+    if msg.hwnd != hwnd && !unsafe { IsChild(hwnd, msg.hwnd) }.as_bool() {
         return false;
     }
 
     // 1. Standard Dialog Navigation (TAB, Arrows, Enter, Space on controls)
     // IsDialogMessageW handles the vast majority of accessibility rules automatically.
-    if IsDialogMessageW(hwnd, msg).as_bool() {
+    if unsafe { IsDialogMessageW(hwnd, msg) }.as_bool() {
         return true;
     }
 

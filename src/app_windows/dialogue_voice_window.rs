@@ -712,7 +712,7 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
     }
 }
 
-pub unsafe fn open_dialog(
+pub fn open_dialog(
     parent: HWND,
     language: Language,
     edge_voices: Vec<VoiceInfo>,
@@ -720,73 +720,75 @@ pub unsafe fn open_dialog(
     sapi4_voices: Vec<VoiceInfo>,
     default_cfg: DialogueVoiceConfig,
 ) -> Option<DialogueVoiceConfig> {
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-    let class_name = to_wide("SonarpadDialogueVoiceDialog");
-    let title = i18n::tr(language, "dialogue_voice.apply.title");
+    unsafe {
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+        let class_name = to_wide("SonarpadDialogueVoiceDialog");
+        let title = i18n::tr(language, "dialogue_voice.apply.title");
 
-    static ONCE: std::sync::Once = std::sync::Once::new();
-    ONCE.call_once(|| {
-        let wc = WNDCLASSW {
-            hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
-                windows::Win32::UI::WindowsAndMessaging::LoadCursorW(None, IDC_ARROW)
-                    .unwrap_or_default()
-                    .0,
-            ),
-            hInstance: hinstance,
-            lpszClassName: PCWSTR(class_name.as_ptr()),
-            lpfnWndProc: Some(wndproc),
-            ..Default::default()
+        static ONCE: std::sync::Once = std::sync::Once::new();
+        ONCE.call_once(|| {
+            let wc = WNDCLASSW {
+                hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+                    windows::Win32::UI::WindowsAndMessaging::LoadCursorW(None, IDC_ARROW)
+                        .unwrap_or_default()
+                        .0,
+                ),
+                hInstance: hinstance,
+                lpszClassName: PCWSTR(class_name.as_ptr()),
+                lpfnWndProc: Some(wndproc),
+                ..Default::default()
+            };
+            RegisterClassW(&wc);
+        });
+
+        let mut data = DialogueVoiceDialogData {
+            language,
+            edge_voices,
+            sapi5_voices,
+            sapi4_voices,
+            default_engine: default_cfg.engine,
+            default_voice: default_cfg.voice,
+            default_rate: default_cfg.rate,
+            default_pitch: default_cfg.pitch,
+            default_volume: default_cfg.volume,
+            default_open_quote: default_cfg.opening_quote,
+            default_close_quote: default_cfg.closing_quote,
+            default_allow_multiline: default_cfg.allow_multiline,
+            edge_language_codes: Vec::new(),
+            result: None,
         };
-        RegisterClassW(&wc);
-    });
 
-    let mut data = DialogueVoiceDialogData {
-        language,
-        edge_voices,
-        sapi5_voices,
-        sapi4_voices,
-        default_engine: default_cfg.engine,
-        default_voice: default_cfg.voice,
-        default_rate: default_cfg.rate,
-        default_pitch: default_cfg.pitch,
-        default_volume: default_cfg.volume,
-        default_open_quote: default_cfg.opening_quote,
-        default_close_quote: default_cfg.closing_quote,
-        default_allow_multiline: default_cfg.allow_multiline,
-        edge_language_codes: Vec::new(),
-        result: None,
-    };
-
-    let hwnd = CreateWindowExW(
-        WS_EX_DLGMODALFRAME,
-        PCWSTR(class_name.as_ptr()),
-        PCWSTR(to_wide(&title).as_ptr()),
-        WS_CAPTION | WS_SYSMENU,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        580,
-        460,
-        parent,
-        HMENU(0),
-        hinstance,
-        Some(&mut data as *mut _ as *const std::ffi::c_void),
-    );
-    if hwnd.0 == 0 {
-        return None;
-    }
-
-    windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow(parent, false);
-    ShowWindow(hwnd, SW_SHOW);
-
-    let mut msg = MSG::default();
-    while IsWindow(hwnd).as_bool() && GetMessageW(&mut msg, HWND(0), 0, 0).into() {
-        if !IsDialogMessageW(hwnd, &msg).as_bool() {
-            TranslateMessage(&msg);
-            DispatchMessageW(&msg);
+        let hwnd = CreateWindowExW(
+            WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(to_wide(&title).as_ptr()),
+            WS_CAPTION | WS_SYSMENU,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            580,
+            460,
+            parent,
+            HMENU(0),
+            hinstance,
+            Some(&mut data as *mut _ as *const std::ffi::c_void),
+        );
+        if hwnd.0 == 0 {
+            return None;
         }
-    }
-    windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow(parent, true);
-    windows::Win32::UI::WindowsAndMessaging::SetForegroundWindow(parent);
 
-    data.result
+        windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow(parent, false);
+        ShowWindow(hwnd, SW_SHOW);
+
+        let mut msg = MSG::default();
+        while IsWindow(hwnd).as_bool() && GetMessageW(&mut msg, HWND(0), 0, 0).into() {
+            if !IsDialogMessageW(hwnd, &msg).as_bool() {
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        }
+        windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow(parent, true);
+        windows::Win32::UI::WindowsAndMessaging::SetForegroundWindow(parent);
+
+        data.result
+    }
 }

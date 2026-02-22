@@ -64,13 +64,13 @@ unsafe fn force_focus_editor_on_parent(parent: HWND) {
     }
 }
 
-pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
+pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
-        let focus = GetFocus();
-        let (list, btn) = with_bookmarks_state(hwnd, |s| (s.hwnd_list, s.hwnd_goto))
+        let focus = unsafe { GetFocus() };
+        let (list, btn) = unsafe { with_bookmarks_state(hwnd, |s| (s.hwnd_list, s.hwnd_goto)) }
             .unwrap_or((HWND(0), HWND(0)));
         if focus == list || focus == btn {
-            goto_selected(hwnd);
+            unsafe { goto_selected(hwnd) };
             return true;
         }
     }
@@ -83,55 +83,57 @@ struct BookmarksWindowState {
     hwnd_goto: HWND,
 }
 
-pub unsafe fn open(parent: HWND) {
-    let existing = with_state(parent, |state| state.bookmarks_window).unwrap_or(HWND(0));
-    if existing.0 != 0 {
-        SetForegroundWindow(existing);
-        return;
-    }
-
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-    let class_name = to_wide(BOOKMARKS_CLASS_NAME);
-    let wc = WNDCLASSW {
-        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
-            LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
-        ),
-        hInstance: hinstance,
-        lpszClassName: PCWSTR(class_name.as_ptr()),
-        lpfnWndProc: Some(bookmarks_wndproc),
-        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
-        ..Default::default()
-    };
-    RegisterClassW(&wc);
-
-    let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
-    let title = to_wide(&i18n::tr(language, "bookmarks.title"));
-
-    let window = CreateWindowExW(
-        WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
-        PCWSTR(class_name.as_ptr()),
-        PCWSTR(title.as_ptr()),
-        WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        400,
-        450,
-        parent,
-        None,
-        hinstance,
-        Some(parent.0 as *const std::ffi::c_void),
-    );
-
-    if window.0 != 0 {
-        if with_state(parent, |state| {
-            state.bookmarks_window = window;
-        })
-        .is_none()
-        {
-            crate::log_debug("Failed to access bookmarks state");
+pub fn open(parent: HWND) {
+    unsafe {
+        let existing = with_state(parent, |state| state.bookmarks_window).unwrap_or(HWND(0));
+        if existing.0 != 0 {
+            SetForegroundWindow(existing);
+            return;
         }
-        EnableWindow(parent, false);
-        SetForegroundWindow(window);
+
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+        let class_name = to_wide(BOOKMARKS_CLASS_NAME);
+        let wc = WNDCLASSW {
+            hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+                LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
+            ),
+            hInstance: hinstance,
+            lpszClassName: PCWSTR(class_name.as_ptr()),
+            lpfnWndProc: Some(bookmarks_wndproc),
+            hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+            ..Default::default()
+        };
+        RegisterClassW(&wc);
+
+        let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
+        let title = to_wide(&i18n::tr(language, "bookmarks.title"));
+
+        let window = CreateWindowExW(
+            WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            400,
+            450,
+            parent,
+            None,
+            hinstance,
+            Some(parent.0 as *const std::ffi::c_void),
+        );
+
+        if window.0 != 0 {
+            if with_state(parent, |state| {
+                state.bookmarks_window = window;
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access bookmarks state");
+            }
+            EnableWindow(parent, false);
+            SetForegroundWindow(window);
+        }
     }
 }
 

@@ -99,7 +99,7 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
             }
         }
     }
-    unsafe { handle_accessibility(hwnd, msg) }
+    handle_accessibility(hwnd, msg)
 }
 
 struct PodcastState {
@@ -1901,7 +1901,7 @@ fn stop_recording_action(state: &mut PodcastState, hwnd: HWND) {
         return;
     }
     if state.saving_dialog.0 == 0 {
-        let dialog = unsafe { podcast_save_window::open(hwnd) };
+        let dialog = podcast_save_window::open(hwnd);
         if dialog.0 != 0 {
             state.saving_dialog = dialog;
             unsafe {

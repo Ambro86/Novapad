@@ -36,91 +36,93 @@ fn progress_text(language: Language, pct: usize) -> String {
     i18n::tr_f(language, "audiobook.progress", &[("pct", &pct.to_string())])
 }
 
-pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
+pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
-        let focus = GetFocus();
-        let cancel_btn = with_progress_state(hwnd, |s| s.hwnd_cancel).unwrap_or(HWND(0));
+        let focus = unsafe { GetFocus() };
+        let cancel_btn = unsafe { with_progress_state(hwnd, |s| s.hwnd_cancel) }.unwrap_or(HWND(0));
         if focus == cancel_btn {
-            request_cancel(hwnd);
+            unsafe { request_cancel(hwnd) };
             return true;
         }
     }
     handle_accessibility(hwnd, msg)
 }
 
-pub unsafe fn open(parent: HWND, total: usize) -> HWND {
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-    let class_name = to_wide(PROGRESS_CLASS_NAME);
-    let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
-    let title_w = to_wide(&i18n::tr(language, "audiobook.title"));
+pub fn open(parent: HWND, total: usize) -> HWND {
+    unsafe {
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+        let class_name = to_wide(PROGRESS_CLASS_NAME);
+        let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
+        let title_w = to_wide(&i18n::tr(language, "audiobook.title"));
 
-    let wc = WNDCLASSW {
-        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
-            LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
-        ),
-        hInstance: hinstance,
-        lpszClassName: PCWSTR(class_name.as_ptr()),
-        lpfnWndProc: Some(progress_wndproc),
-        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
-        ..Default::default()
-    };
-    RegisterClassW(&wc);
+        let wc = WNDCLASSW {
+            hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+                LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
+            ),
+            hInstance: hinstance,
+            lpszClassName: PCWSTR(class_name.as_ptr()),
+            lpfnWndProc: Some(progress_wndproc),
+            hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+            ..Default::default()
+        };
+        RegisterClassW(&wc);
 
-    let hwnd = CreateWindowExW(
-        WS_EX_DLGMODALFRAME,
-        PCWSTR(class_name.as_ptr()),
-        PCWSTR(title_w.as_ptr()),
-        WS_POPUP | WS_CAPTION | WS_VISIBLE,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        300,
-        150,
-        parent,
-        HMENU(0),
-        hinstance,
-        Some(parent.0 as *const _),
-    );
-
-    if hwnd.0 != 0 {
-        EnableWindow(parent, false);
-        if with_progress_state(hwnd, |state| {
-            SendMessageW(
-                state.hwnd_pb,
-                PBM_SETRANGE,
-                WPARAM(0),
-                LPARAM((total as isize) << 16),
-            );
-            state.total = total;
-            state.current = 0;
-        })
-        .is_none()
-        {
-            crate::log_debug("Failed to access audiobook state");
-        }
-
-        // Center window relative to parent
-        let mut rc_parent = RECT::default();
-        let mut rc_dlg = RECT::default();
-        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::GetWindowRect(
+        let hwnd = CreateWindowExW(
+            WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(title_w.as_ptr()),
+            WS_POPUP | WS_CAPTION | WS_VISIBLE,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            300,
+            150,
             parent,
-            &mut rc_parent
-        ));
-        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::GetWindowRect(
-            hwnd,
-            &mut rc_dlg
-        ));
+            HMENU(0),
+            hinstance,
+            Some(parent.0 as *const _),
+        );
 
-        let dlg_w = rc_dlg.right - rc_dlg.left;
-        let dlg_h = rc_dlg.bottom - rc_dlg.top;
-        let parent_w = rc_parent.right - rc_parent.left;
-        let parent_h = rc_parent.bottom - rc_parent.top;
+        if hwnd.0 != 0 {
+            EnableWindow(parent, false);
+            if with_progress_state(hwnd, |state| {
+                SendMessageW(
+                    state.hwnd_pb,
+                    PBM_SETRANGE,
+                    WPARAM(0),
+                    LPARAM((total as isize) << 16),
+                );
+                state.total = total;
+                state.current = 0;
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access audiobook state");
+            }
 
-        let x = rc_parent.left + (parent_w - dlg_w) / 2;
-        let y = rc_parent.top + (parent_h - dlg_h) / 2;
+            // Center window relative to parent
+            let mut rc_parent = RECT::default();
+            let mut rc_dlg = RECT::default();
+            crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::GetWindowRect(
+                parent,
+                &mut rc_parent
+            ));
+            crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::GetWindowRect(
+                hwnd,
+                &mut rc_dlg
+            ));
 
-        crate::log_if_err!(MoveWindow(hwnd, x, y, dlg_w, dlg_h, true));
+            let dlg_w = rc_dlg.right - rc_dlg.left;
+            let dlg_h = rc_dlg.bottom - rc_dlg.top;
+            let parent_w = rc_parent.right - rc_parent.left;
+            let parent_h = rc_parent.bottom - rc_parent.top;
+
+            let x = rc_parent.left + (parent_w - dlg_w) / 2;
+            let y = rc_parent.top + (parent_h - dlg_h) / 2;
+
+            crate::log_if_err!(MoveWindow(hwnd, x, y, dlg_w, dlg_h, true));
+        }
+        hwnd
     }
-    hwnd
 }
 
 unsafe extern "system" fn progress_wndproc(

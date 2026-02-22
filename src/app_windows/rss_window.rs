@@ -1547,56 +1547,58 @@ struct SearchDialogInit {
     parent: HWND,
 }
 
-pub unsafe fn open(parent: HWND) {
-    let exists = with_state(parent, |s| s.rss_window).unwrap_or(HWND(0));
-    if exists.0 != 0 {
-        SetForegroundWindow(exists);
-        return;
-    }
+pub fn open(parent: HWND) {
+    unsafe {
+        let exists = with_state(parent, |s| s.rss_window).unwrap_or(HWND(0));
+        if exists.0 != 0 {
+            SetForegroundWindow(exists);
+            return;
+        }
 
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-    let class_name = to_wide(RSS_WINDOW_CLASS);
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+        let class_name = to_wide(RSS_WINDOW_CLASS);
 
-    let wc = WNDCLASSW {
-        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
-            windows::Win32::UI::WindowsAndMessaging::LoadCursorW(
-                None,
-                windows::Win32::UI::WindowsAndMessaging::IDC_ARROW,
-            )
-            .unwrap_or_default()
-            .0,
-        ),
-        hInstance: hinstance,
-        lpszClassName: PCWSTR(class_name.as_ptr()),
-        lpfnWndProc: Some(rss_wndproc),
-        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
-        ..Default::default()
-    };
-    RegisterClassW(&wc);
+        let wc = WNDCLASSW {
+            hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+                windows::Win32::UI::WindowsAndMessaging::LoadCursorW(
+                    None,
+                    windows::Win32::UI::WindowsAndMessaging::IDC_ARROW,
+                )
+                .unwrap_or_default()
+                .0,
+            ),
+            hInstance: hinstance,
+            lpszClassName: PCWSTR(class_name.as_ptr()),
+            lpfnWndProc: Some(rss_wndproc),
+            hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+            ..Default::default()
+        };
+        RegisterClassW(&wc);
 
-    let language = with_state(parent, |s| s.settings.language).unwrap_or_default();
-    let title = to_wide(&i18n::tr(language, "rss.window.title"));
+        let language = with_state(parent, |s| s.settings.language).unwrap_or_default();
+        let title = to_wide(&i18n::tr(language, "rss.window.title"));
 
-    let hwnd = CreateWindowExW(
-        WS_EX_DLGMODALFRAME,
-        PCWSTR(class_name.as_ptr()),
-        PCWSTR(title.as_ptr()),
-        WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        500,
-        600,
-        parent,
-        None,
-        hinstance,
-        Some(parent.0 as *const _),
-    );
+        let hwnd = CreateWindowExW(
+            WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            500,
+            600,
+            parent,
+            None,
+            hinstance,
+            Some(parent.0 as *const _),
+        );
 
-    if hwnd.0 != 0 && with_state(parent, |s| s.rss_window = hwnd).is_none() {
-        crate::log_debug("Failed to set rss_window state");
-        // IMPORTANT: do NOT disable the parent window.
-        // If the parent is disabled, Windows (and NVDA) treat the editor as unavailable,
-        // and SetFocus/SetForegroundWindow will not behave reliably.
+        if hwnd.0 != 0 && with_state(parent, |s| s.rss_window = hwnd).is_none() {
+            crate::log_debug("Failed to set rss_window state");
+            // IMPORTANT: do NOT disable the parent window.
+            // If the parent is disabled, Windows (and NVDA) treat the editor as unavailable,
+            // and SetFocus/SetForegroundWindow will not behave reliably.
+        }
     }
 }
 

@@ -557,20 +557,64 @@ pub unsafe fn open_with_command(
     }
 }
 
-pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
-    let focus = GetFocus();
-    if focus.0 == 0 {
-        return false;
-    }
-    let focus_parent = GetParent(focus);
-    if focus != hwnd && focus_parent != hwnd {
-        return false;
-    }
+pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
+    unsafe {
+        let focus = GetFocus();
+        if focus.0 == 0 {
+            return false;
+        }
+        let focus_parent = GetParent(focus);
+        if focus != hwnd && focus_parent != hwnd {
+            return false;
+        }
 
-    if msg.message == WM_SYSKEYDOWN {
-        if msg.wParam.0 as u32 == 'I' as u32 {
+        if msg.message == WM_SYSKEYDOWN {
+            if msg.wParam.0 as u32 == 'I' as u32 {
+                if with_prompt_state(hwnd, |state| {
+                    SetFocus(state.input);
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access prompt state");
+                }
+                return true;
+            }
+            if msg.wParam.0 as u32 == 'O' as u32 {
+                if with_prompt_state(hwnd, |state| {
+                    SetFocus(state.output);
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access prompt state");
+                }
+                return true;
+            }
+            return false;
+        }
+
+        if msg.message != WM_KEYDOWN {
+            return false;
+        }
+
+        if msg.wParam.0 as u32 == VK_TAB.0 as u32 {
+            let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
             if with_prompt_state(hwnd, |state| {
-                SetFocus(state.input);
+                let order = [
+                    state.input,
+                    state.output,
+                    state.checkbox_autoscroll,
+                    state.checkbox_strip_ansi,
+                    state.checkbox_announce_lines,
+                    state.checkbox_beep_on_idle,
+                    state.checkbox_prevent_sleep,
+                ];
+                let mut idx = order.iter().position(|&h| h == focus).unwrap_or(0);
+                if shift_down {
+                    idx = if idx == 0 { order.len() - 1 } else { idx - 1 };
+                } else {
+                    idx = (idx + 1) % order.len();
+                }
+                SetFocus(order[idx]);
             })
             .is_none()
             {
@@ -578,9 +622,12 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
             }
             return true;
         }
-        if msg.wParam.0 as u32 == 'O' as u32 {
+
+        if msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
             if with_prompt_state(hwnd, |state| {
-                SetFocus(state.output);
+                if focus == state.input {
+                    send_input_to_pty(state);
+                }
             })
             .is_none()
             {
@@ -588,84 +635,39 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
             }
             return true;
         }
-        return false;
-    }
 
-    if msg.message != WM_KEYDOWN {
-        return false;
-    }
-
-    if msg.wParam.0 as u32 == VK_TAB.0 as u32 {
-        let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
-        if with_prompt_state(hwnd, |state| {
-            let order = [
-                state.input,
-                state.output,
-                state.checkbox_autoscroll,
-                state.checkbox_strip_ansi,
-                state.checkbox_announce_lines,
-                state.checkbox_beep_on_idle,
-                state.checkbox_prevent_sleep,
-            ];
-            let mut idx = order.iter().position(|&h| h == focus).unwrap_or(0);
-            if shift_down {
-                idx = if idx == 0 { order.len() - 1 } else { idx - 1 };
-            } else {
-                idx = (idx + 1) % order.len();
-            }
-            SetFocus(order[idx]);
-        })
-        .is_none()
-        {
-            crate::log_debug("Failed to access prompt state");
-        }
-        return true;
-    }
-
-    if msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
-        if with_prompt_state(hwnd, |state| {
-            if focus == state.input {
-                send_input_to_pty(state);
-            }
-        })
-        .is_none()
-        {
-            crate::log_debug("Failed to access prompt state");
-        }
-        return true;
-    }
-
-    let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
-    if ctrl_down && msg.wParam.0 as u32 == 'C' as u32 {
-        if with_prompt_state(hwnd, |state| {
-            if focus == state.output {
-                copy_output_selection(state.output);
-            } else if let Some(session) = state.session.as_ref()
-                && !session.send_ctrl_c()
+        let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
+        if ctrl_down && msg.wParam.0 as u32 == 'C' as u32 {
+            if with_prompt_state(hwnd, |state| {
+                if focus == state.output {
+                    copy_output_selection(state.output);
+                } else if let Some(session) = state.session.as_ref()
+                    && !session.send_ctrl_c()
+                {
+                    crate::log_debug("Failed to send Ctrl+C");
+                }
+            })
+            .is_none()
             {
-                crate::log_debug("Failed to send Ctrl+C");
+                crate::log_debug("Failed to access prompt state");
             }
-        })
-        .is_none()
-        {
-            crate::log_debug("Failed to access prompt state");
+            return true;
         }
-        return true;
-    }
-    if ctrl_down && msg.wParam.0 as u32 == 'L' as u32 {
-        if with_prompt_state(hwnd, |state| {
-            if confirm_clear_output(hwnd, state.parent) {
-                clear_output(state);
+        if ctrl_down && msg.wParam.0 as u32 == 'L' as u32 {
+            if with_prompt_state(hwnd, |state| {
+                if confirm_clear_output(hwnd, state.parent) {
+                    clear_output(state);
+                }
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access prompt state");
             }
-        })
-        .is_none()
-        {
-            crate::log_debug("Failed to access prompt state");
+            return true;
         }
-        return true;
-    }
 
-    false
+        false
+    }
 }
 
 unsafe extern "system" fn prompt_wndproc(

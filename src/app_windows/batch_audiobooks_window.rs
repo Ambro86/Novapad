@@ -88,11 +88,11 @@ enum BatchStatusCode {
     Canceled = 4,
 }
 
-pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
+pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message == WM_KEYDOWN {
         let vk = msg.wParam.0 as u32;
         if vk == VK_ESCAPE.0 as u32 {
-            if let Err(e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
+            if let Err(e) = unsafe { PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) } {
                 crate::log_debug(&format!("Failed to post WM_CLOSE: {}", e));
             }
             return true;
@@ -104,10 +104,11 @@ pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
                 return false;
             };
             if msg.hwnd == log_edit {
-                let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
-                let next = GetNextDlgTabItem(hwnd, log_edit, shift_down);
+                let shift_down =
+                    (unsafe { GetKeyState(VK_SHIFT.0 as i32) } & (0x8000u16 as i16)) != 0;
+                let next = unsafe { GetNextDlgTabItem(hwnd, log_edit, shift_down) };
                 if next.0 != 0 {
-                    SetFocus(next);
+                    unsafe { SetFocus(next) };
                     return true;
                 }
             }

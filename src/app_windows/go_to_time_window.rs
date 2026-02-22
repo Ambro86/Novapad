@@ -28,62 +28,65 @@ struct GoToTimeState {
     prev_focus: HWND,
 }
 
-pub unsafe fn open(parent: HWND) {
-    let existing = with_state(parent, |state| state.go_to_time_dialog).unwrap_or(HWND(0));
-    if existing.0 != 0 {
-        SetForegroundWindow(existing);
-        return;
-    }
-    let has_player = with_state(parent, |state| state.active_audiobook.is_some()).unwrap_or(false);
-    if !has_player {
-        return;
-    }
+pub fn open(parent: HWND) {
+    unsafe {
+        let existing = with_state(parent, |state| state.go_to_time_dialog).unwrap_or(HWND(0));
+        if existing.0 != 0 {
+            SetForegroundWindow(existing);
+            return;
+        }
+        let has_player =
+            with_state(parent, |state| state.active_audiobook.is_some()).unwrap_or(false);
+        if !has_player {
+            return;
+        }
 
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-    let class_name = to_wide(GO_TO_TIME_CLASS);
-    let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
-    let title_w = to_wide(&i18n::tr(language, "go_to_time.title"));
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+        let class_name = to_wide(GO_TO_TIME_CLASS);
+        let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
+        let title_w = to_wide(&i18n::tr(language, "go_to_time.title"));
 
-    let wc = WNDCLASSW {
-        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
-            LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
-        ),
-        hInstance: hinstance,
-        lpszClassName: PCWSTR(class_name.as_ptr()),
-        lpfnWndProc: Some(go_to_time_wndproc),
-        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
-        ..Default::default()
-    };
-    RegisterClassW(&wc);
+        let wc = WNDCLASSW {
+            hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+                LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
+            ),
+            hInstance: hinstance,
+            lpszClassName: PCWSTR(class_name.as_ptr()),
+            lpfnWndProc: Some(go_to_time_wndproc),
+            hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+            ..Default::default()
+        };
+        RegisterClassW(&wc);
 
-    let prev_focus = GetFocus();
-    let state = Box::new(GoToTimeState {
-        parent,
-        input: HWND(0),
-        status: HWND(0),
-        prev_focus,
-    });
-    let state_ptr = Box::into_raw(state);
-    let hwnd = CreateWindowExW(
-        WS_EX_DLGMODALFRAME,
-        PCWSTR(class_name.as_ptr()),
-        PCWSTR(title_w.as_ptr()),
-        WS_POPUP | WS_CAPTION | WS_VISIBLE,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        360,
-        180,
-        parent,
-        HMENU(0),
-        hinstance,
-        Some(state_ptr as *const _),
-    );
-    if hwnd.0 == 0 {
-        let _unused_box = Box::from_raw(state_ptr);
-        return;
+        let prev_focus = GetFocus();
+        let state = Box::new(GoToTimeState {
+            parent,
+            input: HWND(0),
+            status: HWND(0),
+            prev_focus,
+        });
+        let state_ptr = Box::into_raw(state);
+        let hwnd = CreateWindowExW(
+            WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(title_w.as_ptr()),
+            WS_POPUP | WS_CAPTION | WS_VISIBLE,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            360,
+            180,
+            parent,
+            HMENU(0),
+            hinstance,
+            Some(state_ptr as *const _),
+        );
+        if hwnd.0 == 0 {
+            let _unused_box = Box::from_raw(state_ptr);
+            return;
+        }
+        EnableWindow(parent, false);
+        with_state(parent, |state| state.go_to_time_dialog = hwnd);
     }
-    EnableWindow(parent, false);
-    with_state(parent, |state| state.go_to_time_dialog = hwnd);
 }
 
 unsafe extern "system" fn go_to_time_wndproc(
@@ -316,9 +319,6 @@ unsafe fn go_to_time_wndproc_inner(
     }
 }
 
-pub unsafe fn handle_navigation(
-    hwnd: HWND,
-    msg: &windows::Win32::UI::WindowsAndMessaging::MSG,
-) -> bool {
+pub fn handle_navigation(hwnd: HWND, msg: &windows::Win32::UI::WindowsAndMessaging::MSG) -> bool {
     handle_accessibility(hwnd, msg)
 }

@@ -112,119 +112,123 @@ fn unregister_readonly_text_window(hwnd: HWND) {
     }
 }
 
-pub unsafe fn handle_readonly_navigation(msg: &MSG) -> bool {
-    if msg.message != WM_KEYDOWN {
-        return false;
-    }
-    let windows: Vec<HWND> = match readonly_text_windows().lock() {
-        Ok(windows) => windows.clone(),
-        Err(_e) => {
-            crate::log_debug("Failed to lock readonly text windows");
+pub fn handle_readonly_navigation(msg: &MSG) -> bool {
+    unsafe {
+        if msg.message != WM_KEYDOWN {
             return false;
         }
-    };
-    let target = windows
-        .into_iter()
-        .find(|hwnd| msg.hwnd == *hwnd || IsChild(*hwnd, msg.hwnd).as_bool());
-    let Some(hwnd) = target else {
-        return false;
-    };
-    let key = msg.wParam.0 as u32;
-    if key == VK_TAB.0 as u32 {
-        let shift_down = GetKeyState(VK_SHIFT.0 as i32) < 0;
-        if with_readonly_text_state(hwnd, |state| {
-            if shift_down {
-                if GetFocus() == state.ok_button {
-                    SetFocus(state.edit);
-                } else {
+        let windows: Vec<HWND> = match readonly_text_windows().lock() {
+            Ok(windows) => windows.clone(),
+            Err(_e) => {
+                crate::log_debug("Failed to lock readonly text windows");
+                return false;
+            }
+        };
+        let target = windows
+            .into_iter()
+            .find(|hwnd| msg.hwnd == *hwnd || IsChild(*hwnd, msg.hwnd).as_bool());
+        let Some(hwnd) = target else {
+            return false;
+        };
+        let key = msg.wParam.0 as u32;
+        if key == VK_TAB.0 as u32 {
+            let shift_down = GetKeyState(VK_SHIFT.0 as i32) < 0;
+            if with_readonly_text_state(hwnd, |state| {
+                if shift_down {
+                    if GetFocus() == state.ok_button {
+                        SetFocus(state.edit);
+                    } else {
+                        SetFocus(state.ok_button);
+                    }
+                } else if GetFocus() == state.edit {
                     SetFocus(state.ok_button);
+                } else {
+                    SetFocus(state.edit);
                 }
-            } else if GetFocus() == state.edit {
-                SetFocus(state.ok_button);
-            } else {
-                SetFocus(state.edit);
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access readonly text state");
             }
-        })
-        .is_none()
-        {
-            crate::log_debug("Failed to access readonly text state");
-        }
-        return true;
-    }
-    if key == VK_ESCAPE.0 as u32 {
-        crate::log_if_err!(DestroyWindow(hwnd));
-        return true;
-    }
-    if key == VK_RETURN.0 as u32 {
-        let mut handled = false;
-        if with_readonly_text_state(hwnd, |state| {
-            if GetFocus() == state.ok_button {
-                crate::log_if_err!(DestroyWindow(hwnd));
-                handled = true;
-            }
-        })
-        .is_none()
-        {
-            crate::log_debug("Failed to access readonly text state");
-        }
-        if handled {
             return true;
         }
+        if key == VK_ESCAPE.0 as u32 {
+            crate::log_if_err!(DestroyWindow(hwnd));
+            return true;
+        }
+        if key == VK_RETURN.0 as u32 {
+            let mut handled = false;
+            if with_readonly_text_state(hwnd, |state| {
+                if GetFocus() == state.ok_button {
+                    crate::log_if_err!(DestroyWindow(hwnd));
+                    handled = true;
+                }
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access readonly text state");
+            }
+            if handled {
+                return true;
+            }
+        }
+        false
     }
-    false
 }
 
-pub unsafe fn open(parent: HWND) {
-    open_window(parent, HelpWindowKind::Guide);
+pub fn open(parent: HWND) {
+    unsafe { open_window(parent, HelpWindowKind::Guide) };
 }
 
-pub unsafe fn open_changelog(parent: HWND) {
-    open_window(parent, HelpWindowKind::Changelog);
+pub fn open_changelog(parent: HWND) {
+    unsafe { open_window(parent, HelpWindowKind::Changelog) };
 }
 
-pub unsafe fn open_donations(parent: HWND) {
-    open_window(parent, HelpWindowKind::Donations);
+pub fn open_donations(parent: HWND) {
+    unsafe { open_window(parent, HelpWindowKind::Donations) };
 }
 
-pub unsafe fn open_readonly_text(parent: HWND, title: &str, content: &str) {
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-    let class_name = to_wide(READONLY_TEXT_CLASS_NAME);
-    let wc = WNDCLASSW {
-        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
-            LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
-        ),
-        hInstance: hinstance,
-        lpszClassName: PCWSTR(class_name.as_ptr()),
-        lpfnWndProc: Some(readonly_text_wndproc),
-        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
-        ..Default::default()
-    };
-    RegisterClassW(&wc);
+pub fn open_readonly_text(parent: HWND, title: &str, content: &str) {
+    unsafe {
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+        let class_name = to_wide(READONLY_TEXT_CLASS_NAME);
+        let wc = WNDCLASSW {
+            hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+                LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
+            ),
+            hInstance: hinstance,
+            lpszClassName: PCWSTR(class_name.as_ptr()),
+            lpfnWndProc: Some(readonly_text_wndproc),
+            hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+            ..Default::default()
+        };
+        RegisterClassW(&wc);
 
-    let init = Box::new(ReadonlyTextInit {
-        content: normalize_to_crlf(content),
-    });
-    let init_ptr = Box::into_raw(init);
-    let title_wide = to_wide(title);
-    let hwnd = CreateWindowExW(
-        WS_EX_CONTROLPARENT,
-        PCWSTR(class_name.as_ptr()),
-        PCWSTR(title_wide.as_ptr()),
-        WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        640,
-        480,
-        parent,
-        None,
-        hinstance,
-        Some(init_ptr as *const std::ffi::c_void),
-    );
-    if hwnd.0 != 0 {
-        register_readonly_text_window(hwnd);
-        SetForegroundWindow(hwnd);
-    } else if !init_ptr.is_null() {
-        let _unused_box = Box::from_raw(init_ptr);
+        let init = Box::new(ReadonlyTextInit {
+            content: normalize_to_crlf(content),
+        });
+        let init_ptr = Box::into_raw(init);
+        let title_wide = to_wide(title);
+        let hwnd = CreateWindowExW(
+            WS_EX_CONTROLPARENT,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(title_wide.as_ptr()),
+            WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            640,
+            480,
+            parent,
+            None,
+            hinstance,
+            Some(init_ptr as *const std::ffi::c_void),
+        );
+        if hwnd.0 != 0 {
+            register_readonly_text_window(hwnd);
+            SetForegroundWindow(hwnd);
+        } else if !init_ptr.is_null() {
+            let _unused_box = Box::from_raw(init_ptr);
+        }
     }
 }
 
@@ -293,19 +297,21 @@ unsafe fn open_window(parent: HWND, kind: HelpWindowKind) {
     }
 }
 
-pub unsafe fn handle_tab(hwnd: HWND) {
-    if with_help_state(hwnd, |state| {
-        let focus = GetFocus();
+pub fn handle_tab(hwnd: HWND) {
+    unsafe {
+        if with_help_state(hwnd, |state| {
+            let focus = GetFocus();
 
-        if focus == state.edit {
-            SetFocus(state.ok_button);
-        } else {
-            SetFocus(state.edit);
+            if focus == state.edit {
+                SetFocus(state.ok_button);
+            } else {
+                SetFocus(state.edit);
+            }
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access help state");
         }
-    })
-    .is_none()
-    {
-        crate::log_debug("Failed to access help state");
     }
 }
 

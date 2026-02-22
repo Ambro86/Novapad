@@ -453,158 +453,161 @@ unsafe fn move_options_focus_tab(hwnd: HWND, backwards: bool) {
     }
 }
 
-pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
-    if (msg.message == WM_KEYDOWN
-        || msg.message == windows::Win32::UI::WindowsAndMessaging::WM_SYSKEYDOWN)
-        && with_options_state(hwnd, |state| state.shortcut_capture_pending).unwrap_or(false)
-    {
-        let edit_shortcut_value =
-            with_options_state(hwnd, |state| state.edit_shortcut_value).unwrap_or(HWND(0));
-        if edit_shortcut_value.0 == 0 {
-            return false;
-        }
-
-        let key = msg.wParam.0 as u16;
-        if key == VK_ESCAPE.0 {
-            if with_options_state(hwnd, |state| {
-                state.shortcut_capture_pending = false;
-            })
-            .is_none()
-            {
-                crate::log_debug("Failed to access state in options_window");
-            }
-            update_shortcut_binding_text(hwnd);
-            return true;
-        }
-        if key == VK_TAB.0 {
-            if with_options_state(hwnd, |state| {
-                state.shortcut_capture_pending = false;
-            })
-            .is_none()
-            {
-                crate::log_debug("Failed to access state in options_window");
-            }
-            update_shortcut_binding_text(hwnd);
-            let shift_down =
-                modifier_down_any(&[VK_SHIFT.0 as i32, VK_LSHIFT.0 as i32, VK_RSHIFT.0 as i32]);
-            move_options_focus_tab(hwnd, shift_down);
-            return true;
-        }
-        if key == VK_RETURN.0 || key == VK_SPACE.0 {
-            return true;
-        }
-        if is_modifier_vk(key) {
-            return true;
-        }
-
-        let normalized_key = if (b'a' as u16..=b'z' as u16).contains(&key) {
-            key - 32
-        } else {
-            key
-        };
-        let action = selected_shortcut_action(hwnd);
-        let ctrl = modifier_down_any(&[
-            VK_CONTROL.0 as i32,
-            VK_LCONTROL.0 as i32,
-            VK_RCONTROL.0 as i32,
-        ]);
-        let shift = modifier_down_any(&[VK_SHIFT.0 as i32, VK_LSHIFT.0 as i32, VK_RSHIFT.0 as i32]);
-        let alt = modifier_down_any(&[VK_MENU.0 as i32, VK_LMENU.0 as i32, VK_RMENU.0 as i32]);
-        let candidate = ShortcutBinding::new(ctrl, shift, alt, normalized_key);
-
-        let conflict = with_options_state(hwnd, |state| {
-            find_shortcut_conflict(&state.shortcut_draft, action, candidate).map(
-                |conflict_action| {
-                    let language =
-                        with_state(state.parent, |app| app.settings.language).unwrap_or_default();
-                    let shortcut = format_shortcut(candidate);
-                    let conflict_label = shortcut_action_label(language, conflict_action);
-                    let message = i18n::tr_f(
-                        language,
-                        "options.shortcuts.duplicate_error",
-                        &[("shortcut", &shortcut), ("action", conflict_label)],
-                    );
-                    (language, message)
-                },
-            )
-        })
-        .flatten();
-        if let Some((language, message)) = conflict {
-            crate::show_error(hwnd, language, &message);
-            update_shortcut_binding_text(hwnd);
-            return true;
-        }
-
-        if with_options_state(hwnd, |state| {
-            set_shortcut_binding_for_action(&mut state.shortcut_draft, action, candidate);
-            state.shortcut_capture_pending = false;
-        })
-        .is_none()
+pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
+    unsafe {
+        if (msg.message == WM_KEYDOWN
+            || msg.message == windows::Win32::UI::WindowsAndMessaging::WM_SYSKEYDOWN)
+            && with_options_state(hwnd, |state| state.shortcut_capture_pending).unwrap_or(false)
         {
-            crate::log_debug("Failed to access state in options_window");
-        }
-        update_shortcut_binding_text(hwnd);
-        return true;
-    }
-
-    if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_TAB.0 as u32 {
-        let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
-        if ctrl_down {
-            let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
-
-            if let Some(tabs) = with_options_state(hwnd, |state| state.hwnd_tabs)
-                && tabs.0 != 0
-            {
-                let current = SendMessageW(tabs, TCM_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
-                let mut next = if shift_down { current - 1 } else { current + 1 };
-                if next < 0 {
-                    next = OPTIONS_TAB_COUNT - 1;
-                } else if next >= OPTIONS_TAB_COUNT {
-                    next = 0;
-                }
-                SendMessageW(tabs, TCM_SETCURSEL, WPARAM(next as usize), LPARAM(0));
-                set_active_tab(hwnd, next);
-                SetFocus(tabs);
-
-                // Force update focus for screen readers
-                if let Err(_e) =
-                    PostMessageW(hwnd, WM_NEXTDLGCTL, WPARAM(tabs.0 as usize), LPARAM(1))
-                {
-                    crate::log_debug(&format!("Error posting WM_NEXTDLGCTL: {:?}", _e));
-                }
-                return true;
+            let edit_shortcut_value =
+                with_options_state(hwnd, |state| state.edit_shortcut_value).unwrap_or(HWND(0));
+            if edit_shortcut_value.0 == 0 {
+                return false;
             }
-        }
-    }
-    if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
-        let focus = GetFocus();
-        if GetParent(focus) == hwnd {
-            let dropped = SendMessageW(focus, CB_GETDROPPEDSTATE, WPARAM(0), LPARAM(0)).0 != 0;
-            if !dropped {
-                // If focus is on the insert tag button, insert the tag before closing
-                let is_insert_tag_button =
-                    with_options_state(hwnd, |state| focus == state.button_tts_insert_tag)
-                        .unwrap_or(false);
-                if is_insert_tag_button {
-                    insert_voice_tag_from_options(hwnd);
-                }
+
+            let key = msg.wParam.0 as u16;
+            if key == VK_ESCAPE.0 {
                 if with_options_state(hwnd, |state| {
-                    SendMessageW(
-                        hwnd,
-                        WM_COMMAND,
-                        WPARAM(OPTIONS_ID_OK),
-                        LPARAM(state.ok_button.0),
-                    );
+                    state.shortcut_capture_pending = false;
                 })
                 .is_none()
                 {
                     crate::log_debug("Failed to access state in options_window");
                 }
+                update_shortcut_binding_text(hwnd);
                 return true;
             }
+            if key == VK_TAB.0 {
+                if with_options_state(hwnd, |state| {
+                    state.shortcut_capture_pending = false;
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access state in options_window");
+                }
+                update_shortcut_binding_text(hwnd);
+                let shift_down =
+                    modifier_down_any(&[VK_SHIFT.0 as i32, VK_LSHIFT.0 as i32, VK_RSHIFT.0 as i32]);
+                move_options_focus_tab(hwnd, shift_down);
+                return true;
+            }
+            if key == VK_RETURN.0 || key == VK_SPACE.0 {
+                return true;
+            }
+            if is_modifier_vk(key) {
+                return true;
+            }
+
+            let normalized_key = if (b'a' as u16..=b'z' as u16).contains(&key) {
+                key - 32
+            } else {
+                key
+            };
+            let action = selected_shortcut_action(hwnd);
+            let ctrl = modifier_down_any(&[
+                VK_CONTROL.0 as i32,
+                VK_LCONTROL.0 as i32,
+                VK_RCONTROL.0 as i32,
+            ]);
+            let shift =
+                modifier_down_any(&[VK_SHIFT.0 as i32, VK_LSHIFT.0 as i32, VK_RSHIFT.0 as i32]);
+            let alt = modifier_down_any(&[VK_MENU.0 as i32, VK_LMENU.0 as i32, VK_RMENU.0 as i32]);
+            let candidate = ShortcutBinding::new(ctrl, shift, alt, normalized_key);
+
+            let conflict = with_options_state(hwnd, |state| {
+                find_shortcut_conflict(&state.shortcut_draft, action, candidate).map(
+                    |conflict_action| {
+                        let language = with_state(state.parent, |app| app.settings.language)
+                            .unwrap_or_default();
+                        let shortcut = format_shortcut(candidate);
+                        let conflict_label = shortcut_action_label(language, conflict_action);
+                        let message = i18n::tr_f(
+                            language,
+                            "options.shortcuts.duplicate_error",
+                            &[("shortcut", &shortcut), ("action", conflict_label)],
+                        );
+                        (language, message)
+                    },
+                )
+            })
+            .flatten();
+            if let Some((language, message)) = conflict {
+                crate::show_error(hwnd, language, &message);
+                update_shortcut_binding_text(hwnd);
+                return true;
+            }
+
+            if with_options_state(hwnd, |state| {
+                set_shortcut_binding_for_action(&mut state.shortcut_draft, action, candidate);
+                state.shortcut_capture_pending = false;
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access state in options_window");
+            }
+            update_shortcut_binding_text(hwnd);
+            return true;
         }
+
+        if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_TAB.0 as u32 {
+            let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
+            if ctrl_down {
+                let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+
+                if let Some(tabs) = with_options_state(hwnd, |state| state.hwnd_tabs)
+                    && tabs.0 != 0
+                {
+                    let current = SendMessageW(tabs, TCM_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
+                    let mut next = if shift_down { current - 1 } else { current + 1 };
+                    if next < 0 {
+                        next = OPTIONS_TAB_COUNT - 1;
+                    } else if next >= OPTIONS_TAB_COUNT {
+                        next = 0;
+                    }
+                    SendMessageW(tabs, TCM_SETCURSEL, WPARAM(next as usize), LPARAM(0));
+                    set_active_tab(hwnd, next);
+                    SetFocus(tabs);
+
+                    // Force update focus for screen readers
+                    if let Err(_e) =
+                        PostMessageW(hwnd, WM_NEXTDLGCTL, WPARAM(tabs.0 as usize), LPARAM(1))
+                    {
+                        crate::log_debug(&format!("Error posting WM_NEXTDLGCTL: {:?}", _e));
+                    }
+                    return true;
+                }
+            }
+        }
+        if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
+            let focus = GetFocus();
+            if GetParent(focus) == hwnd {
+                let dropped = SendMessageW(focus, CB_GETDROPPEDSTATE, WPARAM(0), LPARAM(0)).0 != 0;
+                if !dropped {
+                    // If focus is on the insert tag button, insert the tag before closing
+                    let is_insert_tag_button =
+                        with_options_state(hwnd, |state| focus == state.button_tts_insert_tag)
+                            .unwrap_or(false);
+                    if is_insert_tag_button {
+                        insert_voice_tag_from_options(hwnd);
+                    }
+                    if with_options_state(hwnd, |state| {
+                        SendMessageW(
+                            hwnd,
+                            WM_COMMAND,
+                            WPARAM(OPTIONS_ID_OK),
+                            LPARAM(state.ok_button.0),
+                        );
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access state in options_window");
+                    }
+                    return true;
+                }
+            }
+        }
+        handle_accessibility(hwnd, msg)
     }
-    handle_accessibility(hwnd, msg)
 }
 
 struct OptionsDialogState {
@@ -1106,57 +1109,59 @@ fn collect_voice_language_codes(voices: &[VoiceInfo]) -> Vec<String> {
     codes
 }
 
-pub unsafe fn open(parent: HWND) {
-    let existing = with_state(parent, |state| state.options_dialog).unwrap_or(HWND(0));
-    if existing.0 != 0 {
-        SetForegroundWindow(existing);
-        return;
-    }
-
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-    let class_name = to_wide(OPTIONS_CLASS_NAME);
-    let wc = WNDCLASSW {
-        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
-            LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
-        ),
-        hInstance: hinstance,
-        lpszClassName: PCWSTR(class_name.as_ptr()),
-        lpfnWndProc: Some(options_wndproc),
-        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
-        ..Default::default()
-    };
-    RegisterClassW(&wc);
-
-    let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
-    let labels = options_labels(language);
-    let title = to_wide(&labels.title);
-
-    let dialog = CreateWindowExW(
-        WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
-        PCWSTR(class_name.as_ptr()),
-        PCWSTR(title.as_ptr()),
-        WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        620,
-        710,
-        parent,
-        None,
-        hinstance,
-        Some(parent.0 as *const std::ffi::c_void),
-    );
-
-    if dialog.0 != 0 {
-        if with_state(parent, |state| {
-            state.options_dialog = dialog;
-        })
-        .is_none()
-        {
-            crate::log_debug("Failed to access state in options_window");
+pub fn open(parent: HWND) {
+    unsafe {
+        let existing = with_state(parent, |state| state.options_dialog).unwrap_or(HWND(0));
+        if existing.0 != 0 {
+            SetForegroundWindow(existing);
+            return;
         }
-        EnableWindow(parent, true);
-        SetForegroundWindow(dialog);
-        ensure_voice_lists_loaded(parent, language);
+
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+        let class_name = to_wide(OPTIONS_CLASS_NAME);
+        let wc = WNDCLASSW {
+            hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+                LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
+            ),
+            hInstance: hinstance,
+            lpszClassName: PCWSTR(class_name.as_ptr()),
+            lpfnWndProc: Some(options_wndproc),
+            hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+            ..Default::default()
+        };
+        RegisterClassW(&wc);
+
+        let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
+        let labels = options_labels(language);
+        let title = to_wide(&labels.title);
+
+        let dialog = CreateWindowExW(
+            WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            620,
+            710,
+            parent,
+            None,
+            hinstance,
+            Some(parent.0 as *const std::ffi::c_void),
+        );
+
+        if dialog.0 != 0 {
+            if with_state(parent, |state| {
+                state.options_dialog = dialog;
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access state in options_window");
+            }
+            EnableWindow(parent, true);
+            SetForegroundWindow(dialog);
+            ensure_voice_lists_loaded(parent, language);
+        }
     }
 }
 

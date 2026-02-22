@@ -199,63 +199,65 @@ fn language_from_code(code: &str, fallback: Language) -> Language {
     }
 }
 
-pub unsafe fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
+pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     handle_accessibility(hwnd, msg)
 }
 
-pub unsafe fn open(parent: HWND) {
-    let existing = with_state(parent, |state| state.wiktionary_window).unwrap_or(HWND(0));
-    if existing.0 != 0 {
-        SetForegroundWindow(existing);
-        return;
+pub fn open(parent: HWND) {
+    unsafe {
+        let existing = with_state(parent, |state| state.wiktionary_window).unwrap_or(HWND(0));
+        if existing.0 != 0 {
+            SetForegroundWindow(existing);
+            return;
+        }
+
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+        let class_name = to_wide(WIKTIONARY_CLASS_NAME);
+        let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
+        let labels = wiktionary_labels(language);
+        let title = to_wide(&labels.title);
+
+        let wc = WNDCLASSW {
+            hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+                LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
+            ),
+            hInstance: hinstance,
+            lpszClassName: PCWSTR(class_name.as_ptr()),
+            lpfnWndProc: Some(wiktionary_wndproc),
+            hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+            ..Default::default()
+        };
+        RegisterClassW(&wc);
+
+        let state = Box::new(WiktionaryWindowState {
+            parent,
+            input: HWND(0),
+            language_combo: HWND(0),
+            output: HWND(0),
+            search: HWND(0),
+            close: HWND(0),
+        });
+        let state_ptr = Box::into_raw(state);
+        let hwnd = CreateWindowExW(
+            WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            520,
+            420,
+            parent,
+            HMENU(0),
+            hinstance,
+            Some(state_ptr as *const _),
+        );
+        if hwnd.0 == 0 {
+            let _unused_box = Box::from_raw(state_ptr);
+            return;
+        }
+        with_state(parent, |state| state.wiktionary_window = hwnd);
     }
-
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-    let class_name = to_wide(WIKTIONARY_CLASS_NAME);
-    let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
-    let labels = wiktionary_labels(language);
-    let title = to_wide(&labels.title);
-
-    let wc = WNDCLASSW {
-        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
-            LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
-        ),
-        hInstance: hinstance,
-        lpszClassName: PCWSTR(class_name.as_ptr()),
-        lpfnWndProc: Some(wiktionary_wndproc),
-        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
-        ..Default::default()
-    };
-    RegisterClassW(&wc);
-
-    let state = Box::new(WiktionaryWindowState {
-        parent,
-        input: HWND(0),
-        language_combo: HWND(0),
-        output: HWND(0),
-        search: HWND(0),
-        close: HWND(0),
-    });
-    let state_ptr = Box::into_raw(state);
-    let hwnd = CreateWindowExW(
-        WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
-        PCWSTR(class_name.as_ptr()),
-        PCWSTR(title.as_ptr()),
-        WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        520,
-        420,
-        parent,
-        HMENU(0),
-        hinstance,
-        Some(state_ptr as *const _),
-    );
-    if hwnd.0 == 0 {
-        let _unused_box = Box::from_raw(state_ptr);
-        return;
-    }
-    with_state(parent, |state| state.wiktionary_window = hwnd);
 }
 
 unsafe extern "system" fn wiktionary_wndproc(

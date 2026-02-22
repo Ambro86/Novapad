@@ -1660,24 +1660,28 @@ pub unsafe fn reset_audiobook_pitch(hwnd: HWND) -> Option<f32> {
     Some(pitch)
 }
 
-pub unsafe fn audiobook_volume_level(hwnd: HWND) -> Option<f32> {
-    with_state(hwnd, |state| {
-        state
-            .active_audiobook
-            .as_ref()
-            .map(|player| if player.muted { 0.0 } else { player.volume })
-    })
-    .flatten()
+pub fn audiobook_volume_level(hwnd: HWND) -> Option<f32> {
+    unsafe {
+        with_state(hwnd, |state| {
+            state
+                .active_audiobook
+                .as_ref()
+                .map(|player| if player.muted { 0.0 } else { player.volume })
+        })
+        .flatten()
+    }
 }
 
-pub unsafe fn audiobook_output_stopped(hwnd: HWND) -> Option<bool> {
-    with_state(hwnd, |state| {
-        state
-            .active_audiobook
-            .as_ref()
-            .map(|p| p.output.is_stopped())
-    })
-    .flatten()
+pub fn audiobook_output_stopped(hwnd: HWND) -> Option<bool> {
+    unsafe {
+        with_state(hwnd, |state| {
+            state
+                .active_audiobook
+                .as_ref()
+                .map(|p| p.output.is_stopped())
+        })
+        .flatten()
+    }
 }
 
 /// Switch to a different audio track and restart playback.

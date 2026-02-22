@@ -1364,7 +1364,7 @@ fn announce_player_pitch(language: Language, pitch: f32) {
 }
 
 fn announce_player_volume(hwnd: HWND) {
-    let volume = unsafe { crate::audio_player::audiobook_volume_level(hwnd) };
+    let volume = crate::audio_player::audiobook_volume_level(hwnd);
     let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     let Some(volume) = volume else {
         return;
@@ -8715,7 +8715,7 @@ fn handle_audio_playlist_timer(hwnd: HWND) {
     if is_paused {
         return;
     }
-    let output_stopped = unsafe { audio_player::audiobook_output_stopped(hwnd) }.unwrap_or(false);
+    let output_stopped = audio_player::audiobook_output_stopped(hwnd).unwrap_or(false);
     if !should_advance && !output_stopped {
         return;
     }

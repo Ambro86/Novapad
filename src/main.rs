@@ -1351,9 +1351,7 @@ fn announce_player_time(hwnd: HWND) {
     };
     nvda_speak(&message);
     if should_stop {
-        unsafe {
-            stop_audiobook_playback(hwnd);
-        }
+        stop_audiobook_playback(hwnd);
     }
 }
 
@@ -1468,9 +1466,9 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
         PlayerCommand::TogglePause => unsafe {
             toggle_audiobook_pause(hwnd);
         },
-        PlayerCommand::Stop => unsafe {
+        PlayerCommand::Stop => {
             stop_audiobook_playback(hwnd);
-        },
+        }
         PlayerCommand::Seek(amount) => unsafe {
             seek_audiobook(hwnd, amount);
         },
@@ -8721,7 +8719,7 @@ fn handle_audio_playlist_timer(hwnd: HWND) {
         && output_stopped
         && current_seconds == 0
         && elapsed_since_start.as_secs() <= 5
-        && unsafe { audio_player::retry_current_with_ffmpeg_stream(hwnd) }
+        && audio_player::retry_current_with_ffmpeg_stream(hwnd)
     {
         return;
     }
@@ -8749,9 +8747,7 @@ fn handle_audio_playlist_timer(hwnd: HWND) {
         }
     }
     if !switch_audio_playlist_relative(hwnd, 1) {
-        unsafe {
-            audio_player::stop_audiobook_playback(hwnd);
-        }
+        audio_player::stop_audiobook_playback(hwnd);
     }
 }
 

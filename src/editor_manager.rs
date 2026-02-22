@@ -1774,14 +1774,16 @@ pub fn normalize_whitespace_active_edit(hwnd: HWND) -> bool {
     true
 }
 
-pub unsafe fn get_selected_text(hwnd_edit: HWND) -> Option<String> {
+pub fn get_selected_text(hwnd_edit: HWND) -> Option<String> {
     let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXGETSEL,
-        WPARAM(0),
-        LPARAM(&mut selection as *mut _ as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut selection as *mut _ as isize),
+        );
+    }
     if selection.cpMin > selection.cpMax {
         std::mem::swap(&mut selection.cpMin, &mut selection.cpMax);
     }
@@ -2379,25 +2381,27 @@ pub unsafe fn clean_end_of_line_hyphens_active_edit(hwnd: HWND) -> bool {
     true
 }
 
-pub unsafe fn text_stats_active_edit(hwnd: HWND) {
-    let Some(hwnd_edit) = crate::get_active_edit(hwnd) else {
+pub fn text_stats_active_edit(hwnd: HWND) {
+    let Some(hwnd_edit) = (unsafe { crate::get_active_edit(hwnd) }) else {
         return;
     };
     let text = get_edit_text(hwnd_edit);
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     if text.is_empty() {
         let message = build_text_stats_message(language, 0, 0, 0, 0);
-        crate::show_info(hwnd, language, &message);
+        unsafe { crate::show_info(hwnd, language, &message) };
         return;
     }
 
     let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXGETSEL,
-        WPARAM(0),
-        LPARAM(&mut selection as *mut _ as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut selection as *mut _ as isize),
+        );
+    }
 
     let target = if selection.cpMin != selection.cpMax {
         let start_byte = utf16_index_to_byte(&text, selection.cpMin);
@@ -2422,8 +2426,8 @@ pub unsafe fn text_stats_active_edit(hwnd: HWND) {
         words,
         lines,
     );
-    crate::show_info(hwnd, language, &message);
-    SetFocus(hwnd_edit);
+    unsafe { crate::show_info(hwnd, language, &message) };
+    unsafe { SetFocus(hwnd_edit) };
 }
 
 fn normalize_whitespace_block(text: &str, line_ending: &str) -> String {

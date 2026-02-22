@@ -4094,7 +4094,7 @@ pub fn start_audiobook_from_selection(hwnd: HWND) {
     let Some(hwnd_edit) = (unsafe { get_active_edit(hwnd) }) else {
         return;
     };
-    let text = unsafe { crate::editor_manager::get_selected_text(hwnd_edit) };
+    let text = crate::editor_manager::get_selected_text(hwnd_edit);
     let Some(text) = text else {
         let language =
             unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();

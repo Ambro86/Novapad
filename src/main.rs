@@ -8702,13 +8702,15 @@ fn handle_audio_playlist_timer(hwnd: HWND) {
             if player.is_paused {
                 return Some((true, false, 0_u64, std::time::Duration::from_secs(0)));
             }
-            let duration = audio_player::audiobook_duration_secs(&player.path)?;
             let current = audio_player::audiobook_position_secs(player)
                 .max(0.0)
                 .floor() as u64;
+            let should_advance = audio_player::audiobook_duration_secs(&player.path)
+                .map(|duration| current >= duration.saturating_add(1))
+                .unwrap_or(false);
             Some((
                 false,
-                current >= duration.saturating_add(1),
+                should_advance,
                 current,
                 player.start_instant.elapsed(),
             ))
@@ -8732,6 +8734,31 @@ fn handle_audio_playlist_timer(hwnd: HWND) {
         && unsafe { audio_player::retry_current_with_ffmpeg_stream(hwnd) }
     {
         return;
+    }
+    // In the first seconds after startup/resume FFmpeg streaming may transiently report
+    // "stopped" before stable output; avoid stopping the playlist too early.
+    if !should_advance && output_stopped && elapsed_since_start.as_secs() <= 2 {
+        return;
+    }
+    // If output stops mid-file (e.g. transient backend failure), recover by restarting
+    // from the current position instead of stopping playback entirely.
+    if !should_advance && output_stopped {
+        let restart = unsafe {
+            with_state(hwnd, |state| {
+                let player = state.active_audiobook.as_ref()?;
+                let position_secs = audio_player::audiobook_position_secs(player)
+                    .max(0.0)
+                    .floor() as u64;
+                Some((player.path.clone(), position_secs))
+            })
+            .flatten()
+        };
+        if let Some((path, position_secs)) = restart {
+            unsafe {
+                audio_player::start_audiobook_at(hwnd, &path, position_secs);
+            }
+            return;
+        }
     }
     if !switch_audio_playlist_relative(hwnd, 1) {
         unsafe {

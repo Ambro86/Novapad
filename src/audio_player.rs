@@ -768,6 +768,15 @@ fn start_audiobook_at_with_options(
                         options.audio_track,
                     ) {
                         Ok(output) => {
+                            unsafe {
+                                if with_state(hwnd_main, |state| {
+                                    state.audio_ffmpeg_retry_for = Some(path.clone());
+                                })
+                                .is_none()
+                                {
+                                    crate::log_debug("Failed to access audio player state");
+                                }
+                            }
                             log_debug("Audio player: using FFmpeg streaming");
                             output
                         }

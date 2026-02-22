@@ -4036,7 +4036,7 @@ pub fn start_audiobook(hwnd: HWND) {
     let Some(hwnd_edit) = (unsafe { get_active_edit(hwnd) }) else {
         return;
     };
-    let text = unsafe { get_edit_text(hwnd_edit) };
+    let text = get_edit_text(hwnd_edit);
     let (suggested_name, doc_path, split_epub, language, is_unsaved_doc) = unsafe {
         with_state(hwnd, |state| {
             state.docs.get(state.current).map(|doc| {

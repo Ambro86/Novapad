@@ -1158,62 +1158,68 @@ impl Default for Document {
 
 // --- Editor Helpers ---
 
-pub unsafe fn set_edit_text(hwnd_edit: HWND, text: &str) {
+pub fn set_edit_text(hwnd_edit: HWND, text: &str) {
     let wide = to_wide_normalized(text);
     if hwnd_edit.0 != 0 {
         // Prevent programmatic loads from marking the document as modified.
-        SendMessageW(hwnd_edit, EM_SETEVENTMASK, WPARAM(0), LPARAM(0));
+        unsafe { SendMessageW(hwnd_edit, EM_SETEVENTMASK, WPARAM(0), LPARAM(0)) };
     }
-    if let Err(e) = SetWindowTextW(hwnd_edit, PCWSTR(wide.as_ptr())) {
+    if let Err(e) = unsafe { SetWindowTextW(hwnd_edit, PCWSTR(wide.as_ptr())) } {
         crate::log_debug(&format!("Failed to set editor text: {}", e));
     }
     if hwnd_edit.0 != 0 {
-        SendMessageW(hwnd_edit, EM_SETMODIFY, WPARAM(0), LPARAM(0));
+        unsafe { SendMessageW(hwnd_edit, EM_SETMODIFY, WPARAM(0), LPARAM(0)) };
         // Programmatic loads must not leave stale undo history.
-        SendMessageW(hwnd_edit, EM_EMPTYUNDOBUFFER, WPARAM(0), LPARAM(0));
-        SendMessageW(
-            hwnd_edit,
-            EM_SETEVENTMASK,
-            WPARAM(0),
-            LPARAM((ENM_CHANGE | ENM_SELCHANGE) as isize),
-        );
+        unsafe { SendMessageW(hwnd_edit, EM_EMPTYUNDOBUFFER, WPARAM(0), LPARAM(0)) };
+        unsafe {
+            SendMessageW(
+                hwnd_edit,
+                EM_SETEVENTMASK,
+                WPARAM(0),
+                LPARAM((ENM_CHANGE | ENM_SELCHANGE) as isize),
+            );
+        }
     }
 }
 
-pub unsafe fn get_edit_text(hwnd_edit: HWND) -> String {
+pub fn get_edit_text(hwnd_edit: HWND) -> String {
     use windows::Win32::UI::WindowsAndMessaging::{WM_GETTEXT, WM_GETTEXTLENGTH};
-    let len = SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as usize;
+    let len = unsafe { SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)) }.0 as usize;
     if len == 0 {
         return String::new();
     }
     let mut buf = vec![0u16; len + 1];
-    SendMessageW(
-        hwnd_edit,
-        WM_GETTEXT,
-        WPARAM(buf.len()),
-        LPARAM(buf.as_mut_ptr() as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            WM_GETTEXT,
+            WPARAM(buf.len()),
+            LPARAM(buf.as_mut_ptr() as isize),
+        );
+    }
     String::from_utf16_lossy(&buf[..len])
 }
 
-pub unsafe fn send_to_active_edit(hwnd: HWND, msg: u32) {
-    if let Some(hwnd_edit) = crate::get_active_edit(hwnd) {
-        SendMessageW(hwnd_edit, msg, WPARAM(0), LPARAM(0));
+pub fn send_to_active_edit(hwnd: HWND, msg: u32) {
+    if let Some(hwnd_edit) = unsafe { crate::get_active_edit(hwnd) } {
+        unsafe { SendMessageW(hwnd_edit, msg, WPARAM(0), LPARAM(0)) };
     }
 }
 
-pub unsafe fn select_all_active_edit(hwnd: HWND) {
-    if let Some(hwnd_edit) = crate::get_active_edit(hwnd) {
+pub fn select_all_active_edit(hwnd: HWND) {
+    if let Some(hwnd_edit) = unsafe { crate::get_active_edit(hwnd) } {
         let cr = CHARRANGE {
             cpMin: 0,
             cpMax: -1,
         };
-        SendMessageW(
-            hwnd_edit,
-            EM_EXSETSEL,
-            WPARAM(0),
-            LPARAM(&cr as *const _ as isize),
-        );
+        unsafe {
+            SendMessageW(
+                hwnd_edit,
+                EM_EXSETSEL,
+                WPARAM(0),
+                LPARAM(&cr as *const _ as isize),
+            );
+        }
     }
 }
 

@@ -8598,9 +8598,7 @@ fn play_audio_playlist_item(hwnd: HWND, index: usize) {
 
     let tab_index = unsafe { editor_manager::ensure_audio_document_tab(hwnd, &path) };
     if let Some(tab_index) = tab_index {
-        unsafe {
-            editor_manager::select_tab(hwnd, tab_index);
-        }
+        editor_manager::select_tab(hwnd, tab_index);
     }
     audio_player::stop_audiobook_playback(hwnd);
     audio_player::start_audiobook_playback(hwnd, &path);

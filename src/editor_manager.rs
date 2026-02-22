@@ -790,11 +790,13 @@ fn apply_text_limit(hwnd_edit: HWND) {
     }
 }
 
-pub unsafe fn apply_text_limit_to_all_edits(hwnd: HWND) {
-    let edits = with_state(hwnd, |state| {
-        state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>()
-    })
-    .unwrap_or_default();
+pub fn apply_text_limit_to_all_edits(hwnd: HWND) {
+    let edits = unsafe {
+        with_state(hwnd, |state| {
+            state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>()
+        })
+        .unwrap_or_default()
+    };
 
     for hwnd_edit in edits {
         apply_text_limit(hwnd_edit);
@@ -1619,7 +1621,7 @@ pub fn strip_markdown_active_edit(hwnd: HWND) -> bool {
         );
     }
     end_single_undo_action(hwnd_edit);
-    unsafe { mark_dirty_from_edit(hwnd, hwnd_edit) };
+    mark_dirty_from_edit(hwnd, hwnd_edit);
     unsafe { SetFocus(hwnd_edit) };
     true
 }
@@ -1769,7 +1771,7 @@ pub fn normalize_whitespace_active_edit(hwnd: HWND) -> bool {
             LPARAM(replace_wide.as_ptr() as isize),
         );
     }
-    unsafe { mark_dirty_from_edit(hwnd, hwnd_edit) };
+    mark_dirty_from_edit(hwnd, hwnd_edit);
     unsafe { SetFocus(hwnd_edit) };
     true
 }
@@ -3354,127 +3356,137 @@ pub unsafe fn get_or_create_rss_document(hwnd: HWND, title: &str) -> Option<HWND
     Some(hwnd_edit)
 }
 
-pub unsafe fn select_tab(hwnd: HWND, index: usize) {
-    crate::log_debug(&format!("Editor: select_tab called for index {}", index));
-    let result = with_state(hwnd, |state| {
-        if index >= state.docs.len() {
-            return None;
-        }
-        let prev = state.current;
-        let prev_edit = state.docs.get(prev).map(|doc| doc.hwnd_edit);
-        let new_doc = state.docs.get(index);
-        let new_edit = new_doc.map(|doc| doc.hwnd_edit);
-        let is_audiobook = new_doc
-            .map(|doc| matches!(doc.format, FileFormat::Audiobook))
-            .unwrap_or(false);
-        crate::log_debug(&format!(
-            "Editor: Switching from index {} to {}. Is audiobook: {}",
-            prev, index, is_audiobook
-        ));
-        state.current = index;
-        Some((state.hwnd_tab, prev_edit, new_edit, is_audiobook))
-    })
-    .flatten();
+pub fn select_tab(hwnd: HWND, index: usize) {
+    unsafe {
+        crate::log_debug(&format!("Editor: select_tab called for index {}", index));
+        let result = with_state(hwnd, |state| {
+            if index >= state.docs.len() {
+                return None;
+            }
+            let prev = state.current;
+            let prev_edit = state.docs.get(prev).map(|doc| doc.hwnd_edit);
+            let new_doc = state.docs.get(index);
+            let new_edit = new_doc.map(|doc| doc.hwnd_edit);
+            let is_audiobook = new_doc
+                .map(|doc| matches!(doc.format, FileFormat::Audiobook))
+                .unwrap_or(false);
+            crate::log_debug(&format!(
+                "Editor: Switching from index {} to {}. Is audiobook: {}",
+                prev, index, is_audiobook
+            ));
+            state.current = index;
+            Some((state.hwnd_tab, prev_edit, new_edit, is_audiobook))
+        })
+        .flatten();
 
-    let Some((hwnd_tab, prev_edit, new_edit, is_audiobook)) = result else {
-        return;
-    };
+        let Some((hwnd_tab, prev_edit, new_edit, is_audiobook)) = result else {
+            return;
+        };
 
-    if let Some(hwnd_edit) = prev_edit {
-        ShowWindow(hwnd_edit, SW_HIDE);
-    }
-    SendMessageW(hwnd_tab, TCM_SETCURSEL, WPARAM(index), LPARAM(0));
-    if let Some(hwnd_edit) = new_edit {
-        if is_audiobook {
+        if let Some(hwnd_edit) = prev_edit {
             ShowWindow(hwnd_edit, SW_HIDE);
-            SetFocus(hwnd_tab);
-        } else {
-            ShowWindow(hwnd_edit, SW_SHOW);
-            SetFocus(hwnd_edit);
         }
-    }
-    update_window_title(hwnd);
-    crate::menu::update_playback_menu(hwnd, is_audiobook);
-    layout_children(hwnd);
-    crate::update_main_status_bar(hwnd);
-}
-
-pub unsafe fn insert_tab(hwnd_tab: HWND, title: &str, index: i32) {
-    let mut text = to_wide(title);
-    let mut item = TCITEMW {
-        mask: TCIF_TEXT,
-        pszText: PWSTR(text.as_mut_ptr()),
-        ..Default::default()
-    };
-    SendMessageW(
-        hwnd_tab,
-        TCM_INSERTITEMW,
-        WPARAM(index as usize),
-        LPARAM(&mut item as *mut _ as isize),
-    );
-}
-
-pub unsafe fn update_tab_title(hwnd_tab: HWND, index: usize, title: &str, dirty: bool) {
-    let label = if dirty {
-        format!("{title}*")
-    } else {
-        title.to_string()
-    };
-    let mut text = to_wide(&label);
-    let mut item = TCITEMW {
-        mask: TCIF_TEXT,
-        pszText: PWSTR(text.as_mut_ptr()),
-        ..Default::default()
-    };
-    SendMessageW(
-        hwnd_tab,
-        TCM_SETITEMW,
-        WPARAM(index),
-        LPARAM(&mut item as *mut _ as isize),
-    );
-}
-
-pub unsafe fn mark_dirty_from_edit(hwnd: HWND, hwnd_edit: HWND) {
-    if with_state(hwnd, |state| {
-        for (i, doc) in state.docs.iter_mut().enumerate() {
-            if doc.hwnd_edit == hwnd_edit && !doc.dirty {
-                doc.dirty = true;
-                update_tab_title(state.hwnd_tab, i, &doc.title, true);
-                update_window_title(hwnd);
-                break;
-            }
-        }
-    })
-    .is_none()
-    {
-        crate::log_debug("Failed to access editor state");
-    }
-}
-
-pub unsafe fn update_window_title(hwnd: HWND) {
-    if with_state(hwnd, |state| {
-        if let Some(doc) = state.docs.get(state.current) {
-            let display_title = &doc.title;
-            let app_name = crate::settings::app_display_name(&state.settings);
-            let base_title = if display_title.trim().is_empty() {
-                app_name.to_string()
+        SendMessageW(hwnd_tab, TCM_SETCURSEL, WPARAM(index), LPARAM(0));
+        if let Some(hwnd_edit) = new_edit {
+            if is_audiobook {
+                ShowWindow(hwnd_edit, SW_HIDE);
+                SetFocus(hwnd_tab);
             } else {
-                format!("{display_title} - {app_name}")
-            };
-            let full_title = apply_modified_marker(
-                &base_title,
-                doc.dirty,
-                state.settings.modified_marker_position,
-            );
-            let wide = to_wide(&full_title);
-            if let Err(e) = SetWindowTextW(hwnd, PCWSTR(wide.as_ptr())) {
-                crate::log_debug(&format!("Failed to set window title: {}", e));
+                ShowWindow(hwnd_edit, SW_SHOW);
+                SetFocus(hwnd_edit);
             }
         }
-    })
-    .is_none()
-    {
-        crate::log_debug("Failed to access editor state");
+        update_window_title(hwnd);
+        crate::menu::update_playback_menu(hwnd, is_audiobook);
+        layout_children(hwnd);
+        crate::update_main_status_bar(hwnd);
+    }
+}
+
+pub fn insert_tab(hwnd_tab: HWND, title: &str, index: i32) {
+    unsafe {
+        let mut text = to_wide(title);
+        let mut item = TCITEMW {
+            mask: TCIF_TEXT,
+            pszText: PWSTR(text.as_mut_ptr()),
+            ..Default::default()
+        };
+        SendMessageW(
+            hwnd_tab,
+            TCM_INSERTITEMW,
+            WPARAM(index as usize),
+            LPARAM(&mut item as *mut _ as isize),
+        );
+    }
+}
+
+pub fn update_tab_title(hwnd_tab: HWND, index: usize, title: &str, dirty: bool) {
+    unsafe {
+        let label = if dirty {
+            format!("{title}*")
+        } else {
+            title.to_string()
+        };
+        let mut text = to_wide(&label);
+        let mut item = TCITEMW {
+            mask: TCIF_TEXT,
+            pszText: PWSTR(text.as_mut_ptr()),
+            ..Default::default()
+        };
+        SendMessageW(
+            hwnd_tab,
+            TCM_SETITEMW,
+            WPARAM(index),
+            LPARAM(&mut item as *mut _ as isize),
+        );
+    }
+}
+
+pub fn mark_dirty_from_edit(hwnd: HWND, hwnd_edit: HWND) {
+    unsafe {
+        if with_state(hwnd, |state| {
+            for (i, doc) in state.docs.iter_mut().enumerate() {
+                if doc.hwnd_edit == hwnd_edit && !doc.dirty {
+                    doc.dirty = true;
+                    update_tab_title(state.hwnd_tab, i, &doc.title, true);
+                    update_window_title(hwnd);
+                    break;
+                }
+            }
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access editor state");
+        }
+    }
+}
+
+pub fn update_window_title(hwnd: HWND) {
+    unsafe {
+        if with_state(hwnd, |state| {
+            if let Some(doc) = state.docs.get(state.current) {
+                let display_title = &doc.title;
+                let app_name = crate::settings::app_display_name(&state.settings);
+                let base_title = if display_title.trim().is_empty() {
+                    app_name.to_string()
+                } else {
+                    format!("{display_title} - {app_name}")
+                };
+                let full_title = apply_modified_marker(
+                    &base_title,
+                    doc.dirty,
+                    state.settings.modified_marker_position,
+                );
+                let wide = to_wide(&full_title);
+                if let Err(e) = SetWindowTextW(hwnd, PCWSTR(wide.as_ptr())) {
+                    crate::log_debug(&format!("Failed to set window title: {}", e));
+                }
+            }
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access editor state");
+        }
     }
 }
 

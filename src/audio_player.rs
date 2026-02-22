@@ -1343,46 +1343,48 @@ pub unsafe fn retry_current_with_ffmpeg_stream(hwnd: HWND) -> bool {
     true
 }
 
-pub unsafe fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
-    crate::log_debug(&format!(
-        "Audio player: start_audiobook_at called for {} at {}s",
-        path.display(),
-        seconds
-    ));
-    let (speed, pitch, volume, muted, prev_volume) = with_state(hwnd, |state| {
-        if let Some(player) = &state.active_audiobook {
-            (
-                player.speed,
-                player.pitch,
-                player.volume,
-                player.muted,
-                player.prev_volume,
-            )
-        } else {
-            (1.0, 0.0, 1.0, false, 1.0)
-        }
-    })
-    .unwrap_or((1.0, 0.0, 1.0, false, 1.0));
+pub fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
+    unsafe {
+        crate::log_debug(&format!(
+            "Audio player: start_audiobook_at called for {} at {}s",
+            path.display(),
+            seconds
+        ));
+        let (speed, pitch, volume, muted, prev_volume) = with_state(hwnd, |state| {
+            if let Some(player) = &state.active_audiobook {
+                (
+                    player.speed,
+                    player.pitch,
+                    player.volume,
+                    player.muted,
+                    player.prev_volume,
+                )
+            } else {
+                (1.0, 0.0, 1.0, false, 1.0)
+            }
+        })
+        .unwrap_or((1.0, 0.0, 1.0, false, 1.0));
 
-    let audio_track = with_state(hwnd, |state| state.selected_audio_track).flatten();
-    stop_audiobook_playback(hwnd);
-    let path_buf = path.to_path_buf();
-    start_audiobook_at_with_options(
-        hwnd,
-        path_buf,
-        seconds,
-        AudiobookPlaybackOptions {
-            speed,
-            pitch,
-            paused: false,
-            volume,
-            muted,
-            prev_volume,
-            mix_export: false,
-            audio_track,
-            force_ffmpeg_stream: false,
-        },
-    );
+        let audio_track = with_state(hwnd, |state| state.selected_audio_track).flatten();
+        stop_audiobook_playback(hwnd);
+        let path_buf = path.to_path_buf();
+        start_audiobook_at_with_options(
+            hwnd,
+            path_buf,
+            seconds,
+            AudiobookPlaybackOptions {
+                speed,
+                pitch,
+                paused: false,
+                volume,
+                muted,
+                prev_volume,
+                mix_export: false,
+                audio_track,
+                force_ffmpeg_stream: false,
+            },
+        );
+    }
 }
 
 pub unsafe fn change_audiobook_volume(hwnd: HWND, delta: f32) {

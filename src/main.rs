@@ -8748,9 +8748,7 @@ fn handle_audio_playlist_timer(hwnd: HWND) {
             .flatten()
         };
         if let Some((path, position_secs)) = restart {
-            unsafe {
-                audio_player::start_audiobook_at(hwnd, &path, position_secs);
-            }
+            audio_player::start_audiobook_at(hwnd, &path, position_secs);
             return;
         }
     }

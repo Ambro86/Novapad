@@ -17,3 +17,12 @@ Service/integra.txt
 
 claude.md
 nul
+
+# Temporary/private debug artifacts
+_tmp_bridge_*.txt
+diff_ci.txt
+sapi4_bridge/stderr.txt
+sapi4_bridge/stdout.txt
+sapi4_bridge/test_input.txt
+sapi4_bridge/tentativi.txt
+src/tools/fetch_fn.txt

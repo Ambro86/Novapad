@@ -3523,289 +3523,308 @@ fn apply_modified_marker(title: &str, dirty: bool, position: ModifiedMarkerPosit
     }
 }
 
-pub unsafe fn layout_children(hwnd: HWND) {
-    let state_data = with_state(hwnd, |state| {
-        (
-            state.hwnd_tab,
-            state.hwnd_status,
-            state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>(),
-            state.voice_panel_visible,
-            state.voice_favorites_visible,
-            state.settings.tts_engine,
-            state.settings.tts_only_multilingual,
-            state.voice_label_engine,
-            state.voice_combo_engine,
-            state.voice_label_language,
-            state.voice_combo_language,
-            state.voice_label_voice,
-            state.voice_combo_voice,
-            state.voice_button_insert_tag,
-            state.voice_label_speed,
-            state.voice_combo_speed,
-            state.voice_edit_speed,
-            state.voice_label_pitch,
-            state.voice_combo_pitch,
-            state.voice_edit_pitch,
-            state.voice_label_volume,
-            state.voice_combo_volume,
-            state.voice_edit_volume,
-            state.voice_checkbox_multilingual,
-            state.voice_label_favorites,
-            state.voice_combo_favorites,
-        )
-    });
-    if state_data.is_none() {
-        crate::log_debug("Failed to access editor state");
-        return;
-    }
+pub fn layout_children(hwnd: HWND) {
+    unsafe {
+        let state_data = with_state(hwnd, |state| {
+            (
+                state.hwnd_tab,
+                state.hwnd_status,
+                state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>(),
+                state.voice_panel_visible,
+                state.voice_favorites_visible,
+                state.settings.tts_engine,
+                state.settings.tts_only_multilingual,
+                state.voice_label_engine,
+                state.voice_combo_engine,
+                state.voice_label_language,
+                state.voice_combo_language,
+                state.voice_label_voice,
+                state.voice_combo_voice,
+                state.voice_button_insert_tag,
+                state.voice_label_speed,
+                state.voice_combo_speed,
+                state.voice_edit_speed,
+                state.voice_label_pitch,
+                state.voice_combo_pitch,
+                state.voice_edit_pitch,
+                state.voice_label_volume,
+                state.voice_combo_volume,
+                state.voice_edit_volume,
+                state.voice_checkbox_multilingual,
+                state.voice_label_favorites,
+                state.voice_combo_favorites,
+            )
+        });
+        if state_data.is_none() {
+            crate::log_debug("Failed to access editor state");
+            return;
+        }
 
-    let Some((
-        hwnd_tab,
-        hwnd_status,
-        edit_handles,
-        voice_panel_visible,
-        favorites_visible,
-        tts_engine,
-        tts_only_multilingual,
-        label_engine,
-        combo_engine,
-        label_language,
-        combo_language,
-        label_voice,
-        combo_voice,
-        button_insert_tag,
-        label_speed,
-        combo_speed,
-        edit_speed,
-        label_pitch,
-        combo_pitch,
-        edit_pitch,
-        label_volume,
-        combo_volume,
-        edit_volume,
-        checkbox_multilingual,
-        label_favorites,
-        combo_favorites,
-    )) = state_data
-    else {
-        return;
-    };
-
-    let mut rc = RECT::default();
-    if GetClientRect(hwnd, &mut rc).is_err() {
-        return;
-    }
-
-    let width = rc.right - rc.left;
-    let height = rc.bottom - rc.top;
-    let status_height = if hwnd_status.0 != 0 { 22 } else { 0 };
-    let tab_height = (height - status_height).max(0);
-
-    crate::log_if_err!(MoveWindow(hwnd_tab, 0, 0, width, tab_height, true));
-    if hwnd_status.0 != 0 {
-        crate::log_if_err!(MoveWindow(
+        let Some((
+            hwnd_tab,
             hwnd_status,
-            0,
-            tab_height,
-            width,
-            status_height,
-            true
-        ));
-    }
+            edit_handles,
+            voice_panel_visible,
+            favorites_visible,
+            tts_engine,
+            tts_only_multilingual,
+            label_engine,
+            combo_engine,
+            label_language,
+            combo_language,
+            label_voice,
+            combo_voice,
+            button_insert_tag,
+            label_speed,
+            combo_speed,
+            edit_speed,
+            label_pitch,
+            combo_pitch,
+            edit_pitch,
+            label_volume,
+            combo_volume,
+            edit_volume,
+            checkbox_multilingual,
+            label_favorites,
+            combo_favorites,
+        )) = state_data
+        else {
+            return;
+        };
 
-    let mut tab_rc = rc;
-    SendMessageW(
-        hwnd_tab,
-        TCM_ADJUSTRECT,
-        WPARAM(0),
-        LPARAM(&mut tab_rc as *mut _ as isize),
-    );
+        let mut rc = RECT::default();
+        if GetClientRect(hwnd, &mut rc).is_err() {
+            return;
+        }
 
-    let mut panel_height = 0;
-    let panel_visible = voice_panel_visible || favorites_visible;
-    if panel_visible {
-        let show_multilingual =
-            voice_panel_visible && matches!(tts_engine, crate::settings::TtsEngine::Edge);
-        let show_language = voice_panel_visible
-            && matches!(tts_engine, crate::settings::TtsEngine::Edge)
-            && !tts_only_multilingual;
-        let mut rows = 0;
-        if voice_panel_visible {
-            rows += 5;
-            if show_multilingual {
+        let width = rc.right - rc.left;
+        let height = rc.bottom - rc.top;
+        let status_height = if hwnd_status.0 != 0 { 22 } else { 0 };
+        let tab_height = (height - status_height).max(0);
+
+        crate::log_if_err!(MoveWindow(hwnd_tab, 0, 0, width, tab_height, true));
+        if hwnd_status.0 != 0 {
+            crate::log_if_err!(MoveWindow(
+                hwnd_status,
+                0,
+                tab_height,
+                width,
+                status_height,
+                true
+            ));
+        }
+
+        let mut tab_rc = rc;
+        SendMessageW(
+            hwnd_tab,
+            TCM_ADJUSTRECT,
+            WPARAM(0),
+            LPARAM(&mut tab_rc as *mut _ as isize),
+        );
+
+        let mut panel_height = 0;
+        let panel_visible = voice_panel_visible || favorites_visible;
+        if panel_visible {
+            let show_multilingual =
+                voice_panel_visible && matches!(tts_engine, crate::settings::TtsEngine::Edge);
+            let show_language = voice_panel_visible
+                && matches!(tts_engine, crate::settings::TtsEngine::Edge)
+                && !tts_only_multilingual;
+            let mut rows = 0;
+            if voice_panel_visible {
+                rows += 5;
+                if show_multilingual {
+                    rows += 1;
+                }
+                if show_language {
+                    rows += 1;
+                }
+            }
+            if favorites_visible {
                 rows += 1;
             }
-            if show_language {
-                rows += 1;
-            }
-        }
-        if favorites_visible {
-            rows += 1;
-        }
-        panel_height = VOICE_PANEL_PADDING * 2
-            + VOICE_PANEL_ROW_HEIGHT * rows
-            + VOICE_PANEL_SPACING * (rows - 1);
-        let label_x = tab_rc.left + VOICE_PANEL_PADDING;
-        let combo_x = label_x + VOICE_PANEL_LABEL_WIDTH + VOICE_PANEL_PADDING;
-        let combo_width = (tab_rc.right - VOICE_PANEL_PADDING) - combo_x;
-        let combo_width = if combo_width < 120 { 120 } else { combo_width };
-        let combo_voice_width =
-            (combo_width - (VOICE_PANEL_BUTTON_WIDTH + VOICE_PANEL_PADDING)).max(120);
-        let button_voice_x = combo_x + combo_voice_width + VOICE_PANEL_PADDING;
-        let row1_top = tab_rc.top + VOICE_PANEL_PADDING;
-        let row2_top = row1_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
-        let row3_top = row2_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
-        let row4_top = row3_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
-        let row5_top = row4_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
-        let row6_top = row5_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
-        let row7_top = row6_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
-        let row8_top = row7_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
+            panel_height = VOICE_PANEL_PADDING * 2
+                + VOICE_PANEL_ROW_HEIGHT * rows
+                + VOICE_PANEL_SPACING * (rows - 1);
+            let label_x = tab_rc.left + VOICE_PANEL_PADDING;
+            let combo_x = label_x + VOICE_PANEL_LABEL_WIDTH + VOICE_PANEL_PADDING;
+            let combo_width = (tab_rc.right - VOICE_PANEL_PADDING) - combo_x;
+            let combo_width = if combo_width < 120 { 120 } else { combo_width };
+            let combo_voice_width =
+                (combo_width - (VOICE_PANEL_BUTTON_WIDTH + VOICE_PANEL_PADDING)).max(120);
+            let button_voice_x = combo_x + combo_voice_width + VOICE_PANEL_PADDING;
+            let row1_top = tab_rc.top + VOICE_PANEL_PADDING;
+            let row2_top = row1_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
+            let row3_top = row2_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
+            let row4_top = row3_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
+            let row5_top = row4_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
+            let row6_top = row5_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
+            let row7_top = row6_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
+            let row8_top = row7_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING;
 
-        if voice_panel_visible {
-            crate::log_if_err!(MoveWindow(
-                label_engine,
-                label_x,
-                row1_top,
-                VOICE_PANEL_LABEL_WIDTH,
-                VOICE_PANEL_ROW_HEIGHT,
-                true,
-            ));
-            crate::log_if_err!(MoveWindow(
-                combo_engine,
-                combo_x,
-                row1_top - 2,
-                combo_width,
-                VOICE_PANEL_COMBO_HEIGHT,
-                true,
-            ));
-            crate::log_if_err!(MoveWindow(
-                label_language,
-                label_x,
-                row2_top,
-                VOICE_PANEL_LABEL_WIDTH,
-                VOICE_PANEL_ROW_HEIGHT,
-                true,
-            ));
-            crate::log_if_err!(MoveWindow(
-                combo_language,
-                combo_x,
-                row2_top - 2,
-                combo_width,
-                VOICE_PANEL_COMBO_HEIGHT,
-                true,
-            ));
-            crate::log_if_err!(MoveWindow(
-                label_voice,
-                label_x,
-                if show_language { row3_top } else { row2_top },
-                VOICE_PANEL_LABEL_WIDTH,
-                VOICE_PANEL_ROW_HEIGHT,
-                true,
-            ));
-            crate::log_if_err!(MoveWindow(
-                combo_voice,
-                combo_x,
-                (if show_language { row3_top } else { row2_top }) - 2,
-                combo_voice_width,
-                VOICE_PANEL_COMBO_HEIGHT,
-                true,
-            ));
-            crate::log_if_err!(MoveWindow(
-                button_insert_tag,
-                button_voice_x,
-                if show_language { row3_top } else { row2_top },
-                VOICE_PANEL_BUTTON_WIDTH,
-                VOICE_PANEL_ROW_HEIGHT,
-                true,
-            ));
-            crate::log_if_err!(MoveWindow(
-                label_speed,
-                label_x,
-                if show_language { row4_top } else { row3_top },
-                VOICE_PANEL_LABEL_WIDTH,
-                VOICE_PANEL_ROW_HEIGHT,
-                true,
-            ));
-            crate::log_if_err!(MoveWindow(
-                combo_speed,
-                combo_x,
-                (if show_language { row4_top } else { row3_top }) - 2,
-                combo_width,
-                VOICE_PANEL_COMBO_HEIGHT,
-                true,
-            ));
-            crate::log_if_err!(MoveWindow(
-                edit_speed,
-                combo_x,
-                (if show_language { row4_top } else { row3_top }) - 2,
-                combo_width,
-                VOICE_PANEL_COMBO_HEIGHT,
-                true,
-            ));
-            crate::log_if_err!(MoveWindow(
-                label_pitch,
-                label_x,
-                if show_language { row5_top } else { row4_top },
-                VOICE_PANEL_LABEL_WIDTH,
-                VOICE_PANEL_ROW_HEIGHT,
-                true,
-            ));
-            crate::log_if_err!(MoveWindow(
-                combo_pitch,
-                combo_x,
-                (if show_language { row5_top } else { row4_top }) - 2,
-                combo_width,
-                VOICE_PANEL_COMBO_HEIGHT,
-                true,
-            ));
-            crate::log_if_err!(MoveWindow(
-                edit_pitch,
-                combo_x,
-                (if show_language { row5_top } else { row4_top }) - 2,
-                combo_width,
-                VOICE_PANEL_COMBO_HEIGHT,
-                true,
-            ));
-            crate::log_if_err!(MoveWindow(
-                label_volume,
-                label_x,
-                if show_language { row6_top } else { row5_top },
-                VOICE_PANEL_LABEL_WIDTH,
-                VOICE_PANEL_ROW_HEIGHT,
-                true,
-            ));
-            crate::log_if_err!(MoveWindow(
-                combo_volume,
-                combo_x,
-                (if show_language { row6_top } else { row5_top }) - 2,
-                combo_width,
-                VOICE_PANEL_COMBO_HEIGHT,
-                true,
-            ));
-            crate::log_if_err!(MoveWindow(
-                edit_volume,
-                combo_x,
-                (if show_language { row6_top } else { row5_top }) - 2,
-                combo_width,
-                VOICE_PANEL_COMBO_HEIGHT,
-                true,
-            ));
-            if show_multilingual {
-                let checkbox_row = if show_language { row7_top } else { row6_top };
+            if voice_panel_visible {
                 crate::log_if_err!(MoveWindow(
-                    checkbox_multilingual,
+                    label_engine,
                     label_x,
-                    checkbox_row,
-                    combo_width + VOICE_PANEL_LABEL_WIDTH + VOICE_PANEL_PADDING,
+                    row1_top,
+                    VOICE_PANEL_LABEL_WIDTH,
                     VOICE_PANEL_ROW_HEIGHT,
                     true,
                 ));
-                if favorites_visible {
-                    let favorites_row = if show_language { row8_top } else { row7_top };
+                crate::log_if_err!(MoveWindow(
+                    combo_engine,
+                    combo_x,
+                    row1_top - 2,
+                    combo_width,
+                    VOICE_PANEL_COMBO_HEIGHT,
+                    true,
+                ));
+                crate::log_if_err!(MoveWindow(
+                    label_language,
+                    label_x,
+                    row2_top,
+                    VOICE_PANEL_LABEL_WIDTH,
+                    VOICE_PANEL_ROW_HEIGHT,
+                    true,
+                ));
+                crate::log_if_err!(MoveWindow(
+                    combo_language,
+                    combo_x,
+                    row2_top - 2,
+                    combo_width,
+                    VOICE_PANEL_COMBO_HEIGHT,
+                    true,
+                ));
+                crate::log_if_err!(MoveWindow(
+                    label_voice,
+                    label_x,
+                    if show_language { row3_top } else { row2_top },
+                    VOICE_PANEL_LABEL_WIDTH,
+                    VOICE_PANEL_ROW_HEIGHT,
+                    true,
+                ));
+                crate::log_if_err!(MoveWindow(
+                    combo_voice,
+                    combo_x,
+                    (if show_language { row3_top } else { row2_top }) - 2,
+                    combo_voice_width,
+                    VOICE_PANEL_COMBO_HEIGHT,
+                    true,
+                ));
+                crate::log_if_err!(MoveWindow(
+                    button_insert_tag,
+                    button_voice_x,
+                    if show_language { row3_top } else { row2_top },
+                    VOICE_PANEL_BUTTON_WIDTH,
+                    VOICE_PANEL_ROW_HEIGHT,
+                    true,
+                ));
+                crate::log_if_err!(MoveWindow(
+                    label_speed,
+                    label_x,
+                    if show_language { row4_top } else { row3_top },
+                    VOICE_PANEL_LABEL_WIDTH,
+                    VOICE_PANEL_ROW_HEIGHT,
+                    true,
+                ));
+                crate::log_if_err!(MoveWindow(
+                    combo_speed,
+                    combo_x,
+                    (if show_language { row4_top } else { row3_top }) - 2,
+                    combo_width,
+                    VOICE_PANEL_COMBO_HEIGHT,
+                    true,
+                ));
+                crate::log_if_err!(MoveWindow(
+                    edit_speed,
+                    combo_x,
+                    (if show_language { row4_top } else { row3_top }) - 2,
+                    combo_width,
+                    VOICE_PANEL_COMBO_HEIGHT,
+                    true,
+                ));
+                crate::log_if_err!(MoveWindow(
+                    label_pitch,
+                    label_x,
+                    if show_language { row5_top } else { row4_top },
+                    VOICE_PANEL_LABEL_WIDTH,
+                    VOICE_PANEL_ROW_HEIGHT,
+                    true,
+                ));
+                crate::log_if_err!(MoveWindow(
+                    combo_pitch,
+                    combo_x,
+                    (if show_language { row5_top } else { row4_top }) - 2,
+                    combo_width,
+                    VOICE_PANEL_COMBO_HEIGHT,
+                    true,
+                ));
+                crate::log_if_err!(MoveWindow(
+                    edit_pitch,
+                    combo_x,
+                    (if show_language { row5_top } else { row4_top }) - 2,
+                    combo_width,
+                    VOICE_PANEL_COMBO_HEIGHT,
+                    true,
+                ));
+                crate::log_if_err!(MoveWindow(
+                    label_volume,
+                    label_x,
+                    if show_language { row6_top } else { row5_top },
+                    VOICE_PANEL_LABEL_WIDTH,
+                    VOICE_PANEL_ROW_HEIGHT,
+                    true,
+                ));
+                crate::log_if_err!(MoveWindow(
+                    combo_volume,
+                    combo_x,
+                    (if show_language { row6_top } else { row5_top }) - 2,
+                    combo_width,
+                    VOICE_PANEL_COMBO_HEIGHT,
+                    true,
+                ));
+                crate::log_if_err!(MoveWindow(
+                    edit_volume,
+                    combo_x,
+                    (if show_language { row6_top } else { row5_top }) - 2,
+                    combo_width,
+                    VOICE_PANEL_COMBO_HEIGHT,
+                    true,
+                ));
+                if show_multilingual {
+                    let checkbox_row = if show_language { row7_top } else { row6_top };
+                    crate::log_if_err!(MoveWindow(
+                        checkbox_multilingual,
+                        label_x,
+                        checkbox_row,
+                        combo_width + VOICE_PANEL_LABEL_WIDTH + VOICE_PANEL_PADDING,
+                        VOICE_PANEL_ROW_HEIGHT,
+                        true,
+                    ));
+                    if favorites_visible {
+                        let favorites_row = if show_language { row8_top } else { row7_top };
+                        crate::log_if_err!(MoveWindow(
+                            label_favorites,
+                            label_x,
+                            favorites_row,
+                            VOICE_PANEL_LABEL_WIDTH,
+                            VOICE_PANEL_ROW_HEIGHT,
+                            true,
+                        ));
+                        crate::log_if_err!(MoveWindow(
+                            combo_favorites,
+                            combo_x,
+                            favorites_row - 2,
+                            combo_width,
+                            VOICE_PANEL_COMBO_HEIGHT,
+                            true,
+                        ));
+                    }
+                } else if favorites_visible {
                     crate::log_if_err!(MoveWindow(
                         label_favorites,
                         label_x,
-                        favorites_row,
+                        row6_top,
                         VOICE_PANEL_LABEL_WIDTH,
                         VOICE_PANEL_ROW_HEIGHT,
                         true,
@@ -3813,7 +3832,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
                     crate::log_if_err!(MoveWindow(
                         combo_favorites,
                         combo_x,
-                        favorites_row - 2,
+                        row6_top - 2,
                         combo_width,
                         VOICE_PANEL_COMBO_HEIGHT,
                         true,
@@ -3823,7 +3842,7 @@ pub unsafe fn layout_children(hwnd: HWND) {
                 crate::log_if_err!(MoveWindow(
                     label_favorites,
                     label_x,
-                    row6_top,
+                    row1_top,
                     VOICE_PANEL_LABEL_WIDTH,
                     VOICE_PANEL_ROW_HEIGHT,
                     true,
@@ -3831,120 +3850,105 @@ pub unsafe fn layout_children(hwnd: HWND) {
                 crate::log_if_err!(MoveWindow(
                     combo_favorites,
                     combo_x,
-                    row6_top - 2,
+                    row1_top - 2,
                     combo_width,
                     VOICE_PANEL_COMBO_HEIGHT,
                     true,
                 ));
             }
-        } else if favorites_visible {
-            crate::log_if_err!(MoveWindow(
-                label_favorites,
-                label_x,
-                row1_top,
-                VOICE_PANEL_LABEL_WIDTH,
-                VOICE_PANEL_ROW_HEIGHT,
-                true,
-            ));
-            crate::log_if_err!(MoveWindow(
-                combo_favorites,
-                combo_x,
-                row1_top - 2,
-                combo_width,
-                VOICE_PANEL_COMBO_HEIGHT,
-                true,
-            ));
         }
-    }
 
-    let panel_offset = panel_height;
-    for hwnd_edit in edit_handles {
-        if hwnd_edit.0 != 0 {
-            crate::log_if_err!(MoveWindow(
-                hwnd_edit,
-                tab_rc.left,
-                tab_rc.top + panel_offset,
-                tab_rc.right - tab_rc.left,
-                tab_rc.bottom - tab_rc.top - panel_offset,
-                true,
-            ));
+        let panel_offset = panel_height;
+        for hwnd_edit in edit_handles {
+            if hwnd_edit.0 != 0 {
+                crate::log_if_err!(MoveWindow(
+                    hwnd_edit,
+                    tab_rc.left,
+                    tab_rc.top + panel_offset,
+                    tab_rc.right - tab_rc.left,
+                    tab_rc.bottom - tab_rc.top - panel_offset,
+                    true,
+                ));
+            }
         }
     }
 }
 
-pub unsafe fn create_edit(
+pub fn create_edit(
     parent: HWND,
     hfont: HFONT,
     word_wrap: bool,
     text_color: u32,
     text_size: i32,
 ) -> HWND {
-    let mut style = WS_CHILD
-        | WS_CLIPCHILDREN
-        | WS_VSCROLL
-        | WS_GROUP
-        | windows::Win32::UI::WindowsAndMessaging::WINDOW_STYLE(ES_MULTILINE as u32)
-        | windows::Win32::UI::WindowsAndMessaging::WINDOW_STYLE(ES_AUTOVSCROLL as u32)
-        | windows::Win32::UI::WindowsAndMessaging::WINDOW_STYLE(ES_WANTRETURN as u32);
-    if !word_wrap {
-        style |= WS_HSCROLL
-            | windows::Win32::UI::WindowsAndMessaging::WINDOW_STYLE(ES_AUTOHSCROLL as u32);
-    }
-
-    let hwnd_edit = windows::Win32::UI::WindowsAndMessaging::CreateWindowExW(
-        WS_EX_CLIENTEDGE,
-        MSFTEDIT_CLASS,
-        PCWSTR::null(),
-        style,
-        0,
-        0,
-        0,
-        0,
-        parent,
-        HMENU(0),
-        HINSTANCE(0),
-        None,
-    );
-
-    if hwnd_edit.0 != 0 {
-        if hfont.0 != 0 {
-            SendMessageW(hwnd_edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+    unsafe {
+        let mut style = WS_CHILD
+            | WS_CLIPCHILDREN
+            | WS_VSCROLL
+            | WS_GROUP
+            | windows::Win32::UI::WindowsAndMessaging::WINDOW_STYLE(ES_MULTILINE as u32)
+            | windows::Win32::UI::WindowsAndMessaging::WINDOW_STYLE(ES_AUTOVSCROLL as u32)
+            | windows::Win32::UI::WindowsAndMessaging::WINDOW_STYLE(ES_WANTRETURN as u32);
+        if !word_wrap {
+            style |= WS_HSCROLL
+                | windows::Win32::UI::WindowsAndMessaging::WINDOW_STYLE(ES_AUTOHSCROLL as u32);
         }
-        // Allow large pastes (default edit limit is ~32K).
-        apply_text_limit(hwnd_edit);
-        apply_text_appearance(hwnd_edit, text_color, text_size);
-        if let Some(settings) = with_state(parent, |state| state.settings.clone()) {
-            apply_indent_settings_to_edit(hwnd_edit, &settings);
+
+        let hwnd_edit = windows::Win32::UI::WindowsAndMessaging::CreateWindowExW(
+            WS_EX_CLIENTEDGE,
+            MSFTEDIT_CLASS,
+            PCWSTR::null(),
+            style,
+            0,
+            0,
+            0,
+            0,
+            parent,
+            HMENU(0),
+            HINSTANCE(0),
+            None,
+        );
+
+        if hwnd_edit.0 != 0 {
+            if hfont.0 != 0 {
+                SendMessageW(hwnd_edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+            }
+            // Allow large pastes (default edit limit is ~32K).
+            apply_text_limit(hwnd_edit);
+            apply_text_appearance(hwnd_edit, text_color, text_size);
+            if let Some(settings) = with_state(parent, |state| state.settings.clone()) {
+                apply_indent_settings_to_edit(hwnd_edit, &settings);
+                SendMessageW(
+                    hwnd_edit,
+                    EM_SETREADONLY,
+                    WPARAM(if settings.editor_read_only { 1 } else { 0 }),
+                    LPARAM(0),
+                );
+            }
+            SendMessageW(hwnd_edit, EM_SETMODIFY, WPARAM(0), LPARAM(0));
+            // Fresh editor instance starts with empty undo stack.
+            SendMessageW(hwnd_edit, EM_EMPTYUNDOBUFFER, WPARAM(0), LPARAM(0));
             SendMessageW(
                 hwnd_edit,
-                EM_SETREADONLY,
-                WPARAM(if settings.editor_read_only { 1 } else { 0 }),
-                LPARAM(0),
+                EM_SETEVENTMASK,
+                WPARAM(0),
+                LPARAM((ENM_CHANGE | ENM_SELCHANGE) as isize),
             );
+            // Install subclass for smart quotes
+            let proc_ptr = edit_subclass_proc as *const () as usize;
+            let prev = SetWindowLongPtrW(hwnd_edit, GWLP_WNDPROC, proc_ptr as isize);
+            SetWindowLongPtrW(hwnd_edit, GWLP_USERDATA, prev);
         }
-        SendMessageW(hwnd_edit, EM_SETMODIFY, WPARAM(0), LPARAM(0));
-        // Fresh editor instance starts with empty undo stack.
-        SendMessageW(hwnd_edit, EM_EMPTYUNDOBUFFER, WPARAM(0), LPARAM(0));
-        SendMessageW(
-            hwnd_edit,
-            EM_SETEVENTMASK,
-            WPARAM(0),
-            LPARAM((ENM_CHANGE | ENM_SELCHANGE) as isize),
-        );
-        // Install subclass for smart quotes
-        let proc_ptr = edit_subclass_proc as *const () as usize;
-        let prev = SetWindowLongPtrW(hwnd_edit, GWLP_WNDPROC, proc_ptr as isize);
-        SetWindowLongPtrW(hwnd_edit, GWLP_USERDATA, prev);
+        hwnd_edit
     }
-    hwnd_edit
 }
 
 pub fn save_current_document(hwnd: HWND) -> bool {
-    unsafe { save_document_at(hwnd, get_current_index(hwnd), false) }
+    save_document_at(hwnd, get_current_index(hwnd), false)
 }
 
 pub fn save_current_document_as(hwnd: HWND) -> bool {
-    unsafe { save_document_at(hwnd, get_current_index(hwnd), true) }
+    save_document_at(hwnd, get_current_index(hwnd), true)
 }
 
 pub fn save_all_documents(hwnd: HWND) -> bool {
@@ -3956,200 +3960,204 @@ pub fn save_all_documents(hwnd: HWND) -> bool {
         }
     }
     for index in dirty_indices {
-        if !unsafe { save_document_at(hwnd, index, false) } {
+        if !save_document_at(hwnd, index, false) {
             return false;
         }
     }
     true
 }
 
-pub unsafe fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
-    let result = with_state(hwnd, |state| {
-        if state.docs.is_empty() || index >= state.docs.len() {
-            return None;
-        }
-        // Prevent saving audio/video files which would corrupt them
-        if matches!(state.docs[index].format, FileFormat::Audiobook) {
-            return None;
-        }
-        if let Some(path) = state.docs[index].path.as_ref()
-            && crate::file_handler::is_audio_path(path)
-        {
-            return None;
-        }
-        let language = state.settings.language;
-        let text = get_edit_text(state.docs[index].hwnd_edit);
-        let is_lossy_doc = matches!(
-            state.docs[index].format,
-            FileFormat::Docx
-                | FileFormat::Odt
-                | FileFormat::Doc
-                | FileFormat::Pdf
-                | FileFormat::Spreadsheet
-                | FileFormat::Epub
-                | FileFormat::Html
-                | FileFormat::Ppt
-                | FileFormat::Pptx
-                | FileFormat::Odp
-        );
-        let mut suggested_name = state.docs[index]
-            .path
-            .as_ref()
-            .and_then(|path| {
-                if path.exists() {
-                    path.file_stem()
-                        .and_then(|name| name.to_str())
-                        .map(|s| s.to_string())
-                } else {
-                    None
-                }
-            })
-            .or_else(|| crate::suggested_filename_from_text(&text).filter(|name| !name.is_empty()))
-            .unwrap_or_else(|| state.docs[index].title.clone());
-        if is_lossy_doc {
-            let mut name_path = PathBuf::from(&suggested_name);
-            name_path.set_extension("txt");
-            suggested_name = name_path
-                .file_name()
-                .and_then(|name| name.to_str())
-                .unwrap_or("document.txt")
-                .to_string();
-        }
-
-        let path_info = if !force_dialog && !is_lossy_doc {
-            state.docs[index].path.clone().map(|p| (p, None))
-        } else {
-            None
-        };
-
-        let (path, user_selected_encoding) = match path_info {
-            Some((path, enc)) => (path, enc),
-            None => {
-                let initial_encoding = state.docs[index]
-                    .current_save_text_encoding
-                    .or(state.docs[index].opened_text_encoding)
-                    .unwrap_or_default();
-                match crate::save_file_dialog_with_encoding(
-                    hwnd,
-                    Some(&suggested_name),
-                    initial_encoding,
-                ) {
-                    Some((path, enc)) => (path, Some(enc)),
-                    None => return None,
-                }
+pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
+    unsafe {
+        let result = with_state(hwnd, |state| {
+            if state.docs.is_empty() || index >= state.docs.len() {
+                return None;
             }
-        };
-        if crate::file_handler::is_audio_path(&path) {
-            return None;
-        }
-
-        let is_pdf = crate::file_handler::is_pdf_path(&path);
-        let is_docx = crate::file_handler::is_docx_path(&path);
-        let is_doc = path
-            .extension()
-            .and_then(|s| s.to_str())
-            .map(|s| s.eq_ignore_ascii_case("doc"))
-            .unwrap_or(false);
-        let is_rtf = path
-            .extension()
-            .and_then(|s| s.to_str())
-            .map(|s| s.eq_ignore_ascii_case("rtf"))
-            .unwrap_or(false);
-
-        if is_pdf {
-            let pdf_title = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("Sonarpad Document");
-            if let Err(message) =
-                crate::file_handler::write_pdf_text(&path, pdf_title, &text, language)
+            // Prevent saving audio/video files which would corrupt them
+            if matches!(state.docs[index].format, FileFormat::Audiobook) {
+                return None;
+            }
+            if let Some(path) = state.docs[index].path.as_ref()
+                && crate::file_handler::is_audio_path(path)
             {
-                crate::show_error(hwnd, language, &message);
                 return None;
             }
-            state.docs[index].format = FileFormat::Pdf;
-        } else if is_docx || is_doc {
-            if let Err(message) = crate::file_handler::write_docx_text(&path, &text, language) {
-                crate::show_error(hwnd, language, &message);
-                return None;
-            }
-            state.docs[index].format = if is_docx {
+            let language = state.settings.language;
+            let text = get_edit_text(state.docs[index].hwnd_edit);
+            let is_lossy_doc = matches!(
+                state.docs[index].format,
                 FileFormat::Docx
+                    | FileFormat::Odt
+                    | FileFormat::Doc
+                    | FileFormat::Pdf
+                    | FileFormat::Spreadsheet
+                    | FileFormat::Epub
+                    | FileFormat::Html
+                    | FileFormat::Ppt
+                    | FileFormat::Pptx
+                    | FileFormat::Odp
+            );
+            let mut suggested_name = state.docs[index]
+                .path
+                .as_ref()
+                .and_then(|path| {
+                    if path.exists() {
+                        path.file_stem()
+                            .and_then(|name| name.to_str())
+                            .map(|s| s.to_string())
+                    } else {
+                        None
+                    }
+                })
+                .or_else(|| {
+                    crate::suggested_filename_from_text(&text).filter(|name| !name.is_empty())
+                })
+                .unwrap_or_else(|| state.docs[index].title.clone());
+            if is_lossy_doc {
+                let mut name_path = PathBuf::from(&suggested_name);
+                name_path.set_extension("txt");
+                suggested_name = name_path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or("document.txt")
+                    .to_string();
+            }
+
+            let path_info = if !force_dialog && !is_lossy_doc {
+                state.docs[index].path.clone().map(|p| (p, None))
             } else {
-                FileFormat::Doc
+                None
             };
-        } else if is_rtf {
-            if let Err(message) =
-                crate::audio_utils::write_rtf_text(&path, state.docs[index].hwnd_edit)
+
+            let (path, user_selected_encoding) = match path_info {
+                Some((path, enc)) => (path, enc),
+                None => {
+                    let initial_encoding = state.docs[index]
+                        .current_save_text_encoding
+                        .or(state.docs[index].opened_text_encoding)
+                        .unwrap_or_default();
+                    match crate::save_file_dialog_with_encoding(
+                        hwnd,
+                        Some(&suggested_name),
+                        initial_encoding,
+                    ) {
+                        Some((path, enc)) => (path, Some(enc)),
+                        None => return None,
+                    }
+                }
+            };
+            if crate::file_handler::is_audio_path(&path) {
+                return None;
+            }
+
+            let is_pdf = crate::file_handler::is_pdf_path(&path);
+            let is_docx = crate::file_handler::is_docx_path(&path);
+            let is_doc = path
+                .extension()
+                .and_then(|s| s.to_str())
+                .map(|s| s.eq_ignore_ascii_case("doc"))
+                .unwrap_or(false);
+            let is_rtf = path
+                .extension()
+                .and_then(|s| s.to_str())
+                .map(|s| s.eq_ignore_ascii_case("rtf"))
+                .unwrap_or(false);
+
+            if is_pdf {
+                let pdf_title = path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("Sonarpad Document");
+                if let Err(message) =
+                    crate::file_handler::write_pdf_text(&path, pdf_title, &text, language)
+                {
+                    crate::show_error(hwnd, language, &message);
+                    return None;
+                }
+                state.docs[index].format = FileFormat::Pdf;
+            } else if is_docx || is_doc {
+                if let Err(message) = crate::file_handler::write_docx_text(&path, &text, language) {
+                    crate::show_error(hwnd, language, &message);
+                    return None;
+                }
+                state.docs[index].format = if is_docx {
+                    FileFormat::Docx
+                } else {
+                    FileFormat::Doc
+                };
+            } else if is_rtf {
+                if let Err(message) =
+                    crate::audio_utils::write_rtf_text(&path, state.docs[index].hwnd_edit)
+                {
+                    crate::show_error(hwnd, language, &message);
+                    return None;
+                }
+                state.docs[index].format = FileFormat::Doc; // Doc handles RTF as well
+            } else {
+                let encoding = if let Some(enc) = user_selected_encoding {
+                    state.docs[index].current_save_text_encoding = Some(enc);
+                    enc
+                } else {
+                    state.docs[index]
+                        .current_save_text_encoding
+                        .or(state.docs[index].opened_text_encoding)
+                        .unwrap_or_default()
+                };
+                let bytes = encode_text(&text, encoding);
+                if let Err(err) = std::fs::write(&path, bytes) {
+                    crate::show_error(
+                        hwnd,
+                        language,
+                        &crate::settings::error_save_file_message(language, err),
+                    );
+                    return None;
+                }
+                state.docs[index].format = FileFormat::Text(encoding);
+            }
+
+            let hwnd_edit = state.docs[index].hwnd_edit;
+            let (old_bookmark_key, _) =
+                crate::bookmark_storage_key(state.docs[index].path.as_deref(), hwnd_edit);
+            let (new_bookmark_key, new_bookmark_persist) =
+                crate::bookmark_storage_key(Some(path.as_path()), hwnd_edit);
+            if old_bookmark_key != new_bookmark_key
+                && let Some(mut moved) = state.bookmarks.files.remove(&old_bookmark_key)
             {
-                crate::show_error(hwnd, language, &message);
-                return None;
+                state
+                    .bookmarks
+                    .files
+                    .entry(new_bookmark_key)
+                    .or_default()
+                    .append(&mut moved);
+                if new_bookmark_persist {
+                    crate::bookmarks::save_bookmarks(&state.bookmarks);
+                }
             }
-            state.docs[index].format = FileFormat::Doc; // Doc handles RTF as well
+            state.docs[index].path = Some(path.clone());
+            state.docs[index].dirty = false;
+            if force_dialog {
+                state.docs[index].is_temporary = false;
+                state.docs[index].from_rss = false;
+            }
+            SendMessageW(hwnd_edit, EM_SETMODIFY, WPARAM(0), LPARAM(0));
+            let title = path.file_name().and_then(|s| s.to_str()).unwrap_or("File");
+            state.docs[index].title = title.to_string();
+            update_tab_title(state.hwnd_tab, index, &state.docs[index].title, false);
+            if index == state.current {
+                update_window_title(hwnd);
+            }
+            Some(path)
+        });
+        if result.is_none() {
+            crate::log_debug("Failed to access editor state");
+        }
+
+        if let Some(Some(path)) = result {
+            crate::push_recent_file(hwnd, &path);
+            true
         } else {
-            let encoding = if let Some(enc) = user_selected_encoding {
-                state.docs[index].current_save_text_encoding = Some(enc);
-                enc
-            } else {
-                state.docs[index]
-                    .current_save_text_encoding
-                    .or(state.docs[index].opened_text_encoding)
-                    .unwrap_or_default()
-            };
-            let bytes = encode_text(&text, encoding);
-            if let Err(err) = std::fs::write(&path, bytes) {
-                crate::show_error(
-                    hwnd,
-                    language,
-                    &crate::settings::error_save_file_message(language, err),
-                );
-                return None;
-            }
-            state.docs[index].format = FileFormat::Text(encoding);
+            false
         }
-
-        let hwnd_edit = state.docs[index].hwnd_edit;
-        let (old_bookmark_key, _) =
-            crate::bookmark_storage_key(state.docs[index].path.as_deref(), hwnd_edit);
-        let (new_bookmark_key, new_bookmark_persist) =
-            crate::bookmark_storage_key(Some(path.as_path()), hwnd_edit);
-        if old_bookmark_key != new_bookmark_key
-            && let Some(mut moved) = state.bookmarks.files.remove(&old_bookmark_key)
-        {
-            state
-                .bookmarks
-                .files
-                .entry(new_bookmark_key)
-                .or_default()
-                .append(&mut moved);
-            if new_bookmark_persist {
-                crate::bookmarks::save_bookmarks(&state.bookmarks);
-            }
-        }
-        state.docs[index].path = Some(path.clone());
-        state.docs[index].dirty = false;
-        if force_dialog {
-            state.docs[index].is_temporary = false;
-            state.docs[index].from_rss = false;
-        }
-        SendMessageW(hwnd_edit, EM_SETMODIFY, WPARAM(0), LPARAM(0));
-        let title = path.file_name().and_then(|s| s.to_str()).unwrap_or("File");
-        state.docs[index].title = title.to_string();
-        update_tab_title(state.hwnd_tab, index, &state.docs[index].title, false);
-        if index == state.current {
-            update_window_title(hwnd);
-        }
-        Some(path)
-    });
-    if result.is_none() {
-        crate::log_debug("Failed to access editor state");
-    }
-
-    if let Some(Some(path)) = result {
-        crate::push_recent_file(hwnd, &path);
-        true
-    } else {
-        false
     }
 }
 
@@ -4158,7 +4166,7 @@ pub fn close_current_document(hwnd: HWND) {
         Some(i) => i,
         None => return,
     };
-    if !unsafe { close_document_at(hwnd, index) } {
+    if !close_document_at(hwnd, index) {
         crate::log_debug("Failed to close document");
     }
 }
@@ -4174,7 +4182,7 @@ pub fn close_other_documents(hwnd: HWND) -> bool {
             return true;
         }
         let idx = if current == 0 { 1 } else { 0 };
-        if !unsafe { close_document_at(hwnd, idx) } {
+        if !close_document_at(hwnd, idx) {
             return false;
         }
     }
@@ -4183,126 +4191,128 @@ pub fn close_other_documents(hwnd: HWND) -> bool {
 pub fn close_all_documents(hwnd: HWND) -> bool {
     let initial_total = unsafe { with_state(hwnd, |state| state.docs.len()) }.unwrap_or(0);
     for _ in 0..initial_total {
-        if !unsafe { close_document_at(hwnd, 0) } {
+        if !close_document_at(hwnd, 0) {
             return false;
         }
     }
     true
 }
 
-pub unsafe fn close_document_at(hwnd: HWND, index: usize) -> bool {
-    let result = with_state(hwnd, |state| {
-        if index >= state.docs.len() {
-            return None;
+pub fn close_document_at(hwnd: HWND, index: usize) -> bool {
+    unsafe {
+        let result = with_state(hwnd, |state| {
+            if index >= state.docs.len() {
+                return None;
+            }
+            Some((
+                state.current,
+                state.hwnd_tab,
+                state.docs.len(),
+                state.docs[index].title.clone(),
+            ))
+        });
+        if result.is_none() {
+            crate::log_debug("Failed to access editor state");
         }
-        Some((
-            state.current,
-            state.hwnd_tab,
-            state.docs.len(),
-            state.docs[index].title.clone(),
-        ))
-    });
-    if result.is_none() {
-        crate::log_debug("Failed to access editor state");
-    }
 
-    let (_current, hwnd_tab, _count, title) = match result {
-        Some(Some(values)) => values,
-        _ => return true,
-    };
+        let (_current, hwnd_tab, _count, title) = match result {
+            Some(Some(values)) => values,
+            _ => return true,
+        };
 
-    if !confirm_save_if_dirty_entry(hwnd, index, &title) {
-        return false;
-    }
-
-    let mut closing_hwnd_edit = HWND(0);
-    let mut new_hwnd_edit = None;
-    let mut was_current = false;
-    let mut was_empty = false;
-    let mut update_title = false;
-    let mut was_audiobook = false;
-
-    if with_state(hwnd, |state| {
-        was_current = state.current == index;
-        let doc = state.docs.remove(index);
-        closing_hwnd_edit = doc.hwnd_edit;
-        was_audiobook = matches!(doc.format, FileFormat::Audiobook);
-        SendMessageW(
-            hwnd_tab,
-            windows::Win32::UI::Controls::TCM_DELETEITEM,
-            WPARAM(index),
-            LPARAM(0),
-        );
-
-        if state.docs.is_empty() {
-            state.untitled_count = 0;
-            state.current = 0;
-            was_empty = true;
-        } else if was_current {
-            let idx = if index >= state.docs.len() {
-                state.docs.len() - 1
-            } else {
-                index
-            };
-            state.current = idx;
-            SendMessageW(hwnd_tab, TCM_SETCURSEL, WPARAM(idx), LPARAM(0));
-            new_hwnd_edit = state.docs.get(idx).map(|doc| doc.hwnd_edit);
-            update_title = true;
-        } else if index < state.current {
-            state.current -= 1;
-            SendMessageW(hwnd_tab, TCM_SETCURSEL, WPARAM(state.current), LPARAM(0));
+        if !confirm_save_if_dirty_entry(hwnd, index, &title) {
+            return false;
         }
-    })
-    .is_none()
-    {
-        crate::log_debug("Failed to access editor state");
-    }
 
-    if closing_hwnd_edit.0 != 0 {
-        crate::log_if_err!(DestroyWindow(closing_hwnd_edit));
-    }
-    if was_audiobook {
-        crate::audio_player::stop_audiobook_playback(hwnd);
-        crate::clear_active_podcast_chapters(hwnd);
-    }
+        let mut closing_hwnd_edit = HWND(0);
+        let mut new_hwnd_edit = None;
+        let mut was_current = false;
+        let mut was_empty = false;
+        let mut update_title = false;
+        let mut was_audiobook = false;
 
-    if was_empty {
-        new_document(hwnd);
-    } else {
-        if let Some(hwnd_edit) = new_hwnd_edit {
-            let is_audiobook = with_state(hwnd, |state| {
-                state
-                    .docs
-                    .get(state.current)
-                    .map(|d| matches!(d.format, FileFormat::Audiobook))
-                    .unwrap_or(false)
-            })
-            .unwrap_or(false);
-            if is_audiobook {
-                let hwnd_tab = with_state(hwnd, |state| state.hwnd_tab).unwrap_or(HWND(0));
-                if hwnd_tab.0 != 0 {
-                    SetFocus(hwnd_tab);
+        if with_state(hwnd, |state| {
+            was_current = state.current == index;
+            let doc = state.docs.remove(index);
+            closing_hwnd_edit = doc.hwnd_edit;
+            was_audiobook = matches!(doc.format, FileFormat::Audiobook);
+            SendMessageW(
+                hwnd_tab,
+                windows::Win32::UI::Controls::TCM_DELETEITEM,
+                WPARAM(index),
+                LPARAM(0),
+            );
+
+            if state.docs.is_empty() {
+                state.untitled_count = 0;
+                state.current = 0;
+                was_empty = true;
+            } else if was_current {
+                let idx = if index >= state.docs.len() {
+                    state.docs.len() - 1
+                } else {
+                    index
+                };
+                state.current = idx;
+                SendMessageW(hwnd_tab, TCM_SETCURSEL, WPARAM(idx), LPARAM(0));
+                new_hwnd_edit = state.docs.get(idx).map(|doc| doc.hwnd_edit);
+                update_title = true;
+            } else if index < state.current {
+                state.current -= 1;
+                SendMessageW(hwnd_tab, TCM_SETCURSEL, WPARAM(state.current), LPARAM(0));
+            }
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access editor state");
+        }
+
+        if closing_hwnd_edit.0 != 0 {
+            crate::log_if_err!(DestroyWindow(closing_hwnd_edit));
+        }
+        if was_audiobook {
+            crate::audio_player::stop_audiobook_playback(hwnd);
+            crate::clear_active_podcast_chapters(hwnd);
+        }
+
+        if was_empty {
+            new_document(hwnd);
+        } else {
+            if let Some(hwnd_edit) = new_hwnd_edit {
+                let is_audiobook = with_state(hwnd, |state| {
+                    state
+                        .docs
+                        .get(state.current)
+                        .map(|d| matches!(d.format, FileFormat::Audiobook))
+                        .unwrap_or(false)
+                })
+                .unwrap_or(false);
+                if is_audiobook {
+                    let hwnd_tab = with_state(hwnd, |state| state.hwnd_tab).unwrap_or(HWND(0));
+                    if hwnd_tab.0 != 0 {
+                        SetFocus(hwnd_tab);
+                    }
+                } else {
+                    ShowWindow(hwnd_edit, SW_SHOW);
+                    SetFocus(hwnd_edit);
                 }
-            } else {
-                ShowWindow(hwnd_edit, SW_SHOW);
-                SetFocus(hwnd_edit);
+            }
+            if update_title {
+                update_window_title(hwnd);
             }
         }
-        if update_title {
-            update_window_title(hwnd);
-        }
+        layout_children(hwnd);
+        let is_audiobook = with_state(hwnd, |state| {
+            state
+                .docs
+                .get(state.current)
+                .map(|d| matches!(d.format, FileFormat::Audiobook))
+                .unwrap_or(false)
+        })
+        .unwrap_or(false);
+        crate::menu::update_playback_menu(hwnd, is_audiobook);
+        true
     }
-    layout_children(hwnd);
-    let is_audiobook = with_state(hwnd, |state| {
-        state
-            .docs
-            .get(state.current)
-            .map(|d| matches!(d.format, FileFormat::Audiobook))
-            .unwrap_or(false)
-    })
-    .unwrap_or(false);
-    crate::menu::update_playback_menu(hwnd, is_audiobook);
-    true
 }
 
 pub fn try_close_app(hwnd: HWND) -> bool {

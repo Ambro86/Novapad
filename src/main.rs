@@ -8058,6 +8058,11 @@ unsafe fn create_accelerators() -> HACCEL {
             cmd: IDM_TOOLS_DICTIONARY_LOOKUP as u16,
         },
         ACCEL {
+            fVirt: virt_alt_shift,
+            key: 'V' as u16,
+            cmd: IDM_TOOLS_APPLY_DIALOGUE_VOICE as u16,
+        },
+        ACCEL {
             fVirt: virt,
             key: VK_TAB.0,
             cmd: IDM_NEXT_TAB as u16,

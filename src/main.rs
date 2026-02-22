@@ -1463,15 +1463,15 @@ fn handle_chapter_list(hwnd: HWND) {
 
 fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
     match command {
-        PlayerCommand::TogglePause => unsafe {
+        PlayerCommand::TogglePause => {
             toggle_audiobook_pause(hwnd);
-        },
+        }
         PlayerCommand::Stop => {
             stop_audiobook_playback(hwnd);
         }
-        PlayerCommand::Seek(amount) => unsafe {
+        PlayerCommand::Seek(amount) => {
             seek_audiobook(hwnd, amount);
-        },
+        }
         PlayerCommand::SeekToStart => unsafe {
             if let Err(err) = seek_audiobook_to(hwnd, 0) {
                 if err == "No active audiobook" {
@@ -8602,10 +8602,8 @@ fn play_audio_playlist_item(hwnd: HWND, index: usize) {
             editor_manager::select_tab(hwnd, tab_index);
         }
     }
-    unsafe {
-        audio_player::stop_audiobook_playback(hwnd);
-        audio_player::start_audiobook_playback(hwnd, &path);
-    }
+    audio_player::stop_audiobook_playback(hwnd);
+    audio_player::start_audiobook_playback(hwnd, &path);
 }
 
 pub(crate) unsafe fn queue_audio_files_and_play(hwnd: HWND, paths: Vec<PathBuf>) {

@@ -1538,7 +1538,7 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
         PlayerCommand::SpeedReset => {
             let language =
                 unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
-            let speed = unsafe { reset_audiobook_speed(hwnd) };
+            let speed = reset_audiobook_speed(hwnd);
             if let Some(speed) = speed {
                 announce_player_speed(language, speed);
             }
@@ -1546,7 +1546,7 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
         PlayerCommand::PitchReset => {
             let language =
                 unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
-            let pitch = unsafe { reset_audiobook_pitch(hwnd) };
+            let pitch = reset_audiobook_pitch(hwnd);
             if let Some(pitch) = pitch {
                 announce_player_pitch(language, pitch);
             }

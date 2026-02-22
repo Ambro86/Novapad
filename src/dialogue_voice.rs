@@ -1,4 +1,5 @@
 use crate::settings::TtsEngine;
+use sha2::Digest;
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, PartialEq, Eq)]
@@ -14,13 +15,39 @@ pub struct DialogueVoiceConfig {
 }
 
 impl DialogueVoiceConfig {
-    pub fn sidecar_path_for(path: &Path) -> PathBuf {
+    fn legacy_sidecar_path_for(path: &Path) -> PathBuf {
         let file_name = path
             .file_name()
             .and_then(|s| s.to_str())
             .unwrap_or("document");
         let mut sidecar = path.to_path_buf();
         sidecar.set_file_name(format!("{file_name}.dialogue.ini"));
+        sidecar
+    }
+
+    pub fn sidecar_path_for(path: &Path) -> PathBuf {
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(path.to_string_lossy().as_bytes());
+        let hash = hex::encode(hasher.finalize());
+
+        let file_stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or("document");
+        let safe_stem: String = file_stem
+            .chars()
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                    c
+                } else {
+                    '_'
+                }
+            })
+            .collect();
+        let file_name = format!("{safe_stem}.{}.dialogue.ini", &hash[..16]);
+        let mut sidecar = crate::settings::settings_dir().join("dialogs");
+        sidecar.push(file_name);
         sidecar
     }
 }
@@ -44,6 +71,14 @@ pub fn engine_to_key(engine: TtsEngine) -> &'static str {
 
 pub fn save_dialogue_voice_config(path: &Path, cfg: &DialogueVoiceConfig) -> Result<(), String> {
     let sidecar = DialogueVoiceConfig::sidecar_path_for(path);
+    if let Some(parent) = sidecar.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| {
+            format!(
+                "Failed to create dialogue config folder {:?}: {}",
+                parent, e
+            )
+        })?;
+    }
     let body = format!(
         "engine={}\nvoice={}\nrate={}\npitch={}\nvolume={}\nopen_quote={}\nclose_quote={}\nallow_multiline={}\n",
         engine_to_key(cfg.engine),
@@ -61,7 +96,9 @@ pub fn save_dialogue_voice_config(path: &Path, cfg: &DialogueVoiceConfig) -> Res
 
 pub fn load_dialogue_voice_config(path: &Path) -> Option<DialogueVoiceConfig> {
     let sidecar = DialogueVoiceConfig::sidecar_path_for(path);
-    let text = std::fs::read_to_string(&sidecar).ok()?;
+    let text = std::fs::read_to_string(&sidecar).ok().or_else(|| {
+        std::fs::read_to_string(DialogueVoiceConfig::legacy_sidecar_path_for(path)).ok()
+    })?;
     let mut engine = None;
     let mut voice = String::new();
     let mut rate = 0;

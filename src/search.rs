@@ -323,7 +323,7 @@ fn replaced_count_message(language: Language, count: usize) -> String {
     i18n::tr_f(language, key, &[("count", &count.to_string())])
 }
 
-pub unsafe fn find_next(
+pub fn find_next(
     hwnd: HWND,
     hwnd_edit: HWND,
     search: &str,
@@ -331,60 +331,37 @@ pub unsafe fn find_next(
     wrap: bool,
     options: &FindOptions,
 ) -> bool {
-    if options.use_regex {
-        return find_next_regex(hwnd, hwnd_edit, search, flags, wrap, options);
-    }
-    let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXGETSEL,
-        WPARAM(0),
-        LPARAM(&mut cr as *mut _ as isize),
-    );
-
-    let down = (flags & FR_DOWN) != FINDREPLACE_FLAGS(0);
-    let wide_search = to_wide(search);
-
-    let mut ft = FINDTEXTEXW {
-        chrg: CHARRANGE {
-            cpMin: if down { cr.cpMax } else { cr.cpMin },
-            cpMax: if down { -1 } else { 0 },
-        },
-        lpstrText: PCWSTR(wide_search.as_ptr()),
-        chrgText: CHARRANGE { cpMin: 0, cpMax: 0 },
-    };
-
-    let result = SendMessageW(
-        hwnd_edit,
-        EM_FINDTEXTEXW,
-        WPARAM(flags.0 as usize),
-        LPARAM(&mut ft as *mut _ as isize),
-    );
-
-    if result.0 != -1 {
-        let mut sel = ft.chrgText;
-        std::mem::swap(&mut sel.cpMin, &mut sel.cpMax);
+    unsafe {
+        if options.use_regex {
+            return find_next_regex(hwnd, hwnd_edit, search, flags, wrap, options);
+        }
+        let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
         SendMessageW(
             hwnd_edit,
-            EM_EXSETSEL,
+            EM_EXGETSEL,
             WPARAM(0),
-            LPARAM(&mut sel as *mut _ as isize),
+            LPARAM(&mut cr as *mut _ as isize),
         );
-        SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
-        SetFocus(hwnd_edit);
-        return true;
-    }
 
-    if wrap {
-        let text_len = SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as i32;
-        ft.chrg.cpMin = if down { 0 } else { text_len };
-        ft.chrg.cpMax = if down { -1 } else { 0 };
+        let down = (flags & FR_DOWN) != FINDREPLACE_FLAGS(0);
+        let wide_search = to_wide(search);
+
+        let mut ft = FINDTEXTEXW {
+            chrg: CHARRANGE {
+                cpMin: if down { cr.cpMax } else { cr.cpMin },
+                cpMax: if down { -1 } else { 0 },
+            },
+            lpstrText: PCWSTR(wide_search.as_ptr()),
+            chrgText: CHARRANGE { cpMin: 0, cpMax: 0 },
+        };
+
         let result = SendMessageW(
             hwnd_edit,
             EM_FINDTEXTEXW,
             WPARAM(flags.0 as usize),
             LPARAM(&mut ft as *mut _ as isize),
         );
+
         if result.0 != -1 {
             let mut sel = ft.chrgText;
             std::mem::swap(&mut sel.cpMin, &mut sel.cpMax);
@@ -398,8 +375,33 @@ pub unsafe fn find_next(
             SetFocus(hwnd_edit);
             return true;
         }
+
+        if wrap {
+            let text_len = SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as i32;
+            ft.chrg.cpMin = if down { 0 } else { text_len };
+            ft.chrg.cpMax = if down { -1 } else { 0 };
+            let result = SendMessageW(
+                hwnd_edit,
+                EM_FINDTEXTEXW,
+                WPARAM(flags.0 as usize),
+                LPARAM(&mut ft as *mut _ as isize),
+            );
+            if result.0 != -1 {
+                let mut sel = ft.chrgText;
+                std::mem::swap(&mut sel.cpMin, &mut sel.cpMax);
+                SendMessageW(
+                    hwnd_edit,
+                    EM_EXSETSEL,
+                    WPARAM(0),
+                    LPARAM(&mut sel as *mut _ as isize),
+                );
+                SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+                SetFocus(hwnd_edit);
+                return true;
+            }
+        }
+        false
     }
-    false
 }
 
 unsafe fn replace_selection_if_match(
@@ -453,7 +455,7 @@ unsafe fn replace_selection_if_match(
     }
 }
 
-pub unsafe fn replace_all(
+pub fn replace_all(
     hwnd: HWND,
     hwnd_edit: HWND,
     search: &str,
@@ -461,84 +463,86 @@ pub unsafe fn replace_all(
     flags: FINDREPLACE_FLAGS,
     options: &FindOptions,
 ) {
-    if options.use_regex {
-        replace_all_regex(hwnd, hwnd_edit, search, replace, flags, options);
-        return;
-    }
-    if options.replace_in_all_docs {
-        replace_all_in_all_docs(hwnd, search, replace, flags);
-        return;
-    }
-    if options.replace_in_selection {
-        replace_all_in_selection(hwnd, hwnd_edit, search, replace, flags);
-        return;
-    }
-    if search.is_empty() {
-        return;
-    }
-    let mut start = 0i32;
-    let mut count = 0usize;
-    let replace_wide = to_wide(replace);
-    let search_wide = to_wide(search);
-
-    loop {
-        let mut ft = FINDTEXTEXW {
-            chrg: CHARRANGE {
-                cpMin: start,
-                cpMax: -1,
-            },
-            lpstrText: PCWSTR(search_wide.as_ptr()),
-            chrgText: CHARRANGE { cpMin: 0, cpMax: 0 },
-        };
-
-        let res = SendMessageW(
-            hwnd_edit,
-            EM_FINDTEXTEXW,
-            WPARAM(flags.0 as usize),
-            LPARAM(&mut ft as *mut _ as isize),
-        );
-
-        if res.0 != -1 {
-            SendMessageW(
-                hwnd_edit,
-                EM_EXSETSEL,
-                WPARAM(0),
-                LPARAM(&mut ft.chrgText as *mut _ as isize),
-            );
-            SendMessageW(
-                hwnd_edit,
-                EM_REPLACESEL,
-                WPARAM(1),
-                LPARAM(replace_wide.as_ptr() as isize),
-            );
-            count += 1;
-
-            let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
-            SendMessageW(
-                hwnd_edit,
-                EM_EXGETSEL,
-                WPARAM(0),
-                LPARAM(&mut cr as *mut _ as isize),
-            );
-            start = cr.cpMax;
-        } else {
-            break;
+    unsafe {
+        if options.use_regex {
+            replace_all_regex(hwnd, hwnd_edit, search, replace, flags, options);
+            return;
         }
-    }
+        if options.replace_in_all_docs {
+            replace_all_in_all_docs(hwnd, search, replace, flags);
+            return;
+        }
+        if options.replace_in_selection {
+            replace_all_in_selection(hwnd, hwnd_edit, search, replace, flags);
+            return;
+        }
+        if search.is_empty() {
+            return;
+        }
+        let mut start = 0i32;
+        let mut count = 0usize;
+        let replace_wide = to_wide(replace);
+        let search_wide = to_wide(search);
 
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    if count == 0 {
-        let message = to_wide(&text_not_found_message(language));
-        let title = to_wide(&find_title(language));
-        crate::message_box_modal(
-            hwnd,
-            PCWSTR(message.as_ptr()),
-            PCWSTR(title.as_ptr()),
-            MB_OK | MB_ICONWARNING,
-        );
-    } else {
-        let message = replaced_count_message(language, count);
-        show_info(hwnd, language, &message);
+        loop {
+            let mut ft = FINDTEXTEXW {
+                chrg: CHARRANGE {
+                    cpMin: start,
+                    cpMax: -1,
+                },
+                lpstrText: PCWSTR(search_wide.as_ptr()),
+                chrgText: CHARRANGE { cpMin: 0, cpMax: 0 },
+            };
+
+            let res = SendMessageW(
+                hwnd_edit,
+                EM_FINDTEXTEXW,
+                WPARAM(flags.0 as usize),
+                LPARAM(&mut ft as *mut _ as isize),
+            );
+
+            if res.0 != -1 {
+                SendMessageW(
+                    hwnd_edit,
+                    EM_EXSETSEL,
+                    WPARAM(0),
+                    LPARAM(&mut ft.chrgText as *mut _ as isize),
+                );
+                SendMessageW(
+                    hwnd_edit,
+                    EM_REPLACESEL,
+                    WPARAM(1),
+                    LPARAM(replace_wide.as_ptr() as isize),
+                );
+                count += 1;
+
+                let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
+                SendMessageW(
+                    hwnd_edit,
+                    EM_EXGETSEL,
+                    WPARAM(0),
+                    LPARAM(&mut cr as *mut _ as isize),
+                );
+                start = cr.cpMax;
+            } else {
+                break;
+            }
+        }
+
+        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+        if count == 0 {
+            let message = to_wide(&text_not_found_message(language));
+            let title = to_wide(&find_title(language));
+            crate::message_box_modal(
+                hwnd,
+                PCWSTR(message.as_ptr()),
+                PCWSTR(title.as_ptr()),
+                MB_OK | MB_ICONWARNING,
+            );
+        } else {
+            let message = replaced_count_message(language, count);
+            show_info(hwnd, language, &message);
+        }
     }
 }
 

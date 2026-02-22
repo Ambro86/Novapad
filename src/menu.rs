@@ -371,282 +371,284 @@ fn label_with_shortcut(label: &str, binding: ShortcutBinding) -> String {
     )
 }
 
-pub unsafe fn update_playback_menu(hwnd: HWND, show: bool) {
-    let hmenu = GetMenu(hwnd);
-    if hmenu.0 == 0 {
-        return;
-    }
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    let existing = with_state(hwnd, |state| state.playback_menu).unwrap_or(HMENU(0));
-    let show_download = with_state(hwnd, |state| {
-        state
-            .docs
-            .get(state.current)
-            .map(|doc| doc.from_rss)
-            .unwrap_or(false)
-    })
-    .unwrap_or(false);
-    if show {
-        if existing.0 != 0 {
-            remove_playback_menu(hmenu, existing);
-            with_state(hwnd, |state| state.playback_menu = HMENU(0));
-        }
-        let playback_menu = CreateMenu().unwrap_or(HMENU(0));
-        if playback_menu.0 == 0 {
+pub fn update_playback_menu(hwnd: HWND, show: bool) {
+    unsafe {
+        let hmenu = GetMenu(hwnd);
+        if hmenu.0 == 0 {
             return;
         }
-        let title = i18n::tr(language, "menu.playback");
-        let play_pause = i18n::tr(language, "playback.play_pause");
-        let stop = i18n::tr(language, "playback.stop");
-        let seek_forward = i18n::tr(language, "playback.seek_forward");
-        let seek_backward = i18n::tr(language, "playback.seek_backward");
-        let seek_to_start = i18n::tr(language, "playback.seek_to_start");
-        let seek_to_end = i18n::tr(language, "playback.seek_to_end");
-        let shortcuts = with_state(hwnd, |state| state.settings.shortcuts.clone())
-            .unwrap_or_else(ShortcutSettings::default);
-        let track_prev = label_with_shortcut(
-            &i18n::tr(language, "playback.track_prev"),
-            shortcuts.media_prev,
-        );
-        let track_next = label_with_shortcut(
-            &i18n::tr(language, "playback.track_next"),
-            shortcuts.media_next,
-        );
-        let go_to_time = i18n::tr(language, "playback.go_to_time");
-        let announce_time = i18n::tr(language, "playback.announce_time");
-        let volume_up = i18n::tr(language, "playback.volume_up");
-        let volume_down = i18n::tr(language, "playback.volume_down");
-        let volume_reset = i18n::tr(language, "playback.volume_reset");
-        let speed_up = i18n::tr(language, "playback.speed_up");
-        let speed_down = i18n::tr(language, "playback.speed_down");
-        let speed_reset = i18n::tr(language, "playback.speed_reset");
-        let pitch_up = i18n::tr(language, "playback.pitch_up");
-        let pitch_down = i18n::tr(language, "playback.pitch_down");
-        let pitch_reset = i18n::tr(language, "playback.pitch_reset");
-        let reset_menu_label = i18n::tr(language, "playback.reset_menu");
-        let mute_toggle = i18n::tr(language, "playback.mute_toggle");
-        let add_subtitles = i18n::tr(language, "playback.add_subtitles");
-        let remove_subtitles = i18n::tr(language, "playback.remove_subtitles");
-        let chapter_prev = i18n::tr(language, "playback.chapter_prev");
-        let chapter_next = i18n::tr(language, "playback.chapter_next");
-        let chapter_list = i18n::tr(language, "playback.chapter_list");
-        let download_episode = i18n::tr(language, "playback.download_episode");
-        let has_chapters =
-            with_state(hwnd, |state| !state.active_podcast_chapters.is_empty()).unwrap_or(false);
-        let (audio_tracks, selected_track) = with_state(hwnd, |state| {
-            (
-                state.available_audio_tracks.clone(),
-                state.selected_audio_track,
-            )
+        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+        let existing = with_state(hwnd, |state| state.playback_menu).unwrap_or(HMENU(0));
+        let show_download = with_state(hwnd, |state| {
+            state
+                .docs
+                .get(state.current)
+                .map(|doc| doc.from_rss)
+                .unwrap_or(false)
         })
-        .unwrap_or_default();
+        .unwrap_or(false);
+        if show {
+            if existing.0 != 0 {
+                remove_playback_menu(hmenu, existing);
+                with_state(hwnd, |state| state.playback_menu = HMENU(0));
+            }
+            let playback_menu = CreateMenu().unwrap_or(HMENU(0));
+            if playback_menu.0 == 0 {
+                return;
+            }
+            let title = i18n::tr(language, "menu.playback");
+            let play_pause = i18n::tr(language, "playback.play_pause");
+            let stop = i18n::tr(language, "playback.stop");
+            let seek_forward = i18n::tr(language, "playback.seek_forward");
+            let seek_backward = i18n::tr(language, "playback.seek_backward");
+            let seek_to_start = i18n::tr(language, "playback.seek_to_start");
+            let seek_to_end = i18n::tr(language, "playback.seek_to_end");
+            let shortcuts = with_state(hwnd, |state| state.settings.shortcuts.clone())
+                .unwrap_or_else(ShortcutSettings::default);
+            let track_prev = label_with_shortcut(
+                &i18n::tr(language, "playback.track_prev"),
+                shortcuts.media_prev,
+            );
+            let track_next = label_with_shortcut(
+                &i18n::tr(language, "playback.track_next"),
+                shortcuts.media_next,
+            );
+            let go_to_time = i18n::tr(language, "playback.go_to_time");
+            let announce_time = i18n::tr(language, "playback.announce_time");
+            let volume_up = i18n::tr(language, "playback.volume_up");
+            let volume_down = i18n::tr(language, "playback.volume_down");
+            let volume_reset = i18n::tr(language, "playback.volume_reset");
+            let speed_up = i18n::tr(language, "playback.speed_up");
+            let speed_down = i18n::tr(language, "playback.speed_down");
+            let speed_reset = i18n::tr(language, "playback.speed_reset");
+            let pitch_up = i18n::tr(language, "playback.pitch_up");
+            let pitch_down = i18n::tr(language, "playback.pitch_down");
+            let pitch_reset = i18n::tr(language, "playback.pitch_reset");
+            let reset_menu_label = i18n::tr(language, "playback.reset_menu");
+            let mute_toggle = i18n::tr(language, "playback.mute_toggle");
+            let add_subtitles = i18n::tr(language, "playback.add_subtitles");
+            let remove_subtitles = i18n::tr(language, "playback.remove_subtitles");
+            let chapter_prev = i18n::tr(language, "playback.chapter_prev");
+            let chapter_next = i18n::tr(language, "playback.chapter_next");
+            let chapter_list = i18n::tr(language, "playback.chapter_list");
+            let download_episode = i18n::tr(language, "playback.download_episode");
+            let has_chapters = with_state(hwnd, |state| !state.active_podcast_chapters.is_empty())
+                .unwrap_or(false);
+            let (audio_tracks, selected_track) = with_state(hwnd, |state| {
+                (
+                    state.available_audio_tracks.clone(),
+                    state.selected_audio_track,
+                )
+            })
+            .unwrap_or_default();
 
-        append_menu_string(
-            playback_menu,
-            MF_STRING,
-            IDM_PLAYBACK_PLAY_PAUSE,
-            &play_pause,
-        );
-        append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_STOP, &stop);
-        append_menu_string(
-            playback_menu,
-            MF_STRING,
-            IDM_PLAYBACK_SEEK_FORWARD,
-            &seek_forward,
-        );
-        append_menu_string(
-            playback_menu,
-            MF_STRING,
-            IDM_PLAYBACK_SEEK_BACKWARD,
-            &seek_backward,
-        );
-        append_menu_string(
-            playback_menu,
-            MF_STRING,
-            IDM_PLAYBACK_SEEK_TO_START,
-            &seek_to_start,
-        );
-        append_menu_string(
-            playback_menu,
-            MF_STRING,
-            IDM_PLAYBACK_SEEK_TO_END,
-            &seek_to_end,
-        );
-        append_menu_string(
-            playback_menu,
-            MF_STRING,
-            IDM_PLAYBACK_TRACK_PREV,
-            &track_prev,
-        );
-        append_menu_string(
-            playback_menu,
-            MF_STRING,
-            IDM_PLAYBACK_TRACK_NEXT,
-            &track_next,
-        );
-        if has_chapters {
             append_menu_string(
                 playback_menu,
                 MF_STRING,
-                IDM_PLAYBACK_CHAPTER_PREV,
-                &chapter_prev,
+                IDM_PLAYBACK_PLAY_PAUSE,
+                &play_pause,
+            );
+            append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_STOP, &stop);
+            append_menu_string(
+                playback_menu,
+                MF_STRING,
+                IDM_PLAYBACK_SEEK_FORWARD,
+                &seek_forward,
             );
             append_menu_string(
                 playback_menu,
                 MF_STRING,
-                IDM_PLAYBACK_CHAPTER_NEXT,
-                &chapter_next,
+                IDM_PLAYBACK_SEEK_BACKWARD,
+                &seek_backward,
             );
             append_menu_string(
                 playback_menu,
                 MF_STRING,
-                IDM_PLAYBACK_CHAPTER_LIST,
-                &chapter_list,
+                IDM_PLAYBACK_SEEK_TO_START,
+                &seek_to_start,
             );
-        }
-        if show_download {
             append_menu_string(
                 playback_menu,
                 MF_STRING,
-                IDM_PLAYBACK_DOWNLOAD_EPISODE,
-                &download_episode,
+                IDM_PLAYBACK_SEEK_TO_END,
+                &seek_to_end,
             );
-        }
-        append_menu_string(
-            playback_menu,
-            MF_STRING,
-            IDM_PLAYBACK_GO_TO_TIME,
-            &go_to_time,
-        );
-        append_menu_string(
-            playback_menu,
-            MF_STRING,
-            IDM_PLAYBACK_ANNOUNCE_TIME,
-            &announce_time,
-        );
-        append_menu_string(
-            playback_menu,
-            MF_STRING,
-            IDM_PLAYBACK_ADD_SUBTITLES,
-            &add_subtitles,
-        );
-        append_menu_string(
-            playback_menu,
-            MF_STRING,
-            IDM_PLAYBACK_REMOVE_SUBTITLES,
-            &remove_subtitles,
-        );
-        // Audio tracks submenu
-        if !audio_tracks.is_empty() {
-            let audio_track_label = i18n::tr(language, "playback.audio_track");
-            let audio_tracks_menu = CreateMenu().unwrap_or(HMENU(0));
-            if audio_tracks_menu.0 != 0 {
-                for (i, track) in audio_tracks.iter().enumerate() {
-                    if i >= IDM_PLAYBACK_AUDIO_TRACK_MAX {
-                        break;
+            append_menu_string(
+                playback_menu,
+                MF_STRING,
+                IDM_PLAYBACK_TRACK_PREV,
+                &track_prev,
+            );
+            append_menu_string(
+                playback_menu,
+                MF_STRING,
+                IDM_PLAYBACK_TRACK_NEXT,
+                &track_next,
+            );
+            if has_chapters {
+                append_menu_string(
+                    playback_menu,
+                    MF_STRING,
+                    IDM_PLAYBACK_CHAPTER_PREV,
+                    &chapter_prev,
+                );
+                append_menu_string(
+                    playback_menu,
+                    MF_STRING,
+                    IDM_PLAYBACK_CHAPTER_NEXT,
+                    &chapter_next,
+                );
+                append_menu_string(
+                    playback_menu,
+                    MF_STRING,
+                    IDM_PLAYBACK_CHAPTER_LIST,
+                    &chapter_list,
+                );
+            }
+            if show_download {
+                append_menu_string(
+                    playback_menu,
+                    MF_STRING,
+                    IDM_PLAYBACK_DOWNLOAD_EPISODE,
+                    &download_episode,
+                );
+            }
+            append_menu_string(
+                playback_menu,
+                MF_STRING,
+                IDM_PLAYBACK_GO_TO_TIME,
+                &go_to_time,
+            );
+            append_menu_string(
+                playback_menu,
+                MF_STRING,
+                IDM_PLAYBACK_ANNOUNCE_TIME,
+                &announce_time,
+            );
+            append_menu_string(
+                playback_menu,
+                MF_STRING,
+                IDM_PLAYBACK_ADD_SUBTITLES,
+                &add_subtitles,
+            );
+            append_menu_string(
+                playback_menu,
+                MF_STRING,
+                IDM_PLAYBACK_REMOVE_SUBTITLES,
+                &remove_subtitles,
+            );
+            // Audio tracks submenu
+            if !audio_tracks.is_empty() {
+                let audio_track_label = i18n::tr(language, "playback.audio_track");
+                let audio_tracks_menu = CreateMenu().unwrap_or(HMENU(0));
+                if audio_tracks_menu.0 != 0 {
+                    for (i, track) in audio_tracks.iter().enumerate() {
+                        if i >= IDM_PLAYBACK_AUDIO_TRACK_MAX {
+                            break;
+                        }
+                        let mut label = format!("{}", track.index);
+                        if let Some(ref lang) = track.language {
+                            label.push_str(&format!(" [{}]", lang));
+                        }
+                        if let Some(ref title) = track.title {
+                            label.push_str(&format!(" - {}", title));
+                        }
+                        label.push_str(&format!(
+                            " ({}, {}ch, {}Hz)",
+                            track.codec, track.channels, track.sample_rate
+                        ));
+                        let is_selected = selected_track
+                            .map(|s| s == track.index)
+                            .unwrap_or(track.is_default);
+                        let flags = if is_selected {
+                            MF_STRING | MF_CHECKED
+                        } else {
+                            MF_STRING | MF_UNCHECKED
+                        };
+                        append_menu_string(
+                            audio_tracks_menu,
+                            flags,
+                            IDM_PLAYBACK_AUDIO_TRACK_BASE + i,
+                            &label,
+                        );
                     }
-                    let mut label = format!("{}", track.index);
-                    if let Some(ref lang) = track.language {
-                        label.push_str(&format!(" [{}]", lang));
-                    }
-                    if let Some(ref title) = track.title {
-                        label.push_str(&format!(" - {}", title));
-                    }
-                    label.push_str(&format!(
-                        " ({}, {}ch, {}Hz)",
-                        track.codec, track.channels, track.sample_rate
-                    ));
-                    let is_selected = selected_track
-                        .map(|s| s == track.index)
-                        .unwrap_or(track.is_default);
-                    let flags = if is_selected {
-                        MF_STRING | MF_CHECKED
-                    } else {
-                        MF_STRING | MF_UNCHECKED
-                    };
                     append_menu_string(
-                        audio_tracks_menu,
-                        flags,
-                        IDM_PLAYBACK_AUDIO_TRACK_BASE + i,
-                        &label,
+                        playback_menu,
+                        MF_POPUP,
+                        audio_tracks_menu.0 as usize,
+                        &audio_track_label,
                     );
                 }
+            }
+            append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_VOLUME_UP, &volume_up);
+            append_menu_string(
+                playback_menu,
+                MF_STRING,
+                IDM_PLAYBACK_VOLUME_DOWN,
+                &volume_down,
+            );
+            append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_SPEED_UP, &speed_up);
+            append_menu_string(
+                playback_menu,
+                MF_STRING,
+                IDM_PLAYBACK_SPEED_DOWN,
+                &speed_down,
+            );
+            append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_PITCH_UP, &pitch_up);
+            append_menu_string(
+                playback_menu,
+                MF_STRING,
+                IDM_PLAYBACK_PITCH_DOWN,
+                &pitch_down,
+            );
+            let reset_menu = CreateMenu().unwrap_or(HMENU(0));
+            if reset_menu.0 != 0 {
+                append_menu_string(
+                    reset_menu,
+                    MF_STRING,
+                    IDM_PLAYBACK_VOLUME_RESET,
+                    &volume_reset,
+                );
+                append_menu_string(
+                    reset_menu,
+                    MF_STRING,
+                    IDM_PLAYBACK_SPEED_RESET,
+                    &speed_reset,
+                );
+                append_menu_string(
+                    reset_menu,
+                    MF_STRING,
+                    IDM_PLAYBACK_PITCH_RESET,
+                    &pitch_reset,
+                );
                 append_menu_string(
                     playback_menu,
                     MF_POPUP,
-                    audio_tracks_menu.0 as usize,
-                    &audio_track_label,
+                    reset_menu.0 as usize,
+                    &reset_menu_label,
                 );
             }
-        }
-        append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_VOLUME_UP, &volume_up);
-        append_menu_string(
-            playback_menu,
-            MF_STRING,
-            IDM_PLAYBACK_VOLUME_DOWN,
-            &volume_down,
-        );
-        append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_SPEED_UP, &speed_up);
-        append_menu_string(
-            playback_menu,
-            MF_STRING,
-            IDM_PLAYBACK_SPEED_DOWN,
-            &speed_down,
-        );
-        append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_PITCH_UP, &pitch_up);
-        append_menu_string(
-            playback_menu,
-            MF_STRING,
-            IDM_PLAYBACK_PITCH_DOWN,
-            &pitch_down,
-        );
-        let reset_menu = CreateMenu().unwrap_or(HMENU(0));
-        if reset_menu.0 != 0 {
-            append_menu_string(
-                reset_menu,
-                MF_STRING,
-                IDM_PLAYBACK_VOLUME_RESET,
-                &volume_reset,
-            );
-            append_menu_string(
-                reset_menu,
-                MF_STRING,
-                IDM_PLAYBACK_SPEED_RESET,
-                &speed_reset,
-            );
-            append_menu_string(
-                reset_menu,
-                MF_STRING,
-                IDM_PLAYBACK_PITCH_RESET,
-                &pitch_reset,
-            );
             append_menu_string(
                 playback_menu,
-                MF_POPUP,
-                reset_menu.0 as usize,
-                &reset_menu_label,
+                MF_STRING,
+                IDM_PLAYBACK_MUTE_TOGGLE,
+                &mute_toggle,
             );
+            let wide = to_wide(&title);
+            crate::log_if_err!(InsertMenuW(
+                hmenu,
+                0,
+                MF_BYPOSITION | MF_POPUP,
+                playback_menu.0 as usize,
+                PCWSTR(wide.as_ptr()),
+            ));
+            with_state(hwnd, |state| state.playback_menu = playback_menu);
+            crate::log_if_err!(DrawMenuBar(hwnd));
+        } else if existing.0 != 0 {
+            remove_playback_menu(hmenu, existing);
+            with_state(hwnd, |state| state.playback_menu = HMENU(0));
+            crate::log_if_err!(DrawMenuBar(hwnd));
         }
-        append_menu_string(
-            playback_menu,
-            MF_STRING,
-            IDM_PLAYBACK_MUTE_TOGGLE,
-            &mute_toggle,
-        );
-        let wide = to_wide(&title);
-        crate::log_if_err!(InsertMenuW(
-            hmenu,
-            0,
-            MF_BYPOSITION | MF_POPUP,
-            playback_menu.0 as usize,
-            PCWSTR(wide.as_ptr()),
-        ));
-        with_state(hwnd, |state| state.playback_menu = playback_menu);
-        crate::log_if_err!(DrawMenuBar(hwnd));
-    } else if existing.0 != 0 {
-        remove_playback_menu(hmenu, existing);
-        with_state(hwnd, |state| state.playback_menu = HMENU(0));
-        crate::log_if_err!(DrawMenuBar(hwnd));
     }
 }
 
@@ -674,564 +676,567 @@ unsafe fn remove_playback_menu(hmenu: HMENU, playback_menu: HMENU) {
     }
 }
 
-pub unsafe fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
-    let hmenu = CreateMenu().unwrap_or(HMENU(0));
-    let file_menu = CreateMenu().unwrap_or(HMENU(0));
-    let recent_menu = CreateMenu().unwrap_or(HMENU(0));
-    let edit_menu = CreateMenu().unwrap_or(HMENU(0));
-    let view_menu = CreateMenu().unwrap_or(HMENU(0));
-    let view_font_menu = CreateMenu().unwrap_or(HMENU(0));
-    let view_color_menu = CreateMenu().unwrap_or(HMENU(0));
-    let view_size_menu = CreateMenu().unwrap_or(HMENU(0));
-    let insert_menu = CreateMenu().unwrap_or(HMENU(0));
-    let window_menu = CreateMenu().unwrap_or(HMENU(0));
-    let voice_audio_menu = CreateMenu().unwrap_or(HMENU(0));
-    let tools_menu = CreateMenu().unwrap_or(HMENU(0));
-    let help_menu = CreateMenu().unwrap_or(HMENU(0));
+pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
+    unsafe {
+        let hmenu = CreateMenu().unwrap_or(HMENU(0));
+        let file_menu = CreateMenu().unwrap_or(HMENU(0));
+        let recent_menu = CreateMenu().unwrap_or(HMENU(0));
+        let edit_menu = CreateMenu().unwrap_or(HMENU(0));
+        let view_menu = CreateMenu().unwrap_or(HMENU(0));
+        let view_font_menu = CreateMenu().unwrap_or(HMENU(0));
+        let view_color_menu = CreateMenu().unwrap_or(HMENU(0));
+        let view_size_menu = CreateMenu().unwrap_or(HMENU(0));
+        let insert_menu = CreateMenu().unwrap_or(HMENU(0));
+        let window_menu = CreateMenu().unwrap_or(HMENU(0));
+        let voice_audio_menu = CreateMenu().unwrap_or(HMENU(0));
+        let tools_menu = CreateMenu().unwrap_or(HMENU(0));
+        let help_menu = CreateMenu().unwrap_or(HMENU(0));
 
-    let mut labels = menu_labels(language);
-    let shortcuts = with_state(hwnd, |state| state.settings.shortcuts.clone())
-        .unwrap_or_else(ShortcutSettings::default);
-    labels.file_read_start = label_with_shortcut(&labels.file_read_start, shortcuts.read_start);
-    labels.file_read_pause =
-        label_with_shortcut(&labels.file_read_pause, shortcuts.read_pause_resume);
-    labels.file_read_stop = label_with_shortcut(&labels.file_read_stop, shortcuts.read_stop);
-    labels.file_execute = label_with_shortcut(&labels.file_execute, shortcuts.execute_file);
-    labels.file_audiobook = label_with_shortcut(&labels.file_audiobook, shortcuts.audiobook);
-    labels.file_batch_audiobooks =
-        label_with_shortcut(&labels.file_batch_audiobooks, shortcuts.batch_audiobooks);
-    labels.file_podcast = label_with_shortcut(&labels.file_podcast, shortcuts.record_podcast);
-    labels.file_convert_audio =
-        label_with_shortcut(&labels.file_convert_audio, shortcuts.convert_audio);
-    labels.menu_rss = label_with_shortcut(&labels.menu_rss, shortcuts.open_rss);
-    labels.menu_podcasts = label_with_shortcut(&labels.menu_podcasts, shortcuts.open_podcasts);
-    labels.menu_dictionary =
-        label_with_shortcut(&labels.menu_dictionary, shortcuts.open_dictionary);
-    labels.menu_options = label_with_shortcut(&labels.menu_options, shortcuts.open_options);
-    labels.menu_prompt = label_with_shortcut(&labels.menu_prompt, shortcuts.open_terminal);
-    labels.menu_wikipedia_import =
-        label_with_shortcut(&labels.menu_wikipedia_import, shortcuts.import_wikipedia);
-    labels.menu_import_youtube =
-        label_with_shortcut(&labels.menu_import_youtube, shortcuts.import_youtube);
-    labels.edit_find = label_with_shortcut(&labels.edit_find, shortcuts.find);
-    labels.edit_quote_lines = label_with_shortcut(&labels.edit_quote_lines, shortcuts.quote_lines);
-    labels.edit_unquote_lines =
-        label_with_shortcut(&labels.edit_unquote_lines, shortcuts.unquote_lines);
+        let mut labels = menu_labels(language);
+        let shortcuts = with_state(hwnd, |state| state.settings.shortcuts.clone())
+            .unwrap_or_else(ShortcutSettings::default);
+        labels.file_read_start = label_with_shortcut(&labels.file_read_start, shortcuts.read_start);
+        labels.file_read_pause =
+            label_with_shortcut(&labels.file_read_pause, shortcuts.read_pause_resume);
+        labels.file_read_stop = label_with_shortcut(&labels.file_read_stop, shortcuts.read_stop);
+        labels.file_execute = label_with_shortcut(&labels.file_execute, shortcuts.execute_file);
+        labels.file_audiobook = label_with_shortcut(&labels.file_audiobook, shortcuts.audiobook);
+        labels.file_batch_audiobooks =
+            label_with_shortcut(&labels.file_batch_audiobooks, shortcuts.batch_audiobooks);
+        labels.file_podcast = label_with_shortcut(&labels.file_podcast, shortcuts.record_podcast);
+        labels.file_convert_audio =
+            label_with_shortcut(&labels.file_convert_audio, shortcuts.convert_audio);
+        labels.menu_rss = label_with_shortcut(&labels.menu_rss, shortcuts.open_rss);
+        labels.menu_podcasts = label_with_shortcut(&labels.menu_podcasts, shortcuts.open_podcasts);
+        labels.menu_dictionary =
+            label_with_shortcut(&labels.menu_dictionary, shortcuts.open_dictionary);
+        labels.menu_options = label_with_shortcut(&labels.menu_options, shortcuts.open_options);
+        labels.menu_prompt = label_with_shortcut(&labels.menu_prompt, shortcuts.open_terminal);
+        labels.menu_wikipedia_import =
+            label_with_shortcut(&labels.menu_wikipedia_import, shortcuts.import_wikipedia);
+        labels.menu_import_youtube =
+            label_with_shortcut(&labels.menu_import_youtube, shortcuts.import_youtube);
+        labels.edit_find = label_with_shortcut(&labels.edit_find, shortcuts.find);
+        labels.edit_quote_lines =
+            label_with_shortcut(&labels.edit_quote_lines, shortcuts.quote_lines);
+        labels.edit_unquote_lines =
+            label_with_shortcut(&labels.edit_unquote_lines, shortcuts.unquote_lines);
 
-    append_menu_string(file_menu, MF_STRING, IDM_FILE_NEW, &labels.file_new);
-    append_menu_string(file_menu, MF_STRING, IDM_FILE_OPEN, &labels.file_open);
-    append_menu_string(file_menu, MF_STRING, IDM_FILE_SAVE, &labels.file_save);
-    append_menu_string(file_menu, MF_STRING, IDM_FILE_SAVE_AS, &labels.file_save_as);
-    append_menu_string(
-        file_menu,
-        MF_STRING,
-        IDM_FILE_SAVE_ALL,
-        &labels.file_save_all,
-    );
-    crate::log_if_err!(AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null()));
-    append_menu_string(
-        file_menu,
-        MF_POPUP,
-        recent_menu.0 as usize,
-        &labels.file_recent,
-    );
-    crate::log_if_err!(AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null()));
-    append_menu_string(file_menu, MF_STRING, IDM_FILE_EXECUTE, &labels.file_execute);
-    crate::log_if_err!(AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null()));
-    append_menu_string(file_menu, MF_STRING, IDM_FILE_EXIT, &labels.file_exit);
-    append_menu_string(hmenu, MF_POPUP, file_menu.0 as usize, &labels.menu_file);
+        append_menu_string(file_menu, MF_STRING, IDM_FILE_NEW, &labels.file_new);
+        append_menu_string(file_menu, MF_STRING, IDM_FILE_OPEN, &labels.file_open);
+        append_menu_string(file_menu, MF_STRING, IDM_FILE_SAVE, &labels.file_save);
+        append_menu_string(file_menu, MF_STRING, IDM_FILE_SAVE_AS, &labels.file_save_as);
+        append_menu_string(
+            file_menu,
+            MF_STRING,
+            IDM_FILE_SAVE_ALL,
+            &labels.file_save_all,
+        );
+        crate::log_if_err!(AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null()));
+        append_menu_string(
+            file_menu,
+            MF_POPUP,
+            recent_menu.0 as usize,
+            &labels.file_recent,
+        );
+        crate::log_if_err!(AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null()));
+        append_menu_string(file_menu, MF_STRING, IDM_FILE_EXECUTE, &labels.file_execute);
+        crate::log_if_err!(AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null()));
+        append_menu_string(file_menu, MF_STRING, IDM_FILE_EXIT, &labels.file_exit);
+        append_menu_string(hmenu, MF_POPUP, file_menu.0 as usize, &labels.menu_file);
 
-    append_menu_string(edit_menu, MF_STRING, IDM_EDIT_UNDO, &labels.edit_undo);
-    crate::log_if_err!(AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null()));
-    append_menu_string(edit_menu, MF_STRING, IDM_EDIT_CUT, &labels.edit_cut);
-    append_menu_string(edit_menu, MF_STRING, IDM_EDIT_COPY, &labels.edit_copy);
-    append_menu_string(edit_menu, MF_STRING, IDM_EDIT_PASTE, &labels.edit_paste);
-    append_menu_string(
-        edit_menu,
-        MF_STRING,
-        IDM_EDIT_SELECT_ALL,
-        &labels.edit_select_all,
-    );
-    crate::log_if_err!(AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null()));
-    append_menu_string(edit_menu, MF_STRING, IDM_EDIT_FIND, &labels.edit_find);
-    append_menu_string(
-        edit_menu,
-        MF_STRING,
-        IDM_EDIT_FIND_IN_FILES,
-        &labels.edit_find_in_files,
-    );
-    append_menu_string(
-        edit_menu,
-        MF_STRING,
-        IDM_EDIT_FIND_NEXT,
-        &labels.edit_find_next,
-    );
-    append_menu_string(
-        edit_menu,
-        MF_STRING,
-        IDM_EDIT_FIND_PREVIOUS,
-        &labels.edit_find_previous,
-    );
-    append_menu_string(edit_menu, MF_STRING, IDM_EDIT_REPLACE, &labels.edit_replace);
-    append_menu_string(
-        edit_menu,
-        MF_STRING,
-        IDM_EDIT_GO_TO_LINE,
-        &labels.edit_goto_line,
-    );
-    crate::log_if_err!(AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null()));
-    append_menu_string(
-        edit_menu,
-        MF_STRING,
-        IDM_EDIT_PREV_SPELLING_ERROR,
-        &labels.edit_prev_spelling_error,
-    );
-    append_menu_string(
-        edit_menu,
-        MF_STRING,
-        IDM_EDIT_NEXT_SPELLING_ERROR,
-        &labels.edit_next_spelling_error,
-    );
-    crate::log_if_err!(AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null()));
-    let text_menu = CreateMenu().unwrap_or(HMENU(0));
-    append_menu_string(
-        text_menu,
-        MF_STRING,
-        IDM_EDIT_AUTO_FORMAT_TTS,
-        &labels.edit_auto_format_tts,
-    );
-    append_menu_string(
-        text_menu,
-        MF_STRING,
-        IDM_EDIT_STRIP_MARKDOWN,
-        &labels.edit_strip_markdown,
-    );
-    append_menu_string(
-        text_menu,
-        MF_STRING,
-        IDM_EDIT_NORMALIZE_WHITESPACE,
-        &labels.edit_normalize_whitespace,
-    );
-    append_menu_string(
-        text_menu,
-        MF_STRING,
-        IDM_EDIT_HARD_LINE_BREAK,
-        &labels.edit_hard_line_break,
-    );
-    append_menu_string(
-        text_menu,
-        MF_STRING,
-        IDM_EDIT_JOIN_LINES,
-        &labels.edit_join_lines,
-    );
-    append_menu_string(
-        text_menu,
-        MF_STRING,
-        IDM_EDIT_CLEAN_EOL_HYPHENS,
-        &labels.edit_clean_eol_hyphens,
-    );
-    append_menu_string(
-        text_menu,
-        MF_STRING,
-        IDM_EDIT_ORDER_ITEMS,
-        &labels.edit_order_items,
-    );
-    append_menu_string(
-        text_menu,
-        MF_STRING,
-        IDM_EDIT_KEEP_UNIQUE_ITEMS,
-        &labels.edit_keep_unique_items,
-    );
-    append_menu_string(
-        text_menu,
-        MF_STRING,
-        IDM_EDIT_REVERSE_ITEMS,
-        &labels.edit_reverse_items,
-    );
-    append_menu_string(
-        text_menu,
-        MF_STRING,
-        IDM_EDIT_QUOTE_LINES,
-        &labels.edit_quote_lines,
-    );
-    append_menu_string(
-        text_menu,
-        MF_STRING,
-        IDM_EDIT_UNQUOTE_LINES,
-        &labels.edit_unquote_lines,
-    );
-    append_menu_string(text_menu, MF_STRING, IDM_EDIT_INDENT, &labels.edit_indent);
-    append_menu_string(text_menu, MF_STRING, IDM_EDIT_OUTDENT, &labels.edit_outdent);
-    append_menu_string(
-        text_menu,
-        MF_STRING,
-        IDM_EDIT_REMOVE_DUPLICATE_LINES,
-        &labels.edit_remove_duplicate_lines,
-    );
-    append_menu_string(
-        text_menu,
-        MF_STRING,
-        IDM_EDIT_REMOVE_DUPLICATE_CONSECUTIVE_LINES,
-        &labels.edit_remove_duplicate_consecutive_lines,
-    );
-    append_menu_string(
-        edit_menu,
-        MF_POPUP,
-        text_menu.0 as usize,
-        &labels.edit_text_menu,
-    );
-    crate::log_if_err!(AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null()));
-    append_menu_string(
-        edit_menu,
-        MF_STRING,
-        IDM_EDIT_TEXT_STATS,
-        &labels.edit_text_stats,
-    );
-    append_menu_string(hmenu, MF_POPUP, edit_menu.0 as usize, &labels.menu_edit);
+        append_menu_string(edit_menu, MF_STRING, IDM_EDIT_UNDO, &labels.edit_undo);
+        crate::log_if_err!(AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null()));
+        append_menu_string(edit_menu, MF_STRING, IDM_EDIT_CUT, &labels.edit_cut);
+        append_menu_string(edit_menu, MF_STRING, IDM_EDIT_COPY, &labels.edit_copy);
+        append_menu_string(edit_menu, MF_STRING, IDM_EDIT_PASTE, &labels.edit_paste);
+        append_menu_string(
+            edit_menu,
+            MF_STRING,
+            IDM_EDIT_SELECT_ALL,
+            &labels.edit_select_all,
+        );
+        crate::log_if_err!(AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null()));
+        append_menu_string(edit_menu, MF_STRING, IDM_EDIT_FIND, &labels.edit_find);
+        append_menu_string(
+            edit_menu,
+            MF_STRING,
+            IDM_EDIT_FIND_IN_FILES,
+            &labels.edit_find_in_files,
+        );
+        append_menu_string(
+            edit_menu,
+            MF_STRING,
+            IDM_EDIT_FIND_NEXT,
+            &labels.edit_find_next,
+        );
+        append_menu_string(
+            edit_menu,
+            MF_STRING,
+            IDM_EDIT_FIND_PREVIOUS,
+            &labels.edit_find_previous,
+        );
+        append_menu_string(edit_menu, MF_STRING, IDM_EDIT_REPLACE, &labels.edit_replace);
+        append_menu_string(
+            edit_menu,
+            MF_STRING,
+            IDM_EDIT_GO_TO_LINE,
+            &labels.edit_goto_line,
+        );
+        crate::log_if_err!(AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null()));
+        append_menu_string(
+            edit_menu,
+            MF_STRING,
+            IDM_EDIT_PREV_SPELLING_ERROR,
+            &labels.edit_prev_spelling_error,
+        );
+        append_menu_string(
+            edit_menu,
+            MF_STRING,
+            IDM_EDIT_NEXT_SPELLING_ERROR,
+            &labels.edit_next_spelling_error,
+        );
+        crate::log_if_err!(AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null()));
+        let text_menu = CreateMenu().unwrap_or(HMENU(0));
+        append_menu_string(
+            text_menu,
+            MF_STRING,
+            IDM_EDIT_AUTO_FORMAT_TTS,
+            &labels.edit_auto_format_tts,
+        );
+        append_menu_string(
+            text_menu,
+            MF_STRING,
+            IDM_EDIT_STRIP_MARKDOWN,
+            &labels.edit_strip_markdown,
+        );
+        append_menu_string(
+            text_menu,
+            MF_STRING,
+            IDM_EDIT_NORMALIZE_WHITESPACE,
+            &labels.edit_normalize_whitespace,
+        );
+        append_menu_string(
+            text_menu,
+            MF_STRING,
+            IDM_EDIT_HARD_LINE_BREAK,
+            &labels.edit_hard_line_break,
+        );
+        append_menu_string(
+            text_menu,
+            MF_STRING,
+            IDM_EDIT_JOIN_LINES,
+            &labels.edit_join_lines,
+        );
+        append_menu_string(
+            text_menu,
+            MF_STRING,
+            IDM_EDIT_CLEAN_EOL_HYPHENS,
+            &labels.edit_clean_eol_hyphens,
+        );
+        append_menu_string(
+            text_menu,
+            MF_STRING,
+            IDM_EDIT_ORDER_ITEMS,
+            &labels.edit_order_items,
+        );
+        append_menu_string(
+            text_menu,
+            MF_STRING,
+            IDM_EDIT_KEEP_UNIQUE_ITEMS,
+            &labels.edit_keep_unique_items,
+        );
+        append_menu_string(
+            text_menu,
+            MF_STRING,
+            IDM_EDIT_REVERSE_ITEMS,
+            &labels.edit_reverse_items,
+        );
+        append_menu_string(
+            text_menu,
+            MF_STRING,
+            IDM_EDIT_QUOTE_LINES,
+            &labels.edit_quote_lines,
+        );
+        append_menu_string(
+            text_menu,
+            MF_STRING,
+            IDM_EDIT_UNQUOTE_LINES,
+            &labels.edit_unquote_lines,
+        );
+        append_menu_string(text_menu, MF_STRING, IDM_EDIT_INDENT, &labels.edit_indent);
+        append_menu_string(text_menu, MF_STRING, IDM_EDIT_OUTDENT, &labels.edit_outdent);
+        append_menu_string(
+            text_menu,
+            MF_STRING,
+            IDM_EDIT_REMOVE_DUPLICATE_LINES,
+            &labels.edit_remove_duplicate_lines,
+        );
+        append_menu_string(
+            text_menu,
+            MF_STRING,
+            IDM_EDIT_REMOVE_DUPLICATE_CONSECUTIVE_LINES,
+            &labels.edit_remove_duplicate_consecutive_lines,
+        );
+        append_menu_string(
+            edit_menu,
+            MF_POPUP,
+            text_menu.0 as usize,
+            &labels.edit_text_menu,
+        );
+        crate::log_if_err!(AppendMenuW(edit_menu, MF_SEPARATOR, 0, PCWSTR::null()));
+        append_menu_string(
+            edit_menu,
+            MF_STRING,
+            IDM_EDIT_TEXT_STATS,
+            &labels.edit_text_stats,
+        );
+        append_menu_string(hmenu, MF_POPUP, edit_menu.0 as usize, &labels.menu_edit);
 
-    append_menu_string(
-        view_menu,
-        MF_STRING,
-        IDM_VIEW_SHOW_VOICES,
-        &labels.view_show_voices,
-    );
-    append_menu_string(
-        view_menu,
-        MF_STRING,
-        IDM_VIEW_SHOW_FAVORITES,
-        &labels.view_show_favorites,
-    );
-    append_menu_string(
-        view_menu,
-        MF_STRING,
-        IDM_VIEW_READ_ONLY,
-        &labels.view_read_only,
-    );
-    append_menu_string(
-        view_menu,
-        MF_STRING,
-        IDM_VIEW_WORD_WRAP,
-        &labels.view_word_wrap,
-    );
-    crate::log_if_err!(AppendMenuW(view_menu, MF_SEPARATOR, 0, PCWSTR::null()));
-    append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_ARIAL, "Arial");
-    append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_CALIBRI, "Calibri");
-    append_menu_string(
-        view_font_menu,
-        MF_STRING,
-        IDM_VIEW_FONT_CONSOLAS,
-        "Consolas",
-    );
-    append_menu_string(
-        view_font_menu,
-        MF_STRING,
-        IDM_VIEW_FONT_SEGOE_UI,
-        "Segoe UI",
-    );
-    append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_TAHOMA, "Tahoma");
-    append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_VERDANA, "Verdana");
-    append_menu_string(
-        view_font_menu,
-        MF_STRING,
-        IDM_VIEW_FONT_TIMES_NEW_ROMAN,
-        "Times New Roman",
-    );
-    append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_GEORGIA, "Georgia");
-    append_menu_string(
-        view_menu,
-        MF_POPUP,
-        view_font_menu.0 as usize,
-        &labels.view_font,
-    );
-    crate::log_if_err!(AppendMenuW(view_menu, MF_SEPARATOR, 0, PCWSTR::null()));
-    append_menu_string(
-        view_color_menu,
-        MF_STRING,
-        IDM_VIEW_TEXT_COLOR_BLACK,
-        &labels.view_text_color_black,
-    );
-    append_menu_string(
-        view_color_menu,
-        MF_STRING,
-        IDM_VIEW_TEXT_COLOR_DARK_BLUE,
-        &labels.view_text_color_dark_blue,
-    );
-    append_menu_string(
-        view_color_menu,
-        MF_STRING,
-        IDM_VIEW_TEXT_COLOR_DARK_GREEN,
-        &labels.view_text_color_dark_green,
-    );
-    append_menu_string(
-        view_color_menu,
-        MF_STRING,
-        IDM_VIEW_TEXT_COLOR_DARK_BROWN,
-        &labels.view_text_color_dark_brown,
-    );
-    append_menu_string(
-        view_color_menu,
-        MF_STRING,
-        IDM_VIEW_TEXT_COLOR_DARK_GRAY,
-        &labels.view_text_color_dark_gray,
-    );
-    append_menu_string(
-        view_color_menu,
-        MF_STRING,
-        IDM_VIEW_TEXT_COLOR_LIGHT_BLUE,
-        &labels.view_text_color_light_blue,
-    );
-    append_menu_string(
-        view_color_menu,
-        MF_STRING,
-        IDM_VIEW_TEXT_COLOR_LIGHT_GREEN,
-        &labels.view_text_color_light_green,
-    );
-    append_menu_string(
-        view_color_menu,
-        MF_STRING,
-        IDM_VIEW_TEXT_COLOR_LIGHT_BROWN,
-        &labels.view_text_color_light_brown,
-    );
-    append_menu_string(
-        view_color_menu,
-        MF_STRING,
-        IDM_VIEW_TEXT_COLOR_LIGHT_GRAY,
-        &labels.view_text_color_light_gray,
-    );
-    append_menu_string(
-        view_size_menu,
-        MF_STRING,
-        IDM_VIEW_TEXT_SIZE_SMALL,
-        &labels.view_text_size_small,
-    );
-    append_menu_string(
-        view_size_menu,
-        MF_STRING,
-        IDM_VIEW_TEXT_SIZE_NORMAL,
-        &labels.view_text_size_normal,
-    );
-    append_menu_string(
-        view_size_menu,
-        MF_STRING,
-        IDM_VIEW_TEXT_SIZE_LARGE,
-        &labels.view_text_size_large,
-    );
-    append_menu_string(
-        view_size_menu,
-        MF_STRING,
-        IDM_VIEW_TEXT_SIZE_XLARGE,
-        &labels.view_text_size_xlarge,
-    );
-    append_menu_string(
-        view_size_menu,
-        MF_STRING,
-        IDM_VIEW_TEXT_SIZE_XXLARGE,
-        &labels.view_text_size_xxlarge,
-    );
-    append_menu_string(
-        view_menu,
-        MF_POPUP,
-        view_color_menu.0 as usize,
-        &labels.view_text_color,
-    );
-    append_menu_string(
-        view_menu,
-        MF_POPUP,
-        view_size_menu.0 as usize,
-        &labels.view_text_size,
-    );
-    append_menu_string(hmenu, MF_POPUP, view_menu.0 as usize, &labels.menu_view);
+        append_menu_string(
+            view_menu,
+            MF_STRING,
+            IDM_VIEW_SHOW_VOICES,
+            &labels.view_show_voices,
+        );
+        append_menu_string(
+            view_menu,
+            MF_STRING,
+            IDM_VIEW_SHOW_FAVORITES,
+            &labels.view_show_favorites,
+        );
+        append_menu_string(
+            view_menu,
+            MF_STRING,
+            IDM_VIEW_READ_ONLY,
+            &labels.view_read_only,
+        );
+        append_menu_string(
+            view_menu,
+            MF_STRING,
+            IDM_VIEW_WORD_WRAP,
+            &labels.view_word_wrap,
+        );
+        crate::log_if_err!(AppendMenuW(view_menu, MF_SEPARATOR, 0, PCWSTR::null()));
+        append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_ARIAL, "Arial");
+        append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_CALIBRI, "Calibri");
+        append_menu_string(
+            view_font_menu,
+            MF_STRING,
+            IDM_VIEW_FONT_CONSOLAS,
+            "Consolas",
+        );
+        append_menu_string(
+            view_font_menu,
+            MF_STRING,
+            IDM_VIEW_FONT_SEGOE_UI,
+            "Segoe UI",
+        );
+        append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_TAHOMA, "Tahoma");
+        append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_VERDANA, "Verdana");
+        append_menu_string(
+            view_font_menu,
+            MF_STRING,
+            IDM_VIEW_FONT_TIMES_NEW_ROMAN,
+            "Times New Roman",
+        );
+        append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_GEORGIA, "Georgia");
+        append_menu_string(
+            view_menu,
+            MF_POPUP,
+            view_font_menu.0 as usize,
+            &labels.view_font,
+        );
+        crate::log_if_err!(AppendMenuW(view_menu, MF_SEPARATOR, 0, PCWSTR::null()));
+        append_menu_string(
+            view_color_menu,
+            MF_STRING,
+            IDM_VIEW_TEXT_COLOR_BLACK,
+            &labels.view_text_color_black,
+        );
+        append_menu_string(
+            view_color_menu,
+            MF_STRING,
+            IDM_VIEW_TEXT_COLOR_DARK_BLUE,
+            &labels.view_text_color_dark_blue,
+        );
+        append_menu_string(
+            view_color_menu,
+            MF_STRING,
+            IDM_VIEW_TEXT_COLOR_DARK_GREEN,
+            &labels.view_text_color_dark_green,
+        );
+        append_menu_string(
+            view_color_menu,
+            MF_STRING,
+            IDM_VIEW_TEXT_COLOR_DARK_BROWN,
+            &labels.view_text_color_dark_brown,
+        );
+        append_menu_string(
+            view_color_menu,
+            MF_STRING,
+            IDM_VIEW_TEXT_COLOR_DARK_GRAY,
+            &labels.view_text_color_dark_gray,
+        );
+        append_menu_string(
+            view_color_menu,
+            MF_STRING,
+            IDM_VIEW_TEXT_COLOR_LIGHT_BLUE,
+            &labels.view_text_color_light_blue,
+        );
+        append_menu_string(
+            view_color_menu,
+            MF_STRING,
+            IDM_VIEW_TEXT_COLOR_LIGHT_GREEN,
+            &labels.view_text_color_light_green,
+        );
+        append_menu_string(
+            view_color_menu,
+            MF_STRING,
+            IDM_VIEW_TEXT_COLOR_LIGHT_BROWN,
+            &labels.view_text_color_light_brown,
+        );
+        append_menu_string(
+            view_color_menu,
+            MF_STRING,
+            IDM_VIEW_TEXT_COLOR_LIGHT_GRAY,
+            &labels.view_text_color_light_gray,
+        );
+        append_menu_string(
+            view_size_menu,
+            MF_STRING,
+            IDM_VIEW_TEXT_SIZE_SMALL,
+            &labels.view_text_size_small,
+        );
+        append_menu_string(
+            view_size_menu,
+            MF_STRING,
+            IDM_VIEW_TEXT_SIZE_NORMAL,
+            &labels.view_text_size_normal,
+        );
+        append_menu_string(
+            view_size_menu,
+            MF_STRING,
+            IDM_VIEW_TEXT_SIZE_LARGE,
+            &labels.view_text_size_large,
+        );
+        append_menu_string(
+            view_size_menu,
+            MF_STRING,
+            IDM_VIEW_TEXT_SIZE_XLARGE,
+            &labels.view_text_size_xlarge,
+        );
+        append_menu_string(
+            view_size_menu,
+            MF_STRING,
+            IDM_VIEW_TEXT_SIZE_XXLARGE,
+            &labels.view_text_size_xxlarge,
+        );
+        append_menu_string(
+            view_menu,
+            MF_POPUP,
+            view_color_menu.0 as usize,
+            &labels.view_text_color,
+        );
+        append_menu_string(
+            view_menu,
+            MF_POPUP,
+            view_size_menu.0 as usize,
+            &labels.view_text_size,
+        );
+        append_menu_string(hmenu, MF_POPUP, view_menu.0 as usize, &labels.menu_view);
 
-    append_menu_string(
-        insert_menu,
-        MF_STRING,
-        IDM_INSERT_BOOKMARK,
-        &labels.insert_bookmark,
-    );
-    append_menu_string(
-        insert_menu,
-        MF_STRING,
-        IDM_GOTO_NEXT_BOOKMARK,
-        &labels.insert_goto_next_bookmark,
-    );
-    append_menu_string(
-        insert_menu,
-        MF_STRING,
-        IDM_GOTO_PREV_BOOKMARK,
-        &labels.insert_goto_prev_bookmark,
-    );
-    append_menu_string(
-        insert_menu,
-        MF_STRING,
-        IDM_INSERT_CLEAR_BOOKMARKS,
-        &labels.insert_clear_bookmarks,
-    );
-    append_menu_string(
-        insert_menu,
-        MF_STRING,
-        IDM_MANAGE_BOOKMARKS,
-        &labels.manage_bookmarks,
-    );
-    append_menu_string(hmenu, MF_POPUP, insert_menu.0 as usize, &labels.menu_insert);
+        append_menu_string(
+            insert_menu,
+            MF_STRING,
+            IDM_INSERT_BOOKMARK,
+            &labels.insert_bookmark,
+        );
+        append_menu_string(
+            insert_menu,
+            MF_STRING,
+            IDM_GOTO_NEXT_BOOKMARK,
+            &labels.insert_goto_next_bookmark,
+        );
+        append_menu_string(
+            insert_menu,
+            MF_STRING,
+            IDM_GOTO_PREV_BOOKMARK,
+            &labels.insert_goto_prev_bookmark,
+        );
+        append_menu_string(
+            insert_menu,
+            MF_STRING,
+            IDM_INSERT_CLEAR_BOOKMARKS,
+            &labels.insert_clear_bookmarks,
+        );
+        append_menu_string(
+            insert_menu,
+            MF_STRING,
+            IDM_MANAGE_BOOKMARKS,
+            &labels.manage_bookmarks,
+        );
+        append_menu_string(hmenu, MF_POPUP, insert_menu.0 as usize, &labels.menu_insert);
 
-    append_menu_string(window_menu, MF_STRING, IDM_FILE_CLOSE, &labels.file_close);
-    append_menu_string(
-        window_menu,
-        MF_STRING,
-        IDM_WINDOW_OPEN_DOCUMENTS,
-        &labels.window_open_documents,
-    );
-    crate::log_if_err!(AppendMenuW(window_menu, MF_SEPARATOR, 0, PCWSTR::null()));
-    append_menu_string(
-        window_menu,
-        MF_STRING,
-        IDM_FILE_CLOSE_OTHERS,
-        &format!("{}\tCtrl+Shift+W", labels.window_close_others),
-    );
-    append_menu_string(
-        window_menu,
-        MF_STRING,
-        IDM_WINDOW_CLOSE_ALL,
-        &labels.window_close_all,
-    );
-    append_menu_string(
-        voice_audio_menu,
-        MF_STRING,
-        IDM_FILE_READ_START,
-        &labels.file_read_start,
-    );
-    append_menu_string(
-        voice_audio_menu,
-        MF_STRING,
-        IDM_FILE_READ_PAUSE,
-        &labels.file_read_pause,
-    );
-    append_menu_string(
-        voice_audio_menu,
-        MF_STRING,
-        IDM_FILE_READ_STOP,
-        &labels.file_read_stop,
-    );
-    crate::log_if_err!(AppendMenuW(
-        voice_audio_menu,
-        MF_SEPARATOR,
-        0,
-        PCWSTR::null()
-    ));
-    append_menu_string(
-        voice_audio_menu,
-        MF_STRING,
-        IDM_FILE_AUDIOBOOK,
-        &labels.file_audiobook,
-    );
-    append_menu_string(
-        voice_audio_menu,
-        MF_STRING,
-        IDM_FILE_BATCH_AUDIOBOOK,
-        &labels.file_batch_audiobooks,
-    );
-    append_menu_string(
-        voice_audio_menu,
-        MF_STRING,
-        IDM_FILE_PODCAST,
-        &labels.file_podcast,
-    );
-    append_menu_string(
-        voice_audio_menu,
-        MF_STRING,
-        IDM_FILE_CONVERT_AUDIO,
-        &labels.file_convert_audio,
-    );
-    append_menu_string(
-        hmenu,
-        MF_POPUP,
-        voice_audio_menu.0 as usize,
-        &labels.menu_voice_audio,
-    );
+        append_menu_string(window_menu, MF_STRING, IDM_FILE_CLOSE, &labels.file_close);
+        append_menu_string(
+            window_menu,
+            MF_STRING,
+            IDM_WINDOW_OPEN_DOCUMENTS,
+            &labels.window_open_documents,
+        );
+        crate::log_if_err!(AppendMenuW(window_menu, MF_SEPARATOR, 0, PCWSTR::null()));
+        append_menu_string(
+            window_menu,
+            MF_STRING,
+            IDM_FILE_CLOSE_OTHERS,
+            &format!("{}\tCtrl+Shift+W", labels.window_close_others),
+        );
+        append_menu_string(
+            window_menu,
+            MF_STRING,
+            IDM_WINDOW_CLOSE_ALL,
+            &labels.window_close_all,
+        );
+        append_menu_string(
+            voice_audio_menu,
+            MF_STRING,
+            IDM_FILE_READ_START,
+            &labels.file_read_start,
+        );
+        append_menu_string(
+            voice_audio_menu,
+            MF_STRING,
+            IDM_FILE_READ_PAUSE,
+            &labels.file_read_pause,
+        );
+        append_menu_string(
+            voice_audio_menu,
+            MF_STRING,
+            IDM_FILE_READ_STOP,
+            &labels.file_read_stop,
+        );
+        crate::log_if_err!(AppendMenuW(
+            voice_audio_menu,
+            MF_SEPARATOR,
+            0,
+            PCWSTR::null()
+        ));
+        append_menu_string(
+            voice_audio_menu,
+            MF_STRING,
+            IDM_FILE_AUDIOBOOK,
+            &labels.file_audiobook,
+        );
+        append_menu_string(
+            voice_audio_menu,
+            MF_STRING,
+            IDM_FILE_BATCH_AUDIOBOOK,
+            &labels.file_batch_audiobooks,
+        );
+        append_menu_string(
+            voice_audio_menu,
+            MF_STRING,
+            IDM_FILE_PODCAST,
+            &labels.file_podcast,
+        );
+        append_menu_string(
+            voice_audio_menu,
+            MF_STRING,
+            IDM_FILE_CONVERT_AUDIO,
+            &labels.file_convert_audio,
+        );
+        append_menu_string(
+            hmenu,
+            MF_POPUP,
+            voice_audio_menu.0 as usize,
+            &labels.menu_voice_audio,
+        );
 
-    append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_PROMPT, &labels.menu_prompt);
-    append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_RSS, &labels.menu_rss);
-    append_menu_string(
-        tools_menu,
-        MF_STRING,
-        IDM_TOOLS_PODCASTS,
-        &labels.menu_podcasts,
-    );
-    append_menu_string(
-        tools_menu,
-        MF_STRING,
-        IDM_TOOLS_DICTIONARY,
-        &labels.menu_dictionary,
-    );
-    append_menu_string(
-        tools_menu,
-        MF_STRING,
-        IDM_TOOLS_DICTIONARY_LOOKUP,
-        &labels.menu_dictionary_lookup,
-    );
-    append_menu_string(
-        tools_menu,
-        MF_STRING,
-        IDM_TOOLS_WIKIPEDIA_IMPORT,
-        &labels.menu_wikipedia_import,
-    );
-    append_menu_string(
-        tools_menu,
-        MF_STRING,
-        IDM_TOOLS_IMPORT_YOUTUBE,
-        &labels.menu_import_youtube,
-    );
-    append_menu_string(
-        tools_menu,
-        MF_STRING,
-        IDM_TOOLS_STREAM_AUDIO,
-        &labels.menu_stream_audio,
-    );
-    append_menu_string(
-        tools_menu,
-        MF_STRING,
-        IDM_TOOLS_APPLY_DIALOGUE_VOICE,
-        &labels.menu_apply_dialogue_voice,
-    );
-    append_menu_string(
-        tools_menu,
-        MF_STRING,
-        IDM_TOOLS_OPTIONS,
-        &labels.menu_options,
-    );
-    append_menu_string(hmenu, MF_POPUP, tools_menu.0 as usize, &labels.menu_tools);
-    append_menu_string(hmenu, MF_POPUP, window_menu.0 as usize, &labels.menu_window);
+        append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_PROMPT, &labels.menu_prompt);
+        append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_RSS, &labels.menu_rss);
+        append_menu_string(
+            tools_menu,
+            MF_STRING,
+            IDM_TOOLS_PODCASTS,
+            &labels.menu_podcasts,
+        );
+        append_menu_string(
+            tools_menu,
+            MF_STRING,
+            IDM_TOOLS_DICTIONARY,
+            &labels.menu_dictionary,
+        );
+        append_menu_string(
+            tools_menu,
+            MF_STRING,
+            IDM_TOOLS_DICTIONARY_LOOKUP,
+            &labels.menu_dictionary_lookup,
+        );
+        append_menu_string(
+            tools_menu,
+            MF_STRING,
+            IDM_TOOLS_WIKIPEDIA_IMPORT,
+            &labels.menu_wikipedia_import,
+        );
+        append_menu_string(
+            tools_menu,
+            MF_STRING,
+            IDM_TOOLS_IMPORT_YOUTUBE,
+            &labels.menu_import_youtube,
+        );
+        append_menu_string(
+            tools_menu,
+            MF_STRING,
+            IDM_TOOLS_STREAM_AUDIO,
+            &labels.menu_stream_audio,
+        );
+        append_menu_string(
+            tools_menu,
+            MF_STRING,
+            IDM_TOOLS_APPLY_DIALOGUE_VOICE,
+            &labels.menu_apply_dialogue_voice,
+        );
+        append_menu_string(
+            tools_menu,
+            MF_STRING,
+            IDM_TOOLS_OPTIONS,
+            &labels.menu_options,
+        );
+        append_menu_string(hmenu, MF_POPUP, tools_menu.0 as usize, &labels.menu_tools);
+        append_menu_string(hmenu, MF_POPUP, window_menu.0 as usize, &labels.menu_window);
 
-    append_menu_string(help_menu, MF_STRING, IDM_HELP_GUIDE, &labels.help_guide);
-    append_menu_string(
-        help_menu,
-        MF_STRING,
-        IDM_HELP_CHANGELOG,
-        &labels.help_changelog,
-    );
-    append_menu_string(
-        help_menu,
-        MF_STRING,
-        IDM_HELP_DONATIONS,
-        &labels.help_donations,
-    );
-    append_menu_string(
-        help_menu,
-        MF_STRING,
-        IDM_HELP_CHECK_UPDATES,
-        &labels.help_check_updates,
-    );
-    append_menu_string(
-        help_menu,
-        MF_STRING,
-        IDM_HELP_EXPORT_DIAGNOSTICS,
-        &labels.help_export_diagnostics,
-    );
-    append_menu_string(help_menu, MF_STRING, IDM_HELP_ABOUT, &labels.help_about);
-    append_menu_string(hmenu, MF_POPUP, help_menu.0 as usize, &labels.menu_help);
+        append_menu_string(help_menu, MF_STRING, IDM_HELP_GUIDE, &labels.help_guide);
+        append_menu_string(
+            help_menu,
+            MF_STRING,
+            IDM_HELP_CHANGELOG,
+            &labels.help_changelog,
+        );
+        append_menu_string(
+            help_menu,
+            MF_STRING,
+            IDM_HELP_DONATIONS,
+            &labels.help_donations,
+        );
+        append_menu_string(
+            help_menu,
+            MF_STRING,
+            IDM_HELP_CHECK_UPDATES,
+            &labels.help_check_updates,
+        );
+        append_menu_string(
+            help_menu,
+            MF_STRING,
+            IDM_HELP_EXPORT_DIAGNOSTICS,
+            &labels.help_export_diagnostics,
+        );
+        append_menu_string(help_menu, MF_STRING, IDM_HELP_ABOUT, &labels.help_about);
+        append_menu_string(hmenu, MF_POPUP, help_menu.0 as usize, &labels.menu_help);
 
-    crate::log_if_err!(SetMenu(hwnd, hmenu));
-    (hmenu, recent_menu)
+        crate::log_if_err!(SetMenu(hwnd, hmenu));
+        (hmenu, recent_menu)
+    }
 }
 
 pub fn update_recent_menu(hwnd: HWND, hmenu_recent: HMENU) {

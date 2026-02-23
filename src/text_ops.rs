@@ -61,8 +61,9 @@ pub fn remove_duplicate_lines(scope: &str) -> String {
     let mut out_lines = Vec::new();
 
     for line in lines {
-        // Compare lines by exact text content (do NOT trim spaces, do NOT ignore case).
-        if seen.insert(line) {
+        // Treat whitespace-only lines as equivalent to empty lines.
+        let key = if line.trim().is_empty() { "" } else { line };
+        if seen.insert(key) {
             out_lines.push(line);
         }
     }
@@ -85,13 +86,15 @@ pub fn remove_duplicate_consecutive_lines(scope: &str) -> String {
     let lines = split_lines_keep_empty(content);
     let mut out_lines = Vec::new();
 
-    let mut last_line: Option<&str> = None;
+    let mut last_key: Option<&str> = None;
     for line in lines {
-        if last_line == Some(line) {
+        // Treat whitespace-only lines as equivalent to empty lines.
+        let key = if line.trim().is_empty() { "" } else { line };
+        if last_key == Some(key) {
             continue;
         }
         out_lines.push(line);
-        last_line = Some(line);
+        last_key = Some(key);
     }
 
     let mut out = out_lines.join(eol);
@@ -140,10 +143,10 @@ mod tests {
     }
 
     #[test]
-    fn test_whitespace_significant() {
-        let input = "a\na \n";
-        assert_eq!(remove_duplicate_lines(input), "a\na \n");
-        assert_eq!(remove_duplicate_consecutive_lines(input), "a\na \n");
+    fn test_whitespace_blank_lines_are_treated_as_empty() {
+        let input = "a\n   \n\t\nb\n  \n";
+        assert_eq!(remove_duplicate_lines(input), "a\n   \nb\n");
+        assert_eq!(remove_duplicate_consecutive_lines(input), "a\n   \nb\n");
     }
 
     #[test]

@@ -1461,7 +1461,56 @@ fn handle_chapter_list(hwnd: HWND) {
     }
 }
 
+fn is_direct_stream_url_path(path: &Path) -> bool {
+    let s = path.to_string_lossy();
+    s.starts_with("http://") || s.starts_with("https://")
+}
+
+fn is_direct_stream_playback_active(hwnd: HWND) -> bool {
+    unsafe {
+        with_state(hwnd, |state| {
+            if let Some(player) = state.active_audiobook.as_ref()
+                && is_direct_stream_url_path(&player.path)
+            {
+                return true;
+            }
+            state
+                .docs
+                .get(state.current)
+                .and_then(|doc| {
+                    if matches!(doc.format, FileFormat::Audiobook) {
+                        doc.path.as_ref()
+                    } else {
+                        None
+                    }
+                })
+                .is_some_and(|path| is_direct_stream_url_path(path))
+        })
+        .unwrap_or(false)
+    }
+}
+
 fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
+    let disable_seek_rate_pitch = matches!(
+        command,
+        PlayerCommand::Seek(_)
+            | PlayerCommand::SeekToStart
+            | PlayerCommand::SeekToEnd
+            | PlayerCommand::GoToTime
+            | PlayerCommand::Speed(_)
+            | PlayerCommand::SpeedReset
+            | PlayerCommand::Pitch(_)
+            | PlayerCommand::PitchReset
+    ) && is_direct_stream_playback_active(hwnd);
+    if disable_seek_rate_pitch {
+        let language =
+            unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+        let message = i18n::tr(language, "subtitle_mode.off");
+        if !message.is_empty() {
+            crate::accessibility::screen_reader_speak(&message);
+        }
+        return;
+    }
     match command {
         PlayerCommand::TogglePause => {
             toggle_audiobook_pause(hwnd);

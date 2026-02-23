@@ -384,6 +384,28 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                 .unwrap_or(false)
         })
         .unwrap_or(false);
+        let direct_stream_playback = with_state(hwnd, |state| {
+            if let Some(player) = state.active_audiobook.as_ref() {
+                let s = player.path.to_string_lossy();
+                if s.starts_with("http://") || s.starts_with("https://") {
+                    return true;
+                }
+            }
+            state
+                .docs
+                .get(state.current)
+                .and_then(|doc| {
+                    if matches!(doc.format, crate::settings::FileFormat::Audiobook) {
+                        doc.path.as_ref()
+                    } else {
+                        None
+                    }
+                })
+                .map(|p| p.to_string_lossy())
+                .map(|s| s.starts_with("http://") || s.starts_with("https://"))
+                .unwrap_or(false)
+        })
+        .unwrap_or(false);
         if show {
             if existing.0 != 0 {
                 remove_playback_menu(hmenu, existing);
@@ -446,27 +468,32 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                 &play_pause,
             );
             append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_STOP, &stop);
+            let seek_flags = if direct_stream_playback {
+                MF_STRING | MF_GRAYED
+            } else {
+                MF_STRING
+            };
             append_menu_string(
                 playback_menu,
-                MF_STRING,
+                seek_flags,
                 IDM_PLAYBACK_SEEK_FORWARD,
                 &seek_forward,
             );
             append_menu_string(
                 playback_menu,
-                MF_STRING,
+                seek_flags,
                 IDM_PLAYBACK_SEEK_BACKWARD,
                 &seek_backward,
             );
             append_menu_string(
                 playback_menu,
-                MF_STRING,
+                seek_flags,
                 IDM_PLAYBACK_SEEK_TO_START,
                 &seek_to_start,
             );
             append_menu_string(
                 playback_menu,
-                MF_STRING,
+                seek_flags,
                 IDM_PLAYBACK_SEEK_TO_END,
                 &seek_to_end,
             );
@@ -512,7 +539,11 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
             }
             append_menu_string(
                 playback_menu,
-                MF_STRING,
+                if direct_stream_playback {
+                    MF_STRING | MF_GRAYED
+                } else {
+                    MF_STRING
+                },
                 IDM_PLAYBACK_GO_TO_TIME,
                 &go_to_time,
             );
@@ -584,17 +615,22 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                 IDM_PLAYBACK_VOLUME_DOWN,
                 &volume_down,
             );
-            append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_SPEED_UP, &speed_up);
+            let rate_flags = if direct_stream_playback {
+                MF_STRING | MF_GRAYED
+            } else {
+                MF_STRING
+            };
+            append_menu_string(playback_menu, rate_flags, IDM_PLAYBACK_SPEED_UP, &speed_up);
             append_menu_string(
                 playback_menu,
-                MF_STRING,
+                rate_flags,
                 IDM_PLAYBACK_SPEED_DOWN,
                 &speed_down,
             );
-            append_menu_string(playback_menu, MF_STRING, IDM_PLAYBACK_PITCH_UP, &pitch_up);
+            append_menu_string(playback_menu, rate_flags, IDM_PLAYBACK_PITCH_UP, &pitch_up);
             append_menu_string(
                 playback_menu,
-                MF_STRING,
+                rate_flags,
                 IDM_PLAYBACK_PITCH_DOWN,
                 &pitch_down,
             );
@@ -608,13 +644,21 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                 );
                 append_menu_string(
                     reset_menu,
-                    MF_STRING,
+                    if direct_stream_playback {
+                        MF_STRING | MF_GRAYED
+                    } else {
+                        MF_STRING
+                    },
                     IDM_PLAYBACK_SPEED_RESET,
                     &speed_reset,
                 );
                 append_menu_string(
                     reset_menu,
-                    MF_STRING,
+                    if direct_stream_playback {
+                        MF_STRING | MF_GRAYED
+                    } else {
+                        MF_STRING
+                    },
                     IDM_PLAYBACK_PITCH_RESET,
                     &pitch_reset,
                 );

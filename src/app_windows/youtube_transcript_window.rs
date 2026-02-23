@@ -52,6 +52,7 @@ const STREAM_ID_URL: usize = 9311;
 const STREAM_ID_FORMAT: usize = 9312;
 const STREAM_ID_OK: usize = 9313;
 const STREAM_ID_CANCEL: usize = 9314;
+const STREAM_ID_DIRECT_PLAY: usize = 9315;
 const STREAM_TRACK_ID_COMBO: usize = 9321;
 const STREAM_TRACK_ID_OK: usize = 9322;
 const STREAM_TRACK_ID_CANCEL: usize = 9323;
@@ -1481,6 +1482,7 @@ enum StreamOutputFormat {
 struct StreamDialogResult {
     url: String,
     format: StreamOutputFormat,
+    direct_play: bool,
 }
 
 #[derive(Clone)]
@@ -1500,6 +1502,7 @@ struct StreamDialogState {
     language: Language,
     url_edit: HWND,
     format_combo: HWND,
+    direct_play_check: HWND,
     ok_button: HWND,
     result: Arc<Mutex<Option<StreamDialogResult>>>,
 }
@@ -1665,13 +1668,27 @@ unsafe fn stream_dialog_wndproc_inner(
                 HINSTANCE(0),
                 None,
             );
+            let direct_play_check = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&i18n::tr(init.language, "stream_audio.direct_play")).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                110,
+                50,
+                330,
+                22,
+                hwnd,
+                HMENU(STREAM_ID_DIRECT_PLAY as isize),
+                HINSTANCE(0),
+                None,
+            );
             let format_label = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
                 PCWSTR(to_wide(&i18n::tr(init.language, "stream_audio.format_label")).as_ptr()),
                 WS_CHILD | WS_VISIBLE,
                 16,
-                52,
+                84,
                 90,
                 20,
                 hwnd,
@@ -1685,7 +1702,7 @@ unsafe fn stream_dialog_wndproc_inner(
                 PCWSTR::null(),
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
                 110,
-                50,
+                82,
                 210,
                 180,
                 hwnd,
@@ -1699,7 +1716,7 @@ unsafe fn stream_dialog_wndproc_inner(
                 PCWSTR(to_wide(&i18n::tr(init.language, "youtube.ok")).as_ptr()),
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
                 350,
-                94,
+                118,
                 90,
                 28,
                 hwnd,
@@ -1713,7 +1730,7 @@ unsafe fn stream_dialog_wndproc_inner(
                 PCWSTR(to_wide(&i18n::tr(init.language, "youtube.cancel")).as_ptr()),
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                 350,
-                126,
+                150,
                 90,
                 28,
                 hwnd,
@@ -1727,6 +1744,7 @@ unsafe fn stream_dialog_wndproc_inner(
                 url_edit,
                 format_label,
                 format_combo,
+                direct_play_check,
                 ok_button,
                 cancel_button,
             ] {
@@ -1752,6 +1770,7 @@ unsafe fn stream_dialog_wndproc_inner(
                 language: init.language,
                 url_edit,
                 format_combo,
+                direct_play_check,
                 ok_button,
                 result: init.result.clone(),
             });
@@ -1774,8 +1793,15 @@ unsafe fn stream_dialog_wndproc_inner(
                         .get(format_idx.max(0) as usize)
                         .map(|(_, f)| *f)
                         .unwrap_or(StreamOutputFormat::Auto);
+                    let direct_play =
+                        SendMessageW(state.direct_play_check, BM_GETCHECK, WPARAM(0), LPARAM(0)).0
+                            == BST_CHECKED.0 as isize;
                     *state.result.lock().unwrap_or_else(|e| e.into_inner()) =
-                        Some(StreamDialogResult { url, format });
+                        Some(StreamDialogResult {
+                            url,
+                            format,
+                            direct_play,
+                        });
                 })
                 .is_none()
                 {
@@ -1880,7 +1906,7 @@ fn show_stream_dialog(parent: HWND, language: Language) -> Option<StreamDialogRe
             CW_USEDEFAULT,
             CW_USEDEFAULT,
             470,
-            200,
+            230,
             parent,
             HMENU(0),
             hinstance,
@@ -2560,6 +2586,28 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 language,
                 &i18n::tr(language, "stream_audio.invalid_url"),
             );
+        }
+        return;
+    }
+
+    if dialog_data.direct_play {
+        let stream_path = PathBuf::from(&url);
+        unsafe {
+            crate::queue_audio_files_and_play(parent, vec![stream_path.clone()]);
+            crate::editor_manager::mark_current_document_from_rss(parent, true);
+            let episode_title = stream_path
+                .file_name()
+                .and_then(|s| s.to_str())
+                .filter(|s| !s.trim().is_empty())
+                .map(|s| s.to_string())
+                .or_else(|| Some(url.clone()));
+            crate::set_active_podcast_episode_info(
+                parent,
+                Some(url),
+                episode_title,
+                Some(stream_path),
+            );
+            crate::menu::update_playback_menu(parent, true);
         }
         return;
     }

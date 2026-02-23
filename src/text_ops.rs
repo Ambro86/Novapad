@@ -146,7 +146,7 @@ mod tests {
     fn test_whitespace_blank_lines_are_treated_as_empty() {
         let input = "a\n   \n\t\nb\n  \n";
         assert_eq!(remove_duplicate_lines(input), "a\n   \nb\n");
-        assert_eq!(remove_duplicate_consecutive_lines(input), "a\n   \nb\n");
+        assert_eq!(remove_duplicate_consecutive_lines(input), "a\n   \nb\n  \n");
     }
 
     #[test]

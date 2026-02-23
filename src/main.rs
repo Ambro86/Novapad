@@ -198,7 +198,7 @@ const VOICE_PANEL_ID_INSERT_TAG: usize = 21011;
 const MAIN_STATUS_ID: usize = 22001;
 const VOICE_MENU_ID_ADD_FAVORITE: u32 = 9001;
 const VOICE_MENU_ID_REMOVE_FAVORITE: u32 = 9002;
-const WINDOW_MENU_INDEX: i32 = 6;
+const WINDOW_MENU_INDEX: i32 = 7;
 const WINDOW_DOC_MENU_BASE: usize = 11_000;
 const WINDOW_DOC_MENU_MAX: usize = 200;
 const WINDOW_DOC_MENU_SEPARATOR_ID: usize = 10_999;
@@ -1464,6 +1464,15 @@ fn handle_chapter_list(hwnd: HWND) {
 fn is_direct_stream_url_path(path: &Path) -> bool {
     let s = path.to_string_lossy();
     s.starts_with("http://") || s.starts_with("https://")
+}
+
+fn is_stream_cache_media(path: &Path) -> bool {
+    let name = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    name.starts_with("stream_")
 }
 
 fn is_direct_stream_playback_active(hwnd: HWND) -> bool {
@@ -8766,19 +8775,33 @@ fn handle_audio_playlist_timer(hwnd: HWND) {
     // If output stops mid-file (e.g. transient backend failure), recover by restarting
     // from the current position instead of stopping playback entirely.
     if !should_advance && output_stopped {
-        let restart = unsafe {
+        let is_stream_cache = unsafe {
             with_state(hwnd, |state| {
-                let player = state.active_audiobook.as_ref()?;
-                let position_secs = audio_player::audiobook_position_secs(player)
-                    .max(0.0)
-                    .floor() as u64;
-                Some((player.path.clone(), position_secs))
+                state
+                    .active_audiobook
+                    .as_ref()
+                    .map(|player| is_stream_cache_media(&player.path))
+                    .unwrap_or(false)
             })
-            .flatten()
+            .unwrap_or(false)
         };
-        if let Some((path, position_secs)) = restart {
-            audio_player::start_audiobook_at(hwnd, &path, position_secs);
-            return;
+        if is_stream_cache {
+            log_debug("Audio player: stream cache output stopped, skipping mid-file auto-restart");
+        } else {
+            let restart = unsafe {
+                with_state(hwnd, |state| {
+                    let player = state.active_audiobook.as_ref()?;
+                    let position_secs = audio_player::audiobook_position_secs(player)
+                        .max(0.0)
+                        .floor() as u64;
+                    Some((player.path.clone(), position_secs))
+                })
+                .flatten()
+            };
+            if let Some((path, position_secs)) = restart {
+                audio_player::start_audiobook_at(hwnd, &path, position_secs);
+                return;
+            }
         }
     }
     if !switch_audio_playlist_relative(hwnd, 1) {

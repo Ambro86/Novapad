@@ -4398,11 +4398,6 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                     app_windows::youtube_transcript_window::play_streaming_audio_from_url(hwnd);
                     LRESULT(0)
                 }
-                IDM_TOOLS_APPLY_DIALOGUE_VOICE => {
-                    log_debug("Menu: Apply dialogue voice");
-                    apply_dialogue_voice_sidecar_for_current_file(hwnd);
-                    LRESULT(0)
-                }
                 IDM_TOOLS_PROMPT => {
                     log_debug("Menu: Prompt");
                     app_windows::prompt_window::open(hwnd);
@@ -8050,11 +8045,6 @@ unsafe fn create_accelerators() -> HACCEL {
             cmd: IDM_TOOLS_DICTIONARY_LOOKUP as u16,
         },
         ACCEL {
-            fVirt: virt_alt_shift,
-            key: 'V' as u16,
-            cmd: IDM_TOOLS_APPLY_DIALOGUE_VOICE as u16,
-        },
-        ACCEL {
             fVirt: virt,
             key: VK_TAB.0,
             cmd: IDM_NEXT_TAB as u16,
@@ -9337,90 +9327,6 @@ fn suggest_extension_for_interpreter(interpreter: &str) -> &'static str {
     } else {
         "txt"
     }
-}
-
-unsafe fn apply_dialogue_voice_sidecar_for_current_file(hwnd: HWND) {
-    let (language, doc_path, settings) = with_state(hwnd, |state| {
-        (
-            state.settings.language,
-            state.docs.get(state.current).and_then(|d| d.path.clone()),
-            state.settings.clone(),
-        )
-    })
-    .unwrap_or((Language::Italian, None, AppSettings::default()));
-
-    let Some(doc_path) = doc_path else {
-        let msg = i18n::tr(language, "dialogue_voice.apply.save_first");
-        show_error(hwnd, language, &msg);
-        return;
-    };
-
-    let current_cfg = crate::dialogue_voice::load_dialogue_voice_config(&doc_path);
-    let default_cfg = crate::dialogue_voice::DialogueVoiceConfig {
-        engine: current_cfg
-            .as_ref()
-            .map(|cfg| cfg.engine)
-            .unwrap_or(settings.dialogue_tts_engine),
-        voice: current_cfg
-            .as_ref()
-            .map(|cfg| cfg.voice.clone())
-            .unwrap_or_else(|| {
-                if settings.dialogue_voice.trim().is_empty() {
-                    settings.tts_voice.clone()
-                } else {
-                    settings.dialogue_voice.clone()
-                }
-            }),
-        rate: current_cfg
-            .as_ref()
-            .map(|cfg| cfg.rate)
-            .unwrap_or(settings.dialogue_voice_rate),
-        pitch: current_cfg
-            .as_ref()
-            .map(|cfg| cfg.pitch)
-            .unwrap_or(settings.dialogue_voice_pitch),
-        volume: current_cfg
-            .as_ref()
-            .map(|cfg| cfg.volume)
-            .unwrap_or(settings.dialogue_voice_volume),
-        opening_quote: current_cfg
-            .as_ref()
-            .map(|cfg| cfg.opening_quote.clone())
-            .unwrap_or_else(|| "\"".to_string()),
-        closing_quote: current_cfg
-            .as_ref()
-            .map(|cfg| cfg.closing_quote.clone())
-            .unwrap_or_else(|| "\"".to_string()),
-        allow_multiline: current_cfg
-            .as_ref()
-            .map(|cfg| cfg.allow_multiline)
-            .unwrap_or(false),
-    };
-    let (edge_voices, sapi5_voices, sapi4_voices) = with_state(hwnd, |state| {
-        (
-            state.edge_voices.clone(),
-            state.sapi_voices.clone(),
-            crate::sapi4_engine::get_voices(),
-        )
-    })
-    .unwrap_or((Vec::new(), Vec::new(), Vec::new()));
-    let Some(cfg) = app_windows::dialogue_voice_window::open_dialog(
-        hwnd,
-        language,
-        edge_voices,
-        sapi5_voices,
-        sapi4_voices,
-        default_cfg,
-    ) else {
-        return;
-    };
-    if let Err(err) = crate::dialogue_voice::save_dialogue_voice_config(&doc_path, &cfg) {
-        show_error(hwnd, language, &err);
-        return;
-    }
-
-    let msg = i18n::tr(language, "dialogue_voice.apply.saved");
-    show_info(hwnd, language, &msg);
 }
 
 unsafe fn execute_current_file(hwnd: HWND) {

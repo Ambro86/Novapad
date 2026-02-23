@@ -379,13 +379,9 @@ pub fn start_tts_from_caret(hwnd: HWND) {
         ));
 
     let (mut text, initial_caret_pos) = unsafe { get_text_from_caret(hwnd_edit) };
-    let doc_path = unsafe {
-        with_state(hwnd, |state| {
-            state.docs.get(state.current).and_then(|d| d.path.clone())
-        })
-    }
-    .flatten();
-    text = crate::dialogue_voice::apply_dialogue_tags_from_sidecar(&text, doc_path.as_deref());
+    let dialogue_settings =
+        unsafe { with_state(hwnd, |state| state.settings.clone()) }.unwrap_or_default();
+    text = crate::dialogue_voice::apply_dialogue_tags_from_settings(&text, &dialogue_settings);
     if text.trim().is_empty() {
         unsafe {
             show_error(hwnd, language, &settings::tts_no_text_message(language));
@@ -3469,7 +3465,7 @@ fn start_audiobook_with_text(
     suggested_name: Option<String>,
     epub_chapters: Option<Vec<String>>,
     is_unsaved_doc: bool,
-    doc_path: Option<&Path>,
+    _doc_path: Option<&Path>,
 ) {
     let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     if text.trim().is_empty() {
@@ -3536,7 +3532,9 @@ fn start_audiobook_with_text(
         0,
         100,
     ));
-    text = crate::dialogue_voice::apply_dialogue_tags_from_sidecar(&text, doc_path);
+    let dialogue_settings =
+        unsafe { with_state(hwnd, |state| state.settings.clone()) }.unwrap_or_default();
+    text = crate::dialogue_voice::apply_dialogue_tags_from_settings(&text, &dialogue_settings);
 
     let base_split_option_visible = audiobook_split_by_time
         || audiobook_split_by_text

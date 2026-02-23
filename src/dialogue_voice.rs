@@ -1,6 +1,5 @@
-use crate::settings::TtsEngine;
-use sha2::Digest;
-use std::path::{Path, PathBuf};
+use crate::settings::{AppSettings, TtsEngine};
+use std::path::PathBuf;
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct DialogueVoiceConfig {
@@ -15,40 +14,8 @@ pub struct DialogueVoiceConfig {
 }
 
 impl DialogueVoiceConfig {
-    fn legacy_sidecar_path_for(path: &Path) -> PathBuf {
-        let file_name = path
-            .file_name()
-            .and_then(|s| s.to_str())
-            .unwrap_or("document");
-        let mut sidecar = path.to_path_buf();
-        sidecar.set_file_name(format!("{file_name}.dialogue.ini"));
-        sidecar
-    }
-
-    pub fn sidecar_path_for(path: &Path) -> PathBuf {
-        let mut hasher = sha2::Sha256::new();
-        hasher.update(path.to_string_lossy().as_bytes());
-        let hash = hex::encode(hasher.finalize());
-
-        let file_stem = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .filter(|s| !s.trim().is_empty())
-            .unwrap_or("document");
-        let safe_stem: String = file_stem
-            .chars()
-            .map(|c| {
-                if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
-                    c
-                } else {
-                    '_'
-                }
-            })
-            .collect();
-        let file_name = format!("{safe_stem}.{}.dialogue.ini", &hash[..16]);
-        let mut sidecar = crate::settings::settings_dir().join("dialogs");
-        sidecar.push(file_name);
-        sidecar
+    pub fn config_path() -> PathBuf {
+        crate::settings::settings_dir().join("dialogue.ini")
     }
 }
 
@@ -69,9 +36,9 @@ pub fn engine_to_key(engine: TtsEngine) -> &'static str {
     }
 }
 
-pub fn save_dialogue_voice_config(path: &Path, cfg: &DialogueVoiceConfig) -> Result<(), String> {
-    let sidecar = DialogueVoiceConfig::sidecar_path_for(path);
-    if let Some(parent) = sidecar.parent() {
+pub fn save_dialogue_voice_config(cfg: &DialogueVoiceConfig) -> Result<(), String> {
+    let config_path = DialogueVoiceConfig::config_path();
+    if let Some(parent) = config_path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| {
             format!(
                 "Failed to create dialogue config folder {:?}: {}",
@@ -90,15 +57,13 @@ pub fn save_dialogue_voice_config(path: &Path, cfg: &DialogueVoiceConfig) -> Res
         cfg.closing_quote,
         if cfg.allow_multiline { "true" } else { "false" }
     );
-    std::fs::write(&sidecar, body)
-        .map_err(|e| format!("Failed to save dialogue sidecar {:?}: {}", sidecar, e))
+    std::fs::write(&config_path, body)
+        .map_err(|e| format!("Failed to save dialogue config {:?}: {}", config_path, e))
 }
 
-pub fn load_dialogue_voice_config(path: &Path) -> Option<DialogueVoiceConfig> {
-    let sidecar = DialogueVoiceConfig::sidecar_path_for(path);
-    let text = std::fs::read_to_string(&sidecar).ok().or_else(|| {
-        std::fs::read_to_string(DialogueVoiceConfig::legacy_sidecar_path_for(path)).ok()
-    })?;
+pub fn load_dialogue_voice_config() -> Option<DialogueVoiceConfig> {
+    let config_path = DialogueVoiceConfig::config_path();
+    let text = std::fs::read_to_string(config_path).ok()?;
     let mut engine = None;
     let mut voice = String::new();
     let mut rate = 0;
@@ -234,13 +199,21 @@ pub fn apply_dialogue_tags(text: &str, cfg: &DialogueVoiceConfig) -> String {
     if replaced_any { out } else { text.to_string() }
 }
 
-pub fn apply_dialogue_tags_from_sidecar(text: &str, doc_path: Option<&Path>) -> String {
-    let Some(path) = doc_path else {
+pub fn apply_dialogue_tags_from_settings(text: &str, settings: &AppSettings) -> String {
+    if !settings.use_dialogue_voice {
         return text.to_string();
+    }
+    let fallback = DialogueVoiceConfig {
+        engine: settings.dialogue_tts_engine,
+        voice: settings.dialogue_voice.clone(),
+        rate: settings.dialogue_voice_rate,
+        pitch: settings.dialogue_voice_pitch,
+        volume: settings.dialogue_voice_volume,
+        opening_quote: settings.dialogue_opening_quote.clone(),
+        closing_quote: settings.dialogue_closing_quote.clone(),
+        allow_multiline: settings.dialogue_allow_multiline,
     };
-    let Some(cfg) = load_dialogue_voice_config(path) else {
-        return text.to_string();
-    };
+    let cfg = load_dialogue_voice_config().unwrap_or(fallback);
     apply_dialogue_tags(text, &cfg)
 }
 

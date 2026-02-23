@@ -253,6 +253,26 @@ pub enum RssPodcastUnreadLabelPosition {
     After,
 }
 
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum ListDateDisplayMode {
+    #[serde(rename = "always")]
+    #[default]
+    Always,
+    #[serde(rename = "never")]
+    Never,
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum ListTimeDisplayMode {
+    #[serde(rename = "always")]
+    Always,
+    #[serde(rename = "never")]
+    Never,
+    #[serde(rename = "only_if_multiple_same_day")]
+    #[default]
+    OnlyIfMultipleSameDay,
+}
+
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ShortcutBinding {
     pub ctrl: bool,
@@ -439,6 +459,12 @@ pub struct AppSettings {
     pub dialogue_voice_volume: i32,
     #[serde(default = "default_dialogue_tts_engine")]
     pub dialogue_tts_engine: TtsEngine,
+    #[serde(default = "default_dialogue_opening_quote")]
+    pub dialogue_opening_quote: String,
+    #[serde(default = "default_dialogue_closing_quote")]
+    pub dialogue_closing_quote: String,
+    #[serde(default)]
+    pub dialogue_allow_multiline: bool,
     pub tts_only_multilingual: bool,
     pub tts_manual_tuning: bool,
     pub split_on_newline: bool,
@@ -545,6 +571,14 @@ pub struct AppSettings {
     #[serde(default)]
     pub rss_podcast_unread_label_position: RssPodcastUnreadLabelPosition,
     #[serde(default)]
+    pub rss_articles_date_display: ListDateDisplayMode,
+    #[serde(default)]
+    pub rss_articles_time_display: ListTimeDisplayMode,
+    #[serde(default)]
+    pub podcast_episodes_date_display: ListDateDisplayMode,
+    #[serde(default)]
+    pub podcast_episodes_time_display: ListTimeDisplayMode,
+    #[serde(default)]
     pub shortcuts: ShortcutSettings,
     pub spellcheck_enabled: bool,
     pub spellcheck_language_mode: SpellcheckLanguageMode,
@@ -643,6 +677,14 @@ fn default_dialogue_tts_engine() -> TtsEngine {
     TtsEngine::Edge
 }
 
+fn default_dialogue_opening_quote() -> String {
+    "\"".to_string()
+}
+
+fn default_dialogue_closing_quote() -> String {
+    "\"".to_string()
+}
+
 fn default_indent_tab_width() -> u32 {
     4
 }
@@ -677,6 +719,9 @@ impl Default for AppSettings {
             dialogue_voice_pitch: 0,
             dialogue_voice_volume: 100,
             dialogue_tts_engine: TtsEngine::Edge,
+            dialogue_opening_quote: default_dialogue_opening_quote(),
+            dialogue_closing_quote: default_dialogue_closing_quote(),
+            dialogue_allow_multiline: false,
             tts_only_multilingual: false,
             tts_manual_tuning: false,
             split_on_newline: false,
@@ -756,6 +801,10 @@ impl Default for AppSettings {
             rss_quick_copy_mode: RssQuickCopyMode::Title,
             announce_unread_rss_podcast_items: true,
             rss_podcast_unread_label_position: RssPodcastUnreadLabelPosition::Before,
+            rss_articles_date_display: ListDateDisplayMode::Always,
+            rss_articles_time_display: ListTimeDisplayMode::Always,
+            podcast_episodes_date_display: ListDateDisplayMode::Always,
+            podcast_episodes_time_display: ListTimeDisplayMode::OnlyIfMultipleSameDay,
             shortcuts: ShortcutSettings::default(),
             spellcheck_enabled: false,
             spellcheck_language_mode: SpellcheckLanguageMode::FollowEditorLanguage,

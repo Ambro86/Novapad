@@ -1,12 +1,13 @@
 use crate::accessibility::{nvda_speak, to_wide};
 use crate::app_windows::help_window;
+use crate::settings::{ListDateDisplayMode, ListTimeDisplayMode};
 
 use crate::editor_manager;
 use crate::i18n;
 use crate::log_debug;
 use crate::tools::rss::{self, RssFeedCache, RssItem, RssSource, RssSourceType};
 use crate::with_state;
-use chrono::{Local, TimeZone};
+use chrono::{Local, NaiveDate, TimeZone};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use std::collections::{HashMap, HashSet};
@@ -298,6 +299,8 @@ fn rss_source_display_title(
     }
 }
 
+// Keeps call sites explicit and avoids refactors across UI code paths.
+#[allow(clippy::too_many_arguments)]
 fn rss_item_display_title(
     title: &str,
     language: crate::settings::Language,
@@ -305,12 +308,21 @@ fn rss_item_display_title(
     item_unread: bool,
     pub_date: Option<i64>,
     unread_label_position: crate::settings::RssPodcastUnreadLabelPosition,
+    date_mode: ListDateDisplayMode,
+    time_mode: ListTimeDisplayMode,
+    has_multiple_items_same_day: bool,
 ) -> String {
     let base = format!(
         "{title}{}",
-        format_timestamp_for_language(pub_date, language)
-            .map(|ts| format!(". {ts}"))
-            .unwrap_or_default()
+        format_timestamp_for_list(
+            pub_date,
+            language,
+            date_mode,
+            time_mode,
+            has_multiple_items_same_day,
+        )
+        .map(|ts| format!(". {ts}"))
+        .unwrap_or_default()
     );
     if announce_unread && item_unread {
         return match unread_label_position {
@@ -323,6 +335,85 @@ fn rss_item_display_title(
         };
     }
     base
+}
+
+fn day_from_timestamp(timestamp: Option<i64>) -> Option<NaiveDate> {
+    let ts = timestamp?;
+    Local
+        .timestamp_opt(ts, 0)
+        .single()
+        .map(|dt| dt.date_naive())
+}
+
+fn build_day_counts(items: &[RssItem]) -> HashMap<NaiveDate, usize> {
+    let mut counts: HashMap<NaiveDate, usize> = HashMap::new();
+    for item in items {
+        if let Some(day) = day_from_timestamp(item.pub_date) {
+            *counts.entry(day).or_insert(0) += 1;
+        }
+    }
+    counts
+}
+
+fn has_multiple_items_same_day(
+    pub_date: Option<i64>,
+    day_counts: &HashMap<NaiveDate, usize>,
+) -> bool {
+    day_from_timestamp(pub_date)
+        .and_then(|d| day_counts.get(&d).copied())
+        .is_some_and(|count| count > 1)
+}
+
+fn format_timestamp_for_list(
+    timestamp: Option<i64>,
+    language: crate::settings::Language,
+    date_mode: ListDateDisplayMode,
+    time_mode: ListTimeDisplayMode,
+    has_multiple_same_day: bool,
+) -> Option<String> {
+    let ts = timestamp?;
+    let dt = Local.timestamp_opt(ts, 0).single()?;
+    let (date_pattern, time_pattern) = match language {
+        crate::settings::Language::English => ("%m/%d/%Y", "%I:%M %p"),
+        crate::settings::Language::Italian => ("%d/%m/%Y", "%H:%M"),
+        crate::settings::Language::Spanish => ("%d/%m/%Y", "%H:%M"),
+        crate::settings::Language::Portuguese => ("%d/%m/%Y", "%H:%M"),
+        crate::settings::Language::Swedish => ("%Y-%m-%d", "%H:%M"),
+        crate::settings::Language::Vietnamese => ("%d/%m/%Y", "%H:%M"),
+        crate::settings::Language::Czech => ("%d.%m.%Y", "%H:%M"),
+        crate::settings::Language::Polish => ("%d.%m.%Y", "%H:%M"),
+        crate::settings::Language::French => ("%d/%m/%Y", "%H:%M"),
+        crate::settings::Language::Serbian => ("%d.%m.%Y", "%H:%M"),
+        crate::settings::Language::Ukrainian => ("%d.%m.%Y", "%H:%M"),
+    };
+    let show_date = matches!(date_mode, ListDateDisplayMode::Always);
+    let show_time = match time_mode {
+        ListTimeDisplayMode::Always => true,
+        ListTimeDisplayMode::Never => false,
+        ListTimeDisplayMode::OnlyIfMultipleSameDay => has_multiple_same_day,
+    };
+    if !show_date && !show_time {
+        return None;
+    }
+    if show_date && !show_time {
+        let now = Local::now().date_naive();
+        let item_day = dt.date_naive();
+        let day_diff = (now - item_day).num_days();
+        if day_diff == 0 {
+            return Some(i18n::tr(language, "rss.date.today"));
+        }
+        if day_diff == 1 {
+            return Some(i18n::tr(language, "rss.date.yesterday"));
+        }
+        if day_diff == 2 {
+            return Some(i18n::tr(language, "rss.date.day_before_yesterday"));
+        }
+        return Some(dt.format(date_pattern).to_string());
+    }
+    if !show_date && show_time {
+        return Some(dt.format(time_pattern).to_string());
+    }
+    format_timestamp_for_language(timestamp, language)
 }
 
 fn format_timestamp_for_language(
@@ -515,6 +606,24 @@ unsafe fn show_selected_properties(hwnd: HWND) {
 
 fn percent_encode(input: &str) -> String {
     url::form_urlencoded::byte_serialize(input.as_bytes()).collect()
+}
+
+fn mailto_encode_component(input: &str) -> String {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    let mut out = String::with_capacity(input.len() * 3);
+    for b in input.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                out.push(b as char)
+            }
+            _ => {
+                out.push('%');
+                out.push(HEX[(b >> 4) as usize] as char);
+                out.push(HEX[(b & 0x0F) as usize] as char);
+            }
+        }
+    }
+    out
 }
 
 fn decode_mail_text_component(input: &str) -> String {
@@ -836,6 +945,23 @@ fn rss_item_key(item: &RssItem) -> String {
     item.title.trim().to_string()
 }
 
+fn select_newest_item_key(items: &[RssItem], removed_keys: &HashSet<String>) -> Option<String> {
+    let mut best: Option<(i64, usize, String)> = None;
+    for (idx, item) in items.iter().enumerate() {
+        let key = rss_item_key(item);
+        if removed_keys.contains(&key) {
+            continue;
+        }
+        let ts = item.pub_date.unwrap_or(i64::MIN);
+        match &best {
+            Some((best_ts, best_idx, _))
+                if ts < *best_ts || (ts == *best_ts && idx >= *best_idx) => {}
+            _ => best = Some((ts, idx, key)),
+        }
+    }
+    best.map(|(_, _, key)| key)
+}
+
 unsafe fn source_removed_keys_for_tree_item(
     hwnd: HWND,
     hitem: windows::Win32::UI::Controls::HTREEITEM,
@@ -862,33 +988,16 @@ unsafe fn source_removed_keys_for_tree_item(
     .unwrap_or_default()
 }
 
-fn sort_google_news_items_by_date_desc(items: &mut [RssItem]) {
+fn sort_items_by_date_desc(items: &mut [RssItem]) {
     let mut indexed: Vec<(usize, RssItem)> = items.iter().cloned().enumerate().collect();
-    indexed.sort_by(|(ia, a), (ib, b)| match (a.pub_date, b.pub_date) {
-        (Some(ad), Some(bd)) => bd.cmp(&ad).then_with(|| ia.cmp(ib)),
-        _ => ia.cmp(ib),
+    indexed.sort_by(|(ia, a), (ib, b)| {
+        let at = a.pub_date.unwrap_or(i64::MIN);
+        let bt = b.pub_date.unwrap_or(i64::MIN);
+        bt.cmp(&at).then_with(|| ia.cmp(ib))
     });
     for (dst, (_, item)) in indexed.into_iter().enumerate() {
         items[dst] = item;
     }
-}
-
-unsafe fn is_google_news_source_tree_item(
-    hwnd: HWND,
-    hitem: windows::Win32::UI::Controls::HTREEITEM,
-) -> bool {
-    with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
-        Some(NodeData::Source(source_index)) => with_state(s.parent, |ps| {
-            ps.settings
-                .rss_sources
-                .get(*source_index)
-                .map(|src| src.url.contains("news.google.") && src.url.contains("/rss/"))
-                .unwrap_or(false)
-        })
-        .unwrap_or(false),
-        _ => false,
-    })
-    .unwrap_or(false)
 }
 
 unsafe fn prune_persisted_read_keys_for_source(
@@ -2514,26 +2623,51 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
             if let Some(item) = item
                 && rss_item_key(&item) == msg_data.item_key
             {
-                let (language, announce_unread, unread_label_position) =
-                    with_rss_state(hwnd, |s| {
-                        with_state(s.parent, |ps| {
-                            (
-                                ps.settings.language,
-                                ps.settings.announce_unread_rss_podcast_items,
-                                ps.settings.rss_podcast_unread_label_position,
-                            )
-                        })
-                        .unwrap_or((
-                            crate::settings::Language::English,
-                            true,
-                            crate::settings::RssPodcastUnreadLabelPosition::Before,
-                        ))
+                let (
+                    language,
+                    announce_unread,
+                    unread_label_position,
+                    rss_date_mode,
+                    rss_time_mode,
+                ) = with_rss_state(hwnd, |s| {
+                    with_state(s.parent, |ps| {
+                        (
+                            ps.settings.language,
+                            ps.settings.announce_unread_rss_podcast_items,
+                            ps.settings.rss_podcast_unread_label_position,
+                            ps.settings.rss_articles_date_display,
+                            ps.settings.rss_articles_time_display,
+                        )
                     })
                     .unwrap_or((
                         crate::settings::Language::English,
                         true,
                         crate::settings::RssPodcastUnreadLabelPosition::Before,
-                    ));
+                        ListDateDisplayMode::Always,
+                        ListTimeDisplayMode::Always,
+                    ))
+                })
+                .unwrap_or((
+                    crate::settings::Language::English,
+                    true,
+                    crate::settings::RssPodcastUnreadLabelPosition::Before,
+                    ListDateDisplayMode::Always,
+                    ListTimeDisplayMode::Always,
+                ));
+                let day_counts = with_rss_state(hwnd, |s| {
+                    s.source_items
+                        .values()
+                        .find(|state| {
+                            state
+                                .items
+                                .iter()
+                                .any(|x| rss_item_key(x) == msg_data.item_key)
+                        })
+                        .map(|state| build_day_counts(&state.items))
+                        .unwrap_or_default()
+                })
+                .unwrap_or_default();
+                let same_day = has_multiple_items_same_day(item.pub_date, &day_counts);
                 let updated = rss_item_display_title(
                     &item.title,
                     language,
@@ -2541,6 +2675,9 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                     false,
                     item.pub_date,
                     unread_label_position,
+                    rss_date_mode,
+                    rss_time_mode,
+                    same_day,
                 );
                 let text = to_wide(&updated);
                 let mut tv_item = TVITEMW {
@@ -3498,11 +3635,7 @@ unsafe fn start_background_unread_check(hwnd: HWND) {
                     let _permit = sem.acquire().await.ok()?;
                     let result = rss::fetch_and_parse(&url, kind, cache, cfg, false).await;
                     if let Ok(outcome) = result {
-                        let newest_key = outcome
-                            .items
-                            .iter()
-                            .map(rss_item_key)
-                            .find(|key| !removed_keys.contains(key));
+                        let newest_key = select_newest_item_key(&outcome.items, &removed_keys);
                         let msg = Box::new(BackgroundCheckResult {
                             source_idx: idx,
                             newest_item_key: newest_key,
@@ -3580,8 +3713,6 @@ unsafe fn process_background_check_result(hwnd: HWND, res: BackgroundCheckResult
 unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
     let hitem = windows::Win32::UI::Controls::HTREEITEM(res.hitem);
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-    let is_google_news_source = is_google_news_source_tree_item(hwnd, hitem);
-
     let caret = windows::Win32::UI::Controls::HTREEITEM(
         SendMessageW(
             hwnd_tree,
@@ -3747,9 +3878,9 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                             appended += 1;
                         }
                     }
-                    if is_google_news_source {
-                        sort_google_news_items_by_date_desc(&mut state.items);
-                    }
+                    // Keep a consistent chronological order for all RSS feeds.
+                    // Google News often requires this, but standard feeds can also arrive unsorted.
+                    sort_items_by_date_desc(&mut state.items);
                 });
                 if appended > 0 {
                     log_debug(&format!(
@@ -3806,9 +3937,8 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                         .into_iter()
                         .filter(|item| !removed_keys.contains(&rss_item_key(item)))
                         .collect();
-                    if is_google_news_source {
-                        sort_google_news_items_by_date_desc(&mut items);
-                    }
+                    // Keep a consistent chronological order for all RSS feeds.
+                    sort_items_by_date_desc(&mut items);
                     s.source_items.insert(
                         hitem.0,
                         SourceItemsState {
@@ -3991,25 +4121,32 @@ unsafe fn load_more_items(
     if hwnd_tree.0 == 0 {
         return 0;
     }
-    let (language, announce_unread, unread_label_position) = with_rss_state(hwnd, |s| {
-        with_state(s.parent, |ps| {
-            (
-                ps.settings.language,
-                ps.settings.announce_unread_rss_podcast_items,
-                ps.settings.rss_podcast_unread_label_position,
-            )
+    let (language, announce_unread, unread_label_position, rss_date_mode, rss_time_mode) =
+        with_rss_state(hwnd, |s| {
+            with_state(s.parent, |ps| {
+                (
+                    ps.settings.language,
+                    ps.settings.announce_unread_rss_podcast_items,
+                    ps.settings.rss_podcast_unread_label_position,
+                    ps.settings.rss_articles_date_display,
+                    ps.settings.rss_articles_time_display,
+                )
+            })
+            .unwrap_or((
+                crate::settings::Language::English,
+                true,
+                crate::settings::RssPodcastUnreadLabelPosition::Before,
+                ListDateDisplayMode::Always,
+                ListTimeDisplayMode::Always,
+            ))
         })
         .unwrap_or((
             crate::settings::Language::English,
             true,
             crate::settings::RssPodcastUnreadLabelPosition::Before,
-        ))
-    })
-    .unwrap_or((
-        crate::settings::Language::English,
-        true,
-        crate::settings::RssPodcastUnreadLabelPosition::Before,
-    ));
+            ListDateDisplayMode::Always,
+            ListTimeDisplayMode::Always,
+        ));
 
     SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(0), LPARAM(0));
     let (inserted, loaded_after, total_after) = with_rss_state(hwnd, |s| {
@@ -4021,6 +4158,7 @@ unsafe fn load_more_items(
         }
         let mut inserted = 0usize;
         let mut idx = state.loaded;
+        let day_counts = build_day_counts(&state.items);
         while idx < state.items.len() && inserted < batch {
             let item = &state.items[idx];
             idx += 1;
@@ -4035,6 +4173,9 @@ unsafe fn load_more_items(
                 item_unread,
                 item.pub_date,
                 unread_label_position,
+                rss_date_mode,
+                rss_time_mode,
+                has_multiple_items_same_day(item.pub_date, &day_counts),
             );
             let text = to_wide(&display_title);
             let c_children = if item.is_folder { 1 } else { 0 };
@@ -4619,28 +4760,40 @@ unsafe fn undo_last_delete(hwnd: HWND) {
                 }
 
                 let mut restored_hitem = windows::Win32::UI::Controls::HTREEITEM(0);
-                let (language, announce_unread, unread_label_position) =
-                    with_rss_state(hwnd, |s| {
-                        with_state(s.parent, |ps| {
-                            (
-                                ps.settings.language,
-                                ps.settings.announce_unread_rss_podcast_items,
-                                ps.settings.rss_podcast_unread_label_position,
-                            )
-                        })
-                        .unwrap_or((
-                            crate::settings::Language::English,
-                            true,
-                            crate::settings::RssPodcastUnreadLabelPosition::Before,
-                        ))
+                let (
+                    language,
+                    announce_unread,
+                    unread_label_position,
+                    rss_date_mode,
+                    rss_time_mode,
+                ) = with_rss_state(hwnd, |s| {
+                    with_state(s.parent, |ps| {
+                        (
+                            ps.settings.language,
+                            ps.settings.announce_unread_rss_podcast_items,
+                            ps.settings.rss_podcast_unread_label_position,
+                            ps.settings.rss_articles_date_display,
+                            ps.settings.rss_articles_time_display,
+                        )
                     })
                     .unwrap_or((
                         crate::settings::Language::English,
                         true,
                         crate::settings::RssPodcastUnreadLabelPosition::Before,
-                    ));
+                        ListDateDisplayMode::Always,
+                        ListTimeDisplayMode::Always,
+                    ))
+                })
+                .unwrap_or((
+                    crate::settings::Language::English,
+                    true,
+                    crate::settings::RssPodcastUnreadLabelPosition::Before,
+                    ListDateDisplayMode::Always,
+                    ListTimeDisplayMode::Always,
+                ));
                 with_rss_state(hwnd, |s| {
                     if let Some(state) = s.source_items.get(&source_hitem.0) {
+                        let day_counts = build_day_counts(&state.items);
                         for entry in state.items.iter().take(state.loaded) {
                             if entry.title.trim().is_empty() {
                                 continue;
@@ -4653,6 +4806,9 @@ unsafe fn undo_last_delete(hwnd: HWND) {
                                 item_unread,
                                 entry.pub_date,
                                 unread_label_position,
+                                rss_date_mode,
+                                rss_time_mode,
+                                has_multiple_items_same_day(entry.pub_date, &day_counts),
                             );
                             let text = to_wide(&display_title);
                             let mut tvis = TVINSERTSTRUCTW {
@@ -5296,12 +5452,12 @@ unsafe fn handle_article_action(hwnd: HWND, action: ArticleAction) {
                 title.clone()
             };
             let subject = decode_mail_text_component(&subject_raw);
-            let intro = i18n::tr(language, "rss.email.body_intro");
+            let intro = decode_mail_text_component(&i18n::tr(language, "rss.email.body_intro"));
             let body = format!("\r\n{}\r\n{}\r\n", intro, url);
             format!(
                 "mailto:?subject={}&body={}",
-                percent_encode(&subject),
-                percent_encode(&body)
+                mailto_encode_component(&subject),
+                mailto_encode_component(&body)
             )
         }
     };

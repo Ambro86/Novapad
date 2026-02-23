@@ -134,7 +134,6 @@ pub const IDM_TOOLS_PODCASTS: usize = 5006;
 pub const IDM_TOOLS_DICTIONARY_LOOKUP: usize = 5007;
 pub const IDM_TOOLS_WIKIPEDIA_IMPORT: usize = 5008;
 pub const IDM_TOOLS_STREAM_AUDIO: usize = 5009;
-pub const IDM_TOOLS_APPLY_DIALOGUE_VOICE: usize = 5010;
 pub const IDM_HELP_GUIDE: usize = 7001;
 pub const IDM_HELP_ABOUT: usize = 7002;
 pub const IDM_HELP_CHECK_UPDATES: usize = 7003;
@@ -158,7 +157,6 @@ pub struct MenuLabels {
     pub menu_wikipedia_import: String,
     pub menu_import_youtube: String,
     pub menu_stream_audio: String,
-    pub menu_apply_dialogue_voice: String,
     pub menu_prompt: String,
     pub menu_rss: String,
     pub menu_podcasts: String,
@@ -263,7 +261,6 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         menu_wikipedia_import: i18n::tr(language, "menu.wikipedia_import"),
         menu_import_youtube: i18n::tr(language, "menu.import_youtube"),
         menu_stream_audio: i18n::tr(language, "menu.stream_audio"),
-        menu_apply_dialogue_voice: i18n::tr(language, "menu.apply_dialogue_voice"),
         menu_prompt: i18n::tr(language, "menu.prompt"),
         menu_rss: i18n::tr(language, "menu.rss"),
         menu_podcasts: i18n::tr(language, "menu.podcasts"),
@@ -1190,12 +1187,6 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
             MF_STRING,
             IDM_TOOLS_STREAM_AUDIO,
             &labels.menu_stream_audio,
-        );
-        append_menu_string(
-            tools_menu,
-            MF_STRING,
-            IDM_TOOLS_APPLY_DIALOGUE_VOICE,
-            &labels.menu_apply_dialogue_voice,
         );
         append_menu_string(
             tools_menu,

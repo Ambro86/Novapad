@@ -5,10 +5,10 @@ use crate::editor_manager::{
     update_window_title,
 };
 use crate::settings::{
-    Language, ModifiedMarkerPosition, OpenBehavior, PodcastDeleteConfirmMode, RssDeleteConfirmMode,
-    RssPodcastUnreadLabelPosition, ShortcutBinding, ShortcutSettings, SubtitleReadMode,
-    TRUSTED_CLIENT_TOKEN, TtsEngine, VOICE_LIST_URL, VoiceInfo, format_shortcut,
-    save_settings_with_default_copy, sync_context_menu, sync_start_menu_shortcuts,
+    Language, ListDateDisplayMode, ListTimeDisplayMode, ModifiedMarkerPosition, OpenBehavior,
+    PodcastDeleteConfirmMode, RssDeleteConfirmMode, RssPodcastUnreadLabelPosition, ShortcutBinding,
+    ShortcutSettings, SubtitleReadMode, TRUSTED_CLIENT_TOKEN, TtsEngine, VOICE_LIST_URL, VoiceInfo,
+    format_shortcut, save_settings_with_default_copy, sync_context_menu, sync_start_menu_shortcuts,
 };
 use crate::{i18n, rebuild_menus, refresh_voice_panel, tts_engine, with_state};
 use reqwest::blocking::Client;
@@ -109,6 +109,10 @@ const OPTIONS_ID_ANNOUNCE_UNREAD_RSS_PODCAST: usize = 6067;
 const OPTIONS_ID_UNREAD_LABEL_POSITION: usize = 6078;
 const OPTIONS_ID_CONFIRM_DELETE_PODCAST_MODE: usize = 6068;
 const OPTIONS_ID_RSS_QUICK_COPY_MODE: usize = 6069;
+const OPTIONS_ID_RSS_DATE_DISPLAY: usize = 6083;
+const OPTIONS_ID_RSS_TIME_DISPLAY: usize = 6084;
+const OPTIONS_ID_PODCAST_DATE_DISPLAY: usize = 6085;
+const OPTIONS_ID_PODCAST_TIME_DISPLAY: usize = 6086;
 const OPTIONS_ID_MANAGE_ASSOCIATIONS: usize = 6044;
 const OPTIONS_ID_PROMPT_PROGRAM: usize = 6019;
 const OPTIONS_ID_NETWORK_PROXY: usize = 6075;
@@ -122,7 +126,11 @@ const OPTIONS_ID_DIALOGUE_VOICE_RATE: usize = 6052;
 const OPTIONS_ID_DIALOGUE_VOICE_PITCH: usize = 6053;
 const OPTIONS_ID_DIALOGUE_VOICE_VOLUME: usize = 6054;
 const OPTIONS_ID_DIALOGUE_TTS_ENGINE: usize = 6055;
+const OPTIONS_ID_DIALOGUE_VOICE_LANGUAGE: usize = 6082;
 const OPTIONS_ID_TTS_INSERT_TAG: usize = 6056;
+const OPTIONS_ID_DIALOGUE_OPEN_QUOTE: usize = 6079;
+const OPTIONS_ID_DIALOGUE_CLOSE_QUOTE: usize = 6080;
+const OPTIONS_ID_DIALOGUE_ALLOW_MULTILINE: usize = 6081;
 const OPTIONS_ID_SHORTCUT_ACTION: usize = 6070;
 const OPTIONS_ID_SHORTCUT_VALUE: usize = 6071;
 const OPTIONS_ID_SHORTCUT_CHANGE: usize = 6072;
@@ -661,6 +669,14 @@ struct OptionsDialogState {
     checkbox_announce_unread_rss_podcast: HWND,
     label_unread_label_position: HWND,
     combo_unread_label_position: HWND,
+    label_rss_date_display: HWND,
+    combo_rss_date_display: HWND,
+    label_rss_time_display: HWND,
+    combo_rss_time_display: HWND,
+    label_podcast_date_display: HWND,
+    combo_podcast_date_display: HWND,
+    label_podcast_time_display: HWND,
+    combo_podcast_time_display: HWND,
     label_podcastindex_key: HWND,
     edit_podcastindex_key: HWND,
     label_podcastindex_secret: HWND,
@@ -673,12 +689,19 @@ struct OptionsDialogState {
     button_dialogue_voice_preview: HWND,
     label_dialogue_engine: HWND,
     combo_dialogue_engine: HWND,
+    label_dialogue_voice_language: HWND,
+    combo_dialogue_voice_language: HWND,
     label_dialogue_voice_rate: HWND,
     combo_dialogue_voice_rate: HWND,
     label_dialogue_voice_pitch: HWND,
     combo_dialogue_voice_pitch: HWND,
     label_dialogue_voice_volume: HWND,
     combo_dialogue_voice_volume: HWND,
+    label_dialogue_open_quote: HWND,
+    edit_dialogue_open_quote: HWND,
+    label_dialogue_close_quote: HWND,
+    edit_dialogue_close_quote: HWND,
+    checkbox_dialogue_allow_multiline: HWND,
     checkbox_split_on_newline: HWND,
     checkbox_word_wrap: HWND,
     checkbox_smart_quotes: HWND,
@@ -737,6 +760,7 @@ struct OptionsDialogState {
     shortcut_draft: ShortcutSettings,
     shortcut_capture_pending: bool,
     tts_voice_language_codes: Vec<String>,
+    dialogue_voice_language_codes: Vec<String>,
     ok_button: HWND,
     cancel_button: HWND,
 }
@@ -760,9 +784,13 @@ struct OptionsLabels {
     label_dialogue_voice: String,
     label_dialogue_voice_preview: String,
     label_dialogue_engine: String,
+    label_dialogue_voice_language: String,
     label_dialogue_voice_rate: String,
     label_dialogue_voice_pitch: String,
     label_dialogue_voice_volume: String,
+    label_dialogue_open_quote: String,
+    label_dialogue_close_quote: String,
+    label_dialogue_allow_multiline: String,
     label_tts_speed: String,
     label_tts_pitch: String,
     label_tts_volume: String,
@@ -822,6 +850,10 @@ struct OptionsLabels {
     label_podcast_cache_limit: String,
     label_announce_unread_rss_podcast: String,
     label_unread_label_position: String,
+    label_rss_date_display: String,
+    label_rss_time_display: String,
+    label_podcast_date_display: String,
+    label_podcast_time_display: String,
     label_podcastindex_key: String,
     label_podcastindex_secret: String,
     label_podcastindex_signup: String,
@@ -878,6 +910,11 @@ struct OptionsLabels {
     rss_quick_copy_all: String,
     unread_label_position_before: String,
     unread_label_position_after: String,
+    list_date_always: String,
+    list_date_never: String,
+    list_time_always: String,
+    list_time_never: String,
+    list_time_only_if_multiple_same_day: String,
     ok: String,
     cancel: String,
     voices_empty: String,
@@ -906,9 +943,13 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_dialogue_voice: i18n::tr(language, "options.label.dialogue_voice"),
         label_dialogue_voice_preview: i18n::tr(language, "options.label.dialogue_voice_preview"),
         label_dialogue_engine: i18n::tr(language, "options.label.tts_engine"),
+        label_dialogue_voice_language: i18n::tr(language, "options.label.voice_language"),
         label_dialogue_voice_rate: i18n::tr(language, "tts_tuning.label_speed"),
         label_dialogue_voice_pitch: i18n::tr(language, "tts_tuning.label_pitch"),
         label_dialogue_voice_volume: i18n::tr(language, "tts_tuning.label_volume"),
+        label_dialogue_open_quote: i18n::tr(language, "dialogue_voice.apply.open_quote_title"),
+        label_dialogue_close_quote: i18n::tr(language, "dialogue_voice.apply.close_quote_title"),
+        label_dialogue_allow_multiline: i18n::tr(language, "dialogue_voice.apply.multiline_body"),
         label_tts_speed: i18n::tr(language, "tts_tuning.label_speed"),
         label_tts_pitch: i18n::tr(language, "tts_tuning.label_pitch"),
         label_tts_volume: i18n::tr(language, "tts_tuning.label_volume"),
@@ -986,6 +1027,10 @@ fn options_labels(language: Language) -> OptionsLabels {
             "options.label.announce_unread_rss_podcast",
         ),
         label_unread_label_position: i18n::tr(language, "options.label.unread_label_position"),
+        label_rss_date_display: i18n::tr(language, "options.label.rss_date_display"),
+        label_rss_time_display: i18n::tr(language, "options.label.rss_time_display"),
+        label_podcast_date_display: i18n::tr(language, "options.label.podcast_date_display"),
+        label_podcast_time_display: i18n::tr(language, "options.label.podcast_time_display"),
         label_podcastindex_key: i18n::tr(language, "options.label.podcastindex_key"),
         label_podcastindex_secret: i18n::tr(language, "options.label.podcastindex_secret"),
         label_podcastindex_signup: i18n::tr(language, "options.button.podcastindex_signup"),
@@ -1056,6 +1101,14 @@ fn options_labels(language: Language) -> OptionsLabels {
         rss_quick_copy_all: i18n::tr(language, "options.rss_quick_copy.all"),
         unread_label_position_before: i18n::tr(language, "options.unread_label_position.before"),
         unread_label_position_after: i18n::tr(language, "options.unread_label_position.after"),
+        list_date_always: i18n::tr(language, "options.list_date.always"),
+        list_date_never: i18n::tr(language, "options.list_date.never"),
+        list_time_always: i18n::tr(language, "options.list_time.always"),
+        list_time_never: i18n::tr(language, "options.list_time.never"),
+        list_time_only_if_multiple_same_day: i18n::tr(
+            language,
+            "options.list_time.only_if_multiple_same_day",
+        ),
         ok: i18n::tr(language, "options.ok"),
         cancel: i18n::tr(language, "options.cancel"),
         voices_empty: i18n::tr(language, "options.voices.empty"),
@@ -1176,6 +1229,8 @@ pub fn refresh_voices(hwnd: HWND) {
             checkbox,
             label_tts_voice_language,
             combo_tts_voice_language,
+            label_dialogue_voice_language,
+            combo_dialogue_voice_language,
         ) = match with_options_state(hwnd, |state| {
             (
                 state.parent,
@@ -1186,6 +1241,8 @@ pub fn refresh_voices(hwnd: HWND) {
                 state.checkbox_multilingual,
                 state.label_tts_voice_language,
                 state.combo_tts_voice_language,
+                state.label_dialogue_voice_language,
+                state.combo_dialogue_voice_language,
             )
         }) {
             Some(values) => values,
@@ -1260,6 +1317,25 @@ pub fn refresh_voices(hwnd: HWND) {
             },
         );
         EnableWindow(combo_tts_voice_language, show_language_combo);
+
+        let show_dialogue_language_combo = dialogue_engine == TtsEngine::Edge && !only_multilingual;
+        ShowWindow(
+            label_dialogue_voice_language,
+            if show_dialogue_language_combo {
+                SW_SHOW
+            } else {
+                SW_HIDE
+            },
+        );
+        ShowWindow(
+            combo_dialogue_voice_language,
+            if show_dialogue_language_combo {
+                SW_SHOW
+            } else {
+                SW_HIDE
+            },
+        );
+        EnableWindow(combo_dialogue_voice_language, show_dialogue_language_combo);
 
         let mut language_filter: Option<String> = None;
         if show_language_combo {
@@ -1338,6 +1414,86 @@ pub fn refresh_voices(hwnd: HWND) {
             crate::log_debug("Failed to access state in options_window");
         }
 
+        let mut dialogue_language_filter: Option<String> = None;
+        if show_dialogue_language_combo {
+            let previous_selection = with_options_state(hwnd, |state| {
+                let sel = SendMessageW(
+                    state.combo_dialogue_voice_language,
+                    CB_GETCURSEL,
+                    WPARAM(0),
+                    LPARAM(0),
+                )
+                .0;
+                if sel >= 0 {
+                    state
+                        .dialogue_voice_language_codes
+                        .get(sel as usize)
+                        .cloned()
+                } else {
+                    None
+                }
+            })
+            .flatten();
+
+            let mut codes = collect_voice_language_codes(&dialogue_voices);
+            if !codes.is_empty() {
+                let selected_from_voice = dialogue_voices
+                    .iter()
+                    .find(|v| v.short_name == settings.dialogue_voice)
+                    .and_then(|v| voice_locale_language_code(&v.locale));
+                let selected_code = previous_selection
+                    .filter(|code| codes.contains(code))
+                    .or(selected_from_voice.filter(|code| codes.contains(code)))
+                    .unwrap_or_else(|| codes[0].clone());
+                SendMessageW(
+                    combo_dialogue_voice_language,
+                    CB_RESETCONTENT,
+                    WPARAM(0),
+                    LPARAM(0),
+                );
+                let mut selected_index: Option<usize> = None;
+                for (idx, code) in codes.iter().enumerate() {
+                    let label = localized_voice_language_name(settings.language, &labels, code);
+                    let added = SendMessageW(
+                        combo_dialogue_voice_language,
+                        CB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(to_wide(&label).as_ptr() as isize),
+                    )
+                    .0;
+                    if added >= 0 && *code == selected_code {
+                        selected_index = Some(idx);
+                    }
+                }
+                SendMessageW(
+                    combo_dialogue_voice_language,
+                    CB_SETCURSEL,
+                    WPARAM(selected_index.unwrap_or(0)),
+                    LPARAM(0),
+                );
+                dialogue_language_filter = Some(selected_code);
+            }
+            if with_options_state(hwnd, |state| {
+                state.dialogue_voice_language_codes = std::mem::take(&mut codes);
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access state in options_window");
+            }
+        } else if with_options_state(hwnd, |state| {
+            state.dialogue_voice_language_codes.clear();
+            SendMessageW(
+                state.combo_dialogue_voice_language,
+                CB_RESETCONTENT,
+                WPARAM(0),
+                LPARAM(0),
+            );
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access state in options_window");
+        }
+
         // If switching engine, we might not have the correct "selected" voice in settings yet if we haven't saved.
         // But we pass settings.tts_voice. If it's an ID from other engine, it won't match, so it selects default/first.
         populate_voice_combo(
@@ -1359,7 +1515,7 @@ pub fn refresh_voices(hwnd: HWND) {
             } else {
                 false
             },
-            None,
+            dialogue_language_filter.as_deref(),
             &labels,
         );
     }
@@ -1833,6 +1989,36 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
             );
             y += 30;
 
+            let label_dialogue_voice_language = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_dialogue_voice_language).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_dialogue_voice_language = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                120,
+                hwnd,
+                HMENU(OPTIONS_ID_DIALOGUE_VOICE_LANGUAGE as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
             let label_dialogue_voice = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -1952,6 +2138,82 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 None,
             );
             y += 36;
+
+            let label_dialogue_open_quote = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_dialogue_open_quote).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let edit_dialogue_open_quote = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_EDIT,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                170,
+                y - 2,
+                300,
+                22,
+                hwnd,
+                HMENU(OPTIONS_ID_DIALOGUE_OPEN_QUOTE as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
+            let label_dialogue_close_quote = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_dialogue_close_quote).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let edit_dialogue_close_quote = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_EDIT,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                170,
+                y - 2,
+                300,
+                22,
+                hwnd,
+                HMENU(OPTIONS_ID_DIALOGUE_CLOSE_QUOTE as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
+            let checkbox_dialogue_allow_multiline = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_dialogue_allow_multiline).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                170,
+                y,
+                300,
+                38,
+                hwnd,
+                HMENU(OPTIONS_ID_DIALOGUE_ALLOW_MULTILINE as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 44;
 
             let button_dialogue_voice_preview = CreateWindowExW(
                 Default::default(),
@@ -2432,6 +2694,126 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 180,
                 hwnd,
                 HMENU(OPTIONS_ID_UNREAD_LABEL_POSITION as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
+            let label_rss_date_display = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_rss_date_display).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_rss_date_display = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                180,
+                hwnd,
+                HMENU(OPTIONS_ID_RSS_DATE_DISPLAY as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
+            let label_rss_time_display = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_rss_time_display).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_rss_time_display = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                180,
+                hwnd,
+                HMENU(OPTIONS_ID_RSS_TIME_DISPLAY as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
+            let label_podcast_date_display = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_podcast_date_display).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_podcast_date_display = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                180,
+                hwnd,
+                HMENU(OPTIONS_ID_PODCAST_DATE_DISPLAY as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 30;
+
+            let label_podcast_time_display = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_podcast_time_display).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let combo_podcast_time_display = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                170,
+                y - 2,
+                300,
+                180,
+                hwnd,
+                HMENU(OPTIONS_ID_PODCAST_TIME_DISPLAY as isize),
                 HINSTANCE(0),
                 None,
             );
@@ -3324,6 +3706,14 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 checkbox_announce_unread_rss_podcast,
                 label_unread_label_position,
                 combo_unread_label_position,
+                label_rss_date_display,
+                combo_rss_date_display,
+                label_rss_time_display,
+                combo_rss_time_display,
+                label_podcast_date_display,
+                combo_podcast_date_display,
+                label_podcast_time_display,
+                combo_podcast_time_display,
                 label_podcastindex_key,
                 edit_podcastindex_key,
                 label_podcastindex_secret,
@@ -3334,6 +3724,8 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 checkbox_use_dialogue_voice,
                 label_dialogue_engine,
                 combo_dialogue_engine,
+                label_dialogue_voice_language,
+                combo_dialogue_voice_language,
                 label_dialogue_voice,
                 combo_dialogue_voice,
                 label_dialogue_voice_rate,
@@ -3342,6 +3734,11 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 combo_dialogue_voice_pitch,
                 label_dialogue_voice_volume,
                 combo_dialogue_voice_volume,
+                label_dialogue_open_quote,
+                edit_dialogue_open_quote,
+                label_dialogue_close_quote,
+                edit_dialogue_close_quote,
+                checkbox_dialogue_allow_multiline,
                 button_dialogue_voice_preview,
                 checkbox_split_on_newline,
                 checkbox_word_wrap,
@@ -3458,6 +3855,14 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 checkbox_announce_unread_rss_podcast,
                 label_unread_label_position,
                 combo_unread_label_position,
+                label_rss_date_display,
+                combo_rss_date_display,
+                label_rss_time_display,
+                combo_rss_time_display,
+                label_podcast_date_display,
+                combo_podcast_date_display,
+                label_podcast_time_display,
+                combo_podcast_time_display,
                 label_podcastindex_key,
                 edit_podcastindex_key,
                 label_podcastindex_secret,
@@ -3467,6 +3872,8 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 checkbox_use_dialogue_voice,
                 label_dialogue_engine,
                 combo_dialogue_engine,
+                label_dialogue_voice_language,
+                combo_dialogue_voice_language,
                 label_dialogue_voice,
                 combo_dialogue_voice,
                 label_dialogue_voice_rate,
@@ -3475,6 +3882,11 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 combo_dialogue_voice_pitch,
                 label_dialogue_voice_volume,
                 combo_dialogue_voice_volume,
+                label_dialogue_open_quote,
+                edit_dialogue_open_quote,
+                label_dialogue_close_quote,
+                edit_dialogue_close_quote,
+                checkbox_dialogue_allow_multiline,
                 button_dialogue_voice_preview,
                 checkbox_split_on_newline,
                 checkbox_word_wrap,
@@ -3534,6 +3946,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 shortcut_draft: ShortcutSettings::default(),
                 shortcut_capture_pending: false,
                 tts_voice_language_codes: Vec::new(),
+                dialogue_voice_language_codes: Vec::new(),
                 ok_button,
                 cancel_button,
             });
@@ -3571,6 +3984,12 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                     LRESULT(0)
                 }
                 OPTIONS_ID_TTS_VOICE_LANGUAGE => {
+                    if code == CBN_SELCHANGE {
+                        refresh_voices(hwnd);
+                    }
+                    LRESULT(0)
+                }
+                OPTIONS_ID_DIALOGUE_VOICE_LANGUAGE => {
                     if code == CBN_SELCHANGE {
                         refresh_voices(hwnd);
                     }
@@ -3804,6 +4223,8 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 let is_tts_combo = with_options_state(hwnd, |state| {
                     focus == state.combo_voice
                         || focus == state.combo_tts_voice_language
+                        || focus == state.combo_dialogue_voice
+                        || focus == state.combo_dialogue_voice_language
                         || focus == state.combo_tts_speed
                         || focus == state.combo_tts_pitch
                         || focus == state.combo_tts_volume
@@ -3908,6 +4329,14 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         checkbox_announce_unread_rss_podcast,
         _label_unread_label_position,
         combo_unread_label_position,
+        _label_rss_date_display,
+        combo_rss_date_display,
+        _label_rss_time_display,
+        combo_rss_time_display,
+        _label_podcast_date_display,
+        combo_podcast_date_display,
+        _label_podcast_time_display,
+        combo_podcast_time_display,
         _label_podcastindex_key,
         edit_podcastindex_key,
         _label_podcastindex_secret,
@@ -3917,10 +4346,17 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         checkbox_multilingual,
         checkbox_use_dialogue_voice,
         combo_dialogue_engine,
+        _label_dialogue_voice_language,
+        _combo_dialogue_voice_language,
         combo_dialogue_voice,
         combo_dialogue_voice_rate,
         combo_dialogue_voice_pitch,
         combo_dialogue_voice_volume,
+        _label_dialogue_open_quote,
+        edit_dialogue_open_quote,
+        _label_dialogue_close_quote,
+        edit_dialogue_close_quote,
+        checkbox_dialogue_allow_multiline,
         checkbox_split_on_newline,
         checkbox_word_wrap,
         checkbox_smart_quotes,
@@ -3998,6 +4434,14 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.checkbox_announce_unread_rss_podcast,
             state.label_unread_label_position,
             state.combo_unread_label_position,
+            state.label_rss_date_display,
+            state.combo_rss_date_display,
+            state.label_rss_time_display,
+            state.combo_rss_time_display,
+            state.label_podcast_date_display,
+            state.combo_podcast_date_display,
+            state.label_podcast_time_display,
+            state.combo_podcast_time_display,
             state.label_podcastindex_key,
             state.edit_podcastindex_key,
             state.label_podcastindex_secret,
@@ -4007,10 +4451,17 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.checkbox_multilingual,
             state.checkbox_use_dialogue_voice,
             state.combo_dialogue_engine,
+            state.label_dialogue_voice_language,
+            state.combo_dialogue_voice_language,
             state.combo_dialogue_voice,
             state.combo_dialogue_voice_rate,
             state.combo_dialogue_voice_pitch,
             state.combo_dialogue_voice_volume,
+            state.label_dialogue_open_quote,
+            state.edit_dialogue_open_quote,
+            state.label_dialogue_close_quote,
+            state.edit_dialogue_close_quote,
+            state.checkbox_dialogue_allow_multiline,
             state.checkbox_split_on_newline,
             state.checkbox_word_wrap,
             state.checkbox_smart_quotes,
@@ -4062,7 +4513,17 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         None => return,
     };
 
-    let settings = with_state(parent, |state| state.settings.clone()).unwrap_or_default();
+    let mut settings = with_state(parent, |state| state.settings.clone()).unwrap_or_default();
+    if let Some(cfg) = crate::dialogue_voice::load_dialogue_voice_config() {
+        settings.dialogue_tts_engine = cfg.engine;
+        settings.dialogue_voice = cfg.voice;
+        settings.dialogue_voice_rate = cfg.rate;
+        settings.dialogue_voice_pitch = cfg.pitch;
+        settings.dialogue_voice_volume = cfg.volume;
+        settings.dialogue_opening_quote = cfg.opening_quote;
+        settings.dialogue_closing_quote = cfg.closing_quote;
+        settings.dialogue_allow_multiline = cfg.allow_multiline;
+    }
     let labels = options_labels(settings.language);
 
     SendMessageW(combo_lang, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
@@ -4432,6 +4893,34 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         checkbox_use_dialogue_voice,
         BM_SETCHECK,
         WPARAM(if settings.use_dialogue_voice {
+            BST_CHECKED.0 as usize
+        } else {
+            0
+        }),
+        LPARAM(0),
+    );
+    if let Err(_e) = SetWindowTextW(
+        edit_dialogue_open_quote,
+        PCWSTR(to_wide(&settings.dialogue_opening_quote).as_ptr()),
+    ) {
+        crate::log_debug(&format!(
+            "Failed to set dialogue opening quote text: {:?}",
+            _e
+        ));
+    }
+    if let Err(_e) = SetWindowTextW(
+        edit_dialogue_close_quote,
+        PCWSTR(to_wide(&settings.dialogue_closing_quote).as_ptr()),
+    ) {
+        crate::log_debug(&format!(
+            "Failed to set dialogue closing quote text: {:?}",
+            _e
+        ));
+    }
+    SendMessageW(
+        checkbox_dialogue_allow_multiline,
+        BM_SETCHECK,
+        WPARAM(if settings.dialogue_allow_multiline {
             BST_CHECKED.0 as usize
         } else {
             0
@@ -4948,6 +5437,122 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         combo_unread_label_position,
         CB_SETCURSEL,
         WPARAM(unread_label_idx),
+        LPARAM(0),
+    );
+
+    SendMessageW(
+        combo_rss_date_display,
+        CB_RESETCONTENT,
+        WPARAM(0),
+        LPARAM(0),
+    );
+    for option in [
+        labels.list_date_always.clone(),
+        labels.list_date_never.clone(),
+    ] {
+        SendMessageW(
+            combo_rss_date_display,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&option).as_ptr() as isize),
+        );
+    }
+    let rss_date_idx = match settings.rss_articles_date_display {
+        ListDateDisplayMode::Always => 0,
+        ListDateDisplayMode::Never => 1,
+    };
+    SendMessageW(
+        combo_rss_date_display,
+        CB_SETCURSEL,
+        WPARAM(rss_date_idx),
+        LPARAM(0),
+    );
+
+    SendMessageW(
+        combo_rss_time_display,
+        CB_RESETCONTENT,
+        WPARAM(0),
+        LPARAM(0),
+    );
+    for option in [
+        labels.list_time_always.clone(),
+        labels.list_time_never.clone(),
+        labels.list_time_only_if_multiple_same_day.clone(),
+    ] {
+        SendMessageW(
+            combo_rss_time_display,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&option).as_ptr() as isize),
+        );
+    }
+    let rss_time_idx = match settings.rss_articles_time_display {
+        ListTimeDisplayMode::Always => 0,
+        ListTimeDisplayMode::Never => 1,
+        ListTimeDisplayMode::OnlyIfMultipleSameDay => 2,
+    };
+    SendMessageW(
+        combo_rss_time_display,
+        CB_SETCURSEL,
+        WPARAM(rss_time_idx),
+        LPARAM(0),
+    );
+
+    SendMessageW(
+        combo_podcast_date_display,
+        CB_RESETCONTENT,
+        WPARAM(0),
+        LPARAM(0),
+    );
+    for option in [
+        labels.list_date_always.clone(),
+        labels.list_date_never.clone(),
+    ] {
+        SendMessageW(
+            combo_podcast_date_display,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&option).as_ptr() as isize),
+        );
+    }
+    let podcast_date_idx = match settings.podcast_episodes_date_display {
+        ListDateDisplayMode::Always => 0,
+        ListDateDisplayMode::Never => 1,
+    };
+    SendMessageW(
+        combo_podcast_date_display,
+        CB_SETCURSEL,
+        WPARAM(podcast_date_idx),
+        LPARAM(0),
+    );
+
+    SendMessageW(
+        combo_podcast_time_display,
+        CB_RESETCONTENT,
+        WPARAM(0),
+        LPARAM(0),
+    );
+    for option in [
+        labels.list_time_always.clone(),
+        labels.list_time_never.clone(),
+        labels.list_time_only_if_multiple_same_day.clone(),
+    ] {
+        SendMessageW(
+            combo_podcast_time_display,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&option).as_ptr() as isize),
+        );
+    }
+    let podcast_time_idx = match settings.podcast_episodes_time_display {
+        ListTimeDisplayMode::Always => 0,
+        ListTimeDisplayMode::Never => 1,
+        ListTimeDisplayMode::OnlyIfMultipleSameDay => 2,
+    };
+    SendMessageW(
+        combo_podcast_time_display,
+        CB_SETCURSEL,
+        WPARAM(podcast_time_idx),
         LPARAM(0),
     );
 
@@ -5478,12 +6083,19 @@ unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
         button,
         label_engine,
         combo_engine,
+        label_voice_language,
+        combo_voice_language,
         label_rate,
         combo_rate,
         label_pitch,
         combo_pitch,
         label_volume,
         combo_volume,
+        label_open_quote,
+        edit_open_quote,
+        label_close_quote,
+        edit_close_quote,
+        checkbox_multiline,
     ) = match with_options_state(hwnd, |state| {
         (
             state.checkbox_use_dialogue_voice,
@@ -5492,12 +6104,19 @@ unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
             state.button_dialogue_voice_preview,
             state.label_dialogue_engine,
             state.combo_dialogue_engine,
+            state.label_dialogue_voice_language,
+            state.combo_dialogue_voice_language,
             state.label_dialogue_voice_rate,
             state.combo_dialogue_voice_rate,
             state.label_dialogue_voice_pitch,
             state.combo_dialogue_voice_pitch,
             state.label_dialogue_voice_volume,
             state.combo_dialogue_voice_volume,
+            state.label_dialogue_open_quote,
+            state.edit_dialogue_open_quote,
+            state.label_dialogue_close_quote,
+            state.edit_dialogue_close_quote,
+            state.checkbox_dialogue_allow_multiline,
         )
     }) {
         Some(values) => values,
@@ -5510,16 +6129,31 @@ unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
         button,
         label_engine,
         combo_engine,
+        label_voice_language,
+        combo_voice_language,
         label_rate,
         combo_rate,
         label_pitch,
         combo_pitch,
         label_volume,
         combo_volume,
+        label_open_quote,
+        edit_open_quote,
+        label_close_quote,
+        edit_close_quote,
+        checkbox_multiline,
     ];
+    let enabled =
+        SendMessageW(checkbox, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 == BST_CHECKED.0;
     for control in controls {
-        ShowWindow(control, SW_HIDE);
-        EnableWindow(control, false);
+        let is_toggle = control == checkbox;
+        let visible = if is_toggle || enabled {
+            SW_SHOW
+        } else {
+            SW_HIDE
+        };
+        ShowWindow(control, visible);
+        EnableWindow(control, is_toggle || enabled);
     }
 }
 
@@ -5961,6 +6595,10 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         edit_podcast_cache_limit,
         checkbox_announce_unread_rss_podcast,
         combo_unread_label_position,
+        combo_rss_date_display,
+        combo_rss_time_display,
+        combo_podcast_date_display,
+        combo_podcast_time_display,
         edit_podcastindex_key,
         edit_podcastindex_secret,
         checkbox_tts_manual,
@@ -5971,6 +6609,9 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         combo_dialogue_voice_rate,
         combo_dialogue_voice_pitch,
         combo_dialogue_voice_volume,
+        edit_dialogue_open_quote,
+        edit_dialogue_close_quote,
+        checkbox_dialogue_allow_multiline,
         checkbox_split_on_newline,
         checkbox_word_wrap,
         checkbox_smart_quotes,
@@ -6027,6 +6668,10 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.edit_podcast_cache_limit,
             state.checkbox_announce_unread_rss_podcast,
             state.combo_unread_label_position,
+            state.combo_rss_date_display,
+            state.combo_rss_time_display,
+            state.combo_podcast_date_display,
+            state.combo_podcast_time_display,
             state.edit_podcastindex_key,
             state.edit_podcastindex_secret,
             state.checkbox_tts_manual,
@@ -6037,6 +6682,9 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.combo_dialogue_voice_rate,
             state.combo_dialogue_voice_pitch,
             state.combo_dialogue_voice_volume,
+            state.edit_dialogue_open_quote,
+            state.edit_dialogue_close_quote,
+            state.checkbox_dialogue_allow_multiline,
             state.checkbox_split_on_newline,
             state.checkbox_word_wrap,
             state.checkbox_smart_quotes,
@@ -6101,6 +6749,9 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.settings.dialogue_voice_pitch,
             state.settings.dialogue_voice_volume,
             state.settings.dialogue_tts_engine,
+            state.settings.dialogue_opening_quote.clone(),
+            state.settings.dialogue_closing_quote.clone(),
+            state.settings.dialogue_allow_multiline,
             state.tts_session.is_some(),
         )
     });
@@ -6116,6 +6767,9 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         old_dialogue_pitch,
         old_dialogue_volume,
         old_dialogue_engine,
+        old_dialogue_opening_quote,
+        old_dialogue_closing_quote,
+        old_dialogue_allow_multiline,
         was_tts_active,
     ) = res.unwrap_or((
         settings.tts_engine,
@@ -6129,6 +6783,9 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         settings.dialogue_voice_pitch,
         settings.dialogue_voice_volume,
         settings.dialogue_tts_engine,
+        settings.dialogue_opening_quote.clone(),
+        settings.dialogue_closing_quote.clone(),
+        settings.dialogue_allow_multiline,
         false,
     ));
 
@@ -6468,6 +7125,42 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     } else {
         RssPodcastUnreadLabelPosition::Before
     };
+    let rss_date_sel = SendMessageW(combo_rss_date_display, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    settings.rss_articles_date_display = if rss_date_sel == 1 {
+        ListDateDisplayMode::Never
+    } else {
+        ListDateDisplayMode::Always
+    };
+    let rss_time_sel = SendMessageW(combo_rss_time_display, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    settings.rss_articles_time_display = match rss_time_sel {
+        1 => ListTimeDisplayMode::Never,
+        2 => ListTimeDisplayMode::OnlyIfMultipleSameDay,
+        _ => ListTimeDisplayMode::Always,
+    };
+    let podcast_date_sel = SendMessageW(
+        combo_podcast_date_display,
+        CB_GETCURSEL,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0;
+    settings.podcast_episodes_date_display = if podcast_date_sel == 1 {
+        ListDateDisplayMode::Never
+    } else {
+        ListDateDisplayMode::Always
+    };
+    let podcast_time_sel = SendMessageW(
+        combo_podcast_time_display,
+        CB_GETCURSEL,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0;
+    settings.podcast_episodes_time_display = match podcast_time_sel {
+        1 => ListTimeDisplayMode::Never,
+        2 => ListTimeDisplayMode::OnlyIfMultipleSameDay,
+        _ => ListTimeDisplayMode::Always,
+    };
 
     let prompt_sel = SendMessageW(combo_prompt_program, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     settings.prompt_program = match prompt_sel {
@@ -6571,6 +7264,38 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
     settings.dialogue_voice_rate = combo_value(combo_dialogue_voice_rate);
     settings.dialogue_voice_pitch = combo_value(combo_dialogue_voice_pitch);
     settings.dialogue_voice_volume = combo_value(combo_dialogue_voice_volume);
+    let dialogue_open_quote_len = GetWindowTextLengthW(edit_dialogue_open_quote);
+    if dialogue_open_quote_len >= 0 {
+        let mut buf = vec![0u16; (dialogue_open_quote_len + 1) as usize];
+        let read = GetWindowTextW(edit_dialogue_open_quote, &mut buf);
+        let text = String::from_utf16_lossy(&buf[..read as usize]);
+        let trimmed = text.trim();
+        settings.dialogue_opening_quote = if trimmed.is_empty() {
+            "\"".to_string()
+        } else {
+            trimmed.to_string()
+        };
+    }
+    let dialogue_close_quote_len = GetWindowTextLengthW(edit_dialogue_close_quote);
+    if dialogue_close_quote_len >= 0 {
+        let mut buf = vec![0u16; (dialogue_close_quote_len + 1) as usize];
+        let read = GetWindowTextW(edit_dialogue_close_quote, &mut buf);
+        let text = String::from_utf16_lossy(&buf[..read as usize]);
+        let trimmed = text.trim();
+        settings.dialogue_closing_quote = if trimmed.is_empty() {
+            "\"".to_string()
+        } else {
+            trimmed.to_string()
+        };
+    }
+    settings.dialogue_allow_multiline = SendMessageW(
+        checkbox_dialogue_allow_multiline,
+        BM_GETCHECK,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0 as u32
+        == BST_CHECKED.0;
 
     let skip_sel = SendMessageW(combo_audio_skip, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     if skip_sel >= 0 {
@@ -6690,6 +7415,20 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         }
     }
 
+    let dialogue_cfg = crate::dialogue_voice::DialogueVoiceConfig {
+        engine: settings.dialogue_tts_engine,
+        voice: settings.dialogue_voice.clone(),
+        rate: settings.dialogue_voice_rate,
+        pitch: settings.dialogue_voice_pitch,
+        volume: settings.dialogue_voice_volume,
+        opening_quote: settings.dialogue_opening_quote.clone(),
+        closing_quote: settings.dialogue_closing_quote.clone(),
+        allow_multiline: settings.dialogue_allow_multiline,
+    };
+    if let Err(err) = crate::dialogue_voice::save_dialogue_voice_config(&dialogue_cfg) {
+        crate::log_debug(&format!("Failed to save dialogue config: {}", err));
+    }
+
     if with_state(parent, |state| {
         state.settings = settings.clone();
     })
@@ -6744,7 +7483,10 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             || old_dialogue_rate != settings.dialogue_voice_rate
             || old_dialogue_pitch != settings.dialogue_voice_pitch
             || old_dialogue_volume != settings.dialogue_voice_volume
-            || old_dialogue_engine != settings.dialogue_tts_engine)
+            || old_dialogue_engine != settings.dialogue_tts_engine
+            || old_dialogue_opening_quote != settings.dialogue_opening_quote
+            || old_dialogue_closing_quote != settings.dialogue_closing_quote
+            || old_dialogue_allow_multiline != settings.dialogue_allow_multiline)
     {
         crate::restart_tts_from_current_offset(parent);
     }
@@ -7471,6 +8213,38 @@ fn layout_rss_podcast_tab(state: &OptionsDialogState) {
         y,
         OPTIONS_COMBO_HEIGHT,
     );
+    y = layout_label_control(
+        "label_rss_date_display",
+        state.label_rss_date_display,
+        "combo_rss_date_display",
+        state.combo_rss_date_display,
+        y,
+        OPTIONS_COMBO_HEIGHT,
+    );
+    y = layout_label_control(
+        "label_rss_time_display",
+        state.label_rss_time_display,
+        "combo_rss_time_display",
+        state.combo_rss_time_display,
+        y,
+        OPTIONS_COMBO_HEIGHT,
+    );
+    y = layout_label_control(
+        "label_podcast_date_display",
+        state.label_podcast_date_display,
+        "combo_podcast_date_display",
+        state.combo_podcast_date_display,
+        y,
+        OPTIONS_COMBO_HEIGHT,
+    );
+    y = layout_label_control(
+        "label_podcast_time_display",
+        state.label_podcast_time_display,
+        "combo_podcast_time_display",
+        state.combo_podcast_time_display,
+        y,
+        OPTIONS_COMBO_HEIGHT,
+    );
     y += OPTIONS_SECTION_GAP;
     y = layout_label_control(
         "label_podcast_cache_limit",
@@ -7625,6 +8399,8 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.checkbox_tts_manual,
             state.checkbox_split_on_newline,
             state.checkbox_use_dialogue_voice,
+            state.label_dialogue_engine,
+            state.combo_dialogue_engine,
             state.label_dialogue_voice,
             state.combo_dialogue_voice,
             state.label_dialogue_voice_rate,
@@ -7633,6 +8409,11 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.combo_dialogue_voice_pitch,
             state.label_dialogue_voice_volume,
             state.combo_dialogue_voice_volume,
+            state.label_dialogue_open_quote,
+            state.edit_dialogue_open_quote,
+            state.label_dialogue_close_quote,
+            state.edit_dialogue_close_quote,
+            state.checkbox_dialogue_allow_multiline,
             state.button_dialogue_voice_preview,
         ] {
             ShowWindow(control, if show_voice { SW_SHOW } else { SW_HIDE });
@@ -7705,6 +8486,14 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.checkbox_announce_unread_rss_podcast,
             state.label_unread_label_position,
             state.combo_unread_label_position,
+            state.label_rss_date_display,
+            state.combo_rss_date_display,
+            state.label_rss_time_display,
+            state.combo_rss_time_display,
+            state.label_podcast_date_display,
+            state.combo_podcast_date_display,
+            state.label_podcast_time_display,
+            state.combo_podcast_time_display,
             state.label_podcastindex_key,
             state.edit_podcastindex_key,
             state.label_podcastindex_secret,

@@ -2,10 +2,10 @@ use crate::accessibility::{handle_accessibility, nvda_speak, to_wide};
 use crate::app_windows::help_window;
 use crate::editor_manager;
 use crate::i18n;
-use crate::settings::{self, Language, confirm_title};
+use crate::settings::{self, Language, ListDateDisplayMode, ListTimeDisplayMode, confirm_title};
 use crate::tools::rss::{self, PodcastEpisode, RssSource, RssSourceType};
 use crate::{log_debug, with_state};
-use chrono::{Local, TimeZone};
+use chrono::{Local, NaiveDate, TimeZone};
 use quick_xml::{Reader, events::Event};
 use sha1::{Digest as Sha1Digest, Sha1};
 use std::collections::{HashMap, HashSet};
@@ -328,6 +328,8 @@ fn podcast_source_display_title(
     }
 }
 
+// Keeps call sites explicit and avoids refactors across UI code paths.
+#[allow(clippy::too_many_arguments)]
 fn podcast_episode_display_title(
     title: &str,
     language: crate::settings::Language,
@@ -335,10 +337,19 @@ fn podcast_episode_display_title(
     item_unplayed: bool,
     pub_date: Option<i64>,
     unread_label_position: crate::settings::RssPodcastUnreadLabelPosition,
+    date_mode: ListDateDisplayMode,
+    time_mode: ListTimeDisplayMode,
+    has_multiple_items_same_day: bool,
 ) -> String {
-    let ts_suffix = format_timestamp_for_language(pub_date, language)
-        .map(|ts| format!(". {ts}"))
-        .unwrap_or_default();
+    let ts_suffix = format_timestamp_for_list(
+        pub_date,
+        language,
+        date_mode,
+        time_mode,
+        has_multiple_items_same_day,
+    )
+    .map(|ts| format!(". {ts}"))
+    .unwrap_or_default();
     if announce_unread && item_unplayed {
         match unread_label_position {
             crate::settings::RssPodcastUnreadLabelPosition::Before => format!(
@@ -355,6 +366,85 @@ fn podcast_episode_display_title(
     } else {
         format!("{title}{ts_suffix}")
     }
+}
+
+fn day_from_timestamp(timestamp: Option<i64>) -> Option<NaiveDate> {
+    let ts = timestamp?;
+    Local
+        .timestamp_opt(ts, 0)
+        .single()
+        .map(|dt| dt.date_naive())
+}
+
+fn build_day_counts(items: &[PodcastEpisode]) -> HashMap<NaiveDate, usize> {
+    let mut counts: HashMap<NaiveDate, usize> = HashMap::new();
+    for item in items {
+        if let Some(day) = day_from_timestamp(item.pub_date) {
+            *counts.entry(day).or_insert(0) += 1;
+        }
+    }
+    counts
+}
+
+fn has_multiple_items_same_day(
+    pub_date: Option<i64>,
+    day_counts: &HashMap<NaiveDate, usize>,
+) -> bool {
+    day_from_timestamp(pub_date)
+        .and_then(|d| day_counts.get(&d).copied())
+        .is_some_and(|count| count > 1)
+}
+
+fn format_timestamp_for_list(
+    timestamp: Option<i64>,
+    language: crate::settings::Language,
+    date_mode: ListDateDisplayMode,
+    time_mode: ListTimeDisplayMode,
+    has_multiple_same_day: bool,
+) -> Option<String> {
+    let ts = timestamp?;
+    let dt = Local.timestamp_opt(ts, 0).single()?;
+    let (date_pattern, time_pattern) = match language {
+        crate::settings::Language::English => ("%m/%d/%Y", "%I:%M %p"),
+        crate::settings::Language::Italian => ("%d/%m/%Y", "%H:%M"),
+        crate::settings::Language::Spanish => ("%d/%m/%Y", "%H:%M"),
+        crate::settings::Language::Portuguese => ("%d/%m/%Y", "%H:%M"),
+        crate::settings::Language::Swedish => ("%Y-%m-%d", "%H:%M"),
+        crate::settings::Language::Vietnamese => ("%d/%m/%Y", "%H:%M"),
+        crate::settings::Language::Czech => ("%d.%m.%Y", "%H:%M"),
+        crate::settings::Language::Polish => ("%d.%m.%Y", "%H:%M"),
+        crate::settings::Language::French => ("%d/%m/%Y", "%H:%M"),
+        crate::settings::Language::Serbian => ("%d.%m.%Y", "%H:%M"),
+        crate::settings::Language::Ukrainian => ("%d.%m.%Y", "%H:%M"),
+    };
+    let show_date = matches!(date_mode, ListDateDisplayMode::Always);
+    let show_time = match time_mode {
+        ListTimeDisplayMode::Always => true,
+        ListTimeDisplayMode::Never => false,
+        ListTimeDisplayMode::OnlyIfMultipleSameDay => has_multiple_same_day,
+    };
+    if !show_date && !show_time {
+        return None;
+    }
+    if show_date && !show_time {
+        let now = Local::now().date_naive();
+        let item_day = dt.date_naive();
+        let day_diff = (now - item_day).num_days();
+        if day_diff == 0 {
+            return Some(i18n::tr(language, "rss.date.today"));
+        }
+        if day_diff == 1 {
+            return Some(i18n::tr(language, "rss.date.yesterday"));
+        }
+        if day_diff == 2 {
+            return Some(i18n::tr(language, "rss.date.day_before_yesterday"));
+        }
+        return Some(dt.format(date_pattern).to_string());
+    }
+    if !show_date && show_time {
+        return Some(dt.format(time_pattern).to_string());
+    }
+    format_timestamp_for_language(timestamp, language)
 }
 
 fn format_timestamp_for_language(
@@ -1556,25 +1646,32 @@ unsafe fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<Podcast
         }
     }
 
-    let (language, announce_unread, unread_label_position) = with_podcast_state(hwnd, |s| {
-        with_state(s.parent, |ps| {
-            (
-                ps.settings.language,
-                ps.settings.announce_unread_rss_podcast_items,
-                ps.settings.rss_podcast_unread_label_position,
-            )
+    let (language, announce_unread, unread_label_position, podcast_date_mode, podcast_time_mode) =
+        with_podcast_state(hwnd, |s| {
+            with_state(s.parent, |ps| {
+                (
+                    ps.settings.language,
+                    ps.settings.announce_unread_rss_podcast_items,
+                    ps.settings.rss_podcast_unread_label_position,
+                    ps.settings.podcast_episodes_date_display,
+                    ps.settings.podcast_episodes_time_display,
+                )
+            })
+            .unwrap_or((
+                s.language,
+                true,
+                crate::settings::RssPodcastUnreadLabelPosition::Before,
+                ListDateDisplayMode::Always,
+                ListTimeDisplayMode::OnlyIfMultipleSameDay,
+            ))
         })
         .unwrap_or((
-            s.language,
+            Language::English,
             true,
             crate::settings::RssPodcastUnreadLabelPosition::Before,
-        ))
-    })
-    .unwrap_or((
-        Language::English,
-        true,
-        crate::settings::RssPodcastUnreadLabelPosition::Before,
-    ));
+            ListDateDisplayMode::Always,
+            ListTimeDisplayMode::OnlyIfMultipleSameDay,
+        ));
 
     let read_keys = with_podcast_state(hwnd, |s| {
         s.source_items
@@ -1584,6 +1681,7 @@ unsafe fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<Podcast
     })
     .unwrap_or_default();
 
+    let day_counts = build_day_counts(&new_items);
     for item in new_items.iter() {
         let item_unplayed = !read_keys.contains(&episode_key(item));
         let display_title = podcast_episode_display_title(
@@ -1593,6 +1691,9 @@ unsafe fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<Podcast
             item_unplayed,
             item.pub_date,
             unread_label_position,
+            podcast_date_mode,
+            podcast_time_mode,
+            has_multiple_items_same_day(item.pub_date, &day_counts),
         );
         let title = to_wide(&display_title);
         let mut tvis = TVINSERTSTRUCTW {
@@ -5111,28 +5212,40 @@ unsafe fn undo_last_delete(hwnd: HWND) {
                 }
 
                 let mut restored_hitem = HTREEITEM(0);
-                let (language, announce_unread, unread_label_position) =
-                    with_podcast_state(hwnd, |s| {
-                        with_state(s.parent, |ps| {
-                            (
-                                ps.settings.language,
-                                ps.settings.announce_unread_rss_podcast_items,
-                                ps.settings.rss_podcast_unread_label_position,
-                            )
-                        })
-                        .unwrap_or((
-                            s.language,
-                            true,
-                            crate::settings::RssPodcastUnreadLabelPosition::Before,
-                        ))
+                let (
+                    language,
+                    announce_unread,
+                    unread_label_position,
+                    podcast_date_mode,
+                    podcast_time_mode,
+                ) = with_podcast_state(hwnd, |s| {
+                    with_state(s.parent, |ps| {
+                        (
+                            ps.settings.language,
+                            ps.settings.announce_unread_rss_podcast_items,
+                            ps.settings.rss_podcast_unread_label_position,
+                            ps.settings.podcast_episodes_date_display,
+                            ps.settings.podcast_episodes_time_display,
+                        )
                     })
                     .unwrap_or((
-                        Language::English,
+                        s.language,
                         true,
                         crate::settings::RssPodcastUnreadLabelPosition::Before,
-                    ));
+                        ListDateDisplayMode::Always,
+                        ListTimeDisplayMode::OnlyIfMultipleSameDay,
+                    ))
+                })
+                .unwrap_or((
+                    Language::English,
+                    true,
+                    crate::settings::RssPodcastUnreadLabelPosition::Before,
+                    ListDateDisplayMode::Always,
+                    ListTimeDisplayMode::OnlyIfMultipleSameDay,
+                ));
                 with_podcast_state(hwnd, |s| {
                     if let Some(state) = s.source_items.get(&source_hitem.0) {
+                        let day_counts = build_day_counts(&state.items);
                         for entry in &state.items {
                             let item_unplayed = !state.read_item_keys.contains(&episode_key(entry));
                             let display_title = podcast_episode_display_title(
@@ -5142,6 +5255,9 @@ unsafe fn undo_last_delete(hwnd: HWND) {
                                 item_unplayed,
                                 entry.pub_date,
                                 unread_label_position,
+                                podcast_date_mode,
+                                podcast_time_mode,
+                                has_multiple_items_same_day(entry.pub_date, &day_counts),
                             );
                             let text = to_wide(&display_title);
                             let mut tvis = TVINSERTSTRUCTW {
@@ -7325,26 +7441,45 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
             if let Some(episode) = episode
                 && episode_key(&episode) == msg.item_key
             {
-                let (language, announce_unread, unread_label_position) =
-                    with_podcast_state(hwnd, |s| {
-                        with_state(s.parent, |ps| {
-                            (
-                                ps.settings.language,
-                                ps.settings.announce_unread_rss_podcast_items,
-                                ps.settings.rss_podcast_unread_label_position,
-                            )
-                        })
-                        .unwrap_or((
-                            Language::English,
-                            true,
-                            crate::settings::RssPodcastUnreadLabelPosition::Before,
-                        ))
+                let (
+                    language,
+                    announce_unread,
+                    unread_label_position,
+                    podcast_date_mode,
+                    podcast_time_mode,
+                ) = with_podcast_state(hwnd, |s| {
+                    with_state(s.parent, |ps| {
+                        (
+                            ps.settings.language,
+                            ps.settings.announce_unread_rss_podcast_items,
+                            ps.settings.rss_podcast_unread_label_position,
+                            ps.settings.podcast_episodes_date_display,
+                            ps.settings.podcast_episodes_time_display,
+                        )
                     })
                     .unwrap_or((
                         Language::English,
                         true,
                         crate::settings::RssPodcastUnreadLabelPosition::Before,
-                    ));
+                        ListDateDisplayMode::Always,
+                        ListTimeDisplayMode::OnlyIfMultipleSameDay,
+                    ))
+                })
+                .unwrap_or((
+                    Language::English,
+                    true,
+                    crate::settings::RssPodcastUnreadLabelPosition::Before,
+                    ListDateDisplayMode::Always,
+                    ListTimeDisplayMode::OnlyIfMultipleSameDay,
+                ));
+                let day_counts = with_podcast_state(hwnd, |s| {
+                    s.source_items
+                        .values()
+                        .find(|state| state.items.iter().any(|x| episode_key(x) == msg.item_key))
+                        .map(|state| build_day_counts(&state.items))
+                        .unwrap_or_default()
+                })
+                .unwrap_or_default();
                 let display_title = podcast_episode_display_title(
                     &episode.title,
                     language,
@@ -7352,6 +7487,9 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                     false,
                     episode.pub_date,
                     unread_label_position,
+                    podcast_date_mode,
+                    podcast_time_mode,
+                    has_multiple_items_same_day(episode.pub_date, &day_counts),
                 );
                 let text = to_wide(&display_title);
                 let mut tvis = TVITEMW {

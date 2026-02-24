@@ -1042,6 +1042,7 @@ pub(crate) fn download_podcast_episode(
     let Some(target) = target else {
         return;
     };
+    let target = ensure_path_extension(target, &ext);
     let cache_path = cache_path.clone();
     let url = url.clone();
     std::thread::spawn(move || {
@@ -1103,6 +1104,18 @@ pub(crate) fn download_podcast_episode(
             ));
         }
     });
+}
+
+fn ensure_path_extension(mut path: PathBuf, desired_ext: &str) -> PathBuf {
+    let has_nonempty_extension = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| !e.trim().is_empty())
+        .unwrap_or(false);
+    if !has_nonempty_extension {
+        path.set_extension(desired_ext);
+    }
+    path
 }
 
 unsafe fn save_podcast_episode_dialog(
@@ -1827,6 +1840,14 @@ fn main() -> windows::core::Result<()> {
             }
         }
     }
+    if args.iter().any(|arg| arg == "-h" || arg == "--help") {
+        print_cli_help();
+        std::process::exit(0);
+    }
+    if args.iter().any(|arg| arg == "--version") {
+        println!("Sonarpad {}", env!("CARGO_PKG_VERSION"));
+        std::process::exit(0);
+    }
     updater::cleanup_backup_on_start();
     updater::cleanup_update_lock_on_start();
     updater::cleanup_update_temp_on_start();
@@ -1851,6 +1872,20 @@ fn main() -> windows::core::Result<()> {
     }
 
     Ok(())
+}
+
+fn print_cli_help() {
+    println!("Sonarpad {}", env!("CARGO_PKG_VERSION"));
+    println!("Usage:");
+    println!("  sonarpad.exe [OPTIONS] [FILES...]");
+    println!();
+    println!("Options:");
+    println!("  -h, --help         Show this help message and exit");
+    println!("  --version          Show version and exit");
+    println!("  --self-update      Internal updater mode (do not use manually)");
+    println!();
+    println!("Arguments:");
+    println!("  FILES...           One or more files to open");
 }
 
 /// Core dell'applicazione - separato per error boundary

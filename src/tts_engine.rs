@@ -199,6 +199,14 @@ fn utf16_len(text: &str) -> usize {
     text.encode_utf16().count()
 }
 
+fn decode_basic_xml_entities(text: &str) -> String {
+    text.replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+}
+
 pub(crate) fn split_voice_tag_spans(
     text: &str,
     default_engine: TtsEngine,
@@ -231,7 +239,11 @@ pub(crate) fn split_voice_tag_spans(
                             orig_len += pending_len;
                             pending_len = 0;
                         }
-                        segments.push((chunk.to_string(), current_override.clone(), orig_len));
+                        segments.push((
+                            decode_basic_xml_entities(chunk),
+                            current_override.clone(),
+                            orig_len,
+                        ));
                     }
                 }
                 let tag_len = utf16_len(&text[i..end]);
@@ -257,7 +269,11 @@ pub(crate) fn split_voice_tag_spans(
             if pending_len > 0 {
                 orig_len += pending_len;
             }
-            segments.push((tail.to_string(), current_override.clone(), orig_len));
+            segments.push((
+                decode_basic_xml_entities(tail),
+                current_override.clone(),
+                orig_len,
+            ));
         }
     } else if pending_len > 0
         && let Some(last) = segments.last_mut()
@@ -765,8 +781,18 @@ async fn synthesize_segment_to_wav(
     )
     .await?;
     let (samples, src_rate, src_channels) = if config.engine == TtsEngine::Edge {
-        let (s, r, c) = decode_mp3_to_pcm(&bytes).map_err(|e| e.to_string())?;
-        (s, r, c)
+        match decode_mp3_to_pcm(&bytes) {
+            Ok(v) => v,
+            Err(mp3_err) => match decode_wav_to_pcm(&bytes) {
+                Ok(v) => v,
+                Err(wav_err) => {
+                    return Err(format!(
+                        "Segment decode failed (mp3='{}', wav='{}')",
+                        mp3_err, wav_err
+                    ));
+                }
+            },
+        }
     } else {
         decode_wav_to_pcm(&bytes)?
     };
@@ -2119,8 +2145,33 @@ fn run_split_audiobook_by_time_edge(
                 return Err(cancelled_message(options.language));
             }
 
-                let (samples, src_rate, src_channels) =
-                    decode_mp3_to_pcm(&data).map_err(|e| e.to_string())?;
+                let (samples, src_rate, src_channels) = match decode_mp3_to_pcm(&data) {
+                    Ok(v) => v,
+                    Err(err) => {
+                        crate::log_debug(&format!(
+                            "Edge WS: skipping undecodable audio chunk (chunk_index={}): {}",
+                            next_to_write, err
+                        ));
+                        current_global_progress = current_global_progress.saturating_add(1);
+                        if options.progress_hwnd.0 != 0 {
+                            unsafe {
+                                if let Err(e) = PostMessageW(
+                                    options.progress_hwnd,
+                                    crate::WM_UPDATE_PROGRESS,
+                                    WPARAM(current_global_progress),
+                                    LPARAM(0),
+                                ) {
+                                    crate::log_debug(&format!(
+                                        "Failed to post WM_UPDATE_PROGRESS: {}",
+                                        e
+                                    ));
+                                }
+                            }
+                        }
+                        next_to_write = next_to_write.saturating_add(1);
+                        continue;
+                    }
+                };
                 let chunk_duration = samples.len() as f64 / (src_rate as f64 * src_channels as f64);
 
                 if split_seconds > 0.0
@@ -4644,7 +4695,7 @@ mod tests {
         TtsEngine, build_audiobook_parts_by_positions, collect_marker_entries, find_edge_split_idx,
         is_edge_text_usable, normalize_for_tts, parse_edge_binary_audio_payload,
         parse_sapi4_part_index, sanitize_edge_text, split_into_tts_chunks,
-        split_long_sentence_edge_with_limit, strip_dashed_lines,
+        split_long_sentence_edge_with_limit, split_voice_tag_spans, strip_dashed_lines,
     };
 
     #[test]
@@ -4729,6 +4780,15 @@ mod tests {
                 "part_12.mp3"
             ]
         );
+    }
+
+    #[test]
+    fn split_voice_tag_spans_decodes_basic_xml_entities_in_text() {
+        let input = r#"<voice engine="edge" voice="it-IT-DiegoNeural">&quot;Ciao &amp; mondo&quot;</voice>"#;
+        let spans = split_voice_tag_spans(input, TtsEngine::Edge);
+        assert_eq!(spans.len(), 1);
+        assert_eq!(spans[0].0, "\"Ciao & mondo\"");
+        assert!(spans[0].1.is_some());
     }
 
     #[test]
@@ -5662,9 +5722,17 @@ pub(crate) fn run_tts_audiobook_part(
             write_wav_from_pcm(&source_wav, &resampled, target_rate, target_channels)
         })();
         if let Err(err) = wav_result {
+            crate::log_debug(&format!(
+                "MP3 post-process skipped: WAV conversion failed, keeping original MP3: {}",
+                err
+            ));
             if let Err(restore_err) = std::fs::rename(&source_mp3, options.output) {
                 crate::log_debug(&format!(
                     "Failed to restore original MP3 after WAV conversion failure: {}",
+                    restore_err
+                ));
+                return Err(format!(
+                    "Failed to restore original MP3 after conversion failure: {}",
                     restore_err
                 ));
             }
@@ -5674,7 +5742,7 @@ pub(crate) fn run_tts_audiobook_part(
                     remove_err
                 ));
             }
-            return Err(err);
+            return Ok(());
         }
 
         let mp3_settings = crate::ffmpeg_export::ConvertAudioSettings {
@@ -5797,12 +5865,33 @@ pub(crate) fn render_mixed_audiobook_part(
             language: options.language,
         };
 
-        let wav_path = rt.block_on(synthesize_segment_to_wav(
+        match rt.block_on(synthesize_segment_to_wav(
             &chunk.text_to_read,
             &synth,
             target,
-        ))?;
-        temp_wavs.push(wav_path);
+        )) {
+            Ok(wav_path) => temp_wavs.push(wav_path),
+            Err(err) => {
+                crate::log_debug(&format!(
+                    "Mixed audiobook: skipping undecodable segment: {}",
+                    err
+                ));
+                *current_global_progress += 1;
+                if options.progress_hwnd.0 != 0 {
+                    unsafe {
+                        if let Err(e) = PostMessageW(
+                            options.progress_hwnd,
+                            crate::WM_UPDATE_PROGRESS,
+                            WPARAM(*current_global_progress),
+                            LPARAM(0),
+                        ) {
+                            crate::log_debug(&format!("Failed to post WM_UPDATE_PROGRESS: {}", e));
+                        }
+                    }
+                }
+                continue;
+            }
+        }
 
         *current_global_progress += 1;
         if options.progress_hwnd.0 != 0 {
@@ -5819,6 +5908,9 @@ pub(crate) fn render_mixed_audiobook_part(
         }
     }
 
+    if temp_wavs.is_empty() {
+        return Err("No valid audio segments were produced.".to_string());
+    }
     crate::audio_utils::join_wav_files(&temp_wavs, &actual_output).map_err(|e| e.to_string())?;
     for path in temp_wavs {
         if let Err(e) = std::fs::remove_file(&path) {

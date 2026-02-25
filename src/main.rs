@@ -104,8 +104,8 @@ use windows::Win32::UI::Controls::{
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_APPS, VK_CONTROL, VK_ESCAPE,
-    VK_F1, VK_F2, VK_F3, VK_F4, VK_F7, VK_F8, VK_F9, VK_F10, VK_MENU, VK_NEXT, VK_OEM_COMMA,
-    VK_OEM_PERIOD, VK_PRIOR, VK_RETURN, VK_SHIFT, VK_TAB,
+    VK_F1, VK_F2, VK_F3, VK_F4, VK_F7, VK_F8, VK_F9, VK_F10, VK_MEDIA_PLAY_PAUSE, VK_MENU, VK_NEXT,
+    VK_OEM_COMMA, VK_OEM_PERIOD, VK_PRIOR, VK_RETURN, VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
 use windows::Win32::UI::Shell::{
@@ -132,11 +132,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
     RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED, SW_SHOWNORMAL,
     SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
     TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage,
-    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE,
-    WM_CUT, WM_DESTROY, WM_DROPFILES, WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL,
-    WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSKEYDOWN,
-    WM_TIMER, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW,
-    WS_TABSTOP, WS_VISIBLE,
+    WINDOW_STYLE, WM_APP, WM_APPCOMMAND, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY,
+    WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES, WM_INITMENUPOPUP, WM_KEYDOWN,
+    WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT,
+    WM_SETREDRAW, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN,
+    WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{HSTRING, Interface, PCWSTR, PWSTR, implement, w};
 
@@ -147,6 +147,7 @@ const EM_LINEINDEX: u32 = 0x00BB;
 const EM_LINELENGTH: u32 = 0x00C1;
 const EM_SETSEL: u32 = 0x00B1;
 const EM_CANUNDO: u32 = 0x00C6;
+const APPCOMMAND_MEDIA_PLAY_PAUSE: usize = 14;
 
 use crate::app_windows::find_in_files_window::{
     FindInFilesCache, apply_find_in_files_selection, focus_find_in_files_results,
@@ -2205,6 +2206,22 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                     && GetFocus() == hwnd_edit
                     && focus_find_in_files_results()
                 {
+                    continue;
+                }
+            }
+            if (msg.message == WM_KEYDOWN
+                && msg.wParam.0 as u32 == u32::from(VK_MEDIA_PLAY_PAUSE.0))
+                || (msg.message == WM_APPCOMMAND
+                    && appcommand_from_lparam(msg.lParam) == APPCOMMAND_MEDIA_PLAY_PAUSE)
+            {
+                let has_player =
+                    with_state(hwnd, |state| state.active_audiobook.is_some()).unwrap_or(false);
+                if has_player {
+                    handle_player_command(hwnd, PlayerCommand::TogglePause);
+                    continue;
+                }
+                if is_tts_active(hwnd) {
+                    tts_engine::toggle_tts_pause(hwnd);
                     continue;
                 }
             }
@@ -7893,6 +7910,10 @@ unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
 
 fn is_modifier_vk(key: u16) -> bool {
     matches!(key, 0x10 | 0x11 | 0x12 | 0xA0..=0xA5)
+}
+
+fn appcommand_from_lparam(lparam: LPARAM) -> usize {
+    ((lparam.0 as usize) >> 16) & 0x7ff
 }
 
 unsafe fn shortcut_matches_message(binding: ShortcutBinding, msg: &MSG) -> bool {

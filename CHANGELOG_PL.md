@@ -21,9 +21,10 @@ Ulepszenia
 • Ulepszono komunikat po zamianie, dodając poprawne formy liczby pojedynczej i mnogiej (np. „1 zamianę” vs „2 zamiany”).
 • Dodano w oknie słownika wybór języka wyszukiwania, z domyślną opcją Auto (język interfejsu) oraz możliwością ręcznego wyboru.
 • Dodano nową kartę Skróty w Opcjach do personalizacji skrótów klawiaturowych, z wykrywaniem konfliktów i ostrzeżeniem, gdy skrót jest już przypisany do innej akcji.
+• Dodano wstępną obsługę przełączników wiersza poleceń: `-h`/`--help` pokazują szybką pomoc, a `--version` wypisuje wersję programu.
 • Uproszczono ręczną regulację prędkości i tonu: pola ręczne używają teraz skali wyśrodkowanej na 100, gdzie 100 oznacza wartość normalną.
 • Ulepszono wybór głosów Microsoft zarówno w Opcje > Głos, jak i w panelu głosów edytora: dodano zlokalizowaną listę języków do filtrowania głosów po języku, a tryb „tylko głosy wielojęzyczne” pozostał pojedynczą listą bez podziału na języki (lista języków jest wtedy ukrywana).
-• Dodano nowe okno Narzędzia > „Zastosuj głos dla dialogów...” z pełną nawigacją klawiszem Tab, oparte na tym samym modelu głosów co główny interfejs (silnik, filtr języka Edge, głos oraz etykietowane szybkość/ton/głośność); reguły dialogów są zapisywane w pliku sidecar `.ini`, bez modyfikowania tekstu dokumentu.
+• Dodano konfigurację głosu dialogów w Opcje > Głos z pełną nawigacją klawiszem Tab, opartą na tym samym modelu głosów co główny interfejs (silnik, filtr języka Edge, głos oraz etykietowane szybkość/ton/głośność); reguły dialogów są zapisywane w konfiguracji `.ini`, bez modyfikowania tekstu dokumentu.
 • Ulepszono etykietę Cofnij: pozycja Edycja > Cofnij pokazuje teraz, co zostanie cofnięte (np. edycja tekstu, cytowanie/odcytowanie linii lub wstawienie tagu głosu), pozostając niedostępna, gdy nie ma czego cofać.
 Poprawki błędów
 • Naprawiono interfejs bitrate w oknie zapisu audiobooka: usunięto teksty zakodowane na stałe po włosku i dodano 64 kbps do listy wybieralnych bitrate.

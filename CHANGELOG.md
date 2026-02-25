@@ -21,9 +21,10 @@ Improvements
 • Improved replace feedback messages with proper singular/plural forms (e.g. “1 replacement made” vs “2 replacements made”).
 • Added dictionary lookup language selection in the dictionary window, with default Auto (interface language) and optional manual override.
 • Added a new Shortcuts tab in Options to customize key bindings, with conflict detection that warns when a shortcut is already assigned to another action.
+• Added initial command-line switch support: `-h`/`--help` now show usage information and `--version` prints the program version.
 • Improved manual speed and pitch tuning clarity: manual fields now use a 100-centered scale, where 100 corresponds to the normal value.
 • Improved Microsoft voices selection in both Options > Voice and the in-editor Voice panel: added a localized language combo to filter voices by language, while keeping multilingual-only mode as a single ungrouped voice list (language combo hidden when enabled).
-• Added a new Tools > "Apply dialogue voice..." window with full Tab navigation, using the same voice model as the main UI (engine, Edge language filter, voice, and labeled speed/pitch/volume); dialogue voice rules are saved in a sidecar `.ini` file, so the document text is not modified.
+• Added dialogue-voice configuration in Options > Voice with full Tab navigation, using the same voice model as the main UI (engine, Edge language filter, voice, and labeled speed/pitch/volume); dialogue voice rules are saved in configuration `.ini`, so document text is not modified.
 • Improved Undo labeling: the Edit > Undo entry now shows what action will be undone (for example, text edits, quote/unquote lines, or voice-tag insertion), while remaining disabled when no undo is available.
 Bug fixes
 • Fixed audiobook save dialog bitrate UI: removed hardcoded Italian labels and added 64 kbps to selectable bitrate options.

@@ -21,9 +21,10 @@ Mejoras
 • Mejorado el mensaje de reemplazo con singular/plural correcto (por ejemplo, “1 reemplazo realizado” frente a “2 reemplazos realizados”).
 • Añadida en la ventana del diccionario la selección de idioma de búsqueda, con valor predeterminado Auto (idioma de la interfaz) y opción de ajuste manual.
 • Añadida una nueva pestaña de Atajos en Opciones para personalizar combinaciones de teclas, con detección de conflictos y aviso cuando un atajo ya está asignado a otra acción.
+• Añadido soporte inicial para parámetros de línea de comandos: `-h`/`--help` muestran la ayuda rápida y `--version` muestra la versión del programa.
 • Mejorada la claridad del ajuste manual de velocidad y tono: los campos manuales ahora usan una escala centrada en 100, donde 100 corresponde al valor normal.
 • Mejorada la selección de voces Microsoft tanto en Opciones > Voz como en el panel de voces del editor: se añadió un combobox de idioma localizado para filtrar voces por idioma, manteniendo el modo “solo voces multilingües” como una lista única sin división por idioma (con el combobox de idioma oculto cuando está activo).
-• Añadida la nueva ventana Herramientas > "Aplicar voz para diálogos..." con navegación completa por Tab, usando el mismo modelo de voces de la interfaz principal (motor, filtro de idioma Edge, voz y velocidad/tono/volumen con etiquetas); las reglas de diálogos se guardan en un archivo sidecar `.ini`, sin modificar el texto del documento.
+• Añadida la configuración de voz para diálogos en Opciones > Voz con navegación completa por Tab, usando el mismo modelo de voces de la interfaz principal (motor, filtro de idioma Edge, voz y velocidad/tono/volumen con etiquetas); las reglas de diálogos se guardan en configuración `.ini`, sin modificar el texto del documento.
 • Mejorada la etiqueta de Deshacer: la opción Editar > Deshacer ahora muestra qué acción se va a deshacer (por ejemplo, edición de texto, comentar/descomentar líneas o inserción de etiqueta de voz), manteniéndose no disponible cuando no hay nada que deshacer.
 Correcciones de errores
 • Corregida la interfaz de bitrate en la ventana de guardado de audiolibros: se eliminaron textos hardcoded en italiano y se añadió 64 kbps entre los bitrates seleccionables.

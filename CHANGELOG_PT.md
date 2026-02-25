@@ -21,9 +21,10 @@ Melhorias
 • Melhorada a mensagem de substituição com singular/plural corretos (por exemplo, “1 substituição realizada” vs “2 substituições realizadas”).
 • Adicionada na janela do dicionário a seleção de idioma de pesquisa, com Auto (idioma da interface) por padrão e possibilidade de escolha manual.
 • Adicionada uma nova aba de Atalhos nas Opções para personalizar combinações de teclas, com deteção de conflitos e aviso quando um atalho já está atribuído a outra ação.
+• Adicionado suporte inicial a parâmetros de linha de comandos: `-h`/`--help` mostram a ajuda rápida e `--version` mostra a versão do programa.
 • Melhorada a clareza do ajuste manual de velocidade e tom: os campos manuais agora usam uma escala centrada em 100, onde 100 corresponde ao valor normal.
 • Melhorada a seleção de vozes Microsoft em Opções > Voz e no painel de vozes do editor: foi adicionada uma combobox de idioma localizada para filtrar vozes por idioma, mantendo o modo “apenas vozes multilíngues” como lista única sem divisão por idioma (com a combobox de idioma oculta quando ativa).
-• Adicionada a nova janela Ferramentas > "Aplicar voz para diálogos..." com navegação completa por Tab, usando o mesmo modelo de vozes da interface principal (motor, filtro de idioma Edge, voz e velocidade/tom/volume com etiquetas); as regras de diálogos são guardadas num ficheiro sidecar `.ini`, sem modificar o texto do documento.
+• Adicionada a configuração de voz para diálogos em Opções > Voz com navegação completa por Tab, usando o mesmo modelo de vozes da interface principal (motor, filtro de idioma Edge, voz e velocidade/tom/volume com etiquetas); as regras de diálogos são guardadas na configuração `.ini`, sem modificar o texto do documento.
 • Melhorada a etiqueta de Desfazer: a opção Editar > Desfazer agora mostra qual ação será desfeita (por exemplo, edição de texto, comentar/descomentar linhas ou inserção de tag de voz), mantendo-se indisponível quando não há nada para desfazer.
 Correções de bugs
 • Corrigida a interface de bitrate na janela de gravação de audiolivro: removidos textos hardcoded em italiano e adicionada a opção 64 kbps entre os bitrates selecionáveis.

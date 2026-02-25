@@ -8,8 +8,8 @@ use crate::settings::{
 use crate::{EM_LINEFROMCHAR, EM_LINEINDEX, get_active_edit, log_debug, with_state};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM};
-use windows::Win32::Graphics::Gdi::HFONT;
+use windows::Win32::Foundation::{BOOL, HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM};
+use windows::Win32::Graphics::Gdi::{HFONT, InvalidateRect};
 use windows::Win32::UI::Controls::RichEdit::{
     CFM_COLOR, CFM_SIZE, CHARFORMAT2W, CHARRANGE, EM_EXGETSEL, EM_EXSETSEL, EM_GETTEXTRANGE,
     EM_SETCHARFORMAT, EM_SETEVENTMASK, ENM_CHANGE, ENM_SELCHANGE, MSFTEDIT_CLASS, SCF_ALL,
@@ -4157,6 +4157,20 @@ pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
             true
         } else {
             false
+        }
+    }
+}
+
+pub fn refresh_current_editor_visual(hwnd: HWND) {
+    unsafe {
+        let hwnd_edit = with_state(hwnd, |state| {
+            state.docs.get(state.current).map(|doc| doc.hwnd_edit)
+        })
+        .flatten();
+        if let Some(hwnd_edit) = hwnd_edit
+            && !InvalidateRect(hwnd_edit, None, BOOL(1)).as_bool()
+        {
+            crate::log_debug("InvalidateRect failed after save");
         }
     }
 }

@@ -3933,16 +3933,19 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 IDM_FILE_SAVE => {
                     log_debug("Menu: Save document");
                     editor_manager::save_current_document(hwnd);
+                    editor_manager::refresh_current_editor_visual(hwnd);
                     LRESULT(0)
                 }
                 IDM_FILE_SAVE_AS => {
                     log_debug("Menu: Save document as");
                     editor_manager::save_current_document_as(hwnd);
+                    editor_manager::refresh_current_editor_visual(hwnd);
                     LRESULT(0)
                 }
                 IDM_FILE_SAVE_ALL => {
                     log_debug("Menu: Save all documents");
                     editor_manager::save_all_documents(hwnd);
+                    editor_manager::refresh_current_editor_visual(hwnd);
                     LRESULT(0)
                 }
                 IDM_FILE_CLOSE => {

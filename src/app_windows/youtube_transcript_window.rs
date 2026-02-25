@@ -21,15 +21,15 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL,
-    CB_RESETCONTENT, CB_SETCURSEL, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW,
-    DefWindowProcW, DestroyWindow, DispatchMessageW, EN_CHANGE, ES_AUTOHSCROLL, ES_MULTILINE,
-    ES_READONLY, FindWindowExW, GWLP_USERDATA, GetMessageW, GetWindowLongPtrW, HMENU, IDC_ARROW,
-    IDYES, IsDialogMessageW, IsWindow, LoadCursorW, MB_ICONQUESTION, MB_YESNO, MSG, MessageBoxW,
-    PM_REMOVE, PeekMessageW, PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW, SendMessageW,
-    SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, ShowWindow, TranslateMessage,
-    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY,
-    WM_SETFONT, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME,
-    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    CB_RESETCONTENT, CB_SETCURSEL, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, EN_CHANGE, ES_AUTOHSCROLL,
+    ES_MULTILINE, ES_READONLY, FindWindowExW, GWLP_USERDATA, GetMessageW, GetWindowLongPtrW, HMENU,
+    IDC_ARROW, IDYES, IsDialogMessageW, IsWindow, LoadCursorW, MB_ICONQUESTION, MB_YESNO, MSG,
+    MessageBoxW, PM_REMOVE, PeekMessageW, PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW,
+    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
+    TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY,
+    WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, w};
 
@@ -53,6 +53,7 @@ const STREAM_ID_FORMAT: usize = 9312;
 const STREAM_ID_OK: usize = 9313;
 const STREAM_ID_CANCEL: usize = 9314;
 const STREAM_ID_DIRECT_PLAY: usize = 9315;
+const STREAM_ID_QUALITY: usize = 9316;
 const STREAM_TRACK_ID_COMBO: usize = 9321;
 const STREAM_TRACK_ID_OK: usize = 9322;
 const STREAM_TRACK_ID_CANCEL: usize = 9323;
@@ -1478,10 +1479,20 @@ enum StreamOutputFormat {
     Mp4,
 }
 
+#[derive(Clone, Copy)]
+enum StreamQualitySelection {
+    Original,
+    BitrateKbps(u32),
+    Mp4High,
+    Mp4Medium,
+    Mp4Low,
+}
+
 #[derive(Clone)]
 struct StreamDialogResult {
     url: String,
     format: StreamOutputFormat,
+    quality: StreamQualitySelection,
     direct_play: bool,
 }
 
@@ -1502,6 +1513,7 @@ struct StreamDialogState {
     language: Language,
     url_edit: HWND,
     format_combo: HWND,
+    quality_combo: HWND,
     direct_play_check: HWND,
     ok_button: HWND,
     result: Arc<Mutex<Option<StreamDialogResult>>>,
@@ -1540,14 +1552,21 @@ impl StreamOutputFormat {
         ]
     }
 
-    fn as_audio_convert_settings(self) -> Option<crate::ffmpeg_export::ConvertAudioSettings> {
+    fn as_audio_convert_settings(
+        self,
+        quality: StreamQualitySelection,
+    ) -> Option<crate::ffmpeg_export::ConvertAudioSettings> {
         use crate::ffmpeg_export::{
             ConvertAudioFormat as F, ConvertAudioQuality as Q, ConvertAudioSettings,
         };
         match self {
             StreamOutputFormat::Mp3 => Some(ConvertAudioSettings {
                 format: F::Mp3,
-                quality: Q::BitrateKbps(192),
+                quality: match quality {
+                    StreamQualitySelection::BitrateKbps(kbps) => Q::BitrateKbps(kbps),
+                    StreamQualitySelection::Original => Q::None,
+                    _ => Q::BitrateKbps(192),
+                },
             }),
             StreamOutputFormat::M4a => Some(ConvertAudioSettings {
                 format: F::Aac,
@@ -1585,6 +1604,88 @@ impl StreamOutputFormat {
             StreamOutputFormat::Auto => None,
         }
     }
+}
+
+fn stream_quality_items(
+    language: Language,
+    format: StreamOutputFormat,
+) -> Vec<(String, StreamQualitySelection)> {
+    match format {
+        StreamOutputFormat::Mp3 => {
+            let mut items = vec![(
+                i18n::tr(language, "stream_audio.quality.original"),
+                StreamQualitySelection::Original,
+            )];
+            for kbps in [64u32, 80, 96, 128, 160, 192, 196, 224, 250, 256, 320] {
+                items.push((
+                    format!("{kbps} kbps"),
+                    StreamQualitySelection::BitrateKbps(kbps),
+                ));
+            }
+            items
+        }
+        StreamOutputFormat::Mp4 => vec![
+            (
+                i18n::tr(language, "stream_audio.quality.original"),
+                StreamQualitySelection::Original,
+            ),
+            (
+                i18n::tr(language, "stream_audio.quality.high"),
+                StreamQualitySelection::Mp4High,
+            ),
+            (
+                i18n::tr(language, "stream_audio.quality.medium"),
+                StreamQualitySelection::Mp4Medium,
+            ),
+            (
+                i18n::tr(language, "stream_audio.quality.low"),
+                StreamQualitySelection::Mp4Low,
+            ),
+        ],
+        _ => vec![(
+            i18n::tr(language, "stream_audio.quality.original"),
+            StreamQualitySelection::Original,
+        )],
+    }
+}
+
+unsafe fn current_stream_format(state: &StreamDialogState) -> StreamOutputFormat {
+    let format_idx = SendMessageW(state.format_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    StreamOutputFormat::combo_items(state.language)
+        .get(format_idx.max(0) as usize)
+        .map(|(_, f)| *f)
+        .unwrap_or(StreamOutputFormat::Auto)
+}
+
+unsafe fn refill_stream_quality_combo(state: &StreamDialogState, keep_selection: bool) {
+    let prev_selection = if keep_selection {
+        SendMessageW(state.quality_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0
+    } else {
+        -1
+    };
+    SendMessageW(state.quality_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    let format = current_stream_format(state);
+    let items = stream_quality_items(state.language, format);
+    for (label, _) in &items {
+        let wide = to_wide(label);
+        SendMessageW(
+            state.quality_combo,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(wide.as_ptr() as isize),
+        );
+    }
+    let selected_idx = if prev_selection >= 0 && (prev_selection as usize) < items.len() {
+        prev_selection
+    } else {
+        0
+    };
+    SendMessageW(
+        state.quality_combo,
+        CB_SETCURSEL,
+        WPARAM(selected_idx as usize),
+        LPARAM(0),
+    );
 }
 
 unsafe fn with_stream_dialog_state<F, R>(hwnd: HWND, f: F) -> Option<R>
@@ -1710,13 +1811,41 @@ unsafe fn stream_dialog_wndproc_inner(
                 HINSTANCE(0),
                 None,
             );
+            let quality_label = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&i18n::tr(init.language, "stream_audio.quality_label")).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                16,
+                116,
+                90,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let quality_combo = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_COMBOBOXW,
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                110,
+                114,
+                210,
+                180,
+                hwnd,
+                HMENU(STREAM_ID_QUALITY as isize),
+                HINSTANCE(0),
+                None,
+            );
             let ok_button = CreateWindowExW(
                 Default::default(),
                 WC_BUTTON,
                 PCWSTR(to_wide(&i18n::tr(init.language, "youtube.ok")).as_ptr()),
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
                 350,
-                118,
+                146,
                 90,
                 28,
                 hwnd,
@@ -1730,7 +1859,7 @@ unsafe fn stream_dialog_wndproc_inner(
                 PCWSTR(to_wide(&i18n::tr(init.language, "youtube.cancel")).as_ptr()),
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                 350,
-                150,
+                178,
                 90,
                 28,
                 hwnd,
@@ -1744,6 +1873,8 @@ unsafe fn stream_dialog_wndproc_inner(
                 url_edit,
                 format_label,
                 format_combo,
+                quality_label,
+                quality_combo,
                 direct_play_check,
                 ok_button,
                 cancel_button,
@@ -1770,16 +1901,29 @@ unsafe fn stream_dialog_wndproc_inner(
                 language: init.language,
                 url_edit,
                 format_combo,
+                quality_combo,
                 direct_play_check,
                 ok_button,
                 result: init.result.clone(),
             });
+            refill_stream_quality_combo(&state, false);
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
             SetFocus(url_edit);
             LRESULT(0)
         }
         WM_COMMAND => {
             let cmd_id = wparam.0 & 0xffff;
+            let notify_code = (wparam.0 >> 16) & 0xffff;
+            if cmd_id == STREAM_ID_FORMAT && notify_code == CBN_SELCHANGE as usize {
+                if with_stream_dialog_state(hwnd, |state| {
+                    refill_stream_quality_combo(state, false);
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to refresh stream quality combo");
+                }
+                return LRESULT(0);
+            }
             if cmd_id == STREAM_ID_OK || cmd_id == 1 {
                 if with_stream_dialog_state(hwnd, |state| {
                     let msg = i18n::tr(state.language, "stream_audio.progress_downloading");
@@ -1793,6 +1937,12 @@ unsafe fn stream_dialog_wndproc_inner(
                         .get(format_idx.max(0) as usize)
                         .map(|(_, f)| *f)
                         .unwrap_or(StreamOutputFormat::Auto);
+                    let quality_idx =
+                        SendMessageW(state.quality_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+                    let quality = stream_quality_items(state.language, format)
+                        .get(quality_idx.max(0) as usize)
+                        .map(|(_, q)| *q)
+                        .unwrap_or(StreamQualitySelection::Original);
                     let direct_play =
                         SendMessageW(state.direct_play_check, BM_GETCHECK, WPARAM(0), LPARAM(0)).0
                             == BST_CHECKED.0 as isize;
@@ -1800,6 +1950,7 @@ unsafe fn stream_dialog_wndproc_inner(
                         Some(StreamDialogResult {
                             url,
                             format,
+                            quality,
                             direct_play,
                         });
                 })
@@ -1906,7 +2057,7 @@ fn show_stream_dialog(parent: HWND, language: Language) -> Option<StreamDialogRe
             CW_USEDEFAULT,
             CW_USEDEFAULT,
             470,
-            230,
+            268,
             parent,
             HMENU(0),
             hinstance,
@@ -2734,7 +2885,19 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
     } else {
         match dialog_data.format {
             StreamOutputFormat::Mp4 => {
-                cmd.arg("-f").arg("best[ext=mp4]/best");
+                let mp4_profile = match dialog_data.quality {
+                    StreamQualitySelection::Mp4High => {
+                        "bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best"
+                    }
+                    StreamQualitySelection::Mp4Medium => {
+                        "best[ext=mp4][height<=720]/best[height<=720]/best"
+                    }
+                    StreamQualitySelection::Mp4Low => {
+                        "best[ext=mp4][height<=480]/best[height<=480]/worst"
+                    }
+                    _ => "best[ext=mp4]/best",
+                };
+                cmd.arg("-f").arg(mp4_profile);
             }
             _ => {
                 cmd.arg("-f").arg("bestaudio/best");
@@ -3158,7 +3321,9 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
     report_progress(progress, 100);
     close_progress_dialog(progress);
 
-    let final_path = if let Some(convert_settings) = dialog_data.format.as_audio_convert_settings()
+    let final_path = if let Some(convert_settings) = dialog_data
+        .format
+        .as_audio_convert_settings(dialog_data.quality)
     {
         let target_ext = dialog_data.format.extension().unwrap_or("mp3");
         if downloaded_path

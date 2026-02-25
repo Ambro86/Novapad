@@ -82,6 +82,7 @@ const OPTIONS_ID_AUDIOBOOK_SAVE_FOLDER_BROWSE: usize = 6065;
 const OPTIONS_ID_AUDIO_SPLIT_MINUTES: usize = 6058;
 const OPTIONS_ID_AUDIO_SPLIT_START_NUMBER: usize = 6059;
 const OPTIONS_ID_AUDIO_SPLIT_TEXT: usize = 6013;
+const OPTIONS_ID_AUDIO_SPLIT_PARTS_COUNT: usize = 6087;
 const OPTIONS_ID_AUDIO_SPLIT_REQUIRE_NEWLINE: usize = 6016;
 const OPTIONS_ID_AUDIO_SPLIT_EPUB_CHAPTERS: usize = 6063;
 const OPTIONS_ID_SUBTITLE_MODE: usize = 6046;
@@ -144,6 +145,7 @@ const WM_TTS_VOICES_LOADED: u32 = WM_APP + 2;
 const WM_TTS_SAPI_VOICES_LOADED: u32 = WM_APP + 8;
 const AUDIOBOOK_SPLIT_BY_TEXT: u32 = u32::MAX;
 const AUDIOBOOK_SPLIT_BY_TIME: u32 = u32::MAX - 1;
+const AUDIOBOOK_SPLIT_BY_PARTS: u32 = u32::MAX - 2;
 
 const OPTIONS_TAB_GENERAL: i32 = 0;
 const OPTIONS_TAB_VOICE: i32 = 1;
@@ -655,6 +657,8 @@ struct OptionsDialogState {
     combo_audio_split: HWND,
     label_audio_split_minutes: HWND,
     combo_audio_split_minutes: HWND,
+    label_audio_split_parts_count: HWND,
+    edit_audio_split_parts_count: HWND,
     label_audio_split_start_number: HWND,
     combo_audio_split_start_number: HWND,
     label_audio_split_text: HWND,
@@ -841,6 +845,7 @@ struct OptionsLabels {
     label_audiobook_save_folder_browse: String,
     label_audio_split: String,
     label_audio_split_minutes: String,
+    label_audio_split_parts_count: String,
     label_audio_split_start_number: String,
     label_audio_split_text: String,
     label_audio_split_requires_newline: String,
@@ -883,7 +888,7 @@ struct OptionsLabels {
     split_none: String,
     split_by_time: String,
     split_by_text: String,
-    split_parts: String,
+    split_by_parts: String,
     spellcheck_lang_follow: String,
     spellcheck_lang_en_us: String,
     spellcheck_lang_en_gb: String,
@@ -1006,6 +1011,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_audiobook_save_folder_browse: i18n::tr(language, "options.button.browse"),
         label_audio_split: i18n::tr(language, "options.label.audio_split"),
         label_audio_split_minutes: i18n::tr(language, "options.label.audio_split_minutes"),
+        label_audio_split_parts_count: i18n::tr(language, "options.label.audio_split_parts_count"),
         label_audio_split_start_number: i18n::tr(
             language,
             "options.label.audio_split_start_number",
@@ -1074,7 +1080,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         split_none: i18n::tr(language, "options.split.none"),
         split_by_time: i18n::tr(language, "options.split.by_time"),
         split_by_text: i18n::tr(language, "options.split.by_text"),
-        split_parts: i18n::tr(language, "options.split.parts"),
+        split_by_parts: i18n::tr(language, "options.split.by_parts"),
         spellcheck_lang_follow: i18n::tr(language, "options.spellcheck.lang.follow"),
         spellcheck_lang_en_us: i18n::tr(language, "options.spellcheck.lang.en_us"),
         spellcheck_lang_en_gb: i18n::tr(language, "options.spellcheck.lang.en_gb"),
@@ -2360,6 +2366,36 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 140,
                 hwnd,
                 HMENU(OPTIONS_ID_AUDIO_SPLIT_MINUTES as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 34;
+
+            let label_audio_split_parts_count = CreateWindowExW(
+                Default::default(),
+                WC_STATIC,
+                PCWSTR(to_wide(&labels.label_audio_split_parts_count).as_ptr()),
+                WS_CHILD | WS_VISIBLE,
+                20,
+                y,
+                140,
+                20,
+                hwnd,
+                HMENU(0),
+                HINSTANCE(0),
+                None,
+            );
+            let edit_audio_split_parts_count = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                w!("EDIT"),
+                PCWSTR::null(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                170,
+                y - 2,
+                300,
+                22,
+                hwnd,
+                HMENU(OPTIONS_ID_AUDIO_SPLIT_PARTS_COUNT as isize),
                 HINSTANCE(0),
                 None,
             );
@@ -3692,6 +3728,8 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 combo_audio_split,
                 label_audio_split_minutes,
                 combo_audio_split_minutes,
+                label_audio_split_parts_count,
+                edit_audio_split_parts_count,
                 label_audio_split_start_number,
                 combo_audio_split_start_number,
                 label_audio_split_text,
@@ -3841,6 +3879,8 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 combo_audio_split,
                 label_audio_split_minutes,
                 combo_audio_split_minutes,
+                label_audio_split_parts_count,
+                edit_audio_split_parts_count,
                 label_audio_split_start_number,
                 combo_audio_split_start_number,
                 label_audio_split_text,
@@ -4318,6 +4358,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         _button_audiobook_save_folder_browse,
         combo_audio_split,
         combo_audio_split_minutes,
+        edit_audio_split_parts_count,
         combo_audio_split_start_number,
         _label_audio_split_text,
         edit_audio_split_text,
@@ -4423,6 +4464,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.button_audiobook_save_folder_browse,
             state.combo_audio_split,
             state.combo_audio_split_minutes,
+            state.edit_audio_split_parts_count,
             state.combo_audio_split_start_number,
             state.label_audio_split_text,
             state.edit_audio_split_text,
@@ -5671,10 +5713,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         (0, labels.split_none.clone()),
         (AUDIOBOOK_SPLIT_BY_TIME, labels.split_by_time.clone()),
         (AUDIOBOOK_SPLIT_BY_TEXT, labels.split_by_text.clone()),
-        (2, format!("2 {}", labels.split_parts)),
-        (4, format!("4 {}", labels.split_parts)),
-        (6, format!("6 {}", labels.split_parts)),
-        (8, format!("8 {}", labels.split_parts)),
+        (AUDIOBOOK_SPLIT_BY_PARTS, labels.split_by_parts.clone()),
     ];
     let mut selected_split_idx = 0;
     for (parts, label) in split_options.iter() {
@@ -5695,7 +5734,8 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             || (settings.audiobook_split_by_text && *parts == AUDIOBOOK_SPLIT_BY_TEXT)
             || (!settings.audiobook_split_by_time
                 && !settings.audiobook_split_by_text
-                && *parts == settings.audiobook_split)
+                && settings.audiobook_split > 0
+                && *parts == AUDIOBOOK_SPLIT_BY_PARTS)
         {
             selected_split_idx = idx;
         }
@@ -5714,7 +5754,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         LPARAM(0),
     );
     let mut selected_minutes_idx = 0;
-    for minutes in 1..=20u32 {
+    for minutes in 1..=60u32 {
         let label = format!("{minutes}");
         let idx = SendMessageW(
             combo_audio_split_minutes,
@@ -5739,6 +5779,17 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         WPARAM(selected_minutes_idx),
         LPARAM(0),
     );
+
+    let split_parts_value = if settings.audiobook_split == 0 {
+        2
+    } else {
+        settings.audiobook_split.clamp(1, 100)
+    };
+    let split_parts_wide = to_wide(&split_parts_value.to_string());
+    if let Err(_e) = SetWindowTextW(
+        edit_audio_split_parts_count,
+        PCWSTR(split_parts_wide.as_ptr()),
+    ) {}
 
     SendMessageW(
         combo_audio_split_start_number,
@@ -6587,6 +6638,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         edit_audiobook_save_folder,
         combo_audio_split,
         combo_audio_split_minutes,
+        edit_audio_split_parts_count,
         combo_audio_split_start_number,
         edit_audio_split_text,
         checkbox_audio_split_requires_newline,
@@ -6660,6 +6712,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.edit_audiobook_save_folder,
             state.combo_audio_split,
             state.combo_audio_split_minutes,
+            state.edit_audio_split_parts_count,
             state.combo_audio_split_start_number,
             state.edit_audio_split_text,
             state.checkbox_audio_split_requires_newline,
@@ -7311,26 +7364,53 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
 
     let split_sel = SendMessageW(combo_audio_split, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     if split_sel >= 0 {
-        let split_parts = SendMessageW(
+        let split_mode = SendMessageW(
             combo_audio_split,
             CB_GETITEMDATA,
             WPARAM(split_sel as usize),
             LPARAM(0),
         )
         .0;
-        let split_parts = split_parts as u32;
-        if split_parts == AUDIOBOOK_SPLIT_BY_TIME {
+        let split_mode = split_mode as u32;
+        if split_mode == AUDIOBOOK_SPLIT_BY_TIME {
             settings.audiobook_split_by_time = true;
             settings.audiobook_split_by_text = false;
             settings.audiobook_split = 0;
-        } else if split_parts == AUDIOBOOK_SPLIT_BY_TEXT {
+        } else if split_mode == AUDIOBOOK_SPLIT_BY_TEXT {
             settings.audiobook_split_by_time = false;
             settings.audiobook_split_by_text = true;
             settings.audiobook_split = 0;
+        } else if split_mode == AUDIOBOOK_SPLIT_BY_PARTS {
+            settings.audiobook_split_by_time = false;
+            settings.audiobook_split_by_text = false;
+            let parts_len = GetWindowTextLengthW(edit_audio_split_parts_count);
+            if parts_len >= 0 {
+                let mut buf = vec![0u16; (parts_len + 1) as usize];
+                let read = GetWindowTextW(edit_audio_split_parts_count, &mut buf);
+                let text = String::from_utf16_lossy(&buf[..read as usize]);
+                let trimmed = text.trim();
+                let parsed = trimmed.parse::<u32>().ok();
+                if !matches!(parsed, Some(1..=100)) {
+                    let error_title = i18n::tr(settings.language, "app.error_title");
+                    let error_message =
+                        i18n::tr(settings.language, "options.error.audio_split_parts_invalid");
+                    MessageBoxW(
+                        hwnd,
+                        PCWSTR(to_wide(&error_message).as_ptr()),
+                        PCWSTR(to_wide(&error_title).as_ptr()),
+                        MB_OK | MB_ICONWARNING,
+                    );
+                    SetFocus(edit_audio_split_parts_count);
+                    return;
+                }
+                settings.audiobook_split = parsed.unwrap_or(2);
+            } else {
+                settings.audiobook_split = settings.audiobook_split.clamp(1, 100);
+            }
         } else {
             settings.audiobook_split_by_time = false;
             settings.audiobook_split_by_text = false;
-            settings.audiobook_split = split_parts;
+            settings.audiobook_split = 0;
         }
     }
 
@@ -7349,7 +7429,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             LPARAM(0),
         )
         .0 as u32;
-        settings.audiobook_split_minutes = minutes.clamp(1, 20);
+        settings.audiobook_split_minutes = minutes.clamp(1, 60);
     }
 
     let start_sel = SendMessageW(
@@ -7506,6 +7586,8 @@ unsafe fn update_audio_split_visibility(hwnd: HWND) {
         checkbox_audio_split_requires_newline,
         label_audio_split_minutes,
         combo_audio_split_minutes,
+        label_audio_split_parts_count,
+        edit_audio_split_parts_count,
         label_audio_split_start_number,
         combo_audio_split_start_number,
     ) = match with_options_state(hwnd, |state| {
@@ -7516,6 +7598,8 @@ unsafe fn update_audio_split_visibility(hwnd: HWND) {
             state.checkbox_audio_split_requires_newline,
             state.label_audio_split_minutes,
             state.combo_audio_split_minutes,
+            state.label_audio_split_parts_count,
+            state.edit_audio_split_parts_count,
             state.label_audio_split_start_number,
             state.combo_audio_split_start_number,
         )
@@ -7525,7 +7609,7 @@ unsafe fn update_audio_split_visibility(hwnd: HWND) {
     };
 
     let split_sel = SendMessageW(combo_audio_split, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-    let (selected_text, selected_time) = if split_sel >= 0 {
+    let (selected_text, selected_time, selected_parts) = if split_sel >= 0 {
         let split_parts = SendMessageW(
             combo_audio_split,
             CB_GETITEMDATA,
@@ -7536,9 +7620,10 @@ unsafe fn update_audio_split_visibility(hwnd: HWND) {
         (
             split_parts == AUDIOBOOK_SPLIT_BY_TEXT,
             split_parts == AUDIOBOOK_SPLIT_BY_TIME,
+            split_parts == AUDIOBOOK_SPLIT_BY_PARTS,
         )
     } else {
-        (false, false)
+        (false, false, false)
     };
 
     let show_text = if selected_text { SW_SHOW } else { SW_HIDE };
@@ -7552,6 +7637,10 @@ unsafe fn update_audio_split_visibility(hwnd: HWND) {
     ShowWindow(label_audio_split_minutes, show_time);
     ShowWindow(combo_audio_split_minutes, show_time);
     EnableWindow(combo_audio_split_minutes, selected_time);
+    let show_parts = if selected_parts { SW_SHOW } else { SW_HIDE };
+    ShowWindow(label_audio_split_parts_count, show_parts);
+    ShowWindow(edit_audio_split_parts_count, show_parts);
+    EnableWindow(edit_audio_split_parts_count, selected_parts);
     ShowWindow(label_audio_split_start_number, show_time);
     ShowWindow(combo_audio_split_start_number, show_time);
     EnableWindow(combo_audio_split_start_number, selected_time);
@@ -8050,7 +8139,7 @@ fn layout_editor_tab(state: &OptionsDialogState) {
 }
 
 fn layout_audio_tab(state: &OptionsDialogState) {
-    let (show_text_split, show_time_split) = unsafe {
+    let (show_text_split, show_time_split, show_parts_split) = unsafe {
         let split_sel = SendMessageW(state.combo_audio_split, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
         if split_sel >= 0 {
             let split_parts = SendMessageW(
@@ -8063,9 +8152,10 @@ fn layout_audio_tab(state: &OptionsDialogState) {
             (
                 split_parts == AUDIOBOOK_SPLIT_BY_TEXT,
                 split_parts == AUDIOBOOK_SPLIT_BY_TIME,
+                split_parts == AUDIOBOOK_SPLIT_BY_PARTS,
             )
         } else {
-            (false, false)
+            (false, false, false)
         }
     };
     let mut y = OPTIONS_CONTENT_TOP;
@@ -8128,6 +8218,16 @@ fn layout_audio_tab(state: &OptionsDialogState) {
             state.combo_audio_split_start_number,
             y,
             OPTIONS_COMBO_HEIGHT,
+        );
+    }
+    if show_parts_split {
+        y = layout_label_control(
+            "label_audio_split_parts_count",
+            state.label_audio_split_parts_count,
+            "edit_audio_split_parts_count",
+            state.edit_audio_split_parts_count,
+            y,
+            OPTIONS_EDIT_HEIGHT,
         );
     }
     if show_text_split {
@@ -8459,6 +8559,8 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.combo_audio_split,
             state.label_audio_split_minutes,
             state.combo_audio_split_minutes,
+            state.label_audio_split_parts_count,
+            state.edit_audio_split_parts_count,
             state.label_audio_split_start_number,
             state.combo_audio_split_start_number,
             state.label_audio_split_text,
@@ -8537,6 +8639,8 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
         checkbox,
         label_minutes,
         combo_minutes,
+        label_parts,
+        edit_parts,
         label_start,
         combo_start,
     )) = with_options_state(hwnd, |state| {
@@ -8546,6 +8650,8 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.checkbox_audio_split_requires_newline,
             state.label_audio_split_minutes,
             state.combo_audio_split_minutes,
+            state.label_audio_split_parts_count,
+            state.edit_audio_split_parts_count,
             state.label_audio_split_start_number,
             state.combo_audio_split_start_number,
         )
@@ -8555,10 +8661,13 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
         ShowWindow(checkbox, SW_HIDE);
         ShowWindow(label_minutes, SW_HIDE);
         ShowWindow(combo_minutes, SW_HIDE);
+        ShowWindow(label_parts, SW_HIDE);
+        ShowWindow(edit_parts, SW_HIDE);
         ShowWindow(label_start, SW_HIDE);
         ShowWindow(combo_start, SW_HIDE);
         EnableWindow(edit_text, false);
         EnableWindow(checkbox, false);
+        EnableWindow(edit_parts, false);
         EnableWindow(combo_minutes, false);
         EnableWindow(combo_start, false);
     }

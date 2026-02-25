@@ -7,6 +7,8 @@ Improvements
 • Added support for the system media Play/Pause key (headsets/keyboards): it now controls both media playback and text reading pause/resume (with media playback priority when both are active).
 • Added a new File > Recent Files entry: "Clear recent files" to quickly wipe the recent documents list.
 • Expanded audio bitrate options in Convert Audio and podcast recording settings: added lower values (64/96 kbps) and extended MP3 up to 320 kbps, with aligned validation and encoder handling.
+• Extended audiobook split-by-time options up to 60 minutes.
+• Improved audiobook split-by-parts: users can now enter the number of parts manually, with validation from 1 to 100.
 • Added a new View > Read-only mode to lock editor text from accidental edits while keeping documents fully readable and navigable.
 • Added an accessible progress bar during program updates, so screen readers can track download progress in real time.
 • Added a new quiet status bar in the main window showing characters, words, and line/column (for example: "Characters (with spaces): 11. | Words: 2. | Ln 1, Col 12") without disturbing NVDA focus.

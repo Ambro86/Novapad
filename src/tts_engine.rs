@@ -3596,7 +3596,7 @@ fn start_audiobook_with_text(
     let mixed_needed = has_voice_tags(&cleaned);
     let use_epub_split = audiobook_split_by_epub_chapter && epub_chapters.as_ref().is_some();
     let mut split_by_time = audiobook_split_by_time;
-    let split_minutes = audiobook_split_minutes.clamp(1, 20);
+    let split_minutes = audiobook_split_minutes.clamp(1, 60);
     let split_start_number = audiobook_split_start_number.clamp(1, 99);
     let mut split_parts = audiobook_split;
     let mut split_by_text = audiobook_split_by_text;

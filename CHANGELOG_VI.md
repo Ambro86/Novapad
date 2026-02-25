@@ -7,6 +7,8 @@ Cải tiến
 • Da them ho tro phim da phuong tien Play/Pause cua he thong (tai nghe/ban phim): nay co the dieu khien ca phat media va tam dung/tiep tuc doc van ban (uu tien trinh phat media khi ca hai dang hoat dong).
 • Da them muc moi trong Tep > Tep gan day: "Xoa tep gan day" de xoa nhanh danh sach tai lieu vua mo.
 • Đã mở rộng tùy chọn bitrate trong Chuyển đổi âm thanh và cài đặt ghi podcast: thêm mức thấp hơn (64/96 kbps) và nâng MP3 lên tối đa 320 kbps, đồng bộ cả kiểm tra hợp lệ và xử lý bộ mã hóa.
+• Đã mở rộng tùy chọn chia sách nói theo thời lượng lên đến 60 phút.
+• Đã cải thiện chia sách nói theo số phần: người dùng có thể nhập thủ công số phần, với kiểm tra hợp lệ từ 1 đến 100.
 • Đã thêm chế độ mới Xem > Chỉ đọc để ngăn chỉnh sửa nhầm văn bản, đồng thời vẫn giữ khả năng đọc và điều hướng đầy đủ tài liệu.
 • Đã thêm thanh tiến trình có thể truy cập trong quá trình cập nhật chương trình, giúp trình đọc màn hình theo dõi tiến độ tải xuống theo thời gian thực.
 • Đã thêm thanh trạng thái mới dạng yên lặng ở cửa sổ chính với số ký tự, số từ và vị trí dòng/cột (ví dụ: "Ký tự (kể cả khoảng trắng): 11. | Từ: 2. | Ln 1, Col 12"), không làm ảnh hưởng tiêu điểm của NVDA.

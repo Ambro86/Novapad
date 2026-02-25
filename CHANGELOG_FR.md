@@ -7,6 +7,8 @@ Améliorations
 • Ajout de la prise en charge de la touche multimédia système Lecture/Pause (casque/clavier) : elle contrôle désormais à la fois la lecture multimédia et la pause/reprise de la lecture de texte (priorité au lecteur multimédia lorsque les deux sont actifs).
 • Ajout d'une nouvelle entrée dans Fichier > Fichiers récents : « Vider les fichiers récents » pour effacer rapidement la liste des documents récents.
 • Extension des options de débit binaire dans Convertir l’audio et dans les paramètres d’enregistrement de podcast : ajout de valeurs plus basses (64/96 kbps) et extension du MP3 jusqu’à 320 kbps, avec validation et gestion de l’encodeur harmonisées.
+• Extension des options de découpage de livre audio par durée jusqu’à 60 minutes.
+• Amélioration du découpage en parties : il est désormais possible de saisir manuellement le nombre de parties, avec validation de 1 à 100.
 • Ajout du nouveau mode Affichage > Lecture seule pour éviter les modifications accidentelles tout en conservant une lecture et une navigation complètes des documents.
 • Ajout d’une barre de progression accessible pendant les mises à jour du programme, afin que les lecteurs d’écran puissent suivre en temps réel l’avancement du téléchargement.
 • Ajout d’une nouvelle barre d’état discrète dans la fenêtre principale avec le nombre de caractères, de mots et la position ligne/colonne (par exemple : "Caractères (avec espaces) : 11. | Mots : 2. | Ln 1, Col 12"), sans perturber le focus NVDA.

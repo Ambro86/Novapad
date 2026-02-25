@@ -1333,6 +1333,9 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
         settings.audiobook_m4b_bitrate = 128;
     }
     settings.audiobook_m4b_bitrate = settings.audiobook_m4b_bitrate.clamp(64, 256);
+    settings.audiobook_split = settings.audiobook_split.clamp(0, 100);
+    settings.audiobook_split_minutes = settings.audiobook_split_minutes.clamp(1, 60);
+    settings.audiobook_split_start_number = settings.audiobook_split_start_number.clamp(1, 99);
     if settings.modified_marker_position == ModifiedMarkerPosition::Unknown {
         settings.modified_marker_position = ModifiedMarkerPosition::End;
     }

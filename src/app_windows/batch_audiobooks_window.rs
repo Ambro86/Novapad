@@ -1838,7 +1838,7 @@ fn export_single_audiobook(
     } else {
         tts.audiobook_split_by_time
     };
-    let split_minutes = tts.audiobook_split_minutes.clamp(1, 20);
+    let split_minutes = tts.audiobook_split_minutes.clamp(1, 60);
     let split_start_number = tts.audiobook_split_start_number.clamp(1, 99);
     let split_by_text = tts.audiobook_split_by_text && !split_by_time && !use_epub_split;
     let split_parts = if split_by_time || use_epub_split {

@@ -7,6 +7,8 @@ Melhorias
 • Adicionado suporte à tecla multimédia de sistema Reproduzir/Pausar (auscultadores/teclado): agora controla tanto a reprodução multimédia como a pausa/retoma da leitura de texto (com prioridade para o leitor multimédia quando ambos estão ativos).
 • Adicionada uma nova opção em Ficheiro > Ficheiros recentes: "Limpar ficheiros recentes" para esvaziar rapidamente a lista de documentos recentes.
 • Ampliadas as opções de bitrate na conversão de áudio e na gravação de podcast: adicionados valores mais baixos (64/96 kbps) e MP3 estendido até 320 kbps, com validação e tratamento do encoder alinhados.
+• Ampliadas as opções de divisão de audiolivros por tempo até 60 minutos.
+• Melhorada a divisão de audiolivros por partes: agora o número de partes pode ser inserido manualmente, com validação de 1 a 100.
 • Adicionado o novo modo Ver > Somente leitura para bloquear edições acidentais no texto, mantendo leitura e navegação completas dos documentos.
 • Adicionada uma barra de progresso acessível durante as atualizações do programa, para que leitores de ecrã possam acompanhar em tempo real o progresso da transferência.
 • Adicionada uma nova barra de estado discreta na janela principal com contagem de caracteres, palavras e posição linha/coluna (por exemplo: "Caracteres (com espaços): 11. | Palavras: 2. | Ln 1, Col 12"), sem interferir com o foco do NVDA.

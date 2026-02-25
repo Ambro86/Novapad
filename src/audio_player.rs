@@ -750,7 +750,35 @@ fn start_audiobook_at_with_options(
                         "Audio player: forced FFmpeg streaming failed: {}",
                         stream_err
                     ));
-                    return;
+                    match decode_ffmpeg_to_wav(&final_path, options.audio_track) {
+                        Ok(wav_path) => match BassOutput::start(
+                            &wav_path,
+                            seconds,
+                            effective_speed,
+                            options.pitch,
+                            initial_volume,
+                            effective_paused,
+                        ) {
+                            Ok(output) => {
+                                log_debug("Audio player: forced FFmpeg fallback to WAV succeeded");
+                                output
+                            }
+                            Err(err) => {
+                                log_debug(&format!(
+                                    "Audio player: forced fallback BASS failed: {}",
+                                    err
+                                ));
+                                return;
+                            }
+                        },
+                        Err(err) => {
+                            log_debug(&format!(
+                                "Audio player: forced fallback decode failed: {}",
+                                err
+                            ));
+                            return;
+                        }
+                    }
                 }
             }
         } else {

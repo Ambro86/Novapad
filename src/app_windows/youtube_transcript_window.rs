@@ -2156,6 +2156,50 @@ fn plain_label(text: &str) -> String {
     text.replace('&', "")
 }
 
+fn probe_stream_media_title(ytdlp_path: &Path, url: &str) -> Option<String> {
+    let output = ytdlp_command(ytdlp_path)
+        .arg("--no-playlist")
+        .arg("--no-warnings")
+        .arg("--skip-download")
+        .arg("--print")
+        .arg("title")
+        .arg("--")
+        .arg(url)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let raw = String::from_utf8_lossy(&output.stdout);
+    let first_non_empty = raw.lines().map(str::trim).find(|line| !line.is_empty())?;
+    let sanitized = crate::sanitize_filename(first_non_empty);
+    if sanitized.is_empty() {
+        None
+    } else {
+        Some(sanitized)
+    }
+}
+
+fn unique_stream_named_path(dir: &Path, title: &str, ext: &str) -> PathBuf {
+    let first = dir.join(format!("{title}.{ext}"));
+    if !first.exists() {
+        return first;
+    }
+    for n in 2..=999 {
+        let candidate = dir.join(format!("{title} ({n}).{ext}"));
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    dir.join(format!("{title}_{stamp}.{ext}"))
+}
+
 fn probe_stream_audio_tracks(
     ytdlp_path: &Path,
     url: &str,
@@ -2631,6 +2675,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             return;
         }
     };
+    let stream_title = probe_stream_media_title(&ytdlp_path, &url);
 
     let selected_audio_format =
         match probe_stream_audio_tracks_responsive(parent, language, &ytdlp_path, &url) {
@@ -3171,18 +3216,47 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         downloaded_path
     };
 
+    let playback_path = if let Some(title) = stream_title.as_ref() {
+        let ext = final_path
+            .extension()
+            .and_then(|e| e.to_str())
+            .filter(|e| !e.trim().is_empty())
+            .unwrap_or("mp3");
+        let target = unique_stream_named_path(&cache_dir, title, ext);
+        if target != final_path {
+            match std::fs::rename(&final_path, &target) {
+                Ok(()) => target,
+                Err(err) => {
+                    crate::log_debug(&format!(
+                        "Stream title rename failed ({} -> {}): {}",
+                        final_path.to_string_lossy(),
+                        target.to_string_lossy(),
+                        err
+                    ));
+                    final_path.clone()
+                }
+            }
+        } else {
+            final_path.clone()
+        }
+    } else {
+        final_path.clone()
+    };
+
     unsafe {
-        crate::queue_audio_files_and_play(parent, vec![final_path.clone()]);
+        crate::queue_audio_files_and_play(parent, vec![playback_path.clone()]);
         crate::editor_manager::mark_current_document_from_rss(parent, true);
-        let episode_title = final_path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .map(|s| s.to_string());
+        let episode_title = stream_title.or_else(|| {
+            playback_path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .map(|s| s.to_string())
+        });
         crate::set_active_podcast_episode_info(
             parent,
             Some(url),
             episode_title,
-            Some(final_path.clone()),
+            Some(playback_path.clone()),
         );
         crate::menu::update_playback_menu(parent, true);
     }

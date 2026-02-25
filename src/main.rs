@@ -1485,7 +1485,20 @@ fn is_stream_cache_media(path: &Path) -> bool {
         .and_then(|s| s.to_str())
         .unwrap_or_default()
         .to_ascii_lowercase();
-    name.starts_with("stream_")
+    if name.starts_with("stream_") {
+        return true;
+    }
+    // Streaming downloads can now be renamed to media title, so they may not keep
+    // the old "stream_*" prefix. Treat WebM files in podcast cache as stream media.
+    if path
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("webm"))
+    {
+        let full = path.to_string_lossy().to_ascii_lowercase();
+        return full.contains("\\podcast cache\\");
+    }
+    false
 }
 
 fn is_direct_stream_playback_active(hwnd: HWND) -> bool {

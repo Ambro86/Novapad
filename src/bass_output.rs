@@ -254,6 +254,14 @@ impl BassOutput {
             let play_ok = unsafe { (api.channel_play)(handle, 0) };
             if play_ok == 0 {
                 log_bass_error(api, "BASS_ChannelPlay (ffmpeg)");
+                let free_ok = unsafe { (api.stream_free)(handle) };
+                if free_ok == 0 {
+                    log_bass_error(api, "BASS_StreamFree (ffmpeg play-fail)");
+                }
+                return Err(format!(
+                    "BASS_ChannelPlay (ffmpeg) failed (error {})",
+                    bass_error(api)
+                ));
             }
         }
 

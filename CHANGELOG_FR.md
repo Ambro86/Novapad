@@ -3,7 +3,7 @@
 Version 0.6.7 – 2026-02-13
 Améliorations
 • Ajout de la prise en charge globale du proxy réseau (HTTP/HTTPS et SOCKS5/SOCKS5H) pour les fonctions en ligne, avec validation à l'enregistrement des options : les proxys invalides sont signalés puis supprimés automatiquement.
-• Ajout d'une nouvelle fonction dans Outils : « Lire l'audio en streaming... », permettant de coller une URL (YouTube ou lien média direct), de choisir le format de sortie et de lancer la lecture dans le lecteur audio de Sonarpad.
+• Ajout d'une nouvelle fonction dans Outils : « Lire l'audio en streaming... », permettant de coller une URL (YouTube ou lien média direct), de choisir le format de sortie et le profil qualité/débit binaire (y compris qualité/débit d'origine pour MP3 et MP4), puis de lancer la lecture dans le lecteur audio de Sonarpad.
 • Ajout d'une nouvelle entrée dans Fichier > Fichiers récents : « Vider les fichiers récents » pour effacer rapidement la liste des documents récents.
 • Extension des options de débit binaire dans Convertir l’audio et dans les paramètres d’enregistrement de podcast : ajout de valeurs plus basses (64/96 kbps) et extension du MP3 jusqu’à 320 kbps, avec validation et gestion de l’encodeur harmonisées.
 • Ajout du nouveau mode Affichage > Lecture seule pour éviter les modifications accidentelles tout en conservant une lecture et une navigation complètes des documents.

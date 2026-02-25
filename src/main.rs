@@ -3934,8 +3934,16 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                         state.spellcheck_last_highlighted_line = None;
                     });
                     if let Some(selected) = open_file_dialog_with_encoding(hwnd) {
-                        for (path, encoding) in selected {
-                            open_document_with_encoding(hwnd, &path, encoding);
+                        if selected.iter().all(|(path, _)| is_audio_path(path)) {
+                            let audio_paths = selected
+                                .into_iter()
+                                .map(|(path, _)| path)
+                                .collect::<Vec<_>>();
+                            queue_audio_files_and_play(hwnd, audio_paths);
+                        } else {
+                            for (path, encoding) in selected {
+                                open_document_with_encoding(hwnd, &path, encoding);
+                            }
                         }
                         if with_state(hwnd, |state| state.prompt_window.0 != 0).unwrap_or(false) {
                             focus_editor(hwnd);

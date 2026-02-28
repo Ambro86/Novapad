@@ -2,6 +2,7 @@
 
 Version 0.6.7 – 2026-02-13
 Improvements
+• Added Chinese and Lithuanian localization updates across app resources, including updated guide/donations texts and NSIS setup translations (new Simplified Chinese and Lithuanian installer strings, plus completed Ukrainian setup translation).
 • Added global network proxy support (HTTP/HTTPS and SOCKS5/SOCKS5H) for online features, with proxy validation on Options save: invalid proxies are warned and automatically removed.
 • Added a new Tools action: "Play streaming audio...", allowing users to paste a URL (YouTube or direct media link), choose output format and quality/bitrate profile (including original quality/bitrate for MP3 and MP4), and play it directly in Sonarpad’s audio player.
 • Added support for the system media Play/Pause key (headsets/keyboards): it now controls both media playback and text reading pause/resume (with media playback priority when both are active).
@@ -27,9 +28,10 @@ Improvements
 • Added initial command-line switch support: `-h`/`--help` now show usage information and `--version` prints the program version.
 • Improved manual speed and pitch tuning clarity: manual fields now use a 100-centered scale, where 100 corresponds to the normal value.
 • Improved Microsoft voices selection in both Options > Voice and the in-editor Voice panel: added a localized language combo to filter voices by language, while keeping multilingual-only mode as a single ungrouped voice list (language combo hidden when enabled).
-• Added dialogue-voice configuration in Options > Voice with full Tab navigation, using the same voice model as the main UI (engine, Edge language filter, voice, and labeled speed/pitch/volume); dialogue voice rules are saved in configuration `.ini`, so document text is not modified.
+• Added dialogue-voice configuration in Options > Voice with full Tab navigation, using the same voice model as the main UI (engine, Edge language filter, voice, and labeled speed/pitch/volume); added optional secondary dialogue voice with the same controls (engine, Edge language filter, voice, speed/pitch/volume) for alternating dialogues; dialogue voice rules are saved in configuration `.ini`, so document text is not modified.
 • Improved Undo labeling: the Edit > Undo entry now shows what action will be undone (for example, text edits, quote/unquote lines, or voice-tag insertion), while remaining disabled when no undo is available.
 Bug fixes
+• Improved M4B audiobook creation with chapter metadata and chapter markers; fixed the chipmunk playback issue (high pitch/speed) in generated M4B files.
 • Fixed audiobook save dialog bitrate UI: removed hardcoded Italian labels and added 64 kbps to selectable bitrate options.
 • Fixed Save All (Ctrl+Shift+S): all open modified documents are now detected reliably (including unsaved/new tabs), and Save All correctly saves each one or opens Save As where needed.
 • Fixed Google News RSS item ordering: articles are now shown in descending publish date (newest first) when dates are available.

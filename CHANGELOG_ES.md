@@ -2,6 +2,7 @@
 
 Versión 0.6.7 – 2026-02-13
 Mejoras
+• Actualizada la localización en chino y lituano en todos los recursos de la app, incluidas guía/texto de donaciones y traducciones del instalador NSIS (nuevas cadenas de instalación en chino simplificado y lituano, además de completar la traducción ucraniana del setup).
 • Añadido soporte global de proxy de red (HTTP/HTTPS y SOCKS5/SOCKS5H) para funciones en línea, con validación al guardar Opciones: los proxies no válidos se avisan y se eliminan automáticamente.
 • Añadida una nueva función en Herramientas: "Reproducir audio en streaming...", que permite pegar una URL (YouTube o enlace multimedia directo), elegir el formato de salida y el perfil de calidad/bitrate (incluida calidad/bitrate original para MP3 y MP4) y reproducirla en el reproductor de Sonarpad.
 • Añadido soporte para la tecla multimedia de sistema Reproducir/Pausar (auriculares/teclado): ahora controla tanto la reproducción multimedia como la pausa/reanudación de la lectura de texto (con prioridad para el reproductor multimedia cuando ambos están activos).
@@ -27,9 +28,10 @@ Mejoras
 • Añadido soporte inicial para parámetros de línea de comandos: `-h`/`--help` muestran la ayuda rápida y `--version` muestra la versión del programa.
 • Mejorada la claridad del ajuste manual de velocidad y tono: los campos manuales ahora usan una escala centrada en 100, donde 100 corresponde al valor normal.
 • Mejorada la selección de voces Microsoft tanto en Opciones > Voz como en el panel de voces del editor: se añadió un combobox de idioma localizado para filtrar voces por idioma, manteniendo el modo “solo voces multilingües” como una lista única sin división por idioma (con el combobox de idioma oculto cuando está activo).
-• Añadida la configuración de voz para diálogos en Opciones > Voz con navegación completa por Tab, usando el mismo modelo de voces de la interfaz principal (motor, filtro de idioma Edge, voz y velocidad/tono/volumen con etiquetas); las reglas de diálogos se guardan en configuración `.ini`, sin modificar el texto del documento.
+• Añadida la configuración de voz para diálogos en Opciones > Voz con navegación completa por Tab, usando el mismo modelo de voces de la interfaz principal (motor, filtro de idioma Edge, voz y velocidad/tono/volumen con etiquetas); añadida también una segunda voz de diálogos opcional con los mismos controles (motor, filtro de idioma Edge, voz, velocidad/tono/volumen) para alternar diálogos; las reglas de diálogos se guardan en configuración `.ini`, sin modificar el texto del documento.
 • Mejorada la etiqueta de Deshacer: la opción Editar > Deshacer ahora muestra qué acción se va a deshacer (por ejemplo, edición de texto, comentar/descomentar líneas o inserción de etiqueta de voz), manteniéndose no disponible cuando no hay nada que deshacer.
 Correcciones de errores
+• Mejorada la creación de audiolibros M4B con metadatos y marcadores de capítulo; corregido el problema "chipmunk" (voz demasiado aguda/rápida) en los archivos M4B generados.
 • Corregida la interfaz de bitrate en la ventana de guardado de audiolibros: se eliminaron textos hardcoded en italiano y se añadió 64 kbps entre los bitrates seleccionables.
 • Corregido "Guardar todo" (Ctrl+Shift+S): ahora se detectan de forma fiable todos los documentos abiertos modificados (incluidas pestañas nuevas/sin guardar) y Guardar todo guarda cada uno correctamente, abriendo "Guardar como" cuando hace falta.
 • Corregido el orden de artículos RSS de Google News: cuando hay fecha disponible, los artículos ahora se muestran del más reciente al más antiguo.

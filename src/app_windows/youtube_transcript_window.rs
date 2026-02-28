@@ -53,6 +53,9 @@ const STREAM_ID_FORMAT: usize = 9312;
 const STREAM_ID_OK: usize = 9313;
 const STREAM_ID_CANCEL: usize = 9314;
 const STREAM_ID_DIRECT_PLAY: usize = 9315;
+
+#[inline]
+fn ignore_bool(_value: bool) {}
 const STREAM_ID_QUALITY: usize = 9316;
 const STREAM_TRACK_ID_COMBO: usize = 9321;
 const STREAM_TRACK_ID_OK: usize = 9322;
@@ -2453,7 +2456,7 @@ fn probe_stream_audio_tracks_responsive(
     let url = url.to_string();
     let worker = std::thread::spawn(move || probe_stream_audio_tracks(&ytdlp, &url));
     while !worker.is_finished() {
-        let _ = pump_messages_detect_stream_cancel(parent, progress);
+        ignore_bool(pump_messages_detect_stream_cancel(parent, progress));
         std::thread::sleep(std::time::Duration::from_millis(30));
     }
     close_progress_dialog(progress);
@@ -3347,7 +3350,10 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 report_progress(converting_progress, pct);
                 // Keep window responsive during in-process conversion on slower machines.
                 if last_pump.elapsed() >= std::time::Duration::from_millis(50) {
-                    let _ = pump_messages_detect_stream_cancel(parent, converting_progress);
+                    ignore_bool(pump_messages_detect_stream_cancel(
+                        parent,
+                        converting_progress,
+                    ));
                     last_pump = std::time::Instant::now();
                 }
             };

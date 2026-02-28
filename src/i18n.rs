@@ -13,6 +13,8 @@ const PL_JSON: &str = include_str!("../i18n/pl.json");
 const FR_JSON: &str = include_str!("../i18n/fr.json");
 const SR_JSON: &str = include_str!("../i18n/sr.json");
 const UK_JSON: &str = include_str!("../i18n/uk.json");
+const LT_JSON: &str = include_str!("../i18n/lt.json");
+const ZH_JSON: &str = include_str!("../i18n/zh.json");
 
 fn load_map(raw: &str) -> HashMap<String, String> {
     let mut map: HashMap<String, String> = serde_json::from_str(raw).unwrap_or_default();
@@ -184,6 +186,8 @@ fn map_for_language(language: Language) -> &'static HashMap<String, String> {
     static FR: OnceLock<HashMap<String, String>> = OnceLock::new();
     static SR: OnceLock<HashMap<String, String>> = OnceLock::new();
     static UK: OnceLock<HashMap<String, String>> = OnceLock::new();
+    static LT: OnceLock<HashMap<String, String>> = OnceLock::new();
+    static ZH: OnceLock<HashMap<String, String>> = OnceLock::new();
     match language {
         Language::Italian => IT.get_or_init(|| load_map(IT_JSON)),
         Language::Spanish => ES.get_or_init(|| load_map(ES_JSON)),
@@ -195,6 +199,8 @@ fn map_for_language(language: Language) -> &'static HashMap<String, String> {
         Language::French => FR.get_or_init(load_fr_map),
         Language::Serbian => SR.get_or_init(|| load_map(SR_JSON)),
         Language::Ukrainian => UK.get_or_init(|| load_map(UK_JSON)),
+        Language::Lithuanian => LT.get_or_init(|| load_map(LT_JSON)),
+        Language::Chinese => ZH.get_or_init(|| load_map(ZH_JSON)),
         Language::English => EN.get_or_init(|| load_map(EN_JSON)),
     }
 }

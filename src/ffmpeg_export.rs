@@ -130,6 +130,7 @@ fn ensure_tts_cache(
                         pitch: settings.tts_pitch,
                         volume: settings.tts_volume,
                         sapi4_threads: None,
+                        finalize_progress_steps: 0,
                     };
                     let config = tts_engine::MixedAudiobookConfig {
                         main_engine: settings.tts_engine,
@@ -180,6 +181,7 @@ fn ensure_tts_cache(
                         pitch: settings.tts_pitch,
                         volume: settings.tts_volume,
                         sapi4_threads: None,
+                        finalize_progress_steps: 0,
                     };
                     let config = tts_engine::MixedAudiobookConfig {
                         main_engine: settings.tts_engine,
@@ -222,6 +224,7 @@ fn ensure_tts_cache(
                         pitch: settings.tts_pitch,
                         volume: settings.tts_volume,
                         sapi4_threads: None,
+                        finalize_progress_steps: 0,
                     };
                     let config = tts_engine::MixedAudiobookConfig {
                         main_engine: settings.tts_engine,
@@ -523,6 +526,384 @@ pub fn segment_audio_file(
         (api.av_packet_free)(&mut pkt);
         (api.avformat_free_context)(out_ctx);
         (api.avformat_close_input)(&mut in_ctx);
+    }
+    Ok(())
+}
+
+pub fn merge_audio_files_with_chapters_copy(
+    input_files: &[PathBuf],
+    output_path: &Path,
+    chapter_titles: Option<&[String]>,
+) -> Result<(), String> {
+    if input_files.len() < 2 {
+        return Err("FFmpeg: at least 2 input files are required".to_string());
+    }
+    let api = ffmpeg_api()?;
+
+    let mut durations_ms: Vec<u64> = Vec::with_capacity(input_files.len());
+    for input in input_files {
+        let source = FfmpegSource::try_new(input, 0, None, None)
+            .map_err(|e| format!("FFmpeg: failed to probe {}: {}", input.display(), e))?;
+        let duration = source
+            .total_duration()
+            .ok_or_else(|| format!("FFmpeg: missing duration for {}", input.display()))?;
+        let ms = duration.as_millis().min(u64::MAX as u128) as u64;
+        if ms == 0 {
+            return Err(format!("FFmpeg: zero duration for {}", input.display()));
+        }
+        durations_ms.push(ms);
+    }
+
+    let out_c = CString::new(output_path.to_string_lossy().as_bytes())
+        .map_err(|_| "FFmpeg: invalid output path".to_string())?;
+    let mut out_ctx: *mut AVFormatContext = ptr::null_mut();
+    let alloc_ret = unsafe {
+        (api.avformat_alloc_output_context2)(
+            &mut out_ctx,
+            ptr::null_mut(),
+            ptr::null(),
+            out_c.as_ptr(),
+        )
+    };
+    if alloc_ret < 0 || out_ctx.is_null() {
+        return Err("FFmpeg: failed to allocate output context".to_string());
+    }
+
+    let mut first_in_ctx: *mut AVFormatContext = ptr::null_mut();
+    let first_c = CString::new(input_files[0].to_string_lossy().as_bytes())
+        .map_err(|_| "FFmpeg: invalid first input path".to_string())?;
+    let first_open = unsafe {
+        (api.avformat_open_input)(
+            &mut first_in_ctx,
+            first_c.as_ptr(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+        )
+    };
+    if first_open < 0 || first_in_ctx.is_null() {
+        unsafe { (api.avformat_free_context)(out_ctx) };
+        return Err("FFmpeg: failed to open first input".to_string());
+    }
+    if unsafe { (api.avformat_find_stream_info)(first_in_ctx, ptr::null_mut()) } < 0 {
+        unsafe {
+            (api.avformat_close_input)(&mut first_in_ctx);
+            (api.avformat_free_context)(out_ctx);
+        }
+        return Err("FFmpeg: failed to read first input stream info".to_string());
+    }
+    let first_audio_idx = unsafe {
+        (api.av_find_best_stream)(
+            first_in_ctx,
+            AVMediaType_AVMEDIA_TYPE_AUDIO,
+            -1,
+            -1,
+            ptr::null_mut(),
+            0,
+        )
+    };
+    if first_audio_idx < 0 {
+        unsafe {
+            (api.avformat_close_input)(&mut first_in_ctx);
+            (api.avformat_free_context)(out_ctx);
+        }
+        return Err("FFmpeg: no audio stream in first input".to_string());
+    }
+    let in_stream = unsafe { *(*first_in_ctx).streams.add(first_audio_idx as usize) };
+    let out_stream = unsafe { (api.avformat_new_stream)(out_ctx, ptr::null()) };
+    if out_stream.is_null() {
+        unsafe {
+            (api.avformat_close_input)(&mut first_in_ctx);
+            (api.avformat_free_context)(out_ctx);
+        }
+        return Err("FFmpeg: failed to create output stream".to_string());
+    }
+    unsafe {
+        if (api.avcodec_parameters_copy)((*out_stream).codecpar, (*in_stream).codecpar) < 0 {
+            (api.avformat_close_input)(&mut first_in_ctx);
+            (api.avformat_free_context)(out_ctx);
+            return Err("FFmpeg: codec parameters copy failed".to_string());
+        }
+        (*out_stream).time_base = (*in_stream).time_base;
+    }
+
+    let chapter_count = input_files.len();
+    let chapters_ptr = unsafe {
+        (api.av_mallocz)((chapter_count * std::mem::size_of::<*mut AVChapter>()) as libc::size_t)
+            as *mut *mut AVChapter
+    };
+    if chapters_ptr.is_null() {
+        unsafe {
+            (api.avformat_close_input)(&mut first_in_ctx);
+            (api.avformat_free_context)(out_ctx);
+        }
+        return Err("FFmpeg: failed to allocate chapter array".to_string());
+    }
+    let mut cumulative_ms = 0u64;
+    for (idx, dur_ms) in durations_ms.iter().enumerate() {
+        let chapter = unsafe { (api.av_mallocz)(std::mem::size_of::<AVChapter>() as libc::size_t) }
+            as *mut AVChapter;
+        if chapter.is_null() {
+            unsafe {
+                (api.avformat_close_input)(&mut first_in_ctx);
+                (api.avformat_free_context)(out_ctx);
+            }
+            return Err("FFmpeg: failed to allocate chapter".to_string());
+        }
+        let start_ms = cumulative_ms as i64;
+        let end_ms = cumulative_ms.saturating_add(*dur_ms) as i64;
+        cumulative_ms = cumulative_ms.saturating_add(*dur_ms);
+        let title = chapter_titles
+            .and_then(|titles| titles.get(idx))
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| format!("Part {:02}", idx + 1));
+        let mut dict: *mut AVDictionary = ptr::null_mut();
+        dict_set_str(api, &mut dict, "title", &title)?;
+        unsafe {
+            (*chapter).id = idx as i64;
+            (*chapter).time_base = AVRational { num: 1, den: 1000 };
+            (*chapter).start = start_ms;
+            (*chapter).end = end_ms;
+            (*chapter).metadata = dict;
+            *chapters_ptr.add(idx) = chapter;
+        }
+    }
+    unsafe {
+        (*out_ctx).chapters = chapters_ptr;
+        (*out_ctx).nb_chapters = chapter_count as u32;
+    }
+
+    let mut io: *mut AVIOContext = ptr::null_mut();
+    let open_io = unsafe { (api.avio_open)(&mut io, out_c.as_ptr(), AVIO_FLAG_WRITE) };
+    if open_io < 0 {
+        unsafe {
+            (api.avformat_close_input)(&mut first_in_ctx);
+            (api.avformat_free_context)(out_ctx);
+        }
+        return Err("FFmpeg: failed to open output IO".to_string());
+    }
+    unsafe {
+        (*out_ctx).pb = io;
+    }
+
+    let header_ret = unsafe { (api.avformat_write_header)(out_ctx, ptr::null_mut()) };
+    if header_ret < 0 {
+        unsafe {
+            (api.avio_closep)(&mut io);
+            (api.avformat_close_input)(&mut first_in_ctx);
+            (api.avformat_free_context)(out_ctx);
+        }
+        return Err("FFmpeg: failed to write output header".to_string());
+    }
+    unsafe {
+        (api.avformat_close_input)(&mut first_in_ctx);
+    }
+    let out_tb = unsafe { (*out_stream).time_base };
+
+    let mut global_last_dts = 0i64;
+    let mut has_global_last_dts = false;
+    let mut part_offsets_ts: Vec<i64> = Vec::with_capacity(durations_ms.len());
+    let mut cumulative_ms: i64 = 0;
+    for dur_ms in &durations_ms {
+        part_offsets_ts.push(rescale_q(
+            cumulative_ms,
+            AVRational { num: 1, den: 1000 },
+            out_tb,
+        ));
+        cumulative_ms = cumulative_ms.saturating_add(*dur_ms as i64);
+    }
+    for (idx, input) in input_files.iter().enumerate() {
+        let mut in_ctx: *mut AVFormatContext = ptr::null_mut();
+        let input_c = CString::new(input.to_string_lossy().as_bytes())
+            .map_err(|_| "FFmpeg: invalid input path".to_string())?;
+        let open_ret = unsafe {
+            (api.avformat_open_input)(
+                &mut in_ctx,
+                input_c.as_ptr(),
+                ptr::null_mut(),
+                ptr::null_mut(),
+            )
+        };
+        if open_ret < 0 || in_ctx.is_null() {
+            unsafe {
+                (api.avio_closep)(&mut io);
+                (api.avformat_free_context)(out_ctx);
+            };
+            return Err(format!("FFmpeg: failed to open {}", input.display()));
+        }
+        if unsafe { (api.avformat_find_stream_info)(in_ctx, ptr::null_mut()) } < 0 {
+            unsafe {
+                (api.avformat_close_input)(&mut in_ctx);
+                (api.avio_closep)(&mut io);
+                (api.avformat_free_context)(out_ctx);
+            }
+            return Err(format!(
+                "FFmpeg: failed stream info for {}",
+                input.display()
+            ));
+        }
+        let audio_idx = unsafe {
+            (api.av_find_best_stream)(
+                in_ctx,
+                AVMediaType_AVMEDIA_TYPE_AUDIO,
+                -1,
+                -1,
+                ptr::null_mut(),
+                0,
+            )
+        };
+        if audio_idx < 0 {
+            unsafe {
+                (api.avformat_close_input)(&mut in_ctx);
+                (api.avio_closep)(&mut io);
+                (api.avformat_free_context)(out_ctx);
+            }
+            return Err(format!("FFmpeg: no audio stream in {}", input.display()));
+        }
+        let in_stream = unsafe { *(*in_ctx).streams.add(audio_idx as usize) };
+        let in_tb = unsafe { (*in_stream).time_base };
+        let fallback_frame_duration = unsafe {
+            let codecpar = (*in_stream).codecpar;
+            if codecpar.is_null() {
+                1024i64
+            } else {
+                let frame_size = (*codecpar).frame_size as i64;
+                let sample_rate = (*codecpar).sample_rate as i64;
+                if frame_size > 0 && sample_rate > 0 {
+                    let dur = rescale_q(
+                        frame_size,
+                        AVRational {
+                            num: 1,
+                            den: sample_rate as i32,
+                        },
+                        out_tb,
+                    );
+                    dur.max(1)
+                } else {
+                    1024i64
+                }
+            }
+        };
+        let mut pkt = unsafe { (api.av_packet_alloc)() };
+        if pkt.is_null() {
+            unsafe {
+                (api.avformat_close_input)(&mut in_ctx);
+                (api.avio_closep)(&mut io);
+                (api.avformat_free_context)(out_ctx);
+            }
+            return Err("FFmpeg: packet allocation failed".to_string());
+        }
+        let part_offset_ts = part_offsets_ts.get(idx).copied().unwrap_or(0);
+        let mut part_cursor_ts = if has_global_last_dts {
+            global_last_dts.max(part_offset_ts)
+        } else {
+            part_offset_ts
+        };
+        let mut part_max_end_ts = part_cursor_ts;
+        let mut packets_written_in_part: usize = 0;
+        loop {
+            let read_ret = unsafe { (api.av_read_frame)(in_ctx, pkt) };
+            if read_ret < 0 {
+                break;
+            }
+            if unsafe { (*pkt).stream_index } != audio_idx {
+                unsafe { (api.av_packet_unref)(pkt) };
+                continue;
+            }
+            unsafe {
+                (*pkt).stream_index = (*out_stream).index;
+                (api.av_packet_rescale_ts)(pkt, in_tb, out_tb);
+                let out_duration = if (*pkt).duration > 0 {
+                    (*pkt).duration
+                } else {
+                    fallback_frame_duration
+                };
+                (*pkt).duration = out_duration;
+                // Deterministic packet timeline for chapter merge:
+                // avoids invalid NOPTS/DTS from segmented AAC parts.
+                let mut normalized_dts = part_cursor_ts;
+                if has_global_last_dts && normalized_dts <= global_last_dts {
+                    normalized_dts = global_last_dts.saturating_add(out_duration);
+                }
+                let normalized_pts = normalized_dts;
+                (*pkt).dts = normalized_dts;
+                (*pkt).pts = normalized_pts;
+                (*pkt).pos = -1;
+                let wret = (api.av_interleaved_write_frame)(out_ctx, pkt);
+                if wret >= 0 {
+                    packets_written_in_part = packets_written_in_part.saturating_add(1);
+                    global_last_dts = normalized_dts;
+                    has_global_last_dts = true;
+                    let end_ts = normalized_dts.saturating_add(out_duration);
+                    part_cursor_ts = end_ts;
+                    if end_ts > part_max_end_ts {
+                        part_max_end_ts = end_ts;
+                    }
+                }
+                (api.av_packet_unref)(pkt);
+                if wret < 0 {
+                    let err_text = ffmpeg_error_text(api, wret);
+                    log_debug(&format!(
+                        "FFmpeg merge debug: part={} in_tb={}/{} out_tb={}/{} out_dur={} part_offset={} norm_pts={} norm_dts={} last_dts={}",
+                        idx + 1,
+                        in_tb.num,
+                        in_tb.den,
+                        out_tb.num,
+                        out_tb.den,
+                        out_duration,
+                        part_offset_ts,
+                        normalized_pts,
+                        normalized_dts,
+                        global_last_dts
+                    ));
+                    (api.av_packet_free)(&mut pkt);
+                    (api.avformat_close_input)(&mut in_ctx);
+                    (api.avio_closep)(&mut io);
+                    (api.avformat_free_context)(out_ctx);
+                    return Err(format!(
+                        "FFmpeg: write frame failed on part {} ({})",
+                        idx + 1,
+                        err_text
+                    ));
+                }
+            }
+        }
+        log_debug(&format!(
+            "FFmpeg merge: part {} packets_written={} part_offset={} max_end={}",
+            idx + 1,
+            packets_written_in_part,
+            part_offset_ts,
+            part_max_end_ts
+        ));
+        if packets_written_in_part == 0 {
+            unsafe {
+                (api.av_packet_free)(&mut pkt);
+                (api.avformat_close_input)(&mut in_ctx);
+                (api.avio_closep)(&mut io);
+                (api.avformat_free_context)(out_ctx);
+            }
+            return Err(format!(
+                "FFmpeg: no audio packets written while merging part {}",
+                idx + 1
+            ));
+        }
+        unsafe {
+            (api.av_packet_free)(&mut pkt);
+            (api.avformat_close_input)(&mut in_ctx);
+        }
+    }
+
+    unsafe {
+        let trailer_ret = (api.av_write_trailer)(out_ctx);
+        if trailer_ret < 0 {
+            log_debug(&format!(
+                "FFmpeg: av_write_trailer failed in merge_audio_files_with_chapters_copy: {}",
+                trailer_ret
+            ));
+        }
+        (api.avio_closep)(&mut io);
+        (api.avformat_free_context)(out_ctx);
     }
     Ok(())
 }
@@ -934,6 +1315,13 @@ fn encode_mixed_audio_to_m4a(
         }
         unsafe {
             if (api.av_frame_make_writable)(frame) < 0 {
+                (api.swr_free)(&mut swr_ctx);
+                (api.av_frame_free)(&mut frame);
+                (api.avio_closep)(&mut io);
+                (api.avcodec_free_context)(&mut codec_ctx);
+                (api.avformat_free_context)(out_ctx);
+                (api.av_channel_layout_uninit)(&mut in_layout);
+                (api.av_channel_layout_uninit)(&mut out_layout);
                 return Err("FFmpeg: frame not writable".to_string());
             }
         }
@@ -1470,7 +1858,8 @@ pub fn convert_audio_file_with_channels(
     let mut source =
         FfmpegSource::try_new(input_path, 0, Some(pts_clock.clone()), Some(stream_index))?;
     let in_sample_rate = source.sample_rate();
-    let channels = forced_channels.unwrap_or(source.channels()).max(1);
+    let in_channels = source.channels().max(1);
+    let out_channels = forced_channels.unwrap_or(in_channels).max(1);
     let total_duration = source.total_duration();
     let total_duration_us = total_duration.and_then(|d| {
         let micros = d.as_micros();
@@ -1493,7 +1882,23 @@ pub fn convert_audio_file_with_channels(
         }
     });
     let out_sample_rate = match settings.format {
+        ConvertAudioFormat::Aac => 48_000,
         ConvertAudioFormat::Opus => 48_000,
+        ConvertAudioFormat::Mp3 => {
+            let requested_bitrate = match settings.quality {
+                ConvertAudioQuality::BitrateKbps(bitrate) => bitrate,
+                _ => 0,
+            };
+            if requested_bitrate > 160 && in_sample_rate <= 24_000 {
+                log_debug(&format!(
+                    "FFmpeg MP3: upsampling from {} Hz to 48000 Hz to honor {} kbps target",
+                    in_sample_rate, requested_bitrate
+                ));
+                48_000
+            } else {
+                in_sample_rate
+            }
+        }
         _ => in_sample_rate,
     };
 
@@ -1564,7 +1969,7 @@ pub fn convert_audio_file_with_channels(
             den: out_sample_rate as i32,
         };
         let mut out_layout: AVChannelLayout = std::mem::zeroed();
-        (api.av_channel_layout_default)(&mut out_layout, channels as i32);
+        (api.av_channel_layout_default)(&mut out_layout, out_channels as i32);
         (*codec_ctx).ch_layout = out_layout;
     }
 
@@ -1634,12 +2039,17 @@ pub fn convert_audio_file_with_channels(
     }
 
     let encoder_frame_size = unsafe { (*codec_ctx).frame_size };
-    let in_frame_size = encoder_frame_size.max(1024) as usize;
+    let encoder_has_fixed_frame_size = encoder_frame_size > 0;
+    let in_frame_size = if encoder_has_fixed_frame_size {
+        encoder_frame_size as usize
+    } else {
+        1024usize
+    };
     let mut in_layout: AVChannelLayout = unsafe { std::mem::zeroed() };
     let mut out_layout: AVChannelLayout = unsafe { std::mem::zeroed() };
     unsafe {
-        (api.av_channel_layout_default)(&mut in_layout, channels as i32);
-        (api.av_channel_layout_default)(&mut out_layout, channels as i32);
+        (api.av_channel_layout_default)(&mut in_layout, in_channels as i32);
+        (api.av_channel_layout_default)(&mut out_layout, out_channels as i32);
     }
     let mut swr_ctx: *mut SwrContext = ptr::null_mut();
     let swr_ret = unsafe {
@@ -1689,7 +2099,7 @@ pub fn convert_audio_file_with_channels(
         }
         return Err("FFmpeg: failed to allocate frame".to_string());
     }
-    let mut out_capacity = if encoder_frame_size > 0 {
+    let mut out_capacity = if encoder_has_fixed_frame_size {
         encoder_frame_size
     } else {
         unsafe { (api.swr_get_out_samples)(swr_ctx, in_frame_size as i32) }
@@ -1702,7 +2112,7 @@ pub fn convert_audio_file_with_channels(
         (*frame).format = enc_fmt;
         (*frame).sample_rate = out_sample_rate as i32;
         let mut frame_layout: AVChannelLayout = std::mem::zeroed();
-        (api.av_channel_layout_default)(&mut frame_layout, channels as i32);
+        (api.av_channel_layout_default)(&mut frame_layout, out_channels as i32);
         (*frame).ch_layout = frame_layout;
         if (api.av_frame_get_buffer)(frame, 0) < 0 {
             (api.av_frame_free)(&mut frame);
@@ -1716,7 +2126,7 @@ pub fn convert_audio_file_with_channels(
         }
     }
 
-    let channel_count = channels as usize;
+    let in_channel_count = in_channels as usize;
     let mut next_pts: i64 = 0;
     let mut canceled = false;
     let mut processed_frames: u64 = 0;
@@ -1763,8 +2173,8 @@ pub fn convert_audio_file_with_channels(
             canceled = true;
             break;
         }
-        let mut input_frame = Vec::with_capacity(in_frame_size * channel_count);
-        while input_frame.len() < in_frame_size * channel_count {
+        let mut input_frame = Vec::with_capacity(in_frame_size * in_channel_count);
+        while input_frame.len() < in_frame_size * in_channel_count {
             if is_canceled(&cancel) {
                 canceled = true;
                 break;
@@ -1780,11 +2190,8 @@ pub fn convert_audio_file_with_channels(
         if input_frame.is_empty() {
             break;
         }
-        if input_frame.len() < in_frame_size * channel_count {
-            input_frame.resize(in_frame_size * channel_count, 0.0);
-        }
         processed_frames =
-            processed_frames.saturating_add((input_frame.len() / channel_count) as u64);
+            processed_frames.saturating_add((input_frame.len() / in_channel_count) as u64);
         if let (Some(total_us), Some(cb)) = (total_duration_us, progress.as_mut())
             && total_us > 0
         {
@@ -1812,9 +2219,32 @@ pub fn convert_audio_file_with_channels(
             }
         }
 
+        let needed_out = unsafe { (api.swr_get_out_samples)(swr_ctx, in_frame_size as i32) };
+        if !encoder_has_fixed_frame_size && needed_out > 0 {
+            let current_cap = unsafe { (*frame).nb_samples };
+            if needed_out > current_cap {
+                unsafe {
+                    (*frame).nb_samples = needed_out;
+                    if (api.av_frame_get_buffer)(frame, 0) < 0 {
+                        (api.swr_free)(&mut swr_ctx);
+                        (api.av_frame_free)(&mut frame);
+                        (api.avio_closep)(&mut io);
+                        (api.avcodec_free_context)(&mut codec_ctx);
+                        (api.avformat_free_context)(out_ctx);
+                        (api.av_channel_layout_uninit)(&mut in_layout);
+                        (api.av_channel_layout_uninit)(&mut out_layout);
+                        return Err("FFmpeg: failed to grow frame buffer".to_string());
+                    }
+                }
+            }
+        }
+
         unsafe {
             if (api.av_frame_make_writable)(frame) < 0 {
                 return Err("FFmpeg: frame not writable".to_string());
+            }
+            if encoder_has_fixed_frame_size {
+                (*frame).nb_samples = encoder_frame_size;
             }
         }
         let mut in_ptr = input_frame.as_ptr() as *const u8;
@@ -1830,6 +2260,15 @@ pub fn convert_audio_file_with_channels(
             )
         };
         if converted < 0 {
+            unsafe {
+                (api.swr_free)(&mut swr_ctx);
+                (api.av_frame_free)(&mut frame);
+                (api.avio_closep)(&mut io);
+                (api.avcodec_free_context)(&mut codec_ctx);
+                (api.avformat_free_context)(out_ctx);
+                (api.av_channel_layout_uninit)(&mut in_layout);
+                (api.av_channel_layout_uninit)(&mut out_layout);
+            }
             return Err("FFmpeg: resample failed".to_string());
         }
         if converted == 0 {
@@ -1882,9 +2321,28 @@ pub fn convert_audio_file_with_channels(
             if pending <= 0 {
                 break;
             }
+            let current_cap = unsafe { (*frame).nb_samples };
+            if !encoder_has_fixed_frame_size && pending > current_cap {
+                unsafe {
+                    (*frame).nb_samples = pending;
+                    if (api.av_frame_get_buffer)(frame, 0) < 0 {
+                        (api.swr_free)(&mut swr_ctx);
+                        (api.av_frame_free)(&mut frame);
+                        (api.avio_closep)(&mut io);
+                        (api.avcodec_free_context)(&mut codec_ctx);
+                        (api.avformat_free_context)(out_ctx);
+                        (api.av_channel_layout_uninit)(&mut in_layout);
+                        (api.av_channel_layout_uninit)(&mut out_layout);
+                        return Err("FFmpeg: failed to grow frame buffer".to_string());
+                    }
+                }
+            }
             unsafe {
                 if (api.av_frame_make_writable)(frame) < 0 {
                     return Err("FFmpeg: frame not writable".to_string());
+                }
+                if encoder_has_fixed_frame_size {
+                    (*frame).nb_samples = encoder_frame_size;
                 }
             }
             let out_count = unsafe { (*frame).nb_samples };
@@ -1992,6 +2450,9 @@ pub fn convert_audio_file_with_channels(
 #[cfg(test)]
 mod convert_tests {
     use super::*;
+    use std::path::PathBuf;
+    use std::process::Command;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn test_validate_mp3_bitrate() {
@@ -2016,6 +2477,103 @@ mod convert_tests {
                 "-b:a".to_string(),
                 "192k".to_string(),
             ]
+        );
+    }
+
+    fn ffprobe_duration(path: &std::path::Path) -> Result<f64, String> {
+        let output = Command::new("ffprobe")
+            .args([
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=nw=1:nk=1",
+            ])
+            .arg(path)
+            .output()
+            .map_err(|e| format!("ffprobe launch failed: {}", e))?;
+        if !output.status.success() {
+            return Err(format!(
+                "ffprobe failed (code {:?}): {}",
+                output.status.code(),
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+        let s = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        s.parse::<f64>()
+            .map_err(|e| format!("ffprobe parse duration failed ({}): {}", s, e))
+    }
+
+    #[test]
+    fn test_mp3_to_wav_to_mp3_duration_guard() {
+        let input = std::env::var("SONARPAD_FFMPEG_DURATION_INPUT").unwrap_or_else(|_| {
+            r"C:\Users\ambro\Documents\Sonarpad Audiobooks\ravagliani.edge_source.tmp.mp3"
+                .to_string()
+        });
+        let input_path = PathBuf::from(&input);
+        if !input_path.exists() {
+            eprintln!("Skipping duration guard test: input not found: {}", input);
+            return;
+        }
+
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        let out_wav = std::env::temp_dir().join(format!("sonarpad_dur_guard_{}.wav", stamp));
+        let out_mp3 = std::env::temp_dir().join(format!("sonarpad_dur_guard_{}.mp3", stamp));
+
+        let wav_settings = ConvertAudioSettings {
+            format: ConvertAudioFormat::Wav,
+            quality: ConvertAudioQuality::None,
+        };
+        convert_audio_file_with_channels(&input_path, &out_wav, &wav_settings, None, None, Some(2))
+            .map_err(|e| {
+                if let Err(remove_err) = std::fs::remove_file(&out_wav) {
+                    eprintln!("Cleanup failed (wav): {}", remove_err);
+                }
+                if let Err(remove_err) = std::fs::remove_file(&out_mp3) {
+                    eprintln!("Cleanup failed (mp3): {}", remove_err);
+                }
+                e
+            })
+            .unwrap();
+
+        let mp3_settings = ConvertAudioSettings {
+            format: ConvertAudioFormat::Mp3,
+            quality: ConvertAudioQuality::BitrateKbps(128),
+        };
+        convert_audio_file(&out_wav, &out_mp3, &mp3_settings, None, None)
+            .map_err(|e| {
+                if let Err(remove_err) = std::fs::remove_file(&out_wav) {
+                    eprintln!("Cleanup failed (wav): {}", remove_err);
+                }
+                if let Err(remove_err) = std::fs::remove_file(&out_mp3) {
+                    eprintln!("Cleanup failed (mp3): {}", remove_err);
+                }
+                e
+            })
+            .unwrap();
+
+        let wav_dur = ffprobe_duration(&out_wav).unwrap();
+        let mp3_dur = ffprobe_duration(&out_mp3).unwrap();
+
+        if let Err(remove_err) = std::fs::remove_file(&out_wav) {
+            eprintln!("Cleanup failed (wav): {}", remove_err);
+        }
+        if let Err(remove_err) = std::fs::remove_file(&out_mp3) {
+            eprintln!("Cleanup failed (mp3): {}", remove_err);
+        }
+
+        // Guard: final MP3 must preserve WAV duration (allow small mux/encoder drift).
+        let drift = (wav_dur - mp3_dur).abs();
+        assert!(
+            drift <= 2.0,
+            "Duration loss too high: wav={}s mp3={}s drift={}s",
+            wav_dur,
+            mp3_dur,
+            drift
         );
     }
 }

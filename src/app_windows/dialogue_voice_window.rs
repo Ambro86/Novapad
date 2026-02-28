@@ -674,6 +674,12 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                         data.result = Some(DialogueVoiceConfig {
                             engine,
                             voice,
+                            use_secondary_voice: false,
+                            secondary_voice: String::new(),
+                            secondary_engine: TtsEngine::Edge,
+                            secondary_rate: 0,
+                            secondary_pitch: 0,
+                            secondary_volume: 100,
                             rate,
                             pitch,
                             volume,

@@ -1995,15 +1995,16 @@ fn segment_batch_output(
     split_minutes: u32,
     split_start_number: u32,
 ) -> Result<Vec<PathBuf>, String> {
+    const TIME_SPLIT_PART_WIDTH: usize = 4;
     let stem = output
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("audiobook");
     let ext = output.extension().and_then(|s| s.to_str());
     let pattern = if let Some(ext) = ext {
-        output.with_file_name(format!("{stem}_part%02d.{ext}"))
+        output.with_file_name(format!("{stem} Part %0{TIME_SPLIT_PART_WIDTH}d.{ext}"))
     } else {
-        output.with_file_name(format!("{stem}_part%02d"))
+        output.with_file_name(format!("{stem} Part %0{TIME_SPLIT_PART_WIDTH}d"))
     };
     let segment_seconds = split_minutes.saturating_mul(60);
     crate::ffmpeg_export::segment_audio_file(
@@ -2016,7 +2017,7 @@ fn segment_batch_output(
     let parent = output
         .parent()
         .ok_or_else(|| "Batch: output has no parent directory".to_string())?;
-    let prefix = format!("{stem}_part");
+    let prefix = format!("{stem} Part ");
     let mut outputs = Vec::new();
     for entry in
         std::fs::read_dir(parent).map_err(|e| format!("Batch: failed to read output dir: {}", e))?
@@ -2225,6 +2226,7 @@ fn export_parts(
                     pitch: tts.tts_pitch,
                     volume: tts.tts_volume,
                     sapi4_threads: None,
+                    finalize_progress_steps: 0,
                 };
                 run_tts_audiobook_part(part_chunks, &mut progress, &options)?;
             }
@@ -2410,6 +2412,7 @@ fn export_parts_mixed(
             pitch: tts.tts_pitch,
             volume: tts.tts_volume,
             sapi4_threads: None,
+            finalize_progress_steps: 0,
         };
         let config = MixedAudiobookConfig {
             main_engine: tts.tts_engine,

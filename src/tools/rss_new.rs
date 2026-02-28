@@ -5,7 +5,7 @@ pub async fn fetch_article_text(
     let start_total = Instant::now();
     let url_str = normalize_url(url);
     if url_str.is_empty() {
-        return Err("Empty URL".to_string());
+        return Err(crate::i18n::tr(language, "rss.error.empty_url"));
     }
 
     log_debug(&format!("rss_article_fetch starting via curl-impersonate url=\"{}\"", url_str));
@@ -34,4 +34,5 @@ pub async fn fetch_article_text(
     ));
     Ok(format!("{}\n\n{}", article.title, article.content))
 }
+
 

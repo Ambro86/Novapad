@@ -294,6 +294,8 @@ where
     encode_wav_to_audio(wav_path, mp3_path, bitrate_kbps, progress)
 }
 
+// Kept as optional Media Foundation fallback utility for local troubleshooting paths.
+#[allow(dead_code)]
 pub fn encode_wav_to_m4b<F>(
     wav_path: &Path,
     m4b_path: &Path,

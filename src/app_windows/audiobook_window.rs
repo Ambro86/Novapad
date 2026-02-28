@@ -7,14 +7,14 @@ use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM}
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::{PBM_SETPOS, PBM_SETRANGE, WC_BUTTON};
-use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, GetFocus, SetFocus, VK_RETURN};
+use windows::Win32::UI::Input::KeyboardAndMouse::{GetFocus, SetFocus, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, GWLP_USERDATA,
-    GetParent, GetWindowLongPtrW, HMENU, IDC_ARROW, IDYES, LoadCursorW, MB_ICONWARNING, MB_YESNO,
-    MSG, MessageBoxW, MoveWindow, RegisterClassW, SendMessageW, SetForegroundWindow,
-    SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE,
-    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WNDCLASSW, WS_CAPTION, WS_CHILD,
-    WS_EX_DLGMODALFRAME, WS_POPUP, WS_TABSTOP, WS_VISIBLE,
+    GetWindowLongPtrW, HMENU, IDC_ARROW, IDYES, LoadCursorW, MB_ICONWARNING, MB_YESNO, MSG,
+    MessageBoxW, MoveWindow, RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
+    SetWindowTextW, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
+    WM_NCDESTROY, WM_SETFOCUS, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CONTROLPARENT,
+    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, w};
 
@@ -24,6 +24,7 @@ const WM_UPDATE_PROGRESS: u32 = WM_APP + 6;
 pub const WM_SET_PROGRESS_TOTAL: u32 = WM_APP + 8;
 
 struct ProgressDialogState {
+    parent: HWND,
     hwnd_pb: HWND,
     hwnd_text: HWND,
     hwnd_cancel: HWND,
@@ -68,22 +69,21 @@ pub fn open(parent: HWND, total: usize) -> HWND {
         RegisterClassW(&wc);
 
         let hwnd = CreateWindowExW(
-            WS_EX_DLGMODALFRAME,
+            WS_EX_DLGMODALFRAME | WS_EX_CONTROLPARENT,
             PCWSTR(class_name.as_ptr()),
             PCWSTR(title_w.as_ptr()),
-            WS_POPUP | WS_CAPTION | WS_VISIBLE,
+            WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
             300,
             150,
-            parent,
-            HMENU(0),
+            None,
+            None,
             hinstance,
             Some(parent.0 as *const _),
         );
 
         if hwnd.0 != 0 {
-            EnableWindow(parent, false);
             if with_progress_state(hwnd, |state| {
                 SendMessageW(
                     state.hwnd_pb,
@@ -193,6 +193,7 @@ unsafe fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: L
             );
 
             let state = Box::new(ProgressDialogState {
+                parent,
                 hwnd_pb: pb,
                 hwnd_text: label,
                 hwnd_cancel,
@@ -283,9 +284,8 @@ unsafe fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: L
             LRESULT(0)
         }
         WM_DESTROY => {
-            let parent = GetParent(hwnd);
+            let parent = with_progress_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
             if parent.0 != 0 {
-                EnableWindow(parent, true);
                 SetForegroundWindow(parent);
             }
             LRESULT(0)
@@ -302,7 +302,7 @@ unsafe fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: L
 }
 
 pub fn request_cancel(hwnd: HWND) {
-    let parent = unsafe { GetParent(hwnd) };
+    let parent = unsafe { with_progress_state(hwnd, |state| state.parent).unwrap_or(HWND(0)) };
     if parent.0 == 0 {
         return;
     }

@@ -7,7 +7,7 @@ Salva: salva il documento (Ctrl+S).
 Salva con nome: salva con un nuovo nome.
 Salva tutto: salva tutti i documenti (Ctrl+Shift+S).
 Chiudi tab: chiude il documento corrente (Ctrl+W).
-File recenti: apre un file recente.
+File recenti: apre un file usato di recente.
 
 Voce e audio:
 Lettura: F5 avvia la lettura, F4 pausa/riprendi, F6 ferma la lettura.
@@ -23,9 +23,9 @@ Comandi da tastiera:
 - FRECCIA DESTRA: Avanti di 1 minuto.
 - FRECCIA SINISTRA: Indietro di 1 minuto.
 - FRECCIA SU: Aumenta il volume.
-- FRECCIA GIU: Diminuisce il volume.
-- +: Aumenta la velocita di riproduzione.
-- -: Diminuisce la velocita di riproduzione.
+- FRECCIA GIÙ: Diminuisce il volume.
+- +: Aumenta la velocità di riproduzione.
+- -: Diminuisce la velocità di riproduzione.
 - CTRL+I: Annuncia il tempo di riproduzione.
 - CTRL+T: Vai a un tempo specifico.
 - CTRL+B: Inserisce un segnalibro nel minuto esatto.
@@ -41,16 +41,16 @@ Trova: cerca un testo nel documento (Ctrl+F).
 Trova nei file: cerca un testo tra più file (Ctrl+Shift+F).
 Trova successivo: trova la prossima occorrenza (F3).
 Sostituisci: cerca e sostituisce il testo (Ctrl+H).
-Normalizza spazi bianchi: rimuove spazi iniziali/finali e riduce righe vuote (Ctrl+Shift+Invio).
+Normalizza spazi bianchi: rimuove spazi iniziali/finali e spazi multipli (Ctrl+Shift+Invio).
 Unisci righe: unisce le righe del paragrafo o della selezione (Ctrl+Shift+J).
-Riformatta righe: reimpagina il paragrafo o la selezione (Ctrl+Shift+H).
-Pulisci testo Markdown: rimuove i tag Markdown (Ctrl+Shift+M).
+Riformatta righe: riformatta il paragrafo o la selezione (Ctrl+Shift+H).
+Pulisci testo Markdown: rimuove la formattazione Markdown (Ctrl+Shift+M).
 Ordina righe: ordina le righe del paragrafo o della selezione (Alt+Shift+O).
 Rimuovi duplicati: rimuove le righe duplicate nel paragrafo o nella selezione (Alt+Shift+K).
 Inverti righe: inverte l'ordine delle righe nel paragrafo o nella selezione (Alt+Shift+Z).
 Commenta righe: aggiunge un prefisso alle righe del paragrafo o della selezione (Ctrl+Q).
 Decommenta righe: rimuove il prefisso dalle righe del paragrafo o della selezione (Ctrl+Shift+Q).
-Statistiche testo: mostra caratteri, parole e righe su selezione o documento (Alt+Y).
+Statistiche testo: mostra numero di caratteri, parole e righe nella selezione o nel documento (Alt+Y).
 Navigazione errori ortografici: F7 errore precedente, F8 errore successivo.
 
 Visualizza:
@@ -72,21 +72,21 @@ Audiolibri in sequenza: apre la finestra per convertire una lista di file (o int
 - Scegli cartella di destinazione e formato (MP3 o WAV).
 - Opzioni per creare sottocartelle e evitare sovrascritture.
 - Premi Avvia per processare tutto in background.
-Dizionario: apre la finestra del dizionario. L'elenco si naviga con le frecce su/giu.
+Dizionario: apre la finestra del dizionario. L'elenco si naviga con le frecce su/giù.
 Tab porta al pulsante "Aggiungi voci al dizionario", attivabile con Invio o Spazio.
-Nella finestra di aggiunta/modifica: inserisci "Parola originale", poi Tab su "Parola in sostituzione", quindi OK o Annulla (Invio/Spazio). ESC annulla.
+Nella finestra di aggiunta/modifica: inserisci "Parola originale", poi premi Tab su "Parola sostitutiva", quindi OK o Annulla (Invio/Spazio). Esc annulla.
 Nell'elenco, Tab porta ai pulsanti "Modifica voce" e "Rimuovi voce selezionata".
 Le sostituzioni del dizionario sono applicate durante la lettura e la creazione dell'audiolibro e vengono salvate.
 Importa trascrizione da YouTube: incolla un URL, scegli la lingua e importa il testo nell'editor (Ctrl+Y). Opzione per includere i timestamp.
 Cerca e importa da Wikipedia: cerca un articolo su Wikipedia e ne importa il testo nell'editor (Alt+Shift+W).
 Dizionario online: cerca definizioni e traduzioni nel Wiktionary online (Alt+Shift+D).
 Terminale accessibile: apre un terminale dedicato con output separato e stabile per gli screen reader (Ctrl+Shift+T).
-Scorciatoie: Alt+I focus input, Alt+O focus output, Tab/Shift+Tab per spostarsi tra input, output e opzioni.
-Invio invia il testo. Ctrl+C copia l'output (o invia Ctrl+C al programma). Ctrl+L pulisce l'output con conferma.
-Opzioni nel terminale: scorrimento automatico, rimuovi ANSI, annuncia nuove righe, avviso sonoro dopo 1s, evita risparmio energetico.
-Scelte programma: Prompt dei comandi (cmd.exe), PowerShell, Codex CLI (da Opzioni).
+Scorciatoie: Alt+I sposta il focus sull'input, Alt+O sposta il focus sull'output, Tab/Shift+Tab per spostarsi tra input, output e opzioni.
+Invio: invia il testo. Ctrl+C copia l'output (o invia Ctrl+C al programma). Ctrl+L pulisce l'output con conferma.
+Opzioni nel terminale: scorrimento automatico, rimozione codici ANSI, annuncio nuove righe, avviso sonoro dopo 1 s, disattiva risparmio energetico.
+Programmi disponibili: Prompt dei comandi (cmd.exe), PowerShell, Codex CLI (da Opzioni).
 
-RSS / Articoli: apre la finestra RSS/Articoli, aggiungi fonti, espandi un feed e premi Invio per importare un articolo nell'editor.
+RSS / Articoli: apre la finestra RSS/Articoli; aggiungi una fonte, espandi un feed e premi Invio per importare un articolo nell'editor.
 Nella finestra RSS, seleziona un feed o sito e premi Canc per rimuoverlo dalla libreria.
 Nel menu contestuale dei feed o siti puoi modificare o eliminare un RSS o sito.
 Dopo aver importato una notizia, premi Esc per tornare all'elenco RSS.
@@ -99,9 +99,9 @@ Lingua: cambia la lingua dell'interfaccia.
 Apertura file: apre i file in nuova scheda o nuova finestra.
 Seleziona voce: sceglie la voce per la lettura.
 Solo voci multilingua: filtra l'elenco delle voci.
-Scegli tono, velocita' e volume: imposta tono, velocita' e volume delle voci (sia Microsoft che SAPI5). Valgono per lettura e audiolibri.
+Scegli tono, velocità e volume: imposta tono, velocità e volume delle voci (sia Microsoft che SAPI5). Valgono per lettura e audiolibri.
 Sposta cursore durante la lettura: segue visivamente il testo mentre viene letto.
-Divisione audiolibro per testo: divide l'audiolibro quando il testo indicato compare a inizio riga (case sensitive: "Capitolo" e "capitolo" sono diversi). Esempio: con "Capitolo" crea una parte per ogni capitolo, includendo autore e introduzione nella prima parte fino al primo Capitolo. Se non trovato, nessuna divisione.
+Divisione audiolibro per testo: divide l'audiolibro quando il testo indicato compare a inizio riga (sensibile a maiuscole/minuscole: "Capitolo" e "capitolo" sono diversi). Esempio: con "Capitolo" crea una parte per ogni capitolo, includendo autore e introduzione nella prima parte fino al primo Capitolo. Se non trovato, nessuna divisione.
 Altre opzioni per dividere l'audiolibro: 2 parti, 4 parti, 6 parti, 8 parti.
 
 Aiuto:

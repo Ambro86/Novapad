@@ -55,6 +55,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use windows::core::{PCWSTR, PWSTR, w};
 
 const RSS_WINDOW_CLASS: &str = "SonarpadRssWindow";
+
+#[inline]
+fn ignore_bool(_value: bool) {}
 const ID_TREE: usize = 1001;
 const ID_BTN_ADD: usize = 1002;
 const ID_BTN_CLOSE: usize = 1003;
@@ -374,7 +377,9 @@ fn format_timestamp_for_list(
     let ts = timestamp?;
     let dt = Local.timestamp_opt(ts, 0).single()?;
     let (date_pattern, time_pattern) = match language {
-        crate::settings::Language::English => ("%m/%d/%Y", "%I:%M %p"),
+        crate::settings::Language::English
+        | crate::settings::Language::Lithuanian
+        | crate::settings::Language::Chinese => ("%m/%d/%Y", "%I:%M %p"),
         crate::settings::Language::Italian => ("%d/%m/%Y", "%H:%M"),
         crate::settings::Language::Spanish => ("%d/%m/%Y", "%H:%M"),
         crate::settings::Language::Portuguese => ("%d/%m/%Y", "%H:%M"),
@@ -423,7 +428,9 @@ fn format_timestamp_for_language(
     let ts = timestamp?;
     let dt = Local.timestamp_opt(ts, 0).single()?;
     let (date_pattern, time_pattern) = match language {
-        crate::settings::Language::English => ("%m/%d/%Y", "%I:%M %p"),
+        crate::settings::Language::English
+        | crate::settings::Language::Lithuanian
+        | crate::settings::Language::Chinese => ("%m/%d/%Y", "%I:%M %p"),
         crate::settings::Language::Italian => ("%d/%m/%Y", "%H:%M"),
         crate::settings::Language::Spanish => ("%d/%m/%Y", "%H:%M"),
         crate::settings::Language::Portuguese => ("%d/%m/%Y", "%H:%M"),
@@ -672,9 +679,10 @@ fn google_news_params(
         crate::settings::Language::Polish => ("pl", "PL", "PL:pl"),
         crate::settings::Language::French => ("fr", "FR", "FR:fr"),
         crate::settings::Language::Serbian => ("sr", "RS", "RS:sr"),
-        crate::settings::Language::Ukrainian | crate::settings::Language::English => {
-            ("en", "US", "US:en")
-        }
+        crate::settings::Language::Ukrainian
+        | crate::settings::Language::English
+        | crate::settings::Language::Lithuanian
+        | crate::settings::Language::Chinese => ("en", "US", "US:en"),
     }
 }
 
@@ -1202,7 +1210,9 @@ fn rss_fetch_config(parent: HWND) -> rss::RssFetchConfig {
 fn default_feed_path(language: crate::settings::Language) -> Option<PathBuf> {
     let file_name = match language {
         crate::settings::Language::Ukrainian => "feed_uk.txt",
-        crate::settings::Language::English => "feed_en.txt",
+        crate::settings::Language::English
+        | crate::settings::Language::Lithuanian
+        | crate::settings::Language::Chinese => "feed_en.txt",
         crate::settings::Language::Italian => "feed_it.txt",
         crate::settings::Language::Spanish => "feed_es.txt",
         crate::settings::Language::Portuguese => "feed_pt.txt",
@@ -1229,7 +1239,9 @@ fn default_feed_path(language: crate::settings::Language) -> Option<PathBuf> {
 fn embedded_default_feeds(language: crate::settings::Language) -> &'static str {
     match language {
         crate::settings::Language::Ukrainian => FEED_UK_DATA,
-        crate::settings::Language::English => FEED_EN_DATA,
+        crate::settings::Language::English
+        | crate::settings::Language::Lithuanian
+        | crate::settings::Language::Chinese => FEED_EN_DATA,
         crate::settings::Language::Italian => FEED_IT_DATA,
         crate::settings::Language::Spanish => FEED_ES_DATA,
         crate::settings::Language::Portuguese => FEED_PT_DATA,
@@ -1270,7 +1282,10 @@ fn is_default_key(
     key: &str,
 ) -> bool {
     match language {
-        crate::settings::Language::Ukrainian | crate::settings::Language::English => settings
+        crate::settings::Language::Ukrainian
+        | crate::settings::Language::English
+        | crate::settings::Language::Lithuanian
+        | crate::settings::Language::Chinese => settings
             .rss_default_en_keys
             .iter()
             .any(|k| normalize_rss_url_key(k) == key),
@@ -1454,14 +1469,15 @@ unsafe fn ensure_default_sources(parent: HWND) {
     }
     with_state(parent, |s| {
         let changed = match language {
-            crate::settings::Language::Ukrainian | crate::settings::Language::English => {
-                apply_default_sources(
-                    &mut s.settings.rss_sources,
-                    &s.settings.rss_removed_default_en,
-                    &mut s.settings.rss_default_en_keys,
-                    &defaults,
-                )
-            }
+            crate::settings::Language::Ukrainian
+            | crate::settings::Language::English
+            | crate::settings::Language::Lithuanian
+            | crate::settings::Language::Chinese => apply_default_sources(
+                &mut s.settings.rss_sources,
+                &s.settings.rss_removed_default_en,
+                &mut s.settings.rss_default_en_keys,
+                &defaults,
+            ),
             crate::settings::Language::Swedish => apply_default_sources(
                 &mut s.settings.rss_sources,
                 &s.settings.rss_removed_default_en,
@@ -1532,14 +1548,15 @@ pub(crate) fn sync_default_sources_for_settings(
         return false;
     }
     match language {
-        crate::settings::Language::Ukrainian | crate::settings::Language::English => {
-            apply_default_sources(
-                &mut settings.rss_sources,
-                &settings.rss_removed_default_en,
-                &mut settings.rss_default_en_keys,
-                &defaults,
-            )
-        }
+        crate::settings::Language::Ukrainian
+        | crate::settings::Language::English
+        | crate::settings::Language::Lithuanian
+        | crate::settings::Language::Chinese => apply_default_sources(
+            &mut settings.rss_sources,
+            &settings.rss_removed_default_en,
+            &mut settings.rss_default_en_keys,
+            &defaults,
+        ),
         crate::settings::Language::Swedish => apply_default_sources(
             &mut settings.rss_sources,
             &settings.rss_removed_default_en,
@@ -2569,7 +2586,7 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                 return LRESULT(0);
             }
             if key == 'C' as u32 && GetKeyState(VK_CONTROL.0 as i32) < 0 {
-                let _ = handle_rss_quick_copy(hwnd);
+                ignore_bool(handle_rss_quick_copy(hwnd));
                 return LRESULT(0);
             }
             if key == u32::from(VK_RETURN.0) && GetKeyState(VK_MENU.0 as i32) < 0 {
@@ -3043,7 +3060,7 @@ unsafe fn rss_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: L
         if key == 'C' as u32 && GetKeyState(VK_CONTROL.0 as i32) < 0 {
             let parent = GetParent(hwnd);
             if parent.0 != 0 {
-                let _ = handle_rss_quick_copy(parent);
+                ignore_bool(handle_rss_quick_copy(parent));
                 return LRESULT(0);
             }
         }
@@ -3523,6 +3540,7 @@ unsafe fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEIT
     } else {
         rss::RssFetchConfig::default()
     };
+    let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
     if parent.0 != 0 {
         ensure_rss_http(parent);
     }
@@ -3545,6 +3563,7 @@ unsafe fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEIT
             cache,
             fetch_config,
             false,
+            language,
         ));
         let msg = Box::new(FetchResult {
             hitem: hitem.0,
@@ -3606,6 +3625,7 @@ unsafe fn start_background_unread_check(hwnd: HWND) {
     }
 
     let fetch_config = rss_fetch_config(parent);
+    let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
     ensure_rss_http(parent);
 
     let hwnd_raw = hwnd.0;
@@ -3633,7 +3653,8 @@ unsafe fn start_background_unread_check(hwnd: HWND) {
 
                 let handle = tokio::spawn(async move {
                     let _permit = sem.acquire().await.ok()?;
-                    let result = rss::fetch_and_parse(&url, kind, cache, cfg, false).await;
+                    let result =
+                        rss::fetch_and_parse(&url, kind, cache, cfg, false, language).await;
                     if let Ok(outcome) = result {
                         let newest_key = select_newest_item_key(&outcome.items, &removed_keys);
                         let msg = Box::new(BackgroundCheckResult {
@@ -4397,7 +4418,9 @@ unsafe fn handle_delete(hwnd: HWND) {
                         if !key.is_empty() && default_keys.contains(&key) {
                             let removed_list = match language {
                                 crate::settings::Language::Ukrainian
-                                | crate::settings::Language::English => {
+                                | crate::settings::Language::English
+                                | crate::settings::Language::Lithuanian
+                                | crate::settings::Language::Chinese => {
                                     &mut ps.settings.rss_removed_default_en
                                 }
                                 crate::settings::Language::Swedish => {
@@ -4634,7 +4657,9 @@ unsafe fn undo_last_delete(hwnd: HWND) {
                 if let Some(key) = default_removed_key_added {
                     let removed_list = match language {
                         crate::settings::Language::Ukrainian
-                        | crate::settings::Language::English => {
+                        | crate::settings::Language::English
+                        | crate::settings::Language::Lithuanian
+                        | crate::settings::Language::Chinese => {
                             &mut ps.settings.rss_removed_default_en
                         }
                         crate::settings::Language::Swedish => {
@@ -4995,6 +5020,7 @@ unsafe fn handle_retry_now(hwnd: HWND) {
     } else {
         rss::RssFetchConfig::default()
     };
+    let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
     if parent.0 != 0 {
         ensure_rss_http(parent);
     }
@@ -5017,6 +5043,7 @@ unsafe fn handle_retry_now(hwnd: HWND) {
             cache,
             fetch_config,
             true,
+            language,
         ));
         let msg = Box::new(FetchResult {
             hitem: hitem.0,

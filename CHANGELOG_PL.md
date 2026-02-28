@@ -2,6 +2,7 @@
 
 Wersja 0.6.7 – 2026-02-13
 Ulepszenia
+• Zaktualizowano lokalizację chińską i litewską we wszystkich zasobach aplikacji, w tym teksty przewodnika/darowizn oraz tłumaczenia instalatora NSIS (nowe ciągi instalatora dla chińskiego uproszczonego i litewskiego oraz uzupełnione tłumaczenie ukraińskie setupu).
 • Dodano globalną obsługę proxy sieciowego (HTTP/HTTPS oraz SOCKS5/SOCKS5H) dla funkcji online, z walidacją przy zapisie opcji: nieprawidłowe proxy jest sygnalizowane i usuwane automatycznie.
 • Dodano nową funkcję w menu Narzędzia: „Odtwórz dźwięk ze streamingu...”, która pozwala wkleić adres URL (YouTube lub bezpośredni link do mediów), wybrać format wyjściowy oraz profil jakości/bitrate (w tym oryginalną jakość/bitrate dla MP3 i MP4) i odtworzyć materiał w odtwarzaczu Sonarpad.
 • Dodano obsługę systemowego klawisza multimedialnego Play/Pause (słuchawki/klawiatura): teraz steruje zarówno odtwarzaniem multimediów, jak i pauzą/wznowieniem czytania tekstu (z priorytetem odtwarzacza multimediów, gdy oba są aktywne).
@@ -27,9 +28,10 @@ Ulepszenia
 • Dodano wstępną obsługę przełączników wiersza poleceń: `-h`/`--help` pokazują szybką pomoc, a `--version` wypisuje wersję programu.
 • Uproszczono ręczną regulację prędkości i tonu: pola ręczne używają teraz skali wyśrodkowanej na 100, gdzie 100 oznacza wartość normalną.
 • Ulepszono wybór głosów Microsoft zarówno w Opcje > Głos, jak i w panelu głosów edytora: dodano zlokalizowaną listę języków do filtrowania głosów po języku, a tryb „tylko głosy wielojęzyczne” pozostał pojedynczą listą bez podziału na języki (lista języków jest wtedy ukrywana).
-• Dodano konfigurację głosu dialogów w Opcje > Głos z pełną nawigacją klawiszem Tab, opartą na tym samym modelu głosów co główny interfejs (silnik, filtr języka Edge, głos oraz etykietowane szybkość/ton/głośność); reguły dialogów są zapisywane w konfiguracji `.ini`, bez modyfikowania tekstu dokumentu.
+• Dodano konfigurację głosu dialogów w Opcje > Głos z pełną nawigacją klawiszem Tab, opartą na tym samym modelu głosów co główny interfejs (silnik, filtr języka Edge, głos oraz etykietowane szybkość/ton/głośność); dodano też opcjonalny drugi głos dialogów z tymi samymi kontrolkami (silnik, filtr języka Edge, głos, szybkość/ton/głośność) do naprzemiennego czytania dialogów; reguły dialogów są zapisywane w konfiguracji `.ini`, bez modyfikowania tekstu dokumentu.
 • Ulepszono etykietę Cofnij: pozycja Edycja > Cofnij pokazuje teraz, co zostanie cofnięte (np. edycja tekstu, cytowanie/odcytowanie linii lub wstawienie tagu głosu), pozostając niedostępna, gdy nie ma czego cofać.
 Poprawki błędów
+• Ulepszono tworzenie audiobooków M4B o metadane i znaczniki rozdziałów; naprawiono problem „chipmunk” (zbyt wysoki/szybki głos) w generowanych plikach M4B.
 • Naprawiono interfejs bitrate w oknie zapisu audiobooka: usunięto teksty zakodowane na stałe po włosku i dodano 64 kbps do listy wybieralnych bitrate.
 • Naprawiono „Zapisz wszystko” (Ctrl+Shift+S): wszystkie otwarte zmodyfikowane dokumenty są teraz wykrywane niezawodnie (także nowe/niezapisane karty), a zapis wszystkich działa poprawnie dla każdego pliku, otwierając „Zapisz jako”, gdy to potrzebne.
 • Poprawiono kolejność artykułów RSS z Google News: gdy data publikacji jest dostępna, artykuły są teraz wyświetlane od najnowszego do najstarszego.

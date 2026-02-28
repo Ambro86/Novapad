@@ -39,6 +39,9 @@ type SubtitleSpeechCancel = Arc<Mutex<Option<Arc<AtomicBool>>>>;
 type SubtitleSpeechCommand = Arc<Mutex<Option<tokio::sync::mpsc::UnboundedSender<TtsCommand>>>>;
 type SubtitleSpeechHandles = (SubtitleSpeechCancel, SubtitleSpeechCommand);
 
+#[inline]
+fn ignore_bool(_value: bool) {}
+
 pub struct AudiobookPlayer {
     pub path: PathBuf,
     output: Arc<BassOutput>,
@@ -543,23 +546,7 @@ pub fn audiobook_duration_secs(path: &Path) -> Option<u64> {
         return Some(d.as_secs());
     }
 
-    // Use alias if needed for MF
-    let mut final_path = path.to_path_buf();
-    if (extension == "mp4" || extension == "aac" || extension == "mp3")
-        && !path.to_string_lossy().contains("podcast cache")
-    {
-        let cache_dir = settings_dir().join("podcast cache");
-        let mut hasher = sha2::Sha256::new();
-        use sha2::Digest;
-        hasher.update(path.to_string_lossy().as_bytes());
-        let hash = hex::encode(hasher.finalize());
-        let linked_path = cache_dir.join(format!("link_{}.m4a", &hash[..16]));
-        if linked_path.exists() {
-            final_path = linked_path;
-        }
-    }
-
-    if let Ok(dur) = crate::mf_encoder::get_audio_duration_mf(&final_path) {
+    if let Ok(dur) = crate::mf_encoder::get_audio_duration_mf(path) {
         return Some(dur);
     }
     let file = std::fs::File::open(path).ok()?;
@@ -664,11 +651,6 @@ fn start_audiobook_at_with_options(
             path.display()
         ));
         log_debug(&format!("Audio player: Opening file {}", path.display()));
-        let extension = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("")
-            .to_lowercase();
         let subtitle_mode =
             unsafe { with_state(hwnd_main, |state| state.settings.subtitle_read_mode) }
                 .unwrap_or(SubtitleReadMode::Off);
@@ -687,36 +669,19 @@ fn start_audiobook_at_with_options(
         let effective_speed = requested_speed;
         log_mkv_probe_once(&path);
 
-        // Force M4A extension for Media Foundation to avoid indexing hangs on .mp4 video files
-        // and to speed up .mp3/.aac opening.
-        let mut final_path = path.clone();
-        if (extension == "mp4" || extension == "aac" || extension == "mp3")
-            && !is_mixed_output(&path)
-            && !path.to_string_lossy().contains("podcast cache")
-        {
-            let cache_dir = settings_dir().join("podcast cache");
-            std::fs::create_dir_all(&cache_dir).ok();
-            let mut hasher = sha2::Sha256::new();
-            hasher.update(path.to_string_lossy().as_bytes());
-            let hash = hex::encode(hasher.finalize());
-            let linked_path = cache_dir.join(format!("link_{}.m4a", &hash[..16]));
-
-            if !linked_path.exists() {
-                // Try hard link first (instant, no space)
-                if let Err(e) = std::fs::hard_link(&path, &linked_path)
-                    && e.kind() != std::io::ErrorKind::AlreadyExists
-                {
-                    // Fallback to copy if on different volume (slow, but only once)
-                    if std::fs::copy(&path, &linked_path).is_err() {}
-                }
-            }
-
-            if linked_path.exists() {
-                final_path = linked_path;
-            }
-        }
+        let final_path = path.clone();
+        let extension = final_path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
 
         let mut force_ffmpeg_stream = options.force_ffmpeg_stream;
+        if !force_ffmpeg_stream {
+            // Formats that are frequently problematic with direct BASS open:
+            // prefer FFmpeg streaming path (already used for webm fallback).
+            force_ffmpeg_stream = matches!(extension.as_str(), "m4a" | "aac" | "mp4");
+        }
         if !force_ffmpeg_stream {
             force_ffmpeg_stream = unsafe {
                 with_state(hwnd_main, |state| {
@@ -1021,18 +986,19 @@ pub fn toggle_audiobook_pause(hwnd: HWND) {
             if let Some(mut player) = state.active_audiobook.take() {
                 if player.output.is_stopped() {
                     crate::log_debug(
-                        "Audio player: toggle on stopped stream, restarting from beginning",
+                        "Audio player: toggle on stopped stream, restarting from saved position",
                     );
                     stop_shared_subtitle_speech(
                         &player.subtitle_speech_cancel,
                         &player.subtitle_speech_command,
                         "stopped_restart",
                     );
+                    let resume_seconds = player.accumulated_seconds;
                     player.subtitle_cancel.store(true, Ordering::Relaxed);
                     player.stop();
                     return Some(ToggleAction::RestartFromPosition {
                         path: player.path.clone(),
-                        seconds: 0,
+                        seconds: resume_seconds,
                         speed: player.speed,
                         pitch: player.pitch,
                         volume: player.volume,
@@ -1171,6 +1137,12 @@ pub fn seek_audiobook(hwnd: HWND, seconds: i64) {
                     let mut player = player;
                     player.accumulated_seconds = new_pos as u64;
                     player.start_instant = std::time::Instant::now();
+                    player.is_paused = false;
+                    if !player.play() {
+                        log_debug(
+                            "Audio player: failed to resume after seek_audiobook direct seek",
+                        );
+                    }
                     state.active_audiobook = Some(player);
                     return Some(SeekAction::Direct);
                 }
@@ -1182,7 +1154,7 @@ pub fn seek_audiobook(hwnd: HWND, seconds: i64) {
                     duration: audiobook_duration_secs(&player.path),
                     speed: player.speed,
                     pitch: player.pitch,
-                    paused: player.is_paused,
+                    paused: false,
                     volume: player.volume,
                     muted: player.muted,
                     prev_volume: player.prev_volume,
@@ -1260,6 +1232,12 @@ pub fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> {
                 if player.output.seek_to_seconds(seconds as f64) {
                     player.accumulated_seconds = seconds;
                     player.start_instant = std::time::Instant::now();
+                    player.is_paused = false;
+                    if !player.play() {
+                        log_debug(
+                            "Audio player: failed to resume after seek_audiobook_to direct seek",
+                        );
+                    }
                     return Some(SeekToAction::Direct);
                 }
                 Some(SeekToAction::Restart(player.path.clone()))
@@ -2528,7 +2506,7 @@ fn start_subtitle_reader(
                                                         "{} sottotitoli di {} creati",
                                                         done, total_jobs
                                                     );
-                                                    let _ = nvda_speak(&msg);
+                                                    ignore_bool(nvda_speak(&msg));
                                                 }
                                             }
                                             Err(e) => {

@@ -2,6 +2,7 @@
 
 Versione 0.6.7 – 2026-02-13
 Miglioramenti
+• Aggiornata la localizzazione cinese e lituana in tutte le risorse dell'app, incluse guida/testo donazioni e traduzioni setup NSIS (nuove stringhe installer in cinese semplificato e lituano, più completamento della traduzione ucraina del setup).
 • Aggiunto il supporto proxy di rete globale (HTTP/HTTPS e SOCKS5/SOCKS5H) per le funzioni online, con validazione al salvataggio Opzioni: i proxy non validi vengono segnalati e rimossi automaticamente.
 • Aggiunta una nuova funzione in Strumenti: "Riproduci audio da streaming...", che permette di inserire un URL (YouTube o link media diretto), scegliere il formato di output e il profilo qualità/bitrate (inclusa qualità/bitrate originale per MP3 e MP4) e avviare la riproduzione nell’audio player di Sonarpad.
 • Aggiunto il supporto al tasto multimediale Play/Pausa di sistema (cuffie/tastiera): ora controlla sia la riproduzione media sia la pausa/ripresa della lettura testo (con priorità al player media quando entrambi sono attivi).
@@ -27,9 +28,10 @@ Miglioramenti
 • Aggiunto il supporto iniziale ai parametri da riga di comando: `-h`/`--help` mostrano la guida rapida e `--version` mostra la versione del programma.
 • Resa più chiara la regolazione manuale di velocità e tono: i campi ora usano una scala centrata su 100, dove 100 corrisponde al valore normale.
 • Migliorata la selezione delle voci Microsoft sia in Opzioni > Voce sia nel pannello voci dell’editor: aggiunta una casella combinata lingua localizzata per filtrare le voci per lingua, mantenendo la modalità “solo voci multilingua” come elenco unico non diviso per lingua (con combo lingua nascosta quando attiva).
-• Aggiunta la configurazione della voce per i dialoghi in Opzioni > Voce con navigazione completa via Tab, usando lo stesso modello voci dell’interfaccia principale (sistema, filtro lingua Edge, voce e velocità/tono/volume con etichette); le regole dialoghi vengono salvate in configurazione `.ini`, senza modificare il testo del documento.
+• Aggiunta la configurazione della voce per i dialoghi in Opzioni > Voce con navigazione completa via Tab, usando lo stesso modello voci dell’interfaccia principale (sistema, filtro lingua Edge, voce e velocità/tono/volume con etichette); aggiunta anche la seconda voce dialoghi opzionale con gli stessi controlli (sistema, filtro lingua Edge, voce, velocità/tono/volume) per alternare i dialoghi; le regole dialoghi vengono salvate in configurazione `.ini`, senza modificare il testo del documento.
 • Migliorata l’etichetta di Annulla: la voce Modifica > Annulla ora mostra l’azione che verrà annullata (ad esempio modifica testo, commenta/decommenta righe o inserimento tag voce), restando non disponibile quando non esiste nulla da annullare.
 Correzioni di bug
+• Migliorata la creazione degli audiolibri M4B con metadata capitoli e marker capitolo; risolto il problema "chipmunk" (voce troppo veloce/acuta) nei file M4B generati.
 • Corretta l'interfaccia bitrate nella finestra di salvataggio audiolibro: rimossi i testi hardcoded in italiano e aggiunta l'opzione 64 kbps tra i bitrate selezionabili.
 • Corretto "Salva tutto" (Ctrl+Shift+S): ora tutti i documenti aperti modificati vengono rilevati in modo affidabile (inclusi tab nuovi/non salvati) e il salvataggio procede correttamente su ciascun file, aprendo "Salva con nome" quando necessario.
 • Corretto l'ordinamento degli articoli RSS di Google News: quando la data è disponibile, gli articoli vengono ora mostrati dal più recente al meno recente.

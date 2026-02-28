@@ -132,9 +132,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED, SW_SHOWNORMAL,
     SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
     TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage,
-    WINDOW_STYLE, WM_APP, WM_APPCOMMAND, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY,
-    WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES, WM_INITMENUPOPUP, WM_KEYDOWN,
-    WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT,
+    WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_APPCOMMAND, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU,
+    WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES, WM_INITMENUPOPUP,
+    WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT,
     WM_SETREDRAW, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN,
     WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
 };
@@ -582,6 +582,8 @@ fn dictionary_cache_key(language: Language, pref: &str, word: &str) -> String {
         Language::French => "fr",
         Language::Serbian => "sr",
         Language::Ukrainian => "uk",
+        Language::Lithuanian => "lt",
+        Language::Chinese => "zh",
     };
     format!(
         "{}|{}|{}",
@@ -1580,10 +1582,15 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
         PlayerCommand::SeekToEnd => unsafe {
             if let Some(result) = with_state(hwnd, |state| {
                 let player = state.active_audiobook.as_ref()?;
-                let total = player
-                    .duration_secs()
-                    .map(|s| s.max(0.0).floor() as u64)
-                    .or_else(|| crate::audio_player::audiobook_duration_secs(&player.path))?;
+                let live_total = player.duration_secs().map(|s| s.max(0.0).floor() as u64);
+                let file_total = crate::audio_player::audiobook_duration_secs(&player.path);
+                let total = match (file_total, live_total) {
+                    // Prefer the larger duration to avoid BASS underestimation on long MP3.
+                    (Some(file), Some(live)) => Some(file.max(live)),
+                    (Some(file), None) => Some(file),
+                    (None, Some(live)) => Some(live),
+                    (None, None) => None,
+                }?;
                 // Seek just before the exact end to avoid immediate stop logic.
                 let target = total.saturating_sub(1);
                 Some(seek_audiobook_to(hwnd, target))
@@ -1653,10 +1660,14 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
             handle_chapter_list(hwnd);
         }
         PlayerCommand::TrackPrev => {
-            let _ = switch_audio_playlist_relative(hwnd, -1);
+            if !switch_audio_playlist_relative(hwnd, -1) {
+                crate::log_debug("Audio player: no previous track available in playlist");
+            }
         }
         PlayerCommand::TrackNext => {
-            let _ = switch_audio_playlist_relative(hwnd, 1);
+            if !switch_audio_playlist_relative(hwnd, 1) {
+                crate::log_debug("Audio player: no next track available in playlist");
+            }
         }
         PlayerCommand::BlockNavigation | PlayerCommand::None => {}
     }
@@ -1689,9 +1700,64 @@ fn has_secondary_window_open(hwnd: HWND) -> bool {
                 || state.rss_window.0 != 0
                 || state.rss_add_dialog.0 != 0
                 || state.go_to_time_dialog.0 != 0
-                || state.audiobook_progress.0 != 0
         })
         .unwrap_or(false)
+    }
+}
+
+fn should_force_editor_focus_on_foreground(hwnd: HWND) -> bool {
+    unsafe {
+        with_state(hwnd, |state| {
+            let is_reader_mode = state
+                .docs
+                .get(state.current)
+                .map(|doc| matches!(doc.format, FileFormat::Audiobook))
+                .unwrap_or(false);
+            state.update_progress_window.0 == 0 && !is_reader_mode
+        })
+        .unwrap_or(false)
+    }
+}
+
+fn force_active_editor_focus(hwnd: HWND) {
+    if !should_force_editor_focus_on_foreground(hwnd) {
+        return;
+    }
+    unsafe {
+        if let Some(hwnd_edit) = get_active_edit(hwnd) {
+            SetFocus(hwnd_edit);
+            SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+            SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
+            crate::log_if_err!(PostMessageW(
+                hwnd,
+                WM_NEXTDLGCTL,
+                WPARAM(hwnd_edit.0 as usize),
+                LPARAM(1)
+            ));
+            NotifyWinEvent(
+                EVENT_OBJECT_FOCUS,
+                hwnd_edit,
+                OBJID_CLIENT.0,
+                CHILDID_SELF as i32,
+            );
+        }
+    }
+}
+
+fn schedule_editor_focus_retry(hwnd: HWND) {
+    unsafe {
+        if SetTimer(hwnd, FOCUS_EDITOR_TIMER_ID, 80, None) == 0 {
+            crate::log_debug("Failed to set FOCUS_EDITOR_TIMER_ID");
+        }
+        if SetTimer(hwnd, FOCUS_EDITOR_TIMER_ID2, 200, None) == 0 {
+            crate::log_debug("Failed to set FOCUS_EDITOR_TIMER_ID2");
+        }
+        if SetTimer(hwnd, FOCUS_EDITOR_TIMER_ID3, 350, None) == 0 {
+            crate::log_debug("Failed to set FOCUS_EDITOR_TIMER_ID3");
+        }
+        if SetTimer(hwnd, FOCUS_EDITOR_TIMER_ID4, 600, None) == 0 {
+            crate::log_debug("Failed to set FOCUS_EDITOR_TIMER_ID4");
+        }
     }
 }
 
@@ -3154,19 +3220,15 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
             LRESULT(0)
         }
         WM_SETFOCUS => {
-            with_state(hwnd, |state| {
-                if let Some(doc) = state.docs.get(state.current) {
-                    if matches!(doc.format, FileFormat::Audiobook) {
-                        unsafe {
-                            SetFocus(state.hwnd_tab);
-                        }
-                    } else {
-                        unsafe {
-                            SetFocus(doc.hwnd_edit);
-                        }
-                    }
-                }
-            });
+            force_active_editor_focus(hwnd);
+            LRESULT(0)
+        }
+        WM_ACTIVATE => {
+            let is_activating = (wparam.0 & 0xFFFF) != 0;
+            if is_activating && should_force_editor_focus_on_foreground(hwnd) {
+                force_active_editor_focus(hwnd);
+                schedule_editor_focus_retry(hwnd);
+            }
             LRESULT(0)
         }
         WM_NOTIFY => {
@@ -3216,7 +3278,7 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 || wparam.0 == FOCUS_EDITOR_TIMER_ID4
             {
                 kill_timer_best_effort(hwnd, wparam.0, "KillTimer FOCUS_EDITOR");
-                focus_editor(hwnd);
+                force_active_editor_focus(hwnd);
                 return LRESULT(0);
             }
             if wparam.0 == CHAPTER_ANNOUNCE_TIMER_ID {
@@ -3657,21 +3719,11 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
             LRESULT(0)
         }
         WM_FOCUS_EDITOR => {
-            if has_secondary_window_open(hwnd) {
-                return LRESULT(0);
-            }
-            focus_editor(hwnd);
-            if SetTimer(hwnd, FOCUS_EDITOR_TIMER_ID, 80, None) == 0 {
-                crate::log_debug("Failed to set FOCUS_EDITOR_TIMER_ID");
-            }
-            if SetTimer(hwnd, FOCUS_EDITOR_TIMER_ID2, 200, None) == 0 {
-                crate::log_debug("Failed to set FOCUS_EDITOR_TIMER_ID2");
-            }
-            if SetTimer(hwnd, FOCUS_EDITOR_TIMER_ID3, 350, None) == 0 {
-                crate::log_debug("Failed to set FOCUS_EDITOR_TIMER_ID3");
-            }
-            if SetTimer(hwnd, FOCUS_EDITOR_TIMER_ID4, 600, None) == 0 {
-                crate::log_debug("Failed to set FOCUS_EDITOR_TIMER_ID4");
+            if should_force_editor_focus_on_foreground(hwnd) {
+                force_active_editor_focus(hwnd);
+                schedule_editor_focus_retry(hwnd);
+            } else if !has_secondary_window_open(hwnd) {
+                focus_editor(hwnd);
             }
             LRESULT(0)
         }
@@ -4765,6 +4817,22 @@ fn localized_voice_language_name(language: Language, code: &str) -> String {
             let value = from_i18n("options.lang.uk");
             if value == "options.lang.uk" {
                 "Ukrainian".to_string()
+            } else {
+                value
+            }
+        }
+        "lt" => {
+            let value = from_i18n("options.lang.lt");
+            if value == "options.lang.lt" {
+                "Lithuanian".to_string()
+            } else {
+                value
+            }
+        }
+        "zh" => {
+            let value = from_i18n("options.lang.zh");
+            if value == "options.lang.zh" {
+                "Chinese".to_string()
             } else {
                 value
             }
@@ -8737,7 +8805,12 @@ pub(crate) unsafe fn queue_audio_files_and_play(hwnd: HWND, paths: Vec<PathBuf>)
         return;
     }
     for path in &paths {
-        let _ = editor_manager::ensure_audio_document_tab(hwnd, path);
+        if editor_manager::ensure_audio_document_tab(hwnd, path).is_none() {
+            crate::log_debug(&format!(
+                "Audio player: failed to ensure audio tab for {}",
+                path.display()
+            ));
+        }
         push_recent_file(hwnd, path);
     }
     let target_index = with_state(hwnd, |state| {
@@ -8817,9 +8890,15 @@ fn handle_audio_playlist_timer(hwnd: HWND) {
             let current = audio_player::audiobook_position_secs(player)
                 .max(0.0)
                 .floor() as u64;
-            let should_advance = audio_player::audiobook_duration_secs(&player.path)
-                .map(|duration| current >= duration.saturating_add(1))
+            let near_end_player = player
+                .duration_secs()
+                .map(|d| current.saturating_add(1) >= d.max(0.0).floor() as u64)
                 .unwrap_or(false);
+            let near_end_file = audio_player::audiobook_duration_secs(&player.path)
+                .map(|duration| current.saturating_add(1) >= duration)
+                .unwrap_or(false);
+            // Treat as ended if either live player duration or file duration confirms near-end.
+            let should_advance = near_end_player || near_end_file;
             Some((
                 false,
                 should_advance,
@@ -8885,7 +8964,8 @@ fn handle_audio_playlist_timer(hwnd: HWND) {
         }
     }
     if !switch_audio_playlist_relative(hwnd, 1) {
-        audio_player::stop_audiobook_playback(hwnd);
+        // Keep the player instance alive when no next track is available.
+        // This matches non-hard-stop behavior (seek back and resume works).
     }
 }
 

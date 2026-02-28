@@ -151,6 +151,7 @@ type AvDictSet = unsafe extern "C" fn(
     libc::c_int,
 ) -> libc::c_int;
 type AvDictFree = unsafe extern "C" fn(*mut *mut AVDictionary);
+type AvMallocz = unsafe extern "C" fn(libc::size_t) -> *mut libc::c_void;
 
 pub(crate) struct FfmpegApi {
     _libs: Vec<Library>,
@@ -207,6 +208,7 @@ pub(crate) struct FfmpegApi {
     pub(crate) av_dict_get: AvDictGet,
     pub(crate) av_dict_set: AvDictSet,
     pub(crate) av_dict_free: AvDictFree,
+    pub(crate) av_mallocz: AvMallocz,
 }
 
 fn load_symbol<T: Copy>(lib: &Library, name: &[u8]) -> Result<T, String> {
@@ -347,6 +349,7 @@ fn load_ffmpeg_api() -> Result<FfmpegApi, String> {
     let av_dict_get = load_symbol(avutil, b"av_dict_get\0")?;
     let av_dict_set = load_symbol(avutil, b"av_dict_set\0")?;
     let av_dict_free = load_symbol(avutil, b"av_dict_free\0")?;
+    let av_mallocz = load_symbol(avutil, b"av_mallocz\0")?;
 
     Ok(FfmpegApi {
         _libs: libs,
@@ -403,6 +406,7 @@ fn load_ffmpeg_api() -> Result<FfmpegApi, String> {
         av_dict_get,
         av_dict_set,
         av_dict_free,
+        av_mallocz,
     })
 }
 

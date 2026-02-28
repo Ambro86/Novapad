@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WixLocalization xmlns="http://schemas.microsoft.com/wix/2006/localization" Culture="uk-UA">
+  <String Id="CargoPackagerLanguage">1058</String>
+  <String Id="CargoPackagerCodepage">1251</String>
+  <String Id="DowngradeErrorMessage">Вже встановлено новішу версію [ProductName].</String>
+  <String Id="LaunchApp">Запустити [ProductName]</String>
+  <String Id="InstallAppFeature">Встановити [ProductName].</String>
+  <String Id="MainFeatureTitle">Програма</String>
+  <String Id="RunAppDescription">Запустити [ProductName]</String>
+  <String Id="OpenWithLabel">Відкрити в [ProductName]</String>
+  <String Id="UninstallShortcutName">Видалити [ProductName]</String>
+  <String Id="UninstallShortcutDescription">Видалити [ProductName]</String>
+  <String Id="DesktopShortcutFeatureTitle">Ярлик на робочому столі</String>
+  <String Id="DesktopShortcutFeatureDescription">Створити ярлик на робочому столі</String>
+  <String Id="FileAssociationsFeatureTitle">Асоціації файлів</String>
+  <String Id="FileAssociationsFeatureDescription">Пов'язати типи файлів із [ProductName]</String>
+  <String Id="ContextMenuFeatureTitle">Контекстне меню</String>
+  <String Id="ContextMenuFeatureDescription">Додати «[OpenWithLabel]» до контекстного меню</String>
+</WixLocalization>

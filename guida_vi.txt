@@ -4,7 +4,7 @@ Tệp:
 Mới: Tạo tài liệu mới (Ctrl+N).
 Mở: Mở các tệp văn bản, PDF, EPUB, MP3 và các định dạng hỗ trợ khác (Ctrl+O).
 Lưu: Lưu tài liệu (Ctrl+S).
-Lưu mới thành: Lưu với tên mới.
+Lưu thành…: Lưu với tên mới.
 Lưu tất cả: Lưu tất cả tài liệu (Ctrl+Shift+S).
 Đóng tab: Đóng tài liệu hiện tại (Ctrl+W).
 Tệp gần đây: Mở một tệp gần đây.
@@ -49,7 +49,7 @@ Tìm tiếp theo: Tìm vị trí xuất hiện tiếp theo (F3).
 Thay thế: Tìm và thay thế văn bản (Ctrl+H).
 Chuẩn hóa khoảng trắng: Loại bỏ khoảng trắng ở đầu/cuối dòng và thu gọn các đoạn trống (Ctrl+Shift+Enter).
 Nối các dòng: Nối các dòng trong đoạn văn hoặc phần đang chọn (Ctrl+Shift+J).
-Ngắt dòng cứng: Sắp xếp lại dòng cho đoạn văn hoặc phần đang chọn (Ctrl+Shift+H).
+Định dạng lại đoạn văn: Sắp xếp lại dòng cho đoạn văn hoặc phần đang chọn (Ctrl+Shift+H).
 Loại bỏ các thẻ Markdown: Loại bỏ các thẻ Markdown (Ctrl+Shift+M).
 Sắp xếp các mục: Sắp xếp các dòng trong đoạn văn hoặc phần đang chọn (Alt+Shift+O).
 Giữ lại các mục duy nhất: Xóa các dòng trùng lặp trong đoạn văn hoặc phần đang chọn (Alt+Shift+K).
@@ -65,8 +65,8 @@ Hiện các giọng đọc yêu thích: Hiện danh sách giọng đọc yêu th
 Màu chữ: Thay đổi màu chữ (bao gồm cả màu sáng và tối).
 Cỡ chữ: Thay đổi kích thước chữ (nhỏ, bình thường, lớn, rất lớn, cực kỳ lớn).
 Khi danh sách các mục hiển thị, nhấn phím Tab để di chuyển tiêu điểm giữa trình soạn thảo và các bộ điều khiển, trong khi nhấn Shift+Tab để di chuyển ngược lại.
-Để thêm hoặc xóa một mục khỏi danh sách yêu thích, hãy dùng phím Tab để di chuyển đến danh sách giọng đọc và thêm hoặc xóa bằng phím Applications hoặc chuột phải.
-Từ danh sách giọng đọc yêu thích, bạn cũng có thể nhấn phím Applications để xóa các mục đã được thêm trước đó.
+Để thêm hoặc xóa một mục khỏi danh sách yêu thích, hãy dùng phím Tab để di chuyển đến danh sách giọng đọc và thêm hoặc xóa bằng phím Menu ngữ cảnh (Applications) hoặc chuột phải.
+Từ danh sách giọng đọc yêu thích, bạn cũng có thể nhấn phím Menu ngữ cảnh (Applications) để xóa các mục đã được thêm trước đó.
 Phím tắt bàn phím: bạn có thể nhấn F9 và F10 để chuyển đổi giữa các mục trong khi đọc, xoay vòng qua những mục đã thêm vào yêu thích.
 
 Dấu trang: 
@@ -90,10 +90,10 @@ Phím Tab di chuyển đến nút "Thêm mục vào từ điển", kích hoạt 
 Trong cửa sổ thêm/sửa: nhập "Từ gốc", sau đó nhấn Tab đến "Từ thay thế", rồi chọn Đồng ý hoặc Hủy bỏ (Enter/Phím Cách). Nhấn ESC để hủy.
 Trong danh sách, phím Tab di chuyển đến "Sửa mục" và "Xóa mục đã chọn".
 Các thay thế từ điển được áp dụng trong khi đọc và tạo sách nói và được lưu lại.
-Nhập bản phụ đề YouTube: dán một URL, chọn ngôn ngữ và nhập văn bản vào trình soạn thảo (Ctrl+Y). Tùy chọn có mốc thời gian.
+Nhập phụ đề từ YouTube: dán một URL, chọn ngôn ngữ và nhập văn bản vào trình soạn thảo (Ctrl+Y). Tùy chọn có mốc thời gian.
 Tìm kiếm và nhập từ Wikipedia: tìm kiếm một bài viết trên Wikipedia và nhập văn bản của nó vào trình soạn thảo (Alt+Shift+W).
 Từ điển trực tuyến: tìm kiếm các định nghĩa và bản dịch trong Wiktionary trực tuyến (Alt+Shift+D).
-Terminal hỗ trợ tiếp cận: mở một terminal chuyên dụng với đầu ra ổn định cho các trình đọc màn hình (Ctrl+Shift+T).
+Terminal hỗ trợ truy cập: mở một terminal chuyên dụng với đầu ra ổn định cho các trình đọc màn hình (Ctrl+Shift+T).
 Phím tắt: Alt+I tập trung vào ô nhập liệu, Alt+O tập trung vào ô đầu ra, Tab/Shift+Tab di chuyển giữa ô nhập, ô đầu ra và các tùy chọn.
 Enter gửi lệnh nhập liệu.
 Ctrl+C sao chép đầu ra (hoặc gửi lệnh Ctrl+C đến chương trình). Ctrl+L xóa sạch đầu ra sau khi xác nhận.
@@ -103,7 +103,7 @@ RSS / Bài viết: mở cửa sổ RSS/Bài viết, thêm nguồn, mở rộng f
 Trong cửa sổ RSS, chọn một feed hoặc trang web và nhấn Delete để xóa nó khỏi thư viện.
 Từ menu chuột phải trên một feed hoặc trang web, bạn có thể sửa hoặc xóa một nguồn RSS hoặc trang web.
 Sau khi nhập một bài viết RSS, nhấn Esc để quay lại danh sách RSS.
-Podcasts: mở cửa sổ Podcasts để tìm kiếm và quản lý các lượt đăng ký.
+Podcasts: mở cửa sổ Podcasts để tìm kiếm và quản lý đăng ký podcast.
 Trong danh sách tập phim, nhấn Enter để phát tập đó.
 Trong khi phát, phím Esc dừng podcast và quay lại thư viện.
 
@@ -114,8 +114,7 @@ Ngôn ngữ: Thay đổi ngôn ngữ giao diện.
 Cách thức mở tệp: Mở tệp trong tab mới hoặc cửa sổ mới.
 Giọng đọc: Chọn giọng đọc để nghe.
 Giọng đọc đa ngôn ngữ: Lọc danh sách giọng đọc.
-Chọn cao độ, tốc độ và âm lượng: Thiết lập cao độ, tốc độ và âm lượng cho các giọng đọc (cả Microsoft và SAPI5).
-Áp dụng cho việc đọc và tạo sách nói.
+Chọn cao độ, tốc độ và âm lượng: Thiết lập cao độ, tốc độ và âm lượng cho các giọng đọc (Microsoft và SAPI5). Áp dụng cho việc đọc và tạo sách nói.
 Di chuyển con trỏ trong khi đọc: Di chuyển con trỏ theo văn bản một cách trực quan khi đang được đọc.
 Chia nhỏ sách nói theo văn bản: Chia nhỏ khi dấu đánh dấu xuất hiện ở đầu dòng (phân biệt chữ hoa chữ thường: "Chapter" và "chapter" là khác nhau).
 Ví dụ: với từ "Chapter" nó sẽ tạo ra một phần cho mỗi chương, bao gồm cả tác giả và lời giới thiệu trong phần đầu tiên cho đến từ "Chapter" đầu tiên.

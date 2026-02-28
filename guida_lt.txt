@@ -1,0 +1,112 @@
+Programų gidas
+
+Failas:
+Naujas: Sukurti naują dokumentą (Ctrl+N).
+Atidaryti: Atidaryti tekstinius failus, PDF, EPUB, MP3 ir kitus palaikomus formatus (Ctrl+O).
+Išsaugoti: išsaugokite dokumentą (Ctrl+S).
+Išsaugoti kaip: išsaugoti su nauju pavadinimu.
+Išsaugoti viską: išsaugoti visus dokumentus (Ctrl+Shift+S).
+Uždaryti skirtuką: uždaryti esamą dokumentą (Ctrl+W).
+Naujausi failai: Atidarykite naujausią failą.
+
+Balsas ir garso įrašai:
+Skaitymas: F5 Pradėti skaityti, F4 Pauzė/Tęsti, F6 Sustabdyti skaitymą.
+Mėgstamiausi skaitant: F9 ankstesnis mėgstamiausias balsas, F10 kitas mėgstamiausias balsas.
+Įrašyti garso knygą: Sukurti MP3 failą iš esamo teksto (Ctrl+R).
+Garso knygų partijos: konvertuokite failų sąrašą į garso knygas (Ctrl+Shift+B).
+Įrašyti podcastą: įrašykite podcastą iš mikrofono ir (arba) sistemos garso (Ctrl+Shift+R).
+Konvertuoti garso įrašą: Konvertuoti garso/vaizdo įrašų failus į kitus garso formatus (Ctrl+Shift+A).
+MP3 garso knygos:
+Kai atidarote MP3 failą, „Sonarpad“ veikia kaip garso grotuvas.
+Klaviatūros valdymas:
+- SPACE: Paleisti / Sustabdyti.
+- DEŠINĖS PUSĖS RODYKLĖ: Perkelti į priekį 1 minutę.
+- KAIRĖS RODYKLĖ: Atsukti 1 minutę atgal.
+- AUKŠTYNĖ RODYKLĖ: Padidinti garsumą.
+- ŽEMYN NUKREIPTA STRĖLĖ: Sumažinti garsumą.
+- +: Padidinti atkūrimo greitį.
+- -: Sumažinti atkūrimo greitį.
+- CTRL+I: Pranešti apie atkūrimo laiką.
+- CTRL+T: Pereiti prie konkretaus laiko.
+- CTRL+B: įterpti žymę tiksliu laiku.
+
+Redaguoti:
+Atšaukti: Atšaukti paskutinį veiksmą (Ctrl+Z).
+Iškirpti: pašalinti pažymėtą tekstą ir nukopijuoti jį į iškarpinę (Ctrl+X).
+Kopijuoti: Kopijuoti pasirinktą tekstą į iškarpinę (Ctrl+C).
+Įklijuoti: įklijuoti iškarpinės turinį į dokumentą (Ctrl+V).
+Pasirinkti viską: Pasirinkti visą tekstą (Ctrl+A).
+Rasti: ieškoti teksto dokumente (Ctrl+F).
+Ieškoti failuose: ieškoti teksto keliuose failuose (Ctrl+Shift+F).
+Rasti kitą: Rasti kitą pasikartojimą (F3).
+Pakeisti: Rasti ir pakeisti tekstą (Ctrl+H).
+Normalizuoti tarpelius: apkarpyti eilutės kraštus ir sumažinti tuščius tarpelius (Ctrl+Shift+Enter).
+Sujungti eilutes: Sujungti eilutes pastraipoje arba atrinktame tekste (Ctrl+Shift+J).
+Kietas eilutės pertraukimas: Perrašykite pastraipą arba atranką (Ctrl+Shift+H).
+Pašalinti Markdown žymes: Pašalinti Markdown žymes (Ctrl+Shift+M).
+Užsakyti elementus: Rūšiuoti pastraipą arba atrinktas eilutes (Alt+Shift+O).
+Išsaugoti unikalius elementus: pašalinti pasikartojančias eilutes pastraipoje arba atrinktame tekste (Alt+Shift+K).
+Atvirkštiniai elementai: Atvirkštiniai paragrafo arba pasirinkto teksto eilutės (Alt+Shift+Z).
+Cituojamos eilutės: pridėkite priešdėlį prie pastraipos arba atrinktų eilučių (Ctrl+Q).
+Cituojamų eilučių pašalinimas: pašalinkite priešdėlį iš pastraipos arba pasirinkto teksto eilučių (Ctrl+Shift+Q).
+Teksto statistika: rodo simbolius, žodžius ir eilutes pagal pasirinkimą arba dokumentą (Alt+Y).
+Rašybos tikrinimo navigacija: F7 ankstesnė klaida, F8 kita klaida.
+
+Peržiūrėti:
+Rodyti balsus redaktoriuje: rodyti balso sistemą, balso sąrašą ir daugiakalbį filtrą.
+Rodyti mėgstamus balsus: rodyti mėgstamų balsų sąrašą redaktoriuje.
+Teksto spalva: pakeiskite teksto spalvą (įskaitant šviesias ir tamsias spalvas).
+Teksto dydis: Keiskite teksto dydį (mažas, normalus, didelis, labai didelis, labai labai didelis).
+Kai įrašų sąrašas matomas, paspaudus klavišą „Tab“ žymeklis perkeliamas tarp redaktoriaus ir valdymo elementų, o paspaudus klavišus „Shift“ + „Tab“ – atgal.
+Norėdami pridėti arba pašalinti įrašą iš mėgstamiausių, naudokite klavišą „Tab“, kad pereitumėte prie įrašų sąrašo, ir pridėkite arba pašalinkite jį naudodami klavišą „Applications“ arba dešinįjį pelės mygtuką. Iš mėgstamiausių įrašų sąrašo taip pat galite paspausti klavišą „Applications“, kad pašalintumėte jau pridėtus įrašus.
+Klavišų kombinacijos: skaitymo metu galima paspausti klavišus F9 ir F10, kad pereitumėte tarp įrašų, peržiūrėdami tuos, kurie buvo pridėti į mėgstamiausius.
+
+Žymės:
+Įterpti žymę: išsaugoti dabartinę žymeklio padėtį arba garso knygos laiką (Ctrl+B).
+Žymių tvarkymas: peržiūrėkite, pereikite prie arba ištrinkite išsaugotas žymes. Atidarant failą su žymėmis, žymeklis arba atkūrimas automatiškai bus atnaujintas nuo pirmos prieinamos žymės.
+
+Įrankiai:
+Batch Audiobooks: atidaro langą, kuriame galima konvertuoti failų sąrašą (arba visą aplanką) į garso knygas.
+- Pridėti failus/aplankus į eilę.
+- Pasirinkite paskirties aplanką ir formatą (MP3 arba WAV).
+- Galimybės kurti pakatalogius ir išvengti perrašymo.
+- Paspauskite „Pradėti“, kad viskas būtų apdorota fone.
+Žodynas: Atidarykite žodyno langą. Sąrašą galima naršyti naudodami rodykles „Aukštyn“/„Žemyn“.
+Tab pereina prie mygtuko „Pridėti įrašus į žodyną“, aktyvuojamo klavišu Enter arba tarpo klavišu.
+Pridėjimo/redagavimo lange: įveskite „Originalus žodis“, tada pereikite prie „Pakeitimo žodis“, tada spauskite „OK“ arba „Atšaukti“ (Enter/Space). ESC atšaukia.
+Sąraše skirtukas perkeliamas į „Redaguoti įrašą“ ir „Pašalinti pasirinktą įrašą“.
+Žodynų pakeitimai taikomi skaitymo ir garso knygų kūrimo metu ir yra išsaugomi.
+Importuokite „YouTube“ transkriptą: įklijuokite URL adresą, pasirinkite kalbą ir importuokite tekstą į redaktorių (Ctrl+Y). Pasirenkami laiko žymos.
+Paieška ir importavimas iš Vikipedijos: ieškokite straipsnio Vikipedijoje ir importuokite jo tekstą į redaktorių (Alt+Shift+W).
+Internetinis žodynas: ieškokite apibrėžimų ir vertimų internetiniame Vikisłowniku (Alt+Shift+D).
+Prieinamas terminalas: atidaro specialų terminalą su stabiliu išvesties ekranų skaitytuvams (Ctrl+Shift+T).
+Spartieji klavišai: Alt+I fokusuoja įvestį, Alt+O fokusuoja išvestį, Tab/Shift+Tab perkelia tarp įvesties, išvesties ir parinkčių.
+Enter siunčia įvestį. Ctrl+C kopijuoja išvestį (arba siunčia Ctrl+C į programą). Ctrl+L išvalo išvestį su patvirtinimu.
+Terminalo parinktys: automatinis slinkties, ANSI juostos pašalinimas, naujų eilučių pranešimas, signalas po 1 sekundės neveikimo, miego režimo užkirtimas.
+Programos pasirinkimai: Komandų eilutė (cmd.exe), PowerShell, Codex CLI (iš parinkčių).
+
+RSS / Straipsniai: atidaro langą „RSS/Straipsniai“, pridėkite šaltinius, išskleiskite srautą ir paspauskite „Enter“, kad importuotumėte straipsnį į redaktorių.
+RSS lange pasirinkite naujienų šaltinį arba svetainę ir paspauskite „Delete“ (Naikinti), kad jį pašalintumėte iš bibliotekos.
+Iš kontekstinio meniu, esančio naujienų sraute ar svetainėje, galite redaguoti arba ištrinti RSS ar svetainę.
+Importavę RSS straipsnį, paspauskite klavišą „Esc“, kad grįžtumėte į RSS sąrašą.
+Podcast'ai: atidaro langą „Podcast'ai“, kuriame galima ieškoti ir tvarkyti prenumeratas.
+Epizodų sąraše paspauskite „Enter“, kad paleistumėte epizodą.
+Atkūrimo metu klavišas „Esc“ sustabdo podcastą ir grąžina į biblioteką.
+
+Pasirinkimai:
+Kalba: Keisti sąsajos kalbą.
+Atidaryti elgesį: atidaryti failus naujame skirtuke arba naujame lange.
+Balsas: Pasirinkite skaitymo balsą.
+Daugiakalbiai balsai: filtruokite balsų sąrašą.
+Pasirinkite toną, greitį ir garsumą: nustatykite toną, greitį ir garsumą balsams (tiek „Microsoft“, tiek „SAPI5“). Taikoma skaitymui ir audioknygoms.
+Judinkite žymeklį skaitymo metu: vizualiai sekite tekstą, kai jis skaitomas.
+Garso knyga padalinta pagal tekstą: padalijama, kai žymė pasirodo eilutės pradžioje (skiriamos didžiosios ir mažosios raidės: „Chapter“ ir „chapter“ yra skirtingi). Pavyzdys: su „Chapter“ sukuria vieną dalį kiekvienam skyriui, įskaitant autorių ir įvadą pirmoje dalyje iki pirmojo skyriaus. Jei nerasta, nepadalijama.
+Kitos garso knygos padalijimo galimybės: 2 dalys, 4 dalys, 6 dalys, 8 dalys.
+
+Pagalba:
+Vadovas: Atidarykite šį vadovą (F1).
+Patikrinti atnaujinimus: Patikrinkite, ar yra naujų atnaujinimų (F2).
+Changelog: Atidarykite changelog langą.
+Apie: Rodyti programos informaciją.
+
+

@@ -1,5 +1,4 @@
-Guia del programa
-
+Guía del programa
 Archivo:
 Nuevo: Crear un nuevo documento (Ctrl+N).
 Abrir: Abrir archivos de texto, PDF, EPUB, MP3 y otros formatos compatibles (Ctrl+O).
@@ -8,30 +7,40 @@ Guardar como: Guardar con un nombre nuevo.
 Guardar todo: Guardar todos los documentos (Ctrl+Shift+S).
 Cerrar pestaña: Cerrar el documento actual (Ctrl+W).
 Archivos recientes: Abrir un archivo reciente.
-
+ 
 Voz y audio:
-Lectura: F5 iniciar lectura, F4 pausar/reanudar, F6 detener lectura.
-Favoritos durante lectura: F9 voz favorita anterior, F10 voz favorita siguiente.
-Grabar audiolibro: Crear un archivo MP3 desde el texto actual (Ctrl+R).
+Lectura: F5 Iniciar lectura, F4 Pausar/Reanudar, F6 Detener lectura.
+Favoritos durante la lectura: F9 voz favorita anterior, F10 voz favorita siguiente.
+Grabar audiolibro: Crear un archivo MP3 a partir del texto actual (Ctrl+R).
 Audiolibros por lotes: Convertir una lista de archivos en audiolibros (Ctrl+Shift+B).
-Grabar podcast: Grabar un podcast desde microfono y/o audio del sistema (Ctrl+Shift+R).
+Grabar podcast: Grabar un podcast desde el micrófono y/o el audio del sistema (Ctrl+Shift+R).
 Convertir audio: Convertir archivos de audio/video a otros formatos de audio (Ctrl+Shift+A).
 Audiolibros MP3:
-Cuando abres un archivo MP3, Sonarpad actua como reproductor de audio.
+Cuando abres un archivo MP3, Sonarpad actúa como reproductor de audio.
 Controles de teclado:
-- ESPACIO: Reproducir / Pausar.
-- FLECHA DERECHA: Avanzar 1 minuto.
-- FLECHA IZQUIERDA: Retroceder 1 minuto.
-- FLECHA ARRIBA: Subir volumen.
-- FLECHA ABAJO: Bajar volumen.
-- +: Aumentar la velocidad de reproduccion.
-- -: Disminuir la velocidad de reproduccion.
-- CTRL+I: Anunciar el tiempo de reproduccion.
-- CTRL+T: Ir a un tiempo especifico.
-- CTRL+B: Insertar un marcador en el tiempo exacto.
-
-Edicion:
-Deshacer: Deshacer la ultima operacion (Ctrl+Z).
+• 
+ESPACIO: Reproducir / Pausar.
+• 
+FLECHA DERECHA: Avanzar 1 minuto.
+• 
+FLECHA IZQUIERDA: Retroceder 1 minuto.
+• 
+FLECHA ARRIBA: Subir volumen.
+• 
+FLECHA ABAJO: Bajar volumen.
+• 
++: Aumentar la velocidad de reproducción.
+• 
+-: Disminuir la velocidad de reproducción.
+• 
+CTRL+I: Anunciar el tiempo de reproducción.
+• 
+CTRL+T: Ir a un tiempo específico.
+• 
+CTRL+B: Insertar un marcador en el tiempo exacto.
+ 
+Edición:
+Deshacer: Deshacer la última operación (Ctrl+Z).
 Cortar: Eliminar el texto seleccionado y copiarlo al portapapeles (Ctrl+X).
 Copiar: Copiar el texto seleccionado al portapapeles (Ctrl+C).
 Pegar: Pegar el contenido del portapapeles en el documento (Ctrl+V).
@@ -40,74 +49,78 @@ Buscar: Buscar texto en el documento (Ctrl+F).
 Buscar en archivos: Buscar texto en varios archivos (Ctrl+Shift+F).
 Buscar siguiente: Buscar la siguiente coincidencia (F3).
 Reemplazar: Buscar y reemplazar texto (Ctrl+H).
-Normalizar espacios en blanco: Recorta bordes y reduce lineas en blanco (Ctrl+Shift+Enter).
-Unir lineas: Une las lineas del parrafo o la seleccion (Ctrl+Shift+J).
-Salto de linea duro: Refluye el parrafo o la seleccion (Ctrl+Shift+H).
-Eliminar etiquetas Markdown: Quitar etiquetas Markdown (Ctrl+Shift+M).
-Ordenar lineas: Ordena las lineas del parrafo o la seleccion (Alt+Shift+O).
-Eliminar duplicados: Quita lineas duplicadas en el parrafo o la seleccion (Alt+Shift+K).
-Invertir lineas: Invierte el orden de las lineas en el parrafo o la seleccion (Alt+Shift+Z).
-Comentar lineas: Agrega un prefijo a las lineas del parrafo o la seleccion (Ctrl+Q).
-Descomentar lineas: Quita el prefijo de las lineas del parrafo o la seleccion (Ctrl+Shift+Q).
-Estadisticas de texto: Muestra caracteres, palabras y lineas en seleccion o documento (Alt+Y).
-Navegacion de ortografia: F7 error anterior, F8 error siguiente.
-
+Normalizar espacios en blanco: Recortar bordes de línea y reducir líneas en blanco consecutivas (Ctrl+Shift+Enter).
+Unir líneas: Unir las líneas del párrafo o de la selección (Ctrl+Shift+J).
+Salto de línea duro: Reformatear el párrafo o la selección (Ctrl+Shift+H).
+Eliminar etiquetas Markdown: Quitar las etiquetas Markdown (Ctrl+Shift+M).
+Ordenar líneas: Ordenar las líneas del párrafo o de la selección (Alt+Shift+O).
+Eliminar duplicados: Quitar líneas duplicadas en el párrafo o en la selección (Alt+Shift+K).
+Invertir líneas: Invertir el orden de las líneas en el párrafo o en la selección (Alt+Shift+Z).
+Comentar líneas: Agregar un prefijo a las líneas del párrafo o de la selección (Ctrl+Q).
+Descomentar líneas: Quitar el prefijo de las líneas del párrafo o de la selección (Ctrl+Shift+Q).
+Estadísticas de texto: Mostrar caracteres, palabras y líneas en la selección o en el documento (Alt+Y).
+Navegación ortográfica: F7 error anterior, F8 error siguiente.
+ 
 Vista:
-Mostrar voces en el editor: Mostrar sistema de voces, lista de voces y filtro multilingue.
+Mostrar voces en el editor: Mostrar el sistema de voces, la lista de voces y el filtro multilingüe.
 Mostrar voces favoritas: Mostrar la lista de voces favoritas en el editor.
 Color del texto: Cambiar el color del texto (incluye colores claros y oscuros).
-Tamano del texto: Cambiar el tamano del texto (pequeno, normal, grande, extra grande, extra extra grande).
-Cuando la lista de entradas esta visible, al pulsar Tab se mueve el foco entre el editor y los controles, mientras que Shift+Tab lo mueve hacia atras.
-Para agregar o quitar una entrada de favoritos, usa Tab para ir a la lista y agregala o quitala con la tecla Aplicaciones o el boton derecho del mouse. En la lista de favoritos tambien puedes usar la tecla Aplicaciones para quitar entradas ya agregadas.
-Atajos de teclado: es posible pulsar F9 y F10 para cambiar entre entradas durante la lectura, recorriendo las agregadas a favoritos.
-
+Tamaño del texto: Cambiar el tamaño del texto (pequeño, normal, grande, extra grande, extra extra grande).
+Cuando la lista de entradas está visible, al pulsar Tab se mueve el foco entre el editor y los controles, mientras que Shift+Tab lo mueve hacia atrás.
+Para agregar o quitar una entrada de favoritos, usa Tab para ir a la lista y agrégala o quítala con la tecla Aplicaciones o el botón derecho del ratón. En la lista de favoritos también puedes usar la tecla Aplicaciones para quitar entradas ya agregadas.
+Atajos de teclado: Pulsar F9 y F10 para cambiar entre entradas durante la lectura, recorriendo las agregadas a favoritos.
+ 
 Marcadores:
-Insertar marcador: Guardar la posicion actual del cursor o el tiempo del audiolibro (Ctrl+B).
-Gestionar marcadores: Ver, saltar o eliminar marcadores guardados. Al abrir un archivo con marcadores, el cursor o la reproduccion se reanudara automaticamente desde el primero disponible.
-
+Insertar marcador: Guardar la posición actual del cursor o el tiempo del audiolibro (Ctrl+B).
+Gestionar marcadores: Ver, saltar o eliminar marcadores guardados. Al abrir un archivo con marcadores, el cursor o la reproducción se reanudará automáticamente desde el primero disponible.
+ 
 Herramientas:
-Audiolibros en lote: abre la ventana para convertir una lista de archivos (o carpetas enteras) en audiolibros.
-- Agrega archivos/carpetas a la cola.
-- Elige carpeta de destino y formato (MP3 o WAV).
-- Opciones para crear subcarpetas y evitar sobrescribir.
-- Pulsa Iniciar para procesar todo en segundo plano.
+Audiolibros en lote: Abrir la ventana para convertir una lista de archivos (o carpetas completas) en audiolibros.
+• 
+Agregar archivos/carpetas a la cola.
+• 
+Elegir carpeta de destino y formato (MP3 o WAV).
+• 
+Opciones para crear subcarpetas y evitar sobrescrituras.
+• 
+Pulsar Iniciar para procesar todo en segundo plano.
 Diccionario: Abrir la ventana del diccionario. La lista se navega con las flechas Arriba/Abajo.
-Tab mueve a "Agregar entradas al diccionario", activado con Enter o Espacio.
-En la ventana agregar/editar: ingresa "Palabra original", luego Tab a "Palabra de reemplazo", luego OK o Cancelar (Enter/Espacio). ESC cancela.
+Tab mueve al botón "Agregar entradas al diccionario", activado con Enter o Espacio.
+En la ventana Agregar/Editar: ingresar "Palabra original", luego Tab a "Palabra de reemplazo", después OK o Cancelar (Enter/Espacio). Esc cancela.
 En la lista, Tab mueve a "Editar entrada" y "Eliminar entrada seleccionada".
-Los reemplazos del diccionario se aplican durante la lectura y la creacion de audiolibros y se guardan.
-Importar transcripcion de YouTube: pega una URL, elige el idioma e importa el texto al editor (Ctrl+Y). Opcional con marcas de tiempo.
-Buscar e importar desde Wikipedia: busca un articulo en Wikipedia e importa su texto al editor (Alt+Shift+W).
-Diccionario en linea: busca definiciones y traducciones en el Wikcionario en linea (Alt+Shift+D).
-Terminal accesible: abre un terminal dedicado con salida estable para lectores de pantalla (Ctrl+Shift+T).
+Los reemplazos del diccionario se aplican durante la lectura y la creación de audiolibros y se guardan automáticamente.
+Importar transcripción de YouTube: Pegar una URL, elegir el idioma e importar el texto al editor (Ctrl+Y). Opción para incluir marcas de tiempo.
+Buscar e importar desde Wikipedia: Buscar un artículo en Wikipedia e importar su texto al editor (Alt+Shift+W).
+Diccionario en línea: Buscar definiciones y traducciones en el Wikcionario en línea (Alt+Shift+D).
+Terminal accesible: Abrir un terminal dedicado con salida estable para lectores de pantalla (Ctrl+Shift+T).
 Atajos: Alt+I enfoca la entrada, Alt+O enfoca la salida, Tab/Shift+Tab mueve entre entrada, salida y opciones.
-Enter envia la entrada. Ctrl+C copia la salida (o envia Ctrl+C al programa). Ctrl+L limpia la salida con confirmacion.
-Opciones del terminal: auto-desplazamiento, eliminar ANSI, anunciar nuevas lineas, beep tras 1 s sin actividad, evitar suspension.
-Programas: Simbolo del sistema (cmd.exe), PowerShell, Codex CLI (desde Opciones).
-
-RSS / Articulos: abre la ventana RSS/Articulos, agrega fuentes, expande un feed y pulsa Enter para importar un articulo al editor.
-En la ventana RSS, selecciona un feed o sitio y pulsa Supr para eliminarlo de la biblioteca.
-En el menu contextual de un feed o sitio puedes modificar o eliminar un RSS o sitio.
-Despues de importar un articulo RSS, pulsa Esc para volver a la lista RSS.
-Podcast: abre la ventana Podcasts para buscar y gestionar suscripciones.
-En la lista de episodios, pulsa Enter para reproducir el episodio.
-Durante la reproduccion, Esc detiene el podcast y vuelve a la biblioteca.
-
+Enter envía la entrada. Ctrl+C copia la salida (o envía Ctrl+C al programa). Ctrl+L limpia la salida con confirmación.
+Opciones del terminal: desplazamiento automático, eliminar códigos ANSI de formato, anunciar nuevas líneas, aviso sonoro tras 1 s sin actividad, evitar suspensión.
+Programas disponibles: Símbolo del sistema (cmd.exe), PowerShell, Codex CLI (desde Opciones).
+ 
+RSS / Artículos:
+Abrir la ventana RSS/Artículos. Agregar fuentes, expandir un feed y pulsar Enter para importar un artículo al editor.
+En la ventana RSS, seleccionar un feed o sitio y pulsar Supr para eliminarlo de la biblioteca.
+En el menú contextual de un feed o sitio puedes modificar o eliminar una fuente RSS o un sitio.
+Después de importar un artículo RSS, pulsar Esc para volver a la lista RSS.
+ 
+Podcasts:
+Abrir la ventana Podcasts para buscar y gestionar suscripciones.
+En la lista de episodios, pulsar Enter para reproducir el episodio.
+Durante la reproducción, Esc detiene el podcast y vuelve a la biblioteca.
+ 
 Opciones:
 Idioma: Cambiar el idioma de la interfaz.
-Comportamiento de apertura: Abrir archivos en nueva pestaña o nueva ventana.
+Comportamiento de apertura: Abrir archivos en una nueva pestaña o en una nueva ventana.
 Voz: Elegir la voz para la lectura.
-Voces multilingues: Filtrar la lista de voces.
-Elegir tono, velocidad y volumen: Ajusta tono, velocidad y volumen para las voces (Microsoft y SAPI5). Se aplica a lectura y audiolibros.
-Mover cursor durante lectura: Seguir visualmente el texto mientras se lee.
-Division de audiolibro por texto: Divide cuando el marcador aparece al inicio de una linea (sensible a mayusculas: "Chapter" y "chapter" son diferentes). Ejemplo: con "Chapter" crea una parte por capitulo, incluyendo autor e introduccion en la primera parte hasta el primer Chapter. Si no se encuentra, no se divide.
+Voces multilingües: Filtrar la lista de voces.
+Elegir tono, velocidad y volumen: Ajustar tono, velocidad y volumen para las voces (Microsoft y SAPI5). Se aplica a lectura y audiolibros.
+Mover cursor durante la lectura: Seguir visualmente el texto mientras se lee.
+División de audiolibro por texto: Dividir cuando el marcador aparece al inicio de una línea (sensible a mayúsculas/minúsculas: "Chapter" y "chapter" son diferentes). Ejemplo: con "Chapter" crea una parte por capítulo, incluyendo autor e introducción en la primera parte hasta el primer Chapter. Si no se encuentra, no se divide.
 Otras opciones para dividir el audiolibro: 2 partes, 4 partes, 6 partes, 8 partes.
-
+ 
 Ayuda:
-Guia: Abrir esta guia (F1).
+Guía: Abrir esta guía (F1).
 Buscar actualizaciones: Comprobar si hay actualizaciones (F2).
-Changelog: Abrir la ventana de cambios.
-Acerca de: Mostrar la informacion del programa.
-
-
-
+Registro de cambios: Abrir la ventana de cambios.
+Acerca de: Mostrar la información del programa.

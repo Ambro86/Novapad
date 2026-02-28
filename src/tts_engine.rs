@@ -17,7 +17,7 @@ use std::io::{BufWriter, Cursor, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::mpsc;
 use tokio_tungstenite::{
     connect_async, tungstenite, tungstenite::client::IntoClientRequest,
@@ -42,7 +42,10 @@ pub const MAX_TTS_TEXT_LEN: usize = 3000;
 pub const MAX_TTS_TEXT_LEN_LONG: usize = 2000;
 pub const MAX_TTS_FIRST_CHUNK_LEN_LONG: usize = 800;
 pub const TTS_LONG_TEXT_THRESHOLD: usize = MAX_TTS_TEXT_LEN;
-const EDGE_TTS_MAX_BYTES: usize = 4096;
+// Some voices silently truncate long SSML payloads without returning an error.
+// Keep Edge chunks conservative to avoid partial audiobook exports.
+const EDGE_TTS_MAX_BYTES: usize = 1800;
+const KEEP_EDGE_TEMP_AFTER_CONVERSION: bool = false;
 
 pub const WM_TTS_PLAYBACK_DONE: u32 = WM_APP + 3;
 pub const WM_TTS_PLAYBACK_ERROR: u32 = WM_APP + 5;
@@ -335,6 +338,31 @@ pub struct AudiobookCommonOptions<'a> {
     pub pitch: i32,
     pub volume: i32,
     pub sapi4_threads: Option<u32>,
+    pub finalize_progress_steps: usize,
+}
+
+fn post_audiobook_progress(hwnd: HWND, current: usize) {
+    if hwnd.0 == 0 {
+        return;
+    }
+    unsafe {
+        if let Err(e) = PostMessageW(hwnd, crate::WM_UPDATE_PROGRESS, WPARAM(current), LPARAM(0)) {
+            crate::log_debug(&format!("Failed to post WM_UPDATE_PROGRESS: {}", e));
+        }
+    }
+}
+
+fn advance_finalize_progress(
+    options: &AudiobookCommonOptions<'_>,
+    current_global_progress: &mut usize,
+    remaining_steps: &mut usize,
+) {
+    if *remaining_steps == 0 {
+        return;
+    }
+    *current_global_progress = current_global_progress.saturating_add(1);
+    post_audiobook_progress(options.progress_hwnd, *current_global_progress);
+    *remaining_steps = remaining_steps.saturating_sub(1);
 }
 
 fn cancelled_message(language: Language) -> String {
@@ -1823,6 +1851,20 @@ async fn download_edge_chunk_ws(
         return Err("Edge WS: no audio sent".to_string());
     }
 
+    let text_utf16_len = utf16_len(&chunk.text_to_read);
+    let text_bytes_len = chunk.text_to_read.len();
+    let audio_bytes_len = chunk_buffer.len();
+    crate::log_debug(&format!(
+        "Edge WS: chunk completed (chunk_index={} text_bytes={} utf16_len={} audio_bytes={})",
+        idx, text_bytes_len, text_utf16_len, audio_bytes_len
+    ));
+    if audio_bytes_len < 4096 && text_utf16_len > 600 {
+        crate::log_debug(&format!(
+            "Edge WS: suspiciously small audio payload (chunk_index={} utf16_len={} audio_bytes={})",
+            idx, text_utf16_len, audio_bytes_len
+        ));
+    }
+
     Ok(chunk_buffer)
 }
 
@@ -1882,6 +1924,7 @@ async fn download_edge_chunk_ws_with_retry(
 }
 
 fn time_split_part_output(base: &Path, part_index: u32, start_number: u32) -> PathBuf {
+    const TIME_SPLIT_PART_WIDTH: usize = 4;
     let stem = base
         .file_stem()
         .and_then(|s| s.to_str())
@@ -1893,7 +1936,79 @@ fn time_split_part_output(base: &Path, part_index: u32, start_number: u32) -> Pa
         .filter(|s| !s.is_empty())
         .unwrap_or("mp3");
     let number = start_number.saturating_add(part_index);
-    base.with_file_name(format!("{stem}_part{number:02}.{ext}"))
+    base.with_file_name(format!(
+        "{stem} Part {number:0width$}.{ext}",
+        width = TIME_SPLIT_PART_WIDTH
+    ))
+}
+
+fn split_part_output(base: &Path, part_index: usize, total_parts: usize) -> PathBuf {
+    let stem = base
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("audiobook");
+    let ext = base
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("mp3");
+    let width = std::cmp::max(2, total_parts.to_string().len());
+    let number = part_index + 1;
+    base.with_file_name(format!("{stem} Part {number:0width$}.{ext}"))
+}
+
+fn collect_split_part_files(base: &Path) -> Result<Vec<PathBuf>, String> {
+    let stem = base
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("audiobook");
+    let ext = base
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_ascii_lowercase())
+        .unwrap_or_else(|| "m4b".to_string());
+    let prefix = format!("{stem} Part ");
+    let parent = base
+        .parent()
+        .ok_or_else(|| "Output path has no parent directory".to_string())?;
+    let mut found: Vec<(usize, PathBuf)> = Vec::new();
+    for entry in std::fs::read_dir(parent).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        let Some(stem_name) = path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        let Some(path_ext) = path.extension().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if !path_ext.eq_ignore_ascii_case(&ext) {
+            continue;
+        }
+        if !stem_name.starts_with(&prefix) {
+            continue;
+        }
+        let Some(num_str) = stem_name.strip_prefix(&prefix) else {
+            continue;
+        };
+        let Ok(idx) = num_str.parse::<usize>() else {
+            continue;
+        };
+        if idx == 0 {
+            continue;
+        }
+        found.push((idx, path));
+    }
+    found.sort_by_key(|(idx, _)| *idx);
+    Ok(found.into_iter().map(|(_, p)| p).collect())
+}
+
+fn merge_m4b_parts_with_chapters(
+    part_files: &[PathBuf],
+    output: &Path,
+    chapter_titles: Option<&[String]>,
+) -> Result<(), String> {
+    crate::ffmpeg_export::merge_audio_files_with_chapters_copy(part_files, output, chapter_titles)
 }
 
 fn split_parts_output_in_subfolder(output: &Path) -> PathBuf {
@@ -1929,11 +2044,19 @@ fn finish_time_split_part(
         return Ok(());
     };
     let res = if is_aac {
-        crate::mf_encoder::encode_wav_to_m4b(
+        let settings = crate::ffmpeg_export::ConvertAudioSettings {
+            format: crate::ffmpeg_export::ConvertAudioFormat::Aac,
+            quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(
+                options.audiobook_bitrate_kbps,
+            ),
+        };
+        let mut progress = |_p: u32| {};
+        crate::ffmpeg_export::convert_audio_file(
             &wav_path,
             part_output,
-            options.audiobook_bitrate_kbps,
-            |_| {},
+            &settings,
+            None,
+            Some(&mut progress),
         )
     } else {
         let settings = crate::ffmpeg_export::ConvertAudioSettings {
@@ -2419,6 +2542,7 @@ async fn download_edge_chunks_ws_parallel_to_writer(
 ) -> Result<usize, String> {
     const MAX_PARALLEL_CHUNKS: usize = 8;
     const CHUNK_RETRIES: usize = 6;
+    let is_lithuanian_voice = options.voice.to_ascii_lowercase().starts_with("lt-");
 
     if start_index >= chunks.len() {
         return Ok(chunks.len());
@@ -2426,11 +2550,73 @@ async fn download_edge_chunks_ws_parallel_to_writer(
 
     let mut pending: BTreeMap<usize, Vec<u8>> = BTreeMap::new();
     let mut next_to_write = start_index;
+    let mut written_chunks = 0usize;
+    let mut skipped_empty_chunks = 0usize;
+    let mut total_audio_bytes = 0usize;
 
     let mut stream = futures_util::stream::iter(chunks.iter().enumerate().skip(start_index))
         .map(|(idx, chunk)| async move {
-            let res = download_edge_chunk_ws_with_retry(chunk, options, idx, CHUNK_RETRIES).await;
-            (idx, res)
+            let mut validate_attempt = 0usize;
+            loop {
+                if options.cancel.load(Ordering::Relaxed) {
+                    break (idx, Err("Cancelled".to_string()));
+                }
+
+                validate_attempt = validate_attempt.saturating_add(1);
+                let res = if is_lithuanian_voice {
+                    match download_edge_chunk_ws_adaptive_lt(chunk, options, idx, CHUNK_RETRIES, 0)
+                        .await
+                    {
+                        Ok(mut audio) => {
+                            if is_lt_audio_suspicious(&chunk.text_to_read, audio.len())
+                                && let Ok(strict_audio) = download_edge_chunk_ws_strict_small_lt(
+                                    chunk,
+                                    options,
+                                    idx,
+                                    CHUNK_RETRIES,
+                                )
+                                .await
+                                && strict_audio.len() > audio.len()
+                            {
+                                audio = strict_audio;
+                            }
+                            Ok(audio)
+                        }
+                        Err(err) => Err(err),
+                    }
+                } else {
+                    download_edge_chunk_ws_with_retry(chunk, options, idx, CHUNK_RETRIES).await
+                };
+
+                let audio = match res {
+                    Ok(audio) => audio,
+                    Err(err) => {
+                        crate::log_debug(&format!(
+                            "Edge WS: chunk {} fetch failed on validation attempt {}: {}. Retrying...",
+                            idx, validate_attempt, err
+                        ));
+                        continue;
+                    }
+                };
+
+                match decode_mp3_to_pcm(&audio) {
+                    Ok((samples, _rate, _channels)) if !samples.is_empty() => {
+                        break (idx, Ok(audio));
+                    }
+                    Ok((_samples, _rate, _channels)) => {
+                        crate::log_debug(&format!(
+                            "Edge WS: chunk {} invalid audio (empty decoded samples) on validation attempt {}. Retrying...",
+                            idx, validate_attempt
+                        ));
+                    }
+                    Err(err) => {
+                        crate::log_debug(&format!(
+                            "Edge WS: chunk {} invalid audio (decode error) on validation attempt {}: {}. Retrying...",
+                            idx, validate_attempt, err
+                        ));
+                    }
+                }
+            }
         })
         .buffer_unordered(MAX_PARALLEL_CHUNKS);
 
@@ -2440,13 +2626,9 @@ async fn download_edge_chunks_ws_parallel_to_writer(
         }
         let audio = res?;
         pending.insert(idx, audio);
-
         while let Some(data) = pending.remove(&next_to_write) {
             if data.is_empty() {
-                crate::log_debug(&format!(
-                    "Edge WS: skipping empty audio payload after sanitization (chunk_index={}).",
-                    next_to_write
-                ));
+                skipped_empty_chunks = skipped_empty_chunks.saturating_add(1);
                 *current_global_progress += 1;
                 if options.progress_hwnd.0 != 0 {
                     unsafe {
@@ -2465,6 +2647,8 @@ async fn download_edge_chunks_ws_parallel_to_writer(
             }
             writer.write_all(&data).map_err(|err| err.to_string())?;
             writer.flush().map_err(|err| err.to_string())?;
+            written_chunks = written_chunks.saturating_add(1);
+            total_audio_bytes = total_audio_bytes.saturating_add(data.len());
 
             *current_global_progress += 1;
             if options.progress_hwnd.0 != 0 {
@@ -2482,6 +2666,12 @@ async fn download_edge_chunks_ws_parallel_to_writer(
             next_to_write = next_to_write.saturating_add(1);
         }
     }
+
+    let expected_chunks = chunks.len().saturating_sub(start_index);
+    crate::log_debug(&format!(
+        "Edge WS export summary: expected_chunks={} written_chunks={} skipped_empty_chunks={} total_audio_bytes={}",
+        expected_chunks, written_chunks, skipped_empty_chunks, total_audio_bytes
+    ));
 
     Ok(chunks.len())
 }
@@ -2722,14 +2912,108 @@ fn normalize_weird_spaces(text: &str) -> String {
     out
 }
 
-pub fn normalize_for_tts(text: &str, split_on_newline: bool) -> String {
+#[derive(Clone, Copy)]
+enum TtsSanitizeProfile {
+    Safe,
+    Strict,
+}
+
+fn normalize_tts_strict_chars(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for ch in text.chars() {
+        let mapped = match ch {
+            // Smart/directional double quotes -> plain quote
+            '“' | '”' | '„' | '‟' | '«' | '»' | '〝' | '〞' => '"',
+            // Smart/directional single quotes/apostrophes -> plain apostrophe
+            '‘' | '’' | '‚' | '‛' | '‹' | '›' | '`' | '´' => '\'',
+            // Long dashes/minus variants -> hyphen-minus
+            '–' | '—' | '―' | '−' => '-',
+            _ => ch,
+        };
+
+        // Horizontal ellipsis -> three dots
+        if mapped == '…' {
+            out.push_str("...");
+            continue;
+        }
+
+        // Keep only letters/digits/whitespace and a conservative punctuation set.
+        let safe_punct = matches!(
+            mapped,
+            '.' | ','
+                | ';'
+                | ':'
+                | '!'
+                | '?'
+                | '"'
+                | '\''
+                | '-'
+                | '('
+                | ')'
+                | '['
+                | ']'
+                | '{'
+                | '}'
+                | '/'
+                | '\\'
+                | '@'
+                | '#'
+                | '%'
+                | '&'
+                | '+'
+                | '='
+                | '*'
+                | '_'
+                | '<'
+                | '>'
+                | '|'
+                | '~'
+        );
+
+        if mapped.is_alphanumeric() || mapped.is_whitespace() || safe_punct {
+            out.push(mapped);
+        } else {
+            out.push(' ');
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+fn preview_for_log(text: &str, max_chars: usize) -> String {
+    let mut out = String::with_capacity(max_chars);
+    for ch in text.chars().take(max_chars) {
+        if ch == '\n' || ch == '\r' || ch == '\t' {
+            out.push(' ');
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
+fn normalize_for_tts_with_profile(
+    text: &str,
+    split_on_newline: bool,
+    profile: TtsSanitizeProfile,
+) -> String {
     let normalized_spaces = normalize_weird_spaces(text);
-    let normalized = if split_on_newline {
+    let mut normalized = if split_on_newline {
         normalized_spaces
     } else {
         normalized_spaces.replace('\n', " ").replace('\r', "")
     };
-    normalized.replace(['«', '»'], "")
+    match profile {
+        TtsSanitizeProfile::Safe => normalized.replace(['«', '»'], ""),
+        TtsSanitizeProfile::Strict => {
+            normalized = normalize_tts_strict_chars(&normalized);
+            normalized
+        }
+    }
+}
+
+pub fn normalize_for_tts(text: &str, split_on_newline: bool) -> String {
+    normalize_for_tts_with_profile(text, split_on_newline, TtsSanitizeProfile::Safe)
 }
 
 fn apply_dictionary(text: &str, dictionary: &[DictionaryEntry]) -> String {
@@ -3214,6 +3498,162 @@ fn split_text_edge(text: &str) -> Vec<String> {
     out
 }
 
+fn split_text_edge_with_limit(text: &str, max_bytes: usize) -> Vec<String> {
+    let cleaned = sanitize_edge_text(text);
+    let escaped = escape_xml(&cleaned);
+    let sentences = split_sentences(&escaped);
+    let mut out = Vec::new();
+    let mut current = String::new();
+
+    for sentence in sentences {
+        let sentence_trim = sentence.trim();
+        if sentence_trim.is_empty() {
+            continue;
+        }
+
+        let sentence_len = sentence_trim.len();
+        if current.is_empty() {
+            if sentence_len > max_bytes {
+                out.extend(split_long_sentence_edge_with_limit(
+                    sentence_trim,
+                    max_bytes,
+                ));
+            } else {
+                current.push_str(sentence_trim);
+            }
+        } else {
+            let combined_len = current.len().saturating_add(1).saturating_add(sentence_len);
+            if combined_len > max_bytes {
+                out.push(current.trim().to_string());
+                current.clear();
+                if sentence_len > max_bytes {
+                    out.extend(split_long_sentence_edge_with_limit(
+                        sentence_trim,
+                        max_bytes,
+                    ));
+                } else {
+                    current.push_str(sentence_trim);
+                }
+            } else {
+                current.push(' ');
+                current.push_str(sentence_trim);
+            }
+        }
+    }
+
+    if !current.trim().is_empty() {
+        out.push(current.trim().to_string());
+    }
+
+    out
+}
+
+fn split_edge_chunk_in_two(text: &str) -> Option<(String, String)> {
+    if text.trim().is_empty() || text.len() < 8 {
+        return None;
+    }
+    let mid = text.len() / 2;
+    let mut split_at = find_edge_split_idx(text, mid);
+    if split_at == 0 || split_at >= text.len() {
+        split_at = find_edge_split_idx(text, text.len().saturating_sub(1));
+    }
+    if split_at == 0 || split_at >= text.len() {
+        return None;
+    }
+    let (a, b) = text.split_at(split_at);
+    let a = a.trim().to_string();
+    let b = b.trim().to_string();
+    if a.is_empty() || b.is_empty() {
+        return None;
+    }
+    Some((a, b))
+}
+
+fn is_lt_audio_suspicious(text: &str, audio_len: usize) -> bool {
+    let text_len = utf16_len(text);
+    if text_len < 120 {
+        return false;
+    }
+    let min_expected = text_len.saturating_mul(120);
+    audio_len < min_expected
+}
+
+async fn download_edge_chunk_ws_adaptive_lt(
+    chunk: &TtsChunk,
+    options: &EdgeStreamOptions<'_>,
+    idx: usize,
+    max_retries: usize,
+    depth: usize,
+) -> Result<Vec<u8>, String> {
+    let audio = download_edge_chunk_ws_with_retry(chunk, options, idx, max_retries).await?;
+    if !is_lt_audio_suspicious(&chunk.text_to_read, audio.len()) {
+        return Ok(audio);
+    }
+    if depth >= 3 {
+        return Ok(audio);
+    }
+    let Some((left, right)) = split_edge_chunk_in_two(&chunk.text_to_read) else {
+        return Ok(audio);
+    };
+
+    let left_chunk = TtsChunk {
+        text_to_read: left,
+        original_len: chunk.original_len / 2,
+        override_voice: chunk.override_voice.clone(),
+    };
+    let right_chunk = TtsChunk {
+        text_to_read: right,
+        original_len: chunk.original_len.saturating_sub(left_chunk.original_len),
+        override_voice: chunk.override_voice.clone(),
+    };
+
+    let left_audio = Box::pin(download_edge_chunk_ws_adaptive_lt(
+        &left_chunk,
+        options,
+        idx,
+        max_retries,
+        depth + 1,
+    ))
+    .await?;
+    let right_audio = Box::pin(download_edge_chunk_ws_adaptive_lt(
+        &right_chunk,
+        options,
+        idx,
+        max_retries,
+        depth + 1,
+    ))
+    .await?;
+
+    let mut merged = Vec::with_capacity(left_audio.len().saturating_add(right_audio.len()));
+    merged.extend_from_slice(&left_audio);
+    merged.extend_from_slice(&right_audio);
+    Ok(merged)
+}
+
+async fn download_edge_chunk_ws_strict_small_lt(
+    chunk: &TtsChunk,
+    options: &EdgeStreamOptions<'_>,
+    idx: usize,
+    max_retries: usize,
+) -> Result<Vec<u8>, String> {
+    const STRICT_LIMIT: usize = 320;
+    let parts = split_text_edge_with_limit(&chunk.text_to_read, STRICT_LIMIT);
+    if parts.len() <= 1 {
+        return download_edge_chunk_ws_with_retry(chunk, options, idx, max_retries).await;
+    }
+    let mut out = Vec::new();
+    for part in parts {
+        let sub = TtsChunk {
+            text_to_read: part,
+            original_len: chunk.original_len,
+            override_voice: chunk.override_voice.clone(),
+        };
+        let audio = download_edge_chunk_ws_with_retry(&sub, options, idx, max_retries).await?;
+        out.extend_from_slice(&audio);
+    }
+    Ok(out)
+}
+
 fn split_sentences(text: &str) -> Vec<&str> {
     let mut out = Vec::new();
     let mut start = 0usize;
@@ -3381,9 +3821,8 @@ fn split_text_for_engine(text: &str, engine: TtsEngine) -> Vec<String> {
 
 fn split_by_custom_dictionary(
     text: &str,
-    custom_entries: &[DictionaryEntry],
+    _custom_entries: &[DictionaryEntry],
 ) -> Vec<(String, Option<VoiceOverride>, usize)> {
-    let _ = custom_entries;
     if text.is_empty() {
         Vec::new()
     } else {
@@ -3537,7 +3976,7 @@ fn start_audiobook_with_text(
         audiobook_split_by_time,
         audiobook_split_minutes,
         audiobook_split_start_number,
-        audiobook_m4b_bitrate,
+        initial_audiobook_m4b_bitrate,
         tts_engine,
         dictionary,
         tts_rate,
@@ -3612,6 +4051,7 @@ fn start_audiobook_with_text(
     let mut marker_parts: Option<Vec<Vec<String>>> = None;
     let mut marker_positions: Option<Vec<usize>> = None;
     let mut marker_text: Option<String> = None;
+    let mut selected_marker_titles: Option<Vec<String>> = None;
     let mut mixed_marker_parts: Option<Vec<Vec<TtsChunk>>> = None;
     let mut sapi4_threads: Option<u32> = None;
 
@@ -3684,6 +4124,12 @@ fn start_audiobook_with_text(
                 .iter()
                 .filter_map(|idx| entries.get(*idx).map(|e| e.pos))
                 .collect();
+            selected_marker_titles = Some(
+                selected
+                    .iter()
+                    .filter_map(|idx| entries.get(*idx).map(|e| e.label.clone()))
+                    .collect(),
+            );
             if positions.is_empty() {
                 split_parts = 0;
             } else {
@@ -3750,6 +4196,17 @@ fn start_audiobook_with_text(
         false
     };
     let split_into_multiple_files = expected_multi_file_split;
+    let chapter_titles = if use_epub_split {
+        epub_chapters.as_ref().map(|chs| {
+            chs.iter()
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>()
+        })
+    } else {
+        selected_marker_titles.clone()
+    };
     crate::log_debug(&format!(
         "Audiobook: split summary split_by_time={} split_parts={} chunks={} marker_parts={} mixed_marker_parts={} expected_multi_file_split={}",
         split_by_time,
@@ -3771,6 +4228,10 @@ fn start_audiobook_with_text(
     };
     let mut output = save_result.path;
     let create_parts_folder = save_result.create_parts_folder;
+    let audiobook_m4b_bitrate = unsafe {
+        with_state(hwnd, |state| state.settings.audiobook_m4b_bitrate)
+            .unwrap_or(initial_audiobook_m4b_bitrate)
+    };
     crate::log_debug(&format!(
         "Audiobook: settings bitrate resolved to {} kbps for output {:?}",
         audiobook_m4b_bitrate, output
@@ -3802,10 +4263,49 @@ fn start_audiobook_with_text(
     } else {
         chunks.len()
     };
+    let output_extension = output
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let is_aac_output =
+        output_extension == "m4b" || output_extension == "m4a" || output_extension == "mp4";
+    let expected_output_parts = if let Some(parts) = &mixed_marker_parts {
+        parts.iter().filter(|p| !p.is_empty()).count().max(1)
+    } else if let Some(parts) = &marker_parts {
+        parts.iter().filter(|p| !p.is_empty()).count().max(1)
+    } else if split_parts > 1 {
+        std::cmp::min(split_parts as usize, chunks_len).max(1)
+    } else {
+        1usize
+    };
+    // Per-part finalize progress steps consumed inside run_tts_audiobook_part.
+    let finalize_progress_steps_per_part =
+        if tts_engine == TtsEngine::Edge && is_aac_output && expected_multi_file_split {
+            // One step per part conversion to avoid hitting 100% before the last chapter conversion.
+            1usize
+        } else if tts_engine == TtsEngine::Edge
+            && !split_by_time
+            && split_parts == 0
+            && marker_parts.is_none()
+            && mixed_marker_parts.is_none()
+            && !expected_multi_file_split
+        {
+            4usize
+        } else {
+            0usize
+        };
+    let extra_progress_steps =
+        if tts_engine == TtsEngine::Edge && is_aac_output && expected_multi_file_split {
+            expected_output_parts
+        } else {
+            finalize_progress_steps_per_part
+        };
+    let progress_total = chunks_len.saturating_add(extra_progress_steps);
 
     let cancel_token = Arc::new(AtomicBool::new(false));
     let progress_hwnd = unsafe {
-        let h = crate::app_windows::audiobook_window::open(hwnd, chunks_len);
+        let h = crate::app_windows::audiobook_window::open(hwnd, progress_total);
         if with_state(hwnd, |state| {
             state.audiobook_progress = h;
             state.audiobook_cancel = Some(cancel_token.clone());
@@ -3819,16 +4319,37 @@ fn start_audiobook_with_text(
 
     let cancel_clone = cancel_token.clone();
     std::thread::spawn(move || {
-        let extension = output
+        let final_output = output.clone();
+        let extension = final_output
             .extension()
             .and_then(|s| s.to_str())
             .unwrap_or("")
             .to_lowercase();
         let is_aac = extension == "m4b" || extension == "m4a" || extension == "mp4";
+        let aac_with_chapters = is_aac && expected_multi_file_split;
+        let emit_part_files = !is_aac || aac_with_chapters;
+        let chapter_work_output = if aac_with_chapters {
+            let stem = final_output
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("audiobook");
+            let ext = final_output
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or("m4b");
+            let stamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(0);
+            final_output.with_file_name(format!("{stem}.chapbuild.{stamp}.{ext}"))
+        } else {
+            final_output.clone()
+        };
+        let work_output_for_cleanup = chapter_work_output.clone();
 
         let options = AudiobookCommonOptions {
             voice: &voice,
-            output: &output,
+            output: &chapter_work_output,
             progress_hwnd,
             cancel: cancel_clone,
             language,
@@ -3837,6 +4358,7 @@ fn start_audiobook_with_text(
             pitch: tts_pitch,
             volume: tts_volume,
             sapi4_threads,
+            finalize_progress_steps: finalize_progress_steps_per_part,
         };
         let engine_name = match tts_engine {
             TtsEngine::Edge => "edge",
@@ -3861,20 +4383,10 @@ fn start_audiobook_with_text(
                         if part_chunks.is_empty() {
                             continue;
                         }
-                        let part_output = if parts_len > 1 && !is_aac {
-                            let stem = output
-                                .file_stem()
-                                .and_then(|s| s.to_str())
-                                .unwrap_or("audiobook");
-                            let ext = output
-                                .extension()
-                                .and_then(|s| s.to_str())
-                                .map(str::trim)
-                                .filter(|s| !s.is_empty())
-                                .unwrap_or("mp3");
-                            output.with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
+                        let part_output = if parts_len > 1 && emit_part_files {
+                            split_part_output(options.output, part_idx, parts_len)
                         } else {
-                            output.to_path_buf()
+                            options.output.to_path_buf()
                         };
                         render_mixed_audiobook_part(
                             part_chunks,
@@ -3885,24 +4397,18 @@ fn start_audiobook_with_text(
                         )?;
                     }
                 } else if let Some(ref chunks) = mixed_chunks {
-                    let parts_count = if is_aac { 1 } else { split_parts as usize };
+                    let parts_count = if emit_part_files {
+                        split_parts as usize
+                    } else {
+                        1
+                    };
                     let parts = split_tts_chunks_by_parts(chunks, parts_count);
                     let parts_len = parts.len();
                     for (part_idx, part_chunks) in parts.iter().enumerate() {
-                        let part_output = if parts_len > 1 && !is_aac {
-                            let stem = output
-                                .file_stem()
-                                .and_then(|s| s.to_str())
-                                .unwrap_or("audiobook");
-                            let ext = output
-                                .extension()
-                                .and_then(|s| s.to_str())
-                                .map(str::trim)
-                                .filter(|s| !s.is_empty())
-                                .unwrap_or("mp3");
-                            output.with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
+                        let part_output = if parts_len > 1 && emit_part_files {
+                            split_part_output(options.output, part_idx, parts_len)
                         } else {
-                            output.to_path_buf()
+                            options.output.to_path_buf()
                         };
                         render_mixed_audiobook_part(
                             part_chunks,
@@ -3919,7 +4425,7 @@ fn start_audiobook_with_text(
             match tts_engine {
                 TtsEngine::Edge => {
                     if let Some(ref parts) = marker_parts {
-                        if is_aac {
+                        if is_aac && !aac_with_chapters {
                             // Merge all marker parts into one for AAC
                             let all_chunks: Vec<String> = parts.iter().flatten().cloned().collect();
                             run_split_audiobook(&all_chunks, 0, options)
@@ -3935,13 +4441,17 @@ fn start_audiobook_with_text(
                             options,
                         )
                     } else {
-                        run_split_audiobook(&chunks, if is_aac { 0 } else { split_parts }, options)
+                        run_split_audiobook(
+                            &chunks,
+                            if emit_part_files { split_parts } else { 0 },
+                            options,
+                        )
                     }
                 }
                 TtsEngine::Sapi4 => {
                     let voice_idx = parse_sapi4_voice_index(&voice);
                     if let Some(ref parts) = marker_parts {
-                        if is_aac {
+                        if is_aac && !aac_with_chapters {
                             let all_chunks: Vec<String> = parts.iter().flatten().cloned().collect();
                             run_split_sapi4_audiobook(&all_chunks, voice_idx, 0, options)
                         } else {
@@ -3960,14 +4470,14 @@ fn start_audiobook_with_text(
                         run_split_sapi4_audiobook(
                             &chunks,
                             voice_idx,
-                            if is_aac { 0 } else { split_parts },
+                            if emit_part_files { split_parts } else { 0 },
                             options,
                         )
                     }
                 }
                 TtsEngine::Sapi5 => {
                     if let Some(ref parts) = marker_parts {
-                        if is_aac {
+                        if is_aac && !aac_with_chapters {
                             let all_chunks: Vec<String> = parts.iter().flatten().cloned().collect();
                             run_split_sapi_audiobook(&all_chunks, 0, options)
                         } else {
@@ -3985,7 +4495,7 @@ fn start_audiobook_with_text(
                     } else {
                         run_split_sapi_audiobook(
                             &chunks,
-                            if is_aac { 0 } else { split_parts },
+                            if emit_part_files { split_parts } else { 0 },
                             options,
                         )
                     }
@@ -3993,26 +4503,28 @@ fn start_audiobook_with_text(
             }
         };
         if result.is_ok() && split_by_time && !time_split_done {
-            let stem = output
+            let stem = final_output
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("audiobook");
-            let ext = output
+            let ext = final_output
                 .extension()
                 .and_then(|s| s.to_str())
                 .map(str::trim)
                 .filter(|s| !s.is_empty())
                 .unwrap_or("mp3");
-            let pattern = output.with_file_name(format!("{stem}_part%02d.{ext}"));
+            const TIME_SPLIT_PART_WIDTH: usize = 4;
+            let pattern = final_output
+                .with_file_name(format!("{stem} Part %0{TIME_SPLIT_PART_WIDTH}d.{ext}"));
             let segment_seconds = split_minutes.saturating_mul(60);
             result = crate::ffmpeg_export::segment_audio_file(
-                &output,
+                &final_output,
                 &pattern,
                 segment_seconds,
                 split_start_number,
             );
             if result.is_ok()
-                && let Err(e) = std::fs::remove_file(&output)
+                && let Err(e) = std::fs::remove_file(&final_output)
             {
                 crate::log_debug(&format!(
                     "Failed to remove original audiobook after segmenting: {}",
@@ -4021,11 +4533,56 @@ fn start_audiobook_with_text(
             }
         }
 
-        let success = result.is_ok();
+        let mut success = result.is_ok();
+        if success && aac_with_chapters {
+            match collect_split_part_files(&work_output_for_cleanup) {
+                Ok(part_files) if part_files.len() > 1 => {
+                    match merge_m4b_parts_with_chapters(
+                        &part_files,
+                        &final_output,
+                        chapter_titles.as_deref(),
+                    ) {
+                        Ok(()) => {
+                            for file in &part_files {
+                                if let Err(e) = std::fs::remove_file(file) {
+                                    crate::log_debug(&format!(
+                                        "M4B chapter merge cleanup: failed to remove part {}: {}",
+                                        file.display(),
+                                        e
+                                    ));
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            crate::log_debug(&format!("M4B chapter merge failed: {}", e));
+                            result = Err(e);
+                            success = false;
+                        }
+                    }
+                }
+                Ok(_) => {
+                    result = Err("M4B chapter merge: not enough part files".to_string());
+                    success = false;
+                }
+                Err(e) => {
+                    result = Err(e);
+                    success = false;
+                }
+            }
+            if work_output_for_cleanup.exists()
+                && let Err(e) = std::fs::remove_file(&work_output_for_cleanup)
+            {
+                crate::log_debug(&format!(
+                    "M4B chapter merge cleanup: failed to remove temp output {}: {}",
+                    work_output_for_cleanup.display(),
+                    e
+                ));
+            }
+        }
 
-        if success && is_aac && !split_by_time {
+        if success && is_aac && !split_by_time && !aac_with_chapters {
             // Set metadata for the single M4B file
-            let file_title = output
+            let file_title = final_output
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("Audiobook");
@@ -4044,7 +4601,7 @@ fn start_audiobook_with_text(
             }
 
             if crate::audio_utils::set_file_metadata(
-                &output,
+                &final_output,
                 Some(file_title),
                 Some("Sonarpad"),
                 if comment.is_empty() {
@@ -4226,21 +4783,7 @@ fn run_split_audiobook(
         let part_chunks = &chunks[start_idx..end_idx];
 
         let part_output = if parts > 1 {
-            let stem = options
-                .output
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("audiobook");
-            let ext = options
-                .output
-                .extension()
-                .and_then(|s| s.to_str())
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-                .unwrap_or("mp3");
-            options
-                .output
-                .with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
+            split_part_output(options.output, part_idx, parts)
         } else {
             options.output.to_path_buf()
         };
@@ -4257,6 +4800,7 @@ fn run_split_audiobook(
             pitch: options.pitch,
             volume: options.volume,
             sapi4_threads: options.sapi4_threads,
+            finalize_progress_steps: 0,
         };
 
         run_tts_audiobook_part(part_chunks, &mut current_global_progress, &part_options)?;
@@ -4276,21 +4820,7 @@ fn run_marker_split_audiobook(
             continue;
         }
         let part_output = if parts_len > 1 {
-            let stem = options
-                .output
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("audiobook");
-            let ext = options
-                .output
-                .extension()
-                .and_then(|s| s.to_str())
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-                .unwrap_or("mp3");
-            options
-                .output
-                .with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
+            split_part_output(options.output, part_idx, parts_len)
         } else {
             options.output.to_path_buf()
         };
@@ -4306,6 +4836,7 @@ fn run_marker_split_audiobook(
             pitch: options.pitch,
             volume: options.volume,
             sapi4_threads: options.sapi4_threads,
+            finalize_progress_steps: 0,
         };
 
         run_tts_audiobook_part(part_chunks, &mut current_global_progress, &part_options)?;
@@ -4343,21 +4874,7 @@ fn run_split_sapi4_audiobook(
 
         let part_chunks = &chunks[start_idx..end_idx];
         let part_output = if parts_count > 1 {
-            let stem = options
-                .output
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("audiobook");
-            let ext = options
-                .output
-                .extension()
-                .and_then(|s| s.to_str())
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-                .unwrap_or("mp3");
-            options
-                .output
-                .with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
+            split_part_output(options.output, part_idx, parts_count)
         } else {
             options.output.to_path_buf()
         };
@@ -4373,6 +4890,7 @@ fn run_split_sapi4_audiobook(
             pitch: options.pitch,
             volume: options.volume,
             sapi4_threads: options.sapi4_threads,
+            finalize_progress_steps: 0,
         };
 
         run_sapi4_parallel_part(
@@ -4397,21 +4915,7 @@ fn run_marker_split_sapi4_audiobook(
         }
 
         let part_output = if parts.len() > 1 {
-            let stem = options
-                .output
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("audiobook");
-            let ext = options
-                .output
-                .extension()
-                .and_then(|s| s.to_str())
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-                .unwrap_or("mp3");
-            options
-                .output
-                .with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
+            split_part_output(options.output, part_idx, parts.len())
         } else {
             options.output.to_path_buf()
         };
@@ -4427,6 +4931,7 @@ fn run_marker_split_sapi4_audiobook(
             pitch: options.pitch,
             volume: options.volume,
             sapi4_threads: options.sapi4_threads,
+            finalize_progress_steps: 0,
         };
 
         run_sapi4_parallel_part(
@@ -4694,8 +5199,9 @@ mod tests {
     use super::{
         TtsEngine, build_audiobook_parts_by_positions, collect_marker_entries, find_edge_split_idx,
         is_edge_text_usable, normalize_for_tts, parse_edge_binary_audio_payload,
-        parse_sapi4_part_index, sanitize_edge_text, split_into_tts_chunks,
-        split_long_sentence_edge_with_limit, split_voice_tag_spans, strip_dashed_lines,
+        parse_sapi4_part_index, prepare_tts_text, preview_for_log, sanitize_edge_text,
+        split_into_tts_chunks, split_long_sentence_edge_with_limit, split_text_for_engine,
+        split_voice_tag_spans, strip_dashed_lines,
     };
 
     #[test]
@@ -4938,7 +5444,9 @@ mod tests {
 
     #[test]
     fn audiobook_liturgia_no_skipped_or_reordered_lines() {
-        let path = r"C:\Users\ambro\Downloads\05-02-2026.txt";
+        let path_owned = std::env::var("SONARPAD_TTS_TEST_PATH")
+            .unwrap_or_else(|_| r"C:\Users\ambro\Downloads\05-02-2026.txt".to_string());
+        let path = path_owned.as_str();
         let raw = match std::fs::read_to_string(path) {
             Ok(s) => s,
             Err(e) => {
@@ -5065,6 +5573,40 @@ mod tests {
             chunks.len()
         );
     }
+
+    #[test]
+    fn audiobook_real_pipeline_chunk_count_for_env_file() {
+        let path_owned = std::env::var("SONARPAD_TTS_TEST_PATH")
+            .unwrap_or_else(|_| r"C:\Users\ambro\Downloads\05-02-2026.txt".to_string());
+        let path = path_owned.as_str();
+        let raw = match std::fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("Skipping test – cannot read {path}: {e}");
+                return;
+            }
+        };
+
+        let cleaned = strip_dashed_lines(&raw);
+        let prepared = prepare_tts_text(&cleaned, true, &[]);
+        let chunks = split_text_for_engine(&prepared, TtsEngine::Edge);
+
+        assert!(
+            !chunks.is_empty(),
+            "real audiobook pipeline produced 0 chunks"
+        );
+
+        let first_preview = preview_for_log(&chunks[0], 140);
+        let last_preview = preview_for_log(&chunks[chunks.len() - 1], 140);
+        eprintln!(
+            "REAL PIPELINE: cleaned_chars={} prepared_chars={} chunks={} first=\"{}\" last=\"{}\"",
+            cleaned.chars().count(),
+            prepared.chars().count(),
+            chunks.len(),
+            first_preview,
+            last_preview
+        );
+    }
 }
 
 fn merge_and_finalize_sapi4_audio(
@@ -5084,7 +5626,6 @@ fn merge_and_finalize_sapi4_audio(
         .to_lowercase();
     let is_mp3 = extension == "mp3";
     let is_aac = extension == "m4b" || extension == "m4a" || extension == "mp4";
-
     let final_wav = if is_mp3 || is_aac {
         output.with_extension("wav.tmp")
     } else {
@@ -5096,11 +5637,19 @@ fn merge_and_finalize_sapi4_audio(
 
     if is_mp3 || is_aac {
         let res = if is_aac {
-            crate::mf_encoder::encode_wav_to_m4b(
+            let settings = crate::ffmpeg_export::ConvertAudioSettings {
+                format: crate::ffmpeg_export::ConvertAudioFormat::Aac,
+                quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(
+                    options.audiobook_bitrate_kbps,
+                ),
+            };
+            let mut progress = |_p: u32| {};
+            crate::ffmpeg_export::convert_audio_file(
                 &final_wav,
                 output,
-                options.audiobook_bitrate_kbps,
-                |_| {},
+                &settings,
+                None,
+                Some(&mut progress),
             )
         } else {
             let settings = crate::ffmpeg_export::ConvertAudioSettings {
@@ -5371,21 +5920,7 @@ fn run_split_sapi_audiobook(
         let part_chunks = &chunks[start_idx..end_idx];
 
         let part_output = if parts > 1 {
-            let stem = options
-                .output
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("audiobook");
-            let ext = options
-                .output
-                .extension()
-                .and_then(|s| s.to_str())
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-                .unwrap_or("mp3");
-            options
-                .output
-                .with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
+            split_part_output(options.output, part_idx, parts)
         } else {
             options.output.to_path_buf()
         };
@@ -5408,6 +5943,7 @@ fn run_split_sapi_audiobook(
                 pitch: options.pitch,
                 volume: options.volume,
                 sapi4_threads: options.sapi4_threads,
+                finalize_progress_steps: 0,
             };
             run_sapi5_parallel_part(part_chunks, &mut current_global_progress, &part_options)?;
             continue;
@@ -5460,11 +5996,19 @@ fn run_split_sapi_audiobook(
         })?;
 
         if is_aac {
-            let res = crate::mf_encoder::encode_wav_to_m4b(
+            let settings = crate::ffmpeg_export::ConvertAudioSettings {
+                format: crate::ffmpeg_export::ConvertAudioFormat::Aac,
+                quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(
+                    options.audiobook_bitrate_kbps,
+                ),
+            };
+            let mut progress = |_p: u32| {};
+            let res = crate::ffmpeg_export::convert_audio_file(
                 &actual_output,
                 &part_output,
-                options.audiobook_bitrate_kbps,
-                |_| {},
+                &settings,
+                None,
+                Some(&mut progress),
             );
             std::fs::remove_file(&actual_output).ok();
             res?;
@@ -5485,21 +6029,7 @@ fn run_marker_split_sapi_audiobook(
             continue;
         }
         let part_output = if parts_len > 1 {
-            let stem = options
-                .output
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("audiobook");
-            let ext = options
-                .output
-                .extension()
-                .and_then(|s| s.to_str())
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-                .unwrap_or("mp3");
-            options
-                .output
-                .with_file_name(format!("{}_part{}.{}", stem, part_idx + 1, ext))
+            split_part_output(options.output, part_idx, parts_len)
         } else {
             options.output.to_path_buf()
         };
@@ -5522,6 +6052,7 @@ fn run_marker_split_sapi_audiobook(
                 pitch: options.pitch,
                 volume: options.volume,
                 sapi4_threads: options.sapi4_threads,
+                finalize_progress_steps: 0,
             };
             run_sapi5_parallel_part(part_chunks, &mut current_global_progress, &part_options)?;
             continue;
@@ -5574,11 +6105,19 @@ fn run_marker_split_sapi_audiobook(
         })?;
 
         if is_aac {
-            let res = crate::mf_encoder::encode_wav_to_m4b(
+            let settings = crate::ffmpeg_export::ConvertAudioSettings {
+                format: crate::ffmpeg_export::ConvertAudioFormat::Aac,
+                quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(
+                    options.audiobook_bitrate_kbps,
+                ),
+            };
+            let mut progress = |_p: u32| {};
+            let res = crate::ffmpeg_export::convert_audio_file(
                 &actual_output,
                 &part_output,
-                options.audiobook_bitrate_kbps,
-                |_| {},
+                &settings,
+                None,
+                Some(&mut progress),
             );
             std::fs::remove_file(&actual_output).ok();
             res?;
@@ -5592,6 +6131,34 @@ pub(crate) fn run_tts_audiobook_part(
     current_global_progress: &mut usize,
     options: &AudiobookCommonOptions,
 ) -> Result<(), String> {
+    let mut remaining_finalize_progress_steps = options.finalize_progress_steps;
+    let is_lithuanian_voice = options.voice.to_ascii_lowercase().starts_with("lt-");
+    const LT_EDGE_MAX_BYTES: usize = 900;
+
+    let chunk_texts: Vec<String> = {
+        let mut out = Vec::new();
+        for chunk in chunks {
+            // Force strict sanitization for audiobook edge chunks by default.
+            // Safe profile remains available for non-audiobook paths.
+            let normalized =
+                normalize_for_tts_with_profile(chunk, true, TtsSanitizeProfile::Strict);
+            let trimmed = normalized.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            if is_lithuanian_voice && normalized.len() > LT_EDGE_MAX_BYTES {
+                out.extend(
+                    split_text_edge_with_limit(&normalized, LT_EDGE_MAX_BYTES)
+                        .into_iter()
+                        .filter(|s| !s.trim().is_empty()),
+                );
+            } else {
+                out.push(normalized);
+            }
+        }
+        out
+    };
+
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -5602,11 +6169,11 @@ pub(crate) fn run_tts_audiobook_part(
             return Err(cancelled_message(options.language));
         }
 
-        if chunks.is_empty() {
+        if chunk_texts.is_empty() {
             return Ok(());
         }
 
-        let edge_chunks: Vec<TtsChunk> = chunks
+        let edge_chunks: Vec<TtsChunk> = chunk_texts
             .iter()
             .map(|chunk| TtsChunk {
                 text_to_read: chunk.clone(),
@@ -5686,31 +6253,22 @@ pub(crate) fn run_tts_audiobook_part(
     let is_aac = extension == "m4b" || extension == "m4a" || extension == "mp4";
 
     if is_aac {
-        let wav_path = options.output.with_extension("wav.tmp");
-        if let Err(e) = std::fs::rename(options.output, &wav_path) {
-            return Err(format!("Failed to rename for M4B conversion: {}", e));
-        }
-
-        let res = crate::mf_encoder::encode_wav_to_m4b(
-            &wav_path,
-            options.output,
-            options.audiobook_bitrate_kbps,
-            |_| {},
+        advance_finalize_progress(
+            options,
+            current_global_progress,
+            &mut remaining_finalize_progress_steps,
         );
-        std::fs::remove_file(&wav_path).ok();
-        res?;
-    } else if is_mp3 {
         let source_mp3 = options.output.with_extension("edge_source.tmp.mp3");
         let source_wav = options.output.with_extension("edge_source.tmp.wav");
         if let Err(e) = std::fs::rename(options.output, &source_mp3) {
-            return Err(format!("Failed to prepare MP3 conversion: {}", e));
+            return Err(format!("Failed to prepare AAC conversion: {}", e));
         }
 
         let wav_result = (|| -> Result<(), String> {
             let bytes = std::fs::read(&source_mp3)
-                .map_err(|e| format!("Failed to read source MP3 for re-encode: {}", e))?;
+                .map_err(|e| format!("Failed to read source MP3 for AAC conversion: {}", e))?;
             let (samples, src_rate, src_channels) = decode_mp3_to_pcm(&bytes)?;
-            let target_rate = 44_100u32;
+            let target_rate = 48_000u32;
             let target_channels = 2u16;
             let resampled = resample_pcm(
                 &samples,
@@ -5721,28 +6279,168 @@ pub(crate) fn run_tts_audiobook_part(
             );
             write_wav_from_pcm(&source_wav, &resampled, target_rate, target_channels)
         })();
+        advance_finalize_progress(
+            options,
+            current_global_progress,
+            &mut remaining_finalize_progress_steps,
+        );
         if let Err(err) = wav_result {
             crate::log_debug(&format!(
-                "MP3 post-process skipped: WAV conversion failed, keeping original MP3: {}",
+                "AAC post-process skipped: WAV conversion failed: {}",
                 err
             ));
+            if let Err(restore_err) = std::fs::rename(&source_mp3, options.output) {
+                crate::log_debug(&format!(
+                    "Failed to restore source MP3 after AAC conversion failure: {}",
+                    restore_err
+                ));
+                return Err(format!(
+                    "Failed to restore source MP3 after AAC conversion failure: {}",
+                    restore_err
+                ));
+            }
+            if let Err(remove_err) = std::fs::remove_file(&source_wav) {
+                crate::log_debug(&format!(
+                    "Failed to remove temp WAV after AAC conversion failure: {}",
+                    remove_err
+                ));
+            }
+            return Ok(());
+        }
+
+        let aac_settings = crate::ffmpeg_export::ConvertAudioSettings {
+            format: crate::ffmpeg_export::ConvertAudioFormat::Aac,
+            quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(
+                options.audiobook_bitrate_kbps,
+            ),
+        };
+        let mut ffmpeg_progress = |_p: u32| {};
+        let convert_result = crate::ffmpeg_export::convert_audio_file(
+            &source_wav,
+            options.output,
+            &aac_settings,
+            None,
+            Some(&mut ffmpeg_progress),
+        );
+        advance_finalize_progress(
+            options,
+            current_global_progress,
+            &mut remaining_finalize_progress_steps,
+        );
+        if let Err(err) = convert_result {
+            crate::log_if_err!(std::fs::remove_file(options.output));
+            if let Err(restore_err) = std::fs::rename(&source_mp3, options.output) {
+                crate::log_debug(&format!(
+                    "Failed to restore source MP3 after AAC re-encode failure: {}",
+                    restore_err
+                ));
+            }
+            if let Err(remove_err) = std::fs::remove_file(&source_wav) {
+                crate::log_debug(&format!(
+                    "Failed to remove temp WAV after AAC re-encode failure: {}",
+                    remove_err
+                ));
+            }
+            return Err(err);
+        }
+        if !KEEP_EDGE_TEMP_AFTER_CONVERSION {
+            if let Err(remove_err) = std::fs::remove_file(&source_wav) {
+                crate::log_debug(&format!(
+                    "Failed to remove temp WAV after AAC re-encode: {}",
+                    remove_err
+                ));
+            }
+            if let Err(remove_err) = std::fs::remove_file(&source_mp3) {
+                crate::log_debug(&format!(
+                    "Failed to remove temp source MP3 after AAC re-encode: {}",
+                    remove_err
+                ));
+            }
+        } else {
+            crate::log_debug("Keeping AAC edge temp files (debug mode)");
+        }
+        advance_finalize_progress(
+            options,
+            current_global_progress,
+            &mut remaining_finalize_progress_steps,
+        );
+    } else if is_mp3 {
+        advance_finalize_progress(
+            options,
+            current_global_progress,
+            &mut remaining_finalize_progress_steps,
+        );
+        let source_mp3 = options.output.with_extension("edge_source.tmp.mp3");
+        let source_wav = options.output.with_extension("edge_source.tmp.wav");
+        if let Err(e) = std::fs::rename(options.output, &source_mp3) {
+            return Err(format!("Failed to prepare MP3 conversion: {}", e));
+        }
+
+        let wav_settings = crate::ffmpeg_export::ConvertAudioSettings {
+            format: crate::ffmpeg_export::ConvertAudioFormat::Wav,
+            quality: crate::ffmpeg_export::ConvertAudioQuality::None,
+        };
+        const MP3_TO_WAV_MAX_ATTEMPTS: usize = 12;
+        let mut wav_result = Err("MP3->WAV conversion not attempted".to_string());
+        for attempt in 1..=MP3_TO_WAV_MAX_ATTEMPTS {
+            wav_result = crate::ffmpeg_export::convert_audio_file_with_channels(
+                &source_mp3,
+                &source_wav,
+                &wav_settings,
+                None,
+                None,
+                Some(2),
+            );
+            if wav_result.is_ok() {
+                break;
+            }
+            if let Err(remove_err) = std::fs::remove_file(&source_wav)
+                && remove_err.kind() != std::io::ErrorKind::NotFound
+            {
+                crate::log_debug(&format!(
+                    "Failed to remove partial WAV output after MP3->WAV attempt {}: {}",
+                    attempt, remove_err
+                ));
+            }
+            if attempt < MP3_TO_WAV_MAX_ATTEMPTS {
+                if let Err(err) = &wav_result {
+                    crate::log_debug(&format!(
+                        "MP3->WAV attempt {}/{} failed: {}. Retrying...",
+                        attempt, MP3_TO_WAV_MAX_ATTEMPTS, err
+                    ));
+                }
+                std::thread::sleep(std::time::Duration::from_millis(300));
+            }
+        }
+        advance_finalize_progress(
+            options,
+            current_global_progress,
+            &mut remaining_finalize_progress_steps,
+        );
+        if let Err(err) = wav_result {
+            crate::log_if_err!(std::fs::remove_file(options.output));
             if let Err(restore_err) = std::fs::rename(&source_mp3, options.output) {
                 crate::log_debug(&format!(
                     "Failed to restore original MP3 after WAV conversion failure: {}",
                     restore_err
                 ));
                 return Err(format!(
-                    "Failed to restore original MP3 after conversion failure: {}",
-                    restore_err
+                    "MP3->WAV failed after {} attempts ({}) and restore failed: {}",
+                    MP3_TO_WAV_MAX_ATTEMPTS, err, restore_err
                 ));
             }
-            if let Err(remove_err) = std::fs::remove_file(&source_wav) {
+            if let Err(remove_err) = std::fs::remove_file(&source_wav)
+                && remove_err.kind() != std::io::ErrorKind::NotFound
+            {
                 crate::log_debug(&format!(
                     "Failed to remove temp WAV after conversion failure: {}",
                     remove_err
                 ));
             }
-            return Ok(());
+            return Err(format!(
+                "MP3->WAV failed after {} attempts: {}",
+                MP3_TO_WAV_MAX_ATTEMPTS, err
+            ));
         }
 
         let mp3_settings = crate::ffmpeg_export::ConvertAudioSettings {
@@ -5758,12 +6456,43 @@ pub(crate) fn run_tts_audiobook_part(
                 last_convert_pct = pct;
             }
         };
-        let reencode_result = crate::ffmpeg_export::convert_audio_file(
-            &source_wav,
-            options.output,
-            &mp3_settings,
-            None,
-            Some(&mut ffmpeg_progress),
+        const MP3_REENCODE_MAX_ATTEMPTS: usize = 12;
+        let mut reencode_result = Err("MP3 re-encode not attempted".to_string());
+        for attempt in 1..=MP3_REENCODE_MAX_ATTEMPTS {
+            reencode_result = crate::ffmpeg_export::convert_audio_file(
+                &source_wav,
+                options.output,
+                &mp3_settings,
+                None,
+                Some(&mut ffmpeg_progress),
+            );
+            if reencode_result.is_ok() {
+                break;
+            }
+
+            if let Err(remove_err) = std::fs::remove_file(options.output)
+                && remove_err.kind() != std::io::ErrorKind::NotFound
+            {
+                crate::log_debug(&format!(
+                    "Failed to remove partial MP3 output after re-encode attempt {}: {}",
+                    attempt, remove_err
+                ));
+            }
+
+            if attempt < MP3_REENCODE_MAX_ATTEMPTS {
+                if let Err(err) = &reencode_result {
+                    crate::log_debug(&format!(
+                        "MP3 re-encode attempt {}/{} failed: {}. Retrying...",
+                        attempt, MP3_REENCODE_MAX_ATTEMPTS, err
+                    ));
+                }
+                std::thread::sleep(std::time::Duration::from_millis(300));
+            }
+        }
+        advance_finalize_progress(
+            options,
+            current_global_progress,
+            &mut remaining_finalize_progress_steps,
         );
         if let Err(err) = reencode_result {
             crate::log_if_err!(std::fs::remove_file(options.output));
@@ -5773,27 +6502,42 @@ pub(crate) fn run_tts_audiobook_part(
                     restore_err
                 ));
             }
-            if let Err(remove_err) = std::fs::remove_file(&source_wav) {
+            if let Err(remove_err) = std::fs::remove_file(&source_wav)
+                && remove_err.kind() != std::io::ErrorKind::NotFound
+            {
                 crate::log_debug(&format!(
                     "Failed to remove temp WAV after re-encode failure: {}",
                     remove_err
                 ));
             }
-            return Err(err);
-        }
-
-        if let Err(remove_err) = std::fs::remove_file(&source_wav) {
-            crate::log_debug(&format!(
-                "Failed to remove temp WAV after MP3 re-encode: {}",
-                remove_err
+            return Err(format!(
+                "MP3 re-encode failed after {} attempts: {}",
+                MP3_REENCODE_MAX_ATTEMPTS, err
             ));
         }
-        if let Err(remove_err) = std::fs::remove_file(&source_mp3) {
-            crate::log_debug(&format!(
-                "Failed to remove source MP3 after re-encode: {}",
-                remove_err
-            ));
+        if !KEEP_EDGE_TEMP_AFTER_CONVERSION {
+            if let Err(remove_err) = std::fs::remove_file(&source_wav)
+                && remove_err.kind() != std::io::ErrorKind::NotFound
+            {
+                crate::log_debug(&format!(
+                    "Failed to remove temp WAV after MP3 re-encode: {}",
+                    remove_err
+                ));
+            }
+            if let Err(remove_err) = std::fs::remove_file(&source_mp3) {
+                crate::log_debug(&format!(
+                    "Failed to remove source MP3 after re-encode: {}",
+                    remove_err
+                ));
+            }
+        } else {
+            crate::log_debug("Keeping MP3 edge temp files (debug mode)");
         }
+        advance_finalize_progress(
+            options,
+            current_global_progress,
+            &mut remaining_finalize_progress_steps,
+        );
     }
 
     Ok(())
@@ -5919,11 +6663,19 @@ pub(crate) fn render_mixed_audiobook_part(
     }
 
     if is_aac {
-        let res = crate::mf_encoder::encode_wav_to_m4b(
+        let settings = crate::ffmpeg_export::ConvertAudioSettings {
+            format: crate::ffmpeg_export::ConvertAudioFormat::Aac,
+            quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(
+                options.audiobook_bitrate_kbps,
+            ),
+        };
+        let mut progress = |_p: u32| {};
+        let res = crate::ffmpeg_export::convert_audio_file(
             &actual_output,
             output,
-            options.audiobook_bitrate_kbps,
-            |_| {},
+            &settings,
+            None,
+            Some(&mut progress),
         );
         std::fs::remove_file(&actual_output).ok();
         res?;

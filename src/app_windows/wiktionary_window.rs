@@ -71,6 +71,7 @@ fn dictionary_cache_key(language: Language, pref: &str, word: &str) -> String {
     let lang = match language {
         Language::Italian => "it",
         Language::Ukrainian | Language::English => "en",
+        Language::Lithuanian => "lt",
         Language::Spanish => "es",
         Language::Portuguese => "pt",
         Language::Swedish => "sv",
@@ -79,6 +80,7 @@ fn dictionary_cache_key(language: Language, pref: &str, word: &str) -> String {
         Language::Polish => "pl",
         Language::French => "fr",
         Language::Serbian => "sr",
+        Language::Chinese => "zh",
     };
     format!(
         "{}|{}|{}",
@@ -195,6 +197,8 @@ fn language_from_code(code: &str, fallback: Language) -> Language {
         "fr" => Language::French,
         "sr" => Language::Serbian,
         "uk" => Language::Ukrainian,
+        "lt" => Language::Lithuanian,
+        "zh" => Language::Chinese,
         _ => fallback,
     }
 }
@@ -367,6 +371,8 @@ unsafe fn wiktionary_wndproc_inner(
                 (i18n::tr(language, "options.lang.fr"), "fr"),
                 (i18n::tr(language, "options.lang.sr"), "sr"),
                 (i18n::tr(language, "options.lang.uk"), "uk"),
+                (i18n::tr(language, "options.lang.lt"), "lt"),
+                (i18n::tr(language, "options.lang.zh"), "zh"),
             ];
             let saved_lookup_pref = with_state(parent, |state| {
                 state.settings.dictionary_lookup_language.clone()
@@ -782,6 +788,8 @@ unsafe fn run_lookup(hwnd: HWND) {
             9 => "fr",
             10 => "sr",
             11 => "uk",
+            12 => "lt",
+            13 => "zh",
             _ => "auto",
         }
         .to_string()

@@ -167,6 +167,14 @@ impl BassOutput {
             let seek_ok = unsafe { (api.channel_set_position)(handle, pos, BASS_POS_BYTE) };
             if seek_ok == 0 {
                 log_bass_error(api, "BASS_ChannelSetPosition");
+                let free_ok = unsafe { (api.stream_free)(handle) };
+                if free_ok == 0 {
+                    log_bass_error(api, "BASS_StreamFree (seek-fail)");
+                }
+                return Err(format!(
+                    "BASS initial seek failed (error {})",
+                    bass_error(api)
+                ));
             }
         }
 

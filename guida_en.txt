@@ -2,7 +2,7 @@ Program Guide
 
 File:
 New: Create a new document (Ctrl+N).
-Open: Open text files, PDF, EPUB, MP3, and other supported formats (Ctrl+O).
+Open: Open text files, PDFs, EPUBs, MP3s, and other supported formats (Ctrl+O).
 Save: Save the document (Ctrl+S).
 Save As: Save with a new name.
 Save All: Save all documents (Ctrl+Shift+S).
@@ -10,7 +10,7 @@ Close Tab: Close the current document (Ctrl+W).
 Recent Files: Open a recent file.
 
 Voice and audio:
-Reading: F5 Start reading, F4 Pause/Resume, F6 Stop reading.
+Reading: F5 Start Reading, F4 Pause/Resume, F6 Stop Reading.
 Favorites during reading: F9 previous favorite voice, F10 next favorite voice.
 Record Audiobook: Create an MP3 file from the current text (Ctrl+R).
 Batch Audiobooks: Convert a list of files into audiobooks (Ctrl+Shift+B).
@@ -49,8 +49,8 @@ Keep Unique Items: Remove duplicate lines in the paragraph or selection (Alt+Shi
 Reverse Items: Reverse the lines in the paragraph or selection (Alt+Shift+Z).
 Quote Lines: Add a prefix to lines in the paragraph or selection (Ctrl+Q).
 Unquote Lines: Remove the prefix from lines in the paragraph or selection (Ctrl+Shift+Q).
-Text Statistics: Shows characters, words, and lines for selection or document (Alt+Y).
-Spellcheck navigation: F7 previous error, F8 next error.
+Text Statistics: Show characters, words, and lines for the selection or document (Alt+Y).
+Spellcheck Navigation: F7 previous error, F8 next error.
 
 View:
 Show voices in editor: Show voice system, voice list, and multilingual filter.
@@ -59,43 +59,43 @@ Text color: Change the text color (including light and dark colors).
 Text size: Change the text size (small, normal, large, extra large, extra extra large).
 When the list of entries is visible, pressing Tab moves the focus between the editor and the controls, while Shift+Tab moves it backward.
 To add or remove an entry from favorites, use Tab to move to the list of entries and add or remove it using the Applications key or the right mouse button. From the list of favorite entries, you can also press the Applications key to remove entries that have already been added.
-Keyboard shortcuts: it is possible to press F9 and F10 to switch between entries during reading, cycling through those added to favorites.
+Keyboard shortcuts: Press F9 and F10 to switch between entries during reading, cycling through those added to favorites.
 
 Bookmarks:
 Insert Bookmark: Save the current cursor position or audiobook time (Ctrl+B).
 Manage Bookmarks: View, jump to, or delete saved bookmarks. When opening a file with bookmarks, the cursor or playback will automatically resume from the first available one.
 
 Tools:
-Batch Audiobooks: opens a window to convert a list of files (or entire folders) into audiobooks.
+Batch Audiobooks: Opens a window to convert a list of files (or entire folders) into audiobooks.
 - Add files/folders to the queue.
 - Choose destination folder and format (MP3 or WAV).
 - Options to create subfolders and avoid overwrites.
 - Press Start to process everything in the background.
-Dictionary: Open the dictionary window. The list is navigated with Up/Down arrows.
+Dictionary: Opens the dictionary window. The list is navigated with Up/Down arrows.
 Tab moves to the "Add entries to dictionary" button, activated with Enter or Space.
 In the add/edit window: enter "Original word", then Tab to "Replacement word", then OK or Cancel (Enter/Space). ESC cancels.
 In the list, Tab moves to "Edit entry" and "Remove selected entry".
-Dictionary replacements are applied during reading and audiobook creation and are saved.
+Dictionary replacements are applied during reading and audiobook creation and are saved automatically.
 Import YouTube transcript: paste a URL, choose the language, and import the text into the editor (Ctrl+Y). Optional timestamps.
 Search and import from Wikipedia: search for an article on Wikipedia and import its text into the editor (Alt+Shift+W).
 Online dictionary: search for definitions and translations in the online Wiktionary (Alt+Shift+D).
-Accessible Terminal: opens a dedicated terminal with stable output for screen readers (Ctrl+Shift+T).
+Accessible Terminal: Opens a dedicated terminal with stable output for screen readers (Ctrl+Shift+T).
 Shortcuts: Alt+I focuses input, Alt+O focuses output, Tab/Shift+Tab moves between input, output, and options.
 Enter sends the input. Ctrl+C copies the output (or sends Ctrl+C to the program). Ctrl+L clears the output with confirmation.
-Terminal options: auto-scroll, strip ANSI, announce new lines, beep after 1s idle, prevent sleep.
+Terminal options: auto-scroll, strip ANSI codes, announce new lines, beep after 1 s idle, prevent sleep.
 Program choices: Command Prompt (cmd.exe), PowerShell, Codex CLI (from Options).
 
-RSS / Articles: opens the RSS/Articles window, add sources, expand a feed, and press Enter to import an article into the editor.
+RSS / Articles: Opens the RSS/Articles window. Add sources, expand a feed, and press Enter to import an article into the editor.
 In the RSS window, select a feed or site and press Delete to remove it from the library.
-From the context menu on a feed or site you can edit or delete an RSS or site.
-After importing an RSS article, press Esc to return to the RSS list.
-Podcasts: opens the Podcasts window to search and manage subscriptions.
+From the context menu of a feed or site, you can edit or delete the RSS source or site.
+After importing an article, press Esc to return to the RSS list.
+Podcasts: Opens the Podcasts window to search and manage subscriptions.
 In the episode list, press Enter to play the episode.
 During playback, Esc stops the podcast and returns to the library.
 
 Options:
 Language: Change interface language.
-Open Behavior: Open files in new tab or new window.
+Open Behavior: Open files in a new tab or a new window.
 Voice: Choose voice for reading.
 Multilingual Voices: Filter voice list.
 Choose pitch, speed, and volume: Set pitch, speed, and volume for voices (both Microsoft and SAPI5). Applies to reading and audiobooks.
@@ -106,7 +106,7 @@ Other options to split the audiobook: 2 parts, 4 parts, 6 parts, 8 parts.
 Help:
 Guide: Open this guide (F1).
 Check for updates: Check if updates are available (F2).
-Changelog: Open the changelog window.
-About: Show program information.
+Changelog: Opens the changelog window.
+About: Shows program information.
 
 

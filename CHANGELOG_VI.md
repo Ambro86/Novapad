@@ -2,6 +2,7 @@
 
 Phiên bản 0.6.7 – 2026-02-13
 Cải tiến
+• Đã cập nhật bản địa hóa tiếng Trung và tiếng Litva trên toàn bộ tài nguyên ứng dụng, bao gồm hướng dẫn/nội dung quyên góp và bản dịch trình cài đặt NSIS (thêm chuỗi cài đặt mới cho tiếng Trung giản thể và tiếng Litva, đồng thời hoàn thiện bản dịch tiếng Ukraina của setup).
 • Da bo sung ho tro proxy mang toan cuc (HTTP/HTTPS va SOCKS5/SOCKS5H) cho cac tinh nang truc tuyen, kem kiem tra khi luu Tuy chon: proxy khong hop le se duoc canh bao va xoa tu dong.
 • Da them tinh nang moi trong Cong cu: "Phat am thanh tu streaming...", cho phep dan URL (YouTube hoac lien ket media truc tiep), chon dinh dang dau ra va ho so chat luong/bitrate (bao gom chat luong/bitrate goc cho MP3 va MP4) va phat ngay trong trinh phat cua Sonarpad.
 • Da them ho tro phim da phuong tien Play/Pause cua he thong (tai nghe/ban phim): nay co the dieu khien ca phat media va tam dung/tiep tuc doc van ban (uu tien trinh phat media khi ca hai dang hoat dong).
@@ -27,9 +28,10 @@ Cải tiến
 • Đã thêm hỗ trợ ban đầu cho tham số dòng lệnh: `-h`/`--help` hiển thị trợ giúp nhanh và `--version` hiển thị phiên bản chương trình.
 • Đã làm rõ hơn cách chỉnh tay tốc độ và cao độ: các ô chỉnh tay giờ dùng thang lấy 100 làm mốc, trong đó 100 tương ứng giá trị bình thường.
 • Đã cải thiện chọn giọng Microsoft trong cả Tùy chọn > Giọng nói và bảng giọng nói của trình soạn thảo: thêm combobox ngôn ngữ đã bản địa hóa để lọc giọng theo ngôn ngữ, đồng thời vẫn giữ chế độ “chỉ giọng đa ngôn ngữ” là một danh sách duy nhất không chia theo ngôn ngữ (ẩn combobox ngôn ngữ khi chế độ này bật).
-• Đã thêm cấu hình giọng cho hội thoại trong Tùy chọn > Giọng nói với điều hướng đầy đủ bằng Tab, dùng cùng mô hình giọng của giao diện chính (engine, bộ lọc ngôn ngữ Edge, giọng và tốc độ/cao độ/âm lượng có nhãn); quy tắc hội thoại được lưu trong cấu hình `.ini`, không sửa đổi văn bản tài liệu.
+• Đã thêm cấu hình giọng cho hội thoại trong Tùy chọn > Giọng nói với điều hướng đầy đủ bằng Tab, dùng cùng mô hình giọng của giao diện chính (engine, bộ lọc ngôn ngữ Edge, giọng và tốc độ/cao độ/âm lượng có nhãn); thêm giọng hội thoại thứ hai tùy chọn với cùng nhóm điều khiển (engine, bộ lọc ngôn ngữ Edge, giọng, tốc độ/cao độ/âm lượng) để luân phiên hội thoại; quy tắc hội thoại được lưu trong cấu hình `.ini`, không sửa đổi văn bản tài liệu.
 • Đã cải thiện nhãn Hoàn tác: mục Chỉnh sửa > Hoàn tác giờ hiển thị hành động sẽ được hoàn tác (ví dụ chỉnh sửa văn bản, thêm/bỏ comment dòng hoặc chèn thẻ giọng nói), đồng thời vẫn bị vô hiệu khi không có gì để hoàn tác.
 Sửa lỗi
+• Đã cải thiện tạo sách nói M4B với metadata và marker chương; đã sửa lỗi "chipmunk" (giọng quá cao/quá nhanh) trong tệp M4B tạo ra.
 • Đã sửa giao diện bitrate trong cửa sổ lưu sách nói: đã bỏ các nhãn hardcoded bằng tiếng Ý và thêm tùy chọn 64 kbps vào danh sách bitrate có thể chọn.
 • Đã sửa "Lưu tất cả" (Ctrl+Shift+S): giờ đây tất cả tài liệu đang mở đã chỉnh sửa đều được phát hiện ổn định (kể cả tab mới/chưa lưu), và Lưu tất cả sẽ lưu đúng từng tài liệu, mở "Lưu thành" khi cần.
 • Đã sửa thứ tự bài RSS từ Google News: khi có ngày xuất bản, bài viết giờ được hiển thị từ mới nhất đến cũ nhất.

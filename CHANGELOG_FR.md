@@ -2,6 +2,7 @@
 
 Version 0.6.7 – 2026-02-13
 Améliorations
+• Mise à jour de la localisation chinoise et lituanienne dans l’ensemble des ressources de l’application, y compris le guide/texte des dons et les traductions de l’installateur NSIS (nouvelles chaînes d’installation en chinois simplifié et lituanien, ainsi que finalisation de la traduction ukrainienne du setup).
 • Ajout de la prise en charge globale du proxy réseau (HTTP/HTTPS et SOCKS5/SOCKS5H) pour les fonctions en ligne, avec validation à l'enregistrement des options : les proxys invalides sont signalés puis supprimés automatiquement.
 • Ajout d'une nouvelle fonction dans Outils : « Lire l'audio en streaming... », permettant de coller une URL (YouTube ou lien média direct), de choisir le format de sortie et le profil qualité/débit binaire (y compris qualité/débit d'origine pour MP3 et MP4), puis de lancer la lecture dans le lecteur audio de Sonarpad.
 • Ajout de la prise en charge de la touche multimédia système Lecture/Pause (casque/clavier) : elle contrôle désormais à la fois la lecture multimédia et la pause/reprise de la lecture de texte (priorité au lecteur multimédia lorsque les deux sont actifs).
@@ -27,9 +28,10 @@ Améliorations
 • Ajout d’un support initial des paramètres en ligne de commande : `-h`/`--help` affichent l’aide rapide et `--version` affiche la version du programme.
 • Réglage manuel de la vitesse et de la tonalité rendu plus clair : les champs manuels utilisent désormais une échelle centrée sur 100, où 100 correspond à la valeur normale.
 • Amélioration de la sélection des voix Microsoft dans Options > Voix et dans le panneau des voix de l’éditeur : ajout d’une liste de langue localisée pour filtrer les voix par langue, tout en conservant le mode « voix multilingues uniquement » comme une liste unique non séparée par langue (liste de langue masquée lorsqu’il est activé).
-• Ajout de la configuration de la voix pour les dialogues dans Options > Voix avec navigation complète au clavier (Tab), en réutilisant le même modèle de voix que l’interface principale (moteur, filtre de langue Edge, voix et vitesse/tonalité/volume avec libellés) ; les règles de dialogue sont enregistrées dans la configuration `.ini`, sans modifier le texte du document.
+• Ajout de la configuration de la voix pour les dialogues dans Options > Voix avec navigation complète au clavier (Tab), en réutilisant le même modèle de voix que l’interface principale (moteur, filtre de langue Edge, voix et vitesse/tonalité/volume avec libellés) ; ajout également d’une deuxième voix de dialogue optionnelle avec les mêmes contrôles (moteur, filtre de langue Edge, voix, vitesse/tonalité/volume) pour alterner les dialogues ; les règles de dialogue sont enregistrées dans la configuration `.ini`, sans modifier le texte du document.
 • Amélioration de l'étiquette Annuler : l'entrée Édition > Annuler affiche désormais l'action qui sera annulée (par exemple édition de texte, commenter/décommenter des lignes ou insertion de balise de voix), tout en restant indisponible lorsqu'il n'y a rien à annuler.
 Corrections de bugs
+• Amélioration de la création des livres audio M4B avec métadonnées de chapitres et marqueurs de chapitre ; correction du problème « chipmunk » (voix trop aiguë/rapide) dans les fichiers M4B générés.
 • Correction de l’interface bitrate dans la fenêtre d’enregistrement de livre audio : suppression des libellés italiens codés en dur et ajout de 64 kbps dans les débits sélectionnables.
 • Correction de « Enregistrer tout » (Ctrl+Shift+S) : tous les documents ouverts modifiés sont désormais détectés de façon fiable (y compris les onglets nouveaux/non enregistrés) et l’enregistrement global fonctionne correctement pour chacun, avec « Enregistrer sous » lorsque nécessaire.
 • Correction de l'ordre des articles RSS Google News : lorsque la date est disponible, les articles sont désormais affichés du plus récent au plus ancien.

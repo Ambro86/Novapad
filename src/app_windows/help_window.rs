@@ -27,6 +27,7 @@ const READONLY_TEXT_CLASS_NAME: &str = "SonarpadReadonlyText";
 const READONLY_TEXT_ID_OK: usize = 7013;
 const DONATIONS_IT: &str = include_str!("../../donations_it.txt");
 const DONATIONS_EN: &str = include_str!("../../donations_en.txt");
+const DONATIONS_UK: &str = include_str!("../../donations_uk.txt");
 const DONATIONS_ES: &str = include_str!("../../donations_es.txt");
 const DONATIONS_PT: &str = include_str!("../../donations_pt.txt");
 const DONATIONS_SV: &str = include_str!("../../donations_sv.txt");
@@ -34,6 +35,8 @@ const DONATIONS_CS: &str = include_str!("../../donations_cs.txt");
 const DONATIONS_PL: &str = include_str!("../../donations_pl.txt");
 const DONATIONS_FR: &str = include_str!("../../donations_fr.txt");
 const DONATIONS_SR: &str = include_str!("../../donations_sr.txt");
+const DONATIONS_LT: &str = include_str!("../../donations_lt.txt");
+const DONATIONS_ZH: &str = include_str!("../../donations_zh.txt");
 
 fn read_override_text(file_name: &str) -> Option<String> {
     let exe_path = match std::env::current_exe() {
@@ -392,9 +395,8 @@ unsafe fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
             let content = match init.kind {
                 HelpWindowKind::Guide => match init.language {
                     Language::Italian => include_str!("../../guida.txt").to_string(),
-                    Language::Ukrainian | Language::English => {
-                        include_str!("../../guida_en.txt").to_string()
-                    }
+                    Language::Ukrainian => include_str!("../../guida_uk.txt").to_string(),
+                    Language::English => include_str!("../../guida_en.txt").to_string(),
                     Language::Spanish => include_str!("../../guida_es.txt").to_string(),
                     Language::Portuguese => include_str!("../../guida_pt.txt").to_string(),
                     Language::Swedish => read_override_text("guida_sv.txt")
@@ -408,6 +410,8 @@ unsafe fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
                         .unwrap_or_else(|| include_str!("../../guida_fr.txt").to_string()),
                     Language::Serbian => read_override_text("guida_sr.txt")
                         .unwrap_or_else(|| include_str!("../../guida_sr.txt").to_string()),
+                    Language::Lithuanian => include_str!("../../guida_lt.txt").to_string(),
+                    Language::Chinese => include_str!("../../guida_zh.txt").to_string(),
                 },
                 HelpWindowKind::Changelog => match init.language {
                     Language::Italian => include_str!("../../CHANGELOG_IT.md").to_string(),
@@ -422,6 +426,8 @@ unsafe fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
                     Language::Polish => include_str!("../../CHANGELOG_PL.md").to_string(),
                     Language::French => include_str!("../../CHANGELOG_FR.md").to_string(),
                     Language::Serbian => include_str!("../../CHANGELOG.md").to_string(),
+                    Language::Lithuanian => include_str!("../../CHANGELOG.md").to_string(),
+                    Language::Chinese => include_str!("../../CHANGELOG.md").to_string(),
                 },
                 HelpWindowKind::Donations => donations_content(init.language),
             };
@@ -551,7 +557,8 @@ fn help_title(language: Language, kind: HelpWindowKind) -> String {
 fn donations_content(language: Language) -> String {
     match language {
         Language::Italian => DONATIONS_IT.to_string(),
-        Language::Ukrainian | Language::English => DONATIONS_EN.to_string(),
+        Language::Ukrainian => DONATIONS_UK.to_string(),
+        Language::English => DONATIONS_EN.to_string(),
         Language::Spanish => DONATIONS_ES.to_string(),
         Language::Portuguese => DONATIONS_PT.to_string(),
         Language::Swedish => {
@@ -570,6 +577,8 @@ fn donations_content(language: Language) -> String {
         Language::Serbian => {
             read_override_text("donations_sr.txt").unwrap_or_else(|| DONATIONS_SR.to_string())
         }
+        Language::Lithuanian => DONATIONS_LT.to_string(),
+        Language::Chinese => DONATIONS_ZH.to_string(),
     }
 }
 

@@ -16,6 +16,46 @@ mod settings {
         Vietnamese,
         Serbian,
         Ukrainian,
+        Lithuanian,
+        Chinese,
+    }
+}
+
+mod i18n {
+    use crate::settings::Language;
+
+    pub fn tr(language: Language, key: &str) -> String {
+        match key {
+            "reader.no_title" => match language {
+                Language::Italian => "Nessun titolo".to_string(),
+                Language::French => "Sans titre".to_string(),
+                Language::Spanish => "Sin título".to_string(),
+                Language::Portuguese => "Sem título".to_string(),
+                Language::Swedish => "Ingen titel".to_string(),
+                Language::Vietnamese => "Không có tiêu đề".to_string(),
+                Language::Czech => "Bez názvu".to_string(),
+                Language::Polish => "Brak tytułu".to_string(),
+                Language::Serbian => "Bez naslova".to_string(),
+                Language::Lithuanian => "Be pavadinimo".to_string(),
+                Language::Chinese => "无标题".to_string(),
+                Language::Ukrainian | Language::English => "No Title".to_string(),
+            },
+            "reader.external_link" => match language {
+                Language::Italian => "Link esterno:\n{url}".to_string(),
+                Language::French => "Lien externe :\n{url}".to_string(),
+                Language::Spanish => "Enlace externo:\n{url}".to_string(),
+                Language::Portuguese => "Link externo:\n{url}".to_string(),
+                Language::Swedish => "Extern länk:\n{url}".to_string(),
+                Language::Vietnamese => "Liên kết ngoài:\n{url}".to_string(),
+                Language::Czech => "Externí odkaz:\n{url}".to_string(),
+                Language::Polish => "Link zewnętrzny:\n{url}".to_string(),
+                Language::Serbian => "Spoljašnji link:\n{url}".to_string(),
+                Language::Lithuanian => "Išorinė nuoroda:\n{url}".to_string(),
+                Language::Chinese => "外部链接：\n{url}".to_string(),
+                Language::Ukrainian | Language::English => "External link:\n{url}".to_string(),
+            },
+            _ => key.to_string(),
+        }
     }
 }
 

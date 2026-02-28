@@ -133,6 +133,10 @@ pub enum Language {
     Serbian,
     #[serde(rename = "uk")]
     Ukrainian,
+    #[serde(rename = "lt")]
+    Lithuanian,
+    #[serde(rename = "zh")]
+    Chinese,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -451,6 +455,18 @@ pub struct AppSettings {
     pub use_dialogue_voice: bool,
     #[serde(default)]
     pub dialogue_voice: String,
+    #[serde(default)]
+    pub dialogue_use_secondary_voice: bool,
+    #[serde(default)]
+    pub dialogue_secondary_voice: String,
+    #[serde(default = "default_dialogue_tts_engine")]
+    pub dialogue_secondary_tts_engine: TtsEngine,
+    #[serde(default = "default_dialogue_voice_rate")]
+    pub dialogue_secondary_voice_rate: i32,
+    #[serde(default = "default_dialogue_voice_pitch")]
+    pub dialogue_secondary_voice_pitch: i32,
+    #[serde(default = "default_dialogue_voice_volume")]
+    pub dialogue_secondary_voice_volume: i32,
     #[serde(default = "default_dialogue_voice_rate")]
     pub dialogue_voice_rate: i32,
     #[serde(default = "default_dialogue_voice_pitch")]
@@ -715,6 +731,12 @@ impl Default for AppSettings {
             tts_voice: "it-IT-IsabellaNeural".to_string(),
             use_dialogue_voice: false,
             dialogue_voice: String::new(),
+            dialogue_use_secondary_voice: false,
+            dialogue_secondary_voice: String::new(),
+            dialogue_secondary_tts_engine: TtsEngine::Edge,
+            dialogue_secondary_voice_rate: 0,
+            dialogue_secondary_voice_pitch: 0,
+            dialogue_secondary_voice_volume: 100,
             dialogue_voice_rate: 0,
             dialogue_voice_pitch: 0,
             dialogue_voice_volume: 100,
@@ -1171,6 +1193,12 @@ fn system_language() -> Language {
         }
         if lower.starts_with("uk") {
             return Language::Ukrainian;
+        }
+        if lower.starts_with("lt") {
+            return Language::Lithuanian;
+        }
+        if lower.starts_with("zh") {
+            return Language::Chinese;
         }
         return Language::English;
     }

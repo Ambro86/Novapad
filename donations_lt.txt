@@ -1,0 +1,19 @@
+Dovanos
+Sonarpad yra programa, kuri iš pradžių buvo sukurta asmeniniams poreikiams tenkinti, tačiau laikui bėgant ji vis labiau plėtėsi. Jos tobulinimas reikalauja nuolatinio darbo, siekiant pagerinti funkcijas, ištaisyti klaidas, ieškoti naujų idėjų ir kruopščiai išbandyti visas funkcijas.
+Jei manote, kad ši programa yra naudinga ir norite paremti jos plėtrą, galite paaukoti.
+PayPal
+Galite paaukoti per PayPal naudodami šią nuorodą:
+https://www.paypal.me/ambrogio86
+Jei įmanoma, prašome mokėjimo pastaboje nurodyti „Sonarpad“.
+Bankinis pavedimas
+Taip pat galite paaukoti pervedimu į banko sąskaitą, atidarytą Ambrogio Riili vardu.
+IBAN: IT77W0306901020100000064149
+Jei įmanoma, nurodykite aiškią mokėjimo priežastį, pavyzdžiui, „Sonarpad“.
+Visi, kurie remia projektą, bus paminėti programoje ir GitHub saugykloje, nebent jie pageidauja likti anoniminiai arba naudoti slapyvardį.
+
+Dėkojame Jiri Holzinger ir Paola Vagata už jų indėlį.
+Už vertimą į vietnamiečių kalbą dėkojame Anh Duc Nguyen.
+Už čekų kalbos vertimą dėkojame Radekui Žaludui ir Jiriui Holzingerui.
+Už ispanų kalbos vertimą dėkojame Arturo Fernandez Rivas.
+Už serbų kalbos vertimą dėkojame Milai Kuran.
+Už ukrainiečių kalbos vertimą dėkojame Ivanui Shtefuriakui.

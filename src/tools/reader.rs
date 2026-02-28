@@ -1,3 +1,4 @@
+use crate::i18n;
 use crate::settings::Language;
 use scraper::{Html, Selector};
 
@@ -380,7 +381,7 @@ fn extract_cbc_initial_state_article_text(html_content: &str) -> Option<String> 
     if best.is_empty() { None } else { Some(best) }
 }
 
-fn extract_jina_markdown_fixture(raw_content: &str) -> Option<ArticleContent> {
+fn extract_jina_markdown_fixture(raw_content: &str, language: Language) -> Option<ArticleContent> {
     if !raw_content.contains("URL Source:")
         || !raw_content.contains("Markdown Content:")
         || !raw_content.contains("Title:")
@@ -392,8 +393,8 @@ fn extract_jina_markdown_fixture(raw_content: &str) -> Option<ArticleContent> {
         .lines()
         .find_map(|line| line.strip_prefix("Title:").map(str::trim))
         .filter(|t| !t.is_empty())
-        .unwrap_or("No Title")
-        .to_string();
+        .map(str::to_string)
+        .unwrap_or_else(|| i18n::tr(language, "reader.no_title"));
 
     let marker = "Markdown Content:";
     let start = raw_content.find(marker)? + marker.len();
@@ -474,18 +475,20 @@ fn author_prefix(language: Language) -> &'static str {
         Language::Polish => "Autor",
         Language::Vietnamese => "Bởi",
         Language::Serbian => "Autor",
+        Language::Lithuanian => "Autorius",
+        Language::Chinese => "作者",
     }
 }
 
 pub fn reader_mode_extract(html_content: &str, language: Language) -> Option<ArticleContent> {
     if !html_content.contains("<html")
-        && let Some(article) = extract_jina_markdown_fixture(html_content)
+        && let Some(article) = extract_jina_markdown_fixture(html_content, language)
     {
         return Some(article);
     }
 
     let document = Html::parse_document(html_content);
-    let title = pick_title(&document);
+    let title = pick_title(&document, language);
 
     let mut body_acc = String::new();
     let mut author_info = String::new();
@@ -788,7 +791,7 @@ pub fn reader_mode_extract(html_content: &str, language: Language) -> Option<Art
     if final_content.trim().len() < 10
         && let Some(url) = pick_reddit_link_post_url(&document)
     {
-        final_content = format!("External link:\n{url}");
+        final_content = i18n::tr(language, "reader.external_link").replace("{url}", &url);
     }
     Some(ArticleContent {
         title: title.trim().to_string(),
@@ -845,6 +848,8 @@ mod tests {
             Language::Polish,
             Language::French,
             Language::Serbian,
+            Language::Lithuanian,
+            Language::Chinese,
         ];
 
         for language in languages {
@@ -860,6 +865,8 @@ mod tests {
                 Language::Polish => "Polish",
                 Language::French => "French",
                 Language::Serbian => "Serbian",
+                Language::Lithuanian => "Lithuanian",
+                Language::Chinese => "Chinese",
             };
             assert!(
                 !prefix.trim().is_empty(),
@@ -903,7 +910,7 @@ mod tests {
     }
 }
 
-fn pick_title(document: &Html) -> String {
+fn pick_title(document: &Html, language: Language) -> String {
     let title_selectors = ["meta[property='og:title']", "h1", "title"];
     for sel in title_selectors {
         if let Ok(s) = Selector::parse(sel)
@@ -920,7 +927,7 @@ fn pick_title(document: &Html) -> String {
             }
         }
     }
-    "No Title".to_string()
+    i18n::tr(language, "reader.no_title")
 }
 
 fn pick_meta_description(document: &Html) -> Option<String> {

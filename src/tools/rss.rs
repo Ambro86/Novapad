@@ -1,5 +1,6 @@
 use crate::log_debug;
 use crate::tools::reader;
+use crate::{i18n, settings::Language};
 use encoding_rs::{Encoding, WINDOWS_1252};
 use feed_rs::parser;
 use reqwest::{self, StatusCode, header};
@@ -494,6 +495,7 @@ fn parse_feed_bytes(
     bytes: Vec<u8>,
     fallback_title: &str,
     max_excerpt_chars: usize,
+    language: Language,
 ) -> Option<(String, Vec<RssItem>)> {
     let cursor = Cursor::new(bytes);
     let feed = parser::parse(cursor).ok()?;
@@ -510,7 +512,7 @@ fn parse_feed_bytes(
                 .title
                 .as_ref()
                 .map(|t| t.content.clone())
-                .unwrap_or_else(|| "No Title".to_string());
+                .unwrap_or_else(|| i18n::tr(language, "reader.no_title_fallback"));
             let title = decode_basic_html_entities(&title);
             let link = select_entry_link(&entry);
             let guid = if let Some(stable_guid) = stable_google_news_guid(&entry.id, &link) {
@@ -818,6 +820,7 @@ pub(crate) fn resolve_google_news_article_url_blocking(
 fn parse_podcast_feed_bytes(
     bytes: Vec<u8>,
     fallback_title: &str,
+    language: Language,
 ) -> Option<(String, Vec<PodcastEpisode>)> {
     let cursor = Cursor::new(bytes);
     let feed = match parser::parse(cursor) {
@@ -840,7 +843,7 @@ fn parse_podcast_feed_bytes(
                 .title
                 .as_ref()
                 .map(|t| t.content.clone())
-                .unwrap_or_else(|| "No Title".to_string());
+                .unwrap_or_else(|| i18n::tr(language, "reader.no_title_fallback"));
             let title = decode_basic_html_entities(&title);
             let link = select_entry_link(&entry);
             let guid = if !entry.id.trim().is_empty() {
@@ -1035,6 +1038,8 @@ fn dedup_podcast_items(items: Vec<PodcastEpisode>, max_items: usize) -> Vec<Podc
     out
 }
 
+// Keeps call sites stable while threading localized fallback messages.
+#[allow(clippy::too_many_arguments)]
 async fn fetch_bytes_with_retries(
     http: &RssHttp,
     url: &str,
@@ -1042,6 +1047,7 @@ async fn fetch_bytes_with_retries(
     _fetch_kind: &str,
     _override_cooldown: bool,
     _fetch_config: &RssFetchConfig,
+    language: Language,
     mut cache: Option<&mut RssFeedCache>,
 ) -> Result<FetchBytesOutcome, FeedFetchError> {
     let host = host_from_url(url).unwrap_or_else(|| "unknown".to_string());
@@ -1131,7 +1137,7 @@ async fn fetch_bytes_with_retries(
     }
     let cache = cache.as_deref().cloned().unwrap_or_default();
     Err(FeedFetchError::Network {
-        message: "Retries exhausted".to_string(),
+        message: i18n::tr(language, "rss.error.retries_exhausted"),
         cache,
     })
 }
@@ -1171,6 +1177,7 @@ pub async fn fetch_and_parse(
     cache: RssFeedCache,
     fetch_config: RssFetchConfig,
     override_cooldown: bool,
+    language: Language,
 ) -> Result<RssFetchOutcome, FeedFetchError> {
     let url = normalize_url(url);
     let http = shared_http().map_err(|e| FeedFetchError::Network {
@@ -1186,6 +1193,7 @@ pub async fn fetch_and_parse(
         "feed",
         override_cooldown,
         &fetch_config,
+        language,
         Some(&mut cache),
     )
     .await;
@@ -1240,9 +1248,12 @@ pub async fn fetch_and_parse(
         });
     }
 
-    if let Some((title, items)) =
-        parse_feed_bytes(out.bytes.clone(), &url, fetch_config.max_excerpt_chars)
-    {
+    if let Some((title, items)) = parse_feed_bytes(
+        out.bytes.clone(),
+        &url,
+        fetch_config.max_excerpt_chars,
+        language,
+    ) {
         return Ok(RssFetchOutcome {
             kind: RssSourceType::Feed,
             title,
@@ -1264,6 +1275,7 @@ pub async fn fetch_and_parse(
             "feed",
             override_cooldown,
             &fetch_config,
+            language,
             None,
         )
         .await;
@@ -1276,9 +1288,12 @@ pub async fn fetch_and_parse(
             },
         };
 
-        if let Some((title, items)) =
-            parse_feed_bytes(sub_bytes, &feed_link, fetch_config.max_excerpt_chars)
-        {
+        if let Some((title, items)) = parse_feed_bytes(
+            sub_bytes,
+            &feed_link,
+            fetch_config.max_excerpt_chars,
+            language,
+        ) {
             cache.feed_url = Some(feed_link);
             return Ok(RssFetchOutcome {
                 kind: RssSourceType::Feed,
@@ -1341,7 +1356,7 @@ pub async fn fetch_article_text(
     let start_total = Instant::now();
     let mut url_str = normalize_url(url);
     if url_str.is_empty() {
-        return Err("Empty URL".to_string());
+        return Err(i18n::tr(language, "rss.error.empty_url"));
     }
     if is_google_news_article_url(&url_str) {
         log_debug(&format!(
@@ -1491,6 +1506,7 @@ mod tests {
             bytes,
             "http://estaticos.elmundo.es/elmundo/rss/portada.xml",
             512,
+            crate::settings::Language::English,
         );
         let Some((title, items)) = parsed else {
             panic!("failed to parse elmundo feed fixture");
@@ -1513,8 +1529,13 @@ mod tests {
     </item>
   </channel>
 </rss>"#;
-        let parsed = parse_feed_bytes(xml.as_bytes().to_vec(), "fallback", 512)
-            .expect("failed to parse inline rss fixture");
+        let parsed = parse_feed_bytes(
+            xml.as_bytes().to_vec(),
+            "fallback",
+            512,
+            crate::settings::Language::English,
+        )
+        .expect("failed to parse inline rss fixture");
         let (feed_title, items) = parsed;
         assert_eq!(feed_title, "marca & portada");
         assert_eq!(items.len(), 1);
@@ -1608,6 +1629,7 @@ pub async fn fetch_podcast_feed(
     cache: RssFeedCache,
     cfg: RssFetchConfig,
     override_cooldown: bool,
+    language: Language,
 ) -> Result<PodcastFetchOutcome, FeedFetchError> {
     let url = normalize_url(url);
     let http = shared_http().map_err(|e| FeedFetchError::Network {
@@ -1623,6 +1645,7 @@ pub async fn fetch_podcast_feed(
         "podcast",
         override_cooldown,
         &cfg,
+        language,
         Some(&mut cache),
     )
     .await;
@@ -1674,7 +1697,7 @@ pub async fn fetch_podcast_feed(
             cache,
         });
     }
-    if let Some((title, items)) = parse_podcast_feed_bytes(out.bytes, &url) {
+    if let Some((title, items)) = parse_podcast_feed_bytes(out.bytes, &url, language) {
         return Ok(PodcastFetchOutcome {
             title,
             items: dedup_podcast_items(items, cfg.max_items_per_feed),

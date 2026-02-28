@@ -269,7 +269,6 @@ pub fn join_wav_files(inputs: &[std::path::PathBuf], output: &Path) -> Result<()
     // 4. Finalize the output header with the correct total size
     writer.data_size = total_data_size;
     writer.finalize()?;
-
     Ok(())
 }
 

@@ -405,7 +405,9 @@ fn format_timestamp_for_list(
     let ts = timestamp?;
     let dt = Local.timestamp_opt(ts, 0).single()?;
     let (date_pattern, time_pattern) = match language {
-        crate::settings::Language::English => ("%m/%d/%Y", "%I:%M %p"),
+        crate::settings::Language::English
+        | crate::settings::Language::Lithuanian
+        | crate::settings::Language::Chinese => ("%m/%d/%Y", "%I:%M %p"),
         crate::settings::Language::Italian => ("%d/%m/%Y", "%H:%M"),
         crate::settings::Language::Spanish => ("%d/%m/%Y", "%H:%M"),
         crate::settings::Language::Portuguese => ("%d/%m/%Y", "%H:%M"),
@@ -454,7 +456,9 @@ fn format_timestamp_for_language(
     let ts = timestamp?;
     let dt = Local.timestamp_opt(ts, 0).single()?;
     let (date_pattern, time_pattern) = match language {
-        crate::settings::Language::English => ("%m/%d/%Y", "%I:%M %p"),
+        crate::settings::Language::English
+        | crate::settings::Language::Lithuanian
+        | crate::settings::Language::Chinese => ("%m/%d/%Y", "%I:%M %p"),
         crate::settings::Language::Italian => ("%d/%m/%Y", "%H:%M"),
         crate::settings::Language::Spanish => ("%d/%m/%Y", "%H:%M"),
         crate::settings::Language::Portuguese => ("%d/%m/%Y", "%H:%M"),
@@ -1351,6 +1355,7 @@ unsafe fn load_episode_children(hwnd: HWND, hitem: HTREEITEM, node: NodeData, fo
             cache,
             rss_fetch_config(parent),
             false,
+            language,
         ));
         let msg = Box::new(FetchResult {
             hitem: hitem.0,
@@ -1428,6 +1433,7 @@ unsafe fn start_background_unheard_check(hwnd: HWND) {
     }
 
     let fetch_config = rss_fetch_config(parent);
+    let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
     ensure_rss_http(parent);
 
     let hwnd_raw = hwnd.0;
@@ -1454,7 +1460,7 @@ unsafe fn start_background_unheard_check(hwnd: HWND) {
 
                 let handle = tokio::spawn(async move {
                     let _permit = sem.acquire().await.ok()?;
-                    let result = rss::fetch_podcast_feed(&url, cache, cfg, false).await;
+                    let result = rss::fetch_podcast_feed(&url, cache, cfg, false, language).await;
                     if let Ok(outcome) = result {
                         let newest_key = outcome
                             .items
@@ -7643,7 +7649,7 @@ const APPLE_LIMIT: u32 = 50;
 fn apple_country_for_language(language: Language) -> &'static str {
     match language {
         Language::Italian => "it",
-        Language::Ukrainian | Language::English => "us",
+        Language::Ukrainian | Language::Lithuanian | Language::Chinese | Language::English => "us",
         Language::Spanish => "es",
         Language::Portuguese => "pt",
         Language::Swedish => "se",
@@ -7658,7 +7664,7 @@ fn apple_country_for_language(language: Language) -> &'static str {
 fn podcastindex_language_code(language: Language) -> &'static str {
     match language {
         Language::Italian => "it",
-        Language::Ukrainian | Language::English => "en",
+        Language::Ukrainian | Language::Lithuanian | Language::Chinese | Language::English => "en",
         Language::Spanish => "es",
         Language::Portuguese => "pt",
         Language::Swedish => "sv",
@@ -7715,7 +7721,7 @@ fn apple_categories(language: Language) -> Vec<Category> {
             "True crime",
             "TV e film",
         ),
-        Language::Ukrainian | Language::English => (
+        Language::Ukrainian | Language::Lithuanian | Language::Chinese | Language::English => (
             "Arts",
             "Business",
             "Comedy",
@@ -8099,7 +8105,7 @@ fn apple_subcategories(language: Language) -> Vec<Category> {
             (1563, "Recensioni di film"),
             (1561, "Recensioni TV"),
         ],
-        Language::Ukrainian | Language::English => &[
+        Language::Ukrainian | Language::Lithuanian | Language::Chinese | Language::English => &[
             // Arts
             (1482, "Books"),
             (1402, "Design"),
@@ -9199,7 +9205,7 @@ fn podcastindex_categories(language: Language) -> Vec<Category> {
             (111, "Gioco di ruolo"),
             (112, "Cryptocurrency"),
         ],
-        Language::Ukrainian | Language::English => &[
+        Language::Ukrainian | Language::Lithuanian | Language::Chinese | Language::English => &[
             (1, "Arts"),
             (2, "Books"),
             (3, "Design"),

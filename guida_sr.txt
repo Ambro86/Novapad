@@ -1,5 +1,5 @@
 
-PROGRAMSKI VODIČ
+VODIČ ZA PROGRAM
 
 Datoteka: 
 Novo: Kreira novu datoteku (Ctrl+N). 
@@ -14,29 +14,29 @@ Glas i audio:
 Čitanje: F5 pokreće čitanje, F4 pauzira ili nastavlja, F6 zaustavlja čitanje. 
 Omiljeni glasovi tokom čitanja: F9 prethodni omiljeni glas, F10 sledeći omiljeni glas. 
 Snimi audio‑knjigu: Kreira MP3 datoteku iz trenutnog teksta (Ctrl+R). 
-Serijsko pravljenje audio‑knjiga: Pretvara listu datoteka u audio‑knjige (Ctrl+Shift+B).
+Grupno pretvaranje u audio‑knjige: Pretvara listu datoteka u audio‑knjige (Ctrl+Shift+B).
 Snimi podkast: Snima podkast sa mikrofona i/ili sistemskog zvuka (Ctrl+Shift+R).
 Konvertuj audio: Konvertuje audio/video datoteke u druge audio formate (Ctrl+Shift+A).
-MP3 audio‑knjige: 
+Audio-knjige (MP3): 
 Kada otvoriš MP3 datoteku, Sonarpad radi kao audio plejer. 
 Tastaturne komande: 
 SPACE: Reprodukcija / pauza. 
-Strelica desno: Premotavanje 1 minut unapred. 
-Strelica levo: Premotavanje 1 minut unazad. 
-Strelica gore: Pojačavanje zvuka. 
-Strelica dole: Smanjivanje zvuka. 
-+: Ubrzavanje reprodukcije. 
--: Usporavanje reprodukcije. 
-CTRL+I: Najavljuje trenutno vreme reprodukcije. 
-CTRL+T: Ide na određeno vreme. 
-CTRL+B: Ubacuje marker na tačno vreme.
+Strelica desno: Premotava 1 minut unapred. 
+Strelica levo: Premotava 1 minut unazad. 
+Strelica gore: Pojačava zvuk. 
+Strelica dole: Smanjuje zvuk. 
++: Ubrzava reprodukciju. 
+-: Usporava reprodukciju. 
+Ctrl+I: Najavljuje trenutno vreme reprodukcije. 
+Ctrl+T: Ide na određeno vreme. 
+Ctrl+B: Ubacuje obeleživač na trenutno vreme.
 
 Uređivanje: 
-Opozovi: Poništava poslednju radnju (Ctrl+Z). 
+Poništi: Poništava poslednju radnju (Ctrl+Z). 
 Iseci: Uklanja označen tekst i kopira ga u privremenu memoriju (Ctrl+X). 
 Kopiraj: Kopira označen tekst u privremenu memoriju (Ctrl+C). 
 Zalepi: Ubacuje sadržaj iz privremene memorije u dokument (Ctrl+V). 
-Označi sve: Označava ceo tekst (Ctrl+A). 
+Odaberi sve: Označava ceo tekst (Ctrl+A). 
 Pronađi: Pretraga teksta u dokumentu (Ctrl+F). 
 Pronađi u datotekama: Pretraga teksta kroz više datoteka (Ctrl+Shift+F). 
 Pronađi sledeće: Pronalazi sledeće pojavljivanje (F3). 
@@ -60,40 +60,40 @@ Boja teksta: Menja boju teksta (svetle i tamne varijante).
 Veličina teksta: Menja veličinu teksta (mala, normalna, velika, veoma velika, izuzetno velika). 
 Kad je lista stavki vidljiva, taster Tab premešta fokus između uređivača i kontrola, dok ga Shift+Tab vraća unazad.  
 Da bi se stavka dodala u omiljene ili uklonila iz njih, koristi Tab da pređeš na listu stavki, pa je dodaj ili ukloni tasterom Applications ili desnim tasterom miša. Iz liste omiljenih stavki takođe možeš da pritisneš taster Applications da ukloniš stavke koje su već dodate.  
-Prečice na tastaturi: moguće je pritisnuti F9 i F10 da se prelazi između stavki tokom čitanja, kružno kroz one dodate u omiljene.
+Prečice na tastaturi: možeš pritisnuti F9 i F10 da prelaziš između stavki tokom čitanja, kružno kroz one dodate u omiljene.
 
 Obeleživači: 
 Ubaci obeleživač: Čuva trenutnu poziciju kursora ili vreme u audio‑knjizi (Ctrl+B). 
 Upravljaj obeleživačima: Pregled, skok na obeleživač ili brisanje sačuvanih obeleživača. Ako datoteka sadrži obeleživače, otvaranje automatski nastavlja od prvog dostupnog.
 
 Alati: 
-Pretvaranje teksta u audio knjige: otvara prozor za pretvaranje liste datoteka ili fascikli u audio‑knjige. 
+Grupno pretvaranje u audio-knjige: Otvara prozor za pretvaranje liste datoteka ili fascikli u audio‑knjige. 
 - Dodaj datoteke ili fascikle u red čekanja. 
 - Izaberi odredišnu fasciklu i format (MP3 ili WAV). 
 - Opcije za kreiranje podfascikli i izbegavanje prepisivanja. 
 - Pritisni dugme Započni da bi obrada krenula u pozadini. 
-Rečnik: Otvara prozor rečnika. Po listi se krećemo strelicama gore/dole. 
-Tab prelazi na dugme „Dodaj unose u rečnik“, a dugme se aktivira tasterom Enter ili Space.
-U prozoru za dodavanje ili izmenu: unosi se „Izvorna reč“, zatim Tab prelazi na „Zamenska reč“. Dugme OK se potvrđuje tasterom Enter ili Space, a ESC otkazuje.
+Rečnik: Otvara prozor rečnika. Po listi se krećeš strelicama gore/dole. 
+Tab prelazi na dugme „Dodaj unose u rečnik“, a dugme se aktivira tasterom Enter ili razmakom.
+U prozoru za dodavanje ili izmenu: unosi se „Izvorna reč“, zatim Tab prelazi na „Zamenska reč“. Dugme OK se potvrđuje tasterom Enter ili razmakom, a Esc otkazuje.
 U listi, Tab prelazi na „Uredi unos“ i „Ukloni izabrani unos“. 
 Zamene iz rečnika primenjuju se tokom čitanja i kreiranja audio‑knjiga i automatski se čuvaju. 
 Uvezi YouTube transkript: nalepi link, izaberi jezik i uvezi tekst u uređivač (Ctrl+Y). Opcione vremenske oznake. 
 Pretraga i uvoz sa Wikipedije: pretraga članka i uvoz teksta u uređivač (Alt+Shift+W). 
 Mrežni rečnik: pretraga definicija i prevoda na servisu Wiktionary (Alt+Shift+D).
-Pristupačni terminal: otvara terminal sa stabilnim izlazom za čitače ekrana (Ctrl+Shift+T). 
+Pristupačni terminal: Otvara terminal sa stabilnim izlazom za čitače ekrana (Ctrl+Shift+T). 
 Prečice: Alt+I fokusira unos, Alt+O fokusira izlaz, Tab/Shift+Tab prelazi između unosa, izlaza i opcija. 
 Enter šalje unos. Ctrl+C kopira izlaz (ili prosleđuje komandu za kopiranje programu). Ctrl+L briše izlaz uz potvrdu.
 Opcije terminala: automatsko klizanje, uklanjanje ANSI oznaka, najava novih linija, zvučni signal posle 1 s neaktivnosti, sprečavanje uspavljivanja. 
-Programi: Command Prompt (cmd.exe), PowerShell, Codex CLI (iz Opcija).
+Programi: Command Prompt (cmd.exe), PowerShell, Codex CLI (u Opcijama).
 
-RSS / Članci: otvara prozor RSS/Članci, gde se dodaju izvori; proširi se kanal i pritisne Enter da se članak uveze u uređivač.
-U RSS prozoru, izaberi izvor ili sajt i pritisni Delete da ga ukloniš iz biblioteke. 
-Kontekst meni omogućava izmenu ili brisanje izvora. 
-Posle uvoza članka, Escape vraća na listu. 
+RSS / članci: Otvara prozor RSS / članci, gde dodaješ izvore; proširi kanal i pritisni Enter da se članak uveze u uređivač.
+U RSS prozoru izaberi izvor ili sajt i pritisni Delete da ga ukloniš iz biblioteke. 
+Kontekstni meni omogućava izmenu ili brisanje izvora. 
+Posle uvoza članka Escape vraća na listu. 
 
-Podkasti: otvara prozor Podkasta za pretragu i upravljanje pretplatama. 
-U listi epizoda, Enter pušta epizodu. 
-Tokom reprodukcije, Escape zaustavlja podkast i vraća u biblioteku.
+Podkasti: Otvara prozor podkasta za pretragu i upravljanje pretplatama. 
+U listi epizoda, Enter pokreće reprodukciju epizode. 
+Tokom reprodukcije, Escape zaustavlja podkast i vraća te u biblioteku.
 
 Opcije: 
 Jezik: Menja jezik izgleda programa. 

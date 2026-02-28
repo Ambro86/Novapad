@@ -5,6 +5,12 @@ use std::path::PathBuf;
 pub struct DialogueVoiceConfig {
     pub engine: TtsEngine,
     pub voice: String,
+    pub use_secondary_voice: bool,
+    pub secondary_voice: String,
+    pub secondary_engine: TtsEngine,
+    pub secondary_rate: i32,
+    pub secondary_pitch: i32,
+    pub secondary_volume: i32,
     pub rate: i32,
     pub pitch: i32,
     pub volume: i32,
@@ -47,9 +53,19 @@ pub fn save_dialogue_voice_config(cfg: &DialogueVoiceConfig) -> Result<(), Strin
         })?;
     }
     let body = format!(
-        "engine={}\nvoice={}\nrate={}\npitch={}\nvolume={}\nopen_quote={}\nclose_quote={}\nallow_multiline={}\n",
+        "engine={}\nvoice={}\nuse_secondary_voice={}\nsecondary_voice={}\nsecondary_engine={}\nsecondary_rate={}\nsecondary_pitch={}\nsecondary_volume={}\nrate={}\npitch={}\nvolume={}\nopen_quote={}\nclose_quote={}\nallow_multiline={}\n",
         engine_to_key(cfg.engine),
         cfg.voice,
+        if cfg.use_secondary_voice {
+            "true"
+        } else {
+            "false"
+        },
+        cfg.secondary_voice,
+        engine_to_key(cfg.secondary_engine),
+        cfg.secondary_rate,
+        cfg.secondary_pitch,
+        cfg.secondary_volume,
         cfg.rate,
         cfg.pitch,
         cfg.volume,
@@ -66,6 +82,12 @@ pub fn load_dialogue_voice_config() -> Option<DialogueVoiceConfig> {
     let text = std::fs::read_to_string(config_path).ok()?;
     let mut engine = None;
     let mut voice = String::new();
+    let mut use_secondary_voice = false;
+    let mut secondary_voice = String::new();
+    let mut secondary_engine = None;
+    let mut secondary_rate = 0;
+    let mut secondary_pitch = 0;
+    let mut secondary_volume = 100;
     let mut rate = 0;
     let mut pitch = 0;
     let mut volume = 100;
@@ -86,6 +108,27 @@ pub fn load_dialogue_voice_config() -> Option<DialogueVoiceConfig> {
         match key.as_str() {
             "engine" => engine = parse_engine_input(val),
             "voice" => voice = val.to_string(),
+            "use_secondary_voice" => {
+                use_secondary_voice =
+                    matches!(val.to_ascii_lowercase().as_str(), "true" | "1" | "yes")
+            }
+            "secondary_voice" => secondary_voice = val.to_string(),
+            "secondary_engine" => secondary_engine = parse_engine_input(val),
+            "secondary_rate" => {
+                if let Ok(parsed) = val.parse::<i32>() {
+                    secondary_rate = parsed;
+                }
+            }
+            "secondary_pitch" => {
+                if let Ok(parsed) = val.parse::<i32>() {
+                    secondary_pitch = parsed;
+                }
+            }
+            "secondary_volume" => {
+                if let Ok(parsed) = val.parse::<i32>() {
+                    secondary_volume = parsed;
+                }
+            }
             "rate" => {
                 if let Ok(parsed) = val.parse::<i32>() {
                     rate = parsed;
@@ -117,6 +160,12 @@ pub fn load_dialogue_voice_config() -> Option<DialogueVoiceConfig> {
     Some(DialogueVoiceConfig {
         engine,
         voice,
+        use_secondary_voice,
+        secondary_voice,
+        secondary_engine: secondary_engine.unwrap_or(engine),
+        secondary_rate,
+        secondary_pitch,
+        secondary_volume,
         rate,
         pitch,
         volume,
@@ -161,18 +210,24 @@ pub fn apply_dialogue_tags(text: &str, cfg: &DialogueVoiceConfig) -> String {
         return text.to_string();
     }
 
-    let open_tag = format!(
-        "<voice engine=\"{}\" voice=\"{}\" rate=\"{}\" pitch=\"{}\" volume=\"{}\">",
-        engine_to_key(cfg.engine),
-        xml_escape_attr(&cfg.voice),
-        cfg.rate,
-        cfg.pitch,
-        cfg.volume
-    );
+    let build_open_tag =
+        |engine: TtsEngine, voice_name: &str, rate: i32, pitch: i32, volume: i32| {
+            format!(
+                "<voice engine=\"{}\" voice=\"{}\" rate=\"{}\" pitch=\"{}\" volume=\"{}\">",
+                engine_to_key(engine),
+                xml_escape_attr(voice_name),
+                rate,
+                pitch,
+                volume
+            )
+        };
     let close_tag = "</voice>";
+    let use_secondary = cfg.use_secondary_voice && !cfg.secondary_voice.trim().is_empty();
+    let secondary_voice = cfg.secondary_voice.trim();
     let mut out = String::with_capacity(text.len() + 128);
     let mut cursor = 0usize;
     let mut replaced_any = false;
+    let mut use_secondary_next = false;
 
     while cursor < text.len() {
         let Some(open_rel) = text[cursor..].find(&cfg.opening_quote) else {
@@ -189,9 +244,30 @@ pub fn apply_dialogue_tags(text: &str, cfg: &DialogueVoiceConfig) -> String {
             break;
         };
         let end = close_pos + cfg.closing_quote.len();
+        let (engine, selected_voice, rate, pitch, volume) = if use_secondary && use_secondary_next {
+            (
+                cfg.secondary_engine,
+                secondary_voice,
+                cfg.secondary_rate,
+                cfg.secondary_pitch,
+                cfg.secondary_volume,
+            )
+        } else {
+            (
+                cfg.engine,
+                cfg.voice.as_str(),
+                cfg.rate,
+                cfg.pitch,
+                cfg.volume,
+            )
+        };
+        let open_tag = build_open_tag(engine, selected_voice, rate, pitch, volume);
         out.push_str(&open_tag);
         out.push_str(&text[open_pos..end]);
         out.push_str(close_tag);
+        if use_secondary {
+            use_secondary_next = !use_secondary_next;
+        }
         cursor = end;
         replaced_any = true;
     }
@@ -206,6 +282,12 @@ pub fn apply_dialogue_tags_from_settings(text: &str, settings: &AppSettings) -> 
     let fallback = DialogueVoiceConfig {
         engine: settings.dialogue_tts_engine,
         voice: settings.dialogue_voice.clone(),
+        use_secondary_voice: settings.dialogue_use_secondary_voice,
+        secondary_voice: settings.dialogue_secondary_voice.clone(),
+        secondary_engine: settings.dialogue_secondary_tts_engine,
+        secondary_rate: settings.dialogue_secondary_voice_rate,
+        secondary_pitch: settings.dialogue_secondary_voice_pitch,
+        secondary_volume: settings.dialogue_secondary_voice_volume,
         rate: settings.dialogue_voice_rate,
         pitch: settings.dialogue_voice_pitch,
         volume: settings.dialogue_voice_volume,
@@ -226,6 +308,12 @@ mod tests {
         DialogueVoiceConfig {
             engine: TtsEngine::Edge,
             voice: "it-IT-ElsaNeural".to_string(),
+            use_secondary_voice: false,
+            secondary_voice: String::new(),
+            secondary_engine: TtsEngine::Edge,
+            secondary_rate: 0,
+            secondary_pitch: 0,
+            secondary_volume: 100,
             rate: 0,
             pitch: 0,
             volume: 100,
@@ -248,5 +336,22 @@ mod tests {
         let text = "\"ciao\nmondo\"";
         let out = apply_dialogue_tags(text, &cfg("\"", "\"", false));
         assert_eq!(out, text);
+    }
+
+    #[test]
+    fn dialogue_tags_alternate_primary_and_secondary_voice() {
+        let text = "\"ciao\" e \"come va\"";
+        let mut settings = cfg("\"", "\"", false);
+        settings.use_secondary_voice = true;
+        settings.secondary_voice = "it-IT-DiegoNeural".to_string();
+        settings.secondary_rate = -10;
+        settings.secondary_pitch = 6;
+        settings.secondary_volume = 130;
+        let out = apply_dialogue_tags(text, &settings);
+        assert!(out.contains("it-IT-ElsaNeural"));
+        assert!(out.contains("it-IT-DiegoNeural"));
+        assert!(
+            out.contains("voice=\"it-IT-DiegoNeural\" rate=\"-10\" pitch=\"6\" volume=\"130\"")
+        );
     }
 }

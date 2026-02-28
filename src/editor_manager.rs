@@ -568,7 +568,7 @@ fn get_text_range_simple(hwnd: HWND, start: i32, end: i32) -> String {
 
 unsafe fn selected_line_block_from_selection(
     hwnd_edit: HWND,
-    text: &str,
+    _text: &str,
     mut selection: CHARRANGE,
 ) -> Option<(i32, i32, String, bool)> {
     if selection.cpMin == selection.cpMax {
@@ -651,7 +651,6 @@ unsafe fn selected_line_block_from_selection(
 
     let selected = get_text_range_simple(hwnd_edit, range_start, range_end);
     let trailing = selected.ends_with('\n') || selected.ends_with('\r');
-    let _ = text;
     Some((range_start, range_end, selected, trailing))
 }
 
@@ -1487,13 +1486,17 @@ pub fn try_normalize_undo(hwnd: HWND) -> bool {
         return false;
     };
     if undo.hwnd_edit.0 == 0 {
-        let _ = unsafe { with_state(hwnd, |state| state.normalize_undo = None) };
+        if unsafe { with_state(hwnd, |state| state.normalize_undo = None) }.is_none() {
+            crate::log_debug("Failed to access editor state");
+        }
         return false;
     }
     let current_text = get_edit_text(undo.hwnd_edit);
     if current_text == undo.text {
         // Stale snapshot: do not consume Ctrl+Z, let normal editor undo run.
-        let _ = unsafe { with_state(hwnd, |state| state.normalize_undo = None) };
+        if unsafe { with_state(hwnd, |state| state.normalize_undo = None) }.is_none() {
+            crate::log_debug("Failed to access editor state");
+        }
         return false;
     }
 

@@ -85,9 +85,9 @@ impl Telemetry {
 
 /// Initialize telemetry. Call once at startup.
 pub fn init() {
-    let _ = TELEMETRY.get_or_init(Telemetry::new);
-    let _ = LAST_ACTION.get_or_init(|| Mutex::new(LastAction::default()));
-    let _ = LAST_REPORTED_ACTION.get_or_init(|| Mutex::new(String::new()));
+    TELEMETRY.get_or_init(Telemetry::new);
+    LAST_ACTION.get_or_init(|| Mutex::new(LastAction::default()));
+    LAST_REPORTED_ACTION.get_or_init(|| Mutex::new(String::new()));
 }
 
 /// Record a user action. Adds a breadcrumb and updates last_action.

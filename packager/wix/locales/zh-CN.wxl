@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WixLocalization xmlns="http://schemas.microsoft.com/wix/2006/localization" Culture="zh-CN">
+  <String Id="CargoPackagerLanguage">2052</String>
+  <String Id="CargoPackagerCodepage">936</String>
+  <String Id="DowngradeErrorMessage">已安装较新版本的 [ProductName]。</String>
+  <String Id="LaunchApp">启动 [ProductName]</String>
+  <String Id="InstallAppFeature">安装 [ProductName]。</String>
+  <String Id="MainFeatureTitle">应用程序</String>
+  <String Id="RunAppDescription">运行 [ProductName]</String>
+  <String Id="OpenWithLabel">使用 [ProductName] 打开</String>
+  <String Id="UninstallShortcutName">卸载 [ProductName]</String>
+  <String Id="UninstallShortcutDescription">卸载 [ProductName]</String>
+  <String Id="DesktopShortcutFeatureTitle">桌面快捷方式</String>
+  <String Id="DesktopShortcutFeatureDescription">创建桌面快捷方式</String>
+  <String Id="FileAssociationsFeatureTitle">文件关联</String>
+  <String Id="FileAssociationsFeatureDescription">将文件类型与 [ProductName] 关联</String>
+  <String Id="ContextMenuFeatureTitle">右键菜单</String>
+  <String Id="ContextMenuFeatureDescription">将 “[OpenWithLabel]” 添加到右键菜单</String>
+</WixLocalization>

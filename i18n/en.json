@@ -240,6 +240,7 @@
   "options.label.subtitle_offset": "Subtitle timing offset (ms):",
   "options.label.audio_wasapi": "Use WASAPI output (beta)",
   "options.subtitle_mode.off": "Disabled",
+  "playback.direct_stream_command_disabled": "Command disabled during direct streaming",
   "options.subtitle_mode.nvda": "NVDA",
   "options.subtitle_mode.user": "Use selected voice",
   "options.subtitle_mode.record": "Record to file",
@@ -681,6 +682,13 @@
   "podcasts.download_filter": "Audio files\\0*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav\\0All files\\0*.*\\0\\0",
   "podcasts.download_started": "Download started",
   "podcasts.download_completed": "Download completed",
+  "podcasts.save_confirm_title": "Episode saved",
+  "podcasts.save_confirm_body": "Saved in:\n{path}",
+  "podcasts.save_confirm_open_folder": "Open folder",
+  "podcasts.save_confirm_ok": "OK",
+  "podcasts.save_error_title": "Save failed",
+  "podcasts.save_error_body": "Unable to save the episode.\nError: {err}",
+  "podcasts.save_error_ok": "OK",
   "podcasts.download_failed": "Download failed",
   "podcasts.download_progress": "Downloading {pct}%",
   "podcasts.search.button": "Search",
@@ -932,6 +940,7 @@
   "stream_audio.url_label": "URL:",
   "stream_audio.format_label": "Format:",
   "stream_audio.format.auto": "Automatic (no conversion)",
+  "stream_audio.track.auto": "Automatic",
   "stream_audio.progress_converting": "Converting format...",
   "stream_audio.convert_failed": "Streaming conversion error: {err}",
   "recent.clear": "Clear Recent Files",
@@ -987,3 +996,7 @@
   "reader.external_link": "External link:\n{url}",
   "options.lang.lt": "Lithuanian"
 }
+
+
+
+

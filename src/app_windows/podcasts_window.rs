@@ -12,7 +12,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::System::DataExchange::{
@@ -183,6 +183,9 @@ struct PodcastWindowState {
     reorder_dialog: HWND,
     last_selected: isize,
     pending_play: Option<String>,
+    download_in_progress: bool,
+    last_download_progress_pct: u32,
+    last_download_progress_at: Option<Instant>,
     preview_sources: Vec<crate::tools::rss::RssSource>,
     removed_history: Vec<PodcastLastRemoved>,
     suppress_tree_selection_events: bool,
@@ -1947,7 +1950,6 @@ unsafe fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpis
         return;
     };
     let play_key = episode_key(episode);
-    mark_episode_played_with_delayed_ui(hwnd, parent, play_key.clone());
     let should_start = with_podcast_state(hwnd, |s| {
         if s.pending_play.as_deref() == Some(play_key.as_str()) {
             return false;
@@ -1959,6 +1961,7 @@ unsafe fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpis
     if !should_start {
         return;
     }
+    mark_episode_played_with_delayed_ui(hwnd, parent, play_key.clone());
     if parent.0 != 0 {
         crate::set_pending_podcast_chapters_key(parent, Some(play_key.clone()));
         if !episode.podlove_chapters.is_empty() {
@@ -2022,26 +2025,79 @@ unsafe fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpis
     let hwnd_copy = hwnd;
     let cache_limit_mb = with_state(parent, |s| s.settings.podcast_cache_limit_mb).unwrap_or(500);
     let cache_dir = podcast_cache_dir();
+    with_podcast_state(hwnd, |s| {
+        s.download_in_progress = true;
+        s.last_download_progress_pct = 0;
+        s.last_download_progress_at = None;
+    });
 
     std::thread::spawn(move || {
         log_debug(&format!("Podcast thread: starting download for {}", url));
+        unsafe {
+            if windows::Win32::UI::WindowsAndMessaging::IsWindow(hwnd_copy).as_bool() {
+                PostMessageW(
+                    hwnd_copy,
+                    WM_PODCAST_DOWNLOAD_PROGRESS,
+                    WPARAM(0),
+                    LPARAM(0),
+                )
+                .ok();
+            }
+        }
         let mut last_reported_pct = 0u32;
-        let bytes = rss::fetch_url_bytes_with_progress(&url, |pct| {
-            if pct >= last_reported_pct + 10 || (pct == 100 && last_reported_pct < 100) {
-                last_reported_pct = (pct / 10) * 10;
-                unsafe {
-                    if windows::Win32::UI::WindowsAndMessaging::IsWindow(hwnd_copy).as_bool() {
-                        PostMessageW(
-                            hwnd_copy,
-                            WM_PODCAST_DOWNLOAD_PROGRESS,
-                            WPARAM(last_reported_pct as usize),
-                            LPARAM(0),
-                        )
-                        .ok();
+        let mut attempt: u32 = 0;
+        let bytes = loop {
+            attempt += 1;
+            let result = rss::fetch_url_bytes_with_progress(&url, |pct| {
+                // Avoid announcing "100%" before file write/finalization is truly done.
+                // Final completion is announced via "podcasts.download_completed".
+                let announced_pct = pct.min(90);
+                if announced_pct >= last_reported_pct + 10 {
+                    last_reported_pct = (announced_pct / 10) * 10;
+                    unsafe {
+                        if windows::Win32::UI::WindowsAndMessaging::IsWindow(hwnd_copy).as_bool() {
+                            PostMessageW(
+                                hwnd_copy,
+                                WM_PODCAST_DOWNLOAD_PROGRESS,
+                                WPARAM(last_reported_pct as usize),
+                                LPARAM(0),
+                            )
+                            .ok();
+                        }
                     }
                 }
+            });
+            match result {
+                Ok(bytes) => break Ok(bytes),
+                Err(err) => {
+                    crate::log_debug(&format!(
+                        "podcasts_download_attempt_failed attempt={} url={} err={}",
+                        attempt, url, err
+                    ));
+                    if attempt < 5 {
+                        last_reported_pct = 0;
+                        unsafe {
+                            if windows::Win32::UI::WindowsAndMessaging::IsWindow(hwnd_copy)
+                                .as_bool()
+                            {
+                                PostMessageW(
+                                    hwnd_copy,
+                                    WM_PODCAST_DOWNLOAD_PROGRESS,
+                                    WPARAM(0),
+                                    LPARAM(0),
+                                )
+                                .ok();
+                            }
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(
+                            500u64 * attempt as u64,
+                        ));
+                        continue;
+                    }
+                    break Err(err);
+                }
             }
-        });
+        };
         let bytes = match bytes {
             Ok(b) => {
                 log_debug(&format!("podcasts_download_ok len={} url={}", b.len(), url));
@@ -6967,6 +7023,9 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 reorder_dialog: HWND(0),
                 last_selected: 0,
                 pending_play: None,
+                download_in_progress: false,
+                last_download_progress_pct: 0,
+                last_download_progress_at: None,
                 preview_sources: Vec::new(),
                 removed_history: Vec::new(),
                 suppress_tree_selection_events: false,
@@ -7084,6 +7143,14 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 ID_SEARCH_BUTTON => {
                     if code == windows::Win32::UI::WindowsAndMessaging::BN_CLICKED as u16 {
                         trigger_search_from_edit(hwnd);
+                        return LRESULT(0);
+                    }
+                    LRESULT(0)
+                }
+                ID_SEARCH_PROVIDER => {
+                    if code == windows::Win32::UI::WindowsAndMessaging::CBN_SETFOCUS as u16 {
+                        let language = with_podcast_state(hwnd, |s| s.language).unwrap_or_default();
+                        announce_status(&i18n::tr(language, "podcasts.categories.source.label"));
                         return LRESULT(0);
                     }
                     LRESULT(0)
@@ -7447,6 +7514,14 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
             if let Some(episode) = episode
                 && episode_key(&episode) == msg.item_key
             {
+                let should_skip_ui_update = with_podcast_state(hwnd, |s| {
+                    s.download_in_progress
+                        || s.pending_play.as_deref() == Some(msg.item_key.as_str())
+                })
+                .unwrap_or(false);
+                if should_skip_ui_update {
+                    return LRESULT(0);
+                }
                 let (
                     language,
                     announce_unread,
@@ -7543,7 +7618,19 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 return LRESULT(0);
             }
             let msg = unsafe { Box::from_raw(ptr) };
-            with_podcast_state(hwnd, |s| s.pending_play = None);
+            let (language, announce_download_completed) = with_podcast_state(hwnd, |s| {
+                let language = s.language;
+                let announce = s.download_in_progress;
+                s.download_in_progress = false;
+                s.last_download_progress_pct = 0;
+                s.last_download_progress_at = None;
+                s.pending_play = None;
+                (language, announce)
+            })
+            .unwrap_or((Language::default(), false));
+            if announce_download_completed {
+                announce_status(&i18n::tr(language, "podcasts.download_completed"));
+            }
             let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
             mark_podcast_episode_played(&msg.path);
             editor_manager::open_document(parent, &msg.path);
@@ -7569,7 +7656,12 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
             LRESULT(0)
         }
         WM_PODCAST_PLAY_FAILED => {
-            with_podcast_state(hwnd, |s| s.pending_play = None);
+            with_podcast_state(hwnd, |s| {
+                s.pending_play = None;
+                s.download_in_progress = false;
+                s.last_download_progress_pct = 0;
+                s.last_download_progress_at = None;
+            });
             let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
             if parent.0 != 0 {
                 crate::set_pending_podcast_chapters_key(parent, None);
@@ -7578,13 +7670,36 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
         }
         WM_PODCAST_DOWNLOAD_PROGRESS => {
             let pct = wparam.0 as u32;
-            let language = with_podcast_state(hwnd, |s| s.language).unwrap_or_default();
+            let now = Instant::now();
+            let (language, should_announce) = with_podcast_state(hwnd, |s| {
+                let language = s.language;
+                let should = if pct == 0 {
+                    true
+                } else if pct >= 100 {
+                    s.last_download_progress_pct < 100
+                } else if pct > s.last_download_progress_pct {
+                    s.last_download_progress_at
+                        .map(|t| now.saturating_duration_since(t) >= Duration::from_millis(600))
+                        .unwrap_or(true)
+                } else {
+                    false
+                };
+                if should {
+                    s.last_download_progress_pct = pct.min(100);
+                    s.last_download_progress_at = Some(now);
+                }
+                (language, should)
+            })
+            .unwrap_or((Language::default(), true));
+            if !should_announce {
+                return LRESULT(0);
+            }
             let message = crate::i18n::tr_f(
                 language,
                 "podcasts.download_progress",
                 &[("pct", &pct.to_string())],
             );
-            crate::accessibility::nvda_speak(&message);
+            announce_status(&message);
             LRESULT(0)
         }
         WM_DESTROY => {

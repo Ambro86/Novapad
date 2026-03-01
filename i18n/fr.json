@@ -240,6 +240,7 @@
   "options.label.subtitle_offset": "Décalage des sous-titres (ms) :",
   "options.label.audio_wasapi": "Utiliser la sortie WASAPI (bêta)",
   "options.subtitle_mode.off": "Désactivée",
+  "playback.direct_stream_command_disabled": "Commande désactivée pendant le streaming direct",
   "options.subtitle_mode.nvda": "NVDA",
   "options.subtitle_mode.user": "Utiliser la voix sélectionnée",
   "options.subtitle_mode.record": "Enregistrer dans un fichier",
@@ -682,6 +683,13 @@
   "podcasts.download_filter": "Fichiers audio\\\\\\\\\\0*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav\\\\\\\\\\0Tous les fichiers\\\\\\\\\\0*.*\\\\\\\\\\0\\\\\\\\\\0",
   "podcasts.download_started": "Téléchargement démarré",
   "podcasts.download_completed": "Téléchargement terminé",
+  "podcasts.save_confirm_title": "Épisode enregistré",
+  "podcasts.save_confirm_body": "Enregistré dans :\n{path}",
+  "podcasts.save_confirm_open_folder": "Ouvrir le dossier",
+  "podcasts.save_confirm_ok": "OK",
+  "podcasts.save_error_title": "Échec de l’enregistrement",
+  "podcasts.save_error_body": "Impossible d’enregistrer l’épisode.\nErreur : {err}",
+  "podcasts.save_error_ok": "OK",
   "podcasts.download_failed": "Échec du téléchargement",
   "podcasts.download_progress": "Téléchargement {pct} %",
   "podcasts.search.button": "Rechercher",
@@ -932,6 +940,7 @@
   "stream_audio.url_label": "URL :",
   "stream_audio.format_label": "Format :",
   "stream_audio.format.auto": "Automatique (sans conversion)",
+  "stream_audio.track.auto": "Automatique",
   "stream_audio.progress_converting": "Conversion du format...",
   "stream_audio.convert_failed": "Erreur de conversion du flux : {err}",
   "recent.clear": "Vider les fichiers récents",
@@ -987,3 +996,7 @@
   "reader.external_link": "Lien externe :\n{url}",
   "options.lang.lt": "Lituanien"
 }
+
+
+
+

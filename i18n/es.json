@@ -227,6 +227,7 @@
   "options.label.subtitle_offset": "Offset de subtítulos (ms):",
   "options.label.audio_wasapi": "Usar salida WASAPI (beta)",
   "options.subtitle_mode.off": "Desactivada",
+  "playback.direct_stream_command_disabled": "Comando deshabilitado durante la transmisión directa",
   "options.subtitle_mode.nvda": "NVDA",
   "options.subtitle_mode.user": "Usar voz seleccionada",
   "options.subtitle_mode.record": "Grabar en archivo",
@@ -662,6 +663,13 @@
   "podcasts.download_filter": "Archivos de audio\\0*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav\\0Todos los archivos\\0*.*\\0\\0",
   "podcasts.download_started": "Descarga iniciada",
   "podcasts.download_completed": "Descarga completada",
+  "podcasts.save_confirm_title": "Episodio guardado",
+  "podcasts.save_confirm_body": "Guardado en:\n{path}",
+  "podcasts.save_confirm_open_folder": "Abrir carpeta",
+  "podcasts.save_confirm_ok": "OK",
+  "podcasts.save_error_title": "Error al guardar",
+  "podcasts.save_error_body": "No se pudo guardar el episodio.\nError: {err}",
+  "podcasts.save_error_ok": "OK",
   "podcasts.download_failed": "Descarga fallida",
   "podcasts.download_progress": "Descargando {pct}%",
   "podcasts.search.button": "Buscar",
@@ -925,6 +933,7 @@
   "stream_audio.url_label": "URL:",
   "stream_audio.format_label": "Formato:",
   "stream_audio.format.auto": "Automático (sin conversión)",
+  "stream_audio.track.auto": "Automático",
   "stream_audio.progress_converting": "Convirtiendo formato...",
   "stream_audio.convert_failed": "Error al convertir el streaming: {err}",
   "recent.clear": "Limpiar archivos recientes",
@@ -987,3 +996,7 @@
   "reader.external_link": "Enlace externo:\n{url}",
   "options.lang.lt": "Lituano"
 }
+
+
+
+

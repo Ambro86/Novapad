@@ -2,7 +2,10 @@
 
 Phiên bản 0.6.7 – 2026-02-13
 Cải tiến
-• Đã cập nhật bản địa hóa tiếng Trung và tiếng Litva trên toàn bộ tài nguyên ứng dụng, bao gồm hướng dẫn/nội dung quyên góp và bản dịch trình cài đặt NSIS (thêm chuỗi cài đặt mới cho tiếng Trung giản thể và tiếng Litva, đồng thời hoàn thiện bản dịch tiếng Ukraina của setup).
+• Đã cập nhật bản dịch tiếng Ba Lan nhờ DJ Graco.
+• Đã thêm bản dịch tiếng Litva.
+• Đã thêm bản dịch tiếng Trung.
+• Đã cập nhật hướng dẫn cho tất cả ngôn ngữ và làm mới tài nguyên bản địa hóa trên toàn bộ ứng dụng, bao gồm nội dung quyên góp và bản dịch trình cài đặt NSIS (thêm chuỗi cài đặt mới cho tiếng Trung giản thể và tiếng Litva, đồng thời hoàn thiện bản dịch tiếng Ukraina của setup).
 • Da bo sung ho tro proxy mang toan cuc (HTTP/HTTPS va SOCKS5/SOCKS5H) cho cac tinh nang truc tuyen, kem kiem tra khi luu Tuy chon: proxy khong hop le se duoc canh bao va xoa tu dong.
 • Da them tinh nang moi trong Cong cu: "Phat am thanh tu streaming...", cho phep dan URL (YouTube hoac lien ket media truc tiep), chon dinh dang dau ra va ho so chat luong/bitrate (bao gom chat luong/bitrate goc cho MP3 va MP4) va phat ngay trong trinh phat cua Sonarpad.
 • Da them ho tro phim da phuong tien Play/Pause cua he thong (tai nghe/ban phim): nay co the dieu khien ca phat media va tam dung/tiep tuc doc van ban (uu tien trinh phat media khi ca hai dang hoat dong).

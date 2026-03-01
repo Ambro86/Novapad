@@ -1470,7 +1470,7 @@ fn looks_like_valid_stream_url(input: &str) -> bool {
         || (host_lc.starts_with('[') && host_lc.ends_with(']'))
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum StreamOutputFormat {
     Auto,
     Mp3,
@@ -1508,6 +1508,7 @@ struct StreamAudioTrack {
 struct StreamDialogInit {
     parent: HWND,
     language: Language,
+    default_format: StreamOutputFormat,
     result: Arc<Mutex<Option<StreamDialogResult>>>,
 }
 
@@ -1605,6 +1606,32 @@ impl StreamOutputFormat {
             StreamOutputFormat::Flac => Some("flac"),
             StreamOutputFormat::Mp4 => Some("mp4"),
             StreamOutputFormat::Auto => None,
+        }
+    }
+
+    fn from_settings_value(value: &str) -> Self {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "mp4" => StreamOutputFormat::Mp4,
+            "mp3" => StreamOutputFormat::Mp3,
+            "m4a" => StreamOutputFormat::M4a,
+            "opus" => StreamOutputFormat::Opus,
+            "ogg" => StreamOutputFormat::Ogg,
+            "wav" => StreamOutputFormat::Wav,
+            "flac" => StreamOutputFormat::Flac,
+            _ => StreamOutputFormat::Auto,
+        }
+    }
+
+    fn settings_value(self) -> &'static str {
+        match self {
+            StreamOutputFormat::Auto => "auto",
+            StreamOutputFormat::Mp4 => "mp4",
+            StreamOutputFormat::Mp3 => "mp3",
+            StreamOutputFormat::M4a => "m4a",
+            StreamOutputFormat::Opus => "opus",
+            StreamOutputFormat::Ogg => "ogg",
+            StreamOutputFormat::Wav => "wav",
+            StreamOutputFormat::Flac => "flac",
         }
     }
 }
@@ -1897,7 +1924,11 @@ unsafe fn stream_dialog_wndproc_inner(
                     LPARAM(wide.as_ptr() as isize),
                 );
             }
-            SendMessageW(format_combo, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+            let default_idx = items
+                .iter()
+                .position(|(_, format)| *format == init.default_format)
+                .unwrap_or(0);
+            SendMessageW(format_combo, CB_SETCURSEL, WPARAM(default_idx), LPARAM(0));
 
             let state = Box::new(StreamDialogState {
                 parent: init.parent,
@@ -2027,7 +2058,11 @@ unsafe fn stream_dialog_wndproc_inner(
     }
 }
 
-fn show_stream_dialog(parent: HWND, language: Language) -> Option<StreamDialogResult> {
+fn show_stream_dialog(
+    parent: HWND,
+    language: Language,
+    default_format: StreamOutputFormat,
+) -> Option<StreamDialogResult> {
     let hinstance = HINSTANCE(unsafe { GetModuleHandleW(None).unwrap_or_default().0 });
     let class_name = to_wide(STREAM_DIALOG_CLASS_NAME);
     let wc = windows::Win32::UI::WindowsAndMessaging::WNDCLASSW {
@@ -2048,6 +2083,7 @@ fn show_stream_dialog(parent: HWND, language: Language) -> Option<StreamDialogRe
     let init = Box::new(StreamDialogInit {
         parent,
         language,
+        default_format,
         result: Arc::clone(&result),
     });
     let title = to_wide(&i18n::tr(language, "stream_audio.prompt_title"));
@@ -2564,7 +2600,7 @@ unsafe fn stream_track_dialog_wndproc_inner(
                 }
             }
 
-            let auto_label = i18n::tr(init.language, "stream_audio.format.auto");
+            let auto_label = i18n::tr(init.language, "stream_audio.track.auto");
             let auto_w = to_wide(&auto_label);
             SendMessageW(
                 combo,
@@ -2756,12 +2792,33 @@ fn choose_stream_audio_track(
 }
 
 pub fn play_streaming_audio_from_url(parent: HWND) {
-    let language =
-        unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
-    let Some(dialog_data) = show_stream_dialog(parent, language) else {
+    let (language, default_format) = unsafe {
+        with_state(parent, |state| {
+            (
+                state.settings.language,
+                StreamOutputFormat::from_settings_value(
+                    &state.settings.stream_audio_default_format,
+                ),
+            )
+        })
+    }
+    .unwrap_or((Language::default(), StreamOutputFormat::Auto));
+    let Some(dialog_data) = show_stream_dialog(parent, language, default_format) else {
         post_focus_editor(parent);
         return;
     };
+    let saved = unsafe {
+        with_state(parent, |state| {
+            let new_value = dialog_data.format.settings_value().to_string();
+            if state.settings.stream_audio_default_format != new_value {
+                state.settings.stream_audio_default_format = new_value;
+                save_settings(state.settings.clone());
+            }
+        })
+    };
+    if saved.is_none() {
+        crate::log_debug("Failed to persist stream output format preference");
+    }
     let url: String = dialog_data
         .url
         .chars()
@@ -2884,7 +2941,23 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         .arg("--verbose");
 
     if let Some(format_id) = selected_audio_format.as_ref() {
-        cmd.arg("-f").arg(format_id);
+        match dialog_data.format {
+            StreamOutputFormat::Mp4 => {
+                cmd.arg("-f").arg(format!(
+                    "bestvideo[ext=mp4]+{id}/bestvideo+{id}/best[ext=mp4]/best",
+                    id = format_id
+                ));
+            }
+            StreamOutputFormat::Auto => {
+                cmd.arg("-f").arg(format!(
+                    "bestvideo[ext=webm]+{id}/bestvideo+{id}/best",
+                    id = format_id
+                ));
+            }
+            _ => {
+                cmd.arg("-f").arg(format_id);
+            }
+        }
     } else {
         match dialog_data.format {
             StreamOutputFormat::Mp4 => {
@@ -2901,6 +2974,10 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                     _ => "best[ext=mp4]/best",
                 };
                 cmd.arg("-f").arg(mp4_profile);
+            }
+            StreamOutputFormat::Auto => {
+                cmd.arg("-f")
+                    .arg("bestvideo[ext=webm]+bestaudio[ext=webm]/bestvideo+bestaudio/best");
             }
             _ => {
                 cmd.arg("-f").arg("bestaudio/best");
@@ -3003,6 +3080,11 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         }
     });
 
+    let allow_early_finalize = !matches!(
+        dialog_data.format,
+        StreamOutputFormat::Auto | StreamOutputFormat::Mp4
+    );
+
     let mut last_pct = 0u32;
     let mut ui_pct = 0u32;
     let mut ui_target_pct = 0u32;
@@ -3038,11 +3120,12 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                     ui_pct = (ui_pct + 1).min(ui_target_pct);
                     report_progress(progress, ui_pct);
                 }
-                if reached_100_at
-                    .map(|t| {
-                        t.elapsed() > std::time::Duration::from_secs(STREAM_POST_100_GRACE_SECS)
-                    })
-                    .unwrap_or(false)
+                if allow_early_finalize
+                    && reached_100_at
+                        .map(|t| {
+                            t.elapsed() > std::time::Duration::from_secs(STREAM_POST_100_GRACE_SECS)
+                        })
+                        .unwrap_or(false)
                     && find_latest_downloaded_stream_file(&cache_dir, &prefix).is_some()
                 {
                     crate::log_debug(

@@ -141,6 +141,7 @@ const OPTIONS_ID_DIALOGUE_SECONDARY_TTS_ENGINE: usize = 6093;
 const OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_LANGUAGE: usize = 6094;
 const OPTIONS_ID_DIALOGUE_MULTILINGUAL: usize = 6095;
 const OPTIONS_ID_DIALOGUE_SECONDARY_MULTILINGUAL: usize = 6096;
+const OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_PREVIEW: usize = 6097;
 const OPTIONS_ID_SHORTCUT_ACTION: usize = 6070;
 const OPTIONS_ID_SHORTCUT_VALUE: usize = 6071;
 const OPTIONS_ID_SHORTCUT_CHANGE: usize = 6072;
@@ -700,6 +701,7 @@ struct OptionsDialogState {
     label_dialogue_voice: HWND,
     combo_dialogue_voice: HWND,
     button_dialogue_voice_preview: HWND,
+    button_dialogue_secondary_voice_preview: HWND,
     label_dialogue_engine: HWND,
     combo_dialogue_engine: HWND,
     label_dialogue_voice_language: HWND,
@@ -2310,6 +2312,22 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
             );
             y += 26;
 
+            let button_dialogue_voice_preview = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_dialogue_voice_preview).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                170,
+                y,
+                300,
+                26,
+                hwnd,
+                HMENU(OPTIONS_ID_DIALOGUE_VOICE_PREVIEW as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 32;
+
             let label_dialogue_voice_rate = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -2522,6 +2540,22 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
             );
             y += 26;
 
+            let button_dialogue_secondary_voice_preview = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_dialogue_voice_preview).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                170,
+                y,
+                300,
+                26,
+                hwnd,
+                HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_PREVIEW as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 32;
+
             let label_dialogue_secondary_voice_rate = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -2687,22 +2721,6 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 None,
             );
             y += 44;
-
-            let button_dialogue_voice_preview = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_dialogue_voice_preview).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                170,
-                y,
-                300,
-                26,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_VOICE_PREVIEW as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 36;
 
             let label_audio_skip = CreateWindowExW(
                 Default::default(),
@@ -4260,6 +4278,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 edit_dialogue_close_quote,
                 checkbox_dialogue_allow_multiline,
                 button_dialogue_voice_preview,
+                button_dialogue_secondary_voice_preview,
                 checkbox_split_on_newline,
                 checkbox_word_wrap,
                 checkbox_smart_quotes,
@@ -4425,6 +4444,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 edit_dialogue_close_quote,
                 checkbox_dialogue_allow_multiline,
                 button_dialogue_voice_preview,
+                button_dialogue_secondary_voice_preview,
                 checkbox_split_on_newline,
                 checkbox_word_wrap,
                 checkbox_smart_quotes,
@@ -4650,6 +4670,10 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 }
                 OPTIONS_ID_DIALOGUE_VOICE_PREVIEW => {
                     preview_dialogue_voice(hwnd);
+                    LRESULT(0)
+                }
+                OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_PREVIEW => {
+                    preview_dialogue_secondary_voice(hwnd);
                     LRESULT(0)
                 }
                 OPTIONS_ID_PODCASTINDEX_SIGNUP => {
@@ -6798,6 +6822,7 @@ unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
         label,
         combo,
         button,
+        secondary_button,
         label_engine,
         combo_engine,
         label_voice_language,
@@ -6834,6 +6859,7 @@ unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
             state.label_dialogue_voice,
             state.combo_dialogue_voice,
             state.button_dialogue_voice_preview,
+            state.button_dialogue_secondary_voice_preview,
             state.label_dialogue_engine,
             state.combo_dialogue_engine,
             state.label_dialogue_voice_language,
@@ -6893,6 +6919,7 @@ unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
         label_secondary_voice,
         combo_secondary_voice,
         checkbox_dialogue_secondary_multilingual,
+        secondary_button,
         label_secondary_rate,
         combo_secondary_rate,
         label_secondary_pitch,
@@ -6964,6 +6991,7 @@ unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
             || control == combo_secondary_voice_language
             || control == combo_secondary_voice
             || control == checkbox_dialogue_secondary_multilingual
+            || control == secondary_button
             || control == label_secondary_rate
             || control == combo_secondary_rate
             || control == label_secondary_pitch
@@ -7369,6 +7397,161 @@ unsafe fn preview_dialogue_voice(hwnd: HWND) {
     let rate = combo_value(combo_dialogue_voice_rate);
     let pitch = combo_value(combo_dialogue_voice_pitch);
     let volume = combo_value(combo_dialogue_voice_volume);
+
+    match engine {
+        TtsEngine::Edge => {
+            let chunks = tts_engine::split_into_tts_chunks(&text, false, &[], engine);
+            let options = tts_engine::TtsPlaybackOptions {
+                hwnd: parent,
+                engine,
+                cleaned: text,
+                voice,
+                chunks,
+                initial_caret_pos: 0,
+                rate,
+                pitch,
+                volume,
+            };
+            tts_engine::start_tts_playback_with_chunks(options);
+        }
+        TtsEngine::Sapi4 => {
+            tts_engine::stop_tts_playback(parent);
+            let voice_idx = if let Some(hash_pos) = voice.find('#') {
+                let rest = &voice[hash_pos + 1..];
+                if let Some(pipe_pos) = rest.find('|') {
+                    rest[..pipe_pos].parse::<i32>().unwrap_or(1)
+                } else {
+                    rest.parse::<i32>().unwrap_or(1)
+                }
+            } else {
+                1
+            };
+            let cancel = Arc::new(AtomicBool::new(false));
+            let (command_tx, command_rx) = mpsc::unbounded_channel();
+            if with_state(parent, |state| {
+                state.tts_session = Some(tts_engine::TtsSession {
+                    id: state.tts_next_session_id,
+                    command_tx,
+                    cancel: cancel.clone(),
+                    paused: false,
+                    initial_caret_pos: 0,
+                });
+                state.tts_next_session_id += 1;
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access state in options_window");
+            }
+            crate::sapi4_engine::play_sapi4(
+                voice_idx, text, rate, pitch, volume, cancel, command_rx,
+            );
+        }
+        TtsEngine::Sapi5 => {
+            tts_engine::stop_tts_playback(parent);
+            let cancel = Arc::new(AtomicBool::new(false));
+            let (command_tx, command_rx) = mpsc::unbounded_channel();
+            if with_state(parent, |state| {
+                state.tts_session = Some(tts_engine::TtsSession {
+                    id: state.tts_next_session_id,
+                    command_tx,
+                    cancel: cancel.clone(),
+                    paused: false,
+                    initial_caret_pos: 0,
+                });
+                state.tts_next_session_id += 1;
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access state in options_window");
+            }
+            if let Err(e) = crate::sapi5_engine::play_sapi(
+                vec![text],
+                voice,
+                rate,
+                pitch,
+                volume,
+                cancel,
+                command_rx,
+            ) {
+                crate::log_debug(&format!("SAPI5 test playback failed: {}", e));
+            }
+        }
+    }
+}
+
+unsafe fn preview_dialogue_secondary_voice(hwnd: HWND) {
+    let (
+        parent,
+        combo_dialogue_secondary_engine,
+        combo_dialogue_secondary_voice,
+        combo_dialogue_secondary_voice_rate,
+        combo_dialogue_secondary_voice_pitch,
+        combo_dialogue_secondary_voice_volume,
+    ) = match with_options_state(hwnd, |state| {
+        (
+            state.parent,
+            state.combo_dialogue_secondary_engine,
+            state.combo_dialogue_secondary_voice,
+            state.combo_dialogue_secondary_voice_rate,
+            state.combo_dialogue_secondary_voice_pitch,
+            state.combo_dialogue_secondary_voice_volume,
+        )
+    }) {
+        Some(values) => values,
+        None => return,
+    };
+
+    let language = with_state(parent, |state| state.settings.language).unwrap_or(Language::Italian);
+
+    let text = i18n::tr(language, "tts.preview_text");
+    if text.trim().is_empty() {
+        return;
+    }
+
+    let engine_sel = SendMessageW(
+        combo_dialogue_secondary_engine,
+        CB_GETCURSEL,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0;
+    let engine = match engine_sel {
+        1 => TtsEngine::Sapi5,
+        2 => TtsEngine::Sapi4,
+        _ => TtsEngine::Edge,
+    };
+    let voices = with_state(parent, |state| match engine {
+        TtsEngine::Edge => state.edge_voices.clone(),
+        TtsEngine::Sapi5 => state.sapi_voices.clone(),
+        TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
+    })
+    .unwrap_or_default();
+
+    let voice_sel = SendMessageW(
+        combo_dialogue_secondary_voice,
+        CB_GETCURSEL,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0;
+    if voice_sel < 0 {
+        return;
+    }
+    let voice_index = SendMessageW(
+        combo_dialogue_secondary_voice,
+        CB_GETITEMDATA,
+        WPARAM(voice_sel as usize),
+        LPARAM(0),
+    )
+    .0 as usize;
+    if voice_index >= voices.len() {
+        return;
+    }
+    let voice = voices[voice_index].short_name.clone();
+
+    let rate = combo_value(combo_dialogue_secondary_voice_rate);
+    let pitch = combo_value(combo_dialogue_secondary_voice_pitch);
+    let volume = combo_value(combo_dialogue_secondary_voice_volume);
 
     match engine {
         TtsEngine::Edge => {
@@ -8944,6 +9127,11 @@ fn layout_voice_tab(state: &OptionsDialogState) {
         state.checkbox_dialogue_multilingual,
         y,
     );
+    y = layout_button_compact(
+        "button_dialogue_voice_preview",
+        state.button_dialogue_voice_preview,
+        y,
+    );
     y = layout_label_control(
         "label_dialogue_voice_rate",
         state.label_dialogue_voice_rate,
@@ -9002,6 +9190,11 @@ fn layout_voice_tab(state: &OptionsDialogState) {
         state.checkbox_dialogue_secondary_multilingual,
         y,
     );
+    y = layout_button_compact(
+        "button_dialogue_secondary_voice_preview",
+        state.button_dialogue_secondary_voice_preview,
+        y,
+    );
     y = layout_label_control(
         "label_dialogue_secondary_voice_rate",
         state.label_dialogue_secondary_voice_rate,
@@ -9042,14 +9235,9 @@ fn layout_voice_tab(state: &OptionsDialogState) {
         y,
         OPTIONS_EDIT_HEIGHT,
     );
-    y = layout_checkbox(
+    layout_checkbox(
         "checkbox_dialogue_allow_multiline",
         state.checkbox_dialogue_allow_multiline,
-        y,
-    );
-    layout_button_compact(
-        "button_dialogue_voice_preview",
-        state.button_dialogue_voice_preview,
         y,
     );
 }
@@ -9546,6 +9734,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.edit_dialogue_close_quote,
             state.checkbox_dialogue_allow_multiline,
             state.button_dialogue_voice_preview,
+            state.button_dialogue_secondary_voice_preview,
         ] {
             ShowWindow(control, if show_voice { SW_SHOW } else { SW_HIDE });
         }

@@ -124,19 +124,19 @@ use windows::Win32::UI::WindowsAndMessaging::{
     EnumWindows, FALT, FCONTROL, FSHIFT, FVIRTKEY, FindWindowW, GWLP_USERDATA, GWLP_WNDPROC,
     GetClassNameW, GetCursorPos, GetForegroundWindow, GetMenu, GetMenuItemCount, GetMessageW,
     GetParent, GetSubMenu, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW,
-    GetWindowThreadProcessId, HACCEL, HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, IsChild,
-    IsIconic, IsWindow, KillTimer, LoadCursorW, LoadIconW, MB_ICONASTERISK, MB_ICONERROR,
-    MB_ICONINFORMATION, MB_OK, MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION,
-    MF_CHECKED, MF_ENABLED, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG,
-    MessageBoxW, ModifyMenuW, OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW,
-    RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED, SW_SHOWNORMAL,
-    SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
-    TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage,
-    WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_APPCOMMAND, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU,
-    WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES, WM_INITMENUPOPUP,
-    WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT,
-    WM_SETREDRAW, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN,
-    WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
+    GetWindowThreadProcessId, HACCEL, HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, IDYES,
+    IsChild, IsIconic, IsWindow, KillTimer, LoadCursorW, LoadIconW, MB_ICONASTERISK, MB_ICONERROR,
+    MB_ICONINFORMATION, MB_OK, MB_YESNO, MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND,
+    MF_BYPOSITION, MF_CHECKED, MF_ENABLED, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING,
+    MF_UNCHECKED, MSG, MessageBoxW, ModifyMenuW, OBJID_CLIENT, PostMessageW, PostQuitMessage,
+    RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED,
+    SW_SHOWNORMAL, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW,
+    ShowWindow, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW,
+    TranslateMessage, WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_APPCOMMAND, WM_CLOSE, WM_COMMAND,
+    WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES,
+    WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE,
+    WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WNDPROC,
+    WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{HSTRING, Interface, PCWSTR, PWSTR, implement, w};
 
@@ -174,6 +174,7 @@ const WM_CHECK_PENDING_UPDATE: u32 = WM_APP + 82;
 const WM_SHOW_CHANGELOG: u32 = WM_APP + 83;
 const WM_PODCAST_CHAPTERS_READY: u32 = WM_APP + 31;
 const WM_DICTIONARY_LOADED: u32 = WM_APP + 32;
+const WM_PODCAST_EPISODE_SAVE_RESULT: u32 = WM_APP + 33;
 const FOCUS_EDITOR_TIMER_ID: usize = 1;
 const FOCUS_EDITOR_TIMER_ID2: usize = 2;
 const FOCUS_EDITOR_TIMER_ID3: usize = 3;
@@ -362,6 +363,12 @@ struct PdfLoadingState {
     frame: usize,
     start_time: Instant,
     ocr_timeout_secs: u64,
+}
+
+struct PodcastEpisodeSaveResult {
+    language: Language,
+    target_path: PathBuf,
+    error: Option<String>,
 }
 
 struct PodcastChaptersReady {
@@ -1016,6 +1023,24 @@ pub(crate) fn download_active_podcast_episode(hwnd: HWND) {
     download_podcast_episode(hwnd, url, title, cache_path, language);
 }
 
+fn post_podcast_episode_save_result(hwnd: HWND, payload: PodcastEpisodeSaveResult) {
+    let ptr = Box::into_raw(Box::new(payload));
+    unsafe {
+        if let Err(err) = PostMessageW(
+            hwnd,
+            WM_PODCAST_EPISODE_SAVE_RESULT,
+            WPARAM(0),
+            LPARAM(ptr as isize),
+        ) {
+            log_debug(&format!(
+                "Failed to post WM_PODCAST_EPISODE_SAVE_RESULT: {}",
+                err
+            ));
+            let _drop_payload = Box::from_raw(ptr);
+        }
+    }
+}
+
 pub(crate) fn download_podcast_episode(
     hwnd: HWND,
     url: Option<String>,
@@ -1048,15 +1073,34 @@ pub(crate) fn download_podcast_episode(
     let target = ensure_path_extension(target, &ext);
     let cache_path = cache_path.clone();
     let url = url.clone();
+    let hwnd_copy = hwnd;
     std::thread::spawn(move || {
         let Some(cache_path) = cache_path.as_ref() else {
-            log_debug("podcast_episode_save_failed no_cache_path");
+            let err = "no cache path".to_string();
+            log_debug(&format!("podcast_episode_save_failed {}", err));
+            post_podcast_episode_save_result(
+                hwnd_copy,
+                PodcastEpisodeSaveResult {
+                    language,
+                    target_path: target.clone(),
+                    error: Some(err),
+                },
+            );
             return;
         };
 
         if !cache_path.exists() {
             let Some(url) = url.as_ref() else {
-                log_debug("podcast_episode_save_failed no_cache_and_no_url");
+                let err = "no cache and no source URL".to_string();
+                log_debug(&format!("podcast_episode_save_failed {}", err));
+                post_podcast_episode_save_result(
+                    hwnd_copy,
+                    PodcastEpisodeSaveResult {
+                        language,
+                        target_path: target.clone(),
+                        error: Some(err),
+                    },
+                );
                 return;
             };
             log_debug(&format!(
@@ -1073,6 +1117,16 @@ pub(crate) fn download_podcast_episode(
                     crate::tools::rss::RssFetchConfig::default(),
                 ))
             } else {
+                let err = "failed to create async runtime".to_string();
+                log_debug(&format!("podcast_episode_save_failed {}", err));
+                post_podcast_episode_save_result(
+                    hwnd_copy,
+                    PodcastEpisodeSaveResult {
+                        language,
+                        target_path: target.clone(),
+                        error: Some(err),
+                    },
+                );
                 return;
             };
             match bytes {
@@ -1081,15 +1135,30 @@ pub(crate) fn download_podcast_episode(
                         crate::log_if_err!(std::fs::create_dir_all(parent));
                     }
                     if let Err(e) = std::fs::write(cache_path, b) {
-                        log_debug(&format!(
-                            "podcast_episode_save: failed to write to cache: {}",
-                            e
-                        ));
+                        let err = format!("failed to write to cache: {}", e);
+                        log_debug(&format!("podcast_episode_save: {}", err));
+                        post_podcast_episode_save_result(
+                            hwnd_copy,
+                            PodcastEpisodeSaveResult {
+                                language,
+                                target_path: target.clone(),
+                                error: Some(err),
+                            },
+                        );
                         return;
                     }
                 }
                 Err(e) => {
-                    log_debug(&format!("podcast_episode_save: download failed: {}", e));
+                    let err = format!("download failed: {}", e);
+                    log_debug(&format!("podcast_episode_save: {}", err));
+                    post_podcast_episode_save_result(
+                        hwnd_copy,
+                        PodcastEpisodeSaveResult {
+                            language,
+                            target_path: target.clone(),
+                            error: Some(err),
+                        },
+                    );
                     return;
                 }
             }
@@ -1100,11 +1169,28 @@ pub(crate) fn download_podcast_episode(
                 "podcast_episode_saved src=cache dst={}",
                 target.to_string_lossy()
             ));
+            post_podcast_episode_save_result(
+                hwnd_copy,
+                PodcastEpisodeSaveResult {
+                    language,
+                    target_path: target,
+                    error: None,
+                },
+            );
         } else {
+            let err = format!("copy failed to dst={}", target.to_string_lossy());
             log_debug(&format!(
                 "podcast_episode_save_failed copy dst={}",
                 target.to_string_lossy()
             ));
+            post_podcast_episode_save_result(
+                hwnd_copy,
+                PodcastEpisodeSaveResult {
+                    language,
+                    target_path: target,
+                    error: Some(err),
+                },
+            );
         }
     });
 }
@@ -1137,10 +1223,14 @@ unsafe fn save_podcast_episode_dialog(
     {
         buffer[i] = *ch;
     }
+    let initial_dir = PathBuf::from(settings::default_media_save_folder());
+    crate::log_if_err!(std::fs::create_dir_all(&initial_dir));
+    let initial_dir_wide = to_wide(&initial_dir.to_string_lossy());
     let mut ofn = OPENFILENAMEW {
         lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
         hwndOwner: hwnd,
         lpstrFilter: PCWSTR(filter.as_ptr()),
+        lpstrInitialDir: PCWSTR(initial_dir_wide.as_ptr()),
         lpstrFile: PWSTR(buffer.as_mut_ptr()),
         nMaxFile: buffer.len() as u32,
         Flags: OFN_EXPLORER | OFN_HIDEREADONLY | OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT,
@@ -1543,7 +1633,7 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
     if disable_seek_rate_pitch {
         let language =
             unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
-        let message = i18n::tr(language, "subtitle_mode.off");
+        let message = i18n::tr(language, "playback.direct_stream_command_disabled");
         if !message.is_empty() {
             crate::accessibility::screen_reader_speak(&message);
         }
@@ -3371,6 +3461,72 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                     nvda_speak(&message);
                 }
                 crate::menu::update_playback_menu(hwnd, true);
+            }
+            LRESULT(0)
+        }
+        WM_PODCAST_EPISODE_SAVE_RESULT => {
+            let ptr = lparam.0 as *mut PodcastEpisodeSaveResult;
+            if ptr.is_null() {
+                return LRESULT(0);
+            }
+            let payload = Box::from_raw(ptr);
+            if let Some(err) = payload.error {
+                let body = i18n::tr_f(
+                    payload.language,
+                    "podcasts.save_error_body",
+                    &[("err", &err)],
+                );
+                let title = i18n::tr(payload.language, "podcasts.save_error_title");
+                let body_w = to_wide(&body);
+                let title_w = to_wide(&title);
+                message_box_modal(
+                    hwnd,
+                    PCWSTR(body_w.as_ptr()),
+                    PCWSTR(title_w.as_ptr()),
+                    MB_OK | MB_ICONERROR,
+                );
+                return LRESULT(0);
+            }
+
+            let path_text = payload.target_path.to_string_lossy().to_string();
+            let saved_line = i18n::tr_f(
+                payload.language,
+                "podcasts.save_confirm_body",
+                &[("path", &path_text)],
+            );
+            let open_label = i18n::tr(payload.language, "podcasts.save_confirm_open_folder");
+            let body = format!("{saved_line}\n\n{open_label}?");
+            let title = i18n::tr(payload.language, "podcasts.save_confirm_title");
+            let body_w = to_wide(&body);
+            let title_w = to_wide(&title);
+            let response = message_box_modal(
+                hwnd,
+                PCWSTR(body_w.as_ptr()),
+                PCWSTR(title_w.as_ptr()),
+                MB_YESNO | MB_ICONINFORMATION,
+            );
+            if response == IDYES {
+                let folder = payload
+                    .target_path
+                    .parent()
+                    .map(Path::to_path_buf)
+                    .unwrap_or_else(|| payload.target_path.clone());
+                let folder_wide = to_wide(&folder.to_string_lossy());
+                let open_res = ShellExecuteW(
+                    hwnd,
+                    w!("open"),
+                    PCWSTR(folder_wide.as_ptr()),
+                    PCWSTR::null(),
+                    PCWSTR::null(),
+                    SW_SHOWNORMAL,
+                );
+                if open_res.0 as isize <= 32 {
+                    log_debug(&format!(
+                        "podcast_episode_save_open_folder_failed path={} code={}",
+                        folder.to_string_lossy(),
+                        open_res.0
+                    ));
+                }
             }
             LRESULT(0)
         }
@@ -10515,6 +10671,15 @@ pub(crate) unsafe fn save_file_dialog_with_encoding(
     pfd.SetFileTypes(&spec).ok()?;
     pfd.SetFileTypeIndex(1).ok()?; // Default to TXT
     pfd.SetDefaultExtension(w!("txt")).ok()?;
+    let initial_dir = settings::default_documents_save_folder();
+    crate::log_if_err!(std::fs::create_dir_all(&initial_dir));
+    let initial_dir_w = to_wide(&initial_dir);
+    if let Ok(shell_folder) =
+        SHCreateItemFromParsingName::<_, _, IShellItem>(PCWSTR(initial_dir_w.as_ptr()), None)
+    {
+        let _unused = pfd.SetDefaultFolder(&shell_folder);
+        let _unused = pfd.SetFolder(&shell_folder);
+    }
 
     if let Some(name) = suggested_name {
         pfd.SetFileName(PCWSTR(to_wide(name).as_ptr())).ok()?;

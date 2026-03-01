@@ -2,7 +2,10 @@
 
 Version 0.6.7 – 2026-02-13
 Improvements
-• Added Chinese and Lithuanian localization updates across app resources, including updated guide/donations texts and NSIS setup translations (new Simplified Chinese and Lithuanian installer strings, plus completed Ukrainian setup translation).
+• Updated Polish translation thanks to DJ Graco.
+• Added Lithuanian translation.
+• Added Chinese translation.
+• Updated guides for all languages and refreshed localization resources across the app, including donations texts and NSIS setup translations (new Simplified Chinese and Lithuanian installer strings, plus completed Ukrainian setup translation).
 • Added global network proxy support (HTTP/HTTPS and SOCKS5/SOCKS5H) for online features, with proxy validation on Options save: invalid proxies are warned and automatically removed.
 • Added a new Tools action: "Play streaming audio...", allowing users to paste a URL (YouTube or direct media link), choose output format and quality/bitrate profile (including original quality/bitrate for MP3 and MP4), and play it directly in Sonarpad’s audio player.
 • Added support for the system media Play/Pause key (headsets/keyboards): it now controls both media playback and text reading pause/resume (with media playback priority when both are active).

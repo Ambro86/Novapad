@@ -240,6 +240,7 @@
   "options.label.subtitle_offset": "Зміщення субтитрів (мс):",
   "options.label.audio_wasapi": "Аудіовихід WASAPI (бета)",
   "options.subtitle_mode.off": "Вимкнено",
+  "playback.direct_stream_command_disabled": "Команду вимкнено під час прямої трансляції",
   "options.subtitle_mode.nvda": "NVDA",
   "options.subtitle_mode.user": "Вибраний голос",
   "options.subtitle_mode.record": "Записати у файл",
@@ -681,6 +682,13 @@
   "podcasts.download_filter": "Аудіофайли\\0*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav\\0Всі файли\\0*.*\\0\\0",
   "podcasts.download_started": "Завантаження розпочато",
   "podcasts.download_completed": "Завантаження завершено",
+  "podcasts.save_confirm_title": "Епізод збережено",
+  "podcasts.save_confirm_body": "Збережено в:\n{path}",
+  "podcasts.save_confirm_open_folder": "Відкрити папку",
+  "podcasts.save_confirm_ok": "OK",
+  "podcasts.save_error_title": "Не вдалося зберегти",
+  "podcasts.save_error_body": "Не вдалося зберегти епізод.\nПомилка: {err}",
+  "podcasts.save_error_ok": "OK",
   "podcasts.download_failed": "Завантаження не вдалося",
   "podcasts.download_progress": "Завантаження {pct}%",
   "podcasts.search.button": "Шукати",
@@ -932,6 +940,7 @@
   "stream_audio.url_label": "URL:",
   "stream_audio.format_label": "Формат:",
   "stream_audio.format.auto": "Автоматично (без перетворення)",
+  "stream_audio.track.auto": "Автоматично",
   "stream_audio.progress_converting": "Перетворення формату...",
   "stream_audio.convert_failed": "Помилка перетворення потоку: {err}",
   "recent.clear": "Очистити список останніх файлів",
@@ -987,3 +996,7 @@
   "reader.external_link": "External link:\n{url}",
   "options.lang.lt": "Литовська"
 }
+
+
+
+

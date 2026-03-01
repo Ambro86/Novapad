@@ -28,6 +28,15 @@ pub const CURLOPT_TLS_EXTENSION_ORDER: i32 = 1012;
 
 pub struct CurlClient;
 
+fn parse_content_length_header(header_line: &[u8]) -> Option<u64> {
+    let text = std::str::from_utf8(header_line).ok()?.trim();
+    let (name, value) = text.split_once(':')?;
+    if !name.eq_ignore_ascii_case("content-length") {
+        return None;
+    }
+    value.trim().parse::<u64>().ok().filter(|v| *v > 0)
+}
+
 fn apply_tls_ca(easy: &mut Easy) -> anyhow::Result<()> {
     // Prima scelta: CA bundle embedded in memoria (evita problemi di path Unicode/permessi su cacert.pem).
     let (blob_applied, blob_rc) = unsafe {
@@ -191,8 +200,15 @@ impl CurlClient {
         crate::log_debug("Curl: starting perform...");
         let mut last_log_mb = 0;
         let mut last_pct = 0u32;
+        let header_content_length = std::cell::Cell::new(0.0f64);
         {
             let mut transfer = easy.transfer();
+            transfer.header_function(|header| {
+                if let Some(len) = parse_content_length_header(header) {
+                    header_content_length.set(len as f64);
+                }
+                true
+            })?;
             transfer.write_function(|new_data| {
                 data.extend_from_slice(new_data);
                 let current_mb = data.len() / (1024 * 1024);
@@ -203,8 +219,13 @@ impl CurlClient {
                 Ok(new_data.len())
             })?;
             transfer.progress_function(|dltotal, dlnow, _, _| {
-                if dltotal > 0.0 {
-                    let pct = (dlnow / dltotal * 100.0) as u32;
+                let total = if dltotal > 0.0 {
+                    dltotal
+                } else {
+                    header_content_length.get()
+                };
+                if total > 0.0 {
+                    let pct = (dlnow / total * 100.0) as u32;
                     if pct > last_pct {
                         last_pct = pct;
                         progress_cb(pct);
@@ -292,15 +313,27 @@ fn fetch_url_chrome_advanced<F: FnMut(u32)>(
 
     let mut data = Vec::new();
     let mut last_pct = 0u32;
+    let header_content_length = std::cell::Cell::new(0.0f64);
     {
         let mut transfer = easy.transfer();
+        transfer.header_function(|header| {
+            if let Some(len) = parse_content_length_header(header) {
+                header_content_length.set(len as f64);
+            }
+            true
+        })?;
         transfer.write_function(|new_data| {
             data.extend_from_slice(new_data);
             Ok(new_data.len())
         })?;
         transfer.progress_function(|dltotal, dlnow, _, _| {
-            if dltotal > 0.0 {
-                let pct = (dlnow / dltotal * 100.0) as u32;
+            let total = if dltotal > 0.0 {
+                dltotal
+            } else {
+                header_content_length.get()
+            };
+            if total > 0.0 {
+                let pct = (dlnow / total * 100.0) as u32;
                 if pct > last_pct {
                     last_pct = pct;
                     progress_cb(pct);

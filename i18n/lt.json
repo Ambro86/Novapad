@@ -240,6 +240,7 @@
   "options.label.subtitle_offset": "Subtitrų laiko nuokrypis (ms):",
   "options.label.audio_wasapi": "Naudokite WASAPI išvestį (beta)",
   "options.subtitle_mode.off": "Neįgalusis",
+  "playback.direct_stream_command_disabled": "Komanda išjungta tiesioginio transliavimo metu",
   "options.subtitle_mode.nvda": "Nevizualinis prieiga prie darbalaukio",
   "options.subtitle_mode.user": "Naudokite pasirinktą balsą",
   "options.subtitle_mode.record": "Įrašyti į failą",
@@ -681,6 +682,13 @@
   "podcasts.download_filter": "Garso failai\\0*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav\\0Visi failai\\0*.*\\0\\0",
   "podcasts.download_started": "Pradėtas atsisiuntimas",
   "podcasts.download_completed": "Atsisiuntimas baigtas",
+  "podcasts.save_confirm_title": "Epizodas išsaugotas",
+  "podcasts.save_confirm_body": "Išsaugota į:\n{path}",
+  "podcasts.save_confirm_open_folder": "Atidaryti aplanką",
+  "podcasts.save_confirm_ok": "OK",
+  "podcasts.save_error_title": "Išsaugoti nepavyko",
+  "podcasts.save_error_body": "Nepavyko išsaugoti epizodo.\nKlaida: {err}",
+  "podcasts.save_error_ok": "OK",
   "podcasts.download_failed": "Atsisiuntimas nepavyko",
   "podcasts.download_progress": "Atsisiuntimas {pct}%",
   "podcasts.search.button": "Paieška",
@@ -932,6 +940,7 @@
   "stream_audio.url_label": "URL:",
   "stream_audio.format_label": "Formatas:",
   "stream_audio.format.auto": "Automatinis (be konvertavimo)",
+  "stream_audio.track.auto": "Automatinis",
   "stream_audio.progress_converting": "Konvertuojamas formatas...",
   "stream_audio.convert_failed": "Srautinio perdavimo konvertavimo klaida: {err}",
   "recent.clear": "Išvalyti naujausius failus",
@@ -987,3 +996,7 @@
   "reader.external_link": "Išorinė nuoroda: {url}",
   "options.lang.lt": "Lietuvių"
 }
+
+
+
+

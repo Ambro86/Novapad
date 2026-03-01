@@ -236,6 +236,7 @@
   "options.label.subtitle_offset": "Undertextoffset (ms):",
   "options.label.audio_wasapi": "Använd WASAPI-utdata (beta)",
   "options.subtitle_mode.off": "Inaktiverad",
+  "playback.direct_stream_command_disabled": "Kommando inaktiverat under direktströmning",
   "options.subtitle_mode.nvda": "NVDA",
   "options.subtitle_mode.user": "Använd vald röst",
   "options.subtitle_mode.record": "Spela in till fil",
@@ -669,6 +670,13 @@
   "podcasts.download_filter": "Ljudfiler\\\\\\\\\\\\0*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav\\\\\\\\\\\\0Alla filer\\\\\\\\\\\\0*.*\\\\\\\\\\\\0\\\\\\\\\\\\0",
   "podcasts.download_started": "Nedladdning startad",
   "podcasts.download_completed": "Nedladdning slutförd",
+  "podcasts.save_confirm_title": "Avsnitt sparat",
+  "podcasts.save_confirm_body": "Sparat i:\n{path}",
+  "podcasts.save_confirm_open_folder": "Öppna mapp",
+  "podcasts.save_confirm_ok": "OK",
+  "podcasts.save_error_title": "Misslyckades att spara",
+  "podcasts.save_error_body": "Det gick inte att spara avsnittet.\nFel: {err}",
+  "podcasts.save_error_ok": "OK",
   "podcasts.download_failed": "Nedladdning misslyckades",
   "podcasts.download_progress": "Laddar ner {pct}%",
   "podcasts.search.button": "Sök",
@@ -932,6 +940,7 @@
   "stream_audio.url_label": "URL:",
   "stream_audio.format_label": "Format:",
   "stream_audio.format.auto": "Automatiskt (ingen konvertering)",
+  "stream_audio.track.auto": "Automatiskt",
   "stream_audio.progress_converting": "Konverterar format...",
   "stream_audio.convert_failed": "Fel vid konvertering av stream: {err}",
   "recent.clear": "Rensa senaste filer",
@@ -987,3 +996,7 @@
   "reader.external_link": "Extern länk:\n{url}",
   "options.lang.lt": "Litauiska"
 }
+
+
+
+

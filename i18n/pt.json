@@ -221,6 +221,7 @@
   "options.label.subtitle_mode": "Leitura de legendas:",
   "options.label.subtitle_offset": "Offset de legendas (ms):",
   "options.subtitle_mode.off": "Desativada",
+  "playback.direct_stream_command_disabled": "Comando desativado durante a transmissão direta",
   "options.subtitle_mode.nvda": "NVDA",
   "options.subtitle_mode.user": "Usar voz selecionada",
   "options.subtitle_mode.record": "Gravar em ficheiro",
@@ -654,6 +655,13 @@
   "podcasts.download_filter": "Ficheiros de áudio\\0*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav\\0Todos os ficheiros\\0*.*\\0\\0",
   "podcasts.download_started": "Transferência iniciada",
   "podcasts.download_completed": "Transferência concluída",
+  "podcasts.save_confirm_title": "Episódio salvo",
+  "podcasts.save_confirm_body": "Salvo em:\n{path}",
+  "podcasts.save_confirm_open_folder": "Abrir pasta",
+  "podcasts.save_confirm_ok": "OK",
+  "podcasts.save_error_title": "Falha ao salvar",
+  "podcasts.save_error_body": "Não foi possível salvar o episódio.\nErro: {err}",
+  "podcasts.save_error_ok": "OK",
   "podcasts.download_failed": "Transferência falhou",
   "podcasts.download_progress": "A descarregar {pct}%",
   "podcasts.search.button": "Procurar",
@@ -970,6 +978,7 @@
   "stream_audio.url_label": "URL:",
   "stream_audio.format_label": "Formato:",
   "stream_audio.format.auto": "Automático (sem conversão)",
+  "stream_audio.track.auto": "Automático",
   "stream_audio.progress_converting": "A converter o formato...",
   "stream_audio.convert_failed": "Erro na conversão do streaming: {err}",
   "stream_audio.direct_play": "Reproduzir sem transferência (por exemplo rádio em streaming)",
@@ -987,3 +996,7 @@
   "reader.external_link": "Link externo:\n{url}",
   "options.lang.lt": "Lituano"
 }
+
+
+
+

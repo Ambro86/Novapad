@@ -377,10 +377,20 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
         let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
         let existing = with_state(hwnd, |state| state.playback_menu).unwrap_or(HMENU(0));
         let show_download = with_state(hwnd, |state| {
-            state
+            let from_rss_doc = state
                 .docs
                 .get(state.current)
                 .map(|doc| doc.from_rss)
+                .unwrap_or(false);
+            from_rss_doc || state.active_podcast_episode_url.is_some()
+        })
+        .unwrap_or(false);
+        let stream_direct_no_download = with_state(hwnd, |state| {
+            state
+                .active_podcast_episode_cache
+                .as_ref()
+                .map(|p| p.to_string_lossy())
+                .map(|s| s.starts_with("http://") || s.starts_with("https://"))
                 .unwrap_or(false)
         })
         .unwrap_or(false);
@@ -529,7 +539,7 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                     &chapter_list,
                 );
             }
-            if show_download {
+            if show_download && !stream_direct_no_download {
                 append_menu_string(
                     playback_menu,
                     MF_STRING,

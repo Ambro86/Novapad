@@ -240,6 +240,7 @@
   "options.label.subtitle_offset": "Vremenski klizač titlova (ms):",
   "options.label.audio_wasapi": "Koristi WASAPI izlaz (beta)",
   "options.subtitle_mode.off": "Isključeno",
+  "playback.direct_stream_command_disabled": "Komanda je onemogućena tokom direktnog strimovanja",
   "options.subtitle_mode.nvda": "NVDA",
   "options.subtitle_mode.user": "Koristi odabrani glas.",
   "options.subtitle_mode.record": "Snimi u datoteku",
@@ -681,6 +682,13 @@
   "podcasts.download_filter": "Audio datoteke\\0*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav\\0Sve datoteke\\0*.*\\0\\0",
   "podcasts.download_started": "Preuzimanje je započeto.",
   "podcasts.download_completed": "Preuzimanje je završeno.",
+  "podcasts.save_confirm_title": "Epizoda sačuvana",
+  "podcasts.save_confirm_body": "Sačuvano u:\n{path}",
+  "podcasts.save_confirm_open_folder": "Otvori fasciklu",
+  "podcasts.save_confirm_ok": "OK",
+  "podcasts.save_error_title": "Čuvanje nije uspelo",
+  "podcasts.save_error_body": "Nije moguće sačuvati epizodu.\nGreška: {err}",
+  "podcasts.save_error_ok": "OK",
   "podcasts.download_failed": "Preuzimanje nije uspelo.",
   "podcasts.download_progress": "Preuzimanje {pct}%",
   "podcasts.search.button": "Pretraga",
@@ -932,6 +940,7 @@
   "stream_audio.url_label": "URL:",
   "stream_audio.format_label": "Format:",
   "stream_audio.format.auto": "Automatski (bez konverzije)",
+  "stream_audio.track.auto": "Automatski",
   "stream_audio.progress_converting": "Konvertovanje formata...",
   "stream_audio.convert_failed": "Greška pri konverziji striminga: {err}",
   "recent.clear": "Očisti nedavne datoteke",
@@ -987,6 +996,10 @@
   "reader.external_link": "Spoljašnji link:\n{url}",
   "options.lang.lt": "Litvanski"
 }
+
+
+
+
 
 
 

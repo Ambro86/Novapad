@@ -229,6 +229,7 @@
   "options.label.subtitle_offset": "Độ lệch phụ đề (ms):",
   "options.label.audio_wasapi": "Dùng đầu ra WASAPI (beta)",
   "options.subtitle_mode.off": "Tắt",
+  "playback.direct_stream_command_disabled": "Lệnh bị vô hiệu hóa trong khi phát trực tuyến trực tiếp",
   "options.subtitle_mode.nvda": "NVDA",
   "options.subtitle_mode.user": "Dùng giọng đã chọn",
   "options.subtitle_mode.record": "Ghi vào tệp",
@@ -667,6 +668,13 @@
   "podcasts.download_filter": "Tệp âm thanh\\\\\\\\\\0*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav\\\\\\\\\\0Tất cả các tệp\\\\\\\\\\0*.*\\\\\\\\\\0\\\\\\\\\\0",
   "podcasts.download_started": "Đã bắt đầu tải về",
   "podcasts.download_completed": "Tải về hoàn tất",
+  "podcasts.save_confirm_title": "Đã lưu tập",
+  "podcasts.save_confirm_body": "Đã lưu tại:\n{path}",
+  "podcasts.save_confirm_open_folder": "Mở thư mục",
+  "podcasts.save_confirm_ok": "OK",
+  "podcasts.save_error_title": "Lưu không thành công",
+  "podcasts.save_error_body": "Không thể lưu tập.\nLỗi: {err}",
+  "podcasts.save_error_ok": "OK",
   "podcasts.download_failed": "Tải về thất bại",
   "podcasts.download_progress": "Đang tải xuống {pct}%",
   "podcasts.search.button": "Tìm kiếm",
@@ -932,6 +940,7 @@
   "stream_audio.url_label": "URL:",
   "stream_audio.format_label": "Định dạng:",
   "stream_audio.format.auto": "Tự động (không chuyển đổi)",
+  "stream_audio.track.auto": "Tự động",
   "stream_audio.progress_converting": "Đang chuyển đổi định dạng...",
   "stream_audio.convert_failed": "Lỗi chuyển đổi phát trực tuyến: {err}",
   "recent.clear": "Xóa tệp gần đây",
@@ -987,3 +996,7 @@
   "reader.external_link": "Liên kết ngoài:\n{url}",
   "options.lang.lt": "Tiếng Litva"
 }
+
+
+
+

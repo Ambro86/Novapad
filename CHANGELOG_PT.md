@@ -2,7 +2,10 @@
 
 Versão 0.6.7 – 2026-02-13
 Melhorias
-• Atualizada a localização em chinês e lituano em todos os recursos da app, incluindo guia/texto de doações e traduções do instalador NSIS (novas strings de instalação em chinês simplificado e lituano, além da conclusão da tradução ucraniana do setup).
+• Tradução polaca atualizada graças ao DJ Graco.
+• Adicionada a tradução lituana.
+• Adicionada a tradução chinesa.
+• Guias atualizados para todos os idiomas e recursos de localização atualizados em toda a app, incluindo textos de doações e traduções do instalador NSIS (novas strings em chinês simplificado e lituano, além da conclusão da tradução ucraniana do setup).
 • Adicionado suporte global de proxy de rede (HTTP/HTTPS e SOCKS5/SOCKS5H) para funcionalidades online, com validação ao guardar Opções: proxies inválidos são avisados e removidos automaticamente.
 • Adicionada uma nova função em Ferramentas: "Reproduzir áudio por streaming...", que permite colar um URL (YouTube ou link multimédia direto), escolher o formato de saída e o perfil de qualidade/bitrate (incluindo qualidade/bitrate original para MP3 e MP4) e iniciar a reprodução no leitor de áudio do Sonarpad.
 • Adicionado suporte à tecla multimédia de sistema Reproduzir/Pausar (auscultadores/teclado): agora controla tanto a reprodução multimédia como a pausa/retoma da leitura de texto (com prioridade para o leitor multimédia quando ambos estão ativos).

@@ -539,6 +539,8 @@ pub struct AppSettings {
     pub podcast_index_api_key: String,
     pub podcast_index_api_secret: String,
     pub youtube_include_timestamps: bool,
+    #[serde(default = "default_stream_audio_output_format")]
+    pub stream_audio_default_format: String,
     pub last_seen_changelog_version: String,
     pub favorite_voices: Vec<FavoriteVoice>,
     pub dictionary: Vec<DictionaryEntry>,
@@ -721,6 +723,10 @@ fn default_dictionary_lookup_language() -> String {
     "auto".to_string()
 }
 
+fn default_stream_audio_output_format() -> String {
+    "auto".to_string()
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         AppSettings {
@@ -789,6 +795,7 @@ impl Default for AppSettings {
             podcast_index_api_key: String::new(),
             podcast_index_api_secret: String::new(),
             youtube_include_timestamps: true,
+            stream_audio_default_format: default_stream_audio_output_format(),
             last_seen_changelog_version: String::new(),
             favorite_voices: Vec::new(),
             dictionary: Vec::new(),
@@ -1206,39 +1213,69 @@ fn system_language() -> Language {
 }
 
 pub fn default_podcast_save_folder() -> String {
-    let mut base = known_folder_path(&FOLDERID_Documents).unwrap_or_else(|| {
-        std::env::var_os("USERPROFILE")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
-            .join("Documents")
-    });
-    base.push("Sonarpad Recordings");
+    let mut base = sonarpad_documents_root();
+    base.push("Recordings");
     base.to_string_lossy().to_string()
 }
 
 pub fn default_audiobook_save_folder() -> String {
-    let mut base = known_folder_path(&FOLDERID_Documents).unwrap_or_else(|| {
-        std::env::var_os("USERPROFILE")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
-            .join("Documents")
-    });
-    base.push("Sonarpad Audiobooks");
+    let mut base = sonarpad_documents_root();
+    base.push("Audiobooks");
+    base.to_string_lossy().to_string()
+}
+
+pub fn default_media_save_folder() -> String {
+    let mut base = sonarpad_documents_root();
+    base.push("Media");
+    base.to_string_lossy().to_string()
+}
+
+pub fn default_documents_save_folder() -> String {
+    let mut base = sonarpad_documents_root();
+    base.push("Documents");
     base.to_string_lossy().to_string()
 }
 
 fn legacy_podcast_save_folder() -> String {
-    let mut base = known_folder_path(&FOLDERID_Documents).unwrap_or_else(|| {
-        std::env::var_os("USERPROFILE")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
-            .join("Documents")
-    });
+    let mut base = known_documents_dir();
     base.push("Novapad Recordings");
     base.to_string_lossy().to_string()
 }
 
-fn migrate_legacy_podcast_folder(legacy: &std::path::Path, target: &std::path::Path) {
+fn legacy_sonarpad_recordings_folder() -> String {
+    let mut base = known_documents_dir();
+    base.push("Sonarpad Recordings");
+    base.to_string_lossy().to_string()
+}
+
+fn legacy_audiobook_save_folder() -> String {
+    let mut base = known_documents_dir();
+    base.push("Sonarpad Audiobooks");
+    base.to_string_lossy().to_string()
+}
+
+fn legacy_media_save_folder() -> String {
+    let mut base = known_documents_dir();
+    base.push("Sonarpad Media");
+    base.to_string_lossy().to_string()
+}
+
+fn known_documents_dir() -> PathBuf {
+    known_folder_path(&FOLDERID_Documents).unwrap_or_else(|| {
+        std::env::var_os("USERPROFILE")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+            .join("Documents")
+    })
+}
+
+fn sonarpad_documents_root() -> PathBuf {
+    let mut base = known_documents_dir();
+    base.push("Sonarpad");
+    base
+}
+
+fn migrate_legacy_folder(legacy: &std::path::Path, target: &std::path::Path) {
     if !legacy.exists() || target.exists() {
         return;
     }
@@ -1358,9 +1395,35 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     {
         let legacy_path = PathBuf::from(legacy_podcast_save_folder());
         let new_path = PathBuf::from(default_podcast_save_folder());
-        migrate_legacy_podcast_folder(&legacy_path, &new_path);
+        migrate_legacy_folder(&legacy_path, &new_path);
         settings.podcast_save_folder = new_path.to_string_lossy().to_string();
     }
+    if settings
+        .podcast_save_folder
+        .trim()
+        .eq_ignore_ascii_case(&legacy_sonarpad_recordings_folder())
+    {
+        settings.podcast_save_folder = PathBuf::from(default_podcast_save_folder())
+            .to_string_lossy()
+            .to_string();
+    }
+    migrate_legacy_folder(
+        &PathBuf::from(legacy_sonarpad_recordings_folder()),
+        &PathBuf::from(default_podcast_save_folder()),
+    );
+    let legacy_audiobooks_path = PathBuf::from(legacy_audiobook_save_folder());
+    let new_audiobooks_path = PathBuf::from(default_audiobook_save_folder());
+    migrate_legacy_folder(&legacy_audiobooks_path, &new_audiobooks_path);
+    if settings
+        .audiobook_save_folder
+        .trim()
+        .eq_ignore_ascii_case(&legacy_audiobook_save_folder())
+    {
+        settings.audiobook_save_folder = new_audiobooks_path.to_string_lossy().to_string();
+    }
+    let legacy_media_path = PathBuf::from(legacy_media_save_folder());
+    let new_media_path = PathBuf::from(default_media_save_folder());
+    migrate_legacy_folder(&legacy_media_path, &new_media_path);
     if settings.podcast_mp3_bitrate == 0 {
         settings.podcast_mp3_bitrate = 128;
     }
@@ -1428,6 +1491,19 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     }
     if settings.dictionary_lookup_language.trim().is_empty() {
         settings.dictionary_lookup_language = default_dictionary_lookup_language();
+    }
+    settings.stream_audio_default_format = settings.stream_audio_default_format.trim().to_string();
+    if settings.stream_audio_default_format.is_empty() {
+        settings.stream_audio_default_format = default_stream_audio_output_format();
+    } else {
+        settings.stream_audio_default_format =
+            settings.stream_audio_default_format.to_ascii_lowercase();
+        if !matches!(
+            settings.stream_audio_default_format.as_str(),
+            "auto" | "mp4" | "mp3" | "m4a" | "opus" | "ogg" | "wav" | "flac"
+        ) {
+            settings.stream_audio_default_format = default_stream_audio_output_format();
+        }
     }
     settings
         .dictionary_search_history

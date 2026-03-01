@@ -215,6 +215,7 @@
   "options.label.subtitle_offset": "字幕时间偏移量（毫秒）：",
   "options.label.audio_wasapi": "使用WASAPI输出（测试版）",
   "options.subtitle_mode.off": "关闭",
+  "playback.direct_stream_command_disabled": "在直接流媒体播放期间命令已禁用",
   "options.subtitle_mode.nvda": "非视觉桌面访问",
   "options.subtitle_mode.user": "使用选定语音",
   "options.subtitle_mode.record": "记录到文件",
@@ -652,6 +653,13 @@
   "podcasts.download_filter": "音频文件\\0*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav\\0所有文件\\0*.*\\0\\0",
   "podcasts.download_started": "下载开始",
   "podcasts.download_completed": "下载完成",
+  "podcasts.save_confirm_title": "剧集已保存",
+  "podcasts.save_confirm_body": "已保存到：\n{path}",
+  "podcasts.save_confirm_open_folder": "打开文件夹",
+  "podcasts.save_confirm_ok": "确定",
+  "podcasts.save_error_title": "保存失败",
+  "podcasts.save_error_body": "无法保存该剧集。\n错误：{err}",
+  "podcasts.save_error_ok": "确定",
   "podcasts.download_failed": "下载失败",
   "podcasts.download_progress": "下载中 {pct}%",
   "podcasts.search.button": "搜索",
@@ -888,6 +896,7 @@
   "stream_audio.url_label": "URL:",
   "stream_audio.format_label": "格式：",
   "stream_audio.format.auto": "自动（不转换）",
+  "stream_audio.track.auto": "自动",
   "stream_audio.progress_converting": "转换格式中...",
   "stream_audio.convert_failed": "流式转换错误：{err}",
   "recent.clear": "清除最近使用的文件",
@@ -987,3 +996,7 @@
   "voice.lang.ps": "普什图语",
   "voice.lang.su": "巽他语"
 }
+
+
+
+

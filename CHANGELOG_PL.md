@@ -5,6 +5,7 @@ Ulepszenia
 • Zaktualizowano tłumaczenie polskie dzięki DJ Graco.
 • Dodano tłumaczenie litewskie.
 • Dodano tłumaczenie chińskie.
+• Zreorganizowano foldery wyjściowe do `Dokumenty\\Sonarpad`: pliki są teraz zapisywane w dedykowanych podfolderach `audiobooks`, `documents`, `recordings` i `media`, z automatyczną migracją ze starych ścieżek.
 • Zaktualizowano przewodniki we wszystkich językach i zasoby lokalizacyjne całej aplikacji, w tym teksty darowizn oraz tłumaczenia instalatora NSIS (nowe ciągi dla chińskiego uproszczonego i litewskiego oraz uzupełnione tłumaczenie ukraińskie setupu).
 • Dodano globalną obsługę proxy sieciowego (HTTP/HTTPS oraz SOCKS5/SOCKS5H) dla funkcji online, z walidacją przy zapisie opcji: nieprawidłowe proxy jest sygnalizowane i usuwane automatycznie.
 • Dodano nową funkcję w menu Narzędzia: „Odtwórz dźwięk ze streamingu...”, która pozwala wkleić adres URL (YouTube lub bezpośredni link do mediów), wybrać format wyjściowy oraz profil jakości/bitrate (w tym oryginalną jakość/bitrate dla MP3 i MP4) i odtworzyć materiał w odtwarzaczu Sonarpad.
@@ -34,6 +35,8 @@ Ulepszenia
 • Dodano konfigurację głosu dialogów w Opcje > Głos z pełną nawigacją klawiszem Tab, opartą na tym samym modelu głosów co główny interfejs (silnik, filtr języka Edge, głos oraz etykietowane szybkość/ton/głośność); dodano też opcjonalny drugi głos dialogów z tymi samymi kontrolkami (silnik, filtr języka Edge, głos, szybkość/ton/głośność) do naprzemiennego czytania dialogów; reguły dialogów są zapisywane w konfiguracji `.ini`, bez modyfikowania tekstu dokumentu.
 • Ulepszono etykietę Cofnij: pozycja Edycja > Cofnij pokazuje teraz, co zostanie cofnięte (np. edycja tekstu, cytowanie/odcytowanie linii lub wstawienie tagu głosu), pozostając niedostępna, gdy nie ma czego cofać.
 Poprawki błędów
+• Naprawiono obsługę otwierania RTF: pliki `.rtf` są teraz wyodrębniane i wyświetlane jako czytelny tekst, a nie surowy znacznik RTF (np. `{\\rtf1...}`).
+• Naprawiono otwieranie chińskich plików tekstowych kodowanych jako GB18030/GBK: Sonarpad poprawnie je wykrywa i dekoduje, eliminując nieczytelny tekst (mojibake).
 • Ulepszono tworzenie audiobooków M4B o metadane i znaczniki rozdziałów; naprawiono problem „chipmunk” (zbyt wysoki/szybki głos) w generowanych plikach M4B.
 • Naprawiono interfejs bitrate w oknie zapisu audiobooka: usunięto teksty zakodowane na stałe po włosku i dodano 64 kbps do listy wybieralnych bitrate.
 • Naprawiono „Zapisz wszystko” (Ctrl+Shift+S): wszystkie otwarte zmodyfikowane dokumenty są teraz wykrywane niezawodnie (także nowe/niezapisane karty), a zapis wszystkich działa poprawnie dla każdego pliku, otwierając „Zapisz jako”, gdy to potrzebne.

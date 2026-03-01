@@ -3202,6 +3202,20 @@ fn load_document_content(
             opened_text_encoding: None,
         }));
     }
+    let is_rtf = path
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.eq_ignore_ascii_case("rtf"))
+        .unwrap_or(false);
+    if is_rtf {
+        let bytes = std::fs::read(path)
+            .map_err(|err| crate::settings::error_open_file_message(language, err))?;
+        return Ok(Some(LoadedDocument {
+            content: extract_rtf_text(&bytes),
+            format: FileFormat::Text(TextEncoding::Utf8),
+            opened_text_encoding: None,
+        }));
+    }
     if is_gdoc_path(path) {
         let bytes = match std::fs::read(path) {
             Ok(bytes) => bytes,

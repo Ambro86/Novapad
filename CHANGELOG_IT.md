@@ -5,6 +5,7 @@ Miglioramenti
 • Aggiornata la traduzione polacca grazie a DJ Graco.
 • Aggiunta la traduzione lituana.
 • Aggiunta la traduzione cinese.
+• Riorganizzate le cartelle di output in `Documenti\\Sonarpad`: i file ora vengono salvati nelle sottocartelle dedicate `audiobooks`, `documents`, `recordings` e `media`, con migrazione automatica dai percorsi legacy.
 • Aggiornate le guide per tutte le lingue e aggiornate le risorse di localizzazione dell'app, incluse testo donazioni e traduzioni setup NSIS (nuove stringhe installer in cinese semplificato e lituano, più completamento della traduzione ucraina del setup).
 • Aggiunto il supporto proxy di rete globale (HTTP/HTTPS e SOCKS5/SOCKS5H) per le funzioni online, con validazione al salvataggio Opzioni: i proxy non validi vengono segnalati e rimossi automaticamente.
 • Aggiunta una nuova funzione in Strumenti: "Riproduci audio da streaming...", che permette di inserire un URL (YouTube o link media diretto), scegliere il formato di output e il profilo qualità/bitrate (inclusa qualità/bitrate originale per MP3 e MP4) e avviare la riproduzione nell’audio player di Sonarpad.
@@ -34,6 +35,8 @@ Miglioramenti
 • Aggiunta la configurazione della voce per i dialoghi in Opzioni > Voce con navigazione completa via Tab, usando lo stesso modello voci dell’interfaccia principale (sistema, filtro lingua Edge, voce e velocità/tono/volume con etichette); aggiunta anche la seconda voce dialoghi opzionale con gli stessi controlli (sistema, filtro lingua Edge, voce, velocità/tono/volume) per alternare i dialoghi; le regole dialoghi vengono salvate in configurazione `.ini`, senza modificare il testo del documento.
 • Migliorata l’etichetta di Annulla: la voce Modifica > Annulla ora mostra l’azione che verrà annullata (ad esempio modifica testo, commenta/decommenta righe o inserimento tag voce), restando non disponibile quando non esiste nulla da annullare.
 Correzioni di bug
+• Corretto il supporto apertura RTF: i file `.rtf` ora vengono estratti e mostrati come testo leggibile, non più come markup RTF grezzo (es. `{\\rtf1...}`).
+• Corretta l'apertura dei file di testo cinesi in codifica GB18030/GBK: Sonarpad ora li rileva e decodifica correttamente, evitando testo illeggibile (mojibake).
 • Migliorata la creazione degli audiolibri M4B con metadata capitoli e marker capitolo; risolto il problema "chipmunk" (voce troppo veloce/acuta) nei file M4B generati.
 • Corretta l'interfaccia bitrate nella finestra di salvataggio audiolibro: rimossi i testi hardcoded in italiano e aggiunta l'opzione 64 kbps tra i bitrate selezionabili.
 • Corretto "Salva tutto" (Ctrl+Shift+S): ora tutti i documenti aperti modificati vengono rilevati in modo affidabile (inclusi tab nuovi/non salvati) e il salvataggio procede correttamente su ciascun file, aprendo "Salva con nome" quando necessario.

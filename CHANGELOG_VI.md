@@ -5,6 +5,7 @@ Cải tiến
 • Đã cập nhật bản dịch tiếng Ba Lan nhờ DJ Graco.
 • Đã thêm bản dịch tiếng Litva.
 • Đã thêm bản dịch tiếng Trung.
+• Đã tổ chức lại thư mục đầu ra về `Documents\\Sonarpad`: tệp giờ được lưu vào các thư mục con riêng `audiobooks`, `documents`, `recordings` và `media`, kèm tự động chuyển dữ liệu từ đường dẫn cũ.
 • Đã cập nhật hướng dẫn cho tất cả ngôn ngữ và làm mới tài nguyên bản địa hóa trên toàn bộ ứng dụng, bao gồm nội dung quyên góp và bản dịch trình cài đặt NSIS (thêm chuỗi cài đặt mới cho tiếng Trung giản thể và tiếng Litva, đồng thời hoàn thiện bản dịch tiếng Ukraina của setup).
 • Da bo sung ho tro proxy mang toan cuc (HTTP/HTTPS va SOCKS5/SOCKS5H) cho cac tinh nang truc tuyen, kem kiem tra khi luu Tuy chon: proxy khong hop le se duoc canh bao va xoa tu dong.
 • Da them tinh nang moi trong Cong cu: "Phat am thanh tu streaming...", cho phep dan URL (YouTube hoac lien ket media truc tiep), chon dinh dang dau ra va ho so chat luong/bitrate (bao gom chat luong/bitrate goc cho MP3 va MP4) va phat ngay trong trinh phat cua Sonarpad.
@@ -34,6 +35,8 @@ Cải tiến
 • Đã thêm cấu hình giọng cho hội thoại trong Tùy chọn > Giọng nói với điều hướng đầy đủ bằng Tab, dùng cùng mô hình giọng của giao diện chính (engine, bộ lọc ngôn ngữ Edge, giọng và tốc độ/cao độ/âm lượng có nhãn); thêm giọng hội thoại thứ hai tùy chọn với cùng nhóm điều khiển (engine, bộ lọc ngôn ngữ Edge, giọng, tốc độ/cao độ/âm lượng) để luân phiên hội thoại; quy tắc hội thoại được lưu trong cấu hình `.ini`, không sửa đổi văn bản tài liệu.
 • Đã cải thiện nhãn Hoàn tác: mục Chỉnh sửa > Hoàn tác giờ hiển thị hành động sẽ được hoàn tác (ví dụ chỉnh sửa văn bản, thêm/bỏ comment dòng hoặc chèn thẻ giọng nói), đồng thời vẫn bị vô hiệu khi không có gì để hoàn tác.
 Sửa lỗi
+• Đã sửa hỗ trợ mở tệp RTF: tệp `.rtf` giờ được trích xuất và hiển thị thành văn bản dễ đọc, không còn hiển thị mã RTF thô (ví dụ `{\\rtf1...}`).
+• Đã sửa mở tệp văn bản tiếng Trung mã hóa GB18030/GBK: Sonarpad giờ phát hiện và giải mã đúng, tránh hiện tượng chữ lỗi (mojibake).
 • Đã cải thiện tạo sách nói M4B với metadata và marker chương; đã sửa lỗi "chipmunk" (giọng quá cao/quá nhanh) trong tệp M4B tạo ra.
 • Đã sửa giao diện bitrate trong cửa sổ lưu sách nói: đã bỏ các nhãn hardcoded bằng tiếng Ý và thêm tùy chọn 64 kbps vào danh sách bitrate có thể chọn.
 • Đã sửa "Lưu tất cả" (Ctrl+Shift+S): giờ đây tất cả tài liệu đang mở đã chỉnh sửa đều được phát hiện ổn định (kể cả tab mới/chưa lưu), và Lưu tất cả sẽ lưu đúng từng tài liệu, mở "Lưu thành" khi cần.

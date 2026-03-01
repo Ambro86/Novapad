@@ -277,6 +277,105 @@ fn western_european_char_score(text: &str) -> usize {
         .count()
 }
 
+fn cjk_char_score(text: &str) -> usize {
+    text.chars()
+        .filter(|&ch| {
+            let code = ch as u32;
+            (0x4E00..=0x9FFF).contains(&code)
+                || (0x3400..=0x4DBF).contains(&code)
+                || (0xF900..=0xFAFF).contains(&code)
+        })
+        .count()
+}
+
+fn mojibake_latin1_score(text: &str) -> usize {
+    text.chars()
+        .filter(|ch| {
+            matches!(
+                ch,
+                'Â' | 'Ã'
+                    | 'Ä'
+                    | 'Å'
+                    | 'Æ'
+                    | 'Ç'
+                    | 'Ð'
+                    | 'Ñ'
+                    | 'Ò'
+                    | 'Ó'
+                    | 'Ô'
+                    | 'Õ'
+                    | 'Ö'
+                    | '×'
+                    | 'Ø'
+                    | 'Ù'
+                    | 'Ú'
+                    | 'Û'
+                    | 'Ü'
+                    | 'Ý'
+                    | 'Þ'
+                    | 'ß'
+                    | 'à'
+                    | 'á'
+                    | 'â'
+                    | 'ã'
+                    | 'ä'
+                    | 'å'
+                    | 'æ'
+                    | 'ç'
+                    | 'è'
+                    | 'é'
+                    | 'ê'
+                    | 'ë'
+                    | 'ì'
+                    | 'í'
+                    | 'î'
+                    | 'ï'
+                    | 'ð'
+                    | 'ñ'
+                    | 'ò'
+                    | 'ó'
+                    | 'ô'
+                    | 'õ'
+                    | 'ö'
+                    | 'ø'
+                    | 'ù'
+                    | 'ú'
+                    | 'û'
+                    | 'ü'
+                    | 'ý'
+                    | 'þ'
+                    | 'ÿ'
+            )
+        })
+        .count()
+}
+
+fn should_prefer_gb18030(current_text: &str, gb_text: &str) -> bool {
+    let gb_cjk = cjk_char_score(gb_text);
+    if gb_cjk < 4 {
+        return false;
+    }
+
+    let current_cjk = cjk_char_score(current_text);
+    if current_cjk >= gb_cjk {
+        return false;
+    }
+
+    let replacement_count = gb_text.chars().filter(|&c| c == '\u{FFFD}').count();
+    if replacement_count > 2 {
+        return false;
+    }
+
+    let mojibake_score = mojibake_latin1_score(current_text);
+    let letter_count = current_text
+        .chars()
+        .filter(|ch| ch.is_alphabetic())
+        .count()
+        .max(1);
+
+    mojibake_score >= 8 && mojibake_score * 3 >= letter_count
+}
+
 fn prefer_cp1250_for_language(language: Language) -> bool {
     matches!(language, Language::Czech | Language::Polish)
 }
@@ -321,8 +420,18 @@ fn decode_ansi_best_effort(bytes: &[u8], language: Language) -> String {
     let (cp1252_text, _, _) = WINDOWS_1252.decode(bytes);
     let cp1252_text = cp1252_text.into_owned();
     let acp_text = decode_ansi_with_acp(bytes);
+    let gb18030_text = Encoding::for_label(b"gb18030").map(|enc| {
+        let (text, _, _) = enc.decode(bytes);
+        text.into_owned()
+    });
 
-    choose_ansi_decoding(language, &cp1250_text, &cp1252_text, acp_text.as_deref())
+    let chosen = choose_ansi_decoding(language, &cp1250_text, &cp1252_text, acp_text.as_deref());
+    if let Some(gb_text) = gb18030_text
+        && should_prefer_gb18030(&chosen, &gb_text)
+    {
+        return gb_text;
+    }
+    chosen
 }
 
 pub fn decode_text_with_encoding(

@@ -5,6 +5,7 @@ Improvements
 • Updated Polish translation thanks to DJ Graco.
 • Added Lithuanian translation.
 • Added Chinese translation.
+• Reorganized Sonarpad output folders under `Documents\\Sonarpad`: files are now saved in dedicated subfolders `audiobooks`, `documents`, `recordings`, and `media`, with automatic migration from legacy paths.
 • Updated guides for all languages and refreshed localization resources across the app, including donations texts and NSIS setup translations (new Simplified Chinese and Lithuanian installer strings, plus completed Ukrainian setup translation).
 • Added global network proxy support (HTTP/HTTPS and SOCKS5/SOCKS5H) for online features, with proxy validation on Options save: invalid proxies are warned and automatically removed.
 • Added a new Tools action: "Play streaming audio...", allowing users to paste a URL (YouTube or direct media link), choose output format and quality/bitrate profile (including original quality/bitrate for MP3 and MP4), and play it directly in Sonarpad’s audio player.
@@ -34,6 +35,8 @@ Improvements
 • Added dialogue-voice configuration in Options > Voice with full Tab navigation, using the same voice model as the main UI (engine, Edge language filter, voice, and labeled speed/pitch/volume); added optional secondary dialogue voice with the same controls (engine, Edge language filter, voice, speed/pitch/volume) for alternating dialogues; dialogue voice rules are saved in configuration `.ini`, so document text is not modified.
 • Improved Undo labeling: the Edit > Undo entry now shows what action will be undone (for example, text edits, quote/unquote lines, or voice-tag insertion), while remaining disabled when no undo is available.
 Bug fixes
+• Fixed RTF file opening: `.rtf` documents are now parsed and displayed as plain readable text instead of raw RTF markup (e.g. `{\\rtf1...}`).
+• Fixed opening of Chinese text files encoded in GB18030/GBK: Sonarpad now detects and decodes these files correctly, avoiding mojibake output.
 • Improved M4B audiobook creation with chapter metadata and chapter markers; fixed the chipmunk playback issue (high pitch/speed) in generated M4B files.
 • Fixed audiobook save dialog bitrate UI: removed hardcoded Italian labels and added 64 kbps to selectable bitrate options.
 • Fixed Save All (Ctrl+Shift+S): all open modified documents are now detected reliably (including unsaved/new tabs), and Save All correctly saves each one or opens Save As where needed.

@@ -6874,6 +6874,27 @@ fn combo_value(hwnd: HWND) -> i32 {
     }
 }
 
+unsafe fn selected_voice_short_name_from_combo_text(combo: HWND) -> Option<String> {
+    let len = GetWindowTextLengthW(combo);
+    if len <= 0 {
+        return None;
+    }
+
+    let mut buf = vec![0u16; (len + 1) as usize];
+    let read = GetWindowTextW(combo, &mut buf);
+    if read <= 0 {
+        return None;
+    }
+
+    let label = String::from_utf16_lossy(&buf[..read as usize]);
+    let short_name = label.split(" (").next().unwrap_or("").trim();
+    if short_name.is_empty() {
+        None
+    } else {
+        Some(short_name.to_string())
+    }
+}
+
 fn selected_shortcut_action(hwnd: HWND) -> ShortcutAction {
     let sel = unsafe {
         with_options_state(hwnd, |state| {
@@ -8935,6 +8956,10 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         .0 as usize;
         if voice_index < dialogue_voices.len() {
             settings.dialogue_voice = dialogue_voices[voice_index].short_name.clone();
+        } else if let Some(short_name) =
+            selected_voice_short_name_from_combo_text(combo_dialogue_voice)
+        {
+            settings.dialogue_voice = short_name;
         }
     }
     let dialogue_secondary_voice_sel = SendMessageW(
@@ -8955,9 +8980,11 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         if voice_index < dialogue_secondary_voices.len() {
             settings.dialogue_secondary_voice =
                 dialogue_secondary_voices[voice_index].short_name.clone();
+        } else if let Some(short_name) =
+            selected_voice_short_name_from_combo_text(combo_dialogue_secondary_voice)
+        {
+            settings.dialogue_secondary_voice = short_name;
         }
-    } else {
-        settings.dialogue_secondary_voice.clear();
     }
     if settings.tts_manual_tuning {
         settings.dialogue_voice_rate = read_tts_tuning_edit_value(

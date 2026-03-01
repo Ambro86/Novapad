@@ -5,6 +5,7 @@ Améliorations
 • Mise à jour de la traduction polonaise grâce à DJ Graco.
 • Ajout de la traduction lituanienne.
 • Ajout de la traduction chinoise.
+• Réorganisation des dossiers de sortie dans `Documents\\Sonarpad` : les fichiers sont désormais enregistrés dans des sous-dossiers dédiés `audiobooks`, `documents`, `recordings` et `media`, avec migration automatique depuis les anciens chemins.
 • Guides mis à jour pour toutes les langues et ressources de localisation actualisées dans toute l’application, y compris les textes de dons et les traductions de l’installateur NSIS (nouvelles chaînes en chinois simplifié et lituanien, ainsi que finalisation de la traduction ukrainienne du setup).
 • Ajout de la prise en charge globale du proxy réseau (HTTP/HTTPS et SOCKS5/SOCKS5H) pour les fonctions en ligne, avec validation à l'enregistrement des options : les proxys invalides sont signalés puis supprimés automatiquement.
 • Ajout d'une nouvelle fonction dans Outils : « Lire l'audio en streaming... », permettant de coller une URL (YouTube ou lien média direct), de choisir le format de sortie et le profil qualité/débit binaire (y compris qualité/débit d'origine pour MP3 et MP4), puis de lancer la lecture dans le lecteur audio de Sonarpad.
@@ -34,6 +35,8 @@ Améliorations
 • Ajout de la configuration de la voix pour les dialogues dans Options > Voix avec navigation complète au clavier (Tab), en réutilisant le même modèle de voix que l’interface principale (moteur, filtre de langue Edge, voix et vitesse/tonalité/volume avec libellés) ; ajout également d’une deuxième voix de dialogue optionnelle avec les mêmes contrôles (moteur, filtre de langue Edge, voix, vitesse/tonalité/volume) pour alterner les dialogues ; les règles de dialogue sont enregistrées dans la configuration `.ini`, sans modifier le texte du document.
 • Amélioration de l'étiquette Annuler : l'entrée Édition > Annuler affiche désormais l'action qui sera annulée (par exemple édition de texte, commenter/décommenter des lignes ou insertion de balise de voix), tout en restant indisponible lorsqu'il n'y a rien à annuler.
 Corrections de bugs
+• Correction de l'ouverture des fichiers RTF : les fichiers `.rtf` sont désormais extraits et affichés en texte lisible, au lieu du balisage RTF brut (ex. `{\\rtf1...}`).
+• Correction de l'ouverture des fichiers texte chinois encodés en GB18030/GBK : Sonarpad les détecte et les décode correctement, évitant le texte illisible (mojibake).
 • Amélioration de la création des livres audio M4B avec métadonnées de chapitres et marqueurs de chapitre ; correction du problème « chipmunk » (voix trop aiguë/rapide) dans les fichiers M4B générés.
 • Correction de l’interface bitrate dans la fenêtre d’enregistrement de livre audio : suppression des libellés italiens codés en dur et ajout de 64 kbps dans les débits sélectionnables.
 • Correction de « Enregistrer tout » (Ctrl+Shift+S) : tous les documents ouverts modifiés sont désormais détectés de façon fiable (y compris les onglets nouveaux/non enregistrés) et l’enregistrement global fonctionne correctement pour chacun, avec « Enregistrer sous » lorsque nécessaire.

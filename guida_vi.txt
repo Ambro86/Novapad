@@ -6,18 +6,10 @@ Mở: Mở các tệp văn bản, PDF, EPUB, MP3 và các định dạng hỗ tr
 Lưu: Lưu tài liệu (Ctrl+S).
 Lưu thành…: Lưu với tên mới.
 Lưu tất cả: Lưu tất cả tài liệu (Ctrl+Shift+S).
-Đóng tab: Đóng tài liệu hiện tại (Ctrl+W).
 Tệp gần đây: Mở một tệp gần đây.
 
-Giọng nói và âm thanh:
-Đọc: F5 Bắt đầu đọc, F4 Tạm dừng/Tiếp tục, F6 Dừng đọc.
-Yêu thích khi đang đọc: F9 giọng đọc yêu thích trước đó, F10 giọng đọc yêu thích tiếp theo.
-Ghi âm sách nói: Tạo một tệp MP3 từ văn bản hiện tại (Ctrl+R).
-Sách nói hàng loạt: Chuyển đổi danh sách tệp thành sách nói (Ctrl+Shift+B).
-Ghi âm podcast: Ghi âm một podcast từ micro và/hoặc âm thanh hệ thống (Ctrl+Shift+R).
-Chuyển đổi âm thanh: Chuyển đổi tệp âm thanh/video sang định dạng âm thanh khác (Ctrl+Shift+A).
-Sách nói MP3: 
-Khi bạn mở một tệp MP3, Sonarpad hoạt động như một trình phát âm thanh.
+Tệp đa phương tiện:
+Khi bạn mở một tệp đa phương tiện (MP3, WAV, MP4, AVI), Sonarpad sẽ trở thành trình phát âm thanh.
 Các phím điều khiển bàn phím:
 
 * PHÍM CÁCH: Phát / Tạm dừng.
@@ -31,6 +23,8 @@ Các phím điều khiển bàn phím:
 
 * +: Tăng tốc độ phát.
 * -: Giảm tốc độ phát.
+- SHIFT +: Tăng cao độ.
+- SHIFT -: Giảm cao độ.
 * CTRL+I: Thông báo thời gian phát.
 * CTRL+T: Đi tới một mốc thời gian cụ thể.
 
@@ -74,6 +68,14 @@ Chèn dấu trang: Lưu vị trí con trỏ hiện tại hoặc thời gian tron
 Quản lý dấu trang: Xem, đi tới hoặc xóa các dấu trang đã lưu.
 Khi mở một tệp có dấu trang, con trỏ hoặc vị trí phát sẽ tự động tiếp tục từ dấu trang đầu tiên hiện có.
 
+Giọng nói và âm thanh:
+Đọc: F5 Bắt đầu đọc, F4 Tạm dừng/Tiếp tục, F6 Dừng đọc.
+Yêu thích khi đang đọc: F9 giọng đọc yêu thích trước đó, F10 giọng đọc yêu thích tiếp theo.
+Ghi âm sách nói: Tạo một tệp MP3 từ văn bản hiện tại (Ctrl+R).
+Sách nói hàng loạt: Chuyển đổi danh sách tệp thành sách nói (Ctrl+Shift+B).
+Ghi âm podcast: Ghi âm một podcast từ micro và/hoặc âm thanh hệ thống (Ctrl+Shift+R).
+Chuyển đổi âm thanh: Chuyển đổi tệp âm thanh/video sang định dạng âm thanh khác (Ctrl+Shift+A).
+
 Công cụ: 
 Sách nói hàng loạt: mở một cửa sổ để chuyển đổi một danh sách các tệp (hoặc toàn bộ thư mục) thành sách nói.
 
@@ -93,6 +95,7 @@ Các thay thế từ điển được áp dụng trong khi đọc và tạo sác
 Nhập phụ đề từ YouTube: dán một URL, chọn ngôn ngữ và nhập văn bản vào trình soạn thảo (Ctrl+Y). Tùy chọn có mốc thời gian.
 Tìm kiếm và nhập từ Wikipedia: tìm kiếm một bài viết trên Wikipedia và nhập văn bản của nó vào trình soạn thảo (Alt+Shift+W).
 Từ điển trực tuyến: tìm kiếm các định nghĩa và bản dịch trong Wiktionary trực tuyến (Alt+Shift+D).
+Phát âm thanh trực tuyến (Alt+Shift+S): Phát âm thanh từ các trang web streaming như YouTube, cho phép chọn định dạng và chất lượng, và cho phép nghe mà không cần tải xuống (ví dụ cho radio trực tuyến).
 Terminal hỗ trợ truy cập: mở một terminal chuyên dụng với đầu ra ổn định cho các trình đọc màn hình (Ctrl+Shift+T).
 Phím tắt: Alt+I tập trung vào ô nhập liệu, Alt+O tập trung vào ô đầu ra, Tab/Shift+Tab di chuyển giữa ô nhập, ô đầu ra và các tùy chọn.
 Enter gửi lệnh nhập liệu.
@@ -109,23 +112,61 @@ Trong khi phát, phím Esc dừng podcast và quay lại thư viện.
 
 
 
-Tùy chọn:
-Ngôn ngữ: Thay đổi ngôn ngữ giao diện.
-Cách thức mở tệp: Mở tệp trong tab mới hoặc cửa sổ mới.
-Giọng đọc: Chọn giọng đọc để nghe.
-Giọng đọc đa ngôn ngữ: Lọc danh sách giọng đọc.
-Chọn cao độ, tốc độ và âm lượng: Thiết lập cao độ, tốc độ và âm lượng cho các giọng đọc (Microsoft và SAPI5). Áp dụng cho việc đọc và tạo sách nói.
-Di chuyển con trỏ trong khi đọc: Di chuyển con trỏ theo văn bản một cách trực quan khi đang được đọc.
-Chia nhỏ sách nói theo văn bản: Chia nhỏ khi dấu đánh dấu xuất hiện ở đầu dòng (phân biệt chữ hoa chữ thường: "Chapter" và "chapter" là khác nhau).
-Ví dụ: với từ "Chapter" nó sẽ tạo ra một phần cho mỗi chương, bao gồm cả tác giả và lời giới thiệu trong phần đầu tiên cho đến từ "Chapter" đầu tiên.
-Nếu không tìm thấy, sẽ không chia nhỏ.
-Các tùy chọn khác để chia nhỏ sách nói: 2 phần, 4 phần, 6 phần, 8 phần.
+Tùy chọn
+Cửa sổ Tùy chọn cho phép bạn tùy chỉnh cách hoạt động của Sonarpad. Các cài đặt được chia thành nhiều thẻ khác nhau.
+Thẻ Chung
+Ngôn ngữ giao diện: cho phép bạn chọn ngôn ngữ của chương trình.
+Mở tệp (tab mới / cửa sổ mới): với Tab mới, bạn có thể chuyển đổi giữa các tệp đang mở bằng Ctrl+Tab. Với Cửa sổ mới, bạn có thể chuyển đổi giữa các cửa sổ bằng Alt+Tab.
+Kiểm tra cập nhật khi khởi động: tự động kiểm tra bản cập nhật khi chương trình khởi động.
+Gửi báo cáo lỗi ẩn danh: tự động gửi báo cáo lỗi ẩn danh đến tác giả chương trình.
+Thêm vào menu ngữ cảnh “Mở bằng Sonarpad”: thêm một tùy chọn trong Trình quản lý tệp để mở tệp trực tiếp bằng Sonarpad.
+Liên kết tệp: mở cửa sổ Windows để quản lý các liên kết tệp được Sonarpad hỗ trợ.
+Proxy toàn cục: cho phép cấu hình proxy được sử dụng cho tất cả các kết nối của chương trình.
+Thẻ Giọng nói
+Công cụ TTS (Microsoft / SAPI5 / SAPI4): cho phép chọn công cụ tổng hợp giọng nói khi đọc.
+Giọng chính: cho phép chọn giọng được sử dụng để đọc văn bản. Với các giọng Edge, có thêm trường lọc theo ngôn ngữ và tùy chọn “Chỉ giọng đa ngôn ngữ”.
+Nghe thử giọng: phát thử giọng đã chọn.
+Cao độ, tốc độ và âm lượng: cho phép điều chỉnh các thông số này.
+Giọng khác cho hội thoại: nếu bật, cho phép sử dụng giọng khác cho các đoạn hội thoại.
+Giọng hội thoại thứ nhất (tùy chọn): cho phép đặt một giọng riêng cho hội thoại.
+Giọng hội thoại thứ hai (tùy chọn): cho phép thêm một giọng thứ hai cho hội thoại.
+Nếu được bật, Sonarpad có thể sử dụng tối đa ba giọng khác nhau.
+Thẻ Trình soạn thảo
+Tự động xuống dòng: bật hoặc tắt chức năng tự động xuống dòng.
+Độ rộng dòng: đặt số ký tự tối đa trên mỗi dòng.
+Dấu ngoặc kép thông minh: tự động thay dấu ngoặc kép thẳng bằng dấu ngoặc kép kiểu in ấn.
+Kiểm tra chính tả: bật kiểm tra chính tả cho ngôn ngữ đang sử dụng.
+Ngôn ngữ dịch từ điển: đặt ngôn ngữ đích cho từ điển trực tuyến.
+Ngôn ngữ Wikipedia: chọn ngôn ngữ dùng để tìm kiếm trên Wikipedia.
+Thẻ Âm thanh
+Khoảng nhảy tiến/lùi: xác định số giây tua tiến hoặc tua lùi khi phát.
+Thư mục mặc định cho sách nói: đặt thư mục đích cho sách nói được tạo.
+Chia sách nói: không chia, chia theo văn bản, chia thành số phần cụ thể hoặc chia theo thời lượng.
+Tùy chọn phụ đề: cho phép chọn cách xử lý phụ đề khi phát tệp đa phương tiện.
+Thẻ RSS và Podcast
+Giới hạn bộ nhớ đệm podcast: xác định dung lượng tối đa cho podcast đã tải xuống.
+Podcast Index (API key / API secret): nhập thông tin xác thực cho Podcast Index.
+Xác nhận xóa RSS/Podcast: hiển thị thông báo xác nhận trước khi xóa mục.
+Thông báo trạng thái chưa đọc/chưa phát: cho biết mục đã được đọc hoặc phát hay chưa.
+Hiển thị ngày/giờ: cho phép tùy chỉnh cách hiển thị ngày và giờ.
+Sao chép nhanh RSS: cho phép chọn nội dung sẽ được sao chép bằng Ctrl+C.
+Thẻ Phím tắt
+Danh sách lệnh với phím tắt có thể chỉnh sửa.
+Ghi lại tổ hợp phím mới.
+Khôi phục phím tắt mặc định.
+Cửa sổ: mở menu Cửa sổ.
+Tài liệu đang mở...: hiển thị danh sách các tài liệu đang mở.
+Đóng các tài liệu khác: đóng tất cả tài liệu trừ tài liệu đang hoạt động.
+Đóng tất cả: đóng tất cả các tài liệu đang mở.
 
 Trợ giúp: 
 Hướng dẫn: Mở bản hướng dẫn này (F1).
 Kiểm tra bản cập nhật: Kiểm tra xem có bản cập nhật mới không (F2).
 Nhật ký thay đổi: Mở cửa sổ nhật ký thay đổi.
 Giới thiệu: Hiển thị thông tin chương trình.
+
+
+
 
 
 

@@ -5,18 +5,12 @@ Abrir: Abrir archivos de texto, PDF, EPUB, MP3 y otros formatos compatibles (Ctr
 Guardar: Guardar el documento (Ctrl+S).
 Guardar como: Guardar con un nombre nuevo.
 Guardar todo: Guardar todos los documentos (Ctrl+Shift+S).
-Cerrar pestaña: Cerrar el documento actual (Ctrl+W).
 Archivos recientes: Abrir un archivo reciente.
+
+
  
-Voz y audio:
-Lectura: F5 Iniciar lectura, F4 Pausar/Reanudar, F6 Detener lectura.
-Favoritos durante la lectura: F9 voz favorita anterior, F10 voz favorita siguiente.
-Grabar audiolibro: Crear un archivo MP3 a partir del texto actual (Ctrl+R).
-Audiolibros por lotes: Convertir una lista de archivos en audiolibros (Ctrl+Shift+B).
-Grabar podcast: Grabar un podcast desde el micrófono y/o el audio del sistema (Ctrl+Shift+R).
-Convertir audio: Convertir archivos de audio/video a otros formatos de audio (Ctrl+Shift+A).
-Audiolibros MP3:
-Cuando abres un archivo MP3, Sonarpad actúa como reproductor de audio.
+Archivos multimedia:
+Cuando abres un archivo multimedia (MP3, WAV, MP4, AVI), Sonarpad se convierte en un reproductor de audio.
 Controles de teclado:
 • 
 ESPACIO: Reproducir / Pausar.
@@ -33,6 +27,8 @@ FLECHA ABAJO: Bajar volumen.
 • 
 -: Disminuir la velocidad de reproducción.
 • 
+- SHIFT +: Aumenta el tono.
+- SHIFT -: Disminuye el tono.
 CTRL+I: Anunciar el tiempo de reproducción.
 • 
 CTRL+T: Ir a un tiempo específico.
@@ -74,6 +70,14 @@ Marcadores:
 Insertar marcador: Guardar la posición actual del cursor o el tiempo del audiolibro (Ctrl+B).
 Gestionar marcadores: Ver, saltar o eliminar marcadores guardados. Al abrir un archivo con marcadores, el cursor o la reproducción se reanudará automáticamente desde el primero disponible.
  
+Voz y audio:
+Lectura: F5 Iniciar lectura, F4 Pausar/Reanudar, F6 Detener lectura.
+Favoritos durante la lectura: F9 voz favorita anterior, F10 voz favorita siguiente.
+Grabar audiolibro: Crear un archivo MP3 a partir del texto actual (Ctrl+R).
+Audiolibros por lotes: Convertir una lista de archivos en audiolibros (Ctrl+Shift+B).
+Grabar podcast: Grabar un podcast desde el micrófono y/o el audio del sistema (Ctrl+Shift+R).
+Convertir audio: Convertir archivos de audio/video a otros formatos de audio (Ctrl+Shift+A).
+
 Herramientas:
 Audiolibros en lote: Abrir la ventana para convertir una lista de archivos (o carpetas completas) en audiolibros.
 • 
@@ -92,6 +96,7 @@ Los reemplazos del diccionario se aplican durante la lectura y la creación de a
 Importar transcripción de YouTube: Pegar una URL, elegir el idioma e importar el texto al editor (Ctrl+Y). Opción para incluir marcas de tiempo.
 Buscar e importar desde Wikipedia: Buscar un artículo en Wikipedia e importar su texto al editor (Alt+Shift+W).
 Diccionario en línea: Buscar definiciones y traducciones en el Wikcionario en línea (Alt+Shift+D).
+Reproducir streaming de audio (Alt+Shift+S): Reproduce audio desde sitios de streaming como YouTube, permite elegir el formato y la calidad, y permite escuchar sin descargar (por ejemplo, para radio en línea).
 Terminal accesible: Abrir un terminal dedicado con salida estable para lectores de pantalla (Ctrl+Shift+T).
 Atajos: Alt+I enfoca la entrada, Alt+O enfoca la salida, Tab/Shift+Tab mueve entre entrada, salida y opciones.
 Enter envía la entrada. Ctrl+C copia la salida (o envía Ctrl+C al programa). Ctrl+L limpia la salida con confirmación.
@@ -109,18 +114,58 @@ Abrir la ventana Podcasts para buscar y gestionar suscripciones.
 En la lista de episodios, pulsar Enter para reproducir el episodio.
 Durante la reproducción, Esc detiene el podcast y vuelve a la biblioteca.
  
-Opciones:
-Idioma: Cambiar el idioma de la interfaz.
-Comportamiento de apertura: Abrir archivos en una nueva pestaña o en una nueva ventana.
-Voz: Elegir la voz para la lectura.
-Voces multilingües: Filtrar la lista de voces.
-Elegir tono, velocidad y volumen: Ajustar tono, velocidad y volumen para las voces (Microsoft y SAPI5). Se aplica a lectura y audiolibros.
-Mover cursor durante la lectura: Seguir visualmente el texto mientras se lee.
-División de audiolibro por texto: Dividir cuando el marcador aparece al inicio de una línea (sensible a mayúsculas/minúsculas: "Chapter" y "chapter" son diferentes). Ejemplo: con "Chapter" crea una parte por capítulo, incluyendo autor e introducción en la primera parte hasta el primer Chapter. Si no se encuentra, no se divide.
-Otras opciones para dividir el audiolibro: 2 partes, 4 partes, 6 partes, 8 partes.
- 
+Opciones
+La ventana Opciones permite personalizar el comportamiento de Sonarpad. La configuración está dividida en diferentes pestañas.
+Pestaña General
+Idioma de la interfaz: permite elegir el idioma del programa.
+Apertura de archivos (nueva pestaña / nueva ventana): con Nueva pestaña puedes cambiar entre los archivos abiertos usando Ctrl+Tab. Con Nueva ventana puedes cambiar entre ventanas usando Alt+Tab.
+Comprobar actualizaciones al iniciar: verifica automáticamente si hay actualizaciones cuando el programa se inicia.
+Enviar informes de errores anónimos: envía automáticamente informes anónimos al autor del programa.
+Agregar al menú contextual “Abrir con Sonarpad”: añade una opción en el Explorador de archivos para abrir directamente los archivos con Sonarpad.
+Asociaciones de archivos: abre la ventana de Windows para gestionar las asociaciones de archivos compatibles con Sonarpad.
+Proxy global: permite configurar un proxy que se utilizará para todas las conexiones del programa.
+Pestaña Voz
+Motor TTS (Microsoft / SAPI5 / SAPI4): permite elegir el motor de voz utilizado durante la lectura.
+Voz principal: permite seleccionar la voz utilizada para la lectura del texto. Para las voces Edge hay un segundo campo para filtrar por idioma y la opción “Solo voces multilingües”.
+Vista previa de voz: reproduce una muestra de la voz seleccionada.
+Tono, velocidad y volumen: permiten ajustar estos parámetros.
+Voz diferente para los diálogos: si está activado, permite utilizar una voz distinta para las partes dialogadas.
+Primera voz para diálogos (opcional): permite configurar una voz específica para los diálogos.
+Segunda voz para diálogos (opcional): permite añadir una segunda voz para los diálogos.
+Si están activadas, Sonarpad puede utilizar hasta tres voces diferentes.
+Pestaña Editor
+Salto de línea automático: activa o desactiva el ajuste automático de línea.
+Ancho de línea: establece el número máximo de caracteres por línea.
+Comillas inteligentes: sustituye automáticamente las comillas simples por comillas tipográficas.
+Corrector ortográfico: activa la revisión ortográfica para el idioma en uso.
+Idioma de traducción del diccionario: establece el idioma de destino para el diccionario en línea.
+Idioma de Wikipedia: selecciona el idioma utilizado para las búsquedas en Wikipedia.
+Pestaña Audio
+Intervalo de salto adelante/atrás: define cuántos segundos avanzar o retroceder durante la reproducción.
+Carpeta predeterminada de audiolibros: establece la carpeta de destino para los audiolibros generados.
+División del audiolibro: sin división, dividir por texto, dividir en un número específico de partes o dividir por duración.
+Opciones de subtítulos: permite elegir cómo se gestionan los subtítulos durante la reproducción de archivos multimedia.
+Pestaña RSS y Podcast
+Límite de caché de podcasts: define el espacio máximo utilizado para los podcasts descargados.
+Podcast Index (API key / API secret): permite introducir las credenciales para Podcast Index.
+Confirmar eliminación de RSS/Podcast: muestra un mensaje de confirmación antes de eliminar elementos.
+Anuncio de estado no leído/no reproducido: indica si un elemento ha sido leído o reproducido.
+Visualización de fecha/hora: permite personalizar cómo se muestran la fecha y la hora.
+Copia rápida RSS: permite elegir qué se copia con Ctrl+C.
+Pestaña Atajos
+Lista de comandos con atajos editables.
+Registrar nueva combinación de teclas.
+Restaurar atajos predeterminados.
+Ventana: abre el menú Ventana.
+Documentos abiertos...: muestra la lista de documentos abiertos.
+Cerrar los demás: cierra todos los documentos excepto el activo.
+Cerrar todo: cierra todos los documentos abiertos.
+
 Ayuda:
 Guía: Abrir esta guía (F1).
 Buscar actualizaciones: Comprobar si hay actualizaciones (F2).
 Registro de cambios: Abrir la ventana de cambios.
 Acerca de: Mostrar la información del programa.
+
+
+

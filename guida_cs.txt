@@ -7,19 +7,10 @@ Menu Soubor:
  Uložit: Uloží dokument (Ctrl+S).
  Uložit jako: Uloží s novým názvem.
  Uložit vše: Uloží všechny dokumenty (Ctrl+Shift+S).
- Zavřít kartu: Zavře aktuální dokument (Ctrl+W).
  Nedávné soubory: Otevře nedávný soubor.
 
-Menu Hlas a zvuk:
-
- Čtení: F5 Spustit čtení, F4 Pozastavit/Pokračovat, F6 Zastavit čtení.
- Oblíbené během čtení: F9 předchozí oblíbený hlas, F10 další oblíbený hlas.
- Nahrát audioknihu: Vytvoří soubor MP3 nebo WAV z aktuálního textu (Ctrl+R).
- Dávkové audioknihy: Převede seznam souborů na audioknihy (Ctrl+Shift+B).
- Nahrát podcast: Nahraje podcast z mikrofonu a/nebo systémového zvuku (Ctrl+Shift+R).
- Převést audio: Převede audio/video soubory do jiných audio formátů (Ctrl+Shift+A).
-Přehrávání MP3 souboru nebo Audioknihy:
-Když otevřete soubor MP3, Sonarpad funguje jako audio přehrávač.
+Multimediální soubory:
+Když otevřete multimediální soubor (MP3, WAV, MP4, AVI), Sonarpad se stane přehrávačem zvuku.
 Klávesové zkratky přehrávače:
 
  MEZERNÍK: Přehrát / Pozastavit.
@@ -29,6 +20,8 @@ Klávesové zkratky přehrávače:
  DOLNÍ ŠIPKA: Snížit hlasitost.
  +: Zvýšit rychlost přehrávání.
  -: Snížit rychlost přehrávání.
+- SHIFT +: Zvýší výšku tónu.
+- SHIFT -: Sníží výšku tónu.
  CTRL+I: Ohlásit čas přehrávání.
  CTRL+T: Přejít na konkrétní čas.
  CTRL+B: Vložit záložku v přesný čas.
@@ -72,6 +65,15 @@ Menu Záložky:
  Vložit záložku: Uloží aktuální pozici kurzoru nebo čas audioknihy (Ctrl+B).
  Spravovat záložky: Zobrazí, přejde na konkrétní záložku nebo odstraní uložené záložky. Při otevření souboru se záložkami bude kurzor nebo přehrávání automaticky pokračovat od první dostupné.
 
+Menu Hlas a zvuk:
+
+ Čtení: F5 Spustit čtení, F4 Pozastavit/Pokračovat, F6 Zastavit čtení.
+ Oblíbené během čtení: F9 předchozí oblíbený hlas, F10 další oblíbený hlas.
+ Nahrát audioknihu: Vytvoří soubor MP3 nebo WAV z aktuálního textu (Ctrl+R).
+ Dávkové audioknihy: Převede seznam souborů na audioknihy (Ctrl+Shift+B).
+ Nahrát podcast: Nahraje podcast z mikrofonu a/nebo systémového zvuku (Ctrl+Shift+R).
+ Převést audio: Převede audio/video soubory do jiných audio formátů (Ctrl+Shift+A).
+
 Menu Nástroje:
 
  Hromadné audioknihy: otevře okno pro převod seznamu souborů (nebo celých složek) na audioknihy s vybranou syntézou do formátu WAV nebo MP3.
@@ -91,6 +93,7 @@ Menu Nástroje:
  Importovat přepis z YouTube: vložte URL, zvolte jazyk a importujte text do editoru (Ctrl+Y). Volitelná časová razítka.
  Hledat a importovat z Wikipedie: Najde článek na Wikipedii a importuje jeho text do editoru (Alt+Shift+W).
  Online slovník: hledá definice a překlady v online Wikislovníku (Alt+Shift+D).
+Přehrát streamované audio (Alt+Shift+S): Přehrává audio ze streamovacích webů jako je YouTube, umožňuje zvolit formát a kvalitu a umožňuje poslech bez stahování (například pro online rádio).
  Přístupný terminál: otevře vyhrazený terminál se stabilním výstupem pro čtečky obrazovky (Ctrl+Shift+T).
  Zkratky: Alt+I zaměří fokus na vstupní políčko, Alt+O zaměří fokus na výstupní pole, Tab/Shift+Tab přesouvá mezi vstupem, výstupem a možnostmi.
  Enter odešle vstup. Ctrl+C zkopíruje výstup (nebo odešle Ctrl+C do programu). Ctrl+L vymaže výstup s potvrzením.
@@ -108,16 +111,52 @@ RSS / Články: otevře okno RSS/Články, přidat zdroje, šipkou doprava rozba
  V seznamu epizod stiskněte Enter pro přehrání epizody.
  Během přehrávání Esc zastaví podcast a vrátí se do knihovny.
 
-Možnosti:
-
- Jazyk: Změnit jazyk rozhraní.
- Chování při otevírání: Otevírat soubory na nové kartě nebo v novém okně.
- Hlas: Zvolit hlas pro čtení.
- Vícejazyčné hlasy: Filtruje seznam hlasů.
- Zvolit výšku, rychlost a hlasitost: Nastaví výšku, rychlost a hlasitost pro hlasy (Microsoft i SAPI5). Platí pro čtení a audioknihy.
- Posouvat kurzor během čtení: Vizuálně sleduje text, jak je čten.
- Rozdělení audioknihy podle textu: Rozdělí text, když se značka objeví na začátku řádku (rozlišují se velká a malá písmena: "Kapitola" a "kapitola" jsou odlišné). Příklad: s "Kapitola" vytvoří jednu část na kapitolu, včetně autora a úvodu v první části až po první Kapitolu. Pokud nenalezeno, nic se nerozdělí.
- Další možnosti rozdělení audioknihy: 2 části, 4 části, 6 částí, 8 částí.
+Možnosti
+Okno Možnosti umožňuje přizpůsobit chování programu Sonarpad. Nastavení jsou rozdělena do několika karet.
+Karta Obecné
+Jazyk rozhraní: umožňuje zvolit jazyk programu.
+Otevírání souborů (nová karta / nové okno): s možností Nová karta můžete přepínat mezi otevřenými soubory pomocí Ctrl+Tab. S možností Nové okno můžete přepínat mezi okny pomocí Alt+Tab.
+Kontrola aktualizací při spuštění: automaticky kontroluje dostupnost aktualizací při spuštění programu.
+Odesílání anonymních hlášení o pádech: automaticky odesílá anonymní chybová hlášení autorovi programu.
+Přidat do kontextové nabídky „Otevřít pomocí Sonarpad“: přidá možnost do Průzkumníka souborů pro otevření souborů přímo v Sonarpad.
+Přiřazení souborů: otevře dialog Windows pro správu přiřazení souborů podporovaných programem Sonarpad.
+Globální proxy: umožňuje nastavit proxy server pro všechna připojení programu.
+Karta Hlas
+TTS modul (Microsoft / SAPI5 / SAPI4): umožňuje vybrat hlasový modul používaný při čtení.
+Hlavní hlas: umožňuje vybrat hlas používaný pro čtení textu. U hlasů Edge je k dispozici další pole pro filtrování podle jazyka a možnost „Pouze vícejazyčné hlasy“.
+Náhled hlasu: přehraje ukázku vybraného hlasu.
+Výška, rychlost a hlasitost: umožňují upravit tyto parametry.
+Jiný hlas pro dialogy: pokud je aktivováno, použije se jiný hlas pro dialogové části textu.
+První hlas pro dialogy (volitelné): umožňuje nastavit konkrétní hlas pro dialogy.
+Druhý hlas pro dialogy (volitelné): umožňuje přidat druhý hlas pro dialogy.
+Pokud jsou aktivovány, může Sonarpad používat až tři různé hlasy.
+Karta Editor
+Automatické zalamování řádků: zapíná nebo vypíná automatické zalamování textu.
+Šířka řádku: nastavuje maximální počet znaků na řádek.
+Chytré uvozovky: automaticky nahrazuje rovné uvozovky typografickými.
+Kontrola pravopisu: zapíná kontrolu pravopisu pro aktuální jazyk.
+Jazyk překladu slovníku: nastavuje cílový jazyk online slovníku.
+Jazyk Wikipedie: vybírá jazyk používaný pro vyhledávání na Wikipedii.
+Karta Zvuk
+Interval posunu vpřed/vzad: určuje počet sekund pro posun při přehrávání.
+Výchozí složka pro audioknihy: nastavuje cílovou složku pro generované audioknihy.
+Rozdělení audioknihy: bez rozdělení, rozdělení podle textu, rozdělení na určitý počet částí nebo podle délky.
+Možnosti titulků: umožňuje zvolit způsob zpracování titulků při přehrávání multimediálních souborů.
+Karta RSS a Podcasty
+Limit mezipaměti podcastů: určuje maximální místo používané pro stažené podcasty.
+Podcast Index (API key / API secret): zadání přihlašovacích údajů pro Podcast Index.
+Potvrdit odstranění RSS/Podcastu: zobrazí potvrzení před odstraněním položky.
+Oznámení o nepřečteném/nepřehraném stavu: informuje, zda byla položka přečtena nebo přehrána.
+Zobrazení data/času: umožňuje přizpůsobit zobrazení data a času.
+Rychlé kopírování RSS: umožňuje vybrat, co se zkopíruje pomocí Ctrl+C.
+Karta Klávesové zkratky
+Seznam příkazů s upravitelnými klávesovými zkratkami.
+Zaznamenat novou kombinaci kláves.
+Obnovit výchozí klávesové zkratky.
+Okno: otevře nabídku Okno.
+Otevřené dokumenty...: zobrazí seznam otevřených dokumentů.
+Zavřít ostatní: zavře všechny dokumenty kromě aktivního.
+Zavřít vše: zavře všechny otevřené dokumenty.
 
 Menu Nápověda:
 
@@ -125,4 +164,7 @@ Příručka: Otevře tuto příručku (F1).
 Zkontrolovat aktualizace: Zkontroluje, zda jsou k dispozici aktualizace (F2).
 Seznam změn: Otevře okno se seznamem změn.
 O programu: Zobrazí informace o programu.
+
+
+
 

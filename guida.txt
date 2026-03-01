@@ -6,18 +6,10 @@ Apri: apre file di testo, PDF, EPUB, MP3 e altri formati supportati (Ctrl+O).
 Salva: salva il documento (Ctrl+S).
 Salva con nome: salva con un nuovo nome.
 Salva tutto: salva tutti i documenti (Ctrl+Shift+S).
-Chiudi tab: chiude il documento corrente (Ctrl+W).
 File recenti: apre un file usato di recente.
 
-Voce e audio:
-Lettura: F5 avvia la lettura, F4 pausa/riprendi, F6 ferma la lettura.
-Preferiti durante la lettura: F9 voce preferita precedente, F10 voce preferita successiva.
-Registra audiolibro: crea un file MP3 dal testo corrente (Ctrl+R).
-Registra in batch: converte una lista di file in audiolibri (Ctrl+Shift+B).
-Crea podcast: crea un podcast da microfono e/o audio di sistema (Ctrl+Shift+R).
-Converti audio: converte file audio/video in altri formati audio (Ctrl+Shift+A).
-Audiolibri MP3:
-Quando apri un file MP3, Sonarpad diventa un lettore audio.
+File multimediali:
+Quando apri un file multimediale (MP3, WAV, MP4, AVI), Sonarpad diventa un lettore audio.
 Comandi da tastiera:
 - SPAZIO: Play / Pausa.
 - FRECCIA DESTRA: Avanti di 1 minuto.
@@ -26,6 +18,8 @@ Comandi da tastiera:
 - FRECCIA GIÙ: Diminuisce il volume.
 - +: Aumenta la velocità di riproduzione.
 - -: Diminuisce la velocità di riproduzione.
+- SHIFT +: Aumenta il tono.
+- SHIFT -: Diminuisce il tono.
 - CTRL+I: Annuncia il tempo di riproduzione.
 - CTRL+T: Vai a un tempo specifico.
 - CTRL+B: Inserisce un segnalibro nel minuto esatto.
@@ -66,6 +60,14 @@ Segnalibri:
 Inserisci segnalibro: salva la posizione attuale del cursore o il tempo dell'audiolibro (Ctrl+B).
 Gestisci segnalibri: visualizza, salta o elimina i segnalibri salvati. All'apertura di un file con segnalibri, il cursore o la riproduzione ripartiranno automaticamente dal primo disponibile.
 
+Voce e audio:
+Lettura: F5 avvia la lettura, F4 pausa/riprendi, F6 ferma la lettura.
+Preferiti durante la lettura: F9 voce preferita precedente, F10 voce preferita successiva.
+Registra audiolibro: crea un file MP3 dal testo corrente (Ctrl+R).
+Registra in batch: converte una lista di file in audiolibri (Ctrl+Shift+B).
+Crea podcast: crea un podcast da microfono e/o audio di sistema (Ctrl+Shift+R).
+Converti audio: converte file audio/video in altri formati audio (Ctrl+Shift+A).
+
 Strumenti:
 Audiolibri in sequenza: apre la finestra per convertire una lista di file (o intere cartelle) in audiolibri.
 - Aggiungi file/cartelle alla coda.
@@ -80,6 +82,7 @@ Le sostituzioni del dizionario sono applicate durante la lettura e la creazione 
 Importa trascrizione da YouTube: incolla un URL, scegli la lingua e importa il testo nell'editor (Ctrl+Y). Opzione per includere i timestamp.
 Cerca e importa da Wikipedia: cerca un articolo su Wikipedia e ne importa il testo nell'editor (Alt+Shift+W).
 Dizionario online: cerca definizioni e traduzioni nel Wiktionary online (Alt+Shift+D).
+Riproduci audio da streaming (Alt+Shift+S): Riproduce audio da siti di streaming come YouTube, permette di scegliere formato e qualità e consente l’ascolto senza scaricare (ad esempio per radio online).
 Terminale accessibile: apre un terminale dedicato con output separato e stabile per gli screen reader (Ctrl+Shift+T).
 Scorciatoie: Alt+I sposta il focus sull'input, Alt+O sposta il focus sull'output, Tab/Shift+Tab per spostarsi tra input, output e opzioni.
 Invio: invia il testo. Ctrl+C copia l'output (o invia Ctrl+C al programma). Ctrl+L pulisce l'output con conferma.
@@ -94,20 +97,63 @@ Podcast: apre la finestra Podcast per cercare e gestire le sottoscrizioni.
 Nell'elenco episodi, premi Invio per riprodurre l'episodio.
 Durante la riproduzione, Esc ferma il podcast e torna alla libreria.
 
-Opzioni:
-Lingua: cambia la lingua dell'interfaccia.
-Apertura file: apre i file in nuova scheda o nuova finestra.
-Seleziona voce: sceglie la voce per la lettura.
-Solo voci multilingua: filtra l'elenco delle voci.
-Scegli tono, velocità e volume: imposta tono, velocità e volume delle voci (sia Microsoft che SAPI5). Valgono per lettura e audiolibri.
-Sposta cursore durante la lettura: segue visivamente il testo mentre viene letto.
-Divisione audiolibro per testo: divide l'audiolibro quando il testo indicato compare a inizio riga (sensibile a maiuscole/minuscole: "Capitolo" e "capitolo" sono diversi). Esempio: con "Capitolo" crea una parte per ogni capitolo, includendo autore e introduzione nella prima parte fino al primo Capitolo. Se non trovato, nessuna divisione.
-Altre opzioni per dividere l'audiolibro: 2 parti, 4 parti, 6 parti, 8 parti.
+Opzioni
+La finestra Opzioni consente di personalizzare il comportamento di Sonarpad. Le impostazioni sono suddivise in diverse schede.
+Scheda Generale
+Lingua interfaccia: consente di scegliere la lingua del programma.
+Apertura file (nuova scheda / nuova finestra): con Nuova scheda puoi passare tra i file aperti usando Ctrl+Tab. Con Nuova finestra puoi passare tra le finestre usando Alt+Tab.
+Controllo aggiornamenti all’avvio: verifica automaticamente la presenza di aggiornamenti quando il programma viene avviato.
+Invio report crash anonimi: invia automaticamente segnalazioni anonime di errore all’autore del programma.
+Aggiungi al menu contestuale “Apri con Sonarpad”: aggiunge in Esplora File la voce per aprire direttamente i file con Sonarpad.
+Associazioni file: apre la finestra di Windows per gestire le associazioni dei file supportati da Sonarpad.
+Proxy globale: permette di configurare un proxy da utilizzare per tutte le connessioni del programma.
+Scheda Voce
+Motore TTS (Microsoft / SAPI5 / SAPI4): consente di scegliere il motore vocale.
+Voce principale: permette di selezionare la voce utilizzata per la lettura del testo. Per le voci Edge è disponibile un filtro per lingua e l’opzione “Solo voci multilingua”.
+Anteprima voce: riproduce un esempio della voce selezionata.
+Tono, velocità e volume: consentono di regolare questi parametri.
+Voce diversa per i dialoghi: se attivata, permette di usare una voce differente per le parti dialogate.
+Prima voce dialoghi (opzionale): consente di impostare una voce specifica per i dialoghi.
+Seconda voce dialoghi (opzionale): consente di aggiungere una seconda voce per i dialoghi.
+Se attivate, Sonarpad può utilizzare fino a tre voci differenti.
+Scheda Editor
+A capo automatico: attiva o disattiva il ritorno automatico a capo.
+Larghezza riga: imposta il numero massimo di caratteri per riga.
+Virgolette intelligenti: sostituisce automaticamente le virgolette semplici.
+Controllo ortografico: attiva il correttore ortografico per la lingua in uso.
+Lingua traduzione dizionario: imposta la lingua del dizionario online.
+Lingua Wikipedia: seleziona la lingua per le ricerche su Wikipedia.
+Scheda Audio
+Intervallo salto avanti/indietro: definisce di quanti secondi avanzare o tornare indietro.
+Cartella predefinita audiolibri: imposta la cartella di destinazione.
+Divisione audiolibro: nessuna divisione, in base al testo, in un numero specifico di parti o in base alla durata.
+Opzioni sottotitoli: consente di scegliere come gestire i sottotitoli durante l’ascolto.
+Scheda RSS e Podcast
+Limite cache podcast: definisce lo spazio massimo per i podcast scaricati.
+Podcast Index (API key / API secret): inserimento credenziali.
+Conferma eliminazione RSS/Podcast: mostra un messaggio di conferma prima dell’eliminazione.
+Annuncio stato non letto/non riprodotto: indica lo stato degli elementi.
+Visualizzazione data/ora: permette di personalizzare la visualizzazione.
+Copia rapida RSS: consente di scegliere cosa copiare con Ctrl+C.
+Scheda Scorciatoie
+Elenco comandi con scorciatoie modificabili.
+Registrazione nuova combinazione tasti.
+Ripristino scorciatoie predefinite.
+Finestra: apre il menu Finestra.
+Documenti aperti...: mostra l'elenco dei documenti aperti.
+Chiudi gli altri: chiude tutti i documenti tranne quello attivo.
+Chiudi tutti: chiude tutti i documenti aperti.
 
 Aiuto:
 Guida: apre questa guida (F1).
 Controllo aggiornamenti: controlla se ci sono aggiornamenti (F2).
 Registro modifiche: mostra il changelog.
 Informazioni sul programma: mostra informazioni sul programma.
+
+
+
+
+
+
 
 

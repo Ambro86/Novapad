@@ -6,18 +6,10 @@ Atidaryti: Atidaryti tekstinius failus, PDF, EPUB, MP3 ir kitus palaikomus forma
 Išsaugoti: išsaugokite dokumentą (Ctrl+S).
 Išsaugoti kaip: išsaugoti su nauju pavadinimu.
 Išsaugoti viską: išsaugoti visus dokumentus (Ctrl+Shift+S).
-Uždaryti skirtuką: uždaryti esamą dokumentą (Ctrl+W).
 Naujausi failai: Atidarykite naujausią failą.
 
-Balsas ir garso įrašai:
-Skaitymas: F5 Pradėti skaityti, F4 Pauzė/Tęsti, F6 Sustabdyti skaitymą.
-Mėgstamiausi skaitant: F9 ankstesnis mėgstamiausias balsas, F10 kitas mėgstamiausias balsas.
-Įrašyti garso knygą: Sukurti MP3 failą iš esamo teksto (Ctrl+R).
-Garso knygų partijos: konvertuokite failų sąrašą į garso knygas (Ctrl+Shift+B).
-Įrašyti podcastą: įrašykite podcastą iš mikrofono ir (arba) sistemos garso (Ctrl+Shift+R).
-Konvertuoti garso įrašą: Konvertuoti garso/vaizdo įrašų failus į kitus garso formatus (Ctrl+Shift+A).
-MP3 garso knygos:
-Kai atidarote MP3 failą, „Sonarpad“ veikia kaip garso grotuvas.
+Multimedijos failai:
+Kai atidarote multimedijos failą (MP3, WAV, MP4, AVI), Sonarpad tampa garso grotuvu.
 Klaviatūros valdymas:
 - SPACE: Paleisti / Sustabdyti.
 - DEŠINĖS PUSĖS RODYKLĖ: Perkelti į priekį 1 minutę.
@@ -26,6 +18,8 @@ Klaviatūros valdymas:
 - ŽEMYN NUKREIPTA STRĖLĖ: Sumažinti garsumą.
 - +: Padidinti atkūrimo greitį.
 - -: Sumažinti atkūrimo greitį.
+- SHIFT +: Padidina tono aukštį.
+- SHIFT -: Sumažina tono aukštį.
 - CTRL+I: Pranešti apie atkūrimo laiką.
 - CTRL+T: Pereiti prie konkretaus laiko.
 - CTRL+B: įterpti žymę tiksliu laiku.
@@ -65,6 +59,14 @@ Klavišų kombinacijos: skaitymo metu galima paspausti klavišus F9 ir F10, kad 
 Įterpti žymę: išsaugoti dabartinę žymeklio padėtį arba garso knygos laiką (Ctrl+B).
 Žymių tvarkymas: peržiūrėkite, pereikite prie arba ištrinkite išsaugotas žymes. Atidarant failą su žymėmis, žymeklis arba atkūrimas automatiškai bus atnaujintas nuo pirmos prieinamos žymės.
 
+Balsas ir garso įrašai:
+Skaitymas: F5 Pradėti skaityti, F4 Pauzė/Tęsti, F6 Sustabdyti skaitymą.
+Mėgstamiausi skaitant: F9 ankstesnis mėgstamiausias balsas, F10 kitas mėgstamiausias balsas.
+Įrašyti garso knygą: Sukurti MP3 failą iš esamo teksto (Ctrl+R).
+Garso knygų partijos: konvertuokite failų sąrašą į garso knygas (Ctrl+Shift+B).
+Įrašyti podcastą: įrašykite podcastą iš mikrofono ir (arba) sistemos garso (Ctrl+Shift+R).
+Konvertuoti garso įrašą: Konvertuoti garso/vaizdo įrašų failus į kitus garso formatus (Ctrl+Shift+A).
+
 Įrankiai:
 Batch Audiobooks: atidaro langą, kuriame galima konvertuoti failų sąrašą (arba visą aplanką) į garso knygas.
 - Pridėti failus/aplankus į eilę.
@@ -79,6 +81,7 @@ Sąraše skirtukas perkeliamas į „Redaguoti įrašą“ ir „Pašalinti pasi
 Importuokite „YouTube“ transkriptą: įklijuokite URL adresą, pasirinkite kalbą ir importuokite tekstą į redaktorių (Ctrl+Y). Pasirenkami laiko žymos.
 Paieška ir importavimas iš Vikipedijos: ieškokite straipsnio Vikipedijoje ir importuokite jo tekstą į redaktorių (Alt+Shift+W).
 Internetinis žodynas: ieškokite apibrėžimų ir vertimų internetiniame Vikisłowniku (Alt+Shift+D).
+Paleisti srautinį garso įrašą (Alt+Shift+S): Paleidžia garsą iš srautinių svetainių, tokių kaip YouTube, leidžia pasirinkti formatą ir kokybę bei klausytis be atsisiuntimo (pavyzdžiui, internetinei radijai).
 Prieinamas terminalas: atidaro specialų terminalą su stabiliu išvesties ekranų skaitytuvams (Ctrl+Shift+T).
 Spartieji klavišai: Alt+I fokusuoja įvestį, Alt+O fokusuoja išvestį, Tab/Shift+Tab perkelia tarp įvesties, išvesties ir parinkčių.
 Enter siunčia įvestį. Ctrl+C kopijuoja išvestį (arba siunčia Ctrl+C į programą). Ctrl+L išvalo išvestį su patvirtinimu.
@@ -93,20 +96,60 @@ Podcast'ai: atidaro langą „Podcast'ai“, kuriame galima ieškoti ir tvarkyti
 Epizodų sąraše paspauskite „Enter“, kad paleistumėte epizodą.
 Atkūrimo metu klavišas „Esc“ sustabdo podcastą ir grąžina į biblioteką.
 
-Pasirinkimai:
-Kalba: Keisti sąsajos kalbą.
-Atidaryti elgesį: atidaryti failus naujame skirtuke arba naujame lange.
-Balsas: Pasirinkite skaitymo balsą.
-Daugiakalbiai balsai: filtruokite balsų sąrašą.
-Pasirinkite toną, greitį ir garsumą: nustatykite toną, greitį ir garsumą balsams (tiek „Microsoft“, tiek „SAPI5“). Taikoma skaitymui ir audioknygoms.
-Judinkite žymeklį skaitymo metu: vizualiai sekite tekstą, kai jis skaitomas.
-Garso knyga padalinta pagal tekstą: padalijama, kai žymė pasirodo eilutės pradžioje (skiriamos didžiosios ir mažosios raidės: „Chapter“ ir „chapter“ yra skirtingi). Pavyzdys: su „Chapter“ sukuria vieną dalį kiekvienam skyriui, įskaitant autorių ir įvadą pirmoje dalyje iki pirmojo skyriaus. Jei nerasta, nepadalijama.
-Kitos garso knygos padalijimo galimybės: 2 dalys, 4 dalys, 6 dalys, 8 dalys.
+Parinktys
+Langas Parinktys leidžia pritaikyti Sonarpad veikimą. Nustatymai suskirstyti į skirtingas korteles.
+Kortelė Bendrieji
+Sąsajos kalba: leidžia pasirinkti programos kalbą.
+Failų atidarymas (nauja kortelė / naujas langas): pasirinkus Nauja kortelė galite perjungti atidarytus failus naudodami Ctrl+Tab. Pasirinkus Naujas langas galite perjungti langus naudodami Alt+Tab.
+Tikrinti atnaujinimus paleidžiant: automatiškai tikrina, ar yra atnaujinimų, kai programa paleidžiama.
+Siųsti anonimines klaidų ataskaitas: automatiškai siunčia anonimines klaidų ataskaitas programos autoriui.
+Pridėti į kontekstinį meniu „Atidaryti su Sonarpad“: prideda parinktį Failų naršyklėje, leidžiančią tiesiogiai atidaryti failus su Sonarpad.
+Failų susiejimai: atidaro Windows langą failų susiejimams, kuriuos palaiko Sonarpad, valdyti.
+Globalus tarpinis serveris (proxy): leidžia nustatyti proxy serverį, naudojamą visiems programos ryšiams.
+Kortelė Balsas
+TTS variklis (Microsoft / SAPI5 / SAPI4): leidžia pasirinkti balso sintezės variklį skaitymui.
+Pagrindinis balsas: leidžia pasirinkti balsą, naudojamą teksto skaitymui. Edge balsams yra papildomas laukas filtravimui pagal kalbą ir parinktis „Tik daugiakalbiai balsai“.
+Balso peržiūra: atkuria pasirinkto balso pavyzdį.
+Tono aukštis, greitis ir garsumas: leidžia reguliuoti šiuos parametrus.
+Kitas balsas dialogams: jei įjungta, dialogo dalims naudojamas kitas balsas.
+Pirmasis dialogų balsas (nebūtina): leidžia nustatyti konkretų balsą dialogams.
+Antrasis dialogų balsas (nebūtina): leidžia pridėti antrą dialogų balsą.
+Jei įjungta, Sonarpad gali naudoti iki trijų skirtingų balsų.
+Kortelė Redaktorius
+Automatinis eilučių laužymas: įjungia arba išjungia automatinį teksto laužymą.
+Eilutės plotis: nustato maksimalų simbolių skaičių eilutėje.
+Išmaniosios kabutės: automatiškai pakeičia paprastas kabutes tipografinėmis.
+Rašybos tikrinimas: įjungia rašybos tikrinimą naudojamai kalbai.
+Žodyno vertimo kalba: nustato internetinio žodyno tikslinę kalbą.
+Vikipedijos kalba: pasirenka kalbą paieškai Vikipedijoje.
+Kortelė Garsas
+Peršokimo pirmyn/atgal intervalas: nustato sekundžių skaičių peršokimui atkūrimo metu.
+Numatytasis audioknygų aplankas: nustato sugeneruotų audioknygų paskirties aplanką.
+Audioknygos padalijimas: be padalijimo, padalijimas pagal tekstą, padalijimas į konkretų dalių skaičių arba pagal trukmę.
+Subtitrų parinktys: leidžia pasirinkti, kaip subtitrai tvarkomi atkuriant medijos failus.
+Kortelė RSS ir Podcastai
+Podcastų talpyklos limitas: nustato maksimalų vietos kiekį atsisiųstiems podcastams.
+Podcast Index (API key / API secret): leidžia įvesti Podcast Index prisijungimo duomenis.
+Patvirtinti RSS/Podcast šalinimą: rodo patvirtinimo pranešimą prieš pašalinant elementą.
+Ne perskaityta/ne perklausyta būsena: rodo, ar elementas jau buvo perskaitytas arba perklausytas.
+Datos/laiko rodymas: leidžia pritaikyti datos ir laiko rodymą.
+Greitas RSS kopijavimas: leidžia pasirinkti, kas bus nukopijuota paspaudus Ctrl+C.
+Kortelė Spartieji klavišai
+Komandų sąrašas su redaguojamais spartiaisiais klavišais.
+Naujos klavišų kombinacijos įrašymas.
+Numatytųjų sparčiųjų klavišų atkūrimas.
+Langas: atidaro meniu Langas.
+Atidaryti dokumentai...: rodo atidarytų dokumentų sąrašą.
+Uždaryti kitus: uždaro visus dokumentus, išskyrus aktyvų.
+Uždaryti visus: uždaro visus atidarytus dokumentus.
 
 Pagalba:
 Vadovas: Atidarykite šį vadovą (F1).
 Patikrinti atnaujinimus: Patikrinkite, ar yra naujų atnaujinimų (F2).
 Changelog: Atidarykite changelog langą.
 Apie: Rodyti programos informaciją.
+
+
+
 
 

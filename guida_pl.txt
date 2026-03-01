@@ -7,19 +7,10 @@ Plik:
  Zapisz: Zapisz dokument (Ctrl+S).
  Zapisz jako: Zapisz pod nową nazwą.
  Zapisz wszystko: Zapisz wszystkie dokumenty (Ctrl+Shift+S).
- Zamknij kartę: Zamknij bieżący dokument (Ctrl+W).
  Ostatnie pliki: Otwórz ostatnio używany plik.
 
-Głos i audio:
-
- Czytanie: F5 Rozpocznij czytanie, F4 Pauza/Wznów, F6 Zatrzymaj czytanie.
- Ulubione podczas czytania: F9 poprzedni ulubiony głos, F10 następny ulubiony głos.
- Nagraj audiobook: Utwórz plik MP3 z bieżącego tekstu (Ctrl+R).
- Audiobooki wsadowe: Konwertuj listę plików na audiobooki (Ctrl+Shift+B).
- Nagraj podcast: Nagraj podcast z mikrofonu i/lub dźwięku systemowego (Ctrl+Shift+R).
- Konwertuj audio: Konwertuj pliki audio/wideo do innych formatów audio (Ctrl+Shift+A).
-Audiobooki MP3:
-Po otwarciu pliku MP3, Sonarpad działa jako odtwarzacz audio.
+Pliki multimedialne:
+Gdy otworzysz plik multimedialny (MP3, WAV, MP4, AVI), Sonarpad staje się odtwarzaczem audio.
 Sterowanie klawiaturą:
 
  SPACJA: Odtwarzaj / Pauza.
@@ -29,6 +20,8 @@ Sterowanie klawiaturą:
  STRZAŁKA W DÓŁ: Zmniejsz głośność.
  +: Zwiększ prędkość odtwarzania.
  -: Zmniejsz prędkość odtwarzania.
+- SHIFT +: Zwiększa wysokość dźwięku.
+- SHIFT -: Zmniejsza wysokość dźwięku.
  CTRL+I: Ogłoś czas odtwarzania.
  CTRL+T: Idź do określonego czasu.
  CTRL+B: Wstaw zakładkę w dokładnym czasie.
@@ -71,6 +64,15 @@ Zakładki:
  Wstaw zakładkę: Zapisz bieżącą pozycję kursora lub czas audiobooka (Ctrl+B).
  Zarządzaj zakładkami: Wyświetl, przejdź do lub usuń zapisane zakładki. Podczas otwierania pliku z zakładkami, kursor lub odtwarzanie automatycznie wznowi się od pierwszej dostępnej.
 
+Głos i audio:
+
+ Czytanie: F5 Rozpocznij czytanie, F4 Pauza/Wznów, F6 Zatrzymaj czytanie.
+ Ulubione podczas czytania: F9 poprzedni ulubiony głos, F10 następny ulubiony głos.
+ Nagraj audiobook: Utwórz plik MP3 z bieżącego tekstu (Ctrl+R).
+ Audiobooki wsadowe: Konwertuj listę plików na audiobooki (Ctrl+Shift+B).
+ Nagraj podcast: Nagraj podcast z mikrofonu i/lub dźwięku systemowego (Ctrl+Shift+R).
+ Konwertuj audio: Konwertuj pliki audio/wideo do innych formatów audio (Ctrl+Shift+A).
+
 Narzędzia:
 
  Audiobooki wsadowo: otwiera okno do konwersji listy plików (lub całych folderów) na audiobooki.
@@ -90,6 +92,7 @@ Narzędzia:
  Importuj transkrypcję YouTube: wklej adres URL, wybierz język i zaimportuj tekst do edytora (Ctrl+Y). Opcjonalne znaczniki czasu.
  Szukaj i importuj z Wikipedii: wyszukaj artykuł w Wikipedii i zaimportuj jego tekst do edytora (Alt+Shift+W).
  Słownik online: szukaj definicji i tłumaczeń w internetowym Wikisłowniku (Alt+Shift+D).
+Odtwarzaj strumieniowe audio (Alt+Shift+S): Odtwarza dźwięk z serwisów streamingowych takich jak YouTube, umożliwia wybór formatu i jakości oraz pozwala słuchać bez pobierania (na przykład radia internetowego).
  Dostępny terminal: otwiera dedykowany terminal ze stabilnym wyjściem dla czytników ekranu (Ctrl+Shift+T).
  Skróty: Alt+I aktywuje wejście, Alt+O aktywuje wyjście, Tab/Shift+Tab przenosi między wejściem, wyjściem i opcjami.
  Enter wysyła wejście. Ctrl+C kopiuje wyjście (lub wysyła Ctrl+C do programu). Ctrl+L czyści wyjście po potwierdzeniu.
@@ -110,16 +113,52 @@ Otwiera okno RSS/Artykuły, pozwala dodawać źródła, rozwijać kanał i nacis
 
 
 
-Opcje:
-
- Język: Zmień język interfejsu.
- Zachowanie przy otwieraniu: Otwórz pliki w nowej karcie lub nowym oknie.
- Głos: Wybierz głos do czytania.
- Głosy wielojęzyczne: Filtruj listę głosów.
- Wybierz ton, prędkość i głośność: Ustaw ton, prędkość i głośność dla głosów (zarówno Microsoft, jak i SAPI5). Dotyczy czytania i audiobooków.
- Przesuwaj kursor podczas czytania: Wizualnie śledź tekst podczas jego odczytywania.
- Podział audiobooka według tekstu: Podziel, gdy znacznik pojawi się na początku linii (wielkość liter ma znaczenie: "Rozdział" i "rozdział" to co innego). Przykład: przy "Rozdział" tworzy jedną część na rozdział, w tym autora i wstęp w pierwszej części aż do pierwszego Rozdziału. Jeśli nie znaleziono, brak podziału.
- Inne opcje podziału audiobooka: 2 części, 4 części, 6 części, 8 części.
+Opcje
+Okno Opcje umożliwia dostosowanie działania programu Sonarpad. Ustawienia są podzielone na różne karty.
+Karta Ogólne
+Język interfejsu: umożliwia wybór języka programu.
+Otwieranie plików (nowa karta / nowe okno): przy wyborze Nowa karta można przełączać się między otwartymi plikami za pomocą Ctrl+Tab. Przy wyborze Nowe okno można przełączać się między oknami za pomocą Alt+Tab.
+Sprawdzaj aktualizacje przy uruchomieniu: automatycznie sprawdza dostępność aktualizacji po uruchomieniu programu.
+Wysyłanie anonimowych raportów o błędach: automatycznie wysyła anonimowe raporty o błędach do autora programu.
+Dodaj do menu kontekstowego „Otwórz za pomocą Sonarpad”: dodaje opcję w Eksploratorze plików umożliwiającą bezpośrednie otwieranie plików w Sonarpad.
+Skojarzenia plików: otwiera okno systemu Windows do zarządzania skojarzeniami plików obsługiwanych przez Sonarpad.
+Globalny serwer proxy: umożliwia skonfigurowanie serwera proxy używanego do wszystkich połączeń programu.
+Karta Głos
+Silnik TTS (Microsoft / SAPI5 / SAPI4): umożliwia wybór silnika mowy używanego podczas czytania.
+Głos główny: pozwala wybrać głos używany do odczytu tekstu. W przypadku głosów Edge dostępne jest dodatkowe pole filtrowania według języka oraz opcja „Tylko głosy wielojęzyczne”.
+Podgląd głosu: odtwarza próbkę wybranego głosu.
+Wysokość, szybkość i głośność: umożliwiają regulację tych parametrów.
+Inny głos dla dialogów: po włączeniu pozwala używać innego głosu dla części dialogowych.
+Pierwszy głos dialogów (opcjonalny): umożliwia ustawienie konkretnego głosu dla dialogów.
+Drugi głos dialogów (opcjonalny): umożliwia dodanie drugiego głosu dla dialogów.
+Po włączeniu Sonarpad może używać maksymalnie trzech różnych głosów.
+Karta Edytor
+Automatyczne zawijanie wierszy: włącza lub wyłącza automatyczne zawijanie tekstu.
+Szerokość wiersza: ustawia maksymalną liczbę znaków w wierszu.
+Inteligentne cudzysłowy: automatycznie zastępuje proste cudzysłowy cudzysłowami typograficznymi.
+Sprawdzanie pisowni: włącza sprawdzanie pisowni dla używanego języka.
+Język tłumaczenia słownika: ustawia język docelowy słownika online.
+Język Wikipedii: wybiera język używany do wyszukiwania w Wikipedii.
+Karta Audio
+Interwał przeskoku do przodu/do tyłu: określa liczbę sekund przeskoku podczas odtwarzania.
+Domyślny folder audiobooków: ustawia folder docelowy dla generowanych audiobooków.
+Podział audiobooka: brak podziału, podział według tekstu, podział na określoną liczbę części lub podział według czasu trwania.
+Opcje napisów: umożliwia wybór sposobu obsługi napisów podczas odtwarzania plików multimedialnych.
+Karta RSS i Podcast
+Limit pamięci podręcznej podcastów: określa maksymalną przestrzeń używaną dla pobranych podcastów.
+Podcast Index (API key / API secret): wprowadzenie danych uwierzytelniających do Podcast Index.
+Potwierdzenie usunięcia RSS/Podcastu: wyświetla komunikat potwierdzający przed usunięciem elementu.
+Powiadomienie o stanie nieprzeczytany/nieodtworzony: informuje, czy element został już przeczytany lub odtworzony.
+Wyświetlanie daty/godziny: umożliwia dostosowanie sposobu wyświetlania daty i godziny.
+Szybkie kopiowanie RSS: umożliwia wybór, co zostanie skopiowane za pomocą Ctrl+C.
+Karta Skróty
+Lista poleceń z edytowalnymi skrótami klawiaturowymi.
+Rejestrowanie nowej kombinacji klawiszy.
+Przywrócenie domyślnych skrótów.
+Okno: otwiera menu Okno.
+Otwarte dokumenty...: wyświetla listę otwartych dokumentów.
+Zamknij pozostałe: zamyka wszystkie dokumenty oprócz aktywnego.
+Zamknij wszystko: zamyka wszystkie otwarte dokumenty.
 
 Pomoc:
 
@@ -127,4 +166,7 @@ Pomoc:
  Sprawdź aktualizacje: Sprawdź, czy dostępne są aktualizacje (F2).
  Dziennik zmian: Otwórz okno dziennika zmian.
  O programie: Pokaż informacje o programie.
+
+
+
 

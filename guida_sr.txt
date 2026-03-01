@@ -7,18 +7,10 @@ Otvori: Otvara tekstualne datoteke, PDF, EPUB, MP3 i druge podržane formate (Ct
 Sačuvaj: Čuva datoteku (Ctrl+S). 
 Sačuvaj kao: Čuva pod novim imenom. 
 Sačuvaj sve: Čuva sve datoteke (Ctrl+Shift+S). 
-Zatvori karticu: Zatvara trenutnu datoteku (Ctrl+W). 
 Nedavne datoteke: Otvara nedavno korišćenu datoteku. 
 
-Glas i audio:
-Čitanje: F5 pokreće čitanje, F4 pauzira ili nastavlja, F6 zaustavlja čitanje. 
-Omiljeni glasovi tokom čitanja: F9 prethodni omiljeni glas, F10 sledeći omiljeni glas. 
-Snimi audio‑knjigu: Kreira MP3 datoteku iz trenutnog teksta (Ctrl+R). 
-Grupno pretvaranje u audio‑knjige: Pretvara listu datoteka u audio‑knjige (Ctrl+Shift+B).
-Snimi podkast: Snima podkast sa mikrofona i/ili sistemskog zvuka (Ctrl+Shift+R).
-Konvertuj audio: Konvertuje audio/video datoteke u druge audio formate (Ctrl+Shift+A).
-Audio-knjige (MP3): 
-Kada otvoriš MP3 datoteku, Sonarpad radi kao audio plejer. 
+Multimedijalni fajlovi:
+Kada otvorite multimedijalni fajl (MP3, WAV, MP4, AVI), Sonarpad postaje audio plejer.
 Tastaturne komande: 
 SPACE: Reprodukcija / pauza. 
 Strelica desno: Premotava 1 minut unapred. 
@@ -27,6 +19,8 @@ Strelica gore: Pojačava zvuk.
 Strelica dole: Smanjuje zvuk. 
 +: Ubrzava reprodukciju. 
 -: Usporava reprodukciju. 
+- SHIFT +: Povećava visinu tona.
+- SHIFT -: Smanjuje visinu tona.
 Ctrl+I: Najavljuje trenutno vreme reprodukcije. 
 Ctrl+T: Ide na određeno vreme. 
 Ctrl+B: Ubacuje obeleživač na trenutno vreme.
@@ -66,6 +60,14 @@ Obeleživači:
 Ubaci obeleživač: Čuva trenutnu poziciju kursora ili vreme u audio‑knjizi (Ctrl+B). 
 Upravljaj obeleživačima: Pregled, skok na obeleživač ili brisanje sačuvanih obeleživača. Ako datoteka sadrži obeleživače, otvaranje automatski nastavlja od prvog dostupnog.
 
+Glas i audio:
+Čitanje: F5 pokreće čitanje, F4 pauzira ili nastavlja, F6 zaustavlja čitanje. 
+Omiljeni glasovi tokom čitanja: F9 prethodni omiljeni glas, F10 sledeći omiljeni glas. 
+Snimi audio‑knjigu: Kreira MP3 datoteku iz trenutnog teksta (Ctrl+R). 
+Grupno pretvaranje u audio‑knjige: Pretvara listu datoteka u audio‑knjige (Ctrl+Shift+B).
+Snimi podkast: Snima podkast sa mikrofona i/ili sistemskog zvuka (Ctrl+Shift+R).
+Konvertuj audio: Konvertuje audio/video datoteke u druge audio formate (Ctrl+Shift+A).
+
 Alati: 
 Grupno pretvaranje u audio-knjige: Otvara prozor za pretvaranje liste datoteka ili fascikli u audio‑knjige. 
 - Dodaj datoteke ili fascikle u red čekanja. 
@@ -80,6 +82,7 @@ Zamene iz rečnika primenjuju se tokom čitanja i kreiranja audio‑knjiga i aut
 Uvezi YouTube transkript: nalepi link, izaberi jezik i uvezi tekst u uređivač (Ctrl+Y). Opcione vremenske oznake. 
 Pretraga i uvoz sa Wikipedije: pretraga članka i uvoz teksta u uređivač (Alt+Shift+W). 
 Mrežni rečnik: pretraga definicija i prevoda na servisu Wiktionary (Alt+Shift+D).
+Reprodukuj striming audio (Alt+Shift+S): Reprodukuje audio sa streaming sajtova kao što je YouTube, omogućava izbor formata i kvaliteta i omogućava slušanje bez preuzimanja (na primer za onlajn radio).
 Pristupačni terminal: Otvara terminal sa stabilnim izlazom za čitače ekrana (Ctrl+Shift+T). 
 Prečice: Alt+I fokusira unos, Alt+O fokusira izlaz, Tab/Shift+Tab prelazi između unosa, izlaza i opcija. 
 Enter šalje unos. Ctrl+C kopira izlaz (ili prosleđuje komandu za kopiranje programu). Ctrl+L briše izlaz uz potvrdu.
@@ -95,20 +98,60 @@ Podkasti: Otvara prozor podkasta za pretragu i upravljanje pretplatama.
 U listi epizoda, Enter pokreće reprodukciju epizode. 
 Tokom reprodukcije, Escape zaustavlja podkast i vraća te u biblioteku.
 
-Opcije: 
-Jezik: Menja jezik izgleda programa. 
-Način otvaranja: Otvara datoteke u novoj kartici ili novom prozoru. 
-Glas: Izbor glasa za čitanje. 
-Višejezični glasovi: Filter liste glasova. 
-Visina, brzina i jačina: Podešavanje za glasove (Microsoft i SAPI5). Važi za čitanje i audio‑knjige. 
-Pomeraj kursor tokom čitanja: Vizuelno prati tekst tokom čitanja. 
-Podela audio‑knjige po tekstu: Deli kada se marker pojavi na početku reda (razlikuje velika i mala slova: „Poglavlje“ i „poglavlje“ su različiti). Primer: sa markerom „Poglavlje“ pravi jednu celinu po poglavlju, uključujući autora i uvod u prvu celinu do prvog poglavlja. Ako marker ne postoji, nema podele.
-Ostale podele: 2 dela, 4 dela, 6 delova, 8 delova.
+Opcije
+Prozor Opcije omogućava prilagođavanje ponašanja programa Sonarpad. Podešavanja su podeljena u različite kartice.
+Kartica Opšte
+Jezik interfejsa: omogućava izbor jezika programa.
+Otvaranje fajlova (nova kartica / novi prozor): sa opcijom Nova kartica možete prelaziti između otvorenih fajlova pomoću Ctrl+Tab. Sa opcijom Novi prozor možete prelaziti između prozora pomoću Alt+Tab.
+Provera ažuriranja pri pokretanju: automatski proverava dostupnost ažuriranja pri pokretanju programa.
+Slanje anonimnih izveštaja o greškama: automatski šalje anonimne izveštaje o greškama autoru programa.
+Dodaj u kontekstni meni „Otvori pomoću Sonarpad”: dodaje opciju u File Explorer za direktno otvaranje fajlova u Sonarpad-u.
+Povezivanje fajlova: otvara Windows prozor za upravljanje povezivanjem fajlova koje Sonarpad podržava.
+Globalni proxy: omogućava podešavanje proxy servera koji će se koristiti za sve veze programa.
+Kartica Glas
+TTS motor (Microsoft / SAPI5 / SAPI4): omogućava izbor govornog motora za čitanje.
+Glavni glas: omogućava izbor glasa koji se koristi za čitanje teksta. Za Edge glasove dostupno je dodatno polje za filtriranje po jeziku i opcija „Samo višejezični glasovi”.
+Pregled glasa: reprodukuje primer izabranog glasa.
+Visina tona, brzina i jačina zvuka: omogućavaju podešavanje ovih parametara.
+Drugi glas za dijaloge: ako je aktivirano, koristi drugačiji glas za delove teksta koji su dijalozi.
+Prvi glas za dijaloge (opciono): omogućava postavljanje posebnog glasa za dijaloge.
+Drugi glas za dijaloge (opciono): omogućava dodavanje drugog glasa za dijaloge.
+Ako su aktivirani, Sonarpad može koristiti do tri različita glasa.
+Kartica Editor
+Automatsko prelamanje reda: uključuje ili isključuje automatsko prelamanje teksta.
+Širina reda: određuje maksimalan broj znakova po redu.
+Pametni navodnici: automatski zamenjuju obične navodnike tipografskim.
+Provera pravopisa: uključuje proveru pravopisa za trenutno izabrani jezik.
+Jezik prevoda rečnika: postavlja ciljni jezik za onlajn rečnik.
+Jezik Wikipedije: bira jezik za pretragu na Wikipediji.
+Kartica Audio
+Interval preskakanja napred/nazad: određuje broj sekundi za preskakanje tokom reprodukcije.
+Podrazumevana fascikla za audio-knjige: postavlja odredišnu fasciklu za generisane audio-knjige.
+Podela audio-knjige: bez podele, podela po tekstu, podela na određeni broj delova ili podela po trajanju.
+Opcije titlova: omogućavaju izbor načina upravljanja titlovima tokom reprodukcije multimedijalnih fajlova.
+Kartica RSS i Podcast
+Ograničenje keša za podkaste: određuje maksimalan prostor za preuzete podkaste.
+Podcast Index (API key / API secret): unos podataka za Podcast Index.
+Potvrda brisanja RSS/Podcast: prikazuje poruku potvrde pre brisanja stavke.
+Obaveštenje o statusu nepročitano/nepreslušano: pokazuje da li je stavka već pročitana ili preslušana.
+Prikaz datuma/vremena: omogućava prilagođavanje prikaza datuma i vremena.
+Brzo kopiranje RSS: omogućava izbor sadržaja koji će biti kopiran pomoću Ctrl+C.
+Kartica Prečice
+Lista komandi sa izmenjivim prečicama na tastaturi.
+Snimanje nove kombinacije tastera.
+Vraćanje podrazumevanih prečica.
+Prozor: otvara meni Prozor.
+Otvoreni dokumenti...: prikazuje listu otvorenih dokumenata.
+Zatvori ostale: zatvara sve dokumente osim aktivnog.
+Zatvori sve: zatvara sve otvorene dokumente.
 
 Pomoć: 
 Vodič: Otvara ovaj vodič (F1). 
 Proveri ažuriranja: Proverava dostupna ažuriranja (F2). 
 Lista izmena: Otvara prozor sa izmenama. 
 O programu: Prikazuje informacije o programu.
+
+
+
 
 

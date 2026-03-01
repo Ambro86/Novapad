@@ -6,18 +6,10 @@ Open: Open text files, PDFs, EPUBs, MP3s, and other supported formats (Ctrl+O).
 Save: Save the document (Ctrl+S).
 Save As: Save with a new name.
 Save All: Save all documents (Ctrl+Shift+S).
-Close Tab: Close the current document (Ctrl+W).
 Recent Files: Open a recent file.
 
-Voice and audio:
-Reading: F5 Start Reading, F4 Pause/Resume, F6 Stop Reading.
-Favorites during reading: F9 previous favorite voice, F10 next favorite voice.
-Record Audiobook: Create an MP3 file from the current text (Ctrl+R).
-Batch Audiobooks: Convert a list of files into audiobooks (Ctrl+Shift+B).
-Record Podcast: Record a podcast from microphone and/or system audio (Ctrl+Shift+R).
-Convert Audio: Convert audio/video files to other audio formats (Ctrl+Shift+A).
-MP3 Audiobooks:
-When you open an MP3 file, Sonarpad acts as an audio player.
+Multimedia Files:
+When you open a multimedia file (MP3, WAV, MP4, AVI), Sonarpad becomes an audio player.
 Keyboard controls:
 - SPACE: Play / Pause.
 - RIGHT ARROW: Fast forward 1 minute.
@@ -26,6 +18,8 @@ Keyboard controls:
 - DOWN ARROW: Decrease volume.
 - +: Increase playback speed.
 - -: Decrease playback speed.
+- SHIFT +: Increase the pitch.
+- SHIFT -: Decrease the pitch.
 - CTRL+I: Announce playback time.
 - CTRL+T: Go to a specific time.
 - CTRL+B: Insert a bookmark at the exact time.
@@ -65,6 +59,14 @@ Bookmarks:
 Insert Bookmark: Save the current cursor position or audiobook time (Ctrl+B).
 Manage Bookmarks: View, jump to, or delete saved bookmarks. When opening a file with bookmarks, the cursor or playback will automatically resume from the first available one.
 
+Voice and audio:
+Reading: F5 Start Reading, F4 Pause/Resume, F6 Stop Reading.
+Favorites during reading: F9 previous favorite voice, F10 next favorite voice.
+Record Audiobook: Create an MP3 file from the current text (Ctrl+R).
+Batch Audiobooks: Convert a list of files into audiobooks (Ctrl+Shift+B).
+Record Podcast: Record a podcast from microphone and/or system audio (Ctrl+Shift+R).
+Convert Audio: Convert audio/video files to other audio formats (Ctrl+Shift+A).
+
 Tools:
 Batch Audiobooks: Opens a window to convert a list of files (or entire folders) into audiobooks.
 - Add files/folders to the queue.
@@ -79,6 +81,7 @@ Dictionary replacements are applied during reading and audiobook creation and ar
 Import YouTube transcript: paste a URL, choose the language, and import the text into the editor (Ctrl+Y). Optional timestamps.
 Search and import from Wikipedia: search for an article on Wikipedia and import its text into the editor (Alt+Shift+W).
 Online dictionary: search for definitions and translations in the online Wiktionary (Alt+Shift+D).
+Play Streaming Audio (Alt+Shift+S): Plays audio from streaming websites such as YouTube, allows you to choose the format and quality, and lets you listen without downloading (for example, for online radio).
 Accessible Terminal: Opens a dedicated terminal with stable output for screen readers (Ctrl+Shift+T).
 Shortcuts: Alt+I focuses input, Alt+O focuses output, Tab/Shift+Tab moves between input, output, and options.
 Enter sends the input. Ctrl+C copies the output (or sends Ctrl+C to the program). Ctrl+L clears the output with confirmation.
@@ -93,20 +96,60 @@ Podcasts: Opens the Podcasts window to search and manage subscriptions.
 In the episode list, press Enter to play the episode.
 During playback, Esc stops the podcast and returns to the library.
 
-Options:
-Language: Change interface language.
-Open Behavior: Open files in a new tab or a new window.
-Voice: Choose voice for reading.
-Multilingual Voices: Filter voice list.
-Choose pitch, speed, and volume: Set pitch, speed, and volume for voices (both Microsoft and SAPI5). Applies to reading and audiobooks.
-Move cursor during reading: Visually follow the text as it is being read.
-Audiobook split by text: Split when the marker appears at the start of a line (case sensitive: "Chapter" and "chapter" are different). Example: with "Chapter" it creates one part per chapter, including author and introduction in the first part up to the first Chapter. If not found, no split.
-Other options to split the audiobook: 2 parts, 4 parts, 6 parts, 8 parts.
+Options
+The Options window allows you to customize the behavior of Sonarpad. Settings are divided into different tabs.
+General Tab
+Interface language: lets you choose the language of the program.
+File opening (new tab / new window): with New tab you can switch between open files using Ctrl+Tab. With New window you can switch between windows using Alt+Tab.
+Check for updates at startup: automatically checks for updates when the program starts.
+Send anonymous crash reports: automatically sends anonymous error reports to the program author.
+Add to context menu “Open with Sonarpad”: adds an entry in File Explorer to open files directly with Sonarpad.
+File associations: opens the Windows dialog to manage file associations supported by Sonarpad.
+Global proxy: allows you to configure a proxy to be used for all program connections.
+Voice Tab
+TTS Engine (Microsoft / SAPI5 / SAPI4): lets you choose the speech engine used during reading.
+Main voice: allows you to select the voice used for reading the text. For Edge voices, a second field is available to filter voices by language and the “Multilingual voices only” option.
+Voice preview: plays a sample of the selected voice.
+Pitch, speed and volume: allow you to adjust these parameters.
+Different voice for dialogues: if enabled, allows a different voice to be used for dialogue parts.
+First dialogue voice (optional): allows you to set a specific voice for dialogues.
+Second dialogue voice (optional): allows you to add a second voice for dialogues.
+If enabled, Sonarpad can use up to three different voices.
+Editor Tab
+Automatic line wrap: enables or disables automatic line wrapping.
+Line width: sets the maximum number of characters per line.
+Smart quotes: automatically replaces straight quotes with typographic quotes.
+Spell check: enables the spell checker for the current language.
+Dictionary translation language: sets the target language for the online dictionary.
+Wikipedia language: selects the language used for Wikipedia searches.
+Audio Tab
+Forward/backward jump interval: defines how many seconds to skip forward or backward during playback.
+Default audiobook folder: sets the destination folder for generated audiobooks.
+Audiobook splitting: no split, split by text, split into a specific number of parts, or split by duration.
+Subtitle options: allows you to choose how subtitles are handled during media playback.
+RSS and Podcast Tab
+Podcast cache limit: defines the maximum space used for downloaded podcasts.
+Podcast Index (API key / API secret): enter credentials for Podcast Index.
+Confirm RSS/Podcast deletion: shows a confirmation message before deleting items.
+Unread/unplayed status announcement: indicates whether an item has been read or played.
+Date/time display: allows customization of date and time display.
+Quick RSS copy: lets you choose what is copied with Ctrl+C.
+Shortcuts Tab
+List of commands with editable shortcuts.
+Record new key combination.
+Restore default shortcuts.
+Window: opens the Window menu.
+Open Documents...: shows the list of open documents.
+Close Others: closes all documents except the active one.
+Close All: closes all open documents.
 
 Help:
 Guide: Open this guide (F1).
 Check for updates: Check if updates are available (F2).
 Changelog: Opens the changelog window.
 About: Shows program information.
+
+
+
 
 

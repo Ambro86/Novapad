@@ -6,18 +6,10 @@ Abrir: abrir arquivos de texto, PDF, EPUB, MP3 e outros formatos suportados (Ctr
 Salvar: salvar o documento (Ctrl+S).
 Salvar como: salvar com um novo nome.
 Salvar tudo: salvar todos os documentos (Ctrl+Shift+S).
-Fechar aba: fechar o documento atual (Ctrl+W).
 Arquivos recentes: abrir um arquivo recente.
 
-Voz e audio:
-Leitura: F5 iniciar leitura, F4 pausar/retomar, F6 parar leitura.
-Favoritos durante leitura: F9 voz favorita anterior, F10 voz favorita seguinte.
-Gravar audiolivro: criar um arquivo MP3 a partir do texto atual (Ctrl+R).
-Audiolivros em lote: converter uma lista de arquivos em audiolivros (Ctrl+Shift+B).
-Gravar podcast: gravar um podcast do microfone e/ou audio do sistema (Ctrl+Shift+R).
-Converter audio: converter arquivos de audio/video para outros formatos de audio (Ctrl+Shift+A).
-Audiolivros MP3:
-Ao abrir um arquivo MP3, Sonarpad funciona como reprodutor de audio.
+Arquivos multimídia:
+Quando você abre um arquivo multimídia (MP3, WAV, MP4, AVI), o Sonarpad se torna um reprodutor de áudio.
 Controles de teclado:
 - ESPACO: Reproduzir / Pausar.
 - SETA DIREITA: Avancar 1 minuto.
@@ -26,6 +18,8 @@ Controles de teclado:
 - SETA PARA BAIXO: Diminuir volume.
 - +: Aumentar a velocidade de reproducao.
 - -: Diminuir a velocidade de reproducao.
+- SHIFT +: Aumenta o tom.
+- SHIFT -: Diminui o tom.
 - CTRL+I: Anunciar o tempo de reproducao.
 - CTRL+T: Ir para um tempo especifico.
 - CTRL+B: Inserir um marcador no tempo exato.
@@ -65,6 +59,14 @@ Marcadores:
 Inserir marcador: salvar a posicao atual do cursor ou o tempo do audiolivro (Ctrl+B).
 Gerenciar marcadores: ver, ir ou excluir marcadores salvos. Ao abrir um arquivo com marcadores, o cursor ou a reproducao retomara automaticamente no primeiro disponivel.
 
+Voz e audio:
+Leitura: F5 iniciar leitura, F4 pausar/retomar, F6 parar leitura.
+Favoritos durante leitura: F9 voz favorita anterior, F10 voz favorita seguinte.
+Gravar audiolivro: criar um arquivo MP3 a partir do texto atual (Ctrl+R).
+Audiolivros em lote: converter uma lista de arquivos em audiolivros (Ctrl+Shift+B).
+Gravar podcast: gravar um podcast do microfone e/ou audio do sistema (Ctrl+Shift+R).
+Converter audio: converter arquivos de audio/video para outros formatos de audio (Ctrl+Shift+A).
+
 Ferramentas:
 Audiolivros em Lote: abre a janela para converter uma lista de arquivos (ou pastas inteiras) em audiolivros.
 - Adicione arquivos/pastas a fila.
@@ -79,6 +81,7 @@ As substituicoes do dicionario sao aplicadas durante a leitura e criacao de audi
 Importar transcricao do YouTube: cole uma URL, escolha o idioma e importe o texto para o editor (Ctrl+Y). Opcional com timestamps.
 Pesquisar e importar do Wikipedia: pesquisar um artigo na Wikipedia e importar o texto para o editor (Alt+Shift+W).
 Dicionario online: pesquisar definicoes e traducoes no Wiktionary online (Alt+Shift+D).
+Reproduzir áudio em streaming (Alt+Shift+S): Reproduz áudio de sites de streaming como o YouTube, permite escolher o formato e a qualidade e permite ouvir sem baixar (por exemplo, para rádio online).
 Terminal acessivel: abre um terminal dedicado com saida estavel para leitores de tela (Ctrl+Shift+T).
 RSS / Artigos: abre a janela RSS/Artigos, adicione fontes, expanda um feed e pressione Enter para importar um artigo para o editor.
 Na janela RSS, selecione um feed ou site e pressione Delete para remove-lo da biblioteca.
@@ -88,20 +91,60 @@ Podcast: abre a janela Podcasts para buscar e gerenciar assinaturas.
 Na lista de episodios, pressione Enter para reproduzir o episodio.
 Durante a reproducao, Esc para o podcast e volta a biblioteca.
 
-Opcoes:
-Idioma: alterar o idioma da interface.
-Comportamento de abertura: abrir arquivos em nova aba ou nova janela.
-Voz: escolher a voz para leitura.
-Vozes multilingues: filtrar a lista de vozes.
-Escolher tom, velocidade e volume: ajustar tom, velocidade e volume para as vozes (Microsoft e SAPI5). Aplica a leitura e audiolivros.
-Mover cursor durante leitura: seguir visualmente o texto enquanto e lido.
-Divisao de audiolivro por texto: dividir quando o marcador aparece no inicio da linha (sensivel a maiusculas: "Chapter" e "chapter" sao diferentes). Exemplo: com "Chapter" cria uma parte por capitulo, incluindo autor e introducao na primeira parte ate o primeiro Chapter. Se nao encontrado, nao divide.
-Outras opcoes para dividir o audiolivro: 2 partes, 4 partes, 6 partes, 8 partes.
+Opções
+A janela Opções permite personalizar o comportamento do Sonarpad. As configurações estão divididas em diferentes abas.
+Aba Geral
+Idioma da interface: permite escolher o idioma do programa.
+Abertura de arquivos (nova aba / nova janela): com Nova aba você pode alternar entre os arquivos abertos usando Ctrl+Tab. Com Nova janela você pode alternar entre janelas usando Alt+Tab.
+Verificar atualizações ao iniciar: verifica automaticamente se há atualizações quando o programa é iniciado.
+Enviar relatórios de erro anônimos: envia automaticamente relatórios de erro anônimos ao autor do programa.
+Adicionar ao menu de contexto “Abrir com Sonarpad”: adiciona uma opção no Explorador de Arquivos para abrir arquivos diretamente com o Sonarpad.
+Associações de arquivos: abre a janela do Windows para gerenciar as associações dos arquivos suportados pelo Sonarpad.
+Proxy global: permite configurar um proxy para ser usado em todas as conexões do programa.
+Aba Voz
+Motor TTS (Microsoft / SAPI5 / SAPI4): permite escolher o motor de voz utilizado durante a leitura.
+Voz principal: permite selecionar a voz usada para a leitura do texto. Para as vozes Edge, há um segundo campo para filtrar por idioma e a opção “Somente vozes multilíngues”.
+Pré-visualização da voz: reproduz um exemplo da voz selecionada.
+Tom, velocidade e volume: permitem ajustar esses parâmetros.
+Voz diferente para diálogos: se ativado, permite usar uma voz diferente para as partes dialogadas.
+Primeira voz para diálogos (opcional): permite definir uma voz específica para diálogos.
+Segunda voz para diálogos (opcional): permite adicionar uma segunda voz para diálogos.
+Se ativadas, o Sonarpad pode utilizar até três vozes diferentes.
+Aba Editor
+Quebra automática de linha: ativa ou desativa a quebra automática de linha.
+Largura da linha: define o número máximo de caracteres por linha.
+Aspas inteligentes: substitui automaticamente aspas simples por aspas tipográficas.
+Corretor ortográfico: ativa a verificação ortográfica para o idioma em uso.
+Idioma de tradução do dicionário: define o idioma de destino do dicionário online.
+Idioma da Wikipédia: seleciona o idioma utilizado para pesquisas na Wikipédia.
+Aba Áudio
+Intervalo de salto para frente/para trás: define quantos segundos avançar ou retroceder durante a reprodução.
+Pasta padrão de audiolivros: define a pasta de destino dos audiolivros gerados.
+Divisão do audiolivro: sem divisão, dividir por texto, dividir em um número específico de partes ou dividir por duração.
+Opções de legendas: permite escolher como as legendas são tratadas durante a reprodução de arquivos multimídia.
+Aba RSS e Podcast
+Limite de cache de podcasts: define o espaço máximo utilizado para podcasts baixados.
+Podcast Index (API key / API secret): permite inserir as credenciais do Podcast Index.
+Confirmar exclusão de RSS/Podcast: exibe uma mensagem de confirmação antes de excluir itens.
+Anúncio de status não lido/não reproduzido: indica se um item já foi lido ou reproduzido.
+Exibição de data/hora: permite personalizar a forma como a data e a hora são exibidas.
+Cópia rápida RSS: permite escolher o que será copiado com Ctrl+C.
+Aba Atalhos
+Lista de comandos com atalhos editáveis.
+Registrar nova combinação de teclas.
+Restaurar atalhos padrão.
+Janela: abre o menu Janela.
+Documentos abertos...: mostra a lista de documentos abertos.
+Fechar os restantes: fecha todos os documentos exceto o ativo.
+Fechar tudo: fecha todos os documentos abertos.
 
 Ajuda:
 Guia: abrir este guia (F1).
 Verificar atualizacoes: verificar se ha atualizacoes (F2).
 Changelog: abrir a janela de alteracoes.
 Sobre: mostrar informacoes do programa.
+
+
+
 
 

@@ -6,18 +6,10 @@ Ny: skapar ett nytt dokument (Ctrl+N).
 Spara: sparar dokumentet (Ctrl+S).
 Spara som: sparar med ett nytt namn.
 Spara alla: sparar alla dokument (Ctrl+Shift+S).
-Stäng flik: stänger det aktuella dokumentet (Ctrl+W).
 Senaste filer: öppnar en nyligen använd fil.
 
-Röst och ljud:
-Läsning: F5 startar läsning, F4 pausa/återuppta, F6 stoppa läsning.
-Favoriter under läsning: F9 föregående favoritröst, F10 nästa favoritröst.
-Spela in ljudbok: skapar en MP3-fil från den aktuella texten (Ctrl+R).
-Batch-ljudböcker: konverterar en lista med filer till ljudböcker (Ctrl+Shift+B).
-Skapa podd: skapar en podd från mikrofon och/eller systemljud (Ctrl+Shift+R).
-Konvertera ljud: konverterar ljud-/videofiler till andra ljudformat (Ctrl+Shift+A).
-MP3-ljudböcker:
-När du öppnar en MP3-fil blir Sonarpad en ljudspelare.
+Multimediefiler:
+När du öppnar en multimediefil (MP3, WAV, MP4, AVI) blir Sonarpad en ljudspelare.
 Tangentbordskommandon:
 
 * MELLANSLAG: Spela / Pausa.
@@ -27,6 +19,8 @@ Tangentbordskommandon:
 * NEDPIL: Sänk volymen.
 * +: Öka uppspelningshastigheten.
 * -: Sänk uppspelningshastigheten.
+- SHIFT +: Höjer tonhöjden.
+- SHIFT -: Sänker tonhöjden.
 * CTRL+I: Avisera uppspelningstiden.
 * CTRL+T: Gå till en specifik tid.
 * CTRL+B: Infoga ett bokmärke vid exakt minut.
@@ -66,6 +60,14 @@ Bokmärken:
 Infoga bokmärke: sparar den aktuella markörpositionen eller ljudbokstiden (Ctrl+B).
 Hantera bokmärken: visa, hoppa till eller ta bort sparade bokmärken. När en fil med bokmärken öppnas startar markören eller uppspelningen automatiskt från det första tillgängliga.
 
+Röst och ljud:
+Läsning: F5 startar läsning, F4 pausa/återuppta, F6 stoppa läsning.
+Favoriter under läsning: F9 föregående favoritröst, F10 nästa favoritröst.
+Spela in ljudbok: skapar en MP3-fil från den aktuella texten (Ctrl+R).
+Batch-ljudböcker: konverterar en lista med filer till ljudböcker (Ctrl+Shift+B).
+Skapa podd: skapar en podd från mikrofon och/eller systemljud (Ctrl+Shift+R).
+Konvertera ljud: konverterar ljud-/videofiler till andra ljudformat (Ctrl+Shift+A).
+
 Verktyg:
 Satsvis ljudböcker: öppnar fönstret för att konvertera en lista med filer (eller hela mappar) till ljudböcker.
 
@@ -81,6 +83,7 @@ Ordlisteersättningar tillämpas under läsning och skapande av ljudbok och spar
 Importera transkriptering från YouTube: klistra in en URL, välj språk och importera texten i redigeraren (Ctrl+Y). Alternativ för att inkludera tidsstämplar.
 Sök och importera från Wikipedia: söker efter en artikel på Wikipedia och importerar texten till redigeraren (Alt+Shift+W).
 Online-ordlista: sök definitioner och översättningar i Wiktionary online (Alt+Shift+D).
+Spela strömmande ljud (Alt+Shift+S): Spelar ljud från streamingwebbplatser som YouTube, låter dig välja format och kvalitet och gör det möjligt att lyssna utan att ladda ner (till exempel för nätradio).
 Tillgänglig terminal: öppnar en dedikerad terminal med separat och stabil utdata för skärmläsare (Ctrl+Shift+T).
 Genvägar: Alt+I fokusera inmatning, Alt+O fokusera utdata, Tab/Shift+Tab för att flytta mellan inmatning, utdata och alternativ.
 Enter skickar texten. Ctrl+C kopierar utdata (eller skickar Ctrl+C till programmet). Ctrl+L rensar utdata med bekräftelse.
@@ -95,19 +98,59 @@ Poddar: öppnar Podd-fönstret för att söka och hantera prenumerationer.
 I avsnittslistan, tryck på Enter för att spela upp avsnittet.
 Under uppspelning stoppar Esc podden och återgår till biblioteket.
 
-Alternativ:
-Språk: ändrar gränssnittsspråket.
-Filöppning: öppnar filer i ny flik eller nytt fönster.
-Välj röst: väljer rösten för läsning.
-Endast flerspråkiga röster: filtrerar röstlistan.
-Välj tonhöjd, hastighet och volym: ställer in rösternas tonhöjd, hastighet och volym (både Microsoft och SAPI5). Gäller för läsning och ljudböcker.
-Flytta markör under läsning: följer texten visuellt medan den läses.
-Uppdelning av ljudbok efter text: delar ljudboken när den angivna texten visas i början av raden (skiftlägeskänslig: "Kapitel" och "kapitel" är olika). Exempel: med "Kapitel" skapas en del för varje kapitel, inklusive författare och introduktion i den första delen fram till det första kapitlet. Om det inte hittas, ingen uppdelning.
-Andra alternativ för att dela ljudboken: 2 delar, 4 delar, 6 delar, 8 delar.
+Alternativ
+Fönstret Alternativ låter dig anpassa hur Sonarpad fungerar. Inställningarna är uppdelade i olika flikar.
+Fliken Allmänt
+Gränssnittsspråk: låter dig välja programmets språk.
+Filöppning (ny flik / nytt fönster): med Ny flik kan du växla mellan öppna filer med Ctrl+Tab. Med Nytt fönster kan du växla mellan fönster med Alt+Tab.
+Sök efter uppdateringar vid start: kontrollerar automatiskt om det finns uppdateringar när programmet startas.
+Skicka anonyma kraschrapporter: skickar automatiskt anonyma felrapporter till programmets utvecklare.
+Lägg till i snabbmenyn ”Öppna med Sonarpad”: lägger till ett alternativ i Utforskaren för att öppna filer direkt med Sonarpad.
+Filassociationer: öppnar Windows-fönstret för att hantera filassociationer som stöds av Sonarpad.
+Global proxy: gör det möjligt att konfigurera en proxy som används för alla programmets anslutningar.
+Fliken Röst
+TTS-motor (Microsoft / SAPI5 / SAPI4): låter dig välja talsyntesmotor för uppläsning.
+Huvudröst: låter dig välja den röst som används för att läsa texten. För Edge-röster finns ett extra fält för att filtrera efter språk samt alternativet ”Endast flerspråkiga röster”.
+Förhandsgranskning av röst: spelar upp ett exempel med den valda rösten.
+Tonhöjd, hastighet och volym: gör det möjligt att justera dessa parametrar.
+Annan röst för dialoger: om aktiverad används en annan röst för dialogdelar.
+Första dialogröst (valfri): gör det möjligt att ange en särskild röst för dialoger.
+Andra dialogröst (valfri): gör det möjligt att lägga till en andra dialogröst.
+Om aktiverade kan Sonarpad använda upp till tre olika röster.
+Fliken Redigerare
+Automatisk radbrytning: aktiverar eller inaktiverar automatisk radbrytning.
+Radbredd: anger maximalt antal tecken per rad.
+Smarta citattecken: ersätter automatiskt raka citattecken med typografiska.
+Stavningskontroll: aktiverar stavningskontroll för aktuellt språk.
+Språk för ordboksöversättning: anger målspråk för onlineordboken.
+Wikipedia-språk: väljer språk för Wikipedia-sökningar.
+Fliken Ljud
+Intervall för framåt/bakåt-hopp: anger hur många sekunder du hoppar framåt eller bakåt under uppspelning.
+Standardmapp för ljudböcker: anger målmappen för genererade ljudböcker.
+Uppdelning av ljudbok: ingen uppdelning, dela efter text, dela i ett visst antal delar eller dela efter längd.
+Undertextalternativ: låter dig välja hur undertexter hanteras under uppspelning av mediefiler.
+Fliken RSS och Podcast
+Gräns för podcastcache: anger maximalt utrymme för nedladdade poddar.
+Podcast Index (API key / API secret): ange inloggningsuppgifter för Podcast Index.
+Bekräfta borttagning av RSS/Podcast: visar en bekräftelse innan objekt tas bort.
+Meddelande om oläst/ospelad status: visar om ett objekt har lästs eller spelats upp.
+Visning av datum/tid: låter dig anpassa hur datum och tid visas.
+Snabbkopiering av RSS: låter dig välja vad som kopieras med Ctrl+C.
+Fliken Kortkommandon
+Lista över kommandon med redigerbara kortkommandon.
+Registrera ny tangentkombination.
+Återställ standardkortkommandon.
+Fönster: öppnar menyn Fönster.
+Öppna dokument...: visar listan över öppna dokument.
+Stäng övriga: stänger alla dokument utom det aktiva.
+Stäng alla: stänger alla öppna dokument.
 
 Hjälp:
 Guide: öppnar denna guide (F1).
 Sök efter uppdateringar: kontrollerar om det finns uppdateringar (F2).
 Ändringslogg: visar ändringsloggen.
 Om programmet: visar information om programmet.
+
+
+
 

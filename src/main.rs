@@ -3488,6 +3488,13 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 return LRESULT(0);
             }
 
+            let show_confirmation =
+                with_state(hwnd, |state| state.settings.show_media_save_confirmation)
+                    .unwrap_or(true);
+            if !show_confirmation {
+                return LRESULT(0);
+            }
+
             let path_text = payload.target_path.to_string_lossy().to_string();
             let saved_line = i18n::tr_f(
                 payload.language,

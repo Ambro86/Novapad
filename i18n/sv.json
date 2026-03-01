@@ -228,6 +228,7 @@
   "options.label.audio_skip": "Hoppintervall media:",
   "options.label.audiobook_save_folder": "Standardmapp för ljudböcker:",
   "options.label.audiobook_bitrate": "Ljudbokens bithastighet (kbps):",
+  "options.label.show_media_save_confirmation": "Visa bekräftelse efter att avsnitt/streaming har sparats",
   "options.label.audio_split": "Dela upp ljudbok i:",
   "options.label.audio_split_text": "Text för delningsmarkör:",
   "options.label.audio_split_requires_newline": "Kräv markören i början av raden",

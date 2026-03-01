@@ -231,6 +231,7 @@
   "options.label.prompt_strip_ansi": "Rimuovi sequenze ANSI nel terminale",
   "options.label.audio_skip": "Spostamento media (frecce):",
   "options.label.audiobook_save_folder": "Cartella predefinita audiolibri:",
+  "options.label.show_media_save_confirmation": "Mostra conferma dopo il salvataggio di un episodio o stream",
   "options.label.audiobook_bitrate": "Bitrate audiolibro (kbps):",
   "options.label.audio_split": "Dividi l'audiolibro in:",
   "options.label.audio_split_text": "Testo per divisione:",

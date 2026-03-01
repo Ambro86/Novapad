@@ -232,6 +232,7 @@
   "options.label.audio_skip": "Interval přeskočení médií:",
   "options.label.audiobook_save_folder": "Výchozí složka audioknih:",
   "options.label.audiobook_bitrate": "Audiobook bitrate (kbps):",
+  "options.label.show_media_save_confirmation": "Zobrazit potvrzení po uložení epizody/streamu",
   "options.label.audio_split": "Rozdělit audioknihu na:",
   "options.label.audio_split_text": "Text značky rozdělení:",
   "options.label.audio_split_requires_newline": "Vyžadovat značku na začátku řádku",

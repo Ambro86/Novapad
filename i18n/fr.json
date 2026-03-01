@@ -232,6 +232,7 @@
   "options.label.audio_skip": "Intervalle de saut média :",
   "options.label.audiobook_save_folder": "Dossier par défaut des livres audio :",
   "options.label.audiobook_bitrate": "Débit de l'audiolivre (kbps) :",
+  "options.label.show_media_save_confirmation": "Afficher une confirmation après l’enregistrement de l’épisode/streaming",
   "options.label.audio_split": "Diviser l'audiolivre en :",
   "options.label.audio_split_text": "Texte du marqueur de division :",
   "options.label.audio_split_requires_newline": "Exiger le marqueur en début de ligne",

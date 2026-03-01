@@ -989,6 +989,7 @@
   "options.label.podcastindex_secret": "Secreto de la API de Podcast Index:",
   "menu.dictionary": "Diccionario y &voz\tCtrl+Shift+D",
   "options.label.audiobook_bitrate": "Tasa de bits del audiolibro (kbps):",
+  "options.label.show_media_save_confirmation": "Mostrar confirmación después de guardar episodio/transmisión",
   "reader.no_title_fallback": "Sin título (predeterminado)",
   "rss.error.empty_url": "URL vacía",
   "rss.error.retries_exhausted": "Número máximo de intentos alcanzado",

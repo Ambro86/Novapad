@@ -231,6 +231,7 @@
   "options.label.prompt_strip_ansi": "Terminal strip ANSI sequences",
   "options.label.audio_skip": "Media skip interval:",
   "options.label.audiobook_save_folder": "Default audiobook folder:",
+  "options.label.show_media_save_confirmation": "Show confirmation after saving an episode/stream",
   "options.label.audiobook_bitrate": "Audiobook bitrate (kbps):",
   "options.label.audio_split": "Split audiobook into:",
   "options.label.audio_split_text": "Split marker text:",

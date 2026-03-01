@@ -536,6 +536,8 @@ pub struct AppSettings {
     pub podcast_include_video: bool,
     pub podcast_monitor_id: String,
     pub podcast_cache_limit_mb: u32,
+    #[serde(default = "default_true")]
+    pub show_media_save_confirmation: bool,
     pub podcast_index_api_key: String,
     pub podcast_index_api_secret: String,
     pub youtube_include_timestamps: bool,
@@ -792,6 +794,7 @@ impl Default for AppSettings {
             podcast_include_video: false,
             podcast_monitor_id: String::new(),
             podcast_cache_limit_mb: 500,
+            show_media_save_confirmation: true,
             podcast_index_api_key: String::new(),
             podcast_index_api_secret: String::new(),
             youtube_include_timestamps: true,

@@ -232,6 +232,7 @@
   "options.label.audio_skip": "Interval preskakanja medija:",
   "options.label.audiobook_save_folder": "Podrazumevana fascikla za audio-knjige:",
   "options.label.audiobook_bitrate": "Bitrejt audio-knjige (kbps):",
+  "options.label.show_media_save_confirmation": "Prikaži potvrdu nakon čuvanja epizode/strimovanja",
   "options.label.audio_split": "Podeli audio-knjigu na:",
   "options.label.audio_split_text": "Tekst oznake za razdvajanje",
   "options.label.audio_split_requires_newline": "Opcija zahteva novi red (Enter).",

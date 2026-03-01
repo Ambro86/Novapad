@@ -207,6 +207,7 @@
   "options.label.audio_skip": "媒体跳过间隔：",
   "options.label.audiobook_save_folder": "默认有声读物文件夹：",
   "options.label.audiobook_bitrate": "有声书比特率（千比特每秒）：",
+  "options.label.show_media_save_confirmation": "保存剧集/流媒体后显示确认提示",
   "options.label.audio_split": "将有声书拆分为：",
   "options.label.audio_split_text": "分割标记文本：",
   "options.label.audio_split_requires_newline": "要求标记位于行首",

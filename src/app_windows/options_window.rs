@@ -81,6 +81,7 @@ const OPTIONS_ID_DIALOGUE_VOICE_VOLUME_EDIT: usize = 6100;
 const OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_RATE_EDIT: usize = 6101;
 const OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_PITCH_EDIT: usize = 6102;
 const OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_VOLUME_EDIT: usize = 6103;
+const OPTIONS_ID_SHOW_MEDIA_SAVE_CONFIRMATION: usize = 6104;
 const OPTIONS_ID_AUDIO_SKIP: usize = 6010;
 const OPTIONS_ID_AUDIO_SPLIT: usize = 6011;
 const OPTIONS_ID_AUDIOBOOK_SAVE_FOLDER: usize = 6064;
@@ -669,6 +670,7 @@ struct OptionsDialogState {
     label_audiobook_save_folder: HWND,
     edit_audiobook_save_folder: HWND,
     button_audiobook_save_folder_browse: HWND,
+    checkbox_show_media_save_confirmation: HWND,
     label_audio_split: HWND,
     combo_audio_split: HWND,
     label_audio_split_minutes: HWND,
@@ -886,6 +888,7 @@ struct OptionsLabels {
     label_audio_skip: String,
     label_audiobook_save_folder: String,
     label_audiobook_save_folder_browse: String,
+    label_show_media_save_confirmation: String,
     label_audio_split: String,
     label_audio_split_minutes: String,
     label_audio_split_parts_count: String,
@@ -1070,6 +1073,10 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_audio_skip: i18n::tr(language, "options.label.audio_skip"),
         label_audiobook_save_folder: i18n::tr(language, "options.label.audiobook_save_folder"),
         label_audiobook_save_folder_browse: i18n::tr(language, "options.button.browse"),
+        label_show_media_save_confirmation: i18n::tr(
+            language,
+            "options.label.show_media_save_confirmation",
+        ),
         label_audio_split: i18n::tr(language, "options.label.audio_split"),
         label_audio_split_minutes: i18n::tr(language, "options.label.audio_split_minutes"),
         label_audio_split_parts_count: i18n::tr(language, "options.label.audio_split_parts_count"),
@@ -2892,6 +2899,22 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
             );
             y += 36;
 
+            let checkbox_show_media_save_confirmation = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_show_media_save_confirmation).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                170,
+                y,
+                360,
+                20,
+                hwnd,
+                HMENU(OPTIONS_ID_SHOW_MEDIA_SAVE_CONFIRMATION as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 28;
+
             let label_audio_split = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -4305,6 +4328,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 label_audiobook_save_folder,
                 edit_audiobook_save_folder,
                 button_audiobook_save_folder_browse,
+                checkbox_show_media_save_confirmation,
                 label_audio_split,
                 combo_audio_split,
                 label_audio_split_minutes,
@@ -4478,6 +4502,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 label_audiobook_save_folder,
                 edit_audiobook_save_folder,
                 button_audiobook_save_folder_browse,
+                checkbox_show_media_save_confirmation,
                 label_audio_split,
                 combo_audio_split,
                 label_audio_split_minutes,
@@ -5034,6 +5059,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         _label_audiobook_save_folder,
         edit_audiobook_save_folder,
         _button_audiobook_save_folder_browse,
+        checkbox_show_media_save_confirmation,
         combo_audio_split,
         combo_audio_split_minutes,
         edit_audio_split_parts_count,
@@ -5158,6 +5184,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.label_audiobook_save_folder,
             state.edit_audiobook_save_folder,
             state.button_audiobook_save_folder_browse,
+            state.checkbox_show_media_save_confirmation,
             state.combo_audio_split,
             state.combo_audio_split_minutes,
             state.edit_audio_split_parts_count,
@@ -6583,6 +6610,16 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         edit_audiobook_save_folder,
         PCWSTR(to_wide(&settings.audiobook_save_folder).as_ptr()),
     ) {}
+    SendMessageW(
+        checkbox_show_media_save_confirmation,
+        BM_SETCHECK,
+        WPARAM(if settings.show_media_save_confirmation {
+            BST_CHECKED.0 as usize
+        } else {
+            0
+        }),
+        LPARAM(0),
+    );
 
     SendMessageW(combo_audio_split, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
     let split_options = [
@@ -8146,6 +8183,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         edit_tts_volume,
         combo_audio_skip,
         edit_audiobook_save_folder,
+        checkbox_show_media_save_confirmation,
         combo_audio_split,
         combo_audio_split_minutes,
         edit_audio_split_parts_count,
@@ -8233,6 +8271,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
             state.edit_tts_volume,
             state.combo_audio_skip,
             state.edit_audiobook_save_folder,
+            state.checkbox_show_media_save_confirmation,
             state.combo_audio_split,
             state.combo_audio_split_minutes,
             state.edit_audio_split_parts_count,
@@ -9113,6 +9152,14 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         let text = String::from_utf16_lossy(&buf[..read as usize]);
         settings.audiobook_save_folder = text.trim().to_string();
     }
+    settings.show_media_save_confirmation = SendMessageW(
+        checkbox_show_media_save_confirmation,
+        BM_GETCHECK,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0 as u32
+        == BST_CHECKED.0;
 
     let cache_len = GetWindowTextLengthW(edit_podcast_cache_limit);
     if cache_len >= 0 {
@@ -9992,6 +10039,11 @@ fn layout_audio_tab(state: &OptionsDialogState) {
         browse_width,
         OPTIONS_BUTTON_HEIGHT,
     );
+    y = layout_checkbox(
+        "checkbox_show_media_save_confirmation",
+        state.checkbox_show_media_save_confirmation,
+        y,
+    );
     y = layout_label_control(
         "label_audio_split",
         state.label_audio_split,
@@ -10377,6 +10429,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.label_audiobook_save_folder,
             state.edit_audiobook_save_folder,
             state.button_audiobook_save_folder_browse,
+            state.checkbox_show_media_save_confirmation,
             state.label_audio_split,
             state.combo_audio_split,
             state.label_audio_split_minutes,

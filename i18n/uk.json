@@ -232,6 +232,7 @@
   "options.label.audio_skip": "Інтервал перемотування медіа:",
   "options.label.audiobook_save_folder": "Типова папка для аудіокниг:",
   "options.label.audiobook_bitrate": "Бітрейт аудіокниги (кбіт/с):",
+  "options.label.show_media_save_confirmation": "Показувати підтвердження після збереження епізоду/потоку",
   "options.label.audio_split": "Розділення аудіокниги:",
   "options.label.audio_split_text": "Маркер розділення тексту:",
   "options.label.audio_split_requires_newline": "Маркер лише на початку рядка",

@@ -217,6 +217,7 @@
   "options.label.prompt_strip_ansi": "Remover sequências ANSI do terminal",
   "options.label.audiobook_save_folder": "Pasta padrão de audiolivros:",
   "options.label.audiobook_bitrate": "Taxa de bits do audiolivro (kbps):",
+  "options.label.show_media_save_confirmation": "Mostrar confirmação após salvar episódio/streaming",
   "options.label.subtitle_ducking": "Redução automática do volume para legendas",
   "options.label.subtitle_mode": "Leitura de legendas:",
   "options.label.subtitle_offset": "Offset de legendas (ms):",

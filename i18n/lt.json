@@ -232,6 +232,7 @@
   "options.label.audio_skip": "Medijos peršokimo intervalas:",
   "options.label.audiobook_save_folder": "Numatytasis garso knygų aplankas:",
   "options.label.audiobook_bitrate": "Garso knygos bitų srautas (kbps):",
+  "options.label.show_media_save_confirmation": "Rodyti patvirtinimą po epizodo/srauto išsaugojimo",
   "options.label.audio_split": "Padalinti garso knygą į:",
   "options.label.audio_split_text": "Skaidyti žymės tekstą:",
   "options.label.audio_split_requires_newline": "Reikalauti žymės eilutės pradžioje",

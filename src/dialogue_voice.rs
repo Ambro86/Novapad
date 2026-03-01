@@ -91,8 +91,8 @@ pub fn load_dialogue_voice_config() -> Option<DialogueVoiceConfig> {
     let mut rate = 0;
     let mut pitch = 0;
     let mut volume = 100;
-    let mut opening_quote = "\"".to_string();
-    let mut closing_quote = "\"".to_string();
+    let mut opening_quote = "\"|\u{201C}|\u{00AB}|\u{201E}".to_string();
+    let mut closing_quote = "\"|\u{201D}|\u{00BB}".to_string();
     let mut allow_multiline = false;
 
     for raw in text.lines() {
@@ -157,6 +157,12 @@ pub fn load_dialogue_voice_config() -> Option<DialogueVoiceConfig> {
     if voice.trim().is_empty() || opening_quote.is_empty() || closing_quote.is_empty() {
         return None;
     }
+    if opening_quote == "\"" {
+        opening_quote = "\"|\u{201C}|\u{00AB}|\u{201E}".to_string();
+    }
+    if closing_quote == "\"" {
+        closing_quote = "\"|\u{201D}|\u{00BB}".to_string();
+    }
     Some(DialogueVoiceConfig {
         engine,
         voice,
@@ -182,33 +188,147 @@ fn xml_escape_attr(value: &str) -> String {
 fn find_closing(
     text: &str,
     search_from: usize,
-    closing_quote: &str,
+    closing_quotes: &[String],
     allow_multiline: bool,
-) -> Option<usize> {
-    if allow_multiline {
-        return text[search_from..]
-            .find(closing_quote)
-            .map(|p| search_from + p);
+) -> Option<(usize, usize)> {
+    if closing_quotes.is_empty() {
+        return None;
     }
-    let line_end = text[search_from..]
-        .find('\n')
-        .map(|p| search_from + p)
-        .unwrap_or(text.len());
-    text[search_from..line_end]
-        .find(closing_quote)
-        .map(|p| search_from + p)
+    let search_end = if allow_multiline {
+        text.len()
+    } else {
+        text[search_from..]
+            .find('\n')
+            .map(|p| search_from + p)
+            .unwrap_or(text.len())
+    };
+    let mut best: Option<(usize, usize)> = None;
+    for quote in closing_quotes {
+        if quote.is_empty() {
+            continue;
+        }
+        if let Some(rel) = text[search_from..search_end].find(quote) {
+            let pos = search_from + rel;
+            let len = quote.len();
+            match best {
+                None => best = Some((pos, len)),
+                Some((best_pos, best_len)) => {
+                    if pos < best_pos || (pos == best_pos && len > best_len) {
+                        best = Some((pos, len));
+                    }
+                }
+            }
+        }
+    }
+    best
+}
+
+fn find_opening(text: &str, cursor: usize, opening_quotes: &[String]) -> Option<(usize, usize)> {
+    if opening_quotes.is_empty() {
+        return None;
+    }
+    let mut best: Option<(usize, usize)> = None;
+    for quote in opening_quotes {
+        if quote.is_empty() {
+            continue;
+        }
+        if let Some(rel) = text[cursor..].find(quote) {
+            let pos = cursor + rel;
+            let len = quote.len();
+            match best {
+                None => best = Some((pos, len)),
+                Some((best_pos, best_len)) => {
+                    if pos < best_pos || (pos == best_pos && len > best_len) {
+                        best = Some((pos, len));
+                    }
+                }
+            }
+        }
+    }
+    best
+}
+
+fn parse_quote_delimiters(raw: &str) -> Vec<String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+    let has_explicit_separator = trimmed
+        .chars()
+        .any(|ch| matches!(ch, '|' | ';' | ',' | '\n' | '\r'));
+    let mut delimiters = if has_explicit_separator {
+        trimmed
+            .split(['|', ';', ',', '\n', '\r'])
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(ToOwned::to_owned)
+            .collect::<Vec<_>>()
+    } else {
+        let space_split = trimmed
+            .split_whitespace()
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>();
+        if space_split.len() > 1 {
+            space_split.into_iter().map(ToOwned::to_owned).collect()
+        } else {
+            vec![trimmed.to_string()]
+        }
+    };
+    delimiters.sort();
+    delimiters.dedup();
+    delimiters
+}
+
+fn quote_delimiters_log(delimiters: &[String]) -> String {
+    delimiters
+        .iter()
+        .map(|d| format!("{:?}", d))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn preview_for_log(text: &str, max_chars: usize) -> String {
+    let mut out = String::with_capacity(max_chars);
+    for ch in text.chars().take(max_chars) {
+        if ch == '\n' || ch == '\r' || ch == '\t' {
+            out.push(' ');
+        } else {
+            out.push(ch);
+        }
+    }
+    out
 }
 
 pub fn apply_dialogue_tags(text: &str, cfg: &DialogueVoiceConfig) -> String {
     if text.is_empty() || cfg.voice.trim().is_empty() {
+        crate::log_debug("Dialogue tagging: skipped (empty text or empty primary voice)");
         return text.to_string();
     }
     if cfg.opening_quote.is_empty() || cfg.closing_quote.is_empty() {
+        crate::log_debug("Dialogue tagging: skipped (empty opening/closing quote)");
+        return text.to_string();
+    }
+    let opening_quotes = parse_quote_delimiters(&cfg.opening_quote);
+    let closing_quotes = parse_quote_delimiters(&cfg.closing_quote);
+    if opening_quotes.is_empty() || closing_quotes.is_empty() {
+        crate::log_debug("Dialogue tagging: skipped (no valid opening/closing quote delimiters)");
         return text.to_string();
     }
     if text.to_ascii_lowercase().contains("<voice") {
+        crate::log_debug("Dialogue tagging: skipped because text already contains <voice> tags");
         return text.to_string();
     }
+    crate::log_debug(&format!(
+        "Dialogue tagging: start open_quote=[{}] close_quote=[{}] allow_multiline={} primary_engine={} primary_voice={:?} secondary_enabled={} secondary_engine={} secondary_voice={:?}",
+        quote_delimiters_log(&opening_quotes),
+        quote_delimiters_log(&closing_quotes),
+        cfg.allow_multiline,
+        engine_to_key(cfg.engine),
+        cfg.voice,
+        cfg.use_secondary_voice,
+        engine_to_key(cfg.secondary_engine),
+        cfg.secondary_voice
+    ));
 
     let build_open_tag =
         |engine: TtsEngine, voice_name: &str, rate: i32, pitch: i32, volume: i32| {
@@ -228,22 +348,28 @@ pub fn apply_dialogue_tags(text: &str, cfg: &DialogueVoiceConfig) -> String {
     let mut cursor = 0usize;
     let mut replaced_any = false;
     let mut use_secondary_next = false;
+    let mut dialogue_idx = 0usize;
 
     while cursor < text.len() {
-        let Some(open_rel) = text[cursor..].find(&cfg.opening_quote) else {
+        let Some((open_pos, open_len)) = find_opening(text, cursor, &opening_quotes) else {
             out.push_str(&text[cursor..]);
             break;
         };
-        let open_pos = cursor + open_rel;
         out.push_str(&text[cursor..open_pos]);
-        let search_from = open_pos + cfg.opening_quote.len();
-        let Some(close_pos) =
-            find_closing(text, search_from, &cfg.closing_quote, cfg.allow_multiline)
+        let search_from = open_pos + open_len;
+        let Some((close_pos, close_len)) =
+            find_closing(text, search_from, &closing_quotes, cfg.allow_multiline)
         else {
+            crate::log_debug(&format!(
+                "Dialogue tagging: unclosed quote at pos={} preview={:?}",
+                open_pos,
+                preview_for_log(&text[open_pos..], 120)
+            ));
             out.push_str(&text[open_pos..]);
             break;
         };
-        let end = close_pos + cfg.closing_quote.len();
+        let end = close_pos + close_len;
+        let before_toggle = use_secondary_next;
         let (engine, selected_voice, rate, pitch, volume) = if use_secondary && use_secondary_next {
             (
                 cfg.secondary_engine,
@@ -265,18 +391,42 @@ pub fn apply_dialogue_tags(text: &str, cfg: &DialogueVoiceConfig) -> String {
         out.push_str(&open_tag);
         out.push_str(&text[open_pos..end]);
         out.push_str(close_tag);
+        crate::log_debug(&format!(
+            "Dialogue tagging: segment={} range=[{}..{}] used_engine={} used_voice={:?} rate={} pitch={} volume={} secondary_before_toggle={} text_preview={:?}",
+            dialogue_idx,
+            open_pos,
+            end,
+            engine_to_key(engine),
+            selected_voice,
+            rate,
+            pitch,
+            volume,
+            before_toggle,
+            preview_for_log(&text[open_pos..end], 120)
+        ));
         if use_secondary {
             use_secondary_next = !use_secondary_next;
         }
         cursor = end;
         replaced_any = true;
+        dialogue_idx += 1;
     }
 
-    if replaced_any { out } else { text.to_string() }
+    if replaced_any {
+        crate::log_debug(&format!(
+            "Dialogue tagging: done segments_tagged={}",
+            dialogue_idx
+        ));
+        out
+    } else {
+        crate::log_debug("Dialogue tagging: done (no matching quoted segments found)");
+        text.to_string()
+    }
 }
 
 pub fn apply_dialogue_tags_from_settings(text: &str, settings: &AppSettings) -> String {
     if !settings.use_dialogue_voice {
+        crate::log_debug("Dialogue tagging: disabled in settings");
         return text.to_string();
     }
     let fallback = DialogueVoiceConfig {
@@ -295,7 +445,13 @@ pub fn apply_dialogue_tags_from_settings(text: &str, settings: &AppSettings) -> 
         closing_quote: settings.dialogue_closing_quote.clone(),
         allow_multiline: settings.dialogue_allow_multiline,
     };
-    let cfg = load_dialogue_voice_config().unwrap_or(fallback);
+    let cfg = if let Some(file_cfg) = load_dialogue_voice_config() {
+        crate::log_debug("Dialogue tagging: using dialogue.ini configuration");
+        file_cfg
+    } else {
+        crate::log_debug("Dialogue tagging: using in-memory settings configuration");
+        fallback
+    };
     apply_dialogue_tags(text, &cfg)
 }
 
@@ -353,5 +509,18 @@ mod tests {
         assert!(
             out.contains("voice=\"it-IT-DiegoNeural\" rate=\"-10\" pitch=\"6\" volume=\"130\"")
         );
+    }
+
+    #[test]
+    fn dialogue_tags_support_multiple_quote_delimiters() {
+        let text = "Prima. \"Ciao mondo” Dopo.";
+        let mut settings = cfg("\"|“|«", "\"|”|»", false);
+        settings.use_secondary_voice = true;
+        settings.secondary_voice = "it-IT-DiegoNeural".to_string();
+        let out = apply_dialogue_tags(text, &settings);
+        assert!(out.contains("<voice"));
+        assert!(out.contains("\"Ciao mondo”"));
+        assert!(out.contains("Prima. "));
+        assert!(out.contains(" Dopo."));
     }
 }

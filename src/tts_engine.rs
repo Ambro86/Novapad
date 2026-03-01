@@ -8,7 +8,7 @@ use crate::settings::{
 use crate::{get_active_edit, log_debug, save_audio_dialog, show_error, with_state};
 use chrono::Local;
 use cpal::Sample;
-use futures_util::{SinkExt, StreamExt};
+use futures_util::{SinkExt, StreamExt, future::join_all};
 use rand::Rng;
 use rodio::{Decoder, OutputStreamBuilder, Sink, Source};
 use sha2::{Digest, Sha256};
@@ -289,9 +289,16 @@ pub(crate) fn split_voice_tag_spans(
     }
     for (i, (txt, ov, len)) in segments.iter().enumerate() {
         crate::log_debug(&format!(
-            "split_voice_tag_spans[{}]: text={:?} override={} rate={:?} pitch={:?} vol={:?} len={}",
+            "split_voice_tag_spans[{}]: text_preview={:?} override_engine={} override_voice={} rate={:?} pitch={:?} vol={:?} len={}",
             i,
-            txt,
+            preview_for_log(txt, 120),
+            ov.as_ref()
+                .map(|o| match o.engine {
+                    TtsEngine::Edge => "edge",
+                    TtsEngine::Sapi5 => "sapi5",
+                    TtsEngine::Sapi4 => "sapi4",
+                })
+                .unwrap_or("(none)"),
             ov.as_ref().map(|o| o.voice.as_str()).unwrap_or("(none)"),
             ov.as_ref().and_then(|o| o.rate),
             ov.as_ref().and_then(|o| o.pitch),
@@ -1893,12 +1900,12 @@ async fn download_edge_chunk_ws_with_retry(
                         || err_str.to_ascii_lowercase().contains("connection reset");
                     let is_timeout = err_str.to_ascii_lowercase().contains("timeout");
                     let base_ms = if is_conn_reset || is_timeout {
-                        1000
+                        250
                     } else {
                         400
                     };
-                    tokio::time::sleep(Duration::from_millis((attempt as u64) * (base_ms as u64)))
-                        .await;
+                    let delay_ms = ((attempt as u64) * (base_ms as u64)).min(2000);
+                    tokio::time::sleep(Duration::from_millis(delay_ms)).await;
                 }
             }
         }
@@ -2979,7 +2986,6 @@ fn normalize_tts_strict_chars(text: &str) -> String {
     out
 }
 
-#[cfg(test)]
 fn preview_for_log(text: &str, max_chars: usize) -> String {
     let mut out = String::with_capacity(max_chars);
     for ch in text.chars().take(max_chars) {
@@ -6547,6 +6553,119 @@ pub(crate) struct MixedAudiobookConfig {
     pub(crate) main_engine: TtsEngine,
 }
 
+fn mixed_chunk_has_usable_content(text: &str) -> bool {
+    let decoded = decode_basic_xml_entities(text);
+    let trimmed = decoded.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    trimmed.chars().any(|ch| ch.is_alphanumeric())
+}
+
+fn resolve_mixed_chunk_synth<'a>(
+    chunk: &'a TtsChunk,
+    options: &'a AudiobookCommonOptions,
+    config: &'a MixedAudiobookConfig,
+) -> (TtsEngine, &'a str, i32, i32, i32) {
+    if let Some(ov) = &chunk.override_voice {
+        (
+            ov.engine,
+            ov.voice.as_str(),
+            ov.rate.unwrap_or(0),
+            ov.pitch.unwrap_or(0),
+            ov.volume.unwrap_or(100),
+        )
+    } else {
+        (
+            config.main_engine,
+            options.voice,
+            options.rate,
+            options.pitch,
+            options.volume,
+        )
+    }
+}
+
+async fn synthesize_mixed_chunk_with_retry(
+    chunk_idx: usize,
+    chunk: &TtsChunk,
+    synth: &SynthesisConfig,
+    target: TargetAudio,
+) -> Option<PathBuf> {
+    const MIXED_SEGMENT_MAX_ATTEMPTS: usize = 5;
+
+    crate::log_debug(&format!(
+        "Mixed audiobook synth: chunk={} engine={} voice={:?} rate={} pitch={} volume={} override={} text_preview={:?}",
+        chunk_idx,
+        match synth.engine {
+            TtsEngine::Edge => "edge",
+            TtsEngine::Sapi5 => "sapi5",
+            TtsEngine::Sapi4 => "sapi4",
+        },
+        synth.voice,
+        synth.rate,
+        synth.pitch,
+        synth.volume,
+        chunk.override_voice.is_some(),
+        preview_for_log(&chunk.text_to_read, 120)
+    ));
+
+    if !mixed_chunk_has_usable_content(&chunk.text_to_read) {
+        crate::log_debug(&format!(
+            "Mixed audiobook: dropping non-usable chunk={} engine={} voice={:?} text_preview={:?}",
+            chunk_idx,
+            match synth.engine {
+                TtsEngine::Edge => "edge",
+                TtsEngine::Sapi5 => "sapi5",
+                TtsEngine::Sapi4 => "sapi4",
+            },
+            synth.voice,
+            preview_for_log(&chunk.text_to_read, 120)
+        ));
+        return None;
+    }
+
+    let mut last_err: Option<String> = None;
+    for attempt in 1..=MIXED_SEGMENT_MAX_ATTEMPTS {
+        match synthesize_segment_to_wav(&chunk.text_to_read, synth, target).await {
+            Ok(wav_path) => return Some(wav_path),
+            Err(err) => {
+                crate::log_debug(&format!(
+                    "Mixed audiobook: synth attempt {}/{} failed for chunk={} engine={} voice={:?}: {}",
+                    attempt,
+                    MIXED_SEGMENT_MAX_ATTEMPTS,
+                    chunk_idx,
+                    match synth.engine {
+                        TtsEngine::Edge => "edge",
+                        TtsEngine::Sapi5 => "sapi5",
+                        TtsEngine::Sapi4 => "sapi4",
+                    },
+                    synth.voice,
+                    err
+                ));
+                last_err = Some(err);
+                if attempt < MIXED_SEGMENT_MAX_ATTEMPTS {
+                    tokio::time::sleep(Duration::from_millis(250 * attempt as u64)).await;
+                }
+            }
+        }
+    }
+
+    crate::log_debug(&format!(
+        "Mixed audiobook: dropping chunk after retries chunk={} engine={} voice={:?} text_preview={:?} last_error={}",
+        chunk_idx,
+        match synth.engine {
+            TtsEngine::Edge => "edge",
+            TtsEngine::Sapi5 => "sapi5",
+            TtsEngine::Sapi4 => "sapi4",
+        },
+        synth.voice,
+        preview_for_log(&chunk.text_to_read, 120),
+        last_err.unwrap_or_else(|| "unknown error".to_string())
+    ));
+    None
+}
+
 pub(crate) fn render_mixed_audiobook_part(
     chunks: &[TtsChunk],
     current_global_progress: &mut usize,
@@ -6576,50 +6695,50 @@ pub(crate) fn render_mixed_audiobook_part(
         channels: 1,
     };
     let mut temp_wavs: Vec<PathBuf> = Vec::new();
+    let edge_only = chunks.iter().all(|chunk| {
+        let (engine, _, _, _, _) = resolve_mixed_chunk_synth(chunk, options, config);
+        engine == TtsEngine::Edge
+    });
 
-    for chunk in chunks {
-        if options.cancel.load(Ordering::Relaxed) {
-            return Err(cancelled_message(options.language));
-        }
+    if edge_only {
+        const MIXED_EDGE_PARALLELISM: usize = 8;
+        crate::log_debug(&format!(
+            "Mixed audiobook: edge-only mode, parallel synthesis enabled with concurrency={}",
+            MIXED_EDGE_PARALLELISM
+        ));
+        for batch_start in (0..chunks.len()).step_by(MIXED_EDGE_PARALLELISM) {
+            if options.cancel.load(Ordering::Relaxed) {
+                return Err(cancelled_message(options.language));
+            }
+            let batch_end = std::cmp::min(batch_start + MIXED_EDGE_PARALLELISM, chunks.len());
+            let batch = &chunks[batch_start..batch_end];
+            let results = rt.block_on(async {
+                let futures = batch.iter().enumerate().map(|(offset, chunk)| {
+                    let idx = batch_start + offset;
+                    let (engine, voice, rate, pitch, volume) =
+                        resolve_mixed_chunk_synth(chunk, options, config);
+                    let synth = SynthesisConfig {
+                        engine,
+                        voice: voice.to_string(),
+                        rate,
+                        pitch,
+                        volume,
+                        language: options.language,
+                    };
+                    async move {
+                        (
+                            idx,
+                            synthesize_mixed_chunk_with_retry(idx, chunk, &synth, target).await,
+                        )
+                    }
+                });
+                join_all(futures).await
+            });
 
-        let (engine, voice, rate, pitch, volume) = if let Some(ov) = &chunk.override_voice {
-            (
-                ov.engine,
-                ov.voice.as_str(),
-                ov.rate.unwrap_or(0),
-                ov.pitch.unwrap_or(0),
-                ov.volume.unwrap_or(100),
-            )
-        } else {
-            (
-                config.main_engine,
-                options.voice,
-                options.rate,
-                options.pitch,
-                options.volume,
-            )
-        };
-
-        let synth = SynthesisConfig {
-            engine,
-            voice: voice.to_string(),
-            rate,
-            pitch,
-            volume,
-            language: options.language,
-        };
-
-        match rt.block_on(synthesize_segment_to_wav(
-            &chunk.text_to_read,
-            &synth,
-            target,
-        )) {
-            Ok(wav_path) => temp_wavs.push(wav_path),
-            Err(err) => {
-                crate::log_debug(&format!(
-                    "Mixed audiobook: skipping undecodable segment: {}",
-                    err
-                ));
+            for (_idx, wav) in results {
+                if let Some(wav_path) = wav {
+                    temp_wavs.push(wav_path);
+                }
                 *current_global_progress += 1;
                 if options.progress_hwnd.0 != 0 {
                     unsafe {
@@ -6633,20 +6752,40 @@ pub(crate) fn render_mixed_audiobook_part(
                         }
                     }
                 }
-                continue;
             }
         }
-
-        *current_global_progress += 1;
-        if options.progress_hwnd.0 != 0 {
-            unsafe {
-                if let Err(e) = PostMessageW(
-                    options.progress_hwnd,
-                    crate::WM_UPDATE_PROGRESS,
-                    WPARAM(*current_global_progress),
-                    LPARAM(0),
-                ) {
-                    crate::log_debug(&format!("Failed to post WM_UPDATE_PROGRESS: {}", e));
+    } else {
+        for (chunk_idx, chunk) in chunks.iter().enumerate() {
+            if options.cancel.load(Ordering::Relaxed) {
+                return Err(cancelled_message(options.language));
+            }
+            let (engine, voice, rate, pitch, volume) =
+                resolve_mixed_chunk_synth(chunk, options, config);
+            let synth = SynthesisConfig {
+                engine,
+                voice: voice.to_string(),
+                rate,
+                pitch,
+                volume,
+                language: options.language,
+            };
+            let wav = rt.block_on(synthesize_mixed_chunk_with_retry(
+                chunk_idx, chunk, &synth, target,
+            ));
+            if let Some(wav_path) = wav {
+                temp_wavs.push(wav_path);
+            }
+            *current_global_progress += 1;
+            if options.progress_hwnd.0 != 0 {
+                unsafe {
+                    if let Err(e) = PostMessageW(
+                        options.progress_hwnd,
+                        crate::WM_UPDATE_PROGRESS,
+                        WPARAM(*current_global_progress),
+                        LPARAM(0),
+                    ) {
+                        crate::log_debug(&format!("Failed to post WM_UPDATE_PROGRESS: {}", e));
+                    }
                 }
             }
         }

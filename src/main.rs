@@ -1707,13 +1707,18 @@ fn has_secondary_window_open(hwnd: HWND) -> bool {
 
 fn should_force_editor_focus_on_foreground(hwnd: HWND) -> bool {
     unsafe {
+        let foreground = GetForegroundWindow();
         with_state(hwnd, |state| {
             let is_reader_mode = state
                 .docs
                 .get(state.current)
                 .map(|doc| matches!(doc.format, FileFormat::Audiobook))
                 .unwrap_or(false);
-            state.update_progress_window.0 == 0 && !is_reader_mode
+            let audiobook_progress_in_foreground =
+                state.audiobook_progress.0 != 0 && foreground == state.audiobook_progress;
+            state.update_progress_window.0 == 0
+                && !audiobook_progress_in_foreground
+                && !is_reader_mode
         })
         .unwrap_or(false)
     }

@@ -694,11 +694,11 @@ fn default_dialogue_tts_engine() -> TtsEngine {
 }
 
 fn default_dialogue_opening_quote() -> String {
-    "\"".to_string()
+    "\"|\u{201C}|\u{00AB}|\u{201E}".to_string()
 }
 
 fn default_dialogue_closing_quote() -> String {
-    "\"".to_string()
+    "\"|\u{201D}|\u{00BB}".to_string()
 }
 
 fn default_indent_tab_width() -> u32 {
@@ -1330,6 +1330,14 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     settings.network_proxy_url = settings.network_proxy_url.trim().to_string();
     settings.network_proxy_username = settings.network_proxy_username.trim().to_string();
     settings.network_proxy_password = settings.network_proxy_password.trim().to_string();
+    settings.dialogue_opening_quote = settings.dialogue_opening_quote.trim().to_string();
+    settings.dialogue_closing_quote = settings.dialogue_closing_quote.trim().to_string();
+    if settings.dialogue_opening_quote.is_empty() || settings.dialogue_opening_quote == "\"" {
+        settings.dialogue_opening_quote = default_dialogue_opening_quote();
+    }
+    if settings.dialogue_closing_quote.is_empty() || settings.dialogue_closing_quote == "\"" {
+        settings.dialogue_closing_quote = default_dialogue_closing_quote();
+    }
     let valid_indent = [2, 4, 6, 8];
     if !valid_indent.contains(&settings.indent_tab_width) {
         settings.indent_tab_width = default_indent_tab_width();

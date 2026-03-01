@@ -120,6 +120,16 @@ pub fn open(parent: HWND, total: usize) -> HWND {
             let y = rc_parent.top + (parent_h - dlg_h) / 2;
 
             crate::log_if_err!(MoveWindow(hwnd, x, y, dlg_w, dlg_h, true));
+            if !SetForegroundWindow(hwnd).as_bool() {
+                crate::log_debug("Audiobook window: SetForegroundWindow failed");
+            }
+            if with_progress_state(hwnd, |state| {
+                SetFocus(state.hwnd_text);
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access audiobook state for initial focus");
+            }
         }
         hwnd
     }

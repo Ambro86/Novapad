@@ -1289,6 +1289,7 @@ pub fn refresh_voices(hwnd: HWND) {
     unsafe {
         let (
             parent,
+            hwnd_tabs,
             combo_voice,
             combo_dialogue_voice,
             combo_dialogue_secondary_voice,
@@ -1305,6 +1306,7 @@ pub fn refresh_voices(hwnd: HWND) {
         ) = match with_options_state(hwnd, |state| {
             (
                 state.parent,
+                state.hwnd_tabs,
                 state.combo_voice,
                 state.combo_dialogue_voice,
                 state.combo_dialogue_secondary_voice,
@@ -1324,6 +1326,9 @@ pub fn refresh_voices(hwnd: HWND) {
             None => return,
         };
         let settings = with_state(parent, |state| state.settings.clone()).unwrap_or_default();
+        let voice_tab_active = hwnd_tabs.0 != 0
+            && SendMessageW(hwnd_tabs, TCM_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32
+                == OPTIONS_TAB_VOICE;
 
         // Determine current engine from combo if possible, otherwise settings
         let engine_sel = SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
@@ -1397,7 +1402,8 @@ pub fn refresh_voices(hwnd: HWND) {
         // Disable multilingual checkbox for SAPI.
         EnableWindow(checkbox, engine == TtsEngine::Edge);
 
-        let show_language_combo = engine == TtsEngine::Edge && !only_multilingual;
+        let show_language_combo =
+            voice_tab_active && engine == TtsEngine::Edge && !only_multilingual;
         ShowWindow(
             label_tts_voice_language,
             if show_language_combo {
@@ -1416,7 +1422,8 @@ pub fn refresh_voices(hwnd: HWND) {
         );
         EnableWindow(combo_tts_voice_language, show_language_combo);
 
-        let show_dialogue_language_combo = dialogue_engine == TtsEngine::Edge && !only_multilingual;
+        let show_dialogue_language_combo =
+            voice_tab_active && dialogue_engine == TtsEngine::Edge && !only_multilingual;
         ShowWindow(
             label_dialogue_voice_language,
             if show_dialogue_language_combo {
@@ -1436,7 +1443,7 @@ pub fn refresh_voices(hwnd: HWND) {
         EnableWindow(combo_dialogue_voice_language, show_dialogue_language_combo);
 
         let show_dialogue_secondary_language_combo =
-            dialogue_secondary_engine == TtsEngine::Edge && !only_multilingual;
+            voice_tab_active && dialogue_secondary_engine == TtsEngine::Edge && !only_multilingual;
         ShowWindow(
             label_dialogue_secondary_voice_language,
             if show_dialogue_secondary_language_combo {
@@ -6810,6 +6817,19 @@ unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
         edit_close_quote,
         checkbox_multiline,
     ];
+    let voice_tab_active = with_options_state(hwnd, |state| {
+        state.hwnd_tabs.0 != 0
+            && SendMessageW(state.hwnd_tabs, TCM_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32
+                == OPTIONS_TAB_VOICE
+    })
+    .unwrap_or(false);
+    if !voice_tab_active {
+        for control in controls {
+            ShowWindow(control, SW_HIDE);
+            EnableWindow(control, false);
+        }
+        return;
+    }
     let enabled =
         SendMessageW(checkbox, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 == BST_CHECKED.0;
     let secondary_enabled = enabled
@@ -8079,7 +8099,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         let text = String::from_utf16_lossy(&buf[..read as usize]);
         let trimmed = text.trim();
         settings.dialogue_opening_quote = if trimmed.is_empty() {
-            "\"".to_string()
+            "\"|\u{201C}|\u{00AB}|\u{201E}".to_string()
         } else {
             trimmed.to_string()
         };
@@ -8091,7 +8111,7 @@ unsafe fn apply_options_dialog(hwnd: HWND) {
         let text = String::from_utf16_lossy(&buf[..read as usize]);
         let trimmed = text.trim();
         settings.dialogue_closing_quote = if trimmed.is_empty() {
-            "\"".to_string()
+            "\"|\u{201D}|\u{00BB}".to_string()
         } else {
             trimmed.to_string()
         };
@@ -9342,6 +9362,8 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.checkbox_use_dialogue_voice,
             state.label_dialogue_engine,
             state.combo_dialogue_engine,
+            state.label_dialogue_voice_language,
+            state.combo_dialogue_voice_language,
             state.label_dialogue_voice,
             state.combo_dialogue_voice,
             state.label_dialogue_voice_rate,

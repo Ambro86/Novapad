@@ -139,6 +139,8 @@ const OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_PITCH: usize = 6091;
 const OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_VOLUME: usize = 6092;
 const OPTIONS_ID_DIALOGUE_SECONDARY_TTS_ENGINE: usize = 6093;
 const OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_LANGUAGE: usize = 6094;
+const OPTIONS_ID_DIALOGUE_MULTILINGUAL: usize = 6095;
+const OPTIONS_ID_DIALOGUE_SECONDARY_MULTILINGUAL: usize = 6096;
 const OPTIONS_ID_SHORTCUT_ACTION: usize = 6070;
 const OPTIONS_ID_SHORTCUT_VALUE: usize = 6071;
 const OPTIONS_ID_SHORTCUT_CHANGE: usize = 6072;
@@ -708,6 +710,7 @@ struct OptionsDialogState {
     combo_dialogue_voice_pitch: HWND,
     label_dialogue_voice_volume: HWND,
     combo_dialogue_voice_volume: HWND,
+    checkbox_dialogue_multilingual: HWND,
     checkbox_dialogue_use_secondary_voice: HWND,
     label_dialogue_secondary_engine: HWND,
     combo_dialogue_secondary_engine: HWND,
@@ -721,6 +724,7 @@ struct OptionsDialogState {
     combo_dialogue_secondary_voice_pitch: HWND,
     label_dialogue_secondary_voice_volume: HWND,
     combo_dialogue_secondary_voice_volume: HWND,
+    checkbox_dialogue_secondary_multilingual: HWND,
     label_dialogue_open_quote: HWND,
     edit_dialogue_open_quote: HWND,
     label_dialogue_close_quote: HWND,
@@ -1297,6 +1301,8 @@ pub fn refresh_voices(hwnd: HWND) {
             combo_dialogue_engine,
             combo_dialogue_secondary_engine,
             checkbox,
+            checkbox_dialogue_multilingual,
+            checkbox_dialogue_secondary_multilingual,
             label_tts_voice_language,
             combo_tts_voice_language,
             label_dialogue_voice_language,
@@ -1314,6 +1320,8 @@ pub fn refresh_voices(hwnd: HWND) {
                 state.combo_dialogue_engine,
                 state.combo_dialogue_secondary_engine,
                 state.checkbox_multilingual,
+                state.checkbox_dialogue_multilingual,
+                state.checkbox_dialogue_secondary_multilingual,
                 state.label_tts_voice_language,
                 state.combo_tts_voice_language,
                 state.label_dialogue_voice_language,
@@ -1393,14 +1401,38 @@ pub fn refresh_voices(hwnd: HWND) {
         let labels = options_labels(settings.language);
         let only_multilingual =
             SendMessageW(checkbox, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 == BST_CHECKED.0;
+        let dialogue_only_multilingual = SendMessageW(
+            checkbox_dialogue_multilingual,
+            BM_GETCHECK,
+            WPARAM(0),
+            LPARAM(0),
+        )
+        .0 as u32
+            == BST_CHECKED.0;
+        let dialogue_secondary_only_multilingual = SendMessageW(
+            checkbox_dialogue_secondary_multilingual,
+            BM_GETCHECK,
+            WPARAM(0),
+            LPARAM(0),
+        )
+        .0 as u32
+            == BST_CHECKED.0;
 
-        // Multilingual checkbox only relevant for Edge voices?
-        // SAPI voices usually don't have "Multilingual" in name in the same way, but let's keep logic if applicable.
-        // Generally assume SAPI voices are local and we list all.
         let filter_multilingual = engine == TtsEngine::Edge && only_multilingual;
+        let dialogue_filter_multilingual =
+            dialogue_engine == TtsEngine::Edge && dialogue_only_multilingual;
+        let dialogue_secondary_filter_multilingual =
+            dialogue_secondary_engine == TtsEngine::Edge && dialogue_secondary_only_multilingual;
 
-        // Disable multilingual checkbox for SAPI.
         EnableWindow(checkbox, engine == TtsEngine::Edge);
+        EnableWindow(
+            checkbox_dialogue_multilingual,
+            dialogue_engine == TtsEngine::Edge,
+        );
+        EnableWindow(
+            checkbox_dialogue_secondary_multilingual,
+            dialogue_secondary_engine == TtsEngine::Edge,
+        );
 
         let show_language_combo =
             voice_tab_active && engine == TtsEngine::Edge && !only_multilingual;
@@ -1423,7 +1455,7 @@ pub fn refresh_voices(hwnd: HWND) {
         EnableWindow(combo_tts_voice_language, show_language_combo);
 
         let show_dialogue_language_combo =
-            voice_tab_active && dialogue_engine == TtsEngine::Edge && !only_multilingual;
+            voice_tab_active && dialogue_engine == TtsEngine::Edge && !dialogue_only_multilingual;
         ShowWindow(
             label_dialogue_voice_language,
             if show_dialogue_language_combo {
@@ -1442,8 +1474,9 @@ pub fn refresh_voices(hwnd: HWND) {
         );
         EnableWindow(combo_dialogue_voice_language, show_dialogue_language_combo);
 
-        let show_dialogue_secondary_language_combo =
-            voice_tab_active && dialogue_secondary_engine == TtsEngine::Edge && !only_multilingual;
+        let show_dialogue_secondary_language_combo = voice_tab_active
+            && dialogue_secondary_engine == TtsEngine::Edge
+            && !dialogue_secondary_only_multilingual;
         ShowWindow(
             label_dialogue_secondary_voice_language,
             if show_dialogue_secondary_language_combo {
@@ -1718,11 +1751,7 @@ pub fn refresh_voices(hwnd: HWND) {
             combo_dialogue_voice,
             &dialogue_voices,
             &settings.dialogue_voice,
-            if dialogue_engine == TtsEngine::Edge {
-                filter_multilingual
-            } else {
-                false
-            },
+            dialogue_filter_multilingual,
             dialogue_language_filter.as_deref(),
             &labels,
         );
@@ -1730,11 +1759,7 @@ pub fn refresh_voices(hwnd: HWND) {
             combo_dialogue_secondary_voice,
             &dialogue_secondary_voices,
             &settings.dialogue_secondary_voice,
-            if dialogue_secondary_engine == TtsEngine::Edge {
-                filter_multilingual
-            } else {
-                false
-            },
+            dialogue_secondary_filter_multilingual,
             dialogue_secondary_language_filter.as_deref(),
             &labels,
         );
@@ -2269,6 +2294,22 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
             );
             y += 30;
 
+            let checkbox_dialogue_multilingual = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_multilingual).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                170,
+                y,
+                300,
+                20,
+                hwnd,
+                HMENU(OPTIONS_ID_DIALOGUE_MULTILINGUAL as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 26;
+
             let label_dialogue_voice_rate = CreateWindowExW(
                 Default::default(),
                 WC_STATIC,
@@ -2464,6 +2505,22 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 None,
             );
             y += 40;
+
+            let checkbox_dialogue_secondary_multilingual = CreateWindowExW(
+                Default::default(),
+                WC_BUTTON,
+                PCWSTR(to_wide(&labels.label_multilingual).as_ptr()),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                170,
+                y,
+                300,
+                20,
+                hwnd,
+                HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_MULTILINGUAL as isize),
+                HINSTANCE(0),
+                None,
+            );
+            y += 26;
 
             let label_dialogue_secondary_voice_rate = CreateWindowExW(
                 Default::default(),
@@ -4176,6 +4233,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 combo_dialogue_voice_language,
                 label_dialogue_voice,
                 combo_dialogue_voice,
+                checkbox_dialogue_multilingual,
                 label_dialogue_voice_rate,
                 combo_dialogue_voice_rate,
                 label_dialogue_voice_pitch,
@@ -4189,6 +4247,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 combo_dialogue_secondary_voice_language,
                 label_dialogue_secondary_voice,
                 combo_dialogue_secondary_voice,
+                checkbox_dialogue_secondary_multilingual,
                 label_dialogue_secondary_voice_rate,
                 combo_dialogue_secondary_voice_rate,
                 label_dialogue_secondary_voice_pitch,
@@ -4339,6 +4398,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 combo_dialogue_voice_language,
                 label_dialogue_voice,
                 combo_dialogue_voice,
+                checkbox_dialogue_multilingual,
                 label_dialogue_voice_rate,
                 combo_dialogue_voice_rate,
                 label_dialogue_voice_pitch,
@@ -4352,6 +4412,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 combo_dialogue_secondary_voice_language,
                 label_dialogue_secondary_voice,
                 combo_dialogue_secondary_voice,
+                checkbox_dialogue_secondary_multilingual,
                 label_dialogue_secondary_voice_rate,
                 combo_dialogue_secondary_voice_rate,
                 label_dialogue_secondary_voice_pitch,
@@ -4460,6 +4521,11 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                     refresh_voices(hwnd);
                     LRESULT(0)
                 }
+                OPTIONS_ID_DIALOGUE_MULTILINGUAL | OPTIONS_ID_DIALOGUE_SECONDARY_MULTILINGUAL => {
+                    refresh_voices(hwnd);
+                    update_dialogue_voice_visibility(hwnd);
+                    LRESULT(0)
+                }
                 OPTIONS_ID_TTS_VOICE_LANGUAGE => {
                     if code == CBN_SELCHANGE {
                         refresh_voices(hwnd);
@@ -4524,6 +4590,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                             }
                         }
                         refresh_voices(hwnd);
+                        update_dialogue_voice_visibility(hwnd);
                     }
                     LRESULT(0)
                 }
@@ -4543,6 +4610,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                             }
                         }
                         refresh_voices(hwnd);
+                        update_dialogue_voice_visibility(hwnd);
                     }
                     LRESULT(0)
                 }
@@ -4859,6 +4927,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         checkbox_multilingual,
         checkbox_use_dialogue_voice,
         combo_dialogue_engine,
+        checkbox_dialogue_multilingual,
         _label_dialogue_voice_language,
         _combo_dialogue_voice_language,
         combo_dialogue_voice,
@@ -4868,6 +4937,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         checkbox_dialogue_use_secondary_voice,
         _label_dialogue_secondary_engine,
         combo_dialogue_secondary_engine,
+        checkbox_dialogue_secondary_multilingual,
         _label_dialogue_secondary_voice_language,
         _combo_dialogue_secondary_voice_language,
         _label_dialogue_secondary_voice,
@@ -4975,6 +5045,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.checkbox_multilingual,
             state.checkbox_use_dialogue_voice,
             state.combo_dialogue_engine,
+            state.checkbox_dialogue_multilingual,
             state.label_dialogue_voice_language,
             state.combo_dialogue_voice_language,
             state.combo_dialogue_voice,
@@ -4984,6 +5055,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             state.checkbox_dialogue_use_secondary_voice,
             state.label_dialogue_secondary_engine,
             state.combo_dialogue_secondary_engine,
+            state.checkbox_dialogue_secondary_multilingual,
             state.label_dialogue_secondary_voice_language,
             state.combo_dialogue_secondary_voice_language,
             state.label_dialogue_secondary_voice,
@@ -5504,6 +5576,12 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         LPARAM(0),
     );
     SendMessageW(
+        checkbox_dialogue_multilingual,
+        BM_SETCHECK,
+        WPARAM(0),
+        LPARAM(0),
+    );
+    SendMessageW(
         checkbox_dialogue_use_secondary_voice,
         BM_SETCHECK,
         WPARAM(if settings.dialogue_use_secondary_voice {
@@ -5511,6 +5589,12 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
         } else {
             0
         }),
+        LPARAM(0),
+    );
+    SendMessageW(
+        checkbox_dialogue_secondary_multilingual,
+        BM_SETCHECK,
+        WPARAM(0),
         LPARAM(0),
     );
     if let Err(_e) = SetWindowTextW(
@@ -6724,7 +6808,7 @@ unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
         combo_pitch,
         label_volume,
         combo_volume,
-        checkbox_multilingual,
+        checkbox_dialogue_multilingual,
         checkbox_use_secondary_voice,
         label_secondary_engine,
         combo_secondary_engine,
@@ -6732,6 +6816,7 @@ unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
         combo_secondary_voice_language,
         label_secondary_voice,
         combo_secondary_voice,
+        checkbox_dialogue_secondary_multilingual,
         label_secondary_rate,
         combo_secondary_rate,
         label_secondary_pitch,
@@ -6759,7 +6844,7 @@ unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
             state.combo_dialogue_voice_pitch,
             state.label_dialogue_voice_volume,
             state.combo_dialogue_voice_volume,
-            state.checkbox_multilingual,
+            state.checkbox_dialogue_multilingual,
             state.checkbox_dialogue_use_secondary_voice,
             state.label_dialogue_secondary_engine,
             state.combo_dialogue_secondary_engine,
@@ -6767,6 +6852,7 @@ unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
             state.combo_dialogue_secondary_voice_language,
             state.label_dialogue_secondary_voice,
             state.combo_dialogue_secondary_voice,
+            state.checkbox_dialogue_secondary_multilingual,
             state.label_dialogue_secondary_voice_rate,
             state.combo_dialogue_secondary_voice_rate,
             state.label_dialogue_secondary_voice_pitch,
@@ -6798,6 +6884,7 @@ unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
         combo_pitch,
         label_volume,
         combo_volume,
+        checkbox_dialogue_multilingual,
         checkbox_use_secondary_voice,
         label_secondary_engine,
         combo_secondary_engine,
@@ -6805,6 +6892,7 @@ unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
         combo_secondary_voice_language,
         label_secondary_voice,
         combo_secondary_voice,
+        checkbox_dialogue_secondary_multilingual,
         label_secondary_rate,
         combo_secondary_rate,
         label_secondary_pitch,
@@ -6843,12 +6931,29 @@ unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
             == BST_CHECKED.0;
     let secondary_engine_sel =
         SendMessageW(combo_secondary_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    let dialogue_engine_sel = SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    let dialogue_engine_is_edge = dialogue_engine_sel <= 0;
     let secondary_engine_is_edge = secondary_engine_sel <= 0;
-    let only_multilingual = SendMessageW(checkbox_multilingual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0
-        as u32
+    let dialogue_only_multilingual = SendMessageW(
+        checkbox_dialogue_multilingual,
+        BM_GETCHECK,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0 as u32
         == BST_CHECKED.0;
+    let dialogue_secondary_only_multilingual = SendMessageW(
+        checkbox_dialogue_secondary_multilingual,
+        BM_GETCHECK,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0 as u32
+        == BST_CHECKED.0;
+    let show_dialogue_lang_combo =
+        enabled && dialogue_engine_is_edge && !dialogue_only_multilingual;
     let show_secondary_lang_combo =
-        secondary_enabled && secondary_engine_is_edge && !only_multilingual;
+        secondary_enabled && secondary_engine_is_edge && !dialogue_secondary_only_multilingual;
     for control in controls {
         let is_toggle = control == checkbox;
         let is_secondary_toggle = control == checkbox_use_secondary_voice;
@@ -6858,6 +6963,7 @@ unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
             || control == label_secondary_voice_language
             || control == combo_secondary_voice_language
             || control == combo_secondary_voice
+            || control == checkbox_dialogue_secondary_multilingual
             || control == label_secondary_rate
             || control == combo_secondary_rate
             || control == label_secondary_pitch
@@ -6871,8 +6977,39 @@ unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
         };
         let is_secondary_lang_control =
             control == label_secondary_voice_language || control == combo_secondary_voice_language;
+        let is_primary_lang_control =
+            control == label_voice_language || control == combo_voice_language;
+        let is_primary_multilingual_toggle = control == checkbox_dialogue_multilingual;
+        let is_secondary_multilingual_toggle = control == checkbox_dialogue_secondary_multilingual;
         let visible = if is_secondary_control {
             if secondary_enabled { SW_SHOW } else { SW_HIDE }
+        } else {
+            visible
+        };
+        let visible = if is_primary_multilingual_toggle {
+            if enabled && dialogue_engine_is_edge {
+                SW_SHOW
+            } else {
+                SW_HIDE
+            }
+        } else {
+            visible
+        };
+        let visible = if is_secondary_multilingual_toggle {
+            if secondary_enabled && secondary_engine_is_edge {
+                SW_SHOW
+            } else {
+                SW_HIDE
+            }
+        } else {
+            visible
+        };
+        let visible = if is_primary_lang_control {
+            if show_dialogue_lang_combo {
+                SW_SHOW
+            } else {
+                SW_HIDE
+            }
         } else {
             visible
         };
@@ -6886,8 +7023,14 @@ unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
             visible
         };
         ShowWindow(control, visible);
-        if is_secondary_lang_control {
+        if is_primary_lang_control {
+            EnableWindow(control, show_dialogue_lang_combo);
+        } else if is_secondary_lang_control {
             EnableWindow(control, show_secondary_lang_combo);
+        } else if is_primary_multilingual_toggle {
+            EnableWindow(control, enabled && dialogue_engine_is_edge);
+        } else if is_secondary_multilingual_toggle {
+            EnableWindow(control, secondary_enabled && secondary_engine_is_edge);
         } else if is_secondary_control {
             EnableWindow(control, secondary_enabled);
         } else {
@@ -8796,6 +8939,11 @@ fn layout_voice_tab(state: &OptionsDialogState) {
         y,
         OPTIONS_COMBO_HEIGHT,
     );
+    y = layout_checkbox(
+        "checkbox_dialogue_multilingual",
+        state.checkbox_dialogue_multilingual,
+        y,
+    );
     y = layout_label_control(
         "label_dialogue_voice_rate",
         state.label_dialogue_voice_rate,
@@ -8848,6 +8996,11 @@ fn layout_voice_tab(state: &OptionsDialogState) {
         state.combo_dialogue_secondary_voice,
         y,
         OPTIONS_COMBO_HEIGHT,
+    );
+    y = layout_checkbox(
+        "checkbox_dialogue_secondary_multilingual",
+        state.checkbox_dialogue_secondary_multilingual,
+        y,
     );
     y = layout_label_control(
         "label_dialogue_secondary_voice_rate",
@@ -9366,6 +9519,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.combo_dialogue_voice_language,
             state.label_dialogue_voice,
             state.combo_dialogue_voice,
+            state.checkbox_dialogue_multilingual,
             state.label_dialogue_voice_rate,
             state.combo_dialogue_voice_rate,
             state.label_dialogue_voice_pitch,
@@ -9379,6 +9533,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.combo_dialogue_secondary_voice_language,
             state.label_dialogue_secondary_voice,
             state.combo_dialogue_secondary_voice,
+            state.checkbox_dialogue_secondary_multilingual,
             state.label_dialogue_secondary_voice_rate,
             state.combo_dialogue_secondary_voice_rate,
             state.label_dialogue_secondary_voice_pitch,

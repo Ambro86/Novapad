@@ -6,6 +6,7 @@ Améliorations
 • Ajout de la traduction lituanienne.
 • Ajout de la traduction chinoise.
 • Réorganisation des dossiers de sortie dans `Documents\\Sonarpad` : les fichiers sont désormais enregistrés dans des sous-dossiers dédiés `audiobooks`, `documents`, `recordings` et `media`, avec migration automatique depuis les anciens chemins.
+• Amélioration de la prise en charge des fichiers texte très volumineux (jusqu’à 60 Mo) : ouverture et navigation ligne par ligne plus fluides, en particulier avec les lecteurs d’écran.
 • Guides mis à jour pour toutes les langues et ressources de localisation actualisées dans toute l’application, y compris les textes de dons et les traductions de l’installateur NSIS (nouvelles chaînes en chinois simplifié et lituanien, ainsi que finalisation de la traduction ukrainienne du setup).
 • Ajout de la prise en charge globale du proxy réseau (HTTP/HTTPS et SOCKS5/SOCKS5H) pour les fonctions en ligne, avec validation à l'enregistrement des options : les proxys invalides sont signalés puis supprimés automatiquement.
 • Ajout d'une nouvelle fonction dans Outils : « Lire l'audio en streaming... », permettant de coller une URL (YouTube ou lien média direct), de choisir le format de sortie et le profil qualité/débit binaire (y compris qualité/débit d'origine pour MP3 et MP4), puis de lancer la lecture dans le lecteur audio de Sonarpad.

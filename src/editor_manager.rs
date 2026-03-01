@@ -4266,6 +4266,7 @@ pub fn close_document_at(hwnd: HWND, index: usize) -> bool {
             was_current = state.current == index;
             let doc = state.docs.remove(index);
             closing_hwnd_edit = doc.hwnd_edit;
+            state.large_text_editors.remove(&closing_hwnd_edit.0);
             was_audiobook = matches!(doc.format, FileFormat::Audiobook);
             SendMessageW(
                 hwnd_tab,

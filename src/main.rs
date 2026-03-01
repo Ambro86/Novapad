@@ -62,7 +62,7 @@ mod wikipedia;
 mod wiktionary;
 mod win_ocr;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::Write;
 use std::mem::size_of;
 use std::path::{Path, PathBuf};
@@ -1979,6 +1979,7 @@ pub(crate) struct AppState {
     dictionary_cache: HashMap<String, Vec<String>>,
     dictionary_pending_lookup: Option<String>,
     dictionary_prefetch_generation: usize,
+    large_text_editors: HashSet<isize>,
 }
 
 #[derive(Clone)]
@@ -2061,6 +2062,13 @@ fn print_cli_help() {
     println!();
     println!("Arguments:");
     println!("  FILES...           One or more files to open");
+}
+
+unsafe fn is_large_text_editor(hwnd: HWND, hwnd_edit: HWND) -> bool {
+    with_state(hwnd, |state| {
+        state.large_text_editors.contains(&hwnd_edit.0)
+    })
+    .unwrap_or(false)
 }
 
 /// Core dell'applicazione - separato per error boundary
@@ -3268,6 +3276,7 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 dictionary_cache: load_dictionary_cache(),
                 dictionary_pending_lookup: None,
                 dictionary_prefetch_generation: 0,
+                large_text_editors: HashSet::new(),
             });
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
             if SetTimer(hwnd, AUDIO_PLAYLIST_TIMER_ID, 700, None) == 0 {
@@ -3357,10 +3366,13 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
             if hdr.code == EN_SELCHANGE {
                 // Only process if editor has focus to avoid focus issues during file open etc.
                 if GetFocus() == hdr.hwndFrom {
-                    handle_spellcheck_selection_change(hwnd, hdr.hwndFrom);
-                    prefetch_dictionary_for_selection(hwnd, hdr.hwndFrom);
-                    trigger_spellcheck_highlight(hwnd, hdr.hwndFrom);
-                    update_main_status_bar(hwnd);
+                    let is_large_editor = is_large_text_editor(hwnd, hdr.hwndFrom);
+                    if !is_large_editor {
+                        handle_spellcheck_selection_change(hwnd, hdr.hwndFrom);
+                        prefetch_dictionary_for_selection(hwnd, hdr.hwndFrom);
+                        trigger_spellcheck_highlight(hwnd, hdr.hwndFrom);
+                        update_main_status_bar(hwnd);
+                    }
                 }
                 return LRESULT(0);
             }
@@ -9379,6 +9391,7 @@ unsafe fn handle_pdf_loaded(hwnd: HWND, payload: PdfLoadResult) {
 unsafe fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLoadResult) {
     let editor_manager::DocumentLoadResult { path, result } = payload;
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    const LARGE_FILE_NO_WRAP_THRESHOLD_BYTES: u64 = 15 * 1024 * 1024;
 
     let loaded = match result {
         Ok(loaded) => loaded,
@@ -9390,13 +9403,17 @@ unsafe fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLo
     let Some(loaded) = loaded else {
         return;
     };
+    let large_file_no_wrap = std::fs::metadata(&path)
+        .map(|meta| meta.len() >= LARGE_FILE_NO_WRAP_THRESHOLD_BYTES)
+        .unwrap_or(false);
 
     let title = path.file_name().and_then(|s| s.to_str()).unwrap_or("File");
     let (hwnd_edit, new_index) = with_state(hwnd, |state| {
+        let use_word_wrap = state.settings.word_wrap && !large_file_no_wrap;
         let hwnd_edit = editor_manager::create_edit(
             hwnd,
             state.hfont,
-            state.settings.word_wrap,
+            use_word_wrap,
             state.settings.text_color,
             state.settings.text_size,
         );
@@ -9414,6 +9431,11 @@ unsafe fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLo
             is_temporary: false,
         };
         state.docs.push(doc);
+        if large_file_no_wrap {
+            state.large_text_editors.insert(hwnd_edit.0);
+        } else {
+            state.large_text_editors.remove(&hwnd_edit.0);
+        }
         insert_tab(state.hwnd_tab, title, (state.docs.len() - 1) as i32);
         goto_first_bookmark(hwnd_edit, &path, &state.bookmarks, loaded.format);
         (hwnd_edit, state.docs.len() - 1)
@@ -9422,6 +9444,13 @@ unsafe fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLo
 
     if hwnd_edit.0 == 0 {
         return;
+    }
+    if large_file_no_wrap {
+        log_debug(&format!(
+            "Large file mode: disabled word wrap for '{}' (>= {} bytes)",
+            path.display(),
+            LARGE_FILE_NO_WRAP_THRESHOLD_BYTES
+        ));
     }
 
     editor_manager::select_tab(hwnd, new_index);

@@ -6,6 +6,7 @@ Miglioramenti
 • Aggiunta la traduzione lituana.
 • Aggiunta la traduzione cinese.
 • Riorganizzate le cartelle di output in `Documenti\\Sonarpad`: i file ora vengono salvati nelle sottocartelle dedicate `audiobooks`, `documents`, `recordings` e `media`, con migrazione automatica dai percorsi legacy.
+• Migliorato il supporto per file di testo molto grandi (anche 60 MB): apertura e navigazione riga per riga più fluide, in particolare con gli screen reader.
 • Aggiornate le guide per tutte le lingue e aggiornate le risorse di localizzazione dell'app, incluse testo donazioni e traduzioni setup NSIS (nuove stringhe installer in cinese semplificato e lituano, più completamento della traduzione ucraina del setup).
 • Aggiunto il supporto proxy di rete globale (HTTP/HTTPS e SOCKS5/SOCKS5H) per le funzioni online, con validazione al salvataggio Opzioni: i proxy non validi vengono segnalati e rimossi automaticamente.
 • Aggiunta una nuova funzione in Strumenti: "Riproduci audio da streaming...", che permette di inserire un URL (YouTube o link media diretto), scegliere il formato di output e il profilo qualità/bitrate (inclusa qualità/bitrate originale per MP3 e MP4) e avviare la riproduzione nell’audio player di Sonarpad.

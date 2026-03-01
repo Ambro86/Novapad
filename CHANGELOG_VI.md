@@ -6,6 +6,7 @@ Cải tiến
 • Đã thêm bản dịch tiếng Litva.
 • Đã thêm bản dịch tiếng Trung.
 • Đã tổ chức lại thư mục đầu ra về `Documents\\Sonarpad`: tệp giờ được lưu vào các thư mục con riêng `audiobooks`, `documents`, `recordings` và `media`, kèm tự động chuyển dữ liệu từ đường dẫn cũ.
+• Đã cải thiện hỗ trợ cho tệp văn bản rất lớn (kể cả 60 MB): mở tệp và điều hướng theo từng dòng mượt hơn, đặc biệt khi dùng trình đọc màn hình.
 • Đã cập nhật hướng dẫn cho tất cả ngôn ngữ và làm mới tài nguyên bản địa hóa trên toàn bộ ứng dụng, bao gồm nội dung quyên góp và bản dịch trình cài đặt NSIS (thêm chuỗi cài đặt mới cho tiếng Trung giản thể và tiếng Litva, đồng thời hoàn thiện bản dịch tiếng Ukraina của setup).
 • Da bo sung ho tro proxy mang toan cuc (HTTP/HTTPS va SOCKS5/SOCKS5H) cho cac tinh nang truc tuyen, kem kiem tra khi luu Tuy chon: proxy khong hop le se duoc canh bao va xoa tu dong.
 • Da them tinh nang moi trong Cong cu: "Phat am thanh tu streaming...", cho phep dan URL (YouTube hoac lien ket media truc tiep), chon dinh dang dau ra va ho so chat luong/bitrate (bao gom chat luong/bitrate goc cho MP3 va MP4) va phat ngay trong trinh phat cua Sonarpad.

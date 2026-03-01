@@ -6,6 +6,7 @@ Improvements
 • Added Lithuanian translation.
 • Added Chinese translation.
 • Reorganized Sonarpad output folders under `Documents\\Sonarpad`: files are now saved in dedicated subfolders `audiobooks`, `documents`, `recordings`, and `media`, with automatic migration from legacy paths.
+• Improved support for very large text files (including 60 MB): smoother opening and line-by-line navigation, especially with screen readers.
 • Updated guides for all languages and refreshed localization resources across the app, including donations texts and NSIS setup translations (new Simplified Chinese and Lithuanian installer strings, plus completed Ukrainian setup translation).
 • Added global network proxy support (HTTP/HTTPS and SOCKS5/SOCKS5H) for online features, with proxy validation on Options save: invalid proxies are warned and automatically removed.
 • Added a new Tools action: "Play streaming audio...", allowing users to paste a URL (YouTube or direct media link), choose output format and quality/bitrate profile (including original quality/bitrate for MP3 and MP4), and play it directly in Sonarpad’s audio player.

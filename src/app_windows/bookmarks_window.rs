@@ -67,7 +67,7 @@ unsafe fn force_focus_editor_on_parent(parent: HWND) {
 pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
         let focus = unsafe { GetFocus() };
-        let (list, btn) = unsafe { with_bookmarks_state(hwnd, |s| (s.hwnd_list, s.hwnd_goto)) }
+        let (list, btn) = with_bookmarks_state(hwnd, |s| (s.hwnd_list, s.hwnd_goto))
             .unwrap_or((HWND(0), HWND(0)));
         if focus == list || focus == btn {
             goto_selected(hwnd);
@@ -304,24 +304,25 @@ unsafe fn bookmarks_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
     }
 }
 
-unsafe fn with_bookmarks_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+fn with_bookmarks_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut BookmarksWindowState) -> R,
 {
-    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut BookmarksWindowState;
-    if ptr.is_null() {
-        None
-    } else {
-        Some(f(&mut *ptr))
+    unsafe {
+        let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut BookmarksWindowState;
+        if ptr.is_null() {
+            None
+        } else {
+            Some(f(&mut *ptr))
+        }
     }
 }
 
 pub fn refresh_bookmarks_list(hwnd: HWND) {
-    let (parent, hwnd_list) =
-        match unsafe { with_bookmarks_state(hwnd, |s| (s.parent, s.hwnd_list)) } {
-            Some(v) => v,
-            None => return,
-        };
+    let (parent, hwnd_list) = match with_bookmarks_state(hwnd, |s| (s.parent, s.hwnd_list)) {
+        Some(v) => v,
+        None => return,
+    };
 
     let (path, hwnd_edit) = unsafe {
         with_state(parent, |state| {
@@ -370,11 +371,10 @@ pub fn refresh_bookmarks_list(hwnd: HWND) {
 }
 
 pub fn goto_selected(hwnd: HWND) {
-    let (parent, hwnd_list) =
-        match unsafe { with_bookmarks_state(hwnd, |s| (s.parent, s.hwnd_list)) } {
-            Some(v) => v,
-            None => return,
-        };
+    let (parent, hwnd_list) = match with_bookmarks_state(hwnd, |s| (s.parent, s.hwnd_list)) {
+        Some(v) => v,
+        None => return,
+    };
 
     let sel = unsafe { SendMessageW(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)) }.0 as i32;
     if sel < 0 {
@@ -430,11 +430,10 @@ pub fn goto_selected(hwnd: HWND) {
 }
 
 pub fn delete_selected(hwnd: HWND) {
-    let (parent, hwnd_list) =
-        match unsafe { with_bookmarks_state(hwnd, |s| (s.parent, s.hwnd_list)) } {
-            Some(v) => v,
-            None => return,
-        };
+    let (parent, hwnd_list) = match with_bookmarks_state(hwnd, |s| (s.parent, s.hwnd_list)) {
+        Some(v) => v,
+        None => return,
+    };
 
     let sel = unsafe { SendMessageW(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)) }.0 as i32;
     if sel < 0 {

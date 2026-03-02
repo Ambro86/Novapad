@@ -94,11 +94,9 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
         }
         if msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
             let focus = unsafe { GetFocus() };
-            if let Some((input, search, results, close)) = unsafe {
-                with_window_state(hwnd, |state| {
-                    (state.input, state.search, state.results, state.close)
-                })
-            } {
+            if let Some((input, search, results, close)) = with_window_state(hwnd, |state| {
+                (state.input, state.search, state.results, state.close)
+            }) {
                 if focus == close {
                     crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
                     return true;
@@ -587,15 +585,15 @@ unsafe fn focus_next_control(parent: HWND, current: HWND, shift_down: bool) {
     }
 }
 
-unsafe fn with_window_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+fn with_window_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut WikipediaWindowState) -> R,
 {
-    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut WikipediaWindowState;
+    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut WikipediaWindowState };
     if ptr.is_null() {
         None
     } else {
-        Some(f(&mut *ptr))
+        Some(unsafe { f(&mut *ptr) })
     }
 }
 

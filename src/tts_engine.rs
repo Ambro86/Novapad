@@ -429,7 +429,7 @@ pub fn start_tts_from_caret(hwnd: HWND) {
             100,
         ));
 
-    let (mut text, initial_caret_pos) = unsafe { get_text_from_caret(hwnd_edit) };
+    let (mut text, initial_caret_pos) = get_text_from_caret(hwnd_edit);
     let dialogue_settings =
         unsafe { with_state(hwnd, |state| state.settings.clone()) }.unwrap_or_default();
     text = crate::dialogue_voice::apply_dialogue_tags_from_settings(&text, &dialogue_settings);
@@ -2683,70 +2683,74 @@ async fn download_edge_chunks_ws_parallel_to_writer(
     Ok(chunks.len())
 }
 
-unsafe fn get_text_from_caret(hwnd_edit: HWND) -> (String, i32) {
-    let mut range = CHARRANGE { cpMin: 0, cpMax: 0 };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXGETSEL,
-        WPARAM(0),
-        LPARAM(&mut range as *mut _ as isize),
-    );
-    let caret_pos = range.cpMin.min(range.cpMax).max(0);
-    let total_len = SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as i32;
-    if total_len <= 0 {
-        return (String::new(), 0);
+fn get_text_from_caret(hwnd_edit: HWND) -> (String, i32) {
+    unsafe {
+        let mut range = CHARRANGE { cpMin: 0, cpMax: 0 };
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut range as *mut _ as isize),
+        );
+        let caret_pos = range.cpMin.min(range.cpMax).max(0);
+        let total_len = SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as i32;
+        if total_len <= 0 {
+            return (String::new(), 0);
+        }
+        let full_text = get_text_range(hwnd_edit, 0, total_len);
+
+        // Se siamo all'inizio, o se siamo alla fine del testo, leggi tutto dall'inizio
+        if caret_pos == 0 {
+            return (full_text, 0);
+        }
+
+        // Se la posizione del cursore Š oltre la lunghezza del testo (fine file),
+        // ricomincia a leggere dall'inizio come richiesto.
+        if caret_pos >= total_len {
+            return (full_text, 0);
+        }
+
+        let prefix = get_text_range(hwnd_edit, 0, caret_pos);
+        let caret_utf16 = prefix.encode_utf16().count() as i32;
+
+        let wide: Vec<u16> = full_text.encode_utf16().collect();
+
+        let adjusted_pos = adjust_tts_caret_pos(&full_text, caret_utf16);
+        let adjusted_pos = adjusted_pos.max(0) as usize;
+        if adjusted_pos >= wide.len() {
+            return (full_text, 0);
+        }
+        (
+            String::from_utf16_lossy(&wide[adjusted_pos..]),
+            adjusted_pos as i32,
+        )
     }
-    let full_text = get_text_range(hwnd_edit, 0, total_len);
-
-    // Se siamo all'inizio, o se siamo alla fine del testo, leggi tutto dall'inizio
-    if caret_pos == 0 {
-        return (full_text, 0);
-    }
-
-    // Se la posizione del cursore Š oltre la lunghezza del testo (fine file),
-    // ricomincia a leggere dall'inizio come richiesto.
-    if caret_pos >= total_len {
-        return (full_text, 0);
-    }
-
-    let prefix = get_text_range(hwnd_edit, 0, caret_pos);
-    let caret_utf16 = prefix.encode_utf16().count() as i32;
-
-    let wide: Vec<u16> = full_text.encode_utf16().collect();
-
-    let adjusted_pos = adjust_tts_caret_pos(&full_text, caret_utf16);
-    let adjusted_pos = adjusted_pos.max(0) as usize;
-    if adjusted_pos >= wide.len() {
-        return (full_text, 0);
-    }
-    (
-        String::from_utf16_lossy(&wide[adjusted_pos..]),
-        adjusted_pos as i32,
-    )
 }
 
-unsafe fn get_text_range(hwnd_edit: HWND, start: i32, end: i32) -> String {
-    let len = (end - start).max(0) as usize;
-    if len == 0 {
-        return String::new();
+fn get_text_range(hwnd_edit: HWND, start: i32, end: i32) -> String {
+    unsafe {
+        let len = (end - start).max(0) as usize;
+        if len == 0 {
+            return String::new();
+        }
+        let mut buf = vec![0u16; len + 1];
+        let mut text_range = TEXTRANGEW {
+            chrg: CHARRANGE {
+                cpMin: start,
+                cpMax: end,
+            },
+            lpstrText: PWSTR(buf.as_mut_ptr()),
+        };
+        let copied = SendMessageW(
+            hwnd_edit,
+            EM_GETTEXTRANGE,
+            WPARAM(0),
+            LPARAM(&mut text_range as *mut _ as isize),
+        )
+        .0 as usize;
+        let used = copied.min(len);
+        String::from_utf16_lossy(&buf[..used])
     }
-    let mut buf = vec![0u16; len + 1];
-    let mut text_range = TEXTRANGEW {
-        chrg: CHARRANGE {
-            cpMin: start,
-            cpMax: end,
-        },
-        lpstrText: PWSTR(buf.as_mut_ptr()),
-    };
-    let copied = SendMessageW(
-        hwnd_edit,
-        EM_GETTEXTRANGE,
-        WPARAM(0),
-        LPARAM(&mut text_range as *mut _ as isize),
-    )
-    .0 as usize;
-    let used = copied.min(len);
-    String::from_utf16_lossy(&buf[..used])
 }
 
 fn adjust_tts_caret_pos(text: &str, pos: i32) -> i32 {

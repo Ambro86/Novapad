@@ -543,7 +543,7 @@ fn import_podcast_sources_from_file(hwnd: HWND, path: &Path) -> Option<usize> {
     } else {
         Vec::new()
     };
-    let parent = unsafe { with_podcast_state(hwnd, |s| s.parent) }.unwrap_or(HWND(0));
+    let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
     if parent.0 == 0 {
         return None;
     }
@@ -610,7 +610,7 @@ fn escape_opml_attr(value: &str) -> String {
 }
 
 fn export_podcast_sources_to_file(hwnd: HWND, path: &Path) -> Result<usize, String> {
-    let parent = unsafe { with_podcast_state(hwnd, |s| s.parent) }.unwrap_or(HWND(0));
+    let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
     if parent.0 == 0 {
         return Err("missing parent".to_string());
     }
@@ -779,7 +779,7 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
         }
         if key == VK_RETURN.0 as u32 {
             let (hwnd_tree, hwnd_results) =
-                unsafe { with_podcast_state(hwnd, |s| (s.hwnd_tree, s.hwnd_results)) }
+                with_podcast_state(hwnd, |s| (s.hwnd_tree, s.hwnd_results))
                     .unwrap_or((HWND(0), HWND(0)));
             let focus = unsafe { GetFocus() };
 
@@ -794,7 +794,7 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
                 && focus == hwnd_tree
                 && let Some(item) = unsafe { selected_episode(hwnd) }
             {
-                let parent = unsafe { with_podcast_state(hwnd, |s| s.parent) }.unwrap_or(HWND(0));
+                let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
                 unsafe { open_episode_in_player(hwnd, parent, &item) };
                 return true;
             }
@@ -4304,7 +4304,7 @@ pub fn show_context_menu_from_keyboard(hwnd: HWND) {
 }
 
 pub fn focus_library(hwnd: HWND) {
-    let hwnd_tree = unsafe { with_podcast_state(hwnd, |s| s.hwnd_tree) }.unwrap_or(HWND(0));
+    let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     if hwnd_tree.0 != 0 {
         unsafe { SetFocus(hwnd_tree) };
     }
@@ -7861,29 +7861,30 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
     }
 }
 
-unsafe fn with_podcast_state<R>(
-    hwnd: HWND,
-    f: impl FnOnce(&mut PodcastWindowState) -> R,
-) -> Option<R> {
-    let ptr = GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
-        as *mut PodcastWindowState;
+fn with_podcast_state<R>(hwnd: HWND, f: impl FnOnce(&mut PodcastWindowState) -> R) -> Option<R> {
+    let ptr = unsafe {
+        GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+            as *mut PodcastWindowState
+    };
     if ptr.is_null() {
         None
     } else {
-        Some(f(&mut *ptr))
+        Some(unsafe { f(&mut *ptr) })
     }
 }
 
-unsafe fn with_category_dialog_state<R>(
+fn with_category_dialog_state<R>(
     hwnd: HWND,
     f: impl FnOnce(&mut CategoryDialogState) -> R,
 ) -> Option<R> {
-    let ptr = GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
-        as *mut CategoryDialogState;
+    let ptr = unsafe {
+        GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+            as *mut CategoryDialogState
+    };
     if ptr.is_null() {
         None
     } else {
-        Some(f(&mut *ptr))
+        Some(unsafe { f(&mut *ptr) })
     }
 }
 

@@ -1277,16 +1277,18 @@ unsafe fn prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
     }
 }
 
-unsafe fn with_prompt_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+fn with_prompt_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut PromptState) -> R,
 {
-    let ptr = GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
-        as *mut PromptState;
+    let ptr = unsafe {
+        GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+            as *mut PromptState
+    };
     if ptr.is_null() {
         None
     } else {
-        Some(f(&mut *ptr))
+        Some(unsafe { f(&mut *ptr) })
     }
 }
 

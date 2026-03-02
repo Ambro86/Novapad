@@ -65,54 +65,56 @@ const VOICE_PANEL_LABEL_WIDTH: i32 = 140;
 const VOICE_PANEL_COMBO_HEIGHT: i32 = 140;
 const VOICE_PANEL_BUTTON_WIDTH: i32 = 90;
 
-unsafe fn should_use_opening_quote(hwnd_edit: HWND) -> bool {
-    let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXGETSEL,
-        WPARAM(0),
-        LPARAM(&mut selection as *mut _ as isize),
-    );
-    if selection.cpMin <= 0 {
-        return true;
-    }
+fn should_use_opening_quote(hwnd_edit: HWND) -> bool {
+    unsafe {
+        let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut selection as *mut _ as isize),
+        );
+        if selection.cpMin <= 0 {
+            return true;
+        }
 
-    let prev_index = selection.cpMin - 1;
-    let mut buf = [0u16; 2];
-    let mut range = TEXTRANGEW {
-        chrg: CHARRANGE {
-            cpMin: prev_index,
-            cpMax: selection.cpMin,
-        },
-        lpstrText: PWSTR(buf.as_mut_ptr()),
-    };
-    SendMessageW(
-        hwnd_edit,
-        EM_GETTEXTRANGE,
-        WPARAM(0),
-        LPARAM(&mut range as *mut _ as isize),
-    );
-    let prev_char = char::from_u32(buf[0] as u32).unwrap_or('\0');
-    matches!(
-        prev_char,
-        '\0' | ' '
-            | '\n'
-            | '\r'
-            | '\t'
-            | '('
-            | '['
-            | '{'
-            | '<'
-            | '—'
-            | '–'
-            | '«'
-            | '“'
-            | '‘'
-            | '/'
-            | '\\'
-            | '‒'
-            | '―'
-    )
+        let prev_index = selection.cpMin - 1;
+        let mut buf = [0u16; 2];
+        let mut range = TEXTRANGEW {
+            chrg: CHARRANGE {
+                cpMin: prev_index,
+                cpMax: selection.cpMin,
+            },
+            lpstrText: PWSTR(buf.as_mut_ptr()),
+        };
+        SendMessageW(
+            hwnd_edit,
+            EM_GETTEXTRANGE,
+            WPARAM(0),
+            LPARAM(&mut range as *mut _ as isize),
+        );
+        let prev_char = char::from_u32(buf[0] as u32).unwrap_or('\0');
+        matches!(
+            prev_char,
+            '\0' | ' '
+                | '\n'
+                | '\r'
+                | '\t'
+                | '('
+                | '['
+                | '{'
+                | '<'
+                | '—'
+                | '–'
+                | '«'
+                | '“'
+                | '‘'
+                | '/'
+                | '\\'
+                | '‒'
+                | '―'
+        )
+    }
 }
 
 unsafe extern "system" fn edit_subclass_proc(
@@ -566,131 +568,135 @@ fn get_text_range_simple(hwnd: HWND, start: i32, end: i32) -> String {
     String::from_utf16_lossy(&buf[..len])
 }
 
-unsafe fn selected_line_block_from_selection(
+fn selected_line_block_from_selection(
     hwnd_edit: HWND,
     _text: &str,
     mut selection: CHARRANGE,
 ) -> Option<(i32, i32, String, bool)> {
-    if selection.cpMin == selection.cpMax {
-        return None;
-    }
-    if selection.cpMax < selection.cpMin {
-        std::mem::swap(&mut selection.cpMin, &mut selection.cpMax);
-    }
-
-    let text_len = SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as i32;
-    let mut start = selection.cpMin.clamp(0, text_len);
-    let end = selection.cpMax.clamp(0, text_len);
-    if start == end {
-        return None;
-    }
-
-    // If selection starts exactly on a line break, normalize to next line start.
-    if start < end {
-        let next = (start + 1).min(text_len);
-        let first = get_text_range_simple(hwnd_edit, start, next);
-        if first == "\r" {
-            let next2 = (start + 2).min(text_len);
-            let second = get_text_range_simple(hwnd_edit, next, next2);
-            start = if second == "\n" {
-                (start + 2).min(end)
-            } else {
-                next
-            };
-        } else if first == "\n" {
-            start = next;
+    unsafe {
+        if selection.cpMin == selection.cpMax {
+            return None;
         }
-    }
-    if start == end {
-        return None;
-    }
+        if selection.cpMax < selection.cpMin {
+            std::mem::swap(&mut selection.cpMin, &mut selection.cpMax);
+        }
 
-    let start_line = SendMessageW(
-        hwnd_edit,
-        EM_LINEFROMCHAR,
-        WPARAM(start as usize),
-        LPARAM(0),
-    )
-    .0 as i32;
+        let text_len = SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as i32;
+        let mut start = selection.cpMin.clamp(0, text_len);
+        let end = selection.cpMax.clamp(0, text_len);
+        if start == end {
+            return None;
+        }
 
-    // Compute end line from cpMax and exclude the next line when cpMax is
-    // exactly at that line start (classic RichEdit full-line selection case).
-    let mut end_line =
-        SendMessageW(hwnd_edit, EM_LINEFROMCHAR, WPARAM(end as usize), LPARAM(0)).0 as i32;
-    let end_line_start = SendMessageW(
-        hwnd_edit,
-        EM_LINEINDEX,
-        WPARAM(end_line as usize),
-        LPARAM(0),
-    )
-    .0 as i32;
-    if end > start && end == end_line_start {
-        end_line -= 1;
-    }
-    if end_line < start_line {
-        return None;
-    }
+        // If selection starts exactly on a line break, normalize to next line start.
+        if start < end {
+            let next = (start + 1).min(text_len);
+            let first = get_text_range_simple(hwnd_edit, start, next);
+            if first == "\r" {
+                let next2 = (start + 2).min(text_len);
+                let second = get_text_range_simple(hwnd_edit, next, next2);
+                start = if second == "\n" {
+                    (start + 2).min(end)
+                } else {
+                    next
+                };
+            } else if first == "\n" {
+                start = next;
+            }
+        }
+        if start == end {
+            return None;
+        }
 
-    let range_start = SendMessageW(
-        hwnd_edit,
-        EM_LINEINDEX,
-        WPARAM(start_line as usize),
-        LPARAM(0),
-    )
-    .0 as i32;
-    let mut range_end = SendMessageW(
-        hwnd_edit,
-        EM_LINEINDEX,
-        WPARAM((end_line + 1) as usize),
-        LPARAM(0),
-    )
-    .0 as i32;
-    if range_end < 0 {
-        range_end = SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as i32;
-    }
+        let start_line = SendMessageW(
+            hwnd_edit,
+            EM_LINEFROMCHAR,
+            WPARAM(start as usize),
+            LPARAM(0),
+        )
+        .0 as i32;
 
-    let selected = get_text_range_simple(hwnd_edit, range_start, range_end);
-    let trailing = selected.ends_with('\n') || selected.ends_with('\r');
-    Some((range_start, range_end, selected, trailing))
+        // Compute end line from cpMax and exclude the next line when cpMax is
+        // exactly at that line start (classic RichEdit full-line selection case).
+        let mut end_line =
+            SendMessageW(hwnd_edit, EM_LINEFROMCHAR, WPARAM(end as usize), LPARAM(0)).0 as i32;
+        let end_line_start = SendMessageW(
+            hwnd_edit,
+            EM_LINEINDEX,
+            WPARAM(end_line as usize),
+            LPARAM(0),
+        )
+        .0 as i32;
+        if end > start && end == end_line_start {
+            end_line -= 1;
+        }
+        if end_line < start_line {
+            return None;
+        }
+
+        let range_start = SendMessageW(
+            hwnd_edit,
+            EM_LINEINDEX,
+            WPARAM(start_line as usize),
+            LPARAM(0),
+        )
+        .0 as i32;
+        let mut range_end = SendMessageW(
+            hwnd_edit,
+            EM_LINEINDEX,
+            WPARAM((end_line + 1) as usize),
+            LPARAM(0),
+        )
+        .0 as i32;
+        if range_end < 0 {
+            range_end = SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as i32;
+        }
+
+        let selected = get_text_range_simple(hwnd_edit, range_start, range_end);
+        let trailing = selected.ends_with('\n') || selected.ends_with('\r');
+        Some((range_start, range_end, selected, trailing))
+    }
 }
 
-unsafe fn current_line_block_from_caret(
+fn current_line_block_from_caret(
     hwnd_edit: HWND,
     selection: CHARRANGE,
 ) -> Option<(i32, i32, String, bool)> {
-    let text_len = SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as i32;
-    if text_len <= 0 {
-        return None;
+    unsafe {
+        let text_len = SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as i32;
+        if text_len <= 0 {
+            return None;
+        }
+        let caret = selection.cpMin.clamp(0, text_len);
+        let line = SendMessageW(
+            hwnd_edit,
+            EM_LINEFROMCHAR,
+            WPARAM(caret as usize),
+            LPARAM(0),
+        )
+        .0 as i32;
+        let range_start =
+            SendMessageW(hwnd_edit, EM_LINEINDEX, WPARAM(line as usize), LPARAM(0)).0 as i32;
+        if range_start < 0 {
+            return None;
+        }
+        let mut range_end = SendMessageW(
+            hwnd_edit,
+            EM_LINEINDEX,
+            WPARAM((line + 1) as usize),
+            LPARAM(0),
+        )
+        .0 as i32;
+        if range_end < 0 {
+            range_end = text_len;
+        }
+        let selected = get_text_range_simple(hwnd_edit, range_start, range_end);
+        let trailing = selected.ends_with('\n') || selected.ends_with('\r');
+        Some((range_start, range_end, selected, trailing))
     }
-    let caret = selection.cpMin.clamp(0, text_len);
-    let line = SendMessageW(
-        hwnd_edit,
-        EM_LINEFROMCHAR,
-        WPARAM(caret as usize),
-        LPARAM(0),
-    )
-    .0 as i32;
-    let range_start =
-        SendMessageW(hwnd_edit, EM_LINEINDEX, WPARAM(line as usize), LPARAM(0)).0 as i32;
-    if range_start < 0 {
-        return None;
-    }
-    let mut range_end = SendMessageW(
-        hwnd_edit,
-        EM_LINEINDEX,
-        WPARAM((line + 1) as usize),
-        LPARAM(0),
-    )
-    .0 as i32;
-    if range_end < 0 {
-        range_end = text_len;
-    }
-    let selected = get_text_range_simple(hwnd_edit, range_start, range_end);
-    let trailing = selected.ends_with('\n') || selected.ends_with('\r');
-    Some((range_start, range_end, selected, trailing))
 }
 
-unsafe fn restore_caret_after_line_op_if_no_selection(
+fn restore_caret_after_line_op_if_no_selection(
     hwnd_edit: HWND,
     had_selection: bool,
     original_caret: i32,
@@ -698,60 +704,62 @@ unsafe fn restore_caret_after_line_op_if_no_selection(
     original_text: &str,
     replaced_text: &str,
 ) {
-    let new_caret = if had_selection {
-        // Keep caret at the start of the last selected line.
-        // If the block ends with a newline, ignore trailing line breaks first,
-        // otherwise caret can land on the next line outside the selection.
-        let trimmed = replaced_text.trim_end_matches(['\r', '\n']);
-        let last_line_start = trimmed.rfind('\n').map(|idx| idx + 1).unwrap_or(0);
-        let line_start_in_block = byte_index_to_utf16(trimmed, last_line_start);
-        replace_start.saturating_add(line_start_in_block)
-    } else {
-        let new_len = byte_index_to_utf16(replaced_text, replaced_text.len());
-        let relative = original_caret.saturating_sub(replace_start).max(0);
-        // Preserve caret near the same logical content when line ops add/remove a leading prefix
-        // (e.g. quote/unquote or similar commands that shift the line start).
-        let first_old_line = original_text
-            .split('\n')
-            .next()
-            .unwrap_or(original_text)
-            .trim_end_matches('\r');
-        let first_new_line = replaced_text
-            .split('\n')
-            .next()
-            .unwrap_or(replaced_text)
-            .trim_end_matches('\r');
-        let leading_delta =
-            if !first_old_line.is_empty() && first_new_line.ends_with(first_old_line) {
-                byte_index_to_utf16(
-                    first_new_line,
-                    first_new_line.len().saturating_sub(first_old_line.len()),
-                )
-            } else if !first_new_line.is_empty() && first_old_line.ends_with(first_new_line) {
-                -byte_index_to_utf16(
-                    first_old_line,
-                    first_old_line.len().saturating_sub(first_new_line.len()),
-                )
-            } else {
-                0
-            };
-        let shifted = if leading_delta >= 0 {
-            relative.saturating_add(leading_delta)
+    unsafe {
+        let new_caret = if had_selection {
+            // Keep caret at the start of the last selected line.
+            // If the block ends with a newline, ignore trailing line breaks first,
+            // otherwise caret can land on the next line outside the selection.
+            let trimmed = replaced_text.trim_end_matches(['\r', '\n']);
+            let last_line_start = trimmed.rfind('\n').map(|idx| idx + 1).unwrap_or(0);
+            let line_start_in_block = byte_index_to_utf16(trimmed, last_line_start);
+            replace_start.saturating_add(line_start_in_block)
         } else {
-            relative.saturating_sub(leading_delta.saturating_abs())
+            let new_len = byte_index_to_utf16(replaced_text, replaced_text.len());
+            let relative = original_caret.saturating_sub(replace_start).max(0);
+            // Preserve caret near the same logical content when line ops add/remove a leading prefix
+            // (e.g. quote/unquote or similar commands that shift the line start).
+            let first_old_line = original_text
+                .split('\n')
+                .next()
+                .unwrap_or(original_text)
+                .trim_end_matches('\r');
+            let first_new_line = replaced_text
+                .split('\n')
+                .next()
+                .unwrap_or(replaced_text)
+                .trim_end_matches('\r');
+            let leading_delta =
+                if !first_old_line.is_empty() && first_new_line.ends_with(first_old_line) {
+                    byte_index_to_utf16(
+                        first_new_line,
+                        first_new_line.len().saturating_sub(first_old_line.len()),
+                    )
+                } else if !first_new_line.is_empty() && first_old_line.ends_with(first_new_line) {
+                    -byte_index_to_utf16(
+                        first_old_line,
+                        first_old_line.len().saturating_sub(first_new_line.len()),
+                    )
+                } else {
+                    0
+                };
+            let shifted = if leading_delta >= 0 {
+                relative.saturating_add(leading_delta)
+            } else {
+                relative.saturating_sub(leading_delta.saturating_abs())
+            };
+            replace_start.saturating_add(shifted.min(new_len))
         };
-        replace_start.saturating_add(shifted.min(new_len))
-    };
-    let mut caret_range = CHARRANGE {
-        cpMin: new_caret,
-        cpMax: new_caret,
-    };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXSETSEL,
-        WPARAM(0),
-        LPARAM(&mut caret_range as *mut _ as isize),
-    );
+        let mut caret_range = CHARRANGE {
+            cpMin: new_caret,
+            cpMax: new_caret,
+        };
+        SendMessageW(
+            hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut caret_range as *mut _ as isize),
+        );
+    }
 }
 
 fn apply_indent_settings_to_edit(hwnd_edit: HWND, settings: &AppSettings) {
@@ -1227,102 +1235,104 @@ pub fn select_all_active_edit(hwnd: HWND) {
 }
 
 pub fn remove_duplicate_lines_active_edit(hwnd: HWND) -> bool {
-    unsafe { apply_text_op_active_edit(hwnd, crate::text_ops::remove_duplicate_lines) }
+    apply_text_op_active_edit(hwnd, crate::text_ops::remove_duplicate_lines)
 }
 
 pub fn remove_duplicate_consecutive_lines_active_edit(hwnd: HWND) -> bool {
-    unsafe { apply_text_op_active_edit(hwnd, crate::text_ops::remove_duplicate_consecutive_lines) }
+    apply_text_op_active_edit(hwnd, crate::text_ops::remove_duplicate_consecutive_lines)
 }
 
 pub fn auto_format_tts_active_edit(hwnd: HWND) -> bool {
-    unsafe { apply_text_op_active_edit(hwnd, auto_format_tts_block) }
+    apply_text_op_active_edit(hwnd, auto_format_tts_block)
 }
 
-unsafe fn apply_text_op_active_edit<F>(hwnd: HWND, op: F) -> bool
+fn apply_text_op_active_edit<F>(hwnd: HWND, op: F) -> bool
 where
     F: Fn(&str) -> String,
 {
-    let Some(hwnd_edit) = crate::get_active_edit(hwnd) else {
-        return false;
-    };
-
-    let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXGETSEL,
-        WPARAM(0),
-        LPARAM(&mut selection as *mut _ as isize),
-    );
-
-    if selection.cpMin > selection.cpMax {
-        std::mem::swap(&mut selection.cpMin, &mut selection.cpMax);
-    }
-
-    let (affected, replace_range) = if selection.cpMin != selection.cpMax {
-        let affected = get_text_range(hwnd_edit, selection);
-        if affected.is_empty() {
+    unsafe {
+        let Some(hwnd_edit) = crate::get_active_edit(hwnd) else {
             return false;
-        }
-        (affected, selection)
-    } else {
-        let text = get_edit_text(hwnd_edit);
-        if text.is_empty() {
-            return false;
-        }
-        let replace_range = CHARRANGE {
-            cpMin: 0,
-            cpMax: byte_index_to_utf16(&text, text.len()),
         };
-        (text, replace_range)
-    };
 
-    let processed = op(&affected);
+        let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut selection as *mut _ as isize),
+        );
 
-    if processed == affected {
-        return false;
+        if selection.cpMin > selection.cpMax {
+            std::mem::swap(&mut selection.cpMin, &mut selection.cpMax);
+        }
+
+        let (affected, replace_range) = if selection.cpMin != selection.cpMax {
+            let affected = get_text_range(hwnd_edit, selection);
+            if affected.is_empty() {
+                return false;
+            }
+            (affected, selection)
+        } else {
+            let text = get_edit_text(hwnd_edit);
+            if text.is_empty() {
+                return false;
+            }
+            let replace_range = CHARRANGE {
+                cpMin: 0,
+                cpMax: byte_index_to_utf16(&text, text.len()),
+            };
+            (text, replace_range)
+        };
+
+        let processed = op(&affected);
+
+        if processed == affected {
+            return false;
+        }
+
+        let mut replace_range = replace_range;
+
+        // Select the range to be replaced
+        SendMessageW(
+            hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut replace_range as *mut _ as isize),
+        );
+
+        // Single-undo guarantee.
+        begin_single_undo_action(hwnd_edit);
+        let replace_wide = to_wide(&processed);
+        SendMessageW(
+            hwnd_edit,
+            EM_REPLACESEL,
+            WPARAM(1),
+            LPARAM(replace_wide.as_ptr() as isize),
+        );
+
+        // According to specs:
+        // "If operating on selection: replace the selection and re-select the replaced block (same start, new end)."
+        // EM_REPLACESEL with 1 (fCanUndo) often handles caret, but let's ensure selection is set to the new block.
+        // The previous selection started at `replace_range.cpMin`.
+        // The new end is `replace_range.cpMin + processed_utf16_len`.
+        let new_len_utf16 = processed.encode_utf16().count() as i32;
+        let mut new_selection = CHARRANGE {
+            cpMin: replace_range.cpMin,
+            cpMax: replace_range.cpMin + new_len_utf16,
+        };
+        SendMessageW(
+            hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut new_selection as *mut _ as isize),
+        );
+
+        end_single_undo_action(hwnd_edit);
+        mark_dirty_from_edit(hwnd, hwnd_edit);
+        SetFocus(hwnd_edit);
+        true
     }
-
-    let mut replace_range = replace_range;
-
-    // Select the range to be replaced
-    SendMessageW(
-        hwnd_edit,
-        EM_EXSETSEL,
-        WPARAM(0),
-        LPARAM(&mut replace_range as *mut _ as isize),
-    );
-
-    // Single-undo guarantee.
-    begin_single_undo_action(hwnd_edit);
-    let replace_wide = to_wide(&processed);
-    SendMessageW(
-        hwnd_edit,
-        EM_REPLACESEL,
-        WPARAM(1),
-        LPARAM(replace_wide.as_ptr() as isize),
-    );
-
-    // According to specs:
-    // "If operating on selection: replace the selection and re-select the replaced block (same start, new end)."
-    // EM_REPLACESEL with 1 (fCanUndo) often handles caret, but let's ensure selection is set to the new block.
-    // The previous selection started at `replace_range.cpMin`.
-    // The new end is `replace_range.cpMin + processed_utf16_len`.
-    let new_len_utf16 = processed.encode_utf16().count() as i32;
-    let mut new_selection = CHARRANGE {
-        cpMin: replace_range.cpMin,
-        cpMax: replace_range.cpMin + new_len_utf16,
-    };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXSETSEL,
-        WPARAM(0),
-        LPARAM(&mut new_selection as *mut _ as isize),
-    );
-
-    end_single_undo_action(hwnd_edit);
-    mark_dirty_from_edit(hwnd, hwnd_edit);
-    SetFocus(hwnd_edit);
-    true
 }
 
 fn get_text_range(hwnd_edit: HWND, range: CHARRANGE) -> String {
@@ -3087,46 +3097,44 @@ pub fn ensure_audio_document_tab(hwnd: HWND, path: &Path) -> Option<usize> {
     }
 }
 
-unsafe fn open_document_with_encoding_internal(
+fn open_document_with_encoding_internal(
     hwnd: HWND,
     path: &Path,
     user_encoding: Option<TextEncoding>,
     from_copydata: bool,
 ) {
-    // Record telemetry for hang diagnostics
-    let ext = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("unknown");
-    crate::telemetry::record_action("file_open", ext);
+    unsafe {
+        // Record telemetry for hang diagnostics
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("unknown");
+        crate::telemetry::record_action("file_open", ext);
 
-    log_debug(&format!(
-        "Open document: {} (encoding: {:?})",
-        path.display(),
-        user_encoding
-    ));
+        log_debug(&format!(
+            "Open document: {} (encoding: {:?})",
+            path.display(),
+            user_encoding
+        ));
 
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    if is_pdf_path(path) {
-        crate::open_pdf_document_async(hwnd, path, from_copydata);
-        return;
-    }
-    if is_audio_path(path) {
-        unsafe {
-            crate::queue_audio_files_and_play(hwnd, vec![path.to_path_buf()]);
+        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+        if is_pdf_path(path) {
+            crate::open_pdf_document_async(hwnd, path, from_copydata);
+            return;
         }
-        return;
-    }
+        if is_audio_path(path) {
+            crate::queue_audio_files_and_play(hwnd, vec![path.to_path_buf()]);
+            return;
+        }
 
-    let path_buf = path.to_path_buf();
-    let hwnd_main = hwnd;
-    std::thread::spawn(move || {
-        let result = load_document_content(&path_buf, user_encoding, language);
-        let payload = Box::new(DocumentLoadResult {
-            path: path_buf,
-            result,
-        });
-        unsafe {
+        let path_buf = path.to_path_buf();
+        let hwnd_main = hwnd;
+        std::thread::spawn(move || {
+            let result = load_document_content(&path_buf, user_encoding, language);
+            let payload = Box::new(DocumentLoadResult {
+                path: path_buf,
+                result,
+            });
             let payload_ptr = Box::into_raw(payload);
             if let Err(e) = PostMessageW(
                 hwnd_main,
@@ -3137,8 +3145,8 @@ unsafe fn open_document_with_encoding_internal(
                 crate::log_debug(&format!("Failed to post WM_DOCUMENT_LOADED: {}", e));
                 let _unused_box = Box::from_raw(payload_ptr);
             }
-        }
-    });
+        });
+    }
 }
 
 fn load_document_content(
@@ -3297,7 +3305,7 @@ fn load_document_content(
 }
 
 pub fn open_document_with_encoding(hwnd: HWND, path: &Path, user_encoding: Option<TextEncoding>) {
-    unsafe { open_document_with_encoding_internal(hwnd, path, user_encoding, false) };
+    open_document_with_encoding_internal(hwnd, path, user_encoding, false);
 }
 
 pub fn open_document_with_encoding_from_copydata(
@@ -3305,7 +3313,7 @@ pub fn open_document_with_encoding_from_copydata(
     path: &Path,
     user_encoding: Option<TextEncoding>,
 ) {
-    unsafe { open_document_with_encoding_internal(hwnd, path, user_encoding, true) };
+    open_document_with_encoding_internal(hwnd, path, user_encoding, true);
 }
 
 pub fn open_document(hwnd: HWND, path: &Path) {

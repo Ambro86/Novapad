@@ -355,25 +355,26 @@ struct MyPropVariant {
     _padding: [u8; 8],
 }
 
-unsafe fn set_prop(store: &IPropertyStore, key: &PROPERTYKEY, value: &str) -> Result<(), String> {
-    let wide = to_wide(value);
-    let psz = SHStrDupW(PCWSTR(wide.as_ptr())).map_err(|e: windows::core::Error| e.to_string())?;
-
-    let mut pv = MyPropVariant {
-        vt: VT_LPWSTR,
-        w_reserved1: 0,
-        w_reserved2: 0,
-        w_reserved3: 0,
-        pwsz_val: psz,
-        _padding: [0; 8],
-    };
-
-    let res = store.SetValue(key, &pv as *const MyPropVariant as *const PROPVARIANT);
+fn set_prop(store: &IPropertyStore, key: &PROPERTYKEY, value: &str) -> Result<(), String> {
     unsafe {
-        PropVariantClear(&mut pv as *mut MyPropVariant as *mut PROPVARIANT).ok();
-    }
+        let wide = to_wide(value);
+        let psz =
+            SHStrDupW(PCWSTR(wide.as_ptr())).map_err(|e: windows::core::Error| e.to_string())?;
 
-    res.map_err(|e| format!("IPropertyStore::SetValue failed: {}", e))
+        let mut pv = MyPropVariant {
+            vt: VT_LPWSTR,
+            w_reserved1: 0,
+            w_reserved2: 0,
+            w_reserved3: 0,
+            pwsz_val: psz,
+            _padding: [0; 8],
+        };
+
+        let res = store.SetValue(key, &pv as *const MyPropVariant as *const PROPVARIANT);
+        PropVariantClear(&mut pv as *mut MyPropVariant as *mut PROPVARIANT).ok();
+
+        res.map_err(|e| format!("IPropertyStore::SetValue failed: {}", e))
+    }
 }
 
 pub fn write_rtf_text(path: &Path, hwnd_edit: HWND) -> Result<(), String> {

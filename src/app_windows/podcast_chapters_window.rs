@@ -313,14 +313,11 @@ unsafe fn chapter_list_wndproc_inner(
     }
 }
 
-unsafe fn with_chapter_state<R>(
-    hwnd: HWND,
-    f: impl FnOnce(&mut ChapterListState) -> R,
-) -> Option<R> {
-    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ChapterListState;
+fn with_chapter_state<R>(hwnd: HWND, f: impl FnOnce(&mut ChapterListState) -> R) -> Option<R> {
+    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ChapterListState };
     if ptr.is_null() {
         None
     } else {
-        Some(f(&mut *ptr))
+        Some(unsafe { f(&mut *ptr) })
     }
 }

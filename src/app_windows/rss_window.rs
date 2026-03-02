@@ -1149,13 +1149,11 @@ fn apply_root_order(
             );
         }
     }
-    unsafe {
-        with_rss_state(hwnd, |s| {
-            for (i, hitem) in ordered_items.iter().enumerate() {
-                s.node_data.insert(hitem.0, NodeData::Source(i));
-            }
-        });
-    }
+    with_rss_state(hwnd, |s| {
+        for (i, hitem) in ordered_items.iter().enumerate() {
+            s.node_data.insert(hitem.0, NodeData::Source(i));
+        }
+    });
     let mut sort_cb = TVSORTCB {
         hParent: TVI_ROOT,
         lpfnCompare: Some(rss_tree_compare),
@@ -1739,7 +1737,7 @@ pub fn focus_library(hwnd: HWND) {
         return;
     }
     unsafe { SetForegroundWindow(hwnd) };
-    let hwnd_tree = unsafe { with_rss_state(hwnd, |s| s.hwnd_tree) }.unwrap_or(HWND(0));
+    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     if hwnd_tree.0 != 0 {
         unsafe { select_first_root_if_needed(hwnd, hwnd_tree) };
         unsafe { SetFocus(hwnd_tree) };
@@ -3023,15 +3021,15 @@ unsafe fn reorder_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
     }
 }
 
-unsafe fn with_rss_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+fn with_rss_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut RssWindowState) -> R,
 {
-    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut RssWindowState;
+    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut RssWindowState };
     if ptr.is_null() {
         None
     } else {
-        Some(f(&mut *ptr))
+        Some(unsafe { f(&mut *ptr) })
     }
 }
 
@@ -5075,7 +5073,7 @@ struct ReorderDialogInit {
 }
 
 fn selected_source_index(hwnd: HWND) -> Option<usize> {
-    let hwnd_tree = unsafe { with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0)) };
+    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     if hwnd_tree.0 == 0 {
         return None;
     }
@@ -5093,13 +5091,11 @@ fn selected_source_index(hwnd: HWND) -> Option<usize> {
     if hitem.0 == 0 {
         return None;
     }
-    unsafe {
-        with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
-            Some(NodeData::Source(idx)) => Some(*idx),
-            _ => None,
-        })
-        .flatten()
-    }
+    with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
+        Some(NodeData::Source(idx)) => Some(*idx),
+        _ => None,
+    })
+    .flatten()
 }
 
 fn apply_reorder_action(
@@ -5108,8 +5104,8 @@ fn apply_reorder_action(
     action: ReorderAction,
     target_index: usize,
 ) -> Option<usize> {
-    let hwnd_tree = unsafe { with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0)) };
-    let parent = unsafe { with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0)) };
+    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
     if hwnd_tree.0 == 0 || parent.0 == 0 {
         return None;
     }

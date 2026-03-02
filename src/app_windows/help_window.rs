@@ -534,15 +534,15 @@ unsafe fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
     }
 }
 
-unsafe fn with_help_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+fn with_help_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut HelpWindowState) -> R,
 {
-    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut HelpWindowState;
+    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut HelpWindowState };
     if ptr.is_null() {
         None
     } else {
-        Some(f(&mut *ptr))
+        Some(unsafe { f(&mut *ptr) })
     }
 }
 
@@ -738,14 +738,14 @@ unsafe fn readonly_text_wndproc_inner(
     }
 }
 
-unsafe fn with_readonly_text_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+fn with_readonly_text_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut ReadonlyTextState) -> R,
 {
-    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ReadonlyTextState;
+    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ReadonlyTextState };
     if ptr.is_null() {
         None
     } else {
-        Some(f(&mut *ptr))
+        Some(unsafe { f(&mut *ptr) })
     }
 }

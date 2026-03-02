@@ -437,15 +437,15 @@ unsafe fn marker_select_wndproc_inner(
     }
 }
 
-unsafe fn with_marker_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+fn with_marker_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut MarkerSelectState) -> R,
 {
-    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut MarkerSelectState;
+    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut MarkerSelectState };
     if ptr.is_null() {
         None
     } else {
-        Some(f(&mut *ptr))
+        Some(unsafe { f(&mut *ptr) })
     }
 }
 fn list_has_unselected(list: HWND) -> bool {

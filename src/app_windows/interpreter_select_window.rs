@@ -278,14 +278,14 @@ unsafe fn interpreter_select_wndproc_inner(
     }
 }
 
-unsafe fn with_interpreter_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+fn with_interpreter_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut InterpreterSelectState) -> R,
 {
-    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut InterpreterSelectState;
+    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut InterpreterSelectState };
     if ptr.is_null() {
         None
     } else {
-        Some(f(&mut *ptr))
+        Some(unsafe { f(&mut *ptr) })
     }
 }

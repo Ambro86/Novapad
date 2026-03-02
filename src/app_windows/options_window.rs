@@ -5072,15 +5072,15 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
     }
 }
 
-unsafe fn with_options_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+fn with_options_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut OptionsDialogState) -> R,
 {
-    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut OptionsDialogState;
+    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut OptionsDialogState };
     if ptr.is_null() {
         None
     } else {
-        Some(f(&mut *ptr))
+        Some(unsafe { f(&mut *ptr) })
     }
 }
 

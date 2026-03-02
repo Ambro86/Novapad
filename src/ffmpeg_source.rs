@@ -458,20 +458,22 @@ fn init_ffmpeg_once(api: &FfmpegApi) {
 }
 
 /// Helper to read a string value from an AVDictionary.
-unsafe fn dict_get_string(api: &FfmpegApi, dict: *mut AVDictionary, key: &str) -> Option<String> {
-    if dict.is_null() {
-        return None;
+fn dict_get_string(api: &FfmpegApi, dict: *mut AVDictionary, key: &str) -> Option<String> {
+    unsafe {
+        if dict.is_null() {
+            return None;
+        }
+        let key_c = CString::new(key).ok()?;
+        let entry = (api.av_dict_get)(dict, key_c.as_ptr(), ptr::null(), AV_DICT_IGNORE_SUFFIX);
+        if entry.is_null() {
+            return None;
+        }
+        let value_ptr = (*entry).value;
+        if value_ptr.is_null() {
+            return None;
+        }
+        Some(CStr::from_ptr(value_ptr).to_string_lossy().into_owned())
     }
-    let key_c = CString::new(key).ok()?;
-    let entry = (api.av_dict_get)(dict, key_c.as_ptr(), ptr::null(), AV_DICT_IGNORE_SUFFIX);
-    if entry.is_null() {
-        return None;
-    }
-    let value_ptr = (*entry).value;
-    if value_ptr.is_null() {
-        return None;
-    }
-    Some(CStr::from_ptr(value_ptr).to_string_lossy().into_owned())
 }
 
 /// List all audio streams in a media file.
@@ -561,8 +563,8 @@ pub fn list_audio_streams(path: &Path) -> Result<Vec<AudioStreamInfo>, String> {
         let sample_rate = unsafe { (*codecpar).sample_rate };
         let metadata = unsafe { (*stream).metadata };
 
-        let language = unsafe { dict_get_string(api, metadata, "language") };
-        let title = unsafe { dict_get_string(api, metadata, "title") };
+        let language = dict_get_string(api, metadata, "language");
+        let title = dict_get_string(api, metadata, "title");
 
         let is_default = i as i32 == default_stream;
 

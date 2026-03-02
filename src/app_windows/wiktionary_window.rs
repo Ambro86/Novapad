@@ -746,15 +746,15 @@ unsafe fn focus_next_control(parent: HWND, current: HWND, shift_down: bool) {
     }
 }
 
-unsafe fn with_window_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+fn with_window_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut WiktionaryWindowState) -> R,
 {
-    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut WiktionaryWindowState;
+    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut WiktionaryWindowState };
     if ptr.is_null() {
         None
     } else {
-        Some(f(&mut *ptr))
+        Some(unsafe { f(&mut *ptr) })
     }
 }
 

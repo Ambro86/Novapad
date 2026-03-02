@@ -389,15 +389,15 @@ unsafe fn dictionary_wndproc_inner(
     }
 }
 
-unsafe fn with_dictionary_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+fn with_dictionary_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut DictionaryWindowState) -> R,
 {
-    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut DictionaryWindowState;
+    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut DictionaryWindowState };
     if ptr.is_null() {
         None
     } else {
-        Some(f(&mut *ptr))
+        Some(unsafe { f(&mut *ptr) })
     }
 }
 
@@ -416,11 +416,10 @@ unsafe fn update_button_states(hwnd: HWND) {
 }
 
 pub fn refresh_dictionary_list(hwnd: HWND) {
-    let (parent, hwnd_list) =
-        match unsafe { with_dictionary_state(hwnd, |s| (s.parent, s.hwnd_list)) } {
-            Some(values) => values,
-            None => return,
-        };
+    let (parent, hwnd_list) = match with_dictionary_state(hwnd, |s| (s.parent, s.hwnd_list)) {
+        Some(values) => values,
+        None => return,
+    };
 
     let selected = unsafe { SendMessageW(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)) }.0;
     unsafe { SendMessageW(hwnd_list, LB_RESETCONTENT, WPARAM(0), LPARAM(0)) };
@@ -934,15 +933,15 @@ unsafe fn dictionary_entry_wndproc_inner(
     }
 }
 
-unsafe fn with_entry_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+fn with_entry_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut DictionaryEntryState) -> R,
 {
-    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut DictionaryEntryState;
+    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut DictionaryEntryState };
     if ptr.is_null() {
         None
     } else {
-        Some(f(&mut *ptr))
+        Some(unsafe { f(&mut *ptr) })
     }
 }
 

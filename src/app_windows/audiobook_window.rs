@@ -40,7 +40,7 @@ fn progress_text(language: Language, pct: usize) -> String {
 pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
         let focus = unsafe { GetFocus() };
-        let cancel_btn = unsafe { with_progress_state(hwnd, |s| s.hwnd_cancel) }.unwrap_or(HWND(0));
+        let cancel_btn = with_progress_state(hwnd, |s| s.hwnd_cancel).unwrap_or(HWND(0));
         if focus == cancel_btn {
             request_cancel(hwnd);
             return true;
@@ -312,7 +312,7 @@ unsafe fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: L
 }
 
 pub fn request_cancel(hwnd: HWND) {
-    let parent = unsafe { with_progress_state(hwnd, |state| state.parent).unwrap_or(HWND(0)) };
+    let parent = with_progress_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
     if parent.0 == 0 {
         return;
     }
@@ -365,14 +365,16 @@ pub fn request_cancel(hwnd: HWND) {
     }
 }
 
-unsafe fn with_progress_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+fn with_progress_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut ProgressDialogState) -> R,
 {
-    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ProgressDialogState;
-    if ptr.is_null() {
-        None
-    } else {
-        Some(f(&mut *ptr))
+    unsafe {
+        let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ProgressDialogState;
+        if ptr.is_null() {
+            None
+        } else {
+            Some(f(&mut *ptr))
+        }
     }
 }

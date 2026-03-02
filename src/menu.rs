@@ -710,26 +710,28 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
     }
 }
 
-unsafe fn remove_playback_menu(hmenu: HMENU, playback_menu: HMENU) {
-    if hmenu.0 == 0 || playback_menu.0 == 0 {
-        return;
-    }
-    let mut detached = false;
-    let count = GetMenuItemCount(hmenu);
-    if count > 0 {
-        for index in 0..count {
-            if GetSubMenu(hmenu, index) == playback_menu {
-                crate::log_if_err!(DeleteMenu(hmenu, index as u32, MF_BYPOSITION));
-                detached = true;
-                break;
+fn remove_playback_menu(hmenu: HMENU, playback_menu: HMENU) {
+    unsafe {
+        if hmenu.0 == 0 || playback_menu.0 == 0 {
+            return;
+        }
+        let mut detached = false;
+        let count = GetMenuItemCount(hmenu);
+        if count > 0 {
+            for index in 0..count {
+                if GetSubMenu(hmenu, index) == playback_menu {
+                    crate::log_if_err!(DeleteMenu(hmenu, index as u32, MF_BYPOSITION));
+                    detached = true;
+                    break;
+                }
             }
         }
-    }
-    if detached {
-        if IsMenu(playback_menu).as_bool() {
-            crate::log_if_err!(DestroyMenu(playback_menu));
-        } else {
-            crate::log_debug("remove_playback_menu: playback menu handle already invalid");
+        if detached {
+            if IsMenu(playback_menu).as_bool() {
+                crate::log_if_err!(DestroyMenu(playback_menu));
+            } else {
+                crate::log_debug("remove_playback_menu: playback menu handle already invalid");
+            }
         }
     }
 }

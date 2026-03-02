@@ -708,15 +708,15 @@ unsafe fn import_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
     }
 }
 
-unsafe fn with_import_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+fn with_import_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut ImportState) -> R,
 {
-    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ImportState;
+    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ImportState };
     if ptr.is_null() {
         None
     } else {
-        Some(f(&mut *ptr))
+        Some(unsafe { f(&mut *ptr) })
     }
 }
 
@@ -743,22 +743,20 @@ fn start_load_languages(hwnd: HWND) -> bool {
     let mut already_loading = false;
     let mut cancelled_flag: Option<Arc<AtomicBool>> = None;
 
-    if unsafe {
-        with_import_state(hwnd, |state| {
-            edit = state.url_edit;
-            ok_button = state.ok_button;
-            load_button = state.load_button;
-            combo = state.lang_combo;
-            timestamp = state.timestamp_check;
-            status = state.status_label;
-            language = state.language;
-            url = read_edit_text(state.url_edit);
-            already_loading = state.loading;
-            state.loading = true;
-            state.cancelled.store(false, Ordering::SeqCst);
-            cancelled_flag = Some(state.cancelled.clone());
-        })
-    }
+    if with_import_state(hwnd, |state| {
+        edit = state.url_edit;
+        ok_button = state.ok_button;
+        load_button = state.load_button;
+        combo = state.lang_combo;
+        timestamp = state.timestamp_check;
+        status = state.status_label;
+        language = state.language;
+        url = read_edit_text(state.url_edit);
+        already_loading = state.loading;
+        state.loading = true;
+        state.cancelled.store(false, Ordering::SeqCst);
+        cancelled_flag = Some(state.cancelled.clone());
+    })
     .is_none()
     {
         crate::log_debug("Failed to access import state at L641");
@@ -924,18 +922,16 @@ fn finish_load_languages(hwnd: HWND, result: LoadResult) {
     let mut timestamp = HWND(0);
     let mut status = HWND(0);
 
-    let state_ok = unsafe {
-        with_import_state(hwnd, |state| {
-            edit = state.url_edit;
-            ok_button = state.ok_button;
-            load_button = state.load_button;
-            combo = state.lang_combo;
-            timestamp = state.timestamp_check;
-            status = state.status_label;
-            language = state.language;
-            state.loading = false;
-        })
-    }
+    let state_ok = with_import_state(hwnd, |state| {
+        edit = state.url_edit;
+        ok_button = state.ok_button;
+        load_button = state.load_button;
+        combo = state.lang_combo;
+        timestamp = state.timestamp_check;
+        status = state.status_label;
+        language = state.language;
+        state.loading = false;
+    })
     .is_some();
 
     if !state_ok {
@@ -986,11 +982,9 @@ fn finish_load_languages(hwnd: HWND, result: LoadResult) {
         SetFocus(combo);
     }
 
-    if unsafe {
-        with_import_state(hwnd, |state| {
-            state.transcripts = result.transcripts;
-        })
-    }
+    if with_import_state(hwnd, |state| {
+        state.transcripts = result.transcripts;
+    })
     .is_none()
     {
         crate::log_debug("Failed to access import state at L786");
@@ -1006,18 +1000,16 @@ fn reset_languages_loading_state(hwnd: HWND) {
     let mut timestamp = HWND(0);
     let mut status = HWND(0);
 
-    let state_ok = unsafe {
-        with_import_state(hwnd, |state| {
-            edit = state.url_edit;
-            ok_button = state.ok_button;
-            load_button = state.load_button;
-            combo = state.lang_combo;
-            timestamp = state.timestamp_check;
-            status = state.status_label;
-            language = state.language;
-            state.loading = false;
-        })
-    }
+    let state_ok = with_import_state(hwnd, |state| {
+        edit = state.url_edit;
+        ok_button = state.ok_button;
+        load_button = state.load_button;
+        combo = state.lang_combo;
+        timestamp = state.timestamp_check;
+        status = state.status_label;
+        language = state.language;
+        state.loading = false;
+    })
     .is_some();
 
     if !state_ok {
@@ -1049,17 +1041,15 @@ fn reset_text_loading_state(hwnd: HWND) {
     let mut timestamp = HWND(0);
     let mut status = HWND(0);
 
-    let state_ok = unsafe {
-        with_import_state(hwnd, |state| {
-            edit = state.url_edit;
-            ok_button = state.ok_button;
-            load_button = state.load_button;
-            combo = state.lang_combo;
-            timestamp = state.timestamp_check;
-            status = state.status_label;
-            state.loading = false;
-        })
-    }
+    let state_ok = with_import_state(hwnd, |state| {
+        edit = state.url_edit;
+        ok_button = state.ok_button;
+        load_button = state.load_button;
+        combo = state.lang_combo;
+        timestamp = state.timestamp_check;
+        status = state.status_label;
+        state.loading = false;
+    })
     .is_some();
 
     if !state_ok {
@@ -1096,21 +1086,19 @@ fn start_load_transcript_text(
     let mut already_loading = false;
     let mut cancelled_flag: Option<Arc<AtomicBool>> = None;
 
-    if unsafe {
-        with_import_state(hwnd, |state| {
-            edit = state.url_edit;
-            ok_button = state.ok_button;
-            load_button = state.load_button;
-            combo = state.lang_combo;
-            timestamp = state.timestamp_check;
-            status = state.status_label;
-            language = state.language;
-            already_loading = state.loading;
-            state.loading = true;
-            state.cancelled.store(false, Ordering::SeqCst);
-            cancelled_flag = Some(state.cancelled.clone());
-        })
-    }
+    if with_import_state(hwnd, |state| {
+        edit = state.url_edit;
+        ok_button = state.ok_button;
+        load_button = state.load_button;
+        combo = state.lang_combo;
+        timestamp = state.timestamp_check;
+        status = state.status_label;
+        language = state.language;
+        already_loading = state.loading;
+        state.loading = true;
+        state.cancelled.store(false, Ordering::SeqCst);
+        cancelled_flag = Some(state.cancelled.clone());
+    })
     .is_none()
     {
         crate::log_debug("Failed to access import state at start_load_transcript_text");
@@ -1264,18 +1252,16 @@ fn finish_load_text(hwnd: HWND, result: TextLoadResult) {
     let mut timestamp = HWND(0);
     let mut status = HWND(0);
 
-    let state_ok = unsafe {
-        with_import_state(hwnd, |state| {
-            edit = state.url_edit;
-            ok_button = state.ok_button;
-            load_button = state.load_button;
-            combo = state.lang_combo;
-            timestamp = state.timestamp_check;
-            status = state.status_label;
-            language = state.language;
-            state.loading = false;
-        })
-    }
+    let state_ok = with_import_state(hwnd, |state| {
+        edit = state.url_edit;
+        ok_button = state.ok_button;
+        load_button = state.load_button;
+        combo = state.lang_combo;
+        timestamp = state.timestamp_check;
+        status = state.status_label;
+        language = state.language;
+        state.loading = false;
+    })
     .is_some();
 
     if !state_ok {
@@ -1304,14 +1290,12 @@ fn finish_load_text(hwnd: HWND, result: TextLoadResult) {
         return;
     }
 
-    if unsafe {
-        with_import_state(hwnd, |state| {
-            *state.result.lock().unwrap_or_else(|e| e.into_inner()) = Some(ImportResult {
-                text: result.text,
-                include_timestamps: result.include_timestamps,
-            });
-        })
-    }
+    if with_import_state(hwnd, |state| {
+        *state.result.lock().unwrap_or_else(|e| e.into_inner()) = Some(ImportResult {
+            text: result.text,
+            include_timestamps: result.include_timestamps,
+        });
+    })
     .is_none()
     {
         crate::log_debug("Failed to access import state at finish_load_text");
@@ -1718,27 +1702,27 @@ unsafe fn refill_stream_quality_combo(state: &StreamDialogState, keep_selection:
     );
 }
 
-unsafe fn with_stream_dialog_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+fn with_stream_dialog_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut StreamDialogState) -> R,
 {
-    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut StreamDialogState;
+    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut StreamDialogState };
     if ptr.is_null() {
         None
     } else {
-        Some(f(&mut *ptr))
+        Some(unsafe { f(&mut *ptr) })
     }
 }
 
-unsafe fn with_stream_track_dialog_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+fn with_stream_track_dialog_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut StreamTrackDialogState) -> R,
 {
-    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut StreamTrackDialogState;
+    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut StreamTrackDialogState };
     if ptr.is_null() {
         None
     } else {
-        Some(f(&mut *ptr))
+        Some(unsafe { f(&mut *ptr) })
     }
 }
 

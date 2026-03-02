@@ -736,16 +736,18 @@ unsafe fn find_in_files_wndproc_inner(
     }
 }
 
-unsafe fn with_find_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+fn with_find_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut FindInFilesState) -> R,
 {
-    let ptr = GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
-        as *mut FindInFilesState;
+    let ptr = unsafe {
+        GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+            as *mut FindInFilesState
+    };
     if ptr.is_null() {
         None
     } else {
-        Some(f(&mut *ptr))
+        Some(unsafe { f(&mut *ptr) })
     }
 }
 

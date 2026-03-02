@@ -240,7 +240,7 @@ fn bring_window_to_foreground(hwnd: HWND) {
     }
 }
 
-unsafe fn notify_active_editor_focus(hwnd: HWND, notify_when_audiobook: bool) {
+fn notify_active_editor_focus(hwnd: HWND, notify_when_audiobook: bool) {
     let is_audiobook = unsafe {
         with_state(hwnd, |state| {
             state
@@ -258,6 +258,7 @@ unsafe fn notify_active_editor_focus(hwnd: HWND, notify_when_audiobook: bool) {
         }
         let tab_hwnd = unsafe { with_state(hwnd, |state| state.hwnd_tab) }.unwrap_or(HWND(0));
         if tab_hwnd.0 != 0 {
+            // SAFETY: `tab_hwnd` is owned by this process and used only for an accessibility focus event.
             unsafe {
                 NotifyWinEvent(
                     EVENT_OBJECT_FOCUS,
@@ -271,6 +272,7 @@ unsafe fn notify_active_editor_focus(hwnd: HWND, notify_when_audiobook: bool) {
     }
 
     if let Some(hwnd_edit) = unsafe { get_active_edit(hwnd) } {
+        // SAFETY: `hwnd_edit` is the current editor handle managed by app state.
         unsafe {
             NotifyWinEvent(
                 EVENT_OBJECT_FOCUS,
@@ -700,14 +702,17 @@ fn start_dictionary_lookup(
     });
 }
 
-unsafe fn prefetch_dictionary_for_selection(hwnd: HWND, hwnd_edit: HWND) {
+fn prefetch_dictionary_for_selection(hwnd: HWND, hwnd_edit: HWND) {
     let mut range = CHARRANGE::default();
-    SendMessageW(
-        hwnd_edit,
-        EM_EXGETSEL,
-        WPARAM(0),
-        LPARAM(&mut range as *mut _ as isize),
-    );
+    // SAFETY: `hwnd_edit` is an edit control and `range` is valid writable memory.
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut range as *mut _ as isize),
+        );
+    }
     let start = range.cpMin;
     let end = range.cpMax;
     if start >= end || (end - start) > 50 {
@@ -722,12 +727,15 @@ unsafe fn prefetch_dictionary_for_selection(hwnd: HWND, hwnd_edit: HWND) {
         },
         lpstrText: windows::core::PWSTR(buf.as_mut_ptr()),
     };
-    let copied = SendMessageW(
-        hwnd_edit,
-        EM_GETTEXTRANGE,
-        WPARAM(0),
-        LPARAM(&mut tr as *mut _ as isize),
-    )
+    // SAFETY: `tr` points to `buf`, which is allocated for the requested range plus terminator.
+    let copied = unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_GETTEXTRANGE,
+            WPARAM(0),
+            LPARAM(&mut tr as *mut _ as isize),
+        )
+    }
     .0 as usize;
     if copied == 0 {
         return;
@@ -739,25 +747,27 @@ unsafe fn prefetch_dictionary_for_selection(hwnd: HWND, hwnd_edit: HWND) {
     }
     let word = trimmed.to_string();
 
-    let prefetch_info = with_state(hwnd, |state| {
-        let language = state.settings.language;
-        let pref = state.settings.dictionary_translation_language.clone();
-        let key = dictionary_cache_key(language, &pref, &word);
-        if let Some(lines) = state.dictionary_cache.get(&key).cloned() {
-            if is_dictionary_not_found_cache_entry(language, &lines) {
-                state.dictionary_cache.remove(&key);
-                save_dictionary_cache(&state.dictionary_cache);
-            } else {
+    let prefetch_info = unsafe {
+        with_state(hwnd, |state| {
+            let language = state.settings.language;
+            let pref = state.settings.dictionary_translation_language.clone();
+            let key = dictionary_cache_key(language, &pref, &word);
+            if let Some(lines) = state.dictionary_cache.get(&key).cloned() {
+                if is_dictionary_not_found_cache_entry(language, &lines) {
+                    state.dictionary_cache.remove(&key);
+                    save_dictionary_cache(&state.dictionary_cache);
+                } else {
+                    return None;
+                }
+            }
+            if state.dictionary_pending_lookup.as_ref() == Some(&key) {
                 return None;
             }
-        }
-        if state.dictionary_pending_lookup.as_ref() == Some(&key) {
-            return None;
-        }
-        state.dictionary_pending_lookup = Some(key.clone());
-        let generation = state.dictionary_prefetch_generation;
-        Some((word.clone(), language, pref, key, generation))
-    })
+            state.dictionary_pending_lookup = Some(key.clone());
+            let generation = state.dictionary_prefetch_generation;
+            Some((word.clone(), language, pref, key, generation))
+        })
+    }
     .flatten();
 
     if let Some((word, language, pref, key, generation)) = prefetch_info {
@@ -790,21 +800,24 @@ fn audiobook_position_ms_from_state(state: &AppState) -> Option<u64> {
     Some(accumulated_ms.saturating_add(elapsed_audio_ms))
 }
 
-unsafe fn update_chapter_announcement(hwnd: HWND) {
-    let (current_pos_ms, chapters, last_idx, language) = with_state(hwnd, |state| {
-        (
-            audiobook_position_ms_from_state(state),
-            state.active_podcast_chapters.clone(),
-            state.last_announced_chapter_index,
-            state.settings.language,
-        )
-    })
+fn update_chapter_announcement(hwnd: HWND) {
+    let (current_pos_ms, chapters, last_idx, language) = unsafe {
+        with_state(hwnd, |state| {
+            (
+                audiobook_position_ms_from_state(state),
+                state.active_podcast_chapters.clone(),
+                state.last_announced_chapter_index,
+                state.settings.language,
+            )
+        })
+    }
     .unwrap_or((None, Vec::new(), None, Language::default()));
     let Some(current_pos_ms) = current_pos_ms else {
         return;
     };
     if chapters.is_empty() {
-        if with_state(hwnd, |state| state.last_announced_chapter_index = None).is_none() {
+        if unsafe { with_state(hwnd, |state| state.last_announced_chapter_index = None) }.is_none()
+        {
             crate::log_debug("Failed to clear last announced chapter index");
         }
         return;
@@ -813,9 +826,11 @@ unsafe fn update_chapter_announcement(hwnd: HWND) {
     if current_idx == last_idx {
         return;
     }
-    if with_state(hwnd, |state| {
-        state.last_announced_chapter_index = current_idx
-    })
+    if unsafe {
+        with_state(hwnd, |state| {
+            state.last_announced_chapter_index = current_idx
+        })
+    }
     .is_none()
     {
         crate::log_debug("Failed to update last announced chapter index");
@@ -2141,11 +2156,13 @@ fn print_cli_help() {
     println!("  FILES...           One or more files to open");
 }
 
-unsafe fn is_large_text_editor(hwnd: HWND, hwnd_edit: HWND) -> bool {
-    with_state(hwnd, |state| {
-        state.large_text_editors.contains(&hwnd_edit.0)
-    })
-    .unwrap_or(false)
+fn is_large_text_editor(hwnd: HWND, hwnd_edit: HWND) -> bool {
+    unsafe {
+        with_state(hwnd, |state| {
+            state.large_text_editors.contains(&hwnd_edit.0)
+        })
+        .unwrap_or(false)
+    }
 }
 
 /// Core dell'applicazione - separato per error boundary
@@ -3381,9 +3398,7 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 ShowWindow(hwnd, SW_SHOWMAXIMIZED);
                 bring_window_to_foreground(hwnd);
 
-                unsafe {
-                    notify_active_editor_focus(hwnd, true);
-                }
+                notify_active_editor_focus(hwnd, true);
                 crate::log_if_err!(PostMessageW(hwnd, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)));
             } else {
                 editor_manager::new_document(hwnd);
@@ -4959,14 +4974,16 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
     }
 }
 
-unsafe fn cycle_favorite_voice(hwnd: HWND, direction: i32) {
-    let (favorites, current_engine, current_voice) = with_state(hwnd, |state| {
-        (
-            state.settings.favorite_voices.clone(),
-            state.settings.tts_engine,
-            state.settings.tts_voice.clone(),
-        )
-    })
+fn cycle_favorite_voice(hwnd: HWND, direction: i32) {
+    let (favorites, current_engine, current_voice) = unsafe {
+        with_state(hwnd, |state| {
+            (
+                state.settings.favorite_voices.clone(),
+                state.settings.tts_engine,
+                state.settings.tts_voice.clone(),
+            )
+        })
+    }
     .unwrap_or((Vec::new(), TtsEngine::Edge, String::new()));
     if favorites.is_empty() {
         return;
@@ -4995,21 +5012,27 @@ unsafe fn cycle_favorite_voice(hwnd: HWND, direction: i32) {
     if next_fav.engine == current_engine && next_fav.short_name == current_voice {
         return;
     }
-    with_state(hwnd, |state| {
-        state.settings.tts_engine = next_fav.engine;
-        state.settings.tts_voice = next_fav.short_name.clone();
-    });
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    unsafe {
+        with_state(hwnd, |state| {
+            state.settings.tts_engine = next_fav.engine;
+            state.settings.tts_voice = next_fav.short_name.clone();
+        });
+    }
+    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     app_windows::options_window::ensure_voice_lists_loaded(hwnd, language);
-    refresh_voice_panel(hwnd);
-    if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
+    unsafe {
+        refresh_voice_panel(hwnd);
+    }
+    if let Some(settings) = unsafe { with_state(hwnd, |state| state.settings.clone()) } {
         save_settings(settings);
     }
-    restart_tts_from_current_offset(hwnd);
+    unsafe {
+        restart_tts_from_current_offset(hwnd);
+    }
 }
 
-unsafe fn is_tts_active(hwnd: HWND) -> bool {
-    with_state(hwnd, |state| state.tts_session.is_some()).unwrap_or(false)
+fn is_tts_active(hwnd: HWND) -> bool {
+    unsafe { with_state(hwnd, |state| state.tts_session.is_some()).unwrap_or(false) }
 }
 
 struct VoicePanelLabels {
@@ -5322,9 +5345,10 @@ fn create_ui_font(
     if hfont.0 == 0 { None } else { Some(hfont) }
 }
 
-unsafe fn apply_ui_font(hwnd: HWND, face_name: String) {
+fn apply_ui_font(hwnd: HWND, face_name: String) {
     let (base_font, text_size) =
-        with_state(hwnd, |state| (state.hfont, state.settings.text_size)).unwrap_or((HFONT(0), 12));
+        unsafe { with_state(hwnd, |state| (state.hfont, state.settings.text_size)) }
+            .unwrap_or((HFONT(0), 12));
     let custom_font = create_ui_font(
         &face_name,
         if base_font.0 != 0 {
@@ -5336,97 +5360,109 @@ unsafe fn apply_ui_font(hwnd: HWND, face_name: String) {
     );
     let is_custom = custom_font.is_some() && !face_name.trim().is_empty();
     let new_font_resolved =
-        custom_font.unwrap_or_else(|| HFONT(GetStockObject(DEFAULT_GUI_FONT).0));
-    let Some((new_font, old_font, old_custom)) = with_state(hwnd, |state| {
-        let old_font = state.hfont;
-        let old_custom = state.hfont_custom;
-        state.hfont = new_font_resolved;
-        state.hfont_custom = is_custom;
-        state.settings.editor_font_face = face_name.clone();
-        Some((new_font_resolved, old_font, old_custom))
-    })
+        custom_font.unwrap_or_else(|| unsafe { HFONT(GetStockObject(DEFAULT_GUI_FONT).0) });
+    let Some((new_font, old_font, old_custom)) = unsafe {
+        with_state(hwnd, |state| {
+            let old_font = state.hfont;
+            let old_custom = state.hfont_custom;
+            state.hfont = new_font_resolved;
+            state.hfont_custom = is_custom;
+            state.settings.editor_font_face = face_name.clone();
+            Some((new_font_resolved, old_font, old_custom))
+        })
+    }
     .flatten() else {
         return;
     };
 
-    if old_custom && old_font.0 != 0 && old_font != new_font && !DeleteObject(old_font).as_bool() {
+    if old_custom
+        && old_font.0 != 0
+        && old_font != new_font
+        && !unsafe { DeleteObject(old_font) }.as_bool()
+    {
         log_debug("DeleteObject failed for previous UI font");
     }
 
-    let controls = with_state(hwnd, |state| {
-        vec![
-            state.hwnd_tab,
-            state.voice_label_engine,
-            state.voice_combo_engine,
-            state.voice_label_language,
-            state.voice_combo_language,
-            state.voice_label_voice,
-            state.voice_combo_voice,
-            state.voice_button_insert_tag,
-            state.voice_label_speed,
-            state.voice_combo_speed,
-            state.voice_edit_speed,
-            state.voice_label_pitch,
-            state.voice_combo_pitch,
-            state.voice_edit_pitch,
-            state.voice_label_volume,
-            state.voice_combo_volume,
-            state.voice_edit_volume,
-            state.voice_checkbox_multilingual,
-            state.voice_label_favorites,
-            state.voice_combo_favorites,
-        ]
-    })
+    let controls = unsafe {
+        with_state(hwnd, |state| {
+            vec![
+                state.hwnd_tab,
+                state.voice_label_engine,
+                state.voice_combo_engine,
+                state.voice_label_language,
+                state.voice_combo_language,
+                state.voice_label_voice,
+                state.voice_combo_voice,
+                state.voice_button_insert_tag,
+                state.voice_label_speed,
+                state.voice_combo_speed,
+                state.voice_edit_speed,
+                state.voice_label_pitch,
+                state.voice_combo_pitch,
+                state.voice_edit_pitch,
+                state.voice_label_volume,
+                state.voice_combo_volume,
+                state.voice_edit_volume,
+                state.voice_checkbox_multilingual,
+                state.voice_label_favorites,
+                state.voice_combo_favorites,
+            ]
+        })
+    }
     .unwrap_or_default();
     for control in controls {
         if control.0 != 0 {
-            SendMessageW(control, WM_SETFONT, WPARAM(new_font.0 as usize), LPARAM(1));
+            unsafe {
+                SendMessageW(control, WM_SETFONT, WPARAM(new_font.0 as usize), LPARAM(1));
+            }
         }
     }
     editor_manager::apply_font_to_all_edits(hwnd, new_font);
-    if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
+    if let Some(settings) = unsafe { with_state(hwnd, |state| state.settings.clone()) } {
         save_settings(settings);
     }
 }
 
-unsafe fn update_text_preferences(hwnd: HWND, text_color: Option<u32>, text_size: Option<i32>) {
+fn update_text_preferences(hwnd: HWND, text_color: Option<u32>, text_size: Option<i32>) {
     let mut changed = false;
     let mut next_color = None;
     let mut next_size = None;
-    with_state(hwnd, |state| {
-        if let Some(color) = text_color {
-            if state.settings.text_color != color {
-                state.settings.text_color = color;
-                changed = true;
+    unsafe {
+        with_state(hwnd, |state| {
+            if let Some(color) = text_color {
+                if state.settings.text_color != color {
+                    state.settings.text_color = color;
+                    changed = true;
+                }
+                next_color = Some(state.settings.text_color);
+            } else {
+                next_color = Some(state.settings.text_color);
             }
-            next_color = Some(state.settings.text_color);
-        } else {
-            next_color = Some(state.settings.text_color);
-        }
-        if let Some(size) = text_size {
-            if state.settings.text_size != size {
-                state.settings.text_size = size;
-                changed = true;
+            if let Some(size) = text_size {
+                if state.settings.text_size != size {
+                    state.settings.text_size = size;
+                    changed = true;
+                }
+                next_size = Some(state.settings.text_size);
+            } else {
+                next_size = Some(state.settings.text_size);
             }
-            next_size = Some(state.settings.text_size);
-        } else {
-            next_size = Some(state.settings.text_size);
-        }
-    });
+        });
+    }
 
     let (color, size) = match (next_color, next_size) {
         (Some(c), Some(s)) => (c, s),
         _ => return,
     };
-    if changed && let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
+    if changed && let Some(settings) = unsafe { with_state(hwnd, |state| state.settings.clone()) } {
         save_settings(settings);
     }
     editor_manager::apply_text_appearance_to_all_edits(hwnd, color, size);
     update_voice_panel_menu_check(hwnd);
 }
 
-unsafe fn update_voice_panel_menu_check(hwnd: HWND) {
-    let (visible, favorites_visible, text_color, text_size, read_only, word_wrap) =
+fn update_voice_panel_menu_check(hwnd: HWND) {
+    let (visible, favorites_visible, text_color, text_size, read_only, word_wrap) = unsafe {
         with_state(hwnd, |state| {
             (
                 state.voice_panel_visible,
@@ -5437,13 +5473,16 @@ unsafe fn update_voice_panel_menu_check(hwnd: HWND) {
                 state.settings.word_wrap,
             )
         })
-        .unwrap_or((false, false, 0x000000, 12, false, true));
-    let hmenu = GetMenu(hwnd);
+    }
+    .unwrap_or((false, false, 0x000000, 12, false, true));
+    let hmenu = unsafe { GetMenu(hwnd) };
     if hmenu.0 == 0 {
         return;
     }
     let flags = if visible { MF_CHECKED } else { MF_UNCHECKED };
-    if CheckMenuItem(hmenu, IDM_VIEW_SHOW_VOICES as u32, (MF_BYCOMMAND | flags).0) == 0xFFFFFFFF {
+    if unsafe { CheckMenuItem(hmenu, IDM_VIEW_SHOW_VOICES as u32, (MF_BYCOMMAND | flags).0) }
+        == 0xFFFFFFFF
+    {
         crate::log_debug("CheckMenuItem failed for IDM_VIEW_SHOW_VOICES");
     }
     let fav_flags = if favorites_visible {
@@ -5451,23 +5490,29 @@ unsafe fn update_voice_panel_menu_check(hwnd: HWND) {
     } else {
         MF_UNCHECKED
     };
-    CheckMenuItem(
-        hmenu,
-        IDM_VIEW_SHOW_FAVORITES as u32,
-        (MF_BYCOMMAND | fav_flags).0,
-    );
+    unsafe {
+        CheckMenuItem(
+            hmenu,
+            IDM_VIEW_SHOW_FAVORITES as u32,
+            (MF_BYCOMMAND | fav_flags).0,
+        );
+    }
     let read_only_flags = if read_only { MF_CHECKED } else { MF_UNCHECKED };
-    CheckMenuItem(
-        hmenu,
-        IDM_VIEW_READ_ONLY as u32,
-        (MF_BYCOMMAND | read_only_flags).0,
-    );
+    unsafe {
+        CheckMenuItem(
+            hmenu,
+            IDM_VIEW_READ_ONLY as u32,
+            (MF_BYCOMMAND | read_only_flags).0,
+        );
+    }
     let wrap_flags = if word_wrap { MF_CHECKED } else { MF_UNCHECKED };
-    CheckMenuItem(
-        hmenu,
-        IDM_VIEW_WORD_WRAP as u32,
-        (MF_BYCOMMAND | wrap_flags).0,
-    );
+    unsafe {
+        CheckMenuItem(
+            hmenu,
+            IDM_VIEW_WORD_WRAP as u32,
+            (MF_BYCOMMAND | wrap_flags).0,
+        );
+    }
 
     let color_items = [
         IDM_VIEW_TEXT_COLOR_BLACK,
@@ -5487,7 +5532,8 @@ unsafe fn update_voice_panel_menu_check(hwnd: HWND) {
         } else {
             MF_UNCHECKED
         };
-        if CheckMenuItem(hmenu, item as u32, (MF_BYCOMMAND | item_flags).0) == 0xFFFFFFFF {
+        if unsafe { CheckMenuItem(hmenu, item as u32, (MF_BYCOMMAND | item_flags).0) } == 0xFFFFFFFF
+        {
             crate::log_debug("CheckMenuItem failed for view item");
         }
     }
@@ -5506,22 +5552,23 @@ unsafe fn update_voice_panel_menu_check(hwnd: HWND) {
         } else {
             MF_UNCHECKED
         };
-        if CheckMenuItem(hmenu, item as u32, (MF_BYCOMMAND | item_flags).0) == 0xFFFFFFFF {
+        if unsafe { CheckMenuItem(hmenu, item as u32, (MF_BYCOMMAND | item_flags).0) } == 0xFFFFFFFF
+        {
             crate::log_debug("CheckMenuItem failed for color item");
         }
     }
 }
 
-unsafe fn toggle_voice_panel(hwnd: HWND) {
-    let visible = with_state(hwnd, |state| state.voice_panel_visible).unwrap_or(false);
+fn toggle_voice_panel(hwnd: HWND) {
+    let visible = unsafe { with_state(hwnd, |state| state.voice_panel_visible) }.unwrap_or(false);
     set_voice_panel_visible(hwnd, !visible);
 }
 
-unsafe fn set_voice_panel_visible(hwnd: HWND, visible: bool) {
+fn set_voice_panel_visible(hwnd: HWND, visible: bool) {
     set_voice_panel_visible_internal(hwnd, visible, true);
 }
 
-unsafe fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: bool) {
+fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: bool) {
     let (
         label_engine,
         combo_engine,
@@ -5541,31 +5588,33 @@ unsafe fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: b
         edit_volume,
         checkbox_multilingual,
         changed,
-    ) = match with_state(hwnd, |state| {
-        let changed = state.settings.show_voice_panel != visible;
-        state.voice_panel_visible = visible;
-        state.settings.show_voice_panel = visible;
-        (
-            state.voice_label_engine,
-            state.voice_combo_engine,
-            state.voice_label_language,
-            state.voice_combo_language,
-            state.voice_label_voice,
-            state.voice_combo_voice,
-            state.voice_button_insert_tag,
-            state.voice_label_speed,
-            state.voice_combo_speed,
-            state.voice_edit_speed,
-            state.voice_label_pitch,
-            state.voice_combo_pitch,
-            state.voice_edit_pitch,
-            state.voice_label_volume,
-            state.voice_combo_volume,
-            state.voice_edit_volume,
-            state.voice_checkbox_multilingual,
-            changed,
-        )
-    }) {
+    ) = match unsafe {
+        with_state(hwnd, |state| {
+            let changed = state.settings.show_voice_panel != visible;
+            state.voice_panel_visible = visible;
+            state.settings.show_voice_panel = visible;
+            (
+                state.voice_label_engine,
+                state.voice_combo_engine,
+                state.voice_label_language,
+                state.voice_combo_language,
+                state.voice_label_voice,
+                state.voice_combo_voice,
+                state.voice_button_insert_tag,
+                state.voice_label_speed,
+                state.voice_combo_speed,
+                state.voice_edit_speed,
+                state.voice_label_pitch,
+                state.voice_combo_pitch,
+                state.voice_edit_pitch,
+                state.voice_label_volume,
+                state.voice_combo_volume,
+                state.voice_edit_volume,
+                state.voice_checkbox_multilingual,
+                changed,
+            )
+        })
+    } {
         Some(values) => values,
         None => return,
     };
@@ -5591,18 +5640,23 @@ unsafe fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: b
         checkbox_multilingual,
     ] {
         if control.0 != 0 {
-            ShowWindow(control, show);
+            unsafe {
+                ShowWindow(control, show);
+            }
         }
     }
     update_voice_panel_menu_check(hwnd);
     if visible {
-        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+        let language =
+            unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
         app_windows::options_window::ensure_voice_lists_loaded(hwnd, language);
-        refresh_voice_panel(hwnd);
+        unsafe {
+            refresh_voice_panel(hwnd);
+        }
     }
     if persist
         && changed
-        && let Some(settings) = with_state(hwnd, |state| state.settings.clone())
+        && let Some(settings) = unsafe { with_state(hwnd, |state| state.settings.clone()) }
     {
         save_settings(settings);
     }
@@ -5610,44 +5664,52 @@ unsafe fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: b
     editor_manager::layout_children(hwnd);
 }
 
-unsafe fn toggle_favorites_panel(hwnd: HWND) {
-    let visible = with_state(hwnd, |state| state.voice_favorites_visible).unwrap_or(false);
+fn toggle_favorites_panel(hwnd: HWND) {
+    let visible =
+        unsafe { with_state(hwnd, |state| state.voice_favorites_visible) }.unwrap_or(false);
     set_favorites_panel_visible(hwnd, !visible);
 }
 
-unsafe fn set_favorites_panel_visible(hwnd: HWND, visible: bool) {
+fn set_favorites_panel_visible(hwnd: HWND, visible: bool) {
     set_favorites_panel_visible_internal(hwnd, visible, true);
 }
 
-unsafe fn set_favorites_panel_visible_internal(hwnd: HWND, visible: bool, persist: bool) {
-    let (label_favorites, combo_favorites, changed) = match with_state(hwnd, |state| {
-        let changed = state.settings.show_favorite_panel != visible;
-        state.voice_favorites_visible = visible;
-        state.settings.show_favorite_panel = visible;
-        (
-            state.voice_label_favorites,
-            state.voice_combo_favorites,
-            changed,
-        )
-    }) {
+fn set_favorites_panel_visible_internal(hwnd: HWND, visible: bool, persist: bool) {
+    let (label_favorites, combo_favorites, changed) = match unsafe {
+        with_state(hwnd, |state| {
+            let changed = state.settings.show_favorite_panel != visible;
+            state.voice_favorites_visible = visible;
+            state.settings.show_favorite_panel = visible;
+            (
+                state.voice_label_favorites,
+                state.voice_combo_favorites,
+                changed,
+            )
+        })
+    } {
         Some(values) => values,
         None => return,
     };
     let show = if visible { SW_SHOW } else { SW_HIDE };
     for control in [label_favorites, combo_favorites] {
         if control.0 != 0 {
-            ShowWindow(control, show);
+            unsafe {
+                ShowWindow(control, show);
+            }
         }
     }
     update_voice_panel_menu_check(hwnd);
     if visible {
-        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+        let language =
+            unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
         app_windows::options_window::ensure_voice_lists_loaded(hwnd, language);
-        refresh_voice_panel(hwnd);
+        unsafe {
+            refresh_voice_panel(hwnd);
+        }
     }
     if persist
         && changed
-        && let Some(settings) = with_state(hwnd, |state| state.settings.clone())
+        && let Some(settings) = unsafe { with_state(hwnd, |state| state.settings.clone()) }
     {
         save_settings(settings);
     }
@@ -6055,180 +6117,184 @@ pub(crate) unsafe fn refresh_voice_panel(hwnd: HWND) {
     }
 }
 
-unsafe fn refresh_voice_panel_voice_list(hwnd: HWND) {
-    let (voice_visible, combo_voice, checkbox_multilingual, label_language, combo_language) =
-        match with_state(hwnd, |state| {
+fn refresh_voice_panel_voice_list(hwnd: HWND) {
+    unsafe {
+        let (voice_visible, combo_voice, checkbox_multilingual, label_language, combo_language) =
+            match with_state(hwnd, |state| {
+                (
+                    state.voice_panel_visible,
+                    state.voice_combo_voice,
+                    state.voice_checkbox_multilingual,
+                    state.voice_label_language,
+                    state.voice_combo_language,
+                )
+            }) {
+                Some(values) => values,
+                None => return,
+            };
+        if !voice_visible || combo_voice.0 == 0 {
+            return;
+        }
+
+        let settings = with_state(hwnd, |state| state.settings.clone()).unwrap_or_default();
+        let labels = voice_panel_labels(settings.language);
+        let is_edge = matches!(settings.tts_engine, TtsEngine::Edge);
+        SendMessageW(
+            checkbox_multilingual,
+            BM_SETCHECK,
+            WPARAM(if settings.tts_only_multilingual {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        EnableWindow(checkbox_multilingual, is_edge);
+        let multi_show = if is_edge { SW_SHOW } else { SW_HIDE };
+        ShowWindow(checkbox_multilingual, multi_show);
+        let show_language_combo = is_edge && !settings.tts_only_multilingual;
+        ShowWindow(
+            label_language,
+            if show_language_combo {
+                SW_SHOW
+            } else {
+                SW_HIDE
+            },
+        );
+        ShowWindow(
+            combo_language,
+            if show_language_combo {
+                SW_SHOW
+            } else {
+                SW_HIDE
+            },
+        );
+        EnableWindow(combo_language, show_language_combo);
+
+        let voices: Vec<crate::settings::VoiceInfo> =
+            with_state(hwnd, |state| match settings.tts_engine {
+                TtsEngine::Edge => state.edge_voices.clone(),
+                TtsEngine::Sapi5 => state.sapi_voices.clone(),
+                TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
+            })
+            .unwrap_or_default();
+        let mut language_filter: Option<String> = None;
+        if show_language_combo {
+            let previous_selection = with_state(hwnd, |state| {
+                let sel = SendMessageW(combo_language, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+                if sel >= 0 {
+                    state.voice_language_codes.get(sel as usize).cloned()
+                } else {
+                    None
+                }
+            })
+            .flatten();
+            let mut codes = collect_voice_language_codes(&voices);
+            if !codes.is_empty() {
+                let selected_from_voice = voices
+                    .iter()
+                    .find(|v| v.short_name == settings.tts_voice)
+                    .and_then(|v| voice_locale_language_code(&v.locale));
+                let selected_code = previous_selection
+                    .filter(|code| codes.contains(code))
+                    .or(selected_from_voice.filter(|code| codes.contains(code)))
+                    .unwrap_or_else(|| codes[0].clone());
+                SendMessageW(combo_language, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+                let mut selected_index: Option<usize> = None;
+                for (idx, code) in codes.iter().enumerate() {
+                    let label = localized_voice_language_name(settings.language, code);
+                    let added = SendMessageW(
+                        combo_language,
+                        CB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(to_wide(&label).as_ptr() as isize),
+                    )
+                    .0;
+                    if added >= 0 && *code == selected_code {
+                        selected_index = Some(idx);
+                    }
+                }
+                SendMessageW(
+                    combo_language,
+                    CB_SETCURSEL,
+                    WPARAM(selected_index.unwrap_or(0)),
+                    LPARAM(0),
+                );
+                language_filter = Some(selected_code);
+            }
+            if with_state(hwnd, |state| {
+                state.voice_language_codes = std::mem::take(&mut codes);
+            })
+            .is_none()
+            {
+                log_debug("Failed to update voice language codes");
+            }
+        } else {
+            SendMessageW(combo_language, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+            if with_state(hwnd, |state| state.voice_language_codes.clear()).is_none() {
+                log_debug("Failed to clear voice language codes");
+            }
+        }
+        populate_voice_panel_combo(
+            combo_voice,
+            &voices,
+            &settings.tts_voice,
+            settings.tts_only_multilingual,
+            language_filter.as_deref(),
+            &labels.voices_empty,
+        );
+    }
+}
+
+fn clear_voice_labels_if_hidden(hwnd: HWND) {
+    unsafe {
+        let (
+            voice_visible,
+            favorites_visible,
+            label_engine,
+            label_language,
+            label_voice,
+            label_speed,
+            label_pitch,
+            label_volume,
+            checkbox_multilingual,
+            label_favorites,
+        ) = match with_state(hwnd, |state| {
             (
                 state.voice_panel_visible,
-                state.voice_combo_voice,
-                state.voice_checkbox_multilingual,
+                state.voice_favorites_visible,
+                state.voice_label_engine,
                 state.voice_label_language,
-                state.voice_combo_language,
+                state.voice_label_voice,
+                state.voice_label_speed,
+                state.voice_label_pitch,
+                state.voice_label_volume,
+                state.voice_checkbox_multilingual,
+                state.voice_label_favorites,
             )
         }) {
             Some(values) => values,
             None => return,
         };
-    if !voice_visible || combo_voice.0 == 0 {
-        return;
+        if voice_visible || favorites_visible {
+            return;
+        }
+        let empty = to_wide("");
+        crate::log_if_err!(SetWindowTextW(label_engine, PCWSTR(empty.as_ptr())));
+        crate::log_if_err!(SetWindowTextW(label_language, PCWSTR(empty.as_ptr())));
+        crate::log_if_err!(SetWindowTextW(label_voice, PCWSTR(empty.as_ptr())));
+        crate::log_if_err!(SetWindowTextW(label_speed, PCWSTR(empty.as_ptr())));
+        crate::log_if_err!(SetWindowTextW(label_pitch, PCWSTR(empty.as_ptr())));
+        crate::log_if_err!(SetWindowTextW(label_volume, PCWSTR(empty.as_ptr())));
+        crate::log_if_err!(SetWindowTextW(
+            checkbox_multilingual,
+            PCWSTR(empty.as_ptr())
+        ));
+        crate::log_if_err!(SetWindowTextW(label_favorites, PCWSTR(empty.as_ptr())));
     }
-
-    let settings = with_state(hwnd, |state| state.settings.clone()).unwrap_or_default();
-    let labels = voice_panel_labels(settings.language);
-    let is_edge = matches!(settings.tts_engine, TtsEngine::Edge);
-    SendMessageW(
-        checkbox_multilingual,
-        BM_SETCHECK,
-        WPARAM(if settings.tts_only_multilingual {
-            BST_CHECKED.0 as usize
-        } else {
-            0
-        }),
-        LPARAM(0),
-    );
-    EnableWindow(checkbox_multilingual, is_edge);
-    let multi_show = if is_edge { SW_SHOW } else { SW_HIDE };
-    ShowWindow(checkbox_multilingual, multi_show);
-    let show_language_combo = is_edge && !settings.tts_only_multilingual;
-    ShowWindow(
-        label_language,
-        if show_language_combo {
-            SW_SHOW
-        } else {
-            SW_HIDE
-        },
-    );
-    ShowWindow(
-        combo_language,
-        if show_language_combo {
-            SW_SHOW
-        } else {
-            SW_HIDE
-        },
-    );
-    EnableWindow(combo_language, show_language_combo);
-
-    let voices: Vec<crate::settings::VoiceInfo> =
-        with_state(hwnd, |state| match settings.tts_engine {
-            TtsEngine::Edge => state.edge_voices.clone(),
-            TtsEngine::Sapi5 => state.sapi_voices.clone(),
-            TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
-        })
-        .unwrap_or_default();
-    let mut language_filter: Option<String> = None;
-    if show_language_combo {
-        let previous_selection = with_state(hwnd, |state| {
-            let sel = SendMessageW(combo_language, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-            if sel >= 0 {
-                state.voice_language_codes.get(sel as usize).cloned()
-            } else {
-                None
-            }
-        })
-        .flatten();
-        let mut codes = collect_voice_language_codes(&voices);
-        if !codes.is_empty() {
-            let selected_from_voice = voices
-                .iter()
-                .find(|v| v.short_name == settings.tts_voice)
-                .and_then(|v| voice_locale_language_code(&v.locale));
-            let selected_code = previous_selection
-                .filter(|code| codes.contains(code))
-                .or(selected_from_voice.filter(|code| codes.contains(code)))
-                .unwrap_or_else(|| codes[0].clone());
-            SendMessageW(combo_language, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-            let mut selected_index: Option<usize> = None;
-            for (idx, code) in codes.iter().enumerate() {
-                let label = localized_voice_language_name(settings.language, code);
-                let added = SendMessageW(
-                    combo_language,
-                    CB_ADDSTRING,
-                    WPARAM(0),
-                    LPARAM(to_wide(&label).as_ptr() as isize),
-                )
-                .0;
-                if added >= 0 && *code == selected_code {
-                    selected_index = Some(idx);
-                }
-            }
-            SendMessageW(
-                combo_language,
-                CB_SETCURSEL,
-                WPARAM(selected_index.unwrap_or(0)),
-                LPARAM(0),
-            );
-            language_filter = Some(selected_code);
-        }
-        if with_state(hwnd, |state| {
-            state.voice_language_codes = std::mem::take(&mut codes);
-        })
-        .is_none()
-        {
-            log_debug("Failed to update voice language codes");
-        }
-    } else {
-        SendMessageW(combo_language, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-        if with_state(hwnd, |state| state.voice_language_codes.clear()).is_none() {
-            log_debug("Failed to clear voice language codes");
-        }
-    }
-    populate_voice_panel_combo(
-        combo_voice,
-        &voices,
-        &settings.tts_voice,
-        settings.tts_only_multilingual,
-        language_filter.as_deref(),
-        &labels.voices_empty,
-    );
 }
 
-unsafe fn clear_voice_labels_if_hidden(hwnd: HWND) {
-    let (
-        voice_visible,
-        favorites_visible,
-        label_engine,
-        label_language,
-        label_voice,
-        label_speed,
-        label_pitch,
-        label_volume,
-        checkbox_multilingual,
-        label_favorites,
-    ) = match with_state(hwnd, |state| {
-        (
-            state.voice_panel_visible,
-            state.voice_favorites_visible,
-            state.voice_label_engine,
-            state.voice_label_language,
-            state.voice_label_voice,
-            state.voice_label_speed,
-            state.voice_label_pitch,
-            state.voice_label_volume,
-            state.voice_checkbox_multilingual,
-            state.voice_label_favorites,
-        )
-    }) {
-        Some(values) => values,
-        None => return,
-    };
-    if voice_visible || favorites_visible {
-        return;
-    }
-    let empty = to_wide("");
-    crate::log_if_err!(SetWindowTextW(label_engine, PCWSTR(empty.as_ptr())));
-    crate::log_if_err!(SetWindowTextW(label_language, PCWSTR(empty.as_ptr())));
-    crate::log_if_err!(SetWindowTextW(label_voice, PCWSTR(empty.as_ptr())));
-    crate::log_if_err!(SetWindowTextW(label_speed, PCWSTR(empty.as_ptr())));
-    crate::log_if_err!(SetWindowTextW(label_pitch, PCWSTR(empty.as_ptr())));
-    crate::log_if_err!(SetWindowTextW(label_volume, PCWSTR(empty.as_ptr())));
-    crate::log_if_err!(SetWindowTextW(
-        checkbox_multilingual,
-        PCWSTR(empty.as_ptr())
-    ));
-    crate::log_if_err!(SetWindowTextW(label_favorites, PCWSTR(empty.as_ptr())));
-}
-
-unsafe fn populate_voice_panel_combo(
+fn populate_voice_panel_combo(
     combo_voice: HWND,
     voices: &[VoiceInfo],
     selected: &str,
@@ -6236,160 +6302,149 @@ unsafe fn populate_voice_panel_combo(
     language_filter: Option<&str>,
     empty_label: &str,
 ) {
-    SendMessageW(combo_voice, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    if voices.is_empty() {
-        SendMessageW(
-            combo_voice,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(to_wide(empty_label).as_ptr() as isize),
-        );
-        SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
-        return;
-    }
-    let mut selected_index: Option<usize> = None;
-    let mut combo_index = 0usize;
-
-    for (voice_index, voice) in voices.iter().enumerate() {
-        if only_multilingual && !voice.is_multilingual {
-            continue;
-        }
-        if let Some(filter) = language_filter {
-            let Some(code) = voice_locale_language_code(&voice.locale) else {
-                continue;
-            };
-            if code != filter {
-                continue;
-            }
-        }
-        let label = format!("{} ({})", voice.short_name, voice.locale);
-        let idx = SendMessageW(
-            combo_voice,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(to_wide(&label).as_ptr() as isize),
-        )
-        .0;
-        if idx >= 0 {
+    unsafe {
+        SendMessageW(combo_voice, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        if voices.is_empty() {
             SendMessageW(
                 combo_voice,
-                CB_SETITEMDATA,
-                WPARAM(idx as usize),
-                LPARAM(voice_index as isize),
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(empty_label).as_ptr() as isize),
             );
-            if voice.short_name == selected {
-                selected_index = Some(combo_index);
-            }
-            combo_index += 1;
+            SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+            return;
         }
-    }
+        let mut selected_index: Option<usize> = None;
+        let mut combo_index = 0usize;
 
-    if let Some(idx) = selected_index {
-        SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(idx), LPARAM(0));
-    } else if combo_index > 0 {
-        SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+        for (voice_index, voice) in voices.iter().enumerate() {
+            if only_multilingual && !voice.is_multilingual {
+                continue;
+            }
+            if let Some(filter) = language_filter {
+                let Some(code) = voice_locale_language_code(&voice.locale) else {
+                    continue;
+                };
+                if code != filter {
+                    continue;
+                }
+            }
+            let label = format!("{} ({})", voice.short_name, voice.locale);
+            let idx = SendMessageW(
+                combo_voice,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&label).as_ptr() as isize),
+            )
+            .0;
+            if idx >= 0 {
+                SendMessageW(
+                    combo_voice,
+                    CB_SETITEMDATA,
+                    WPARAM(idx as usize),
+                    LPARAM(voice_index as isize),
+                );
+                if voice.short_name == selected {
+                    selected_index = Some(combo_index);
+                }
+                combo_index += 1;
+            }
+        }
+
+        if let Some(idx) = selected_index {
+            SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(idx), LPARAM(0));
+        } else if combo_index > 0 {
+            SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+        }
     }
 }
 
-unsafe fn populate_favorites_combo(
+fn populate_favorites_combo(
     combo_favorites: HWND,
     favorites: &[FavoriteVoice],
     selected_engine: TtsEngine,
     selected_voice: &str,
     labels: &VoicePanelLabels,
 ) {
-    SendMessageW(combo_favorites, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    if favorites.is_empty() {
-        SendMessageW(
-            combo_favorites,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(to_wide(&labels.favorites_empty).as_ptr() as isize),
-        );
-        SendMessageW(combo_favorites, CB_SETCURSEL, WPARAM(0), LPARAM(0));
-        return;
-    }
-    let mut selected_index: Option<usize> = None;
-    for (idx, fav) in favorites.iter().enumerate() {
-        let engine_label = match fav.engine {
-            TtsEngine::Edge => &labels.engine_edge,
-            TtsEngine::Sapi5 => &labels.engine_sapi,
-            TtsEngine::Sapi4 => &labels.engine_sapi,
-        };
-        let label = format!("{} ({})", fav.short_name, engine_label);
-        let cb_idx = SendMessageW(
-            combo_favorites,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(to_wide(&label).as_ptr() as isize),
-        )
-        .0;
-        if cb_idx >= 0 {
+    unsafe {
+        SendMessageW(combo_favorites, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        if favorites.is_empty() {
             SendMessageW(
                 combo_favorites,
-                CB_SETITEMDATA,
-                WPARAM(cb_idx as usize),
-                LPARAM(idx as isize),
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&labels.favorites_empty).as_ptr() as isize),
             );
-            if fav.short_name == selected_voice && fav.engine == selected_engine {
-                selected_index = Some(cb_idx as usize);
+            SendMessageW(combo_favorites, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+            return;
+        }
+        let mut selected_index: Option<usize> = None;
+        for (idx, fav) in favorites.iter().enumerate() {
+            let engine_label = match fav.engine {
+                TtsEngine::Edge => &labels.engine_edge,
+                TtsEngine::Sapi5 => &labels.engine_sapi,
+                TtsEngine::Sapi4 => &labels.engine_sapi,
+            };
+            let label = format!("{} ({})", fav.short_name, engine_label);
+            let cb_idx = SendMessageW(
+                combo_favorites,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&label).as_ptr() as isize),
+            )
+            .0;
+            if cb_idx >= 0 {
+                SendMessageW(
+                    combo_favorites,
+                    CB_SETITEMDATA,
+                    WPARAM(cb_idx as usize),
+                    LPARAM(idx as isize),
+                );
+                if fav.short_name == selected_voice && fav.engine == selected_engine {
+                    selected_index = Some(cb_idx as usize);
+                }
             }
         }
-    }
-    if let Some(idx) = selected_index {
-        SendMessageW(combo_favorites, CB_SETCURSEL, WPARAM(idx), LPARAM(0));
-    } else {
-        SendMessageW(combo_favorites, CB_SETCURSEL, WPARAM(0), LPARAM(0));
-    }
-}
-
-unsafe fn handle_voice_panel_engine_change(hwnd: HWND) {
-    let (combo_engine, language) = match with_state(hwnd, |state| {
-        (state.voice_combo_engine, state.settings.language)
-    }) {
-        Some(values) => values,
-        None => return,
-    };
-    let sel = SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-    let new_engine = match sel {
-        1 => TtsEngine::Sapi5,
-        2 => TtsEngine::Sapi4,
-        _ => TtsEngine::Edge,
-    };
-    let (old_engine, old_voice) = with_state(hwnd, |state| {
-        (state.settings.tts_engine, state.settings.tts_voice.clone())
-    })
-    .unwrap_or((TtsEngine::Edge, String::new()));
-    with_state(hwnd, |state| {
-        state.settings.tts_engine = new_engine;
-    });
-    app_windows::options_window::ensure_voice_lists_loaded(hwnd, language);
-    refresh_voice_panel(hwnd);
-    let mut new_voice = old_voice.clone();
-    if let Some(voice_name) = current_voice_selection(hwnd, new_engine) {
-        with_state(hwnd, |state| {
-            state.settings.tts_voice = voice_name.clone();
-        });
-        new_voice = voice_name;
-    }
-    let changed = new_engine != old_engine || new_voice != old_voice;
-    if changed {
-        if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
-            save_settings(settings);
+        if let Some(idx) = selected_index {
+            SendMessageW(combo_favorites, CB_SETCURSEL, WPARAM(idx), LPARAM(0));
+        } else {
+            SendMessageW(combo_favorites, CB_SETCURSEL, WPARAM(0), LPARAM(0));
         }
-        restart_tts_from_current_offset(hwnd);
     }
 }
 
-unsafe fn handle_voice_panel_voice_change(hwnd: HWND) {
-    let engine = with_state(hwnd, |state| state.settings.tts_engine).unwrap_or_default();
-    if let Some(voice_name) = current_voice_selection(hwnd, engine) {
-        let old_voice =
-            with_state(hwnd, |state| state.settings.tts_voice.clone()).unwrap_or_default();
-        if voice_name != old_voice {
+fn handle_voice_panel_engine_change(hwnd: HWND) {
+    unsafe {
+        let (combo_engine, language) = match with_state(hwnd, |state| {
+            (state.voice_combo_engine, state.settings.language)
+        }) {
+            Some(values) => values,
+            None => return,
+        };
+        let sel = SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+        let new_engine = match sel {
+            1 => TtsEngine::Sapi5,
+            2 => TtsEngine::Sapi4,
+            _ => TtsEngine::Edge,
+        };
+        let (old_engine, old_voice) = with_state(hwnd, |state| {
+            (state.settings.tts_engine, state.settings.tts_voice.clone())
+        })
+        .unwrap_or((TtsEngine::Edge, String::new()));
+        with_state(hwnd, |state| {
+            state.settings.tts_engine = new_engine;
+        });
+        app_windows::options_window::ensure_voice_lists_loaded(hwnd, language);
+        refresh_voice_panel(hwnd);
+        let mut new_voice = old_voice.clone();
+        if let Some(voice_name) = current_voice_selection(hwnd, new_engine) {
             with_state(hwnd, |state| {
-                state.settings.tts_voice = voice_name;
+                state.settings.tts_voice = voice_name.clone();
             });
+            new_voice = voice_name;
+        }
+        let changed = new_engine != old_engine || new_voice != old_voice;
+        if changed {
             if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
                 save_settings(settings);
             }
@@ -6398,249 +6453,287 @@ unsafe fn handle_voice_panel_voice_change(hwnd: HWND) {
     }
 }
 
-unsafe fn handle_voice_panel_multilingual_toggle(hwnd: HWND) {
-    let (checkbox, is_edge) = with_state(hwnd, |state| {
-        (
-            state.voice_checkbox_multilingual,
-            matches!(state.settings.tts_engine, TtsEngine::Edge),
-        )
-    })
-    .unwrap_or((HWND(0), false));
-    if checkbox.0 == 0 {
-        return;
+fn handle_voice_panel_voice_change(hwnd: HWND) {
+    unsafe {
+        let engine = with_state(hwnd, |state| state.settings.tts_engine).unwrap_or_default();
+        if let Some(voice_name) = current_voice_selection(hwnd, engine) {
+            let old_voice =
+                with_state(hwnd, |state| state.settings.tts_voice.clone()).unwrap_or_default();
+            if voice_name != old_voice {
+                with_state(hwnd, |state| {
+                    state.settings.tts_voice = voice_name;
+                });
+                if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
+                    save_settings(settings);
+                }
+                restart_tts_from_current_offset(hwnd);
+            }
+        }
     }
-    if !is_edge {
-        return;
-    }
-    let checked =
-        SendMessageW(checkbox, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 == BST_CHECKED.0;
-    with_state(hwnd, |state| {
-        state.settings.tts_only_multilingual = checked;
-    });
-    if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
-        save_settings(settings);
-    }
-    refresh_voice_panel_voice_list(hwnd);
 }
 
-unsafe fn insert_voice_tag_from_voice_panel(hwnd: HWND) {
-    let (engine, rate, pitch, volume) = with_state(hwnd, |state| {
-        (
-            state.settings.tts_engine,
-            state.settings.tts_rate,
-            state.settings.tts_pitch,
-            state.settings.tts_volume,
-        )
-    })
-    .unwrap_or_default();
-    let voice_name = current_voice_selection(hwnd, engine)
-        .or_else(|| with_state(hwnd, |state| Some(state.settings.tts_voice.clone())).flatten())
+fn handle_voice_panel_multilingual_toggle(hwnd: HWND) {
+    unsafe {
+        let (checkbox, is_edge) = with_state(hwnd, |state| {
+            (
+                state.voice_checkbox_multilingual,
+                matches!(state.settings.tts_engine, TtsEngine::Edge),
+            )
+        })
+        .unwrap_or((HWND(0), false));
+        if checkbox.0 == 0 {
+            return;
+        }
+        if !is_edge {
+            return;
+        }
+        let checked =
+            SendMessageW(checkbox, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 == BST_CHECKED.0;
+        with_state(hwnd, |state| {
+            state.settings.tts_only_multilingual = checked;
+        });
+        if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
+            save_settings(settings);
+        }
+        refresh_voice_panel_voice_list(hwnd);
+    }
+}
+
+fn insert_voice_tag_from_voice_panel(hwnd: HWND) {
+    unsafe {
+        let (engine, rate, pitch, volume) = with_state(hwnd, |state| {
+            (
+                state.settings.tts_engine,
+                state.settings.tts_rate,
+                state.settings.tts_pitch,
+                state.settings.tts_volume,
+            )
+        })
         .unwrap_or_default();
-    if voice_name.trim().is_empty() {
-        return;
-    }
-    crate::editor_manager::insert_voice_tag_at_caret(
-        hwnd,
-        engine,
-        &voice_name,
-        rate,
-        pitch,
-        volume,
-    );
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    let label = clean_menu_label(&i18n::tr(language, "options.label.insert_voice_tag"));
-    if !label.is_empty() {
-        with_state(hwnd, |state| state.undo_action_label = Some(label));
+        let voice_name = current_voice_selection(hwnd, engine)
+            .or_else(|| with_state(hwnd, |state| Some(state.settings.tts_voice.clone())).flatten())
+            .unwrap_or_default();
+        if voice_name.trim().is_empty() {
+            return;
+        }
+        crate::editor_manager::insert_voice_tag_at_caret(
+            hwnd,
+            engine,
+            &voice_name,
+            rate,
+            pitch,
+            volume,
+        );
+        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+        let label = clean_menu_label(&i18n::tr(language, "options.label.insert_voice_tag"));
+        if !label.is_empty() {
+            with_state(hwnd, |state| state.undo_action_label = Some(label));
+        }
     }
 }
 
-unsafe fn is_voice_panel_tuning_edit(hwnd: HWND, target: HWND) -> bool {
+fn is_voice_panel_tuning_edit(hwnd: HWND, target: HWND) -> bool {
     if target.0 == 0 {
         return false;
     }
-    with_state(hwnd, |state| {
-        target == state.voice_edit_speed
-            || target == state.voice_edit_pitch
-            || target == state.voice_edit_volume
-    })
+    unsafe {
+        with_state(hwnd, |state| {
+            target == state.voice_edit_speed
+                || target == state.voice_edit_pitch
+                || target == state.voice_edit_volume
+        })
+    }
     .unwrap_or(false)
 }
 
-unsafe fn handle_voice_panel_tuning_combo_change(hwnd: HWND) {
-    let (combo_speed, combo_pitch, combo_volume, was_active, old_rate, old_pitch, old_volume) =
-        with_state(hwnd, |state| {
-            (
-                state.voice_combo_speed,
-                state.voice_combo_pitch,
-                state.voice_combo_volume,
-                state.tts_session.is_some(),
-                state.settings.tts_rate,
-                state.settings.tts_pitch,
-                state.settings.tts_volume,
-            )
+fn handle_voice_panel_tuning_combo_change(hwnd: HWND) {
+    unsafe {
+        let (combo_speed, combo_pitch, combo_volume, was_active, old_rate, old_pitch, old_volume) =
+            with_state(hwnd, |state| {
+                (
+                    state.voice_combo_speed,
+                    state.voice_combo_pitch,
+                    state.voice_combo_volume,
+                    state.tts_session.is_some(),
+                    state.settings.tts_rate,
+                    state.settings.tts_pitch,
+                    state.settings.tts_volume,
+                )
+            })
+            .unwrap_or((HWND(0), HWND(0), HWND(0), false, 0, 0, 100));
+        if combo_speed.0 == 0 || combo_pitch.0 == 0 || combo_volume.0 == 0 {
+            return;
+        }
+        let rate = combo_value(combo_speed);
+        let pitch = combo_value(combo_pitch);
+        let volume = combo_value(combo_volume);
+        let changed = with_state(hwnd, |state| {
+            if state.settings.tts_rate != rate
+                || state.settings.tts_pitch != pitch
+                || state.settings.tts_volume != volume
+            {
+                state.settings.tts_rate = rate;
+                state.settings.tts_pitch = pitch;
+                state.settings.tts_volume = volume;
+                true
+            } else {
+                false
+            }
         })
-        .unwrap_or((HWND(0), HWND(0), HWND(0), false, 0, 0, 100));
-    if combo_speed.0 == 0 || combo_pitch.0 == 0 || combo_volume.0 == 0 {
-        return;
-    }
-    let rate = combo_value(combo_speed);
-    let pitch = combo_value(combo_pitch);
-    let volume = combo_value(combo_volume);
-    let changed = with_state(hwnd, |state| {
-        if state.settings.tts_rate != rate
-            || state.settings.tts_pitch != pitch
-            || state.settings.tts_volume != volume
-        {
-            state.settings.tts_rate = rate;
-            state.settings.tts_pitch = pitch;
-            state.settings.tts_volume = volume;
-            true
-        } else {
-            false
-        }
-    })
-    .unwrap_or(false);
-    if changed {
-        if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
-            save_settings(settings);
-        }
-        if was_active && (old_rate != rate || old_pitch != pitch || old_volume != volume) {
-            restart_tts_from_current_offset(hwnd);
+        .unwrap_or(false);
+        if changed {
+            if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
+                save_settings(settings);
+            }
+            if was_active && (old_rate != rate || old_pitch != pitch || old_volume != volume) {
+                restart_tts_from_current_offset(hwnd);
+            }
         }
     }
 }
 
-unsafe fn handle_voice_panel_tuning_edit_change(hwnd: HWND) {
-    let (edit_speed, edit_pitch, edit_volume, was_active, old_rate, old_pitch, old_volume) =
-        with_state(hwnd, |state| {
-            (
-                state.voice_edit_speed,
-                state.voice_edit_pitch,
-                state.voice_edit_volume,
-                state.tts_session.is_some(),
-                state.settings.tts_rate,
-                state.settings.tts_pitch,
-                state.settings.tts_volume,
-            )
+fn handle_voice_panel_tuning_edit_change(hwnd: HWND) {
+    unsafe {
+        let (edit_speed, edit_pitch, edit_volume, was_active, old_rate, old_pitch, old_volume) =
+            with_state(hwnd, |state| {
+                (
+                    state.voice_edit_speed,
+                    state.voice_edit_pitch,
+                    state.voice_edit_volume,
+                    state.tts_session.is_some(),
+                    state.settings.tts_rate,
+                    state.settings.tts_pitch,
+                    state.settings.tts_volume,
+                )
+            })
+            .unwrap_or((HWND(0), HWND(0), HWND(0), false, 0, 0, 100));
+        if edit_speed.0 == 0 || edit_pitch.0 == 0 || edit_volume.0 == 0 {
+            return;
+        }
+        let rate = read_tts_tuning_edit_value(edit_speed, old_rate, TTS_RATE_MIN, TTS_RATE_MAX);
+        let pitch = read_tts_tuning_edit_value(edit_pitch, old_pitch, TTS_PITCH_MIN, TTS_PITCH_MAX);
+        let volume = read_tts_edit_value(edit_volume, old_volume, TTS_VOLUME_MIN, TTS_VOLUME_MAX);
+        let changed = with_state(hwnd, |state| {
+            if state.settings.tts_rate != rate
+                || state.settings.tts_pitch != pitch
+                || state.settings.tts_volume != volume
+            {
+                state.settings.tts_rate = rate;
+                state.settings.tts_pitch = pitch;
+                state.settings.tts_volume = volume;
+                true
+            } else {
+                false
+            }
         })
-        .unwrap_or((HWND(0), HWND(0), HWND(0), false, 0, 0, 100));
-    if edit_speed.0 == 0 || edit_pitch.0 == 0 || edit_volume.0 == 0 {
-        return;
-    }
-    let rate = read_tts_tuning_edit_value(edit_speed, old_rate, TTS_RATE_MIN, TTS_RATE_MAX);
-    let pitch = read_tts_tuning_edit_value(edit_pitch, old_pitch, TTS_PITCH_MIN, TTS_PITCH_MAX);
-    let volume = read_tts_edit_value(edit_volume, old_volume, TTS_VOLUME_MIN, TTS_VOLUME_MAX);
-    let changed = with_state(hwnd, |state| {
-        if state.settings.tts_rate != rate
-            || state.settings.tts_pitch != pitch
-            || state.settings.tts_volume != volume
-        {
-            state.settings.tts_rate = rate;
-            state.settings.tts_pitch = pitch;
-            state.settings.tts_volume = volume;
-            true
-        } else {
-            false
-        }
-    })
-    .unwrap_or(false);
-    if changed {
-        if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
-            save_settings(settings);
-        }
-        if was_active && (old_rate != rate || old_pitch != pitch || old_volume != volume) {
-            restart_tts_from_current_offset(hwnd);
+        .unwrap_or(false);
+        if changed {
+            if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
+                save_settings(settings);
+            }
+            if was_active && (old_rate != rate || old_pitch != pitch || old_volume != volume) {
+                restart_tts_from_current_offset(hwnd);
+            }
         }
     }
 }
 
-unsafe fn handle_voice_panel_favorite_change(hwnd: HWND) {
-    let (combo_favorites, favorites) = with_state(hwnd, |state| {
-        (
-            state.voice_combo_favorites,
-            state.settings.favorite_voices.clone(),
+fn handle_voice_panel_favorite_change(hwnd: HWND) {
+    unsafe {
+        let (combo_favorites, favorites) = with_state(hwnd, |state| {
+            (
+                state.voice_combo_favorites,
+                state.settings.favorite_voices.clone(),
+            )
+        })
+        .unwrap_or((HWND(0), Vec::new()));
+        if combo_favorites.0 == 0 || favorites.is_empty() {
+            return;
+        }
+        let sel = SendMessageW(combo_favorites, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+        if sel < 0 {
+            return;
+        }
+        let fav_idx = SendMessageW(
+            combo_favorites,
+            CB_GETITEMDATA,
+            WPARAM(sel as usize),
+            LPARAM(0),
         )
-    })
-    .unwrap_or((HWND(0), Vec::new()));
-    if combo_favorites.0 == 0 || favorites.is_empty() {
-        return;
+        .0 as usize;
+        let Some(fav) = favorites.get(fav_idx).cloned() else {
+            return;
+        };
+        let (old_engine, old_voice) = with_state(hwnd, |state| {
+            (state.settings.tts_engine, state.settings.tts_voice.clone())
+        })
+        .unwrap_or((TtsEngine::Edge, String::new()));
+        if fav.engine == old_engine && fav.short_name == old_voice {
+            return;
+        }
+        with_state(hwnd, |state| {
+            state.settings.tts_engine = fav.engine;
+            state.settings.tts_voice = fav.short_name.clone();
+        });
+        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+        app_windows::options_window::ensure_voice_lists_loaded(hwnd, language);
+        refresh_voice_panel(hwnd);
+        if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
+            save_settings(settings);
+        }
+        restart_tts_from_current_offset(hwnd);
     }
-    let sel = SendMessageW(combo_favorites, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-    if sel < 0 {
-        return;
-    }
-    let fav_idx = SendMessageW(
-        combo_favorites,
-        CB_GETITEMDATA,
-        WPARAM(sel as usize),
-        LPARAM(0),
-    )
-    .0 as usize;
-    let Some(fav) = favorites.get(fav_idx).cloned() else {
-        return;
-    };
-    let (old_engine, old_voice) = with_state(hwnd, |state| {
-        (state.settings.tts_engine, state.settings.tts_voice.clone())
-    })
-    .unwrap_or((TtsEngine::Edge, String::new()));
-    if fav.engine == old_engine && fav.short_name == old_voice {
-        return;
-    }
-    with_state(hwnd, |state| {
-        state.settings.tts_engine = fav.engine;
-        state.settings.tts_voice = fav.short_name.clone();
-    });
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    app_windows::options_window::ensure_voice_lists_loaded(hwnd, language);
-    refresh_voice_panel(hwnd);
-    if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
-        save_settings(settings);
-    }
-    restart_tts_from_current_offset(hwnd);
 }
 
-unsafe fn current_voice_selection(hwnd: HWND, engine: TtsEngine) -> Option<String> {
-    let (combo_voice, voices) = with_state(hwnd, |state| {
-        let list = match engine {
-            TtsEngine::Edge => state.edge_voices.clone(),
-            TtsEngine::Sapi5 => state.sapi_voices.clone(),
-            TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
-        };
-        (state.voice_combo_voice, list)
-    })?;
+fn current_voice_selection(hwnd: HWND, engine: TtsEngine) -> Option<String> {
+    let (combo_voice, voices) = unsafe {
+        with_state(hwnd, |state| {
+            let list = match engine {
+                TtsEngine::Edge => state.edge_voices.clone(),
+                TtsEngine::Sapi5 => state.sapi_voices.clone(),
+                TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
+            };
+            (state.voice_combo_voice, list)
+        })
+    }?;
     if voices.is_empty() || combo_voice.0 == 0 {
         return None;
     }
-    let sel = SendMessageW(combo_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    let sel = unsafe { SendMessageW(combo_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
     if sel < 0 {
         return None;
     }
-    let voice_index =
-        SendMessageW(combo_voice, CB_GETITEMDATA, WPARAM(sel as usize), LPARAM(0)).0 as usize;
+    let voice_index = unsafe {
+        SendMessageW(combo_voice, CB_GETITEMDATA, WPARAM(sel as usize), LPARAM(0)).0 as usize
+    };
     voices.get(voice_index).map(|v| v.short_name.clone())
 }
 
-unsafe fn current_favorite_selection(hwnd: HWND) -> Option<FavoriteVoice> {
-    let (combo_favorites, favorites) = with_state(hwnd, |state| {
-        (
-            state.voice_combo_favorites,
-            state.settings.favorite_voices.clone(),
-        )
-    })?;
+fn current_favorite_selection(hwnd: HWND) -> Option<FavoriteVoice> {
+    let (combo_favorites, favorites) = unsafe {
+        with_state(hwnd, |state| {
+            (
+                state.voice_combo_favorites,
+                state.settings.favorite_voices.clone(),
+            )
+        })
+    }?;
     if combo_favorites.0 == 0 || favorites.is_empty() {
         return None;
     }
-    let sel = SendMessageW(combo_favorites, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    let sel = unsafe { SendMessageW(combo_favorites, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
     if sel < 0 {
         return None;
     }
-    let fav_idx = SendMessageW(
-        combo_favorites,
-        CB_GETITEMDATA,
-        WPARAM(sel as usize),
-        LPARAM(0),
-    )
-    .0 as usize;
+    let fav_idx = unsafe {
+        SendMessageW(
+            combo_favorites,
+            CB_GETITEMDATA,
+            WPARAM(sel as usize),
+            LPARAM(0),
+        )
+        .0 as usize
+    };
     favorites.get(fav_idx).cloned()
 }
 
@@ -6727,7 +6820,7 @@ pub(crate) unsafe fn restart_tts_from_current_offset(hwnd: HWND) {
     tts_engine::start_tts_from_caret(hwnd);
 }
 
-unsafe fn adjust_tts_restart_pos(hwnd_edit: HWND, pos: i32) -> i32 {
+fn adjust_tts_restart_pos(hwnd_edit: HWND, pos: i32) -> i32 {
     if pos <= 0 {
         return 0;
     }
@@ -6788,14 +6881,16 @@ unsafe fn adjust_tts_restart_pos(hwnd_edit: HWND, pos: i32) -> i32 {
     pos
 }
 
-unsafe fn spellcheck_caret_char_index(hwnd_edit: HWND) -> Option<i32> {
+fn spellcheck_caret_char_index(hwnd_edit: HWND) -> Option<i32> {
     let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXGETSEL,
-        WPARAM(0),
-        LPARAM(&mut selection as *mut _ as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut selection as *mut _ as isize),
+        );
+    }
     if selection.cpMin < 0 {
         None
     } else {
@@ -6803,7 +6898,7 @@ unsafe fn spellcheck_caret_char_index(hwnd_edit: HWND) -> Option<i32> {
     }
 }
 
-unsafe fn spellcheck_char_index_from_lparam(hwnd_edit: HWND, lparam: LPARAM) -> Option<i32> {
+fn spellcheck_char_index_from_lparam(hwnd_edit: HWND, lparam: LPARAM) -> Option<i32> {
     if lparam.0 == -1 {
         return spellcheck_caret_char_index(hwnd_edit);
     }
@@ -6813,50 +6908,58 @@ unsafe fn spellcheck_char_index_from_lparam(hwnd_edit: HWND, lparam: LPARAM) -> 
         return spellcheck_caret_char_index(hwnd_edit);
     }
     let mut pt = POINT { x, y };
-    if !ScreenToClient(hwnd_edit, &mut pt).as_bool() {
+    if !unsafe { ScreenToClient(hwnd_edit, &mut pt).as_bool() } {
         crate::log_debug("ScreenToClient failed");
     }
-    let res = SendMessageW(
-        hwnd_edit,
-        EM_CHARFROMPOS,
-        WPARAM(0),
-        LPARAM(&pt as *const _ as isize),
-    )
-    .0 as i32;
+    let res = unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_CHARFROMPOS,
+            WPARAM(0),
+            LPARAM(&pt as *const _ as isize),
+        )
+        .0 as i32
+    };
     if res < 0 { None } else { Some(res) }
 }
 
-unsafe fn spellcheck_line_info(hwnd_edit: HWND, char_index: i32) -> Option<(i32, i32, String)> {
+fn spellcheck_line_info(hwnd_edit: HWND, char_index: i32) -> Option<(i32, i32, String)> {
     if char_index < 0 {
         return None;
     }
-    let line_index = SendMessageW(
-        hwnd_edit,
-        EM_LINEFROMCHAR,
-        WPARAM(char_index as usize),
-        LPARAM(0),
-    )
-    .0 as i32;
+    let line_index = unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_LINEFROMCHAR,
+            WPARAM(char_index as usize),
+            LPARAM(0),
+        )
+        .0 as i32
+    };
     if line_index < 0 {
         return None;
     }
-    let line_start = SendMessageW(
-        hwnd_edit,
-        EM_LINEINDEX,
-        WPARAM(line_index as usize),
-        LPARAM(0),
-    )
-    .0 as i32;
+    let line_start = unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_LINEINDEX,
+            WPARAM(line_index as usize),
+            LPARAM(0),
+        )
+        .0 as i32
+    };
     if line_start < 0 {
         return None;
     }
-    let line_len = SendMessageW(
-        hwnd_edit,
-        EM_LINELENGTH,
-        WPARAM(line_start as usize),
-        LPARAM(0),
-    )
-    .0 as i32;
+    let line_len = unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_LINELENGTH,
+            WPARAM(line_start as usize),
+            LPARAM(0),
+        )
+        .0 as i32
+    };
     if line_len <= 0 {
         return Some((line_index, line_start, String::new()));
     }
@@ -6868,18 +6971,20 @@ unsafe fn spellcheck_line_info(hwnd_edit: HWND, char_index: i32) -> Option<(i32,
         },
         lpstrText: PWSTR(buf.as_mut_ptr()),
     };
-    SendMessageW(
-        hwnd_edit,
-        EM_GETTEXTRANGE,
-        WPARAM(0),
-        LPARAM(&mut range as *mut _ as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_GETTEXTRANGE,
+            WPARAM(0),
+            LPARAM(&mut range as *mut _ as isize),
+        );
+    }
     let line_len = line_len.max(0) as usize;
     let line_text = String::from_utf16_lossy(&buf[..line_len]);
     Some((line_index, line_start, line_text))
 }
 
-unsafe fn spellcheck_word_context_from_char_index(
+fn spellcheck_word_context_from_char_index(
     hwnd_edit: HWND,
     char_index: i32,
 ) -> Option<SpellcheckWordContext> {
@@ -6909,7 +7014,7 @@ unsafe fn spellcheck_word_context_from_char_index(
     })
 }
 
-unsafe fn spellcheck_word_context_from_lparam(
+fn spellcheck_word_context_from_lparam(
     hwnd_edit: HWND,
     lparam: LPARAM,
 ) -> Option<SpellcheckWordContext> {
@@ -6917,77 +7022,85 @@ unsafe fn spellcheck_word_context_from_lparam(
     spellcheck_word_context_from_char_index(hwnd_edit, char_index)
 }
 
-unsafe fn handle_spellcheck_selection_change(hwnd: HWND, hwnd_edit: HWND) {
-    let announce_allowed = with_state(hwnd, |state| {
-        if state.spellcheck_space_trigger == Some(hwnd_edit) {
-            // Force re-highlight of current line when space/punctuation is pressed.
-            state.spellcheck_last_highlighted_line = None;
-            state.spellcheck_space_trigger = None;
-            state.spellcheck_typing_in_progress = false;
-            return true;
-        }
-        !state.spellcheck_typing_in_progress
-    })
+fn handle_spellcheck_selection_change(hwnd: HWND, hwnd_edit: HWND) {
+    let announce_allowed = unsafe {
+        with_state(hwnd, |state| {
+            if state.spellcheck_space_trigger == Some(hwnd_edit) {
+                // Force re-highlight of current line when space/punctuation is pressed.
+                state.spellcheck_last_highlighted_line = None;
+                state.spellcheck_space_trigger = None;
+                state.spellcheck_typing_in_progress = false;
+                return true;
+            }
+            !state.spellcheck_typing_in_progress
+        })
+    }
     .unwrap_or(false);
     let Some(caret_index) = spellcheck_caret_char_index(hwnd_edit) else {
-        with_state(hwnd, |state| state.spellcheck_last_announce = None);
+        unsafe {
+            with_state(hwnd, |state| state.spellcheck_last_announce = None);
+        }
         return;
     };
     let Some(word_ctx) = spellcheck_word_context_from_char_index(hwnd_edit, caret_index) else {
-        with_state(hwnd, |state| state.spellcheck_last_announce = None);
+        unsafe {
+            with_state(hwnd, |state| state.spellcheck_last_announce = None);
+        }
         return;
     };
 
-    let (announce_msg, fallback_msg) = with_state(hwnd, |state| {
-        let settings = &state.settings;
-        let Some(resolution) = state.spellcheck_manager.resolve_language(settings) else {
-            state.spellcheck_last_announce = None;
-            return (None, None);
-        };
-        let language_ui = settings.language;
-        let fallback_msg = if resolution.announce_fallback {
-            Some(i18n::tr_f(
-                language_ui,
-                "spellcheck.language_fallback",
-                &[
-                    ("requested", &resolution.requested),
-                    ("language", &resolution.effective),
-                ],
-            ))
-        } else {
-            None
-        };
-
-        let miss = state.spellcheck_manager.is_word_misspelled(
-            word_ctx.doc_id,
-            word_ctx.line_index,
-            &word_ctx.line_text,
-            word_ctx.word_range,
-            &resolution.effective,
-        );
-        if let Some(miss) = miss {
-            let key = SpellcheckAnnounceKey {
-                doc_id: word_ctx.doc_id,
-                line_index: word_ctx.line_index,
-                start_utf8: miss.start,
-                end_utf8: miss.end,
-                line_hash: word_ctx.line_hash,
-                language: resolution.effective.clone(),
+    let (announce_msg, fallback_msg) = unsafe {
+        with_state(hwnd, |state| {
+            let settings = &state.settings;
+            let Some(resolution) = state.spellcheck_manager.resolve_language(settings) else {
+                state.spellcheck_last_announce = None;
+                return (None, None);
             };
-            if announce_allowed && state.spellcheck_last_announce.as_ref() != Some(&key) {
-                state.spellcheck_last_announce = Some(key);
-                let msg = i18n::tr_f(
+            let language_ui = settings.language;
+            let fallback_msg = if resolution.announce_fallback {
+                Some(i18n::tr_f(
                     language_ui,
-                    "spellcheck.announce_misspelled",
-                    &[("word", &word_ctx.word)],
-                );
-                return (Some(msg), fallback_msg);
+                    "spellcheck.language_fallback",
+                    &[
+                        ("requested", &resolution.requested),
+                        ("language", &resolution.effective),
+                    ],
+                ))
+            } else {
+                None
+            };
+
+            let miss = state.spellcheck_manager.is_word_misspelled(
+                word_ctx.doc_id,
+                word_ctx.line_index,
+                &word_ctx.line_text,
+                word_ctx.word_range,
+                &resolution.effective,
+            );
+            if let Some(miss) = miss {
+                let key = SpellcheckAnnounceKey {
+                    doc_id: word_ctx.doc_id,
+                    line_index: word_ctx.line_index,
+                    start_utf8: miss.start,
+                    end_utf8: miss.end,
+                    line_hash: word_ctx.line_hash,
+                    language: resolution.effective.clone(),
+                };
+                if announce_allowed && state.spellcheck_last_announce.as_ref() != Some(&key) {
+                    state.spellcheck_last_announce = Some(key);
+                    let msg = i18n::tr_f(
+                        language_ui,
+                        "spellcheck.announce_misspelled",
+                        &[("word", &word_ctx.word)],
+                    );
+                    return (Some(msg), fallback_msg);
+                }
+                return (None, fallback_msg);
             }
-            return (None, fallback_msg);
-        }
-        state.spellcheck_last_announce = None;
-        (None, fallback_msg)
-    })
+            state.spellcheck_last_announce = None;
+            (None, fallback_msg)
+        })
+    }
     .unwrap_or((None, None));
 
     if let Some(message) = fallback_msg {
@@ -7000,37 +7113,41 @@ unsafe fn handle_spellcheck_selection_change(hwnd: HWND, hwnd_edit: HWND) {
 }
 
 /// Triggers the debounced spellcheck highlight timer
-unsafe fn trigger_spellcheck_highlight(hwnd: HWND, hwnd_edit: HWND) {
-    let should_start_timer = with_state(hwnd, |state| {
-        if !state.settings.spellcheck_enabled {
-            return false;
-        }
-        state.spellcheck_highlight_pending = Some(hwnd_edit);
-        true
-    })
+fn trigger_spellcheck_highlight(hwnd: HWND, hwnd_edit: HWND) {
+    let should_start_timer = unsafe {
+        with_state(hwnd, |state| {
+            if !state.settings.spellcheck_enabled {
+                return false;
+            }
+            state.spellcheck_highlight_pending = Some(hwnd_edit);
+            true
+        })
+    }
     .unwrap_or(false);
 
     if should_start_timer {
         // Reset/start the debounce timer only if spellcheck is enabled
-        SetTimer(
-            hwnd,
-            SPELLCHECK_HIGHLIGHT_TIMER_ID,
-            SPELLCHECK_HIGHLIGHT_DEBOUNCE_MS,
-            None,
-        );
+        unsafe {
+            SetTimer(
+                hwnd,
+                SPELLCHECK_HIGHLIGHT_TIMER_ID,
+                SPELLCHECK_HIGHLIGHT_DEBOUNCE_MS,
+                None,
+            );
+        }
     }
 }
 
 /// Called when the debounce timer fires - highlights misspellings on current line
-unsafe fn handle_spellcheck_highlight_timer(hwnd: HWND) {
+fn handle_spellcheck_highlight_timer(hwnd: HWND) {
     let Some(hwnd_edit) =
-        with_state(hwnd, |state| state.spellcheck_highlight_pending.take()).flatten()
+        (unsafe { with_state(hwnd, |state| state.spellcheck_highlight_pending.take()).flatten() })
     else {
         return;
     };
 
     // Don't do anything if editor doesn't have focus
-    if GetFocus() != hwnd_edit {
+    if unsafe { GetFocus() } != hwnd_edit {
         return;
     }
 
@@ -7046,14 +7163,16 @@ unsafe fn handle_spellcheck_highlight_timer(hwnd: HWND) {
     let doc_id = hwnd_edit.0;
 
     // Check if we're on the same line as before - no need to re-highlight
-    let should_highlight = with_state(hwnd, |state| {
-        let last = state.spellcheck_last_highlighted_line;
-        if last == Some((doc_id, line_index)) {
-            return false;
-        }
-        state.spellcheck_last_highlighted_line = Some((doc_id, line_index));
-        true
-    })
+    let should_highlight = unsafe {
+        with_state(hwnd, |state| {
+            let last = state.spellcheck_last_highlighted_line;
+            if last == Some((doc_id, line_index)) {
+                return false;
+            }
+            state.spellcheck_last_highlighted_line = Some((doc_id, line_index));
+            true
+        })
+    }
     .unwrap_or(false);
 
     if !should_highlight {
@@ -7061,17 +7180,19 @@ unsafe fn handle_spellcheck_highlight_timer(hwnd: HWND) {
     }
 
     // Get misspellings for this line
-    let misspellings = with_state(hwnd, |state| {
-        let settings = &state.settings;
-        let resolution = state.spellcheck_manager.resolve_language(settings)?;
-        let misses = state.spellcheck_manager.check_line(
-            doc_id,
-            line_index,
-            &line_text,
-            &resolution.effective,
-        );
-        Some((misses, settings.text_color))
-    })
+    let misspellings = unsafe {
+        with_state(hwnd, |state| {
+            let settings = &state.settings;
+            let resolution = state.spellcheck_manager.resolve_language(settings)?;
+            let misses = state.spellcheck_manager.check_line(
+                doc_id,
+                line_index,
+                &line_text,
+                &resolution.effective,
+            );
+            Some((misses, settings.text_color))
+        })
+    }
     .flatten();
 
     let Some((misspellings, text_color)) = misspellings else {
@@ -7092,175 +7213,174 @@ unsafe fn handle_spellcheck_highlight_timer(hwnd: HWND) {
 }
 
 /// Resets line formatting to normal (removes red background)
-unsafe fn reset_line_formatting(
-    hwnd_edit: HWND,
-    line_start: i32,
-    line_len: usize,
-    _text_color: u32,
-) {
-    if line_len == 0 {
-        return;
+fn reset_line_formatting(hwnd_edit: HWND, line_start: i32, line_len: usize, _text_color: u32) {
+    unsafe {
+        if line_len == 0 {
+            return;
+        }
+
+        // Check if this editor still has focus - don't mess with selection if not
+        if GetFocus() != hwnd_edit {
+            return;
+        }
+
+        // Save modified state - formatting changes should not mark document as dirty
+        let was_modified = SendMessageW(hwnd_edit, EM_GETMODIFY, WPARAM(0), LPARAM(0)).0 != 0;
+
+        // Disable change notifications during formatting
+        SendMessageW(hwnd_edit, EM_SETEVENTMASK, WPARAM(0), LPARAM(0));
+
+        // Lock the control to prevent redraws/scrolling
+        SendMessageW(hwnd_edit, WM_SETREDRAW, WPARAM(0), LPARAM(0));
+
+        // Save current selection
+        let mut old_sel = CHARRANGE { cpMin: 0, cpMax: 0 };
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut old_sel as *mut _ as isize),
+        );
+
+        // Select the line
+        let line_end = line_start + line_len as i32;
+        let mut sel = CHARRANGE {
+            cpMin: line_start,
+            cpMax: line_end,
+        };
+        SendMessageW(
+            hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut sel as *mut _ as isize),
+        );
+
+        // Apply normal formatting (remove background color)
+        let mut format = CHARFORMAT2W::default();
+        format.Base.cbSize = std::mem::size_of::<CHARFORMAT2W>() as u32;
+        format.Base.dwMask = CFM_BACKCOLOR;
+        format.Base.dwEffects = CFE_AUTOBACKCOLOR; // Use default background
+        SendMessageW(
+            hwnd_edit,
+            EM_SETCHARFORMAT,
+            WPARAM(SCF_SELECTION as usize),
+            LPARAM(&mut format as *mut _ as isize),
+        );
+
+        // Restore selection
+        SendMessageW(
+            hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut old_sel as *mut _ as isize),
+        );
+
+        // Unlock redraw
+        SendMessageW(hwnd_edit, WM_SETREDRAW, WPARAM(1), LPARAM(0));
+        // Force repaint to avoid stale/blank regions after formatting changes.
+        if !InvalidateRect(hwnd_edit, None, BOOL(1)).as_bool() {
+            crate::log_debug("InvalidateRect failed in reset_line_formatting");
+        }
+
+        // Re-enable change notifications
+        SendMessageW(
+            hwnd_edit,
+            EM_SETEVENTMASK,
+            WPARAM(0),
+            LPARAM((ENM_CHANGE | ENM_SELCHANGE) as isize),
+        );
+
+        // Restore modified state
+        SendMessageW(
+            hwnd_edit,
+            EM_SETMODIFY,
+            WPARAM(if was_modified { 1 } else { 0 }),
+            LPARAM(0),
+        );
     }
-
-    // Check if this editor still has focus - don't mess with selection if not
-    if GetFocus() != hwnd_edit {
-        return;
-    }
-
-    // Save modified state - formatting changes should not mark document as dirty
-    let was_modified = SendMessageW(hwnd_edit, EM_GETMODIFY, WPARAM(0), LPARAM(0)).0 != 0;
-
-    // Disable change notifications during formatting
-    SendMessageW(hwnd_edit, EM_SETEVENTMASK, WPARAM(0), LPARAM(0));
-
-    // Lock the control to prevent redraws/scrolling
-    SendMessageW(hwnd_edit, WM_SETREDRAW, WPARAM(0), LPARAM(0));
-
-    // Save current selection
-    let mut old_sel = CHARRANGE { cpMin: 0, cpMax: 0 };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXGETSEL,
-        WPARAM(0),
-        LPARAM(&mut old_sel as *mut _ as isize),
-    );
-
-    // Select the line
-    let line_end = line_start + line_len as i32;
-    let mut sel = CHARRANGE {
-        cpMin: line_start,
-        cpMax: line_end,
-    };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXSETSEL,
-        WPARAM(0),
-        LPARAM(&mut sel as *mut _ as isize),
-    );
-
-    // Apply normal formatting (remove background color)
-    let mut format = CHARFORMAT2W::default();
-    format.Base.cbSize = std::mem::size_of::<CHARFORMAT2W>() as u32;
-    format.Base.dwMask = CFM_BACKCOLOR;
-    format.Base.dwEffects = CFE_AUTOBACKCOLOR; // Use default background
-    SendMessageW(
-        hwnd_edit,
-        EM_SETCHARFORMAT,
-        WPARAM(SCF_SELECTION as usize),
-        LPARAM(&mut format as *mut _ as isize),
-    );
-
-    // Restore selection
-    SendMessageW(
-        hwnd_edit,
-        EM_EXSETSEL,
-        WPARAM(0),
-        LPARAM(&mut old_sel as *mut _ as isize),
-    );
-
-    // Unlock redraw
-    SendMessageW(hwnd_edit, WM_SETREDRAW, WPARAM(1), LPARAM(0));
-    // Force repaint to avoid stale/blank regions after formatting changes.
-    if !InvalidateRect(hwnd_edit, None, BOOL(1)).as_bool() {
-        crate::log_debug("InvalidateRect failed in reset_line_formatting");
-    }
-
-    // Re-enable change notifications
-    SendMessageW(
-        hwnd_edit,
-        EM_SETEVENTMASK,
-        WPARAM(0),
-        LPARAM((ENM_CHANGE | ENM_SELCHANGE) as isize),
-    );
-
-    // Restore modified state
-    SendMessageW(
-        hwnd_edit,
-        EM_SETMODIFY,
-        WPARAM(if was_modified { 1 } else { 0 }),
-        LPARAM(0),
-    );
 }
 
 /// Highlights a misspelled word with red background
-unsafe fn highlight_misspelled_word(hwnd_edit: HWND, start: i32, end: i32) {
-    // Check if this editor still has focus - don't mess with selection if not
-    if GetFocus() != hwnd_edit {
-        return;
+fn highlight_misspelled_word(hwnd_edit: HWND, start: i32, end: i32) {
+    unsafe {
+        // Check if this editor still has focus - don't mess with selection if not
+        if GetFocus() != hwnd_edit {
+            return;
+        }
+
+        // Save modified state - formatting changes should not mark document as dirty
+        let was_modified = SendMessageW(hwnd_edit, EM_GETMODIFY, WPARAM(0), LPARAM(0)).0 != 0;
+
+        // Disable change notifications during formatting
+        SendMessageW(hwnd_edit, EM_SETEVENTMASK, WPARAM(0), LPARAM(0));
+
+        // Lock the control to prevent redraws/scrolling
+        SendMessageW(hwnd_edit, WM_SETREDRAW, WPARAM(0), LPARAM(0));
+
+        // Save current selection
+        let mut old_sel = CHARRANGE { cpMin: 0, cpMax: 0 };
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut old_sel as *mut _ as isize),
+        );
+
+        // Select the misspelled word
+        let mut sel = CHARRANGE {
+            cpMin: start,
+            cpMax: end,
+        };
+        SendMessageW(
+            hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut sel as *mut _ as isize),
+        );
+
+        // Apply red background color
+        let mut format = CHARFORMAT2W::default();
+        format.Base.cbSize = std::mem::size_of::<CHARFORMAT2W>() as u32;
+        format.Base.dwMask = CFM_BACKCOLOR;
+        format.crBackColor = windows::Win32::Foundation::COLORREF(0x0000FF); // Red in BGR format
+        SendMessageW(
+            hwnd_edit,
+            EM_SETCHARFORMAT,
+            WPARAM(SCF_SELECTION as usize),
+            LPARAM(&mut format as *mut _ as isize),
+        );
+
+        // Restore selection
+        SendMessageW(
+            hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut old_sel as *mut _ as isize),
+        );
+
+        // Unlock redraw
+        SendMessageW(hwnd_edit, WM_SETREDRAW, WPARAM(1), LPARAM(0));
+        // Force repaint to avoid stale/blank regions after formatting changes.
+        if !InvalidateRect(hwnd_edit, None, BOOL(1)).as_bool() {
+            crate::log_debug("InvalidateRect failed in highlight_misspelled_word");
+        }
+
+        // Re-enable change notifications
+        SendMessageW(
+            hwnd_edit,
+            EM_SETEVENTMASK,
+            WPARAM(0),
+            LPARAM((ENM_CHANGE | ENM_SELCHANGE) as isize),
+        );
+
+        // Restore modified state
+        SendMessageW(
+            hwnd_edit,
+            EM_SETMODIFY,
+            WPARAM(if was_modified { 1 } else { 0 }),
+            LPARAM(0),
+        );
     }
-
-    // Save modified state - formatting changes should not mark document as dirty
-    let was_modified = SendMessageW(hwnd_edit, EM_GETMODIFY, WPARAM(0), LPARAM(0)).0 != 0;
-
-    // Disable change notifications during formatting
-    SendMessageW(hwnd_edit, EM_SETEVENTMASK, WPARAM(0), LPARAM(0));
-
-    // Lock the control to prevent redraws/scrolling
-    SendMessageW(hwnd_edit, WM_SETREDRAW, WPARAM(0), LPARAM(0));
-
-    // Save current selection
-    let mut old_sel = CHARRANGE { cpMin: 0, cpMax: 0 };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXGETSEL,
-        WPARAM(0),
-        LPARAM(&mut old_sel as *mut _ as isize),
-    );
-
-    // Select the misspelled word
-    let mut sel = CHARRANGE {
-        cpMin: start,
-        cpMax: end,
-    };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXSETSEL,
-        WPARAM(0),
-        LPARAM(&mut sel as *mut _ as isize),
-    );
-
-    // Apply red background color
-    let mut format = CHARFORMAT2W::default();
-    format.Base.cbSize = std::mem::size_of::<CHARFORMAT2W>() as u32;
-    format.Base.dwMask = CFM_BACKCOLOR;
-    format.crBackColor = windows::Win32::Foundation::COLORREF(0x0000FF); // Red in BGR format
-    SendMessageW(
-        hwnd_edit,
-        EM_SETCHARFORMAT,
-        WPARAM(SCF_SELECTION as usize),
-        LPARAM(&mut format as *mut _ as isize),
-    );
-
-    // Restore selection
-    SendMessageW(
-        hwnd_edit,
-        EM_EXSETSEL,
-        WPARAM(0),
-        LPARAM(&mut old_sel as *mut _ as isize),
-    );
-
-    // Unlock redraw
-    SendMessageW(hwnd_edit, WM_SETREDRAW, WPARAM(1), LPARAM(0));
-    // Force repaint to avoid stale/blank regions after formatting changes.
-    if !InvalidateRect(hwnd_edit, None, BOOL(1)).as_bool() {
-        crate::log_debug("InvalidateRect failed in highlight_misspelled_word");
-    }
-
-    // Re-enable change notifications
-    SendMessageW(
-        hwnd_edit,
-        EM_SETEVENTMASK,
-        WPARAM(0),
-        LPARAM((ENM_CHANGE | ENM_SELCHANGE) as isize),
-    );
-
-    // Restore modified state
-    SendMessageW(
-        hwnd_edit,
-        EM_SETMODIFY,
-        WPARAM(if was_modified { 1 } else { 0 }),
-        LPARAM(0),
-    );
 }
 
 pub(crate) unsafe fn show_editor_context_menu(hwnd: HWND, hwnd_edit: HWND, lparam: LPARAM) {
@@ -7576,53 +7696,60 @@ pub(crate) unsafe fn show_editor_context_menu(hwnd: HWND, hwnd_edit: HWND, lpara
     });
 }
 
-unsafe fn open_dictionary_lookup(hwnd: HWND) {
+fn open_dictionary_lookup(hwnd: HWND) {
     app_windows::wiktionary_window::open(hwnd);
 }
 
-unsafe fn can_undo_now(hwnd: HWND) -> bool {
-    if with_state(hwnd, |state| state.normalize_undo.is_some()).unwrap_or(false) {
+fn can_undo_now(hwnd: HWND) -> bool {
+    if unsafe { with_state(hwnd, |state| state.normalize_undo.is_some()).unwrap_or(false) } {
         return true;
     }
-    let Some(hwnd_edit) = get_active_edit(hwnd) else {
+    let Some(hwnd_edit) = (unsafe { get_active_edit(hwnd) }) else {
         return false;
     };
-    SendMessageW(hwnd_edit, EM_CANUNDO, WPARAM(0), LPARAM(0)).0 != 0
+    // SAFETY: querying EM_CANUNDO on the active edit control is side-effect free.
+    unsafe { SendMessageW(hwnd_edit, EM_CANUNDO, WPARAM(0), LPARAM(0)).0 != 0 }
 }
 
-pub(crate) unsafe fn update_main_status_bar(hwnd: HWND) {
+pub(crate) fn update_main_status_bar(hwnd: HWND) {
     let (hwnd_status, language) =
-        with_state(hwnd, |state| (state.hwnd_status, state.settings.language))
+        unsafe { with_state(hwnd, |state| (state.hwnd_status, state.settings.language)) }
             .unwrap_or((HWND(0), Language::default()));
     if hwnd_status.0 == 0 {
         return;
     }
-    let (chars, words, line, col) = if let Some(hwnd_edit) = get_active_edit(hwnd) {
+    let (chars, words, line, col) = if let Some(hwnd_edit) = unsafe { get_active_edit(hwnd) } {
         let text = editor_manager::get_edit_text(hwnd_edit);
         let chars = text.chars().count();
         let words = text.split_whitespace().count();
         let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
-        SendMessageW(
-            hwnd_edit,
-            EM_EXGETSEL,
-            WPARAM(0),
-            LPARAM(&mut selection as *mut _ as isize),
-        );
+        unsafe {
+            SendMessageW(
+                hwnd_edit,
+                EM_EXGETSEL,
+                WPARAM(0),
+                LPARAM(&mut selection as *mut _ as isize),
+            );
+        }
         let caret = selection.cpMax.max(0);
-        let line_idx = SendMessageW(
-            hwnd_edit,
-            EM_LINEFROMCHAR,
-            WPARAM(caret as usize),
-            LPARAM(0),
-        )
-        .0 as i32;
-        let line_start = SendMessageW(
-            hwnd_edit,
-            EM_LINEINDEX,
-            WPARAM(line_idx.max(0) as usize),
-            LPARAM(0),
-        )
-        .0 as i32;
+        let line_idx = unsafe {
+            SendMessageW(
+                hwnd_edit,
+                EM_LINEFROMCHAR,
+                WPARAM(caret as usize),
+                LPARAM(0),
+            )
+            .0 as i32
+        };
+        let line_start = unsafe {
+            SendMessageW(
+                hwnd_edit,
+                EM_LINEINDEX,
+                WPARAM(line_idx.max(0) as usize),
+                LPARAM(0),
+            )
+            .0 as i32
+        };
         let col = (caret - line_start).max(0) + 1;
         (chars, words, line_idx.max(0) + 1, col)
     } else {
@@ -7643,12 +7770,14 @@ pub(crate) unsafe fn update_main_status_bar(hwnd: HWND) {
         chars_label, words_label, line, col
     );
     let label_wide = to_wide(&label);
-    SendMessageW(
-        hwnd_status,
-        SB_SETTEXTW,
-        WPARAM(0),
-        LPARAM(label_wide.as_ptr() as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_status,
+            SB_SETTEXTW,
+            WPARAM(0),
+            LPARAM(label_wide.as_ptr() as isize),
+        );
+    }
 }
 
 fn build_undo_menu_label(hwnd: HWND, language: Language) -> String {
@@ -7673,37 +7802,42 @@ fn build_undo_menu_label(hwnd: HWND, language: Language) -> String {
     }
 }
 
-unsafe fn has_active_text_selection(hwnd: HWND) -> bool {
-    let Some(hwnd_edit) = get_active_edit(hwnd) else {
+fn has_active_text_selection(hwnd: HWND) -> bool {
+    let Some(hwnd_edit) = (unsafe { get_active_edit(hwnd) }) else {
         return false;
     };
     let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXGETSEL,
-        WPARAM(0),
-        LPARAM(&mut selection as *mut _ as isize),
-    );
+    // SAFETY: `selection` is valid writable memory and `hwnd_edit` is the active edit control.
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut selection as *mut _ as isize),
+        );
+    }
     selection.cpMin != selection.cpMax
 }
 
-unsafe fn can_paste_now(hwnd: HWND) -> bool {
-    if get_active_edit(hwnd).is_none() {
+fn can_paste_now(hwnd: HWND) -> bool {
+    if unsafe { get_active_edit(hwnd) }.is_none() {
         return false;
     }
     // CF_UNICODETEXT = 13
-    IsClipboardFormatAvailable(13).is_ok()
+    unsafe { IsClipboardFormatAvailable(13).is_ok() }
 }
 
-unsafe fn show_voice_context_menu(hwnd: HWND, target: HWND, lparam: LPARAM) {
-    let (combo_voice, combo_favorites, engine, language) = with_state(hwnd, |state| {
-        (
-            state.voice_combo_voice,
-            state.voice_combo_favorites,
-            state.settings.tts_engine,
-            state.settings.language,
-        )
-    })
+fn show_voice_context_menu(hwnd: HWND, target: HWND, lparam: LPARAM) {
+    let (combo_voice, combo_favorites, engine, language) = unsafe {
+        with_state(hwnd, |state| {
+            (
+                state.voice_combo_voice,
+                state.voice_combo_favorites,
+                state.settings.tts_engine,
+                state.settings.language,
+            )
+        })
+    }
     .unwrap_or((HWND(0), HWND(0), TtsEngine::Edge, Language::Italian));
     let labels = voice_panel_labels(language);
 
@@ -7721,13 +7855,15 @@ unsafe fn show_voice_context_menu(hwnd: HWND, target: HWND, lparam: LPARAM) {
         let Some(voice_name) = current_voice_selection(hwnd, engine) else {
             return;
         };
-        let is_favorite = with_state(hwnd, |state| {
-            state
-                .settings
-                .favorite_voices
-                .iter()
-                .any(|fav| fav.engine == engine && fav.short_name == voice_name)
-        })
+        let is_favorite = unsafe {
+            with_state(hwnd, |state| {
+                state
+                    .settings
+                    .favorite_voices
+                    .iter()
+                    .any(|fav| fav.engine == engine && fav.short_name == voice_name)
+            })
+        }
         .unwrap_or(false);
         if is_favorite {
             action_id = VOICE_MENU_ID_REMOVE_FAVORITE;
@@ -7744,41 +7880,39 @@ unsafe fn show_voice_context_menu(hwnd: HWND, target: HWND, lparam: LPARAM) {
     let Some(ctx) = ctx_voice else {
         return;
     };
-    let menu = CreatePopupMenu().unwrap_or(HMENU(0));
-    if menu.0 == 0 {
-        return;
-    }
-    crate::log_if_err!(AppendMenuW(
-        menu,
-        MF_STRING,
-        action_id as usize,
-        PCWSTR(to_wide(&action_label).as_ptr()),
-    ));
-    with_state(hwnd, |state| {
-        state.voice_context_voice = Some(ctx);
-    });
+    unsafe {
+        let menu = CreatePopupMenu().unwrap_or(HMENU(0));
+        if menu.0 == 0 {
+            return;
+        }
+        crate::log_if_err!(AppendMenuW(
+            menu,
+            MF_STRING,
+            action_id as usize,
+            PCWSTR(to_wide(&action_label).as_ptr()),
+        ));
+        with_state(hwnd, |state| {
+            state.voice_context_voice = Some(ctx);
+        });
 
-    let mut x = (lparam.0 & 0xffff) as i32;
-    let mut y = ((lparam.0 >> 16) & 0xffff) as i32;
-    if x == -1 && y == -1 {
-        let mut pt = windows::Win32::Foundation::POINT::default();
-        crate::log_if_err!(GetCursorPos(&mut pt));
-        x = pt.x;
-        y = pt.y;
-    }
+        let mut x = (lparam.0 & 0xffff) as i32;
+        let mut y = ((lparam.0 >> 16) & 0xffff) as i32;
+        if x == -1 && y == -1 {
+            let mut pt = windows::Win32::Foundation::POINT::default();
+            crate::log_if_err!(GetCursorPos(&mut pt));
+            x = pt.x;
+            y = pt.y;
+        }
 
-    SetForegroundWindow(hwnd);
-    if !TrackPopupMenu(menu, TPM_RIGHTBUTTON, x, y, 0, hwnd, None).as_bool() {
-        crate::log_debug("TrackPopupMenu failed");
+        SetForegroundWindow(hwnd);
+        if !TrackPopupMenu(menu, TPM_RIGHTBUTTON, x, y, 0, hwnd, None).as_bool() {
+            crate::log_debug("TrackPopupMenu failed");
+        }
+        crate::log_if_err!(PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0)));
     }
-    crate::log_if_err!(PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0)));
 }
 
-unsafe fn replace_spellcheck_word(
-    hwnd_edit: HWND,
-    ctx: &SpellcheckContextMenuState,
-    replacement: &str,
-) {
+fn replace_spellcheck_word(hwnd_edit: HWND, ctx: &SpellcheckContextMenuState, replacement: &str) {
     let start_utf16 = ctx.line_start
         + spellcheck::utf8_byte_offset_to_utf16_units(&ctx.line_text, ctx.word_range.0);
     let end_utf16 = ctx.line_start
@@ -7787,35 +7921,41 @@ unsafe fn replace_spellcheck_word(
         cpMin: start_utf16,
         cpMax: end_utf16,
     };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXSETSEL,
-        WPARAM(0),
-        LPARAM(&mut range as *mut _ as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut range as *mut _ as isize),
+        );
+    }
     let wide = to_wide(replacement);
-    SendMessageW(
-        hwnd_edit,
-        EM_REPLACESEL,
-        WPARAM(1),
-        LPARAM(wide.as_ptr() as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_REPLACESEL,
+            WPARAM(1),
+            LPARAM(wide.as_ptr() as isize),
+        );
+    }
     let new_end =
         start_utf16 + spellcheck::utf8_byte_offset_to_utf16_units(replacement, replacement.len());
     let mut new_sel = CHARRANGE {
         cpMin: new_end,
         cpMax: new_end,
     };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXSETSEL,
-        WPARAM(0),
-        LPARAM(&mut new_sel as *mut _ as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut new_sel as *mut _ as isize),
+        );
+    }
 }
 
-unsafe fn handle_spellcheck_suggestion(hwnd: HWND, index: usize) {
-    let ctx = with_state(hwnd, |state| state.spellcheck_context.clone()).unwrap_or(None);
+fn handle_spellcheck_suggestion(hwnd: HWND, index: usize) {
+    let ctx = unsafe { with_state(hwnd, |state| state.spellcheck_context.clone()) }.unwrap_or(None);
     let Some(ctx) = ctx else {
         return;
     };
@@ -7825,53 +7965,61 @@ unsafe fn handle_spellcheck_suggestion(hwnd: HWND, index: usize) {
     if ctx.hwnd_edit.0 != 0 {
         replace_spellcheck_word(ctx.hwnd_edit, &ctx, &replacement);
     }
-    with_state(hwnd, |state| {
-        state.spellcheck_manager.clear_cache();
-        state.spellcheck_last_announce = None;
-        state.spellcheck_context = None;
-    });
+    unsafe {
+        with_state(hwnd, |state| {
+            state.spellcheck_manager.clear_cache();
+            state.spellcheck_last_announce = None;
+            state.spellcheck_context = None;
+        });
+    }
 }
 
-unsafe fn handle_spellcheck_add_to_dictionary(hwnd: HWND) {
-    let ctx = with_state(hwnd, |state| state.spellcheck_context.clone()).unwrap_or(None);
+fn handle_spellcheck_add_to_dictionary(hwnd: HWND) {
+    let ctx = unsafe { with_state(hwnd, |state| state.spellcheck_context.clone()) }.unwrap_or(None);
     let Some(ctx) = ctx else {
         return;
     };
-    with_state(hwnd, |state| {
-        state
-            .spellcheck_manager
-            .add_to_dictionary(&ctx.word, &ctx.language);
-        state.spellcheck_last_announce = None;
-        state.spellcheck_context = None;
-    });
+    unsafe {
+        with_state(hwnd, |state| {
+            state
+                .spellcheck_manager
+                .add_to_dictionary(&ctx.word, &ctx.language);
+            state.spellcheck_last_announce = None;
+            state.spellcheck_context = None;
+        });
+    }
 }
 
-unsafe fn handle_spellcheck_ignore_once(hwnd: HWND) {
-    let ctx = with_state(hwnd, |state| state.spellcheck_context.clone()).unwrap_or(None);
+fn handle_spellcheck_ignore_once(hwnd: HWND) {
+    let ctx = unsafe { with_state(hwnd, |state| state.spellcheck_context.clone()) }.unwrap_or(None);
     let Some(ctx) = ctx else {
         return;
     };
-    with_state(hwnd, |state| {
-        state
-            .spellcheck_manager
-            .ignore_once(&ctx.word, &ctx.language);
-        state.spellcheck_last_announce = None;
-        state.spellcheck_context = None;
-    });
+    unsafe {
+        with_state(hwnd, |state| {
+            state
+                .spellcheck_manager
+                .ignore_once(&ctx.word, &ctx.language);
+            state.spellcheck_last_announce = None;
+            state.spellcheck_context = None;
+        });
+    }
 }
 
 /// Navigate to next (forward=true) or previous (forward=false) spelling error
-unsafe fn go_to_spelling_error(hwnd: HWND, forward: bool) {
+fn go_to_spelling_error(hwnd: HWND, forward: bool) {
     use windows::Win32::UI::Controls::RichEdit::{CHARRANGE, EM_EXGETSEL, EM_EXSETSEL};
 
-    let Some(hwnd_edit) = get_active_edit(hwnd) else {
+    let Some(hwnd_edit) = (unsafe { get_active_edit(hwnd) }) else {
         return;
     };
 
     // Get spellcheck language
-    let resolution = with_state(hwnd, |state| {
-        state.spellcheck_manager.resolve_language(&state.settings)
-    })
+    let resolution = unsafe {
+        with_state(hwnd, |state| {
+            state.spellcheck_manager.resolve_language(&state.settings)
+        })
+    }
     .flatten();
     let Some(resolution) = resolution else {
         // Spellcheck disabled or no language available
@@ -7880,22 +8028,26 @@ unsafe fn go_to_spelling_error(hwnd: HWND, forward: bool) {
 
     // Get current cursor position
     let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXGETSEL,
-        WPARAM(0),
-        LPARAM(&mut cr as *mut _ as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut cr as *mut _ as isize),
+        );
+    }
     let current_pos = if forward { cr.cpMax } else { cr.cpMin };
 
     // Get document info
-    let doc_id = with_state(hwnd, |state| {
-        state
-            .docs
-            .iter()
-            .find(|d| d.hwnd_edit == hwnd_edit)
-            .map(|d| d.hwnd_edit.0)
-    })
+    let doc_id = unsafe {
+        with_state(hwnd, |state| {
+            state
+                .docs
+                .iter()
+                .find(|d| d.hwnd_edit == hwnd_edit)
+                .map(|d| d.hwnd_edit.0)
+        })
+    }
     .flatten()
     .unwrap_or(0);
 
@@ -7909,14 +8061,16 @@ unsafe fn go_to_spelling_error(hwnd: HWND, forward: bool) {
 
     let mut line_start_utf16 = 0i32;
     for (line_idx, line) in text.lines().enumerate() {
-        let misspellings = with_state(hwnd, |state| {
-            state.spellcheck_manager.check_line(
-                doc_id,
-                line_idx as i32,
-                line,
-                &resolution.effective,
-            )
-        })
+        let misspellings = unsafe {
+            with_state(hwnd, |state| {
+                state.spellcheck_manager.check_line(
+                    doc_id,
+                    line_idx as i32,
+                    line,
+                    &resolution.effective,
+                )
+            })
+        }
         .unwrap_or_default();
 
         for m in misspellings {
@@ -7957,24 +8111,27 @@ unsafe fn go_to_spelling_error(hwnd: HWND, forward: bool) {
             cpMin: start,
             cpMax: end,
         };
-        SendMessageW(
-            hwnd_edit,
-            EM_EXSETSEL,
-            WPARAM(0),
-            LPARAM(&mut new_range as *mut _ as isize),
-        );
-        // Scroll to make visible
-        SendMessageW(
-            hwnd_edit,
-            crate::accessibility::EM_SCROLLCARET,
-            WPARAM(0),
-            LPARAM(0),
-        );
+        unsafe {
+            SendMessageW(
+                hwnd_edit,
+                EM_EXSETSEL,
+                WPARAM(0),
+                LPARAM(&mut new_range as *mut _ as isize),
+            );
+            // Scroll to make visible
+            SendMessageW(
+                hwnd_edit,
+                crate::accessibility::EM_SCROLLCARET,
+                WPARAM(0),
+                LPARAM(0),
+            );
+        }
     }
 }
 
-unsafe fn handle_voice_context_favorite(hwnd: HWND, add: bool) {
-    let ctx = with_state(hwnd, |state| state.voice_context_voice.clone()).unwrap_or(None);
+fn handle_voice_context_favorite(hwnd: HWND, add: bool) {
+    let ctx =
+        unsafe { with_state(hwnd, |state| state.voice_context_voice.clone()) }.unwrap_or(None);
     let Some(fav) = ctx else {
         return;
     };
@@ -7983,269 +8140,284 @@ unsafe fn handle_voice_context_favorite(hwnd: HWND, add: bool) {
     } else {
         remove_favorite_voice(hwnd, fav.engine, &fav.short_name);
     }
-    with_state(hwnd, |state| {
-        state.voice_context_voice = None;
-    });
-}
-
-unsafe fn add_favorite_voice(hwnd: HWND, engine: TtsEngine, voice_name: &str) {
-    with_state(hwnd, |state| {
-        if state
-            .settings
-            .favorite_voices
-            .iter()
-            .any(|fav| fav.engine == engine && fav.short_name == voice_name)
-        {
-            return;
-        }
-        state.settings.favorite_voices.push(FavoriteVoice {
-            engine,
-            short_name: voice_name.to_string(),
+    unsafe {
+        with_state(hwnd, |state| {
+            state.voice_context_voice = None;
         });
-    });
-    if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
-        save_settings(settings);
     }
-    refresh_voice_panel(hwnd);
 }
 
-unsafe fn remove_favorite_voice(hwnd: HWND, engine: TtsEngine, voice_name: &str) {
-    with_state(hwnd, |state| {
-        state
-            .settings
-            .favorite_voices
-            .retain(|fav| !(fav.engine == engine && fav.short_name == voice_name));
-    });
-    if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
+fn add_favorite_voice(hwnd: HWND, engine: TtsEngine, voice_name: &str) {
+    unsafe {
+        with_state(hwnd, |state| {
+            if state
+                .settings
+                .favorite_voices
+                .iter()
+                .any(|fav| fav.engine == engine && fav.short_name == voice_name)
+            {
+                return;
+            }
+            state.settings.favorite_voices.push(FavoriteVoice {
+                engine,
+                short_name: voice_name.to_string(),
+            });
+        });
+    }
+    if let Some(settings) = unsafe { with_state(hwnd, |state| state.settings.clone()) } {
         save_settings(settings);
     }
-    refresh_voice_panel(hwnd);
+    unsafe {
+        refresh_voice_panel(hwnd);
+    }
 }
 
-unsafe fn is_focus_in_voice_panel(hwnd: HWND) -> bool {
-    let focus = GetFocus();
+fn remove_favorite_voice(hwnd: HWND, engine: TtsEngine, voice_name: &str) {
+    unsafe {
+        with_state(hwnd, |state| {
+            state
+                .settings
+                .favorite_voices
+                .retain(|fav| !(fav.engine == engine && fav.short_name == voice_name));
+        });
+    }
+    if let Some(settings) = unsafe { with_state(hwnd, |state| state.settings.clone()) } {
+        save_settings(settings);
+    }
+    unsafe {
+        refresh_voice_panel(hwnd);
+    }
+}
+
+fn is_focus_in_voice_panel(hwnd: HWND) -> bool {
+    let focus = unsafe { GetFocus() };
     if focus.0 == 0 {
         return false;
     }
 
     let mut class_buf = [0u16; 64];
-    let len = GetClassNameW(focus, &mut class_buf);
+    let len = unsafe { GetClassNameW(focus, &mut class_buf) };
     let class_name = String::from_utf16_lossy(&class_buf[..len as usize]);
     if class_name == "ComboLBox" {
         return true;
     }
 
-    with_state(hwnd, |state| {
-        if !state.voice_panel_visible && !state.voice_favorites_visible {
-            return false;
-        }
-        let is_match =
-            |ctrl: HWND| ctrl.0 != 0 && (focus == ctrl || IsChild(ctrl, focus).as_bool());
-        is_match(state.voice_combo_engine)
-            || is_match(state.voice_combo_language)
-            || is_match(state.voice_combo_voice)
-            || is_match(state.voice_button_insert_tag)
-            || is_match(state.voice_combo_speed)
-            || is_match(state.voice_combo_pitch)
-            || is_match(state.voice_combo_volume)
-            || is_match(state.voice_edit_speed)
-            || is_match(state.voice_edit_pitch)
-            || is_match(state.voice_edit_volume)
-            || is_match(state.voice_checkbox_multilingual)
-            || is_match(state.voice_combo_favorites)
-    })
+    unsafe {
+        with_state(hwnd, |state| {
+            if !state.voice_panel_visible && !state.voice_favorites_visible {
+                return false;
+            }
+            let is_match =
+                |ctrl: HWND| ctrl.0 != 0 && (focus == ctrl || IsChild(ctrl, focus).as_bool());
+            is_match(state.voice_combo_engine)
+                || is_match(state.voice_combo_language)
+                || is_match(state.voice_combo_voice)
+                || is_match(state.voice_button_insert_tag)
+                || is_match(state.voice_combo_speed)
+                || is_match(state.voice_combo_pitch)
+                || is_match(state.voice_combo_volume)
+                || is_match(state.voice_edit_speed)
+                || is_match(state.voice_edit_pitch)
+                || is_match(state.voice_edit_volume)
+                || is_match(state.voice_checkbox_multilingual)
+                || is_match(state.voice_combo_favorites)
+        })
+    }
     .unwrap_or(false)
 }
 
-unsafe fn handle_voice_panel_tab(hwnd: HWND) -> bool {
-    let (
-        visible,
-        combo_engine,
-        combo_language,
-        combo_voice,
-        button_insert_tag,
-        combo_speed,
-        combo_pitch,
-        combo_volume,
-        edit_speed,
-        edit_pitch,
-        edit_volume,
-        checkbox_multilingual,
-        combo_favorites,
-        favorites_visible,
-        is_edge,
-        only_multilingual,
-        manual_tuning,
-        hwnd_tab,
-    ) = match with_state(hwnd, |state| {
-        (
-            state.voice_panel_visible,
-            state.voice_combo_engine,
-            state.voice_combo_language,
-            state.voice_combo_voice,
-            state.voice_button_insert_tag,
-            state.voice_combo_speed,
-            state.voice_combo_pitch,
-            state.voice_combo_volume,
-            state.voice_edit_speed,
-            state.voice_edit_pitch,
-            state.voice_edit_volume,
-            state.voice_checkbox_multilingual,
-            state.voice_combo_favorites,
-            state.voice_favorites_visible,
-            matches!(state.settings.tts_engine, TtsEngine::Edge),
-            state.settings.tts_only_multilingual,
-            state.settings.tts_manual_tuning,
-            state.hwnd_tab,
-        )
-    }) {
-        Some(values) => values,
-        None => return false,
-    };
-    if !visible && !favorites_visible {
-        return false;
-    }
-    let raw_focus = GetFocus();
-    if raw_focus.0 == 0 {
-        return false;
-    }
-    let focus = if raw_focus == combo_engine || IsChild(combo_engine, raw_focus).as_bool() {
-        combo_engine
-    } else if raw_focus == combo_language || IsChild(combo_language, raw_focus).as_bool() {
-        combo_language
-    } else if raw_focus == combo_voice || IsChild(combo_voice, raw_focus).as_bool() {
-        combo_voice
-    } else if raw_focus == button_insert_tag || IsChild(button_insert_tag, raw_focus).as_bool() {
-        button_insert_tag
-    } else if raw_focus == combo_speed || IsChild(combo_speed, raw_focus).as_bool() {
-        combo_speed
-    } else if raw_focus == combo_pitch || IsChild(combo_pitch, raw_focus).as_bool() {
-        combo_pitch
-    } else if raw_focus == combo_volume || IsChild(combo_volume, raw_focus).as_bool() {
-        combo_volume
-    } else if raw_focus == combo_favorites || IsChild(combo_favorites, raw_focus).as_bool() {
-        combo_favorites
-    } else {
-        raw_focus
-    };
-    let is_combo_focus = focus == combo_engine
-        || (is_edge && !only_multilingual && focus == combo_language)
-        || focus == combo_voice
-        || focus == button_insert_tag
-        || (!manual_tuning && focus == combo_speed)
-        || (!manual_tuning && focus == combo_pitch)
-        || (!manual_tuning && focus == combo_volume)
-        || (favorites_visible && focus == combo_favorites);
-    if is_combo_focus {
-        let dropped = SendMessageW(focus, CB_GETDROPPEDSTATE, WPARAM(0), LPARAM(0)).0 != 0;
-        if dropped {
+fn handle_voice_panel_tab(hwnd: HWND) -> bool {
+    unsafe {
+        let (
+            visible,
+            combo_engine,
+            combo_language,
+            combo_voice,
+            button_insert_tag,
+            combo_speed,
+            combo_pitch,
+            combo_volume,
+            edit_speed,
+            edit_pitch,
+            edit_volume,
+            checkbox_multilingual,
+            combo_favorites,
+            favorites_visible,
+            is_edge,
+            only_multilingual,
+            manual_tuning,
+            hwnd_tab,
+        ) = match with_state(hwnd, |state| {
+            (
+                state.voice_panel_visible,
+                state.voice_combo_engine,
+                state.voice_combo_language,
+                state.voice_combo_voice,
+                state.voice_button_insert_tag,
+                state.voice_combo_speed,
+                state.voice_combo_pitch,
+                state.voice_combo_volume,
+                state.voice_edit_speed,
+                state.voice_edit_pitch,
+                state.voice_edit_volume,
+                state.voice_checkbox_multilingual,
+                state.voice_combo_favorites,
+                state.voice_favorites_visible,
+                matches!(state.settings.tts_engine, TtsEngine::Edge),
+                state.settings.tts_only_multilingual,
+                state.settings.tts_manual_tuning,
+                state.hwnd_tab,
+            )
+        }) {
+            Some(values) => values,
+            None => return false,
+        };
+        if !visible && !favorites_visible {
             return false;
         }
-    }
-    let (mut hwnd_edit, is_audiobook) = with_state(hwnd, |state| {
-        let doc = state.docs.get(state.current);
-        let hwnd_edit = doc.map(|d| d.hwnd_edit).unwrap_or(HWND(0));
-        let is_audiobook = doc
-            .map(|d| matches!(d.format, FileFormat::Audiobook))
-            .unwrap_or(false);
-        (hwnd_edit, is_audiobook)
-    })
-    .unwrap_or((HWND(0), false));
-    if is_audiobook {
-        hwnd_edit = hwnd_tab;
-    }
-    let speed_control = if manual_tuning {
-        edit_speed
-    } else {
-        combo_speed
-    };
-    let pitch_control = if manual_tuning {
-        edit_pitch
-    } else {
-        combo_pitch
-    };
-    let volume_control = if manual_tuning {
-        edit_volume
-    } else {
-        combo_volume
-    };
-    if focus != hwnd_edit
-        && focus != combo_engine
-        && focus != combo_language
-        && focus != combo_voice
-        && focus != button_insert_tag
-        && focus != speed_control
-        && focus != pitch_control
-        && focus != volume_control
-        && focus != hwnd_tab
-        && !(is_edge && focus == checkbox_multilingual)
-        && !(favorites_visible && focus == combo_favorites)
-    {
-        return false;
-    }
-    let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
-    if focus == hwnd_edit || focus == hwnd_tab {
+        let raw_focus = GetFocus();
+        if raw_focus.0 == 0 {
+            return false;
+        }
+        let focus = if raw_focus == combo_engine || IsChild(combo_engine, raw_focus).as_bool() {
+            combo_engine
+        } else if raw_focus == combo_language || IsChild(combo_language, raw_focus).as_bool() {
+            combo_language
+        } else if raw_focus == combo_voice || IsChild(combo_voice, raw_focus).as_bool() {
+            combo_voice
+        } else if raw_focus == button_insert_tag || IsChild(button_insert_tag, raw_focus).as_bool()
+        {
+            button_insert_tag
+        } else if raw_focus == combo_speed || IsChild(combo_speed, raw_focus).as_bool() {
+            combo_speed
+        } else if raw_focus == combo_pitch || IsChild(combo_pitch, raw_focus).as_bool() {
+            combo_pitch
+        } else if raw_focus == combo_volume || IsChild(combo_volume, raw_focus).as_bool() {
+            combo_volume
+        } else if raw_focus == combo_favorites || IsChild(combo_favorites, raw_focus).as_bool() {
+            combo_favorites
+        } else {
+            raw_focus
+        };
+        let is_combo_focus = focus == combo_engine
+            || (is_edge && !only_multilingual && focus == combo_language)
+            || focus == combo_voice
+            || focus == button_insert_tag
+            || (!manual_tuning && focus == combo_speed)
+            || (!manual_tuning && focus == combo_pitch)
+            || (!manual_tuning && focus == combo_volume)
+            || (favorites_visible && focus == combo_favorites);
+        if is_combo_focus {
+            let dropped = SendMessageW(focus, CB_GETDROPPEDSTATE, WPARAM(0), LPARAM(0)).0 != 0;
+            if dropped {
+                return false;
+            }
+        }
+        let (mut hwnd_edit, is_audiobook) = with_state(hwnd, |state| {
+            let doc = state.docs.get(state.current);
+            let hwnd_edit = doc.map(|d| d.hwnd_edit).unwrap_or(HWND(0));
+            let is_audiobook = doc
+                .map(|d| matches!(d.format, FileFormat::Audiobook))
+                .unwrap_or(false);
+            (hwnd_edit, is_audiobook)
+        })
+        .unwrap_or((HWND(0), false));
+        if is_audiobook {
+            hwnd_edit = hwnd_tab;
+        }
+        let speed_control = if manual_tuning {
+            edit_speed
+        } else {
+            combo_speed
+        };
+        let pitch_control = if manual_tuning {
+            edit_pitch
+        } else {
+            combo_pitch
+        };
+        let volume_control = if manual_tuning {
+            edit_volume
+        } else {
+            combo_volume
+        };
+        if focus != hwnd_edit
+            && focus != combo_engine
+            && focus != combo_language
+            && focus != combo_voice
+            && focus != button_insert_tag
+            && focus != speed_control
+            && focus != pitch_control
+            && focus != volume_control
+            && focus != hwnd_tab
+            && !(is_edge && focus == checkbox_multilingual)
+            && !(favorites_visible && focus == combo_favorites)
+        {
+            return false;
+        }
+        let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+        if focus == hwnd_edit || focus == hwnd_tab {
+            if visible {
+                SetFocus(combo_engine);
+            } else if favorites_visible {
+                SetFocus(combo_favorites);
+            }
+            return true;
+        }
+        let fallback_edit = if hwnd_edit.0 != 0 {
+            hwnd_edit
+        } else {
+            hwnd_tab
+        };
+        let mut order = Vec::new();
         if visible {
-            SetFocus(combo_engine);
-        } else if favorites_visible {
-            SetFocus(combo_favorites);
+            order.push(combo_engine);
+            if is_edge && !only_multilingual {
+                order.push(combo_language);
+            }
+            order.push(combo_voice);
+            order.push(button_insert_tag);
+            order.push(speed_control);
+            order.push(pitch_control);
+            order.push(volume_control);
+            if is_edge {
+                order.push(checkbox_multilingual);
+            }
         }
-        return true;
-    }
-    let fallback_edit = if hwnd_edit.0 != 0 {
-        hwnd_edit
-    } else {
-        hwnd_tab
-    };
-    let mut order = Vec::new();
-    if visible {
-        order.push(combo_engine);
-        if is_edge && !only_multilingual {
-            order.push(combo_language);
+        if favorites_visible {
+            order.push(combo_favorites);
         }
-        order.push(combo_voice);
-        order.push(button_insert_tag);
-        order.push(speed_control);
-        order.push(pitch_control);
-        order.push(volume_control);
-        if is_edge {
-            order.push(checkbox_multilingual);
-        }
-    }
-    if favorites_visible {
-        order.push(combo_favorites);
-    }
-    let Some(idx) = order.iter().position(|item| *item == focus) else {
-        return false;
-    };
-    if shift_down {
-        if idx == 0 {
-            if fallback_edit.0 != 0 {
-                SetFocus(fallback_edit);
+        let Some(idx) = order.iter().position(|item| *item == focus) else {
+            return false;
+        };
+        if shift_down {
+            if idx == 0 {
+                if fallback_edit.0 != 0 {
+                    SetFocus(fallback_edit);
+                    return true;
+                }
+                return false;
+            }
+            let target = order[idx - 1];
+            if target.0 != 0 {
+                SetFocus(target);
                 return true;
             }
-            return false;
-        }
-        let target = order[idx - 1];
-        if target.0 != 0 {
-            SetFocus(target);
-            return true;
-        }
-    } else {
-        if idx + 1 >= order.len() {
-            if fallback_edit.0 != 0 {
-                SetFocus(fallback_edit);
+        } else {
+            if idx + 1 >= order.len() {
+                if fallback_edit.0 != 0 {
+                    SetFocus(fallback_edit);
+                    return true;
+                }
+                return false;
+            }
+            let target = order[idx + 1];
+            if target.0 != 0 {
+                SetFocus(target);
                 return true;
             }
-            return false;
         }
-        let target = order[idx + 1];
-        if target.0 != 0 {
-            SetFocus(target);
-            return true;
-        }
+        false
     }
-    false
 }
 
 fn is_modifier_vk(key: u16) -> bool {
@@ -8256,7 +8428,7 @@ fn appcommand_from_lparam(lparam: LPARAM) -> usize {
     ((lparam.0 as usize) >> 16) & 0x7ff
 }
 
-unsafe fn shortcut_matches_message(binding: ShortcutBinding, msg: &MSG) -> bool {
+fn shortcut_matches_message(binding: ShortcutBinding, msg: &MSG) -> bool {
     if msg.message != WM_KEYDOWN && msg.message != WM_SYSKEYDOWN {
         return false;
     }
@@ -8264,39 +8436,44 @@ unsafe fn shortcut_matches_message(binding: ShortcutBinding, msg: &MSG) -> bool 
     if is_modifier_vk(key) {
         return false;
     }
-    let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
-    let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
-    let alt_down = (GetKeyState(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
+    // SAFETY: key-state reads are thread-local Win32 queries with no aliasing requirements.
+    let ctrl_down = unsafe { (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0 };
+    // SAFETY: key-state reads are thread-local Win32 queries with no aliasing requirements.
+    let shift_down = unsafe { (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0 };
+    // SAFETY: key-state reads are thread-local Win32 queries with no aliasing requirements.
+    let alt_down = unsafe { (GetKeyState(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0 };
     key == binding.key
         && ctrl_down == binding.ctrl
         && shift_down == binding.shift
         && alt_down == binding.alt
 }
 
-unsafe fn dispatch_shortcut_command(hwnd: HWND, cmd: usize) {
-    crate::log_if_err!(PostMessageW(hwnd, WM_COMMAND, WPARAM(cmd), LPARAM(0)));
+fn dispatch_shortcut_command(hwnd: HWND, cmd: usize) {
+    unsafe {
+        crate::log_if_err!(PostMessageW(hwnd, WM_COMMAND, WPARAM(cmd), LPARAM(0)));
+    }
 }
 
-unsafe fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
+fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message != WM_KEYDOWN && msg.message != WM_SYSKEYDOWN {
         return false;
     }
-    let options_hwnd = with_state(hwnd, |state| state.options_dialog).unwrap_or(HWND(0));
+    let options_hwnd = unsafe { with_state(hwnd, |state| state.options_dialog) }.unwrap_or(HWND(0));
     if options_hwnd.0 != 0
-        && (msg.hwnd == options_hwnd || IsChild(options_hwnd, msg.hwnd).as_bool())
+        && (msg.hwnd == options_hwnd || unsafe { IsChild(options_hwnd, msg.hwnd).as_bool() })
     {
         return false;
     }
 
-    let shortcuts = with_state(hwnd, |state| state.settings.shortcuts.clone())
+    let shortcuts = unsafe { with_state(hwnd, |state| state.settings.shortcuts.clone()) }
         .unwrap_or_else(ShortcutSettings::default);
 
     // Dedicated shortcut requested for streaming audio.
     // NOTE: this intentionally takes precedence over the accelerator table.
     let key = msg.wParam.0 as u16;
-    let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
-    let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
-    let alt_down = (GetKeyState(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
+    let ctrl_down = unsafe { (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0 };
+    let shift_down = unsafe { (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0 };
+    let alt_down = unsafe { (GetKeyState(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0 };
     if key == 'S' as u16 && !ctrl_down && shift_down && alt_down {
         dispatch_shortcut_command(hwnd, IDM_TOOLS_STREAM_AUDIO);
         return true;
@@ -8393,180 +8570,182 @@ unsafe fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
     false
 }
 
-unsafe fn create_accelerators() -> HACCEL {
-    let virt = FCONTROL | FVIRTKEY;
-    let virt_shift = FCONTROL | FSHIFT | FVIRTKEY;
-    let virt_shift_only = FSHIFT | FVIRTKEY;
-    let virt_alt = FALT | FVIRTKEY;
-    let virt_alt_shift = FALT | FSHIFT | FVIRTKEY;
-    let accels = [
-        ACCEL {
-            fVirt: virt,
-            key: 'N' as u16,
-            cmd: IDM_FILE_NEW as u16,
-        },
-        ACCEL {
-            fVirt: virt,
-            key: 'O' as u16,
-            cmd: IDM_FILE_OPEN as u16,
-        },
-        ACCEL {
-            fVirt: virt,
-            key: 'S' as u16,
-            cmd: IDM_FILE_SAVE as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift,
-            key: 'S' as u16,
-            cmd: IDM_FILE_SAVE_ALL as u16,
-        },
-        ACCEL {
-            fVirt: virt,
-            key: 'W' as u16,
-            cmd: IDM_FILE_CLOSE as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift,
-            key: 'W' as u16,
-            cmd: IDM_FILE_CLOSE_OTHERS as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift,
-            key: 'F' as u16,
-            cmd: IDM_EDIT_FIND_IN_FILES as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift,
-            key: 'M' as u16,
-            cmd: IDM_EDIT_STRIP_MARKDOWN as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift,
-            key: 'H' as u16,
-            cmd: IDM_EDIT_HARD_LINE_BREAK as u16,
-        },
-        ACCEL {
-            fVirt: virt_alt_shift,
-            key: 'O' as u16,
-            cmd: IDM_EDIT_ORDER_ITEMS as u16,
-        },
-        ACCEL {
-            fVirt: virt_alt_shift,
-            key: 'K' as u16,
-            cmd: IDM_EDIT_KEEP_UNIQUE_ITEMS as u16,
-        },
-        ACCEL {
-            fVirt: virt_alt_shift,
-            key: 'Z' as u16,
-            cmd: IDM_EDIT_REVERSE_ITEMS as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift,
-            key: VK_RETURN.0,
-            cmd: IDM_EDIT_NORMALIZE_WHITESPACE as u16,
-        },
-        ACCEL {
-            fVirt: FVIRTKEY,
-            key: VK_F3.0,
-            cmd: IDM_EDIT_FIND_NEXT as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift_only,
-            key: VK_F3.0,
-            cmd: IDM_EDIT_FIND_PREVIOUS as u16,
-        },
-        ACCEL {
-            fVirt: virt,
-            key: 'H' as u16,
-            cmd: IDM_EDIT_REPLACE as u16,
-        },
-        ACCEL {
-            fVirt: virt,
-            key: 'J' as u16,
-            cmd: IDM_EDIT_GO_TO_LINE as u16,
-        },
-        ACCEL {
-            fVirt: virt,
-            key: 'A' as u16,
-            cmd: IDM_EDIT_SELECT_ALL as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift,
-            key: VK_OEM_PERIOD.0,
-            cmd: IDM_EDIT_INDENT as u16,
-        },
-        ACCEL {
-            fVirt: virt,
-            key: VK_OEM_PERIOD.0,
-            cmd: IDM_EDIT_INSERT_ELLIPSIS as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift,
-            key: VK_OEM_COMMA.0,
-            cmd: IDM_EDIT_OUTDENT as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift,
-            key: 'J' as u16,
-            cmd: IDM_EDIT_JOIN_LINES as u16,
-        },
-        ACCEL {
-            fVirt: virt_alt,
-            key: 'Y' as u16,
-            cmd: IDM_EDIT_TEXT_STATS as u16,
-        },
-        ACCEL {
-            fVirt: virt,
-            key: 'D' as u16,
-            cmd: IDM_EDIT_REMOVE_DUPLICATE_LINES as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift,
-            key: 'C' as u16,
-            cmd: IDM_EDIT_REMOVE_DUPLICATE_CONSECUTIVE_LINES as u16,
-        },
-        ACCEL {
-            fVirt: virt_alt_shift,
-            key: 'H' as u16,
-            cmd: IDM_EDIT_CLEAN_EOL_HYPHENS as u16,
-        },
-        ACCEL {
-            fVirt: virt_alt_shift,
-            key: 'D' as u16,
-            cmd: IDM_TOOLS_DICTIONARY_LOOKUP as u16,
-        },
-        ACCEL {
-            fVirt: virt,
-            key: VK_TAB.0,
-            cmd: IDM_NEXT_TAB as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift_only,
-            key: VK_NEXT.0,
-            cmd: IDM_GOTO_NEXT_BOOKMARK as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift_only,
-            key: VK_PRIOR.0,
-            cmd: IDM_GOTO_PREV_BOOKMARK as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift,
-            key: 'G' as u16,
-            cmd: IDM_MANAGE_BOOKMARKS as u16,
-        },
-        ACCEL {
-            fVirt: virt_shift,
-            key: 'L' as u16,
-            cmd: IDM_INSERT_CLEAR_BOOKMARKS as u16,
-        },
-        ACCEL {
-            fVirt: virt,
-            key: 'B' as u16,
-            cmd: IDM_INSERT_BOOKMARK as u16,
-        },
-    ];
-    CreateAcceleratorTableW(&accels).unwrap_or(HACCEL(0))
+fn create_accelerators() -> HACCEL {
+    unsafe {
+        let virt = FCONTROL | FVIRTKEY;
+        let virt_shift = FCONTROL | FSHIFT | FVIRTKEY;
+        let virt_shift_only = FSHIFT | FVIRTKEY;
+        let virt_alt = FALT | FVIRTKEY;
+        let virt_alt_shift = FALT | FSHIFT | FVIRTKEY;
+        let accels = [
+            ACCEL {
+                fVirt: virt,
+                key: 'N' as u16,
+                cmd: IDM_FILE_NEW as u16,
+            },
+            ACCEL {
+                fVirt: virt,
+                key: 'O' as u16,
+                cmd: IDM_FILE_OPEN as u16,
+            },
+            ACCEL {
+                fVirt: virt,
+                key: 'S' as u16,
+                cmd: IDM_FILE_SAVE as u16,
+            },
+            ACCEL {
+                fVirt: virt_shift,
+                key: 'S' as u16,
+                cmd: IDM_FILE_SAVE_ALL as u16,
+            },
+            ACCEL {
+                fVirt: virt,
+                key: 'W' as u16,
+                cmd: IDM_FILE_CLOSE as u16,
+            },
+            ACCEL {
+                fVirt: virt_shift,
+                key: 'W' as u16,
+                cmd: IDM_FILE_CLOSE_OTHERS as u16,
+            },
+            ACCEL {
+                fVirt: virt_shift,
+                key: 'F' as u16,
+                cmd: IDM_EDIT_FIND_IN_FILES as u16,
+            },
+            ACCEL {
+                fVirt: virt_shift,
+                key: 'M' as u16,
+                cmd: IDM_EDIT_STRIP_MARKDOWN as u16,
+            },
+            ACCEL {
+                fVirt: virt_shift,
+                key: 'H' as u16,
+                cmd: IDM_EDIT_HARD_LINE_BREAK as u16,
+            },
+            ACCEL {
+                fVirt: virt_alt_shift,
+                key: 'O' as u16,
+                cmd: IDM_EDIT_ORDER_ITEMS as u16,
+            },
+            ACCEL {
+                fVirt: virt_alt_shift,
+                key: 'K' as u16,
+                cmd: IDM_EDIT_KEEP_UNIQUE_ITEMS as u16,
+            },
+            ACCEL {
+                fVirt: virt_alt_shift,
+                key: 'Z' as u16,
+                cmd: IDM_EDIT_REVERSE_ITEMS as u16,
+            },
+            ACCEL {
+                fVirt: virt_shift,
+                key: VK_RETURN.0,
+                cmd: IDM_EDIT_NORMALIZE_WHITESPACE as u16,
+            },
+            ACCEL {
+                fVirt: FVIRTKEY,
+                key: VK_F3.0,
+                cmd: IDM_EDIT_FIND_NEXT as u16,
+            },
+            ACCEL {
+                fVirt: virt_shift_only,
+                key: VK_F3.0,
+                cmd: IDM_EDIT_FIND_PREVIOUS as u16,
+            },
+            ACCEL {
+                fVirt: virt,
+                key: 'H' as u16,
+                cmd: IDM_EDIT_REPLACE as u16,
+            },
+            ACCEL {
+                fVirt: virt,
+                key: 'J' as u16,
+                cmd: IDM_EDIT_GO_TO_LINE as u16,
+            },
+            ACCEL {
+                fVirt: virt,
+                key: 'A' as u16,
+                cmd: IDM_EDIT_SELECT_ALL as u16,
+            },
+            ACCEL {
+                fVirt: virt_shift,
+                key: VK_OEM_PERIOD.0,
+                cmd: IDM_EDIT_INDENT as u16,
+            },
+            ACCEL {
+                fVirt: virt,
+                key: VK_OEM_PERIOD.0,
+                cmd: IDM_EDIT_INSERT_ELLIPSIS as u16,
+            },
+            ACCEL {
+                fVirt: virt_shift,
+                key: VK_OEM_COMMA.0,
+                cmd: IDM_EDIT_OUTDENT as u16,
+            },
+            ACCEL {
+                fVirt: virt_shift,
+                key: 'J' as u16,
+                cmd: IDM_EDIT_JOIN_LINES as u16,
+            },
+            ACCEL {
+                fVirt: virt_alt,
+                key: 'Y' as u16,
+                cmd: IDM_EDIT_TEXT_STATS as u16,
+            },
+            ACCEL {
+                fVirt: virt,
+                key: 'D' as u16,
+                cmd: IDM_EDIT_REMOVE_DUPLICATE_LINES as u16,
+            },
+            ACCEL {
+                fVirt: virt_shift,
+                key: 'C' as u16,
+                cmd: IDM_EDIT_REMOVE_DUPLICATE_CONSECUTIVE_LINES as u16,
+            },
+            ACCEL {
+                fVirt: virt_alt_shift,
+                key: 'H' as u16,
+                cmd: IDM_EDIT_CLEAN_EOL_HYPHENS as u16,
+            },
+            ACCEL {
+                fVirt: virt_alt_shift,
+                key: 'D' as u16,
+                cmd: IDM_TOOLS_DICTIONARY_LOOKUP as u16,
+            },
+            ACCEL {
+                fVirt: virt,
+                key: VK_TAB.0,
+                cmd: IDM_NEXT_TAB as u16,
+            },
+            ACCEL {
+                fVirt: virt_shift_only,
+                key: VK_NEXT.0,
+                cmd: IDM_GOTO_NEXT_BOOKMARK as u16,
+            },
+            ACCEL {
+                fVirt: virt_shift_only,
+                key: VK_PRIOR.0,
+                cmd: IDM_GOTO_PREV_BOOKMARK as u16,
+            },
+            ACCEL {
+                fVirt: virt_shift,
+                key: 'G' as u16,
+                cmd: IDM_MANAGE_BOOKMARKS as u16,
+            },
+            ACCEL {
+                fVirt: virt_shift,
+                key: 'L' as u16,
+                cmd: IDM_INSERT_CLEAR_BOOKMARKS as u16,
+            },
+            ACCEL {
+                fVirt: virt,
+                key: 'B' as u16,
+                cmd: IDM_INSERT_BOOKMARK as u16,
+            },
+        ];
+        CreateAcceleratorTableW(&accels).unwrap_or(HACCEL(0))
+    }
 }
 
 unsafe extern "system" fn enum_close_other_windows(hwnd: HWND, lparam: LPARAM) -> BOOL {
@@ -8592,8 +8771,10 @@ unsafe extern "system" fn enum_close_other_windows(hwnd: HWND, lparam: LPARAM) -
     )
 }
 
-unsafe fn close_other_windows(hwnd: HWND) {
-    crate::log_if_err!(EnumWindows(Some(enum_close_other_windows), LPARAM(hwnd.0)));
+fn close_other_windows(hwnd: HWND) {
+    unsafe {
+        crate::log_if_err!(EnumWindows(Some(enum_close_other_windows), LPARAM(hwnd.0)));
+    }
 }
 
 pub(crate) unsafe fn get_active_edit(hwnd: HWND) -> Option<HWND> {
@@ -8613,35 +8794,123 @@ fn bookmark_storage_key(path: Option<&Path>, hwnd_edit: HWND) -> (String, bool) 
     }
 }
 
-unsafe fn insert_bookmark(hwnd: HWND) {
-    let (hwnd_edit, path, format): (HWND, Option<std::path::PathBuf>, FileFormat) =
-        with_state(hwnd, |state| {
-            state
-                .docs
-                .get(state.current)
-                .map(|doc| (doc.hwnd_edit, doc.path.clone(), doc.format))
-        })
-        .flatten()
-        .unwrap_or((HWND(0), None, FileFormat::default()));
-    if hwnd_edit.0 == 0 {
-        return;
-    }
-    let (storage_key, persist_to_disk) = bookmark_storage_key(path.as_deref(), hwnd_edit);
+fn insert_bookmark(hwnd: HWND) {
+    unsafe {
+        let (hwnd_edit, path, format): (HWND, Option<std::path::PathBuf>, FileFormat) =
+            with_state(hwnd, |state| {
+                state
+                    .docs
+                    .get(state.current)
+                    .map(|doc| (doc.hwnd_edit, doc.path.clone(), doc.format))
+            })
+            .flatten()
+            .unwrap_or((HWND(0), None, FileFormat::default()));
+        if hwnd_edit.0 == 0 {
+            return;
+        }
+        let (storage_key, persist_to_disk) = bookmark_storage_key(path.as_deref(), hwnd_edit);
 
-    if matches!(format, FileFormat::Audiobook) {
-        let (pos, snippet) = with_state(hwnd, |state| {
-            if let Some(player) = &mut state.active_audiobook {
-                let position_secs = crate::audio_player::audiobook_position_secs(player);
-                audio_bookmark_position_and_snippet(position_secs)
-            } else {
-                (0, "Audio non in riproduzione".to_string())
+        if matches!(format, FileFormat::Audiobook) {
+            let (pos, snippet) = with_state(hwnd, |state| {
+                if let Some(player) = &mut state.active_audiobook {
+                    let position_secs = crate::audio_player::audiobook_position_secs(player);
+                    audio_bookmark_position_and_snippet(position_secs)
+                } else {
+                    (0, "Audio non in riproduzione".to_string())
+                }
+            })
+            .unwrap_or((0, String::new()));
+
+            let bookmark = Bookmark {
+                position: pos,
+                snippet,
+                timestamp: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+            };
+
+            let bookmarks_window = with_state(hwnd, |state| {
+                let list = state
+                    .bookmarks
+                    .files
+                    .entry(storage_key.clone())
+                    .or_default();
+                list.push(bookmark);
+                if persist_to_disk {
+                    save_bookmarks(&state.bookmarks);
+                }
+                state.bookmarks_window
+            })
+            .unwrap_or(HWND(0));
+
+            if bookmarks_window.0 != 0 {
+                app_windows::bookmarks_window::refresh_bookmarks_list(bookmarks_window);
             }
-        })
-        .unwrap_or((0, String::new()));
+            confirm_menu_action(hwnd, "insert.bookmark");
+            return;
+        }
+
+        let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut cr as *mut _ as isize),
+        );
+
+        let pos = cr.cpMax;
+
+        // 1. Try to get up to 60 characters AFTER the cursor
+        let mut buffer = vec![0u16; 62];
+        let mut tr = TEXTRANGEW {
+            chrg: CHARRANGE {
+                cpMin: pos,
+                cpMax: pos + 60,
+            },
+            lpstrText: PWSTR(buffer.as_mut_ptr()),
+        };
+        let copied = SendMessageW(
+            hwnd_edit,
+            EM_GETTEXTRANGE,
+            WPARAM(0),
+            LPARAM(&mut tr as *mut _ as isize),
+        )
+        .0 as usize;
+        let mut snippet = String::from_utf16_lossy(&buffer[..copied]);
+
+        // Stop at the first newline
+        if let Some(idx) = snippet.find(['\r', '\n']) {
+            snippet.truncate(idx);
+        }
+
+        // 2. If the resulting snippet is empty (e.g. cursor at end of line), take text BEFORE the cursor
+        if snippet.trim().is_empty() && pos > 0 {
+            let start_pre = (pos - 60).max(0);
+            let mut buffer_pre = vec![0u16; 62];
+            let mut tr_pre = TEXTRANGEW {
+                chrg: CHARRANGE {
+                    cpMin: start_pre,
+                    cpMax: pos,
+                },
+                lpstrText: PWSTR(buffer_pre.as_mut_ptr()),
+            };
+            let copied_pre = SendMessageW(
+                hwnd_edit,
+                EM_GETTEXTRANGE,
+                WPARAM(0),
+                LPARAM(&mut tr_pre as *mut _ as isize),
+            )
+            .0 as usize;
+            let mut snippet_pre = String::from_utf16_lossy(&buffer_pre[..copied_pre]);
+
+            // Take text after the last newline in this prefix
+            if let Some(idx) = snippet_pre.rfind(['\r', '\n']) {
+                snippet_pre = snippet_pre[idx + 1..].to_string();
+            }
+            snippet = snippet_pre;
+        }
 
         let bookmark = Bookmark {
             position: pos,
-            snippet,
+            snippet: snippet.trim().to_string(),
             timestamp: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         };
 
@@ -8663,99 +8932,7 @@ unsafe fn insert_bookmark(hwnd: HWND) {
             app_windows::bookmarks_window::refresh_bookmarks_list(bookmarks_window);
         }
         confirm_menu_action(hwnd, "insert.bookmark");
-        return;
     }
-
-    let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
-    unsafe {
-        SendMessageW(
-            hwnd_edit,
-            EM_EXGETSEL,
-            WPARAM(0),
-            LPARAM(&mut cr as *mut _ as isize),
-        );
-    }
-
-    let pos = cr.cpMax;
-
-    // 1. Try to get up to 60 characters AFTER the cursor
-    let mut buffer = vec![0u16; 62];
-    let mut tr = TEXTRANGEW {
-        chrg: CHARRANGE {
-            cpMin: pos,
-            cpMax: pos + 60,
-        },
-        lpstrText: PWSTR(buffer.as_mut_ptr()),
-    };
-    let copied = unsafe {
-        SendMessageW(
-            hwnd_edit,
-            EM_GETTEXTRANGE,
-            WPARAM(0),
-            LPARAM(&mut tr as *mut _ as isize),
-        )
-        .0 as usize
-    };
-    let mut snippet = String::from_utf16_lossy(&buffer[..copied]);
-
-    // Stop at the first newline
-    if let Some(idx) = snippet.find(['\r', '\n']) {
-        snippet.truncate(idx);
-    }
-
-    // 2. If the resulting snippet is empty (e.g. cursor at end of line), take text BEFORE the cursor
-    if snippet.trim().is_empty() && pos > 0 {
-        let start_pre = (pos - 60).max(0);
-        let mut buffer_pre = vec![0u16; 62];
-        let mut tr_pre = TEXTRANGEW {
-            chrg: CHARRANGE {
-                cpMin: start_pre,
-                cpMax: pos,
-            },
-            lpstrText: PWSTR(buffer_pre.as_mut_ptr()),
-        };
-        let copied_pre = unsafe {
-            SendMessageW(
-                hwnd_edit,
-                EM_GETTEXTRANGE,
-                WPARAM(0),
-                LPARAM(&mut tr_pre as *mut _ as isize),
-            )
-            .0 as usize
-        };
-        let mut snippet_pre = String::from_utf16_lossy(&buffer_pre[..copied_pre]);
-
-        // Take text after the last newline in this prefix
-        if let Some(idx) = snippet_pre.rfind(['\r', '\n']) {
-            snippet_pre = snippet_pre[idx + 1..].to_string();
-        }
-        snippet = snippet_pre;
-    }
-
-    let bookmark = Bookmark {
-        position: pos,
-        snippet: snippet.trim().to_string(),
-        timestamp: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-    };
-
-    let bookmarks_window = with_state(hwnd, |state| {
-        let list = state
-            .bookmarks
-            .files
-            .entry(storage_key.clone())
-            .or_default();
-        list.push(bookmark);
-        if persist_to_disk {
-            save_bookmarks(&state.bookmarks);
-        }
-        state.bookmarks_window
-    })
-    .unwrap_or(HWND(0));
-
-    if bookmarks_window.0 != 0 {
-        app_windows::bookmarks_window::refresh_bookmarks_list(bookmarks_window);
-    }
-    confirm_menu_action(hwnd, "insert.bookmark");
 }
 
 fn audio_bookmark_position_and_snippet(position_secs: f64) -> (i32, String) {
@@ -8768,24 +8945,27 @@ fn audio_bookmark_position_and_snippet(position_secs: f64) -> (i32, String) {
     )
 }
 
-unsafe fn goto_relative_bookmark(hwnd: HWND, forward: bool) -> bool {
-    let (path, hwnd_edit, format): (Option<std::path::PathBuf>, HWND, FileFormat) =
+fn goto_relative_bookmark(hwnd: HWND, forward: bool) -> bool {
+    let (path, hwnd_edit, format): (Option<std::path::PathBuf>, HWND, FileFormat) = unsafe {
         with_state(hwnd, |state| {
             state
                 .docs
                 .get(state.current)
                 .map(|doc| (doc.path.clone(), doc.hwnd_edit, doc.format))
         })
-        .flatten()
-        .unwrap_or((None, HWND(0), FileFormat::default()));
+    }
+    .flatten()
+    .unwrap_or((None, HWND(0), FileFormat::default()));
     if hwnd_edit.0 == 0 {
         return false;
     }
 
     let (storage_key, _) = bookmark_storage_key(path.as_deref(), hwnd_edit);
-    let Some(bookmarks) = with_state(hwnd, |state| {
-        state.bookmarks.files.get(&storage_key).cloned()
-    })
+    let Some(bookmarks) = unsafe {
+        with_state(hwnd, |state| {
+            state.bookmarks.files.get(&storage_key).cloned()
+        })
+    }
     .flatten() else {
         return false;
     };
@@ -8794,24 +8974,28 @@ unsafe fn goto_relative_bookmark(hwnd: HWND, forward: bool) -> bool {
     }
 
     let current_pos = if matches!(format, FileFormat::Audiobook) {
-        with_state(hwnd, |state| {
-            let active = state.active_audiobook.as_ref()?;
-            let current_path = path.as_ref()?;
-            if active.path != *current_path {
-                return Some(0);
-            }
-            Some(crate::audio_player::audiobook_position_secs(active).floor() as i32)
-        })
+        unsafe {
+            with_state(hwnd, |state| {
+                let active = state.active_audiobook.as_ref()?;
+                let current_path = path.as_ref()?;
+                if active.path != *current_path {
+                    return Some(0);
+                }
+                Some(crate::audio_player::audiobook_position_secs(active).floor() as i32)
+            })
+        }
         .flatten()
         .unwrap_or(0)
     } else {
         let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
-        SendMessageW(
-            hwnd_edit,
-            EM_EXGETSEL,
-            WPARAM(0),
-            LPARAM(&mut cr as *mut _ as isize),
-        );
+        unsafe {
+            SendMessageW(
+                hwnd_edit,
+                EM_EXGETSEL,
+                WPARAM(0),
+                LPARAM(&mut cr as *mut _ as isize),
+            );
+        }
         if forward { cr.cpMax } else { cr.cpMin }
     };
 
@@ -8841,26 +9025,30 @@ unsafe fn goto_relative_bookmark(hwnd: HWND, forward: bool) -> bool {
         cpMin: target_position,
         cpMax: target_position,
     };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXSETSEL,
-        WPARAM(0),
-        LPARAM(&mut cr as *mut _ as isize),
-    );
-    SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
-    SetFocus(hwnd_edit);
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut cr as *mut _ as isize),
+        );
+        SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+        SetFocus(hwnd_edit);
+    }
     announce_bookmark_target_line(hwnd_edit, target_position, &target_snippet);
     true
 }
 
-unsafe fn announce_bookmark_target_line(hwnd_edit: HWND, position: i32, fallback: &str) {
-    let line = SendMessageW(
-        hwnd_edit,
-        EM_LINEFROMCHAR,
-        WPARAM(position.max(0) as usize),
-        LPARAM(0),
-    )
-    .0 as i32;
+fn announce_bookmark_target_line(hwnd_edit: HWND, position: i32, fallback: &str) {
+    let line = unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_LINEFROMCHAR,
+            WPARAM(position.max(0) as usize),
+            LPARAM(0),
+        )
+        .0 as i32
+    };
     if line < 0 {
         if !fallback.is_empty() {
             crate::accessibility::screen_reader_speak(fallback);
@@ -8868,20 +9056,22 @@ unsafe fn announce_bookmark_target_line(hwnd_edit: HWND, position: i32, fallback
         return;
     }
     let line_start =
-        SendMessageW(hwnd_edit, EM_LINEINDEX, WPARAM(line as usize), LPARAM(0)).0 as i32;
+        unsafe { SendMessageW(hwnd_edit, EM_LINEINDEX, WPARAM(line as usize), LPARAM(0)).0 as i32 };
     if line_start < 0 {
         if !fallback.is_empty() {
             crate::accessibility::screen_reader_speak(fallback);
         }
         return;
     }
-    let line_len = SendMessageW(
-        hwnd_edit,
-        EM_LINELENGTH,
-        WPARAM(line_start.max(0) as usize),
-        LPARAM(0),
-    )
-    .0 as i32;
+    let line_len = unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_LINELENGTH,
+            WPARAM(line_start.max(0) as usize),
+            LPARAM(0),
+        )
+        .0 as i32
+    };
     if line_len <= 0 {
         if !fallback.is_empty() {
             crate::accessibility::screen_reader_speak(fallback);
@@ -8896,12 +9086,14 @@ unsafe fn announce_bookmark_target_line(hwnd_edit: HWND, position: i32, fallback
         },
         lpstrText: PWSTR(buf.as_mut_ptr()),
     };
-    SendMessageW(
-        hwnd_edit,
-        EM_GETTEXTRANGE,
-        WPARAM(0),
-        LPARAM(&mut range as *mut _ as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_GETTEXTRANGE,
+            WPARAM(0),
+            LPARAM(&mut range as *mut _ as isize),
+        );
+    }
     let text = String::from_utf16_lossy(&buf[..line_len as usize]);
     let trimmed = text.trim();
     if !trimmed.is_empty() {
@@ -8911,13 +9103,15 @@ unsafe fn announce_bookmark_target_line(hwnd_edit: HWND, position: i32, fallback
     }
 }
 
-unsafe fn clear_current_bookmarks(hwnd: HWND) -> bool {
-    let (path, hwnd_edit) = with_state(hwnd, |state| {
-        state
-            .docs
-            .get(state.current)
-            .map(|doc| (doc.path.clone(), doc.hwnd_edit))
-    })
+fn clear_current_bookmarks(hwnd: HWND) -> bool {
+    let (path, hwnd_edit) = unsafe {
+        with_state(hwnd, |state| {
+            state
+                .docs
+                .get(state.current)
+                .map(|doc| (doc.path.clone(), doc.hwnd_edit))
+        })
+    }
     .flatten()
     .unwrap_or((None, HWND(0)));
     if hwnd_edit.0 == 0 {
@@ -8925,13 +9119,15 @@ unsafe fn clear_current_bookmarks(hwnd: HWND) -> bool {
     }
     let (storage_key, persist_to_disk) = bookmark_storage_key(path.as_deref(), hwnd_edit);
 
-    let (removed, bookmarks_window) = with_state(hwnd, |state| {
-        let removed = state.bookmarks.files.remove(&storage_key).is_some();
-        if removed && persist_to_disk {
-            save_bookmarks(&state.bookmarks);
-        }
-        (removed, state.bookmarks_window)
-    })
+    let (removed, bookmarks_window) = unsafe {
+        with_state(hwnd, |state| {
+            let removed = state.bookmarks.files.remove(&storage_key).is_some();
+            if removed && persist_to_disk {
+                save_bookmarks(&state.bookmarks);
+            }
+            (removed, state.bookmarks_window)
+        })
+    }
     .unwrap_or((false, HWND(0)));
 
     if bookmarks_window.0 != 0 {
@@ -8940,7 +9136,7 @@ unsafe fn clear_current_bookmarks(hwnd: HWND) -> bool {
     removed
 }
 
-pub(crate) unsafe fn goto_first_bookmark(
+pub(crate) fn goto_first_bookmark(
     hwnd_edit: HWND,
     path: &Path,
     bookmarks: &BookmarkStore,
@@ -8957,36 +9153,42 @@ pub(crate) unsafe fn goto_first_bookmark(
                 cpMin: bm.position,
                 cpMax: bm.position,
             };
-            SendMessageW(
-                hwnd_edit,
-                EM_EXSETSEL,
-                WPARAM(0),
-                LPARAM(&mut cr as *mut _ as isize),
-            );
-            SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+            unsafe {
+                SendMessageW(
+                    hwnd_edit,
+                    EM_EXSETSEL,
+                    WPARAM(0),
+                    LPARAM(&mut cr as *mut _ as isize),
+                );
+                SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+            }
         }
     }
 }
 
-pub(crate) unsafe fn rebuild_menus(hwnd: HWND) {
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+pub(crate) fn rebuild_menus(hwnd: HWND) {
+    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     let (_, recent_menu) = create_menus(hwnd, language);
-    with_state(hwnd, |state| {
-        state.hmenu_recent = recent_menu;
-    });
+    unsafe {
+        with_state(hwnd, |state| {
+            state.hmenu_recent = recent_menu;
+        });
+    }
     update_recent_menu(hwnd, recent_menu);
     update_voice_panel_menu_check(hwnd);
 }
 
-pub(crate) unsafe fn push_recent_file(hwnd: HWND, path: &Path) {
-    let (hmenu_recent, files) = match with_state(hwnd, |state| {
-        state.recent_files.retain(|p| p != path);
-        state.recent_files.insert(0, path.to_path_buf());
-        if state.recent_files.len() > MAX_RECENT {
-            state.recent_files.truncate(MAX_RECENT);
-        }
-        (state.hmenu_recent, state.recent_files.clone())
-    }) {
+pub(crate) fn push_recent_file(hwnd: HWND, path: &Path) {
+    let (hmenu_recent, files) = match unsafe {
+        with_state(hwnd, |state| {
+            state.recent_files.retain(|p| p != path);
+            state.recent_files.insert(0, path.to_path_buf());
+            if state.recent_files.len() > MAX_RECENT {
+                state.recent_files.truncate(MAX_RECENT);
+            }
+            (state.hmenu_recent, state.recent_files.clone())
+        })
+    } {
         Some(values) => values,
         None => return,
     };
@@ -8994,11 +9196,13 @@ pub(crate) unsafe fn push_recent_file(hwnd: HWND, path: &Path) {
     save_recent_files(&files);
 }
 
-pub(crate) unsafe fn clear_recent_files(hwnd: HWND) {
-    let hmenu_recent = with_state(hwnd, |state| {
-        state.recent_files.clear();
-        state.hmenu_recent
-    })
+pub(crate) fn clear_recent_files(hwnd: HWND) {
+    let hmenu_recent = unsafe {
+        with_state(hwnd, |state| {
+            state.recent_files.clear();
+            state.hmenu_recent
+        })
+    }
     .unwrap_or(HMENU(0));
     if hmenu_recent.0 != 0 {
         update_recent_menu(hwnd, hmenu_recent);
@@ -9052,9 +9256,9 @@ mod tests {
     }
 }
 
-unsafe fn open_document_with_encoding(hwnd: HWND, path: &Path, encoding: Option<TextEncoding>) {
-    let behavior =
-        with_state(hwnd, |state| state.settings.open_behavior).unwrap_or(OpenBehavior::NewTab);
+fn open_document_with_encoding(hwnd: HWND, path: &Path, encoding: Option<TextEncoding>) {
+    let behavior = unsafe { with_state(hwnd, |state| state.settings.open_behavior) }
+        .unwrap_or(OpenBehavior::NewTab);
     if behavior == OpenBehavior::NewWindow && spawn_new_window_with_path(path) {
         return;
     }
@@ -9254,12 +9458,14 @@ fn handle_audio_playlist_timer(hwnd: HWND) {
     }
 }
 
-unsafe fn open_path_with_behavior(hwnd: HWND, path: &Path) {
-    if is_audio_path(path) {
-        queue_audio_files_and_play(hwnd, vec![path.to_path_buf()]);
-        return;
+fn open_path_with_behavior(hwnd: HWND, path: &Path) {
+    unsafe {
+        if is_audio_path(path) {
+            queue_audio_files_and_play(hwnd, vec![path.to_path_buf()]);
+            return;
+        }
+        open_document_with_encoding(hwnd, path, None);
     }
-    open_document_with_encoding(hwnd, path, None);
 }
 
 pub(crate) unsafe fn with_state<F, R>(hwnd: HWND, f: F) -> Option<R>
@@ -9363,7 +9569,7 @@ pub(crate) unsafe fn open_pdf_document_async(hwnd: HWND, path: &Path, from_copyd
     });
 }
 
-unsafe fn start_ocr_for_pdf(
+fn start_ocr_for_pdf(
     hwnd: HWND,
     hwnd_edit: HWND,
     path: PathBuf,
@@ -9417,251 +9623,259 @@ unsafe fn start_ocr_for_pdf(
     });
 }
 
-unsafe fn handle_pdf_loaded(hwnd: HWND, payload: PdfLoadResult) {
-    let PdfLoadResult {
-        hwnd_edit,
-        path,
-        result,
-        from_copydata,
-    } = payload;
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-
-    stop_pdf_loading_animation(hwnd, hwnd_edit);
-
-    let doc_index = with_state(hwnd, |state| {
-        state
-            .docs
-            .iter()
-            .enumerate()
-            .find_map(|(i, doc)| (doc.hwnd_edit == hwnd_edit).then_some(i))
-    })
-    .flatten();
-
-    let Some(index) = doc_index else {
-        return;
-    };
-
-    match result {
-        Ok(PdfTextResult::Text(text)) => {
-            editor_manager::set_edit_text(hwnd_edit, &text);
-            with_state(hwnd, |state| {
-                goto_first_bookmark(hwnd_edit, &path, &state.bookmarks, FileFormat::Pdf);
-            });
-            let msg = pdf_loaded_message(language);
-            crate::log_debug(&format!("Info (speech): {msg}"));
-            crate::accessibility::nvda_speak(&msg);
-            unsafe {
-                crate::log_if_err!(MessageBeep(MB_ICONASTERISK));
-            }
-            let mut update_title = false;
-            with_state(hwnd, |state| {
-                if let Some(doc) = state.docs.get_mut(index) {
-                    doc.dirty = false;
-                    update_tab_title(state.hwnd_tab, index, &doc.title, false);
-                    update_title = state.current == index;
-                }
-            });
-            if update_title {
-                update_window_title(hwnd);
-            }
-            push_recent_file(hwnd, &path);
-        }
-        Ok(PdfTextResult::NoText) => {
-            start_ocr_for_pdf(hwnd, hwnd_edit, path, from_copydata, language);
-        }
-        Err(message) => {
-            // Instead of closing the document, show error message as placeholder text
-            let error_placeholder = format!(
-                "{}\n\n{}",
-                message,
-                i18n::tr(language, "app.pdf_error_hint")
-            );
-            editor_manager::set_edit_text(hwnd_edit, &error_placeholder);
-            show_error(hwnd, language, &message);
-            let mut update_title = false;
-            with_state(hwnd, |state| {
-                if let Some(doc) = state.docs.get_mut(index) {
-                    doc.dirty = false;
-                    update_tab_title(state.hwnd_tab, index, &doc.title, false);
-                    update_title = state.current == index;
-                }
-            });
-            if update_title {
-                update_window_title(hwnd);
-            }
-        }
-    }
-}
-
-unsafe fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLoadResult) {
-    let editor_manager::DocumentLoadResult { path, result } = payload;
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    const LARGE_FILE_NO_WRAP_THRESHOLD_BYTES: u64 = 15 * 1024 * 1024;
-
-    let loaded = match result {
-        Ok(loaded) => loaded,
-        Err(message) => {
-            show_error(hwnd, language, &message);
-            return;
-        }
-    };
-    let Some(loaded) = loaded else {
-        return;
-    };
-    let large_file_no_wrap = std::fs::metadata(&path)
-        .map(|meta| meta.len() >= LARGE_FILE_NO_WRAP_THRESHOLD_BYTES)
-        .unwrap_or(false);
-
-    let title = path.file_name().and_then(|s| s.to_str()).unwrap_or("File");
-    let (hwnd_edit, new_index) = with_state(hwnd, |state| {
-        let use_word_wrap = state.settings.word_wrap && !large_file_no_wrap;
-        let hwnd_edit = editor_manager::create_edit(
-            hwnd,
-            state.hfont,
-            use_word_wrap,
-            state.settings.text_color,
-            state.settings.text_size,
-        );
-        editor_manager::set_edit_text(hwnd_edit, &loaded.content);
-
-        let doc = Document {
-            title: title.to_string(),
-            path: Some(path.clone()),
+fn handle_pdf_loaded(hwnd: HWND, payload: PdfLoadResult) {
+    unsafe {
+        let PdfLoadResult {
             hwnd_edit,
-            dirty: false,
-            format: loaded.format,
-            opened_text_encoding: loaded.opened_text_encoding,
-            current_save_text_encoding: None,
-            from_rss: false,
-            is_temporary: false,
-        };
-        state.docs.push(doc);
-        if large_file_no_wrap {
-            state.large_text_editors.insert(hwnd_edit.0);
-        } else {
-            state.large_text_editors.remove(&hwnd_edit.0);
-        }
-        insert_tab(state.hwnd_tab, title, (state.docs.len() - 1) as i32);
-        goto_first_bookmark(hwnd_edit, &path, &state.bookmarks, loaded.format);
-        (hwnd_edit, state.docs.len() - 1)
-    })
-    .unwrap_or((HWND(0), 0));
-
-    if hwnd_edit.0 == 0 {
-        return;
-    }
-    if large_file_no_wrap {
-        log_debug(&format!(
-            "Large file mode: disabled word wrap for '{}' (>= {} bytes)",
-            path.display(),
-            LARGE_FILE_NO_WRAP_THRESHOLD_BYTES
-        ));
-    }
-
-    editor_manager::select_tab(hwnd, new_index);
-    push_recent_file(hwnd, &path);
-
-    let pending = with_state(hwnd, |state| state.pending_find_in_files.clone()).unwrap_or(None);
-    if let Some(pending) = pending
-        && pending.path == path
-    {
-        apply_find_in_files_selection(
-            hwnd_edit,
-            &pending.snippet,
-            &pending.term,
-            pending.start_utf16,
-            pending.len_utf16,
-        );
-        with_state(hwnd, |state| {
-            state.pending_find_in_files = None;
-        });
-    }
-}
-
-unsafe fn start_pdf_loading_animation(hwnd: HWND, hwnd_edit: HWND, ocr_timeout_secs: u64) {
-    let timer_id = with_state(hwnd, |state| {
-        let timer_id = state.next_timer_id;
-        state.next_timer_id = state.next_timer_id.saturating_add(1);
-        state.pdf_loading.push(PdfLoadingState {
-            hwnd_edit,
-            timer_id,
-            frame: 0,
-            start_time: Instant::now(),
-            ocr_timeout_secs,
-        });
-        timer_id
-    })
-    .unwrap_or(0);
-
-    if timer_id == 0 {
-        return;
-    }
-
-    if SetTimer(hwnd, timer_id, 120, None) == 0 {
-        stop_pdf_loading_animation(hwnd, hwnd_edit);
-    }
-}
-
-unsafe fn stop_pdf_loading_animation(hwnd: HWND, hwnd_edit: HWND) {
-    let mut timer_id = None;
-    with_state(hwnd, |state| {
-        if let Some(pos) = state
-            .pdf_loading
-            .iter()
-            .position(|entry| entry.hwnd_edit == hwnd_edit)
-        {
-            timer_id = Some(state.pdf_loading[pos].timer_id);
-            state.pdf_loading.swap_remove(pos);
-        }
-    });
-    if let Some(timer_id) = timer_id {
-        kill_timer_best_effort(hwnd, timer_id, "KillTimer PDF_LOADING");
-    }
-}
-
-unsafe fn handle_pdf_loading_timer(hwnd: HWND, timer_id: usize) {
-    let mut target = None;
-    let mut should_timeout = false;
-    with_state(hwnd, |state| {
-        if let Some(entry) = state
-            .pdf_loading
-            .iter_mut()
-            .find(|entry| entry.timer_id == timer_id)
-        {
-            entry.frame = entry.frame.wrapping_add(1);
-            let timeout_secs = entry.ocr_timeout_secs;
-            if timeout_secs == 0 || entry.start_time.elapsed().as_secs() >= timeout_secs {
-                should_timeout = true;
-            }
-            target = Some((entry.hwnd_edit, entry.frame, timeout_secs));
-        }
-    });
-
-    if should_timeout && let Some((hwnd_edit, _, timeout_secs)) = target {
-        stop_pdf_loading_animation(hwnd, hwnd_edit);
+            path,
+            result,
+            from_copydata,
+        } = payload;
         let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-        let from_copydata = timeout_secs != 0;
-        let path = with_state(hwnd, |state| {
+
+        stop_pdf_loading_animation(hwnd, hwnd_edit);
+
+        let doc_index = with_state(hwnd, |state| {
             state
                 .docs
                 .iter()
-                .find(|d| d.hwnd_edit == hwnd_edit)
-                .and_then(|d| d.path.clone())
+                .enumerate()
+                .find_map(|(i, doc)| (doc.hwnd_edit == hwnd_edit).then_some(i))
         })
         .flatten();
 
-        if let Some(path) = path {
-            start_ocr_for_pdf(hwnd, hwnd_edit, path, from_copydata, language);
-        } else {
-            let err = i18n::tr(language, "app.pdf_error_hint");
-            editor_manager::set_edit_text(hwnd_edit, &err);
-        }
-        return;
-    }
+        let Some(index) = doc_index else {
+            return;
+        };
 
-    if let Some((hwnd_edit, frame, _)) = target {
+        match result {
+            Ok(PdfTextResult::Text(text)) => {
+                editor_manager::set_edit_text(hwnd_edit, &text);
+                with_state(hwnd, |state| {
+                    goto_first_bookmark(hwnd_edit, &path, &state.bookmarks, FileFormat::Pdf);
+                });
+                let msg = pdf_loaded_message(language);
+                crate::log_debug(&format!("Info (speech): {msg}"));
+                crate::accessibility::nvda_speak(&msg);
+                crate::log_if_err!(MessageBeep(MB_ICONASTERISK));
+                let mut update_title = false;
+                with_state(hwnd, |state| {
+                    if let Some(doc) = state.docs.get_mut(index) {
+                        doc.dirty = false;
+                        update_tab_title(state.hwnd_tab, index, &doc.title, false);
+                        update_title = state.current == index;
+                    }
+                });
+                if update_title {
+                    update_window_title(hwnd);
+                }
+                push_recent_file(hwnd, &path);
+            }
+            Ok(PdfTextResult::NoText) => {
+                start_ocr_for_pdf(hwnd, hwnd_edit, path, from_copydata, language);
+            }
+            Err(message) => {
+                // Instead of closing the document, show error message as placeholder text
+                let error_placeholder = format!(
+                    "{}\n\n{}",
+                    message,
+                    i18n::tr(language, "app.pdf_error_hint")
+                );
+                editor_manager::set_edit_text(hwnd_edit, &error_placeholder);
+                show_error(hwnd, language, &message);
+                let mut update_title = false;
+                with_state(hwnd, |state| {
+                    if let Some(doc) = state.docs.get_mut(index) {
+                        doc.dirty = false;
+                        update_tab_title(state.hwnd_tab, index, &doc.title, false);
+                        update_title = state.current == index;
+                    }
+                });
+                if update_title {
+                    update_window_title(hwnd);
+                }
+            }
+        }
+    }
+}
+
+fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLoadResult) {
+    unsafe {
+        let editor_manager::DocumentLoadResult { path, result } = payload;
         let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-        editor_manager::set_edit_text(hwnd_edit, &pdf_loading_placeholder(frame, language));
+        const LARGE_FILE_NO_WRAP_THRESHOLD_BYTES: u64 = 15 * 1024 * 1024;
+
+        let loaded = match result {
+            Ok(loaded) => loaded,
+            Err(message) => {
+                show_error(hwnd, language, &message);
+                return;
+            }
+        };
+        let Some(loaded) = loaded else {
+            return;
+        };
+        let large_file_no_wrap = std::fs::metadata(&path)
+            .map(|meta| meta.len() >= LARGE_FILE_NO_WRAP_THRESHOLD_BYTES)
+            .unwrap_or(false);
+
+        let title = path.file_name().and_then(|s| s.to_str()).unwrap_or("File");
+        let (hwnd_edit, new_index) = with_state(hwnd, |state| {
+            let use_word_wrap = state.settings.word_wrap && !large_file_no_wrap;
+            let hwnd_edit = editor_manager::create_edit(
+                hwnd,
+                state.hfont,
+                use_word_wrap,
+                state.settings.text_color,
+                state.settings.text_size,
+            );
+            editor_manager::set_edit_text(hwnd_edit, &loaded.content);
+
+            let doc = Document {
+                title: title.to_string(),
+                path: Some(path.clone()),
+                hwnd_edit,
+                dirty: false,
+                format: loaded.format,
+                opened_text_encoding: loaded.opened_text_encoding,
+                current_save_text_encoding: None,
+                from_rss: false,
+                is_temporary: false,
+            };
+            state.docs.push(doc);
+            if large_file_no_wrap {
+                state.large_text_editors.insert(hwnd_edit.0);
+            } else {
+                state.large_text_editors.remove(&hwnd_edit.0);
+            }
+            insert_tab(state.hwnd_tab, title, (state.docs.len() - 1) as i32);
+            goto_first_bookmark(hwnd_edit, &path, &state.bookmarks, loaded.format);
+            (hwnd_edit, state.docs.len() - 1)
+        })
+        .unwrap_or((HWND(0), 0));
+
+        if hwnd_edit.0 == 0 {
+            return;
+        }
+        if large_file_no_wrap {
+            log_debug(&format!(
+                "Large file mode: disabled word wrap for '{}' (>= {} bytes)",
+                path.display(),
+                LARGE_FILE_NO_WRAP_THRESHOLD_BYTES
+            ));
+        }
+
+        editor_manager::select_tab(hwnd, new_index);
+        push_recent_file(hwnd, &path);
+
+        let pending = with_state(hwnd, |state| state.pending_find_in_files.clone()).unwrap_or(None);
+        if let Some(pending) = pending
+            && pending.path == path
+        {
+            apply_find_in_files_selection(
+                hwnd_edit,
+                &pending.snippet,
+                &pending.term,
+                pending.start_utf16,
+                pending.len_utf16,
+            );
+            with_state(hwnd, |state| {
+                state.pending_find_in_files = None;
+            });
+        }
+    }
+}
+
+fn start_pdf_loading_animation(hwnd: HWND, hwnd_edit: HWND, ocr_timeout_secs: u64) {
+    unsafe {
+        let timer_id = with_state(hwnd, |state| {
+            let timer_id = state.next_timer_id;
+            state.next_timer_id = state.next_timer_id.saturating_add(1);
+            state.pdf_loading.push(PdfLoadingState {
+                hwnd_edit,
+                timer_id,
+                frame: 0,
+                start_time: Instant::now(),
+                ocr_timeout_secs,
+            });
+            timer_id
+        })
+        .unwrap_or(0);
+
+        if timer_id == 0 {
+            return;
+        }
+
+        if SetTimer(hwnd, timer_id, 120, None) == 0 {
+            stop_pdf_loading_animation(hwnd, hwnd_edit);
+        }
+    }
+}
+
+fn stop_pdf_loading_animation(hwnd: HWND, hwnd_edit: HWND) {
+    unsafe {
+        let mut timer_id = None;
+        with_state(hwnd, |state| {
+            if let Some(pos) = state
+                .pdf_loading
+                .iter()
+                .position(|entry| entry.hwnd_edit == hwnd_edit)
+            {
+                timer_id = Some(state.pdf_loading[pos].timer_id);
+                state.pdf_loading.swap_remove(pos);
+            }
+        });
+        if let Some(timer_id) = timer_id {
+            kill_timer_best_effort(hwnd, timer_id, "KillTimer PDF_LOADING");
+        }
+    }
+}
+
+fn handle_pdf_loading_timer(hwnd: HWND, timer_id: usize) {
+    unsafe {
+        let mut target = None;
+        let mut should_timeout = false;
+        with_state(hwnd, |state| {
+            if let Some(entry) = state
+                .pdf_loading
+                .iter_mut()
+                .find(|entry| entry.timer_id == timer_id)
+            {
+                entry.frame = entry.frame.wrapping_add(1);
+                let timeout_secs = entry.ocr_timeout_secs;
+                if timeout_secs == 0 || entry.start_time.elapsed().as_secs() >= timeout_secs {
+                    should_timeout = true;
+                }
+                target = Some((entry.hwnd_edit, entry.frame, timeout_secs));
+            }
+        });
+
+        if should_timeout && let Some((hwnd_edit, _, timeout_secs)) = target {
+            stop_pdf_loading_animation(hwnd, hwnd_edit);
+            let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+            let from_copydata = timeout_secs != 0;
+            let path = with_state(hwnd, |state| {
+                state
+                    .docs
+                    .iter()
+                    .find(|d| d.hwnd_edit == hwnd_edit)
+                    .and_then(|d| d.path.clone())
+            })
+            .flatten();
+
+            if let Some(path) = path {
+                start_ocr_for_pdf(hwnd, hwnd_edit, path, from_copydata, language);
+            } else {
+                let err = i18n::tr(language, "app.pdf_error_hint");
+                editor_manager::set_edit_text(hwnd_edit, &err);
+            }
+            return;
+        }
+
+        if let Some((hwnd_edit, frame, _)) = target {
+            let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+            editor_manager::set_edit_text(hwnd_edit, &pdf_loading_placeholder(frame, language));
+        }
     }
 }
 
@@ -9679,12 +9893,12 @@ pub(crate) fn pdf_loading_placeholder(frame: usize, language: crate::settings::L
     format!("{loading}\r\n\r\n[{bar}]\r\n{analyzing} {spinner}")
 }
 
-unsafe fn handle_drop_files(hwnd: HWND, hdrop: HDROP) {
-    let count = DragQueryFileW(hdrop, 0xFFFFFFFF, None);
+fn handle_drop_files(hwnd: HWND, hdrop: HDROP) {
+    let count = unsafe { DragQueryFileW(hdrop, 0xFFFFFFFF, None) };
     let mut dropped_paths = Vec::new();
     for index in 0..count {
         let mut buffer = [0u16; 260];
-        let len = DragQueryFileW(hdrop, index, Some(&mut buffer));
+        let len = unsafe { DragQueryFileW(hdrop, index, Some(&mut buffer)) };
         if len == 0 {
             continue;
         }
@@ -9695,23 +9909,29 @@ unsafe fn handle_drop_files(hwnd: HWND, hdrop: HDROP) {
         dropped_paths.push(path);
     }
     if !dropped_paths.is_empty() && dropped_paths.iter().all(|path| is_audio_path(path)) {
-        queue_audio_files_and_play(hwnd, dropped_paths);
+        unsafe {
+            queue_audio_files_and_play(hwnd, dropped_paths);
+        }
     } else {
         for path in dropped_paths {
             open_path_with_behavior(hwnd, &path);
         }
     }
-    DragFinish(hdrop);
+    unsafe {
+        DragFinish(hdrop);
+    }
 }
 
-unsafe fn next_tab_with_prompt(hwnd: HWND) {
-    let (current, count) = match with_state(hwnd, |state| {
-        if state.docs.is_empty() {
-            return None;
-        }
-        let current = state.current;
-        Some((current, state.docs.len()))
-    }) {
+fn next_tab_with_prompt(hwnd: HWND) {
+    let (current, count) = match unsafe {
+        with_state(hwnd, |state| {
+            if state.docs.is_empty() {
+                return None;
+            }
+            let current = state.current;
+            Some((current, state.docs.len()))
+        })
+    } {
         Some(Some(values)) => values,
         _ => return,
     };
@@ -9722,21 +9942,23 @@ unsafe fn next_tab_with_prompt(hwnd: HWND) {
     select_tab(hwnd, next);
 }
 
-unsafe fn open_documents_popup(hwnd: HWND) {
-    let docs = with_state(hwnd, |state| {
-        state
-            .docs
-            .iter()
-            .enumerate()
-            .map(|(idx, doc)| (idx, doc.title.clone()))
-            .collect::<Vec<_>>()
-    })
+fn open_documents_popup(hwnd: HWND) {
+    let docs = unsafe {
+        with_state(hwnd, |state| {
+            state
+                .docs
+                .iter()
+                .enumerate()
+                .map(|(idx, doc)| (idx, doc.title.clone()))
+                .collect::<Vec<_>>()
+        })
+    }
     .unwrap_or_default();
     if docs.len() <= 1 {
         return;
     }
 
-    let menu = CreatePopupMenu().unwrap_or(HMENU(0));
+    let menu = unsafe { CreatePopupMenu().unwrap_or(HMENU(0)) };
     if menu.0 == 0 {
         return;
     }
@@ -9749,27 +9971,31 @@ unsafe fn open_documents_popup(hwnd: HWND) {
             title.clone()
         };
         let label = format!("&{} {}", idx + 1, display);
-        crate::log_if_err!(AppendMenuW(
-            menu,
-            MF_STRING,
-            id as usize,
-            PCWSTR(to_wide(&label).as_ptr()),
-        ));
+        unsafe {
+            crate::log_if_err!(AppendMenuW(
+                menu,
+                MF_STRING,
+                id as usize,
+                PCWSTR(to_wide(&label).as_ptr()),
+            ));
+        }
     }
 
     let mut pt = POINT::default();
-    if GetCursorPos(&mut pt).is_err() {
+    if unsafe { GetCursorPos(&mut pt).is_err() } {
         return;
     }
-    let command = TrackPopupMenu(
-        menu,
-        TPM_RIGHTBUTTON | TPM_RETURNCMD,
-        pt.x,
-        pt.y,
-        0,
-        hwnd,
-        None,
-    );
+    let command = unsafe {
+        TrackPopupMenu(
+            menu,
+            TPM_RIGHTBUTTON | TPM_RETURNCMD,
+            pt.x,
+            pt.y,
+            0,
+            hwnd,
+            None,
+        )
+    };
     if let Some(index) = window_doc_menu_index_from_command(command.0 as usize) {
         select_tab(hwnd, index);
     }
@@ -9783,36 +10009,44 @@ fn window_doc_menu_index_from_command(cmd_id: usize) -> Option<usize> {
     }
 }
 
-unsafe fn refresh_window_open_documents_menu(hwnd: HWND, window_menu: HMENU) {
-    crate::log_if_err!(DeleteMenu(
-        window_menu,
-        WINDOW_DOC_MENU_SEPARATOR_ID as u32,
-        MF_BYCOMMAND
-    ));
+fn refresh_window_open_documents_menu(hwnd: HWND, window_menu: HMENU) {
+    unsafe {
+        crate::log_if_err!(DeleteMenu(
+            window_menu,
+            WINDOW_DOC_MENU_SEPARATOR_ID as u32,
+            MF_BYCOMMAND
+        ));
+    }
     for idx in 0..WINDOW_DOC_MENU_MAX {
         let cmd_id = (WINDOW_DOC_MENU_BASE + idx) as u32;
-        crate::log_if_err!(DeleteMenu(window_menu, cmd_id, MF_BYCOMMAND));
+        unsafe {
+            crate::log_if_err!(DeleteMenu(window_menu, cmd_id, MF_BYCOMMAND));
+        }
     }
 
-    let docs = with_state(hwnd, |state| {
-        state
-            .docs
-            .iter()
-            .enumerate()
-            .map(|(idx, doc)| (idx, doc.title.clone()))
-            .collect::<Vec<_>>()
-    })
+    let docs = unsafe {
+        with_state(hwnd, |state| {
+            state
+                .docs
+                .iter()
+                .enumerate()
+                .map(|(idx, doc)| (idx, doc.title.clone()))
+                .collect::<Vec<_>>()
+        })
+    }
     .unwrap_or_default();
     if docs.len() <= 1 {
         return;
     }
 
-    crate::log_if_err!(AppendMenuW(
-        window_menu,
-        MF_SEPARATOR,
-        WINDOW_DOC_MENU_SEPARATOR_ID,
-        PCWSTR::null()
-    ));
+    unsafe {
+        crate::log_if_err!(AppendMenuW(
+            window_menu,
+            MF_SEPARATOR,
+            WINDOW_DOC_MENU_SEPARATOR_ID,
+            PCWSTR::null()
+        ));
+    }
     for (idx, title) in docs.iter().take(WINDOW_DOC_MENU_MAX) {
         let display = if title.trim().is_empty() {
             format!("Documento {}", idx + 1)
@@ -9820,12 +10054,14 @@ unsafe fn refresh_window_open_documents_menu(hwnd: HWND, window_menu: HMENU) {
             title.clone()
         };
         let label = format!("&{} {}", idx + 1, display);
-        crate::log_if_err!(AppendMenuW(
-            window_menu,
-            MF_STRING,
-            WINDOW_DOC_MENU_BASE + idx,
-            PCWSTR(to_wide(&label).as_ptr()),
-        ));
+        unsafe {
+            crate::log_if_err!(AppendMenuW(
+                window_menu,
+                MF_STRING,
+                WINDOW_DOC_MENU_BASE + idx,
+                PCWSTR(to_wide(&label).as_ptr()),
+            ));
+        }
     }
 }
 
@@ -9863,15 +10099,17 @@ fn suggest_extension_for_interpreter(interpreter: &str) -> &'static str {
     }
 }
 
-unsafe fn execute_current_file(hwnd: HWND) {
-    let (path, content, interpreter) = match with_state(hwnd, |state| {
-        let doc = state.docs.get(state.current)?;
-        let path = doc.path.clone();
-        let hwnd_edit = doc.hwnd_edit;
-        let content = editor_manager::get_edit_text(hwnd_edit);
-        let interpreter = state.settings.interpreter_path.clone();
-        Some((path, content, interpreter))
-    }) {
+fn execute_current_file(hwnd: HWND) {
+    let (path, content, interpreter) = match unsafe {
+        with_state(hwnd, |state| {
+            let doc = state.docs.get(state.current)?;
+            let path = doc.path.clone();
+            let hwnd_edit = doc.hwnd_edit;
+            let content = editor_manager::get_edit_text(hwnd_edit);
+            let interpreter = state.settings.interpreter_path.clone();
+            Some((path, content, interpreter))
+        })
+    } {
         Some(Some(v)) => v,
         _ => return,
     };
@@ -9897,18 +10135,18 @@ unsafe fn execute_current_file(hwnd: HWND) {
         .unwrap_or("")
         .to_lowercase();
     if extension == "html" || extension == "htm" {
-        unsafe {
-            let res = ShellExecuteW(
+        let res = unsafe {
+            ShellExecuteW(
                 hwnd,
                 w!("open"),
                 PCWSTR(to_wide(&exec_path.to_string_lossy()).as_ptr()),
                 PCWSTR::null(),
                 PCWSTR::null(),
                 SW_SHOWNORMAL,
-            );
-            if res.0 as isize <= 32 {
-                crate::log_debug(&format!("ShellExecuteW failed to open HTML: {}", res.0));
-            }
+            )
+        };
+        if res.0 as isize <= 32 {
+            crate::log_debug(&format!("ShellExecuteW failed to open HTML: {}", res.0));
         }
         return;
     }
@@ -9917,18 +10155,20 @@ unsafe fn execute_current_file(hwnd: HWND) {
     app_windows::prompt_window::open_with_command(hwnd, Some(command), working_dir);
 }
 
-unsafe fn attempt_switch_to_selected_tab(hwnd: HWND) {
-    let (current, hwnd_tab, count) = match with_state(hwnd, |state| {
-        if state.docs.is_empty() {
-            return None;
-        }
-        let current = state.current;
-        Some((current, state.hwnd_tab, state.docs.len()))
-    }) {
+fn attempt_switch_to_selected_tab(hwnd: HWND) {
+    let (current, hwnd_tab, count) = match unsafe {
+        with_state(hwnd, |state| {
+            if state.docs.is_empty() {
+                return None;
+            }
+            let current = state.current;
+            Some((current, state.hwnd_tab, state.docs.len()))
+        })
+    } {
         Some(Some(values)) => values,
         _ => return,
     };
-    let sel = SendMessageW(hwnd_tab, TCM_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
+    let sel = unsafe { SendMessageW(hwnd_tab, TCM_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32 };
     if sel < 0 {
         return;
     }
@@ -10322,58 +10562,60 @@ impl IFileDialogControlEvents_Impl for AudiobookBitrateDialogHandler {
     }
 }
 /// Mostra dialog per salvare file diagnostici zip.
-unsafe fn export_diagnostics_dialog(hwnd: HWND) {
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+fn export_diagnostics_dialog(hwnd: HWND) {
+    unsafe {
+        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
 
-    // Genera nome file con timestamp
-    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
-    let default_name = format!("sonarpad_diagnostics_{}.zip", timestamp);
-    let mut default_wide = to_wide(&default_name);
-    default_wide.resize(260, 0);
+        // Genera nome file con timestamp
+        let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+        let default_name = format!("sonarpad_diagnostics_{}.zip", timestamp);
+        let mut default_wide = to_wide(&default_name);
+        default_wide.resize(260, 0);
 
-    let zip_archive_label = i18n::tr(language, "dialog.zip_archive");
-    let all_files_label = i18n::tr(language, "dialog.all_files");
-    let filter = to_wide(&format!(
-        "{} (*.zip)\0*.zip\0{} (*.*)\0*.*\0\0",
-        zip_archive_label, all_files_label
-    ));
-    let title = to_wide(&i18n::tr(language, "dialog.export_diagnostics_title"));
+        let zip_archive_label = i18n::tr(language, "dialog.zip_archive");
+        let all_files_label = i18n::tr(language, "dialog.all_files");
+        let filter = to_wide(&format!(
+            "{} (*.zip)\0*.zip\0{} (*.*)\0*.*\0\0",
+            zip_archive_label, all_files_label
+        ));
+        let title = to_wide(&i18n::tr(language, "dialog.export_diagnostics_title"));
 
-    let mut ofn = OPENFILENAMEW {
-        lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
-        hwndOwner: hwnd,
-        lpstrFile: PWSTR(default_wide.as_mut_ptr()),
-        nMaxFile: default_wide.len() as u32,
-        lpstrFilter: PCWSTR(filter.as_ptr()),
-        lpstrTitle: PCWSTR(title.as_ptr()),
-        lpstrDefExt: PCWSTR(to_wide("zip").as_ptr()),
-        nFilterIndex: 1,
-        Flags: OFN_EXPLORER | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST,
-        ..Default::default()
-    };
+        let mut ofn = OPENFILENAMEW {
+            lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
+            hwndOwner: hwnd,
+            lpstrFile: PWSTR(default_wide.as_mut_ptr()),
+            nMaxFile: default_wide.len() as u32,
+            lpstrFilter: PCWSTR(filter.as_ptr()),
+            lpstrTitle: PCWSTR(title.as_ptr()),
+            lpstrDefExt: PCWSTR(to_wide("zip").as_ptr()),
+            nFilterIndex: 1,
+            Flags: OFN_EXPLORER | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST,
+            ..Default::default()
+        };
 
-    if !GetSaveFileNameW(&mut ofn).as_bool() {
-        return;
-    }
-
-    let len = default_wide
-        .iter()
-        .position(|&c| c == 0)
-        .unwrap_or(default_wide.len());
-    let path = PathBuf::from(String::from_utf16_lossy(&default_wide[..len]));
-
-    match diagnostics::export_diagnostics_zip(&path) {
-        Ok(()) => {
-            let message = i18n::tr(language, "dialog.export_diagnostics_success");
-            show_info(hwnd, language, &message);
+        if !GetSaveFileNameW(&mut ofn).as_bool() {
+            return;
         }
-        Err(e) => {
-            let message = format!(
-                "{}: {}",
-                i18n::tr(language, "dialog.export_diagnostics_error"),
-                e
-            );
-            show_error(hwnd, language, &message);
+
+        let len = default_wide
+            .iter()
+            .position(|&c| c == 0)
+            .unwrap_or(default_wide.len());
+        let path = PathBuf::from(String::from_utf16_lossy(&default_wide[..len]));
+
+        match diagnostics::export_diagnostics_zip(&path) {
+            Ok(()) => {
+                let message = i18n::tr(language, "dialog.export_diagnostics_success");
+                show_info(hwnd, language, &message);
+            }
+            Err(e) => {
+                let message = format!(
+                    "{}: {}",
+                    i18n::tr(language, "dialog.export_diagnostics_error"),
+                    e
+                );
+                show_error(hwnd, language, &message);
+            }
         }
     }
 }

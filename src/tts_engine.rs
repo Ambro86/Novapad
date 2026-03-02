@@ -402,7 +402,7 @@ pub fn post_tts_error(hwnd: HWND, session_id: u64, message: String) {
 }
 
 pub fn start_tts_from_caret(hwnd: HWND) {
-    let Some(hwnd_edit) = (unsafe { get_active_edit(hwnd) }) else {
+    let Some(hwnd_edit) = get_active_edit(hwnd) else {
         return;
     };
     let (language, split_on_newline, tts_engine, dictionary, tts_rate, tts_pitch, tts_volume) =
@@ -4649,7 +4649,7 @@ fn start_audiobook_with_text(
 }
 
 pub fn start_audiobook(hwnd: HWND) {
-    let Some(hwnd_edit) = (unsafe { get_active_edit(hwnd) }) else {
+    let Some(hwnd_edit) = get_active_edit(hwnd) else {
         return;
     };
     let text = get_edit_text(hwnd_edit);
@@ -4707,7 +4707,7 @@ pub fn start_audiobook(hwnd: HWND) {
 }
 
 pub fn start_audiobook_from_selection(hwnd: HWND) {
-    let Some(hwnd_edit) = (unsafe { get_active_edit(hwnd) }) else {
+    let Some(hwnd_edit) = get_active_edit(hwnd) else {
         return;
     };
     let text = crate::editor_manager::get_selected_text(hwnd_edit);

@@ -42,7 +42,7 @@ fn force_focus_editor_on_parent(parent: HWND) {
         return;
     }
     unsafe { SetForegroundWindow(parent) };
-    if let Some(hwnd_edit) = unsafe { crate::get_active_edit(parent) } {
+    if let Some(hwnd_edit) = crate::get_active_edit(parent) {
         unsafe {
             SetFocus(hwnd_edit);
             SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));

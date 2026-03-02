@@ -792,7 +792,7 @@ fn force_focus_editor_on_parent(parent: HWND) {
             LPARAM(0),
         );
     }
-    if unsafe { get_active_edit(parent) }.is_none() {
+    if get_active_edit(parent).is_none() {
         unsafe {
             SendMessageW(
                 parent,
@@ -802,7 +802,7 @@ fn force_focus_editor_on_parent(parent: HWND) {
             );
         }
     }
-    if let Some(hwnd_edit) = unsafe { get_active_edit(parent) } {
+    if let Some(hwnd_edit) = get_active_edit(parent) {
         unsafe {
             SetFocus(hwnd_edit);
             SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(0));
@@ -820,7 +820,7 @@ fn force_focus_editor_on_parent(parent: HWND) {
 
 fn apply_import_text(parent: HWND, text: &str) -> bool {
     force_focus_editor_on_parent(parent);
-    let Some(hwnd_edit) = (unsafe { get_active_edit(parent) }) else {
+    let Some(hwnd_edit) = get_active_edit(parent) else {
         return false;
     };
     let existing = get_edit_text(hwnd_edit);

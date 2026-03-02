@@ -271,7 +271,7 @@ fn notify_active_editor_focus(hwnd: HWND, notify_when_audiobook: bool) {
         return;
     }
 
-    if let Some(hwnd_edit) = unsafe { get_active_edit(hwnd) } {
+    if let Some(hwnd_edit) = get_active_edit(hwnd) {
         // SAFETY: `hwnd_edit` is the current editor handle managed by app state.
         unsafe {
             NotifyWinEvent(
@@ -7707,7 +7707,7 @@ fn can_undo_now(hwnd: HWND) -> bool {
     if unsafe { with_state(hwnd, |state| state.normalize_undo.is_some()).unwrap_or(false) } {
         return true;
     }
-    let Some(hwnd_edit) = (unsafe { get_active_edit(hwnd) }) else {
+    let Some(hwnd_edit) = get_active_edit(hwnd) else {
         return false;
     };
     // SAFETY: querying EM_CANUNDO on the active edit control is side-effect free.
@@ -7721,7 +7721,7 @@ pub(crate) fn update_main_status_bar(hwnd: HWND) {
     if hwnd_status.0 == 0 {
         return;
     }
-    let (chars, words, line, col) = if let Some(hwnd_edit) = unsafe { get_active_edit(hwnd) } {
+    let (chars, words, line, col) = if let Some(hwnd_edit) = get_active_edit(hwnd) {
         let text = editor_manager::get_edit_text(hwnd_edit);
         let chars = text.chars().count();
         let words = text.split_whitespace().count();
@@ -7806,7 +7806,7 @@ fn build_undo_menu_label(hwnd: HWND, language: Language) -> String {
 }
 
 fn has_active_text_selection(hwnd: HWND) -> bool {
-    let Some(hwnd_edit) = (unsafe { get_active_edit(hwnd) }) else {
+    let Some(hwnd_edit) = get_active_edit(hwnd) else {
         return false;
     };
     let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
@@ -7823,7 +7823,7 @@ fn has_active_text_selection(hwnd: HWND) -> bool {
 }
 
 fn can_paste_now(hwnd: HWND) -> bool {
-    if unsafe { get_active_edit(hwnd) }.is_none() {
+    if get_active_edit(hwnd).is_none() {
         return false;
     }
     // CF_UNICODETEXT = 13
@@ -8013,7 +8013,7 @@ fn handle_spellcheck_ignore_once(hwnd: HWND) {
 fn go_to_spelling_error(hwnd: HWND, forward: bool) {
     use windows::Win32::UI::Controls::RichEdit::{CHARRANGE, EM_EXGETSEL, EM_EXSETSEL};
 
-    let Some(hwnd_edit) = (unsafe { get_active_edit(hwnd) }) else {
+    let Some(hwnd_edit) = get_active_edit(hwnd) else {
         return;
     };
 
@@ -8776,11 +8776,13 @@ fn close_other_windows(hwnd: HWND) {
     }
 }
 
-pub(crate) unsafe fn get_active_edit(hwnd: HWND) -> Option<HWND> {
-    with_state(hwnd, |state| {
-        state.docs.get(state.current).map(|doc| doc.hwnd_edit)
-    })
-    .flatten()
+pub(crate) fn get_active_edit(hwnd: HWND) -> Option<HWND> {
+    unsafe {
+        with_state(hwnd, |state| {
+            state.docs.get(state.current).map(|doc| doc.hwnd_edit)
+        })
+        .flatten()
+    }
 }
 
 const UNSAVED_BOOKMARK_PREFIX: &str = "__unsaved__:";

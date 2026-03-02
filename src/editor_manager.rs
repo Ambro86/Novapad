@@ -822,7 +822,7 @@ pub fn insert_voice_tag_at_caret(
     if voice.is_empty() {
         return;
     }
-    let Some(hwnd_edit) = (unsafe { get_active_edit(hwnd) }) else {
+    let Some(hwnd_edit) = get_active_edit(hwnd) else {
         log_debug("insert_voice_tag_at_caret: no active edit");
         return;
     };
@@ -1210,13 +1210,13 @@ pub fn get_edit_text(hwnd_edit: HWND) -> String {
 }
 
 pub fn send_to_active_edit(hwnd: HWND, msg: u32) {
-    if let Some(hwnd_edit) = unsafe { crate::get_active_edit(hwnd) } {
+    if let Some(hwnd_edit) = crate::get_active_edit(hwnd) {
         unsafe { SendMessageW(hwnd_edit, msg, WPARAM(0), LPARAM(0)) };
     }
 }
 
 pub fn select_all_active_edit(hwnd: HWND) {
-    if let Some(hwnd_edit) = unsafe { crate::get_active_edit(hwnd) } {
+    if let Some(hwnd_edit) = crate::get_active_edit(hwnd) {
         let cr = CHARRANGE {
             cpMin: 0,
             cpMax: -1,
@@ -1554,7 +1554,7 @@ pub fn try_normalize_undo(hwnd: HWND) -> bool {
 }
 
 pub fn undo_active_edit_skip_navigation(hwnd: HWND) -> bool {
-    let Some(hwnd_edit) = (unsafe { crate::get_active_edit(hwnd) }) else {
+    let Some(hwnd_edit) = crate::get_active_edit(hwnd) else {
         return false;
     };
     let mut before = get_edit_text(hwnd_edit);
@@ -1596,7 +1596,7 @@ pub fn handle_normalize_edit_change(hwnd: HWND, hwnd_edit: HWND) {
 }
 
 pub fn strip_markdown_active_edit(hwnd: HWND) -> bool {
-    let Some(hwnd_edit) = (unsafe { crate::get_active_edit(hwnd) }) else {
+    let Some(hwnd_edit) = crate::get_active_edit(hwnd) else {
         return false;
     };
     let text = get_edit_text(hwnd_edit);
@@ -1640,7 +1640,7 @@ pub fn strip_markdown_active_edit(hwnd: HWND) -> bool {
 }
 
 pub fn normalize_whitespace_active_edit(hwnd: HWND) -> bool {
-    let Some(hwnd_edit) = (unsafe { crate::get_active_edit(hwnd) }) else {
+    let Some(hwnd_edit) = crate::get_active_edit(hwnd) else {
         return false;
     };
     let text = get_edit_text(hwnd_edit);
@@ -2414,7 +2414,7 @@ pub fn clean_end_of_line_hyphens_active_edit(hwnd: HWND) -> bool {
 }
 
 pub fn text_stats_active_edit(hwnd: HWND) {
-    let Some(hwnd_edit) = (unsafe { crate::get_active_edit(hwnd) }) else {
+    let Some(hwnd_edit) = crate::get_active_edit(hwnd) else {
         return;
     };
     let text = get_edit_text(hwnd_edit);

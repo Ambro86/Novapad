@@ -5084,1725 +5084,1733 @@ where
     }
 }
 
-unsafe fn initialize_options_dialog(hwnd: HWND) {
-    let (
-        parent,
-        combo_lang,
-        combo_modified_marker_position,
-        combo_open,
-        combo_tts_engine,
-        _combo_tts_voice_language,
-        _combo_voice,
-        combo_tts_speed,
-        combo_tts_pitch,
-        combo_tts_volume,
-        edit_tts_speed,
-        edit_tts_pitch,
-        edit_tts_volume,
-        combo_audio_skip,
-        _label_audiobook_save_folder,
-        edit_audiobook_save_folder,
-        _button_audiobook_save_folder_browse,
-        checkbox_show_media_save_confirmation,
-        combo_audio_split,
-        combo_audio_split_minutes,
-        edit_audio_split_parts_count,
-        combo_audio_split_start_number,
-        _label_audio_split_text,
-        edit_audio_split_text,
-        checkbox_audio_split_requires_newline,
-        checkbox_audio_split_epub_chapters,
-        checkbox_subtitle_ducking,
-        _label_podcast_cache_limit,
-        edit_podcast_cache_limit,
-        checkbox_announce_unread_rss_podcast,
-        _label_unread_label_position,
-        combo_unread_label_position,
-        _label_rss_date_display,
-        combo_rss_date_display,
-        _label_rss_time_display,
-        combo_rss_time_display,
-        _label_podcast_date_display,
-        combo_podcast_date_display,
-        _label_podcast_time_display,
-        combo_podcast_time_display,
-        _label_podcastindex_key,
-        edit_podcastindex_key,
-        _label_podcastindex_secret,
-        edit_podcastindex_secret,
-        _button_podcastindex_signup,
-        checkbox_tts_manual,
-        checkbox_multilingual,
-        checkbox_use_dialogue_voice,
-        combo_dialogue_engine,
-        checkbox_dialogue_multilingual,
-        _label_dialogue_voice_language,
-        _combo_dialogue_voice_language,
-        combo_dialogue_voice,
-        combo_dialogue_voice_rate,
-        edit_dialogue_voice_rate,
-        combo_dialogue_voice_pitch,
-        edit_dialogue_voice_pitch,
-        combo_dialogue_voice_volume,
-        edit_dialogue_voice_volume,
-        checkbox_dialogue_use_secondary_voice,
-        _label_dialogue_secondary_engine,
-        combo_dialogue_secondary_engine,
-        checkbox_dialogue_secondary_multilingual,
-        _label_dialogue_secondary_voice_language,
-        _combo_dialogue_secondary_voice_language,
-        _label_dialogue_secondary_voice,
-        combo_dialogue_secondary_voice,
-        combo_dialogue_secondary_voice_rate,
-        edit_dialogue_secondary_voice_rate,
-        combo_dialogue_secondary_voice_pitch,
-        edit_dialogue_secondary_voice_pitch,
-        combo_dialogue_secondary_voice_volume,
-        edit_dialogue_secondary_voice_volume,
-        _label_dialogue_open_quote,
-        edit_dialogue_open_quote,
-        _label_dialogue_close_quote,
-        edit_dialogue_close_quote,
-        checkbox_dialogue_allow_multiline,
-        checkbox_split_on_newline,
-        checkbox_word_wrap,
-        checkbox_smart_quotes,
-        checkbox_strip_markdown_keep_bullets,
-        checkbox_spellcheck,
-        combo_spellcheck_language,
-        _label_dictionary_translation,
-        combo_dictionary_translation,
-        _label_wikipedia_language,
-        combo_wikipedia_language,
-        _label_wrap_width,
-        edit_wrap_width,
-        _label_indentation,
-        combo_indentation,
-        _label_tab_width,
-        combo_tab_width,
-        _label_space_width,
-        combo_space_width,
-        _label_quote_prefix,
-        edit_quote_prefix,
-        _label_interpreter_path,
-        edit_interpreter_path,
-        _button_interpreter_browse,
-        _label_subtitle_mode,
-        combo_subtitle_mode,
-        _label_subtitle_offset,
-        edit_subtitle_offset,
-        checkbox_move_cursor,
-        checkbox_check_updates,
-        checkbox_send_crash_reports,
-        checkbox_use_legacy_name,
-        checkbox_context_menu,
-        combo_confirm_delete_rss_mode,
-        combo_confirm_delete_podcast_mode,
-        combo_rss_quick_copy_mode,
-        _label_prompt_program,
-        combo_prompt_program,
-        _label_network_proxy,
-        edit_network_proxy,
-        _label_network_proxy_username,
-        edit_network_proxy_username,
-        _label_network_proxy_password,
-        edit_network_proxy_password,
-        combo_shortcut_action,
-        _edit_shortcut_value,
-    ) = match with_options_state(hwnd, |state| {
-        (
-            state.parent,
-            state.combo_lang,
-            state.combo_modified_marker_position,
-            state.combo_open,
-            state.combo_tts_engine,
-            state.combo_tts_voice_language,
-            state.combo_voice,
-            state.combo_tts_speed,
-            state.combo_tts_pitch,
-            state.combo_tts_volume,
-            state.edit_tts_speed,
-            state.edit_tts_pitch,
-            state.edit_tts_volume,
-            state.combo_audio_skip,
-            state.label_audiobook_save_folder,
-            state.edit_audiobook_save_folder,
-            state.button_audiobook_save_folder_browse,
-            state.checkbox_show_media_save_confirmation,
-            state.combo_audio_split,
-            state.combo_audio_split_minutes,
-            state.edit_audio_split_parts_count,
-            state.combo_audio_split_start_number,
-            state.label_audio_split_text,
-            state.edit_audio_split_text,
-            state.checkbox_audio_split_requires_newline,
-            state.checkbox_audio_split_epub_chapters,
-            state.checkbox_subtitle_ducking,
-            state.label_podcast_cache_limit,
-            state.edit_podcast_cache_limit,
-            state.checkbox_announce_unread_rss_podcast,
-            state.label_unread_label_position,
-            state.combo_unread_label_position,
-            state.label_rss_date_display,
-            state.combo_rss_date_display,
-            state.label_rss_time_display,
-            state.combo_rss_time_display,
-            state.label_podcast_date_display,
-            state.combo_podcast_date_display,
-            state.label_podcast_time_display,
-            state.combo_podcast_time_display,
-            state.label_podcastindex_key,
-            state.edit_podcastindex_key,
-            state.label_podcastindex_secret,
-            state.edit_podcastindex_secret,
-            state.button_podcastindex_signup,
-            state.checkbox_tts_manual,
-            state.checkbox_multilingual,
-            state.checkbox_use_dialogue_voice,
-            state.combo_dialogue_engine,
-            state.checkbox_dialogue_multilingual,
-            state.label_dialogue_voice_language,
-            state.combo_dialogue_voice_language,
-            state.combo_dialogue_voice,
-            state.combo_dialogue_voice_rate,
-            state.edit_dialogue_voice_rate,
-            state.combo_dialogue_voice_pitch,
-            state.edit_dialogue_voice_pitch,
-            state.combo_dialogue_voice_volume,
-            state.edit_dialogue_voice_volume,
-            state.checkbox_dialogue_use_secondary_voice,
-            state.label_dialogue_secondary_engine,
-            state.combo_dialogue_secondary_engine,
-            state.checkbox_dialogue_secondary_multilingual,
-            state.label_dialogue_secondary_voice_language,
-            state.combo_dialogue_secondary_voice_language,
-            state.label_dialogue_secondary_voice,
-            state.combo_dialogue_secondary_voice,
-            state.combo_dialogue_secondary_voice_rate,
-            state.edit_dialogue_secondary_voice_rate,
-            state.combo_dialogue_secondary_voice_pitch,
-            state.edit_dialogue_secondary_voice_pitch,
-            state.combo_dialogue_secondary_voice_volume,
-            state.edit_dialogue_secondary_voice_volume,
-            state.label_dialogue_open_quote,
-            state.edit_dialogue_open_quote,
-            state.label_dialogue_close_quote,
-            state.edit_dialogue_close_quote,
-            state.checkbox_dialogue_allow_multiline,
-            state.checkbox_split_on_newline,
-            state.checkbox_word_wrap,
-            state.checkbox_smart_quotes,
-            state.checkbox_strip_markdown_keep_bullets,
-            state.checkbox_spellcheck,
-            state.combo_spellcheck_language,
-            state.label_dictionary_translation,
-            state.combo_dictionary_translation,
-            state.label_wikipedia_language,
-            state.combo_wikipedia_language,
-            state.label_wrap_width,
-            state.edit_wrap_width,
-            state.label_indentation,
-            state.combo_indentation,
-            state.label_tab_width,
-            state.combo_tab_width,
-            state.label_space_width,
-            state.combo_space_width,
-            state.label_quote_prefix,
-            state.edit_quote_prefix,
-            state.label_interpreter_path,
-            state.edit_interpreter_path,
-            state.button_interpreter_browse,
-            state.label_subtitle_mode,
-            state.combo_subtitle_mode,
-            state.label_subtitle_offset,
-            state.edit_subtitle_offset,
-            state.checkbox_move_cursor,
-            state.checkbox_check_updates,
-            state.checkbox_send_crash_reports,
-            state.checkbox_use_legacy_name,
-            state.checkbox_context_menu,
-            state.combo_confirm_delete_rss_mode,
-            state.combo_confirm_delete_podcast_mode,
-            state.combo_rss_quick_copy_mode,
-            state.label_prompt_program,
-            state.combo_prompt_program,
-            state.label_network_proxy,
-            state.edit_network_proxy,
-            state.label_network_proxy_username,
-            state.edit_network_proxy_username,
-            state.label_network_proxy_password,
-            state.edit_network_proxy_password,
-            state.combo_shortcut_action,
-            state.edit_shortcut_value,
-        )
-    }) {
-        Some(values) => values,
-        None => return,
-    };
+fn initialize_options_dialog(hwnd: HWND) {
+    unsafe {
+        let (
+            parent,
+            combo_lang,
+            combo_modified_marker_position,
+            combo_open,
+            combo_tts_engine,
+            _combo_tts_voice_language,
+            _combo_voice,
+            combo_tts_speed,
+            combo_tts_pitch,
+            combo_tts_volume,
+            edit_tts_speed,
+            edit_tts_pitch,
+            edit_tts_volume,
+            combo_audio_skip,
+            _label_audiobook_save_folder,
+            edit_audiobook_save_folder,
+            _button_audiobook_save_folder_browse,
+            checkbox_show_media_save_confirmation,
+            combo_audio_split,
+            combo_audio_split_minutes,
+            edit_audio_split_parts_count,
+            combo_audio_split_start_number,
+            _label_audio_split_text,
+            edit_audio_split_text,
+            checkbox_audio_split_requires_newline,
+            checkbox_audio_split_epub_chapters,
+            checkbox_subtitle_ducking,
+            _label_podcast_cache_limit,
+            edit_podcast_cache_limit,
+            checkbox_announce_unread_rss_podcast,
+            _label_unread_label_position,
+            combo_unread_label_position,
+            _label_rss_date_display,
+            combo_rss_date_display,
+            _label_rss_time_display,
+            combo_rss_time_display,
+            _label_podcast_date_display,
+            combo_podcast_date_display,
+            _label_podcast_time_display,
+            combo_podcast_time_display,
+            _label_podcastindex_key,
+            edit_podcastindex_key,
+            _label_podcastindex_secret,
+            edit_podcastindex_secret,
+            _button_podcastindex_signup,
+            checkbox_tts_manual,
+            checkbox_multilingual,
+            checkbox_use_dialogue_voice,
+            combo_dialogue_engine,
+            checkbox_dialogue_multilingual,
+            _label_dialogue_voice_language,
+            _combo_dialogue_voice_language,
+            combo_dialogue_voice,
+            combo_dialogue_voice_rate,
+            edit_dialogue_voice_rate,
+            combo_dialogue_voice_pitch,
+            edit_dialogue_voice_pitch,
+            combo_dialogue_voice_volume,
+            edit_dialogue_voice_volume,
+            checkbox_dialogue_use_secondary_voice,
+            _label_dialogue_secondary_engine,
+            combo_dialogue_secondary_engine,
+            checkbox_dialogue_secondary_multilingual,
+            _label_dialogue_secondary_voice_language,
+            _combo_dialogue_secondary_voice_language,
+            _label_dialogue_secondary_voice,
+            combo_dialogue_secondary_voice,
+            combo_dialogue_secondary_voice_rate,
+            edit_dialogue_secondary_voice_rate,
+            combo_dialogue_secondary_voice_pitch,
+            edit_dialogue_secondary_voice_pitch,
+            combo_dialogue_secondary_voice_volume,
+            edit_dialogue_secondary_voice_volume,
+            _label_dialogue_open_quote,
+            edit_dialogue_open_quote,
+            _label_dialogue_close_quote,
+            edit_dialogue_close_quote,
+            checkbox_dialogue_allow_multiline,
+            checkbox_split_on_newline,
+            checkbox_word_wrap,
+            checkbox_smart_quotes,
+            checkbox_strip_markdown_keep_bullets,
+            checkbox_spellcheck,
+            combo_spellcheck_language,
+            _label_dictionary_translation,
+            combo_dictionary_translation,
+            _label_wikipedia_language,
+            combo_wikipedia_language,
+            _label_wrap_width,
+            edit_wrap_width,
+            _label_indentation,
+            combo_indentation,
+            _label_tab_width,
+            combo_tab_width,
+            _label_space_width,
+            combo_space_width,
+            _label_quote_prefix,
+            edit_quote_prefix,
+            _label_interpreter_path,
+            edit_interpreter_path,
+            _button_interpreter_browse,
+            _label_subtitle_mode,
+            combo_subtitle_mode,
+            _label_subtitle_offset,
+            edit_subtitle_offset,
+            checkbox_move_cursor,
+            checkbox_check_updates,
+            checkbox_send_crash_reports,
+            checkbox_use_legacy_name,
+            checkbox_context_menu,
+            combo_confirm_delete_rss_mode,
+            combo_confirm_delete_podcast_mode,
+            combo_rss_quick_copy_mode,
+            _label_prompt_program,
+            combo_prompt_program,
+            _label_network_proxy,
+            edit_network_proxy,
+            _label_network_proxy_username,
+            edit_network_proxy_username,
+            _label_network_proxy_password,
+            edit_network_proxy_password,
+            combo_shortcut_action,
+            _edit_shortcut_value,
+        ) = match with_options_state(hwnd, |state| {
+            (
+                state.parent,
+                state.combo_lang,
+                state.combo_modified_marker_position,
+                state.combo_open,
+                state.combo_tts_engine,
+                state.combo_tts_voice_language,
+                state.combo_voice,
+                state.combo_tts_speed,
+                state.combo_tts_pitch,
+                state.combo_tts_volume,
+                state.edit_tts_speed,
+                state.edit_tts_pitch,
+                state.edit_tts_volume,
+                state.combo_audio_skip,
+                state.label_audiobook_save_folder,
+                state.edit_audiobook_save_folder,
+                state.button_audiobook_save_folder_browse,
+                state.checkbox_show_media_save_confirmation,
+                state.combo_audio_split,
+                state.combo_audio_split_minutes,
+                state.edit_audio_split_parts_count,
+                state.combo_audio_split_start_number,
+                state.label_audio_split_text,
+                state.edit_audio_split_text,
+                state.checkbox_audio_split_requires_newline,
+                state.checkbox_audio_split_epub_chapters,
+                state.checkbox_subtitle_ducking,
+                state.label_podcast_cache_limit,
+                state.edit_podcast_cache_limit,
+                state.checkbox_announce_unread_rss_podcast,
+                state.label_unread_label_position,
+                state.combo_unread_label_position,
+                state.label_rss_date_display,
+                state.combo_rss_date_display,
+                state.label_rss_time_display,
+                state.combo_rss_time_display,
+                state.label_podcast_date_display,
+                state.combo_podcast_date_display,
+                state.label_podcast_time_display,
+                state.combo_podcast_time_display,
+                state.label_podcastindex_key,
+                state.edit_podcastindex_key,
+                state.label_podcastindex_secret,
+                state.edit_podcastindex_secret,
+                state.button_podcastindex_signup,
+                state.checkbox_tts_manual,
+                state.checkbox_multilingual,
+                state.checkbox_use_dialogue_voice,
+                state.combo_dialogue_engine,
+                state.checkbox_dialogue_multilingual,
+                state.label_dialogue_voice_language,
+                state.combo_dialogue_voice_language,
+                state.combo_dialogue_voice,
+                state.combo_dialogue_voice_rate,
+                state.edit_dialogue_voice_rate,
+                state.combo_dialogue_voice_pitch,
+                state.edit_dialogue_voice_pitch,
+                state.combo_dialogue_voice_volume,
+                state.edit_dialogue_voice_volume,
+                state.checkbox_dialogue_use_secondary_voice,
+                state.label_dialogue_secondary_engine,
+                state.combo_dialogue_secondary_engine,
+                state.checkbox_dialogue_secondary_multilingual,
+                state.label_dialogue_secondary_voice_language,
+                state.combo_dialogue_secondary_voice_language,
+                state.label_dialogue_secondary_voice,
+                state.combo_dialogue_secondary_voice,
+                state.combo_dialogue_secondary_voice_rate,
+                state.edit_dialogue_secondary_voice_rate,
+                state.combo_dialogue_secondary_voice_pitch,
+                state.edit_dialogue_secondary_voice_pitch,
+                state.combo_dialogue_secondary_voice_volume,
+                state.edit_dialogue_secondary_voice_volume,
+                state.label_dialogue_open_quote,
+                state.edit_dialogue_open_quote,
+                state.label_dialogue_close_quote,
+                state.edit_dialogue_close_quote,
+                state.checkbox_dialogue_allow_multiline,
+                state.checkbox_split_on_newline,
+                state.checkbox_word_wrap,
+                state.checkbox_smart_quotes,
+                state.checkbox_strip_markdown_keep_bullets,
+                state.checkbox_spellcheck,
+                state.combo_spellcheck_language,
+                state.label_dictionary_translation,
+                state.combo_dictionary_translation,
+                state.label_wikipedia_language,
+                state.combo_wikipedia_language,
+                state.label_wrap_width,
+                state.edit_wrap_width,
+                state.label_indentation,
+                state.combo_indentation,
+                state.label_tab_width,
+                state.combo_tab_width,
+                state.label_space_width,
+                state.combo_space_width,
+                state.label_quote_prefix,
+                state.edit_quote_prefix,
+                state.label_interpreter_path,
+                state.edit_interpreter_path,
+                state.button_interpreter_browse,
+                state.label_subtitle_mode,
+                state.combo_subtitle_mode,
+                state.label_subtitle_offset,
+                state.edit_subtitle_offset,
+                state.checkbox_move_cursor,
+                state.checkbox_check_updates,
+                state.checkbox_send_crash_reports,
+                state.checkbox_use_legacy_name,
+                state.checkbox_context_menu,
+                state.combo_confirm_delete_rss_mode,
+                state.combo_confirm_delete_podcast_mode,
+                state.combo_rss_quick_copy_mode,
+                state.label_prompt_program,
+                state.combo_prompt_program,
+                state.label_network_proxy,
+                state.edit_network_proxy,
+                state.label_network_proxy_username,
+                state.edit_network_proxy_username,
+                state.label_network_proxy_password,
+                state.edit_network_proxy_password,
+                state.combo_shortcut_action,
+                state.edit_shortcut_value,
+            )
+        }) {
+            Some(values) => values,
+            None => return,
+        };
 
-    let mut settings = with_state(parent, |state| state.settings.clone()).unwrap_or_default();
-    if let Some(cfg) = crate::dialogue_voice::load_dialogue_voice_config() {
-        settings.dialogue_tts_engine = cfg.engine;
-        settings.dialogue_voice = cfg.voice;
-        settings.dialogue_use_secondary_voice = cfg.use_secondary_voice;
-        settings.dialogue_secondary_voice = cfg.secondary_voice;
-        settings.dialogue_secondary_tts_engine = cfg.secondary_engine;
-        settings.dialogue_secondary_voice_rate = cfg.secondary_rate;
-        settings.dialogue_secondary_voice_pitch = cfg.secondary_pitch;
-        settings.dialogue_secondary_voice_volume = cfg.secondary_volume;
-        settings.dialogue_voice_rate = cfg.rate;
-        settings.dialogue_voice_pitch = cfg.pitch;
-        settings.dialogue_voice_volume = cfg.volume;
-        settings.dialogue_opening_quote = cfg.opening_quote;
-        settings.dialogue_closing_quote = cfg.closing_quote;
-        settings.dialogue_allow_multiline = cfg.allow_multiline;
-    }
-    let labels = options_labels(settings.language);
+        let mut settings = with_state(parent, |state| state.settings.clone()).unwrap_or_default();
+        if let Some(cfg) = crate::dialogue_voice::load_dialogue_voice_config() {
+            settings.dialogue_tts_engine = cfg.engine;
+            settings.dialogue_voice = cfg.voice;
+            settings.dialogue_use_secondary_voice = cfg.use_secondary_voice;
+            settings.dialogue_secondary_voice = cfg.secondary_voice;
+            settings.dialogue_secondary_tts_engine = cfg.secondary_engine;
+            settings.dialogue_secondary_voice_rate = cfg.secondary_rate;
+            settings.dialogue_secondary_voice_pitch = cfg.secondary_pitch;
+            settings.dialogue_secondary_voice_volume = cfg.secondary_volume;
+            settings.dialogue_voice_rate = cfg.rate;
+            settings.dialogue_voice_pitch = cfg.pitch;
+            settings.dialogue_voice_volume = cfg.volume;
+            settings.dialogue_opening_quote = cfg.opening_quote;
+            settings.dialogue_closing_quote = cfg.closing_quote;
+            settings.dialogue_allow_multiline = cfg.allow_multiline;
+        }
+        let labels = options_labels(settings.language);
 
-    SendMessageW(combo_lang, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    SendMessageW(
-        combo_lang,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.lang_it).as_ptr() as isize),
-    );
-    SendMessageW(
-        combo_lang,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.lang_en).as_ptr() as isize),
-    );
-    SendMessageW(
-        combo_lang,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.lang_es).as_ptr() as isize),
-    );
-    SendMessageW(
-        combo_lang,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.lang_pt).as_ptr() as isize),
-    );
-    SendMessageW(
-        combo_lang,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.lang_sv).as_ptr() as isize),
-    );
-    SendMessageW(
-        combo_lang,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.lang_vi).as_ptr() as isize),
-    );
-    SendMessageW(
-        combo_lang,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.lang_cs).as_ptr() as isize),
-    );
-    SendMessageW(
-        combo_lang,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.lang_pl).as_ptr() as isize),
-    );
-    SendMessageW(
-        combo_lang,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.lang_fr).as_ptr() as isize),
-    );
-    SendMessageW(
-        combo_lang,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.lang_sr).as_ptr() as isize),
-    );
-    SendMessageW(
-        combo_lang,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.lang_uk).as_ptr() as isize),
-    );
-    SendMessageW(
-        combo_lang,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.lang_lt).as_ptr() as isize),
-    );
-    SendMessageW(
-        combo_lang,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.lang_zh).as_ptr() as isize),
-    );
+        SendMessageW(combo_lang, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        SendMessageW(
+            combo_lang,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.lang_it).as_ptr() as isize),
+        );
+        SendMessageW(
+            combo_lang,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.lang_en).as_ptr() as isize),
+        );
+        SendMessageW(
+            combo_lang,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.lang_es).as_ptr() as isize),
+        );
+        SendMessageW(
+            combo_lang,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.lang_pt).as_ptr() as isize),
+        );
+        SendMessageW(
+            combo_lang,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.lang_sv).as_ptr() as isize),
+        );
+        SendMessageW(
+            combo_lang,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.lang_vi).as_ptr() as isize),
+        );
+        SendMessageW(
+            combo_lang,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.lang_cs).as_ptr() as isize),
+        );
+        SendMessageW(
+            combo_lang,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.lang_pl).as_ptr() as isize),
+        );
+        SendMessageW(
+            combo_lang,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.lang_fr).as_ptr() as isize),
+        );
+        SendMessageW(
+            combo_lang,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.lang_sr).as_ptr() as isize),
+        );
+        SendMessageW(
+            combo_lang,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.lang_uk).as_ptr() as isize),
+        );
+        SendMessageW(
+            combo_lang,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.lang_lt).as_ptr() as isize),
+        );
+        SendMessageW(
+            combo_lang,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.lang_zh).as_ptr() as isize),
+        );
 
-    let lang_index = match settings.language {
-        Language::Italian => 0,
-        Language::English => 1,
-        Language::Spanish => 2,
-        Language::Portuguese => 3,
-        Language::Swedish => 4,
-        Language::Vietnamese => 5,
-        Language::Czech => 6,
-        Language::Polish => 7,
-        Language::French => 8,
-        Language::Serbian => 9,
-        Language::Ukrainian => 10,
-        Language::Lithuanian => 11,
-        Language::Chinese => 12,
-    };
-    SendMessageW(combo_lang, CB_SETCURSEL, WPARAM(lang_index), LPARAM(0));
+        let lang_index = match settings.language {
+            Language::Italian => 0,
+            Language::English => 1,
+            Language::Spanish => 2,
+            Language::Portuguese => 3,
+            Language::Swedish => 4,
+            Language::Vietnamese => 5,
+            Language::Czech => 6,
+            Language::Polish => 7,
+            Language::French => 8,
+            Language::Serbian => 9,
+            Language::Ukrainian => 10,
+            Language::Lithuanian => 11,
+            Language::Chinese => 12,
+        };
+        SendMessageW(combo_lang, CB_SETCURSEL, WPARAM(lang_index), LPARAM(0));
 
-    SendMessageW(combo_lang, CB_SETCURSEL, WPARAM(lang_index), LPARAM(0));
+        SendMessageW(combo_lang, CB_SETCURSEL, WPARAM(lang_index), LPARAM(0));
 
-    SendMessageW(
-        combo_modified_marker_position,
-        CB_RESETCONTENT,
-        WPARAM(0),
-        LPARAM(0),
-    );
-    SendMessageW(
-        combo_modified_marker_position,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.marker_position_end).as_ptr() as isize),
-    );
-    SendMessageW(
-        combo_modified_marker_position,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.marker_position_beginning).as_ptr() as isize),
-    );
-    let position_index = match settings.modified_marker_position {
-        ModifiedMarkerPosition::Beginning => 1,
-        _ => 0,
-    };
-    SendMessageW(
-        combo_modified_marker_position,
-        CB_SETCURSEL,
-        WPARAM(position_index),
-        LPARAM(0),
-    );
+        SendMessageW(
+            combo_modified_marker_position,
+            CB_RESETCONTENT,
+            WPARAM(0),
+            LPARAM(0),
+        );
+        SendMessageW(
+            combo_modified_marker_position,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.marker_position_end).as_ptr() as isize),
+        );
+        SendMessageW(
+            combo_modified_marker_position,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.marker_position_beginning).as_ptr() as isize),
+        );
+        let position_index = match settings.modified_marker_position {
+            ModifiedMarkerPosition::Beginning => 1,
+            _ => 0,
+        };
+        SendMessageW(
+            combo_modified_marker_position,
+            CB_SETCURSEL,
+            WPARAM(position_index),
+            LPARAM(0),
+        );
 
-    SendMessageW(combo_open, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    SendMessageW(
-        combo_open,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.open_new_tab).as_ptr() as isize),
-    );
-    SendMessageW(
-        combo_open,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.open_new_window).as_ptr() as isize),
-    );
-    let open_index = match settings.open_behavior {
-        OpenBehavior::NewTab => 0,
-        OpenBehavior::NewWindow => 1,
-    };
-    SendMessageW(combo_open, CB_SETCURSEL, WPARAM(open_index), LPARAM(0));
+        SendMessageW(combo_open, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        SendMessageW(
+            combo_open,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.open_new_tab).as_ptr() as isize),
+        );
+        SendMessageW(
+            combo_open,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.open_new_window).as_ptr() as isize),
+        );
+        let open_index = match settings.open_behavior {
+            OpenBehavior::NewTab => 0,
+            OpenBehavior::NewWindow => 1,
+        };
+        SendMessageW(combo_open, CB_SETCURSEL, WPARAM(open_index), LPARAM(0));
 
-    SendMessageW(combo_tts_engine, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    SendMessageW(
-        combo_tts_engine,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.engine_edge).as_ptr() as isize),
-    );
-    SendMessageW(
-        combo_tts_engine,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.engine_sapi5).as_ptr() as isize),
-    );
-    SendMessageW(
-        combo_tts_engine,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.engine_sapi4).as_ptr() as isize),
-    );
+        SendMessageW(combo_tts_engine, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        SendMessageW(
+            combo_tts_engine,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.engine_edge).as_ptr() as isize),
+        );
+        SendMessageW(
+            combo_tts_engine,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.engine_sapi5).as_ptr() as isize),
+        );
+        SendMessageW(
+            combo_tts_engine,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.engine_sapi4).as_ptr() as isize),
+        );
 
-    let engine_index = match settings.tts_engine {
-        TtsEngine::Edge => 0,
-        TtsEngine::Sapi5 => 1,
-        TtsEngine::Sapi4 => 2,
-    };
-    SendMessageW(
-        combo_tts_engine,
-        CB_SETCURSEL,
-        WPARAM(engine_index),
-        LPARAM(0),
-    );
+        let engine_index = match settings.tts_engine {
+            TtsEngine::Edge => 0,
+            TtsEngine::Sapi5 => 1,
+            TtsEngine::Sapi4 => 2,
+        };
+        SendMessageW(
+            combo_tts_engine,
+            CB_SETCURSEL,
+            WPARAM(engine_index),
+            LPARAM(0),
+        );
 
-    SendMessageW(combo_dialogue_engine, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    SendMessageW(
-        combo_dialogue_engine,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.engine_edge).as_ptr() as isize),
-    );
-    SendMessageW(
-        combo_dialogue_engine,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.engine_sapi5).as_ptr() as isize),
-    );
-    SendMessageW(
-        combo_dialogue_engine,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.engine_sapi4).as_ptr() as isize),
-    );
-    let dialogue_engine_index = match settings.dialogue_tts_engine {
-        TtsEngine::Edge => 0,
-        TtsEngine::Sapi5 => 1,
-        TtsEngine::Sapi4 => 2,
-    };
-    SendMessageW(
-        combo_dialogue_engine,
-        CB_SETCURSEL,
-        WPARAM(dialogue_engine_index),
-        LPARAM(0),
-    );
-    SendMessageW(
-        combo_dialogue_secondary_engine,
-        CB_RESETCONTENT,
-        WPARAM(0),
-        LPARAM(0),
-    );
-    SendMessageW(
-        combo_dialogue_secondary_engine,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.engine_edge).as_ptr() as isize),
-    );
-    SendMessageW(
-        combo_dialogue_secondary_engine,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.engine_sapi5).as_ptr() as isize),
-    );
-    SendMessageW(
-        combo_dialogue_secondary_engine,
-        CB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(to_wide(&labels.engine_sapi4).as_ptr() as isize),
-    );
-    let dialogue_secondary_engine_index = match settings.dialogue_secondary_tts_engine {
-        TtsEngine::Edge => 0,
-        TtsEngine::Sapi5 => 1,
-        TtsEngine::Sapi4 => 2,
-    };
-    SendMessageW(
-        combo_dialogue_secondary_engine,
-        CB_SETCURSEL,
-        WPARAM(dialogue_secondary_engine_index),
-        LPARAM(0),
-    );
+        SendMessageW(combo_dialogue_engine, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        SendMessageW(
+            combo_dialogue_engine,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.engine_edge).as_ptr() as isize),
+        );
+        SendMessageW(
+            combo_dialogue_engine,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.engine_sapi5).as_ptr() as isize),
+        );
+        SendMessageW(
+            combo_dialogue_engine,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.engine_sapi4).as_ptr() as isize),
+        );
+        let dialogue_engine_index = match settings.dialogue_tts_engine {
+            TtsEngine::Edge => 0,
+            TtsEngine::Sapi5 => 1,
+            TtsEngine::Sapi4 => 2,
+        };
+        SendMessageW(
+            combo_dialogue_engine,
+            CB_SETCURSEL,
+            WPARAM(dialogue_engine_index),
+            LPARAM(0),
+        );
+        SendMessageW(
+            combo_dialogue_secondary_engine,
+            CB_RESETCONTENT,
+            WPARAM(0),
+            LPARAM(0),
+        );
+        SendMessageW(
+            combo_dialogue_secondary_engine,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.engine_edge).as_ptr() as isize),
+        );
+        SendMessageW(
+            combo_dialogue_secondary_engine,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.engine_sapi5).as_ptr() as isize),
+        );
+        SendMessageW(
+            combo_dialogue_secondary_engine,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.engine_sapi4).as_ptr() as isize),
+        );
+        let dialogue_secondary_engine_index = match settings.dialogue_secondary_tts_engine {
+            TtsEngine::Edge => 0,
+            TtsEngine::Sapi5 => 1,
+            TtsEngine::Sapi4 => 2,
+        };
+        SendMessageW(
+            combo_dialogue_secondary_engine,
+            CB_SETCURSEL,
+            WPARAM(dialogue_secondary_engine_index),
+            LPARAM(0),
+        );
 
-    let speed_items = [
-        (
-            i18n::tr(settings.language, "tts_tuning.speed.extremely_slow"),
-            -100,
-        ),
-        (
-            i18n::tr(settings.language, "tts_tuning.speed.very_slow"),
-            -60,
-        ),
-        (i18n::tr(settings.language, "tts_tuning.speed.slow"), -35),
-        (
-            i18n::tr(settings.language, "tts_tuning.speed.a_bit_slow"),
-            -20,
-        ),
-        (
-            i18n::tr(settings.language, "tts_tuning.speed.slightly_slow"),
-            -10,
-        ),
-        (i18n::tr(settings.language, "tts_tuning.speed.normal"), 0),
-        (
-            i18n::tr(settings.language, "tts_tuning.speed.slightly_fast"),
-            10,
-        ),
-        (
-            i18n::tr(settings.language, "tts_tuning.speed.a_bit_fast"),
-            20,
-        ),
-        (i18n::tr(settings.language, "tts_tuning.speed.fast"), 35),
-        (
-            i18n::tr(settings.language, "tts_tuning.speed.very_fast"),
-            50,
-        ),
-        (
-            i18n::tr(settings.language, "tts_tuning.speed.super_fast"),
-            100,
-        ),
-    ];
-    let pitch_items = [
-        (
-            i18n::tr(settings.language, "tts_tuning.pitch.very_low"),
-            -12,
-        ),
-        (i18n::tr(settings.language, "tts_tuning.pitch.low"), -10),
-        (
-            i18n::tr(settings.language, "tts_tuning.pitch.a_bit_low"),
-            -7,
-        ),
-        (
-            i18n::tr(settings.language, "tts_tuning.pitch.slightly_low"),
-            -5,
-        ),
-        (
-            i18n::tr(settings.language, "tts_tuning.pitch.a_little_lower"),
-            -2,
-        ),
-        (i18n::tr(settings.language, "tts_tuning.pitch.normal"), 0),
-        (
-            i18n::tr(settings.language, "tts_tuning.pitch.a_little_higher"),
-            2,
-        ),
-        (
-            i18n::tr(settings.language, "tts_tuning.pitch.slightly_high"),
-            5,
-        ),
-        (
-            i18n::tr(settings.language, "tts_tuning.pitch.a_bit_high"),
-            7,
-        ),
-        (i18n::tr(settings.language, "tts_tuning.pitch.high"), 9),
-        (
-            i18n::tr(settings.language, "tts_tuning.pitch.very_high"),
-            12,
-        ),
-    ];
-    let volume_items = [
-        (
-            i18n::tr(settings.language, "tts_tuning.volume.very_low"),
-            25,
-        ),
-        (i18n::tr(settings.language, "tts_tuning.volume.low"), 40),
-        (
-            i18n::tr(settings.language, "tts_tuning.volume.a_bit_low"),
-            55,
-        ),
-        (
-            i18n::tr(settings.language, "tts_tuning.volume.medium_low"),
-            70,
-        ),
-        (
-            i18n::tr(settings.language, "tts_tuning.volume.slightly_low"),
-            85,
-        ),
-        (i18n::tr(settings.language, "tts_tuning.volume.normal"), 100),
-        (
-            i18n::tr(settings.language, "tts_tuning.volume.slightly_high"),
-            115,
-        ),
-        (
-            i18n::tr(settings.language, "tts_tuning.volume.medium_high"),
-            130,
-        ),
-        (
-            i18n::tr(settings.language, "tts_tuning.volume.a_bit_high"),
-            145,
-        ),
-        (i18n::tr(settings.language, "tts_tuning.volume.high"), 160),
-        (
-            i18n::tr(settings.language, "tts_tuning.volume.very_high"),
-            180,
-        ),
-        (
-            i18n::tr(settings.language, "tts_tuning.volume.maximum"),
-            200,
-        ),
-    ];
-    init_tts_combo(combo_tts_speed, &speed_items);
-    init_tts_combo(combo_tts_pitch, &pitch_items);
-    init_tts_combo(combo_tts_volume, &volume_items);
-    init_tts_combo(combo_dialogue_voice_rate, &speed_items);
-    init_tts_combo(combo_dialogue_voice_pitch, &pitch_items);
-    init_tts_combo(combo_dialogue_voice_volume, &volume_items);
-    init_tts_combo(combo_dialogue_secondary_voice_rate, &speed_items);
-    init_tts_combo(combo_dialogue_secondary_voice_pitch, &pitch_items);
-    init_tts_combo(combo_dialogue_secondary_voice_volume, &volume_items);
-    select_combo_value(combo_tts_speed, settings.tts_rate);
-    select_combo_value(combo_tts_pitch, settings.tts_pitch);
-    select_combo_value(combo_tts_volume, settings.tts_volume);
-    select_combo_value(combo_dialogue_voice_rate, settings.dialogue_voice_rate);
-    select_combo_value(combo_dialogue_voice_pitch, settings.dialogue_voice_pitch);
-    select_combo_value(combo_dialogue_voice_volume, settings.dialogue_voice_volume);
-    select_combo_value(
-        combo_dialogue_secondary_voice_rate,
-        settings.dialogue_secondary_voice_rate,
-    );
-    select_combo_value(
-        combo_dialogue_secondary_voice_pitch,
-        settings.dialogue_secondary_voice_pitch,
-    );
-    select_combo_value(
-        combo_dialogue_secondary_voice_volume,
-        settings.dialogue_secondary_voice_volume,
-    );
-    if let Err(_e) = SetWindowTextW(
-        edit_tts_speed,
-        PCWSTR(to_wide(&tts_ui_value_from_internal(settings.tts_rate).to_string()).as_ptr()),
-    ) {
-        crate::log_debug(&format!("Failed to set speed text: {:?}", _e));
-    }
-    if let Err(_e) = SetWindowTextW(
-        edit_tts_pitch,
-        PCWSTR(to_wide(&tts_ui_value_from_internal(settings.tts_pitch).to_string()).as_ptr()),
-    ) {
-        crate::log_debug(&format!("Failed to set pitch text: {:?}", _e));
-    }
-    if let Err(_e) = SetWindowTextW(
-        edit_tts_volume,
-        PCWSTR(to_wide(&settings.tts_volume.to_string()).as_ptr()),
-    ) {
-        crate::log_debug(&format!("Failed to set volume text: {:?}", _e));
-    }
-    if let Err(_e) = SetWindowTextW(
-        edit_dialogue_voice_rate,
-        PCWSTR(
-            to_wide(&tts_ui_value_from_internal(settings.dialogue_voice_rate).to_string()).as_ptr(),
-        ),
-    ) {
-        crate::log_debug(&format!("Failed to set dialogue speed text: {:?}", _e));
-    }
-    if let Err(_e) = SetWindowTextW(
-        edit_dialogue_voice_pitch,
-        PCWSTR(
-            to_wide(&tts_ui_value_from_internal(settings.dialogue_voice_pitch).to_string())
+        let speed_items = [
+            (
+                i18n::tr(settings.language, "tts_tuning.speed.extremely_slow"),
+                -100,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.speed.very_slow"),
+                -60,
+            ),
+            (i18n::tr(settings.language, "tts_tuning.speed.slow"), -35),
+            (
+                i18n::tr(settings.language, "tts_tuning.speed.a_bit_slow"),
+                -20,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.speed.slightly_slow"),
+                -10,
+            ),
+            (i18n::tr(settings.language, "tts_tuning.speed.normal"), 0),
+            (
+                i18n::tr(settings.language, "tts_tuning.speed.slightly_fast"),
+                10,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.speed.a_bit_fast"),
+                20,
+            ),
+            (i18n::tr(settings.language, "tts_tuning.speed.fast"), 35),
+            (
+                i18n::tr(settings.language, "tts_tuning.speed.very_fast"),
+                50,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.speed.super_fast"),
+                100,
+            ),
+        ];
+        let pitch_items = [
+            (
+                i18n::tr(settings.language, "tts_tuning.pitch.very_low"),
+                -12,
+            ),
+            (i18n::tr(settings.language, "tts_tuning.pitch.low"), -10),
+            (
+                i18n::tr(settings.language, "tts_tuning.pitch.a_bit_low"),
+                -7,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.pitch.slightly_low"),
+                -5,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.pitch.a_little_lower"),
+                -2,
+            ),
+            (i18n::tr(settings.language, "tts_tuning.pitch.normal"), 0),
+            (
+                i18n::tr(settings.language, "tts_tuning.pitch.a_little_higher"),
+                2,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.pitch.slightly_high"),
+                5,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.pitch.a_bit_high"),
+                7,
+            ),
+            (i18n::tr(settings.language, "tts_tuning.pitch.high"), 9),
+            (
+                i18n::tr(settings.language, "tts_tuning.pitch.very_high"),
+                12,
+            ),
+        ];
+        let volume_items = [
+            (
+                i18n::tr(settings.language, "tts_tuning.volume.very_low"),
+                25,
+            ),
+            (i18n::tr(settings.language, "tts_tuning.volume.low"), 40),
+            (
+                i18n::tr(settings.language, "tts_tuning.volume.a_bit_low"),
+                55,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.volume.medium_low"),
+                70,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.volume.slightly_low"),
+                85,
+            ),
+            (i18n::tr(settings.language, "tts_tuning.volume.normal"), 100),
+            (
+                i18n::tr(settings.language, "tts_tuning.volume.slightly_high"),
+                115,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.volume.medium_high"),
+                130,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.volume.a_bit_high"),
+                145,
+            ),
+            (i18n::tr(settings.language, "tts_tuning.volume.high"), 160),
+            (
+                i18n::tr(settings.language, "tts_tuning.volume.very_high"),
+                180,
+            ),
+            (
+                i18n::tr(settings.language, "tts_tuning.volume.maximum"),
+                200,
+            ),
+        ];
+        init_tts_combo(combo_tts_speed, &speed_items);
+        init_tts_combo(combo_tts_pitch, &pitch_items);
+        init_tts_combo(combo_tts_volume, &volume_items);
+        init_tts_combo(combo_dialogue_voice_rate, &speed_items);
+        init_tts_combo(combo_dialogue_voice_pitch, &pitch_items);
+        init_tts_combo(combo_dialogue_voice_volume, &volume_items);
+        init_tts_combo(combo_dialogue_secondary_voice_rate, &speed_items);
+        init_tts_combo(combo_dialogue_secondary_voice_pitch, &pitch_items);
+        init_tts_combo(combo_dialogue_secondary_voice_volume, &volume_items);
+        select_combo_value(combo_tts_speed, settings.tts_rate);
+        select_combo_value(combo_tts_pitch, settings.tts_pitch);
+        select_combo_value(combo_tts_volume, settings.tts_volume);
+        select_combo_value(combo_dialogue_voice_rate, settings.dialogue_voice_rate);
+        select_combo_value(combo_dialogue_voice_pitch, settings.dialogue_voice_pitch);
+        select_combo_value(combo_dialogue_voice_volume, settings.dialogue_voice_volume);
+        select_combo_value(
+            combo_dialogue_secondary_voice_rate,
+            settings.dialogue_secondary_voice_rate,
+        );
+        select_combo_value(
+            combo_dialogue_secondary_voice_pitch,
+            settings.dialogue_secondary_voice_pitch,
+        );
+        select_combo_value(
+            combo_dialogue_secondary_voice_volume,
+            settings.dialogue_secondary_voice_volume,
+        );
+        if let Err(_e) = SetWindowTextW(
+            edit_tts_speed,
+            PCWSTR(to_wide(&tts_ui_value_from_internal(settings.tts_rate).to_string()).as_ptr()),
+        ) {
+            crate::log_debug(&format!("Failed to set speed text: {:?}", _e));
+        }
+        if let Err(_e) = SetWindowTextW(
+            edit_tts_pitch,
+            PCWSTR(to_wide(&tts_ui_value_from_internal(settings.tts_pitch).to_string()).as_ptr()),
+        ) {
+            crate::log_debug(&format!("Failed to set pitch text: {:?}", _e));
+        }
+        if let Err(_e) = SetWindowTextW(
+            edit_tts_volume,
+            PCWSTR(to_wide(&settings.tts_volume.to_string()).as_ptr()),
+        ) {
+            crate::log_debug(&format!("Failed to set volume text: {:?}", _e));
+        }
+        if let Err(_e) = SetWindowTextW(
+            edit_dialogue_voice_rate,
+            PCWSTR(
+                to_wide(&tts_ui_value_from_internal(settings.dialogue_voice_rate).to_string())
+                    .as_ptr(),
+            ),
+        ) {
+            crate::log_debug(&format!("Failed to set dialogue speed text: {:?}", _e));
+        }
+        if let Err(_e) = SetWindowTextW(
+            edit_dialogue_voice_pitch,
+            PCWSTR(
+                to_wide(&tts_ui_value_from_internal(settings.dialogue_voice_pitch).to_string())
+                    .as_ptr(),
+            ),
+        ) {
+            crate::log_debug(&format!("Failed to set dialogue pitch text: {:?}", _e));
+        }
+        if let Err(_e) = SetWindowTextW(
+            edit_dialogue_voice_volume,
+            PCWSTR(to_wide(&settings.dialogue_voice_volume.to_string()).as_ptr()),
+        ) {
+            crate::log_debug(&format!("Failed to set dialogue volume text: {:?}", _e));
+        }
+        if let Err(_e) = SetWindowTextW(
+            edit_dialogue_secondary_voice_rate,
+            PCWSTR(
+                to_wide(
+                    &tts_ui_value_from_internal(settings.dialogue_secondary_voice_rate).to_string(),
+                )
                 .as_ptr(),
-        ),
-    ) {
-        crate::log_debug(&format!("Failed to set dialogue pitch text: {:?}", _e));
-    }
-    if let Err(_e) = SetWindowTextW(
-        edit_dialogue_voice_volume,
-        PCWSTR(to_wide(&settings.dialogue_voice_volume.to_string()).as_ptr()),
-    ) {
-        crate::log_debug(&format!("Failed to set dialogue volume text: {:?}", _e));
-    }
-    if let Err(_e) = SetWindowTextW(
-        edit_dialogue_secondary_voice_rate,
-        PCWSTR(
-            to_wide(
-                &tts_ui_value_from_internal(settings.dialogue_secondary_voice_rate).to_string(),
-            )
-            .as_ptr(),
-        ),
-    ) {
-        crate::log_debug(&format!(
-            "Failed to set secondary dialogue speed text: {:?}",
-            _e
-        ));
-    }
-    if let Err(_e) = SetWindowTextW(
-        edit_dialogue_secondary_voice_pitch,
-        PCWSTR(
-            to_wide(
-                &tts_ui_value_from_internal(settings.dialogue_secondary_voice_pitch).to_string(),
-            )
-            .as_ptr(),
-        ),
-    ) {
-        crate::log_debug(&format!(
-            "Failed to set secondary dialogue pitch text: {:?}",
-            _e
-        ));
-    }
-    if let Err(_e) = SetWindowTextW(
-        edit_dialogue_secondary_voice_volume,
-        PCWSTR(to_wide(&settings.dialogue_secondary_voice_volume.to_string()).as_ptr()),
-    ) {
-        crate::log_debug(&format!(
-            "Failed to set secondary dialogue volume text: {:?}",
-            _e
-        ));
-    }
-    SendMessageW(
-        checkbox_tts_manual,
-        BM_SETCHECK,
-        WPARAM(if settings.tts_manual_tuning {
-            BST_CHECKED.0 as usize
-        } else {
-            0
-        }),
-        LPARAM(0),
-    );
-    update_tts_manual_visibility(hwnd);
+            ),
+        ) {
+            crate::log_debug(&format!(
+                "Failed to set secondary dialogue speed text: {:?}",
+                _e
+            ));
+        }
+        if let Err(_e) = SetWindowTextW(
+            edit_dialogue_secondary_voice_pitch,
+            PCWSTR(
+                to_wide(
+                    &tts_ui_value_from_internal(settings.dialogue_secondary_voice_pitch)
+                        .to_string(),
+                )
+                .as_ptr(),
+            ),
+        ) {
+            crate::log_debug(&format!(
+                "Failed to set secondary dialogue pitch text: {:?}",
+                _e
+            ));
+        }
+        if let Err(_e) = SetWindowTextW(
+            edit_dialogue_secondary_voice_volume,
+            PCWSTR(to_wide(&settings.dialogue_secondary_voice_volume.to_string()).as_ptr()),
+        ) {
+            crate::log_debug(&format!(
+                "Failed to set secondary dialogue volume text: {:?}",
+                _e
+            ));
+        }
+        SendMessageW(
+            checkbox_tts_manual,
+            BM_SETCHECK,
+            WPARAM(if settings.tts_manual_tuning {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        update_tts_manual_visibility(hwnd);
 
-    SendMessageW(
-        checkbox_multilingual,
-        BM_SETCHECK,
-        WPARAM(if settings.tts_only_multilingual {
-            BST_CHECKED.0 as usize
-        } else {
-            0
-        }),
-        LPARAM(0),
-    );
-    SendMessageW(
-        checkbox_use_dialogue_voice,
-        BM_SETCHECK,
-        WPARAM(if settings.use_dialogue_voice {
-            BST_CHECKED.0 as usize
-        } else {
-            0
-        }),
-        LPARAM(0),
-    );
-    SendMessageW(
-        checkbox_dialogue_multilingual,
-        BM_SETCHECK,
-        WPARAM(0),
-        LPARAM(0),
-    );
-    SendMessageW(
-        checkbox_dialogue_use_secondary_voice,
-        BM_SETCHECK,
-        WPARAM(if settings.dialogue_use_secondary_voice {
-            BST_CHECKED.0 as usize
-        } else {
-            0
-        }),
-        LPARAM(0),
-    );
-    SendMessageW(
-        checkbox_dialogue_secondary_multilingual,
-        BM_SETCHECK,
-        WPARAM(0),
-        LPARAM(0),
-    );
-    if let Err(_e) = SetWindowTextW(
-        edit_dialogue_open_quote,
-        PCWSTR(to_wide(&settings.dialogue_opening_quote).as_ptr()),
-    ) {
-        crate::log_debug(&format!(
-            "Failed to set dialogue opening quote text: {:?}",
-            _e
-        ));
-    }
-    if let Err(_e) = SetWindowTextW(
-        edit_dialogue_close_quote,
-        PCWSTR(to_wide(&settings.dialogue_closing_quote).as_ptr()),
-    ) {
-        crate::log_debug(&format!(
-            "Failed to set dialogue closing quote text: {:?}",
-            _e
-        ));
-    }
-    SendMessageW(
-        checkbox_dialogue_allow_multiline,
-        BM_SETCHECK,
-        WPARAM(if settings.dialogue_allow_multiline {
-            BST_CHECKED.0 as usize
-        } else {
-            0
-        }),
-        LPARAM(0),
-    );
-    // Populate dialogue voice combo - will be filled in refresh_voices
-    SendMessageW(combo_dialogue_voice, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    SendMessageW(
-        combo_dialogue_secondary_voice,
-        CB_RESETCONTENT,
-        WPARAM(0),
-        LPARAM(0),
-    );
-    update_dialogue_voice_visibility(hwnd);
+        SendMessageW(
+            checkbox_multilingual,
+            BM_SETCHECK,
+            WPARAM(if settings.tts_only_multilingual {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_use_dialogue_voice,
+            BM_SETCHECK,
+            WPARAM(if settings.use_dialogue_voice {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_dialogue_multilingual,
+            BM_SETCHECK,
+            WPARAM(0),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_dialogue_use_secondary_voice,
+            BM_SETCHECK,
+            WPARAM(if settings.dialogue_use_secondary_voice {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_dialogue_secondary_multilingual,
+            BM_SETCHECK,
+            WPARAM(0),
+            LPARAM(0),
+        );
+        if let Err(_e) = SetWindowTextW(
+            edit_dialogue_open_quote,
+            PCWSTR(to_wide(&settings.dialogue_opening_quote).as_ptr()),
+        ) {
+            crate::log_debug(&format!(
+                "Failed to set dialogue opening quote text: {:?}",
+                _e
+            ));
+        }
+        if let Err(_e) = SetWindowTextW(
+            edit_dialogue_close_quote,
+            PCWSTR(to_wide(&settings.dialogue_closing_quote).as_ptr()),
+        ) {
+            crate::log_debug(&format!(
+                "Failed to set dialogue closing quote text: {:?}",
+                _e
+            ));
+        }
+        SendMessageW(
+            checkbox_dialogue_allow_multiline,
+            BM_SETCHECK,
+            WPARAM(if settings.dialogue_allow_multiline {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        // Populate dialogue voice combo - will be filled in refresh_voices
+        SendMessageW(combo_dialogue_voice, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        SendMessageW(
+            combo_dialogue_secondary_voice,
+            CB_RESETCONTENT,
+            WPARAM(0),
+            LPARAM(0),
+        );
+        update_dialogue_voice_visibility(hwnd);
 
-    SendMessageW(
-        checkbox_audio_split_requires_newline,
-        BM_SETCHECK,
-        WPARAM(if settings.audiobook_split_text_requires_newline {
-            BST_CHECKED.0 as usize
-        } else {
-            0
-        }),
-        LPARAM(0),
-    );
-    SendMessageW(
-        checkbox_audio_split_epub_chapters,
-        BM_SETCHECK,
-        WPARAM(if settings.audiobook_split_by_epub_chapter {
-            BST_CHECKED.0 as usize
-        } else {
-            0
-        }),
-        LPARAM(0),
-    );
-    SendMessageW(
-        checkbox_subtitle_ducking,
-        BM_SETCHECK,
-        WPARAM(if settings.subtitle_mix_ducking {
-            BST_CHECKED.0 as usize
-        } else {
-            0
-        }),
-        LPARAM(0),
-    );
-    SendMessageW(
-        checkbox_split_on_newline,
-        BM_SETCHECK,
-        WPARAM(if settings.split_on_newline {
-            BST_CHECKED.0 as usize
-        } else {
-            0
-        }),
-        LPARAM(0),
-    );
-    SendMessageW(
-        checkbox_word_wrap,
-        BM_SETCHECK,
-        WPARAM(if settings.word_wrap {
-            BST_CHECKED.0 as usize
-        } else {
-            0
-        }),
-        LPARAM(0),
-    );
-    SendMessageW(
-        checkbox_smart_quotes,
-        BM_SETCHECK,
-        WPARAM(if settings.smart_quotes {
-            BST_CHECKED.0 as usize
-        } else {
-            0
-        }),
-        LPARAM(0),
-    );
-    SendMessageW(
-        checkbox_strip_markdown_keep_bullets,
-        BM_SETCHECK,
-        WPARAM(if settings.strip_markdown_keep_bullets {
-            BST_CHECKED.0 as usize
-        } else {
-            0
-        }),
-        LPARAM(0),
-    );
-    SendMessageW(
-        checkbox_spellcheck,
-        BM_SETCHECK,
-        WPARAM(if settings.spellcheck_enabled {
-            BST_CHECKED.0 as usize
-        } else {
-            0
-        }),
-        LPARAM(0),
-    );
-    SendMessageW(
-        combo_spellcheck_language,
-        CB_RESETCONTENT,
-        WPARAM(0),
-        LPARAM(0),
-    );
-    let spellcheck_options = [
-        (labels.spellcheck_lang_follow.clone(), "follow"),
-        (labels.spellcheck_lang_en_us.clone(), "en-US"),
-        (labels.spellcheck_lang_en_gb.clone(), "en-GB"),
-        (labels.spellcheck_lang_it.clone(), "it-IT"),
-        (labels.spellcheck_lang_es.clone(), "es-ES"),
-        (labels.spellcheck_lang_pt_br.clone(), "pt-BR"),
-        (labels.spellcheck_lang_fr.clone(), "fr-FR"),
-        (labels.spellcheck_lang_de.clone(), "de-DE"),
-        ("Polski (Polska)".to_string(), "pl-PL"),
-    ];
-    let mut selected_idx = 0;
-    let current_val = if settings.spellcheck_language_mode
-        == crate::settings::SpellcheckLanguageMode::FollowEditorLanguage
-    {
-        "follow"
-    } else {
-        &settings.spellcheck_fixed_language
-    };
-
-    for (i, (label, val)) in spellcheck_options.iter().enumerate() {
+        SendMessageW(
+            checkbox_audio_split_requires_newline,
+            BM_SETCHECK,
+            WPARAM(if settings.audiobook_split_text_requires_newline {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_audio_split_epub_chapters,
+            BM_SETCHECK,
+            WPARAM(if settings.audiobook_split_by_epub_chapter {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_subtitle_ducking,
+            BM_SETCHECK,
+            WPARAM(if settings.subtitle_mix_ducking {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_split_on_newline,
+            BM_SETCHECK,
+            WPARAM(if settings.split_on_newline {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_word_wrap,
+            BM_SETCHECK,
+            WPARAM(if settings.word_wrap {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_smart_quotes,
+            BM_SETCHECK,
+            WPARAM(if settings.smart_quotes {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_strip_markdown_keep_bullets,
+            BM_SETCHECK,
+            WPARAM(if settings.strip_markdown_keep_bullets {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_spellcheck,
+            BM_SETCHECK,
+            WPARAM(if settings.spellcheck_enabled {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
         SendMessageW(
             combo_spellcheck_language,
-            CB_ADDSTRING,
+            CB_RESETCONTENT,
             WPARAM(0),
-            LPARAM(to_wide(label).as_ptr() as isize),
+            LPARAM(0),
         );
-        if *val == current_val {
-            selected_idx = i;
-        }
-    }
-    SendMessageW(
-        combo_spellcheck_language,
-        CB_SETCURSEL,
-        WPARAM(selected_idx),
-        LPARAM(0),
-    );
-    update_spellcheck_language_visibility(hwnd);
+        let spellcheck_options = [
+            (labels.spellcheck_lang_follow.clone(), "follow"),
+            (labels.spellcheck_lang_en_us.clone(), "en-US"),
+            (labels.spellcheck_lang_en_gb.clone(), "en-GB"),
+            (labels.spellcheck_lang_it.clone(), "it-IT"),
+            (labels.spellcheck_lang_es.clone(), "es-ES"),
+            (labels.spellcheck_lang_pt_br.clone(), "pt-BR"),
+            (labels.spellcheck_lang_fr.clone(), "fr-FR"),
+            (labels.spellcheck_lang_de.clone(), "de-DE"),
+            ("Polski (Polska)".to_string(), "pl-PL"),
+        ];
+        let mut selected_idx = 0;
+        let current_val = if settings.spellcheck_language_mode
+            == crate::settings::SpellcheckLanguageMode::FollowEditorLanguage
+        {
+            "follow"
+        } else {
+            &settings.spellcheck_fixed_language
+        };
 
-    SendMessageW(
-        combo_dictionary_translation,
-        CB_RESETCONTENT,
-        WPARAM(0),
-        LPARAM(0),
-    );
-    let dictionary_translation_options = [
-        (labels.dictionary_translation_auto.clone(), "auto"),
-        (labels.dictionary_translation_none.clone(), "none"),
-        (labels.lang_it.clone(), "it"),
-        (labels.lang_en.clone(), "en"),
-        (labels.lang_es.clone(), "es"),
-        (labels.lang_pt.clone(), "pt"),
-        (labels.lang_sv.clone(), "sv"),
-        (labels.lang_vi.clone(), "vi"),
-        (labels.lang_cs.clone(), "cs"),
-        (labels.lang_pl.clone(), "pl"),
-        (labels.lang_fr.clone(), "fr"),
-        (labels.lang_uk.clone(), "uk"),
-        (labels.lang_lt.clone(), "lt"),
-        (labels.lang_zh.clone(), "zh"),
-    ];
-    let current_dict_lang = settings
-        .dictionary_translation_language
-        .trim()
-        .to_ascii_lowercase();
-    let mut dict_selected_idx = 0;
-    for (i, (label, val)) in dictionary_translation_options.iter().enumerate() {
+        for (i, (label, val)) in spellcheck_options.iter().enumerate() {
+            SendMessageW(
+                combo_spellcheck_language,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(label).as_ptr() as isize),
+            );
+            if *val == current_val {
+                selected_idx = i;
+            }
+        }
+        SendMessageW(
+            combo_spellcheck_language,
+            CB_SETCURSEL,
+            WPARAM(selected_idx),
+            LPARAM(0),
+        );
+        update_spellcheck_language_visibility(hwnd);
+
         SendMessageW(
             combo_dictionary_translation,
-            CB_ADDSTRING,
+            CB_RESETCONTENT,
             WPARAM(0),
-            LPARAM(to_wide(label).as_ptr() as isize),
+            LPARAM(0),
         );
-        if *val == current_dict_lang {
-            dict_selected_idx = i;
+        let dictionary_translation_options = [
+            (labels.dictionary_translation_auto.clone(), "auto"),
+            (labels.dictionary_translation_none.clone(), "none"),
+            (labels.lang_it.clone(), "it"),
+            (labels.lang_en.clone(), "en"),
+            (labels.lang_es.clone(), "es"),
+            (labels.lang_pt.clone(), "pt"),
+            (labels.lang_sv.clone(), "sv"),
+            (labels.lang_vi.clone(), "vi"),
+            (labels.lang_cs.clone(), "cs"),
+            (labels.lang_pl.clone(), "pl"),
+            (labels.lang_fr.clone(), "fr"),
+            (labels.lang_uk.clone(), "uk"),
+            (labels.lang_lt.clone(), "lt"),
+            (labels.lang_zh.clone(), "zh"),
+        ];
+        let current_dict_lang = settings
+            .dictionary_translation_language
+            .trim()
+            .to_ascii_lowercase();
+        let mut dict_selected_idx = 0;
+        for (i, (label, val)) in dictionary_translation_options.iter().enumerate() {
+            SendMessageW(
+                combo_dictionary_translation,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(label).as_ptr() as isize),
+            );
+            if *val == current_dict_lang {
+                dict_selected_idx = i;
+            }
         }
-    }
-    SendMessageW(
-        combo_dictionary_translation,
-        CB_SETCURSEL,
-        WPARAM(dict_selected_idx),
-        LPARAM(0),
-    );
+        SendMessageW(
+            combo_dictionary_translation,
+            CB_SETCURSEL,
+            WPARAM(dict_selected_idx),
+            LPARAM(0),
+        );
 
-    SendMessageW(
-        combo_wikipedia_language,
-        CB_RESETCONTENT,
-        WPARAM(0),
-        LPARAM(0),
-    );
-    let wikipedia_language_options = [
-        (labels.wikipedia_language_auto.clone(), "auto"),
-        (labels.lang_it.clone(), "it"),
-        (labels.lang_en.clone(), "en"),
-        (labels.lang_es.clone(), "es"),
-        (labels.lang_pt.clone(), "pt"),
-        (labels.lang_sv.clone(), "sv"),
-        (labels.lang_vi.clone(), "vi"),
-        (labels.lang_cs.clone(), "cs"),
-        (labels.lang_pl.clone(), "pl"),
-        (labels.lang_fr.clone(), "fr"),
-        (labels.lang_uk.clone(), "uk"),
-        (labels.lang_lt.clone(), "lt"),
-        (labels.lang_zh.clone(), "zh"),
-    ];
-    let current_wikipedia_lang = settings.wikipedia_language.trim().to_ascii_lowercase();
-    let mut wiki_selected_idx = 0;
-    for (i, (label, val)) in wikipedia_language_options.iter().enumerate() {
         SendMessageW(
             combo_wikipedia_language,
-            CB_ADDSTRING,
+            CB_RESETCONTENT,
             WPARAM(0),
-            LPARAM(to_wide(label).as_ptr() as isize),
+            LPARAM(0),
         );
-        if *val == current_wikipedia_lang {
-            wiki_selected_idx = i;
+        let wikipedia_language_options = [
+            (labels.wikipedia_language_auto.clone(), "auto"),
+            (labels.lang_it.clone(), "it"),
+            (labels.lang_en.clone(), "en"),
+            (labels.lang_es.clone(), "es"),
+            (labels.lang_pt.clone(), "pt"),
+            (labels.lang_sv.clone(), "sv"),
+            (labels.lang_vi.clone(), "vi"),
+            (labels.lang_cs.clone(), "cs"),
+            (labels.lang_pl.clone(), "pl"),
+            (labels.lang_fr.clone(), "fr"),
+            (labels.lang_uk.clone(), "uk"),
+            (labels.lang_lt.clone(), "lt"),
+            (labels.lang_zh.clone(), "zh"),
+        ];
+        let current_wikipedia_lang = settings.wikipedia_language.trim().to_ascii_lowercase();
+        let mut wiki_selected_idx = 0;
+        for (i, (label, val)) in wikipedia_language_options.iter().enumerate() {
+            SendMessageW(
+                combo_wikipedia_language,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(label).as_ptr() as isize),
+            );
+            if *val == current_wikipedia_lang {
+                wiki_selected_idx = i;
+            }
         }
-    }
-    SendMessageW(
-        combo_wikipedia_language,
-        CB_SETCURSEL,
-        WPARAM(wiki_selected_idx),
-        LPARAM(0),
-    );
+        SendMessageW(
+            combo_wikipedia_language,
+            CB_SETCURSEL,
+            WPARAM(wiki_selected_idx),
+            LPARAM(0),
+        );
 
-    let wrap_text = settings.wrap_width.to_string();
-    if let Err(_e) = SetWindowTextW(edit_wrap_width, PCWSTR(to_wide(&wrap_text).as_ptr())) {
-        crate::log_debug(&format!("Error: {:?}", _e));
-    }
+        let wrap_text = settings.wrap_width.to_string();
+        if let Err(_e) = SetWindowTextW(edit_wrap_width, PCWSTR(to_wide(&wrap_text).as_ptr())) {
+            crate::log_debug(&format!("Error: {:?}", _e));
+        }
 
-    SendMessageW(combo_indentation, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    let indent_options = [
-        labels.indent_default.clone(),
-        labels.indent_tabs.clone(),
-        labels.indent_spaces.clone(),
-    ];
-    for label in indent_options.iter() {
+        SendMessageW(combo_indentation, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        let indent_options = [
+            labels.indent_default.clone(),
+            labels.indent_tabs.clone(),
+            labels.indent_spaces.clone(),
+        ];
+        for label in indent_options.iter() {
+            SendMessageW(
+                combo_indentation,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(label).as_ptr() as isize),
+            );
+        }
+        let indent_index = match settings.indentation_mode {
+            crate::settings::IndentationMode::Default => 0,
+            crate::settings::IndentationMode::Tabs => 1,
+            crate::settings::IndentationMode::Spaces => 2,
+        };
         SendMessageW(
             combo_indentation,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(to_wide(label).as_ptr() as isize),
+            CB_SETCURSEL,
+            WPARAM(indent_index),
+            LPARAM(0),
         );
-    }
-    let indent_index = match settings.indentation_mode {
-        crate::settings::IndentationMode::Default => 0,
-        crate::settings::IndentationMode::Tabs => 1,
-        crate::settings::IndentationMode::Spaces => 2,
-    };
-    SendMessageW(
-        combo_indentation,
-        CB_SETCURSEL,
-        WPARAM(indent_index),
-        LPARAM(0),
-    );
 
-    SendMessageW(combo_tab_width, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    SendMessageW(combo_space_width, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    let mut tab_sel = 0usize;
-    let mut space_sel = 0usize;
-    for (idx, width) in [2u32, 4, 6, 8].iter().enumerate() {
-        let label = width.to_string();
-        let tab_idx = SendMessageW(
-            combo_tab_width,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(to_wide(&label).as_ptr() as isize),
-        )
-        .0 as usize;
-        SendMessageW(
-            combo_tab_width,
-            CB_SETITEMDATA,
-            WPARAM(tab_idx),
-            LPARAM(*width as isize),
-        );
-        if *width == settings.indent_tab_width {
-            tab_sel = idx;
+        SendMessageW(combo_tab_width, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        SendMessageW(combo_space_width, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        let mut tab_sel = 0usize;
+        let mut space_sel = 0usize;
+        for (idx, width) in [2u32, 4, 6, 8].iter().enumerate() {
+            let label = width.to_string();
+            let tab_idx = SendMessageW(
+                combo_tab_width,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&label).as_ptr() as isize),
+            )
+            .0 as usize;
+            SendMessageW(
+                combo_tab_width,
+                CB_SETITEMDATA,
+                WPARAM(tab_idx),
+                LPARAM(*width as isize),
+            );
+            if *width == settings.indent_tab_width {
+                tab_sel = idx;
+            }
+
+            let space_idx = SendMessageW(
+                combo_space_width,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&label).as_ptr() as isize),
+            )
+            .0 as usize;
+            SendMessageW(
+                combo_space_width,
+                CB_SETITEMDATA,
+                WPARAM(space_idx),
+                LPARAM(*width as isize),
+            );
+            if *width == settings.indent_space_width {
+                space_sel = idx;
+            }
         }
-
-        let space_idx = SendMessageW(
-            combo_space_width,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(to_wide(&label).as_ptr() as isize),
-        )
-        .0 as usize;
+        SendMessageW(combo_tab_width, CB_SETCURSEL, WPARAM(tab_sel), LPARAM(0));
         SendMessageW(
             combo_space_width,
-            CB_SETITEMDATA,
-            WPARAM(space_idx),
-            LPARAM(*width as isize),
+            CB_SETCURSEL,
+            WPARAM(space_sel),
+            LPARAM(0),
         );
-        if *width == settings.indent_space_width {
-            space_sel = idx;
-        }
-    }
-    SendMessageW(combo_tab_width, CB_SETCURSEL, WPARAM(tab_sel), LPARAM(0));
-    SendMessageW(
-        combo_space_width,
-        CB_SETCURSEL,
-        WPARAM(space_sel),
-        LPARAM(0),
-    );
-    update_indentation_visibility(hwnd);
+        update_indentation_visibility(hwnd);
 
-    if let Err(_e) = SetWindowTextW(
-        edit_quote_prefix,
-        PCWSTR(to_wide(&settings.quote_prefix).as_ptr()),
-    ) {}
-    if let Err(_e) = SetWindowTextW(
-        edit_interpreter_path,
-        PCWSTR(to_wide(&settings.interpreter_path).as_ptr()),
-    ) {}
-    if let Err(_e) = SetWindowTextW(
-        edit_subtitle_offset,
-        PCWSTR(to_wide(&settings.subtitle_offset_ms.to_string()).as_ptr()),
-    ) {}
-    SendMessageW(combo_subtitle_mode, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    let subtitle_mode_options = [
-        labels.subtitle_mode_off.clone(),
-        labels.subtitle_mode_nvda.clone(),
-        labels.subtitle_mode_user.clone(),
-        labels.subtitle_mode_record.clone(),
-    ];
-    for label in subtitle_mode_options.iter() {
+        if let Err(_e) = SetWindowTextW(
+            edit_quote_prefix,
+            PCWSTR(to_wide(&settings.quote_prefix).as_ptr()),
+        ) {}
+        if let Err(_e) = SetWindowTextW(
+            edit_interpreter_path,
+            PCWSTR(to_wide(&settings.interpreter_path).as_ptr()),
+        ) {}
+        if let Err(_e) = SetWindowTextW(
+            edit_subtitle_offset,
+            PCWSTR(to_wide(&settings.subtitle_offset_ms.to_string()).as_ptr()),
+        ) {}
+        SendMessageW(combo_subtitle_mode, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        let subtitle_mode_options = [
+            labels.subtitle_mode_off.clone(),
+            labels.subtitle_mode_nvda.clone(),
+            labels.subtitle_mode_user.clone(),
+            labels.subtitle_mode_record.clone(),
+        ];
+        for label in subtitle_mode_options.iter() {
+            SendMessageW(
+                combo_subtitle_mode,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(label).as_ptr() as isize),
+            );
+        }
+        let subtitle_mode_index = match settings.subtitle_read_mode {
+            SubtitleReadMode::Off => 0,
+            SubtitleReadMode::Nvda => 1,
+            SubtitleReadMode::User => 2,
+            SubtitleReadMode::Record => 3,
+            _ => 2,
+        };
         SendMessageW(
             combo_subtitle_mode,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(to_wide(label).as_ptr() as isize),
+            CB_SETCURSEL,
+            WPARAM(subtitle_mode_index),
+            LPARAM(0),
         );
-    }
-    let subtitle_mode_index = match settings.subtitle_read_mode {
-        SubtitleReadMode::Off => 0,
-        SubtitleReadMode::Nvda => 1,
-        SubtitleReadMode::User => 2,
-        SubtitleReadMode::Record => 3,
-        _ => 2,
-    };
-    SendMessageW(
-        combo_subtitle_mode,
-        CB_SETCURSEL,
-        WPARAM(subtitle_mode_index),
-        LPARAM(0),
-    );
-    update_subtitle_ducking_visibility(hwnd);
-    SendMessageW(
-        checkbox_move_cursor,
-        BM_SETCHECK,
-        WPARAM(if settings.move_cursor_during_reading {
-            BST_CHECKED.0 as usize
-        } else {
-            0
-        }),
-        LPARAM(0),
-    );
-    SendMessageW(
-        checkbox_check_updates,
-        BM_SETCHECK,
-        WPARAM(if settings.check_updates_on_startup {
-            BST_CHECKED.0 as usize
-        } else {
-            0
-        }),
-        LPARAM(0),
-    );
-    SendMessageW(
-        checkbox_send_crash_reports,
-        BM_SETCHECK,
-        WPARAM(if settings.send_crash_reports {
-            BST_CHECKED.0 as usize
-        } else {
-            0
-        }),
-        LPARAM(0),
-    );
-    SendMessageW(
-        checkbox_use_legacy_name,
-        BM_SETCHECK,
-        WPARAM(if settings.use_legacy_name {
-            BST_CHECKED.0 as usize
-        } else {
-            0
-        }),
-        LPARAM(0),
-    );
-    SendMessageW(
-        checkbox_context_menu,
-        BM_SETCHECK,
-        WPARAM(if settings.context_menu_open_with {
-            BST_CHECKED.0 as usize
-        } else {
-            0
-        }),
-        LPARAM(0),
-    );
-    SendMessageW(
-        combo_confirm_delete_rss_mode,
-        CB_RESETCONTENT,
-        WPARAM(0),
-        LPARAM(0),
-    );
-    for option in [
-        labels.confirm_delete_feed.clone(),
-        labels.confirm_delete_article.clone(),
-        labels.confirm_delete_both.clone(),
-        labels.confirm_delete_none.clone(),
-    ] {
+        update_subtitle_ducking_visibility(hwnd);
+        SendMessageW(
+            checkbox_move_cursor,
+            BM_SETCHECK,
+            WPARAM(if settings.move_cursor_during_reading {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_check_updates,
+            BM_SETCHECK,
+            WPARAM(if settings.check_updates_on_startup {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_send_crash_reports,
+            BM_SETCHECK,
+            WPARAM(if settings.send_crash_reports {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_use_legacy_name,
+            BM_SETCHECK,
+            WPARAM(if settings.use_legacy_name {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_context_menu,
+            BM_SETCHECK,
+            WPARAM(if settings.context_menu_open_with {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
         SendMessageW(
             combo_confirm_delete_rss_mode,
-            CB_ADDSTRING,
+            CB_RESETCONTENT,
             WPARAM(0),
-            LPARAM(to_wide(&option).as_ptr() as isize),
+            LPARAM(0),
         );
-    }
-    let rss_confirm_idx = match settings.rss_delete_confirm_mode {
-        RssDeleteConfirmMode::Feed => 0,
-        RssDeleteConfirmMode::Article => 1,
-        RssDeleteConfirmMode::Both => 2,
-        RssDeleteConfirmMode::None => 3,
-    };
-    SendMessageW(
-        combo_confirm_delete_rss_mode,
-        CB_SETCURSEL,
-        WPARAM(rss_confirm_idx),
-        LPARAM(0),
-    );
-    SendMessageW(
-        combo_confirm_delete_podcast_mode,
-        CB_RESETCONTENT,
-        WPARAM(0),
-        LPARAM(0),
-    );
-    for option in [
-        labels.confirm_delete_podcast.clone(),
-        labels.confirm_delete_episode.clone(),
-        labels.confirm_delete_both.clone(),
-        labels.confirm_delete_none.clone(),
-    ] {
+        for option in [
+            labels.confirm_delete_feed.clone(),
+            labels.confirm_delete_article.clone(),
+            labels.confirm_delete_both.clone(),
+            labels.confirm_delete_none.clone(),
+        ] {
+            SendMessageW(
+                combo_confirm_delete_rss_mode,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&option).as_ptr() as isize),
+            );
+        }
+        let rss_confirm_idx = match settings.rss_delete_confirm_mode {
+            RssDeleteConfirmMode::Feed => 0,
+            RssDeleteConfirmMode::Article => 1,
+            RssDeleteConfirmMode::Both => 2,
+            RssDeleteConfirmMode::None => 3,
+        };
+        SendMessageW(
+            combo_confirm_delete_rss_mode,
+            CB_SETCURSEL,
+            WPARAM(rss_confirm_idx),
+            LPARAM(0),
+        );
         SendMessageW(
             combo_confirm_delete_podcast_mode,
-            CB_ADDSTRING,
+            CB_RESETCONTENT,
             WPARAM(0),
-            LPARAM(to_wide(&option).as_ptr() as isize),
+            LPARAM(0),
         );
-    }
-    let podcast_confirm_idx = match settings.podcast_delete_confirm_mode {
-        PodcastDeleteConfirmMode::Podcast => 0,
-        PodcastDeleteConfirmMode::Episode => 1,
-        PodcastDeleteConfirmMode::Both => 2,
-        PodcastDeleteConfirmMode::None => 3,
-    };
-    SendMessageW(
-        combo_confirm_delete_podcast_mode,
-        CB_SETCURSEL,
-        WPARAM(podcast_confirm_idx),
-        LPARAM(0),
-    );
-    SendMessageW(
-        combo_rss_quick_copy_mode,
-        CB_RESETCONTENT,
-        WPARAM(0),
-        LPARAM(0),
-    );
-    for option in [
-        labels.rss_quick_copy_title.clone(),
-        labels.rss_quick_copy_url.clone(),
-        labels.rss_quick_copy_content.clone(),
-        labels.rss_quick_copy_all.clone(),
-    ] {
+        for option in [
+            labels.confirm_delete_podcast.clone(),
+            labels.confirm_delete_episode.clone(),
+            labels.confirm_delete_both.clone(),
+            labels.confirm_delete_none.clone(),
+        ] {
+            SendMessageW(
+                combo_confirm_delete_podcast_mode,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&option).as_ptr() as isize),
+            );
+        }
+        let podcast_confirm_idx = match settings.podcast_delete_confirm_mode {
+            PodcastDeleteConfirmMode::Podcast => 0,
+            PodcastDeleteConfirmMode::Episode => 1,
+            PodcastDeleteConfirmMode::Both => 2,
+            PodcastDeleteConfirmMode::None => 3,
+        };
+        SendMessageW(
+            combo_confirm_delete_podcast_mode,
+            CB_SETCURSEL,
+            WPARAM(podcast_confirm_idx),
+            LPARAM(0),
+        );
         SendMessageW(
             combo_rss_quick_copy_mode,
-            CB_ADDSTRING,
+            CB_RESETCONTENT,
             WPARAM(0),
-            LPARAM(to_wide(&option).as_ptr() as isize),
+            LPARAM(0),
         );
-    }
-    let rss_quick_copy_idx = match settings.rss_quick_copy_mode {
-        crate::settings::RssQuickCopyMode::Title => 0,
-        crate::settings::RssQuickCopyMode::Url => 1,
-        crate::settings::RssQuickCopyMode::Content => 2,
-        crate::settings::RssQuickCopyMode::All => 3,
-    };
-    SendMessageW(
-        combo_rss_quick_copy_mode,
-        CB_SETCURSEL,
-        WPARAM(rss_quick_copy_idx),
-        LPARAM(0),
-    );
-    SendMessageW(
-        checkbox_announce_unread_rss_podcast,
-        BM_SETCHECK,
-        WPARAM(if settings.announce_unread_rss_podcast_items {
-            BST_CHECKED.0 as usize
-        } else {
-            0
-        }),
-        LPARAM(0),
-    );
-    SendMessageW(
-        combo_unread_label_position,
-        CB_RESETCONTENT,
-        WPARAM(0),
-        LPARAM(0),
-    );
-    for option in [
-        labels.unread_label_position_before.clone(),
-        labels.unread_label_position_after.clone(),
-    ] {
+        for option in [
+            labels.rss_quick_copy_title.clone(),
+            labels.rss_quick_copy_url.clone(),
+            labels.rss_quick_copy_content.clone(),
+            labels.rss_quick_copy_all.clone(),
+        ] {
+            SendMessageW(
+                combo_rss_quick_copy_mode,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&option).as_ptr() as isize),
+            );
+        }
+        let rss_quick_copy_idx = match settings.rss_quick_copy_mode {
+            crate::settings::RssQuickCopyMode::Title => 0,
+            crate::settings::RssQuickCopyMode::Url => 1,
+            crate::settings::RssQuickCopyMode::Content => 2,
+            crate::settings::RssQuickCopyMode::All => 3,
+        };
+        SendMessageW(
+            combo_rss_quick_copy_mode,
+            CB_SETCURSEL,
+            WPARAM(rss_quick_copy_idx),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_announce_unread_rss_podcast,
+            BM_SETCHECK,
+            WPARAM(if settings.announce_unread_rss_podcast_items {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
         SendMessageW(
             combo_unread_label_position,
-            CB_ADDSTRING,
+            CB_RESETCONTENT,
             WPARAM(0),
-            LPARAM(to_wide(&option).as_ptr() as isize),
+            LPARAM(0),
         );
-    }
-    let unread_label_idx = match settings.rss_podcast_unread_label_position {
-        RssPodcastUnreadLabelPosition::Before => 0,
-        RssPodcastUnreadLabelPosition::After => 1,
-    };
-    SendMessageW(
-        combo_unread_label_position,
-        CB_SETCURSEL,
-        WPARAM(unread_label_idx),
-        LPARAM(0),
-    );
+        for option in [
+            labels.unread_label_position_before.clone(),
+            labels.unread_label_position_after.clone(),
+        ] {
+            SendMessageW(
+                combo_unread_label_position,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&option).as_ptr() as isize),
+            );
+        }
+        let unread_label_idx = match settings.rss_podcast_unread_label_position {
+            RssPodcastUnreadLabelPosition::Before => 0,
+            RssPodcastUnreadLabelPosition::After => 1,
+        };
+        SendMessageW(
+            combo_unread_label_position,
+            CB_SETCURSEL,
+            WPARAM(unread_label_idx),
+            LPARAM(0),
+        );
 
-    SendMessageW(
-        combo_rss_date_display,
-        CB_RESETCONTENT,
-        WPARAM(0),
-        LPARAM(0),
-    );
-    for option in [
-        labels.list_date_always.clone(),
-        labels.list_date_never.clone(),
-    ] {
         SendMessageW(
             combo_rss_date_display,
-            CB_ADDSTRING,
+            CB_RESETCONTENT,
             WPARAM(0),
-            LPARAM(to_wide(&option).as_ptr() as isize),
+            LPARAM(0),
         );
-    }
-    let rss_date_idx = match settings.rss_articles_date_display {
-        ListDateDisplayMode::Always => 0,
-        ListDateDisplayMode::Never => 1,
-    };
-    SendMessageW(
-        combo_rss_date_display,
-        CB_SETCURSEL,
-        WPARAM(rss_date_idx),
-        LPARAM(0),
-    );
+        for option in [
+            labels.list_date_always.clone(),
+            labels.list_date_never.clone(),
+        ] {
+            SendMessageW(
+                combo_rss_date_display,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&option).as_ptr() as isize),
+            );
+        }
+        let rss_date_idx = match settings.rss_articles_date_display {
+            ListDateDisplayMode::Always => 0,
+            ListDateDisplayMode::Never => 1,
+        };
+        SendMessageW(
+            combo_rss_date_display,
+            CB_SETCURSEL,
+            WPARAM(rss_date_idx),
+            LPARAM(0),
+        );
 
-    SendMessageW(
-        combo_rss_time_display,
-        CB_RESETCONTENT,
-        WPARAM(0),
-        LPARAM(0),
-    );
-    for option in [
-        labels.list_time_always.clone(),
-        labels.list_time_never.clone(),
-        labels.list_time_only_if_multiple_same_day.clone(),
-    ] {
         SendMessageW(
             combo_rss_time_display,
-            CB_ADDSTRING,
+            CB_RESETCONTENT,
             WPARAM(0),
-            LPARAM(to_wide(&option).as_ptr() as isize),
+            LPARAM(0),
         );
-    }
-    let rss_time_idx = match settings.rss_articles_time_display {
-        ListTimeDisplayMode::Always => 0,
-        ListTimeDisplayMode::Never => 1,
-        ListTimeDisplayMode::OnlyIfMultipleSameDay => 2,
-    };
-    SendMessageW(
-        combo_rss_time_display,
-        CB_SETCURSEL,
-        WPARAM(rss_time_idx),
-        LPARAM(0),
-    );
+        for option in [
+            labels.list_time_always.clone(),
+            labels.list_time_never.clone(),
+            labels.list_time_only_if_multiple_same_day.clone(),
+        ] {
+            SendMessageW(
+                combo_rss_time_display,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&option).as_ptr() as isize),
+            );
+        }
+        let rss_time_idx = match settings.rss_articles_time_display {
+            ListTimeDisplayMode::Always => 0,
+            ListTimeDisplayMode::Never => 1,
+            ListTimeDisplayMode::OnlyIfMultipleSameDay => 2,
+        };
+        SendMessageW(
+            combo_rss_time_display,
+            CB_SETCURSEL,
+            WPARAM(rss_time_idx),
+            LPARAM(0),
+        );
 
-    SendMessageW(
-        combo_podcast_date_display,
-        CB_RESETCONTENT,
-        WPARAM(0),
-        LPARAM(0),
-    );
-    for option in [
-        labels.list_date_always.clone(),
-        labels.list_date_never.clone(),
-    ] {
         SendMessageW(
             combo_podcast_date_display,
-            CB_ADDSTRING,
+            CB_RESETCONTENT,
             WPARAM(0),
-            LPARAM(to_wide(&option).as_ptr() as isize),
+            LPARAM(0),
         );
-    }
-    let podcast_date_idx = match settings.podcast_episodes_date_display {
-        ListDateDisplayMode::Always => 0,
-        ListDateDisplayMode::Never => 1,
-    };
-    SendMessageW(
-        combo_podcast_date_display,
-        CB_SETCURSEL,
-        WPARAM(podcast_date_idx),
-        LPARAM(0),
-    );
+        for option in [
+            labels.list_date_always.clone(),
+            labels.list_date_never.clone(),
+        ] {
+            SendMessageW(
+                combo_podcast_date_display,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&option).as_ptr() as isize),
+            );
+        }
+        let podcast_date_idx = match settings.podcast_episodes_date_display {
+            ListDateDisplayMode::Always => 0,
+            ListDateDisplayMode::Never => 1,
+        };
+        SendMessageW(
+            combo_podcast_date_display,
+            CB_SETCURSEL,
+            WPARAM(podcast_date_idx),
+            LPARAM(0),
+        );
 
-    SendMessageW(
-        combo_podcast_time_display,
-        CB_RESETCONTENT,
-        WPARAM(0),
-        LPARAM(0),
-    );
-    for option in [
-        labels.list_time_always.clone(),
-        labels.list_time_never.clone(),
-        labels.list_time_only_if_multiple_same_day.clone(),
-    ] {
         SendMessageW(
             combo_podcast_time_display,
-            CB_ADDSTRING,
+            CB_RESETCONTENT,
             WPARAM(0),
-            LPARAM(to_wide(&option).as_ptr() as isize),
+            LPARAM(0),
         );
-    }
-    let podcast_time_idx = match settings.podcast_episodes_time_display {
-        ListTimeDisplayMode::Always => 0,
-        ListTimeDisplayMode::Never => 1,
-        ListTimeDisplayMode::OnlyIfMultipleSameDay => 2,
-    };
-    SendMessageW(
-        combo_podcast_time_display,
-        CB_SETCURSEL,
-        WPARAM(podcast_time_idx),
-        LPARAM(0),
-    );
-
-    SendMessageW(combo_prompt_program, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    let prompt_options = [
-        labels.prompt_cmd.clone(),
-        labels.prompt_powershell.clone(),
-        labels.prompt_codex.clone(),
-    ];
-    for label in prompt_options.iter() {
-        SendMessageW(
-            combo_prompt_program,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(to_wide(label).as_ptr() as isize),
-        );
-    }
-    let program = settings.prompt_program.to_ascii_lowercase();
-    let program_idx = if program.contains("powershell") {
-        1
-    } else if program.contains("codex") {
-        2
-    } else {
-        0
-    };
-    SendMessageW(
-        combo_prompt_program,
-        CB_SETCURSEL,
-        WPARAM(program_idx),
-        LPARAM(0),
-    );
-    if let Err(_e) = SetWindowTextW(
-        edit_network_proxy,
-        PCWSTR(to_wide(&settings.network_proxy_url).as_ptr()),
-    ) {
-        crate::log_debug(&format!("Failed to set network proxy text: {:?}", _e));
-    }
-    if let Err(_e) = SetWindowTextW(
-        edit_network_proxy_username,
-        PCWSTR(to_wide(&settings.network_proxy_username).as_ptr()),
-    ) {
-        crate::log_debug(&format!(
-            "Failed to set network proxy username text: {:?}",
-            _e
-        ));
-    }
-    if let Err(_e) = SetWindowTextW(
-        edit_network_proxy_password,
-        PCWSTR(to_wide(&settings.network_proxy_password).as_ptr()),
-    ) {
-        crate::log_debug(&format!(
-            "Failed to set network proxy password text: {:?}",
-            _e
-        ));
-    }
-    if with_options_state(hwnd, |state| {
-        state.shortcut_draft = settings.shortcuts.clone();
-        state.shortcut_capture_pending = false;
-    })
-    .is_none()
-    {
-        crate::log_debug("Failed to access state in options_window");
-    }
-    SendMessageW(combo_shortcut_action, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    for action in ShortcutAction::ALL {
-        SendMessageW(
-            combo_shortcut_action,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(to_wide(&shortcut_action_label(settings.language, action)).as_ptr() as isize),
-        );
-    }
-    SendMessageW(combo_shortcut_action, CB_SETCURSEL, WPARAM(0), LPARAM(0));
-    update_shortcut_binding_text(hwnd);
-
-    SendMessageW(combo_audio_skip, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    let skip_options = [
-        (10, "10 s"),
-        (30, "30 s"),
-        (60, "1 m"),
-        (120, "2 m"),
-        (300, "5 m"),
-    ];
-    let mut selected_idx = 2;
-    for (secs, label) in skip_options.iter() {
-        let idx = SendMessageW(
-            combo_audio_skip,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(to_wide(label).as_ptr() as isize),
-        )
-        .0 as usize;
-        SendMessageW(
-            combo_audio_skip,
-            CB_SETITEMDATA,
-            WPARAM(idx),
-            LPARAM(*secs as isize),
-        );
-        if *secs == settings.audiobook_skip_seconds {
-            selected_idx = idx;
+        for option in [
+            labels.list_time_always.clone(),
+            labels.list_time_never.clone(),
+            labels.list_time_only_if_multiple_same_day.clone(),
+        ] {
+            SendMessageW(
+                combo_podcast_time_display,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&option).as_ptr() as isize),
+            );
         }
-    }
-    SendMessageW(
-        combo_audio_skip,
-        CB_SETCURSEL,
-        WPARAM(selected_idx),
-        LPARAM(0),
-    );
-    if let Err(_e) = SetWindowTextW(
-        edit_audiobook_save_folder,
-        PCWSTR(to_wide(&settings.audiobook_save_folder).as_ptr()),
-    ) {}
-    SendMessageW(
-        checkbox_show_media_save_confirmation,
-        BM_SETCHECK,
-        WPARAM(if settings.show_media_save_confirmation {
-            BST_CHECKED.0 as usize
+        let podcast_time_idx = match settings.podcast_episodes_time_display {
+            ListTimeDisplayMode::Always => 0,
+            ListTimeDisplayMode::Never => 1,
+            ListTimeDisplayMode::OnlyIfMultipleSameDay => 2,
+        };
+        SendMessageW(
+            combo_podcast_time_display,
+            CB_SETCURSEL,
+            WPARAM(podcast_time_idx),
+            LPARAM(0),
+        );
+
+        SendMessageW(combo_prompt_program, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        let prompt_options = [
+            labels.prompt_cmd.clone(),
+            labels.prompt_powershell.clone(),
+            labels.prompt_codex.clone(),
+        ];
+        for label in prompt_options.iter() {
+            SendMessageW(
+                combo_prompt_program,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(label).as_ptr() as isize),
+            );
+        }
+        let program = settings.prompt_program.to_ascii_lowercase();
+        let program_idx = if program.contains("powershell") {
+            1
+        } else if program.contains("codex") {
+            2
         } else {
             0
-        }),
-        LPARAM(0),
-    );
-
-    SendMessageW(combo_audio_split, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    let split_options = [
-        (0, labels.split_none.clone()),
-        (AUDIOBOOK_SPLIT_BY_TIME, labels.split_by_time.clone()),
-        (AUDIOBOOK_SPLIT_BY_TEXT, labels.split_by_text.clone()),
-        (AUDIOBOOK_SPLIT_BY_PARTS, labels.split_by_parts.clone()),
-    ];
-    let mut selected_split_idx = 0;
-    for (parts, label) in split_options.iter() {
-        let idx = SendMessageW(
-            combo_audio_split,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(to_wide(label).as_ptr() as isize),
-        )
-        .0 as usize;
+        };
         SendMessageW(
-            combo_audio_split,
-            CB_SETITEMDATA,
-            WPARAM(idx),
-            LPARAM(*parts as isize),
+            combo_prompt_program,
+            CB_SETCURSEL,
+            WPARAM(program_idx),
+            LPARAM(0),
         );
-        if (settings.audiobook_split_by_time && *parts == AUDIOBOOK_SPLIT_BY_TIME)
-            || (settings.audiobook_split_by_text && *parts == AUDIOBOOK_SPLIT_BY_TEXT)
-            || (!settings.audiobook_split_by_time
-                && !settings.audiobook_split_by_text
-                && settings.audiobook_split > 0
-                && *parts == AUDIOBOOK_SPLIT_BY_PARTS)
+        if let Err(_e) = SetWindowTextW(
+            edit_network_proxy,
+            PCWSTR(to_wide(&settings.network_proxy_url).as_ptr()),
+        ) {
+            crate::log_debug(&format!("Failed to set network proxy text: {:?}", _e));
+        }
+        if let Err(_e) = SetWindowTextW(
+            edit_network_proxy_username,
+            PCWSTR(to_wide(&settings.network_proxy_username).as_ptr()),
+        ) {
+            crate::log_debug(&format!(
+                "Failed to set network proxy username text: {:?}",
+                _e
+            ));
+        }
+        if let Err(_e) = SetWindowTextW(
+            edit_network_proxy_password,
+            PCWSTR(to_wide(&settings.network_proxy_password).as_ptr()),
+        ) {
+            crate::log_debug(&format!(
+                "Failed to set network proxy password text: {:?}",
+                _e
+            ));
+        }
+        if with_options_state(hwnd, |state| {
+            state.shortcut_draft = settings.shortcuts.clone();
+            state.shortcut_capture_pending = false;
+        })
+        .is_none()
         {
-            selected_split_idx = idx;
+            crate::log_debug("Failed to access state in options_window");
         }
-    }
-    SendMessageW(
-        combo_audio_split,
-        CB_SETCURSEL,
-        WPARAM(selected_split_idx),
-        LPARAM(0),
-    );
+        SendMessageW(combo_shortcut_action, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        for action in ShortcutAction::ALL {
+            SendMessageW(
+                combo_shortcut_action,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(
+                    to_wide(&shortcut_action_label(settings.language, action)).as_ptr() as isize,
+                ),
+            );
+        }
+        SendMessageW(combo_shortcut_action, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+        update_shortcut_binding_text(hwnd);
 
-    SendMessageW(
-        combo_audio_split_minutes,
-        CB_RESETCONTENT,
-        WPARAM(0),
-        LPARAM(0),
-    );
-    let mut selected_minutes_idx = 0;
-    for minutes in 1..=60u32 {
-        let label = format!("{minutes}");
-        let idx = SendMessageW(
-            combo_audio_split_minutes,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(to_wide(&label).as_ptr() as isize),
-        )
-        .0 as usize;
+        SendMessageW(combo_audio_skip, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        let skip_options = [
+            (10, "10 s"),
+            (30, "30 s"),
+            (60, "1 m"),
+            (120, "2 m"),
+            (300, "5 m"),
+        ];
+        let mut selected_idx = 2;
+        for (secs, label) in skip_options.iter() {
+            let idx = SendMessageW(
+                combo_audio_skip,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(label).as_ptr() as isize),
+            )
+            .0 as usize;
+            SendMessageW(
+                combo_audio_skip,
+                CB_SETITEMDATA,
+                WPARAM(idx),
+                LPARAM(*secs as isize),
+            );
+            if *secs == settings.audiobook_skip_seconds {
+                selected_idx = idx;
+            }
+        }
+        SendMessageW(
+            combo_audio_skip,
+            CB_SETCURSEL,
+            WPARAM(selected_idx),
+            LPARAM(0),
+        );
+        if let Err(_e) = SetWindowTextW(
+            edit_audiobook_save_folder,
+            PCWSTR(to_wide(&settings.audiobook_save_folder).as_ptr()),
+        ) {}
+        SendMessageW(
+            checkbox_show_media_save_confirmation,
+            BM_SETCHECK,
+            WPARAM(if settings.show_media_save_confirmation {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+
+        SendMessageW(combo_audio_split, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        let split_options = [
+            (0, labels.split_none.clone()),
+            (AUDIOBOOK_SPLIT_BY_TIME, labels.split_by_time.clone()),
+            (AUDIOBOOK_SPLIT_BY_TEXT, labels.split_by_text.clone()),
+            (AUDIOBOOK_SPLIT_BY_PARTS, labels.split_by_parts.clone()),
+        ];
+        let mut selected_split_idx = 0;
+        for (parts, label) in split_options.iter() {
+            let idx = SendMessageW(
+                combo_audio_split,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(label).as_ptr() as isize),
+            )
+            .0 as usize;
+            SendMessageW(
+                combo_audio_split,
+                CB_SETITEMDATA,
+                WPARAM(idx),
+                LPARAM(*parts as isize),
+            );
+            if (settings.audiobook_split_by_time && *parts == AUDIOBOOK_SPLIT_BY_TIME)
+                || (settings.audiobook_split_by_text && *parts == AUDIOBOOK_SPLIT_BY_TEXT)
+                || (!settings.audiobook_split_by_time
+                    && !settings.audiobook_split_by_text
+                    && settings.audiobook_split > 0
+                    && *parts == AUDIOBOOK_SPLIT_BY_PARTS)
+            {
+                selected_split_idx = idx;
+            }
+        }
+        SendMessageW(
+            combo_audio_split,
+            CB_SETCURSEL,
+            WPARAM(selected_split_idx),
+            LPARAM(0),
+        );
+
         SendMessageW(
             combo_audio_split_minutes,
-            CB_SETITEMDATA,
-            WPARAM(idx),
-            LPARAM(minutes as isize),
-        );
-        if minutes == settings.audiobook_split_minutes {
-            selected_minutes_idx = idx;
-        }
-    }
-    SendMessageW(
-        combo_audio_split_minutes,
-        CB_SETCURSEL,
-        WPARAM(selected_minutes_idx),
-        LPARAM(0),
-    );
-
-    let split_parts_value = if settings.audiobook_split == 0 {
-        2
-    } else {
-        settings.audiobook_split.clamp(1, 100)
-    };
-    let split_parts_wide = to_wide(&split_parts_value.to_string());
-    if let Err(_e) = SetWindowTextW(
-        edit_audio_split_parts_count,
-        PCWSTR(split_parts_wide.as_ptr()),
-    ) {}
-
-    SendMessageW(
-        combo_audio_split_start_number,
-        CB_RESETCONTENT,
-        WPARAM(0),
-        LPARAM(0),
-    );
-    let mut selected_start_idx = 0;
-    for number in 1..=99u32 {
-        let label = format!("{number:02}");
-        let idx = SendMessageW(
-            combo_audio_split_start_number,
-            CB_ADDSTRING,
+            CB_RESETCONTENT,
             WPARAM(0),
-            LPARAM(to_wide(&label).as_ptr() as isize),
-        )
-        .0 as usize;
+            LPARAM(0),
+        );
+        let mut selected_minutes_idx = 0;
+        for minutes in 1..=60u32 {
+            let label = format!("{minutes}");
+            let idx = SendMessageW(
+                combo_audio_split_minutes,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&label).as_ptr() as isize),
+            )
+            .0 as usize;
+            SendMessageW(
+                combo_audio_split_minutes,
+                CB_SETITEMDATA,
+                WPARAM(idx),
+                LPARAM(minutes as isize),
+            );
+            if minutes == settings.audiobook_split_minutes {
+                selected_minutes_idx = idx;
+            }
+        }
+        SendMessageW(
+            combo_audio_split_minutes,
+            CB_SETCURSEL,
+            WPARAM(selected_minutes_idx),
+            LPARAM(0),
+        );
+
+        let split_parts_value = if settings.audiobook_split == 0 {
+            2
+        } else {
+            settings.audiobook_split.clamp(1, 100)
+        };
+        let split_parts_wide = to_wide(&split_parts_value.to_string());
+        if let Err(_e) = SetWindowTextW(
+            edit_audio_split_parts_count,
+            PCWSTR(split_parts_wide.as_ptr()),
+        ) {}
+
         SendMessageW(
             combo_audio_split_start_number,
-            CB_SETITEMDATA,
-            WPARAM(idx),
-            LPARAM(number as isize),
+            CB_RESETCONTENT,
+            WPARAM(0),
+            LPARAM(0),
         );
-        if number == settings.audiobook_split_start_number {
-            selected_start_idx = idx;
+        let mut selected_start_idx = 0;
+        for number in 1..=99u32 {
+            let label = format!("{number:02}");
+            let idx = SendMessageW(
+                combo_audio_split_start_number,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&label).as_ptr() as isize),
+            )
+            .0 as usize;
+            SendMessageW(
+                combo_audio_split_start_number,
+                CB_SETITEMDATA,
+                WPARAM(idx),
+                LPARAM(number as isize),
+            );
+            if number == settings.audiobook_split_start_number {
+                selected_start_idx = idx;
+            }
         }
-    }
-    SendMessageW(
-        combo_audio_split_start_number,
-        CB_SETCURSEL,
-        WPARAM(selected_start_idx),
-        LPARAM(0),
-    );
+        SendMessageW(
+            combo_audio_split_start_number,
+            CB_SETCURSEL,
+            WPARAM(selected_start_idx),
+            LPARAM(0),
+        );
 
-    let split_text_wide = to_wide(&settings.audiobook_split_text);
-    if let Err(_e) = SetWindowTextW(edit_audio_split_text, PCWSTR(split_text_wide.as_ptr())) {
-        crate::log_debug(&format!("Error: {:?}", _e));
-    }
-    update_audio_split_visibility(hwnd);
+        let split_text_wide = to_wide(&settings.audiobook_split_text);
+        if let Err(_e) = SetWindowTextW(edit_audio_split_text, PCWSTR(split_text_wide.as_ptr())) {
+            crate::log_debug(&format!("Error: {:?}", _e));
+        }
+        update_audio_split_visibility(hwnd);
 
-    let cache_limit_text = settings.podcast_cache_limit_mb.to_string();
-    if let Err(_e) = SetWindowTextW(
-        edit_podcast_cache_limit,
-        PCWSTR(to_wide(&cache_limit_text).as_ptr()),
-    ) {}
-    if let Err(_e) = SetWindowTextW(
-        edit_podcastindex_key,
-        PCWSTR(to_wide(&settings.podcast_index_api_key).as_ptr()),
-    ) {}
-    let secret = crate::settings::decrypt_podcast_index_secret(&settings.podcast_index_api_secret)
-        .unwrap_or_default();
-    if let Err(_e) = SetWindowTextW(edit_podcastindex_secret, PCWSTR(to_wide(&secret).as_ptr())) {
-        crate::log_debug(&format!("Error: {:?}", _e));
-    }
+        let cache_limit_text = settings.podcast_cache_limit_mb.to_string();
+        if let Err(_e) = SetWindowTextW(
+            edit_podcast_cache_limit,
+            PCWSTR(to_wide(&cache_limit_text).as_ptr()),
+        ) {}
+        if let Err(_e) = SetWindowTextW(
+            edit_podcastindex_key,
+            PCWSTR(to_wide(&settings.podcast_index_api_key).as_ptr()),
+        ) {}
+        let secret =
+            crate::settings::decrypt_podcast_index_secret(&settings.podcast_index_api_secret)
+                .unwrap_or_default();
+        if let Err(_e) = SetWindowTextW(edit_podcastindex_secret, PCWSTR(to_wide(&secret).as_ptr()))
+        {
+            crate::log_debug(&format!("Error: {:?}", _e));
+        }
 
-    refresh_voices(hwnd);
+        refresh_voices(hwnd);
+    }
 }
 
 fn populate_voice_combo(

@@ -1755,310 +1755,314 @@ unsafe extern "system" fn stream_dialog_wndproc(
     crate::panic_guard::guard(
         "stream_dialog_wndproc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { stream_dialog_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || stream_dialog_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn stream_dialog_wndproc_inner(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let create_struct = lparam.0 as *const CREATESTRUCTW;
-            let init_ptr = (*create_struct).lpCreateParams as *mut StreamDialogInit;
-            if init_ptr.is_null() {
-                return LRESULT(0);
-            }
-            let init = Box::from_raw(init_ptr);
-            let hfont = with_state(init.parent, |state| state.hfont).unwrap_or(HFONT(0));
-
-            let url_label = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&i18n::tr(init.language, "stream_audio.url_label")).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                18,
-                90,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let url_edit = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                110,
-                16,
-                330,
-                22,
-                hwnd,
-                HMENU(STREAM_ID_URL as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let direct_play_check = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&i18n::tr(init.language, "stream_audio.direct_play")).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                110,
-                50,
-                330,
-                22,
-                hwnd,
-                HMENU(STREAM_ID_DIRECT_PLAY as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let format_label = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&i18n::tr(init.language, "stream_audio.format_label")).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                84,
-                90,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let format_combo = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                110,
-                82,
-                210,
-                180,
-                hwnd,
-                HMENU(STREAM_ID_FORMAT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let quality_label = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&i18n::tr(init.language, "stream_audio.quality_label")).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                116,
-                90,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let quality_combo = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                110,
-                114,
-                210,
-                180,
-                hwnd,
-                HMENU(STREAM_ID_QUALITY as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let ok_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&i18n::tr(init.language, "youtube.ok")).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                350,
-                146,
-                90,
-                28,
-                hwnd,
-                HMENU(STREAM_ID_OK as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let cancel_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&i18n::tr(init.language, "youtube.cancel")).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                350,
-                178,
-                90,
-                28,
-                hwnd,
-                HMENU(STREAM_ID_CANCEL as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            for control in [
-                url_label,
-                url_edit,
-                format_label,
-                format_combo,
-                quality_label,
-                quality_combo,
-                direct_play_check,
-                ok_button,
-                cancel_button,
-            ] {
-                if control.0 != 0 && hfont.0 != 0 {
-                    SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let create_struct = lparam.0 as *const CREATESTRUCTW;
+                let init_ptr = (*create_struct).lpCreateParams as *mut StreamDialogInit;
+                if init_ptr.is_null() {
+                    return LRESULT(0);
                 }
-            }
+                let init = Box::from_raw(init_ptr);
+                let hfont = with_state(init.parent, |state| state.hfont).unwrap_or(HFONT(0));
 
-            let items = StreamOutputFormat::combo_items(init.language);
-            for (label, _) in &items {
-                let wide = to_wide(label);
-                SendMessageW(
-                    format_combo,
-                    CB_ADDSTRING,
-                    WPARAM(0),
-                    LPARAM(wide.as_ptr() as isize),
-                );
-            }
-            let default_idx = items
-                .iter()
-                .position(|(_, format)| *format == init.default_format)
-                .unwrap_or(0);
-            SendMessageW(format_combo, CB_SETCURSEL, WPARAM(default_idx), LPARAM(0));
-
-            let state = Box::new(StreamDialogState {
-                parent: init.parent,
-                language: init.language,
-                url_edit,
-                format_combo,
-                quality_combo,
-                direct_play_check,
-                ok_button,
-                result: init.result.clone(),
-            });
-            refill_stream_quality_combo(&state, false);
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
-            SetFocus(url_edit);
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-            let cmd_id = wparam.0 & 0xffff;
-            let notify_code = (wparam.0 >> 16) & 0xffff;
-            if cmd_id == STREAM_ID_FORMAT && notify_code == CBN_SELCHANGE as usize {
-                if with_stream_dialog_state(hwnd, |state| {
-                    refill_stream_quality_combo(state, false);
-                })
-                .is_none()
-                {
-                    crate::log_debug("Failed to refresh stream quality combo");
-                }
-                return LRESULT(0);
-            }
-            if cmd_id == STREAM_ID_OK || cmd_id == 1 {
-                if with_stream_dialog_state(hwnd, |state| {
-                    let msg = i18n::tr(state.language, "stream_audio.progress_downloading");
-                    if !screen_reader_speak(&msg) {
-                        crate::log_debug("Screen reader speak failed");
-                    }
-                    let url = read_edit_text(state.url_edit);
-                    let format_idx =
-                        SendMessageW(state.format_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-                    let format = StreamOutputFormat::combo_items(state.language)
-                        .get(format_idx.max(0) as usize)
-                        .map(|(_, f)| *f)
-                        .unwrap_or(StreamOutputFormat::Auto);
-                    let quality_idx =
-                        SendMessageW(state.quality_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-                    let quality = stream_quality_items(state.language, format)
-                        .get(quality_idx.max(0) as usize)
-                        .map(|(_, q)| *q)
-                        .unwrap_or(StreamQualitySelection::Original);
-                    let direct_play =
-                        SendMessageW(state.direct_play_check, BM_GETCHECK, WPARAM(0), LPARAM(0)).0
-                            == BST_CHECKED.0 as isize;
-                    *state.result.lock().unwrap_or_else(|e| e.into_inner()) =
-                        Some(StreamDialogResult {
-                            url,
-                            format,
-                            quality,
-                            direct_play,
-                        });
-                })
-                .is_none()
-                {
-                    crate::log_debug("Failed to access stream dialog state");
-                }
-                crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
-                return LRESULT(0);
-            }
-            if cmd_id == STREAM_ID_CANCEL || cmd_id == 2 {
-                if with_stream_dialog_state(hwnd, |state| {
-                    *state.result.lock().unwrap_or_else(|e| e.into_inner()) = None;
-                })
-                .is_none()
-                {
-                    crate::log_debug("Failed to access stream dialog state");
-                }
-                crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
-                return LRESULT(0);
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_KEYDOWN => {
-            if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                crate::log_if_err!(PostMessageW(
+                let url_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&i18n::tr(init.language, "stream_audio.url_label")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    18,
+                    90,
+                    20,
                     hwnd,
-                    WM_COMMAND,
-                    WPARAM(STREAM_ID_CANCEL),
-                    LPARAM(0)
-                ));
-                return LRESULT(0);
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let url_edit = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    110,
+                    16,
+                    330,
+                    22,
+                    hwnd,
+                    HMENU(STREAM_ID_URL as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let direct_play_check = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(init.language, "stream_audio.direct_play")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    110,
+                    50,
+                    330,
+                    22,
+                    hwnd,
+                    HMENU(STREAM_ID_DIRECT_PLAY as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let format_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&i18n::tr(init.language, "stream_audio.format_label")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    84,
+                    90,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let format_combo = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    110,
+                    82,
+                    210,
+                    180,
+                    hwnd,
+                    HMENU(STREAM_ID_FORMAT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let quality_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(
+                        to_wide(&i18n::tr(init.language, "stream_audio.quality_label")).as_ptr(),
+                    ),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    116,
+                    90,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let quality_combo = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    110,
+                    114,
+                    210,
+                    180,
+                    hwnd,
+                    HMENU(STREAM_ID_QUALITY as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let ok_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(init.language, "youtube.ok")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    350,
+                    146,
+                    90,
+                    28,
+                    hwnd,
+                    HMENU(STREAM_ID_OK as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let cancel_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(init.language, "youtube.cancel")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    350,
+                    178,
+                    90,
+                    28,
+                    hwnd,
+                    HMENU(STREAM_ID_CANCEL as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                for control in [
+                    url_label,
+                    url_edit,
+                    format_label,
+                    format_combo,
+                    quality_label,
+                    quality_combo,
+                    direct_play_check,
+                    ok_button,
+                    cancel_button,
+                ] {
+                    if control.0 != 0 && hfont.0 != 0 {
+                        SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    }
+                }
+
+                let items = StreamOutputFormat::combo_items(init.language);
+                for (label, _) in &items {
+                    let wide = to_wide(label);
+                    SendMessageW(
+                        format_combo,
+                        CB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(wide.as_ptr() as isize),
+                    );
+                }
+                let default_idx = items
+                    .iter()
+                    .position(|(_, format)| *format == init.default_format)
+                    .unwrap_or(0);
+                SendMessageW(format_combo, CB_SETCURSEL, WPARAM(default_idx), LPARAM(0));
+
+                let state = Box::new(StreamDialogState {
+                    parent: init.parent,
+                    language: init.language,
+                    url_edit,
+                    format_combo,
+                    quality_combo,
+                    direct_play_check,
+                    ok_button,
+                    result: init.result.clone(),
+                });
+                refill_stream_quality_combo(&state, false);
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+                SetFocus(url_edit);
+                LRESULT(0)
             }
-            if wparam.0 as u32 == VK_RETURN.0 as u32 {
-                let ok = with_stream_dialog_state(hwnd, |state| state.ok_button).unwrap_or(HWND(0));
-                if GetFocus() == ok {
+            WM_COMMAND => {
+                let cmd_id = wparam.0 & 0xffff;
+                let notify_code = (wparam.0 >> 16) & 0xffff;
+                if cmd_id == STREAM_ID_FORMAT && notify_code == CBN_SELCHANGE as usize {
+                    if with_stream_dialog_state(hwnd, |state| {
+                        refill_stream_quality_combo(state, false);
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to refresh stream quality combo");
+                    }
+                    return LRESULT(0);
+                }
+                if cmd_id == STREAM_ID_OK || cmd_id == 1 {
+                    if with_stream_dialog_state(hwnd, |state| {
+                        let msg = i18n::tr(state.language, "stream_audio.progress_downloading");
+                        if !screen_reader_speak(&msg) {
+                            crate::log_debug("Screen reader speak failed");
+                        }
+                        let url = read_edit_text(state.url_edit);
+                        let format_idx =
+                            SendMessageW(state.format_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+                        let format = StreamOutputFormat::combo_items(state.language)
+                            .get(format_idx.max(0) as usize)
+                            .map(|(_, f)| *f)
+                            .unwrap_or(StreamOutputFormat::Auto);
+                        let quality_idx =
+                            SendMessageW(state.quality_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+                        let quality = stream_quality_items(state.language, format)
+                            .get(quality_idx.max(0) as usize)
+                            .map(|(_, q)| *q)
+                            .unwrap_or(StreamQualitySelection::Original);
+                        let direct_play = SendMessageW(
+                            state.direct_play_check,
+                            BM_GETCHECK,
+                            WPARAM(0),
+                            LPARAM(0),
+                        )
+                        .0 == BST_CHECKED.0 as isize;
+                        *state.result.lock().unwrap_or_else(|e| e.into_inner()) =
+                            Some(StreamDialogResult {
+                                url,
+                                format,
+                                quality,
+                                direct_play,
+                            });
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access stream dialog state");
+                    }
+                    crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
+                    return LRESULT(0);
+                }
+                if cmd_id == STREAM_ID_CANCEL || cmd_id == 2 {
+                    if with_stream_dialog_state(hwnd, |state| {
+                        *state.result.lock().unwrap_or_else(|e| e.into_inner()) = None;
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access stream dialog state");
+                    }
+                    crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_KEYDOWN => {
+                if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
                     crate::log_if_err!(PostMessageW(
                         hwnd,
                         WM_COMMAND,
-                        WPARAM(STREAM_ID_OK),
+                        WPARAM(STREAM_ID_CANCEL),
                         LPARAM(0)
                     ));
                     return LRESULT(0);
                 }
+                if wparam.0 as u32 == VK_RETURN.0 as u32 {
+                    let ok =
+                        with_stream_dialog_state(hwnd, |state| state.ok_button).unwrap_or(HWND(0));
+                    if GetFocus() == ok {
+                        crate::log_if_err!(PostMessageW(
+                            hwnd,
+                            WM_COMMAND,
+                            WPARAM(STREAM_ID_OK),
+                            LPARAM(0)
+                        ));
+                        return LRESULT(0);
+                    }
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_CLOSE => {
-            crate::log_if_err!(DestroyWindow(hwnd));
-            LRESULT(0)
-        }
-        WM_DESTROY => {
-            if with_stream_dialog_state(hwnd, |state| {
-                EnableWindow(state.parent, true);
-                SetForegroundWindow(state.parent);
-            })
-            .is_none()
-            {
-                crate::log_debug("Failed to access stream dialog state");
+            WM_CLOSE => {
+                crate::log_if_err!(DestroyWindow(hwnd));
+                LRESULT(0)
             }
-            LRESULT(0)
-        }
-        WM_NCDESTROY => {
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut StreamDialogState;
-            if !ptr.is_null() {
-                let _unused = Box::from_raw(ptr);
+            WM_DESTROY => {
+                if with_stream_dialog_state(hwnd, |state| {
+                    EnableWindow(state.parent, true);
+                    SetForegroundWindow(state.parent);
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access stream dialog state");
+                }
+                LRESULT(0)
             }
-            LRESULT(0)
+            WM_NCDESTROY => {
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut StreamDialogState;
+                if !ptr.is_null() {
+                    let _unused = Box::from_raw(ptr);
+                }
+                LRESULT(0)
+            }
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 

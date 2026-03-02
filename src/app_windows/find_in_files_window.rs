@@ -852,23 +852,17 @@ fn start_search(state: &mut FindInFilesState) {
     let labels = labels(state.language);
 
     if term.is_empty() {
-        unsafe {
-            crate::show_error(state.parent, state.language, &labels.empty_term);
-        }
+        crate::show_error(state.parent, state.language, &labels.empty_term);
         return;
     }
     if folder.is_empty() {
-        unsafe {
-            crate::show_error(state.parent, state.language, &labels.empty_folder);
-        }
+        crate::show_error(state.parent, state.language, &labels.empty_folder);
         return;
     }
 
     let folder_path = PathBuf::from(folder);
     if !folder_path.is_dir() {
-        unsafe {
-            crate::show_error(state.parent, state.language, &labels.invalid_folder);
-        }
+        crate::show_error(state.parent, state.language, &labels.invalid_folder);
         return;
     }
 

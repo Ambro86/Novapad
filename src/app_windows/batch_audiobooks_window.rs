@@ -1118,29 +1118,23 @@ fn start_batch(state: &mut BatchState) {
     }
     let labels = labels(state.language);
     if state.items.is_empty() {
-        unsafe {
-            show_error(state.hwnd, state.language, &labels.empty_queue);
-        }
+        show_error(state.hwnd, state.language, &labels.empty_queue);
         return;
     }
     let output_folder = read_control_text(state.output_edit);
     if output_folder.trim().is_empty() {
-        unsafe {
-            show_error(state.hwnd, state.language, &labels.no_output_folder);
-        }
+        show_error(state.hwnd, state.language, &labels.no_output_folder);
         return;
     }
     let output_folder = PathBuf::from(output_folder.trim());
     if !output_folder.exists()
         && let Err(err) = std::fs::create_dir_all(&output_folder)
     {
-        unsafe {
-            show_error(
-                state.hwnd,
-                state.language,
-                &format!("{}: {}", labels.invalid_output_folder, err),
-            );
-        }
+        show_error(
+            state.hwnd,
+            state.language,
+            &format!("{}: {}", labels.invalid_output_folder, err),
+        );
         return;
     }
     let format_sel =
@@ -1157,9 +1151,7 @@ fn start_batch(state: &mut BatchState) {
         .unwrap_or((TtsEngine::Edge, "it-IT-IsabellaNeural".to_string()))
     };
     if tts_engine == TtsEngine::Edge && format == AudioFormat::Wav {
-        unsafe {
-            show_error(state.hwnd, state.language, &labels.wav_not_supported);
-        }
+        show_error(state.hwnd, state.language, &labels.wav_not_supported);
         return;
     }
 

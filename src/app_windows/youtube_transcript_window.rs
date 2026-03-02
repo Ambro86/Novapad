@@ -854,9 +854,7 @@ fn start_load_languages(hwnd: HWND) -> bool {
                 }
                 Err(err) => {
                     crate::log_debug(&format!("yt-dlp download failed: {}", err));
-                    unsafe {
-                        show_error(hwnd, language, &labels_data.ytdlp_download_failed);
-                    }
+                    show_error(hwnd, language, &labels_data.ytdlp_download_failed);
                     return LoadResult {
                         transcripts: Vec::new(),
                         error: None,
@@ -1182,9 +1180,7 @@ fn start_load_transcript_text(
                     }
                     Err(err) => {
                         crate::log_debug(&format!("yt-dlp download failed: {}", err));
-                        unsafe {
-                            show_error(hwnd, language, &labels_data.ytdlp_download_failed);
-                        }
+                        show_error(hwnd, language, &labels_data.ytdlp_download_failed);
                         return TextLoadResult {
                             text: String::new(),
                             include_timestamps,
@@ -2864,23 +2860,19 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         .filter(|ch| !ch.is_whitespace())
         .collect();
     if url.is_empty() {
-        unsafe {
-            show_error(
-                parent,
-                language,
-                &i18n::tr(language, "stream_audio.invalid_url"),
-            );
-        }
+        show_error(
+            parent,
+            language,
+            &i18n::tr(language, "stream_audio.invalid_url"),
+        );
         return;
     }
     if !looks_like_valid_stream_url(&url) {
-        unsafe {
-            show_error(
-                parent,
-                language,
-                &i18n::tr(language, "stream_audio.invalid_url"),
-            );
-        }
+        show_error(
+            parent,
+            language,
+            &i18n::tr(language, "stream_audio.invalid_url"),
+        );
         return;
     }
 
@@ -2912,9 +2904,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         }
         Err(err) => {
             let message = i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)]);
-            unsafe {
-                show_error(parent, language, &message);
-            }
+            show_error(parent, language, &message);
             return;
         }
     };
@@ -2945,9 +2935,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             "stream_audio.download_failed",
             &[("err", &err.to_string())],
         );
-        unsafe {
-            show_error(parent, language, &message);
-        }
+        show_error(parent, language, &message);
         return;
     }
     let stamp = std::time::SystemTime::now()
@@ -3053,9 +3041,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 "stream_audio.download_failed",
                 &[("err", &err.to_string())],
             );
-            unsafe {
-                show_error(parent, language, &message);
-            }
+            show_error(parent, language, &message);
             return;
         }
     };
@@ -3064,17 +3050,15 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         Some(stderr) => stderr,
         None => {
             close_progress_dialog(progress);
-            unsafe {
-                show_error(
-                    parent,
+            show_error(
+                parent,
+                language,
+                &i18n::tr_f(
                     language,
-                    &i18n::tr_f(
-                        language,
-                        "stream_audio.download_failed",
-                        &[("err", "yt-dlp stderr unavailable")],
-                    ),
-                );
-            }
+                    "stream_audio.download_failed",
+                    &[("err", "yt-dlp stderr unavailable")],
+                ),
+            );
             return;
         }
     };
@@ -3198,17 +3182,15 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             }
             Err(err) => {
                 close_progress_dialog(progress);
-                unsafe {
-                    show_error(
-                        parent,
+                show_error(
+                    parent,
+                    language,
+                    &i18n::tr_f(
                         language,
-                        &i18n::tr_f(
-                            language,
-                            "stream_audio.download_failed",
-                            &[("err", &err.to_string())],
-                        ),
-                    );
-                }
+                        "stream_audio.download_failed",
+                        &[("err", &err.to_string())],
+                    ),
+                );
                 return;
             }
         }
@@ -3420,31 +3402,25 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 let message =
                     i18n::tr_f(language, "stream_audio.download_failed", &[("err", &msg)]);
                 close_progress_dialog(progress);
-                unsafe {
-                    show_error(parent, language, &message);
-                }
+                show_error(parent, language, &message);
                 return;
             }
             retry_path
         } else {
             let message = i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)]);
             close_progress_dialog(progress);
-            unsafe {
-                show_error(parent, language, &message);
-            }
+            show_error(parent, language, &message);
             return;
         }
     };
 
     let Some(downloaded_path) = downloaded_path else {
         close_progress_dialog(progress);
-        unsafe {
-            show_error(
-                parent,
-                language,
-                &i18n::tr(language, "stream_audio.no_output"),
-            );
-        }
+        show_error(
+            parent,
+            language,
+            &i18n::tr(language, "stream_audio.no_output"),
+        );
         return;
     };
     let final_path = if let Some(convert_settings) = dialog_data
@@ -3503,13 +3479,11 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                     converted_path
                 }
                 Err(err) => {
-                    unsafe {
-                        show_error(
-                            parent,
-                            language,
-                            &i18n::tr_f(language, "stream_audio.convert_failed", &[("err", &err)]),
-                        );
-                    }
+                    show_error(
+                        parent,
+                        language,
+                        &i18n::tr_f(language, "stream_audio.convert_failed", &[("err", &err)]),
+                    );
                     return;
                 }
             }
@@ -3648,9 +3622,7 @@ fn check_ytdlp_update(hwnd: HWND, language: Language, labels: &Labels, path: &Pa
     close_progress_dialog(progress);
     if let Err(err) = result {
         crate::log_debug(&format!("yt-dlp update failed: {}", err));
-        unsafe {
-            show_error(hwnd, language, &labels.ytdlp_update_failed);
-        }
+        show_error(hwnd, language, &labels.ytdlp_update_failed);
     }
 }
 

@@ -917,7 +917,7 @@ fn find_next_regex(
         Ok(regex) => regex,
         Err(err) => {
             let message = i18n::tr_f(language, "find.regex_error", &[("err", &err)]);
-            unsafe { show_error(hwnd, language, &message) };
+            show_error(hwnd, language, &message);
             return false;
         }
     };
@@ -1037,7 +1037,7 @@ fn replace_selection_if_match_regex(
         Ok(regex) => regex,
         Err(err) => {
             let message = i18n::tr_f(language, "find.regex_error", &[("err", &err)]);
-            unsafe { show_error(hwnd, language, &message) };
+            show_error(hwnd, language, &message);
             return false;
         }
     };
@@ -1094,7 +1094,7 @@ fn replace_all_regex(
         Ok(regex) => regex,
         Err(err) => {
             let message = i18n::tr_f(language, "find.regex_error", &[("err", &err)]);
-            unsafe { show_error(hwnd, language, &message) };
+            show_error(hwnd, language, &message);
             return;
         }
     };

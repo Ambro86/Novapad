@@ -10623,7 +10623,7 @@ fn export_diagnostics_dialog(hwnd: HWND) {
     }
 }
 
-pub(crate) unsafe fn show_error(hwnd: HWND, language: Language, message: &str) {
+pub(crate) fn show_error(hwnd: HWND, language: Language, message: &str) {
     show_error_with_id(hwnd, language, message, None);
 }
 

@@ -434,9 +434,7 @@ pub fn start_tts_from_caret(hwnd: HWND) {
         unsafe { with_state(hwnd, |state| state.settings.clone()) }.unwrap_or_default();
     text = crate::dialogue_voice::apply_dialogue_tags_from_settings(&text, &dialogue_settings);
     if text.trim().is_empty() {
-        unsafe {
-            show_error(hwnd, language, &settings::tts_no_text_message(language));
-        }
+        show_error(hwnd, language, &settings::tts_no_text_message(language));
         return;
     }
     let voice = unsafe {
@@ -3969,9 +3967,7 @@ fn start_audiobook_with_text(
 ) {
     let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     if text.trim().is_empty() {
-        unsafe {
-            show_error(hwnd, language, &settings::tts_no_text_message(language));
-        }
+        show_error(hwnd, language, &settings::tts_no_text_message(language));
         return;
     }
 
@@ -4068,9 +4064,7 @@ fn start_audiobook_with_text(
     if use_epub_split {
         let Some(chapters) = epub_chapters.as_ref() else {
             crate::log_debug("EPUB split requested without chapter data.");
-            unsafe {
-                show_error(hwnd, language, &settings::tts_no_text_message(language));
-            }
+            show_error(hwnd, language, &settings::tts_no_text_message(language));
             return;
         };
         if mixed_needed {
@@ -4089,9 +4083,7 @@ fn start_audiobook_with_text(
             );
         }
         if marker_parts.is_none() && mixed_marker_parts.is_none() {
-            unsafe {
-                show_error(hwnd, language, &settings::tts_no_text_message(language));
-            }
+            show_error(hwnd, language, &settings::tts_no_text_message(language));
             return;
         }
     }
@@ -4252,13 +4244,11 @@ fn start_audiobook_with_text(
         if let Some(parent) = nested_output.parent()
             && let Err(e) = std::fs::create_dir_all(parent)
         {
-            unsafe {
-                show_error(
-                    hwnd,
-                    language,
-                    &i18n::tr_f(language, "app.error_save_file", &[("err", &e.to_string())]),
-                );
-            }
+            show_error(
+                hwnd,
+                language,
+                &i18n::tr_f(language, "app.error_save_file", &[("err", &e.to_string())]),
+            );
             return;
         }
         output = nested_output;
@@ -4683,9 +4673,7 @@ pub fn start_audiobook(hwnd: HWND) {
                 epub_chapters = Some(chapters);
             }
             Err(err) => {
-                unsafe {
-                    show_error(hwnd, language, &err);
-                }
+                show_error(hwnd, language, &err);
                 return;
             }
         }
@@ -4714,9 +4702,7 @@ pub fn start_audiobook_from_selection(hwnd: HWND) {
     let Some(text) = text else {
         let language =
             unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
-        unsafe {
-            show_error(hwnd, language, &settings::tts_no_text_message(language));
-        }
+        show_error(hwnd, language, &settings::tts_no_text_message(language));
         return;
     };
     let suggested_name = unsafe {

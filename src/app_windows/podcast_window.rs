@@ -1697,9 +1697,7 @@ fn update_status_from_recorder(state: &mut PodcastState) {
             }
         }
         if let Some(err) = recorder.take_error() {
-            unsafe {
-                show_error(state.parent, state.language, &err);
-            }
+            show_error(state.parent, state.language, &err);
         }
     } else {
         update_status_text(state, RecorderStatus::Idle);
@@ -1751,9 +1749,7 @@ fn restart_mic_monitor(state: &mut PodcastState) {
                     LPARAM(0),
                 );
             }
-            unsafe {
-                show_error(state.parent, state.language, &e);
-            }
+            show_error(state.parent, state.language, &e);
         }
     }
 }
@@ -1798,13 +1794,11 @@ fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
         && let Err(err) =
             probe_device_with_name(&mic_device_id, &selected_device_name(state, true), false)
     {
-        unsafe {
-            show_error(
-                state.parent,
-                state.language,
-                &format!("{} {}", labels.error_microphone, err),
-            );
-        }
+        show_error(
+            state.parent,
+            state.language,
+            &format!("{} {}", labels.error_microphone, err),
+        );
         if include_system {
             unsafe {
                 SendMessageW(
@@ -1820,13 +1814,11 @@ fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
         && let Err(err) =
             probe_device_with_name(&system_device_id, &selected_device_name(state, false), true)
     {
-        unsafe {
-            show_error(
-                state.parent,
-                state.language,
-                &format!("{} {}", labels.error_system_audio, err),
-            );
-        }
+        show_error(
+            state.parent,
+            state.language,
+            &format!("{} {}", labels.error_system_audio, err),
+        );
         if include_mic {
             unsafe {
                 SendMessageW(
@@ -1887,9 +1879,7 @@ fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
             }
         }
         Err(err) => {
-            unsafe {
-                show_error(state.parent, state.language, &err);
-            }
+            show_error(state.parent, state.language, &err);
             update_recording_controls(state);
         }
     }

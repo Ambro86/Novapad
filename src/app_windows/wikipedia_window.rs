@@ -507,19 +507,21 @@ unsafe extern "system" fn tab_subclass_proc(
     crate::panic_guard::guard(
         "tab_subclass_proc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { tab_subclass_proc_inner(hwnd, msg, wparam, lparam) },
+        || tab_subclass_proc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if msg == windows::Win32::UI::WindowsAndMessaging::WM_KEYDOWN {
         let key = wparam.0 as u16;
         if key == windows::Win32::UI::Input::KeyboardAndMouse::VK_TAB.0 {
-            let shift_down = windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(
-                windows::Win32::UI::Input::KeyboardAndMouse::VK_SHIFT.0 as i32,
-            ) & 0x8000u16 as i16
+            let shift_down = unsafe {
+                windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(
+                    windows::Win32::UI::Input::KeyboardAndMouse::VK_SHIFT.0 as i32,
+                )
+            } & 0x8000u16 as i16
                 != 0;
-            let parent = windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd);
+            let parent = unsafe { windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd) };
             if parent.0 != 0 {
                 focus_next_control(parent, hwnd, shift_down);
                 return LRESULT(0);
@@ -537,28 +539,32 @@ unsafe fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         return LRESULT(0);
     }
     if msg == windows::Win32::UI::WindowsAndMessaging::WM_GETDLGCODE {
-        let id = GetDlgCtrlID(hwnd) as usize;
+        let id = unsafe { GetDlgCtrlID(hwnd) as usize };
         if id == WIKIPEDIA_CLOSE_ID || id == WIKIPEDIA_SEARCH_ID || id == WIKIPEDIA_RESULTS_ID {
             return LRESULT(windows::Win32::UI::WindowsAndMessaging::DLGC_WANTALLKEYS as isize);
         }
     }
-    let prev = windows::Win32::UI::WindowsAndMessaging::GetWindowLongPtrW(
-        hwnd,
-        windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
-    );
+    let prev = unsafe {
+        windows::Win32::UI::WindowsAndMessaging::GetWindowLongPtrW(
+            hwnd,
+            windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+        )
+    };
     if prev == 0 {
-        return DefWindowProcW(hwnd, msg, wparam, lparam);
+        return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
     }
-    windows::Win32::UI::WindowsAndMessaging::CallWindowProcW(
-        Some(std::mem::transmute::<
-            isize,
-            unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
-        >(prev)),
-        hwnd,
-        msg,
-        wparam,
-        lparam,
-    )
+    unsafe {
+        windows::Win32::UI::WindowsAndMessaging::CallWindowProcW(
+            Some(std::mem::transmute::<
+                isize,
+                unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
+            >(prev)),
+            hwnd,
+            msg,
+            wparam,
+            lparam,
+        )
+    }
 }
 
 fn focus_next_control(parent: HWND, current: HWND, shift_down: bool) {

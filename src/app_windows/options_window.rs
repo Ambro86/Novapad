@@ -6805,7 +6805,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
     refresh_voices(hwnd);
 }
 
-unsafe fn populate_voice_combo(
+fn populate_voice_combo(
     combo_voice: HWND,
     voices: &[VoiceInfo],
     selected: &str,
@@ -6813,63 +6813,65 @@ unsafe fn populate_voice_combo(
     language_filter: Option<&str>,
     labels: &OptionsLabels,
 ) {
-    SendMessageW(combo_voice, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    if voices.is_empty() {
-        let label = &labels.voices_empty;
-        // We could also check if it's loading, but SAPI loads fast.
-        // For Edge, it might be loading.
-        // We can check if "loading" logic is needed, but "voices_empty" is safe default.
-        SendMessageW(
-            combo_voice,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(to_wide(label).as_ptr() as isize),
-        );
-        SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
-        return;
-    }
-    let mut selected_index: Option<usize> = None;
-    let mut combo_index = 0usize;
-
-    for (voice_index, voice) in voices.iter().enumerate() {
-        if only_multilingual && !voice.is_multilingual {
-            continue;
-        }
-        if let Some(filter) = language_filter {
-            let Some(code) = voice_locale_language_code(&voice.locale) else {
-                continue;
-            };
-            if code != filter {
-                continue;
-            }
-        }
-        let label = format!("{} ({})", voice.short_name, voice.locale);
-        let wide = to_wide(&label);
-        let idx = SendMessageW(
-            combo_voice,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(wide.as_ptr() as isize),
-        )
-        .0;
-        if idx >= 0 {
+    unsafe {
+        SendMessageW(combo_voice, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        if voices.is_empty() {
+            let label = &labels.voices_empty;
+            // We could also check if it's loading, but SAPI loads fast.
+            // For Edge, it might be loading.
+            // We can check if "loading" logic is needed, but "voices_empty" is safe default.
             SendMessageW(
                 combo_voice,
-                CB_SETITEMDATA,
-                WPARAM(idx as usize),
-                LPARAM(voice_index as isize),
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(label).as_ptr() as isize),
             );
-            if voice.short_name == selected {
-                selected_index = Some(combo_index);
-            }
-            combo_index += 1;
+            SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+            return;
         }
-    }
+        let mut selected_index: Option<usize> = None;
+        let mut combo_index = 0usize;
 
-    if let Some(idx) = selected_index {
-        SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(idx), LPARAM(0));
-    } else if combo_index > 0 {
-        SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+        for (voice_index, voice) in voices.iter().enumerate() {
+            if only_multilingual && !voice.is_multilingual {
+                continue;
+            }
+            if let Some(filter) = language_filter {
+                let Some(code) = voice_locale_language_code(&voice.locale) else {
+                    continue;
+                };
+                if code != filter {
+                    continue;
+                }
+            }
+            let label = format!("{} ({})", voice.short_name, voice.locale);
+            let wide = to_wide(&label);
+            let idx = SendMessageW(
+                combo_voice,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(wide.as_ptr() as isize),
+            )
+            .0;
+            if idx >= 0 {
+                SendMessageW(
+                    combo_voice,
+                    CB_SETITEMDATA,
+                    WPARAM(idx as usize),
+                    LPARAM(voice_index as isize),
+                );
+                if voice.short_name == selected {
+                    selected_index = Some(combo_index);
+                }
+                combo_index += 1;
+            }
+        }
+
+        if let Some(idx) = selected_index {
+            SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(idx), LPARAM(0));
+        } else if combo_index > 0 {
+            SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+        }
     }
 }
 

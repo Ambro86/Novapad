@@ -480,15 +480,19 @@ unsafe fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
                 let button_height = 28;
                 let margin = 12;
                 let edit_height = (height - button_height - (margin * 2)).max(0);
-                crate::log_if_err!(MoveWindow(state.edit, 0, 0, width, edit_height, true));
-                crate::log_if_err!(MoveWindow(
-                    state.ok_button,
-                    width - button_width - margin,
-                    edit_height + margin,
-                    button_width,
-                    button_height,
-                    true,
-                ));
+                crate::log_if_err!(unsafe {
+                    MoveWindow(state.edit, 0, 0, width, edit_height, true)
+                });
+                crate::log_if_err!(unsafe {
+                    MoveWindow(
+                        state.ok_button,
+                        width - button_width - margin,
+                        edit_height + margin,
+                        button_width,
+                        button_height,
+                        true,
+                    )
+                });
             })
             .is_none()
             {
@@ -598,81 +602,82 @@ unsafe extern "system" fn readonly_text_wndproc(
     crate::panic_guard::guard(
         "readonly_text_wndproc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { readonly_text_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || readonly_text_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn readonly_text_wndproc_inner(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
+fn readonly_text_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_CREATE => {
             let create_struct = lparam.0 as *const CREATESTRUCTW;
-            let init_ptr = (*create_struct).lpCreateParams as *mut ReadonlyTextInit;
+            let init_ptr = unsafe { (*create_struct).lpCreateParams as *mut ReadonlyTextInit };
             if init_ptr.is_null() {
                 return LRESULT(0);
             }
-            let init = Box::from_raw(init_ptr);
+            let init = unsafe { Box::from_raw(init_ptr) };
 
-            let edit = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD
-                    | WS_VISIBLE
-                    | WS_VSCROLL
-                    | WINDOW_STYLE(ES_MULTILINE as u32)
-                    | WINDOW_STYLE(ES_AUTOVSCROLL as u32)
-                    | WINDOW_STYLE(ES_WANTRETURN as u32)
-                    | WS_TABSTOP,
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            SendMessageW(
-                edit,
-                windows::Win32::UI::Controls::EM_SETREADONLY,
-                WPARAM(1),
-                LPARAM(0),
-            );
+            let edit = unsafe {
+                CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_VSCROLL
+                        | WINDOW_STYLE(ES_MULTILINE as u32)
+                        | WINDOW_STYLE(ES_AUTOVSCROLL as u32)
+                        | WINDOW_STYLE(ES_WANTRETURN as u32)
+                        | WS_TABSTOP,
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
+            unsafe {
+                SendMessageW(
+                    edit,
+                    windows::Win32::UI::Controls::EM_SETREADONLY,
+                    WPARAM(1),
+                    LPARAM(0),
+                );
+            }
 
-            let ok_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                w!("OK"),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(READONLY_TEXT_ID_OK as isize),
-                HINSTANCE(0),
-                None,
-            );
+            let ok_button = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    w!("OK"),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(READONLY_TEXT_ID_OK as isize),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
 
             let content_wide = to_wide(&init.content);
-            let _res = SetWindowTextW(edit, PCWSTR(content_wide.as_ptr()));
-            SetFocus(edit);
+            let _res = unsafe { SetWindowTextW(edit, PCWSTR(content_wide.as_ptr())) };
+            unsafe { SetFocus(edit) };
 
             let state = Box::new(ReadonlyTextState {
-                parent: (*create_struct).hwndParent,
+                parent: unsafe { (*create_struct).hwndParent },
                 edit,
                 ok_button,
             });
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+            unsafe { SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize) };
             LRESULT(0)
         }
         WM_SETFOCUS => {
-            if with_readonly_text_state(hwnd, |state| SetFocus(state.edit)).is_none() {
+            if with_readonly_text_state(hwnd, |state| unsafe { SetFocus(state.edit) }).is_none() {
                 crate::log_debug("Failed to access readonly text state");
             }
             LRESULT(0)
@@ -680,10 +685,10 @@ unsafe fn readonly_text_wndproc_inner(
         WM_COMMAND => {
             let cmd_id = wparam.0 & 0xffff;
             if cmd_id == READONLY_TEXT_ID_OK || cmd_id == IDCANCEL.0 as usize {
-                crate::log_if_err!(DestroyWindow(hwnd));
+                crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
                 return LRESULT(0);
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
+            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
         }
         WM_SIZE => {
             let width = (lparam.0 & 0xffff) as i32;
@@ -693,15 +698,19 @@ unsafe fn readonly_text_wndproc_inner(
                 let button_height = 28;
                 let margin = 12;
                 let edit_height = (height - button_height - (margin * 2)).max(0);
-                crate::log_if_err!(MoveWindow(state.edit, 0, 0, width, edit_height, true));
-                crate::log_if_err!(MoveWindow(
-                    state.ok_button,
-                    width - button_width - margin,
-                    edit_height + margin,
-                    button_width,
-                    button_height,
-                    true,
-                ));
+                crate::log_if_err!(unsafe {
+                    MoveWindow(state.edit, 0, 0, width, edit_height, true)
+                });
+                crate::log_if_err!(unsafe {
+                    MoveWindow(
+                        state.ok_button,
+                        width - button_width - margin,
+                        edit_height + margin,
+                        button_width,
+                        button_height,
+                        true,
+                    )
+                });
             })
             .is_none()
             {
@@ -711,11 +720,11 @@ unsafe fn readonly_text_wndproc_inner(
         }
         WM_NCDESTROY => {
             unregister_readonly_text_window(hwnd);
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ReadonlyTextState;
+            let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ReadonlyTextState };
             if !ptr.is_null() {
-                let state = Box::from_raw(ptr);
+                let state = unsafe { Box::from_raw(ptr) };
                 if state.parent.0 != 0 {
-                    SetForegroundWindow(state.parent);
+                    unsafe { SetForegroundWindow(state.parent) };
                     crate::app_windows::podcasts_window::focus_library(state.parent);
                     crate::app_windows::rss_window::focus_library(state.parent);
                 }
@@ -723,14 +732,14 @@ unsafe fn readonly_text_wndproc_inner(
             LRESULT(0)
         }
         WM_CLOSE => {
-            crate::log_if_err!(DestroyWindow(hwnd));
+            crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
             LRESULT(0)
         }
         WM_KEYDOWN => {
             if wparam.0 as u32 == VK_RETURN.0 as u32 {
                 if with_readonly_text_state(hwnd, |state| {
-                    if GetFocus() == state.ok_button {
-                        crate::log_if_err!(DestroyWindow(hwnd));
+                    if unsafe { GetFocus() } == state.ok_button {
+                        crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
                     }
                 })
                 .is_none()
@@ -739,9 +748,9 @@ unsafe fn readonly_text_wndproc_inner(
                 }
                 return LRESULT(0);
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
+            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+        _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }
 }
 

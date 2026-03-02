@@ -427,11 +427,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
     crate::panic_guard::guard(
         "dialogue_voice_window_wndproc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { wndproc_inner(hwnd, msg, wparam, lparam) },
+        || wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_CREATE => {
             let cs = lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;

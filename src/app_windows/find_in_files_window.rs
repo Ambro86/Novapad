@@ -258,7 +258,7 @@ unsafe extern "system" fn find_in_files_wndproc(
     crate::panic_guard::guard(
         "find_in_files_wndproc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { find_in_files_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || find_in_files_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
@@ -280,196 +280,215 @@ pub(crate) fn focus_find_in_files_results() -> bool {
     true
 }
 
-unsafe fn find_in_files_wndproc_inner(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
+fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_CREATE => {
             let create_struct =
                 lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
-            let init_ptr = (*create_struct).lpCreateParams as *mut FindInFilesInit;
+            let init_ptr = unsafe { (*create_struct).lpCreateParams as *mut FindInFilesInit };
             if init_ptr.is_null() {
                 return LRESULT(0);
             }
             let init = unsafe { Box::from_raw(init_ptr) };
             let labels = labels(init.language);
-            let hfont = with_state(init.parent, |state| state.hfont).unwrap_or(HFONT(0));
+            let hfont = unsafe { with_state(init.parent, |state| state.hfont) }.unwrap_or(HFONT(0));
 
-            let term_label = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.term_label).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                14,
-                160,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let term_edit = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_EDIT,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                16,
-                36,
-                560,
-                24,
-                hwnd,
-                HMENU(FIND_IN_FILES_ID_TERM as isize),
-                HINSTANCE(0),
-                None,
-            );
+            let term_label = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.term_label).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    14,
+                    160,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
+            let term_edit = unsafe {
+                CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_EDIT,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    16,
+                    36,
+                    560,
+                    24,
+                    hwnd,
+                    HMENU(FIND_IN_FILES_ID_TERM as isize),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
 
-            let folder_label = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.folder_label).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                70,
-                160,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let folder_edit = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_EDIT,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                16,
-                92,
-                440,
-                24,
-                hwnd,
-                HMENU(FIND_IN_FILES_ID_FOLDER as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let browse_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.browse).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                464,
-                92,
-                112,
-                24,
-                hwnd,
-                HMENU(FIND_IN_FILES_ID_BROWSE as isize),
-                HINSTANCE(0),
-                None,
-            );
+            let folder_label = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.folder_label).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    70,
+                    160,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
+            let folder_edit = unsafe {
+                CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_EDIT,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    16,
+                    92,
+                    440,
+                    24,
+                    hwnd,
+                    HMENU(FIND_IN_FILES_ID_FOLDER as isize),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
+            let browse_button = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.browse).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    464,
+                    92,
+                    112,
+                    24,
+                    hwnd,
+                    HMENU(FIND_IN_FILES_ID_BROWSE as isize),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
 
-            let search_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.search).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                464,
-                124,
-                112,
-                26,
-                hwnd,
-                HMENU(FIND_IN_FILES_ID_SEARCH as isize),
-                HINSTANCE(0),
-                None,
-            );
+            let search_button = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.search).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    464,
+                    124,
+                    112,
+                    26,
+                    hwnd,
+                    HMENU(FIND_IN_FILES_ID_SEARCH as isize),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
 
-            let progress_label = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&format!("{} 0%", &labels.progress)).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                126,
-                220,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
+            let progress_label = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&format!("{} 0%", &labels.progress)).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    126,
+                    220,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
 
-            let progress_bar = CreateWindowExW(
-                Default::default(),
-                PROGRESS_CLASSW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                148,
-                560,
-                18,
-                hwnd,
-                HMENU(FIND_IN_FILES_ID_PROGRESS as isize),
-                HINSTANCE(0),
-                None,
-            );
-            SendMessageW(
-                progress_bar,
-                PBM_SETRANGE,
-                WPARAM(0),
-                LPARAM(((0u16 as u32) | ((100u16 as u32) << 16)) as isize),
-            );
+            let progress_bar = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    PROGRESS_CLASSW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    148,
+                    560,
+                    18,
+                    hwnd,
+                    HMENU(FIND_IN_FILES_ID_PROGRESS as isize),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
+            unsafe {
+                SendMessageW(
+                    progress_bar,
+                    PBM_SETRANGE,
+                    WPARAM(0),
+                    LPARAM(((0u16 as u32) | ((100u16 as u32) << 16)) as isize),
+                )
+            };
 
-            let results_label = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.results).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                176,
-                160,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let results_tree = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("SysTreeView32"),
-                PCWSTR::null(),
-                WS_CHILD
-                    | WS_VISIBLE
-                    | WS_TABSTOP
-                    | WS_VSCROLL
-                    | WINDOW_STYLE(
-                        TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | TVS_SHOWSELALWAYS,
-                    ),
-                16,
-                198,
-                560,
-                160,
-                hwnd,
-                HMENU(FIND_IN_FILES_ID_RESULTS as isize),
-                HINSTANCE(0),
-                None,
-            );
+            let results_label = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.results).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    176,
+                    160,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
+            let results_tree = unsafe {
+                CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("SysTreeView32"),
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WS_VSCROLL
+                        | WINDOW_STYLE(
+                            TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | TVS_SHOWSELALWAYS,
+                        ),
+                    16,
+                    198,
+                    560,
+                    160,
+                    hwnd,
+                    HMENU(FIND_IN_FILES_ID_RESULTS as isize),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
 
-            let go_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.go).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                464,
-                362,
-                112,
-                26,
-                hwnd,
-                HMENU(FIND_IN_FILES_ID_GO as isize),
-                HINSTANCE(0),
-                None,
-            );
+            let go_button = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.go).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    464,
+                    362,
+                    112,
+                    26,
+                    hwnd,
+                    HMENU(FIND_IN_FILES_ID_GO as isize),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
 
             for control in [
                 term_label,
@@ -485,11 +504,13 @@ unsafe fn find_in_files_wndproc_inner(
                 go_button,
             ] {
                 if control.0 != 0 && hfont.0 != 0 {
-                    SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    unsafe {
+                        SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1))
+                    };
                 }
             }
 
-            SetFocus(term_edit);
+            unsafe { SetFocus(term_edit) };
 
             let state = Box::new(FindInFilesState {
                 hwnd,
@@ -509,11 +530,13 @@ unsafe fn find_in_files_wndproc_inner(
                 searching: false,
                 cancel_flag: None,
             });
-            SetWindowLongPtrW(
-                hwnd,
-                windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
-                Box::into_raw(state) as isize,
-            );
+            unsafe {
+                SetWindowLongPtrW(
+                    hwnd,
+                    windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+                    Box::into_raw(state) as isize,
+                )
+            };
 
             if with_find_state(hwnd, |state| {
                 apply_cache(state);
@@ -531,10 +554,12 @@ unsafe fn find_in_files_wndproc_inner(
                 if with_find_state(hwnd, |state| {
                     if let Some(folder) = browse_for_folder(hwnd, state.language) {
                         let wide = to_wide(folder.to_string_lossy().as_ref());
-                        if let Err(_e) = SetWindowTextW(state.folder_edit, PCWSTR(wide.as_ptr())) {
+                        if let Err(_e) =
+                            unsafe { SetWindowTextW(state.folder_edit, PCWSTR(wide.as_ptr())) }
+                        {
                             crate::log_debug(&format!("Error: {:?}", _e));
                         }
-                        SetFocus(state.term_edit);
+                        unsafe { SetFocus(state.term_edit) };
                     }
                 })
                 .is_none()
@@ -561,19 +586,19 @@ unsafe fn find_in_files_wndproc_inner(
                 }
                 LRESULT(0)
             } else {
-                DefWindowProcW(hwnd, msg, wparam, lparam)
+                unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
             }
         }
         WM_KEYDOWN => {
             if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                if let Err(_e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
+                if let Err(_e) = unsafe { PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) } {
                     crate::log_debug(&format!("Error: {:?}", _e));
                 }
                 return LRESULT(0);
             }
             if wparam.0 as u32 == VK_RETURN.0 as u32 {
                 if with_find_state(hwnd, |state| {
-                    let focus = GetFocus();
+                    let focus = unsafe { GetFocus() };
                     if focus == state.results_tree {
                         open_selected_result(state);
                     } else {
@@ -586,7 +611,7 @@ unsafe fn find_in_files_wndproc_inner(
                 }
                 return LRESULT(0);
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
+            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
         }
         WM_NOTIFY => {
             let hdr = lparam.0 as *const NMHDR;
@@ -657,7 +682,7 @@ unsafe fn find_in_files_wndproc_inner(
                     }
                 }
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
+            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
         }
         WM_FIND_IN_FILES_PROGRESS => {
             let percent = wparam.0 as u32;
@@ -710,12 +735,12 @@ unsafe fn find_in_files_wndproc_inner(
             {
                 crate::log_debug("Failed to access find state");
             }
-            crate::log_if_err!(DestroyWindow(hwnd));
+            crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
             LRESULT(0)
         }
         WM_DESTROY => {
             if with_find_state(hwnd, |state| {
-                SetForegroundWindow(state.parent);
+                unsafe { SetForegroundWindow(state.parent) };
             })
             .is_none()
             {
@@ -724,15 +749,16 @@ unsafe fn find_in_files_wndproc_inner(
             LRESULT(0)
         }
         WM_NCDESTROY => {
-            let ptr =
+            let ptr = unsafe {
                 GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
-                    as *mut FindInFilesState;
+                    as *mut FindInFilesState
+            };
             if !ptr.is_null() {
-                let _unused_box = Box::from_raw(ptr);
+                let _unused_box = unsafe { Box::from_raw(ptr) };
             }
             LRESULT(0)
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+        _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }
 }
 

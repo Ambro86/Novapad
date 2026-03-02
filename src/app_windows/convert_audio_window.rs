@@ -230,457 +230,465 @@ unsafe extern "system" fn convert_wndproc(
     crate::panic_guard::guard(
         "convert_wndproc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { convert_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || convert_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn convert_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let cs = &*(lparam.0 as *const CREATESTRUCTW);
-            let parent = cs.hwndParent;
-            let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
-            let labels = labels(language);
-            let hfont = with_state(parent, |state| state.hfont).unwrap_or(HFONT(0));
+fn convert_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let cs = &*(lparam.0 as *const CREATESTRUCTW);
+                let parent = cs.hwndParent;
+                let language =
+                    with_state(parent, |state| state.settings.language).unwrap_or_default();
+                let labels = labels(language);
+                let hfont = with_state(parent, |state| state.hfont).unwrap_or(HFONT(0));
 
-            let input_label = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.input).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                18,
-                120,
-                18,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let input_edit = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_EDIT,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                16,
-                38,
-                380,
-                24,
-                hwnd,
-                HMENU(CONVERT_ID_INPUT_EDIT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let input_browse = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.browse).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                404,
-                38,
-                90,
-                24,
-                hwnd,
-                HMENU(CONVERT_ID_INPUT_BROWSE as isize),
-                HINSTANCE(0),
-                None,
-            );
+                let input_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.input).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    18,
+                    120,
+                    18,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let input_edit = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_EDIT,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    16,
+                    38,
+                    380,
+                    24,
+                    hwnd,
+                    HMENU(CONVERT_ID_INPUT_EDIT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let input_browse = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.browse).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    404,
+                    38,
+                    90,
+                    24,
+                    hwnd,
+                    HMENU(CONVERT_ID_INPUT_BROWSE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
 
-            let output_label = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.output).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                70,
-                120,
-                18,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let output_edit = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_EDIT,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                16,
-                90,
-                380,
-                24,
-                hwnd,
-                HMENU(CONVERT_ID_OUTPUT_EDIT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let output_browse = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.browse).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                404,
-                90,
-                90,
-                24,
-                hwnd,
-                HMENU(CONVERT_ID_OUTPUT_BROWSE as isize),
-                HINSTANCE(0),
-                None,
-            );
+                let output_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.output).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    70,
+                    120,
+                    18,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let output_edit = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_EDIT,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    16,
+                    90,
+                    380,
+                    24,
+                    hwnd,
+                    HMENU(CONVERT_ID_OUTPUT_EDIT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let output_browse = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.browse).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    404,
+                    90,
+                    90,
+                    24,
+                    hwnd,
+                    HMENU(CONVERT_ID_OUTPUT_BROWSE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
 
-            let format_label = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.format).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                122,
-                120,
-                18,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let format_combo = CreateWindowExW(
-                Default::default(),
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                140,
-                118,
-                160,
-                200,
-                hwnd,
-                HMENU(CONVERT_ID_FORMAT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            SendMessageW(
-                format_combo,
-                CB_ADDSTRING,
-                WPARAM(0),
-                LPARAM(to_wide(&labels.format_mp3).as_ptr() as isize),
-            );
-            SendMessageW(
-                format_combo,
-                CB_ADDSTRING,
-                WPARAM(0),
-                LPARAM(to_wide(&labels.format_aac).as_ptr() as isize),
-            );
-            SendMessageW(
-                format_combo,
-                CB_ADDSTRING,
-                WPARAM(0),
-                LPARAM(to_wide(&labels.format_opus).as_ptr() as isize),
-            );
-            SendMessageW(
-                format_combo,
-                CB_ADDSTRING,
-                WPARAM(0),
-                LPARAM(to_wide(&labels.format_ogg).as_ptr() as isize),
-            );
-            SendMessageW(
-                format_combo,
-                CB_ADDSTRING,
-                WPARAM(0),
-                LPARAM(to_wide(&labels.format_flac).as_ptr() as isize),
-            );
-            SendMessageW(
-                format_combo,
-                CB_ADDSTRING,
-                WPARAM(0),
-                LPARAM(to_wide(&labels.format_wav).as_ptr() as isize),
-            );
-            SendMessageW(
-                format_combo,
-                CB_ADDSTRING,
-                WPARAM(0),
-                LPARAM(to_wide(&labels.format_aiff).as_ptr() as isize),
-            );
-            SendMessageW(format_combo, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+                let format_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.format).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    122,
+                    120,
+                    18,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let format_combo = CreateWindowExW(
+                    Default::default(),
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    140,
+                    118,
+                    160,
+                    200,
+                    hwnd,
+                    HMENU(CONVERT_ID_FORMAT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                SendMessageW(
+                    format_combo,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(to_wide(&labels.format_mp3).as_ptr() as isize),
+                );
+                SendMessageW(
+                    format_combo,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(to_wide(&labels.format_aac).as_ptr() as isize),
+                );
+                SendMessageW(
+                    format_combo,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(to_wide(&labels.format_opus).as_ptr() as isize),
+                );
+                SendMessageW(
+                    format_combo,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(to_wide(&labels.format_ogg).as_ptr() as isize),
+                );
+                SendMessageW(
+                    format_combo,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(to_wide(&labels.format_flac).as_ptr() as isize),
+                );
+                SendMessageW(
+                    format_combo,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(to_wide(&labels.format_wav).as_ptr() as isize),
+                );
+                SendMessageW(
+                    format_combo,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(to_wide(&labels.format_aiff).as_ptr() as isize),
+                );
+                SendMessageW(format_combo, CB_SETCURSEL, WPARAM(0), LPARAM(0));
 
-            let quality_label = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.quality_bitrate).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                154,
-                160,
-                18,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let quality_edit_combo = CreateWindowExW(
-                Default::default(),
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWN as u32),
-                180,
-                150,
-                120,
-                200,
-                hwnd,
-                HMENU(CONVERT_ID_QUALITY_EDIT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let quality_combo = CreateWindowExW(
-                Default::default(),
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                180,
-                150,
-                120,
-                200,
-                hwnd,
-                HMENU(CONVERT_ID_QUALITY_COMBO as isize),
-                HINSTANCE(0),
-                None,
-            );
+                let quality_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.quality_bitrate).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    154,
+                    160,
+                    18,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let quality_edit_combo = CreateWindowExW(
+                    Default::default(),
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWN as u32),
+                    180,
+                    150,
+                    120,
+                    200,
+                    hwnd,
+                    HMENU(CONVERT_ID_QUALITY_EDIT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let quality_combo = CreateWindowExW(
+                    Default::default(),
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    180,
+                    150,
+                    120,
+                    200,
+                    hwnd,
+                    HMENU(CONVERT_ID_QUALITY_COMBO as isize),
+                    HINSTANCE(0),
+                    None,
+                );
 
-            let status_label = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.status_ready).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                186,
-                300,
-                18,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let convert_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.button_convert).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                300,
-                180,
-                96,
-                28,
-                hwnd,
-                HMENU(CONVERT_ID_CONVERT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let close_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.button_close).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                402,
-                180,
-                92,
-                28,
-                hwnd,
-                HMENU(CONVERT_ID_CLOSE as isize),
-                HINSTANCE(0),
-                None,
-            );
+                let status_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.status_ready).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    186,
+                    300,
+                    18,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let convert_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.button_convert).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    300,
+                    180,
+                    96,
+                    28,
+                    hwnd,
+                    HMENU(CONVERT_ID_CONVERT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let close_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.button_close).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    402,
+                    180,
+                    92,
+                    28,
+                    hwnd,
+                    HMENU(CONVERT_ID_CLOSE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
 
-            for control in [
-                input_label,
-                input_edit,
-                input_browse,
-                output_label,
-                output_edit,
-                output_browse,
-                format_label,
-                format_combo,
-                quality_label,
-                quality_edit_combo,
-                quality_combo,
-                status_label,
-                convert_button,
-                close_button,
-            ] {
-                if control.0 != 0 && hfont.0 != 0 {
-                    SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                for control in [
+                    input_label,
+                    input_edit,
+                    input_browse,
+                    output_label,
+                    output_edit,
+                    output_browse,
+                    format_label,
+                    format_combo,
+                    quality_label,
+                    quality_edit_combo,
+                    quality_combo,
+                    status_label,
+                    convert_button,
+                    close_button,
+                ] {
+                    if control.0 != 0 && hfont.0 != 0 {
+                        SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    }
                 }
+
+                let mut state = Box::new(ConvertWindowState {
+                    hwnd,
+                    parent,
+                    input_edit,
+                    output_edit,
+                    format_combo,
+                    quality_label,
+                    quality_edit_combo,
+                    quality_combo,
+                    convert_button,
+                    close_button,
+                    status_label,
+                    language,
+                    status_dialog: HWND(0),
+                    cancel_flag: None,
+                    running: false,
+                });
+
+                update_quality_controls(&mut state, AudioFormat::Mp3, &labels);
+                ShowWindow(
+                    state.quality_combo,
+                    windows::Win32::UI::WindowsAndMessaging::SW_HIDE,
+                );
+                if let Some(path) = current_media_path(parent) {
+                    set_edit_text(state.input_edit, &path);
+                    if get_edit_text(state.output_edit).is_empty()
+                        && let Some(suggested) =
+                            build_default_output_path(&path, current_format(state.format_combo))
+                    {
+                        set_edit_text(state.output_edit, &suggested);
+                    }
+                }
+
+                SetWindowLongPtrW(
+                    hwnd,
+                    windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+                    Box::into_raw(state) as isize,
+                );
+                SetFocus(input_edit);
+                LRESULT(0)
             }
-
-            let mut state = Box::new(ConvertWindowState {
-                hwnd,
-                parent,
-                input_edit,
-                output_edit,
-                format_combo,
-                quality_label,
-                quality_edit_combo,
-                quality_combo,
-                convert_button,
-                close_button,
-                status_label,
-                language,
-                status_dialog: HWND(0),
-                cancel_flag: None,
-                running: false,
-            });
-
-            update_quality_controls(&mut state, AudioFormat::Mp3, &labels);
-            ShowWindow(
-                state.quality_combo,
-                windows::Win32::UI::WindowsAndMessaging::SW_HIDE,
-            );
-            if let Some(path) = current_media_path(parent) {
-                set_edit_text(state.input_edit, &path);
-                if get_edit_text(state.output_edit).is_empty()
-                    && let Some(suggested) =
-                        build_default_output_path(&path, current_format(state.format_combo))
-                {
-                    set_edit_text(state.output_edit, &suggested);
+            WM_COMMAND => {
+                let cmd_id = wparam.0 & 0xFFFF;
+                let notify = (wparam.0 >> 16) as u16;
+                let ptr =
+                    GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+                        as *mut ConvertWindowState;
+                if ptr.is_null() {
+                    return LRESULT(0);
                 }
-            }
+                let state = &mut *ptr;
+                let labels = labels(state.language);
 
-            SetWindowLongPtrW(
-                hwnd,
-                windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
-                Box::into_raw(state) as isize,
-            );
-            SetFocus(input_edit);
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-            let cmd_id = wparam.0 & 0xFFFF;
-            let notify = (wparam.0 >> 16) as u16;
-            let ptr =
-                GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
-                    as *mut ConvertWindowState;
-            if ptr.is_null() {
-                return LRESULT(0);
-            }
-            let state = &mut *ptr;
-            let labels = labels(state.language);
-
-            match cmd_id {
-                CONVERT_ID_INPUT_BROWSE => {
-                    if state.running {
-                        return LRESULT(0);
-                    }
-                    if let Some(path) = open_input_dialog(state.hwnd, state.language, &labels) {
-                        set_edit_text(state.input_edit, &path);
-                        if get_edit_text(state.output_edit).is_empty()
-                            && let Some(suggested) =
-                                build_default_output_path(&path, current_format(state.format_combo))
-                        {
-                            set_edit_text(state.output_edit, &suggested);
-                        }
-                        SetForegroundWindow(state.hwnd);
-                        SetFocus(state.input_edit);
-                    }
-                }
-                CONVERT_ID_OUTPUT_BROWSE => {
-                    if state.running {
-                        return LRESULT(0);
-                    }
-                    let format = current_format(state.format_combo);
-                    let initial = get_edit_text(state.output_edit);
-                    let initial_path = if initial.is_empty() {
-                        None
-                    } else {
-                        Some(PathBuf::from(initial))
-                    };
-                    if let Some(path) = open_output_dialog(
-                        state.hwnd,
-                        state.language,
-                        &labels,
-                        format,
-                        initial_path.as_ref(),
-                    ) {
-                        set_edit_text(state.output_edit, &path);
-                        SetForegroundWindow(state.hwnd);
-                        SetFocus(state.output_edit);
-                    }
-                }
-                CONVERT_ID_FORMAT => {
-                    if notify as u32 == windows::Win32::UI::WindowsAndMessaging::CBN_SELCHANGE {
-                        let format = current_format(state.format_combo);
-                        update_quality_controls(state, format, &labels);
-                        let current_output = get_edit_text(state.output_edit);
-                        if !current_output.is_empty() {
-                            let mut path = PathBuf::from(current_output);
-                            path.set_extension(extension_for_format(format));
-                            set_edit_text(state.output_edit, &path);
-                        }
-                    }
-                }
-                CONVERT_ID_CONVERT => {
-                    if state.running {
-                        return LRESULT(0);
-                    }
-                    let input_text = get_edit_text(state.input_edit);
-                    if input_text.is_empty() {
-                        show_error(state.parent, state.language, &labels.error_no_input);
-                        return LRESULT(0);
-                    }
-                    let output_text = get_edit_text(state.output_edit);
-                    if output_text.is_empty() {
-                        show_error(state.parent, state.language, &labels.error_no_output);
-                        return LRESULT(0);
-                    }
-                    if input_text == output_text {
-                        show_error(state.parent, state.language, &labels.error_same_path);
-                        return LRESULT(0);
-                    }
-
-                    let format = current_format(state.format_combo);
-                    let quality = match read_quality(state, format, &labels) {
-                        Ok(q) => q,
-                        Err(err) => {
-                            show_error(state.parent, state.language, &err);
+                match cmd_id {
+                    CONVERT_ID_INPUT_BROWSE => {
+                        if state.running {
                             return LRESULT(0);
                         }
-                    };
-
-                    let settings = ConvertAudioSettings {
-                        format: map_format(format),
-                        quality,
-                    };
-
-                    let args = build_ffmpeg_args(&settings);
-                    log_debug(&format!("Convert audio args: {}", args.join(" ")));
-
-                    state.running = true;
-                    set_status(state, &labels.status_running);
-                    set_controls_enabled(state, false);
-                    let cancel_flag = Arc::new(AtomicBool::new(false));
-                    state.cancel_flag = Some(cancel_flag.clone());
-                    if state.status_dialog.0 == 0 {
-                        let dialog_labels = SaveDialogLabels {
-                            title: labels.title.clone(),
-                            in_progress: labels.status_running.clone(),
-                            cancel: i18n::tr(state.language, "podcast.save.cancel"),
-                        };
-                        let dialog = podcast_save_window::open_with_labels(
-                            state.hwnd,
-                            state.language,
-                            dialog_labels,
-                            true,
-                        );
-                        if dialog.0 != 0 {
-                            state.status_dialog = dialog;
+                        if let Some(path) = open_input_dialog(state.hwnd, state.language, &labels) {
+                            set_edit_text(state.input_edit, &path);
+                            if get_edit_text(state.output_edit).is_empty()
+                                && let Some(suggested) = build_default_output_path(
+                                    &path,
+                                    current_format(state.format_combo),
+                                )
+                            {
+                                set_edit_text(state.output_edit, &suggested);
+                            }
+                            SetForegroundWindow(state.hwnd);
+                            SetFocus(state.input_edit);
                         }
                     }
+                    CONVERT_ID_OUTPUT_BROWSE => {
+                        if state.running {
+                            return LRESULT(0);
+                        }
+                        let format = current_format(state.format_combo);
+                        let initial = get_edit_text(state.output_edit);
+                        let initial_path = if initial.is_empty() {
+                            None
+                        } else {
+                            Some(PathBuf::from(initial))
+                        };
+                        if let Some(path) = open_output_dialog(
+                            state.hwnd,
+                            state.language,
+                            &labels,
+                            format,
+                            initial_path.as_ref(),
+                        ) {
+                            set_edit_text(state.output_edit, &path);
+                            SetForegroundWindow(state.hwnd);
+                            SetFocus(state.output_edit);
+                        }
+                    }
+                    CONVERT_ID_FORMAT => {
+                        if notify as u32 == windows::Win32::UI::WindowsAndMessaging::CBN_SELCHANGE {
+                            let format = current_format(state.format_combo);
+                            update_quality_controls(state, format, &labels);
+                            let current_output = get_edit_text(state.output_edit);
+                            if !current_output.is_empty() {
+                                let mut path = PathBuf::from(current_output);
+                                path.set_extension(extension_for_format(format));
+                                set_edit_text(state.output_edit, &path);
+                            }
+                        }
+                    }
+                    CONVERT_ID_CONVERT => {
+                        if state.running {
+                            return LRESULT(0);
+                        }
+                        let input_text = get_edit_text(state.input_edit);
+                        if input_text.is_empty() {
+                            show_error(state.parent, state.language, &labels.error_no_input);
+                            return LRESULT(0);
+                        }
+                        let output_text = get_edit_text(state.output_edit);
+                        if output_text.is_empty() {
+                            show_error(state.parent, state.language, &labels.error_no_output);
+                            return LRESULT(0);
+                        }
+                        if input_text == output_text {
+                            show_error(state.parent, state.language, &labels.error_same_path);
+                            return LRESULT(0);
+                        }
 
-                    let input = PathBuf::from(input_text);
-                    let output = PathBuf::from(output_text);
-                    let hwnd_target = state.hwnd;
+                        let format = current_format(state.format_combo);
+                        let quality = match read_quality(state, format, &labels) {
+                            Ok(q) => q,
+                            Err(err) => {
+                                show_error(state.parent, state.language, &err);
+                                return LRESULT(0);
+                            }
+                        };
 
-                    std::thread::spawn(move || {
-                        let result =
-                            convert_audio_file(&input, &output, &settings, Some(cancel_flag), None)
-                                .map(|_| output);
-                        let boxed = Box::new(result);
-                        unsafe {
+                        let settings = ConvertAudioSettings {
+                            format: map_format(format),
+                            quality,
+                        };
+
+                        let args = build_ffmpeg_args(&settings);
+                        log_debug(&format!("Convert audio args: {}", args.join(" ")));
+
+                        state.running = true;
+                        set_status(state, &labels.status_running);
+                        set_controls_enabled(state, false);
+                        let cancel_flag = Arc::new(AtomicBool::new(false));
+                        state.cancel_flag = Some(cancel_flag.clone());
+                        if state.status_dialog.0 == 0 {
+                            let dialog_labels = SaveDialogLabels {
+                                title: labels.title.clone(),
+                                in_progress: labels.status_running.clone(),
+                                cancel: i18n::tr(state.language, "podcast.save.cancel"),
+                            };
+                            let dialog = podcast_save_window::open_with_labels(
+                                state.hwnd,
+                                state.language,
+                                dialog_labels,
+                                true,
+                            );
+                            if dialog.0 != 0 {
+                                state.status_dialog = dialog;
+                            }
+                        }
+
+                        let input = PathBuf::from(input_text);
+                        let output = PathBuf::from(output_text);
+                        let hwnd_target = state.hwnd;
+
+                        std::thread::spawn(move || {
+                            let result = convert_audio_file(
+                                &input,
+                                &output,
+                                &settings,
+                                Some(cancel_flag),
+                                None,
+                            )
+                            .map(|_| output);
+                            let boxed = Box::new(result);
                             if IsWindow(hwnd_target).as_bool() {
                                 let raw = Box::into_raw(boxed);
                                 if let Err(err) = PostMessageW(
@@ -695,134 +703,134 @@ unsafe fn convert_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                             } else {
                                 let _boxed = boxed;
                             }
+                        });
+                    }
+                    CONVERT_ID_CLOSE => {
+                        if let Err(e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
+                            log_debug(&format!("Failed to post WM_CLOSE: {}", e));
                         }
-                    });
+                    }
+                    _ => {}
                 }
-                CONVERT_ID_CLOSE => {
+                LRESULT(0)
+            }
+            WM_KEYDOWN => {
+                if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
                     if let Err(e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
                         log_debug(&format!("Failed to post WM_CLOSE: {}", e));
                     }
+                    return LRESULT(0);
                 }
-                _ => {}
+                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
-            LRESULT(0)
-        }
-        WM_KEYDOWN => {
-            if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                if let Err(e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
-                    log_debug(&format!("Failed to post WM_CLOSE: {}", e));
+            WM_CONVERT_DONE => {
+                let ptr =
+                    GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+                        as *mut ConvertWindowState;
+                if ptr.is_null() {
+                    return LRESULT(0);
                 }
-                return LRESULT(0);
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_CONVERT_DONE => {
-            let ptr =
-                GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
-                    as *mut ConvertWindowState;
-            if ptr.is_null() {
-                return LRESULT(0);
-            }
-            let state = &mut *ptr;
-            let labels = labels(state.language);
+                let state = &mut *ptr;
+                let labels = labels(state.language);
 
-            let boxed = Box::from_raw(lparam.0 as *mut Result<PathBuf, String>);
-            state.running = false;
-            set_controls_enabled(state, true);
-            state.cancel_flag = None;
-            if state.status_dialog.0 != 0 {
-                let dialog = state.status_dialog;
-                state.status_dialog = HWND(0);
-                if IsWindow(dialog).as_bool()
-                    && let Err(e) = PostMessageW(
-                        dialog,
-                        podcast_save_window::WM_PODCAST_SAVE_DONE,
-                        WPARAM(0),
-                        LPARAM(0),
-                    )
-                {
-                    log_debug(&format!("Failed to close status dialog: {}", e));
-                }
-            }
-
-            match *boxed {
-                Ok(path) => {
-                    set_status(state, &labels.status_done);
-                    set_edit_text(state.output_edit, &path);
-                    show_info(state.parent, state.language, &labels.success);
-                }
-                Err(err) => {
-                    if err == "Conversion canceled." {
-                        log_debug("Convert audio canceled by user");
-                        set_status(state, &labels.status_ready);
-                        show_info(
-                            state.parent,
-                            state.language,
-                            &i18n::tr(state.language, "tts.cancelled"),
-                        );
-                    } else {
-                        log_debug(&format!("Convert audio failed: {}", err));
-                        set_status(state, &labels.status_ready);
-                        show_error(state.parent, state.language, &labels.error_failed);
+                let boxed = Box::from_raw(lparam.0 as *mut Result<PathBuf, String>);
+                state.running = false;
+                set_controls_enabled(state, true);
+                state.cancel_flag = None;
+                if state.status_dialog.0 != 0 {
+                    let dialog = state.status_dialog;
+                    state.status_dialog = HWND(0);
+                    if IsWindow(dialog).as_bool()
+                        && let Err(e) = PostMessageW(
+                            dialog,
+                            podcast_save_window::WM_PODCAST_SAVE_DONE,
+                            WPARAM(0),
+                            LPARAM(0),
+                        )
+                    {
+                        log_debug(&format!("Failed to close status dialog: {}", e));
                     }
                 }
-            }
-            LRESULT(0)
-        }
-        podcast_save_window::WM_PODCAST_SAVE_CANCEL => {
-            let ptr =
-                GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
-                    as *mut ConvertWindowState;
-            if ptr.is_null() {
-                return LRESULT(0);
-            }
-            let state = &mut *ptr;
-            if let Some(flag) = state.cancel_flag.as_ref() {
-                flag.store(true, Ordering::Relaxed);
-            }
-            LRESULT(0)
-        }
-        WM_CLOSE => {
-            crate::log_if_err!(DestroyWindow(hwnd));
-            LRESULT(0)
-        }
-        WM_DESTROY => {
-            let ptr =
-                GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
-                    as *mut ConvertWindowState;
-            if !ptr.is_null() {
-                let state = &mut *ptr;
-                if state.status_dialog.0 != 0 {
-                    crate::log_if_err!(DestroyWindow(state.status_dialog));
-                    state.status_dialog = HWND(0);
+
+                match *boxed {
+                    Ok(path) => {
+                        set_status(state, &labels.status_done);
+                        set_edit_text(state.output_edit, &path);
+                        show_info(state.parent, state.language, &labels.success);
+                    }
+                    Err(err) => {
+                        if err == "Conversion canceled." {
+                            log_debug("Convert audio canceled by user");
+                            set_status(state, &labels.status_ready);
+                            show_info(
+                                state.parent,
+                                state.language,
+                                &i18n::tr(state.language, "tts.cancelled"),
+                            );
+                        } else {
+                            log_debug(&format!("Convert audio failed: {}", err));
+                            set_status(state, &labels.status_ready);
+                            show_error(state.parent, state.language, &labels.error_failed);
+                        }
+                    }
                 }
+                LRESULT(0)
             }
-            let parent = windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd);
-            if with_state(parent, |state| {
-                state.convert_audio_window = HWND(0);
-            })
-            .is_none()
-            {
-                log_debug("Failed to update convert window state");
+            podcast_save_window::WM_PODCAST_SAVE_CANCEL => {
+                let ptr =
+                    GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+                        as *mut ConvertWindowState;
+                if ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let state = &mut *ptr;
+                if let Some(flag) = state.cancel_flag.as_ref() {
+                    flag.store(true, Ordering::Relaxed);
+                }
+                LRESULT(0)
             }
-            crate::focus_editor(parent);
-            LRESULT(0)
+            WM_CLOSE => {
+                crate::log_if_err!(DestroyWindow(hwnd));
+                LRESULT(0)
+            }
+            WM_DESTROY => {
+                let ptr =
+                    GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+                        as *mut ConvertWindowState;
+                if !ptr.is_null() {
+                    let state = &mut *ptr;
+                    if state.status_dialog.0 != 0 {
+                        crate::log_if_err!(DestroyWindow(state.status_dialog));
+                        state.status_dialog = HWND(0);
+                    }
+                }
+                let parent = windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd);
+                if with_state(parent, |state| {
+                    state.convert_audio_window = HWND(0);
+                })
+                .is_none()
+                {
+                    log_debug("Failed to update convert window state");
+                }
+                crate::focus_editor(parent);
+                LRESULT(0)
+            }
+            WM_NCDESTROY => {
+                let ptr =
+                    GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+                        as *mut ConvertWindowState;
+                if !ptr.is_null() {
+                    SetWindowLongPtrW(
+                        hwnd,
+                        windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+                        0,
+                    );
+                    let _unused_box = Box::from_raw(ptr);
+                }
+                LRESULT(0)
+            }
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        WM_NCDESTROY => {
-            let ptr =
-                GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
-                    as *mut ConvertWindowState;
-            if !ptr.is_null() {
-                SetWindowLongPtrW(
-                    hwnd,
-                    windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
-                    0,
-                );
-                let _unused_box = Box::from_raw(ptr);
-            }
-            LRESULT(0)
-        }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 

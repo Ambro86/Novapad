@@ -1095,7 +1095,7 @@ pub(crate) fn download_podcast_episode(
     }
     let ext = ext.unwrap_or_else(|| "mp3".to_string());
     let suggested_full = format!("{}.{}", suggested_name, ext);
-    let target = unsafe { save_podcast_episode_dialog(hwnd, language, &suggested_full) };
+    let target = save_podcast_episode_dialog(hwnd, language, &suggested_full);
     let Some(target) = target else {
         return;
     };
@@ -1236,7 +1236,7 @@ fn ensure_path_extension(mut path: PathBuf, desired_ext: &str) -> PathBuf {
     path
 }
 
-unsafe fn save_podcast_episode_dialog(
+fn save_podcast_episode_dialog(
     hwnd: HWND,
     language: Language,
     suggested_name: &str,
@@ -1265,7 +1265,7 @@ unsafe fn save_podcast_episode_dialog(
         Flags: OFN_EXPLORER | OFN_HIDEREADONLY | OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT,
         ..Default::default()
     };
-    if !GetSaveFileNameW(&mut ofn).as_bool() {
+    if !unsafe { GetSaveFileNameW(&mut ofn) }.as_bool() {
         return None;
     }
     let end = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
@@ -10982,8 +10982,8 @@ pub(crate) unsafe fn open_file_dialog_with_encoding(
     }
 }
 
-pub(crate) unsafe fn open_subtitle_file_dialog(hwnd: HWND) -> Option<PathBuf> {
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+pub(crate) fn open_subtitle_file_dialog(hwnd: HWND) -> Option<PathBuf> {
+    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     let title = i18n::tr(language, "dialog.open_subtitles_title");
     let filter_label = i18n::tr(language, "dialog.subtitles_filter");
     let all_files_label = i18n::tr(language, "dialog.all_files");
@@ -11014,7 +11014,7 @@ pub(crate) unsafe fn open_subtitle_file_dialog(hwnd: HWND) -> Option<PathBuf> {
         ..Default::default()
     };
 
-    if !GetOpenFileNameW(&mut ofn).as_bool() {
+    if !unsafe { GetOpenFileNameW(&mut ofn) }.as_bool() {
         return None;
     }
     let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());

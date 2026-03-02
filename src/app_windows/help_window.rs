@@ -180,15 +180,15 @@ pub fn handle_readonly_navigation(msg: &MSG) -> bool {
 }
 
 pub fn open(parent: HWND) {
-    unsafe { open_window(parent, HelpWindowKind::Guide) };
+    open_window(parent, HelpWindowKind::Guide);
 }
 
 pub fn open_changelog(parent: HWND) {
-    unsafe { open_window(parent, HelpWindowKind::Changelog) };
+    open_window(parent, HelpWindowKind::Changelog);
 }
 
 pub fn open_donations(parent: HWND) {
-    unsafe { open_window(parent, HelpWindowKind::Donations) };
+    open_window(parent, HelpWindowKind::Donations);
 }
 
 pub fn open_readonly_text(parent: HWND, title: &str, content: &str) {
@@ -235,33 +235,36 @@ pub fn open_readonly_text(parent: HWND, title: &str, content: &str) {
     }
 }
 
-unsafe fn open_window(parent: HWND, kind: HelpWindowKind) {
-    let existing = with_state(parent, |state| match kind {
-        HelpWindowKind::Guide => state.help_window,
-        HelpWindowKind::Changelog => state.changelog_window,
-        HelpWindowKind::Donations => state.donations_window,
-    })
+fn open_window(parent: HWND, kind: HelpWindowKind) {
+    let existing = unsafe {
+        with_state(parent, |state| match kind {
+            HelpWindowKind::Guide => state.help_window,
+            HelpWindowKind::Changelog => state.changelog_window,
+            HelpWindowKind::Donations => state.donations_window,
+        })
+    }
     .unwrap_or(HWND(0));
     if existing.0 != 0 {
-        SetForegroundWindow(existing);
+        unsafe { SetForegroundWindow(existing) };
         return;
     }
 
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+    let hinstance = HINSTANCE(unsafe { GetModuleHandleW(None).unwrap_or_default().0 });
     let class_name = to_wide(HELP_CLASS_NAME);
     let wc = WNDCLASSW {
-        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
-            LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
-        ),
+        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(unsafe {
+            LoadCursorW(None, IDC_ARROW).unwrap_or_default().0
+        }),
         hInstance: hinstance,
         lpszClassName: PCWSTR(class_name.as_ptr()),
         lpfnWndProc: Some(help_wndproc),
         hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
         ..Default::default()
     };
-    RegisterClassW(&wc);
+    unsafe { RegisterClassW(&wc) };
 
-    let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
+    let language =
+        unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
     let title = to_wide(&help_title(language, kind));
     let init = Box::new(HelpWindowInit {
         parent,
@@ -269,34 +272,38 @@ unsafe fn open_window(parent: HWND, kind: HelpWindowKind) {
         language,
     });
     let init_ptr = Box::into_raw(init);
-    let window = CreateWindowExW(
-        WS_EX_CONTROLPARENT,
-        PCWSTR(class_name.as_ptr()),
-        PCWSTR(title.as_ptr()),
-        WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        640,
-        520,
-        parent,
-        None,
-        hinstance,
-        Some(init_ptr as *const std::ffi::c_void),
-    );
+    let window = unsafe {
+        CreateWindowExW(
+            WS_EX_CONTROLPARENT,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            640,
+            520,
+            parent,
+            None,
+            hinstance,
+            Some(init_ptr as *const std::ffi::c_void),
+        )
+    };
 
     if window.0 != 0 {
-        if with_state(parent, |state| match kind {
-            HelpWindowKind::Guide => state.help_window = window,
-            HelpWindowKind::Changelog => state.changelog_window = window,
-            HelpWindowKind::Donations => state.donations_window = window,
-        })
+        if unsafe {
+            with_state(parent, |state| match kind {
+                HelpWindowKind::Guide => state.help_window = window,
+                HelpWindowKind::Changelog => state.changelog_window = window,
+                HelpWindowKind::Donations => state.donations_window = window,
+            })
+        }
         .is_none()
         {
             crate::log_debug("Failed to access help state");
         }
-        SetForegroundWindow(window);
+        unsafe { SetForegroundWindow(window) };
     } else if !init_ptr.is_null() {
-        let _unused_box = Box::from_raw(init_ptr);
+        let _unused_box = unsafe { Box::from_raw(init_ptr) };
     }
 }
 

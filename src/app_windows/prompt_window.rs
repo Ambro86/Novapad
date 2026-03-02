@@ -1505,20 +1505,20 @@ where
     save_settings(settings);
 }
 
-unsafe fn send_input_to_pty(state: &mut PromptState) {
+fn send_input_to_pty(state: &mut PromptState) {
     if state.input.0 == 0 {
         return;
     }
-    let len = GetWindowTextLengthW(state.input);
+    let len = unsafe { GetWindowTextLengthW(state.input) };
     if len < 0 {
         return;
     }
     let mut buffer = vec![0u16; (len + 1) as usize];
-    let read = GetWindowTextW(state.input, &mut buffer);
+    let read = unsafe { GetWindowTextW(state.input, &mut buffer) };
     let text = String::from_utf16_lossy(&buffer[..read as usize]);
     if state.program_is_codex && is_codex_approvals_command(&text) {
         spawn_codex_approvals();
-        if let Err(_e) = SetWindowTextW(state.input, PCWSTR::null()) {
+        if let Err(_e) = unsafe { SetWindowTextW(state.input, PCWSTR::null()) } {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
         return;
@@ -1530,12 +1530,12 @@ unsafe fn send_input_to_pty(state: &mut PromptState) {
             crate::log_debug("Failed to write input");
         }
     }
-    if let Err(_e) = SetWindowTextW(state.input, PCWSTR::null()) {
+    if let Err(_e) = unsafe { SetWindowTextW(state.input, PCWSTR::null()) } {
         crate::log_debug(&format!("Error: {:?}", _e));
     }
 }
 
-unsafe fn clear_output(state: &mut PromptState) {
+fn clear_output(state: &mut PromptState) {
     state.buffer.clear();
     state.buffer_utf16_len = 0;
     state.line_start_byte = 0;
@@ -1544,12 +1544,12 @@ unsafe fn clear_output(state: &mut PromptState) {
     state.blank_line_streak = 0;
     state.pending_ws.clear();
     state.last_announced_line.clear();
-    if let Err(_e) = SetWindowTextW(state.output, PCWSTR::null()) {
+    if let Err(_e) = unsafe { SetWindowTextW(state.output, PCWSTR::null()) } {
         crate::log_debug(&format!("Error: {:?}", _e));
     }
 }
 
-unsafe fn trim_output_keep_last(state: &mut PromptState) {
+fn trim_output_keep_last(state: &mut PromptState) {
     if state.buffer_utf16_len <= PROMPT_OUTPUT_KEEP {
         return;
     }
@@ -1575,18 +1575,20 @@ unsafe fn trim_output_keep_last(state: &mut PromptState) {
     state.pending_ws.clear();
     state.last_announced_line.clear();
     let wide = to_wide(&state.buffer);
-    SendMessageW(state.output, EM_SETREADONLY, WPARAM(0), LPARAM(0));
-    if let Err(_e) = SetWindowTextW(state.output, PCWSTR(wide.as_ptr())) {
+    unsafe { SendMessageW(state.output, EM_SETREADONLY, WPARAM(0), LPARAM(0)) };
+    if let Err(_e) = unsafe { SetWindowTextW(state.output, PCWSTR(wide.as_ptr())) } {
         crate::log_debug(&format!("Error: {:?}", _e));
     }
-    SendMessageW(state.output, EM_SETREADONLY, WPARAM(1), LPARAM(0));
-    SendMessageW(
-        state.output,
-        EM_SETSEL,
-        WPARAM(state.buffer_utf16_len),
-        LPARAM(state.buffer_utf16_len as isize),
-    );
-    SendMessageW(state.output, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+    unsafe {
+        SendMessageW(state.output, EM_SETREADONLY, WPARAM(1), LPARAM(0));
+        SendMessageW(
+            state.output,
+            EM_SETSEL,
+            WPARAM(state.buffer_utf16_len),
+            LPARAM(state.buffer_utf16_len as isize),
+        );
+        SendMessageW(state.output, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+    }
 }
 
 fn apply_prevent_sleep(enabled: bool) -> bool {
@@ -1625,9 +1627,7 @@ fn append_output(state: &mut PromptState, text: &str) {
 
     let filtered_units = filtered.encode_utf16().count();
     if state.buffer_utf16_len + filtered_units > PROMPT_OUTPUT_LIMIT {
-        unsafe {
-            trim_output_keep_last(state);
-        }
+        trim_output_keep_last(state);
     }
 
     let prev_len = state.buffer_utf16_len;

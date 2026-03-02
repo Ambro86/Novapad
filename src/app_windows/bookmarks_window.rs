@@ -37,28 +37,32 @@ fn bookmark_storage_key(path: Option<&std::path::Path>, hwnd_edit: HWND) -> (Str
     }
 }
 
-unsafe fn force_focus_editor_on_parent(parent: HWND) {
+fn force_focus_editor_on_parent(parent: HWND) {
     if parent.0 == 0 {
         return;
     }
-    SetForegroundWindow(parent);
-    if let Some(hwnd_edit) = crate::get_active_edit(parent) {
-        SetFocus(hwnd_edit);
-        SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
-        SendMessageW(
-            parent,
-            WM_NEXTDLGCTL,
-            WPARAM(hwnd_edit.0 as usize),
-            LPARAM(1),
-        );
-        SetFocus(hwnd_edit);
-        NotifyWinEvent(
-            EVENT_OBJECT_FOCUS,
-            hwnd_edit,
-            OBJID_CLIENT.0,
-            windows::Win32::UI::WindowsAndMessaging::CHILDID_SELF as i32,
-        );
-        if let Err(_e) = PostMessageW(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) {
+    unsafe { SetForegroundWindow(parent) };
+    if let Some(hwnd_edit) = unsafe { crate::get_active_edit(parent) } {
+        unsafe {
+            SetFocus(hwnd_edit);
+            SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
+            SendMessageW(
+                parent,
+                WM_NEXTDLGCTL,
+                WPARAM(hwnd_edit.0 as usize),
+                LPARAM(1),
+            );
+            SetFocus(hwnd_edit);
+            NotifyWinEvent(
+                EVENT_OBJECT_FOCUS,
+                hwnd_edit,
+                OBJID_CLIENT.0,
+                windows::Win32::UI::WindowsAndMessaging::CHILDID_SELF as i32,
+            );
+        }
+        if let Err(_e) =
+            unsafe { PostMessageW(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) }
+        {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
     }

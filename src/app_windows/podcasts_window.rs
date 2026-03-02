@@ -1598,7 +1598,7 @@ fn process_background_check_result(hwnd: HWND, res: BackgroundCheckResult) {
         .flatten();
 
         if let Some(hitem) = hitem_opt {
-            unsafe { set_source_unheard(hwnd, hitem, true) };
+            set_source_unheard(hwnd, hitem, true);
         }
     }
 }
@@ -1910,11 +1910,11 @@ unsafe fn reload_tree(hwnd: HWND) {
     }
 }
 
-unsafe fn mark_episode_played_with_delayed_ui(hwnd: HWND, parent: HWND, episode_key_value: String) {
+fn mark_episode_played_with_delayed_ui(hwnd: HWND, parent: HWND, episode_key_value: String) {
     mark_episode_played_with_ui_delay(hwnd, parent, episode_key_value, 2000, 8);
 }
 
-unsafe fn mark_episode_played_with_ui_delay(
+fn mark_episode_played_with_ui_delay(
     hwnd: HWND,
     parent: HWND,
     episode_key_value: String,
@@ -1925,15 +1925,15 @@ unsafe fn mark_episode_played_with_ui_delay(
     if hwnd_tree.0 == 0 {
         return;
     }
-    let mut episode_hitem = HTREEITEM(
+    let mut episode_hitem = HTREEITEM(unsafe {
         SendMessageW(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(TVGN_CARET as usize),
             LPARAM(0),
         )
-        .0,
-    );
+        .0
+    });
     let selected_matches = with_podcast_state(hwnd, |s| match s.node_data.get(&episode_hitem.0) {
         Some(NodeData::Episode(item)) => episode_key(item) == episode_key_value,
         _ => false,
@@ -1955,15 +1955,15 @@ unsafe fn mark_episode_played_with_ui_delay(
         return;
     }
 
-    let source_hitem = HTREEITEM(
+    let source_hitem = HTREEITEM(unsafe {
         SendMessageW(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(TVGN_PARENT as usize),
             LPARAM(episode_hitem.0),
         )
-        .0,
-    );
+        .0
+    });
     if source_hitem.0 != 0 {
         with_podcast_state(hwnd, |s| {
             if let Some(state) = s.source_items.get_mut(&source_hitem.0) {
@@ -1972,19 +1972,21 @@ unsafe fn mark_episode_played_with_ui_delay(
             if let Some(NodeData::Source(source_index)) = s.node_data.get(&source_hitem.0)
                 && parent.0 != 0
             {
-                with_state(parent, |ps| {
-                    if let Some(src) = ps.settings.podcast_sources.get_mut(*source_index)
-                        && !src.read_item_keys.iter().any(|k| k == &episode_key_value)
-                    {
-                        src.read_item_keys.push(episode_key_value.clone());
-                        const MAX_PERSISTED_READ_KEYS: usize = 5000;
-                        if src.read_item_keys.len() > MAX_PERSISTED_READ_KEYS {
-                            let overflow = src.read_item_keys.len() - MAX_PERSISTED_READ_KEYS;
-                            src.read_item_keys.drain(0..overflow);
+                unsafe {
+                    with_state(parent, |ps| {
+                        if let Some(src) = ps.settings.podcast_sources.get_mut(*source_index)
+                            && !src.read_item_keys.iter().any(|k| k == &episode_key_value)
+                        {
+                            src.read_item_keys.push(episode_key_value.clone());
+                            const MAX_PERSISTED_READ_KEYS: usize = 5000;
+                            if src.read_item_keys.len() > MAX_PERSISTED_READ_KEYS {
+                                let overflow = src.read_item_keys.len() - MAX_PERSISTED_READ_KEYS;
+                                src.read_item_keys.drain(0..overflow);
+                            }
+                            settings::save_settings(ps.settings.clone());
                         }
-                        settings::save_settings(ps.settings.clone());
-                    }
-                });
+                    });
+                }
             }
         });
     }
@@ -2441,7 +2443,7 @@ fn mark_podcast_episode_played(path: &Path) {
     }
 }
 
-unsafe fn set_source_unheard(hwnd: HWND, hitem: HTREEITEM, unheard: bool) {
+fn set_source_unheard(hwnd: HWND, hitem: HTREEITEM, unheard: bool) {
     let first_item_key: Option<String> = if !unheard {
         with_podcast_state(hwnd, |s| {
             s.source_items
@@ -2463,33 +2465,35 @@ unsafe fn set_source_unheard(hwnd: HWND, hitem: HTREEITEM, unheard: bool) {
         let Some(idx) = source_idx else {
             return (hwnd_tree, None);
         };
-        let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
-        let title_opt = with_state(parent, |ps| {
-            if let Some(src) = ps.settings.podcast_sources.get_mut(idx) {
-                let mut changed = false;
-                if src.unread != unheard {
-                    src.unread = unheard;
-                    changed = true;
+        let language = unsafe { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
+        let title_opt = unsafe {
+            with_state(parent, |ps| {
+                if let Some(src) = ps.settings.podcast_sources.get_mut(idx) {
+                    let mut changed = false;
+                    if src.unread != unheard {
+                        src.unread = unheard;
+                        changed = true;
+                    }
+                    if let Some(ref key) = first_item_key
+                        && src.last_seen_guid.as_ref() != Some(key)
+                    {
+                        src.last_seen_guid = Some(key.clone());
+                        changed = true;
+                    }
+                    if changed {
+                        let title = podcast_source_display_title(
+                            src,
+                            language,
+                            ps.settings.announce_unread_rss_podcast_items,
+                            ps.settings.rss_podcast_unread_label_position,
+                        );
+                        settings::save_settings(ps.settings.clone());
+                        return Some(title);
+                    }
                 }
-                if let Some(ref key) = first_item_key
-                    && src.last_seen_guid.as_ref() != Some(key)
-                {
-                    src.last_seen_guid = Some(key.clone());
-                    changed = true;
-                }
-                if changed {
-                    let title = podcast_source_display_title(
-                        src,
-                        language,
-                        ps.settings.announce_unread_rss_podcast_items,
-                        ps.settings.rss_podcast_unread_label_position,
-                    );
-                    settings::save_settings(ps.settings.clone());
-                    return Some(title);
-                }
-            }
-            None
-        })
+                None
+            })
+        }
         .flatten();
         (hwnd_tree, title_opt)
     })
@@ -2499,40 +2503,42 @@ unsafe fn set_source_unheard(hwnd: HWND, hitem: HTREEITEM, unheard: bool) {
     }
 }
 
-unsafe fn add_podcast_source(parent: HWND, feed_url: &str, title: &str) -> Option<usize> {
+fn add_podcast_source(parent: HWND, feed_url: &str, title: &str) -> Option<usize> {
     let normalized = rss::normalize_url(feed_url);
     if normalized.is_empty() {
         return None;
     }
-    with_state(parent, |ps| {
-        if ps
-            .settings
-            .podcast_sources
-            .iter()
-            .any(|src| rss::normalize_url(&src.url) == normalized)
-        {
-            return None;
-        }
-        let final_title = if title.trim().is_empty() {
-            normalized.clone()
-        } else {
-            title.trim().to_string()
-        };
-        ps.settings.podcast_sources.push(RssSource {
-            title: final_title,
-            url: normalized,
-            kind: RssSourceType::Feed,
-            user_title: !title.trim().is_empty(),
-            unread: true,
-            cache: rss::RssFeedCache::default(),
-            last_seen_guid: None,
-            last_updated: None,
-            removed_item_keys: Vec::new(),
-            read_item_keys: Vec::new(),
-        });
-        settings::save_settings(ps.settings.clone());
-        Some(ps.settings.podcast_sources.len() - 1)
-    })
+    unsafe {
+        with_state(parent, |ps| {
+            if ps
+                .settings
+                .podcast_sources
+                .iter()
+                .any(|src| rss::normalize_url(&src.url) == normalized)
+            {
+                return None;
+            }
+            let final_title = if title.trim().is_empty() {
+                normalized.clone()
+            } else {
+                title.trim().to_string()
+            };
+            ps.settings.podcast_sources.push(RssSource {
+                title: final_title,
+                url: normalized,
+                kind: RssSourceType::Feed,
+                user_title: !title.trim().is_empty(),
+                unread: true,
+                cache: rss::RssFeedCache::default(),
+                last_seen_guid: None,
+                last_updated: None,
+                removed_item_keys: Vec::new(),
+                read_item_keys: Vec::new(),
+            });
+            settings::save_settings(ps.settings.clone());
+            Some(ps.settings.podcast_sources.len() - 1)
+        })
+    }
     .flatten()
 }
 
@@ -4356,58 +4362,68 @@ pub fn focus_library(hwnd: HWND) {
     }
 }
 
-unsafe fn force_focus_editor_on_parent(parent: HWND) {
+fn force_focus_editor_on_parent(parent: HWND) {
     if parent.0 == 0 {
         return;
     }
-    SetForegroundWindow(parent);
-    SetActiveWindow(parent);
-    SendMessageW(parent, WM_SETFOCUS, WPARAM(0), LPARAM(0));
-    if crate::get_active_edit(parent).is_none() {
-        SendMessageW(
-            parent,
-            WM_COMMAND,
-            WPARAM(crate::menu::IDM_FILE_NEW),
-            LPARAM(0),
-        );
+    unsafe {
+        SetForegroundWindow(parent);
+        SetActiveWindow(parent);
+        SendMessageW(parent, WM_SETFOCUS, WPARAM(0), LPARAM(0));
     }
-    if let Some(hwnd_edit) = crate::get_active_edit(parent) {
-        SetFocus(hwnd_edit);
-        SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
-        SendMessageW(
-            parent,
-            WM_NEXTDLGCTL,
-            WPARAM(hwnd_edit.0 as usize),
-            LPARAM(1),
-        );
+    if unsafe { crate::get_active_edit(parent) }.is_none() {
+        unsafe {
+            SendMessageW(
+                parent,
+                WM_COMMAND,
+                WPARAM(crate::menu::IDM_FILE_NEW),
+                LPARAM(0),
+            );
+        }
+    }
+    if let Some(hwnd_edit) = unsafe { crate::get_active_edit(parent) } {
+        unsafe {
+            SetFocus(hwnd_edit);
+            SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
+            SendMessageW(
+                parent,
+                WM_NEXTDLGCTL,
+                WPARAM(hwnd_edit.0 as usize),
+                LPARAM(1),
+            );
+        }
         // Re-assert focus after dialog navigation to help screen readers settle on the edit control.
-        SetFocus(hwnd_edit);
-        SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
-        NotifyWinEvent(
-            EVENT_OBJECT_FOCUS,
-            hwnd_edit,
-            OBJID_CLIENT.0,
-            CHILDID_SELF as i32,
-        );
+        unsafe {
+            SetFocus(hwnd_edit);
+            SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
+            NotifyWinEvent(
+                EVENT_OBJECT_FOCUS,
+                hwnd_edit,
+                OBJID_CLIENT.0,
+                CHILDID_SELF as i32,
+            );
+        }
     }
-    SendMessageW(parent, WM_SETFOCUS, WPARAM(0), LPARAM(0));
-    if let Err(_e) = PostMessageW(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) {
+    unsafe {
+        SendMessageW(parent, WM_SETFOCUS, WPARAM(0), LPARAM(0));
+    }
+    if let Err(_e) = unsafe { PostMessageW(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) } {
         crate::log_debug(&format!("Error: {:?}", _e));
     }
 }
 
-unsafe fn show_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
+fn show_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
     let (hwnd_tree, hwnd_results) =
         with_podcast_state(hwnd, |s| (s.hwnd_tree, s.hwnd_results)).unwrap_or((HWND(0), HWND(0)));
     if hwnd_tree.0 == 0 {
         return;
     }
-    let focus = GetFocus();
+    let focus = unsafe { GetFocus() };
     let target_list = focus == hwnd_results;
     if target_list {
-        show_search_context_menu(hwnd, x, y, use_hit_test);
+        unsafe { show_search_context_menu(hwnd, x, y, use_hit_test) };
     } else {
-        show_tree_context_menu(hwnd, x, y, use_hit_test);
+        unsafe { show_tree_context_menu(hwnd, x, y, use_hit_test) };
     }
 }
 
@@ -5857,7 +5873,7 @@ unsafe fn description_wndproc_inner(
     }
 }
 
-unsafe fn apply_reorder_action(
+fn apply_reorder_action(
     hwnd: HWND,
     source_index: usize,
     action: ReorderAction,
@@ -5872,25 +5888,31 @@ unsafe fn apply_reorder_action(
     if source_index >= root_items.len() {
         return None;
     }
-    let new_index = with_state(parent, |ps| {
-        let moved = match action {
-            ReorderAction::Up => settings::move_podcast_feed_up(&mut ps.settings, source_index),
-            ReorderAction::Down => settings::move_podcast_feed_down(&mut ps.settings, source_index),
-            ReorderAction::Top => {
-                settings::move_podcast_feed_to_top(&mut ps.settings, source_index)
+    let new_index = unsafe {
+        with_state(parent, |ps| {
+            let moved = match action {
+                ReorderAction::Up => settings::move_podcast_feed_up(&mut ps.settings, source_index),
+                ReorderAction::Down => {
+                    settings::move_podcast_feed_down(&mut ps.settings, source_index)
+                }
+                ReorderAction::Top => {
+                    settings::move_podcast_feed_to_top(&mut ps.settings, source_index)
+                }
+                ReorderAction::Bottom => {
+                    settings::move_podcast_feed_to_bottom(&mut ps.settings, source_index)
+                }
+                ReorderAction::Position => settings::move_podcast_feed_to_index(
+                    &mut ps.settings,
+                    source_index,
+                    target_index,
+                ),
+            };
+            if moved.is_some() {
+                settings::save_settings(ps.settings.clone());
             }
-            ReorderAction::Bottom => {
-                settings::move_podcast_feed_to_bottom(&mut ps.settings, source_index)
-            }
-            ReorderAction::Position => {
-                settings::move_podcast_feed_to_index(&mut ps.settings, source_index, target_index)
-            }
-        };
-        if moved.is_some() {
-            settings::save_settings(ps.settings.clone());
-        }
-        moved
-    })
+            moved
+        })
+    }
     .flatten();
     let new_index = new_index?;
     if move_vec_to_index(&mut root_items, source_index, new_index) {
@@ -5899,18 +5921,18 @@ unsafe fn apply_reorder_action(
     Some(new_index)
 }
 
-unsafe fn handle_reorder_action(hwnd: HWND, action: ReorderAction) {
+fn handle_reorder_action(hwnd: HWND, action: ReorderAction) {
     let Some(source_index) = selected_source_index(hwnd) else {
         return;
     };
     let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-    let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
-    let total = with_state(parent, |ps| ps.settings.podcast_sources.len()).unwrap_or(0);
+    let language = unsafe { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
+    let total = unsafe { with_state(parent, |ps| ps.settings.podcast_sources.len()) }.unwrap_or(0);
     if total == 0 {
         return;
     }
     if matches!(action, ReorderAction::Position) {
-        show_reorder_dialog(hwnd, source_index, total);
+        unsafe { show_reorder_dialog(hwnd, source_index, total) };
         return;
     }
     let new_index = match action {
@@ -5929,13 +5951,15 @@ unsafe fn handle_reorder_action(hwnd: HWND, action: ReorderAction) {
     }
 }
 
-unsafe fn handle_sort_action(hwnd: HWND, order: crate::settings::SortOrder) {
+fn handle_sort_action(hwnd: HWND, order: crate::settings::SortOrder) {
     let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-    with_state(parent, |ps| {
-        crate::settings::sort_podcast_sources(&mut ps.settings, order);
-        crate::settings::save_settings(ps.settings.clone());
-    });
-    reload_tree(hwnd);
+    unsafe {
+        with_state(parent, |ps| {
+            crate::settings::sort_podcast_sources(&mut ps.settings, order);
+            crate::settings::save_settings(ps.settings.clone());
+        });
+        reload_tree(hwnd);
+    }
 }
 
 unsafe fn show_reorder_dialog(parent_hwnd: HWND, source_index: usize, total: usize) {

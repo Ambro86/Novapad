@@ -1465,82 +1465,84 @@ fn apply_default_sources(
     changed
 }
 
-unsafe fn ensure_default_sources(parent: HWND) {
-    let language = with_state(parent, |s| s.settings.language).unwrap_or_default();
+fn ensure_default_sources(parent: HWND) {
+    let language = unsafe { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
     let defaults = load_default_feeds(language);
     if defaults.is_empty() {
         return;
     }
-    with_state(parent, |s| {
-        let changed = match language {
-            crate::settings::Language::Ukrainian
-            | crate::settings::Language::English
-            | crate::settings::Language::Lithuanian
-            | crate::settings::Language::Chinese => apply_default_sources(
-                &mut s.settings.rss_sources,
-                &s.settings.rss_removed_default_en,
-                &mut s.settings.rss_default_en_keys,
-                &defaults,
-            ),
-            crate::settings::Language::Swedish => apply_default_sources(
-                &mut s.settings.rss_sources,
-                &s.settings.rss_removed_default_en,
-                &mut s.settings.rss_default_en_keys,
-                &defaults,
-            ),
-            crate::settings::Language::Italian => apply_default_sources(
-                &mut s.settings.rss_sources,
-                &s.settings.rss_removed_default_it,
-                &mut s.settings.rss_default_it_keys,
-                &defaults,
-            ),
-            crate::settings::Language::Spanish => apply_default_sources(
-                &mut s.settings.rss_sources,
-                &s.settings.rss_removed_default_es,
-                &mut s.settings.rss_default_es_keys,
-                &defaults,
-            ),
-            crate::settings::Language::Portuguese => apply_default_sources(
-                &mut s.settings.rss_sources,
-                &s.settings.rss_removed_default_pt,
-                &mut s.settings.rss_default_pt_keys,
-                &defaults,
-            ),
-            crate::settings::Language::Vietnamese => apply_default_sources(
-                &mut s.settings.rss_sources,
-                &s.settings.rss_removed_default_vi,
-                &mut s.settings.rss_default_vi_keys,
-                &defaults,
-            ),
-            crate::settings::Language::Czech => apply_default_sources(
-                &mut s.settings.rss_sources,
-                &s.settings.rss_removed_default_cs,
-                &mut s.settings.rss_default_cs_keys,
-                &defaults,
-            ),
-            crate::settings::Language::Polish => apply_default_sources(
-                &mut s.settings.rss_sources,
-                &s.settings.rss_removed_default_pl,
-                &mut s.settings.rss_default_pl_keys,
-                &defaults,
-            ),
-            crate::settings::Language::French => apply_default_sources(
-                &mut s.settings.rss_sources,
-                &s.settings.rss_removed_default_fr,
-                &mut s.settings.rss_default_fr_keys,
-                &defaults,
-            ),
-            crate::settings::Language::Serbian => apply_default_sources(
-                &mut s.settings.rss_sources,
-                &s.settings.rss_removed_default_sr,
-                &mut s.settings.rss_default_sr_keys,
-                &defaults,
-            ),
-        };
-        if changed {
-            crate::settings::save_settings(s.settings.clone());
-        }
-    });
+    unsafe {
+        with_state(parent, |s| {
+            let changed = match language {
+                crate::settings::Language::Ukrainian
+                | crate::settings::Language::English
+                | crate::settings::Language::Lithuanian
+                | crate::settings::Language::Chinese => apply_default_sources(
+                    &mut s.settings.rss_sources,
+                    &s.settings.rss_removed_default_en,
+                    &mut s.settings.rss_default_en_keys,
+                    &defaults,
+                ),
+                crate::settings::Language::Swedish => apply_default_sources(
+                    &mut s.settings.rss_sources,
+                    &s.settings.rss_removed_default_en,
+                    &mut s.settings.rss_default_en_keys,
+                    &defaults,
+                ),
+                crate::settings::Language::Italian => apply_default_sources(
+                    &mut s.settings.rss_sources,
+                    &s.settings.rss_removed_default_it,
+                    &mut s.settings.rss_default_it_keys,
+                    &defaults,
+                ),
+                crate::settings::Language::Spanish => apply_default_sources(
+                    &mut s.settings.rss_sources,
+                    &s.settings.rss_removed_default_es,
+                    &mut s.settings.rss_default_es_keys,
+                    &defaults,
+                ),
+                crate::settings::Language::Portuguese => apply_default_sources(
+                    &mut s.settings.rss_sources,
+                    &s.settings.rss_removed_default_pt,
+                    &mut s.settings.rss_default_pt_keys,
+                    &defaults,
+                ),
+                crate::settings::Language::Vietnamese => apply_default_sources(
+                    &mut s.settings.rss_sources,
+                    &s.settings.rss_removed_default_vi,
+                    &mut s.settings.rss_default_vi_keys,
+                    &defaults,
+                ),
+                crate::settings::Language::Czech => apply_default_sources(
+                    &mut s.settings.rss_sources,
+                    &s.settings.rss_removed_default_cs,
+                    &mut s.settings.rss_default_cs_keys,
+                    &defaults,
+                ),
+                crate::settings::Language::Polish => apply_default_sources(
+                    &mut s.settings.rss_sources,
+                    &s.settings.rss_removed_default_pl,
+                    &mut s.settings.rss_default_pl_keys,
+                    &defaults,
+                ),
+                crate::settings::Language::French => apply_default_sources(
+                    &mut s.settings.rss_sources,
+                    &s.settings.rss_removed_default_fr,
+                    &mut s.settings.rss_default_fr_keys,
+                    &defaults,
+                ),
+                crate::settings::Language::Serbian => apply_default_sources(
+                    &mut s.settings.rss_sources,
+                    &s.settings.rss_removed_default_sr,
+                    &mut s.settings.rss_default_sr_keys,
+                    &defaults,
+                ),
+            };
+            if changed {
+                crate::settings::save_settings(s.settings.clone());
+            }
+        });
+    }
 }
 
 pub(crate) fn sync_default_sources_for_settings(
@@ -5158,18 +5160,18 @@ fn apply_reorder_action(
     Some(new_index)
 }
 
-unsafe fn handle_reorder_action(hwnd: HWND, action: ReorderAction) {
+fn handle_reorder_action(hwnd: HWND, action: ReorderAction) {
     let Some(source_index) = selected_source_index(hwnd) else {
         return;
     };
     let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-    let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
-    let total = with_state(parent, |ps| ps.settings.rss_sources.len()).unwrap_or(0);
+    let language = unsafe { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
+    let total = unsafe { with_state(parent, |ps| ps.settings.rss_sources.len()) }.unwrap_or(0);
     if total == 0 {
         return;
     }
     if matches!(action, ReorderAction::Position) {
-        show_reorder_dialog(hwnd, source_index, total);
+        unsafe { show_reorder_dialog(hwnd, source_index, total) };
         return;
     }
     let new_index = match action {
@@ -5188,13 +5190,15 @@ unsafe fn handle_reorder_action(hwnd: HWND, action: ReorderAction) {
     }
 }
 
-unsafe fn handle_sort_action(hwnd: HWND, order: crate::settings::SortOrder) {
+fn handle_sort_action(hwnd: HWND, order: crate::settings::SortOrder) {
     let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-    with_state(parent, |ps| {
-        crate::settings::sort_rss_sources(&mut ps.settings, order);
-        crate::settings::save_settings(ps.settings.clone());
-    });
-    reload_tree(hwnd);
+    unsafe {
+        with_state(parent, |ps| {
+            crate::settings::sort_rss_sources(&mut ps.settings, order);
+            crate::settings::save_settings(ps.settings.clone());
+        });
+        reload_tree(hwnd);
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -5281,12 +5285,12 @@ fn copy_text_to_clipboard(hwnd: HWND, text: &str) {
     }
 }
 
-unsafe fn fetch_full_article_text_for_quick_copy(parent: HWND, item: &RssItem) -> String {
+fn fetch_full_article_text_for_quick_copy(parent: HWND, item: &RssItem) -> String {
     if parent.0 == 0 {
         return clean_html_for_quick_copy(&item.description);
     }
     ensure_rss_http(parent);
-    let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
+    let language = unsafe { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
     let rt = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -5311,7 +5315,7 @@ unsafe fn fetch_full_article_text_for_quick_copy(parent: HWND, item: &RssItem) -
     }
 }
 
-unsafe fn rss_quick_copy_text(
+fn rss_quick_copy_text(
     parent: HWND,
     item: &RssItem,
     mode: crate::settings::RssQuickCopyMode,
@@ -5375,13 +5379,14 @@ fn clean_html_for_quick_copy(input: &str) -> String {
     normalize_article_text(out.trim())
 }
 
-unsafe fn handle_rss_quick_copy(hwnd: HWND) -> bool {
+fn handle_rss_quick_copy(hwnd: HWND) -> bool {
     let Some(item) = selected_article_item(hwnd) else {
         return false;
     };
     let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-    let mode = with_state(parent, |ps| ps.settings.rss_quick_copy_mode).unwrap_or_default();
-    let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
+    let mode =
+        unsafe { with_state(parent, |ps| ps.settings.rss_quick_copy_mode) }.unwrap_or_default();
+    let language = unsafe { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
     let text = rss_quick_copy_text(parent, &item, mode);
     if text.trim().is_empty() {
         return false;
@@ -5391,7 +5396,7 @@ unsafe fn handle_rss_quick_copy(hwnd: HWND) -> bool {
     true
 }
 
-unsafe fn handle_article_action(hwnd: HWND, action: ArticleAction) {
+fn handle_article_action(hwnd: HWND, action: ArticleAction) {
     let Some(item) = selected_article_item(hwnd) else {
         log_debug("rss_action kind=article action=unavailable reason=no_article");
         return;
@@ -5428,7 +5433,7 @@ unsafe fn handle_article_action(hwnd: HWND, action: ArticleAction) {
     }
     let title = item.title.trim().to_string();
     let language = with_rss_state(hwnd, |s| {
-        with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
+        unsafe { with_state(s.parent, |ps| ps.settings.language) }.unwrap_or_default()
     })
     .unwrap_or_default();
     let share_url = match action {
@@ -5504,52 +5509,62 @@ unsafe fn handle_article_action(hwnd: HWND, action: ArticleAction) {
     }
 }
 
-unsafe fn force_focus_editor_on_parent(parent: HWND) {
+fn force_focus_editor_on_parent(parent: HWND) {
     if parent.0 == 0 {
         return;
     }
-    SetForegroundWindow(parent);
-    SetActiveWindow(parent);
-    SendMessageW(parent, WM_SETFOCUS, WPARAM(0), LPARAM(0));
-    if crate::get_active_edit(parent).is_none() {
-        SendMessageW(
-            parent,
-            WM_COMMAND,
-            WPARAM(crate::menu::IDM_FILE_NEW),
-            LPARAM(0),
-        );
+    unsafe {
+        SetForegroundWindow(parent);
+        SetActiveWindow(parent);
+        SendMessageW(parent, WM_SETFOCUS, WPARAM(0), LPARAM(0));
     }
-    if let Some(hwnd_edit) = crate::get_active_edit(parent) {
-        SetFocus(hwnd_edit);
-        SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
-        SendMessageW(
-            parent,
-            WM_NEXTDLGCTL,
-            WPARAM(hwnd_edit.0 as usize),
-            LPARAM(1),
-        );
+    if unsafe { crate::get_active_edit(parent) }.is_none() {
+        unsafe {
+            SendMessageW(
+                parent,
+                WM_COMMAND,
+                WPARAM(crate::menu::IDM_FILE_NEW),
+                LPARAM(0),
+            );
+        }
+    }
+    if let Some(hwnd_edit) = unsafe { crate::get_active_edit(parent) } {
+        unsafe {
+            SetFocus(hwnd_edit);
+            SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
+            SendMessageW(
+                parent,
+                WM_NEXTDLGCTL,
+                WPARAM(hwnd_edit.0 as usize),
+                LPARAM(1),
+            );
+        }
         // Re-assert focus after dialog navigation to help NVDA settle on the edit control.
-        SetFocus(hwnd_edit);
-        SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
-        NotifyWinEvent(
-            EVENT_OBJECT_FOCUS,
-            hwnd_edit,
-            OBJID_CLIENT.0,
-            CHILDID_SELF as i32,
-        );
+        unsafe {
+            SetFocus(hwnd_edit);
+            SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
+            NotifyWinEvent(
+                EVENT_OBJECT_FOCUS,
+                hwnd_edit,
+                OBJID_CLIENT.0,
+                CHILDID_SELF as i32,
+            );
+        }
     }
-    SendMessageW(parent, WM_SETFOCUS, WPARAM(0), LPARAM(0));
-    if let Err(_e) = PostMessageW(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) {
+    unsafe {
+        SendMessageW(parent, WM_SETFOCUS, WPARAM(0), LPARAM(0));
+    }
+    if let Err(_e) = unsafe { PostMessageW(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) } {
         crate::log_debug(&format!("Error: {:?}", _e));
     }
 }
 
-unsafe fn import_item(hwnd: HWND, item: RssItem) {
+fn import_item(hwnd: HWND, item: RssItem) {
     let url = item.link.clone();
 
     let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
     let language = if parent.0 != 0 {
-        with_state(parent, |state| state.settings.language).unwrap_or_default()
+        unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default()
     } else {
         crate::settings::Language::default()
     };
@@ -5586,12 +5601,14 @@ unsafe fn import_item(hwnd: HWND, item: RssItem) {
             }
         };
         let msg = Box::new(ImportResult { text });
-        if let Err(_e) = PostMessageW(
-            hwnd,
-            WM_RSS_IMPORT_COMPLETE,
-            WPARAM(0),
-            LPARAM(Box::into_raw(msg) as isize),
-        ) {}
+        if let Err(_e) = unsafe {
+            PostMessageW(
+                hwnd,
+                WM_RSS_IMPORT_COMPLETE,
+                WPARAM(0),
+                LPARAM(Box::into_raw(msg) as isize),
+            )
+        } {}
     });
 }
 
@@ -5785,7 +5802,7 @@ unsafe fn reorder_control_subclass_proc_inner(
     )
 }
 
-unsafe fn show_add_dialog(parent_hwnd: HWND) {
+fn show_add_dialog(parent_hwnd: HWND) {
     show_add_dialog_with_prefill(parent_hwnd, String::new(), String::new());
 }
 
@@ -5996,8 +6013,8 @@ unsafe fn search_keyword_wndproc_inner(
     }
 }
 
-unsafe fn show_add_dialog_with_prefill(parent_hwnd: HWND, title: String, url: String) {
-    show_add_dialog_with_prefill_options(parent_hwnd, title, url, false);
+fn show_add_dialog_with_prefill(parent_hwnd: HWND, title: String, url: String) {
+    unsafe { show_add_dialog_with_prefill_options(parent_hwnd, title, url, false) };
 }
 
 unsafe fn show_add_dialog_with_prefill_options(

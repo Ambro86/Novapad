@@ -404,7 +404,7 @@ pub fn find_next(
     }
 }
 
-unsafe fn replace_selection_if_match(
+fn replace_selection_if_match(
     hwnd: HWND,
     hwnd_edit: HWND,
     search: &str,
@@ -416,12 +416,14 @@ unsafe fn replace_selection_if_match(
         return replace_selection_if_match_regex(hwnd, hwnd_edit, search, replace, flags, options);
     }
     let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXGETSEL,
-        WPARAM(0),
-        LPARAM(&mut cr as *mut _ as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut cr as *mut _ as isize),
+        );
+    }
 
     if cr.cpMin == cr.cpMax {
         return false;
@@ -434,21 +436,25 @@ unsafe fn replace_selection_if_match(
         chrgText: CHARRANGE { cpMin: 0, cpMax: 0 },
     };
 
-    let res = SendMessageW(
-        hwnd_edit,
-        EM_FINDTEXTEXW,
-        WPARAM(flags.0 as usize),
-        LPARAM(&mut ft as *mut _ as isize),
-    );
+    let res = unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_FINDTEXTEXW,
+            WPARAM(flags.0 as usize),
+            LPARAM(&mut ft as *mut _ as isize),
+        )
+    };
 
     if res.0 == cr.cpMin as isize && ft.chrgText.cpMax == cr.cpMax {
         let replace_wide = to_wide(replace);
-        SendMessageW(
-            hwnd_edit,
-            EM_REPLACESEL,
-            WPARAM(1),
-            LPARAM(replace_wide.as_ptr() as isize),
-        );
+        unsafe {
+            SendMessageW(
+                hwnd_edit,
+                EM_REPLACESEL,
+                WPARAM(1),
+                LPARAM(replace_wide.as_ptr() as isize),
+            );
+        }
         true
     } else {
         false
@@ -546,16 +552,18 @@ pub fn replace_all(
     }
 }
 
-unsafe fn get_find_options(hwnd: HWND) -> FindOptions {
-    with_state(hwnd, |state| FindOptions {
-        use_regex: state.find_use_regex,
-        dot_matches_newline: state.find_dot_matches_newline,
-        wrap_around: state.find_wrap_around,
-        match_case: state.find_match_case,
-        whole_word: state.find_whole_word,
-        replace_in_selection: state.find_replace_in_selection,
-        replace_in_all_docs: state.find_replace_in_all_docs,
-    })
+fn get_find_options(hwnd: HWND) -> FindOptions {
+    unsafe {
+        with_state(hwnd, |state| FindOptions {
+            use_regex: state.find_use_regex,
+            dot_matches_newline: state.find_dot_matches_newline,
+            wrap_around: state.find_wrap_around,
+            match_case: state.find_match_case,
+            whole_word: state.find_whole_word,
+            replace_in_selection: state.find_replace_in_selection,
+            replace_in_all_docs: state.find_replace_in_all_docs,
+        })
+    }
     .unwrap_or(FindOptions {
         use_regex: false,
         dot_matches_newline: false,
@@ -787,37 +795,40 @@ fn dialog_metrics(hwnd: HWND) -> (i32, i32, i32) {
     }
 }
 
-unsafe fn create_checkbox(parent: HWND, id: isize, text: &str, x: i32, y: i32, width: i32) -> HWND {
+fn create_checkbox(parent: HWND, id: isize, text: &str, x: i32, y: i32, width: i32) -> HWND {
     let wide = to_wide(text);
-    CreateWindowExW(
-        Default::default(),
-        WC_BUTTON,
-        PCWSTR(wide.as_ptr()),
-        windows::Win32::UI::WindowsAndMessaging::WS_CHILD
-            | windows::Win32::UI::WindowsAndMessaging::WS_VISIBLE
-            | windows::Win32::UI::WindowsAndMessaging::WS_TABSTOP
-            | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-        x,
-        y,
-        width,
-        18,
-        parent,
-        HMENU(id),
-        HINSTANCE(0),
-        None,
-    )
+    unsafe {
+        CreateWindowExW(
+            Default::default(),
+            WC_BUTTON,
+            PCWSTR(wide.as_ptr()),
+            windows::Win32::UI::WindowsAndMessaging::WS_CHILD
+                | windows::Win32::UI::WindowsAndMessaging::WS_VISIBLE
+                | windows::Win32::UI::WindowsAndMessaging::WS_TABSTOP
+                | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+            x,
+            y,
+            width,
+            18,
+            parent,
+            HMENU(id),
+            HINSTANCE(0),
+            None,
+        )
+    }
 }
 
-unsafe fn is_checkbox_checked(hwnd: HWND, id: isize) -> bool {
-    let hwnd_child = windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, id as i32);
+fn is_checkbox_checked(hwnd: HWND, id: isize) -> bool {
+    let hwnd_child =
+        unsafe { windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, id as i32) };
     if hwnd_child.0 == 0 {
         return false;
     }
-    let res = SendMessageW(hwnd_child, BM_GETCHECK, WPARAM(0), LPARAM(0));
+    let res = unsafe { SendMessageW(hwnd_child, BM_GETCHECK, WPARAM(0), LPARAM(0)) };
     res.0 as u32 == BST_CHECKED.0
 }
 
-unsafe fn set_checkbox_checked(hwnd: HWND, checked: bool) {
+fn set_checkbox_checked(hwnd: HWND, checked: bool) {
     if hwnd.0 == 0 {
         return;
     }
@@ -826,11 +837,12 @@ unsafe fn set_checkbox_checked(hwnd: HWND, checked: bool) {
     } else {
         Default::default()
     };
-    SendMessageW(hwnd, BM_SETCHECK, WPARAM(value.0 as usize), LPARAM(0));
+    unsafe { SendMessageW(hwnd, BM_SETCHECK, WPARAM(value.0 as usize), LPARAM(0)) };
 }
 
-unsafe fn set_checkbox_checked_by_id(hwnd: HWND, id: isize, checked: bool) {
-    let hwnd_child = windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, id as i32);
+fn set_checkbox_checked_by_id(hwnd: HWND, id: isize, checked: bool) {
+    let hwnd_child =
+        unsafe { windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, id as i32) };
     set_checkbox_checked(hwnd_child, checked);
 }
 
@@ -872,7 +884,7 @@ fn build_regex(
     Regex::new(&final_pattern).map_err(|err| err.to_string())
 }
 
-unsafe fn find_next_regex(
+fn find_next_regex(
     hwnd: HWND,
     hwnd_edit: HWND,
     search: &str,
@@ -880,12 +892,12 @@ unsafe fn find_next_regex(
     wrap: bool,
     options: &FindOptions,
 ) -> bool {
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     let regex = match build_regex(search, flags, options) {
         Ok(regex) => regex,
         Err(err) => {
             let message = i18n::tr_f(language, "find.regex_error", &[("err", &err)]);
-            show_error(hwnd, language, &message);
+            unsafe { show_error(hwnd, language, &message) };
             return false;
         }
     };
@@ -905,12 +917,14 @@ unsafe fn find_next_regex(
     };
 
     let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXGETSEL,
-        WPARAM(0),
-        LPARAM(&mut cr as *mut _ as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut cr as *mut _ as isize),
+        );
+    }
     let down = (flags & FR_DOWN) != FINDREPLACE_FLAGS(0);
     let start_utf16 = if down { cr.cpMax } else { cr.cpMin };
     let start_byte_original = utf16_index_to_byte(&original_text, start_utf16);
@@ -960,14 +974,16 @@ unsafe fn find_next_regex(
         cpMax: byte_index_to_utf16(&original_text, orig_end),
     };
     std::mem::swap(&mut sel.cpMin, &mut sel.cpMax);
-    SendMessageW(
-        hwnd_edit,
-        EM_EXSETSEL,
-        WPARAM(0),
-        LPARAM(&mut sel as *mut _ as isize),
-    );
-    SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
-    SetFocus(hwnd_edit);
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut sel as *mut _ as isize),
+        );
+        SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+        SetFocus(hwnd_edit);
+    }
     true
 }
 
@@ -988,7 +1004,7 @@ fn regex_find_backward(regex: &Regex, text: &str, end: usize) -> Option<(usize, 
     last
 }
 
-unsafe fn replace_selection_if_match_regex(
+fn replace_selection_if_match_regex(
     hwnd: HWND,
     hwnd_edit: HWND,
     search: &str,
@@ -996,22 +1012,24 @@ unsafe fn replace_selection_if_match_regex(
     flags: FINDREPLACE_FLAGS,
     options: &FindOptions,
 ) -> bool {
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     let regex = match build_regex(search, flags, options) {
         Ok(regex) => regex,
         Err(err) => {
             let message = i18n::tr_f(language, "find.regex_error", &[("err", &err)]);
-            show_error(hwnd, language, &message);
+            unsafe { show_error(hwnd, language, &message) };
             return false;
         }
     };
     let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXGETSEL,
-        WPARAM(0),
-        LPARAM(&mut cr as *mut _ as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut cr as *mut _ as isize),
+        );
+    }
     if cr.cpMin == cr.cpMax {
         return false;
     }
@@ -1029,16 +1047,18 @@ unsafe fn replace_selection_if_match_regex(
     let normalized = normalize_regex_replacement(replace);
     let replaced = regex.replace(selected, normalized.as_str()).to_string();
     let replace_wide = to_wide(&replaced);
-    SendMessageW(
-        hwnd_edit,
-        EM_REPLACESEL,
-        WPARAM(1),
-        LPARAM(replace_wide.as_ptr() as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_REPLACESEL,
+            WPARAM(1),
+            LPARAM(replace_wide.as_ptr() as isize),
+        );
+    }
     true
 }
 
-unsafe fn replace_all_regex(
+fn replace_all_regex(
     hwnd: HWND,
     hwnd_edit: HWND,
     search: &str,
@@ -1049,12 +1069,12 @@ unsafe fn replace_all_regex(
     if search.is_empty() {
         return;
     }
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     let regex = match build_regex(search, flags, options) {
         Ok(regex) => regex,
         Err(err) => {
             let message = i18n::tr_f(language, "find.regex_error", &[("err", &err)]);
-            show_error(hwnd, language, &message);
+            unsafe { show_error(hwnd, language, &message) };
             return;
         }
     };
@@ -1062,13 +1082,15 @@ unsafe fn replace_all_regex(
     let mut total_count = 0usize;
 
     if options.replace_in_all_docs {
-        let edits = with_state(hwnd, |state| {
-            state
-                .docs
-                .iter()
-                .map(|doc| doc.hwnd_edit)
-                .collect::<Vec<_>>()
-        })
+        let edits = unsafe {
+            with_state(hwnd, |state| {
+                state
+                    .docs
+                    .iter()
+                    .map(|doc| doc.hwnd_edit)
+                    .collect::<Vec<_>>()
+            })
+        }
         .unwrap_or_default();
         for hwnd_doc in edits {
             let text = get_edit_text(hwnd_doc);
@@ -1085,12 +1107,14 @@ unsafe fn replace_all_regex(
         }
     } else if options.replace_in_selection {
         let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
-        SendMessageW(
-            hwnd_edit,
-            EM_EXGETSEL,
-            WPARAM(0),
-            LPARAM(&mut cr as *mut _ as isize),
-        );
+        unsafe {
+            SendMessageW(
+                hwnd_edit,
+                EM_EXGETSEL,
+                WPARAM(0),
+                LPARAM(&mut cr as *mut _ as isize),
+            );
+        }
         if cr.cpMin == cr.cpMax {
             return;
         }
@@ -1117,53 +1141,54 @@ unsafe fn replace_all_regex(
     if total_count == 0 {
         let message = to_wide(&text_not_found_message(language));
         let title = to_wide(&find_title(language));
-        crate::message_box_modal(
-            hwnd,
-            PCWSTR(message.as_ptr()),
-            PCWSTR(title.as_ptr()),
-            MB_OK | MB_ICONWARNING,
-        );
+        unsafe {
+            crate::message_box_modal(
+                hwnd,
+                PCWSTR(message.as_ptr()),
+                PCWSTR(title.as_ptr()),
+                MB_OK | MB_ICONWARNING,
+            );
+        }
     } else {
         let message = replaced_count_message(language, total_count);
-        show_info(hwnd, language, &message);
+        unsafe { show_info(hwnd, language, &message) };
     }
 }
 
-unsafe fn replace_all_in_all_docs(
-    hwnd: HWND,
-    search: &str,
-    replace: &str,
-    flags: FINDREPLACE_FLAGS,
-) {
-    let edits = with_state(hwnd, |state| {
-        state
-            .docs
-            .iter()
-            .map(|doc| doc.hwnd_edit)
-            .collect::<Vec<_>>()
-    })
+fn replace_all_in_all_docs(hwnd: HWND, search: &str, replace: &str, flags: FINDREPLACE_FLAGS) {
+    let edits = unsafe {
+        with_state(hwnd, |state| {
+            state
+                .docs
+                .iter()
+                .map(|doc| doc.hwnd_edit)
+                .collect::<Vec<_>>()
+        })
+    }
     .unwrap_or_default();
     let mut total_count = 0usize;
     for hwnd_doc in edits {
         total_count += replace_all_in_range(hwnd_doc, search, replace, flags, 0, -1);
     }
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     if total_count == 0 {
         let message = to_wide(&text_not_found_message(language));
         let title = to_wide(&find_title(language));
-        crate::message_box_modal(
-            hwnd,
-            PCWSTR(message.as_ptr()),
-            PCWSTR(title.as_ptr()),
-            MB_OK | MB_ICONWARNING,
-        );
+        unsafe {
+            crate::message_box_modal(
+                hwnd,
+                PCWSTR(message.as_ptr()),
+                PCWSTR(title.as_ptr()),
+                MB_OK | MB_ICONWARNING,
+            );
+        }
     } else {
         let message = replaced_count_message(language, total_count);
-        show_info(hwnd, language, &message);
+        unsafe { show_info(hwnd, language, &message) };
     }
 }
 
-unsafe fn replace_all_in_selection(
+fn replace_all_in_selection(
     hwnd: HWND,
     hwnd_edit: HWND,
     search: &str,
@@ -1171,33 +1196,37 @@ unsafe fn replace_all_in_selection(
     flags: FINDREPLACE_FLAGS,
 ) {
     let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXGETSEL,
-        WPARAM(0),
-        LPARAM(&mut cr as *mut _ as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut cr as *mut _ as isize),
+        );
+    }
     if cr.cpMin == cr.cpMax {
         return;
     }
     let count = replace_all_in_range(hwnd_edit, search, replace, flags, cr.cpMin, cr.cpMax);
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     if count == 0 {
         let message = to_wide(&text_not_found_message(language));
         let title = to_wide(&find_title(language));
-        crate::message_box_modal(
-            hwnd,
-            PCWSTR(message.as_ptr()),
-            PCWSTR(title.as_ptr()),
-            MB_OK | MB_ICONWARNING,
-        );
+        unsafe {
+            crate::message_box_modal(
+                hwnd,
+                PCWSTR(message.as_ptr()),
+                PCWSTR(title.as_ptr()),
+                MB_OK | MB_ICONWARNING,
+            );
+        }
     } else {
         let message = replaced_count_message(language, count);
-        show_info(hwnd, language, &message);
+        unsafe { show_info(hwnd, language, &message) };
     }
 }
 
-unsafe fn replace_all_in_range(
+fn replace_all_in_range(
     hwnd_edit: HWND,
     search: &str,
     replace: &str,
@@ -1224,37 +1253,43 @@ unsafe fn replace_all_in_range(
             lpstrText: PCWSTR(search_wide.as_ptr()),
             chrgText: CHARRANGE { cpMin: 0, cpMax: 0 },
         };
-        let res = SendMessageW(
-            hwnd_edit,
-            EM_FINDTEXTEXW,
-            WPARAM(flags.0 as usize),
-            LPARAM(&mut ft as *mut _ as isize),
-        );
+        let res = unsafe {
+            SendMessageW(
+                hwnd_edit,
+                EM_FINDTEXTEXW,
+                WPARAM(flags.0 as usize),
+                LPARAM(&mut ft as *mut _ as isize),
+            )
+        };
         if res.0 == -1 {
             break;
         }
-        SendMessageW(
-            hwnd_edit,
-            EM_EXSETSEL,
-            WPARAM(0),
-            LPARAM(&mut ft.chrgText as *mut _ as isize),
-        );
-        SendMessageW(
-            hwnd_edit,
-            EM_REPLACESEL,
-            WPARAM(1),
-            LPARAM(replace_wide.as_ptr() as isize),
-        );
+        unsafe {
+            SendMessageW(
+                hwnd_edit,
+                EM_EXSETSEL,
+                WPARAM(0),
+                LPARAM(&mut ft.chrgText as *mut _ as isize),
+            );
+            SendMessageW(
+                hwnd_edit,
+                EM_REPLACESEL,
+                WPARAM(1),
+                LPARAM(replace_wide.as_ptr() as isize),
+            );
+        }
         count += 1;
         let match_len = ft.chrgText.cpMax - ft.chrgText.cpMin;
         let delta = replace_len - match_len;
         let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
-        SendMessageW(
-            hwnd_edit,
-            EM_EXGETSEL,
-            WPARAM(0),
-            LPARAM(&mut cr as *mut _ as isize),
-        );
+        unsafe {
+            SendMessageW(
+                hwnd_edit,
+                EM_EXGETSEL,
+                WPARAM(0),
+                LPARAM(&mut cr as *mut _ as isize),
+            );
+        }
         start = cr.cpMax;
         if end != -1 {
             end += delta;
@@ -1263,24 +1298,28 @@ unsafe fn replace_all_in_range(
     count
 }
 
-unsafe fn replace_range_text(hwnd_edit: HWND, start_utf16: i32, end_utf16: i32, text: &str) {
+fn replace_range_text(hwnd_edit: HWND, start_utf16: i32, end_utf16: i32, text: &str) {
     let mut range = CHARRANGE {
         cpMin: start_utf16,
         cpMax: end_utf16,
     };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXSETSEL,
-        WPARAM(0),
-        LPARAM(&mut range as *mut _ as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut range as *mut _ as isize),
+        );
+    }
     let wide = to_wide(text);
-    SendMessageW(
-        hwnd_edit,
-        EM_REPLACESEL,
-        WPARAM(1),
-        LPARAM(wide.as_ptr() as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_REPLACESEL,
+            WPARAM(1),
+            LPARAM(wide.as_ptr() as isize),
+        );
+    }
 }
 
 /// Normalizes Windows line endings (\r\n) to Unix (\n) for regex searching.

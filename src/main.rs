@@ -5020,9 +5020,7 @@ fn cycle_favorite_voice(hwnd: HWND, direction: i32) {
     }
     let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     app_windows::options_window::ensure_voice_lists_loaded(hwnd, language);
-    unsafe {
-        refresh_voice_panel(hwnd);
-    }
+    refresh_voice_panel(hwnd);
     if let Some(settings) = unsafe { with_state(hwnd, |state| state.settings.clone()) } {
         save_settings(settings);
     }
@@ -5648,9 +5646,7 @@ fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: bool) {
         let language =
             unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
         app_windows::options_window::ensure_voice_lists_loaded(hwnd, language);
-        unsafe {
-            refresh_voice_panel(hwnd);
-        }
+        refresh_voice_panel(hwnd);
     }
     if persist
         && changed
@@ -5701,9 +5697,7 @@ fn set_favorites_panel_visible_internal(hwnd: HWND, visible: bool, persist: bool
         let language =
             unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
         app_windows::options_window::ensure_voice_lists_loaded(hwnd, language);
-        unsafe {
-            refresh_voice_panel(hwnd);
-        }
+        refresh_voice_panel(hwnd);
     }
     if persist
         && changed
@@ -5715,403 +5709,409 @@ fn set_favorites_panel_visible_internal(hwnd: HWND, visible: bool, persist: bool
     editor_manager::layout_children(hwnd);
 }
 
-pub(crate) unsafe fn refresh_voice_panel(hwnd: HWND) {
-    let (
-        voice_visible,
-        label_engine,
-        combo_engine,
-        label_language,
-        combo_language,
-        label_voice,
-        combo_voice,
-        button_insert_tag,
-        label_speed,
-        combo_speed,
-        edit_speed,
-        label_pitch,
-        combo_pitch,
-        edit_pitch,
-        label_volume,
-        combo_volume,
-        edit_volume,
-        checkbox_multilingual,
-        favorites_visible,
-        label_favorites,
-        combo_favorites,
-    ) = match with_state(hwnd, |state| {
-        (
-            state.voice_panel_visible,
-            state.voice_label_engine,
-            state.voice_combo_engine,
-            state.voice_label_language,
-            state.voice_combo_language,
-            state.voice_label_voice,
-            state.voice_combo_voice,
-            state.voice_button_insert_tag,
-            state.voice_label_speed,
-            state.voice_combo_speed,
-            state.voice_edit_speed,
-            state.voice_label_pitch,
-            state.voice_combo_pitch,
-            state.voice_edit_pitch,
-            state.voice_label_volume,
-            state.voice_combo_volume,
-            state.voice_edit_volume,
-            state.voice_checkbox_multilingual,
-            state.voice_favorites_visible,
-            state.voice_label_favorites,
-            state.voice_combo_favorites,
-        )
-    }) {
-        Some(values) => values,
-        None => return,
-    };
-    if !voice_visible && !favorites_visible {
-        return;
-    }
-
-    let settings = with_state(hwnd, |state| state.settings.clone()).unwrap_or_default();
-    let labels = voice_panel_labels(settings.language);
-    if voice_visible {
-        let label_engine_wide = to_wide(&labels.label_engine);
-        let label_language_wide = to_wide(&labels.label_language);
-        let label_voice_wide = to_wide(&labels.label_voice);
-        let label_speed_wide = to_wide(&labels.label_speed);
-        let label_pitch_wide = to_wide(&labels.label_pitch);
-        let label_volume_wide = to_wide(&labels.label_volume);
-        crate::log_if_err!(SetWindowTextW(
+pub(crate) fn refresh_voice_panel(hwnd: HWND) {
+    unsafe {
+        let (
+            voice_visible,
             label_engine,
-            PCWSTR(label_engine_wide.as_ptr())
-        ));
-        crate::log_if_err!(SetWindowTextW(
+            combo_engine,
             label_language,
-            PCWSTR(label_language_wide.as_ptr())
-        ));
-        crate::log_if_err!(SetWindowTextW(
-            label_voice,
-            PCWSTR(label_voice_wide.as_ptr())
-        ));
-        let button_insert_wide = to_wide(&labels.button_insert_tag);
-        crate::log_if_err!(SetWindowTextW(
-            button_insert_tag,
-            PCWSTR(button_insert_wide.as_ptr())
-        ));
-        crate::log_if_err!(SetWindowTextW(
-            label_speed,
-            PCWSTR(label_speed_wide.as_ptr())
-        ));
-        crate::log_if_err!(SetWindowTextW(
-            label_pitch,
-            PCWSTR(label_pitch_wide.as_ptr())
-        ));
-        crate::log_if_err!(SetWindowTextW(
-            label_volume,
-            PCWSTR(label_volume_wide.as_ptr())
-        ));
-        let label_multi_wide = to_wide(&labels.label_multilingual);
-        crate::log_if_err!(SetWindowTextW(
-            checkbox_multilingual,
-            PCWSTR(label_multi_wide.as_ptr())
-        ));
-    }
-    if favorites_visible && label_favorites.0 != 0 {
-        let label_fav_wide = to_wide(&labels.label_favorites);
-        crate::log_if_err!(SetWindowTextW(
-            label_favorites,
-            PCWSTR(label_fav_wide.as_ptr())
-        ));
-    }
-
-    if voice_visible && combo_engine.0 != 0 && combo_voice.0 != 0 {
-        SendMessageW(combo_engine, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-        SendMessageW(
-            combo_engine,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(to_wide(&labels.engine_edge).as_ptr() as isize),
-        );
-        SendMessageW(
-            combo_engine,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(to_wide(&labels.engine_sapi).as_ptr() as isize),
-        );
-        SendMessageW(
-            combo_engine,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(to_wide(&labels.engine_sapi4).as_ptr() as isize),
-        );
-        let engine_index = match settings.tts_engine {
-            TtsEngine::Edge => 0,
-            TtsEngine::Sapi5 => 1,
-            TtsEngine::Sapi4 => 2,
-        };
-        SendMessageW(combo_engine, CB_SETCURSEL, WPARAM(engine_index), LPARAM(0));
-        let is_edge = matches!(settings.tts_engine, TtsEngine::Edge);
-        SendMessageW(
-            checkbox_multilingual,
-            BM_SETCHECK,
-            WPARAM(if settings.tts_only_multilingual {
-                BST_CHECKED.0 as usize
-            } else {
-                0
-            }),
-            LPARAM(0),
-        );
-        EnableWindow(checkbox_multilingual, is_edge);
-        let multi_show = if is_edge { SW_SHOW } else { SW_HIDE };
-        ShowWindow(checkbox_multilingual, multi_show);
-        let show_language_combo = is_edge && !settings.tts_only_multilingual;
-        ShowWindow(
-            label_language,
-            if show_language_combo {
-                SW_SHOW
-            } else {
-                SW_HIDE
-            },
-        );
-        ShowWindow(
             combo_language,
-            if show_language_combo {
-                SW_SHOW
-            } else {
-                SW_HIDE
-            },
-        );
-        EnableWindow(combo_language, show_language_combo);
-    }
-
-    if voice_visible {
-        let speed_items = [
-            (
-                i18n::tr(settings.language, "tts_tuning.speed.extremely_slow"),
-                -100,
-            ),
-            (
-                i18n::tr(settings.language, "tts_tuning.speed.very_slow"),
-                -60,
-            ),
-            (i18n::tr(settings.language, "tts_tuning.speed.slow"), -35),
-            (
-                i18n::tr(settings.language, "tts_tuning.speed.a_bit_slow"),
-                -20,
-            ),
-            (
-                i18n::tr(settings.language, "tts_tuning.speed.slightly_slow"),
-                -10,
-            ),
-            (i18n::tr(settings.language, "tts_tuning.speed.normal"), 0),
-            (
-                i18n::tr(settings.language, "tts_tuning.speed.slightly_fast"),
-                10,
-            ),
-            (
-                i18n::tr(settings.language, "tts_tuning.speed.a_bit_fast"),
-                20,
-            ),
-            (i18n::tr(settings.language, "tts_tuning.speed.fast"), 35),
-            (
-                i18n::tr(settings.language, "tts_tuning.speed.very_fast"),
-                50,
-            ),
-            (
-                i18n::tr(settings.language, "tts_tuning.speed.super_fast"),
-                100,
-            ),
-        ];
-        let pitch_items = [
-            (
-                i18n::tr(settings.language, "tts_tuning.pitch.very_low"),
-                -12,
-            ),
-            (i18n::tr(settings.language, "tts_tuning.pitch.low"), -10),
-            (
-                i18n::tr(settings.language, "tts_tuning.pitch.a_bit_low"),
-                -7,
-            ),
-            (
-                i18n::tr(settings.language, "tts_tuning.pitch.slightly_low"),
-                -5,
-            ),
-            (
-                i18n::tr(settings.language, "tts_tuning.pitch.a_little_lower"),
-                -2,
-            ),
-            (i18n::tr(settings.language, "tts_tuning.pitch.normal"), 0),
-            (
-                i18n::tr(settings.language, "tts_tuning.pitch.a_little_higher"),
-                2,
-            ),
-            (
-                i18n::tr(settings.language, "tts_tuning.pitch.slightly_high"),
-                5,
-            ),
-            (
-                i18n::tr(settings.language, "tts_tuning.pitch.a_bit_high"),
-                7,
-            ),
-            (i18n::tr(settings.language, "tts_tuning.pitch.high"), 9),
-            (
-                i18n::tr(settings.language, "tts_tuning.pitch.very_high"),
-                12,
-            ),
-        ];
-        let volume_items = [
-            (
-                i18n::tr(settings.language, "tts_tuning.volume.very_low"),
-                25,
-            ),
-            (i18n::tr(settings.language, "tts_tuning.volume.low"), 40),
-            (
-                i18n::tr(settings.language, "tts_tuning.volume.a_bit_low"),
-                55,
-            ),
-            (
-                i18n::tr(settings.language, "tts_tuning.volume.medium_low"),
-                70,
-            ),
-            (
-                i18n::tr(settings.language, "tts_tuning.volume.slightly_low"),
-                85,
-            ),
-            (i18n::tr(settings.language, "tts_tuning.volume.normal"), 100),
-            (
-                i18n::tr(settings.language, "tts_tuning.volume.slightly_high"),
-                115,
-            ),
-            (
-                i18n::tr(settings.language, "tts_tuning.volume.medium_high"),
-                130,
-            ),
-            (
-                i18n::tr(settings.language, "tts_tuning.volume.a_bit_high"),
-                145,
-            ),
-            (i18n::tr(settings.language, "tts_tuning.volume.high"), 160),
-            (
-                i18n::tr(settings.language, "tts_tuning.volume.very_high"),
-                180,
-            ),
-            (
-                i18n::tr(settings.language, "tts_tuning.volume.maximum"),
-                200,
-            ),
-        ];
-        init_tts_panel_combo(combo_speed, &speed_items);
-        init_tts_panel_combo(combo_pitch, &pitch_items);
-        init_tts_panel_combo(combo_volume, &volume_items);
-        select_combo_nearest_value(combo_speed, settings.tts_rate);
-        select_combo_nearest_value(combo_pitch, settings.tts_pitch);
-        select_combo_nearest_value(combo_volume, settings.tts_volume);
-        crate::log_if_err!(SetWindowTextW(
-            edit_speed,
-            PCWSTR(to_wide(&tts_ui_value_from_internal(settings.tts_rate).to_string()).as_ptr()),
-        ));
-        crate::log_if_err!(SetWindowTextW(
-            edit_pitch,
-            PCWSTR(to_wide(&tts_ui_value_from_internal(settings.tts_pitch).to_string()).as_ptr()),
-        ));
-        crate::log_if_err!(SetWindowTextW(
-            edit_volume,
-            PCWSTR(to_wide(&settings.tts_volume.to_string()).as_ptr()),
-        ));
-        let manual = settings.tts_manual_tuning;
-        ShowWindow(combo_speed, if manual { SW_HIDE } else { SW_SHOW });
-        ShowWindow(combo_pitch, if manual { SW_HIDE } else { SW_SHOW });
-        ShowWindow(combo_volume, if manual { SW_HIDE } else { SW_SHOW });
-        ShowWindow(edit_speed, if manual { SW_SHOW } else { SW_HIDE });
-        ShowWindow(edit_pitch, if manual { SW_SHOW } else { SW_HIDE });
-        ShowWindow(edit_volume, if manual { SW_SHOW } else { SW_HIDE });
-        EnableWindow(combo_speed, !manual);
-        EnableWindow(combo_pitch, !manual);
-        EnableWindow(combo_volume, !manual);
-        EnableWindow(edit_speed, manual);
-        EnableWindow(edit_pitch, manual);
-        EnableWindow(edit_volume, manual);
-        let voices: Vec<crate::settings::VoiceInfo> =
-            with_state(hwnd, |state| match settings.tts_engine {
-                TtsEngine::Edge => state.edge_voices.clone(),
-                TtsEngine::Sapi5 => state.sapi_voices.clone(),
-                TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
-            })
-            .unwrap_or_default();
-        let mut language_filter: Option<String> = None;
-        let show_language_combo =
-            matches!(settings.tts_engine, TtsEngine::Edge) && !settings.tts_only_multilingual;
-        if show_language_combo {
-            let previous_selection = with_state(hwnd, |state| {
-                let sel = SendMessageW(combo_language, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-                if sel >= 0 {
-                    state.voice_language_codes.get(sel as usize).cloned()
-                } else {
-                    None
-                }
-            })
-            .flatten();
-            let mut codes = collect_voice_language_codes(&voices);
-            if !codes.is_empty() {
-                let selected_from_voice = voices
-                    .iter()
-                    .find(|v| v.short_name == settings.tts_voice)
-                    .and_then(|v| voice_locale_language_code(&v.locale));
-                let selected_code = previous_selection
-                    .filter(|code| codes.contains(code))
-                    .or(selected_from_voice.filter(|code| codes.contains(code)))
-                    .unwrap_or_else(|| codes[0].clone());
-                SendMessageW(combo_language, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-                let mut selected_index: Option<usize> = None;
-                for (idx, code) in codes.iter().enumerate() {
-                    let label = localized_voice_language_name(settings.language, code);
-                    let added = SendMessageW(
-                        combo_language,
-                        CB_ADDSTRING,
-                        WPARAM(0),
-                        LPARAM(to_wide(&label).as_ptr() as isize),
-                    )
-                    .0;
-                    if added >= 0 && *code == selected_code {
-                        selected_index = Some(idx);
-                    }
-                }
-                SendMessageW(
-                    combo_language,
-                    CB_SETCURSEL,
-                    WPARAM(selected_index.unwrap_or(0)),
-                    LPARAM(0),
-                );
-                language_filter = Some(selected_code);
-            }
-            if with_state(hwnd, |state| {
-                state.voice_language_codes = std::mem::take(&mut codes);
-            })
-            .is_none()
-            {
-                log_debug("Failed to update voice language codes");
-            }
-        } else {
-            SendMessageW(combo_language, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-            if with_state(hwnd, |state| state.voice_language_codes.clear()).is_none() {
-                log_debug("Failed to clear voice language codes");
-            }
-        }
-        populate_voice_panel_combo(
+            label_voice,
             combo_voice,
-            &voices,
-            &settings.tts_voice,
-            settings.tts_only_multilingual,
-            language_filter.as_deref(),
-            &labels.voices_empty,
-        );
-    }
-    if favorites_visible {
-        populate_favorites_combo(
+            button_insert_tag,
+            label_speed,
+            combo_speed,
+            edit_speed,
+            label_pitch,
+            combo_pitch,
+            edit_pitch,
+            label_volume,
+            combo_volume,
+            edit_volume,
+            checkbox_multilingual,
+            favorites_visible,
+            label_favorites,
             combo_favorites,
-            &settings.favorite_voices,
-            settings.tts_engine,
-            &settings.tts_voice,
-            &labels,
-        );
+        ) = match with_state(hwnd, |state| {
+            (
+                state.voice_panel_visible,
+                state.voice_label_engine,
+                state.voice_combo_engine,
+                state.voice_label_language,
+                state.voice_combo_language,
+                state.voice_label_voice,
+                state.voice_combo_voice,
+                state.voice_button_insert_tag,
+                state.voice_label_speed,
+                state.voice_combo_speed,
+                state.voice_edit_speed,
+                state.voice_label_pitch,
+                state.voice_combo_pitch,
+                state.voice_edit_pitch,
+                state.voice_label_volume,
+                state.voice_combo_volume,
+                state.voice_edit_volume,
+                state.voice_checkbox_multilingual,
+                state.voice_favorites_visible,
+                state.voice_label_favorites,
+                state.voice_combo_favorites,
+            )
+        }) {
+            Some(values) => values,
+            None => return,
+        };
+        if !voice_visible && !favorites_visible {
+            return;
+        }
+
+        let settings = with_state(hwnd, |state| state.settings.clone()).unwrap_or_default();
+        let labels = voice_panel_labels(settings.language);
+        if voice_visible {
+            let label_engine_wide = to_wide(&labels.label_engine);
+            let label_language_wide = to_wide(&labels.label_language);
+            let label_voice_wide = to_wide(&labels.label_voice);
+            let label_speed_wide = to_wide(&labels.label_speed);
+            let label_pitch_wide = to_wide(&labels.label_pitch);
+            let label_volume_wide = to_wide(&labels.label_volume);
+            crate::log_if_err!(SetWindowTextW(
+                label_engine,
+                PCWSTR(label_engine_wide.as_ptr())
+            ));
+            crate::log_if_err!(SetWindowTextW(
+                label_language,
+                PCWSTR(label_language_wide.as_ptr())
+            ));
+            crate::log_if_err!(SetWindowTextW(
+                label_voice,
+                PCWSTR(label_voice_wide.as_ptr())
+            ));
+            let button_insert_wide = to_wide(&labels.button_insert_tag);
+            crate::log_if_err!(SetWindowTextW(
+                button_insert_tag,
+                PCWSTR(button_insert_wide.as_ptr())
+            ));
+            crate::log_if_err!(SetWindowTextW(
+                label_speed,
+                PCWSTR(label_speed_wide.as_ptr())
+            ));
+            crate::log_if_err!(SetWindowTextW(
+                label_pitch,
+                PCWSTR(label_pitch_wide.as_ptr())
+            ));
+            crate::log_if_err!(SetWindowTextW(
+                label_volume,
+                PCWSTR(label_volume_wide.as_ptr())
+            ));
+            let label_multi_wide = to_wide(&labels.label_multilingual);
+            crate::log_if_err!(SetWindowTextW(
+                checkbox_multilingual,
+                PCWSTR(label_multi_wide.as_ptr())
+            ));
+        }
+        if favorites_visible && label_favorites.0 != 0 {
+            let label_fav_wide = to_wide(&labels.label_favorites);
+            crate::log_if_err!(SetWindowTextW(
+                label_favorites,
+                PCWSTR(label_fav_wide.as_ptr())
+            ));
+        }
+
+        if voice_visible && combo_engine.0 != 0 && combo_voice.0 != 0 {
+            SendMessageW(combo_engine, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+            SendMessageW(
+                combo_engine,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&labels.engine_edge).as_ptr() as isize),
+            );
+            SendMessageW(
+                combo_engine,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&labels.engine_sapi).as_ptr() as isize),
+            );
+            SendMessageW(
+                combo_engine,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&labels.engine_sapi4).as_ptr() as isize),
+            );
+            let engine_index = match settings.tts_engine {
+                TtsEngine::Edge => 0,
+                TtsEngine::Sapi5 => 1,
+                TtsEngine::Sapi4 => 2,
+            };
+            SendMessageW(combo_engine, CB_SETCURSEL, WPARAM(engine_index), LPARAM(0));
+            let is_edge = matches!(settings.tts_engine, TtsEngine::Edge);
+            SendMessageW(
+                checkbox_multilingual,
+                BM_SETCHECK,
+                WPARAM(if settings.tts_only_multilingual {
+                    BST_CHECKED.0 as usize
+                } else {
+                    0
+                }),
+                LPARAM(0),
+            );
+            EnableWindow(checkbox_multilingual, is_edge);
+            let multi_show = if is_edge { SW_SHOW } else { SW_HIDE };
+            ShowWindow(checkbox_multilingual, multi_show);
+            let show_language_combo = is_edge && !settings.tts_only_multilingual;
+            ShowWindow(
+                label_language,
+                if show_language_combo {
+                    SW_SHOW
+                } else {
+                    SW_HIDE
+                },
+            );
+            ShowWindow(
+                combo_language,
+                if show_language_combo {
+                    SW_SHOW
+                } else {
+                    SW_HIDE
+                },
+            );
+            EnableWindow(combo_language, show_language_combo);
+        }
+
+        if voice_visible {
+            let speed_items = [
+                (
+                    i18n::tr(settings.language, "tts_tuning.speed.extremely_slow"),
+                    -100,
+                ),
+                (
+                    i18n::tr(settings.language, "tts_tuning.speed.very_slow"),
+                    -60,
+                ),
+                (i18n::tr(settings.language, "tts_tuning.speed.slow"), -35),
+                (
+                    i18n::tr(settings.language, "tts_tuning.speed.a_bit_slow"),
+                    -20,
+                ),
+                (
+                    i18n::tr(settings.language, "tts_tuning.speed.slightly_slow"),
+                    -10,
+                ),
+                (i18n::tr(settings.language, "tts_tuning.speed.normal"), 0),
+                (
+                    i18n::tr(settings.language, "tts_tuning.speed.slightly_fast"),
+                    10,
+                ),
+                (
+                    i18n::tr(settings.language, "tts_tuning.speed.a_bit_fast"),
+                    20,
+                ),
+                (i18n::tr(settings.language, "tts_tuning.speed.fast"), 35),
+                (
+                    i18n::tr(settings.language, "tts_tuning.speed.very_fast"),
+                    50,
+                ),
+                (
+                    i18n::tr(settings.language, "tts_tuning.speed.super_fast"),
+                    100,
+                ),
+            ];
+            let pitch_items = [
+                (
+                    i18n::tr(settings.language, "tts_tuning.pitch.very_low"),
+                    -12,
+                ),
+                (i18n::tr(settings.language, "tts_tuning.pitch.low"), -10),
+                (
+                    i18n::tr(settings.language, "tts_tuning.pitch.a_bit_low"),
+                    -7,
+                ),
+                (
+                    i18n::tr(settings.language, "tts_tuning.pitch.slightly_low"),
+                    -5,
+                ),
+                (
+                    i18n::tr(settings.language, "tts_tuning.pitch.a_little_lower"),
+                    -2,
+                ),
+                (i18n::tr(settings.language, "tts_tuning.pitch.normal"), 0),
+                (
+                    i18n::tr(settings.language, "tts_tuning.pitch.a_little_higher"),
+                    2,
+                ),
+                (
+                    i18n::tr(settings.language, "tts_tuning.pitch.slightly_high"),
+                    5,
+                ),
+                (
+                    i18n::tr(settings.language, "tts_tuning.pitch.a_bit_high"),
+                    7,
+                ),
+                (i18n::tr(settings.language, "tts_tuning.pitch.high"), 9),
+                (
+                    i18n::tr(settings.language, "tts_tuning.pitch.very_high"),
+                    12,
+                ),
+            ];
+            let volume_items = [
+                (
+                    i18n::tr(settings.language, "tts_tuning.volume.very_low"),
+                    25,
+                ),
+                (i18n::tr(settings.language, "tts_tuning.volume.low"), 40),
+                (
+                    i18n::tr(settings.language, "tts_tuning.volume.a_bit_low"),
+                    55,
+                ),
+                (
+                    i18n::tr(settings.language, "tts_tuning.volume.medium_low"),
+                    70,
+                ),
+                (
+                    i18n::tr(settings.language, "tts_tuning.volume.slightly_low"),
+                    85,
+                ),
+                (i18n::tr(settings.language, "tts_tuning.volume.normal"), 100),
+                (
+                    i18n::tr(settings.language, "tts_tuning.volume.slightly_high"),
+                    115,
+                ),
+                (
+                    i18n::tr(settings.language, "tts_tuning.volume.medium_high"),
+                    130,
+                ),
+                (
+                    i18n::tr(settings.language, "tts_tuning.volume.a_bit_high"),
+                    145,
+                ),
+                (i18n::tr(settings.language, "tts_tuning.volume.high"), 160),
+                (
+                    i18n::tr(settings.language, "tts_tuning.volume.very_high"),
+                    180,
+                ),
+                (
+                    i18n::tr(settings.language, "tts_tuning.volume.maximum"),
+                    200,
+                ),
+            ];
+            init_tts_panel_combo(combo_speed, &speed_items);
+            init_tts_panel_combo(combo_pitch, &pitch_items);
+            init_tts_panel_combo(combo_volume, &volume_items);
+            select_combo_nearest_value(combo_speed, settings.tts_rate);
+            select_combo_nearest_value(combo_pitch, settings.tts_pitch);
+            select_combo_nearest_value(combo_volume, settings.tts_volume);
+            crate::log_if_err!(SetWindowTextW(
+                edit_speed,
+                PCWSTR(
+                    to_wide(&tts_ui_value_from_internal(settings.tts_rate).to_string()).as_ptr()
+                ),
+            ));
+            crate::log_if_err!(SetWindowTextW(
+                edit_pitch,
+                PCWSTR(
+                    to_wide(&tts_ui_value_from_internal(settings.tts_pitch).to_string()).as_ptr()
+                ),
+            ));
+            crate::log_if_err!(SetWindowTextW(
+                edit_volume,
+                PCWSTR(to_wide(&settings.tts_volume.to_string()).as_ptr()),
+            ));
+            let manual = settings.tts_manual_tuning;
+            ShowWindow(combo_speed, if manual { SW_HIDE } else { SW_SHOW });
+            ShowWindow(combo_pitch, if manual { SW_HIDE } else { SW_SHOW });
+            ShowWindow(combo_volume, if manual { SW_HIDE } else { SW_SHOW });
+            ShowWindow(edit_speed, if manual { SW_SHOW } else { SW_HIDE });
+            ShowWindow(edit_pitch, if manual { SW_SHOW } else { SW_HIDE });
+            ShowWindow(edit_volume, if manual { SW_SHOW } else { SW_HIDE });
+            EnableWindow(combo_speed, !manual);
+            EnableWindow(combo_pitch, !manual);
+            EnableWindow(combo_volume, !manual);
+            EnableWindow(edit_speed, manual);
+            EnableWindow(edit_pitch, manual);
+            EnableWindow(edit_volume, manual);
+            let voices: Vec<crate::settings::VoiceInfo> =
+                with_state(hwnd, |state| match settings.tts_engine {
+                    TtsEngine::Edge => state.edge_voices.clone(),
+                    TtsEngine::Sapi5 => state.sapi_voices.clone(),
+                    TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
+                })
+                .unwrap_or_default();
+            let mut language_filter: Option<String> = None;
+            let show_language_combo =
+                matches!(settings.tts_engine, TtsEngine::Edge) && !settings.tts_only_multilingual;
+            if show_language_combo {
+                let previous_selection = with_state(hwnd, |state| {
+                    let sel = SendMessageW(combo_language, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+                    if sel >= 0 {
+                        state.voice_language_codes.get(sel as usize).cloned()
+                    } else {
+                        None
+                    }
+                })
+                .flatten();
+                let mut codes = collect_voice_language_codes(&voices);
+                if !codes.is_empty() {
+                    let selected_from_voice = voices
+                        .iter()
+                        .find(|v| v.short_name == settings.tts_voice)
+                        .and_then(|v| voice_locale_language_code(&v.locale));
+                    let selected_code = previous_selection
+                        .filter(|code| codes.contains(code))
+                        .or(selected_from_voice.filter(|code| codes.contains(code)))
+                        .unwrap_or_else(|| codes[0].clone());
+                    SendMessageW(combo_language, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+                    let mut selected_index: Option<usize> = None;
+                    for (idx, code) in codes.iter().enumerate() {
+                        let label = localized_voice_language_name(settings.language, code);
+                        let added = SendMessageW(
+                            combo_language,
+                            CB_ADDSTRING,
+                            WPARAM(0),
+                            LPARAM(to_wide(&label).as_ptr() as isize),
+                        )
+                        .0;
+                        if added >= 0 && *code == selected_code {
+                            selected_index = Some(idx);
+                        }
+                    }
+                    SendMessageW(
+                        combo_language,
+                        CB_SETCURSEL,
+                        WPARAM(selected_index.unwrap_or(0)),
+                        LPARAM(0),
+                    );
+                    language_filter = Some(selected_code);
+                }
+                if with_state(hwnd, |state| {
+                    state.voice_language_codes = std::mem::take(&mut codes);
+                })
+                .is_none()
+                {
+                    log_debug("Failed to update voice language codes");
+                }
+            } else {
+                SendMessageW(combo_language, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+                if with_state(hwnd, |state| state.voice_language_codes.clear()).is_none() {
+                    log_debug("Failed to clear voice language codes");
+                }
+            }
+            populate_voice_panel_combo(
+                combo_voice,
+                &voices,
+                &settings.tts_voice,
+                settings.tts_only_multilingual,
+                language_filter.as_deref(),
+                &labels.voices_empty,
+            );
+        }
+        if favorites_visible {
+            populate_favorites_combo(
+                combo_favorites,
+                &settings.favorite_voices,
+                settings.tts_engine,
+                &settings.tts_voice,
+                &labels,
+            );
+        }
     }
 }
 
@@ -8172,9 +8172,7 @@ fn add_favorite_voice(hwnd: HWND, engine: TtsEngine, voice_name: &str) {
     if let Some(settings) = unsafe { with_state(hwnd, |state| state.settings.clone()) } {
         save_settings(settings);
     }
-    unsafe {
-        refresh_voice_panel(hwnd);
-    }
+    refresh_voice_panel(hwnd);
 }
 
 fn remove_favorite_voice(hwnd: HWND, engine: TtsEngine, voice_name: &str) {
@@ -8189,9 +8187,7 @@ fn remove_favorite_voice(hwnd: HWND, engine: TtsEngine, voice_name: &str) {
     if let Some(settings) = unsafe { with_state(hwnd, |state| state.settings.clone()) } {
         save_settings(settings);
     }
-    unsafe {
-        refresh_voice_panel(hwnd);
-    }
+    refresh_voice_panel(hwnd);
 }
 
 fn is_focus_in_voice_panel(hwnd: HWND) -> bool {

@@ -5026,9 +5026,7 @@ fn cycle_favorite_voice(hwnd: HWND, direction: i32) {
     if let Some(settings) = unsafe { with_state(hwnd, |state| state.settings.clone()) } {
         save_settings(settings);
     }
-    unsafe {
-        restart_tts_from_current_offset(hwnd);
-    }
+    restart_tts_from_current_offset(hwnd);
 }
 
 fn is_tts_active(hwnd: HWND) -> bool {
@@ -6789,35 +6787,37 @@ unsafe extern "system" fn voice_combo_subclass_proc(
     )
 }
 
-pub(crate) unsafe fn restart_tts_from_current_offset(hwnd: HWND) {
-    let mut restart = None;
-    with_state(hwnd, |state| {
-        if let Some(session) = &state.tts_session
-            && let Some(doc) = state.docs.get(state.current)
-        {
-            if matches!(doc.format, FileFormat::Audiobook) {
-                return;
+pub(crate) fn restart_tts_from_current_offset(hwnd: HWND) {
+    unsafe {
+        let mut restart = None;
+        with_state(hwnd, |state| {
+            if let Some(session) = &state.tts_session
+                && let Some(doc) = state.docs.get(state.current)
+            {
+                if matches!(doc.format, FileFormat::Audiobook) {
+                    return;
+                }
+                let pos = (session.initial_caret_pos + state.tts_last_offset).max(0);
+                restart = Some((doc.hwnd_edit, pos));
             }
-            let pos = (session.initial_caret_pos + state.tts_last_offset).max(0);
-            restart = Some((doc.hwnd_edit, pos));
-        }
-    });
-    let Some((hwnd_edit, pos)) = restart else {
-        return;
-    };
-    tts_engine::stop_tts_playback(hwnd);
-    let pos = adjust_tts_restart_pos(hwnd_edit, pos);
-    let mut cr = CHARRANGE {
-        cpMin: pos,
-        cpMax: pos,
-    };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXSETSEL,
-        WPARAM(0),
-        LPARAM(&mut cr as *mut _ as isize),
-    );
-    tts_engine::start_tts_from_caret(hwnd);
+        });
+        let Some((hwnd_edit, pos)) = restart else {
+            return;
+        };
+        tts_engine::stop_tts_playback(hwnd);
+        let pos = adjust_tts_restart_pos(hwnd_edit, pos);
+        let mut cr = CHARRANGE {
+            cpMin: pos,
+            cpMax: pos,
+        };
+        SendMessageW(
+            hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut cr as *mut _ as isize),
+        );
+        tts_engine::start_tts_from_caret(hwnd);
+    }
 }
 
 fn adjust_tts_restart_pos(hwnd_edit: HWND, pos: i32) -> i32 {

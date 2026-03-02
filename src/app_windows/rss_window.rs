@@ -2838,194 +2838,196 @@ unsafe extern "system" fn reorder_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "reorder_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { reorder_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || reorder_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn reorder_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let cs = lparam.0 as *const CREATESTRUCTW;
-            let init_ptr = (*cs).lpCreateParams as *mut ReorderDialogInit;
-            if init_ptr.is_null() {
-                return LRESULT(0);
-            }
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, init_ptr as isize);
-            let init = &*init_ptr;
-
-            let language = with_rss_state(init.parent, |s| {
-                with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
-            })
-            .unwrap_or_default();
-            let position_template = i18n::tr(language, "rss.reorder.position_of");
-            let position_text = position_template
-                .replace("{x}", &(init.source_index + 1).to_string())
-                .replace("{n}", &init.total.to_string());
-            let move_label = i18n::tr(language, "rss.reorder.move_to_position");
-            let ok_label = i18n::tr(language, "rss.dialog.ok");
-            let cancel_label = i18n::tr(language, "rss.dialog.cancel");
-
-            let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-            CreateWindowExW(
-                Default::default(),
-                w!("STATIC"),
-                PCWSTR(to_wide(&position_text).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                10,
-                10,
-                330,
-                16,
-                hwnd,
-                HMENU(1),
-                hinstance,
-                None,
-            );
-            CreateWindowExW(
-                Default::default(),
-                w!("STATIC"),
-                PCWSTR(to_wide(&move_label).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                10,
-                36,
-                330,
-                16,
-                hwnd,
-                HMENU(2),
-                hinstance,
-                None,
-            );
-            let edit = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                10,
-                54,
-                120,
-                24,
-                hwnd,
-                HMENU(REORDER_EDIT_ID as isize),
-                hinstance,
-                None,
-            );
-            SendMessageW(edit, EM_LIMITTEXT, WPARAM(6), LPARAM(0));
-            let ok = CreateWindowExW(
-                Default::default(),
-                w!("BUTTON"),
-                PCWSTR(to_wide(&ok_label).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                170,
-                96,
-                80,
-                24,
-                hwnd,
-                HMENU(REORDER_OK_ID as isize),
-                hinstance,
-                None,
-            );
-            let cancel = CreateWindowExW(
-                Default::default(),
-                w!("BUTTON"),
-                PCWSTR(to_wide(&cancel_label).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                260,
-                96,
-                80,
-                24,
-                hwnd,
-                HMENU(REORDER_CANCEL_ID as isize),
-                hinstance,
-                None,
-            );
-            let proc_ptr = reorder_control_subclass_proc as *const () as usize;
-            for control in [edit, ok, cancel] {
-                let prev = SetWindowLongPtrW(control, GWLP_WNDPROC, proc_ptr as isize);
-                SetWindowLongPtrW(control, GWLP_USERDATA, prev);
-            }
-            SetFocus(edit);
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-            let id = wparam.0 & 0xffff;
-            match id {
-                1 => {
-                    SendMessageW(hwnd, WM_COMMAND, WPARAM(REORDER_OK_ID), LPARAM(0));
-                    LRESULT(0)
+fn reorder_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let cs = lparam.0 as *const CREATESTRUCTW;
+                let init_ptr = (*cs).lpCreateParams as *mut ReorderDialogInit;
+                if init_ptr.is_null() {
+                    return LRESULT(0);
                 }
-                REORDER_OK_ID => {
-                    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ReorderDialogInit;
-                    if ptr.is_null() {
-                        return LRESULT(0);
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, init_ptr as isize);
+                let init = &*init_ptr;
+
+                let language = with_rss_state(init.parent, |s| {
+                    with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
+                })
+                .unwrap_or_default();
+                let position_template = i18n::tr(language, "rss.reorder.position_of");
+                let position_text = position_template
+                    .replace("{x}", &(init.source_index + 1).to_string())
+                    .replace("{n}", &init.total.to_string());
+                let move_label = i18n::tr(language, "rss.reorder.move_to_position");
+                let ok_label = i18n::tr(language, "rss.dialog.ok");
+                let cancel_label = i18n::tr(language, "rss.dialog.cancel");
+
+                let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+                CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&position_text).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    10,
+                    10,
+                    330,
+                    16,
+                    hwnd,
+                    HMENU(1),
+                    hinstance,
+                    None,
+                );
+                CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&move_label).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    10,
+                    36,
+                    330,
+                    16,
+                    hwnd,
+                    HMENU(2),
+                    hinstance,
+                    None,
+                );
+                let edit = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    10,
+                    54,
+                    120,
+                    24,
+                    hwnd,
+                    HMENU(REORDER_EDIT_ID as isize),
+                    hinstance,
+                    None,
+                );
+                SendMessageW(edit, EM_LIMITTEXT, WPARAM(6), LPARAM(0));
+                let ok = CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&ok_label).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    170,
+                    96,
+                    80,
+                    24,
+                    hwnd,
+                    HMENU(REORDER_OK_ID as isize),
+                    hinstance,
+                    None,
+                );
+                let cancel = CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&cancel_label).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    260,
+                    96,
+                    80,
+                    24,
+                    hwnd,
+                    HMENU(REORDER_CANCEL_ID as isize),
+                    hinstance,
+                    None,
+                );
+                let proc_ptr = reorder_control_subclass_proc as *const () as usize;
+                for control in [edit, ok, cancel] {
+                    let prev = SetWindowLongPtrW(control, GWLP_WNDPROC, proc_ptr as isize);
+                    SetWindowLongPtrW(control, GWLP_USERDATA, prev);
+                }
+                SetFocus(edit);
+                LRESULT(0)
+            }
+            WM_COMMAND => {
+                let id = wparam.0 & 0xffff;
+                match id {
+                    1 => {
+                        SendMessageW(hwnd, WM_COMMAND, WPARAM(REORDER_OK_ID), LPARAM(0));
+                        LRESULT(0)
                     }
-                    let init = &*ptr;
-                    let edit = GetDlgItem(hwnd, REORDER_EDIT_ID as i32);
-                    let len = SendMessageW(
-                        edit,
-                        windows::Win32::UI::WindowsAndMessaging::WM_GETTEXTLENGTH,
-                        WPARAM(0),
-                        LPARAM(0),
-                    )
-                    .0;
-                    let mut buf = vec![0u16; len as usize + 1];
-                    SendMessageW(
-                        edit,
-                        windows::Win32::UI::WindowsAndMessaging::WM_GETTEXT,
-                        WPARAM(buf.len()),
-                        LPARAM(buf.as_mut_ptr() as isize),
-                    );
-                    let text = String::from_utf16_lossy(&buf[..len as usize]);
-                    let language = with_rss_state(init.parent, |s| {
-                        with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
-                    })
-                    .unwrap_or_default();
-                    let pos = match text.trim().parse::<usize>() {
-                        Ok(v) if v > 0 => v,
-                        _ => {
-                            let message = i18n::tr(language, "rss.reorder.invalid_position");
-                            announce_rss_status(&message);
-                            SetFocus(edit);
+                    REORDER_OK_ID => {
+                        let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ReorderDialogInit;
+                        if ptr.is_null() {
                             return LRESULT(0);
                         }
-                    };
-                    let target = pos.clamp(1, init.total) - 1;
-                    if let Some(new_index) = apply_reorder_action(
-                        init.parent,
-                        init.source_index,
-                        ReorderAction::Position,
-                        target,
-                    ) && new_index != init.source_index
-                    {
-                        let template = i18n::tr(language, "rss.reorder.moved_position");
-                        let message = template.replace("{x}", &(new_index + 1).to_string());
-                        announce_rss_status(&message);
+                        let init = &*ptr;
+                        let edit = GetDlgItem(hwnd, REORDER_EDIT_ID as i32);
+                        let len = SendMessageW(
+                            edit,
+                            windows::Win32::UI::WindowsAndMessaging::WM_GETTEXTLENGTH,
+                            WPARAM(0),
+                            LPARAM(0),
+                        )
+                        .0;
+                        let mut buf = vec![0u16; len as usize + 1];
+                        SendMessageW(
+                            edit,
+                            windows::Win32::UI::WindowsAndMessaging::WM_GETTEXT,
+                            WPARAM(buf.len()),
+                            LPARAM(buf.as_mut_ptr() as isize),
+                        );
+                        let text = String::from_utf16_lossy(&buf[..len as usize]);
+                        let language = with_rss_state(init.parent, |s| {
+                            with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
+                        })
+                        .unwrap_or_default();
+                        let pos = match text.trim().parse::<usize>() {
+                            Ok(v) if v > 0 => v,
+                            _ => {
+                                let message = i18n::tr(language, "rss.reorder.invalid_position");
+                                announce_rss_status(&message);
+                                SetFocus(edit);
+                                return LRESULT(0);
+                            }
+                        };
+                        let target = pos.clamp(1, init.total) - 1;
+                        if let Some(new_index) = apply_reorder_action(
+                            init.parent,
+                            init.source_index,
+                            ReorderAction::Position,
+                            target,
+                        ) && new_index != init.source_index
+                        {
+                            let template = i18n::tr(language, "rss.reorder.moved_position");
+                            let message = template.replace("{x}", &(new_index + 1).to_string());
+                            announce_rss_status(&message);
+                        }
+                        crate::log_if_err!(DestroyWindow(hwnd));
+                        LRESULT(0)
                     }
-                    crate::log_if_err!(DestroyWindow(hwnd));
-                    LRESULT(0)
+                    REORDER_CANCEL_ID | 2 => {
+                        crate::log_if_err!(DestroyWindow(hwnd));
+                        LRESULT(0)
+                    }
+                    _ => DefWindowProcW(hwnd, msg, wparam, lparam),
                 }
-                REORDER_CANCEL_ID | 2 => {
-                    crate::log_if_err!(DestroyWindow(hwnd));
-                    LRESULT(0)
+            }
+            WM_KEYDOWN => {
+                if wparam.0 as u16 == VK_ESCAPE.0 {
+                    SendMessageW(hwnd, WM_COMMAND, WPARAM(REORDER_CANCEL_ID), LPARAM(0));
+                    return LRESULT(0);
                 }
-                _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
-        }
-        WM_KEYDOWN => {
-            if wparam.0 as u16 == VK_ESCAPE.0 {
-                SendMessageW(hwnd, WM_COMMAND, WPARAM(REORDER_CANCEL_ID), LPARAM(0));
-                return LRESULT(0);
+            WM_NCDESTROY => {
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ReorderDialogInit;
+                if !ptr.is_null() {
+                    let init = Box::from_raw(ptr);
+                    with_rss_state(init.parent, |s| s.reorder_dialog = HWND(0));
+                }
+                LRESULT(0)
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        WM_NCDESTROY => {
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ReorderDialogInit;
-            if !ptr.is_null() {
-                let init = unsafe { Box::from_raw(ptr) };
-                with_rss_state(init.parent, |s| s.reorder_dialog = HWND(0));
-            }
-            LRESULT(0)
-        }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 
@@ -3049,59 +3051,61 @@ unsafe extern "system" fn rss_tree_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "rss_tree_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { rss_tree_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || rss_tree_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn rss_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    if msg == windows::Win32::UI::WindowsAndMessaging::WM_CHAR
-        && wparam.0 as u32 == 3
-        && GetKeyState(VK_CONTROL.0 as i32) < 0
-    {
-        return LRESULT(0);
-    }
-    if msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN {
-        let key = wparam.0 as u32;
-        if key == 'C' as u32 && GetKeyState(VK_CONTROL.0 as i32) < 0 {
-            let parent = GetParent(hwnd);
-            if parent.0 != 0 {
-                ignore_bool(handle_rss_quick_copy(parent));
-                return LRESULT(0);
-            }
-        }
-        if key == u32::from(VK_RETURN.0) && GetKeyState(VK_MENU.0 as i32) < 0 {
-            let parent = GetParent(hwnd);
-            if parent.0 != 0 {
-                show_selected_properties(parent);
-                return LRESULT(0);
-            }
-        }
-        if key == u32::from(VK_APPS.0)
-            || (key == u32::from(VK_F10.0) && GetKeyState(VK_SHIFT.0 as i32) < 0)
+fn rss_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        if msg == windows::Win32::UI::WindowsAndMessaging::WM_CHAR
+            && wparam.0 as u32 == 3
+            && GetKeyState(VK_CONTROL.0 as i32) < 0
         {
-            let parent = GetParent(hwnd);
-            if parent.0 != 0 {
-                if let Err(_e) =
-                    PostMessageW(parent, WM_CONTEXTMENU, WPARAM(hwnd.0 as usize), LPARAM(-1))
-                {
-                    crate::log_debug(&format!("Error: {:?}", _e));
+            return LRESULT(0);
+        }
+        if msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN {
+            let key = wparam.0 as u32;
+            if key == 'C' as u32 && GetKeyState(VK_CONTROL.0 as i32) < 0 {
+                let parent = GetParent(hwnd);
+                if parent.0 != 0 {
+                    ignore_bool(handle_rss_quick_copy(parent));
+                    return LRESULT(0);
                 }
-                return LRESULT(0);
+            }
+            if key == u32::from(VK_RETURN.0) && GetKeyState(VK_MENU.0 as i32) < 0 {
+                let parent = GetParent(hwnd);
+                if parent.0 != 0 {
+                    show_selected_properties(parent);
+                    return LRESULT(0);
+                }
+            }
+            if key == u32::from(VK_APPS.0)
+                || (key == u32::from(VK_F10.0) && GetKeyState(VK_SHIFT.0 as i32) < 0)
+            {
+                let parent = GetParent(hwnd);
+                if parent.0 != 0 {
+                    if let Err(_e) =
+                        PostMessageW(parent, WM_CONTEXTMENU, WPARAM(hwnd.0 as usize), LPARAM(-1))
+                    {
+                        crate::log_debug(&format!("Error: {:?}", _e));
+                    }
+                    return LRESULT(0);
+                }
             }
         }
-    }
 
-    let parent = GetParent(hwnd);
-    let prev_proc = if parent.0 != 0 {
-        with_rss_state(parent, |s| s.tree_proc).unwrap_or(None)
-    } else {
-        None
-    };
-    if let Some(proc) = prev_proc {
-        CallWindowProcW(Some(proc), hwnd, msg, wparam, lparam)
-    } else {
-        DefWindowProcW(hwnd, msg, wparam, lparam)
+        let parent = GetParent(hwnd);
+        let prev_proc = if parent.0 != 0 {
+            with_rss_state(parent, |s| s.tree_proc).unwrap_or(None)
+        } else {
+            None
+        };
+        if let Some(proc) = prev_proc {
+            CallWindowProcW(Some(proc), hwnd, msg, wparam, lparam)
+        } else {
+            DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
     }
 }
 
@@ -4272,7 +4276,7 @@ fn load_more_items(
     inserted
 }
 
-unsafe fn handle_enter_action(hwnd: HWND, open_in_browser: bool) {
+fn handle_enter_action(hwnd: HWND, open_in_browser: bool) {
     // UI: Enter imports the article, Shift+Enter opens it in the browser.
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     let hitem = windows::Win32::UI::Controls::HTREEITEM(
@@ -4299,15 +4303,15 @@ unsafe fn handle_enter_action(hwnd: HWND, open_in_browser: bool) {
     if let Some(item) = item_opt {
         let item_key = rss_item_key(&item);
         with_rss_state(hwnd, |s| {
-            let parent = windows::Win32::UI::Controls::HTREEITEM(
+            let parent = windows::Win32::UI::Controls::HTREEITEM(unsafe {
                 SendMessageW(
                     s.hwnd_tree,
                     TVM_GETNEXTITEM,
                     WPARAM(TVGN_PARENT as usize),
                     LPARAM(hitem.0),
                 )
-                .0,
-            );
+                .0
+            });
             if parent.0 != 0
                 && let Some(state) = s.source_items.get_mut(&parent.0)
             {
@@ -4316,19 +4320,21 @@ unsafe fn handle_enter_action(hwnd: HWND, open_in_browser: bool) {
             if parent.0 != 0
                 && let Some(NodeData::Source(source_index)) = s.node_data.get(&parent.0)
             {
-                with_state(s.parent, |ps| {
-                    if let Some(src) = ps.settings.rss_sources.get_mut(*source_index)
-                        && !src.read_item_keys.iter().any(|k| k == &item_key)
-                    {
-                        src.read_item_keys.push(item_key.clone());
-                        const MAX_PERSISTED_READ_KEYS: usize = 5000;
-                        if src.read_item_keys.len() > MAX_PERSISTED_READ_KEYS {
-                            let overflow = src.read_item_keys.len() - MAX_PERSISTED_READ_KEYS;
-                            src.read_item_keys.drain(0..overflow);
+                unsafe {
+                    with_state(s.parent, |ps| {
+                        if let Some(src) = ps.settings.rss_sources.get_mut(*source_index)
+                            && !src.read_item_keys.iter().any(|k| k == &item_key)
+                        {
+                            src.read_item_keys.push(item_key.clone());
+                            const MAX_PERSISTED_READ_KEYS: usize = 5000;
+                            if src.read_item_keys.len() > MAX_PERSISTED_READ_KEYS {
+                                let overflow = src.read_item_keys.len() - MAX_PERSISTED_READ_KEYS;
+                                src.read_item_keys.drain(0..overflow);
+                            }
+                            crate::settings::save_settings(ps.settings.clone());
                         }
-                        crate::settings::save_settings(ps.settings.clone());
-                    }
-                });
+                    });
+                }
             }
         });
         let delayed_key = rss_item_key(&item);
@@ -4340,12 +4346,14 @@ unsafe fn handle_enter_action(hwnd: HWND, open_in_browser: bool) {
                 item_key: delayed_key,
             });
             let payload_ptr = Box::into_raw(payload);
-            if let Err(e) = PostMessageW(
-                hwnd,
-                WM_RSS_MARK_ITEM_READ_UI,
-                WPARAM(0),
-                LPARAM(payload_ptr as isize),
-            ) {
+            if let Err(e) = unsafe {
+                PostMessageW(
+                    hwnd,
+                    WM_RSS_MARK_ITEM_READ_UI,
+                    WPARAM(0),
+                    LPARAM(payload_ptr as isize),
+                )
+            } {
                 let _payload_owner = unsafe { Box::from_raw(payload_ptr) };
                 crate::log_debug(&format!("Failed to post WM_RSS_MARK_ITEM_READ_UI: {}", e));
             }
@@ -4356,12 +4364,14 @@ unsafe fn handle_enter_action(hwnd: HWND, open_in_browser: bool) {
             import_item(hwnd, item);
         }
     } else {
-        SendMessageW(
-            hwnd_tree,
-            TVM_EXPAND,
-            WPARAM(TVE_EXPAND.0 as usize),
-            LPARAM(hitem.0),
-        );
+        unsafe {
+            SendMessageW(
+                hwnd_tree,
+                TVM_EXPAND,
+                WPARAM(TVE_EXPAND.0 as usize),
+                LPARAM(hitem.0),
+            );
+        }
     }
 }
 
@@ -5749,11 +5759,11 @@ unsafe extern "system" fn reorder_control_subclass_proc(
     crate::panic_guard::guard(
         "reorder_control_subclass_proc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { reorder_control_subclass_proc_inner(hwnd, msg, wparam, lparam) },
+        || reorder_control_subclass_proc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn reorder_control_subclass_proc_inner(
+fn reorder_control_subclass_proc_inner(
     hwnd: HWND,
     msg: u32,
     wparam: WPARAM,
@@ -5763,8 +5773,8 @@ unsafe fn reorder_control_subclass_proc_inner(
         return LRESULT(0);
     }
     if msg == WM_KEYDOWN {
-        let id = GetDlgCtrlID(hwnd) as usize;
-        let parent = GetParent(hwnd);
+        let id = unsafe { GetDlgCtrlID(hwnd) as usize };
+        let parent = unsafe { GetParent(hwnd) };
         let (edit_id, ok_id, cancel_id) =
             if id == REORDER_EDIT_ID || id == REORDER_OK_ID || id == REORDER_CANCEL_ID {
                 (REORDER_EDIT_ID, REORDER_OK_ID, REORDER_CANCEL_ID)
@@ -5774,26 +5784,28 @@ unsafe fn reorder_control_subclass_proc_inner(
                 (0, 0, 0)
             };
         if edit_id == 0 {
-            let prev = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+            let prev = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) };
             if prev == 0 {
-                return DefWindowProcW(hwnd, msg, wparam, lparam);
+                return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
             }
-            return CallWindowProcW(
-                Some(std::mem::transmute::<
-                    isize,
-                    unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
-                >(prev)),
-                hwnd,
-                msg,
-                wparam,
-                lparam,
-            );
+            return unsafe {
+                CallWindowProcW(
+                    Some(std::mem::transmute::<
+                        isize,
+                        unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
+                    >(prev)),
+                    hwnd,
+                    msg,
+                    wparam,
+                    lparam,
+                )
+            };
         }
-        let edit = GetDlgItem(parent, edit_id as i32);
-        let ok = GetDlgItem(parent, ok_id as i32);
-        let cancel = GetDlgItem(parent, cancel_id as i32);
+        let edit = unsafe { GetDlgItem(parent, edit_id as i32) };
+        let ok = unsafe { GetDlgItem(parent, ok_id as i32) };
+        let cancel = unsafe { GetDlgItem(parent, cancel_id as i32) };
         if wparam.0 as u16 == VK_TAB.0 {
-            let shift = (GetKeyState(VK_SHIFT.0 as i32) & 0x8000u16 as i16) != 0;
+            let shift = (unsafe { GetKeyState(VK_SHIFT.0 as i32) } & 0x8000u16 as i16) != 0;
             let next = if shift {
                 if id == edit_id {
                     cancel
@@ -5809,33 +5821,35 @@ unsafe fn reorder_control_subclass_proc_inner(
             } else {
                 edit
             };
-            SetFocus(next);
+            unsafe { SetFocus(next) };
             return LRESULT(0);
         }
         if wparam.0 as u16 == VK_RETURN.0 {
             let target = if id == cancel_id { cancel_id } else { ok_id };
-            SendMessageW(parent, WM_COMMAND, WPARAM(target), LPARAM(0));
+            unsafe { SendMessageW(parent, WM_COMMAND, WPARAM(target), LPARAM(0)) };
             return LRESULT(0);
         }
         if wparam.0 as u16 == VK_ESCAPE.0 {
-            SendMessageW(parent, WM_COMMAND, WPARAM(cancel_id), LPARAM(0));
+            unsafe { SendMessageW(parent, WM_COMMAND, WPARAM(cancel_id), LPARAM(0)) };
             return LRESULT(0);
         }
     }
-    let prev = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+    let prev = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) };
     if prev == 0 {
-        return DefWindowProcW(hwnd, msg, wparam, lparam);
+        return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
     }
-    CallWindowProcW(
-        Some(std::mem::transmute::<
-            isize,
-            unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
-        >(prev)),
-        hwnd,
-        msg,
-        wparam,
-        lparam,
-    )
+    unsafe {
+        CallWindowProcW(
+            Some(std::mem::transmute::<
+                isize,
+                unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
+            >(prev)),
+            hwnd,
+            msg,
+            wparam,
+            lparam,
+        )
+    }
 }
 
 fn show_add_dialog(parent_hwnd: HWND) {
@@ -6126,21 +6140,26 @@ unsafe extern "system" fn input_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "input_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { input_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || input_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn input_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let cs = lparam.0 as *const CREATESTRUCTW;
-            let init_ptr = (*cs).lpCreateParams as *mut AddDialogInit;
-            let (parent, prefill_title, prefill_url, hide_url_field): (HWND, String, String, bool) =
-                if init_ptr.is_null() {
+fn input_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let cs = lparam.0 as *const CREATESTRUCTW;
+                let init_ptr = (*cs).lpCreateParams as *mut AddDialogInit;
+                let (parent, prefill_title, prefill_url, hide_url_field): (
+                    HWND,
+                    String,
+                    String,
+                    bool,
+                ) = if init_ptr.is_null() {
                     (HWND(0), String::new(), String::new(), false)
                 } else {
-                    let init = unsafe { Box::from_raw(init_ptr) };
+                    let init = Box::from_raw(init_ptr);
                     (
                         init.parent,
                         init.prefill_title,
@@ -6148,230 +6167,231 @@ unsafe fn input_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPAR
                         init.hide_url_field,
                     )
                 };
-            // We need language. But we can't easily pass it.
-            // We can get it from parent (rss_window) -> parent (main)
-            let main_hwnd = with_rss_state(parent, |s| s.parent).unwrap_or(HWND(0));
-            let language = with_state(main_hwnd, |s| s.settings.language).unwrap_or_default();
-
-            let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-            // URL label
-            CreateWindowExW(
-                Default::default(),
-                w!("STATIC"),
-                PCWSTR(to_wide(&i18n::tr(language, "rss.dialog.url_label")).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                10,
-                10,
-                360,
-                16,
-                hwnd,
-                HMENU(105),
-                hinstance,
-                None,
-            );
-            // URL edit
-            CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                10,
-                28,
-                360,
-                24,
-                hwnd,
-                HMENU(101),
-                hinstance,
-                None,
-            );
-            // Title label
-            CreateWindowExW(
-                Default::default(),
-                w!("STATIC"),
-                PCWSTR(to_wide(&i18n::tr(language, "rss.dialog.title_label")).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                10,
-                58,
-                360,
-                16,
-                hwnd,
-                HMENU(106),
-                hinstance,
-                None,
-            );
-            // Title edit
-            CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                10,
-                76,
-                360,
-                24,
-                hwnd,
-                HMENU(104),
-                hinstance,
-                None,
-            );
-            // OK
-            CreateWindowExW(
-                Default::default(),
-                w!("BUTTON"),
-                PCWSTR(to_wide(&i18n::tr(language, "rss.dialog.ok")).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                180,
-                120,
-                90,
-                24,
-                hwnd,
-                HMENU(102),
-                hinstance,
-                None,
-            );
-            // Cancel
-            CreateWindowExW(
-                Default::default(),
-                w!("BUTTON"),
-                PCWSTR(to_wide(&i18n::tr(language, "rss.dialog.cancel")).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                280,
-                120,
-                90,
-                24,
-                hwnd,
-                HMENU(103),
-                hinstance,
-                None,
-            );
-            if !prefill_url.trim().is_empty()
-                && let Err(_e) = SetWindowTextW(
-                    GetDlgItem(hwnd, 101),
-                    PCWSTR(to_wide(&prefill_url).as_ptr()),
-                )
-            {}
-            if !prefill_title.trim().is_empty()
-                && let Err(_e) = SetWindowTextW(
-                    GetDlgItem(hwnd, 104),
-                    PCWSTR(to_wide(&prefill_title).as_ptr()),
-                )
-            {}
-            if hide_url_field {
-                ShowWindow(GetDlgItem(hwnd, 105), SW_HIDE);
-                ShowWindow(GetDlgItem(hwnd, 101), SW_HIDE);
-                SetFocus(GetDlgItem(hwnd, 104));
-            } else {
-                SetFocus(GetDlgItem(hwnd, 101));
-            }
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-            let id = wparam.0 & 0xffff;
-            match id {
-                1 => {
-                    // IDOK (Enter). This window is not a real DialogBox, so we map Enter to our OK button.
-                    // Re-dispatch as if OK (102) was pressed.
-                    SendMessageW(hwnd, WM_COMMAND, WPARAM(102), LPARAM(0));
-                    LRESULT(0)
-                }
-                102 => {
-                    // OK
-                    let h_edit_url = GetDlgItem(hwnd, 101);
-                    let len = SendMessageW(
-                        h_edit_url,
-                        windows::Win32::UI::WindowsAndMessaging::WM_GETTEXTLENGTH,
-                        WPARAM(0),
-                        LPARAM(0),
-                    )
-                    .0;
-                    let mut buf = vec![0u16; len as usize + 1];
-                    SendMessageW(
-                        h_edit_url,
-                        windows::Win32::UI::WindowsAndMessaging::WM_GETTEXT,
-                        WPARAM(buf.len()),
-                        LPARAM(buf.as_mut_ptr() as isize),
-                    );
-                    let url = String::from_utf16_lossy(&buf[..len as usize]);
-
-                    let h_edit_title = GetDlgItem(hwnd, 104);
-                    let tlen = SendMessageW(
-                        h_edit_title,
-                        windows::Win32::UI::WindowsAndMessaging::WM_GETTEXTLENGTH,
-                        WPARAM(0),
-                        LPARAM(0),
-                    )
-                    .0;
-                    let mut tbuf = vec![0u16; tlen as usize + 1];
-                    SendMessageW(
-                        h_edit_title,
-                        windows::Win32::UI::WindowsAndMessaging::WM_GETTEXT,
-                        WPARAM(tbuf.len()),
-                        LPARAM(tbuf.as_mut_ptr() as isize),
-                    );
-                    let title = String::from_utf16_lossy(&tbuf[..tlen as usize]);
-
-                    if !url.trim().is_empty() {
-                        let parent = windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd);
-                        let main_hwnd = with_rss_state(parent, |s| s.parent).unwrap_or(HWND(0));
-                        let language =
-                            with_state(main_hwnd, |s| s.settings.language).unwrap_or_default();
-                        let mut source_url = url.trim().to_string();
-                        let mut source_title = title.trim().to_string();
-                        if !is_valid_article_url(&source_url) {
-                            source_url = build_google_news_rss_url(&source_url, language);
-                            if source_title.is_empty() {
-                                source_title = format_google_news_source_title(url.trim());
-                            }
-                        }
-                        if source_title.is_empty() {
-                            source_title = source_url.clone();
-                        }
-
-                        let payload = format!("{}\n{}", source_title, source_url);
-                        let url_wide = to_wide(&payload);
-                        let cds = COPYDATASTRUCT {
-                            dwData: 0x52535331,
-                            cbData: (url_wide.len() * 2) as u32,
-                            lpData: url_wide.as_ptr() as *mut _,
-                        };
-                        SendMessageW(
-                            parent,
-                            windows::Win32::UI::WindowsAndMessaging::WM_COPYDATA,
-                            WPARAM(hwnd.0 as usize),
-                            LPARAM(&cds as *const _ as isize),
-                        );
-                    }
-                    crate::log_if_err!(DestroyWindow(hwnd));
-                    LRESULT(0)
-                }
-                103 | 2 => {
-                    crate::log_if_err!(DestroyWindow(hwnd));
-                    LRESULT(0)
-                }
-                _ => DefWindowProcW(hwnd, msg, wparam, lparam),
-            }
-        }
-        WM_DESTROY => {
-            // We can't access AppState directly from here easily without exact parent link.
-            // But we know parent is rss_window.
-            // However, rss_window state has parent.
-            // Let's rely on GWL_USERDATA of parent if possible?
-            // Actually, when show_add_dialog creates it, it passes parent_hwnd as parent in CreateWindowEx
-            let desktop = windows::Win32::UI::WindowsAndMessaging::GetDesktopWindow();
-            let parent = windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd);
-
-            if parent != desktop && parent.0 != 0 {
-                // This parent is rss_window
-                // We need to reach main window to clear rss_add_dialog
-                // rss_window stores its state in GWLP_USERDATA
+                // We need language. But we can't easily pass it.
+                // We can get it from parent (rss_window) -> parent (main)
                 let main_hwnd = with_rss_state(parent, |s| s.parent).unwrap_or(HWND(0));
-                if main_hwnd.0 != 0 {
-                    with_state(main_hwnd, |s| s.rss_add_dialog = HWND(0));
+                let language = with_state(main_hwnd, |s| s.settings.language).unwrap_or_default();
+
+                let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+                // URL label
+                CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&i18n::tr(language, "rss.dialog.url_label")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    10,
+                    10,
+                    360,
+                    16,
+                    hwnd,
+                    HMENU(105),
+                    hinstance,
+                    None,
+                );
+                // URL edit
+                CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    10,
+                    28,
+                    360,
+                    24,
+                    hwnd,
+                    HMENU(101),
+                    hinstance,
+                    None,
+                );
+                // Title label
+                CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&i18n::tr(language, "rss.dialog.title_label")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    10,
+                    58,
+                    360,
+                    16,
+                    hwnd,
+                    HMENU(106),
+                    hinstance,
+                    None,
+                );
+                // Title edit
+                CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    10,
+                    76,
+                    360,
+                    24,
+                    hwnd,
+                    HMENU(104),
+                    hinstance,
+                    None,
+                );
+                // OK
+                CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&i18n::tr(language, "rss.dialog.ok")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    180,
+                    120,
+                    90,
+                    24,
+                    hwnd,
+                    HMENU(102),
+                    hinstance,
+                    None,
+                );
+                // Cancel
+                CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&i18n::tr(language, "rss.dialog.cancel")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    280,
+                    120,
+                    90,
+                    24,
+                    hwnd,
+                    HMENU(103),
+                    hinstance,
+                    None,
+                );
+                if !prefill_url.trim().is_empty()
+                    && let Err(_e) = SetWindowTextW(
+                        GetDlgItem(hwnd, 101),
+                        PCWSTR(to_wide(&prefill_url).as_ptr()),
+                    )
+                {}
+                if !prefill_title.trim().is_empty()
+                    && let Err(_e) = SetWindowTextW(
+                        GetDlgItem(hwnd, 104),
+                        PCWSTR(to_wide(&prefill_title).as_ptr()),
+                    )
+                {}
+                if hide_url_field {
+                    ShowWindow(GetDlgItem(hwnd, 105), SW_HIDE);
+                    ShowWindow(GetDlgItem(hwnd, 101), SW_HIDE);
+                    SetFocus(GetDlgItem(hwnd, 104));
+                } else {
+                    SetFocus(GetDlgItem(hwnd, 101));
                 }
-                with_rss_state(parent, |s| s.pending_edit = None);
+                LRESULT(0)
             }
-            LRESULT(0)
+            WM_COMMAND => {
+                let id = wparam.0 & 0xffff;
+                match id {
+                    1 => {
+                        // IDOK (Enter). This window is not a real DialogBox, so we map Enter to our OK button.
+                        // Re-dispatch as if OK (102) was pressed.
+                        SendMessageW(hwnd, WM_COMMAND, WPARAM(102), LPARAM(0));
+                        LRESULT(0)
+                    }
+                    102 => {
+                        // OK
+                        let h_edit_url = GetDlgItem(hwnd, 101);
+                        let len = SendMessageW(
+                            h_edit_url,
+                            windows::Win32::UI::WindowsAndMessaging::WM_GETTEXTLENGTH,
+                            WPARAM(0),
+                            LPARAM(0),
+                        )
+                        .0;
+                        let mut buf = vec![0u16; len as usize + 1];
+                        SendMessageW(
+                            h_edit_url,
+                            windows::Win32::UI::WindowsAndMessaging::WM_GETTEXT,
+                            WPARAM(buf.len()),
+                            LPARAM(buf.as_mut_ptr() as isize),
+                        );
+                        let url = String::from_utf16_lossy(&buf[..len as usize]);
+
+                        let h_edit_title = GetDlgItem(hwnd, 104);
+                        let tlen = SendMessageW(
+                            h_edit_title,
+                            windows::Win32::UI::WindowsAndMessaging::WM_GETTEXTLENGTH,
+                            WPARAM(0),
+                            LPARAM(0),
+                        )
+                        .0;
+                        let mut tbuf = vec![0u16; tlen as usize + 1];
+                        SendMessageW(
+                            h_edit_title,
+                            windows::Win32::UI::WindowsAndMessaging::WM_GETTEXT,
+                            WPARAM(tbuf.len()),
+                            LPARAM(tbuf.as_mut_ptr() as isize),
+                        );
+                        let title = String::from_utf16_lossy(&tbuf[..tlen as usize]);
+
+                        if !url.trim().is_empty() {
+                            let parent = windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd);
+                            let main_hwnd = with_rss_state(parent, |s| s.parent).unwrap_or(HWND(0));
+                            let language =
+                                with_state(main_hwnd, |s| s.settings.language).unwrap_or_default();
+                            let mut source_url = url.trim().to_string();
+                            let mut source_title = title.trim().to_string();
+                            if !is_valid_article_url(&source_url) {
+                                source_url = build_google_news_rss_url(&source_url, language);
+                                if source_title.is_empty() {
+                                    source_title = format_google_news_source_title(url.trim());
+                                }
+                            }
+                            if source_title.is_empty() {
+                                source_title = source_url.clone();
+                            }
+
+                            let payload = format!("{}\n{}", source_title, source_url);
+                            let url_wide = to_wide(&payload);
+                            let cds = COPYDATASTRUCT {
+                                dwData: 0x52535331,
+                                cbData: (url_wide.len() * 2) as u32,
+                                lpData: url_wide.as_ptr() as *mut _,
+                            };
+                            SendMessageW(
+                                parent,
+                                windows::Win32::UI::WindowsAndMessaging::WM_COPYDATA,
+                                WPARAM(hwnd.0 as usize),
+                                LPARAM(&cds as *const _ as isize),
+                            );
+                        }
+                        crate::log_if_err!(DestroyWindow(hwnd));
+                        LRESULT(0)
+                    }
+                    103 | 2 => {
+                        crate::log_if_err!(DestroyWindow(hwnd));
+                        LRESULT(0)
+                    }
+                    _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+                }
+            }
+            WM_DESTROY => {
+                // We can't access AppState directly from here easily without exact parent link.
+                // But we know parent is rss_window.
+                // However, rss_window state has parent.
+                // Let's rely on GWL_USERDATA of parent if possible?
+                // Actually, when show_add_dialog creates it, it passes parent_hwnd as parent in CreateWindowEx
+                let desktop = windows::Win32::UI::WindowsAndMessaging::GetDesktopWindow();
+                let parent = windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd);
+
+                if parent != desktop && parent.0 != 0 {
+                    // This parent is rss_window
+                    // We need to reach main window to clear rss_add_dialog
+                    // rss_window stores its state in GWLP_USERDATA
+                    let main_hwnd = with_rss_state(parent, |s| s.parent).unwrap_or(HWND(0));
+                    if main_hwnd.0 != 0 {
+                        with_state(main_hwnd, |s| s.rss_add_dialog = HWND(0));
+                    }
+                    with_rss_state(parent, |s| s.pending_edit = None);
+                }
+                LRESULT(0)
+            }
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }

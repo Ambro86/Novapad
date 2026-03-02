@@ -799,7 +799,7 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
                 && let Some(item) = selected_episode(hwnd)
             {
                 let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-                unsafe { open_episode_in_player(hwnd, parent, &item) };
+                open_episode_in_player(hwnd, parent, &item);
                 return true;
             }
         }
@@ -2025,9 +2025,9 @@ fn mark_episode_played_with_ui_delay(
     );
 }
 
-unsafe fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpisode) {
+fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpisode) {
     let Some(url) = episode.enclosure_url.as_ref() else {
-        let language = with_state(parent, |s| s.settings.language).unwrap_or_default();
+        let language = unsafe { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
         announce_status(&i18n::tr(language, "podcasts.no_audio_url"));
         return;
     };
@@ -2090,7 +2090,7 @@ unsafe fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpis
     }
 
     // Show loading message immediately so user knows action was triggered
-    let language = with_state(parent, |s| s.settings.language).unwrap_or_default();
+    let language = unsafe { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
     announce_status(&i18n::tr(language, "podcasts.loading"));
 
     if parent.0 != 0 {
@@ -2128,7 +2128,8 @@ unsafe fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpis
     }
 
     let hwnd_copy = hwnd;
-    let cache_limit_mb = with_state(parent, |s| s.settings.podcast_cache_limit_mb).unwrap_or(500);
+    let cache_limit_mb =
+        unsafe { with_state(parent, |s| s.settings.podcast_cache_limit_mb) }.unwrap_or(500);
     let cache_dir = podcast_cache_dir();
     with_podcast_state(hwnd, |s| {
         s.download_in_progress = true;
@@ -4203,145 +4204,147 @@ unsafe extern "system" fn add_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "add_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { add_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || add_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn add_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let cs = lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
-            let init_ptr = (*cs).lpCreateParams as *mut AddDialogInit;
-            let parent = if init_ptr.is_null() {
-                HWND(0)
-            } else {
-                let init = unsafe { Box::from_raw(init_ptr) };
-                init.parent
-            };
-            let language = with_podcast_state(parent, |s| s.language).unwrap_or_default();
-            let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-            CreateWindowExW(
-                Default::default(),
-                w!("STATIC"),
-                PCWSTR(to_wide(&i18n::tr(language, "podcasts.add_dialog.url_label")).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                10,
-                10,
-                320,
-                16,
-                hwnd,
-                HMENU(1),
-                hinstance,
-                None,
-            );
-            CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                10,
-                28,
-                320,
-                24,
-                hwnd,
-                HMENU(ADD_URL_EDIT_ID as isize),
-                hinstance,
-                None,
-            );
-            CreateWindowExW(
-                Default::default(),
-                w!("BUTTON"),
-                PCWSTR(to_wide(&i18n::tr(language, "podcasts.add_dialog.ok")).as_ptr()),
-                WS_CHILD
-                    | WS_VISIBLE
-                    | WS_TABSTOP
-                    | WINDOW_STYLE(
-                        windows::Win32::UI::WindowsAndMessaging::BS_DEFPUSHBUTTON as u32,
-                    ),
-                150,
-                70,
-                80,
-                24,
-                hwnd,
-                HMENU(ADD_OK_ID as isize),
-                hinstance,
-                None,
-            );
-            CreateWindowExW(
-                Default::default(),
-                w!("BUTTON"),
-                PCWSTR(to_wide(&i18n::tr(language, "podcasts.add_dialog.cancel")).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                250,
-                70,
-                80,
-                24,
-                hwnd,
-                HMENU(ADD_CANCEL_ID as isize),
-                hinstance,
-                None,
-            );
-            SetFocus(GetDlgItem(hwnd, ADD_URL_EDIT_ID as i32));
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-            let id = wparam.0 & 0xffff;
-            match id {
-                1 => {
-                    SendMessageW(hwnd, WM_COMMAND, WPARAM(ADD_OK_ID), LPARAM(0));
-                    LRESULT(0)
-                }
-                ADD_OK_ID => {
-                    let h_edit_url = GetDlgItem(hwnd, ADD_URL_EDIT_ID as i32);
-                    let len = SendMessageW(
-                        h_edit_url,
-                        windows::Win32::UI::WindowsAndMessaging::WM_GETTEXTLENGTH,
-                        WPARAM(0),
-                        LPARAM(0),
-                    )
-                    .0;
-                    let mut buf = vec![0u16; len as usize + 1];
-                    SendMessageW(
-                        h_edit_url,
-                        windows::Win32::UI::WindowsAndMessaging::WM_GETTEXT,
-                        WPARAM(buf.len()),
-                        LPARAM(buf.as_mut_ptr() as isize),
-                    );
-                    let url = String::from_utf16_lossy(&buf[..len as usize]);
-                    let parent = GetParent(hwnd);
-                    if !url.trim().is_empty() {
-                        let payload = url.trim().to_string();
-                        let url_wide = to_wide(&payload);
-                        let cds = COPYDATASTRUCT {
-                            dwData: PODCAST_ADD_COPYDATA,
-                            cbData: (url_wide.len() * 2) as u32,
-                            lpData: url_wide.as_ptr() as *mut _,
-                        };
-                        SendMessageW(
-                            parent,
-                            WM_COPYDATA,
-                            WPARAM(hwnd.0 as usize),
-                            LPARAM(&cds as *const _ as isize),
-                        );
-                    }
-                    crate::log_if_err!(DestroyWindow(hwnd));
-                    LRESULT(0)
-                }
-                ADD_CANCEL_ID | 2 => {
-                    crate::log_if_err!(DestroyWindow(hwnd));
-                    LRESULT(0)
-                }
-                _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+fn add_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let cs = lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
+                let init_ptr = (*cs).lpCreateParams as *mut AddDialogInit;
+                let parent = if init_ptr.is_null() {
+                    HWND(0)
+                } else {
+                    let init = Box::from_raw(init_ptr);
+                    init.parent
+                };
+                let language = with_podcast_state(parent, |s| s.language).unwrap_or_default();
+                let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+                CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&i18n::tr(language, "podcasts.add_dialog.url_label")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    10,
+                    10,
+                    320,
+                    16,
+                    hwnd,
+                    HMENU(1),
+                    hinstance,
+                    None,
+                );
+                CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    10,
+                    28,
+                    320,
+                    24,
+                    hwnd,
+                    HMENU(ADD_URL_EDIT_ID as isize),
+                    hinstance,
+                    None,
+                );
+                CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&i18n::tr(language, "podcasts.add_dialog.ok")).as_ptr()),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WINDOW_STYLE(
+                            windows::Win32::UI::WindowsAndMessaging::BS_DEFPUSHBUTTON as u32,
+                        ),
+                    150,
+                    70,
+                    80,
+                    24,
+                    hwnd,
+                    HMENU(ADD_OK_ID as isize),
+                    hinstance,
+                    None,
+                );
+                CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&i18n::tr(language, "podcasts.add_dialog.cancel")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    250,
+                    70,
+                    80,
+                    24,
+                    hwnd,
+                    HMENU(ADD_CANCEL_ID as isize),
+                    hinstance,
+                    None,
+                );
+                SetFocus(GetDlgItem(hwnd, ADD_URL_EDIT_ID as i32));
+                LRESULT(0)
             }
+            WM_COMMAND => {
+                let id = wparam.0 & 0xffff;
+                match id {
+                    1 => {
+                        SendMessageW(hwnd, WM_COMMAND, WPARAM(ADD_OK_ID), LPARAM(0));
+                        LRESULT(0)
+                    }
+                    ADD_OK_ID => {
+                        let h_edit_url = GetDlgItem(hwnd, ADD_URL_EDIT_ID as i32);
+                        let len = SendMessageW(
+                            h_edit_url,
+                            windows::Win32::UI::WindowsAndMessaging::WM_GETTEXTLENGTH,
+                            WPARAM(0),
+                            LPARAM(0),
+                        )
+                        .0;
+                        let mut buf = vec![0u16; len as usize + 1];
+                        SendMessageW(
+                            h_edit_url,
+                            windows::Win32::UI::WindowsAndMessaging::WM_GETTEXT,
+                            WPARAM(buf.len()),
+                            LPARAM(buf.as_mut_ptr() as isize),
+                        );
+                        let url = String::from_utf16_lossy(&buf[..len as usize]);
+                        let parent = GetParent(hwnd);
+                        if !url.trim().is_empty() {
+                            let payload = url.trim().to_string();
+                            let url_wide = to_wide(&payload);
+                            let cds = COPYDATASTRUCT {
+                                dwData: PODCAST_ADD_COPYDATA,
+                                cbData: (url_wide.len() * 2) as u32,
+                                lpData: url_wide.as_ptr() as *mut _,
+                            };
+                            SendMessageW(
+                                parent,
+                                WM_COPYDATA,
+                                WPARAM(hwnd.0 as usize),
+                                LPARAM(&cds as *const _ as isize),
+                            );
+                        }
+                        crate::log_if_err!(DestroyWindow(hwnd));
+                        LRESULT(0)
+                    }
+                    ADD_CANCEL_ID | 2 => {
+                        crate::log_if_err!(DestroyWindow(hwnd));
+                        LRESULT(0)
+                    }
+                    _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+                }
+            }
+            WM_DESTROY => {
+                let parent = GetParent(hwnd);
+                let main_hwnd = with_podcast_state(parent, |s| s.parent).unwrap_or(HWND(0));
+                with_state(main_hwnd, |s| s.podcasts_add_dialog = HWND(0));
+                LRESULT(0)
+            }
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        WM_DESTROY => {
-            let parent = GetParent(hwnd);
-            let main_hwnd = with_podcast_state(parent, |s| s.parent).unwrap_or(HWND(0));
-            with_state(main_hwnd, |s| s.podcasts_add_dialog = HWND(0));
-            LRESULT(0)
-        }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 
@@ -5182,7 +5185,7 @@ fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
     };
     let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
     match action {
-        EpisodeAction::Play => unsafe { open_episode_in_player(hwnd, parent, &item) },
+        EpisodeAction::Play => open_episode_in_player(hwnd, parent, &item),
         EpisodeAction::OpenEpisode => {
             if !item.link.trim().is_empty()
                 && let Err(_e) = crate::audio_utils::open_url_in_browser(&item.link)
@@ -5707,11 +5710,11 @@ unsafe extern "system" fn description_control_subclass_proc(
     crate::panic_guard::guard(
         "description_control_subclass_proc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { description_control_subclass_proc_inner(hwnd, msg, wparam, lparam) },
+        || description_control_subclass_proc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn description_control_subclass_proc_inner(
+fn description_control_subclass_proc_inner(
     hwnd: HWND,
     msg: u32,
     wparam: WPARAM,
@@ -5721,49 +5724,52 @@ unsafe fn description_control_subclass_proc_inner(
         return LRESULT(0);
     }
     if msg == WM_KEYDOWN {
-        let id = GetDlgCtrlID(hwnd) as usize;
-        let parent = GetParent(hwnd);
-        let edit = GetDlgItem(parent, ID_DESCRIPTION_EDIT as i32);
-        let ok = GetDlgItem(parent, ID_DESCRIPTION_OK as i32);
+        let id = unsafe { GetDlgCtrlID(hwnd) as usize };
+        let parent = unsafe { GetParent(hwnd) };
+        let edit = unsafe { GetDlgItem(parent, ID_DESCRIPTION_EDIT as i32) };
+        let ok = unsafe { GetDlgItem(parent, ID_DESCRIPTION_OK as i32) };
 
         if wparam.0 as u16 == VK_TAB.0 {
             let next = if id == ID_DESCRIPTION_EDIT { ok } else { edit };
             if next.0 != 0 {
-                SetFocus(next);
+                unsafe { SetFocus(next) };
             }
             return LRESULT(0);
         }
         if wparam.0 as u16 == VK_RETURN.0 && id == ID_DESCRIPTION_OK {
-            crate::log_if_err!(DestroyWindow(parent));
+            crate::log_if_err!(unsafe { DestroyWindow(parent) });
             return LRESULT(0);
         }
         if wparam.0 as u16 == VK_ESCAPE.0 {
-            crate::log_if_err!(DestroyWindow(parent));
+            crate::log_if_err!(unsafe { DestroyWindow(parent) });
             return LRESULT(0);
         }
         // Allow Ctrl+A in edit
         if id == ID_DESCRIPTION_EDIT
             && wparam.0 as u16 == 'A' as u16
-            && GetKeyState(VK_CONTROL.0 as i32) < 0
+            && unsafe { GetKeyState(VK_CONTROL.0 as i32) } < 0
         {
-            SendMessageW(edit, EM_SETSEL, WPARAM(0), LPARAM(-1));
+            unsafe { SendMessageW(edit, EM_SETSEL, WPARAM(0), LPARAM(-1)) };
             return LRESULT(0);
         }
     }
-    let prev = GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA);
+    let prev =
+        unsafe { GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA) };
     if prev == 0 {
-        return DefWindowProcW(hwnd, msg, wparam, lparam);
+        return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
     }
-    CallWindowProcW(
-        Some(std::mem::transmute::<
-            isize,
-            unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
-        >(prev)),
-        hwnd,
-        msg,
-        wparam,
-        lparam,
-    )
+    unsafe {
+        CallWindowProcW(
+            Some(std::mem::transmute::<
+                isize,
+                unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
+            >(prev)),
+            hwnd,
+            msg,
+            wparam,
+            lparam,
+        )
+    }
 }
 
 unsafe extern "system" fn description_wndproc(
@@ -5774,7 +5780,7 @@ unsafe extern "system" fn description_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "description_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
+        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
         || unsafe { description_wndproc_inner(hwnd, msg, wparam, lparam) },
     )
 }
@@ -6109,11 +6115,11 @@ unsafe extern "system" fn reorder_control_subclass_proc(
     crate::panic_guard::guard(
         "reorder_control_subclass_proc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { reorder_control_subclass_proc_inner(hwnd, msg, wparam, lparam) },
+        || reorder_control_subclass_proc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn reorder_control_subclass_proc_inner(
+fn reorder_control_subclass_proc_inner(
     hwnd: HWND,
     msg: u32,
     wparam: WPARAM,
@@ -6123,13 +6129,13 @@ unsafe fn reorder_control_subclass_proc_inner(
         return LRESULT(0);
     }
     if msg == WM_KEYDOWN {
-        let id = GetDlgCtrlID(hwnd) as usize;
-        let parent = GetParent(hwnd);
-        let edit = GetDlgItem(parent, REORDER_EDIT_ID as i32);
-        let ok = GetDlgItem(parent, REORDER_OK_ID as i32);
-        let cancel = GetDlgItem(parent, REORDER_CANCEL_ID as i32);
+        let id = unsafe { GetDlgCtrlID(hwnd) as usize };
+        let parent = unsafe { GetParent(hwnd) };
+        let edit = unsafe { GetDlgItem(parent, REORDER_EDIT_ID as i32) };
+        let ok = unsafe { GetDlgItem(parent, REORDER_OK_ID as i32) };
+        let cancel = unsafe { GetDlgItem(parent, REORDER_CANCEL_ID as i32) };
         if wparam.0 as u16 == VK_TAB.0 {
-            let shift = (GetKeyState(VK_SHIFT.0 as i32) & 0x8000u16 as i16) != 0;
+            let shift = (unsafe { GetKeyState(VK_SHIFT.0 as i32) } & 0x8000u16 as i16) != 0;
             let next = if shift {
                 if id == REORDER_EDIT_ID {
                     cancel
@@ -6145,7 +6151,7 @@ unsafe fn reorder_control_subclass_proc_inner(
             } else {
                 edit
             };
-            SetFocus(next);
+            unsafe { SetFocus(next) };
             return LRESULT(0);
         }
         if wparam.0 as u16 == VK_RETURN.0 {
@@ -6154,28 +6160,31 @@ unsafe fn reorder_control_subclass_proc_inner(
             } else {
                 REORDER_OK_ID
             };
-            SendMessageW(parent, WM_COMMAND, WPARAM(target), LPARAM(0));
+            unsafe { SendMessageW(parent, WM_COMMAND, WPARAM(target), LPARAM(0)) };
             return LRESULT(0);
         }
         if wparam.0 as u16 == VK_ESCAPE.0 {
-            SendMessageW(parent, WM_COMMAND, WPARAM(REORDER_CANCEL_ID), LPARAM(0));
+            unsafe { SendMessageW(parent, WM_COMMAND, WPARAM(REORDER_CANCEL_ID), LPARAM(0)) };
             return LRESULT(0);
         }
     }
-    let prev = GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA);
+    let prev =
+        unsafe { GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA) };
     if prev == 0 {
-        return DefWindowProcW(hwnd, msg, wparam, lparam);
+        return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
     }
-    CallWindowProcW(
-        Some(std::mem::transmute::<
-            isize,
-            unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
-        >(prev)),
-        hwnd,
-        msg,
-        wparam,
-        lparam,
-    )
+    unsafe {
+        CallWindowProcW(
+            Some(std::mem::transmute::<
+                isize,
+                unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
+            >(prev)),
+            hwnd,
+            msg,
+            wparam,
+            lparam,
+        )
+    }
 }
 
 unsafe extern "system" fn reorder_wndproc(
@@ -6186,244 +6195,246 @@ unsafe extern "system" fn reorder_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "reorder_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { reorder_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || reorder_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn reorder_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let cs = lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
-            let init_ptr = (*cs).lpCreateParams as *mut ReorderDialogInit;
-            if init_ptr.is_null() {
-                return LRESULT(0);
+fn reorder_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let cs = lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
+                let init_ptr = (*cs).lpCreateParams as *mut ReorderDialogInit;
+                if init_ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let init = &*init_ptr;
+                let parent = init.parent;
+                let source_index = init.source_index;
+                let total = init.total;
+                SetWindowLongPtrW(
+                    hwnd,
+                    windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+                    init_ptr as isize,
+                );
+                let language = with_podcast_state(parent, |s| s.language).unwrap_or_default();
+                let position_template = i18n::tr(language, "rss.reorder.position_of");
+                let position_text = position_template
+                    .replace("{x}", &(source_index + 1).to_string())
+                    .replace("{n}", &total.to_string());
+                let move_label = i18n::tr(language, "rss.reorder.move_to_position");
+                let ok_label = i18n::tr(language, "rss.dialog.ok");
+                let cancel_label = i18n::tr(language, "rss.dialog.cancel");
+                let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+                CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&position_text).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    10,
+                    10,
+                    280,
+                    16,
+                    hwnd,
+                    HMENU(1),
+                    hinstance,
+                    None,
+                );
+                CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&move_label).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    10,
+                    32,
+                    280,
+                    16,
+                    hwnd,
+                    HMENU(2),
+                    hinstance,
+                    None,
+                );
+                let edit = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    10,
+                    54,
+                    280,
+                    24,
+                    hwnd,
+                    HMENU(REORDER_EDIT_ID as isize),
+                    hinstance,
+                    None,
+                );
+                let ok = CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&ok_label).as_ptr()),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WINDOW_STYLE(
+                            windows::Win32::UI::WindowsAndMessaging::BS_DEFPUSHBUTTON as u32,
+                        ),
+                    130,
+                    92,
+                    70,
+                    24,
+                    hwnd,
+                    HMENU(REORDER_OK_ID as isize),
+                    hinstance,
+                    None,
+                );
+                let cancel = CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&cancel_label).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    210,
+                    92,
+                    70,
+                    24,
+                    hwnd,
+                    HMENU(REORDER_CANCEL_ID as isize),
+                    hinstance,
+                    None,
+                );
+                let proc_ptr = reorder_control_subclass_proc as *const () as usize;
+                let prev = SetWindowLongPtrW(
+                    edit,
+                    windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
+                    proc_ptr as isize,
+                );
+                SetWindowLongPtrW(
+                    edit,
+                    windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+                    prev,
+                );
+                let proc_ptr = reorder_control_subclass_proc as *const () as usize;
+                let prev_ok = SetWindowLongPtrW(
+                    ok,
+                    windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
+                    proc_ptr as isize,
+                );
+                SetWindowLongPtrW(
+                    ok,
+                    windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+                    prev_ok,
+                );
+                let proc_ptr = reorder_control_subclass_proc as *const () as usize;
+                let prev_cancel = SetWindowLongPtrW(
+                    cancel,
+                    windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
+                    proc_ptr as isize,
+                );
+                SetWindowLongPtrW(
+                    cancel,
+                    windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+                    prev_cancel,
+                );
+                let text = format!("{}", source_index + 1);
+                if let Err(_e) = SetWindowTextW(edit, PCWSTR(to_wide(&text).as_ptr())) {
+                    crate::log_debug(&format!("Error: {:?}", _e));
+                }
+                SetFocus(edit);
+                LRESULT(0)
             }
-            let init = &*init_ptr;
-            let parent = init.parent;
-            let source_index = init.source_index;
-            let total = init.total;
-            SetWindowLongPtrW(
-                hwnd,
-                windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
-                init_ptr as isize,
-            );
-            let language = with_podcast_state(parent, |s| s.language).unwrap_or_default();
-            let position_template = i18n::tr(language, "rss.reorder.position_of");
-            let position_text = position_template
-                .replace("{x}", &(source_index + 1).to_string())
-                .replace("{n}", &total.to_string());
-            let move_label = i18n::tr(language, "rss.reorder.move_to_position");
-            let ok_label = i18n::tr(language, "rss.dialog.ok");
-            let cancel_label = i18n::tr(language, "rss.dialog.cancel");
-            let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-            CreateWindowExW(
-                Default::default(),
-                w!("STATIC"),
-                PCWSTR(to_wide(&position_text).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                10,
-                10,
-                280,
-                16,
-                hwnd,
-                HMENU(1),
-                hinstance,
-                None,
-            );
-            CreateWindowExW(
-                Default::default(),
-                w!("STATIC"),
-                PCWSTR(to_wide(&move_label).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                10,
-                32,
-                280,
-                16,
-                hwnd,
-                HMENU(2),
-                hinstance,
-                None,
-            );
-            let edit = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                10,
-                54,
-                280,
-                24,
-                hwnd,
-                HMENU(REORDER_EDIT_ID as isize),
-                hinstance,
-                None,
-            );
-            let ok = CreateWindowExW(
-                Default::default(),
-                w!("BUTTON"),
-                PCWSTR(to_wide(&ok_label).as_ptr()),
-                WS_CHILD
-                    | WS_VISIBLE
-                    | WS_TABSTOP
-                    | WINDOW_STYLE(
-                        windows::Win32::UI::WindowsAndMessaging::BS_DEFPUSHBUTTON as u32,
-                    ),
-                130,
-                92,
-                70,
-                24,
-                hwnd,
-                HMENU(REORDER_OK_ID as isize),
-                hinstance,
-                None,
-            );
-            let cancel = CreateWindowExW(
-                Default::default(),
-                w!("BUTTON"),
-                PCWSTR(to_wide(&cancel_label).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                210,
-                92,
-                70,
-                24,
-                hwnd,
-                HMENU(REORDER_CANCEL_ID as isize),
-                hinstance,
-                None,
-            );
-            let proc_ptr = reorder_control_subclass_proc as *const () as usize;
-            let prev = SetWindowLongPtrW(
-                edit,
-                windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
-                proc_ptr as isize,
-            );
-            SetWindowLongPtrW(
-                edit,
-                windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
-                prev,
-            );
-            let proc_ptr = reorder_control_subclass_proc as *const () as usize;
-            let prev_ok = SetWindowLongPtrW(
-                ok,
-                windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
-                proc_ptr as isize,
-            );
-            SetWindowLongPtrW(
-                ok,
-                windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
-                prev_ok,
-            );
-            let proc_ptr = reorder_control_subclass_proc as *const () as usize;
-            let prev_cancel = SetWindowLongPtrW(
-                cancel,
-                windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
-                proc_ptr as isize,
-            );
-            SetWindowLongPtrW(
-                cancel,
-                windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
-                prev_cancel,
-            );
-            let text = format!("{}", source_index + 1);
-            if let Err(_e) = SetWindowTextW(edit, PCWSTR(to_wide(&text).as_ptr())) {
-                crate::log_debug(&format!("Error: {:?}", _e));
-            }
-            SetFocus(edit);
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-            let id = wparam.0 & 0xffff;
-            match id {
-                REORDER_OK_ID | 1 => {
-                    let ptr = GetWindowLongPtrW(
-                        hwnd,
-                        windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
-                    ) as *mut ReorderDialogInit;
-                    if ptr.is_null() {
-                        return LRESULT(0);
-                    }
-                    let init = &*ptr;
-                    let edit = GetDlgItem(hwnd, REORDER_EDIT_ID as i32);
-                    let len = SendMessageW(
-                        edit,
-                        windows::Win32::UI::WindowsAndMessaging::WM_GETTEXTLENGTH,
-                        WPARAM(0),
-                        LPARAM(0),
-                    )
-                    .0;
-                    let mut buf = vec![0u16; len as usize + 1];
-                    SendMessageW(
-                        edit,
-                        windows::Win32::UI::WindowsAndMessaging::WM_GETTEXT,
-                        WPARAM(buf.len()),
-                        LPARAM(buf.as_mut_ptr() as isize),
-                    );
-                    let text = String::from_utf16_lossy(&buf[..len as usize]);
-                    let language =
-                        with_podcast_state(init.parent, |s| s.language).unwrap_or_default();
-                    let pos = match text.trim().parse::<usize>() {
-                        Ok(v) if v > 0 => v,
-                        _ => {
-                            let message = i18n::tr(language, "rss.reorder.invalid_position");
-                            announce_status(&message);
-                            SetFocus(edit);
+            WM_COMMAND => {
+                let id = wparam.0 & 0xffff;
+                match id {
+                    REORDER_OK_ID | 1 => {
+                        let ptr = GetWindowLongPtrW(
+                            hwnd,
+                            windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+                        ) as *mut ReorderDialogInit;
+                        if ptr.is_null() {
                             return LRESULT(0);
                         }
-                    };
-                    let target = pos.clamp(1, init.total) - 1;
-                    if let Some(new_index) = apply_reorder_action(
-                        init.parent,
-                        init.source_index,
-                        ReorderAction::Position,
-                        target,
-                    ) && new_index != init.source_index
-                    {
-                        let template = i18n::tr(language, "rss.reorder.moved_position");
-                        let message = template.replace("{x}", &(new_index + 1).to_string());
-                        announce_status(&message);
+                        let init = &*ptr;
+                        let edit = GetDlgItem(hwnd, REORDER_EDIT_ID as i32);
+                        let len = SendMessageW(
+                            edit,
+                            windows::Win32::UI::WindowsAndMessaging::WM_GETTEXTLENGTH,
+                            WPARAM(0),
+                            LPARAM(0),
+                        )
+                        .0;
+                        let mut buf = vec![0u16; len as usize + 1];
+                        SendMessageW(
+                            edit,
+                            windows::Win32::UI::WindowsAndMessaging::WM_GETTEXT,
+                            WPARAM(buf.len()),
+                            LPARAM(buf.as_mut_ptr() as isize),
+                        );
+                        let text = String::from_utf16_lossy(&buf[..len as usize]);
+                        let language =
+                            with_podcast_state(init.parent, |s| s.language).unwrap_or_default();
+                        let pos = match text.trim().parse::<usize>() {
+                            Ok(v) if v > 0 => v,
+                            _ => {
+                                let message = i18n::tr(language, "rss.reorder.invalid_position");
+                                announce_status(&message);
+                                SetFocus(edit);
+                                return LRESULT(0);
+                            }
+                        };
+                        let target = pos.clamp(1, init.total) - 1;
+                        if let Some(new_index) = apply_reorder_action(
+                            init.parent,
+                            init.source_index,
+                            ReorderAction::Position,
+                            target,
+                        ) && new_index != init.source_index
+                        {
+                            let template = i18n::tr(language, "rss.reorder.moved_position");
+                            let message = template.replace("{x}", &(new_index + 1).to_string());
+                            announce_status(&message);
+                        }
+                        crate::log_if_err!(DestroyWindow(hwnd));
+                        focus_library(init.parent);
+                        LRESULT(0)
                     }
-                    crate::log_if_err!(DestroyWindow(hwnd));
-                    focus_library(init.parent);
-                    LRESULT(0)
-                }
-                REORDER_CANCEL_ID | 2 => {
-                    let ptr = GetWindowLongPtrW(
-                        hwnd,
-                        windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
-                    ) as *mut ReorderDialogInit;
-                    let parent = if ptr.is_null() {
-                        HWND(0)
-                    } else {
-                        (*ptr).parent
-                    };
-                    crate::log_if_err!(DestroyWindow(hwnd));
-                    if parent.0 != 0 {
-                        focus_library(parent);
+                    REORDER_CANCEL_ID | 2 => {
+                        let ptr = GetWindowLongPtrW(
+                            hwnd,
+                            windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+                        ) as *mut ReorderDialogInit;
+                        let parent = if ptr.is_null() {
+                            HWND(0)
+                        } else {
+                            (*ptr).parent
+                        };
+                        crate::log_if_err!(DestroyWindow(hwnd));
+                        if parent.0 != 0 {
+                            focus_library(parent);
+                        }
+                        LRESULT(0)
                     }
-                    LRESULT(0)
+                    _ => DefWindowProcW(hwnd, msg, wparam, lparam),
                 }
-                _ => DefWindowProcW(hwnd, msg, wparam, lparam),
             }
-        }
-        WM_KEYDOWN => {
-            if wparam.0 as u16 == VK_ESCAPE.0 {
-                SendMessageW(hwnd, WM_COMMAND, WPARAM(REORDER_CANCEL_ID), LPARAM(0));
-                return LRESULT(0);
+            WM_KEYDOWN => {
+                if wparam.0 as u16 == VK_ESCAPE.0 {
+                    SendMessageW(hwnd, WM_COMMAND, WPARAM(REORDER_CANCEL_ID), LPARAM(0));
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_NCDESTROY => {
-            let ptr =
-                GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
-                    as *mut ReorderDialogInit;
-            if !ptr.is_null() {
-                let init = unsafe { Box::from_raw(ptr) };
-                with_podcast_state(init.parent, |s| s.reorder_dialog = HWND(0));
+            WM_NCDESTROY => {
+                let ptr =
+                    GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+                        as *mut ReorderDialogInit;
+                if !ptr.is_null() {
+                    let init = Box::from_raw(ptr);
+                    with_podcast_state(init.parent, |s| s.reorder_dialog = HWND(0));
+                }
+                LRESULT(0)
             }
-            LRESULT(0)
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 
@@ -6435,18 +6446,13 @@ unsafe extern "system" fn podcast_tree_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "podcast_tree_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { podcast_tree_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || podcast_tree_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn podcast_tree_wndproc_inner(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    if msg == WM_CHAR && wparam.0 as u32 == 26 && GetKeyState(VK_CONTROL.0 as i32) < 0 {
+fn podcast_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    if msg == WM_CHAR && wparam.0 as u32 == 26 && unsafe { GetKeyState(VK_CONTROL.0 as i32) < 0 } {
         return LRESULT(0);
     }
     if msg == WM_KEYDOWN
@@ -6455,7 +6461,7 @@ unsafe fn podcast_tree_wndproc_inner(
     {
         let key = wparam.0 as u32;
         if msg == WM_CHAR && key == VK_RETURN.0 as u32 {
-            let parent = GetParent(hwnd);
+            let parent = unsafe { GetParent(hwnd) };
             if parent.0 != 0
                 && let Some(item) = selected_episode(parent)
             {
@@ -6465,7 +6471,7 @@ unsafe fn podcast_tree_wndproc_inner(
             }
         }
         if key == VK_DELETE.0 as u32 {
-            let parent = GetParent(hwnd);
+            let parent = unsafe { GetParent(hwnd) };
             if parent.0 != 0 {
                 if selected_episode(parent).is_some() {
                     handle_episode_action(parent, EpisodeAction::Remove);
@@ -6475,15 +6481,15 @@ unsafe fn podcast_tree_wndproc_inner(
                 return LRESULT(0);
             }
         }
-        if key == 'Z' as u32 && GetKeyState(VK_CONTROL.0 as i32) < 0 {
-            let parent = GetParent(hwnd);
+        if key == 'Z' as u32 && unsafe { GetKeyState(VK_CONTROL.0 as i32) < 0 } {
+            let parent = unsafe { GetParent(hwnd) };
             if parent.0 != 0 {
-                undo_last_delete(parent);
+                unsafe { undo_last_delete(parent) };
                 return LRESULT(0);
             }
         }
         if key == VK_RIGHT.0 as u32 {
-            let parent = GetParent(hwnd);
+            let parent = unsafe { GetParent(hwnd) };
             if parent.0 != 0
                 && let Some(node) = selected_node_data(parent)
                 && matches!(node, NodeData::Source(_) | NodeData::PreviewSource(_))
@@ -6491,55 +6497,63 @@ unsafe fn podcast_tree_wndproc_inner(
                 let hitem = selected_tree_item(parent);
                 if hitem.0 != 0 {
                     load_episode_children(parent, hitem, node, false);
-                    SendMessageW(
-                        hwnd,
-                        TVM_EXPAND,
-                        WPARAM(windows::Win32::UI::Controls::TVE_EXPAND.0 as usize),
-                        LPARAM(hitem.0),
-                    );
+                    unsafe {
+                        SendMessageW(
+                            hwnd,
+                            TVM_EXPAND,
+                            WPARAM(windows::Win32::UI::Controls::TVE_EXPAND.0 as usize),
+                            LPARAM(hitem.0),
+                        );
+                    }
                     return LRESULT(0);
                 }
             }
         }
         if key == VK_LEFT.0 as u32 {
-            let parent = GetParent(hwnd);
+            let parent = unsafe { GetParent(hwnd) };
             if parent.0 != 0 {
                 let hitem = selected_tree_item(parent);
                 if hitem.0 != 0 {
                     let parent_item = HTREEITEM(
-                        SendMessageW(
-                            hwnd,
-                            TVM_GETNEXTITEM,
-                            WPARAM(TVGN_PARENT as usize),
-                            LPARAM(hitem.0),
-                        )
+                        unsafe {
+                            SendMessageW(
+                                hwnd,
+                                TVM_GETNEXTITEM,
+                                WPARAM(TVGN_PARENT as usize),
+                                LPARAM(hitem.0),
+                            )
+                        }
                         .0,
                     );
                     if parent_item.0 != 0 {
-                        SendMessageW(
-                            hwnd,
-                            TVM_SELECTITEM,
-                            WPARAM(TVGN_CARET as usize),
-                            LPARAM(parent_item.0),
-                        );
+                        unsafe {
+                            SendMessageW(
+                                hwnd,
+                                TVM_SELECTITEM,
+                                WPARAM(TVGN_CARET as usize),
+                                LPARAM(parent_item.0),
+                            );
+                        }
                         return LRESULT(0);
                     }
                     if selected_source_index(parent).is_some() {
-                        SendMessageW(
-                            hwnd,
-                            TVM_EXPAND,
-                            WPARAM(windows::Win32::UI::Controls::TVE_COLLAPSE.0 as usize),
-                            LPARAM(hitem.0),
-                        );
+                        unsafe {
+                            SendMessageW(
+                                hwnd,
+                                TVM_EXPAND,
+                                WPARAM(windows::Win32::UI::Controls::TVE_COLLAPSE.0 as usize),
+                                LPARAM(hitem.0),
+                            );
+                        }
                         return LRESULT(0);
                     }
                 }
             }
         }
         if key == VK_RETURN.0 as u32 {
-            let parent = GetParent(hwnd);
+            let parent = unsafe { GetParent(hwnd) };
             if parent.0 != 0 {
-                if GetKeyState(VK_MENU.0 as i32) < 0 {
+                if unsafe { GetKeyState(VK_MENU.0 as i32) < 0 } {
                     show_selected_properties(parent);
                     return LRESULT(0);
                 }
@@ -6560,13 +6574,13 @@ unsafe fn podcast_tree_wndproc_inner(
             }
         }
         if key == u32::from(VK_APPS.0)
-            || (key == u32::from(VK_F10.0) && GetKeyState(VK_SHIFT.0 as i32) < 0)
+            || (key == u32::from(VK_F10.0) && unsafe { GetKeyState(VK_SHIFT.0 as i32) < 0 })
         {
-            let parent = GetParent(hwnd);
+            let parent = unsafe { GetParent(hwnd) };
             if parent.0 != 0 {
-                if let Err(_e) =
+                if let Err(_e) = unsafe {
                     PostMessageW(parent, WM_CONTEXTMENU, WPARAM(hwnd.0 as usize), LPARAM(-1))
-                {
+                } {
                     crate::log_debug(&format!("Error: {:?}", _e));
                 }
                 return LRESULT(0);
@@ -6574,16 +6588,16 @@ unsafe fn podcast_tree_wndproc_inner(
         }
     }
 
-    let parent = GetParent(hwnd);
+    let parent = unsafe { GetParent(hwnd) };
     let prev_proc = if parent.0 != 0 {
         with_podcast_state(parent, |s| s.tree_proc).unwrap_or(None)
     } else {
         None
     };
     if let Some(proc) = prev_proc {
-        CallWindowProcW(Some(proc), hwnd, msg, wparam, lparam)
+        unsafe { CallWindowProcW(Some(proc), hwnd, msg, wparam, lparam) }
     } else {
-        DefWindowProcW(hwnd, msg, wparam, lparam)
+        unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
     }
 }
 
@@ -6595,21 +6609,16 @@ unsafe extern "system" fn podcast_search_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "podcast_search_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { podcast_search_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || podcast_search_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn podcast_search_wndproc_inner(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
+fn podcast_search_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if msg == WM_KEYDOWN || msg == windows::Win32::UI::WindowsAndMessaging::WM_SYSKEYDOWN {
         let key = wparam.0 as u32;
         if key == VK_TAB.0 as u32 {
-            let parent = GetParent(hwnd);
+            let parent = unsafe { GetParent(hwnd) };
             if parent.0 != 0 {
                 let (
                     hwnd_tree,
@@ -6639,7 +6648,7 @@ unsafe fn podcast_search_wndproc_inner(
                     HWND(0),
                     HWND(0),
                 ));
-                let prev = GetKeyState(VK_SHIFT.0 as i32) < 0;
+                let prev = unsafe { GetKeyState(VK_SHIFT.0 as i32) < 0 };
                 let target = if prev {
                     hwnd_tree
                 } else if hwnd_search_button.0 != 0 {
@@ -6656,13 +6665,13 @@ unsafe fn podcast_search_wndproc_inner(
                     hwnd_close
                 };
                 if target.0 != 0 {
-                    SetFocus(target);
+                    unsafe { SetFocus(target) };
                     return LRESULT(0);
                 }
             }
         }
         if key == VK_RETURN.0 as u32 {
-            let parent = GetParent(hwnd);
+            let parent = unsafe { GetParent(hwnd) };
             if parent.0 != 0 {
                 trigger_search_from_edit(parent);
             }
@@ -6674,7 +6683,7 @@ unsafe fn podcast_search_wndproc_inner(
     {
         let key = wparam.0 as u32;
         if key == VK_RETURN.0 as u32 {
-            let parent = GetParent(hwnd);
+            let parent = unsafe { GetParent(hwnd) };
             if parent.0 != 0 {
                 trigger_search_from_edit(parent);
             }
@@ -6682,29 +6691,29 @@ unsafe fn podcast_search_wndproc_inner(
         }
     }
     if msg == WM_CHAR && wparam.0 as u32 == 13 {
-        let parent = GetParent(hwnd);
+        let parent = unsafe { GetParent(hwnd) };
         if parent.0 != 0 {
             trigger_search_from_edit(parent);
         }
         return LRESULT(0);
     }
     if msg == windows::Win32::UI::WindowsAndMessaging::WM_SYSCHAR && wparam.0 as u32 == 13 {
-        let parent = GetParent(hwnd);
+        let parent = unsafe { GetParent(hwnd) };
         if parent.0 != 0 {
             trigger_search_from_edit(parent);
         }
         return LRESULT(0);
     }
-    let parent = GetParent(hwnd);
+    let parent = unsafe { GetParent(hwnd) };
     let prev_proc = if parent.0 != 0 {
         with_podcast_state(parent, |s| s.search_proc).unwrap_or(None)
     } else {
         None
     };
     if let Some(proc) = prev_proc {
-        CallWindowProcW(Some(proc), hwnd, msg, wparam, lparam)
+        unsafe { CallWindowProcW(Some(proc), hwnd, msg, wparam, lparam) }
     } else {
-        DefWindowProcW(hwnd, msg, wparam, lparam)
+        unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
     }
 }
 
@@ -7033,9 +7042,9 @@ unsafe fn create_controls(hwnd: HWND) {
     }
 }
 
-unsafe fn resize_controls(hwnd: HWND) {
+fn resize_controls(hwnd: HWND) {
     let mut rect = windows::Win32::Foundation::RECT::default();
-    if GetClientRect(hwnd, &mut rect).is_err() {
+    if unsafe { GetClientRect(hwnd, &mut rect) }.is_err() {
         return;
     }
     let width = (rect.right - rect.left).max(0);
@@ -7087,89 +7096,91 @@ unsafe fn resize_controls(hwnd: HWND) {
         HWND(0),
     ));
     if controls.0 != HWND(0) {
-        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            controls.0,
-            margin,
-            margin,
-            width - margin * 2,
-            tree_h,
-            true,
-        ));
-        let mut y = margin + tree_h + spacing;
-        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            controls.1,
-            margin,
-            y,
-            width - margin * 2,
-            label_h,
-            true,
-        ));
-        y += label_h + spacing;
-        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            controls.2,
-            margin,
-            y,
-            width - margin * 2,
-            search_h,
-            true,
-        ));
-        y += search_h + spacing;
-        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            controls.3,
-            margin,
-            y,
-            width - margin * 2,
-            search_h,
-            true,
-        ));
-        y += search_h + spacing;
-        let button_total_w = (width - margin * 2).max(0);
-        let button_w = ((button_total_w - spacing) / 2).max(120);
-        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            controls.4,
-            margin,
-            y,
-            button_w,
-            search_button_h,
-            true,
-        ));
-        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            controls.5,
-            margin + button_w + spacing,
-            y,
-            button_w,
-            search_button_h,
-            true,
-        ));
-        y += search_button_h + spacing;
-        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            controls.6,
-            margin,
-            y,
-            width - margin * 2,
-            results_h,
-            true,
-        ));
-        y += results_h + spacing;
-        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            controls.7, margin, y, 200, button_h, true,
-        ));
-        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            controls.10,
-            (width - margin - 200).max(margin),
-            y,
-            200,
-            button_h,
-            true,
-        ));
-        y += button_h + spacing;
-        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            controls.8, margin, y, 200, button_h, true,
-        ));
-        y += button_h + spacing;
-        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-            controls.9, margin, y, 200, button_h, true,
-        ));
+        unsafe {
+            crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                controls.0,
+                margin,
+                margin,
+                width - margin * 2,
+                tree_h,
+                true,
+            ));
+            let mut y = margin + tree_h + spacing;
+            crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                controls.1,
+                margin,
+                y,
+                width - margin * 2,
+                label_h,
+                true,
+            ));
+            y += label_h + spacing;
+            crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                controls.2,
+                margin,
+                y,
+                width - margin * 2,
+                search_h,
+                true,
+            ));
+            y += search_h + spacing;
+            crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                controls.3,
+                margin,
+                y,
+                width - margin * 2,
+                search_h,
+                true,
+            ));
+            y += search_h + spacing;
+            let button_total_w = (width - margin * 2).max(0);
+            let button_w = ((button_total_w - spacing) / 2).max(120);
+            crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                controls.4,
+                margin,
+                y,
+                button_w,
+                search_button_h,
+                true,
+            ));
+            crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                controls.5,
+                margin + button_w + spacing,
+                y,
+                button_w,
+                search_button_h,
+                true,
+            ));
+            y += search_button_h + spacing;
+            crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                controls.6,
+                margin,
+                y,
+                width - margin * 2,
+                results_h,
+                true,
+            ));
+            y += results_h + spacing;
+            crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                controls.7, margin, y, 200, button_h, true,
+            ));
+            crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                controls.10,
+                (width - margin - 200).max(margin),
+                y,
+                200,
+                button_h,
+                true,
+            ));
+            y += button_h + spacing;
+            crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                controls.8, margin, y, 200, button_h, true,
+            ));
+            y += button_h + spacing;
+            crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                controls.9, margin, y, 200, button_h, true,
+            ));
+        }
     }
 }
 

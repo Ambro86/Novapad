@@ -1818,3047 +1818,3054 @@ unsafe extern "system" fn options_wndproc(
     crate::panic_guard::guard(
         "options_wndproc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { options_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || options_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let create_struct = lparam.0 as *const CREATESTRUCTW;
-            let parent = HWND((*create_struct).lpCreateParams as isize);
-            let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
-            let labels = options_labels(language);
+fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let create_struct = lparam.0 as *const CREATESTRUCTW;
+                let parent = HWND((*create_struct).lpCreateParams as isize);
+                let language =
+                    with_state(parent, |state| state.settings.language).unwrap_or_default();
+                let labels = options_labels(language);
 
-            let hfont = with_state(parent, |state| state.hfont).unwrap_or(HFONT(0));
+                let hfont = with_state(parent, |state| state.hfont).unwrap_or(HFONT(0));
 
-            let hwnd_tabs = CreateWindowExW(
-                Default::default(),
-                WC_TABCONTROLW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                20,
-                10,
-                640,
-                28,
-                hwnd,
-                HMENU(OPTIONS_ID_TABS as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let tab_labels = [
-                labels.tab_general.clone(),
-                labels.tab_voice.clone(),
-                labels.tab_editor.clone(),
-                labels.tab_audio.clone(),
-                labels.tab_rss_podcast.clone(),
-                labels.tab_shortcuts.clone(),
-            ];
-            for (index, label) in tab_labels.iter().enumerate() {
-                let mut text = to_wide(label);
-                let mut item = TCITEMW {
-                    mask: TCIF_TEXT,
-                    pszText: PWSTR(text.as_mut_ptr()),
-                    ..Default::default()
-                };
-                SendMessageW(
-                    hwnd_tabs,
-                    TCM_INSERTITEMW,
-                    WPARAM(index),
-                    LPARAM(&mut item as *mut _ as isize),
+                let hwnd_tabs = CreateWindowExW(
+                    Default::default(),
+                    WC_TABCONTROLW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    20,
+                    10,
+                    640,
+                    28,
+                    hwnd,
+                    HMENU(OPTIONS_ID_TABS as isize),
+                    HINSTANCE(0),
+                    None,
                 );
+                let tab_labels = [
+                    labels.tab_general.clone(),
+                    labels.tab_voice.clone(),
+                    labels.tab_editor.clone(),
+                    labels.tab_audio.clone(),
+                    labels.tab_rss_podcast.clone(),
+                    labels.tab_shortcuts.clone(),
+                ];
+                for (index, label) in tab_labels.iter().enumerate() {
+                    let mut text = to_wide(label);
+                    let mut item = TCITEMW {
+                        mask: TCIF_TEXT,
+                        pszText: PWSTR(text.as_mut_ptr()),
+                        ..Default::default()
+                    };
+                    SendMessageW(
+                        hwnd_tabs,
+                        TCM_INSERTITEMW,
+                        WPARAM(index),
+                        LPARAM(&mut item as *mut _ as isize),
+                    );
+                }
+                SendMessageW(hwnd_tabs, TCM_SETCURSEL, WPARAM(0), LPARAM(0));
+
+                let mut y = 50;
+                let label_lang = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_language).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_lang = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    120,
+                    hwnd,
+                    HMENU(OPTIONS_ID_LANG as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 40;
+
+                let label_modified_marker_position = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_modified_marker_position).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_modified_marker_position = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    120,
+                    hwnd,
+                    HMENU(OPTIONS_ID_MODIFIED_MARKER_POSITION as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 40;
+
+                let label_open = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_open).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_open = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    120,
+                    hwnd,
+                    HMENU(OPTIONS_ID_OPEN as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 40;
+
+                let label_tts_engine = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_tts_engine).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_tts_engine = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    120,
+                    hwnd,
+                    HMENU(OPTIONS_ID_TTS_ENGINE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 40;
+
+                let label_tts_voice_language = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_tts_voice_language).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_tts_voice_language = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    140,
+                    hwnd,
+                    HMENU(OPTIONS_ID_TTS_VOICE_LANGUAGE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 40;
+
+                let label_voice = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_voice).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_voice = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    140,
+                    hwnd,
+                    HMENU(OPTIONS_ID_VOICE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 40;
+
+                let checkbox_multilingual = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_multilingual).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    300,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_MULTILINGUAL as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 28;
+
+                let label_tts_speed = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_tts_speed).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_tts_speed = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    140,
+                    hwnd,
+                    HMENU(OPTIONS_ID_TTS_SPEED as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_tts_speed = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    300,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_TTS_SPEED_EDIT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 40;
+
+                let label_tts_pitch = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_tts_pitch).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_tts_pitch = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    140,
+                    hwnd,
+                    HMENU(OPTIONS_ID_TTS_PITCH as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_tts_pitch = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    300,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_TTS_PITCH_EDIT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 40;
+
+                let label_tts_volume = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_tts_volume).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_tts_volume = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    140,
+                    hwnd,
+                    HMENU(OPTIONS_ID_TTS_VOLUME as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_tts_volume = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    300,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_TTS_VOLUME_EDIT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 36;
+
+                let button_tts_preview = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_tts_preview).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    170,
+                    y,
+                    300,
+                    26,
+                    hwnd,
+                    HMENU(OPTIONS_ID_TTS_PREVIEW as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let button_tts_insert_tag = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_tts_insert_tag).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    170,
+                    y,
+                    300,
+                    26,
+                    hwnd,
+                    HMENU(OPTIONS_ID_TTS_INSERT_TAG as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let checkbox_use_dialogue_voice = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_use_dialogue_voice).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    300,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_USE_DIALOGUE_VOICE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 26;
+
+                let label_dialogue_engine = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_dialogue_engine).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_dialogue_engine = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    120,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_TTS_ENGINE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_dialogue_voice_language = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_dialogue_voice_language).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_dialogue_voice_language = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    120,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_VOICE_LANGUAGE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_dialogue_voice = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_dialogue_voice).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_dialogue_voice = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    200,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_VOICE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let checkbox_dialogue_multilingual = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_multilingual).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    300,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_MULTILINGUAL as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 26;
+
+                let button_dialogue_voice_preview = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_dialogue_voice_preview).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    170,
+                    y,
+                    300,
+                    26,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_VOICE_PREVIEW as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 32;
+
+                let label_dialogue_voice_rate = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_dialogue_voice_rate).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_dialogue_voice_rate = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    140,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_VOICE_RATE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_dialogue_voice_rate = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    300,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_VOICE_RATE_EDIT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 40;
+
+                let label_dialogue_voice_pitch = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_dialogue_voice_pitch).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_dialogue_voice_pitch = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    140,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_VOICE_PITCH as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_dialogue_voice_pitch = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    300,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_VOICE_PITCH_EDIT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 40;
+
+                let label_dialogue_voice_volume = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_dialogue_voice_volume).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_dialogue_voice_volume = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    140,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_VOICE_VOLUME as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_dialogue_voice_volume = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    300,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_VOICE_VOLUME_EDIT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 36;
+
+                let checkbox_dialogue_use_secondary_voice = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_dialogue_use_secondary_voice).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    300,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_USE_SECONDARY_VOICE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 26;
+
+                let label_dialogue_secondary_engine = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_dialogue_secondary_engine).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_dialogue_secondary_engine = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    120,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_TTS_ENGINE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 40;
+
+                let label_dialogue_secondary_voice_language = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_dialogue_secondary_voice_language).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_dialogue_secondary_voice_language = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    120,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_LANGUAGE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 40;
+
+                let label_dialogue_secondary_voice = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_dialogue_secondary_voice).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_dialogue_secondary_voice = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    200,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_VOICE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 40;
+
+                let checkbox_dialogue_secondary_multilingual = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_multilingual).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    300,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_MULTILINGUAL as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 26;
+
+                let button_dialogue_secondary_voice_preview = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_dialogue_voice_preview).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    170,
+                    y,
+                    300,
+                    26,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_PREVIEW as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 32;
+
+                let label_dialogue_secondary_voice_rate = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_dialogue_voice_rate).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_dialogue_secondary_voice_rate = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    140,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_RATE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_dialogue_secondary_voice_rate = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    300,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_RATE_EDIT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 40;
+
+                let label_dialogue_secondary_voice_pitch = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_dialogue_voice_pitch).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_dialogue_secondary_voice_pitch = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    140,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_PITCH as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_dialogue_secondary_voice_pitch = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    300,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_PITCH_EDIT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 40;
+
+                let label_dialogue_secondary_voice_volume = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_dialogue_voice_volume).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_dialogue_secondary_voice_volume = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    140,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_VOLUME as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_dialogue_secondary_voice_volume = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    300,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_VOLUME_EDIT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_dialogue_open_quote = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_dialogue_open_quote).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_dialogue_open_quote = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_EDIT,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    300,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_OPEN_QUOTE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_dialogue_close_quote = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_dialogue_close_quote).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_dialogue_close_quote = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_EDIT,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    300,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_CLOSE_QUOTE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let checkbox_dialogue_allow_multiline = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_dialogue_allow_multiline).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    300,
+                    38,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DIALOGUE_ALLOW_MULTILINE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 44;
+
+                let label_audio_skip = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_audio_skip).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_audio_skip = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    140,
+                    hwnd,
+                    HMENU(OPTIONS_ID_AUDIO_SKIP as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 40;
+
+                let label_audiobook_save_folder = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_audiobook_save_folder).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_audiobook_save_folder = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    220,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_AUDIOBOOK_SAVE_FOLDER as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let button_audiobook_save_folder_browse = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_audiobook_save_folder_browse).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    395,
+                    y - 2,
+                    75,
+                    24,
+                    hwnd,
+                    HMENU(OPTIONS_ID_AUDIOBOOK_SAVE_FOLDER_BROWSE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 36;
+
+                let checkbox_show_media_save_confirmation = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_show_media_save_confirmation).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    360,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_SHOW_MEDIA_SAVE_CONFIRMATION as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 28;
+
+                let label_audio_split = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_audio_split).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_audio_split = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    140,
+                    hwnd,
+                    HMENU(OPTIONS_ID_AUDIO_SPLIT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 34;
+
+                let label_audio_split_minutes = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_audio_split_minutes).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_audio_split_minutes = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    140,
+                    hwnd,
+                    HMENU(OPTIONS_ID_AUDIO_SPLIT_MINUTES as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 34;
+
+                let label_audio_split_parts_count = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_audio_split_parts_count).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_audio_split_parts_count = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    300,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_AUDIO_SPLIT_PARTS_COUNT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 34;
+
+                let label_audio_split_start_number = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_audio_split_start_number).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_audio_split_start_number = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    140,
+                    hwnd,
+                    HMENU(OPTIONS_ID_AUDIO_SPLIT_START_NUMBER as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 34;
+
+                let label_audio_split_text = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_audio_split_text).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_audio_split_text = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    300,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_AUDIO_SPLIT_TEXT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 34;
+
+                let checkbox_audio_split_requires_newline = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_audio_split_requires_newline).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    300,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_AUDIO_SPLIT_REQUIRE_NEWLINE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 24;
+
+                let checkbox_audio_split_epub_chapters = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_audio_split_epub_chapters).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    300,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_AUDIO_SPLIT_EPUB_CHAPTERS as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 24;
+
+                let checkbox_subtitle_ducking = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_subtitle_ducking).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    300,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_SUBTITLE_DUCKING as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 26;
+
+                let label_subtitle_mode = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_subtitle_mode).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_subtitle_mode = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    140,
+                    hwnd,
+                    HMENU(OPTIONS_ID_SUBTITLE_MODE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_subtitle_offset = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_subtitle_offset).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_subtitle_offset = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    300,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_SUBTITLE_OFFSET as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_confirm_delete_rss_mode = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_confirm_delete_rss_mode).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_confirm_delete_rss_mode = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    180,
+                    hwnd,
+                    HMENU(OPTIONS_ID_CONFIRM_DELETE_RSS_MODE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_confirm_delete_podcast_mode = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_confirm_delete_podcast_mode).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_confirm_delete_podcast_mode = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    180,
+                    hwnd,
+                    HMENU(OPTIONS_ID_CONFIRM_DELETE_PODCAST_MODE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_rss_quick_copy_mode = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_rss_quick_copy_mode).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_rss_quick_copy_mode = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    180,
+                    hwnd,
+                    HMENU(OPTIONS_ID_RSS_QUICK_COPY_MODE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_podcast_cache_limit = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_podcast_cache_limit).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_podcast_cache_limit = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    80,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_PODCAST_CACHE_LIMIT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let checkbox_announce_unread_rss_podcast = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_announce_unread_rss_podcast).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    360,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_ANNOUNCE_UNREAD_RSS_PODCAST as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 28;
+
+                let label_unread_label_position = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_unread_label_position).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_unread_label_position = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    180,
+                    hwnd,
+                    HMENU(OPTIONS_ID_UNREAD_LABEL_POSITION as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_rss_date_display = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_rss_date_display).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_rss_date_display = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    180,
+                    hwnd,
+                    HMENU(OPTIONS_ID_RSS_DATE_DISPLAY as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_rss_time_display = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_rss_time_display).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_rss_time_display = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    180,
+                    hwnd,
+                    HMENU(OPTIONS_ID_RSS_TIME_DISPLAY as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_podcast_date_display = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_podcast_date_display).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_podcast_date_display = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    180,
+                    hwnd,
+                    HMENU(OPTIONS_ID_PODCAST_DATE_DISPLAY as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_podcast_time_display = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_podcast_time_display).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_podcast_time_display = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    180,
+                    hwnd,
+                    HMENU(OPTIONS_ID_PODCAST_TIME_DISPLAY as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_podcastindex_key = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_podcastindex_key).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_podcastindex_key = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    300,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_PODCASTINDEX_KEY as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_podcastindex_secret = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_podcastindex_secret).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_podcastindex_secret = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WINDOW_STYLE((ES_AUTOHSCROLL | ES_PASSWORD) as u32),
+                    170,
+                    y - 2,
+                    300,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_PODCASTINDEX_SECRET as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let button_podcastindex_signup = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_podcastindex_signup).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    170,
+                    y,
+                    300,
+                    26,
+                    hwnd,
+                    HMENU(OPTIONS_ID_PODCASTINDEX_SIGNUP as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 34;
+
+                let checkbox_tts_manual = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_tts_manual_tuning).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    300,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_TTS_MANUAL_TUNING as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 24;
+
+                let checkbox_split_on_newline = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_split_on_newline).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    300,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_SPLIT_ON_NEWLINE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 24;
+
+                let checkbox_word_wrap = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_word_wrap).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    300,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_WORD_WRAP as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 24;
+
+                let checkbox_smart_quotes = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_smart_quotes).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    300,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_SMART_QUOTES as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 26;
+
+                let checkbox_strip_markdown_keep_bullets = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_strip_markdown_keep_bullets).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    300,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_STRIP_MARKDOWN_KEEP_BULLETS as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 26;
+
+                let checkbox_spellcheck = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_spellcheck).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    300,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_SPELLCHECK_ENABLED as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 26;
+
+                let label_spellcheck_language = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_spellcheck_language).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_spellcheck_language = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    200,
+                    hwnd,
+                    HMENU(OPTIONS_ID_SPELLCHECK_LANGUAGE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_dictionary_translation = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_dictionary_translation).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_dictionary_translation = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    200,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DICTIONARY_TRANSLATION as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_wikipedia_language = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_wikipedia_language).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_wikipedia_language = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    200,
+                    hwnd,
+                    HMENU(OPTIONS_ID_WIKIPEDIA_LANGUAGE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_wrap_width = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_wrap_width).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_wrap_width = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    80,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_WRAP_WIDTH as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_indentation = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_indentation).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_indentation = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    200,
+                    hwnd,
+                    HMENU(OPTIONS_ID_INDENT_MODE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_tab_width = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_tab_width).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_tab_width = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    80,
+                    200,
+                    hwnd,
+                    HMENU(OPTIONS_ID_TAB_WIDTH as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let label_space_width = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_space_width).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_space_width = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    80,
+                    200,
+                    hwnd,
+                    HMENU(OPTIONS_ID_SPACE_WIDTH as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_quote_prefix = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_quote_prefix).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_quote_prefix = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    120,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_QUOTE_PREFIX as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_interpreter_path = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_interpreter_path).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_interpreter_path = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    140,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_INTERPRETER_PATH as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let button_interpreter_browse = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_interpreter_browse).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    315,
+                    y - 2,
+                    70,
+                    24,
+                    hwnd,
+                    HMENU(OPTIONS_ID_INTERPRETER_BROWSE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let button_interpreter_search = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_interpreter_search).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    390,
+                    y - 2,
+                    100,
+                    24,
+                    hwnd,
+                    HMENU(OPTIONS_ID_INTERPRETER_SEARCH as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let checkbox_move_cursor = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_move_cursor).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    300,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_MOVE_CURSOR as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 24;
+
+                let checkbox_check_updates = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_check_updates).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    300,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_CHECK_UPDATES as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 24;
+
+                let checkbox_send_crash_reports = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_send_crash_reports).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    300,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_SEND_CRASH_REPORTS as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 24;
+
+                let checkbox_use_legacy_name = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_use_legacy_name).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    300,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_USE_LEGACY_NAME as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 24;
+
+                let checkbox_context_menu = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_context_menu).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    300,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_CONTEXT_MENU as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 28;
+
+                let label_file_associations = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_file_associations).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let button_manage_associations = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_manage_associations).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    170,
+                    y - 2,
+                    300,
+                    26,
+                    hwnd,
+                    HMENU(OPTIONS_ID_MANAGE_ASSOCIATIONS as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 34;
+
+                let label_prompt_program = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_prompt_program).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_prompt_program = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    120,
+                    hwnd,
+                    HMENU(OPTIONS_ID_PROMPT_PROGRAM as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_network_proxy = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_network_proxy).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_network_proxy = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    300,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_NETWORK_PROXY as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_network_proxy_username = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_network_proxy_username).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_network_proxy_username = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    300,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_NETWORK_PROXY_USERNAME as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let label_network_proxy_password = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_network_proxy_password).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_network_proxy_password = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WINDOW_STYLE((ES_AUTOHSCROLL | ES_PASSWORD) as u32),
+                    170,
+                    y - 2,
+                    300,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_NETWORK_PROXY_PASSWORD as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 40;
+
+                let label_shortcut_action = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_shortcut_action).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_shortcut_action = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    200,
+                    hwnd,
+                    HMENU(OPTIONS_ID_SHORTCUT_ACTION as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 34;
+                let label_shortcut_value = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_shortcut_value).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_shortcut_value = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_EDIT,
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WINDOW_STYLE(ES_AUTOHSCROLL as u32)
+                        | WINDOW_STYLE(ES_READONLY as u32),
+                    170,
+                    y - 2,
+                    300,
+                    24,
+                    hwnd,
+                    HMENU(OPTIONS_ID_SHORTCUT_VALUE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 34;
+                let button_shortcut_change = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_shortcut_change).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    170,
+                    y - 2,
+                    146,
+                    26,
+                    hwnd,
+                    HMENU(OPTIONS_ID_SHORTCUT_CHANGE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let button_shortcut_reset = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_shortcut_reset).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    324,
+                    y - 2,
+                    146,
+                    26,
+                    hwnd,
+                    HMENU(OPTIONS_ID_SHORTCUT_RESET as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let button_shortcut_reset_all = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_shortcut_reset_all).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    170,
+                    y + 30,
+                    300,
+                    26,
+                    hwnd,
+                    HMENU(OPTIONS_ID_SHORTCUT_RESET_ALL as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 40;
+
+                let ok_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.ok).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    280,
+                    y,
+                    90,
+                    28,
+                    hwnd,
+                    HMENU(OPTIONS_ID_OK as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let cancel_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.cancel).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    380,
+                    y,
+                    90,
+                    28,
+                    hwnd,
+                    HMENU(OPTIONS_ID_CANCEL as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                for control in [
+                    hwnd_tabs,
+                    label_lang,
+                    combo_lang,
+                    label_modified_marker_position,
+                    combo_modified_marker_position,
+                    label_open,
+                    combo_open,
+                    label_tts_engine,
+                    combo_tts_engine,
+                    label_tts_voice_language,
+                    combo_tts_voice_language,
+                    label_voice,
+                    combo_voice,
+                    label_tts_speed,
+                    combo_tts_speed,
+                    label_tts_pitch,
+                    combo_tts_pitch,
+                    label_tts_volume,
+                    combo_tts_volume,
+                    edit_tts_speed,
+                    edit_tts_pitch,
+                    edit_tts_volume,
+                    button_tts_preview,
+                    button_tts_insert_tag,
+                    label_audio_skip,
+                    combo_audio_skip,
+                    label_audiobook_save_folder,
+                    edit_audiobook_save_folder,
+                    button_audiobook_save_folder_browse,
+                    checkbox_show_media_save_confirmation,
+                    label_audio_split,
+                    combo_audio_split,
+                    label_audio_split_minutes,
+                    combo_audio_split_minutes,
+                    label_audio_split_parts_count,
+                    edit_audio_split_parts_count,
+                    label_audio_split_start_number,
+                    combo_audio_split_start_number,
+                    label_audio_split_text,
+                    edit_audio_split_text,
+                    checkbox_audio_split_requires_newline,
+                    checkbox_audio_split_epub_chapters,
+                    checkbox_subtitle_ducking,
+                    label_subtitle_offset,
+                    edit_subtitle_offset,
+                    label_podcast_cache_limit,
+                    edit_podcast_cache_limit,
+                    checkbox_announce_unread_rss_podcast,
+                    label_unread_label_position,
+                    combo_unread_label_position,
+                    label_rss_date_display,
+                    combo_rss_date_display,
+                    label_rss_time_display,
+                    combo_rss_time_display,
+                    label_podcast_date_display,
+                    combo_podcast_date_display,
+                    label_podcast_time_display,
+                    combo_podcast_time_display,
+                    label_podcastindex_key,
+                    edit_podcastindex_key,
+                    label_podcastindex_secret,
+                    edit_podcastindex_secret,
+                    button_podcastindex_signup,
+                    checkbox_tts_manual,
+                    checkbox_multilingual,
+                    checkbox_use_dialogue_voice,
+                    label_dialogue_engine,
+                    combo_dialogue_engine,
+                    label_dialogue_voice_language,
+                    combo_dialogue_voice_language,
+                    label_dialogue_voice,
+                    combo_dialogue_voice,
+                    checkbox_dialogue_multilingual,
+                    label_dialogue_voice_rate,
+                    combo_dialogue_voice_rate,
+                    edit_dialogue_voice_rate,
+                    label_dialogue_voice_pitch,
+                    combo_dialogue_voice_pitch,
+                    edit_dialogue_voice_pitch,
+                    label_dialogue_voice_volume,
+                    combo_dialogue_voice_volume,
+                    edit_dialogue_voice_volume,
+                    checkbox_dialogue_use_secondary_voice,
+                    label_dialogue_secondary_engine,
+                    combo_dialogue_secondary_engine,
+                    label_dialogue_secondary_voice_language,
+                    combo_dialogue_secondary_voice_language,
+                    label_dialogue_secondary_voice,
+                    combo_dialogue_secondary_voice,
+                    checkbox_dialogue_secondary_multilingual,
+                    label_dialogue_secondary_voice_rate,
+                    combo_dialogue_secondary_voice_rate,
+                    edit_dialogue_secondary_voice_rate,
+                    label_dialogue_secondary_voice_pitch,
+                    combo_dialogue_secondary_voice_pitch,
+                    edit_dialogue_secondary_voice_pitch,
+                    label_dialogue_secondary_voice_volume,
+                    combo_dialogue_secondary_voice_volume,
+                    edit_dialogue_secondary_voice_volume,
+                    label_dialogue_open_quote,
+                    edit_dialogue_open_quote,
+                    label_dialogue_close_quote,
+                    edit_dialogue_close_quote,
+                    checkbox_dialogue_allow_multiline,
+                    button_dialogue_voice_preview,
+                    button_dialogue_secondary_voice_preview,
+                    checkbox_split_on_newline,
+                    checkbox_word_wrap,
+                    checkbox_smart_quotes,
+                    checkbox_strip_markdown_keep_bullets,
+                    checkbox_spellcheck,
+                    label_spellcheck_language,
+                    combo_spellcheck_language,
+                    label_dictionary_translation,
+                    combo_dictionary_translation,
+                    label_wikipedia_language,
+                    combo_wikipedia_language,
+                    label_wrap_width,
+                    edit_wrap_width,
+                    label_indentation,
+                    combo_indentation,
+                    label_tab_width,
+                    combo_tab_width,
+                    label_space_width,
+                    combo_space_width,
+                    label_quote_prefix,
+                    edit_quote_prefix,
+                    label_interpreter_path,
+                    edit_interpreter_path,
+                    button_interpreter_browse,
+                    label_subtitle_mode,
+                    combo_subtitle_mode,
+                    label_subtitle_offset,
+                    edit_subtitle_offset,
+                    checkbox_move_cursor,
+                    checkbox_check_updates,
+                    checkbox_send_crash_reports,
+                    checkbox_use_legacy_name,
+                    checkbox_context_menu,
+                    label_confirm_delete_rss_mode,
+                    combo_confirm_delete_rss_mode,
+                    label_confirm_delete_podcast_mode,
+                    combo_confirm_delete_podcast_mode,
+                    label_rss_quick_copy_mode,
+                    combo_rss_quick_copy_mode,
+                    label_file_associations,
+                    button_manage_associations,
+                    label_prompt_program,
+                    combo_prompt_program,
+                    label_network_proxy,
+                    edit_network_proxy,
+                    label_network_proxy_username,
+                    edit_network_proxy_username,
+                    label_network_proxy_password,
+                    edit_network_proxy_password,
+                    label_shortcut_action,
+                    combo_shortcut_action,
+                    label_shortcut_value,
+                    edit_shortcut_value,
+                    button_shortcut_change,
+                    button_shortcut_reset,
+                    button_shortcut_reset_all,
+                    ok_button,
+                    cancel_button,
+                ] {
+                    if control.0 != 0 && hfont.0 != 0 {
+                        SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    }
+                }
+
+                let dialog_state = Box::new(OptionsDialogState {
+                    parent,
+                    hwnd_tabs,
+                    focus_initialized: false,
+                    label_language: label_lang,
+                    label_modified_marker_position,
+                    label_open,
+                    label_tts_engine,
+                    label_tts_voice_language,
+                    label_voice,
+                    label_tts_speed,
+                    label_tts_pitch,
+                    label_tts_volume,
+                    button_tts_preview,
+                    button_tts_insert_tag,
+                    combo_lang,
+                    combo_modified_marker_position,
+                    combo_open,
+                    combo_tts_engine,
+                    combo_tts_voice_language,
+                    combo_voice,
+                    combo_tts_speed,
+                    combo_tts_pitch,
+                    combo_tts_volume,
+                    edit_tts_speed,
+                    edit_tts_pitch,
+                    edit_tts_volume,
+                    checkbox_tts_manual,
+                    label_audio_skip,
+                    combo_audio_skip,
+                    label_audiobook_save_folder,
+                    edit_audiobook_save_folder,
+                    button_audiobook_save_folder_browse,
+                    checkbox_show_media_save_confirmation,
+                    label_audio_split,
+                    combo_audio_split,
+                    label_audio_split_minutes,
+                    combo_audio_split_minutes,
+                    label_audio_split_parts_count,
+                    edit_audio_split_parts_count,
+                    label_audio_split_start_number,
+                    combo_audio_split_start_number,
+                    label_audio_split_text,
+                    edit_audio_split_text,
+                    checkbox_audio_split_requires_newline,
+                    checkbox_audio_split_epub_chapters,
+                    checkbox_subtitle_ducking,
+                    label_subtitle_offset,
+                    edit_subtitle_offset,
+                    label_podcast_cache_limit,
+                    edit_podcast_cache_limit,
+                    checkbox_announce_unread_rss_podcast,
+                    label_unread_label_position,
+                    combo_unread_label_position,
+                    label_rss_date_display,
+                    combo_rss_date_display,
+                    label_rss_time_display,
+                    combo_rss_time_display,
+                    label_podcast_date_display,
+                    combo_podcast_date_display,
+                    label_podcast_time_display,
+                    combo_podcast_time_display,
+                    label_podcastindex_key,
+                    edit_podcastindex_key,
+                    label_podcastindex_secret,
+                    edit_podcastindex_secret,
+                    button_podcastindex_signup,
+                    checkbox_multilingual,
+                    checkbox_use_dialogue_voice,
+                    label_dialogue_engine,
+                    combo_dialogue_engine,
+                    label_dialogue_voice_language,
+                    combo_dialogue_voice_language,
+                    label_dialogue_voice,
+                    combo_dialogue_voice,
+                    checkbox_dialogue_multilingual,
+                    label_dialogue_voice_rate,
+                    combo_dialogue_voice_rate,
+                    edit_dialogue_voice_rate,
+                    label_dialogue_voice_pitch,
+                    combo_dialogue_voice_pitch,
+                    edit_dialogue_voice_pitch,
+                    label_dialogue_voice_volume,
+                    combo_dialogue_voice_volume,
+                    edit_dialogue_voice_volume,
+                    checkbox_dialogue_use_secondary_voice,
+                    label_dialogue_secondary_engine,
+                    combo_dialogue_secondary_engine,
+                    label_dialogue_secondary_voice_language,
+                    combo_dialogue_secondary_voice_language,
+                    label_dialogue_secondary_voice,
+                    combo_dialogue_secondary_voice,
+                    checkbox_dialogue_secondary_multilingual,
+                    label_dialogue_secondary_voice_rate,
+                    combo_dialogue_secondary_voice_rate,
+                    edit_dialogue_secondary_voice_rate,
+                    label_dialogue_secondary_voice_pitch,
+                    combo_dialogue_secondary_voice_pitch,
+                    edit_dialogue_secondary_voice_pitch,
+                    label_dialogue_secondary_voice_volume,
+                    combo_dialogue_secondary_voice_volume,
+                    edit_dialogue_secondary_voice_volume,
+                    label_dialogue_open_quote,
+                    edit_dialogue_open_quote,
+                    label_dialogue_close_quote,
+                    edit_dialogue_close_quote,
+                    checkbox_dialogue_allow_multiline,
+                    button_dialogue_voice_preview,
+                    button_dialogue_secondary_voice_preview,
+                    checkbox_split_on_newline,
+                    checkbox_word_wrap,
+                    checkbox_smart_quotes,
+                    checkbox_strip_markdown_keep_bullets,
+                    checkbox_spellcheck,
+                    label_spellcheck_language,
+                    combo_spellcheck_language,
+                    label_dictionary_translation,
+                    combo_dictionary_translation,
+                    label_wikipedia_language,
+                    combo_wikipedia_language,
+                    label_wrap_width,
+                    edit_wrap_width,
+                    label_indentation,
+                    combo_indentation,
+                    label_tab_width,
+                    combo_tab_width,
+                    label_space_width,
+                    combo_space_width,
+                    label_quote_prefix,
+                    edit_quote_prefix,
+                    label_interpreter_path,
+                    edit_interpreter_path,
+                    button_interpreter_browse,
+                    button_interpreter_search,
+                    label_subtitle_mode,
+                    combo_subtitle_mode,
+                    checkbox_move_cursor,
+                    checkbox_check_updates,
+                    checkbox_send_crash_reports,
+                    checkbox_use_legacy_name,
+                    checkbox_context_menu,
+                    label_confirm_delete_rss_mode,
+                    combo_confirm_delete_rss_mode,
+                    label_confirm_delete_podcast_mode,
+                    combo_confirm_delete_podcast_mode,
+                    label_rss_quick_copy_mode,
+                    combo_rss_quick_copy_mode,
+                    label_file_associations,
+                    button_manage_associations,
+                    label_prompt_program,
+                    combo_prompt_program,
+                    label_network_proxy,
+                    edit_network_proxy,
+                    label_network_proxy_username,
+                    edit_network_proxy_username,
+                    label_network_proxy_password,
+                    edit_network_proxy_password,
+                    label_shortcut_action,
+                    combo_shortcut_action,
+                    label_shortcut_value,
+                    edit_shortcut_value,
+                    button_shortcut_change,
+                    button_shortcut_reset,
+                    button_shortcut_reset_all,
+                    shortcut_draft: ShortcutSettings::default(),
+                    shortcut_capture_pending: false,
+                    tts_voice_language_codes: Vec::new(),
+                    dialogue_voice_language_codes: Vec::new(),
+                    secondary_dialogue_voice_language_codes: Vec::new(),
+                    active_tab: OPTIONS_TAB_GENERAL,
+                    scroll_offsets: [0; OPTIONS_TAB_COUNT as usize],
+                    content_heights: [0; OPTIONS_TAB_COUNT as usize],
+                    ok_button,
+                    cancel_button,
+                });
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(dialog_state) as isize);
+                initialize_options_dialog(hwnd);
+                set_active_tab(hwnd, OPTIONS_TAB_GENERAL);
+                LRESULT(0)
             }
-            SendMessageW(hwnd_tabs, TCM_SETCURSEL, WPARAM(0), LPARAM(0));
-
-            let mut y = 50;
-            let label_lang = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_language).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_lang = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                120,
-                hwnd,
-                HMENU(OPTIONS_ID_LANG as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 40;
-
-            let label_modified_marker_position = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_modified_marker_position).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_modified_marker_position = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                120,
-                hwnd,
-                HMENU(OPTIONS_ID_MODIFIED_MARKER_POSITION as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 40;
-
-            let label_open = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_open).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_open = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                120,
-                hwnd,
-                HMENU(OPTIONS_ID_OPEN as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 40;
-
-            let label_tts_engine = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_tts_engine).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_tts_engine = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                120,
-                hwnd,
-                HMENU(OPTIONS_ID_TTS_ENGINE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 40;
-
-            let label_tts_voice_language = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_tts_voice_language).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_tts_voice_language = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                140,
-                hwnd,
-                HMENU(OPTIONS_ID_TTS_VOICE_LANGUAGE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 40;
-
-            let label_voice = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_voice).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_voice = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                140,
-                hwnd,
-                HMENU(OPTIONS_ID_VOICE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 40;
-
-            let checkbox_multilingual = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_multilingual).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_MULTILINGUAL as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 28;
-
-            let label_tts_speed = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_tts_speed).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_tts_speed = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                140,
-                hwnd,
-                HMENU(OPTIONS_ID_TTS_SPEED as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_tts_speed = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                300,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_TTS_SPEED_EDIT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 40;
-
-            let label_tts_pitch = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_tts_pitch).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_tts_pitch = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                140,
-                hwnd,
-                HMENU(OPTIONS_ID_TTS_PITCH as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_tts_pitch = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                300,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_TTS_PITCH_EDIT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 40;
-
-            let label_tts_volume = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_tts_volume).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_tts_volume = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                140,
-                hwnd,
-                HMENU(OPTIONS_ID_TTS_VOLUME as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_tts_volume = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                300,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_TTS_VOLUME_EDIT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 36;
-
-            let button_tts_preview = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_tts_preview).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                170,
-                y,
-                300,
-                26,
-                hwnd,
-                HMENU(OPTIONS_ID_TTS_PREVIEW as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let button_tts_insert_tag = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_tts_insert_tag).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                170,
-                y,
-                300,
-                26,
-                hwnd,
-                HMENU(OPTIONS_ID_TTS_INSERT_TAG as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let checkbox_use_dialogue_voice = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_use_dialogue_voice).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_USE_DIALOGUE_VOICE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 26;
-
-            let label_dialogue_engine = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_dialogue_engine).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_dialogue_engine = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                120,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_TTS_ENGINE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_dialogue_voice_language = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_dialogue_voice_language).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_dialogue_voice_language = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                120,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_VOICE_LANGUAGE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_dialogue_voice = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_dialogue_voice).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_dialogue_voice = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                200,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_VOICE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let checkbox_dialogue_multilingual = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_multilingual).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_MULTILINGUAL as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 26;
-
-            let button_dialogue_voice_preview = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_dialogue_voice_preview).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                170,
-                y,
-                300,
-                26,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_VOICE_PREVIEW as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 32;
-
-            let label_dialogue_voice_rate = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_dialogue_voice_rate).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_dialogue_voice_rate = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                140,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_VOICE_RATE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_dialogue_voice_rate = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                300,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_VOICE_RATE_EDIT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 40;
-
-            let label_dialogue_voice_pitch = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_dialogue_voice_pitch).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_dialogue_voice_pitch = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                140,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_VOICE_PITCH as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_dialogue_voice_pitch = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                300,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_VOICE_PITCH_EDIT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 40;
-
-            let label_dialogue_voice_volume = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_dialogue_voice_volume).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_dialogue_voice_volume = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                140,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_VOICE_VOLUME as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_dialogue_voice_volume = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                300,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_VOICE_VOLUME_EDIT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 36;
-
-            let checkbox_dialogue_use_secondary_voice = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_dialogue_use_secondary_voice).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_USE_SECONDARY_VOICE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 26;
-
-            let label_dialogue_secondary_engine = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_dialogue_secondary_engine).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_dialogue_secondary_engine = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                120,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_TTS_ENGINE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 40;
-
-            let label_dialogue_secondary_voice_language = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_dialogue_secondary_voice_language).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_dialogue_secondary_voice_language = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                120,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_LANGUAGE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 40;
-
-            let label_dialogue_secondary_voice = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_dialogue_secondary_voice).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_dialogue_secondary_voice = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                200,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_VOICE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 40;
-
-            let checkbox_dialogue_secondary_multilingual = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_multilingual).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_MULTILINGUAL as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 26;
-
-            let button_dialogue_secondary_voice_preview = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_dialogue_voice_preview).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                170,
-                y,
-                300,
-                26,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_PREVIEW as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 32;
-
-            let label_dialogue_secondary_voice_rate = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_dialogue_voice_rate).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_dialogue_secondary_voice_rate = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                140,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_RATE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_dialogue_secondary_voice_rate = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                300,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_RATE_EDIT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 40;
-
-            let label_dialogue_secondary_voice_pitch = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_dialogue_voice_pitch).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_dialogue_secondary_voice_pitch = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                140,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_PITCH as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_dialogue_secondary_voice_pitch = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                300,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_PITCH_EDIT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 40;
-
-            let label_dialogue_secondary_voice_volume = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_dialogue_voice_volume).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_dialogue_secondary_voice_volume = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                140,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_VOLUME as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_dialogue_secondary_voice_volume = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                300,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_VOLUME_EDIT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_dialogue_open_quote = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_dialogue_open_quote).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_dialogue_open_quote = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_EDIT,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                300,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_OPEN_QUOTE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_dialogue_close_quote = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_dialogue_close_quote).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_dialogue_close_quote = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_EDIT,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                300,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_CLOSE_QUOTE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let checkbox_dialogue_allow_multiline = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_dialogue_allow_multiline).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                300,
-                38,
-                hwnd,
-                HMENU(OPTIONS_ID_DIALOGUE_ALLOW_MULTILINE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 44;
-
-            let label_audio_skip = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_audio_skip).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_audio_skip = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                140,
-                hwnd,
-                HMENU(OPTIONS_ID_AUDIO_SKIP as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 40;
-
-            let label_audiobook_save_folder = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_audiobook_save_folder).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_audiobook_save_folder = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                220,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_AUDIOBOOK_SAVE_FOLDER as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let button_audiobook_save_folder_browse = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_audiobook_save_folder_browse).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                395,
-                y - 2,
-                75,
-                24,
-                hwnd,
-                HMENU(OPTIONS_ID_AUDIOBOOK_SAVE_FOLDER_BROWSE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 36;
-
-            let checkbox_show_media_save_confirmation = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_show_media_save_confirmation).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                360,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_SHOW_MEDIA_SAVE_CONFIRMATION as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 28;
-
-            let label_audio_split = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_audio_split).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_audio_split = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                140,
-                hwnd,
-                HMENU(OPTIONS_ID_AUDIO_SPLIT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 34;
-
-            let label_audio_split_minutes = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_audio_split_minutes).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_audio_split_minutes = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                140,
-                hwnd,
-                HMENU(OPTIONS_ID_AUDIO_SPLIT_MINUTES as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 34;
-
-            let label_audio_split_parts_count = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_audio_split_parts_count).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_audio_split_parts_count = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                300,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_AUDIO_SPLIT_PARTS_COUNT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 34;
-
-            let label_audio_split_start_number = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_audio_split_start_number).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_audio_split_start_number = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                140,
-                hwnd,
-                HMENU(OPTIONS_ID_AUDIO_SPLIT_START_NUMBER as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 34;
-
-            let label_audio_split_text = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_audio_split_text).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_audio_split_text = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                300,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_AUDIO_SPLIT_TEXT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 34;
-
-            let checkbox_audio_split_requires_newline = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_audio_split_requires_newline).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_AUDIO_SPLIT_REQUIRE_NEWLINE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 24;
-
-            let checkbox_audio_split_epub_chapters = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_audio_split_epub_chapters).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_AUDIO_SPLIT_EPUB_CHAPTERS as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 24;
-
-            let checkbox_subtitle_ducking = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_subtitle_ducking).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_SUBTITLE_DUCKING as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 26;
-
-            let label_subtitle_mode = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_subtitle_mode).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_subtitle_mode = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                140,
-                hwnd,
-                HMENU(OPTIONS_ID_SUBTITLE_MODE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_subtitle_offset = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_subtitle_offset).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_subtitle_offset = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                300,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_SUBTITLE_OFFSET as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_confirm_delete_rss_mode = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_confirm_delete_rss_mode).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_confirm_delete_rss_mode = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                180,
-                hwnd,
-                HMENU(OPTIONS_ID_CONFIRM_DELETE_RSS_MODE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_confirm_delete_podcast_mode = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_confirm_delete_podcast_mode).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_confirm_delete_podcast_mode = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                180,
-                hwnd,
-                HMENU(OPTIONS_ID_CONFIRM_DELETE_PODCAST_MODE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_rss_quick_copy_mode = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_rss_quick_copy_mode).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_rss_quick_copy_mode = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                180,
-                hwnd,
-                HMENU(OPTIONS_ID_RSS_QUICK_COPY_MODE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_podcast_cache_limit = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_podcast_cache_limit).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_podcast_cache_limit = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                80,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_PODCAST_CACHE_LIMIT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let checkbox_announce_unread_rss_podcast = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_announce_unread_rss_podcast).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                360,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_ANNOUNCE_UNREAD_RSS_PODCAST as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 28;
-
-            let label_unread_label_position = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_unread_label_position).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_unread_label_position = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                180,
-                hwnd,
-                HMENU(OPTIONS_ID_UNREAD_LABEL_POSITION as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_rss_date_display = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_rss_date_display).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_rss_date_display = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                180,
-                hwnd,
-                HMENU(OPTIONS_ID_RSS_DATE_DISPLAY as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_rss_time_display = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_rss_time_display).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_rss_time_display = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                180,
-                hwnd,
-                HMENU(OPTIONS_ID_RSS_TIME_DISPLAY as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_podcast_date_display = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_podcast_date_display).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_podcast_date_display = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                180,
-                hwnd,
-                HMENU(OPTIONS_ID_PODCAST_DATE_DISPLAY as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_podcast_time_display = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_podcast_time_display).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_podcast_time_display = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                180,
-                hwnd,
-                HMENU(OPTIONS_ID_PODCAST_TIME_DISPLAY as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_podcastindex_key = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_podcastindex_key).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_podcastindex_key = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                300,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_PODCASTINDEX_KEY as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_podcastindex_secret = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_podcastindex_secret).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_podcastindex_secret = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD
-                    | WS_VISIBLE
-                    | WS_TABSTOP
-                    | WINDOW_STYLE((ES_AUTOHSCROLL | ES_PASSWORD) as u32),
-                170,
-                y - 2,
-                300,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_PODCASTINDEX_SECRET as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let button_podcastindex_signup = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_podcastindex_signup).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                170,
-                y,
-                300,
-                26,
-                hwnd,
-                HMENU(OPTIONS_ID_PODCASTINDEX_SIGNUP as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 34;
-
-            let checkbox_tts_manual = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_tts_manual_tuning).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_TTS_MANUAL_TUNING as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 24;
-
-            let checkbox_split_on_newline = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_split_on_newline).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_SPLIT_ON_NEWLINE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 24;
-
-            let checkbox_word_wrap = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_word_wrap).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_WORD_WRAP as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 24;
-
-            let checkbox_smart_quotes = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_smart_quotes).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_SMART_QUOTES as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 26;
-
-            let checkbox_strip_markdown_keep_bullets = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_strip_markdown_keep_bullets).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_STRIP_MARKDOWN_KEEP_BULLETS as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 26;
-
-            let checkbox_spellcheck = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_spellcheck).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_SPELLCHECK_ENABLED as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 26;
-
-            let label_spellcheck_language = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_spellcheck_language).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_spellcheck_language = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                200,
-                hwnd,
-                HMENU(OPTIONS_ID_SPELLCHECK_LANGUAGE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_dictionary_translation = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_dictionary_translation).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_dictionary_translation = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                200,
-                hwnd,
-                HMENU(OPTIONS_ID_DICTIONARY_TRANSLATION as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_wikipedia_language = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_wikipedia_language).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_wikipedia_language = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                200,
-                hwnd,
-                HMENU(OPTIONS_ID_WIKIPEDIA_LANGUAGE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_wrap_width = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_wrap_width).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_wrap_width = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                80,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_WRAP_WIDTH as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_indentation = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_indentation).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_indentation = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                200,
-                hwnd,
-                HMENU(OPTIONS_ID_INDENT_MODE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_tab_width = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_tab_width).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_tab_width = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                80,
-                200,
-                hwnd,
-                HMENU(OPTIONS_ID_TAB_WIDTH as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let label_space_width = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_space_width).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_space_width = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                80,
-                200,
-                hwnd,
-                HMENU(OPTIONS_ID_SPACE_WIDTH as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_quote_prefix = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_quote_prefix).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_quote_prefix = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                120,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_QUOTE_PREFIX as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_interpreter_path = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_interpreter_path).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_interpreter_path = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                140,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_INTERPRETER_PATH as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let button_interpreter_browse = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_interpreter_browse).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                315,
-                y - 2,
-                70,
-                24,
-                hwnd,
-                HMENU(OPTIONS_ID_INTERPRETER_BROWSE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let button_interpreter_search = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_interpreter_search).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                390,
-                y - 2,
-                100,
-                24,
-                hwnd,
-                HMENU(OPTIONS_ID_INTERPRETER_SEARCH as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let checkbox_move_cursor = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_move_cursor).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_MOVE_CURSOR as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 24;
-
-            let checkbox_check_updates = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_check_updates).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_CHECK_UPDATES as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 24;
-
-            let checkbox_send_crash_reports = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_send_crash_reports).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_SEND_CRASH_REPORTS as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 24;
-
-            let checkbox_use_legacy_name = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_use_legacy_name).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_USE_LEGACY_NAME as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 24;
-
-            let checkbox_context_menu = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_context_menu).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                170,
-                y,
-                300,
-                20,
-                hwnd,
-                HMENU(OPTIONS_ID_CONTEXT_MENU as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 28;
-
-            let label_file_associations = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_file_associations).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let button_manage_associations = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_manage_associations).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                170,
-                y - 2,
-                300,
-                26,
-                hwnd,
-                HMENU(OPTIONS_ID_MANAGE_ASSOCIATIONS as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 34;
-
-            let label_prompt_program = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_prompt_program).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_prompt_program = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                120,
-                hwnd,
-                HMENU(OPTIONS_ID_PROMPT_PROGRAM as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_network_proxy = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_network_proxy).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_network_proxy = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                300,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_NETWORK_PROXY as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_network_proxy_username = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_network_proxy_username).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_network_proxy_username = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                170,
-                y - 2,
-                300,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_NETWORK_PROXY_USERNAME as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 30;
-
-            let label_network_proxy_password = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_network_proxy_password).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_network_proxy_password = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD
-                    | WS_VISIBLE
-                    | WS_TABSTOP
-                    | WINDOW_STYLE((ES_AUTOHSCROLL | ES_PASSWORD) as u32),
-                170,
-                y - 2,
-                300,
-                22,
-                hwnd,
-                HMENU(OPTIONS_ID_NETWORK_PROXY_PASSWORD as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 40;
-
-            let label_shortcut_action = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_shortcut_action).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_shortcut_action = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                170,
-                y - 2,
-                300,
-                200,
-                hwnd,
-                HMENU(OPTIONS_ID_SHORTCUT_ACTION as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 34;
-            let label_shortcut_value = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.label_shortcut_value).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                y,
-                140,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_shortcut_value = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_EDIT,
-                PCWSTR::null(),
-                WS_CHILD
-                    | WS_VISIBLE
-                    | WS_TABSTOP
-                    | WINDOW_STYLE(ES_AUTOHSCROLL as u32)
-                    | WINDOW_STYLE(ES_READONLY as u32),
-                170,
-                y - 2,
-                300,
-                24,
-                hwnd,
-                HMENU(OPTIONS_ID_SHORTCUT_VALUE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 34;
-            let button_shortcut_change = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_shortcut_change).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                170,
-                y - 2,
-                146,
-                26,
-                hwnd,
-                HMENU(OPTIONS_ID_SHORTCUT_CHANGE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let button_shortcut_reset = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_shortcut_reset).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                324,
-                y - 2,
-                146,
-                26,
-                hwnd,
-                HMENU(OPTIONS_ID_SHORTCUT_RESET as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let button_shortcut_reset_all = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.label_shortcut_reset_all).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                170,
-                y + 30,
-                300,
-                26,
-                hwnd,
-                HMENU(OPTIONS_ID_SHORTCUT_RESET_ALL as isize),
-                HINSTANCE(0),
-                None,
-            );
-            y += 40;
-
-            let ok_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.ok).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                280,
-                y,
-                90,
-                28,
-                hwnd,
-                HMENU(OPTIONS_ID_OK as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let cancel_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.cancel).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                380,
-                y,
-                90,
-                28,
-                hwnd,
-                HMENU(OPTIONS_ID_CANCEL as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            for control in [
-                hwnd_tabs,
-                label_lang,
-                combo_lang,
-                label_modified_marker_position,
-                combo_modified_marker_position,
-                label_open,
-                combo_open,
-                label_tts_engine,
-                combo_tts_engine,
-                label_tts_voice_language,
-                combo_tts_voice_language,
-                label_voice,
-                combo_voice,
-                label_tts_speed,
-                combo_tts_speed,
-                label_tts_pitch,
-                combo_tts_pitch,
-                label_tts_volume,
-                combo_tts_volume,
-                edit_tts_speed,
-                edit_tts_pitch,
-                edit_tts_volume,
-                button_tts_preview,
-                button_tts_insert_tag,
-                label_audio_skip,
-                combo_audio_skip,
-                label_audiobook_save_folder,
-                edit_audiobook_save_folder,
-                button_audiobook_save_folder_browse,
-                checkbox_show_media_save_confirmation,
-                label_audio_split,
-                combo_audio_split,
-                label_audio_split_minutes,
-                combo_audio_split_minutes,
-                label_audio_split_parts_count,
-                edit_audio_split_parts_count,
-                label_audio_split_start_number,
-                combo_audio_split_start_number,
-                label_audio_split_text,
-                edit_audio_split_text,
-                checkbox_audio_split_requires_newline,
-                checkbox_audio_split_epub_chapters,
-                checkbox_subtitle_ducking,
-                label_subtitle_offset,
-                edit_subtitle_offset,
-                label_podcast_cache_limit,
-                edit_podcast_cache_limit,
-                checkbox_announce_unread_rss_podcast,
-                label_unread_label_position,
-                combo_unread_label_position,
-                label_rss_date_display,
-                combo_rss_date_display,
-                label_rss_time_display,
-                combo_rss_time_display,
-                label_podcast_date_display,
-                combo_podcast_date_display,
-                label_podcast_time_display,
-                combo_podcast_time_display,
-                label_podcastindex_key,
-                edit_podcastindex_key,
-                label_podcastindex_secret,
-                edit_podcastindex_secret,
-                button_podcastindex_signup,
-                checkbox_tts_manual,
-                checkbox_multilingual,
-                checkbox_use_dialogue_voice,
-                label_dialogue_engine,
-                combo_dialogue_engine,
-                label_dialogue_voice_language,
-                combo_dialogue_voice_language,
-                label_dialogue_voice,
-                combo_dialogue_voice,
-                checkbox_dialogue_multilingual,
-                label_dialogue_voice_rate,
-                combo_dialogue_voice_rate,
-                edit_dialogue_voice_rate,
-                label_dialogue_voice_pitch,
-                combo_dialogue_voice_pitch,
-                edit_dialogue_voice_pitch,
-                label_dialogue_voice_volume,
-                combo_dialogue_voice_volume,
-                edit_dialogue_voice_volume,
-                checkbox_dialogue_use_secondary_voice,
-                label_dialogue_secondary_engine,
-                combo_dialogue_secondary_engine,
-                label_dialogue_secondary_voice_language,
-                combo_dialogue_secondary_voice_language,
-                label_dialogue_secondary_voice,
-                combo_dialogue_secondary_voice,
-                checkbox_dialogue_secondary_multilingual,
-                label_dialogue_secondary_voice_rate,
-                combo_dialogue_secondary_voice_rate,
-                edit_dialogue_secondary_voice_rate,
-                label_dialogue_secondary_voice_pitch,
-                combo_dialogue_secondary_voice_pitch,
-                edit_dialogue_secondary_voice_pitch,
-                label_dialogue_secondary_voice_volume,
-                combo_dialogue_secondary_voice_volume,
-                edit_dialogue_secondary_voice_volume,
-                label_dialogue_open_quote,
-                edit_dialogue_open_quote,
-                label_dialogue_close_quote,
-                edit_dialogue_close_quote,
-                checkbox_dialogue_allow_multiline,
-                button_dialogue_voice_preview,
-                button_dialogue_secondary_voice_preview,
-                checkbox_split_on_newline,
-                checkbox_word_wrap,
-                checkbox_smart_quotes,
-                checkbox_strip_markdown_keep_bullets,
-                checkbox_spellcheck,
-                label_spellcheck_language,
-                combo_spellcheck_language,
-                label_dictionary_translation,
-                combo_dictionary_translation,
-                label_wikipedia_language,
-                combo_wikipedia_language,
-                label_wrap_width,
-                edit_wrap_width,
-                label_indentation,
-                combo_indentation,
-                label_tab_width,
-                combo_tab_width,
-                label_space_width,
-                combo_space_width,
-                label_quote_prefix,
-                edit_quote_prefix,
-                label_interpreter_path,
-                edit_interpreter_path,
-                button_interpreter_browse,
-                label_subtitle_mode,
-                combo_subtitle_mode,
-                label_subtitle_offset,
-                edit_subtitle_offset,
-                checkbox_move_cursor,
-                checkbox_check_updates,
-                checkbox_send_crash_reports,
-                checkbox_use_legacy_name,
-                checkbox_context_menu,
-                label_confirm_delete_rss_mode,
-                combo_confirm_delete_rss_mode,
-                label_confirm_delete_podcast_mode,
-                combo_confirm_delete_podcast_mode,
-                label_rss_quick_copy_mode,
-                combo_rss_quick_copy_mode,
-                label_file_associations,
-                button_manage_associations,
-                label_prompt_program,
-                combo_prompt_program,
-                label_network_proxy,
-                edit_network_proxy,
-                label_network_proxy_username,
-                edit_network_proxy_username,
-                label_network_proxy_password,
-                edit_network_proxy_password,
-                label_shortcut_action,
-                combo_shortcut_action,
-                label_shortcut_value,
-                edit_shortcut_value,
-                button_shortcut_change,
-                button_shortcut_reset,
-                button_shortcut_reset_all,
-                ok_button,
-                cancel_button,
-            ] {
-                if control.0 != 0 && hfont.0 != 0 {
-                    SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+            WM_NOTIFY => {
+                let hdr = &*(lparam.0 as *const NMHDR);
+                if hdr.idFrom == OPTIONS_ID_TABS && hdr.code == TCN_SELCHANGE {
+                    let tabs = with_options_state(hwnd, |state| state.hwnd_tabs).unwrap_or(HWND(0));
+                    if tabs.0 != 0 {
+                        let index =
+                            SendMessageW(tabs, TCM_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
+                        set_active_tab(hwnd, index);
+                        return LRESULT(0);
+                    }
                 }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
-
-            let dialog_state = Box::new(OptionsDialogState {
-                parent,
-                hwnd_tabs,
-                focus_initialized: false,
-                label_language: label_lang,
-                label_modified_marker_position,
-                label_open,
-                label_tts_engine,
-                label_tts_voice_language,
-                label_voice,
-                label_tts_speed,
-                label_tts_pitch,
-                label_tts_volume,
-                button_tts_preview,
-                button_tts_insert_tag,
-                combo_lang,
-                combo_modified_marker_position,
-                combo_open,
-                combo_tts_engine,
-                combo_tts_voice_language,
-                combo_voice,
-                combo_tts_speed,
-                combo_tts_pitch,
-                combo_tts_volume,
-                edit_tts_speed,
-                edit_tts_pitch,
-                edit_tts_volume,
-                checkbox_tts_manual,
-                label_audio_skip,
-                combo_audio_skip,
-                label_audiobook_save_folder,
-                edit_audiobook_save_folder,
-                button_audiobook_save_folder_browse,
-                checkbox_show_media_save_confirmation,
-                label_audio_split,
-                combo_audio_split,
-                label_audio_split_minutes,
-                combo_audio_split_minutes,
-                label_audio_split_parts_count,
-                edit_audio_split_parts_count,
-                label_audio_split_start_number,
-                combo_audio_split_start_number,
-                label_audio_split_text,
-                edit_audio_split_text,
-                checkbox_audio_split_requires_newline,
-                checkbox_audio_split_epub_chapters,
-                checkbox_subtitle_ducking,
-                label_subtitle_offset,
-                edit_subtitle_offset,
-                label_podcast_cache_limit,
-                edit_podcast_cache_limit,
-                checkbox_announce_unread_rss_podcast,
-                label_unread_label_position,
-                combo_unread_label_position,
-                label_rss_date_display,
-                combo_rss_date_display,
-                label_rss_time_display,
-                combo_rss_time_display,
-                label_podcast_date_display,
-                combo_podcast_date_display,
-                label_podcast_time_display,
-                combo_podcast_time_display,
-                label_podcastindex_key,
-                edit_podcastindex_key,
-                label_podcastindex_secret,
-                edit_podcastindex_secret,
-                button_podcastindex_signup,
-                checkbox_multilingual,
-                checkbox_use_dialogue_voice,
-                label_dialogue_engine,
-                combo_dialogue_engine,
-                label_dialogue_voice_language,
-                combo_dialogue_voice_language,
-                label_dialogue_voice,
-                combo_dialogue_voice,
-                checkbox_dialogue_multilingual,
-                label_dialogue_voice_rate,
-                combo_dialogue_voice_rate,
-                edit_dialogue_voice_rate,
-                label_dialogue_voice_pitch,
-                combo_dialogue_voice_pitch,
-                edit_dialogue_voice_pitch,
-                label_dialogue_voice_volume,
-                combo_dialogue_voice_volume,
-                edit_dialogue_voice_volume,
-                checkbox_dialogue_use_secondary_voice,
-                label_dialogue_secondary_engine,
-                combo_dialogue_secondary_engine,
-                label_dialogue_secondary_voice_language,
-                combo_dialogue_secondary_voice_language,
-                label_dialogue_secondary_voice,
-                combo_dialogue_secondary_voice,
-                checkbox_dialogue_secondary_multilingual,
-                label_dialogue_secondary_voice_rate,
-                combo_dialogue_secondary_voice_rate,
-                edit_dialogue_secondary_voice_rate,
-                label_dialogue_secondary_voice_pitch,
-                combo_dialogue_secondary_voice_pitch,
-                edit_dialogue_secondary_voice_pitch,
-                label_dialogue_secondary_voice_volume,
-                combo_dialogue_secondary_voice_volume,
-                edit_dialogue_secondary_voice_volume,
-                label_dialogue_open_quote,
-                edit_dialogue_open_quote,
-                label_dialogue_close_quote,
-                edit_dialogue_close_quote,
-                checkbox_dialogue_allow_multiline,
-                button_dialogue_voice_preview,
-                button_dialogue_secondary_voice_preview,
-                checkbox_split_on_newline,
-                checkbox_word_wrap,
-                checkbox_smart_quotes,
-                checkbox_strip_markdown_keep_bullets,
-                checkbox_spellcheck,
-                label_spellcheck_language,
-                combo_spellcheck_language,
-                label_dictionary_translation,
-                combo_dictionary_translation,
-                label_wikipedia_language,
-                combo_wikipedia_language,
-                label_wrap_width,
-                edit_wrap_width,
-                label_indentation,
-                combo_indentation,
-                label_tab_width,
-                combo_tab_width,
-                label_space_width,
-                combo_space_width,
-                label_quote_prefix,
-                edit_quote_prefix,
-                label_interpreter_path,
-                edit_interpreter_path,
-                button_interpreter_browse,
-                button_interpreter_search,
-                label_subtitle_mode,
-                combo_subtitle_mode,
-                checkbox_move_cursor,
-                checkbox_check_updates,
-                checkbox_send_crash_reports,
-                checkbox_use_legacy_name,
-                checkbox_context_menu,
-                label_confirm_delete_rss_mode,
-                combo_confirm_delete_rss_mode,
-                label_confirm_delete_podcast_mode,
-                combo_confirm_delete_podcast_mode,
-                label_rss_quick_copy_mode,
-                combo_rss_quick_copy_mode,
-                label_file_associations,
-                button_manage_associations,
-                label_prompt_program,
-                combo_prompt_program,
-                label_network_proxy,
-                edit_network_proxy,
-                label_network_proxy_username,
-                edit_network_proxy_username,
-                label_network_proxy_password,
-                edit_network_proxy_password,
-                label_shortcut_action,
-                combo_shortcut_action,
-                label_shortcut_value,
-                edit_shortcut_value,
-                button_shortcut_change,
-                button_shortcut_reset,
-                button_shortcut_reset_all,
-                shortcut_draft: ShortcutSettings::default(),
-                shortcut_capture_pending: false,
-                tts_voice_language_codes: Vec::new(),
-                dialogue_voice_language_codes: Vec::new(),
-                secondary_dialogue_voice_language_codes: Vec::new(),
-                active_tab: OPTIONS_TAB_GENERAL,
-                scroll_offsets: [0; OPTIONS_TAB_COUNT as usize],
-                content_heights: [0; OPTIONS_TAB_COUNT as usize],
-                ok_button,
-                cancel_button,
-            });
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(dialog_state) as isize);
-            initialize_options_dialog(hwnd);
-            set_active_tab(hwnd, OPTIONS_TAB_GENERAL);
-            LRESULT(0)
-        }
-        WM_NOTIFY => {
-            let hdr = &*(lparam.0 as *const NMHDR);
-            if hdr.idFrom == OPTIONS_ID_TABS && hdr.code == TCN_SELCHANGE {
-                let tabs = with_options_state(hwnd, |state| state.hwnd_tabs).unwrap_or(HWND(0));
-                if tabs.0 != 0 {
-                    let index = SendMessageW(tabs, TCM_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
-                    set_active_tab(hwnd, index);
-                    return LRESULT(0);
-                }
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_COMMAND => {
-            let cmd_id = wparam.0 & 0xffff;
-            let code = (wparam.0 >> 16) as u32;
-            match cmd_id {
-                OPTIONS_ID_OK => {
-                    apply_options_dialog(hwnd);
-                    LRESULT(0)
-                }
-                OPTIONS_ID_CANCEL | 2 => {
-                    crate::log_if_err!(DestroyWindow(hwnd));
-                    LRESULT(0)
-                }
-                OPTIONS_ID_MULTILINGUAL => {
-                    refresh_voices(hwnd);
-                    LRESULT(0)
-                }
-                OPTIONS_ID_DIALOGUE_MULTILINGUAL | OPTIONS_ID_DIALOGUE_SECONDARY_MULTILINGUAL => {
-                    refresh_voices(hwnd);
-                    update_dialogue_voice_visibility(hwnd);
-                    LRESULT(0)
-                }
-                OPTIONS_ID_TTS_VOICE_LANGUAGE => {
-                    if code == CBN_SELCHANGE {
-                        refresh_voices(hwnd);
+            WM_COMMAND => {
+                let cmd_id = wparam.0 & 0xffff;
+                let code = (wparam.0 >> 16) as u32;
+                match cmd_id {
+                    OPTIONS_ID_OK => {
+                        apply_options_dialog(hwnd);
+                        LRESULT(0)
                     }
-                    LRESULT(0)
-                }
-                OPTIONS_ID_DIALOGUE_VOICE_LANGUAGE => {
-                    if code == CBN_SELCHANGE {
-                        refresh_voices(hwnd);
+                    OPTIONS_ID_CANCEL | 2 => {
+                        crate::log_if_err!(DestroyWindow(hwnd));
+                        LRESULT(0)
                     }
-                    LRESULT(0)
-                }
-                OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_LANGUAGE => {
-                    if code == CBN_SELCHANGE {
+                    OPTIONS_ID_MULTILINGUAL => {
                         refresh_voices(hwnd);
+                        LRESULT(0)
                     }
-                    LRESULT(0)
-                }
-                OPTIONS_ID_TTS_PREVIEW => {
-                    preview_voice(hwnd);
-                    LRESULT(0)
-                }
-                OPTIONS_ID_TTS_INSERT_TAG => {
-                    insert_voice_tag_from_options(hwnd);
-                    LRESULT(0)
-                }
-                OPTIONS_ID_TTS_ENGINE => {
-                    if code == CBN_SELCHANGE {
-                        // When engine changes, verify if we need to load SAPI voices
-                        let combo =
-                            with_options_state(hwnd, |s| s.combo_tts_engine).unwrap_or(HWND(0));
-                        let sel = SendMessageW(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-                        if sel == 1 {
-                            // SAPI5
-                            let parent = with_options_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-                            let has_sapi =
-                                with_state(parent, |s| !s.sapi_voices.is_empty()).unwrap_or(false);
-                            if !has_sapi {
-                                let lang =
-                                    with_state(parent, |s| s.settings.language).unwrap_or_default();
-                                ensure_sapi_voices_loaded(parent, lang);
-                            }
-                        }
-
-                        refresh_voices(hwnd);
-                    }
-                    LRESULT(0)
-                }
-                OPTIONS_ID_DIALOGUE_TTS_ENGINE => {
-                    if code == CBN_SELCHANGE {
-                        let combo = with_options_state(hwnd, |s| s.combo_dialogue_engine)
-                            .unwrap_or(HWND(0));
-                        let sel = SendMessageW(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-                        if sel == 1 {
-                            let parent = with_options_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-                            let has_sapi =
-                                with_state(parent, |s| !s.sapi_voices.is_empty()).unwrap_or(false);
-                            if !has_sapi {
-                                let lang =
-                                    with_state(parent, |s| s.settings.language).unwrap_or_default();
-                                ensure_sapi_voices_loaded(parent, lang);
-                            }
-                        }
+                    OPTIONS_ID_DIALOGUE_MULTILINGUAL
+                    | OPTIONS_ID_DIALOGUE_SECONDARY_MULTILINGUAL => {
                         refresh_voices(hwnd);
                         update_dialogue_voice_visibility(hwnd);
+                        LRESULT(0)
                     }
-                    LRESULT(0)
-                }
-                OPTIONS_ID_DIALOGUE_SECONDARY_TTS_ENGINE => {
-                    if code == CBN_SELCHANGE {
-                        let combo = with_options_state(hwnd, |s| s.combo_dialogue_secondary_engine)
-                            .unwrap_or(HWND(0));
-                        let sel = SendMessageW(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-                        if sel == 1 {
-                            let parent = with_options_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-                            let has_sapi =
-                                with_state(parent, |s| !s.sapi_voices.is_empty()).unwrap_or(false);
-                            if !has_sapi {
-                                let lang =
-                                    with_state(parent, |s| s.settings.language).unwrap_or_default();
-                                ensure_sapi_voices_loaded(parent, lang);
-                            }
+                    OPTIONS_ID_TTS_VOICE_LANGUAGE => {
+                        if code == CBN_SELCHANGE {
+                            refresh_voices(hwnd);
                         }
-                        refresh_voices(hwnd);
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_DIALOGUE_VOICE_LANGUAGE => {
+                        if code == CBN_SELCHANGE {
+                            refresh_voices(hwnd);
+                        }
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_LANGUAGE => {
+                        if code == CBN_SELCHANGE {
+                            refresh_voices(hwnd);
+                        }
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_TTS_PREVIEW => {
+                        preview_voice(hwnd);
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_TTS_INSERT_TAG => {
+                        insert_voice_tag_from_options(hwnd);
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_TTS_ENGINE => {
+                        if code == CBN_SELCHANGE {
+                            // When engine changes, verify if we need to load SAPI voices
+                            let combo =
+                                with_options_state(hwnd, |s| s.combo_tts_engine).unwrap_or(HWND(0));
+                            let sel = SendMessageW(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+                            if sel == 1 {
+                                // SAPI5
+                                let parent =
+                                    with_options_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                                let has_sapi = with_state(parent, |s| !s.sapi_voices.is_empty())
+                                    .unwrap_or(false);
+                                if !has_sapi {
+                                    let lang = with_state(parent, |s| s.settings.language)
+                                        .unwrap_or_default();
+                                    ensure_sapi_voices_loaded(parent, lang);
+                                }
+                            }
+
+                            refresh_voices(hwnd);
+                        }
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_DIALOGUE_TTS_ENGINE => {
+                        if code == CBN_SELCHANGE {
+                            let combo = with_options_state(hwnd, |s| s.combo_dialogue_engine)
+                                .unwrap_or(HWND(0));
+                            let sel = SendMessageW(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+                            if sel == 1 {
+                                let parent =
+                                    with_options_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                                let has_sapi = with_state(parent, |s| !s.sapi_voices.is_empty())
+                                    .unwrap_or(false);
+                                if !has_sapi {
+                                    let lang = with_state(parent, |s| s.settings.language)
+                                        .unwrap_or_default();
+                                    ensure_sapi_voices_loaded(parent, lang);
+                                }
+                            }
+                            refresh_voices(hwnd);
+                            update_dialogue_voice_visibility(hwnd);
+                        }
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_DIALOGUE_SECONDARY_TTS_ENGINE => {
+                        if code == CBN_SELCHANGE {
+                            let combo =
+                                with_options_state(hwnd, |s| s.combo_dialogue_secondary_engine)
+                                    .unwrap_or(HWND(0));
+                            let sel = SendMessageW(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+                            if sel == 1 {
+                                let parent =
+                                    with_options_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                                let has_sapi = with_state(parent, |s| !s.sapi_voices.is_empty())
+                                    .unwrap_or(false);
+                                if !has_sapi {
+                                    let lang = with_state(parent, |s| s.settings.language)
+                                        .unwrap_or_default();
+                                    ensure_sapi_voices_loaded(parent, lang);
+                                }
+                            }
+                            refresh_voices(hwnd);
+                            update_dialogue_voice_visibility(hwnd);
+                        }
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_AUDIO_SPLIT => {
+                        if code == CBN_SELCHANGE {
+                            update_audio_split_visibility(hwnd);
+                            relayout_active_tab_content(hwnd);
+                        }
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_SUBTITLE_MODE => {
+                        if code == CBN_SELCHANGE {
+                            update_subtitle_ducking_visibility(hwnd);
+                            relayout_active_tab_content(hwnd);
+                        }
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_INDENT_MODE => {
+                        if code == CBN_SELCHANGE {
+                            update_indentation_visibility(hwnd);
+                            relayout_active_tab_content(hwnd);
+                        }
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_SPELLCHECK_ENABLED => {
+                        update_spellcheck_language_visibility(hwnd);
+                        relayout_active_tab_content(hwnd);
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_TTS_MANUAL_TUNING => {
+                        update_tts_manual_visibility(hwnd);
+                        relayout_active_tab_content(hwnd);
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_USE_DIALOGUE_VOICE => {
                         update_dialogue_voice_visibility(hwnd);
-                    }
-                    LRESULT(0)
-                }
-                OPTIONS_ID_AUDIO_SPLIT => {
-                    if code == CBN_SELCHANGE {
-                        update_audio_split_visibility(hwnd);
                         relayout_active_tab_content(hwnd);
+                        LRESULT(0)
                     }
-                    LRESULT(0)
-                }
-                OPTIONS_ID_SUBTITLE_MODE => {
-                    if code == CBN_SELCHANGE {
-                        update_subtitle_ducking_visibility(hwnd);
+                    OPTIONS_ID_DIALOGUE_USE_SECONDARY_VOICE => {
+                        update_dialogue_voice_visibility(hwnd);
                         relayout_active_tab_content(hwnd);
+                        LRESULT(0)
                     }
-                    LRESULT(0)
-                }
-                OPTIONS_ID_INDENT_MODE => {
-                    if code == CBN_SELCHANGE {
-                        update_indentation_visibility(hwnd);
-                        relayout_active_tab_content(hwnd);
+                    OPTIONS_ID_DIALOGUE_VOICE_PREVIEW => {
+                        preview_dialogue_voice(hwnd);
+                        LRESULT(0)
                     }
-                    LRESULT(0)
-                }
-                OPTIONS_ID_SPELLCHECK_ENABLED => {
-                    update_spellcheck_language_visibility(hwnd);
-                    relayout_active_tab_content(hwnd);
-                    LRESULT(0)
-                }
-                OPTIONS_ID_TTS_MANUAL_TUNING => {
-                    update_tts_manual_visibility(hwnd);
-                    relayout_active_tab_content(hwnd);
-                    LRESULT(0)
-                }
-                OPTIONS_ID_USE_DIALOGUE_VOICE => {
-                    update_dialogue_voice_visibility(hwnd);
-                    relayout_active_tab_content(hwnd);
-                    LRESULT(0)
-                }
-                OPTIONS_ID_DIALOGUE_USE_SECONDARY_VOICE => {
-                    update_dialogue_voice_visibility(hwnd);
-                    relayout_active_tab_content(hwnd);
-                    LRESULT(0)
-                }
-                OPTIONS_ID_DIALOGUE_VOICE_PREVIEW => {
-                    preview_dialogue_voice(hwnd);
-                    LRESULT(0)
-                }
-                OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_PREVIEW => {
-                    preview_dialogue_secondary_voice(hwnd);
-                    LRESULT(0)
-                }
-                OPTIONS_ID_PODCASTINDEX_SIGNUP => {
-                    open_podcastindex_signup();
-                    LRESULT(0)
-                }
-                OPTIONS_ID_INTERPRETER_BROWSE => {
-                    browse_for_interpreter(hwnd);
-                    LRESULT(0)
-                }
-                OPTIONS_ID_AUDIOBOOK_SAVE_FOLDER_BROWSE => {
-                    browse_for_audiobook_folder(hwnd);
-                    LRESULT(0)
-                }
-                OPTIONS_ID_INTERPRETER_SEARCH => {
-                    search_for_interpreter(hwnd);
-                    LRESULT(0)
-                }
-                OPTIONS_ID_MANAGE_ASSOCIATIONS => {
-                    unsafe {
+                    OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_PREVIEW => {
+                        preview_dialogue_secondary_voice(hwnd);
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_PODCASTINDEX_SIGNUP => {
+                        open_podcastindex_signup();
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_INTERPRETER_BROWSE => {
+                        browse_for_interpreter(hwnd);
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_AUDIOBOOK_SAVE_FOLDER_BROWSE => {
+                        browse_for_audiobook_folder(hwnd);
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_INTERPRETER_SEARCH => {
+                        search_for_interpreter(hwnd);
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_MANAGE_ASSOCIATIONS => {
                         crate::settings::register_application_capabilities();
                         let url = to_wide("ms-settings:defaultapps?registeredApp=Sonarpad");
                         ShellExecuteW(
@@ -4869,12 +4876,70 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                             PCWSTR::null(),
                             SW_SHOWNORMAL,
                         );
+                        LRESULT(0)
                     }
-                    LRESULT(0)
-                }
-                OPTIONS_ID_SHORTCUT_ACTION => {
-                    if code == CBN_SELCHANGE {
+                    OPTIONS_ID_SHORTCUT_ACTION => {
+                        if code == CBN_SELCHANGE {
+                            if with_options_state(hwnd, |state| {
+                                state.shortcut_capture_pending = false;
+                            })
+                            .is_none()
+                            {
+                                crate::log_debug("Failed to access state in options_window");
+                            }
+                            update_shortcut_binding_text(hwnd);
+                        }
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_SHORTCUT_CHANGE => {
                         if with_options_state(hwnd, |state| {
+                            state.shortcut_capture_pending = true;
+                        })
+                        .is_none()
+                        {
+                            crate::log_debug("Failed to access state in options_window");
+                        }
+                        update_shortcut_binding_text(hwnd);
+                        if let Some(control) =
+                            with_options_state(hwnd, |state| state.edit_shortcut_value)
+                        {
+                            SetFocus(control);
+                        }
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_SHORTCUT_RESET => {
+                        let action = selected_shortcut_action(hwnd);
+                        let defaults = ShortcutSettings::default();
+                        let default_binding = shortcut_binding_for_action(&defaults, action);
+                        let conflict = with_options_state(hwnd, |state| {
+                            find_shortcut_conflict(&state.shortcut_draft, action, default_binding)
+                                .map(|conflict_action| {
+                                    let language =
+                                        with_state(state.parent, |app| app.settings.language)
+                                            .unwrap_or_default();
+                                    let shortcut = format_shortcut(default_binding);
+                                    let conflict_label =
+                                        shortcut_action_label(language, conflict_action);
+                                    let message = i18n::tr_f(
+                                        language,
+                                        "options.shortcuts.duplicate_error",
+                                        &[("shortcut", &shortcut), ("action", &conflict_label)],
+                                    );
+                                    (language, message)
+                                })
+                        })
+                        .flatten();
+                        if let Some((language, message)) = conflict {
+                            crate::show_error(hwnd, language, &message);
+                            update_shortcut_binding_text(hwnd);
+                            return LRESULT(0);
+                        }
+                        if with_options_state(hwnd, |state| {
+                            set_shortcut_binding_for_action(
+                                &mut state.shortcut_draft,
+                                action,
+                                default_binding,
+                            );
                             state.shortcut_capture_pending = false;
                         })
                         .is_none()
@@ -4882,193 +4947,135 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                             crate::log_debug("Failed to access state in options_window");
                         }
                         update_shortcut_binding_text(hwnd);
+                        LRESULT(0)
                     }
-                    LRESULT(0)
-                }
-                OPTIONS_ID_SHORTCUT_CHANGE => {
-                    if with_options_state(hwnd, |state| {
-                        state.shortcut_capture_pending = true;
-                    })
-                    .is_none()
-                    {
-                        crate::log_debug("Failed to access state in options_window");
-                    }
-                    update_shortcut_binding_text(hwnd);
-                    if let Some(control) =
-                        with_options_state(hwnd, |state| state.edit_shortcut_value)
-                    {
-                        SetFocus(control);
-                    }
-                    LRESULT(0)
-                }
-                OPTIONS_ID_SHORTCUT_RESET => {
-                    let action = selected_shortcut_action(hwnd);
-                    let defaults = ShortcutSettings::default();
-                    let default_binding = shortcut_binding_for_action(&defaults, action);
-                    let conflict = with_options_state(hwnd, |state| {
-                        find_shortcut_conflict(&state.shortcut_draft, action, default_binding).map(
-                            |conflict_action| {
-                                let language =
-                                    with_state(state.parent, |app| app.settings.language)
-                                        .unwrap_or_default();
-                                let shortcut = format_shortcut(default_binding);
-                                let conflict_label =
-                                    shortcut_action_label(language, conflict_action);
-                                let message = i18n::tr_f(
-                                    language,
-                                    "options.shortcuts.duplicate_error",
-                                    &[("shortcut", &shortcut), ("action", &conflict_label)],
-                                );
-                                (language, message)
-                            },
-                        )
-                    })
-                    .flatten();
-                    if let Some((language, message)) = conflict {
-                        crate::show_error(hwnd, language, &message);
-                        update_shortcut_binding_text(hwnd);
-                        return LRESULT(0);
-                    }
-                    if with_options_state(hwnd, |state| {
-                        set_shortcut_binding_for_action(
-                            &mut state.shortcut_draft,
-                            action,
-                            default_binding,
-                        );
-                        state.shortcut_capture_pending = false;
-                    })
-                    .is_none()
-                    {
-                        crate::log_debug("Failed to access state in options_window");
-                    }
-                    update_shortcut_binding_text(hwnd);
-                    LRESULT(0)
-                }
-                OPTIONS_ID_SHORTCUT_RESET_ALL => {
-                    if with_options_state(hwnd, |state| {
-                        state.shortcut_draft = ShortcutSettings::default();
-                        state.shortcut_capture_pending = false;
-                    })
-                    .is_none()
-                    {
-                        crate::log_debug("Failed to access state in options_window");
-                    }
-                    update_shortcut_binding_text(hwnd);
-                    LRESULT(0)
-                }
-                _ => DefWindowProcW(hwnd, msg, wparam, lparam),
-            }
-        }
-        WM_VSCROLL => {
-            if handle_options_vscroll(hwnd, wparam) {
-                return LRESULT(0);
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_MOUSEWHEEL => {
-            if handle_options_mouse_wheel(hwnd, wparam) {
-                return LRESULT(0);
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_KEYDOWN => {
-            if wparam.0 as u32 == VK_TAB.0 as u32 {
-                let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
-                if ctrl_down {
-                    let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
-                    let tabs = with_options_state(hwnd, |state| state.hwnd_tabs).unwrap_or(HWND(0));
-                    if tabs.0 != 0 {
-                        let current =
-                            SendMessageW(tabs, TCM_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
-                        let mut next = if shift_down { current - 1 } else { current + 1 };
-                        if next < 0 {
-                            next = OPTIONS_TAB_COUNT - 1;
-                        } else if next >= OPTIONS_TAB_COUNT {
-                            next = 0;
+                    OPTIONS_ID_SHORTCUT_RESET_ALL => {
+                        if with_options_state(hwnd, |state| {
+                            state.shortcut_draft = ShortcutSettings::default();
+                            state.shortcut_capture_pending = false;
+                        })
+                        .is_none()
+                        {
+                            crate::log_debug("Failed to access state in options_window");
                         }
-                        SendMessageW(tabs, TCM_SETCURSEL, WPARAM(next as usize), LPARAM(0));
-                        set_active_tab(hwnd, next);
-                        SetFocus(tabs);
-                        return LRESULT(0);
+                        update_shortcut_binding_text(hwnd);
+                        LRESULT(0)
                     }
+                    _ => DefWindowProcW(hwnd, msg, wparam, lparam),
                 }
             }
-            if wparam.0 as u32 == VK_RETURN.0 as u32 {
-                let focus = GetFocus();
-                let is_tts_combo = with_options_state(hwnd, |state| {
-                    focus == state.combo_voice
-                        || focus == state.combo_tts_voice_language
-                        || focus == state.combo_dialogue_voice
-                        || focus == state.combo_dialogue_voice_language
-                        || focus == state.edit_dialogue_voice_rate
-                        || focus == state.edit_dialogue_voice_pitch
-                        || focus == state.edit_dialogue_voice_volume
-                        || focus == state.combo_dialogue_secondary_engine
-                        || focus == state.combo_dialogue_secondary_voice_language
-                        || focus == state.combo_dialogue_secondary_voice
-                        || focus == state.combo_dialogue_secondary_voice_rate
-                        || focus == state.combo_dialogue_secondary_voice_pitch
-                        || focus == state.combo_dialogue_secondary_voice_volume
-                        || focus == state.edit_dialogue_secondary_voice_rate
-                        || focus == state.edit_dialogue_secondary_voice_pitch
-                        || focus == state.edit_dialogue_secondary_voice_volume
-                        || focus == state.combo_tts_speed
-                        || focus == state.combo_tts_pitch
-                        || focus == state.combo_tts_volume
-                        || focus == state.edit_tts_speed
-                        || focus == state.edit_tts_pitch
-                        || focus == state.edit_tts_volume
-                })
-                .unwrap_or(false);
-                if is_tts_combo {
-                    apply_options_dialog(hwnd);
+            WM_VSCROLL => {
+                if handle_options_vscroll(hwnd, wparam) {
                     return LRESULT(0);
                 }
-            } else if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                crate::log_if_err!(DestroyWindow(hwnd));
-                return LRESULT(0);
+                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_DESTROY => {
-            let parent = with_options_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
-            if parent.0 != 0 {
-                EnableWindow(parent, true);
-                SetForegroundWindow(parent);
-                // Only focus editor if not in player mode (audiobook)
-                if !crate::editor_manager::is_current_audiobook(parent) {
-                    SetFocus(parent);
-                    if let Some(edit) = crate::get_active_edit(parent) {
-                        SetFocus(edit);
+            WM_MOUSEWHEEL => {
+                if handle_options_mouse_wheel(hwnd, wparam) {
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_KEYDOWN => {
+                if wparam.0 as u32 == VK_TAB.0 as u32 {
+                    let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
+                    if ctrl_down {
+                        let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+                        let tabs =
+                            with_options_state(hwnd, |state| state.hwnd_tabs).unwrap_or(HWND(0));
+                        if tabs.0 != 0 {
+                            let current =
+                                SendMessageW(tabs, TCM_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
+                            let mut next = if shift_down { current - 1 } else { current + 1 };
+                            if next < 0 {
+                                next = OPTIONS_TAB_COUNT - 1;
+                            } else if next >= OPTIONS_TAB_COUNT {
+                                next = 0;
+                            }
+                            SendMessageW(tabs, TCM_SETCURSEL, WPARAM(next as usize), LPARAM(0));
+                            set_active_tab(hwnd, next);
+                            SetFocus(tabs);
+                            return LRESULT(0);
+                        }
                     }
-                    if let Err(_e) =
-                        PostMessageW(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0))
+                }
+                if wparam.0 as u32 == VK_RETURN.0 as u32 {
+                    let focus = GetFocus();
+                    let is_tts_combo = with_options_state(hwnd, |state| {
+                        focus == state.combo_voice
+                            || focus == state.combo_tts_voice_language
+                            || focus == state.combo_dialogue_voice
+                            || focus == state.combo_dialogue_voice_language
+                            || focus == state.edit_dialogue_voice_rate
+                            || focus == state.edit_dialogue_voice_pitch
+                            || focus == state.edit_dialogue_voice_volume
+                            || focus == state.combo_dialogue_secondary_engine
+                            || focus == state.combo_dialogue_secondary_voice_language
+                            || focus == state.combo_dialogue_secondary_voice
+                            || focus == state.combo_dialogue_secondary_voice_rate
+                            || focus == state.combo_dialogue_secondary_voice_pitch
+                            || focus == state.combo_dialogue_secondary_voice_volume
+                            || focus == state.edit_dialogue_secondary_voice_rate
+                            || focus == state.edit_dialogue_secondary_voice_pitch
+                            || focus == state.edit_dialogue_secondary_voice_volume
+                            || focus == state.combo_tts_speed
+                            || focus == state.combo_tts_pitch
+                            || focus == state.combo_tts_volume
+                            || focus == state.edit_tts_speed
+                            || focus == state.edit_tts_pitch
+                            || focus == state.edit_tts_volume
+                    })
+                    .unwrap_or(false);
+                    if is_tts_combo {
+                        apply_options_dialog(hwnd);
+                        return LRESULT(0);
+                    }
+                } else if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
+                    crate::log_if_err!(DestroyWindow(hwnd));
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_DESTROY => {
+                let parent = with_options_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
+                if parent.0 != 0 {
+                    EnableWindow(parent, true);
+                    SetForegroundWindow(parent);
+                    // Only focus editor if not in player mode (audiobook)
+                    if !crate::editor_manager::is_current_audiobook(parent) {
+                        SetFocus(parent);
+                        if let Some(edit) = crate::get_active_edit(parent) {
+                            SetFocus(edit);
+                        }
+                        if let Err(_e) =
+                            PostMessageW(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0))
+                        {
+                            crate::log_debug(&format!("Error: {:?}", _e));
+                        }
+                    }
+                    if with_state(parent, |state| {
+                        state.options_dialog = HWND(0);
+                    })
+                    .is_none()
                     {
-                        crate::log_debug(&format!("Error: {:?}", _e));
+                        crate::log_debug("Failed to access state in options_window");
                     }
                 }
-                if with_state(parent, |state| {
-                    state.options_dialog = HWND(0);
-                })
-                .is_none()
-                {
-                    crate::log_debug("Failed to access state in options_window");
+                LRESULT(0)
+            }
+            WM_NCDESTROY => {
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut OptionsDialogState;
+                if !ptr.is_null() {
+                    let _unused_box = Box::from_raw(ptr);
                 }
+                LRESULT(0)
             }
-            LRESULT(0)
-        }
-        WM_NCDESTROY => {
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut OptionsDialogState;
-            if !ptr.is_null() {
-                let _unused_box = Box::from_raw(ptr);
+            WM_CLOSE => {
+                crate::log_if_err!(DestroyWindow(hwnd));
+                LRESULT(0)
             }
-            LRESULT(0)
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        WM_CLOSE => {
-            crate::log_if_err!(DestroyWindow(hwnd));
-            LRESULT(0)
-        }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 

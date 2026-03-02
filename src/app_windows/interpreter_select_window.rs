@@ -135,11 +135,11 @@ unsafe extern "system" fn interpreter_select_wndproc(
     crate::panic_guard::guard(
         "interpreter_select_wndproc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { interpreter_select_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || interpreter_select_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn interpreter_select_wndproc_inner(
+fn interpreter_select_wndproc_inner(
     hwnd: HWND,
     msg: u32,
     wparam: WPARAM,
@@ -148,81 +148,97 @@ unsafe fn interpreter_select_wndproc_inner(
     match msg {
         WM_CREATE => {
             let create_struct = lparam.0 as *const CREATESTRUCTW;
-            let init_ptr = (*create_struct).lpCreateParams as *mut InterpreterSelectInit;
+            let init_ptr = unsafe { (*create_struct).lpCreateParams as *mut InterpreterSelectInit };
             if init_ptr.is_null() {
                 return LRESULT(0);
             }
             let init = unsafe { Box::from_raw(init_ptr) };
             let parent = init.parent;
-            let hfont = with_state(parent, |state| state.hfont).unwrap_or(HFONT(0));
+            let hfont = unsafe { with_state(parent, |state| state.hfont) }.unwrap_or(HFONT(0));
 
-            let list = CreateWindowExW(
-                Default::default(),
-                w!("LISTBOX"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL | WINDOW_STYLE(LBS_NOTIFY as u32),
-                10,
-                10,
-                460,
-                200,
-                hwnd,
-                HMENU(ID_LIST as isize),
-                HINSTANCE(0),
-                None,
-            );
+            let list = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    w!("LISTBOX"),
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WS_VSCROLL
+                        | WINDOW_STYLE(LBS_NOTIFY as u32),
+                    10,
+                    10,
+                    460,
+                    200,
+                    hwnd,
+                    HMENU(ID_LIST as isize),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
 
             for item in init.items.iter() {
-                SendMessageW(
-                    list,
-                    LB_ADDSTRING,
-                    WPARAM(0),
-                    LPARAM(to_wide(item).as_ptr() as isize),
-                );
+                unsafe {
+                    SendMessageW(
+                        list,
+                        LB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(to_wide(item).as_ptr() as isize),
+                    );
+                }
             }
-            SendMessageW(list, LB_SETCURSEL, WPARAM(0), LPARAM(0));
-            SetFocus(list);
+            unsafe {
+                SendMessageW(list, LB_SETCURSEL, WPARAM(0), LPARAM(0));
+                SetFocus(list);
+            }
 
-            let ok = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&i18n::tr(init.language, "options.ok")).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                280,
-                220,
-                90,
-                28,
-                hwnd,
-                HMENU(ID_OK as isize),
-                HINSTANCE(0),
-                None,
-            );
+            let ok = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(init.language, "options.ok")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    280,
+                    220,
+                    90,
+                    28,
+                    hwnd,
+                    HMENU(ID_OK as isize),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
 
-            let cancel = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&i18n::tr(init.language, "options.cancel")).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                380,
-                220,
-                90,
-                28,
-                hwnd,
-                HMENU(ID_CANCEL as isize),
-                HINSTANCE(0),
-                None,
-            );
+            let cancel = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(init.language, "options.cancel")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    380,
+                    220,
+                    90,
+                    28,
+                    hwnd,
+                    HMENU(ID_CANCEL as isize),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
 
             if hfont.0 != 0 {
-                SendMessageW(list, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-                SendMessageW(ok, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-                SendMessageW(cancel, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                unsafe {
+                    SendMessageW(list, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    SendMessageW(ok, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    SendMessageW(cancel, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                }
             }
 
             let state = Box::new(InterpreterSelectState {
                 list,
                 result: init.result.clone(),
             });
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+            unsafe { SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize) };
             LRESULT(0)
         }
         WM_COMMAND => {
@@ -230,51 +246,58 @@ unsafe fn interpreter_select_wndproc_inner(
             match id {
                 ID_OK => {
                     with_interpreter_state(hwnd, |state| {
-                        let sel = SendMessageW(state.list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+                        let sel = unsafe {
+                            SendMessageW(state.list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0
+                        };
                         if sel >= 0 {
-                            let len = SendMessageW(
-                                state.list,
-                                LB_GETTEXTLEN,
-                                WPARAM(sel as usize),
-                                LPARAM(0),
-                            )
-                            .0;
-                            if len >= 0 {
-                                let mut buf = vec![0u16; (len + 1) as usize];
+                            let len = unsafe {
                                 SendMessageW(
                                     state.list,
-                                    LB_GETTEXT,
+                                    LB_GETTEXTLEN,
                                     WPARAM(sel as usize),
-                                    LPARAM(buf.as_mut_ptr() as isize),
-                                );
+                                    LPARAM(0),
+                                )
+                                .0
+                            };
+                            if len >= 0 {
+                                let mut buf = vec![0u16; (len + 1) as usize];
+                                unsafe {
+                                    SendMessageW(
+                                        state.list,
+                                        LB_GETTEXT,
+                                        WPARAM(sel as usize),
+                                        LPARAM(buf.as_mut_ptr() as isize),
+                                    );
+                                }
                                 let path = String::from_utf16_lossy(&buf[..len as usize]);
                                 *state.result.lock().unwrap_or_else(|e| e.into_inner()) =
                                     Some(path);
                             }
                         }
                     });
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
                     LRESULT(0)
                 }
                 ID_CANCEL => {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
                     LRESULT(0)
                 }
-                _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+                _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
             }
         }
         WM_CLOSE => {
-            crate::log_if_err!(DestroyWindow(hwnd));
+            crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
             LRESULT(0)
         }
         WM_NCDESTROY => {
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut InterpreterSelectState;
+            let ptr =
+                unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut InterpreterSelectState };
             if !ptr.is_null() {
-                let _unused_box = Box::from_raw(ptr);
+                let _unused_box = unsafe { Box::from_raw(ptr) };
             }
             LRESULT(0)
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+        _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }
 }
 

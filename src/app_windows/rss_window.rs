@@ -1737,7 +1737,7 @@ pub fn open(parent: HWND) {
 pub fn show_context_menu_from_keyboard(hwnd: HWND) {
     let mut pt = POINT::default();
     crate::log_if_err!(unsafe { GetCursorPos(&mut pt) });
-    unsafe { show_rss_context_menu(hwnd, pt.x, pt.y, false) };
+    show_rss_context_menu(hwnd, pt.x, pt.y, false);
 }
 
 pub fn focus_library(hwnd: HWND) {
@@ -1752,312 +1752,314 @@ pub fn focus_library(hwnd: HWND) {
     }
 }
 
-unsafe fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
-    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-    if hwnd_tree.0 == 0 {
-        return;
-    }
-
-    let mut rect = RECT::default();
-    if use_hit_test
-        && GetWindowRect(hwnd_tree, &mut rect).is_ok()
-        && (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom)
-    {
-        return;
-    }
-
-    let hitem = if use_hit_test {
-        let mut pt = POINT { x, y };
-        if rect.right != 0 || rect.bottom != 0 {
-            pt.x -= rect.left;
-            pt.y -= rect.top;
+fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
+    unsafe {
+        let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+        if hwnd_tree.0 == 0 {
+            return;
         }
-        let mut hit = TVHITTESTINFO {
-            pt,
-            ..Default::default()
-        };
-        let hitem = windows::Win32::UI::Controls::HTREEITEM(
-            SendMessageW(
-                hwnd_tree,
-                TVM_HITTEST,
-                WPARAM(0),
-                LPARAM(&mut hit as *mut _ as isize),
-            )
-            .0,
-        );
-        if hitem.0 != 0 {
-            SendMessageW(
-                hwnd_tree,
-                TVM_SELECTITEM,
-                WPARAM(TVGN_CARET as usize),
-                LPARAM(hitem.0),
-            );
-            SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(hitem.0));
-        }
-        hitem
-    } else {
-        windows::Win32::UI::Controls::HTREEITEM(
-            SendMessageW(
-                hwnd_tree,
-                TVM_GETNEXTITEM,
-                WPARAM(TVGN_CARET as usize),
-                LPARAM(0),
-            )
-            .0,
-        )
-    };
 
-    if hitem.0 == 0 {
-        return;
-    }
-
-    let (is_source, source_index, article_item) =
-        with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
-            Some(NodeData::Source(idx)) => (true, Some(*idx), None),
-            Some(NodeData::Item(item)) => (false, None, Some(item.clone())),
-            None => (false, None, None),
-        })
-        .unwrap_or((false, None, None));
-    if !is_source && article_item.is_none() {
-        return;
-    }
-
-    let language = with_rss_state(hwnd, |s| {
-        with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
-    })
-    .unwrap_or_default();
-    let edit_label = i18n::tr(language, "rss.context.edit");
-    let delete_label = i18n::tr(language, "rss.context.delete");
-    let remove_entry_label = i18n::tr(language, "dictionary.remove");
-    let retry_label = i18n::tr(language, "rss.context.retry_now");
-    let reorder_label = i18n::tr(language, "rss.context.reorder");
-    let reorder_up = i18n::tr(language, "rss.reorder.move_up");
-    let reorder_down = i18n::tr(language, "rss.reorder.move_down");
-    let reorder_top = i18n::tr(language, "rss.reorder.move_top");
-    let reorder_bottom = i18n::tr(language, "rss.reorder.move_bottom");
-    let reorder_position = i18n::tr(language, "rss.reorder.move_to_position");
-    let sort_asc = i18n::tr(language, "rss.reorder.title_asc");
-    let sort_desc = i18n::tr(language, "rss.reorder.title_desc");
-    let sort_newest = i18n::tr(language, "rss.reorder.date_newest");
-    let sort_oldest = i18n::tr(language, "rss.reorder.date_oldest");
-    let open_label = i18n::tr(language, "rss.context.open_browser");
-    let facebook_label = i18n::tr(language, "rss.context.share_facebook");
-    let twitter_label = i18n::tr(language, "rss.context.share_twitter");
-    let whatsapp_label = i18n::tr(language, "rss.context.share_whatsapp");
-    let email_label = i18n::tr(language, "rss.context.share_email");
-    let properties_label = i18n::tr(language, "context.properties");
-    let undo_label = i18n::tr(language, "edit.undo")
-        .split('\t')
-        .next()
-        .unwrap_or_default()
-        .to_string();
-    let has_undo = with_rss_state(hwnd, |s| !s.removed_history.is_empty()).unwrap_or(false);
-
-    if let Ok(menu) = CreatePopupMenu()
-        && menu.0 != 0
-    {
-        if is_source {
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_EDIT,
-                PCWSTR(to_wide(&edit_label).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_DELETE,
-                PCWSTR(to_wide(&delete_label).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_RETRY,
-                PCWSTR(to_wide(&retry_label).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_PROPERTIES,
-                PCWSTR(to_wide(&properties_label).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()) {}
-            let undo_flags = if has_undo {
-                MF_STRING
-            } else {
-                MF_STRING | MF_GRAYED
-            };
-            if let Err(_e) = AppendMenuW(
-                menu,
-                undo_flags,
-                ID_CTX_UNDO_DELETE,
-                PCWSTR(to_wide(&undo_label).as_ptr()),
-            ) {}
-            if let Some(idx) = source_index {
-                let total = with_rss_state(hwnd, |s| {
-                    with_state(s.parent, |ps| ps.settings.rss_sources.len())
-                })
-                .flatten()
-                .unwrap_or(0);
-                let at_top = idx == 0;
-                let at_bottom = total == 0 || idx + 1 >= total;
-                if let Ok(submenu) = CreatePopupMenu()
-                    && submenu.0 != 0
-                {
-                    let up_flags = if at_top {
-                        MF_STRING | MF_GRAYED
-                    } else {
-                        MF_STRING
-                    };
-                    let down_flags = if at_bottom {
-                        MF_STRING | MF_GRAYED
-                    } else {
-                        MF_STRING
-                    };
-                    if let Err(_e) = AppendMenuW(
-                        submenu,
-                        up_flags,
-                        ID_CTX_REORDER_UP,
-                        PCWSTR(to_wide(&reorder_up).as_ptr()),
-                    ) {}
-                    if let Err(_e) = AppendMenuW(
-                        submenu,
-                        down_flags,
-                        ID_CTX_REORDER_DOWN,
-                        PCWSTR(to_wide(&reorder_down).as_ptr()),
-                    ) {}
-                    if let Err(_e) = AppendMenuW(
-                        submenu,
-                        up_flags,
-                        ID_CTX_REORDER_TOP,
-                        PCWSTR(to_wide(&reorder_top).as_ptr()),
-                    ) {}
-                    if let Err(_e) = AppendMenuW(
-                        submenu,
-                        down_flags,
-                        ID_CTX_REORDER_BOTTOM,
-                        PCWSTR(to_wide(&reorder_bottom).as_ptr()),
-                    ) {}
-                    if let Err(_e) = AppendMenuW(
-                        submenu,
-                        MF_STRING,
-                        ID_CTX_REORDER_POSITION,
-                        PCWSTR(to_wide(&reorder_position).as_ptr()),
-                    ) {}
-                    if let Err(_e) = AppendMenuW(submenu, MF_SEPARATOR, 0, PCWSTR::null()) {}
-                    if let Err(_e) = AppendMenuW(
-                        submenu,
-                        MF_STRING,
-                        ID_CTX_SORT_ASC,
-                        PCWSTR(to_wide(&sort_asc).as_ptr()),
-                    ) {}
-                    if let Err(_e) = AppendMenuW(
-                        submenu,
-                        MF_STRING,
-                        ID_CTX_SORT_DESC,
-                        PCWSTR(to_wide(&sort_desc).as_ptr()),
-                    ) {}
-                    if let Err(_e) = AppendMenuW(
-                        submenu,
-                        MF_STRING,
-                        ID_CTX_SORT_NEWEST,
-                        PCWSTR(to_wide(&sort_newest).as_ptr()),
-                    ) {}
-                    if let Err(_e) = AppendMenuW(
-                        submenu,
-                        MF_STRING,
-                        ID_CTX_SORT_OLDEST,
-                        PCWSTR(to_wide(&sort_oldest).as_ptr()),
-                    ) {}
-                    if let Err(_e) = AppendMenuW(
-                        menu,
-                        MF_POPUP,
-                        submenu.0 as usize,
-                        PCWSTR(to_wide(&reorder_label).as_ptr()),
-                    ) {}
-                }
-            }
-        } else if let Some(item) = article_item {
-            let url = item.link.trim();
-            let valid_url = !url.is_empty() && is_valid_article_url(url);
-            let flags = if valid_url {
-                MF_STRING
-            } else {
-                MF_STRING | MF_GRAYED
-            };
-            if let Err(_e) = AppendMenuW(
-                menu,
-                flags,
-                ID_CTX_OPEN_BROWSER,
-                PCWSTR(to_wide(&open_label).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                flags,
-                ID_CTX_SHARE_FACEBOOK,
-                PCWSTR(to_wide(&facebook_label).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                flags,
-                ID_CTX_SHARE_TWITTER,
-                PCWSTR(to_wide(&twitter_label).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                flags,
-                ID_CTX_SHARE_WHATSAPP,
-                PCWSTR(to_wide(&whatsapp_label).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                flags,
-                ID_CTX_SHARE_EMAIL,
-                PCWSTR(to_wide(&email_label).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_PROPERTIES,
-                PCWSTR(to_wide(&properties_label).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_DELETE,
-                PCWSTR(to_wide(&remove_entry_label).as_ptr()),
-            ) {}
-            let undo_flags = if has_undo {
-                MF_STRING
-            } else {
-                MF_STRING | MF_GRAYED
-            };
-            if let Err(_e) = AppendMenuW(
-                menu,
-                undo_flags,
-                ID_CTX_UNDO_DELETE,
-                PCWSTR(to_wide(&undo_label).as_ptr()),
-            ) {}
-        }
-        SetForegroundWindow(hwnd);
-        if !TrackPopupMenu(
-            menu,
-            windows::Win32::UI::WindowsAndMessaging::TPM_RIGHTBUTTON,
-            x,
-            y,
-            0,
-            hwnd,
-            None,
-        )
-        .as_bool()
+        let mut rect = RECT::default();
+        if use_hit_test
+            && GetWindowRect(hwnd_tree, &mut rect).is_ok()
+            && (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom)
         {
-            crate::log_debug("TrackPopupMenu failed");
+            return;
         }
-        if let Err(e) = PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0)) {
-            crate::log_debug(&format!("Failed to post WM_NULL: {}", e));
+
+        let hitem = if use_hit_test {
+            let mut pt = POINT { x, y };
+            if rect.right != 0 || rect.bottom != 0 {
+                pt.x -= rect.left;
+                pt.y -= rect.top;
+            }
+            let mut hit = TVHITTESTINFO {
+                pt,
+                ..Default::default()
+            };
+            let hitem = windows::Win32::UI::Controls::HTREEITEM(
+                SendMessageW(
+                    hwnd_tree,
+                    TVM_HITTEST,
+                    WPARAM(0),
+                    LPARAM(&mut hit as *mut _ as isize),
+                )
+                .0,
+            );
+            if hitem.0 != 0 {
+                SendMessageW(
+                    hwnd_tree,
+                    TVM_SELECTITEM,
+                    WPARAM(TVGN_CARET as usize),
+                    LPARAM(hitem.0),
+                );
+                SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(hitem.0));
+            }
+            hitem
+        } else {
+            windows::Win32::UI::Controls::HTREEITEM(
+                SendMessageW(
+                    hwnd_tree,
+                    TVM_GETNEXTITEM,
+                    WPARAM(TVGN_CARET as usize),
+                    LPARAM(0),
+                )
+                .0,
+            )
+        };
+
+        if hitem.0 == 0 {
+            return;
         }
-        crate::log_if_err!(DestroyMenu(menu));
+
+        let (is_source, source_index, article_item) =
+            with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
+                Some(NodeData::Source(idx)) => (true, Some(*idx), None),
+                Some(NodeData::Item(item)) => (false, None, Some(item.clone())),
+                None => (false, None, None),
+            })
+            .unwrap_or((false, None, None));
+        if !is_source && article_item.is_none() {
+            return;
+        }
+
+        let language = with_rss_state(hwnd, |s| {
+            with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
+        })
+        .unwrap_or_default();
+        let edit_label = i18n::tr(language, "rss.context.edit");
+        let delete_label = i18n::tr(language, "rss.context.delete");
+        let remove_entry_label = i18n::tr(language, "dictionary.remove");
+        let retry_label = i18n::tr(language, "rss.context.retry_now");
+        let reorder_label = i18n::tr(language, "rss.context.reorder");
+        let reorder_up = i18n::tr(language, "rss.reorder.move_up");
+        let reorder_down = i18n::tr(language, "rss.reorder.move_down");
+        let reorder_top = i18n::tr(language, "rss.reorder.move_top");
+        let reorder_bottom = i18n::tr(language, "rss.reorder.move_bottom");
+        let reorder_position = i18n::tr(language, "rss.reorder.move_to_position");
+        let sort_asc = i18n::tr(language, "rss.reorder.title_asc");
+        let sort_desc = i18n::tr(language, "rss.reorder.title_desc");
+        let sort_newest = i18n::tr(language, "rss.reorder.date_newest");
+        let sort_oldest = i18n::tr(language, "rss.reorder.date_oldest");
+        let open_label = i18n::tr(language, "rss.context.open_browser");
+        let facebook_label = i18n::tr(language, "rss.context.share_facebook");
+        let twitter_label = i18n::tr(language, "rss.context.share_twitter");
+        let whatsapp_label = i18n::tr(language, "rss.context.share_whatsapp");
+        let email_label = i18n::tr(language, "rss.context.share_email");
+        let properties_label = i18n::tr(language, "context.properties");
+        let undo_label = i18n::tr(language, "edit.undo")
+            .split('\t')
+            .next()
+            .unwrap_or_default()
+            .to_string();
+        let has_undo = with_rss_state(hwnd, |s| !s.removed_history.is_empty()).unwrap_or(false);
+
+        if let Ok(menu) = CreatePopupMenu()
+            && menu.0 != 0
+        {
+            if is_source {
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_EDIT,
+                    PCWSTR(to_wide(&edit_label).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_DELETE,
+                    PCWSTR(to_wide(&delete_label).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_RETRY,
+                    PCWSTR(to_wide(&retry_label).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_PROPERTIES,
+                    PCWSTR(to_wide(&properties_label).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()) {}
+                let undo_flags = if has_undo {
+                    MF_STRING
+                } else {
+                    MF_STRING | MF_GRAYED
+                };
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    undo_flags,
+                    ID_CTX_UNDO_DELETE,
+                    PCWSTR(to_wide(&undo_label).as_ptr()),
+                ) {}
+                if let Some(idx) = source_index {
+                    let total = with_rss_state(hwnd, |s| {
+                        with_state(s.parent, |ps| ps.settings.rss_sources.len())
+                    })
+                    .flatten()
+                    .unwrap_or(0);
+                    let at_top = idx == 0;
+                    let at_bottom = total == 0 || idx + 1 >= total;
+                    if let Ok(submenu) = CreatePopupMenu()
+                        && submenu.0 != 0
+                    {
+                        let up_flags = if at_top {
+                            MF_STRING | MF_GRAYED
+                        } else {
+                            MF_STRING
+                        };
+                        let down_flags = if at_bottom {
+                            MF_STRING | MF_GRAYED
+                        } else {
+                            MF_STRING
+                        };
+                        if let Err(_e) = AppendMenuW(
+                            submenu,
+                            up_flags,
+                            ID_CTX_REORDER_UP,
+                            PCWSTR(to_wide(&reorder_up).as_ptr()),
+                        ) {}
+                        if let Err(_e) = AppendMenuW(
+                            submenu,
+                            down_flags,
+                            ID_CTX_REORDER_DOWN,
+                            PCWSTR(to_wide(&reorder_down).as_ptr()),
+                        ) {}
+                        if let Err(_e) = AppendMenuW(
+                            submenu,
+                            up_flags,
+                            ID_CTX_REORDER_TOP,
+                            PCWSTR(to_wide(&reorder_top).as_ptr()),
+                        ) {}
+                        if let Err(_e) = AppendMenuW(
+                            submenu,
+                            down_flags,
+                            ID_CTX_REORDER_BOTTOM,
+                            PCWSTR(to_wide(&reorder_bottom).as_ptr()),
+                        ) {}
+                        if let Err(_e) = AppendMenuW(
+                            submenu,
+                            MF_STRING,
+                            ID_CTX_REORDER_POSITION,
+                            PCWSTR(to_wide(&reorder_position).as_ptr()),
+                        ) {}
+                        if let Err(_e) = AppendMenuW(submenu, MF_SEPARATOR, 0, PCWSTR::null()) {}
+                        if let Err(_e) = AppendMenuW(
+                            submenu,
+                            MF_STRING,
+                            ID_CTX_SORT_ASC,
+                            PCWSTR(to_wide(&sort_asc).as_ptr()),
+                        ) {}
+                        if let Err(_e) = AppendMenuW(
+                            submenu,
+                            MF_STRING,
+                            ID_CTX_SORT_DESC,
+                            PCWSTR(to_wide(&sort_desc).as_ptr()),
+                        ) {}
+                        if let Err(_e) = AppendMenuW(
+                            submenu,
+                            MF_STRING,
+                            ID_CTX_SORT_NEWEST,
+                            PCWSTR(to_wide(&sort_newest).as_ptr()),
+                        ) {}
+                        if let Err(_e) = AppendMenuW(
+                            submenu,
+                            MF_STRING,
+                            ID_CTX_SORT_OLDEST,
+                            PCWSTR(to_wide(&sort_oldest).as_ptr()),
+                        ) {}
+                        if let Err(_e) = AppendMenuW(
+                            menu,
+                            MF_POPUP,
+                            submenu.0 as usize,
+                            PCWSTR(to_wide(&reorder_label).as_ptr()),
+                        ) {}
+                    }
+                }
+            } else if let Some(item) = article_item {
+                let url = item.link.trim();
+                let valid_url = !url.is_empty() && is_valid_article_url(url);
+                let flags = if valid_url {
+                    MF_STRING
+                } else {
+                    MF_STRING | MF_GRAYED
+                };
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    flags,
+                    ID_CTX_OPEN_BROWSER,
+                    PCWSTR(to_wide(&open_label).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    flags,
+                    ID_CTX_SHARE_FACEBOOK,
+                    PCWSTR(to_wide(&facebook_label).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    flags,
+                    ID_CTX_SHARE_TWITTER,
+                    PCWSTR(to_wide(&twitter_label).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    flags,
+                    ID_CTX_SHARE_WHATSAPP,
+                    PCWSTR(to_wide(&whatsapp_label).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    flags,
+                    ID_CTX_SHARE_EMAIL,
+                    PCWSTR(to_wide(&email_label).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_PROPERTIES,
+                    PCWSTR(to_wide(&properties_label).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_DELETE,
+                    PCWSTR(to_wide(&remove_entry_label).as_ptr()),
+                ) {}
+                let undo_flags = if has_undo {
+                    MF_STRING
+                } else {
+                    MF_STRING | MF_GRAYED
+                };
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    undo_flags,
+                    ID_CTX_UNDO_DELETE,
+                    PCWSTR(to_wide(&undo_label).as_ptr()),
+                ) {}
+            }
+            SetForegroundWindow(hwnd);
+            if !TrackPopupMenu(
+                menu,
+                windows::Win32::UI::WindowsAndMessaging::TPM_RIGHTBUTTON,
+                x,
+                y,
+                0,
+                hwnd,
+                None,
+            )
+            .as_bool()
+            {
+                crate::log_debug("TrackPopupMenu failed");
+            }
+            if let Err(e) = PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0)) {
+                crate::log_debug(&format!("Failed to post WM_NULL: {}", e));
+            }
+            crate::log_if_err!(DestroyMenu(menu));
+        }
     }
 }
 
@@ -3109,130 +3111,132 @@ fn rss_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) 
     }
 }
 
-unsafe fn create_controls(hwnd: HWND) {
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+fn create_controls(hwnd: HWND) {
+    unsafe {
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
 
-    let hwnd_tree = CreateWindowExW(
-        WS_EX_CLIENTEDGE,
-        w!("SysTreeView32"),
-        PCWSTR::null(),
-        WS_CHILD
-            | WS_VISIBLE
-            | WS_TABSTOP
-            | WS_VSCROLL
-            | WINDOW_STYLE(
-                windows::Win32::UI::Controls::TVS_HASLINES
-                    | windows::Win32::UI::Controls::TVS_HASBUTTONS
-                    | windows::Win32::UI::Controls::TVS_LINESATROOT
-                    | windows::Win32::UI::Controls::TVS_SHOWSELALWAYS,
-            ),
-        10,
-        10,
-        460,
-        500,
-        hwnd,
-        HMENU(ID_TREE as isize),
-        hinstance,
-        None,
-    );
-    if hwnd_tree.0 != 0 {
-        let proc_ptr = rss_tree_wndproc as *const () as usize;
-        let old = SetWindowLongPtrW(hwnd_tree, GWLP_WNDPROC, proc_ptr as isize);
+        let hwnd_tree = CreateWindowExW(
+            WS_EX_CLIENTEDGE,
+            w!("SysTreeView32"),
+            PCWSTR::null(),
+            WS_CHILD
+                | WS_VISIBLE
+                | WS_TABSTOP
+                | WS_VSCROLL
+                | WINDOW_STYLE(
+                    windows::Win32::UI::Controls::TVS_HASLINES
+                        | windows::Win32::UI::Controls::TVS_HASBUTTONS
+                        | windows::Win32::UI::Controls::TVS_LINESATROOT
+                        | windows::Win32::UI::Controls::TVS_SHOWSELALWAYS,
+                ),
+            10,
+            10,
+            460,
+            500,
+            hwnd,
+            HMENU(ID_TREE as isize),
+            hinstance,
+            None,
+        );
+        if hwnd_tree.0 != 0 {
+            let proc_ptr = rss_tree_wndproc as *const () as usize;
+            let old = SetWindowLongPtrW(hwnd_tree, GWLP_WNDPROC, proc_ptr as isize);
+            with_rss_state(hwnd, |s| {
+                s.tree_proc = mem::transmute::<isize, WNDPROC>(old)
+            });
+        }
+
+        let language = with_rss_state(hwnd, |s| {
+            with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
+        })
+        .unwrap_or_default();
+
+        let hwnd_add = CreateWindowExW(
+            Default::default(),
+            WC_BUTTON,
+            PCWSTR(to_wide(&i18n::tr(language, "rss.tree.add_source")).as_ptr()),
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+            10,
+            520,
+            90,
+            30,
+            hwnd,
+            HMENU(ID_BTN_ADD as isize),
+            hinstance,
+            None,
+        );
+
+        let hwnd_import = CreateWindowExW(
+            Default::default(),
+            WC_BUTTON,
+            PCWSTR(to_wide(&i18n::tr(language, "rss.tree.import_txt")).as_ptr()),
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+            105,
+            520,
+            90,
+            30,
+            hwnd,
+            HMENU(ID_BTN_IMPORT as isize),
+            hinstance,
+            None,
+        );
+
+        let export_label = i18n::tr(language, "rss.tree.export_opml");
+        let export_label = if export_label == "rss.tree.export_opml" {
+            "Export OPML...".to_string()
+        } else {
+            export_label
+        };
+        let hwnd_export = CreateWindowExW(
+            Default::default(),
+            WC_BUTTON,
+            PCWSTR(to_wide(&export_label).as_ptr()),
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+            200,
+            520,
+            90,
+            30,
+            hwnd,
+            HMENU(ID_BTN_EXPORT as isize),
+            hinstance,
+            None,
+        );
+
+        let hwnd_close = CreateWindowExW(
+            Default::default(),
+            WC_BUTTON,
+            PCWSTR(to_wide(&i18n::tr(language, "rss.tree.close")).as_ptr()),
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+            295,
+            520,
+            80,
+            30,
+            hwnd,
+            HMENU(ID_BTN_CLOSE as isize),
+            hinstance,
+            None,
+        );
+
         with_rss_state(hwnd, |s| {
-            s.tree_proc = mem::transmute::<isize, WNDPROC>(old)
+            s.hwnd_tree = hwnd_tree;
+            s.hwnd_import = hwnd_import;
+            s.hwnd_export = hwnd_export;
         });
+
+        let hfont = with_rss_state(hwnd, |s| {
+            with_state(s.parent, |ps| ps.hfont).unwrap_or(HFONT(0))
+        })
+        .unwrap_or(HFONT(0));
+        if hfont.0 != 0 {
+            SendMessageW(hwnd_tree, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+            SendMessageW(hwnd_add, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+            SendMessageW(hwnd_import, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+            SendMessageW(hwnd_export, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+            SendMessageW(hwnd_close, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+        }
+
+        SetFocus(hwnd_tree);
     }
-
-    let language = with_rss_state(hwnd, |s| {
-        with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
-    })
-    .unwrap_or_default();
-
-    let hwnd_add = CreateWindowExW(
-        Default::default(),
-        WC_BUTTON,
-        PCWSTR(to_wide(&i18n::tr(language, "rss.tree.add_source")).as_ptr()),
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-        10,
-        520,
-        90,
-        30,
-        hwnd,
-        HMENU(ID_BTN_ADD as isize),
-        hinstance,
-        None,
-    );
-
-    let hwnd_import = CreateWindowExW(
-        Default::default(),
-        WC_BUTTON,
-        PCWSTR(to_wide(&i18n::tr(language, "rss.tree.import_txt")).as_ptr()),
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-        105,
-        520,
-        90,
-        30,
-        hwnd,
-        HMENU(ID_BTN_IMPORT as isize),
-        hinstance,
-        None,
-    );
-
-    let export_label = i18n::tr(language, "rss.tree.export_opml");
-    let export_label = if export_label == "rss.tree.export_opml" {
-        "Export OPML...".to_string()
-    } else {
-        export_label
-    };
-    let hwnd_export = CreateWindowExW(
-        Default::default(),
-        WC_BUTTON,
-        PCWSTR(to_wide(&export_label).as_ptr()),
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-        200,
-        520,
-        90,
-        30,
-        hwnd,
-        HMENU(ID_BTN_EXPORT as isize),
-        hinstance,
-        None,
-    );
-
-    let hwnd_close = CreateWindowExW(
-        Default::default(),
-        WC_BUTTON,
-        PCWSTR(to_wide(&i18n::tr(language, "rss.tree.close")).as_ptr()),
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-        295,
-        520,
-        80,
-        30,
-        hwnd,
-        HMENU(ID_BTN_CLOSE as isize),
-        hinstance,
-        None,
-    );
-
-    with_rss_state(hwnd, |s| {
-        s.hwnd_tree = hwnd_tree;
-        s.hwnd_import = hwnd_import;
-        s.hwnd_export = hwnd_export;
-    });
-
-    let hfont = with_rss_state(hwnd, |s| {
-        with_state(s.parent, |ps| ps.hfont).unwrap_or(HFONT(0))
-    })
-    .unwrap_or(HFONT(0));
-    if hfont.0 != 0 {
-        SendMessageW(hwnd_tree, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-        SendMessageW(hwnd_add, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-        SendMessageW(hwnd_import, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-        SendMessageW(hwnd_export, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-        SendMessageW(hwnd_close, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-    }
-
-    SetFocus(hwnd_tree);
 }
 
 fn reload_tree(hwnd: HWND) {
@@ -3763,199 +3767,312 @@ fn process_background_check_result(hwnd: HWND, res: BackgroundCheckResult) {
     }
 }
 
-unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
-    let hitem = windows::Win32::UI::Controls::HTREEITEM(res.hitem);
-    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-    let caret = windows::Win32::UI::Controls::HTREEITEM(
-        SendMessageW(
-            hwnd_tree,
-            TVM_GETNEXTITEM,
-            WPARAM(TVGN_CARET as usize),
-            LPARAM(0),
-        )
-        .0,
-    );
+fn process_fetch_result(hwnd: HWND, res: FetchResult) {
+    unsafe {
+        let hitem = windows::Win32::UI::Controls::HTREEITEM(res.hitem);
+        let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+        let caret = windows::Win32::UI::Controls::HTREEITEM(
+            SendMessageW(
+                hwnd_tree,
+                TVM_GETNEXTITEM,
+                WPARAM(TVGN_CARET as usize),
+                LPARAM(0),
+            )
+            .0,
+        );
 
-    match res.result {
-        Ok(outcome) => {
-            // Update source title if applicable
-            let is_source_node = with_rss_state(hwnd, |s| {
-                s.node_data.contains_key(&hitem.0)
-                    && matches!(s.node_data[&hitem.0], NodeData::Source(_))
-            })
-            .unwrap_or(false);
-            if is_source_node {
-                let idx = with_rss_state(hwnd, |s| {
-                    if let NodeData::Source(i) = s.node_data[&hitem.0] {
-                        Some(i)
-                    } else {
-                        None
-                    }
-                })
-                .flatten();
-                if let Some(i) = idx {
-                    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-                    let mut final_title = outcome.title.clone();
-                    let allow_title_update = caret != hitem;
-                    with_state(parent, |ps| {
-                        let lang = ps.settings.language;
-                        let (_key, keep_default_title) = ps
-                            .settings
-                            .rss_sources
-                            .get(i)
-                            .map(|src| {
-                                let key = normalize_rss_url_key(&src.url);
-                                let keep = is_default_key(lang, &ps.settings, &key);
-                                (key, keep)
-                            })
-                            .unwrap_or_default();
-                        if let Some(src) = ps.settings.rss_sources.get_mut(i) {
-                            let looks_auto = src.title.trim().is_empty() || src.title == src.url;
-                            if !src.user_title
-                                && !keep_default_title
-                                && looks_auto
-                                && !outcome.title.is_empty()
-                            {
-                                src.title = outcome.title.clone();
-                            }
-                            final_title = rss_source_display_title(
-                                src,
-                                lang,
-                                ps.settings.announce_unread_rss_podcast_items,
-                                ps.settings.rss_podcast_unread_label_position,
-                            );
-                            if src.kind != outcome.kind {
-                                src.kind = outcome.kind;
-                            }
-                            src.cache = outcome.cache.clone();
-                            let max_ts = outcome.items.iter().filter_map(|i| i.pub_date).max();
-                            if let Some(ts) = max_ts {
-                                src.last_updated = Some(ts);
-                            }
-                        }
-                        crate::settings::save_settings(ps.settings.clone());
-                    });
-
-                    if allow_title_update {
-                        let title_wide = to_wide(&final_title);
-                        let mut tvi = TVITEMW {
-                            mask: TVIF_TEXT,
-                            hItem: hitem,
-                            pszText: windows::core::PWSTR(title_wide.as_ptr() as *mut _),
-                            ..Default::default()
-                        };
-                        SendMessageW(
-                            hwnd_tree,
-                            TVM_SETITEMW,
-                            WPARAM(0),
-                            LPARAM(&mut tvi as *mut _ as isize),
-                        );
-                    }
-                }
-            }
-
-            if outcome.not_modified {
-                let has_items = with_rss_state(hwnd, |s| {
-                    s.source_items
-                        .get(&hitem.0)
-                        .map(|state| !state.items.is_empty())
-                        .unwrap_or(false)
+        match res.result {
+            Ok(outcome) => {
+                // Update source title if applicable
+                let is_source_node = with_rss_state(hwnd, |s| {
+                    s.node_data.contains_key(&hitem.0)
+                        && matches!(s.node_data[&hitem.0], NodeData::Source(_))
                 })
                 .unwrap_or(false);
-                if !has_items {
-                    let child = SendMessageW(
-                        hwnd_tree,
-                        TVM_GETNEXTITEM,
-                        WPARAM(TVGN_CHILD as usize),
-                        LPARAM(hitem.0),
-                    );
-                    if child.0 != 0 {
-                        let mut item = TVITEMW {
-                            mask: TVIF_TEXT,
-                            hItem: windows::Win32::UI::Controls::HTREEITEM(child.0),
-                            pszText: windows::core::PWSTR::null(),
-                            cchTextMax: 0,
-                            ..Default::default()
-                        };
-                        SendMessageW(
+                if is_source_node {
+                    let idx = with_rss_state(hwnd, |s| {
+                        if let NodeData::Source(i) = s.node_data[&hitem.0] {
+                            Some(i)
+                        } else {
+                            None
+                        }
+                    })
+                    .flatten();
+                    if let Some(i) = idx {
+                        let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                        let mut final_title = outcome.title.clone();
+                        let allow_title_update = caret != hitem;
+                        with_state(parent, |ps| {
+                            let lang = ps.settings.language;
+                            let (_key, keep_default_title) = ps
+                                .settings
+                                .rss_sources
+                                .get(i)
+                                .map(|src| {
+                                    let key = normalize_rss_url_key(&src.url);
+                                    let keep = is_default_key(lang, &ps.settings, &key);
+                                    (key, keep)
+                                })
+                                .unwrap_or_default();
+                            if let Some(src) = ps.settings.rss_sources.get_mut(i) {
+                                let looks_auto =
+                                    src.title.trim().is_empty() || src.title == src.url;
+                                if !src.user_title
+                                    && !keep_default_title
+                                    && looks_auto
+                                    && !outcome.title.is_empty()
+                                {
+                                    src.title = outcome.title.clone();
+                                }
+                                final_title = rss_source_display_title(
+                                    src,
+                                    lang,
+                                    ps.settings.announce_unread_rss_podcast_items,
+                                    ps.settings.rss_podcast_unread_label_position,
+                                );
+                                if src.kind != outcome.kind {
+                                    src.kind = outcome.kind;
+                                }
+                                src.cache = outcome.cache.clone();
+                                let max_ts = outcome.items.iter().filter_map(|i| i.pub_date).max();
+                                if let Some(ts) = max_ts {
+                                    src.last_updated = Some(ts);
+                                }
+                            }
+                            crate::settings::save_settings(ps.settings.clone());
+                        });
+
+                        if allow_title_update {
+                            let title_wide = to_wide(&final_title);
+                            let mut tvi = TVITEMW {
+                                mask: TVIF_TEXT,
+                                hItem: hitem,
+                                pszText: windows::core::PWSTR(title_wide.as_ptr() as *mut _),
+                                ..Default::default()
+                            };
+                            SendMessageW(
+                                hwnd_tree,
+                                TVM_SETITEMW,
+                                WPARAM(0),
+                                LPARAM(&mut tvi as *mut _ as isize),
+                            );
+                        }
+                    }
+                }
+
+                if outcome.not_modified {
+                    let has_items = with_rss_state(hwnd, |s| {
+                        s.source_items
+                            .get(&hitem.0)
+                            .map(|state| !state.items.is_empty())
+                            .unwrap_or(false)
+                    })
+                    .unwrap_or(false);
+                    if !has_items {
+                        let child = SendMessageW(
                             hwnd_tree,
-                            TVM_GETITEMW,
-                            WPARAM(0),
-                            LPARAM(&mut item as *mut _ as isize),
+                            TVM_GETNEXTITEM,
+                            WPARAM(TVGN_CHILD as usize),
+                            LPARAM(hitem.0),
                         );
-                        let mut buf = vec![0u16; 64];
-                        item.pszText = windows::core::PWSTR(buf.as_mut_ptr());
-                        item.cchTextMax = buf.len() as i32;
-                        if SendMessageW(
-                            hwnd_tree,
-                            TVM_GETITEMW,
-                            WPARAM(0),
-                            LPARAM(&mut item as *mut _ as isize),
-                        )
-                        .0 != 0
-                        {
-                            let len = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
-                            let text = String::from_utf16_lossy(&buf[..len]);
-                            if text.trim() == "Loading..." {
-                                SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
+                        if child.0 != 0 {
+                            let mut item = TVITEMW {
+                                mask: TVIF_TEXT,
+                                hItem: windows::Win32::UI::Controls::HTREEITEM(child.0),
+                                pszText: windows::core::PWSTR::null(),
+                                cchTextMax: 0,
+                                ..Default::default()
+                            };
+                            SendMessageW(
+                                hwnd_tree,
+                                TVM_GETITEMW,
+                                WPARAM(0),
+                                LPARAM(&mut item as *mut _ as isize),
+                            );
+                            let mut buf = vec![0u16; 64];
+                            item.pszText = windows::core::PWSTR(buf.as_mut_ptr());
+                            item.cchTextMax = buf.len() as i32;
+                            if SendMessageW(
+                                hwnd_tree,
+                                TVM_GETITEMW,
+                                WPARAM(0),
+                                LPARAM(&mut item as *mut _ as isize),
+                            )
+                            .0 != 0
+                            {
+                                let len = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+                                let text = String::from_utf16_lossy(&buf[..len]);
+                                if text.trim() == "Loading..." {
+                                    SendMessageW(
+                                        hwnd_tree,
+                                        TVM_DELETEITEM,
+                                        WPARAM(0),
+                                        LPARAM(child.0),
+                                    );
+                                }
                             }
                         }
                     }
+                    return;
                 }
-                return;
-            }
 
-            let mut appended = 0usize;
-            let mut loaded_before = 0usize;
-            let mut total_before = 0usize;
-            let existing =
-                with_rss_state(hwnd, |s| s.source_items.contains_key(&hitem.0)).unwrap_or(false);
+                let mut appended = 0usize;
+                let mut loaded_before = 0usize;
+                let mut total_before = 0usize;
+                let existing = with_rss_state(hwnd, |s| s.source_items.contains_key(&hitem.0))
+                    .unwrap_or(false);
 
-            let removed_keys = source_removed_keys_for_tree_item(hwnd, hitem);
+                let removed_keys = source_removed_keys_for_tree_item(hwnd, hitem);
 
-            if existing {
-                with_rss_state(hwnd, |s| {
-                    let Some(state) = s.source_items.get_mut(&hitem.0) else {
-                        return;
-                    };
-                    loaded_before = state.loaded;
-                    total_before = state.items.len();
-                    let mut seen: HashSet<String> = state.items.iter().map(rss_item_key).collect();
-                    for item in outcome.items {
-                        let key = rss_item_key(&item);
-                        if removed_keys.contains(&key) {
-                            continue;
+                if existing {
+                    with_rss_state(hwnd, |s| {
+                        let Some(state) = s.source_items.get_mut(&hitem.0) else {
+                            return;
+                        };
+                        loaded_before = state.loaded;
+                        total_before = state.items.len();
+                        let mut seen: HashSet<String> =
+                            state.items.iter().map(rss_item_key).collect();
+                        for item in outcome.items {
+                            let key = rss_item_key(&item);
+                            if removed_keys.contains(&key) {
+                                continue;
+                            }
+                            if seen.insert(key) {
+                                state.items.push(item);
+                                appended += 1;
+                            }
                         }
-                        if seen.insert(key) {
-                            state.items.push(item);
-                            appended += 1;
+                        // Keep a consistent chronological order for all RSS feeds.
+                        // Google News often requires this, but standard feeds can also arrive unsorted.
+                        sort_items_by_date_desc(&mut state.items);
+                    });
+                    if appended > 0 {
+                        log_debug(&format!(
+                            "rss_ui_batch start source={} append_count={} loaded_before={} total_before={}",
+                            hitem.0, appended, loaded_before, total_before
+                        ));
+                        if loaded_before >= total_before {
+                            let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                            let (_initial_count, next_count) = rss_page_sizes(parent);
+                            load_more_items(hwnd, hitem, next_count);
                         }
+                        log_debug(&format!(
+                            "rss_ui_batch end source={} appended={}",
+                            hitem.0, appended
+                        ));
+                        set_source_unread(hwnd, hitem, true);
+                    } else {
+                        // Feed opened/refreshed with no newly appended items: clear "new items" flag.
+                        // This keeps source-level status aligned with real incoming updates.
+                        set_source_unread(hwnd, hitem, false);
                     }
-                    // Keep a consistent chronological order for all RSS feeds.
-                    // Google News often requires this, but standard feeds can also arrive unsorted.
-                    sort_items_by_date_desc(&mut state.items);
-                });
-                if appended > 0 {
+                } else {
+                    loop {
+                        let child = SendMessageW(
+                            hwnd_tree,
+                            TVM_GETNEXTITEM,
+                            WPARAM(TVGN_CHILD as usize),
+                            LPARAM(hitem.0),
+                        );
+                        if child.0 == 0 {
+                            break;
+                        }
+                        SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
+                    }
+
+                    let saved_read_item_keys: HashSet<String> = with_rss_state(hwnd, |s| {
+                        let source_index = match s.node_data.get(&hitem.0) {
+                            Some(NodeData::Source(index)) => Some(*index),
+                            _ => None,
+                        };
+                        with_state(s.parent, |ps| {
+                            source_index
+                                .and_then(|index| ps.settings.rss_sources.get(index))
+                                .map(|src| src.read_item_keys.iter().cloned().collect())
+                        })
+                        .flatten()
+                        .unwrap_or_default()
+                    })
+                    .unwrap_or_default();
+
+                    with_rss_state(hwnd, |s| {
+                        let mut items: Vec<RssItem> = outcome
+                            .items
+                            .into_iter()
+                            .filter(|item| !removed_keys.contains(&rss_item_key(item)))
+                            .collect();
+                        // Keep a consistent chronological order for all RSS feeds.
+                        sort_items_by_date_desc(&mut items);
+                        s.source_items.insert(
+                            hitem.0,
+                            SourceItemsState {
+                                items,
+                                loaded: 0,
+                                read_item_keys: saved_read_item_keys,
+                            },
+                        );
+                    });
+                    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                    let (initial_count, _next_count) = rss_page_sizes(parent);
                     log_debug(&format!(
-                        "rss_ui_batch start source={} append_count={} loaded_before={} total_before={}",
-                        hitem.0, appended, loaded_before, total_before
+                        "rss_ui_batch start source={} append_count={} loaded_before=0 total_before=0",
+                        hitem.0, initial_count
                     ));
-                    if loaded_before >= total_before {
-                        let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-                        let (_initial_count, next_count) = rss_page_sizes(parent);
-                        load_more_items(hwnd, hitem, next_count);
-                    }
+                    let inserted = load_more_items(hwnd, hitem, initial_count);
                     log_debug(&format!(
                         "rss_ui_batch end source={} appended={}",
-                        hitem.0, appended
+                        hitem.0, inserted
                     ));
-                    set_source_unread(hwnd, hitem, true);
-                } else {
-                    // Feed opened/refreshed with no newly appended items: clear "new items" flag.
-                    // This keeps source-level status aligned with real incoming updates.
+
+                    // User expanded the feed and items are now loaded - mark as read
+                    // This updates last_seen_guid to the newest item
                     set_source_unread(hwnd, hitem, false);
                 }
-            } else {
+                prune_persisted_read_keys_for_source(hwnd, hitem);
+            }
+            Err(e) => {
+                let (message, cache) = match e {
+                    rss::FeedFetchError::HttpStatus {
+                        status,
+                        kind,
+                        cache,
+                    } => (format!("Feed error {status} ({kind})."), Some(cache)),
+                    rss::FeedFetchError::Network { message, cache } => {
+                        (format!("Error: {message}"), Some(cache))
+                    }
+                };
+
+                let is_source_node = with_rss_state(hwnd, |s| {
+                    s.node_data.contains_key(&hitem.0)
+                        && matches!(s.node_data[&hitem.0], NodeData::Source(_))
+                })
+                .unwrap_or(false);
+                if is_source_node {
+                    let idx = with_rss_state(hwnd, |s| {
+                        if let NodeData::Source(i) = s.node_data[&hitem.0] {
+                            Some(i)
+                        } else {
+                            None
+                        }
+                    })
+                    .flatten();
+                    if let (Some(i), Some(cache)) = (idx, cache) {
+                        let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                        with_state(parent, |ps| {
+                            if let Some(src) = ps.settings.rss_sources.get_mut(i) {
+                                src.cache = cache;
+                            }
+                            crate::settings::save_settings(ps.settings.clone());
+                        });
+                    }
+                }
+
+                let has_items = with_rss_state(hwnd, |s| s.source_items.contains_key(&hitem.0))
+                    .unwrap_or(false);
+                if has_items {
+                    return;
+                }
                 loop {
                     let child = SendMessageW(
                         hwnd_tree,
@@ -3968,132 +4085,28 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                     }
                     SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
                 }
-
-                let saved_read_item_keys: HashSet<String> = with_rss_state(hwnd, |s| {
-                    let source_index = match s.node_data.get(&hitem.0) {
-                        Some(NodeData::Source(index)) => Some(*index),
-                        _ => None,
-                    };
-                    with_state(s.parent, |ps| {
-                        source_index
-                            .and_then(|index| ps.settings.rss_sources.get(index))
-                            .map(|src| src.read_item_keys.iter().cloned().collect())
-                    })
-                    .flatten()
-                    .unwrap_or_default()
-                })
-                .unwrap_or_default();
-
                 with_rss_state(hwnd, |s| {
-                    let mut items: Vec<RssItem> = outcome
-                        .items
-                        .into_iter()
-                        .filter(|item| !removed_keys.contains(&rss_item_key(item)))
-                        .collect();
-                    // Keep a consistent chronological order for all RSS feeds.
-                    sort_items_by_date_desc(&mut items);
-                    s.source_items.insert(
-                        hitem.0,
-                        SourceItemsState {
-                            items,
-                            loaded: 0,
-                            read_item_keys: saved_read_item_keys,
-                        },
-                    );
+                    s.source_items.remove(&hitem.0);
                 });
-                let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-                let (initial_count, _next_count) = rss_page_sizes(parent);
-                log_debug(&format!(
-                    "rss_ui_batch start source={} append_count={} loaded_before=0 total_before=0",
-                    hitem.0, initial_count
-                ));
-                let inserted = load_more_items(hwnd, hitem, initial_count);
-                log_debug(&format!(
-                    "rss_ui_batch end source={} appended={}",
-                    hitem.0, inserted
-                ));
-
-                // User expanded the feed and items are now loaded - mark as read
-                // This updates last_seen_guid to the newest item
-                set_source_unread(hwnd, hitem, false);
-            }
-            prune_persisted_read_keys_for_source(hwnd, hitem);
-        }
-        Err(e) => {
-            let (message, cache) = match e {
-                rss::FeedFetchError::HttpStatus {
-                    status,
-                    kind,
-                    cache,
-                } => (format!("Feed error {status} ({kind})."), Some(cache)),
-                rss::FeedFetchError::Network { message, cache } => {
-                    (format!("Error: {message}"), Some(cache))
-                }
-            };
-
-            let is_source_node = with_rss_state(hwnd, |s| {
-                s.node_data.contains_key(&hitem.0)
-                    && matches!(s.node_data[&hitem.0], NodeData::Source(_))
-            })
-            .unwrap_or(false);
-            if is_source_node {
-                let idx = with_rss_state(hwnd, |s| {
-                    if let NodeData::Source(i) = s.node_data[&hitem.0] {
-                        Some(i)
-                    } else {
-                        None
-                    }
-                })
-                .flatten();
-                if let (Some(i), Some(cache)) = (idx, cache) {
-                    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-                    with_state(parent, |ps| {
-                        if let Some(src) = ps.settings.rss_sources.get_mut(i) {
-                            src.cache = cache;
-                        }
-                        crate::settings::save_settings(ps.settings.clone());
-                    });
-                }
-            }
-
-            let has_items =
-                with_rss_state(hwnd, |s| s.source_items.contains_key(&hitem.0)).unwrap_or(false);
-            if has_items {
-                return;
-            }
-            loop {
-                let child = SendMessageW(
-                    hwnd_tree,
-                    TVM_GETNEXTITEM,
-                    WPARAM(TVGN_CHILD as usize),
-                    LPARAM(hitem.0),
-                );
-                if child.0 == 0 {
-                    break;
-                }
-                SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
-            }
-            with_rss_state(hwnd, |s| {
-                s.source_items.remove(&hitem.0);
-            });
-            let text = to_wide(&message);
-            let mut tvis = TVINSERTSTRUCTW {
-                hParent: hitem,
-                hInsertAfter: TVI_LAST,
-                Anonymous: TVINSERTSTRUCTW_0 {
-                    item: TVITEMW {
-                        mask: TVIF_TEXT,
-                        pszText: windows::core::PWSTR(text.as_ptr() as *mut _),
-                        ..Default::default()
+                let text = to_wide(&message);
+                let mut tvis = TVINSERTSTRUCTW {
+                    hParent: hitem,
+                    hInsertAfter: TVI_LAST,
+                    Anonymous: TVINSERTSTRUCTW_0 {
+                        item: TVITEMW {
+                            mask: TVIF_TEXT,
+                            pszText: windows::core::PWSTR(text.as_ptr() as *mut _),
+                            ..Default::default()
+                        },
                     },
-                },
-            };
-            SendMessageW(
-                hwnd_tree,
-                TVM_INSERTITEMW,
-                WPARAM(0),
-                LPARAM(&mut tvis as *mut _ as isize),
-            );
+                };
+                SendMessageW(
+                    hwnd_tree,
+                    TVM_INSERTITEMW,
+                    WPARAM(0),
+                    LPARAM(&mut tvis as *mut _ as isize),
+                );
+            }
         }
     }
 }
@@ -4375,477 +4388,490 @@ fn handle_enter_action(hwnd: HWND, open_in_browser: bool) {
     }
 }
 
-unsafe fn handle_delete(hwnd: HWND) {
-    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-    let hitem = windows::Win32::UI::Controls::HTREEITEM(
-        unsafe {
+fn handle_delete(hwnd: HWND) {
+    unsafe {
+        let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+        let hitem = windows::Win32::UI::Controls::HTREEITEM(
             SendMessageW(
                 hwnd_tree,
                 TVM_GETNEXTITEM,
                 WPARAM(TVGN_CARET as usize),
                 LPARAM(0),
             )
+            .0,
+        );
+        if hitem.0 == 0 {
+            return;
         }
-        .0,
-    );
-    if hitem.0 == 0 {
-        return;
-    }
 
-    let selected_node = with_rss_state(hwnd, |s| s.node_data.get(&hitem.0).cloned()).flatten();
+        let selected_node = with_rss_state(hwnd, |s| s.node_data.get(&hitem.0).cloned()).flatten();
 
-    if let Some(NodeData::Source(idx)) = selected_node {
-        let source_info = with_rss_state(hwnd, |s| {
-            with_state(s.parent, |ps| ps.settings.rss_sources.get(idx).cloned()).flatten()
-        })
-        .flatten();
-        let (title, url) = source_info
-            .as_ref()
-            .map(|src| (src.title.clone(), src.url.clone()))
-            .unwrap_or_default();
-
-        // Localize message and title
-        let (language, require_confirm) = with_rss_state(hwnd, |s| {
-            with_state(s.parent, |ps| {
-                (
-                    ps.settings.language,
-                    matches!(
-                        ps.settings.rss_delete_confirm_mode,
-                        crate::settings::RssDeleteConfirmMode::Feed
-                            | crate::settings::RssDeleteConfirmMode::Both
-                    ),
-                )
+        if let Some(NodeData::Source(idx)) = selected_node {
+            let source_info = with_rss_state(hwnd, |s| {
+                with_state(s.parent, |ps| ps.settings.rss_sources.get(idx).cloned()).flatten()
             })
-            .unwrap_or((crate::settings::Language::default(), true))
-        })
-        .unwrap_or((crate::settings::Language::default(), true));
-        let msg_template = i18n::tr(language, "rss.delete_confirm");
-        let msg_text = msg_template.replace("{title}", &title);
-        let caption = i18n::tr(language, "rss.delete_title");
+            .flatten();
+            let (title, url) = source_info
+                .as_ref()
+                .map(|src| (src.title.clone(), src.url.clone()))
+                .unwrap_or_default();
 
-        let confirmed = if require_confirm {
-            MessageBoxW(
-                hwnd,
-                PCWSTR(to_wide(&msg_text).as_ptr()),
-                PCWSTR(to_wide(&caption).as_ptr()),
-                MB_YESNO | MB_ICONQUESTION,
-            ) == IDYES
-        } else {
-            true
-        };
-        if confirmed {
-            let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-            let mut default_removed_key_added: Option<String> = None;
-            let mut delayed_target_source_idx: Option<usize> = None;
-            with_state(parent, |ps| {
-                if matches!(
-                    language,
-                    crate::settings::Language::English
-                        | crate::settings::Language::Swedish
-                        | crate::settings::Language::Italian
-                        | crate::settings::Language::Spanish
-                        | crate::settings::Language::Portuguese
-                        | crate::settings::Language::Vietnamese
-                        | crate::settings::Language::Czech
-                        | crate::settings::Language::Polish
-                        | crate::settings::Language::French
-                        | crate::settings::Language::Serbian
-                ) {
-                    let defaults = load_default_feeds(language);
-                    if !defaults.is_empty() {
-                        let mut default_keys = HashSet::new();
-                        for (_title, url) in defaults {
-                            let key = normalize_rss_url_key(&url);
-                            if !key.is_empty() {
-                                default_keys.insert(key);
+            // Localize message and title
+            let (language, require_confirm) = with_rss_state(hwnd, |s| {
+                with_state(s.parent, |ps| {
+                    (
+                        ps.settings.language,
+                        matches!(
+                            ps.settings.rss_delete_confirm_mode,
+                            crate::settings::RssDeleteConfirmMode::Feed
+                                | crate::settings::RssDeleteConfirmMode::Both
+                        ),
+                    )
+                })
+                .unwrap_or((crate::settings::Language::default(), true))
+            })
+            .unwrap_or((crate::settings::Language::default(), true));
+            let msg_template = i18n::tr(language, "rss.delete_confirm");
+            let msg_text = msg_template.replace("{title}", &title);
+            let caption = i18n::tr(language, "rss.delete_title");
+
+            let confirmed = if require_confirm {
+                MessageBoxW(
+                    hwnd,
+                    PCWSTR(to_wide(&msg_text).as_ptr()),
+                    PCWSTR(to_wide(&caption).as_ptr()),
+                    MB_YESNO | MB_ICONQUESTION,
+                ) == IDYES
+            } else {
+                true
+            };
+            if confirmed {
+                let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                let mut default_removed_key_added: Option<String> = None;
+                let mut delayed_target_source_idx: Option<usize> = None;
+                with_state(parent, |ps| {
+                    if matches!(
+                        language,
+                        crate::settings::Language::English
+                            | crate::settings::Language::Swedish
+                            | crate::settings::Language::Italian
+                            | crate::settings::Language::Spanish
+                            | crate::settings::Language::Portuguese
+                            | crate::settings::Language::Vietnamese
+                            | crate::settings::Language::Czech
+                            | crate::settings::Language::Polish
+                            | crate::settings::Language::French
+                            | crate::settings::Language::Serbian
+                    ) {
+                        let defaults = load_default_feeds(language);
+                        if !defaults.is_empty() {
+                            let mut default_keys = HashSet::new();
+                            for (_title, url) in defaults {
+                                let key = normalize_rss_url_key(&url);
+                                if !key.is_empty() {
+                                    default_keys.insert(key);
+                                }
                             }
-                        }
-                        let key = normalize_rss_url_key(&url);
-                        if !key.is_empty() && default_keys.contains(&key) {
-                            let removed_list = match language {
-                                crate::settings::Language::Ukrainian
-                                | crate::settings::Language::English
-                                | crate::settings::Language::Lithuanian
-                                | crate::settings::Language::Chinese => {
-                                    &mut ps.settings.rss_removed_default_en
+                            let key = normalize_rss_url_key(&url);
+                            if !key.is_empty() && default_keys.contains(&key) {
+                                let removed_list = match language {
+                                    crate::settings::Language::Ukrainian
+                                    | crate::settings::Language::English
+                                    | crate::settings::Language::Lithuanian
+                                    | crate::settings::Language::Chinese => {
+                                        &mut ps.settings.rss_removed_default_en
+                                    }
+                                    crate::settings::Language::Swedish => {
+                                        &mut ps.settings.rss_removed_default_en
+                                    }
+                                    crate::settings::Language::Italian => {
+                                        &mut ps.settings.rss_removed_default_it
+                                    }
+                                    crate::settings::Language::Spanish => {
+                                        &mut ps.settings.rss_removed_default_es
+                                    }
+                                    crate::settings::Language::Portuguese => {
+                                        &mut ps.settings.rss_removed_default_pt
+                                    }
+                                    crate::settings::Language::Vietnamese => {
+                                        &mut ps.settings.rss_removed_default_vi
+                                    }
+                                    crate::settings::Language::Czech => {
+                                        &mut ps.settings.rss_removed_default_en
+                                    }
+                                    crate::settings::Language::Polish => {
+                                        &mut ps.settings.rss_removed_default_pl
+                                    }
+                                    crate::settings::Language::French => {
+                                        &mut ps.settings.rss_removed_default_fr
+                                    }
+                                    crate::settings::Language::Serbian => {
+                                        &mut ps.settings.rss_removed_default_sr
+                                    }
+                                };
+                                let already =
+                                    removed_list.iter().any(|u| normalize_rss_url_key(u) == key);
+                                if !already {
+                                    removed_list.push(key.clone());
+                                    default_removed_key_added = Some(key);
                                 }
-                                crate::settings::Language::Swedish => {
-                                    &mut ps.settings.rss_removed_default_en
-                                }
-                                crate::settings::Language::Italian => {
-                                    &mut ps.settings.rss_removed_default_it
-                                }
-                                crate::settings::Language::Spanish => {
-                                    &mut ps.settings.rss_removed_default_es
-                                }
-                                crate::settings::Language::Portuguese => {
-                                    &mut ps.settings.rss_removed_default_pt
-                                }
-                                crate::settings::Language::Vietnamese => {
-                                    &mut ps.settings.rss_removed_default_vi
-                                }
-                                crate::settings::Language::Czech => {
-                                    &mut ps.settings.rss_removed_default_en
-                                }
-                                crate::settings::Language::Polish => {
-                                    &mut ps.settings.rss_removed_default_pl
-                                }
-                                crate::settings::Language::French => {
-                                    &mut ps.settings.rss_removed_default_fr
-                                }
-                                crate::settings::Language::Serbian => {
-                                    &mut ps.settings.rss_removed_default_sr
-                                }
-                            };
-                            let already =
-                                removed_list.iter().any(|u| normalize_rss_url_key(u) == key);
-                            if !already {
-                                removed_list.push(key.clone());
-                                default_removed_key_added = Some(key);
                             }
                         }
                     }
-                }
-                ps.settings.rss_sources.remove(idx);
-                delayed_target_source_idx = if ps.settings.rss_sources.is_empty() {
-                    None
-                } else if idx > 0 {
-                    Some(idx - 1)
-                } else {
-                    Some(0)
-                };
-                crate::settings::save_settings(ps.settings.clone());
-            });
-            with_rss_state(hwnd, |s| s.suppress_tree_selection_events = true);
-            SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(0), LPARAM(0));
-            reload_tree(hwnd);
-            SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(1), LPARAM(0));
-            with_rss_state(hwnd, |s| s.suppress_tree_selection_events = false);
-            if let Some(source) = source_info {
-                with_rss_state(hwnd, |s| {
-                    s.removed_history.push(RssLastRemoved::Source {
-                        index: idx,
-                        source,
-                        language,
-                        default_removed_key_added,
-                    });
+                    ps.settings.rss_sources.remove(idx);
+                    delayed_target_source_idx = if ps.settings.rss_sources.is_empty() {
+                        None
+                    } else if idx > 0 {
+                        Some(idx - 1)
+                    } else {
+                        Some(0)
+                    };
+                    crate::settings::save_settings(ps.settings.clone());
                 });
+                with_rss_state(hwnd, |s| s.suppress_tree_selection_events = true);
+                SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(0), LPARAM(0));
+                reload_tree(hwnd);
+                SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(1), LPARAM(0));
+                with_rss_state(hwnd, |s| s.suppress_tree_selection_events = false);
+                if let Some(source) = source_info {
+                    with_rss_state(hwnd, |s| {
+                        s.removed_history.push(RssLastRemoved::Source {
+                            index: idx,
+                            source,
+                            language,
+                            default_removed_key_added,
+                        });
+                    });
+                }
+                announce_rss_status(&i18n::tr(language, "rss.removed"));
+                if let Some(target_idx) = delayed_target_source_idx {
+                    schedule_delayed_source_select(hwnd, target_idx);
+                }
             }
-            announce_rss_status(&i18n::tr(language, "rss.removed"));
-            if let Some(target_idx) = delayed_target_source_idx {
-                schedule_delayed_source_select(hwnd, target_idx);
+        } else if let Some(NodeData::Item(item)) = selected_node {
+            let (language, require_confirm) = with_rss_state(hwnd, |s| {
+                with_state(s.parent, |ps| {
+                    (
+                        ps.settings.language,
+                        matches!(
+                            ps.settings.rss_delete_confirm_mode,
+                            crate::settings::RssDeleteConfirmMode::Article
+                                | crate::settings::RssDeleteConfirmMode::Both
+                        ),
+                    )
+                })
+                .unwrap_or((crate::settings::Language::default(), true))
+            })
+            .unwrap_or((crate::settings::Language::default(), true));
+            let title = if item.title.trim().is_empty() {
+                item.link.clone()
+            } else {
+                item.title.clone()
+            };
+            let msg_template = i18n::tr(language, "rss.delete_confirm");
+            let msg_text = msg_template.replace("{title}", &title);
+            let caption = i18n::tr(language, "rss.delete_title");
+            let confirmed = if require_confirm {
+                MessageBoxW(
+                    hwnd,
+                    PCWSTR(to_wide(&msg_text).as_ptr()),
+                    PCWSTR(to_wide(&caption).as_ptr()),
+                    MB_YESNO | MB_ICONQUESTION,
+                ) == IDYES
+            } else {
+                true
+            };
+            if confirmed {
+                let parent_item = windows::Win32::UI::Controls::HTREEITEM(
+                    SendMessageW(
+                        hwnd_tree,
+                        TVM_GETNEXTITEM,
+                        WPARAM(TVGN_PARENT as usize),
+                        LPARAM(hitem.0),
+                    )
+                    .0,
+                );
+                let next_sibling = windows::Win32::UI::Controls::HTREEITEM(
+                    SendMessageW(
+                        hwnd_tree,
+                        TVM_GETNEXTITEM,
+                        WPARAM(windows::Win32::UI::Controls::TVGN_NEXT as usize),
+                        LPARAM(hitem.0),
+                    )
+                    .0,
+                );
+                let prev_sibling = windows::Win32::UI::Controls::HTREEITEM(
+                    SendMessageW(
+                        hwnd_tree,
+                        TVM_GETNEXTITEM,
+                        WPARAM(windows::Win32::UI::Controls::TVGN_PREVIOUS as usize),
+                        LPARAM(hitem.0),
+                    )
+                    .0,
+                );
+                let key = rss_item_key(&item);
+                let mut source_idx_for_undo: Option<usize> = None;
+                let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                if parent.0 != 0 {
+                    let source_index =
+                        with_rss_state(hwnd, |s| match s.node_data.get(&parent_item.0) {
+                            Some(NodeData::Source(idx)) => Some(*idx),
+                            _ => None,
+                        })
+                        .flatten();
+                    if let Some(source_idx) = source_index {
+                        source_idx_for_undo = Some(source_idx);
+                        with_state(parent, |ps| {
+                            if let Some(src) = ps.settings.rss_sources.get_mut(source_idx)
+                                && !src.removed_item_keys.iter().any(|k| k == &key)
+                            {
+                                src.removed_item_keys.push(key.clone());
+                                crate::settings::save_settings(ps.settings.clone());
+                            }
+                        });
+                    }
+                }
+                let mut removed_position: Option<usize> = None;
+                with_rss_state(hwnd, |s| {
+                    s.node_data.remove(&hitem.0);
+                    if parent_item.0 != 0
+                        && let Some(state) = s.source_items.get_mut(&parent_item.0)
+                        && let Some(pos) = state.items.iter().position(|x| rss_item_key(x) == key)
+                    {
+                        removed_position = Some(pos);
+                        state.items.remove(pos);
+                        state.loaded = state.loaded.saturating_sub(1);
+                    }
+                });
+                SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(hitem.0));
+                let next_exists = next_sibling.0 != 0
+                    && with_rss_state(hwnd, |s| s.node_data.contains_key(&next_sibling.0))
+                        .unwrap_or(false);
+                let prev_exists = prev_sibling.0 != 0
+                    && with_rss_state(hwnd, |s| s.node_data.contains_key(&prev_sibling.0))
+                        .unwrap_or(false);
+                if next_exists {
+                    SendMessageW(
+                        hwnd_tree,
+                        TVM_SELECTITEM,
+                        WPARAM(TVGN_CARET as usize),
+                        LPARAM(next_sibling.0),
+                    );
+                } else if prev_exists {
+                    SendMessageW(
+                        hwnd_tree,
+                        TVM_SELECTITEM,
+                        WPARAM(TVGN_CARET as usize),
+                        LPARAM(prev_sibling.0),
+                    );
+                } else if parent_item.0 != 0 {
+                    SendMessageW(
+                        hwnd_tree,
+                        TVM_SELECTITEM,
+                        WPARAM(TVGN_CARET as usize),
+                        LPARAM(parent_item.0),
+                    );
+                }
+                if let (Some(source_index), Some(position)) =
+                    (source_idx_for_undo, removed_position)
+                {
+                    with_rss_state(hwnd, |s| {
+                        s.removed_history.push(RssLastRemoved::Item {
+                            source_index,
+                            item,
+                            key,
+                            position,
+                        });
+                    });
+                }
+                announce_rss_status(&i18n::tr(language, "rss.article_removed"));
             }
         }
-    } else if let Some(NodeData::Item(item)) = selected_node {
-        let (language, require_confirm) = with_rss_state(hwnd, |s| {
-            with_state(s.parent, |ps| {
-                (
-                    ps.settings.language,
-                    matches!(
-                        ps.settings.rss_delete_confirm_mode,
-                        crate::settings::RssDeleteConfirmMode::Article
-                            | crate::settings::RssDeleteConfirmMode::Both
-                    ),
-                )
-            })
-            .unwrap_or((crate::settings::Language::default(), true))
-        })
-        .unwrap_or((crate::settings::Language::default(), true));
-        let title = if item.title.trim().is_empty() {
-            item.link.clone()
-        } else {
-            item.title.clone()
+        if hwnd_tree.0 != 0 && GetFocus() != hwnd_tree {
+            with_rss_state(hwnd, |s| s.suppress_focus_restore_once = true);
+            SetFocus(hwnd_tree);
+        }
+    }
+}
+
+fn undo_last_delete(hwnd: HWND) {
+    unsafe {
+        let Some(last_removed) = with_rss_state(hwnd, |s| s.removed_history.pop()).flatten() else {
+            return;
         };
-        let msg_template = i18n::tr(language, "rss.delete_confirm");
-        let msg_text = msg_template.replace("{title}", &title);
-        let caption = i18n::tr(language, "rss.delete_title");
-        let confirmed = if require_confirm {
-            MessageBoxW(
-                hwnd,
-                PCWSTR(to_wide(&msg_text).as_ptr()),
-                PCWSTR(to_wide(&caption).as_ptr()),
-                MB_YESNO | MB_ICONQUESTION,
-            ) == IDYES
-        } else {
-            true
-        };
-        if confirmed {
-            let parent_item = windows::Win32::UI::Controls::HTREEITEM(
-                SendMessageW(
-                    hwnd_tree,
-                    TVM_GETNEXTITEM,
-                    WPARAM(TVGN_PARENT as usize),
-                    LPARAM(hitem.0),
-                )
-                .0,
-            );
-            let next_sibling = windows::Win32::UI::Controls::HTREEITEM(
-                SendMessageW(
-                    hwnd_tree,
-                    TVM_GETNEXTITEM,
-                    WPARAM(windows::Win32::UI::Controls::TVGN_NEXT as usize),
-                    LPARAM(hitem.0),
-                )
-                .0,
-            );
-            let prev_sibling = windows::Win32::UI::Controls::HTREEITEM(
-                SendMessageW(
-                    hwnd_tree,
-                    TVM_GETNEXTITEM,
-                    WPARAM(windows::Win32::UI::Controls::TVGN_PREVIOUS as usize),
-                    LPARAM(hitem.0),
-                )
-                .0,
-            );
-            let key = rss_item_key(&item);
-            let mut source_idx_for_undo: Option<usize> = None;
-            let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-            if parent.0 != 0 {
-                let source_index =
-                    with_rss_state(hwnd, |s| match s.node_data.get(&parent_item.0) {
-                        Some(NodeData::Source(idx)) => Some(*idx),
-                        _ => None,
-                    })
-                    .flatten();
-                if let Some(source_idx) = source_index {
-                    source_idx_for_undo = Some(source_idx);
+
+        match last_removed {
+            RssLastRemoved::Source {
+                index,
+                source,
+                language,
+                default_removed_key_added,
+            } => {
+                let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                if parent.0 == 0 {
+                    return;
+                }
+                let mut restored_index = index;
+                with_state(parent, |ps| {
+                    let insert_at = index.min(ps.settings.rss_sources.len());
+                    restored_index = insert_at;
+                    ps.settings.rss_sources.insert(insert_at, source);
+                    if let Some(key) = default_removed_key_added {
+                        let removed_list = match language {
+                            crate::settings::Language::Ukrainian
+                            | crate::settings::Language::English
+                            | crate::settings::Language::Lithuanian
+                            | crate::settings::Language::Chinese => {
+                                &mut ps.settings.rss_removed_default_en
+                            }
+                            crate::settings::Language::Swedish => {
+                                &mut ps.settings.rss_removed_default_en
+                            }
+                            crate::settings::Language::Italian => {
+                                &mut ps.settings.rss_removed_default_it
+                            }
+                            crate::settings::Language::Spanish => {
+                                &mut ps.settings.rss_removed_default_es
+                            }
+                            crate::settings::Language::Portuguese => {
+                                &mut ps.settings.rss_removed_default_pt
+                            }
+                            crate::settings::Language::Vietnamese => {
+                                &mut ps.settings.rss_removed_default_vi
+                            }
+                            crate::settings::Language::Czech => {
+                                &mut ps.settings.rss_removed_default_en
+                            }
+                            crate::settings::Language::Polish => {
+                                &mut ps.settings.rss_removed_default_pl
+                            }
+                            crate::settings::Language::French => {
+                                &mut ps.settings.rss_removed_default_fr
+                            }
+                            crate::settings::Language::Serbian => {
+                                &mut ps.settings.rss_removed_default_sr
+                            }
+                        };
+                        removed_list.retain(|u| normalize_rss_url_key(u) != key);
+                    }
+                    crate::settings::save_settings(ps.settings.clone());
+                })
+                .unwrap_or(());
+
+                let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+                with_rss_state(hwnd, |s| s.suppress_tree_selection_events = true);
+                if hwnd_tree.0 != 0 {
+                    SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(0), LPARAM(0));
+                }
+                reload_tree(hwnd);
+                if hwnd_tree.0 != 0 {
+                    SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(1), LPARAM(0));
+                    with_rss_state(hwnd, |s| s.suppress_tree_selection_events = false);
+                    if GetFocus() != hwnd_tree {
+                        with_rss_state(hwnd, |s| s.suppress_focus_restore_once = true);
+                        SetFocus(hwnd_tree);
+                    }
+                } else {
+                    with_rss_state(hwnd, |s| s.suppress_tree_selection_events = false);
+                }
+                schedule_delayed_source_select(hwnd, restored_index);
+            }
+            RssLastRemoved::Item {
+                source_index,
+                item,
+                key,
+                position,
+            } => {
+                let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                if parent.0 != 0 {
                     with_state(parent, |ps| {
-                        if let Some(src) = ps.settings.rss_sources.get_mut(source_idx)
-                            && !src.removed_item_keys.iter().any(|k| k == &key)
-                        {
-                            src.removed_item_keys.push(key.clone());
+                        if let Some(src) = ps.settings.rss_sources.get_mut(source_index) {
+                            src.removed_item_keys.retain(|k| k != &key);
                             crate::settings::save_settings(ps.settings.clone());
                         }
                     });
                 }
-            }
-            let mut removed_position: Option<usize> = None;
-            with_rss_state(hwnd, |s| {
-                s.node_data.remove(&hitem.0);
-                if parent_item.0 != 0
-                    && let Some(state) = s.source_items.get_mut(&parent_item.0)
-                    && let Some(pos) = state.items.iter().position(|x| rss_item_key(x) == key)
-                {
-                    removed_position = Some(pos);
-                    state.items.remove(pos);
-                    state.loaded = state.loaded.saturating_sub(1);
-                }
-            });
-            SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(hitem.0));
-            let next_exists = next_sibling.0 != 0
-                && with_rss_state(hwnd, |s| s.node_data.contains_key(&next_sibling.0))
-                    .unwrap_or(false);
-            let prev_exists = prev_sibling.0 != 0
-                && with_rss_state(hwnd, |s| s.node_data.contains_key(&prev_sibling.0))
-                    .unwrap_or(false);
-            if next_exists {
-                SendMessageW(
-                    hwnd_tree,
-                    TVM_SELECTITEM,
-                    WPARAM(TVGN_CARET as usize),
-                    LPARAM(next_sibling.0),
-                );
-            } else if prev_exists {
-                SendMessageW(
-                    hwnd_tree,
-                    TVM_SELECTITEM,
-                    WPARAM(TVGN_CARET as usize),
-                    LPARAM(prev_sibling.0),
-                );
-            } else if parent_item.0 != 0 {
-                SendMessageW(
-                    hwnd_tree,
-                    TVM_SELECTITEM,
-                    WPARAM(TVGN_CARET as usize),
-                    LPARAM(parent_item.0),
-                );
-            }
-            if let (Some(source_index), Some(position)) = (source_idx_for_undo, removed_position) {
-                with_rss_state(hwnd, |s| {
-                    s.removed_history.push(RssLastRemoved::Item {
-                        source_index,
-                        item,
-                        key,
-                        position,
-                    });
-                });
-            }
-            announce_rss_status(&i18n::tr(language, "rss.article_removed"));
-        }
-    }
-    if hwnd_tree.0 != 0 && GetFocus() != hwnd_tree {
-        with_rss_state(hwnd, |s| s.suppress_focus_restore_once = true);
-        SetFocus(hwnd_tree);
-    }
-}
 
-unsafe fn undo_last_delete(hwnd: HWND) {
-    let Some(last_removed) = with_rss_state(hwnd, |s| s.removed_history.pop()).flatten() else {
-        return;
-    };
-
-    match last_removed {
-        RssLastRemoved::Source {
-            index,
-            source,
-            language,
-            default_removed_key_added,
-        } => {
-            let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-            if parent.0 == 0 {
-                return;
-            }
-            let mut restored_index = index;
-            with_state(parent, |ps| {
-                let insert_at = index.min(ps.settings.rss_sources.len());
-                restored_index = insert_at;
-                ps.settings.rss_sources.insert(insert_at, source);
-                if let Some(key) = default_removed_key_added {
-                    let removed_list = match language {
-                        crate::settings::Language::Ukrainian
-                        | crate::settings::Language::English
-                        | crate::settings::Language::Lithuanian
-                        | crate::settings::Language::Chinese => {
-                            &mut ps.settings.rss_removed_default_en
+                let source_hitem = with_rss_state(hwnd, |s| {
+                    s.node_data.iter().find_map(|(&h, node)| match node {
+                        NodeData::Source(i) if *i == source_index => {
+                            Some(windows::Win32::UI::Controls::HTREEITEM(h))
                         }
-                        crate::settings::Language::Swedish => {
-                            &mut ps.settings.rss_removed_default_en
-                        }
-                        crate::settings::Language::Italian => {
-                            &mut ps.settings.rss_removed_default_it
-                        }
-                        crate::settings::Language::Spanish => {
-                            &mut ps.settings.rss_removed_default_es
-                        }
-                        crate::settings::Language::Portuguese => {
-                            &mut ps.settings.rss_removed_default_pt
-                        }
-                        crate::settings::Language::Vietnamese => {
-                            &mut ps.settings.rss_removed_default_vi
-                        }
-                        crate::settings::Language::Czech => &mut ps.settings.rss_removed_default_en,
-                        crate::settings::Language::Polish => {
-                            &mut ps.settings.rss_removed_default_pl
-                        }
-                        crate::settings::Language::French => {
-                            &mut ps.settings.rss_removed_default_fr
-                        }
-                        crate::settings::Language::Serbian => {
-                            &mut ps.settings.rss_removed_default_sr
-                        }
-                    };
-                    removed_list.retain(|u| normalize_rss_url_key(u) != key);
-                }
-                crate::settings::save_settings(ps.settings.clone());
-            })
-            .unwrap_or(());
-
-            let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-            with_rss_state(hwnd, |s| s.suppress_tree_selection_events = true);
-            if hwnd_tree.0 != 0 {
-                SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(0), LPARAM(0));
-            }
-            reload_tree(hwnd);
-            if hwnd_tree.0 != 0 {
-                SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(1), LPARAM(0));
-                with_rss_state(hwnd, |s| s.suppress_tree_selection_events = false);
-                if GetFocus() != hwnd_tree {
-                    with_rss_state(hwnd, |s| s.suppress_focus_restore_once = true);
-                    SetFocus(hwnd_tree);
-                }
-            } else {
-                with_rss_state(hwnd, |s| s.suppress_tree_selection_events = false);
-            }
-            schedule_delayed_source_select(hwnd, restored_index);
-        }
-        RssLastRemoved::Item {
-            source_index,
-            item,
-            key,
-            position,
-        } => {
-            let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-            if parent.0 != 0 {
-                with_state(parent, |ps| {
-                    if let Some(src) = ps.settings.rss_sources.get_mut(source_index) {
-                        src.removed_item_keys.retain(|k| k != &key);
-                        crate::settings::save_settings(ps.settings.clone());
-                    }
-                });
-            }
-
-            let source_hitem = with_rss_state(hwnd, |s| {
-                s.node_data.iter().find_map(|(&h, node)| match node {
-                    NodeData::Source(i) if *i == source_index => {
-                        Some(windows::Win32::UI::Controls::HTREEITEM(h))
-                    }
-                    _ => None,
+                        _ => None,
+                    })
                 })
-            })
-            .flatten();
+                .flatten();
 
-            let Some(source_hitem) = source_hitem else {
-                return;
-            };
+                let Some(source_hitem) = source_hitem else {
+                    return;
+                };
 
-            let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-            let mut show_in_tree = false;
-            with_rss_state(hwnd, |s| {
-                if let Some(state) = s.source_items.get_mut(&source_hitem.0) {
-                    let insert_at = position.min(state.items.len());
-                    if state.loaded > 0 && insert_at <= state.loaded {
-                        state.loaded += 1;
-                        show_in_tree = true;
+                let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+                let mut show_in_tree = false;
+                with_rss_state(hwnd, |s| {
+                    if let Some(state) = s.source_items.get_mut(&source_hitem.0) {
+                        let insert_at = position.min(state.items.len());
+                        if state.loaded > 0 && insert_at <= state.loaded {
+                            state.loaded += 1;
+                            show_in_tree = true;
+                        }
+                        state.items.insert(insert_at, item.clone());
                     }
-                    state.items.insert(insert_at, item.clone());
-                }
-            });
+                });
 
-            if show_in_tree && hwnd_tree.0 != 0 {
-                with_rss_state(hwnd, |s| s.suppress_tree_selection_events = true);
-                // Rebuild loaded children to preserve exact order after undo.
-                SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(0), LPARAM(0));
-                SendMessageW(
-                    hwnd_tree,
-                    TVM_SELECTITEM,
-                    WPARAM(TVGN_CARET as usize),
-                    LPARAM(source_hitem.0),
-                );
-                loop {
-                    let child = windows::Win32::UI::Controls::HTREEITEM(
-                        SendMessageW(
-                            hwnd_tree,
-                            TVM_GETNEXTITEM,
-                            WPARAM(TVGN_CHILD as usize),
-                            LPARAM(source_hitem.0),
-                        )
-                        .0,
+                if show_in_tree && hwnd_tree.0 != 0 {
+                    with_rss_state(hwnd, |s| s.suppress_tree_selection_events = true);
+                    // Rebuild loaded children to preserve exact order after undo.
+                    SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(0), LPARAM(0));
+                    SendMessageW(
+                        hwnd_tree,
+                        TVM_SELECTITEM,
+                        WPARAM(TVGN_CARET as usize),
+                        LPARAM(source_hitem.0),
                     );
-                    if child.0 == 0 {
-                        break;
+                    loop {
+                        let child = windows::Win32::UI::Controls::HTREEITEM(
+                            SendMessageW(
+                                hwnd_tree,
+                                TVM_GETNEXTITEM,
+                                WPARAM(TVGN_CHILD as usize),
+                                LPARAM(source_hitem.0),
+                            )
+                            .0,
+                        );
+                        if child.0 == 0 {
+                            break;
+                        }
+                        with_rss_state(hwnd, |s| {
+                            s.node_data.remove(&child.0);
+                        });
+                        SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
                     }
-                    with_rss_state(hwnd, |s| {
-                        s.node_data.remove(&child.0);
-                    });
-                    SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
-                }
 
-                let mut restored_hitem = windows::Win32::UI::Controls::HTREEITEM(0);
-                let (
-                    language,
-                    announce_unread,
-                    unread_label_position,
-                    rss_date_mode,
-                    rss_time_mode,
-                ) = with_rss_state(hwnd, |s| {
-                    with_state(s.parent, |ps| {
-                        (
-                            ps.settings.language,
-                            ps.settings.announce_unread_rss_podcast_items,
-                            ps.settings.rss_podcast_unread_label_position,
-                            ps.settings.rss_articles_date_display,
-                            ps.settings.rss_articles_time_display,
-                        )
+                    let mut restored_hitem = windows::Win32::UI::Controls::HTREEITEM(0);
+                    let (
+                        language,
+                        announce_unread,
+                        unread_label_position,
+                        rss_date_mode,
+                        rss_time_mode,
+                    ) = with_rss_state(hwnd, |s| {
+                        with_state(s.parent, |ps| {
+                            (
+                                ps.settings.language,
+                                ps.settings.announce_unread_rss_podcast_items,
+                                ps.settings.rss_podcast_unread_label_position,
+                                ps.settings.rss_articles_date_display,
+                                ps.settings.rss_articles_time_display,
+                            )
+                        })
+                        .unwrap_or((
+                            crate::settings::Language::English,
+                            true,
+                            crate::settings::RssPodcastUnreadLabelPosition::Before,
+                            ListDateDisplayMode::Always,
+                            ListTimeDisplayMode::Always,
+                        ))
                     })
                     .unwrap_or((
                         crate::settings::Language::English,
@@ -4853,109 +4879,103 @@ unsafe fn undo_last_delete(hwnd: HWND) {
                         crate::settings::RssPodcastUnreadLabelPosition::Before,
                         ListDateDisplayMode::Always,
                         ListTimeDisplayMode::Always,
-                    ))
-                })
-                .unwrap_or((
-                    crate::settings::Language::English,
-                    true,
-                    crate::settings::RssPodcastUnreadLabelPosition::Before,
-                    ListDateDisplayMode::Always,
-                    ListTimeDisplayMode::Always,
-                ));
-                with_rss_state(hwnd, |s| {
-                    if let Some(state) = s.source_items.get(&source_hitem.0) {
-                        let day_counts = build_day_counts(&state.items);
-                        for entry in state.items.iter().take(state.loaded) {
-                            if entry.title.trim().is_empty() {
-                                continue;
-                            }
-                            let item_unread = !state.read_item_keys.contains(&rss_item_key(entry));
-                            let display_title = rss_item_display_title(
-                                &entry.title,
-                                language,
-                                announce_unread,
-                                item_unread,
-                                entry.pub_date,
-                                unread_label_position,
-                                rss_date_mode,
-                                rss_time_mode,
-                                has_multiple_items_same_day(entry.pub_date, &day_counts),
-                            );
-                            let text = to_wide(&display_title);
-                            let mut tvis = TVINSERTSTRUCTW {
-                                hParent: source_hitem,
-                                hInsertAfter: TVI_LAST,
-                                Anonymous: TVINSERTSTRUCTW_0 {
-                                    item: TVITEMW {
-                                        mask: TVIF_TEXT
-                                            | TVIF_PARAM
-                                            | windows::Win32::UI::Controls::TVIF_CHILDREN,
-                                        pszText: windows::core::PWSTR(text.as_ptr() as *mut _),
-                                        cChildren: TVITEMEXW_CHILDREN(if entry.is_folder {
-                                            1
-                                        } else {
-                                            0
-                                        }),
-                                        lParam: LPARAM(0),
-                                        ..Default::default()
+                    ));
+                    with_rss_state(hwnd, |s| {
+                        if let Some(state) = s.source_items.get(&source_hitem.0) {
+                            let day_counts = build_day_counts(&state.items);
+                            for entry in state.items.iter().take(state.loaded) {
+                                if entry.title.trim().is_empty() {
+                                    continue;
+                                }
+                                let item_unread =
+                                    !state.read_item_keys.contains(&rss_item_key(entry));
+                                let display_title = rss_item_display_title(
+                                    &entry.title,
+                                    language,
+                                    announce_unread,
+                                    item_unread,
+                                    entry.pub_date,
+                                    unread_label_position,
+                                    rss_date_mode,
+                                    rss_time_mode,
+                                    has_multiple_items_same_day(entry.pub_date, &day_counts),
+                                );
+                                let text = to_wide(&display_title);
+                                let mut tvis = TVINSERTSTRUCTW {
+                                    hParent: source_hitem,
+                                    hInsertAfter: TVI_LAST,
+                                    Anonymous: TVINSERTSTRUCTW_0 {
+                                        item: TVITEMW {
+                                            mask: TVIF_TEXT
+                                                | TVIF_PARAM
+                                                | windows::Win32::UI::Controls::TVIF_CHILDREN,
+                                            pszText: windows::core::PWSTR(text.as_ptr() as *mut _),
+                                            cChildren: TVITEMEXW_CHILDREN(if entry.is_folder {
+                                                1
+                                            } else {
+                                                0
+                                            }),
+                                            lParam: LPARAM(0),
+                                            ..Default::default()
+                                        },
                                     },
-                                },
-                            };
-                            let hchild = windows::Win32::UI::Controls::HTREEITEM(
-                                SendMessageW(
-                                    hwnd_tree,
-                                    TVM_INSERTITEMW,
-                                    WPARAM(0),
-                                    LPARAM(&mut tvis as *mut _ as isize),
-                                )
-                                .0,
-                            );
-                            if hchild.0 != 0 {
-                                s.node_data.insert(hchild.0, NodeData::Item(entry.clone()));
-                                if rss_item_key(entry) == key {
-                                    restored_hitem = hchild;
+                                };
+                                let hchild = windows::Win32::UI::Controls::HTREEITEM(
+                                    SendMessageW(
+                                        hwnd_tree,
+                                        TVM_INSERTITEMW,
+                                        WPARAM(0),
+                                        LPARAM(&mut tvis as *mut _ as isize),
+                                    )
+                                    .0,
+                                );
+                                if hchild.0 != 0 {
+                                    s.node_data.insert(hchild.0, NodeData::Item(entry.clone()));
+                                    if rss_item_key(entry) == key {
+                                        restored_hitem = hchild;
+                                    }
                                 }
                             }
                         }
+                    });
+                    SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(1), LPARAM(0));
+                    with_rss_state(hwnd, |s| s.suppress_tree_selection_events = false);
+                    if restored_hitem.0 != 0 {
+                        SendMessageW(
+                            hwnd_tree,
+                            TVM_SELECTITEM,
+                            WPARAM(TVGN_CARET as usize),
+                            LPARAM(restored_hitem.0),
+                        );
+                        SendMessageW(
+                            hwnd_tree,
+                            TVM_ENSUREVISIBLE,
+                            WPARAM(0),
+                            LPARAM(restored_hitem.0),
+                        );
+                    } else {
+                        SendMessageW(
+                            hwnd_tree,
+                            TVM_SELECTITEM,
+                            WPARAM(TVGN_CARET as usize),
+                            LPARAM(source_hitem.0),
+                        );
                     }
-                });
-                SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(1), LPARAM(0));
-                with_rss_state(hwnd, |s| s.suppress_tree_selection_events = false);
-                if restored_hitem.0 != 0 {
-                    SendMessageW(
-                        hwnd_tree,
-                        TVM_SELECTITEM,
-                        WPARAM(TVGN_CARET as usize),
-                        LPARAM(restored_hitem.0),
-                    );
-                    SendMessageW(
-                        hwnd_tree,
-                        TVM_ENSUREVISIBLE,
-                        WPARAM(0),
-                        LPARAM(restored_hitem.0),
-                    );
-                } else {
+                    if GetFocus() != hwnd_tree {
+                        with_rss_state(hwnd, |s| s.suppress_focus_restore_once = true);
+                        SetFocus(hwnd_tree);
+                    }
+                } else if hwnd_tree.0 != 0 {
                     SendMessageW(
                         hwnd_tree,
                         TVM_SELECTITEM,
                         WPARAM(TVGN_CARET as usize),
                         LPARAM(source_hitem.0),
                     );
-                }
-                if GetFocus() != hwnd_tree {
-                    with_rss_state(hwnd, |s| s.suppress_focus_restore_once = true);
-                    SetFocus(hwnd_tree);
-                }
-            } else if hwnd_tree.0 != 0 {
-                SendMessageW(
-                    hwnd_tree,
-                    TVM_SELECTITEM,
-                    WPARAM(TVGN_CARET as usize),
-                    LPARAM(source_hitem.0),
-                );
-                if GetFocus() != hwnd_tree {
-                    with_rss_state(hwnd, |s| s.suppress_focus_restore_once = true);
-                    SetFocus(hwnd_tree);
+                    if GetFocus() != hwnd_tree {
+                        with_rss_state(hwnd, |s| s.suppress_focus_restore_once = true);
+                        SetFocus(hwnd_tree);
+                    }
                 }
             }
         }
@@ -5921,149 +5941,149 @@ unsafe extern "system" fn search_keyword_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "search_keyword_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { search_keyword_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || search_keyword_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn search_keyword_wndproc_inner(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let cs = lparam.0 as *const CREATESTRUCTW;
-            let init_ptr = (*cs).lpCreateParams as *mut SearchDialogInit;
-            let parent = if init_ptr.is_null() {
-                HWND(0)
-            } else {
-                let init = Box::from_raw(init_ptr);
-                init.parent
-            };
-            let main_hwnd = with_rss_state(parent, |s| s.parent).unwrap_or(HWND(0));
-            let language = with_state(main_hwnd, |s| s.settings.language).unwrap_or_default();
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, parent.0);
-
-            let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-            let keyword_label = tr_or(language, "rss.search_dialog.keyword_label", "Keyword:");
-            CreateWindowExW(
-                Default::default(),
-                w!("STATIC"),
-                PCWSTR(to_wide(&keyword_label).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                10,
-                12,
-                390,
-                18,
-                hwnd,
-                HMENU(1601),
-                hinstance,
-                None,
-            );
-            let edit = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                10,
-                34,
-                390,
-                24,
-                hwnd,
-                HMENU(SEARCH_EDIT_ID as isize),
-                hinstance,
-                None,
-            );
-            CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&i18n::tr(language, "rss.dialog.ok")).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                220,
-                80,
-                85,
-                28,
-                hwnd,
-                HMENU(SEARCH_OK_ID as isize),
-                hinstance,
-                None,
-            );
-            CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&i18n::tr(language, "rss.dialog.cancel")).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                315,
-                80,
-                85,
-                28,
-                hwnd,
-                HMENU(SEARCH_CANCEL_ID as isize),
-                hinstance,
-                None,
-            );
-            let ok = GetDlgItem(hwnd, SEARCH_OK_ID as i32);
-            let cancel = GetDlgItem(hwnd, SEARCH_CANCEL_ID as i32);
-            let proc_ptr = reorder_control_subclass_proc as *const () as usize;
-            for control in [edit, ok, cancel] {
-                let prev = SetWindowLongPtrW(control, GWLP_WNDPROC, proc_ptr as isize);
-                SetWindowLongPtrW(control, GWLP_USERDATA, prev);
-            }
-            SetFocus(edit);
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-            let id = wparam.0 & 0xffff;
-            if id == SEARCH_CANCEL_ID || id == 2 {
-                crate::log_if_err!(DestroyWindow(hwnd));
-                return LRESULT(0);
-            }
-            if id == SEARCH_OK_ID || id == 1 {
-                let parent = HWND(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+fn search_keyword_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let cs = lparam.0 as *const CREATESTRUCTW;
+                let init_ptr = (*cs).lpCreateParams as *mut SearchDialogInit;
+                let parent = if init_ptr.is_null() {
+                    HWND(0)
+                } else {
+                    let init = Box::from_raw(init_ptr);
+                    init.parent
+                };
                 let main_hwnd = with_rss_state(parent, |s| s.parent).unwrap_or(HWND(0));
                 let language = with_state(main_hwnd, |s| s.settings.language).unwrap_or_default();
-                let edit = GetDlgItem(hwnd, SEARCH_EDIT_ID as i32);
-                let mut buf = vec![0u16; 1024];
-                let len = windows::Win32::UI::WindowsAndMessaging::GetWindowTextW(edit, &mut buf)
-                    as usize;
-                let keyword = String::from_utf16_lossy(&buf[..len]).trim().to_string();
-                if keyword.is_empty() {
-                    let title = tr_or(language, "rss.search_dialog.title", "Search RSS by keyword");
-                    let message = tr_or(
-                        language,
-                        "rss.search_dialog.empty_keyword",
-                        "Please enter a keyword.",
-                    );
-                    MessageBoxW(
-                        hwnd,
-                        PCWSTR(to_wide(&message).as_ptr()),
-                        PCWSTR(to_wide(&title).as_ptr()),
-                        MB_OK | MB_ICONINFORMATION,
-                    );
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, parent.0);
+
+                let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+                let keyword_label = tr_or(language, "rss.search_dialog.keyword_label", "Keyword:");
+                CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&keyword_label).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    10,
+                    12,
+                    390,
+                    18,
+                    hwnd,
+                    HMENU(1601),
+                    hinstance,
+                    None,
+                );
+                let edit = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    10,
+                    34,
+                    390,
+                    24,
+                    hwnd,
+                    HMENU(SEARCH_EDIT_ID as isize),
+                    hinstance,
+                    None,
+                );
+                CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(language, "rss.dialog.ok")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    220,
+                    80,
+                    85,
+                    28,
+                    hwnd,
+                    HMENU(SEARCH_OK_ID as isize),
+                    hinstance,
+                    None,
+                );
+                CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(language, "rss.dialog.cancel")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    315,
+                    80,
+                    85,
+                    28,
+                    hwnd,
+                    HMENU(SEARCH_CANCEL_ID as isize),
+                    hinstance,
+                    None,
+                );
+                let ok = GetDlgItem(hwnd, SEARCH_OK_ID as i32);
+                let cancel = GetDlgItem(hwnd, SEARCH_CANCEL_ID as i32);
+                let proc_ptr = reorder_control_subclass_proc as *const () as usize;
+                for control in [edit, ok, cancel] {
+                    let prev = SetWindowLongPtrW(control, GWLP_WNDPROC, proc_ptr as isize);
+                    SetWindowLongPtrW(control, GWLP_USERDATA, prev);
+                }
+                SetFocus(edit);
+                LRESULT(0)
+            }
+            WM_COMMAND => {
+                let id = wparam.0 & 0xffff;
+                if id == SEARCH_CANCEL_ID || id == 2 {
+                    crate::log_if_err!(DestroyWindow(hwnd));
                     return LRESULT(0);
                 }
-                let url = build_google_news_rss_url(&keyword, language);
-                let source_title = format_google_news_source_title(&keyword);
-                show_add_dialog_with_prefill_options(parent, source_title, url, true);
+                if id == SEARCH_OK_ID || id == 1 {
+                    let parent = HWND(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+                    let main_hwnd = with_rss_state(parent, |s| s.parent).unwrap_or(HWND(0));
+                    let language =
+                        with_state(main_hwnd, |s| s.settings.language).unwrap_or_default();
+                    let edit = GetDlgItem(hwnd, SEARCH_EDIT_ID as i32);
+                    let mut buf = vec![0u16; 1024];
+                    let len =
+                        windows::Win32::UI::WindowsAndMessaging::GetWindowTextW(edit, &mut buf)
+                            as usize;
+                    let keyword = String::from_utf16_lossy(&buf[..len]).trim().to_string();
+                    if keyword.is_empty() {
+                        let title =
+                            tr_or(language, "rss.search_dialog.title", "Search RSS by keyword");
+                        let message = tr_or(
+                            language,
+                            "rss.search_dialog.empty_keyword",
+                            "Please enter a keyword.",
+                        );
+                        MessageBoxW(
+                            hwnd,
+                            PCWSTR(to_wide(&message).as_ptr()),
+                            PCWSTR(to_wide(&title).as_ptr()),
+                            MB_OK | MB_ICONINFORMATION,
+                        );
+                        return LRESULT(0);
+                    }
+                    let url = build_google_news_rss_url(&keyword, language);
+                    let source_title = format_google_news_source_title(&keyword);
+                    show_add_dialog_with_prefill_options(parent, source_title, url, true);
+                    crate::log_if_err!(DestroyWindow(hwnd));
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_CLOSE => {
                 crate::log_if_err!(DestroyWindow(hwnd));
-                return LRESULT(0);
+                LRESULT(0)
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_CLOSE => {
-            crate::log_if_err!(DestroyWindow(hwnd));
-            LRESULT(0)
-        }
-        WM_NCDESTROY => {
-            let parent = HWND(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
-            if parent.0 != 0 {
-                with_rss_state(parent, |s| s.search_dialog = HWND(0));
+            WM_NCDESTROY => {
+                let parent = HWND(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+                if parent.0 != 0 {
+                    with_rss_state(parent, |s| s.search_dialog = HWND(0));
+                }
+                LRESULT(0)
             }
-            LRESULT(0)
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 

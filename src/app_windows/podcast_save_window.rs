@@ -253,87 +253,101 @@ unsafe extern "system" fn save_wndproc(
     crate::panic_guard::guard(
         "save_wndproc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { save_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || save_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_CREATE => {
             let create_struct = lparam.0 as *const CREATESTRUCTW;
-            let params = Box::from_raw((*create_struct).lpCreateParams as *mut SaveCreateParams);
+            let params =
+                unsafe { Box::from_raw((*create_struct).lpCreateParams as *mut SaveCreateParams) };
             let parent = params.parent;
             let language = params.language;
             let labels = params.labels;
             let show_cancel = params.show_cancel;
-            let main = GetParent(parent);
-            let hfont = with_state(main, |state| state.hfont).unwrap_or(HFONT(0));
+            let main = unsafe { GetParent(parent) };
+            let hfont = unsafe { with_state(main, |state| state.hfont) }.unwrap_or(HFONT(0));
             let label_text = format!("{} 0%", labels.in_progress);
 
-            let label = CreateWindowExW(
-                Default::default(),
-                w!("EDIT"),
-                PCWSTR(to_wide(&label_text).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_CENTER | ES_READONLY),
-                20,
-                20,
-                260,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-
-            let progress = CreateWindowExW(
-                Default::default(),
-                w!("msctls_progress32"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                50,
-                260,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-
-            let cancel_button = if show_cancel {
+            let label = unsafe {
                 CreateWindowExW(
                     Default::default(),
-                    WC_BUTTON,
-                    PCWSTR(to_wide(&labels.cancel).as_ptr()),
-                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                    95,
-                    80,
-                    90,
-                    28,
+                    w!("EDIT"),
+                    PCWSTR(to_wide(&label_text).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_CENTER | ES_READONLY),
+                    20,
+                    20,
+                    260,
+                    20,
                     hwnd,
-                    HMENU(SAVE_ID_CANCEL as isize),
+                    HMENU(0),
                     HINSTANCE(0),
                     None,
                 )
+            };
+
+            let progress = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    w!("msctls_progress32"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    50,
+                    260,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
+
+            let cancel_button = if show_cancel {
+                unsafe {
+                    CreateWindowExW(
+                        Default::default(),
+                        WC_BUTTON,
+                        PCWSTR(to_wide(&labels.cancel).as_ptr()),
+                        WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                        95,
+                        80,
+                        90,
+                        28,
+                        hwnd,
+                        HMENU(SAVE_ID_CANCEL as isize),
+                        HINSTANCE(0),
+                        None,
+                    )
+                }
             } else {
                 HWND(0)
             };
 
-            if let Err(e) = SetWindowTextW(hwnd, PCWSTR(to_wide(&labels.title).as_ptr())) {
+            if let Err(e) = unsafe { SetWindowTextW(hwnd, PCWSTR(to_wide(&labels.title).as_ptr())) }
+            {
                 crate::log_debug(&format!("Failed to set title: {}", e));
             }
-            SendMessageW(label, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-            SendMessageW(progress, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-            if cancel_button.0 != 0 {
-                SendMessageW(
-                    cancel_button,
-                    WM_SETFONT,
-                    WPARAM(hfont.0 as usize),
-                    LPARAM(1),
-                );
+            unsafe {
+                SendMessageW(label, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                SendMessageW(progress, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
             }
-            SendMessageW(progress, PBM_SETRANGE, WPARAM(0), LPARAM((100isize) << 16));
-            SendMessageW(progress, PBM_SETPOS, WPARAM(0), LPARAM(0));
+            if cancel_button.0 != 0 {
+                unsafe {
+                    SendMessageW(
+                        cancel_button,
+                        WM_SETFONT,
+                        WPARAM(hfont.0 as usize),
+                        LPARAM(1),
+                    );
+                }
+            }
+            unsafe {
+                SendMessageW(progress, PBM_SETRANGE, WPARAM(0), LPARAM((100isize) << 16));
+                SendMessageW(progress, PBM_SETPOS, WPARAM(0), LPARAM(0));
+            }
 
             let state = SaveState {
                 parent,
@@ -346,16 +360,18 @@ unsafe fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
                 labels,
                 show_cancel,
             };
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(Box::new(state)) as isize);
-            SetFocus(label);
-            if SetTimer(hwnd, SAVE_PROGRESS_TIMER_ID, SAVE_PROGRESS_TICK_MS, None) == 0 {
+            unsafe {
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(Box::new(state)) as isize);
+                SetFocus(label);
+            }
+            if unsafe { SetTimer(hwnd, SAVE_PROGRESS_TIMER_ID, SAVE_PROGRESS_TICK_MS, None) } == 0 {
                 crate::log_debug("Failed to set SAVE_PROGRESS_TIMER");
             }
             LRESULT(0)
         }
         WM_SETFOCUS => {
             if with_save_state(hwnd, |state| {
-                SetFocus(state.label);
+                unsafe { SetFocus(state.label) };
             })
             .is_none()
             {
@@ -369,7 +385,7 @@ unsafe fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
                 request_cancel(hwnd);
                 return LRESULT(0);
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
+            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
         }
         WM_KEYDOWN | WM_SYSKEYDOWN => {
             if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
@@ -383,34 +399,34 @@ unsafe fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
                 && show_cancel
                 && cancel.0 != 0
             {
-                let focus = GetFocus();
-                let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+                let focus = unsafe { GetFocus() };
+                let shift_down =
+                    (unsafe { GetKeyState(VK_SHIFT.0 as i32) } & (0x8000u16 as i16)) != 0;
                 if !shift_down && focus != cancel {
-                    SetFocus(cancel);
+                    unsafe { SetFocus(cancel) };
                     return LRESULT(0);
                 }
                 if shift_down && focus == cancel {
-                    SetFocus(label);
+                    unsafe { SetFocus(label) };
                     return LRESULT(0);
                 }
             }
             if wparam.0 as u32 == VK_RETURN.0 as u32
                 && let Some(cancel) = with_save_state(hwnd, |state| state.cancel_button)
                 && cancel.0 != 0
-                && GetFocus() == cancel
+                && unsafe { GetFocus() } == cancel
             {
-                if let Err(_e) =
+                if let Err(_e) = unsafe {
                     PostMessageW(hwnd, WM_COMMAND, WPARAM(SAVE_ID_CANCEL), LPARAM(cancel.0))
-                {
-                }
+                } {}
                 return LRESULT(0);
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
+            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
         }
         WM_PODCAST_SAVE_PROGRESS => {
             let pct = wparam.0.min(100);
             if with_save_state(hwnd, |state| {
-                SendMessageW(state.progress, PBM_SETPOS, WPARAM(pct), LPARAM(0));
+                unsafe { SendMessageW(state.progress, PBM_SETPOS, WPARAM(pct), LPARAM(0)) };
                 state.current_pct = state.current_pct.max(pct);
                 update_progress_label(state);
             })
@@ -425,12 +441,14 @@ unsafe fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
                 if with_save_state(hwnd, |state| {
                     if state.current_pct < SAVE_PROGRESS_MAX_FAKE {
                         state.current_pct = (state.current_pct + 1).min(SAVE_PROGRESS_MAX_FAKE);
-                        SendMessageW(
-                            state.progress,
-                            PBM_SETPOS,
-                            WPARAM(state.current_pct),
-                            LPARAM(0),
-                        );
+                        unsafe {
+                            SendMessageW(
+                                state.progress,
+                                PBM_SETPOS,
+                                WPARAM(state.current_pct),
+                                LPARAM(0),
+                            );
+                        }
                         update_progress_label(state);
                     }
                 })
@@ -440,10 +458,10 @@ unsafe fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
                 }
                 return LRESULT(0);
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
+            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
         }
         WM_PODCAST_SAVE_DONE => {
-            crate::log_if_err!(DestroyWindow(hwnd));
+            crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
             LRESULT(0)
         }
         WM_CLOSE => {
@@ -452,26 +470,27 @@ unsafe fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
         }
         WM_NCDESTROY => {
             let parent = with_save_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
-            if let Err(e) = KillTimer(hwnd, SAVE_PROGRESS_TIMER_ID) {
+            if let Err(e) = unsafe { KillTimer(hwnd, SAVE_PROGRESS_TIMER_ID) } {
                 crate::log_debug(&format!("Failed to kill SAVE_PROGRESS_TIMER: {}", e));
             }
             if parent.0 != 0 {
-                EnableWindow(parent, true);
+                unsafe { EnableWindow(parent, true) };
                 // Keep focus within Sonarpad when progress dialogs close (e.g. streaming
                 // download -> conversion handoff), avoiding transient desktop focus.
-                SetForegroundWindow(parent);
-                if let Err(_e) = PostMessageW(parent, WM_PODCAST_SAVE_CLOSED, WPARAM(0), LPARAM(0))
+                unsafe { SetForegroundWindow(parent) };
+                if let Err(_e) =
+                    unsafe { PostMessageW(parent, WM_PODCAST_SAVE_CLOSED, WPARAM(0), LPARAM(0)) }
                 {
                     crate::log_debug(&format!("Error: {:?}", _e));
                 }
             }
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+            let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) };
             if ptr != 0 {
-                let _unused_box = Box::from_raw(ptr as *mut SaveState);
+                let _unused_box = unsafe { Box::from_raw(ptr as *mut SaveState) };
             }
             LRESULT(0)
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+        _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }
 }
 

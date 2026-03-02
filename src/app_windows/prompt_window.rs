@@ -318,104 +318,114 @@ unsafe extern "system" fn simple_prompt_wndproc(
     crate::panic_guard::guard(
         "simple_prompt_wndproc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { simple_prompt_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || simple_prompt_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn simple_prompt_wndproc_inner(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
+fn simple_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_CREATE => {
             let create_struct =
                 lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
-            let data_ptr = (*create_struct).lpCreateParams as *mut SimplePromptData;
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, data_ptr as isize);
+            let data_ptr = unsafe { (*create_struct).lpCreateParams as *mut SimplePromptData };
+            unsafe { SetWindowLongPtrW(hwnd, GWLP_USERDATA, data_ptr as isize) };
 
-            let data = &*data_ptr;
+            let data = unsafe { &*data_ptr };
             let hfont = HFONT(
-                windows::Win32::Graphics::Gdi::GetStockObject(
-                    windows::Win32::Graphics::Gdi::DEFAULT_GUI_FONT,
-                )
+                unsafe {
+                    windows::Win32::Graphics::Gdi::GetStockObject(
+                        windows::Win32::Graphics::Gdi::DEFAULT_GUI_FONT,
+                    )
+                }
                 .0,
             );
 
             // Get language from parent or default
-            let parent = GetParent(hwnd);
-            let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
+            let parent = unsafe { GetParent(hwnd) };
+            let language =
+                unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
 
-            let _label = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&data.body).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                20,
-                350,
-                60,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
+            let _label = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&data.body).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    20,
+                    350,
+                    60,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
 
-            let edit = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_EDIT,
-                PCWSTR(to_wide(&data.value).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                20,
-                90,
-                345,
-                24,
-                hwnd,
-                HMENU(101),
-                HINSTANCE(0),
-                None,
-            );
+            let edit = unsafe {
+                CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_EDIT,
+                    PCWSTR(to_wide(&data.value).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    20,
+                    90,
+                    345,
+                    24,
+                    hwnd,
+                    HMENU(101),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
 
-            let ok = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&i18n::tr(language, "options.ok")).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                180,
-                135,
-                80,
-                28,
-                hwnd,
-                HMENU(1),
-                HINSTANCE(0),
-                None,
-            );
+            let ok = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(language, "options.ok")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    180,
+                    135,
+                    80,
+                    28,
+                    hwnd,
+                    HMENU(1),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
 
-            let cancel = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&i18n::tr(language, "options.cancel")).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                270,
-                135,
-                95,
-                28,
-                hwnd,
-                HMENU(2),
-                HINSTANCE(0),
-                None,
-            );
+            let cancel = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(language, "options.cancel")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    270,
+                    135,
+                    95,
+                    28,
+                    hwnd,
+                    HMENU(2),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
 
             if hfont.0 != 0 {
-                SendMessageW(_label, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-                SendMessageW(edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-                SendMessageW(ok, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-                SendMessageW(cancel, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                unsafe {
+                    SendMessageW(_label, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    SendMessageW(edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    SendMessageW(ok, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    SendMessageW(cancel, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                }
             }
 
-            SetFocus(edit);
-            SendMessageW(edit, 0x00B1, WPARAM(0), LPARAM(-1)); // EM_SETSEL: select all
+            unsafe {
+                SetFocus(edit);
+                SendMessageW(edit, 0x00B1, WPARAM(0), LPARAM(-1)); // EM_SETSEL: select all
+            }
 
             LRESULT(0)
         }
@@ -423,31 +433,36 @@ unsafe fn simple_prompt_wndproc_inner(
             let id = wparam.0 & 0xffff;
             if id == 1 {
                 // OK
-                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut SimplePromptData;
+                let ptr =
+                    unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut SimplePromptData };
                 if !ptr.is_null() {
-                    let data = &mut *ptr;
-                    let edit = windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, 101);
-                    let len = GetWindowTextLengthW(edit);
+                    let data = unsafe { &mut *ptr };
+                    let edit =
+                        unsafe { windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, 101) };
+                    let len = unsafe { GetWindowTextLengthW(edit) };
                     let mut buf = vec![0u16; (len + 1) as usize];
-                    let read = GetWindowTextW(edit, &mut buf);
+                    let read = unsafe { GetWindowTextW(edit, &mut buf) };
                     data.value = String::from_utf16_lossy(&buf[..read as usize]);
                     data.confirmed = true;
                 }
-                crate::log_if_err!(DestroyWindow(hwnd));
+                crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
             } else if id == 2 {
                 // Cancel
-                crate::log_if_err!(DestroyWindow(hwnd));
+                crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
             }
             LRESULT(0)
         }
         WM_KEYDOWN => {
             let key = wparam.0 as u32;
             if key == VK_TAB.0 as u32 {
-                let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
-                let current_focus = GetFocus();
-                let edit = windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, 101);
-                let ok = windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, 1);
-                let cancel = windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, 2);
+                let shift_down =
+                    (unsafe { GetKeyState(VK_SHIFT.0 as i32) } & (0x8000u16 as i16)) != 0;
+                let current_focus = unsafe { GetFocus() };
+                let edit =
+                    unsafe { windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, 101) };
+                let ok = unsafe { windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, 1) };
+                let cancel =
+                    unsafe { windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, 2) };
 
                 let order = [edit, ok, cancel];
                 let mut idx = order.iter().position(|&h| h == current_focus).unwrap_or(0);
@@ -457,24 +472,24 @@ unsafe fn simple_prompt_wndproc_inner(
                 } else {
                     idx = (idx + 1) % order.len();
                 }
-                SetFocus(order[idx]);
+                unsafe { SetFocus(order[idx]) };
                 return LRESULT(0);
             }
             if key == VK_RETURN.0 as u32 {
-                SendMessageW(hwnd, WM_COMMAND, WPARAM(1), LPARAM(0));
+                unsafe { SendMessageW(hwnd, WM_COMMAND, WPARAM(1), LPARAM(0)) };
                 return LRESULT(0);
             }
             if key == VK_ESCAPE.0 as u32 {
-                SendMessageW(hwnd, WM_COMMAND, WPARAM(2), LPARAM(0));
+                unsafe { SendMessageW(hwnd, WM_COMMAND, WPARAM(2), LPARAM(0)) };
                 return LRESULT(0);
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
+            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
         }
         WM_CLOSE => {
-            crate::log_if_err!(DestroyWindow(hwnd));
+            crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
             LRESULT(0)
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+        _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }
 }
 

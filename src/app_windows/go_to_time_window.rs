@@ -97,225 +97,225 @@ unsafe extern "system" fn go_to_time_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "go_to_time_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { go_to_time_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || go_to_time_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn go_to_time_wndproc_inner(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let cs = lparam.0 as *const CREATESTRUCTW;
-            let init_ptr = (*cs).lpCreateParams as *mut GoToTimeState;
-            if init_ptr.is_null() {
-                return LRESULT(0);
-            }
-            SetWindowLongPtrW(
-                hwnd,
-                windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
-                init_ptr as isize,
-            );
-            let parent = (*init_ptr).parent;
-            let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
-
-            let label = i18n::tr(language, "go_to_time.label_time");
-            let hint = i18n::tr(language, "go_to_time.hint");
-            let ok_text = i18n::tr(language, "go_to_time.ok");
-            let cancel_text = i18n::tr(language, "go_to_time.cancel");
-
-            let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-            CreateWindowExW(
-                Default::default(),
-                w!("STATIC"),
-                PCWSTR(to_wide(&label).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                10,
-                12,
-                330,
-                16,
-                hwnd,
-                HMENU(1),
-                hinstance,
-                None,
-            );
-            let input = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                10,
-                30,
-                160,
-                24,
-                hwnd,
-                HMENU(GO_TO_TIME_EDIT_ID as isize),
-                hinstance,
-                None,
-            );
-            CreateWindowExW(
-                Default::default(),
-                w!("STATIC"),
-                PCWSTR(to_wide(&hint).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                10,
-                58,
-                330,
-                16,
-                hwnd,
-                HMENU(2),
-                hinstance,
-                None,
-            );
-            let status = CreateWindowExW(
-                Default::default(),
-                w!("STATIC"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE,
-                10,
-                78,
-                330,
-                16,
-                hwnd,
-                HMENU(GO_TO_TIME_STATUS_ID as isize),
-                hinstance,
-                None,
-            );
-            CreateWindowExW(
-                Default::default(),
-                w!("BUTTON"),
-                PCWSTR(to_wide(&ok_text).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                170,
-                110,
-                80,
-                26,
-                hwnd,
-                HMENU(GO_TO_TIME_OK_ID as isize),
-                hinstance,
-                None,
-            );
-            CreateWindowExW(
-                Default::default(),
-                w!("BUTTON"),
-                PCWSTR(to_wide(&cancel_text).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                260,
-                110,
-                80,
-                26,
-                hwnd,
-                HMENU(GO_TO_TIME_CANCEL_ID as isize),
-                hinstance,
-                None,
-            );
-
-            (*init_ptr).input = input;
-            (*init_ptr).status = status;
-            SetFocus(input);
-            LRESULT(0)
-        }
-        WM_KEYDOWN => {
-            if wparam.0 as u32 == windows::Win32::UI::Input::KeyboardAndMouse::VK_ESCAPE.0 as u32 {
-                crate::log_if_err!(DestroyWindow(hwnd));
-                return LRESULT(0);
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_COMMAND => {
-            let id = wparam.0 & 0xffff;
-            if id == GO_TO_TIME_CANCEL_ID || id == 2 {
-                crate::log_if_err!(DestroyWindow(hwnd));
-                return LRESULT(0);
-            }
-            if id == GO_TO_TIME_OK_ID || id == 1 {
-                let parent = GetParent(hwnd);
+fn go_to_time_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let cs = lparam.0 as *const CREATESTRUCTW;
+                let init_ptr = (*cs).lpCreateParams as *mut GoToTimeState;
+                if init_ptr.is_null() {
+                    return LRESULT(0);
+                }
+                SetWindowLongPtrW(
+                    hwnd,
+                    windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+                    init_ptr as isize,
+                );
+                let parent = (*init_ptr).parent;
                 let language =
                     with_state(parent, |state| state.settings.language).unwrap_or_default();
-                let input = GetDlgItem(hwnd, GO_TO_TIME_EDIT_ID as i32);
-                let len = SendMessageW(
-                    input,
-                    windows::Win32::UI::WindowsAndMessaging::WM_GETTEXTLENGTH,
-                    WPARAM(0),
-                    LPARAM(0),
-                )
-                .0;
-                let mut buf = vec![0u16; len as usize + 1];
-                SendMessageW(
-                    input,
-                    windows::Win32::UI::WindowsAndMessaging::WM_GETTEXT,
-                    WPARAM(buf.len()),
-                    LPARAM(buf.as_mut_ptr() as isize),
+
+                let label = i18n::tr(language, "go_to_time.label_time");
+                let hint = i18n::tr(language, "go_to_time.hint");
+                let ok_text = i18n::tr(language, "go_to_time.ok");
+                let cancel_text = i18n::tr(language, "go_to_time.cancel");
+
+                let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+                CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&label).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    10,
+                    12,
+                    330,
+                    16,
+                    hwnd,
+                    HMENU(1),
+                    hinstance,
+                    None,
                 );
-                let text = String::from_utf16_lossy(&buf[..len as usize]);
-                let target = match parse_time_input(&text) {
-                    Ok(v) => v,
-                    Err(_) => {
-                        let msg = i18n::tr(language, "go_to_time.invalid_time");
+                let input = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    10,
+                    30,
+                    160,
+                    24,
+                    hwnd,
+                    HMENU(GO_TO_TIME_EDIT_ID as isize),
+                    hinstance,
+                    None,
+                );
+                CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&hint).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    10,
+                    58,
+                    330,
+                    16,
+                    hwnd,
+                    HMENU(2),
+                    hinstance,
+                    None,
+                );
+                let status = CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE,
+                    10,
+                    78,
+                    330,
+                    16,
+                    hwnd,
+                    HMENU(GO_TO_TIME_STATUS_ID as isize),
+                    hinstance,
+                    None,
+                );
+                CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&ok_text).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    170,
+                    110,
+                    80,
+                    26,
+                    hwnd,
+                    HMENU(GO_TO_TIME_OK_ID as isize),
+                    hinstance,
+                    None,
+                );
+                CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&cancel_text).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    260,
+                    110,
+                    80,
+                    26,
+                    hwnd,
+                    HMENU(GO_TO_TIME_CANCEL_ID as isize),
+                    hinstance,
+                    None,
+                );
+
+                (*init_ptr).input = input;
+                (*init_ptr).status = status;
+                SetFocus(input);
+                LRESULT(0)
+            }
+            WM_KEYDOWN => {
+                if wparam.0 as u32
+                    == windows::Win32::UI::Input::KeyboardAndMouse::VK_ESCAPE.0 as u32
+                {
+                    crate::log_if_err!(DestroyWindow(hwnd));
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_COMMAND => {
+                let id = wparam.0 & 0xffff;
+                if id == GO_TO_TIME_CANCEL_ID || id == 2 {
+                    crate::log_if_err!(DestroyWindow(hwnd));
+                    return LRESULT(0);
+                }
+                if id == GO_TO_TIME_OK_ID || id == 1 {
+                    let parent = GetParent(hwnd);
+                    let language =
+                        with_state(parent, |state| state.settings.language).unwrap_or_default();
+                    let input = GetDlgItem(hwnd, GO_TO_TIME_EDIT_ID as i32);
+                    let len = SendMessageW(
+                        input,
+                        windows::Win32::UI::WindowsAndMessaging::WM_GETTEXTLENGTH,
+                        WPARAM(0),
+                        LPARAM(0),
+                    )
+                    .0;
+                    let mut buf = vec![0u16; len as usize + 1];
+                    SendMessageW(
+                        input,
+                        windows::Win32::UI::WindowsAndMessaging::WM_GETTEXT,
+                        WPARAM(buf.len()),
+                        LPARAM(buf.as_mut_ptr() as isize),
+                    );
+                    let text = String::from_utf16_lossy(&buf[..len as usize]);
+                    let target = match parse_time_input(&text) {
+                        Ok(v) => v,
+                        Err(_) => {
+                            let msg = i18n::tr(language, "go_to_time.invalid_time");
+                            let status = GetDlgItem(hwnd, GO_TO_TIME_STATUS_ID as i32);
+                            let wide = to_wide(&msg);
+                            crate::log_if_err!(SetWindowTextW(status, PCWSTR(wide.as_ptr())));
+                            nvda_speak(&msg);
+                            SetFocus(input);
+                            return LRESULT(0);
+                        }
+                    };
+                    let (path, duration) = with_state(parent, |state| {
+                        state.active_audiobook.as_ref().map(|p| {
+                            let duration = audiobook_duration_secs(&p.path);
+                            (p.path.clone(), duration)
+                        })
+                    })
+                    .unwrap_or(None)
+                    .unwrap_or((std::path::PathBuf::new(), None));
+                    if path.as_os_str().is_empty() {
+                        crate::log_if_err!(DestroyWindow(hwnd));
+                        return LRESULT(0);
+                    }
+                    let mut seek_target = target as u64;
+                    if let Some(max_secs) = duration
+                        && seek_target > max_secs
+                    {
+                        seek_target = max_secs;
+                        let msg = i18n::tr(language, "go_to_time.clamped");
                         let status = GetDlgItem(hwnd, GO_TO_TIME_STATUS_ID as i32);
                         let wide = to_wide(&msg);
                         crate::log_if_err!(SetWindowTextW(status, PCWSTR(wide.as_ptr())));
                         nvda_speak(&msg);
-                        SetFocus(input);
-                        return LRESULT(0);
                     }
-                };
-                let (path, duration) = with_state(parent, |state| {
-                    state.active_audiobook.as_ref().map(|p| {
-                        let duration = audiobook_duration_secs(&p.path);
-                        (p.path.clone(), duration)
-                    })
-                })
-                .unwrap_or(None)
-                .unwrap_or((std::path::PathBuf::new(), None));
-                if path.as_os_str().is_empty() {
+                    crate::log_if_err!(seek_audiobook_to(parent, seek_target));
                     crate::log_if_err!(DestroyWindow(hwnd));
                     return LRESULT(0);
                 }
-                let mut seek_target = target as u64;
-                if let Some(max_secs) = duration
-                    && seek_target > max_secs
-                {
-                    seek_target = max_secs;
-                    let msg = i18n::tr(language, "go_to_time.clamped");
-                    let status = GetDlgItem(hwnd, GO_TO_TIME_STATUS_ID as i32);
-                    let wide = to_wide(&msg);
-                    crate::log_if_err!(SetWindowTextW(status, PCWSTR(wide.as_ptr())));
-                    nvda_speak(&msg);
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_DESTROY => {
+                let parent = GetParent(hwnd);
+                if parent.0 != 0 {
+                    EnableWindow(parent, true);
+                    SetForegroundWindow(parent);
                 }
-                crate::log_if_err!(seek_audiobook_to(parent, seek_target));
-                crate::log_if_err!(DestroyWindow(hwnd));
-                return LRESULT(0);
+                LRESULT(0)
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_DESTROY => {
-            let parent = GetParent(hwnd);
-            if parent.0 != 0 {
-                EnableWindow(parent, true);
-                SetForegroundWindow(parent);
-            }
-            LRESULT(0)
-        }
-        WM_NCDESTROY => {
-            let ptr =
-                GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
-                    as *mut GoToTimeState;
-            if !ptr.is_null() {
-                let state = unsafe { Box::from_raw(ptr) };
-                let parent = state.parent;
-                with_state(parent, |s| s.go_to_time_dialog = HWND(0));
-                if parent.0 != 0 && state.prev_focus.0 != 0 {
-                    SetFocus(state.prev_focus);
+            WM_NCDESTROY => {
+                let ptr =
+                    GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+                        as *mut GoToTimeState;
+                if !ptr.is_null() {
+                    let state = Box::from_raw(ptr);
+                    let parent = state.parent;
+                    with_state(parent, |s| s.go_to_time_dialog = HWND(0));
+                    if parent.0 != 0 && state.prev_focus.0 != 0 {
+                        SetFocus(state.prev_focus);
+                    }
                 }
+                LRESULT(0)
             }
-            LRESULT(0)
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 

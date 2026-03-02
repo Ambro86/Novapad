@@ -7045,7 +7045,7 @@ fn select_combo_nearest_value(hwnd: HWND, value: i32) {
     }
 }
 
-unsafe fn update_tts_manual_visibility(hwnd: HWND) {
+fn update_tts_manual_visibility(hwnd: HWND) {
     let (
         checkbox,
         combo_speed,
@@ -7092,25 +7092,30 @@ unsafe fn update_tts_manual_visibility(hwnd: HWND) {
         Some(values) => values,
         None => return,
     };
-    let manual =
-        SendMessageW(checkbox, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 == BST_CHECKED.0;
+    let manual = unsafe { SendMessageW(checkbox, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 }
+        == BST_CHECKED.0;
     if manual {
         let rate = combo_value(combo_speed);
         let pitch = combo_value(combo_pitch);
         let volume = combo_value(combo_volume);
-        if let Err(_e) = SetWindowTextW(
-            edit_speed,
-            PCWSTR(to_wide(&tts_ui_value_from_internal(rate).to_string()).as_ptr()),
-        ) {
+        if let Err(_e) = unsafe {
+            SetWindowTextW(
+                edit_speed,
+                PCWSTR(to_wide(&tts_ui_value_from_internal(rate).to_string()).as_ptr()),
+            )
+        } {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
-        if let Err(_e) = SetWindowTextW(
-            edit_pitch,
-            PCWSTR(to_wide(&tts_ui_value_from_internal(pitch).to_string()).as_ptr()),
-        ) {
+        if let Err(_e) = unsafe {
+            SetWindowTextW(
+                edit_pitch,
+                PCWSTR(to_wide(&tts_ui_value_from_internal(pitch).to_string()).as_ptr()),
+            )
+        } {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
-        if let Err(_e) = SetWindowTextW(edit_volume, PCWSTR(to_wide(&volume.to_string()).as_ptr()))
+        if let Err(_e) =
+            unsafe { SetWindowTextW(edit_volume, PCWSTR(to_wide(&volume.to_string()).as_ptr())) }
         {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
@@ -7120,40 +7125,52 @@ unsafe fn update_tts_manual_visibility(hwnd: HWND) {
         let sd_rate = combo_value(combo_dialogue_secondary_voice_rate);
         let sd_pitch = combo_value(combo_dialogue_secondary_voice_pitch);
         let sd_volume = combo_value(combo_dialogue_secondary_voice_volume);
-        if let Err(_e) = SetWindowTextW(
-            edit_dialogue_voice_rate,
-            PCWSTR(to_wide(&tts_ui_value_from_internal(d_rate).to_string()).as_ptr()),
-        ) {
+        if let Err(_e) = unsafe {
+            SetWindowTextW(
+                edit_dialogue_voice_rate,
+                PCWSTR(to_wide(&tts_ui_value_from_internal(d_rate).to_string()).as_ptr()),
+            )
+        } {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
-        if let Err(_e) = SetWindowTextW(
-            edit_dialogue_voice_pitch,
-            PCWSTR(to_wide(&tts_ui_value_from_internal(d_pitch).to_string()).as_ptr()),
-        ) {
+        if let Err(_e) = unsafe {
+            SetWindowTextW(
+                edit_dialogue_voice_pitch,
+                PCWSTR(to_wide(&tts_ui_value_from_internal(d_pitch).to_string()).as_ptr()),
+            )
+        } {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
-        if let Err(_e) = SetWindowTextW(
-            edit_dialogue_voice_volume,
-            PCWSTR(to_wide(&d_volume.to_string()).as_ptr()),
-        ) {
+        if let Err(_e) = unsafe {
+            SetWindowTextW(
+                edit_dialogue_voice_volume,
+                PCWSTR(to_wide(&d_volume.to_string()).as_ptr()),
+            )
+        } {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
-        if let Err(_e) = SetWindowTextW(
-            edit_dialogue_secondary_voice_rate,
-            PCWSTR(to_wide(&tts_ui_value_from_internal(sd_rate).to_string()).as_ptr()),
-        ) {
+        if let Err(_e) = unsafe {
+            SetWindowTextW(
+                edit_dialogue_secondary_voice_rate,
+                PCWSTR(to_wide(&tts_ui_value_from_internal(sd_rate).to_string()).as_ptr()),
+            )
+        } {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
-        if let Err(_e) = SetWindowTextW(
-            edit_dialogue_secondary_voice_pitch,
-            PCWSTR(to_wide(&tts_ui_value_from_internal(sd_pitch).to_string()).as_ptr()),
-        ) {
+        if let Err(_e) = unsafe {
+            SetWindowTextW(
+                edit_dialogue_secondary_voice_pitch,
+                PCWSTR(to_wide(&tts_ui_value_from_internal(sd_pitch).to_string()).as_ptr()),
+            )
+        } {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
-        if let Err(_e) = SetWindowTextW(
-            edit_dialogue_secondary_voice_volume,
-            PCWSTR(to_wide(&sd_volume.to_string()).as_ptr()),
-        ) {
+        if let Err(_e) = unsafe {
+            SetWindowTextW(
+                edit_dialogue_secondary_voice_volume,
+                PCWSTR(to_wide(&sd_volume.to_string()).as_ptr()),
+            )
+        } {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
     } else {
@@ -7198,81 +7215,83 @@ unsafe fn update_tts_manual_visibility(hwnd: HWND) {
         select_combo_nearest_value(combo_dialogue_secondary_voice_pitch, sd_pitch);
         select_combo_nearest_value(combo_dialogue_secondary_voice_volume, sd_volume);
     }
-    ShowWindow(combo_speed, if manual { SW_HIDE } else { SW_SHOW });
-    ShowWindow(combo_pitch, if manual { SW_HIDE } else { SW_SHOW });
-    ShowWindow(combo_volume, if manual { SW_HIDE } else { SW_SHOW });
-    ShowWindow(edit_speed, if manual { SW_SHOW } else { SW_HIDE });
-    ShowWindow(edit_pitch, if manual { SW_SHOW } else { SW_HIDE });
-    ShowWindow(edit_volume, if manual { SW_SHOW } else { SW_HIDE });
-    ShowWindow(
-        combo_dialogue_voice_rate,
-        if manual { SW_HIDE } else { SW_SHOW },
-    );
-    ShowWindow(
-        combo_dialogue_voice_pitch,
-        if manual { SW_HIDE } else { SW_SHOW },
-    );
-    ShowWindow(
-        combo_dialogue_voice_volume,
-        if manual { SW_HIDE } else { SW_SHOW },
-    );
-    ShowWindow(
-        edit_dialogue_voice_rate,
-        if manual { SW_SHOW } else { SW_HIDE },
-    );
-    ShowWindow(
-        edit_dialogue_voice_pitch,
-        if manual { SW_SHOW } else { SW_HIDE },
-    );
-    ShowWindow(
-        edit_dialogue_voice_volume,
-        if manual { SW_SHOW } else { SW_HIDE },
-    );
-    ShowWindow(
-        combo_dialogue_secondary_voice_rate,
-        if manual { SW_HIDE } else { SW_SHOW },
-    );
-    ShowWindow(
-        combo_dialogue_secondary_voice_pitch,
-        if manual { SW_HIDE } else { SW_SHOW },
-    );
-    ShowWindow(
-        combo_dialogue_secondary_voice_volume,
-        if manual { SW_HIDE } else { SW_SHOW },
-    );
-    ShowWindow(
-        edit_dialogue_secondary_voice_rate,
-        if manual { SW_SHOW } else { SW_HIDE },
-    );
-    ShowWindow(
-        edit_dialogue_secondary_voice_pitch,
-        if manual { SW_SHOW } else { SW_HIDE },
-    );
-    ShowWindow(
-        edit_dialogue_secondary_voice_volume,
-        if manual { SW_SHOW } else { SW_HIDE },
-    );
-    EnableWindow(combo_speed, !manual);
-    EnableWindow(combo_pitch, !manual);
-    EnableWindow(combo_volume, !manual);
-    EnableWindow(edit_speed, manual);
-    EnableWindow(edit_pitch, manual);
-    EnableWindow(edit_volume, manual);
-    EnableWindow(combo_dialogue_voice_rate, !manual);
-    EnableWindow(combo_dialogue_voice_pitch, !manual);
-    EnableWindow(combo_dialogue_voice_volume, !manual);
-    EnableWindow(edit_dialogue_voice_rate, manual);
-    EnableWindow(edit_dialogue_voice_pitch, manual);
-    EnableWindow(edit_dialogue_voice_volume, manual);
-    EnableWindow(combo_dialogue_secondary_voice_rate, !manual);
-    EnableWindow(combo_dialogue_secondary_voice_pitch, !manual);
-    EnableWindow(combo_dialogue_secondary_voice_volume, !manual);
-    EnableWindow(edit_dialogue_secondary_voice_rate, manual);
-    EnableWindow(edit_dialogue_secondary_voice_pitch, manual);
-    EnableWindow(edit_dialogue_secondary_voice_volume, manual);
+    unsafe {
+        ShowWindow(combo_speed, if manual { SW_HIDE } else { SW_SHOW });
+        ShowWindow(combo_pitch, if manual { SW_HIDE } else { SW_SHOW });
+        ShowWindow(combo_volume, if manual { SW_HIDE } else { SW_SHOW });
+        ShowWindow(edit_speed, if manual { SW_SHOW } else { SW_HIDE });
+        ShowWindow(edit_pitch, if manual { SW_SHOW } else { SW_HIDE });
+        ShowWindow(edit_volume, if manual { SW_SHOW } else { SW_HIDE });
+        ShowWindow(
+            combo_dialogue_voice_rate,
+            if manual { SW_HIDE } else { SW_SHOW },
+        );
+        ShowWindow(
+            combo_dialogue_voice_pitch,
+            if manual { SW_HIDE } else { SW_SHOW },
+        );
+        ShowWindow(
+            combo_dialogue_voice_volume,
+            if manual { SW_HIDE } else { SW_SHOW },
+        );
+        ShowWindow(
+            edit_dialogue_voice_rate,
+            if manual { SW_SHOW } else { SW_HIDE },
+        );
+        ShowWindow(
+            edit_dialogue_voice_pitch,
+            if manual { SW_SHOW } else { SW_HIDE },
+        );
+        ShowWindow(
+            edit_dialogue_voice_volume,
+            if manual { SW_SHOW } else { SW_HIDE },
+        );
+        ShowWindow(
+            combo_dialogue_secondary_voice_rate,
+            if manual { SW_HIDE } else { SW_SHOW },
+        );
+        ShowWindow(
+            combo_dialogue_secondary_voice_pitch,
+            if manual { SW_HIDE } else { SW_SHOW },
+        );
+        ShowWindow(
+            combo_dialogue_secondary_voice_volume,
+            if manual { SW_HIDE } else { SW_SHOW },
+        );
+        ShowWindow(
+            edit_dialogue_secondary_voice_rate,
+            if manual { SW_SHOW } else { SW_HIDE },
+        );
+        ShowWindow(
+            edit_dialogue_secondary_voice_pitch,
+            if manual { SW_SHOW } else { SW_HIDE },
+        );
+        ShowWindow(
+            edit_dialogue_secondary_voice_volume,
+            if manual { SW_SHOW } else { SW_HIDE },
+        );
+        EnableWindow(combo_speed, !manual);
+        EnableWindow(combo_pitch, !manual);
+        EnableWindow(combo_volume, !manual);
+        EnableWindow(edit_speed, manual);
+        EnableWindow(edit_pitch, manual);
+        EnableWindow(edit_volume, manual);
+        EnableWindow(combo_dialogue_voice_rate, !manual);
+        EnableWindow(combo_dialogue_voice_pitch, !manual);
+        EnableWindow(combo_dialogue_voice_volume, !manual);
+        EnableWindow(edit_dialogue_voice_rate, manual);
+        EnableWindow(edit_dialogue_voice_pitch, manual);
+        EnableWindow(edit_dialogue_voice_volume, manual);
+        EnableWindow(combo_dialogue_secondary_voice_rate, !manual);
+        EnableWindow(combo_dialogue_secondary_voice_pitch, !manual);
+        EnableWindow(combo_dialogue_secondary_voice_volume, !manual);
+        EnableWindow(edit_dialogue_secondary_voice_rate, manual);
+        EnableWindow(edit_dialogue_secondary_voice_pitch, manual);
+        EnableWindow(edit_dialogue_secondary_voice_volume, manual);
+    }
 }
 
-unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
+fn update_dialogue_voice_visibility(hwnd: HWND) {
     let (
         checkbox,
         label,
@@ -7408,56 +7427,64 @@ unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
     ];
     let voice_tab_active = with_options_state(hwnd, |state| {
         state.hwnd_tabs.0 != 0
-            && SendMessageW(state.hwnd_tabs, TCM_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32
-                == OPTIONS_TAB_VOICE
+            && unsafe {
+                SendMessageW(state.hwnd_tabs, TCM_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32
+            } == OPTIONS_TAB_VOICE
     })
     .unwrap_or(false);
     if !voice_tab_active {
         for control in controls {
-            ShowWindow(control, SW_HIDE);
-            EnableWindow(control, false);
+            unsafe {
+                ShowWindow(control, SW_HIDE);
+                EnableWindow(control, false);
+            }
         }
         return;
     }
-    let enabled =
-        SendMessageW(checkbox, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 == BST_CHECKED.0;
+    let enabled = unsafe { SendMessageW(checkbox, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 }
+        == BST_CHECKED.0;
     let secondary_enabled = enabled
-        && SendMessageW(
-            checkbox_use_secondary_voice,
+        && (unsafe {
+            SendMessageW(
+                checkbox_use_secondary_voice,
+                BM_GETCHECK,
+                WPARAM(0),
+                LPARAM(0),
+            )
+            .0 as u32
+        } == BST_CHECKED.0);
+    let secondary_engine_sel =
+        unsafe { SendMessageW(combo_secondary_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+    let dialogue_engine_sel =
+        unsafe { SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+    let dialogue_engine_is_edge = dialogue_engine_sel <= 0;
+    let secondary_engine_is_edge = secondary_engine_sel <= 0;
+    let dialogue_only_multilingual = (unsafe {
+        SendMessageW(
+            checkbox_dialogue_multilingual,
             BM_GETCHECK,
             WPARAM(0),
             LPARAM(0),
         )
         .0 as u32
-            == BST_CHECKED.0;
-    let secondary_engine_sel =
-        SendMessageW(combo_secondary_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-    let dialogue_engine_sel = SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-    let dialogue_engine_is_edge = dialogue_engine_sel <= 0;
-    let secondary_engine_is_edge = secondary_engine_sel <= 0;
-    let dialogue_only_multilingual = SendMessageW(
-        checkbox_dialogue_multilingual,
-        BM_GETCHECK,
-        WPARAM(0),
-        LPARAM(0),
-    )
-    .0 as u32
-        == BST_CHECKED.0;
-    let dialogue_secondary_only_multilingual = SendMessageW(
-        checkbox_dialogue_secondary_multilingual,
-        BM_GETCHECK,
-        WPARAM(0),
-        LPARAM(0),
-    )
-    .0 as u32
-        == BST_CHECKED.0;
+    } == BST_CHECKED.0);
+    let dialogue_secondary_only_multilingual = (unsafe {
+        SendMessageW(
+            checkbox_dialogue_secondary_multilingual,
+            BM_GETCHECK,
+            WPARAM(0),
+            LPARAM(0),
+        )
+        .0 as u32
+    } == BST_CHECKED.0);
     let show_dialogue_lang_combo =
         enabled && dialogue_engine_is_edge && !dialogue_only_multilingual;
     let show_secondary_lang_combo =
         secondary_enabled && secondary_engine_is_edge && !dialogue_secondary_only_multilingual;
     let manual_tuning =
         with_options_state(hwnd, |state| state.checkbox_tts_manual).is_some_and(|h| {
-            SendMessageW(h, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 == BST_CHECKED.0
+            (unsafe { SendMessageW(h, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 })
+                == BST_CHECKED.0
         });
     for control in controls {
         let is_toggle = control == checkbox;
@@ -7577,27 +7604,27 @@ unsafe fn update_dialogue_voice_visibility(hwnd: HWND) {
         } else {
             visible
         };
-        ShowWindow(control, visible);
+        unsafe { ShowWindow(control, visible) };
         if is_primary_lang_control {
-            EnableWindow(control, show_dialogue_lang_combo);
+            unsafe { EnableWindow(control, show_dialogue_lang_combo) };
         } else if is_secondary_lang_control {
-            EnableWindow(control, show_secondary_lang_combo);
+            unsafe { EnableWindow(control, show_secondary_lang_combo) };
         } else if is_primary_combo_tuning {
-            EnableWindow(control, enabled && !manual_tuning);
+            unsafe { EnableWindow(control, enabled && !manual_tuning) };
         } else if is_primary_edit_tuning {
-            EnableWindow(control, enabled && manual_tuning);
+            unsafe { EnableWindow(control, enabled && manual_tuning) };
         } else if is_secondary_combo_tuning {
-            EnableWindow(control, secondary_enabled && !manual_tuning);
+            unsafe { EnableWindow(control, secondary_enabled && !manual_tuning) };
         } else if is_secondary_edit_tuning {
-            EnableWindow(control, secondary_enabled && manual_tuning);
+            unsafe { EnableWindow(control, secondary_enabled && manual_tuning) };
         } else if is_primary_multilingual_toggle {
-            EnableWindow(control, enabled && dialogue_engine_is_edge);
+            unsafe { EnableWindow(control, enabled && dialogue_engine_is_edge) };
         } else if is_secondary_multilingual_toggle {
-            EnableWindow(control, secondary_enabled && secondary_engine_is_edge);
+            unsafe { EnableWindow(control, secondary_enabled && secondary_engine_is_edge) };
         } else if is_secondary_control {
-            EnableWindow(control, secondary_enabled);
+            unsafe { EnableWindow(control, secondary_enabled) };
         } else {
-            EnableWindow(control, is_toggle || is_secondary_toggle || enabled);
+            unsafe { EnableWindow(control, is_toggle || is_secondary_toggle || enabled) };
         }
     }
 }
@@ -10582,7 +10609,7 @@ fn handle_options_vscroll(hwnd: HWND, wparam: WPARAM) -> bool {
     changed
 }
 
-unsafe fn set_active_tab(hwnd: HWND, index: i32) {
+fn set_active_tab(hwnd: HWND, index: i32) {
     let index = index.clamp(0, OPTIONS_TAB_COUNT - 1);
     let focus_first = with_options_state(hwnd, |state| {
         if state.focus_initialized {
@@ -10636,7 +10663,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.label_file_associations,
             state.button_manage_associations,
         ] {
-            ShowWindow(control, if show_general { SW_SHOW } else { SW_HIDE });
+            unsafe { ShowWindow(control, if show_general { SW_SHOW } else { SW_HIDE }) };
         }
 
         for control in [
@@ -10702,7 +10729,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.button_dialogue_voice_preview,
             state.button_dialogue_secondary_voice_preview,
         ] {
-            ShowWindow(control, if show_voice { SW_SHOW } else { SW_HIDE });
+            unsafe { ShowWindow(control, if show_voice { SW_SHOW } else { SW_HIDE }) };
         }
 
         for control in [
@@ -10732,7 +10759,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.button_interpreter_search,
             state.checkbox_move_cursor,
         ] {
-            ShowWindow(control, if show_editor { SW_SHOW } else { SW_HIDE });
+            unsafe { ShowWindow(control, if show_editor { SW_SHOW } else { SW_HIDE }) };
         }
 
         for control in [
@@ -10760,7 +10787,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.label_subtitle_offset,
             state.edit_subtitle_offset,
         ] {
-            ShowWindow(control, if show_audio { SW_SHOW } else { SW_HIDE });
+            unsafe { ShowWindow(control, if show_audio { SW_SHOW } else { SW_HIDE }) };
         }
 
         for control in [
@@ -10789,7 +10816,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.edit_podcastindex_secret,
             state.button_podcastindex_signup,
         ] {
-            ShowWindow(control, if show_rss_podcast { SW_SHOW } else { SW_HIDE });
+            unsafe { ShowWindow(control, if show_rss_podcast { SW_SHOW } else { SW_HIDE }) };
         }
 
         for control in [
@@ -10801,7 +10828,7 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.button_shortcut_reset,
             state.button_shortcut_reset_all,
         ] {
-            ShowWindow(control, if show_shortcuts { SW_SHOW } else { SW_HIDE });
+            unsafe { ShowWindow(control, if show_shortcuts { SW_SHOW } else { SW_HIDE }) };
         }
     })
     .is_none()
@@ -10843,20 +10870,22 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
             state.combo_audio_split_start_number,
         )
     }) {
-        ShowWindow(label_text, SW_HIDE);
-        ShowWindow(edit_text, SW_HIDE);
-        ShowWindow(checkbox, SW_HIDE);
-        ShowWindow(label_minutes, SW_HIDE);
-        ShowWindow(combo_minutes, SW_HIDE);
-        ShowWindow(label_parts, SW_HIDE);
-        ShowWindow(edit_parts, SW_HIDE);
-        ShowWindow(label_start, SW_HIDE);
-        ShowWindow(combo_start, SW_HIDE);
-        EnableWindow(edit_text, false);
-        EnableWindow(checkbox, false);
-        EnableWindow(edit_parts, false);
-        EnableWindow(combo_minutes, false);
-        EnableWindow(combo_start, false);
+        unsafe {
+            ShowWindow(label_text, SW_HIDE);
+            ShowWindow(edit_text, SW_HIDE);
+            ShowWindow(checkbox, SW_HIDE);
+            ShowWindow(label_minutes, SW_HIDE);
+            ShowWindow(combo_minutes, SW_HIDE);
+            ShowWindow(label_parts, SW_HIDE);
+            ShowWindow(edit_parts, SW_HIDE);
+            ShowWindow(label_start, SW_HIDE);
+            ShowWindow(combo_start, SW_HIDE);
+            EnableWindow(edit_text, false);
+            EnableWindow(checkbox, false);
+            EnableWindow(edit_parts, false);
+            EnableWindow(combo_minutes, false);
+            EnableWindow(combo_start, false);
+        }
     }
 
     if focus_first {

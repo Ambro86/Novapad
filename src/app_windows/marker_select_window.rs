@@ -173,267 +173,273 @@ unsafe extern "system" fn marker_select_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "marker_select_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { marker_select_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || marker_select_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn marker_select_wndproc_inner(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let create_struct = lparam.0 as *const CREATESTRUCTW;
-            let init_ptr = (*create_struct).lpCreateParams as *mut MarkerSelectInit;
-            if init_ptr.is_null() {
-                return LRESULT(0);
-            }
-            let init = unsafe { Box::from_raw(init_ptr) };
-            let labels = labels(init.language);
+fn marker_select_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let create_struct = lparam.0 as *const CREATESTRUCTW;
+                let init_ptr = (*create_struct).lpCreateParams as *mut MarkerSelectInit;
+                if init_ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let init = Box::from_raw(init_ptr);
+                let labels = labels(init.language);
 
-            let hfont = with_state(init.parent, |state| state.hfont).unwrap_or(HFONT(0));
+                let hfont = with_state(init.parent, |state| state.hfont).unwrap_or(HFONT(0));
 
-            let hint = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.hint).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                14,
-                420,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-
-            let list = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("LISTBOX"),
-                PCWSTR::null(),
-                WS_CHILD
-                    | WS_VISIBLE
-                    | WS_TABSTOP
-                    | WS_VSCROLL
-                    | WINDOW_STYLE((LBS_NOTIFY | LBS_MULTIPLESEL | LBS_NOINTEGRALHEIGHT) as u32),
-                16,
-                40,
-                420,
-                220,
-                hwnd,
-                HMENU(MARKER_ID_LIST as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            for item in init.items.iter() {
-                SendMessageW(
-                    list,
-                    LB_ADDSTRING,
-                    WPARAM(0),
-                    LPARAM(to_wide(item).as_ptr() as isize),
+                let hint = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.hint).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    14,
+                    420,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
                 );
-            }
-            let count = SendMessageW(list, LB_GETCOUNT, WPARAM(0), LPARAM(0)).0;
-            for idx in 0..count {
-                SendMessageW(list, LB_SETSEL, WPARAM(1), LPARAM(idx));
-            }
-            if count > 0 {
-                SendMessageW(list, LB_SETCURSEL, WPARAM(0), LPARAM(0));
-                SendMessageW(list, LB_SETCARETINDEX, WPARAM(0), LPARAM(0));
-                SendMessageW(list, LB_SETTOPINDEX, WPARAM(0), LPARAM(0));
-            }
-            SetFocus(list);
 
-            let toggle_all = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.toggle_all).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                16,
-                270,
-                140,
-                28,
-                hwnd,
-                HMENU(MARKER_ID_TOGGLE_ALL as isize),
-                HINSTANCE(0),
-                None,
-            );
+                let list = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("LISTBOX"),
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WS_VSCROLL
+                        | WINDOW_STYLE(
+                            (LBS_NOTIFY | LBS_MULTIPLESEL | LBS_NOINTEGRALHEIGHT) as u32,
+                        ),
+                    16,
+                    40,
+                    420,
+                    220,
+                    hwnd,
+                    HMENU(MARKER_ID_LIST as isize),
+                    HINSTANCE(0),
+                    None,
+                );
 
-            let ok = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.ok).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                250,
-                270,
-                90,
-                28,
-                hwnd,
-                HMENU(MARKER_ID_OK as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            let cancel = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.cancel).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                346,
-                270,
-                90,
-                28,
-                hwnd,
-                HMENU(MARKER_ID_CANCEL as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            for control in [hint, list, toggle_all, ok, cancel] {
-                if control.0 != 0 && hfont.0 != 0 {
-                    SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                for item in init.items.iter() {
+                    SendMessageW(
+                        list,
+                        LB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(to_wide(item).as_ptr() as isize),
+                    );
                 }
-            }
-
-            let state = Box::new(MarkerSelectState {
-                parent: init.parent,
-                list,
-                toggle_all,
-                result: init.result.clone(),
-            });
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
-
-            update_toggle_all_label(toggle_all, init.language, list);
-
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-            let cmd_id = wparam.0 & 0xffff;
-            let notification = ((wparam.0 >> 16) & 0xffff) as u16;
-            if cmd_id == MARKER_ID_LIST && notification as u32 == LBN_SELCHANGE {
-                if with_marker_state(hwnd, |state| {
-                    let language =
-                        with_state(state.parent, |s| s.settings.language).unwrap_or_default();
-                    update_toggle_all_label(state.toggle_all, language, state.list);
-                })
-                .is_none()
-                {
-                    crate::log_debug("Failed to access marker state");
+                let count = SendMessageW(list, LB_GETCOUNT, WPARAM(0), LPARAM(0)).0;
+                for idx in 0..count {
+                    SendMessageW(list, LB_SETSEL, WPARAM(1), LPARAM(idx));
                 }
-                LRESULT(0)
-            } else if cmd_id == MARKER_ID_TOGGLE_ALL {
-                if with_marker_state(hwnd, |state| {
-                    let should_select_all = list_has_unselected(state.list);
-                    set_all_selected(state.list, should_select_all);
-                    let language =
-                        with_state(state.parent, |s| s.settings.language).unwrap_or_default();
-                    update_toggle_all_label(state.toggle_all, language, state.list);
-                })
-                .is_none()
-                {
-                    crate::log_debug("Failed to access marker state");
+                if count > 0 {
+                    SendMessageW(list, LB_SETCURSEL, WPARAM(0), LPARAM(0));
+                    SendMessageW(list, LB_SETCARETINDEX, WPARAM(0), LPARAM(0));
+                    SendMessageW(list, LB_SETTOPINDEX, WPARAM(0), LPARAM(0));
                 }
-                LRESULT(0)
-            } else if cmd_id == MARKER_ID_OK {
-                if with_marker_state(hwnd, |state| {
-                    let count = SendMessageW(state.list, LB_GETCOUNT, WPARAM(0), LPARAM(0)).0;
-                    let mut selected = Vec::new();
-                    for idx in 0..count {
-                        let is_selected =
-                            SendMessageW(state.list, LB_GETSEL, WPARAM(idx as usize), LPARAM(0)).0;
-                        if is_selected > 0 {
-                            selected.push(idx as usize);
-                        }
+                SetFocus(list);
+
+                let toggle_all = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.toggle_all).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    16,
+                    270,
+                    140,
+                    28,
+                    hwnd,
+                    HMENU(MARKER_ID_TOGGLE_ALL as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                let ok = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.ok).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    250,
+                    270,
+                    90,
+                    28,
+                    hwnd,
+                    HMENU(MARKER_ID_OK as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                let cancel = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.cancel).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    346,
+                    270,
+                    90,
+                    28,
+                    hwnd,
+                    HMENU(MARKER_ID_CANCEL as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                for control in [hint, list, toggle_all, ok, cancel] {
+                    if control.0 != 0 && hfont.0 != 0 {
+                        SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                     }
-                    *state.result.lock().unwrap_or_else(|e| e.into_inner()) = Some(selected);
-                })
-                .is_none()
-                {
-                    crate::log_debug("Failed to access marker state");
                 }
-                if let Err(_e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
-                    crate::log_debug(&format!("Error: {:?}", _e));
-                }
+
+                let state = Box::new(MarkerSelectState {
+                    parent: init.parent,
+                    list,
+                    toggle_all,
+                    result: init.result.clone(),
+                });
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+
+                update_toggle_all_label(toggle_all, init.language, list);
+
                 LRESULT(0)
-            } else if cmd_id == MARKER_ID_CANCEL {
-                if with_marker_state(hwnd, |state| {
-                    *state.result.lock().unwrap_or_else(|e| e.into_inner()) = None;
-                })
-                .is_none()
-                {
-                    crate::log_debug("Failed to access marker state");
-                }
-                if let Err(_e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
-                    crate::log_debug(&format!("Error: {:?}", _e));
-                }
-                LRESULT(0)
-            } else {
-                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
-        }
-        WM_KEYDOWN => {
-            if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                if let Err(_e) = PostMessageW(hwnd, WM_COMMAND, WPARAM(MARKER_ID_CANCEL), LPARAM(0))
-                {
-                    crate::log_debug(&format!("Error: {:?}", _e));
-                }
-                return LRESULT(0);
-            }
-            if wparam.0 as u32 == VK_RETURN.0 as u32 {
-                let focus = GetFocus();
-                let list = with_marker_state(hwnd, |state| state.list).unwrap_or(HWND(0));
-                if focus == list {
-                    if let Err(e) = PostMessageW(hwnd, WM_COMMAND, WPARAM(MARKER_ID_OK), LPARAM(0))
+            WM_COMMAND => {
+                let cmd_id = wparam.0 & 0xffff;
+                let notification = ((wparam.0 >> 16) & 0xffff) as u16;
+                if cmd_id == MARKER_ID_LIST && notification as u32 == LBN_SELCHANGE {
+                    if with_marker_state(hwnd, |state| {
+                        let language =
+                            with_state(state.parent, |s| s.settings.language).unwrap_or_default();
+                        update_toggle_all_label(state.toggle_all, language, state.list);
+                    })
+                    .is_none()
                     {
-                        crate::log_debug(&format!("Failed to post MARKER_ID_OK: {}", e));
+                        crate::log_debug("Failed to access marker state");
+                    }
+                    LRESULT(0)
+                } else if cmd_id == MARKER_ID_TOGGLE_ALL {
+                    if with_marker_state(hwnd, |state| {
+                        let should_select_all = list_has_unselected(state.list);
+                        set_all_selected(state.list, should_select_all);
+                        let language =
+                            with_state(state.parent, |s| s.settings.language).unwrap_or_default();
+                        update_toggle_all_label(state.toggle_all, language, state.list);
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access marker state");
+                    }
+                    LRESULT(0)
+                } else if cmd_id == MARKER_ID_OK {
+                    if with_marker_state(hwnd, |state| {
+                        let count = SendMessageW(state.list, LB_GETCOUNT, WPARAM(0), LPARAM(0)).0;
+                        let mut selected = Vec::new();
+                        for idx in 0..count {
+                            let is_selected = SendMessageW(
+                                state.list,
+                                LB_GETSEL,
+                                WPARAM(idx as usize),
+                                LPARAM(0),
+                            )
+                            .0;
+                            if is_selected > 0 {
+                                selected.push(idx as usize);
+                            }
+                        }
+                        *state.result.lock().unwrap_or_else(|e| e.into_inner()) = Some(selected);
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access marker state");
+                    }
+                    if let Err(_e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
+                        crate::log_debug(&format!("Error: {:?}", _e));
+                    }
+                    LRESULT(0)
+                } else if cmd_id == MARKER_ID_CANCEL {
+                    if with_marker_state(hwnd, |state| {
+                        *state.result.lock().unwrap_or_else(|e| e.into_inner()) = None;
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access marker state");
+                    }
+                    if let Err(_e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
+                        crate::log_debug(&format!("Error: {:?}", _e));
+                    }
+                    LRESULT(0)
+                } else {
+                    DefWindowProcW(hwnd, msg, wparam, lparam)
+                }
+            }
+            WM_KEYDOWN => {
+                if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
+                    if let Err(_e) =
+                        PostMessageW(hwnd, WM_COMMAND, WPARAM(MARKER_ID_CANCEL), LPARAM(0))
+                    {
+                        crate::log_debug(&format!("Error: {:?}", _e));
                     }
                     return LRESULT(0);
                 }
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_CLOSE => {
-            if with_marker_state(hwnd, |state| {
-                if state
-                    .result
-                    .lock()
-                    .unwrap_or_else(|e| e.into_inner())
-                    .is_none()
-                {
-                    *state.result.lock().unwrap_or_else(|e| e.into_inner()) = None;
+                if wparam.0 as u32 == VK_RETURN.0 as u32 {
+                    let focus = GetFocus();
+                    let list = with_marker_state(hwnd, |state| state.list).unwrap_or(HWND(0));
+                    if focus == list {
+                        if let Err(e) =
+                            PostMessageW(hwnd, WM_COMMAND, WPARAM(MARKER_ID_OK), LPARAM(0))
+                        {
+                            crate::log_debug(&format!("Failed to post MARKER_ID_OK: {}", e));
+                        }
+                        return LRESULT(0);
+                    }
                 }
-            })
-            .is_none()
-            {
-                crate::log_debug("Failed to access marker state");
+                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
-            crate::log_if_err!(DestroyWindow(hwnd));
-            LRESULT(0)
-        }
-        WM_DESTROY => {
-            if with_marker_state(hwnd, |state| {
-                EnableWindow(state.parent, true);
-                SetForegroundWindow(state.parent);
-            })
-            .is_none()
-            {
-                crate::log_debug("Failed to access marker state");
+            WM_CLOSE => {
+                if with_marker_state(hwnd, |state| {
+                    if state
+                        .result
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .is_none()
+                    {
+                        *state.result.lock().unwrap_or_else(|e| e.into_inner()) = None;
+                    }
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access marker state");
+                }
+                crate::log_if_err!(DestroyWindow(hwnd));
+                LRESULT(0)
             }
-            LRESULT(0)
-        }
-        WM_NCDESTROY => {
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut MarkerSelectState;
-            if !ptr.is_null() {
-                let _unused_box = Box::from_raw(ptr);
+            WM_DESTROY => {
+                if with_marker_state(hwnd, |state| {
+                    EnableWindow(state.parent, true);
+                    SetForegroundWindow(state.parent);
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access marker state");
+                }
+                LRESULT(0)
             }
-            LRESULT(0)
+            WM_NCDESTROY => {
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut MarkerSelectState;
+                if !ptr.is_null() {
+                    let _unused_box = Box::from_raw(ptr);
+                }
+                LRESULT(0)
+            }
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 

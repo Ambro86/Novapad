@@ -150,88 +150,97 @@ unsafe extern "system" fn bookmarks_wndproc(
     crate::panic_guard::guard(
         "bookmarks_wndproc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { bookmarks_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || bookmarks_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn bookmarks_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+fn bookmarks_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_CREATE => {
             let create_struct = lparam.0 as *const CREATESTRUCTW;
-            let parent = HWND((*create_struct).lpCreateParams as isize);
-            let hfont = with_state(parent, |state| state.hfont).unwrap_or(HFONT(0));
-            let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
+            let parent = unsafe { HWND((*create_struct).lpCreateParams as isize) };
+            let hfont = unsafe { with_state(parent, |state| state.hfont) }.unwrap_or(HFONT(0));
+            let language =
+                unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
 
-            let hwnd_list = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_LISTBOXW,
-                PCWSTR::null(),
-                WS_CHILD
-                    | WS_VISIBLE
-                    | WS_VSCROLL
-                    | WS_TABSTOP
-                    | WINDOW_STYLE((LBS_NOTIFY | LBS_HASSTRINGS) as u32),
-                10,
-                10,
-                360,
-                300,
-                hwnd,
-                HMENU(BOOKMARKS_ID_LIST as isize),
-                HINSTANCE(0),
-                None,
-            );
+            let hwnd_list = unsafe {
+                CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_LISTBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_VSCROLL
+                        | WS_TABSTOP
+                        | WINDOW_STYLE((LBS_NOTIFY | LBS_HASSTRINGS) as u32),
+                    10,
+                    10,
+                    360,
+                    300,
+                    hwnd,
+                    HMENU(BOOKMARKS_ID_LIST as isize),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
 
             let btn_goto_text = i18n::tr(language, "bookmarks.goto");
-            let hwnd_goto = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&btn_goto_text).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                10,
-                320,
-                110,
-                30,
-                hwnd,
-                HMENU(BOOKMARKS_ID_GOTO as isize),
-                HINSTANCE(0),
-                None,
-            );
+            let hwnd_goto = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&btn_goto_text).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    10,
+                    320,
+                    110,
+                    30,
+                    hwnd,
+                    HMENU(BOOKMARKS_ID_GOTO as isize),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
 
             let btn_del_text = i18n::tr(language, "bookmarks.delete");
-            let hwnd_delete = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&btn_del_text).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                130,
-                320,
-                110,
-                30,
-                hwnd,
-                HMENU(BOOKMARKS_ID_DELETE as isize),
-                HINSTANCE(0),
-                None,
-            );
+            let hwnd_delete = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&btn_del_text).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    130,
+                    320,
+                    110,
+                    30,
+                    hwnd,
+                    HMENU(BOOKMARKS_ID_DELETE as isize),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
 
             let btn_ok_text = i18n::tr(language, "options.ok");
-            let hwnd_ok = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&btn_ok_text).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                250,
-                320,
-                110,
-                30,
-                hwnd,
-                HMENU(BOOKMARKS_ID_OK as isize),
-                HINSTANCE(0),
-                None,
-            );
+            let hwnd_ok = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&btn_ok_text).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    250,
+                    320,
+                    110,
+                    30,
+                    hwnd,
+                    HMENU(BOOKMARKS_ID_OK as isize),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
 
             for ctrl in [hwnd_list, hwnd_goto, hwnd_delete, hwnd_ok] {
                 if ctrl.0 != 0 && hfont.0 != 0 {
-                    SendMessageW(ctrl, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    unsafe { SendMessageW(ctrl, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1)) };
                 }
             }
 
@@ -240,14 +249,14 @@ unsafe fn bookmarks_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 hwnd_list,
                 hwnd_goto,
             });
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+            unsafe { SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize) };
 
             refresh_bookmarks_list(hwnd);
 
-            if SendMessageW(hwnd_list, LB_GETCOUNT, WPARAM(0), LPARAM(0)).0 > 0 {
-                SendMessageW(hwnd_list, LB_SETCURSEL, WPARAM(0), LPARAM(0));
+            if unsafe { SendMessageW(hwnd_list, LB_GETCOUNT, WPARAM(0), LPARAM(0)).0 } > 0 {
+                unsafe { SendMessageW(hwnd_list, LB_SETCURSEL, WPARAM(0), LPARAM(0)) };
             }
-            SetFocus(hwnd_list);
+            unsafe { SetFocus(hwnd_list) };
 
             LRESULT(0)
         }
@@ -264,7 +273,7 @@ unsafe fn bookmarks_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     LRESULT(0)
                 }
                 BOOKMARKS_ID_OK => {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
                     LRESULT(0)
                 }
                 BOOKMARKS_ID_LIST if notify == LBN_DBLCLK as u16 => {
@@ -272,24 +281,26 @@ unsafe fn bookmarks_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     LRESULT(0)
                 }
                 cmd if cmd == IDCANCEL.0 as usize || cmd == 2 => {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
                     LRESULT(0)
                 }
-                _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+                _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
             }
         }
         WM_CLOSE => {
-            crate::log_if_err!(DestroyWindow(hwnd));
+            crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
             LRESULT(0)
         }
         WM_DESTROY => {
             let parent = with_bookmarks_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
             if parent.0 != 0 {
-                EnableWindow(parent, true);
+                unsafe { EnableWindow(parent, true) };
                 force_focus_editor_on_parent(parent);
-                if with_state(parent, |state| {
-                    state.bookmarks_window = HWND(0);
-                })
+                if unsafe {
+                    with_state(parent, |state| {
+                        state.bookmarks_window = HWND(0);
+                    })
+                }
                 .is_none()
                 {
                     crate::log_debug("Failed to access bookmarks state");
@@ -298,13 +309,14 @@ unsafe fn bookmarks_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             LRESULT(0)
         }
         WM_NCDESTROY => {
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut BookmarksWindowState;
+            let ptr =
+                unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut BookmarksWindowState };
             if !ptr.is_null() {
-                let _unused_box = Box::from_raw(ptr);
+                let _unused_box = unsafe { Box::from_raw(ptr) };
             }
             LRESULT(0)
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+        _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }
 }
 

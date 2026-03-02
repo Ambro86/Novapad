@@ -3413,449 +3413,371 @@ unsafe extern "system" fn categories_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "categories_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { categories_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || categories_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn categories_wndproc_inner(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let cs = lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
-            let init_ptr = (*cs).lpCreateParams as *mut CategoryDialogInit;
-            let init = if init_ptr.is_null() {
-                return LRESULT(0);
-            } else {
-                unsafe { Box::from_raw(init_ptr) }
-            };
-            let language = with_podcast_state(init.parent, |s| s.language).unwrap_or_default();
-            let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-
-            let label_source = CreateWindowExW(
-                Default::default(),
-                w!("STATIC"),
-                PCWSTR(to_wide(&i18n::tr(language, "podcasts.categories.source.label")).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(1),
-                hinstance,
-                None,
-            );
-            let combo_source = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("COMBOBOX"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(CATEGORIES_SOURCE_COMBO_ID as isize),
-                hinstance,
-                None,
-            );
-
-            let label_mode = CreateWindowExW(
-                Default::default(),
-                w!("STATIC"),
-                PCWSTR(to_wide(&i18n::tr(language, "podcasts.categories.mode.label")).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(2),
-                hinstance,
-                None,
-            );
-            let combo_mode = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("COMBOBOX"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(CATEGORIES_MODE_COMBO_ID as isize),
-                hinstance,
-                None,
-            );
-
-            let label_list = CreateWindowExW(
-                Default::default(),
-                w!("STATIC"),
-                PCWSTR(to_wide(&i18n::tr(language, "podcasts.categories.list.label")).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(3),
-                hinstance,
-                None,
-            );
-            let list = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("LISTBOX"),
-                PCWSTR::null(),
-                WS_CHILD
-                    | WS_VISIBLE
-                    | WS_TABSTOP
-                    | WINDOW_STYLE(
-                        (LBS_NOTIFY as u32) | windows::Win32::UI::WindowsAndMessaging::WS_VSCROLL.0,
-                    ),
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(CATEGORIES_LIST_ID as isize),
-                hinstance,
-                None,
-            );
-            let list_proc = if list.0 != 0 {
-                let proc_ptr = category_list_wndproc as *const () as usize;
-                let old = SetWindowLongPtrW(
-                    list,
-                    windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
-                    proc_ptr as isize,
-                );
-                std::mem::transmute::<isize, WNDPROC>(old)
-            } else {
-                None
-            };
-
-            let term_label = CreateWindowExW(
-                Default::default(),
-                w!("STATIC"),
-                PCWSTR(to_wide(&i18n::tr(language, "podcasts.categories.term.label")).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(4),
-                hinstance,
-                None,
-            );
-            let term_edit = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(CATEGORIES_TERM_EDIT_ID as isize),
-                hinstance,
-                None,
-            );
-            if term_edit.0 != 0 && !init.initial_term.trim().is_empty() {
-                let wide = to_wide(&init.initial_term);
-                if let Err(e) = SetWindowTextW(term_edit, PCWSTR(wide.as_ptr())) {
-                    crate::log_debug(&format!("SetWindowTextW failed: {:?}", e));
-                }
-            }
-
-            let status = CreateWindowExW(
-                Default::default(),
-                w!("STATIC"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE,
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(CATEGORIES_STATUS_ID as isize),
-                hinstance,
-                None,
-            );
-
-            let open_btn = CreateWindowExW(
-                Default::default(),
-                w!("BUTTON"),
-                PCWSTR(to_wide(&i18n::tr(language, "podcasts.categories.open")).as_ptr()),
-                WS_CHILD
-                    | WS_VISIBLE
-                    | WS_TABSTOP
-                    | WINDOW_STYLE(
-                        windows::Win32::UI::WindowsAndMessaging::BS_DEFPUSHBUTTON as u32,
-                    ),
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(CATEGORIES_OPEN_ID as isize),
-                hinstance,
-                None,
-            );
-            let cancel_btn = CreateWindowExW(
-                Default::default(),
-                w!("BUTTON"),
-                PCWSTR(to_wide(&i18n::tr(language, "podcasts.categories.cancel")).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(CATEGORIES_CANCEL_ID as isize),
-                hinstance,
-                None,
-            );
-
-            if combo_source.0 != 0 {
-                let apple_label = i18n::tr(language, "podcasts.categories.source.apple");
-                let podcastindex_label =
-                    i18n::tr(language, "podcasts.categories.source.podcastindex");
-                let apple_wide = to_wide(&apple_label);
-                let podcastindex_wide = to_wide(&podcastindex_label);
-                SendMessageW(
-                    combo_source,
-                    CB_ADDSTRING,
-                    WPARAM(0),
-                    LPARAM(apple_wide.as_ptr() as isize),
-                );
-                SendMessageW(
-                    combo_source,
-                    CB_ADDSTRING,
-                    WPARAM(0),
-                    LPARAM(podcastindex_wide.as_ptr() as isize),
-                );
-                let source_index = if matches!(init.initial_source, Source::PodcastIndex) {
-                    1
+fn categories_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let cs = lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
+                let init_ptr = (*cs).lpCreateParams as *mut CategoryDialogInit;
+                let init = if init_ptr.is_null() {
+                    return LRESULT(0);
                 } else {
-                    0
+                    Box::from_raw(init_ptr)
                 };
-                SendMessageW(combo_source, CB_SETCURSEL, WPARAM(source_index), LPARAM(0));
-            }
-            if combo_mode.0 != 0 {
-                let top_label = i18n::tr(language, "podcasts.categories.mode.top");
-                let search_label = i18n::tr(language, "podcasts.categories.mode.search");
-                let top_wide = to_wide(&top_label);
-                let search_wide = to_wide(&search_label);
-                SendMessageW(
-                    combo_mode,
-                    CB_ADDSTRING,
-                    WPARAM(0),
-                    LPARAM(top_wide.as_ptr() as isize),
-                );
-                SendMessageW(
-                    combo_mode,
-                    CB_ADDSTRING,
-                    WPARAM(0),
-                    LPARAM(search_wide.as_ptr() as isize),
-                );
-                SendMessageW(combo_mode, CB_SETCURSEL, WPARAM(0), LPARAM(0));
-            }
+                let language = with_podcast_state(init.parent, |s| s.language).unwrap_or_default();
+                let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
 
-            let state = Box::new(CategoryDialogState {
-                parent: init.parent,
-                language,
-                hwnd_source_label: label_source,
-                hwnd_source: combo_source,
-                hwnd_mode_label: label_mode,
-                hwnd_mode: combo_mode,
-                hwnd_list_label: label_list,
-                hwnd_list: list,
-                list_proc,
-                hwnd_term_label: term_label,
-                hwnd_term_edit: term_edit,
-                hwnd_open: open_btn,
-                hwnd_cancel: cancel_btn,
-                hwnd_status: status,
-                source: init.initial_source,
-                mode: Mode::Top,
-                categories: Vec::new(),
-            });
-            SetWindowLongPtrW(
-                hwnd,
-                windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
-                Box::into_raw(state) as isize,
-            );
+                let label_source = CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(
+                        to_wide(&i18n::tr(language, "podcasts.categories.source.label")).as_ptr(),
+                    ),
+                    WS_CHILD | WS_VISIBLE,
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(1),
+                    hinstance,
+                    None,
+                );
+                let combo_source = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("COMBOBOX"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(CATEGORIES_SOURCE_COMBO_ID as isize),
+                    hinstance,
+                    None,
+                );
 
-            let hfont = HFONT(
-                windows::Win32::Graphics::Gdi::GetStockObject(
-                    windows::Win32::Graphics::Gdi::DEFAULT_GUI_FONT,
-                )
-                .0,
-            );
-            for ctrl in [
-                label_source,
-                combo_source,
-                label_mode,
-                combo_mode,
-                label_list,
-                list,
-                term_label,
-                term_edit,
-                status,
-                open_btn,
-                cancel_btn,
-            ] {
-                if ctrl.0 != 0 {
-                    SendMessageW(ctrl, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                let label_mode = CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&i18n::tr(language, "podcasts.categories.mode.label")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(2),
+                    hinstance,
+                    None,
+                );
+                let combo_mode = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("COMBOBOX"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(CATEGORIES_MODE_COMBO_ID as isize),
+                    hinstance,
+                    None,
+                );
+
+                let label_list = CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&i18n::tr(language, "podcasts.categories.list.label")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(3),
+                    hinstance,
+                    None,
+                );
+                let list = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("LISTBOX"),
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WINDOW_STYLE(
+                            (LBS_NOTIFY as u32)
+                                | windows::Win32::UI::WindowsAndMessaging::WS_VSCROLL.0,
+                        ),
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(CATEGORIES_LIST_ID as isize),
+                    hinstance,
+                    None,
+                );
+                let list_proc = if list.0 != 0 {
+                    let proc_ptr = category_list_wndproc as *const () as usize;
+                    let old = SetWindowLongPtrW(
+                        list,
+                        windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
+                        proc_ptr as isize,
+                    );
+                    std::mem::transmute::<isize, WNDPROC>(old)
+                } else {
+                    None
+                };
+
+                let term_label = CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&i18n::tr(language, "podcasts.categories.term.label")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(4),
+                    hinstance,
+                    None,
+                );
+                let term_edit = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(CATEGORIES_TERM_EDIT_ID as isize),
+                    hinstance,
+                    None,
+                );
+                if term_edit.0 != 0 && !init.initial_term.trim().is_empty() {
+                    let wide = to_wide(&init.initial_term);
+                    if let Err(e) = SetWindowTextW(term_edit, PCWSTR(wide.as_ptr())) {
+                        crate::log_debug(&format!("SetWindowTextW failed: {:?}", e));
+                    }
                 }
-            }
 
-            load_categories_for_source(hwnd, init.initial_source);
-            set_category_mode(hwnd, Mode::Top);
-            SetFocus(list);
-            LRESULT(0)
-        }
-        WM_SIZE => {
-            let mut rect = windows::Win32::Foundation::RECT::default();
-            crate::log_if_err!(GetClientRect(hwnd, &mut rect));
-            let width = (rect.right - rect.left).max(0);
-            let height = (rect.bottom - rect.top).max(0);
-            let margin = 10;
-            let spacing = 6;
-            let label_h = 16;
-            let row_h = 24;
-            let button_h = 26;
-            let status_h = 18;
+                let status = CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE,
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(CATEGORIES_STATUS_ID as isize),
+                    hinstance,
+                    None,
+                );
 
-            let (
-                label_source,
-                combo_source,
-                label_mode,
-                combo_mode,
-                label_list,
-                list,
-                term_label,
-                term_edit,
-                open_btn,
-                cancel_btn,
-                status,
-            ) = with_category_dialog_state(hwnd, |s| {
-                (
-                    s.hwnd_source_label,
-                    s.hwnd_source,
-                    s.hwnd_mode_label,
-                    s.hwnd_mode,
-                    s.hwnd_list_label,
-                    s.hwnd_list,
-                    s.hwnd_term_label,
-                    s.hwnd_term_edit,
-                    s.hwnd_open,
-                    s.hwnd_cancel,
-                    s.hwnd_status,
-                )
-            })
-            .unwrap_or((
-                HWND(0),
-                HWND(0),
-                HWND(0),
-                HWND(0),
-                HWND(0),
-                HWND(0),
-                HWND(0),
-                HWND(0),
-                HWND(0),
-                HWND(0),
-                HWND(0),
-            ));
+                let open_btn = CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&i18n::tr(language, "podcasts.categories.open")).as_ptr()),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WINDOW_STYLE(
+                            windows::Win32::UI::WindowsAndMessaging::BS_DEFPUSHBUTTON as u32,
+                        ),
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(CATEGORIES_OPEN_ID as isize),
+                    hinstance,
+                    None,
+                );
+                let cancel_btn = CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&i18n::tr(language, "podcasts.categories.cancel")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(CATEGORIES_CANCEL_ID as isize),
+                    hinstance,
+                    None,
+                );
 
-            let mut y = margin;
-            if label_source.0 != 0 {
-                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                if combo_source.0 != 0 {
+                    let apple_label = i18n::tr(language, "podcasts.categories.source.apple");
+                    let podcastindex_label =
+                        i18n::tr(language, "podcasts.categories.source.podcastindex");
+                    let apple_wide = to_wide(&apple_label);
+                    let podcastindex_wide = to_wide(&podcastindex_label);
+                    SendMessageW(
+                        combo_source,
+                        CB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(apple_wide.as_ptr() as isize),
+                    );
+                    SendMessageW(
+                        combo_source,
+                        CB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(podcastindex_wide.as_ptr() as isize),
+                    );
+                    let source_index = if matches!(init.initial_source, Source::PodcastIndex) {
+                        1
+                    } else {
+                        0
+                    };
+                    SendMessageW(combo_source, CB_SETCURSEL, WPARAM(source_index), LPARAM(0));
+                }
+                if combo_mode.0 != 0 {
+                    let top_label = i18n::tr(language, "podcasts.categories.mode.top");
+                    let search_label = i18n::tr(language, "podcasts.categories.mode.search");
+                    let top_wide = to_wide(&top_label);
+                    let search_wide = to_wide(&search_label);
+                    SendMessageW(
+                        combo_mode,
+                        CB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(top_wide.as_ptr() as isize),
+                    );
+                    SendMessageW(
+                        combo_mode,
+                        CB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(search_wide.as_ptr() as isize),
+                    );
+                    SendMessageW(combo_mode, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+                }
+
+                let state = Box::new(CategoryDialogState {
+                    parent: init.parent,
+                    language,
+                    hwnd_source_label: label_source,
+                    hwnd_source: combo_source,
+                    hwnd_mode_label: label_mode,
+                    hwnd_mode: combo_mode,
+                    hwnd_list_label: label_list,
+                    hwnd_list: list,
+                    list_proc,
+                    hwnd_term_label: term_label,
+                    hwnd_term_edit: term_edit,
+                    hwnd_open: open_btn,
+                    hwnd_cancel: cancel_btn,
+                    hwnd_status: status,
+                    source: init.initial_source,
+                    mode: Mode::Top,
+                    categories: Vec::new(),
+                });
+                SetWindowLongPtrW(
+                    hwnd,
+                    windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+                    Box::into_raw(state) as isize,
+                );
+
+                let hfont = HFONT(
+                    windows::Win32::Graphics::Gdi::GetStockObject(
+                        windows::Win32::Graphics::Gdi::DEFAULT_GUI_FONT,
+                    )
+                    .0,
+                );
+                for ctrl in [
                     label_source,
-                    margin,
-                    y,
-                    width - margin * 2,
-                    label_h,
-                    true,
-                ));
-            }
-            y += label_h + spacing;
-            if combo_source.0 != 0 {
-                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
                     combo_source,
-                    margin,
-                    y,
-                    width - margin * 2,
-                    row_h,
-                    true,
-                ));
-            }
-            y += row_h + spacing;
-            if label_mode.0 != 0 {
-                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
                     label_mode,
-                    margin,
-                    y,
-                    width - margin * 2,
-                    label_h,
-                    true,
-                ));
-            }
-            y += label_h + spacing;
-            if combo_mode.0 != 0 {
-                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
                     combo_mode,
-                    margin,
-                    y,
-                    width - margin * 2,
-                    row_h,
-                    true,
-                ));
-            }
-            y += row_h + spacing;
-            if label_list.0 != 0 {
-                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
                     label_list,
-                    margin,
-                    y,
-                    width - margin * 2,
-                    label_h,
-                    true,
-                ));
-            }
-            y += label_h + spacing;
-
-            let term_visible = with_category_dialog_state(hwnd, |s| s.mode)
-                .map(|m| matches!(m, Mode::SearchInCategory))
-                .unwrap_or(false);
-            let term_block = if term_visible {
-                label_h + spacing + row_h + spacing
-            } else {
-                0
-            };
-            let list_h = (height - y - term_block - status_h - button_h - margin * 2).max(80);
-            if list.0 != 0 {
-                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
                     list,
-                    margin,
-                    y,
-                    width - margin * 2,
-                    list_h,
-                    true,
-                ));
+                    term_label,
+                    term_edit,
+                    status,
+                    open_btn,
+                    cancel_btn,
+                ] {
+                    if ctrl.0 != 0 {
+                        SendMessageW(ctrl, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    }
+                }
+
+                load_categories_for_source(hwnd, init.initial_source);
+                set_category_mode(hwnd, Mode::Top);
+                SetFocus(list);
+                LRESULT(0)
             }
-            y += list_h + spacing;
-            if term_visible {
-                if term_label.0 != 0 {
+            WM_SIZE => {
+                let mut rect = windows::Win32::Foundation::RECT::default();
+                crate::log_if_err!(GetClientRect(hwnd, &mut rect));
+                let width = (rect.right - rect.left).max(0);
+                let height = (rect.bottom - rect.top).max(0);
+                let margin = 10;
+                let spacing = 6;
+                let label_h = 16;
+                let row_h = 24;
+                let button_h = 26;
+                let status_h = 18;
+
+                let (
+                    label_source,
+                    combo_source,
+                    label_mode,
+                    combo_mode,
+                    label_list,
+                    list,
+                    term_label,
+                    term_edit,
+                    open_btn,
+                    cancel_btn,
+                    status,
+                ) = with_category_dialog_state(hwnd, |s| {
+                    (
+                        s.hwnd_source_label,
+                        s.hwnd_source,
+                        s.hwnd_mode_label,
+                        s.hwnd_mode,
+                        s.hwnd_list_label,
+                        s.hwnd_list,
+                        s.hwnd_term_label,
+                        s.hwnd_term_edit,
+                        s.hwnd_open,
+                        s.hwnd_cancel,
+                        s.hwnd_status,
+                    )
+                })
+                .unwrap_or((
+                    HWND(0),
+                    HWND(0),
+                    HWND(0),
+                    HWND(0),
+                    HWND(0),
+                    HWND(0),
+                    HWND(0),
+                    HWND(0),
+                    HWND(0),
+                    HWND(0),
+                    HWND(0),
+                ));
+
+                let mut y = margin;
+                if label_source.0 != 0 {
                     crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-                        term_label,
+                        label_source,
                         margin,
                         y,
                         width - margin * 2,
@@ -3864,9 +3786,9 @@ unsafe fn categories_wndproc_inner(
                     ));
                 }
                 y += label_h + spacing;
-                if term_edit.0 != 0 {
+                if combo_source.0 != 0 {
                     crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-                        term_edit,
+                        combo_source,
                         margin,
                         y,
                         width - margin * 2,
@@ -3875,151 +3797,230 @@ unsafe fn categories_wndproc_inner(
                     ));
                 }
                 y += row_h + spacing;
-            }
-            if status.0 != 0 {
-                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-                    status,
-                    margin,
-                    y,
-                    width - margin * 2,
-                    status_h,
-                    true,
-                ));
-            }
-            y += status_h + spacing;
+                if label_mode.0 != 0 {
+                    crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                        label_mode,
+                        margin,
+                        y,
+                        width - margin * 2,
+                        label_h,
+                        true,
+                    ));
+                }
+                y += label_h + spacing;
+                if combo_mode.0 != 0 {
+                    crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                        combo_mode,
+                        margin,
+                        y,
+                        width - margin * 2,
+                        row_h,
+                        true,
+                    ));
+                }
+                y += row_h + spacing;
+                if label_list.0 != 0 {
+                    crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                        label_list,
+                        margin,
+                        y,
+                        width - margin * 2,
+                        label_h,
+                        true,
+                    ));
+                }
+                y += label_h + spacing;
 
-            let button_w = 100;
-            let cancel_x = (width - margin - button_w).max(margin);
-            let open_x = (cancel_x - spacing - button_w).max(margin);
-            if open_btn.0 != 0 {
-                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-                    open_btn, open_x, y, button_w, button_h, true,
-                ));
-            }
-            if cancel_btn.0 != 0 {
-                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-                    cancel_btn, cancel_x, y, button_w, button_h, true,
-                ));
-            }
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-            let id = wparam.0 & 0xffff;
-            let code = ((wparam.0 >> 16) & 0xffff) as u16;
-            match id {
-                CATEGORIES_OPEN_ID => {
-                    apply_category_selection(hwnd);
-                    LRESULT(0)
+                let term_visible = with_category_dialog_state(hwnd, |s| s.mode)
+                    .map(|m| matches!(m, Mode::SearchInCategory))
+                    .unwrap_or(false);
+                let term_block = if term_visible {
+                    label_h + spacing + row_h + spacing
+                } else {
+                    0
+                };
+                let list_h = (height - y - term_block - status_h - button_h - margin * 2).max(80);
+                if list.0 != 0 {
+                    crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                        list,
+                        margin,
+                        y,
+                        width - margin * 2,
+                        list_h,
+                        true,
+                    ));
                 }
-                CATEGORIES_CANCEL_ID | 2 => {
-                    crate::log_if_err!(DestroyWindow(hwnd));
-                    LRESULT(0)
-                }
-                CATEGORIES_SOURCE_COMBO_ID => {
-                    if code == windows::Win32::UI::WindowsAndMessaging::CBN_SELCHANGE as u16 {
-                        let sel = SendMessageW(
-                            with_category_dialog_state(hwnd, |s| s.hwnd_source).unwrap_or(HWND(0)),
-                            CB_GETCURSEL,
-                            WPARAM(0),
-                            LPARAM(0),
-                        )
-                        .0;
-                        let source = if sel == 1 {
-                            Source::PodcastIndex
-                        } else {
-                            Source::Apple
-                        };
-                        load_categories_for_source(hwnd, source);
+                y += list_h + spacing;
+                if term_visible {
+                    if term_label.0 != 0 {
+                        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                            term_label,
+                            margin,
+                            y,
+                            width - margin * 2,
+                            label_h,
+                            true,
+                        ));
                     }
-                    LRESULT(0)
-                }
-                CATEGORIES_MODE_COMBO_ID => {
-                    if code == windows::Win32::UI::WindowsAndMessaging::CBN_SELCHANGE as u16 {
-                        let sel = SendMessageW(
-                            with_category_dialog_state(hwnd, |s| s.hwnd_mode).unwrap_or(HWND(0)),
-                            CB_GETCURSEL,
-                            WPARAM(0),
-                            LPARAM(0),
-                        )
-                        .0;
-                        let mode = if sel == 1 {
-                            Mode::SearchInCategory
-                        } else {
-                            Mode::Top
-                        };
-                        set_category_mode(hwnd, mode);
-                        SendMessageW(hwnd, WM_SIZE, WPARAM(0), LPARAM(0));
+                    y += label_h + spacing;
+                    if term_edit.0 != 0 {
+                        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                            term_edit,
+                            margin,
+                            y,
+                            width - margin * 2,
+                            row_h,
+                            true,
+                        ));
                     }
-                    LRESULT(0)
+                    y += row_h + spacing;
                 }
-                CATEGORIES_LIST_ID => {
-                    if code == LBN_DBLCLK as u16 {
+                if status.0 != 0 {
+                    crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                        status,
+                        margin,
+                        y,
+                        width - margin * 2,
+                        status_h,
+                        true,
+                    ));
+                }
+                y += status_h + spacing;
+
+                let button_w = 100;
+                let cancel_x = (width - margin - button_w).max(margin);
+                let open_x = (cancel_x - spacing - button_w).max(margin);
+                if open_btn.0 != 0 {
+                    crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                        open_btn, open_x, y, button_w, button_h, true,
+                    ));
+                }
+                if cancel_btn.0 != 0 {
+                    crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                        cancel_btn, cancel_x, y, button_w, button_h, true,
+                    ));
+                }
+                LRESULT(0)
+            }
+            WM_COMMAND => {
+                let id = wparam.0 & 0xffff;
+                let code = ((wparam.0 >> 16) & 0xffff) as u16;
+                match id {
+                    CATEGORIES_OPEN_ID => {
                         apply_category_selection(hwnd);
+                        LRESULT(0)
                     }
-                    LRESULT(0)
+                    CATEGORIES_CANCEL_ID | 2 => {
+                        crate::log_if_err!(DestroyWindow(hwnd));
+                        LRESULT(0)
+                    }
+                    CATEGORIES_SOURCE_COMBO_ID => {
+                        if code == windows::Win32::UI::WindowsAndMessaging::CBN_SELCHANGE as u16 {
+                            let sel = SendMessageW(
+                                with_category_dialog_state(hwnd, |s| s.hwnd_source)
+                                    .unwrap_or(HWND(0)),
+                                CB_GETCURSEL,
+                                WPARAM(0),
+                                LPARAM(0),
+                            )
+                            .0;
+                            let source = if sel == 1 {
+                                Source::PodcastIndex
+                            } else {
+                                Source::Apple
+                            };
+                            load_categories_for_source(hwnd, source);
+                        }
+                        LRESULT(0)
+                    }
+                    CATEGORIES_MODE_COMBO_ID => {
+                        if code == windows::Win32::UI::WindowsAndMessaging::CBN_SELCHANGE as u16 {
+                            let sel = SendMessageW(
+                                with_category_dialog_state(hwnd, |s| s.hwnd_mode)
+                                    .unwrap_or(HWND(0)),
+                                CB_GETCURSEL,
+                                WPARAM(0),
+                                LPARAM(0),
+                            )
+                            .0;
+                            let mode = if sel == 1 {
+                                Mode::SearchInCategory
+                            } else {
+                                Mode::Top
+                            };
+                            set_category_mode(hwnd, mode);
+                            SendMessageW(hwnd, WM_SIZE, WPARAM(0), LPARAM(0));
+                        }
+                        LRESULT(0)
+                    }
+                    CATEGORIES_LIST_ID => {
+                        if code == LBN_DBLCLK as u16 {
+                            apply_category_selection(hwnd);
+                        }
+                        LRESULT(0)
+                    }
+                    _ => DefWindowProcW(hwnd, msg, wparam, lparam),
                 }
-                _ => DefWindowProcW(hwnd, msg, wparam, lparam),
             }
-        }
-        WM_KEYDOWN => {
-            let key = wparam.0 as u16;
-            if key == VK_ESCAPE.0 {
-                crate::log_if_err!(DestroyWindow(hwnd));
-                return LRESULT(0);
-            }
-            if key == VK_RETURN.0 {
-                apply_category_selection(hwnd);
-                return LRESULT(0);
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_PODCAST_CATEGORIES_READY => {
-            let ptr = lparam.0 as *mut CategoryListMsg;
-            if ptr.is_null() {
-                return LRESULT(0);
-            }
-            let msg = unsafe { Box::from_raw(ptr) };
-            if let Some(error) = msg.error.as_deref() {
-                let language = with_category_dialog_state(hwnd, |s| s.language).unwrap_or_default();
-                update_category_status(hwnd, Some(error));
-                let title = i18n::tr(language, "app.error_title");
-                MessageBoxW(
-                    hwnd,
-                    PCWSTR(to_wide(error).as_ptr()),
-                    PCWSTR(to_wide(&title).as_ptr()),
-                    MB_OK | MB_ICONINFORMATION,
-                );
-                announce_status(error);
-            } else {
-                update_category_status(hwnd, None);
-                update_category_list(hwnd, msg.categories);
-            }
-            LRESULT(0)
-        }
-        WM_DESTROY => {
-            let parent = GetParent(hwnd);
-            if parent.0 != 0 {
-                let main_hwnd = with_podcast_state(parent, |s| s.parent).unwrap_or(HWND(0));
-                if main_hwnd.0 != 0 {
-                    with_state(main_hwnd, |s| s.podcasts_categories_dialog = HWND(0));
+            WM_KEYDOWN => {
+                let key = wparam.0 as u16;
+                if key == VK_ESCAPE.0 {
+                    crate::log_if_err!(DestroyWindow(hwnd));
+                    return LRESULT(0);
                 }
-                let hwnd_results =
-                    with_podcast_state(parent, |s| s.hwnd_results).unwrap_or(HWND(0));
-                if hwnd_results.0 != 0 {
-                    SetFocus(hwnd_results);
+                if key == VK_RETURN.0 {
+                    apply_category_selection(hwnd);
+                    return LRESULT(0);
                 }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
-            let ptr =
-                GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
-                    as *mut CategoryDialogState;
-            if !ptr.is_null() {
-                unsafe {
+            WM_PODCAST_CATEGORIES_READY => {
+                let ptr = lparam.0 as *mut CategoryListMsg;
+                if ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let msg = Box::from_raw(ptr);
+                if let Some(error) = msg.error.as_deref() {
+                    let language =
+                        with_category_dialog_state(hwnd, |s| s.language).unwrap_or_default();
+                    update_category_status(hwnd, Some(error));
+                    let title = i18n::tr(language, "app.error_title");
+                    MessageBoxW(
+                        hwnd,
+                        PCWSTR(to_wide(error).as_ptr()),
+                        PCWSTR(to_wide(&title).as_ptr()),
+                        MB_OK | MB_ICONINFORMATION,
+                    );
+                    announce_status(error);
+                } else {
+                    update_category_status(hwnd, None);
+                    update_category_list(hwnd, msg.categories);
+                }
+                LRESULT(0)
+            }
+            WM_DESTROY => {
+                let parent = GetParent(hwnd);
+                if parent.0 != 0 {
+                    let main_hwnd = with_podcast_state(parent, |s| s.parent).unwrap_or(HWND(0));
+                    if main_hwnd.0 != 0 {
+                        with_state(main_hwnd, |s| s.podcasts_categories_dialog = HWND(0));
+                    }
+                    let hwnd_results =
+                        with_podcast_state(parent, |s| s.hwnd_results).unwrap_or(HWND(0));
+                    if hwnd_results.0 != 0 {
+                        SetFocus(hwnd_results);
+                    }
+                }
+                let ptr =
+                    GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+                        as *mut CategoryDialogState;
+                if !ptr.is_null() {
                     let _unused_box = Box::from_raw(ptr);
                 }
+                LRESULT(0)
             }
-            LRESULT(0)
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 
@@ -4031,42 +4032,39 @@ unsafe extern "system" fn category_list_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "category_list_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { category_list_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || category_list_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn category_list_wndproc_inner(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
+fn category_list_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     use windows::Win32::UI::WindowsAndMessaging::{DLGC_WANTALLKEYS, WM_GETDLGCODE};
 
-    // Tell the dialog we want to handle all keys including Enter
-    if msg == WM_GETDLGCODE {
-        return LRESULT(DLGC_WANTALLKEYS as isize);
-    }
-
-    // Handle Enter key - check both WM_KEYDOWN and WM_CHAR
-    if (msg == WM_KEYDOWN || msg == WM_CHAR) && wparam.0 as u16 == VK_RETURN.0 {
-        let parent = GetParent(hwnd);
-        if parent.0 != 0 {
-            apply_category_selection(parent);
+    unsafe {
+        // Tell the dialog we want to handle all keys including Enter
+        if msg == WM_GETDLGCODE {
+            return LRESULT(DLGC_WANTALLKEYS as isize);
         }
-        return LRESULT(0);
-    }
-    let parent = GetParent(hwnd);
-    let prev_proc = if parent.0 != 0 {
-        with_category_dialog_state(parent, |s| s.list_proc).unwrap_or(None)
-    } else {
-        None
-    };
-    if let Some(proc) = prev_proc {
-        CallWindowProcW(Some(proc), hwnd, msg, wparam, lparam)
-    } else {
-        DefWindowProcW(hwnd, msg, wparam, lparam)
+
+        // Handle Enter key - check both WM_KEYDOWN and WM_CHAR
+        if (msg == WM_KEYDOWN || msg == WM_CHAR) && wparam.0 as u16 == VK_RETURN.0 {
+            let parent = GetParent(hwnd);
+            if parent.0 != 0 {
+                apply_category_selection(parent);
+            }
+            return LRESULT(0);
+        }
+        let parent = GetParent(hwnd);
+        let prev_proc = if parent.0 != 0 {
+            with_category_dialog_state(parent, |s| s.list_proc).unwrap_or(None)
+        } else {
+            None
+        };
+        if let Some(proc) = prev_proc {
+            CallWindowProcW(Some(proc), hwnd, msg, wparam, lparam)
+        } else {
+            DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
     }
 }
 
@@ -4471,7 +4469,7 @@ fn show_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
     if target_list {
         show_search_context_menu(hwnd, x, y, use_hit_test);
     } else {
-        unsafe { show_tree_context_menu(hwnd, x, y, use_hit_test) };
+        show_tree_context_menu(hwnd, x, y, use_hit_test);
     }
 }
 
@@ -4677,330 +4675,332 @@ fn show_search_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
     crate::log_if_err!(unsafe { DestroyMenu(menu) });
 }
 
-unsafe fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
-    let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-    if hwnd_tree.0 == 0 {
-        return;
-    }
-    let mut rect = windows::Win32::Foundation::RECT::default();
-    if use_hit_test
-        && GetWindowRect(hwnd_tree, &mut rect).is_ok()
-        && (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom)
-    {
-        return;
-    }
-    let hitem = selected_tree_item(hwnd);
-    if hitem.0 == 0 {
-        return;
-    }
-    let node = with_podcast_state(hwnd, |s| s.node_data.get(&hitem.0).cloned()).flatten();
-    let language = with_podcast_state(hwnd, |s| s.language).unwrap_or_default();
-    let properties_label = i18n::tr(language, "context.properties");
-    let undo_label = i18n::tr(language, "edit.undo")
-        .split('\t')
-        .next()
-        .unwrap_or_default()
-        .to_string();
-    let undo_flags = if with_podcast_state(hwnd, |s| !s.removed_history.is_empty()).unwrap_or(false)
-    {
-        MF_STRING
-    } else {
-        MF_STRING | MF_GRAYED
-    };
-    let menu = CreatePopupMenu().unwrap_or(HMENU(0));
-    if menu.0 == 0 {
-        return;
-    }
-    match node {
-        Some(NodeData::Source(idx)) => {
-            let update_label = i18n::tr(language, "podcasts.context.update");
-            let remove_label = i18n::tr(language, "podcasts.context.remove");
-            let reorder_label = i18n::tr(language, "podcasts.context.reorder");
-            let reorder_up = i18n::tr(language, "rss.reorder.move_up");
-            let reorder_down = i18n::tr(language, "rss.reorder.move_down");
-            let reorder_top = i18n::tr(language, "rss.reorder.move_top");
-            let reorder_bottom = i18n::tr(language, "rss.reorder.move_bottom");
-            let reorder_position = i18n::tr(language, "rss.reorder.move_to_position");
-            let sort_asc = i18n::tr(language, "rss.reorder.title_asc");
-            let sort_desc = i18n::tr(language, "rss.reorder.title_desc");
-            let sort_newest = i18n::tr(language, "rss.reorder.date_newest");
-            let sort_oldest = i18n::tr(language, "rss.reorder.date_oldest");
-            let copy_url = i18n::tr(language, "podcasts.context.copy_url");
-            let open_feed = i18n::tr(language, "podcasts.context.open_feed");
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_UPDATE,
-                PCWSTR(to_wide(&update_label).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_REMOVE,
-                PCWSTR(to_wide(&remove_label).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                undo_flags,
-                ID_CTX_UNDO_DELETE,
-                PCWSTR(to_wide(&undo_label).as_ptr()),
-            ) {}
-            let total = with_podcast_state(hwnd, |s| {
-                with_state(s.parent, |ps| ps.settings.podcast_sources.len()).unwrap_or(0)
-            })
-            .unwrap_or(0);
-            let at_top = idx == 0;
-            let at_bottom = total == 0 || idx + 1 >= total;
-            if let Ok(submenu) = CreatePopupMenu()
-                && submenu.0 != 0
-            {
-                let up_flags = if at_top {
-                    MF_STRING | MF_GRAYED
-                } else {
-                    MF_STRING
-                };
-                let down_flags = if at_bottom {
-                    MF_STRING | MF_GRAYED
-                } else {
-                    MF_STRING
-                };
+fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
+    unsafe {
+        let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+        if hwnd_tree.0 == 0 {
+            return;
+        }
+        let mut rect = windows::Win32::Foundation::RECT::default();
+        if use_hit_test
+            && GetWindowRect(hwnd_tree, &mut rect).is_ok()
+            && (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom)
+        {
+            return;
+        }
+        let hitem = selected_tree_item(hwnd);
+        if hitem.0 == 0 {
+            return;
+        }
+        let node = with_podcast_state(hwnd, |s| s.node_data.get(&hitem.0).cloned()).flatten();
+        let language = with_podcast_state(hwnd, |s| s.language).unwrap_or_default();
+        let properties_label = i18n::tr(language, "context.properties");
+        let undo_label = i18n::tr(language, "edit.undo")
+            .split('\t')
+            .next()
+            .unwrap_or_default()
+            .to_string();
+        let undo_flags =
+            if with_podcast_state(hwnd, |s| !s.removed_history.is_empty()).unwrap_or(false) {
+                MF_STRING
+            } else {
+                MF_STRING | MF_GRAYED
+            };
+        let menu = CreatePopupMenu().unwrap_or(HMENU(0));
+        if menu.0 == 0 {
+            return;
+        }
+        match node {
+            Some(NodeData::Source(idx)) => {
+                let update_label = i18n::tr(language, "podcasts.context.update");
+                let remove_label = i18n::tr(language, "podcasts.context.remove");
+                let reorder_label = i18n::tr(language, "podcasts.context.reorder");
+                let reorder_up = i18n::tr(language, "rss.reorder.move_up");
+                let reorder_down = i18n::tr(language, "rss.reorder.move_down");
+                let reorder_top = i18n::tr(language, "rss.reorder.move_top");
+                let reorder_bottom = i18n::tr(language, "rss.reorder.move_bottom");
+                let reorder_position = i18n::tr(language, "rss.reorder.move_to_position");
+                let sort_asc = i18n::tr(language, "rss.reorder.title_asc");
+                let sort_desc = i18n::tr(language, "rss.reorder.title_desc");
+                let sort_newest = i18n::tr(language, "rss.reorder.date_newest");
+                let sort_oldest = i18n::tr(language, "rss.reorder.date_oldest");
+                let copy_url = i18n::tr(language, "podcasts.context.copy_url");
+                let open_feed = i18n::tr(language, "podcasts.context.open_feed");
                 if let Err(_e) = AppendMenuW(
-                    submenu,
-                    up_flags,
-                    ID_CTX_REORDER_UP,
-                    PCWSTR(to_wide(&reorder_up).as_ptr()),
-                ) {}
-                if let Err(_e) = AppendMenuW(
-                    submenu,
-                    down_flags,
-                    ID_CTX_REORDER_DOWN,
-                    PCWSTR(to_wide(&reorder_down).as_ptr()),
-                ) {}
-                if let Err(_e) = AppendMenuW(
-                    submenu,
-                    up_flags,
-                    ID_CTX_REORDER_TOP,
-                    PCWSTR(to_wide(&reorder_top).as_ptr()),
-                ) {}
-                if let Err(_e) = AppendMenuW(
-                    submenu,
-                    down_flags,
-                    ID_CTX_REORDER_BOTTOM,
-                    PCWSTR(to_wide(&reorder_bottom).as_ptr()),
-                ) {}
-                if let Err(_e) = AppendMenuW(
-                    submenu,
+                    menu,
                     MF_STRING,
-                    ID_CTX_REORDER_POSITION,
-                    PCWSTR(to_wide(&reorder_position).as_ptr()),
-                ) {}
-                if let Err(_e) = AppendMenuW(submenu, MF_SEPARATOR, 0, PCWSTR::null()) {}
-                if let Err(_e) = AppendMenuW(
-                    submenu,
-                    MF_STRING,
-                    ID_CTX_SORT_ASC,
-                    PCWSTR(to_wide(&sort_asc).as_ptr()),
-                ) {}
-                if let Err(_e) = AppendMenuW(
-                    submenu,
-                    MF_STRING,
-                    ID_CTX_SORT_DESC,
-                    PCWSTR(to_wide(&sort_desc).as_ptr()),
-                ) {}
-                if let Err(_e) = AppendMenuW(
-                    submenu,
-                    MF_STRING,
-                    ID_CTX_SORT_NEWEST,
-                    PCWSTR(to_wide(&sort_newest).as_ptr()),
-                ) {}
-                if let Err(_e) = AppendMenuW(
-                    submenu,
-                    MF_STRING,
-                    ID_CTX_SORT_OLDEST,
-                    PCWSTR(to_wide(&sort_oldest).as_ptr()),
+                    ID_CTX_UPDATE,
+                    PCWSTR(to_wide(&update_label).as_ptr()),
                 ) {}
                 if let Err(_e) = AppendMenuW(
                     menu,
-                    MF_POPUP,
-                    submenu.0 as usize,
-                    PCWSTR(to_wide(&reorder_label).as_ptr()),
+                    MF_STRING,
+                    ID_CTX_REMOVE,
+                    PCWSTR(to_wide(&remove_label).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    undo_flags,
+                    ID_CTX_UNDO_DELETE,
+                    PCWSTR(to_wide(&undo_label).as_ptr()),
+                ) {}
+                let total = with_podcast_state(hwnd, |s| {
+                    with_state(s.parent, |ps| ps.settings.podcast_sources.len()).unwrap_or(0)
+                })
+                .unwrap_or(0);
+                let at_top = idx == 0;
+                let at_bottom = total == 0 || idx + 1 >= total;
+                if let Ok(submenu) = CreatePopupMenu()
+                    && submenu.0 != 0
+                {
+                    let up_flags = if at_top {
+                        MF_STRING | MF_GRAYED
+                    } else {
+                        MF_STRING
+                    };
+                    let down_flags = if at_bottom {
+                        MF_STRING | MF_GRAYED
+                    } else {
+                        MF_STRING
+                    };
+                    if let Err(_e) = AppendMenuW(
+                        submenu,
+                        up_flags,
+                        ID_CTX_REORDER_UP,
+                        PCWSTR(to_wide(&reorder_up).as_ptr()),
+                    ) {}
+                    if let Err(_e) = AppendMenuW(
+                        submenu,
+                        down_flags,
+                        ID_CTX_REORDER_DOWN,
+                        PCWSTR(to_wide(&reorder_down).as_ptr()),
+                    ) {}
+                    if let Err(_e) = AppendMenuW(
+                        submenu,
+                        up_flags,
+                        ID_CTX_REORDER_TOP,
+                        PCWSTR(to_wide(&reorder_top).as_ptr()),
+                    ) {}
+                    if let Err(_e) = AppendMenuW(
+                        submenu,
+                        down_flags,
+                        ID_CTX_REORDER_BOTTOM,
+                        PCWSTR(to_wide(&reorder_bottom).as_ptr()),
+                    ) {}
+                    if let Err(_e) = AppendMenuW(
+                        submenu,
+                        MF_STRING,
+                        ID_CTX_REORDER_POSITION,
+                        PCWSTR(to_wide(&reorder_position).as_ptr()),
+                    ) {}
+                    if let Err(_e) = AppendMenuW(submenu, MF_SEPARATOR, 0, PCWSTR::null()) {}
+                    if let Err(_e) = AppendMenuW(
+                        submenu,
+                        MF_STRING,
+                        ID_CTX_SORT_ASC,
+                        PCWSTR(to_wide(&sort_asc).as_ptr()),
+                    ) {}
+                    if let Err(_e) = AppendMenuW(
+                        submenu,
+                        MF_STRING,
+                        ID_CTX_SORT_DESC,
+                        PCWSTR(to_wide(&sort_desc).as_ptr()),
+                    ) {}
+                    if let Err(_e) = AppendMenuW(
+                        submenu,
+                        MF_STRING,
+                        ID_CTX_SORT_NEWEST,
+                        PCWSTR(to_wide(&sort_newest).as_ptr()),
+                    ) {}
+                    if let Err(_e) = AppendMenuW(
+                        submenu,
+                        MF_STRING,
+                        ID_CTX_SORT_OLDEST,
+                        PCWSTR(to_wide(&sort_oldest).as_ptr()),
+                    ) {}
+                    if let Err(_e) = AppendMenuW(
+                        menu,
+                        MF_POPUP,
+                        submenu.0 as usize,
+                        PCWSTR(to_wide(&reorder_label).as_ptr()),
+                    ) {}
+                }
+                if let Err(_e) = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()) {
+                    crate::log_debug(&format!("Error: {:?}", _e));
+                }
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_COPY_URL,
+                    PCWSTR(to_wide(&copy_url).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_OPEN_FEED,
+                    PCWSTR(to_wide(&open_feed).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_PROPERTIES,
+                    PCWSTR(to_wide(&properties_label).as_ptr()),
                 ) {}
             }
-            if let Err(_e) = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()) {
-                crate::log_debug(&format!("Error: {:?}", _e));
+            Some(NodeData::PreviewSource(_)) => {
+                let update_label = i18n::tr(language, "podcasts.context.update");
+                let remove_label = i18n::tr(language, "podcasts.context.remove");
+                let copy_url = i18n::tr(language, "podcasts.context.copy_url");
+                let open_feed = i18n::tr(language, "podcasts.context.open_feed");
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_UPDATE,
+                    PCWSTR(to_wide(&update_label).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_REMOVE,
+                    PCWSTR(to_wide(&remove_label).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    undo_flags,
+                    ID_CTX_UNDO_DELETE,
+                    PCWSTR(to_wide(&undo_label).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_COPY_URL,
+                    PCWSTR(to_wide(&copy_url).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_OPEN_FEED,
+                    PCWSTR(to_wide(&open_feed).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_PROPERTIES,
+                    PCWSTR(to_wide(&properties_label).as_ptr()),
+                ) {}
             }
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_COPY_URL,
-                PCWSTR(to_wide(&copy_url).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_OPEN_FEED,
-                PCWSTR(to_wide(&open_feed).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_PROPERTIES,
-                PCWSTR(to_wide(&properties_label).as_ptr()),
-            ) {}
+            Some(NodeData::Episode(_item)) => {
+                let play_label = i18n::tr(language, "podcasts.context.play");
+                let open_label = i18n::tr(language, "podcasts.context.open_episode");
+                let copy_audio = i18n::tr(language, "podcasts.context.copy_audio");
+                let copy_title = i18n::tr(language, "podcasts.context.copy_title");
+                let download_label = i18n::tr(language, "podcasts.context.download_episode");
+                let view_description = i18n::tr(language, "podcasts.context.view_description");
+                let remove_label = i18n::tr(language, "dictionary.remove");
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_PLAY,
+                    PCWSTR(to_wide(&play_label).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_VIEW_DESCRIPTION,
+                    PCWSTR(to_wide(&view_description).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_OPEN_EPISODE,
+                    PCWSTR(to_wide(&open_label).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_COPY_AUDIO,
+                    PCWSTR(to_wide(&copy_audio).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_COPY_TITLE,
+                    PCWSTR(to_wide(&copy_title).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_DOWNLOAD_EPISODE,
+                    PCWSTR(to_wide(&download_label).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_PROPERTIES,
+                    PCWSTR(to_wide(&properties_label).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_REMOVE_EPISODE,
+                    PCWSTR(to_wide(&remove_label).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    undo_flags,
+                    ID_CTX_UNDO_DELETE,
+                    PCWSTR(to_wide(&undo_label).as_ptr()),
+                ) {}
+            }
+            None => {}
         }
-        Some(NodeData::PreviewSource(_)) => {
-            let update_label = i18n::tr(language, "podcasts.context.update");
-            let remove_label = i18n::tr(language, "podcasts.context.remove");
-            let copy_url = i18n::tr(language, "podcasts.context.copy_url");
-            let open_feed = i18n::tr(language, "podcasts.context.open_feed");
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_UPDATE,
-                PCWSTR(to_wide(&update_label).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_REMOVE,
-                PCWSTR(to_wide(&remove_label).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                undo_flags,
-                ID_CTX_UNDO_DELETE,
-                PCWSTR(to_wide(&undo_label).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_COPY_URL,
-                PCWSTR(to_wide(&copy_url).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_OPEN_FEED,
-                PCWSTR(to_wide(&open_feed).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_PROPERTIES,
-                PCWSTR(to_wide(&properties_label).as_ptr()),
-            ) {}
-        }
-        Some(NodeData::Episode(_item)) => {
-            let play_label = i18n::tr(language, "podcasts.context.play");
-            let open_label = i18n::tr(language, "podcasts.context.open_episode");
-            let copy_audio = i18n::tr(language, "podcasts.context.copy_audio");
-            let copy_title = i18n::tr(language, "podcasts.context.copy_title");
-            let download_label = i18n::tr(language, "podcasts.context.download_episode");
-            let view_description = i18n::tr(language, "podcasts.context.view_description");
-            let remove_label = i18n::tr(language, "dictionary.remove");
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_PLAY,
-                PCWSTR(to_wide(&play_label).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_VIEW_DESCRIPTION,
-                PCWSTR(to_wide(&view_description).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_OPEN_EPISODE,
-                PCWSTR(to_wide(&open_label).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_COPY_AUDIO,
-                PCWSTR(to_wide(&copy_audio).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_COPY_TITLE,
-                PCWSTR(to_wide(&copy_title).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_DOWNLOAD_EPISODE,
-                PCWSTR(to_wide(&download_label).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_PROPERTIES,
-                PCWSTR(to_wide(&properties_label).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                MF_STRING,
-                ID_CTX_REMOVE_EPISODE,
-                PCWSTR(to_wide(&remove_label).as_ptr()),
-            ) {}
-            if let Err(_e) = AppendMenuW(
-                menu,
-                undo_flags,
-                ID_CTX_UNDO_DELETE,
-                PCWSTR(to_wide(&undo_label).as_ptr()),
-            ) {}
-        }
-        None => {}
-    }
 
-    SetForegroundWindow(hwnd);
-    let cmd = TrackPopupMenu(
-        menu,
-        windows::Win32::UI::WindowsAndMessaging::TPM_RETURNCMD,
-        x,
-        y,
-        0,
-        hwnd,
-        None,
-    )
-    .0 as usize;
-    if let Err(_e) = PostMessageW(
-        hwnd,
-        windows::Win32::UI::WindowsAndMessaging::WM_NULL,
-        WPARAM(0),
-        LPARAM(0),
-    ) {}
-    crate::log_if_err!(DestroyMenu(menu));
-    match cmd {
-        ID_CTX_UPDATE => handle_source_action(hwnd, SourceAction::Update),
-        ID_CTX_REMOVE => handle_source_action(hwnd, SourceAction::Remove),
-        ID_CTX_COPY_URL => handle_source_action(hwnd, SourceAction::CopyUrl),
-        ID_CTX_OPEN_FEED => handle_source_action(hwnd, SourceAction::OpenFeed),
-        ID_CTX_REORDER_UP => handle_reorder_action(hwnd, ReorderAction::Up),
-        ID_CTX_REORDER_DOWN => handle_reorder_action(hwnd, ReorderAction::Down),
-        ID_CTX_REORDER_TOP => handle_reorder_action(hwnd, ReorderAction::Top),
-        ID_CTX_REORDER_BOTTOM => handle_reorder_action(hwnd, ReorderAction::Bottom),
-        ID_CTX_REORDER_POSITION => handle_reorder_action(hwnd, ReorderAction::Position),
-        ID_CTX_SORT_ASC => handle_sort_action(hwnd, crate::settings::SortOrder::TitleAsc),
-        ID_CTX_SORT_DESC => handle_sort_action(hwnd, crate::settings::SortOrder::TitleDesc),
-        ID_CTX_SORT_NEWEST => handle_sort_action(hwnd, crate::settings::SortOrder::DateNewest),
-        ID_CTX_SORT_OLDEST => handle_sort_action(hwnd, crate::settings::SortOrder::DateOldest),
-        ID_CTX_UNDO_DELETE => undo_last_delete(hwnd),
-        ID_CTX_PLAY => handle_episode_action(hwnd, EpisodeAction::Play),
-        ID_CTX_OPEN_EPISODE => handle_episode_action(hwnd, EpisodeAction::OpenEpisode),
-        ID_CTX_COPY_AUDIO => handle_episode_action(hwnd, EpisodeAction::CopyAudio),
-        ID_CTX_COPY_TITLE => handle_episode_action(hwnd, EpisodeAction::CopyTitle),
-        ID_CTX_DOWNLOAD_EPISODE => handle_episode_action(hwnd, EpisodeAction::Download),
-        ID_CTX_VIEW_DESCRIPTION => handle_episode_action(hwnd, EpisodeAction::ViewDescription),
-        ID_CTX_REMOVE_EPISODE => handle_episode_action(hwnd, EpisodeAction::Remove),
-        ID_CTX_PROPERTIES => show_selected_properties(hwnd),
-        ID_CTX_SUBSCRIBE => subscribe_selected_result(hwnd),
-        _ => {}
+        SetForegroundWindow(hwnd);
+        let cmd = TrackPopupMenu(
+            menu,
+            windows::Win32::UI::WindowsAndMessaging::TPM_RETURNCMD,
+            x,
+            y,
+            0,
+            hwnd,
+            None,
+        )
+        .0 as usize;
+        if let Err(_e) = PostMessageW(
+            hwnd,
+            windows::Win32::UI::WindowsAndMessaging::WM_NULL,
+            WPARAM(0),
+            LPARAM(0),
+        ) {}
+        crate::log_if_err!(DestroyMenu(menu));
+        match cmd {
+            ID_CTX_UPDATE => handle_source_action(hwnd, SourceAction::Update),
+            ID_CTX_REMOVE => handle_source_action(hwnd, SourceAction::Remove),
+            ID_CTX_COPY_URL => handle_source_action(hwnd, SourceAction::CopyUrl),
+            ID_CTX_OPEN_FEED => handle_source_action(hwnd, SourceAction::OpenFeed),
+            ID_CTX_REORDER_UP => handle_reorder_action(hwnd, ReorderAction::Up),
+            ID_CTX_REORDER_DOWN => handle_reorder_action(hwnd, ReorderAction::Down),
+            ID_CTX_REORDER_TOP => handle_reorder_action(hwnd, ReorderAction::Top),
+            ID_CTX_REORDER_BOTTOM => handle_reorder_action(hwnd, ReorderAction::Bottom),
+            ID_CTX_REORDER_POSITION => handle_reorder_action(hwnd, ReorderAction::Position),
+            ID_CTX_SORT_ASC => handle_sort_action(hwnd, crate::settings::SortOrder::TitleAsc),
+            ID_CTX_SORT_DESC => handle_sort_action(hwnd, crate::settings::SortOrder::TitleDesc),
+            ID_CTX_SORT_NEWEST => handle_sort_action(hwnd, crate::settings::SortOrder::DateNewest),
+            ID_CTX_SORT_OLDEST => handle_sort_action(hwnd, crate::settings::SortOrder::DateOldest),
+            ID_CTX_UNDO_DELETE => undo_last_delete(hwnd),
+            ID_CTX_PLAY => handle_episode_action(hwnd, EpisodeAction::Play),
+            ID_CTX_OPEN_EPISODE => handle_episode_action(hwnd, EpisodeAction::OpenEpisode),
+            ID_CTX_COPY_AUDIO => handle_episode_action(hwnd, EpisodeAction::CopyAudio),
+            ID_CTX_COPY_TITLE => handle_episode_action(hwnd, EpisodeAction::CopyTitle),
+            ID_CTX_DOWNLOAD_EPISODE => handle_episode_action(hwnd, EpisodeAction::Download),
+            ID_CTX_VIEW_DESCRIPTION => handle_episode_action(hwnd, EpisodeAction::ViewDescription),
+            ID_CTX_REMOVE_EPISODE => handle_episode_action(hwnd, EpisodeAction::Remove),
+            ID_CTX_PROPERTIES => show_selected_properties(hwnd),
+            ID_CTX_SUBSCRIBE => subscribe_selected_result(hwnd),
+            _ => {}
+        }
     }
 }
 
@@ -5394,237 +5394,243 @@ fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
     }
 }
 
-unsafe fn undo_last_delete(hwnd: HWND) {
-    let Some(last_removed) = with_podcast_state(hwnd, |s| s.removed_history.pop()).flatten() else {
-        return;
-    };
+fn undo_last_delete(hwnd: HWND) {
+    unsafe {
+        let Some(last_removed) = with_podcast_state(hwnd, |s| s.removed_history.pop()).flatten()
+        else {
+            return;
+        };
 
-    match last_removed {
-        PodcastLastRemoved::Source { index, source } => {
-            let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-            if parent.0 == 0 {
-                return;
+        match last_removed {
+            PodcastLastRemoved::Source { index, source } => {
+                let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                if parent.0 == 0 {
+                    return;
+                }
+                let restored_index = with_state(parent, |ps| {
+                    let insert_at = index.min(ps.settings.podcast_sources.len());
+                    ps.settings.podcast_sources.insert(insert_at, source);
+                    settings::save_settings(ps.settings.clone());
+                    insert_at
+                })
+                .unwrap_or(index);
+
+                with_podcast_state(hwnd, |s| s.suppress_tree_selection_events = true);
+                reload_tree(hwnd);
+                with_podcast_state(hwnd, |s| s.suppress_tree_selection_events = false);
+                let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+                if hwnd_tree.0 != 0 {
+                    let target_hitem = with_podcast_state(hwnd, |s| {
+                        s.node_data.iter().find_map(|(&h, node)| match node {
+                            NodeData::Source(i) if *i == restored_index => Some(HTREEITEM(h)),
+                            _ => None,
+                        })
+                    })
+                    .flatten();
+                    if let Some(target) = target_hitem {
+                        SendMessageW(
+                            hwnd_tree,
+                            TVM_SELECTITEM,
+                            WPARAM(TVGN_CARET as usize),
+                            LPARAM(target.0),
+                        );
+                        SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(target.0));
+                    }
+                    SetFocus(hwnd_tree);
+                }
             }
-            let restored_index = with_state(parent, |ps| {
-                let insert_at = index.min(ps.settings.podcast_sources.len());
-                ps.settings.podcast_sources.insert(insert_at, source);
-                settings::save_settings(ps.settings.clone());
-                insert_at
-            })
-            .unwrap_or(index);
+            PodcastLastRemoved::Episode {
+                source_index,
+                episode,
+                key,
+                position,
+            } => {
+                let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                if parent.0 != 0 {
+                    with_state(parent, |ps| {
+                        if let Some(src) = ps.settings.podcast_sources.get_mut(source_index) {
+                            src.removed_item_keys.retain(|k| k != &key);
+                            settings::save_settings(ps.settings.clone());
+                        }
+                    });
+                }
 
-            with_podcast_state(hwnd, |s| s.suppress_tree_selection_events = true);
-            reload_tree(hwnd);
-            with_podcast_state(hwnd, |s| s.suppress_tree_selection_events = false);
-            let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-            if hwnd_tree.0 != 0 {
-                let target_hitem = with_podcast_state(hwnd, |s| {
+                let source_hitem = with_podcast_state(hwnd, |s| {
                     s.node_data.iter().find_map(|(&h, node)| match node {
-                        NodeData::Source(i) if *i == restored_index => Some(HTREEITEM(h)),
+                        NodeData::Source(i) if *i == source_index => Some(HTREEITEM(h)),
                         _ => None,
                     })
                 })
                 .flatten();
-                if let Some(target) = target_hitem {
-                    SendMessageW(
-                        hwnd_tree,
-                        TVM_SELECTITEM,
-                        WPARAM(TVGN_CARET as usize),
-                        LPARAM(target.0),
-                    );
-                    SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(target.0));
-                }
-                SetFocus(hwnd_tree);
-            }
-        }
-        PodcastLastRemoved::Episode {
-            source_index,
-            episode,
-            key,
-            position,
-        } => {
-            let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-            if parent.0 != 0 {
-                with_state(parent, |ps| {
-                    if let Some(src) = ps.settings.podcast_sources.get_mut(source_index) {
-                        src.removed_item_keys.retain(|k| k != &key);
-                        settings::save_settings(ps.settings.clone());
-                    }
-                });
-            }
 
-            let source_hitem = with_podcast_state(hwnd, |s| {
-                s.node_data.iter().find_map(|(&h, node)| match node {
-                    NodeData::Source(i) if *i == source_index => Some(HTREEITEM(h)),
-                    _ => None,
-                })
-            })
-            .flatten();
+                let Some(source_hitem) = source_hitem else {
+                    return;
+                };
 
-            let Some(source_hitem) = source_hitem else {
-                return;
-            };
-
-            let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-            let mut show_in_tree = false;
-            with_podcast_state(hwnd, |s| {
-                if let Some(state) = s.source_items.get_mut(&source_hitem.0) {
-                    let insert_at = position.min(state.items.len());
-                    state.items.insert(insert_at, episode.clone());
-                    show_in_tree = true;
-                }
-            });
-
-            if show_in_tree && hwnd_tree.0 != 0 {
-                with_podcast_state(hwnd, |s| s.suppress_tree_selection_events = true);
-                // Rebuild source children to preserve original order after undo.
-                SendMessageW(
-                    hwnd_tree,
-                    windows::Win32::UI::WindowsAndMessaging::WM_SETREDRAW,
-                    WPARAM(0),
-                    LPARAM(0),
-                );
-                SendMessageW(
-                    hwnd_tree,
-                    TVM_SELECTITEM,
-                    WPARAM(TVGN_CARET as usize),
-                    LPARAM(source_hitem.0),
-                );
-                loop {
-                    let child = HTREEITEM(
-                        SendMessageW(
-                            hwnd_tree,
-                            TVM_GETNEXTITEM,
-                            WPARAM(TVGN_CHILD as usize),
-                            LPARAM(source_hitem.0),
-                        )
-                        .0,
-                    );
-                    if child.0 == 0 {
-                        break;
-                    }
-                    with_podcast_state(hwnd, |s| {
-                        s.node_data.remove(&child.0);
-                    });
-                    SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
-                }
-
-                let mut restored_hitem = HTREEITEM(0);
-                let (
-                    language,
-                    announce_unread,
-                    unread_label_position,
-                    podcast_date_mode,
-                    podcast_time_mode,
-                ) = with_podcast_state(hwnd, |s| {
-                    with_state(s.parent, |ps| {
-                        (
-                            ps.settings.language,
-                            ps.settings.announce_unread_rss_podcast_items,
-                            ps.settings.rss_podcast_unread_label_position,
-                            ps.settings.podcast_episodes_date_display,
-                            ps.settings.podcast_episodes_time_display,
-                        )
-                    })
-                    .unwrap_or((
-                        s.language,
-                        true,
-                        crate::settings::RssPodcastUnreadLabelPosition::Before,
-                        ListDateDisplayMode::Always,
-                        ListTimeDisplayMode::OnlyIfMultipleSameDay,
-                    ))
-                })
-                .unwrap_or((
-                    Language::English,
-                    true,
-                    crate::settings::RssPodcastUnreadLabelPosition::Before,
-                    ListDateDisplayMode::Always,
-                    ListTimeDisplayMode::OnlyIfMultipleSameDay,
-                ));
+                let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+                let mut show_in_tree = false;
                 with_podcast_state(hwnd, |s| {
-                    if let Some(state) = s.source_items.get(&source_hitem.0) {
-                        let day_counts = build_day_counts(&state.items);
-                        for entry in &state.items {
-                            let item_unplayed = !state.read_item_keys.contains(&episode_key(entry));
-                            let display_title = podcast_episode_display_title(
-                                &entry.title,
-                                language,
-                                announce_unread,
-                                item_unplayed,
-                                entry.pub_date,
-                                unread_label_position,
-                                podcast_date_mode,
-                                podcast_time_mode,
-                                has_multiple_items_same_day(entry.pub_date, &day_counts),
-                            );
-                            let text = to_wide(&display_title);
-                            let mut tvis = TVINSERTSTRUCTW {
-                                hParent: source_hitem,
-                                hInsertAfter: windows::Win32::UI::Controls::TVI_LAST,
-                                Anonymous: windows::Win32::UI::Controls::TVINSERTSTRUCTW_0 {
-                                    item: TVITEMW {
-                                        mask: TVIF_TEXT,
-                                        pszText: windows::core::PWSTR(text.as_ptr() as *mut _),
-                                        ..Default::default()
-                                    },
-                                },
-                            };
-                            let hchild = HTREEITEM(
-                                SendMessageW(
-                                    hwnd_tree,
-                                    TVM_INSERTITEMW,
-                                    WPARAM(0),
-                                    LPARAM(&mut tvis as *mut _ as isize),
-                                )
-                                .0,
-                            );
-                            if hchild.0 != 0 {
-                                s.node_data
-                                    .insert(hchild.0, NodeData::Episode(Box::new(entry.clone())));
-                                if episode_key(entry) == key {
-                                    restored_hitem = hchild;
-                                }
-                            }
-                        }
+                    if let Some(state) = s.source_items.get_mut(&source_hitem.0) {
+                        let insert_at = position.min(state.items.len());
+                        state.items.insert(insert_at, episode.clone());
+                        show_in_tree = true;
                     }
                 });
-                SendMessageW(
-                    hwnd_tree,
-                    windows::Win32::UI::WindowsAndMessaging::WM_SETREDRAW,
-                    WPARAM(1),
-                    LPARAM(0),
-                );
-                with_podcast_state(hwnd, |s| s.suppress_tree_selection_events = false);
-                if restored_hitem.0 != 0 {
+
+                if show_in_tree && hwnd_tree.0 != 0 {
+                    with_podcast_state(hwnd, |s| s.suppress_tree_selection_events = true);
+                    // Rebuild source children to preserve original order after undo.
                     SendMessageW(
                         hwnd_tree,
-                        TVM_SELECTITEM,
-                        WPARAM(TVGN_CARET as usize),
-                        LPARAM(restored_hitem.0),
-                    );
-                    SendMessageW(
-                        hwnd_tree,
-                        TVM_ENSUREVISIBLE,
+                        windows::Win32::UI::WindowsAndMessaging::WM_SETREDRAW,
                         WPARAM(0),
-                        LPARAM(restored_hitem.0),
+                        LPARAM(0),
                     );
-                } else {
                     SendMessageW(
                         hwnd_tree,
                         TVM_SELECTITEM,
                         WPARAM(TVGN_CARET as usize),
                         LPARAM(source_hitem.0),
                     );
+                    loop {
+                        let child = HTREEITEM(
+                            SendMessageW(
+                                hwnd_tree,
+                                TVM_GETNEXTITEM,
+                                WPARAM(TVGN_CHILD as usize),
+                                LPARAM(source_hitem.0),
+                            )
+                            .0,
+                        );
+                        if child.0 == 0 {
+                            break;
+                        }
+                        with_podcast_state(hwnd, |s| {
+                            s.node_data.remove(&child.0);
+                        });
+                        SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
+                    }
+
+                    let mut restored_hitem = HTREEITEM(0);
+                    let (
+                        language,
+                        announce_unread,
+                        unread_label_position,
+                        podcast_date_mode,
+                        podcast_time_mode,
+                    ) = with_podcast_state(hwnd, |s| {
+                        with_state(s.parent, |ps| {
+                            (
+                                ps.settings.language,
+                                ps.settings.announce_unread_rss_podcast_items,
+                                ps.settings.rss_podcast_unread_label_position,
+                                ps.settings.podcast_episodes_date_display,
+                                ps.settings.podcast_episodes_time_display,
+                            )
+                        })
+                        .unwrap_or((
+                            s.language,
+                            true,
+                            crate::settings::RssPodcastUnreadLabelPosition::Before,
+                            ListDateDisplayMode::Always,
+                            ListTimeDisplayMode::OnlyIfMultipleSameDay,
+                        ))
+                    })
+                    .unwrap_or((
+                        Language::English,
+                        true,
+                        crate::settings::RssPodcastUnreadLabelPosition::Before,
+                        ListDateDisplayMode::Always,
+                        ListTimeDisplayMode::OnlyIfMultipleSameDay,
+                    ));
+                    with_podcast_state(hwnd, |s| {
+                        if let Some(state) = s.source_items.get(&source_hitem.0) {
+                            let day_counts = build_day_counts(&state.items);
+                            for entry in &state.items {
+                                let item_unplayed =
+                                    !state.read_item_keys.contains(&episode_key(entry));
+                                let display_title = podcast_episode_display_title(
+                                    &entry.title,
+                                    language,
+                                    announce_unread,
+                                    item_unplayed,
+                                    entry.pub_date,
+                                    unread_label_position,
+                                    podcast_date_mode,
+                                    podcast_time_mode,
+                                    has_multiple_items_same_day(entry.pub_date, &day_counts),
+                                );
+                                let text = to_wide(&display_title);
+                                let mut tvis = TVINSERTSTRUCTW {
+                                    hParent: source_hitem,
+                                    hInsertAfter: windows::Win32::UI::Controls::TVI_LAST,
+                                    Anonymous: windows::Win32::UI::Controls::TVINSERTSTRUCTW_0 {
+                                        item: TVITEMW {
+                                            mask: TVIF_TEXT,
+                                            pszText: windows::core::PWSTR(text.as_ptr() as *mut _),
+                                            ..Default::default()
+                                        },
+                                    },
+                                };
+                                let hchild = HTREEITEM(
+                                    SendMessageW(
+                                        hwnd_tree,
+                                        TVM_INSERTITEMW,
+                                        WPARAM(0),
+                                        LPARAM(&mut tvis as *mut _ as isize),
+                                    )
+                                    .0,
+                                );
+                                if hchild.0 != 0 {
+                                    s.node_data.insert(
+                                        hchild.0,
+                                        NodeData::Episode(Box::new(entry.clone())),
+                                    );
+                                    if episode_key(entry) == key {
+                                        restored_hitem = hchild;
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    SendMessageW(
+                        hwnd_tree,
+                        windows::Win32::UI::WindowsAndMessaging::WM_SETREDRAW,
+                        WPARAM(1),
+                        LPARAM(0),
+                    );
+                    with_podcast_state(hwnd, |s| s.suppress_tree_selection_events = false);
+                    if restored_hitem.0 != 0 {
+                        SendMessageW(
+                            hwnd_tree,
+                            TVM_SELECTITEM,
+                            WPARAM(TVGN_CARET as usize),
+                            LPARAM(restored_hitem.0),
+                        );
+                        SendMessageW(
+                            hwnd_tree,
+                            TVM_ENSUREVISIBLE,
+                            WPARAM(0),
+                            LPARAM(restored_hitem.0),
+                        );
+                    } else {
+                        SendMessageW(
+                            hwnd_tree,
+                            TVM_SELECTITEM,
+                            WPARAM(TVGN_CARET as usize),
+                            LPARAM(source_hitem.0),
+                        );
+                    }
+                    SetFocus(hwnd_tree);
+                } else if hwnd_tree.0 != 0 {
+                    SendMessageW(
+                        hwnd_tree,
+                        TVM_SELECTITEM,
+                        WPARAM(TVGN_CARET as usize),
+                        LPARAM(source_hitem.0),
+                    );
+                    SetFocus(hwnd_tree);
                 }
-                SetFocus(hwnd_tree);
-            } else if hwnd_tree.0 != 0 {
-                SendMessageW(
-                    hwnd_tree,
-                    TVM_SELECTITEM,
-                    WPARAM(TVGN_CARET as usize),
-                    LPARAM(source_hitem.0),
-                );
-                SetFocus(hwnd_tree);
             }
         }
     }
@@ -5781,185 +5787,182 @@ unsafe extern "system" fn description_wndproc(
     crate::panic_guard::guard(
         "description_wndproc",
         || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
-        || unsafe { description_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || description_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn description_wndproc_inner(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let cs = lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
-            let init_ptr = (*cs).lpCreateParams as *mut DescriptionDialogInit;
-            if !init_ptr.is_null() {
-                let init = unsafe { Box::from_raw(init_ptr) };
-                let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+fn description_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let cs = lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
+                let init_ptr = (*cs).lpCreateParams as *mut DescriptionDialogInit;
+                if !init_ptr.is_null() {
+                    let init = Box::from_raw(init_ptr);
+                    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
 
-                let full_text = format!("{}\r\n\r\n{}", init.title, init.content);
+                    let full_text = format!("{}\r\n\r\n{}", init.title, init.content);
 
-                let edit = CreateWindowExW(
-                    WS_EX_CLIENTEDGE,
-                    w!("EDIT"),
-                    PCWSTR::null(),
-                    WS_CHILD
-                        | WS_VISIBLE
-                        | windows::Win32::UI::WindowsAndMessaging::WS_VSCROLL
-                        | WS_TABSTOP
-                        | WINDOW_STYLE(
-                            (windows::Win32::UI::WindowsAndMessaging::ES_MULTILINE
-                                | windows::Win32::UI::WindowsAndMessaging::ES_READONLY
-                                | windows::Win32::UI::WindowsAndMessaging::ES_AUTOVSCROLL)
-                                as u32,
-                        ),
-                    0,
-                    0,
-                    0,
-                    0,
-                    hwnd,
-                    HMENU(ID_DESCRIPTION_EDIT as isize),
-                    hinstance,
-                    None,
-                );
+                    let edit = CreateWindowExW(
+                        WS_EX_CLIENTEDGE,
+                        w!("EDIT"),
+                        PCWSTR::null(),
+                        WS_CHILD
+                            | WS_VISIBLE
+                            | windows::Win32::UI::WindowsAndMessaging::WS_VSCROLL
+                            | WS_TABSTOP
+                            | WINDOW_STYLE(
+                                (windows::Win32::UI::WindowsAndMessaging::ES_MULTILINE
+                                    | windows::Win32::UI::WindowsAndMessaging::ES_READONLY
+                                    | windows::Win32::UI::WindowsAndMessaging::ES_AUTOVSCROLL)
+                                    as u32,
+                            ),
+                        0,
+                        0,
+                        0,
+                        0,
+                        hwnd,
+                        HMENU(ID_DESCRIPTION_EDIT as isize),
+                        hinstance,
+                        None,
+                    );
 
-                let hfont = HFONT(
-                    windows::Win32::Graphics::Gdi::GetStockObject(
-                        windows::Win32::Graphics::Gdi::DEFAULT_GUI_FONT,
-                    )
-                    .0,
-                );
-                SendMessageW(edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    let hfont = HFONT(
+                        windows::Win32::Graphics::Gdi::GetStockObject(
+                            windows::Win32::Graphics::Gdi::DEFAULT_GUI_FONT,
+                        )
+                        .0,
+                    );
+                    SendMessageW(edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
 
-                let wide_text = to_wide(&full_text);
-                SendMessageW(
-                    edit,
-                    windows::Win32::UI::WindowsAndMessaging::WM_SETTEXT,
-                    WPARAM(0),
-                    LPARAM(wide_text.as_ptr() as isize),
-                );
+                    let wide_text = to_wide(&full_text);
+                    SendMessageW(
+                        edit,
+                        windows::Win32::UI::WindowsAndMessaging::WM_SETTEXT,
+                        WPARAM(0),
+                        LPARAM(wide_text.as_ptr() as isize),
+                    );
 
-                let ok_button = CreateWindowExW(
-                    Default::default(),
-                    w!("BUTTON"),
-                    w!("OK"),
-                    WS_CHILD
-                        | WS_VISIBLE
-                        | WS_TABSTOP
-                        | WINDOW_STYLE(
-                            windows::Win32::UI::WindowsAndMessaging::BS_DEFPUSHBUTTON as u32,
-                        ),
-                    0,
-                    0,
-                    0,
-                    0,
-                    hwnd,
-                    HMENU(ID_DESCRIPTION_OK as isize),
-                    hinstance,
-                    None,
-                );
-                SendMessageW(ok_button, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    let ok_button = CreateWindowExW(
+                        Default::default(),
+                        w!("BUTTON"),
+                        w!("OK"),
+                        WS_CHILD
+                            | WS_VISIBLE
+                            | WS_TABSTOP
+                            | WINDOW_STYLE(
+                                windows::Win32::UI::WindowsAndMessaging::BS_DEFPUSHBUTTON as u32,
+                            ),
+                        0,
+                        0,
+                        0,
+                        0,
+                        hwnd,
+                        HMENU(ID_DESCRIPTION_OK as isize),
+                        hinstance,
+                        None,
+                    );
+                    SendMessageW(ok_button, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
 
-                // Subclass controls for Tab navigation
-                let proc_ptr = description_control_subclass_proc as *const () as usize;
+                    // Subclass controls for Tab navigation
+                    let proc_ptr = description_control_subclass_proc as *const () as usize;
 
-                let prev_edit = SetWindowLongPtrW(
-                    edit,
-                    windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
-                    proc_ptr as isize,
-                );
-                SetWindowLongPtrW(
-                    edit,
-                    windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
-                    prev_edit,
-                );
+                    let prev_edit = SetWindowLongPtrW(
+                        edit,
+                        windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
+                        proc_ptr as isize,
+                    );
+                    SetWindowLongPtrW(
+                        edit,
+                        windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+                        prev_edit,
+                    );
 
-                let prev_ok = SetWindowLongPtrW(
-                    ok_button,
-                    windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
-                    proc_ptr as isize,
-                );
-                SetWindowLongPtrW(
-                    ok_button,
-                    windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
-                    prev_ok,
-                );
+                    let prev_ok = SetWindowLongPtrW(
+                        ok_button,
+                        windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
+                        proc_ptr as isize,
+                    );
+                    SetWindowLongPtrW(
+                        ok_button,
+                        windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+                        prev_ok,
+                    );
 
-                SetFocus(edit);
-            }
-            LRESULT(0)
-        }
-        WM_SIZE => {
-            let mut rect = windows::Win32::Foundation::RECT::default();
-            crate::log_if_err!(GetClientRect(hwnd, &mut rect));
-            let width = rect.right;
-            let height = rect.bottom;
-            let button_height = 30;
-            let margin = 10;
-
-            let edit_height = if height > (button_height + 2 * margin) {
-                height - button_height - 2 * margin
-            } else {
-                height
-            };
-
-            let edit = GetDlgItem(hwnd, ID_DESCRIPTION_EDIT as i32);
-            if edit.0 != 0 {
-                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-                    edit,
-                    0,
-                    0,
-                    width,
-                    edit_height,
-                    true
-                ));
-            }
-
-            let ok_button = GetDlgItem(hwnd, ID_DESCRIPTION_OK as i32);
-            if ok_button.0 != 0 {
-                let btn_width = 80;
-                let btn_x = (width - btn_width) / 2;
-                let btn_y = edit_height + margin;
-                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-                    ok_button,
-                    btn_x,
-                    btn_y,
-                    btn_width,
-                    button_height,
-                    true
-                ));
-            }
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-            let id = wparam.0 & 0xffff;
-            if id == ID_DESCRIPTION_OK || id == 2 {
-                crate::log_if_err!(DestroyWindow(hwnd));
-                return LRESULT(0);
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_KEYDOWN => {
-            if wparam.0 as u16 == VK_ESCAPE.0 {
-                crate::log_if_err!(DestroyWindow(hwnd));
-                return LRESULT(0);
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_DESTROY => {
-            let parent = GetParent(hwnd);
-            if parent.0 != 0 {
-                let main_hwnd = with_podcast_state(parent, |s| s.parent).unwrap_or(HWND(0));
-                if main_hwnd.0 != 0 {
-                    with_state(main_hwnd, |s| s.podcasts_description_dialog = HWND(0));
+                    SetFocus(edit);
                 }
-                focus_library(parent);
+                LRESULT(0)
             }
-            LRESULT(0)
+            WM_SIZE => {
+                let mut rect = windows::Win32::Foundation::RECT::default();
+                crate::log_if_err!(GetClientRect(hwnd, &mut rect));
+                let width = rect.right;
+                let height = rect.bottom;
+                let button_height = 30;
+                let margin = 10;
+
+                let edit_height = if height > (button_height + 2 * margin) {
+                    height - button_height - 2 * margin
+                } else {
+                    height
+                };
+
+                let edit = GetDlgItem(hwnd, ID_DESCRIPTION_EDIT as i32);
+                if edit.0 != 0 {
+                    crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                        edit,
+                        0,
+                        0,
+                        width,
+                        edit_height,
+                        true
+                    ));
+                }
+
+                let ok_button = GetDlgItem(hwnd, ID_DESCRIPTION_OK as i32);
+                if ok_button.0 != 0 {
+                    let btn_width = 80;
+                    let btn_x = (width - btn_width) / 2;
+                    let btn_y = edit_height + margin;
+                    crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                        ok_button,
+                        btn_x,
+                        btn_y,
+                        btn_width,
+                        button_height,
+                        true
+                    ));
+                }
+                LRESULT(0)
+            }
+            WM_COMMAND => {
+                let id = wparam.0 & 0xffff;
+                if id == ID_DESCRIPTION_OK || id == 2 {
+                    crate::log_if_err!(DestroyWindow(hwnd));
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_KEYDOWN => {
+                if wparam.0 as u16 == VK_ESCAPE.0 {
+                    crate::log_if_err!(DestroyWindow(hwnd));
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_DESTROY => {
+                let parent = GetParent(hwnd);
+                if parent.0 != 0 {
+                    let main_hwnd = with_podcast_state(parent, |s| s.parent).unwrap_or(HWND(0));
+                    if main_hwnd.0 != 0 {
+                        with_state(main_hwnd, |s| s.podcasts_description_dialog = HWND(0));
+                    }
+                    focus_library(parent);
+                }
+                LRESULT(0)
+            }
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 
@@ -6484,7 +6487,7 @@ fn podcast_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPAR
         if key == 'Z' as u32 && unsafe { GetKeyState(VK_CONTROL.0 as i32) < 0 } {
             let parent = unsafe { GetParent(hwnd) };
             if parent.0 != 0 {
-                unsafe { undo_last_delete(parent) };
+                undo_last_delete(parent);
                 return LRESULT(0);
             }
         }
@@ -6717,327 +6720,329 @@ fn podcast_search_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
     }
 }
 
-unsafe fn create_controls(hwnd: HWND) {
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-    let hwnd_tree = CreateWindowExW(
-        WS_EX_CLIENTEDGE,
-        w!("SysTreeView32"),
-        PCWSTR::null(),
-        WS_CHILD
-            | WS_VISIBLE
-            | WS_TABSTOP
-            | WINDOW_STYLE(
-                windows::Win32::UI::Controls::TVS_HASLINES
-                    | windows::Win32::UI::Controls::TVS_HASBUTTONS
-                    | windows::Win32::UI::Controls::TVS_LINESATROOT
-                    | windows::Win32::UI::Controls::TVS_SHOWSELALWAYS,
+fn create_controls(hwnd: HWND) {
+    unsafe {
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+        let hwnd_tree = CreateWindowExW(
+            WS_EX_CLIENTEDGE,
+            w!("SysTreeView32"),
+            PCWSTR::null(),
+            WS_CHILD
+                | WS_VISIBLE
+                | WS_TABSTOP
+                | WINDOW_STYLE(
+                    windows::Win32::UI::Controls::TVS_HASLINES
+                        | windows::Win32::UI::Controls::TVS_HASBUTTONS
+                        | windows::Win32::UI::Controls::TVS_LINESATROOT
+                        | windows::Win32::UI::Controls::TVS_SHOWSELALWAYS,
+                ),
+            10,
+            10,
+            460,
+            280,
+            hwnd,
+            HMENU(ID_TREE as isize),
+            hinstance,
+            None,
+        );
+        if hwnd_tree.0 != 0 {
+            let proc_ptr = podcast_tree_wndproc as *const () as usize;
+            let old = SetWindowLongPtrW(
+                hwnd_tree,
+                windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
+                proc_ptr as isize,
+            );
+            with_podcast_state(hwnd, |s| {
+                s.tree_proc = std::mem::transmute::<isize, WNDPROC>(old)
+            });
+        }
+
+        let hwnd_delete = CreateWindowExW(
+            Default::default(),
+            w!("BUTTON"),
+            PCWSTR(
+                to_wide(&i18n::tr(
+                    with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
+                    "podcasts.delete_button",
+                ))
+                .as_ptr(),
             ),
-        10,
-        10,
-        460,
-        280,
-        hwnd,
-        HMENU(ID_TREE as isize),
-        hinstance,
-        None,
-    );
-    if hwnd_tree.0 != 0 {
-        let proc_ptr = podcast_tree_wndproc as *const () as usize;
-        let old = SetWindowLongPtrW(
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+            220,
+            300,
+            200,
+            26,
+            hwnd,
+            HMENU(ID_DELETE_BUTTON as isize),
+            hinstance,
+            None,
+        );
+
+        let hwnd_search_label = CreateWindowExW(
+            Default::default(),
+            w!("STATIC"),
+            PCWSTR(
+                to_wide(&i18n::tr(
+                    with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
+                    "podcasts.search.label",
+                ))
+                .as_ptr(),
+            ),
+            WS_CHILD | WS_VISIBLE,
+            10,
+            310,
+            460,
+            16,
+            hwnd,
+            HMENU(ID_SEARCH_LABEL as isize),
+            hinstance,
+            None,
+        );
+
+        let hwnd_search = CreateWindowExW(
+            WS_EX_CLIENTEDGE,
+            w!("EDIT"),
+            PCWSTR::null(),
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+            10,
+            330,
+            460,
+            24,
+            hwnd,
+            HMENU(ID_SEARCH_EDIT as isize),
+            hinstance,
+            None,
+        );
+        if hwnd_search.0 != 0 {
+            let proc_ptr = podcast_search_wndproc as *const () as usize;
+            let old = SetWindowLongPtrW(
+                hwnd_search,
+                windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
+                proc_ptr as isize,
+            );
+            with_podcast_state(hwnd, |s| {
+                s.search_proc = std::mem::transmute::<isize, WNDPROC>(old)
+            });
+        }
+
+        let provider_itunes = i18n::tr(
+            with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
+            "podcasts.search.provider.itunes",
+        );
+        let provider_podcastindex = i18n::tr(
+            with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
+            "podcasts.search.provider.podcastindex",
+        );
+        let hwnd_search_provider = CreateWindowExW(
+            WS_EX_CLIENTEDGE,
+            w!("COMBOBOX"),
+            PCWSTR::null(),
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+            10,
+            364,
+            220,
+            200,
+            hwnd,
+            HMENU(ID_SEARCH_PROVIDER as isize),
+            hinstance,
+            None,
+        );
+        if hwnd_search_provider.0 != 0 {
+            let itunes_wide = to_wide(&provider_itunes);
+            let podcastindex_wide = to_wide(&provider_podcastindex);
+            SendMessageW(
+                hwnd_search_provider,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(itunes_wide.as_ptr() as isize),
+            );
+            SendMessageW(
+                hwnd_search_provider,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(podcastindex_wide.as_ptr() as isize),
+            );
+            SendMessageW(hwnd_search_provider, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+        }
+
+        let hwnd_search_button = CreateWindowExW(
+            Default::default(),
+            w!("BUTTON"),
+            PCWSTR(
+                to_wide(&i18n::tr(
+                    with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
+                    "podcasts.search.button",
+                ))
+                .as_ptr(),
+            ),
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+            10,
+            396,
+            140,
+            26,
+            hwnd,
+            HMENU(ID_SEARCH_BUTTON as isize),
+            hinstance,
+            None,
+        );
+
+        let hwnd_search_categories = CreateWindowExW(
+            Default::default(),
+            w!("BUTTON"),
+            PCWSTR(
+                to_wide(&i18n::tr(
+                    with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
+                    "podcasts.categories.browse_button",
+                ))
+                .as_ptr(),
+            ),
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+            160,
+            396,
+            200,
+            26,
+            hwnd,
+            HMENU(ID_SEARCH_CATEGORIES_BUTTON as isize),
+            hinstance,
+            None,
+        );
+
+        let hwnd_results = CreateWindowExW(
+            WS_EX_CLIENTEDGE,
+            w!("LISTBOX"),
+            PCWSTR::null(),
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(LBS_NOTIFY as u32),
+            10,
+            430,
+            460,
+            140,
+            hwnd,
+            HMENU(ID_RESULTS as isize),
+            hinstance,
+            None,
+        );
+
+        let hwnd_add = CreateWindowExW(
+            Default::default(),
+            w!("BUTTON"),
+            PCWSTR(
+                to_wide(&i18n::tr(
+                    with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
+                    "podcasts.add_button",
+                ))
+                .as_ptr(),
+            ),
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+            10,
+            490,
+            200,
+            26,
+            hwnd,
+            HMENU(ID_ADD_BUTTON as isize),
+            hinstance,
+            None,
+        );
+
+        let hwnd_import = CreateWindowExW(
+            Default::default(),
+            w!("BUTTON"),
+            PCWSTR(
+                to_wide(&i18n::tr(
+                    with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
+                    "podcasts.import_button",
+                ))
+                .as_ptr(),
+            ),
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+            10,
+            526,
+            200,
+            26,
+            hwnd,
+            HMENU(ID_IMPORT_BUTTON as isize),
+            hinstance,
+            None,
+        );
+
+        let hwnd_export = CreateWindowExW(
+            Default::default(),
+            w!("BUTTON"),
+            PCWSTR(
+                to_wide(&i18n::tr(
+                    with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
+                    "podcasts.export_button",
+                ))
+                .as_ptr(),
+            ),
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+            10,
+            562,
+            200,
+            26,
+            hwnd,
+            HMENU(ID_EXPORT_BUTTON as isize),
+            hinstance,
+            None,
+        );
+
+        let hwnd_close = CreateWindowExW(
+            Default::default(),
+            w!("BUTTON"),
+            PCWSTR(
+                to_wide(&i18n::tr(
+                    with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
+                    "podcasts.close",
+                ))
+                .as_ptr(),
+            ),
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+            430,
+            490,
+            200,
+            26,
+            hwnd,
+            HMENU(ID_CLOSE_BUTTON as isize),
+            hinstance,
+            None,
+        );
+
+        with_podcast_state(hwnd, |s| {
+            s.hwnd_tree = hwnd_tree;
+            s.hwnd_search_label = hwnd_search_label;
+            s.hwnd_search = hwnd_search;
+            s.hwnd_search_provider = hwnd_search_provider;
+            s.hwnd_search_button = hwnd_search_button;
+            s.hwnd_search_categories = hwnd_search_categories;
+            s.hwnd_results = hwnd_results;
+            s.hwnd_add = hwnd_add;
+            s.hwnd_import = hwnd_import;
+            s.hwnd_export = hwnd_export;
+            s.hwnd_delete = hwnd_delete;
+            s.hwnd_close = hwnd_close;
+        });
+
+        let hfont = HFONT(
+            windows::Win32::Graphics::Gdi::GetStockObject(
+                windows::Win32::Graphics::Gdi::DEFAULT_GUI_FONT,
+            )
+            .0,
+        );
+        for ctrl in [
             hwnd_tree,
-            windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
-            proc_ptr as isize,
-        );
-        with_podcast_state(hwnd, |s| {
-            s.tree_proc = std::mem::transmute::<isize, WNDPROC>(old)
-        });
-    }
-
-    let hwnd_delete = CreateWindowExW(
-        Default::default(),
-        w!("BUTTON"),
-        PCWSTR(
-            to_wide(&i18n::tr(
-                with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
-                "podcasts.delete_button",
-            ))
-            .as_ptr(),
-        ),
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-        220,
-        300,
-        200,
-        26,
-        hwnd,
-        HMENU(ID_DELETE_BUTTON as isize),
-        hinstance,
-        None,
-    );
-
-    let hwnd_search_label = CreateWindowExW(
-        Default::default(),
-        w!("STATIC"),
-        PCWSTR(
-            to_wide(&i18n::tr(
-                with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
-                "podcasts.search.label",
-            ))
-            .as_ptr(),
-        ),
-        WS_CHILD | WS_VISIBLE,
-        10,
-        310,
-        460,
-        16,
-        hwnd,
-        HMENU(ID_SEARCH_LABEL as isize),
-        hinstance,
-        None,
-    );
-
-    let hwnd_search = CreateWindowExW(
-        WS_EX_CLIENTEDGE,
-        w!("EDIT"),
-        PCWSTR::null(),
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-        10,
-        330,
-        460,
-        24,
-        hwnd,
-        HMENU(ID_SEARCH_EDIT as isize),
-        hinstance,
-        None,
-    );
-    if hwnd_search.0 != 0 {
-        let proc_ptr = podcast_search_wndproc as *const () as usize;
-        let old = SetWindowLongPtrW(
+            hwnd_search_label,
             hwnd_search,
-            windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
-            proc_ptr as isize,
-        );
-        with_podcast_state(hwnd, |s| {
-            s.search_proc = std::mem::transmute::<isize, WNDPROC>(old)
-        });
-    }
-
-    let provider_itunes = i18n::tr(
-        with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
-        "podcasts.search.provider.itunes",
-    );
-    let provider_podcastindex = i18n::tr(
-        with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
-        "podcasts.search.provider.podcastindex",
-    );
-    let hwnd_search_provider = CreateWindowExW(
-        WS_EX_CLIENTEDGE,
-        w!("COMBOBOX"),
-        PCWSTR::null(),
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-        10,
-        364,
-        220,
-        200,
-        hwnd,
-        HMENU(ID_SEARCH_PROVIDER as isize),
-        hinstance,
-        None,
-    );
-    if hwnd_search_provider.0 != 0 {
-        let itunes_wide = to_wide(&provider_itunes);
-        let podcastindex_wide = to_wide(&provider_podcastindex);
-        SendMessageW(
             hwnd_search_provider,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(itunes_wide.as_ptr() as isize),
-        );
-        SendMessageW(
-            hwnd_search_provider,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(podcastindex_wide.as_ptr() as isize),
-        );
-        SendMessageW(hwnd_search_provider, CB_SETCURSEL, WPARAM(0), LPARAM(0));
-    }
-
-    let hwnd_search_button = CreateWindowExW(
-        Default::default(),
-        w!("BUTTON"),
-        PCWSTR(
-            to_wide(&i18n::tr(
-                with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
-                "podcasts.search.button",
-            ))
-            .as_ptr(),
-        ),
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-        10,
-        396,
-        140,
-        26,
-        hwnd,
-        HMENU(ID_SEARCH_BUTTON as isize),
-        hinstance,
-        None,
-    );
-
-    let hwnd_search_categories = CreateWindowExW(
-        Default::default(),
-        w!("BUTTON"),
-        PCWSTR(
-            to_wide(&i18n::tr(
-                with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
-                "podcasts.categories.browse_button",
-            ))
-            .as_ptr(),
-        ),
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-        160,
-        396,
-        200,
-        26,
-        hwnd,
-        HMENU(ID_SEARCH_CATEGORIES_BUTTON as isize),
-        hinstance,
-        None,
-    );
-
-    let hwnd_results = CreateWindowExW(
-        WS_EX_CLIENTEDGE,
-        w!("LISTBOX"),
-        PCWSTR::null(),
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(LBS_NOTIFY as u32),
-        10,
-        430,
-        460,
-        140,
-        hwnd,
-        HMENU(ID_RESULTS as isize),
-        hinstance,
-        None,
-    );
-
-    let hwnd_add = CreateWindowExW(
-        Default::default(),
-        w!("BUTTON"),
-        PCWSTR(
-            to_wide(&i18n::tr(
-                with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
-                "podcasts.add_button",
-            ))
-            .as_ptr(),
-        ),
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-        10,
-        490,
-        200,
-        26,
-        hwnd,
-        HMENU(ID_ADD_BUTTON as isize),
-        hinstance,
-        None,
-    );
-
-    let hwnd_import = CreateWindowExW(
-        Default::default(),
-        w!("BUTTON"),
-        PCWSTR(
-            to_wide(&i18n::tr(
-                with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
-                "podcasts.import_button",
-            ))
-            .as_ptr(),
-        ),
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-        10,
-        526,
-        200,
-        26,
-        hwnd,
-        HMENU(ID_IMPORT_BUTTON as isize),
-        hinstance,
-        None,
-    );
-
-    let hwnd_export = CreateWindowExW(
-        Default::default(),
-        w!("BUTTON"),
-        PCWSTR(
-            to_wide(&i18n::tr(
-                with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
-                "podcasts.export_button",
-            ))
-            .as_ptr(),
-        ),
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-        10,
-        562,
-        200,
-        26,
-        hwnd,
-        HMENU(ID_EXPORT_BUTTON as isize),
-        hinstance,
-        None,
-    );
-
-    let hwnd_close = CreateWindowExW(
-        Default::default(),
-        w!("BUTTON"),
-        PCWSTR(
-            to_wide(&i18n::tr(
-                with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
-                "podcasts.close",
-            ))
-            .as_ptr(),
-        ),
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-        430,
-        490,
-        200,
-        26,
-        hwnd,
-        HMENU(ID_CLOSE_BUTTON as isize),
-        hinstance,
-        None,
-    );
-
-    with_podcast_state(hwnd, |s| {
-        s.hwnd_tree = hwnd_tree;
-        s.hwnd_search_label = hwnd_search_label;
-        s.hwnd_search = hwnd_search;
-        s.hwnd_search_provider = hwnd_search_provider;
-        s.hwnd_search_button = hwnd_search_button;
-        s.hwnd_search_categories = hwnd_search_categories;
-        s.hwnd_results = hwnd_results;
-        s.hwnd_add = hwnd_add;
-        s.hwnd_import = hwnd_import;
-        s.hwnd_export = hwnd_export;
-        s.hwnd_delete = hwnd_delete;
-        s.hwnd_close = hwnd_close;
-    });
-
-    let hfont = HFONT(
-        windows::Win32::Graphics::Gdi::GetStockObject(
-            windows::Win32::Graphics::Gdi::DEFAULT_GUI_FONT,
-        )
-        .0,
-    );
-    for ctrl in [
-        hwnd_tree,
-        hwnd_search_label,
-        hwnd_search,
-        hwnd_search_provider,
-        hwnd_search_button,
-        hwnd_search_categories,
-        hwnd_results,
-        hwnd_add,
-        hwnd_import,
-        hwnd_export,
-        hwnd_close,
-    ] {
-        if ctrl.0 != 0 {
-            SendMessageW(ctrl, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+            hwnd_search_button,
+            hwnd_search_categories,
+            hwnd_results,
+            hwnd_add,
+            hwnd_import,
+            hwnd_export,
+            hwnd_close,
+        ] {
+            if ctrl.0 != 0 {
+                SendMessageW(ctrl, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+            }
         }
     }
 }

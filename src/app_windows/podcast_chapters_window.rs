@@ -173,143 +173,143 @@ unsafe extern "system" fn chapter_list_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "chapter_list_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { chapter_list_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || chapter_list_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn chapter_list_wndproc_inner(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let create_struct = lparam.0 as *const CREATESTRUCTW;
-            let init_ptr = (*create_struct).lpCreateParams as *mut ChapterListInit;
-            if init_ptr.is_null() {
-                return LRESULT(0);
-            }
-            let init = unsafe { Box::from_raw(init_ptr) };
-            let hfont = with_state(init.parent, |state| state.hfont).unwrap_or(HFONT(0));
+fn chapter_list_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let create_struct = lparam.0 as *const CREATESTRUCTW;
+                let init_ptr = (*create_struct).lpCreateParams as *mut ChapterListInit;
+                if init_ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let init = Box::from_raw(init_ptr);
+                let hfont = with_state(init.parent, |state| state.hfont).unwrap_or(HFONT(0));
 
-            let list = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("LISTBOX"),
-                PCWSTR::null(),
-                WS_CHILD
-                    | WS_VISIBLE
-                    | WS_TABSTOP
-                    | WS_VSCROLL
-                    | WINDOW_STYLE((LBS_NOTIFY | LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT) as u32),
-                16,
-                16,
-                392,
-                220,
-                hwnd,
-                HMENU(CHAPTER_LIST_ID_LIST as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            SendMessageW(list, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
-            for item in init.items.iter() {
-                SendMessageW(
-                    list,
-                    LB_ADDSTRING,
-                    WPARAM(0),
-                    LPARAM(to_wide(item).as_ptr() as isize),
+                let list = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("LISTBOX"),
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WS_VSCROLL
+                        | WINDOW_STYLE((LBS_NOTIFY | LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT) as u32),
+                    16,
+                    16,
+                    392,
+                    220,
+                    hwnd,
+                    HMENU(CHAPTER_LIST_ID_LIST as isize),
+                    HINSTANCE(0),
+                    None,
                 );
-            }
-            SendMessageW(list, LB_SETCURSEL, WPARAM(0), LPARAM(0));
-            SetFocus(list);
 
-            let ok = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&i18n::tr(init.language, "marker_select.ok")).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                220,
-                248,
-                90,
-                28,
-                hwnd,
-                HMENU(CHAPTER_LIST_ID_OK as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            let cancel = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&i18n::tr(init.language, "marker_select.cancel")).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                318,
-                248,
-                90,
-                28,
-                hwnd,
-                HMENU(CHAPTER_LIST_ID_CANCEL as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            for control in [list, ok, cancel] {
-                if control.0 != 0 && hfont.0 != 0 {
-                    SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                SendMessageW(list, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+                for item in init.items.iter() {
+                    SendMessageW(
+                        list,
+                        LB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(to_wide(item).as_ptr() as isize),
+                    );
                 }
-            }
+                SendMessageW(list, LB_SETCURSEL, WPARAM(0), LPARAM(0));
+                SetFocus(list);
 
-            let state = Box::new(ChapterListState {
-                parent: init.parent,
-                list,
-                ok,
-                result: init.result,
-            });
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-            let cmd_id = wparam.0 & 0xffff;
-            match cmd_id {
-                CHAPTER_LIST_ID_OK => {
-                    let (list, result) =
-                        with_chapter_state(hwnd, |state| (state.list, state.result.clone()))
-                            .unwrap_or((HWND(0), Arc::new(Mutex::new(None))));
-                    if list.0 != 0 {
-                        let sel = SendMessageW(list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
-                        if sel >= 0 && result.lock().map(|mut r| *r = Some(sel as usize)).is_err() {
-                            crate::log_debug("Failed to update podcast chapter selection");
-                        }
+                let ok = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(init.language, "marker_select.ok")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    220,
+                    248,
+                    90,
+                    28,
+                    hwnd,
+                    HMENU(CHAPTER_LIST_ID_OK as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                let cancel = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(init.language, "marker_select.cancel")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    318,
+                    248,
+                    90,
+                    28,
+                    hwnd,
+                    HMENU(CHAPTER_LIST_ID_CANCEL as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                for control in [list, ok, cancel] {
+                    if control.0 != 0 && hfont.0 != 0 {
+                        SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                     }
-                    crate::log_if_err!(DestroyWindow(hwnd));
-                    LRESULT(0)
                 }
-                CHAPTER_LIST_ID_CANCEL => {
-                    crate::log_if_err!(DestroyWindow(hwnd));
-                    LRESULT(0)
+
+                let state = Box::new(ChapterListState {
+                    parent: init.parent,
+                    list,
+                    ok,
+                    result: init.result,
+                });
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+                LRESULT(0)
+            }
+            WM_COMMAND => {
+                let cmd_id = wparam.0 & 0xffff;
+                match cmd_id {
+                    CHAPTER_LIST_ID_OK => {
+                        let (list, result) =
+                            with_chapter_state(hwnd, |state| (state.list, state.result.clone()))
+                                .unwrap_or((HWND(0), Arc::new(Mutex::new(None))));
+                        if list.0 != 0 {
+                            let sel =
+                                SendMessageW(list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
+                            if sel >= 0
+                                && result.lock().map(|mut r| *r = Some(sel as usize)).is_err()
+                            {
+                                crate::log_debug("Failed to update podcast chapter selection");
+                            }
+                        }
+                        crate::log_if_err!(DestroyWindow(hwnd));
+                        LRESULT(0)
+                    }
+                    CHAPTER_LIST_ID_CANCEL => {
+                        crate::log_if_err!(DestroyWindow(hwnd));
+                        LRESULT(0)
+                    }
+                    _ => DefWindowProcW(hwnd, msg, wparam, lparam),
                 }
-                _ => DefWindowProcW(hwnd, msg, wparam, lparam),
             }
-        }
-        WM_CLOSE => {
-            crate::log_if_err!(DestroyWindow(hwnd));
-            LRESULT(0)
-        }
-        WM_DESTROY => {
-            let parent = with_chapter_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
-            if parent.0 != 0 {
-                SetForegroundWindow(parent);
+            WM_CLOSE => {
+                crate::log_if_err!(DestroyWindow(hwnd));
+                LRESULT(0)
             }
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ChapterListState;
-            if !ptr.is_null() {
-                let _unused_box = Box::from_raw(ptr);
+            WM_DESTROY => {
+                let parent = with_chapter_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
+                if parent.0 != 0 {
+                    SetForegroundWindow(parent);
+                }
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ChapterListState;
+                if !ptr.is_null() {
+                    let _unused_box = Box::from_raw(ptr);
+                }
+                LRESULT(0)
             }
-            LRESULT(0)
+            WM_NCDESTROY => DefWindowProcW(hwnd, msg, wparam, lparam),
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        WM_NCDESTROY => DefWindowProcW(hwnd, msg, wparam, lparam),
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 

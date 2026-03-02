@@ -882,7 +882,7 @@ pub fn start_tts_playback_with_chunks(options: TtsPlaybackOptions) {
     std::thread::spawn(move || {
         // Wrap entire TTS playback in catch_unwind to prevent panics from crashing the app
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            tts_playback_inner(
+            tts_playback_inner(TtsPlaybackRequest {
                 hwnd_copy,
                 session_id,
                 chunks,
@@ -895,7 +895,7 @@ pub fn start_tts_playback_with_chunks(options: TtsPlaybackOptions) {
                 language,
                 cancel_flag,
                 rx,
-            );
+            });
         }));
 
         if let Err(panic_info) = result {
@@ -916,8 +916,7 @@ pub fn start_tts_playback_with_chunks(options: TtsPlaybackOptions) {
     });
 }
 
-#[allow(clippy::too_many_arguments)]
-fn tts_playback_inner(
+struct TtsPlaybackRequest {
     hwnd_copy: HWND,
     session_id: u64,
     chunks: Vec<crate::TtsChunk>,
@@ -929,8 +928,25 @@ fn tts_playback_inner(
     tts_engine: TtsEngine,
     language: Language,
     cancel_flag: Arc<AtomicBool>,
-    mut rx: mpsc::UnboundedReceiver<TtsCommand>,
-) {
+    rx: mpsc::UnboundedReceiver<TtsCommand>,
+}
+
+fn tts_playback_inner(req: TtsPlaybackRequest) {
+    let TtsPlaybackRequest {
+        hwnd_copy,
+        session_id,
+        chunks,
+        cleaned,
+        voice,
+        tts_rate,
+        tts_pitch,
+        tts_volume,
+        tts_engine,
+        language,
+        cancel_flag,
+        rx,
+    } = req;
+    let mut rx = rx;
     let start = Instant::now();
     let mut total_audio_bytes = 0usize;
     let mut first_audio_at: Option<Instant> = None;

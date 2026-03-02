@@ -1038,15 +1038,10 @@ fn dedup_podcast_items(items: Vec<PodcastEpisode>, max_items: usize) -> Vec<Podc
     out
 }
 
-// Keeps call sites stable while threading localized fallback messages.
-#[allow(clippy::too_many_arguments)]
 async fn fetch_bytes_with_retries(
     http: &RssHttp,
     url: &str,
     is_feed: bool,
-    _fetch_kind: &str,
-    _override_cooldown: bool,
-    _fetch_config: &RssFetchConfig,
     language: Language,
     mut cache: Option<&mut RssFeedCache>,
 ) -> Result<FetchBytesOutcome, FeedFetchError> {
@@ -1176,7 +1171,7 @@ pub async fn fetch_and_parse(
     _source_kind: RssSourceType,
     cache: RssFeedCache,
     fetch_config: RssFetchConfig,
-    override_cooldown: bool,
+    _override_cooldown: bool,
     language: Language,
 ) -> Result<RssFetchOutcome, FeedFetchError> {
     let url = normalize_url(url);
@@ -1186,17 +1181,7 @@ pub async fn fetch_and_parse(
     })?;
     let mut cache = cache;
 
-    let out_result = fetch_bytes_with_retries(
-        http,
-        &url,
-        true,
-        "feed",
-        override_cooldown,
-        &fetch_config,
-        language,
-        Some(&mut cache),
-    )
-    .await;
+    let out_result = fetch_bytes_with_retries(http, &url, true, language, Some(&mut cache)).await;
 
     let out = match out_result {
         Ok(o) => o,
@@ -1268,17 +1253,7 @@ pub async fn fetch_and_parse(
     let feed_links = extract_feed_links(&html, &url);
     for feed_link in feed_links {
         crate::log_debug(&format!("Discovering feed at: {}", feed_link));
-        let sub_out_result = fetch_bytes_with_retries(
-            http,
-            &feed_link,
-            true,
-            "feed",
-            override_cooldown,
-            &fetch_config,
-            language,
-            None,
-        )
-        .await;
+        let sub_out_result = fetch_bytes_with_retries(http, &feed_link, true, language, None).await;
 
         let sub_bytes = match sub_out_result {
             Ok(o) => o.bytes,
@@ -1628,7 +1603,7 @@ pub async fn fetch_podcast_feed(
     url: &str,
     cache: RssFeedCache,
     cfg: RssFetchConfig,
-    override_cooldown: bool,
+    _override_cooldown: bool,
     language: Language,
 ) -> Result<PodcastFetchOutcome, FeedFetchError> {
     let url = normalize_url(url);
@@ -1638,17 +1613,7 @@ pub async fn fetch_podcast_feed(
     })?;
     let mut cache = cache;
 
-    let out_result = fetch_bytes_with_retries(
-        http,
-        &url,
-        true,
-        "podcast",
-        override_cooldown,
-        &cfg,
-        language,
-        Some(&mut cache),
-    )
-    .await;
+    let out_result = fetch_bytes_with_retries(http, &url, true, language, Some(&mut cache)).await;
 
     let out = match out_result {
         Ok(o) => o,

@@ -345,13 +345,12 @@ pub fn set_file_metadata(
 }
 
 #[repr(C)]
-#[allow(non_snake_case)]
 struct MyPropVariant {
     vt: u16,
     w_reserved1: u16,
     w_reserved2: u16,
     w_reserved3: u16,
-    pwsz_val: PWSTR,
+    pwsz_value: PWSTR,
     _padding: [u8; 8],
 }
 
@@ -366,7 +365,7 @@ fn set_prop(store: &IPropertyStore, key: &PROPERTYKEY, value: &str) -> Result<()
             w_reserved1: 0,
             w_reserved2: 0,
             w_reserved3: 0,
-            pwsz_val: psz,
+            pwsz_value: psz,
             _padding: [0; 8],
         };
 

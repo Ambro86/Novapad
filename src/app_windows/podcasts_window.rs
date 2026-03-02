@@ -332,39 +332,42 @@ fn podcast_source_display_title(
     }
 }
 
-// Keeps call sites explicit and avoids refactors across UI code paths.
-#[allow(clippy::too_many_arguments)]
-fn podcast_episode_display_title(
-    title: &str,
+#[derive(Clone, Copy)]
+struct PodcastEpisodeTitleContext {
     language: crate::settings::Language,
     announce_unread: bool,
-    item_unplayed: bool,
-    pub_date: Option<i64>,
     unread_label_position: crate::settings::RssPodcastUnreadLabelPosition,
     date_mode: ListDateDisplayMode,
     time_mode: ListTimeDisplayMode,
+}
+
+fn podcast_episode_display_title(
+    title: &str,
+    item_unplayed: bool,
+    pub_date: Option<i64>,
     has_multiple_items_same_day: bool,
+    ctx: PodcastEpisodeTitleContext,
 ) -> String {
     let ts_suffix = format_timestamp_for_list(
         pub_date,
-        language,
-        date_mode,
-        time_mode,
+        ctx.language,
+        ctx.date_mode,
+        ctx.time_mode,
         has_multiple_items_same_day,
     )
     .map(|ts| format!(". {ts}"))
     .unwrap_or_default();
-    if announce_unread && item_unplayed {
-        match unread_label_position {
+    if ctx.announce_unread && item_unplayed {
+        match ctx.unread_label_position {
             crate::settings::RssPodcastUnreadLabelPosition::Before => format!(
                 "{}{}{}",
-                i18n::tr(language, "podcasts.item_unplayed_prefix"),
+                i18n::tr(ctx.language, "podcasts.item_unplayed_prefix"),
                 title,
                 ts_suffix
             ),
             crate::settings::RssPodcastUnreadLabelPosition::After => format!(
                 "{title}{ts_suffix}{}",
-                i18n::tr(language, "podcasts.item_unplayed_suffix")
+                i18n::tr(ctx.language, "podcasts.item_unplayed_suffix")
             ),
         }
     } else {
@@ -1769,18 +1772,21 @@ fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<PodcastEpisode
     .unwrap_or_default();
 
     let day_counts = build_day_counts(&new_items);
+    let title_ctx = PodcastEpisodeTitleContext {
+        language,
+        announce_unread,
+        unread_label_position,
+        date_mode: podcast_date_mode,
+        time_mode: podcast_time_mode,
+    };
     for item in new_items.iter() {
         let item_unplayed = !read_keys.contains(&episode_key(item));
         let display_title = podcast_episode_display_title(
             &item.title,
-            language,
-            announce_unread,
             item_unplayed,
             item.pub_date,
-            unread_label_position,
-            podcast_date_mode,
-            podcast_time_mode,
             has_multiple_items_same_day(item.pub_date, &day_counts),
+            title_ctx,
         );
         let title = to_wide(&display_title);
         let mut tvis = TVINSERTSTRUCTW {
@@ -5544,19 +5550,22 @@ fn undo_last_delete(hwnd: HWND) {
                     with_podcast_state(hwnd, |s| {
                         if let Some(state) = s.source_items.get(&source_hitem.0) {
                             let day_counts = build_day_counts(&state.items);
+                            let title_ctx = PodcastEpisodeTitleContext {
+                                language,
+                                announce_unread,
+                                unread_label_position,
+                                date_mode: podcast_date_mode,
+                                time_mode: podcast_time_mode,
+                            };
                             for entry in &state.items {
                                 let item_unplayed =
                                     !state.read_item_keys.contains(&episode_key(entry));
                                 let display_title = podcast_episode_display_title(
                                     &entry.title,
-                                    language,
-                                    announce_unread,
                                     item_unplayed,
                                     entry.pub_date,
-                                    unread_label_position,
-                                    podcast_date_mode,
-                                    podcast_time_mode,
                                     has_multiple_items_same_day(entry.pub_date, &day_counts),
+                                    title_ctx,
                                 );
                                 let text = to_wide(&display_title);
                                 let mut tvis = TVINSERTSTRUCTW {
@@ -7872,16 +7881,19 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                             .unwrap_or_default()
                     })
                     .unwrap_or_default();
-                    let display_title = podcast_episode_display_title(
-                        &episode.title,
+                    let title_ctx = PodcastEpisodeTitleContext {
                         language,
                         announce_unread,
+                        unread_label_position,
+                        date_mode: podcast_date_mode,
+                        time_mode: podcast_time_mode,
+                    };
+                    let display_title = podcast_episode_display_title(
+                        &episode.title,
                         false,
                         episode.pub_date,
-                        unread_label_position,
-                        podcast_date_mode,
-                        podcast_time_mode,
                         has_multiple_items_same_day(episode.pub_date, &day_counts),
+                        title_ctx,
                     );
                     let text = to_wide(&display_title);
                     let mut tvis = TVITEMW {

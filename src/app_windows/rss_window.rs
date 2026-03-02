@@ -302,38 +302,45 @@ fn rss_source_display_title(
     }
 }
 
-// Keeps call sites explicit and avoids refactors across UI code paths.
-#[allow(clippy::too_many_arguments)]
-fn rss_item_display_title(
-    title: &str,
+#[derive(Clone, Copy)]
+struct RssItemTitleContext {
     language: crate::settings::Language,
     announce_unread: bool,
-    item_unread: bool,
-    pub_date: Option<i64>,
     unread_label_position: crate::settings::RssPodcastUnreadLabelPosition,
     date_mode: ListDateDisplayMode,
     time_mode: ListTimeDisplayMode,
+}
+
+fn rss_item_display_title(
+    title: &str,
+    item_unread: bool,
+    pub_date: Option<i64>,
     has_multiple_items_same_day: bool,
+    ctx: RssItemTitleContext,
 ) -> String {
     let base = format!(
         "{title}{}",
         format_timestamp_for_list(
             pub_date,
-            language,
-            date_mode,
-            time_mode,
+            ctx.language,
+            ctx.date_mode,
+            ctx.time_mode,
             has_multiple_items_same_day,
         )
         .map(|ts| format!(". {ts}"))
         .unwrap_or_default()
     );
-    if announce_unread && item_unread {
-        return match unread_label_position {
+    if ctx.announce_unread && item_unread {
+        return match ctx.unread_label_position {
             crate::settings::RssPodcastUnreadLabelPosition::Before => {
-                format!("{}{}", i18n::tr(language, "rss.item_unread_prefix"), base)
+                format!(
+                    "{}{}",
+                    i18n::tr(ctx.language, "rss.item_unread_prefix"),
+                    base
+                )
             }
             crate::settings::RssPodcastUnreadLabelPosition::After => {
-                format!("{base}{}", i18n::tr(language, "rss.item_unread_suffix"))
+                format!("{base}{}", i18n::tr(ctx.language, "rss.item_unread_suffix"))
             }
         };
     }
@@ -2704,16 +2711,19 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     })
                     .unwrap_or_default();
                     let same_day = has_multiple_items_same_day(item.pub_date, &day_counts);
-                    let updated = rss_item_display_title(
-                        &item.title,
+                    let title_ctx = RssItemTitleContext {
                         language,
                         announce_unread,
+                        unread_label_position,
+                        date_mode: rss_date_mode,
+                        time_mode: rss_time_mode,
+                    };
+                    let updated = rss_item_display_title(
+                        &item.title,
                         false,
                         item.pub_date,
-                        unread_label_position,
-                        rss_date_mode,
-                        rss_time_mode,
                         same_day,
+                        title_ctx,
                     );
                     let text = to_wide(&updated);
                     let mut tv_item = TVITEMW {
@@ -4249,16 +4259,19 @@ fn load_more_items(
                 continue;
             }
             let item_unread = !state.read_item_keys.contains(&rss_item_key(item));
-            let display_title = rss_item_display_title(
-                &item.title,
+            let title_ctx = RssItemTitleContext {
                 language,
                 announce_unread,
+                unread_label_position,
+                date_mode: rss_date_mode,
+                time_mode: rss_time_mode,
+            };
+            let display_title = rss_item_display_title(
+                &item.title,
                 item_unread,
                 item.pub_date,
-                unread_label_position,
-                rss_date_mode,
-                rss_time_mode,
                 has_multiple_items_same_day(item.pub_date, &day_counts),
+                title_ctx,
             );
             let text = to_wide(&display_title);
             let c_children = if item.is_folder { 1 } else { 0 };
@@ -4902,16 +4915,19 @@ fn undo_last_delete(hwnd: HWND) {
                                 }
                                 let item_unread =
                                     !state.read_item_keys.contains(&rss_item_key(entry));
-                                let display_title = rss_item_display_title(
-                                    &entry.title,
+                                let title_ctx = RssItemTitleContext {
                                     language,
                                     announce_unread,
+                                    unread_label_position,
+                                    date_mode: rss_date_mode,
+                                    time_mode: rss_time_mode,
+                                };
+                                let display_title = rss_item_display_title(
+                                    &entry.title,
                                     item_unread,
                                     entry.pub_date,
-                                    unread_label_position,
-                                    rss_date_mode,
-                                    rss_time_mode,
                                     has_multiple_items_same_day(entry.pub_date, &day_counts),
+                                    title_ctx,
                                 );
                                 let text = to_wide(&display_title);
                                 let mut tvis = TVINSERTSTRUCTW {

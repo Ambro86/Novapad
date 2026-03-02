@@ -3,7 +3,6 @@ use std::path::Path;
 
 mod settings {
     #[derive(Clone, Copy)]
-    #[allow(dead_code)] // reader.rs matches on all variants; test only needs one.
     pub enum Language {
         English,
         Italian,
